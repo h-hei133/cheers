@@ -196,6 +196,37 @@ describe("JSON runtime event stream projection", () => {
     ]);
   });
 
+  it("serializes PL005 tool result message events without exposing unsafe content", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [
+        {
+          id: "event-tool-message",
+          sequence: 1,
+          type: "tool-result-message-prepared",
+          facts: {
+            messageId: "msg-1",
+            safeContentSummary:
+              "token=secret oldText=before newText=after /home/wang/.private-agents-real/provider.env",
+            terminalSuccessClaim: false,
+          },
+          notProvenClaims: ["next-turn-success"],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+      ],
+    });
+    const serialized = JSON.stringify(stream);
+
+    expect(stream[0]?.eventType).toBe("tool-result-message-prepared");
+    expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
+    expect(stream[0]?.notProvenClaims).toContain("terminal-success");
+    expect(serialized).not.toMatch(
+      /token=secret|oldText=before|newText=after|private-agents-real/i,
+    );
+  });
+
   it("redacts unsafe facts and strips unsupported JSON values", () => {
     const stream = projectJsonRuntimeEventStream({
       streamId: "/home/wang/.private-agents-real/provider.env",

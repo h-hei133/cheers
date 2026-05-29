@@ -7,6 +7,11 @@ import type { PackageInventoryProjection } from "../resources/packageInventory.j
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type { AssistantResponseState } from "../../turn/assistantResponse.js";
 import type { NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
+import type {
+  ToolBatchDispatchPlan,
+  ToolResultDetail,
+} from "../../tools/toolBatchDispatch.js";
+import type { ToolResultMessageBatch } from "../../turn/toolResultMessage.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
 import type {
   ToolAfterObservationAnnotation,
@@ -43,6 +48,12 @@ export type RuntimeProjectionEventType =
   | "assistant-response-accumulated"
   | "tool-call-batch-extracted"
   | "tool-call-extraction-failed"
+  | "tool-batch-dispatch-planned"
+  | "before-tool-policy-decided"
+  | "tool-call-authority-required"
+  | "tool-call-dispatched"
+  | "tool-result-message-prepared"
+  | "tool-batch-save-point-observed"
   | "tool-dispatch-not-run"
   | "agent-loop-started"
   | "agent-loop-state-transitioned"
@@ -95,6 +106,9 @@ export function projectRuntimeEvents(input: {
   readonly toolResults?: readonly ToolExecutionResult[];
   readonly toolPolicyDecisions?: readonly ToolBeforePolicyDecision[];
   readonly toolResultAnnotations?: readonly ToolAfterObservationAnnotation[];
+  readonly toolDispatchPlans?: readonly ToolBatchDispatchPlan[];
+  readonly toolResultDetails?: readonly ToolResultDetail[];
+  readonly toolResultMessages?: readonly ToolResultMessageBatch[];
   readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
   readonly assistantResponses?: readonly AssistantResponseState[];
   readonly toolCallBatches?: readonly NormalizedToolCallBatch[];
@@ -262,6 +276,56 @@ export function projectRuntimeEvents(input: {
     );
   }
 
+  for (const plan of input.toolDispatchPlans ?? []) {
+    append(
+      "tool-batch-dispatch-planned",
+      {
+        planId: plan.planId,
+        batchId: plan.batchId,
+        responseId: plan.responseId,
+        turnId: plan.turnId,
+        dispatchPolicy: plan.dispatchPolicy,
+        dispatchStatus: plan.dispatchStatus,
+        callCount: plan.calls.length,
+        blockedCallIds: plan.blockedCallIds,
+        authorityRequiredCallIds: plan.authorityRequiredCallIds,
+        unsupportedCallIds: plan.unsupportedCallIds,
+        dispatchedCallIds: plan.dispatchedCallIds,
+        redactionStatus: plan.redactionStatus,
+        terminalSuccessClaim: false,
+      },
+      plan.notProvenClaims,
+    );
+    for (const call of plan.calls) {
+      const facts = {
+        planId: plan.planId,
+        batchId: plan.batchId,
+        toolCallId: call.toolCallId,
+        toolName: call.toolName,
+        callStatus: call.callStatus,
+        dispatchStatus: call.dispatchStatus,
+        decisionId: call.beforePolicyDecision.decisionId,
+        decisionStatus: call.beforePolicyDecision.status,
+        authorityRequirement: call.authorityRequirement,
+        redactionStatus: call.redactionStatus,
+        terminalSuccessClaim: false,
+      };
+      append("before-tool-policy-decided", facts, call.notProvenClaims);
+      if (call.dispatchStatus === "authority_required") {
+        append("tool-call-authority-required", facts, call.notProvenClaims);
+      }
+      if (call.dispatchStatus === "blocked") {
+        append("tool-call-blocked", facts, call.notProvenClaims);
+      }
+      if (call.dispatchStatus === "dispatched") {
+        append("tool-call-dispatched", facts, call.notProvenClaims);
+      }
+      if (call.dispatchStatus === "not_dispatched") {
+        append("tool-dispatch-not-run", facts, call.notProvenClaims);
+      }
+    }
+  }
+
   for (const receipt of input.executionReceipts ?? []) {
     append(
       "execution-receipt-observed",
@@ -294,6 +358,44 @@ export function projectRuntimeEvents(input: {
         ...(result.reportSafe?.notProvenClaims ?? []),
       ],
     );
+  }
+
+  for (const detail of input.toolResultDetails ?? []) {
+    append(
+      "tool-result-observed",
+      {
+        resultDetailsId: detail.resultDetailsId,
+        toolCallId: detail.toolCallId,
+        toolName: detail.toolName,
+        resultStatus: detail.resultStatus,
+        contentSummary: detail.contentSummary,
+        systemDetails: detail.systemDetails,
+        reportSafe: detail.reportSafe,
+        redactionStatus: detail.redactionStatus,
+        terminalSuccessClaim: false,
+      },
+      detail.notProvenClaims,
+    );
+  }
+
+  for (const batch of input.toolResultMessages ?? []) {
+    for (const message of batch.messages) {
+      append(
+        "tool-result-message-prepared",
+        {
+          batchId: batch.batchId,
+          dispatchPlanId: batch.dispatchPlanId,
+          messageId: message.messageId,
+          role: message.role,
+          toolCallId: message.toolCallId,
+          toolName: message.toolName,
+          deliveryStatus: message.deliveryStatus,
+          redactionStatus: message.redactionStatus,
+          terminalSuccessClaim: false,
+        },
+        message.notProvenClaims,
+      );
+    }
   }
 
   for (const decision of input.toolPolicyDecisions ?? []) {
@@ -334,6 +436,20 @@ export function projectRuntimeEvents(input: {
       },
       input.savePoint.notProvenClaims,
     );
+    if (input.savePoint.safeEvidenceIds.some((id) => id.includes("tool-result-batch"))) {
+      append(
+        "tool-batch-save-point-observed",
+        {
+          savePointId: input.savePoint.id,
+          turnSnapshotId: input.savePoint.turnSnapshotId,
+          safeEvidenceIds: input.savePoint.safeEvidenceIds,
+          executionReceiptCount: input.savePoint.executionReceipts.length,
+          pendingNextTurnFactCount: input.savePoint.pendingNextTurnFacts.length,
+          terminalSuccessClaim: input.savePoint.terminalSuccessClaim,
+        },
+        input.savePoint.notProvenClaims,
+      );
+    }
   }
 
   if (input.resultFacts) {

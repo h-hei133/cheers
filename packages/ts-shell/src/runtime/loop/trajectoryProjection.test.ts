@@ -225,6 +225,47 @@ describe("loop trajectory projection", () => {
     );
   });
 
+  it("projects PL005 dispatch result messages and save point facts without success claims", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-pl005-trajectory",
+      workspaceRoot: "/workspace",
+      prompt: "use a safe tool",
+      providerOptIn: false,
+      maxTurns: 1,
+      toolBatchPolicy: "sequential",
+      modelBoundary: async () => ({
+        responseId: "response-pl005-trajectory",
+        stopReason: "tool-calls",
+        toolCalls: [{ id: "call-read", name: "read", arguments: { path: "a.ts" } }],
+      }),
+      toolBatchDispatch: async () => ({
+        success: true,
+        content: "safe tool summary",
+      }),
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "loop-pl005",
+      prompt: "use a safe tool",
+      loop,
+    });
+
+    expect(trajectory.toolResultMessageIds).toHaveLength(1);
+    expect(trajectory.stages.find((stage) => stage.category === "tool-result-messages"))
+      .toMatchObject({ observationStatus: "observed" });
+    expect(trajectory.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "tool-batch-dispatch-planned",
+        "before-tool-policy-decided",
+        "tool-result-message-prepared",
+        "loop-save-point-observed",
+      ]),
+    );
+    expect(trajectory.notProvenClaims).toEqual(
+      expect.arrayContaining(["terminal-success", "next-turn-success"]),
+    );
+    expect(trajectory.terminalSuccessClaim).toBe(false);
+  });
+
   it("keeps disconnected pieces visible as not-proven", () => {
     const trajectory = projectLoopTrajectory({
       loopId: "loop-disconnected",

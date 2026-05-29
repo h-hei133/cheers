@@ -10,7 +10,9 @@ import { createCommandExecutionReceipt } from "../execution/executionReceipt.js"
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
+import { prepareToolResultMessages } from "../../turn/toolResultMessage.js";
 import { extractToolCallBatch } from "../../tools/toolCallBatch.js";
+import { dispatchToolBatch, planToolBatchDispatch } from "../../tools/toolBatchDispatch.js";
 import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,
@@ -137,6 +139,52 @@ describe("runtime event projection", () => {
         "terminal-success",
       ]),
     );
+  });
+
+  it("projects PL005 tool dispatch phases and result messages as observation-only", async () => {
+    const boundary = createModelResponseBoundary({
+      responseId: "response-dispatch-events",
+      turnId: "turn-1",
+      source: "fake_default_safe",
+      toolCallCount: 1,
+    });
+    const assistant = accumulateAssistantResponse({
+      responseBoundary: boundary,
+      chunks: [{ toolCalls: [{ id: "call-read", name: "read", arguments: { path: "a.ts" } }] }],
+    });
+    const batch = extractToolCallBatch({
+      responseBoundary: boundary,
+      assistantResponse: assistant,
+    });
+    const dispatch = await dispatchToolBatch({
+      batch,
+      context: { taskId: "task", workspaceRoot: "/workspace" },
+      dispatchPolicy: "sequential",
+      dispatch: async () => ({ success: true, content: "safe tool summary" }),
+    });
+    const messages = prepareToolResultMessages({
+      dispatchPlan: dispatch.dispatchPlan,
+      resultDetails: dispatch.resultDetails,
+    });
+    const events = projectRuntimeEvents({
+      toolDispatchPlans: [planToolBatchDispatch({ batch, dispatchPolicy: "sequential" })],
+      toolResultDetails: dispatch.resultDetails,
+      toolResultMessages: [messages],
+      toolResultAnnotations: dispatch.afterAnnotations,
+    });
+
+    expect(events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "tool-batch-dispatch-planned",
+        "before-tool-policy-decided",
+        "tool-call-dispatched",
+        "tool-result-observed",
+        "tool-result-message-prepared",
+        "tool-result-annotated",
+      ]),
+    );
+    expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
+    expect(JSON.stringify(events)).not.toContain('"success":true');
   });
 
   it("redacts unsafe event fields and avoids raw tool content", () => {

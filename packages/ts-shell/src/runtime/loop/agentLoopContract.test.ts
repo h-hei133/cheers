@@ -67,8 +67,18 @@ describe("agent loop contract", () => {
       unsupportedCallCount: 2,
       terminalSuccessClaim: false,
     });
-    expect(turn?.toolResultBatch).toBeUndefined();
-    expect(loop.events.map((event) => event.type)).toContain("tool-dispatch-not-run");
+    expect(turn?.toolResultBatch?.resultDetails?.map((detail) => detail.resultStatus))
+      .toEqual(["not_executed", "rejected", "unsupported", "unsupported"]);
+    expect(turn?.toolResultBatch?.resultMessages?.messages.map((message) => message.deliveryStatus))
+      .toEqual(["not_prepared", "blocked", "unsupported", "unsupported"]);
+    expect(loop.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "tool-batch-dispatch-planned",
+        "before-tool-policy-decided",
+        "tool-result-message-prepared",
+        "tool-dispatch-not-run",
+      ]),
+    );
     expect(
       JSON.stringify(loop),
     ).not.toContain('"success":true');

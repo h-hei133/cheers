@@ -223,10 +223,11 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
           observed("tool-result-details") === "observed"
         ? "observed"
         : "not_proven",
-      summary: `toolBatches=${stage("tool-call-batch")?.sourceIds.length ?? 0}; policyDecisions=${trajectory.toolPolicyIds.length}; receipts=${trajectory.receiptIds.length}; dispatch=not-run; toolResults=not-available; toolSuccess=not-proven`,
+      summary: `toolBatches=${stage("tool-call-batch")?.sourceIds.length ?? 0}; policyDecisions=${trajectory.toolPolicyIds.length}; receipts=${trajectory.receiptIds.length}; resultMessages=${trajectory.toolResultMessageIds.length}; dispatch=${observed("before-tool-policy")}; toolResults=${observed("tool-result-details")}; toolSuccess=not-proven`,
       notProvenClaims: [
         ...(stage("tool-call-batch")?.notProvenClaims ?? []),
         ...(stage("tool-result-details")?.notProvenClaims ?? []),
+        ...(stage("tool-result-messages")?.notProvenClaims ?? []),
       ],
     }),
     section({

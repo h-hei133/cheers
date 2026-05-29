@@ -57,6 +57,7 @@ export interface LoopTrajectoryProjection {
   readonly eventIds: readonly string[];
   readonly receiptIds: readonly string[];
   readonly toolPolicyIds: readonly string[];
+  readonly toolResultMessageIds: readonly string[];
   readonly savePointIds: readonly string[];
   readonly sessionProjectionIds: readonly string[];
   readonly contextRebuildProjectionIds: readonly string[];
@@ -268,6 +269,42 @@ export function projectLoopTrajectory(
       );
     }
     if (turn.toolResultBatch) {
+      if (turn.toolResultBatch.dispatchPlan) {
+        append(
+          "before-tool-policy",
+          "tool-batch-dispatch-planned",
+          {
+            turn: turn.turn,
+            planId: turn.toolResultBatch.dispatchPlan.planId,
+            batchId: turn.toolResultBatch.dispatchPlan.batchId,
+            dispatchStatus: turn.toolResultBatch.dispatchPlan.dispatchStatus,
+            dispatchPolicy: turn.toolResultBatch.dispatchPlan.dispatchPolicy,
+            authorityRequiredCallIds: turn.toolResultBatch.dispatchPlan.authorityRequiredCallIds,
+            blockedCallIds: turn.toolResultBatch.dispatchPlan.blockedCallIds,
+            unsupportedCallIds: turn.toolResultBatch.dispatchPlan.unsupportedCallIds,
+            dispatchedCallIds: turn.toolResultBatch.dispatchPlan.dispatchedCallIds,
+          },
+          turn.toolResultBatch.dispatchPlan.notProvenClaims,
+          [turn.toolResultBatch.dispatchPlan.planId],
+        );
+        for (const planned of turn.toolResultBatch.dispatchPlan.calls) {
+          append(
+            "before-tool-policy",
+            "before-tool-policy-decided",
+            {
+              turn: turn.turn,
+              planId: turn.toolResultBatch.dispatchPlan.planId,
+              toolCallId: planned.toolCallId,
+              toolName: planned.toolName,
+              dispatchStatus: planned.dispatchStatus,
+              decisionId: planned.beforePolicyDecision.decisionId,
+              decisionStatus: planned.beforePolicyDecision.status,
+            },
+            planned.notProvenClaims,
+            [planned.beforePolicyDecision.decisionId],
+          );
+        }
+      }
       for (const result of turn.toolResultBatch.results) {
         append(
           "tool-result-details",
@@ -283,6 +320,56 @@ export function projectLoopTrajectory(
       }
       for (const receipt of turn.toolResultBatch.executionReceipts) {
         appendReceipt(receipt);
+      }
+      for (const detail of turn.toolResultBatch.resultDetails ?? []) {
+        append(
+          "tool-result-details",
+          "loop-tool-result-observed",
+          {
+            turn: turn.turn,
+            batchId: turn.toolResultBatch.id,
+            resultDetailsId: detail.resultDetailsId,
+            toolCallId: detail.toolCallId,
+            resultStatus: detail.resultStatus,
+            dispatchStatus: detail.systemDetails.dispatchStatus,
+            executionReceiptId: detail.systemDetails.executionReceiptId,
+          },
+          detail.notProvenClaims,
+          [detail.resultDetailsId],
+        );
+      }
+      if (turn.toolResultBatch.resultMessages) {
+        for (const message of turn.toolResultBatch.resultMessages.messages) {
+          append(
+            "tool-result-messages",
+            "tool-result-message-prepared",
+            {
+              turn: turn.turn,
+              batchId: turn.toolResultBatch.resultMessages.batchId,
+              messageId: message.messageId,
+              toolCallId: message.toolCallId,
+              deliveryStatus: message.deliveryStatus,
+              redactionStatus: message.redactionStatus,
+            },
+            message.notProvenClaims,
+            [message.messageId],
+          );
+        }
+      }
+      for (const annotation of turn.toolResultBatch.afterAnnotations ?? []) {
+        append(
+          "after-tool-annotation",
+          "loop-tool-result-observed",
+          {
+            annotationId: annotation.annotationId,
+            decisionId: annotation.decisionId,
+            toolId: annotation.toolId,
+            resultStatus: annotation.resultStatus,
+            blockedFollowUp: annotation.blockedFollowUp,
+          },
+          annotation.notProvenClaims,
+          [annotation.annotationId],
+        );
       }
     }
     append(
@@ -511,6 +598,17 @@ export function projectLoopTrajectory(
   const receiptIds = turns.flatMap((turn) =>
     turn.toolResultBatch?.executionReceipts.map((receipt) => receipt.receiptId) ?? []
   );
+  const toolPolicyIds = [
+    ...(input.toolPolicyDecisions ?? []).map((item) => item.decisionId),
+    ...turns.flatMap((turn) =>
+      turn.toolResultBatch?.dispatchPlan?.calls.map((item) =>
+        item.beforePolicyDecision.decisionId
+      ) ?? []
+    ),
+  ];
+  const toolResultMessageIds = turns.flatMap((turn) =>
+    turn.toolResultBatch?.resultMessages?.messages.map((message) => message.messageId) ?? []
+  );
 
   return deepFreeze({
     loopId: loopId.value,
@@ -518,7 +616,8 @@ export function projectLoopTrajectory(
     snapshotIds: Object.freeze(turns.map((turn) => turn.snapshot.id)),
     eventIds: Object.freeze(events.map((event) => event.id)),
     receiptIds: Object.freeze(receiptIds),
-    toolPolicyIds: Object.freeze((input.toolPolicyDecisions ?? []).map((item) => item.decisionId)),
+    toolPolicyIds: Object.freeze(Array.from(new Set(toolPolicyIds))),
+    toolResultMessageIds: Object.freeze(Array.from(new Set(toolResultMessageIds))),
     savePointIds: Object.freeze(turns.map((turn) => turn.savePoint.id)),
     sessionProjectionIds: Object.freeze(input.sessionProjection ? [
       input.sessionProjection.sessionIdentity,

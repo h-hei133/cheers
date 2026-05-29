@@ -1,6 +1,15 @@
 import { createEvidenceOnlySavePoint, type RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
 import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
 import { accumulateAssistantResponse, type AssistantResponseState } from "../../turn/assistantResponse.js";
+import { prepareToolResultMessages, type ToolResultMessageBatch } from "../../turn/toolResultMessage.js";
+import {
+  dispatchToolBatch,
+  planToolBatchDispatch,
+  type ToolBatchDispatchPlan,
+  type ToolBatchDispatchSeam,
+  type ToolResultDetail,
+} from "../../tools/toolBatchDispatch.js";
+import type { ToolAfterObservationAnnotation } from "../../tools/interception.js";
 import { extractToolCallBatch, type NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import { createRuntimeTurnSnapshot, type RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
@@ -43,7 +52,7 @@ export interface AgentLoopContractPreparedToolCall {
   readonly name: string;
   readonly argumentKeys: readonly string[];
   readonly status?: "prepared" | "malformed" | "unsupported";
-  readonly dispatchStatus?: "not_dispatched";
+  readonly dispatchStatus?: "planned" | "blocked" | "authority_required" | "dispatched" | "dispatch_failed" | "unsupported" | "not_dispatched";
 }
 
 export interface AgentLoopContractToolCallBatch {
@@ -56,9 +65,14 @@ export interface AgentLoopContractToolCallBatch {
 export interface AgentLoopContractToolResultBatch {
   readonly id: string;
   readonly callBatchId: string;
+  readonly dispatchPlan?: ToolBatchDispatchPlan;
   readonly results: readonly ToolExecutionResult[];
+  readonly resultDetails?: readonly ToolResultDetail[];
+  readonly resultMessages?: ToolResultMessageBatch;
+  readonly afterAnnotations?: readonly ToolAfterObservationAnnotation[];
   readonly executionReceipts: readonly RuntimeExecutionReceiptProjection[];
   readonly failedToolCallIds: readonly string[];
+  readonly notDispatchedToolCallIds?: readonly string[];
   readonly terminate: boolean;
 }
 
@@ -98,6 +112,7 @@ export interface AgentLoopContractInput {
   readonly toolBatchBoundary?: (
     batch: AgentLoopContractToolCallBatch,
   ) => Promise<AgentLoopContractToolResultBatch>;
+  readonly toolBatchDispatch?: ToolBatchDispatchSeam;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -323,6 +338,11 @@ export async function runAgentLoopContract(
       let toolResultBatch: AgentLoopContractToolResultBatch | undefined;
       if (normalizedToolCallBatch.calls.length > 0) {
         transition("awaiting_tool_results", `turn-${turn}-tool-call-batch`);
+        const dispatchPlan = planToolBatchDispatch({
+          batch: normalizedToolCallBatch,
+          dispatchPolicy: input.toolBatchPolicy,
+          caller: "agent-loop-contract",
+        });
         toolCallBatch = {
           id: `${snapshot.id}:tool-call-batch`,
           turn,
@@ -333,7 +353,9 @@ export async function runAgentLoopContract(
               name: call.name,
               argumentKeys: call.argumentKeys,
               status: call.status,
-              dispatchStatus: call.dispatchStatus,
+              dispatchStatus:
+                dispatchPlan.calls.find((planned) => planned.toolCallId === call.id)
+                  ?.dispatchStatus ?? call.dispatchStatus,
             })),
           ),
         };
@@ -347,13 +369,41 @@ export async function runAgentLoopContract(
           dispatchStatus: normalizedToolCallBatch.dispatchStatus,
           terminalSuccessClaim: false,
         });
+        appendProjectedEvents(events, projectRuntimeEvents({
+          toolDispatchPlans: [dispatchPlan],
+          toolPolicyDecisions: dispatchPlan.calls.map((call) => call.beforePolicyDecision),
+        }));
         if (!input.toolBatchBoundary) {
-          appendEvent(events, "tool-dispatch-not-run", {
-            turn,
-            batchId: normalizedToolCallBatch.batchId,
-            reason: "tool-batch-boundary-not-provided",
-            terminalSuccessClaim: false,
-          }, normalizedToolCallBatch.notProvenClaims);
+          const dispatchResult = await dispatchToolBatch({
+            batch: normalizedToolCallBatch,
+            context: {
+              taskId: input.sessionId,
+              workspaceRoot: input.workspaceRoot,
+              sessionId: input.sessionId,
+              correlationId: snapshot.id,
+              abortSignal: input.abortSignal,
+            },
+            dispatchPolicy: input.toolBatchPolicy,
+            dispatch: input.toolBatchDispatch,
+            caller: "agent-loop-contract",
+          });
+          const resultMessages = prepareToolResultMessages({
+            dispatchPlan: dispatchResult.dispatchPlan,
+            resultDetails: dispatchResult.resultDetails,
+          });
+          toolResultBatch = {
+            id: dispatchResult.resultBatchId,
+            callBatchId: toolCallBatch.id,
+            dispatchPlan: dispatchResult.dispatchPlan,
+            results: dispatchResult.results,
+            resultDetails: dispatchResult.resultDetails,
+            resultMessages,
+            afterAnnotations: dispatchResult.afterAnnotations,
+            executionReceipts: dispatchResult.executionReceipts,
+            failedToolCallIds: dispatchResult.failedToolCallIds,
+            notDispatchedToolCallIds: dispatchResult.notDispatchedToolCallIds,
+            terminate: false,
+          };
         } else if (toolCalls.length > 0) {
           try {
             toolResultBatch = await input.toolBatchBoundary(toolCallBatch);
@@ -369,12 +419,35 @@ export async function runAgentLoopContract(
               failureClass: "tool-batch-boundary",
             });
           }
+        } else {
+          const resultMessages = prepareToolResultMessages({
+            dispatchPlan,
+            resultDetails: [],
+          });
+          toolResultBatch = {
+            id: `${dispatchPlan.planId}:result-batch`,
+            callBatchId: toolCallBatch.id,
+            dispatchPlan,
+            results: [],
+            resultDetails: [],
+            resultMessages,
+            afterAnnotations: [],
+            executionReceipts: [],
+            failedToolCallIds: [],
+            notDispatchedToolCallIds: normalizedToolCallBatch.calls.map((call) => call.id),
+            terminate: false,
+          };
+        }
+        if (toolResultBatch) {
           appendEvent(events, "agent-loop-tool-result-batch-observed", {
             turn,
             batchId: toolResultBatch.id,
             callBatchId: toolResultBatch.callBatchId,
             resultCount: toolResultBatch.results.length,
+            resultDetailCount: toolResultBatch.resultDetails?.length ?? 0,
+            resultMessageCount: toolResultBatch.resultMessages?.messages.length ?? 0,
             failedToolCallIds: toolResultBatch.failedToolCallIds,
+            notDispatchedToolCallIds: toolResultBatch.notDispatchedToolCallIds ?? [],
             executionReceiptCount: toolResultBatch.executionReceipts.length,
             terminate: toolResultBatch.terminate,
             terminalSuccessClaim: false,
@@ -382,17 +455,18 @@ export async function runAgentLoopContract(
           appendProjectedEvents(
             events,
             projectRuntimeEvents({
+              toolDispatchPlans: toolResultBatch.dispatchPlan
+                ? [toolResultBatch.dispatchPlan]
+                : [],
               executionReceipts: toolResultBatch.executionReceipts,
               toolResults: toolResultBatch.results,
+              toolResultDetails: toolResultBatch.resultDetails ?? [],
+              toolResultMessages: toolResultBatch.resultMessages
+                ? [toolResultBatch.resultMessages]
+                : [],
+              toolResultAnnotations: toolResultBatch.afterAnnotations ?? [],
             }),
           );
-        } else {
-          appendEvent(events, "tool-dispatch-not-run", {
-            turn,
-            batchId: normalizedToolCallBatch.batchId,
-            reason: "no-dispatchable-tool-calls",
-            terminalSuccessClaim: false,
-          }, normalizedToolCallBatch.notProvenClaims);
         }
       }
 
@@ -409,7 +483,10 @@ export async function runAgentLoopContract(
           `turn:${turn}`,
           `model-response:${modelBoundary.stopReason}`,
           ...(toolResultBatch
-            ? [`tool-result-count:${toolResultBatch.results.length}`]
+            ? [
+                `tool-result-count:${toolResultBatch.results.length}`,
+                `tool-result-message-count:${toolResultBatch.resultMessages?.messages.length ?? 0}`,
+              ]
             : []),
         ],
         notProvenClaims: [
