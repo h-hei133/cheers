@@ -1,5 +1,6 @@
 import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../../orchestration/types.js";
 import type { RuntimeProjectionEvent } from "../../runtime/events/runtimeEventProjection.js";
+import type { StaticResourceProjection } from "../../runtime/resources/staticResourceProjection.js";
 import {
   compactSessionPresentationText as compact,
   projectSessionPresentationFacts,
@@ -12,6 +13,7 @@ export interface CliSessionProductSurfaceInput {
   readonly terminalReason: TerminalReason;
   readonly stopReason?: string;
   readonly codingResult?: CodingResultSummary;
+  readonly resourceProjection?: StaticResourceProjection;
   readonly runtimeEvents?: readonly RuntimeProjectionEvent[];
   readonly sessionProjection?: SessionTreeProjection;
 }
@@ -75,6 +77,11 @@ function projectionSummaryLines(input: CliSessionProductSurfaceInput): string[] 
     const lastEvent = input.runtimeEvents[input.runtimeEvents.length - 1];
     lines.push(
       `- Runtime events: count=${input.runtimeEvents.length}; last=${lastEvent?.type ?? "none"}; terminalSuccessClaim=false`,
+    );
+  }
+  if (input.resourceProjection) {
+    lines.push(
+      `- Static resources: count=${input.resourceProjection.resources.length}; registry=${input.resourceProjection.registryMode}; dynamic=${input.resourceProjection.dynamicDiscovery}; execution=${input.resourceProjection.pluginExecution}; providerDefault=${input.resourceProjection.providerDefaultEnablement}`,
     );
   }
   return lines;

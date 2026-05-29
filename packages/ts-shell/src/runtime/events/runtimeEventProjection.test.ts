@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createEvidenceOnlySavePoint } from "../../evidence/runtimeSavePoint.js";
+import { projectStaticResourceRegistry } from "../resources/staticResourceProjection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
@@ -144,6 +145,60 @@ describe("runtime event projection", () => {
     ).toBe(true);
     expect(events.flatMap((event) => event.notProvenClaims)).toContain(
       "terminal-success",
+    );
+  });
+
+  it("projects static resource metadata without discovery, execution, or success claims", () => {
+    const resourceProjection = projectStaticResourceRegistry({
+      descriptors: [
+        {
+          id: "provider.safe",
+          kind: "provider-metadata",
+          name: "Safe Provider Metadata",
+          description: "Metadata only.",
+          sourceType: "fixture",
+          ownerDomain: "runtime/resources",
+          visibility: "runtime",
+          enabledByDefault: false,
+          requiresOptIn: true,
+          capabilitiesSummary: ["text"],
+          riskLevel: "high",
+          providerMetadata: {
+            providerLabel: "openai-compatible",
+            endpointClass: "openai-compatible",
+            capabilityFlags: ["text"],
+            defaultEnabled: false,
+            requiresOptIn: true,
+          },
+          notProvenClaims: [],
+        },
+      ],
+    });
+
+    const events = projectRuntimeEvents({ resourceProjection });
+    const event = events.find(
+      (candidate) => candidate.type === "resource-projection-observed",
+    );
+
+    expect(event?.facts).toMatchObject({
+      registryMode: "explicit-static",
+      dynamicDiscovery: "disabled",
+      packageLoading: "disabled",
+      pluginExecution: "disabled",
+      providerDefaultEnablement: "disabled",
+      resourceCount: 1,
+      providerResourceCount: 1,
+      terminalSuccessClaim: false,
+    });
+    expect(JSON.stringify(events)).not.toContain('"success":true');
+    expect(event?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "resource-execution",
+        "provider-success",
+        "tool-success",
+        "verification-success",
+        "terminal-success",
+      ]),
     );
   });
 });

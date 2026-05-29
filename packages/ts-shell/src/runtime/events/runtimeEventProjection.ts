@@ -1,4 +1,5 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
+import type { StaticResourceProjection } from "../resources/staticResourceProjection.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
 import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
@@ -11,6 +12,7 @@ export type RuntimeProjectionEventType =
   | "tool-result-observed"
   | "save-point-observed"
   | "result-facts-observed"
+  | "resource-projection-observed"
   | "session-projection-observed"
   | "terminal-verdict-observed";
 
@@ -39,6 +41,7 @@ export function projectRuntimeEvents(input: {
   readonly toolResults?: readonly ToolExecutionResult[];
   readonly savePoint?: RuntimeEvidenceSavePoint;
   readonly resultFacts?: RuntimeResultFactsProjection;
+  readonly resourceProjection?: StaticResourceProjection;
   readonly sessionProjection?: SessionTreeProjection;
 }): readonly RuntimeProjectionEvent[] {
   const events: RuntimeProjectionEvent[] = [];
@@ -159,6 +162,30 @@ export function projectRuntimeEvents(input: {
         terminalSuccessClaim: false,
       },
       ["terminal-success"],
+    );
+  }
+
+  if (input.resourceProjection) {
+    append(
+      "resource-projection-observed",
+      {
+        registryMode: input.resourceProjection.registryMode,
+        dynamicDiscovery: input.resourceProjection.dynamicDiscovery,
+        packageLoading: input.resourceProjection.packageLoading,
+        pluginExecution: input.resourceProjection.pluginExecution,
+        providerDefaultEnablement: input.resourceProjection.providerDefaultEnablement,
+        resourceCount: input.resourceProjection.resources.length,
+        rejectedResourceCount: input.resourceProjection.rejectedResourceCount,
+        resourceKinds: input.resourceProjection.resources.map((resource) => resource.kind),
+        providerResourceCount: input.resourceProjection.resources.filter(
+          (resource) => resource.kind === "provider-metadata",
+        ).length,
+        extensionManifestCount: input.resourceProjection.resources.filter(
+          (resource) => resource.kind === "extension-manifest",
+        ).length,
+        terminalSuccessClaim: false,
+      },
+      input.resourceProjection.notProvenClaims,
     );
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CodingResultSummary } from "../../orchestration/types.js";
 import { projectRuntimeEvents } from "../../runtime/events/runtimeEventProjection.js";
+import { projectStaticResourceRegistry } from "../../runtime/resources/staticResourceProjection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createRuntimeEventDigest } from "./sessionEventSurface.js";
 import {
@@ -161,6 +162,24 @@ describe("CLI session product surface", () => {
     });
     const runtimeEvents = projectRuntimeEvents({
       sessionProjection,
+      resourceProjection: projectStaticResourceRegistry({
+        descriptors: [
+          {
+            id: "prompt.safe",
+            kind: "prompt-template",
+            name: "Safe Prompt",
+            description: "Prompt template metadata only.",
+            sourceType: "fixture",
+            ownerDomain: "runtime/resources",
+            visibility: "cli",
+            enabledByDefault: false,
+            requiresOptIn: false,
+            capabilitiesSummary: ["prompt routing"],
+            riskLevel: "low",
+            notProvenClaims: [],
+          },
+        ],
+      }),
       resultFacts: {
         status: "completed",
         terminalClassification: "success",
@@ -175,12 +194,31 @@ describe("CLI session product surface", () => {
       terminalReason: "completed",
       codingResult: result,
       sessionProjection,
+      resourceProjection: projectStaticResourceRegistry({
+        descriptors: [
+          {
+            id: "prompt.safe",
+            kind: "prompt-template",
+            name: "Safe Prompt",
+            description: "Prompt template metadata only.",
+            sourceType: "fixture",
+            ownerDomain: "runtime/resources",
+            visibility: "cli",
+            enabledByDefault: false,
+            requiresOptIn: false,
+            capabilitiesSummary: ["prompt routing"],
+            riskLevel: "low",
+            notProvenClaims: [],
+          },
+        ],
+      }),
       runtimeEvents,
     });
     const rendered = surface?.lines.join("\n") ?? "";
 
     expect(rendered).toContain("- Session path: activePath=2; tree=linear-path");
-    expect(rendered).toContain("- Runtime events: count=3; last=session-projection-observed");
+    expect(rendered).toContain("- Runtime events: count=4; last=session-projection-observed");
+    expect(rendered).toContain("- Static resources: count=1; registry=explicit-static; dynamic=disabled; execution=disabled; providerDefault=disabled");
     expect(rendered).toContain("terminalSuccessClaim=false");
     expect(rendered).not.toMatch(/secret|oldText=raw/);
     expect(surface?.verdict).toBe(
