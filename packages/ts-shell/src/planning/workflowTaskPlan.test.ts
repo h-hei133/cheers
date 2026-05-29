@@ -16,7 +16,7 @@ describe("workflowTaskPlan", () => {
     expect(plan.taskKind).toBe("run-command");
     expect(plan.directCommand).toBe("dir");
     expect(plan.blockedReason).toContain(
-      "Run-command intent is not allowed in the MVP allowlist: dir",
+      "Run-command intent is not allowed in the controlled allowlist: dir",
     );
   });
 

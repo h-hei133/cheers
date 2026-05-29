@@ -2237,7 +2237,7 @@ describe("shell session runtime (W5)", () => {
     const renderedLines: string[] = [];
     const calls: string[] = [];
     const blockedReason =
-      "Run-command intent is not allowed in the MVP allowlist: npm publish Allowed commands: node --version, npm test -- --help, npm run build -- --help Please rephrase your request to one of the allowed command intents.";
+      "Run-command intent is not allowed in the controlled allowlist: npm publish Allowed commands: node --version, npm test -- --help, npm run build -- --help Please rephrase your request to one of the allowed command intents.";
 
     const runtime = new ShellSessionRuntime({
       sessionManager: {
@@ -2286,12 +2286,12 @@ describe("shell session runtime (W5)", () => {
 
     expect(
       renderedLines.some((line) =>
-        line.includes("Run-command intent is not allowed in the MVP allowlist"),
+        line.includes("Run-command intent is not allowed in the controlled allowlist"),
       ),
     ).toBe(true);
     expect(renderedLines).toContain("Next steps");
     expect(renderedLines).toContain(
-      "- Run-command intent was blocked by the MVP allowlist.",
+      "- Run-command intent was blocked by the controlled allowlist.",
     );
     expect(renderedLines).toContain(
       "- Allowed commands: node --version, npm test -- --help, npm run build -- --help",
@@ -2301,7 +2301,7 @@ describe("shell session runtime (W5)", () => {
     );
     expect(renderedLines).toContain("- BlockerKind: command-not-allowlisted");
     expect(renderedLines).toContain(
-      "- Reason: Run-command intent is not allowed in the MVP allowlist: npm publish Allowed commands: node --version, npm test -- --help, npm run build -- --help Please rephrase your request to one of the allowed command intents.",
+      "- Reason: Run-command intent is not allowed in the controlled allowlist: npm publish Allowed commands: node --version, npm test -- --help, npm run build -- --help Please rephrase your request to one of the allowed command intents.",
     );
     expect(renderedLines).toContain(
       "- DoNext: Rephrase the request with an allowlisted command: node --version, npm test -- --help, or npm run build -- --help.",

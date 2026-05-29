@@ -3,8 +3,8 @@ import { sanitizeBrowserText, type BrowserBackendKind } from "./browserCapabilit
 
 export type BrowserRuntimeCandidate =
   | "playwright-cli-skills"
-  | "playwright-mcp"
-  | "stagehand-like"
+  | "browser-tool-server"
+  | "action-layer"
   | "custom-playwright-wrapper"
   | "unavailable";
 
@@ -14,7 +14,7 @@ export type BrowserRuntimeDecisionReason =
   | "sandboxable"
   | "evidence-friendly"
   | "easy-integration"
-  | "mcp-overhead"
+  | "tool-server-overhead"
   | "state-persistence-risk"
   | "simple-ux"
   | "testable"
@@ -59,21 +59,21 @@ const PLAYWRIGHT_CLI: BrowserRuntimeRecommendation = {
   ],
 };
 
-const PLAYWRIGHT_MCP: BrowserRuntimeRecommendation = {
-  candidate: "playwright-mcp",
-  label: "Playwright MCP",
+const TOOL_SERVER: BrowserRuntimeRecommendation = {
+  candidate: "browser-tool-server",
+  label: "browser tool server",
   summary: "Useful later for persistent browser state and rich accessibility introspection, but higher context and lifecycle cost.",
   reasons: [
     "deterministic-actions",
     "evidence-friendly",
-    "mcp-overhead",
+    "tool-server-overhead",
     "state-persistence-risk",
   ],
 };
 
-const STAGEHAND_LIKE: BrowserRuntimeRecommendation = {
-  candidate: "stagehand-like",
-  label: "Stagehand-like abstraction",
+const ACTION_LAYER: BrowserRuntimeRecommendation = {
+  candidate: "action-layer",
+  label: "action-layer abstraction",
   summary: "Useful later for observe/act/extract separation and action cache semantics; not first because it implies planner/model boundaries.",
   reasons: [
     "evidence-friendly",
@@ -119,8 +119,8 @@ export function decideBrowserRuntime(
     recommendation: sanitizeRecommendation(recommendation),
     alternatives: [
       PLAYWRIGHT_CLI,
-      PLAYWRIGHT_MCP,
-      STAGEHAND_LIKE,
+      TOOL_SERVER,
+      ACTION_LAYER,
       CUSTOM_WRAPPER,
     ].filter((item) => item.candidate !== recommendation.candidate).map(sanitizeRecommendation),
     executionAvailable: false,
@@ -154,12 +154,12 @@ function normalizeCandidate(
     case "planned-playwright-cli":
     case "playwright-cli-skills":
       return "playwright-cli-skills";
-    case "planned-playwright-mcp":
-    case "playwright-mcp":
-      return "playwright-mcp";
-    case "planned-stagehand-like":
-    case "stagehand-like":
-      return "stagehand-like";
+    case "planned-browser-tool-server":
+    case "browser-tool-server":
+      return "browser-tool-server";
+    case "planned-action-layer":
+    case "action-layer":
+      return "action-layer";
     case "custom-playwright-wrapper":
       return "custom-playwright-wrapper";
     case "none":
@@ -174,10 +174,10 @@ function recommendationForCandidate(candidate: BrowserRuntimeCandidate): Browser
   switch (candidate) {
     case "playwright-cli-skills":
       return PLAYWRIGHT_CLI;
-    case "playwright-mcp":
-      return PLAYWRIGHT_MCP;
-    case "stagehand-like":
-      return STAGEHAND_LIKE;
+    case "browser-tool-server":
+      return TOOL_SERVER;
+    case "action-layer":
+      return ACTION_LAYER;
     case "custom-playwright-wrapper":
       return CUSTOM_WRAPPER;
     case "unavailable":

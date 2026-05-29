@@ -42,7 +42,7 @@ describe('ToolDispatcher', () => {
     )
 
     expect(result.success).toBe(false)
-    expect(result.error).toContain("not in the MVP allowlist")
+    expect(result.error).toContain("not in the controlled allowlist")
     enforcer.close()
   })
 })

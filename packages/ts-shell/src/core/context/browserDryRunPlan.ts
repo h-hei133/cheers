@@ -163,7 +163,7 @@ function expectedEvidenceFor(action: BrowserActionContract): readonly string[] {
         "runtime logs",
       ];
     case "screenshot":
-      return ["screenshot reference only if a future route enables screenshot policy"];
+      return ["screenshot summary only if a future browser policy enables screenshot handling"];
     default:
       return [
         "blocked action reason",

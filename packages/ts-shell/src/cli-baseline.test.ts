@@ -4839,11 +4839,11 @@ describe("CLI streaming baseline (T3)", () => {
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     expect(output).toContain("Result");
     expect(output).toContain(
-      "Run-command intent is not allowed in the MVP allowlist",
+      "Run-command intent is not allowed in the controlled allowlist",
     );
     expect(output).toContain("Next steps");
     expect(output).toContain(
-      "- Run-command intent was blocked by the MVP allowlist.",
+      "- Run-command intent was blocked by the controlled allowlist.",
     );
     expect(output).toContain("- Allowed commands:");
     expect(output).toContain(

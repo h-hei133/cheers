@@ -15,7 +15,7 @@ describe("sidebar event bridge", () => {
       warmup: { outcome: "status", found: true, staleness: "fresh" },
       validation: [{ command: "rtk npm run build -w packages/ts-shell", status: "passed" }],
       edit: { changedFileCount: 3, failedFileCount: 0 },
-      tools: [{ label: "Playwright MCP", status: "unknown" }],
+      tools: [{ label: "browser tool server", status: "unknown" }],
       warnings: [{ id: "warn", message: "Keep output concise." }],
       blockers: [{ id: "block", message: "No UI in this route." }],
       route: { status: "in-progress", nextAction: "Run focused tests." },

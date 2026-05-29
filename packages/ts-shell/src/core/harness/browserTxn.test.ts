@@ -21,7 +21,7 @@ describe("Route 129 browser transactions", () => {
 
     expect(result.status).toBe("success");
     expect(result.stepSummaries.map((step) => step.kind)).toEqual(["observe", "extract"]);
-    expect(result.finalSummary).toContain("JS rendered Playwright route ready");
+    expect(result.finalSummary).toContain("JS rendered Playwright fixture ready");
     expect(result.cleanupStatus).toBe("closed");
     expect(result.evidence).toContain("browser-transaction:same-page:true");
   }, 30000);

@@ -4,13 +4,13 @@ import { createCommandToolResultSplit } from "../../tools/resultSplit.js";
 import { projectJsonRuntimeEventStream } from "../events/jsonEventStream.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
 import {
-  runReferenceAgentLoop,
-  type ReferenceLoopToolResultBatch,
-} from "./agentLoopReference.js";
+  runAgentLoopContract,
+  type AgentLoopContractToolResultBatch,
+} from "./agentLoopContract.js";
 
-describe("reference agent loop", () => {
+describe("agent loop contract", () => {
   it("models a no-tool path without claiming terminal success", async () => {
-    const loop = await runReferenceAgentLoop({
+    const loop = await runAgentLoopContract({
       sessionId: "sess-loop-no-tool",
       workspaceRoot: "/workspace",
       prompt: "answer only",
@@ -39,7 +39,7 @@ describe("reference agent loop", () => {
       runtimeFacts: { observation: "tool-result-observed" },
     });
 
-    const loop = await runReferenceAgentLoop({
+    const loop = await runAgentLoopContract({
       sessionId: "sess-loop-tool",
       workspaceRoot: "/workspace",
       prompt: "use tools",
@@ -54,7 +54,7 @@ describe("reference agent loop", () => {
           { id: "call-b", name: "git-status", arguments: { short: true } },
         ],
       }),
-      toolBatchBoundary: async (batch): Promise<ReferenceLoopToolResultBatch> => ({
+      toolBatchBoundary: async (batch): Promise<AgentLoopContractToolResultBatch> => ({
         id: "tool-result-batch",
         callBatchId: batch.id,
         results: [
@@ -82,7 +82,7 @@ describe("reference agent loop", () => {
   });
 
   it("keeps save point and next turn preparation truthfulness separate", async () => {
-    const loop = await runReferenceAgentLoop({
+    const loop = await runAgentLoopContract({
       sessionId: "sess-loop-truth",
       workspaceRoot: "/workspace",
       prompt: "continue",
@@ -116,7 +116,7 @@ describe("reference agent loop", () => {
 
   it("delivers next-turn, steering, and follow-up messages by contract", async () => {
     const deliveredByTurn: string[][] = [];
-    const loop = await runReferenceAgentLoop({
+    const loop = await runAgentLoopContract({
       sessionId: "sess-loop-delivery",
       workspaceRoot: "/workspace",
       prompt: "queued",
@@ -154,7 +154,7 @@ describe("reference agent loop", () => {
   });
 
   it("projects abort and failure without terminal success", async () => {
-    const aborted = await runReferenceAgentLoop({
+    const aborted = await runAgentLoopContract({
       sessionId: "sess-loop-abort",
       workspaceRoot: "/workspace",
       prompt: "abort",
@@ -164,7 +164,7 @@ describe("reference agent loop", () => {
         stopReason: "aborted",
       }),
     });
-    const failed = await runReferenceAgentLoop({
+    const failed = await runAgentLoopContract({
       sessionId: "sess-loop-fail",
       workspaceRoot: "/workspace",
       prompt: "fail",
@@ -185,7 +185,7 @@ describe("reference agent loop", () => {
   });
 
   it("emits stable JSON-safe event ordering", async () => {
-    const loop = await runReferenceAgentLoop({
+    const loop = await runAgentLoopContract({
       sessionId: "sess-loop-events",
       workspaceRoot: "/workspace",
       prompt: "events",
@@ -211,7 +211,7 @@ describe("reference agent loop", () => {
   });
 
   it("redacts unsafe loop state and event facts", async () => {
-    const loop = await runReferenceAgentLoop({
+    const loop = await runAgentLoopContract({
       sessionId: "sess-loop-redaction",
       workspaceRoot: "/workspace",
       prompt: "redact",

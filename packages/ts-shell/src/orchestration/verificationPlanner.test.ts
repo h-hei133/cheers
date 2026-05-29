@@ -130,7 +130,7 @@ describe("verification planner", () => {
 
     expect(plan.mode).toBe("unavailable");
     expect(projected.status).toBe("skipped");
-    expect(projected.reason).toContain("not allowed in the MVP allowlist");
+    expect(projected.reason).toContain("not allowed in the controlled allowlist");
   });
 
   it("distinguishes skipped auto verification from not-requested verification", () => {

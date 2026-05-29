@@ -34,7 +34,7 @@ import type { BrowserExternalRuntimeManifestLoadResult } from "./browserExternal
 import { BrowserRuntimeAdapterExecutor } from "./browserRuntimeAdapterExecutor.js";
 import type { BrowserSkillRuntimeBinding } from "./browserSkillRuntimeBinding.js";
 import type { BrowserPlaywrightRuntimeAvailability } from "./browserPlaywrightRuntimeAvailability.js";
-import type { BrowserPlaywrightMcpBackendComparison } from "./browserPlaywrightMcpBackendComparison.js";
+import type { BrowserToolServerBackendComparison } from "./browserToolServerBackendComparison.js";
 import type { BrowserRuntimeDirectionDecision } from "./browserRuntimeDirectionDecision.js";
 import { renderBrowserPlaywrightAdapterSurface } from "./browserPlaywrightAdapterSurface.js";
 import { renderPwRuntimeStatus } from "./pwStatus.js";
@@ -140,7 +140,7 @@ export async function runBrowserCommandAsync(input: {
   readonly browserSkillRuntimeBinding?: BrowserSkillRuntimeBinding;
   readonly browserPlaywrightAvailability?: BrowserPlaywrightRuntimeAvailability;
   readonly browserPwStatus?: PwRuntimeStatus;
-  readonly browserPlaywrightMcpComparison?: BrowserPlaywrightMcpBackendComparison;
+  readonly browserToolServerComparison?: BrowserToolServerBackendComparison;
   readonly browserRuntimeDirectionDecision?: BrowserRuntimeDirectionDecision;
   readonly browserActionCache?: BrowserActionCache;
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore;
@@ -163,7 +163,7 @@ export async function runBrowserCommandAsync(input: {
         renderPwRuntimeStatus(pwStatus),
         renderOptionalPlaywrightDirection({
           availability: input.browserPlaywrightAvailability,
-          mcpComparison: input.browserPlaywrightMcpComparison,
+          toolServerComparison: input.browserToolServerComparison,
           decision: input.browserRuntimeDirectionDecision,
         }),
         "",
@@ -173,7 +173,7 @@ export async function runBrowserCommandAsync(input: {
         ...availability.evidence,
         ...pwStatus.evidence,
         ...(input.browserPlaywrightAvailability?.evidence ?? []),
-        ...(input.browserPlaywrightMcpComparison?.evidence ?? []),
+        ...(input.browserToolServerComparison?.evidence ?? []),
         ...(input.browserRuntimeDirectionDecision?.evidence ?? []),
         ...(input.browserCliExecutionBridgeSummary?.evidence ?? []),
         "browser-command-runner:runtime-status",
@@ -296,17 +296,17 @@ export async function runBrowserCommandAsync(input: {
 
 function renderOptionalPlaywrightDirection(input: {
   readonly availability?: BrowserPlaywrightRuntimeAvailability;
-  readonly mcpComparison?: BrowserPlaywrightMcpBackendComparison;
+  readonly toolServerComparison?: BrowserToolServerBackendComparison;
   readonly decision?: BrowserRuntimeDirectionDecision;
 }): string {
-  if (!input.availability || !input.mcpComparison || !input.decision) {
+  if (!input.availability || !input.toolServerComparison || !input.decision) {
     return "";
   }
   return [
     "",
     renderBrowserPlaywrightAdapterSurface({
       availability: input.availability,
-      mcpComparison: input.mcpComparison,
+      toolServerComparison: input.toolServerComparison,
       decision: input.decision,
       tested: ["runtime status integration"],
     }),

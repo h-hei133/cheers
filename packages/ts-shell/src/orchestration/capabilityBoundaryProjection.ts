@@ -20,7 +20,7 @@ const FOCUSED_TS_SHELL_TEST_COMMAND_ALLOWLIST = [
 ] as const;
 
 export function detectCommand(normalizedPrompt: string): string {
-  // Keep command mapping intentionally narrow for MVP controllability.
+  // Keep command mapping intentionally narrow for controlled runtime policy.
   if (normalizedPrompt.includes("version")) {
     return "node --version";
   }
@@ -83,7 +83,7 @@ export function isAllowlistedFocusedTsShellTestCommand(command: string): boolean
 
 export function blockedCommandReason(command: string): string {
   return [
-    `Run-command intent is not allowed in the MVP allowlist: ${command}`,
+    `Run-command intent is not allowed in the controlled allowlist: ${command}`,
     `Allowed commands: ${RUN_COMMAND_ALLOWLIST.join(", ")}, npm test -w packages/ts-shell -- src/verification/<test>.test.ts`,
     "Please rephrase your request to one of the allowed command intents.",
   ].join(" ");

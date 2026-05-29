@@ -883,12 +883,12 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("stopped");
     expect(result.stopReason).toContain(
-      "Run-command intent is not allowed in the MVP allowlist: dir",
+      "Run-command intent is not allowed in the controlled allowlist: dir",
     );
     const mergedNotes = result.sharedContext.notes.join("\n");
     expect(mergedNotes).toContain("plan: intent=run-command");
     expect(mergedNotes).toContain(
-      "blocker: Run-command intent is not allowed in the MVP allowlist: dir",
+      "blocker: Run-command intent is not allowed in the controlled allowlist: dir",
     );
     expect(mergedNotes).not.toContain("bash(node --version)");
     expect(result.finalOutput).toContain("BlockerKind: command-not-allowlisted");
@@ -7177,7 +7177,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
       expect(result.codingResult?.verification.command).toBe("node --version");
     } else {
       expect(result.stopReason).toMatch(
-        /(?:Run-command intent is not allowed in the MVP allowlist|Escalation denied by user|Re-run and approve escalation for verify command execution\.)/,
+        /(?:Run-command intent is not allowed in the controlled allowlist|Escalation denied by user|Re-run and approve escalation for verify command execution\.)/,
       );
     }
   }, 15000);
@@ -7469,7 +7469,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
   }, 15000);
 
-  it("blocks command intents outside MVP allowlist with actionable stopped_error", async () => {
+  it("blocks command intents outside controlled allowlist with actionable stopped_error", async () => {
     await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
@@ -7488,7 +7488,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(result.status).toBe("stopped_error");
     expect(result.terminalClassification).toBe("stopped");
     expect(result.stopReason).toContain(
-      "Run-command intent is not allowed in the MVP allowlist",
+      "Run-command intent is not allowed in the controlled allowlist",
     );
     expect(result.stopReason).toContain("Allowed commands:");
     expect(result.finalOutput).toContain("Outcome: blocked");

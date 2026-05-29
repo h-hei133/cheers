@@ -198,7 +198,7 @@ async function listModels(args: string[]): Promise<string> {
 
   return [
     `Models for provider=${provider}`,
-    "Source: models.dev/api.json (opencode-compatible)",
+    "Source: models.dev/api.json (OpenAI-compatible provider catalog)",
     ...modelsFromApi.map((model) =>
       model === activeModel ? `* ${model} (active)` : `- ${model}`,
     ),
@@ -301,7 +301,7 @@ async function fetchModelsFromModelsDev(
 function renderOpenAIAccountAuthModelList(activeModel?: string): string {
   return [
     "Models for provider=openai (account-auth)",
-    "Source: codex allowed model set (aligned with opencode codex plugin)",
+    "Source: local account-auth allowed model set",
     ...OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS.map((model) =>
       model === activeModel ? `* ${model} (active)` : `- ${model}`,
     ),

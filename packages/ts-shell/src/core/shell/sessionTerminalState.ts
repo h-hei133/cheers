@@ -197,7 +197,7 @@ function parseRunCommandAllowlistBlockContext(
 ): { allowedCommands: string } | null {
   if (
     !terminalDetail.includes(
-      "Run-command intent is not allowed in the MVP allowlist",
+      "Run-command intent is not allowed in the controlled allowlist",
     )
   ) {
     return null;
@@ -976,7 +976,7 @@ function buildTerminalNextSteps(
     parseRunCommandAllowlistBlockContext(terminalDetail);
   if (runCommandBlockContext) {
     return [
-      "Run-command intent was blocked by the MVP allowlist.",
+      "Run-command intent was blocked by the controlled allowlist.",
       `Allowed commands: ${runCommandBlockContext.allowedCommands}`,
       'Rephrase with one allowed command, for example: "Run node --version".',
     ];

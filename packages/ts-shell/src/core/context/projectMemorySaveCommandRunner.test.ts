@@ -86,7 +86,7 @@ describe("project memory save command runner", () => {
       confidence: "high",
       source: "user-stated-preference",
       safety: "needs-review",
-      summary: "User prefers concise route closeout reports.",
+      summary: "User prefers concise route reports.",
       reason: "Explicit user preference still needs approval before save.",
       evidence: ["route82:user-preference"],
     });

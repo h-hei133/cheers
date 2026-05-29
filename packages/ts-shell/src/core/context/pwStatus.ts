@@ -12,7 +12,7 @@ export function renderPwRuntimeStatus(status: PwRuntimeStatus): string {
     `- Real browser validation: ${status.realBrowserValidationAvailable ? "available" : "unavailable"}`,
     `- Browser launched during status: ${status.browserLaunched ? "yes" : "no"}`,
     "- Default runtime: disabled",
-    "- MCP backend: optional-not-default",
+    "- Tool-server backend: optional-not-default",
     "- Eval mode: available-via-pwEval",
     "- Provider/model call: none",
     `- Reason: ${sanitizeBrowserText(status.reason, 220)}`,

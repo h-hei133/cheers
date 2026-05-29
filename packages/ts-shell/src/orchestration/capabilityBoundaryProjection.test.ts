@@ -7,7 +7,7 @@ import {
 } from "./capabilityBoundaryProjection.js";
 
 describe("capability boundary projection", () => {
-  it("keeps run-command mapping inside the MVP allowlist", () => {
+  it("keeps run-command mapping inside the controlled allowlist", () => {
     expect(detectCommand("please run node version")).toBe("node --version");
     expect(detectCommand("run the test command")).toBe("npm test -- --help");
     expect(detectCommand("run build")).toBe("npm run build -- --help");
@@ -35,7 +35,7 @@ describe("capability boundary projection", () => {
 
   it("formats blocked command guidance with the stable allowlist", () => {
     expect(blockedCommandReason("curl")).toBe(
-      "Run-command intent is not allowed in the MVP allowlist: curl Allowed commands: node --version, npm test -- --help, npm run build -- --help, npm run build -w packages/ts-shell, npm run verify:route219-real-task-quality-benchmark, npm test -w packages/ts-shell -- src/verification/<test>.test.ts Please rephrase your request to one of the allowed command intents.",
+      "Run-command intent is not allowed in the controlled allowlist: curl Allowed commands: node --version, npm test -- --help, npm run build -- --help, npm run build -w packages/ts-shell, npm run verify:route219-real-task-quality-benchmark, npm test -w packages/ts-shell -- src/verification/<test>.test.ts Please rephrase your request to one of the allowed command intents.",
     );
   });
 });

@@ -1,24 +1,24 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 
-export type BrowserPlaywrightMcpSuitability =
+export type BrowserToolServerSuitability =
   | "core-runtime"
   | "optional-backend"
   | "not-recommended";
 
-export interface BrowserPlaywrightMcpBackendComparison {
+export interface BrowserToolServerBackendComparison {
   readonly toolSchemaMaturity: "high" | "medium" | "low";
   readonly controlPlaneVisibility: "strong" | "partial" | "weak";
   readonly permissionMappingComplexity: "low" | "medium" | "high";
   readonly evidenceMappingQuality: "high" | "medium" | "low";
   readonly serverLifecycleComplexity: "low" | "medium" | "high";
   readonly sandboxBoundaryComplexity: "low" | "medium" | "high";
-  readonly suitability: BrowserPlaywrightMcpSuitability;
+  readonly suitability: BrowserToolServerSuitability;
   readonly reason: string;
   readonly warnings: readonly string[];
   readonly evidence: readonly string[];
 }
 
-export function comparePlaywrightMcpBackend(input: Partial<BrowserPlaywrightMcpBackendComparison> = {}): BrowserPlaywrightMcpBackendComparison {
+export function compareBrowserToolServerBackend(input: Partial<BrowserToolServerBackendComparison> = {}): BrowserToolServerBackendComparison {
   const comparison = {
     toolSchemaMaturity: input.toolSchemaMaturity ?? "high",
     controlPlaneVisibility: input.controlPlaneVisibility ?? "partial",
@@ -26,20 +26,20 @@ export function comparePlaywrightMcpBackend(input: Partial<BrowserPlaywrightMcpB
     evidenceMappingQuality: input.evidenceMappingQuality ?? "high",
     serverLifecycleComplexity: input.serverLifecycleComplexity ?? "high",
     sandboxBoundaryComplexity: input.sandboxBoundaryComplexity ?? "high",
-  } satisfies Omit<BrowserPlaywrightMcpBackendComparison, "suitability" | "reason" | "warnings" | "evidence">;
+  } satisfies Omit<BrowserToolServerBackendComparison, "suitability" | "reason" | "warnings" | "evidence">;
   const suitability = decideSuitability(comparison);
   return {
     ...comparison,
     suitability,
     reason: sanitizeBrowserText(reasonFor(suitability), 240),
     warnings: suitability === "optional-backend"
-      ? ["playwright-mcp:not-core-runtime", "playwright-mcp:no-server-launch"]
-      : ["playwright-mcp:recheck-before-use"],
+      ? ["browser-tool-server:not-core-runtime", "browser-tool-server:no-server-launch"]
+      : ["browser-tool-server:recheck-before-use"],
     evidence: [
-      "playwright-mcp-backend-comparison:pure",
-      `playwright-mcp-backend-comparison:suitability:${suitability}`,
-      "playwright-mcp-backend-comparison:no-mcp-launch",
-      "playwright-mcp-backend-comparison:no-provider-or-model-call",
+      "browser-tool-server-backend-comparison:pure",
+      `browser-tool-server-backend-comparison:suitability:${suitability}`,
+      "browser-tool-server-backend-comparison:no-tool-server-launch",
+      "browser-tool-server-backend-comparison:no-provider-or-model-call",
     ],
   };
 }
@@ -51,7 +51,7 @@ function decideSuitability(input: {
   readonly evidenceMappingQuality: "high" | "medium" | "low";
   readonly serverLifecycleComplexity: "low" | "medium" | "high";
   readonly sandboxBoundaryComplexity: "low" | "medium" | "high";
-}): BrowserPlaywrightMcpSuitability {
+}): BrowserToolServerSuitability {
   if (
     input.toolSchemaMaturity === "high" &&
     input.controlPlaneVisibility === "strong" &&
@@ -71,13 +71,13 @@ function decideSuitability(input: {
   return "optional-backend";
 }
 
-function reasonFor(suitability: BrowserPlaywrightMcpSuitability): string {
+function reasonFor(suitability: BrowserToolServerSuitability): string {
   switch (suitability) {
     case "core-runtime":
-      return "Playwright MCP could be a core runtime only if lifecycle, sandbox, and permission mapping stay simple and visible.";
+      return "browser tool server could be a core runtime only if lifecycle, sandbox, and permission mapping stay simple and visible.";
     case "optional-backend":
-      return "Playwright MCP has mature browser tools and strong evidence shape, but server lifecycle and permission mapping make it a better optional backend than core runtime.";
+      return "browser tool server has mature browser tools and strong evidence shape, but server lifecycle and permission mapping make it a better optional backend than core runtime.";
     case "not-recommended":
-      return "Playwright MCP should not be used until tool schema, evidence, and control-plane visibility are strong enough.";
+      return "browser tool server should not be used until tool schema, evidence, and control-plane visibility are strong enough.";
   }
 }

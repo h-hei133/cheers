@@ -24,8 +24,8 @@ describe("browser capability command runner", () => {
     expect(output).toContain("- Decision: external-runner-only");
     expect(output).toContain("- Browser execution default: disabled");
     expect(output).toContain("Playwright CLI/Skills");
-    expect(output).toContain("Playwright MCP");
-    expect(output).toContain("Stagehand-like split");
+    expect(output).toContain("browser tool server");
+    expect(output).toContain("action-layer split");
   });
 
   it("parses supported previews and classifies readiness without execution", () => {
@@ -192,7 +192,7 @@ describe("browser capability command runner", () => {
 
     expect(result.output).toContain("- Requested action: screenshot");
     expect(result.output).toContain("- Sandbox decision: future-sandbox-required");
-    expect(result.output).toContain("screenshot reference only if a future route enables screenshot policy");
+    expect(result.output).toContain("screenshot summary only if a future browser policy enables screenshot handling");
     expect(result.output).toContain("- Executed: no");
   });
 

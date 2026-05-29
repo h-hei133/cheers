@@ -40,7 +40,7 @@ export function decideBrowserActionLoopPolicy(input: {
     return decision("blocked-unsupported-action", `Action ${actionKind} is not allowed by the runtime manifest.`, "Use an action listed in the explicit manifest.");
   }
   if (["auth", "payment", "destructive", "upload", "download", "screenshot"].includes(actionKind)) {
-    return decision("blocked-unsafe-action", `Action ${actionKind} is outside the controlled browser MVP.`, "Keep unsafe actions in preview only.");
+    return decision("blocked-unsafe-action", `Action ${actionKind} is outside the controlled browser runtime.`, "Keep unsafe actions in preview only.");
   }
   const urlOrOrigin = input.request.action.url ??
     (actionKind === "navigate" ? input.request.action.target : undefined) ??

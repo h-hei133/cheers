@@ -113,7 +113,7 @@ function sequencePlan(
     evidence: [
       "browser-agent:controlled-autonomous-use",
       `browser-agent:action-count:${actions.length}`,
-      "browser-agent:no-stagehand-planner",
+      "browser-agent:no-action-layer-planner",
     ],
   };
 }

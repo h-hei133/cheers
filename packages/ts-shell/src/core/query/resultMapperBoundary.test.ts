@@ -119,7 +119,7 @@ describe("resultMapper Result Surface facades", () => {
   it.each([
     {
       name: "command blocked",
-      reason: "Command rm is not allowed in the MVP allowlist",
+      reason: "Command rm is not allowed in the controlled allowlist",
       verification: { status: "blocked", reason: "Command blocked" },
       evidence: ["actionable-blocker-kind:command-not-allowlisted"],
       expectedStopReason: "Command blocked",

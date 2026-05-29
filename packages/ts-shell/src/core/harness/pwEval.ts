@@ -1,10 +1,10 @@
 import { PwAdapter } from "../context/pwAdapter.js";
 import {
-  createPwCloseoutReport,
+  createPwValidationReport,
   failureCodeFromRuntimeStatus,
   pwReportEntryFromEvidence,
   skippedPwReportEntry,
-  type PwCloseoutReport,
+  type PwValidationReport,
   type PwEvalMode,
 } from "../context/pwReport.js";
 import type { PwRuntimeStatus } from "../context/pwRuntime.js";
@@ -31,7 +31,7 @@ export function createPwEvalTasks(): readonly BrowserEvalBenchmarkTask[] {
       taskId: "pw-extract-js",
       description: "extract JS-rendered Direct Playwright text",
       request: pwRequest("extract", "js rendered", undefined, PW_JS_FIXTURE),
-      expectations: [{ kind: "contains", text: "JS rendered Playwright route ready" }, { kind: "executed", value: true }],
+      expectations: [{ kind: "contains", text: "JS rendered Playwright fixture ready" }, { kind: "executed", value: true }],
     },
     {
       taskId: "pw-click",
@@ -54,11 +54,11 @@ export async function runPwEval(input: {
   readonly adapter?: PwAdapter;
   readonly durationBudgetMs?: number;
   readonly tasks?: readonly BrowserEvalBenchmarkTask[];
-}): Promise<PwCloseoutReport> {
+}): Promise<PwValidationReport> {
   const tasks = input.tasks ?? createPwEvalTasks();
   const durationBudgetMs = input.durationBudgetMs ?? 5_000;
   if (input.mode === "skipped" || input.runtimeStatus.status !== "ready" && !input.adapter) {
-    return createPwCloseoutReport({
+    return createPwValidationReport({
       runtimeStatus: input.runtimeStatus,
       entries: tasks.map((task) => skippedPwReportEntry({
         scenarioId: task.taskId,
@@ -66,7 +66,7 @@ export async function runPwEval(input: {
         reasonCode: failureCodeFromRuntimeStatus(input.runtimeStatus),
         evidenceSummary: input.runtimeStatus.reason,
       })),
-      mcpBackend: "optional-not-default",
+      toolServerBackend: "optional-not-default",
     });
   }
   const startedAt = Date.now();
@@ -81,7 +81,7 @@ export async function runPwEval(input: {
     executor,
   });
   const durationMs = Date.now() - startedAt;
-  return createPwCloseoutReport({
+  return createPwValidationReport({
     runtimeStatus: input.runtimeStatus,
     entries: scores.map((score) => {
       const task = tasks.find((candidate) => candidate.taskId === score.taskId);
@@ -95,6 +95,6 @@ export async function runPwEval(input: {
         durationBudgetMs,
       });
     }),
-    mcpBackend: "optional-not-default",
+    toolServerBackend: "optional-not-default",
   });
 }

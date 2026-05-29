@@ -22,7 +22,7 @@ export const browserTxnGoldenCases: readonly BrowserTxnGoldenCase[] = [
       reasonCode: "ready",
       repairStatus: "not-needed",
       cleanupStatus: "closed",
-      finalSummaryIncludes: "JS rendered Playwright route ready",
+      finalSummaryIncludes: "JS rendered Playwright fixture ready",
       expectAction: false,
     },
   },

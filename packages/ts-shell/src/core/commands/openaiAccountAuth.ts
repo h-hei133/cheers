@@ -217,7 +217,7 @@ function buildAuthorizeUrl(input: {
 }
 
 function buildPkceCodes(): { verifier: string; challenge: string } {
-  // Match codex/opencode behavior: PKCE verifier with RFC7636 unreserved chars.
+  // Match the account-auth PKCE requirement: RFC7636 unreserved chars.
   const verifier = generatePkceVerifier(43);
   const challenge = createHash("sha256")
     .update(verifier)

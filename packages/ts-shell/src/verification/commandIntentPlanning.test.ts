@@ -17,7 +17,7 @@ describe("commandIntentPlanning", () => {
       directCommand: "npm publish",
     });
     expect(plan?.blockedReason).toContain(
-      "Run-command intent is not allowed in the MVP allowlist: npm publish",
+      "Run-command intent is not allowed in the controlled allowlist: npm publish",
     );
   });
 

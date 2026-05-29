@@ -3,8 +3,8 @@ import { sanitizeSidebarText } from "./sidebarStateModel.js";
 export type BrowserBackendKind =
   | "none"
   | "planned-playwright-cli"
-  | "planned-playwright-mcp"
-  | "planned-stagehand-like"
+  | "planned-browser-tool-server"
+  | "planned-action-layer"
   | "external";
 
 export type BrowserCapabilityStatus =
@@ -146,17 +146,17 @@ function defaultBackendCandidates(): readonly BrowserBackendCandidate[] {
       kind: "planned-playwright-cli",
       label: "Playwright CLI/Skills",
       status: "future",
-      summary: "Deterministic browser automation candidate; not wired in this route.",
+      summary: "Deterministic browser automation candidate; not wired by default.",
     },
     {
-      kind: "planned-playwright-mcp",
-      label: "Playwright MCP",
+      kind: "planned-browser-tool-server",
+      label: "browser tool server",
       status: "future",
-      summary: "Tool-server candidate with explicit capability list; no MCP launch or discovery here.",
+      summary: "Tool-server candidate with explicit capability list; no tool-server launch or discovery here.",
     },
     {
-      kind: "planned-stagehand-like",
-      label: "Stagehand-like split",
+      kind: "planned-action-layer",
+      label: "action-layer split",
       status: "future",
       summary: "Future deterministic action cache plus optional AI planning boundary; no model call here.",
     },

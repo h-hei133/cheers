@@ -84,11 +84,11 @@ describe("tool execution provenance", () => {
     });
   });
 
-  it("maps MVP allowlist denial as permission blocked", () => {
+  it("maps controlled allowlist denial as permission blocked", () => {
     expect(
       deriveToolExecutionProvenance({
         success: false,
-        error: "Tool 'network-fetch' is not in the MVP allowlist",
+        error: "Tool 'network-fetch' is not in the controlled allowlist",
       }),
     ).toEqual({
       kind: "permission-blocked",

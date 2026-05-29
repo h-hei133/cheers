@@ -10,7 +10,7 @@ describe("sidebar tool availability", () => {
       localCommands: [{ id: "sidebar", status: "available", summary: "Preview command." }],
       mcpServers: [{ id: "playwright", status: "unknown" }],
       skills: [{ id: "imagegen", status: "deferred" }],
-      browserTooling: [{ id: "stagehand", status: "unavailable", summary: "Not configured." }],
+      browserTooling: [{ id: "action-layer", status: "unavailable", summary: "Not configured." }],
     });
 
     expect(summary.discovery).toBe("not-run");

@@ -40,7 +40,7 @@ describe('core tool runtime (W2)', () => {
     )
 
     expect(result.success).toBe(false)
-    expect(result.error).toContain('not in the MVP allowlist')
+    expect(result.error).toContain('not in the controlled allowlist')
     expect(result.metadata?.runtimeReceipt).toMatchObject({
       resultSummary: expect.stringContaining('sandbox:stopped:command-not-allowlisted'),
       cleanupSummary: 'cleanup:not-started',

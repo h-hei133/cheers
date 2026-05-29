@@ -14,7 +14,7 @@ import {
   browserRuntimeRequest,
   createBrowserRuntimeMvpScenarioFixture,
   publicBrowserRuntimeManifestLoad,
-} from "./browserRuntimeMvpScenarioFixtures.js";
+} from "./browserRuntimeCapabilityScenarioFixtures.js";
 import {
   createBrowserEvalBenchmarkReport,
   renderBrowserEvalBenchmarkReport,
@@ -22,7 +22,7 @@ import {
 import { runBrowserEvalBenchmark } from "./browserEvalBenchmarkRunner.js";
 import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
 
-describe("browser runtime MVP scenario examples", () => {
+describe("browser runtime capability scenario examples", () => {
   it("reports runtime status unavailable when no explicit manifest is supplied", async () => {
     const parsed = parseBrowserCommandArgs(["runtime", "status"]);
     const result = await runBrowserCommandAsync({ contract: parsed.contract! });

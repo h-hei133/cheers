@@ -83,7 +83,7 @@ describe("Route 128 browser agent loop", () => {
     );
     expect(observe.status).toBe("completed");
     expect(observe.finalOutput).toContain("Browser task completed");
-    expect(observe.finalOutput).toContain("JS rendered Playwright route ready");
+    expect(observe.finalOutput).toContain("JS rendered Playwright fixture ready");
     expect(observe.codingResult?.evidence.some((entry) => entry.startsWith("browser-agent-observation:"))).toBe(true);
 
     const click = await runBrowserPrompt(

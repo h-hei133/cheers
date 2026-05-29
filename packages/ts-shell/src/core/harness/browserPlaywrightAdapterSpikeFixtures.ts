@@ -71,7 +71,7 @@ function pageEvidence(
   status: BrowserPlaywrightPageEvidence["status"],
   postAction?: string,
 ): BrowserPlaywrightPageEvidence {
-  const text = postAction ?? "JS rendered Playwright route ready";
+  const text = postAction ?? "JS rendered Playwright fixture ready";
   return {
     status,
     url: origin,
@@ -80,7 +80,7 @@ function pageEvidence(
     html: [
       "<main>",
       "<h1>Route 125 Direct Playwright</h1>",
-      "<p>JS rendered Playwright route ready</p>",
+      "<p>JS rendered Playwright fixture ready</p>",
       "<button id=\"save\">Save draft</button>",
       "<input aria-label=\"Safe note\" name=\"note\" type=\"text\" value=\"raw-user-value\" />",
       "<input aria-label=\"Password\" type=\"password\" />",

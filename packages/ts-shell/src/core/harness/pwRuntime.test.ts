@@ -87,7 +87,7 @@ describe("Route 126 Direct Playwright runtime", () => {
     expect(result.output).toContain("- Status: binary-missing");
     expect(result.output).toContain("- Reason code: runtime-binary-missing");
     expect(result.output).toContain("- Executable source: playwright-cache");
-    expect(result.output).toContain("- MCP backend: optional-not-default");
+    expect(result.output).toContain("- Tool-server backend: optional-not-default");
     expect(result.evidence).toContain("pw-runtime:status:binary-missing");
   });
 
@@ -100,7 +100,7 @@ describe("Route 126 Direct Playwright runtime", () => {
     expect(observe.receipt.domSnapshotId).toContain("dom:");
     expect(observe.receipt.accessibilitySnapshotId).toContain("accessibility:");
     expect(observe.receipt.provenanceId).toContain("browser-provenance:");
-    expect(extract.observation?.textSummary).toContain("JS rendered Playwright route ready");
+    expect(extract.observation?.textSummary).toContain("JS rendered Playwright fixture ready");
   });
 
   it("runs injected click and type without exposing typed values", async () => {

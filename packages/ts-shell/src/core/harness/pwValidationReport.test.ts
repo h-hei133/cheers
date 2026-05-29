@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { runBrowserActionLoopExecutor } from "../context/browserActionLoopExecutor.js";
 import { PwAdapter } from "../context/pwAdapter.js";
 import {
-  createPwCloseoutReport,
+  createPwValidationReport,
   failureCodeFromEvidence,
-  renderPwCloseoutReport,
+  renderPwValidationReport,
 } from "../context/pwReport.js";
 import type { PwRuntimeStatus } from "../context/pwRuntime.js";
 import { runPwEval } from "./pwEval.js";
@@ -17,21 +17,21 @@ import {
   pwRequest,
 } from "./pwFixtures.js";
 
-describe("Route 127 Direct Playwright closeout report", () => {
+describe("Direct Playwright validation report", () => {
   it("reports injected eval pass/fail/skip shape through the existing browser eval harness", async () => {
     const report = await runPwEval({
       runtimeStatus: readyStatus(),
       mode: "injected",
       adapter: injectedAdapter(),
     });
-    const rendered = renderPwCloseoutReport(report);
+    const rendered = renderPwValidationReport(report);
 
     expect(report.status).toBe("passed");
     expect(report.passed).toBe(report.total);
     expect(report.entries.map((entry) => entry.mode)).toEqual(expect.arrayContaining(["injected"]));
     expect(report.entries.every((entry) => entry.cleanupStatus === "closed")).toBe(true);
     expect(report.entries.every((entry) => entry.redactionStatus === "safe-summary")).toBe(true);
-    expect(rendered).toContain("MCP backend: optional-not-default");
+    expect(rendered).toContain("tool-server backend: optional-not-default");
     expect(rendered).toContain("Provider/model call: none");
     expect(rendered).not.toContain("<main>");
   });
@@ -48,7 +48,7 @@ describe("Route 127 Direct Playwright closeout report", () => {
     expect(report.entries.every((entry) => entry.durationBudget === "not-run")).toBe(true);
   });
 
-  it("classifies timeout and cleanup evidence with route failure taxonomy", async () => {
+  it("classifies timeout and cleanup evidence with runtime failure taxonomy", async () => {
     const result = await runBrowserActionLoopExecutor({
       request: pwRequest("observe", "timeout", undefined, PW_TIMEOUT_FIXTURE),
       manifestLoad: createPwManifestLoad(),
@@ -71,10 +71,10 @@ describe("Route 127 Direct Playwright closeout report", () => {
       manifestLoad: createPwManifestLoad(),
       executor: injectedAdapter(),
     });
-    const report = createPwCloseoutReport({
+    const report = createPwValidationReport({
       runtimeStatus: readyStatus(),
       entries: [],
-      mcpBackend: "optional-not-default",
+      toolServerBackend: "optional-not-default",
     });
     const serialized = JSON.stringify(secret.receipt) +
       JSON.stringify(secret.observation) +
@@ -119,8 +119,8 @@ function readyStatus(): PwRuntimeStatus {
     providerCall: "none",
     modelCall: "none",
     mcpLaunched: false,
-    reason: "Injected Direct Playwright closeout runtime is available.",
-    nextAction: "Run closeout eval.",
+    reason: "Injected Direct Playwright validation runtime is available.",
+    nextAction: "Run validation eval.",
     warnings: [],
     evidence: ["pw-runtime:status:ready"],
   };

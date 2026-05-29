@@ -5,7 +5,7 @@ import { runBrowserActionLoopExecutor } from "../context/browserActionLoopExecut
 import { BrowserRuntimeAdapterExecutor } from "../context/browserRuntimeAdapterExecutor.js";
 import { applyBrowserSelectorRepair } from "../context/browserSelectorRepairApplyExecutor.js";
 import { createBrowserRuntimeGauntletManifest } from "../context/browserRuntimeGauntletManifest.js";
-import { browserRuntimeRequest } from "./browserRuntimeMvpScenarioFixtures.js";
+import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserRuntimeAdapterFixture } from "./browserRuntimeAdapterFixtures.js";
 import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
 import { runBrowserEvalBenchmark } from "./browserEvalBenchmarkRunner.js";

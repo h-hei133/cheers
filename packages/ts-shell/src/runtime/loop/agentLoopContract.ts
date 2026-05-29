@@ -4,7 +4,7 @@ import type { ToolExecutionResult } from "../../tools/types.js";
 import { projectRuntimeEvents, type RuntimeProjectionEvent } from "../events/runtimeEventProjection.js";
 import type { RuntimeExecutionReceiptProjection } from "../execution/executionReceipt.js";
 
-export type ReferenceAgentLoopState =
+export type AgentLoopContractState =
   | "idle"
   | "starting"
   | "turn_running"
@@ -16,39 +16,39 @@ export type ReferenceAgentLoopState =
   | "aborted"
   | "failed";
 
-export type ReferenceLoopDeliveryMode = "steer" | "follow-up" | "next-turn";
-export type ReferenceLoopStopReason =
+export type AgentLoopContractDeliveryMode = "steer" | "follow-up" | "next-turn";
+export type AgentLoopContractStopReason =
   | "model-stop"
   | "tool-batch-terminated"
   | "turn-limit"
   | "follow-up-drained";
 
-export interface ReferenceLoopQueuedMessage {
+export interface AgentLoopContractQueuedMessage {
   readonly id: string;
-  readonly mode: ReferenceLoopDeliveryMode;
+  readonly mode: AgentLoopContractDeliveryMode;
   readonly text: string;
 }
 
-export interface ReferenceLoopToolCallRequest {
+export interface AgentLoopContractToolCallRequest {
   readonly id: string;
   readonly name: string;
   readonly arguments?: Record<string, unknown>;
 }
 
-export interface ReferenceLoopPreparedToolCall {
+export interface AgentLoopContractPreparedToolCall {
   readonly id: string;
   readonly name: string;
   readonly argumentKeys: readonly string[];
 }
 
-export interface ReferenceLoopToolCallBatch {
+export interface AgentLoopContractToolCallBatch {
   readonly id: string;
   readonly turn: number;
   readonly policy: "sequential" | "parallel" | "metadata-only";
-  readonly calls: readonly ReferenceLoopPreparedToolCall[];
+  readonly calls: readonly AgentLoopContractPreparedToolCall[];
 }
 
-export interface ReferenceLoopToolResultBatch {
+export interface AgentLoopContractToolResultBatch {
   readonly id: string;
   readonly callBatchId: string;
   readonly results: readonly ToolExecutionResult[];
@@ -57,24 +57,24 @@ export interface ReferenceLoopToolResultBatch {
   readonly terminate: boolean;
 }
 
-export interface ReferenceLoopModelResponseBoundary {
+export interface AgentLoopContractModelResponseBoundary {
   readonly responseId: string;
   readonly stopReason: "stop" | "tool-calls" | "aborted" | "failed";
-  readonly toolCalls?: readonly ReferenceLoopToolCallRequest[];
+  readonly toolCalls?: readonly AgentLoopContractToolCallRequest[];
   readonly safeSummary?: string;
   readonly notProvenClaims?: readonly string[];
 }
 
-export interface ReferenceLoopTurnInput {
+export interface AgentLoopContractTurnInput {
   readonly sessionId: string;
   readonly turn: number;
   readonly prompt: string;
-  readonly deliveredMessages: readonly ReferenceLoopQueuedMessage[];
+  readonly deliveredMessages: readonly AgentLoopContractQueuedMessage[];
   readonly pendingNextTurnFacts: readonly string[];
   readonly abortSignal?: AbortSignal;
 }
 
-export interface ReferenceAgentLoopInput {
+export interface AgentLoopContractInput {
   readonly sessionId: string;
   readonly workspaceRoot: string;
   readonly prompt: string;
@@ -82,22 +82,22 @@ export interface ReferenceAgentLoopInput {
   readonly providerMode?: "synthetic" | "real" | "default";
   readonly modelLabel?: string;
   readonly maxTurns?: number;
-  readonly queuedMessages?: readonly ReferenceLoopQueuedMessage[];
+  readonly queuedMessages?: readonly AgentLoopContractQueuedMessage[];
   readonly toolBatchPolicy?: "sequential" | "parallel" | "metadata-only";
   readonly modelBoundary: (
-    input: ReferenceLoopTurnInput,
-  ) => Promise<ReferenceLoopModelResponseBoundary>;
+    input: AgentLoopContractTurnInput,
+  ) => Promise<AgentLoopContractModelResponseBoundary>;
   readonly toolBatchBoundary?: (
-    batch: ReferenceLoopToolCallBatch,
-  ) => Promise<ReferenceLoopToolResultBatch>;
+    batch: AgentLoopContractToolCallBatch,
+  ) => Promise<AgentLoopContractToolResultBatch>;
   readonly abortSignal?: AbortSignal;
 }
 
-export interface ReferenceAgentLoopProjection {
-  readonly state: ReferenceAgentLoopState;
-  readonly stopReason?: ReferenceLoopStopReason;
+export interface AgentLoopContractProjection {
+  readonly state: AgentLoopContractState;
+  readonly stopReason?: AgentLoopContractStopReason;
   readonly failureClass?: "model-boundary" | "tool-batch-boundary";
-  readonly turns: readonly ReferenceLoopTurnProjection[];
+  readonly turns: readonly AgentLoopContractTurnProjection[];
   readonly pendingDelivery: {
     readonly steer: number;
     readonly followUp: number;
@@ -108,16 +108,16 @@ export interface ReferenceAgentLoopProjection {
   readonly notProvenClaims: readonly string[];
 }
 
-export interface ReferenceLoopTurnProjection {
+export interface AgentLoopContractTurnProjection {
   readonly turn: number;
   readonly snapshot: RuntimeTurnSnapshot;
   readonly modelBoundary: {
     readonly responseId: string;
-    readonly stopReason: ReferenceLoopModelResponseBoundary["stopReason"];
+    readonly stopReason: AgentLoopContractModelResponseBoundary["stopReason"];
     readonly toolCallCount: number;
   };
-  readonly toolCallBatch?: ReferenceLoopToolCallBatch;
-  readonly toolResultBatch?: ReferenceLoopToolResultBatch;
+  readonly toolCallBatch?: AgentLoopContractToolCallBatch;
+  readonly toolResultBatch?: AgentLoopContractToolResultBatch;
   readonly savePoint: RuntimeEvidenceSavePoint;
   readonly nextTurn: {
     readonly prepared: boolean;
@@ -139,17 +139,17 @@ const REDACTION_EXCLUSIONS = [
   "unsafe-file-contents",
 ] as const;
 
-export async function runReferenceAgentLoop(
-  input: ReferenceAgentLoopInput,
-): Promise<ReferenceAgentLoopProjection> {
+export async function runAgentLoopContract(
+  input: AgentLoopContractInput,
+): Promise<AgentLoopContractProjection> {
   const events: RuntimeProjectionEvent[] = [];
-  const turns: ReferenceLoopTurnProjection[] = [];
+  const turns: AgentLoopContractTurnProjection[] = [];
   const queued = [...(input.queuedMessages ?? [])];
   const pendingNextTurnFacts: string[] = [];
   const maxTurns = Math.max(1, input.maxTurns ?? 4);
-  let state: ReferenceAgentLoopState = "idle";
+  let state: AgentLoopContractState = "idle";
 
-  const transition = (to: ReferenceAgentLoopState, reason: string) => {
+  const transition = (to: AgentLoopContractState, reason: string) => {
     const from = state;
     state = to;
     appendEvent(events, "agent-loop-state-transitioned", {
@@ -262,8 +262,8 @@ export async function runReferenceAgentLoop(
       }
 
       const toolCalls = modelBoundary.toolCalls ?? [];
-      let toolCallBatch: ReferenceLoopToolCallBatch | undefined;
-      let toolResultBatch: ReferenceLoopToolResultBatch | undefined;
+      let toolCallBatch: AgentLoopContractToolCallBatch | undefined;
+      let toolResultBatch: AgentLoopContractToolResultBatch | undefined;
       if (toolCalls.length > 0) {
         transition("awaiting_tool_results", `turn-${turn}-tool-call-batch`);
         toolCallBatch = {
@@ -343,7 +343,7 @@ export async function runReferenceAgentLoop(
         ],
         notProvenClaims: [
           "terminal-success",
-          "loop-reference-only",
+          "loop-contract-only",
           ...(modelBoundary.notProvenClaims ?? []),
         ],
       });
@@ -381,7 +381,7 @@ export async function runReferenceAgentLoop(
         terminalSuccessClaim: false,
         notProvenClaims: Object.freeze([
           "terminal-success",
-          "loop-reference-only",
+          "loop-contract-only",
         ]),
       }));
 
@@ -407,7 +407,7 @@ export async function runReferenceAgentLoop(
         continue;
       }
 
-      const stopReason: ReferenceLoopStopReason = turn >= maxTurns
+      const stopReason: AgentLoopContractStopReason = turn >= maxTurns
         ? "turn-limit"
         : hasFollowUp
           ? "follow-up-drained"
@@ -439,12 +439,12 @@ export async function runReferenceAgentLoop(
 }
 
 function drainDeliveryForTurn(
-  queued: ReferenceLoopQueuedMessage[],
+  queued: AgentLoopContractQueuedMessage[],
   turn: number,
-): ReferenceLoopQueuedMessage[] {
-  const deliverableMode: ReferenceLoopDeliveryMode =
+): AgentLoopContractQueuedMessage[] {
+  const deliverableMode: AgentLoopContractDeliveryMode =
     turn === 1 ? "next-turn" : "follow-up";
-  const delivered: ReferenceLoopQueuedMessage[] = [];
+  const delivered: AgentLoopContractQueuedMessage[] = [];
   for (let index = 0; index < queued.length;) {
     const message = queued[index];
     if (!message) {
@@ -462,8 +462,8 @@ function drainDeliveryForTurn(
 }
 
 function prepareToolCall(
-  call: ReferenceLoopToolCallRequest,
-): ReferenceLoopPreparedToolCall {
+  call: AgentLoopContractToolCallRequest,
+): AgentLoopContractPreparedToolCall {
   return deepFreeze({
     id: sanitizeText(call.id),
     name: sanitizeText(call.name),
@@ -509,15 +509,15 @@ function appendEvent(
 }
 
 function finalizeProjection(
-  state: ReferenceAgentLoopState,
-  turns: readonly ReferenceLoopTurnProjection[],
+  state: AgentLoopContractState,
+  turns: readonly AgentLoopContractTurnProjection[],
   events: readonly RuntimeProjectionEvent[],
-  queued: readonly ReferenceLoopQueuedMessage[],
+  queued: readonly AgentLoopContractQueuedMessage[],
   options: {
-    readonly stopReason?: ReferenceLoopStopReason;
+    readonly stopReason?: AgentLoopContractStopReason;
     readonly failureClass?: "model-boundary" | "tool-batch-boundary";
   } = {},
-): ReferenceAgentLoopProjection {
+): AgentLoopContractProjection {
   return deepFreeze({
     state,
     ...(options.stopReason ? { stopReason: options.stopReason } : {}),
@@ -536,7 +536,7 @@ function finalizeProjection(
       "tool-success",
       "save-point-success",
       "result-success",
-      "loop-reference-only",
+      "loop-contract-only",
     ]),
   });
 }

@@ -27,7 +27,7 @@ describe("Route 129 browser transaction agent loop", () => {
     expect(result.status).toBe("completed");
     expect(result.finalOutput).toContain("Browser task completed");
     expect(result.finalOutput).toContain("Transaction: success");
-    expect(result.finalOutput).toContain("JS rendered Playwright route ready");
+    expect(result.finalOutput).toContain("JS rendered Playwright fixture ready");
     expect(result.codingResult?.evidence.some((entry) => entry.startsWith("browser-agent-transaction:"))).toBe(true);
   }, 30000);
 

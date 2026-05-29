@@ -14,7 +14,7 @@ describe("tool policy/result contract", () => {
       buildPolicyBlockedResult({
         capability: "command",
         reasonCode: "command-not-allowlisted",
-        reason: "Run-command intent is not allowed in the MVP allowlist: curl",
+        reason: "Run-command intent is not allowed in the controlled allowlist: curl",
         doNext: "Use an allowlisted command.",
         evidence: ["actionable-blocker-kind:command-not-allowlisted"],
       }),

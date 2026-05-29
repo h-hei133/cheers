@@ -20,7 +20,7 @@ export interface PwReportEntry {
   readonly redactionStatus: PwRedactionStatus;
 }
 
-export interface PwCloseoutReport {
+export interface PwValidationReport {
   readonly status: "passed" | "failed" | "skipped";
   readonly runtimeStatus: PwRuntimeStatus["status"];
   readonly runtimeReasonCode: PwRuntimeStatus["reasonCode"];
@@ -30,17 +30,17 @@ export interface PwCloseoutReport {
   readonly failed: number;
   readonly skipped: number;
   readonly entries: readonly PwReportEntry[];
-  readonly mcpBackend: "optional-not-default" | "not-wired";
+  readonly toolServerBackend: "optional-not-default" | "not-wired";
   readonly noProviderModelCalls: true;
   readonly noPublicAutomation: true;
   readonly nextAction: string;
 }
 
-export function createPwCloseoutReport(input: {
+export function createPwValidationReport(input: {
   readonly runtimeStatus: PwRuntimeStatus;
   readonly entries: readonly PwReportEntry[];
-  readonly mcpBackend?: PwCloseoutReport["mcpBackend"];
-}): PwCloseoutReport {
+  readonly toolServerBackend?: PwValidationReport["toolServerBackend"];
+}): PwValidationReport {
   const passed = input.entries.filter((entry) => entry.outcome === "pass").length;
   const failed = input.entries.filter((entry) => entry.outcome === "fail").length;
   const skipped = input.entries.filter((entry) => entry.outcome === "skip").length;
@@ -59,20 +59,20 @@ export function createPwCloseoutReport(input: {
     failed,
     skipped,
     entries: input.entries,
-    mcpBackend: input.mcpBackend ?? "not-wired",
+    toolServerBackend: input.toolServerBackend ?? "not-wired",
     noProviderModelCalls: true,
     noPublicAutomation: true,
     nextAction: status === "failed"
       ? "Inspect failed Direct Playwright scenarios before widening browser runtime scope."
       : status === "skipped"
         ? input.runtimeStatus.nextAction
-        : "Direct Playwright closeout report is usable for controlled local/test runtime validation.",
+        : "Direct Playwright validation report is usable for controlled local/test runtime validation.",
   };
 }
 
-export function renderPwCloseoutReport(report: PwCloseoutReport): string {
+export function renderPwValidationReport(report: PwValidationReport): string {
   return [
-    "Direct Playwright closeout",
+    "Direct Playwright validation",
     `- Status: ${report.status}`,
     `- Runtime: ${report.runtimeStatus}`,
     `- Runtime reason: ${report.runtimeReasonCode}`,
@@ -80,7 +80,7 @@ export function renderPwCloseoutReport(report: PwCloseoutReport): string {
     `- Score: ${report.passed}/${report.total}`,
     `- Failed: ${report.failed}`,
     `- Skipped: ${report.skipped}`,
-    `- MCP backend: ${report.mcpBackend}`,
+    `- tool-server backend: ${report.toolServerBackend}`,
     "- Provider/model call: none",
     "- Public automation: no",
     `- Evidence summary: ${report.entries.map(renderEntrySummary).join("; ") || "none"}`,

@@ -134,8 +134,8 @@ export class ToolRuntime {
         capability: 'command',
         label: toolName,
         reasonCode: 'command-not-allowlisted',
-        reason: `Tool '${toolName}' is not in the MVP allowlist`,
-        doNext: 'Retry with one of the visible MVP tools.',
+        reason: `Tool '${toolName}' is not in the controlled allowlist`,
+        doNext: 'Retry with one of the visible controlled tools.',
         evidence: ['tool-runtime:allowlist-blocked'],
       })
       return deniedResult(receipt.reason, {
@@ -193,7 +193,7 @@ export class ToolRuntime {
         capability: 'tool',
         label: toolName,
         reason: `Tool '${toolName}' is not registered`,
-        doNext: 'Retry with a visible MVP tool.',
+        doNext: 'Retry with a visible controlled tool.',
         evidence: ['tool-runtime:tool-unavailable'],
       })
       return deniedResult(receipt.reason)

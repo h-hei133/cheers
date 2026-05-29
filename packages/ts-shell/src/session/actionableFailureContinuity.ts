@@ -138,7 +138,7 @@ function classifyBlockerFromReason(
   ) {
     return "approval-denied";
   }
-  if (normalized.includes("not allowed in the mvp allowlist")) {
+  if (normalized.includes("not allowed in the controlled allowlist")) {
     return "command-not-allowlisted";
   }
   if (

@@ -48,6 +48,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/build-infrastructure/pi-deep-audit-uncovered-patterns.md` | historical | Reading BI006 pattern-by-pattern Pi audit evidence and local uncovered-pattern status. |  | Build Infrastructure |
 | `docs/build-infrastructure/pi-next-direction-map.md` | historical | Reading BI006 prioritized next-direction map with owner domains, risks, and validation approach. |  | Build Infrastructure |
 | `docs/build-infrastructure/pi-pattern-rejection-and-delay-log.md` | historical | Reading BI006 delayed and rejected Pi patterns plus blind-copy risks. |  | Build Infrastructure |
+| `docs/build-infrastructure/product-naming-origin-audit.md` | historical | Reading BI012 product naming cleanup results, compatibility exceptions, and remaining route-era naming risks. |  | Build Infrastructure |
 | `docs/dev-history/routes/README.md` | historical | Finding route document quarantine status and route-history script namespace. |  | Product Architecture Reset |
 | `docs/dev-history/routes/route222*.md` through `docs/dev-history/routes/route226*.md` | historical | Reading quarantined Route222-226 route documents; old `docs/agent-routes/` paths are compatibility pointers. |  | Product Architecture Reset |
 | `docs/evidence/history/route-reports/README.md` | historical | Finding historical route report provenance and compatibility status. |  | Product Architecture Reset |

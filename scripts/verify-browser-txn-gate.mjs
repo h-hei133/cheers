@@ -19,8 +19,8 @@ const testTargets = [
   'src/core/harness/browserContinue.test.ts',
   'src/core/harness/pwReal.test.ts',
   'src/core/harness/pwRuntime.test.ts',
-  'src/core/harness/pwCloseout.test.ts',
-  'src/core/harness/pwMcp.test.ts',
+  'src/core/harness/pwValidationReport.test.ts',
+  'src/core/harness/browserToolServerBackend.test.ts',
 ]
 
 console.log('gate name=browser-txn-gate')

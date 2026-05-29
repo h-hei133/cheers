@@ -17,7 +17,7 @@ import {
 } from "./runtimeEventProjection.js";
 
 describe("JSON runtime event stream projection", () => {
-  it("serializes BI002 through BI008 event observations as JSON-safe ordered entries", () => {
+  it("serializes runtime event observations as JSON-safe ordered entries", () => {
     const turnSnapshot = createRuntimeTurnSnapshot({
       sessionId: "sess-stream",
       turn: 1,

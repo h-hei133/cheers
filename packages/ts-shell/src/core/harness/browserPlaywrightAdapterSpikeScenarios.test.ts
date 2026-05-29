@@ -5,13 +5,13 @@ import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
 import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
 import { BrowserDirectPlaywrightAdapter } from "../context/browserDirectPlaywrightAdapter.js";
 import { createBrowserExecutionRequest } from "../context/browserExecutionContract.js";
-import { comparePlaywrightMcpBackend } from "../context/browserPlaywrightMcpBackendComparison.js";
+import { compareBrowserToolServerBackend } from "../context/browserToolServerBackendComparison.js";
 import { renderBrowserPlaywrightAdapterSurface } from "../context/browserPlaywrightAdapterSurface.js";
 import { decideBrowserRuntimeDirection } from "../context/browserRuntimeDirectionDecision.js";
 import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
 import { runBrowserEvalBenchmark } from "./browserEvalBenchmarkRunner.js";
 import { createBrowserEvalBenchmarkReport } from "./browserEvalBenchmarkReport.js";
-import { browserRuntimeRequest } from "./browserRuntimeMvpScenarioFixtures.js";
+import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserPlaywrightAdapterSpikeFixture } from "./browserPlaywrightAdapterSpikeFixtures.js";
 
 describe("browser Direct Playwright adapter spike scenarios", () => {
@@ -51,7 +51,7 @@ describe("browser Direct Playwright adapter spike scenarios", () => {
     const fixture = await createBrowserPlaywrightAdapterSpikeFixture();
     const result = await runDirect(fixture, browserRuntimeRequest("extract", fixture.origin));
 
-    expect(result.observation?.textSummary).toContain("JS rendered Playwright route ready");
+    expect(result.observation?.textSummary).toContain("JS rendered Playwright fixture ready");
     expect(result.receipt.executed).toBe(true);
   });
 
@@ -126,44 +126,44 @@ describe("browser Direct Playwright adapter spike scenarios", () => {
 
   it("sidebar/report summary includes adapter status", async () => {
     const fixture = await createBrowserPlaywrightAdapterSpikeFixture();
-    const comparison = comparePlaywrightMcpBackend();
+    const comparison = compareBrowserToolServerBackend();
     const decision = decideBrowserRuntimeDirection({
       availability: fixture.available,
-      mcpComparison: comparison,
+      toolServerComparison: comparison,
       directAdapterScenarioPassed: true,
     });
     const output = renderBrowserPlaywrightAdapterSurface({
       availability: fixture.available,
-      mcpComparison: comparison,
+      toolServerComparison: comparison,
       decision,
       tested: ["observe", "extract", "click", "type"],
     });
 
     expect(output).toContain("Direct Playwright availability");
     expect(output).toContain("Recommended core: direct-playwright");
-    expect(output).toContain("MCP launched: no");
+    expect(output).toContain("tool-server launched: no");
   });
 
   it("integrates Direct Playwright direction into /browser runtime status", async () => {
     const fixture = await createBrowserPlaywrightAdapterSpikeFixture();
-    const comparison = comparePlaywrightMcpBackend();
+    const comparison = compareBrowserToolServerBackend();
     const decision = decideBrowserRuntimeDirection({
       availability: fixture.available,
-      mcpComparison: comparison,
+      toolServerComparison: comparison,
       directAdapterScenarioPassed: true,
     });
     const parsed = parseBrowserCommandArgs(["runtime", "status"]);
     const result = await runBrowserCommandAsync({
       contract: parsed.contract!,
       browserPlaywrightAvailability: fixture.available,
-      browserPlaywrightMcpComparison: comparison,
+      browserToolServerComparison: comparison,
       browserRuntimeDirectionDecision: decision,
     });
 
     expect(result.output).toContain("Browser runtime status");
     expect(result.output).toContain("Direct Playwright availability");
     expect(result.output).toContain("Recommended core: direct-playwright");
-    expect(result.output).toContain("MCP launched: no");
+    expect(result.output).toContain("tool-server launched: no");
   });
 
   it("reuses existing eval gauntlet through injected Playwright-like adapter", async () => {

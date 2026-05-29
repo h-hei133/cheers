@@ -113,8 +113,8 @@ export function deriveToolExecutionProvenance(
   }
 
   if (
-    error.includes("not in the mvp allowlist") ||
-    error.includes("not allowed in the mvp allowlist")
+    error.includes("not in the controlled allowlist") ||
+    error.includes("not allowed in the controlled allowlist")
   ) {
     return {
       kind: "permission-blocked",

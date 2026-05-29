@@ -214,7 +214,7 @@ export function classifyActionableKind(
   if (verificationFailed || normalized.includes("verification failed")) {
     return "verification-failed";
   }
-  if (normalized.includes("not allowed in the mvp allowlist")) {
+  if (normalized.includes("not allowed in the controlled allowlist")) {
     return "command-not-allowlisted";
   }
   if (

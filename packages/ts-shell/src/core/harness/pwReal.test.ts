@@ -43,7 +43,7 @@ describe("Route 126 real Direct Playwright runtime", () => {
     const result = await runReal(runtime, pwRequest("extract", "js rendered", undefined, PW_JS_FIXTURE));
 
     expect(result.receipt.executed).toBe(true);
-    expect(result.observation?.textSummary).toContain("JS rendered Playwright route ready");
+    expect(result.observation?.textSummary).toContain("JS rendered Playwright fixture ready");
   });
 
   realBrowserIt(`real click result${REAL_BROWSER_SKIP_REASON ? ` skipped: ${REAL_BROWSER_SKIP_REASON}` : ""}`, async () => {

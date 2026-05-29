@@ -341,7 +341,7 @@ function classifyActionableBlockerKind(
   if (verificationFailed || normalizedReason.includes("verification failed")) {
     return "verification-failed";
   }
-  if (normalizedReason.includes("not allowed in the mvp allowlist")) {
+  if (normalizedReason.includes("not allowed in the controlled allowlist")) {
     return "command-not-allowlisted";
   }
   if (

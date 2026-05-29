@@ -157,7 +157,7 @@ function buildPlan(input: {
         `browser-transaction-planner:repair:${input.repairAllowed ? "allowed" : "disabled"}`,
         "browser-transaction-planner:deterministic",
         "browser-transaction-planner:no-provider-or-model-call",
-        "browser-transaction-planner:no-stagehand-planner",
+        "browser-transaction-planner:no-action-layer-planner",
       ],
     },
     ...(input.timeoutMs ? { timeoutMs: input.timeoutMs } : {}),

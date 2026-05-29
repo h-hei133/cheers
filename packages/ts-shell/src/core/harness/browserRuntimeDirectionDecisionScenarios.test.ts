@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comparePlaywrightMcpBackend } from "../context/browserPlaywrightMcpBackendComparison.js";
+import { compareBrowserToolServerBackend } from "../context/browserToolServerBackendComparison.js";
 import { renderBrowserPlaywrightAdapterSurface } from "../context/browserPlaywrightAdapterSurface.js";
 import { decideBrowserRuntimeDirection } from "../context/browserRuntimeDirectionDecision.js";
 import { auditBrowserPlaywrightRuntimeAvailability } from "../context/browserPlaywrightRuntimeAvailability.js";
@@ -7,15 +7,15 @@ import { auditBrowserPlaywrightRuntimeAvailability } from "../context/browserPla
 describe("browser runtime direction decision scenarios", () => {
   it("Direct Playwright available and controllable recommends core runtime", async () => {
     const availability = await availablePlaywright();
-    const comparison = comparePlaywrightMcpBackend();
+    const comparison = compareBrowserToolServerBackend();
     const decision = decideBrowserRuntimeDirection({
       availability,
-      mcpComparison: comparison,
+      toolServerComparison: comparison,
       directAdapterScenarioPassed: true,
     });
 
     expect(decision.recommendedCoreRuntime).toBe("direct-playwright");
-    expect(decision.optionalBackends).toContain("playwright-mcp");
+    expect(decision.optionalBackends).toContain("browser-tool-server");
     expect(decision.rejectedPaths).toContain("hand-rolled-low-level-runtime");
   });
 
@@ -25,7 +25,7 @@ describe("browser runtime direction decision scenarios", () => {
     });
     const decision = decideBrowserRuntimeDirection({
       availability,
-      mcpComparison: comparePlaywrightMcpBackend(),
+      toolServerComparison: compareBrowserToolServerBackend(),
       directAdapterScenarioPassed: false,
     });
 
@@ -33,8 +33,8 @@ describe("browser runtime direction decision scenarios", () => {
     expect(decision.route126Prerequisites.join(" ")).toContain("dependency");
   });
 
-  it("MCP backend mature but control plane weaker recommends optional backend", async () => {
-    const comparison = comparePlaywrightMcpBackend({
+  it("tool-server backend mature but control plane weaker recommends optional backend", async () => {
+    const comparison = compareBrowserToolServerBackend({
       toolSchemaMaturity: "high",
       evidenceMappingQuality: "high",
       controlPlaneVisibility: "partial",
@@ -44,35 +44,35 @@ describe("browser runtime direction decision scenarios", () => {
     });
 
     expect(comparison.suitability).toBe("optional-backend");
-    expect(comparison.evidence).toContain("playwright-mcp-backend-comparison:no-mcp-launch");
+    expect(comparison.evidence).toContain("browser-tool-server-backend-comparison:no-tool-server-launch");
   });
 
-  it("Stagehand-like planner useful but not core runtime recommends future planner layer", async () => {
+  it("action-layer planner useful but not core runtime recommends future planner layer", async () => {
     const decision = decideBrowserRuntimeDirection({
       availability: await auditBrowserPlaywrightRuntimeAvailability(),
-      mcpComparison: comparePlaywrightMcpBackend(),
-      stagehandPlannerUseful: true,
+      toolServerComparison: compareBrowserToolServerBackend(),
+      actionLayerPlannerUseful: true,
     });
 
     expect(decision.rejectedPaths).toContain("hand-rolled-low-level-runtime");
-    expect(decision.reasons.join(" ")).toContain("Stagehand-like");
+    expect(decision.reasons.join(" ")).toContain("action-layer");
     expect(decision.recommendedCoreRuntime).toBe("dependency-decision-required");
   });
 
   it("decision report is concise and redacted", async () => {
     const availability = await availablePlaywright();
-    const comparison = comparePlaywrightMcpBackend();
+    const comparison = compareBrowserToolServerBackend();
     const decision = decideBrowserRuntimeDirection({
       availability,
-      mcpComparison: comparison,
+      toolServerComparison: comparison,
       directAdapterScenarioPassed: true,
     });
     const output = renderBrowserPlaywrightAdapterSurface({
       availability,
-      mcpComparison: comparison,
+      toolServerComparison: comparison,
       decision,
       tested: ["observe", "extract", "click", "type", "sk-route125SECRET"],
-      notDone: ["no package install", "no MCP launch", "no public automation"],
+      notDone: ["no tool-server launch", "no public automation"],
     });
 
     expect(output.split("\n").length).toBeLessThan(25);

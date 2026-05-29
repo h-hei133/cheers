@@ -22,7 +22,7 @@ export interface BrowserReplayReadiness {
 }
 
 export interface BrowserActionCacheMetadata {
-  readonly cacheConcept: "stagehand-like-action-cache";
+  readonly cacheConcept: "action-layer-cache";
   readonly cacheKey: string;
   readonly cacheStatus: "not-persisted" | "not-applicable";
   readonly variableKeys: readonly string[];
@@ -105,7 +105,7 @@ export function classifyBrowserReplayReadiness(input: {
     reasons: reasons.length > 0 ? reasons : ["local-test-safe-read-only-action"],
     nextAction: nextActionFor(status),
     actionCacheMetadata: {
-      cacheConcept: "stagehand-like-action-cache",
+      cacheConcept: "action-layer-cache",
       cacheKey: deterministicBrowserActionCacheKey(input.requestId, input.actionKind, input.evidenceBundle.safeOriginOrFixtureId),
       cacheStatus: status === "replay-ready" ? "not-persisted" : "not-applicable",
       variableKeys: [],

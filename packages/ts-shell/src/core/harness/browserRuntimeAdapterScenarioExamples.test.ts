@@ -11,7 +11,7 @@ import { applyBrowserSelectorRepair } from "../context/browserSelectorRepairAppl
 import {
   createBrowserRuntimeAdapterFixture,
 } from "./browserRuntimeAdapterFixtures.js";
-import { browserRuntimeRequest } from "./browserRuntimeMvpScenarioFixtures.js";
+import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 
 describe("browser runtime adapter scenario examples", () => {
   it("reports unavailable when no adapter manifest is supplied", async () => {

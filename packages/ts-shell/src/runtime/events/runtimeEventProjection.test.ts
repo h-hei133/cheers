@@ -10,7 +10,7 @@ import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { projectRuntimeEvents } from "./runtimeEventProjection.js";
 
 describe("runtime event projection", () => {
-  it("projects BI002 and BI003 facts in stable observation order", () => {
+  it("projects runtime snapshot and receipt facts in stable observation order", () => {
     const snapshot = createRuntimeTurnSnapshot({
       sessionId: "sess-events",
       turn: 1,

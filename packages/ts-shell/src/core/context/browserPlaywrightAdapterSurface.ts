@@ -1,5 +1,5 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
-import type { BrowserPlaywrightMcpBackendComparison } from "./browserPlaywrightMcpBackendComparison.js";
+import type { BrowserToolServerBackendComparison } from "./browserToolServerBackendComparison.js";
 import {
   renderBrowserPlaywrightRuntimeAvailability,
   type BrowserPlaywrightRuntimeAvailability,
@@ -8,7 +8,7 @@ import type { BrowserRuntimeDirectionDecision } from "./browserRuntimeDirectionD
 
 export function renderBrowserPlaywrightAdapterSurface(input: {
   readonly availability: BrowserPlaywrightRuntimeAvailability;
-  readonly mcpComparison: BrowserPlaywrightMcpBackendComparison;
+  readonly toolServerComparison: BrowserToolServerBackendComparison;
   readonly decision: BrowserRuntimeDirectionDecision;
   readonly tested?: readonly string[];
   readonly notDone?: readonly string[];
@@ -17,7 +17,7 @@ export function renderBrowserPlaywrightAdapterSurface(input: {
     renderBrowserPlaywrightRuntimeAvailability(input.availability),
     "",
     "Playwright backend direction",
-    `- MCP backend: ${input.mcpComparison.suitability}`,
+    `- tool-server backend: ${input.toolServerComparison.suitability}`,
     `- Recommended core: ${input.decision.recommendedCoreRuntime}`,
     `- Optional backends: ${input.decision.optionalBackends.length > 0 ? input.decision.optionalBackends.join(", ") : "none"}`,
     `- Rejected paths: ${input.decision.rejectedPaths.join(", ")}`,
@@ -26,7 +26,7 @@ export function renderBrowserPlaywrightAdapterSurface(input: {
     `- Next action: ${safe(input.decision.nextAction, 220)}`,
     "- Raw content: excluded",
     "- Provider/model call: none",
-    "- MCP launched: no",
+    "- tool-server launched: no",
   ].join("\n");
 }
 
@@ -34,7 +34,7 @@ function defaultNotDone(): readonly string[] {
   return [
     "no package install",
     "no real browser launch",
-    "no MCP launch",
+    "no tool-server launch",
     "no public automation",
   ];
 }

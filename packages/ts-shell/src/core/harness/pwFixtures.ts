@@ -37,7 +37,7 @@ export const pwFixtures = [
     html: [
       "<!doctype html><html><head><title>Route 126 JS Fixture</title></head><body>",
       "<main><h1>Route 126 JS Fixture</h1><p id=\"status\">Booting</p></main>",
-      "<script>setTimeout(()=>{document.querySelector('#status').textContent='JS rendered Playwright route ready'; window.__pwReady=true;}, 10)</script>",
+      "<script>setTimeout(()=>{document.querySelector('#status').textContent='JS rendered Playwright fixture ready'; window.__pwReady=true;}, 10)</script>",
       "</body></html>",
     ].join(""),
   },
@@ -118,7 +118,7 @@ export function createInjectedPwClient(): PwInjectedClient {
         : request.actionKind === "type"
           ? "Updated Safe note"
           : fixture.marker === PW_JS_FIXTURE
-            ? "JS rendered Playwright route ready"
+            ? "JS rendered Playwright fixture ready"
             : "Static fixture ready";
       return evidence(request, fixture.marker, "ok", postAction, fixture.html);
     },
