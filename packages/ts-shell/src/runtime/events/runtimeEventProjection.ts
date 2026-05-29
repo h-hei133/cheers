@@ -23,7 +23,20 @@ export type RuntimeProjectionEventType =
   | "session-context-rebuild-projected"
   | "branch-unsupported"
   | "compaction-unsupported"
-  | "terminal-verdict-observed";
+  | "terminal-verdict-observed"
+  | "agent-loop-started"
+  | "agent-loop-state-transitioned"
+  | "agent-loop-turn-started"
+  | "agent-loop-model-boundary-observed"
+  | "agent-loop-tool-call-batch-observed"
+  | "agent-loop-tool-result-batch-observed"
+  | "agent-loop-save-point-requested"
+  | "agent-loop-next-turn-prepared"
+  | "agent-loop-delivery-queued"
+  | "agent-loop-delivery-delivered"
+  | "agent-loop-stopped"
+  | "agent-loop-aborted"
+  | "agent-loop-failed";
 
 export interface RuntimeProjectionEvent {
   readonly id: string;
