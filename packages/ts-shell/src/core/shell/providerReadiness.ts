@@ -4,6 +4,7 @@ import type {
   OpenAIAccountAuthConfig,
 } from "../../config/runtimeConfig.js";
 import { createProviderFetchFromEnv } from "../../model-adapters/providerFetch.js";
+import type { ProviderRegistryProjection } from "../../provider/providerRegistry.js";
 import type { QueryEvent } from "../query/events.js";
 import { buildUnavailableResult } from "../tools/toolPolicyResult.js";
 import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
@@ -37,6 +38,51 @@ export interface ProviderReadinessCheckOptions {
   readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
   readonly baseUrl?: string;
   readonly model?: string;
+}
+
+export interface ProviderReadinessMetadataProjection {
+  readonly providerId: string;
+  readonly providerLabel: string;
+  readonly registryMode: ProviderRegistryProjection["registryMode"];
+  readonly providerDefaultEnablement: "disabled";
+  readonly requiresExplicitOptIn: true;
+  readonly compatibilityFlags: readonly string[];
+  readonly authProjectionStatus: "present" | "missing";
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims: readonly string[];
+}
+
+export function projectProviderReadinessMetadata(input: {
+  readonly provider: RuntimeProvider | string;
+  readonly registry: ProviderRegistryProjection;
+}): ProviderReadinessMetadataProjection {
+  const provider =
+    input.registry.providers.find(
+      (candidate) => candidate.providerId === input.provider,
+    ) ?? input.registry.providers[0];
+  const authProjection = input.registry.auth.find(
+    (candidate) => candidate.providerId === provider?.providerId,
+  );
+
+  return {
+    providerId: provider?.providerId ?? String(input.provider),
+    providerLabel: provider?.safeLabel ?? String(input.provider),
+    registryMode: input.registry.registryMode,
+    providerDefaultEnablement: "disabled",
+    requiresExplicitOptIn: true,
+    compatibilityFlags: provider
+      ? compatibilityFlagSummary(provider.compatibility)
+      : [],
+    authProjectionStatus: authProjection ? "present" : "missing",
+    terminalSuccessClaim: false,
+    notProvenClaims: [
+      "provider-enabled",
+      "provider-success",
+      "auth-secret-available",
+      "terminal-success",
+      ...input.registry.notProvenClaims,
+    ],
+  };
 }
 
 export async function checkRealProviderReadiness(
@@ -268,6 +314,24 @@ function isOpenAICompatibleStyleProvider(provider: RuntimeProvider): boolean {
 
 function isRealProviderSupported(provider: RuntimeProvider): boolean {
   return provider !== "anthropic";
+}
+
+function compatibilityFlagSummary(
+  flags: ProviderRegistryProjection["providers"][number]["compatibility"],
+): readonly string[] {
+  return [
+    `developer-role:${flags.developerRole}`,
+    `system-role:${flags.systemRole}`,
+    `tool-calls:${flags.toolCalls}`,
+    `parallel-tool-calls:${flags.parallelToolCalls}`,
+    `json-output:${flags.structuredJsonOutput}`,
+    `streaming:${flags.streaming}`,
+    `reasoning-effort:${flags.reasoningEffort}`,
+    `strict-roles:${flags.strictMessageRoles}`,
+    `openai-compatible:${flags.openAICompatibleShape}`,
+    `custom-headers:${flags.customHeaders}`,
+    ...flags.providerSpecificQuirks.map((quirk) => `quirk:${quirk}`),
+  ].sort();
 }
 
 export function createProviderReadinessTerminalEvent(input: {
