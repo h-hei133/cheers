@@ -46,19 +46,19 @@ describe("CLI session product surface", () => {
     });
 
     expect(surface?.lines.map((line) => line.replace(/:.*/, ""))).toEqual([
-      "Product experience",
-      "- Task",
-      "- Context",
-      "- Plan",
-      "- Proposal",
-      "- Authority",
-      "- Apply",
-      "- Verification",
-      "- Repair",
-      "- Tools",
-      "- Verdict",
-      "- Not proven",
-      "- Next action",
+      "Product surface",
+      "[info] Task",
+      "[info] Context",
+      "[info] Plan",
+      "[info] Proposal",
+      "[blocked] Authority",
+      "[info] Apply",
+      "[blocked] Verification",
+      "[info] Repair",
+      "[info] Tools",
+      "[blocked] Verdict",
+      "[not_proven] Not proven",
+      "[info] Next action",
       "",
     ]);
     expect(surface?.lines.join("\n")).toContain("authority required");
@@ -129,7 +129,7 @@ describe("CLI session product surface", () => {
       "Partial: some work completed, but required evidence is incomplete.",
     );
     expect(surface?.notProvenClaims).toContain("relevant verification did not pass");
-    expect(surface?.lines.join("\n")).toContain("- Verification: status=skipped");
+    expect(surface?.lines.join("\n")).toContain("[partial] Verification: status=skipped");
     expect(surface?.lines.join("\n")).not.toContain("Outcome: success");
   });
 
@@ -216,9 +216,9 @@ describe("CLI session product surface", () => {
     });
     const rendered = surface?.lines.join("\n") ?? "";
 
-    expect(rendered).toContain("- Session path: activePath=2; tree=linear-path");
-    expect(rendered).toContain("- Runtime events: count=4; last=session-projection-observed");
-    expect(rendered).toContain("- Static resources: count=1; registry=explicit-static; dynamic=disabled; execution=disabled; providerDefault=disabled");
+    expect(rendered).toContain("[info] Session: activePath=2; tree=linear-path");
+    expect(rendered).toContain("[info] Events: count=");
+    expect(rendered).toContain("[info] Resources: count=1; registry=explicit-static; dynamic=disabled; execution=disabled; providerDefault=disabled");
     expect(rendered).toContain("terminalSuccessClaim=false");
     expect(rendered).not.toMatch(/secret|oldText=raw/);
     expect(surface?.verdict).toBe(
@@ -304,22 +304,22 @@ describe("CLI session product surface", () => {
       startedRendering: false,
     });
 
-    expect(lines).toContain("Product experience");
+    expect(lines).toContain("Product surface");
     for (const label of [
-      "- Task:",
-      "- Context:",
-      "- Plan:",
-      "- Proposal:",
-      "- Authority:",
-      "- Apply:",
-      "- Verification:",
-      "- Repair:",
-      "- Tools:",
-      "- Verdict:",
-      "- Not proven:",
-      "- Next action:",
+      "Task",
+      "Context",
+      "Plan",
+      "Proposal",
+      "Authority",
+      "Apply",
+      "Verification",
+      "Repair",
+      "Tools",
+      "Verdict",
+      "Not proven",
+      "Next action",
     ]) {
-      expect(lines.some((line) => line.startsWith(label))).toBe(true);
+      expect(lines.some((line) => /^\[[a-z_]+\] [^:]+:/.test(line) && line.includes(`] ${label}:`))).toBe(true);
     }
     expect(lines.join("\n")).toContain("Verified success: relevant verification passed.");
   });
