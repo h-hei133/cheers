@@ -2,6 +2,7 @@ import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.j
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/staticResourceProjection.js";
+import type { PackageInventoryProjection } from "../resources/packageInventory.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
 import type {
@@ -24,6 +25,8 @@ export type RuntimeProjectionEventType =
   | "save-point-observed"
   | "result-facts-observed"
   | "resource-projection-observed"
+  | "package-inventory-observed"
+  | "package-conflict-observed"
   | "extension-hook-policy-observed"
   | "session-projection-observed"
   | "session-active-path-projected"
@@ -75,6 +78,7 @@ export function projectRuntimeEvents(input: {
   readonly savePoint?: RuntimeEvidenceSavePoint;
   readonly resultFacts?: RuntimeResultFactsProjection;
   readonly resourceProjection?: StaticResourceProjection;
+  readonly packageInventory?: PackageInventoryProjection;
   readonly hookPolicyOutcomes?: readonly ExtensionHookPolicyOutcome[];
   readonly sessionProjection?: SessionTreeProjection;
   readonly contextRebuildProjection?: SessionContextRebuildProjection;
@@ -284,6 +288,49 @@ export function projectRuntimeEvents(input: {
       },
       input.resourceProjection.notProvenClaims,
     );
+  }
+
+  if (input.packageInventory) {
+    append(
+      "package-inventory-observed",
+      {
+        inventoryMode: input.packageInventory.inventoryMode,
+        packageInstallation: input.packageInventory.packageInstallation,
+        packageLoading: input.packageInventory.packageLoading,
+        dynamicDiscovery: input.packageInventory.dynamicDiscovery,
+        pluginExecution: input.packageInventory.pluginExecution,
+        scriptExecution: input.packageInventory.scriptExecution,
+        networkLookup: input.packageInventory.networkLookup,
+        providerDefaultEnablement:
+          input.packageInventory.providerDefaultEnablement,
+        packageCount: input.packageInventory.packages.length,
+        rejectedPackageCount: input.packageInventory.rejectedPackageCount,
+        conflictCount: input.packageInventory.conflicts.length,
+        enabledPackageCount: input.packageInventory.packages.filter(
+          (manifest) => manifest.enabledState === "enabled",
+        ).length,
+        blockedPackageCount: input.packageInventory.packages.filter(
+          (manifest) => manifest.enabledState === "blocked",
+        ).length,
+        terminalSuccessClaim: false,
+      },
+      input.packageInventory.notProvenClaims,
+    );
+    for (const conflict of input.packageInventory.conflicts) {
+      append(
+        "package-conflict-observed",
+        {
+          conflictId: conflict.conflictId,
+          kind: conflict.kind,
+          packageCount: conflict.packageIds.length,
+          resourceCount: conflict.resourceIds.length,
+          capability: conflict.capability,
+          precedenceCount: conflict.precedence.length,
+          terminalSuccessClaim: false,
+        },
+        conflict.notProvenClaims,
+      );
+    }
   }
 
   for (const outcome of input.hookPolicyOutcomes ?? []) {

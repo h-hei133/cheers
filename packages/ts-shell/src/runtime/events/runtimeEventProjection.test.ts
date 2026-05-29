@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createEvidenceOnlySavePoint } from "../../evidence/runtimeSavePoint.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
+import { projectPackageResourceInventory } from "../resources/packageInventory.js";
 import { projectStaticResourceRegistry } from "../resources/staticResourceProjection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
@@ -294,6 +295,89 @@ describe("runtime event projection", () => {
     expect(event?.notProvenClaims).toEqual(
       expect.arrayContaining([
         "resource-execution",
+        "provider-success",
+        "tool-success",
+        "verification-success",
+        "terminal-success",
+      ]),
+    );
+  });
+
+  it("projects package inventory and conflicts as metadata-only observations", () => {
+    const packageInventory = projectPackageResourceInventory({
+      manifests: [
+        {
+          packageId: "pkg.safe",
+          safeName: "Safe Package",
+          version: {
+            versionRange: "^1.0.0",
+            pinnedState: "unpinned",
+          },
+          sourceKind: "project",
+          sourceLabel:
+            "provider.env=/home/wang/.private-agents-real/provider.env Authorization: Bearer abc",
+          scope: "project",
+          trustLevel: "project_declared",
+          enabledState: "disabled",
+          resourceIds: ["skill.same"],
+          declaredCapabilities: ["review"],
+          requiredPermissions: ["read"],
+          executable: false,
+          supported: false,
+          notProvenClaims: [],
+        },
+        {
+          packageId: "pkg.other",
+          safeName: "Other Package",
+          version: {
+            exactVersion: "1.0.0",
+            pinnedState: "pinned",
+            integrity: "sha256-ok",
+          },
+          sourceKind: "user",
+          sourceLabel: "user settings",
+          scope: "user",
+          trustLevel: "user_approved",
+          enabledState: "disabled",
+          resourceIds: ["skill.same"],
+          declaredCapabilities: ["review"],
+          requiredPermissions: ["read"],
+          executable: false,
+          supported: false,
+          notProvenClaims: [],
+        },
+      ],
+    });
+
+    const events = projectRuntimeEvents({ packageInventory });
+    const serialized = JSON.stringify(events);
+
+    expect(events.map((event) => event.type)).toEqual([
+      "package-inventory-observed",
+      "package-conflict-observed",
+      "package-conflict-observed",
+    ]);
+    expect(events[0]?.facts).toMatchObject({
+      inventoryMode: "explicit-static",
+      packageInstallation: "disabled",
+      packageLoading: "disabled",
+      dynamicDiscovery: "disabled",
+      pluginExecution: "disabled",
+      scriptExecution: "disabled",
+      networkLookup: "disabled",
+      packageCount: 2,
+      conflictCount: 2,
+      terminalSuccessClaim: false,
+    });
+    expect(
+      events.every((event) => event.facts.terminalSuccessClaim !== true),
+    ).toBe(true);
+    expect(serialized).not.toMatch(/private-agents-real|provider\.env|Bearer abc/i);
+    expect(serialized).not.toContain('"success":true');
+    expect(events[0]?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "package-install",
+        "package-loading",
         "provider-success",
         "tool-success",
         "verification-success",
