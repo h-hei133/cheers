@@ -17,6 +17,7 @@ export interface TerminalMessageRenderResult {
 const SECTION_ORDER = [
   "task",
   "context",
+  "loop",
   "turn",
   "plan",
   "proposal",

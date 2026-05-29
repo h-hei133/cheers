@@ -8,6 +8,7 @@ import {
 } from "../provider/providerRegistry.js";
 import { projectRuntimeEvents } from "../runtime/events/runtimeEventProjection.js";
 import { runAgentLoopContract } from "../runtime/loop/agentLoopContract.js";
+import { projectProductLoopAdapter } from "../runtime/loop/productLoopAdapter.js";
 import { projectLoopTrajectory } from "../runtime/loop/trajectoryProjection.js";
 import {
   projectPackageResourceInventory,
@@ -320,6 +321,49 @@ describe("product surface view model", () => {
     expect(rendered).toContain("compaction=observed");
     expect(rendered).toContain("rebuildInputs=1");
     expect(rendered).toContain("contextSuccess=not-proven");
+    expect(rendered).not.toContain("Outcome: success");
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
+  });
+
+  it("renders the consolidated product loop adapter status without changing terminal truth", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess_surface_adapter",
+      workspaceRoot: "/workspace",
+      prompt: "adapter surface",
+      providerOptIn: false,
+      modelBoundary: async () => ({
+        responseId: "response-surface-adapter",
+        stopReason: "stop",
+      }),
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "surface-adapter",
+      prompt: "adapter surface",
+      loop,
+    });
+    const adapter = projectProductLoopAdapter({
+      adapterId: "surface-adapter",
+      loopTrajectory: trajectory,
+    });
+
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped_error",
+      terminalClassification: "stopped",
+      terminalReason: "stopped_error",
+      productLoopAdapter: adapter,
+    });
+    const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
+
+    expect(viewModel?.sections.map((section) => section.title)).toEqual(
+      expect.arrayContaining([
+        "Product loop adapter",
+        "Feature integration contract",
+      ]),
+    );
+    expect(rendered).toContain("product_integrated=");
+    expect(rendered).toContain("observation_only=");
+    expect(rendered).toContain("feature-contract-valid-is-not-success");
+    expect(rendered).toContain("terminalSuccessClaim=false");
     expect(rendered).not.toContain("Outcome: success");
     expect(viewModel?.terminalSuccessClaim).toBe(false);
   });

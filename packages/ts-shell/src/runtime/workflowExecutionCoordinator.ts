@@ -30,6 +30,7 @@ import {
 } from "../evidence/runtimeSavePoint.js";
 import type { RuntimeExecutionReceiptProjection } from "./execution/executionReceipt.js";
 import type { AgentLoopContractProjection } from "./loop/agentLoopContract.js";
+import { projectProductLoopAdapter } from "./loop/productLoopAdapter.js";
 import {
   projectLoopTrajectory,
   type LoopTrajectoryProjection,
@@ -488,6 +489,13 @@ function createIntegratedRunner(
         realProvider,
         execution,
       });
+      const productLoopAdapter = projectProductLoopAdapter({
+        adapterId: `product-path-adapter:${sharedContext.sessionId}`,
+        promptSummary: cleanPrompt,
+        loopTrajectory,
+        nextAction:
+          "connect future capability blocks through the feature integration contract",
+      });
       const notes = [
         `plan: intent=${workflowPlan.taskKind} reason=${workflowPlan.reason}`,
         ...decisionTrace,
@@ -505,6 +513,7 @@ function createIntegratedRunner(
           notes,
           codingResult: execution.codingResult,
           loopTrajectory,
+          productLoopAdapter,
         };
       }
 
@@ -520,6 +529,7 @@ function createIntegratedRunner(
         ],
         codingResult: execution.codingResult,
         loopTrajectory,
+        productLoopAdapter,
       };
     }
 

@@ -1,6 +1,7 @@
 import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../orchestration/types.js";
 import type { ProviderRegistryProjection } from "../provider/providerRegistry.js";
 import type { RuntimeProjectionEvent } from "../runtime/events/runtimeEventProjection.js";
+import type { ProductLoopAdapterProjection } from "../runtime/loop/productLoopAdapter.js";
 import type { LoopTrajectoryProjection } from "../runtime/loop/trajectoryProjection.js";
 import type { PackageInventoryProjection } from "../runtime/resources/packageInventory.js";
 import type { StaticResourceProjection } from "../runtime/resources/staticResourceProjection.js";
@@ -13,6 +14,7 @@ import type { SessionTreeProjection } from "../session/sessionTreeProjection.js"
 export type ProductSurfaceSectionKind =
   | "task"
   | "context"
+  | "loop"
   | "turn"
   | "plan"
   | "proposal"
@@ -95,13 +97,14 @@ export interface ProductSurfaceInput {
   readonly runtimeEvents?: readonly RuntimeProjectionEvent[];
   readonly sessionProjection?: SessionTreeProjection;
   readonly loopTrajectory?: LoopTrajectoryProjection;
+  readonly productLoopAdapter?: ProductLoopAdapterProjection;
 }
 
 export function projectProductSurfaceViewModel(
   input: ProductSurfaceInput,
 ): ProductSurfaceViewModel | undefined {
   const codingResult = input.codingResult;
-  if (!codingResult && !input.loopTrajectory) {
+  if (!codingResult && !input.loopTrajectory && !input.productLoopAdapter) {
     return undefined;
   }
 
@@ -122,6 +125,7 @@ export function projectProductSurfaceViewModel(
       repairSection(codingResult),
       toolsSection(codingResult),
     ] : []),
+    ...productLoopAdapterSections(input),
     ...loopTrajectorySections(input),
     ...resourceSections(input),
     ...providerSections(input),
@@ -134,20 +138,23 @@ export function projectProductSurfaceViewModel(
       severity: sessionFacts ? verdictSeverity(sessionFacts.truthStatus) : "not_proven",
       status: sessionFacts ? verdictStatus(sessionFacts.truthStatus) : "not_proven",
       summary: sessionFacts?.verdict ??
-        `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? "not-observed"}; terminalSuccessClaim=false`,
+        `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? input.productLoopAdapter?.adapterId ?? "not-observed"}; terminalSuccessClaim=false`,
     }),
     section({
       kind: "not_proven",
       title: "Not proven",
-      severity: (sessionFacts?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "info",
-      status: (sessionFacts?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "observed",
+      severity: (sessionFacts?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "info",
+      status: (sessionFacts?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "observed",
       summary: (sessionFacts?.notProvenClaims.length ?? 0) > 0
         ? sessionFacts!.notProvenClaims.join("; ")
         : (input.loopTrajectory?.notProvenClaims.length ?? 0) > 0
           ? input.loopTrajectory!.notProvenClaims.slice(0, 8).join("; ")
+        : (input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0
+          ? input.productLoopAdapter!.notProvenClaims.slice(0, 8).join("; ")
         : "none",
       notProvenClaims: sessionFacts?.notProvenClaims ??
-        input.loopTrajectory?.notProvenClaims ?? [],
+        input.loopTrajectory?.notProvenClaims ??
+        input.productLoopAdapter?.notProvenClaims ?? [],
     }),
     section({
       kind: "next_action",
@@ -159,6 +166,7 @@ export function projectProductSurfaceViewModel(
         : "info",
       status: "observed",
       summary: sessionFacts?.nextAction ??
+        input.productLoopAdapter?.nextAction ??
         "keep loop trajectory observation separate from terminal success",
     }),
   ];
@@ -166,14 +174,59 @@ export function projectProductSurfaceViewModel(
   return {
     sections,
     verdict: sessionFacts?.verdict ??
-      `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? "not-observed"}`,
+      `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? input.productLoopAdapter?.adapterId ?? "not-observed"}`,
     notProvenClaims: sessionFacts?.notProvenClaims ??
-      input.loopTrajectory?.notProvenClaims ?? [],
+      input.loopTrajectory?.notProvenClaims ??
+      input.productLoopAdapter?.notProvenClaims ?? [],
     nextAction: sessionFacts?.nextAction ??
+      input.productLoopAdapter?.nextAction ??
       "keep loop trajectory observation separate from terminal success",
     redaction: sections.some((item) => item.redaction !== "none") ? "applied" : "none",
     terminalSuccessClaim: false,
   };
+}
+
+function productLoopAdapterSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const adapter = input.productLoopAdapter;
+  if (!adapter) {
+    return [];
+  }
+  const statusCounts = adapter.phaseStatus.reduce<Record<string, number>>(
+    (counts, item) => {
+      counts[item.status] = (counts[item.status] ?? 0) + 1;
+      return counts;
+    },
+    {},
+  );
+  const statusSummary = Object.entries(statusCounts)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([status, count]) => `${status}=${count}`)
+    .join("; ");
+  const productIntegrated = adapter.phaseStatus
+    .filter((item) => item.status === "product_integrated")
+    .map((item) => item.phaseId)
+    .slice(0, 8)
+    .join(",");
+
+  return [
+    section({
+      kind: "loop",
+      title: "Product loop adapter",
+      severity: "not_proven",
+      status: "observed",
+      summary: `adapter=${adapter.adapterId}; statuses=${statusSummary}; productIntegrated=${productIntegrated}; terminalSuccessClaim=false`,
+      machineEventCorrelationIds: adapter.safeReferences.runtimeEventIds,
+      notProvenClaims: adapter.notProvenClaims,
+    }),
+    section({
+      kind: "loop",
+      title: "Feature integration contract",
+      severity: adapter.featureContractAvailable ? "info" : "not_proven",
+      status: adapter.featureContractAvailable ? "observed" : "not_proven",
+      summary: `available=${adapter.featureContractAvailable}; contracts=${adapter.featureContracts.length}; forbiddenShortcutsRequired=true; validationGatesRequired=true`,
+      notProvenClaims: ["feature-contract-valid-is-not-success"],
+    }),
+  ];
 }
 
 function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSection[] {

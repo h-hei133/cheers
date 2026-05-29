@@ -15,6 +15,9 @@ import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
 import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
+import { runAgentLoopContract } from "../loop/agentLoopContract.js";
+import { projectProductLoopAdapter } from "../loop/productLoopAdapter.js";
+import { projectLoopTrajectory } from "../loop/trajectoryProjection.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
@@ -201,6 +204,50 @@ describe("runtime event projection", () => {
     );
     expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
     expect(JSON.stringify(events)).not.toContain('"success":true');
+  });
+
+  it("observes product loop adapters without upgrading result truth", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-adapter-events",
+      workspaceRoot: "/workspace",
+      prompt: "observe adapter",
+      providerOptIn: false,
+      modelBoundary: async () => ({
+        responseId: "response-adapter-events",
+        stopReason: "stop",
+      }),
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "adapter-events",
+      prompt: "observe adapter",
+      loop,
+    });
+    const adapter = projectProductLoopAdapter({
+      adapterId: "adapter-events",
+      loopTrajectory: trajectory,
+    });
+
+    const events = projectRuntimeEvents({
+      productLoopAdapters: [adapter],
+    });
+
+    expect(events.map((event) => event.type)).toEqual([
+      "product-loop-adapter-observed",
+    ]);
+    expect(events[0]?.facts).toMatchObject({
+      adapterId: "adapter-events",
+      observationMode: "host-adapter",
+      featureContractAvailable: true,
+      nextTurnExecuted: false,
+      terminalSuccessClaim: false,
+    });
+    expect(events[0]?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "adapter-observed-is-not-success",
+        "feature-contract-valid-is-not-success",
+        "terminal-success",
+      ]),
+    );
   });
 
   it("projects next-turn bundle, queues, delivery policy, and waiting events safely", () => {

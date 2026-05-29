@@ -14,6 +14,9 @@ export function mapTerminalToOrchestrationResult(
   const latestLoopTrajectory =
     [...state.transcript].reverse().find((turn) => turn.loopTrajectory)
       ?.loopTrajectory;
+  const latestProductLoopAdapter =
+    [...state.transcript].reverse().find((turn) => turn.productLoopAdapter)
+      ?.productLoopAdapter;
   const codingResult = latestCodingResult
     ? {
         ...latestCodingResult,
@@ -43,5 +46,6 @@ export function mapTerminalToOrchestrationResult(
     finalOutput: state.transcript[state.transcript.length - 1]?.content ?? "",
     codingResult,
     loopTrajectory: latestLoopTrajectory,
+    productLoopAdapter: latestProductLoopAdapter,
   };
 }

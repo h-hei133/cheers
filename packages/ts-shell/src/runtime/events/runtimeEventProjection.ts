@@ -35,6 +35,7 @@ import type {
   VerificationLoopIntent,
   VerificationResultObservation,
 } from "../../verification/loopBoundary.js";
+import type { ProductLoopAdapterProjection } from "../loop/productLoopAdapter.js";
 
 export type RuntimeProjectionEventType =
   | "turn-snapshot-observed"
@@ -127,6 +128,7 @@ export type RuntimeProjectionEventType =
   | "loop-repair-handoff-observed"
   | "loop-session-context-projected"
   | "loop-product-surface-projected"
+  | "product-loop-adapter-observed"
   | "loop-stopped"
   | "loop-waiting";
 
@@ -180,6 +182,7 @@ export function projectRuntimeEvents(input: {
   readonly contextRebuildInputs?: readonly LoopContextRebuildInput[];
   readonly continuationReadiness?: readonly ContinuationReadinessProjection[];
   readonly replaySafeLoopStateSummaries?: readonly ReplaySafeLoopStateSummary[];
+  readonly productLoopAdapters?: readonly ProductLoopAdapterProjection[];
 }): readonly RuntimeProjectionEvent[] {
   const events: RuntimeProjectionEvent[] = [];
   const append = (
@@ -1077,6 +1080,27 @@ export function projectRuntimeEvents(input: {
         terminalSuccessClaim: summary.terminalSuccessClaim,
       },
       summary.notProvenClaims,
+    );
+  }
+
+  for (const adapter of input.productLoopAdapters ?? []) {
+    append(
+      "product-loop-adapter-observed",
+      {
+        adapterId: adapter.adapterId,
+        observationMode: adapter.observationMode,
+        phaseStatusCount: adapter.phaseStatus.length,
+        unsupportedPhaseIds: adapter.unsupportedPhaseIds,
+        featureContractAvailable: adapter.featureContractAvailable,
+        featureContractCount: adapter.featureContracts.length,
+        continuationReadinessReferenced:
+          adapter.continuationBoundary.readinessReferenced,
+        replaySafeStateReferenced:
+          adapter.continuationBoundary.replaySafeStateReferenced,
+        nextTurnExecuted: adapter.continuationBoundary.nextTurnExecuted,
+        terminalSuccessClaim: false,
+      },
+      adapter.notProvenClaims,
     );
   }
 

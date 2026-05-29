@@ -14,6 +14,7 @@ import {
 import { createProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStore.js";
 import { runAgentLoopContract } from "../../runtime/loop/agentLoopContract.js";
+import { projectProductLoopAdapter } from "../../runtime/loop/productLoopAdapter.js";
 import { projectLoopTrajectory } from "../../runtime/loop/trajectoryProjection.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
@@ -35,6 +36,10 @@ describe("shell session runtime (W5)", () => {
       loopId: "shell-loop",
       prompt: "observe loop",
       loop,
+    });
+    const productLoopAdapter = projectProductLoopAdapter({
+      adapterId: "shell-loop-adapter",
+      loopTrajectory,
     });
     const runtime = new ShellSessionRuntime({
       sessionManager: {
@@ -79,6 +84,7 @@ describe("shell session runtime (W5)", () => {
             },
             finalOutput: "done",
             loopTrajectory,
+            productLoopAdapter,
           },
         };
       },
@@ -92,6 +98,8 @@ describe("shell session runtime (W5)", () => {
     expect(lines.join("\n")).toContain("terminalSuccessClaim=false");
     expect(lines.join("\n")).toContain("Provider:");
     expect(lines.join("\n")).toContain("providerCalled=not-proven");
+    expect(lines.join("\n")).toContain("Product loop adapter:");
+    expect(lines.join("\n")).toContain("Feature integration contract:");
   });
 
   it("moves through a successful prompt execution lifecycle", async () => {

@@ -196,6 +196,47 @@ describe("JSON runtime event stream projection", () => {
     ]);
   });
 
+  it("serializes product loop adapter observations as observation-only JSON", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [
+        {
+          id: "event-adapter",
+          sequence: 1,
+          type: "product-loop-adapter-observed",
+          facts: {
+            adapterId: "adapter-stream",
+            featureContractAvailable: true,
+            unsupportedPhaseIds: ["storage-backed-branching"],
+            terminalSuccessClaim: false,
+          },
+          notProvenClaims: [
+            "adapter-observed-is-not-success",
+            "feature-contract-valid-is-not-success",
+          ],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+      ],
+    });
+
+    expect(stream[0]).toMatchObject({
+      eventType: "product-loop-adapter-observed",
+      truthfulness: {
+        observationOnly: true,
+        terminalSuccessClaim: false,
+      },
+    });
+    expect(stream[0]?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "adapter-observed-is-not-success",
+        "feature-contract-valid-is-not-success",
+        "terminal-success",
+      ]),
+    );
+  });
+
   it("serializes PL005 tool result message events without exposing unsafe content", () => {
     const stream = projectJsonRuntimeEventStream({
       events: [

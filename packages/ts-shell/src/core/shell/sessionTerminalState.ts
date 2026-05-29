@@ -5,6 +5,7 @@ import type {
   TerminalReason,
 } from "../../orchestration/types.js";
 import type { LoopTrajectoryProjection } from "../../runtime/loop/trajectoryProjection.js";
+import type { ProductLoopAdapterProjection } from "../../runtime/loop/productLoopAdapter.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
 import { projectSessionResultParity } from "../../session/sessionResultParity.js";
@@ -24,6 +25,7 @@ export interface SessionTerminalState {
   lastContinuationReason?: ContinuationReason;
   terminalCodingResult?: CodingResultSummary;
   terminalLoopTrajectory?: LoopTrajectoryProjection;
+  terminalProductLoopAdapter?: ProductLoopAdapterProjection;
   terminalNotes: readonly string[];
   sawTerminalEvent: boolean;
 }
@@ -55,6 +57,7 @@ export function applyTerminalQueryEvent(
   state.lastContinuationReason = event.result.lastContinuationReason;
   state.terminalCodingResult = event.result.codingResult;
   state.terminalLoopTrajectory = event.result.loopTrajectory;
+  state.terminalProductLoopAdapter = event.result.productLoopAdapter;
   state.terminalNotes = event.result.sharedContext.notes;
 }
 
@@ -98,6 +101,7 @@ export function renderSessionTerminalSurface(input: {
       terminalStopReason: terminalState.terminalStopReason,
       codingResult: terminalState.terminalCodingResult,
       loopTrajectory: terminalState.terminalLoopTrajectory,
+      productLoopAdapter: terminalState.terminalProductLoopAdapter,
     });
     renderContinuationSeedSummary(input.renderer, {
       codingResult: terminalState.terminalCodingResult,
@@ -156,6 +160,7 @@ export function renderSessionTerminalSurface(input: {
     terminalStopReason: terminalState.terminalStopReason,
     codingResult: terminalState.terminalCodingResult,
     loopTrajectory: terminalState.terminalLoopTrajectory,
+    productLoopAdapter: terminalState.terminalProductLoopAdapter,
   });
   renderContinuationSeedSummary(input.renderer, {
     codingResult: terminalState.terminalCodingResult,
@@ -528,6 +533,7 @@ function renderProductExperienceSurface(
     terminalStopReason?: string;
     codingResult?: CodingResultSummary;
     loopTrajectory?: LoopTrajectoryProjection;
+    productLoopAdapter?: ProductLoopAdapterProjection;
   },
 ): void {
   const surface = projectCliSessionProductSurface({
@@ -537,6 +543,7 @@ function renderProductExperienceSurface(
     stopReason: input.terminalStopReason,
     codingResult: input.codingResult,
     loopTrajectory: input.loopTrajectory,
+    productLoopAdapter: input.productLoopAdapter,
   });
   if (!surface) {
     return;
