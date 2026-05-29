@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { buildLoopContextRebuildInput } from "../context/rebuildInput.js";
+import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
 import type { CodingResultSummary } from "../orchestration/types.js";
 import {
   projectProviderRegistry,
@@ -12,6 +14,8 @@ import {
   type PackageManifestContract,
 } from "../runtime/resources/packageInventory.js";
 import { projectStaticResourceRegistry } from "../runtime/resources/staticResourceProjection.js";
+import { evaluateContinuationReadiness } from "../session/continuationReadiness.js";
+import { summarizeReplaySafeLoopState } from "../session/replaySafeLoopState.js";
 import { projectSessionTree } from "../session/sessionTreeProjection.js";
 import { projectProductSurfaceViewModel } from "./productSurface.js";
 import { renderTerminalMessage } from "./terminalMessageRenderer.js";
@@ -253,6 +257,71 @@ describe("product surface view model", () => {
     expect(viewModel?.terminalSuccessClaim).toBe(false);
     expect(rendered).toContain("providerCalled=not-proven");
     expect(rendered).not.toContain("Outcome: success");
+  });
+
+  it("renders PL008 session and context continuation facts as not-proven", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess_surface_pl008",
+        projectRoot: "/workspace",
+        createdAt: "2026-05-29T00:00:00.000Z",
+        updatedAt: "2026-05-29T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "continue safely" }],
+      },
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({
+      sessionProjection,
+      optionalFacts: ["branch-summary-record"],
+    });
+    const contextRebuildInput = buildLoopContextRebuildInput({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const continuationReadiness = evaluateContinuationReadiness({
+      sessionProjection,
+      contextRebuildProjection,
+      rebuildInput: contextRebuildInput,
+      optionalFacts: ["branch-summary-record"],
+    });
+    const replaySafeLoopStateSummary = summarizeReplaySafeLoopState({
+      sessionProjection,
+      contextRebuildProjection,
+      continuationReadiness,
+      rebuildInput: contextRebuildInput,
+      terminalResultFacts: {
+        status: "stopped_error",
+        terminalClassification: "stopped",
+        terminalReason: "stopped_error",
+      },
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "surface-pl008",
+      prompt: "continue safely",
+      sessionProjection,
+      contextRebuildProjection,
+      contextRebuildInput,
+      continuationReadiness,
+      replaySafeLoopStateSummary,
+    });
+
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped_error",
+      terminalClassification: "stopped",
+      terminalReason: "stopped_error",
+      codingResult: codingResult(),
+      loopTrajectory: trajectory,
+    });
+    const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
+
+    expect(rendered).toContain("readiness=1");
+    expect(rendered).toContain("replaySummaries=1");
+    expect(rendered).toContain("branch=observed");
+    expect(rendered).toContain("compaction=observed");
+    expect(rendered).toContain("rebuildInputs=1");
+    expect(rendered).toContain("contextSuccess=not-proven");
+    expect(rendered).not.toContain("Outcome: success");
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
   });
 
   it("redacts unsafe raw output, provider config, patch payloads, and hidden reasoning", () => {

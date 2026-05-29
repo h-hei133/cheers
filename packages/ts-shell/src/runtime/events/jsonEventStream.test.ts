@@ -291,6 +291,41 @@ describe("JSON runtime event stream projection", () => {
     );
   });
 
+  it("serializes PL008 continuation observations without unsafe context or success claims", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [
+        {
+          id: "event-pl008",
+          sequence: 1,
+          type: "context-rebuild-input-prepared",
+          facts: {
+            rebuildInputId: "context-rebuild-input-1",
+            missingFacts: ["branch-summary-record"],
+            unsafe:
+              "provider.env=/home/wang/.private-agents-real/provider.env raw provider output hidden reasoning token=secret oldText=before newText=after",
+            terminalSuccessClaim: true,
+          },
+          notProvenClaims: [
+            "context-rebuild-input-is-not-success",
+            "continuation-ready-is-not-success",
+          ],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+      ],
+    });
+    const serialized = serializeJsonRuntimeEventStream(stream);
+
+    expect(stream[0]?.eventType).toBe("context-rebuild-input-prepared");
+    expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
+    expect(stream[0]?.notProvenClaims).toContain("terminal-success");
+    expect(serialized).not.toMatch(
+      /private-agents-real|raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+    );
+  });
+
   it("redacts unsafe facts and strips unsupported JSON values", () => {
     const stream = projectJsonRuntimeEventStream({
       streamId: "/home/wang/.private-agents-real/provider.env",

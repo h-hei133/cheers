@@ -92,15 +92,30 @@ describe("workflowExecutionCoordinator", () => {
     ).toBe("observed");
     expect(result.loopTrajectory?.nextTurnBundleIds).toHaveLength(1);
     expect(result.loopTrajectory?.deliveryPolicyIds).toHaveLength(1);
+    expect(result.loopTrajectory?.contextRebuildInputIds).toHaveLength(1);
+    expect(result.loopTrajectory?.contextRebuildProjectionIds).toHaveLength(1);
+    expect(result.loopTrajectory?.continuationReadinessIds).toHaveLength(1);
+    expect(result.loopTrajectory?.replaySafeLoopStateSummaryIds).toHaveLength(1);
     expect(result.loopTrajectory?.events.map((event) => event.type)).toEqual(
       expect.arrayContaining([
         "loop-input-observed",
         "loop-provider-boundary-observed",
         "loop-save-point-observed",
         "loop-next-turn-delivery-policy-observed",
+        "context-rebuild-input-prepared",
+        "continuation-readiness-evaluated",
+        "branch-unsupported",
+        "compaction-unsupported",
+        "replay-safe-loop-state-summarized",
         "loop-product-surface-projected",
       ]),
     );
+    expect(
+      result.loopTrajectory?.events.some((event) =>
+        event.type === "continuation-readiness-evaluated" &&
+        event.facts.nextTurnExecuted === false
+      ),
+    ).toBe(true);
     expect(result.loopTrajectory?.jsonEventStream.map((entry) => entry.order)).toEqual(
       Array.from(
         { length: result.loopTrajectory?.jsonEventStream.length ?? 0 },

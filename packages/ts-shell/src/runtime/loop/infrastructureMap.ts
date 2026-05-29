@@ -22,7 +22,12 @@ export type LoopInfrastructureCategory =
   | "repair-apply"
   | "post-repair-verification"
   | "session-active-path"
+  | "context-rebuild-input"
   | "context-rebuild-projection"
+  | "continuation-readiness"
+  | "replay-safe-loop-state"
+  | "branch-gap"
+  | "compaction-gap"
   | "package-resource-inventory"
   | "runtime-events"
   | "json-event-stream"
@@ -77,7 +82,12 @@ export const LOOP_INFRASTRUCTURE_CATEGORIES = [
   "repair-apply",
   "post-repair-verification",
   "session-active-path",
+  "context-rebuild-input",
   "context-rebuild-projection",
+  "continuation-readiness",
+  "replay-safe-loop-state",
+  "branch-gap",
+  "compaction-gap",
   "package-resource-inventory",
   "runtime-events",
   "json-event-stream",
@@ -161,8 +171,28 @@ export function createLoopInfrastructureMap(): LoopInfrastructureMap {
     entry("session-active-path", "session", "session", "partial", "SessionTreeProjection.activePathProjection", [
       "session-storage-backed-branching",
     ]),
+    entry("context-rebuild-input", "context", "context", "connected", "LoopContextRebuildInput", [
+      "context-completeness",
+      "continuation-success",
+    ]),
     entry("context-rebuild-projection", "context", "context", "connected", "SessionContextRebuildProjection", [
       "context-rebuild-success",
+    ]),
+    entry("continuation-readiness", "session", "continuation", "connected", "ContinuationReadinessProjection", [
+      "continuation-success",
+      "provider-success",
+    ]),
+    entry("replay-safe-loop-state", "session", "continuation", "connected", "ReplaySafeLoopStateSummary", [
+      "terminal-success",
+      "context-completeness",
+    ]),
+    entry("branch-gap", "session", "session", "unsupported", "branch unsupported/projection-only facts", [
+      "storage-backed-branching",
+      "branch-summary-truth",
+    ]),
+    entry("compaction-gap", "session", "session", "unsupported", "compaction unsupported/projection-only facts", [
+      "storage-backed-compaction",
+      "compaction-summary-truth",
     ]),
     entry("package-resource-inventory", "runtime/resources", "resources", "connected", "package and static resource projections", [
       "package-loading",

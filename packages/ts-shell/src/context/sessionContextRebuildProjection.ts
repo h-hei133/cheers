@@ -26,6 +26,13 @@ export interface SessionContextRebuildProjection {
     readonly toolDetails: "excluded";
     readonly rawTranscript: "excluded";
   };
+  readonly availableContext: readonly string[];
+  readonly missingRequiredFacts: readonly string[];
+  readonly missingOptionalFacts: readonly string[];
+  readonly excludedUnsafeFacts: readonly string[];
+  readonly staleFacts: readonly string[];
+  readonly unsupportedBranchFacts: readonly string[];
+  readonly unsupportedCompactionFacts: readonly string[];
   readonly missingFacts: readonly string[];
   readonly redaction: {
     readonly status: "report-safe" | "redacted";
@@ -37,6 +44,9 @@ export interface SessionContextRebuildProjection {
 
 export function projectSessionContextRebuild(input: {
   readonly sessionProjection: SessionTreeProjection;
+  readonly requiredFacts?: readonly string[];
+  readonly optionalFacts?: readonly string[];
+  readonly staleFacts?: readonly string[];
 }): SessionContextRebuildProjection {
   const activePathSet = new Set(input.sessionProjection.activePath);
   const activePathEntriesConsidered = input.sessionProjection.nodes
@@ -57,19 +67,36 @@ export function projectSessionContextRebuild(input: {
       branchSummaryId: record.branchSummaryId,
       summaryAvailability: record.summaryAvailability,
     }));
-  const missingFacts = [
+  const unsupportedBranchFacts = [
     ...(input.sessionProjection.branchSupport === "not-proven"
       ? ["storage-backed-branch-navigation"]
       : []),
+    ...(input.sessionProjection.branchSummary.availability === "not-supported-by-current-schema"
+      ? ["branch-summary-not-supported-by-current-schema"]
+      : []),
+  ];
+  const unsupportedCompactionFacts = [
     ...(input.sessionProjection.compaction.records.length === 0
-      ? ["compaction-record"]
+      ? ["storage-backed-compaction-record"]
       : []),
-    ...(input.sessionProjection.branchSummary.records.length === 0
-      ? ["branch-summary-record"]
-      : []),
+  ];
+  const excludedUnsafeFacts = [
     "raw-transcript-content",
     "tool-execution-details",
     "resource-details",
+    "raw-provider-output",
+    "raw-edit-content",
+    "unredacted-command-output",
+  ];
+  const missingFacts = [
+    ...unsupportedBranchFacts,
+    ...unsupportedCompactionFacts,
+    ...(input.sessionProjection.branchSummary.records.length === 0
+      ? ["branch-summary-record"]
+      : []),
+    ...excludedUnsafeFacts,
+    ...(input.requiredFacts ?? []),
+    ...(input.optionalFacts ?? []),
   ];
   const redacted =
     input.sessionProjection.compaction.records.some(
@@ -94,6 +121,21 @@ export function projectSessionContextRebuild(input: {
       toolDetails: "excluded",
       rawTranscript: "excluded",
     },
+    availableContext: [
+      `active-path:${activePathEntriesConsidered.length}`,
+      `branch-summaries:${branchSummariesConsidered.length}`,
+      `compactions:${compactionSummariesConsidered.length}`,
+    ],
+    missingRequiredFacts: input.requiredFacts ?? [],
+    missingOptionalFacts: input.optionalFacts ?? [
+      ...unsupportedBranchFacts,
+      ...unsupportedCompactionFacts,
+      "branch-summary-record",
+    ],
+    excludedUnsafeFacts,
+    staleFacts: input.staleFacts ?? [],
+    unsupportedBranchFacts,
+    unsupportedCompactionFacts,
     missingFacts,
     redaction: {
       status: redacted ? "redacted" : "report-safe",
@@ -104,6 +146,8 @@ export function projectSessionContextRebuild(input: {
       "terminal-success",
       "context-rebuild-execution",
       "storage-backed-branch-navigation",
+      "context-rebuilt-is-not-success",
+      "context-completeness",
     ],
   });
 }

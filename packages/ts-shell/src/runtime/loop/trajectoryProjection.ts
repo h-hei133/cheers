@@ -1,3 +1,4 @@
+import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { RuntimeResultFactsProjection, RuntimeProjectionEvent } from "../events/runtimeEventProjection.js";
 import { projectJsonRuntimeEventStream, type JsonRuntimeEventStreamEntry } from "../events/jsonEventStream.js";
@@ -5,6 +6,8 @@ import type { RuntimeExecutionReceiptProjection } from "../execution/executionRe
 import type { PackageInventoryProjection } from "../resources/packageInventory.js";
 import type { StaticResourceProjection } from "../resources/staticResourceProjection.js";
 import type { ProviderRegistryProjection } from "../../provider/providerRegistry.js";
+import type { ContinuationReadinessProjection } from "../../session/continuationReadiness.js";
+import type { ReplaySafeLoopStateSummary } from "../../session/replaySafeLoopState.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type {
   ToolAfterObservationAnnotation,
@@ -44,6 +47,9 @@ export interface LoopTrajectoryProjectionInput {
   readonly toolResultAnnotations?: readonly ToolAfterObservationAnnotation[];
   readonly sessionProjection?: SessionTreeProjection;
   readonly contextRebuildProjection?: SessionContextRebuildProjection;
+  readonly contextRebuildInput?: LoopContextRebuildInput;
+  readonly continuationReadiness?: ContinuationReadinessProjection;
+  readonly replaySafeLoopStateSummary?: ReplaySafeLoopStateSummary;
   readonly resourceProjection?: StaticResourceProjection;
   readonly packageInventory?: PackageInventoryProjection;
   readonly resultFacts?: RuntimeResultFactsProjection;
@@ -69,7 +75,10 @@ export interface LoopTrajectoryProjection {
   readonly repairProposalIds: readonly string[];
   readonly repairApplyIds: readonly string[];
   readonly sessionProjectionIds: readonly string[];
+  readonly contextRebuildInputIds: readonly string[];
   readonly contextRebuildProjectionIds: readonly string[];
+  readonly continuationReadinessIds: readonly string[];
+  readonly replaySafeLoopStateSummaryIds: readonly string[];
   readonly providerMetadataIds: readonly string[];
   readonly productSurfaceSectionIds: readonly string[];
   readonly stages: readonly LoopTrajectoryStage[];
@@ -623,9 +632,94 @@ export function projectLoopTrajectory(
         activePathEntriesConsidered:
           input.contextRebuildProjection.activePathEntriesConsidered.length,
         missingFacts: input.contextRebuildProjection.missingFacts,
+        missingRequiredFacts: input.contextRebuildProjection.missingRequiredFacts,
+        missingOptionalFacts: input.contextRebuildProjection.missingOptionalFacts,
+        excludedUnsafeFacts: input.contextRebuildProjection.excludedUnsafeFacts,
+        staleFacts: input.contextRebuildProjection.staleFacts,
+        unsupportedBranchFacts: input.contextRebuildProjection.unsupportedBranchFacts,
+        unsupportedCompactionFacts: input.contextRebuildProjection.unsupportedCompactionFacts,
       },
       input.contextRebuildProjection.notProvenClaims,
       [input.contextRebuildProjection.rebuildSource.activeLeafId],
+    );
+  }
+
+  if (input.contextRebuildInput) {
+    append(
+      "context-rebuild-input",
+      "context-rebuild-input-prepared",
+      {
+        rebuildInputId: input.contextRebuildInput.rebuildInputId,
+        sourceSessionId: input.contextRebuildInput.sourceSessionId,
+        activePathProjectionId: input.contextRebuildInput.activePathProjectionId,
+        nextTurnBundleId: input.contextRebuildInput.nextTurnBundleId,
+        savePointId: input.contextRebuildInput.savePointId,
+        missingFacts: input.contextRebuildInput.missingFacts,
+        terminalSuccessClaim: false,
+      },
+      input.contextRebuildInput.notProvenClaims,
+      [input.contextRebuildInput.rebuildInputId],
+    );
+  }
+
+  if (input.continuationReadiness) {
+    append(
+      "continuation-readiness",
+      "continuation-readiness-evaluated",
+      {
+        readinessId: input.continuationReadiness.readinessId,
+        status: input.continuationReadiness.status,
+        requiredMissingFacts: input.continuationReadiness.requiredMissingFacts,
+        optionalMissingFacts: input.continuationReadiness.optionalMissingFacts,
+        staleFacts: input.continuationReadiness.staleFacts,
+        nextTurnExecuted: input.continuationReadiness.nextTurnExecuted,
+        terminalSuccessClaim: false,
+      },
+      input.continuationReadiness.notProvenClaims,
+      [input.continuationReadiness.readinessId],
+    );
+    append(
+      "branch-gap",
+      "branch-unsupported",
+      {
+        readinessId: input.continuationReadiness.readinessId,
+        branchGapStatus: input.continuationReadiness.branchGapStatus,
+        terminalSuccessClaim: false,
+      },
+      input.continuationReadiness.notProvenClaims,
+      [input.continuationReadiness.readinessId],
+    );
+    append(
+      "compaction-gap",
+      "compaction-unsupported",
+      {
+        readinessId: input.continuationReadiness.readinessId,
+        compactionGapStatus: input.continuationReadiness.compactionGapStatus,
+        terminalSuccessClaim: false,
+      },
+      input.continuationReadiness.notProvenClaims,
+      [input.continuationReadiness.readinessId],
+    );
+  }
+
+  if (input.replaySafeLoopStateSummary) {
+    append(
+      "replay-safe-loop-state",
+      "replay-safe-loop-state-summarized",
+      {
+        summaryId: input.replaySafeLoopStateSummary.summaryId,
+        sourceSessionId: input.replaySafeLoopStateSummary.sourceSessionId,
+        activePathId: input.replaySafeLoopStateSummary.activePathId,
+        latestSavePointId: input.replaySafeLoopStateSummary.latestSavePointId,
+        nextTurnBundleId: input.replaySafeLoopStateSummary.nextTurnBundleId,
+        contextRebuildProjectionId:
+          input.replaySafeLoopStateSummary.contextRebuildProjectionId,
+        continuationReadinessId:
+          input.replaySafeLoopStateSummary.continuationReadinessId,
+        terminalSuccessClaim: false,
+      },
+      input.replaySafeLoopStateSummary.notProvenClaims,
+      [input.replaySafeLoopStateSummary.summaryId],
     );
   }
 
@@ -799,8 +893,17 @@ export function projectLoopTrajectory(
       input.sessionProjection.sessionIdentity,
       input.sessionProjection.activeLeafId,
     ] : []),
+    contextRebuildInputIds: Object.freeze(input.contextRebuildInput ? [
+      input.contextRebuildInput.rebuildInputId,
+    ] : []),
     contextRebuildProjectionIds: Object.freeze(input.contextRebuildProjection ? [
       input.contextRebuildProjection.rebuildSource.activeLeafId,
+    ] : []),
+    continuationReadinessIds: Object.freeze(input.continuationReadiness ? [
+      input.continuationReadiness.readinessId,
+    ] : []),
+    replaySafeLoopStateSummaryIds: Object.freeze(input.replaySafeLoopStateSummary ? [
+      input.replaySafeLoopStateSummary.summaryId,
     ] : []),
     providerMetadataIds: Object.freeze(input.providerRegistry ? [
       ...input.providerRegistry.providers.map((provider) => provider.providerId),

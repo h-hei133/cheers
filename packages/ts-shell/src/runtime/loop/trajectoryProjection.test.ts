@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import {
   projectProviderRegistry,
@@ -11,6 +12,8 @@ import {
   projectRepairRequiredHandoff,
 } from "../../repair/loopBoundary.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
+import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
+import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
 import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,
@@ -339,6 +342,84 @@ describe("loop trajectory projection", () => {
       expect.arrayContaining(["repair-success", "verification-success"]),
     );
     expect(trajectory.terminalSuccessClaim).toBe(false);
+  });
+
+  it("connects PL008 context rebuild, readiness, replay-safe state, and gap stages", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-pl008-trajectory",
+        projectRoot: "/workspace",
+        createdAt: "2026-05-29T00:00:00.000Z",
+        updatedAt: "2026-05-29T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "continue safely" }],
+      },
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({
+      sessionProjection,
+      optionalFacts: ["branch-summary-record"],
+    });
+    const contextRebuildInput = buildLoopContextRebuildInput({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const continuationReadiness = evaluateContinuationReadiness({
+      sessionProjection,
+      contextRebuildProjection,
+      rebuildInput: contextRebuildInput,
+      optionalFacts: ["branch-summary-record"],
+    });
+    const replaySafeLoopStateSummary = summarizeReplaySafeLoopState({
+      sessionProjection,
+      contextRebuildProjection,
+      continuationReadiness,
+      rebuildInput: contextRebuildInput,
+      terminalResultFacts: {
+        status: "stopped_error",
+        terminalClassification: "stopped",
+        terminalReason: "stopped_error",
+      },
+    });
+
+    const trajectory = projectLoopTrajectory({
+      loopId: "loop-pl008",
+      prompt: "continue safely",
+      sessionProjection,
+      contextRebuildProjection,
+      contextRebuildInput,
+      continuationReadiness,
+      replaySafeLoopStateSummary,
+    });
+
+    expect(trajectory.contextRebuildInputIds).toEqual([
+      contextRebuildInput.rebuildInputId,
+    ]);
+    expect(trajectory.continuationReadinessIds).toEqual([
+      continuationReadiness.readinessId,
+    ]);
+    expect(trajectory.replaySafeLoopStateSummaryIds).toEqual([
+      replaySafeLoopStateSummary.summaryId,
+    ]);
+    expect(trajectory.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "context-rebuild-input-prepared",
+        "continuation-readiness-evaluated",
+        "branch-unsupported",
+        "compaction-unsupported",
+        "replay-safe-loop-state-summarized",
+      ]),
+    );
+    expect(trajectory.stages.find((stage) => stage.category === "branch-gap"))
+      .toMatchObject({ observationStatus: "observed" });
+    expect(trajectory.stages.find((stage) => stage.category === "compaction-gap"))
+      .toMatchObject({ observationStatus: "observed" });
+    expect(trajectory.terminalSuccessClaim).toBe(false);
+    expect(trajectory.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "continuation-ready-is-not-success",
+        "replay-safe-summary-is-not-success",
+      ]),
+    );
   });
 
   it("keeps disconnected pieces visible as not-proven", () => {

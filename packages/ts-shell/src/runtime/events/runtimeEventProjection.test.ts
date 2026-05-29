@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createEvidenceOnlySavePoint } from "../../evidence/runtimeSavePoint.js";
+import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import {
   observeRepairApply,
@@ -11,6 +12,8 @@ import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
 import { projectPackageResourceInventory } from "../resources/packageInventory.js";
 import { projectStaticResourceRegistry } from "../resources/staticResourceProjection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
+import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
+import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
@@ -451,6 +454,94 @@ describe("runtime event projection", () => {
       events.find((event) => event.type === "compaction-unsupported")
         ?.notProvenClaims,
     ).toContain("storage-backed-compaction");
+  });
+
+  it("projects context rebuild input, readiness, and replay-safe state observations", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-pl008-events",
+        projectRoot: "/workspace",
+        createdAt: "2026-05-29T00:00:00.000Z",
+        updatedAt: "2026-05-29T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "safe prompt" }],
+      },
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({
+      sessionProjection,
+      requiredFacts: ["latest-save-point"],
+      optionalFacts: ["branch-summary-record"],
+    });
+    const rebuildInput = buildLoopContextRebuildInput({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const missingRequiredReadiness = evaluateContinuationReadiness({
+      sessionProjection,
+      contextRebuildProjection,
+      rebuildInput,
+      requiredFacts: ["latest-save-point"],
+      optionalFacts: ["branch-summary-record"],
+    });
+    const unsafeSessionProjection = projectSessionTree({
+      session: {
+        id: "sess-pl008-unsafe",
+        projectRoot: "/workspace",
+        createdAt: "2026-05-29T00:00:00.000Z",
+        updatedAt: "2026-05-29T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "safe prompt" }],
+      },
+      branchSummaries: [{
+        id: "unsafe-branch",
+        targetLocation: "/home/wang/.private-agents-real/provider.env",
+        summary: "secret branch summary",
+      }],
+    });
+    const unsafeProjection = projectSessionContextRebuild({
+      sessionProjection: unsafeSessionProjection,
+    });
+    const unsafeReadiness = evaluateContinuationReadiness({
+      sessionProjection: unsafeSessionProjection,
+      contextRebuildProjection: unsafeProjection,
+    });
+    const replaySummary = summarizeReplaySafeLoopState({
+      sessionProjection,
+      contextRebuildProjection,
+      continuationReadiness: missingRequiredReadiness,
+      rebuildInput,
+      terminalResultFacts: {
+        status: "stopped_error",
+        terminalClassification: "stopped",
+        terminalReason: "stopped_error",
+      },
+    });
+
+    const events = projectRuntimeEvents({
+      contextRebuildInputs: [rebuildInput],
+      continuationReadiness: [missingRequiredReadiness, unsafeReadiness],
+      replaySafeLoopStateSummaries: [replaySummary],
+    });
+    const serialized = JSON.stringify(events);
+
+    expect(events.map((event) => event.type)).toEqual([
+      "context-rebuild-input-prepared",
+      "continuation-readiness-evaluated",
+      "missing-required-facts-blocked",
+      "missing-optional-facts-observed",
+      "continuation-readiness-evaluated",
+      "unsafe-context-blocked",
+      "replay-safe-loop-state-summarized",
+    ]);
+    expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
+    expect(events.flatMap((event) => event.notProvenClaims)).toEqual(
+      expect.arrayContaining([
+        "context-rebuild-input-is-not-success",
+        "continuation-ready-is-not-success",
+        "replay-safe-summary-is-not-success",
+      ]),
+    );
+    expect(serialized).not.toMatch(/private-agents-real|secret branch summary/i);
   });
 
   it("projects static resource metadata without discovery, execution, or success claims", () => {

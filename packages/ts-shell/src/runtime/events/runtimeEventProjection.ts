@@ -1,4 +1,5 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
+import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type {
   RepairApplyObservation,
   RepairProposalObservation,
@@ -10,6 +11,8 @@ import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/staticResourceProjection.js";
 import type { PackageInventoryProjection } from "../resources/packageInventory.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
+import type { ContinuationReadinessProjection } from "../../session/continuationReadiness.js";
+import type { ReplaySafeLoopStateSummary } from "../../session/replaySafeLoopState.js";
 import type { AssistantResponseState } from "../../turn/assistantResponse.js";
 import type { NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
 import type { FollowUpQueueProjection } from "../../turn/followUpQueue.js";
@@ -54,6 +57,12 @@ export type RuntimeProjectionEventType =
   | "session-branch-summary-observed"
   | "session-compaction-observed"
   | "session-context-rebuild-projected"
+  | "context-rebuild-input-prepared"
+  | "continuation-readiness-evaluated"
+  | "replay-safe-loop-state-summarized"
+  | "unsafe-context-blocked"
+  | "missing-required-facts-blocked"
+  | "missing-optional-facts-observed"
   | "branch-unsupported"
   | "compaction-unsupported"
   | "terminal-verdict-observed"
@@ -168,6 +177,9 @@ export function projectRuntimeEvents(input: {
   readonly hookPolicyOutcomes?: readonly ExtensionHookPolicyOutcome[];
   readonly sessionProjection?: SessionTreeProjection;
   readonly contextRebuildProjection?: SessionContextRebuildProjection;
+  readonly contextRebuildInputs?: readonly LoopContextRebuildInput[];
+  readonly continuationReadiness?: readonly ContinuationReadinessProjection[];
+  readonly replaySafeLoopStateSummaries?: readonly ReplaySafeLoopStateSummary[];
 }): readonly RuntimeProjectionEvent[] {
   const events: RuntimeProjectionEvent[] = [];
   const append = (
@@ -959,11 +971,112 @@ export function projectRuntimeEvents(input: {
         branchSummariesConsidered:
           input.contextRebuildProjection.branchSummariesConsidered.length,
         missingFacts: input.contextRebuildProjection.missingFacts,
+        availableContext: input.contextRebuildProjection.availableContext,
+        missingRequiredFacts: input.contextRebuildProjection.missingRequiredFacts,
+        missingOptionalFacts: input.contextRebuildProjection.missingOptionalFacts,
+        excludedUnsafeFacts: input.contextRebuildProjection.excludedUnsafeFacts,
+        staleFacts: input.contextRebuildProjection.staleFacts,
+        unsupportedBranchFacts: input.contextRebuildProjection.unsupportedBranchFacts,
+        unsupportedCompactionFacts: input.contextRebuildProjection.unsupportedCompactionFacts,
         redactionStatus: input.contextRebuildProjection.redaction.status,
         terminalSuccessClaim:
           input.contextRebuildProjection.terminalSuccessClaim,
       },
       input.contextRebuildProjection.notProvenClaims,
+    );
+  }
+
+  for (const rebuildInput of input.contextRebuildInputs ?? []) {
+    append(
+      "context-rebuild-input-prepared",
+      {
+        rebuildInputId: rebuildInput.rebuildInputId,
+        sourceSessionId: rebuildInput.sourceSessionId,
+        activePathProjectionId: rebuildInput.activePathProjectionId,
+        nextTurnBundleId: rebuildInput.nextTurnBundleId,
+        savePointId: rebuildInput.savePointId,
+        toolResultMessageCount: rebuildInput.toolResultMessageIds.length,
+        verificationHandoffCount: rebuildInput.verificationHandoffIds.length,
+        repairHandoffCount: rebuildInput.repairHandoffIds.length,
+        includedFactsSummary: rebuildInput.includedFactsSummary,
+        excludedFactsSummary: rebuildInput.excludedFactsSummary,
+        missingFacts: rebuildInput.missingFacts,
+        redactionStatus: rebuildInput.redaction.status,
+        terminalSuccessClaim: rebuildInput.terminalSuccessClaim,
+      },
+      rebuildInput.notProvenClaims,
+    );
+  }
+
+  for (const readiness of input.continuationReadiness ?? []) {
+    append(
+      "continuation-readiness-evaluated",
+      {
+        readinessId: readiness.readinessId,
+        sourceSessionId: readiness.sourceSessionId,
+        status: readiness.status,
+        requiredMissingFacts: readiness.requiredMissingFacts,
+        optionalMissingFacts: readiness.optionalMissingFacts,
+        staleFacts: readiness.staleFacts,
+        branchGapStatus: readiness.branchGapStatus,
+        compactionGapStatus: readiness.compactionGapStatus,
+        nextTurnExecuted: readiness.nextTurnExecuted,
+        terminalSuccessClaim: readiness.terminalSuccessClaim,
+      },
+      readiness.notProvenClaims,
+    );
+    if (readiness.status === "blocked_unsafe_context") {
+      append(
+        "unsafe-context-blocked",
+        {
+          readinessId: readiness.readinessId,
+          unsafeFactsExcluded: readiness.unsafeFactsExcluded,
+          terminalSuccessClaim: readiness.terminalSuccessClaim,
+        },
+        readiness.notProvenClaims,
+      );
+    }
+    if (readiness.status === "blocked_missing_required_facts") {
+      append(
+        "missing-required-facts-blocked",
+        {
+          readinessId: readiness.readinessId,
+          requiredMissingFacts: readiness.requiredMissingFacts,
+          terminalSuccessClaim: readiness.terminalSuccessClaim,
+        },
+        readiness.notProvenClaims,
+      );
+    }
+    if (readiness.optionalMissingFacts.length > 0) {
+      append(
+        "missing-optional-facts-observed",
+        {
+          readinessId: readiness.readinessId,
+          optionalMissingFacts: readiness.optionalMissingFacts,
+          terminalSuccessClaim: readiness.terminalSuccessClaim,
+        },
+        readiness.notProvenClaims,
+      );
+    }
+  }
+
+  for (const summary of input.replaySafeLoopStateSummaries ?? []) {
+    append(
+      "replay-safe-loop-state-summarized",
+      {
+        summaryId: summary.summaryId,
+        sourceSessionId: summary.sourceSessionId,
+        activePathId: summary.activePathId,
+        latestSavePointId: summary.latestSavePointId,
+        nextTurnBundleId: summary.nextTurnBundleId,
+        contextRebuildInputId: summary.contextRebuildInputId,
+        contextRebuildProjectionId: summary.contextRebuildProjectionId,
+        continuationReadinessId: summary.continuationReadinessId,
+        terminalResultFacts: summary.terminalResultFacts,
+        redactionStatus: summary.redaction.status,
+        terminalSuccessClaim: summary.terminalSuccessClaim,
+      },
+      summary.notProvenClaims,
     );
   }
 

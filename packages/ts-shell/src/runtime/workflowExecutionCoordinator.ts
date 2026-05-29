@@ -6,6 +6,8 @@ import type {
 import type { PwRuntimeStatus } from "../core/context/pwRuntime.js";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
+import { buildLoopContextRebuildInput } from "../context/rebuildInput.js";
+import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
 import { createComponentLogger, recordCount } from "../observability/index.js";
 import type {
   EscalationDecision,
@@ -36,6 +38,9 @@ import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenc
 import { createModelResponseBoundary } from "../provider/modelResponseBoundary.js";
 import { projectProviderRegistry } from "../provider/providerRegistry.js";
 import { projectWorkflowExecutionResultContract } from "../result/workflowRuntimeProjection.js";
+import { evaluateContinuationReadiness } from "../session/continuationReadiness.js";
+import { summarizeReplaySafeLoopState } from "../session/replaySafeLoopState.js";
+import { projectSessionTree } from "../session/sessionTreeProjection.js";
 import { accumulateAssistantResponse } from "../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy } from "../turn/deliveryPolicy.js";
 import { projectFollowUpQueue } from "../turn/followUpQueue.js";
@@ -657,6 +662,74 @@ function projectProductPathLoopTrajectory(input: {
         postRepairVerificationStatus: "not_run",
       })
     : undefined;
+  const sessionProjection = projectSessionTree({
+    session: {
+      id: input.sessionId,
+      projectRoot: input.turnSnapshot.workspace.identity,
+      createdAt: "1970-01-01T00:00:00.000Z",
+      updatedAt: "1970-01-01T00:00:00.000Z",
+      status: input.execution.codingResult ? "completed" : "error",
+      turns: [{ role: "user", content: input.prompt }],
+    },
+    stateSnapshot: {
+      status: input.execution.codingResult ? "completed" : "error",
+      terminalClassification: input.execution.codingResult ? "stopped" : "error",
+      terminalReason: input.execution.codingResult ? "completed" : "stopped_error",
+    },
+  });
+  const contextRebuildProjection = projectSessionContextRebuild({
+    sessionProjection,
+    optionalFacts: ["storage-backed-branch-navigation", "storage-backed-compaction"],
+  });
+  const contextRebuildInput = buildLoopContextRebuildInput({
+    sessionProjection,
+    contextRebuildProjection,
+    nextTurnBundle,
+    savePoint: input.savePoint,
+    verificationIntents: [verificationIntent],
+    verificationResults: [verificationResult],
+    repairRequiredHandoffs: repairRequired ? [repairRequired] : [],
+    repairProposals: repairProposal ? [repairProposal] : [],
+    repairApplyObservations: repairApply ? [repairApply] : [],
+    providerMetadataIds: [
+      input.providerMode === "real"
+        ? input.realProvider?.provider ?? "real-provider"
+        : "synthetic",
+    ],
+  });
+  const continuationReadiness = evaluateContinuationReadiness({
+    sessionProjection,
+    contextRebuildProjection,
+    rebuildInput: contextRebuildInput,
+    optionalFacts: ["storage-backed-branch-navigation", "storage-backed-compaction"],
+  });
+  const resultFacts = input.execution.codingResult
+    ? {
+        status: input.execution.codingResult.taskSatisfaction.verdict,
+        terminalClassification: input.execution.codingResult.verification.status,
+        terminalReason: input.execution.codingResult.taskKind,
+        verdictSource: "result" as const,
+      }
+    : {
+        status: "unsupported",
+        terminalClassification: "unsupported",
+        terminalReason: "missing-coding-result",
+        verdictSource: "unknown" as const,
+      };
+  const replaySafeLoopStateSummary = summarizeReplaySafeLoopState({
+    sessionProjection,
+    contextRebuildProjection,
+    continuationReadiness,
+    rebuildInput: contextRebuildInput,
+    savePoint: input.savePoint,
+    nextTurnBundle,
+    verificationIntents: [verificationIntent],
+    verificationResults: [verificationResult],
+    repairRequiredHandoffs: repairRequired ? [repairRequired] : [],
+    repairProposals: repairProposal ? [repairProposal] : [],
+    repairApplyObservations: repairApply ? [repairApply] : [],
+    terminalResultFacts: resultFacts,
+  });
   const loop: AgentLoopContractProjection = {
     state: input.execution.codingResult ? "stopped" : "failed",
     stopReason: "model-stop",
@@ -731,6 +804,11 @@ function projectProductPathLoopTrajectory(input: {
     loopId: `product-path:${input.sessionId}`,
     prompt: input.prompt,
     loop,
+    sessionProjection,
+    contextRebuildProjection,
+    contextRebuildInput,
+    continuationReadiness,
+    replaySafeLoopStateSummary,
     providerRegistry: projectProviderRegistry({
       providers: [
         {
@@ -779,19 +857,7 @@ function projectProductPathLoopTrajectory(input: {
           ]
         : [],
     }),
-    resultFacts: input.execution.codingResult
-      ? {
-          status: input.execution.codingResult.taskSatisfaction.verdict,
-          terminalClassification: input.execution.codingResult.verification.status,
-          terminalReason: input.execution.codingResult.taskKind,
-          verdictSource: "result",
-        }
-      : {
-          status: "unsupported",
-          terminalClassification: "unsupported",
-          terminalReason: "missing-coding-result",
-          verdictSource: "unknown",
-        },
+    resultFacts,
   });
 }
 
