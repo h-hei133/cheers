@@ -1,4 +1,5 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
+import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/staticResourceProjection.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
@@ -16,6 +17,12 @@ export type RuntimeProjectionEventType =
   | "resource-projection-observed"
   | "extension-hook-policy-observed"
   | "session-projection-observed"
+  | "session-active-path-projected"
+  | "session-branch-summary-observed"
+  | "session-compaction-observed"
+  | "session-context-rebuild-projected"
+  | "branch-unsupported"
+  | "compaction-unsupported"
   | "terminal-verdict-observed";
 
 export interface RuntimeProjectionEvent {
@@ -46,6 +53,7 @@ export function projectRuntimeEvents(input: {
   readonly resourceProjection?: StaticResourceProjection;
   readonly hookPolicyOutcomes?: readonly ExtensionHookPolicyOutcome[];
   readonly sessionProjection?: SessionTreeProjection;
+  readonly contextRebuildProjection?: SessionContextRebuildProjection;
 }): readonly RuntimeProjectionEvent[] {
   const events: RuntimeProjectionEvent[] = [];
   const append = (
@@ -224,6 +232,99 @@ export function projectRuntimeEvents(input: {
         terminalSuccessClaim: input.sessionProjection.terminal.terminalSuccessClaim,
       },
       input.sessionProjection.terminal.notProvenClaims,
+    );
+    append(
+      "session-active-path-projected",
+      {
+        sessionIdentity: input.sessionProjection.sessionIdentity,
+        activeLeafId: input.sessionProjection.activePathProjection.activeLeafId,
+        pathLength: input.sessionProjection.activePathProjection.pathLength,
+        entryKinds: input.sessionProjection.activePathProjection.entryKinds,
+        redactionStatus: input.sessionProjection.activePathProjection.redactionStatus,
+        contextRebuildReadiness:
+          input.sessionProjection.activePathProjection.contextRebuildReadiness,
+        terminalSuccessClaim: false,
+      },
+      [
+        "terminal-success",
+        ...input.sessionProjection.activePathProjection.unsupportedClaims,
+      ],
+    );
+    if (input.sessionProjection.branchSummary.records.length > 0) {
+      for (const record of input.sessionProjection.branchSummary.records) {
+        append(
+          "session-branch-summary-observed",
+          {
+            branchSummaryId: record.branchSummaryId,
+            sourceBranchIdentity: record.sourceBranchIdentity,
+            targetLocation: record.targetLocation,
+            summaryAvailability: record.summaryAvailability,
+            redactionStatus: record.redaction.status,
+            terminalSuccessClaim: record.terminalSuccessClaim,
+          },
+          record.notProvenClaims,
+        );
+      }
+    } else {
+      append(
+        "branch-unsupported",
+        {
+          sessionIdentity: input.sessionProjection.sessionIdentity,
+          branchSupport: input.sessionProjection.branchSupport,
+          availability: input.sessionProjection.branchSummary.availability,
+          terminalSuccessClaim: false,
+        },
+        input.sessionProjection.branchSummary.notProvenClaims,
+      );
+    }
+    if (input.sessionProjection.compaction.records.length > 0) {
+      for (const record of input.sessionProjection.compaction.records) {
+        append(
+          "session-compaction-observed",
+          {
+            compactionId: record.compactionId,
+            sourceActivePathLength: record.sourceActivePath.length,
+            firstKeptEntryId: record.firstKeptEntryId,
+            summaryAvailability: record.summaryAvailability,
+            evidence: record.evidence,
+            redactionStatus: record.redaction.status,
+            terminalSuccessClaim: record.terminalSuccessClaim,
+          },
+          record.notProvenClaims,
+        );
+      }
+    } else {
+      append(
+        "compaction-unsupported",
+        {
+          sessionIdentity: input.sessionProjection.sessionIdentity,
+          availability: input.sessionProjection.compaction.availability,
+          terminalSuccessClaim: false,
+        },
+        input.sessionProjection.compaction.notProvenClaims,
+      );
+    }
+  }
+
+  if (input.contextRebuildProjection) {
+    append(
+      "session-context-rebuild-projected",
+      {
+        sessionIdentity:
+          input.contextRebuildProjection.rebuildSource.sessionIdentity,
+        activeLeafId: input.contextRebuildProjection.rebuildSource.activeLeafId,
+        activePathEntriesConsidered:
+          input.contextRebuildProjection.activePathEntriesConsidered.length,
+        compactionSummariesConsidered:
+          input.contextRebuildProjection.compactionSummariesConsidered.length,
+        branchSummariesConsidered:
+          input.contextRebuildProjection.branchSummariesConsidered.length,
+        missingFacts: input.contextRebuildProjection.missingFacts,
+        redactionStatus: input.contextRebuildProjection.redaction.status,
+        terminalSuccessClaim:
+          input.contextRebuildProjection.terminalSuccessClaim,
+      },
+      input.contextRebuildProjection.notProvenClaims,
     );
   }
 

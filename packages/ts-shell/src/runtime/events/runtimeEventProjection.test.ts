@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createEvidenceOnlySavePoint } from "../../evidence/runtimeSavePoint.js";
+import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
 import { projectStaticResourceRegistry } from "../resources/staticResourceProjection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
@@ -147,6 +148,99 @@ describe("runtime event projection", () => {
     expect(events.flatMap((event) => event.notProvenClaims)).toContain(
       "terminal-success",
     );
+  });
+
+  it("projects session branch, compaction, and context rebuild observations without verdict claims", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-branch-events",
+        projectRoot: "/workspace",
+        createdAt: "2026-05-19T00:00:00.000Z",
+        updatedAt: "2026-05-19T00:00:00.000Z",
+        status: "active",
+        turns: [
+          {
+            role: "user",
+            content: "token=secret oldText=raw-before",
+            timestamp: "2026-05-19T00:00:01.000Z",
+          },
+        ],
+      },
+      compactions: [
+        {
+          id: "compact_events",
+          summary: "raw provider output: hidden reasoning",
+          evidence: "observed",
+        },
+      ],
+      branchSummaries: [
+        {
+          id: "branch_events",
+          summary: "do not leak this summary",
+        },
+      ],
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({
+      sessionProjection,
+    });
+
+    const events = projectRuntimeEvents({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const serialized = JSON.stringify(events);
+
+    expect(events.map((event) => event.type)).toEqual([
+      "session-projection-observed",
+      "session-active-path-projected",
+      "session-branch-summary-observed",
+      "session-compaction-observed",
+      "session-context-rebuild-projected",
+    ]);
+    expect(
+      events.every((event) => event.facts.terminalSuccessClaim !== true),
+    ).toBe(true);
+    expect(serialized).not.toMatch(
+      /token=secret|raw-before|hidden reasoning|do not leak this summary/i,
+    );
+    expect(
+      events.find((event) => event.type === "session-compaction-observed")
+        ?.notProvenClaims,
+    ).toContain("compaction-summary-truth");
+    expect(
+      events.find((event) => event.type === "session-context-rebuild-projected")
+        ?.notProvenClaims,
+    ).toContain("context-rebuild-execution");
+  });
+
+  it("projects branch and compaction unsupported observations for linear sessions", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-unsupported-events",
+        projectRoot: "/workspace",
+        createdAt: "2026-05-19T00:00:00.000Z",
+        updatedAt: "2026-05-19T00:00:00.000Z",
+        status: "active",
+        turns: [],
+      },
+    });
+
+    const events = projectRuntimeEvents({ sessionProjection });
+
+    expect(events.map((event) => event.type)).toEqual([
+      "session-projection-observed",
+      "session-active-path-projected",
+      "branch-unsupported",
+      "compaction-unsupported",
+    ]);
+    expect(
+      events.find((event) => event.type === "branch-unsupported")
+        ?.notProvenClaims,
+    ).toContain("branch-navigation");
+    expect(
+      events.find((event) => event.type === "compaction-unsupported")
+        ?.notProvenClaims,
+    ).toContain("storage-backed-compaction");
   });
 
   it("projects static resource metadata without discovery, execution, or success claims", () => {
