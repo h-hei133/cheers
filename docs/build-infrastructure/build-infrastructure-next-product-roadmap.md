@@ -11,104 +11,199 @@ specific product blocker proves a missing owner boundary.
 
 ## Recommended Immediate Route
 
-### Real CLI Coding Loop Integration
+### PL004 Model Response And Tool-Call Boundary
 
 Goal:
 
-- Integrate the agent loop spine into the real CLI coding path without replacing
-  the current product loop wholesale.
-- Use the loop trajectory as an observation and handoff surface for real CLI
-  coding turns.
+- Connect a real product-loop model response boundary to the CLI coding path in
+  a fake/default-safe way.
+- Accumulate assistant response state into a report-safe boundary object.
+- Extract and normalize tool calls into a tool-call batch that a later route can
+  dispatch.
 
-Immediate seam from PL001 audit:
+Reason for the sharpened order:
 
-- `workflowExecutionCoordinator` should be the primary emission seam for loop
-  trajectory observations because it already sees the current product turn,
-  task-plan stages, provider mode, runtime events, execution receipts, save
-  point boundary, and result contract.
-- `ShellSessionRuntime` and presentation should consume/render those
-  observations only after owner-domain facts exist; they should not become loop
-  fact owners.
+- PL002 already connected the real CLI product path to loop trajectory
+  observation through the coordinator, shell terminal state, result mapping, and
+  product surface.
+- The next missing dependency is not more observation. It is the model response
+  and tool-call boundary that makes later tool dispatch, next-turn preparation,
+  verification/repair handoff, and continuation hardening meaningful.
 
 Owner domains:
 
-- `runtime`
 - `runtime/loop`
 - `runtime/events`
-- `runtime/execution`
-- `tools`
 - `provider`
-- `session`
-- `context`
-- `presentation`
+- `turn`
+- `tools`
 - `evidence`
 - `result`
-- `core/shell` as host adapter only
+- `presentation` and `core/shell` as consumers only
 
 Existing infrastructure to reuse:
 
 - loop infrastructure map and trajectory projection
 - provider/model registry metadata
-- tool interception decisions
-- execution receipts
-- tool result details
-- evidence-only save points
-- session active path projection
-- context rebuild projection
+- provider draft and turn role draft boundaries
+- turn snapshots
+- tool interception and tool result split shapes for metadata only
 - runtime events and JSON event stream
 - product surface view model and terminal renderer
 - result/evidence truthfulness surfaces
 
-First implementation grouping:
+First implementation grouping after PL002:
 
-- coordinator-level trajectory observation
-- provider/model metadata attachment when already available
-- tool policy, tool result split, and execution receipt attachment when already
-  produced by current stages
-- save point, session active path, and context rebuild projection attachment
-- runtime event and JSON event stream projection
-- product surface rendering with visible not-proven claims
-- result truthfulness tests proving observation does not change verdict
+- provider/model response boundary
+- assistant response accumulation
+- normalized tool-call extraction
+- response/tool-call observations in trajectory and runtime events
+- visible not-proven claims in product surface if rendered
+- result truthfulness tests proving response/tool-call observation does not
+  change verdict
 
 Forbidden shortcuts:
 
 - do not replace `workflowExecutionCoordinator` in one rewrite
 - do not make `ShellSessionRuntime` the product loop owner
-- do not infer write authority from prompt text
-- do not turn provider-called, tool-result observed, command exit zero, or
-  rendered output into success
 - do not enable real provider config by default
-- do not add package loading, dynamic plugin execution, SDK/RPC, TUI, or new
-  dependencies
+- do not call real providers or manually read private provider config
+- do not execute tools, expand command allowlists, change edit behavior, change
+  verification behavior, or change repair behavior
+- do not turn provider response observed, tool calls extracted, or rendered
+  output into success
+- do not add package loading, dynamic plugin execution, SDK/RPC, TUI, browser
+  paths, or new dependencies
 
 Validation expectations:
 
-- focused CLI/product loop tests
-- runtime loop trajectory tests
-- tool interception and execution receipt tests
-- session/context projection tests
-- product surface rendering tests
+- fake/default-safe provider boundary tests
+- assistant response accumulation tests
+- tool-call extraction and normalization tests
+- runtime loop trajectory/event tests if observations change
+- product surface rendering tests if rendered facts change
 - result-contract gate if terminal/result behavior is touched
 - build for touched package if product code changes
 - diff/status hygiene
 
 Expected product value:
 
-- A real CLI path can show what happened in a coding turn with safe facts,
-  receipts, session context, and evidence without overclaiming success.
+- A real CLI path can represent what the assistant response produced, including
+  tool-call intent, before any tool dispatch or success claim.
+
+## PL002 Completed Baseline
+
+PL002 completed the former immediate route:
+
+- coordinator-level loop trajectory observation
+- pass-through on `AgentExecutionOutput` and `OrchestrationResult`
+- result mapper pass-through without terminal truth changes
+- shell terminal state consumption from `query.completed`
+- product surface rendering of loop trajectory sections
+
+This baseline is observation-only. It does not implement model response
+accumulation, model-driven tool batches, tool result messages, next-turn
+semantics, verification/repair handoff inside the loop, or product loop
+replacement.
 
 ## Subsequent Product Routes
 
-### Verification Runtime Dispatch And Evidence
+### PL005 Tool Batch Dispatch And Tool Result Messages
 
 Goal:
 
-- Make verification dispatch more task-relevant and evidence-backed in the real
-  CLI coding path.
+- Dispatch PL004 tool-call batches through sanctioned tool/runtime execution
+  boundaries and construct ordered tool result messages for the next model turn.
+
+Owner domains:
+
+- `tools`
+- `runtime/execution`
+- `runtime/loop`
+- `policy`
+- `evidence`
+- `result`
+
+Existing infrastructure to reuse:
+
+- tool interception decisions
+- execution receipts
+- tool result split
+- runtime events
+- result/evidence truth adapters
+
+Forbidden shortcuts:
+
+- no command allowlist expansion
+- no dynamic plugin/package execution
+- no tool success as task success
+- no edit behavior changes by convenience
+
+Validation expectations:
+
+- before-tool allow/deny tests
+- execution receipt tests
+- tool result message tests
+- abort/cancellation tests
+- no-success-from-tool tests
+
+Expected product value:
+
+- Tool calls become policy-gated next-turn messages rather than observations
+  that cannot continue the loop.
+
+### PL006 Save Point, Prepare-Next-Turn, Steering And Follow-Up
+
+Goal:
+
+- Make save point placement, prepare-next-turn, steering delivery, and follow-up
+  delivery explicit loop phases.
+
+Owner domains:
+
+- `evidence`
+- `turn`
+- `runtime/loop`
+- `session`
+- `context`
+- `core/shell`
+
+Existing infrastructure to reuse:
+
+- evidence-only save points
+- active path projection
+- context rebuild projection
+- shell session runtime cancellation and terminal surfaces
+
+Forbidden shortcuts:
+
+- no session schema migration
+- no next-turn-prepared success
+- no queue reordering that hides user intent
+
+Validation expectations:
+
+- save point tests
+- queue ordering tests
+- next-turn not-success tests
+- session runtime consumer tests
+
+Expected product value:
+
+- The loop can continue from owner facts instead of merely reporting pending
+  facts.
+
+### PL007 Verification And Repair Handoff Inside Loop
+
+Goal:
+
+- Make verification failure and repair handoff explicit loop phases with
+  original failure preservation and re-verification.
 
 Owner domains:
 
 - `verification`
+- `repair`
 - `runtime/execution`
 - `evidence`
 - `result`
@@ -120,16 +215,20 @@ Existing infrastructure to reuse:
 - save points
 - result/evidence truth adapters
 - product surface verification section
+- repair facade projections
 
 Forbidden shortcuts:
 
 - no selected-not-run success
 - no broad skip or weak assertion rebaseline
 - no verification passed claim without a passed command
+- no repair proposal or repair apply as success without re-verification
 
 Validation expectations:
 
 - task-relevant verification tests
+- repair-to-success tests
+- original-failure preservation tests
 - result truthfulness tests
 - focused command receipt tests
 
@@ -137,18 +236,18 @@ Expected product value:
 
 - Users can trust whether a coding task was actually verified.
 
-### Context And Planning Quality Hardening
+### PL008 Session Context Rebuild And Continuation Loop Hardening
 
 Goal:
 
-- Improve planning/context selection for real coding tasks using existing
-  session and context projections.
+- Feed continuation/resume turns from safe session active path and context
+  rebuild facts.
 
 Owner domains:
 
 - `context`
 - `session`
-- `runtime`
+- `runtime/loop`
 - `evidence`
 - `result`
 
@@ -168,12 +267,88 @@ Forbidden shortcuts:
 Validation expectations:
 
 - context projection tests
-- planning handoff tests
+- continuation handoff tests
 - redaction tests
 
 Expected product value:
 
-- Better task understanding without leaking unsafe content or hidden reasoning.
+- Better continuation without leaking unsafe content or hidden reasoning.
+
+### PL009 Product Loop Adapter Consolidation
+
+Goal:
+
+- Consolidate proven PL004-PL008 phases into the local CLI product loop adapter
+  without replacing owner domains or growing compatibility shims.
+
+Owner domains:
+
+- `runtime`
+- `runtime/loop`
+- `core/shell`
+- phase-specific owners from PL004-PL008
+
+Existing infrastructure to reuse:
+
+- coordinator observation baseline
+- proven model/tool/next-turn/verification/session phase surfaces
+- runtime events and product surface
+
+Forbidden shortcuts:
+
+- no broad rewrite of `workflowExecutionCoordinator`
+- no compatibility shim business logic
+- no SDK/RPC/TUI/browser expansion
+
+Validation expectations:
+
+- end-to-end CLI product loop tests
+- coordinator/session runtime regression tests
+- result-contract gate
+- package build
+
+Expected product value:
+
+- The CLI path uses a coherent loop adapter instead of separate observations and
+  staged handoffs.
+
+### PL010 Optional JSON Host Or SDK Route
+
+Goal:
+
+- Expose the stable local loop through a host-neutral JSON/API surface only if a
+  product need is proven.
+
+Owner domains:
+
+- `runtime/events`
+- future host owner
+- `core/shell` adapter if needed
+
+Existing infrastructure to reuse:
+
+- JSON event stream
+- host-neutral runtime events
+- stable local loop adapter
+
+Forbidden shortcuts:
+
+- no default network server
+- no broad public API promises
+- no auth lifecycle by accident
+
+Validation expectations:
+
+- API/stream contract tests
+- cancellation tests
+- redaction tests
+
+Expected product value:
+
+- External consumers can observe or drive the stable loop without changing CLI
+  truth semantics.
+
+## Deferred Product Routes
 
 ### Live Provider Beyond Tiny Controlled Tasks
 
