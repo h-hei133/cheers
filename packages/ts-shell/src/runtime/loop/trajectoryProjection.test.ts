@@ -5,6 +5,11 @@ import {
   projectProviderRegistry,
   unknownProviderCompatibilityFlags,
 } from "../../provider/providerRegistry.js";
+import {
+  observeRepairApply,
+  observeRepairProposal,
+  projectRepairRequiredHandoff,
+} from "../../repair/loopBoundary.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import {
   createToolAfterObservationAnnotation,
@@ -12,6 +17,10 @@ import {
   createToolInterceptionIntent,
 } from "../../tools/interception.js";
 import { createCommandToolResultSplit } from "../../tools/resultSplit.js";
+import {
+  observeVerificationResult,
+  projectVerificationIntent,
+} from "../../verification/loopBoundary.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
 import {
   projectPackageResourceInventory,
@@ -184,7 +193,7 @@ describe("loop trajectory projection", () => {
     );
     expect(trajectory.providerMetadataIds).toContain("synthetic");
     expect(trajectory.productSurfaceSectionIds).toEqual(
-      expect.arrayContaining(["task", "turn", "execution", "save_point"]),
+      expect.arrayContaining(["task", "turn", "execution", "verification", "repair", "save_point"]),
     );
     expect(trajectory.terminalSuccessClaim).toBe(false);
     expect(trajectory.finalObservedFacts.terminalSuccessClaim).toBe(false);
@@ -252,6 +261,8 @@ describe("loop trajectory projection", () => {
     expect(trajectory.toolResultMessageIds).toHaveLength(1);
     expect(trajectory.nextTurnBundleIds).toHaveLength(1);
     expect(trajectory.deliveryPolicyIds).toHaveLength(1);
+    expect(trajectory.verificationIntentIds).toHaveLength(1);
+    expect(trajectory.verificationResultIds).toHaveLength(1);
     expect(trajectory.stages.find((stage) => stage.category === "tool-result-messages"))
       .toMatchObject({ observationStatus: "observed" });
     expect(trajectory.stages.find((stage) => stage.category === "next-turn-delivery-policy"))
@@ -263,10 +274,69 @@ describe("loop trajectory projection", () => {
         "tool-result-message-prepared",
         "loop-save-point-observed",
         "loop-next-turn-delivery-policy-observed",
+        "loop-verification-intent-observed",
+        "loop-verification-result-observed",
       ]),
     );
     expect(trajectory.notProvenClaims).toEqual(
       expect.arrayContaining(["terminal-success", "next-turn-success"]),
+    );
+    expect(trajectory.terminalSuccessClaim).toBe(false);
+  });
+
+  it("projects verification and repair handoff facts without deriving success", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-pl007-trajectory",
+      workspaceRoot: "/workspace",
+      prompt: "verify and repair",
+      providerOptIn: false,
+      maxTurns: 1,
+      modelBoundary: async () => ({
+        responseId: "response-pl007-trajectory",
+        stopReason: "stop",
+      }),
+      verificationBoundary: async ({ turnId }) => {
+        const intent = projectVerificationIntent({
+          sourceTurnId: turnId,
+          targetSummary: "verify changed file",
+          dispatchStatus: "failed",
+          relevanceStatus: "task_relevant",
+        });
+        const result = observeVerificationResult({
+          intent,
+          status: "failed",
+          failureClass: "test-failure",
+        });
+        const repairRequired = projectRepairRequiredHandoff({ verification: result });
+        const repairProposal = observeRepairProposal({ handoff: repairRequired });
+        const repairApply = observeRepairApply({
+          proposal: repairProposal,
+          repairApplyStatus: "applied",
+          postRepairVerificationStatus: "not_run",
+        });
+        return { intent, result, repairRequired, repairProposal, repairApply };
+      },
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "loop-pl007",
+      prompt: "verify and repair",
+      loop,
+    });
+
+    expect(trajectory.verificationIntentIds).toHaveLength(1);
+    expect(trajectory.verificationResultIds).toHaveLength(1);
+    expect(trajectory.repairHandoffIds).toHaveLength(1);
+    expect(trajectory.repairProposalIds).toHaveLength(1);
+    expect(trajectory.repairApplyIds).toHaveLength(1);
+    expect(trajectory.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "loop-verification-intent-observed",
+        "loop-verification-result-observed",
+        "loop-repair-handoff-observed",
+      ]),
+    );
+    expect(trajectory.notProvenClaims).toEqual(
+      expect.arrayContaining(["repair-success", "verification-success"]),
     );
     expect(trajectory.terminalSuccessClaim).toBe(false);
   });

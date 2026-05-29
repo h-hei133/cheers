@@ -1,5 +1,10 @@
 import { createEvidenceOnlySavePoint, type RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
 import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
+import {
+  type RepairApplyObservation,
+  type RepairProposalObservation,
+  type RepairRequiredHandoff,
+} from "../../repair/loopBoundary.js";
 import { accumulateAssistantResponse, type AssistantResponseState } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy, type NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
 import { projectFollowUpQueue, type FollowUpQueueProjection } from "../../turn/followUpQueue.js";
@@ -17,6 +22,12 @@ import type { ToolAfterObservationAnnotation } from "../../tools/interception.js
 import { extractToolCallBatch, type NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import { createRuntimeTurnSnapshot, type RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
+import {
+  observeVerificationResult,
+  projectVerificationIntent,
+  type VerificationLoopIntent,
+  type VerificationResultObservation,
+} from "../../verification/loopBoundary.js";
 import { projectRuntimeEvents, type RuntimeProjectionEvent } from "../events/runtimeEventProjection.js";
 import type { RuntimeExecutionReceiptProjection } from "../execution/executionReceipt.js";
 
@@ -119,7 +130,27 @@ export interface AgentLoopContractInput {
   ) => Promise<AgentLoopContractToolResultBatch>;
   readonly toolBatchDispatch?: ToolBatchDispatchSeam;
   readonly executePreparedNextTurn?: boolean;
+  readonly verificationBoundary?: (
+    input: AgentLoopContractVerificationBoundaryInput,
+  ) => Promise<AgentLoopContractVerificationProjection>;
   readonly abortSignal?: AbortSignal;
+}
+
+export interface AgentLoopContractVerificationBoundaryInput {
+  readonly sessionId: string;
+  readonly turn: number;
+  readonly turnId: string;
+  readonly savePoint: RuntimeEvidenceSavePoint;
+  readonly nextTurnBundle?: NextTurnBundleProjection;
+  readonly toolResultBatch?: AgentLoopContractToolResultBatch;
+}
+
+export interface AgentLoopContractVerificationProjection {
+  readonly intent: VerificationLoopIntent;
+  readonly result: VerificationResultObservation;
+  readonly repairRequired?: RepairRequiredHandoff;
+  readonly repairProposal?: RepairProposalObservation;
+  readonly repairApply?: RepairApplyObservation;
 }
 
 export interface AgentLoopContractProjection {
@@ -161,6 +192,7 @@ export interface AgentLoopContractTurnProjection {
     readonly deliveryPolicy: NextTurnDeliveryPolicyProjection;
     readonly executed: false;
   };
+  readonly verification: AgentLoopContractVerificationProjection;
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
 }
@@ -567,6 +599,33 @@ export async function runAgentLoopContract(
         nextTurnDeliveryPolicies: [deliveryPolicy],
         nextTurnBundles: [nextTurnBundle],
       }));
+      const verification = input.verificationBoundary
+        ? await input.verificationBoundary({
+          sessionId: input.sessionId,
+          turn,
+          turnId: `${input.sessionId}:turn:${turn}`,
+          savePoint,
+          nextTurnBundle,
+          ...(toolResultBatch ? { toolResultBatch } : {}),
+        })
+        : createDefaultVerificationProjection({
+          turnId: `${input.sessionId}:turn:${turn}`,
+          savePoint,
+          nextTurnBundle,
+        });
+      appendProjectedEvents(events, projectRuntimeEvents({
+        verificationIntents: [verification.intent],
+        verificationResults: [verification.result],
+        repairRequiredHandoffs: verification.repairRequired
+          ? [verification.repairRequired]
+          : [],
+        repairProposals: verification.repairProposal
+          ? [verification.repairProposal]
+          : [],
+        repairApplyObservations: verification.repairApply
+          ? [verification.repairApply]
+          : [],
+      }));
       appendEvent(events, "agent-loop-next-turn-prepared", {
         turn,
         bundleId: nextTurnBundle.bundleId,
@@ -600,6 +659,7 @@ export async function runAgentLoopContract(
           deliveryPolicy,
           executed: false,
         },
+        verification,
         terminalSuccessClaim: false,
         notProvenClaims: Object.freeze([
           "terminal-success",
@@ -665,6 +725,31 @@ export async function runAgentLoopContract(
   return finalizeProjection("stopped", turns, events, queued, {
     stopReason: "turn-limit",
   });
+}
+
+function createDefaultVerificationProjection(input: {
+  readonly turnId: string;
+  readonly savePoint: RuntimeEvidenceSavePoint;
+  readonly nextTurnBundle?: NextTurnBundleProjection;
+}): AgentLoopContractVerificationProjection {
+  const intent = projectVerificationIntent({
+    sourceTurnId: input.turnId,
+    targetSummary: input.nextTurnBundle
+      ? `nextTurnBundle=${input.nextTurnBundle.bundleId}`
+      : `savePoint=${input.savePoint.id}`,
+    verificationKind: "owner_projection",
+    dispatchStatus: "planned",
+    relevanceStatus: "not_proven",
+    authorityRequirement: "unknown",
+    notProvenClaims: ["verification-handoff-observation-only"],
+  });
+  const result = observeVerificationResult({
+    intent,
+    status: "not_run",
+    safeSummary: "verification handoff observed; command not run by loop",
+    notProvenClaims: ["verification-not-run"],
+  });
+  return deepFreeze({ intent, result });
 }
 
 function drainDeliveryForTurn(

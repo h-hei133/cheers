@@ -41,6 +41,15 @@ import { evaluateNextTurnDeliveryPolicy } from "../turn/deliveryPolicy.js";
 import { projectFollowUpQueue } from "../turn/followUpQueue.js";
 import { prepareNextTurnBundle } from "../turn/nextTurnBundle.js";
 import { projectSteeringQueue } from "../turn/steeringQueue.js";
+import {
+  observeRepairApply,
+  observeRepairProposal,
+  projectRepairRequiredHandoff,
+} from "../repair/loopBoundary.js";
+import {
+  observeVerificationResult,
+  projectVerificationIntent,
+} from "../verification/loopBoundary.js";
 import { transitionRuntimePhase } from "./runtimePhase.js";
 import {
   notifyRuntimeEvidenceSavePoint,
@@ -594,6 +603,60 @@ function projectProductPathLoopTrajectory(input: {
     deliveryPolicy,
     deliveryStatus: "waiting",
   });
+  const verificationIntent = projectVerificationIntent({
+    sourceTurnId: `${input.sessionId}:turn:${input.turn}`,
+    targetSummary: input.execution.codingResult
+      ? `taskKind=${input.execution.codingResult.taskKind}`
+      : "coding result unavailable",
+    verificationKind: "owner_projection",
+    commandCandidateSummary: input.execution.codingResult?.verification.command,
+    dispatchStatus: verificationDispatchStatus(input.execution),
+    relevanceStatus: verificationRelevanceStatus(input.execution),
+    authorityRequirement: input.execution.codingResult?.verification.command
+      ? "granted"
+      : "unknown",
+    notProvenClaims: ["workflow-verification-observation-only"],
+  });
+  const verificationResult = observeVerificationResult({
+    intent: verificationIntent,
+    status: verificationResultStatus(input.execution),
+    executionReceiptId: executionReceipts[0]?.receiptId,
+    failureClass: input.execution.codingResult?.verification.blockerKind,
+    safeSummary: input.execution.codingResult
+      ? `verification=${input.execution.codingResult.verification.status}; taskKind=${input.execution.codingResult.taskKind}`
+      : "verification unavailable",
+    notProvenClaims: ["workflow-verification-result-is-not-terminal-success"],
+  });
+  const repairRequired = verificationResult.status === "failed" ||
+      verificationResult.status === "blocked"
+    ? projectRepairRequiredHandoff({
+        verification: verificationResult,
+        repairabilityStatus: "repair_required",
+        suggestedRepairMode: "existing_owner",
+        authorityRequirement: "required",
+      })
+    : undefined;
+  const repairProposal = repairRequired
+    ? observeRepairProposal({
+        handoff: repairRequired,
+        proposalSource:
+          (input.execution.codingResult?.repair.notes.length ?? 0) > 0
+            ? "existing_repair_owner_projection"
+            : "unavailable",
+        targetSummary:
+          input.execution.codingResult?.repair.notes.join("; ") ??
+            "repair proposal unavailable",
+        readinessStatus: "unknown",
+        applyStatus: "not_applied",
+      })
+    : undefined;
+  const repairApply = repairProposal
+    ? observeRepairApply({
+        proposal: repairProposal,
+        repairApplyStatus: "not_applied",
+        postRepairVerificationStatus: "not_run",
+      })
+    : undefined;
   const loop: AgentLoopContractProjection = {
     state: input.execution.codingResult ? "stopped" : "failed",
     stopReason: "model-stop",
@@ -631,6 +694,13 @@ function projectProductPathLoopTrajectory(input: {
           followUpQueue,
           deliveryPolicy,
           executed: false,
+        },
+        verification: {
+          intent: verificationIntent,
+          result: verificationResult,
+          ...(repairRequired ? { repairRequired } : {}),
+          ...(repairProposal ? { repairProposal } : {}),
+          ...(repairApply ? { repairApply } : {}),
         },
         terminalSuccessClaim: false,
         notProvenClaims: [
@@ -745,6 +815,39 @@ function providerCompatibilityNotProven() {
       "terminal-success",
     ],
   };
+}
+
+function verificationDispatchStatus(
+  execution: WorkflowExecutionResult,
+): Parameters<typeof projectVerificationIntent>[0]["dispatchStatus"] {
+  const status = execution.codingResult?.verification.status;
+  if (!status || status === "not-requested") return "not_run";
+  if (status === "passed") return "passed";
+  if (status === "failed") return "failed";
+  if (status === "blocked") return "blocked";
+  if (status === "skipped") return "selected";
+  return "not_run";
+}
+
+function verificationRelevanceStatus(
+  execution: WorkflowExecutionResult,
+): Parameters<typeof projectVerificationIntent>[0]["relevanceStatus"] {
+  const scope = execution.codingResult?.verification.selectionScope;
+  if (scope === "focused" || scope === "explicit") return "task_relevant";
+  if (scope === "broader") return "probably_relevant";
+  if (scope === "none") return "not_proven";
+  return execution.codingResult?.verification.command ? "probably_relevant" : "not_proven";
+}
+
+function verificationResultStatus(
+  execution: WorkflowExecutionResult,
+): Parameters<typeof observeVerificationResult>[0]["status"] {
+  const status = execution.codingResult?.verification.status;
+  if (status === "passed") return "passed";
+  if (status === "failed") return "failed";
+  if (status === "blocked") return "blocked";
+  if (status === "skipped") return "selected_not_run";
+  return "not_run";
 }
 
 interface WorkflowExecutionResult {

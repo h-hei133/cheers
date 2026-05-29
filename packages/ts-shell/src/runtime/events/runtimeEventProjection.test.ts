@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { createEvidenceOnlySavePoint } from "../../evidence/runtimeSavePoint.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
+import {
+  observeRepairApply,
+  observeRepairProposal,
+  projectRepairRequiredHandoff,
+} from "../../repair/loopBoundary.js";
 import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
 import { projectPackageResourceInventory } from "../resources/packageInventory.js";
 import { projectStaticResourceRegistry } from "../resources/staticResourceProjection.js";
@@ -15,6 +20,10 @@ import { projectFollowUpQueue } from "../../turn/followUpQueue.js";
 import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectSteeringQueue } from "../../turn/steeringQueue.js";
 import { prepareToolResultMessages } from "../../turn/toolResultMessage.js";
+import {
+  observeVerificationResult,
+  projectVerificationIntent,
+} from "../../verification/loopBoundary.js";
 import { extractToolCallBatch } from "../../tools/toolCallBatch.js";
 import { dispatchToolBatch, planToolBatchDispatch } from "../../tools/toolBatchDispatch.js";
 import {
@@ -231,6 +240,53 @@ describe("runtime event projection", () => {
     expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
     expect(events.flatMap((event) => event.notProvenClaims)).toEqual(
       expect.arrayContaining(["next-turn-success", "terminal-success"]),
+    );
+  });
+
+  it("projects verification and repair handoff events as observation-only", () => {
+    const intent = projectVerificationIntent({
+      sourceTurnId: "turn-events",
+      targetSummary: "verify target",
+      dispatchStatus: "failed",
+      relevanceStatus: "task_relevant",
+    });
+    const result = observeVerificationResult({
+      intent,
+      status: "failed",
+      failureClass: "test-failure",
+    });
+    const handoff = projectRepairRequiredHandoff({ verification: result });
+    const proposal = observeRepairProposal({ handoff, proposalSource: "fake_default_safe" });
+    const apply = observeRepairApply({
+      proposal,
+      repairApplyStatus: "applied",
+      postRepairVerificationStatus: "not_run",
+    });
+    const events = projectRuntimeEvents({
+      verificationIntents: [intent],
+      verificationResults: [result],
+      repairRequiredHandoffs: [handoff],
+      repairProposals: [proposal],
+      repairApplyObservations: [apply],
+    });
+
+    expect(events.map((event) => event.type)).toEqual([
+      "verification-dispatched",
+      "verification-result-observed",
+      "repair-required",
+      "original-failure-preserved",
+      "repair-proposal-observed",
+      "repair-authority-required",
+      "repair-apply-observed",
+      "post-repair-verification-observed",
+    ]);
+    expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
+    expect(events.flatMap((event) => event.notProvenClaims)).toEqual(
+      expect.arrayContaining([
+        "verification-success",
+        "repair-success",
+        "repair-apply-without-post-repair-verification-is-not-success",
+      ]),
     );
   });
 

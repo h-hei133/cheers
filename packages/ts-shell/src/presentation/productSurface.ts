@@ -240,6 +240,40 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       notProvenClaims: stage("execution-receipt")?.notProvenClaims ?? [],
     }),
     section({
+      kind: "verification",
+      title: "Verification",
+      severity: observed("verification-result") === "observed" ? "info" : "not_proven",
+      status: observed("verification-result") === "observed" ? "observed" : "not_proven",
+      summary: `intents=${trajectory.verificationIntentIds.length}; results=${trajectory.verificationResultIds.length}; selected=${observed("verification-intent")}; commandExitZeroIsTaskSuccess=false; verificationSuccess=not-proven`,
+      machineEventCorrelationIds: [
+        ...(stage("verification-intent")?.eventIds ?? []),
+        ...(stage("verification-result")?.eventIds ?? []),
+      ],
+      notProvenClaims: [
+        ...(stage("verification-intent")?.notProvenClaims ?? []),
+        ...(stage("verification-result")?.notProvenClaims ?? []),
+      ],
+    }),
+    section({
+      kind: "repair",
+      title: "Repair",
+      severity: trajectory.repairHandoffIds.length > 0 ? "info" : "not_proven",
+      status: trajectory.repairHandoffIds.length > 0 ? "observed" : "not_proven",
+      summary: `handoffs=${trajectory.repairHandoffIds.length}; proposals=${trajectory.repairProposalIds.length}; applies=${trajectory.repairApplyIds.length}; postRepairVerification=${observed("post-repair-verification")}; repairSuccess=not-proven`,
+      machineEventCorrelationIds: [
+        ...(stage("repair-handoff")?.eventIds ?? []),
+        ...(stage("repair-proposal")?.eventIds ?? []),
+        ...(stage("repair-apply")?.eventIds ?? []),
+        ...(stage("post-repair-verification")?.eventIds ?? []),
+      ],
+      notProvenClaims: [
+        ...(stage("repair-handoff")?.notProvenClaims ?? []),
+        ...(stage("repair-proposal")?.notProvenClaims ?? []),
+        ...(stage("repair-apply")?.notProvenClaims ?? []),
+        ...(stage("post-repair-verification")?.notProvenClaims ?? []),
+      ],
+    }),
+    section({
       kind: "save_point",
       title: "Save point",
       severity: trajectory.savePointIds.length > 0 ? "info" : "not_proven",

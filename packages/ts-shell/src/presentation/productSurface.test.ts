@@ -189,6 +189,8 @@ describe("product surface view model", () => {
       "provider",
       "tools",
       "execution",
+      "verification",
+      "repair",
       "save_point",
       "session",
       "context",
@@ -203,6 +205,8 @@ describe("product surface view model", () => {
     expect(rendered).toContain("dispatch=observed");
     expect(rendered).toContain("toolResults=not_proven");
     expect(rendered).toContain("resultMessages=0");
+    expect(rendered).toContain("verificationSuccess=not-proven");
+    expect(rendered).toContain("repairSuccess=not-proven");
     expect(rendered).toContain("nextTurnExecuted=false");
     expect(rendered).toContain("[not_proven] Verdict:");
     expect(rendered).toContain("terminalSuccessClaim=false");

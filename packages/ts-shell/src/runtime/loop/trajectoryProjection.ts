@@ -63,6 +63,11 @@ export interface LoopTrajectoryProjection {
   readonly steeringMessageIds: readonly string[];
   readonly followUpMessageIds: readonly string[];
   readonly deliveryPolicyIds: readonly string[];
+  readonly verificationIntentIds: readonly string[];
+  readonly verificationResultIds: readonly string[];
+  readonly repairHandoffIds: readonly string[];
+  readonly repairProposalIds: readonly string[];
+  readonly repairApplyIds: readonly string[];
   readonly sessionProjectionIds: readonly string[];
   readonly contextRebuildProjectionIds: readonly string[];
   readonly providerMetadataIds: readonly string[];
@@ -93,6 +98,8 @@ const LOOP_PRODUCT_SURFACE_SECTION_IDS = [
   "provider",
   "tools",
   "execution",
+  "verification",
+  "repair",
   "save_point",
   "session",
   "context",
@@ -446,6 +453,95 @@ export function projectLoopTrajectory(
       turn.nextTurn.deliveryPolicy.notProvenClaims,
       [turn.nextTurn.deliveryPolicy.policyId],
     );
+    append(
+      "verification-intent",
+      "loop-verification-intent-observed",
+      {
+        turn: turn.turn,
+        intentId: turn.verification.intent.intentId,
+        dispatchStatus: turn.verification.intent.dispatchStatus,
+        relevanceStatus: turn.verification.intent.relevanceStatus,
+        authorityRequirement: turn.verification.intent.authorityRequirement,
+        terminalSuccessClaim: false,
+      },
+      turn.verification.intent.notProvenClaims,
+      [turn.verification.intent.intentId],
+    );
+    append(
+      "verification-result",
+      "loop-verification-result-observed",
+      {
+        turn: turn.turn,
+        verificationId: turn.verification.result.verificationId,
+        status: turn.verification.result.status,
+        relevanceStatus: turn.verification.result.relevanceStatus,
+        failureClass: turn.verification.result.failureClass,
+        terminalSuccessClaim: false,
+      },
+      turn.verification.result.notProvenClaims,
+      [turn.verification.result.verificationId],
+    );
+    if (turn.verification.repairRequired) {
+      append(
+        "repair-handoff",
+        "loop-repair-handoff-observed",
+        {
+          turn: turn.turn,
+          handoffId: turn.verification.repairRequired.handoffId,
+          sourceVerificationId: turn.verification.repairRequired.sourceVerificationId,
+          repairabilityStatus: turn.verification.repairRequired.repairabilityStatus,
+          originalFailurePreserved:
+            turn.verification.repairRequired.originalFailurePreserved,
+          terminalSuccessClaim: false,
+        },
+        turn.verification.repairRequired.notProvenClaims,
+        [turn.verification.repairRequired.handoffId],
+      );
+    }
+    if (turn.verification.repairProposal) {
+      append(
+        "repair-proposal",
+        "loop-repair-handoff-observed",
+        {
+          turn: turn.turn,
+          proposalId: turn.verification.repairProposal.proposalId,
+          proposalSource: turn.verification.repairProposal.proposalSource,
+          readinessStatus: turn.verification.repairProposal.readinessStatus,
+          applyStatus: turn.verification.repairProposal.applyStatus,
+          terminalSuccessClaim: false,
+        },
+        turn.verification.repairProposal.notProvenClaims,
+        [turn.verification.repairProposal.proposalId],
+      );
+    }
+    if (turn.verification.repairApply) {
+      append(
+        "repair-apply",
+        "loop-repair-handoff-observed",
+        {
+          turn: turn.turn,
+          repairApplyId: turn.verification.repairApply.repairApplyId,
+          repairApplyStatus: turn.verification.repairApply.repairApplyStatus,
+          repairAuthorityStatus: turn.verification.repairApply.repairAuthorityStatus,
+          terminalSuccessClaim: false,
+        },
+        turn.verification.repairApply.notProvenClaims,
+        [turn.verification.repairApply.repairApplyId],
+      );
+      append(
+        "post-repair-verification",
+        "loop-verification-result-observed",
+        {
+          turn: turn.turn,
+          repairApplyId: turn.verification.repairApply.repairApplyId,
+          postRepairVerificationStatus:
+            turn.verification.repairApply.postRepairVerificationStatus,
+          terminalSuccessClaim: false,
+        },
+        turn.verification.repairApply.notProvenClaims,
+        [turn.verification.repairApply.repairApplyId],
+      );
+    }
   }
 
   if (input.providerRegistry) {
@@ -669,6 +765,17 @@ export function projectLoopTrajectory(
     turn.nextTurn.followUpQueue.items.map((item) => item.followUpId)
   );
   const deliveryPolicyIds = turns.map((turn) => turn.nextTurn.deliveryPolicy.policyId);
+  const verificationIntentIds = turns.map((turn) => turn.verification.intent.intentId);
+  const verificationResultIds = turns.map((turn) => turn.verification.result.verificationId);
+  const repairHandoffIds = turns.flatMap((turn) =>
+    turn.verification.repairRequired ? [turn.verification.repairRequired.handoffId] : []
+  );
+  const repairProposalIds = turns.flatMap((turn) =>
+    turn.verification.repairProposal ? [turn.verification.repairProposal.proposalId] : []
+  );
+  const repairApplyIds = turns.flatMap((turn) =>
+    turn.verification.repairApply ? [turn.verification.repairApply.repairApplyId] : []
+  );
 
   return deepFreeze({
     loopId: loopId.value,
@@ -683,6 +790,11 @@ export function projectLoopTrajectory(
     steeringMessageIds: Object.freeze(Array.from(new Set(steeringMessageIds))),
     followUpMessageIds: Object.freeze(Array.from(new Set(followUpMessageIds))),
     deliveryPolicyIds: Object.freeze(Array.from(new Set(deliveryPolicyIds))),
+    verificationIntentIds: Object.freeze(Array.from(new Set(verificationIntentIds))),
+    verificationResultIds: Object.freeze(Array.from(new Set(verificationResultIds))),
+    repairHandoffIds: Object.freeze(Array.from(new Set(repairHandoffIds))),
+    repairProposalIds: Object.freeze(Array.from(new Set(repairProposalIds))),
+    repairApplyIds: Object.freeze(Array.from(new Set(repairApplyIds))),
     sessionProjectionIds: Object.freeze(input.sessionProjection ? [
       input.sessionProjection.sessionIdentity,
       input.sessionProjection.activeLeafId,

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { createCommandToolResultSplit } from "../../tools/resultSplit.js";
+import {
+  observeRepairApply,
+  observeRepairProposal,
+  projectRepairRequiredHandoff,
+} from "../../repair/loopBoundary.js";
+import {
+  observeVerificationResult,
+  projectVerificationIntent,
+} from "../../verification/loopBoundary.js";
 import { projectJsonRuntimeEventStream } from "../events/jsonEventStream.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
 import {
@@ -205,6 +214,64 @@ describe("agent loop contract", () => {
         "next-turn-waiting",
       ]),
     );
+  });
+
+  it("observes verification failure and repair handoff without applying repair", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-loop-verification-repair",
+      workspaceRoot: "/workspace",
+      prompt: "verify",
+      providerOptIn: false,
+      maxTurns: 1,
+      modelBoundary: async () => ({
+        responseId: "response-verification-repair",
+        stopReason: "stop",
+      }),
+      verificationBoundary: async ({ turnId }) => {
+        const intent = projectVerificationIntent({
+          sourceTurnId: turnId,
+          targetSummary: "verify changed file",
+          dispatchStatus: "failed",
+          relevanceStatus: "task_relevant",
+          commandCandidateSummary: "npm test -w packages/ts-shell",
+        });
+        const result = observeVerificationResult({
+          intent,
+          status: "failed",
+          failureClass: "test-failure",
+        });
+        const repairRequired = projectRepairRequiredHandoff({ verification: result });
+        const repairProposal = observeRepairProposal({
+          handoff: repairRequired,
+          proposalSource: "fake_default_safe",
+          targetSummary: "proposal only",
+          applyStatus: "not_applied",
+        });
+        const repairApply = observeRepairApply({
+          proposal: repairProposal,
+          repairApplyStatus: "not_applied",
+          postRepairVerificationStatus: "not_run",
+        });
+        return { intent, result, repairRequired, repairProposal, repairApply };
+      },
+    });
+
+    const turn = loop.turns[0];
+    expect(turn?.verification.result.status).toBe("failed");
+    expect(turn?.verification.repairRequired?.originalFailurePreserved).toBe(true);
+    expect(turn?.verification.repairProposal?.terminalSuccessClaim).toBe(false);
+    expect(turn?.verification.repairApply?.postRepairVerificationStatus).toBe("not_run");
+    expect(loop.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "verification-result-observed",
+        "repair-required",
+        "repair-proposal-observed",
+        "repair-apply-observed",
+        "post-repair-verification-observed",
+        "original-failure-preserved",
+      ]),
+    );
+    expect(JSON.stringify(loop)).not.toContain('"success":true');
   });
 
   it("delivers next-turn, steering, and follow-up messages when explicitly enabled", async () => {

@@ -259,6 +259,38 @@ describe("JSON runtime event stream projection", () => {
     );
   });
 
+  it("serializes PL007 verification and repair observations without success claims", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [
+        {
+          id: "event-verification-repair",
+          sequence: 1,
+          type: "repair-apply-observed",
+          facts: {
+            repairApplyStatus: "applied",
+            postRepairVerificationStatus: "not_run",
+            raw:
+              "raw provider output: hidden reasoning token=secret oldText=before newText=after",
+            terminalSuccessClaim: false,
+          },
+          notProvenClaims: ["repair-success", "verification-success"],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+      ],
+    });
+    const serialized = JSON.stringify(stream);
+
+    expect(stream[0]?.eventType).toBe("repair-apply-observed");
+    expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
+    expect(stream[0]?.notProvenClaims).toContain("terminal-success");
+    expect(serialized).not.toMatch(
+      /raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+    );
+  });
+
   it("redacts unsafe facts and strips unsupported JSON values", () => {
     const stream = projectJsonRuntimeEventStream({
       streamId: "/home/wang/.private-agents-real/provider.env",

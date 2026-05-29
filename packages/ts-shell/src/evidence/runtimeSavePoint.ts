@@ -20,6 +20,11 @@ export interface RuntimeSavePointInput {
   readonly beforeToolDecisionIds?: readonly string[];
   readonly afterToolAnnotationIds?: readonly string[];
   readonly nextTurnBundleId?: string;
+  readonly verificationIntentIds?: readonly string[];
+  readonly verificationResultIds?: readonly string[];
+  readonly repairHandoffIds?: readonly string[];
+  readonly repairProposalIds?: readonly string[];
+  readonly repairApplyIds?: readonly string[];
   readonly sessionProjectionIds?: readonly string[];
   readonly contextProjectionIds?: readonly string[];
   readonly pendingNextTurnFacts?: readonly string[];
@@ -52,6 +57,11 @@ export interface RuntimeEvidenceSavePoint {
   readonly beforeToolDecisionIds: readonly string[];
   readonly afterToolAnnotationIds: readonly string[];
   readonly nextTurnBundleId?: string;
+  readonly verificationIntentIds: readonly string[];
+  readonly verificationResultIds: readonly string[];
+  readonly repairHandoffIds: readonly string[];
+  readonly repairProposalIds: readonly string[];
+  readonly repairApplyIds: readonly string[];
   readonly sessionProjectionIds: readonly string[];
   readonly contextProjectionIds: readonly string[];
   readonly pendingNextTurnFacts: readonly string[];
@@ -126,6 +136,21 @@ export function createEvidenceOnlySavePoint(
     ...(input.nextTurnBundleId
       ? { nextTurnBundleId: sanitizeEvidenceId(input.nextTurnBundleId, redactions) }
       : {}),
+    verificationIntentIds: Object.freeze(
+      (input.verificationIntentIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    verificationResultIds: Object.freeze(
+      (input.verificationResultIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    repairHandoffIds: Object.freeze(
+      (input.repairHandoffIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    repairProposalIds: Object.freeze(
+      (input.repairProposalIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    repairApplyIds: Object.freeze(
+      (input.repairApplyIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
     sessionProjectionIds: Object.freeze(
       (input.sessionProjectionIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
     ),

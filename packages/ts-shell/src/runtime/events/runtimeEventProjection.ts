@@ -1,4 +1,9 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
+import type {
+  RepairApplyObservation,
+  RepairProposalObservation,
+  RepairRequiredHandoff,
+} from "../../repair/loopBoundary.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { ModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
 import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
@@ -23,6 +28,10 @@ import type {
 } from "../../tools/interception.js";
 import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import type { RuntimeExecutionReceiptProjection } from "../execution/executionReceipt.js";
+import type {
+  VerificationLoopIntent,
+  VerificationResultObservation,
+} from "../../verification/loopBoundary.js";
 
 export type RuntimeProjectionEventType =
   | "turn-snapshot-observed"
@@ -68,6 +77,17 @@ export type RuntimeProjectionEventType =
   | "next-turn-waiting"
   | "next-turn-delivery-unsupported"
   | "next-turn-abandoned"
+  | "verification-intent-planned"
+  | "verification-selected"
+  | "verification-dispatched"
+  | "verification-result-observed"
+  | "verification-relevance-rejected"
+  | "repair-required"
+  | "repair-proposal-observed"
+  | "repair-authority-required"
+  | "repair-apply-observed"
+  | "post-repair-verification-observed"
+  | "original-failure-preserved"
   | "tool-dispatch-not-run"
   | "agent-loop-started"
   | "agent-loop-state-transitioned"
@@ -93,6 +113,9 @@ export type RuntimeProjectionEventType =
   | "loop-steering-queue-observed"
   | "loop-follow-up-queue-observed"
   | "loop-next-turn-delivery-policy-observed"
+  | "loop-verification-intent-observed"
+  | "loop-verification-result-observed"
+  | "loop-repair-handoff-observed"
   | "loop-session-context-projected"
   | "loop-product-surface-projected"
   | "loop-stopped"
@@ -130,6 +153,11 @@ export function projectRuntimeEvents(input: {
   readonly steeringQueues?: readonly SteeringQueueProjection[];
   readonly followUpQueues?: readonly FollowUpQueueProjection[];
   readonly nextTurnDeliveryPolicies?: readonly NextTurnDeliveryPolicyProjection[];
+  readonly verificationIntents?: readonly VerificationLoopIntent[];
+  readonly verificationResults?: readonly VerificationResultObservation[];
+  readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
+  readonly repairProposals?: readonly RepairProposalObservation[];
+  readonly repairApplyObservations?: readonly RepairApplyObservation[];
   readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
   readonly assistantResponses?: readonly AssistantResponseState[];
   readonly toolCallBatches?: readonly NormalizedToolCallBatch[];
@@ -591,6 +619,132 @@ export function projectRuntimeEvents(input: {
         terminalSuccessClaim: bundle.terminalSuccessClaim,
       },
       bundle.notProvenClaims,
+    );
+  }
+
+  for (const intent of input.verificationIntents ?? []) {
+    append(
+      intent.dispatchStatus === "selected"
+        ? "verification-selected"
+        : intent.dispatchStatus === "dispatched" ||
+            intent.dispatchStatus === "passed" ||
+            intent.dispatchStatus === "failed"
+          ? "verification-dispatched"
+          : "verification-intent-planned",
+      {
+        intentId: intent.intentId,
+        sourceTurnId: intent.sourceTurnId,
+        targetSummary: intent.targetSummary,
+        verificationKind: intent.verificationKind,
+        commandCandidateSummary: intent.commandCandidateSummary,
+        authorityRequirement: intent.authorityRequirement,
+        dispatchStatus: intent.dispatchStatus,
+        relevanceStatus: intent.relevanceStatus,
+        redactionStatus: intent.redactionStatus,
+        terminalSuccessClaim: intent.terminalSuccessClaim,
+      },
+      intent.notProvenClaims,
+    );
+  }
+
+  for (const result of input.verificationResults ?? []) {
+    append(
+      result.status === "relevance_rejected"
+        ? "verification-relevance-rejected"
+        : "verification-result-observed",
+      {
+        verificationId: result.verificationId,
+        intentId: result.intentId,
+        executionReceiptId: result.executionReceiptId,
+        status: result.status,
+        relevanceStatus: result.relevanceStatus,
+        failureClass: result.failureClass,
+        safeSummary: result.safeSummary,
+        redactionStatus: result.redactionStatus,
+        terminalSuccessClaim: result.terminalSuccessClaim,
+      },
+      result.notProvenClaims,
+    );
+  }
+
+  for (const handoff of input.repairRequiredHandoffs ?? []) {
+    append(
+      "repair-required",
+      {
+        handoffId: handoff.handoffId,
+        sourceVerificationId: handoff.sourceVerificationId,
+        failureClass: handoff.failureClass,
+        repairabilityStatus: handoff.repairabilityStatus,
+        suggestedRepairMode: handoff.suggestedRepairMode,
+        authorityRequirement: handoff.authorityRequirement,
+        redactionStatus: handoff.redactionStatus,
+        terminalSuccessClaim: handoff.terminalSuccessClaim,
+      },
+      handoff.notProvenClaims,
+    );
+    append(
+      "original-failure-preserved",
+      {
+        handoffId: handoff.handoffId,
+        sourceVerificationId: handoff.sourceVerificationId,
+        originalFailurePreserved: handoff.originalFailurePreserved,
+        terminalSuccessClaim: handoff.terminalSuccessClaim,
+      },
+      handoff.notProvenClaims,
+    );
+  }
+
+  for (const proposal of input.repairProposals ?? []) {
+    append(
+      "repair-proposal-observed",
+      {
+        proposalId: proposal.proposalId,
+        sourceFailureId: proposal.sourceFailureId,
+        proposalSource: proposal.proposalSource,
+        targetSummary: proposal.targetSummary,
+        readinessStatus: proposal.readinessStatus,
+        authorityRequirement: proposal.authorityRequirement,
+        applyStatus: proposal.applyStatus,
+        redactionStatus: proposal.redactionStatus,
+        terminalSuccessClaim: proposal.terminalSuccessClaim,
+      },
+      proposal.notProvenClaims,
+    );
+    if (proposal.authorityRequirement === "required") {
+      append(
+        "repair-authority-required",
+        {
+          proposalId: proposal.proposalId,
+          authorityRequirement: proposal.authorityRequirement,
+          terminalSuccessClaim: proposal.terminalSuccessClaim,
+        },
+        proposal.notProvenClaims,
+      );
+    }
+  }
+
+  for (const apply of input.repairApplyObservations ?? []) {
+    append(
+      "repair-apply-observed",
+      {
+        repairApplyId: apply.repairApplyId,
+        proposalId: apply.proposalId,
+        repairApplyStatus: apply.repairApplyStatus,
+        repairAuthorityStatus: apply.repairAuthorityStatus,
+        originalFailurePreserved: apply.originalFailurePreserved,
+        redactionStatus: apply.redactionStatus,
+        terminalSuccessClaim: apply.terminalSuccessClaim,
+      },
+      apply.notProvenClaims,
+    );
+    append(
+      "post-repair-verification-observed",
+      {
+        repairApplyId: apply.repairApplyId,
+        postRepairVerificationStatus: apply.postRepairVerificationStatus,
+        terminalSuccessClaim: apply.terminalSuccessClaim,
+      },
+      apply.notProvenClaims,
     );
   }
 

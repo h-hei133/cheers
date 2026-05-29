@@ -15,6 +15,12 @@ export type LoopInfrastructureCategory =
   | "steering-queue"
   | "follow-up-queue"
   | "next-turn-delivery-policy"
+  | "verification-intent"
+  | "verification-result"
+  | "repair-handoff"
+  | "repair-proposal"
+  | "repair-apply"
+  | "post-repair-verification"
   | "session-active-path"
   | "context-rebuild-projection"
   | "package-resource-inventory"
@@ -64,6 +70,12 @@ export const LOOP_INFRASTRUCTURE_CATEGORIES = [
   "steering-queue",
   "follow-up-queue",
   "next-turn-delivery-policy",
+  "verification-intent",
+  "verification-result",
+  "repair-handoff",
+  "repair-proposal",
+  "repair-apply",
+  "post-repair-verification",
   "session-active-path",
   "context-rebuild-projection",
   "package-resource-inventory",
@@ -123,6 +135,28 @@ export function createLoopInfrastructureMap(): LoopInfrastructureMap {
     entry("next-turn-delivery-policy", "turn", "next_turn", "connected", "NextTurnDeliveryPolicyProjection", [
       "next-turn-success",
       "provider-called",
+    ]),
+    entry("verification-intent", "verification", "verification", "connected", "VerificationLoopIntent", [
+      "verification-success",
+      "task-success",
+    ]),
+    entry("verification-result", "verification", "verification", "connected", "VerificationResultObservation", [
+      "verification-success",
+      "command-success",
+      "task-success",
+    ]),
+    entry("repair-handoff", "repair", "repair", "connected", "RepairRequiredHandoff", [
+      "repair-success",
+    ]),
+    entry("repair-proposal", "repair", "repair", "connected", "RepairProposalObservation", [
+      "repair-success",
+    ]),
+    entry("repair-apply", "repair", "repair", "connected", "RepairApplyObservation", [
+      "repair-success",
+    ]),
+    entry("post-repair-verification", "verification", "repair", "connected", "RepairApplyObservation.postRepairVerificationStatus", [
+      "verification-success",
+      "repair-success",
     ]),
     entry("session-active-path", "session", "session", "partial", "SessionTreeProjection.activePathProjection", [
       "session-storage-backed-branching",
