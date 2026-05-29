@@ -8,6 +8,9 @@ import { projectStaticResourceRegistry } from "../resources/staticResourceProjec
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
+import { createModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
+import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
+import { extractToolCallBatch } from "../../tools/toolCallBatch.js";
 import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,
@@ -84,6 +87,56 @@ describe("runtime event projection", () => {
       terminalSuccessClaim: false,
       terminalClassification: "stopped",
     });
+  });
+
+  it("projects model response, assistant accumulation, and tool-call batch events as observation-only", () => {
+    const boundary = createModelResponseBoundary({
+      responseId: "response-events-boundary",
+      turnId: "turn-1",
+      source: "fake_default_safe",
+      assistantContent: "safe assistant text",
+      toolCallCount: 2,
+    });
+    const assistant = accumulateAssistantResponse({
+      responseBoundary: boundary,
+      chunks: [{
+        textDelta: "safe assistant text",
+        toolCalls: [
+          { id: "call-read", name: "read", arguments: { path: "a.ts" } },
+          { id: "call-unsupported", name: "mcp__missing__tool" },
+        ],
+      }],
+    });
+    const batch = extractToolCallBatch({
+      responseBoundary: boundary,
+      assistantResponse: assistant,
+    });
+
+    const events = projectRuntimeEvents({
+      modelResponseBoundaries: [boundary],
+      assistantResponses: [assistant],
+      toolCallBatches: [batch],
+    });
+    const serialized = JSON.stringify(events);
+
+    expect(events.map((event) => event.type)).toEqual([
+      "model-response-boundary-observed",
+      "assistant-response-accumulated",
+      "tool-call-batch-extracted",
+      "tool-dispatch-not-run",
+    ]);
+    expect(
+      events.every((event) => event.facts.terminalSuccessClaim === false),
+    ).toBe(true);
+    expect(serialized).not.toContain('"success":true');
+    expect(events.flatMap((event) => event.notProvenClaims)).toEqual(
+      expect.arrayContaining([
+        "provider-success",
+        "tool-dispatch-not-run",
+        "tool-success",
+        "terminal-success",
+      ]),
+    );
   });
 
   it("redacts unsafe event fields and avoids raw tool content", () => {

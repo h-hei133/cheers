@@ -199,6 +199,9 @@ describe("product surface view model", () => {
     ]);
     expect(viewModel?.terminalSuccessClaim).toBe(false);
     expect(rendered).toContain("[not_proven] Provider:");
+    expect(rendered).toContain("modelResponses=1");
+    expect(rendered).toContain("dispatch=not-run");
+    expect(rendered).toContain("toolResults=not-available");
     expect(rendered).toContain("[not_proven] Verdict:");
     expect(rendered).toContain("terminalSuccessClaim=false");
     expect(rendered).not.toContain("Outcome: success");

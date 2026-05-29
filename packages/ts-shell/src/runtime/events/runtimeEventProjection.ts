@@ -1,9 +1,12 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
+import type { ModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
 import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/staticResourceProjection.js";
 import type { PackageInventoryProjection } from "../resources/packageInventory.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
+import type { AssistantResponseState } from "../../turn/assistantResponse.js";
+import type { NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
 import type {
   ToolAfterObservationAnnotation,
@@ -36,6 +39,11 @@ export type RuntimeProjectionEventType =
   | "branch-unsupported"
   | "compaction-unsupported"
   | "terminal-verdict-observed"
+  | "model-response-boundary-observed"
+  | "assistant-response-accumulated"
+  | "tool-call-batch-extracted"
+  | "tool-call-extraction-failed"
+  | "tool-dispatch-not-run"
   | "agent-loop-started"
   | "agent-loop-state-transitioned"
   | "agent-loop-turn-started"
@@ -87,6 +95,9 @@ export function projectRuntimeEvents(input: {
   readonly toolResults?: readonly ToolExecutionResult[];
   readonly toolPolicyDecisions?: readonly ToolBeforePolicyDecision[];
   readonly toolResultAnnotations?: readonly ToolAfterObservationAnnotation[];
+  readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
+  readonly assistantResponses?: readonly AssistantResponseState[];
+  readonly toolCallBatches?: readonly NormalizedToolCallBatch[];
   readonly savePoint?: RuntimeEvidenceSavePoint;
   readonly resultFacts?: RuntimeResultFactsProjection;
   readonly resourceProjection?: StaticResourceProjection;
@@ -177,6 +188,77 @@ export function projectRuntimeEvents(input: {
         phase: input.turnSnapshot.phase,
       },
       ["terminal-success"],
+    );
+  }
+
+  for (const boundary of input.modelResponseBoundaries ?? []) {
+    append(
+      "model-response-boundary-observed",
+      {
+        responseId: boundary.responseId,
+        turnId: boundary.turnId,
+        providerMode: boundary.providerMode,
+        providerSafeLabel: boundary.providerSafeLabel,
+        modelSafeLabel: boundary.modelSafeLabel,
+        responseSource: boundary.source,
+        responseStatus: boundary.status,
+        assistantContentSummary: boundary.assistantContentSummary,
+        toolCallCount: boundary.toolCallCount,
+        redactionStatus: boundary.redaction.status,
+        terminalSuccessClaim: false,
+      },
+      boundary.notProvenClaims,
+    );
+  }
+
+  for (const response of input.assistantResponses ?? []) {
+    append(
+      "assistant-response-accumulated",
+      {
+        responseId: response.responseId,
+        turnId: response.turnId,
+        chunkCount: response.chunkCount,
+        textDeltaCount: response.textDeltaCount,
+        contentSummary: response.contentSummary,
+        toolCallCandidateCount: response.toolCallCandidates.length,
+        accumulationStatus: response.accumulationStatus,
+        redactionStatus: response.redaction.status,
+        terminalSuccessClaim: false,
+      },
+      response.notProvenClaims,
+    );
+  }
+
+  for (const batch of input.toolCallBatches ?? []) {
+    append(
+      batch.extractionStatus === "failed"
+        ? "tool-call-extraction-failed"
+        : "tool-call-batch-extracted",
+      {
+        batchId: batch.batchId,
+        responseId: batch.responseId,
+        turnId: batch.turnId,
+        extractionStatus: batch.extractionStatus,
+        dispatchStatus: batch.dispatchStatus,
+        toolCallCount: batch.calls.length,
+        malformedCallCount: batch.malformedCallCount,
+        unsupportedCallCount: batch.unsupportedCallCount,
+        toolNames: batch.calls.map((call) => call.name),
+        redactionStatus: batch.redaction.status,
+        terminalSuccessClaim: false,
+      },
+      batch.notProvenClaims,
+    );
+    append(
+      "tool-dispatch-not-run",
+      {
+        batchId: batch.batchId,
+        responseId: batch.responseId,
+        dispatchStatus: batch.dispatchStatus,
+        toolCallCount: batch.calls.length,
+        terminalSuccessClaim: false,
+      },
+      batch.notProvenClaims,
     );
   }
 

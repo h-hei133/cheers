@@ -206,15 +206,24 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       title: "Provider",
       severity: "not_proven",
       status: "not_proven",
-      summary: `metadata=${trajectory.providerMetadataIds.length}; providerCalled=not-proven`,
-      notProvenClaims: stage("provider-metadata")?.notProvenClaims ?? ["provider-called"],
+      summary: `metadata=${trajectory.providerMetadataIds.length}; modelResponses=${stage("model-boundary")?.sourceIds.length ?? 0}; providerCalled=not-proven`,
+      notProvenClaims: [
+        ...(stage("provider-metadata")?.notProvenClaims ?? ["provider-called"]),
+        ...(stage("model-boundary")?.notProvenClaims ?? []),
+      ],
     }),
     section({
       kind: "tools",
       title: "Tools",
-      severity: observed("tool-result-details") === "observed" ? "info" : "not_proven",
-      status: observed("tool-result-details") === "observed" ? "observed" : "not_proven",
-      summary: `policyDecisions=${trajectory.toolPolicyIds.length}; receipts=${trajectory.receiptIds.length}; toolSuccess=not-proven`,
+      severity: observed("tool-call-batch") === "observed" ||
+          observed("tool-result-details") === "observed"
+        ? "info"
+        : "not_proven",
+      status: observed("tool-call-batch") === "observed" ||
+          observed("tool-result-details") === "observed"
+        ? "observed"
+        : "not_proven",
+      summary: `toolBatches=${stage("tool-call-batch")?.sourceIds.length ?? 0}; policyDecisions=${trajectory.toolPolicyIds.length}; receipts=${trajectory.receiptIds.length}; dispatch=not-run; toolResults=not-available; toolSuccess=not-proven`,
       notProvenClaims: [
         ...(stage("tool-call-batch")?.notProvenClaims ?? []),
         ...(stage("tool-result-details")?.notProvenClaims ?? []),

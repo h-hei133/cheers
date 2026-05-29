@@ -26,9 +26,52 @@ describe("agent loop contract", () => {
     expect(loop.stopReason).toBe("model-stop");
     expect(loop.turns).toHaveLength(1);
     expect(loop.turns[0]?.modelBoundary.toolCallCount).toBe(0);
+    expect(loop.turns[0]?.normalizedToolCallBatch?.extractionStatus).toBe("empty");
+    expect(loop.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "model-response-boundary-observed",
+        "assistant-response-accumulated",
+        "tool-call-batch-extracted",
+        "tool-dispatch-not-run",
+      ]),
+    );
     expect(loop.terminalSuccessClaim).toBe(false);
     expect(loop.notProvenClaims).toContain("terminal-success");
     expect(loop.turns[0]?.savePoint.terminalSuccessClaim).toBe(false);
+  });
+
+  it("observes malformed and unsupported tool calls without dispatching tools", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-loop-tool-observation",
+      workspaceRoot: "/workspace",
+      prompt: "observe tools",
+      providerOptIn: false,
+      modelBoundary: async () => ({
+        responseId: "response-tool-observation",
+        stopReason: "tool-calls",
+        toolCalls: [
+          { id: "call-read", name: "read", arguments: { path: "a.ts" } },
+          { id: "call-read", name: "read" },
+          { id: "call-missing", name: "" },
+          { id: "call-unsupported", name: "mcp__missing__tool" },
+        ],
+      }),
+    });
+    const turn = loop.turns[0];
+
+    expect(loop.state).toBe("stopped");
+    expect(turn?.normalizedToolCallBatch).toMatchObject({
+      extractionStatus: "partial",
+      dispatchStatus: "not_dispatched",
+      malformedCallCount: 1,
+      unsupportedCallCount: 2,
+      terminalSuccessClaim: false,
+    });
+    expect(turn?.toolResultBatch).toBeUndefined();
+    expect(loop.events.map((event) => event.type)).toContain("tool-dispatch-not-run");
+    expect(
+      JSON.stringify(loop),
+    ).not.toContain('"success":true');
   });
 
   it("models a tool call batch and evidence-only save point", async () => {

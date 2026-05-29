@@ -1,4 +1,7 @@
 import { createEvidenceOnlySavePoint, type RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
+import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
+import { accumulateAssistantResponse, type AssistantResponseState } from "../../turn/assistantResponse.js";
+import { extractToolCallBatch, type NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import { createRuntimeTurnSnapshot, type RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
 import { projectRuntimeEvents, type RuntimeProjectionEvent } from "../events/runtimeEventProjection.js";
@@ -39,6 +42,8 @@ export interface AgentLoopContractPreparedToolCall {
   readonly id: string;
   readonly name: string;
   readonly argumentKeys: readonly string[];
+  readonly status?: "prepared" | "malformed" | "unsupported";
+  readonly dispatchStatus?: "not_dispatched";
 }
 
 export interface AgentLoopContractToolCallBatch {
@@ -62,6 +67,9 @@ export interface AgentLoopContractModelResponseBoundary {
   readonly stopReason: "stop" | "tool-calls" | "aborted" | "failed";
   readonly toolCalls?: readonly AgentLoopContractToolCallRequest[];
   readonly safeSummary?: string;
+  readonly responseBoundary?: ModelResponseBoundary;
+  readonly assistantResponse?: AssistantResponseState;
+  readonly toolCallBatch?: NormalizedToolCallBatch;
   readonly notProvenClaims?: readonly string[];
 }
 
@@ -115,8 +123,12 @@ export interface AgentLoopContractTurnProjection {
     readonly responseId: string;
     readonly stopReason: AgentLoopContractModelResponseBoundary["stopReason"];
     readonly toolCallCount: number;
+    readonly responseStatus?: ModelResponseBoundary["status"];
+    readonly responseSource?: ModelResponseBoundary["source"];
+    readonly assistantAccumulationStatus?: AssistantResponseState["accumulationStatus"];
   };
   readonly toolCallBatch?: AgentLoopContractToolCallBatch;
+  readonly normalizedToolCallBatch?: NormalizedToolCallBatch;
   readonly toolResultBatch?: AgentLoopContractToolResultBatch;
   readonly savePoint: RuntimeEvidenceSavePoint;
   readonly nextTurn: {
@@ -228,22 +240,63 @@ export async function runAgentLoopContract(
         pendingNextTurnFacts,
         abortSignal: input.abortSignal,
       });
+      const responseBoundary = modelBoundary.responseBoundary ??
+        createModelResponseBoundary({
+          responseId: modelBoundary.responseId,
+          turnId: `${input.sessionId}:turn:${turn}`,
+          providerMode: input.providerMode,
+          modelSafeLabel: input.modelLabel,
+          source: "fake_default_safe",
+          status: modelBoundary.stopReason === "failed"
+            ? "failed"
+            : modelBoundary.stopReason === "aborted"
+              ? "aborted"
+              : "observed",
+          assistantContent: modelBoundary.safeSummary,
+          toolCallCount: modelBoundary.toolCalls?.length ?? 0,
+          notProvenClaims: modelBoundary.notProvenClaims,
+        });
+      const assistantResponse = modelBoundary.assistantResponse ??
+        accumulateAssistantResponse({
+          responseBoundary,
+          turnId: `${input.sessionId}:turn:${turn}`,
+          chunks: [{
+            textDelta: modelBoundary.safeSummary,
+            toolCalls: modelBoundary.toolCalls ?? [],
+          }],
+          notProvenClaims: modelBoundary.notProvenClaims,
+        });
+      const normalizedToolCallBatch = modelBoundary.toolCallBatch ??
+        extractToolCallBatch({
+          responseBoundary,
+          assistantResponse,
+          turnId: `${input.sessionId}:turn:${turn}`,
+          batchId: `${snapshot.id}:tool-call-batch`,
+          notProvenClaims: modelBoundary.notProvenClaims,
+        });
+      appendProjectedEvents(events, projectRuntimeEvents({
+        modelResponseBoundaries: [responseBoundary],
+        assistantResponses: [assistantResponse],
+        toolCallBatches: [normalizedToolCallBatch],
+      }));
       appendEvent(events, "agent-loop-model-boundary-observed", {
         turn,
-        responseId: sanitizeText(modelBoundary.responseId),
+        responseId: responseBoundary.responseId,
         stopReason: modelBoundary.stopReason,
-        safeSummary: modelBoundary.safeSummary
-          ? summarizeText(modelBoundary.safeSummary)
+        responseSource: responseBoundary.source,
+        responseStatus: responseBoundary.status,
+        safeSummary: responseBoundary.assistantContentSummary
+          ? summarizeText(responseBoundary.assistantContentSummary)
           : undefined,
-        toolCallCount: modelBoundary.toolCalls?.length ?? 0,
+        toolCallCount: normalizedToolCallBatch.calls.length,
         terminalSuccessClaim: false,
-      }, ["terminal-success", ...(modelBoundary.notProvenClaims ?? [])]);
+      }, ["terminal-success", ...responseBoundary.notProvenClaims]);
 
       if (modelBoundary.stopReason === "aborted" || input.abortSignal?.aborted) {
         transition("aborted", "model-boundary-aborted");
         appendEvent(events, "agent-loop-aborted", {
           turn,
-          responseId: sanitizeText(modelBoundary.responseId),
+          responseId: responseBoundary.responseId,
           terminalSuccessClaim: false,
         });
         return finalizeProjection("aborted", turns, events, queued);
@@ -253,7 +306,7 @@ export async function runAgentLoopContract(
         appendEvent(events, "agent-loop-failed", {
           turn,
           failureClass: "model-boundary",
-          responseId: sanitizeText(modelBoundary.responseId),
+          responseId: responseBoundary.responseId,
           terminalSuccessClaim: false,
         });
         return finalizeProjection("failed", turns, events, queued, {
@@ -261,16 +314,28 @@ export async function runAgentLoopContract(
         });
       }
 
-      const toolCalls = modelBoundary.toolCalls ?? [];
+      const toolCalls = (modelBoundary.toolCalls ?? []).filter((call) =>
+        normalizedToolCallBatch.calls.some((normalized) =>
+          normalized.id === call.id && normalized.status === "prepared"
+        )
+      );
       let toolCallBatch: AgentLoopContractToolCallBatch | undefined;
       let toolResultBatch: AgentLoopContractToolResultBatch | undefined;
-      if (toolCalls.length > 0) {
+      if (normalizedToolCallBatch.calls.length > 0) {
         transition("awaiting_tool_results", `turn-${turn}-tool-call-batch`);
         toolCallBatch = {
           id: `${snapshot.id}:tool-call-batch`,
           turn,
           policy: input.toolBatchPolicy ?? "metadata-only",
-          calls: Object.freeze(toolCalls.map(prepareToolCall)),
+          calls: Object.freeze(
+            normalizedToolCallBatch.calls.map((call) => ({
+              id: call.id,
+              name: call.name,
+              argumentKeys: call.argumentKeys,
+              status: call.status,
+              dispatchStatus: call.dispatchStatus,
+            })),
+          ),
         };
         appendEvent(events, "agent-loop-tool-call-batch-observed", {
           turn,
@@ -278,51 +343,57 @@ export async function runAgentLoopContract(
           policy: toolCallBatch.policy,
           toolCallCount: toolCallBatch.calls.length,
           toolNames: toolCallBatch.calls.map((call) => call.name),
+          extractionStatus: normalizedToolCallBatch.extractionStatus,
+          dispatchStatus: normalizedToolCallBatch.dispatchStatus,
           terminalSuccessClaim: false,
         });
         if (!input.toolBatchBoundary) {
-          transition("failed", "tool-batch-boundary-missing");
-          appendEvent(events, "agent-loop-failed", {
+          appendEvent(events, "tool-dispatch-not-run", {
             turn,
-            failureClass: "tool-batch-boundary",
+            batchId: normalizedToolCallBatch.batchId,
             reason: "tool-batch-boundary-not-provided",
             terminalSuccessClaim: false,
-          });
-          return finalizeProjection("failed", turns, events, queued, {
-            failureClass: "tool-batch-boundary",
-          });
-        }
-        try {
-          toolResultBatch = await input.toolBatchBoundary(toolCallBatch);
-        } catch (error) {
-          transition("failed", "tool-batch-boundary-failed");
-          appendEvent(events, "agent-loop-failed", {
+          }, normalizedToolCallBatch.notProvenClaims);
+        } else if (toolCalls.length > 0) {
+          try {
+            toolResultBatch = await input.toolBatchBoundary(toolCallBatch);
+          } catch (error) {
+            transition("failed", "tool-batch-boundary-failed");
+            appendEvent(events, "agent-loop-failed", {
+              turn,
+              failureClass: "tool-batch-boundary",
+              errorClass: error instanceof Error ? error.name : "unknown",
+              terminalSuccessClaim: false,
+            });
+            return finalizeProjection("failed", turns, events, queued, {
+              failureClass: "tool-batch-boundary",
+            });
+          }
+          appendEvent(events, "agent-loop-tool-result-batch-observed", {
             turn,
-            failureClass: "tool-batch-boundary",
-            errorClass: error instanceof Error ? error.name : "unknown",
+            batchId: toolResultBatch.id,
+            callBatchId: toolResultBatch.callBatchId,
+            resultCount: toolResultBatch.results.length,
+            failedToolCallIds: toolResultBatch.failedToolCallIds,
+            executionReceiptCount: toolResultBatch.executionReceipts.length,
+            terminate: toolResultBatch.terminate,
             terminalSuccessClaim: false,
           });
-          return finalizeProjection("failed", turns, events, queued, {
-            failureClass: "tool-batch-boundary",
-          });
+          appendProjectedEvents(
+            events,
+            projectRuntimeEvents({
+              executionReceipts: toolResultBatch.executionReceipts,
+              toolResults: toolResultBatch.results,
+            }),
+          );
+        } else {
+          appendEvent(events, "tool-dispatch-not-run", {
+            turn,
+            batchId: normalizedToolCallBatch.batchId,
+            reason: "no-dispatchable-tool-calls",
+            terminalSuccessClaim: false,
+          }, normalizedToolCallBatch.notProvenClaims);
         }
-        appendEvent(events, "agent-loop-tool-result-batch-observed", {
-          turn,
-          batchId: toolResultBatch.id,
-          callBatchId: toolResultBatch.callBatchId,
-          resultCount: toolResultBatch.results.length,
-          failedToolCallIds: toolResultBatch.failedToolCallIds,
-          executionReceiptCount: toolResultBatch.executionReceipts.length,
-          terminate: toolResultBatch.terminate,
-          terminalSuccessClaim: false,
-        });
-        appendProjectedEvents(
-          events,
-          projectRuntimeEvents({
-            executionReceipts: toolResultBatch.executionReceipts,
-            toolResults: toolResultBatch.results,
-          }),
-        );
       }
 
       transition("saving_point", `turn-${turn}-save-point`);
@@ -369,9 +440,13 @@ export async function runAgentLoopContract(
         modelBoundary: {
           responseId: sanitizeText(modelBoundary.responseId),
           stopReason: modelBoundary.stopReason,
-          toolCallCount: toolCalls.length,
+          toolCallCount: normalizedToolCallBatch.calls.length,
+          responseStatus: responseBoundary.status,
+          responseSource: responseBoundary.source,
+          assistantAccumulationStatus: assistantResponse.accumulationStatus,
         },
         ...(toolCallBatch ? { toolCallBatch } : {}),
+        normalizedToolCallBatch,
         ...(toolResultBatch ? { toolResultBatch } : {}),
         savePoint,
         nextTurn: {
@@ -397,7 +472,7 @@ export async function runAgentLoopContract(
         });
       }
 
-      if (toolCalls.length > 0 && turn < maxTurns) {
+      if (toolResultBatch && toolCalls.length > 0 && turn < maxTurns) {
         continue;
       }
 

@@ -33,8 +33,10 @@ import {
   type LoopTrajectoryProjection,
 } from "./loop/trajectoryProjection.js";
 import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenceLedger.js";
+import { createModelResponseBoundary } from "../provider/modelResponseBoundary.js";
 import { projectProviderRegistry } from "../provider/providerRegistry.js";
 import { projectWorkflowExecutionResultContract } from "../result/workflowRuntimeProjection.js";
+import { accumulateAssistantResponse } from "../turn/assistantResponse.js";
 import { transitionRuntimePhase } from "./runtimePhase.js";
 import {
   notifyRuntimeEvidenceSavePoint,
@@ -43,6 +45,7 @@ import {
 } from "./turnBoundary.js";
 import { createRuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
 import type { RuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
+import { extractToolCallBatch } from "../tools/toolCallBatch.js";
 import {
   runApplyPatchRuntimeBridgeIfRequested,
   type ApplyPatchRuntimeRouteOptions,
@@ -525,6 +528,37 @@ function projectProductPathLoopTrajectory(input: {
   readonly execution: WorkflowExecutionResult;
 }): LoopTrajectoryProjection {
   const executionReceipts = input.execution.executionReceipts ?? [];
+  const responseBoundary = createModelResponseBoundary({
+    responseId: `workflow-response-${hashStableId(`${input.sessionId}:${input.turn}`)}`,
+    turnId: `${input.sessionId}:turn:${input.turn}`,
+    providerMode: input.providerMode,
+    providerSafeLabel: input.providerMode === "real"
+      ? input.realProvider?.provider ?? "real-provider"
+      : "synthetic-provider",
+    modelSafeLabel: input.realProvider?.model,
+    source: "existing_safe_projection",
+    status: input.execution.codingResult ? "observed" : "failed",
+    assistantContent: input.execution.userFacingOutput,
+    toolCallCount: 0,
+    notProvenClaims: [
+      "provider-success",
+      "tool-success",
+      "task-success",
+      "terminal-success",
+    ],
+  });
+  const assistantResponse = accumulateAssistantResponse({
+    responseBoundary,
+    turnId: `${input.sessionId}:turn:${input.turn}`,
+    chunks: [{ textDelta: input.execution.userFacingOutput }],
+    notProvenClaims: ["existing-product-output-is-observation-only"],
+  });
+  const normalizedToolCallBatch = extractToolCallBatch({
+    responseBoundary,
+    assistantResponse,
+    turnId: `${input.sessionId}:turn:${input.turn}`,
+    batchId: `workflow-tool-calls-${hashStableId(`${input.sessionId}:${input.turn}`)}`,
+  });
   const loop: AgentLoopContractProjection = {
     state: input.execution.codingResult ? "stopped" : "failed",
     stopReason: "model-stop",
@@ -533,10 +567,14 @@ function projectProductPathLoopTrajectory(input: {
         turn: input.turn,
         snapshot: input.turnSnapshot,
         modelBoundary: {
-          responseId: `workflow-response-${hashStableId(`${input.sessionId}:${input.turn}`)}`,
+          responseId: responseBoundary.responseId,
           stopReason: input.execution.codingResult ? "stop" : "failed",
-          toolCallCount: executionReceipts.length,
+          toolCallCount: normalizedToolCallBatch.calls.length,
+          responseStatus: responseBoundary.status,
+          responseSource: responseBoundary.source,
+          assistantAccumulationStatus: assistantResponse.accumulationStatus,
         },
+        normalizedToolCallBatch,
         ...(executionReceipts.length > 0
           ? {
               toolResultBatch: {

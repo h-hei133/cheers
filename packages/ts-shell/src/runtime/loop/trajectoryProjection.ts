@@ -213,12 +213,46 @@ export function projectLoopTrajectory(
         turn: turn.turn,
         responseId: turn.modelBoundary.responseId,
         stopReason: turn.modelBoundary.stopReason,
+        responseSource: turn.modelBoundary.responseSource,
+        responseStatus: turn.modelBoundary.responseStatus,
+        assistantAccumulationStatus: turn.modelBoundary.assistantAccumulationStatus,
         toolCallCount: turn.modelBoundary.toolCallCount,
       },
       turn.notProvenClaims,
       [turn.modelBoundary.responseId],
     );
-    if (turn.toolCallBatch) {
+    if (turn.normalizedToolCallBatch) {
+      append(
+        "tool-call-batch",
+        turn.normalizedToolCallBatch.extractionStatus === "failed"
+          ? "tool-call-extraction-failed"
+          : "tool-call-batch-extracted",
+        {
+          turn: turn.turn,
+          batchId: turn.normalizedToolCallBatch.batchId,
+          extractionStatus: turn.normalizedToolCallBatch.extractionStatus,
+          dispatchStatus: turn.normalizedToolCallBatch.dispatchStatus,
+          callCount: turn.normalizedToolCallBatch.calls.length,
+          malformedCallCount: turn.normalizedToolCallBatch.malformedCallCount,
+          unsupportedCallCount: turn.normalizedToolCallBatch.unsupportedCallCount,
+          toolNames: turn.normalizedToolCallBatch.calls.map((call) => call.name),
+        },
+        turn.normalizedToolCallBatch.notProvenClaims,
+        [turn.normalizedToolCallBatch.batchId],
+      );
+      append(
+        "before-tool-policy",
+        "tool-dispatch-not-run",
+        {
+          turn: turn.turn,
+          batchId: turn.normalizedToolCallBatch.batchId,
+          dispatchStatus: turn.normalizedToolCallBatch.dispatchStatus,
+          terminalSuccessClaim: false,
+        },
+        turn.normalizedToolCallBatch.notProvenClaims,
+        [turn.normalizedToolCallBatch.batchId],
+      );
+    } else if (turn.toolCallBatch) {
       append(
         "tool-call-batch",
         "loop-tool-policy-observed",

@@ -165,6 +165,16 @@ describe("loop trajectory projection", () => {
     });
 
     expect(trajectory.turnIds).toEqual(["turn:1"]);
+    expect(trajectory.stages.find((stage) => stage.category === "model-boundary"))
+      .toMatchObject({ observationStatus: "partial" });
+    expect(trajectory.stages.find((stage) => stage.category === "tool-call-batch"))
+      .toMatchObject({ observationStatus: "partial" });
+    expect(trajectory.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "tool-call-batch-extracted",
+        "tool-dispatch-not-run",
+      ]),
+    );
     expect(trajectory.receiptIds).toEqual([receipt.receiptId]);
     expect(trajectory.toolPolicyIds).toEqual([decision.decisionId]);
     expect(trajectory.savePointIds).toHaveLength(1);
