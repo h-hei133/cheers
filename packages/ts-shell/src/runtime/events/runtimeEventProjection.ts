@@ -1,4 +1,5 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
+import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/staticResourceProjection.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
@@ -13,6 +14,7 @@ export type RuntimeProjectionEventType =
   | "save-point-observed"
   | "result-facts-observed"
   | "resource-projection-observed"
+  | "extension-hook-policy-observed"
   | "session-projection-observed"
   | "terminal-verdict-observed";
 
@@ -42,6 +44,7 @@ export function projectRuntimeEvents(input: {
   readonly savePoint?: RuntimeEvidenceSavePoint;
   readonly resultFacts?: RuntimeResultFactsProjection;
   readonly resourceProjection?: StaticResourceProjection;
+  readonly hookPolicyOutcomes?: readonly ExtensionHookPolicyOutcome[];
   readonly sessionProjection?: SessionTreeProjection;
 }): readonly RuntimeProjectionEvent[] {
   const events: RuntimeProjectionEvent[] = [];
@@ -189,6 +192,25 @@ export function projectRuntimeEvents(input: {
     );
   }
 
+  for (const outcome of input.hookPolicyOutcomes ?? []) {
+    append(
+      "extension-hook-policy-observed",
+      {
+        hookId: outcome.hookId,
+        extensionId: outcome.extensionId,
+        eventKind: outcome.eventKind,
+        requestedEffect: outcome.requestedEffect,
+        acceptedEffect: outcome.acceptedEffect,
+        policyStatus: outcome.status,
+        reason: outcome.reason,
+        redactionStatus: outcome.redaction.status,
+        evidenceAnnotationCount: outcome.evidenceAnnotations.length,
+        terminalSuccessClaim: outcome.terminalSuccessClaim,
+      },
+      outcome.notProvenClaims,
+    );
+  }
+
   if (input.sessionProjection) {
     append(
       "session-projection-observed",
@@ -218,6 +240,7 @@ const REDACTION_EXCLUSIONS = [
   "hidden-reasoning",
   "full-transcript",
   "unsafe-file-contents",
+  "executable-plugin-code",
 ] as const;
 
 function sanitizeRecord(input: Record<string, unknown>): {
@@ -268,6 +291,9 @@ function sanitizeText(input: string): { readonly value: string; readonly redacte
   value = value.replace(/\bBearer\s+[A-Za-z0-9._-]+/gi, "Bearer [secret-redacted]");
   value = value.replace(/\btoken=[^\s;,)]+/gi, "token=[secret-redacted]");
   value = value.replace(/\bauthorization[:=][^\s;,)]+/gi, "authorization=[secret-redacted]");
+  value = value.replace(/\bapi[_-]?key[:=][^\s;,)]+/gi, "apiKey=[secret-redacted]");
+  value = value.replace(/\bauth(?:orization)?[_-]?header[:=][^\n\r]*/gi, "authHeader=[secret-redacted]");
+  value = value.replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]");
   value = value.replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]");
   value = value.replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]");
   value = value.replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]");

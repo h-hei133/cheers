@@ -26,6 +26,8 @@ export interface StaticResourceSummary {
   readonly extension?: {
     readonly extensionId: string;
     readonly capabilities: readonly string[];
+    readonly lifecycleEvents: readonly string[];
+    readonly hookEffects: readonly string[];
     readonly toolKinds: readonly string[];
     readonly requiredPermissions: readonly string[];
     readonly executable: false;
@@ -130,6 +132,8 @@ function toSummary(descriptor: StaticResourceDescriptor): StaticResourceSummary 
           extension: {
             extensionId: descriptor.extensionManifest.extensionId,
             capabilities: descriptor.extensionManifest.capabilities,
+            lifecycleEvents: descriptor.extensionManifest.lifecycleEvents ?? [],
+            hookEffects: descriptor.extensionManifest.hookEffects ?? [],
             toolKinds: descriptor.extensionManifest.toolKinds,
             requiredPermissions: descriptor.extensionManifest.requiredPermissions,
             executable: false,

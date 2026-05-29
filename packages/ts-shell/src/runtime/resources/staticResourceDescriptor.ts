@@ -1,3 +1,12 @@
+import type {
+  ExtensionHookEffect,
+  ExtensionLifecycleEventKind,
+} from "../extensions/lifecycle.js";
+import {
+  isExtensionHookEffect,
+  isExtensionLifecycleEventKind,
+} from "../extensions/lifecycle.js";
+
 export type StaticResourceKind =
   | "skill"
   | "prompt-template"
@@ -20,6 +29,8 @@ export interface StaticExtensionManifest {
   readonly extensionId: string;
   readonly safeName: string;
   readonly capabilities: readonly string[];
+  readonly lifecycleEvents?: readonly ExtensionLifecycleEventKind[];
+  readonly hookEffects?: readonly ExtensionHookEffect[];
   readonly toolKinds: readonly string[];
   readonly requiredPermissions: readonly string[];
   readonly executable: false;
@@ -119,6 +130,16 @@ function findInvalidDescriptorReason(
     }
     if (descriptor.extensionManifest.supported !== false) {
       return "extension manifests are not supported for execution";
+    }
+    for (const eventKind of descriptor.extensionManifest.lifecycleEvents ?? []) {
+      if (!isExtensionLifecycleEventKind(eventKind)) {
+        return "extension manifest references an unsupported lifecycle event";
+      }
+    }
+    for (const hookEffect of descriptor.extensionManifest.hookEffects ?? []) {
+      if (!isExtensionHookEffect(hookEffect)) {
+        return "extension manifest references an unsupported hook effect";
+      }
     }
   }
   return undefined;

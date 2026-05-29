@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createEvidenceOnlySavePoint } from "../../evidence/runtimeSavePoint.js";
+import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
 import { projectStaticResourceRegistry } from "../resources/staticResourceProjection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
@@ -197,6 +198,56 @@ describe("runtime event projection", () => {
         "provider-success",
         "tool-success",
         "verification-success",
+        "terminal-success",
+      ]),
+    );
+  });
+
+  it("projects extension hook policy outcomes as observations only", () => {
+    const hookOutcome = applyExtensionHookPolicy({
+      descriptor: {
+        hookId: "extension.safe.tool.observe",
+        extensionId: "extension.safe",
+        eventKind: "tool-call-prepared",
+        ownerDomain: "runtime/extensions",
+        allowedEffect: "block-action",
+        riskLevel: "medium",
+        requiresOptIn: true,
+        supported: false,
+        executable: false,
+        registrationMode: "static-internal",
+        notProvenClaims: [],
+      },
+      requestedEffect: "block-action",
+      summary:
+        "Blocked unsafe projection with provider.env=/home/wang/.private-agents-real/provider.env",
+      evidenceAnnotations: ["extension-hook:block-action"],
+    });
+
+    const events = projectRuntimeEvents({
+      hookPolicyOutcomes: [hookOutcome],
+    });
+    const event = events.find(
+      (candidate) => candidate.type === "extension-hook-policy-observed",
+    );
+    const serialized = JSON.stringify(events);
+
+    expect(event?.facts).toMatchObject({
+      hookId: "extension.safe.tool.observe",
+      extensionId: "extension.safe",
+      eventKind: "tool-call-prepared",
+      requestedEffect: "block-action",
+      acceptedEffect: "block-action",
+      policyStatus: "accepted",
+      terminalSuccessClaim: false,
+    });
+    expect(serialized).not.toContain("/home/wang/.private-agents-real");
+    expect(serialized).not.toContain('"success":true');
+    expect(event?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "extension-execution",
+        "plugin-execution",
+        "tool-success",
         "terminal-success",
       ]),
     );

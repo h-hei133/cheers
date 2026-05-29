@@ -126,6 +126,8 @@ describe("static resource projection", () => {
             extensionId: "extension.safe",
             safeName: "Safe Extension Manifest",
             capabilities: ["metadata"],
+            lifecycleEvents: ["tool-call-prepared", "save-point-observed"],
+            hookEffects: ["observe-only", "annotate-evidence"],
             toolKinds: [],
             requiredPermissions: ["explicit-opt-in"],
             executable: false,
@@ -143,6 +145,12 @@ describe("static resource projection", () => {
       "prompt-template",
       "extension-manifest",
     ]);
+    expect(projection.resources[1]?.extension).toMatchObject({
+      lifecycleEvents: ["tool-call-prepared", "save-point-observed"],
+      hookEffects: ["observe-only", "annotate-evidence"],
+      executable: false,
+      supported: false,
+    });
     expect(JSON.stringify(projection)).not.toContain('"success":true');
     expect(projection.notProvenClaims).toEqual(
       expect.arrayContaining([
@@ -153,6 +161,60 @@ describe("static resource projection", () => {
         "terminal-success",
       ]),
     );
+  });
+
+  it("rejects extension manifests that reference unsupported lifecycle metadata", () => {
+    const projection = projectStaticResourceRegistry({
+      descriptors: [
+        descriptor({
+          id: "extension.future",
+          kind: "extension-manifest",
+          name: "Future Extension Manifest",
+          description: "Unsupported lifecycle metadata.",
+          extensionManifest: {
+            extensionId: "extension.future",
+            safeName: "Future Extension Manifest",
+            capabilities: ["metadata"],
+            lifecycleEvents: ["execute-plugin-now"],
+            toolKinds: [],
+            requiredPermissions: [],
+            executable: false,
+            supported: false,
+          } as never,
+        }),
+      ],
+    });
+
+    expect(projection.resources).toHaveLength(0);
+    expect(projection.rejectedResourceCount).toBe(1);
+    expect(projection.pluginExecution).toBe("disabled");
+  });
+
+  it("rejects extension manifests that reference unsupported hook effects", () => {
+    const projection = projectStaticResourceRegistry({
+      descriptors: [
+        descriptor({
+          id: "extension.hook",
+          kind: "extension-manifest",
+          name: "Hook Extension Manifest",
+          description: "Unsupported hook metadata.",
+          extensionManifest: {
+            extensionId: "extension.hook",
+            safeName: "Hook Extension Manifest",
+            capabilities: ["metadata"],
+            hookEffects: ["force-terminal-success"],
+            toolKinds: [],
+            requiredPermissions: [],
+            executable: false,
+            supported: false,
+          } as never,
+        }),
+      ],
+    });
+
+    expect(projection.resources).toHaveLength(0);
+    expect(projection.rejectedResourceCount).toBe(1);
+    expect(projection.pluginExecution).toBe("disabled");
   });
 });
 
