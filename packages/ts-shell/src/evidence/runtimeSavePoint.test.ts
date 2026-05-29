@@ -130,4 +130,33 @@ describe("runtime evidence save point", () => {
     expect(savePoint.terminalSuccessClaim).toBe(false);
     expect(savePoint.notProvenClaims).toContain("verification-success");
   });
+
+  it("captures post-tool next-turn references without implying execution or success", () => {
+    const snapshot = createRuntimeTurnSnapshot({
+      sessionId: "sess-post-tool-save-point",
+      turn: 5,
+      phase: "turn",
+      workspaceRoot: "/tmp/workspace",
+      providerOptIn: false,
+    });
+    const savePoint = createEvidenceOnlySavePoint({
+      turnSnapshot: snapshot,
+      phase: "save_point",
+      evidenceIds: ["tool-result-batch:batch-a"],
+      toolResultMessageIds: ["tool-result-message:call-a"],
+      toolResultDetailIds: ["tool-result-detail:call-a"],
+      beforeToolDecisionIds: ["before-tool:call-a"],
+      afterToolAnnotationIds: ["after-tool:call-a"],
+      nextTurnBundleId: "bundle-a",
+      pendingNextTurnFacts: ["next-turn:not-executed"],
+      notProvenClaims: ["next-turn-execution"],
+    });
+
+    expect(savePoint.toolResultMessageIds).toEqual(["tool-result-message:call-a"]);
+    expect(savePoint.nextTurnBundleId).toBe("bundle-a");
+    expect(savePoint.pendingNextTurnFacts).toContain("next-turn:not-executed");
+    expect(savePoint.terminalSuccessClaim).toBe(false);
+    expect(savePoint.notProvenClaims).toContain("next-turn-execution");
+    expect(JSON.stringify(savePoint)).not.toContain('"success":true');
+  });
 });

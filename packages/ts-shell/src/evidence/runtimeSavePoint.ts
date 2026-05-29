@@ -15,6 +15,13 @@ export interface RuntimeSavePointInput {
     readonly terminalReason?: string;
   };
   readonly executionReceipts?: readonly RuntimeExecutionReceiptProjection[];
+  readonly toolResultMessageIds?: readonly string[];
+  readonly toolResultDetailIds?: readonly string[];
+  readonly beforeToolDecisionIds?: readonly string[];
+  readonly afterToolAnnotationIds?: readonly string[];
+  readonly nextTurnBundleId?: string;
+  readonly sessionProjectionIds?: readonly string[];
+  readonly contextProjectionIds?: readonly string[];
   readonly pendingNextTurnFacts?: readonly string[];
   readonly notProvenClaims?: readonly string[];
 }
@@ -40,6 +47,13 @@ export interface RuntimeEvidenceSavePoint {
     readonly terminalReason?: string;
   };
   readonly executionReceipts: readonly RuntimeSavePointExecutionReceipt[];
+  readonly toolResultMessageIds: readonly string[];
+  readonly toolResultDetailIds: readonly string[];
+  readonly beforeToolDecisionIds: readonly string[];
+  readonly afterToolAnnotationIds: readonly string[];
+  readonly nextTurnBundleId?: string;
+  readonly sessionProjectionIds: readonly string[];
+  readonly contextProjectionIds: readonly string[];
   readonly pendingNextTurnFacts: readonly string[];
   readonly notProvenClaims: readonly string[];
   readonly redaction: {
@@ -97,6 +111,27 @@ export function createEvidenceOnlySavePoint(
     resultProjectionStatus: "observed-not-verdict",
     ...(observedResult ? { observedResult: Object.freeze(observedResult) } : {}),
     executionReceipts: Object.freeze(executionReceipts),
+    toolResultMessageIds: Object.freeze(
+      (input.toolResultMessageIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    toolResultDetailIds: Object.freeze(
+      (input.toolResultDetailIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    beforeToolDecisionIds: Object.freeze(
+      (input.beforeToolDecisionIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    afterToolAnnotationIds: Object.freeze(
+      (input.afterToolAnnotationIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    ...(input.nextTurnBundleId
+      ? { nextTurnBundleId: sanitizeEvidenceId(input.nextTurnBundleId, redactions) }
+      : {}),
+    sessionProjectionIds: Object.freeze(
+      (input.sessionProjectionIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    contextProjectionIds: Object.freeze(
+      (input.contextProjectionIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
     pendingNextTurnFacts: Object.freeze(
       (input.pendingNextTurnFacts ?? []).map((fact) =>
         sanitizeEvidenceId(fact, redactions),

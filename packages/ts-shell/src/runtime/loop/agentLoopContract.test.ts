@@ -167,7 +167,47 @@ describe("agent loop contract", () => {
     ).toBe(true);
   });
 
-  it("delivers next-turn, steering, and follow-up messages by contract", async () => {
+  it("does not execute a prepared next turn by default", async () => {
+    let modelCalls = 0;
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-loop-default-next-turn",
+      workspaceRoot: "/workspace",
+      prompt: "queued",
+      providerOptIn: false,
+      maxTurns: 3,
+      queuedMessages: [
+        { id: "follow", mode: "follow-up", text: "follow after boundary" },
+      ],
+      modelBoundary: async () => {
+        modelCalls += 1;
+        return {
+          responseId: "response-default-next-turn",
+          stopReason: "tool-calls",
+          toolCalls: [{ id: "call-read", name: "read", arguments: { path: "a.ts" } }],
+        };
+      },
+      toolBatchDispatch: async () => ({
+        success: true,
+        content: "safe tool summary",
+      }),
+    });
+
+    expect(modelCalls).toBe(1);
+    expect(loop.stopReason).toBe("next-turn-waiting");
+    expect(loop.turns).toHaveLength(1);
+    expect(loop.turns[0]?.nextTurn.bundle?.deliveryStatus).toBe("waiting");
+    expect(loop.turns[0]?.nextTurn.deliveryPolicy.nextTurnExecuted).toBe(false);
+    expect(loop.turns[0]?.nextTurn.executed).toBe(false);
+    expect(loop.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "next-turn-bundle-prepared",
+        "next-turn-delivery-policy-evaluated",
+        "next-turn-waiting",
+      ]),
+    );
+  });
+
+  it("delivers next-turn, steering, and follow-up messages when explicitly enabled", async () => {
     const deliveredByTurn: string[][] = [];
     const loop = await runAgentLoopContract({
       sessionId: "sess-loop-delivery",
@@ -175,6 +215,7 @@ describe("agent loop contract", () => {
       prompt: "queued",
       providerOptIn: false,
       maxTurns: 2,
+      executePreparedNextTurn: true,
       queuedMessages: [
         { id: "next", mode: "next-turn", text: "next turn context" },
         { id: "steer", mode: "steer", text: "steer now" },

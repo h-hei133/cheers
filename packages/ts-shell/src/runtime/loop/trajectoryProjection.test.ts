@@ -250,7 +250,11 @@ describe("loop trajectory projection", () => {
     });
 
     expect(trajectory.toolResultMessageIds).toHaveLength(1);
+    expect(trajectory.nextTurnBundleIds).toHaveLength(1);
+    expect(trajectory.deliveryPolicyIds).toHaveLength(1);
     expect(trajectory.stages.find((stage) => stage.category === "tool-result-messages"))
+      .toMatchObject({ observationStatus: "observed" });
+    expect(trajectory.stages.find((stage) => stage.category === "next-turn-delivery-policy"))
       .toMatchObject({ observationStatus: "observed" });
     expect(trajectory.events.map((event) => event.type)).toEqual(
       expect.arrayContaining([
@@ -258,6 +262,7 @@ describe("loop trajectory projection", () => {
         "before-tool-policy-decided",
         "tool-result-message-prepared",
         "loop-save-point-observed",
+        "loop-next-turn-delivery-policy-observed",
       ]),
     );
     expect(trajectory.notProvenClaims).toEqual(

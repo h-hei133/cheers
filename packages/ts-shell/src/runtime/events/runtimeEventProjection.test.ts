@@ -10,6 +10,10 @@ import { createCommandExecutionReceipt } from "../execution/executionReceipt.js"
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
+import { evaluateNextTurnDeliveryPolicy } from "../../turn/deliveryPolicy.js";
+import { projectFollowUpQueue } from "../../turn/followUpQueue.js";
+import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
+import { projectSteeringQueue } from "../../turn/steeringQueue.js";
 import { prepareToolResultMessages } from "../../turn/toolResultMessage.js";
 import { extractToolCallBatch } from "../../tools/toolCallBatch.js";
 import { dispatchToolBatch, planToolBatchDispatch } from "../../tools/toolBatchDispatch.js";
@@ -185,6 +189,49 @@ describe("runtime event projection", () => {
     );
     expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
     expect(JSON.stringify(events)).not.toContain('"success":true');
+  });
+
+  it("projects next-turn bundle, queues, delivery policy, and waiting events safely", () => {
+    const steeringQueue = projectSteeringQueue({
+      turnId: "sess:turn:1",
+      messages: [{ id: "steer-a", mode: "steer", text: "steer safely" }],
+    });
+    const followUpQueue = projectFollowUpQueue({
+      turnId: "sess:turn:1",
+      pendingBundleId: "bundle-a",
+      messages: [{ id: "follow-a", mode: "follow-up", text: "follow safely" }],
+    });
+    const policy = evaluateNextTurnDeliveryPolicy({
+      bundleId: "bundle-a",
+      steeringQueue,
+      followUpQueue,
+      deliveryStatus: "waiting",
+    });
+    const bundle = prepareNextTurnBundle({
+      bundleId: "bundle-a",
+      turnId: "sess:turn:1",
+      steeringQueue,
+      followUpQueue,
+      deliveryPolicy: policy,
+    });
+    const events = projectRuntimeEvents({
+      steeringQueues: [steeringQueue],
+      followUpQueues: [followUpQueue],
+      nextTurnDeliveryPolicies: [policy],
+      nextTurnBundles: [bundle],
+    });
+
+    expect(events.map((event) => event.type)).toEqual([
+      "steering-queued",
+      "follow-up-queued",
+      "next-turn-delivery-policy-evaluated",
+      "next-turn-waiting",
+      "next-turn-bundle-prepared",
+    ]);
+    expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
+    expect(events.flatMap((event) => event.notProvenClaims)).toEqual(
+      expect.arrayContaining(["next-turn-success", "terminal-success"]),
+    );
   });
 
   it("redacts unsafe event fields and avoids raw tool content", () => {

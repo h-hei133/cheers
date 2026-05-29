@@ -37,6 +37,10 @@ import { createModelResponseBoundary } from "../provider/modelResponseBoundary.j
 import { projectProviderRegistry } from "../provider/providerRegistry.js";
 import { projectWorkflowExecutionResultContract } from "../result/workflowRuntimeProjection.js";
 import { accumulateAssistantResponse } from "../turn/assistantResponse.js";
+import { evaluateNextTurnDeliveryPolicy } from "../turn/deliveryPolicy.js";
+import { projectFollowUpQueue } from "../turn/followUpQueue.js";
+import { prepareNextTurnBundle } from "../turn/nextTurnBundle.js";
+import { projectSteeringQueue } from "../turn/steeringQueue.js";
 import { transitionRuntimePhase } from "./runtimePhase.js";
 import {
   notifyRuntimeEvidenceSavePoint,
@@ -439,6 +443,8 @@ function createIntegratedRunner(
           : turnSnapshot.phase,
         "save_point",
       );
+      const nextTurnBundleId =
+        `workflow-next-turn-${hashStableId(`${sharedContext.sessionId}:${turn}`)}`;
       const savePoint = createEvidenceOnlySavePoint({
         turnSnapshot,
         phase: savePointPhase.status === "accepted" ? savePointPhase.to : "aborted",
@@ -450,6 +456,7 @@ function createIntegratedRunner(
           terminalReason: execution.codingResult?.taskKind,
         },
         executionReceipts: execution.executionReceipts ?? [],
+        nextTurnBundleId,
         pendingNextTurnFacts: [
           workflowPlan.usedRestoredState
             ? "continuation-state-consumed"
@@ -559,6 +566,34 @@ function projectProductPathLoopTrajectory(input: {
     turnId: `${input.sessionId}:turn:${input.turn}`,
     batchId: `workflow-tool-calls-${hashStableId(`${input.sessionId}:${input.turn}`)}`,
   });
+  const nextTurnBundleId = input.savePoint.nextTurnBundleId ??
+    `workflow-next-turn-${hashStableId(`${input.sessionId}:${input.turn}`)}`;
+  const steeringQueue = projectSteeringQueue({
+    turnId: `${input.sessionId}:turn:${input.turn}`,
+    messages: [],
+  });
+  const followUpQueue = projectFollowUpQueue({
+    turnId: `${input.sessionId}:turn:${input.turn}`,
+    pendingBundleId: nextTurnBundleId,
+    messages: [],
+  });
+  const deliveryPolicy = evaluateNextTurnDeliveryPolicy({
+    bundleId: nextTurnBundleId,
+    steeringQueue,
+    followUpQueue,
+    modelResponseIds: [responseBoundary.responseId],
+    deliveryStatus: "waiting",
+  });
+  const nextTurnBundle = prepareNextTurnBundle({
+    bundleId: nextTurnBundleId,
+    turnId: `${input.sessionId}:turn:${input.turn}`,
+    assistantResponse,
+    steeringQueue,
+    followUpQueue,
+    savePointId: input.savePoint.id,
+    deliveryPolicy,
+    deliveryStatus: "waiting",
+  });
   const loop: AgentLoopContractProjection = {
     state: input.execution.codingResult ? "stopped" : "failed",
     stopReason: "model-stop",
@@ -589,8 +624,13 @@ function projectProductPathLoopTrajectory(input: {
           : {}),
         savePoint: input.savePoint,
         nextTurn: {
-          prepared: false,
+          prepared: true,
           pendingFacts: input.savePoint.pendingNextTurnFacts,
+          bundle: nextTurnBundle,
+          steeringQueue,
+          followUpQueue,
+          deliveryPolicy,
+          executed: false,
         },
         terminalSuccessClaim: false,
         notProvenClaims: [

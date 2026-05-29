@@ -12,6 +12,9 @@ export type LoopInfrastructureCategory =
   | "after-tool-annotation"
   | "save-point"
   | "next-turn-preparation"
+  | "steering-queue"
+  | "follow-up-queue"
+  | "next-turn-delivery-policy"
   | "session-active-path"
   | "context-rebuild-projection"
   | "package-resource-inventory"
@@ -58,6 +61,9 @@ export const LOOP_INFRASTRUCTURE_CATEGORIES = [
   "after-tool-annotation",
   "save-point",
   "next-turn-preparation",
+  "steering-queue",
+  "follow-up-queue",
+  "next-turn-delivery-policy",
   "session-active-path",
   "context-rebuild-projection",
   "package-resource-inventory",
@@ -105,6 +111,18 @@ export function createLoopInfrastructureMap(): LoopInfrastructureMap {
     ]),
     entry("next-turn-preparation", "runtime/loop", "next_turn", "connected", "pending next turn facts", [
       "next-turn-success",
+    ]),
+    entry("steering-queue", "turn", "next_turn", "connected", "SteeringQueueProjection", [
+      "next-turn-success",
+      "steering-delivery-success",
+    ]),
+    entry("follow-up-queue", "turn", "next_turn", "connected", "FollowUpQueueProjection", [
+      "next-turn-success",
+      "follow-up-delivery-success",
+    ]),
+    entry("next-turn-delivery-policy", "turn", "next_turn", "connected", "NextTurnDeliveryPolicyProjection", [
+      "next-turn-success",
+      "provider-called",
     ]),
     entry("session-active-path", "session", "session", "partial", "SessionTreeProjection.activePathProjection", [
       "session-storage-backed-branching",

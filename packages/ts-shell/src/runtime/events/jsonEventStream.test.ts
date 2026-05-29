@@ -227,6 +227,38 @@ describe("JSON runtime event stream projection", () => {
     );
   });
 
+  it("serializes PL006 next-turn delivery observations without success claims", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [
+        {
+          id: "event-next-turn",
+          sequence: 1,
+          type: "next-turn-bundle-prepared",
+          facts: {
+            bundleId: "bundle-a",
+            deliveryStatus: "waiting",
+            safeSummary:
+              "raw provider output: hidden reasoning token=secret oldText=before newText=after",
+            terminalSuccessClaim: false,
+          },
+          notProvenClaims: ["next-turn-success"],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+      ],
+    });
+    const serialized = JSON.stringify(stream);
+
+    expect(stream[0]?.eventType).toBe("next-turn-bundle-prepared");
+    expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
+    expect(stream[0]?.notProvenClaims).toContain("terminal-success");
+    expect(serialized).not.toMatch(
+      /raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+    );
+  });
+
   it("redacts unsafe facts and strips unsupported JSON values", () => {
     const stream = projectJsonRuntimeEventStream({
       streamId: "/home/wang/.private-agents-real/provider.env",

@@ -84,12 +84,20 @@ describe("workflowExecutionCoordinator", () => {
       result.loopTrajectory?.stages.find(
         (stage) => stage.category === "before-tool-policy",
       )?.observationStatus,
-    ).toBe("not_proven");
+    ).toBe("observed");
+    expect(
+      result.loopTrajectory?.stages.find(
+        (stage) => stage.category === "next-turn-delivery-policy",
+      )?.observationStatus,
+    ).toBe("observed");
+    expect(result.loopTrajectory?.nextTurnBundleIds).toHaveLength(1);
+    expect(result.loopTrajectory?.deliveryPolicyIds).toHaveLength(1);
     expect(result.loopTrajectory?.events.map((event) => event.type)).toEqual(
       expect.arrayContaining([
         "loop-input-observed",
         "loop-provider-boundary-observed",
         "loop-save-point-observed",
+        "loop-next-turn-delivery-policy-observed",
         "loop-product-surface-projected",
       ]),
     );

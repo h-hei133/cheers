@@ -244,8 +244,12 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       title: "Save point",
       severity: trajectory.savePointIds.length > 0 ? "info" : "not_proven",
       status: trajectory.savePointIds.length > 0 ? "observed" : "not_proven",
-      summary: `savePoints=${trajectory.savePointIds.length}; savePointSuccess=not-proven`,
-      machineEventCorrelationIds: stage("save-point")?.eventIds ?? [],
+      summary: `savePoints=${trajectory.savePointIds.length}; bundles=${trajectory.nextTurnBundleIds.length}; steering=${trajectory.steeringMessageIds.length}; followUps=${trajectory.followUpMessageIds.length}; deliveryPolicies=${trajectory.deliveryPolicyIds.length}; nextTurnExecuted=false; savePointSuccess=not-proven`,
+      machineEventCorrelationIds: [
+        ...(stage("save-point")?.eventIds ?? []),
+        ...(stage("next-turn-preparation")?.eventIds ?? []),
+        ...(stage("next-turn-delivery-policy")?.eventIds ?? []),
+      ],
       notProvenClaims: stage("save-point")?.notProvenClaims ?? [],
     }),
     section({
@@ -270,7 +274,7 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       title: "Events",
       severity: "info",
       status: "observed",
-      summary: `events=${trajectory.events.length}; jsonStream=${trajectory.jsonEventStream.length}; terminalSuccessClaim=false`,
+      summary: `events=${trajectory.events.length}; jsonStream=${trajectory.jsonEventStream.length}; nextTurnWaiting=${observed("next-turn-preparation")}; terminalSuccessClaim=false`,
       machineEventCorrelationIds: trajectory.eventIds,
       notProvenClaims: stage("runtime-events")?.notProvenClaims ?? [],
     }),

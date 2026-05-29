@@ -59,6 +59,10 @@ export interface LoopTrajectoryProjection {
   readonly toolPolicyIds: readonly string[];
   readonly toolResultMessageIds: readonly string[];
   readonly savePointIds: readonly string[];
+  readonly nextTurnBundleIds: readonly string[];
+  readonly steeringMessageIds: readonly string[];
+  readonly followUpMessageIds: readonly string[];
+  readonly deliveryPolicyIds: readonly string[];
   readonly sessionProjectionIds: readonly string[];
   readonly contextRebuildProjectionIds: readonly string[];
   readonly providerMetadataIds: readonly string[];
@@ -391,10 +395,56 @@ export function projectLoopTrajectory(
       {
         turn: turn.turn,
         prepared: turn.nextTurn.prepared,
+        bundleId: turn.nextTurn.bundle?.bundleId,
         pendingFactCount: turn.nextTurn.pendingFacts.length,
+        deliveryStatus: turn.nextTurn.bundle?.deliveryStatus ?? "not_prepared",
+        nextTurnExecuted: turn.nextTurn.executed,
       },
-      ["terminal-success", "next-turn-success"],
-      [`turn:${turn.turn}`],
+      turn.nextTurn.bundle?.notProvenClaims ?? ["terminal-success", "next-turn-success"],
+      turn.nextTurn.bundle ? [turn.nextTurn.bundle.bundleId] : [`turn:${turn.turn}`],
+    );
+    append(
+      "steering-queue",
+      "loop-steering-queue-observed",
+      {
+        turn: turn.turn,
+        queueId: turn.nextTurn.steeringQueue.queueId,
+        queuedCount: turn.nextTurn.steeringQueue.queuedCount,
+        deliveredCount: turn.nextTurn.steeringQueue.deliveredCount,
+        blockedCount: turn.nextTurn.steeringQueue.blockedCount,
+        terminalSuccessClaim: false,
+      },
+      turn.nextTurn.steeringQueue.notProvenClaims,
+      [turn.nextTurn.steeringQueue.queueId],
+    );
+    append(
+      "follow-up-queue",
+      "loop-follow-up-queue-observed",
+      {
+        turn: turn.turn,
+        queueId: turn.nextTurn.followUpQueue.queueId,
+        queuedCount: turn.nextTurn.followUpQueue.queuedCount,
+        deliveredCount: turn.nextTurn.followUpQueue.deliveredCount,
+        blockedCount: turn.nextTurn.followUpQueue.blockedCount,
+        terminalSuccessClaim: false,
+      },
+      turn.nextTurn.followUpQueue.notProvenClaims,
+      [turn.nextTurn.followUpQueue.queueId],
+    );
+    append(
+      "next-turn-delivery-policy",
+      "loop-next-turn-delivery-policy-observed",
+      {
+        turn: turn.turn,
+        policyId: turn.nextTurn.deliveryPolicy.policyId,
+        deliveryStatus: turn.nextTurn.deliveryPolicy.deliveryStatus,
+        entryCount: turn.nextTurn.deliveryPolicy.entries.length,
+        providerCalled: turn.nextTurn.deliveryPolicy.providerCalled,
+        nextTurnExecuted: turn.nextTurn.deliveryPolicy.nextTurnExecuted,
+        terminalSuccessClaim: false,
+      },
+      turn.nextTurn.deliveryPolicy.notProvenClaims,
+      [turn.nextTurn.deliveryPolicy.policyId],
     );
   }
 
@@ -609,6 +659,16 @@ export function projectLoopTrajectory(
   const toolResultMessageIds = turns.flatMap((turn) =>
     turn.toolResultBatch?.resultMessages?.messages.map((message) => message.messageId) ?? []
   );
+  const nextTurnBundleIds = turns.flatMap((turn) =>
+    turn.nextTurn.bundle ? [turn.nextTurn.bundle.bundleId] : []
+  );
+  const steeringMessageIds = turns.flatMap((turn) =>
+    turn.nextTurn.steeringQueue.items.map((item) => item.steeringId)
+  );
+  const followUpMessageIds = turns.flatMap((turn) =>
+    turn.nextTurn.followUpQueue.items.map((item) => item.followUpId)
+  );
+  const deliveryPolicyIds = turns.map((turn) => turn.nextTurn.deliveryPolicy.policyId);
 
   return deepFreeze({
     loopId: loopId.value,
@@ -619,6 +679,10 @@ export function projectLoopTrajectory(
     toolPolicyIds: Object.freeze(Array.from(new Set(toolPolicyIds))),
     toolResultMessageIds: Object.freeze(Array.from(new Set(toolResultMessageIds))),
     savePointIds: Object.freeze(turns.map((turn) => turn.savePoint.id)),
+    nextTurnBundleIds: Object.freeze(Array.from(new Set(nextTurnBundleIds))),
+    steeringMessageIds: Object.freeze(Array.from(new Set(steeringMessageIds))),
+    followUpMessageIds: Object.freeze(Array.from(new Set(followUpMessageIds))),
+    deliveryPolicyIds: Object.freeze(Array.from(new Set(deliveryPolicyIds))),
     sessionProjectionIds: Object.freeze(input.sessionProjection ? [
       input.sessionProjection.sessionIdentity,
       input.sessionProjection.activeLeafId,

@@ -1,6 +1,10 @@
 import { createEvidenceOnlySavePoint, type RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
 import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
 import { accumulateAssistantResponse, type AssistantResponseState } from "../../turn/assistantResponse.js";
+import { evaluateNextTurnDeliveryPolicy, type NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
+import { projectFollowUpQueue, type FollowUpQueueProjection } from "../../turn/followUpQueue.js";
+import { prepareNextTurnBundle, type NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
+import { projectSteeringQueue, type SteeringQueueProjection } from "../../turn/steeringQueue.js";
 import { prepareToolResultMessages, type ToolResultMessageBatch } from "../../turn/toolResultMessage.js";
 import {
   dispatchToolBatch,
@@ -33,7 +37,8 @@ export type AgentLoopContractStopReason =
   | "model-stop"
   | "tool-batch-terminated"
   | "turn-limit"
-  | "follow-up-drained";
+  | "follow-up-drained"
+  | "next-turn-waiting";
 
 export interface AgentLoopContractQueuedMessage {
   readonly id: string;
@@ -113,6 +118,7 @@ export interface AgentLoopContractInput {
     batch: AgentLoopContractToolCallBatch,
   ) => Promise<AgentLoopContractToolResultBatch>;
   readonly toolBatchDispatch?: ToolBatchDispatchSeam;
+  readonly executePreparedNextTurn?: boolean;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -149,6 +155,11 @@ export interface AgentLoopContractTurnProjection {
   readonly nextTurn: {
     readonly prepared: boolean;
     readonly pendingFacts: readonly string[];
+    readonly bundle?: NextTurnBundleProjection;
+    readonly steeringQueue: SteeringQueueProjection;
+    readonly followUpQueue: FollowUpQueueProjection;
+    readonly deliveryPolicy: NextTurnDeliveryPolicyProjection;
+    readonly executed: false;
   };
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
@@ -471,10 +482,22 @@ export async function runAgentLoopContract(
       }
 
       transition("saving_point", `turn-${turn}-save-point`);
+      const nextTurnBundleId = `${snapshot.id}:next-turn-bundle`;
       const savePoint = createEvidenceOnlySavePoint({
         turnSnapshot: snapshot,
         phase: "save_point",
         executionReceipts: toolResultBatch?.executionReceipts,
+        toolResultMessageIds:
+          toolResultBatch?.resultMessages?.messages.map((message) => message.messageId),
+        toolResultDetailIds:
+          toolResultBatch?.resultDetails?.map((detail) => detail.resultDetailsId),
+        beforeToolDecisionIds:
+          toolResultBatch?.dispatchPlan?.calls.map((call) =>
+            call.beforePolicyDecision.decisionId
+          ),
+        afterToolAnnotationIds:
+          toolResultBatch?.afterAnnotations?.map((annotation) => annotation.annotationId),
+        nextTurnBundleId,
         evidenceIds: [
           `model-boundary:${modelBoundary.responseId}`,
           ...(toolResultBatch ? [`tool-result-batch:${toolResultBatch.id}`] : []),
@@ -505,11 +528,53 @@ export async function runAgentLoopContract(
 
       transition("preparing_next_turn", `turn-${turn}-next-turn`);
       pendingNextTurnFacts.splice(0, pendingNextTurnFacts.length, ...savePoint.pendingNextTurnFacts);
+      const queuedForProjection = [...delivered, ...queued];
+      const deliveredMessageIds = delivered.map((message) => message.id);
+      const steeringQueue = projectSteeringQueue({
+        turnId: `${input.sessionId}:turn:${turn}`,
+        messages: queuedForProjection,
+        deliveredMessageIds,
+      });
+      const followUpQueue = projectFollowUpQueue({
+        turnId: `${input.sessionId}:turn:${turn}`,
+        pendingBundleId: nextTurnBundleId,
+        messages: queuedForProjection,
+        deliveredMessageIds,
+      });
+      const deliveryPolicy = evaluateNextTurnDeliveryPolicy({
+        bundleId: nextTurnBundleId,
+        steeringQueue,
+        followUpQueue,
+        toolResultMessageIds:
+          toolResultBatch?.resultMessages?.messages.map((message) => message.messageId),
+        modelResponseIds: [responseBoundary.responseId],
+        deliveryStatus: input.executePreparedNextTurn ? "delivered" : "waiting",
+      });
+      const nextTurnBundle = prepareNextTurnBundle({
+        bundleId: nextTurnBundleId,
+        turnId: `${input.sessionId}:turn:${turn}`,
+        toolResultMessages: toolResultBatch?.resultMessages,
+        assistantResponse,
+        steeringQueue,
+        followUpQueue,
+        savePointId: savePoint.id,
+        deliveryPolicy,
+        deliveryStatus: input.executePreparedNextTurn ? "delivered" : "waiting",
+      });
+      appendProjectedEvents(events, projectRuntimeEvents({
+        steeringQueues: [steeringQueue],
+        followUpQueues: [followUpQueue],
+        nextTurnDeliveryPolicies: [deliveryPolicy],
+        nextTurnBundles: [nextTurnBundle],
+      }));
       appendEvent(events, "agent-loop-next-turn-prepared", {
         turn,
+        bundleId: nextTurnBundle.bundleId,
         pendingFactCount: pendingNextTurnFacts.length,
+        deliveryStatus: nextTurnBundle.deliveryStatus,
+        nextTurnExecuted: false,
         terminalSuccessClaim: false,
-      });
+      }, nextTurnBundle.notProvenClaims);
 
       turns.push(deepFreeze({
         turn,
@@ -529,6 +594,11 @@ export async function runAgentLoopContract(
         nextTurn: {
           prepared: true,
           pendingFacts: Object.freeze([...pendingNextTurnFacts]),
+          bundle: nextTurnBundle,
+          steeringQueue,
+          followUpQueue,
+          deliveryPolicy,
+          executed: false,
         },
         terminalSuccessClaim: false,
         notProvenClaims: Object.freeze([
@@ -549,20 +619,27 @@ export async function runAgentLoopContract(
         });
       }
 
-      if (toolResultBatch && toolCalls.length > 0 && turn < maxTurns) {
+      if (
+        input.executePreparedNextTurn &&
+        toolResultBatch &&
+        toolCalls.length > 0 &&
+        turn < maxTurns
+      ) {
         continue;
       }
 
       transition("waiting_for_follow_up", `turn-${turn}-follow-up-check`);
       const hasFollowUp = queued.some((message) => message.mode === "follow-up");
-      if (hasFollowUp && turn < maxTurns) {
+      if (input.executePreparedNextTurn && hasFollowUp && turn < maxTurns) {
         continue;
       }
 
       const stopReason: AgentLoopContractStopReason = turn >= maxTurns
         ? "turn-limit"
+        : toolResultBatch && toolCalls.length > 0
+          ? "next-turn-waiting"
         : hasFollowUp
-          ? "follow-up-drained"
+          ? "next-turn-waiting"
           : "model-stop";
       transition("stopped", stopReason);
       appendEvent(events, "agent-loop-stopped", {

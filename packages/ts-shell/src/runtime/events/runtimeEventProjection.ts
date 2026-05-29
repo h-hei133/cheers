@@ -6,6 +6,10 @@ import type { StaticResourceProjection } from "../resources/staticResourceProjec
 import type { PackageInventoryProjection } from "../resources/packageInventory.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type { AssistantResponseState } from "../../turn/assistantResponse.js";
+import type { NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
+import type { FollowUpQueueProjection } from "../../turn/followUpQueue.js";
+import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
+import type { SteeringQueueProjection } from "../../turn/steeringQueue.js";
 import type { NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import type {
   ToolBatchDispatchPlan,
@@ -54,6 +58,16 @@ export type RuntimeProjectionEventType =
   | "tool-call-dispatched"
   | "tool-result-message-prepared"
   | "tool-batch-save-point-observed"
+  | "post-tool-save-point-observed"
+  | "next-turn-bundle-prepared"
+  | "steering-queued"
+  | "steering-delivered"
+  | "follow-up-queued"
+  | "follow-up-delivered"
+  | "next-turn-delivery-policy-evaluated"
+  | "next-turn-waiting"
+  | "next-turn-delivery-unsupported"
+  | "next-turn-abandoned"
   | "tool-dispatch-not-run"
   | "agent-loop-started"
   | "agent-loop-state-transitioned"
@@ -76,6 +90,9 @@ export type RuntimeProjectionEventType =
   | "loop-execution-receipt-observed"
   | "loop-save-point-observed"
   | "loop-next-turn-prepared"
+  | "loop-steering-queue-observed"
+  | "loop-follow-up-queue-observed"
+  | "loop-next-turn-delivery-policy-observed"
   | "loop-session-context-projected"
   | "loop-product-surface-projected"
   | "loop-stopped"
@@ -109,6 +126,10 @@ export function projectRuntimeEvents(input: {
   readonly toolDispatchPlans?: readonly ToolBatchDispatchPlan[];
   readonly toolResultDetails?: readonly ToolResultDetail[];
   readonly toolResultMessages?: readonly ToolResultMessageBatch[];
+  readonly nextTurnBundles?: readonly NextTurnBundleProjection[];
+  readonly steeringQueues?: readonly SteeringQueueProjection[];
+  readonly followUpQueues?: readonly FollowUpQueueProjection[];
+  readonly nextTurnDeliveryPolicies?: readonly NextTurnDeliveryPolicyProjection[];
   readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
   readonly assistantResponses?: readonly AssistantResponseState[];
   readonly toolCallBatches?: readonly NormalizedToolCallBatch[];
@@ -449,7 +470,128 @@ export function projectRuntimeEvents(input: {
         },
         input.savePoint.notProvenClaims,
       );
+      append(
+        "post-tool-save-point-observed",
+        {
+          savePointId: input.savePoint.id,
+          turnSnapshotId: input.savePoint.turnSnapshotId,
+          toolResultMessageIds: input.savePoint.toolResultMessageIds,
+          toolResultDetailIds: input.savePoint.toolResultDetailIds,
+          beforeToolDecisionIds: input.savePoint.beforeToolDecisionIds,
+          afterToolAnnotationIds: input.savePoint.afterToolAnnotationIds,
+          nextTurnBundleId: input.savePoint.nextTurnBundleId,
+          terminalSuccessClaim: input.savePoint.terminalSuccessClaim,
+        },
+        input.savePoint.notProvenClaims,
+      );
     }
+  }
+
+  for (const queue of input.steeringQueues ?? []) {
+    for (const item of queue.items) {
+      append(
+        item.deliveryStatus === "delivered" ? "steering-delivered" : "steering-queued",
+        {
+          queueId: queue.queueId,
+          steeringId: item.steeringId,
+          source: item.source,
+          priority: item.priority,
+          safeSummary: item.safeSummary,
+          deliveryStatus: item.deliveryStatus,
+          redactionStatus: item.redactionStatus,
+          terminalSuccessClaim: false,
+        },
+        item.notProvenClaims,
+      );
+    }
+  }
+
+  for (const queue of input.followUpQueues ?? []) {
+    for (const item of queue.items) {
+      append(
+        item.deliveryStatus === "delivered" ? "follow-up-delivered" : "follow-up-queued",
+        {
+          queueId: queue.queueId,
+          followUpId: item.followUpId,
+          source: item.source,
+          targetTurnId: item.targetTurnId,
+          safeSummary: item.safeSummary,
+          deliveryStatus: item.deliveryStatus,
+          redactionStatus: item.redactionStatus,
+          terminalSuccessClaim: false,
+        },
+        item.notProvenClaims,
+      );
+    }
+  }
+
+  for (const policy of input.nextTurnDeliveryPolicies ?? []) {
+    append(
+      "next-turn-delivery-policy-evaluated",
+      {
+        policyId: policy.policyId,
+        bundleId: policy.bundleId,
+        deliveryStatus: policy.deliveryStatus,
+        entryCount: policy.entries.length,
+        providerCalled: policy.providerCalled,
+        nextTurnExecuted: policy.nextTurnExecuted,
+        terminalSuccessClaim: policy.terminalSuccessClaim,
+      },
+      policy.notProvenClaims,
+    );
+    if (policy.deliveryStatus === "waiting") {
+      append(
+        "next-turn-waiting",
+        {
+          policyId: policy.policyId,
+          bundleId: policy.bundleId,
+          terminalSuccessClaim: policy.terminalSuccessClaim,
+        },
+        policy.notProvenClaims,
+      );
+    }
+    if (policy.deliveryStatus === "unsupported") {
+      append(
+        "next-turn-delivery-unsupported",
+        {
+          policyId: policy.policyId,
+          bundleId: policy.bundleId,
+          terminalSuccessClaim: policy.terminalSuccessClaim,
+        },
+        policy.notProvenClaims,
+      );
+    }
+    if (policy.deliveryStatus === "abandoned") {
+      append(
+        "next-turn-abandoned",
+        {
+          policyId: policy.policyId,
+          bundleId: policy.bundleId,
+          terminalSuccessClaim: policy.terminalSuccessClaim,
+        },
+        policy.notProvenClaims,
+      );
+    }
+  }
+
+  for (const bundle of input.nextTurnBundles ?? []) {
+    append(
+      "next-turn-bundle-prepared",
+      {
+        bundleId: bundle.bundleId,
+        turnId: bundle.turnId,
+        sourceToolResultMessageIds: bundle.sourceToolResultMessageIds,
+        steeringMessageIds: bundle.steeringMessageIds,
+        followUpMessageIds: bundle.followUpMessageIds,
+        contextRebuildProjectionId: bundle.contextRebuildProjectionId,
+        sessionActivePathId: bundle.sessionActivePathId,
+        providerMetadataIds: bundle.providerMetadataIds,
+        deliveryPolicyId: bundle.deliveryPolicyId,
+        deliveryStatus: bundle.deliveryStatus,
+        terminalSuccessClaim: bundle.terminalSuccessClaim,
+      },
+      bundle.notProvenClaims,
+    );
   }
 
   if (input.resultFacts) {
