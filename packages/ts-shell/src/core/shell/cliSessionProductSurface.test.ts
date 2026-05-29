@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CodingResultSummary } from "../../orchestration/types.js";
+import { projectRuntimeEvents } from "../../runtime/events/runtimeEventProjection.js";
+import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createRuntimeEventDigest } from "./sessionEventSurface.js";
 import {
   applyTerminalQueryEvent,
@@ -128,6 +130,62 @@ describe("CLI session product surface", () => {
     expect(surface?.notProvenClaims).toContain("relevant verification did not pass");
     expect(surface?.lines.join("\n")).toContain("- Verification: status=skipped");
     expect(surface?.lines.join("\n")).not.toContain("Outcome: success");
+  });
+
+  it("consumes safe session and runtime projections without changing the verdict", () => {
+    const result = codingResult({
+      verification: {
+        status: "skipped",
+        reason: "not run",
+      },
+    });
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess_product_projection",
+        projectRoot: "/workspace",
+        createdAt: "2026-05-19T00:00:00.000Z",
+        updatedAt: "2026-05-19T00:00:00.000Z",
+        status: "completed",
+        turns: [
+          {
+            role: "user",
+            content: "token=secret oldText=raw",
+          },
+        ],
+      },
+      stateSnapshot: {
+        status: "completed",
+        terminalClassification: "success",
+        terminalReason: "completed",
+      },
+    });
+    const runtimeEvents = projectRuntimeEvents({
+      sessionProjection,
+      resultFacts: {
+        status: "completed",
+        terminalClassification: "success",
+        terminalReason: "completed",
+        verdictSource: "result",
+      },
+    });
+
+    const surface = projectCliSessionProductSurface({
+      status: "completed",
+      terminalClassification: "success",
+      terminalReason: "completed",
+      codingResult: result,
+      sessionProjection,
+      runtimeEvents,
+    });
+    const rendered = surface?.lines.join("\n") ?? "";
+
+    expect(rendered).toContain("- Session path: activePath=2; tree=linear-path");
+    expect(rendered).toContain("- Runtime events: count=3; last=session-projection-observed");
+    expect(rendered).toContain("terminalSuccessClaim=false");
+    expect(rendered).not.toMatch(/secret|oldText=raw/);
+    expect(surface?.verdict).toBe(
+      "Not proven: the system did not gather enough evidence to claim success.",
+    );
   });
 
   it("redacts raw content, provider homes, secrets, and raw edit text", () => {

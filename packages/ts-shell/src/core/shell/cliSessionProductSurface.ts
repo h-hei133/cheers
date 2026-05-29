@@ -1,8 +1,10 @@
 import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../../orchestration/types.js";
+import type { RuntimeProjectionEvent } from "../../runtime/events/runtimeEventProjection.js";
 import {
   compactSessionPresentationText as compact,
   projectSessionPresentationFacts,
 } from "../../session/sessionPresentationFacts.js";
+import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 
 export interface CliSessionProductSurfaceInput {
   readonly status: OrchestrationStatus;
@@ -10,6 +12,8 @@ export interface CliSessionProductSurfaceInput {
   readonly terminalReason: TerminalReason;
   readonly stopReason?: string;
   readonly codingResult?: CodingResultSummary;
+  readonly runtimeEvents?: readonly RuntimeProjectionEvent[];
+  readonly sessionProjection?: SessionTreeProjection;
 }
 
 export interface CliSessionProductSurface {
@@ -45,6 +49,7 @@ export function projectCliSessionProductSurface(
     `- Verification: ${verificationSummary(codingResult)}`,
     `- Repair: ${repairSummary(codingResult)}`,
     `- Tools: ${toolSummary(codingResult)}`,
+    ...projectionSummaryLines(input),
     `- Verdict: ${verdict}`,
     `- Not proven: ${notProvenClaims.length > 0 ? notProvenClaims.join("; ") : "none"}`,
     `- Next action: ${nextAction}`,
@@ -57,6 +62,22 @@ export function projectCliSessionProductSurface(
     notProvenClaims,
     nextAction,
   };
+}
+
+function projectionSummaryLines(input: CliSessionProductSurfaceInput): string[] {
+  const lines: string[] = [];
+  if (input.sessionProjection) {
+    lines.push(
+      `- Session path: activePath=${input.sessionProjection.activePath.length}; tree=${input.sessionProjection.treeSupport}; branch=${input.sessionProjection.branchSupport}; terminalSuccessClaim=${input.sessionProjection.terminal.terminalSuccessClaim}`,
+    );
+  }
+  if (input.runtimeEvents) {
+    const lastEvent = input.runtimeEvents[input.runtimeEvents.length - 1];
+    lines.push(
+      `- Runtime events: count=${input.runtimeEvents.length}; last=${lastEvent?.type ?? "none"}; terminalSuccessClaim=false`,
+    );
+  }
+  return lines;
 }
 
 function contextSummary(codingResult: CodingResultSummary): string {

@@ -23,6 +23,7 @@ import {
   projectCurrentSessionMetadata,
   projectSessionMetadata,
 } from "./sessionMetadataProjection.js";
+import { projectSessionTree } from "./sessionTreeProjection.js";
 import { projectCompactRetentionPlanInput } from "./sessionCompactProjection.js";
 import {
   projectRecoveryTrustBoundaryBlock,
@@ -260,6 +261,47 @@ describe("session substrate projections", () => {
       sessionId: "sess_meta",
       updatedAt: "2026-05-19T00:00:01.000Z",
     });
+  });
+
+  it("projects a schema-neutral active path without raw transcript content or terminal success claims", () => {
+    const projection = projectSessionTree({
+      session: {
+        ...makeSession({
+          id: "sess_tree",
+          status: "completed",
+          updatedAt: "2026-05-19T00:00:03.000Z",
+        }),
+        turns: [
+          {
+            role: "user",
+            content: "token=secret oldText=raw-before",
+            timestamp: "2026-05-19T00:00:01.000Z",
+          },
+          {
+            role: "assistant",
+            content: "raw provider output: hidden reasoning",
+            timestamp: "2026-05-19T00:00:02.000Z",
+          },
+        ],
+      },
+      stateSnapshot: {
+        status: "completed",
+        terminalClassification: "success",
+        terminalReason: "completed",
+      },
+    });
+    const serialized = JSON.stringify(projection);
+
+    expect(projection.treeSupport).toBe("linear-path");
+    expect(projection.branchSupport).toBe("not-proven");
+    expect(projection.activePath).toEqual([
+      "sess_tree:root",
+      "sess_tree:turn-1",
+      "sess_tree:turn-2",
+    ]);
+    expect(projection.terminal.terminalSuccessClaim).toBe(false);
+    expect(projection.terminal.notProvenClaims).toContain("terminal-success");
+    expect(serialized).not.toMatch(/token=secret|raw-before|hidden reasoning|raw provider output/i);
   });
 
   it("projects recovery trust boundary blocks with the existing hint shape", () => {
