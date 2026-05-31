@@ -6,15 +6,15 @@ import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
 import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
-import { projectStaticResourceRegistry } from "../resources/staticResourceProjection.js";
+import { projectStaticResourceRegistry } from "../resources/projection.js";
 import {
   projectJsonRuntimeEventStream,
   serializeJsonRuntimeEventStream,
-} from "./jsonEventStream.js";
+} from "./stream.js";
 import {
   projectRuntimeEvents,
   type RuntimeProjectionEvent,
-} from "./runtimeEventProjection.js";
+} from "./projection.js";
 
 describe("JSON runtime event stream projection", () => {
   it("serializes runtime event observations as JSON-safe ordered entries", () => {

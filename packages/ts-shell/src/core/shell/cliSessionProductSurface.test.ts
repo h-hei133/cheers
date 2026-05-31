@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CodingResultSummary } from "../../orchestration/types.js";
-import { projectRuntimeEvents } from "../../runtime/events/runtimeEventProjection.js";
-import { projectStaticResourceRegistry } from "../../runtime/resources/staticResourceProjection.js";
+import { projectRuntimeEvents } from "../../runtime/events/projection.js";
+import { projectStaticResourceRegistry } from "../../runtime/resources/projection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createRuntimeEventDigest } from "./sessionEventSurface.js";
 import {

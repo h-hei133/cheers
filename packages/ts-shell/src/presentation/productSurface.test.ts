@@ -12,20 +12,20 @@ import {
   projectProviderRegistry,
   unknownProviderCompatibilityFlags,
 } from "../provider/providerRegistry.js";
-import { projectRuntimeEvents } from "../runtime/events/runtimeEventProjection.js";
-import { runAgentLoopContract } from "../runtime/loop/agentLoopContract.js";
-import { projectProductLoopAdapter } from "../runtime/loop/productLoopAdapter.js";
-import { projectLoopTrajectory } from "../runtime/loop/trajectoryProjection.js";
+import { projectRuntimeEvents } from "../runtime/events/projection.js";
+import { runAgentLoopContract } from "../runtime/loop/contract.js";
+import { projectProductLoopAdapter } from "../runtime/loop/adapter.js";
+import { projectLoopTrajectory } from "../runtime/loop/trajectory.js";
 import {
   projectPackageResourceInventory,
   type PackageManifestContract,
-} from "../runtime/resources/packageInventory.js";
-import { projectStaticResourceRegistry } from "../runtime/resources/staticResourceProjection.js";
+} from "../runtime/resources/inventory.js";
+import { projectStaticResourceRegistry } from "../runtime/resources/projection.js";
 import { evaluateContinuationReadiness } from "../session/continuationReadiness.js";
 import { summarizeReplaySafeLoopState } from "../session/replaySafeLoopState.js";
 import { projectSessionTree } from "../session/sessionTreeProjection.js";
-import { projectProductSurfaceViewModel } from "./productSurface.js";
-import { renderTerminalMessage } from "./terminalMessageRenderer.js";
+import { projectProductSurfaceViewModel } from "./surface/model.js";
+import { renderTerminalMessage } from "./terminal/renderer.js";
 
 describe("product surface view model", () => {
   it("builds semantic sections from result, session, event, provider, package, and resource facts", () => {

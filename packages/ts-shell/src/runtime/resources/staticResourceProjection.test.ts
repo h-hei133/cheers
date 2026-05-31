@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { StaticResourceDescriptor } from "./staticResourceDescriptor.js";
-import { validateStaticResourceDescriptor } from "./staticResourceDescriptor.js";
-import { projectStaticResourceRegistry } from "./staticResourceProjection.js";
+import type { StaticResourceDescriptor } from "./descriptor.js";
+import { validateStaticResourceDescriptor } from "./descriptor.js";
+import { projectStaticResourceRegistry } from "./projection.js";
 
 describe("static resource projection", () => {
   it("accepts safe static descriptors and adds not-proven resource claims", () => {

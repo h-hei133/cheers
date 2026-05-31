@@ -1,8 +1,8 @@
 import {
   projectProductSurfaceViewModel,
   type ProductSurfaceInput,
-} from "../../presentation/productSurface.js";
-import { renderTerminalMessage } from "../../presentation/terminalMessageRenderer.js";
+} from "../../presentation/surface/model.js";
+import { renderTerminalMessage } from "../../presentation/terminal/renderer.js";
 
 export type CliSessionProductSurfaceInput = ProductSurfaceInput;
 

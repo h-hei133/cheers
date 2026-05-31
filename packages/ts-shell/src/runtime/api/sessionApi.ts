@@ -1,10 +1,10 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
-import type { RuntimeResultFactsProjection } from "../events/runtimeEventProjection.js";
-import type { RuntimeProjectionEvent } from "../events/runtimeEventProjection.js";
+import type { RuntimeResultFactsProjection } from "../events/projection.js";
+import type { RuntimeProjectionEvent } from "../events/projection.js";
 import {
   projectJsonRuntimeEventStream,
   type JsonRuntimeEventStreamEntry,
-} from "../events/jsonEventStream.js";
+} from "../events/stream.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 
 export type RuntimeSessionOperation =

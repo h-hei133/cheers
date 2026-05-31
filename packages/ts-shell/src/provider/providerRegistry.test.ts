@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { projectProviderReadinessMetadata } from "../core/shell/providerReadiness.js";
-import { projectRuntimeEvents } from "../runtime/events/runtimeEventProjection.js";
-import { projectStaticResourceRegistry } from "../runtime/resources/staticResourceProjection.js";
+import { projectRuntimeEvents } from "../runtime/events/projection.js";
+import { projectStaticResourceRegistry } from "../runtime/resources/projection.js";
 import {
   classifyProviderFailure,
   projectProviderRegistry,

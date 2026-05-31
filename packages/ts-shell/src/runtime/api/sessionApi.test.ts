@@ -5,7 +5,7 @@ import {
   createRuntimeSessionApi,
   projectRuntimeSessionApiContract,
 } from "./sessionApi.js";
-import type { RuntimeProjectionEvent } from "../events/runtimeEventProjection.js";
+import type { RuntimeProjectionEvent } from "../events/projection.js";
 
 describe("runtime session API boundary", () => {
   it("projects a host-neutral API contract without SDK, RPC, TUI, or CLI ownership", () => {

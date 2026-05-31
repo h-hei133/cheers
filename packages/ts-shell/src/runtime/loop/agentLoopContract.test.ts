@@ -10,12 +10,12 @@ import {
   observeVerificationResult,
   projectVerificationIntent,
 } from "../../verification/loopBoundary.js";
-import { projectJsonRuntimeEventStream } from "../events/jsonEventStream.js";
+import { projectJsonRuntimeEventStream } from "../events/stream.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
 import {
   runAgentLoopContract,
   type AgentLoopContractToolResultBatch,
-} from "./agentLoopContract.js";
+} from "./contract.js";
 
 describe("agent loop contract", () => {
   it("models a no-tool path without claiming terminal success", async () => {

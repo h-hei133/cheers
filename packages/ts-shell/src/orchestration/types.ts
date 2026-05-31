@@ -1,8 +1,8 @@
 import type { QueryEvent } from '../core/query/events.js'
 import type { RecoverySurfaceSummary } from './patchRecovery/recoverySurfaceProjection.js'
 import type { PerFilePatchResultProjection } from '../edit/result/perFilePatchResultProjection.js'
-import type { ProductLoopAdapterProjection } from '../runtime/loop/productLoopAdapter.js'
-import type { LoopTrajectoryProjection } from '../runtime/loop/trajectoryProjection.js'
+import type { ProductLoopAdapterProjection } from '../runtime/loop/adapter.js'
+import type { LoopTrajectoryProjection } from '../runtime/loop/trajectory.js'
 
 export type AgentRole = 'planner' | 'coder' | 'reviewer'
 export type ContinuationReason = 'handoff' | 'retryable-error'

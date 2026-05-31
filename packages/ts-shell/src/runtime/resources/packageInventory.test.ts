@@ -5,7 +5,7 @@ import {
   validatePackageManifest,
   type PackageEnablementState,
   type PackageManifestContract,
-} from "./packageInventory.js";
+} from "./inventory.js";
 
 describe("package resource inventory governance", () => {
   it("accepts report-safe manifests and preserves scope, trust, source, and version metadata", () => {

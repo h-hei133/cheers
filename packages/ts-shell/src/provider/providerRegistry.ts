@@ -1,4 +1,4 @@
-import type { StaticResourceDescriptor } from "../runtime/resources/staticResourceDescriptor.js";
+import type { StaticResourceDescriptor } from "../runtime/resources/descriptor.js";
 
 export type ProviderCapabilityState = "supported" | "unsupported" | "unknown";
 

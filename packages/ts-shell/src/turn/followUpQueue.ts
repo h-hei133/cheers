@@ -1,4 +1,4 @@
-import type { AgentLoopContractQueuedMessage } from "../runtime/loop/agentLoopContract.js";
+import type { AgentLoopContractQueuedMessage } from "../runtime/loop/contract.js";
 
 export type FollowUpDeliveryStatus =
   | "queued"

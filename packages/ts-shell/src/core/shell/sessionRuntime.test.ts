@@ -13,9 +13,9 @@ import {
 } from "../context/compactLiveCheckpoint.js";
 import { createProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStore.js";
-import { runAgentLoopContract } from "../../runtime/loop/agentLoopContract.js";
-import { projectProductLoopAdapter } from "../../runtime/loop/productLoopAdapter.js";
-import { projectLoopTrajectory } from "../../runtime/loop/trajectoryProjection.js";
+import { runAgentLoopContract } from "../../runtime/loop/contract.js";
+import { projectProductLoopAdapter } from "../../runtime/loop/adapter.js";
+import { projectLoopTrajectory } from "../../runtime/loop/trajectory.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
 describe("shell session runtime (W5)", () => {

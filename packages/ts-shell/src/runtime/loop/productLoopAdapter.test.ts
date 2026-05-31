@@ -5,14 +5,14 @@ import { projectSessionContextRebuild } from "../../context/sessionContextRebuil
 import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
 import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
-import { runAgentLoopContract } from "./agentLoopContract.js";
+import { runAgentLoopContract } from "./contract.js";
 import {
   buildContinuationContextFeatureContract,
   buildContextDiscoveryTargetSelectionFeatureContract,
   buildPlanningFeatureContract,
   buildStagedContextAcquisitionFeatureContract,
   validateFutureFeatureIntegration,
-} from "./featureContract.js";
+} from "./feature.js";
 import {
   getProductLoopPhaseStatusMap,
   PRODUCT_LOOP_PHASE_STATUS_MAP,
@@ -20,8 +20,8 @@ import {
 import {
   projectProductLoopAdapter,
   projectProductLoopAdapterObservationEvent,
-} from "./productLoopAdapter.js";
-import { projectLoopTrajectory } from "./trajectoryProjection.js";
+} from "./adapter.js";
+import { projectLoopTrajectory } from "./trajectory.js";
 
 describe("product loop adapter", () => {
   it("consolidates PL002 through PL008 safe references without terminal success", async () => {

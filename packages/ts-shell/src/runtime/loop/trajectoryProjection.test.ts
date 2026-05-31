@@ -28,17 +28,17 @@ import { createCommandExecutionReceipt } from "../execution/executionReceipt.js"
 import {
   projectPackageResourceInventory,
   type PackageManifestContract,
-} from "../resources/packageInventory.js";
-import { projectStaticResourceRegistry } from "../resources/staticResourceProjection.js";
+} from "../resources/inventory.js";
+import { projectStaticResourceRegistry } from "../resources/projection.js";
 import {
   runAgentLoopContract,
   type AgentLoopContractToolResultBatch,
-} from "./agentLoopContract.js";
+} from "./contract.js";
 import {
   createLoopInfrastructureMap,
   LOOP_INFRASTRUCTURE_CATEGORIES,
-} from "./infrastructureMap.js";
-import { projectLoopTrajectory } from "./trajectoryProjection.js";
+} from "./infrastructure.js";
+import { projectLoopTrajectory } from "./trajectory.js";
 
 describe("loop trajectory projection", () => {
   it("maps every loop infrastructure category or marks it not-proven", () => {

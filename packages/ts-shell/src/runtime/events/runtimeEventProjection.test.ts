@@ -9,15 +9,15 @@ import {
   projectRepairRequiredHandoff,
 } from "../../repair/loopBoundary.js";
 import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
-import { projectPackageResourceInventory } from "../resources/packageInventory.js";
-import { projectStaticResourceRegistry } from "../resources/staticResourceProjection.js";
+import { projectPackageResourceInventory } from "../resources/inventory.js";
+import { projectStaticResourceRegistry } from "../resources/projection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
 import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
 import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
-import { runAgentLoopContract } from "../loop/agentLoopContract.js";
-import { projectProductLoopAdapter } from "../loop/productLoopAdapter.js";
-import { projectLoopTrajectory } from "../loop/trajectoryProjection.js";
+import { runAgentLoopContract } from "../loop/contract.js";
+import { projectProductLoopAdapter } from "../loop/adapter.js";
+import { projectLoopTrajectory } from "../loop/trajectory.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
@@ -37,7 +37,7 @@ import {
   createToolBeforePolicyDecision,
   createToolInterceptionIntent,
 } from "../../tools/interception.js";
-import { projectRuntimeEvents } from "./runtimeEventProjection.js";
+import { projectRuntimeEvents } from "./projection.js";
 
 describe("runtime event projection", () => {
   it("projects runtime snapshot and receipt facts in stable observation order", () => {
