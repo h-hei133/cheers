@@ -23,13 +23,75 @@ export interface RepoIntelligenceFile {
 }
 
 export interface RepoIntelligenceCandidate {
+  readonly candidateId: string;
   readonly path: string;
   readonly safeLabel: string;
   readonly role: RepoIntelligenceFileRole;
+  readonly packageName?: string;
+  readonly moduleHint: string;
   readonly score: number;
+  readonly scoreComponents: {
+    readonly taskTokenOverlap: number;
+    readonly roleBoost: number;
+    readonly scriptBoost: number;
+    readonly exactNameBoost: number;
+    readonly primarySourceNameBoost: number;
+    readonly freshnessBoost: number;
+  };
   readonly reasons: readonly string[];
+  readonly pathMatchReasons: readonly string[];
+  readonly taskTokenMatchReasons: readonly string[];
+  readonly testAdjacencyHints: readonly string[];
   readonly symbolHints: readonly string[];
   readonly freshness: "fresh-stat" | "unknown";
+  readonly uncertaintyNotes: readonly string[];
+  readonly notProvenClaims: readonly string[];
+}
+
+export type RepoDiscoveryConfidence = "high" | "medium" | "low";
+
+export interface RepoDiscoveryScanProfile {
+  readonly profileId: string;
+  readonly workspaceLabel: string;
+  readonly scanMode: "bounded-local-files";
+  readonly scanBudget: {
+    readonly maxFiles: number;
+    readonly pathPriorityPrefillLimit: number;
+    readonly pathPriorityScanLimit: number;
+  };
+  readonly filesConsideredCount: number;
+  readonly filesOmittedCount: number;
+  readonly omittedReasonCategories: readonly string[];
+  readonly rawContentExcluded: true;
+  readonly packageMapAvailable: boolean;
+  readonly moduleMapAvailable: boolean;
+  readonly scanLimitReached: boolean;
+  readonly discoveryConfidence: RepoDiscoveryConfidence;
+  readonly notProvenClaims: readonly string[];
+}
+
+export interface RepoCandidateOmission {
+  readonly reason: string;
+  readonly count: number;
+  readonly exampleLabels: readonly string[];
+  readonly notProvenClaims: readonly string[];
+}
+
+export type RepoTargetRankingAmbiguityState =
+  | "unambiguous-top-candidate"
+  | "multiple-plausible-candidates"
+  | "weak-signal-candidate"
+  | "no-candidate";
+
+export interface RepoTargetRankingEvidence {
+  readonly rankingId: string;
+  readonly ambiguityState: RepoTargetRankingAmbiguityState;
+  readonly selectedCandidateId?: string;
+  readonly competingCandidateIds: readonly string[];
+  readonly weakCandidateIds: readonly string[];
+  readonly missingDiscoveryFacts: readonly string[];
+  readonly notProvenClaims: readonly string[];
+  readonly evidence: readonly string[];
 }
 
 export interface RepoIntelligenceSnapshot {
@@ -50,6 +112,8 @@ export interface RepoIntelligenceSnapshot {
   readonly configMap: readonly string[];
   readonly boundaryHints: readonly string[];
   readonly files: readonly RepoIntelligenceFile[];
+  readonly scanProfile: RepoDiscoveryScanProfile;
+  readonly candidateOmissions: readonly RepoCandidateOmission[];
   readonly cacheStatus: "disabled" | "enabled-not-used";
   readonly staleIndexWarnings: readonly string[];
   readonly evidence: readonly string[];
@@ -58,6 +122,7 @@ export interface RepoIntelligenceSnapshot {
 export interface RepoIntelligenceResult {
   readonly snapshot: RepoIntelligenceSnapshot;
   readonly candidates: readonly RepoIntelligenceCandidate[];
+  readonly targetRanking: RepoTargetRankingEvidence;
   readonly recentRelevantFiles: readonly string[];
   readonly missingFacts: readonly string[];
   readonly nextReadSuggestions: readonly string[];
@@ -75,14 +140,25 @@ export async function buildRepoIntelligence(input: {
   const maxFiles = input.maxFiles ?? 240;
   const maxCandidates = input.maxCandidates ?? 8;
   const packageMap = await discoverPackageMap(workspaceRoot);
-  const files = await discoverRepoFiles({
+  const discovered = await discoverRepoFiles({
     workspaceRoot,
     userTask: input.userTask,
     maxFiles,
     packageMap,
   });
+  const files = discovered.files;
   const moduleMap = buildModuleMap(files);
   const snapshotId = buildSnapshotId({ packageMap, files });
+  const candidateOmissions = buildCandidateOmissions(discovered.omissions);
+  const scanProfile = buildDiscoveryScanProfile({
+    workspaceLabel: safeTargetLabel(path.basename(workspaceRoot) || workspaceRoot),
+    maxFiles,
+    files,
+    packageMapAvailable: packageMap.length > 0,
+    moduleMapAvailable: moduleMap.length > 0,
+    omissions: candidateOmissions,
+    filesConsideredCount: discovered.filesConsideredCount,
+  });
   const snapshot: RepoIntelligenceSnapshot = {
     snapshotId,
     workspaceRootLabel: safeTargetLabel(path.basename(workspaceRoot) || workspaceRoot),
@@ -93,11 +169,15 @@ export async function buildRepoIntelligence(input: {
     configMap: files.filter((file) => file.role === "config").map((file) => file.safeLabel),
     boundaryHints: buildBoundaryHints(packageMap, files),
     files,
+    scanProfile,
+    candidateOmissions,
     cacheStatus: input.cache?.enabled ? "enabled-not-used" : "disabled",
     staleIndexWarnings: input.cache?.enabled ? ["persistent cache read/write is not implemented by default"] : [],
     evidence: [
       `repo-intelligence:snapshot:${snapshotId}`,
+      `repo-intelligence:scan-profile:${scanProfile.profileId}`,
       `repo-intelligence:files:${files.length}`,
+      `repo-intelligence:files-omitted:${scanProfile.filesOmittedCount}`,
       `repo-intelligence:packages:${packageMap.length}`,
       `repo-intelligence:cache:${input.cache?.enabled ? "enabled-not-used" : "disabled"}`,
       "repo-intelligence:mutation-authority:not-granted",
@@ -109,10 +189,12 @@ export async function buildRepoIntelligence(input: {
     userTask: input.userTask,
     maxCandidates,
   });
-  const missingFacts =
-    candidates.length === 0
-      ? ["no candidate files matched the vague task within the bounded repository scan"]
-      : [];
+  const targetRanking = buildTargetRankingEvidence({
+    userTask: input.userTask,
+    candidates,
+    scanProfile,
+  });
+  const missingFacts = buildBlockingDiscoveryFacts(targetRanking.missingDiscoveryFacts);
   const nextReadSuggestions =
     candidates.length > 0
       ? candidates.slice(0, 4).map((candidate) => candidate.safeLabel)
@@ -121,13 +203,17 @@ export async function buildRepoIntelligence(input: {
   return {
     snapshot,
     candidates,
+    targetRanking,
     recentRelevantFiles: candidates.slice(0, 5).map((candidate) => candidate.safeLabel),
     missingFacts,
     nextReadSuggestions,
     evidence: [
       ...snapshot.evidence,
       `repo-intelligence:candidates:${candidates.length}`,
+      `repo-intelligence:target-ranking:${targetRanking.rankingId}`,
+      `repo-intelligence:ambiguity:${targetRanking.ambiguityState}`,
       ...candidates.slice(0, 3).map((candidate) => `repo-intelligence:candidate:${candidate.safeLabel}`),
+      ...targetRanking.evidence,
     ],
   };
 }
@@ -153,7 +239,8 @@ export function rankRepoCandidates(input: {
         editLike && file.role === "source" && countOverlap(tokens, basenameTokens) >= 2
           ? 40
           : 0;
-      const score = overlap * 14 + roleBoost + scriptBoost + exactNameBoost + primarySourceNameBoost + freshnessBoost(file);
+      const freshness = freshnessBoost(file);
+      const score = overlap * 14 + roleBoost + scriptBoost + exactNameBoost + primarySourceNameBoost + freshness;
       const reasons = [
         overlap > 0 ? `task-token-overlap:${overlap}` : undefined,
         roleBoost > 0 ? `role:${file.role}` : undefined,
@@ -162,13 +249,44 @@ export function rankRepoCandidates(input: {
         primarySourceNameBoost > 0 ? "primary-source-name-match" : undefined,
       ].filter((reason): reason is string => Boolean(reason));
       return {
+        candidateId: `repo_candidate_${buildSnapshotId({ path: file.safeLabel, score }).slice("repo_intel_".length)}`,
         path: file.path,
         safeLabel: file.safeLabel,
         role: file.role,
+        packageName: file.packageName,
+        moduleHint: normalizeRelative(path.dirname(file.path)),
         score,
+        scoreComponents: {
+          taskTokenOverlap: overlap * 14,
+          roleBoost,
+          scriptBoost,
+          exactNameBoost,
+          primarySourceNameBoost,
+          freshnessBoost: freshness,
+        },
         reasons,
+        pathMatchReasons: [
+          exactNameBoost > 0 ? "basename-token-match" : undefined,
+          primarySourceNameBoost > 0 ? "primary-source-basename-match" : undefined,
+          countOverlap(tokens, pathTokens) > 0 ? `path-token-overlap:${countOverlap(tokens, pathTokens)}` : undefined,
+        ].filter((reason): reason is string => Boolean(reason)),
+        taskTokenMatchReasons: overlap > 0
+          ? Array.from(new Set(tokens)).filter((token) =>
+            pathTokens.includes(token) || symbolTokens.includes(token)
+          ).map((token) => `task-token:${token}`)
+          : [],
+        testAdjacencyHints: buildTestAdjacencyHints(file, input.files),
         symbolHints: file.symbolHints,
         freshness: "fresh-stat" as const,
+        uncertaintyNotes: [
+          score < WEAK_CANDIDATE_SCORE_THRESHOLD ? "weak-ranking-signal" : undefined,
+          file.role === "docs" && editLike ? "docs-candidate-for-edit-like-task" : undefined,
+        ].filter((note): note is string => Boolean(note)),
+        notProvenClaims: [
+          "candidate-found-is-not-context-success",
+          "high-rank-is-not-correct-target",
+          "selected-candidate-is-not-edit-authority",
+        ],
       };
     })
     .filter((candidate) => candidate.reasons.some((reason) =>
@@ -219,20 +337,42 @@ async function discoverPackageMap(workspaceRoot: string): Promise<RepoIntelligen
   return packages.sort((left, right) => left.path.localeCompare(right.path));
 }
 
+interface DiscoveredRepoFiles {
+  readonly files: readonly RepoIntelligenceFile[];
+  readonly omissions: ReadonlyMap<string, { readonly count: number; readonly examples: readonly string[] }>;
+  readonly filesConsideredCount: number;
+}
+
 async function discoverRepoFiles(input: {
   readonly workspaceRoot: string;
   readonly userTask: string;
   readonly maxFiles: number;
   readonly packageMap: RepoIntelligenceSnapshot["packageMap"];
-}): Promise<RepoIntelligenceFile[]> {
+}): Promise<DiscoveredRepoFiles> {
   const files: RepoIntelligenceFile[] = [];
   const seen = new Set<string>();
+  const omissions = new Map<string, { count: number; examples: string[] }>();
+  let filesConsideredCount = 0;
   const scanProfile = buildRepoScanProfile(input.userTask);
+  const addOmission = (reason: string, relativePath: string): void => {
+    const current = omissions.get(reason) ?? { count: 0, examples: [] };
+    omissions.set(reason, {
+      count: current.count + 1,
+      examples: current.examples.length < 5
+        ? [...current.examples, safeTargetLabel(relativePath)]
+        : current.examples,
+    });
+  };
   const addFile = async (relativePath: string): Promise<void> => {
-    if (files.length >= input.maxFiles || seen.has(relativePath)) {
+    if (seen.has(relativePath)) {
+      return;
+    }
+    if (files.length >= input.maxFiles) {
+      addOmission("scan-budget-reached", relativePath);
       return;
     }
     seen.add(relativePath);
+    filesConsideredCount += 1;
     const absolutePath = path.join(input.workspaceRoot, relativePath);
     const stat = await fs.stat(absolutePath);
     const prefix = await readTextPrefix(absolutePath, 16_000);
@@ -255,6 +395,7 @@ async function discoverRepoFiles(input: {
   }
   const visit = async (directory: string): Promise<void> => {
     if (files.length >= input.maxFiles) {
+      addOmission("scan-budget-reached", normalizeRelative(path.relative(input.workspaceRoot, directory)));
       return;
     }
     const entries = sortRepoEntries({
@@ -268,21 +409,24 @@ async function discoverRepoFiles(input: {
         return;
       }
       const absolutePath = path.join(directory, entry.name);
+      const relativePath = normalizeRelative(path.relative(input.workspaceRoot, absolutePath));
       if (entry.isDirectory()) {
         if (!IGNORED_DIRS.has(entry.name)) {
           await visit(absolutePath);
+        } else {
+          addOmission("generated-or-vendor-path-excluded", relativePath);
         }
         continue;
       }
       if (!entry.isFile() || !isSupportedRepoFile(entry.name)) {
+        addOmission(entry.isFile() ? "file-type-excluded" : "non-file-entry-excluded", relativePath);
         continue;
       }
-      const relativePath = normalizeRelative(path.relative(input.workspaceRoot, absolutePath));
       await addFile(relativePath);
     }
   };
   await visit(input.workspaceRoot);
-  return files;
+  return { files, omissions, filesConsideredCount };
 }
 
 async function discoverPathPriorityFilePaths(input: {
@@ -395,6 +539,179 @@ function buildModuleMap(files: readonly RepoIntelligenceFile[]): RepoIntelligenc
     .map(([directory, value]) => ({ directory, ...value }))
     .sort((left, right) => right.files - left.files || left.directory.localeCompare(right.directory))
     .slice(0, 24);
+}
+
+function buildCandidateOmissions(
+  omissions: ReadonlyMap<string, { readonly count: number; readonly examples: readonly string[] }>,
+): readonly RepoCandidateOmission[] {
+  return Array.from(omissions.entries())
+    .map(([reason, value]) => ({
+      reason,
+      count: value.count,
+      exampleLabels: value.examples,
+      notProvenClaims: ["omitted-file-is-not-irrelevant"],
+    }))
+    .sort((left, right) => right.count - left.count || left.reason.localeCompare(right.reason));
+}
+
+function buildDiscoveryScanProfile(input: {
+  readonly workspaceLabel: string;
+  readonly maxFiles: number;
+  readonly files: readonly RepoIntelligenceFile[];
+  readonly packageMapAvailable: boolean;
+  readonly moduleMapAvailable: boolean;
+  readonly omissions: readonly RepoCandidateOmission[];
+  readonly filesConsideredCount: number;
+}): RepoDiscoveryScanProfile {
+  const filesOmittedCount = input.omissions.reduce((sum, omission) => sum + omission.count, 0);
+  const scanLimitReached = input.omissions.some((omission) => omission.reason === "scan-budget-reached");
+  const discoveryConfidence: RepoDiscoveryConfidence = scanLimitReached
+    ? "low"
+    : input.files.length === 0
+      ? "low"
+      : filesOmittedCount > 0
+        ? "medium"
+        : "high";
+  return {
+    profileId: `repo_scan_${buildSnapshotId({
+      workspaceLabel: input.workspaceLabel,
+      files: input.files.map((file) => file.safeLabel),
+      omissions: input.omissions.map((omission) => `${omission.reason}:${omission.count}`),
+    }).slice("repo_intel_".length)}`,
+    workspaceLabel: input.workspaceLabel,
+    scanMode: "bounded-local-files",
+    scanBudget: {
+      maxFiles: input.maxFiles,
+      pathPriorityPrefillLimit: PATH_PRIORITY_PREFILL_LIMIT,
+      pathPriorityScanLimit: PATH_PRIORITY_SCAN_LIMIT,
+    },
+    filesConsideredCount: input.filesConsideredCount,
+    filesOmittedCount,
+    omittedReasonCategories: input.omissions.map((omission) => omission.reason),
+    rawContentExcluded: true,
+    packageMapAvailable: input.packageMapAvailable,
+    moduleMapAvailable: input.moduleMapAvailable,
+    scanLimitReached,
+    discoveryConfidence,
+    notProvenClaims: [
+      "scan-completed-is-not-repository-understanding",
+      "context-found-is-not-enough-context",
+      "omitted-files-remain-unproven",
+    ],
+  };
+}
+
+function buildTargetRankingEvidence(input: {
+  readonly userTask: string;
+  readonly candidates: readonly RepoIntelligenceCandidate[];
+  readonly scanProfile: RepoDiscoveryScanProfile;
+}): RepoTargetRankingEvidence {
+  const selected = input.candidates[0];
+  const second = input.candidates[1];
+  const weakCandidateIds = input.candidates
+    .filter((candidate) => candidate.score < WEAK_CANDIDATE_SCORE_THRESHOLD)
+    .map((candidate) => candidate.candidateId);
+  const competingCandidateIds = input.candidates
+    .slice(1, 4)
+    .filter((candidate) => selected ? selected.score - candidate.score <= 18 : true)
+    .map((candidate) => candidate.candidateId);
+  const ambiguityState: RepoTargetRankingAmbiguityState = !selected
+    ? "no-candidate"
+    : selected.score < WEAK_CANDIDATE_SCORE_THRESHOLD
+      ? "weak-signal-candidate"
+      : second && selected.score - second.score <= 18
+        ? "multiple-plausible-candidates"
+        : "unambiguous-top-candidate";
+  const missingDiscoveryFacts = buildMissingDiscoveryFacts({
+    userTask: input.userTask,
+    ambiguityState,
+    scanProfile: input.scanProfile,
+    selected,
+    competingCandidateIds,
+  });
+  const rankingId = `target_ranking_${buildSnapshotId({
+    task: input.userTask,
+    selected: selected?.safeLabel,
+    competingCandidateIds,
+    ambiguityState,
+  }).slice("repo_intel_".length)}`;
+  return {
+    rankingId,
+    ambiguityState,
+    selectedCandidateId: selected?.candidateId,
+    competingCandidateIds,
+    weakCandidateIds,
+    missingDiscoveryFacts,
+    notProvenClaims: [
+      "high-ranked-file-is-not-correct-target",
+      "selected-candidate-is-not-edit-authority",
+      "target-ranking-is-not-task-success",
+    ],
+    evidence: [
+      `repo-intelligence:target-ranking:${rankingId}`,
+      `repo-intelligence:target-ranking-ambiguity:${ambiguityState}`,
+      `repo-intelligence:target-ranking-missing-facts:${missingDiscoveryFacts.length}`,
+    ],
+  };
+}
+
+function buildMissingDiscoveryFacts(input: {
+  readonly userTask: string;
+  readonly ambiguityState: RepoTargetRankingAmbiguityState;
+  readonly scanProfile: RepoDiscoveryScanProfile;
+  readonly selected?: RepoIntelligenceCandidate;
+  readonly competingCandidateIds: readonly string[];
+}): readonly string[] {
+  const facts = [
+    hasExplicitPathHint(input.userTask) ? undefined : "missing explicit file path",
+    hasLikelySymbolHint(input.userTask) ? undefined : "missing symbol name",
+    input.scanProfile.packageMapAvailable ? undefined : "missing package or workspace scope",
+    input.scanProfile.scanLimitReached ? "insufficient scan coverage" : undefined,
+    input.ambiguityState === "no-candidate"
+      ? "no candidate files matched the vague task within the bounded repository scan"
+      : undefined,
+    input.ambiguityState === "weak-signal-candidate" ? "weak target ranking signal" : undefined,
+    input.ambiguityState === "multiple-plausible-candidates" ? "ambiguous candidate set" : undefined,
+    input.competingCandidateIds.length > 0 ? "target family uncertainty" : undefined,
+    input.selected?.testAdjacencyHints.length ? undefined : "missing test target",
+  ].filter((fact): fact is string => Boolean(fact));
+  return Array.from(new Set(facts));
+}
+
+function buildBlockingDiscoveryFacts(facts: readonly string[]): readonly string[] {
+  const blocking = new Set([
+    "no candidate files matched the vague task within the bounded repository scan",
+    "weak target ranking signal",
+    "insufficient scan coverage",
+  ]);
+  return facts.filter((fact) => blocking.has(fact));
+}
+
+function buildTestAdjacencyHints(
+  file: RepoIntelligenceFile,
+  files: readonly RepoIntelligenceFile[],
+): readonly string[] {
+  if (file.role === "test") {
+    return ["candidate-is-test"];
+  }
+  const baseName = path.parse(file.path).name.toLowerCase();
+  return files
+    .filter((candidate) =>
+      candidate.role === "test" &&
+      path.parse(candidate.path).name.toLowerCase().startsWith(baseName)
+    )
+    .slice(0, 4)
+    .map((candidate) => `related-test:${candidate.safeLabel}`);
+}
+
+function hasExplicitPathHint(task: string): boolean {
+  return /(?:^|\s)[./\w-]+\.(?:ts|tsx|js|jsx|json|md|yaml|yml)\b/.test(task) ||
+    task.includes("/");
+}
+
+function hasLikelySymbolHint(task: string): boolean {
+  return /\b[A-Za-z_$][A-Za-z0-9_$]*(?:\(\)|\.)/.test(task) ||
+    /[a-z][A-Z][A-Za-z0-9_$]*/.test(task);
 }
 
 function buildBoundaryHints(
@@ -617,6 +934,7 @@ const IGNORED_DIRS = new Set([
 
 const PATH_PRIORITY_PREFILL_LIMIT = 96;
 const PATH_PRIORITY_SCAN_LIMIT = 5_000;
+const WEAK_CANDIDATE_SCORE_THRESHOLD = 50;
 
 const STOP_WORDS = new Set([
   "the",

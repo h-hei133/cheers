@@ -10,6 +10,7 @@ import {
   buildRepoIntelligence,
   type RepoIntelligenceCandidate,
   type RepoIntelligenceResult,
+  type RepoTargetRankingAmbiguityState,
 } from "./repoIntelligence.js";
 import type { CodingTaskKind } from "./types.js";
 import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
@@ -25,6 +26,7 @@ export interface ContextEngineResult {
   readonly userTask: string;
   readonly repo: RepoIntelligenceResult;
   readonly selectedCandidate?: RepoIntelligenceCandidate;
+  readonly discoveryHandoff: ContextDiscoveryHandoffFacts;
   readonly workflowPlan: WorkflowTaskPlan;
   readonly bundle?: ContextGraphPlanningBundle;
   readonly memory: ContextWorkingMemory;
@@ -42,6 +44,19 @@ export interface ContextEngineResult {
   readonly missingFacts: readonly string[];
   readonly nextReadSuggestions: readonly string[];
   readonly evidence: readonly string[];
+}
+
+export interface ContextDiscoveryHandoffFacts {
+  readonly handoffId: string;
+  readonly selectedCandidateIds: readonly string[];
+  readonly competingCandidateIds: readonly string[];
+  readonly omittedCandidateFacts: readonly string[];
+  readonly ambiguityState: RepoTargetRankingAmbiguityState;
+  readonly missingDiscoveryFacts: readonly string[];
+  readonly scanProfileId: string;
+  readonly targetRankingEvidenceId: string;
+  readonly rawContentExcluded: true;
+  readonly notProvenClaims: readonly string[];
 }
 
 export async function runContextEngine(input: {
@@ -67,6 +82,7 @@ export async function runContextEngine(input: {
     currentRepoFileLabels: repo.snapshot.files.map((file) => file.safeLabel),
     memory: input.previousMemory,
   });
+  const discoveryHandoff = buildDiscoveryHandoff(repo);
   if (reuse.reusable) {
     return {
       engineId: `context_engine_${reuse.memory.memoryId}`,
@@ -74,6 +90,7 @@ export async function runContextEngine(input: {
       userTask: input.userTask,
       repo,
       selectedCandidate: repo.candidates.find((candidate) => candidate.safeLabel === reuse.memory.selectedTargetPath),
+      discoveryHandoff,
       workflowPlan: buildWorkflowPlan({
         userTask: input.userTask,
         targetPath: reuse.memory.selectedTargetPath,
@@ -100,6 +117,7 @@ export async function runContextEngine(input: {
       evidence: [
         ...repo.evidence,
         ...reuse.evidence,
+        `context-engine:discovery-handoff:${discoveryHandoff.handoffId}`,
         "context-engine:status:reused-memory",
         "context-engine:mutation-authority:not-granted",
       ],
@@ -124,6 +142,7 @@ export async function runContextEngine(input: {
       status: "insufficient-context",
       userTask: input.userTask,
       repo,
+      discoveryHandoff,
       workflowPlan,
       memory,
       filesRead: [],
@@ -141,6 +160,7 @@ export async function runContextEngine(input: {
       evidence: [
         ...repo.evidence,
         ...reuse.evidence,
+        `context-engine:discovery-handoff:${discoveryHandoff.handoffId}`,
         "context-engine:status:insufficient-context",
         "context-engine:mutation-authority:not-granted",
       ],
@@ -171,6 +191,7 @@ export async function runContextEngine(input: {
     userTask: input.userTask,
     repo,
     selectedCandidate,
+    discoveryHandoff,
     workflowPlan,
     bundle,
     memory,
@@ -197,11 +218,36 @@ export async function runContextEngine(input: {
     evidence: [
       ...repo.evidence,
       ...reuse.evidence,
+      `context-engine:discovery-handoff:${discoveryHandoff.handoffId}`,
       ...memory.evidence,
       ...bundle.taskContextAcquisition.evidence,
       ...bundle.taskContextSufficiency.evidence,
       "context-engine:status:context-built",
       "context-engine:mutation-authority:not-granted",
+    ],
+  };
+}
+
+function buildDiscoveryHandoff(repo: RepoIntelligenceResult): ContextDiscoveryHandoffFacts {
+  return {
+    handoffId: `context_discovery_handoff_${repo.targetRanking.rankingId.replace(/^target_ranking_/, "")}`,
+    selectedCandidateIds: repo.targetRanking.selectedCandidateId
+      ? [repo.targetRanking.selectedCandidateId]
+      : [],
+    competingCandidateIds: repo.targetRanking.competingCandidateIds,
+    omittedCandidateFacts: repo.snapshot.candidateOmissions.map((omission) =>
+      `${omission.reason}:${omission.count}`
+    ),
+    ambiguityState: repo.targetRanking.ambiguityState,
+    missingDiscoveryFacts: repo.targetRanking.missingDiscoveryFacts,
+    scanProfileId: repo.snapshot.scanProfile.profileId,
+    targetRankingEvidenceId: repo.targetRanking.rankingId,
+    rawContentExcluded: repo.snapshot.scanProfile.rawContentExcluded,
+    notProvenClaims: [
+      "candidate-to-context-handoff-is-not-edit-authority",
+      "context-found-is-not-enough-context",
+      "selected-candidate-is-not-correct-target",
+      ...repo.targetRanking.notProvenClaims,
     ],
   };
 }

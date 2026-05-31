@@ -57,6 +57,20 @@ describe("runContextEngine", () => {
     expect(result.repo.snapshot.packageMap[0]?.scripts).toContain("test");
     expect(result.repo.candidates.map((candidate) => candidate.safeLabel)).toContain("src/runtime/planner.ts");
     expect(result.selectedCandidate?.safeLabel).toBe("src/runtime/planner.ts");
+    expect(result.discoveryHandoff).toMatchObject({
+      selectedCandidateIds: [result.selectedCandidate?.candidateId],
+      scanProfileId: result.repo.snapshot.scanProfile.profileId,
+      targetRankingEvidenceId: result.repo.targetRanking.rankingId,
+      rawContentExcluded: true,
+    });
+    expect(result.discoveryHandoff.ambiguityState).toBe(result.repo.targetRanking.ambiguityState);
+    expect(result.discoveryHandoff.missingDiscoveryFacts).toEqual(result.repo.targetRanking.missingDiscoveryFacts);
+    expect(result.discoveryHandoff.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "candidate-to-context-handoff-is-not-edit-authority",
+        "context-found-is-not-enough-context",
+      ]),
+    );
     expect(result.bundle?.codeGraphTrace.traceId).toMatch(/^code_graph_trace_/);
     expect(result.bundle?.codeGraphImpact.likelyTests).toContain("src/runtime/planner.test.ts");
     expect(result.filesRead.map((file) => file.path)).toContain("src/runtime/planner.ts");
@@ -64,6 +78,7 @@ describe("runContextEngine", () => {
     expect(result.memory.compactSummary).toContain("target=src/runtime/planner.ts");
     expect(result.memory.fileReceipts.map((receipt) => receipt.path)).toContain("src/runtime/planner.ts");
     expect(result.evidence).toContain("context-engine:status:context-built");
+    expect(result.evidence).toContain(`context-engine:discovery-handoff:${result.discoveryHandoff.handoffId}`);
     expect(result.evidence).toContain("context-engine:mutation-authority:not-granted");
   });
 
@@ -84,12 +99,40 @@ describe("runContextEngine", () => {
     });
 
     expect(second.status).toBe("reused-memory");
+    expect(second.discoveryHandoff.selectedCandidateIds).toEqual([second.selectedCandidate?.candidateId]);
+    expect(second.discoveryHandoff.notProvenClaims).toEqual(
+      expect.arrayContaining(["selected-candidate-is-not-correct-target"]),
+    );
     expect(second.contextBudget.filesRead).toBe(0);
     expect(second.memory.memoryId).toBe(first.memory.memoryId);
     expect(second.memory.missingFacts).toEqual([]);
     expect(second.missingFacts).toEqual([]);
     expect(second.memory.planningWarnings.length).toBeGreaterThan(0);
     expect(second.evidence).toContain("context-memory-reuse:avoids-reread:fresh-receipts");
+  });
+
+  it("carries no-candidate discovery handoff facts without edit authority", async () => {
+    const result = await runContextEngine({
+      workspaceRoot,
+      userTask: "Investigate qzzxwv unexplained behavior",
+      maxRepoFiles: 80,
+      maxCandidates: 5,
+    });
+
+    expect(result.status).toBe("insufficient-context");
+    expect(result.discoveryHandoff).toMatchObject({
+      selectedCandidateIds: [],
+      ambiguityState: "no-candidate",
+      rawContentExcluded: true,
+    });
+    expect(result.discoveryHandoff.missingDiscoveryFacts).toEqual(
+      expect.arrayContaining([
+        "missing explicit file path",
+        "missing symbol name",
+        "no candidate files matched the vague task within the bounded repository scan",
+      ]),
+    );
+    expect(result.evidence).toContain("context-engine:mutation-authority:not-granted");
   });
 
   it("rejects previous memory when repo snapshot or workspace path boundaries do not match", async () => {

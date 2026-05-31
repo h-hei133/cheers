@@ -17,6 +17,162 @@ afterEach(async () => {
 });
 
 describe("buildRepoIntelligence", () => {
+  it("exposes report-safe scan profile and omission accounting for bounded discovery", async () => {
+    await fs.mkdir(path.join(workspaceRoot, ".codex", "prompts"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(path.join(workspaceRoot, ".codex", "prompts", "private.md"), "ignored prompt\n");
+    await fs.writeFile(path.join(workspaceRoot, "notes.txt"), "unsupported target ranking note\n");
+    await fs.writeFile(path.join(workspaceRoot, "src", "targetRanking.ts"), "export function targetRanking() { return true; }\n");
+
+    const result = await buildRepoIntelligence({
+      workspaceRoot,
+      userTask: "Fix targetRanking",
+      maxFiles: 20,
+      maxCandidates: 5,
+    });
+
+    expect(result.snapshot.scanProfile).toMatchObject({
+      scanMode: "bounded-local-files",
+      rawContentExcluded: true,
+      scanLimitReached: false,
+    });
+    expect(result.snapshot.scanProfile.scanBudget.maxFiles).toBe(20);
+    expect(result.snapshot.scanProfile.filesConsideredCount).toBeGreaterThan(0);
+    expect(result.snapshot.scanProfile.filesOmittedCount).toBeGreaterThan(0);
+    expect(result.snapshot.scanProfile.omittedReasonCategories).toEqual(
+      expect.arrayContaining(["generated-or-vendor-path-excluded", "file-type-excluded"]),
+    );
+    expect(result.snapshot.scanProfile.notProvenClaims).toEqual(
+      expect.arrayContaining(["scan-completed-is-not-repository-understanding"]),
+    );
+    expect(result.snapshot.candidateOmissions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: "generated-or-vendor-path-excluded",
+          notProvenClaims: expect.arrayContaining(["omitted-file-is-not-irrelevant"]),
+        }),
+      ]),
+    );
+  });
+
+  it("reports safe candidate evidence, score components, ranking reasons, and truthfulness limits", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "targetRanking.ts"),
+      "export function rankTargetCandidate() { return 'target'; }\n",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "targetRanking.test.ts"),
+      "import { rankTargetCandidate } from './targetRanking.js';\n",
+    );
+
+    const result = await buildRepoIntelligence({
+      workspaceRoot,
+      userTask: "Fix rankTargetCandidate in src/targetRanking.ts and update targetRanking test",
+      maxFiles: 20,
+      maxCandidates: 5,
+    });
+    const candidate = result.candidates[0];
+
+    expect(candidate).toMatchObject({
+      safeLabel: "src/targetRanking.ts",
+      role: "source",
+      moduleHint: "src",
+      freshness: "fresh-stat",
+    });
+    expect(candidate?.candidateId).toMatch(/^repo_candidate_/);
+    expect(candidate?.scoreComponents.taskTokenOverlap).toBeGreaterThan(0);
+    expect(candidate?.pathMatchReasons.length).toBeGreaterThan(0);
+    expect(candidate?.taskTokenMatchReasons).toEqual(expect.arrayContaining(["task-token:target"]));
+    expect(candidate?.testAdjacencyHints).toEqual(expect.arrayContaining(["related-test:src/targetRanking.test.ts"]));
+    expect(candidate?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "high-rank-is-not-correct-target",
+        "selected-candidate-is-not-edit-authority",
+      ]),
+    );
+    expect(result.targetRanking.notProvenClaims).toEqual(
+      expect.arrayContaining(["target-ranking-is-not-task-success"]),
+    );
+  });
+
+  it("keeps target ranking ambiguity visible without granting target correctness", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(path.join(workspaceRoot, "src", "alphaTarget.ts"), "export function selectTarget() { return 'a'; }\n");
+    await fs.writeFile(path.join(workspaceRoot, "src", "betaTarget.ts"), "export function selectTarget() { return 'b'; }\n");
+
+    const result = await buildRepoIntelligence({
+      workspaceRoot,
+      userTask: "Fix selectTarget target behavior",
+      maxFiles: 20,
+      maxCandidates: 5,
+    });
+
+    expect(result.targetRanking.ambiguityState).toBe("multiple-plausible-candidates");
+    expect(result.targetRanking.competingCandidateIds.length).toBeGreaterThan(0);
+    expect(result.targetRanking.missingDiscoveryFacts).toEqual(
+      expect.arrayContaining(["ambiguous candidate set", "target family uncertainty"]),
+    );
+    expect(result.targetRanking.notProvenClaims).toEqual(
+      expect.arrayContaining(["high-ranked-file-is-not-correct-target"]),
+    );
+  });
+
+  it("emits missing discovery facts for no-candidate and weak pathless tasks", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(path.join(workspaceRoot, "src", "planner.ts"), "export const planner = true;\n");
+
+    const none = await buildRepoIntelligence({
+      workspaceRoot,
+      userTask: "Investigate qzzxwv unexplained behavior",
+      maxFiles: 20,
+      maxCandidates: 5,
+    });
+
+    expect(none.candidates).toHaveLength(0);
+    expect(none.targetRanking.ambiguityState).toBe("no-candidate");
+    expect(none.targetRanking.missingDiscoveryFacts).toEqual(
+      expect.arrayContaining([
+        "missing explicit file path",
+        "missing symbol name",
+        "no candidate files matched the vague task within the bounded repository scan",
+      ]),
+    );
+    expect(none.missingFacts).toContain("no candidate files matched the vague task within the bounded repository scan");
+
+    const weak = await buildRepoIntelligence({
+      workspaceRoot,
+      userTask: "plan",
+      maxFiles: 20,
+      maxCandidates: 5,
+    });
+
+    expect(weak.candidates[0]?.safeLabel).toBe("src/planner.ts");
+    expect(weak.targetRanking.ambiguityState).toBe("weak-signal-candidate");
+    expect(weak.targetRanking.weakCandidateIds).toEqual([weak.candidates[0]?.candidateId]);
+    expect(weak.targetRanking.missingDiscoveryFacts).toEqual(
+      expect.arrayContaining(["weak target ranking signal", "missing explicit file path"]),
+    );
+    expect(weak.missingFacts).toContain("weak target ranking signal");
+  });
+
+  it("does not leak unsafe prompt or raw content markers into discovery facts", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(path.join(workspaceRoot, "src", "providerTarget.ts"), "export const providerTarget = true;\n");
+
+    const result = await buildRepoIntelligence({
+      workspaceRoot,
+      userTask: "Fix providerTarget token=secret api_key=abc oldText=before newText=after raw provider output: nope hidden reasoning",
+      maxFiles: 20,
+      maxCandidates: 5,
+    });
+    const serialized = JSON.stringify(result);
+
+    expect(serialized).not.toMatch(/token=secret|api_key=abc|oldText=before|newText=after|raw provider output: nope|hidden reasoning/i);
+    expect(serialized).toContain("raw-content-excluded");
+    expect(result.snapshot.scanProfile.rawContentExcluded).toBe(true);
+  });
+
   it("excludes local agent and audit directories from product-path candidates", async () => {
     await fs.mkdir(path.join(workspaceRoot, ".codex", "prompts"), { recursive: true });
     await fs.mkdir(path.join(workspaceRoot, ".omx", "context"), { recursive: true });

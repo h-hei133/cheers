@@ -96,6 +96,69 @@ export function validateFutureFeatureIntegration(
   });
 }
 
+export function buildContextDiscoveryTargetSelectionFeatureContract(): FutureFeatureIntegrationContract {
+  return validateFutureFeatureIntegration({
+    featureId: "context-discovery-target-selection",
+    ownerDomain: "orchestration/repo-intelligence",
+    loopPhase: "context-discovery-target-selection",
+    inputFacts: [
+      "user-task",
+      "workspace-label",
+      "bounded-file-scan-profile",
+      "package-map",
+      "module-map",
+    ],
+    outputHandoffFacts: [
+      "scan-profile-id",
+      "selected-candidate-ids",
+      "competing-candidate-ids",
+      "omitted-candidate-facts",
+      "ambiguity-state",
+      "missing-discovery-facts",
+      "target-ranking-evidence-id",
+      "raw-content-excluded",
+    ],
+    runtimeEvents: [
+      "context-discovery-observed",
+      "target-ranking-observed",
+    ],
+    evidenceFacts: [
+      "scan-budget",
+      "files-considered-count",
+      "files-omitted-count",
+      "candidate-score-components",
+      "candidate-ranking-reasons",
+      "raw-content-excluded",
+    ],
+    productSurfaceSection: "context-discovery",
+    resultTruthfulnessBoundary: "context discovery and target ranking facts are not task success, edit authority, apply authority, or verification success",
+    notProvenClaims: [
+      "scan-completed-is-not-repository-understanding",
+      "candidate-found-is-not-context-success",
+      "high-ranked-file-is-not-correct-target",
+      "selected-candidate-is-not-edit-authority",
+      "feature-contract-valid-is-not-success",
+      "product-surface-rendered-is-not-success",
+    ],
+    forbiddenShortcuts: [
+      "treat-scan-completed-as-repository-understanding",
+      "treat-candidate-found-as-context-success",
+      "treat-high-rank-as-correct-target",
+      "treat-selected-candidate-as-edit-authority",
+      "treat-feature-contract-valid-as-task-success",
+    ],
+    validationGates: [
+      "repo-intelligence-focused-tests",
+      "context-engine-focused-tests",
+      "target-ranking-ambiguity-tests",
+      "feature-contract-tests",
+      "redaction-tests",
+      "truthfulness-tests",
+    ],
+    terminalSuccessClaim: false,
+  });
+}
+
 function sanitizeId(value: string): string {
   return value
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")

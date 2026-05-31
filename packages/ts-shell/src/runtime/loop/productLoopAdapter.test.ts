@@ -6,7 +6,10 @@ import { evaluateContinuationReadiness } from "../../session/continuationReadine
 import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { runAgentLoopContract } from "./agentLoopContract.js";
-import { validateFutureFeatureIntegration } from "./featureContract.js";
+import {
+  buildContextDiscoveryTargetSelectionFeatureContract,
+  validateFutureFeatureIntegration,
+} from "./featureContract.js";
 import {
   getProductLoopPhaseStatusMap,
   PRODUCT_LOOP_PHASE_STATUS_MAP,
@@ -227,6 +230,76 @@ describe("product loop adapter", () => {
         "resultTruthfulnessBoundary",
       ]),
     );
+  });
+
+  it("declares context discovery and target selection as an observation-only feature contract", () => {
+    const contract = buildContextDiscoveryTargetSelectionFeatureContract();
+
+    expect(contract.valid).toBe(true);
+    expect(contract.terminalSuccessClaim).toBe(false);
+    expect(contract.declaration).toMatchObject({
+      featureId: "context-discovery-target-selection",
+      ownerDomain: "orchestration/repo-intelligence",
+      loopPhase: "context-discovery-target-selection",
+      productSurfaceSection: "context-discovery",
+      terminalSuccessClaim: false,
+    });
+    expect(contract.declaration.outputHandoffFacts).toEqual(
+      expect.arrayContaining([
+        "scan-profile-id",
+        "selected-candidate-ids",
+        "competing-candidate-ids",
+        "omitted-candidate-facts",
+        "ambiguity-state",
+        "missing-discovery-facts",
+        "target-ranking-evidence-id",
+      ]),
+    );
+    expect(contract.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "feature-contract-valid-is-not-success",
+        "high-ranked-file-is-not-correct-target",
+        "selected-candidate-is-not-edit-authority",
+      ]),
+    );
+    expect(contract.declaration.forbiddenShortcuts).toEqual(
+      expect.arrayContaining([
+        "treat-high-rank-as-correct-target",
+        "treat-selected-candidate-as-edit-authority",
+      ]),
+    );
+  });
+
+  it("lets the runtime loop observe the context discovery contract without moving owner truth", () => {
+    const trajectory = projectLoopTrajectory({
+      loopId: "context-discovery-contract-loop",
+      prompt: "observe context discovery contract",
+      resultFacts: {
+        status: "stopped",
+        terminalClassification: "stopped",
+        terminalReason: "waiting_for_input",
+        verdictSource: "result",
+      },
+    });
+    const contract = buildContextDiscoveryTargetSelectionFeatureContract();
+    const adapter = projectProductLoopAdapter({
+      adapterId: "context-discovery-contract-adapter",
+      promptSummary: "observe context discovery contract",
+      loopTrajectory: trajectory,
+      featureContracts: [contract],
+    });
+
+    expect(adapter.ownerDomain).toBe("runtime/loop");
+    expect(adapter.featureContracts).toEqual([contract]);
+    expect(adapter.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "feature-contract-valid-is-not-success",
+        "candidate-found-is-not-context-success",
+        "terminal-success",
+      ]),
+    );
+    expect(adapter.resultTruthfulnessBoundary.terminalSuccessClaim).toBe(false);
+    expect(adapter.terminalSuccessClaim).toBe(false);
   });
 
   it("emits report-safe observation events and redacts unsafe adapter inputs", () => {
