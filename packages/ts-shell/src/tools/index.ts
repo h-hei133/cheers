@@ -1,3 +1,3 @@
-export * from "./dispatch/index.js";
-export * from "./policy/index.js";
-export * from "./result/index.js";
+export * from "./dispatch/dispatcher.js";
+export * from "./policy/interception.js";
+export * from "./result/split.js";

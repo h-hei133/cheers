@@ -214,6 +214,139 @@ Internal imports were updated away from the moved old paths for touched owner do
 
 Audit the remaining write execution adjacency for owner placement only where import churn and compatibility risk are bounded.
 
+## Owner Index Compatibility Trim
+
+Status: structure-only owner index cleanup for context, planning, provider, and tools. Product behavior was preserved. No result truthfulness, provider configuration, provider calls, fallback behavior, tool authority, command allowlists, edit/apply/write approval behavior, verification execution, repair execution, session schema, CLI behavior, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+Initial status:
+
+- `git status --short --branch` reported `## main...origin/main`.
+- No pre-edit push was attempted because the branch was not ahead.
+- The worktree was clean before editing.
+
+Inspection summary:
+
+- Latest pressure report, remaining internally imported compatibility files, context/planning/provider/tools owner indexes, old entry surfaces, imports to broad indexes and old paths, package exports, package metadata, tests outside touched owner folders, direct file counts, and long basenames were inspected.
+- Serena targeted inspection confirmed the four parent owner indexes have no symbol bodies and only re-export child owner indexes.
+- `packages/ts-shell/package.json` exposes `dist`, `src`, and a CLI binary, with no documented package export for the removed child index paths.
+
+### Before Snapshot
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Export-only compatibility files | 106 |
+| Zero-internal-import compatibility files | 92 |
+| Internally imported compatibility files | 14 |
+| Target owner index files | 16 |
+| `context` owner index files | 4 |
+| `planning` owner index files | 4 |
+| `provider` owner index files | 4 |
+| `tools` owner index files | 4 |
+| Tests outside owner folders for touched owners | 21 |
+| Long basenames in target areas | 2 |
+
+Target internally imported compatibility files before:
+
+| Path | Internal imports | Importer |
+|---|---:|---|
+| `context/acquisition/index.ts` | 1 | `context/index.ts` |
+| `context/discovery/index.ts` | 1 | `context/index.ts` |
+| `context/memory/index.ts` | 1 | `context/index.ts` |
+| `planning/grounded/index.ts` | 1 | `planning/index.ts` |
+| `planning/handoff/index.ts` | 1 | `planning/index.ts` |
+| `planning/runtime/index.ts` | 1 | `planning/index.ts` |
+| `provider/registry/index.ts` | 1 | `provider/index.ts` |
+| `provider/request/index.ts` | 1 | `provider/index.ts` |
+| `provider/response/index.ts` | 1 | `provider/index.ts` |
+| `tools/dispatch/index.ts` | 1 | `tools/index.ts` |
+| `tools/policy/index.ts` | 1 | `tools/index.ts` |
+| `tools/result/index.ts` | 1 | `tools/index.ts` |
+
+### After Snapshot
+
+After measurements:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Export-only compatibility files | 106 | 94 |
+| Zero-internal-import compatibility files | 92 | 92 |
+| Internally imported compatibility files | 14 | 2 |
+| Target owner index files | 16 | 4 |
+| `context` owner index files | 4 | 1 |
+| `planning` owner index files | 4 | 1 |
+| `provider` owner index files | 4 | 1 |
+| `tools` owner index files | 4 | 1 |
+| Tests outside owner folders for touched owners | 21 | 21 |
+| Long basenames in target areas | 2 | 2 |
+
+Target internally imported compatibility files after:
+
+| Path | Internal imports | Status |
+|---|---:|---|
+| none | 0 | none remain in the target owner index area |
+
+### Compatibility Files Considered
+
+| Path | Status | Internal imports before | Internal imports after | Package-facing status | Reason | Deletion condition |
+|---|---|---:|---:|---|---|---|
+| `context/acquisition/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete acquisition files directly | already met |
+| `context/discovery/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete discovery files directly | already met |
+| `context/memory/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete memory files directly | already met |
+| `planning/grounded/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete grounded files directly | already met |
+| `planning/handoff/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete handoff files directly | already met |
+| `planning/runtime/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete runtime files directly | already met |
+| `provider/registry/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete registry files directly | already met |
+| `provider/request/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete request files directly | already met |
+| `provider/response/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete response files directly | already met |
+| `tools/dispatch/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete dispatch files directly | already met |
+| `tools/policy/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete policy files directly | already met |
+| `tools/result/index.ts` | removed | 1 | 0 | no documented package export found | parent owner index now exports concrete result files directly | already met |
+| `context/index.ts` | kept | 0 | 0 | root owner entry | retained as owner entry and package-facing aggregation surface | remove only if all owner entry consumers and package safety are proven disposable |
+| `planning/index.ts` | kept | 0 | 0 | root owner entry | retained as owner entry and package-facing aggregation surface | remove only if all owner entry consumers and package safety are proven disposable |
+| `provider/index.ts` | kept | 0 | 0 | root owner entry | retained as owner entry and package-facing aggregation surface | remove only if all owner entry consumers and package safety are proven disposable |
+| `tools/index.ts` | kept | 0 | 0 | root owner entry | retained as owner entry and package-facing aggregation surface | remove only if all owner entry consumers and package safety are proven disposable |
+| `provider/providerRegistry.ts` | kept | 0 | 0 | old entry surface | no internal import pressure in this bounded cleanup | remove only after provider-facing package safety is reviewed |
+| `tools/dispatcher.ts` | kept | 0 | 0 | old entry surface | no internal import pressure in this bounded cleanup | remove only after tools-facing package safety is reviewed |
+| `tools/interception.ts` | kept | 0 | 0 | old entry surface | no internal import pressure in this bounded cleanup | remove only after tools-facing package safety is reviewed |
+| `tools/resultSplit.ts` | kept | 0 | 0 | old entry surface | no internal import pressure in this bounded cleanup | remove only after tools-facing package safety is reviewed |
+
+### Files Removed
+
+- `packages/ts-shell/src/context/acquisition/index.ts`
+- `packages/ts-shell/src/context/discovery/index.ts`
+- `packages/ts-shell/src/context/memory/index.ts`
+- `packages/ts-shell/src/planning/grounded/index.ts`
+- `packages/ts-shell/src/planning/handoff/index.ts`
+- `packages/ts-shell/src/planning/runtime/index.ts`
+- `packages/ts-shell/src/provider/registry/index.ts`
+- `packages/ts-shell/src/provider/request/index.ts`
+- `packages/ts-shell/src/provider/response/index.ts`
+- `packages/ts-shell/src/tools/dispatch/index.ts`
+- `packages/ts-shell/src/tools/policy/index.ts`
+- `packages/ts-shell/src/tools/result/index.ts`
+
+### Files Moved
+
+- None.
+
+### Tests Moved
+
+- None.
+
+### Imports Updated
+
+- `context/index.ts` now exports concrete acquisition, discovery, and memory owner files directly.
+- `planning/index.ts` now exports concrete grounded, handoff, and runtime owner files directly.
+- `provider/index.ts` now exports concrete registry, request, and response owner files directly.
+- `tools/index.ts` now exports concrete dispatch, policy, and result owner files directly.
+
+### Remaining Visible Debt
+
+- Two internally imported compatibility files remain outside this bounded target: `orchestration/contextEngine.ts` and `orchestration/planningRuntimeProductProjection.ts`.
+- Root owner indexes and old zero-internal entry surfaces remain until package-facing safety is reviewed.
+
 ## SR015 Snapshot
 
 Status: structure-only owner split for write-adjacent projection, verification command, patch hunk, approval authority, planning wording, and shell result assembly files. Runtime behavior, provider gates, approval semantics, apply semantics, package scripts, build config, workflow coordinator behavior, and session manager behavior were not changed.
