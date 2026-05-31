@@ -312,6 +312,50 @@ Expected product value:
 - The CLI path uses a coherent loop adapter instead of separate observations and
   staged handoffs.
 
+### CP002 Repo Intelligence, Context Discovery, And Target Ranking Upgrade
+
+Goal:
+
+- Start the Context and Planning Quality Block by hardening bounded repository
+  discovery, candidate omission accounting, target ranking, ambiguity handling,
+  missing discovery facts, and PL009 feature-contract linkage.
+
+Owner domains:
+
+- `orchestration` repo intelligence and context engine
+- `runtime/loop` feature integration contract
+- `presentation` only if new report-safe sections are needed
+
+Existing infrastructure to reuse:
+
+- `repoIntelligence`
+- `contextEngine`
+- `contextGraphPlanning`
+- `planningRuntime`
+- PL009 product loop adapter and feature contract
+
+Forbidden shortcuts:
+
+- no provider calls
+- no edit/apply behavior changes
+- no persistent index service
+- no SDK/RPC/TUI/MCP/plugin/package-loading expansion
+- no target ranking success without evidence
+
+Validation expectations:
+
+- repo intelligence tests
+- context engine tests
+- target ranking and ambiguity tests
+- missing facts tests
+- Agent Loop feature contract tests
+- product surface tests only if rendered output changes
+
+Expected product value:
+
+- Vague or pathless tasks produce clearer, evidence-backed discovery and target
+  selection facts before later planning or edit routes consume them.
+
 ### PL010 Optional JSON Host Or SDK Route
 
 Goal:
