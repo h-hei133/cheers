@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildLoopContextRebuildInput } from "../context/rebuildInput.js";
-import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
-import { evaluateContinuationReadiness } from "./continuationReadiness.js";
-import { summarizeReplaySafeLoopState } from "./replaySafeLoopState.js";
-import { projectSessionTree } from "./sessionTreeProjection.js";
+import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
+import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
+import { evaluateContinuationReadiness } from "../continuation/readiness.js";
+import { summarizeReplaySafeLoopState } from "./state.js";
+import { projectSessionTree } from "../sessionTreeProjection.js";
 
 describe("replay-safe loop state summary", () => {
   it("contains safe references and excludes raw transcript content", () => {

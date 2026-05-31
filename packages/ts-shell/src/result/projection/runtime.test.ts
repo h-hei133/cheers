@@ -4,7 +4,7 @@ import {
   projectWorkflowExecutionResultContract,
   projectWorkflowRuntimeResultContract,
   truncateText,
-} from "./workflowRuntimeProjection.js";
+} from "./runtime.js";
 
 describe("workflowRuntimeProjection", () => {
   it("keeps run-command handoff truthfulness unchanged for blocked verification", () => {

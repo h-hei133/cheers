@@ -9,7 +9,7 @@ import {
   buildVerificationCommandResult,
   type VerificationCommandResult,
 } from "./verificationCommandResult.js";
-import type { VerificationCommandPlan } from "./verificationCommandPlan.js";
+import type { VerificationCommandPlan } from "../verification/command/plan.js";
 
 export interface VerificationCommandRun {
   readonly plan: VerificationCommandPlan;

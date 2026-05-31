@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "../orchestration/agentPlan.js";
-import { buildCodeGraphImpact } from "../orchestration/codeGraphImpact.js";
-import { normalizeCodeGraphFacts } from "../orchestration/codeGraphFacts.js";
-import { buildCodeGraphTrace } from "../orchestration/codeGraphTrace.js";
-import { buildContextGraph } from "../orchestration/contextGraph.js";
-import { buildPlanQuality } from "../orchestration/planQuality.js";
-import { buildVerificationCommandPlan } from "./verificationCommandPlan.js";
+import { buildAgentPlan } from "../../orchestration/agentPlan.js";
+import { buildCodeGraphImpact } from "../../orchestration/codeGraphImpact.js";
+import { normalizeCodeGraphFacts } from "../../orchestration/codeGraphFacts.js";
+import { buildCodeGraphTrace } from "../../orchestration/codeGraphTrace.js";
+import { buildContextGraph } from "../../orchestration/contextGraph.js";
+import { buildPlanQuality } from "../../orchestration/planQuality.js";
+import { buildVerificationCommandPlan } from "./plan.js";
 
 describe("verificationCommandPlan", () => {
   it("selects an allowlisted Agent Plan verification command without granting authority", () => {

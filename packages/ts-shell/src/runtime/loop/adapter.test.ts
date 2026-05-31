@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
-import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
-import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
+import { evaluateContinuationReadiness } from "../../session/continuation/readiness.js";
+import { summarizeReplaySafeLoopState } from "../../session/replay/state.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { runAgentLoopContract } from "./contract.js";
 import {

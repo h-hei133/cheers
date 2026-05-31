@@ -1,4 +1,4 @@
-import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
+import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
 import type { RuntimeResultFactsProjection } from "../events/projection.js";
 import type { RuntimeProjectionEvent } from "../events/projection.js";
 import {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { projectEditOperation } from "./editFacade.js";
+import { projectEditOperation } from "./projection.js";
 
 describe("editFacade", () => {
   it("requires authority, apply, and post-write verification before success", () => {

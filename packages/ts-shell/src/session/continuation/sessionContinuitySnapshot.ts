@@ -1,4 +1,4 @@
-import { selectContinuityTerminalSource } from "../../result/sessionResultTruthAdapter.js";
+import { selectContinuityTerminalSource } from "../../result/terminal/truth.js";
 import { deriveActionableFailureContinuity } from "../actionableFailureContinuity.js";
 import {
   buildActionHandoffSummary,

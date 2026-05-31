@@ -1,4 +1,4 @@
-import type { RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
+import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type {
   RepairApplyObservation,
@@ -13,8 +13,8 @@ import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/projection.js";
 import type { PackageInventoryProjection } from "../resources/inventory.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
-import type { ContinuationReadinessProjection } from "../../session/continuationReadiness.js";
-import type { ReplaySafeLoopStateSummary } from "../../session/replaySafeLoopState.js";
+import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
+import type { ReplaySafeLoopStateSummary } from "../../session/replay/state.js";
 import type { AssistantResponseState } from "../../turn/assistantResponse.js";
 import type { NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
 import type { FollowUpQueueProjection } from "../../turn/followUpQueue.js";

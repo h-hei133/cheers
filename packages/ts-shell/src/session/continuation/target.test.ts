@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   isUsableContinuationTargetPath,
   rebindContinuationTargetToWorkspace,
-} from "./continuationTargetRebase.js";
+} from "./target.js";
 
 describe("continuationTargetRebase", () => {
   it("rejects placeholder continuation targets", () => {

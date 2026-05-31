@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
-import type { ContextWorkingMemory } from "../context/memory/model.js";
+import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
+import type { ContextWorkingMemory } from "../../context/memory/model.js";
 import {
   evaluateContinuationReadiness,
   type ContinuationContextReadinessStatus,
   type ContinuationReadinessStatus,
-} from "./continuationReadiness.js";
-import { projectSessionTree } from "./sessionTreeProjection.js";
+} from "./readiness.js";
+import { projectSessionTree } from "../sessionTreeProjection.js";
 
 describe("continuation readiness", () => {
   it("represents readiness states without executing the next turn", () => {

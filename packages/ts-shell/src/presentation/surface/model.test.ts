@@ -24,8 +24,8 @@ import {
   type PackageManifestContract,
 } from "../../runtime/resources/inventory.js";
 import { projectStaticResourceRegistry } from "../../runtime/resources/projection.js";
-import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
-import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
+import { evaluateContinuationReadiness } from "../../session/continuation/readiness.js";
+import { summarizeReplaySafeLoopState } from "../../session/replay/state.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { projectProductSurfaceViewModel } from "./model.js";
 import { renderTerminalMessage } from "../terminal/renderer.js";

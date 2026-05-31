@@ -4,7 +4,7 @@ import {
   collectContinuationTransformsFromEvidence,
   inferReplaceDirectiveFromContinuationEvidence,
 } from "../evidence/continuationTransformEvidence.js";
-import { rebindContinuationTargetToWorkspace } from "../session/continuationTargetRebase.js";
+import { rebindContinuationTargetToWorkspace } from "../session/continuation/target.js";
 
 export function isRepairContinuationFollowUpPrompt(prompt: string): boolean {
   return /(?:\bcontinue fixing(?:\s+that)?\b|\bthen continue(?:\s+fixing)?\b|\bwhy did it stop[^\n]*continue\b|\bwhat should we do next[^\n]*continue fixing\b|刚才为什么停了.*继续修|那继续修|继续修这个|就按刚才那个继续修|按这个继续修|那就按这个继续修)/i.test(

@@ -1,4 +1,4 @@
-import type { RuntimeEvidenceSavePoint } from "../evidence/runtimeSavePoint.js";
+import type { RuntimeEvidenceSavePoint } from "../evidence/savepoint/model.js";
 import type { RuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
 
 export interface RuntimeTurnBoundaryObserver {

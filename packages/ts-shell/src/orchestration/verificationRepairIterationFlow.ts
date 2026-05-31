@@ -14,7 +14,7 @@ import type { OrchestrationResult } from "./types.js";
 import {
   projectRepairIteration,
   type ProductRepairIterationProjection,
-} from "../repair/repairFacade.js";
+} from "../repair/iteration/projection.js";
 
 export type RepairIterationVerdict =
   | "verified-success-with-repair"

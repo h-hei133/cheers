@@ -12,8 +12,8 @@ import {
   projectRepairRequiredHandoff,
 } from "../../repair/loopBoundary.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
-import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
-import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
+import { evaluateContinuationReadiness } from "../../session/continuation/readiness.js";
+import { summarizeReplaySafeLoopState } from "../../session/replay/state.js";
 import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,

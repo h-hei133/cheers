@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { RuntimeEvidenceSavePoint } from "../evidence/runtimeSavePoint.js";
+import type { RuntimeEvidenceSavePoint } from "../evidence/savepoint/model.js";
 import type { RuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
 import { runMvpIntegratedFlow } from "./workflowExecutionCoordinator.js";
 

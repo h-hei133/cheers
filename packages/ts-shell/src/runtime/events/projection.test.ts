@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createEvidenceOnlySavePoint } from "../../evidence/runtimeSavePoint.js";
+import { createEvidenceOnlySavePoint } from "../../evidence/savepoint/model.js";
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import {
@@ -12,8 +12,8 @@ import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
 import { projectPackageResourceInventory } from "../resources/inventory.js";
 import { projectStaticResourceRegistry } from "../resources/projection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
-import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
-import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
+import { evaluateContinuationReadiness } from "../../session/continuation/readiness.js";
+import { summarizeReplaySafeLoopState } from "../../session/replay/state.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import { runAgentLoopContract } from "../loop/contract.js";
 import { projectProductLoopAdapter } from "../loop/adapter.js";

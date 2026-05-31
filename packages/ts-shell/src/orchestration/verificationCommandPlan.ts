@@ -1,1 +1,1 @@
-export * from "../verification/verificationCommandPlan.js";
+export * from "../verification/command/plan.js";

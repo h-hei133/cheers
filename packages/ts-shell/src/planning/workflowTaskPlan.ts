@@ -35,7 +35,7 @@ import {
   resolveSingleFileEditFailureRepairContext,
   resolveSingleFileEditFailureRepairContextAbandonment,
   resolveSingleFileEditRepairPayloadKind,
-} from "../repair/singleFileRepairPlanning.js";
+} from "../repair/proposal/singleFile.js";
 import {
   deriveCrossFileRepairCandidates,
   extractCrossFileFailureEntriesFromContinuity,
@@ -110,13 +110,13 @@ import {
   resolveWorkflowTargetPlanning,
   shouldBlockMutationForTargetResolution,
 } from "./workflowTargetPlanning.js";
-import { rebindContinuationTargetToWorkspace } from "../session/continuationTargetRebase.js";
+import { rebindContinuationTargetToWorkspace } from "../session/continuation/target.js";
 import { deriveWorkflowPlanningContinuitySignals } from "../session/continuation/workflowPlanningContinuity.js";
 import { buildCommandIntentPlan } from "../verification/commandIntentPlanning.js";
 import { buildVerifyContinuationPlanning } from "../verification/verifyContinuationPlanning.js";
 
 export { extractInlineContinuityContext } from "../session/inlineContinuityContext.js";
-export { rebindContinuationTargetToWorkspace } from "../session/continuationTargetRebase.js";
+export { rebindContinuationTargetToWorkspace } from "../session/continuation/target.js";
 
 export function buildWorkflowTaskPlan(
   prompt: string,

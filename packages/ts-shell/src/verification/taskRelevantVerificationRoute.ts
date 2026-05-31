@@ -6,7 +6,7 @@ import { isAllowlistedRunCommand } from "../orchestration/capabilityBoundaryProj
 import {
   buildVerificationCommandPlan,
   type VerificationCommandPlan,
-} from "./verificationCommandPlan.js";
+} from "./command/plan.js";
 import {
   runVerificationCommand,
   type VerificationCommandRun,

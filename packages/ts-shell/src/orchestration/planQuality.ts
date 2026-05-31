@@ -6,7 +6,7 @@ import type { ContextGraphScore } from "./contextGraphScore.js";
 import { buildContextGraphReadinessFacts, type ContextGraphReadinessFacts } from "./contextGraphReadiness.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
-import type { VerificationCommandPlan } from "./verificationCommandPlan.js";
+import type { VerificationCommandPlan } from "../verification/command/plan.js";
 import type { VerificationRepairContext } from "./verificationRepairContext.js";
 import type { CodeGraphTrace } from "./codeGraphTrace.js";
 import type { CodeGraphImpact } from "./codeGraphImpact.js";

@@ -1,4 +1,4 @@
-import type { RuntimeEvidenceSavePoint } from "../evidence/runtimeSavePoint.js";
+import type { RuntimeEvidenceSavePoint } from "../evidence/savepoint/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../repair/loopBoundary.js";
 import type { SessionTreeProjection } from "../session/sessionTreeProjection.js";
 import type { SessionContextRebuildProjection } from "./sessionContextRebuildProjection.js";

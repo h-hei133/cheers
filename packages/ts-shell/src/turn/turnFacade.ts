@@ -1,5 +1,5 @@
 import type { QueryEvent } from "../core/query/events.js";
-import type { RuntimeEvidenceSavePoint } from "../evidence/runtimeSavePoint.js";
+import type { RuntimeEvidenceSavePoint } from "../evidence/savepoint/model.js";
 import {
   runMvpIntegratedFlow,
   streamMvpIntegratedFlow,

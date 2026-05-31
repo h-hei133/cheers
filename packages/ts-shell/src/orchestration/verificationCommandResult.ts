@@ -9,7 +9,7 @@ import {
 } from "./verificationFailureClassifier.js";
 import type { ToolLifecycleResult } from "./flowDispatch.js";
 import { projectRuntimeReceiptEvidence } from "./flowDispatch.js";
-import type { VerificationCommandPlan } from "./verificationCommandPlan.js";
+import type { VerificationCommandPlan } from "../verification/command/plan.js";
 
 export type VerificationCommandOutcome =
   | "success"

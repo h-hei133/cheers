@@ -6,7 +6,7 @@ import type { RecoveryAuthorityStoreConfig } from "./patchRecovery/recoveryAutho
 import {
   projectEditOperation,
   type ProductEditOperationProjection,
-} from "../edit/editFacade.js";
+} from "../edit/result/projection.js";
 
 export type ControlledEditOperationKind =
   | "update-existing-file"

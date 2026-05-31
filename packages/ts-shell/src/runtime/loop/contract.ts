@@ -1,4 +1,4 @@
-import { createEvidenceOnlySavePoint, type RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
+import { createEvidenceOnlySavePoint, type RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
 import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/response/boundary.js";
 import {
   type RepairApplyObservation,

@@ -6,8 +6,8 @@ import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js"
 import type { PackageInventoryProjection } from "../resources/inventory.js";
 import type { StaticResourceProjection } from "../resources/projection.js";
 import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
-import type { ContinuationReadinessProjection } from "../../session/continuationReadiness.js";
-import type { ReplaySafeLoopStateSummary } from "../../session/replaySafeLoopState.js";
+import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
+import type { ReplaySafeLoopStateSummary } from "../../session/replay/state.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type {
   ToolAfterObservationAnnotation,

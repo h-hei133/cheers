@@ -1,1 +1,1 @@
-export * from "../../edit/editFacade.js";
+export * from "../../edit/result/projection.js";

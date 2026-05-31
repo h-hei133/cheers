@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { ContinuityStateLike } from "../orchestration/runtimeHandoffProjection.js";
-import { isUsableContinuationTargetPath } from "../session/continuationTargetRebase.js";
+import { isUsableContinuationTargetPath } from "../session/continuation/target.js";
 import {
   extractCrossFileFailureEntriesFromContinuity,
   extractCrossFileStateListFromContinuityEvidence,

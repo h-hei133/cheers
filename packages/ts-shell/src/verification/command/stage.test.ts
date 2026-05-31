@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { runDirectCommandStage } from "./commandStage.js";
+import { runDirectCommandStage } from "./stage.js";
 
 describe("commandStage", () => {
   it("keeps blocked direct commands skipped instead of success", async () => {

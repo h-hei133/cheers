@@ -6,7 +6,7 @@ import {
   resolveSingleFileEditFailureRepairContext,
   resolveSingleFileEditFailureRepairContextAbandonment,
   resolveSingleFileEditRepairPayloadKind,
-} from "./singleFileRepairPlanning.js";
+} from "./singleFile.js";
 
 describe("singleFileRepairPlanning", () => {
   const workspaceRoot = path.resolve("/tmp/workflow-repair");

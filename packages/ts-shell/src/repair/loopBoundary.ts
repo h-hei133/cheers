@@ -1,5 +1,5 @@
 import type { VerificationResultObservation } from "../verification/loopBoundary.js";
-import type { ProductRepairIterationProjection } from "./repairFacade.js";
+import type { ProductRepairIterationProjection } from "./iteration/projection.js";
 
 export type RepairabilityStatus =
   | "repair_required"

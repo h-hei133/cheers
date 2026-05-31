@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { projectRepairIteration } from "./repairFacade.js";
+import { projectRepairIteration } from "./projection.js";
 
 describe("repairFacade", () => {
   it("requires repaired apply and same-command re-verification for success", () => {

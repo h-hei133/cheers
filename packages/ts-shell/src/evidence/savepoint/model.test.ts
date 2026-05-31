@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { createRuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
-import { createCommandExecutionReceipt } from "../runtime/execution/receipt.js";
-import { createEvidenceOnlySavePoint } from "./runtimeSavePoint.js";
+import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
+import { createCommandExecutionReceipt } from "../../runtime/execution/receipt.js";
+import { createEvidenceOnlySavePoint } from "./model.js";
 
 describe("runtime evidence save point", () => {
   it("redacts unsafe evidence content and remains evidence-only", () => {

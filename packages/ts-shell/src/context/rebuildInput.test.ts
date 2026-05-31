@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createRuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
-import { createEvidenceOnlySavePoint } from "../evidence/runtimeSavePoint.js";
+import { createEvidenceOnlySavePoint } from "../evidence/savepoint/model.js";
 import { projectSessionTree } from "../session/sessionTreeProjection.js";
 import { prepareNextTurnBundle } from "../turn/nextTurnBundle.js";
 import { projectSessionContextRebuild } from "./sessionContextRebuildProjection.js";

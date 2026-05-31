@@ -6,7 +6,7 @@ import {
   buildVerificationCommandResult,
   buildVerificationCommandSurfaceResult,
 } from "./verificationCommandResult.js";
-import { buildVerificationCommandPlan } from "./verificationCommandPlan.js";
+import { buildVerificationCommandPlan } from "../verification/command/plan.js";
 
 describe("verificationCommandResult", () => {
   it("projects successful command verification with receipt markers", () => {

@@ -27,7 +27,7 @@ import {
 import {
   createEvidenceOnlySavePoint,
   type RuntimeEvidenceSavePoint,
-} from "../evidence/runtimeSavePoint.js";
+} from "../evidence/savepoint/model.js";
 import type { RuntimeExecutionReceiptProjection } from "./execution/receipt.js";
 import type { AgentLoopContractProjection } from "./loop/contract.js";
 import { projectProductLoopAdapter } from "./loop/adapter.js";
@@ -38,9 +38,9 @@ import {
 import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenceLedger.js";
 import { createModelResponseBoundary } from "../provider/response/boundary.js";
 import { projectProviderRegistry } from "../provider/registry/provider.js";
-import { projectWorkflowExecutionResultContract } from "../result/workflowRuntimeProjection.js";
-import { evaluateContinuationReadiness } from "../session/continuationReadiness.js";
-import { summarizeReplaySafeLoopState } from "../session/replaySafeLoopState.js";
+import { projectWorkflowExecutionResultContract } from "../result/projection/runtime.js";
+import { evaluateContinuationReadiness } from "../session/continuation/readiness.js";
+import { summarizeReplaySafeLoopState } from "../session/replay/state.js";
 import { projectSessionTree } from "../session/sessionTreeProjection.js";
 import { accumulateAssistantResponse } from "../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy } from "../turn/deliveryPolicy.js";
@@ -80,7 +80,7 @@ import {
   extractInlineContinuityContext,
 } from "../planning/workflowTaskPlan.js";
 import { isVerifyLikeCommand } from "../policy/commandIntentPolicy.js";
-import { runDirectCommandStage } from "../verification/commandStage.js";
+import { runDirectCommandStage } from "../verification/command/stage.js";
 import { runWorkflowMutationRuntime } from "../edit/workflowMutationRuntime.js";
 import { runAnchoredProposalStage } from "../proposal/anchoredProposalStage.js";
 import {

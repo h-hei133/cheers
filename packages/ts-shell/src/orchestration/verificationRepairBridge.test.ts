@@ -5,7 +5,7 @@ import { buildAgentPlan } from "./agentPlan.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import type { ToolLifecycleResult } from "./flowDispatch.js";
 import { buildVerificationCommandResult } from "./verificationCommandResult.js";
-import { buildVerificationCommandPlan } from "./verificationCommandPlan.js";
+import { buildVerificationCommandPlan } from "../verification/command/plan.js";
 import { bridgeVerificationCommandToRepairLoop } from "./verificationRepairBridge.js";
 
 describe("verificationRepairBridge", () => {

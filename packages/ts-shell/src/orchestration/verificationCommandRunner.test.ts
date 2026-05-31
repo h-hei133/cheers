@@ -4,7 +4,7 @@ import { projectRuntimeReceipt } from "../core/runtime/runtimeReceiptProjection.
 import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import type { ToolExecutionContext, ToolExecutionResult } from "../tools/types.js";
 import { runVerificationCommand } from "./verificationCommandRunner.js";
-import { buildVerificationCommandPlan } from "./verificationCommandPlan.js";
+import { buildVerificationCommandPlan } from "../verification/command/plan.js";
 
 describe("verificationCommandRunner", () => {
   it("runs ready commands through the existing runtime dispatcher", async () => {

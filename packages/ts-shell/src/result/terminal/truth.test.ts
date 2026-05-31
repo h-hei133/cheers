@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { QueryCompletionTranscriptEvent } from "./sessionResultTruthAdapter.js";
-import { selectContinuityTerminalSource } from "./sessionResultTruthAdapter.js";
+import type { QueryCompletionTranscriptEvent } from "./truth.js";
+import { selectContinuityTerminalSource } from "./truth.js";
 
 describe("selectContinuityTerminalSource", () => {
   it("does not let query-level success upgrade a coding-level stopped result", () => {

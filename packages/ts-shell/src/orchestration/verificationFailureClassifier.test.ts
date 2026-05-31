@@ -4,7 +4,7 @@ import { createCommandRuntimeReceipt } from "../core/runtime/runtimeReceipt.js";
 import type { ToolLifecycleResult } from "./flowDispatch.js";
 import { projectRuntimeReceiptEvidence } from "./flowDispatch.js";
 import { classifyVerificationCommandFailure } from "./verificationFailureClassifier.js";
-import { buildVerificationCommandPlan } from "./verificationCommandPlan.js";
+import { buildVerificationCommandPlan } from "../verification/command/plan.js";
 
 describe("verificationFailureClassifier", () => {
   it("classifies failed allowlisted test commands as repair eligible", () => {

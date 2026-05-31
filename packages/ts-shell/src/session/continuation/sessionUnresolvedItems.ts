@@ -1,5 +1,5 @@
 import type { CodingResultSummary } from "../../orchestration/types.js";
-import type { QueryCompletionTranscriptEvent } from "../../result/sessionResultTruthAdapter.js";
+import type { QueryCompletionTranscriptEvent } from "../../result/terminal/truth.js";
 import { compactContinuityText } from "../sessionContinuityModule.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 

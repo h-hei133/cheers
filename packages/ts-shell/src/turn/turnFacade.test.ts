@@ -5,7 +5,7 @@ import {
   runProductTurn,
   streamProductTurn,
 } from "./turnFacade.js";
-import { createEvidenceOnlySavePoint } from "../evidence/runtimeSavePoint.js";
+import { createEvidenceOnlySavePoint } from "../evidence/savepoint/model.js";
 import type { OrchestrationResult } from "../orchestration/types.js";
 import { createRuntimeTurnSnapshot } from "./turnSnapshot.js";
 
