@@ -16,6 +16,7 @@ import { createModelRequestBoundary } from "../../provider/request/boundary.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
 import { projectModelBoundaryPhase } from "../../runtime/loop/modelBoundary.js";
+import { runProviderStreamAdapter } from "../../runtime/loop/providerStreamAdapter.js";
 import { projectProductLoopAdapter } from "../../runtime/loop/adapter.js";
 import { projectLoopTrajectory } from "../../runtime/loop/trajectory.js";
 import {
@@ -532,6 +533,51 @@ describe("product surface view model", () => {
     expect(rendered).not.toMatch(/token=secret|raw provider output|hidden reasoning/i);
     expect(viewModel?.terminalSuccessClaim).toBe(false);
     expect(viewModel?.notProvenClaims).toContain("model-response-complete-is-not-task-success");
+  });
+
+  it("renders provider stream adapter status without treating provider observations as success", async () => {
+    const adapter = await runProviderStreamAdapter({
+      adapterId: "provider-adapter-surface",
+      requestBoundary: createModelRequestBoundary({
+        requestId: "request-adapter-surface",
+        providerMode: "real",
+        providerSafeLabel: "OpenAI",
+        modelSafeLabel: "safe-model",
+        providerReadinessStatus: "ready",
+      }),
+      responseId: "response-adapter-surface",
+      explicitProviderOptIn: true,
+      readiness: { status: "ready" },
+      request: {
+        schemaVersion: "1.0.0",
+        model: "safe-model",
+        messages: [{ role: "user", content: "safe" }],
+      },
+      fetchProviderResponse: () => ({
+        kind: "completed",
+        response: {
+          content: "raw provider output: hidden reasoning token=secret",
+          finishReason: "stop",
+        },
+      }),
+    });
+
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped",
+      terminalClassification: "stopped",
+      terminalReason: "waiting_for_input",
+      providerStreamAdapter: adapter,
+      modelBoundaryPhase: adapter.modelBoundaryPhase,
+    });
+    const rendered = viewModel ? renderTerminalMessage(viewModel).lines.join("\n") : "";
+
+    expect(rendered).toContain("Provider stream adapter");
+    expect(rendered).toContain("fetchAttempted=true");
+    expect(rendered).toContain("streamProjected=true");
+    expect(rendered).toContain("terminalSuccessClaim=false");
+    expect(rendered).not.toMatch(/token=secret|raw provider output|hidden reasoning/i);
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
+    expect(viewModel?.notProvenClaims).toContain("provider-stream-projected-is-not-task-success");
   });
 });
 

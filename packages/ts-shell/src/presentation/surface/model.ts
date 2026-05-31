@@ -8,6 +8,7 @@ import type { ModelBoundaryPhaseProjection } from "../../runtime/loop/modelBound
 import type { RuntimeProjectionEvent } from "../../runtime/events/projection.js";
 import type { ProductLoopAdapterProjection } from "../../runtime/loop/adapter.js";
 import type { LoopTrajectoryProjection } from "../../runtime/loop/trajectory.js";
+import type { ProviderStreamAdapterProjection } from "../../runtime/loop/providerStreamAdapter.js";
 import type { PackageInventoryProjection } from "../../runtime/resources/inventory.js";
 import type { StaticResourceProjection } from "../../runtime/resources/projection.js";
 import {
@@ -106,6 +107,7 @@ export interface ProductSurfaceInput {
   readonly packageInventory?: PackageInventoryProjection;
   readonly providerRegistry?: ProviderRegistryProjection;
   readonly modelBoundaryPhase?: ModelBoundaryPhaseProjection;
+  readonly providerStreamAdapter?: ProviderStreamAdapterProjection;
   readonly runtimeEvents?: readonly RuntimeProjectionEvent[];
   readonly sessionProjection?: SessionTreeProjection;
   readonly loopTrajectory?: LoopTrajectoryProjection;
@@ -117,7 +119,7 @@ export function projectProductSurfaceViewModel(
   input: ProductSurfaceInput,
 ): ProductSurfaceViewModel | undefined {
   const codingResult = input.codingResult;
-  if (!codingResult && !input.loopTrajectory && !input.productLoopAdapter && !input.contextPlanningSummary && !input.modelBoundaryPhase) {
+  if (!codingResult && !input.loopTrajectory && !input.productLoopAdapter && !input.contextPlanningSummary && !input.modelBoundaryPhase && !input.providerStreamAdapter) {
     return undefined;
   }
 
@@ -142,6 +144,7 @@ export function projectProductSurfaceViewModel(
     ...productLoopAdapterSections(input),
     ...loopTrajectorySections(input),
     ...resourceSections(input),
+    ...providerStreamAdapterSections(input.providerStreamAdapter),
     ...providerSections(input),
     ...modelBoundarySections(input.modelBoundaryPhase),
     ...packageSections(input),
@@ -158,10 +161,12 @@ export function projectProductSurfaceViewModel(
     section({
       kind: "not_proven",
       title: "Not proven",
-      severity: (sessionFacts?.notProvenClaims.length ?? input.modelBoundaryPhase?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "info",
-      status: (sessionFacts?.notProvenClaims.length ?? input.modelBoundaryPhase?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "observed",
+      severity: (sessionFacts?.notProvenClaims.length ?? input.providerStreamAdapter?.notProvenClaims.length ?? input.modelBoundaryPhase?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "info",
+      status: (sessionFacts?.notProvenClaims.length ?? input.providerStreamAdapter?.notProvenClaims.length ?? input.modelBoundaryPhase?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "observed",
       summary: (sessionFacts?.notProvenClaims.length ?? 0) > 0
         ? sessionFacts!.notProvenClaims.join("; ")
+        : (input.providerStreamAdapter?.notProvenClaims.length ?? 0) > 0
+          ? input.providerStreamAdapter!.notProvenClaims.slice(0, 8).join("; ")
         : (input.modelBoundaryPhase?.notProvenClaims.length ?? 0) > 0
           ? input.modelBoundaryPhase!.notProvenClaims.slice(0, 8).join("; ")
         : (input.contextPlanningSummary?.notProvenClaims.length ?? 0) > 0
@@ -172,6 +177,7 @@ export function projectProductSurfaceViewModel(
           ? input.productLoopAdapter!.notProvenClaims.slice(0, 8).join("; ")
         : "none",
       notProvenClaims: sessionFacts?.notProvenClaims ??
+        input.providerStreamAdapter?.notProvenClaims ??
         input.modelBoundaryPhase?.notProvenClaims ??
         input.contextPlanningSummary?.notProvenClaims ??
         input.loopTrajectory?.notProvenClaims ??
@@ -188,6 +194,7 @@ export function projectProductSurfaceViewModel(
       status: "observed",
       summary: sessionFacts?.nextAction ??
         input.contextPlanningSummary?.nextAction ??
+        input.providerStreamAdapter?.nextAction ??
         input.productLoopAdapter?.nextAction ??
         "keep loop trajectory observation separate from terminal success",
     }),
@@ -200,15 +207,44 @@ export function projectProductSurfaceViewModel(
     notProvenClaims: sessionFacts?.notProvenClaims ??
       input.modelBoundaryPhase?.notProvenClaims ??
       input.contextPlanningSummary?.notProvenClaims ??
+      input.providerStreamAdapter?.notProvenClaims ??
       input.loopTrajectory?.notProvenClaims ??
       input.productLoopAdapter?.notProvenClaims ?? [],
     nextAction: sessionFacts?.nextAction ??
       input.contextPlanningSummary?.nextAction ??
+      input.providerStreamAdapter?.nextAction ??
       input.productLoopAdapter?.nextAction ??
       "keep loop trajectory observation separate from terminal success",
     redaction: sections.some((item) => item.redaction !== "none") ? "applied" : "none",
     terminalSuccessClaim: false,
   };
+}
+
+function providerStreamAdapterSections(
+  adapter: ProviderStreamAdapterProjection | undefined,
+): ProductSurfaceSection[] {
+  if (!adapter) {
+    return [];
+  }
+  return [section({
+    kind: "provider",
+    title: "Provider stream adapter",
+    severity: adapter.failureClass
+      ? adapter.fetchAttempted ? "error" : "blocked"
+      : adapter.status === "projected" ? "not_proven" : "blocked",
+    status: adapter.status === "projected"
+      ? "observed"
+      : adapter.status === "blocked" ? "blocked" : "not_run",
+    summary: `optIn=${adapter.explicitOptIn}; readiness=${adapter.readinessStatus}; fetchAttempted=${adapter.fetchAttempted}; streamProjected=${adapter.streamProjected}; assistant=${adapter.assistantAccumulationStatus}; toolCalls=${adapter.toolCallExtractionStatus}; failure=${adapter.failureClass ?? "none"}; terminalSuccessClaim=false`,
+    facts: [
+      { label: "adapterId", value: adapter.adapterId },
+      { label: "requestId", value: adapter.requestId },
+      { label: "responseId", value: adapter.responseId },
+      { label: "redaction", value: adapter.redaction.status },
+    ],
+    redaction: adapter.redaction.status === "redacted" ? "applied" : "none",
+    notProvenClaims: adapter.notProvenClaims,
+  })];
 }
 
 function modelBoundarySections(

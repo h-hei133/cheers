@@ -19,6 +19,7 @@ import { runAgentLoopContract } from "../loop/contract.js";
 import { projectProductLoopAdapter } from "../loop/adapter.js";
 import { projectLoopTrajectory } from "../loop/trajectory.js";
 import { projectModelBoundaryPhase } from "../loop/modelBoundary.js";
+import { runProviderStreamAdapter } from "../loop/providerStreamAdapter.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/response/boundary.js";
 import { createModelRequestBoundary } from "../../provider/request/boundary.js";
@@ -162,26 +163,35 @@ describe("runtime event projection", () => {
     );
   });
 
-  it("projects model request and provider stream events as observation-only", () => {
+  it("projects model request and provider stream events as observation-only", async () => {
     const request = createModelRequestBoundary({
       requestId: "request-events",
-      providerSafeLabel: "Synthetic provider",
+      providerMode: "real",
+      providerSafeLabel: "OpenAI",
       modelSafeLabel: "Fixture model",
       providerReadinessStatus: "ready",
     });
-    const phase = projectModelBoundaryPhase({
-      phaseId: "phase-events",
+    const adapter = await runProviderStreamAdapter({
+      adapterId: "provider-adapter-events",
       requestBoundary: request,
       responseId: "response-events",
-      streamEvents: [
-        { eventId: "start", kind: "stream_started", retry: "not_allowed" },
-        { eventId: "delta", kind: "content_delta", contentDelta: "safe", retry: "not_allowed" },
-        { eventId: "complete", kind: "stream_completed", retry: "not_allowed" },
-      ],
+      explicitProviderOptIn: true,
+      readiness: { status: "ready" },
+      request: {
+        schemaVersion: "1.0.0",
+        model: "safe-model",
+        messages: [{ role: "user", content: "safe" }],
+      },
+      fetchProviderResponse: () => ({
+        kind: "completed",
+        response: { content: "safe", finishReason: "stop" },
+      }),
     });
+    const phase = adapter.modelBoundaryPhase!;
 
     const events = projectRuntimeEvents({
       modelRequestBoundaries: [request],
+      providerStreamAdapters: [adapter],
       providerResponseStreams: [phase.stream],
       modelBoundaryPhases: [phase],
     });
@@ -189,6 +199,8 @@ describe("runtime event projection", () => {
     expect(events.map((event) => event.type)).toEqual([
       "model-request-prepared",
       "provider-readiness-observed",
+      "provider-fetch-attempted",
+      "provider-stream-projected",
       "provider-stream-started",
       "provider-stream-delta-observed",
       "model-boundary-completed",

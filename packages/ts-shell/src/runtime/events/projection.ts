@@ -39,6 +39,7 @@ import type {
 } from "../../verification/loopBoundary.js";
 import type { ProductLoopAdapterProjection } from "../loop/adapter.js";
 import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
+import type { ProviderStreamAdapterProjection } from "../loop/providerStreamAdapter.js";
 
 export type RuntimeProjectionEventType =
   | "turn-snapshot-observed"
@@ -72,6 +73,9 @@ export type RuntimeProjectionEventType =
   | "terminal-verdict-observed"
   | "model-request-prepared"
   | "provider-readiness-observed"
+  | "provider-fetch-blocked"
+  | "provider-fetch-attempted"
+  | "provider-stream-projected"
   | "provider-stream-started"
   | "provider-stream-delta-observed"
   | "provider-stream-cancelled"
@@ -182,6 +186,7 @@ export function projectRuntimeEvents(input: {
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
   readonly modelRequestBoundaries?: readonly ModelRequestBoundary[];
   readonly providerResponseStreams?: readonly ProviderResponseStreamProjection[];
+  readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjection[];
   readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjection[];
   readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
   readonly assistantResponses?: readonly AssistantResponseState[];
@@ -316,6 +321,54 @@ export function projectRuntimeEvents(input: {
         terminalSuccessClaim: false,
       },
       request.notProvenClaims,
+    );
+  }
+
+  for (const adapter of input.providerStreamAdapters ?? []) {
+    if (!adapter.fetchAttempted) {
+      append(
+        "provider-fetch-blocked",
+        {
+          adapterId: adapter.adapterId,
+          requestId: adapter.requestId,
+          responseId: adapter.responseId,
+          explicitOptIn: adapter.explicitOptIn,
+          readinessStatus: adapter.readinessStatus,
+          failureClass: adapter.failureClass,
+          streamProjected: adapter.streamProjected,
+          terminalSuccessClaim: false,
+        },
+        adapter.notProvenClaims,
+      );
+      continue;
+    }
+    append(
+      "provider-fetch-attempted",
+      {
+        adapterId: adapter.adapterId,
+        requestId: adapter.requestId,
+        responseId: adapter.responseId,
+        explicitOptIn: adapter.explicitOptIn,
+        readinessStatus: adapter.readinessStatus,
+        fetchAttempted: adapter.fetchAttempted,
+        terminalSuccessClaim: false,
+      },
+      adapter.notProvenClaims,
+    );
+    append(
+      "provider-stream-projected",
+      {
+        adapterId: adapter.adapterId,
+        requestId: adapter.requestId,
+        responseId: adapter.responseId,
+        streamProjected: adapter.streamProjected,
+        assistantAccumulationStatus: adapter.assistantAccumulationStatus,
+        toolCallExtractionStatus: adapter.toolCallExtractionStatus,
+        failureClass: adapter.failureClass,
+        redactionStatus: adapter.redaction.status,
+        terminalSuccessClaim: false,
+      },
+      adapter.notProvenClaims,
     );
   }
 
