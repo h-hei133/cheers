@@ -2,7 +2,7 @@ import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatc
 import {
   buildPerFilePatchPlan,
   type PerFilePatchPlan,
-} from "./perFilePatchPlan.js";
+} from "../../edit/patch/plan/perFile.js";
 import {
   buildSingleFileApplyPatchPermissionUxRealRouteSeam,
   type SingleFileApplyPatchPermissionUxRealRouteStatus,

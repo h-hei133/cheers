@@ -1,5 +1,5 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
-import type { BrowserRuntimeExecutorResult } from "./browserRuntimeExecutor.js";
+import type { BrowserRuntimeExecutorResult } from "./browser/runtime/core/executor.js";
 
 export type BrowserObservationStatus = "success" | "stopped" | "failed";
 

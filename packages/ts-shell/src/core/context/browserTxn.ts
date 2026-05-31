@@ -18,7 +18,7 @@ import {
   createBrowserRuntimeManifest,
   validateBrowserRuntimeManifest,
   type BrowserRuntimeManifest,
-} from "./browserRuntimeManifest.js";
+} from "./browser/runtime/core/manifest.js";
 import type {
   PwBrowser,
   PwBrowserContext,

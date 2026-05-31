@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runProposalHunkSetRoute } from "./proposalHunkSetRoute.js";
 import type { ProposalHunkSetManifest } from "./proposalHunkSet.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 const tempRoots: string[] = [];
 

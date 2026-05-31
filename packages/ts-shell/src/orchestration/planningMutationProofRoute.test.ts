@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildPlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
 import { runPlanningMutationProofRoute } from "./planningMutationProofRoute.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 const tempRoots: string[] = [];
 const targetPath = "src/contextEngine.ts";

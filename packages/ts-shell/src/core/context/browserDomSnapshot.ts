@@ -1,5 +1,5 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
-import { normalizeOriginLike } from "./browserRuntimeManifest.js";
+import { normalizeOriginLike } from "./browser/runtime/core/manifest.js";
 
 export interface BrowserDomSnapshot {
   readonly snapshotId: string;

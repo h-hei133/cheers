@@ -13,99 +13,39 @@ Top crowded directories by direct TypeScript file count:
 | Directory | Direct files |
 |---|---:|
 | `orchestration` | 404 |
-| `core/context` | 268 |
-| `orchestration/patchResult` | 113 |
-| `core/harness` | 91 |
-| `session` | 50 |
-| `core/shell` | 49 |
-| `entrypoints` | 46 |
-| `core/context/memory` | 39 |
-| `core/context/sidebar` | 34 |
-| `session/continuation` | 33 |
-| `context` | 28 |
-| `core/commands` | 26 |
-| `runtime/loop` | 20 |
-| `core/tools` | 19 |
-| `edit` | 19 |
-| `session/store` | 19 |
-| `orchestration/patchRecovery` | 16 |
-| `session/recovery` | 16 |
-| `verification` | 16 |
-| `edit/result/journal` | 15 |
-| `turn` | 15 |
-| `orchestration/patchApplication` | 12 |
-| `planning` | 11 |
-| `tools` | 11 |
-| `cli/interactive` | 10 |
-| `orchestration/patchParsing` | 10 |
-| `repair` | 10 |
-| `runtime/execution` | 10 |
-| `context/acquisition` | 9 |
-| `core/context/startup` | 9 |
-
-Target direct counts before editing:
-
-| Directory | Direct files before | Direct tests before |
-|---|---:|---:|
-| `orchestration` | 404 | 173 |
-| `orchestration/patchResult` | 113 | 57 |
-| `core/context` | 268 | 73 |
-| `edit` | 19 | 6 |
-| `verification` | 16 | 5 |
-| `repair` | 10 | 2 |
-| `evidence` | 6 | 1 |
-| `result` | 2 | 0 |
-
-Other before measurements:
-
-- Direct browser-cluster files in `core/context`: 232, including 58 direct tests.
-- Direct compact-cluster files in `core/context`: 29, including 14 direct tests.
-- Tests still outside owner folders in target roots: 342.
-- Export-only compatibility files: 105.
-- Compatibility files with zero internal imports: 64.
-- Compatibility files still imported internally: 41.
-- Files with long basenames in target areas: 62.
-
-## After Snapshot
-
-Top crowded directories by direct TypeScript file count:
-
-| Directory | Direct files |
-|---|---:|
-| `orchestration` | 404 |
 | `core/context` | 225 |
 | `orchestration/patchResult` | 100 |
 | `core/harness` | 91 |
 | `session` | 50 |
 | `core/shell` | 49 |
-| `entrypoints` | 46 |
+| `entrypoints` | 45 |
 | `core/context/memory` | 39 |
 | `core/context/sidebar` | 34 |
 | `session/continuation` | 33 |
 | `context` | 28 |
 | `core/commands` | 26 |
 | `runtime/loop` | 20 |
-| `core/tools` | 19 |
-| `edit` | 19 |
 | `session/store` | 19 |
-| `orchestration/patchRecovery` | 16 |
-| `session/recovery` | 16 |
+| `edit` | 19 |
+| `core/tools` | 19 |
 | `verification` | 16 |
-| `edit/result/journal` | 15 |
+| `session/recovery` | 16 |
+| `orchestration/patchRecovery` | 16 |
 | `turn` | 15 |
+| `edit/result/journal` | 15 |
 | `core/context/browser/receipt` | 14 |
 | `edit/result/workspace` | 13 |
-| `core/context/compact/injection` | 12 |
 | `orchestration/patchApplication` | 12 |
-| `planning` | 11 |
+| `core/context/compact/injection` | 12 |
 | `tools` | 11 |
-| `cli/interactive` | 10 |
-| `orchestration/patchParsing` | 10 |
+| `planning` | 11 |
+| `runtime/execution` | 10 |
 | `repair` | 10 |
+| `orchestration/patchParsing` | 10 |
 
-Target direct counts after editing:
+Target direct counts before editing:
 
-| Directory | Direct files after | Direct tests after |
+| Directory | Direct files before | Direct tests before |
 |---|---:|---:|
 | `orchestration` | 404 | 173 |
 | `orchestration/patchResult` | 100 | 51 |
@@ -116,42 +56,114 @@ Target direct counts after editing:
 | `evidence` | 6 | 1 |
 | `result` | 2 | 0 |
 
-Other after measurements:
+Other before measurements:
 
 - Direct browser-cluster files in `core/context`: 218, including 53 direct tests.
-- Direct compact-cluster files in `core/context`: 0, including 0 direct tests.
-- Tests still outside owner folders in target roots: 317.
+- Direct browser runtime-cluster files in `core/context`: 114, including 28 direct tests.
+- Direct browser skill-cluster files in `core/context`: 23, including 11 direct tests.
+- Direct patch output adjacency files in `orchestration/patchResult`: 100, including 51 direct tests.
+- Direct patch planning adjacency files in `orchestration/patchResult`: 5, including 2 direct tests.
+- Tests still outside owner folders in target roots: 119.
 - Export-only compatibility files: 105.
-- Compatibility files with zero internal imports: 64.
-- Compatibility files still imported internally: 41.
-- Files with long basenames in target areas: 62.
+- Compatibility files with zero internal imports: 87.
+- Compatibility files still imported internally: 18.
+- Files with long basenames in target areas: 95.
+
+## After Snapshot
+
+Top crowded directories by direct TypeScript file count:
+
+| Directory | Direct files |
+|---|---:|
+| `orchestration` | 404 |
+| `core/context` | 172 |
+| `core/harness` | 91 |
+| `orchestration/patchResult` | 90 |
+| `session` | 50 |
+| `core/shell` | 49 |
+| `entrypoints` | 45 |
+| `core/context/memory` | 39 |
+| `core/context/sidebar` | 34 |
+| `session/continuation` | 33 |
+| `context` | 28 |
+| `core/commands` | 26 |
+| `runtime/loop` | 20 |
+| `session/store` | 19 |
+| `edit` | 19 |
+| `core/tools` | 19 |
+| `core/context/browser/runtime/core` | 19 |
+| `verification` | 16 |
+| `session/recovery` | 16 |
+| `orchestration/patchRecovery` | 16 |
+| `turn` | 15 |
+| `edit/result/journal` | 15 |
+| `core/context/browser/receipt` | 14 |
+| `edit/result/workspace` | 13 |
+| `core/context/browser/runtime/external` | 13 |
+| `orchestration/patchApplication` | 12 |
+| `core/context/compact/injection` | 12 |
+| `core/context/browser/skill/runner` | 12 |
+| `tools` | 11 |
+| `planning` | 11 |
+
+Target direct counts after editing:
+
+| Directory | Direct files after | Direct tests after |
+|---|---:|---:|
+| `orchestration` | 404 | 173 |
+| `orchestration/patchResult` | 90 | 47 |
+| `core/context` | 172 | 35 |
+| `edit` | 19 | 6 |
+| `verification` | 16 | 5 |
+| `repair` | 10 | 2 |
+| `evidence` | 6 | 1 |
+| `result` | 2 | 0 |
+
+Other after measurements:
+
+- Direct browser-cluster files in `core/context`: 165, including 34 direct tests.
+- Direct browser runtime-cluster files in `core/context`: 82, including 19 direct tests.
+- Direct browser skill-cluster files in `core/context`: 2, including 1 direct test.
+- Direct patch output adjacency files in `orchestration/patchResult`: 90, including 47 direct tests.
+- Direct patch planning adjacency files in `orchestration/patchResult`: 0, including 0 direct tests.
+- Tests still outside owner folders in target roots: 96.
+- Export-only compatibility files: 105.
+- Compatibility files with zero internal imports: 87.
+- Compatibility files still imported internally: 18.
+- Files with long basenames in target areas: 80.
 
 ## Directories Improved
 
-- `core/context`: 268 to 225 direct files; direct tests reduced from 73 to 54.
-- `orchestration/patchResult`: 113 to 100 direct files; direct tests reduced from 57 to 51.
-- Direct browser-cluster files in `core/context`: 232 to 218.
-- Direct compact-cluster files in `core/context`: 29 to 0.
-- Tests still outside owner folders in target roots: 342 to 317.
+- `core/context`: 225 to 172 direct files; direct tests reduced from 54 to 35.
+- `orchestration/patchResult`: 100 to 90 direct files; direct tests reduced from 51 to 47.
+- Direct browser runtime-cluster files in `core/context`: 114 to 82.
+- Direct browser skill-cluster files in `core/context`: 23 to 2.
+- Direct patch planning adjacency files in `orchestration/patchResult`: 5 to 0.
+- Tests still outside owner folders in target roots: 119 to 96.
+- Files with long basenames in target areas: 95 to 80.
 
 ## Owner Files Moved
 
-- `core/context/browserReceiptCache*` files now live under `core/context/browser/receipt/`.
-- `core/context/compactCommand*` files now live under `core/context/compact/command/`.
-- `core/context/compactCheckpointSurface*` and `compactLiveCheckpoint*` files now live under `core/context/compact/checkpoint/`.
-- `core/context/compactContinuity*` files now live under `core/context/compact/continuity/`.
-- `core/context/compactHandoffRenderer*` and `compactSessionSurface*` files now live under `core/context/compact/delivery/`.
-- `core/context/compactFutureTurn*`, `compactInjectedContext*`, and `compactInjection*` files now live under `core/context/compact/injection/`.
-- `core/context/compactRedactionPolicy*` files now live under `core/context/compact/policy/`.
-- `orchestration/patchResult/mixedFileWriteResult*`, `multiFileWriteResult*`, `workspaceCreateResult*`, `workspaceDeleteResult*`, `workspaceMoveResult*`, `workspaceWriteResult*`, and `writeFailureState.ts` now live under `edit/result/workspace/`.
+- Browser skill execution files now live under `core/context/browser/skill/execution/`.
+- Browser skill runner files now live under `core/context/browser/skill/runner/`.
+- Browser skill runtime binding now lives under `core/context/browser/skill/runtime/`.
+- Browser runtime files now live under `core/context/browser/runtime/core/`.
+- Browser external runtime files now live under `core/context/browser/runtime/external/`.
+- Patch planning files now live under `edit/patch/plan/`.
+- Patch candidate and bounded write policy files now live under `edit/patch/plan/` and `edit/authority/`.
+- Workspace write authority now lives under `edit/authority/`.
+
+Deferred move:
+
+- `core/context/browserSkillManagedRunnerPolicy*` remains at the previous path because it contains existing compatibility-facing text that should not be rewritten in a structure-only pass.
 
 ## Tests Moved
 
-Twenty-five tests were moved beside clearer owner code:
+Twenty-three tests were moved beside clearer owner code:
 
-- 5 browser receipt-cache tests under `core/context/browser/receipt/`.
-- 14 compact-context tests under `core/context/compact/`.
-- 6 workspace-result tests under `edit/result/workspace/`.
+- 10 browser skill tests under `core/context/browser/skill/`.
+- 9 browser runtime tests under `core/context/browser/runtime/`.
+- 4 patch planning and write policy tests under `edit/patch/plan/` and `edit/authority/`.
 
 ## Compatibility Status
 
@@ -164,8 +176,8 @@ Existing export-only compatibility files remain classified as kept until downstr
 | Class | Count before | Count after |
 |---|---:|---:|
 | Export-only compatibility files | 105 | 105 |
-| Zero-internal-import compatibility files | 64 | 64 |
-| Internally imported compatibility files | 41 | 41 |
+| Zero-internal-import compatibility files | 87 | 87 |
+| Internally imported compatibility files | 18 | 18 |
 
 Deletion condition: remove an export-only compatibility file only after internal imports are zero and no package consumer compatibility need is documented.
 
@@ -173,29 +185,28 @@ Deletion condition: remove an export-only compatibility file only after internal
 
 Internal imports were updated away from old moved paths for the touched owner domains. Active imports now target:
 
-- `core/context/browser/receipt/*`
-- `core/context/compact/command/*`
-- `core/context/compact/checkpoint/*`
-- `core/context/compact/continuity/*`
-- `core/context/compact/delivery/*`
-- `core/context/compact/injection/*`
-- `core/context/compact/policy/*`
-- `edit/result/workspace/*`
+- `core/context/browser/skill/execution/*`
+- `core/context/browser/skill/runner/*`
+- `core/context/browser/skill/runtime/*`
+- `core/context/browser/runtime/core/*`
+- `core/context/browser/runtime/external/*`
+- `edit/patch/plan/*`
+- `edit/authority/*`
 
 ## Validation Evidence
 
-- Focused moved-owner tests passed: 25 files, 66 tests.
+- Focused moved-owner tests passed: 24 files, 122 tests.
 - `npm run build -w packages/ts-shell` passed.
 - `npm run verify:result-contract` passed.
 
 ## Remaining Visible Debt
 
 - `orchestration` remains the largest direct root because central owner files were not moved for appearance alone.
-- `core/context` remains crowded beyond the browser receipt-cache and compact clusters moved here.
+- `core/context` remains crowded beyond the browser runtime and skill clusters moved here.
 - `orchestration/patchResult` still contains write execution and permission-adjacent files that need separate ownership review before movement.
-- `core/shell` still has root tests that touch provider, recovery, session, and terminal boundaries.
+- `core/harness` still has browser scenario fixtures that may warrant a future owner review.
 - Compatibility files remain numerous because downstream compatibility has not been proven disposable.
 
 ## Recommended Next Step
 
-Audit the remaining browser runtime, browser skill-runner, and patch planning clusters for safe owner-folder movement.
+Audit remaining write execution and permission-adjacent files under `orchestration/patchResult` for safe owner-folder movement.

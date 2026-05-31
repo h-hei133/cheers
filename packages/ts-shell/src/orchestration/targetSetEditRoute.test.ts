@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { buildDiscoveryEditManifest } from "./discoveryEditManifest.js";
 import { runTargetSetEditRoute } from "./targetSetEditRoute.js";
 import { buildTargetSetEditRouteResult } from "./targetSetEditResult.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 const tempRoots: string[] = [];
 

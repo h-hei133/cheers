@@ -11,7 +11,7 @@ import {
 } from "./providerAnchoredProposal.js";
 import { selectEditProposalHunks } from "./editProposalSelection.js";
 import { applyEditProposalSelection, type EditProposalApplyResult } from "./editProposalApply.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 import { activateTaskLifecycle } from "./taskLifecycleActivation.js";
 import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";

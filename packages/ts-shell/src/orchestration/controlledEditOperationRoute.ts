@@ -1,6 +1,6 @@
 import { projectApplyPatchRuntimeMutationRoute } from "./mutationRoutingProjection.js";
 import type { OrchestrationResult } from "./types.js";
-import { classifyBoundedApplyPatchCandidate } from "./patchResult/boundedApplyPatchCandidate.js";
+import { classifyBoundedApplyPatchCandidate } from "../edit/patch/plan/candidate.js";
 import type { MutationRoutingProjectionAuthority } from "./mutationRoutingProjection.js";
 import type { RecoveryAuthorityStoreConfig } from "./patchRecovery/recoveryAuthorityStore.js";
 import {

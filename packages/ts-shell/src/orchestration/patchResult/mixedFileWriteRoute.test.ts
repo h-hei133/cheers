@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { normalizeBoundedBroadPatchText } from "../patchParsing/boundedBroadPatchNormalizer.js";
 import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
 import { restoreRecoveryAuthorityRecord } from "../patchRecovery/restorePrimitive.js";
-import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../../edit/authority/workspace.js";
 import { runMixedFileWriteRoute } from "./mixedFileWriteRoute.js";
 
 const tempRoots: string[] = [];

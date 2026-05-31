@@ -3,7 +3,7 @@ import {
   type WorkspaceWriteRoute,
 } from "./patchResult/workspaceWriteRoute.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
-import type { WorkspaceWriteTargetAuthority } from "./patchResult/workspaceAuthority.js";
+import type { WorkspaceWriteTargetAuthority } from "../edit/authority/workspace.js";
 import type { RecoveryAuthorityStoreConfig } from "./patchRecovery/recoveryAuthorityStore.js";
 import {
   buildEditSnapshotStoreConfig,

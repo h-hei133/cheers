@@ -1,9 +1,9 @@
-import type { BrowserExternalRunnerAction } from "./browserExternalRunnerProtocol.js";
+import type { BrowserExternalRunnerAction } from "./browser/runtime/external/protocol.js";
 import {
   classifyBrowserSkillRunnerReadiness,
   type BrowserSkillRunnerReadiness,
-} from "./browserSkillRunnerReadiness.js";
-import type { BrowserSkillRunnerMetadata as Route105BrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
+} from "./browser/skill/runner/readiness.js";
+import type { BrowserSkillRunnerMetadata as Route105BrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
 
 export interface BrowserSkillManagedRunnerMetadata {
   readonly skillId: string;

@@ -11,7 +11,7 @@ import {
   planEditRepairProposal,
 } from "./editRepairPlanner.js";
 import { buildEditRepairResult } from "./editRepairResult.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 const tempRoots: string[] = [];
 

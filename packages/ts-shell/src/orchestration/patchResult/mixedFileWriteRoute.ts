@@ -19,16 +19,16 @@ import type {
 import {
   buildPerFilePatchPlan,
   type PerFilePatchPlan,
-} from "./perFilePatchPlan.js";
+} from "../../edit/patch/plan/perFile.js";
 import {
   MAX_BOUNDED_WRITE_OPERATIONS,
   isBoundedWriteOperationCount,
-} from "./boundedWritePolicy.js";
+} from "../../edit/authority/writePolicy.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
 import type {
   WorkspaceCreateTargetAuthority,
   WorkspaceWriteTargetAuthority,
-} from "./workspaceAuthority.js";
+} from "../../edit/authority/workspace.js";
 import {
   buildWorkspaceWriteFailureState,
   type WorkspaceWriteEffect,

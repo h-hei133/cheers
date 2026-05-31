@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { SessionManager } from "../session/SessionManager.js";
-import { createWorkspaceWriteAuthority } from "../orchestration/patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 import { buildWorkspaceWriteRouteResult } from "../edit/result/workspace/workspaceWriteResult.js";
 import { runWorkspaceWriteRoute } from "../orchestration/patchResult/workspaceWriteRoute.js";
 

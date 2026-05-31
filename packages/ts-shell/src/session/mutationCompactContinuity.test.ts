@@ -6,8 +6,8 @@ import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "../orchestration/types.js";
-import { buildMultiFileUpdatePlanningRouteResult } from "../orchestration/patchResult/multiFilePlanningResult.js";
-import type { MultiFileUpdatePlanningClassification } from "../orchestration/patchResult/multiFileUpdatePlanning.js";
+import { buildMultiFileUpdatePlanningRouteResult } from "../edit/patch/plan/result.js";
+import type { MultiFileUpdatePlanningClassification } from "../edit/patch/plan/multiFile.js";
 import { SessionManager, type Session } from "./SessionManager.js";
 
 describe("mutation compact continuity", () => {

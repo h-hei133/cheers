@@ -3,7 +3,7 @@ import type {
   NoPartialPatchApplicationContract,
   PatchWriteIntent,
 } from "./noPartialApply.js";
-import { isBoundedWriteOperationCount } from "../patchResult/boundedWritePolicy.js";
+import { isBoundedWriteOperationCount } from "../../edit/authority/writePolicy.js";
 
 export type MultiFileUpdateTargetCount = number;
 

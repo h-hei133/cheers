@@ -12,7 +12,7 @@ import { projectMutationVerificationHandoff } from "../../../verification/result
 import {
   projectPerFilePatchResult,
   type PerFilePatchFailureClass,
-} from "../../../orchestration/patchResult/perFilePatchPlan.js";
+} from "../../patch/plan/perFile.js";
 import type { MultiFileWriteRoute } from "../../../orchestration/patchResult/multiFileWriteRoute.js";
 
 export function buildMultiFileWriteRouteResult(input: {

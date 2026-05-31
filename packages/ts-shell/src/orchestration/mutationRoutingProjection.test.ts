@@ -8,7 +8,7 @@ import {
 } from "./mutationRoutingProjection.js";
 import { readRecoveryAuthorityRecord } from "./patchRecovery/recoveryAuthorityStore.js";
 import { restoreRecoveryAuthorityRecord } from "./patchRecovery/restorePrimitive.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 const tempRoots: string[] = [];
 

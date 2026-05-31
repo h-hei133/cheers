@@ -21,7 +21,7 @@ import {
 import {
   classifyMultiFileUpdatePlanningNoWrite,
   type MultiFileUpdatePlanningClassification,
-} from "./multiFileUpdatePlanning.js";
+} from "../../edit/patch/plan/multiFile.js";
 import { buildSingleFileUpdatePatchReadinessContract } from "./readiness.js";
 
 type UnsupportedCapability =

@@ -13,14 +13,14 @@ import { buildGuardedWriteGate, type GuardedWriteGate } from "./guardedWriteGate
 import {
   buildPerFilePatchPlan,
   type PerFilePatchPlan,
-} from "./perFilePatchPlan.js";
+} from "../../edit/patch/plan/perFile.js";
 import { buildSingleFileApplyPatchFinalStaleReadContract } from "./singleFileApplyPatchFinalStaleRead.js";
 import {
   buildSingleFileApplyPatchOptInDryRunRoute,
   type SingleFileApplyPatchOptInDryRunRouteAccepted,
 } from "./singleFileApplyPatchOptInDryRunRoute.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
-import type { WorkspaceWriteTargetAuthority } from "./workspaceAuthority.js";
+import type { WorkspaceWriteTargetAuthority } from "../../edit/authority/workspace.js";
 import {
   buildWorkspaceWriteFailureState,
   type WorkspaceWriteEffect,

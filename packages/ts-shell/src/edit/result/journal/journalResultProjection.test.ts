@@ -3,7 +3,7 @@ import { projectJournalFailureSurface } from "./journalResultProjection.js";
 import {
   buildPerFilePatchPlan,
   projectPerFilePatchResult,
-} from "../../../orchestration/patchResult/perFilePatchPlan.js";
+} from "../../patch/plan/perFile.js";
 import type { RouteScopedEditJournal } from "../../../orchestration/patchResult/routeScopedEditJournal.js";
 
 describe("journal failure result projection", () => {

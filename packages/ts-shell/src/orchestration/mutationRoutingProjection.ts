@@ -30,11 +30,11 @@ import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/si
 import type {
   WorkspaceCreateTargetAuthority,
   WorkspaceWriteTargetAuthority,
-} from "./patchResult/workspaceAuthority.js";
+} from "../edit/authority/workspace.js";
 import {
   classifyBoundedApplyPatchCandidate,
   type BoundedApplyPatchCandidateProjection,
-} from "./patchResult/boundedApplyPatchCandidate.js";
+} from "../edit/patch/plan/candidate.js";
 import { buildMixedFileWriteRouteResult } from "../edit/result/workspace/mixedFileWriteResult.js";
 import {
   patchIsBoundedMixedWriteFiles,

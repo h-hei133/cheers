@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { captureRecoveryAuthorityRecord } from "./patchRecovery/recoveryAuthorityStore.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 import { buildEditRecoveryPlan } from "./editRecoveryPlan.js";
 
 const tempRoots: string[] = [];

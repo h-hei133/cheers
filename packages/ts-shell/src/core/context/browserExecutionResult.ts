@@ -5,8 +5,8 @@ import {
   createBrowserExecutionReceipt,
   type BrowserExecutionReceipt,
 } from "./browserExecutionReceipt.js";
-import type { BrowserSkillRunnerReadiness } from "./browserSkillRunnerReadiness.js";
-import type { BrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
+import type { BrowserSkillRunnerReadiness } from "./browser/skill/runner/readiness.js";
+import type { BrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
 
 export interface BrowserExecutionResult {
   readonly request: BrowserExecutionRequest;

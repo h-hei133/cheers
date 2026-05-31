@@ -3,8 +3,8 @@ import type {
   PerFilePatchOperation,
   PerFilePatchPlan,
   PerFilePatchResultProjection,
-} from "../../../orchestration/patchResult/perFilePatchPlan.js";
-import { projectPerFilePatchResult } from "../../../orchestration/patchResult/perFilePatchPlan.js";
+} from "../../patch/plan/perFile.js";
+import { projectPerFilePatchResult } from "../../patch/plan/perFile.js";
 import type {
   RouteScopedEditJournal,
   RouteScopedEditJournalFailureClass,

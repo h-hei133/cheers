@@ -10,8 +10,8 @@ import {
   classifyBrowserReplayReadiness,
   type BrowserReplayReadiness,
 } from "./browserReplayReadiness.js";
-import type { BrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
-import type { BrowserSkillRunnerReadiness } from "./browserSkillRunnerReadiness.js";
+import type { BrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
+import type { BrowserSkillRunnerReadiness } from "./browser/skill/runner/readiness.js";
 
 export type BrowserExecutionReceiptId = string;
 export type BrowserExecutionReceiptVersion = "browser-execution-receipt/v1";

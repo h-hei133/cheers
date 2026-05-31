@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { compareBrowserToolServerBackend } from "../context/browserToolServerBackendComparison.js";
 import { renderBrowserPlaywrightAdapterSurface } from "../context/browserPlaywrightAdapterSurface.js";
-import { decideBrowserRuntimeDirection } from "../context/browserRuntimeDirectionDecision.js";
+import { decideBrowserRuntimeDirection } from "../context/browser/runtime/core/directionDecision.js";
 import { auditBrowserPlaywrightRuntimeAvailability } from "../context/browserPlaywrightRuntimeAvailability.js";
 
 describe("browser runtime direction decision scenarios", () => {

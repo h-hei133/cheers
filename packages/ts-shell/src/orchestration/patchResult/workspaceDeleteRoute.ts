@@ -15,9 +15,9 @@ import { verifyParsedPatch } from "../patchVerification/verify.js";
 import {
   buildPerFilePatchPlan,
   type PerFilePatchPlan,
-} from "./perFilePatchPlan.js";
+} from "../../edit/patch/plan/perFile.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
-import type { WorkspaceWriteTargetAuthority } from "./workspaceAuthority.js";
+import type { WorkspaceWriteTargetAuthority } from "../../edit/authority/workspace.js";
 import {
   buildWorkspaceWriteFailureState,
   type WorkspaceWriteEffect,

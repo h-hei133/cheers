@@ -8,7 +8,7 @@ import {
 } from "./generatedEditConfirmation.js";
 import { buildGeneratedEditProposalManifest } from "./generatedEditProposal.js";
 import { planGeneratedEdit } from "./generatedEditPlanner.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 describe("generatedEditConfirmation", () => {
   it("does not treat proposal review as mutation confirmation", () => {

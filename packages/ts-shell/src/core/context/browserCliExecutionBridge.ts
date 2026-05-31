@@ -4,24 +4,24 @@ import {
 import {
   decideBrowserExternalRunnerPolicy,
   type BrowserExternalRunnerDecision,
-} from "./browserExternalRunnerPolicy.js";
-import { BrowserExternalRunnerExecutor } from "./browserExternalRunnerExecutor.js";
+} from "./browser/runtime/external/policy.js";
+import { BrowserExternalRunnerExecutor } from "./browser/runtime/external/executor.js";
 import {
   createBrowserNetworkAllowlist,
 } from "./browserNetworkAllowlist.js";
 import {
   browserRuntimeDependencySummary,
-} from "./browserRuntimeAvailabilitySurface.js";
+} from "./browser/runtime/core/availabilitySurface.js";
 import {
   classifyBrowserSkillRunnerReadiness,
   type BrowserSkillRunnerReadiness,
-} from "./browserSkillRunnerReadiness.js";
-import type { BrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
-import type { BrowserSkillRunnerBinding } from "./browserSkillRunnerBinding.js";
-import { BrowserSkillExecutionExecutor } from "./browserSkillExecutionExecutor.js";
+} from "./browser/skill/runner/readiness.js";
+import type { BrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
+import type { BrowserSkillRunnerBinding } from "./browser/skill/runner/binding.js";
+import { BrowserSkillExecutionExecutor } from "./browser/skill/execution/executor.js";
 import {
   decideBrowserRuntimeDependencyPolicy,
-} from "./browserRuntimeDependencyPolicy.js";
+} from "./browser/runtime/core/dependencyPolicy.js";
 import {
   BrowserPlaywrightCliLocalFixtureExecutor,
 } from "./browserPlaywrightCliExecutor.js";

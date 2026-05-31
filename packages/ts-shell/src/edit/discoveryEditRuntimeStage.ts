@@ -12,7 +12,7 @@ import {
   runFencedEditReplacementRoute,
   runTargetSetEditRoute,
 } from "../orchestration/editPatchModule.js";
-import { createWorkspaceWriteAuthority } from "../orchestration/patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "./authority/workspace.js";
 
 export interface EditRuntimeStageResult {
   readonly events: QueryEvent[];

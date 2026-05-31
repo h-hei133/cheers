@@ -3,7 +3,7 @@ import {
   projectApplyPatchRuntimeMutationRoute,
   type ApplyPatchRuntimeRouteOptions,
 } from "../orchestration/mutationRoutingProjection.js";
-import { createWorkspaceWriteAuthority } from "../orchestration/patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "./authority/workspace.js";
 import { createWorkspaceFileReader } from "./workspace/readPolicy.js";
 
 export type { ApplyPatchRuntimeRouteOptions } from "../orchestration/mutationRoutingProjection.js";

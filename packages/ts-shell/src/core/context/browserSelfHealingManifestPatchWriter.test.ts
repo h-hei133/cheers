@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createBrowserExternalRunnerManifest, serializeBrowserExternalRunnerManifest, validateBrowserExternalRunnerManifest } from "./browserExternalRunnerManifest.js";
+import { createBrowserExternalRunnerManifest, serializeBrowserExternalRunnerManifest, validateBrowserExternalRunnerManifest } from "./browser/runtime/external/manifest.js";
 import { createBrowserLocalFixtureManifest, serializeBrowserLocalFixtureManifest, validateBrowserLocalFixtureManifest } from "./browserLocalFixtureManifest.js";
 import { decideBrowserSelfHealingManifestPatchPolicy } from "./browserSelfHealingManifestPatchPolicy.js";
 import { renderBrowserSelfHealingManifestPatchSurface } from "./browserSelfHealingManifestPatchSurface.js";

@@ -9,7 +9,7 @@ import type {
 } from "../../../orchestration/types.js";
 import { projectPerFilePatchFailureResultWithJournal } from "../journal/journalFailureConsumer.js";
 import { projectMutationVerificationHandoff } from "../../../verification/result/mutationVerificationProjection.js";
-import { projectPerFilePatchResult } from "../../../orchestration/patchResult/perFilePatchPlan.js";
+import { projectPerFilePatchResult } from "../../patch/plan/perFile.js";
 import type { WorkspaceCreateRoute } from "../../../orchestration/patchResult/workspaceCreateRoute.js";
 
 export function buildWorkspaceCreateRouteResult(input: {

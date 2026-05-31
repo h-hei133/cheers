@@ -20,7 +20,7 @@ import { classifyProviderAnchorQuality } from "./providerAnchorQuality.js";
 import { validateProviderOutput } from "./providerOutputValidator.js";
 import { selectEditProposalHunks } from "./editProposalSelection.js";
 import { applyEditProposalSelection } from "./editProposalApply.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 const tempRoots: string[] = [];
 

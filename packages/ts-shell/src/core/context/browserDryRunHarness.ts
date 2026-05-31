@@ -2,7 +2,7 @@ import type { BrowserActionContract } from "./browserActionContract.js";
 import { classifyBrowserActionReadiness } from "./browserActionReadiness.js";
 import { createBrowserCapabilityState, type BrowserCapabilityState } from "./browserCapabilityModel.js";
 import { createBrowserDryRunPlan, type BrowserDryRunPlan } from "./browserDryRunPlan.js";
-import { decideBrowserRuntime } from "./browserRuntimeDecision.js";
+import { decideBrowserRuntime } from "./browser/runtime/core/decision.js";
 import { classifyBrowserSandboxPolicy } from "./browserSandboxPolicy.js";
 
 export interface BrowserDryRunHarnessInput {

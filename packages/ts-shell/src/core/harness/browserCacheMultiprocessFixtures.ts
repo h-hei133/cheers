@@ -5,7 +5,7 @@ import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../context/browser/receipt/brows
 import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
-} from "../context/browserExternalRunnerManifest.js";
+} from "../context/browser/runtime/external/manifest.js";
 import { BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV } from "../context/browserCliExecutorInjection.js";
 import {
   browserReceiptCacheLockPath,

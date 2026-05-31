@@ -15,12 +15,12 @@ import { verifyParsedPatch } from "../patchVerification/verify.js";
 import {
   buildPerFilePatchPlan,
   type PerFilePatchPlan,
-} from "./perFilePatchPlan.js";
+} from "../../edit/patch/plan/perFile.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
 import type {
   WorkspaceCreateTargetAuthority,
   WorkspaceWriteTargetAuthority,
-} from "./workspaceAuthority.js";
+} from "../../edit/authority/workspace.js";
 import {
   buildWorkspaceWriteFailureState,
   type WorkspaceWriteEffect,

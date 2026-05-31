@@ -2,7 +2,7 @@ import path from "node:path";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SandboxEnforcer } from "../sandbox/index.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";
-import { createWorkspaceWriteAuthority } from "../orchestration/patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "./authority/workspace.js";
 import {
   buildFencedEditReplacementRouteResult,
   runFencedEditReplacementRoute,

@@ -1,5 +1,5 @@
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
-import type { BrowserRuntimePreflight } from "./browserRuntimePreflight.js";
+import type { BrowserRuntimePreflight } from "./browser/runtime/core/preflight.js";
 import type { BrowserExternalNetworkIntent } from "./browserExternalNetworkExecutionMode.js";
 import type { BrowserExternalNetworkRunnerManifest } from "./browserExternalNetworkRunnerManifest.js";
 

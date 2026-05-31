@@ -2,7 +2,7 @@ import fs from "node:fs";
 import {
   validateBrowserExternalRunnerManifest,
   type BrowserExternalRunnerManifest,
-} from "./browserExternalRunnerManifest.js";
+} from "./browser/runtime/external/manifest.js";
 import {
   validateBrowserLocalFixtureManifest,
   type BrowserLocalFixtureManifest,

@@ -14,7 +14,7 @@ import { classifyProviderAnchorQuality } from "./providerAnchorQuality.js";
 import { matchProviderAnchorCandidates } from "./providerAnchorMatcher.js";
 import { extractProviderProposalAnchors } from "./providerProposalAnchors.js";
 import { validateProviderOutput } from "./providerOutputValidator.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 import {
   buildClaimLedgerProjection,
   type ClaimLedgerEvidenceSource,

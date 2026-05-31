@@ -7,7 +7,7 @@ import { buildPlanningMutationHandoffProjection } from "../planning/handoff/muta
 import { buildPlanningMutationProposalBridge } from "../planning/handoff/bridge.js";
 import { runPlanningMutationProofHandoff } from "./planningMutationProofHandoff.js";
 import { verifyPlanningMutationProofHandoff } from "./planningMutationProofVerification.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 const tempRoots: string[] = [];
 const targetPath = "src/contextEngine.ts";

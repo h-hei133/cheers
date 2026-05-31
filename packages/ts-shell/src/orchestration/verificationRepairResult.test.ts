@@ -6,7 +6,7 @@ import { buildAgentPlan } from "./agentPlan.js";
 import { applyEditProposalSelection } from "./editProposalApply.js";
 import { buildEditRepairProposalReview } from "./editProposalReview.js";
 import { selectEditProposalHunks } from "./editProposalSelection.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import { buildVerificationRepairContext } from "./verificationRepairContext.js";
 import {

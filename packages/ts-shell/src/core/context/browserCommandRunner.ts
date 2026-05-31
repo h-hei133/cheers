@@ -23,19 +23,19 @@ import type { BrowserPublicReadOnlyHttpClient } from "./browserPublicReadOnlyWeb
 import {
   decideBrowserRuntimeAvailability,
   renderBrowserRuntimeStatusSurface,
-} from "./browserRuntimeAvailability.js";
-import type { BrowserRuntimeExecutor } from "./browserRuntimeExecutor.js";
+} from "./browser/runtime/core/availability.js";
+import type { BrowserRuntimeExecutor } from "./browser/runtime/core/executor.js";
 import {
   validateBrowserRuntimeManifest,
   type BrowserRuntimeManifestLoadResult,
-} from "./browserRuntimeManifest.js";
-import { renderBrowserRuntimeSurface } from "./browserRuntimeSurface.js";
-import type { BrowserExternalRuntimeManifestLoadResult } from "./browserExternalRuntimeManifest.js";
-import { BrowserRuntimeAdapterExecutor } from "./browserRuntimeAdapterExecutor.js";
-import type { BrowserSkillRuntimeBinding } from "./browserSkillRuntimeBinding.js";
+} from "./browser/runtime/core/manifest.js";
+import { renderBrowserRuntimeSurface } from "./browser/runtime/core/surface.js";
+import type { BrowserExternalRuntimeManifestLoadResult } from "./browser/runtime/external/runtimeManifest.js";
+import { BrowserRuntimeAdapterExecutor } from "./browser/runtime/core/adapterExecutor.js";
+import type { BrowserSkillRuntimeBinding } from "./browser/skill/runtime/binding.js";
 import type { BrowserPlaywrightRuntimeAvailability } from "./browserPlaywrightRuntimeAvailability.js";
 import type { BrowserToolServerBackendComparison } from "./browserToolServerBackendComparison.js";
-import type { BrowserRuntimeDirectionDecision } from "./browserRuntimeDirectionDecision.js";
+import type { BrowserRuntimeDirectionDecision } from "./browser/runtime/core/directionDecision.js";
 import { renderBrowserPlaywrightAdapterSurface } from "./browserPlaywrightAdapterSurface.js";
 import { renderPwRuntimeStatus } from "./pwStatus.js";
 import { getPwRuntimeStatus, type PwRuntimeStatus } from "./pwRuntime.js";
@@ -43,7 +43,7 @@ import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
-import { renderBrowserSkillRunnerSurface } from "./browserSkillRunnerSurface.js";
+import { renderBrowserSkillRunnerSurface } from "./browser/skill/runner/surface.js";
 import { runBrowserReplayCommand } from "./browserReplayCommandRunner.js";
 import { runBrowserSelfHealingCommand } from "./browserSelfHealingCommandRunner.js";
 

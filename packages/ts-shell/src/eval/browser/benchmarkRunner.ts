@@ -1,6 +1,6 @@
 import { runBrowserActionLoopExecutor } from "../../core/context/browserActionLoopExecutor.js";
-import type { BrowserRuntimeExecutor } from "../../core/context/browserRuntimeExecutor.js";
-import type { BrowserRuntimeManifestLoadResult } from "../../core/context/browserRuntimeManifest.js";
+import type { BrowserRuntimeExecutor } from "../../core/context/browser/runtime/core/executor.js";
+import type { BrowserRuntimeManifestLoadResult } from "../../core/context/browser/runtime/core/manifest.js";
 import type {
   BrowserEvalBenchmarkScore,
   BrowserEvalBenchmarkTask,

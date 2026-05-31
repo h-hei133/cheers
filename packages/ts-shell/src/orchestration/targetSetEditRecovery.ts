@@ -3,7 +3,7 @@ import {
   type EditRecoveryPlan,
 } from "./editRecoveryPlan.js";
 import type { TargetSetEditRoute } from "./targetSetEditRoute.js";
-import type { WorkspaceWriteTargetAuthority } from "./patchResult/workspaceAuthority.js";
+import type { WorkspaceWriteTargetAuthority } from "../edit/authority/workspace.js";
 
 export async function buildTargetSetPartialRecoveryPlan(input: {
   readonly route: TargetSetEditRoute;

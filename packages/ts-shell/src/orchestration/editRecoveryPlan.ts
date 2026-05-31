@@ -6,7 +6,7 @@ import {
   previewRecoveryAuthorityRestore,
   type RestorePreviewBlockedReason,
 } from "./patchRecovery/restorePreview.js";
-import type { WorkspaceWriteTargetAuthority } from "./patchResult/workspaceAuthority.js";
+import type { WorkspaceWriteTargetAuthority } from "../edit/authority/workspace.js";
 
 export type EditRecoveryMode = "single-file" | "target-set-subset";
 

@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
 import { restoreRecoveryAuthorityRecord } from "../patchRecovery/restorePrimitive.js";
-import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../../edit/authority/workspace.js";
 import { runMultiFileWriteRoute } from "./multiFileWriteRoute.js";
 
 const tempRoots: string[] = [];

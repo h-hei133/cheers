@@ -3,11 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { normalizeBoundedBroadPatchText } from "../patchParsing/boundedBroadPatchNormalizer.js";
-import { classifyBoundedApplyPatchCandidate } from "./boundedApplyPatchCandidate.js";
+import { classifyBoundedApplyPatchCandidate } from "../../edit/patch/plan/candidate.js";
 import { projectApplyPatchRuntimeMutationRoute } from "../mutationRoutingProjection.js";
 import { readRecoveryAuthorityRecord } from "../patchRecovery/recoveryAuthorityStore.js";
 import { restoreRecoveryAuthorityRecord } from "../patchRecovery/restorePrimitive.js";
-import { createWorkspaceWriteAuthority } from "./workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../../edit/authority/workspace.js";
 
 const tempRoots: string[] = [];
 

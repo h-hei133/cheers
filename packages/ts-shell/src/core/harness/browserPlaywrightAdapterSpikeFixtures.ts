@@ -12,7 +12,7 @@ import {
   createBrowserRuntimeManifest,
   validateBrowserRuntimeManifest,
   type BrowserRuntimeManifestLoadResult,
-} from "../context/browserRuntimeManifest.js";
+} from "../context/browser/runtime/core/manifest.js";
 
 export interface BrowserPlaywrightAdapterSpikeFixture {
   readonly origin: string;

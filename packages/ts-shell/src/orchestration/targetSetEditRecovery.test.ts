@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildDiscoveryEditManifest } from "./discoveryEditManifest.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 import { runTargetSetEditRoute } from "./targetSetEditRoute.js";
 import { buildTargetSetPartialRecoveryPlan } from "./targetSetEditRecovery.js";
 import { runEditRecoveryApplyRoute } from "./editRecoveryApply.js";

@@ -5,15 +5,15 @@ import {
   serializeBrowserExternalRunnerManifest,
   validateBrowserExternalRunnerManifest,
   type BrowserExternalRunnerManifest,
-} from "./browserExternalRunnerManifest.js";
+} from "./browser/runtime/external/manifest.js";
 import {
   BROWSER_LOCAL_FIXTURE_MANIFEST_VERSION,
   serializeBrowserLocalFixtureManifest,
   validateBrowserLocalFixtureManifest,
   type BrowserLocalFixtureManifest,
 } from "./browserLocalFixtureManifest.js";
-import { createBrowserSkillRunnerBinding } from "./browserSkillRunnerBinding.js";
-import { createBrowserSkillRunnerMetadata } from "./browserSkillRunnerMetadata.js";
+import { createBrowserSkillRunnerBinding } from "./browser/skill/runner/binding.js";
+import { createBrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
 import {
   createBrowserSelfHealingManifestPatch,
   type BrowserSelfHealingManifestKind,

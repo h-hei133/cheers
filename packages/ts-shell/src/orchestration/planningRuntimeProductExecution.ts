@@ -15,7 +15,7 @@ import {
   type PlanningMutationProofConfirmation,
   type PlanningMutationProofWorkspace,
 } from "./planningMutationProofHandoff.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 export interface PlanningRuntimeProductControlledWorkspace {
   readonly scope: "controlled-temp-workspace";

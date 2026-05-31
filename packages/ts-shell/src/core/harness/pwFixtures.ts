@@ -7,7 +7,7 @@ import {
   createBrowserRuntimeManifest,
   validateBrowserRuntimeManifest,
   type BrowserRuntimeManifestLoadResult,
-} from "../context/browserRuntimeManifest.js";
+} from "../context/browser/runtime/core/manifest.js";
 
 export const PW_STATIC_FIXTURE = "local-fixture://pw/static";
 export const PW_JS_FIXTURE = "local-fixture://pw/js";

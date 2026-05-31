@@ -1,5 +1,5 @@
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
-import type { WorkspaceWriteTargetAuthority } from "./patchResult/workspaceAuthority.js";
+import type { WorkspaceWriteTargetAuthority } from "../edit/authority/workspace.js";
 import {
   runFencedEditReplacementRoute,
   type FencedEditReplacementRoute,

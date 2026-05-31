@@ -1,10 +1,10 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
-import type { BrowserRuntimeManifest } from "./browserRuntimeManifest.js";
+import type { BrowserRuntimeManifest } from "./browser/runtime/core/manifest.js";
 import {
   browserRuntimeActionAllowed,
   browserRuntimeOriginAllowed,
   normalizeOriginLike,
-} from "./browserRuntimeManifest.js";
+} from "./browser/runtime/core/manifest.js";
 import type { PwRuntimeStatus } from "./pwRuntime.js";
 
 export type BrowserToolName =

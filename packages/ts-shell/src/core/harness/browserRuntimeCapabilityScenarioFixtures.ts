@@ -5,11 +5,11 @@ import {
   validateBrowserRuntimeManifest,
   type BrowserRuntimeManifest,
   type BrowserRuntimeManifestLoadResult,
-} from "../context/browserRuntimeManifest.js";
+} from "../context/browser/runtime/core/manifest.js";
 import {
   SimulatedBrowserRuntimeExecutor,
   type BrowserRuntimePageState,
-} from "../context/browserRuntimeExecutor.js";
+} from "../context/browser/runtime/core/executor.js";
 
 export interface BrowserRuntimeMvpScenarioFixture {
   readonly manifest: BrowserRuntimeManifest;

@@ -10,8 +10,8 @@ import { BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV } from "../context/browserCliE
 import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
-} from "../context/browserExternalRunnerManifest.js";
-import { createBrowserSkillRunnerMetadata } from "../context/browserSkillRunnerMetadata.js";
+} from "../context/browser/runtime/external/manifest.js";
+import { createBrowserSkillRunnerMetadata } from "../context/browser/skill/runner/metadata.js";
 
 describe("browser skill runner CLI scenario examples", () => {
   const tempRoots: string[] = [];

@@ -6,7 +6,7 @@ import {
 import {
   browserRuntimeDependencySummary,
   renderBrowserRuntimeAvailabilitySurface,
-} from "./browserRuntimeAvailabilitySurface.js";
+} from "./browser/runtime/core/availabilitySurface.js";
 
 export function renderBrowserCapabilitySurface(
   state: BrowserCapabilityState = createBrowserCapabilityState(),

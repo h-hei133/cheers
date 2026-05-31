@@ -2,8 +2,8 @@ import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 import type {
   BrowserRuntimeExecutor,
   BrowserRuntimeExecutorResult,
-} from "./browserRuntimeExecutor.js";
-import type { BrowserRuntimeManifest } from "./browserRuntimeManifest.js";
+} from "./browser/runtime/core/executor.js";
+import type { BrowserRuntimeManifest } from "./browser/runtime/core/manifest.js";
 import {
   type BrowserPlaywrightPageEvidence,
   mapPlaywrightEvidenceToRuntimeResult,

@@ -11,23 +11,23 @@ import {
 } from "./browserCliExecutionBridge.js";
 import {
   renderBrowserRuntimeAvailabilitySurface,
-} from "./browserRuntimeAvailabilitySurface.js";
+} from "./browser/runtime/core/availabilitySurface.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import { createBrowserExecutionResult } from "./browserExecutionResult.js";
 import { renderBrowserExecutionSurface } from "./browserExecutionSurface.js";
 import { renderBrowserExecutionReceiptSurface } from "./browserExecutionReceiptSurface.js";
-import { renderBrowserExternalRunnerSurface } from "./browserExternalRunnerSurface.js";
+import { renderBrowserExternalRunnerSurface } from "./browser/runtime/external/surface.js";
 import { renderBrowserExecutionLifecycleSurface } from "./browserExecutionLifecycleSurface.js";
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
-import { runBrowserRuntimePreflight } from "./browserRuntimePreflight.js";
+import { runBrowserRuntimePreflight } from "./browser/runtime/core/preflight.js";
 import { renderBrowserSandboxSurface } from "./browserSandboxSurface.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
-import { renderBrowserSkillRunnerSurface } from "./browserSkillRunnerSurface.js";
+import { renderBrowserSkillRunnerSurface } from "./browser/skill/runner/surface.js";
 import {
   hasBrowserSkillExecutionEvidence,
   renderBrowserSkillExecutionSurface,
-} from "./browserSkillExecutionSurface.js";
+} from "./browser/skill/execution/surface.js";
 import type { BrowserActionCache } from "./browserActionCache.js";
 import type { BrowserReceiptCacheStore } from "./browser/receipt/browserReceiptCacheStore.js";
 import {

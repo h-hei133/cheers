@@ -1,8 +1,8 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserSelectorRepairSeed } from "./browserSelectorRepairSeed.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
-import type { BrowserRuntimeManifest } from "./browserRuntimeManifest.js";
-import { browserRuntimeOriginAllowed } from "./browserRuntimeManifest.js";
+import type { BrowserRuntimeManifest } from "./browser/runtime/core/manifest.js";
+import { browserRuntimeOriginAllowed } from "./browser/runtime/core/manifest.js";
 
 export type BrowserSelectorRepairApplyStatus =
   | "allowed"

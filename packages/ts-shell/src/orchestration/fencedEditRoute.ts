@@ -9,7 +9,7 @@ import {
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
 import type {
   WorkspaceWriteTargetAuthority,
-} from "./patchResult/workspaceAuthority.js";
+} from "../edit/authority/workspace.js";
 import {
   runWorkspaceWriteRoute,
   type WorkspaceWriteRoute,

@@ -5,7 +5,7 @@ import {
   type ExactFencedReplacementPlan,
   type FencedEditMapping,
 } from "./fencedEditPlanner.js";
-import type { WorkspaceWriteTargetAuthority } from "./patchResult/workspaceAuthority.js";
+import type { WorkspaceWriteTargetAuthority } from "../edit/authority/workspace.js";
 
 export type TargetSetEditPlanBlocker =
   | "confirmation-required"

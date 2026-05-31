@@ -6,7 +6,7 @@ import {
   buildMultiHunkApplyPatch,
   runExactHunkApplyRoute,
 } from "./exactHunkApply.js";
-import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
+import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
 
 const tempRoots: string[] = [];
 
