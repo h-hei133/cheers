@@ -82,7 +82,7 @@ const focusedTests = [
   'src/session/stoppedSessionContinuity.test.ts',
   'src/session/sessionResumeContextBuilder.test.ts',
   'src/core/shell/sessionRuntimeBoundary.test.ts',
-  'src/core/query/resultMapperBoundary.test.ts',
+  'src/core/query/mapping/mapperBoundary.test.ts',
 ]
 
 console.log('gate name=context-planning')

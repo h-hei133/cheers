@@ -1,4 +1,4 @@
-import type { QueryEvent } from '../query/events.js'
+import type { QueryEvent } from '../query/runtime/events.js'
 import type { ToolExecutionResult } from '../../tools/types.js'
 
 export interface PendingApprovalEntry {

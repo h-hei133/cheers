@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { QueryEvent } from "../../core/query/events.js";
+import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { OrchestrationResult } from "../../orchestration/types.js";
 import { applyCompactRetentionPlan } from "./retentionPlanner.js";
 

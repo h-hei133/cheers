@@ -8,10 +8,10 @@ import {
   buildHardFailureStopReason,
   hasHardFailureSignal,
   hasSuccessfulMutationWithVerificationCaveat,
-} from "../../core/query/capabilityResultClassification.js";
-import type { QueryRuntimeState } from "../../core/query/runtimeState.js";
-import { classifyTerminalReason } from "../../core/query/terminalClassificationProjection.js";
-import type { QueryTerminal } from "../../core/query/transitions.js";
+} from "../../core/query/mapping/capabilityClassification.js";
+import type { QueryRuntimeState } from "../../core/query/runtime/state.js";
+import { classifyTerminalReason } from "../../core/query/terminal/classificationProjection.js";
+import type { QueryTerminal } from "../../core/query/runtime/transitions.js";
 
 export function deriveTruthfulTerminal(input: {
   terminal: QueryTerminal;

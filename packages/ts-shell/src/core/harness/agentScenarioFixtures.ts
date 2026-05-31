@@ -3,16 +3,16 @@ import os from "node:os";
 import path from "node:path";
 import { createCompactInjectionStateStore } from "../context/compactInjectionState.js";
 import { createCompactLiveCheckpointStore } from "../context/compactLiveCheckpoint.js";
-import { createProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
-import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStore.js";
-import { createProjectMemoryReviewStateStore } from "../context/projectMemoryReviewState.js";
-import type { ProjectMemoryRecord } from "../context/projectMemoryStoreContract.js";
-import { createSidebarLiveEventStore } from "../context/sidebarLiveEventStore.js";
+import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
+import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
+import { createProjectMemoryReviewStateStore } from "../context/memory/projectMemoryReviewState.js";
+import type { ProjectMemoryRecord } from "../context/memory/projectMemoryStoreContract.js";
+import { createSidebarLiveEventStore } from "../context/sidebar/sidebarLiveEventStore.js";
 import type { BrowserExecutor } from "../context/browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "../context/browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";
 import type { BrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
-import { createStartupWarmContextCacheStore } from "../context/startupWarmContextHealth.js";
+import { createStartupWarmContextCacheStore } from "../context/startup/startupWarmContextHealth.js";
 import type { CommandContext } from "../commands/types.js";
 import {
   deterministicScenarioTimestamp,

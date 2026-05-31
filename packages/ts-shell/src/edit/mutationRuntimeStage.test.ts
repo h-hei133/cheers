@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { QueryEvent } from "../core/query/events.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import {
   runPrimaryMutationRuntimeStage,

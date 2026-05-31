@@ -1,4 +1,4 @@
-import { routeScopedEditJournalBoundaryFacts } from "./journalMetadataBoundary.js";
+import { routeScopedEditJournalBoundaryFacts } from "../../edit/result/journal/journalMetadataBoundary.js";
 
 export type RouteScopedEditJournalOperationKind =
   | "update"

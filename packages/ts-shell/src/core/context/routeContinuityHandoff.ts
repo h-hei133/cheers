@@ -7,12 +7,12 @@ import {
   type CompactContinuityPacket,
   type CompactContinuityPacketSource,
 } from "./compactContinuityPacket.js";
-import { CONTEXT_CONTINUITY_MANIFEST } from "./contextContinuityManifest.js";
+import { CONTEXT_CONTINUITY_MANIFEST } from "./model/contextContinuityManifest.js";
 import {
   projectContextState,
   type ContextStateProjection,
   type ContextStateProjectionInput,
-} from "./contextStateProjection.js";
+} from "./model/contextStateProjection.js";
 import { applyCompactRedactionPolicy } from "./compactRedactionPolicy.js";
 
 export interface RouteContinuityHandoffInput {

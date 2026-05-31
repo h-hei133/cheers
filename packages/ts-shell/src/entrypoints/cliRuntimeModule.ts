@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import * as readline from "node:readline";
-import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
+import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
 import {
   isFenceLine,

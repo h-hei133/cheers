@@ -1,4 +1,4 @@
-import type { QueryEvent } from "../../core/query/events.js";
+import type { QueryEvent } from "../../core/query/runtime/events.js";
 import { extractSeedInfluenceFromStrings } from "../sessionContinuityModule.js";
 import type { SeedInfluenceDiagnostic } from "../sessionContinuityTypes.js";
 

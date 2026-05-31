@@ -1,4 +1,4 @@
-import type { QueryRuntimeRepairSummary } from "../../core/query/runtimeState.js";
+import type { QueryRuntimeRepairSummary } from "../../core/query/runtime/state.js";
 import type { DurableLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
 import type {
   ContinuationReason,

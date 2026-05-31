@@ -186,12 +186,12 @@ async function main() {
   const checks = []
   checks.push(await runFocusedTest(
     'result-mapper-terminal-contract-tests',
-    'src/core/query/resultMapper.test.ts',
+    'src/core/query/mapping/mapper.test.ts',
     'preserves explicit terminalClassification when provided|falls back to reason-based classification when terminalClassification is missing|keeps successful edits successful when verification is blocked|still stops when verification is blocked without an applied edit|maps verification failure to a stopped terminal result|maps hard tool failures to an error terminal result|maps insufficient evidence without mutation to a stopped terminal result',
   ))
   checks.push(await runFocusedTest(
     'query-terminal-classification-tests',
-    'src/core/query/QueryEngine.test.ts',
+    'src/core/query/runtime/engine.test.ts',
     'executes planner -> coder -> reviewer through the core query loop|exposes explicit terminal stop reasons for invalid handoff|terminates with stopped_error after retry budget is exhausted',
   ))
   checks.push(await runFocusedTest(

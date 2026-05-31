@@ -9,7 +9,7 @@ import type { ProductLoopAdapterProjection } from "../../runtime/loop/adapter.js
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
 import { projectSessionResultParity } from "../../session/sessionResultParity.js";
-import type { QueryEvent } from "../query/events.js";
+import type { QueryEvent } from "../query/runtime/events.js";
 import type { RuntimeEventDigest } from "./sessionEventSurface.js";
 import { projectCliSessionProductSurface } from "./cliSessionProductSurface.js";
 import { renderExecutionSummaryBlock } from "./sessionEventSurface.js";

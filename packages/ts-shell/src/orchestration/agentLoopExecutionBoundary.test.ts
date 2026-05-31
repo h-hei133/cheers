@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PwRuntimeStatus } from "../core/context/pwRuntime.js";
-import type { QueryEvent } from "../core/query/events.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
 import {
   detectWorkflowBrowserPlan,
   executeBrowserModulePlan,

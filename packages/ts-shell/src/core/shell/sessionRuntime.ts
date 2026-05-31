@@ -5,10 +5,10 @@ import type {
 } from "../../session/SessionManager.js";
 import type { CompactLiveCheckpointStore } from "../context/compactLiveCheckpoint.js";
 import type { CompactInjectionStateStore } from "../context/compactInjectionState.js";
-import type { ProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
-import type { ProjectMemoryStore } from "../context/projectMemoryStoreContract.js";
-import type { QueryEvent } from "../query/events.js";
-import type { QueryRuntimeStateSeed } from "../query/runtimeState.js";
+import type { ProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
+import type { ProjectMemoryStore } from "../context/memory/projectMemoryStoreContract.js";
+import type { QueryEvent } from "../query/runtime/events.js";
+import type { QueryRuntimeStateSeed } from "../query/runtime/state.js";
 import {
   createRuntimeEventDigest,
   renderSessionQueryEventSurface,

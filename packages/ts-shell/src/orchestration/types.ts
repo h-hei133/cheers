@@ -1,4 +1,4 @@
-import type { QueryEvent } from '../core/query/events.js'
+import type { QueryEvent } from '../core/query/runtime/events.js'
 import type { RecoverySurfaceSummary } from './patchRecovery/recoverySurfaceProjection.js'
 import type { PerFilePatchResultProjection } from '../edit/result/perFilePatchResultProjection.js'
 import type { ProductLoopAdapterProjection } from '../runtime/loop/adapter.js'

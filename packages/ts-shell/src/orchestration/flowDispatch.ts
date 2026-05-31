@@ -1,4 +1,4 @@
-import type { QueryEvent } from "../core/query/events.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
 import { buildCompletedToolResult } from "../core/tools/toolPolicyResult.js";
 import { projectToolLifecycle } from "../core/tools/toolLifecycleProjection.js";
 import type { ToolLifecycleProjection } from "../core/tools/toolLifecycleProjection.js";

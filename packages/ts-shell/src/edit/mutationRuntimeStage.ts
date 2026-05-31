@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { QueryEvent } from "../core/query/events.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
 import { computeFragmentFingerprint } from "../context/readWindowContinuation.js";
 import {
   appendCurrentRequestScopeEvidence,

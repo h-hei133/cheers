@@ -9,7 +9,7 @@ import { createBrowserPublicReadOnlyWebManifest } from "../context/browserPublic
 import { decideBrowserPublicReadOnlyWebPolicy } from "../context/browserPublicReadOnlyWebPolicy.js";
 import { runBrowserPublicReadOnlyWebExecutor } from "../context/browserPublicReadOnlyWebExecutor.js";
 import { createBrowserPublicReadOnlyWebReceipt } from "../context/browserPublicReadOnlyWebReceipt.js";
-import { adaptCommandResultToSidebarEvent } from "../context/sidebarCommandEventAdapter.js";
+import { adaptCommandResultToSidebarEvent } from "../context/sidebar/sidebarCommandEventAdapter.js";
 import {
   browserRuntimeRequest,
   createBrowserRuntimeMvpScenarioFixture,

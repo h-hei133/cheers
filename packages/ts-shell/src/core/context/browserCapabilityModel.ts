@@ -1,4 +1,4 @@
-import { sanitizeSidebarText } from "./sidebarStateModel.js";
+import { sanitizeSidebarText } from "./sidebar/sidebarStateModel.js";
 
 export type BrowserBackendKind =
   | "none"

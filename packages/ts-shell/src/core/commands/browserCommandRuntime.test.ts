@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
-import { createSidebarLiveEventStore } from "../context/sidebarLiveEventStore.js";
+import { createSidebarLiveEventStore } from "../context/sidebar/sidebarLiveEventStore.js";
 import { FakeBrowserExecutor } from "../context/browserExecutor.js";
 import { createBrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
 import { BrowserExternalRunnerExecutor } from "../context/browserExternalRunnerExecutor.js";

@@ -1,4 +1,4 @@
-import type { QueryEvent } from "../core/query/events.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
 
 export type TranscriptLifecycleEventName =

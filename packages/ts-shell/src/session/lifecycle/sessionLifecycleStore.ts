@@ -1,7 +1,7 @@
 import {
   createEmptyLifecycleIndex,
 } from "../../core/tools/toolResultLifecycle.js";
-import type { QueryRuntimeRecoveryBoundary } from "../../core/query/runtimeState.js";
+import type { QueryRuntimeRecoveryBoundary } from "../../core/query/runtime/state.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshotOverrides } from "../schema/sessionStateSnapshot.js";
 import {

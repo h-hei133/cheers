@@ -1,4 +1,4 @@
-import type { QueryRuntimeRepairSummary } from "../../core/query/runtimeState.js";
+import type { QueryRuntimeRepairSummary } from "../../core/query/runtime/state.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
@@ -6,7 +6,7 @@ import {
   buildSessionReplayPlan,
   normalizeReplayTranscriptEvents,
   prepareReplayTranscript,
-} from "../replay/builder.js";
+} from "./builder.js";
 import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 
 export interface TranscriptRepairContext {

@@ -1,6 +1,6 @@
 import { SandboxEnforcer } from "../sandbox/index.js";
 import { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
-import type { QueryEvent } from "../core/query/events.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { ToolDispatcher as ToolDispatcherType } from "../tools/dispatch/dispatcher.js";
 import { isAllowlistedRunCommand } from "../orchestration/capabilityBoundaryProjection.js";
 import {

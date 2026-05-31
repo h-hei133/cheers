@@ -169,7 +169,7 @@ async function main() {
   const checks = []
   checks.push(await runFocusedTest(
     'query-engine-main-loop-tests',
-    'src/core/query/QueryEngine.test.ts',
+    'src/core/query/runtime/engine.test.ts',
     'executes planner -> coder -> reviewer through the core query loop|exposes explicit terminal stop reasons for invalid handoff|streams custom runtime events and compensates orphaned tool lifecycle before terminal completion|terminates with stopped_error after retry budget is exhausted|compensates orphaned approval requests on retryable failure paths',
   ))
   checks.push(await runFocusedTest(

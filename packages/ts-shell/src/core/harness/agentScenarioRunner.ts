@@ -8,8 +8,8 @@ import {
   type CompactLiveCheckpointStore,
 } from "../context/compactLiveCheckpoint.js";
 import { planCompactFutureTurnInjection } from "../context/compactFutureTurnInjection.js";
-import type { ProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
-import { planProjectMemoryFutureTurnInjection } from "../context/projectMemoryFutureTurnInjection.js";
+import type { ProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
+import { planProjectMemoryFutureTurnInjection } from "../context/memory/projectMemoryFutureTurnInjection.js";
 import { evaluateAgentScenarioAssertion } from "./agentScenarioAssertions.js";
 import { seedProjectMemoryRecord, createValidationEvidenceFixture } from "./agentScenarioFixtures.js";
 import {

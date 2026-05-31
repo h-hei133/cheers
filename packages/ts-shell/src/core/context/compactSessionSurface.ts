@@ -2,7 +2,7 @@ import type { CompactCommandRunResult } from "./compactCommandRunner.js";
 import {
   renderProjectMemoryCandidateSurface,
   summarizeProjectMemoryCandidates,
-} from "./projectMemoryCandidateSurface.js";
+} from "./memory/projectMemoryCandidateSurface.js";
 
 export function formatCompactSessionSurface(
   result: CompactCommandRunResult,

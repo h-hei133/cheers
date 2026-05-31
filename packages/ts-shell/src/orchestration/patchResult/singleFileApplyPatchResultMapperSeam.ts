@@ -1,5 +1,5 @@
-import { mapTerminalToOrchestrationResult } from "../../core/query/resultMapper.js";
-import type { OrchestrationResult } from "../../orchestration/types.js";
+import { mapTerminalToOrchestrationResult } from "../../core/query/mapping/mapper.js";
+import type { OrchestrationResult } from "../types.js";
 import type { SingleFileApplyPatchResultMapperConsumerContract } from "./singleFileApplyPatchResultMapperConsumer.js";
 
 export type SingleFileApplyPatchResultMapperSeamStatus =

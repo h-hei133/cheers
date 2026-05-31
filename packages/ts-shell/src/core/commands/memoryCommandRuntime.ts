@@ -2,35 +2,35 @@ import {
   getLatestCompactCheckpoint,
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
 } from "../context/compactLiveCheckpoint.js";
-import { extractProjectMemoryCandidates } from "../context/projectMemoryCandidateExtractor.js";
+import { extractProjectMemoryCandidates } from "../context/memory/projectMemoryCandidateExtractor.js";
 import {
   parseProjectMemoryReviewCommandArgs,
   ProjectMemoryReviewCommandContractError,
-} from "../context/projectMemoryReviewCommandContract.js";
-import { runProjectMemoryReviewCommand } from "../context/projectMemoryReviewCommandRunner.js";
+} from "../context/memory/projectMemoryReviewCommandContract.js";
+import { runProjectMemoryReviewCommand } from "../context/memory/projectMemoryReviewCommandRunner.js";
 import {
   parseProjectMemoryRecallCommandArgs,
   ProjectMemoryRecallCommandContractError,
-} from "../context/projectMemoryRecallCommandContract.js";
-import { runProjectMemoryRecallCommand } from "../context/projectMemoryRecallCommandRunner.js";
+} from "../context/memory/projectMemoryRecallCommandContract.js";
+import { runProjectMemoryRecallCommand } from "../context/memory/projectMemoryRecallCommandRunner.js";
 import {
   parseProjectMemoryDeleteCommandArgs,
   ProjectMemoryDeleteCommandContractError,
-} from "../context/projectMemoryDeleteCommandContract.js";
-import { runProjectMemoryDeleteCommand } from "../context/projectMemoryDeleteCommandRunner.js";
+} from "../context/memory/projectMemoryDeleteCommandContract.js";
+import { runProjectMemoryDeleteCommand } from "../context/memory/projectMemoryDeleteCommandRunner.js";
 import {
   parseProjectMemoryUseCommandArgs,
   ProjectMemoryUseCommandContractError,
-} from "../context/projectMemoryUseCommandContract.js";
-import { runProjectMemoryUseCommand } from "../context/projectMemoryUseCommandRunner.js";
+} from "../context/memory/projectMemoryUseCommandContract.js";
+import { runProjectMemoryUseCommand } from "../context/memory/projectMemoryUseCommandRunner.js";
 import {
   parseProjectMemorySaveCommandArgs,
   ProjectMemorySaveCommandContractError,
-} from "../context/projectMemorySaveCommandContract.js";
-import { runProjectMemorySaveCommand } from "../context/projectMemorySaveCommandRunner.js";
+} from "../context/memory/projectMemorySaveCommandContract.js";
+import { runProjectMemorySaveCommand } from "../context/memory/projectMemorySaveCommandRunner.js";
 import {
   DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE,
-} from "../context/projectMemoryReviewState.js";
+} from "../context/memory/projectMemoryReviewState.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 

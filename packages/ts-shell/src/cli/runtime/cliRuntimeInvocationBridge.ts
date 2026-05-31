@@ -1,5 +1,5 @@
-import type { QueryEvent } from "../../core/query/events.js";
-import type { QueryRuntimeStateSeed } from "../../core/query/runtimeState.js";
+import type { QueryEvent } from "../../core/query/runtime/events.js";
+import type { QueryRuntimeStateSeed } from "../../core/query/runtime/state.js";
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
 import type {
   EscalationPrompt,

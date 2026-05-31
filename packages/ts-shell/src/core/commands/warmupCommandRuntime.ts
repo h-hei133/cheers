@@ -1,8 +1,8 @@
 import {
   parseStartupWarmCommandArgs,
   StartupWarmCommandContractError,
-} from "../context/startupWarmCommandContract.js";
-import { runStartupWarmCommand } from "../context/startupWarmCommandRunner.js";
+} from "../context/startup/startupWarmCommandContract.js";
+import { runStartupWarmCommand } from "../context/startup/startupWarmCommandRunner.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 

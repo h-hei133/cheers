@@ -11,8 +11,8 @@ import {
   createCompactLiveCheckpointStore,
   updateLatestCompactCheckpoint,
 } from "../context/compactLiveCheckpoint.js";
-import { createProjectMemoryInjectionStateStore } from "../context/projectMemoryInjectionState.js";
-import { createProjectMemoryLocalStore } from "../context/projectMemoryLocalStore.js";
+import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
+import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
 import { projectProductLoopAdapter } from "../../runtime/loop/adapter.js";
 import { projectLoopTrajectory } from "../../runtime/loop/trajectory.js";
@@ -3448,7 +3448,7 @@ describe("shell session runtime (W5)", () => {
         renderer: { renderLine() {}, renderChunk() {} } as never,
         runPrompt: async function* (_prompt, signal) {
           await new Promise((resolve) => setTimeout(resolve, 0));
-          for await (const event of [] as import("../query/events.js").QueryEvent[]) {
+          for await (const event of [] as import("../query/runtime/events.js").QueryEvent[]) {
             yield event;
           }
           if (signal.aborted) {

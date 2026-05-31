@@ -1,5 +1,5 @@
 import type { RecoverySurfaceSummary } from "../../orchestration/patchRecovery/recoverySurfaceProjection.js";
-import type { ContextStateProjectionInput } from "./contextStateProjection.js";
+import type { ContextStateProjectionInput } from "./model/contextStateProjection.js";
 
 export type CompactCommandMode = "preview" | "render" | "json";
 export type CompactCommandSource = "session" | "route" | "manual";

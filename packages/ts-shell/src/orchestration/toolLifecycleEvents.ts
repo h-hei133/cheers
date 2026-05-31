@@ -1,4 +1,4 @@
-import type { QueryEvent } from "../core/query/events.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
 import { deriveApprovalDecisionProvenance } from "../core/tools/approvalProvenance.js";
 import { deriveToolExecutionProvenance } from "../core/tools/toolExecutionProvenance.js";
 

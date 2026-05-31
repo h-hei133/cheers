@@ -3,8 +3,8 @@ import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
 import { decideQueryRoute, type TaskMode } from "../core/query/routeDecision.js";
 import { streamLightweightChat } from "../core/query/lightweightChat.js";
 import { validateLightweightProviderCredential } from "../core/query/lightweightRoute.js";
-import type { QueryEvent } from "../core/query/events.js";
-import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
+import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import {
   type ApplyPatchRuntimeRouteOptions,
 } from "../orchestration/runMvpIntegratedFlow.js";

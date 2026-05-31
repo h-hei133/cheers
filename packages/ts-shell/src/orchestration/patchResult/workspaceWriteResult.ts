@@ -1,14 +1,14 @@
-import { mapTerminalToOrchestrationResult } from "../../core/query/resultMapper.js";
-import type { QueryRuntimeState } from "../../core/query/runtimeState.js";
-import type { QueryTerminal } from "../../core/query/transitions.js";
+import { mapTerminalToOrchestrationResult } from "../../core/query/mapping/mapper.js";
+import type { QueryRuntimeState } from "../../core/query/runtime/state.js";
+import type { QueryTerminal } from "../../core/query/runtime/transitions.js";
 import { createEmptyLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
 import { projectRecoverySurfaceSummary } from "../patchRecovery/recoverySurfaceProjection.js";
 import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "../types.js";
-import { projectPerFilePatchFailureResultWithJournal } from "./journalFailureConsumer.js";
-import { projectMutationVerificationHandoff } from "./mutationVerificationProjection.js";
+import { projectPerFilePatchFailureResultWithJournal } from "../../edit/result/journal/journalFailureConsumer.js";
+import { projectMutationVerificationHandoff } from "../../verification/result/mutationVerificationProjection.js";
 import {
   projectPerFilePatchResult,
   type PerFilePatchFailureClass,

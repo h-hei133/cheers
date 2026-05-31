@@ -1,10 +1,10 @@
 import type {
   CodingPatchFailureCode,
   CodingResultSummary,
-} from "../../orchestration/types.js";
-import type { QueryRuntimeState } from "../../core/query/runtimeState.js";
+} from "../types.js";
+import type { QueryRuntimeState } from "../../core/query/runtime/state.js";
 import { createEmptyLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
-import type { QueryTerminal } from "../../core/query/transitions.js";
+import type { QueryTerminal } from "../../core/query/runtime/transitions.js";
 import type {
   SingleFileApplyPatchRuntimeBridge,
   SingleFileApplyPatchRuntimeBridgeBlocker,

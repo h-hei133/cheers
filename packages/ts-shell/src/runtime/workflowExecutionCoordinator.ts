@@ -4,8 +4,8 @@ import type {
   RuntimeProvider,
 } from "../config/runtimeConfig.js";
 import type { PwRuntimeStatus } from "../core/context/pwRuntime.js";
-import type { QueryEvent } from "../core/query/events.js";
-import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
+import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { buildLoopContextRebuildInput } from "../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
 import { createComponentLogger, recordCount } from "../observability/index.js";

@@ -8,7 +8,7 @@ import type {
   SessionResumeEligibility,
 } from "../../session/SessionManager.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
-import { CONTINUATION_SAFETY_POLICY } from "../query/runtimeState.js";
+import { CONTINUATION_SAFETY_POLICY } from "../query/runtime/state.js";
 import {
   applyShellSubstrateTransition,
   type ShellRuntimeContext,

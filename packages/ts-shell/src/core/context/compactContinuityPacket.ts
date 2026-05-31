@@ -1,4 +1,4 @@
-import type { ContextProjectionFact } from "./contextStateProjection.js";
+import type { ContextProjectionFact } from "./model/contextStateProjection.js";
 
 export type CompactContinuityPacketSource =
   | "compact"

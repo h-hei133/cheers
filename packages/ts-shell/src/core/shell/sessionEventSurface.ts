@@ -1,5 +1,5 @@
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
-import type { QueryEvent } from "../query/events.js";
+import type { QueryEvent } from "../query/runtime/events.js";
 
 export interface RuntimeEventDigest {
   mcpSnapshots: number;

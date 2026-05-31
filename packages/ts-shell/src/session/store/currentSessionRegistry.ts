@@ -8,7 +8,7 @@ import {
   type CurrentSessionSelectionRecord,
   type CurrentSessionSelectionResolution,
   type CurrentSessionSelectionStore,
-} from "../store/currentSelection.js";
+} from "./currentSelection.js";
 import { normalizeProjectRootKey } from "./projectBindingPolicy.js";
 import { projectCurrentSessionMetadata } from "../sessionMetadataProjection.js";
 

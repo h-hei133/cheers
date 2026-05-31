@@ -3,8 +3,8 @@ import fsSync, { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { QueryEvent } from "../core/query/events.js";
-import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
+import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import { safeRemoveDir } from "../test-utils/cleanup.js";
 import {

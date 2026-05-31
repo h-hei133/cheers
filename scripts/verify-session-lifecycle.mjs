@@ -172,7 +172,7 @@ async function main() {
   ))
   checks.push(await runFocusedTest(
     'query-replay-compact-seed-tests',
-    'src/core/query/QueryEngine.test.ts',
+    'src/core/query/runtime/engine.test.ts',
     'imports replay-built runtime seed instead of restarting from the first turn|drops compacted transcript and derived context for fresh-only recovery seeds',
   ))
   checks.push(await runFocusedTest(

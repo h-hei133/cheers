@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { QueryEvent } from "../core/query/events.js";
+import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SandboxEnforcer } from "../sandbox/index.js";
 import type { CodingResultSummary } from "../orchestration/types.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";

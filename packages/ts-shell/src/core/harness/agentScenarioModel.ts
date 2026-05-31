@@ -1,5 +1,5 @@
 import type { CommandContext, CommandExecutionResult } from "../commands/types.js";
-import type { SidebarEvent } from "../context/sidebarEventModel.js";
+import type { SidebarEvent } from "../context/sidebar/sidebarEventModel.js";
 
 export type AgentScenarioStatus = "passed" | "failed" | "blocked" | "skipped";
 export type AgentScenarioStepKind =

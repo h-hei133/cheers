@@ -3,7 +3,7 @@ import type { ResolvedProviderCredential } from "../shell/providerCredentials.js
 import { redactProviderFailureDetail } from "../shell/providerFailureRedaction.js";
 import { OpenAIModelAdapter } from "../../model-adapters/providers/openai/OpenAIModelAdapter.js";
 import type { NormalizedProviderError } from "../../model-adapters/types.js";
-import type { QueryEvent } from "./events.js";
+import type { QueryEvent } from "./runtime/events.js";
 import type { TaskMode } from "./routeDecision.js";
 import type { AgentExecutionOutput, OrchestrationResult } from "../../orchestration/types.js";
 

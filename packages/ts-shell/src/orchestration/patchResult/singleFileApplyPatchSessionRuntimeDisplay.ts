@@ -1,4 +1,4 @@
-import type { OrchestrationResult } from "../../orchestration/types.js";
+import type { OrchestrationResult } from "../types.js";
 import type { SingleFileApplyPatchResultMapperConsumerContract } from "./singleFileApplyPatchResultMapperConsumer.js";
 
 export type SingleFileApplyPatchSessionRuntimeDisplayStatus =

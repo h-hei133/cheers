@@ -1,11 +1,11 @@
 import { getLatestCompactCheckpoint } from "../context/compactLiveCheckpoint.js";
 import { browserCapabilitySidebarToolItem } from "../context/browserCapabilitySurface.js";
-import { parseSidebarLivePanelCommandArgs } from "../context/sidebarLivePanelCommandContract.js";
-import { runSidebarLivePanelCommand } from "../context/sidebarLivePanelCommandRunner.js";
-import { parseSidebarPanelCommandArgs } from "../context/sidebarPanelCommandContract.js";
-import { runSidebarPanelCommand } from "../context/sidebarPanelCommandRunner.js";
-import { projectSidebarState } from "../context/sidebarStateProjection.js";
-import { renderSidebarStateSurface } from "../context/sidebarStateSurface.js";
+import { parseSidebarLivePanelCommandArgs } from "../context/sidebar/sidebarLivePanelCommandContract.js";
+import { runSidebarLivePanelCommand } from "../context/sidebar/sidebarLivePanelCommandRunner.js";
+import { parseSidebarPanelCommandArgs } from "../context/sidebar/sidebarPanelCommandContract.js";
+import { runSidebarPanelCommand } from "../context/sidebar/sidebarPanelCommandRunner.js";
+import { projectSidebarState } from "../context/sidebar/sidebarStateProjection.js";
+import { renderSidebarStateSurface } from "../context/sidebar/sidebarStateSurface.js";
 import {
   sidebarLiveEventStoreForContext,
   sidebarSessionScopeId,

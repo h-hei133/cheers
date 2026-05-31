@@ -1,4 +1,4 @@
-import type { QueryEvent } from "../../core/query/events.js";
+import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type {
   ContinuationEvidenceToken,
   ContinuationPolicyEvidence,
@@ -6,12 +6,12 @@ import type {
   QueryRuntimeRecoveryBoundary,
   QueryRuntimeRepairSummary,
   QueryRuntimeStateSeed,
-} from "../../core/query/runtimeState.js";
+} from "../../core/query/runtime/state.js";
 import {
   buildContinuationPolicyEvidence,
   CONTINUATION_SAFETY_POLICY,
   resolveContinuationSafety,
-} from "../../core/query/runtimeState.js";
+} from "../../core/query/runtime/state.js";
 import type {
   AgentExecutionOutput,
   AgentRole,

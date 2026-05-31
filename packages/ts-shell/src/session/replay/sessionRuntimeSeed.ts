@@ -1,8 +1,8 @@
-import type { QueryRuntimeStateSeed } from "../../core/query/runtimeState.js";
+import type { QueryRuntimeStateSeed } from "../../core/query/runtime/state.js";
 import {
   buildResumeReplayInput,
   type RuntimeSeedOptions,
-} from "../replay/builder.js";
+} from "./builder.js";
 import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 
 export function buildSessionRuntimeStateSeed(input: {

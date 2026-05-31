@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { mapTerminalToOrchestrationResult } from "../../core/query/resultMapper.js";
+import { mapTerminalToOrchestrationResult } from "../../core/query/mapping/mapper.js";
 import { buildSingleFileUpdatePatchApprovalContract } from "./productionGate.js";
 import { buildSingleFileApplyPatchResultMapperConsumerContract } from "./singleFileApplyPatchResultMapperConsumer.js";
 import {
