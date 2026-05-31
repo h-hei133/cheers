@@ -1,7 +1,7 @@
 # Build Infrastructure Next Product Roadmap
 
-Status: BI017 closeout.
-Date: 2026-05-29.
+Status: PS001 audit update.
+Date: 2026-05-31.
 
 ## Transition
 
@@ -11,55 +11,68 @@ specific product blocker proves a missing owner boundary.
 
 ## Recommended Immediate Route
 
-### PL004 Model Response And Tool-Call Boundary
+### PS002 Model Request, Stream Accumulation, And Tool-Call Handoff
 
 Goal:
 
-- Connect a real product-loop model response boundary to the CLI coding path in
-  a fake/default-safe way.
-- Accumulate assistant response state into a report-safe boundary object.
-- Extract and normalize tool calls into a tool-call batch that a later route can
-  dispatch.
+- Build the owner-domain model request boundary that consumes CP006 context and
+  planning facts.
+- Adapt normalized stream events into report-safe assistant accumulation and a
+  completed model response boundary.
+- Extract only completed normalized tool calls into a not-dispatched tool-call
+  batch.
+- Classify abort/cancel/failure states for streaming without executing fallback
+  or tools.
+- Emit runtime events and product surface facts without changing terminal truth.
 
-Reason for the sharpened order:
+Reason for the sharpened order after CP006 and PS001:
 
-- PL002 already connected the real CLI product path to loop trajectory
-  observation through the coordinator, shell terminal state, result mapping, and
-  product surface.
-- The next missing dependency is not more observation. It is the model response
-  and tool-call boundary that makes later tool dispatch, next-turn preparation,
-  verification/repair handoff, and continuation hardening meaningful.
+- CP006 made context discovery, acquisition, planning, handoff, memory, and
+  continuation facts visible without success upgrades.
+- PS001 found that provider adapters, assistant accumulation, tool-call
+  extraction, Agent Loop contract, runtime events, JSON stream, and product
+  surface already have useful pieces, but no coherent product-safe seam consumes
+  CP facts into model request preparation and streaming response handling.
+- The next missing dependency is a model-boundary stream projection that keeps
+  provider-called, stream-started, content-delta, tool-call-extracted,
+  fallback-eligible, and model-complete distinct from task success.
 
 Owner domains:
 
-- `runtime/loop`
-- `runtime/events`
 - `provider`
 - `turn`
-- `tools`
+- `runtime/loop`
+- `runtime/events`
+- `tools` for extraction only
 - `evidence`
 - `result`
 - `presentation` and `core/shell` as consumers only
 
 Existing infrastructure to reuse:
 
-- loop infrastructure map and trajectory projection
+- CP006 context planning summary
 - provider/model registry metadata
-- provider draft and turn role draft boundaries
+- provider readiness/config gates
+- provider adapter normalized stream events
+- model response boundary
+- assistant response accumulator
+- tool-call extraction batch
+- Agent Loop contract, loop infrastructure map, and trajectory projection
 - turn snapshots
-- tool interception and tool result split shapes for metadata only
 - runtime events and JSON event stream
 - product surface view model and terminal renderer
 - result/evidence truthfulness surfaces
 
-First implementation grouping after PL002:
+First implementation grouping after PS001:
 
-- provider/model response boundary
-- assistant response accumulation
-- normalized tool-call extraction
-- response/tool-call observations in trajectory and runtime events
+- model request boundary consuming CP facts
+- stream lifecycle projection
+- assistant response accumulation from normalized deltas
+- completed tool-call handoff into a not-dispatched batch
+- streaming abort/cancel/failure taxonomy
+- response/tool-call observations in trajectory/runtime events
 - visible not-proven claims in product surface if rendered
-- result truthfulness tests proving response/tool-call observation does not
+- result truthfulness tests proving stream/model/tool-call observations do not
   change verdict
 
 Forbidden shortcuts:
@@ -68,18 +81,21 @@ Forbidden shortcuts:
 - do not make `ShellSessionRuntime` the product loop owner
 - do not enable real provider config by default
 - do not call real providers or manually read private provider config
+- do not execute fallback
 - do not execute tools, expand command allowlists, change edit behavior, change
   verification behavior, or change repair behavior
-- do not turn provider response observed, tool calls extracted, or rendered
+- do not turn provider-called, stream-started, content-delta, tool-call partial,
+  tool calls extracted, model response complete, fallback eligible, or rendered
   output into success
 - do not add package loading, dynamic plugin execution, SDK/RPC, TUI, browser
   paths, or new dependencies
 
 Validation expectations:
 
-- fake/default-safe provider boundary tests
-- assistant response accumulation tests
-- tool-call extraction and normalization tests
+- request-prep tests for CP fact ingestion and no-write/not-proven propagation
+- stream lifecycle and assistant accumulation tests
+- tool-call partial/completed/malformed/unsupported extraction tests
+- abort/cancel/failure taxonomy tests
 - runtime loop trajectory/event tests if observations change
 - product surface rendering tests if rendered facts change
 - result-contract gate if terminal/result behavior is touched
@@ -88,10 +104,16 @@ Validation expectations:
 
 Expected product value:
 
-- A real CLI path can represent what the assistant response produced, including
-  tool-call intent, before any tool dispatch or success claim.
+- A real CLI path can prepare a model request from CP facts and represent what a
+  stream produced, including assistant response state and completed tool-call
+  intent, before any fallback, tool dispatch, or success claim.
 
-## PL002 Completed Baseline
+PS001 planning details:
+
+- `docs/build-infrastructure/provider-streaming-model-boundary-audit.md`
+- `docs/build-infrastructure/provider-streaming-model-boundary-roadmap.md`
+
+## Prior Completed Baseline
 
 PL002 completed the former immediate route:
 
@@ -105,6 +127,9 @@ This baseline is observation-only. It does not implement model response
 accumulation, model-driven tool batches, tool result messages, next-turn
 semantics, verification/repair handoff inside the loop, or product loop
 replacement.
+
+CP006 later added product-surface context and planning facts. Those facts are
+the required input dependency for PS002 model request preparation.
 
 ## Subsequent Product Routes
 
