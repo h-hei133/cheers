@@ -73,12 +73,22 @@ describe("runContextEngine", () => {
     );
     expect(result.bundle?.codeGraphTrace.traceId).toMatch(/^code_graph_trace_/);
     expect(result.bundle?.codeGraphImpact.likelyTests).toContain("src/runtime/planner.test.ts");
+    expect(result.contextAcquisitionHandoff).toBe(result.bundle?.stagedContextAcquisition);
+    expect(result.contextAcquisitionHandoff?.sufficiencyDecision.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "sufficient-for-review-only-planning-is-not-edit-authority",
+        "sufficient-for-review-only-planning-is-not-task-success",
+      ]),
+    );
     expect(result.filesRead.map((file) => file.path)).toContain("src/runtime/planner.ts");
     expect(result.contextBudget.filesRead).toBeGreaterThan(0);
     expect(result.memory.compactSummary).toContain("target=src/runtime/planner.ts");
     expect(result.memory.fileReceipts.map((receipt) => receipt.path)).toContain("src/runtime/planner.ts");
     expect(result.evidence).toContain("context-engine:status:context-built");
     expect(result.evidence).toContain(`context-engine:discovery-handoff:${result.discoveryHandoff.handoffId}`);
+    expect(result.evidence).toContain(
+      `context-engine:context-acquisition-handoff:${result.contextAcquisitionHandoff?.acquisitionFactsId}`,
+    );
     expect(result.evidence).toContain("context-engine:mutation-authority:not-granted");
   });
 

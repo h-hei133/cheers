@@ -1,4 +1,5 @@
 import type { ContextGraphPlanningBundle } from "./contextGraphPlanning.js";
+import type { StagedContextAcquisitionFacts } from "./contextGraphPlanning.js";
 import { buildContextGraphPlanningBundle } from "./contextGraphPlanning.js";
 import {
   buildContextWorkingMemory,
@@ -27,6 +28,7 @@ export interface ContextEngineResult {
   readonly repo: RepoIntelligenceResult;
   readonly selectedCandidate?: RepoIntelligenceCandidate;
   readonly discoveryHandoff: ContextDiscoveryHandoffFacts;
+  readonly contextAcquisitionHandoff?: StagedContextAcquisitionFacts;
   readonly workflowPlan: WorkflowTaskPlan;
   readonly bundle?: ContextGraphPlanningBundle;
   readonly memory: ContextWorkingMemory;
@@ -195,6 +197,7 @@ export async function runContextEngine(input: {
     workflowPlan,
     bundle,
     memory,
+    contextAcquisitionHandoff: bundle.stagedContextAcquisition,
     filesRead: bundle.packet.selectedCandidateSummaries.map((summary) => ({
       path: summary.pathLabel,
       reason: summary.relation,
@@ -219,6 +222,8 @@ export async function runContextEngine(input: {
       ...repo.evidence,
       ...reuse.evidence,
       `context-engine:discovery-handoff:${discoveryHandoff.handoffId}`,
+      `context-engine:context-acquisition-handoff:${bundle.stagedContextAcquisition.acquisitionFactsId}`,
+      ...bundle.stagedContextAcquisition.evidence,
       ...memory.evidence,
       ...bundle.taskContextAcquisition.evidence,
       ...bundle.taskContextSufficiency.evidence,

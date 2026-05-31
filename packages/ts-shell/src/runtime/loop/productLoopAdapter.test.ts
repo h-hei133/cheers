@@ -8,6 +8,7 @@ import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { runAgentLoopContract } from "./agentLoopContract.js";
 import {
   buildContextDiscoveryTargetSelectionFeatureContract,
+  buildStagedContextAcquisitionFeatureContract,
   validateFutureFeatureIntegration,
 } from "./featureContract.js";
 import {
@@ -299,6 +300,82 @@ describe("product loop adapter", () => {
       ]),
     );
     expect(adapter.resultTruthfulnessBoundary.terminalSuccessClaim).toBe(false);
+    expect(adapter.terminalSuccessClaim).toBe(false);
+  });
+
+  it("declares staged context acquisition as an observation-only feature contract", () => {
+    const contract = buildStagedContextAcquisitionFeatureContract();
+
+    expect(contract.valid).toBe(true);
+    expect(contract.terminalSuccessClaim).toBe(false);
+    expect(contract.declaration).toMatchObject({
+      featureId: "staged-context-acquisition",
+      ownerDomain: "orchestration/context-graph",
+      loopPhase: "context-acquisition",
+      productSurfaceSection: "staged-context-acquisition",
+      terminalSuccessClaim: false,
+    });
+    expect(contract.declaration.outputHandoffFacts).toEqual(
+      expect.arrayContaining([
+        "staged-read-plan",
+        "read-budget-accounting",
+        "context-packet-provenance",
+        "context-graph-score-components",
+        "code-graph-impact-trace",
+        "stale-context-facts",
+        "required-missing-facts",
+        "optional-missing-facts",
+        "next-read-suggestions",
+        "context-sufficiency-decision",
+      ]),
+    );
+    expect(contract.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "read-planned-is-not-read-completed",
+        "read-completed-is-not-enough-context",
+        "context-packet-exists-is-not-repository-understanding",
+        "stale-context-cannot-be-fresh-context",
+        "feature-contract-valid-is-not-success",
+      ]),
+    );
+    expect(contract.declaration.forbiddenShortcuts).toEqual(
+      expect.arrayContaining([
+        "treat-read-completed-as-enough-context",
+        "treat-stale-context-as-fresh-context",
+        "treat-review-only-sufficiency-as-edit-authority",
+      ]),
+    );
+  });
+
+  it("lets the runtime loop observe staged context acquisition without moving graph truth", () => {
+    const trajectory = projectLoopTrajectory({
+      loopId: "staged-context-acquisition-contract-loop",
+      prompt: "observe staged context acquisition contract",
+      resultFacts: {
+        status: "stopped",
+        terminalClassification: "stopped",
+        terminalReason: "waiting_for_input",
+        verdictSource: "result",
+      },
+    });
+    const contract = buildStagedContextAcquisitionFeatureContract();
+    const adapter = projectProductLoopAdapter({
+      adapterId: "staged-context-acquisition-contract-adapter",
+      promptSummary: "observe staged context acquisition contract",
+      loopTrajectory: trajectory,
+      featureContracts: [contract],
+    });
+
+    expect(adapter.ownerDomain).toBe("runtime/loop");
+    expect(adapter.featureContracts).toEqual([contract]);
+    expect(adapter.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "read-completed-is-not-enough-context",
+        "sufficient-for-review-only-planning-is-not-edit-authority",
+        "feature-contract-valid-is-not-success",
+        "terminal-success",
+      ]),
+    );
     expect(adapter.terminalSuccessClaim).toBe(false);
   });
 

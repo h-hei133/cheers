@@ -60,6 +60,65 @@ describe("buildContextGraphPlanningBundle", () => {
     expect(bundle.agentPlan.suggestedVerification).toContain("npm test -- --help");
     expect(bundle.taskLifecycle.lifecycleId).toMatch(/^task_lifecycle_/);
     expect(bundle.taskReadPlan.requiredReads).toContain("src/target.ts");
+    expect(bundle.stagedContextAcquisition.acquisitionFactsId).toMatch(/^staged_context_acquisition_/);
+    expect(bundle.stagedContextAcquisition.stagedReadPlan).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target: "src/target.ts",
+          readStage: "initial-high-value-read",
+          readPriority: "high",
+          rawContentPolicy: "raw-content-excluded",
+          expectedDownstreamConsumer: "context-graph-planning",
+          notProvenClaims: expect.arrayContaining([
+            "read-planned-is-not-read-completed",
+            "read-completed-is-not-enough-context",
+          ]),
+        }),
+      ]),
+    );
+    expect(bundle.stagedContextAcquisition.readBudget).toMatchObject({
+      budgetKind: "bounded-context-packet",
+      filesRead: bundle.packet.readBudget.filesRead,
+      filesSkipped: bundle.packet.omittedCandidateSummaries.length,
+      nextReadAvailable: bundle.taskReadPlan.suggestedNextReads.length > 0,
+    });
+    expect(bundle.stagedContextAcquisition.packetProvenance).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          packetId: bundle.packet.packetId,
+          sourceFilePath: "src/target.ts",
+          readStage: "initial-high-value-read",
+          rawContentRedactionStatus: "raw-content-excluded",
+          derivedSummaryStatus: "summary-derived",
+          downstreamUse: "context-graph-planning",
+          notProvenClaims: expect.arrayContaining([
+            "context-packet-exists-is-not-repository-understanding",
+          ]),
+        }),
+      ]),
+    );
+    expect(bundle.stagedContextAcquisition.graphScoring.components).toMatchObject({
+      taskTokenRelevance: "unavailable",
+      symbolHintRelevance: "unavailable",
+      packageOrModuleProximity: "unavailable",
+      fileRole: "unavailable",
+    });
+    expect(bundle.stagedContextAcquisition.graphScoring.unavailableComponents).toEqual(
+      expect.arrayContaining(["task-token-relevance", "symbol-hint-relevance"]),
+    );
+    expect(bundle.stagedContextAcquisition.impactTrace.factClassifications.map((fact) => fact.classification)).toEqual(
+      expect.arrayContaining(["observed", "inferred"]),
+    );
+    expect(bundle.stagedContextAcquisition.staleContext).toMatchObject({
+      status: "fresh",
+      sufficiencyDowngrade: false,
+    });
+    expect(bundle.stagedContextAcquisition.sufficiencyDecision.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "sufficient-for-review-only-planning-is-not-edit-authority",
+        "sufficient-for-review-only-planning-is-not-task-success",
+      ]),
+    );
     expect(bundle.analysisBrief.supportingEvidenceIds).toContain(bundle.taskReadPlan.readPlanId);
     expect(bundle.taskExecutionPlan.analysisBriefId).toBe(bundle.analysisBrief.briefId);
     expect(bundle.agentPlan.taskLifecycleId).toBe(bundle.taskLifecycle.lifecycleId);
@@ -80,5 +139,61 @@ describe("buildContextGraphPlanningBundle", () => {
     expect(bundle.graphResult.evidence).toContain(
       "context-graph-result:mutation-authority:not-granted",
     );
+  });
+
+  it("keeps partial context, next reads, and redaction facts visible without success inflation", async () => {
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "largeContext.ts"),
+      `export const largeContext = "${"x".repeat(8_200)}";\n`,
+    );
+    const workflowPlan: WorkflowTaskPlan = {
+      taskKind: "edit-file",
+      reason: "Fix targetThing token=secret oldText=before newText=after raw provider output: nope hidden reasoning",
+      targetPath: "src/target.ts",
+      contextPlanningRequested: true,
+      contextPlanningReason: "explicit-context-packet",
+      inspectFirst: true,
+      verifyAfterEdit: true,
+    };
+
+    const bundle = await buildContextGraphPlanningBundle({
+      workspaceRoot,
+      targetPath: "src/target.ts",
+      workflowPlan,
+    });
+    const facts = bundle.stagedContextAcquisition;
+    const serialized = JSON.stringify(facts);
+
+    expect(facts.readBudget.filesSkipped).toBeGreaterThan(0);
+    expect(facts.readBudget.skippedReasonCategories).toEqual(
+      expect.arrayContaining(["file byte budget exceeded"]),
+    );
+    expect(facts.readBudget.budgetExhausted).toBe(true);
+    expect(facts.nextReadSuggestions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target: "src/largeContext.ts",
+          notProvenClaims: expect.arrayContaining(["next-read-suggestion-is-not-completed-read"]),
+        }),
+      ]),
+    );
+    expect(facts.sufficiencyDecision.status).toBe("budget_exhausted");
+    expect(facts.requiredMissingFacts.length + facts.optionalMissingFacts.length).toBeGreaterThan(0);
+    expect(facts.evidence).toEqual(
+      expect.arrayContaining([
+        "staged-context-acquisition:mutation-authority:not-granted",
+        "staged-context-acquisition:provider-call:not-run",
+        "staged-context-acquisition:command-dispatch:not-run",
+        "staged-context-acquisition:raw-content-excluded",
+      ]),
+    );
+    expect(facts.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "context-packet-exists-is-not-repository-understanding",
+        "graph-edge-observed-is-not-full-impact-proof",
+        "next-read-suggestion-is-not-completed-read",
+      ]),
+    );
+    expect(serialized).not.toMatch(/token=secret|oldText=before|newText=after|raw provider output: nope|hidden reasoning/i);
   });
 });

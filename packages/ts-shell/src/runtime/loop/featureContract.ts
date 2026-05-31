@@ -159,6 +159,80 @@ export function buildContextDiscoveryTargetSelectionFeatureContract(): FutureFea
   });
 }
 
+export function buildStagedContextAcquisitionFeatureContract(): FutureFeatureIntegrationContract {
+  return validateFutureFeatureIntegration({
+    featureId: "staged-context-acquisition",
+    ownerDomain: "orchestration/context-graph",
+    loopPhase: "context-acquisition",
+    inputFacts: [
+      "context-discovery-handoff",
+      "selected-candidate-ids",
+      "target-ranking-evidence-id",
+      "read-budget",
+      "context-packet-id",
+      "context-graph-id",
+    ],
+    outputHandoffFacts: [
+      "staged-read-plan",
+      "read-budget-accounting",
+      "context-packet-provenance",
+      "context-graph-score-components",
+      "code-graph-impact-trace",
+      "stale-context-facts",
+      "required-missing-facts",
+      "optional-missing-facts",
+      "next-read-suggestions",
+      "context-sufficiency-decision",
+    ],
+    runtimeEvents: [
+      "staged-context-acquisition-observed",
+      "context-packet-observed",
+      "context-graph-score-observed",
+    ],
+    evidenceFacts: [
+      "read-stage-reasons",
+      "read-budget-files-read",
+      "read-budget-files-skipped",
+      "packet-provenance",
+      "graph-score-components",
+      "impact-trace-classifications",
+      "stale-context-status",
+      "raw-content-excluded",
+    ],
+    productSurfaceSection: "staged-context-acquisition",
+    resultTruthfulnessBoundary: "staged context acquisition facts are not edit authority, apply authority, verification success, or task success",
+    notProvenClaims: [
+      "read-planned-is-not-read-completed",
+      "read-completed-is-not-enough-context",
+      "context-packet-exists-is-not-repository-understanding",
+      "graph-edge-observed-is-not-full-impact-proof",
+      "stale-context-cannot-be-fresh-context",
+      "next-read-suggestion-is-not-completed-read",
+      "sufficient-for-review-only-planning-is-not-edit-authority",
+      "feature-contract-valid-is-not-success",
+    ],
+    forbiddenShortcuts: [
+      "treat-read-planned-as-read-completed",
+      "treat-read-completed-as-enough-context",
+      "treat-context-packet-as-repository-understanding",
+      "treat-graph-edge-as-full-impact-proof",
+      "treat-stale-context-as-fresh-context",
+      "treat-next-read-suggestion-as-completed-read",
+      "treat-review-only-sufficiency-as-edit-authority",
+      "treat-feature-contract-valid-as-task-success",
+    ],
+    validationGates: [
+      "context-graph-focused-tests",
+      "context-engine-focused-tests",
+      "context-acquisition-projection-tests",
+      "feature-contract-tests",
+      "redaction-tests",
+      "truthfulness-tests",
+    ],
+    terminalSuccessClaim: false,
+  });
+}
+
 function sanitizeId(value: string): string {
   return value
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
