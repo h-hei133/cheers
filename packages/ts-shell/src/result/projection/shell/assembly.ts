@@ -1,16 +1,16 @@
 import {
   buildActionResultSeedFromCodingResult,
   extractAttemptedFilesFromEvidence,
-} from "../evidence/projection/action/result.js";
-import { projectMutationVerificationHandoff } from "../verification/result/projection/mutation.js";
+} from "../../../evidence/projection/action/result.js";
+import { projectMutationVerificationHandoff } from "../../../verification/result/projection/mutation.js";
 import type {
   CodingPatchRecord,
   CodingResultProvenanceSummary,
   CodingResultSummary,
   CodingTaskKind,
   CodingVerificationSummary,
-} from "./types.js";
-import { buildMutationTaskDelivery } from "./verificationResultAggregation.js";
+} from "../../../orchestration/types.js";
+import { buildMutationTaskDelivery } from "./verification.js";
 
 export interface ShellResultAssemblyInput {
   readonly taskKind: CodingTaskKind;

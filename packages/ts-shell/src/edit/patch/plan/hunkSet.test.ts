@@ -3,7 +3,7 @@ import {
   buildExactHunkSetModel,
   locateExactHunkRange,
   sortHunksForApply,
-} from "./exactHunkSet.js";
+} from "./hunkSet.js";
 
 describe("exactHunkSet", () => {
   it("models exact hunks with hashes and no raw old/new content", () => {

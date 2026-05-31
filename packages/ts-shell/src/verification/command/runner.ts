@@ -1,15 +1,15 @@
-import type { QueryEvent } from "../core/query/runtime/events.js";
-import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
+import type { QueryEvent } from "../../core/query/runtime/events.js";
+import type { ToolDispatcher } from "../../tools/dispatch/dispatcher.js";
 import {
   createToolRuntimeProvenanceCollector,
   dispatchRuntimeTool,
   type ToolLifecycleResult,
-} from "./toolRuntimeModule.js";
+} from "../../orchestration/toolRuntimeModule.js";
 import {
   buildVerificationCommandResult,
   type VerificationCommandResult,
-} from "./verificationCommandResult.js";
-import type { VerificationCommandPlan } from "../verification/command/plan.js";
+} from "./result.js";
+import type { VerificationCommandPlan } from "./plan.js";
 
 export interface VerificationCommandRun {
   readonly plan: VerificationCommandPlan;

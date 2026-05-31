@@ -7,7 +7,7 @@ import {
   stripVerificationTailForMutationTarget,
   type VerificationPlan,
   type VerificationRetryDecision,
-} from "./verificationPlanner.js";
+} from "../verification/command/selection.js";
 import {
   projectCommandVerificationResult,
   projectNotRequestedVerification,
@@ -19,7 +19,7 @@ import type { CodingVerificationSummary } from "./types.js";
 export type {
   VerificationPlan,
   VerificationRetryDecision,
-} from "./verificationPlanner.js";
+} from "../verification/command/selection.js";
 export type { VerificationProjection } from "./verificationResultProjection.js";
 
 export function stripVerificationTailForTarget(prompt: string): string {

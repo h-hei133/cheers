@@ -1,11 +1,11 @@
 import { rebindPathLikeToWorkspace } from "../core/paths/legacyRootRebase.js";
-import { formatApprovalAuthorityFacts } from "./approvalAuthorityProjection.js";
+import { formatApprovalAuthorityFacts } from "../edit/authority/projection/approval.js";
 import { projectProviderSafeDiagnostics } from "./providerOutcomeProjection.js";
 import type { ContinuityStateLike } from "./runtimeHandoffProjection.js";
 import {
   blockerNextAction,
   inferVerificationBlockerKind,
-} from "./toolExecutionOutcomeProjection.js";
+} from "../verification/result/failure/outcome.js";
 import type { CodingVerificationBlockerKind } from "./types.js";
 import type { ReflectiveStateQueryKind } from "./workflowTaskPlanner.js";
 

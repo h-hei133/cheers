@@ -1,6 +1,6 @@
 import path from "node:path";
-import { normalizeSubjectTargetWithRootPath } from "../core/paths/legacyRootRebase.js";
-import type { ContinuityStateLike } from "./runtimeHandoffProjection.js";
+import { normalizeSubjectTargetWithRootPath } from "../../../core/paths/legacyRootRebase.js";
+import type { ContinuityStateLike } from "../../../orchestration/runtimeHandoffProjection.js";
 
 export function formatApprovalAuthorityFacts(input: {
   readonly continuity: ContinuityStateLike;

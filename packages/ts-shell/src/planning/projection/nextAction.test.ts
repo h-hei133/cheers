@@ -3,7 +3,7 @@ import {
   buildAmbiguousEditInstructionReason,
   formatEditExecutionFailure,
   formatTargetResolutionBlockerReason,
-} from "./doNextProjection.js";
+} from "./nextAction.js";
 
 describe("do next projection", () => {
   it("formats edit execution failure with an explicit next action", () => {

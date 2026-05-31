@@ -1,6 +1,6 @@
-import type { FencedEditMapping } from "./fencedEditPlanner.js";
-import type { ExactHunkRange } from "./exactHunkSet.js";
-import { sortHunksForApply, splitExactHunkLines } from "./exactHunkSet.js";
+import type { FencedEditMapping } from "../../../orchestration/fencedEditPlanner.js";
+import type { ExactHunkRange } from "../plan/hunkSet.js";
+import { sortHunksForApply, splitExactHunkLines } from "../plan/hunkSet.js";
 
 export type ExactHunkConflictKind =
   | "duplicate-hunk"

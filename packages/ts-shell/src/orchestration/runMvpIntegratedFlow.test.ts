@@ -22,7 +22,7 @@ import {
   appendToolResultEvent,
   appendToolStartedEvent,
 } from "./toolLifecycleEvents.js";
-import { buildMutationTaskDelivery } from "./verificationResultAggregation.js";
+import { buildMutationTaskDelivery } from "../result/projection/shell/verification.js";
 
 describe("MVP integrated end-to-end flow (T10)", () => {
   let workspaceRoot = "";

@@ -6,7 +6,7 @@ import {
 import {
   buildAmbiguousEditInstructionReason,
   formatEditExecutionFailure,
-} from "../../orchestration/doNextProjection.js";
+} from "../../planning/projection/nextAction.js";
 import { extractLowRiskUnchangedVerifications } from "../../orchestration/fileConstraintAssertions.js";
 import {
   applySingleFileReplacePatch,

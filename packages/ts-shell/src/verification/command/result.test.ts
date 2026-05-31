@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createCommandRuntimeReceipt } from "../core/runtime/runtimeReceipt.js";
-import { projectRuntimeReceipt } from "../core/runtime/runtimeReceiptProjection.js";
-import type { ToolLifecycleResult } from "./flowDispatch.js";
+import { createCommandRuntimeReceipt } from "../../core/runtime/runtimeReceipt.js";
+import { projectRuntimeReceipt } from "../../core/runtime/runtimeReceiptProjection.js";
+import type { ToolLifecycleResult } from "../../orchestration/flowDispatch.js";
 import {
   buildVerificationCommandResult,
   buildVerificationCommandSurfaceResult,
-} from "./verificationCommandResult.js";
-import { buildVerificationCommandPlan } from "../verification/command/plan.js";
+} from "./result.js";
+import { buildVerificationCommandPlan } from "./plan.js";
 
 describe("verificationCommandResult", () => {
   it("projects successful command verification with receipt markers", () => {

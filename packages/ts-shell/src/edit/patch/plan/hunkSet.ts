@@ -1,5 +1,5 @@
-import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
-import type { FencedEditMapping } from "./fencedEditPlanner.js";
+import { hashContent } from "../../../orchestration/patchRecovery/recoveryAuthorityStore.js";
+import type { FencedEditMapping } from "../../../orchestration/fencedEditPlanner.js";
 
 export interface ExactHunkRange {
   readonly startLine: number;

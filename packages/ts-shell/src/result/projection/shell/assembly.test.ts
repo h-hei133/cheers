@@ -5,7 +5,7 @@ import {
   deriveActionableBlockerContract,
   renderShellExecutionSummary,
   type ShellResultAssemblyInput,
-} from "./shellResultAssembly.js";
+} from "./assembly.js";
 
 describe("shell result assembly", () => {
   it("assembles successful mutation output while preserving changed files", () => {

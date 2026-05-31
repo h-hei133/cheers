@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { createCommandRuntimeReceipt } from "../core/runtime/runtimeReceipt.js";
-import { projectRuntimeReceipt } from "../core/runtime/runtimeReceiptProjection.js";
-import type { ToolLifecycleResult } from "./flowDispatch.js";
+import { createCommandRuntimeReceipt } from "../../core/runtime/runtimeReceipt.js";
+import { projectRuntimeReceipt } from "../../core/runtime/runtimeReceiptProjection.js";
+import type { ToolLifecycleResult } from "../../orchestration/flowDispatch.js";
 import {
   planVerification,
   planVerificationRetry,
   stripVerificationTailForMutationTarget,
-} from "./verificationPlanner.js";
+} from "./selection.js";
 import {
   projectCommandVerificationResult,
   projectNotRequestedVerification,
   projectSkippedVerification,
-} from "./verificationResultProjection.js";
+} from "../../orchestration/verificationResultProjection.js";
 
 describe("verification planner", () => {
   it("selects explicit allowlisted verify commands", () => {

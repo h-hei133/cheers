@@ -9,11 +9,11 @@ import {
 import {
   buildVerificationCommandResult,
   type VerificationCommandResult,
-} from "./verificationCommandResult.js";
+} from "../verification/command/result.js";
 import {
   runVerificationCommand,
   type VerificationCommandRun,
-} from "./verificationCommandRunner.js";
+} from "../verification/command/runner.js";
 
 export type PlanningRuntimeProductVerificationStatus =
   | "not-requested"

@@ -2,14 +2,14 @@ import type {
   CodingResultSummary,
   CodingVerificationSummary,
   OrchestrationResult,
-} from "./types.js";
+} from "../../orchestration/types.js";
 import {
   classifyVerificationCommandFailure,
   type VerificationFailureClassification,
-} from "../verification/result/failure/classifier.js";
-import type { ToolLifecycleResult } from "./flowDispatch.js";
-import { projectRuntimeReceiptEvidence } from "./flowDispatch.js";
-import type { VerificationCommandPlan } from "../verification/command/plan.js";
+} from "../result/failure/classifier.js";
+import type { ToolLifecycleResult } from "../../orchestration/flowDispatch.js";
+import { projectRuntimeReceiptEvidence } from "../../orchestration/flowDispatch.js";
+import type { VerificationCommandPlan } from "./plan.js";
 
 export type VerificationCommandOutcome =
   | "success"

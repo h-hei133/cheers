@@ -3,8 +3,8 @@ import {
   type ToolLifecycleResult,
 } from "./flowDispatch.js";
 import { projectVerificationEvidence } from "./flowEvidenceProjection.js";
-import { classifyVerificationFailure } from "./toolExecutionOutcomeProjection.js";
-import type { VerificationPlan, VerificationRetryDecision } from "./verificationPlanner.js";
+import { classifyVerificationFailure } from "../verification/result/failure/outcome.js";
+import type { VerificationPlan, VerificationRetryDecision } from "../verification/command/selection.js";
 import type { CodingVerificationSummary } from "./types.js";
 
 export interface VerificationProjection {

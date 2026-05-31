@@ -5,7 +5,7 @@ import {
   formatApprovalAuthorityFacts,
   projectApprovalAuthority,
   projectApprovalProvenance,
-} from "./approvalAuthorityProjection.js";
+} from "./approval.js";
 
 describe("approval authority projection", () => {
   it("formats one-shot approval memory without granting authorization", () => {

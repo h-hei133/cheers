@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectExactHunkConflicts } from "./exactHunkConflict.js";
+import { detectExactHunkConflicts } from "./conflict.js";
 
 describe("exactHunkConflict", () => {
   it("accepts non-overlapping exact hunks and returns deterministic order", () => {

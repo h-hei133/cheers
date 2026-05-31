@@ -4,7 +4,7 @@ import {
   buildShellCodingResult,
   deriveActionableBlockerContract,
   type ShellResultAssemblyInput,
-} from "./shellResultAssembly.js";
+} from "../result/projection/shell/assembly.js";
 import type {
   CodingPatchRecord,
   CodingResultSummary,

@@ -2,8 +2,8 @@ import type { QueryEvent } from "../../core/query/runtime/events.js";
 import {
   appendCurrentRequestScopeEvidence,
   deriveCurrentPermissionRequestFromToolInput,
-} from "../../orchestration/approvalAuthorityProjection.js";
-import { classifyVerificationFailure } from "../../orchestration/toolExecutionOutcomeProjection.js";
+} from "../../edit/authority/projection/approval.js";
+import { classifyVerificationFailure } from "../result/failure/outcome.js";
 import {
   dispatchRuntimeTool,
   type CodingResultProvenanceCollector,

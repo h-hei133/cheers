@@ -7,7 +7,7 @@ import type {
   OrchestrationResult,
 } from "./types.js";
 import type { ProposalHunkSetRoute } from "./proposalHunkSetRoute.js";
-import { projectExactHunkResultSummary } from "./exactHunkResult.js";
+import { projectExactHunkResultSummary } from "../edit/patch/result/hunk.js";
 
 export function buildProposalHunkSetRouteResult(input: {
   readonly sessionId: string;

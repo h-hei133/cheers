@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createCommandRuntimeReceipt } from "../core/runtime/runtimeReceipt.js";
-import { projectRuntimeReceipt } from "../core/runtime/runtimeReceiptProjection.js";
-import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
-import type { ToolExecutionContext, ToolExecutionResult } from "../tools/types.js";
-import { runVerificationCommand } from "./verificationCommandRunner.js";
-import { buildVerificationCommandPlan } from "../verification/command/plan.js";
+import { createCommandRuntimeReceipt } from "../../core/runtime/runtimeReceipt.js";
+import { projectRuntimeReceipt } from "../../core/runtime/runtimeReceiptProjection.js";
+import type { ToolDispatcher } from "../../tools/dispatch/dispatcher.js";
+import type { ToolExecutionContext, ToolExecutionResult } from "../../tools/types.js";
+import { runVerificationCommand } from "./runner.js";
+import { buildVerificationCommandPlan } from "./plan.js";
 
 describe("verificationCommandRunner", () => {
   it("runs ready commands through the existing runtime dispatcher", async () => {

@@ -1,6 +1,6 @@
 import {
   formatEditExecutionFailure,
-} from "../../orchestration/doNextProjection.js";
+} from "../../planning/projection/nextAction.js";
 import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
 import { selectMutationTargetFromPrompt } from "./targetSelection.js";
 

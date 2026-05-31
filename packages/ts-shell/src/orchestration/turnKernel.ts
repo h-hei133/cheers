@@ -2,7 +2,7 @@ import type { RuntimeOutcomeProjection } from "./runtimeOutcomeProjection.js";
 import {
   projectRuntimeMutationOutcome,
 } from "./runtimeOutcomeProjection.js";
-import type { ShellResultAssemblyInput } from "./shellResultAssembly.js";
+import type { ShellResultAssemblyInput } from "../result/projection/shell/assembly.js";
 import type { CodingResultProvenanceSummary } from "./types.js";
 import {
   projectRunCommandDispatchOutcome,

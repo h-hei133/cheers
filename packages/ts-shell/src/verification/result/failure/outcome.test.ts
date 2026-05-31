@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyVerificationFailure,
   inferVerificationBlockerKind,
-} from "./toolExecutionOutcomeProjection.js";
+} from "./outcome.js";
 
 describe("tool execution outcome projection", () => {
   it("classifies missing command failures with a retry next action", () => {

@@ -1,7 +1,7 @@
 import type {
   CodingTaskKind,
   CodingVerificationSummary,
-} from "./types.js";
+} from "../../../orchestration/types.js";
 
 export function buildVerificationResultNote(
   verification: CodingVerificationSummary,

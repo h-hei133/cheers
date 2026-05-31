@@ -1,4 +1,4 @@
-import { detectExactHunkConflicts } from "./exactHunkConflict.js";
+import { detectExactHunkConflicts } from "../edit/patch/apply/conflict.js";
 import type { ProviderAnchorMatch, ProviderAnchorMatchResult } from "./providerAnchorMatcher.js";
 
 export type ProviderAnchorConflictKind =

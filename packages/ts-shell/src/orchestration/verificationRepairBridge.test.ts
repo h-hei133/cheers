@@ -4,7 +4,7 @@ import { projectRuntimeReceipt } from "../core/runtime/runtimeReceiptProjection.
 import { buildAgentPlan } from "./agentPlan.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import type { ToolLifecycleResult } from "./flowDispatch.js";
-import { buildVerificationCommandResult } from "./verificationCommandResult.js";
+import { buildVerificationCommandResult } from "../verification/command/result.js";
 import { buildVerificationCommandPlan } from "../verification/command/plan.js";
 import { bridgeVerificationCommandToRepairLoop } from "./verificationRepairBridge.js";
 

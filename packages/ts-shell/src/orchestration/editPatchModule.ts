@@ -218,11 +218,11 @@ export {
   type ExactHunkSetFile,
   type ExactHunkSetModel,
   type ExactHunkRange,
-} from "./exactHunkSet.js";
+} from "../edit/patch/plan/hunkSet.js";
 export {
   detectExactHunkConflicts,
   type ExactHunkConflictResult,
-} from "./exactHunkConflict.js";
+} from "../edit/patch/apply/conflict.js";
 export {
   buildMultiHunkApplyPatch,
   runExactHunkApplyRoute,
@@ -231,7 +231,7 @@ export {
 export {
   projectExactHunkResultSummary,
   type ExactHunkResultSummary,
-} from "./exactHunkResult.js";
+} from "../edit/patch/result/hunk.js";
 export {
   runProposalHunkSetRoute,
   type ProposalHunkSetRoute,
@@ -302,11 +302,11 @@ export {
   buildVerificationCommandSurfaceResult,
   type VerificationCommandOutcome,
   type VerificationCommandResult,
-} from "./verificationCommandResult.js";
+} from "../verification/command/result.js";
 export {
   runVerificationCommand,
   type VerificationCommandRun,
-} from "./verificationCommandRunner.js";
+} from "../verification/command/runner.js";
 export {
   bridgeVerificationCommandToRepairLoop,
   type VerificationRepairBridgeResult,

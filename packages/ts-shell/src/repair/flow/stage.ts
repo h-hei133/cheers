@@ -2,7 +2,7 @@ import path from "node:path";
 import {
   appendCurrentRequestScopeEvidence,
   deriveCurrentPermissionRequestFromToolInput,
-} from "../../orchestration/approvalAuthorityProjection.js";
+} from "../../edit/authority/projection/approval.js";
 import { executeFileMutationBranch } from "../../orchestration/mutationExecution.js";
 import { dispatchRuntimeTool } from "../../orchestration/toolRuntimeModule.js";
 import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";

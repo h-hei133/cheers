@@ -1,5 +1,5 @@
-import type { ToolLifecycleProjection } from "../core/tools/toolLifecycleProjection.js";
-import type { CodingVerificationBlockerKind } from "./types.js";
+import type { ToolLifecycleProjection } from "../../../core/tools/toolLifecycleProjection.js";
+import type { CodingVerificationBlockerKind } from "../../../orchestration/types.js";
 
 export interface ToolExecutionOutcomeInput {
   readonly output?: string;

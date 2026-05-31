@@ -3,7 +3,7 @@ import type { TargetedContextPacket } from "./contextPacket.js";
 import type { EditRepairRawProposal } from "./editRepairProposal.js";
 import type { ProviderEditAvailability } from "./providerEditPlanner.js";
 import type { OrchestrationResult } from "./types.js";
-import type { VerificationCommandResult } from "./verificationCommandResult.js";
+import type { VerificationCommandResult } from "../verification/command/result.js";
 import type { VerificationRepairContext } from "./verificationRepairContext.js";
 import { buildVerificationRepairContext } from "./verificationRepairContext.js";
 import {

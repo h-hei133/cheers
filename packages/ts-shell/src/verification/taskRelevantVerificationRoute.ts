@@ -10,7 +10,7 @@ import {
 import {
   runVerificationCommand,
   type VerificationCommandRun,
-} from "../orchestration/verificationCommandRunner.js";
+} from "./command/runner.js";
 import type {
   CodingResultSummary,
   OrchestrationResult,

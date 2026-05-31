@@ -15,8 +15,8 @@ import {
   locateExactHunkRange,
   type ExactHunkSetModel,
   type ExactHunkRange,
-} from "./exactHunkSet.js";
-import { detectExactHunkConflicts } from "./exactHunkConflict.js";
+} from "../edit/patch/plan/hunkSet.js";
+import { detectExactHunkConflicts } from "../edit/patch/apply/conflict.js";
 
 export type ProposalHunkSetPlanBlocker =
   | "selection-not-confirmed"

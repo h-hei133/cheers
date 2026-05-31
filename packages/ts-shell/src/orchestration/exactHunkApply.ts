@@ -12,7 +12,7 @@ import {
   type EditSnapshotStorageOptions,
 } from "./editSnapshot.js";
 import type { FencedEditMapping } from "./fencedEditPlanner.js";
-import { splitExactHunkLines } from "./exactHunkSet.js";
+import { splitExactHunkLines } from "../edit/patch/plan/hunkSet.js";
 
 export type ExactHunkApplyStatus = "written" | "blocked";
 

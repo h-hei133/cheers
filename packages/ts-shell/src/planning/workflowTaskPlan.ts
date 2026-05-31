@@ -72,7 +72,7 @@ import {
   type RepairContinuationObject,
 } from "../orchestration/continuationModule.js";
 import { buildReflectiveStateQueryResponse } from "../orchestration/continuationPlanning.js";
-import { formatTargetResolutionBlockerReason } from "../orchestration/doNextProjection.js";
+import { formatTargetResolutionBlockerReason } from "./projection/nextAction.js";
 import { projectProviderDiagnosticHandoff } from "../orchestration/providerModule.js";
 import {
   inferRepoDiagnosis,

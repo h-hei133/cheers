@@ -5,7 +5,7 @@ import { computeFragmentFingerprint } from "../../context/readWindowContinuation
 import {
   appendCurrentRequestScopeEvidence,
   deriveCurrentPermissionRequestFromToolInput,
-} from "../../orchestration/approvalAuthorityProjection.js";
+} from "../authority/projection/approval.js";
 import {
   executeFileMutationBranch,
   type FileMutationExecutionResult,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectExactHunkResultSummary } from "./exactHunkResult.js";
+import { projectExactHunkResultSummary } from "./hunk.js";
 
 describe("exactHunkResult", () => {
   it("summarizes changed failed and unattempted hunk counts without content", () => {

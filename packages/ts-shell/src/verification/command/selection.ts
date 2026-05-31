@@ -1,10 +1,10 @@
-import { blockedCommandReason, isAllowlistedRunCommand } from "./capabilityBoundaryProjection.js";
+import { blockedCommandReason, isAllowlistedRunCommand } from "../../orchestration/capabilityBoundaryProjection.js";
 import type {
   CodingTaskKind,
   CodingVerificationBlockerKind,
   CodingVerificationSelectionScope,
   CodingVerificationSelectionSource,
-} from "./types.js";
+} from "../../orchestration/types.js";
 
 export type VerificationPlanMode =
   | "command"

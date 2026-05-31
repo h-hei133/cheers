@@ -1,4 +1,4 @@
-import { locateExactHunkRange, type ExactHunkRange } from "./exactHunkSet.js";
+import { locateExactHunkRange, type ExactHunkRange } from "../edit/patch/plan/hunkSet.js";
 import type { FencedEditMapping } from "./fencedEditPlanner.js";
 import type { ProviderAnchorCandidate } from "./providerAnchorCandidate.js";
 

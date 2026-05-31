@@ -1,4 +1,4 @@
-import type { TargetResolutionBlocker } from "./targetResolution.js";
+import type { TargetResolutionBlocker } from "../../orchestration/targetResolution.js";
 
 export function buildAmbiguousEditInstructionReason(
   targetPath?: string,
