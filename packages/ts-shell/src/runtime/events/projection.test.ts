@@ -207,6 +207,8 @@ describe("runtime event projection", () => {
       "model-boundary-completed",
     ]);
     expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
+    expect(JSON.stringify(events)).toContain('"liveClassification":"live_completed"');
+    expect(JSON.stringify(events)).toContain('"fallbackStatus":"fallback_not_attempted"');
     expect(JSON.stringify(events)).not.toMatch(/provider\.env|raw provider output|hidden reasoning/i);
   });
 

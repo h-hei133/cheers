@@ -28,6 +28,42 @@ export type ProviderStreamReadinessStatus =
   | "blocked"
   | "unknown";
 
+export type ProviderLiveAttemptClassification =
+  | "live_completed"
+  | "live_partial"
+  | "provider_blocked"
+  | "config_failed"
+  | "auth_failed"
+  | "network_failed"
+  | "endpoint_failed"
+  | "rate_limited"
+  | "timeout"
+  | "cancelled"
+  | "output_invalid"
+  | "output_insufficient"
+  | "redaction_failed"
+  | "unsupported"
+  | "unknown_failed";
+
+export type ProviderRetryEligibility =
+  | "retry_eligible"
+  | "retry_not_allowed";
+
+export type ProviderFallbackEligibility =
+  | "fallback_eligible"
+  | "fallback_not_eligible";
+
+export type ProviderFallbackStatus = "fallback_not_attempted";
+
+export type ProviderRecoveryFact =
+  | ProviderRetryEligibility
+  | ProviderFallbackEligibility
+  | ProviderFallbackStatus
+  | "manual_action_required"
+  | "provider_unavailable"
+  | "output_insufficient_recovery_needed"
+  | "redaction_failure_blocks_reporting";
+
 export interface ProviderStreamReadiness {
   readonly status: ProviderStreamReadinessStatus;
   readonly failureClass?: ProviderFailureClass;
@@ -42,10 +78,15 @@ export interface ProviderStreamAdapterProjection {
   readonly readinessStatus: ProviderStreamReadinessStatus;
   readonly status: ProviderStreamAdapterStatus;
   readonly fetchAttempted: boolean;
+  readonly liveClassification: ProviderLiveAttemptClassification;
   readonly streamProjected: boolean;
   readonly assistantAccumulationStatus: "not_run" | ModelBoundaryPhaseProjection["assistantResponse"]["accumulationStatus"];
   readonly toolCallExtractionStatus: "not_run" | ModelBoundaryPhaseProjection["toolCallBatch"]["extractionStatus"];
   readonly failureClass?: ProviderFailureClass;
+  readonly retryEligibility: ProviderRetryEligibility;
+  readonly fallbackEligibility: ProviderFallbackEligibility;
+  readonly fallbackStatus: ProviderFallbackStatus;
+  readonly recoveryFacts: readonly ProviderRecoveryFact[];
   readonly redaction: {
     readonly status: "report-safe" | "redacted";
     readonly excluded: readonly string[];
@@ -228,10 +269,25 @@ function blockedProjection(
     readinessStatus: readiness.status,
     status: input.explicitProviderOptIn ? "blocked" : "not_run",
     fetchAttempted: false,
+    liveClassification: classifyLiveAttempt({
+      fetchAttempted: false,
+      readinessStatus: readiness.status,
+      failureClass: readiness.failureClass,
+    }),
     streamProjected: false,
     assistantAccumulationStatus: "not_run",
     toolCallExtractionStatus: "not_run",
     failureClass: readiness.failureClass,
+    retryEligibility: "retry_not_allowed",
+    fallbackEligibility: "fallback_not_eligible",
+    fallbackStatus: "fallback_not_attempted",
+    recoveryFacts: recoveryFacts({
+      fetchAttempted: false,
+      readinessStatus: readiness.status,
+      failureClass: readiness.failureClass,
+      retryEligibility: "retry_not_allowed",
+      fallbackEligibility: "fallback_not_eligible",
+    }),
     redaction: {
       status: input.requestBoundary.redaction.status,
       excluded: REDACTION_EXCLUSIONS,
@@ -248,6 +304,15 @@ function projectedProjection(
   failureClass?: ProviderFailureClass,
 ): ProviderStreamAdapterProjection {
   const streamFailure = failureClass ?? phase.stream.failure?.class;
+  const retryEligibility = retryEligibilityForPhase(phase);
+  const fallbackEligibility = phase.stream.failure?.fallbackEligibility === "eligible"
+    ? "fallback_eligible"
+    : "fallback_not_eligible";
+  const redactionStatus = phase.stream.redaction.status === "redacted" ||
+      phase.assistantResponse.redaction.status === "redacted" ||
+      phase.toolCallBatch.redaction.status === "redacted"
+    ? "redacted"
+    : "report-safe";
   return deepFreeze({
     adapterId: sanitizeText(input.adapterId),
     requestId: input.requestBoundary.requestId,
@@ -256,16 +321,30 @@ function projectedProjection(
     readinessStatus: input.readiness?.status ?? "ready",
     status: "projected",
     fetchAttempted: true,
+    liveClassification: classifyLiveAttempt({
+      fetchAttempted: true,
+      readinessStatus: input.readiness?.status ?? "ready",
+      failureClass: streamFailure,
+      streamStatus: phase.stream.status,
+      redactionStatus,
+    }),
     streamProjected: true,
     assistantAccumulationStatus: phase.assistantResponse.accumulationStatus,
     toolCallExtractionStatus: phase.toolCallBatch.extractionStatus,
     ...(streamFailure ? { failureClass: streamFailure } : {}),
+    retryEligibility,
+    fallbackEligibility,
+    fallbackStatus: "fallback_not_attempted",
+    recoveryFacts: recoveryFacts({
+      fetchAttempted: true,
+      readinessStatus: input.readiness?.status ?? "ready",
+      failureClass: streamFailure,
+      retryEligibility,
+      fallbackEligibility,
+      redactionStatus,
+    }),
     redaction: {
-      status: phase.stream.redaction.status === "redacted" ||
-          phase.assistantResponse.redaction.status === "redacted" ||
-          phase.toolCallBatch.redaction.status === "redacted"
-        ? "redacted"
-        : "report-safe",
+      status: redactionStatus,
       excluded: REDACTION_EXCLUSIONS,
     },
     nextAction: streamFailure
@@ -278,6 +357,137 @@ function projectedProjection(
     ]),
     terminalSuccessClaim: false,
   });
+}
+
+function classifyLiveAttempt(input: {
+  readonly fetchAttempted: boolean;
+  readonly readinessStatus: ProviderStreamReadinessStatus;
+  readonly failureClass?: ProviderFailureClass;
+  readonly streamStatus?: ModelBoundaryPhaseProjection["stream"]["status"];
+  readonly redactionStatus?: "report-safe" | "redacted";
+}): ProviderLiveAttemptClassification {
+  if (input.redactionStatus === "redacted" && input.failureClass === "provider_redaction_failure") {
+    return "redaction_failed";
+  }
+  if (!input.fetchAttempted) {
+    switch (input.readinessStatus) {
+      case "missing_config":
+        return "config_failed";
+      case "missing_auth":
+      case "auth_failed":
+        return "auth_failed";
+      case "network_failed":
+        return "network_failed";
+      case "unknown":
+        return "unsupported";
+      case "blocked":
+      case "ready":
+        return "provider_blocked";
+    }
+  }
+  if (input.failureClass) {
+    return liveClassificationForFailure(input.failureClass);
+  }
+  switch (input.streamStatus) {
+    case "completed":
+      return "live_completed";
+    case "partial":
+    case "streaming":
+      return "live_partial";
+    case "cancelled":
+      return "cancelled";
+    case "output_invalid":
+      return "output_invalid";
+    case "output_insufficient":
+      return "output_insufficient";
+    case "redaction_failed":
+      return "redaction_failed";
+    case "failed":
+      return "unknown_failed";
+    case "not_started":
+    case undefined:
+      return "provider_blocked";
+  }
+}
+
+function liveClassificationForFailure(
+  failureClass: ProviderFailureClass,
+): ProviderLiveAttemptClassification {
+  switch (failureClass) {
+    case "provider_config":
+      return "config_failed";
+    case "provider_auth":
+      return "auth_failed";
+    case "provider_network":
+      return "network_failed";
+    case "provider_endpoint":
+      return "endpoint_failed";
+    case "provider_rate_limited":
+      return "rate_limited";
+    case "provider_timeout":
+      return "timeout";
+    case "provider_cancelled":
+      return "cancelled";
+    case "provider_output_invalid":
+    case "provider_stream_event_malformed":
+    case "provider_stream_protocol_error":
+      return "output_invalid";
+    case "provider_output_insufficient":
+      return "output_insufficient";
+    case "provider_redaction_failure":
+      return "redaction_failed";
+    case "provider_fallback_eligible":
+    case "provider_fallback_ineligible":
+    case "provider_unknown":
+    default:
+      return "unknown_failed";
+  }
+}
+
+function retryEligibilityForPhase(
+  phase: ModelBoundaryPhaseProjection,
+): ProviderRetryEligibility {
+  if (phase.stream.cancellation?.retryStatus === "retry_eligible") {
+    return "retry_eligible";
+  }
+  return "retry_not_allowed";
+}
+
+function recoveryFacts(input: {
+  readonly fetchAttempted: boolean;
+  readonly readinessStatus: ProviderStreamReadinessStatus;
+  readonly failureClass?: ProviderFailureClass;
+  readonly retryEligibility: ProviderRetryEligibility;
+  readonly fallbackEligibility: ProviderFallbackEligibility;
+  readonly redactionStatus?: "report-safe" | "redacted";
+}): readonly ProviderRecoveryFact[] {
+  const facts = new Set<ProviderRecoveryFact>([
+    input.retryEligibility,
+    input.fallbackEligibility,
+    "fallback_not_attempted",
+  ]);
+  if (!input.fetchAttempted || input.readinessStatus !== "ready") {
+    facts.add("manual_action_required");
+  }
+  if (
+    input.readinessStatus === "network_failed" ||
+    input.failureClass === "provider_network" ||
+    input.failureClass === "provider_endpoint" ||
+    input.failureClass === "provider_rate_limited" ||
+    input.failureClass === "provider_timeout"
+  ) {
+    facts.add("provider_unavailable");
+  }
+  if (input.failureClass === "provider_output_insufficient") {
+    facts.add("output_insufficient_recovery_needed");
+  }
+  if (
+    input.failureClass === "provider_redaction_failure" ||
+    input.redactionStatus === "redacted"
+  ) {
+    facts.add("redaction_failure_blocks_reporting");
+  }
+  return Object.freeze([...facts]);
 }
 
 function classifyProviderError(error: unknown): ProviderFailureClass {

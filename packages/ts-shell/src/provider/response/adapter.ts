@@ -118,6 +118,19 @@ function completedResponseToStreamEvents(input: {
       ...base,
     });
   }
+  if (
+    !input.outcome.response.content?.trim() &&
+    (input.outcome.response.toolCalls ?? []).length === 0
+  ) {
+    events.push({
+      eventId: `${input.responseId}:insufficient`,
+      kind: "output_insufficient",
+      failureClass: "provider_output_insufficient",
+      fallbackEligible: false,
+      ...base,
+    });
+    return Object.freeze(events);
+  }
   for (const [index, toolCall] of (input.outcome.response.toolCalls ?? []).entries()) {
     events.push({
       eventId: `${input.responseId}:tool:${index + 1}`,

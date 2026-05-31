@@ -570,9 +570,19 @@ describe("product surface view model", () => {
       modelBoundaryPhase: adapter.modelBoundaryPhase,
     });
     const rendered = viewModel ? renderTerminalMessage(viewModel).lines.join("\n") : "";
+    const providerSection = viewModel?.sections.find((section) => section.kind === "provider");
 
     expect(rendered).toContain("Provider stream adapter");
     expect(rendered).toContain("fetchAttempted=true");
+    expect(rendered).toContain("classification=live_completed");
+    expect(providerSection?.facts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "recoveryFacts",
+          value: expect.stringContaining("fallback_not_attempted"),
+        }),
+      ]),
+    );
     expect(rendered).toContain("streamProjected=true");
     expect(rendered).toContain("terminalSuccessClaim=false");
     expect(rendered).not.toMatch(/token=secret|raw provider output|hidden reasoning/i);

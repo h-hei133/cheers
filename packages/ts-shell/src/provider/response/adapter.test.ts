@@ -58,4 +58,25 @@ describe("provider fetch outcome stream adapter", () => {
       fallbackEligible: false,
     });
   });
+
+  it("classifies empty completed output as insufficient without fallback execution", async () => {
+    const events = await providerFetchOutcomeToStreamEvents({
+      requestId: "request-empty",
+      responseId: "response-empty",
+      outcome: {
+        kind: "completed",
+        response: { content: "   ", finishReason: "stop" },
+      },
+    });
+
+    expect(events.map((event) => event.kind)).toEqual([
+      "stream_started",
+      "output_insufficient",
+    ]);
+    expect(events.at(-1)).toMatchObject({
+      failureClass: "provider_output_insufficient",
+      fallbackEligible: false,
+      retry: "not_allowed",
+    });
+  });
 });

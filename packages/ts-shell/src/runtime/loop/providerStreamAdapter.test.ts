@@ -33,9 +33,21 @@ describe("provider stream adapter", () => {
       explicitOptIn: "missing",
       status: "not_run",
       fetchAttempted: false,
+      liveClassification: "provider_blocked",
       streamProjected: false,
+      retryEligibility: "retry_not_allowed",
+      fallbackEligibility: "fallback_not_eligible",
+      fallbackStatus: "fallback_not_attempted",
       terminalSuccessClaim: false,
     });
+    expect(adapter.recoveryFacts).toEqual(
+      expect.arrayContaining([
+        "retry_not_allowed",
+        "fallback_not_eligible",
+        "fallback_not_attempted",
+        "manual_action_required",
+      ]),
+    );
     expect(adapter.modelBoundaryPhase).toBeUndefined();
   });
 
@@ -68,6 +80,7 @@ describe("provider stream adapter", () => {
       status: "blocked",
       fetchAttempted: false,
       failureClass: "provider_auth",
+      liveClassification: "auth_failed",
       nextAction: "auth readiness is missing",
     });
   });
@@ -101,9 +114,13 @@ describe("provider stream adapter", () => {
     expect(adapter).toMatchObject({
       status: "projected",
       fetchAttempted: true,
+      liveClassification: "live_completed",
       streamProjected: true,
       assistantAccumulationStatus: "accumulated",
       toolCallExtractionStatus: "extracted",
+      retryEligibility: "retry_not_allowed",
+      fallbackEligibility: "fallback_not_eligible",
+      fallbackStatus: "fallback_not_attempted",
       terminalSuccessClaim: false,
     });
     expect(adapter.modelBoundaryPhase?.stream.status).toBe("completed");
@@ -120,11 +137,11 @@ describe("provider stream adapter", () => {
   });
 
   it.each([
-    ["authentication", "provider_auth"],
-    ["network", "provider_network"],
-    ["rate_limit", "provider_rate_limited"],
-    ["server", "provider_endpoint"],
-  ] as const)("maps %s provider failures without fake success", async (kind, failureClass) => {
+    ["authentication", "provider_auth", "auth_failed"],
+    ["network", "provider_network", "network_failed"],
+    ["rate_limit", "provider_rate_limited", "rate_limited"],
+    ["server", "provider_endpoint", "endpoint_failed"],
+  ] as const)("maps %s provider failures without fake success", async (kind, failureClass, liveClassification) => {
     const adapter = await runProviderStreamAdapter({
       adapterId: `provider-adapter-${kind}`,
       requestBoundary: createModelRequestBoundary({
@@ -152,6 +169,9 @@ describe("provider stream adapter", () => {
       status: "projected",
       fetchAttempted: true,
       failureClass,
+      liveClassification,
+      retryEligibility: "retry_not_allowed",
+      fallbackStatus: "fallback_not_attempted",
       terminalSuccessClaim: false,
     });
     expect(adapter.modelBoundaryPhase?.stream.failure).toMatchObject({
@@ -185,5 +205,141 @@ describe("provider stream adapter", () => {
 
     expect(adapter.redaction.status).toBe("redacted");
     expect(serialized).not.toMatch(/token=secret|oldText=before|newText=after|private-agents-real|hidden reasoning/i);
+  });
+
+  it.each([
+    ["invalid_request", 408, "provider_timeout", "timeout"],
+    ["unknown", 499, "provider_endpoint", "endpoint_failed"],
+  ] as const)("classifies %s status %s as report-safe recovery facts", async (kind, statusCode, failureClass, liveClassification) => {
+    const adapter = await runProviderStreamAdapter({
+      adapterId: `provider-adapter-${kind}-${statusCode}`,
+      requestBoundary: createModelRequestBoundary({
+        requestId: `request-${kind}-${statusCode}`,
+        providerMode: "real",
+        providerReadinessStatus: "ready",
+        providerSafeLabel: "OpenAI",
+        modelSafeLabel: "safe-model",
+      }),
+      responseId: `response-${kind}-${statusCode}`,
+      explicitProviderOptIn: true,
+      readiness: { status: "ready" },
+      request,
+      fetchProviderResponse: () => {
+        throw {
+          provider: "openai",
+          kind,
+          statusCode,
+          code: "safe-code",
+          message: "safe classified failure",
+          retriable: false,
+        };
+      },
+    });
+
+    expect(adapter).toMatchObject({
+      failureClass,
+      liveClassification,
+      fallbackEligibility: "fallback_not_eligible",
+      fallbackStatus: "fallback_not_attempted",
+      terminalSuccessClaim: false,
+    });
+    expect(adapter.recoveryFacts).toContain("provider_unavailable");
+  });
+
+  it("classifies cancellation without executing retry or fallback", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const adapter = await runProviderStreamAdapter({
+      adapterId: "provider-adapter-cancelled",
+      requestBoundary: createModelRequestBoundary({
+        requestId: "request-cancelled",
+        providerMode: "real",
+        providerReadinessStatus: "ready",
+        providerSafeLabel: "OpenAI",
+        modelSafeLabel: "safe-model",
+      }),
+      responseId: "response-cancelled",
+      explicitProviderOptIn: true,
+      readiness: { status: "ready" },
+      request,
+      signal: controller.signal,
+      fetchProviderResponse: () => {
+        throw new Error("aborted");
+      },
+    });
+
+    expect(adapter).toMatchObject({
+      failureClass: "provider_cancelled",
+      liveClassification: "cancelled",
+      retryEligibility: "retry_not_allowed",
+      fallbackStatus: "fallback_not_attempted",
+      terminalSuccessClaim: false,
+    });
+  });
+
+  it("classifies empty provider output as insufficient recovery needed", async () => {
+    const adapter = await runProviderStreamAdapter({
+      adapterId: "provider-adapter-empty-output",
+      requestBoundary: createModelRequestBoundary({
+        requestId: "request-empty-output",
+        providerMode: "real",
+        providerReadinessStatus: "ready",
+        providerSafeLabel: "OpenAI",
+        modelSafeLabel: "safe-model",
+      }),
+      responseId: "response-empty-output",
+      explicitProviderOptIn: true,
+      readiness: { status: "ready" },
+      request,
+      fetchProviderResponse: () => ({
+        kind: "completed",
+        response: { content: " ", finishReason: "stop" },
+      }),
+    });
+
+    expect(adapter).toMatchObject({
+      failureClass: "provider_output_insufficient",
+      liveClassification: "output_insufficient",
+      fallbackStatus: "fallback_not_attempted",
+      terminalSuccessClaim: false,
+    });
+    expect(adapter.recoveryFacts).toContain("output_insufficient_recovery_needed");
+  });
+
+  it("keeps provider attempt and model completion from becoming task success", async () => {
+    const adapter = await runProviderStreamAdapter({
+      adapterId: "provider-adapter-truth",
+      requestBoundary: createModelRequestBoundary({
+        requestId: "request-truth",
+        providerMode: "real",
+        providerReadinessStatus: "ready",
+        providerSafeLabel: "OpenAI",
+        modelSafeLabel: "safe-model",
+      }),
+      responseId: "response-truth",
+      explicitProviderOptIn: true,
+      readiness: { status: "ready" },
+      request,
+      fetchProviderResponse: () => ({
+        kind: "completed",
+        response: {
+          content: "safe answer",
+          toolCalls: [{ id: "call-safe", name: "read", arguments: { path: "a.ts" } }],
+          finishReason: "tool_calls",
+        },
+      }),
+    });
+
+    expect(adapter.liveClassification).toBe("live_completed");
+    expect(adapter.terminalSuccessClaim).toBe(false);
+    expect(adapter.modelBoundaryPhase?.terminalSuccessClaim).toBe(false);
+    expect(adapter.modelBoundaryPhase?.toolBatchHandoffPrepared).toBe(true);
+    expect(adapter.modelBoundaryPhase?.toolCallBatch.dispatchStatus).toBe("not_dispatched");
+    expect(adapter.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "provider-attempted-is-not-provider-success",
+        "model-boundary-completed-is-not-terminal-success",
+      ]),
+    );
   });
 });

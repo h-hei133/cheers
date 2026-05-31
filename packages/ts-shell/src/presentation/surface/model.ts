@@ -235,12 +235,14 @@ function providerStreamAdapterSections(
     status: adapter.status === "projected"
       ? "observed"
       : adapter.status === "blocked" ? "blocked" : "not_run",
-    summary: `optIn=${adapter.explicitOptIn}; readiness=${adapter.readinessStatus}; fetchAttempted=${adapter.fetchAttempted}; streamProjected=${adapter.streamProjected}; assistant=${adapter.assistantAccumulationStatus}; toolCalls=${adapter.toolCallExtractionStatus}; failure=${adapter.failureClass ?? "none"}; terminalSuccessClaim=false`,
+    summary: `optIn=${adapter.explicitOptIn}; readiness=${adapter.readinessStatus}; fetchAttempted=${adapter.fetchAttempted}; classification=${adapter.liveClassification}; streamProjected=${adapter.streamProjected}; assistant=${adapter.assistantAccumulationStatus}; toolCalls=${adapter.toolCallExtractionStatus}; retry=${adapter.retryEligibility}; fallback=${adapter.fallbackEligibility}; fallbackStatus=${adapter.fallbackStatus}; failure=${adapter.failureClass ?? "none"}; terminalSuccessClaim=false`,
     facts: [
       { label: "adapterId", value: adapter.adapterId },
       { label: "requestId", value: adapter.requestId },
       { label: "responseId", value: adapter.responseId },
       { label: "redaction", value: adapter.redaction.status },
+      { label: "liveClassification", value: adapter.liveClassification },
+      { label: "recoveryFacts", value: adapter.recoveryFacts.join(",") },
     ],
     redaction: adapter.redaction.status === "redacted" ? "applied" : "none",
     notProvenClaims: adapter.notProvenClaims,
