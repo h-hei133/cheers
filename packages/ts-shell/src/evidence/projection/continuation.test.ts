@@ -2,7 +2,7 @@ import {
   collectContinuationTransformsFromEvidence,
   inferReplaceDirectiveFromContinuationEvidence,
   parseContinuationTransformEvidence,
-} from "./continuationTransformEvidence.js";
+} from "./continuation.js";
 
 describe("continuationTransformEvidence", () => {
   const rebindTarget = (candidatePath: string): string | undefined =>

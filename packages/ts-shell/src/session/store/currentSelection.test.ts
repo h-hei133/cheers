@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { Session } from "./schema/sessionRecord.js";
+import type { Session } from "../schema/sessionRecord.js";
 import {
   createEmptyCurrentSessionSelectionStore,
   parseCurrentSessionSelectionStore,
   selectCurrentSession,
-} from "./currentSessionSelection.js";
+} from "./currentSelection.js";
 
 describe("currentSessionSelection", () => {
   it("parses invalid stores as empty with a stable diagnostic", () => {

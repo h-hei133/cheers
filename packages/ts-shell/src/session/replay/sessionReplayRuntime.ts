@@ -1,7 +1,7 @@
 import type {
   QueryRuntimeStateSeed,
 } from "../../core/query/runtimeState.js";
-import type { RuntimeSeedOptions } from "../sessionReplayBuilder.js";
+import type { RuntimeSeedOptions } from "../replay/builder.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import {
   buildReplayPlan,

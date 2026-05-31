@@ -48,7 +48,7 @@ import {
   isAtypicalReopenFollowUpPrompt,
   isDegradedReopenFollowUpPrompt,
   resolveContinuationReopenTarget,
-} from "../repair/degradedReopenPlanning.js";
+} from "../repair/handoff/reopen.js";
 import {
   collectContinuationTransforms,
   inferReplaceDirectiveFromContinuity,
@@ -112,7 +112,7 @@ import {
 } from "./workflowTargetPlanning.js";
 import { rebindContinuationTargetToWorkspace } from "../session/continuation/target.js";
 import { deriveWorkflowPlanningContinuitySignals } from "../session/continuation/workflowPlanningContinuity.js";
-import { buildCommandIntentPlan } from "../verification/commandIntentPlanning.js";
+import { buildCommandIntentPlan } from "../verification/intent/command.js";
 import { buildVerifyContinuationPlanning } from "../verification/verifyContinuationPlanning.js";
 
 export { extractInlineContinuityContext } from "../session/inlineContinuityContext.js";

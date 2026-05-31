@@ -3,7 +3,7 @@ import type { ContinuationTransform } from "../orchestration/workflowTaskPlanner
 import {
   collectContinuationTransformsFromEvidence,
   inferReplaceDirectiveFromContinuationEvidence,
-} from "../evidence/continuationTransformEvidence.js";
+} from "../evidence/projection/continuation.js";
 import { rebindContinuationTargetToWorkspace } from "../session/continuation/target.js";
 
 export function isRepairContinuationFollowUpPrompt(prompt: string): boolean {

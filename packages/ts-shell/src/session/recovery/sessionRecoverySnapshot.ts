@@ -12,7 +12,7 @@ import type { TranscriptEvent } from "../sessionEventCodec.js";
 import {
   normalizeReplayTranscriptEvents,
   prepareReplayTranscript,
-} from "../sessionReplayBuilder.js";
+} from "../replay/builder.js";
 import { deriveLifecycleIndexFromTranscript } from "./sessionLifecycleReadModel.js";
 
 export interface RecoverySnapshot {

@@ -1,6 +1,6 @@
 import type {
   CurrentSessionSelectionResolution,
-} from "../currentSessionSelection.js";
+} from "../store/currentSelection.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type {
   SessionStateSnapshot,

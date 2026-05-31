@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCommandIntentPlan } from "./commandIntentPlanning.js";
+import { buildCommandIntentPlan } from "./command.js";
 
 describe("commandIntentPlanning", () => {
   it("keeps unsupported command intent blocked without execution", () => {

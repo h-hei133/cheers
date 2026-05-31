@@ -6,7 +6,7 @@ import {
   buildSessionReplayPlan,
   normalizeReplayTranscriptEvents,
   prepareReplayTranscript,
-} from "../sessionReplayBuilder.js";
+} from "../replay/builder.js";
 import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 
 export interface TranscriptRepairContext {

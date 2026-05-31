@@ -9,7 +9,7 @@ import {
   isAtypicalReopenFollowUpPrompt,
   isDegradedReopenFollowUpPrompt,
   resolveContinuationReopenTarget,
-} from "./degradedReopenPlanning.js";
+} from "./reopen.js";
 
 function makeWorkspace(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "degraded-reopen-"));

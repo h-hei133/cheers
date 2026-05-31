@@ -16,7 +16,7 @@ import {
   isVerifyContinuationFollowUpPrompt,
   prefersTestOverBuildInFollowUp,
 } from "../verification/verifyContinuationPlanning.js";
-import { detectUnsupportedCommandForPlanning } from "../verification/commandIntentPlanning.js";
+import { detectUnsupportedCommandForPlanning } from "../verification/intent/command.js";
 import { extractReplaceDirective } from "../edit/mutationInstructionPlanner.js";
 import { parseGroundedRepairConstraints } from "../repair/groundedAnswerRepair.js";
 import {

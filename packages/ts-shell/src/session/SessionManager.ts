@@ -18,7 +18,7 @@ import {
 import type { ContinuationReason } from "../orchestration/types.js";
 import type {
   CurrentSessionSelectionResolution,
-} from "./currentSessionSelection.js";
+} from "./store/currentSelection.js";
 import {
   SESSION_APPROVAL_AUDIT_HISTORY_LIMIT,
   recordSessionApprovalAuditDecision,
@@ -35,7 +35,7 @@ import type {
 import {
   buildSessionStateSnapshot,
 } from "./schema/sessionStateSnapshot.js";
-import type { RuntimeSeedOptions } from "./sessionReplayBuilder.js";
+import type { RuntimeSeedOptions } from "./replay/builder.js";
 import {
   projectSortedSessionReentrySummaries,
   selectRecoveryTrustBoundaryBlock,
@@ -118,7 +118,7 @@ import {
   saveSessionError,
 } from "./lifecycle/sessionTerminalStore.js";
 
-export type { CurrentSessionSelectionResolution } from "./currentSessionSelection.js";
+export type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
 export type {
   ApprovalAuditMemoryState,
   SessionContinuitySnapshot,

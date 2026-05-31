@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyLifecycleIndex } from "../core/tools/toolResultLifecycle.js";
-import type { AgentExecutionOutput } from "../orchestration/types.js";
-import type { RecoverySnapshot, TranscriptEvent } from "./SessionManager.js";
+import { createEmptyLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
+import type { AgentExecutionOutput } from "../../orchestration/types.js";
+import type { RecoverySnapshot, TranscriptEvent } from "../SessionManager.js";
 import {
   buildReplayTurnPairingState,
   buildResumeReplayInput,
@@ -9,7 +9,7 @@ import {
   normalizeReplayTranscriptEvents,
   prepareReplayTranscript,
   projectReplayMessages,
-} from "./sessionReplayBuilder.js";
+} from "./builder.js";
 
 describe("session replay builder", () => {
   it("repairs interrupted replay transcript without changing event order", () => {
