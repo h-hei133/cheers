@@ -7,7 +7,7 @@ import {
   buildSingleFileApplyPatchPermissionUxRealRouteSeam,
   type SingleFileApplyPatchPermissionUxRealRouteStatus,
 } from "./singleFileApplyPatchPermissionUxRealRouteSeam.js";
-import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
+import type { SingleFileApplyPatchRequestedUserDecision } from "../../edit/authority/approval/permission.js";
 
 export type NoWriteRuntimeSource =
   | "synthetic"

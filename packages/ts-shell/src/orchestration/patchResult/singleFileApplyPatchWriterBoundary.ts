@@ -1,5 +1,5 @@
-import type { SingleFileApplyPatchFinalStaleReadResult } from "./singleFileApplyPatchFinalStaleRead.js";
-import type { SingleFileApplyPatchPermissionUxContract } from "./singleFileApplyPatchPermissionUxContract.js";
+import type { SingleFileApplyPatchFinalStaleReadResult } from "../../edit/write/runtime/finalRead.js";
+import type { SingleFileApplyPatchPermissionUxContract } from "../../edit/authority/approval/permission.js";
 
 export type SingleFileApplyPatchWriterBoundaryBlockedBy =
   | "permission"

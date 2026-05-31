@@ -9,7 +9,7 @@ import type { CodingResultProvenanceCollector } from "../orchestration/toolRunti
 import type { CodingTaskKind } from "../orchestration/types.js";
 import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import { runCommandVerificationStage } from "./command/verificationStage.js";
-import { runLowRiskVerificationStage } from "./lowRiskVerificationStage.js";
+import { runLowRiskVerificationStage } from "./command/lowRisk.js";
 
 export interface WorkflowVerificationStageResult {
   readonly verification: CodingVerificationSummary;

@@ -16,7 +16,7 @@ import {
   buildPerFilePatchPlan,
   type PerFilePatchPlan,
 } from "../../edit/patch/plan/perFile.js";
-import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
+import type { SingleFileApplyPatchRequestedUserDecision } from "../../edit/authority/approval/permission.js";
 import type {
   WorkspaceCreateTargetAuthority,
   WorkspaceWriteTargetAuthority,

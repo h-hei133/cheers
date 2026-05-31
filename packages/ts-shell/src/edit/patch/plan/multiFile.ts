@@ -1,7 +1,7 @@
 import type { ParsedPatch, PatchFailure } from "../../../orchestration/patchParsing/types.js";
 import { parseApplyPatchText } from "../../../orchestration/patchParsing/parser.js";
 import { verifyParsedPatch } from "../../../orchestration/patchVerification/verify.js";
-import { buildPatchPreview } from "../../../orchestration/patchResult/preview.js";
+import { buildPatchPreview } from "../result/preview.js";
 import {
   MAX_BOUNDED_WRITE_OPERATIONS,
   isBoundedWriteOperationCount,

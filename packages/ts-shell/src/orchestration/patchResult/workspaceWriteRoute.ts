@@ -14,12 +14,12 @@ import {
   buildPerFilePatchPlan,
   type PerFilePatchPlan,
 } from "../../edit/patch/plan/perFile.js";
-import { buildSingleFileApplyPatchFinalStaleReadContract } from "./singleFileApplyPatchFinalStaleRead.js";
+import { buildSingleFileApplyPatchFinalStaleReadContract } from "../../edit/write/runtime/finalRead.js";
 import {
   buildSingleFileApplyPatchOptInDryRunRoute,
   type SingleFileApplyPatchOptInDryRunRouteAccepted,
 } from "./singleFileApplyPatchOptInDryRunRoute.js";
-import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
+import type { SingleFileApplyPatchRequestedUserDecision } from "../../edit/authority/approval/permission.js";
 import type { WorkspaceWriteTargetAuthority } from "../../edit/authority/workspace.js";
 import {
   buildWorkspaceWriteFailureState,
@@ -27,7 +27,7 @@ import {
   type WorkspaceWriteFailurePhase,
   type WorkspaceWriteFailureState,
 } from "../../edit/result/workspace/writeFailureState.js";
-import { buildWriteDecisionGate, type WriteDecisionGate } from "./writeDecisionGate.js";
+import { buildWriteDecisionGate, type WriteDecisionGate } from "../../edit/authority/approval/decision.js";
 
 export type WorkspaceWriteRouteStatus = "written" | "blocked";
 

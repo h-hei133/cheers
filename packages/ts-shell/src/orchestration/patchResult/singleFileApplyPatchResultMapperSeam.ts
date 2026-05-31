@@ -1,6 +1,6 @@
 import { mapTerminalToOrchestrationResult } from "../../core/query/mapping/mapper.js";
 import type { OrchestrationResult } from "../types.js";
-import type { SingleFileApplyPatchResultMapperConsumerContract } from "./singleFileApplyPatchResultMapperConsumer.js";
+import type { SingleFileApplyPatchResultMapperConsumerContract } from "../../result/projection/patch/mapper.js";
 
 export type SingleFileApplyPatchResultMapperSeamStatus =
   | "dry-run-ready"

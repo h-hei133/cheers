@@ -6,7 +6,7 @@ import {
   type FencedEditMapping,
   type FencedEditPlanBlocker,
 } from "./fencedEditPlanner.js";
-import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
+import type { SingleFileApplyPatchRequestedUserDecision } from "../edit/authority/approval/permission.js";
 import type {
   WorkspaceWriteTargetAuthority,
 } from "../edit/authority/workspace.js";

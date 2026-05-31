@@ -1,10 +1,10 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildSingleFileUpdatePatchApprovalContract } from "./productionGate.js";
-import { buildSingleFileApplyPatchDryRun } from "./singleFileApplyPatchDryRun.js";
-import { buildSingleFileApplyPatchFinalStaleReadContract } from "./singleFileApplyPatchFinalStaleRead.js";
-import { buildSingleFileApplyPatchPermissionUxContract } from "./singleFileApplyPatchPermissionUxContract.js";
-import { buildSingleFileApplyPatchStaleReadContract } from "./singleFileApplyPatchStaleRead.js";
+import { buildSingleFileUpdatePatchApprovalContract } from "../../edit/authority/approval/production.js";
+import { buildSingleFileApplyPatchDryRun } from "../../edit/patch/apply/dryRun.js";
+import { buildSingleFileApplyPatchFinalStaleReadContract } from "../../edit/write/runtime/finalRead.js";
+import { buildSingleFileApplyPatchPermissionUxContract } from "../../edit/authority/approval/permission.js";
+import { buildSingleFileApplyPatchStaleReadContract } from "../../edit/patch/apply/staleRead.js";
 import {
   buildSingleFileApplyPatchWriterBoundaryContract,
   type SingleFileApplyPatchUnsupportedOperation,

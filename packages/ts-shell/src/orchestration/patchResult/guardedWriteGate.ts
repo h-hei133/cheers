@@ -1,4 +1,4 @@
-import type { WriteDecisionGate } from "./writeDecisionGate.js";
+import type { WriteDecisionGate } from "../../edit/authority/approval/decision.js";
 
 export type GuardedWriteGateStatus = "ready" | "blocked";
 

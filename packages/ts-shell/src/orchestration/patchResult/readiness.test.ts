@@ -7,7 +7,7 @@ import type {
   PatchVerificationResult,
 } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
-import { buildPatchPreview } from "./preview.js";
+import { buildPatchPreview } from "../../edit/patch/result/preview.js";
 import { buildSingleFileUpdatePatchReadinessContract } from "./readiness.js";
 
 const workspaceRoot = path.resolve("D:/workspace/project");

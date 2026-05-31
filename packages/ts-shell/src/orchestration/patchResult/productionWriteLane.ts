@@ -5,8 +5,8 @@ import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type { PatchFailure } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
 import type { GuardedWriteGate } from "./guardedWriteGate.js";
-import { buildSingleFileApplyPatchFinalStaleReadContract } from "./singleFileApplyPatchFinalStaleRead.js";
-import type { SingleFileApplyPatchPermissionUxContract } from "./singleFileApplyPatchPermissionUxContract.js";
+import { buildSingleFileApplyPatchFinalStaleReadContract } from "../../edit/write/runtime/finalRead.js";
+import type { SingleFileApplyPatchPermissionUxContract } from "../../edit/authority/approval/permission.js";
 
 export type ProductionWriteLaneStatus = "written" | "blocked";
 

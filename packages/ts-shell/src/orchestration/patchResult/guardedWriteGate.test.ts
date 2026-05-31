@@ -5,7 +5,7 @@ import {
   type SingleFileReplacePatchResult,
 } from "../patchMutationLane.js";
 import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatchOptInDryRunRoute.js";
-import { buildWriteDecisionGate } from "./writeDecisionGate.js";
+import { buildWriteDecisionGate } from "../../edit/authority/approval/decision.js";
 import {
   buildGuardedWriteGate,
   type GuardedWriteGate,

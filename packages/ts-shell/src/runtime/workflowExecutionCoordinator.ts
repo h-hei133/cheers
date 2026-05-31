@@ -51,11 +51,11 @@ import {
   observeRepairApply,
   observeRepairProposal,
   projectRepairRequiredHandoff,
-} from "../repair/loopBoundary.js";
+} from "../repair/handoff/boundary.js";
 import {
   observeVerificationResult,
   projectVerificationIntent,
-} from "../verification/loopBoundary.js";
+} from "../verification/result/boundary.js";
 import { transitionRuntimePhase } from "./runtimePhase.js";
 import {
   notifyRuntimeEvidenceSavePoint,
@@ -81,7 +81,7 @@ import {
 } from "../planning/workflowTaskPlan.js";
 import { isVerifyLikeCommand } from "../policy/commandIntentPolicy.js";
 import { runDirectCommandStage } from "../verification/command/stage.js";
-import { runWorkflowMutationRuntime } from "../edit/workflowMutationRuntime.js";
+import { runWorkflowMutationRuntime } from "../edit/runtime/workflow.js";
 import { runAnchoredProposalStage } from "../proposal/anchoredProposalStage.js";
 import {
   executeBrowserModulePlan,

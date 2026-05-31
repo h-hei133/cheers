@@ -5,11 +5,11 @@ import {
   observeRepairApply,
   observeRepairProposal,
   projectRepairRequiredHandoff,
-} from "../../repair/loopBoundary.js";
+} from "../../repair/handoff/boundary.js";
 import {
   observeVerificationResult,
   projectVerificationIntent,
-} from "../../verification/loopBoundary.js";
+} from "../../repair/handoff/boundary.js";
 import { projectJsonRuntimeEventStream } from "../events/stream.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import {

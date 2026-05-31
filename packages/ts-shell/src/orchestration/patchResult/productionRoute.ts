@@ -1,5 +1,5 @@
 import type { GuardedWriteGate } from "./guardedWriteGate.js";
-import type { SingleFileApplyPatchPermissionUxContract } from "./singleFileApplyPatchPermissionUxContract.js";
+import type { SingleFileApplyPatchPermissionUxContract } from "../../edit/authority/approval/permission.js";
 import {
   runProductionWriteLane,
   type ProductionWriteLane,

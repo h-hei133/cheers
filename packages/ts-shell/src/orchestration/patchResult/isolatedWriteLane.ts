@@ -4,9 +4,9 @@ import { buildNoPartialPatchApplicationContract } from "../patchApplication/noPa
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type { PatchFailure } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
-import { buildSingleFileApplyPatchFinalStaleReadContract } from "./singleFileApplyPatchFinalStaleRead.js";
-import type { SingleFileApplyPatchPermissionUxContract } from "./singleFileApplyPatchPermissionUxContract.js";
-import type { WriteDecisionGate } from "./writeDecisionGate.js";
+import { buildSingleFileApplyPatchFinalStaleReadContract } from "../../edit/write/runtime/finalRead.js";
+import type { SingleFileApplyPatchPermissionUxContract } from "../../edit/authority/approval/permission.js";
+import type { WriteDecisionGate } from "../../edit/authority/approval/decision.js";
 
 export type IsolatedWriteLaneStatus = "written" | "blocked";
 

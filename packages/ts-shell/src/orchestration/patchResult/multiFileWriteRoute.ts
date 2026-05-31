@@ -20,7 +20,7 @@ import {
   MAX_BOUNDED_WRITE_OPERATIONS,
   isBoundedWriteOperationCount,
 } from "../../edit/authority/writePolicy.js";
-import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
+import type { SingleFileApplyPatchRequestedUserDecision } from "../../edit/authority/approval/permission.js";
 import type { WorkspaceWriteTargetAuthority } from "../../edit/authority/workspace.js";
 import {
   buildWorkspaceWriteFailureState,

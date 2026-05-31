@@ -7,7 +7,7 @@ import {
 } from "./guardedWriteSmoke.js";
 import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatchOptInDryRunRoute.js";
 import { runProductionWriteLane, type ProductionWriteLane } from "./productionWriteLane.js";
-import { buildWriteDecisionGate } from "./writeDecisionGate.js";
+import { buildWriteDecisionGate } from "../../edit/authority/approval/decision.js";
 
 const workspaceRoot = path.resolve("D:/fixture/guarded-write");
 const rawPatchText = [

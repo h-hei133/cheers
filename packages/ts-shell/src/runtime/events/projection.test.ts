@@ -7,7 +7,7 @@ import {
   observeRepairApply,
   observeRepairProposal,
   projectRepairRequiredHandoff,
-} from "../../repair/loopBoundary.js";
+} from "../../repair/handoff/boundary.js";
 import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
 import { projectPackageResourceInventory } from "../resources/inventory.js";
 import { projectStaticResourceRegistry } from "../resources/projection.js";
@@ -32,7 +32,7 @@ import { prepareToolResultMessages } from "../../turn/toolResultMessage.js";
 import {
   observeVerificationResult,
   projectVerificationIntent,
-} from "../../verification/loopBoundary.js";
+} from "../../repair/handoff/boundary.js";
 import { extractToolCallBatch } from "../../tools/toolCallBatch.js";
 import { dispatchToolBatch, planToolBatchDispatch } from "../../tools/toolBatchDispatch.js";
 import {

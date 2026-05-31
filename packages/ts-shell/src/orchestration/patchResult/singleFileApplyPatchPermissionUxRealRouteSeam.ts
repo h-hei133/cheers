@@ -2,7 +2,7 @@ import type {
   SingleFileApplyPatchOptInDryRunRouteAccepted,
   SingleFileApplyPatchOptInDryRunRouteResult,
 } from "./singleFileApplyPatchOptInDryRunRoute.js";
-import type { SingleFileApplyPatchRequestedUserDecision } from "./singleFileApplyPatchPermissionUxContract.js";
+import type { SingleFileApplyPatchRequestedUserDecision } from "../../edit/authority/approval/permission.js";
 
 export type SingleFileApplyPatchPermissionUxRealRouteStatus =
   | "pending"

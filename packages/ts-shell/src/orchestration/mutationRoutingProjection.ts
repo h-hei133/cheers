@@ -26,7 +26,7 @@ import {
 } from "./patchResult/workspaceMoveRoute.js";
 import { buildWorkspaceWriteRouteResult } from "../edit/result/workspace/workspaceWriteResult.js";
 import { runWorkspaceWriteRoute } from "./patchResult/workspaceWriteRoute.js";
-import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
+import type { SingleFileApplyPatchRequestedUserDecision } from "../edit/authority/approval/permission.js";
 import type {
   WorkspaceCreateTargetAuthority,
   WorkspaceWriteTargetAuthority,

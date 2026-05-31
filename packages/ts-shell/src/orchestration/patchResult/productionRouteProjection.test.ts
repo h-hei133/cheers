@@ -6,7 +6,7 @@ import { buildGuardedWriteGate } from "./guardedWriteGate.js";
 import { runProductionRoute } from "./productionRoute.js";
 import { buildProductionRouteRuntimeProjection } from "./productionRouteProjection.js";
 import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatchOptInDryRunRoute.js";
-import { buildWriteDecisionGate } from "./writeDecisionGate.js";
+import { buildWriteDecisionGate } from "../../edit/authority/approval/decision.js";
 
 const rawPatchText = [
   "*** Begin Patch",

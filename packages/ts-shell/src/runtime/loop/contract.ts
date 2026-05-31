@@ -4,7 +4,7 @@ import {
   type RepairApplyObservation,
   type RepairProposalObservation,
   type RepairRequiredHandoff,
-} from "../../repair/loopBoundary.js";
+} from "../../repair/handoff/boundary.js";
 import { accumulateAssistantResponse, type AssistantResponseState } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy, type NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
 import { projectFollowUpQueue, type FollowUpQueueProjection } from "../../turn/followUpQueue.js";
@@ -27,7 +27,7 @@ import {
   projectVerificationIntent,
   type VerificationLoopIntent,
   type VerificationResultObservation,
-} from "../../verification/loopBoundary.js";
+} from "../../verification/result/boundary.js";
 import { projectRuntimeEvents, type RuntimeProjectionEvent } from "../events/projection.js";
 import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
 

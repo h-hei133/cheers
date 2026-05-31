@@ -10,7 +10,7 @@ import {
   observeRepairApply,
   observeRepairProposal,
   projectRepairRequiredHandoff,
-} from "../../repair/loopBoundary.js";
+} from "../../repair/handoff/boundary.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { evaluateContinuationReadiness } from "../../session/continuation/readiness.js";
 import { summarizeReplaySafeLoopState } from "../../session/replay/state.js";
@@ -23,7 +23,7 @@ import { createCommandToolResultSplit } from "../../tools/result/split.js";
 import {
   observeVerificationResult,
   projectVerificationIntent,
-} from "../../verification/loopBoundary.js";
+} from "../../repair/handoff/boundary.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import {
   projectPackageResourceInventory,

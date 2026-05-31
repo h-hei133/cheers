@@ -2,10 +2,10 @@ import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
 import type { ReplaySafePlanningStateFacts } from "../../context/memory/model.js";
-import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../../repair/loopBoundary.js";
+import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../../repair/handoff/boundary.js";
 import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
 import type { ToolResultMessageBatch } from "../../turn/toolResultMessage.js";
-import type { VerificationLoopIntent, VerificationResultObservation } from "../../verification/loopBoundary.js";
+import type { VerificationLoopIntent, VerificationResultObservation } from "../../verification/result/boundary.js";
 import type { ContinuationReadinessProjection } from "../continuation/readiness.js";
 import type { SessionTreeProjection } from "../sessionTreeProjection.js";
 

@@ -2,17 +2,17 @@ import path from "node:path";
 import {
   buildSingleFileUpdatePatchApprovalContract,
   type SingleFileUpdatePatchApprovalContract,
-} from "./productionGate.js";
+} from "../../edit/authority/approval/production.js";
 import type { SingleFileUpdatePatchReadinessContract } from "./readiness.js";
-import { buildSingleFileApplyPatchDryRun } from "./singleFileApplyPatchDryRun.js";
-import type { SingleFileApplyPatchPermissionUxDecision } from "./singleFileApplyPatchPermissionUxContract.js";
-import { buildSingleFileApplyPatchPermissionUxContract } from "./singleFileApplyPatchPermissionUxContract.js";
-import { buildSingleFileApplyPatchResultMapperConsumerContract } from "./singleFileApplyPatchResultMapperConsumer.js";
+import { buildSingleFileApplyPatchDryRun } from "../../edit/patch/apply/dryRun.js";
+import type { SingleFileApplyPatchPermissionUxDecision } from "../../edit/authority/approval/permission.js";
+import { buildSingleFileApplyPatchPermissionUxContract } from "../../edit/authority/approval/permission.js";
+import { buildSingleFileApplyPatchResultMapperConsumerContract } from "../../result/projection/patch/mapper.js";
 import { buildSingleFileApplyPatchResultMapperSeamContract } from "./singleFileApplyPatchResultMapperSeam.js";
-import { buildSingleFileApplyPatchRuntimeBridge } from "./singleFileApplyPatchRuntimeBridge.js";
+import { buildSingleFileApplyPatchRuntimeBridge } from "../../result/projection/patch/runtime.js";
 import { buildSingleFileApplyPatchSessionRuntimeSeamContract } from "./singleFileApplyPatchSessionRuntimeSeam.js";
-import { buildSingleFileApplyPatchStaleReadContract } from "./singleFileApplyPatchStaleRead.js";
-import { buildSingleFileApplyPatchTerminalSurface } from "./singleFileApplyPatchTerminalSurface.js";
+import { buildSingleFileApplyPatchStaleReadContract } from "../../edit/patch/apply/staleRead.js";
+import { buildSingleFileApplyPatchTerminalSurface } from "../../result/projection/patch/terminal.js";
 
 export interface SingleFileApplyPatchOptInDryRunRouteInput {
   readonly workspaceRoot: string;

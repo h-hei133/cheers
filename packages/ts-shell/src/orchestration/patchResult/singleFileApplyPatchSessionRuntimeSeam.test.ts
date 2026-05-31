@@ -1,19 +1,19 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildSingleFileUpdatePatchApprovalContract } from "./productionGate.js";
-import { buildSingleFileApplyPatchDryRun } from "./singleFileApplyPatchDryRun.js";
-import { buildSingleFileApplyPatchResultMapperConsumerContract } from "./singleFileApplyPatchResultMapperConsumer.js";
+import { buildSingleFileUpdatePatchApprovalContract } from "../../edit/authority/approval/production.js";
+import { buildSingleFileApplyPatchDryRun } from "../../edit/patch/apply/dryRun.js";
+import { buildSingleFileApplyPatchResultMapperConsumerContract } from "../../result/projection/patch/mapper.js";
 import { buildSingleFileApplyPatchResultMapperSeamContract } from "./singleFileApplyPatchResultMapperSeam.js";
-import { buildSingleFileApplyPatchRuntimeBridge } from "./singleFileApplyPatchRuntimeBridge.js";
+import { buildSingleFileApplyPatchRuntimeBridge } from "../../result/projection/patch/runtime.js";
 import {
   buildSingleFileApplyPatchSessionRuntimeSeamContract,
   type SingleFileApplyPatchSessionRuntimeSeamContract,
 } from "./singleFileApplyPatchSessionRuntimeSeam.js";
-import { buildSingleFileApplyPatchStaleReadContract } from "./singleFileApplyPatchStaleRead.js";
+import { buildSingleFileApplyPatchStaleReadContract } from "../../edit/patch/apply/staleRead.js";
 import {
   buildSingleFileApplyPatchTerminalSurface,
   type SingleFileApplyPatchTerminalSurface,
-} from "./singleFileApplyPatchTerminalSurface.js";
+} from "../../result/projection/patch/terminal.js";
 
 const workspaceRoot = path.resolve("D:/workspace/project");
 

@@ -4,7 +4,7 @@ import type {
   RepairApplyObservation,
   RepairProposalObservation,
   RepairRequiredHandoff,
-} from "../../repair/loopBoundary.js";
+} from "../../repair/handoff/boundary.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { ModelResponseBoundary } from "../../provider/response/boundary.js";
 import type { ProviderResponseStreamProjection } from "../../provider/response/stream.js";
@@ -36,7 +36,7 @@ import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js"
 import type {
   VerificationLoopIntent,
   VerificationResultObservation,
-} from "../../verification/loopBoundary.js";
+} from "../../verification/result/boundary.js";
 import type { ProductLoopAdapterProjection } from "../loop/adapter.js";
 import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
 import type { ProviderStreamAdapterProjection } from "../loop/providerStreamAdapter.js";

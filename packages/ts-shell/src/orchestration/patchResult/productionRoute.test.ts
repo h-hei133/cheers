@@ -8,7 +8,7 @@ import {
 } from "../patchMutationLane.js";
 import { buildGuardedWriteGate } from "./guardedWriteGate.js";
 import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatchOptInDryRunRoute.js";
-import { buildWriteDecisionGate } from "./writeDecisionGate.js";
+import { buildWriteDecisionGate } from "../../edit/authority/approval/decision.js";
 import { runProductionRoute, type ProductionRoute } from "./productionRoute.js";
 
 const applyPatchText = [

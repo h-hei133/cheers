@@ -1,10 +1,10 @@
 import type { RuntimeEvidenceSavePoint } from "../evidence/savepoint/model.js";
-import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../repair/loopBoundary.js";
+import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../repair/handoff/boundary.js";
 import type { SessionTreeProjection } from "../session/sessionTreeProjection.js";
 import type { SessionContextRebuildProjection } from "./sessionContextRebuildProjection.js";
 import type { NextTurnBundleProjection } from "../turn/nextTurnBundle.js";
 import type { ToolResultMessageBatch } from "../turn/toolResultMessage.js";
-import type { VerificationLoopIntent, VerificationResultObservation } from "../verification/loopBoundary.js";
+import type { VerificationLoopIntent, VerificationResultObservation } from "../verification/result/boundary.js";
 
 export interface LoopContextRebuildInput {
   readonly rebuildInputId: string;

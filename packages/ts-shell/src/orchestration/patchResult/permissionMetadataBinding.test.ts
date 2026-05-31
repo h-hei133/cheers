@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildSingleFileUpdatePatchApprovalContract,
   buildSingleFileUpdatePatchResultSurfaceContract,
-} from "./productionGate.js";
-import { buildSingleFileApplyPatchDryRun } from "./singleFileApplyPatchDryRun.js";
-import { buildSingleFileApplyPatchStaleReadContract } from "./singleFileApplyPatchStaleRead.js";
+} from "../../edit/authority/approval/production.js";
+import { buildSingleFileApplyPatchDryRun } from "../../edit/patch/apply/dryRun.js";
+import { buildSingleFileApplyPatchStaleReadContract } from "../../edit/patch/apply/staleRead.js";
 
 const workspaceRoot = path.resolve("D:/workspace/project");
 
