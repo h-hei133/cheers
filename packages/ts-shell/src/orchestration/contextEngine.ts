@@ -115,10 +115,16 @@ export async function runContextEngine(input: {
         ...repo.missingFacts,
         ...reuse.memory.missingFacts,
       ],
-      nextReadSuggestions: repo.nextReadSuggestions,
+      nextReadSuggestions: [
+        ...repo.nextReadSuggestions,
+        ...reuse.discoveryHandoff.nextReadSuggestions,
+      ],
       evidence: [
         ...repo.evidence,
         ...reuse.evidence,
+        `context-memory-reuse:eligibility:${reuse.eligibility.status}`,
+        `context-memory-reuse:discovery-handoff:${reuse.discoveryHandoff.handoffId}`,
+        `context-memory-reuse:planning-handoff:${reuse.planningHandoff.handoffId}`,
         `context-engine:discovery-handoff:${discoveryHandoff.handoffId}`,
         "context-engine:status:reused-memory",
         "context-engine:mutation-authority:not-granted",
@@ -158,10 +164,20 @@ export async function runContextEngine(input: {
         ...repo.missingFacts,
         "no selected target for context graph planning",
       ],
-      nextReadSuggestions: repo.nextReadSuggestions,
+      nextReadSuggestions: [
+        ...repo.nextReadSuggestions,
+        ...(reuse.discoveryHandoff?.nextReadSuggestions ?? []),
+      ],
       evidence: [
         ...repo.evidence,
         ...reuse.evidence,
+        `context-memory-reuse:eligibility:${reuse.eligibility.status}`,
+        ...(reuse.discoveryHandoff
+          ? [`context-memory-reuse:discovery-handoff:${reuse.discoveryHandoff.handoffId}`]
+          : []),
+        ...(reuse.planningHandoff
+          ? [`context-memory-reuse:planning-handoff:${reuse.planningHandoff.handoffId}`]
+          : []),
         `context-engine:discovery-handoff:${discoveryHandoff.handoffId}`,
         "context-engine:status:insufficient-context",
         "context-engine:mutation-authority:not-granted",
@@ -221,6 +237,13 @@ export async function runContextEngine(input: {
     evidence: [
       ...repo.evidence,
       ...reuse.evidence,
+      `context-memory-reuse:eligibility:${reuse.eligibility.status}`,
+      ...(reuse.discoveryHandoff
+        ? [`context-memory-reuse:discovery-handoff:${reuse.discoveryHandoff.handoffId}`]
+        : []),
+      ...(reuse.planningHandoff
+        ? [`context-memory-reuse:planning-handoff:${reuse.planningHandoff.handoffId}`]
+        : []),
       `context-engine:discovery-handoff:${discoveryHandoff.handoffId}`,
       `context-engine:context-acquisition-handoff:${bundle.stagedContextAcquisition.acquisitionFactsId}`,
       ...bundle.stagedContextAcquisition.evidence,
@@ -295,6 +318,108 @@ function buildInsufficientMemory(input: {
   readonly reason: string;
 }): ContextWorkingMemory {
   const memoryId = `ctx_mem_insufficient_${input.repo.snapshot.snapshotId}`;
+  const invalidation = {
+    invalidationId: `context-memory-invalidation:${memoryId}`,
+    policy: "stat-size-mtime" as const,
+    staleFiles: [],
+    invalidationSignals: ["missing-selected-target"],
+    missingFreshnessEvidence: ["no context receipts available"],
+    invalidated: true,
+    nextReadSuggestions: ["rerun discovery with an explicit target or symbol"],
+    notProvenClaims: [
+      "memory-exists-is-not-fresh-context",
+      "memory-reused-is-not-enough-context",
+      "refresh-suggested-is-not-completed-read",
+    ],
+  };
+  const recordFacts = {
+    recordId: `context-memory-record:${memoryId}`,
+    memoryId,
+    sourceTurnOrLabel: "context-engine-insufficient-context",
+    sourceCandidateIds: [],
+    sourceContextPacketIds: [],
+    sourcePlanningIds: [],
+    createdPhase: "context-memory",
+    intendedReuseScope: "not-reusable-without-discovery-refresh",
+    freshnessEvidence: [],
+    stalenessEvidence: invalidation.invalidationSignals,
+    invalidationState: invalidation,
+    redactionState: "report-safe" as const,
+    notProvenClaims: [
+      "memory-record-exists-is-not-fresh-context",
+      "memory-record-exists-is-not-task-success",
+      "memory-record-excludes-raw-transcript-and-file-content",
+    ],
+  };
+  const reuseEligibility = {
+    eligibilityId: `context-memory-reuse:${memoryId}`,
+    status: "unsupported" as const,
+    reason: input.reason,
+    matchingTaskFacts: [],
+    matchingTargetFacts: [],
+    matchingWorkspaceFacts: [`repoSnapshotId=${input.repo.snapshot.snapshotId}`],
+    freshnessRequirement: "unsupported" as const,
+    missingFacts: ["selected target", "context packet"],
+    requiredRefreshSuggestions: ["rerun bounded discovery and staged reads"],
+    optionalRefreshSuggestions: [],
+    notProvenClaims: [
+      "reuse-eligible-is-not-fresh-context",
+      "memory-reused-is-not-enough-context",
+      "reuse-eligible-is-not-task-success",
+    ],
+  };
+  const discoveryHandoff = {
+    handoffId: `context-memory-discovery-handoff:${memoryId}`,
+    reusedCandidateIds: [],
+    candidateFreshnessState: "unsupported" as const,
+    reusedContextPacketIds: [],
+    contextPacketFreshnessState: "unsupported" as const,
+    stalePacketsExcluded: [],
+    requiredRefreshCandidates: reuseEligibility.requiredRefreshSuggestions,
+    optionalRefreshCandidates: [],
+    discoveryFactsToRerun: ["target-ranking", "candidate-freshness"],
+    stagedReadsToRerun: ["missing-context-packets"],
+    nextReadSuggestions: reuseEligibility.requiredRefreshSuggestions,
+    notProvenClaims: [
+      "memory-handoff-is-not-fresh-discovery",
+      "required-refresh-cannot-be-bypassed-by-memory",
+      "next-read-suggestion-is-not-completed-read",
+    ],
+  };
+  const planningHandoff = {
+    handoffId: `context-memory-planning-handoff:${memoryId}`,
+    reusedPlanningQualityIds: [],
+    assumptionsRemainValid: [],
+    assumptionsRequiringRefresh: reuseEligibility.requiredRefreshSuggestions,
+    constraintsRemainActive: ["mutationAuthority=not-granted", "verificationIntent=selected-not-run"],
+    replaySafePlanStepIds: [],
+    editHandoffFreshnessState: "unsupported" as const,
+    verificationHandoffFreshnessState: "unsupported" as const,
+    unsupportedOrStalePlanningReasons: invalidation.invalidationSignals,
+    replaySafePlanningState: {
+      replayStateId: `replay-safe-planning-state:${memoryId}`,
+      taskIntentSummary: input.userTask.replace(/\s+/g, " ").trim().slice(0, 160),
+      discoveryHandoffIds: [],
+      stagedContextIds: [],
+      contextSufficiencyStatus: "unsupported",
+      planningQualityIds: [],
+      assumptionsAndConstraints: ["mutationAuthority=not-granted", "verificationIntent=selected-not-run"],
+      editHandoffIds: [],
+      verificationHandoffIds: [],
+      staleInvalidationFacts: invalidation.invalidationSignals,
+      continuationReadiness: "requires-refresh" as const,
+      notProvenClaims: [
+        "replay-state-available-is-not-plan-validity",
+        "replayed-edit-handoff-is-not-mutation-authority",
+        "replayed-verification-intent-is-not-verification-passed",
+      ],
+    },
+    notProvenClaims: [
+      "replayed-plan-is-not-executable-work",
+      "replayed-edit-handoff-is-not-mutation-authority",
+      "replayed-verification-intent-is-not-verification-passed",
+    ],
+  };
   return {
     memoryId,
     taskFingerprint: fingerprintTask(input.userTask),
@@ -313,10 +438,11 @@ function buildInsufficientMemory(input: {
     editTargetRationale: [],
     verificationIntent: [],
     handoffSummary: "handoff=blocked-before-mutation-runtime; mutationAuthority=not-granted",
-    invalidation: {
-      policy: "stat-size-mtime",
-      staleFiles: [],
-    },
+    invalidation,
+    recordFacts,
+    reuseEligibility,
+    discoveryHandoff,
+    planningHandoff,
     redactionStatus: "redacted-and-budgeted",
     mutationAuthority: "not-granted",
     evidence: [

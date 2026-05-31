@@ -1,5 +1,6 @@
 import type { LoopContextRebuildInput } from "../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../context/sessionContextRebuildProjection.js";
+import type { ContextWorkingMemory } from "../orchestration/contextMemory.js";
 import type { SessionTreeProjection } from "./sessionTreeProjection.js";
 
 export type ContinuationReadinessStatus =
@@ -12,6 +13,16 @@ export type ContinuationReadinessStatus =
   | "not_ready"
   | "not_proven";
 
+export type ContinuationContextReadinessStatus =
+  | "ready_for_review_only_planning"
+  | "ready_with_required_refresh"
+  | "ready_with_optional_refresh"
+  | "blocked_stale_context"
+  | "blocked_workspace_mismatch"
+  | "blocked_missing_required_facts"
+  | "blocked_ambiguous_target"
+  | "unsupported";
+
 export interface ContinuationReadinessProjection {
   readonly readinessId: string;
   readonly sourceSessionId: string;
@@ -20,6 +31,14 @@ export interface ContinuationReadinessProjection {
   readonly optionalMissingFacts: readonly string[];
   readonly staleFacts: readonly string[];
   readonly unsafeFactsExcluded: readonly string[];
+  readonly contextReadinessStatus: ContinuationContextReadinessStatus;
+  readonly sourceMemoryIds: readonly string[];
+  readonly sourceSessionPathFacts: readonly string[];
+  readonly contextRebuildProjectionIds: readonly string[];
+  readonly requiredRefreshReads: readonly string[];
+  readonly optionalRefreshReads: readonly string[];
+  readonly missingRequiredFacts: readonly string[];
+  readonly missingOptionalFacts: readonly string[];
   readonly branchGapStatus: "branch_unsupported" | "branch_projection_only" | "not_proven";
   readonly compactionGapStatus: "compaction_unsupported" | "compaction_projection_only" | "not_proven";
   readonly nextTurnExecuted: false;
@@ -51,6 +70,10 @@ export function evaluateContinuationReadiness(input: {
   readonly requiredFacts?: readonly string[];
   readonly optionalFacts?: readonly string[];
   readonly staleFacts?: readonly string[];
+  readonly sourceMemories?: readonly ContextWorkingMemory[];
+  readonly sourceSessionPathFacts?: readonly string[];
+  readonly ambiguousTarget?: boolean;
+  readonly workspaceMismatch?: boolean;
   readonly unsupported?: boolean;
   readonly notProven?: boolean;
 }): ContinuationReadinessProjection {
@@ -66,6 +89,22 @@ export function evaluateContinuationReadiness(input: {
     ...input.contextRebuildProjection.excludedUnsafeFacts,
     ...(input.rebuildInput?.excludedFactsSummary ?? []),
   ];
+  const staleFacts = input.staleFacts ?? input.contextRebuildProjection.staleFacts;
+  const memoryRequiredRefreshReads = (input.sourceMemories ?? []).flatMap((memory) =>
+    memory.reuseEligibility.requiredRefreshSuggestions
+  );
+  const memoryOptionalRefreshReads = (input.sourceMemories ?? []).flatMap((memory) =>
+    memory.reuseEligibility.optionalRefreshSuggestions
+  );
+  const requiredRefreshReads = unique([
+    ...memoryRequiredRefreshReads,
+    ...staleFacts.map((fact) => `refresh stale fact: ${fact}`),
+    ...requiredMissingFacts.map((fact) => `refresh required fact: ${fact}`),
+  ]);
+  const optionalRefreshReads = unique([
+    ...memoryOptionalRefreshReads,
+    ...optionalMissingFacts.map((fact) => `refresh optional fact: ${fact}`),
+  ]);
   const status = readinessStatus({
     notProven: input.notProven,
     unsupported: input.unsupported,
@@ -74,8 +113,17 @@ export function evaluateContinuationReadiness(input: {
       input.rebuildInput?.redaction.status === "redacted",
     requiredMissingFacts,
     optionalMissingFacts,
-    staleFacts: input.staleFacts ?? input.contextRebuildProjection.staleFacts,
+    staleFacts,
     hasTurnMessages: input.sessionProjection.activePathProjection.entryKinds.includes("turn-message"),
+  });
+  const contextReadinessStatus = continuationContextReadinessStatus({
+    unsupported: input.unsupported,
+    workspaceMismatch: input.workspaceMismatch,
+    ambiguousTarget: input.ambiguousTarget,
+    staleFacts,
+    requiredMissingFacts,
+    requiredRefreshReads,
+    optionalRefreshReads,
   });
 
   return deepFreeze({
@@ -84,8 +132,21 @@ export function evaluateContinuationReadiness(input: {
     status,
     requiredMissingFacts,
     optionalMissingFacts,
-    staleFacts: input.staleFacts ?? input.contextRebuildProjection.staleFacts,
+    staleFacts,
     unsafeFactsExcluded,
+    contextReadinessStatus,
+    sourceMemoryIds: (input.sourceMemories ?? []).map((memory) => memory.memoryId),
+    sourceSessionPathFacts: input.sourceSessionPathFacts ?? [
+      `session=${input.sessionProjection.sessionIdentity}`,
+      `activeLeaf=${input.sessionProjection.activeLeafId}`,
+    ],
+    contextRebuildProjectionIds: [
+      `${input.contextRebuildProjection.rebuildSource.sessionIdentity}:context-rebuild:${input.contextRebuildProjection.rebuildSource.activeLeafId}`,
+    ],
+    requiredRefreshReads,
+    optionalRefreshReads,
+    missingRequiredFacts: requiredMissingFacts,
+    missingOptionalFacts: optionalMissingFacts,
     branchGapStatus:
       input.sessionProjection.branchSummary.availability === "observed"
         ? "branch_projection_only"
@@ -112,6 +173,9 @@ export function evaluateContinuationReadiness(input: {
       "repair-success",
       "continuation-ready-is-not-success",
       "context-rebuilt-is-not-success",
+      "continuation-ready-is-not-edit-authority",
+      "continuation-ready-is-not-apply-authority",
+      "continuation-ready-is-not-verification-success",
       ...input.contextRebuildProjection.notProvenClaims,
       ...(input.rebuildInput?.notProvenClaims ?? []),
     ],
@@ -136,6 +200,29 @@ function readinessStatus(input: {
   if (input.notProven) return "not_proven";
   if (input.optionalMissingFacts.length > 0) return "ready_with_missing_optional_facts";
   return "ready";
+}
+
+function continuationContextReadinessStatus(input: {
+  readonly unsupported?: boolean;
+  readonly workspaceMismatch?: boolean;
+  readonly ambiguousTarget?: boolean;
+  readonly staleFacts: readonly string[];
+  readonly requiredMissingFacts: readonly string[];
+  readonly requiredRefreshReads: readonly string[];
+  readonly optionalRefreshReads: readonly string[];
+}): ContinuationContextReadinessStatus {
+  if (input.unsupported) return "unsupported";
+  if (input.workspaceMismatch) return "blocked_workspace_mismatch";
+  if (input.ambiguousTarget) return "blocked_ambiguous_target";
+  if (input.staleFacts.length > 0) return "blocked_stale_context";
+  if (input.requiredMissingFacts.length > 0) return "blocked_missing_required_facts";
+  if (input.requiredRefreshReads.length > 0) return "ready_with_required_refresh";
+  if (input.optionalRefreshReads.length > 0) return "ready_with_optional_refresh";
+  return "ready_for_review_only_planning";
+}
+
+function unique(values: readonly string[]): readonly string[] {
+  return Array.from(new Set(values.filter((value) => value.trim().length > 0)));
 }
 
 function deepFreeze<T>(value: T): T {

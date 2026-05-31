@@ -7,6 +7,7 @@ import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { runAgentLoopContract } from "./agentLoopContract.js";
 import {
+  buildContinuationContextFeatureContract,
   buildContextDiscoveryTargetSelectionFeatureContract,
   buildPlanningFeatureContract,
   buildStagedContextAcquisitionFeatureContract,
@@ -448,6 +449,91 @@ describe("product loop adapter", () => {
       expect.arrayContaining([
         "plan-generated-is-not-executable-work",
         "edit-handoff-ready-is-not-mutation-authority",
+        "terminal-success",
+      ]),
+    );
+    expect(adapter.resultTruthfulnessBoundary.terminalSuccessClaim).toBe(false);
+    expect(adapter.terminalSuccessClaim).toBe(false);
+  });
+
+  it("declares continuation context as an observation-only feature contract", () => {
+    const contract = buildContinuationContextFeatureContract();
+
+    expect(contract.valid).toBe(true);
+    expect(contract.terminalSuccessClaim).toBe(false);
+    expect(contract.declaration).toMatchObject({
+      featureId: "continuation-context",
+      ownerDomain: "orchestration/context-memory",
+      loopPhase: "continuation-context",
+      productSurfaceSection: "continuation-context",
+      terminalSuccessClaim: false,
+    });
+    expect(contract.declaration.inputFacts).toEqual(
+      expect.arrayContaining([
+        "context-memory-record-facts",
+        "reuse-eligibility-facts",
+        "stale-invalidation-facts",
+        "session-context-rebuild-projection",
+        "continuation-readiness-facts",
+        "replay-safe-planning-state",
+        "cp002-discovery-handoff",
+        "cp003-staged-context-acquisition",
+        "cp004-planning-handoff",
+      ]),
+    );
+    expect(contract.declaration.outputHandoffFacts).toEqual(
+      expect.arrayContaining([
+        "memory-to-discovery-handoff",
+        "memory-to-staged-read-handoff",
+        "memory-to-planning-handoff",
+        "required-refresh-reads",
+        "continuation-context-readiness",
+      ]),
+    );
+    expect(contract.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "memory-exists-is-not-fresh-context",
+        "memory-reused-is-not-enough-context",
+        "continuation-ready-is-not-task-success",
+        "replay-state-available-is-not-plan-validity",
+        "feature-contract-valid-is-not-success",
+      ]),
+    );
+    expect(contract.declaration.forbiddenShortcuts).toEqual(
+      expect.arrayContaining([
+        "treat-memory-exists-as-fresh-context",
+        "treat-memory-reused-as-enough-context",
+        "treat-continuation-ready-as-task-success",
+        "treat-replayed-edit-handoff-as-mutation-authority",
+      ]),
+    );
+  });
+
+  it("lets the runtime loop observe continuation context without moving freshness truth", () => {
+    const trajectory = projectLoopTrajectory({
+      loopId: "continuation-context-contract-loop",
+      prompt: "observe continuation context contract",
+      resultFacts: {
+        status: "stopped",
+        terminalClassification: "stopped",
+        terminalReason: "waiting_for_input",
+        verdictSource: "result",
+      },
+    });
+    const contract = buildContinuationContextFeatureContract();
+    const adapter = projectProductLoopAdapter({
+      adapterId: "continuation-context-contract-adapter",
+      promptSummary: "observe continuation context contract",
+      loopTrajectory: trajectory,
+      featureContracts: [contract],
+    });
+
+    expect(adapter.ownerDomain).toBe("runtime/loop");
+    expect(adapter.featureContracts).toEqual([contract]);
+    expect(adapter.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "memory-exists-is-not-fresh-context",
+        "continuation-ready-is-not-task-success",
         "terminal-success",
       ]),
     );

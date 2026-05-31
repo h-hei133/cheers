@@ -1,6 +1,7 @@
 import type { LoopContextRebuildInput } from "../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../context/sessionContextRebuildProjection.js";
 import type { RuntimeEvidenceSavePoint } from "../evidence/runtimeSavePoint.js";
+import type { ReplaySafePlanningStateFacts } from "../orchestration/contextMemory.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../repair/loopBoundary.js";
 import type { NextTurnBundleProjection } from "../turn/nextTurnBundle.js";
 import type { ToolResultMessageBatch } from "../turn/toolResultMessage.js";
@@ -22,6 +23,10 @@ export interface ReplaySafeLoopStateSummary {
   readonly contextRebuildInputId?: string;
   readonly contextRebuildProjectionId: string;
   readonly continuationReadinessId: string;
+  readonly replaySafePlanningStateIds: readonly string[];
+  readonly planningQualityIds: readonly string[];
+  readonly discoveryHandoffIds: readonly string[];
+  readonly stagedContextIds: readonly string[];
   readonly terminalResultFacts: {
     readonly status?: string;
     readonly terminalClassification?: string;
@@ -62,6 +67,7 @@ export function summarizeReplaySafeLoopState(input: {
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
+  readonly replaySafePlanningStates?: readonly ReplaySafePlanningStateFacts[];
   readonly terminalResultFacts?: {
     readonly status?: string;
     readonly terminalClassification?: string;
@@ -77,6 +83,7 @@ export function summarizeReplaySafeLoopState(input: {
     ...(input.repairProposals ?? []).map((item) => item.proposalId),
     ...(input.repairApplyObservations ?? []).map((item) => item.repairApplyId),
   ];
+  const replaySafePlanningStates = input.replaySafePlanningStates ?? [];
   return deepFreeze({
     summaryId: `replay-safe-loop-state:${input.sessionProjection.sessionIdentity}:${input.sessionProjection.activeLeafId}`,
     sourceSessionId: input.sessionProjection.sessionIdentity,
@@ -91,6 +98,10 @@ export function summarizeReplaySafeLoopState(input: {
     ...(input.rebuildInput ? { contextRebuildInputId: input.rebuildInput.rebuildInputId } : {}),
     contextRebuildProjectionId: `${input.contextRebuildProjection.rebuildSource.sessionIdentity}:context-rebuild:${input.contextRebuildProjection.rebuildSource.activeLeafId}`,
     continuationReadinessId: input.continuationReadiness.readinessId,
+    replaySafePlanningStateIds: replaySafePlanningStates.map((state) => state.replayStateId),
+    planningQualityIds: replaySafePlanningStates.flatMap((state) => state.planningQualityIds),
+    discoveryHandoffIds: replaySafePlanningStates.flatMap((state) => state.discoveryHandoffIds),
+    stagedContextIds: replaySafePlanningStates.flatMap((state) => state.stagedContextIds),
     terminalResultFacts: {
       ...input.terminalResultFacts,
       terminalSuccessClaim: false,
@@ -101,7 +112,11 @@ export function summarizeReplaySafeLoopState(input: {
       "verification-success",
       "repair-success",
       "replay-safe-summary-is-not-success",
+      "replay-state-available-is-not-plan-validity",
+      "replayed-edit-handoff-is-not-mutation-authority",
+      "replayed-verification-intent-is-not-verification-passed",
       "context-completeness",
+      ...replaySafePlanningStates.flatMap((state) => state.notProvenClaims),
       ...input.sessionProjection.terminal.notProvenClaims,
       ...input.contextRebuildProjection.notProvenClaims,
       ...input.continuationReadiness.notProvenClaims,

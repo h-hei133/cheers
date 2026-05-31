@@ -310,6 +310,86 @@ export function buildPlanningFeatureContract(): FutureFeatureIntegrationContract
   });
 }
 
+export function buildContinuationContextFeatureContract(): FutureFeatureIntegrationContract {
+  return validateFutureFeatureIntegration({
+    featureId: "continuation-context",
+    ownerDomain: "orchestration/context-memory",
+    loopPhase: "continuation-context",
+    inputFacts: [
+      "context-memory-record-facts",
+      "reuse-eligibility-facts",
+      "stale-invalidation-facts",
+      "session-context-rebuild-projection",
+      "continuation-readiness-facts",
+      "replay-safe-planning-state",
+      "cp002-discovery-handoff",
+      "cp003-staged-context-acquisition",
+      "cp004-planning-handoff",
+    ],
+    outputHandoffFacts: [
+      "memory-to-discovery-handoff",
+      "memory-to-staged-read-handoff",
+      "memory-to-planning-handoff",
+      "required-refresh-reads",
+      "optional-refresh-reads",
+      "stale-packets-excluded",
+      "continuation-context-readiness",
+      "not-proven-claims",
+    ],
+    runtimeEvents: [
+      "continuation-context-observed",
+      "memory-reuse-eligibility-observed",
+      "stale-invalidation-observed",
+      "replay-safe-planning-state-observed",
+    ],
+    evidenceFacts: [
+      "memory-record-id",
+      "source-candidate-ids",
+      "source-context-packet-ids",
+      "source-planning-ids",
+      "freshness-evidence",
+      "staleness-evidence",
+      "redaction-state",
+      "terminal-success-claim-false",
+    ],
+    productSurfaceSection: "continuation-context",
+    resultTruthfulnessBoundary: "continuation context facts are not fresh context, enough context, edit authority, apply authority, verification success, repair success, plan validity, or terminal success",
+    notProvenClaims: [
+      "memory-exists-is-not-fresh-context",
+      "memory-reused-is-not-enough-context",
+      "continuation-ready-is-not-task-success",
+      "replay-state-available-is-not-plan-validity",
+      "replayed-edit-handoff-is-not-mutation-authority",
+      "replayed-verification-intent-is-not-verification-passed",
+      "refresh-suggested-is-not-completed-read",
+      "feature-contract-valid-is-not-success",
+      "product-surface-rendered-is-not-success",
+    ],
+    forbiddenShortcuts: [
+      "treat-memory-exists-as-fresh-context",
+      "treat-memory-reused-as-enough-context",
+      "treat-continuation-ready-as-task-success",
+      "treat-replay-state-as-plan-validity",
+      "treat-replayed-edit-handoff-as-mutation-authority",
+      "treat-replayed-verification-intent-as-verification-passed",
+      "treat-refresh-suggestion-as-completed-read",
+      "treat-feature-contract-valid-as-task-success",
+      "treat-product-surface-rendered-as-task-success",
+    ],
+    validationGates: [
+      "context-memory-focused-tests",
+      "context-engine-focused-tests",
+      "session-context-rebuild-focused-tests",
+      "continuation-readiness-focused-tests",
+      "replay-safe-state-focused-tests",
+      "feature-contract-tests",
+      "redaction-tests",
+      "truthfulness-tests",
+    ],
+    terminalSuccessClaim: false,
+  });
+}
+
 function sanitizeId(value: string): string {
   return value
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
