@@ -651,3 +651,101 @@ After measurements:
 - `orchestration` remains the largest direct root.
 - Remaining internally imported compatibility surfaces are mostly owner indexes, harness compatibility, repair handoff compatibility, and result/evidence projection compatibility.
 - Result/evidence compatibility should be handled only with result contract validation because those surfaces are output-facing.
+
+## SR018 Repair Result Compatibility Trim
+
+Status: structure-only cleanup for repair handoff, evidence projection, and result projection compatibility surfaces. Product behavior was preserved. No output semantics, result truthfulness, provider configuration, provider calls, fallback behavior, tool authority, command allowlists, edit/apply/write approval behavior, verification execution, repair execution, session schema, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+Inspection summary:
+
+- Latest pressure report, repair handoff and flow owners, result projection owners, evidence projection owners, adjacent verification result owners, export-only files, internal imports, package-facing entry points, tests in touched owner areas, direct file counts, and long basenames were inspected.
+- The safe change was limited to one-line compatibility exports that already pointed at concrete owner files through an extra intermediate export.
+- `packages/ts-shell/package.json` and source entry-point searches showed no documented package export for the removed intermediate deep files.
+
+### Before Snapshot
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Export-only compatibility files | 113 |
+| Zero-internal-import compatibility files | 96 |
+| Internally imported compatibility files | 17 |
+| `repair/handoff` direct files | 4 |
+| `repair/flow` direct files | 4 |
+| `result/projection` direct files | 1 |
+| `evidence/projection` direct files | 2 |
+| `verification/result` direct files | 3 |
+| Tests outside owner folders for touched owners | 12 |
+| Long basenames in target areas | 2 |
+
+Target export-only compatibility files before:
+
+| Path | Internal imports |
+|---|---:|
+| `evidence/projection/continuation.ts` | 1 |
+| `repair/handoff/continuationPlanning.ts` | 1 |
+| `repair/handoff/reopen.ts` | 1 |
+| `result/projection/runtime.ts` | 1 |
+| `verification/result/mutationVerificationProjection.ts` | 0 |
+
+### After Snapshot
+
+After measurements:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Export-only compatibility files | 113 | 109 |
+| Zero-internal-import compatibility files | 96 | 96 |
+| Internally imported compatibility files | 17 | 13 |
+| `repair/handoff` direct files | 4 | 2 |
+| `repair/flow` direct files | 4 | 4 |
+| `result/projection` direct files | 1 | 0 |
+| `evidence/projection` direct files | 2 | 1 |
+| `verification/result` direct files | 3 | 3 |
+| Tests outside owner folders for touched owners | 12 | 12 |
+| Long basenames in target areas | 2 | 2 |
+
+Target export-only compatibility files after:
+
+| Path | Internal imports | Status |
+|---|---:|---|
+| `verification/result/mutationVerificationProjection.ts` | 0 | kept |
+
+### Compatibility Files Considered
+
+| Path | Status | Internal imports before | Internal imports after | Package-facing status | Reason | Deletion condition |
+|---|---|---:|---:|---|---|---|
+| `evidence/projection/continuation.ts` | removed | 1 | 0 | no documented package export found | root evidence compatibility now exports directly from `evidence/projection/repair/continuation.ts` | already met |
+| `repair/handoff/continuationPlanning.ts` | removed | 1 | 0 | no documented package export found | root repair compatibility now exports directly from `repair/handoff/planning/continuation.ts` | already met |
+| `repair/handoff/reopen.ts` | removed | 1 | 0 | no documented package export found | root repair compatibility now exports directly from `repair/handoff/state/reopen.ts` | already met |
+| `result/projection/runtime.ts` | removed | 1 | 0 | no documented package export found | root result compatibility now exports directly from `result/projection/workflow/runtime.ts` | already met |
+| `verification/result/mutationVerificationProjection.ts` | kept | 0 | 0 | verification result compatibility export | adjacent verification result surface was not touched | remove only after verification result ownership and package-facing safety are reviewed |
+
+### Files Removed
+
+- `packages/ts-shell/src/evidence/projection/continuation.ts`
+- `packages/ts-shell/src/repair/handoff/continuationPlanning.ts`
+- `packages/ts-shell/src/repair/handoff/reopen.ts`
+- `packages/ts-shell/src/result/projection/runtime.ts`
+
+### Files Moved
+
+- None.
+
+### Tests Moved
+
+- None.
+
+### Imports Updated
+
+- `evidence/continuationTransformEvidence.ts` now exports from `evidence/projection/repair/continuation.ts`.
+- `repair/repairContinuationPlanning.ts` now exports from `repair/handoff/planning/continuation.ts`.
+- `repair/degradedReopenPlanning.ts` now exports from `repair/handoff/state/reopen.ts`.
+- `result/workflowRuntimeProjection.ts` now exports from `result/projection/workflow/runtime.ts`.
+
+### Remaining Visible Debt
+
+- Remaining internally imported compatibility files are outside the repair/result/evidence target area measured here.
+- `verification/result/mutationVerificationProjection.ts` remains a zero-internal-import compatibility export and needs a narrow verification result safety check before deletion.
+- Result and evidence projection surfaces remain output-facing; any further cleanup there should keep the result contract gate.
