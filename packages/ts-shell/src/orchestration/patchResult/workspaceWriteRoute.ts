@@ -9,7 +9,7 @@ import { buildNoPartialPatchApplicationContract } from "../patchApplication/noPa
 import { parseApplyPatchText } from "../patchParsing/parser.js";
 import type { PatchFailure } from "../patchParsing/types.js";
 import { verifyParsedPatch } from "../patchVerification/verify.js";
-import { buildGuardedWriteGate, type GuardedWriteGate } from "./guardedWriteGate.js";
+import { buildGuardedWriteGate, type GuardedWriteGate } from "../../edit/write/status/guard.js";
 import {
   buildPerFilePatchPlan,
   type PerFilePatchPlan,
@@ -18,7 +18,7 @@ import { buildSingleFileApplyPatchFinalStaleReadContract } from "../../edit/writ
 import {
   buildSingleFileApplyPatchOptInDryRunRoute,
   type SingleFileApplyPatchOptInDryRunRouteAccepted,
-} from "./singleFileApplyPatchOptInDryRunRoute.js";
+} from "../../edit/patch/apply/optIn.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "../../edit/authority/approval/permission.js";
 import type { WorkspaceWriteTargetAuthority } from "../../edit/authority/workspace.js";
 import {

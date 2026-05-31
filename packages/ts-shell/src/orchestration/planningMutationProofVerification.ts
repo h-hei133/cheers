@@ -4,7 +4,7 @@ import {
   type ClaimLedgerMutationScope,
   type ClaimLedgerPerFileClaim,
   type ClaimLedgerProjection,
-} from "./claimLedgerProjection.js";
+} from "../evidence/projection/claim/ledger.js";
 import type { FencedEditMapping } from "./fencedEditPlanner.js";
 import type {
   PlanningMutationHandoffVerificationIntent,

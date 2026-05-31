@@ -1,4 +1,4 @@
-import type { MixedOperationReadinessProjection } from "../../orchestration/patchResult/mixedOperationReadiness.js";
+import type { MixedOperationReadinessProjection } from "../patch/status/mixedOperation.js";
 import {
   projectJournalFailureSurface,
   type JournalFailureSurfaceProjection,
@@ -9,7 +9,7 @@ import type {
   PerFilePatchPlan,
   PerFilePatchSupportStatus,
 } from "../patch/plan/perFile.js";
-import type { RouteScopedEditJournal } from "../../orchestration/patchResult/routeScopedEditJournal.js";
+import type { RouteScopedEditJournal } from "./journal/model.js";
 
 export interface PerFilePatchResultProjection {
   readonly supportStatus: PerFilePatchSupportStatus;

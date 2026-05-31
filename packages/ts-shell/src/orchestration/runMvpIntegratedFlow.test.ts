@@ -10,7 +10,7 @@ import { safeRemoveDir } from "../test-utils/cleanup.js";
 import {
   buildActionResultSeedFromCodingResult,
   extractAttemptedFilesFromEvidence,
-} from "./actionResultEvidence.js";
+} from "../evidence/projection/action/result.js";
 import {
   runMvpIntegratedFlow,
   streamMvpIntegratedFlow,

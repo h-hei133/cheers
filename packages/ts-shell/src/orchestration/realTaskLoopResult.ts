@@ -7,7 +7,7 @@ import {
   buildClaimLedgerProjection,
   type ClaimLedgerEvidenceSource,
   type ClaimLedgerProjection,
-} from "./claimLedgerProjection.js";
+} from "../evidence/projection/claim/ledger.js";
 import type { RealTaskLoopRepairProof } from "./realTaskLoopRepairChain.js";
 
 interface SnapshotInspectableRoute {

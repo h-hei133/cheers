@@ -1,7 +1,7 @@
 import type {
   RouteScopedEditJournal,
   RouteScopedEditJournalOperation,
-} from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
+} from "../model.js";
 
 export type JournalFailureApplicationState =
   | "failed-before-apply"

@@ -5,7 +5,7 @@ import type {
   OriginalContentAuthorityRecord,
   OriginalContentPersistence,
 } from "../../edit/result/journal/authority/original.js";
-import type { RouteScopedEditJournalOperationKind } from "../patchResult/routeScopedEditJournal.js";
+import type { RouteScopedEditJournalOperationKind } from "../../edit/result/journal/model.js";
 
 export type RecoveryAuthorityStoreMode = "disabled" | "non-default";
 export type RecoveryAuthorityBeforeState = "exists" | "absent";

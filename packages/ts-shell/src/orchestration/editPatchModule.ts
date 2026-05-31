@@ -23,7 +23,7 @@ import {
 import {
   projectEditPatchResult,
   type EditPatchResultProjection,
-} from "./editPatchResult.js";
+} from "../edit/result/patch/projection.js";
 export {
   parseExactFencedReplacementMapping,
   planExactFencedReplacement,
@@ -296,7 +296,7 @@ export {
   classifyVerificationCommandFailure,
   type VerificationFailureClass,
   type VerificationFailureClassification,
-} from "./verificationFailureClassifier.js";
+} from "../verification/result/failure/classifier.js";
 export {
   buildVerificationCommandResult,
   buildVerificationCommandSurfaceResult,

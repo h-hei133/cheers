@@ -1,4 +1,4 @@
-import type { NoWriteRuntimeRoute } from "./noWriteRuntimeRoute.js";
+import type { NoWriteRuntimeRoute } from "../../edit/write/status/noWrite.js";
 
 export type RuntimeNoWriteSmokeStatus = "ready" | "blocked";
 

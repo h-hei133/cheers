@@ -1,5 +1,5 @@
 import type { CodingVerificationSummary } from "../../orchestration/types.js";
-import type { ClaimLedgerEvidenceSource } from "../../orchestration/claimLedgerProjection.js";
+import type { ClaimLedgerEvidenceSource } from "../../evidence/projection/claim/ledger.js";
 import type { PlanningRuntimeResult } from "./engine.js";
 import {
   runPlanningMutationProofRoute,

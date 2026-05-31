@@ -7,7 +7,7 @@ import {
   classifyAddFileNoWrite,
   patchFailureFromAddClassification,
   type AddFileNoWriteClassification,
-} from "../../../orchestration/patchResult/addFileClassification.js";
+} from "../status/addFile.js";
 import {
   buildSingleFileApplyPatchBaseEvidence,
   type SingleFileApplyPatchBaseEvidence,
@@ -22,7 +22,7 @@ import {
   classifyMultiFileUpdatePlanningNoWrite,
   type MultiFileUpdatePlanningClassification,
 } from "../plan/multiFile.js";
-import { buildSingleFileUpdatePatchReadinessContract } from "../../../orchestration/patchResult/readiness.js";
+import { buildSingleFileUpdatePatchReadinessContract } from "../status/readiness.js";
 
 type UnsupportedCapability =
   | AddFileNoWriteClassification

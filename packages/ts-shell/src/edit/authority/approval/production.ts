@@ -4,7 +4,7 @@ import type { SingleFileApplyPatchStaleReadResult } from "../../patch/apply/stal
 import type {
   SingleFileUpdatePatchReadinessContract,
   SingleFileUpdatePatchResultRecord,
-} from "../../../orchestration/patchResult/readiness.js";
+} from "../../patch/status/readiness.js";
 
 export type SingleFileUpdatePatchApprovalDecision =
   | "pending"

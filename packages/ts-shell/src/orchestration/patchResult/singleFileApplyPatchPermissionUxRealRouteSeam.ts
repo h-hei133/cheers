@@ -1,7 +1,7 @@
 import type {
   SingleFileApplyPatchOptInDryRunRouteAccepted,
   SingleFileApplyPatchOptInDryRunRouteResult,
-} from "./singleFileApplyPatchOptInDryRunRoute.js";
+} from "../../edit/patch/apply/optIn.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "../../edit/authority/approval/permission.js";
 
 export type SingleFileApplyPatchPermissionUxRealRouteStatus =

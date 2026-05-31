@@ -6,8 +6,8 @@ import {
   applySingleFileReplacePatch,
   type SingleFileReplacePatchResult,
 } from "../patchMutationLane.js";
-import { buildGuardedWriteGate } from "./guardedWriteGate.js";
-import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatchOptInDryRunRoute.js";
+import { buildGuardedWriteGate } from "../../edit/write/status/guard.js";
+import { buildSingleFileApplyPatchOptInDryRunRoute } from "../../edit/patch/apply/optIn.js";
 import { buildWriteDecisionGate } from "../../edit/authority/approval/decision.js";
 import { runProductionRoute, type ProductionRoute } from "./productionRoute.js";
 

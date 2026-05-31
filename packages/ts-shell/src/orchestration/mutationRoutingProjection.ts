@@ -2,8 +2,8 @@ import type { OrchestrationResult } from "./types.js";
 import {
   buildNoWriteRuntimeRoute,
   type NoWriteRuntimeSource,
-} from "./patchResult/noWriteRuntimeRoute.js";
-import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
+} from "../edit/write/status/noWrite.js";
+import { buildNoWriteRuntimeRouteResult } from "../result/projection/write/noWrite.js";
 import { buildWorkspaceCreateRouteResult } from "../edit/result/workspace/projection/create.js";
 import {
   patchIsSingleAddFile,

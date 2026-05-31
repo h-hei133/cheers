@@ -4,7 +4,7 @@ import {
   buildPerFilePatchPlan,
   projectPerFilePatchResult,
 } from "../../../patch/plan/perFile.js";
-import type { RouteScopedEditJournal } from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
+import type { RouteScopedEditJournal } from "../model.js";
 
 describe("journal failure result projection", () => {
   it("projects planned-only journal without changed files", () => {

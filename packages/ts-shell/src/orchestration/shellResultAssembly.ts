@@ -1,7 +1,7 @@
 import {
   buildActionResultSeedFromCodingResult,
   extractAttemptedFilesFromEvidence,
-} from "./actionResultEvidence.js";
+} from "../evidence/projection/action/result.js";
 import { projectMutationVerificationHandoff } from "../verification/result/projection/mutation.js";
 import type {
   CodingPatchRecord,

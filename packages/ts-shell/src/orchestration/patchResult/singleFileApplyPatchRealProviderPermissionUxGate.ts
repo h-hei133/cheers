@@ -1,4 +1,4 @@
-import type { SingleFileApplyPatchOptInDryRunRouteResult } from "./singleFileApplyPatchOptInDryRunRoute.js";
+import type { SingleFileApplyPatchOptInDryRunRouteResult } from "../../edit/patch/apply/optIn.js";
 import type { SingleFileApplyPatchPermissionUxRealRouteSeam } from "./singleFileApplyPatchPermissionUxRealRouteSeam.js";
 
 export type SingleFileApplyPatchRealProviderPermissionUxGateStatus =

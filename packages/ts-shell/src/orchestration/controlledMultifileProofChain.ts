@@ -21,7 +21,7 @@ import {
   type ClaimLedgerPerFileClaim,
   type ClaimLedgerProjection,
   type ClaimLedgerRepairInput,
-} from "./claimLedgerProjection.js";
+} from "../evidence/projection/claim/ledger.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import { buildProviderAnchoredProposal } from "./providerAnchoredProposal.js";
 

@@ -1,7 +1,7 @@
 import type {
   RouteScopedEditJournal,
   RouteScopedEditJournalOperationKind,
-} from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
+} from "../model.js";
 
 export type OriginalContentAuthorityStatus =
   | "missing"

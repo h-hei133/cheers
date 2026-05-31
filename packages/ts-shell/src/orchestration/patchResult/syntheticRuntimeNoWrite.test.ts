@@ -9,7 +9,7 @@ import {
 import {
   buildNoWriteRuntimeRoute,
   type NoWriteRuntimeRoute,
-} from "./noWriteRuntimeRoute.js";
+} from "../../edit/write/status/noWrite.js";
 
 const rawPatchText = [
   "*** Begin Patch",

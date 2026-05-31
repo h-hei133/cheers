@@ -10,7 +10,7 @@ import type {
   RouteScopedEditJournalFailureClass,
   RouteScopedEditJournalOperation,
   RouteScopedEditJournalOperationKind,
-} from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
+} from "../model.js";
 
 export function buildJournalForFailureResult(input: {
   readonly routeId: string;

@@ -1,8 +1,8 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatchOptInDryRunRoute.js";
+import { buildSingleFileApplyPatchOptInDryRunRoute } from "../../edit/patch/apply/optIn.js";
 import { buildWriteDecisionGate } from "../../edit/authority/approval/decision.js";
-import { type IsolatedWriteLane, runIsolatedWriteLane } from "./isolatedWriteLane.js";
+import { type IsolatedWriteLane, runIsolatedWriteLane } from "../../edit/write/status/isolated.js";
 import {
   buildRealProviderWriteSmokeContract,
   type RealProviderWriteSmokeContract,

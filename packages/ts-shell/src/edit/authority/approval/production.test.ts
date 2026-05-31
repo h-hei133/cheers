@@ -20,7 +20,7 @@ import {
 import {
   buildSingleFileUpdatePatchReadinessContract,
   type SingleFileUpdatePatchReadinessContract,
-} from "../../../orchestration/patchResult/readiness.js";
+} from "../../patch/status/readiness.js";
 
 const workspaceRoot = path.resolve("D:/workspace/project");
 

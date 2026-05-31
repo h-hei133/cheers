@@ -1,4 +1,4 @@
-import type { SingleFileApplyPatchOptInDryRunRouteResult } from "./singleFileApplyPatchOptInDryRunRoute.js";
+import type { SingleFileApplyPatchOptInDryRunRouteResult } from "../../edit/patch/apply/optIn.js";
 
 export type SingleFileApplyPatchRealProviderDryRunGateStatus =
   | "ready"

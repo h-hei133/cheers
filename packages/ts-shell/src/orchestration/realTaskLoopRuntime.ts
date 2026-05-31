@@ -42,7 +42,7 @@ import {
   classifyRealTaskLoopVerificationStatus,
   type RealTaskLoopResult,
 } from "./realTaskLoopResult.js";
-import type { ClaimLedgerEvidenceSource } from "./claimLedgerProjection.js";
+import type { ClaimLedgerEvidenceSource } from "../evidence/projection/claim/ledger.js";
 import { extractProviderProposalAnchors } from "./providerProposalAnchors.js";
 import { matchProviderAnchorCandidates } from "./providerAnchorMatcher.js";
 import { detectProviderAnchorConflicts } from "./providerAnchorConflict.js";

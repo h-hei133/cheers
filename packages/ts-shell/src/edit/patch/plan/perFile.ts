@@ -10,7 +10,7 @@ import { verifyParsedPatch } from "../../../orchestration/patchVerification/veri
 import {
   projectMixedOperationReadiness,
   type MixedOperationReadinessProjection,
-} from "../../../orchestration/patchResult/mixedOperationReadiness.js";
+} from "../status/mixedOperation.js";
 import {
   MAX_BOUNDED_WRITE_OPERATIONS,
   isBoundedWriteOperationCount,

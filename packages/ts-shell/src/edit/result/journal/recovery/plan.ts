@@ -23,7 +23,7 @@ import {
 import {
   projectRouteScopedEditJournal,
   type RouteScopedEditJournal,
-} from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
+} from "../model.js";
 
 export interface JournalRecoveryPlanProjection {
   readonly source: "route-scoped-edit-journal-recovery-plan";

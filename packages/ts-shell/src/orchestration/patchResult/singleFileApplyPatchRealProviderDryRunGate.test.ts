@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatchOptInDryRunRoute.js";
+import { buildSingleFileApplyPatchOptInDryRunRoute } from "../../edit/patch/apply/optIn.js";
 import {
   buildSingleFileApplyPatchRealProviderDryRunGateContract,
   type SingleFileApplyPatchRealProviderDryRunGateContract,

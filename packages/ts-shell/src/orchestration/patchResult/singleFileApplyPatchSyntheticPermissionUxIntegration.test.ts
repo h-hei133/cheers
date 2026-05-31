@@ -6,7 +6,7 @@ import {
   applySingleFileReplacePatch,
   type SingleFileReplacePatchResult,
 } from "../patchMutationLane.js";
-import { buildSingleFileApplyPatchOptInDryRunRoute } from "./singleFileApplyPatchOptInDryRunRoute.js";
+import { buildSingleFileApplyPatchOptInDryRunRoute } from "../../edit/patch/apply/optIn.js";
 import { buildSingleFileApplyPatchPermissionUxRealRouteSeam } from "./singleFileApplyPatchPermissionUxRealRouteSeam.js";
 
 const applyPatchText = [

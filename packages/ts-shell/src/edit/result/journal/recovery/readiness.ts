@@ -7,7 +7,7 @@ import {
   type OriginalContentAuthorityProjection,
 } from "../authority/original.js";
 import type { JournalRecoveryPlanProjection } from "./plan.js";
-import type { RouteScopedEditJournal } from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
+import type { RouteScopedEditJournal } from "../model.js";
 
 export interface JournalRecoveryReadinessProjection {
   readonly recoveryPlanMode: "plan-only";

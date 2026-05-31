@@ -1,4 +1,4 @@
-import type { IsolatedWriteLane } from "./isolatedWriteLane.js";
+import type { IsolatedWriteLane } from "../../edit/write/status/isolated.js";
 
 export type RealProviderWriteSmokeStatus = "ready" | "blocked";
 

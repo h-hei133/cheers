@@ -1,13 +1,13 @@
-import type { GuardedWriteGate } from "./guardedWriteGate.js";
+import type { GuardedWriteGate } from "../../edit/write/status/guard.js";
 import type { SingleFileApplyPatchPermissionUxContract } from "../../edit/authority/approval/permission.js";
 import {
   runProductionWriteLane,
   type ProductionWriteLane,
-} from "./productionWriteLane.js";
+} from "../../edit/write/status/production.js";
 import {
   buildRouteWiringGate,
   type RouteWiringGate,
-} from "./routeWiringGate.js";
+} from "../../edit/write/status/wiring.js";
 
 export type ProductionRouteStatus = "written" | "blocked";
 

@@ -3,7 +3,7 @@ import {
   buildOriginalContentCaptureRequirements,
   projectOriginalContentAuthority,
 } from "./original.js";
-import type { RouteScopedEditJournal } from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
+import type { RouteScopedEditJournal } from "../model.js";
 
 describe("journal original-content authority seam", () => {
   it("derives capture requirements without reading or storing content", () => {

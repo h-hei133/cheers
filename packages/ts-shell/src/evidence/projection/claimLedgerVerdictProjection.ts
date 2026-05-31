@@ -1,7 +1,7 @@
 import type {
   ClaimLedgerNotProvenClaim,
   ClaimLedgerTerminalClaim,
-} from "../../orchestration/claimLedgerProjection.js";
+} from "./claim/ledger.js";
 import {
   assertNoProductVerdictSuccessUpgrade,
   projectRuntimeTerminalVerdict,

@@ -1,4 +1,4 @@
-import type { ClaimLedgerEvidenceSource } from "./claimLedgerProjection.js";
+import type { ClaimLedgerEvidenceSource } from "../evidence/projection/claim/ledger.js";
 import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import type { PlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";

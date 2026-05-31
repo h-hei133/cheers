@@ -4,7 +4,7 @@ import { buildEditRepairProposalReview } from "./editProposalReview.js";
 import { selectEditProposalHunks, type EditProposalSelection } from "./editProposalSelection.js";
 import { applyEditProposalSelection, type EditProposalApplyResult } from "./editProposalApply.js";
 import { createWorkspaceWriteAuthority } from "../edit/authority/workspace.js";
-import type { ClaimLedgerEvidenceSource } from "./claimLedgerProjection.js";
+import type { ClaimLedgerEvidenceSource } from "../evidence/projection/claim/ledger.js";
 import {
   realTaskLoopExactNewText,
   realTaskLoopRepairableFailedText,

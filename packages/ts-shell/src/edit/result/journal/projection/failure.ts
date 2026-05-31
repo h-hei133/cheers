@@ -8,7 +8,7 @@ import {
   type RouteScopedEditJournal,
   type RouteScopedEditJournalFailureClass,
   type RouteScopedEditJournalOperationKind,
-} from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
+} from "../model.js";
 
 export interface JournalFailureSurfaceProjection {
   readonly source: "route-scoped-edit-journal";

@@ -6,7 +6,7 @@ import type {
 import {
   classifyVerificationCommandFailure,
   type VerificationFailureClassification,
-} from "./verificationFailureClassifier.js";
+} from "../verification/result/failure/classifier.js";
 import type { ToolLifecycleResult } from "./flowDispatch.js";
 import { projectRuntimeReceiptEvidence } from "./flowDispatch.js";
 import type { VerificationCommandPlan } from "../verification/command/plan.js";
