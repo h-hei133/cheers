@@ -4,7 +4,7 @@ import path from "node:path";
 import type {
   OriginalContentAuthorityRecord,
   OriginalContentPersistence,
-} from "../../edit/result/journal/journalOriginalContentAuthority.js";
+} from "../../edit/result/journal/authority/original.js";
 import type { RouteScopedEditJournalOperationKind } from "../patchResult/routeScopedEditJournal.js";
 
 export type RecoveryAuthorityStoreMode = "disabled" | "non-default";

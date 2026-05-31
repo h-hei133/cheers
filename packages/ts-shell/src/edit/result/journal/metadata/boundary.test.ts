@@ -3,7 +3,7 @@ import {
   journalFailureSurfaceBoundaryFacts,
   routeScopedEditJournalRecoveryBlockers,
   routeScopedEditJournalBoundaryFacts,
-} from "./journalMetadataBoundary.js";
+} from "./boundary.js";
 
 describe("journal metadata boundary facts", () => {
   it("keeps route-scoped journal facts metadata-only", () => {

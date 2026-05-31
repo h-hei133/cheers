@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { projectJournalFailureSurface } from "./journalResultProjection.js";
+import { projectJournalFailureSurface } from "./failure.js";
 import {
   buildPerFilePatchPlan,
   projectPerFilePatchResult,
-} from "../../patch/plan/perFile.js";
-import type { RouteScopedEditJournal } from "../../../orchestration/patchResult/routeScopedEditJournal.js";
+} from "../../../patch/plan/perFile.js";
+import type { RouteScopedEditJournal } from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
 
 describe("journal failure result projection", () => {
   it("projects planned-only journal without changed files", () => {

@@ -2,9 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createWorkspaceWriteAuthority } from "../../authority/workspace.js";
-import { buildWorkspaceCreateRouteResult } from "./workspaceCreateResult.js";
-import { runWorkspaceCreateRoute } from "../../../orchestration/patchResult/workspaceCreateRoute.js";
+import { createWorkspaceWriteAuthority } from "../../../authority/workspace.js";
+import { buildWorkspaceCreateRouteResult } from "./create.js";
+import { runWorkspaceCreateRoute } from "../../../../orchestration/patchResult/workspaceCreateRoute.js";
 
 const tempRoots: string[] = [];
 

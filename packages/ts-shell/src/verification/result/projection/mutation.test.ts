@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectMutationVerificationHandoff } from "./mutationVerificationProjection.js";
+import { projectMutationVerificationHandoff } from "./mutation.js";
 
 describe("mutation verification projection", () => {
   it("keeps verified writes successful with real changed files", () => {

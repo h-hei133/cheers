@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { projectJournalFailureState } from "./journalFailureStateProjection.js";
-import type { RouteScopedEditJournal } from "../../../orchestration/patchResult/routeScopedEditJournal.js";
+import { projectJournalFailureState } from "./state.js";
+import type { RouteScopedEditJournal } from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
 
 describe("journal failure state projection", () => {
   it("classifies preflight and writer failures as failed before apply", () => {

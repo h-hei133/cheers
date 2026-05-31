@@ -48,12 +48,12 @@ import {
   isAtypicalReopenFollowUpPrompt,
   isDegradedReopenFollowUpPrompt,
   resolveContinuationReopenTarget,
-} from "../repair/handoff/reopen.js";
+} from "../repair/handoff/state/reopen.js";
 import {
   collectContinuationTransforms,
   inferReplaceDirectiveFromContinuity,
   isRepairContinuationFollowUpPrompt,
-} from "../repair/handoff/continuationPlanning.js";
+} from "../repair/handoff/planning/continuation.js";
 import {
   detectGroundedDeliverableMode,
   inferGroundedDeliverableModeFromContinuity,

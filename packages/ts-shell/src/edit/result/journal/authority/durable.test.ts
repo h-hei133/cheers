@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCurrentJournalDurableAuthority,
   futureJournalDurableAuthorityOptions,
-} from "./journalDurableAuthority.js";
+} from "./durable.js";
 
 describe("journal durable authority descriptor", () => {
   it("describes current durable authority as absent and non-executing", () => {

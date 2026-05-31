@@ -17,7 +17,7 @@ import {
 import type { CodingVerificationSummary } from "../../orchestration/types.js";
 import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
 import { isVerifyLikeCommand } from "../../policy/commandIntentPolicy.js";
-import { truncateText } from "../../result/projection/runtime.js";
+import { truncateText } from "../../result/projection/workflow/runtime.js";
 
 export async function runDirectCommandStage(input: {
   readonly plan: WorkflowTaskPlan;

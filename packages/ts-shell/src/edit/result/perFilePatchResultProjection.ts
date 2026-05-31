@@ -2,7 +2,7 @@ import type { MixedOperationReadinessProjection } from "../../orchestration/patc
 import {
   projectJournalFailureSurface,
   type JournalFailureSurfaceProjection,
-} from "./journal/journalResultProjection.js";
+} from "./journal/projection/failure.js";
 import type {
   PerFilePatchFailureClass,
   PerFilePatchOperationKind,

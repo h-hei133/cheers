@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildOriginalContentCaptureRequirements,
   projectOriginalContentAuthority,
-} from "./journalOriginalContentAuthority.js";
-import type { RouteScopedEditJournal } from "../../../orchestration/patchResult/routeScopedEditJournal.js";
+} from "./original.js";
+import type { RouteScopedEditJournal } from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
 
 describe("journal original-content authority seam", () => {
   it("derives capture requirements without reading or storing content", () => {

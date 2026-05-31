@@ -2,7 +2,7 @@ import {
   buildActionResultSeedFromCodingResult,
   extractAttemptedFilesFromEvidence,
 } from "./actionResultEvidence.js";
-import { projectMutationVerificationHandoff } from "../verification/result/mutationVerificationProjection.js";
+import { projectMutationVerificationHandoff } from "../verification/result/projection/mutation.js";
 import type {
   CodingPatchRecord,
   CodingResultProvenanceSummary,

@@ -2,9 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createWorkspaceWriteAuthority } from "../../authority/workspace.js";
-import { buildWorkspaceWriteRouteResult } from "./workspaceWriteResult.js";
-import { runWorkspaceWriteRoute } from "../../../orchestration/patchResult/workspaceWriteRoute.js";
+import { createWorkspaceWriteAuthority } from "../../../authority/workspace.js";
+import { buildWorkspaceWriteRouteResult } from "./write.js";
+import { runWorkspaceWriteRoute } from "../../../../orchestration/patchResult/workspaceWriteRoute.js";
 
 const applyPatchText = [
   "*** Begin Patch",

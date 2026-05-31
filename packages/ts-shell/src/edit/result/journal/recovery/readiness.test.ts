@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { projectJournalRecoveryPlan } from "./journalRecoveryPlanProjection.js";
-import { projectJournalRecoveryReadiness } from "./journalRecoveryReadinessProjection.js";
-import type { RouteScopedEditJournal } from "../../../orchestration/patchResult/routeScopedEditJournal.js";
+import { projectJournalRecoveryPlan } from "./plan.js";
+import { projectJournalRecoveryReadiness } from "./readiness.js";
+import type { RouteScopedEditJournal } from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
 
 describe("journal recovery readiness projection", () => {
   it("combines recovery plan facts with absent durable authority diagnostics", () => {

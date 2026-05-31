@@ -2,9 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createWorkspaceWriteAuthority } from "../../authority/workspace.js";
-import { buildMultiFileWriteRouteResult } from "./multiFileWriteResult.js";
-import { runMultiFileWriteRoute } from "../../../orchestration/patchResult/multiFileWriteRoute.js";
+import { createWorkspaceWriteAuthority } from "../../../authority/workspace.js";
+import { buildMultiFileWriteRouteResult } from "./multiFile.js";
+import { runMultiFileWriteRoute } from "../../../../orchestration/patchResult/multiFileWriteRoute.js";
 
 const tempRoots: string[] = [];
 

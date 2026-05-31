@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { projectJournalRecoveryPlan } from "./journalRecoveryPlanProjection.js";
-import type { RouteScopedEditJournal } from "../../../orchestration/patchResult/routeScopedEditJournal.js";
+import { projectJournalRecoveryPlan } from "./plan.js";
+import type { RouteScopedEditJournal } from "../../../../orchestration/patchResult/routeScopedEditJournal.js";
 
 describe("journal recovery plan projection", () => {
   it("builds a metadata-only plan without recovery or rollback claims", () => {
