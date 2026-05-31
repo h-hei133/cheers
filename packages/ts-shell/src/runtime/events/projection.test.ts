@@ -18,8 +18,10 @@ import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import { runAgentLoopContract } from "../loop/contract.js";
 import { projectProductLoopAdapter } from "../loop/adapter.js";
 import { projectLoopTrajectory } from "../loop/trajectory.js";
+import { projectModelBoundaryPhase } from "../loop/modelBoundary.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/response/boundary.js";
+import { createModelRequestBoundary } from "../../provider/request/boundary.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy } from "../../turn/deliveryPolicy.js";
 import { projectFollowUpQueue } from "../../turn/followUpQueue.js";
@@ -158,6 +160,42 @@ describe("runtime event projection", () => {
         "terminal-success",
       ]),
     );
+  });
+
+  it("projects model request and provider stream events as observation-only", () => {
+    const request = createModelRequestBoundary({
+      requestId: "request-events",
+      providerSafeLabel: "Synthetic provider",
+      modelSafeLabel: "Fixture model",
+      providerReadinessStatus: "ready",
+    });
+    const phase = projectModelBoundaryPhase({
+      phaseId: "phase-events",
+      requestBoundary: request,
+      responseId: "response-events",
+      streamEvents: [
+        { eventId: "start", kind: "stream_started", retry: "not_allowed" },
+        { eventId: "delta", kind: "content_delta", contentDelta: "safe", retry: "not_allowed" },
+        { eventId: "complete", kind: "stream_completed", retry: "not_allowed" },
+      ],
+    });
+
+    const events = projectRuntimeEvents({
+      modelRequestBoundaries: [request],
+      providerResponseStreams: [phase.stream],
+      modelBoundaryPhases: [phase],
+    });
+
+    expect(events.map((event) => event.type)).toEqual([
+      "model-request-prepared",
+      "provider-readiness-observed",
+      "provider-stream-started",
+      "provider-stream-delta-observed",
+      "model-boundary-completed",
+      "model-boundary-completed",
+    ]);
+    expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
+    expect(JSON.stringify(events)).not.toMatch(/provider\.env|raw provider output|hidden reasoning/i);
   });
 
   it("projects PL005 tool dispatch phases and result messages as observation-only", async () => {

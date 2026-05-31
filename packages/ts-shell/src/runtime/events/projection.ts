@@ -7,6 +7,8 @@ import type {
 } from "../../repair/loopBoundary.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { ModelResponseBoundary } from "../../provider/response/boundary.js";
+import type { ProviderResponseStreamProjection } from "../../provider/response/stream.js";
+import type { ModelRequestBoundary } from "../../provider/request/boundary.js";
 import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/projection.js";
 import type { PackageInventoryProjection } from "../resources/inventory.js";
@@ -36,6 +38,7 @@ import type {
   VerificationResultObservation,
 } from "../../verification/loopBoundary.js";
 import type { ProductLoopAdapterProjection } from "../loop/adapter.js";
+import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
 
 export type RuntimeProjectionEventType =
   | "turn-snapshot-observed"
@@ -67,6 +70,14 @@ export type RuntimeProjectionEventType =
   | "branch-unsupported"
   | "compaction-unsupported"
   | "terminal-verdict-observed"
+  | "model-request-prepared"
+  | "provider-readiness-observed"
+  | "provider-stream-started"
+  | "provider-stream-delta-observed"
+  | "provider-stream-cancelled"
+  | "provider-stream-failed"
+  | "model-boundary-partial"
+  | "model-boundary-completed"
   | "model-response-boundary-observed"
   | "assistant-response-accumulated"
   | "tool-call-batch-extracted"
@@ -169,6 +180,9 @@ export function projectRuntimeEvents(input: {
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
+  readonly modelRequestBoundaries?: readonly ModelRequestBoundary[];
+  readonly providerResponseStreams?: readonly ProviderResponseStreamProjection[];
+  readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjection[];
   readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
   readonly assistantResponses?: readonly AssistantResponseState[];
   readonly toolCallBatches?: readonly NormalizedToolCallBatch[];
@@ -266,6 +280,131 @@ export function projectRuntimeEvents(input: {
         phase: input.turnSnapshot.phase,
       },
       ["terminal-success"],
+    );
+  }
+
+  for (const request of input.modelRequestBoundaries ?? []) {
+    append(
+      "model-request-prepared",
+      {
+        requestId: request.requestId,
+        turnId: request.turnId,
+        loopId: request.loopId,
+        providerSafeLabel: request.providerSafeLabel,
+        modelSafeLabel: request.modelSafeLabel,
+        providerMode: request.providerMode,
+        readinessStatus: request.readinessStatus,
+        providerReadinessStatus: request.providerReadinessStatus,
+        providerDefaultEnablement: request.providerDefaultEnablement,
+        providerRequiresExplicitOptIn: request.providerRequiresExplicitOptIn,
+        contextPlanningSummaryId: request.contextPlanningSummaryId,
+        missingRequiredFactCount: request.missingRequiredFacts.length,
+        missingOptionalFactCount: request.missingOptionalFacts.length,
+        mutationAuthority: request.mutationAuthority,
+        redactionStatus: request.redaction.status,
+        terminalSuccessClaim: false,
+      },
+      request.notProvenClaims,
+    );
+    append(
+      "provider-readiness-observed",
+      {
+        requestId: request.requestId,
+        providerReadinessStatus: request.providerReadinessStatus,
+        providerDefaultEnablement: request.providerDefaultEnablement,
+        providerRequiresExplicitOptIn: request.providerRequiresExplicitOptIn,
+        terminalSuccessClaim: false,
+      },
+      request.notProvenClaims,
+    );
+  }
+
+  for (const stream of input.providerResponseStreams ?? []) {
+    if (stream.eventCount > 0) {
+      append(
+        "provider-stream-started",
+        {
+          streamId: stream.streamId,
+          requestId: stream.requestId,
+          responseId: stream.responseId,
+          status: stream.status,
+          eventCount: stream.eventCount,
+          terminalSuccessClaim: false,
+        },
+        stream.notProvenClaims,
+      );
+    }
+    if (stream.contentDeltaCount > 0 || stream.toolCallDeltaCount > 0) {
+      append(
+        "provider-stream-delta-observed",
+        {
+          streamId: stream.streamId,
+          responseId: stream.responseId,
+          contentDeltaCount: stream.contentDeltaCount,
+          toolCallDeltaCount: stream.toolCallDeltaCount,
+          contentSummary: stream.contentSummary,
+          terminalSuccessClaim: false,
+        },
+        stream.notProvenClaims,
+      );
+    }
+    if (stream.status === "cancelled") {
+      append(
+        "provider-stream-cancelled",
+        {
+          streamId: stream.streamId,
+          responseId: stream.responseId,
+          cancellationKind: stream.cancellation?.kind,
+          partialResponsePreserved: stream.cancellation?.partialResponsePreserved,
+          retryStatus: stream.cancellation?.retryStatus,
+          terminalSuccessClaim: false,
+        },
+        stream.notProvenClaims,
+      );
+    }
+    if (stream.failure) {
+      append(
+        "provider-stream-failed",
+        {
+          streamId: stream.streamId,
+          responseId: stream.responseId,
+          failureClass: stream.failure.class,
+          fallbackEligibility: stream.failure.fallbackEligibility,
+          fallbackExecuted: stream.failure.fallbackExecuted,
+          terminalSuccessClaim: false,
+        },
+        stream.notProvenClaims,
+      );
+    }
+    append(
+      stream.status === "completed" ? "model-boundary-completed" : "model-boundary-partial",
+      {
+        streamId: stream.streamId,
+        responseId: stream.responseId,
+        status: stream.status,
+        assistantMessageCompleted: stream.assistantMessageCompleted,
+        streamCompleted: stream.streamCompleted,
+        toolCallCount: stream.completedToolCalls.length,
+        terminalSuccessClaim: false,
+      },
+      stream.notProvenClaims,
+    );
+  }
+
+  for (const phase of input.modelBoundaryPhases ?? []) {
+    append(
+      phase.stream.status === "completed" ? "model-boundary-completed" : "model-boundary-partial",
+      {
+        phaseId: phase.phaseId,
+        requestId: phase.requestBoundary.requestId,
+        responseId: phase.responseBoundary.responseId,
+        streamStatus: phase.stream.status,
+        assistantAccumulationStatus: phase.assistantResponse.accumulationStatus,
+        toolCallExtractionStatus: phase.toolCallBatch.extractionStatus,
+        toolBatchHandoffPrepared: phase.toolBatchHandoffPrepared,
+        terminalSuccessClaim: phase.terminalSuccessClaim,
+      },
+      phase.notProvenClaims,
     );
   }
 

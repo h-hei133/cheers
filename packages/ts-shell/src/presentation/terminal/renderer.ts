@@ -35,6 +35,7 @@ const SECTION_ORDER = [
   "save_point",
   "resources",
   "provider",
+  "model_boundary",
   "packages",
   "session",
   "events",

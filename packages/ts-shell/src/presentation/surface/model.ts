@@ -4,6 +4,7 @@ import type {
 } from "../../context/acquisition/summary.js";
 import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../../orchestration/types.js";
 import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
+import type { ModelBoundaryPhaseProjection } from "../../runtime/loop/modelBoundary.js";
 import type { RuntimeProjectionEvent } from "../../runtime/events/projection.js";
 import type { ProductLoopAdapterProjection } from "../../runtime/loop/adapter.js";
 import type { LoopTrajectoryProjection } from "../../runtime/loop/trajectory.js";
@@ -36,6 +37,7 @@ export type ProductSurfaceSectionKind =
   | "save_point"
   | "resources"
   | "provider"
+  | "model_boundary"
   | "packages"
   | "session"
   | "events"
@@ -103,6 +105,7 @@ export interface ProductSurfaceInput {
   readonly resourceProjection?: StaticResourceProjection;
   readonly packageInventory?: PackageInventoryProjection;
   readonly providerRegistry?: ProviderRegistryProjection;
+  readonly modelBoundaryPhase?: ModelBoundaryPhaseProjection;
   readonly runtimeEvents?: readonly RuntimeProjectionEvent[];
   readonly sessionProjection?: SessionTreeProjection;
   readonly loopTrajectory?: LoopTrajectoryProjection;
@@ -114,7 +117,7 @@ export function projectProductSurfaceViewModel(
   input: ProductSurfaceInput,
 ): ProductSurfaceViewModel | undefined {
   const codingResult = input.codingResult;
-  if (!codingResult && !input.loopTrajectory && !input.productLoopAdapter && !input.contextPlanningSummary) {
+  if (!codingResult && !input.loopTrajectory && !input.productLoopAdapter && !input.contextPlanningSummary && !input.modelBoundaryPhase) {
     return undefined;
   }
 
@@ -140,6 +143,7 @@ export function projectProductSurfaceViewModel(
     ...loopTrajectorySections(input),
     ...resourceSections(input),
     ...providerSections(input),
+    ...modelBoundarySections(input.modelBoundaryPhase),
     ...packageSections(input),
     ...sessionSections(input),
     ...eventSections(input),
@@ -154,10 +158,12 @@ export function projectProductSurfaceViewModel(
     section({
       kind: "not_proven",
       title: "Not proven",
-      severity: (sessionFacts?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "info",
-      status: (sessionFacts?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "observed",
+      severity: (sessionFacts?.notProvenClaims.length ?? input.modelBoundaryPhase?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "info",
+      status: (sessionFacts?.notProvenClaims.length ?? input.modelBoundaryPhase?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "observed",
       summary: (sessionFacts?.notProvenClaims.length ?? 0) > 0
         ? sessionFacts!.notProvenClaims.join("; ")
+        : (input.modelBoundaryPhase?.notProvenClaims.length ?? 0) > 0
+          ? input.modelBoundaryPhase!.notProvenClaims.slice(0, 8).join("; ")
         : (input.contextPlanningSummary?.notProvenClaims.length ?? 0) > 0
           ? input.contextPlanningSummary!.notProvenClaims.slice(0, 8).join("; ")
         : (input.loopTrajectory?.notProvenClaims.length ?? 0) > 0
@@ -166,6 +172,7 @@ export function projectProductSurfaceViewModel(
           ? input.productLoopAdapter!.notProvenClaims.slice(0, 8).join("; ")
         : "none",
       notProvenClaims: sessionFacts?.notProvenClaims ??
+        input.modelBoundaryPhase?.notProvenClaims ??
         input.contextPlanningSummary?.notProvenClaims ??
         input.loopTrajectory?.notProvenClaims ??
         input.productLoopAdapter?.notProvenClaims ?? [],
@@ -191,6 +198,7 @@ export function projectProductSurfaceViewModel(
     verdict: sessionFacts?.verdict ??
       `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? input.productLoopAdapter?.adapterId ?? "not-observed"}`,
     notProvenClaims: sessionFacts?.notProvenClaims ??
+      input.modelBoundaryPhase?.notProvenClaims ??
       input.contextPlanningSummary?.notProvenClaims ??
       input.loopTrajectory?.notProvenClaims ??
       input.productLoopAdapter?.notProvenClaims ?? [],
@@ -201,6 +209,52 @@ export function projectProductSurfaceViewModel(
     redaction: sections.some((item) => item.redaction !== "none") ? "applied" : "none",
     terminalSuccessClaim: false,
   };
+}
+
+function modelBoundarySections(
+  phase: ModelBoundaryPhaseProjection | undefined,
+): ProductSurfaceSection[] {
+  if (!phase) {
+    return [];
+  }
+  const streamStatus = phase.stream.status;
+  const failureClass = phase.stream.failure?.class ?? "none";
+  const cancellation = phase.stream.cancellation?.kind ?? "none";
+  return [section({
+    kind: "model_boundary",
+    title: "Model boundary",
+    severity: streamStatus === "failed" ||
+        streamStatus === "output_invalid" ||
+        streamStatus === "output_insufficient" ||
+        streamStatus === "redaction_failed"
+      ? "error"
+      : streamStatus === "cancelled"
+        ? "partial"
+        : "not_proven",
+    status: streamStatus === "completed"
+      ? "observed"
+      : streamStatus === "failed" ||
+          streamStatus === "output_invalid" ||
+          streamStatus === "output_insufficient" ||
+          streamStatus === "redaction_failed"
+        ? "failed"
+        : streamStatus === "cancelled" || streamStatus === "partial"
+          ? "partial"
+          : "not_proven",
+    summary: `providerMode=${phase.requestBoundary.providerMode}; model=${phase.requestBoundary.modelSafeLabel}; request=${phase.requestBoundary.readinessStatus}; stream=${streamStatus}; assistant=${phase.assistantResponse.accumulationStatus}; toolCalls=${phase.toolCallBatch.extractionStatus}; failure=${failureClass}; cancellation=${cancellation}; fallback=${phase.stream.failure?.fallbackEligibility ?? "unknown"}; terminalSuccessClaim=false`,
+    facts: [
+      { label: "requestId", value: phase.requestBoundary.requestId },
+      { label: "provider", value: phase.requestBoundary.providerSafeLabel },
+      { label: "model", value: phase.requestBoundary.modelSafeLabel },
+      { label: "missingRequiredFacts", value: String(phase.requestBoundary.missingRequiredFacts.length) },
+      { label: "dispatchStatus", value: phase.toolCallBatch.dispatchStatus },
+    ],
+    redaction: phase.stream.redaction.status === "redacted" ||
+        phase.requestBoundary.redaction.status === "redacted"
+      ? "applied"
+      : "none",
+    notProvenClaims: phase.notProvenClaims,
+  })];
 }
 
 function contextPlanningSections(

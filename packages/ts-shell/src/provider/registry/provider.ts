@@ -9,10 +9,15 @@ export type ProviderFailureClass =
   | "provider_endpoint"
   | "provider_rate_limited"
   | "provider_timeout"
+  | "provider_cancelled"
+  | "provider_stream_protocol_error"
+  | "provider_stream_event_malformed"
   | "provider_output_invalid"
   | "provider_output_insufficient"
   | "provider_redaction_failure"
   | "provider_route_error"
+  | "provider_fallback_eligible"
+  | "provider_fallback_ineligible"
   | "provider_unknown";
 
 export interface ProviderCompatibilityFlags {
@@ -115,10 +120,15 @@ export const PROVIDER_FAILURE_TAXONOMY: readonly ProviderFailureClass[] = Object
   "provider_endpoint",
   "provider_rate_limited",
   "provider_timeout",
+  "provider_cancelled",
+  "provider_stream_protocol_error",
+  "provider_stream_event_malformed",
   "provider_output_invalid",
   "provider_output_insufficient",
   "provider_redaction_failure",
   "provider_route_error",
+  "provider_fallback_eligible",
+  "provider_fallback_ineligible",
   "provider_unknown",
 ]);
 
@@ -170,9 +180,19 @@ export function classifyProviderFailure(input: {
   readonly insufficientOutput?: boolean;
   readonly missingConfig?: boolean;
   readonly missingAuth?: boolean;
+  readonly cancelled?: boolean;
+  readonly streamProtocolError?: boolean;
+  readonly malformedStreamEvent?: boolean;
+  readonly fallbackEligible?: boolean;
+  readonly fallbackIneligible?: boolean;
 }): ProviderFailureClass {
   if (input.routeBug) return "provider_route_error";
   if (input.redactionFailed) return "provider_redaction_failure";
+  if (input.malformedStreamEvent) return "provider_stream_event_malformed";
+  if (input.streamProtocolError) return "provider_stream_protocol_error";
+  if (input.cancelled) return "provider_cancelled";
+  if (input.fallbackEligible) return "provider_fallback_eligible";
+  if (input.fallbackIneligible) return "provider_fallback_ineligible";
   if (input.missingAuth) return "provider_auth";
   if (input.missingConfig) return "provider_config";
   if (input.invalidOutput) return "provider_output_invalid";
@@ -182,6 +202,13 @@ export function classifyProviderFailure(input: {
   if (input.status === 429) return "provider_rate_limited";
   if (input.status && input.status >= 400) return "provider_endpoint";
   const text = `${input.errorName ?? ""} ${input.message ?? ""}`;
+  if (/cancelled|canceled|user abort|provider abort/i.test(text)) return "provider_cancelled";
+  if (/stream protocol|sse protocol|invalid frame|unexpected eof/i.test(text)) {
+    return "provider_stream_protocol_error";
+  }
+  if (/malformed stream|malformed event|invalid stream event/i.test(text)) {
+    return "provider_stream_event_malformed";
+  }
   if (/abort|timeout|timed out/i.test(text)) return "provider_timeout";
   if (/network|fetch|econn|enotfound|unreachable|socket/i.test(text)) {
     return "provider_network";

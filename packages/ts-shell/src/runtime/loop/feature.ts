@@ -310,6 +310,80 @@ export function buildPlanningFeatureContract(): FutureFeatureIntegrationContract
   });
 }
 
+export function buildModelBoundaryFeatureContract(): FutureFeatureIntegrationContract {
+  return validateFutureFeatureIntegration({
+    featureId: "model-boundary",
+    ownerDomain: "provider/runtime-loop",
+    loopPhase: "model-boundary",
+    inputFacts: [
+      "context-planning-summary",
+      "provider-registry",
+      "provider-readiness",
+      "planning-constraints",
+      "no-write-status",
+      "missing-required-facts",
+    ],
+    outputHandoffFacts: [
+      "model-request-boundary",
+      "provider-stream-projection",
+      "assistant-response-accumulation",
+      "tool-call-batch-not-dispatched",
+      "cancellation-projection",
+      "provider-failure-classification",
+    ],
+    runtimeEvents: [
+      "model-request-prepared",
+      "provider-stream-started",
+      "provider-stream-delta-observed",
+      "assistant-response-accumulated",
+      "tool-call-batch-extracted",
+      "provider-stream-cancelled",
+      "provider-stream-failed",
+      "model-boundary-completed",
+    ],
+    evidenceFacts: [
+      "request-id",
+      "provider-safe-label",
+      "model-safe-label",
+      "stream-status",
+      "redaction-status",
+      "terminal-success-claim-false",
+    ],
+    productSurfaceSection: "model-boundary",
+    resultTruthfulnessBoundary: "model boundary facts are not task success, provider success, tool execution, mutation authority, verification success, or terminal success",
+    notProvenClaims: [
+      "model-request-prepared-is-not-provider-success",
+      "stream-started-is-not-model-response-complete",
+      "content-delta-is-not-final-response",
+      "assistant-accumulated-is-not-task-success",
+      "tool-call-extracted-is-not-tool-executed",
+      "fallback-eligible-is-not-fallback-executed",
+      "model-response-complete-is-not-task-success",
+      "product-surface-rendered-is-not-success",
+    ],
+    forbiddenShortcuts: [
+      "treat-provider-called-as-provider-success",
+      "treat-stream-started-as-complete",
+      "treat-content-delta-as-final-response",
+      "treat-assistant-accumulated-as-task-success",
+      "treat-tool-call-extracted-as-tool-executed",
+      "treat-fallback-eligible-as-fallback-executed",
+      "treat-model-response-complete-as-task-success",
+    ],
+    validationGates: [
+      "provider-request-boundary-tests",
+      "provider-response-stream-tests",
+      "assistant-accumulation-tests",
+      "tool-call-extraction-tests",
+      "runtime-event-tests",
+      "product-surface-tests",
+      "redaction-tests",
+      "truthfulness-tests",
+    ],
+    terminalSuccessClaim: false,
+  });
+}
+
 export function buildContinuationContextFeatureContract(): FutureFeatureIntegrationContract {
   return validateFutureFeatureIntegration({
     featureId: "continuation-context",
