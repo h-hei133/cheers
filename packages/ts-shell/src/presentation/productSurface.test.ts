@@ -1,6 +1,12 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 import { buildLoopContextRebuildInput } from "../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
+import { buildContextPlanningBlockSummary } from "../orchestration/contextPlanningSummary.js";
+import { runPlanningRuntime } from "../orchestration/planningRuntime.js";
 import type { CodingResultSummary } from "../orchestration/types.js";
 import {
   projectProviderRegistry,
@@ -368,6 +374,93 @@ describe("product surface view model", () => {
     expect(viewModel?.terminalSuccessClaim).toBe(false);
   });
 
+  it("renders Context and Planning block sections from machine facts without success inflation", async () => {
+    await withPlanningFixture(async (workspaceRoot) => {
+      const planning = await runPlanningRuntime({
+        workspaceRoot,
+        userTask: "Implement better context engine target ranking and cover it with a test",
+        maxRepoFiles: 80,
+        maxCandidates: 5,
+      });
+      const summary = buildContextPlanningBlockSummary({
+        context: planning.context,
+        planning,
+        mutationHandoff: planning.mutationHandoff,
+      });
+      const viewModel = projectProductSurfaceViewModel({
+        status: "stopped_error",
+        terminalClassification: "stopped",
+        terminalReason: "waiting_for_input",
+        contextPlanningSummary: summary,
+      });
+      const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
+
+      expect(viewModel?.sections.map((section) => section.kind)).toEqual([
+        "context_discovery",
+        "context_acquisition",
+        "planning",
+        "handoff",
+        "continuation_context",
+        "verdict",
+        "not_proven",
+        "next_action",
+      ]);
+      expect(rendered).toContain("[warning] Planning:");
+      expect(rendered).toContain("quality=");
+      expect(rendered).toContain("[not_proven] Handoff:");
+      expect(rendered).toContain("noWrite=no-write-authority-granted");
+      expect(rendered).toContain("verificationRun=selected-not-run");
+      expect(rendered).toContain("memoryReuse=");
+      expect(rendered).toContain("product-surface-rendered-is-not-success");
+      expect(rendered).not.toContain("Outcome: success");
+      expect(viewModel?.terminalSuccessClaim).toBe(false);
+    });
+  });
+
+  it("keeps human section status consistent with blocked and stale machine facts", async () => {
+    await withPlanningFixture(async (workspaceRoot) => {
+      const planning = await runPlanningRuntime({
+        workspaceRoot,
+        userTask: "Implement better context engine target ranking and cover it with a test",
+        maxRepoFiles: 80,
+        maxCandidates: 5,
+      });
+      const summary = buildContextPlanningBlockSummary({
+        context: {
+          ...planning.context,
+          memory: {
+            ...planning.context.memory,
+            invalidation: {
+              ...planning.context.memory.invalidation,
+              staleFiles: ["src/contextEngine.ts"],
+              invalidationSignals: ["file-stat-mismatch:src/contextEngine.ts"],
+            },
+          },
+        },
+        planning,
+      });
+      const viewModel = projectProductSurfaceViewModel({
+        status: "stopped_error",
+        terminalClassification: "stopped",
+        terminalReason: "waiting_for_input",
+        contextPlanningSummary: summary,
+      });
+      const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
+
+      for (const kind of ["context_discovery", "context_acquisition", "planning", "continuation_context"] as const) {
+        expect(viewModel?.sections.find((section) => section.kind === kind)).toMatchObject({
+          severity: "blocked",
+          status: "blocked",
+        });
+      }
+      expect(rendered).toContain("stale=2");
+      expect(rendered).toContain("status: blocked");
+      expect(rendered).toContain("refresh");
+      expect(viewModel?.nextAction).toContain("refresh");
+      expect(viewModel?.terminalSuccessClaim).toBe(false);
+    });
+  });
+
   it("redacts unsafe raw output, provider config, patch payloads, and hidden reasoning", () => {
     const viewModel = projectProductSurfaceViewModel({
       status: "stopped_error",
@@ -396,6 +489,40 @@ describe("product surface view model", () => {
     expect(rendered).toContain("[raw-content-excluded]");
   });
 });
+
+async function withPlanningFixture<T>(
+  fn: (workspaceRoot: string) => Promise<T>,
+): Promise<T> {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "product-surface-context-planning-"));
+  try {
+    await fs.mkdir(path.join(workspaceRoot, "src"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "package.json"),
+      JSON.stringify({ name: "product-surface-fixture", scripts: { test: "vitest run" } }, null, 2),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "contextEngine.ts"),
+      [
+        "import { rankTarget } from './targetRanker.js';",
+        "export function runContextEngine(task: string) {",
+        "  return rankTarget(task);",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "targetRanker.ts"),
+      "export function rankTarget(task: string) { return task.length; }\n",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "contextEngine.test.ts"),
+      "import { runContextEngine } from './contextEngine.js';\nexpect(runContextEngine('task')).toBe(4);\n",
+    );
+    return await fn(workspaceRoot);
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+}
 
 function codingResult(overrides: Partial<CodingResultSummary> = {}): CodingResultSummary {
   return {

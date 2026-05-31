@@ -1,3 +1,7 @@
+import type {
+  ContextPlanningBlockStatus,
+  ContextPlanningBlockSummary,
+} from "../orchestration/contextPlanningSummary.js";
 import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../orchestration/types.js";
 import type { ProviderRegistryProjection } from "../provider/providerRegistry.js";
 import type { RuntimeProjectionEvent } from "../runtime/events/runtimeEventProjection.js";
@@ -14,9 +18,14 @@ import type { SessionTreeProjection } from "../session/sessionTreeProjection.js"
 export type ProductSurfaceSectionKind =
   | "task"
   | "context"
+  | "context_discovery"
+  | "context_acquisition"
   | "loop"
   | "turn"
   | "plan"
+  | "planning"
+  | "handoff"
+  | "continuation_context"
   | "proposal"
   | "authority"
   | "apply"
@@ -98,13 +107,14 @@ export interface ProductSurfaceInput {
   readonly sessionProjection?: SessionTreeProjection;
   readonly loopTrajectory?: LoopTrajectoryProjection;
   readonly productLoopAdapter?: ProductLoopAdapterProjection;
+  readonly contextPlanningSummary?: ContextPlanningBlockSummary;
 }
 
 export function projectProductSurfaceViewModel(
   input: ProductSurfaceInput,
 ): ProductSurfaceViewModel | undefined {
   const codingResult = input.codingResult;
-  if (!codingResult && !input.loopTrajectory && !input.productLoopAdapter) {
+  if (!codingResult && !input.loopTrajectory && !input.productLoopAdapter && !input.contextPlanningSummary) {
     return undefined;
   }
 
@@ -125,6 +135,7 @@ export function projectProductSurfaceViewModel(
       repairSection(codingResult),
       toolsSection(codingResult),
     ] : []),
+    ...contextPlanningSections(input.contextPlanningSummary),
     ...productLoopAdapterSections(input),
     ...loopTrajectorySections(input),
     ...resourceSections(input),
@@ -143,16 +154,19 @@ export function projectProductSurfaceViewModel(
     section({
       kind: "not_proven",
       title: "Not proven",
-      severity: (sessionFacts?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "info",
-      status: (sessionFacts?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "observed",
+      severity: (sessionFacts?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "info",
+      status: (sessionFacts?.notProvenClaims.length ?? input.contextPlanningSummary?.notProvenClaims.length ?? input.loopTrajectory?.notProvenClaims.length ?? input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0 ? "not_proven" : "observed",
       summary: (sessionFacts?.notProvenClaims.length ?? 0) > 0
         ? sessionFacts!.notProvenClaims.join("; ")
+        : (input.contextPlanningSummary?.notProvenClaims.length ?? 0) > 0
+          ? input.contextPlanningSummary!.notProvenClaims.slice(0, 8).join("; ")
         : (input.loopTrajectory?.notProvenClaims.length ?? 0) > 0
           ? input.loopTrajectory!.notProvenClaims.slice(0, 8).join("; ")
         : (input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0
           ? input.productLoopAdapter!.notProvenClaims.slice(0, 8).join("; ")
         : "none",
       notProvenClaims: sessionFacts?.notProvenClaims ??
+        input.contextPlanningSummary?.notProvenClaims ??
         input.loopTrajectory?.notProvenClaims ??
         input.productLoopAdapter?.notProvenClaims ?? [],
     }),
@@ -166,6 +180,7 @@ export function projectProductSurfaceViewModel(
         : "info",
       status: "observed",
       summary: sessionFacts?.nextAction ??
+        input.contextPlanningSummary?.nextAction ??
         input.productLoopAdapter?.nextAction ??
         "keep loop trajectory observation separate from terminal success",
     }),
@@ -176,14 +191,158 @@ export function projectProductSurfaceViewModel(
     verdict: sessionFacts?.verdict ??
       `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? input.productLoopAdapter?.adapterId ?? "not-observed"}`,
     notProvenClaims: sessionFacts?.notProvenClaims ??
+      input.contextPlanningSummary?.notProvenClaims ??
       input.loopTrajectory?.notProvenClaims ??
       input.productLoopAdapter?.notProvenClaims ?? [],
     nextAction: sessionFacts?.nextAction ??
+      input.contextPlanningSummary?.nextAction ??
       input.productLoopAdapter?.nextAction ??
       "keep loop trajectory observation separate from terminal success",
     redaction: sections.some((item) => item.redaction !== "none") ? "applied" : "none",
     terminalSuccessClaim: false,
   };
+}
+
+function contextPlanningSections(
+  summary: ContextPlanningBlockSummary | undefined,
+): ProductSurfaceSection[] {
+  if (!summary) {
+    return [];
+  }
+  const severity = contextPlanningSeverity(summary.status);
+  const status = contextPlanningSurfaceStatus(summary.status);
+  return [
+    section({
+      kind: "context_discovery",
+      title: "Context discovery",
+      severity,
+      status,
+      summary: `ambiguity=${summary.discovery.ambiguityState}; selected=${summary.discovery.selectedCandidateIds.length}; competing=${summary.discovery.competingCandidateIds.length}; omitted=${summary.discovery.omittedCandidateCount}; missingDiscoveryFacts=${summary.discovery.missingDiscoveryFacts.length}`,
+      facts: [
+        { label: "scanProfile", value: summary.discovery.scanProfileId },
+        { label: "ambiguity", value: summary.discovery.ambiguityState },
+        { label: "selectedCandidateIds", value: summary.discovery.selectedCandidateIds.join(",") || "none" },
+        { label: "competingCandidateIds", value: summary.discovery.competingCandidateIds.join(",") || "none" },
+      ],
+      notProvenClaims: [
+        "discovery-found-is-not-correct-target",
+        "selected-candidate-is-not-edit-authority",
+      ],
+      sourceEvidenceIds: summary.evidence,
+    }),
+    section({
+      kind: "context_acquisition",
+      title: "Context acquisition",
+      severity,
+      status,
+      summary: `mode=${summary.acquisition.mode}; stale=${summary.acquisition.staleFacts.length}; requiredMissing=${summary.acquisition.requiredMissingFacts.length}; optionalMissing=${summary.acquisition.optionalMissingFacts.length}; sufficiency=${summary.acquisition.contextSufficiencyStatus}; readBudget=${summary.acquisition.readBudgetStatus}`,
+      facts: [
+        { label: "packetProvenance", value: String(summary.acquisition.packetProvenanceCount) },
+        { label: "graphConfidence", value: summary.acquisition.graphConfidence },
+        { label: "unavailableGraphComponents", value: summary.acquisition.unavailableGraphComponents.join(",") || "none" },
+        { label: "nextReadSuggestions", value: summary.acquisition.nextReadSuggestions.slice(0, 5).join("; ") || "none" },
+      ],
+      redaction: "excluded",
+      notProvenClaims: [
+        "context-read-is-not-repository-understanding",
+        "context-sufficient-for-review-only-is-not-edit-authority",
+        "next-read-suggestion-is-not-completed-read",
+      ],
+      sourceEvidenceIds: summary.evidence,
+    }),
+    section({
+      kind: "planning",
+      title: "Planning",
+      severity,
+      status,
+      summary: `quality=${summary.planning.qualityStatus}; confidence=${summary.planning.planConfidence}; assumptions=${summary.planning.assumptions.length}; constraints=${summary.planning.constraints.length}; terminalSuccessClaim=false`,
+      facts: [
+        { label: "assumptions", value: summary.planning.assumptions.slice(0, 5).join("; ") || "none" },
+        { label: "constraints", value: summary.planning.constraints.slice(0, 5).join("; ") || "none" },
+        { label: "nextAction", value: summary.planning.nextAction },
+      ],
+      notProvenClaims: [
+        "plan-generated-is-not-executable-work",
+        "planning-facts-are-not-terminal-success",
+      ],
+      sourceEvidenceIds: summary.evidence,
+    }),
+    section({
+      kind: "handoff",
+      title: "Handoff",
+      severity: summary.handoff.editNoWriteStatus.includes("no-write") ? "not_proven" : severity,
+      status: summary.handoff.editNoWriteStatus.includes("no-write") ? "not_run" : status,
+      summary: `edit=${summary.handoff.editHandoffStatus}; noWrite=${summary.handoff.editNoWriteStatus}; exactProposal=${summary.handoff.exactProposalReadiness}; verificationRun=${summary.handoff.verificationSelectedNotRunStatus}`,
+      facts: [
+        { label: "editHandoff", value: summary.handoff.editHandoffStatus },
+        { label: "exactProposalReadiness", value: summary.handoff.exactProposalReadiness },
+        { label: "verificationIntent", value: summary.handoff.verificationIntentStatus },
+        { label: "verificationRun", value: summary.handoff.verificationSelectedNotRunStatus },
+      ],
+      notProvenClaims: [
+        "edit-handoff-ready-is-not-mutation-authority",
+        "verification-intent-selected-is-not-verification-passed",
+      ],
+      sourceEvidenceIds: summary.evidence,
+    }),
+    section({
+      kind: "continuation_context",
+      title: "Continuation context",
+      severity,
+      status,
+      summary: `memoryReuse=${summary.continuation.memoryReuseStatus}; freshness=${summary.continuation.memoryFreshnessRequirement}; readiness=${summary.continuation.continuationReadinessStatus}; requiredRefresh=${summary.continuation.requiredRefreshReads.length}; optionalRefresh=${summary.continuation.optionalRefreshReads.length}; replaySafePlanning=${summary.continuation.replaySafePlanningStateIds.length}`,
+      facts: [
+        { label: "requiredRefreshReads", value: summary.continuation.requiredRefreshReads.slice(0, 5).join("; ") || "none" },
+        { label: "optionalRefreshReads", value: summary.continuation.optionalRefreshReads.slice(0, 5).join("; ") || "none" },
+        { label: "replaySafePlanningStateIds", value: summary.continuation.replaySafePlanningStateIds.join(",") || "none" },
+      ],
+      redaction: "excluded",
+      notProvenClaims: [
+        "memory-reused-is-not-fresh-enough-context",
+        "continuation-ready-is-not-task-success",
+        "replay-state-available-is-not-plan-validity",
+      ],
+      sourceEvidenceIds: summary.evidence,
+    }),
+  ];
+}
+
+function contextPlanningSeverity(status: ContextPlanningBlockStatus): ProductSurfaceSeverity {
+  switch (status) {
+    case "blocked_stale_context":
+    case "blocked_ambiguous_target":
+    case "blocked_missing_required_context":
+      return "blocked";
+    case "partial_required_facts_missing":
+      return "partial";
+    case "unsupported":
+    case "not_proven":
+      return "not_proven";
+    case "review_only_ready":
+      return "warning";
+    case "product_surface_ready":
+    default:
+      return "info";
+  }
+}
+
+function contextPlanningSurfaceStatus(status: ContextPlanningBlockStatus): ProductSurfaceStatus {
+  switch (status) {
+    case "blocked_stale_context":
+    case "blocked_ambiguous_target":
+    case "blocked_missing_required_context":
+      return "blocked";
+    case "partial_required_facts_missing":
+      return "partial";
+    case "unsupported":
+      return "unsupported";
+    case "not_proven":
+      return "not_proven";
+    case "review_only_ready":
+    case "product_surface_ready":
+    default:
+      return "observed";
+  }
 }
 
 function productLoopAdapterSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
