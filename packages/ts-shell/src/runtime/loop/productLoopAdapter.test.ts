@@ -8,6 +8,7 @@ import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { runAgentLoopContract } from "./agentLoopContract.js";
 import {
   buildContextDiscoveryTargetSelectionFeatureContract,
+  buildPlanningFeatureContract,
   buildStagedContextAcquisitionFeatureContract,
   validateFutureFeatureIntegration,
 } from "./featureContract.js";
@@ -376,6 +377,81 @@ describe("product loop adapter", () => {
         "terminal-success",
       ]),
     );
+    expect(adapter.terminalSuccessClaim).toBe(false);
+  });
+
+  it("declares planning owner handoff as an observation-only feature contract", () => {
+    const contract = buildPlanningFeatureContract();
+
+    expect(contract.valid).toBe(true);
+    expect(contract.terminalSuccessClaim).toBe(false);
+    expect(contract.declaration).toMatchObject({
+      featureId: "planning-owner-handoff",
+      ownerDomain: "orchestration/planning-runtime",
+      loopPhase: "planning",
+      productSurfaceSection: "planning-owner-handoff",
+      terminalSuccessClaim: false,
+    });
+    expect(contract.declaration.outputHandoffFacts).toEqual(
+      expect.arrayContaining([
+        "planning-owner-boundary",
+        "plan-quality-facts",
+        "evidence-bound-plan-steps",
+        "planning-assumptions",
+        "planning-constraints",
+        "plan-to-edit-handoff",
+        "plan-to-verification-handoff",
+        "unsupported-classification",
+      ]),
+    );
+    expect(contract.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "plan-generated-is-not-executable-work",
+        "edit-handoff-ready-is-not-mutation-authority",
+        "verification-intent-is-not-verification-run-or-pass",
+        "unsupported-classification-is-not-success",
+        "feature-contract-valid-is-not-success",
+      ]),
+    );
+    expect(contract.declaration.forbiddenShortcuts).toEqual(
+      expect.arrayContaining([
+        "treat-plan-generated-as-executed-work",
+        "treat-edit-handoff-ready-as-mutation-authority",
+        "treat-verification-intent-as-verification-passed",
+        "treat-feature-contract-valid-as-task-success",
+      ]),
+    );
+  });
+
+  it("lets the runtime loop observe planning contracts without moving planning truth", () => {
+    const trajectory = projectLoopTrajectory({
+      loopId: "planning-owner-contract-loop",
+      prompt: "observe planning owner contract",
+      resultFacts: {
+        status: "stopped",
+        terminalClassification: "stopped",
+        terminalReason: "waiting_for_input",
+        verdictSource: "result",
+      },
+    });
+    const contract = buildPlanningFeatureContract();
+    const adapter = projectProductLoopAdapter({
+      adapterId: "planning-owner-contract-adapter",
+      promptSummary: "observe planning owner contract",
+      loopTrajectory: trajectory,
+      featureContracts: [contract],
+    });
+
+    expect(adapter.ownerDomain).toBe("runtime/loop");
+    expect(adapter.featureContracts).toEqual([contract]);
+    expect(adapter.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "plan-generated-is-not-executable-work",
+        "edit-handoff-ready-is-not-mutation-authority",
+        "terminal-success",
+      ]),
+    );
+    expect(adapter.resultTruthfulnessBoundary.terminalSuccessClaim).toBe(false);
     expect(adapter.terminalSuccessClaim).toBe(false);
   });
 

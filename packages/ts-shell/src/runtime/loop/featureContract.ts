@@ -233,6 +233,83 @@ export function buildStagedContextAcquisitionFeatureContract(): FutureFeatureInt
   });
 }
 
+export function buildPlanningFeatureContract(): FutureFeatureIntegrationContract {
+  return validateFutureFeatureIntegration({
+    featureId: "planning-owner-handoff",
+    ownerDomain: "orchestration/planning-runtime",
+    loopPhase: "planning",
+    inputFacts: [
+      "context-discovery-handoff",
+      "target-ranking-evidence-id",
+      "staged-context-acquisition-facts",
+      "context-sufficiency-decision",
+      "task-kind",
+      "verification-command-plan",
+    ],
+    outputHandoffFacts: [
+      "planning-owner-boundary",
+      "plan-quality-facts",
+      "evidence-bound-plan-steps",
+      "planning-assumptions",
+      "planning-constraints",
+      "plan-to-edit-handoff",
+      "plan-to-verification-handoff",
+      "unsupported-classification",
+      "next-action-suggestion",
+    ],
+    runtimeEvents: [
+      "planning-owner-observed",
+      "plan-quality-observed",
+      "edit-handoff-observed",
+      "verification-handoff-observed",
+    ],
+    evidenceFacts: [
+      "context-sufficiency-input",
+      "context-source-ids",
+      "discovery-handoff-ids",
+      "staged-context-ids",
+      "plan-step-evidence-source-ids",
+      "edit-handoff-no-write-status",
+      "verification-selected-not-run-status",
+      "raw-content-excluded",
+    ],
+    productSurfaceSection: "planning-owner-handoff",
+    resultTruthfulnessBoundary: "planning facts are not executable work, mutation authority, apply success, verification success, repair success, or terminal success",
+    notProvenClaims: [
+      "plan-generated-is-not-executable-work",
+      "target-selected-is-not-correct-target-proof",
+      "edit-handoff-ready-is-not-mutation-authority",
+      "exact-proposal-readiness-must-come-from-existing-proposal-backend",
+      "verification-intent-is-not-verification-run-or-pass",
+      "selected-command-is-not-verification-passed",
+      "unsupported-classification-is-not-success",
+      "feature-contract-valid-is-not-success",
+      "product-surface-rendered-is-not-success",
+    ],
+    forbiddenShortcuts: [
+      "treat-plan-generated-as-executed-work",
+      "treat-selected-target-as-correct-target-proof",
+      "treat-edit-handoff-ready-as-mutation-authority",
+      "treat-exact-ready-as-write-success",
+      "treat-verification-intent-as-verification-passed",
+      "treat-selected-command-as-verification-passed",
+      "treat-unsupported-classification-as-success",
+      "treat-feature-contract-valid-as-task-success",
+      "treat-product-surface-rendered-as-task-success",
+    ],
+    validationGates: [
+      "planning-runtime-focused-tests",
+      "planning-handoff-focused-tests",
+      "plan-to-edit-handoff-tests",
+      "plan-to-verification-handoff-tests",
+      "feature-contract-tests",
+      "redaction-tests",
+      "truthfulness-tests",
+    ],
+    terminalSuccessClaim: false,
+  });
+}
+
 function sanitizeId(value: string): string {
   return value
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")

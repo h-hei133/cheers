@@ -81,10 +81,15 @@ export interface PlanningMutationHandoffTarget {
   readonly rationale: string;
   readonly readiness: PlanningMutationHandoffTargetInput["readiness"];
   readonly handoffRoute: PlanningMutationHandoffTargetInput["handoffRoute"];
+  readonly targetConfidence: "high" | "medium" | "low";
+  readonly targetAmbiguity: "single-selected-target" | "multiple-selected-targets" | "missing-target" | "unsupported-target";
   readonly relevantContextReceiptIds: readonly string[];
   readonly readEvidenceIds: readonly string[];
   readonly expectedChangeSummary: string;
   readonly verificationIntentSummary: string;
+  readonly authorityRequirement: "existing-mutation-route-authority-required";
+  readonly noWriteStatus: "no-write-authority-granted";
+  readonly notProvenClaims: readonly string[];
   readonly unsupportedReasons: readonly string[];
 }
 
@@ -117,6 +122,13 @@ export interface PlanningMutationHandoffProjection {
   readonly permissionState: "not-requested";
   readonly requirements: readonly PlanningMutationHandoffRequirement[];
   readonly blockedReasons: readonly string[];
+  readonly targetConfidence: "high" | "medium" | "low";
+  readonly targetAmbiguity: "single-selected-target" | "multiple-selected-targets" | "missing-target" | "unsupported-target";
+  readonly proposedEditScope: "single-file" | "target-set" | "none";
+  readonly exactProposalReadiness: "missing" | "unknown-not-evaluated";
+  readonly authorityRequirement: "existing-mutation-route-authority-required";
+  readonly noWriteStatus: "no-write-authority-granted";
+  readonly notProvenClaims: readonly string[];
   readonly reason: string;
   readonly nextAction: string;
   readonly mutationAuthority: "not-granted";
@@ -171,15 +183,34 @@ export function buildPlanningMutationHandoffProjection(input: {
     blockedReasons,
     unsupportedTargets,
   });
+  const targetAmbiguity = classifyTargetAmbiguity({
+    targetCount: targetPaths.length,
+    unsupportedTargetCount: unsupportedTargets.length,
+  });
+  const targetConfidence = classifyTargetConfidence({
+    reviewReady,
+    targetCount: targetPaths.length,
+    unsupportedTargetCount: unsupportedTargets.length,
+    missingFactCount: input.missingFacts.length,
+  });
+  const proposedEditScope = reviewReady
+    ? targetPaths.length > 1 ? "target-set" as const : "single-file" as const
+    : "none" as const;
+  const handoffNotProvenClaims = handoffNotProvenClaimsForPlanning();
   const targets = input.editTargets.map((target) => ({
     path: target.path,
     rationale: target.rationale,
     readiness: target.readiness,
     handoffRoute: target.handoffRoute,
+    targetConfidence,
+    targetAmbiguity,
     relevantContextReceiptIds: contextReceipts.map((receipt) => receipt.id),
     readEvidenceIds: readEvidence.map((evidence) => evidence.id),
     expectedChangeSummary,
     verificationIntentSummary: verificationIntent.summary,
+    authorityRequirement: "existing-mutation-route-authority-required" as const,
+    noWriteStatus: "no-write-authority-granted" as const,
+    notProvenClaims: handoffNotProvenClaims,
     unsupportedReasons: buildTargetUnsupportedReasons({
       target,
       blockedReasons,
@@ -249,6 +280,11 @@ export function buildPlanningMutationHandoffProjection(input: {
     ),
     ...(proposal?.evidence ?? []),
     ...(proposalReview?.evidence ?? []),
+    `planning-mutation-handoff:target-confidence:${targetConfidence}`,
+    `planning-mutation-handoff:target-ambiguity:${targetAmbiguity}`,
+    `planning-mutation-handoff:proposed-edit-scope:${proposedEditScope}`,
+    "planning-mutation-handoff:exact-proposal-readiness:missing",
+    "planning-mutation-handoff:no-write-status:no-write-authority-granted",
   ]);
 
   return {
@@ -274,6 +310,13 @@ export function buildPlanningMutationHandoffProjection(input: {
     permissionState: "not-requested",
     requirements,
     blockedReasons,
+    targetConfidence,
+    targetAmbiguity,
+    proposedEditScope,
+    exactProposalReadiness: "missing",
+    authorityRequirement: "existing-mutation-route-authority-required",
+    noWriteStatus: "no-write-authority-granted",
+    notProvenClaims: handoffNotProvenClaims,
     reason: buildReason({
       reviewReady,
       targetPaths,
@@ -358,6 +401,42 @@ function buildTargetUnsupportedReasons(input: {
       ? ["target is unsupported before the mutation runtime"]
       : []),
   ]);
+}
+
+function handoffNotProvenClaimsForPlanning(): readonly string[] {
+  return [
+    "edit-handoff-ready-is-not-mutation-authority",
+    "selected-target-is-not-correct-target-proof",
+    "exact-proposal-readiness-must-come-from-existing-proposal-backend",
+    "proposal-prepared-is-not-write-success",
+    "apply-not-run",
+    "verification-not-run",
+  ];
+}
+
+function classifyTargetAmbiguity(input: {
+  readonly targetCount: number;
+  readonly unsupportedTargetCount: number;
+}): PlanningMutationHandoffProjection["targetAmbiguity"] {
+  if (input.targetCount === 0) {
+    return "missing-target";
+  }
+  if (input.unsupportedTargetCount > 0) {
+    return "unsupported-target";
+  }
+  return input.targetCount > 1 ? "multiple-selected-targets" : "single-selected-target";
+}
+
+function classifyTargetConfidence(input: {
+  readonly reviewReady: boolean;
+  readonly targetCount: number;
+  readonly unsupportedTargetCount: number;
+  readonly missingFactCount: number;
+}): PlanningMutationHandoffProjection["targetConfidence"] {
+  if (!input.reviewReady || input.unsupportedTargetCount > 0 || input.missingFactCount > 0) {
+    return "low";
+  }
+  return input.targetCount === 1 ? "medium" : "low";
 }
 
 function buildRequirements(input: {

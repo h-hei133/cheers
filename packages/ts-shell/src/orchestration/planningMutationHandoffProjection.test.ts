@@ -57,12 +57,31 @@ describe("buildPlanningMutationHandoffProjection", () => {
     expect(projection.unsupportedReasons).toEqual([]);
     expect(projection.targets[0]).toMatchObject({
       path: "src/contextEngine.ts",
+      targetConfidence: "medium",
+      targetAmbiguity: "single-selected-target",
       relevantContextReceiptIds: ["context-receipt:ctx_mem_123:1"],
       readEvidenceIds: ["read-evidence:context_engine_123:1"],
       expectedChangeSummary: "Prepare a review-only proposal for src/contextEngine.ts.",
       verificationIntentSummary: "verificationPlan=verification_plan_123; command=npm test -- --help; command-dispatch=not-run",
+      authorityRequirement: "existing-mutation-route-authority-required",
+      noWriteStatus: "no-write-authority-granted",
       unsupportedReasons: [],
     });
+    expect(projection).toMatchObject({
+      targetConfidence: "medium",
+      targetAmbiguity: "single-selected-target",
+      proposedEditScope: "single-file",
+      exactProposalReadiness: "missing",
+      authorityRequirement: "existing-mutation-route-authority-required",
+      noWriteStatus: "no-write-authority-granted",
+    });
+    expect(projection.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "edit-handoff-ready-is-not-mutation-authority",
+        "selected-target-is-not-correct-target-proof",
+        "exact-proposal-readiness-must-come-from-existing-proposal-backend",
+      ]),
+    );
     expect(projection.proposalId).toMatch(/^generated-edit-/);
     expect(projection.proposal?.mutationAuthority).toBe("not-granted");
     expect(projection.proposal?.redactionStatus).toBe("raw-content-excluded");
@@ -134,6 +153,11 @@ describe("buildPlanningMutationHandoffProjection", () => {
         "planning-mutation-handoff:apply:not-run",
         "planning-mutation-handoff:command-dispatch:not-run",
         "planning-mutation-handoff:raw-content-excluded",
+        "planning-mutation-handoff:target-confidence:medium",
+        "planning-mutation-handoff:target-ambiguity:single-selected-target",
+        "planning-mutation-handoff:proposed-edit-scope:single-file",
+        "planning-mutation-handoff:exact-proposal-readiness:missing",
+        "planning-mutation-handoff:no-write-status:no-write-authority-granted",
         "generated-edit-proposal:mutation-authority:not-granted",
         "generated-edit-proposal:raw-content-excluded",
         "edit-proposal-review:status:review-required",
@@ -155,6 +179,10 @@ describe("buildPlanningMutationHandoffProjection", () => {
     expect(projection.handoffState).toBe("planning-only");
     expect(projection.backendLane).toBe("none");
     expect(projection.executionLane).toBe("none");
+    expect(projection.targetAmbiguity).toBe("missing-target");
+    expect(projection.targetConfidence).toBe("low");
+    expect(projection.proposedEditScope).toBe("none");
+    expect(projection.noWriteStatus).toBe("no-write-authority-granted");
     expect(projection.targetPaths).toEqual([]);
     expect(projection.proposal).toBeUndefined();
     expect(projection.proposalReview).toBeUndefined();
@@ -195,6 +223,9 @@ describe("buildPlanningMutationHandoffProjection", () => {
     expect(projection.handoffState).toBe("missing-context");
     expect(projection.backendLane).toBe("none");
     expect(projection.executionLane).toBe("none");
+    expect(projection.targetConfidence).toBe("low");
+    expect(projection.targetAmbiguity).toBe("single-selected-target");
+    expect(projection.proposedEditScope).toBe("none");
     expect(projection.targetPaths).toEqual(["src/app.ts"]);
     expect(projection.proposal).toBeUndefined();
     expect(projection.blockedReasons).toContain("call-site context missing");
@@ -232,6 +263,9 @@ describe("buildPlanningMutationHandoffProjection", () => {
     expect(projection.readiness).toBe("review-ready");
     expect(projection.backendLane).toBe("generated-edit-proposal-review-only");
     expect(projection.executionLane).toBe("existing-target-set-route");
+    expect(projection.targetConfidence).toBe("low");
+    expect(projection.targetAmbiguity).toBe("multiple-selected-targets");
+    expect(projection.proposedEditScope).toBe("target-set");
     expect(projection.proposalReview?.targetScope).toBe("target-set");
     expect(projection.evidence).toContain(
       "planning-mutation-handoff:execution-lane:existing-target-set-route",
