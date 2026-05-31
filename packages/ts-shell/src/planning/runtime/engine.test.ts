@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runPlanningRuntime } from "../planning/runtime/engine.js";
+import { runPlanningRuntime } from "./engine.js";
 
 let workspaceRoot: string;
 
@@ -18,7 +18,7 @@ beforeEach(async () => {
   await fs.writeFile(
     path.join(workspaceRoot, "src", "contextEngine.ts"),
     [
-      "import { rankTarget } from './targetRanker.js';",
+      "import { rankTarget } from '../../orchestration/targetRanker.js';",
       "export function runContextEngine(task: string) {",
       "  return rankTarget(task);",
       "}",
@@ -31,7 +31,7 @@ beforeEach(async () => {
   );
   await fs.writeFile(
     path.join(workspaceRoot, "src", "contextEngine.test.ts"),
-    "import { runContextEngine } from './contextEngine.js';\nexpect(runContextEngine('task')).toBe(4);\n",
+    "import { runContextEngine } from '../../orchestration/contextEngine.js';\nexpect(runContextEngine('task')).toBe(4);\n",
   );
 });
 

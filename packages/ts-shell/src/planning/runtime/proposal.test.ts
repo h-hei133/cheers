@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
-import { preparePlanningRuntimeProductProposal } from "../planning/runtime/proposal.js";
+import { buildPlanningMutationHandoffProjection } from "../handoff/mutation.js";
+import { preparePlanningRuntimeProductProposal } from "./proposal.js";
 
 describe("preparePlanningRuntimeProductProposal", () => {
   it("projects explicit proposal JSON through provider/proposal boundary without provider or apply", async () => {

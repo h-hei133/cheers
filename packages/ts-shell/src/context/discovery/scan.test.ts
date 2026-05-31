@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { buildRepoIntelligence } from "../context/discovery/scan.js";
+import { buildRepoIntelligence } from "./scan.js";
 
 let workspaceRoot: string;
 
@@ -63,7 +63,7 @@ describe("buildRepoIntelligence", () => {
     );
     await fs.writeFile(
       path.join(workspaceRoot, "src", "targetRanking.test.ts"),
-      "import { rankTargetCandidate } from './targetRanking.js';\n",
+      "import { rankTargetCandidate } from '../../orchestration/targetRanking.js';\n",
     );
 
     const result = await buildRepoIntelligence({
@@ -235,7 +235,7 @@ describe("buildRepoIntelligence", () => {
     );
     await fs.writeFile(
       path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "contextEngine.test.ts"),
-      "import { buildContextEngineTargetRanking } from './contextEngine.js';\nexpect(buildContextEngineTargetRanking('contextEngine')).toBe('contextEngine.ts');\n",
+      "import { buildContextEngineTargetRanking } from '../../orchestration/contextEngine.js';\nexpect(buildContextEngineTargetRanking('contextEngine')).toBe('contextEngine.ts');\n",
     );
 
     const result = await buildRepoIntelligence({
@@ -278,7 +278,7 @@ describe("buildRepoIntelligence", () => {
     );
     await fs.writeFile(
       path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "planningRuntimeProductProjection.test.ts"),
-      "import { formatPlanningRuntimeProductOutput } from './planningRuntimeProductProjection.js';\nexpect(formatPlanningRuntimeProductOutput()).toBe('product output');\n",
+      "import { formatPlanningRuntimeProductOutput } from '../../orchestration/planningRuntimeProductProjection.js';\nexpect(formatPlanningRuntimeProductOutput()).toBe('product output');\n",
     );
 
     const result = await buildRepoIntelligence({

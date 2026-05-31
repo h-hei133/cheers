@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { projectProviderReadinessMetadata } from "../core/shell/providerReadiness.js";
-import { projectRuntimeEvents } from "../runtime/events/projection.js";
-import { projectStaticResourceRegistry } from "../runtime/resources/projection.js";
+import { projectProviderReadinessMetadata } from "../../core/shell/providerReadiness.js";
+import { projectRuntimeEvents } from "../../runtime/events/projection.js";
+import { projectStaticResourceRegistry } from "../../runtime/resources/projection.js";
 import {
   classifyProviderFailure,
   projectProviderRegistry,
   unknownProviderCompatibilityFlags,
   type ProviderFallbackPolicyMetadata,
-} from "./registry/provider.js";
+} from "./provider.js";
 
 describe("provider registry metadata", () => {
   it("redacts provider descriptors without enabling execution", () => {

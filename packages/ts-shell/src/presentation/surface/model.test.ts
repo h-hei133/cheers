@@ -3,29 +3,29 @@ import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
-import { buildLoopContextRebuildInput } from "../context/rebuildInput.js";
-import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
-import { buildContextPlanningBlockSummary } from "../context/acquisition/summary.js";
-import { runPlanningRuntime } from "../planning/runtime/engine.js";
-import type { CodingResultSummary } from "../orchestration/types.js";
+import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
+import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
+import { buildContextPlanningBlockSummary } from "../../context/acquisition/summary.js";
+import { runPlanningRuntime } from "../../planning/runtime/engine.js";
+import type { CodingResultSummary } from "../../orchestration/types.js";
 import {
   projectProviderRegistry,
   unknownProviderCompatibilityFlags,
-} from "../provider/registry/provider.js";
-import { projectRuntimeEvents } from "../runtime/events/projection.js";
-import { runAgentLoopContract } from "../runtime/loop/contract.js";
-import { projectProductLoopAdapter } from "../runtime/loop/adapter.js";
-import { projectLoopTrajectory } from "../runtime/loop/trajectory.js";
+} from "../../provider/registry/provider.js";
+import { projectRuntimeEvents } from "../../runtime/events/projection.js";
+import { runAgentLoopContract } from "../../runtime/loop/contract.js";
+import { projectProductLoopAdapter } from "../../runtime/loop/adapter.js";
+import { projectLoopTrajectory } from "../../runtime/loop/trajectory.js";
 import {
   projectPackageResourceInventory,
   type PackageManifestContract,
-} from "../runtime/resources/inventory.js";
-import { projectStaticResourceRegistry } from "../runtime/resources/projection.js";
-import { evaluateContinuationReadiness } from "../session/continuationReadiness.js";
-import { summarizeReplaySafeLoopState } from "../session/replaySafeLoopState.js";
-import { projectSessionTree } from "../session/sessionTreeProjection.js";
-import { projectProductSurfaceViewModel } from "./surface/model.js";
-import { renderTerminalMessage } from "./terminal/renderer.js";
+} from "../../runtime/resources/inventory.js";
+import { projectStaticResourceRegistry } from "../../runtime/resources/projection.js";
+import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
+import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
+import { projectSessionTree } from "../../session/sessionTreeProjection.js";
+import { projectProductSurfaceViewModel } from "./model.js";
+import { renderTerminalMessage } from "../terminal/renderer.js";
 
 describe("product surface view model", () => {
   it("builds semantic sections from result, session, event, provider, package, and resource facts", () => {
@@ -503,7 +503,7 @@ async function withPlanningFixture<T>(
     await fs.writeFile(
       path.join(workspaceRoot, "src", "contextEngine.ts"),
       [
-        "import { rankTarget } from './targetRanker.js';",
+        "import { rankTarget } from '../targetRanker.js';",
         "export function runContextEngine(task: string) {",
         "  return rankTarget(task);",
         "}",
@@ -516,7 +516,7 @@ async function withPlanningFixture<T>(
     );
     await fs.writeFile(
       path.join(workspaceRoot, "src", "contextEngine.test.ts"),
-      "import { runContextEngine } from './contextEngine.js';\nexpect(runContextEngine('task')).toBe(4);\n",
+      "import { runContextEngine } from '../contextEngine.js';\nexpect(runContextEngine('task')).toBe(4);\n",
     );
     return await fn(workspaceRoot);
   } finally {

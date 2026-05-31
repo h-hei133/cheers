@@ -4,8 +4,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { buildContextGraphPlanningBundle } from "../context/acquisition/graph.js";
-import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
+import { buildContextGraphPlanningBundle } from "./graph.js";
+import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
 
 let workspaceRoot: string;
 
@@ -18,11 +18,11 @@ beforeEach(async () => {
   );
   await fs.writeFile(
     path.join(workspaceRoot, "src", "target.ts"),
-    "import { helperValue } from './helper.js';\nexport function targetThing() { return helperValue(); }\n",
+    "import { helperValue } from '../../orchestration/helper.js';\nexport function targetThing() { return helperValue(); }\n",
   );
   await fs.writeFile(
     path.join(workspaceRoot, "src", "target.test.ts"),
-    "import { targetThing } from './target.js';\nexpect(targetThing()).toBe(1);\n",
+    "import { targetThing } from '../../orchestration/target.js';\nexpect(targetThing()).toBe(1);\n",
   );
 });
 

@@ -8,7 +8,7 @@ import {
   executionPolicyMetadataFromToolDecision,
   shouldPreventToolExecution,
   type ToolInterceptionDecisionStatus,
-} from "./policy/interception.js";
+} from "./interception.js";
 
 describe("tool interception contract", () => {
   it("represents every before-tool policy decision without terminal success", () => {

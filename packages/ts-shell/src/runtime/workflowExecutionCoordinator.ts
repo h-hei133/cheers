@@ -29,12 +29,12 @@ import {
   type RuntimeEvidenceSavePoint,
 } from "../evidence/runtimeSavePoint.js";
 import type { RuntimeExecutionReceiptProjection } from "./execution/receipt.js";
-import type { AgentLoopContractProjection } from "./loop/agentLoopContract.js";
-import { projectProductLoopAdapter } from "./loop/productLoopAdapter.js";
+import type { AgentLoopContractProjection } from "./loop/contract.js";
+import { projectProductLoopAdapter } from "./loop/adapter.js";
 import {
   projectLoopTrajectory,
   type LoopTrajectoryProjection,
-} from "./loop/trajectoryProjection.js";
+} from "./loop/trajectory.js";
 import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenceLedger.js";
 import { createModelResponseBoundary } from "../provider/response/boundary.js";
 import { projectProviderRegistry } from "../provider/registry/provider.js";

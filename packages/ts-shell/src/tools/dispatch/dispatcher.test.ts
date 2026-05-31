@@ -2,9 +2,9 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { SandboxEnforcer } from '../sandbox/sandboxEnforcer.js'
-import { ToolDispatcher } from './dispatch/dispatcher.js'
-import { createToolBeforePolicyDecision } from './policy/interception.js'
+import { SandboxEnforcer } from '../../sandbox/sandboxEnforcer.js'
+import { ToolDispatcher } from './dispatcher.js'
+import { createToolBeforePolicyDecision } from '../policy/interception.js'
 
 const workspaceRoot = path.join(os.tmpdir(), 'private-agents-tools-workspace')
 const auditLogPath = path.join(os.tmpdir(), 'private-agents-tools-audit.jsonl')

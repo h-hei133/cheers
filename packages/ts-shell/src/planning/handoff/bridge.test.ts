@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
-import { buildPlanningMutationProposalBridge } from "../planning/handoff/bridge.js";
+import { buildPlanningMutationHandoffProjection } from "./mutation.js";
+import { buildPlanningMutationProposalBridge } from "./bridge.js";
 
 describe("buildPlanningMutationProposalBridge", () => {
   it("consumes a structured planning handoff as proposal-prepared without anchoring or writes by default", () => {

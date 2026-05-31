@@ -4,11 +4,11 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runContextEngine } from "../context/acquisition/engine.js";
+import { runContextEngine } from "../acquisition/engine.js";
 import {
   canReuseContextMemory,
   evaluateContextMemoryFreshness,
-} from "../context/memory/model.js";
+} from "./model.js";
 
 let workspaceRoot: string;
 
@@ -30,7 +30,7 @@ beforeEach(async () => {
   );
   await fs.writeFile(
     path.join(workspaceRoot, "src", "planner.test.ts"),
-    "import { choosePlannerTarget } from './planner.js';\nexpect(choosePlannerTarget('planner')).toBe('planner.ts');\n",
+    "import { choosePlannerTarget } from '../../orchestration/planner.js';\nexpect(choosePlannerTarget('planner')).toBe('planner.ts');\n",
   );
 });
 

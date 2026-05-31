@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createModelResponseBoundary } from "./response/boundary.js";
+import { createModelResponseBoundary } from "./boundary.js";
 
 describe("model response boundary", () => {
   it("creates a fake/default-safe report-safe observation without success claims", () => {
