@@ -1,4 +1,4 @@
-import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
+import type { ContextAwareProviderPromptContext } from "../provider/request/prompt.js";
 import type { ProviderAnchorQuality } from "./providerAnchorQuality.js";
 import { classifyProviderAnchorQuality } from "./providerAnchorQuality.js";
 import type { ProviderAnchoredProposalManifest } from "./providerAnchoredProposal.js";

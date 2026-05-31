@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCommandRuntimeReceipt } from "../core/runtime/runtimeReceipt.js";
 import { projectRuntimeReceipt } from "../core/runtime/runtimeReceiptProjection.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import type { ToolExecutionContext, ToolExecutionResult } from "../tools/types.js";
 import {
   buildTaskRelevantCommandPlan,

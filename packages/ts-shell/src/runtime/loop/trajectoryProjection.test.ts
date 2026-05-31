@@ -5,7 +5,7 @@ import { projectSessionContextRebuild } from "../../context/sessionContextRebuil
 import {
   projectProviderRegistry,
   unknownProviderCompatibilityFlags,
-} from "../../provider/providerRegistry.js";
+} from "../../provider/registry/provider.js";
 import {
   observeRepairApply,
   observeRepairProposal,
@@ -18,13 +18,13 @@ import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,
   createToolInterceptionIntent,
-} from "../../tools/interception.js";
-import { createCommandToolResultSplit } from "../../tools/resultSplit.js";
+} from "../../tools/policy/interception.js";
+import { createCommandToolResultSplit } from "../../tools/result/split.js";
 import {
   observeVerificationResult,
   projectVerificationIntent,
 } from "../../verification/loopBoundary.js";
-import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
+import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import {
   projectPackageResourceInventory,
   type PackageManifestContract,

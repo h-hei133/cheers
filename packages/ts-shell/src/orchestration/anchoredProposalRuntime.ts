@@ -1,5 +1,5 @@
 import { buildContextAwareProviderEditInput } from "./contextAwareProviderEdit.js";
-import { buildContextAwareProviderPrompt } from "./contextAwareProviderPrompt.js";
+import { buildContextAwareProviderPrompt } from "../provider/request/prompt.js";
 import { buildHarnessScorecard, type HarnessScorecard } from "./harnessScorecard.js";
 import { buildHarnessTrace, type HarnessTrace } from "./harnessTrace.js";
 import { buildProviderDryRunResult } from "./providerDryRunResult.js";

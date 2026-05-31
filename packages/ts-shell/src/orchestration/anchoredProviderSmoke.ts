@@ -1,6 +1,6 @@
 import { buildHarnessScorecard, type HarnessScorecard } from "./harnessScorecard.js";
 import { buildHarnessTrace, type HarnessTrace } from "./harnessTrace.js";
-import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
+import type { ContextAwareProviderPromptContext } from "../provider/request/prompt.js";
 import {
   evaluateAnchoredProviderSmokeGate,
   type AnchoredProviderSmokeGate,

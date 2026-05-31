@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyCommandExecutionOutcome } from "./executionErrorTaxonomy.js";
+import { classifyCommandExecutionOutcome } from "./error.js";
 
 describe("execution error taxonomy", () => {
   it("classifies distinct command execution failures without collapsing to generic error", () => {

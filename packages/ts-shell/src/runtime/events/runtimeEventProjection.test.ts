@@ -14,12 +14,12 @@ import { projectStaticResourceRegistry } from "../resources/projection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { evaluateContinuationReadiness } from "../../session/continuationReadiness.js";
 import { summarizeReplaySafeLoopState } from "../../session/replaySafeLoopState.js";
-import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
+import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import { runAgentLoopContract } from "../loop/contract.js";
 import { projectProductLoopAdapter } from "../loop/adapter.js";
 import { projectLoopTrajectory } from "../loop/trajectory.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
-import { createModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
+import { createModelResponseBoundary } from "../../provider/response/boundary.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy } from "../../turn/deliveryPolicy.js";
 import { projectFollowUpQueue } from "../../turn/followUpQueue.js";
@@ -36,7 +36,7 @@ import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,
   createToolInterceptionIntent,
-} from "../../tools/interception.js";
+} from "../../tools/policy/interception.js";
 import { projectRuntimeEvents } from "./projection.js";
 
 describe("runtime event projection", () => {

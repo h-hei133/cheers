@@ -2,7 +2,7 @@ import type { PermissionCheck } from '../sandbox/index.js'
 import type {
   ToolReportSafeProjection,
   ToolResultDetails,
-} from './resultSplit.js'
+} from './result/split.js'
 
 export interface ToolExecutionContext {
   readonly taskId: string

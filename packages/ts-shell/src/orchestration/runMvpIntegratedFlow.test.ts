@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueryEvent } from "../core/query/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtimeState.js";
-import { ToolDispatcher } from "../tools/dispatcher.js";
+import { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import { safeRemoveDir } from "../test-utils/cleanup.js";
 import {
   buildActionResultSeedFromCodingResult,

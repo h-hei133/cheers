@@ -3,7 +3,7 @@ import {
   createProviderFetchFromEnv,
   resolveProviderTransportConfig,
   resolveTransportDecision,
-} from "./providerFetch.js";
+} from "../provider/request/fetch.js";
 
 describe("provider fetch transport", () => {
   it("uses direct provider transport by default with longer timeouts", () => {

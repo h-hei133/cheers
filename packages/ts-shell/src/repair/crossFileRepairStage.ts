@@ -13,7 +13,7 @@ import {
   appendMutationResult,
   type MutationRuntimeAggregate,
 } from "../edit/mutationRuntimeStage.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import {
   shouldDegradeCrossFileRemaining,
   shouldRetainCrossFileFailureInRemaining,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createModelResponseBoundary } from "../provider/modelResponseBoundary.js";
+import { createModelResponseBoundary } from "../provider/response/boundary.js";
 import { accumulateAssistantResponse } from "./assistantResponse.js";
 
 describe("assistant response accumulation", () => {

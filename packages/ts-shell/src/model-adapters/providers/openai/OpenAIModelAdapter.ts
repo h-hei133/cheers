@@ -11,7 +11,7 @@ import {
   writeUserRuntimeConfigFile,
 } from '../../../config/runtimeConfig.js'
 import { createComponentLogger, recordCount } from '../../../observability/index.js'
-import { createProviderFetchFromEnv } from '../../providerFetch.js'
+import { createProviderFetchFromEnv } from '../../../provider/request/fetch.js'
 import type { OpenAIChatCompletionsStreamChunk } from './wireTypes.js'
 import type {
   ModelProviderAdapter,

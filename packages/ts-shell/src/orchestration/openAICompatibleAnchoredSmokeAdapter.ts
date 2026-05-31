@@ -1,7 +1,7 @@
 import type { SchemaVersion } from "../../../../contracts/typescript/types.js";
 import { OpenAIModelAdapter } from "../model-adapters/providers/openai/OpenAIModelAdapter.js";
 import type { NormalizedProviderError } from "../model-adapters/types.js";
-import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
+import type { ContextAwareProviderPromptContext } from "../provider/request/prompt.js";
 import {
   buildProviderExactPatchSystemPrompt,
   parseProviderExactPatchOutput,

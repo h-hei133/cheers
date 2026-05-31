@@ -4,7 +4,7 @@ import { browserObservationFromMetadata } from "../core/context/browserObs.js";
 import { executeBrowserTransaction } from "../core/context/browserTxn.js";
 import type { PwRuntimeStatus } from "../core/context/pwRuntime.js";
 import type { QueryEvent } from "../core/query/events.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import {
   buildBrowserAgentBaseEvidence,
   projectBrowserContinuationEvidence,

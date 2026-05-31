@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
 import { buildContextAwareProviderEditInput } from "./contextAwareProviderEdit.js";
-import { buildContextAwareProviderPrompt } from "./contextAwareProviderPrompt.js";
+import { buildContextAwareProviderPrompt } from "../provider/request/prompt.js";
 import { buildCodeGraphImpact } from "./codeGraphImpact.js";
 import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
 import { buildCodeGraphTrace } from "./codeGraphTrace.js";

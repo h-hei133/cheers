@@ -1,5 +1,5 @@
 import type { QueryEvent } from "../core/query/events.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import type {
   CodingResultSummary,
 } from "../orchestration/types.js";

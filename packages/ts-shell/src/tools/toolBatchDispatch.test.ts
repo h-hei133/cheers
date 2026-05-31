@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { createCommandExecutionReceipt } from "../runtime/execution/executionReceipt.js";
-import { createModelResponseBoundary } from "../provider/modelResponseBoundary.js";
+import { createCommandExecutionReceipt } from "../runtime/execution/receipt.js";
+import { createModelResponseBoundary } from "../provider/response/boundary.js";
 import { accumulateAssistantResponse } from "../turn/assistantResponse.js";
-import { createCommandToolResultSplit } from "./resultSplit.js";
+import { createCommandToolResultSplit } from "./result/split.js";
 import { extractToolCallBatch } from "./toolCallBatch.js";
 import {
   dispatchToolBatch,
   planToolBatchDispatch,
   type ToolBatchPolicy,
 } from "./toolBatchDispatch.js";
-import { createToolBeforePolicyDecision } from "./interception.js";
+import { createToolBeforePolicyDecision } from "./policy/interception.js";
 
 describe("tool batch dispatch", () => {
   it("plans no-tool, one-tool, multi-tool, unsupported, blocked, authority-required, and partial batches", () => {

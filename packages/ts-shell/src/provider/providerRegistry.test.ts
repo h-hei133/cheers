@@ -8,7 +8,7 @@ import {
   projectProviderRegistry,
   unknownProviderCompatibilityFlags,
   type ProviderFallbackPolicyMetadata,
-} from "./providerRegistry.js";
+} from "./registry/provider.js";
 
 describe("provider registry metadata", () => {
   it("redacts provider descriptors without enabling execution", () => {

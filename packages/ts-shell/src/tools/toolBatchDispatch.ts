@@ -1,4 +1,4 @@
-import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/executionReceipt.js";
+import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/receipt.js";
 import type { ToolExecutionContext, ToolExecutionResult } from "./types.js";
 import type { NormalizedToolCall, NormalizedToolCallBatch } from "./toolCallBatch.js";
 import {
@@ -9,7 +9,7 @@ import {
   shouldPreventToolExecution,
   type ToolAfterObservationAnnotation,
   type ToolBeforePolicyDecision,
-} from "./interception.js";
+} from "./policy/interception.js";
 
 export type ToolBatchDispatchStatus =
   | "planned"

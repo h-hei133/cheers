@@ -1,4 +1,4 @@
-import type { ModelResponseBoundary } from "../provider/modelResponseBoundary.js";
+import type { ModelResponseBoundary } from "../provider/response/boundary.js";
 import type { AssistantResponseState } from "../turn/assistantResponse.js";
 import { isAllowlistedTool } from "./types.js";
 

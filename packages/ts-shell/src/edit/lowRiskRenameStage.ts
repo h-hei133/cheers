@@ -10,7 +10,7 @@ import {
 } from "./mutationRuntimeStage.js";
 import { dispatchRuntimeTool } from "../orchestration/toolRuntimeModule.js";
 import { executeFileMutationBranch } from "../orchestration/mutationExecution.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 
 export async function runLowRiskRenameStage(input: {
   readonly rename: {

@@ -7,7 +7,7 @@ import type {
   EscalationResponse,
 } from "../sandbox/index.js";
 import { SandboxEnforcer } from "../sandbox/index.js";
-import { ToolDispatcher } from "../tools/dispatcher.js";
+import { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 
 export interface IntegratedFlowEnvironmentOptions {

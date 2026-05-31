@@ -3,8 +3,8 @@ import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
 } from "../../config/runtimeConfig.js";
-import { createProviderFetchFromEnv } from "../../model-adapters/providerFetch.js";
-import type { ProviderRegistryProjection } from "../../provider/providerRegistry.js";
+import { createProviderFetchFromEnv } from "../../provider/request/fetch.js";
+import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import type { QueryEvent } from "../query/events.js";
 import { buildUnavailableResult } from "../tools/toolPolicyResult.js";
 import { redactProviderFailureDetail } from "./providerFailureRedaction.js";

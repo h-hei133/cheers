@@ -2,7 +2,7 @@ import {
   createDefaultExecutionService,
   type ExecutionAuthority,
   type ExecutionService,
-} from '../../runtime/execution/executionService.js'
+} from '../../runtime/execution/service.js'
 import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
 import {
   classifyMcpFailure,
@@ -18,13 +18,13 @@ import {
 } from '../runtime/runtimeReceipt.js'
 import { projectRuntimeReceipt } from '../runtime/runtimeReceiptProjection.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
-import { createCommandToolResultSplit } from '../../tools/resultSplit.js'
+import { createCommandToolResultSplit } from '../../tools/result/split.js'
 import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,
   createToolInterceptionIntent,
   executionPolicyMetadataFromToolDecision,
-} from '../../tools/interception.js'
+} from '../../tools/policy/interception.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
 import { buildExecutionFailedResult } from './toolPolicyResult.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'

@@ -18,7 +18,7 @@ import {
 import {
   buildContextAwareProviderPrompt,
   type ContextAwareProviderPromptContext,
-} from "./contextAwareProviderPrompt.js";
+} from "../provider/request/prompt.js";
 import type { ProviderEditAvailability } from "./providerEditPlanner.js";
 import {
   normalizeProviderEditProposal,

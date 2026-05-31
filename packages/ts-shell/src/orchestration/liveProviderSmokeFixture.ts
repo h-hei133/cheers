@@ -1,4 +1,4 @@
-import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
+import type { ContextAwareProviderPromptContext } from "../provider/request/prompt.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 
 export interface LiveProviderSmokeFixture {

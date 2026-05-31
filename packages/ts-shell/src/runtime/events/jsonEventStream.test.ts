@@ -4,7 +4,7 @@ import { projectSessionContextRebuild } from "../../context/sessionContextRebuil
 import { createEvidenceOnlySavePoint } from "../../evidence/runtimeSavePoint.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
-import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
+import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import { applyExtensionHookPolicy } from "../extensions/lifecycle.js";
 import { projectStaticResourceRegistry } from "../resources/projection.js";
 import {

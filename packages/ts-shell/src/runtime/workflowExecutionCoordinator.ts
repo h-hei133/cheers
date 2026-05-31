@@ -15,7 +15,7 @@ import type {
   EscalationResponse,
 } from "../sandbox/index.js";
 import type { SandboxEnforcer } from "../sandbox/index.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import {
   buildIntegratedFlowEnvironment,
   type IntegratedFlowEnvironment,
@@ -28,7 +28,7 @@ import {
   createEvidenceOnlySavePoint,
   type RuntimeEvidenceSavePoint,
 } from "../evidence/runtimeSavePoint.js";
-import type { RuntimeExecutionReceiptProjection } from "./execution/executionReceipt.js";
+import type { RuntimeExecutionReceiptProjection } from "./execution/receipt.js";
 import type { AgentLoopContractProjection } from "./loop/agentLoopContract.js";
 import { projectProductLoopAdapter } from "./loop/productLoopAdapter.js";
 import {
@@ -36,8 +36,8 @@ import {
   type LoopTrajectoryProjection,
 } from "./loop/trajectoryProjection.js";
 import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenceLedger.js";
-import { createModelResponseBoundary } from "../provider/modelResponseBoundary.js";
-import { projectProviderRegistry } from "../provider/providerRegistry.js";
+import { createModelResponseBoundary } from "../provider/response/boundary.js";
+import { projectProviderRegistry } from "../provider/registry/provider.js";
 import { projectWorkflowExecutionResultContract } from "../result/workflowRuntimeProjection.js";
 import { evaluateContinuationReadiness } from "../session/continuationReadiness.js";
 import { summarizeReplaySafeLoopState } from "../session/replaySafeLoopState.js";
@@ -73,7 +73,7 @@ import { computeFragmentFingerprint } from "../context/readWindowContinuation.js
 import { runInspectFilesStage } from "../context/inspectFilesStage.js";
 import { runReadRuntimeStage } from "../context/readRuntimeStage.js";
 import { runRepoExplainRuntimeStage } from "../context/repoExplainRuntimeStage.js";
-import { runProviderDraftStage } from "../provider/providerDraftStage.js";
+import { runProviderDraftStage } from "../provider/request/draft.js";
 import { runPlanningRuntimeStage } from "../planning/planningRuntimeStage.js";
 import {
   buildWorkflowTaskPlan,

@@ -8,7 +8,7 @@ import {
   type CommandExecutionRequest,
   type CommandExecutionResult,
   type ExecutionEvent,
-} from './executionService.js'
+} from './service.js'
 
 const originalDaemonEnabled = process.env.DAEMON_ENABLED
 let workspaceRoot: string | undefined

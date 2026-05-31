@@ -6,7 +6,7 @@ import type {
   RepairRequiredHandoff,
 } from "../../repair/loopBoundary.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
-import type { ModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
+import type { ModelResponseBoundary } from "../../provider/response/boundary.js";
 import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/projection.js";
 import type { PackageInventoryProjection } from "../resources/inventory.js";
@@ -28,9 +28,9 @@ import type { ToolExecutionResult } from "../../tools/types.js";
 import type {
   ToolAfterObservationAnnotation,
   ToolBeforePolicyDecision,
-} from "../../tools/interception.js";
+} from "../../tools/policy/interception.js";
 import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
-import type { RuntimeExecutionReceiptProjection } from "../execution/executionReceipt.js";
+import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
 import type {
   VerificationLoopIntent,
   VerificationResultObservation,

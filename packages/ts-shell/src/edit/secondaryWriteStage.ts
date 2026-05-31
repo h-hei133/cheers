@@ -7,7 +7,7 @@ import {
 } from "./mutationRuntimeStage.js";
 import { executeFileMutationBranch } from "../orchestration/mutationExecution.js";
 import { dispatchRuntimeTool } from "../orchestration/toolRuntimeModule.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 
 export async function runSecondaryWriteStage(input: {
   readonly prompt: string;

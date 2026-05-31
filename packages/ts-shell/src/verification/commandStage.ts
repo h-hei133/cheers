@@ -1,6 +1,6 @@
 import type { QueryEvent } from "../core/query/events.js";
-import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/executionReceipt.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/receipt.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import {
   appendCurrentRequestScopeEvidence,
   deriveCurrentPermissionRequestFromToolInput,

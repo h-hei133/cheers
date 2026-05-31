@@ -15,7 +15,7 @@ import type {
 } from "../orchestration/types.js";
 import { dispatchRuntimeTool } from "../orchestration/toolRuntimeModule.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 
 export interface MutationRuntimeAggregate {
   readonly events: QueryEvent[];

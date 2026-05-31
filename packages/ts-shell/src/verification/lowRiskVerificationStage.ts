@@ -11,7 +11,7 @@ import {
   dispatchRuntimeTool,
   type ToolLifecycleResult,
 } from "../orchestration/toolRuntimeModule.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 
 export interface LowRiskVerificationStageResult {
   readonly verification: CodingVerificationSummary;

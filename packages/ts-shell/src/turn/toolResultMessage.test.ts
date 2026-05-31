@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createModelResponseBoundary } from "../provider/modelResponseBoundary.js";
+import { createModelResponseBoundary } from "../provider/response/boundary.js";
 import { accumulateAssistantResponse } from "./assistantResponse.js";
 import { prepareToolResultMessages } from "./toolResultMessage.js";
 import { extractToolCallBatch } from "../tools/toolCallBatch.js";
 import { dispatchToolBatch } from "../tools/toolBatchDispatch.js";
-import { createToolBeforePolicyDecision } from "../tools/interception.js";
+import { createToolBeforePolicyDecision } from "../tools/policy/interception.js";
 
 describe("tool result messages", () => {
   it("prepares report-safe future next-turn messages without delivering a next turn", async () => {

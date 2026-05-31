@@ -3,7 +3,7 @@ import type {
   ContextPlanningBlockSummary,
 } from "../../context/acquisition/summary.js";
 import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../../orchestration/types.js";
-import type { ProviderRegistryProjection } from "../../provider/providerRegistry.js";
+import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import type { RuntimeProjectionEvent } from "../../runtime/events/projection.js";
 import type { ProductLoopAdapterProjection } from "../../runtime/loop/adapter.js";
 import type { LoopTrajectoryProjection } from "../../runtime/loop/trajectory.js";

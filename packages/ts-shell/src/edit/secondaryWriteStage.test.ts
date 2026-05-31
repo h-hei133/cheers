@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { QueryEvent } from "../core/query/events.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import { runSecondaryWriteStage } from "./secondaryWriteStage.js";
 import type { MutationRuntimeAggregate } from "./mutationRuntimeStage.js";
 

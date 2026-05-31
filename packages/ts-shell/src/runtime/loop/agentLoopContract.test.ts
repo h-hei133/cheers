@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createCommandToolResultSplit } from "../../tools/resultSplit.js";
+import { createCommandToolResultSplit } from "../../tools/result/split.js";
 import {
   observeRepairApply,
   observeRepairProposal,
@@ -11,7 +11,7 @@ import {
   projectVerificationIntent,
 } from "../../verification/loopBoundary.js";
 import { projectJsonRuntimeEventStream } from "../events/stream.js";
-import { createCommandExecutionReceipt } from "../execution/executionReceipt.js";
+import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import {
   runAgentLoopContract,
   type AgentLoopContractToolResultBatch,

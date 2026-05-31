@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { runProviderDraftStage } from "./providerDraftStage.js";
+import { runProviderDraftStage } from "./request/draft.js";
 
 describe("providerDraftStage", () => {
   it("keeps synthetic provider drafts local and deterministic", async () => {

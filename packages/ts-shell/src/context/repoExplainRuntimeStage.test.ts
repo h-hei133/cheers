@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";
 import { runRepoExplainRuntimeStage } from "./repoExplainRuntimeStage.js";
 

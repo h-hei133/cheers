@@ -1,6 +1,6 @@
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
-import type { ProviderRegistryProjection } from "../../provider/providerRegistry.js";
+import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import type { ContinuationReadinessProjection } from "../../session/continuationReadiness.js";
 import type { ReplaySafeLoopStateSummary } from "../../session/replaySafeLoopState.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";

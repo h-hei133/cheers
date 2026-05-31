@@ -7,7 +7,7 @@ import {
 } from "../orchestration/verificationModule.js";
 import type { CodingResultProvenanceCollector } from "../orchestration/toolRuntimeModule.js";
 import type { CodingTaskKind } from "../orchestration/types.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import { runCommandVerificationStage } from "./commandVerificationStage.js";
 import { runLowRiskVerificationStage } from "./lowRiskVerificationStage.js";
 

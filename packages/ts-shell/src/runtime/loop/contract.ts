@@ -1,5 +1,5 @@
 import { createEvidenceOnlySavePoint, type RuntimeEvidenceSavePoint } from "../../evidence/runtimeSavePoint.js";
-import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/modelResponseBoundary.js";
+import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/response/boundary.js";
 import {
   type RepairApplyObservation,
   type RepairProposalObservation,
@@ -18,7 +18,7 @@ import {
   type ToolBatchDispatchSeam,
   type ToolResultDetail,
 } from "../../tools/toolBatchDispatch.js";
-import type { ToolAfterObservationAnnotation } from "../../tools/interception.js";
+import type { ToolAfterObservationAnnotation } from "../../tools/policy/interception.js";
 import { extractToolCallBatch, type NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import { createRuntimeTurnSnapshot, type RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
@@ -29,7 +29,7 @@ import {
   type VerificationResultObservation,
 } from "../../verification/loopBoundary.js";
 import { projectRuntimeEvents, type RuntimeProjectionEvent } from "../events/projection.js";
-import type { RuntimeExecutionReceiptProjection } from "../execution/executionReceipt.js";
+import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
 
 export type AgentLoopContractState =
   | "idle"

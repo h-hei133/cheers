@@ -171,7 +171,7 @@ export {
 export {
   buildContextAwareProviderPrompt,
   type ContextAwareProviderPromptContext,
-} from "./contextAwareProviderPrompt.js";
+} from "../provider/request/prompt.js";
 export {
   planContextAwareProviderProposal,
   type ContextAwareProviderFakeProvider,

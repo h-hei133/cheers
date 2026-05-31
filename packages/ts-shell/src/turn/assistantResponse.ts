@@ -1,4 +1,4 @@
-import type { ModelResponseBoundary } from "../provider/modelResponseBoundary.js";
+import type { ModelResponseBoundary } from "../provider/response/boundary.js";
 
 export type AssistantAccumulationStatus = "empty" | "accumulated" | "redacted";
 

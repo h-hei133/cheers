@@ -1,5 +1,5 @@
 import type { RuntimePhase } from "../runtime/runtimePhase.js";
-import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/executionReceipt.js";
+import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/receipt.js";
 import type { RuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
 
 export type RuntimeSavePointRedactionStatus = "report-safe" | "redacted";

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type { ContextAwareProviderPromptContext } from "../../orchestration/contextAwareProviderPrompt.js";
+import type { ContextAwareProviderPromptContext } from "../../provider/request/prompt.js";
 import { buildPlanningExactProposal } from "../../orchestration/planningExactProposal.js";
 import type { PlanningRuntimeResult } from "./engine.js";
 import type { PlanningMutationHandoffProjection } from "../handoff/mutation.js";

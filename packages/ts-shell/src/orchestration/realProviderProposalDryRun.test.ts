@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
+import type { ContextAwareProviderPromptContext } from "../provider/request/prompt.js";
 import { runRealProviderProposalDryRun } from "./realProviderProposalDryRun.js";
 
 describe("realProviderProposalDryRun", () => {

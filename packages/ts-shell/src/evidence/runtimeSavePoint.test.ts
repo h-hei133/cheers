@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createRuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
-import { createCommandExecutionReceipt } from "../runtime/execution/executionReceipt.js";
+import { createCommandExecutionReceipt } from "../runtime/execution/receipt.js";
 import { createEvidenceOnlySavePoint } from "./runtimeSavePoint.js";
 
 describe("runtime evidence save point", () => {

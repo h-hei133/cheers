@@ -1,4 +1,4 @@
-import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
+import type { ContextAwareProviderPromptContext } from "../provider/request/prompt.js";
 
 export function readySmokeInput(requestId: string) {
   return {

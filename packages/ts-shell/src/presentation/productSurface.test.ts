@@ -11,7 +11,7 @@ import type { CodingResultSummary } from "../orchestration/types.js";
 import {
   projectProviderRegistry,
   unknownProviderCompatibilityFlags,
-} from "../provider/providerRegistry.js";
+} from "../provider/registry/provider.js";
 import { projectRuntimeEvents } from "../runtime/events/projection.js";
 import { runAgentLoopContract } from "../runtime/loop/contract.js";
 import { projectProductLoopAdapter } from "../runtime/loop/adapter.js";

@@ -1,5 +1,5 @@
 import type { QueryEvent } from "../core/query/events.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import type { CodingPatchRecord } from "../orchestration/types.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";
 import { projectWorkflowRuntimeOutcome } from "../orchestration/resultSurfaceModule.js";

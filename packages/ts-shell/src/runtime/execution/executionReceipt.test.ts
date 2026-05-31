@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createCommandExecutionReceipt } from "./executionReceipt.js";
+import { createCommandExecutionReceipt } from "./receipt.js";
 
 describe("runtime execution receipt projection", () => {
   it("redacts unsafe command facts and remains evidence-only", () => {

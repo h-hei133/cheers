@@ -10,7 +10,7 @@ import type {
 } from "../orchestration/types.js";
 import type { FileMutationExecutionResult } from "../orchestration/mutationExecution.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import { runCrossFileRepairStage } from "../repair/crossFileRepairStage.js";
 import { runLowRiskRenameStage } from "./lowRiskRenameStage.js";
 import {

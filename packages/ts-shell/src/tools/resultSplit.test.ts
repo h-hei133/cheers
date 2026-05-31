@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { createCommandToolResultSplit } from "./resultSplit.js";
-import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/executionReceipt.js";
+import { createCommandToolResultSplit } from "./result/split.js";
+import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/receipt.js";
 import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,
   createToolInterceptionIntent,
-} from "./interception.js";
+} from "./policy/interception.js";
 
 describe("tool result content details split", () => {
   it("separates model-visible content from runtime details and report-safe projection", () => {

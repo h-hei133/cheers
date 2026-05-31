@@ -15,7 +15,7 @@ import {
   projectWorkflowCommandVerification,
 } from "../orchestration/verificationModule.js";
 import { isVerifyLikeCommand } from "../policy/commandIntentPolicy.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 
 export interface CommandVerificationStageResult {
   readonly verification: CodingVerificationSummary;

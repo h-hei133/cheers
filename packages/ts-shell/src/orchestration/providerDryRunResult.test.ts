@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildProviderDryRunResult } from "./providerDryRunResult.js";
 import { runRealProviderProposalDryRun } from "./realProviderProposalDryRun.js";
-import type { ContextAwareProviderPromptContext } from "./contextAwareProviderPrompt.js";
+import type { ContextAwareProviderPromptContext } from "../provider/request/prompt.js";
 
 describe("providerDryRunResult", () => {
   it("projects provider dry-run status through no-write result surface", async () => {

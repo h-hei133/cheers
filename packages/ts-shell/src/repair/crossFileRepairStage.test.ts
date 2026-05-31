@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { QueryEvent } from "../core/query/events.js";
 import type { MutationRuntimeAggregate } from "../edit/mutationRuntimeStage.js";
-import type { ToolDispatcher } from "../tools/dispatcher.js";
+import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import { runCrossFileRepairStage } from "./crossFileRepairStage.js";
 
 describe("crossFileRepairStage", () => {

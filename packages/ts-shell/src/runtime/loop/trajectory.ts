@@ -2,17 +2,17 @@ import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { RuntimeResultFactsProjection, RuntimeProjectionEvent } from "../events/projection.js";
 import { projectJsonRuntimeEventStream, type JsonRuntimeEventStreamEntry } from "../events/stream.js";
-import type { RuntimeExecutionReceiptProjection } from "../execution/executionReceipt.js";
+import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
 import type { PackageInventoryProjection } from "../resources/inventory.js";
 import type { StaticResourceProjection } from "../resources/projection.js";
-import type { ProviderRegistryProjection } from "../../provider/providerRegistry.js";
+import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import type { ContinuationReadinessProjection } from "../../session/continuationReadiness.js";
 import type { ReplaySafeLoopStateSummary } from "../../session/replaySafeLoopState.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type {
   ToolAfterObservationAnnotation,
   ToolBeforePolicyDecision,
-} from "../../tools/interception.js";
+} from "../../tools/policy/interception.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
 import type { AgentLoopContractProjection } from "./contract.js";
 import {
