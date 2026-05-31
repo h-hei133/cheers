@@ -14,7 +14,7 @@ import type { StaticResourceProjection } from "../../runtime/resources/projectio
 import {
   compactSessionPresentationText as compact,
   projectSessionPresentationFacts,
-} from "../../session/sessionPresentationFacts.js";
+} from "../../session/presentation/facts.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 
 export type ProductSurfaceSectionKind =

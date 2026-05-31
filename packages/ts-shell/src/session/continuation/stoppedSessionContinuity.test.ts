@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CodingResultSummary } from "../orchestration/types.js";
+import type { CodingResultSummary } from "../../orchestration/types.js";
 import { deriveStoppedSessionContinuitySurface } from "./stoppedSessionContinuity.js";
 
 describe("stopped session continuity", () => {
@@ -346,7 +346,6 @@ describe("stopped session continuity", () => {
         restorableFiles: ["src/app.ts"],
         blockedFiles: [],
         recoveryAuthorityId: "authority-fenced",
-        routeId: "fenced-edit-replacement",
         recoveryAction: "preview-restore",
         userFacingMessage:
           "Explicit guarded restore may be available. No automatic recovery ran.",

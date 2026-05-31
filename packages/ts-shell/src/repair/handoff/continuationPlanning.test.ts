@@ -4,7 +4,7 @@ import {
   collectContinuationTransforms,
   inferReplaceDirectiveFromContinuity,
   isRepairContinuationFollowUpPrompt,
-} from "./repairContinuationPlanning.js";
+} from "./continuationPlanning.js";
 
 describe("repairContinuationPlanning", () => {
   it("detects repair continuation follow-up prompts", () => {

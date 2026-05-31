@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCompactContinuitySummary } from "./compactContinuitySummary.js";
+import { buildCompactContinuitySummary } from "./compactSummary.js";
 
 describe("buildCompactContinuitySummary", () => {
   it("projects approval, mutation write, failure, and seed continuity into compact summary entries", () => {

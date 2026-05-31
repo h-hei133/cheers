@@ -1,4 +1,4 @@
-import { normalizeProjectBinding, type WorkspaceRootMode } from "../projectBindingPolicy.js";
+import { normalizeProjectBinding, type WorkspaceRootMode } from "./projectBindingPolicy.js";
 import type { Session } from "../schema/sessionRecord.js";
 
 export interface SessionWorkspaceBindingInput {

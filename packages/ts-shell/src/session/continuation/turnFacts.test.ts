@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveWorkflowTurnContinuationFacts } from "./turnContinuationFacts.js";
+import { deriveWorkflowTurnContinuationFacts } from "./turnFacts.js";
 
 describe("turnContinuationFacts", () => {
   it("derives seed and last-task facts without terminal success projection", () => {

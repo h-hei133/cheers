@@ -9,7 +9,7 @@ import {
   type CurrentSessionSelectionResolution,
   type CurrentSessionSelectionStore,
 } from "../store/currentSelection.js";
-import { normalizeProjectRootKey } from "../projectBindingPolicy.js";
+import { normalizeProjectRootKey } from "./projectBindingPolicy.js";
 import { projectCurrentSessionMetadata } from "../sessionMetadataProjection.js";
 
 export interface SessionRegistryReadResult {

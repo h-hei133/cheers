@@ -67,7 +67,7 @@ import type {
 } from "./sessionContinuityTypes.js";
 import {
   type WorkspaceRootMode,
-} from "./projectBindingPolicy.js";
+} from "./store/projectBindingPolicy.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { buildSessionContinuitySnapshot } from "./continuation/sessionContinuitySnapshot.js";
 import { normalizeLegacyPermissionStateForSession } from "./continuation/legacyPermissionRebase.js";
@@ -143,7 +143,7 @@ export type {
   TranscriptRepairContext,
 } from "./replay/sessionReplayFacade.js";
 
-export type { WorkspaceRootMode } from "./projectBindingPolicy.js";
+export type { WorkspaceRootMode } from "./store/projectBindingPolicy.js";
 export type { Session } from "./schema/sessionRecord.js";
 
 export type ResumeResult = SessionResumeResult;

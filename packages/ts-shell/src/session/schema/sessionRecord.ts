@@ -1,4 +1,4 @@
-import type { WorkspaceRootMode } from "../projectBindingPolicy.js";
+import type { WorkspaceRootMode } from "../store/projectBindingPolicy.js";
 import type { SessionMessage } from "./sessionMessage.js";
 
 export interface Session {

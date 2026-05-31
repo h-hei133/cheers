@@ -5,7 +5,7 @@ import {
   encodeApprovalMemory,
   normalizeApprovalMemoryRecord,
   projectApprovalSummaryFallback,
-} from "./approvalMemoryCodec.js";
+} from "./memoryCodec.js";
 
 describe("approvalMemoryCodec", () => {
   it("normalizes structured approval memory without changing durable defaults", () => {
@@ -17,7 +17,7 @@ describe("approvalMemoryCodec", () => {
         projectRoot: " /repo ",
         cacheKey: " /repo|bash:spawn ",
         scopeLabel: " bash/spawn ",
-        lineage: " route-1 ",
+        lineage: " lineage-1 ",
         stopReason: " denied before write ",
         channel: "interactive",
         inputKey: "a",
@@ -31,7 +31,7 @@ describe("approvalMemoryCodec", () => {
       projectRoot: "/repo",
       cacheKey: "/repo|bash:spawn",
       scopeLabel: "bash/spawn",
-      lineage: "route-1",
+      lineage: "lineage-1",
       stopReason: "denied before write",
       channel: "interactive",
       inputKey: "a",

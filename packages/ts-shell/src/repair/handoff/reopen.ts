@@ -6,7 +6,7 @@ import { isUsableContinuationTargetPath } from "../../session/continuation/targe
 import {
   extractCrossFileFailureEntriesFromContinuity,
   extractCrossFileStateListFromContinuityEvidence,
-} from "../crossFileRepairPlanning.js";
+} from "../flow/crossFilePlanning.js";
 
 export interface ContinuationReopenDecision {
   readonly enabled: boolean;

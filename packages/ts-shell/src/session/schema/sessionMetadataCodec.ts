@@ -1,4 +1,4 @@
-import type { WorkspaceRootMode } from "../projectBindingPolicy.js";
+import type { WorkspaceRootMode } from "../store/projectBindingPolicy.js";
 import type { Session } from "./sessionRecord.js";
 
 export interface SessionMetadata {

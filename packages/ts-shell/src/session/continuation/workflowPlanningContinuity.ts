@@ -1,5 +1,5 @@
 import type { ContinuityStateLike } from "../../orchestration/runtimeHandoffProjection.js";
-import { deriveWorkflowTurnContinuationFacts } from "../turnContinuationFacts.js";
+import { deriveWorkflowTurnContinuationFacts } from "./turnFacts.js";
 
 export interface WorkflowPlanningContinuitySignals {
   readonly hasActionResultSeed: boolean;

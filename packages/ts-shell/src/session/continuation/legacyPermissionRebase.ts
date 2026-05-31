@@ -1,6 +1,6 @@
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
-import { normalizeLegacyPermissionWorkingMemory } from "../projectRootRebaseProjection.js";
+import { normalizeLegacyPermissionWorkingMemory } from "./projectRootRebaseProjection.js";
 
 export function normalizeLegacyPermissionStateForSession(input: {
   readonly session: Session;

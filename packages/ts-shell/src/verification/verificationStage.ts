@@ -8,7 +8,7 @@ import {
 import type { CodingResultProvenanceCollector } from "../orchestration/toolRuntimeModule.js";
 import type { CodingTaskKind } from "../orchestration/types.js";
 import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
-import { runCommandVerificationStage } from "./commandVerificationStage.js";
+import { runCommandVerificationStage } from "./command/verificationStage.js";
 import { runLowRiskVerificationStage } from "./lowRiskVerificationStage.js";
 
 export interface WorkflowVerificationStageResult {

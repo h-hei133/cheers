@@ -2,7 +2,7 @@ import type { QueryEvent } from "../core/query/events.js";
 import {
   applyWholeWordRename,
   computeLineDelta,
-} from "./mutationInstructionPlanner.js";
+} from "./planning/instructionPlanner.js";
 import {
   appendMutationResult,
   hashMutationStageTaskId,

@@ -3,4 +3,4 @@ export {
   buildSessionResumeContext,
   buildSessionResumeSnapshot,
   type SeedInfluenceDiagnostic,
-} from "../sessionResumeContextBuilder.js";
+} from "../recovery/resumeContextBuilder.js";

@@ -1,5 +1,5 @@
 import type { CodingResultSummary } from "../orchestration/types.js";
-import { extractPathLikeTargets } from "./sessionResumeContextBuilder.js";
+import { extractPathLikeTargets } from "./recovery/resumeContextBuilder.js";
 
 export interface MutationContinuityStateInput {
   readonly lastCodingResult?: CodingResultSummary;

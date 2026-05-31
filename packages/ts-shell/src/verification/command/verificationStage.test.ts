@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { runCommandVerificationStage } from "./commandVerificationStage.js";
+import { runCommandVerificationStage } from "./verificationStage.js";
 
 describe("commandVerificationStage", () => {
   it("does not upgrade approval-denied verification to success", async () => {

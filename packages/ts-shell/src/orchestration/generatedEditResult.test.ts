@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildGeneratedEditProposalResult } from "./generatedEditResult.js";
 import { planGeneratedEdit } from "./generatedEditPlanner.js";
-import { deriveStoppedSessionContinuitySurface } from "../session/stoppedSessionContinuity.js";
+import { deriveStoppedSessionContinuitySurface } from "../session/continuation/stoppedSessionContinuity.js";
 
 describe("generatedEditResult", () => {
   it("projects proposal-created as stopped no-write result surface", () => {

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   planMutationTargetSelection,
   selectMutationTargetFromPrompt,
-} from "./mutationTargetSelection.js";
+} from "./targetSelection.js";
 
 describe("mutationTargetSelection", () => {
   const targets = [

@@ -7,8 +7,8 @@ import {
   createWorkspaceFileReader,
   pathStaysInsideWorkspace,
   readWorkspaceFileMap,
-} from "./workspaceReadPolicy.js";
-import { runApplyPatchRuntimeBridgeIfRequested } from "./applyPatchRuntimeBridge.js";
+} from "./readPolicy.js";
+import { runApplyPatchRuntimeBridgeIfRequested } from "../applyPatchRuntimeBridge.js";
 
 describe("workspaceReadPolicy", () => {
   it("reads only files inside the workspace and never treats the root as a file target", () => {
@@ -45,7 +45,7 @@ describe("workspaceReadPolicy", () => {
 });
 
 describe("applyPatchRuntimeBridge", () => {
-  it("stays inert when the explicit apply_patch route option is absent", async () => {
+  it("stays inert when the explicit apply_patch option is absent", async () => {
     await expect(runApplyPatchRuntimeBridgeIfRequested({
       sessionId: "sess_no_apply_patch_runtime",
       prompt: "read only",

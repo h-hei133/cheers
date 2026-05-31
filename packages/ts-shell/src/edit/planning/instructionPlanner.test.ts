@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractReplaceDirective,
   resolveMutationInstruction,
-} from "./mutationInstructionPlanner.js";
+} from "./instructionPlanner.js";
 
 describe("mutationInstructionPlanner", () => {
   it("plans concrete write content without claiming verification", () => {

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runMvpIntegratedFlow } from "../../orchestration/runMvpIntegratedFlow.js";
-import { buildSessionResumeContext } from "../../session/sessionResumeContextBuilder.js";
+import { buildSessionResumeContext } from "../../session/recovery/resumeContextBuilder.js";
 import type { SessionContinuitySnapshot } from "../../session/sessionContinuityTypes.js";
 import { disabledBrowserRuntimeStatus } from "./browserAgentFixtures.js";
 

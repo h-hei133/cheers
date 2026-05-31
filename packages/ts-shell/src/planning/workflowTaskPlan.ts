@@ -19,18 +19,18 @@ import {
   extractFencedContent,
   extractInlineWriteContent,
   extractLowRiskRenameRefactor,
-} from "../edit/mutationInstructionPlanner.js";
+} from "../edit/planning/instructionPlanner.js";
 import {
   buildLocalMutationScopeBlockedPlan,
   resolveMutationScopePlanning,
-} from "../edit/mutationScopePlanning.js";
+} from "../edit/planning/scope.js";
 import {
   buildMissingMutationTargetPlan,
   buildOutOfWorkspaceMutationTargetPlan,
   buildUnclearEditTransformPlan,
   buildUnsupportedDiscoveryEditPlan,
   selectMutationIntentTarget,
-} from "../edit/mutationIntentPlanning.js";
+} from "../edit/planning/intent.js";
 import {
   resolveSingleFileEditFailureRepairContext,
   resolveSingleFileEditFailureRepairContextAbandonment,
@@ -42,7 +42,7 @@ import {
   extractCrossFileStateListFromContinuityEvidence,
   hasCrossFileContinuationContextInContinuity,
   hasCrossFileEvidenceSignalInContinuity,
-} from "../repair/crossFileRepairPlanning.js";
+} from "../repair/flow/crossFilePlanning.js";
 import {
   hasDegradedContinuationEvidenceInState,
   isAtypicalReopenFollowUpPrompt,
@@ -53,12 +53,12 @@ import {
   collectContinuationTransforms,
   inferReplaceDirectiveFromContinuity,
   isRepairContinuationFollowUpPrompt,
-} from "../repair/repairContinuationPlanning.js";
+} from "../repair/handoff/continuationPlanning.js";
 import {
   detectGroundedDeliverableMode,
   inferGroundedDeliverableModeFromContinuity,
   normalizeGroundedRepairInstruction,
-} from "../repair/groundedAnswerRepair.js";
+} from "../repair/proposal/groundedAnswer.js";
 import { buildBrowserIntentPlan } from "../browser/browserIntentPlanning.js";
 import {
   buildWorkflowContinuationLineage,

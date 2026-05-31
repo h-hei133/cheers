@@ -1,5 +1,5 @@
 import type { QueryEvent } from "../core/query/events.js";
-import { extractSecondaryFileWrites } from "./mutationInstructionPlanner.js";
+import { extractSecondaryFileWrites } from "./planning/instructionPlanner.js";
 import {
   appendMutationResult,
   hashMutationStageTaskId,

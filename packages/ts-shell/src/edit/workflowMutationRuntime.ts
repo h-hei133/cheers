@@ -21,7 +21,7 @@ import {
   isSafeGeneratedAlternativeDirective,
   isSafeReboundDirective,
   resolveMutationInstruction,
-} from "./mutationInstructionPlanner.js";
+} from "./planning/instructionPlanner.js";
 import { runPrimaryMutationRuntimeStage } from "./mutationRuntimeStage.js";
 import { runSecondaryWriteStage } from "./secondaryWriteStage.js";
 

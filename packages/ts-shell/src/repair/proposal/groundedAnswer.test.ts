@@ -4,7 +4,7 @@ import {
   detectGroundedDeliverableMode,
   normalizeGroundedRepairInstruction,
   parseGroundedRepairConstraints,
-} from "./groundedAnswerRepair.js";
+} from "./groundedAnswer.js";
 
 describe("groundedAnswerRepair", () => {
   it("normalizes answer-repair follow-ups without making them success", () => {

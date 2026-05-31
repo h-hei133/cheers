@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { CodingResultSummary } from "../orchestration/types.js";
+import type { CodingResultSummary } from "../../orchestration/types.js";
 import {
   projectSessionPresentationFacts,
   type SessionPresentationFactsInput,
-} from "./sessionPresentationFacts.js";
+} from "./facts.js";
 
 describe("sessionPresentationFacts", () => {
   it("keeps skipped verification partial and not-proven instead of success", () => {

@@ -10,7 +10,7 @@ import type {
 } from "../../orchestration/types.js";
 import { SandboxEnforcer } from "../../sandbox/sandboxEnforcer.js";
 import { SessionManager } from "../../session/SessionManager.js";
-import { deriveStoppedSessionContinuitySurface } from "../../session/stoppedSessionContinuity.js";
+import { deriveStoppedSessionContinuitySurface } from "../../session/continuation/stoppedSessionContinuity.js";
 import { ShellSessionRuntime } from "../shell/sessionRuntime.js";
 import { ToolRuntime } from "../tools/runtime.js";
 import { deriveToolExecutionProvenance } from "../tools/toolExecutionProvenance.js";

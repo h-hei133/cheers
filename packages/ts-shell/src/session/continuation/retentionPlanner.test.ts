@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { QueryEvent } from "../core/query/events.js";
-import type { OrchestrationResult } from "../orchestration/types.js";
-import { applyCompactRetentionPlan } from "./compactRetentionPlanner.js";
+import type { QueryEvent } from "../../core/query/events.js";
+import type { OrchestrationResult } from "../../orchestration/types.js";
+import { applyCompactRetentionPlan } from "./retentionPlanner.js";
 
 describe("applyCompactRetentionPlan", () => {
   it("updates source counters without compacting before the turn threshold", () => {

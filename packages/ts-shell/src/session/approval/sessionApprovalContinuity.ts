@@ -1,9 +1,9 @@
 import type { CodingResultSummary } from "../../orchestration/types.js";
-import { projectApprovalAudit } from "../approvalAuditProjection.js";
+import { projectApprovalAudit } from "./auditProjection.js";
 import {
   decodeApprovalMemory,
   decodeApprovalMemoryHistory,
-} from "../approvalMemoryCodec.js";
+} from "./memoryCodec.js";
 import type {
   ApprovalAuditMemoryState,
   SessionContinuitySnapshot,

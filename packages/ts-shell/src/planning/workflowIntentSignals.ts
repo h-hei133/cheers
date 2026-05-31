@@ -17,8 +17,8 @@ import {
   prefersTestOverBuildInFollowUp,
 } from "../verification/verifyContinuationPlanning.js";
 import { detectUnsupportedCommandForPlanning } from "../verification/intent/command.js";
-import { extractReplaceDirective } from "../edit/mutationInstructionPlanner.js";
-import { parseGroundedRepairConstraints } from "../repair/groundedAnswerRepair.js";
+import { extractReplaceDirective } from "../edit/planning/instructionPlanner.js";
+import { parseGroundedRepairConstraints } from "../repair/proposal/groundedAnswer.js";
 import {
   hasExplicitExecutionIntent,
   stripPathTokensForIntent,

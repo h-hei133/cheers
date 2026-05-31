@@ -8,7 +8,7 @@ import {
   hasCrossFileEvidenceSignalInContinuity,
   shouldDegradeCrossFileRemaining,
   shouldRetainCrossFileFailureInRemaining,
-} from "./crossFileRepairPlanning.js";
+} from "./crossFilePlanning.js";
 
 describe("crossFileRepairPlanning", () => {
   it("retains patch-generation failures as remaining repair evidence", () => {

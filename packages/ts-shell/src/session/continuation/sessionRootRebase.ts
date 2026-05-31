@@ -1,9 +1,9 @@
 import {
   projectRebasedSessionRoot,
   projectRootRebase,
-} from "../projectRootRebaseProjection.js";
+} from "./projectRootRebaseProjection.js";
 
-export { projectRebasedSessionRoot } from "../projectRootRebaseProjection.js";
+export { projectRebasedSessionRoot } from "./projectRootRebaseProjection.js";
 
 export function projectSessionRootRebase(input: {
   readonly workingMemory: unknown;

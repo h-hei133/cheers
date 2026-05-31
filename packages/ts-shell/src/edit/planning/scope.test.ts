@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildLocalMutationScopeBlockedPlan,
   resolveMutationScopePlanning,
-} from "./mutationScopePlanning.js";
+} from "./scope.js";
 
 describe("mutationScopePlanning", () => {
   it("projects local mutation scope from read fragment evidence", () => {

@@ -3,8 +3,8 @@ import {
   projectApprovalAudit,
   projectApprovalAuditContinuity,
   projectApprovalSummaryFallback,
-} from "./approvalAuditProjection.js";
-import type { ApprovalAuditMemoryState } from "./sessionContinuityTypes.js";
+} from "./auditProjection.js";
+import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
 
 describe("approvalAuditProjection", () => {
   const approvalAudit: ApprovalAuditMemoryState = {
@@ -15,7 +15,7 @@ describe("approvalAuditProjection", () => {
     projectRoot: "/repo",
     cacheKey: "/repo|apply_patch:workspace-write",
     scopeLabel: "apply_patch/workspace-write",
-    lineage: "route-31",
+    lineage: "lineage-31",
     stopReason: "permission accepted",
     channel: "non-interactive",
     inputKey: "y",
@@ -31,7 +31,7 @@ describe("approvalAuditProjection", () => {
       lastApprovalProjectRoot: "/repo",
       lastApprovalCacheKey: "/repo|apply_patch:workspace-write",
       lastApprovalScope: "apply_patch/workspace-write",
-      lastApprovalLineage: "route-31",
+      lastApprovalLineage: "lineage-31",
       lastApprovalStopReason: "permission accepted",
       lastApprovalChannel: "non-interactive",
       lastApprovalInputKey: "y",
@@ -54,7 +54,7 @@ describe("approvalAuditProjection", () => {
       lastApprovalCacheKey: "/repo|apply_patch:workspace-write",
       lastApprovalScope: "apply_patch/workspace-write",
       lastApprovalRecordedAt: "2026-01-01T00:00:00.000Z",
-      lastApprovalLineage: "route-31",
+      lastApprovalLineage: "lineage-31",
       lastApprovalStopReason: "permission accepted",
       lastApprovalChannel: "non-interactive",
       lastApprovalInputKey: "y",
@@ -66,7 +66,7 @@ describe("approvalAuditProjection", () => {
       lastPermissionRequestScopeLabel: "apply_patch/workspace-write",
       lastPermissionRequestProjectRoot: "/repo",
       lastPermissionRequestSource: "approval-request",
-      lastPermissionRequestLineage: "route-31",
+      lastPermissionRequestLineage: "lineage-31",
       lastApprovalHistory: [approvalAudit],
     });
   });

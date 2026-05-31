@@ -9,7 +9,7 @@ import {
   shouldActivateAnchoredProposalRuntimePrompt,
 } from "../orchestration/anchoredProposalRuntime.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";
-import { readWorkspaceFileMap } from "../edit/workspaceReadPolicy.js";
+import { readWorkspaceFileMap } from "../edit/workspace/readPolicy.js";
 
 export interface AnchoredProposalStageResult {
   readonly events: QueryEvent[];

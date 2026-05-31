@@ -3,8 +3,8 @@ import type { SeedInfluenceDiagnostic } from "./sessionContinuityTypes.js";
 import type {
   CompactContinuityApprovalAudit,
   CompactContinuityWriteState,
-} from "./compactContinuitySummary.js";
-import type { CompactRetentionPlanInput } from "./compactRetentionPlanner.js";
+} from "./continuation/compactSummary.js";
+import type { CompactRetentionPlanInput } from "./continuation/retentionPlanner.js";
 
 export interface SessionCompactProjectionInput {
   readonly workingMemory: unknown;

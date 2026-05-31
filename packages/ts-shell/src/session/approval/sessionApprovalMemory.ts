@@ -5,8 +5,8 @@ import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
 import {
   projectApprovalAuditContinuity,
   projectApprovalSummaryFallback,
-} from "../approvalAuditProjection.js";
-import { decodeApprovalMemoryHistory } from "../approvalMemoryCodec.js";
+} from "./auditProjection.js";
+import { decodeApprovalMemoryHistory } from "./memoryCodec.js";
 
 export const SESSION_APPROVAL_AUDIT_HISTORY_LIMIT = 16;
 

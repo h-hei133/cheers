@@ -1,5 +1,5 @@
 import { hasPathLikeReference } from "../planning/promptTargetProjection.js";
-import { extractReplaceDirective } from "../edit/mutationInstructionPlanner.js";
+import { extractReplaceDirective } from "../edit/planning/instructionPlanner.js";
 import type { ContinuityStateLike } from "../orchestration/runtimeHandoffProjection.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";
 

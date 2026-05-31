@@ -8,7 +8,7 @@ import { dispatchRuntimeTool } from "../orchestration/toolRuntimeModule.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";
 import {
   resolveMutationInstruction,
-} from "../edit/mutationInstructionPlanner.js";
+} from "../edit/planning/instructionPlanner.js";
 import {
   appendMutationResult,
   type MutationRuntimeAggregate,
@@ -17,7 +17,7 @@ import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import {
   shouldDegradeCrossFileRemaining,
   shouldRetainCrossFileFailureInRemaining,
-} from "./crossFileRepairPlanning.js";
+} from "./flow/crossFilePlanning.js";
 
 export interface CrossFileRepairStageResult {
   readonly remainingTargets: string[];

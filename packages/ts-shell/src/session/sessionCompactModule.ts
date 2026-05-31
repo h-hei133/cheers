@@ -1,12 +1,12 @@
 import type { QueryEvent } from "../core/query/events.js";
-import { applyCompactRetentionPlan } from "./compactRetentionPlanner.js";
-import { decodeApprovalMemory, decodeApprovalMemoryHistory } from "./approvalMemoryCodec.js";
-import { deriveStoppedSessionContinuitySurface } from "./stoppedSessionContinuity.js";
+import { applyCompactRetentionPlan } from "./continuation/retentionPlanner.js";
+import { decodeApprovalMemory, decodeApprovalMemoryHistory } from "./approval/memoryCodec.js";
+import { deriveStoppedSessionContinuitySurface } from "./continuation/stoppedSessionContinuity.js";
 import {
   buildActionHandoffSummary,
   buildSeedInfluenceHandoffSummary,
   buildSuccessHandoffDiagnostic,
-} from "./sessionResumeContextBuilder.js";
+} from "./recovery/resumeContextBuilder.js";
 import { projectCompactRetentionPlanInput } from "./sessionCompactProjection.js";
 import type { SeedInfluenceDiagnostic } from "./sessionContinuityTypes.js";
 

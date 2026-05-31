@@ -6,7 +6,7 @@ import {
   buildUnclearEditTransformPlan,
   buildUnsupportedDiscoveryEditPlan,
   selectMutationIntentTarget,
-} from "./mutationIntentPlanning.js";
+} from "./intent.js";
 
 describe("mutationIntentPlanning", () => {
   it("selects mutation targets only for write/edit intents", () => {

@@ -1,4 +1,4 @@
-import { projectSessionBinding, type WorkspaceRootMode } from "../projectBindingPolicy.js";
+import { projectSessionBinding, type WorkspaceRootMode } from "./projectBindingPolicy.js";
 import type { Session } from "../schema/sessionRecord.js";
 
 export interface SessionCreationOptions {

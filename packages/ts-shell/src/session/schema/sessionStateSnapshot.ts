@@ -7,7 +7,7 @@ import type {
   TerminalClassification,
   TerminalReason,
 } from "../../orchestration/types.js";
-import { projectDurableStatus } from "../durableStatusProjection.js";
+import { projectDurableStatus } from "../lifecycle/durableStatusProjection.js";
 import type { Session } from "./sessionRecord.js";
 
 export interface SessionStateSnapshot {

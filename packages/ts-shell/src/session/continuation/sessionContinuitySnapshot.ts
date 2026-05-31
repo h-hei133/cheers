@@ -4,7 +4,7 @@ import {
   buildActionHandoffSummary,
   buildSeedInfluenceHandoffSummary,
   buildSuccessHandoffDiagnostic,
-} from "../sessionResumeContextBuilder.js";
+} from "../recovery/resumeContextBuilder.js";
 import {
   collectRecentCodingResults,
   findLastCodingCompletionEvent,
@@ -20,7 +20,7 @@ import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import type { SessionContinuitySnapshot } from "../sessionContinuityTypes.js";
-import { deriveStoppedSessionContinuitySurface } from "../stoppedSessionContinuity.js";
+import { deriveStoppedSessionContinuitySurface } from "./stoppedSessionContinuity.js";
 import {
   extractActionHandoffSummaryFromMemory,
   extractFailureHandoffDiagnosticFromMemory,

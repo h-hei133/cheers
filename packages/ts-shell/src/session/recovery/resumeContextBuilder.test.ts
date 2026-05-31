@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CodingResultSummary } from "../orchestration/types.js";
-import type { SessionContinuitySnapshot } from "./sessionContinuityTypes.js";
+import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { SessionContinuitySnapshot } from "../sessionContinuityTypes.js";
 import {
   buildActionHandoffSummary,
   buildSeedInfluenceHandoffSummary,
@@ -9,7 +9,7 @@ import {
   buildSuccessHandoffDiagnostic,
   extractPathLikeTargets,
   shouldAutoAttachPathlessContinuation,
-} from "./sessionResumeContextBuilder.js";
+} from "./resumeContextBuilder.js";
 
 describe("session resume context builder", () => {
   it("builds explicit continuation context without changing planned/changed distinctions", () => {
@@ -152,7 +152,6 @@ describe("session resume context builder", () => {
         restorableFiles: ["src/a.ts"],
         blockedFiles: [],
         recoveryAuthorityId: "authority-success",
-        routeId: "fenced-edit-replacement",
         recoveryAction: "preview-restore",
         userFacingMessage:
           "Explicit guarded restore may be available. No automatic recovery ran.",
