@@ -834,3 +834,102 @@ Target export-only compatibility files after:
 
 - Remaining internally imported compatibility files are outside the verification result target area measured here.
 - Remaining cleanup should continue one owner area at a time and keep result contract validation whenever output-facing projection code is touched.
+
+## Harness Compatibility Trim
+
+Status: structure-only cleanup for the browser eval harness compatibility export. Product behavior was preserved. No result truthfulness, provider configuration, provider calls, fallback behavior, tool authority, command allowlists, edit/apply/write approval behavior, verification execution, repair execution, session schema, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+Inspection summary:
+
+- Latest pressure report, remaining internally imported compatibility files, harness owner files, eval-adjacent benchmark owner files, result adapters, result and evidence projections, shell result assembly files, package-facing entry points, old-path imports, tests in touched harness owners, direct file counts, and long basenames were inspected.
+- `core/harness/browserEvalBenchmarkRunner.ts` was a one-line export to `eval/browser/benchmarkRunner.ts` with five internal harness importers.
+- `packages/ts-shell/package.json` and source entry-point searches showed no documented package export for the removed deep file.
+
+### Before Snapshot
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Export-only compatibility files | 108 |
+| Zero-internal-import compatibility files | 95 |
+| Internally imported compatibility files | 13 |
+| Root `orchestration` direct files | 347 |
+| `core/harness` direct files | 91 |
+| `eval/browser` direct files | 3 |
+| `result` direct files | 2 |
+| `result/projection` direct files | 0 |
+| `evidence` direct files | 6 |
+| `evidence/projection` direct files | 1 |
+| `result/projection/shell` direct files | 3 |
+| Tests importing old harness path | 4 |
+| Long basenames in target areas | 48 |
+
+Target internally imported compatibility files before:
+
+| Path | Internal imports | Importers |
+|---|---:|---|
+| `core/harness/browserEvalBenchmarkRunner.ts` | 5 | `core/harness/browserPlaywrightAdapterSpikeScenarios.test.ts`, `core/harness/browserRuntimeCapabilityScenarioExamples.test.ts`, `core/harness/browserRuntimeGauntletScenarios.test.ts`, `core/harness/pwEval.ts`, `core/harness/pwRuntime.test.ts` |
+
+### After Snapshot
+
+After measurements:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Export-only compatibility files | 108 | 107 |
+| Zero-internal-import compatibility files | 95 | 95 |
+| Internally imported compatibility files | 13 | 12 |
+| Root `orchestration` direct files | 347 | 347 |
+| `core/harness` direct files | 91 | 90 |
+| `eval/browser` direct files | 3 | 3 |
+| `result` direct files | 2 | 2 |
+| `result/projection` direct files | 0 | 0 |
+| `evidence` direct files | 6 | 6 |
+| `evidence/projection` direct files | 1 | 1 |
+| `result/projection/shell` direct files | 3 | 3 |
+| Tests importing old harness path | 4 | 0 |
+| Long basenames in target areas | 48 | 48 |
+
+Target internally imported compatibility files after:
+
+| Path | Internal imports | Status |
+|---|---:|---|
+| none | 0 | none remain in the harness target area |
+
+### Compatibility Files Considered
+
+| Path | Status | Internal imports before | Internal imports after | Package-facing status | Reason | Deletion condition |
+|---|---|---:|---:|---|---|---|
+| `core/harness/browserEvalBenchmarkRunner.ts` | removed | 5 | 0 | no documented package export found | internal harness importers now target `eval/browser/benchmarkRunner.ts` directly | already met |
+| `result/workflowRuntimeProjection.ts` | kept | 0 | 0 | result compatibility export | no internal import pressure in this bounded cleanup | remove only after result-facing package safety is reviewed |
+| `result/sessionResultTruthAdapter.ts` | kept | 0 | 0 | result compatibility export | no internal import pressure in this bounded cleanup | remove only after result-facing package safety is reviewed |
+| `evidence/continuationTransformEvidence.ts` | kept | 0 | 0 | evidence compatibility export | no internal import pressure in this bounded cleanup | remove only after evidence-facing package safety is reviewed |
+| `evidence/runtimeSavePoint.ts` | kept | 0 | 0 | evidence compatibility export | no internal import pressure in this bounded cleanup | remove only after evidence-facing package safety is reviewed |
+
+### Files Removed
+
+- `packages/ts-shell/src/core/harness/browserEvalBenchmarkRunner.ts`
+
+### Files Moved
+
+- None.
+
+### Tests Moved
+
+- None.
+
+### Imports Updated
+
+- `core/harness/pwEval.ts`
+- `core/harness/browserPlaywrightAdapterSpikeScenarios.test.ts`
+- `core/harness/browserRuntimeCapabilityScenarioExamples.test.ts`
+- `core/harness/browserRuntimeGauntletScenarios.test.ts`
+- `core/harness/pwRuntime.test.ts`
+
+All now import `runBrowserEvalBenchmark` from `eval/browser/benchmarkRunner.ts`.
+
+### Remaining Visible Debt
+
+- Remaining internally imported compatibility files are owner indexes under context, planning, provider, and tools.
+- Result and evidence root compatibility exports remain zero-internal-import compatibility surfaces and should be reviewed only with package-facing safety and result contract validation where needed.

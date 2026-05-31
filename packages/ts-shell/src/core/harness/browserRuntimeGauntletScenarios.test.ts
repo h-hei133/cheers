@@ -8,7 +8,7 @@ import { createBrowserRuntimeGauntletManifest } from "../context/browser/runtime
 import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserRuntimeAdapterFixture } from "./browserRuntimeAdapterFixtures.js";
 import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
-import { runBrowserEvalBenchmark } from "./browserEvalBenchmarkRunner.js";
+import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
 import {
   createBrowserEvalBenchmarkReport,
   renderBrowserEvalBenchmarkReport,

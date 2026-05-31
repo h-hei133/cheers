@@ -19,7 +19,7 @@ import {
   createBrowserEvalBenchmarkReport,
   renderBrowserEvalBenchmarkReport,
 } from "./browserEvalBenchmarkReport.js";
-import { runBrowserEvalBenchmark } from "./browserEvalBenchmarkRunner.js";
+import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
 import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
 
 describe("browser runtime capability scenario examples", () => {

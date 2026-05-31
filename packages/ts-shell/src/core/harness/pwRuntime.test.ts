@@ -6,7 +6,7 @@ import { PwAdapter } from "../context/pwAdapter.js";
 import { getPwRuntimeStatus, type PwRuntimeModule } from "../context/pwRuntime.js";
 import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
 import { createBrowserEvalBenchmarkReport } from "./browserEvalBenchmarkReport.js";
-import { runBrowserEvalBenchmark } from "./browserEvalBenchmarkRunner.js";
+import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
 import {
   createInjectedPwClient,
   createPwManifestLoad,

@@ -9,7 +9,7 @@ import {
 } from "../context/pwReport.js";
 import type { PwRuntimeStatus } from "../context/pwRuntime.js";
 import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
-import { runBrowserEvalBenchmark } from "./browserEvalBenchmarkRunner.js";
+import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
 import {
   createInjectedPwClient,
   createPwManifestLoad,

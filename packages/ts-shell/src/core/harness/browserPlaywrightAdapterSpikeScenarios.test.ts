@@ -9,7 +9,7 @@ import { compareBrowserToolServerBackend } from "../context/browserToolServerBac
 import { renderBrowserPlaywrightAdapterSurface } from "../context/browserPlaywrightAdapterSurface.js";
 import { decideBrowserRuntimeDirection } from "../context/browser/runtime/core/directionDecision.js";
 import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
-import { runBrowserEvalBenchmark } from "./browserEvalBenchmarkRunner.js";
+import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
 import { createBrowserEvalBenchmarkReport } from "./browserEvalBenchmarkReport.js";
 import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserPlaywrightAdapterSpikeFixture } from "./browserPlaywrightAdapterSpikeFixtures.js";
