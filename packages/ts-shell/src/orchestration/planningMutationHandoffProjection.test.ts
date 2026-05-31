@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
+import { buildPlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
 
 describe("buildPlanningMutationHandoffProjection", () => {
   it("turns a selected edit target into a no-write proposal review envelope", () => {

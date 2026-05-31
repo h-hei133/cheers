@@ -3,10 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildPlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
+import { buildPlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
 import { buildPlanningRuntimeProductProofInputs } from "./planningRuntimeProductExecution.js";
-import { preparePlanningRuntimeProductProposal } from "./planningRuntimeProductProposal.js";
-import { runPlanningRuntime } from "./planningRuntime.js";
+import { preparePlanningRuntimeProductProposal } from "../planning/runtime/proposal.js";
+import { runPlanningRuntime } from "../planning/runtime/engine.js";
 
 const tempRoots: string[] = [];
 

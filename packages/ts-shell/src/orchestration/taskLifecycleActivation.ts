@@ -12,7 +12,7 @@ import { evaluateAnalysisQualityGate, type AnalysisQualityGateResult } from "./a
 import {
   buildContextGraphPlanningBundle,
   type ContextGraphPlanningBundle,
-} from "./contextGraphPlanning.js";
+} from "../context/acquisition/graph.js";
 import { buildHarnessScorecard, type HarnessScorecard } from "./harnessScorecard.js";
 import { buildHarnessTrace, type HarnessTrace } from "./harnessTrace.js";
 import { attachPlanQualityToAgentPlan, buildPlanQuality, type PlanQuality } from "./planQuality.js";

@@ -1,7 +1,7 @@
 import type { LoopContextRebuildInput } from "../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../context/sessionContextRebuildProjection.js";
 import type { RuntimeEvidenceSavePoint } from "../evidence/runtimeSavePoint.js";
-import type { ReplaySafePlanningStateFacts } from "../orchestration/contextMemory.js";
+import type { ReplaySafePlanningStateFacts } from "../context/memory/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../repair/loopBoundary.js";
 import type { NextTurnBundleProjection } from "../turn/nextTurnBundle.js";
 import type { ToolResultMessageBatch } from "../turn/toolResultMessage.js";

@@ -1,11 +1,11 @@
 import type { ClaimLedgerEvidenceSource } from "./claimLedgerProjection.js";
 import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
-import type { PlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
+import type { PlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
 import {
   buildPlanningMutationProposalBridge,
   type PlanningMutationProposalBridge,
-} from "./planningMutationProposalBridge.js";
+} from "../planning/handoff/bridge.js";
 import {
   runPlanningMutationProofHandoff,
   type PlanningMutationProofConfirmation,

@@ -1,8 +1,8 @@
-import type { PlanningRuntimeResult } from "./planningRuntime.js";
+import type { PlanningRuntimeResult } from "../planning/runtime/engine.js";
 import {
   projectContextAcquisition,
   type ContextAcquisitionProjection,
-} from "./contextAcquisitionProjection.js";
+} from "../context/acquisition/projection.js";
 
 export interface PlanningRuntimeSurface {
   readonly runtimeId: string;

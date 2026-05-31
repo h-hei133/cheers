@@ -1,5 +1,5 @@
 import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
-import type { PlanningRuntimeTaskKindHint } from "./planningRuntime.js";
+import type { PlanningRuntimeTaskKindHint } from "../planning/runtime/engine.js";
 
 export type PlanningRuntimeProductTaskKind = PlanningRuntimeTaskKindHint;
 

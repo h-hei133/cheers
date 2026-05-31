@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { buildContextGraphPlanningBundle } from "./contextGraphPlanning.js";
+import { buildContextGraphPlanningBundle } from "../context/acquisition/graph.js";
 import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
 
 let workspaceRoot: string;

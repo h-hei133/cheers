@@ -4,11 +4,11 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runContextEngine } from "./contextEngine.js";
+import { runContextEngine } from "../context/acquisition/engine.js";
 import {
   canReuseContextMemory,
   evaluateContextMemoryFreshness,
-} from "./contextMemory.js";
+} from "../context/memory/model.js";
 
 let workspaceRoot: string;
 

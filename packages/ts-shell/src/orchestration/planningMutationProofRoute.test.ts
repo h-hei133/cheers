@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildPlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
+import { buildPlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
 import { runPlanningMutationProofRoute } from "./planningMutationProofRoute.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";
 

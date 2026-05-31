@@ -4,9 +4,9 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runContextEngine } from "./contextEngine.js";
-import { buildContextPlanningBlockSummary } from "./contextPlanningSummary.js";
-import { runPlanningRuntime } from "./planningRuntime.js";
+import { runContextEngine } from "../context/acquisition/engine.js";
+import { buildContextPlanningBlockSummary } from "../context/acquisition/summary.js";
+import { runPlanningRuntime } from "../planning/runtime/engine.js";
 
 let workspaceRoot: string;
 

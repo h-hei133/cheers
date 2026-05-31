@@ -1,7 +1,7 @@
 import { applyEditProposalSelection, type EditProposalApplyResult } from "./editProposalApply.js";
 import { selectEditProposalHunks, type EditProposalSelection } from "./editProposalSelection.js";
 import type { FencedEditReplacementRouteOptions } from "./fencedEditRoute.js";
-import type { PlanningMutationProposalBridge } from "./planningMutationProposalBridge.js";
+import type { PlanningMutationProposalBridge } from "../planning/handoff/bridge.js";
 import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
 import type { TargetSetEditRouteOptions } from "./targetSetEditRoute.js";
 

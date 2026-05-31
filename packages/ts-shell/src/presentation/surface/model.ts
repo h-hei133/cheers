@@ -1,7 +1,7 @@
 import type {
   ContextPlanningBlockStatus,
   ContextPlanningBlockSummary,
-} from "../../orchestration/contextPlanningSummary.js";
+} from "../../context/acquisition/summary.js";
 import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../../orchestration/types.js";
 import type { ProviderRegistryProjection } from "../../provider/providerRegistry.js";
 import type { RuntimeProjectionEvent } from "../../runtime/events/projection.js";

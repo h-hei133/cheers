@@ -4,7 +4,7 @@ import type {
   CodingResultSummary,
 } from "../orchestration/types.js";
 import { runPlanningRuntime } from "../orchestration/readInspectModule.js";
-import { projectPlanningRuntimeProductOutcome } from "../orchestration/planningRuntimeProductProjection.js";
+import { projectPlanningRuntimeProductOutcome } from "./runtime/projection.js";
 import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import { selectPlanningRuntimeProductRoute } from "../orchestration/planningRuntimeProductRoute.js";
 import type { WorkflowTaskPlan } from "../orchestration/workflowTaskPlanner.js";

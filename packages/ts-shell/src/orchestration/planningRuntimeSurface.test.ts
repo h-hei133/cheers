@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { projectPlanningRuntimeSurface } from "./planningRuntimeSurface.js";
-import type { PlanningRuntimeResult } from "./planningRuntime.js";
+import type { PlanningRuntimeResult } from "../planning/runtime/engine.js";
 
 describe("projectPlanningRuntimeSurface", () => {
   it("projects planning runtime output without granting mutation or execution authority", () => {

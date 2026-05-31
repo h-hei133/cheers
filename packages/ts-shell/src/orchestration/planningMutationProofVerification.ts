@@ -8,9 +8,9 @@ import {
 import type { FencedEditMapping } from "./fencedEditPlanner.js";
 import type {
   PlanningMutationHandoffVerificationIntent,
-} from "./planningMutationHandoffProjection.js";
+} from "../planning/handoff/mutation.js";
 import type { PlanningMutationProofHandoff } from "./planningMutationProofHandoff.js";
-import type { PlanningMutationProposalBridge } from "./planningMutationProposalBridge.js";
+import type { PlanningMutationProposalBridge } from "../planning/handoff/bridge.js";
 import {
   classifyRealTaskLoopApplyStatus,
   classifyRealTaskLoopRecoveryStatus,

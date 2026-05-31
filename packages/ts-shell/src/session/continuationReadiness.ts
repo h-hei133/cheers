@@ -1,6 +1,6 @@
 import type { LoopContextRebuildInput } from "../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../context/sessionContextRebuildProjection.js";
-import type { ContextWorkingMemory } from "../orchestration/contextMemory.js";
+import type { ContextWorkingMemory } from "../context/memory/model.js";
 import type { SessionTreeProjection } from "./sessionTreeProjection.js";
 
 export type ContinuationReadinessStatus =

@@ -1,7 +1,7 @@
 import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
-import type { PlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
-import type { PlanningRuntimeResult } from "./planningRuntime.js";
+import type { PlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
+import type { PlanningRuntimeResult } from "../planning/runtime/engine.js";
 
 export type PlanningExactProposalStatus =
   | "prepared-exact"

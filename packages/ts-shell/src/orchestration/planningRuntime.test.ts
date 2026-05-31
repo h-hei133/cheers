@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runPlanningRuntime } from "./planningRuntime.js";
+import { runPlanningRuntime } from "../planning/runtime/engine.js";
 
 let workspaceRoot: string;
 

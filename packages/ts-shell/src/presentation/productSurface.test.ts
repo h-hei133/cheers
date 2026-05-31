@@ -5,8 +5,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildLoopContextRebuildInput } from "../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
-import { buildContextPlanningBlockSummary } from "../orchestration/contextPlanningSummary.js";
-import { runPlanningRuntime } from "../orchestration/planningRuntime.js";
+import { buildContextPlanningBlockSummary } from "../context/acquisition/summary.js";
+import { runPlanningRuntime } from "../planning/runtime/engine.js";
 import type { CodingResultSummary } from "../orchestration/types.js";
 import {
   projectProviderRegistry,

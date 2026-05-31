@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildPlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
-import { buildPlanningMutationProposalBridge } from "./planningMutationProposalBridge.js";
+import { buildPlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
+import { buildPlanningMutationProposalBridge } from "../planning/handoff/bridge.js";
 import { runPlanningMutationProofHandoff } from "./planningMutationProofHandoff.js";
 import { verifyPlanningMutationProofHandoff } from "./planningMutationProofVerification.js";
 import { createWorkspaceWriteAuthority } from "./patchResult/workspaceAuthority.js";

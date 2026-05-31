@@ -4,8 +4,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { projectContextAcquisition } from "./contextAcquisitionProjection.js";
-import { runContextEngine } from "./contextEngine.js";
+import { projectContextAcquisition } from "../context/acquisition/projection.js";
+import { runContextEngine } from "../context/acquisition/engine.js";
 
 let workspaceRoot: string;
 

@@ -4,11 +4,11 @@ import path from "node:path";
 
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import type { ProviderEditAvailability } from "./providerEditPlanner.js";
-import type { PlanningMutationHandoffProjection } from "./planningMutationHandoffProjection.js";
+import type { PlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
 import type {
   PlanningRuntimeProductProposalPreparation,
   PlanningRuntimeProductProposalSource,
-} from "./planningRuntimeProductProposal.js";
+} from "../planning/runtime/proposal.js";
 import type { LiveProviderReadinessStatus } from "./liveProviderAdapterApproval.js";
 import type { RealProviderProposalDryRunProvider } from "./realProviderProposalDryRun.js";
 import {

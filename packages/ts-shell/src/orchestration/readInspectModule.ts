@@ -66,7 +66,7 @@ export {
 export {
   buildContextGraphPlanningBundle,
   type ContextGraphPlanningBundle,
-} from "./contextGraphPlanning.js";
+} from "../context/acquisition/graph.js";
 export {
   buildRepoIntelligence,
   rankRepoCandidates,
@@ -74,27 +74,27 @@ export {
   type RepoIntelligenceFile,
   type RepoIntelligenceResult,
   type RepoIntelligenceSnapshot,
-} from "./repoIntelligence.js";
+} from "../context/discovery/scan.js";
 export {
   buildContextWorkingMemory,
   canReuseContextMemory,
   evaluateContextMemoryFreshness,
   type ContextMemoryFileReceipt,
   type ContextWorkingMemory,
-} from "./contextMemory.js";
+} from "../context/memory/model.js";
 export {
   runContextEngine,
   type ContextEngineResult,
-} from "./contextEngine.js";
+} from "../context/acquisition/engine.js";
 export {
   runPlanningRuntime,
   type PlanningRuntimeEditTarget,
   type PlanningRuntimeResult,
-} from "./planningRuntime.js";
+} from "../planning/runtime/engine.js";
 export {
   buildGroundedPlanningProjection,
   type GroundedPlanningProjection,
-} from "./groundedPlanningProjection.js";
+} from "../planning/grounded/projection.js";
 export {
   projectPlanningRuntimeSurface,
   type PlanningRuntimeSurface,
@@ -103,11 +103,11 @@ export {
   buildPlanningMutationHandoffProjection,
   type PlanningMutationHandoffProjection,
   type PlanningMutationHandoffRequirement,
-} from "./planningMutationHandoffProjection.js";
+} from "../planning/handoff/mutation.js";
 export {
   projectContextAcquisition,
   type ContextAcquisitionProjection,
-} from "./contextAcquisitionProjection.js";
+} from "../context/acquisition/projection.js";
 export {
   buildContextGraphReadinessFacts,
   type ContextGraphReadinessFacts,

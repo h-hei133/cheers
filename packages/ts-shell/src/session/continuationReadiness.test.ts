@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
-import type { ContextWorkingMemory } from "../orchestration/contextMemory.js";
+import type { ContextWorkingMemory } from "../context/memory/model.js";
 import {
   evaluateContinuationReadiness,
   type ContinuationContextReadinessStatus,
