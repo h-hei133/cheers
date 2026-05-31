@@ -40,11 +40,13 @@ Detailed rules: [architecture boundaries](agent-rules/architecture-boundaries.md
 
 ## Ownership And Naming Summary
 
-- Put behavior in the owning module/domain instead of central orchestration or vague helper buckets.
-- Keep compatibility wrappers thin and delegate-only.
+- Put behavior in the owning module or domain instead of central orchestration, entrypoint files, compatibility shims, or vague helper buckets.
+- Prefer multi-level owner-domain structure where folders carry context and files use short local role names.
+- Use short, responsibility-based file names such as `model`, `contract`, `policy`, `projection`, `renderer`, `adapter`, `state`, `events`, `stream`, or `index` only inside clear domain folders.
+- Do not encode an entire feature, roadmap title, implementation phase, or historical route name into a product file name.
+- Compatibility wrappers must remain thin and delegate or re-export only; they must not become the place where new behavior grows.
 - Keep TypeScript imports ending in `.js` when importing local TypeScript modules that compile to JavaScript.
-- Prefer short, responsibility-based file names backed by domain-specific directories.
-- Avoid route-numbered, roadmap-title, or process-term product names unless the file is explicitly a compatibility/history surface.
+- Avoid external-project names, route-era terms, and process vocabulary in product code, filenames, public runtime fields, and user-visible output unless the surface is explicitly historical or compatibility-only.
 
 Detailed rules: [file placement and naming](agent-rules/file-placement-and-naming.md), [compatibility and history](agent-rules/compatibility-and-history.md).
 

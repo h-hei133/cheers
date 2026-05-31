@@ -1,79 +1,216 @@
 # File Placement And Naming
 
-Code must live in the owning module or domain. Directory names should carry domain context so file names can stay short and responsibility-based.
+Code must live in the module or domain that owns the runtime responsibility. The repository should use domain folders to carry context, so files can stay short, local, and responsibility-based.
 
-## Placement
+These are durable project-level rules. They define how future code should be placed and named. They are not a one-time migration plan.
 
-- Put behavior in the module that owns the runtime responsibility.
-- Do not pile unrelated behavior into one folder.
-- Do not pile unrelated behavior into one file.
-- Large files are acceptable only when their responsibilities are cohesive and rightful.
-- Prefer adding a focused module over growing central orchestration files.
+## Placement Principles
+
+- Put behavior in the module that owns the product responsibility.
+- Prefer owner-domain folders over flat catch-all folders.
+- Prefer subdomain folders when a domain has multiple concepts with different owners.
 - Keep invariants close to the code that owns them.
-- Move related tests with new modules when practical.
+- Keep tests near the owner domain when practical.
+- Avoid growing central orchestration, entrypoints, or compatibility files when a focused domain module can own the behavior.
+- Large files are acceptable only when their responsibilities are cohesive and rightful.
+- A domain manager may coordinate responsibilities that belong to its public contract, but it should not absorb unrelated implementation details.
 
-Keep compatibility and executable shims thin:
+A healthy product path should read as domain ownership first, local role second:
+
+```text
+packages/ts-shell/src/runtime/loop/contract.ts
+packages/ts-shell/src/runtime/events/projection.ts
+packages/ts-shell/src/presentation/terminal/renderer.ts
+packages/ts-shell/src/planning/handoff/edit.ts
+packages/ts-shell/src/provider/registry/model.ts
+packages/ts-shell/src/session/continuation/readiness.ts
+```
+
+## Owner Domains
+
+Use existing owner domains where possible. Common owners include:
+
+```text
+runtime/
+turn/
+context/
+planning/
+provider/
+tools/
+session/
+evidence/
+result/
+presentation/
+policy/
+edit/
+verification/
+repair/
+```
+
+When a domain becomes broad, add meaningful subdomains instead of lengthening file names:
+
+```text
+runtime/loop/
+runtime/events/
+runtime/execution/
+runtime/resources/
+planning/context/
+planning/handoff/
+provider/registry/
+provider/request/
+tools/policy/
+tools/result/
+session/replay/
+session/continuation/
+presentation/surface/
+presentation/terminal/
+```
+
+Do not create folders named only for convenience, such as `helper`, `helpers`, `utils`, `misc`, `common`, or `support`. If a file does not have a clear owner, stop and identify the owner before adding it.
+
+## File Naming Principles
+
+- Prefer short local names inside meaningful folders.
+- Let folders carry domain context; let files name the local role.
+- Reusing the same file name in different domains is allowed when the folder gives the meaning.
+- Avoid long compound file names that encode the full feature path.
+- Avoid roadmap-title, phase-title, implementation-process, or route-style product names.
+- Avoid external-project names in product code, filenames, exported types, runtime fields, or user-visible output.
+- Longer file names are acceptable only when they are stable public concepts and a shorter folder-based name would be less clear.
+
+Preferred local role names include:
+
+```text
+index.ts
+model.ts
+types.ts
+contract.ts
+runtime.ts
+state.ts
+events.ts
+stream.ts
+projection.ts
+adapter.ts
+policy.ts
+boundary.ts
+receipt.ts
+summary.ts
+renderer.ts
+registry.ts
+plan.ts
+graph.ts
+memory.ts
+readiness.ts
+```
+
+Prefer this:
+
+```text
+runtime/events/projection.ts
+runtime/events/stream.ts
+runtime/loop/trajectory.ts
+runtime/resources/descriptor.ts
+presentation/surface/model.ts
+presentation/terminal/renderer.ts
+```
+
+Over this:
+
+```text
+runtimeEventProjection.ts
+jsonEventStream.ts
+trajectoryProjection.ts
+staticResourceDescriptor.ts
+productSurface.ts
+terminalMessageRenderer.ts
+```
+
+## Compatibility Shims
+
+Compatibility shims exist to protect old import paths or public entrypoints. They are not owners of new behavior.
+
+Compatibility shims must:
+
+- remain thin
+- delegate, re-export, or adapt names only
+- not grow business logic
+- not own product decisions
+- not become the primary import path for new code
+
+Examples of compatibility or executable surfaces that must stay thin unless explicitly scoped otherwise:
 
 ```text
 packages/ts-shell/src/entrypoints/cli.tsx
 packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts
 ```
 
-`packages/ts-shell/src/session/SessionManager.ts` is a rightful domain manager, not a hollow facade. It may retain real session lifecycle coordination, public API compatibility, dependency assembly, transaction ordering, and cross-session coordination.
+A compatibility shim is different from a rightful domain manager. For example, `SessionManager` may retain real session lifecycle coordination, public API compatibility, dependency assembly, transaction ordering, and cross-session coordination when those duties are part of its public contract.
 
-Move only concrete subdomain implementation details into focused session modules such as:
+## Session Domain Guidance
+
+Session code should keep public lifecycle coordination separate from focused implementation details.
+
+Focused session subdomains may include:
 
 ```text
-packages/ts-shell/src/session/store/
-packages/ts-shell/src/session/transcript/
-packages/ts-shell/src/session/recovery/
-packages/ts-shell/src/session/replay/
-packages/ts-shell/src/session/continuation/
-packages/ts-shell/src/session/approval/
-packages/ts-shell/src/session/presentation/
-packages/ts-shell/src/session/schema/
+session/store/
+session/transcript/
+session/recovery/
+session/replay/
+session/continuation/
+session/approval/
+session/presentation/
+session/schema/
 ```
 
-Do not place policy logic, writer boundary logic, permission semantics, provider-gate semantics, or result/session mapping logic directly in compatibility shims when a focused module can own it.
+Do not put store layout, transcript serialization, replay construction, recovery ranking, approval memory, presentation formatting, or schema defaults directly into a session compatibility surface when a focused session module can own it.
 
-## Naming
+## Side-Effect Placement
 
-- File names should be short, responsibility-based, and domain-backed.
-- Directory names should carry context so file names do not become long.
-- Avoid vague buckets such as `helper`, `helpers`, `utils`, `misc`, `common`, `support`, or `legacy`.
-- Avoid route-style product names.
-- Product code must not expose development process terms such as route numbers, capstone, closeout, cut-through, sprint, or MVP unless it is explicitly a compatibility/history surface.
-- Do not encode an entire roadmap title into a file, function, or type name.
+Side effects must stay in sanctioned owners.
 
-Good examples:
+- Generic command and file tool side effects should pass through `ExecutionService` or a sanctioned execution owner.
+- Provider network behavior belongs in provider request/fetch owners.
+- Edit and write behavior belongs in edit/write owners.
+- Session persistence belongs in session store/transcript owners.
+- Result and evidence truthfulness belongs in result/evidence owners.
+- Presentation renders facts; it does not own facts.
+
+Do not add direct shell, filesystem write, provider, browser, MCP, or package-loading behavior to arbitrary product modules.
+
+## Product Vocabulary
+
+Product code must avoid development-process vocabulary unless the file is explicitly historical or compatibility-only.
+
+Avoid product names that include:
 
 ```text
-workspaceBoundary.ts
-workspaceAuthority.ts
-writeFailureState.ts
-writeRecovery.ts
-runtimeWriteRoute.ts
-routeWiringGate.ts
-productionRoute.ts
-permissionUxRoute.ts
+route
+capstone
+closeout
+cut-through
+sprint
+MVP
+reference
+inspired
 ```
 
-## Suffixes
+Historical docs may describe past work. Product code should use current domain language.
 
-- `*Gate.ts` for precondition checks and entry decisions.
-- `*Route.ts` for composed execution paths.
-- `*Result.ts` or `*Projection.ts` for terminal/result/session mapping.
-- `*State.ts` for state models.
-- `*Smoke.ts` for real-provider or end-to-end smoke wrappers.
-- `*Authority.ts` or `*Policy.ts` for boundary and safety checks.
-- `*Surface.ts` for user-visible or terminal-facing projections.
-- `*Bridge.ts` for adapter layers between internal contracts and runtime-facing shapes.
+## Tests
 
-Tests should normally match the module name:
+Tests should follow the owner domain. A test may either live beside the module or in the existing package test layout, but it should make ownership clear.
+
+When a module is split into subdomains, tests should target the new owner path rather than relying on old compatibility paths for new coverage.
+
+Examples:
 
 ```text
-workspaceWriteRoute.ts
-workspaceWriteRoute.test.ts
+runtime/events/projection.ts
+runtime/events/projection.test.ts
+
+presentation/terminal/renderer.ts
+presentation/terminal/renderer.test.ts
 ```
 
 ## New File Checklist
@@ -81,14 +218,12 @@ workspaceWriteRoute.test.ts
 Before adding a file, identify:
 
 - owner domain
+- subdomain if the owner is broad
 - local responsibility
 - expected callers
 - focused tests or validation
 - why an existing file is not the right home
+- whether the file name can be shortened by adding a clearer folder
+- whether the file is a real owner or only a compatibility surface
 
-## Compatibility Shims
-
-- Compatibility shims must remain thin.
-- They should delegate, re-export, or adapt names only.
-- They must not gain business logic.
-- Distinguish compatibility shims from rightful domain managers. Domain managers may coordinate real ownership responsibilities when that coordination is part of their public contract.
+Do not add a new file until the owner and local role are clear.
