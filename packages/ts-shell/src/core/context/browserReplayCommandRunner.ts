@@ -1,8 +1,8 @@
 import type { BrowserActionCache } from "./browserActionCache.js";
 import type { BrowserExecutor } from "./browserExecutor.js";
-import { inspectBrowserReceiptCacheHealth } from "./browserReceiptCacheHealth.js";
-import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
-import { renderBrowserReceiptCacheSurface } from "./browserReceiptCacheSurface.js";
+import { inspectBrowserReceiptCacheHealth } from "./browser/receipt/browserReceiptCacheHealth.js";
+import type { BrowserReceiptCacheStore } from "./browser/receipt/browserReceiptCacheStore.js";
+import { renderBrowserReceiptCacheSurface } from "./browser/receipt/browserReceiptCacheSurface.js";
 import { executeBrowserReplay } from "./browserReplayExecutor.js";
 import { planBrowserReplay } from "./browserReplayPlanner.js";
 import type { BrowserReplayCommandRequest } from "./browserReplayCommandContract.js";

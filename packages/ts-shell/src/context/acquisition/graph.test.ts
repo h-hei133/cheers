@@ -22,7 +22,7 @@ beforeEach(async () => {
   );
   await fs.writeFile(
     path.join(workspaceRoot, "src", "target.test.ts"),
-    "import { targetThing } from '../../orchestration/target.js';\nexpect(targetThing()).toBe(1);\n",
+    "import { targetThing } from '../../session/continuation/target.js';\nexpect(targetThing()).toBe(1);\n",
   );
 });
 

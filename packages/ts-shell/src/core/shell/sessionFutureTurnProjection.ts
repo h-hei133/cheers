@@ -2,12 +2,12 @@ import {
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
   getLatestCompactCheckpoint,
   type CompactLiveCheckpointStore,
-} from "../context/compactLiveCheckpoint.js";
+} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
 import {
   DEFAULT_COMPACT_INJECTION_STATE_STORE,
   type CompactInjectionStateStore,
-} from "../context/compactInjectionState.js";
-import { planCompactFutureTurnInjection } from "../context/compactFutureTurnInjection.js";
+} from "../context/compact/injection/compactInjectionState.js";
+import { planCompactFutureTurnInjection } from "../context/compact/injection/compactFutureTurnInjection.js";
 import {
   DEFAULT_PROJECT_MEMORY_INJECTION_STATE_STORE,
   type ProjectMemoryInjectionStateStore,

@@ -2,12 +2,12 @@ import { routeSlashCommand } from "../commands/slashRouter.js";
 import {
   getCompactInjectionState,
   type CompactInjectionStateStore,
-} from "../context/compactInjectionState.js";
+} from "../context/compact/injection/compactInjectionState.js";
 import {
   getLatestCompactCheckpoint,
   type CompactLiveCheckpointStore,
-} from "../context/compactLiveCheckpoint.js";
-import { planCompactFutureTurnInjection } from "../context/compactFutureTurnInjection.js";
+} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
+import { planCompactFutureTurnInjection } from "../context/compact/injection/compactFutureTurnInjection.js";
 import type { ProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
 import { planProjectMemoryFutureTurnInjection } from "../context/memory/projectMemoryFutureTurnInjection.js";
 import { evaluateAgentScenarioAssertion } from "./agentScenarioAssertions.js";

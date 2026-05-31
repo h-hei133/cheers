@@ -4,27 +4,27 @@ import {
   type NoWriteRuntimeSource,
 } from "./patchResult/noWriteRuntimeRoute.js";
 import { buildNoWriteRuntimeRouteResult } from "./patchResult/runtimeRouteResult.js";
-import { buildWorkspaceCreateRouteResult } from "./patchResult/workspaceCreateResult.js";
+import { buildWorkspaceCreateRouteResult } from "../edit/result/workspace/workspaceCreateResult.js";
 import {
   patchIsSingleAddFile,
   runWorkspaceCreateRoute,
 } from "./patchResult/workspaceCreateRoute.js";
-import { buildWorkspaceDeleteRouteResult } from "./patchResult/workspaceDeleteResult.js";
+import { buildWorkspaceDeleteRouteResult } from "../edit/result/workspace/workspaceDeleteResult.js";
 import {
   patchIsSingleDeleteFile,
   runWorkspaceDeleteRoute,
 } from "./patchResult/workspaceDeleteRoute.js";
-import { buildMultiFileWriteRouteResult } from "./patchResult/multiFileWriteResult.js";
+import { buildMultiFileWriteRouteResult } from "../edit/result/workspace/multiFileWriteResult.js";
 import {
   patchIsBoundedUpdateFiles,
   runMultiFileWriteRoute,
 } from "./patchResult/multiFileWriteRoute.js";
-import { buildWorkspaceMoveRouteResult } from "./patchResult/workspaceMoveResult.js";
+import { buildWorkspaceMoveRouteResult } from "../edit/result/workspace/workspaceMoveResult.js";
 import {
   patchIsSingleMoveFile,
   runWorkspaceMoveRoute,
 } from "./patchResult/workspaceMoveRoute.js";
-import { buildWorkspaceWriteRouteResult } from "./patchResult/workspaceWriteResult.js";
+import { buildWorkspaceWriteRouteResult } from "../edit/result/workspace/workspaceWriteResult.js";
 import { runWorkspaceWriteRoute } from "./patchResult/workspaceWriteRoute.js";
 import type { SingleFileApplyPatchRequestedUserDecision } from "./patchResult/singleFileApplyPatchPermissionUxContract.js";
 import type {
@@ -35,7 +35,7 @@ import {
   classifyBoundedApplyPatchCandidate,
   type BoundedApplyPatchCandidateProjection,
 } from "./patchResult/boundedApplyPatchCandidate.js";
-import { buildMixedFileWriteRouteResult } from "./patchResult/mixedFileWriteResult.js";
+import { buildMixedFileWriteRouteResult } from "../edit/result/workspace/mixedFileWriteResult.js";
 import {
   patchIsBoundedMixedWriteFiles,
   runMixedFileWriteRoute,

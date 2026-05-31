@@ -9,7 +9,7 @@ import {
   projectCliCommandExecution,
   type CliCommandExecutionBridge,
 } from "./cliCommandExecutionBridge.js";
-import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../core/context/browserReceiptCacheManifest.js";
+import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../core/context/browser/receipt/browserReceiptCacheManifest.js";
 
 function renderer(): Pick<StreamingRenderer, "renderLine"> & {
   readonly lines: string[];

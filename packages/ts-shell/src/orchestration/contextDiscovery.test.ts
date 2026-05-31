@@ -29,11 +29,11 @@ beforeEach(async () => {
   );
   await fs.writeFile(
     path.join(workspaceRoot, "src", "target.test.ts"),
-    "import { targetThing } from './target.js';\nexpect(targetThing()).toBe(1);\n",
+    "import { targetThing } from '../session/continuation/target.js';\nexpect(targetThing()).toBe(1);\n",
   );
   await fs.writeFile(
     path.join(workspaceRoot, "src", "consumer.ts"),
-    "import { targetThing } from './target.js';\nexport const consumed = targetThing();\n",
+    "import { targetThing } from '../session/continuation/target.js';\nexport const consumed = targetThing();\n",
   );
   await fs.writeFile(
     path.join(workspaceRoot, "README.md"),

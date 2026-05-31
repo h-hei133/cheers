@@ -1,8 +1,8 @@
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import { createBrowserCliExecutionBridge } from "../core/context/browserCliExecutionBridge.js";
 import { loadBrowserCliExecutorInjectionFromEnv } from "../core/context/browserCliExecutorInjection.js";
-import { loadBrowserReceiptCacheManifestFromEnv } from "../core/context/browserReceiptCacheManifest.js";
-import { createBrowserReceiptCacheStore } from "../core/context/browserReceiptCacheStore.js";
+import { loadBrowserReceiptCacheManifestFromEnv } from "../core/context/browser/receipt/browserReceiptCacheManifest.js";
+import { createBrowserReceiptCacheStore } from "../core/context/browser/receipt/browserReceiptCacheStore.js";
 import {
   createBrowserExternalNetworkRunnerHarnessContext,
   loadBrowserExternalNetworkRunnerManifestFromEnv,
@@ -16,8 +16,8 @@ import {
   loadBrowserPublicReadOnlyWebManifestFromEnv,
 } from "../core/context/browserPublicReadOnlyWebManifest.js";
 import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../core/harness/browserPublicReadOnlyWebSmokeConfig.js";
-import type { CompactInjectionStateStore } from "../core/context/compactInjectionState.js";
-import type { CompactLiveCheckpointStore } from "../core/context/compactLiveCheckpoint.js";
+import type { CompactInjectionStateStore } from "../core/context/compact/injection/compactInjectionState.js";
+import type { CompactLiveCheckpointStore } from "../core/context/compact/checkpoint/compactLiveCheckpoint.js";
 import { resolveRepoAwarePromptResponse } from "../core/shell/repoAwareRouting.js";
 import type { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 

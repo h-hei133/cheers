@@ -15,7 +15,7 @@ import {
 } from "./browserExecutionCommandRunner.js";
 import { runBrowserActionLoopExecutor } from "./browserActionLoopExecutor.js";
 import type { BrowserActionCache } from "./browserActionCache.js";
-import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
+import type { BrowserReceiptCacheStore } from "./browser/receipt/browserReceiptCacheStore.js";
 import type { BrowserExternalNetworkRunnerManifestLoadResult } from "./browserExternalNetworkRunnerManifest.js";
 import type { BrowserControlledNetworkRunnerManifestLoadResult } from "./browserControlledNetworkRunnerManifest.js";
 import type { BrowserPublicReadOnlyWebManifestLoadResult } from "./browserPublicReadOnlyWebManifest.js";

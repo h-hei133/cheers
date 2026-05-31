@@ -5,12 +5,12 @@ import { describe, expect, it } from "vitest";
 import { createLongSessionContinuityFixture } from "../../session/__tests__/longSessionContinuityFixtures.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { seedWriterStartedStoppedRecoveryContextSession } from "../../test-utils/stoppedRecoveryFixture.js";
-import { runCompactCommand } from "../context/compactCommandRunner.js";
-import { createCompactInjectionStateStore } from "../context/compactInjectionState.js";
+import { runCompactCommand } from "../context/compact/command/compactCommandRunner.js";
+import { createCompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
 import {
   createCompactLiveCheckpointStore,
   updateLatestCompactCheckpoint,
-} from "../context/compactLiveCheckpoint.js";
+} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
 import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";

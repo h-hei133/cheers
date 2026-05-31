@@ -26,7 +26,7 @@ import {
   type WorkspaceWriteEffect,
   type WorkspaceWriteFailurePhase,
   type WorkspaceWriteFailureState,
-} from "./writeFailureState.js";
+} from "../../edit/result/workspace/writeFailureState.js";
 import { buildWriteDecisionGate, type WriteDecisionGate } from "./writeDecisionGate.js";
 
 export type WorkspaceWriteRouteStatus = "written" | "blocked";

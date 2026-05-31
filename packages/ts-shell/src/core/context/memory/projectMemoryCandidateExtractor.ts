@@ -1,4 +1,4 @@
-import type { CompactContinuityPacket } from "../compactContinuityPacket.js";
+import type { CompactContinuityPacket } from "../compact/continuity/compactContinuityPacket.js";
 import type {
   ContextProjectionFact,
   ContextStateProjection,

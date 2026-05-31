@@ -6,14 +6,14 @@ import {
   factValue,
   type CompactContinuityPacket,
   type CompactContinuityPacketSource,
-} from "./compactContinuityPacket.js";
+} from "./compact/continuity/compactContinuityPacket.js";
 import { CONTEXT_CONTINUITY_MANIFEST } from "./model/contextContinuityManifest.js";
 import {
   projectContextState,
   type ContextStateProjection,
   type ContextStateProjectionInput,
 } from "./model/contextStateProjection.js";
-import { applyCompactRedactionPolicy } from "./compactRedactionPolicy.js";
+import { applyCompactRedactionPolicy } from "./compact/policy/compactRedactionPolicy.js";
 
 export interface RouteContinuityHandoffInput {
   readonly generatedAt: string;

@@ -1,4 +1,4 @@
-import { getLatestCompactCheckpoint } from "../context/compactLiveCheckpoint.js";
+import { getLatestCompactCheckpoint } from "../context/compact/checkpoint/compactLiveCheckpoint.js";
 import { browserCapabilitySidebarToolItem } from "../context/browserCapabilitySurface.js";
 import { parseSidebarLivePanelCommandArgs } from "../context/sidebar/sidebarLivePanelCommandContract.js";
 import { runSidebarLivePanelCommand } from "../context/sidebar/sidebarLivePanelCommandRunner.js";

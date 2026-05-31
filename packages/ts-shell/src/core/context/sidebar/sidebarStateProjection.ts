@@ -1,5 +1,5 @@
-import type { CompactInjectionState } from "../compactInjectionState.js";
-import type { CompactLiveCheckpoint } from "../compactLiveCheckpoint.js";
+import type { CompactInjectionState } from "../compact/injection/compactInjectionState.js";
+import type { CompactLiveCheckpoint } from "../compact/checkpoint/compactLiveCheckpoint.js";
 import type { ProjectMemoryInjectionState } from "../memory/projectMemoryInjectionState.js";
 import type { ProjectMemoryRecord, ProjectMemoryStoreHealth } from "../memory/projectMemoryStoreContract.js";
 import type { ProjectMemoryReviewState } from "../memory/projectMemoryReviewState.js";

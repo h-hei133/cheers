@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createCompactInjectionStateStore } from "../context/compactInjectionState.js";
-import { createCompactLiveCheckpointStore } from "../context/compactLiveCheckpoint.js";
+import { createCompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
+import { createCompactLiveCheckpointStore } from "../context/compact/checkpoint/compactLiveCheckpoint.js";
 import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
 import { createProjectMemoryReviewStateStore } from "../context/memory/projectMemoryReviewState.js";

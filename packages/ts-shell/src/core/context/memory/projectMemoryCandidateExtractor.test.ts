@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runCompactCommand } from "../compactCommandRunner.js";
+import { runCompactCommand } from "../compact/command/compactCommandRunner.js";
 import { projectContextState } from "../model/contextStateProjection.js";
 import { extractProjectMemoryCandidates } from "./projectMemoryCandidateExtractor.js";
 import { evaluateProjectMemoryCandidateQuality } from "./projectMemoryCandidateQuality.js";

@@ -26,7 +26,7 @@ import {
   type WorkspaceWriteEffect,
   type WorkspaceWriteFailurePhase,
   type WorkspaceWriteFailureState,
-} from "./writeFailureState.js";
+} from "../../edit/result/workspace/writeFailureState.js";
 
 export type WorkspaceMoveRouteStatus = "moved" | "blocked";
 

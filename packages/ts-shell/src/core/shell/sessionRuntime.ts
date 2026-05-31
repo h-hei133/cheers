@@ -3,8 +3,8 @@ import type {
   SessionContinuitySnapshot,
   SessionManager,
 } from "../../session/SessionManager.js";
-import type { CompactLiveCheckpointStore } from "../context/compactLiveCheckpoint.js";
-import type { CompactInjectionStateStore } from "../context/compactInjectionState.js";
+import type { CompactLiveCheckpointStore } from "../context/compact/checkpoint/compactLiveCheckpoint.js";
+import type { CompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
 import type { ProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
 import type { ProjectMemoryStore } from "../context/memory/projectMemoryStoreContract.js";
 import type { QueryEvent } from "../query/runtime/events.js";

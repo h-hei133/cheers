@@ -1,8 +1,8 @@
 import fs from "node:fs";
-import { createBrowserReceiptCacheManifest } from "../context/browserReceiptCacheManifest.js";
-import { createBrowserReceiptCacheStore } from "../context/browserReceiptCacheStore.js";
-import { scanBrowserReceiptCacheIntegrity } from "../context/browserReceiptCacheIntegrity.js";
-import { readBrowserReceiptCacheLock } from "../context/browserReceiptCacheLock.js";
+import { createBrowserReceiptCacheManifest } from "../context/browser/receipt/browserReceiptCacheManifest.js";
+import { createBrowserReceiptCacheStore } from "../context/browser/receipt/browserReceiptCacheStore.js";
+import { scanBrowserReceiptCacheIntegrity } from "../context/browser/receipt/browserReceiptCacheIntegrity.js";
+import { readBrowserReceiptCacheLock } from "../context/browser/receipt/browserReceiptCacheLock.js";
 import { runAgentCliProcess } from "./agentCliProcess.js";
 import { mergeCliEvidence } from "./agentCliScenarioModel.js";
 import {

@@ -8,7 +8,7 @@ import {
   createBrowserPersistentReceiptCacheRecord,
   createBrowserPersistentReceiptCacheTombstone,
 } from "../context/browserPersistentReceiptCache.js";
-import { acquireBrowserReceiptCacheLock } from "../context/browserReceiptCacheLock.js";
+import { acquireBrowserReceiptCacheLock } from "../context/browser/receipt/browserReceiptCacheLock.js";
 import {
   createBrowserPersistentReplayScenarioFixture,
   type BrowserPersistentReplayScenarioFixture,

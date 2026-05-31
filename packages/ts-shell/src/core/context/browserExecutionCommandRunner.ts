@@ -29,7 +29,7 @@ import {
   renderBrowserSkillExecutionSurface,
 } from "./browserSkillExecutionSurface.js";
 import type { BrowserActionCache } from "./browserActionCache.js";
-import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
+import type { BrowserReceiptCacheStore } from "./browser/receipt/browserReceiptCacheStore.js";
 import {
   isExternalNetworkExecutionRequest,
 } from "./browserExternalNetworkExecutionMode.js";

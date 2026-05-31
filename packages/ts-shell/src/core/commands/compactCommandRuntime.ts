@@ -1,18 +1,18 @@
 import {
   CompactCommandContractError,
   parseCompactCommandArgs,
-} from "../context/compactCommandContract.js";
-import { formatCompactCheckpointStatus } from "../context/compactCheckpointSurface.js";
+} from "../context/compact/command/compactCommandContract.js";
+import { formatCompactCheckpointStatus } from "../context/compact/checkpoint/compactCheckpointSurface.js";
 import {
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
   updateLatestCompactCheckpoint,
-} from "../context/compactLiveCheckpoint.js";
+} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
 import {
   DEFAULT_COMPACT_INJECTION_STATE_STORE,
   markCompactCheckpointPendingInjection,
-} from "../context/compactInjectionState.js";
-import { runCompactCommand } from "../context/compactCommandRunner.js";
-import { formatCompactSessionSurface } from "../context/compactSessionSurface.js";
+} from "../context/compact/injection/compactInjectionState.js";
+import { runCompactCommand } from "../context/compact/command/compactCommandRunner.js";
+import { formatCompactSessionSurface } from "../context/compact/delivery/compactSessionSurface.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 

@@ -1,7 +1,7 @@
 import type { BrowserCliExecutionBridgeSummary } from "./browserCliExecutionBridge.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
-import type { BrowserReceiptCacheStore } from "./browserReceiptCacheStore.js";
+import type { BrowserReceiptCacheStore } from "./browser/receipt/browserReceiptCacheStore.js";
 import {
   executeBrowserSelfHealingApply,
 } from "./browserSelfHealingApplyExecutor.js";

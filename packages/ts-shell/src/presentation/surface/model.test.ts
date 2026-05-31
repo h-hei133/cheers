@@ -617,7 +617,7 @@ async function withPlanningFixture<T>(
     );
     await fs.writeFile(
       path.join(workspaceRoot, "src", "contextEngine.test.ts"),
-      "import { runContextEngine } from '../contextEngine.js';\nexpect(runContextEngine('task')).toBe(4);\n",
+      "import { runContextEngine } from '../../orchestration/contextEngine.js';\nexpect(runContextEngine('task')).toBe(4);\n",
     );
     return await fn(workspaceRoot);
   } finally {
