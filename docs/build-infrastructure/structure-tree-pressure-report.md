@@ -749,3 +749,88 @@ Target export-only compatibility files after:
 - Remaining internally imported compatibility files are outside the repair/result/evidence target area measured here.
 - `verification/result/mutationVerificationProjection.ts` remains a zero-internal-import compatibility export and needs a narrow verification result safety check before deletion.
 - Result and evidence projection surfaces remain output-facing; any further cleanup there should keep the result contract gate.
+
+## Verification Result Compatibility Trim
+
+Status: structure-only cleanup for verification result compatibility. Product behavior was preserved. No result truthfulness, provider configuration, provider calls, fallback behavior, tool authority, command allowlists, edit/apply/write approval behavior, verification execution, repair execution, session schema, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+Inspection summary:
+
+- Latest pressure report, verification result owner files, adjacent verification command owners, adjacent result and evidence projection owners, adjacent repair handoff owners, export-only files, internal imports, package-facing entry points, tests in touched owner areas, direct file counts, and long basenames were inspected.
+- `verification/result/mutationVerificationProjection.ts` was a one-line export to `verification/result/projection/mutation.ts` with zero internal imports.
+- `packages/ts-shell/package.json` and source entry-point searches showed no documented package export for the removed deep file.
+
+### Before Snapshot
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Export-only compatibility files | 109 |
+| Zero-internal-import compatibility files | 96 |
+| Internally imported compatibility files | 13 |
+| `verification/result` direct files | 3 |
+| `verification/command` direct files | 14 |
+| `result/projection` direct files | 0 |
+| `evidence/projection` direct files | 1 |
+| `repair/handoff` direct files | 2 |
+| Root `orchestration` direct files | 347 |
+| Tests outside owner folders for touched owners | 9 |
+| Long basenames in target areas | 2 |
+
+Target export-only compatibility files before:
+
+| Path | Internal imports |
+|---|---:|
+| `verification/result/mutationVerificationProjection.ts` | 0 |
+
+### After Snapshot
+
+After measurements:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Export-only compatibility files | 109 | 108 |
+| Zero-internal-import compatibility files | 96 | 95 |
+| Internally imported compatibility files | 13 | 13 |
+| `verification/result` direct files | 3 | 2 |
+| `verification/command` direct files | 14 | 14 |
+| `result/projection` direct files | 0 | 0 |
+| `evidence/projection` direct files | 1 | 1 |
+| `repair/handoff` direct files | 2 | 2 |
+| Root `orchestration` direct files | 347 | 347 |
+| Tests outside owner folders for touched owners | 9 | 9 |
+| Long basenames in target areas | 2 | 2 |
+
+Target export-only compatibility files after:
+
+| Path | Internal imports | Status |
+|---|---:|---|
+| none | 0 | none remain in the verification result target area |
+
+### Compatibility Files Considered
+
+| Path | Status | Internal imports before | Internal imports after | Package-facing status | Reason | Deletion condition |
+|---|---|---:|---:|---|---|---|
+| `verification/result/mutationVerificationProjection.ts` | removed | 0 | 0 | no documented package export found | product imports already use `verification/result/projection/mutation.ts` | already met |
+
+### Files Removed
+
+- `packages/ts-shell/src/verification/result/mutationVerificationProjection.ts`
+
+### Files Moved
+
+- None.
+
+### Tests Moved
+
+- None.
+
+### Imports Updated
+
+- None required; current product imports already target `verification/result/projection/mutation.ts`.
+
+### Remaining Visible Debt
+
+- Remaining internally imported compatibility files are outside the verification result target area measured here.
+- Remaining cleanup should continue one owner area at a time and keep result contract validation whenever output-facing projection code is touched.
