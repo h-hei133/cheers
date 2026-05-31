@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
 import { planContextAwareProviderProposal } from "./contextAwareProviderProposal.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
-import { buildPlanQuality } from "./planQuality.js";
+import { buildPlanQuality } from "../planning/quality/model.js";
 
 describe("contextAwareProviderProposal", () => {
   it("creates a context-aware fake-provider proposal with context and plan ids no-write", async () => {

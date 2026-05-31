@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
-import { queryCodeGraphTrace, type CodeGraphQueryResult } from "./codeGraphQuery.js";
-import type { CodeGraphTrace } from "./codeGraphTrace.js";
+import { queryCodeGraphTrace, type CodeGraphQueryResult } from "./query.js";
+import type { CodeGraphTrace } from "./trace.js";
 
 export interface CodeGraphImpact {
   readonly impactQueryId: string;

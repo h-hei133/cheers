@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
-import { queryCodeGraphTrace } from "./codeGraphQuery.js";
-import { buildCodeGraphTrace } from "./codeGraphTrace.js";
-import { buildContextGraph } from "./contextGraph.js";
+import { normalizeCodeGraphFacts } from "./facts.js";
+import { queryCodeGraphTrace } from "./query.js";
+import { buildCodeGraphTrace } from "./trace.js";
+import { buildContextGraph } from "../../../orchestration/contextGraph.js";
 
 describe("queryCodeGraphTrace", () => {
   it("answers bounded test docs call-site and import queries from trace facts only", () => {

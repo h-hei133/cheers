@@ -1,4 +1,4 @@
-import type { PlanQuality } from "./planQuality.js";
+import type { PlanQuality } from "./model.js";
 
 export type PlanQualityGateAction =
   | "provider-proposal"

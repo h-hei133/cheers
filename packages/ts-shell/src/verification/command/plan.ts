@@ -8,13 +8,13 @@ import {
 } from "../../orchestration/capabilityBoundaryProjection.js";
 import { redactProviderEditText } from "../../orchestration/providerEditContext.js";
 import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
-import type { PlanQuality } from "../../orchestration/planQuality.js";
-import type { CodeGraphImpact } from "../../orchestration/codeGraphImpact.js";
+import type { PlanQuality } from "../../planning/quality/model.js";
+import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import type { TaskExecutionPlan } from "../../orchestration/taskExecutionPlan.js";
 import type { TaskLifecycle } from "../../orchestration/taskLifecycle.js";
 import type { AnalysisQualityGateResult } from "../../orchestration/analysisQualityGate.js";
 import type { TaskContextSufficiency } from "../../orchestration/taskContextSufficiency.js";
-import { evaluatePlanQualityGate } from "../../orchestration/planQualityGate.js";
+import { evaluatePlanQualityGate } from "../../planning/quality/gate.js";
 import { isTaskQualityBenchmarkCommand } from "../taskQualityBenchmarkCommand.js";
 
 export type VerificationCommandPlanState =

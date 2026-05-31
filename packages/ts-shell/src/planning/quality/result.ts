@@ -1,8 +1,8 @@
-import type { CodingResultSummary } from "./types.js";
-import type { HarnessScorecard } from "./harnessScorecard.js";
-import type { HarnessTrace } from "./harnessTrace.js";
-import type { PlanQuality } from "./planQuality.js";
-import type { PlanQualityGateResult } from "./planQualityGate.js";
+import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { HarnessScorecard } from "../../orchestration/harnessScorecard.js";
+import type { HarnessTrace } from "../../orchestration/harnessTrace.js";
+import type { PlanQuality } from "./model.js";
+import type { PlanQualityGateResult } from "./gate.js";
 
 export function buildPlanQualityCodingResult(input: {
   readonly planQuality: PlanQuality;

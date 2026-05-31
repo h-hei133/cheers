@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type { ContextGraph } from "./contextGraph.js";
+import type { ContextGraph } from "../../../orchestration/contextGraph.js";
 
 export type CodeGraphStalenessStatus =
   | "fresh"

@@ -15,7 +15,7 @@ import {
 } from "../context/acquisition/graph.js";
 import { buildHarnessScorecard, type HarnessScorecard } from "./harnessScorecard.js";
 import { buildHarnessTrace, type HarnessTrace } from "./harnessTrace.js";
-import { attachPlanQualityToAgentPlan, buildPlanQuality, type PlanQuality } from "./planQuality.js";
+import { attachPlanQualityToAgentPlan, buildPlanQuality, type PlanQuality } from "../planning/quality/model.js";
 import {
   buildTaskLifecycleResult,
   projectTaskLifecycleRuntimeOutcome,

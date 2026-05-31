@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "./agentPlan.js";
-import { buildHarnessScorecard } from "./harnessScorecard.js";
-import { buildHarnessTrace } from "./harnessTrace.js";
-import { buildPlanQuality } from "./planQuality.js";
-import { evaluatePlanQualityGate } from "./planQualityGate.js";
-import { buildPlanQualityCodingResult } from "./planQualityResult.js";
+import { buildAgentPlan } from "../../orchestration/agentPlan.js";
+import { buildHarnessScorecard } from "../../orchestration/harnessScorecard.js";
+import { buildHarnessTrace } from "../../orchestration/harnessTrace.js";
+import { buildPlanQuality } from "./model.js";
+import { evaluatePlanQualityGate } from "./gate.js";
+import { buildPlanQualityCodingResult } from "./result.js";
 
 describe("planQualityResult", () => {
   it("projects replay-safe no-write quality trace and scorecard evidence", () => {

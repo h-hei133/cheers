@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
 
-import type { CodeGraphFact, CodeGraphFacts } from "./codeGraphFacts.js";
-import type { ContextGraph } from "./contextGraph.js";
-import type { TargetedContextPacket } from "./contextPacket.js";
+import type { CodeGraphFact, CodeGraphFacts } from "./facts.js";
+import type { ContextGraph } from "../../../orchestration/contextGraph.js";
+import type { TargetedContextPacket } from "../../../orchestration/contextPacket.js";
 
 export interface CodeGraphTrace {
   readonly traceId: string;

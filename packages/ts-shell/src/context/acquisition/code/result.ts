@@ -1,5 +1,5 @@
-import type { CodeGraphImpact } from "./codeGraphImpact.js";
-import type { CodeGraphTrace } from "./codeGraphTrace.js";
+import type { CodeGraphImpact } from "./impact.js";
+import type { CodeGraphTrace } from "./trace.js";
 
 export type CodeGraphResultOutcome =
   | "code-graph-trace-created"

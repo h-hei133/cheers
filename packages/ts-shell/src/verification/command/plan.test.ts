@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "../../orchestration/agentPlan.js";
-import { buildCodeGraphImpact } from "../../orchestration/codeGraphImpact.js";
-import { normalizeCodeGraphFacts } from "../../orchestration/codeGraphFacts.js";
-import { buildCodeGraphTrace } from "../../orchestration/codeGraphTrace.js";
+import { buildCodeGraphImpact } from "../../context/acquisition/code/impact.js";
+import { normalizeCodeGraphFacts } from "../../context/acquisition/code/facts.js";
+import { buildCodeGraphTrace } from "../../context/acquisition/code/trace.js";
 import { buildContextGraph } from "../../orchestration/contextGraph.js";
-import { buildPlanQuality } from "../../orchestration/planQuality.js";
+import { buildPlanQuality } from "../../planning/quality/model.js";
 import { buildVerificationCommandPlan } from "./plan.js";
 
 describe("verificationCommandPlan", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
-import { buildPlanQuality } from "./planQuality.js";
+import { buildPlanQuality } from "../planning/quality/model.js";
 import { selectEditProposalHunks } from "./editProposalSelection.js";
 import { buildEditRepairProposalReview } from "./editProposalReview.js";
 import type { TargetedContextPacket } from "./contextPacket.js";

@@ -378,3 +378,141 @@ Deletion condition remains unchanged: remove an export-only compatibility file o
 - `orchestration` remains the largest direct root.
 - `orchestration/patchResult` did not improve in this pass because the remaining files are central write execution or provider/permission/apply adjacency.
 - Several long visible names remain in root `orchestration`; the safe ones are mixed with planning/runtime/provider surfaces outside this pass.
+
+## SR016 Snapshot
+
+Status: structure-only cleanup for unused export-only compatibility files and clear owner placement. Product behavior was preserved. No provider configuration, provider calls, fallback behavior, tool authority, command allowlists, edit/apply/write approval behavior, verification execution, repair execution, session schema, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+### Before Snapshot
+
+Top crowded directories by direct TypeScript file count:
+
+| Directory | Direct files |
+|---|---:|
+| `orchestration` | 377 |
+| `core/context` | 172 |
+| `core/harness` | 91 |
+| `session` | 50 |
+| `core/shell` | 49 |
+| `entrypoints` | 46 |
+| `core/context/memory` | 39 |
+| `core/context/sidebar` | 34 |
+| `orchestration/patchResult` | 33 |
+| `session/continuation` | 33 |
+| `context` | 28 |
+| `core/commands` | 26 |
+| `runtime/loop` | 20 |
+| `core/context/browser/runtime/core` | 19 |
+| `core/tools` | 19 |
+| `session/store` | 19 |
+| `edit/write/status` | 16 |
+| `orchestration/patchRecovery` | 16 |
+| `session/recovery` | 16 |
+| `turn` | 15 |
+| `verification/command` | 14 |
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Root `orchestration` direct files | 377 |
+| `orchestration/patchResult` direct files | 33 |
+| Export-only compatibility files | 138 |
+| Zero-internal-import compatibility files | 105 |
+| Internally imported compatibility files | 33 |
+| Tests outside owner folders | 184 |
+| Long basenames in target areas | 244 |
+
+### After Snapshot
+
+Top crowded directories by direct TypeScript file count:
+
+| Directory | Direct files |
+|---|---:|
+| `orchestration` | 348 |
+| `core/context` | 172 |
+| `core/harness` | 91 |
+| `session` | 50 |
+| `core/shell` | 49 |
+| `entrypoints` | 46 |
+| `core/context/memory` | 39 |
+| `core/context/sidebar` | 34 |
+| `orchestration/patchResult` | 33 |
+| `session/continuation` | 33 |
+| `context` | 28 |
+| `core/commands` | 26 |
+| `runtime/loop` | 20 |
+| `core/context/browser/runtime/core` | 19 |
+| `core/tools` | 19 |
+| `session/store` | 19 |
+| `edit/write/status` | 16 |
+| `orchestration/patchRecovery` | 16 |
+| `session/recovery` | 16 |
+| `turn` | 15 |
+| `verification/command` | 14 |
+| `context/acquisition/code` | 12 |
+
+After measurements:
+
+| Measurement | After |
+|---|---:|
+| Root `orchestration` direct files | 348 |
+| `orchestration/patchResult` direct files | 33 |
+| Export-only compatibility files | 127 |
+| Zero-internal-import compatibility files | 94 |
+| Internally imported compatibility files | 33 |
+| Tests outside owner folders | 175 |
+| Long basenames in target areas | 240 |
+
+### Compatibility Files Considered
+
+| Path | Status | Internal imports | Package-facing status | Reason | Deletion condition |
+|---|---|---:|---|---|---|
+| `orchestration/contextAcquisitionProjection.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/contextGraphPlanning.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/contextMemory.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/contextPlanningSummary.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/groundedPlanningProjection.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/planningMutationHandoffProjection.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/planningMutationProposalBridge.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/planningRuntime.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/planningRuntimeProductProposal.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/repoIntelligence.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `orchestration/planQualityScore.ts` | removed | 0 | no package export found | old export-only path after owner imports moved | already met |
+| `context/acquisition/index.ts` | kept | 1 | owner index | still imported internally | internal import count reaches 0 and no package-facing need is documented |
+| `context/discovery/index.ts` | kept | 1 | owner index | still imported internally | internal import count reaches 0 and no package-facing need is documented |
+| `context/memory/index.ts` | kept | 1 | owner index | still imported internally | internal import count reaches 0 and no package-facing need is documented |
+| `planning/runtime/index.ts` | kept | 1 | owner index | still imported internally | internal import count reaches 0 and no package-facing need is documented |
+| `planning/handoff/index.ts` | kept | 1 | owner index | still imported internally | internal import count reaches 0 and no package-facing need is documented |
+| `result/projection/runtime.ts` | kept | 1 | owner projection export | still imported internally | internal import count reaches 0 and no package-facing need is documented |
+
+### Owner Files Moved
+
+- Code graph facts, query, trace, impact, staleness, and result projections moved to `context/acquisition/code/`.
+- Plan quality model, gate, and result projection moved to `planning/quality/`.
+
+### Tests Moved
+
+Nine tests were moved beside owner code:
+
+- 6 code graph tests under `context/acquisition/code/`.
+- 3 plan quality tests under `planning/quality/`.
+
+### Imports Updated
+
+Internal imports were updated away from old root `orchestration` paths for moved code graph and plan quality owners. Touched consumers now import from:
+
+- `context/acquisition/code/*`
+- `planning/quality/*`
+
+### Validation Evidence
+
+- Focused moved-owner and consumer tests passed: 15 files, 49 tests.
+- `npm run build -w packages/ts-shell` passed after import correction.
+- `npm run verify:result-contract` passed after moving a projection that builds `CodingResult` output.
+
+### Remaining Visible Debt
+
+- `orchestration` remains the largest direct root.
+- `orchestration/patchResult` stayed unchanged because remaining files are still central write execution or provider/permission/apply adjacency.
+- Internally imported compatibility files remain at 33 and need import-by-import replacement before any removal.

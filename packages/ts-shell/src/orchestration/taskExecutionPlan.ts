@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 import type { AgentPlan } from "./agentPlan.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
-import type { PlanQuality } from "./planQuality.js";
+import type { PlanQuality } from "../planning/quality/model.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
 import type { TaskReadPlan } from "./taskReadPlan.js";
 

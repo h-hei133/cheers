@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCodeGraphImpact } from "./codeGraphImpact.js";
-import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
-import { buildCodeGraphTrace } from "./codeGraphTrace.js";
-import { buildContextGraph } from "./contextGraph.js";
-import { scoreContextGraph } from "./contextGraphScore.js";
-import { buildTestImpactPlan } from "./testImpactPlan.js";
+import { buildCodeGraphImpact } from "./impact.js";
+import { normalizeCodeGraphFacts } from "./facts.js";
+import { buildCodeGraphTrace } from "./trace.js";
+import { buildContextGraph } from "../../../orchestration/contextGraph.js";
+import { scoreContextGraph } from "../../../orchestration/contextGraphScore.js";
+import { buildTestImpactPlan } from "../../../orchestration/testImpactPlan.js";
 
 describe("buildCodeGraphImpact", () => {
   it("summarizes tests docs call-sites verification and plan-quality contribution", () => {

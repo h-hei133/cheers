@@ -21,14 +21,14 @@ import {
   attachPlanQualityToAgentPlan,
   buildPlanQuality,
   type PlanQuality,
-} from "../../orchestration/planQuality.js";
+} from "../../planning/quality/model.js";
 import { buildHarnessTrace, type HarnessTrace } from "../../orchestration/harnessTrace.js";
 import { buildHarnessScorecard, type HarnessScorecard } from "../../orchestration/harnessScorecard.js";
-import { normalizeCodeGraphFacts, type CodeGraphFacts } from "../../orchestration/codeGraphFacts.js";
-import { buildCodeGraphTrace, type CodeGraphTrace } from "../../orchestration/codeGraphTrace.js";
-import { checkCodeGraphStaleness, type CodeGraphStalenessCheck } from "../../orchestration/codeGraphStaleness.js";
-import { buildCodeGraphImpact, type CodeGraphImpact } from "../../orchestration/codeGraphImpact.js";
-import { buildCodeGraphResult, type CodeGraphResultProjection } from "../../orchestration/codeGraphResult.js";
+import { normalizeCodeGraphFacts, type CodeGraphFacts } from "./code/facts.js";
+import { buildCodeGraphTrace, type CodeGraphTrace } from "./code/trace.js";
+import { checkCodeGraphStaleness, type CodeGraphStalenessCheck } from "./code/staleness.js";
+import { buildCodeGraphImpact, type CodeGraphImpact } from "./code/impact.js";
+import { buildCodeGraphResult, type CodeGraphResultProjection } from "./code/result.js";
 import { buildAnalysisBrief, type AnalysisBrief } from "../../orchestration/analysisBrief.js";
 import { calibrateAnalysisBrief, type AnalysisBriefCalibration } from "../../orchestration/analysisBriefCalibration.js";
 import { evaluateAnalysisQualityGate, type AnalysisQualityGateResult } from "../../orchestration/analysisQualityGate.js";

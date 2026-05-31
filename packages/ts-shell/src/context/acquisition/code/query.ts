@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
-import type { CodeGraphFact, CodeGraphFactKind } from "./codeGraphFacts.js";
-import type { CodeGraphTrace } from "./codeGraphTrace.js";
+import type { CodeGraphFact, CodeGraphFactKind } from "./facts.js";
+import type { CodeGraphTrace } from "./trace.js";
 
 export type CodeGraphQueryType =
   | "impact-for-target"

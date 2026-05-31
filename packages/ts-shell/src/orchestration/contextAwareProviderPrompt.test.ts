@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "./agentPlan.js";
 import { buildContextAwareProviderEditInput } from "./contextAwareProviderEdit.js";
 import { buildContextAwareProviderPrompt } from "../provider/request/prompt.js";
-import { buildCodeGraphImpact } from "./codeGraphImpact.js";
-import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
-import { buildCodeGraphTrace } from "./codeGraphTrace.js";
+import { buildCodeGraphImpact } from "../context/acquisition/code/impact.js";
+import { normalizeCodeGraphFacts } from "../context/acquisition/code/facts.js";
+import { buildCodeGraphTrace } from "../context/acquisition/code/trace.js";
 import { buildContextGraph } from "./contextGraph.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 

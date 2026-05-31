@@ -1,23 +1,23 @@
 import crypto from "node:crypto";
 
-import type { AgentPlan } from "./agentPlan.js";
-import type { ContextGraph } from "./contextGraph.js";
-import type { ContextGraphScore } from "./contextGraphScore.js";
-import { buildContextGraphReadinessFacts, type ContextGraphReadinessFacts } from "./contextGraphReadiness.js";
-import type { TargetedContextPacket } from "./contextPacket.js";
-import type { TestImpactPlan } from "./testImpactPlan.js";
-import type { VerificationCommandPlan } from "../verification/command/plan.js";
-import type { VerificationRepairContext } from "./verificationRepairContext.js";
-import type { CodeGraphTrace } from "./codeGraphTrace.js";
-import type { CodeGraphImpact } from "./codeGraphImpact.js";
-import type { AnalysisBrief } from "./analysisBrief.js";
-import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
-import type { TaskLifecycle } from "./taskLifecycle.js";
-import type { AnalysisBriefCalibration } from "./analysisBriefCalibration.js";
-import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
-import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
-import type { ProviderAnchoredProposalManifest } from "./providerAnchoredProposal.js";
-import type { ProviderAnchoringResult } from "./providerAnchoringResult.js";
+import type { AgentPlan } from "../../orchestration/agentPlan.js";
+import type { ContextGraph } from "../../orchestration/contextGraph.js";
+import type { ContextGraphScore } from "../../orchestration/contextGraphScore.js";
+import { buildContextGraphReadinessFacts, type ContextGraphReadinessFacts } from "../../orchestration/contextGraphReadiness.js";
+import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { VerificationCommandPlan } from "../../verification/command/plan.js";
+import type { VerificationRepairContext } from "../../orchestration/verificationRepairContext.js";
+import type { CodeGraphTrace } from "../../context/acquisition/code/trace.js";
+import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
+import type { AnalysisBrief } from "../../orchestration/analysisBrief.js";
+import type { TaskExecutionPlan } from "../../orchestration/taskExecutionPlan.js";
+import type { TaskLifecycle } from "../../orchestration/taskLifecycle.js";
+import type { AnalysisBriefCalibration } from "../../orchestration/analysisBriefCalibration.js";
+import type { AnalysisQualityGateResult } from "../../orchestration/analysisQualityGate.js";
+import type { TaskContextSufficiency } from "../../orchestration/taskContextSufficiency.js";
+import type { ProviderAnchoredProposalManifest } from "../../orchestration/providerAnchoredProposal.js";
+import type { ProviderAnchoringResult } from "../../orchestration/providerAnchoringResult.js";
 
 export type PlanQualityLevel =
   | "ready"

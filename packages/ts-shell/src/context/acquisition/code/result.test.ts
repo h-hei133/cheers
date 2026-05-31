@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCodeGraphImpact } from "./codeGraphImpact.js";
-import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
-import { buildCodeGraphResult } from "./codeGraphResult.js";
-import { buildCodeGraphTrace } from "./codeGraphTrace.js";
-import { buildContextGraph } from "./contextGraph.js";
+import { buildCodeGraphImpact } from "./impact.js";
+import { normalizeCodeGraphFacts } from "./facts.js";
+import { buildCodeGraphResult } from "./result.js";
+import { buildCodeGraphTrace } from "./trace.js";
+import { buildContextGraph } from "../../../orchestration/contextGraph.js";
 
 describe("buildCodeGraphResult", () => {
   it("renders replay-safe result surface evidence for impact queries", () => {

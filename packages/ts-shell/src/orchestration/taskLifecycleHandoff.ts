@@ -1,6 +1,6 @@
 import type { AnalysisBrief } from "./analysisBrief.js";
 import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
-import type { PlanQuality } from "./planQuality.js";
+import type { PlanQuality } from "../planning/quality/model.js";
 import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";

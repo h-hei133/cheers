@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "./agentPlan.js";
-import { buildContextGraph } from "./contextGraph.js";
-import { scoreContextGraph } from "./contextGraphScore.js";
-import { buildPlanQuality } from "./planQuality.js";
-import { evaluatePlanQualityGate } from "./planQualityGate.js";
+import { buildAgentPlan } from "../../orchestration/agentPlan.js";
+import { buildContextGraph } from "../../orchestration/contextGraph.js";
+import { scoreContextGraph } from "../../orchestration/contextGraphScore.js";
+import { buildPlanQuality } from "./model.js";
+import { evaluatePlanQualityGate } from "./gate.js";
 
 describe("planQualityGate", () => {
   it("blocks provider proposal when quality needs more context", () => {

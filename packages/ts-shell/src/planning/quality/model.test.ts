@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "./agentPlan.js";
-import { buildContextGraph } from "./contextGraph.js";
-import { scoreContextGraph } from "./contextGraphScore.js";
-import { buildPlanQuality, attachPlanQualityToAgentPlan, attachProviderAnchoringToPlanQuality } from "./planQuality.js";
-import type { TargetedContextPacket } from "./contextPacket.js";
-import { buildTestImpactPlan } from "./testImpactPlan.js";
-import { normalizeCodeGraphFacts } from "./codeGraphFacts.js";
-import { buildCodeGraphTrace } from "./codeGraphTrace.js";
-import { buildCodeGraphImpact } from "./codeGraphImpact.js";
+import { buildAgentPlan } from "../../orchestration/agentPlan.js";
+import { buildContextGraph } from "../../orchestration/contextGraph.js";
+import { scoreContextGraph } from "../../orchestration/contextGraphScore.js";
+import { buildPlanQuality, attachPlanQualityToAgentPlan, attachProviderAnchoringToPlanQuality } from "./model.js";
+import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import { buildTestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import { normalizeCodeGraphFacts } from "../../context/acquisition/code/facts.js";
+import { buildCodeGraphTrace } from "../../context/acquisition/code/trace.js";
+import { buildCodeGraphImpact } from "../../context/acquisition/code/impact.js";
 
 describe("planQuality", () => {
   it("scores high-quality context as ready and attaches score to Agent Plan", () => {

@@ -3,14 +3,14 @@ import type { ContextGraph } from "./contextGraph.js";
 import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
-import type { PlanQuality } from "./planQuality.js";
-import type { CodeGraphImpact } from "./codeGraphImpact.js";
+import type { PlanQuality } from "../planning/quality/model.js";
+import type { CodeGraphImpact } from "../context/acquisition/code/impact.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
 import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
 import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
-import { evaluatePlanQualityGate } from "./planQualityGate.js";
+import { evaluatePlanQualityGate } from "../planning/quality/gate.js";
 import {
   buildContextAwareProviderEditInput,
   type ContextAwareProviderEditInput,

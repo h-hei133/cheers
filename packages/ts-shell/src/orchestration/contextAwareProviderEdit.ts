@@ -3,7 +3,7 @@ import type { ContextGraph } from "./contextGraph.js";
 import type { ContextGraphScore } from "./contextGraphScore.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import type { TestImpactPlan } from "./testImpactPlan.js";
-import type { CodeGraphImpact } from "./codeGraphImpact.js";
+import type { CodeGraphImpact } from "../context/acquisition/code/impact.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
 import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
 import type { TaskContextSufficiency } from "./taskContextSufficiency.js";

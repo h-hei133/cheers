@@ -120,11 +120,11 @@ export {
   buildPlanQuality,
   attachPlanQualityToAgentPlan,
   type PlanQuality,
-} from "./planQuality.js";
+} from "../planning/quality/model.js";
 export {
   evaluatePlanQualityGate,
   type PlanQualityGateResult,
-} from "./planQualityGate.js";
+} from "../planning/quality/gate.js";
 export {
   buildHarnessTrace,
   type HarnessTrace,
@@ -140,7 +140,7 @@ export {
 } from "./harnessFailureTaxonomy.js";
 export {
   buildPlanQualityCodingResult,
-} from "./planQualityResult.js";
+} from "../planning/quality/result.js";
 export {
   projectContextPacketToAgentPlanContext,
   type AgentPlanContextProjection,

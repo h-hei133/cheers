@@ -6,8 +6,8 @@ import {
 } from "./editRepairPlanner.js";
 import type { EditRepairRawProposal } from "./editRepairProposal.js";
 import type { ProviderEditAvailability } from "./providerEditPlanner.js";
-import type { PlanQuality } from "./planQuality.js";
-import { evaluatePlanQualityGate } from "./planQualityGate.js";
+import type { PlanQuality } from "../planning/quality/model.js";
+import { evaluatePlanQualityGate } from "../planning/quality/gate.js";
 import type { VerificationRepairContext } from "./verificationRepairContext.js";
 
 export type VerificationRepairPlannerStatus =
