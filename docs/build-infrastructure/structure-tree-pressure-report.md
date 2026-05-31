@@ -516,3 +516,138 @@ Internal imports were updated away from old root `orchestration` paths for moved
 - `orchestration` remains the largest direct root.
 - `orchestration/patchResult` stayed unchanged because remaining files are still central write execution or provider/permission/apply adjacency.
 - Internally imported compatibility files remain at 33 and need import-by-import replacement before any removal.
+
+## SR017 Internal Compatibility Surface Retirement
+
+Status: structure-only cleanup for one old internally imported compatibility surface. Product behavior was preserved. No provider configuration, provider calls, fallback behavior, tool authority, command allowlists, edit/apply/write approval behavior, verification execution, repair execution, session schema, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+Inspection summary:
+
+- Latest pressure report, export-only compatibility surfaces, internally imported compatibility surfaces, root `orchestration` files, owner folders, package-facing entry points, old-path imports, tests outside owner folders, direct file counts, and long basenames were inspected.
+- The safe change was limited to `orchestration/verificationCommandPlan.ts`, which only re-exported `verification/command/plan.ts` and had one internal importer.
+- Package-facing status was checked through `packages/ts-shell/package.json` and source entry-point searches. No documented package export for the removed deep file was found.
+
+### Before Snapshot
+
+Top crowded directories by direct TypeScript file count:
+
+| Directory | Direct files |
+|---|---:|
+| `orchestration` | 348 |
+| `core/context` | 172 |
+| `core/harness` | 91 |
+| `session` | 50 |
+| `core/shell` | 49 |
+| `entrypoints` | 45 |
+| `core/context/memory` | 39 |
+| `core/context/sidebar` | 34 |
+| `orchestration/patchResult` | 33 |
+| `session/continuation` | 33 |
+| `context` | 28 |
+| `core/commands` | 26 |
+| `runtime/loop` | 20 |
+| `core/context/browser/runtime/core` | 19 |
+| `core/tools` | 19 |
+| `session/store` | 19 |
+| `edit/write/status` | 16 |
+| `orchestration/patchRecovery` | 16 |
+| `session/recovery` | 16 |
+| `turn` | 15 |
+| `core/context/browser/receipt` | 14 |
+| `verification/command` | 14 |
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Root `orchestration` direct files | 348 |
+| Export-only compatibility files | 114 |
+| Zero-internal-import compatibility files | 96 |
+| Internally imported compatibility files | 18 |
+| Tests outside owner folders | 2 |
+| Long basenames in target areas | 199 |
+
+### After Snapshot
+
+Top crowded directories by direct TypeScript file count:
+
+| Directory | Direct files |
+|---|---:|
+| `orchestration` | 347 |
+| `core/context` | 172 |
+| `core/harness` | 91 |
+| `session` | 50 |
+| `core/shell` | 49 |
+| `entrypoints` | 45 |
+| `core/context/memory` | 39 |
+| `core/context/sidebar` | 34 |
+| `orchestration/patchResult` | 33 |
+| `session/continuation` | 33 |
+| `context` | 28 |
+| `core/commands` | 26 |
+| `runtime/loop` | 20 |
+| `core/context/browser/runtime/core` | 19 |
+| `core/tools` | 19 |
+| `session/store` | 19 |
+| `edit/write/status` | 16 |
+| `orchestration/patchRecovery` | 16 |
+| `session/recovery` | 16 |
+| `turn` | 15 |
+| `core/context/browser/receipt` | 14 |
+| `verification/command` | 14 |
+
+After measurements:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Root `orchestration` direct files | 348 | 347 |
+| Export-only compatibility files | 114 | 113 |
+| Zero-internal-import compatibility files | 96 | 96 |
+| Internally imported compatibility files | 18 | 17 |
+| Tests outside owner folders | 2 | 2 |
+| Long basenames in target areas | 199 | 199 |
+
+### Compatibility Files Considered
+
+| Path | Status | Internal imports before | Internal imports after | Package-facing status | Reason | Deletion condition |
+|---|---|---:|---:|---|---|---|
+| `orchestration/verificationCommandPlan.ts` | removed | 1 | 0 | no documented package export found | old export-only path after the internal importer moved to `verification/command/plan.ts` | already met |
+| `context/acquisition/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `context/discovery/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `context/memory/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `core/harness/browserEvalBenchmarkRunner.ts` | kept | 5 | 5 | compatibility export in harness area | used by harness tests and runner code; ownership needs a focused harness pass | internal imports move to the eval owner and package-facing safety is clear |
+| `evidence/projection/continuation.ts` | kept | 1 | 1 | projection compatibility export | adjacent evidence compatibility chain needs a separate result-facing validation pass | internal imports move to the concrete projection and package-facing safety is clear |
+| `planning/grounded/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `planning/handoff/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `planning/runtime/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `provider/registry/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `provider/request/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `provider/response/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `repair/handoff/continuationPlanning.ts` | kept | 1 | 1 | compatibility export in repair handoff | root repair compatibility chain should be simplified in a repair-only pass | root compatibility points directly to concrete owner and package-facing safety is clear |
+| `repair/handoff/reopen.ts` | kept | 1 | 1 | compatibility export in repair handoff | root repair compatibility chain should be simplified in a repair-only pass | root compatibility points directly to concrete owner and package-facing safety is clear |
+| `result/projection/runtime.ts` | kept | 1 | 1 | projection compatibility export | result-facing compatibility should move with result contract validation | internal imports move to the workflow projection and package-facing safety is clear |
+| `tools/dispatch/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `tools/policy/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+| `tools/result/index.ts` | kept | 1 | 1 | owner index | still imported by the parent owner index | internal import count reaches 0 and the owner index is proven unnecessary |
+
+### Files Removed
+
+- `packages/ts-shell/src/orchestration/verificationCommandPlan.ts`
+
+### Files Moved
+
+- None.
+
+### Tests Moved
+
+- None.
+
+### Imports Updated
+
+- `planning/runtime/engine.ts` now imports verification command planning from `verification/command/plan.ts`.
+
+### Remaining Visible Debt
+
+- `orchestration` remains the largest direct root.
+- Remaining internally imported compatibility surfaces are mostly owner indexes, harness compatibility, repair handoff compatibility, and result/evidence projection compatibility.
+- Result/evidence compatibility should be handled only with result contract validation because those surfaces are output-facing.
