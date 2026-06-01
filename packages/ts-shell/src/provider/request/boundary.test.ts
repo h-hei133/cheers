@@ -167,6 +167,8 @@ describe("model request boundary", () => {
           unknownCount: 0,
           notDispatchedCount: 1,
           mixedOutcomeStatus: "mixed_success_and_non_success",
+          nextAction: "review_failed_result",
+          nextActionReason: "failed or unavailable tool execution needs review before continuing",
           redactionStatus: "redacted",
           detailStatuses: [],
           blockingFacts: ["call-redacted:not_dispatched"],

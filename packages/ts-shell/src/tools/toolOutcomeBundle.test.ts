@@ -59,6 +59,8 @@ describe("tool outcome bundle", () => {
       blockedCount: 1,
       unsupportedCount: 1,
       mixedOutcomeStatus: "mixed_success_and_non_success",
+      nextAction: "surface_blocked_result",
+      nextActionReason: "blocked or unsupported tool results must stay visible before continuing",
       terminalSuccessClaim: false,
     });
     expect(bundle.receiptIds).toEqual([receipt.receiptId]);
@@ -78,6 +80,7 @@ describe("tool outcome bundle", () => {
         "task-success",
         "verification-success",
         "next-turn-success",
+        "tool-outcome-next-action-is-not-task-success",
       ]),
     );
   });

@@ -1070,6 +1070,8 @@ describe("product surface view model", () => {
         unknownCount: 0,
         notDispatchedCount: 0,
         mixedOutcomeStatus: "mixed_success_and_non_success",
+        nextAction: "surface_blocked_result",
+        nextActionReason: "blocked or unsupported tool results must stay visible before continuing",
         redactionStatus: "report-safe",
         detailStatuses: [],
         blockingFacts: ["call-b:blocked_by_policy"],
@@ -1107,8 +1109,10 @@ describe("product surface view model", () => {
 
     expect(rendered).toContain("Tool outcome");
     expect(rendered).toContain("outcome=mixed_success_and_non_success");
+    expect(rendered).toContain("nextAction=surface_blocked_result");
     expect(rendered).toContain("nextTurn=ready_with_partial_tool_results");
     expect(rendered).toContain("terminalSuccessClaim=false");
+    expect(viewModel?.nextAction).toBe("surface_blocked_result");
     expect(viewModel?.terminalSuccessClaim).toBe(false);
   });
 

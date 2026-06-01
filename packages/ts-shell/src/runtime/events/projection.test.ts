@@ -1476,11 +1476,18 @@ describe("runtime event projection", () => {
     expect(events.map((event) => event.type)).toEqual(
       expect.arrayContaining([
         "tool-outcome-bundle-observed",
+        "tool-result-next-action-observed",
         "save-point-input-prepared",
         "delivery-blocked",
         "next-turn-bundle-blocked",
       ]),
     );
+    expect(
+      events.find((event) => event.type === "tool-result-next-action-observed")?.facts,
+    ).toMatchObject({
+      nextAction: "surface_blocked_result",
+      terminalSuccessClaim: false,
+    });
     expect(events.every((event) => event.facts.terminalSuccessClaim !== true)).toBe(true);
     expect(JSON.stringify(events)).not.toContain('"success":true');
   });

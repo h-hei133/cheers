@@ -14,6 +14,13 @@ export type ToolOutcomeMixedStatus =
   | "all_non_success"
   | "empty";
 
+export type ToolOutcomeNextAction =
+  | "prepare_next_turn"
+  | "await_authority"
+  | "surface_blocked_result"
+  | "review_failed_result"
+  | "no_tool_result";
+
 export interface ToolOutcomeBundleProjection {
   readonly bundleId: string;
   readonly sourceBatchId: string;
@@ -29,6 +36,8 @@ export interface ToolOutcomeBundleProjection {
   readonly unknownCount: number;
   readonly notDispatchedCount: number;
   readonly mixedOutcomeStatus: ToolOutcomeMixedStatus;
+  readonly nextAction: ToolOutcomeNextAction;
+  readonly nextActionReason: string;
   readonly redactionStatus: "report-safe" | "redacted";
   readonly detailStatuses: readonly {
     readonly toolCallId: string;
@@ -85,6 +94,17 @@ export function createToolOutcomeBundle(input: {
     malformedCount +
     unknownCount +
     notDispatchedCount;
+  const nextAction = nextActionFor({
+    executedCount,
+    failedCount,
+    blockedCount,
+    authorityRequiredCount,
+    unsupportedCount,
+    malformedCount,
+    unknownCount,
+    notDispatchedCount,
+    resultMessageCount: resultMessages.length,
+  });
 
   return freeze({
     bundleId: sanitizeId(`tool-outcome-bundle:${input.dispatchResult.resultBatchId}`),
@@ -107,6 +127,8 @@ export function createToolOutcomeBundle(input: {
       executedSuccessCount,
       nonSuccessCount,
     }),
+    nextAction: nextAction.action,
+    nextActionReason: nextAction.reason,
     redactionStatus: redactionStatus(plan, details, input.dispatchResult.executionReceipts),
     detailStatuses: freeze(details.map((detail) =>
       freeze({
@@ -125,12 +147,57 @@ export function createToolOutcomeBundle(input: {
       "save-point-success",
       "next-turn-success",
       "tool-outcome-bundle-is-not-task-success",
+      "tool-outcome-next-action-is-not-task-success",
       ...plan.notProvenClaims,
       ...input.dispatchResult.notProvenClaims,
       ...(input.resultMessages?.notProvenClaims ?? []),
     ]),
     terminalSuccessClaim: false,
   });
+}
+
+function nextActionFor(input: {
+  readonly executedCount: number;
+  readonly failedCount: number;
+  readonly blockedCount: number;
+  readonly authorityRequiredCount: number;
+  readonly unsupportedCount: number;
+  readonly malformedCount: number;
+  readonly unknownCount: number;
+  readonly notDispatchedCount: number;
+  readonly resultMessageCount: number;
+}): {
+  readonly action: ToolOutcomeNextAction;
+  readonly reason: string;
+} {
+  if (input.authorityRequiredCount > 0) {
+    return {
+      action: "await_authority",
+      reason: "tool execution requires explicit authority before a future turn",
+    };
+  }
+  if (input.blockedCount > 0 || input.unsupportedCount > 0 || input.malformedCount > 0 || input.unknownCount > 0) {
+    return {
+      action: "surface_blocked_result",
+      reason: "blocked or unsupported tool results must stay visible before continuing",
+    };
+  }
+  if (input.failedCount > 0 || input.notDispatchedCount > 0) {
+    return {
+      action: "review_failed_result",
+      reason: "failed or unavailable tool execution needs review before continuing",
+    };
+  }
+  if (input.executedCount > 0 && input.resultMessageCount > 0) {
+    return {
+      action: "prepare_next_turn",
+      reason: "report-safe tool result messages are ready for a future turn",
+    };
+  }
+  return {
+    action: "no_tool_result",
+    reason: "no tool result requires a next-turn action",
+  };
 }
 
 function receiptId(receipt: RuntimeExecutionReceiptProjection): string {

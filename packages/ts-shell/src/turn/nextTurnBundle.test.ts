@@ -112,6 +112,8 @@ describe("next turn preparation boundaries", () => {
         unknownCount: 0,
         notDispatchedCount: 0,
         mixedOutcomeStatus: "mixed_success_and_non_success",
+        nextAction: "surface_blocked_result",
+        nextActionReason: "blocked or unsupported tool results must stay visible before continuing",
         redactionStatus: "redacted",
         detailStatuses: [],
         blockingFacts: ["call-redacted:blocked_by_policy"],

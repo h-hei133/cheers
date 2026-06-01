@@ -147,12 +147,19 @@ export function projectProductSurfaceViewModel(
   ) ?? input.runtimeEvents?.find((event) =>
     event.type === "product-completion-packet-observed"
   );
+  const toolNextActionEvent = input.loopTrajectory?.events.find((event) =>
+    event.type === "tool-result-next-action-observed"
+  ) ?? input.runtimeEvents?.find((event) =>
+    event.type === "tool-result-next-action-observed"
+  );
   const observedNextAction = completionPacketEvent
     ? String(completionPacketEvent.facts.nextAction ?? "preserve product completion packet")
     : productCloseoutEvent
     ? String(productCloseoutEvent.facts.nextAction ?? "preserve product closeout facts")
     : loopFinalizationEvent
       ? String(loopFinalizationEvent.facts.nextAction ?? "preserve loop finalization facts")
+      : toolNextActionEvent
+        ? String(toolNextActionEvent.facts.nextAction ?? "preserve tool outcome facts")
       : input.contextPlanningSummary?.nextAction ??
         input.providerStreamAdapter?.nextAction ??
         input.productLoopAdapter?.nextAction ??
@@ -163,6 +170,8 @@ export function projectProductSurfaceViewModel(
     ? `closeout=${factValue(productCloseoutEvent.facts.status)}; resultStatus=${factValue(productCloseoutEvent.facts.resultOwnedTerminalStatus)}; loopDecision=${factValue(productCloseoutEvent.facts.loopOwnedControlDecision)}; nextAction=${factValue(productCloseoutEvent.facts.nextAction)}; terminalSuccessClaim=false`
     : loopFinalizationEvent
       ? `loopDecision=${factValue(loopFinalizationEvent.facts.decision)}; nextAction=${factValue(loopFinalizationEvent.facts.nextAction)}; resultStatus=${factValue(repairVerdictEvent?.facts.status ?? loopFinalizationEvent.facts.resultTerminalStatus)}; missingProof=${factValue(loopFinalizationEvent.facts.missingProofItems)}; originalFailure=${factValue(loopFinalizationEvent.facts.originalFailureClass)}; terminalSuccessClaim=false`
+      : toolNextActionEvent
+        ? `toolNextAction=${factValue(toolNextActionEvent.facts.nextAction)}; reason=${factValue(toolNextActionEvent.facts.nextActionReason)}; terminalSuccessClaim=false`
       : observedNextAction;
 
   const sections = [
@@ -282,9 +291,10 @@ export function projectProductSurfaceViewModel(
 function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
   const events = input.runtimeEvents ?? [];
   const outcome = events.find((event) => event.type === "tool-outcome-bundle-observed");
+  const nextAction = events.find((event) => event.type === "tool-result-next-action-observed");
   const nextTurn = events.find((event) => event.type === "next-turn-bundle-prepared");
   const savePointInput = events.find((event) => event.type === "save-point-input-prepared");
-  if (!outcome && !nextTurn && !savePointInput) {
+  if (!outcome && !nextAction && !nextTurn && !savePointInput) {
     return [];
   }
 
@@ -299,6 +309,7 @@ function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSec
     status: "observed",
     summary: [
       outcome ? `outcome=${factValue(outcome.facts.mixedOutcomeStatus)}` : undefined,
+      nextAction ? `nextAction=${factValue(nextAction.facts.nextAction)}` : undefined,
       savePointInput ? `savePointInput=${factValue(savePointInput.facts.savePointInputId)}` : undefined,
       nextTurn ? `nextTurn=${factValue(nextTurn.facts.readinessStatus)}` : undefined,
       "terminalSuccessClaim=false",
@@ -332,12 +343,27 @@ function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSec
             },
           ]
         : []),
+      ...(nextAction
+        ? [
+            {
+              label: "nextAction",
+              value: factValue(nextAction.facts.nextAction),
+              machineEventCorrelationId: nextAction.id,
+            },
+            {
+              label: "nextActionReason",
+              value: factValue(nextAction.facts.nextActionReason),
+              machineEventCorrelationId: nextAction.id,
+            },
+          ]
+        : []),
     ],
-    machineEventCorrelationIds: [outcome?.id, savePointInput?.id, nextTurn?.id]
+    machineEventCorrelationIds: [outcome?.id, nextAction?.id, savePointInput?.id, nextTurn?.id]
       .filter((id): id is string => Boolean(id)),
     notProvenClaims: events
       .filter((event) =>
         event.type === "tool-outcome-bundle-observed" ||
+        event.type === "tool-result-next-action-observed" ||
         event.type === "save-point-input-prepared" ||
         event.type === "next-turn-bundle-prepared"
       )

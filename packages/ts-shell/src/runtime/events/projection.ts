@@ -161,6 +161,7 @@ export type RuntimeProjectionEventType =
   | "tool-result-message-prepared"
   | "tool-batch-completed"
   | "tool-outcome-bundle-observed"
+  | "tool-result-next-action-observed"
   | "tool-batch-save-point-observed"
   | "save-point-input-prepared"
   | "post-tool-save-point-observed"
@@ -1433,7 +1434,21 @@ export function projectRuntimeEvents(input: {
         unknownCount: bundle.unknownCount,
         notDispatchedCount: bundle.notDispatchedCount,
         mixedOutcomeStatus: bundle.mixedOutcomeStatus,
+        nextAction: bundle.nextAction,
+        nextActionReason: bundle.nextActionReason,
         redactionStatus: bundle.redactionStatus,
+        terminalSuccessClaim: bundle.terminalSuccessClaim,
+      },
+      bundle.notProvenClaims,
+    );
+    append(
+      "tool-result-next-action-observed",
+      {
+        bundleId: bundle.bundleId,
+        sourceBatchId: bundle.sourceBatchId,
+        nextAction: bundle.nextAction,
+        nextActionReason: bundle.nextActionReason,
+        blockedFactCount: bundle.blockingFacts.length,
         terminalSuccessClaim: bundle.terminalSuccessClaim,
       },
       bundle.notProvenClaims,
