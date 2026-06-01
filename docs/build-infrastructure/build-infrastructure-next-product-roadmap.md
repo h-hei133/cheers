@@ -1,6 +1,6 @@
 # Build Infrastructure Next Product Roadmap
 
-Status: MTB001 audit update.
+Status: VR001 audit update.
 Date: 2026-06-01.
 
 ## Transition
@@ -11,22 +11,21 @@ specific product blocker proves a missing owner boundary.
 
 ## Recommended Immediate Task
 
-### MTB002 Safe Model Tool Batch Handoff And Non-Executed Result Messages
+### VR002 Verification Result Boundary In Agent Loop
 
 Goal:
 
-- Consume completed model-boundary facts from the previous block.
-- Produce an explicit report-safe tool batch handoff with normalized call ids,
-  malformed/unsupported/unknown classification, argument redaction status,
-  before-tool policy requirement, authority requirement, dispatch eligibility,
-  execution not-run status, and not-proven claims.
-- Prepare non-executed tool result messages for blocked, authority-required,
-  unsupported, unknown, malformed, and not-dispatched calls.
-- Project runtime events, JSON stream entries, save-point ids, next-turn bundle
-  inputs, and product surface state without executing tools or changing
-  terminal truth.
+- Consume task-relevant verification facts through the existing Agent Loop
+  verification boundary.
+- Keep verification intent, command selection, selected-not-run, dispatch,
+  runtime result, task relevance, coverage, failure class, repair eligibility,
+  and verdict input distinct.
+- Project runtime events, JSON stream entries, save point ids, next-turn facts,
+  and product surface state without changing verification execution, repair
+  execution, command allowlists, or terminal truth.
 
-Reason for the sharpened order after CP006, PS001, and the tool handoff audit:
+Reason for the sharpened order after CP006, PS001, the tool handoff audit, and
+VR001:
 
 - CP006 made context discovery, acquisition, planning, handoff, memory, and
   continuation facts visible without success upgrades.
@@ -41,14 +40,22 @@ Reason for the sharpened order after CP006, PS001, and the tool handoff audit:
   safe handoff fact that keeps extracted tool call, planned batch, policy
   allowed, authority requested, receipt observed, result message prepared,
   save point created, and surface rendered distinct from task success.
+- VR001 found that verification already has command planning, task relevance,
+  authority, dispatch through the existing runtime/tool boundary, receipt-backed
+  result classification, failure classification, and repair eligibility facts,
+  while the Agent Loop only has a default planned/not-run verification
+  projection unless a boundary is injected. The immediate missing product seam
+  is to connect task-relevant verification facts to the Agent Loop without
+  turning intent, selected command, dispatch, exit zero, repair requirement, or
+  product surface rendering into success.
 
 Owner domains:
 
-- `turn`
-- `tools`
 - `runtime/loop`
 - `runtime/events`
-- `runtime/execution` as authority and receipt boundary only
+- `verification`
+- `repair` as repair-eligibility/handoff consumer only
+- `runtime/execution` and `tools` as existing dispatch/receipt boundary only
 - `evidence`
 - `result`
 - `presentation`, `core/tools`, and `core/shell` as consumers only
@@ -58,11 +65,11 @@ Existing infrastructure to reuse:
 - CP006 context planning summary
 - model response boundary
 - assistant response accumulator
-- tool-call extraction batch
-- tool interception policy decisions
-- tool batch dispatch plan/result detail projections
-- tool result message projection
+- tool outcome and next-turn facts as upstream evidence only
 - ExecutionService and execution receipts
+- verification command planning/result classification
+- task-relevant verification route and product verification receipt
+- verification/repair boundary projections
 - Agent Loop contract, loop infrastructure map, and trajectory projection
 - turn snapshots
 - evidence-only save points and next-turn bundles
@@ -72,14 +79,16 @@ Existing infrastructure to reuse:
 
 First implementation grouping after this audit:
 
-- explicit model-boundary-to-tool handoff facts
-- normalized tool batch plan with malformed/unsupported/unknown classifications
-- before-tool policy and authority projection
-- not-dispatched/non-executed tool result details and messages
-- tool handoff observations in trajectory/runtime events and JSON stream
-- save point and next-turn bundle ids from safe tool result message facts
+- explicit task-relevant verification boundary facts in the Agent Loop
+- selected/not-run/blocked/dispatched/passed/failed/cancelled/timed-out and
+  relevance/coverage classifications
+- runtime receipt ids and verification failure class propagation
+- repair eligibility as fact only
+- verification observations in trajectory/runtime events and JSON stream
+- save point and next-turn ids from safe verification facts
 - visible not-proven claims in product surface if rendered
-- result truthfulness tests proving tool observations do not change verdict
+- result truthfulness tests proving verification observations do not change
+  verdict without required evidence
 
 Forbidden shortcuts:
 
@@ -90,22 +99,23 @@ Forbidden shortcuts:
 - do not execute fallback
 - do not execute tools, expand command allowlists, change edit behavior, change
   verification behavior, or change repair behavior
-- do not turn tool-call-extracted, tool-batch-planned, policy-allowed,
-  authority-requested, execution-receipt-observed, command-exit-zero,
-  tool-result-message-prepared, save-point-created, or rendered output into
-  success
+- do not turn verification-intent, selected-command, selected-not-run,
+  dispatch-authorized, dispatch-executed, execution-receipt-observed,
+  command-exit-zero, repair-required, repair-proposal, save-point-created, or
+  rendered output into success
 - do not add package loading, dynamic plugin execution, SDK/RPC, TUI, browser
   paths, or new dependencies
 
 Validation expectations:
 
-- tool handoff tests for source model boundary ids, normalized call ids,
-  malformed/unsupported/unknown statuses, redaction, and not-proven propagation
-- before-tool policy and authority projection tests
-- non-executed tool result message tests
+- verification command plan/result tests
+- task-relevant verification selection, relevance, coverage, authority, and
+  selected-not-run tests
+- verification failure classification tests
 - runtime loop trajectory/event tests if observations change
 - JSON stream observation-only/redaction tests if events change
-- save-point and next-turn bundle tests if ids or pending facts change
+- save-point and next-turn bundle tests if verification ids or pending facts
+  change
 - product surface rendering tests if rendered facts change
 - result-contract gate if terminal/result behavior is touched
 - build for touched package if product code changes
@@ -113,10 +123,10 @@ Validation expectations:
 
 Expected product value:
 
-- A completed model response can hand off tool intent to the loop as safe,
-  policy-aware, authority-aware, non-executed facts that can be saved and
-  prepared for a future turn without bypassing ExecutionService or
-  manufacturing success.
+- The loop can show whether task-relevant verification was intended, selected,
+  authorized, run, passed, failed, blocked, timed out, or not proven, without
+  treating command selection, tool dispatch, exit zero, repair requirement, or
+  product surface rendering as task success.
 
 Planning details:
 
@@ -124,6 +134,8 @@ Planning details:
 - `docs/build-infrastructure/provider-streaming-model-boundary-roadmap.md`
 - `docs/build-infrastructure/model-tool-batch-handoff-audit.md`
 - `docs/build-infrastructure/model-tool-batch-handoff-roadmap.md`
+- `docs/build-infrastructure/verification-repair-behavior-audit.md`
+- `docs/build-infrastructure/verification-repair-behavior-roadmap.md`
 
 ## Prior Completed Baseline
 
