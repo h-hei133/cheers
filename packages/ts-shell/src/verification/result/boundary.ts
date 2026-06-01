@@ -1,4 +1,5 @@
 import type { ProductVerificationReceipt } from "../verificationFacade.js";
+import type { RepairApplyObservation } from "../../repair/handoff/boundary.js";
 
 export type VerificationIntentDispatchStatus =
   | "planned"
@@ -42,6 +43,45 @@ export type VerificationCoverageObservationStatus =
   | "uncovered"
   | "not_proven";
 
+export type PostRepairVerificationRequirementStatus =
+  | "required"
+  | "blocked"
+  | "not_required"
+  | "unavailable"
+  | "not_proven";
+
+export type PostRepairVerificationBlocker =
+  | "none"
+  | "repair-not-applied"
+  | "original-failure-missing"
+  | "verification-unavailable"
+  | "unsupported"
+  | "not-proven";
+
+export type PostRepairVerificationDispatchStatus =
+  | "selected"
+  | "selected_not_run"
+  | "blocked"
+  | "dispatched"
+  | "passed"
+  | "failed"
+  | "timed_out"
+  | "cancelled"
+  | "unavailable"
+  | "skipped"
+  | "not_run";
+
+export type PostRepairVerificationResultStatus =
+  | "passed"
+  | "failed"
+  | "blocked"
+  | "timed_out"
+  | "cancelled"
+  | "unavailable"
+  | "skipped"
+  | "not_run"
+  | "selected_not_run";
+
 export interface VerificationLoopIntent {
   readonly intentId: string;
   readonly sourceTurnId: string;
@@ -73,6 +113,94 @@ export interface VerificationResultObservation {
   readonly selectedNotRun: boolean;
   readonly verdictStatus?: ProductVerificationReceipt["verdictStatus"];
   readonly safeSummary: string;
+  readonly redactionStatus: "report-safe" | "redacted";
+  readonly notProvenClaims: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
+export interface PostRepairVerificationRequirementObservation {
+  readonly requirementId: string;
+  readonly sourceRepairApplyId: string;
+  readonly sourceRepairProposalId: string;
+  readonly sourceVerificationFailureId: string;
+  readonly sourceVerificationId: string;
+  readonly originalFailureClass: string;
+  readonly originalFailureStatus: "failed";
+  readonly repairApplyState: RepairApplyObservation["repairApplyStatus"];
+  readonly repairAuthorityState: RepairApplyObservation["repairAuthorityStatus"];
+  readonly verificationRequired: boolean;
+  readonly requirementStatus: PostRepairVerificationRequirementStatus;
+  readonly verificationBlocker: PostRepairVerificationBlocker;
+  readonly taskRelevanceExpectation: VerificationIntentRelevanceStatus;
+  readonly coverageExpectation: VerificationCoverageObservationStatus;
+  readonly originalRuntimeReceiptIds: readonly string[];
+  readonly repairApplyReceiptIds: readonly string[];
+  readonly touchedTargetSummaries: readonly string[];
+  readonly originalFailurePreserved: true;
+  readonly repairApplyPreserved: true;
+  readonly redactionStatus: "report-safe" | "redacted";
+  readonly notProvenClaims: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
+export interface PostRepairVerificationRequestObservation {
+  readonly requestId: string;
+  readonly requirementId: string;
+  readonly sourceRepairApplyId: string;
+  readonly sourceRepairProposalId: string;
+  readonly sourceVerificationFailureId: string;
+  readonly selectedCommandSummary?: string;
+  readonly selectedNotRun: boolean;
+  readonly dispatchStatus: PostRepairVerificationDispatchStatus;
+  readonly receiptIds: readonly string[];
+  readonly taskRelevanceStatus: VerificationIntentRelevanceStatus;
+  readonly coverageStatus: VerificationCoverageObservationStatus;
+  readonly originalFailurePreserved: true;
+  readonly repairApplyPreserved: true;
+  readonly redactionStatus: "report-safe" | "redacted";
+  readonly notProvenClaims: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
+export interface PostRepairVerificationVerdictCandidateInput {
+  readonly candidateId: string;
+  readonly sourcePostRepairVerificationResultId: string;
+  readonly sourceRepairApplyId: string;
+  readonly sourceVerificationFailureId: string;
+  readonly resultStatus: "passed";
+  readonly taskRelevanceStatus: VerificationIntentRelevanceStatus;
+  readonly coverageStatus: VerificationCoverageObservationStatus;
+  readonly originalFailurePreserved: true;
+  readonly repairApplyPreserved: true;
+  readonly terminalSuccessClaim: false;
+}
+
+export interface PostRepairVerificationResultObservation {
+  readonly resultId: string;
+  readonly requestId?: string;
+  readonly requirementId: string;
+  readonly sourceRepairApplyId: string;
+  readonly sourceRepairProposalId: string;
+  readonly sourceVerificationFailureId: string;
+  readonly sourceVerificationId: string;
+  readonly originalFailureStatus: "failed";
+  readonly originalFailureClass: string;
+  readonly originalFailureSummary: string;
+  readonly originalTaskRelevanceStatus: VerificationIntentRelevanceStatus;
+  readonly originalCoverageStatus: VerificationCoverageObservationStatus;
+  readonly originalRuntimeReceiptIds: readonly string[];
+  readonly repairApplyState: RepairApplyObservation["repairApplyStatus"];
+  readonly repairAuthorityState: RepairApplyObservation["repairAuthorityStatus"];
+  readonly repairApplyReceiptIds: readonly string[];
+  readonly touchedTargetSummaries: readonly string[];
+  readonly status: PostRepairVerificationResultStatus;
+  readonly receiptIds: readonly string[];
+  readonly failureClass?: string;
+  readonly taskRelevanceStatus: VerificationIntentRelevanceStatus;
+  readonly coverageStatus: VerificationCoverageObservationStatus;
+  readonly verdictCandidateInput?: PostRepairVerificationVerdictCandidateInput;
+  readonly originalFailurePreserved: true;
+  readonly repairApplyPreserved: true;
   readonly redactionStatus: "report-safe" | "redacted";
   readonly notProvenClaims: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -229,6 +357,249 @@ export function projectVerificationObservationFromReceipt(input: {
   return freeze({ intent, result });
 }
 
+export function requirePostRepairVerification(input: {
+  readonly repairApply: RepairApplyObservation;
+  readonly requirementStatus?: PostRepairVerificationRequirementStatus;
+  readonly verificationBlocker?: PostRepairVerificationBlocker;
+  readonly taskRelevanceExpectation?: VerificationIntentRelevanceStatus;
+  readonly coverageExpectation?: VerificationCoverageObservationStatus;
+  readonly notProvenClaims?: readonly string[];
+}): PostRepairVerificationRequirementObservation {
+  const redactions = new Set<string>();
+  const requirementStatus = input.requirementStatus ??
+    requirementStatusFromRepairApply(input.repairApply);
+  const verificationBlocker = input.verificationBlocker ??
+    blockerFromRequirement(requirementStatus, input.repairApply);
+  return freeze({
+    requirementId: sanitizeId(`${input.repairApply.repairApplyId}:post-verification`, redactions),
+    sourceRepairApplyId: sanitizeText(input.repairApply.repairApplyId, redactions, 180),
+    sourceRepairProposalId: sanitizeText(input.repairApply.proposalId, redactions, 180),
+    sourceVerificationFailureId: sanitizeText(input.repairApply.sourceFailureId, redactions, 180),
+    sourceVerificationId: sanitizeText(input.repairApply.sourceVerificationId, redactions, 180),
+    originalFailureClass: sanitizeText(input.repairApply.originalFailureClass, redactions, 120),
+    originalFailureStatus: "failed",
+    repairApplyState: input.repairApply.repairApplyStatus,
+    repairAuthorityState: input.repairApply.repairAuthorityStatus,
+    verificationRequired: requirementStatus === "required",
+    requirementStatus,
+    verificationBlocker,
+    taskRelevanceExpectation: input.taskRelevanceExpectation ??
+      input.repairApply.taskRelevanceStatus,
+    coverageExpectation: input.coverageExpectation ?? input.repairApply.coverageStatus,
+    originalRuntimeReceiptIds: input.repairApply.runtimeReceiptIds.map((id) =>
+      sanitizeText(id, redactions, 180)
+    ),
+    repairApplyReceiptIds: input.repairApply.applyReceiptIds.map((id) =>
+      sanitizeText(id, redactions, 180)
+    ),
+    touchedTargetSummaries: input.repairApply.touchedTargetSummaries.map((target) =>
+      sanitizeText(target, redactions, 180)
+    ),
+    originalFailurePreserved: true,
+    repairApplyPreserved: true,
+    redactionStatus:
+      redactions.size > 0 || input.repairApply.redactionStatus === "redacted"
+        ? "redacted"
+        : "report-safe",
+    notProvenClaims: unique([
+      "terminal-success",
+      "task-success",
+      "verification-success",
+      "repair-success",
+      "post-repair-verification-required-is-not-run",
+      "repair-applied-is-not-repair-success",
+      "readback-is-not-post-repair-verification",
+      "original-failure-preserved",
+      ...input.repairApply.notProvenClaims,
+      ...(input.notProvenClaims ?? []),
+    ], redactions),
+    terminalSuccessClaim: false,
+  });
+}
+
+export function requestPostRepairVerification(input: {
+  readonly requirement: PostRepairVerificationRequirementObservation;
+  readonly selectedCommandSummary?: string;
+  readonly dispatchStatus?: PostRepairVerificationDispatchStatus;
+  readonly receiptIds?: readonly string[];
+  readonly taskRelevanceStatus?: VerificationIntentRelevanceStatus;
+  readonly coverageStatus?: VerificationCoverageObservationStatus;
+  readonly notProvenClaims?: readonly string[];
+}): PostRepairVerificationRequestObservation {
+  const redactions = new Set<string>();
+  const dispatchStatus = input.dispatchStatus ??
+    (input.selectedCommandSummary ? "selected_not_run" : "not_run");
+  return freeze({
+    requestId: sanitizeId(`${input.requirement.requirementId}:request`, redactions),
+    requirementId: sanitizeText(input.requirement.requirementId, redactions, 180),
+    sourceRepairApplyId: sanitizeText(input.requirement.sourceRepairApplyId, redactions, 180),
+    sourceRepairProposalId: sanitizeText(
+      input.requirement.sourceRepairProposalId,
+      redactions,
+      180,
+    ),
+    sourceVerificationFailureId: sanitizeText(
+      input.requirement.sourceVerificationFailureId,
+      redactions,
+      180,
+    ),
+    ...(input.selectedCommandSummary
+      ? {
+          selectedCommandSummary: sanitizeText(
+            input.selectedCommandSummary,
+            redactions,
+            180,
+          ),
+        }
+      : {}),
+    selectedNotRun: dispatchStatus === "selected_not_run" ||
+      (dispatchStatus === "not_run" && Boolean(input.selectedCommandSummary)),
+    dispatchStatus,
+    receiptIds: (input.receiptIds ?? []).map((id) => sanitizeText(id, redactions, 180)),
+    taskRelevanceStatus: input.taskRelevanceStatus ??
+      input.requirement.taskRelevanceExpectation,
+    coverageStatus: input.coverageStatus ?? input.requirement.coverageExpectation,
+    originalFailurePreserved: true,
+    repairApplyPreserved: true,
+    redactionStatus:
+      redactions.size > 0 || input.requirement.redactionStatus === "redacted"
+        ? "redacted"
+        : "report-safe",
+    notProvenClaims: unique([
+      "terminal-success",
+      "task-success",
+      "verification-success",
+      "repair-success",
+      "selected-command-is-not-passed",
+      "selected-not-run-is-not-success",
+      "dispatched-is-not-passed",
+      "exit-zero-is-not-task-success",
+      "post-repair-verification-request-is-not-result",
+      ...input.requirement.notProvenClaims,
+      ...(input.notProvenClaims ?? []),
+    ], redactions),
+    terminalSuccessClaim: false,
+  });
+}
+
+export function observePostRepairVerificationResult(input: {
+  readonly requirement: PostRepairVerificationRequirementObservation;
+  readonly request?: PostRepairVerificationRequestObservation;
+  readonly status?: PostRepairVerificationResultStatus;
+  readonly receipt?: ProductVerificationReceipt;
+  readonly receiptIds?: readonly string[];
+  readonly failureClass?: string;
+  readonly taskRelevanceStatus?: VerificationIntentRelevanceStatus;
+  readonly coverageStatus?: VerificationCoverageObservationStatus;
+  readonly notProvenClaims?: readonly string[];
+}): PostRepairVerificationResultObservation {
+  const redactions = new Set<string>();
+  const status = input.status ??
+    postRepairStatusFromReceipt(input.receipt, input.request) ??
+    "not_run";
+  const receiptIds = input.receiptIds ?? input.receipt?.runtimeReceiptIds ?? [];
+  const taskRelevanceStatus = input.taskRelevanceStatus ??
+    relevanceFromReceipt(input.receipt) ??
+    input.request?.taskRelevanceStatus ??
+    input.requirement.taskRelevanceExpectation;
+  const coverageStatus = input.coverageStatus ??
+    coverageFromReceipt(input.receipt) ??
+    input.request?.coverageStatus ??
+    input.requirement.coverageExpectation;
+  const resultId = sanitizeId(`${input.requirement.requirementId}:result`, redactions);
+  const verdictCandidateInput = status === "passed"
+    ? {
+        candidateId: sanitizeId(`${resultId}:verdict-candidate`, redactions),
+        sourcePostRepairVerificationResultId: resultId,
+        sourceRepairApplyId: sanitizeText(input.requirement.sourceRepairApplyId, redactions, 180),
+        sourceVerificationFailureId: sanitizeText(
+          input.requirement.sourceVerificationFailureId,
+          redactions,
+          180,
+        ),
+        resultStatus: "passed" as const,
+        taskRelevanceStatus,
+        coverageStatus,
+        originalFailurePreserved: true as const,
+        repairApplyPreserved: true as const,
+        terminalSuccessClaim: false as const,
+      }
+    : undefined;
+  return freeze({
+    resultId,
+    ...(input.request
+      ? { requestId: sanitizeText(input.request.requestId, redactions, 180) }
+      : {}),
+    requirementId: sanitizeText(input.requirement.requirementId, redactions, 180),
+    sourceRepairApplyId: sanitizeText(input.requirement.sourceRepairApplyId, redactions, 180),
+    sourceRepairProposalId: sanitizeText(
+      input.requirement.sourceRepairProposalId,
+      redactions,
+      180,
+    ),
+    sourceVerificationFailureId: sanitizeText(
+      input.requirement.sourceVerificationFailureId,
+      redactions,
+      180,
+    ),
+    sourceVerificationId: sanitizeText(input.requirement.sourceVerificationId, redactions, 180),
+    originalFailureStatus: "failed",
+    originalFailureClass: sanitizeText(input.requirement.originalFailureClass, redactions, 120),
+    originalFailureSummary: "preserved from source verification failure",
+    originalTaskRelevanceStatus: input.requirement.taskRelevanceExpectation,
+    originalCoverageStatus: input.requirement.coverageExpectation,
+    originalRuntimeReceiptIds: input.requirement.originalRuntimeReceiptIds.map((id) =>
+      sanitizeText(id, redactions, 180)
+    ),
+    repairApplyState: input.requirement.repairApplyState,
+    repairAuthorityState: input.requirement.repairAuthorityState,
+    repairApplyReceiptIds: input.requirement.repairApplyReceiptIds.map((id) =>
+      sanitizeText(id, redactions, 180)
+    ),
+    touchedTargetSummaries: input.requirement.touchedTargetSummaries.map((target) =>
+      sanitizeText(target, redactions, 180)
+    ),
+    status,
+    receiptIds: receiptIds.map((id) => sanitizeText(id, redactions, 180)),
+    ...(input.failureClass ?? input.receipt?.failureClass
+      ? {
+          failureClass: sanitizeText(
+            (input.failureClass ?? input.receipt?.failureClass)!,
+            redactions,
+            120,
+          ),
+        }
+      : {}),
+    taskRelevanceStatus,
+    coverageStatus,
+    ...(verdictCandidateInput ? { verdictCandidateInput } : {}),
+    originalFailurePreserved: true,
+    repairApplyPreserved: true,
+    redactionStatus:
+      redactions.size > 0 ||
+        input.requirement.redactionStatus === "redacted" ||
+        input.request?.redactionStatus === "redacted"
+        ? "redacted"
+        : "report-safe",
+    notProvenClaims: unique([
+      "terminal-success",
+      "task-success",
+      "verification-success",
+      "repair-success",
+      "repair-applied-is-not-repair-success",
+      "exit-zero-is-not-task-success",
+      "post-repair-verification-passed-is-verdict-input-only",
+      "model-response-complete-is-not-task-success",
+      "original-failure-preserved",
+      ...input.requirement.notProvenClaims,
+      ...(input.request?.notProvenClaims ?? []),
+      ...(input.receipt?.notProvenClaims ?? []),
+      ...(input.notProvenClaims ?? []),
+    ], redactions),
+    terminalSuccessClaim: false,
+  });
+}
+
 function dispatchFromReceipt(
   receipt?: ProductVerificationReceipt,
 ): VerificationIntentDispatchStatus | undefined {
@@ -286,6 +657,60 @@ function resultStatusFromReceipt(
     return "unavailable";
   }
   return "unsupported";
+}
+
+function requirementStatusFromRepairApply(
+  repairApply: RepairApplyObservation,
+): PostRepairVerificationRequirementStatus {
+  if (repairApply.repairApplyStatus === "applied") return "required";
+  if (
+    repairApply.repairApplyStatus === "blocked" ||
+    repairApply.repairApplyStatus === "authority_required"
+  ) {
+    return "blocked";
+  }
+  if (repairApply.repairApplyStatus === "unsupported") return "unavailable";
+  if (repairApply.repairApplyStatus === "not_applied") return "not_required";
+  return "not_proven";
+}
+
+function blockerFromRequirement(
+  status: PostRepairVerificationRequirementStatus,
+  repairApply: RepairApplyObservation,
+): PostRepairVerificationBlocker {
+  if (status === "required") return "none";
+  if (repairApply.repairApplyStatus !== "applied") return "repair-not-applied";
+  if (!repairApply.originalFailurePreserved) return "original-failure-missing";
+  if (status === "unavailable") return "verification-unavailable";
+  if (status === "blocked") return "unsupported";
+  return "not-proven";
+}
+
+function postRepairStatusFromReceipt(
+  receipt: ProductVerificationReceipt | undefined,
+  request: PostRepairVerificationRequestObservation | undefined,
+): PostRepairVerificationResultStatus | undefined {
+  if (!receipt) {
+    if (request?.dispatchStatus === "selected_not_run") return "selected_not_run";
+    if (request?.dispatchStatus === "blocked") return "blocked";
+    if (request?.dispatchStatus === "cancelled") return "cancelled";
+    if (request?.dispatchStatus === "skipped") return "skipped";
+    if (request?.dispatchStatus === "unavailable") return "unavailable";
+    return undefined;
+  }
+  if (receipt.dispatchStatus === "not-run" && receipt.selectedCommand) {
+    return "selected_not_run";
+  }
+  if (receipt.dispatchStatus === "not-run") return "not_run";
+  if (receipt.runtimeStatus === "success") return "passed";
+  if (receipt.runtimeStatus === "failed") return "failed";
+  if (receipt.runtimeStatus === "blocked") return "blocked";
+  if (receipt.runtimeStatus === "timeout") return "timed_out";
+  if (receipt.runtimeStatus === "skipped") return "skipped";
+  if (receipt.runtimeStatus === "error" && receipt.failureClass === "command-unavailable") {
+    return "unavailable";
+  }
+  return "failed";
 }
 
 function summaryFromStatus(input: {

@@ -33,8 +33,11 @@ import {
 } from "../../repair/handoff/boundary.js";
 import { projectVerificationReceipt } from "../../verification/verificationFacade.js";
 import {
+  observePostRepairVerificationResult,
   observeVerificationResult,
   projectVerificationIntent,
+  requestPostRepairVerification,
+  requirePostRepairVerification,
 } from "../../verification/result/boundary.js";
 import { projectModelBoundaryPhase } from "../../runtime/loop/modelBoundary.js";
 import { runProviderStreamAdapter } from "../../runtime/loop/providerStreamAdapter.js";
@@ -352,6 +355,20 @@ describe("product surface view model", () => {
           },
           postRepairVerificationStatus: "not_run",
         });
+        const postRepairVerificationRequirement = requirePostRepairVerification({
+          repairApply,
+        });
+        const postRepairVerificationRequest = requestPostRepairVerification({
+          requirement: postRepairVerificationRequirement,
+          dispatchStatus: "dispatched",
+          receiptIds: ["receipt-surface-post-repair"],
+        });
+        const postRepairVerificationResult = observePostRepairVerificationResult({
+          requirement: postRepairVerificationRequirement,
+          request: postRepairVerificationRequest,
+          status: "passed",
+          receiptIds: ["receipt-surface-post-repair"],
+        });
         return {
           intent,
           result,
@@ -360,6 +377,9 @@ describe("product surface view model", () => {
           repairAuthority,
           repairApplyRequest,
           repairApply,
+          postRepairVerificationRequirement,
+          postRepairVerificationRequest,
+          postRepairVerificationResult,
         };
       },
     });
@@ -385,7 +405,9 @@ describe("product surface view model", () => {
     expect(rendered).toContain("applyBlocker: none");
     expect(rendered).toContain("applyAttempted: true");
     expect(rendered).toContain("apply: applied");
-    expect(rendered).toContain("postRepairVerification: not_run");
+    expect(rendered).toContain("postRepairVerification: passed");
+    expect(rendered).toContain("postRepair=passed");
+    expect(rendered).toContain("verdictCandidate: input-only");
     expect(rendered).toContain("repairSuccess=not-proven");
     expect(rendered).not.toContain("Outcome: success");
   });

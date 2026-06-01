@@ -898,6 +898,16 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
     event.type === "loop-repair-handoff-observed" &&
     event.facts.repairApplyId !== undefined
   );
+  const postRepairVerificationEvent = trajectory.events.find((event) =>
+    event.type === "loop-verification-result-observed" &&
+    event.facts.resultId !== undefined &&
+    event.facts.verdictCandidateAvailable !== undefined
+  ) ?? trajectory.events.find((event) =>
+    event.type === "loop-verification-result-observed" &&
+    (event.facts.requirementId !== undefined || event.facts.resultId !== undefined) &&
+    (event.facts.sourceRepairApplyId !== undefined ||
+      event.facts.verdictCandidateAvailable !== undefined)
+  );
   const verificationRuntimeReceiptIds =
     verificationResultEvent?.facts.runtimeReceiptIds;
   const verificationRuntimeReceiptCount = Array.isArray(verificationRuntimeReceiptIds)
@@ -963,14 +973,16 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       title: "Verification",
       severity: observed("verification-result") === "observed" ? "info" : "not_proven",
       status: observed("verification-result") === "observed" ? "observed" : "not_proven",
-      summary: `verificationSuccess=not-proven; taskRelevant=${factValue(verificationResultEvent?.facts.relevanceStatus)}; coverage=${factValue(verificationResultEvent?.facts.coverageStatus)}; authority=${factValue(verificationResultEvent?.facts.authorityRequirement)}; runtimeReceipts=${verificationRuntimeReceiptCount}; repairEligible=${verificationResultEvent?.facts.repairEligible === true ? "yes" : "no"}; commandExitZeroIsTaskSuccess=false; intents=${trajectory.verificationIntentIds.length}; results=${trajectory.verificationResultIds.length}; selected=${observed("verification-intent")}`,
+      summary: `verificationSuccess=not-proven; taskRelevant=${factValue(verificationResultEvent?.facts.relevanceStatus)}; coverage=${factValue(verificationResultEvent?.facts.coverageStatus)}; authority=${factValue(verificationResultEvent?.facts.authorityRequirement)}; runtimeReceipts=${verificationRuntimeReceiptCount}; repairEligible=${verificationResultEvent?.facts.repairEligible === true ? "yes" : "no"}; postRepair=${factValue(postRepairVerificationEvent?.facts.status ?? postRepairVerificationEvent?.facts.requirementStatus)}; verdictCandidate=${postRepairVerificationEvent?.facts.verdictCandidateAvailable === true ? "input-only" : "not_available"}; commandExitZeroIsTaskSuccess=false; intents=${trajectory.verificationIntentIds.length}; results=${trajectory.verificationResultIds.length}; selected=${observed("verification-intent")}`,
       machineEventCorrelationIds: [
         ...(stage("verification-intent")?.eventIds ?? []),
         ...(stage("verification-result")?.eventIds ?? []),
+        ...(stage("post-repair-verification")?.eventIds ?? []),
       ],
       notProvenClaims: [
         ...(stage("verification-intent")?.notProvenClaims ?? []),
         ...(stage("verification-result")?.notProvenClaims ?? []),
+        ...(stage("post-repair-verification")?.notProvenClaims ?? []),
       ],
     }),
     section({
@@ -1032,11 +1044,19 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
         {
           label: "postRepairVerification",
           value: factValue(
+            postRepairVerificationEvent?.facts.status ??
+              postRepairVerificationEvent?.facts.requirementStatus ??
             repairApplyEvent?.facts.postRepairVerificationStatus ??
               repairApplyRequestEvent?.facts.postRepairVerificationStatus ??
               repairProposalEvent?.facts.postRepairVerificationStatus ??
               observed("post-repair-verification"),
           ),
+        },
+        {
+          label: "verdictCandidate",
+          value: postRepairVerificationEvent?.facts.verdictCandidateAvailable === true
+            ? "input-only"
+            : "not_available",
         },
       ],
       machineEventCorrelationIds: [

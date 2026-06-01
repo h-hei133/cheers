@@ -198,4 +198,39 @@ describe("runtime evidence save point", () => {
     expect(savePoint.notProvenClaims).toContain("verification-success");
     expect(JSON.stringify(savePoint)).not.toContain('"success":true');
   });
+
+  it("carries post repair verification ids without declaring success", () => {
+    const snapshot = createRuntimeTurnSnapshot({
+      sessionId: "sess-post-repair-save-point",
+      turn: 7,
+      phase: "turn",
+      workspaceRoot: "/tmp/workspace",
+      providerOptIn: false,
+    });
+    const savePoint = createEvidenceOnlySavePoint({
+      turnSnapshot: snapshot,
+      phase: "save_point",
+      postRepairVerificationRequirementIds: ["post-repair:req"],
+      postRepairVerificationRequestIds: ["post-repair:request"],
+      postRepairVerificationResultIds: ["post-repair:result"],
+      pendingNextTurnFacts: [
+        "post-repair-verification-required:yes",
+        "post-repair-verification-status:passed",
+        "post-repair-verification-terminal-success:false",
+      ],
+      notProvenClaims: [
+        "post-repair-verification-required-is-not-run",
+        "post-repair-verification-passed-is-verdict-input-only",
+      ],
+    });
+
+    expect(savePoint.postRepairVerificationRequirementIds).toEqual(["post-repair:req"]);
+    expect(savePoint.postRepairVerificationRequestIds).toEqual(["post-repair:request"]);
+    expect(savePoint.postRepairVerificationResultIds).toEqual(["post-repair:result"]);
+    expect(savePoint.pendingNextTurnFacts).toContain(
+      "post-repair-verification-terminal-success:false",
+    );
+    expect(savePoint.terminalSuccessClaim).toBe(false);
+    expect(JSON.stringify(savePoint)).not.toContain('"success":true');
+  });
 });

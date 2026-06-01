@@ -48,8 +48,11 @@ import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectSteeringQueue } from "../../turn/steeringQueue.js";
 import { prepareToolResultMessages } from "../../turn/toolResultMessage.js";
 import {
+  observePostRepairVerificationResult,
   observeVerificationResult,
   projectVerificationIntent,
+  requestPostRepairVerification,
+  requirePostRepairVerification,
 } from "../../verification/result/boundary.js";
 import { extractToolCallBatch } from "../../tools/toolCallBatch.js";
 import { dispatchToolBatch, planToolBatchDispatch } from "../../tools/toolBatchDispatch.js";
@@ -612,9 +615,24 @@ describe("runtime event projection", () => {
       },
       postRepairVerificationStatus: "not_run",
     });
+    const postRequirement = requirePostRepairVerification({ repairApply: apply });
+    const postRequest = requestPostRepairVerification({
+      requirement: postRequirement,
+      dispatchStatus: "dispatched",
+      receiptIds: ["receipt-events-post-repair"],
+    });
+    const postResult = observePostRepairVerificationResult({
+      requirement: postRequirement,
+      request: postRequest,
+      status: "passed",
+      receiptIds: ["receipt-events-post-repair"],
+    });
     const events = projectRuntimeEvents({
       verificationIntents: [intent],
       verificationResults: [result],
+      postRepairVerificationRequirements: [postRequirement],
+      postRepairVerificationRequests: [postRequest],
+      postRepairVerificationResults: [postResult],
       repairRequiredHandoffs: [handoff],
       repairProposals: [proposal],
       repairAuthorities: [authority],
@@ -625,6 +643,10 @@ describe("runtime event projection", () => {
     expect(events.map((event) => event.type)).toEqual([
       "verification-dispatched",
       "verification-result-observed",
+      "post-repair-verification-required",
+      "post-repair-verification-requested",
+      "post-repair-verification-result-observed",
+      "post-repair-verification-verdict-candidate-observed",
       "repair-required",
       "original-failure-preserved",
       "repair-proposal-observed",
@@ -636,6 +658,38 @@ describe("runtime event projection", () => {
     ]);
     expect(events).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          type: "post-repair-verification-required",
+          facts: expect.objectContaining({
+            requirementId: postRequirement.requirementId,
+            sourceRepairApplyId: apply.repairApplyId,
+            originalFailureStatus: "failed",
+            repairApplyState: "applied",
+            verificationRequired: true,
+            originalFailurePreserved: true,
+            repairApplyPreserved: true,
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "post-repair-verification-result-observed",
+          facts: expect.objectContaining({
+            resultId: postResult.resultId,
+            status: "passed",
+            receiptIds: ["receipt-events-post-repair"],
+            originalFailurePreserved: true,
+            repairApplyPreserved: true,
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "post-repair-verification-verdict-candidate-observed",
+          facts: expect.objectContaining({
+            sourcePostRepairVerificationResultId: postResult.resultId,
+            resultStatus: "passed",
+            terminalSuccessClaim: false,
+          }),
+        }),
         expect.objectContaining({
           type: "repair-required",
           facts: expect.objectContaining({
@@ -707,6 +761,7 @@ describe("runtime event projection", () => {
         "verification-success",
         "repair-success",
         "repair-apply-without-post-repair-verification-is-not-success",
+        "post-repair-verification-passed-is-verdict-input-only",
       ]),
     );
   });

@@ -2,11 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   observeVerificationResult,
+  observePostRepairVerificationResult,
   projectVerificationIntent,
+  requestPostRepairVerification,
+  requirePostRepairVerification,
   type VerificationIntentDispatchStatus,
   type VerificationIntentRelevanceStatus,
   type VerificationResultObservationStatus,
 } from "./boundary.js";
+import {
+  createRepairApplyRequest,
+  observeRepairApply,
+  observeRepairAuthority,
+  observeRepairProposal,
+  projectRepairRequiredHandoff,
+} from "../../repair/handoff/boundary.js";
 
 describe("verification loop boundary", () => {
   it("represents verification intent states safely", () => {
@@ -199,4 +209,138 @@ describe("verification loop boundary", () => {
     expect(result.verdictStatus).toBe("blocked");
     expect(result.terminalSuccessClaim).toBe(false);
   });
+
+  it("preserves post repair verification requirement, request, and not-run states", () => {
+    const repairApply = makeRepairApply();
+    const requirement = requirePostRepairVerification({ repairApply });
+    const request = requestPostRepairVerification({
+      requirement,
+      selectedCommandSummary: "npm test -w packages/ts-shell -- focused.test.ts",
+    });
+    const result = observePostRepairVerificationResult({
+      requirement,
+      request,
+    });
+
+    expect(requirement).toMatchObject({
+      sourceRepairApplyId: repairApply.repairApplyId,
+      sourceRepairProposalId: repairApply.proposalId,
+      sourceVerificationFailureId: repairApply.sourceFailureId,
+      originalFailureClass: "test-failed",
+      originalFailureStatus: "failed",
+      repairApplyState: "applied",
+      verificationRequired: true,
+      requirementStatus: "required",
+      verificationBlocker: "none",
+      originalFailurePreserved: true,
+      repairApplyPreserved: true,
+      terminalSuccessClaim: false,
+    });
+    expect(request).toMatchObject({
+      selectedNotRun: true,
+      dispatchStatus: "selected_not_run",
+      originalFailurePreserved: true,
+      repairApplyPreserved: true,
+      terminalSuccessClaim: false,
+    });
+    expect(result.status).toBe("selected_not_run");
+    expect(result.verdictCandidateInput).toBeUndefined();
+    expect(result.originalRuntimeReceiptIds).toEqual(["receipt-original"]);
+    expect(result.repairApplyReceiptIds).toEqual(["receipt-apply"]);
+    expect(result.touchedTargetSummaries).toEqual(["src/app.ts"]);
+    expect(result.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "post-repair-verification-required-is-not-run",
+        "selected-command-is-not-passed",
+        "repair-applied-is-not-repair-success",
+      ]),
+    );
+  });
+
+  it("keeps post repair verification result states distinct and exposes passed as verdict input only", () => {
+    const requirement = requirePostRepairVerification({ repairApply: makeRepairApply() });
+    const request = requestPostRepairVerification({
+      requirement,
+      dispatchStatus: "dispatched",
+      receiptIds: ["receipt-post-repair"],
+    });
+    const statuses = [
+      "passed",
+      "failed",
+      "blocked",
+      "timed_out",
+      "cancelled",
+      "unavailable",
+      "skipped",
+      "not_run",
+      "selected_not_run",
+    ] as const;
+    const results = statuses.map((status) =>
+      observePostRepairVerificationResult({
+        requirement,
+        request,
+        status,
+        receiptIds: ["receipt-post-repair"],
+        failureClass: status === "failed" ? "test-failed-after-repair" : undefined,
+      })
+    );
+
+    expect(results.map((result) => result.status)).toEqual(statuses);
+    expect(results.every((result) => result.terminalSuccessClaim === false)).toBe(true);
+    expect(results.find((result) => result.status === "passed")?.verdictCandidateInput)
+      .toMatchObject({
+        resultStatus: "passed",
+        sourceRepairApplyId: requirement.sourceRepairApplyId,
+        sourceVerificationFailureId: requirement.sourceVerificationFailureId,
+        terminalSuccessClaim: false,
+      });
+    expect(JSON.stringify(results)).not.toContain('"success":true');
+  });
 });
+
+function makeRepairApply() {
+  const intent = projectVerificationIntent({
+    sourceTurnId: "turn-post-repair",
+    targetSummary: "verify repair target",
+    dispatchStatus: "failed",
+    relevanceStatus: "task_relevant",
+    coverageStatus: "covered",
+    authorityRequirement: "granted",
+  });
+  const result = observeVerificationResult({
+    intent,
+    status: "failed",
+    runtimeReceiptIds: ["receipt-original"],
+    failureClass: "test-failed",
+    repairEligible: true,
+  });
+  const handoff = projectRepairRequiredHandoff({ verification: result });
+  const proposal = observeRepairProposal({
+    handoff,
+    proposalSource: "deterministic_from_failure_evidence",
+    readinessStatus: "exact_ready",
+    applyStatus: "not_applied",
+  });
+  const authority = observeRepairAuthority({
+    proposal,
+    authorityDecision: "granted",
+    authoritySource: "explicit_repair_authority",
+  });
+  const request = createRepairApplyRequest({
+    proposal,
+    authority,
+    expectedEditOperationKind: "hunk_set",
+  });
+  return observeRepairApply({
+    proposal,
+    authority,
+    request,
+    editApplyObservation: {
+      status: "hunk-set-applied",
+      changedFiles: ["src/app.ts"],
+      evidence: ["receipt-apply"],
+    },
+    applyReceiptIds: ["receipt-apply"],
+    postRepairVerificationStatus: "not_run",
+  });
+}

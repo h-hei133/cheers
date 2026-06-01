@@ -51,6 +51,9 @@ import { createRuntimeTurnSnapshot, type RuntimeTurnSnapshot } from "../../turn/
 import type { ToolExecutionResult } from "../../tools/types.js";
 import {
   observeVerificationResult,
+  type PostRepairVerificationRequirementObservation,
+  type PostRepairVerificationRequestObservation,
+  type PostRepairVerificationResultObservation,
   projectVerificationObservationFromReceipt,
   projectVerificationIntent,
   type VerificationLoopIntent,
@@ -192,6 +195,9 @@ export interface AgentLoopContractVerificationProjection {
   readonly repairAuthority?: RepairAuthorityObservation;
   readonly repairApplyRequest?: RepairApplyRequestObservation;
   readonly repairApply?: RepairApplyObservation;
+  readonly postRepairVerificationRequirement?: PostRepairVerificationRequirementObservation;
+  readonly postRepairVerificationRequest?: PostRepairVerificationRequestObservation;
+  readonly postRepairVerificationResult?: PostRepairVerificationResultObservation;
 }
 
 export interface AgentLoopContractProjection {
@@ -814,6 +820,30 @@ export async function runAgentLoopContract(
               `post-repair-verification:${verification.repairApply.postRepairVerificationStatus}`,
             ]
           : []),
+        ...(verification.postRepairVerificationRequirement
+          ? [
+              `post-repair-verification-requirement:${verification.postRepairVerificationRequirement.requirementId}`,
+              `post-repair-verification-required:${verification.postRepairVerificationRequirement.verificationRequired ? "yes" : "no"}`,
+              `post-repair-verification-blocker:${verification.postRepairVerificationRequirement.verificationBlocker}`,
+              `original-verification-failure:${verification.postRepairVerificationRequirement.sourceVerificationId}`,
+              `repair-apply-preserved:${verification.postRepairVerificationRequirement.repairApplyPreserved ? "yes" : "no"}`,
+            ]
+          : []),
+        ...(verification.postRepairVerificationRequest
+          ? [
+              `post-repair-verification-request:${verification.postRepairVerificationRequest.requestId}`,
+              `post-repair-verification-dispatch:${verification.postRepairVerificationRequest.dispatchStatus}`,
+              `post-repair-verification-selected-not-run:${verification.postRepairVerificationRequest.selectedNotRun ? "yes" : "no"}`,
+            ]
+          : []),
+        ...(verification.postRepairVerificationResult
+          ? [
+              `post-repair-verification-result:${verification.postRepairVerificationResult.resultId}`,
+              `post-repair-verification-status:${verification.postRepairVerificationResult.status}`,
+              `post-repair-verification-verdict-candidate:${verification.postRepairVerificationResult.verdictCandidateInput ? "available" : "not_available"}`,
+              `post-repair-verification-terminal-success:false`,
+            ]
+          : []),
       ];
       const verificationSavePoint = createEvidenceOnlySavePoint({
         ...savePointInput,
@@ -823,6 +853,15 @@ export async function runAgentLoopContract(
         ],
         verificationIntentIds: [verification.intent.intentId],
         verificationResultIds: [verification.result.verificationId],
+        postRepairVerificationRequirementIds: verification.postRepairVerificationRequirement
+          ? [verification.postRepairVerificationRequirement.requirementId]
+          : [],
+        postRepairVerificationRequestIds: verification.postRepairVerificationRequest
+          ? [verification.postRepairVerificationRequest.requestId]
+          : [],
+        postRepairVerificationResultIds: verification.postRepairVerificationResult
+          ? [verification.postRepairVerificationResult.resultId]
+          : [],
         repairHandoffIds: verification.repairRequired
           ? [verification.repairRequired.handoffId]
           : [],
@@ -841,11 +880,23 @@ export async function runAgentLoopContract(
           ...(verification.repairAuthority?.notProvenClaims ?? []),
           ...(verification.repairApplyRequest?.notProvenClaims ?? []),
           ...(verification.repairApply?.notProvenClaims ?? []),
+          ...(verification.postRepairVerificationRequirement?.notProvenClaims ?? []),
+          ...(verification.postRepairVerificationRequest?.notProvenClaims ?? []),
+          ...(verification.postRepairVerificationResult?.notProvenClaims ?? []),
         ],
       });
       appendProjectedEvents(events, projectRuntimeEvents({
         verificationIntents: [verification.intent],
         verificationResults: [verification.result],
+        postRepairVerificationRequirements: verification.postRepairVerificationRequirement
+          ? [verification.postRepairVerificationRequirement]
+          : [],
+        postRepairVerificationRequests: verification.postRepairVerificationRequest
+          ? [verification.postRepairVerificationRequest]
+          : [],
+        postRepairVerificationResults: verification.postRepairVerificationResult
+          ? [verification.postRepairVerificationResult]
+          : [],
         repairRequiredHandoffs: verification.repairRequired
           ? [verification.repairRequired]
           : [],

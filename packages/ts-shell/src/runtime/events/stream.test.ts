@@ -627,18 +627,54 @@ describe("JSON runtime event stream projection", () => {
     );
     expect(serialized).not.toMatch(/raw provider output|hidden reasoning|token=secret/i);
   });
+
+  it("serializes post repair verification observations without success upgrade", () => {
+    const stream = projectJsonRuntimeEventStream({
+      streamId: "post-repair-stream",
+      events: [
+        makeEvent(1, "post-repair-verification-required", {
+          requirementId: "post-repair:requirement",
+          sourceRepairApplyId: "repair-apply:1",
+          originalFailureStatus: "failed",
+          repairApplyState: "applied",
+          verificationRequired: true,
+        }, ["post-repair-verification-required-is-not-run"]),
+        makeEvent(2, "post-repair-verification-result-observed", {
+          resultId: "post-repair:result",
+          status: "passed",
+          verdictCandidateAvailable: true,
+        }, ["post-repair-verification-passed-is-verdict-input-only"]),
+      ],
+    });
+
+    expect(stream.map((entry) => entry.eventType)).toEqual([
+      "post-repair-verification-required",
+      "post-repair-verification-result-observed",
+    ]);
+    expect(stream.every((entry) => entry.truthfulness.terminalSuccessClaim === false))
+      .toBe(true);
+    expect(JSON.stringify(stream)).not.toContain('"success":true');
+    expect(stream.flatMap((entry) => entry.notProvenClaims)).toEqual(
+      expect.arrayContaining([
+        "post-repair-verification-required-is-not-run",
+        "post-repair-verification-passed-is-verdict-input-only",
+      ]),
+    );
+  });
 });
 
 function makeEvent(
   sequence: number,
   type: RuntimeProjectionEvent["type"],
+  facts: Record<string, unknown> = {},
+  notProvenClaims: readonly string[] = ["terminal-success"],
 ): RuntimeProjectionEvent {
   return {
     id: `runtime-event-${sequence}`,
     sequence,
     type,
-    facts: { terminalSuccessClaim: false },
-    notProvenClaims: ["terminal-success"],
+    facts: { ...facts, terminalSuccessClaim: false },
+    notProvenClaims,
     redaction: {
       status: "report-safe",
       excluded: [],

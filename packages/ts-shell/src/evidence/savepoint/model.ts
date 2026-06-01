@@ -36,6 +36,9 @@ export interface RuntimeSavePointInput {
   readonly nextTurnBundleId?: string;
   readonly verificationIntentIds?: readonly string[];
   readonly verificationResultIds?: readonly string[];
+  readonly postRepairVerificationRequirementIds?: readonly string[];
+  readonly postRepairVerificationRequestIds?: readonly string[];
+  readonly postRepairVerificationResultIds?: readonly string[];
   readonly repairHandoffIds?: readonly string[];
   readonly repairProposalIds?: readonly string[];
   readonly repairApplyIds?: readonly string[];
@@ -74,6 +77,9 @@ export interface RuntimeEvidenceSavePoint {
   readonly nextTurnBundleId?: string;
   readonly verificationIntentIds: readonly string[];
   readonly verificationResultIds: readonly string[];
+  readonly postRepairVerificationRequirementIds: readonly string[];
+  readonly postRepairVerificationRequestIds: readonly string[];
+  readonly postRepairVerificationResultIds: readonly string[];
   readonly repairHandoffIds: readonly string[];
   readonly repairProposalIds: readonly string[];
   readonly repairApplyIds: readonly string[];
@@ -160,6 +166,21 @@ export function createEvidenceOnlySavePoint(
     ),
     verificationResultIds: Object.freeze(
       (input.verificationResultIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    postRepairVerificationRequirementIds: Object.freeze(
+      (input.postRepairVerificationRequirementIds ?? []).map((id) =>
+        sanitizeEvidenceId(id, redactions)
+      ),
+    ),
+    postRepairVerificationRequestIds: Object.freeze(
+      (input.postRepairVerificationRequestIds ?? []).map((id) =>
+        sanitizeEvidenceId(id, redactions)
+      ),
+    ),
+    postRepairVerificationResultIds: Object.freeze(
+      (input.postRepairVerificationResultIds ?? []).map((id) =>
+        sanitizeEvidenceId(id, redactions)
+      ),
     ),
     repairHandoffIds: Object.freeze(
       (input.repairHandoffIds ?? []).map((id) => sanitizeEvidenceId(id, redactions)),

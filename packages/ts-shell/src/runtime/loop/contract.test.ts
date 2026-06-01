@@ -9,8 +9,11 @@ import {
   projectRepairRequiredHandoff,
 } from "../../repair/handoff/boundary.js";
 import {
+  observePostRepairVerificationResult,
   observeVerificationResult,
   projectVerificationIntent,
+  requestPostRepairVerification,
+  requirePostRepairVerification,
 } from "../../verification/result/boundary.js";
 import { projectVerificationReceipt } from "../../verification/verificationFacade.js";
 import { projectJsonRuntimeEventStream } from "../events/stream.js";
@@ -296,6 +299,20 @@ describe("agent loop contract", () => {
           },
           postRepairVerificationStatus: "not_run",
         });
+        const postRepairVerificationRequirement = requirePostRepairVerification({
+          repairApply,
+        });
+        const postRepairVerificationRequest = requestPostRepairVerification({
+          requirement: postRepairVerificationRequirement,
+          dispatchStatus: "dispatched",
+          receiptIds: ["receipt-contract-post-repair"],
+        });
+        const postRepairVerificationResult = observePostRepairVerificationResult({
+          requirement: postRepairVerificationRequirement,
+          request: postRepairVerificationRequest,
+          status: "passed",
+          receiptIds: ["receipt-contract-post-repair"],
+        });
         return {
           intent,
           result,
@@ -304,6 +321,9 @@ describe("agent loop contract", () => {
           repairAuthority,
           repairApplyRequest,
           repairApply,
+          postRepairVerificationRequirement,
+          postRepairVerificationRequest,
+          postRepairVerificationResult,
         };
       },
     });
@@ -321,11 +341,33 @@ describe("agent loop contract", () => {
     expect(turn?.verification.repairApply?.repairApplyStatus).toBe("applied");
     expect(turn?.verification.repairApply?.applyAttempted).toBe(true);
     expect(turn?.verification.repairApply?.postRepairVerificationStatus).toBe("not_run");
+    expect(turn?.verification.postRepairVerificationRequirement).toMatchObject({
+      verificationRequired: true,
+      requirementStatus: "required",
+      repairApplyState: "applied",
+      terminalSuccessClaim: false,
+    });
+    expect(turn?.verification.postRepairVerificationRequest?.dispatchStatus).toBe("dispatched");
+    expect(turn?.verification.postRepairVerificationResult).toMatchObject({
+      status: "passed",
+      originalFailurePreserved: true,
+      repairApplyPreserved: true,
+      terminalSuccessClaim: false,
+    });
     expect(turn?.savePoint.repairHandoffIds).toEqual([
       turn?.verification.repairRequired?.handoffId,
     ]);
     expect(turn?.savePoint.repairProposalIds).toEqual([
       turn?.verification.repairProposal?.proposalId,
+    ]);
+    expect(turn?.savePoint.postRepairVerificationRequirementIds).toEqual([
+      turn?.verification.postRepairVerificationRequirement?.requirementId,
+    ]);
+    expect(turn?.savePoint.postRepairVerificationRequestIds).toEqual([
+      turn?.verification.postRepairVerificationRequest?.requestId,
+    ]);
+    expect(turn?.savePoint.postRepairVerificationResultIds).toEqual([
+      turn?.verification.postRepairVerificationResult?.resultId,
     ]);
     expect(turn?.savePoint.pendingNextTurnFacts).toEqual(
       expect.arrayContaining([
@@ -340,6 +382,14 @@ describe("agent loop contract", () => {
         "repair-apply-status:applied",
         "repair-apply-attempted:yes",
         "post-repair-verification:not_run",
+        `post-repair-verification-requirement:${turn?.verification.postRepairVerificationRequirement?.requirementId}`,
+        "post-repair-verification-required:yes",
+        `post-repair-verification-request:${turn?.verification.postRepairVerificationRequest?.requestId}`,
+        "post-repair-verification-dispatch:dispatched",
+        `post-repair-verification-result:${turn?.verification.postRepairVerificationResult?.resultId}`,
+        "post-repair-verification-status:passed",
+        "post-repair-verification-verdict-candidate:available",
+        "post-repair-verification-terminal-success:false",
       ]),
     );
     expect(turn?.nextTurn.pendingFacts).toEqual(
@@ -348,6 +398,7 @@ describe("agent loop contract", () => {
         `original-verification-failure:${turn?.verification.repairRequired?.sourceVerificationId}`,
         `repair-proposal:${turn?.verification.repairProposal?.proposalId}`,
         `repair-apply-request:${turn?.verification.repairApplyRequest?.requestId}`,
+        `post-repair-verification-result:${turn?.verification.postRepairVerificationResult?.resultId}`,
       ]),
     );
     expect(loop.events.map((event) => event.type)).toEqual(
@@ -359,6 +410,9 @@ describe("agent loop contract", () => {
         "repair-apply-requested",
         "repair-apply-observed",
         "post-repair-verification-observed",
+        "post-repair-verification-required",
+        "post-repair-verification-result-observed",
+        "post-repair-verification-verdict-candidate-observed",
         "original-failure-preserved",
       ]),
     );

@@ -46,6 +46,9 @@ import type {
 import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
 import type {
+  PostRepairVerificationRequirementObservation,
+  PostRepairVerificationRequestObservation,
+  PostRepairVerificationResultObservation,
   VerificationLoopIntent,
   VerificationResultObservation,
 } from "../../verification/result/boundary.js";
@@ -176,6 +179,10 @@ export type RuntimeProjectionEventType =
   | "repair-apply-requested"
   | "repair-apply-observed"
   | "post-repair-verification-observed"
+  | "post-repair-verification-required"
+  | "post-repair-verification-requested"
+  | "post-repair-verification-result-observed"
+  | "post-repair-verification-verdict-candidate-observed"
   | "original-failure-preserved"
   | "tool-dispatch-not-run"
   | "agent-loop-started"
@@ -246,6 +253,9 @@ export function projectRuntimeEvents(input: {
   readonly nextTurnDeliveryPolicies?: readonly NextTurnDeliveryPolicyProjection[];
   readonly verificationIntents?: readonly VerificationLoopIntent[];
   readonly verificationResults?: readonly VerificationResultObservation[];
+  readonly postRepairVerificationRequirements?: readonly PostRepairVerificationRequirementObservation[];
+  readonly postRepairVerificationRequests?: readonly PostRepairVerificationRequestObservation[];
+  readonly postRepairVerificationResults?: readonly PostRepairVerificationResultObservation[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
@@ -1452,6 +1462,9 @@ export function projectRuntimeEvents(input: {
         executionReceiptCount: input.savePoint.executionReceipts.length,
         verificationIntentIds: input.savePoint.verificationIntentIds,
         verificationResultIds: input.savePoint.verificationResultIds,
+        postRepairVerificationRequirementIds: input.savePoint.postRepairVerificationRequirementIds,
+        postRepairVerificationRequestIds: input.savePoint.postRepairVerificationRequestIds,
+        postRepairVerificationResultIds: input.savePoint.postRepairVerificationResultIds,
         repairHandoffIds: input.savePoint.repairHandoffIds,
       },
       input.savePoint.notProvenClaims,
@@ -1715,6 +1728,115 @@ export function projectRuntimeEvents(input: {
       },
       result.notProvenClaims,
     );
+  }
+
+  for (const requirement of input.postRepairVerificationRequirements ?? []) {
+    append(
+      "post-repair-verification-required",
+      {
+        requirementId: requirement.requirementId,
+        sourceRepairApplyId: requirement.sourceRepairApplyId,
+        sourceRepairProposalId: requirement.sourceRepairProposalId,
+        sourceVerificationFailureId: requirement.sourceVerificationFailureId,
+        sourceVerificationId: requirement.sourceVerificationId,
+        originalFailureClass: requirement.originalFailureClass,
+        originalFailureStatus: requirement.originalFailureStatus,
+        repairApplyState: requirement.repairApplyState,
+        repairAuthorityState: requirement.repairAuthorityState,
+        verificationRequired: requirement.verificationRequired,
+        requirementStatus: requirement.requirementStatus,
+        verificationBlocker: requirement.verificationBlocker,
+        taskRelevanceExpectation: requirement.taskRelevanceExpectation,
+        coverageExpectation: requirement.coverageExpectation,
+        originalRuntimeReceiptIds: requirement.originalRuntimeReceiptIds,
+        repairApplyReceiptIds: requirement.repairApplyReceiptIds,
+        touchedTargetSummaries: requirement.touchedTargetSummaries,
+        originalFailurePreserved: requirement.originalFailurePreserved,
+        repairApplyPreserved: requirement.repairApplyPreserved,
+        redactionStatus: requirement.redactionStatus,
+        terminalSuccessClaim: requirement.terminalSuccessClaim,
+      },
+      requirement.notProvenClaims,
+    );
+  }
+
+  for (const request of input.postRepairVerificationRequests ?? []) {
+    append(
+      "post-repair-verification-requested",
+      {
+        requestId: request.requestId,
+        requirementId: request.requirementId,
+        sourceRepairApplyId: request.sourceRepairApplyId,
+        sourceRepairProposalId: request.sourceRepairProposalId,
+        sourceVerificationFailureId: request.sourceVerificationFailureId,
+        selectedCommandSummary: request.selectedCommandSummary,
+        selectedNotRun: request.selectedNotRun,
+        dispatchStatus: request.dispatchStatus,
+        receiptIds: request.receiptIds,
+        taskRelevanceStatus: request.taskRelevanceStatus,
+        coverageStatus: request.coverageStatus,
+        originalFailurePreserved: request.originalFailurePreserved,
+        repairApplyPreserved: request.repairApplyPreserved,
+        redactionStatus: request.redactionStatus,
+        terminalSuccessClaim: request.terminalSuccessClaim,
+      },
+      request.notProvenClaims,
+    );
+  }
+
+  for (const result of input.postRepairVerificationResults ?? []) {
+    append(
+      "post-repair-verification-result-observed",
+      {
+        resultId: result.resultId,
+        requestId: result.requestId,
+        requirementId: result.requirementId,
+        sourceRepairApplyId: result.sourceRepairApplyId,
+        sourceRepairProposalId: result.sourceRepairProposalId,
+        sourceVerificationFailureId: result.sourceVerificationFailureId,
+        sourceVerificationId: result.sourceVerificationId,
+        originalFailureStatus: result.originalFailureStatus,
+        originalFailureClass: result.originalFailureClass,
+        originalFailureSummary: result.originalFailureSummary,
+        originalTaskRelevanceStatus: result.originalTaskRelevanceStatus,
+        originalCoverageStatus: result.originalCoverageStatus,
+        originalRuntimeReceiptIds: result.originalRuntimeReceiptIds,
+        repairApplyState: result.repairApplyState,
+        repairAuthorityState: result.repairAuthorityState,
+        repairApplyReceiptIds: result.repairApplyReceiptIds,
+        touchedTargetSummaries: result.touchedTargetSummaries,
+        status: result.status,
+        receiptIds: result.receiptIds,
+        failureClass: result.failureClass,
+        taskRelevanceStatus: result.taskRelevanceStatus,
+        coverageStatus: result.coverageStatus,
+        originalFailurePreserved: result.originalFailurePreserved,
+        repairApplyPreserved: result.repairApplyPreserved,
+        redactionStatus: result.redactionStatus,
+        terminalSuccessClaim: result.terminalSuccessClaim,
+      },
+      result.notProvenClaims,
+    );
+    if (result.verdictCandidateInput) {
+      append(
+        "post-repair-verification-verdict-candidate-observed",
+        {
+          candidateId: result.verdictCandidateInput.candidateId,
+          sourcePostRepairVerificationResultId:
+            result.verdictCandidateInput.sourcePostRepairVerificationResultId,
+          sourceRepairApplyId: result.verdictCandidateInput.sourceRepairApplyId,
+          sourceVerificationFailureId:
+            result.verdictCandidateInput.sourceVerificationFailureId,
+          resultStatus: result.verdictCandidateInput.resultStatus,
+          taskRelevanceStatus: result.verdictCandidateInput.taskRelevanceStatus,
+          coverageStatus: result.verdictCandidateInput.coverageStatus,
+          originalFailurePreserved: result.verdictCandidateInput.originalFailurePreserved,
+          repairApplyPreserved: result.verdictCandidateInput.repairApplyPreserved,
+          terminalSuccessClaim: result.verdictCandidateInput.terminalSuccessClaim,
+        },
+        result.notProvenClaims,
+      );
+    }
   }
 
   for (const handoff of input.repairRequiredHandoffs ?? []) {

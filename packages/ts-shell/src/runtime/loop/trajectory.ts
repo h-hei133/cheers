@@ -71,6 +71,9 @@ export interface LoopTrajectoryProjection {
   readonly deliveryPolicyIds: readonly string[];
   readonly verificationIntentIds: readonly string[];
   readonly verificationResultIds: readonly string[];
+  readonly postRepairVerificationRequirementIds: readonly string[];
+  readonly postRepairVerificationRequestIds: readonly string[];
+  readonly postRepairVerificationResultIds: readonly string[];
   readonly repairHandoffIds: readonly string[];
   readonly repairProposalIds: readonly string[];
   readonly repairApplyIds: readonly string[];
@@ -642,6 +645,78 @@ export function projectLoopTrajectory(
         [turn.verification.repairApply.repairApplyId],
       );
     }
+    if (turn.verification.postRepairVerificationRequirement) {
+      append(
+        "post-repair-verification",
+        "loop-verification-result-observed",
+        {
+          turn: turn.turn,
+          requirementId: turn.verification.postRepairVerificationRequirement.requirementId,
+          sourceRepairApplyId:
+            turn.verification.postRepairVerificationRequirement.sourceRepairApplyId,
+          requirementStatus:
+            turn.verification.postRepairVerificationRequirement.requirementStatus,
+          verificationRequired:
+            turn.verification.postRepairVerificationRequirement.verificationRequired,
+          verificationBlocker:
+            turn.verification.postRepairVerificationRequirement.verificationBlocker,
+          originalFailureClass:
+            turn.verification.postRepairVerificationRequirement.originalFailureClass,
+          repairApplyState:
+            turn.verification.postRepairVerificationRequirement.repairApplyState,
+          originalFailurePreserved:
+            turn.verification.postRepairVerificationRequirement.originalFailurePreserved,
+          repairApplyPreserved:
+            turn.verification.postRepairVerificationRequirement.repairApplyPreserved,
+          terminalSuccessClaim: false,
+        },
+        turn.verification.postRepairVerificationRequirement.notProvenClaims,
+        [turn.verification.postRepairVerificationRequirement.requirementId],
+      );
+    }
+    if (turn.verification.postRepairVerificationRequest) {
+      append(
+        "post-repair-verification",
+        "loop-verification-result-observed",
+        {
+          turn: turn.turn,
+          requestId: turn.verification.postRepairVerificationRequest.requestId,
+          requirementId: turn.verification.postRepairVerificationRequest.requirementId,
+          dispatchStatus: turn.verification.postRepairVerificationRequest.dispatchStatus,
+          selectedNotRun: turn.verification.postRepairVerificationRequest.selectedNotRun,
+          receiptIds: turn.verification.postRepairVerificationRequest.receiptIds,
+          terminalSuccessClaim: false,
+        },
+        turn.verification.postRepairVerificationRequest.notProvenClaims,
+        [turn.verification.postRepairVerificationRequest.requestId],
+      );
+    }
+    if (turn.verification.postRepairVerificationResult) {
+      append(
+        "post-repair-verification",
+        "loop-verification-result-observed",
+        {
+          turn: turn.turn,
+          resultId: turn.verification.postRepairVerificationResult.resultId,
+          requestId: turn.verification.postRepairVerificationResult.requestId,
+          requirementId: turn.verification.postRepairVerificationResult.requirementId,
+          status: turn.verification.postRepairVerificationResult.status,
+          failureClass: turn.verification.postRepairVerificationResult.failureClass,
+          taskRelevanceStatus:
+            turn.verification.postRepairVerificationResult.taskRelevanceStatus,
+          coverageStatus: turn.verification.postRepairVerificationResult.coverageStatus,
+          verdictCandidateAvailable:
+            turn.verification.postRepairVerificationResult.verdictCandidateInput !== undefined,
+          originalFailurePreserved:
+            turn.verification.postRepairVerificationResult.originalFailurePreserved,
+          repairApplyPreserved:
+            turn.verification.postRepairVerificationResult.repairApplyPreserved,
+          terminalSuccessClaim: false,
+        },
+        turn.verification.postRepairVerificationResult.notProvenClaims,
+        [turn.verification.postRepairVerificationResult.resultId],
+      );
+    }
   }
 
   if (input.providerRegistry) {
@@ -952,6 +1027,21 @@ export function projectLoopTrajectory(
   const deliveryPolicyIds = turns.map((turn) => turn.nextTurn.deliveryPolicy.policyId);
   const verificationIntentIds = turns.map((turn) => turn.verification.intent.intentId);
   const verificationResultIds = turns.map((turn) => turn.verification.result.verificationId);
+  const postRepairVerificationRequirementIds = turns.flatMap((turn) =>
+    turn.verification.postRepairVerificationRequirement
+      ? [turn.verification.postRepairVerificationRequirement.requirementId]
+      : []
+  );
+  const postRepairVerificationRequestIds = turns.flatMap((turn) =>
+    turn.verification.postRepairVerificationRequest
+      ? [turn.verification.postRepairVerificationRequest.requestId]
+      : []
+  );
+  const postRepairVerificationResultIds = turns.flatMap((turn) =>
+    turn.verification.postRepairVerificationResult
+      ? [turn.verification.postRepairVerificationResult.resultId]
+      : []
+  );
   const repairHandoffIds = turns.flatMap((turn) =>
     turn.verification.repairRequired ? [turn.verification.repairRequired.handoffId] : []
   );
@@ -977,6 +1067,15 @@ export function projectLoopTrajectory(
     deliveryPolicyIds: Object.freeze(Array.from(new Set(deliveryPolicyIds))),
     verificationIntentIds: Object.freeze(Array.from(new Set(verificationIntentIds))),
     verificationResultIds: Object.freeze(Array.from(new Set(verificationResultIds))),
+    postRepairVerificationRequirementIds: Object.freeze(
+      Array.from(new Set(postRepairVerificationRequirementIds)),
+    ),
+    postRepairVerificationRequestIds: Object.freeze(
+      Array.from(new Set(postRepairVerificationRequestIds)),
+    ),
+    postRepairVerificationResultIds: Object.freeze(
+      Array.from(new Set(postRepairVerificationResultIds)),
+    ),
     repairHandoffIds: Object.freeze(Array.from(new Set(repairHandoffIds))),
     repairProposalIds: Object.freeze(Array.from(new Set(repairProposalIds))),
     repairApplyIds: Object.freeze(Array.from(new Set(repairApplyIds))),

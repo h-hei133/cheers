@@ -23,8 +23,11 @@ import {
 } from "../../tools/policy/interception.js";
 import { createCommandToolResultSplit } from "../../tools/result/split.js";
 import {
+  observePostRepairVerificationResult,
   observeVerificationResult,
   projectVerificationIntent,
+  requestPostRepairVerification,
+  requirePostRepairVerification,
 } from "../../verification/result/boundary.js";
 import { projectVerificationReceipt } from "../../verification/verificationFacade.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
@@ -343,6 +346,20 @@ describe("loop trajectory projection", () => {
           },
           postRepairVerificationStatus: "not_run",
         });
+        const postRepairVerificationRequirement = requirePostRepairVerification({
+          repairApply,
+        });
+        const postRepairVerificationRequest = requestPostRepairVerification({
+          requirement: postRepairVerificationRequirement,
+          dispatchStatus: "dispatched",
+          receiptIds: ["receipt-post-repair-trajectory"],
+        });
+        const postRepairVerificationResult = observePostRepairVerificationResult({
+          requirement: postRepairVerificationRequirement,
+          request: postRepairVerificationRequest,
+          status: "passed",
+          receiptIds: ["receipt-post-repair-trajectory"],
+        });
         return {
           intent,
           result,
@@ -351,6 +368,9 @@ describe("loop trajectory projection", () => {
           repairAuthority,
           repairApplyRequest,
           repairApply,
+          postRepairVerificationRequirement,
+          postRepairVerificationRequest,
+          postRepairVerificationResult,
         };
       },
     });
@@ -365,8 +385,33 @@ describe("loop trajectory projection", () => {
     expect(trajectory.repairHandoffIds).toHaveLength(1);
     expect(trajectory.repairProposalIds).toHaveLength(1);
     expect(trajectory.repairApplyIds).toHaveLength(1);
+    expect(trajectory.postRepairVerificationRequirementIds).toHaveLength(1);
+    expect(trajectory.postRepairVerificationRequestIds).toHaveLength(1);
+    expect(trajectory.postRepairVerificationResultIds).toHaveLength(1);
     expect(trajectory.events).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          type: "loop-verification-result-observed",
+          facts: expect.objectContaining({
+            requirementStatus: "required",
+            verificationRequired: true,
+            verificationBlocker: "none",
+            repairApplyState: "applied",
+            originalFailurePreserved: true,
+            repairApplyPreserved: true,
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "loop-verification-result-observed",
+          facts: expect.objectContaining({
+            status: "passed",
+            verdictCandidateAvailable: true,
+            originalFailurePreserved: true,
+            repairApplyPreserved: true,
+            terminalSuccessClaim: false,
+          }),
+        }),
         expect.objectContaining({
           type: "loop-repair-handoff-observed",
           facts: expect.objectContaining({
@@ -431,7 +476,11 @@ describe("loop trajectory projection", () => {
       ]),
     );
     expect(trajectory.notProvenClaims).toEqual(
-      expect.arrayContaining(["repair-success", "verification-success"]),
+      expect.arrayContaining([
+        "repair-success",
+        "verification-success",
+        "post-repair-verification-passed-is-verdict-input-only",
+      ]),
     );
     expect(trajectory.terminalSuccessClaim).toBe(false);
   });

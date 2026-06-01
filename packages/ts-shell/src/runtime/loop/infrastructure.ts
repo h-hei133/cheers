@@ -174,7 +174,7 @@ export function createLoopInfrastructureMap(): LoopInfrastructureMap {
     entry("repair-apply", "repair", "repair", "connected", "RepairApplyObservation", [
       "repair-success",
     ]),
-    entry("post-repair-verification", "verification", "repair", "connected", "RepairApplyObservation.postRepairVerificationStatus", [
+    entry("post-repair-verification", "verification", "verification", "connected", "PostRepairVerificationRequirement/Request/ResultObservation", [
       "verification-success",
       "repair-success",
     ]),
