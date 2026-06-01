@@ -24,7 +24,15 @@ import { runControlledModelInvocationAdapter } from "../../provider/request/atte
 import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
+import {
+  observeRepairProposal,
+  projectRepairRequiredHandoff,
+} from "../../repair/handoff/boundary.js";
 import { projectVerificationReceipt } from "../../verification/verificationFacade.js";
+import {
+  observeVerificationResult,
+  projectVerificationIntent,
+} from "../../verification/result/boundary.js";
 import { projectModelBoundaryPhase } from "../../runtime/loop/modelBoundary.js";
 import { runProviderStreamAdapter } from "../../runtime/loop/providerStreamAdapter.js";
 import { projectProductLoopAdapter } from "../../runtime/loop/adapter.js";
@@ -283,6 +291,66 @@ describe("product surface view model", () => {
     expect(rendered).toContain("runtimeReceipts=1");
     expect(rendered).toContain("repairEligible=yes");
     expect(rendered).toContain("verificationSuccess=not-proven");
+    expect(rendered).not.toContain("Outcome: success");
+  });
+
+  it("renders repair observations while preserving the original failure and not-run states", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess_surface_repair",
+      workspaceRoot: "/workspace",
+      prompt: "summarize repair observation",
+      providerOptIn: false,
+      modelBoundary: async () => ({
+        responseId: "response-surface-repair",
+        stopReason: "stop",
+      }),
+      verificationBoundary: async ({ turnId }) => {
+        const intent = projectVerificationIntent({
+          sourceTurnId: turnId,
+          targetSummary: "verify repair target",
+          dispatchStatus: "failed",
+          relevanceStatus: "task_relevant",
+          coverageStatus: "covered",
+          authorityRequirement: "granted",
+        });
+        const result = observeVerificationResult({
+          intent,
+          status: "failed",
+          failureClass: "test-failed",
+          repairEligible: true,
+          runtimeReceiptIds: ["receipt-surface-repair"],
+        });
+        const repairRequired = projectRepairRequiredHandoff({ verification: result });
+        const repairProposal = observeRepairProposal({
+          handoff: repairRequired,
+          proposalSource: "deterministic_from_failure_evidence",
+          readinessStatus: "partial",
+          applyStatus: "not_applied",
+          postRepairVerificationStatus: "not_run",
+        });
+        return { intent, result, repairRequired, repairProposal };
+      },
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "surface-repair",
+      prompt: "summarize repair observation",
+      loop,
+    });
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped",
+      terminalClassification: "stopped",
+      terminalReason: "waiting_for_input",
+      loopTrajectory: trajectory,
+    });
+    const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
+
+    expect(rendered).toContain("originalFailure: true");
+    expect(rendered).toContain("failureClass: test-failed");
+    expect(rendered).toContain("repairBlocker: none");
+    expect(rendered).toContain("proposalReadiness: partial");
+    expect(rendered).toContain("apply: not_applied");
+    expect(rendered).toContain("postRepairVerification: not_run");
+    expect(rendered).toContain("repairSuccess=not-proven");
     expect(rendered).not.toContain("Outcome: success");
   });
 

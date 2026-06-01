@@ -32,12 +32,33 @@ export type PostRepairVerificationObservationStatus =
   | "unsupported"
   | "not_proven";
 
+export type RepairBlocker =
+  | "none"
+  | "verification-not-failed"
+  | "task-relevance-not-proven"
+  | "coverage-not-proven"
+  | "missing-authority"
+  | "repair-not-eligible"
+  | "unsupported-failure-class"
+  | "unsafe-failure-class"
+  | "not-proven";
+
+export type RepairRisk = "low" | "medium" | "high" | "unknown";
+
 export interface RepairRequiredHandoff {
   readonly handoffId: string;
   readonly sourceVerificationId: string;
   readonly failureClass: string;
+  readonly originalFailureSummary: string;
   readonly originalFailurePreserved: true;
+  readonly taskRelevanceStatus: VerificationResultObservation["relevanceStatus"];
+  readonly coverageStatus: VerificationResultObservation["coverageStatus"];
+  readonly authorityState: VerificationResultObservation["authorityRequirement"];
+  readonly runtimeReceiptIds: readonly string[];
+  readonly repairEligible: boolean;
   readonly repairabilityStatus: RepairabilityStatus;
+  readonly repairBlocker: RepairBlocker;
+  readonly repairRisk: RepairRisk;
   readonly suggestedRepairMode: "proposal_only" | "existing_owner" | "unsupported" | "unknown";
   readonly authorityRequirement: "required" | "not_required" | "unknown";
   readonly redactionStatus: "report-safe" | "redacted";
@@ -50,9 +71,17 @@ export interface RepairProposalObservation {
   readonly sourceFailureId: string;
   readonly proposalSource: RepairProposalSource;
   readonly targetSummary: string;
+  readonly sourceVerificationId: string;
+  readonly originalFailureClass: string;
+  readonly originalFailureSummary: string;
+  readonly taskRelevanceStatus: RepairRequiredHandoff["taskRelevanceStatus"];
+  readonly coverageStatus: RepairRequiredHandoff["coverageStatus"];
+  readonly runtimeReceiptIds: readonly string[];
   readonly readinessStatus: "exact_ready" | "partial" | "not_ready" | "unknown";
+  readonly proposalRisk: RepairRisk;
   readonly authorityRequirement: "required" | "not_required" | "unknown";
   readonly applyStatus: RepairApplyObservationStatus;
+  readonly postRepairVerificationStatus: PostRepairVerificationObservationStatus;
   readonly redactionStatus: "report-safe" | "redacted";
   readonly notProvenClaims: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -73,18 +102,31 @@ export interface RepairApplyObservation {
 export function projectRepairRequiredHandoff(input: {
   readonly verification: VerificationResultObservation;
   readonly repairabilityStatus?: RepairabilityStatus;
+  readonly repairBlocker?: RepairBlocker;
+  readonly repairRisk?: RepairRisk;
   readonly suggestedRepairMode?: RepairRequiredHandoff["suggestedRepairMode"];
   readonly authorityRequirement?: RepairRequiredHandoff["authorityRequirement"];
   readonly notProvenClaims?: readonly string[];
 }): RepairRequiredHandoff {
   const redactions = new Set<string>();
+  const repairBlocker = input.repairBlocker ?? repairBlockerFromVerification(input.verification);
   return freeze({
     handoffId: sanitizeId(`${input.verification.verificationId}:repair-required`, redactions),
     sourceVerificationId: sanitizeText(input.verification.verificationId, redactions, 180),
     failureClass: sanitizeText(input.verification.failureClass ?? "verification-failed", redactions, 120),
+    originalFailureSummary: sanitizeText(input.verification.safeSummary, redactions, 180),
     originalFailurePreserved: true,
+    taskRelevanceStatus: input.verification.relevanceStatus,
+    coverageStatus: input.verification.coverageStatus,
+    authorityState: input.verification.authorityRequirement,
+    runtimeReceiptIds: input.verification.runtimeReceiptIds.map((id) =>
+      sanitizeText(id, redactions, 180)
+    ),
+    repairEligible: input.verification.repairEligible,
     repairabilityStatus: input.repairabilityStatus ??
-      (input.verification.status === "failed" ? "repair_required" : "not_proven"),
+      repairabilityStatusFromBlocker(input.verification, repairBlocker),
+    repairBlocker,
+    repairRisk: input.repairRisk ?? repairRiskFromVerification(input.verification, repairBlocker),
     suggestedRepairMode: input.suggestedRepairMode ?? "proposal_only",
     authorityRequirement: input.authorityRequirement ?? "required",
     redactionStatus:
@@ -98,6 +140,7 @@ export function projectRepairRequiredHandoff(input: {
       "verification-success",
       "repair-required-is-not-success",
       "original-failure-preserved",
+      "repair-eligible-is-not-success",
       ...(input.verification.notProvenClaims ?? []),
       ...(input.notProvenClaims ?? []),
     ], redactions),
@@ -110,8 +153,10 @@ export function observeRepairProposal(input: {
   readonly proposalSource?: RepairProposalSource;
   readonly targetSummary?: string;
   readonly readinessStatus?: RepairProposalObservation["readinessStatus"];
+  readonly proposalRisk?: RepairRisk;
   readonly authorityRequirement?: RepairProposalObservation["authorityRequirement"];
   readonly applyStatus?: RepairApplyObservationStatus;
+  readonly postRepairVerificationStatus?: PostRepairVerificationObservationStatus;
   readonly repairIteration?: ProductRepairIterationProjection;
   readonly notProvenClaims?: readonly string[];
 }): RepairProposalObservation {
@@ -126,9 +171,20 @@ export function observeRepairProposal(input: {
     proposalSource: input.proposalSource ??
       (input.repairIteration ? "existing_repair_owner_projection" : "unavailable"),
     targetSummary: sanitizeText(targetSummary, redactions, 180),
+    sourceVerificationId: sanitizeText(input.handoff.sourceVerificationId, redactions, 180),
+    originalFailureClass: sanitizeText(input.handoff.failureClass, redactions, 120),
+    originalFailureSummary: sanitizeText(input.handoff.originalFailureSummary, redactions, 180),
+    taskRelevanceStatus: input.handoff.taskRelevanceStatus,
+    coverageStatus: input.handoff.coverageStatus,
+    runtimeReceiptIds: input.handoff.runtimeReceiptIds.map((id) =>
+      sanitizeText(id, redactions, 180)
+    ),
     readinessStatus: input.readinessStatus ?? "unknown",
+    proposalRisk: input.proposalRisk ?? input.handoff.repairRisk,
     authorityRequirement: input.authorityRequirement ?? input.handoff.authorityRequirement,
     applyStatus: input.applyStatus ?? applyStatusFromIteration(input.repairIteration),
+    postRepairVerificationStatus: input.postRepairVerificationStatus ??
+      postRepairStatusFromIteration(input.repairIteration),
     redactionStatus:
       redactions.size > 0 || input.handoff.redactionStatus === "redacted"
         ? "redacted"
@@ -139,11 +195,86 @@ export function observeRepairProposal(input: {
       "repair-success",
       "repair-proposal-is-not-success",
       "repair-continuation-is-not-success",
+      "proposal-ready-is-not-authority",
+      "repair-proposal-is-not-apply",
+      "repair-apply-not-run-is-not-success",
+      "post-repair-verification-not-run-is-not-success",
+      "original-failure-preserved",
+      ...(input.handoff.notProvenClaims ?? []),
       ...(input.repairIteration?.notProvenClaims ?? []),
       ...(input.notProvenClaims ?? []),
     ], redactions),
     terminalSuccessClaim: false,
   });
+}
+
+function repairBlockerFromVerification(
+  verification: VerificationResultObservation,
+): RepairBlocker {
+  if (verification.status !== "failed") return "verification-not-failed";
+  if (
+    verification.authorityRequirement === "required" ||
+    verification.authorityRequirement === "unknown"
+  ) {
+    return "missing-authority";
+  }
+  if (
+    verification.relevanceStatus !== "task_relevant" &&
+    verification.relevanceStatus !== "probably_relevant"
+  ) {
+    return "task-relevance-not-proven";
+  }
+  if (
+    verification.coverageStatus !== "covered" &&
+    verification.coverageStatus !== "partially_covered"
+  ) {
+    return "coverage-not-proven";
+  }
+  if (verification.failureClass === "command-blocked-by-policy") {
+    return "unsafe-failure-class";
+  }
+  if (
+    verification.failureClass === "environment-failed" ||
+    verification.failureClass === "invalid-runtime-receipt" ||
+    verification.failureClass === "no-verification-command" ||
+    verification.failureClass === "command-unavailable"
+  ) {
+    return "unsupported-failure-class";
+  }
+  if (!verification.repairEligible) return "repair-not-eligible";
+  return "none";
+}
+
+function repairabilityStatusFromBlocker(
+  verification: VerificationResultObservation,
+  blocker: RepairBlocker,
+): RepairabilityStatus {
+  if (blocker === "none") return "repair_required";
+  if (blocker === "verification-not-failed") return "not_proven";
+  if (blocker === "repair-not-eligible" || blocker === "unsupported-failure-class") {
+    return "unsupported";
+  }
+  if (blocker === "unsafe-failure-class") return "repair_not_available";
+  if (verification.status === "failed") return "repair_possible";
+  return "not_proven";
+}
+
+function repairRiskFromVerification(
+  verification: VerificationResultObservation,
+  blocker: RepairBlocker,
+): RepairRisk {
+  if (blocker === "unsafe-failure-class") return "high";
+  if (blocker === "unsupported-failure-class" || blocker === "repair-not-eligible") {
+    return "medium";
+  }
+  if (
+    verification.relevanceStatus === "task_relevant" &&
+    verification.coverageStatus === "covered" &&
+    verification.repairEligible
+  ) {
+    return "low";
+  }
+  return "unknown";
 }
 
 export function observeRepairApply(input: {

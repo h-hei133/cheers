@@ -506,7 +506,18 @@ export function projectLoopTrajectory(
           turn: turn.turn,
           handoffId: turn.verification.repairRequired.handoffId,
           sourceVerificationId: turn.verification.repairRequired.sourceVerificationId,
+          failureClass: turn.verification.repairRequired.failureClass,
+          originalFailureSummary:
+            turn.verification.repairRequired.originalFailureSummary,
+          taskRelevanceStatus:
+            turn.verification.repairRequired.taskRelevanceStatus,
+          coverageStatus: turn.verification.repairRequired.coverageStatus,
+          authorityState: turn.verification.repairRequired.authorityState,
+          runtimeReceiptIds: turn.verification.repairRequired.runtimeReceiptIds,
+          repairEligible: turn.verification.repairRequired.repairEligible,
           repairabilityStatus: turn.verification.repairRequired.repairabilityStatus,
+          repairBlocker: turn.verification.repairRequired.repairBlocker,
+          repairRisk: turn.verification.repairRequired.repairRisk,
           originalFailurePreserved:
             turn.verification.repairRequired.originalFailurePreserved,
           terminalSuccessClaim: false,
@@ -522,9 +533,24 @@ export function projectLoopTrajectory(
         {
           turn: turn.turn,
           proposalId: turn.verification.repairProposal.proposalId,
+          sourceFailureId: turn.verification.repairProposal.sourceFailureId,
+          sourceVerificationId: turn.verification.repairProposal.sourceVerificationId,
           proposalSource: turn.verification.repairProposal.proposalSource,
+          originalFailureClass:
+            turn.verification.repairProposal.originalFailureClass,
+          originalFailureSummary:
+            turn.verification.repairProposal.originalFailureSummary,
+          taskRelevanceStatus:
+            turn.verification.repairProposal.taskRelevanceStatus,
+          coverageStatus: turn.verification.repairProposal.coverageStatus,
+          runtimeReceiptIds: turn.verification.repairProposal.runtimeReceiptIds,
           readinessStatus: turn.verification.repairProposal.readinessStatus,
+          proposalRisk: turn.verification.repairProposal.proposalRisk,
+          authorityRequirement:
+            turn.verification.repairProposal.authorityRequirement,
           applyStatus: turn.verification.repairProposal.applyStatus,
+          postRepairVerificationStatus:
+            turn.verification.repairProposal.postRepairVerificationStatus,
           terminalSuccessClaim: false,
         },
         turn.verification.repairProposal.notProvenClaims,

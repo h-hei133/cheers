@@ -573,11 +573,15 @@ describe("runtime event projection", () => {
       targetSummary: "verify target",
       dispatchStatus: "failed",
       relevanceStatus: "task_relevant",
+      coverageStatus: "covered",
+      authorityRequirement: "granted",
     });
     const result = observeVerificationResult({
       intent,
       status: "failed",
-      failureClass: "test-failure",
+      failureClass: "test-failed",
+      repairEligible: true,
+      runtimeReceiptIds: ["receipt-events-repair"],
     });
     const handoff = projectRepairRequiredHandoff({ verification: result });
     const proposal = observeRepairProposal({ handoff, proposalSource: "fake_default_safe" });
@@ -604,6 +608,38 @@ describe("runtime event projection", () => {
       "repair-apply-observed",
       "post-repair-verification-observed",
     ]);
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "repair-required",
+          facts: expect.objectContaining({
+            sourceVerificationId: result.verificationId,
+            failureClass: "test-failed",
+            taskRelevanceStatus: "task_relevant",
+            coverageStatus: "covered",
+            authorityState: "granted",
+            runtimeReceiptIds: ["receipt-events-repair"],
+            repairEligible: true,
+            repairBlocker: "none",
+            repairRisk: "low",
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "repair-proposal-observed",
+          facts: expect.objectContaining({
+            sourceVerificationId: result.verificationId,
+            originalFailureClass: "test-failed",
+            taskRelevanceStatus: "task_relevant",
+            coverageStatus: "covered",
+            runtimeReceiptIds: ["receipt-events-repair"],
+            applyStatus: "not_applied",
+            postRepairVerificationStatus: "not_run",
+            terminalSuccessClaim: false,
+          }),
+        }),
+      ]),
+    );
     expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
     expect(events.flatMap((event) => event.notProvenClaims)).toEqual(
       expect.arrayContaining([

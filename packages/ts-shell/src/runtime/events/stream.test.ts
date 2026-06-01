@@ -378,17 +378,30 @@ describe("JSON runtime event stream projection", () => {
     const stream = projectJsonRuntimeEventStream({
       events: [
         {
-          id: "event-verification-repair",
+          id: "event-repair-proposal",
           sequence: 1,
-          type: "repair-apply-observed",
+          type: "repair-proposal-observed",
           facts: {
-            repairApplyStatus: "applied",
+            proposalId: "proposal-1",
+            sourceVerificationId: "verification-1",
+            originalFailureClass: "test-failed",
+            originalFailureSummary: "verification failed",
+            taskRelevanceStatus: "task_relevant",
+            coverageStatus: "covered",
+            runtimeReceiptIds: ["receipt-repair-stream"],
+            readinessStatus: "partial",
+            applyStatus: "not_applied",
             postRepairVerificationStatus: "not_run",
             raw:
               "raw provider output: hidden reasoning token=secret oldText=before newText=after",
             terminalSuccessClaim: false,
           },
-          notProvenClaims: ["repair-success", "verification-success"],
+          notProvenClaims: [
+            "repair-success",
+            "verification-success",
+            "repair-proposal-is-not-apply",
+            "post-repair-verification-not-run-is-not-success",
+          ],
           redaction: {
             status: "report-safe",
             excluded: [],
@@ -398,7 +411,15 @@ describe("JSON runtime event stream projection", () => {
     });
     const serialized = JSON.stringify(stream);
 
-    expect(stream[0]?.eventType).toBe("repair-apply-observed");
+    expect(stream[0]?.eventType).toBe("repair-proposal-observed");
+    expect(stream[0]?.facts).toEqual(
+      expect.objectContaining({
+        originalFailureClass: "test-failed",
+        runtimeReceiptIds: ["receipt-repair-stream"],
+        applyStatus: "not_applied",
+        postRepairVerificationStatus: "not_run",
+      }),
+    );
     expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
     expect(stream[0]?.notProvenClaims).toContain("terminal-success");
     expect(serialized).not.toMatch(

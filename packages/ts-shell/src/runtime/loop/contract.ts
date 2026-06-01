@@ -771,8 +771,30 @@ export async function runAgentLoopContract(
           receipt: input.verificationReceipt,
           runtimeReceiptIds: input.verificationRuntimeReceiptIds,
         });
+      const repairCarryForwardFacts = [
+        ...(verification.repairRequired
+          ? [
+              `repair-required:${verification.repairRequired.handoffId}`,
+              `repair-blocker:${verification.repairRequired.repairBlocker}`,
+              `repair-eligible:${verification.repairRequired.repairEligible ? "yes" : "no"}`,
+              `original-verification-failure:${verification.repairRequired.sourceVerificationId}`,
+            ]
+          : []),
+        ...(verification.repairProposal
+          ? [
+              `repair-proposal:${verification.repairProposal.proposalId}`,
+              `repair-proposal-readiness:${verification.repairProposal.readinessStatus}`,
+              `repair-apply:${verification.repairProposal.applyStatus}`,
+              `post-repair-verification:${verification.repairProposal.postRepairVerificationStatus}`,
+            ]
+          : []),
+      ];
       const verificationSavePoint = createEvidenceOnlySavePoint({
         ...savePointInput,
+        pendingNextTurnFacts: [
+          ...savePoint.pendingNextTurnFacts,
+          ...repairCarryForwardFacts,
+        ],
         verificationIntentIds: [verification.intent.intentId],
         verificationResultIds: [verification.result.verificationId],
         repairHandoffIds: verification.repairRequired
@@ -834,7 +856,10 @@ export async function runAgentLoopContract(
         savePoint: verificationSavePoint,
         nextTurn: {
           prepared: true,
-          pendingFacts: Object.freeze([...pendingNextTurnFacts]),
+          pendingFacts: Object.freeze([
+            ...pendingNextTurnFacts,
+            ...repairCarryForwardFacts,
+          ]),
           bundle: nextTurnBundle,
           requestPreparation,
           invocationGate,

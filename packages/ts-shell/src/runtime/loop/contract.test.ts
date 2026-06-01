@@ -284,8 +284,33 @@ describe("agent loop contract", () => {
     const turn = loop.turns[0];
     expect(turn?.verification.result.status).toBe("failed");
     expect(turn?.verification.repairRequired?.originalFailurePreserved).toBe(true);
+    expect(turn?.verification.repairRequired?.repairBlocker).toBe("missing-authority");
     expect(turn?.verification.repairProposal?.terminalSuccessClaim).toBe(false);
+    expect(turn?.verification.repairProposal?.applyStatus).toBe("not_applied");
+    expect(turn?.verification.repairProposal?.postRepairVerificationStatus).toBe("not_run");
     expect(turn?.verification.repairApply?.postRepairVerificationStatus).toBe("not_run");
+    expect(turn?.savePoint.repairHandoffIds).toEqual([
+      turn?.verification.repairRequired?.handoffId,
+    ]);
+    expect(turn?.savePoint.repairProposalIds).toEqual([
+      turn?.verification.repairProposal?.proposalId,
+    ]);
+    expect(turn?.savePoint.pendingNextTurnFacts).toEqual(
+      expect.arrayContaining([
+        `repair-required:${turn?.verification.repairRequired?.handoffId}`,
+        "repair-blocker:missing-authority",
+        `repair-proposal:${turn?.verification.repairProposal?.proposalId}`,
+        "repair-apply:not_applied",
+        "post-repair-verification:not_run",
+      ]),
+    );
+    expect(turn?.nextTurn.pendingFacts).toEqual(
+      expect.arrayContaining([
+        `repair-required:${turn?.verification.repairRequired?.handoffId}`,
+        `original-verification-failure:${turn?.verification.repairRequired?.sourceVerificationId}`,
+        `repair-proposal:${turn?.verification.repairProposal?.proposalId}`,
+      ]),
+    );
     expect(loop.events.map((event) => event.type)).toEqual(
       expect.arrayContaining([
         "verification-result-observed",

@@ -878,6 +878,14 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
   const verificationResultEvent = trajectory.events.find((event) =>
     event.type === "loop-verification-result-observed"
   );
+  const repairHandoffEvent = trajectory.events.find((event) =>
+    event.type === "loop-repair-handoff-observed" &&
+    event.facts.handoffId !== undefined
+  );
+  const repairProposalEvent = trajectory.events.find((event) =>
+    event.type === "loop-repair-handoff-observed" &&
+    event.facts.proposalId !== undefined
+  );
   const verificationRuntimeReceiptIds =
     verificationResultEvent?.facts.runtimeReceiptIds;
   const verificationRuntimeReceiptCount = Array.isArray(verificationRuntimeReceiptIds)
@@ -958,7 +966,36 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       title: "Repair",
       severity: trajectory.repairHandoffIds.length > 0 ? "info" : "not_proven",
       status: trajectory.repairHandoffIds.length > 0 ? "observed" : "not_proven",
-      summary: `handoffs=${trajectory.repairHandoffIds.length}; proposals=${trajectory.repairProposalIds.length}; applies=${trajectory.repairApplyIds.length}; postRepairVerification=${observed("post-repair-verification")}; repairSuccess=not-proven`,
+      summary: `repairSuccess=not-proven; handoffs=${trajectory.repairHandoffIds.length}; proposals=${trajectory.repairProposalIds.length}; applies=${trajectory.repairApplyIds.length}`,
+      facts: [
+        {
+          label: "originalFailure",
+          value: factValue(repairHandoffEvent?.facts.originalFailurePreserved),
+        },
+        {
+          label: "failureClass",
+          value: factValue(repairHandoffEvent?.facts.failureClass),
+        },
+        {
+          label: "repairBlocker",
+          value: factValue(repairHandoffEvent?.facts.repairBlocker),
+        },
+        {
+          label: "proposalReadiness",
+          value: factValue(repairProposalEvent?.facts.readinessStatus),
+        },
+        {
+          label: "apply",
+          value: factValue(repairProposalEvent?.facts.applyStatus),
+        },
+        {
+          label: "postRepairVerification",
+          value: factValue(
+            repairProposalEvent?.facts.postRepairVerificationStatus ??
+              observed("post-repair-verification"),
+          ),
+        },
+      ],
       machineEventCorrelationIds: [
         ...(stage("repair-handoff")?.eventIds ?? []),
         ...(stage("repair-proposal")?.eventIds ?? []),

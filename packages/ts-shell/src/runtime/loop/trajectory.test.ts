@@ -305,11 +305,15 @@ describe("loop trajectory projection", () => {
           targetSummary: "verify changed file",
           dispatchStatus: "failed",
           relevanceStatus: "task_relevant",
+          coverageStatus: "covered",
+          authorityRequirement: "granted",
         });
         const result = observeVerificationResult({
           intent,
           status: "failed",
-          failureClass: "test-failure",
+          failureClass: "test-failed",
+          repairEligible: true,
+          runtimeReceiptIds: ["receipt-trajectory-repair"],
         });
         const repairRequired = projectRepairRequiredHandoff({ verification: result });
         const repairProposal = observeRepairProposal({ handoff: repairRequired });
@@ -332,6 +336,34 @@ describe("loop trajectory projection", () => {
     expect(trajectory.repairHandoffIds).toHaveLength(1);
     expect(trajectory.repairProposalIds).toHaveLength(1);
     expect(trajectory.repairApplyIds).toHaveLength(1);
+    expect(trajectory.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "loop-repair-handoff-observed",
+          facts: expect.objectContaining({
+            failureClass: "test-failed",
+            taskRelevanceStatus: "task_relevant",
+            coverageStatus: "covered",
+            repairBlocker: "none",
+            repairRisk: "low",
+            runtimeReceiptIds: ["receipt-trajectory-repair"],
+            originalFailurePreserved: true,
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "loop-repair-handoff-observed",
+          facts: expect.objectContaining({
+            proposalSource: "unavailable",
+            applyStatus: "not_applied",
+            postRepairVerificationStatus: "not_run",
+            originalFailureClass: "test-failed",
+            runtimeReceiptIds: ["receipt-trajectory-repair"],
+            terminalSuccessClaim: false,
+          }),
+        }),
+      ]),
+    );
     expect(trajectory.events.map((event) => event.type)).toEqual(
       expect.arrayContaining([
         "loop-verification-intent-observed",
