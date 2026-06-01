@@ -1474,3 +1474,59 @@ Target root tools entries after:
 ### Recommended Next Step
 
 Review other zero-internal root owner indexes only with explicit package-facing aggregation scope.
+
+## Remaining Content Audit 2026-06-01
+
+Status: docs-only audit and classification of remaining visible structure debt after the context/planning, provider/tool, compatibility, and tools-entry cleanup passes. No source files were edited in this audit.
+
+Inspection summary:
+
+- Current code, latest pressure-report entries, SR003/SR005/SR016-SR019 cleanup notes, context/planning owner folders, root `orchestration` references, package-facing metadata, and targeted imports were inspected.
+- Serena targeted inspection was used for context discovery/acquisition/memory owners, planning runtime/projection owners, and the remaining planning product/proof adjacency still in `orchestration`.
+- Targeted import search found no tracked SR003 old implementation files under `packages/ts-shell/src/orchestration` for `repoIntelligence`, `contextEngine`, `contextGraphPlanning`, `contextAcquisitionProjection`, `contextPlanningSummary`, `contextMemory`, `groundedPlanningProjection`, `planningRuntime`, `planningRuntimeProductProjection`, `planningRuntimeProductProposal`, `planningMutationHandoffProjection`, or `planningMutationProposalBridge`.
+- The remaining references to those old names are historical docs, route docs, scenario strings, or test fixture target-path data rather than active imports, except for adjacent planning product/proof files that were not part of the completed SR003 move set.
+
+Current measured snapshot:
+
+| Measurement | Current |
+|---|---:|
+| Root `orchestration` direct files | 344 |
+| Root `orchestration` direct tests | 152 |
+| `context` direct files | 28 |
+| `planning` direct files | 11 |
+| `core/context` direct files | 172 |
+| `core/harness` direct files | 90 |
+| Export-only compatibility files | 79 |
+| Zero-internal-import compatibility files | 79 |
+| Internally imported export-only compatibility files | 0 |
+
+### Closed Or Completed Content
+
+| Area | Status | Evidence | Follow-up condition |
+|---|---|---|---|
+| SR003 context/planning old paths | closed | Old `orchestration/*` files named by SR003 are absent from `git ls-files`; owner files now exist under `context/discovery`, `context/acquisition`, `context/memory`, `planning/grounded`, `planning/runtime`, and `planning/handoff`. | None for the original move set. |
+| Internally imported export-only compatibility files | closed for current measurement | Current export-only heuristic found 79 export-only files and 0 internal imports to them. | Recheck before each removal batch because imports can drift. |
+| Root tools old entries | closed | `tools/dispatcher.ts`, `tools/interception.ts`, `tools/resultSplit.ts`, and `tools/registry.ts` were removed in prior cleanup entries. | Keep `tools/index.ts` until package-facing aggregation safety is reviewed. |
+
+### Remaining Content Register
+
+| Class | Examples | Classification | Why not handled now | Next owner review |
+|---|---|---|---|---|
+| Root owner aggregation indexes | `context/index.ts`, `planning/index.ts`, `presentation/index.ts`, `provider/index.ts`, `tools/index.ts` | zero-internal owner entries | They have no internal import pressure, but may still be package-facing aggregation surfaces. | Package-facing aggregation audit; remove only if disposable. |
+| Zero-internal compatibility facades | `edit/editFacade.ts`, `presentation/productSurface.ts`, `presentation/terminalMessageRenderer.ts`, `result/sessionResultTruthAdapter.ts`, `result/workflowRuntimeProjection.ts`, selected `session/*` and `verification/*` entries | compatibility or facade surface | Current measurement shows no internal imports, but output/session/verification-facing behavior needs focused owner validation before deletion. | Bounded owner batches with package-entry and script/test checks. |
+| Planning product/proof adjacency still in `orchestration` | `planningRuntimeProductExecution.ts`, `planningRuntimeProductRoute.ts`, `planningRuntimeProductVerification.ts`, `planningRuntimeProductRepair.ts`, `planningMutationProofRoute.ts`, `planningMutationProofHandoff.ts`, `planningMutationProofVerification.ts`, `planningExactProposal.ts` | active implementation, not a simple shim | These files still touch CLI entrypoints, `runtime/workflowExecutionCoordinator.ts`, verification command execution, repair continuation, provider proposal inputs, and workspace proof data. Moving them would cross protected workflow, provider, verification, repair, and result-facing boundaries. | Planning product/proof owner split only with explicit scope and focused tests. |
+| Root `orchestration` long-name implementation and tests | `capabilityBoundaryProjection.ts`, `contextAwareProviderProposal.ts`, `controlledEditOperationRoute.ts`, `planningRuntimeProductExecution.ts`, `targetSetEditRecoveryWorkflow.ts`, `verificationRepairIterationFlow.ts`, many colocated tests | mixed active implementation and tests | The root remains large, but the safe files are mixed with provider, edit/apply, repair, verification, and result-output adjacency. Appearance-only moves would risk owner confusion. | Continue one owner domain at a time, starting where imports are narrow. |
+| `core/context` pressure | browser, memory, model, sidebar, and web/read-only context files under `core/context` | crowded owner area | This is not the SR003 context/planning block; it includes browser/network/receipt/memory/sidebar responsibilities with separate validation needs. | Dedicated `core/context` decomposition pass. |
+| `core/harness` pressure | harness runtime, scoring, traces, fixtures, and evaluator surfaces | crowded owner area | Harness/eval has separate contract and offline-eval boundaries. | Dedicated harness/eval owner pass. |
+| Scenario strings and historical doc paths | `runMvpIntegratedFlow.test.ts` target strings, `planningExactProposal.ts` target-path fixture data, CP route docs, old audit docs | historical or fixture data | These are not active imports. Updating them could change test semantics or erase route history unless the scenario itself is being refreshed. | Leave as history unless a behavior-specific route owns the scenario update. |
+| Protected compatibility surfaces | `model-adapters/providerFetch.ts`, `runtime/execution/*`, `session/*`, result/evidence projections | protected boundary | Provider/auth, execution boundary, session durability, and result/evidence truthfulness require explicit route scope and stronger validation. | Review only under matching provider, execution, session, result, or evidence route. |
+
+### Deferred Validation Requirements
+
+- Any planning product/proof move must run the touched planning runtime/proposal/proof tests, product loop adapter tests if imports change, `npm run build -w packages/ts-shell`, and `npm run verify:result-contract` if output/result-facing projection changes.
+- Any session, runtime execution, provider, edit/apply, verification, repair, result, or evidence cleanup must use its owner-specific focused tests and preserve truthfulness distinctions.
+- Any package-facing compatibility deletion must first prove no internal imports, no package export or script/test real-module path, and no documented public entry need.
+
+### Recommended Next Step
+
+Use a narrow planning product/proof owner audit if the next task wants to continue context/planning structure work. Otherwise, audit root owner aggregation indexes only when package-facing aggregation safety is explicitly in scope.
