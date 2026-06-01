@@ -3,6 +3,7 @@ import {
   prepareToolOutcomeSavePointInput,
   type RuntimeEvidenceSavePoint,
 } from "../../evidence/savepoint/model.js";
+import type { RepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
 import {
   createModelRequestBoundary,
   prepareNextTurnModelRequest,
@@ -60,6 +61,7 @@ import {
   type VerificationResultObservation,
 } from "../../verification/result/boundary.js";
 import type { ProductVerificationReceipt } from "../../verification/verificationFacade.js";
+import type { RepairVerdictTerminalProjection } from "../../result/projection/repair/verdict.js";
 import { projectRuntimeEvents, type RuntimeProjectionEvent } from "../events/projection.js";
 import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
 import {
@@ -198,6 +200,8 @@ export interface AgentLoopContractVerificationProjection {
   readonly postRepairVerificationRequirement?: PostRepairVerificationRequirementObservation;
   readonly postRepairVerificationRequest?: PostRepairVerificationRequestObservation;
   readonly postRepairVerificationResult?: PostRepairVerificationResultObservation;
+  readonly repairVerdictProofInput?: RepairVerdictProofInput;
+  readonly repairVerdictTerminalProjection?: RepairVerdictTerminalProjection;
 }
 
 export interface AgentLoopContractProjection {
@@ -844,6 +848,22 @@ export async function runAgentLoopContract(
               `post-repair-verification-terminal-success:false`,
             ]
           : []),
+        ...(verification.repairVerdictProofInput
+          ? [
+              `repair-verdict-proof-input:${verification.repairVerdictProofInput.proofInputId}`,
+              `repair-verdict-proof-status:${verification.repairVerdictProofInput.proofStatus}`,
+              `repair-verdict-missing-proof:${verification.repairVerdictProofInput.missingProofItems.join(",") || "none"}`,
+              `evidence-input-terminal-success:false`,
+            ]
+          : []),
+        ...(verification.repairVerdictTerminalProjection
+          ? [
+              `repair-verdict-terminal-projection:${verification.repairVerdictTerminalProjection.projectionId}`,
+              `repair-verdict-terminal-status:${verification.repairVerdictTerminalProjection.status}`,
+              `repair-verdict-terminal-classification:${verification.repairVerdictTerminalProjection.terminalClassification}`,
+              `repair-verdict-terminal-success:false`,
+            ]
+          : []),
       ];
       const verificationSavePoint = createEvidenceOnlySavePoint({
         ...savePointInput,
@@ -883,6 +903,8 @@ export async function runAgentLoopContract(
           ...(verification.postRepairVerificationRequirement?.notProvenClaims ?? []),
           ...(verification.postRepairVerificationRequest?.notProvenClaims ?? []),
           ...(verification.postRepairVerificationResult?.notProvenClaims ?? []),
+          ...(verification.repairVerdictProofInput?.notProvenClaims ?? []),
+          ...(verification.repairVerdictTerminalProjection?.notProvenClaims ?? []),
         ],
       });
       appendProjectedEvents(events, projectRuntimeEvents({
@@ -896,6 +918,12 @@ export async function runAgentLoopContract(
           : [],
         postRepairVerificationResults: verification.postRepairVerificationResult
           ? [verification.postRepairVerificationResult]
+          : [],
+        repairVerdictProofInputs: verification.repairVerdictProofInput
+          ? [verification.repairVerdictProofInput]
+          : [],
+        repairVerdictTerminalProjections: verification.repairVerdictTerminalProjection
+          ? [verification.repairVerdictTerminalProjection]
           : [],
         repairRequiredHandoffs: verification.repairRequired
           ? [verification.repairRequired]

@@ -1,4 +1,5 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
+import type { RepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type {
   RepairApplyRequestObservation,
@@ -56,6 +57,7 @@ import type { ProductLoopAdapterProjection } from "../loop/adapter.js";
 import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
 import type { ProviderStreamAdapterProjection } from "../loop/providerStreamAdapter.js";
 import type { ModelResponseReentryCycleProjection } from "../loop/reentry.js";
+import type { RepairVerdictTerminalProjection } from "../../result/projection/repair/verdict.js";
 
 export type RuntimeProjectionEventType =
   | "turn-snapshot-observed"
@@ -183,6 +185,8 @@ export type RuntimeProjectionEventType =
   | "post-repair-verification-requested"
   | "post-repair-verification-result-observed"
   | "post-repair-verification-verdict-candidate-observed"
+  | "repair-verdict-proof-input-observed"
+  | "repair-verdict-terminal-projected"
   | "original-failure-preserved"
   | "tool-dispatch-not-run"
   | "agent-loop-started"
@@ -211,6 +215,8 @@ export type RuntimeProjectionEventType =
   | "loop-next-turn-delivery-policy-observed"
   | "loop-verification-intent-observed"
   | "loop-verification-result-observed"
+  | "loop-evidence-proof-input-observed"
+  | "loop-result-terminal-projection-observed"
   | "loop-repair-handoff-observed"
   | "loop-session-context-projected"
   | "loop-product-surface-projected"
@@ -256,6 +262,8 @@ export function projectRuntimeEvents(input: {
   readonly postRepairVerificationRequirements?: readonly PostRepairVerificationRequirementObservation[];
   readonly postRepairVerificationRequests?: readonly PostRepairVerificationRequestObservation[];
   readonly postRepairVerificationResults?: readonly PostRepairVerificationResultObservation[];
+  readonly repairVerdictProofInputs?: readonly RepairVerdictProofInput[];
+  readonly repairVerdictTerminalProjections?: readonly RepairVerdictTerminalProjection[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
@@ -1837,6 +1845,68 @@ export function projectRuntimeEvents(input: {
         result.notProvenClaims,
       );
     }
+  }
+
+  for (const proofInput of input.repairVerdictProofInputs ?? []) {
+    append(
+      "repair-verdict-proof-input-observed",
+      {
+        proofInputId: proofInput.proofInputId,
+        verdictCandidateId: proofInput.verdictCandidateId,
+        sourcePostRepairVerificationResultId:
+          proofInput.sourcePostRepairVerificationResultId,
+        originalVerificationFailureId: proofInput.originalVerificationFailureId,
+        originalFailureClass: proofInput.originalFailureClass,
+        originalFailureStatus: proofInput.originalFailureStatus,
+        originalReceiptIds: proofInput.originalReceiptIds,
+        repairProposalId: proofInput.repairProposalId,
+        repairAuthorityState: proofInput.repairAuthorityState,
+        repairApplyState: proofInput.repairApplyState,
+        repairTouchedTargetSummaries: proofInput.repairTouchedTargetSummaries,
+        repairApplyReceiptIds: proofInput.repairApplyReceiptIds,
+        postRepairVerificationState: proofInput.postRepairVerificationState,
+        postRepairRelevanceStatus: proofInput.postRepairRelevanceStatus,
+        postRepairCoverageStatus: proofInput.postRepairCoverageStatus,
+        postRepairReceiptIds: proofInput.postRepairReceiptIds,
+        missingProofItems: proofInput.missingProofItems,
+        proofStatus: proofInput.proofStatus,
+        originalFailurePreserved: proofInput.originalFailurePreserved,
+        repairApplyPreserved: proofInput.repairApplyPreserved,
+        evidenceInputOnly: proofInput.evidenceInputOnly,
+        terminalSuccessClaim: proofInput.terminalSuccessClaim,
+      },
+      proofInput.notProvenClaims,
+    );
+  }
+
+  for (const projection of input.repairVerdictTerminalProjections ?? []) {
+    append(
+      "repair-verdict-terminal-projected",
+      {
+        projectionId: projection.projectionId,
+        sourceProofInputId: projection.sourceProofInputId,
+        status: projection.status,
+        terminalClassification: projection.terminalClassification,
+        productVerdictStatus: projection.productVerdict.status,
+        productVerdictReason: projection.productVerdict.reason,
+        originalVerificationFailureId: projection.originalVerificationFailureId,
+        originalFailureClass: projection.originalFailureClass,
+        originalFailureStatus: projection.originalFailureStatus,
+        originalReceiptIds: projection.originalReceiptIds,
+        repairProposalId: projection.repairProposalId,
+        repairAuthorityState: projection.repairAuthorityState,
+        repairApplyState: projection.repairApplyState,
+        repairTouchedTargetSummaries: projection.repairTouchedTargetSummaries,
+        repairApplyReceiptIds: projection.repairApplyReceiptIds,
+        postRepairVerificationState: projection.postRepairVerificationState,
+        postRepairRelevanceStatus: projection.postRepairRelevanceStatus,
+        postRepairCoverageStatus: projection.postRepairCoverageStatus,
+        postRepairReceiptIds: projection.postRepairReceiptIds,
+        missingProofItems: projection.missingProofItems,
+        terminalSuccessClaim: projection.terminalSuccessClaim,
+      },
+      projection.notProvenClaims,
+    );
   }
 
   for (const handoff of input.repairRequiredHandoffs ?? []) {

@@ -661,6 +661,34 @@ describe("JSON runtime event stream projection", () => {
       ]),
     );
   });
+
+  it("serializes repair verdict proof and result projections as JSON-safe observations", () => {
+    const stream = projectJsonRuntimeEventStream({
+      streamId: "repair-verdict-stream",
+      events: [
+        makeEvent(1, "repair-verdict-proof-input-observed", {
+          proofInputId: "proof:repair",
+          proofStatus: "complete",
+          evidenceInputOnly: true,
+          missingProofItems: [],
+        }, ["evidence-input-is-not-terminal-result"]),
+        makeEvent(2, "repair-verdict-terminal-projected", {
+          projectionId: "projection:repair",
+          status: "verified_with_repair",
+          terminalClassification: "success",
+          productVerdictStatus: "COMPLETE",
+        }, ["rendered-output-is-not-success"]),
+      ],
+    });
+
+    expect(stream.map((entry) => entry.eventType)).toEqual([
+      "repair-verdict-proof-input-observed",
+      "repair-verdict-terminal-projected",
+    ]);
+    expect(stream.every((entry) => entry.truthfulness.terminalSuccessClaim === false))
+      .toBe(true);
+    expect(JSON.stringify(stream)).not.toContain('"success":true');
+  });
 });
 
 function makeEvent(

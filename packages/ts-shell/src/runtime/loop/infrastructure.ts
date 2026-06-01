@@ -17,6 +17,8 @@ export type LoopInfrastructureCategory =
   | "next-turn-delivery-policy"
   | "verification-intent"
   | "verification-result"
+  | "evidence-proof-input"
+  | "result-terminal-projection"
   | "repair-handoff"
   | "repair-proposal"
   | "repair-authority"
@@ -79,6 +81,8 @@ export const LOOP_INFRASTRUCTURE_CATEGORIES = [
   "next-turn-delivery-policy",
   "verification-intent",
   "verification-result",
+  "evidence-proof-input",
+  "result-terminal-projection",
   "repair-handoff",
   "repair-proposal",
   "repair-authority",
@@ -158,6 +162,13 @@ export function createLoopInfrastructureMap(): LoopInfrastructureMap {
       "verification-success",
       "command-success",
       "task-success",
+    ]),
+    entry("evidence-proof-input", "evidence", "result", "connected", "RepairVerdictProofInput", [
+      "evidence-input-is-not-terminal-result",
+      "terminal-success",
+    ]),
+    entry("result-terminal-projection", "result", "result", "connected", "RepairVerdictTerminalProjection", [
+      "rendered-output-is-not-success",
     ]),
     entry("repair-handoff", "repair", "repair", "connected", "RepairRequiredHandoff", [
       "repair-success",

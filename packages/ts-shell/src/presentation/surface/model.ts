@@ -127,6 +127,11 @@ export function projectProductSurfaceViewModel(
   if (codingResult && !sessionFacts) {
     return undefined;
   }
+  const repairVerdictEvent = input.loopTrajectory?.events.find((event) =>
+    event.type === "loop-result-terminal-projection-observed"
+  ) ?? input.runtimeEvents?.find((event) =>
+    event.type === "repair-verdict-terminal-projected"
+  );
 
   const sections = [
     ...(codingResult ? [
@@ -158,10 +163,25 @@ export function projectProductSurfaceViewModel(
     section({
       kind: "verdict",
       title: "Verdict",
-      severity: sessionFacts ? verdictSeverity(sessionFacts.truthStatus) : "not_proven",
-      status: sessionFacts ? verdictStatus(sessionFacts.truthStatus) : "not_proven",
+      severity: sessionFacts
+        ? verdictSeverity(sessionFacts.truthStatus)
+        : repairVerdictEvent?.facts.status === "verified_with_repair"
+          ? "success"
+          : repairVerdictEvent
+            ? "partial"
+            : "not_proven",
+      status: sessionFacts
+        ? verdictStatus(sessionFacts.truthStatus)
+        : repairVerdictEvent?.facts.status === "verified_with_repair"
+          ? "passed"
+          : repairVerdictEvent
+            ? "partial"
+            : "not_proven",
       summary: sessionFacts?.verdict ??
-        `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? input.productLoopAdapter?.adapterId ?? "not-observed"}; terminalSuccessClaim=false`,
+        (repairVerdictEvent
+          ? `resultStatus=${factValue(repairVerdictEvent.facts.status)}; originalFailure=${factValue(repairVerdictEvent.facts.originalFailureClass)}; repairApply=${factValue(repairVerdictEvent.facts.repairApplyState)}; postRepair=${factValue(repairVerdictEvent.facts.postRepairVerificationState)}; missingProof=${factValue(repairVerdictEvent.facts.missingProofItems)}; terminalSuccessClaim=false`
+          : `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? input.productLoopAdapter?.adapterId ?? "not-observed"}; terminalSuccessClaim=false`
+        ),
     }),
     section({
       kind: "not_proven",

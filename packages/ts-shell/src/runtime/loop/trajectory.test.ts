@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
+import { buildRepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
+import { projectRepairVerdictTerminal } from "../../result/projection/repair/verdict.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import {
   projectProviderRegistry,
@@ -360,6 +362,12 @@ describe("loop trajectory projection", () => {
           status: "passed",
           receiptIds: ["receipt-post-repair-trajectory"],
         });
+        const repairVerdictProofInput = buildRepairVerdictProofInput({
+          postRepairVerification: postRepairVerificationResult,
+        });
+        const repairVerdictTerminalProjection = projectRepairVerdictTerminal({
+          proofInput: repairVerdictProofInput,
+        });
         return {
           intent,
           result,
@@ -371,6 +379,8 @@ describe("loop trajectory projection", () => {
           postRepairVerificationRequirement,
           postRepairVerificationRequest,
           postRepairVerificationResult,
+          repairVerdictProofInput,
+          repairVerdictTerminalProjection,
         };
       },
     });
@@ -388,6 +398,8 @@ describe("loop trajectory projection", () => {
     expect(trajectory.postRepairVerificationRequirementIds).toHaveLength(1);
     expect(trajectory.postRepairVerificationRequestIds).toHaveLength(1);
     expect(trajectory.postRepairVerificationResultIds).toHaveLength(1);
+    expect(trajectory.repairVerdictProofInputIds).toHaveLength(1);
+    expect(trajectory.repairVerdictTerminalProjectionIds).toHaveLength(1);
     expect(trajectory.events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -409,6 +421,26 @@ describe("loop trajectory projection", () => {
             verdictCandidateAvailable: true,
             originalFailurePreserved: true,
             repairApplyPreserved: true,
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "loop-evidence-proof-input-observed",
+          facts: expect.objectContaining({
+            proofStatus: "complete",
+            missingProofItems: [],
+            evidenceInputOnly: true,
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "loop-result-terminal-projection-observed",
+          facts: expect.objectContaining({
+            status: "verified_with_repair",
+            terminalClassification: "success",
+            originalFailureClass: "test-failed",
+            repairApplyState: "applied",
+            postRepairVerificationState: "passed",
             terminalSuccessClaim: false,
           }),
         }),
@@ -480,6 +512,8 @@ describe("loop trajectory projection", () => {
         "repair-success",
         "verification-success",
         "post-repair-verification-passed-is-verdict-input-only",
+        "evidence-input-is-not-terminal-result",
+        "rendered-output-is-not-success",
       ]),
     );
     expect(trajectory.terminalSuccessClaim).toBe(false);

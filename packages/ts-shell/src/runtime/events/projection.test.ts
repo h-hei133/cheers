@@ -4,6 +4,8 @@ import {
   createEvidenceOnlySavePoint,
   prepareToolOutcomeSavePointInput,
 } from "../../evidence/savepoint/model.js";
+import { buildRepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
+import { projectRepairVerdictTerminal } from "../../result/projection/repair/verdict.js";
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import {
@@ -627,12 +629,18 @@ describe("runtime event projection", () => {
       status: "passed",
       receiptIds: ["receipt-events-post-repair"],
     });
+    const proofInput = buildRepairVerdictProofInput({
+      postRepairVerification: postResult,
+    });
+    const terminalProjection = projectRepairVerdictTerminal({ proofInput });
     const events = projectRuntimeEvents({
       verificationIntents: [intent],
       verificationResults: [result],
       postRepairVerificationRequirements: [postRequirement],
       postRepairVerificationRequests: [postRequest],
       postRepairVerificationResults: [postResult],
+      repairVerdictProofInputs: [proofInput],
+      repairVerdictTerminalProjections: [terminalProjection],
       repairRequiredHandoffs: [handoff],
       repairProposals: [proposal],
       repairAuthorities: [authority],
@@ -647,6 +655,8 @@ describe("runtime event projection", () => {
       "post-repair-verification-requested",
       "post-repair-verification-result-observed",
       "post-repair-verification-verdict-candidate-observed",
+      "repair-verdict-proof-input-observed",
+      "repair-verdict-terminal-projected",
       "repair-required",
       "original-failure-preserved",
       "repair-proposal-observed",
@@ -687,6 +697,27 @@ describe("runtime event projection", () => {
           facts: expect.objectContaining({
             sourcePostRepairVerificationResultId: postResult.resultId,
             resultStatus: "passed",
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "repair-verdict-proof-input-observed",
+          facts: expect.objectContaining({
+            proofInputId: proofInput.proofInputId,
+            proofStatus: "complete",
+            missingProofItems: [],
+            evidenceInputOnly: true,
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "repair-verdict-terminal-projected",
+          facts: expect.objectContaining({
+            projectionId: terminalProjection.projectionId,
+            status: "verified_with_repair",
+            terminalClassification: "success",
+            productVerdictStatus: "COMPLETE",
+            originalFailureClass: "test-failed",
             terminalSuccessClaim: false,
           }),
         }),
@@ -762,6 +793,7 @@ describe("runtime event projection", () => {
         "repair-success",
         "repair-apply-without-post-repair-verification-is-not-success",
         "post-repair-verification-passed-is-verdict-input-only",
+        "evidence-input-is-not-terminal-result",
       ]),
     );
   });

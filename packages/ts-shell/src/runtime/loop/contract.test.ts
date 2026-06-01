@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { createCommandToolResultSplit } from "../../tools/result/split.js";
+import { buildRepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
+import { projectRepairVerdictTerminal } from "../../result/projection/repair/verdict.js";
 import {
   createRepairApplyRequest,
   observeRepairApply,
@@ -263,12 +265,14 @@ describe("agent loop contract", () => {
           targetSummary: "verify changed file",
           dispatchStatus: "failed",
           relevanceStatus: "task_relevant",
+          coverageStatus: "covered",
           commandCandidateSummary: "npm test -w packages/ts-shell",
         });
         const result = observeVerificationResult({
           intent,
           status: "failed",
           failureClass: "test-failure",
+          runtimeReceiptIds: ["receipt-contract-original"],
         });
         const repairRequired = projectRepairRequiredHandoff({ verification: result });
         const repairProposal = observeRepairProposal({
@@ -313,6 +317,12 @@ describe("agent loop contract", () => {
           status: "passed",
           receiptIds: ["receipt-contract-post-repair"],
         });
+        const repairVerdictProofInput = buildRepairVerdictProofInput({
+          postRepairVerification: postRepairVerificationResult,
+        });
+        const repairVerdictTerminalProjection = projectRepairVerdictTerminal({
+          proofInput: repairVerdictProofInput,
+        });
         return {
           intent,
           result,
@@ -324,6 +334,8 @@ describe("agent loop contract", () => {
           postRepairVerificationRequirement,
           postRepairVerificationRequest,
           postRepairVerificationResult,
+          repairVerdictProofInput,
+          repairVerdictTerminalProjection,
         };
       },
     });
@@ -352,6 +364,17 @@ describe("agent loop contract", () => {
       status: "passed",
       originalFailurePreserved: true,
       repairApplyPreserved: true,
+      terminalSuccessClaim: false,
+    });
+    expect(turn?.verification.repairVerdictProofInput).toMatchObject({
+      proofStatus: "complete",
+      missingProofItems: [],
+      terminalSuccessClaim: false,
+    });
+    expect(turn?.verification.repairVerdictTerminalProjection).toMatchObject({
+      status: "verified_with_repair",
+      terminalClassification: "success",
+      originalFailureClass: "test-failure",
       terminalSuccessClaim: false,
     });
     expect(turn?.savePoint.repairHandoffIds).toEqual([
@@ -390,8 +413,19 @@ describe("agent loop contract", () => {
         "post-repair-verification-status:passed",
         "post-repair-verification-verdict-candidate:available",
         "post-repair-verification-terminal-success:false",
+        `repair-verdict-proof-input:${turn?.verification.repairVerdictProofInput?.proofInputId}`,
+        "repair-verdict-proof-status:complete",
+        "repair-verdict-missing-proof:none",
+        "repair-verdict-terminal-status:verified_with_repair",
+        "repair-verdict-terminal-classification:success",
+        "repair-verdict-terminal-success:false",
       ]),
     );
+    expect(
+      turn?.savePoint.pendingNextTurnFacts.some((fact) =>
+        fact.startsWith("repair-verdict-terminal-projection:")
+      ),
+    ).toBe(true);
     expect(turn?.nextTurn.pendingFacts).toEqual(
       expect.arrayContaining([
         `repair-required:${turn?.verification.repairRequired?.handoffId}`,
@@ -413,6 +447,8 @@ describe("agent loop contract", () => {
         "post-repair-verification-required",
         "post-repair-verification-result-observed",
         "post-repair-verification-verdict-candidate-observed",
+        "repair-verdict-proof-input-observed",
+        "repair-verdict-terminal-projected",
         "original-failure-preserved",
       ]),
     );
