@@ -377,6 +377,20 @@ describe("agent loop contract", () => {
       originalFailureClass: "test-failure",
       terminalSuccessClaim: false,
     });
+    expect(turn?.verification.repairReadiness).toMatchObject({
+      status: "verdict_projected",
+      nextAction:
+        "use result-owned verdict; do not infer success from readiness",
+      missingProofItems: [],
+      terminalSuccessClaim: false,
+    });
+    expect(turn?.verification.repairReadiness?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "repair-readiness-is-not-terminal-truth",
+        "repair-proposal-is-not-success",
+        "repair-apply-without-post-repair-verification-is-not-success",
+      ]),
+    );
     expect(turn?.finalization?.input).toMatchObject({
       resultTerminalStatus: "verified_with_repair",
       proofComplete: true,
@@ -450,6 +464,10 @@ describe("agent loop contract", () => {
         "repair-verdict-terminal-status:verified_with_repair",
         "repair-verdict-terminal-classification:success",
         "repair-verdict-terminal-success:false",
+        "repair-readiness:verdict_projected",
+        "repair-readiness-next-action:use result-owned verdict; do not infer success from readiness",
+        "repair-readiness-missing-proof:none",
+        "repair-readiness-terminal-success:false",
         "loop-finalization-decision:stop_complete",
         "pending-user-authority:no",
         "pending-verification:no",

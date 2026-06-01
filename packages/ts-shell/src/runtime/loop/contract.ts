@@ -29,6 +29,10 @@ import {
   type RepairProposalObservation,
   type RepairRequiredHandoff,
 } from "../../repair/handoff/boundary.js";
+import {
+  projectRepairReadiness,
+  type RepairReadinessProjection,
+} from "../../repair/handoff/readiness.js";
 import { accumulateAssistantResponse, type AssistantResponseState } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy, type NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
 import { projectFollowUpQueue, type FollowUpQueueProjection } from "../../turn/followUpQueue.js";
@@ -216,6 +220,7 @@ export interface AgentLoopContractVerificationProjection {
   readonly postRepairVerificationResult?: PostRepairVerificationResultObservation;
   readonly repairVerdictProofInput?: RepairVerdictProofInput;
   readonly repairVerdictTerminalProjection?: RepairVerdictTerminalProjection;
+  readonly repairReadiness?: RepairReadinessProjection;
 }
 
 export interface AgentLoopContractProjection {
@@ -806,7 +811,56 @@ export async function runAgentLoopContract(
           receipt: input.verificationReceipt,
           runtimeReceiptIds: input.verificationRuntimeReceiptIds,
         });
+      const repairReadiness = projectRepairReadiness({
+        verification: verification.result,
+        ...(verification.repairRequired
+          ? { repairRequired: verification.repairRequired }
+          : {}),
+        ...(verification.repairProposal
+          ? { repairProposal: verification.repairProposal }
+          : {}),
+        ...(verification.repairAuthority
+          ? { repairAuthority: verification.repairAuthority }
+          : {}),
+        ...(verification.repairApplyRequest
+          ? { repairApplyRequest: verification.repairApplyRequest }
+          : {}),
+        ...(verification.repairApply ? { repairApply: verification.repairApply } : {}),
+        ...(verification.postRepairVerificationRequirement
+          ? {
+              postRepairVerificationRequirement:
+                verification.postRepairVerificationRequirement,
+            }
+          : {}),
+        ...(verification.postRepairVerificationRequest
+          ? {
+              postRepairVerificationRequest:
+                verification.postRepairVerificationRequest,
+            }
+          : {}),
+        ...(verification.postRepairVerificationResult
+          ? { postRepairVerificationResult: verification.postRepairVerificationResult }
+          : {}),
+        ...(verification.repairVerdictProofInput
+          ? { repairVerdictProofInput: verification.repairVerdictProofInput }
+          : {}),
+        ...(verification.repairVerdictTerminalProjection
+          ? {
+              repairVerdictTerminalProjection:
+                verification.repairVerdictTerminalProjection,
+            }
+          : {}),
+      });
+      const repairReadinessCarryForwardFacts = repairReadiness.status === "not_proven"
+        ? []
+        : [
+            `repair-readiness:${repairReadiness.status}`,
+            `repair-readiness-next-action:${repairReadiness.nextAction}`,
+            `repair-readiness-missing-proof:${repairReadiness.missingProofItems.join(",") || "none"}`,
+            "repair-readiness-terminal-success:false",
+          ];
       const repairCarryForwardFacts = [
+        ...repairReadinessCarryForwardFacts,
         ...(verification.repairRequired
           ? [
               `repair-required:${verification.repairRequired.handoffId}`,
@@ -1003,6 +1057,7 @@ export async function runAgentLoopContract(
           ...(verification.postRepairVerificationResult?.notProvenClaims ?? []),
           ...(verification.repairVerdictProofInput?.notProvenClaims ?? []),
           ...(verification.repairVerdictTerminalProjection?.notProvenClaims ?? []),
+          ...repairReadiness.notProvenClaims,
           ...(finalizationInput?.notProvenClaims ?? []),
           ...(finalizationDecision?.notProvenClaims ?? []),
           ...(closeoutInput?.notProvenClaims ?? []),
@@ -1092,7 +1147,10 @@ export async function runAgentLoopContract(
           deliveryPolicy,
           executed: false,
         },
-          verification,
+          verification: {
+            ...verification,
+            repairReadiness,
+          },
           ...(finalizationInput && finalizationDecision && closeoutInput &&
               closeout && completionPacket
             ? {
