@@ -17,6 +17,48 @@ import {
 } from "./projection.js";
 
 describe("JSON runtime event stream projection", () => {
+  it("keeps product completion packet observations JSON-safe and observation-only", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [{
+        id: "event-packet",
+        sequence: 1,
+        type: "product-completion-packet-observed",
+        facts: {
+          packetId: "packet:1",
+          status: "complete",
+          resultOwnedTerminalStatus: "verified_with_repair",
+          loopDecision: "stop_complete",
+          closeoutState: "complete",
+          nextAction: "stop loop after result-owned verified repair projection",
+          terminalSuccessClaim: false,
+        },
+        notProvenClaims: ["product-completion-packet-is-not-terminal-truth"],
+        redaction: { status: "report-safe", excluded: [] },
+      }],
+      streamId: "packet-stream",
+    });
+
+    expect(stream[0]).toMatchObject({
+      eventType: "product-completion-packet-observed",
+      facts: expect.objectContaining({
+        status: "complete",
+        resultOwnedTerminalStatus: "verified_with_repair",
+        loopDecision: "stop_complete",
+        closeoutState: "complete",
+      }),
+      truthfulness: {
+        observationOnly: true,
+        terminalSuccessClaim: false,
+      },
+    });
+    expect(stream[0]?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "product-completion-packet-is-not-terminal-truth",
+        "terminal-success",
+      ]),
+    );
+  });
+
   it("keeps product closeout observations JSON-safe and observation-only", () => {
     const stream = projectJsonRuntimeEventStream({
       events: [{

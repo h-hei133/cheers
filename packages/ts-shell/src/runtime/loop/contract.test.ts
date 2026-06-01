@@ -400,6 +400,14 @@ describe("agent loop contract", () => {
       loopOwnedControlDecision: "stop_complete",
       terminalSuccessClaim: false,
     });
+    expect(turn?.finalization?.completionPacket).toMatchObject({
+      status: "complete",
+      complete: true,
+      resultOwnedTerminalStatus: "verified_with_repair",
+      loopDecision: "stop_complete",
+      closeoutState: "complete",
+      terminalSuccessClaim: false,
+    });
     expect(turn?.savePoint.repairHandoffIds).toEqual([
       turn?.verification.repairRequired?.handoffId,
     ]);
@@ -451,6 +459,11 @@ describe("agent loop contract", () => {
         "final-observed-status:verified_with_repair",
         "loop-owned-control-decision:stop_complete",
         "product-closeout-terminal-success:false",
+        "product-completion-packet-status:complete",
+        "final-observed-result-status:verified_with_repair",
+        "loop-decision:stop_complete",
+        "closeout-state:complete",
+        "product-completion-packet-terminal-success:false",
       ]),
     );
     expect(
@@ -490,6 +503,7 @@ describe("agent loop contract", () => {
         "loop-finalization-decision-observed",
         "product-loop-closeout-input-observed",
         "product-loop-closeout-projected",
+        "product-completion-packet-observed",
         "original-failure-preserved",
       ]),
     );

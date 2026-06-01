@@ -78,6 +78,7 @@ export interface LoopTrajectoryProjection {
   readonly repairVerdictTerminalProjectionIds: readonly string[];
   readonly loopFinalizationDecisionIds: readonly string[];
   readonly productLoopCloseoutIds: readonly string[];
+  readonly productCompletionPacketIds: readonly string[];
   readonly repairHandoffIds: readonly string[];
   readonly repairProposalIds: readonly string[];
   readonly repairApplyIds: readonly string[];
@@ -117,6 +118,7 @@ const LOOP_PRODUCT_SURFACE_SECTION_IDS = [
   "verification",
   "repair",
   "product_closeout",
+  "product_completion_packet",
   "save_point",
   "session",
   "context",
@@ -835,6 +837,37 @@ export function projectLoopTrajectory(
         turn.finalization.closeout.notProvenClaims,
         [turn.finalization.closeout.closeoutId],
       );
+      append(
+        "product-completion-packet",
+        "product-completion-packet-observed",
+        {
+          turn: turn.turn,
+          packetId: turn.finalization.completionPacket.packetId,
+          resultProjectionId:
+            turn.finalization.completionPacket.resultProjectionId,
+          resultOwnedTerminalStatus:
+            turn.finalization.completionPacket.resultOwnedTerminalStatus,
+          loopDecision: turn.finalization.completionPacket.loopDecision,
+          closeoutState: turn.finalization.completionPacket.closeoutState,
+          status: turn.finalization.completionPacket.status,
+          complete: turn.finalization.completionPacket.complete,
+          originalFailure: turn.finalization.completionPacket.originalFailure,
+          repairRequiredFacts:
+            turn.finalization.completionPacket.repairRequiredFacts,
+          proposalFacts: turn.finalization.completionPacket.proposalFacts,
+          authorityFacts: turn.finalization.completionPacket.authorityFacts,
+          applyObservationFacts:
+            turn.finalization.completionPacket.applyObservationFacts,
+          postRepairVerificationFacts:
+            turn.finalization.completionPacket.postRepairVerificationFacts,
+          missingProofItems:
+            turn.finalization.completionPacket.missingProofItems,
+          nextAction: turn.finalization.completionPacket.nextAction,
+          terminalSuccessClaim: false,
+        },
+        turn.finalization.completionPacket.notProvenClaims,
+        [turn.finalization.completionPacket.packetId],
+      );
     }
   }
 
@@ -1177,6 +1210,9 @@ export function projectLoopTrajectory(
   const productLoopCloseoutIds = turns.flatMap((turn) =>
     turn.finalization ? [turn.finalization.closeout.closeoutId] : []
   );
+  const productCompletionPacketIds = turns.flatMap((turn) =>
+    turn.finalization ? [turn.finalization.completionPacket.packetId] : []
+  );
   const repairHandoffIds = turns.flatMap((turn) =>
     turn.verification.repairRequired ? [turn.verification.repairRequired.handoffId] : []
   );
@@ -1220,6 +1256,9 @@ export function projectLoopTrajectory(
     ),
     productLoopCloseoutIds: Object.freeze(
       Array.from(new Set(productLoopCloseoutIds)),
+    ),
+    productCompletionPacketIds: Object.freeze(
+      Array.from(new Set(productCompletionPacketIds)),
     ),
     repairHandoffIds: Object.freeze(Array.from(new Set(repairHandoffIds))),
     repairProposalIds: Object.freeze(Array.from(new Set(repairProposalIds))),

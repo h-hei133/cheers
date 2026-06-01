@@ -21,6 +21,7 @@ export type LoopInfrastructureCategory =
   | "result-terminal-projection"
   | "loop-finalization"
   | "product-loop-closeout"
+  | "product-completion-packet"
   | "repair-handoff"
   | "repair-proposal"
   | "repair-authority"
@@ -87,6 +88,7 @@ export const LOOP_INFRASTRUCTURE_CATEGORIES = [
   "result-terminal-projection",
   "loop-finalization",
   "product-loop-closeout",
+  "product-completion-packet",
   "repair-handoff",
   "repair-proposal",
   "repair-authority",
@@ -183,6 +185,11 @@ export function createLoopInfrastructureMap(): LoopInfrastructureMap {
       "product-closeout-is-not-terminal-truth",
       "session-carry-forward-is-not-terminal-truth",
       "rendered-output-is-not-terminal-truth",
+    ]),
+    entry("product-completion-packet", "runtime/loop", "product", "connected", "ProductCompletionPacket", [
+      "product-completion-packet-is-not-terminal-truth",
+      "product-consumer-is-not-terminal-truth",
+      "event-emission-is-not-terminal-truth",
     ]),
     entry("repair-handoff", "repair", "repair", "connected", "RepairRequiredHandoff", [
       "repair-success",

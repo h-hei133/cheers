@@ -1,4 +1,5 @@
 export * from "./adapter.js";
+export * from "./completionPacket.js";
 export * from "./contract.js";
 export * from "./feature.js";
 export * from "./infrastructure.js";

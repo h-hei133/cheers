@@ -142,7 +142,14 @@ export function projectProductSurfaceViewModel(
   ) ?? input.runtimeEvents?.find((event) =>
     event.type === "product-loop-closeout-projected"
   );
-  const observedNextAction = productCloseoutEvent
+  const completionPacketEvent = input.loopTrajectory?.events.find((event) =>
+    event.type === "product-completion-packet-observed"
+  ) ?? input.runtimeEvents?.find((event) =>
+    event.type === "product-completion-packet-observed"
+  );
+  const observedNextAction = completionPacketEvent
+    ? String(completionPacketEvent.facts.nextAction ?? "preserve product completion packet")
+    : productCloseoutEvent
     ? String(productCloseoutEvent.facts.nextAction ?? "preserve product closeout facts")
     : loopFinalizationEvent
       ? String(loopFinalizationEvent.facts.nextAction ?? "preserve loop finalization facts")
@@ -150,7 +157,9 @@ export function projectProductSurfaceViewModel(
         input.providerStreamAdapter?.nextAction ??
         input.productLoopAdapter?.nextAction ??
         "keep loop trajectory observation separate from terminal success";
-  const observedNextActionSummary = productCloseoutEvent
+  const observedNextActionSummary = completionPacketEvent
+    ? `packet=${factValue(completionPacketEvent.facts.status)}; resultStatus=${factValue(completionPacketEvent.facts.resultOwnedTerminalStatus)}; loopDecision=${factValue(completionPacketEvent.facts.loopDecision)}; closeout=${factValue(completionPacketEvent.facts.closeoutState)}; nextAction=${factValue(completionPacketEvent.facts.nextAction)}; terminalSuccessClaim=false`
+    : productCloseoutEvent
     ? `closeout=${factValue(productCloseoutEvent.facts.status)}; resultStatus=${factValue(productCloseoutEvent.facts.resultOwnedTerminalStatus)}; loopDecision=${factValue(productCloseoutEvent.facts.loopOwnedControlDecision)}; nextAction=${factValue(productCloseoutEvent.facts.nextAction)}; terminalSuccessClaim=false`
     : loopFinalizationEvent
       ? `loopDecision=${factValue(loopFinalizationEvent.facts.decision)}; nextAction=${factValue(loopFinalizationEvent.facts.nextAction)}; resultStatus=${factValue(repairVerdictEvent?.facts.status ?? loopFinalizationEvent.facts.resultTerminalStatus)}; missingProof=${factValue(loopFinalizationEvent.facts.missingProofItems)}; originalFailure=${factValue(loopFinalizationEvent.facts.originalFailureClass)}; terminalSuccessClaim=false`
@@ -170,6 +179,7 @@ export function projectProductSurfaceViewModel(
     ] : []),
     ...contextPlanningSections(input.contextPlanningSummary),
     ...productLoopAdapterSections(input),
+    ...productCompletionPacketSections(completionPacketEvent),
     ...productLoopCloseoutSections(productCloseoutEvent),
     ...loopTrajectorySections(input),
     ...resourceSections(input),
@@ -220,6 +230,8 @@ export function projectProductSurfaceViewModel(
           ? input.modelBoundaryPhase!.notProvenClaims.slice(0, 8).join("; ")
         : (input.contextPlanningSummary?.notProvenClaims.length ?? 0) > 0
           ? input.contextPlanningSummary!.notProvenClaims.slice(0, 8).join("; ")
+        : (completionPacketEvent?.notProvenClaims.length ?? 0) > 0
+          ? completionPacketEvent!.notProvenClaims.slice(0, 8).join("; ")
         : (productCloseoutEvent?.notProvenClaims.length ?? 0) > 0
           ? productCloseoutEvent!.notProvenClaims.slice(0, 8).join("; ")
         : (input.loopTrajectory?.notProvenClaims.length ?? 0) > 0
@@ -231,6 +243,7 @@ export function projectProductSurfaceViewModel(
         input.providerStreamAdapter?.notProvenClaims ??
         input.modelBoundaryPhase?.notProvenClaims ??
         input.contextPlanningSummary?.notProvenClaims ??
+        completionPacketEvent?.notProvenClaims ??
         productCloseoutEvent?.notProvenClaims ??
         input.loopTrajectory?.notProvenClaims ??
         input.productLoopAdapter?.notProvenClaims ?? [],
@@ -256,6 +269,7 @@ export function projectProductSurfaceViewModel(
       input.modelBoundaryPhase?.notProvenClaims ??
       input.contextPlanningSummary?.notProvenClaims ??
       input.providerStreamAdapter?.notProvenClaims ??
+      completionPacketEvent?.notProvenClaims ??
       productCloseoutEvent?.notProvenClaims ??
       input.loopTrajectory?.notProvenClaims ??
       input.productLoopAdapter?.notProvenClaims ?? [],
@@ -929,6 +943,68 @@ function productLoopCloseoutSections(
         {
           label: "repairChain",
           value: factValue(event.facts.repairChainSummary),
+        },
+        {
+          label: "missingProof",
+          value: factValue(event.facts.missingProofItems),
+        },
+      ],
+      machineEventCorrelationIds: [event.id],
+      notProvenClaims: event.notProvenClaims,
+    }),
+  ];
+}
+
+function productCompletionPacketSections(
+  event: RuntimeProjectionEvent | undefined,
+): ProductSurfaceSection[] {
+  if (!event) {
+    return [];
+  }
+  return [
+    section({
+      kind: "loop",
+      title: "Product completion packet",
+      severity: event.facts.status === "complete" ? "success" : "not_proven",
+      status: event.facts.status === "complete" ? "passed" : "not_proven",
+      summary:
+        `status=${factValue(event.facts.status)}; resultStatus=${factValue(event.facts.resultOwnedTerminalStatus)}; loopDecision=${factValue(event.facts.loopDecision)}; closeout=${factValue(event.facts.closeoutState)}; nextAction=${factValue(event.facts.nextAction)}; terminalSuccessClaim=false`,
+      facts: [
+        {
+          label: "resultStatus",
+          value: factValue(event.facts.resultOwnedTerminalStatus),
+        },
+        {
+          label: "loopDecision",
+          value: factValue(event.facts.loopDecision),
+        },
+        {
+          label: "closeoutState",
+          value: factValue(event.facts.closeoutState),
+        },
+        {
+          label: "originalFailure",
+          value: factValue(event.facts.originalFailure),
+        },
+        {
+          label: "repairRequired",
+          value: factValue(event.facts.repairRequiredFacts),
+        },
+        {
+          label: "proposal",
+          value: factValue(event.facts.proposalFacts),
+        },
+        {
+          label: "authority",
+          value: factValue(event.facts.authorityFacts),
+        },
+        {
+          label: "apply",
+          value: factValue(event.facts.applyObservationFacts),
+        },
+        {
+          label: "postRepairVerification",
+          value: factValue(event.facts.postRepairVerificationFacts),
         },
         {
           label: "missingProof",

@@ -69,6 +69,10 @@ import {
   type ModelResponseReentryCycleProjection,
 } from "./reentry.js";
 import {
+  buildProductCompletionPacket,
+  type ProductCompletionPacket,
+} from "./completionPacket.js";
+import {
   createLoopFinalizationInput,
   createProductLoopCloseoutInput,
   decideLoopFinalization,
@@ -264,6 +268,7 @@ export interface AgentLoopContractTurnProjection {
     readonly decision: LoopFinalizationDecision;
     readonly closeoutInput: ProductLoopCloseoutInput;
     readonly closeout: ProductLoopCloseoutProjection;
+    readonly completionPacket: ProductCompletionPacket;
   };
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
@@ -902,6 +907,51 @@ export async function runAgentLoopContract(
       const closeout = closeoutInput
         ? projectProductLoopCloseout({ closeoutInput })
         : undefined;
+      const completionPacket = verification.repairVerdictTerminalProjection &&
+          finalizationDecision &&
+          closeout
+        ? buildProductCompletionPacket({
+            resultProjection: verification.repairVerdictTerminalProjection,
+            loopDecision: finalizationDecision,
+            closeout,
+            ...(verification.repairRequired
+              ? { repairRequired: verification.repairRequired }
+              : {}),
+            ...(verification.repairProposal
+              ? { repairProposal: verification.repairProposal }
+              : {}),
+            ...(verification.repairAuthority
+              ? { repairAuthority: verification.repairAuthority }
+              : {}),
+            ...(verification.repairApplyRequest
+              ? { repairApplyRequest: verification.repairApplyRequest }
+              : {}),
+            ...(verification.repairApply
+              ? { repairApply: verification.repairApply }
+              : {}),
+            ...(verification.postRepairVerificationRequirement
+              ? {
+                  postRepairVerificationRequirement:
+                    verification.postRepairVerificationRequirement,
+                }
+              : {}),
+            ...(verification.postRepairVerificationRequest
+              ? {
+                  postRepairVerificationRequest:
+                    verification.postRepairVerificationRequest,
+                }
+              : {}),
+            ...(verification.postRepairVerificationResult
+              ? {
+                  postRepairVerificationResult:
+                    verification.postRepairVerificationResult,
+                }
+              : {}),
+            ...(verification.repairVerdictProofInput
+              ? { repairVerdictProofInput: verification.repairVerdictProofInput }
+              : {}),
+          })
+        : undefined;
       const finalizationCarryForwardFacts = finalizationDecision
         ? [
             `loop-finalization-input:${finalizationDecision.sourceInputId}`,
@@ -909,6 +959,7 @@ export async function runAgentLoopContract(
             `loop-finalization-next-action:${finalizationDecision.nextAction}`,
             ...finalizationDecision.sessionCarryForwardFacts,
             ...(closeout?.sessionCarryForwardFacts ?? []),
+            ...(completionPacket?.sessionCarryForwardFacts ?? []),
           ]
         : [];
       const verificationSavePoint = createEvidenceOnlySavePoint({
@@ -956,6 +1007,7 @@ export async function runAgentLoopContract(
           ...(finalizationDecision?.notProvenClaims ?? []),
           ...(closeoutInput?.notProvenClaims ?? []),
           ...(closeout?.notProvenClaims ?? []),
+          ...(completionPacket?.notProvenClaims ?? []),
         ],
       });
       appendProjectedEvents(events, projectRuntimeEvents({
@@ -980,6 +1032,7 @@ export async function runAgentLoopContract(
         loopFinalizationDecisions: finalizationDecision ? [finalizationDecision] : [],
         productLoopCloseoutInputs: closeoutInput ? [closeoutInput] : [],
         productLoopCloseouts: closeout ? [closeout] : [],
+        productCompletionPackets: completionPacket ? [completionPacket] : [],
         repairRequiredHandoffs: verification.repairRequired
           ? [verification.repairRequired]
           : [],
@@ -1040,13 +1093,15 @@ export async function runAgentLoopContract(
           executed: false,
         },
           verification,
-          ...(finalizationInput && finalizationDecision && closeoutInput && closeout
+          ...(finalizationInput && finalizationDecision && closeoutInput &&
+              closeout && completionPacket
             ? {
                 finalization: {
                   input: finalizationInput,
                   decision: finalizationDecision,
                   closeoutInput,
                   closeout,
+                  completionPacket,
                 },
               }
             : {}),

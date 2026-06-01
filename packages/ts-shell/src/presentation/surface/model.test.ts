@@ -422,6 +422,9 @@ describe("product surface view model", () => {
     expect(rendered).toContain("originalFailure=test-failed");
     expect(rendered).toContain("missingProof=");
     expect(rendered).toContain("loopDecision=stop_complete");
+    expect(rendered).toContain("Product completion packet");
+    expect(rendered).toContain("closeoutState: complete");
+    expect(rendered).toContain("postRepairVerification:");
     expect(rendered).toContain("Product loop closeout");
     expect(rendered).toContain("resultOwnedTerminalStatus: verified_with_repair");
     expect(rendered).toContain("loopOwnedControlDecision: stop_complete");

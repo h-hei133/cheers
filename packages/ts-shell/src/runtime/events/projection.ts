@@ -54,6 +54,7 @@ import type {
   VerificationResultObservation,
 } from "../../verification/result/boundary.js";
 import type { ProductLoopAdapterProjection } from "../loop/adapter.js";
+import type { ProductCompletionPacket } from "../loop/completionPacket.js";
 import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
 import type { ProviderStreamAdapterProjection } from "../loop/providerStreamAdapter.js";
 import type { ModelResponseReentryCycleProjection } from "../loop/reentry.js";
@@ -197,6 +198,7 @@ export type RuntimeProjectionEventType =
   | "loop-finalization-decision-observed"
   | "product-loop-closeout-input-observed"
   | "product-loop-closeout-projected"
+  | "product-completion-packet-observed"
   | "original-failure-preserved"
   | "tool-dispatch-not-run"
   | "agent-loop-started"
@@ -279,6 +281,7 @@ export function projectRuntimeEvents(input: {
   readonly loopFinalizationDecisions?: readonly LoopFinalizationDecision[];
   readonly productLoopCloseoutInputs?: readonly ProductLoopCloseoutInput[];
   readonly productLoopCloseouts?: readonly ProductLoopCloseoutProjection[];
+  readonly productCompletionPackets?: readonly ProductCompletionPacket[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
@@ -2017,6 +2020,38 @@ export function projectRuntimeEvents(input: {
         terminalSuccessClaim: closeout.terminalSuccessClaim,
       },
       closeout.notProvenClaims,
+    );
+  }
+
+  for (const packet of input.productCompletionPackets ?? []) {
+    append(
+      "product-completion-packet-observed",
+      {
+        packetId: packet.packetId,
+        resultProjectionId: packet.resultProjectionId,
+        resultOwnedTerminalStatus: packet.resultOwnedTerminalStatus,
+        resultOwnedTerminalClassification:
+          packet.resultOwnedTerminalClassification,
+        loopDecisionId: packet.loopDecisionId,
+        loopDecision: packet.loopDecision,
+        closeoutId: packet.closeoutId,
+        closeoutState: packet.closeoutState,
+        status: packet.status,
+        complete: packet.complete,
+        originalFailure: packet.originalFailure,
+        repairRequiredFacts: packet.repairRequiredFacts,
+        proposalFacts: packet.proposalFacts,
+        authorityFacts: packet.authorityFacts,
+        applyRequestFacts: packet.applyRequestFacts,
+        applyObservationFacts: packet.applyObservationFacts,
+        postRepairVerificationFacts: packet.postRepairVerificationFacts,
+        evidenceFacts: packet.evidenceFacts,
+        missingProofItems: packet.missingProofItems,
+        nextAction: packet.nextAction,
+        sessionCarryForwardFacts: packet.sessionCarryForwardFacts,
+        terminalSuccessClaim: packet.terminalSuccessClaim,
+      },
+      packet.notProvenClaims,
     );
   }
 

@@ -23,6 +23,7 @@ import { evaluateContinuationReadiness } from "../../session/continuation/readin
 import { summarizeReplaySafeLoopState } from "../../session/replay/state.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import { runAgentLoopContract } from "../loop/contract.js";
+import { buildProductCompletionPacket } from "../loop/completionPacket.js";
 import { projectProductLoopAdapter } from "../loop/adapter.js";
 import { projectLoopTrajectory } from "../loop/trajectory.js";
 import { projectModelBoundaryPhase } from "../loop/modelBoundary.js";
@@ -648,6 +649,20 @@ describe("runtime event projection", () => {
       loopDecision: finalizationDecision,
     });
     const closeout = projectProductLoopCloseout({ closeoutInput });
+    const completionPacket = buildProductCompletionPacket({
+      resultProjection: terminalProjection,
+      loopDecision: finalizationDecision,
+      closeout,
+      repairRequired: handoff,
+      repairProposal: proposal,
+      repairAuthority: authority,
+      repairApplyRequest: request,
+      repairApply: apply,
+      postRepairVerificationRequirement: postRequirement,
+      postRepairVerificationRequest: postRequest,
+      postRepairVerificationResult: postResult,
+      repairVerdictProofInput: proofInput,
+    });
     const events = projectRuntimeEvents({
       verificationIntents: [intent],
       verificationResults: [result],
@@ -660,6 +675,7 @@ describe("runtime event projection", () => {
       loopFinalizationDecisions: [finalizationDecision],
       productLoopCloseoutInputs: [closeoutInput],
       productLoopCloseouts: [closeout],
+      productCompletionPackets: [completionPacket],
       repairRequiredHandoffs: [handoff],
       repairProposals: [proposal],
       repairAuthorities: [authority],
@@ -680,6 +696,7 @@ describe("runtime event projection", () => {
       "loop-finalization-decision-observed",
       "product-loop-closeout-input-observed",
       "product-loop-closeout-projected",
+      "product-completion-packet-observed",
       "repair-required",
       "original-failure-preserved",
       "repair-proposal-observed",
@@ -766,6 +783,21 @@ describe("runtime event projection", () => {
           }),
           notProvenClaims: expect.arrayContaining([
             "product-closeout-is-not-terminal-truth",
+          ]),
+        }),
+        expect.objectContaining({
+          type: "product-completion-packet-observed",
+          facts: expect.objectContaining({
+            packetId: completionPacket.packetId,
+            status: "complete",
+            resultOwnedTerminalStatus: "verified_with_repair",
+            loopDecision: "stop_complete",
+            closeoutState: "complete",
+            complete: true,
+            terminalSuccessClaim: false,
+          }),
+          notProvenClaims: expect.arrayContaining([
+            "product-completion-packet-is-not-terminal-truth",
           ]),
         }),
         expect.objectContaining({

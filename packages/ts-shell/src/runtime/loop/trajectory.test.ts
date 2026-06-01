@@ -402,6 +402,7 @@ describe("loop trajectory projection", () => {
     expect(trajectory.repairVerdictTerminalProjectionIds).toHaveLength(1);
     expect(trajectory.loopFinalizationDecisionIds).toHaveLength(1);
     expect(trajectory.productLoopCloseoutIds).toHaveLength(1);
+    expect(trajectory.productCompletionPacketIds).toHaveLength(1);
     expect(trajectory.events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -462,6 +463,17 @@ describe("loop trajectory projection", () => {
             status: "complete",
             resultOwnedTerminalStatus: "verified_with_repair",
             loopOwnedControlDecision: "stop_complete",
+            complete: true,
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "product-completion-packet-observed",
+          facts: expect.objectContaining({
+            status: "complete",
+            resultOwnedTerminalStatus: "verified_with_repair",
+            loopDecision: "stop_complete",
+            closeoutState: "complete",
             complete: true,
             terminalSuccessClaim: false,
           }),
