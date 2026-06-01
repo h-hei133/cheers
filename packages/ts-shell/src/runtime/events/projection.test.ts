@@ -29,6 +29,10 @@ import {
   createModelRequestBoundary,
   prepareNextTurnModelRequest,
 } from "../../provider/request/boundary.js";
+import {
+  createModelInvocationAttemptEnvelope,
+  createModelInvocationGate,
+} from "../../provider/request/invocation.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy } from "../../turn/deliveryPolicy.js";
 import { projectFollowUpQueue } from "../../turn/followUpQueue.js";
@@ -217,6 +221,49 @@ describe("runtime event projection", () => {
     expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
     expect(JSON.stringify(events)).toContain('"liveClassification":"live_completed"');
     expect(JSON.stringify(events)).toContain('"fallbackStatus":"fallback_not_attempted"');
+    expect(JSON.stringify(events)).not.toMatch(/provider\.env|raw provider output|hidden reasoning/i);
+  });
+
+  it("projects model invocation gate and attempt facts as observation-only", () => {
+    const request = createModelRequestBoundary({
+      requestId: "request-invocation-events",
+      providerSafeLabel: "Provider A",
+      modelSafeLabel: "Model A",
+      providerReadinessStatus: "ready",
+    });
+    const preparation = prepareNextTurnModelRequest({
+      nextTurnBundle: prepareNextTurnBundle({
+        bundleId: "bundle-invocation-events",
+        turnId: "turn-invocation-events",
+        toolResultMessages: {
+          batchId: "messages-invocation-events",
+          dispatchPlanId: "plan-invocation-events",
+          messages: [],
+          preparedCount: 0,
+          blockedCount: 0,
+          terminalSuccessClaim: false,
+          notProvenClaims: [],
+        },
+      }),
+      modelRequestBoundary: request,
+    });
+    const gate = createModelInvocationGate({ requestPreparation: preparation });
+    const attempt = createModelInvocationAttemptEnvelope({ gate });
+
+    const events = projectRuntimeEvents({
+      modelInvocationGates: [gate],
+      modelInvocationAttempts: [attempt],
+    });
+
+    expect(events.map((event) => event.type)).toEqual([
+      "model-invocation-gate-observed",
+      "model-invocation-auth-readiness-observed",
+      "model-invocation-explicit-opt-in-required",
+      "model-invocation-blocked",
+      "model-invocation-attempt-prepared",
+    ]);
+    expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
+    expect(JSON.stringify(events)).toContain('"attemptStatus":"blocked"');
     expect(JSON.stringify(events)).not.toMatch(/provider\.env|raw provider output|hidden reasoning/i);
   });
 

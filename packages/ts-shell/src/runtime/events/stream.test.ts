@@ -301,6 +301,43 @@ describe("JSON runtime event stream projection", () => {
     );
   });
 
+  it("serializes model invocation gate observations without success claims", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [
+        {
+          id: "event-model-invocation",
+          sequence: 1,
+          type: "model-invocation-attempt-prepared",
+          facts: {
+            attemptId: "attempt-a",
+            attemptStatus: "blocked",
+            retryEligibility: "retry_metadata_unavailable",
+            fallbackEligibility: "fallback_metadata_unavailable",
+            unsafe:
+              "provider.env=/home/wang/.private-agents-real/provider.env raw provider output hidden reasoning token=secret oldText=before newText=after",
+            terminalSuccessClaim: false,
+          },
+          notProvenClaims: [
+            "invocation-attempted-is-not-provider-success",
+            "provider-completed-is-not-task-success",
+          ],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+      ],
+    });
+    const serialized = serializeJsonRuntimeEventStream(stream);
+
+    expect(stream[0]?.eventType).toBe("model-invocation-attempt-prepared");
+    expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
+    expect(stream[0]?.notProvenClaims).toContain("terminal-success");
+    expect(serialized).not.toMatch(
+      /private-agents-real|raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+    );
+  });
+
   it("serializes PL007 verification and repair observations without success claims", () => {
     const stream = projectJsonRuntimeEventStream({
       events: [

@@ -16,6 +16,10 @@ import {
   createModelRequestBoundary,
   prepareNextTurnModelRequest,
 } from "../../provider/request/boundary.js";
+import {
+  createModelInvocationAttemptEnvelope,
+  createModelInvocationGate,
+} from "../../provider/request/invocation.js";
 import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
@@ -229,6 +233,56 @@ describe("product surface view model", () => {
     expect(rendered).toContain("[not_proven] Verdict:");
     expect(rendered).toContain("terminalSuccessClaim=false");
     expect(rendered).not.toContain("Outcome: success");
+  });
+
+  it("renders invocation gate facts without claiming provider or task success", () => {
+    const request = createModelRequestBoundary({
+      requestId: "request-surface-invocation",
+      providerSafeLabel: "Provider A",
+      modelSafeLabel: "Model A",
+      providerReadinessStatus: "ready",
+    });
+    const preparation = prepareNextTurnModelRequest({
+      nextTurnBundle: prepareNextTurnBundle({
+        bundleId: "bundle-surface-invocation",
+        turnId: "turn-surface-invocation",
+        toolResultMessages: {
+          batchId: "messages-surface-invocation",
+          dispatchPlanId: "plan-surface-invocation",
+          messages: [],
+          preparedCount: 0,
+          blockedCount: 0,
+          terminalSuccessClaim: false,
+          notProvenClaims: [],
+        },
+      }),
+      modelRequestBoundary: request,
+    });
+    const gate = createModelInvocationGate({ requestPreparation: preparation });
+    const attempt = createModelInvocationAttemptEnvelope({ gate });
+    const runtimeEvents = projectRuntimeEvents({
+      modelInvocationGates: [gate],
+      modelInvocationAttempts: [attempt],
+    });
+
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped",
+      terminalClassification: "stopped",
+      terminalReason: "waiting_for_input",
+      runtimeEvents,
+    });
+
+    const section = viewModel?.sections.find((candidate) =>
+      candidate.title === "Invocation gate"
+    );
+    expect(section).toMatchObject({
+      kind: "model_boundary",
+      status: "blocked",
+      severity: "blocked",
+    });
+    expect(section?.summary).toContain("attempt=blocked");
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
+    expect(JSON.stringify(viewModel)).not.toContain('"success":true');
   });
 
   it("renders coding result and loop observation sections together without changing verdict truth", async () => {

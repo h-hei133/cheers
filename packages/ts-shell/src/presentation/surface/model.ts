@@ -151,6 +151,7 @@ export function projectProductSurfaceViewModel(
     ...sessionSections(input),
     ...toolOutcomeEventSections(input),
     ...requestPreparationEventSections(input),
+    ...modelInvocationEventSections(input),
     ...eventSections(input),
     section({
       kind: "verdict",
@@ -290,6 +291,79 @@ function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSec
 
 function factValue(value: unknown): string {
   return safeText(String(value ?? "not-observed"), 120);
+}
+
+function modelInvocationEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const events = input.runtimeEvents ?? [];
+  const gate = events.find((event) => event.type === "model-invocation-gate-observed");
+  const attempt = events.find((event) => event.type === "model-invocation-attempt-prepared");
+  if (!gate && !attempt) {
+    return [];
+  }
+  const blocked = events.find((event) => event.type === "model-invocation-blocked");
+  const optIn = events.find((event) => event.type === "model-invocation-explicit-opt-in-required");
+  const redaction = events.find((event) => event.type === "model-invocation-redaction-blocked");
+
+  return [section({
+    kind: "model_boundary",
+    title: "Invocation gate",
+    severity: redaction ? "error" : blocked ? "blocked" : "not_proven",
+    status: blocked ? "blocked" : "observed",
+    summary: [
+      gate ? `eligibility=${factValue(gate.facts.eligibilityStatus)}` : undefined,
+      gate ? `provider=${factValue(gate.facts.providerSafeLabel)}` : undefined,
+      gate ? `model=${factValue(gate.facts.modelSafeLabel)}` : undefined,
+      gate ? `optIn=${factValue(gate.facts.optInState)}` : undefined,
+      gate ? `auth=${factValue(gate.facts.authReadiness)}` : undefined,
+      attempt ? `attempt=${factValue(attempt.facts.attemptStatus)}` : undefined,
+      attempt ? `retry=${factValue(attempt.facts.retryEligibility)}` : undefined,
+      attempt ? `fallback=${factValue(attempt.facts.fallbackEligibility)}` : undefined,
+      "terminalSuccessClaim=false",
+    ].filter(Boolean).join("; "),
+    facts: [
+      ...(gate
+        ? [
+            {
+              label: "gateId",
+              value: factValue(gate.facts.gateId),
+              machineEventCorrelationId: gate.id,
+            },
+            {
+              label: "requiredUserAction",
+              value: factValue(gate.facts.requiredUserAction),
+              machineEventCorrelationId: gate.id,
+            },
+          ]
+        : []),
+      ...(attempt
+        ? [
+            {
+              label: "attemptId",
+              value: factValue(attempt.facts.attemptId),
+              machineEventCorrelationId: attempt.id,
+            },
+            {
+              label: "invocationMode",
+              value: factValue(attempt.facts.invocationMode),
+              machineEventCorrelationId: attempt.id,
+            },
+          ]
+        : []),
+    ],
+    redaction: gate?.redaction.status === "redacted" || attempt?.redaction.status === "redacted"
+      ? "applied"
+      : "none",
+    machineEventCorrelationIds: [gate?.id, attempt?.id, blocked?.id, optIn?.id, redaction?.id]
+      .filter((id): id is string => Boolean(id)),
+    notProvenClaims: events
+      .filter((event) =>
+        event.type === "model-invocation-gate-observed" ||
+        event.type === "model-invocation-attempt-prepared" ||
+        event.type === "model-invocation-blocked" ||
+        event.type === "model-invocation-explicit-opt-in-required"
+      )
+      .flatMap((event) => event.notProvenClaims),
+  })];
 }
 
 function requestPreparationEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {

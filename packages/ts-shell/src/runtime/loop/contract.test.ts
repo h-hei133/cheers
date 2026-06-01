@@ -159,6 +159,15 @@ describe("agent loop contract", () => {
 
     const turn = loop.turns[0];
     expect(turn?.nextTurn.prepared).toBe(true);
+    expect(turn?.nextTurn.invocationGate).toMatchObject({
+      eligibilityStatus: "blocked_by_missing_opt_in",
+      optInState: "missing",
+      terminalSuccessClaim: false,
+    });
+    expect(turn?.nextTurn.invocationAttempt).toMatchObject({
+      attemptStatus: "blocked",
+      terminalSuccessClaim: false,
+    });
     expect(turn?.nextTurn.pendingFacts).toEqual([
       "turn:1",
       "model-response:stop",

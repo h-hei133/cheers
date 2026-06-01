@@ -12,6 +12,10 @@ import type {
   ModelRequestBoundary,
   NextTurnModelRequestPreparation,
 } from "../../provider/request/boundary.js";
+import type {
+  ModelInvocationAttemptEnvelope,
+  ModelInvocationGateFacts,
+} from "../../provider/request/invocation.js";
 import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/projection.js";
 import type { PackageInventoryProjection } from "../resources/inventory.js";
@@ -84,6 +88,15 @@ export type RuntimeProjectionEventType =
   | "provider-opt-in-required"
   | "redaction-blocked-request"
   | "request-ready-for-explicit-invocation"
+  | "model-invocation-gate-observed"
+  | "model-invocation-blocked"
+  | "model-invocation-explicit-opt-in-required"
+  | "model-invocation-auth-readiness-observed"
+  | "model-invocation-redaction-blocked"
+  | "model-invocation-attempt-prepared"
+  | "model-invocation-attempt-observed"
+  | "model-invocation-failed-as-provider-fact"
+  | "model-invocation-completed-as-provider-fact"
   | "provider-readiness-observed"
   | "provider-fetch-blocked"
   | "provider-fetch-attempted"
@@ -216,6 +229,8 @@ export function projectRuntimeEvents(input: {
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
   readonly modelRequestBoundaries?: readonly ModelRequestBoundary[];
   readonly nextTurnRequestPreparations?: readonly NextTurnModelRequestPreparation[];
+  readonly modelInvocationGates?: readonly ModelInvocationGateFacts[];
+  readonly modelInvocationAttempts?: readonly ModelInvocationAttemptEnvelope[];
   readonly providerResponseStreams?: readonly ProviderResponseStreamProjection[];
   readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjection[];
   readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjection[];
@@ -449,6 +464,136 @@ export function projectRuntimeEvents(input: {
           terminalSuccessClaim: preparation.terminalSuccessClaim,
         },
         preparation.notProvenClaims,
+      );
+    }
+  }
+
+  for (const gate of input.modelInvocationGates ?? []) {
+    append(
+      "model-invocation-gate-observed",
+      {
+        gateId: gate.gateId,
+        sourcePreparedRequestId: gate.sourcePreparedRequestId,
+        providerMetadataId: gate.providerMetadataId,
+        modelMetadataId: gate.modelMetadataId,
+        providerSafeLabel: gate.providerSafeLabel,
+        modelSafeLabel: gate.modelSafeLabel,
+        optInState: gate.optInState,
+        authReadiness: gate.authReadinessState,
+        redactionStatus: gate.redactionState,
+        requestReadinessStatus: gate.requestReadinessState,
+        eligibilityStatus: gate.eligibilityStatus,
+        blockedReasons: gate.blockedReasons,
+        retryEligibility: gate.retryEligibility,
+        fallbackEligibility: gate.fallbackEligibility,
+        requiredUserAction: gate.requiredUserAction,
+        terminalSuccessClaim: gate.terminalSuccessClaim,
+      },
+      gate.notProvenClaims,
+    );
+    append(
+      "model-invocation-auth-readiness-observed",
+      {
+        gateId: gate.gateId,
+        authReadiness: gate.authReadinessState,
+        terminalSuccessClaim: false,
+      },
+      gate.notProvenClaims,
+    );
+    if (gate.optInState === "missing" || gate.optInState === "invalid") {
+      append(
+        "model-invocation-explicit-opt-in-required",
+        {
+          gateId: gate.gateId,
+          optInState: gate.optInState,
+          optInSourceSafeLabel: gate.optInSourceSafeLabel,
+          requiredUserAction: gate.requiredUserAction,
+          terminalSuccessClaim: false,
+        },
+        gate.notProvenClaims,
+      );
+    }
+    if (gate.eligibilityStatus !== "eligible_for_explicit_invocation") {
+      append(
+        "model-invocation-blocked",
+        {
+          gateId: gate.gateId,
+          eligibilityStatus: gate.eligibilityStatus,
+          blockedReasons: gate.blockedReasons,
+          requiredUserAction: gate.requiredUserAction,
+          terminalSuccessClaim: false,
+        },
+        gate.notProvenClaims,
+      );
+    }
+    if (gate.eligibilityStatus === "blocked_by_redaction") {
+      append(
+        "model-invocation-redaction-blocked",
+        {
+          gateId: gate.gateId,
+          redactionStatus: gate.redactionState,
+          requiredUserAction: gate.requiredUserAction,
+          terminalSuccessClaim: false,
+        },
+        gate.notProvenClaims,
+      );
+    }
+  }
+
+  for (const attempt of input.modelInvocationAttempts ?? []) {
+    append(
+      "model-invocation-attempt-prepared",
+      {
+        attemptId: attempt.attemptId,
+        sourceGateId: attempt.sourceGateId,
+        sourcePreparedRequestId: attempt.sourcePreparedRequestId,
+        providerSafeLabel: attempt.providerSafeLabel,
+        modelSafeLabel: attempt.modelSafeLabel,
+        invocationMode: attempt.invocationMode,
+        attemptStatus: attempt.attemptStatus,
+        failureClass: attempt.failureClass,
+        retryEligibility: attempt.retryEligibility,
+        fallbackEligibility: attempt.fallbackEligibility,
+        redactionStatus: attempt.redactionState,
+        terminalSuccessClaim: attempt.terminalSuccessClaim,
+      },
+      attempt.notProvenClaims,
+    );
+    if (attempt.attemptStatus !== "not_attempted" && attempt.attemptStatus !== "blocked") {
+      append(
+        "model-invocation-attempt-observed",
+        {
+          attemptId: attempt.attemptId,
+          attemptStatus: attempt.attemptStatus,
+          invocationMode: attempt.invocationMode,
+          terminalSuccessClaim: false,
+        },
+        attempt.notProvenClaims,
+      );
+    }
+    if (attempt.attemptStatus === "failed") {
+      append(
+        "model-invocation-failed-as-provider-fact",
+        {
+          attemptId: attempt.attemptId,
+          attemptStatus: attempt.attemptStatus,
+          failureClass: attempt.failureClass,
+          retryEligibility: attempt.retryEligibility,
+          fallbackEligibility: attempt.fallbackEligibility,
+          terminalSuccessClaim: false,
+        },
+        attempt.notProvenClaims,
+      );
+    }
+    if (attempt.attemptStatus === "completed") {
+      append(
+        "model-invocation-completed-as-provider-fact",
+        {
+          attemptId: attempt.attemptId,
+          attemptStatus: attempt.attemptStatus,
+          terminalSuccessClaim: false,
+        },
+        attempt.notProvenClaims,
       );
     }
   }

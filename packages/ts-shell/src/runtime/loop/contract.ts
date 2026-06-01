@@ -8,6 +8,12 @@ import {
   prepareNextTurnModelRequest,
   type NextTurnModelRequestPreparation,
 } from "../../provider/request/boundary.js";
+import {
+  createModelInvocationAttemptEnvelope,
+  createModelInvocationGate,
+  type ModelInvocationAttemptEnvelope,
+  type ModelInvocationGateFacts,
+} from "../../provider/request/invocation.js";
 import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/response/boundary.js";
 import {
@@ -205,6 +211,8 @@ export interface AgentLoopContractTurnProjection {
     readonly pendingFacts: readonly string[];
     readonly bundle?: NextTurnBundleProjection;
     readonly requestPreparation?: NextTurnModelRequestPreparation;
+    readonly invocationGate?: ModelInvocationGateFacts;
+    readonly invocationAttempt?: ModelInvocationAttemptEnvelope;
     readonly steeringQueue: SteeringQueueProjection;
     readonly followUpQueue: FollowUpQueueProjection;
     readonly deliveryPolicy: NextTurnDeliveryPolicyProjection;
@@ -688,6 +696,19 @@ export async function runAgentLoopContract(
         taskSummary: input.prompt,
         planningConstraintIds: nextTurnBundle.blockingFacts,
       });
+      const invocationGate = createModelInvocationGate({
+        requestPreparation,
+        explicitOptIn: {
+          state: input.providerOptIn ? "present" : "missing",
+          sourceSafeLabel: input.providerOptIn
+            ? "agent-loop-provider-opt-in"
+            : "explicit-opt-in-not-present",
+        },
+        abortSignal: input.abortSignal,
+      });
+      const invocationAttempt = createModelInvocationAttemptEnvelope({
+        gate: invocationGate,
+      });
       appendProjectedEvents(events, projectRuntimeEvents({
         steeringQueues: [steeringQueue],
         followUpQueues: [followUpQueue],
@@ -695,6 +716,8 @@ export async function runAgentLoopContract(
         nextTurnBundles: [nextTurnBundle],
         modelRequestBoundaries: [modelRequestBoundary],
         nextTurnRequestPreparations: [requestPreparation],
+        modelInvocationGates: [invocationGate],
+        modelInvocationAttempts: [invocationAttempt],
       }));
       const verification = input.verificationBoundary
         ? await input.verificationBoundary({
@@ -754,6 +777,8 @@ export async function runAgentLoopContract(
           pendingFacts: Object.freeze([...pendingNextTurnFacts]),
           bundle: nextTurnBundle,
           requestPreparation,
+          invocationGate,
+          invocationAttempt,
           steeringQueue,
           followUpQueue,
           deliveryPolicy,
