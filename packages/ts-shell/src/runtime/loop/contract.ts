@@ -55,6 +55,10 @@ import {
 } from "../../verification/result/boundary.js";
 import { projectRuntimeEvents, type RuntimeProjectionEvent } from "../events/projection.js";
 import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
+import {
+  projectModelResponseReentryCycle,
+  type ModelResponseReentryCycleProjection,
+} from "./reentry.js";
 
 export type AgentLoopContractState =
   | "idle"
@@ -220,6 +224,7 @@ export interface AgentLoopContractTurnProjection {
     readonly invocationGate?: ModelInvocationGateFacts;
     readonly invocationAttempt?: ModelInvocationAttemptEnvelope;
     readonly controlledInvocation?: ControlledModelInvocationAdapterProjection;
+    readonly responseReentryCycle?: ModelResponseReentryCycleProjection;
     readonly steeringQueue: SteeringQueueProjection;
     readonly followUpQueue: FollowUpQueueProjection;
     readonly deliveryPolicy: NextTurnDeliveryPolicyProjection;
@@ -726,6 +731,13 @@ export async function runAgentLoopContract(
         turnId: `${input.sessionId}:turn:${turn}:next`,
         signal: input.abortSignal,
       });
+      const responseReentryCycle = controlledInvocation.responseHandoff ||
+          controlledInvocation.attemptDecision === "execute_via_provider_fetch"
+        ? projectModelResponseReentryCycle({
+            cycleId: `${input.sessionId}:turn:${turn}:response-cycle`,
+            controlledInvocation,
+          })
+        : undefined;
       appendProjectedEvents(events, projectRuntimeEvents({
         steeringQueues: [steeringQueue],
         followUpQueues: [followUpQueue],
@@ -736,6 +748,7 @@ export async function runAgentLoopContract(
         modelInvocationGates: [invocationGate],
         modelInvocationAttempts: [invocationAttempt],
         controlledModelInvocations: [controlledInvocation],
+        responseReentryCycles: responseReentryCycle ? [responseReentryCycle] : [],
       }));
       const verification = input.verificationBoundary
         ? await input.verificationBoundary({
@@ -798,6 +811,7 @@ export async function runAgentLoopContract(
           invocationGate,
           invocationAttempt,
           controlledInvocation,
+          ...(responseReentryCycle ? { responseReentryCycle } : {}),
           steeringQueue,
           followUpQueue,
           deliveryPolicy,

@@ -22,6 +22,7 @@ import { runAgentLoopContract } from "../loop/contract.js";
 import { projectProductLoopAdapter } from "../loop/adapter.js";
 import { projectLoopTrajectory } from "../loop/trajectory.js";
 import { projectModelBoundaryPhase } from "../loop/modelBoundary.js";
+import { projectModelResponseReentryCycle } from "../loop/reentry.js";
 import { runProviderStreamAdapter } from "../loop/providerStreamAdapter.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/response/boundary.js";
@@ -178,6 +179,98 @@ describe("runtime event projection", () => {
         "terminal-success",
       ]),
     );
+  });
+
+  it("projects response reentry cycle facts as observation-only", () => {
+    const boundary = createModelResponseBoundary({
+      responseId: "response-reentry-events",
+      turnId: "turn-reentry-events",
+      source: "existing_safe_projection",
+      providerMode: "real",
+      assistantContent: "safe assistant text",
+      toolCallCount: 1,
+    });
+    const cycle = projectModelResponseReentryCycle({
+      controlledInvocation: {
+        adapterId: "adapter-reentry-events",
+        sourceGateId: "gate-reentry-events",
+        sourcePreparedRequestId: "prepared-reentry-events",
+        providerSafeLabel: "Provider A",
+        modelSafeLabel: "Model A",
+        invocationMode: "controlled_provider_fetch",
+        controlledOptInState: "present",
+        attemptDecision: "execute_via_provider_fetch",
+        attemptId: "attempt-reentry-events",
+        redactionState: "report-safe",
+        outcome: {
+          attemptId: "attempt-reentry-events",
+          sourceGateId: "gate-reentry-events",
+          providerSafeLabel: "Provider A",
+          modelSafeLabel: "Model A",
+          status: "completed",
+          retryEligibility: "retry_not_allowed",
+          fallbackEligibility: "fallback_unknown",
+          fallbackAttempted: false,
+          responseHandoffId: "handoff-reentry-events",
+          redactionState: "report-safe",
+          notProvenClaims: ["completed-provider-fact-is-not-task-success"],
+          terminalSuccessClaim: false,
+        },
+        responseHandoff: {
+          responseHandoffId: "handoff-reentry-events",
+          sourceAttemptId: "attempt-reentry-events",
+          responseClassification: "completed",
+          assistantContentAvailability: "available",
+          toolCallExtractionReadiness: "ready",
+          modelResponseBoundaryId: "response-reentry-events",
+          redactionStatus: "report-safe",
+          rawOutputExcluded: true,
+          reportSafeToolCallCandidates: [
+            { id: "call-read", name: "read", arguments: { path: "a.ts" } },
+          ],
+          notProvenClaims: ["response-handoff-is-not-final-assistant-success"],
+          terminalSuccessClaim: false,
+        },
+        attemptEnvelope: {
+          attemptId: "attempt-reentry-events",
+          sourceGateId: "gate-reentry-events",
+          sourcePreparedRequestId: "prepared-reentry-events",
+          providerSafeLabel: "Provider A",
+          modelSafeLabel: "Model A",
+          invocationMode: "controlled_provider_fetch",
+          attemptStatus: "completed",
+          retryEligibility: "retry_not_allowed",
+          fallbackEligibility: "fallback_unknown",
+          fallbackAttempted: false,
+          redactionState: "report-safe",
+          notProvenClaims: ["attempt-is-not-provider-success"],
+          terminalSuccessClaim: false,
+        },
+        notProvenClaims: ["attempt-is-not-provider-success"],
+        terminalSuccessClaim: false,
+      },
+      responseBoundary: boundary,
+    });
+
+    const events = projectRuntimeEvents({ responseReentryCycles: [cycle] });
+
+    expect(events.map((event) => event.type)).toEqual([
+      "response-reentry-observed",
+      "model-boundary-processing-observed",
+      "assistant-accumulation-observed",
+      "tool-extraction-observed",
+      "loop-cycle-boundary-observed",
+    ]);
+    expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
+    expect(events.flatMap((event) => event.notProvenClaims)).toEqual(
+      expect.arrayContaining([
+        "reentry-processed-is-not-task-success",
+        "assistant-accumulated-is-not-task-success",
+        "tool-extracted-is-not-tool-executed",
+        "cycle-boundary-is-not-terminal-success",
+      ]),
+    );
+    expect(JSON.stringify(events)).not.toContain('"success":true');
   });
 
   it("projects model request and provider stream events as observation-only", async () => {

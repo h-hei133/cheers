@@ -125,6 +125,9 @@ describe("controlled model invocation adapter", () => {
       rawOutputExcluded: true,
       terminalSuccessClaim: false,
     });
+    expect(adapter.responseHandoff?.reportSafeToolCallCandidates).toEqual([
+      { id: "call-a", name: "read", arguments: { path: "a.ts" } },
+    ]);
     expect(adapter.modelResponseBoundary?.terminalSuccessClaim).toBe(false);
     expect(JSON.stringify(adapter)).not.toContain('"success":true');
   });

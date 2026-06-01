@@ -153,6 +153,7 @@ export function projectProductSurfaceViewModel(
     ...requestPreparationEventSections(input),
     ...modelInvocationEventSections(input),
     ...controlledInvocationEventSections(input),
+    ...responseReentryEventSections(input),
     ...eventSections(input),
     section({
       kind: "verdict",
@@ -292,6 +293,84 @@ function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSec
 
 function factValue(value: unknown): string {
   return safeText(String(value ?? "not-observed"), 120);
+}
+
+function responseReentryEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const events = input.runtimeEvents ?? [];
+  const reentry = events.find((event) => event.type === "response-reentry-observed");
+  const accumulation = events.find((event) => event.type === "assistant-accumulation-observed");
+  const extraction = events.find((event) => event.type === "tool-extraction-observed");
+  const noTool = events.find((event) => event.type === "no-tool-response-observed");
+  const cycle = events.find((event) => event.type === "loop-cycle-boundary-observed");
+  const blocked = events.find((event) => event.type === "loop-cycle-blocked");
+  const partial = events.find((event) => event.type === "loop-cycle-partial");
+  if (!reentry && !cycle) {
+    return [];
+  }
+
+  return [section({
+    kind: "model_boundary",
+    title: "Response cycle",
+    severity: blocked ? "blocked" : partial ? "partial" : "not_proven",
+    status: blocked ? "blocked" : partial ? "partial" : "observed",
+    summary: [
+      reentry ? `reentry=${factValue(reentry.facts.reentryStatus)}` : undefined,
+      accumulation ? `assistant=${factValue(accumulation.facts.completionStatus)}` : undefined,
+      extraction ? `toolExtraction=${factValue(extraction.facts.handoffReadiness)}` : undefined,
+      noTool ? `noTool=${factValue(noTool.facts.noToolStatus)}` : undefined,
+      cycle ? `cycle=${factValue(cycle.facts.cycleStatus)}` : undefined,
+      cycle ? `next=${factValue(cycle.facts.nextHandoffKind)}` : undefined,
+      "terminalSuccessClaim=false",
+    ].filter(Boolean).join("; "),
+    facts: [
+      ...(reentry
+        ? [{
+            label: "responseReentry",
+            value: factValue(reentry.facts.reentryId),
+            machineEventCorrelationId: reentry.id,
+          }]
+        : []),
+      ...(extraction
+        ? [{
+            label: "toolExtraction",
+            value: factValue(extraction.facts.handoffReadiness),
+            machineEventCorrelationId: extraction.id,
+          }]
+        : []),
+      ...(cycle
+        ? [{
+            label: "cycleBoundary",
+            value: factValue(cycle.facts.cycleStatus),
+            machineEventCorrelationId: cycle.id,
+          }]
+        : []),
+    ],
+    redaction: events.some((event) =>
+      event.type === "response-reentry-observed" && event.redaction.status === "redacted"
+    )
+      ? "applied"
+      : "none",
+    machineEventCorrelationIds: [
+      reentry?.id,
+      accumulation?.id,
+      extraction?.id,
+      noTool?.id,
+      cycle?.id,
+      blocked?.id,
+      partial?.id,
+    ].filter((id): id is string => Boolean(id)),
+    notProvenClaims: events
+      .filter((event) =>
+        event.type === "response-reentry-observed" ||
+        event.type === "assistant-accumulation-observed" ||
+        event.type === "tool-extraction-observed" ||
+        event.type === "no-tool-response-observed" ||
+        event.type === "loop-cycle-boundary-observed" ||
+        event.type === "loop-cycle-blocked" ||
+        event.type === "loop-cycle-partial"
+      )
+      .flatMap((event) => event.notProvenClaims),
+  })];
 }
 
 function controlledInvocationEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {

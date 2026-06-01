@@ -478,6 +478,59 @@ describe("JSON runtime event stream projection", () => {
       "event-stream-terminal-success-claim",
     );
   });
+
+  it("keeps response reentry cycle stream entries observation-only", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [
+        {
+          id: "event-reentry",
+          sequence: 1,
+          type: "response-reentry-observed",
+          facts: {
+            reentryId: "reentry-a",
+            reentryStatus: "processed",
+            raw: "raw provider output: hidden reasoning token=secret",
+            terminalSuccessClaim: true,
+          },
+          notProvenClaims: ["reentry-processed-is-not-task-success"],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+        {
+          id: "event-cycle",
+          sequence: 2,
+          type: "loop-cycle-boundary-observed",
+          facts: {
+            cycleId: "cycle-a",
+            cycleStatus: "tool_handoff_ready",
+            terminalSuccessClaim: true,
+          },
+          notProvenClaims: ["cycle-boundary-is-not-terminal-success"],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+      ],
+    });
+    const serialized = serializeJsonRuntimeEventStream(stream);
+
+    expect(stream.map((entry) => entry.eventType)).toEqual([
+      "response-reentry-observed",
+      "loop-cycle-boundary-observed",
+    ]);
+    expect(stream.every((entry) => entry.truthfulness.terminalSuccessClaim === false)).toBe(true);
+    expect(stream.flatMap((entry) => entry.notProvenClaims)).toEqual(
+      expect.arrayContaining([
+        "reentry-processed-is-not-task-success",
+        "cycle-boundary-is-not-terminal-success",
+        "event-stream-terminal-success-claim",
+      ]),
+    );
+    expect(serialized).not.toMatch(/raw provider output|hidden reasoning|token=secret/i);
+  });
 });
 
 function makeEvent(

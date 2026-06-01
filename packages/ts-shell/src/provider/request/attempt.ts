@@ -99,6 +99,7 @@ export interface ProviderResponseHandoffFacts {
   readonly responseClassification: ProviderResponseHandoffClassification;
   readonly assistantContentAvailability: ProviderResponseAssistantContentAvailability;
   readonly toolCallExtractionReadiness: ProviderResponseToolCallExtractionReadiness;
+  readonly reportSafeToolCallCandidates?: readonly unknown[];
   readonly modelResponseBoundaryId?: string;
   readonly redactionStatus: "report-safe" | "redacted";
   readonly rawOutputExcluded: true;
@@ -414,11 +415,14 @@ function createResponseHandoff(input: {
   const hasContent = input.streamEvents.some((event) => Boolean(event.contentDelta));
   const completedToolCalls = input.streamEvents.filter((event) =>
     event.kind === "tool_call_completed"
-  ).length;
+  );
   const partialToolCalls = input.streamEvents.some((event) => event.kind === "tool_call_delta");
   const redacted = input.redactions.size > 0 ||
     input.classification === "redaction_failed" ||
     input.failureClass === "provider_redaction_failure";
+  const reportSafeToolCallCandidates = completedToolCalls.map((event, index) =>
+    sanitizeToolCallCandidate(event, index + 1, input.redactions)
+  );
   const responseHandoffId = sanitizeText(
     `provider-response-handoff:${input.attemptId}`,
     input.redactions,
@@ -432,9 +436,12 @@ function createResponseHandoff(input: {
       assistantContentAvailability: redacted
         ? "redacted"
         : hasContent ? "available" : "absent",
-      toolCallExtractionReadiness: completedToolCalls > 0
+      toolCallExtractionReadiness: completedToolCalls.length > 0
         ? "ready"
         : partialToolCalls ? "partial" : "no_tool_calls",
+      ...(reportSafeToolCallCandidates.length > 0 && !redacted
+        ? { reportSafeToolCallCandidates: Object.freeze(reportSafeToolCallCandidates) }
+        : {}),
       modelResponseBoundaryId: sanitizeText(input.responseId, input.redactions),
       redactionStatus: redacted ? "redacted" : "report-safe",
       rawOutputExcluded: true,
@@ -447,6 +454,21 @@ function createResponseHandoff(input: {
       terminalSuccessClaim: false,
     }),
   };
+}
+
+function sanitizeToolCallCandidate(
+  event: ProviderResponseStreamEvent,
+  index: number,
+  redactions: Set<string>,
+): Readonly<Record<string, unknown>> {
+  const id = sanitizeText(event.toolCallId ?? `malformed-tool-call-${index}`, redactions);
+  const name = sanitizeText(event.toolName ?? "unknown", redactions);
+  const args = sanitizeUnknown(event.toolArguments, redactions);
+  return deepFreeze({
+    id,
+    name,
+    ...(args !== undefined ? { arguments: args } : {}),
+  });
 }
 
 function createOutcome(input: {
@@ -611,6 +633,29 @@ function sanitizeText(input: string, redactions: Set<string>): string {
     redactions.add("unsafe-controlled-invocation-input");
   }
   return value.length > 0 ? value.slice(0, 180) : "redacted-empty";
+}
+
+function sanitizeUnknown(input: unknown, redactions: Set<string>): unknown {
+  if (input === undefined) {
+    return undefined;
+  }
+  if (typeof input === "string") {
+    return sanitizeText(input, redactions);
+  }
+  if (Array.isArray(input)) {
+    return Object.freeze(input.map((item) => sanitizeUnknown(item, redactions)));
+  }
+  if (input && typeof input === "object") {
+    const output: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input)) {
+      output[sanitizeText(key, redactions)] = sanitizeUnknown(value, redactions);
+    }
+    return deepFreeze(output);
+  }
+  if (typeof input === "number") {
+    return Number.isFinite(input) ? input : null;
+  }
+  return input;
 }
 
 function unique(input: readonly string[]): readonly string[] {

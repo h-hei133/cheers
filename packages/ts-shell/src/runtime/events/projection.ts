@@ -50,6 +50,7 @@ import type {
 import type { ProductLoopAdapterProjection } from "../loop/adapter.js";
 import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
 import type { ProviderStreamAdapterProjection } from "../loop/providerStreamAdapter.js";
+import type { ModelResponseReentryCycleProjection } from "../loop/reentry.js";
 
 export type RuntimeProjectionEventType =
   | "turn-snapshot-observed"
@@ -106,6 +107,14 @@ export type RuntimeProjectionEventType =
   | "provider-response-handoff-prepared"
   | "provider-retry-eligible-not-attempted"
   | "provider-fallback-eligible-not-attempted"
+  | "response-reentry-observed"
+  | "model-boundary-processing-observed"
+  | "assistant-accumulation-observed"
+  | "tool-extraction-observed"
+  | "no-tool-response-observed"
+  | "loop-cycle-boundary-observed"
+  | "loop-cycle-blocked"
+  | "loop-cycle-partial"
   | "provider-readiness-observed"
   | "provider-fetch-blocked"
   | "provider-fetch-attempted"
@@ -241,6 +250,7 @@ export function projectRuntimeEvents(input: {
   readonly modelInvocationGates?: readonly ModelInvocationGateFacts[];
   readonly modelInvocationAttempts?: readonly ModelInvocationAttemptEnvelope[];
   readonly controlledModelInvocations?: readonly ControlledModelInvocationAdapterProjection[];
+  readonly responseReentryCycles?: readonly ModelResponseReentryCycleProjection[];
   readonly providerResponseStreams?: readonly ProviderResponseStreamProjection[];
   readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjection[];
   readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjection[];
@@ -730,6 +740,131 @@ export function projectRuntimeEvents(input: {
           terminalSuccessClaim: false,
         },
         adapter.outcome.notProvenClaims,
+      );
+    }
+  }
+
+  for (const cycle of input.responseReentryCycles ?? []) {
+    append(
+      "response-reentry-observed",
+      {
+        cycleId: cycle.cycleId,
+        reentryId: cycle.responseReentry.reentryId,
+        sourceAttemptId: cycle.responseReentry.sourceAttemptId,
+        sourceResponseHandoffId: cycle.responseReentry.sourceResponseHandoffId,
+        responseClassification: cycle.responseReentry.responseClassification,
+        assistantContentAvailability: cycle.responseReentry.assistantContentAvailability,
+        toolCallExtractionReadiness: cycle.responseReentry.toolExtractionReadiness,
+        reentryStatus: cycle.responseReentry.reentryStatus,
+        redactionStatus: cycle.responseReentry.redactionState,
+        rawOutputExcluded: cycle.responseReentry.rawOutputExcluded,
+        terminalSuccessClaim: false,
+      },
+      cycle.responseReentry.notProvenClaims,
+    );
+    if (
+      cycle.responseReentry.reentryStatus === "processed" ||
+      cycle.responseReentry.reentryStatus === "ready_for_boundary_processing"
+    ) {
+      append(
+        "model-boundary-processing-observed",
+        {
+          cycleId: cycle.cycleId,
+          responseReentryId: cycle.responseReentry.reentryId,
+          modelResponseBoundaryId: cycle.responseBoundary.responseId,
+          responseStatus: cycle.responseBoundary.status,
+          terminalSuccessClaim: false,
+        },
+        cycle.notProvenClaims,
+      );
+    }
+    if (cycle.assistantAccumulation) {
+      append(
+        "assistant-accumulation-observed",
+        {
+          accumulationId: cycle.assistantAccumulation.accumulationId,
+          sourceReentryId: cycle.assistantAccumulation.sourceReentryId,
+          contentAvailability: cycle.assistantAccumulation.contentAvailability,
+          contentSummarySafeLabel: cycle.assistantAccumulation.contentSummarySafeLabel,
+          contentRedactionState: cycle.assistantAccumulation.contentRedactionState,
+          hiddenChannelExcluded: cycle.assistantAccumulation.hiddenChannelExcluded,
+          completionStatus: cycle.assistantAccumulation.completionStatus,
+          terminalSuccessClaim: false,
+        },
+        cycle.assistantAccumulation.notProvenClaims,
+      );
+    }
+    if (cycle.toolExtraction) {
+      append(
+        "tool-extraction-observed",
+        {
+          extractionId: cycle.toolExtraction.extractionId,
+          sourceAssistantAccumulationId: cycle.toolExtraction.sourceAssistantAccumulationId,
+          extractedCallIds: cycle.toolExtraction.extractedCallIds,
+          malformedCallIds: cycle.toolExtraction.malformedCallIds,
+          unsupportedCallIds: cycle.toolExtraction.unsupportedCallIds,
+          unknownToolIds: cycle.toolExtraction.unknownToolIds,
+          noToolStatus: cycle.toolExtraction.noToolStatus,
+          extractionConfidence: cycle.toolExtraction.extractionConfidence,
+          handoffReadiness: cycle.toolExtraction.handoffReadiness,
+          terminalSuccessClaim: false,
+        },
+        cycle.toolExtraction.notProvenClaims,
+      );
+      if (cycle.toolExtraction.noToolStatus === "observed") {
+        append(
+          "no-tool-response-observed",
+          {
+            extractionId: cycle.toolExtraction.extractionId,
+            noToolStatus: cycle.toolExtraction.noToolStatus,
+            terminalSuccessClaim: false,
+          },
+          cycle.toolExtraction.notProvenClaims,
+        );
+      }
+    }
+    append(
+      "loop-cycle-boundary-observed",
+      {
+        cycleId: cycle.cycleBoundary.cycleId,
+        sourceInvocationAttemptId: cycle.cycleBoundary.sourceInvocationAttemptId,
+        responseReentryId: cycle.cycleBoundary.responseReentryId,
+        assistantAccumulationId: cycle.cycleBoundary.assistantAccumulationId,
+        toolExtractionId: cycle.cycleBoundary.toolExtractionId,
+        nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
+        cycleStatus: cycle.cycleBoundary.cycleStatus,
+        stopReason: cycle.cycleBoundary.stopReason,
+        continuationRequirement: cycle.cycleBoundary.continuationRequirement,
+        terminalSuccessClaim: false,
+      },
+      cycle.cycleBoundary.notProvenClaims,
+    );
+    if (
+      cycle.cycleBoundary.cycleStatus === "blocked_response" ||
+      cycle.cycleBoundary.cycleStatus === "failed_response" ||
+      cycle.cycleBoundary.cycleStatus === "cancelled_response"
+    ) {
+      append(
+        "loop-cycle-blocked",
+        {
+          cycleId: cycle.cycleBoundary.cycleId,
+          cycleStatus: cycle.cycleBoundary.cycleStatus,
+          stopReason: cycle.cycleBoundary.stopReason,
+          terminalSuccessClaim: false,
+        },
+        cycle.cycleBoundary.notProvenClaims,
+      );
+    }
+    if (cycle.cycleBoundary.cycleStatus === "partial_response") {
+      append(
+        "loop-cycle-partial",
+        {
+          cycleId: cycle.cycleBoundary.cycleId,
+          cycleStatus: cycle.cycleBoundary.cycleStatus,
+          nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
+          terminalSuccessClaim: false,
+        },
+        cycle.cycleBoundary.notProvenClaims,
       );
     }
   }

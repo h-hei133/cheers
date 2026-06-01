@@ -236,6 +236,102 @@ describe("product surface view model", () => {
     expect(rendered).not.toContain("Outcome: success");
   });
 
+  it("renders response cycle observations without success inflation", () => {
+    const runtimeEvents = projectRuntimeEvents({
+      responseReentryCycles: [{
+        cycleId: "cycle-surface",
+        responseReentry: {
+          reentryId: "reentry-surface",
+          sourceAttemptId: "attempt-surface",
+          sourceResponseHandoffId: "handoff-surface",
+          responseClassification: "completed",
+          assistantContentAvailability: "available",
+          toolExtractionReadiness: "no_tool_calls",
+          redactionState: "report-safe",
+          rawOutputExcluded: true,
+          reentryStatus: "processed",
+          terminalSuccessClaim: false,
+          notProvenClaims: ["reentry-processed-is-not-task-success"],
+        },
+        responseBoundary: {
+          responseId: "response-surface",
+          providerMode: "real",
+          source: "existing_safe_projection",
+          status: "observed",
+          assistantContentSummary: "safe summary",
+          toolCallCount: 0,
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+          notProvenClaims: ["model-response-complete-is-not-task-success"],
+          terminalSuccessClaim: false,
+        },
+        assistantAccumulation: {
+          accumulationId: "accumulation-surface",
+          sourceReentryId: "reentry-surface",
+          contentAvailability: "available",
+          contentSummarySafeLabel: "report-safe-summary-present",
+          contentRedactionState: "report-safe",
+          hiddenChannelExcluded: true,
+          completionStatus: "accumulated",
+          terminalSuccessClaim: false,
+          notProvenClaims: ["assistant-accumulated-is-not-task-success"],
+        },
+        toolExtraction: {
+          extractionId: "extraction-surface",
+          sourceAssistantAccumulationId: "accumulation-surface",
+          extractedCallIds: [],
+          malformedCallIds: [],
+          unsupportedCallIds: [],
+          unknownToolIds: [],
+          noToolStatus: "observed",
+          extractionConfidence: "none",
+          handoffReadiness: "no_tool_calls",
+          terminalSuccessClaim: false,
+          notProvenClaims: ["no-tool-response-is-not-task-completion"],
+        },
+        cycleBoundary: {
+          cycleId: "cycle-surface",
+          sourceInvocationAttemptId: "attempt-surface",
+          responseReentryId: "reentry-surface",
+          assistantAccumulationId: "accumulation-surface",
+          toolExtractionId: "extraction-surface",
+          nextHandoffKind: "none",
+          cycleStatus: "no_tool_response_observed",
+          stopReason: "no-tool-response-observed",
+          continuationRequirement: "no_automatic_continuation",
+          terminalSuccessClaim: false,
+          notProvenClaims: ["cycle-boundary-is-not-terminal-success"],
+        },
+        terminalSuccessClaim: false,
+        notProvenClaims: [
+          "reentry-processed-is-not-task-success",
+          "no-tool-response-is-not-task-completion",
+          "cycle-boundary-is-not-terminal-success",
+        ],
+      }],
+    });
+
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped",
+      terminalClassification: "stopped",
+      terminalReason: "waiting_for_input",
+      runtimeEvents,
+    });
+    const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
+
+    expect(viewModel?.sections.find((section) => section.title === "Response cycle"))
+      .toMatchObject({
+        status: "observed",
+        severity: "not_proven",
+      });
+    expect(rendered).toContain("cycle=no_tool_response_observed");
+    expect(rendered).toContain("terminalSuccessClaim=false");
+    expect(rendered).not.toContain("Outcome: success");
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
+  });
+
   it("renders invocation gate facts without claiming provider or task success", () => {
     const request = createModelRequestBoundary({
       requestId: "request-surface-invocation",
