@@ -28,6 +28,23 @@ export interface ProductLoopAdapterInput {
   readonly nextAction?: string;
 }
 
+export interface ProductLoopCompletionConsumerProjection {
+  readonly observed: boolean;
+  readonly viewStatus: "complete_view" | "incomplete_view" | "not_observed";
+  readonly packetIds: readonly string[];
+  readonly resultOwnedTerminalStatus?: string;
+  readonly loopDecision?: string;
+  readonly closeoutState?: string;
+  readonly packetStatus?: string;
+  readonly originalFailureSummary?: string;
+  readonly repairChainSummary?: string;
+  readonly postRepairVerificationSummary?: string;
+  readonly missingProofItems: readonly string[];
+  readonly nextAction?: string;
+  readonly notProvenClaims: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
 export interface ProductLoopAdapterProjection {
   readonly adapterId: string;
   readonly observationMode: "host-adapter";
@@ -58,7 +75,9 @@ export interface ProductLoopAdapterProjection {
     readonly jsonStreamIds: readonly string[];
     readonly productSurfaceSectionIds: readonly string[];
     readonly resultFactIds: readonly string[];
+    readonly productCompletionPacketIds: readonly string[];
   };
+  readonly completionConsumer: ProductLoopCompletionConsumerProjection;
   readonly phaseStatus: readonly ProductLoopPhaseStatusEntry[];
   readonly unsupportedPhaseIds: readonly string[];
   readonly featureContracts: readonly FutureFeatureIntegrationContract[];
@@ -113,6 +132,7 @@ export function projectProductLoopAdapter(
   const resultFactIds = input.loopTrajectory.finalObservedFacts.resultStatus
     ? [`result:${input.loopTrajectory.finalObservedFacts.resultStatus}`]
     : [];
+  const completionConsumer = projectCompletionConsumer(input.loopTrajectory);
   const unsupportedPhaseIds = phaseStatus
     .filter((entry) => entry.status === "unsupported")
     .map((entry) => entry.phaseId);
@@ -129,8 +149,13 @@ export function projectProductLoopAdapter(
       "replay-safe-summary-is-not-success",
       "continuation-ready-is-not-success",
       "product-surface-rendered-is-not-success",
+      "product-consumer-is-not-terminal-truth",
+      "complete-product-view-requires-result-owned-verified-status-and-complete-packet",
+      "session-carry-forward-is-not-terminal-truth",
+      "host-display-is-not-terminal-truth",
       "terminal-success",
       ...input.loopTrajectory.notProvenClaims,
+      ...completionConsumer.notProvenClaims,
       ...phaseClaims,
       ...eventClaims,
       ...featureContracts.flatMap((contract) => contract.notProvenClaims),
@@ -178,7 +203,9 @@ export function projectProductLoopAdapter(
       jsonStreamIds: input.loopTrajectory.jsonEventStream.map((entry) => entry.eventId),
       productSurfaceSectionIds: input.loopTrajectory.productSurfaceSectionIds,
       resultFactIds: Object.freeze(resultFactIds),
+      productCompletionPacketIds: completionConsumer.packetIds,
     },
+    completionConsumer,
     phaseStatus,
     unsupportedPhaseIds: Object.freeze(unsupportedPhaseIds),
     featureContracts,
@@ -209,6 +236,111 @@ export function projectProductLoopAdapter(
       "connect future capability blocks through the feature integration contract").value,
     terminalSuccessClaim: false,
   });
+}
+
+function projectCompletionConsumer(
+  loopTrajectory: LoopTrajectoryProjection,
+): ProductLoopCompletionConsumerProjection {
+  const packetEvents = loopTrajectory.events.filter((event) =>
+    event.type === "product-completion-packet-observed"
+  );
+  const packetIds = loopTrajectory.productCompletionPacketIds.length > 0
+    ? loopTrajectory.productCompletionPacketIds
+    : packetEvents.flatMap((event) =>
+      typeof event.facts.packetId === "string" ? [event.facts.packetId] : []
+    );
+  const latest = packetEvents.at(-1);
+  if (!latest) {
+    return deepFreeze({
+      observed: false,
+      viewStatus: "not_observed",
+      packetIds: Object.freeze(packetIds.map((id) => sanitizeText(id).value)),
+      missingProofItems: Object.freeze([]),
+      notProvenClaims: Object.freeze([
+        "product-completion-packet-not-observed",
+        "product-consumer-is-not-terminal-truth",
+        "complete-product-view-requires-result-owned-verified-status-and-complete-packet",
+        "terminal-success",
+      ]),
+      terminalSuccessClaim: false,
+    });
+  }
+
+  const facts = latest.facts;
+  const resultOwnedTerminalStatus = factString(facts.resultOwnedTerminalStatus);
+  const loopDecision = factString(facts.loopDecision);
+  const closeoutState = factString(facts.closeoutState);
+  const packetStatus = factString(facts.status);
+  const missingProofItems = factStringArray(facts.missingProofItems);
+  const completeProductView = facts.complete === true &&
+    packetStatus === "complete" &&
+    resultOwnedTerminalStatus === "verified_with_repair" &&
+    loopDecision === "stop_complete" &&
+    closeoutState === "complete" &&
+    missingProofItems.length === 0;
+  const originalFailureSummary = factOriginalFailureSummary(facts.originalFailure);
+  const repairChainSummary = facts.applyObservationFacts && typeof facts.applyObservationFacts === "object"
+    ? `apply=${factString((facts.applyObservationFacts as Record<string, unknown>).repairApplyStatus) ?? "unknown"}; receipts=${factStringArray((facts.applyObservationFacts as Record<string, unknown>).applyReceiptIds).length}`
+    : undefined;
+  const postRepairVerificationSummary = facts.postRepairVerificationFacts &&
+      typeof facts.postRepairVerificationFacts === "object"
+    ? `status=${factString((facts.postRepairVerificationFacts as Record<string, unknown>).resultStatus) ?? "unknown"}; required=${factString((facts.postRepairVerificationFacts as Record<string, unknown>).requirementStatus) ?? "unknown"}`
+    : undefined;
+
+  return deepFreeze({
+    observed: true,
+    viewStatus: completeProductView ? "complete_view" : "incomplete_view",
+    packetIds: Object.freeze(packetIds.map((id) => sanitizeText(id).value)),
+    ...(resultOwnedTerminalStatus ? { resultOwnedTerminalStatus } : {}),
+    ...(loopDecision ? { loopDecision } : {}),
+    ...(closeoutState ? { closeoutState } : {}),
+    ...(packetStatus ? { packetStatus } : {}),
+    ...(originalFailureSummary ? { originalFailureSummary } : {}),
+    ...(repairChainSummary ? { repairChainSummary } : {}),
+    ...(postRepairVerificationSummary ? { postRepairVerificationSummary } : {}),
+    missingProofItems: Object.freeze(missingProofItems),
+    ...(factString(facts.nextAction)
+      ? { nextAction: factString(facts.nextAction) }
+      : {}),
+    notProvenClaims: Object.freeze([
+      ...new Set([
+        "product-consumer-is-not-terminal-truth",
+        "session-carry-forward-is-not-terminal-truth",
+        "host-display-is-not-terminal-truth",
+        "event-emission-is-not-terminal-truth",
+        "complete-product-view-requires-result-owned-verified-status-and-complete-packet",
+        "incomplete-proof-cannot-become-complete",
+        "original-failure-must-remain-visible",
+        ...(completeProductView ? [] : ["product-completion-consumer-is-not-complete"]),
+        ...latest.notProvenClaims,
+      ]),
+    ]),
+    terminalSuccessClaim: false,
+  });
+}
+
+function factString(value: unknown): string | undefined {
+  return typeof value === "string" ? sanitizeText(value).value : undefined;
+}
+
+function factStringArray(value: unknown): readonly string[] {
+  return Array.isArray(value)
+    ? Object.freeze(value.flatMap((item) =>
+      typeof item === "string" ? [sanitizeText(item).value] : []
+    ))
+    : Object.freeze([]);
+}
+
+function factOriginalFailureSummary(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const facts = value as Record<string, unknown>;
+  const verificationFailureId = factString(facts.verificationFailureId) ?? "unknown";
+  const failureClass = factString(facts.failureClass) ?? "unknown";
+  const status = factString(facts.status) ?? "unknown";
+  const summary = factString(facts.summary) ?? "not-recorded";
+  return `id=${verificationFailureId}; class=${failureClass}; status=${status}; summary=${summary}`;
 }
 
 export function projectProductLoopAdapterObservationEvent(

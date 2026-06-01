@@ -33,6 +33,19 @@ export interface ReplaySafeLoopStateSummary {
     readonly terminalReason?: string;
     readonly terminalSuccessClaim: false;
   };
+  readonly productCompletionCarryForwardFacts?: {
+    readonly status?: string;
+    readonly resultOwnedTerminalStatus?: string;
+    readonly loopDecision?: string;
+    readonly closeoutState?: string;
+    readonly originalFailureSummary?: string;
+    readonly repairChainSummary?: string;
+    readonly postRepairVerificationSummary?: string;
+    readonly missingProofItems: readonly string[];
+    readonly nextAction?: string;
+    readonly notProvenClaims: readonly string[];
+    readonly terminalSuccessClaim: false;
+  };
   readonly notProvenClaims: readonly string[];
   readonly redaction: {
     readonly status: "report-safe" | "redacted";
@@ -106,6 +119,7 @@ export function summarizeReplaySafeLoopState(input: {
       ...input.terminalResultFacts,
       terminalSuccessClaim: false,
     },
+    ...productCompletionCarryForwardFacts(input.savePoint),
     notProvenClaims: [
       "terminal-success",
       "task-success",
@@ -115,6 +129,7 @@ export function summarizeReplaySafeLoopState(input: {
       "replay-state-available-is-not-plan-validity",
       "replayed-edit-handoff-is-not-mutation-authority",
       "replayed-verification-intent-is-not-verification-passed",
+      "session-carry-forward-is-not-terminal-truth",
       "context-completeness",
       ...replaySafePlanningStates.flatMap((state) => state.notProvenClaims),
       ...input.sessionProjection.terminal.notProvenClaims,
@@ -132,6 +147,56 @@ export function summarizeReplaySafeLoopState(input: {
     },
     terminalSuccessClaim: false,
   });
+}
+
+function productCompletionCarryForwardFacts(
+  savePoint?: RuntimeEvidenceSavePoint,
+): { readonly productCompletionCarryForwardFacts?: ReplaySafeLoopStateSummary["productCompletionCarryForwardFacts"] } {
+  if (!savePoint) {
+    return {};
+  }
+  const facts = savePoint.pendingNextTurnFacts;
+  const status = factValue(facts, "product-completion-packet-status:");
+  const resultOwnedTerminalStatus = factValue(facts, "final-observed-result-status:");
+  const loopDecision = factValue(facts, "loop-decision:");
+  const closeoutState = factValue(facts, "closeout-state:");
+  const originalFailureSummary = factValue(facts, "original-failure-summary:");
+  const repairChainSummary = factValue(facts, "repair-chain-summary:");
+  const postRepairVerificationSummary = factValue(facts, "verification-summary:");
+  const missingProofItems = factValue(facts, "missing-proof-items:");
+  const nextAction = factValue(facts, "next-action:");
+  const notProvenClaims = factValue(facts, "not-proven-claims:");
+
+  if (!status && !resultOwnedTerminalStatus && !loopDecision && !closeoutState) {
+    return {};
+  }
+
+  return {
+    productCompletionCarryForwardFacts: deepFreeze({
+      ...(status ? { status } : {}),
+      ...(resultOwnedTerminalStatus ? { resultOwnedTerminalStatus } : {}),
+      ...(loopDecision ? { loopDecision } : {}),
+      ...(closeoutState ? { closeoutState } : {}),
+      ...(originalFailureSummary ? { originalFailureSummary } : {}),
+      ...(repairChainSummary ? { repairChainSummary } : {}),
+      ...(postRepairVerificationSummary ? { postRepairVerificationSummary } : {}),
+      missingProofItems: splitFactList(missingProofItems),
+      ...(nextAction ? { nextAction } : {}),
+      notProvenClaims: splitFactList(notProvenClaims),
+      terminalSuccessClaim: false,
+    }),
+  };
+}
+
+function factValue(facts: readonly string[], prefix: string): string | undefined {
+  return facts.find((fact) => fact.startsWith(prefix))?.slice(prefix.length);
+}
+
+function splitFactList(value: string | undefined): readonly string[] {
+  if (!value || value === "none") {
+    return [];
+  }
+  return Object.freeze(value.split(",").filter((item) => item.length > 0));
 }
 
 function deepFreeze<T>(value: T): T {

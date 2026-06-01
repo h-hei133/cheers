@@ -824,9 +824,15 @@ describe("product surface view model", () => {
     expect(viewModel?.sections.map((section) => section.title)).toEqual(
       expect.arrayContaining([
         "Product loop adapter",
+        "Product completion consumer",
         "Feature integration contract",
       ]),
     );
+    expect(
+      viewModel?.sections.find((section) =>
+        section.title === "Product completion consumer"
+      )?.summary,
+    ).toContain("packet=not-observed");
     expect(rendered).toContain("product_integrated=");
     expect(rendered).toContain("observation_only=");
     expect(rendered).toContain("feature-contract-valid-is-not-success");

@@ -890,9 +890,21 @@ function productLoopAdapterSections(input: ProductSurfaceInput): ProductSurfaceS
       title: "Product loop adapter",
       severity: "not_proven",
       status: "observed",
-      summary: `adapter=${adapter.adapterId}; statuses=${statusSummary}; productIntegrated=${productIntegrated}; terminalSuccessClaim=false`,
+      summary: `adapter=${adapter.adapterId}; statuses=${statusSummary}; productIntegrated=${productIntegrated}; completionConsumer=${adapter.completionConsumer.viewStatus}; terminalSuccessClaim=false`,
       machineEventCorrelationIds: adapter.safeReferences.runtimeEventIds,
       notProvenClaims: adapter.notProvenClaims,
+    }),
+    section({
+      kind: "loop",
+      title: "Product completion consumer",
+      severity: adapter.completionConsumer.viewStatus === "complete_view"
+        ? "info"
+        : "not_proven",
+      status: adapter.completionConsumer.observed ? "observed" : "not_proven",
+      summary:
+        `packet=${adapter.completionConsumer.packetStatus ?? "not-observed"}; resultStatus=${adapter.completionConsumer.resultOwnedTerminalStatus ?? "not-observed"}; loopDecision=${adapter.completionConsumer.loopDecision ?? "not-observed"}; closeout=${adapter.completionConsumer.closeoutState ?? "not-observed"}; missingProof=${adapter.completionConsumer.missingProofItems.join(",") || "none"}; originalFailure=${adapter.completionConsumer.originalFailureSummary ?? "not-observed"}; terminalSuccessClaim=false`,
+      machineEventCorrelationIds: adapter.safeReferences.productCompletionPacketIds,
+      notProvenClaims: adapter.completionConsumer.notProvenClaims,
     }),
     section({
       kind: "loop",

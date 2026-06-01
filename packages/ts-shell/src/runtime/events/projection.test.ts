@@ -526,6 +526,8 @@ describe("runtime event projection", () => {
       adapterId: "adapter-events",
       observationMode: "host-adapter",
       featureContractAvailable: true,
+      completionConsumerObserved: false,
+      completionConsumerViewStatus: "not_observed",
       nextTurnExecuted: false,
       terminalSuccessClaim: false,
     });

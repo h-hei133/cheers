@@ -2,9 +2,25 @@ import { describe, expect, it } from "vitest";
 
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
+import { buildRepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
+import { projectRepairVerdictTerminal } from "../../result/projection/repair/verdict.js";
+import {
+  createRepairApplyRequest,
+  observeRepairApply,
+  observeRepairAuthority,
+  observeRepairProposal,
+  projectRepairRequiredHandoff,
+} from "../../repair/handoff/boundary.js";
 import { evaluateContinuationReadiness } from "../../session/continuation/readiness.js";
 import { summarizeReplaySafeLoopState } from "../../session/replay/state.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
+import {
+  observePostRepairVerificationResult,
+  observeVerificationResult,
+  projectVerificationIntent,
+  requestPostRepairVerification,
+  requirePostRepairVerification,
+} from "../../verification/result/boundary.js";
 import { runAgentLoopContract } from "./contract.js";
 import {
   buildContinuationContextFeatureContract,
@@ -24,6 +40,142 @@ import {
 import { projectLoopTrajectory } from "./trajectory.js";
 
 describe("product loop adapter", () => {
+  it("consumes product completion packet facts for host display without terminal truth", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-adapter-completion",
+      workspaceRoot: "/workspace",
+      prompt: "verify repair chain",
+      providerOptIn: false,
+      maxTurns: 1,
+      modelBoundary: async () => ({
+        responseId: "response-adapter-completion",
+        stopReason: "stop",
+      }),
+      verificationBoundary: async ({ turnId }) => {
+        const intent = projectVerificationIntent({
+          sourceTurnId: turnId,
+          targetSummary: "verify changed file",
+          dispatchStatus: "failed",
+          relevanceStatus: "task_relevant",
+          coverageStatus: "covered",
+          commandCandidateSummary: "npm test -w packages/ts-shell",
+        });
+        const result = observeVerificationResult({
+          intent,
+          status: "failed",
+          failureClass: "test-failure",
+          runtimeReceiptIds: ["receipt-adapter-original"],
+        });
+        const repairRequired = projectRepairRequiredHandoff({ verification: result });
+        const repairProposal = observeRepairProposal({
+          handoff: repairRequired,
+          proposalSource: "fake_default_safe",
+          targetSummary: "proposal only",
+          readinessStatus: "exact_ready",
+          applyStatus: "not_applied",
+        });
+        const repairAuthority = observeRepairAuthority({
+          proposal: repairProposal,
+          authorityDecision: "granted",
+          authoritySource: "explicit_repair_authority",
+        });
+        const repairApplyRequest = createRepairApplyRequest({
+          proposal: repairProposal,
+          authority: repairAuthority,
+          expectedEditOperationKind: "hunk_set",
+        });
+        const repairApply = observeRepairApply({
+          proposal: repairProposal,
+          authority: repairAuthority,
+          request: repairApplyRequest,
+          editApplyObservation: {
+            status: "hunk-set-applied",
+            changedFiles: ["src/app.ts"],
+            evidence: ["edit-owner-receipt:receipt-adapter-apply"],
+          },
+          postRepairVerificationStatus: "not_run",
+        });
+        const postRepairVerificationRequirement = requirePostRepairVerification({
+          repairApply,
+        });
+        const postRepairVerificationRequest = requestPostRepairVerification({
+          requirement: postRepairVerificationRequirement,
+          dispatchStatus: "dispatched",
+          receiptIds: ["receipt-adapter-post-repair"],
+        });
+        const postRepairVerificationResult = observePostRepairVerificationResult({
+          requirement: postRepairVerificationRequirement,
+          request: postRepairVerificationRequest,
+          status: "passed",
+          receiptIds: ["receipt-adapter-post-repair"],
+        });
+        const repairVerdictProofInput = buildRepairVerdictProofInput({
+          postRepairVerification: postRepairVerificationResult,
+        });
+        const repairVerdictTerminalProjection = projectRepairVerdictTerminal({
+          proofInput: repairVerdictProofInput,
+        });
+
+        return {
+          intent,
+          result,
+          repairRequired,
+          repairProposal,
+          repairAuthority,
+          repairApplyRequest,
+          repairApply,
+          postRepairVerificationRequirement,
+          postRepairVerificationRequest,
+          postRepairVerificationResult,
+          repairVerdictProofInput,
+          repairVerdictTerminalProjection,
+        };
+      },
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "adapter-completion",
+      prompt: "verify repair chain",
+      loop,
+    });
+
+    const adapter = projectProductLoopAdapter({
+      adapterId: "adapter-completion",
+      loopTrajectory: trajectory,
+      loop,
+    });
+
+    expect(adapter.completionConsumer).toMatchObject({
+      observed: true,
+      viewStatus: "complete_view",
+      resultOwnedTerminalStatus: "verified_with_repair",
+      loopDecision: "stop_complete",
+      closeoutState: "complete",
+      packetStatus: "complete",
+      missingProofItems: [],
+      terminalSuccessClaim: false,
+    });
+    expect(adapter.safeReferences.productCompletionPacketIds).toEqual(
+      trajectory.productCompletionPacketIds,
+    );
+    expect(adapter.completionConsumer.originalFailureSummary).toContain(
+      "class=test-failure",
+    );
+    expect(adapter.completionConsumer.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "product-consumer-is-not-terminal-truth",
+        "session-carry-forward-is-not-terminal-truth",
+        "host-display-is-not-terminal-truth",
+        "complete-product-view-requires-result-owned-verified-status-and-complete-packet",
+        "original-failure-must-remain-visible",
+      ]),
+    );
+    expect(adapter.resultTruthfulnessBoundary).toMatchObject({
+      ownerDomain: "result",
+      terminalSuccessClaim: false,
+    });
+    expect(adapter.terminalSuccessClaim).toBe(false);
+  });
+
   it("consolidates PL002 through PL008 safe references without terminal success", async () => {
     const loop = await runAgentLoopContract({
       sessionId: "sess-adapter",
@@ -134,11 +286,48 @@ describe("product loop adapter", () => {
       expect.arrayContaining([
         "adapter-observed-is-not-success",
         "phase-product-integrated-is-not-success",
+        "product-completion-packet-not-observed",
         "continuation-ready-is-not-success",
         "replay-safe-summary-is-not-success",
         "terminal-success",
       ]),
     );
+  });
+
+  it("does not complete the product view from adapter observation alone", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-adapter-no-packet",
+      workspaceRoot: "/workspace",
+      prompt: "adapter only",
+      providerOptIn: false,
+      modelBoundary: async () => ({
+        responseId: "response-adapter-no-packet",
+        stopReason: "stop",
+      }),
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "adapter-no-packet",
+      prompt: "adapter only",
+      loop,
+    });
+
+    const adapter = projectProductLoopAdapter({
+      adapterId: "adapter-no-packet",
+      loopTrajectory: trajectory,
+      loop,
+    });
+
+    expect(adapter.completionConsumer).toMatchObject({
+      observed: false,
+      viewStatus: "not_observed",
+      packetIds: [],
+      missingProofItems: [],
+      terminalSuccessClaim: false,
+    });
+    expect(adapter.completionConsumer.notProvenClaims).toContain(
+      "complete-product-view-requires-result-owned-verified-status-and-complete-packet",
+    );
+    expect(adapter.terminalSuccessClaim).toBe(false);
   });
 
   it("classifies every required product loop phase and keeps all status values visible", () => {

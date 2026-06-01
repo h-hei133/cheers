@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
+import { createEvidenceOnlySavePoint } from "../../evidence/savepoint/model.js";
+import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { evaluateContinuationReadiness } from "../continuation/readiness.js";
 import { summarizeReplaySafeLoopState } from "./state.js";
 import { projectSessionTree } from "../sessionTreeProjection.js";
@@ -76,5 +78,80 @@ describe("replay-safe loop state summary", () => {
     expect(summary.notProvenClaims).toContain("replay-safe-summary-is-not-success");
     expect(summary.notProvenClaims).toContain("replay-state-available-is-not-plan-validity");
     expect(summary.notProvenClaims).toContain("replayed-verification-intent-is-not-verification-passed");
+  });
+
+  it("carries product completion packet facts without terminal truth", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-replay-packet",
+        projectRoot: "/workspace",
+        createdAt: "2026-05-29T00:00:00.000Z",
+        updatedAt: "2026-05-29T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "continue packet facts" }],
+      },
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({ sessionProjection });
+    const rebuildInput = buildLoopContextRebuildInput({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const continuationReadiness = evaluateContinuationReadiness({
+      sessionProjection,
+      contextRebuildProjection,
+      rebuildInput,
+    });
+    const savePoint = createEvidenceOnlySavePoint({
+      turnSnapshot: createRuntimeTurnSnapshot({
+        sessionId: "sess-replay-packet",
+        turn: 1,
+        phase: "turn",
+        workspaceRoot: "/workspace",
+        providerOptIn: false,
+      }),
+      phase: "save_point",
+      pendingNextTurnFacts: [
+        "product-completion-packet-status:complete",
+        "final-observed-result-status:verified_with_repair",
+        "loop-decision:stop_complete",
+        "closeout-state:complete",
+        "original-failure-summary:id=verification:failed; class=test-failed; status=failed",
+        "repair-chain-summary:proposal=repair:proposal; authority=granted; apply=applied; receipts=1",
+        "verification-summary:postRepair=passed",
+        "missing-proof-items:none",
+        "next-action:stop loop after result-owned verified repair projection",
+        "not-proven-claims:product-consumer-is-not-terminal-truth,session-carry-forward-is-not-terminal-truth",
+        "product-completion-packet-terminal-success:false",
+      ],
+    });
+
+    const summary = summarizeReplaySafeLoopState({
+      sessionProjection,
+      contextRebuildProjection,
+      continuationReadiness,
+      rebuildInput,
+      savePoint,
+    });
+
+    expect(summary.productCompletionCarryForwardFacts).toMatchObject({
+      status: "complete",
+      resultOwnedTerminalStatus: "verified_with_repair",
+      loopDecision: "stop_complete",
+      closeoutState: "complete",
+      missingProofItems: [],
+      terminalSuccessClaim: false,
+    });
+    expect(summary.productCompletionCarryForwardFacts?.originalFailureSummary)
+      .toContain("class=test-failed");
+    expect(summary.productCompletionCarryForwardFacts?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "product-consumer-is-not-terminal-truth",
+        "session-carry-forward-is-not-terminal-truth",
+      ]),
+    );
+    expect(summary.notProvenClaims).toContain(
+      "session-carry-forward-is-not-terminal-truth",
+    );
+    expect(summary.terminalSuccessClaim).toBe(false);
   });
 });

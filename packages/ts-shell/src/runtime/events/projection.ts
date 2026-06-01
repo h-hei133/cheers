@@ -2550,6 +2550,17 @@ export function projectRuntimeEvents(input: {
         unsupportedPhaseIds: adapter.unsupportedPhaseIds,
         featureContractAvailable: adapter.featureContractAvailable,
         featureContractCount: adapter.featureContracts.length,
+        completionConsumerObserved: adapter.completionConsumer.observed,
+        completionConsumerViewStatus: adapter.completionConsumer.viewStatus,
+        completionConsumerPacketIds: adapter.completionConsumer.packetIds,
+        completionConsumerResultStatus:
+          adapter.completionConsumer.resultOwnedTerminalStatus,
+        completionConsumerLoopDecision: adapter.completionConsumer.loopDecision,
+        completionConsumerCloseoutState: adapter.completionConsumer.closeoutState,
+        completionConsumerMissingProofItems:
+          adapter.completionConsumer.missingProofItems,
+        completionConsumerOriginalFailure:
+          adapter.completionConsumer.originalFailureSummary,
         continuationReadinessReferenced:
           adapter.continuationBoundary.readinessReferenced,
         replaySafeStateReferenced:
