@@ -1157,3 +1157,133 @@ All now import `runBrowserEvalBenchmark` from `eval/browser/benchmarkRunner.ts`.
 
 - Remaining internally imported compatibility files are owner indexes under context, planning, provider, and tools.
 - Result and evidence root compatibility exports remain zero-internal-import compatibility surfaces and should be reviewed only with package-facing safety and result contract validation where needed.
+
+## Legacy Entry Cleanup
+
+Status: structure-only cleanup for export-only legacy entry files. Product behavior was preserved. No result truthfulness, provider configuration, provider calls, fallback behavior, tool authority, command allowlists, edit/apply/write approval behavior, verification execution, repair execution, session schema, CLI behavior, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+Initial status:
+
+- `git status --short --branch` reported `## main...origin/main`.
+- No pre-edit push was attempted because the branch was not ahead.
+- The worktree was clean before editing.
+
+Inspection summary:
+
+- Latest pressure report, export-only files, package metadata, documented entry references, root `orchestration` files, context/planning/provider/tools/edit/result/evidence/verification/repair/session/core/runtime owner folders, internal imports, script/test path mentions, direct file counts, crowded directories, and long basenames were inspected.
+- Serena targeted inspection confirmed sampled legacy entry files have no symbol bodies and only re-export owner files.
+- `packages/ts-shell/package.json` exposes `dist`, `src`, and a CLI binary, with no documented package export for the removed deep files.
+- Targeted script and test searches found no real module imports to the removed paths.
+
+### Before Snapshot
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Export-only compatibility files | 93 |
+| Zero-internal-import compatibility files | 92 |
+| Internally imported compatibility files | 1 |
+| Root `orchestration` direct files | 345 |
+| `provider` direct files | 4 |
+| `repair` direct files | 6 |
+| `tools` direct files | 11 |
+| Tests outside owner folders for touched owners | 6 |
+| Script/test real-module imports to removed paths | 0 |
+| Long basenames in target areas | 134 |
+
+Top crowded directories before:
+
+| Directory | Direct files |
+|---|---:|
+| `orchestration` | 345 |
+| `core/context` | 172 |
+| `core/harness` | 90 |
+| `session` | 50 |
+| `core/shell` | 49 |
+| `entrypoints` | 46 |
+| `core/context/memory` | 39 |
+| `core/context/sidebar` | 34 |
+| `orchestration/patchResult` | 33 |
+| `session/continuation` | 33 |
+
+### After Snapshot
+
+After measurements:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Export-only compatibility files | 93 | 83 |
+| Zero-internal-import compatibility files | 92 | 82 |
+| Internally imported compatibility files | 1 | 1 |
+| Root `orchestration` direct files | 345 | 344 |
+| `provider` direct files | 4 | 1 |
+| `repair` direct files | 6 | 0 |
+| `tools` direct files | 11 | 11 |
+| Tests outside owner folders for touched owners | 6 | 6 |
+| Script/test real-module imports to removed paths | 0 | 0 |
+| Long basenames in target areas | 134 | 134 |
+
+Top crowded directories after:
+
+| Directory | Direct files |
+|---|---:|
+| `orchestration` | 344 |
+| `core/context` | 172 |
+| `core/harness` | 90 |
+| `session` | 50 |
+| `core/shell` | 49 |
+| `entrypoints` | 46 |
+| `core/context/memory` | 39 |
+| `core/context/sidebar` | 34 |
+| `orchestration/patchResult` | 33 |
+| `session/continuation` | 33 |
+
+### Compatibility Files Considered
+
+| Class | Count before | Count after | Status | Reason | Deletion condition |
+|---|---:|---:|---|---|---|
+| Removed zero-internal legacy entries | 10 | 0 | removed | no internal imports, no package export, no documented public entry need, no script/test real-module import | already met |
+| Internally imported legacy entry | 1 | 1 | kept | `tools/registry.ts` is still imported by `tools/registry-rust-bridge.test.ts` | update the test to owner path and recheck package-facing safety |
+| Owner root indexes | 4 | 4 | kept | root owner aggregation remains clearer than scattered caller imports | remove only after package-facing safety and owner index need are reviewed |
+| Protected or output-facing entries | 38 | 38 | kept | session/runtime execution/edit/result/evidence surfaces need narrower validation because they touch protected boundaries or terminal/result-facing projections | remove only with focused owner review and required result contract validation where applicable |
+| Product and presentation facades | 11 | 11 | kept | caller-facing facade safety is unclear in this cleanup | remove only after facade consumers and package-facing safety are proven disposable |
+| Other zero-internal owner shims | 29 | 29 | kept | no internal import pressure in this cleanup | remove in bounded owner batches after script/test/doc entry checks |
+
+Removed files:
+
+- `packages/ts-shell/src/orchestration/contextAwareProviderPrompt.ts`
+- `packages/ts-shell/src/provider/modelResponseBoundary.ts`
+- `packages/ts-shell/src/provider/providerDraftStage.ts`
+- `packages/ts-shell/src/provider/providerRegistry.ts`
+- `packages/ts-shell/src/repair/crossFileRepairPlanning.ts`
+- `packages/ts-shell/src/repair/degradedReopenPlanning.ts`
+- `packages/ts-shell/src/repair/groundedAnswerRepair.ts`
+- `packages/ts-shell/src/repair/repairContinuationPlanning.ts`
+- `packages/ts-shell/src/repair/repairFacade.ts`
+- `packages/ts-shell/src/repair/singleFileRepairPlanning.ts`
+
+Kept notable files:
+
+| Path | Reason | Deletion condition |
+|---|---|---|
+| `packages/ts-shell/src/orchestration/taskRelevantVerificationRoute.ts` | historical scripts still import this as a real module path | update or retire those script imports, then recheck package-facing safety |
+| `packages/ts-shell/src/tools/registry.ts` | still has one internal test import | update the test to `core/tools/registry.ts`, then recheck package-facing safety |
+| `packages/ts-shell/src/model-adapters/providerFetch.ts` | provider fetch/auth adjacency is protected | review only under explicit provider boundary scope |
+| `packages/ts-shell/src/runtime/execution/*` | execution boundary compatibility is protected | review only under explicit execution boundary scope |
+| `packages/ts-shell/src/session/*` | session durability and schema adjacency is protected | review only under explicit session scope |
+| `packages/ts-shell/src/result/*` and `packages/ts-shell/src/evidence/*` | result and evidence projections are output-facing | review with result contract validation |
+
+Stale strings updated:
+
+- None. Historical/scenario strings and script entries that still name existing tests or kept real module paths were left unchanged.
+
+### Remaining Visible Debt
+
+- `orchestration` remains the largest direct root.
+- One export-only compatibility file still has an internal import: `tools/registry.ts`.
+- Many zero-internal entries remain because their package-facing or protected-boundary safety needs narrower owner review.
+
+### Recommended Next Step
+
+Review `tools/registry.ts` and its remaining test import as the next bounded compatibility cleanup.
