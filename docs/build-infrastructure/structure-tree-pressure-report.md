@@ -347,6 +347,97 @@ Target internally imported compatibility files after:
 - Two internally imported compatibility files remain outside this bounded target: `orchestration/contextEngine.ts` and `orchestration/planningRuntimeProductProjection.ts`.
 - Root owner indexes and old zero-internal entry surfaces remain until package-facing safety is reviewed.
 
+## Context Planning Entry Trim
+
+Status: structure-only cleanup for the remaining internally imported context and planning entry surfaces. Product behavior was preserved. No result truthfulness, provider configuration, provider calls, fallback behavior, tool authority, command allowlists, edit/apply/write approval behavior, verification execution, repair execution, session schema, CLI behavior, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+Initial status:
+
+- `git status --short --branch` reported `## main...origin/main`.
+- No pre-edit push was attempted because the branch was not ahead.
+- The worktree was clean before editing.
+
+Inspection summary:
+
+- Latest pressure report, both old entry files, context acquisition owner files, planning runtime owner files, imports to old entry paths, package metadata, tests around context acquisition and planning runtime, direct file counts, and long basenames were inspected.
+- Serena targeted inspection confirmed the two old entry files had no symbols and only re-exported owner files.
+- `packages/ts-shell/package.json` exposes `dist`, `src`, and a CLI binary, with no documented package export for the removed old entry files.
+
+### Before Snapshot
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Export-only compatibility files | 94 |
+| Zero-internal-import compatibility files | 92 |
+| Internally imported compatibility files | 2 |
+| Root `orchestration` direct files | 347 |
+| `context/acquisition` direct files | 8 |
+| `planning/runtime` direct files | 5 |
+| Tests outside owner folders for touched owners | 27 |
+| Long basenames in target areas | 39 |
+
+Target internally imported compatibility files before:
+
+| Path | Internal imports |
+|---|---:|
+| `orchestration/contextEngine.ts` | 5 |
+| `orchestration/planningRuntimeProductProjection.ts` | 1 |
+
+### After Snapshot
+
+After measurements:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Export-only compatibility files | 94 | 92 |
+| Zero-internal-import compatibility files | 92 | 92 |
+| Internally imported compatibility files | 2 | 0 |
+| Root `orchestration` direct files | 347 | 345 |
+| `context/acquisition` direct files | 8 | 8 |
+| `planning/runtime` direct files | 5 | 5 |
+| Tests outside owner folders for touched owners | 27 | 27 |
+| Long basenames in target areas | 39 | 38 |
+
+Target internally imported compatibility files after:
+
+| Path | Internal imports | Status |
+|---|---:|---|
+| none | 0 | none remain in the target entry area |
+
+### Old Entries Considered
+
+| Path | Status | Internal imports before | Internal imports after | Package-facing status | Reason | Deletion condition |
+|---|---|---:|---:|---|---|---|
+| `orchestration/contextEngine.ts` | removed | 5 | 0 | no documented package export found | internal references now avoid the old entry path and owner implementation remains in `context/acquisition/engine.ts` | already met |
+| `orchestration/planningRuntimeProductProjection.ts` | removed | 1 | 0 | no documented package export found | internal references now avoid the old entry path and owner implementation remains in `planning/runtime/projection.ts` | already met |
+
+### Files Removed
+
+- `packages/ts-shell/src/orchestration/contextEngine.ts`
+- `packages/ts-shell/src/orchestration/planningRuntimeProductProjection.ts`
+
+### Files Moved
+
+- None.
+
+### Tests Moved
+
+- None.
+
+### Imports Updated
+
+- Context acquisition and planning runtime tests no longer import through `orchestration/contextEngine.ts`.
+- Discovery ranking fixtures now use owner paths for context acquisition and planning runtime projection.
+- A product-surface fixture no longer imports through `orchestration/contextEngine.ts`.
+- One integrated-flow fixture no longer imports through `orchestration/contextEngine.ts` while preserving its scenario target path.
+
+### Remaining Visible Debt
+
+- Root `orchestration` remains the largest direct root and still contains many long test and planning-adjacent names outside this bounded cleanup.
+- A few string-only scenario paths still mention old planning or context filenames as task data. They are not imports and should be reviewed only with behavior-specific ownership proof.
+
 ## SR015 Snapshot
 
 Status: structure-only owner split for write-adjacent projection, verification command, patch hunk, approval authority, planning wording, and shell result assembly files. Runtime behavior, provider gates, approval semantics, apply semantics, package scripts, build config, workflow coordinator behavior, and session manager behavior were not changed.

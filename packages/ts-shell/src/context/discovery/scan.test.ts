@@ -209,7 +209,7 @@ describe("buildRepoIntelligence", () => {
 
   it("keeps code candidates ahead of route docs when a bounded scan would otherwise exhaust on docs", async () => {
     await fs.mkdir(path.join(workspaceRoot, "docs", "agent-routes"), { recursive: true });
-    await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "context", "acquisition"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
       JSON.stringify({ name: "fixture" }, null, 2),
@@ -225,7 +225,7 @@ describe("buildRepoIntelligence", () => {
       );
     }
     await fs.writeFile(
-      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "contextEngine.ts"),
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "context", "acquisition", "engine.ts"),
       [
         "export function buildContextEngineTargetRanking(task: string) {",
         "  return task.includes('contextEngine') ? 'contextEngine.ts' : 'unknown';",
@@ -234,26 +234,26 @@ describe("buildRepoIntelligence", () => {
       ].join("\n"),
     );
     await fs.writeFile(
-      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "contextEngine.test.ts"),
-      "import { buildContextEngineTargetRanking } from '../../orchestration/contextEngine.js';\nexpect(buildContextEngineTargetRanking('contextEngine')).toBe('contextEngine.ts');\n",
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "context", "acquisition", "engine.test.ts"),
+      "import { buildContextEngineTargetRanking } from './engine.js';\nexpect(buildContextEngineTargetRanking('contextEngine')).toBe('contextEngine.ts');\n",
     );
 
     const result = await buildRepoIntelligence({
       workspaceRoot,
-      userTask: "Fix contextEngine target ranking bug in packages ts shell orchestration and cover contextEngine test",
+      userTask: "Fix context acquisition engine target ranking bug in packages ts shell and cover contextEngine test",
       maxFiles: 40,
       maxCandidates: 5,
     });
 
     expect(result.snapshot.files.map((file) => file.safeLabel)).toContain(
-      "packages/ts-shell/src/orchestration/contextEngine.ts",
+      "packages/ts-shell/src/context/acquisition/engine.ts",
     );
     expect(result.candidates[0]).toMatchObject({
-      safeLabel: "packages/ts-shell/src/orchestration/contextEngine.ts",
+      safeLabel: "packages/ts-shell/src/context/acquisition/engine.ts",
       role: "source",
     });
     expect(result.candidates[1]).toMatchObject({
-      safeLabel: "packages/ts-shell/src/orchestration/contextEngine.test.ts",
+      safeLabel: "packages/ts-shell/src/context/acquisition/engine.test.ts",
       role: "test",
     });
     expect(result.candidates.slice(0, 2).some((candidate) => candidate.role === "docs")).toBe(false);
@@ -261,7 +261,7 @@ describe("buildRepoIntelligence", () => {
 
   it("prefills deep path-matched product files before earlier source directories exhaust the scan budget", async () => {
     await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "core"), { recursive: true });
-    await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "packages", "ts-shell", "src", "planning", "runtime"), { recursive: true });
     await fs.writeFile(
       path.join(workspaceRoot, "package.json"),
       JSON.stringify({ name: "fixture" }, null, 2),
@@ -273,12 +273,12 @@ describe("buildRepoIntelligence", () => {
       );
     }
     await fs.writeFile(
-      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "planningRuntimeProductProjection.ts"),
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "planning", "runtime", "projection.ts"),
       "export function formatPlanningRuntimeProductOutput() { return 'product output'; }\n",
     );
     await fs.writeFile(
-      path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "planningRuntimeProductProjection.test.ts"),
-      "import { formatPlanningRuntimeProductOutput } from '../../orchestration/planningRuntimeProductProjection.js';\nexpect(formatPlanningRuntimeProductOutput()).toBe('product output');\n",
+      path.join(workspaceRoot, "packages", "ts-shell", "src", "planning", "runtime", "projection.test.ts"),
+      "import { formatPlanningRuntimeProductOutput } from './projection.js';\nexpect(formatPlanningRuntimeProductOutput()).toBe('product output');\n",
     );
 
     const result = await buildRepoIntelligence({
@@ -289,10 +289,10 @@ describe("buildRepoIntelligence", () => {
     });
 
     expect(result.snapshot.files.map((file) => file.safeLabel)).toContain(
-      "packages/ts-shell/src/orchestration/planningRuntimeProductProjection.ts",
+      "packages/ts-shell/src/planning/runtime/projection.ts",
     );
     expect(result.candidates[0]).toMatchObject({
-      safeLabel: "packages/ts-shell/src/orchestration/planningRuntimeProductProjection.ts",
+      safeLabel: "packages/ts-shell/src/planning/runtime/projection.ts",
       role: "source",
     });
   });

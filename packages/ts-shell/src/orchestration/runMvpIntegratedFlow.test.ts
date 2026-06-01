@@ -8217,7 +8217,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     );
     await fs.writeFile(
       path.join(workspaceRoot, "packages", "ts-shell", "src", "orchestration", "contextEngine.test.ts"),
-      "import { buildContextEngineTargetRanking } from './contextEngine.js';\nexpect(buildContextEngineTargetRanking('contextEngine')).toBe('contextEngine.ts');\n",
+      "import { buildContextEngineTargetRanking } from './engine.js';\nexpect(buildContextEngineTargetRanking('contextEngine')).toBe('contextEngine.ts');\n",
     );
 
     const result = await runMvpIntegratedFlow({
