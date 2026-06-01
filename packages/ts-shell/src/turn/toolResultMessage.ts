@@ -7,12 +7,25 @@ export type ToolResultMessageDeliveryStatus =
   | "unsupported"
   | "redacted";
 
+export type ToolResultMessageCategory =
+  | "executed_tool_fact"
+  | "not_dispatched"
+  | "blocked_by_policy"
+  | "authority_required"
+  | "unsupported_tool"
+  | "unknown_tool"
+  | "malformed_arguments"
+  | "execution_unavailable"
+  | "execution_failed"
+  | "execution_receipt_observed";
+
 export interface ToolResultMessageProjection {
   readonly messageId: string;
   readonly role: "tool";
   readonly toolCallId: string;
   readonly toolName: string;
   readonly safeContentSummary: string;
+  readonly category: ToolResultMessageCategory;
   readonly deliveryStatus: ToolResultMessageDeliveryStatus;
   readonly redactionStatus: "report-safe" | "redacted";
   readonly notProvenClaims: readonly string[];
@@ -37,6 +50,7 @@ export function prepareToolResultMessages(input: {
     const detail = input.resultDetails[index] ??
       input.resultDetails.find((candidate) => candidate.toolCallId === call.toolCallId);
     const deliveryStatus = messageDeliveryStatus(call.dispatchStatus, detail?.resultStatus);
+    const category = messageCategory(call, detail);
     const notProvenClaims = unique([
       "terminal-success",
       "task-success",
@@ -53,6 +67,7 @@ export function prepareToolResultMessages(input: {
       toolName: call.toolName,
       safeContentSummary: detail?.reportSafe.summary ??
         call.beforePolicyDecision.reportSafeSummary,
+      category,
       deliveryStatus,
       redactionStatus:
         call.redactionStatus === "redacted" ||
@@ -105,6 +120,45 @@ function messageDeliveryStatus(
     return "not_prepared";
   }
   return "prepared";
+}
+
+function messageCategory(
+  call: ToolBatchDispatchPlan["calls"][number],
+  detail?: ToolResultDetail,
+): ToolResultMessageCategory {
+  if (detail?.systemDetails.executionReceiptId) {
+    return detail.resultStatus === "succeeded"
+      ? "execution_receipt_observed"
+      : "execution_failed";
+  }
+  if (call.malformed || detail?.resultStatus === "rejected") {
+    return "malformed_arguments";
+  }
+  if (call.unknownTool) {
+    return "unknown_tool";
+  }
+  if (call.dispatchStatus === "blocked" || detail?.resultStatus === "blocked") {
+    return "blocked_by_policy";
+  }
+  if (
+    call.dispatchStatus === "authority_required" ||
+    detail?.resultStatus === "authority_required"
+  ) {
+    return "authority_required";
+  }
+  if (call.dispatchStatus === "unsupported" || detail?.resultStatus === "unsupported") {
+    return "unsupported_tool";
+  }
+  if (call.executionState === "execution_unavailable") {
+    return "execution_unavailable";
+  }
+  if (detail?.resultStatus === "failed") {
+    return "execution_failed";
+  }
+  if (detail?.resultStatus === "succeeded") {
+    return "executed_tool_fact";
+  }
+  return "not_dispatched";
 }
 
 function unique(values: readonly string[]): readonly string[] {

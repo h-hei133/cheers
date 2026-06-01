@@ -13,9 +13,22 @@ import {
   type AssistantResponseState,
 } from "../../turn/assistantResponse.js";
 import {
+  prepareToolResultMessages,
+  type ToolResultMessageBatch,
+} from "../../turn/toolResultMessage.js";
+import {
   extractToolCallBatch,
   type NormalizedToolCallBatch,
 } from "../../tools/toolCallBatch.js";
+import {
+  createToolBatchHandoff,
+  prepareSafeToolBatchHandoff,
+  type ToolBatchHandoffProjection,
+} from "../../tools/toolHandoff.js";
+import type {
+  ToolBatchDispatchPlan,
+  ToolResultDetail,
+} from "../../tools/toolBatchDispatch.js";
 
 export interface ModelBoundaryPhaseInput {
   readonly phaseId: string;
@@ -35,6 +48,10 @@ export interface ModelBoundaryPhaseProjection {
   readonly responseBoundary: ModelResponseBoundary;
   readonly assistantResponse: AssistantResponseState;
   readonly toolCallBatch: NormalizedToolCallBatch;
+  readonly toolBatchHandoff: ToolBatchHandoffProjection;
+  readonly toolDispatchPlan: ToolBatchDispatchPlan;
+  readonly nonExecutedToolResultDetails: readonly ToolResultDetail[];
+  readonly nonExecutedToolResultMessages: ToolResultMessageBatch;
   readonly toolBatchHandoffPrepared: boolean;
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
@@ -79,6 +96,24 @@ export function projectModelBoundaryPhase(
     batchId: `${input.phaseId}:tool-call-batch`,
     notProvenClaims: stream.notProvenClaims,
   });
+  const toolHandoff = prepareSafeToolBatchHandoff({
+    responseBoundary,
+    assistantResponse,
+    toolCallBatch,
+    caller: "model-boundary",
+  });
+  const toolResultMessages = prepareToolResultMessages({
+    dispatchPlan: toolHandoff.dispatchPlan,
+    resultDetails: toolHandoff.resultDetails,
+  });
+  const toolBatchHandoff = createToolBatchHandoff({
+    responseBoundary,
+    assistantResponse,
+    toolCallBatch,
+    dispatchPlan: toolHandoff.dispatchPlan,
+    resultDetails: toolHandoff.resultDetails,
+    resultMessages: toolResultMessages,
+  });
 
   return deepFreeze({
     phaseId: input.phaseId,
@@ -88,6 +123,10 @@ export function projectModelBoundaryPhase(
     responseBoundary,
     assistantResponse,
     toolCallBatch,
+    toolBatchHandoff,
+    toolDispatchPlan: toolHandoff.dispatchPlan,
+    nonExecutedToolResultDetails: toolHandoff.resultDetails,
+    nonExecutedToolResultMessages: toolResultMessages,
     toolBatchHandoffPrepared: toolCallBatch.calls.length > 0,
     terminalSuccessClaim: false,
     notProvenClaims: unique([
@@ -100,6 +139,7 @@ export function projectModelBoundaryPhase(
       ...responseBoundary.notProvenClaims,
       ...assistantResponse.notProvenClaims,
       ...toolCallBatch.notProvenClaims,
+      ...toolBatchHandoff.notProvenClaims,
       ...(input.notProvenClaims ?? []),
     ]),
   });

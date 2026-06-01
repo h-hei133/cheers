@@ -23,7 +23,7 @@ import { createCommandToolResultSplit } from "../../tools/result/split.js";
 import {
   observeVerificationResult,
   projectVerificationIntent,
-} from "../../repair/handoff/boundary.js";
+} from "../../verification/result/boundary.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import {
   projectPackageResourceInventory,

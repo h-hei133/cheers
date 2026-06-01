@@ -67,7 +67,7 @@ export interface AgentLoopContractPreparedToolCall {
   readonly id: string;
   readonly name: string;
   readonly argumentKeys: readonly string[];
-  readonly status?: "prepared" | "malformed" | "unsupported";
+  readonly status?: "prepared" | "malformed" | "unsupported" | "unknown";
   readonly dispatchStatus?: "planned" | "blocked" | "authority_required" | "dispatched" | "dispatch_failed" | "unsupported" | "not_dispatched";
 }
 

@@ -258,6 +258,7 @@ function modelBoundarySections(
   const streamStatus = phase.stream.status;
   const failureClass = phase.stream.failure?.class ?? "none";
   const cancellation = phase.stream.cancellation?.kind ?? "none";
+  const handoff = phase.toolBatchHandoff;
   return [section({
     kind: "model_boundary",
     title: "Model boundary",
@@ -279,13 +280,18 @@ function modelBoundarySections(
         : streamStatus === "cancelled" || streamStatus === "partial"
           ? "partial"
           : "not_proven",
-    summary: `providerMode=${phase.requestBoundary.providerMode}; model=${phase.requestBoundary.modelSafeLabel}; request=${phase.requestBoundary.readinessStatus}; stream=${streamStatus}; assistant=${phase.assistantResponse.accumulationStatus}; toolCalls=${phase.toolCallBatch.extractionStatus}; failure=${failureClass}; cancellation=${cancellation}; fallback=${phase.stream.failure?.fallbackEligibility ?? "unknown"}; terminalSuccessClaim=false`,
+    summary: `providerMode=${phase.requestBoundary.providerMode}; model=${phase.requestBoundary.modelSafeLabel}; request=${phase.requestBoundary.readinessStatus}; stream=${streamStatus}; assistant=${phase.assistantResponse.accumulationStatus}; toolCalls=${phase.toolCallBatch.extractionStatus}; handoff=${handoff.executionStatus}; blocked=${phase.toolDispatchPlan.blockedCallIds.length}; authority=${phase.toolDispatchPlan.authorityRequiredCallIds.length}; malformed=${handoff.malformedCallIds.length}; unsupported=${handoff.unsupportedCallIds.length}; unknown=${handoff.unknownToolCallIds.length}; messages=${handoff.nonExecutedMessageIds.length}; next=${handoff.nextTurnInputId ?? handoff.nextTurnInputAbsentReason ?? "not-prepared"}; failure=${failureClass}; cancellation=${cancellation}; fallback=${phase.stream.failure?.fallbackEligibility ?? "unknown"}; terminalSuccessClaim=false`,
     facts: [
       { label: "requestId", value: phase.requestBoundary.requestId },
       { label: "provider", value: phase.requestBoundary.providerSafeLabel },
       { label: "model", value: phase.requestBoundary.modelSafeLabel },
       { label: "missingRequiredFacts", value: String(phase.requestBoundary.missingRequiredFacts.length) },
       { label: "dispatchStatus", value: phase.toolCallBatch.dispatchStatus },
+      { label: "batchStatus", value: handoff.dispatchEligibility },
+      { label: "callCount", value: String(handoff.normalizedToolCallIds.length) },
+      { label: "blockedCount", value: String(phase.toolDispatchPlan.blockedCallIds.length) },
+      { label: "authorityRequiredCount", value: String(phase.toolDispatchPlan.authorityRequiredCallIds.length) },
+      { label: "notDispatchedMessages", value: String(handoff.nonExecutedMessageIds.length) },
     ],
     redaction: phase.stream.redaction.status === "redacted" ||
         phase.requestBoundary.redaction.status === "redacted"

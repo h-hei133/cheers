@@ -5,7 +5,8 @@ import { isAllowlistedTool } from "./types.js";
 export type NormalizedToolCallStatus =
   | "prepared"
   | "malformed"
-  | "unsupported";
+  | "unsupported"
+  | "unknown";
 
 export type ToolCallBatchExtractionStatus =
   | "empty"
@@ -40,6 +41,7 @@ export interface NormalizedToolCallBatch {
   readonly calls: readonly NormalizedToolCall[];
   readonly malformedCallCount: number;
   readonly unsupportedCallCount: number;
+  readonly unknownCallCount: number;
   readonly redaction: {
     readonly status: "report-safe" | "redacted";
     readonly excluded: readonly string[];
@@ -85,11 +87,12 @@ export function extractToolCallBatch(
   });
   const malformedCallCount = calls.filter((call) => call.status === "malformed").length;
   const unsupportedCallCount = calls.filter((call) => call.status === "unsupported").length;
+  const unknownCallCount = calls.filter((call) => call.status === "unknown").length;
   const extractionStatus: ToolCallBatchExtractionStatus = calls.length === 0
     ? "empty"
     : malformedCallCount === calls.length
       ? "failed"
-      : malformedCallCount > 0 || unsupportedCallCount > 0
+      : malformedCallCount > 0 || unsupportedCallCount > 0 || unknownCallCount > 0
         ? "partial"
         : "extracted";
 
@@ -104,6 +107,7 @@ export function extractToolCallBatch(
     calls: Object.freeze(calls),
     malformedCallCount,
     unsupportedCallCount,
+    unknownCallCount,
     redaction: {
       status: redacted ? "redacted" : "report-safe",
       excluded: REDACTION_EXCLUSIONS,
@@ -174,7 +178,7 @@ function normalizeToolCall(
   }
 
   const kind = classifyToolKind(name);
-  if (kind !== "allowlisted") {
+  if (kind === "unsupported") {
     return deepFreeze({
       id,
       name,
@@ -192,6 +196,28 @@ function normalizeToolCall(
       notProvenClaims: Object.freeze([
         ...baseClaims,
         "tool-call-unsupported",
+      ]),
+      terminalSuccessClaim: false,
+    });
+  }
+  if (kind === "unknown") {
+    return deepFreeze({
+      id,
+      name,
+      kind,
+      status: "unknown",
+      argumentKeys: argumentProjection.keys,
+      argumentSummary: argumentProjection.summary,
+      riskLevel: "unknown",
+      beforeToolPolicy: "pending",
+      dispatchStatus: "not_dispatched",
+      redaction: {
+        status: baseRedacted ? "redacted" : "report-safe",
+        excluded: REDACTION_EXCLUSIONS,
+      },
+      notProvenClaims: Object.freeze([
+        ...baseClaims,
+        "tool-call-unknown",
       ]),
       terminalSuccessClaim: false,
     });
@@ -249,7 +275,10 @@ function classifyToolKind(name: string): NormalizedToolCall["kind"] {
   if (name === "unknown") {
     return "unknown";
   }
-  return isAllowlistedTool(name) ? "allowlisted" : "unsupported";
+  if (isAllowlistedTool(name)) {
+    return "allowlisted";
+  }
+  return name.includes(".") || name.includes("__") ? "unsupported" : "unknown";
 }
 
 function projectArguments(value: unknown): {

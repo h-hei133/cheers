@@ -32,7 +32,7 @@ import { prepareToolResultMessages } from "../../turn/toolResultMessage.js";
 import {
   observeVerificationResult,
   projectVerificationIntent,
-} from "../../repair/handoff/boundary.js";
+} from "../../verification/result/boundary.js";
 import { extractToolCallBatch } from "../../tools/toolCallBatch.js";
 import { dispatchToolBatch, planToolBatchDispatch } from "../../tools/toolBatchDispatch.js";
 import {

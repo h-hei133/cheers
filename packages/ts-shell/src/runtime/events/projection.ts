@@ -21,6 +21,7 @@ import type { FollowUpQueueProjection } from "../../turn/followUpQueue.js";
 import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
 import type { SteeringQueueProjection } from "../../turn/steeringQueue.js";
 import type { NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
+import type { ToolBatchHandoffProjection } from "../../tools/toolHandoff.js";
 import type {
   ToolBatchDispatchPlan,
   ToolResultDetail,
@@ -86,6 +87,12 @@ export type RuntimeProjectionEventType =
   | "assistant-response-accumulated"
   | "tool-call-batch-extracted"
   | "tool-call-extraction-failed"
+  | "tool-batch-handoff-observed"
+  | "tool-batch-planned"
+  | "tool-batch-partial"
+  | "tool-call-not-dispatched"
+  | "non-executed-result-message-prepared"
+  | "tool-batch-observation-completed"
   | "tool-batch-dispatch-planned"
   | "before-tool-policy-decided"
   | "tool-call-authority-required"
@@ -191,6 +198,7 @@ export function projectRuntimeEvents(input: {
   readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
   readonly assistantResponses?: readonly AssistantResponseState[];
   readonly toolCallBatches?: readonly NormalizedToolCallBatch[];
+  readonly toolBatchHandoffs?: readonly ToolBatchHandoffProjection[];
   readonly savePoint?: RuntimeEvidenceSavePoint;
   readonly resultFacts?: RuntimeResultFactsProjection;
   readonly resourceProjection?: StaticResourceProjection;
@@ -543,6 +551,92 @@ export function projectRuntimeEvents(input: {
         terminalSuccessClaim: false,
       },
       batch.notProvenClaims,
+    );
+  }
+
+  for (const handoff of input.toolBatchHandoffs ?? []) {
+    append(
+      "tool-batch-handoff-observed",
+      {
+        handoffId: handoff.handoffId,
+        sourceModelBoundaryId: handoff.sourceModelBoundaryId,
+        sourceAssistantResponseId: handoff.sourceAssistantResponseId,
+        batchId: handoff.batchId,
+        extractionStatus: handoff.extractionStatus,
+        normalizedToolCallCount: handoff.normalizedToolCallIds.length,
+        malformedCallIds: handoff.malformedCallIds,
+        unsupportedCallIds: handoff.unsupportedCallIds,
+        unknownToolCallIds: handoff.unknownToolCallIds,
+        argumentRedactionStatus: handoff.argumentRedactionStatus,
+        dispatchEligibility: handoff.dispatchEligibility,
+        policyRequirement: handoff.policyRequirement,
+        authorityRequirement: handoff.authorityRequirement,
+        executionStatus: handoff.executionStatus,
+        savePointInputId: handoff.savePointInputId,
+        savePointInputAbsentReason: handoff.savePointInputAbsentReason,
+        nextTurnInputId: handoff.nextTurnInputId,
+        nextTurnInputAbsentReason: handoff.nextTurnInputAbsentReason,
+        terminalSuccessClaim: false,
+      },
+      handoff.notProvenClaims,
+    );
+    append(
+      "tool-batch-planned",
+      {
+        handoffId: handoff.handoffId,
+        dispatchPlanId: handoff.dispatchPlanId,
+        dispatchEligibility: handoff.dispatchEligibility,
+        executionStatus: handoff.executionStatus,
+        terminalSuccessClaim: false,
+      },
+      handoff.notProvenClaims,
+    );
+    if (handoff.extractionStatus === "partial" || handoff.extractionStatus === "failed") {
+      append(
+        "tool-batch-partial",
+        {
+          handoffId: handoff.handoffId,
+          extractionStatus: handoff.extractionStatus,
+          malformedCallIds: handoff.malformedCallIds,
+          unsupportedCallIds: handoff.unsupportedCallIds,
+          unknownToolCallIds: handoff.unknownToolCallIds,
+          terminalSuccessClaim: false,
+        },
+        handoff.notProvenClaims,
+      );
+    }
+    if (handoff.normalizedToolCallIds.length > 0 && handoff.executionStatus === "not_dispatched") {
+      append(
+        "tool-call-not-dispatched",
+        {
+          handoffId: handoff.handoffId,
+          toolCallIds: handoff.normalizedToolCallIds,
+          executionStatus: handoff.executionStatus,
+          terminalSuccessClaim: false,
+        },
+        handoff.notProvenClaims,
+      );
+    }
+    if (handoff.nonExecutedMessageIds.length > 0) {
+      append(
+        "non-executed-result-message-prepared",
+        {
+          handoffId: handoff.handoffId,
+          messageIds: handoff.nonExecutedMessageIds,
+          terminalSuccessClaim: false,
+        },
+        handoff.notProvenClaims,
+      );
+    }
+    append(
+      "tool-batch-observation-completed",
+      {
+        handoffId: handoff.handoffId,
+        batchId: handoff.batchId,
+        executionStatus: handoff.executionStatus,
+        terminalSuccessClaim: false,
+      },
+      handoff.notProvenClaims,
     );
   }
 

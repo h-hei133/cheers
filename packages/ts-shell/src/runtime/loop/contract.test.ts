@@ -9,7 +9,7 @@ import {
 import {
   observeVerificationResult,
   projectVerificationIntent,
-} from "../../repair/handoff/boundary.js";
+} from "../../verification/result/boundary.js";
 import { projectJsonRuntimeEventStream } from "../events/stream.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import {
@@ -73,7 +73,8 @@ describe("agent loop contract", () => {
       extractionStatus: "partial",
       dispatchStatus: "not_dispatched",
       malformedCallCount: 1,
-      unsupportedCallCount: 2,
+      unsupportedCallCount: 1,
+      unknownCallCount: 1,
       terminalSuccessClaim: false,
     });
     expect(turn?.toolResultBatch?.resultDetails?.map((detail) => detail.resultStatus))

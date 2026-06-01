@@ -40,14 +40,34 @@ export type ToolResultDetailStatus =
   | "rejected"
   | "redacted";
 
+export type ToolArgumentSafetyState = "report-safe" | "redacted";
+
+export type ToolExecutionState =
+  | "not_dispatched"
+  | "blocked"
+  | "authority_required"
+  | "unsupported"
+  | "unknown"
+  | "malformed"
+  | "execution_unavailable";
+
 export interface ToolDispatchPlanCall {
   readonly toolCallId: string;
   readonly toolName: string;
+  readonly callKind: NormalizedToolCall["kind"];
+  readonly safeToolLabel: string;
   readonly callStatus: NormalizedToolCall["status"];
   readonly dispatchStatus: ToolCallDispatchStatus;
+  readonly dispatchEligibility: ToolCallDispatchStatus;
   readonly beforePolicyDecision: ToolBeforePolicyDecision;
+  readonly policyDecisionId: string;
   readonly authorityRequirement: ToolBeforePolicyDecision["authorityRequirement"];
+  readonly argumentSafety: ToolArgumentSafetyState;
   readonly redactionStatus: "report-safe" | "redacted";
+  readonly malformed: boolean;
+  readonly unsupported: boolean;
+  readonly unknownTool: boolean;
+  readonly executionState: ToolExecutionState;
   readonly notProvenClaims: readonly string[];
   readonly terminalSuccessClaim: false;
 }
@@ -62,8 +82,12 @@ export interface ToolBatchDispatchPlan {
   readonly calls: readonly ToolDispatchPlanCall[];
   readonly authorityRequiredCallIds: readonly string[];
   readonly blockedCallIds: readonly string[];
+  readonly malformedCallIds: readonly string[];
   readonly unsupportedCallIds: readonly string[];
+  readonly unknownCallIds: readonly string[];
+  readonly notDispatchedCallIds: readonly string[];
   readonly dispatchedCallIds: readonly string[];
+  readonly executionStatus: "not_dispatched" | "partially_dispatched" | "dispatched";
   readonly redactionStatus: "report-safe" | "redacted";
   readonly notProvenClaims: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -143,14 +167,24 @@ export function planToolBatchDispatch(input: {
       beforePolicyDecision.redactionStatus === "redacted"
         ? "redacted"
         : "report-safe";
+    const dispatchStatus = statusFromPolicy(call, beforePolicyDecision, dispatchPolicy);
     return freeze({
       toolCallId: call.id,
       toolName: call.name,
+      callKind: call.kind,
+      safeToolLabel: call.name,
       callStatus: call.status,
-      dispatchStatus: statusFromPolicy(call, beforePolicyDecision, dispatchPolicy),
+      dispatchStatus,
+      dispatchEligibility: dispatchStatus,
       beforePolicyDecision,
+      policyDecisionId: beforePolicyDecision.decisionId,
       authorityRequirement: beforePolicyDecision.authorityRequirement,
+      argumentSafety: call.redaction.status,
       redactionStatus,
+      malformed: call.status === "malformed",
+      unsupported: call.status === "unsupported",
+      unknownTool: call.status !== "malformed" && (call.status === "unknown" || call.kind === "unknown"),
+      executionState: executionStateFromPlan(call, dispatchStatus, input.dispatchPolicy),
       notProvenClaims: unique([
         ...call.notProvenClaims,
         ...beforePolicyDecision.notProvenClaims,
@@ -174,12 +208,26 @@ export function planToolBatchDispatch(input: {
     blockedCallIds: freeze(calls.filter((call) =>
       call.dispatchStatus === "blocked"
     ).map((call) => call.toolCallId)),
+    malformedCallIds: freeze(calls.filter((call) =>
+      call.malformed
+    ).map((call) => call.toolCallId)),
     unsupportedCallIds: freeze(calls.filter((call) =>
-      call.dispatchStatus === "unsupported"
+      call.unsupported
+    ).map((call) => call.toolCallId)),
+    unknownCallIds: freeze(calls.filter((call) =>
+      call.unknownTool && !call.malformed
+    ).map((call) => call.toolCallId)),
+    notDispatchedCallIds: freeze(calls.filter((call) =>
+      call.dispatchStatus === "not_dispatched"
     ).map((call) => call.toolCallId)),
     dispatchedCallIds: freeze(calls.filter((call) =>
       call.dispatchStatus === "dispatched"
     ).map((call) => call.toolCallId)),
+    executionStatus: calls.some((call) => call.dispatchStatus === "dispatched")
+      ? calls.every((call) => call.dispatchStatus === "dispatched")
+        ? "dispatched"
+        : "partially_dispatched"
+      : "not_dispatched",
     redactionStatus:
       input.batch.redaction.status === "redacted" ||
       calls.some((call) => call.redactionStatus === "redacted")
@@ -303,6 +351,44 @@ export async function dispatchToolBatch(input: {
   });
 }
 
+export function createNonExecutedToolResultDetails(input: {
+  readonly dispatchPlan: ToolBatchDispatchPlan;
+}): readonly ToolResultDetail[] {
+  return freeze(input.dispatchPlan.calls.map((planned) => {
+    const resultStatus = nonExecutedDetailStatus(planned);
+    const summary = nonExecutedSummary(planned);
+    const notProvenClaims = unique([
+      "terminal-success",
+      "task-success",
+      "verification-success",
+      "tool-success",
+      "tool-execution-not-run",
+      ...planned.notProvenClaims,
+    ]);
+    return freeze({
+      resultDetailsId: sanitizeId(`tool-result-detail:${planned.toolCallId}`),
+      toolCallId: planned.toolCallId,
+      toolName: planned.toolName,
+      resultStatus,
+      contentSummary: summary,
+      systemDetails: {
+        dispatchStatus: planned.dispatchStatus,
+        policyDecisionId: planned.beforePolicyDecision.decisionId,
+        terminalSuccessClaim: false,
+      },
+      reportSafe: {
+        summary,
+        redactionStatus: planned.redactionStatus,
+        notProvenClaims,
+        terminalSuccessClaim: false,
+      },
+      redactionStatus: planned.redactionStatus,
+      notProvenClaims,
+      terminalSuccessClaim: false,
+    });
+  }));
+}
+
 function projectToolExecutionResult(result: ToolExecutionResult): ToolExecutionResult {
   return freeze({
     success: result.success,
@@ -374,6 +460,16 @@ function defaultPolicyDecision(
       notProvenClaims: ["tool-call-malformed"],
     });
   }
+  if (call.status === "unknown" || call.kind === "unknown") {
+    return createToolBeforePolicyDecision({
+      intent,
+      status: "unsupported",
+      reason: "tool call name is not recognized by the current sanctioned dispatch set",
+      policySource: "tool-batch-dispatch",
+      reportSafeSummary: call.argumentSummary,
+      notProvenClaims: ["tool-dispatch-unknown"],
+    });
+  }
   if (call.status === "unsupported" || call.kind !== "allowlisted") {
     return createToolBeforePolicyDecision({
       intent,
@@ -427,6 +523,32 @@ function statusFromPolicy(
   return "dispatched";
 }
 
+function executionStateFromPlan(
+  call: NormalizedToolCall,
+  dispatchStatus: ToolCallDispatchStatus,
+  requestedDispatchPolicy: "sequential" | "parallel" | "metadata-only" | undefined,
+): ToolExecutionState {
+  if (call.status === "malformed") {
+    return "malformed";
+  }
+  if (call.status === "unknown" || call.kind === "unknown") {
+    return "unknown";
+  }
+  if (dispatchStatus === "blocked") {
+    return "blocked";
+  }
+  if (dispatchStatus === "authority_required") {
+    return "authority_required";
+  }
+  if (dispatchStatus === "unsupported") {
+    return "unsupported";
+  }
+  if (dispatchStatus === "dispatched") {
+    return requestedDispatchPolicy === "sequential" ? "execution_unavailable" : "not_dispatched";
+  }
+  return "not_dispatched";
+}
+
 function summarizePlanStatus(calls: readonly ToolDispatchPlanCall[]): ToolBatchDispatchStatus {
   if (calls.length === 0) {
     return "planned";
@@ -454,6 +576,44 @@ function summarizePlanStatus(calls: readonly ToolDispatchPlanCall[]): ToolBatchD
     return "unsupported";
   }
   return "not_dispatched";
+}
+
+function nonExecutedDetailStatus(planned: ToolDispatchPlanCall): ToolResultDetailStatus {
+  if (planned.malformed) {
+    return "rejected";
+  }
+  if (planned.dispatchStatus === "blocked") {
+    return "blocked";
+  }
+  if (planned.dispatchStatus === "authority_required") {
+    return "authority_required";
+  }
+  if (planned.dispatchStatus === "unsupported" || planned.unknownTool || planned.unsupported) {
+    return "unsupported";
+  }
+  return "not_executed";
+}
+
+function nonExecutedSummary(planned: ToolDispatchPlanCall): string {
+  if (planned.malformed) {
+    return `malformed arguments for ${planned.safeToolLabel}; execution not run`;
+  }
+  if (planned.unknownTool) {
+    return `unknown tool ${planned.safeToolLabel}; execution not run`;
+  }
+  if (planned.dispatchStatus === "blocked") {
+    return `blocked by policy for ${planned.safeToolLabel}; execution not run`;
+  }
+  if (planned.dispatchStatus === "authority_required") {
+    return `authority required for ${planned.safeToolLabel}; execution not run`;
+  }
+  if (planned.dispatchStatus === "unsupported" || planned.unsupported) {
+    return `unsupported tool ${planned.safeToolLabel}; execution not run`;
+  }
+  if (planned.executionState === "execution_unavailable") {
+    return `execution unavailable for ${planned.safeToolLabel}; execution not run`;
+  }
+  return `${planned.safeToolLabel} not dispatched; execution not run`;
 }
 
 function createNotDispatchedResult(planned: ToolDispatchPlanCall): ToolExecutionResult {
