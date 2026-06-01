@@ -1,7 +1,7 @@
 # Build Infrastructure Next Product Roadmap
 
-Status: PS001 audit update.
-Date: 2026-05-31.
+Status: MTB001 audit update.
+Date: 2026-06-01.
 
 ## Transition
 
@@ -9,23 +9,24 @@ The initial build-infrastructure sequence is closed. The next route should be a
 real product feature route, not another general infrastructure route, unless a
 specific product blocker proves a missing owner boundary.
 
-## Recommended Immediate Route
+## Recommended Immediate Task
 
-### PS002 Model Request, Stream Accumulation, And Tool-Call Handoff
+### MTB002 Safe Model Tool Batch Handoff And Non-Executed Result Messages
 
 Goal:
 
-- Build the owner-domain model request boundary that consumes CP006 context and
-  planning facts.
-- Adapt normalized stream events into report-safe assistant accumulation and a
-  completed model response boundary.
-- Extract only completed normalized tool calls into a not-dispatched tool-call
-  batch.
-- Classify abort/cancel/failure states for streaming without executing fallback
-  or tools.
-- Emit runtime events and product surface facts without changing terminal truth.
+- Consume completed model-boundary facts from the previous block.
+- Produce an explicit report-safe tool batch handoff with normalized call ids,
+  malformed/unsupported/unknown classification, argument redaction status,
+  before-tool policy requirement, authority requirement, dispatch eligibility,
+  execution not-run status, and not-proven claims.
+- Prepare non-executed tool result messages for blocked, authority-required,
+  unsupported, unknown, malformed, and not-dispatched calls.
+- Project runtime events, JSON stream entries, save-point ids, next-turn bundle
+  inputs, and product surface state without executing tools or changing
+  terminal truth.
 
-Reason for the sharpened order after CP006 and PS001:
+Reason for the sharpened order after CP006, PS001, and the tool handoff audit:
 
 - CP006 made context discovery, acquisition, planning, handoff, memory, and
   continuation facts visible without success upgrades.
@@ -33,47 +34,52 @@ Reason for the sharpened order after CP006 and PS001:
   extraction, Agent Loop contract, runtime events, JSON stream, and product
   surface already have useful pieces, but no coherent product-safe seam consumes
   CP facts into model request preparation and streaming response handling.
-- The next missing dependency is a model-boundary stream projection that keeps
-  provider-called, stream-started, content-delta, tool-call-extracted,
-  fallback-eligible, and model-complete distinct from task success.
+- The model-tool audit found that extraction, dispatch planning, policy
+  decisions, ExecutionService receipts, tool result messages, save points,
+  next-turn bundles, runtime events, JSON stream, and product surface already
+  have useful contract/projection pieces. The immediate missing dependency is a
+  safe handoff fact that keeps extracted tool call, planned batch, policy
+  allowed, authority requested, receipt observed, result message prepared,
+  save point created, and surface rendered distinct from task success.
 
 Owner domains:
 
-- `provider`
 - `turn`
+- `tools`
 - `runtime/loop`
 - `runtime/events`
-- `tools` for extraction only
+- `runtime/execution` as authority and receipt boundary only
 - `evidence`
 - `result`
-- `presentation` and `core/shell` as consumers only
+- `presentation`, `core/tools`, and `core/shell` as consumers only
 
 Existing infrastructure to reuse:
 
 - CP006 context planning summary
-- provider/model registry metadata
-- provider readiness/config gates
-- provider adapter normalized stream events
 - model response boundary
 - assistant response accumulator
 - tool-call extraction batch
+- tool interception policy decisions
+- tool batch dispatch plan/result detail projections
+- tool result message projection
+- ExecutionService and execution receipts
 - Agent Loop contract, loop infrastructure map, and trajectory projection
 - turn snapshots
+- evidence-only save points and next-turn bundles
 - runtime events and JSON event stream
 - product surface view model and terminal renderer
 - result/evidence truthfulness surfaces
 
-First implementation grouping after PS001:
+First implementation grouping after this audit:
 
-- model request boundary consuming CP facts
-- stream lifecycle projection
-- assistant response accumulation from normalized deltas
-- completed tool-call handoff into a not-dispatched batch
-- streaming abort/cancel/failure taxonomy
-- response/tool-call observations in trajectory/runtime events
+- explicit model-boundary-to-tool handoff facts
+- normalized tool batch plan with malformed/unsupported/unknown classifications
+- before-tool policy and authority projection
+- not-dispatched/non-executed tool result details and messages
+- tool handoff observations in trajectory/runtime events and JSON stream
+- save point and next-turn bundle ids from safe tool result message facts
 - visible not-proven claims in product surface if rendered
-- result truthfulness tests proving stream/model/tool-call observations do not
-  change verdict
+- result truthfulness tests proving tool observations do not change verdict
 
 Forbidden shortcuts:
 
@@ -84,19 +90,22 @@ Forbidden shortcuts:
 - do not execute fallback
 - do not execute tools, expand command allowlists, change edit behavior, change
   verification behavior, or change repair behavior
-- do not turn provider-called, stream-started, content-delta, tool-call partial,
-  tool calls extracted, model response complete, fallback eligible, or rendered
-  output into success
+- do not turn tool-call-extracted, tool-batch-planned, policy-allowed,
+  authority-requested, execution-receipt-observed, command-exit-zero,
+  tool-result-message-prepared, save-point-created, or rendered output into
+  success
 - do not add package loading, dynamic plugin execution, SDK/RPC, TUI, browser
   paths, or new dependencies
 
 Validation expectations:
 
-- request-prep tests for CP fact ingestion and no-write/not-proven propagation
-- stream lifecycle and assistant accumulation tests
-- tool-call partial/completed/malformed/unsupported extraction tests
-- abort/cancel/failure taxonomy tests
+- tool handoff tests for source model boundary ids, normalized call ids,
+  malformed/unsupported/unknown statuses, redaction, and not-proven propagation
+- before-tool policy and authority projection tests
+- non-executed tool result message tests
 - runtime loop trajectory/event tests if observations change
+- JSON stream observation-only/redaction tests if events change
+- save-point and next-turn bundle tests if ids or pending facts change
 - product surface rendering tests if rendered facts change
 - result-contract gate if terminal/result behavior is touched
 - build for touched package if product code changes
@@ -104,14 +113,17 @@ Validation expectations:
 
 Expected product value:
 
-- A real CLI path can prepare a model request from CP facts and represent what a
-  stream produced, including assistant response state and completed tool-call
-  intent, before any fallback, tool dispatch, or success claim.
+- A completed model response can hand off tool intent to the loop as safe,
+  policy-aware, authority-aware, non-executed facts that can be saved and
+  prepared for a future turn without bypassing ExecutionService or
+  manufacturing success.
 
-PS001 planning details:
+Planning details:
 
 - `docs/build-infrastructure/provider-streaming-model-boundary-audit.md`
 - `docs/build-infrastructure/provider-streaming-model-boundary-roadmap.md`
+- `docs/build-infrastructure/model-tool-batch-handoff-audit.md`
+- `docs/build-infrastructure/model-tool-batch-handoff-roadmap.md`
 
 ## Prior Completed Baseline
 
@@ -128,17 +140,19 @@ accumulation, model-driven tool batches, tool result messages, next-turn
 semantics, verification/repair handoff inside the loop, or product loop
 replacement.
 
-CP006 later added product-surface context and planning facts. Those facts are
-the required input dependency for PS002 model request preparation.
+CP006 later added product-surface context and planning facts. PS001 added the
+provider/model boundary plan. The tool handoff audit uses those facts as the
+required upstream dependency for model-to-tool handoff.
 
 ## Subsequent Product Routes
 
-### PL005 Tool Batch Dispatch And Tool Result Messages
+### MTB003 Sanctioned Tool Dispatch Receipt Observation
 
 Goal:
 
-- Dispatch PL004 tool-call batches through sanctioned tool/runtime execution
-  boundaries and construct ordered tool result messages for the next model turn.
+- Dispatch eligible tool-call batches through sanctioned tool/runtime execution
+  boundaries only when policy permits, authority is proven, and the dispatch
+  seam is explicitly scoped.
 
 Owner domains:
 
@@ -174,8 +188,8 @@ Validation expectations:
 
 Expected product value:
 
-- Tool calls become policy-gated next-turn messages rather than observations
-  that cannot continue the loop.
+- Tool calls can produce redacted execution receipts and result details without
+  turning tool success into task success.
 
 ### PL006 Save Point, Prepare-Next-Turn, Steering And Follow-Up
 
