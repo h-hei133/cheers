@@ -393,6 +393,13 @@ describe("agent loop contract", () => {
       originalFailureClass: "test-failure",
       terminalSuccessClaim: false,
     });
+    expect(turn?.finalization?.closeout).toMatchObject({
+      status: "complete",
+      complete: true,
+      resultOwnedTerminalStatus: "verified_with_repair",
+      loopOwnedControlDecision: "stop_complete",
+      terminalSuccessClaim: false,
+    });
     expect(turn?.savePoint.repairHandoffIds).toEqual([
       turn?.verification.repairRequired?.handoffId,
     ]);
@@ -440,6 +447,10 @@ describe("agent loop contract", () => {
         "pending-verification:no",
         "pending-repair:no",
         "loop-finalization-terminal-success:false",
+        "product-closeout-status:complete",
+        "final-observed-status:verified_with_repair",
+        "loop-owned-control-decision:stop_complete",
+        "product-closeout-terminal-success:false",
       ]),
     );
     expect(
@@ -477,6 +488,8 @@ describe("agent loop contract", () => {
         "repair-verdict-terminal-projected",
         "loop-finalization-input-observed",
         "loop-finalization-decision-observed",
+        "product-loop-closeout-input-observed",
+        "product-loop-closeout-projected",
         "original-failure-preserved",
       ]),
     );

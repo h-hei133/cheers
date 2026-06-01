@@ -401,6 +401,7 @@ describe("loop trajectory projection", () => {
     expect(trajectory.repairVerdictProofInputIds).toHaveLength(1);
     expect(trajectory.repairVerdictTerminalProjectionIds).toHaveLength(1);
     expect(trajectory.loopFinalizationDecisionIds).toHaveLength(1);
+    expect(trajectory.productLoopCloseoutIds).toHaveLength(1);
     expect(trajectory.events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -452,6 +453,16 @@ describe("loop trajectory projection", () => {
             resultTerminalStatus: "verified_with_repair",
             proofComplete: true,
             originalFailureClass: "test-failed",
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "product-loop-closeout-projected",
+          facts: expect.objectContaining({
+            status: "complete",
+            resultOwnedTerminalStatus: "verified_with_repair",
+            loopOwnedControlDecision: "stop_complete",
+            complete: true,
             terminalSuccessClaim: false,
           }),
         }),

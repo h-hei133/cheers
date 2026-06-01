@@ -17,6 +17,46 @@ import {
 } from "./projection.js";
 
 describe("JSON runtime event stream projection", () => {
+  it("keeps product closeout observations JSON-safe and observation-only", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [{
+        id: "event-closeout",
+        sequence: 1,
+        type: "product-loop-closeout-projected",
+        facts: {
+          closeoutId: "closeout:1",
+          status: "complete",
+          resultOwnedTerminalStatus: "verified_with_repair",
+          loopOwnedControlDecision: "stop_complete",
+          nextAction: "stop loop after result-owned verified repair projection",
+          terminalSuccessClaim: false,
+        },
+        notProvenClaims: ["product-closeout-is-not-terminal-truth"],
+        redaction: { status: "report-safe", excluded: [] },
+      }],
+      streamId: "closeout-stream",
+    });
+
+    expect(stream[0]).toMatchObject({
+      eventType: "product-loop-closeout-projected",
+      facts: expect.objectContaining({
+        status: "complete",
+        resultOwnedTerminalStatus: "verified_with_repair",
+        loopOwnedControlDecision: "stop_complete",
+      }),
+      truthfulness: {
+        observationOnly: true,
+        terminalSuccessClaim: false,
+      },
+    });
+    expect(stream[0]?.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "product-closeout-is-not-terminal-truth",
+        "terminal-success",
+      ]),
+    );
+  });
+
   it("serializes runtime event observations as JSON-safe ordered entries", () => {
     const turnSnapshot = createRuntimeTurnSnapshot({
       sessionId: "sess-stream",

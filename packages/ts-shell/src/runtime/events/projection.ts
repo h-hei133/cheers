@@ -60,6 +60,8 @@ import type { ModelResponseReentryCycleProjection } from "../loop/reentry.js";
 import type {
   LoopFinalizationDecision,
   LoopFinalizationInput,
+  ProductLoopCloseoutInput,
+  ProductLoopCloseoutProjection,
 } from "../loop/finalization.js";
 import type { RepairVerdictTerminalProjection } from "../../result/projection/repair/verdict.js";
 
@@ -193,6 +195,8 @@ export type RuntimeProjectionEventType =
   | "repair-verdict-terminal-projected"
   | "loop-finalization-input-observed"
   | "loop-finalization-decision-observed"
+  | "product-loop-closeout-input-observed"
+  | "product-loop-closeout-projected"
   | "original-failure-preserved"
   | "tool-dispatch-not-run"
   | "agent-loop-started"
@@ -273,6 +277,8 @@ export function projectRuntimeEvents(input: {
   readonly repairVerdictTerminalProjections?: readonly RepairVerdictTerminalProjection[];
   readonly loopFinalizationInputs?: readonly LoopFinalizationInput[];
   readonly loopFinalizationDecisions?: readonly LoopFinalizationDecision[];
+  readonly productLoopCloseoutInputs?: readonly ProductLoopCloseoutInput[];
+  readonly productLoopCloseouts?: readonly ProductLoopCloseoutProjection[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
@@ -1962,6 +1968,55 @@ export function projectRuntimeEvents(input: {
         terminalSuccessClaim: decision.terminalSuccessClaim,
       },
       decision.notProvenClaims,
+    );
+  }
+
+  for (const closeoutInput of input.productLoopCloseoutInputs ?? []) {
+    append(
+      "product-loop-closeout-input-observed",
+      {
+        inputId: closeoutInput.inputId,
+        loopDecisionId: closeoutInput.loopDecisionId,
+        resultProjectionId: closeoutInput.resultProjectionId,
+        resultTerminalStatus: closeoutInput.resultTerminalStatus,
+        resultTerminalClassification: closeoutInput.resultTerminalClassification,
+        loopControlDecision: closeoutInput.loopControlDecision,
+        nextAction: closeoutInput.nextAction,
+        pendingUserAction: closeoutInput.pendingUserAction,
+        pendingVerification: closeoutInput.pendingVerification,
+        pendingRepair: closeoutInput.pendingRepair,
+        preservedOriginalFailure: closeoutInput.preservedOriginalFailure,
+        preservedRepairFacts: closeoutInput.preservedRepairFacts,
+        verificationSummary: closeoutInput.verificationSummary,
+        missingProofItems: closeoutInput.missingProofItems,
+        terminalSuccessClaim: closeoutInput.terminalSuccessClaim,
+      },
+      closeoutInput.notProvenClaims,
+    );
+  }
+
+  for (const closeout of input.productLoopCloseouts ?? []) {
+    append(
+      "product-loop-closeout-projected",
+      {
+        closeoutId: closeout.closeoutId,
+        sourceInputId: closeout.sourceInputId,
+        status: closeout.status,
+        resultOwnedTerminalStatus: closeout.resultOwnedTerminalStatus,
+        resultOwnedTerminalClassification:
+          closeout.resultOwnedTerminalClassification,
+        loopOwnedControlDecision: closeout.loopOwnedControlDecision,
+        complete: closeout.complete,
+        nextAction: closeout.nextAction,
+        pendingHandoff: closeout.pendingHandoff,
+        sessionCarryForwardFacts: closeout.sessionCarryForwardFacts,
+        originalFailureSummary: closeout.originalFailureSummary,
+        repairChainSummary: closeout.repairChainSummary,
+        verificationSummary: closeout.verificationSummary,
+        missingProofItems: closeout.missingProofItems,
+        terminalSuccessClaim: closeout.terminalSuccessClaim,
+      },
+      closeout.notProvenClaims,
     );
   }
 

@@ -70,9 +70,13 @@ import {
 } from "./reentry.js";
 import {
   createLoopFinalizationInput,
+  createProductLoopCloseoutInput,
   decideLoopFinalization,
   type LoopFinalizationDecision,
   type LoopFinalizationInput,
+  type ProductLoopCloseoutInput,
+  type ProductLoopCloseoutProjection,
+  projectProductLoopCloseout,
 } from "./finalization.js";
 
 export type AgentLoopContractState =
@@ -258,6 +262,8 @@ export interface AgentLoopContractTurnProjection {
   readonly finalization?: {
     readonly input: LoopFinalizationInput;
     readonly decision: LoopFinalizationDecision;
+    readonly closeoutInput: ProductLoopCloseoutInput;
+    readonly closeout: ProductLoopCloseoutProjection;
   };
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
@@ -886,12 +892,23 @@ export async function runAgentLoopContract(
             pendingHandoffFacts: repairCarryForwardFacts,
           })
         : undefined;
+      const closeoutInput = verification.repairVerdictTerminalProjection &&
+          finalizationDecision
+        ? createProductLoopCloseoutInput({
+            resultProjection: verification.repairVerdictTerminalProjection,
+            loopDecision: finalizationDecision,
+          })
+        : undefined;
+      const closeout = closeoutInput
+        ? projectProductLoopCloseout({ closeoutInput })
+        : undefined;
       const finalizationCarryForwardFacts = finalizationDecision
         ? [
             `loop-finalization-input:${finalizationDecision.sourceInputId}`,
             `loop-finalization-decision:${finalizationDecision.decision}`,
             `loop-finalization-next-action:${finalizationDecision.nextAction}`,
             ...finalizationDecision.sessionCarryForwardFacts,
+            ...(closeout?.sessionCarryForwardFacts ?? []),
           ]
         : [];
       const verificationSavePoint = createEvidenceOnlySavePoint({
@@ -937,6 +954,8 @@ export async function runAgentLoopContract(
           ...(verification.repairVerdictTerminalProjection?.notProvenClaims ?? []),
           ...(finalizationInput?.notProvenClaims ?? []),
           ...(finalizationDecision?.notProvenClaims ?? []),
+          ...(closeoutInput?.notProvenClaims ?? []),
+          ...(closeout?.notProvenClaims ?? []),
         ],
       });
       appendProjectedEvents(events, projectRuntimeEvents({
@@ -959,6 +978,8 @@ export async function runAgentLoopContract(
           : [],
         loopFinalizationInputs: finalizationInput ? [finalizationInput] : [],
         loopFinalizationDecisions: finalizationDecision ? [finalizationDecision] : [],
+        productLoopCloseoutInputs: closeoutInput ? [closeoutInput] : [],
+        productLoopCloseouts: closeout ? [closeout] : [],
         repairRequiredHandoffs: verification.repairRequired
           ? [verification.repairRequired]
           : [],
@@ -1019,8 +1040,15 @@ export async function runAgentLoopContract(
           executed: false,
         },
           verification,
-          ...(finalizationInput && finalizationDecision
-            ? { finalization: { input: finalizationInput, decision: finalizationDecision } }
+          ...(finalizationInput && finalizationDecision && closeoutInput && closeout
+            ? {
+                finalization: {
+                  input: finalizationInput,
+                  decision: finalizationDecision,
+                  closeoutInput,
+                  closeout,
+                },
+              }
             : {}),
           terminalSuccessClaim: false,
         notProvenClaims: Object.freeze([

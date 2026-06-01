@@ -137,6 +137,24 @@ export function projectProductSurfaceViewModel(
   ) ?? input.runtimeEvents?.find((event) =>
     event.type === "loop-finalization-decision-observed"
   );
+  const productCloseoutEvent = input.loopTrajectory?.events.find((event) =>
+    event.type === "product-loop-closeout-projected"
+  ) ?? input.runtimeEvents?.find((event) =>
+    event.type === "product-loop-closeout-projected"
+  );
+  const observedNextAction = productCloseoutEvent
+    ? String(productCloseoutEvent.facts.nextAction ?? "preserve product closeout facts")
+    : loopFinalizationEvent
+      ? String(loopFinalizationEvent.facts.nextAction ?? "preserve loop finalization facts")
+      : input.contextPlanningSummary?.nextAction ??
+        input.providerStreamAdapter?.nextAction ??
+        input.productLoopAdapter?.nextAction ??
+        "keep loop trajectory observation separate from terminal success";
+  const observedNextActionSummary = productCloseoutEvent
+    ? `closeout=${factValue(productCloseoutEvent.facts.status)}; resultStatus=${factValue(productCloseoutEvent.facts.resultOwnedTerminalStatus)}; loopDecision=${factValue(productCloseoutEvent.facts.loopOwnedControlDecision)}; nextAction=${factValue(productCloseoutEvent.facts.nextAction)}; terminalSuccessClaim=false`
+    : loopFinalizationEvent
+      ? `loopDecision=${factValue(loopFinalizationEvent.facts.decision)}; nextAction=${factValue(loopFinalizationEvent.facts.nextAction)}; resultStatus=${factValue(repairVerdictEvent?.facts.status ?? loopFinalizationEvent.facts.resultTerminalStatus)}; missingProof=${factValue(loopFinalizationEvent.facts.missingProofItems)}; originalFailure=${factValue(loopFinalizationEvent.facts.originalFailureClass)}; terminalSuccessClaim=false`
+      : observedNextAction;
 
   const sections = [
     ...(codingResult ? [
@@ -152,6 +170,7 @@ export function projectProductSurfaceViewModel(
     ] : []),
     ...contextPlanningSections(input.contextPlanningSummary),
     ...productLoopAdapterSections(input),
+    ...productLoopCloseoutSections(productCloseoutEvent),
     ...loopTrajectorySections(input),
     ...resourceSections(input),
     ...providerStreamAdapterSections(input.providerStreamAdapter),
@@ -201,6 +220,8 @@ export function projectProductSurfaceViewModel(
           ? input.modelBoundaryPhase!.notProvenClaims.slice(0, 8).join("; ")
         : (input.contextPlanningSummary?.notProvenClaims.length ?? 0) > 0
           ? input.contextPlanningSummary!.notProvenClaims.slice(0, 8).join("; ")
+        : (productCloseoutEvent?.notProvenClaims.length ?? 0) > 0
+          ? productCloseoutEvent!.notProvenClaims.slice(0, 8).join("; ")
         : (input.loopTrajectory?.notProvenClaims.length ?? 0) > 0
           ? input.loopTrajectory!.notProvenClaims.slice(0, 8).join("; ")
         : (input.productLoopAdapter?.notProvenClaims.length ?? 0) > 0
@@ -210,6 +231,7 @@ export function projectProductSurfaceViewModel(
         input.providerStreamAdapter?.notProvenClaims ??
         input.modelBoundaryPhase?.notProvenClaims ??
         input.contextPlanningSummary?.notProvenClaims ??
+        productCloseoutEvent?.notProvenClaims ??
         input.loopTrajectory?.notProvenClaims ??
         input.productLoopAdapter?.notProvenClaims ?? [],
     }),
@@ -222,14 +244,7 @@ export function projectProductSurfaceViewModel(
         ? "success"
         : "info",
       status: "observed",
-      summary: sessionFacts?.nextAction ??
-        (loopFinalizationEvent
-          ? `loopDecision=${factValue(loopFinalizationEvent.facts.decision)}; nextAction=${factValue(loopFinalizationEvent.facts.nextAction)}; resultStatus=${factValue(repairVerdictEvent?.facts.status ?? loopFinalizationEvent.facts.resultTerminalStatus)}; missingProof=${factValue(loopFinalizationEvent.facts.missingProofItems)}; originalFailure=${factValue(loopFinalizationEvent.facts.originalFailureClass)}; terminalSuccessClaim=false`
-          :
-        input.contextPlanningSummary?.nextAction ??
-        input.providerStreamAdapter?.nextAction ??
-        input.productLoopAdapter?.nextAction ??
-        "keep loop trajectory observation separate from terminal success"),
+      summary: sessionFacts?.nextAction ?? observedNextActionSummary,
     }),
   ];
 
@@ -241,16 +256,10 @@ export function projectProductSurfaceViewModel(
       input.modelBoundaryPhase?.notProvenClaims ??
       input.contextPlanningSummary?.notProvenClaims ??
       input.providerStreamAdapter?.notProvenClaims ??
+      productCloseoutEvent?.notProvenClaims ??
       input.loopTrajectory?.notProvenClaims ??
       input.productLoopAdapter?.notProvenClaims ?? [],
-    nextAction: sessionFacts?.nextAction ??
-      (loopFinalizationEvent
-        ? String(loopFinalizationEvent.facts.nextAction ?? "preserve loop finalization facts")
-        :
-      input.contextPlanningSummary?.nextAction ??
-      input.providerStreamAdapter?.nextAction ??
-      input.productLoopAdapter?.nextAction ??
-      "keep loop trajectory observation separate from terminal success"),
+    nextAction: sessionFacts?.nextAction ?? observedNextAction,
     redaction: sections.some((item) => item.redaction !== "none") ? "applied" : "none",
     terminalSuccessClaim: false,
   };
@@ -878,6 +887,56 @@ function productLoopAdapterSections(input: ProductSurfaceInput): ProductSurfaceS
       status: adapter.featureContractAvailable ? "observed" : "not_proven",
       summary: `available=${adapter.featureContractAvailable}; contracts=${adapter.featureContracts.length}; forbiddenShortcutsRequired=true; validationGatesRequired=true`,
       notProvenClaims: ["feature-contract-valid-is-not-success"],
+    }),
+  ];
+}
+
+function productLoopCloseoutSections(
+  event: RuntimeProjectionEvent | undefined,
+): ProductSurfaceSection[] {
+  if (!event) {
+    return [];
+  }
+  return [
+    section({
+      kind: "loop",
+      title: "Product loop closeout",
+      severity: event.facts.status === "complete" ? "success" : "not_proven",
+      status: event.facts.status === "complete" ? "passed" : "not_proven",
+      summary:
+        `status=${factValue(event.facts.status)}; resultStatus=${factValue(event.facts.resultOwnedTerminalStatus)}; loopDecision=${factValue(event.facts.loopOwnedControlDecision)}; nextAction=${factValue(event.facts.nextAction)}; terminalSuccessClaim=false`,
+      facts: [
+        {
+          label: "resultOwnedTerminalStatus",
+          value: factValue(event.facts.resultOwnedTerminalStatus),
+        },
+        {
+          label: "resultOwnedTerminalClassification",
+          value: factValue(event.facts.resultOwnedTerminalClassification),
+        },
+        {
+          label: "loopOwnedControlDecision",
+          value: factValue(event.facts.loopOwnedControlDecision),
+        },
+        {
+          label: "nextAction",
+          value: factValue(event.facts.nextAction),
+        },
+        {
+          label: "originalFailure",
+          value: factValue(event.facts.originalFailureSummary),
+        },
+        {
+          label: "repairChain",
+          value: factValue(event.facts.repairChainSummary),
+        },
+        {
+          label: "missingProof",
+          value: factValue(event.facts.missingProofItems),
+        },
+      ],
+      machineEventCorrelationIds: [event.id],
+      notProvenClaims: event.notProvenClaims,
     }),
   ];
 }

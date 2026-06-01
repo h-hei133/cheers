@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { RepairVerdictTerminalProjection } from "../../result/projection/repair/verdict.js";
 import {
   createLoopFinalizationInput,
+  createProductLoopCloseoutInput,
   decideLoopFinalization,
+  projectProductLoopCloseout,
 } from "./finalization.js";
 
 describe("loop finalization decision", () => {
@@ -83,6 +85,59 @@ describe("loop finalization decision", () => {
     expect(continueRepair.decision).toBe("continue_repair");
     expect(continueRepair.sessionCarryForwardFacts).toContain("pending-repair:yes");
     expect(JSON.stringify([awaitUser, continueRepair])).not.toContain('"success":true');
+  });
+
+  it("projects complete closeout only from result-owned verified status plus stop complete", () => {
+    const resultProjection = projection();
+    const finalizationInput = createLoopFinalizationInput({ resultProjection });
+    const decision = decideLoopFinalization({ finalizationInput });
+    const closeoutInput = createProductLoopCloseoutInput({
+      resultProjection,
+      loopDecision: decision,
+    });
+    const closeout = projectProductLoopCloseout({ closeoutInput });
+
+    expect(closeout).toMatchObject({
+      status: "complete",
+      complete: true,
+      resultOwnedTerminalStatus: "verified_with_repair",
+      loopOwnedControlDecision: "stop_complete",
+      terminalSuccessClaim: false,
+    });
+    expect(closeout.sessionCarryForwardFacts).toEqual(
+      expect.arrayContaining([
+        "product-closeout-status:complete",
+        "result-owned-terminal-status:verified_with_repair",
+        "loop-owned-control-decision:stop_complete",
+        "original-failure:verification:failed",
+      ]),
+    );
+    expect(closeout.notProvenClaims).toContain(
+      "product-closeout-is-not-terminal-truth",
+    );
+  });
+
+  it("keeps incomplete closeout states separate from complete", () => {
+    const resultProjection = projection({
+      status: "partial",
+      terminalClassification: "stopped",
+      missingProofItems: ["post-repair-verification"],
+    });
+    const finalizationInput = createLoopFinalizationInput({ resultProjection });
+    const decision = decideLoopFinalization({ finalizationInput });
+    const closeout = projectProductLoopCloseout({
+      closeoutInput: createProductLoopCloseoutInput({
+        resultProjection,
+        loopDecision: decision,
+      }),
+    });
+
+    expect(closeout.status).toBe("continue_verification");
+    expect(closeout.complete).toBe(false);
+    expect(closeout.resultOwnedTerminalStatus).toBe("partial");
+    expect(closeout.loopOwnedControlDecision).toBe("continue_verification");
+    expect(closeout.missingProofItems).toContain("post-repair-verification");
+    expect(closeout.notProvenClaims).toContain("incomplete-closeout-is-not-success");
   });
 });
 

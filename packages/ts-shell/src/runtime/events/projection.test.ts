@@ -45,7 +45,9 @@ import {
 import { runControlledModelInvocationAdapter } from "../../provider/request/attempt.js";
 import {
   createLoopFinalizationInput,
+  createProductLoopCloseoutInput,
   decideLoopFinalization,
+  projectProductLoopCloseout,
 } from "../loop/finalization.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy } from "../../turn/deliveryPolicy.js";
@@ -641,6 +643,11 @@ describe("runtime event projection", () => {
       resultProjection: terminalProjection,
     });
     const finalizationDecision = decideLoopFinalization({ finalizationInput });
+    const closeoutInput = createProductLoopCloseoutInput({
+      resultProjection: terminalProjection,
+      loopDecision: finalizationDecision,
+    });
+    const closeout = projectProductLoopCloseout({ closeoutInput });
     const events = projectRuntimeEvents({
       verificationIntents: [intent],
       verificationResults: [result],
@@ -651,6 +658,8 @@ describe("runtime event projection", () => {
       repairVerdictTerminalProjections: [terminalProjection],
       loopFinalizationInputs: [finalizationInput],
       loopFinalizationDecisions: [finalizationDecision],
+      productLoopCloseoutInputs: [closeoutInput],
+      productLoopCloseouts: [closeout],
       repairRequiredHandoffs: [handoff],
       repairProposals: [proposal],
       repairAuthorities: [authority],
@@ -669,6 +678,8 @@ describe("runtime event projection", () => {
       "repair-verdict-terminal-projected",
       "loop-finalization-input-observed",
       "loop-finalization-decision-observed",
+      "product-loop-closeout-input-observed",
+      "product-loop-closeout-projected",
       "repair-required",
       "original-failure-preserved",
       "repair-proposal-observed",
@@ -742,6 +753,20 @@ describe("runtime event projection", () => {
             originalFailureClass: "test-failed",
             terminalSuccessClaim: false,
           }),
+        }),
+        expect.objectContaining({
+          type: "product-loop-closeout-projected",
+          facts: expect.objectContaining({
+            closeoutId: closeout.closeoutId,
+            status: "complete",
+            resultOwnedTerminalStatus: "verified_with_repair",
+            loopOwnedControlDecision: "stop_complete",
+            complete: true,
+            terminalSuccessClaim: false,
+          }),
+          notProvenClaims: expect.arrayContaining([
+            "product-closeout-is-not-terminal-truth",
+          ]),
         }),
         expect.objectContaining({
           type: "repair-required",
