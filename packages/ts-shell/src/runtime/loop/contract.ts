@@ -14,6 +14,11 @@ import {
   type ModelInvocationAttemptEnvelope,
   type ModelInvocationGateFacts,
 } from "../../provider/request/invocation.js";
+import {
+  runControlledModelInvocationAdapter,
+  type ControlledModelInvocationAdapterProjection,
+  type ControlledModelInvocationExecutor,
+} from "../../provider/request/attempt.js";
 import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/response/boundary.js";
 import {
@@ -152,6 +157,7 @@ export interface AgentLoopContractInput {
     batch: AgentLoopContractToolCallBatch,
   ) => Promise<AgentLoopContractToolResultBatch>;
   readonly toolBatchDispatch?: ToolBatchDispatchSeam;
+  readonly controlledModelInvocationExecutor?: ControlledModelInvocationExecutor;
   readonly executePreparedNextTurn?: boolean;
   readonly verificationBoundary?: (
     input: AgentLoopContractVerificationBoundaryInput,
@@ -213,6 +219,7 @@ export interface AgentLoopContractTurnProjection {
     readonly requestPreparation?: NextTurnModelRequestPreparation;
     readonly invocationGate?: ModelInvocationGateFacts;
     readonly invocationAttempt?: ModelInvocationAttemptEnvelope;
+    readonly controlledInvocation?: ControlledModelInvocationAdapterProjection;
     readonly steeringQueue: SteeringQueueProjection;
     readonly followUpQueue: FollowUpQueueProjection;
     readonly deliveryPolicy: NextTurnDeliveryPolicyProjection;
@@ -709,6 +716,16 @@ export async function runAgentLoopContract(
       const invocationAttempt = createModelInvocationAttemptEnvelope({
         gate: invocationGate,
       });
+      const controlledInvocation = await runControlledModelInvocationAdapter({
+        requestPreparation,
+        gate: invocationGate,
+        invocationMode: input.controlledModelInvocationExecutor
+          ? "controlled_provider_fetch"
+          : "metadata_only",
+        executor: input.controlledModelInvocationExecutor,
+        turnId: `${input.sessionId}:turn:${turn}:next`,
+        signal: input.abortSignal,
+      });
       appendProjectedEvents(events, projectRuntimeEvents({
         steeringQueues: [steeringQueue],
         followUpQueues: [followUpQueue],
@@ -718,6 +735,7 @@ export async function runAgentLoopContract(
         nextTurnRequestPreparations: [requestPreparation],
         modelInvocationGates: [invocationGate],
         modelInvocationAttempts: [invocationAttempt],
+        controlledModelInvocations: [controlledInvocation],
       }));
       const verification = input.verificationBoundary
         ? await input.verificationBoundary({
@@ -779,6 +797,7 @@ export async function runAgentLoopContract(
           requestPreparation,
           invocationGate,
           invocationAttempt,
+          controlledInvocation,
           steeringQueue,
           followUpQueue,
           deliveryPolicy,

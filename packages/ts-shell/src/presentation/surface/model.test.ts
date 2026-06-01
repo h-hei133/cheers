@@ -20,6 +20,7 @@ import {
   createModelInvocationAttemptEnvelope,
   createModelInvocationGate,
 } from "../../provider/request/invocation.js";
+import { runControlledModelInvocationAdapter } from "../../provider/request/attempt.js";
 import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
@@ -281,6 +282,111 @@ describe("product surface view model", () => {
       severity: "blocked",
     });
     expect(section?.summary).toContain("attempt=blocked");
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
+    expect(JSON.stringify(viewModel)).not.toContain('"success":true');
+  });
+
+  it("renders controlled invocation facts without claiming provider or task success", async () => {
+    const registry = projectProviderRegistry({
+      providers: [{
+        providerId: "provider-a",
+        safeLabel: "Provider A",
+        providerKind: "custom",
+        endpointClass: "unknown",
+        authMode: "none",
+        defaultEnabled: false,
+        requiresExplicitOptIn: true,
+        supportsFallback: "unknown",
+        compatibility: unknownProviderCompatibilityFlags(),
+        riskLevel: "low",
+      }],
+      models: [{
+        modelId: "model-a",
+        safeLabel: "Model A",
+        providerId: "provider-a",
+        family: "fixture",
+        compatibility: unknownProviderCompatibilityFlags(),
+        knownLimitations: [],
+      }],
+      auth: [{
+        providerId: "provider-a",
+        authSourceKind: "none",
+        authMode: "none",
+        resolutionStatus: "resolved",
+      }],
+    });
+    const request = createModelRequestBoundary({
+      requestId: "request-surface-controlled",
+      providerId: "provider-a",
+      providerSafeLabel: "Provider A",
+      modelSafeLabel: "Model A",
+      providerReadinessStatus: "ready",
+      providerRegistry: registry,
+    });
+    const preparation = prepareNextTurnModelRequest({
+      nextTurnBundle: prepareNextTurnBundle({
+        bundleId: "bundle-surface-controlled",
+        turnId: "turn-surface-controlled",
+        toolResultMessages: {
+          batchId: "messages-surface-controlled",
+          dispatchPlanId: "plan-surface-controlled",
+          messages: [{
+            messageId: "message-surface-controlled",
+            role: "tool",
+            toolCallId: "call-surface-controlled",
+            toolName: "read",
+            safeContentSummary: "safe summary",
+            category: "executed_tool_fact",
+            deliveryStatus: "prepared",
+            redactionStatus: "report-safe",
+            notProvenClaims: [],
+            terminalSuccessClaim: false,
+          }],
+          preparedCount: 1,
+          blockedCount: 0,
+          terminalSuccessClaim: false,
+          notProvenClaims: [],
+        },
+      }),
+      modelRequestBoundary: request,
+      providerRegistry: registry,
+      providerId: "provider-a",
+      modelId: "model-a",
+    });
+    const gate = createModelInvocationGate({
+      requestPreparation: preparation,
+      explicitOptIn: { state: "present", sourceSafeLabel: "approved-safe-label" },
+    });
+    const adapter = await runControlledModelInvocationAdapter({
+      gate,
+      requestPreparation: preparation,
+      invocationMode: "controlled_provider_fetch",
+      executor: () => ({
+        kind: "completed",
+        response: { content: "safe content", finishReason: "stop" },
+      }),
+    });
+    const runtimeEvents = projectRuntimeEvents({
+      controlledModelInvocations: [adapter],
+    });
+
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped",
+      terminalClassification: "stopped",
+      terminalReason: "waiting_for_input",
+      runtimeEvents,
+    });
+
+    const section = viewModel?.sections.find((candidate) =>
+      candidate.title === "Controlled invocation"
+    );
+    expect(section).toMatchObject({
+      kind: "provider",
+      status: "observed",
+      severity: "not_proven",
+    });
+    expect(section?.summary).toContain("fallbackAttempted=false");
+    expect(section?.summary).toContain("handoff=completed");
     expect(viewModel?.terminalSuccessClaim).toBe(false);
     expect(JSON.stringify(viewModel)).not.toContain('"success":true');
   });

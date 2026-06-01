@@ -168,6 +168,14 @@ describe("agent loop contract", () => {
       attemptStatus: "blocked",
       terminalSuccessClaim: false,
     });
+    expect(turn?.nextTurn.controlledInvocation).toMatchObject({
+      attemptDecision: "blocked",
+      outcome: {
+        status: "blocked",
+        terminalSuccessClaim: false,
+      },
+      terminalSuccessClaim: false,
+    });
     expect(turn?.nextTurn.pendingFacts).toEqual([
       "turn:1",
       "model-response:stop",
@@ -188,6 +196,7 @@ describe("agent loop contract", () => {
 
   it("does not execute a prepared next turn by default", async () => {
     let modelCalls = 0;
+    let controlledCalls = 0;
     const loop = await runAgentLoopContract({
       sessionId: "sess-loop-default-next-turn",
       workspaceRoot: "/workspace",
@@ -209,9 +218,14 @@ describe("agent loop contract", () => {
         success: true,
         content: "safe tool summary",
       }),
+      controlledModelInvocationExecutor: () => {
+        controlledCalls += 1;
+        return { kind: "completed", response: { content: "safe" } };
+      },
     });
 
     expect(modelCalls).toBe(1);
+    expect(controlledCalls).toBe(0);
     expect(loop.stopReason).toBe("next-turn-waiting");
     expect(loop.turns).toHaveLength(1);
     expect(loop.turns[0]?.nextTurn.bundle?.deliveryStatus).toBe("waiting");

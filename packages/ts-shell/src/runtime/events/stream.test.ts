@@ -338,6 +338,42 @@ describe("JSON runtime event stream projection", () => {
     );
   });
 
+  it("serializes controlled invocation observations without success claims", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [
+        {
+          id: "event-controlled-invocation",
+          sequence: 1,
+          type: "provider-response-handoff-prepared",
+          facts: {
+            responseHandoffId: "handoff-a",
+            responseClassification: "completed",
+            toolCallExtractionReadiness: "ready",
+            raw:
+              "provider.env=/home/wang/.private-agents-real/provider.env raw provider output hidden reasoning token=secret oldText=before newText=after",
+            terminalSuccessClaim: false,
+          },
+          notProvenClaims: [
+            "response-handoff-is-not-final-assistant-success",
+            "tool-extraction-readiness-is-not-tool-execution",
+          ],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+      ],
+    });
+    const serialized = serializeJsonRuntimeEventStream(stream);
+
+    expect(stream[0]?.eventType).toBe("provider-response-handoff-prepared");
+    expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
+    expect(stream[0]?.notProvenClaims).toContain("terminal-success");
+    expect(serialized).not.toMatch(
+      /private-agents-real|raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+    );
+  });
+
   it("serializes PL007 verification and repair observations without success claims", () => {
     const stream = projectJsonRuntimeEventStream({
       events: [

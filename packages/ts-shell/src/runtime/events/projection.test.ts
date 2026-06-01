@@ -26,6 +26,10 @@ import { runProviderStreamAdapter } from "../loop/providerStreamAdapter.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/response/boundary.js";
 import {
+  projectProviderRegistry,
+  unknownProviderCompatibilityFlags,
+} from "../../provider/registry/provider.js";
+import {
   createModelRequestBoundary,
   prepareNextTurnModelRequest,
 } from "../../provider/request/boundary.js";
@@ -33,6 +37,7 @@ import {
   createModelInvocationAttemptEnvelope,
   createModelInvocationGate,
 } from "../../provider/request/invocation.js";
+import { runControlledModelInvocationAdapter } from "../../provider/request/attempt.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy } from "../../turn/deliveryPolicy.js";
 import { projectFollowUpQueue } from "../../turn/followUpQueue.js";
@@ -264,6 +269,75 @@ describe("runtime event projection", () => {
     ]);
     expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
     expect(JSON.stringify(events)).toContain('"attemptStatus":"blocked"');
+    expect(JSON.stringify(events)).not.toMatch(/provider\.env|raw provider output|hidden reasoning/i);
+  });
+
+  it("projects controlled invocation attempt and response handoff facts as observation-only", async () => {
+    const registry = providerRegistry();
+    const request = createModelRequestBoundary({
+      requestId: "request-controlled-events",
+      providerId: "provider-a",
+      providerSafeLabel: "Provider A",
+      modelSafeLabel: "Model A",
+      providerReadinessStatus: "ready",
+      providerRegistry: registry,
+    });
+    const preparation = prepareNextTurnModelRequest({
+      nextTurnBundle: prepareNextTurnBundle({
+        bundleId: "bundle-controlled-events",
+        turnId: "turn-controlled-events",
+        toolResultMessages: {
+          batchId: "messages-controlled-events",
+          dispatchPlanId: "plan-controlled-events",
+          messages: [{
+            messageId: "message-controlled-events",
+            role: "tool",
+            toolCallId: "call-controlled-events",
+            toolName: "read",
+            safeContentSummary: "safe summary",
+            category: "executed_tool_fact",
+            deliveryStatus: "prepared",
+            redactionStatus: "report-safe",
+            notProvenClaims: [],
+            terminalSuccessClaim: false,
+          }],
+          preparedCount: 1,
+          blockedCount: 0,
+          terminalSuccessClaim: false,
+          notProvenClaims: [],
+        },
+      }),
+      modelRequestBoundary: request,
+      providerRegistry: registry,
+      providerId: "provider-a",
+      modelId: "model-a",
+    });
+    const gate = createModelInvocationGate({
+      requestPreparation: preparation,
+      explicitOptIn: { state: "present", sourceSafeLabel: "approved-safe-label" },
+    });
+    const adapter = await runControlledModelInvocationAdapter({
+      gate,
+      requestPreparation: preparation,
+      invocationMode: "controlled_provider_fetch",
+      executor: () => ({
+        kind: "completed",
+        response: { content: "safe content", finishReason: "stop" },
+      }),
+    });
+
+    const events = projectRuntimeEvents({
+      controlledModelInvocations: [adapter],
+    });
+
+    expect(events.map((event) => event.type)).toEqual([
+      "controlled-invocation-adapter-observed",
+      "controlled-invocation-attempt-started",
+      "controlled-invocation-attempt-completed-as-provider-fact",
+      "provider-response-handoff-prepared",
+    ]);
+    expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
+    expect(JSON.stringify(events)).toContain('"fallbackAttempted":false');
     expect(JSON.stringify(events)).not.toMatch(/provider\.env|raw provider output|hidden reasoning/i);
   });
 
@@ -1107,3 +1181,34 @@ describe("runtime event projection", () => {
     expect(JSON.stringify(events)).not.toMatch(/provider\.env|hidden reasoning|token=secret/i);
   });
 });
+
+function providerRegistry() {
+  return projectProviderRegistry({
+    providers: [{
+      providerId: "provider-a",
+      safeLabel: "Provider A",
+      providerKind: "custom",
+      endpointClass: "unknown",
+      authMode: "none",
+      defaultEnabled: false,
+      requiresExplicitOptIn: true,
+      supportsFallback: "unknown",
+      compatibility: unknownProviderCompatibilityFlags(),
+      riskLevel: "low",
+    }],
+    models: [{
+      modelId: "model-a",
+      safeLabel: "Model A",
+      providerId: "provider-a",
+      family: "fixture",
+      compatibility: unknownProviderCompatibilityFlags(),
+      knownLimitations: [],
+    }],
+    auth: [{
+      providerId: "provider-a",
+      authSourceKind: "none",
+      authMode: "none",
+      resolutionStatus: "resolved",
+    }],
+  });
+}

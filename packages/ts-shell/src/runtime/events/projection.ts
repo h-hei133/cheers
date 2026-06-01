@@ -16,6 +16,7 @@ import type {
   ModelInvocationAttemptEnvelope,
   ModelInvocationGateFacts,
 } from "../../provider/request/invocation.js";
+import type { ControlledModelInvocationAdapterProjection } from "../../provider/request/attempt.js";
 import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/projection.js";
 import type { PackageInventoryProjection } from "../resources/inventory.js";
@@ -97,6 +98,14 @@ export type RuntimeProjectionEventType =
   | "model-invocation-attempt-observed"
   | "model-invocation-failed-as-provider-fact"
   | "model-invocation-completed-as-provider-fact"
+  | "controlled-invocation-adapter-observed"
+  | "controlled-invocation-attempt-blocked"
+  | "controlled-invocation-attempt-started"
+  | "controlled-invocation-attempt-completed-as-provider-fact"
+  | "controlled-invocation-attempt-failed-as-provider-fact"
+  | "provider-response-handoff-prepared"
+  | "provider-retry-eligible-not-attempted"
+  | "provider-fallback-eligible-not-attempted"
   | "provider-readiness-observed"
   | "provider-fetch-blocked"
   | "provider-fetch-attempted"
@@ -231,6 +240,7 @@ export function projectRuntimeEvents(input: {
   readonly nextTurnRequestPreparations?: readonly NextTurnModelRequestPreparation[];
   readonly modelInvocationGates?: readonly ModelInvocationGateFacts[];
   readonly modelInvocationAttempts?: readonly ModelInvocationAttemptEnvelope[];
+  readonly controlledModelInvocations?: readonly ControlledModelInvocationAdapterProjection[];
   readonly providerResponseStreams?: readonly ProviderResponseStreamProjection[];
   readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjection[];
   readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjection[];
@@ -594,6 +604,132 @@ export function projectRuntimeEvents(input: {
           terminalSuccessClaim: false,
         },
         attempt.notProvenClaims,
+      );
+    }
+  }
+
+  for (const adapter of input.controlledModelInvocations ?? []) {
+    append(
+      "controlled-invocation-adapter-observed",
+      {
+        adapterId: adapter.adapterId,
+        sourceGateId: adapter.sourceGateId,
+        sourcePreparedRequestId: adapter.sourcePreparedRequestId,
+        providerSafeLabel: adapter.providerSafeLabel,
+        modelSafeLabel: adapter.modelSafeLabel,
+        invocationMode: adapter.invocationMode,
+        controlledOptInState: adapter.controlledOptInState,
+        attemptDecision: adapter.attemptDecision,
+        attemptId: adapter.attemptId,
+        blockedReason: adapter.blockedReason,
+        attemptStatus: adapter.outcome.status,
+        failureClass: adapter.outcome.failureClass,
+        retryEligibility: adapter.outcome.retryEligibility,
+        fallbackEligibility: adapter.outcome.fallbackEligibility,
+        fallbackAttempted: adapter.outcome.fallbackAttempted,
+        responseHandoffId: adapter.outcome.responseHandoffId,
+        redactionStatus: adapter.redactionState,
+        terminalSuccessClaim: false,
+      },
+      adapter.notProvenClaims,
+    );
+    if (adapter.attemptDecision === "blocked" || adapter.outcome.status === "blocked") {
+      append(
+        "controlled-invocation-attempt-blocked",
+        {
+          adapterId: adapter.adapterId,
+          attemptId: adapter.attemptId,
+          blockedReason: adapter.blockedReason,
+          failureClass: adapter.outcome.failureClass,
+          terminalSuccessClaim: false,
+        },
+        adapter.notProvenClaims,
+      );
+    }
+    if (adapter.attemptDecision === "execute_via_provider_fetch") {
+      append(
+        "controlled-invocation-attempt-started",
+        {
+          adapterId: adapter.adapterId,
+          attemptId: adapter.attemptId,
+          invocationMode: adapter.invocationMode,
+          terminalSuccessClaim: false,
+        },
+        adapter.notProvenClaims,
+      );
+    }
+    if (adapter.outcome.status === "completed") {
+      append(
+        "controlled-invocation-attempt-completed-as-provider-fact",
+        {
+          adapterId: adapter.adapterId,
+          attemptId: adapter.attemptId,
+          responseHandoffId: adapter.outcome.responseHandoffId,
+          terminalSuccessClaim: false,
+        },
+        adapter.outcome.notProvenClaims,
+      );
+    }
+    if (
+      adapter.outcome.status === "failed" ||
+      adapter.outcome.status === "cancelled" ||
+      adapter.outcome.status === "output_invalid" ||
+      adapter.outcome.status === "output_insufficient" ||
+      adapter.outcome.status === "redaction_failed" ||
+      adapter.outcome.status === "unsupported"
+    ) {
+      append(
+        "controlled-invocation-attempt-failed-as-provider-fact",
+        {
+          adapterId: adapter.adapterId,
+          attemptId: adapter.attemptId,
+          attemptStatus: adapter.outcome.status,
+          failureClass: adapter.outcome.failureClass,
+          terminalSuccessClaim: false,
+        },
+        adapter.outcome.notProvenClaims,
+      );
+    }
+    if (adapter.responseHandoff) {
+      append(
+        "provider-response-handoff-prepared",
+        {
+          responseHandoffId: adapter.responseHandoff.responseHandoffId,
+          sourceAttemptId: adapter.responseHandoff.sourceAttemptId,
+          responseClassification: adapter.responseHandoff.responseClassification,
+          assistantContentAvailability: adapter.responseHandoff.assistantContentAvailability,
+          toolCallExtractionReadiness: adapter.responseHandoff.toolCallExtractionReadiness,
+          modelResponseBoundaryId: adapter.responseHandoff.modelResponseBoundaryId,
+          redactionStatus: adapter.responseHandoff.redactionStatus,
+          rawOutputExcluded: adapter.responseHandoff.rawOutputExcluded,
+          terminalSuccessClaim: false,
+        },
+        adapter.responseHandoff.notProvenClaims,
+      );
+    }
+    if (adapter.outcome.retryEligibility === "retry_eligible") {
+      append(
+        "provider-retry-eligible-not-attempted",
+        {
+          adapterId: adapter.adapterId,
+          attemptId: adapter.attemptId,
+          retryEligibility: adapter.outcome.retryEligibility,
+          terminalSuccessClaim: false,
+        },
+        adapter.outcome.notProvenClaims,
+      );
+    }
+    if (adapter.outcome.fallbackEligibility === "fallback_eligible") {
+      append(
+        "provider-fallback-eligible-not-attempted",
+        {
+          adapterId: adapter.adapterId,
+          attemptId: adapter.attemptId,
+          fallbackEligibility: adapter.outcome.fallbackEligibility,
+          fallbackAttempted: adapter.outcome.fallbackAttempted,
+          terminalSuccessClaim: false,
+        },
+        adapter.outcome.notProvenClaims,
       );
     }
   }

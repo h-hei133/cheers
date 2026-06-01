@@ -152,6 +152,7 @@ export function projectProductSurfaceViewModel(
     ...toolOutcomeEventSections(input),
     ...requestPreparationEventSections(input),
     ...modelInvocationEventSections(input),
+    ...controlledInvocationEventSections(input),
     ...eventSections(input),
     section({
       kind: "verdict",
@@ -291,6 +292,80 @@ function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSec
 
 function factValue(value: unknown): string {
   return safeText(String(value ?? "not-observed"), 120);
+}
+
+function controlledInvocationEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const events = input.runtimeEvents ?? [];
+  const adapter = events.find((event) => event.type === "controlled-invocation-adapter-observed");
+  if (!adapter) {
+    return [];
+  }
+  const blocked = events.find((event) => event.type === "controlled-invocation-attempt-blocked");
+  const failed = events.find((event) =>
+    event.type === "controlled-invocation-attempt-failed-as-provider-fact"
+  );
+  const completed = events.find((event) =>
+    event.type === "controlled-invocation-attempt-completed-as-provider-fact"
+  );
+  const handoff = events.find((event) => event.type === "provider-response-handoff-prepared");
+
+  return [section({
+    kind: "provider",
+    title: "Controlled invocation",
+    severity: failed ? "error" : blocked ? "blocked" : completed ? "not_proven" : "info",
+    status: failed ? "failed" : blocked ? "blocked" : "observed",
+    summary: [
+      `decision=${factValue(adapter.facts.attemptDecision)}`,
+      `attempt=${factValue(adapter.facts.attemptStatus)}`,
+      `provider=${factValue(adapter.facts.providerSafeLabel)}`,
+      `model=${factValue(adapter.facts.modelSafeLabel)}`,
+      `fallbackAttempted=${factValue(adapter.facts.fallbackAttempted)}`,
+      handoff ? `handoff=${factValue(handoff.facts.responseClassification)}` : undefined,
+      `failure=${factValue(adapter.facts.failureClass)}`,
+      `retry=${factValue(adapter.facts.retryEligibility)}`,
+      `fallback=${factValue(adapter.facts.fallbackEligibility)}`,
+      "terminalSuccessClaim=false",
+    ].filter(Boolean).join("; "),
+    facts: [
+      {
+        label: "adapterId",
+        value: factValue(adapter.facts.adapterId),
+        machineEventCorrelationId: adapter.id,
+      },
+      {
+        label: "requiredUserAction",
+        value: blocked ? factValue(adapter.facts.blockedReason) : "review provider outcome facts",
+        machineEventCorrelationId: adapter.id,
+      },
+      ...(handoff
+        ? [
+            {
+              label: "responseHandoff",
+              value: factValue(handoff.facts.responseHandoffId),
+              machineEventCorrelationId: handoff.id,
+            },
+            {
+              label: "toolExtraction",
+              value: factValue(handoff.facts.toolCallExtractionReadiness),
+              machineEventCorrelationId: handoff.id,
+            },
+          ]
+        : []),
+    ],
+    redaction: adapter.redaction.status === "redacted" || handoff?.redaction.status === "redacted"
+      ? "applied"
+      : "none",
+    machineEventCorrelationIds: [adapter.id, blocked?.id, failed?.id, completed?.id, handoff?.id]
+      .filter((id): id is string => Boolean(id)),
+    notProvenClaims: events
+      .filter((event) =>
+        event.type === "controlled-invocation-adapter-observed" ||
+        event.type === "controlled-invocation-attempt-completed-as-provider-fact" ||
+        event.type === "controlled-invocation-attempt-failed-as-provider-fact" ||
+        event.type === "provider-response-handoff-prepared"
+      )
+      .flatMap((event) => event.notProvenClaims),
+  })];
 }
 
 function modelInvocationEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {

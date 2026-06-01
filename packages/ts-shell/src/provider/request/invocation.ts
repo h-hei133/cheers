@@ -29,7 +29,8 @@ export type ModelInvocationAttemptStatus =
 
 export type ModelInvocationMode =
   | "metadata_only"
-  | "explicit_invocation";
+  | "explicit_invocation"
+  | "controlled_provider_fetch";
 
 export type ModelInvocationRetryEligibility =
   | "retry_metadata_unavailable"
