@@ -1287,3 +1287,94 @@ Stale strings updated:
 ### Recommended Next Step
 
 Review `tools/registry.ts` and its remaining test import as the next bounded compatibility cleanup.
+
+## Tools Registry Entry Trim
+
+Status: structure-only cleanup for the remaining tools registry old entry. Product behavior was preserved. No tool execution semantics, tool authority, command allowlists, provider configuration, provider calls, fallback behavior, edit/apply/write approval behavior, verification execution, repair execution, result truthfulness, session schema, CLI behavior, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+Initial status:
+
+- `git status --short --branch` reported `## main...origin/main`.
+- No pre-edit push was attempted because the branch was not ahead.
+- The worktree was clean before editing.
+
+Inspection summary:
+
+- Latest pressure report, `tools/registry.ts`, concrete tools owner files under `tools` and `core/tools`, the importing test, package metadata, documented public entry references, old tools entry imports and string mentions, direct file counts, and long basenames were inspected.
+- Serena targeted inspection confirmed `tools/registry.ts` had no symbol body and only re-exported `createCoreToolRegistry` from `core/tools/registry.ts` under an old name.
+- Serena targeted inspection confirmed `core/tools/registry.ts` owns the real registry symbols.
+- `packages/ts-shell/package.json` exposes `dist`, `src`, and a CLI binary, with no documented package export for `tools/registry.ts`.
+
+### Before Snapshot
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Export-only compatibility files | 83 |
+| Zero-internal-import compatibility files | 82 |
+| Internally imported compatibility files | 1 |
+| `tools` direct files | 11 |
+| `core/tools` direct files | 19 |
+| Tests importing old tools registry path | 1 |
+| Tests outside owner folders for touched owners | 14 |
+| Long basenames in target areas | 0 |
+
+Target internally imported compatibility files before:
+
+| Path | Internal imports | Importer |
+|---|---:|---|
+| `tools/registry.ts` | 1 | `tools/registry-rust-bridge.test.ts` |
+
+### After Snapshot
+
+After measurements:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Export-only compatibility files | 83 | 82 |
+| Zero-internal-import compatibility files | 82 | 82 |
+| Internally imported compatibility files | 1 | 0 |
+| `tools` direct files | 11 | 9 |
+| `core/tools` direct files | 19 | 20 |
+| Tests importing old tools registry path | 1 | 0 |
+| Tests outside owner folders for touched owners | 14 | 14 |
+| Long basenames in target areas | 0 | 0 |
+
+Target internally imported compatibility files after:
+
+| Path | Internal imports | Status |
+|---|---:|---|
+| none | 0 | none remain |
+
+### Compatibility Files Considered
+
+| Path | Status | Internal imports before | Internal imports after | Package-facing status | Reason | Deletion condition |
+|---|---|---:|---:|---|---|---|
+| `tools/registry.ts` | removed | 1 | 0 | no documented package export found | the only internal test now imports `core/tools/registry.ts` directly | already met |
+
+### Files Removed
+
+- `packages/ts-shell/src/tools/registry.ts`
+
+### Files Moved
+
+- `packages/ts-shell/src/tools/registry-rust-bridge.test.ts` moved to `packages/ts-shell/src/core/tools/registry-rust-bridge.test.ts`.
+
+### Tests Moved
+
+- `registry-rust-bridge.test.ts` moved beside the concrete `core/tools` registry owner.
+
+### Imports Updated
+
+- `core/tools/registry-rust-bridge.test.ts` now imports `createCoreToolRegistry` from `core/tools/registry.ts`.
+- `scripts/verify-rust-execution.mjs` now points to `src/core/tools/registry-rust-bridge.test.ts`.
+
+### Remaining Visible Debt
+
+- Root `tools` still has compatibility-style entries for dispatcher, interception, and result split, but they have zero internal imports and were outside this cleanup.
+- No internally imported export-only compatibility files remain under the measured source tree.
+
+### Recommended Next Step
+
+Review zero-internal root `tools` entries only if package-facing safety is explicitly in scope.

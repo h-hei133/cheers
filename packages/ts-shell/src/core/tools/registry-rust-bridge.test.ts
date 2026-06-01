@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { safeRemoveDir } from '../test-utils/cleanup.js'
+import { safeRemoveDir } from '../../test-utils/cleanup.js'
 
 describe('tool registry rust bridge', () => {
   let workspaceRoot = ''
@@ -15,13 +15,13 @@ describe('tool registry rust bridge', () => {
     delete process.env.DAEMON_ENABLED
     await safeRemoveDir(workspaceRoot)
     vi.resetModules()
-    vi.unmock('../daemon/client.js')
+    vi.unmock('../../daemon/client.js')
   })
 
   it('routes bash through the rust daemon when the feature flag is enabled', async () => {
     process.env.DAEMON_ENABLED = '1'
     vi.resetModules()
-    vi.doMock('../daemon/client.js', () => ({
+    vi.doMock('../../daemon/client.js', () => ({
       executeViaRustDaemon: vi.fn().mockResolvedValue({
         status: 'completed',
         exitCode: 0,
@@ -32,8 +32,8 @@ describe('tool registry rust bridge', () => {
       checkRustDaemonAvailability: () => ({ available: true }),
     }))
 
-    const { createMvpToolRegistry } = await import('./registry.js')
-    const registry = createMvpToolRegistry()
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const registry = createCoreToolRegistry()
     const bashTool = registry.get('bash')
     if (!bashTool) {
       throw new Error('bash tool missing from registry')
@@ -58,14 +58,14 @@ describe('tool registry rust bridge', () => {
       stderr: '',
     })
     vi.resetModules()
-    vi.doMock('../daemon/client.js', () => ({
+    vi.doMock('../../daemon/client.js', () => ({
       executeViaRustDaemon: executeViaRustDaemonMock,
       isRustDaemonEnabled: () => true,
       checkRustDaemonAvailability: () => ({ available: true }),
     }))
 
-    const { createMvpToolRegistry } = await import('./registry.js')
-    const registry = createMvpToolRegistry()
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const registry = createCoreToolRegistry()
     const bashTool = registry.get('bash')
     if (!bashTool) {
       throw new Error('bash tool missing from registry')
@@ -87,11 +87,11 @@ describe('tool registry rust bridge', () => {
   it('keeps local TS execution available when the feature flag is disabled', async () => {
     await fs.mkdir(workspaceRoot, { recursive: true })
     process.env.DAEMON_ENABLED = '0'
-    vi.doUnmock('../daemon/client.js')
+    vi.doUnmock('../../daemon/client.js')
     vi.resetModules()
 
-    const { createMvpToolRegistry } = await import('./registry.js')
-    const registry = createMvpToolRegistry()
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const registry = createCoreToolRegistry()
     const bashTool = registry.get('bash')
     if (!bashTool) {
       throw new Error('bash tool missing from registry')
@@ -113,8 +113,9 @@ describe('tool registry rust bridge', () => {
     expect(result.reportSafe?.executionReceipt).toMatchObject({
       executionStatus: 'success',
       errorClass: 'success',
-      outputSummaryRedactionStatus: 'report-safe',
+      outputSummaryRedactionStatus: 'redacted',
     })
+    expect(result.reportSafe?.executionReceipt.notProvenClaims).toContain('terminal-task-success')
     expect(result.reportSafe?.notProvenClaims).toContain('terminal-task-success')
     expect(result.metadata).toMatchObject({ executionPath: 'ts-local' })
     expect(result.metadata?.runtimeReceipt).toMatchObject({
@@ -126,8 +127,8 @@ describe('tool registry rust bridge', () => {
   it('fails closed when rust daemon execution is unavailable', async () => {
     await fs.mkdir(workspaceRoot, { recursive: true })
     process.env.DAEMON_ENABLED = '1'
-    vi.doMock('../daemon/client.js', async () => {
-      const actual = await vi.importActual<typeof import('../daemon/client.js')>('../daemon/client.js')
+    vi.doMock('../../daemon/client.js', async () => {
+      const actual = await vi.importActual<typeof import('../../daemon/client.js')>('../../daemon/client.js')
       return {
         ...actual,
         executeViaRustDaemon: vi.fn().mockRejectedValue(new Error('daemon boot failed')),
@@ -137,8 +138,8 @@ describe('tool registry rust bridge', () => {
     })
     vi.resetModules()
 
-    const { createMvpToolRegistry } = await import('./registry.js')
-    const registry = createMvpToolRegistry()
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const registry = createCoreToolRegistry()
     const bashTool = registry.get('bash')
     if (!bashTool) {
       throw new Error('bash tool missing from registry')
@@ -167,8 +168,8 @@ describe('tool registry rust bridge', () => {
   it('surfaces stable failure metadata when rust-daemon fails closed', async () => {
     await fs.mkdir(workspaceRoot, { recursive: true })
     process.env.DAEMON_ENABLED = '1'
-    vi.doMock('../daemon/client.js', async () => {
-      const actual = await vi.importActual<typeof import('../daemon/client.js')>('../daemon/client.js')
+    vi.doMock('../../daemon/client.js', async () => {
+      const actual = await vi.importActual<typeof import('../../daemon/client.js')>('../../daemon/client.js')
       return {
         ...actual,
         executeViaRustDaemon: vi.fn().mockRejectedValue(new Error('daemon boot failed')),
@@ -178,8 +179,8 @@ describe('tool registry rust bridge', () => {
     })
     vi.resetModules()
 
-    const { createMvpToolRegistry } = await import('./registry.js')
-    const registry = createMvpToolRegistry()
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const registry = createCoreToolRegistry()
     const bashTool = registry.get('bash')
     if (!bashTool) {
       throw new Error('bash tool missing from registry')
@@ -206,7 +207,7 @@ describe('tool registry rust bridge', () => {
   ] as const)('surfaces stable rust-daemon failure metadata for %s results', async ({ status, expectedFailureKind }) => {
     process.env.DAEMON_ENABLED = '1'
     vi.resetModules()
-    vi.doMock('../daemon/client.js', () => ({
+    vi.doMock('../../daemon/client.js', () => ({
       executeViaRustDaemon: vi.fn().mockResolvedValue({
         status,
         exitCode: null,
@@ -218,8 +219,8 @@ describe('tool registry rust bridge', () => {
       checkRustDaemonAvailability: () => ({ available: true }),
     }))
 
-    const { createMvpToolRegistry } = await import('./registry.js')
-    const registry = createMvpToolRegistry()
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const registry = createCoreToolRegistry()
     const bashTool = registry.get('bash')
     if (!bashTool) {
       throw new Error('bash tool missing from registry')
@@ -242,7 +243,7 @@ describe('tool registry rust bridge', () => {
   it('prefers structured failureKind over stderr wording for rust-daemon failures', async () => {
     process.env.DAEMON_ENABLED = '1'
     vi.resetModules()
-    vi.doMock('../daemon/client.js', () => ({
+    vi.doMock('../../daemon/client.js', () => ({
       executeViaRustDaemon: vi.fn().mockResolvedValue({
         status: 'failed',
         exitCode: null,
@@ -254,8 +255,8 @@ describe('tool registry rust bridge', () => {
       checkRustDaemonAvailability: () => ({ available: true }),
     }))
 
-    const { createMvpToolRegistry } = await import('./registry.js')
-    const registry = createMvpToolRegistry()
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const registry = createCoreToolRegistry()
     const bashTool = registry.get('bash')
     if (!bashTool) {
       throw new Error('bash tool missing from registry')
@@ -278,7 +279,7 @@ describe('tool registry rust bridge', () => {
   it('keeps command failure details report-safe without leaking raw output', async () => {
     process.env.DAEMON_ENABLED = '1'
     vi.resetModules()
-    vi.doMock('../daemon/client.js', () => ({
+    vi.doMock('../../daemon/client.js', () => ({
       executeViaRustDaemon: vi.fn().mockResolvedValue({
         status: 'failed',
         exitCode: 7,
@@ -290,8 +291,8 @@ describe('tool registry rust bridge', () => {
       checkRustDaemonAvailability: () => ({ available: true }),
     }))
 
-    const { createMvpToolRegistry } = await import('./registry.js')
-    const registry = createMvpToolRegistry()
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const registry = createCoreToolRegistry()
     const bashTool = registry.get('bash')
     if (!bashTool) {
       throw new Error('bash tool missing from registry')

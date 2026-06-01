@@ -137,7 +137,7 @@ async function runHardGate() {
 
   const checks = []
   checks.push(await runVitestFile('daemon-client-contract-tests', 'src/daemon/client.test.ts'))
-  checks.push(await runVitestFile('registry-rust-bridge-tests', 'src/tools/registry-rust-bridge.test.ts'))
+  checks.push(await runVitestFile('registry-rust-bridge-tests', 'src/core/tools/registry-rust-bridge.test.ts'))
   checks.push(await runVitestFile('daemon-parity-tests', 'src/daemon/parity.test.ts'))
   checks.push(await runCargoTests())
 
