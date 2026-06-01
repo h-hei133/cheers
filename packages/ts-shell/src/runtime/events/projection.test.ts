@@ -7,7 +7,9 @@ import {
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import {
+  createRepairApplyRequest,
   observeRepairApply,
+  observeRepairAuthority,
   observeRepairProposal,
   projectRepairRequiredHandoff,
 } from "../../repair/handoff/boundary.js";
@@ -584,10 +586,30 @@ describe("runtime event projection", () => {
       runtimeReceiptIds: ["receipt-events-repair"],
     });
     const handoff = projectRepairRequiredHandoff({ verification: result });
-    const proposal = observeRepairProposal({ handoff, proposalSource: "fake_default_safe" });
+    const proposal = observeRepairProposal({
+      handoff,
+      proposalSource: "fake_default_safe",
+      readinessStatus: "exact_ready",
+    });
+    const authority = observeRepairAuthority({
+      proposal,
+      authorityDecision: "granted",
+      authoritySource: "explicit_repair_authority",
+    });
+    const request = createRepairApplyRequest({
+      proposal,
+      authority,
+      expectedEditOperationKind: "hunk_set",
+    });
     const apply = observeRepairApply({
       proposal,
-      repairApplyStatus: "applied",
+      authority,
+      request,
+      editApplyObservation: {
+        status: "hunk-set-applied",
+        changedFiles: ["src/app.ts"],
+        evidence: ["edit-owner-receipt:receipt-events-apply"],
+      },
       postRepairVerificationStatus: "not_run",
     });
     const events = projectRuntimeEvents({
@@ -595,6 +617,8 @@ describe("runtime event projection", () => {
       verificationResults: [result],
       repairRequiredHandoffs: [handoff],
       repairProposals: [proposal],
+      repairAuthorities: [authority],
+      repairApplyRequests: [request],
       repairApplyObservations: [apply],
     });
 
@@ -605,6 +629,8 @@ describe("runtime event projection", () => {
       "original-failure-preserved",
       "repair-proposal-observed",
       "repair-authority-required",
+      "repair-authority-observed",
+      "repair-apply-requested",
       "repair-apply-observed",
       "post-repair-verification-observed",
     ]);
@@ -635,6 +661,41 @@ describe("runtime event projection", () => {
             runtimeReceiptIds: ["receipt-events-repair"],
             applyStatus: "not_applied",
             postRepairVerificationStatus: "not_run",
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "repair-authority-observed",
+          facts: expect.objectContaining({
+            proposalId: proposal.proposalId,
+            sourceVerificationId: result.verificationId,
+            authorityDecision: "granted",
+            authoritySource: "explicit_repair_authority",
+            originalFailureClass: "test-failed",
+            runtimeReceiptIds: ["receipt-events-repair"],
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "repair-apply-requested",
+          facts: expect.objectContaining({
+            requestId: request.requestId,
+            expectedEditOperationKind: "hunk_set",
+            applyReadiness: "ready",
+            applyBlocker: "none",
+            postRepairVerificationStatus: "not_run",
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "repair-apply-observed",
+          facts: expect.objectContaining({
+            repairApplyStatus: "applied",
+            authorityState: "granted",
+            applyAttempted: true,
+            applyReceiptIds: ["edit-owner-receipt:receipt-events-apply"],
+            touchedTargetSummaries: ["src/app.ts"],
+            originalFailureClass: "test-failed",
             terminalSuccessClaim: false,
           }),
         }),

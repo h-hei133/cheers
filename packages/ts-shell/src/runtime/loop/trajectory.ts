@@ -557,6 +557,50 @@ export function projectLoopTrajectory(
         [turn.verification.repairProposal.proposalId],
       );
     }
+    if (turn.verification.repairAuthority) {
+      append(
+        "repair-authority",
+        "loop-repair-handoff-observed",
+        {
+          turn: turn.turn,
+          authorityId: turn.verification.repairAuthority.authorityId,
+          proposalId: turn.verification.repairAuthority.proposalId,
+          sourceVerificationId:
+            turn.verification.repairAuthority.sourceVerificationId,
+          authorityRequired: turn.verification.repairAuthority.authorityRequired,
+          authorityDecision: turn.verification.repairAuthority.authorityDecision,
+          authoritySource: turn.verification.repairAuthority.authoritySource,
+          authorityMissingReason:
+            turn.verification.repairAuthority.authorityMissingReason,
+          originalFailureClass:
+            turn.verification.repairAuthority.originalFailureClass,
+          terminalSuccessClaim: false,
+        },
+        turn.verification.repairAuthority.notProvenClaims,
+        [turn.verification.repairAuthority.authorityId],
+      );
+    }
+    if (turn.verification.repairApplyRequest) {
+      append(
+        "repair-apply-request",
+        "loop-repair-handoff-observed",
+        {
+          turn: turn.turn,
+          requestId: turn.verification.repairApplyRequest.requestId,
+          proposalId: turn.verification.repairApplyRequest.proposalId,
+          expectedEditOperationKind:
+            turn.verification.repairApplyRequest.expectedEditOperationKind,
+          authorityState: turn.verification.repairApplyRequest.authorityState,
+          applyReadiness: turn.verification.repairApplyRequest.applyReadiness,
+          applyBlocker: turn.verification.repairApplyRequest.applyBlocker,
+          postRepairVerificationStatus:
+            turn.verification.repairApplyRequest.postRepairVerificationStatus,
+          terminalSuccessClaim: false,
+        },
+        turn.verification.repairApplyRequest.notProvenClaims,
+        [turn.verification.repairApplyRequest.requestId],
+      );
+    }
     if (turn.verification.repairApply) {
       append(
         "repair-apply",
@@ -564,8 +608,21 @@ export function projectLoopTrajectory(
         {
           turn: turn.turn,
           repairApplyId: turn.verification.repairApply.repairApplyId,
+          proposalId: turn.verification.repairApply.proposalId,
+          sourceVerificationId: turn.verification.repairApply.sourceVerificationId,
+          authorityState: turn.verification.repairApply.authorityState,
+          authoritySource: turn.verification.repairApply.authoritySource,
+          applyReadiness: turn.verification.repairApply.applyReadiness,
+          applyBlocker: turn.verification.repairApply.applyBlocker,
+          applyAttempted: turn.verification.repairApply.applyAttempted,
           repairApplyStatus: turn.verification.repairApply.repairApplyStatus,
           repairAuthorityStatus: turn.verification.repairApply.repairAuthorityStatus,
+          applyReceiptIds: turn.verification.repairApply.applyReceiptIds,
+          touchedTargetSummaries:
+            turn.verification.repairApply.touchedTargetSummaries,
+          originalFailureClass: turn.verification.repairApply.originalFailureClass,
+          originalFailurePreserved:
+            turn.verification.repairApply.originalFailurePreserved,
           terminalSuccessClaim: false,
         },
         turn.verification.repairApply.notProvenClaims,

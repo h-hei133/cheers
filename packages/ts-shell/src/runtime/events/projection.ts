@@ -1,7 +1,9 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type {
+  RepairApplyRequestObservation,
   RepairApplyObservation,
+  RepairAuthorityObservation,
   RepairProposalObservation,
   RepairRequiredHandoff,
 } from "../../repair/handoff/boundary.js";
@@ -170,6 +172,8 @@ export type RuntimeProjectionEventType =
   | "repair-required"
   | "repair-proposal-observed"
   | "repair-authority-required"
+  | "repair-authority-observed"
+  | "repair-apply-requested"
   | "repair-apply-observed"
   | "post-repair-verification-observed"
   | "original-failure-preserved"
@@ -244,6 +248,8 @@ export function projectRuntimeEvents(input: {
   readonly verificationResults?: readonly VerificationResultObservation[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
+  readonly repairAuthorities?: readonly RepairAuthorityObservation[];
+  readonly repairApplyRequests?: readonly RepairApplyRequestObservation[];
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
   readonly modelRequestBoundaries?: readonly ModelRequestBoundary[];
   readonly nextTurnRequestPreparations?: readonly NextTurnModelRequestPreparation[];
@@ -1783,14 +1789,82 @@ export function projectRuntimeEvents(input: {
     }
   }
 
+  for (const authority of input.repairAuthorities ?? []) {
+    append(
+      "repair-authority-observed",
+      {
+        authorityId: authority.authorityId,
+        proposalId: authority.proposalId,
+        sourceFailureId: authority.sourceFailureId,
+        sourceVerificationId: authority.sourceVerificationId,
+        authorityRequired: authority.authorityRequired,
+        authorityDecision: authority.authorityDecision,
+        authoritySource: authority.authoritySource,
+        authorityMissingReason: authority.authorityMissingReason,
+        authorityRisk: authority.authorityRisk,
+        originalFailureClass: authority.originalFailureClass,
+        originalFailureSummary: authority.originalFailureSummary,
+        taskRelevanceStatus: authority.taskRelevanceStatus,
+        coverageStatus: authority.coverageStatus,
+        runtimeReceiptIds: authority.runtimeReceiptIds,
+        redactionStatus: authority.redactionStatus,
+        terminalSuccessClaim: authority.terminalSuccessClaim,
+      },
+      authority.notProvenClaims,
+    );
+  }
+
+  for (const request of input.repairApplyRequests ?? []) {
+    append(
+      "repair-apply-requested",
+      {
+        requestId: request.requestId,
+        proposalId: request.proposalId,
+        sourceFailureId: request.sourceFailureId,
+        sourceVerificationId: request.sourceVerificationId,
+        targetSummary: request.targetSummary,
+        expectedEditOperationKind: request.expectedEditOperationKind,
+        authorityState: request.authorityState,
+        authoritySource: request.authoritySource,
+        applyReadiness: request.applyReadiness,
+        applyBlocker: request.applyBlocker,
+        risk: request.risk,
+        originalFailureClass: request.originalFailureClass,
+        originalFailureSummary: request.originalFailureSummary,
+        taskRelevanceStatus: request.taskRelevanceStatus,
+        coverageStatus: request.coverageStatus,
+        runtimeReceiptIds: request.runtimeReceiptIds,
+        postRepairVerificationStatus: request.postRepairVerificationStatus,
+        redactionStatus: request.redactionStatus,
+        terminalSuccessClaim: request.terminalSuccessClaim,
+      },
+      request.notProvenClaims,
+    );
+  }
+
   for (const apply of input.repairApplyObservations ?? []) {
     append(
       "repair-apply-observed",
       {
         repairApplyId: apply.repairApplyId,
         proposalId: apply.proposalId,
+        sourceFailureId: apply.sourceFailureId,
+        sourceVerificationId: apply.sourceVerificationId,
+        targetSummary: apply.targetSummary,
+        authorityState: apply.authorityState,
+        authoritySource: apply.authoritySource,
+        applyReadiness: apply.applyReadiness,
+        applyBlocker: apply.applyBlocker,
+        applyAttempted: apply.applyAttempted,
         repairApplyStatus: apply.repairApplyStatus,
         repairAuthorityStatus: apply.repairAuthorityStatus,
+        applyReceiptIds: apply.applyReceiptIds,
+        touchedTargetSummaries: apply.touchedTargetSummaries,
+        originalFailureClass: apply.originalFailureClass,
+        originalFailureSummary: apply.originalFailureSummary,
+        taskRelevanceStatus: apply.taskRelevanceStatus,
+        coverageStatus: apply.coverageStatus,
+        runtimeReceiptIds: apply.runtimeReceiptIds,
         originalFailurePreserved: apply.originalFailurePreserved,
         redactionStatus: apply.redactionStatus,
         terminalSuccessClaim: apply.terminalSuccessClaim,

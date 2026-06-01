@@ -407,11 +407,39 @@ describe("JSON runtime event stream projection", () => {
             excluded: [],
           },
         },
+        {
+          id: "event-repair-apply",
+          sequence: 2,
+          type: "repair-apply-observed",
+          facts: {
+            repairApplyId: "apply-1",
+            proposalId: "proposal-1",
+            authorityState: "granted",
+            authoritySource: "explicit_repair_authority",
+            applyReadiness: "ready",
+            applyBlocker: "none",
+            applyAttempted: true,
+            repairApplyStatus: "applied",
+            touchedTargetSummaries: ["src/app.ts"],
+            postRepairVerificationStatus: "not_run",
+            terminalSuccessClaim: false,
+          },
+          notProvenClaims: [
+            "repair-success",
+            "apply-applied-is-not-repair-success",
+            "post-repair-verification-not-run-is-not-success",
+          ],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
       ],
     });
     const serialized = JSON.stringify(stream);
 
     expect(stream[0]?.eventType).toBe("repair-proposal-observed");
+    expect(stream[1]?.eventType).toBe("repair-apply-observed");
     expect(stream[0]?.facts).toEqual(
       expect.objectContaining({
         originalFailureClass: "test-failed",
@@ -420,7 +448,15 @@ describe("JSON runtime event stream projection", () => {
         postRepairVerificationStatus: "not_run",
       }),
     );
+    expect(stream[1]?.facts).toEqual(
+      expect.objectContaining({
+        applyAttempted: true,
+        repairApplyStatus: "applied",
+        postRepairVerificationStatus: "not_run",
+      }),
+    );
     expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
+    expect(stream[1]?.truthfulness.terminalSuccessClaim).toBe(false);
     expect(stream[0]?.notProvenClaims).toContain("terminal-success");
     expect(serialized).not.toMatch(
       /raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,

@@ -5,12 +5,40 @@ import {
   projectVerificationIntent,
 } from "../../verification/result/boundary.js";
 import {
+  createRepairApplyRequest,
   observeRepairApply,
+  observeRepairAuthority,
   observeRepairProposal,
   projectRepairRequiredHandoff,
 } from "./boundary.js";
 
 describe("repair loop boundary", () => {
+  function proposalForApply() {
+    const verification = observeVerificationResult({
+      intent: projectVerificationIntent({
+        sourceTurnId: "turn-authority",
+        targetSummary: "verify target",
+        dispatchStatus: "failed",
+        relevanceStatus: "task_relevant",
+        coverageStatus: "covered",
+        authorityRequirement: "granted",
+      }),
+      status: "failed",
+      failureClass: "test-failed",
+      repairEligible: true,
+      runtimeReceiptIds: ["receipt-apply-source"],
+    });
+    const handoff = projectRepairRequiredHandoff({ verification });
+    return observeRepairProposal({
+      handoff,
+      proposalSource: "existing_repair_owner_projection",
+      targetSummary: "src/app.ts",
+      readinessStatus: "exact_ready",
+      applyStatus: "not_applied",
+      postRepairVerificationStatus: "not_run",
+    });
+  }
+
   it("creates repair-required handoff while preserving original failure", () => {
     const verification = observeVerificationResult({
       intent: projectVerificationIntent({
@@ -163,29 +191,125 @@ describe("repair loop boundary", () => {
   });
 
   it("keeps applied repair without post-repair verification as not success", () => {
-    const verification = observeVerificationResult({
-      intent: projectVerificationIntent({
-        sourceTurnId: "turn-apply",
-        targetSummary: "verify target",
-        dispatchStatus: "failed",
-        relevanceStatus: "task_relevant",
-      }),
-      status: "failed",
+    const proposal = proposalForApply();
+    const authority = observeRepairAuthority({
+      proposal,
+      authorityDecision: "granted",
+      authoritySource: "explicit_repair_authority",
     });
-    const handoff = projectRepairRequiredHandoff({ verification });
-    const proposal = observeRepairProposal({ handoff, applyStatus: "not_applied" });
+    const request = createRepairApplyRequest({
+      proposal,
+      authority,
+      expectedEditOperationKind: "hunk_set",
+    });
     const apply = observeRepairApply({
       proposal,
+      authority,
+      request,
       repairApplyStatus: "applied",
-      repairAuthorityStatus: "granted",
+      editApplyObservation: {
+        status: "hunk-set-applied",
+        changedFiles: ["src/app.ts"],
+        evidence: ["edit-owner-receipt:receipt-apply-1"],
+      },
       postRepairVerificationStatus: "not_run",
     });
 
+    expect(authority.authorityDecision).toBe("granted");
+    expect(request.applyReadiness).toBe("ready");
+    expect(request.applyBlocker).toBe("none");
+    expect(request.terminalSuccessClaim).toBe(false);
     expect(apply.repairApplyStatus).toBe("applied");
+    expect(apply.repairAuthorityStatus).toBe("granted");
+    expect(apply.applyAttempted).toBe(true);
+    expect(apply.applyReceiptIds).toEqual(["edit-owner-receipt:receipt-apply-1"]);
+    expect(apply.touchedTargetSummaries).toEqual(["src/app.ts"]);
+    expect(apply.originalFailureClass).toBe("test-failed");
+    expect(apply.sourceVerificationId).toBe(proposal.sourceVerificationId);
     expect(apply.postRepairVerificationStatus).toBe("not_run");
     expect(apply.terminalSuccessClaim).toBe(false);
     expect(apply.notProvenClaims).toContain(
       "repair-apply-without-post-repair-verification-is-not-success",
     );
+  });
+
+  it("keeps authority states and apply requests distinct from apply", () => {
+    const proposal = proposalForApply();
+    const missing = observeRepairAuthority({ proposal });
+    const promptOnly = observeRepairAuthority({
+      proposal,
+      authorityDecision: "granted",
+      authoritySource: "prompt_text_only",
+    });
+    const denied = observeRepairAuthority({
+      proposal,
+      authorityDecision: "denied",
+      authoritySource: "explicit_repair_authority",
+    });
+    const request = createRepairApplyRequest({
+      proposal,
+      authority: missing,
+      expectedEditOperationKind: "single_target",
+    });
+    const apply = observeRepairApply({
+      proposal,
+      authority: missing,
+      request,
+    });
+
+    expect(missing.authorityDecision).toBe("missing");
+    expect(promptOnly.authorityDecision).toBe("blocked");
+    expect(promptOnly.authorityMissingReason).toContain("prompt text");
+    expect(denied.authorityDecision).toBe("denied");
+    expect(request.applyReadiness).toBe("blocked");
+    expect(request.applyBlocker).toBe("authority-missing");
+    expect(request.terminalSuccessClaim).toBe(false);
+    expect(apply.repairApplyStatus).toBe("not_applied");
+    expect(apply.applyAttempted).toBe(false);
+    expect(apply.repairAuthorityStatus).toBe("required");
+    expect(apply.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "authority-requested-is-not-granted",
+        "apply-request-is-not-apply-attempted",
+        "authority-granted-is-not-apply",
+      ]),
+    );
+  });
+
+  it("classifies controlled edit-owner apply observations without proving repair success", () => {
+    const proposal = proposalForApply();
+    const authority = observeRepairAuthority({
+      proposal,
+      authorityDecision: "granted",
+      authoritySource: "edit_owner",
+    });
+    const request = createRepairApplyRequest({ proposal, authority });
+    const blocked = observeRepairApply({
+      proposal,
+      authority,
+      request,
+      editApplyObservation: {
+        status: "unconfirmed-no-write",
+        changedFiles: [],
+        evidence: ["edit-owner:no-write"],
+      },
+    });
+    const failed = observeRepairApply({
+      proposal,
+      authority,
+      request,
+      editApplyObservation: {
+        status: "hunk-set-failed",
+        changedFiles: [],
+        evidence: ["edit-owner-receipt:receipt-failed"],
+      },
+    });
+
+    expect(blocked.repairApplyStatus).toBe("blocked");
+    expect(blocked.applyAttempted).toBe(false);
+    expect(failed.repairApplyStatus).toBe("failed");
+    expect(failed.applyAttempted).toBe(true);
+    expect(failed.terminalSuccessClaim).toBe(false);
+    expect(failed.notProvenClaims).toContain("apply-attempted-is-not-success");
   });
 });

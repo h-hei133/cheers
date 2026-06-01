@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { createCommandToolResultSplit } from "../../tools/result/split.js";
 import {
+  createRepairApplyRequest,
   observeRepairApply,
+  observeRepairAuthority,
   observeRepairProposal,
   projectRepairRequiredHandoff,
 } from "../../repair/handoff/boundary.js";
@@ -270,14 +272,39 @@ describe("agent loop contract", () => {
           handoff: repairRequired,
           proposalSource: "fake_default_safe",
           targetSummary: "proposal only",
+          readinessStatus: "exact_ready",
           applyStatus: "not_applied",
+        });
+        const repairAuthority = observeRepairAuthority({
+          proposal: repairProposal,
+          authorityDecision: "granted",
+          authoritySource: "explicit_repair_authority",
+        });
+        const repairApplyRequest = createRepairApplyRequest({
+          proposal: repairProposal,
+          authority: repairAuthority,
+          expectedEditOperationKind: "hunk_set",
         });
         const repairApply = observeRepairApply({
           proposal: repairProposal,
-          repairApplyStatus: "not_applied",
+          authority: repairAuthority,
+          request: repairApplyRequest,
+          editApplyObservation: {
+            status: "hunk-set-applied",
+            changedFiles: ["src/app.ts"],
+            evidence: ["edit-owner-receipt:receipt-contract-apply"],
+          },
           postRepairVerificationStatus: "not_run",
         });
-        return { intent, result, repairRequired, repairProposal, repairApply };
+        return {
+          intent,
+          result,
+          repairRequired,
+          repairProposal,
+          repairAuthority,
+          repairApplyRequest,
+          repairApply,
+        };
       },
     });
 
@@ -288,6 +315,11 @@ describe("agent loop contract", () => {
     expect(turn?.verification.repairProposal?.terminalSuccessClaim).toBe(false);
     expect(turn?.verification.repairProposal?.applyStatus).toBe("not_applied");
     expect(turn?.verification.repairProposal?.postRepairVerificationStatus).toBe("not_run");
+    expect(turn?.verification.repairAuthority?.authorityDecision).toBe("granted");
+    expect(turn?.verification.repairApplyRequest?.applyReadiness).toBe("ready");
+    expect(turn?.verification.repairApplyRequest?.applyBlocker).toBe("none");
+    expect(turn?.verification.repairApply?.repairApplyStatus).toBe("applied");
+    expect(turn?.verification.repairApply?.applyAttempted).toBe(true);
     expect(turn?.verification.repairApply?.postRepairVerificationStatus).toBe("not_run");
     expect(turn?.savePoint.repairHandoffIds).toEqual([
       turn?.verification.repairRequired?.handoffId,
@@ -301,6 +333,12 @@ describe("agent loop contract", () => {
         "repair-blocker:missing-authority",
         `repair-proposal:${turn?.verification.repairProposal?.proposalId}`,
         "repair-apply:not_applied",
+        `repair-authority:${turn?.verification.repairAuthority?.authorityId}`,
+        "repair-authority-state:granted",
+        `repair-apply-request:${turn?.verification.repairApplyRequest?.requestId}`,
+        "repair-apply-readiness:ready",
+        "repair-apply-status:applied",
+        "repair-apply-attempted:yes",
         "post-repair-verification:not_run",
       ]),
     );
@@ -309,6 +347,7 @@ describe("agent loop contract", () => {
         `repair-required:${turn?.verification.repairRequired?.handoffId}`,
         `original-verification-failure:${turn?.verification.repairRequired?.sourceVerificationId}`,
         `repair-proposal:${turn?.verification.repairProposal?.proposalId}`,
+        `repair-apply-request:${turn?.verification.repairApplyRequest?.requestId}`,
       ]),
     );
     expect(loop.events.map((event) => event.type)).toEqual(
@@ -316,6 +355,8 @@ describe("agent loop contract", () => {
         "verification-result-observed",
         "repair-required",
         "repair-proposal-observed",
+        "repair-authority-observed",
+        "repair-apply-requested",
         "repair-apply-observed",
         "post-repair-verification-observed",
         "original-failure-preserved",

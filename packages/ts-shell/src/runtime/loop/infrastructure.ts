@@ -19,6 +19,8 @@ export type LoopInfrastructureCategory =
   | "verification-result"
   | "repair-handoff"
   | "repair-proposal"
+  | "repair-authority"
+  | "repair-apply-request"
   | "repair-apply"
   | "post-repair-verification"
   | "session-active-path"
@@ -79,6 +81,8 @@ export const LOOP_INFRASTRUCTURE_CATEGORIES = [
   "verification-result",
   "repair-handoff",
   "repair-proposal",
+  "repair-authority",
+  "repair-apply-request",
   "repair-apply",
   "post-repair-verification",
   "session-active-path",
@@ -159,6 +163,12 @@ export function createLoopInfrastructureMap(): LoopInfrastructureMap {
       "repair-success",
     ]),
     entry("repair-proposal", "repair", "repair", "connected", "RepairProposalObservation", [
+      "repair-success",
+    ]),
+    entry("repair-authority", "repair", "repair", "connected", "RepairAuthorityObservation", [
+      "repair-success",
+    ]),
+    entry("repair-apply-request", "repair", "repair", "connected", "RepairApplyRequestObservation", [
       "repair-success",
     ]),
     entry("repair-apply", "repair", "repair", "connected", "RepairApplyObservation", [

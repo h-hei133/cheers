@@ -25,6 +25,9 @@ import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
 import {
+  createRepairApplyRequest,
+  observeRepairApply,
+  observeRepairAuthority,
   observeRepairProposal,
   projectRepairRequiredHandoff,
 } from "../../repair/handoff/boundary.js";
@@ -324,11 +327,40 @@ describe("product surface view model", () => {
         const repairProposal = observeRepairProposal({
           handoff: repairRequired,
           proposalSource: "deterministic_from_failure_evidence",
-          readinessStatus: "partial",
+          readinessStatus: "exact_ready",
           applyStatus: "not_applied",
           postRepairVerificationStatus: "not_run",
         });
-        return { intent, result, repairRequired, repairProposal };
+        const repairAuthority = observeRepairAuthority({
+          proposal: repairProposal,
+          authorityDecision: "granted",
+          authoritySource: "explicit_repair_authority",
+        });
+        const repairApplyRequest = createRepairApplyRequest({
+          proposal: repairProposal,
+          authority: repairAuthority,
+          expectedEditOperationKind: "hunk_set",
+        });
+        const repairApply = observeRepairApply({
+          proposal: repairProposal,
+          authority: repairAuthority,
+          request: repairApplyRequest,
+          editApplyObservation: {
+            status: "hunk-set-applied",
+            changedFiles: ["src/app.ts"],
+            evidence: ["edit-owner-receipt:receipt-surface-apply"],
+          },
+          postRepairVerificationStatus: "not_run",
+        });
+        return {
+          intent,
+          result,
+          repairRequired,
+          repairProposal,
+          repairAuthority,
+          repairApplyRequest,
+          repairApply,
+        };
       },
     });
     const trajectory = projectLoopTrajectory({
@@ -347,8 +379,12 @@ describe("product surface view model", () => {
     expect(rendered).toContain("originalFailure: true");
     expect(rendered).toContain("failureClass: test-failed");
     expect(rendered).toContain("repairBlocker: none");
-    expect(rendered).toContain("proposalReadiness: partial");
-    expect(rendered).toContain("apply: not_applied");
+    expect(rendered).toContain("proposalReadiness: exact_ready");
+    expect(rendered).toContain("authority: granted");
+    expect(rendered).toContain("applyReadiness: ready");
+    expect(rendered).toContain("applyBlocker: none");
+    expect(rendered).toContain("applyAttempted: true");
+    expect(rendered).toContain("apply: applied");
     expect(rendered).toContain("postRepairVerification: not_run");
     expect(rendered).toContain("repairSuccess=not-proven");
     expect(rendered).not.toContain("Outcome: success");

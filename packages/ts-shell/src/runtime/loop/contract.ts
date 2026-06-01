@@ -22,7 +22,9 @@ import {
 import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/response/boundary.js";
 import {
+  type RepairApplyRequestObservation,
   type RepairApplyObservation,
+  type RepairAuthorityObservation,
   type RepairProposalObservation,
   type RepairRequiredHandoff,
 } from "../../repair/handoff/boundary.js";
@@ -187,6 +189,8 @@ export interface AgentLoopContractVerificationProjection {
   readonly result: VerificationResultObservation;
   readonly repairRequired?: RepairRequiredHandoff;
   readonly repairProposal?: RepairProposalObservation;
+  readonly repairAuthority?: RepairAuthorityObservation;
+  readonly repairApplyRequest?: RepairApplyRequestObservation;
   readonly repairApply?: RepairApplyObservation;
 }
 
@@ -788,6 +792,28 @@ export async function runAgentLoopContract(
               `post-repair-verification:${verification.repairProposal.postRepairVerificationStatus}`,
             ]
           : []),
+        ...(verification.repairAuthority
+          ? [
+              `repair-authority:${verification.repairAuthority.authorityId}`,
+              `repair-authority-state:${verification.repairAuthority.authorityDecision}`,
+              `repair-authority-source:${verification.repairAuthority.authoritySource}`,
+            ]
+          : []),
+        ...(verification.repairApplyRequest
+          ? [
+              `repair-apply-request:${verification.repairApplyRequest.requestId}`,
+              `repair-apply-readiness:${verification.repairApplyRequest.applyReadiness}`,
+              `repair-apply-blocker:${verification.repairApplyRequest.applyBlocker}`,
+            ]
+          : []),
+        ...(verification.repairApply
+          ? [
+              `repair-apply-observation:${verification.repairApply.repairApplyId}`,
+              `repair-apply-status:${verification.repairApply.repairApplyStatus}`,
+              `repair-apply-attempted:${verification.repairApply.applyAttempted ? "yes" : "no"}`,
+              `post-repair-verification:${verification.repairApply.postRepairVerificationStatus}`,
+            ]
+          : []),
       ];
       const verificationSavePoint = createEvidenceOnlySavePoint({
         ...savePointInput,
@@ -812,6 +838,8 @@ export async function runAgentLoopContract(
           ...verification.result.notProvenClaims,
           ...(verification.repairRequired?.notProvenClaims ?? []),
           ...(verification.repairProposal?.notProvenClaims ?? []),
+          ...(verification.repairAuthority?.notProvenClaims ?? []),
+          ...(verification.repairApplyRequest?.notProvenClaims ?? []),
           ...(verification.repairApply?.notProvenClaims ?? []),
         ],
       });
@@ -823,6 +851,12 @@ export async function runAgentLoopContract(
           : [],
         repairProposals: verification.repairProposal
           ? [verification.repairProposal]
+          : [],
+        repairAuthorities: verification.repairAuthority
+          ? [verification.repairAuthority]
+          : [],
+        repairApplyRequests: verification.repairApplyRequest
+          ? [verification.repairApplyRequest]
           : [],
         repairApplyObservations: verification.repairApply
           ? [verification.repairApply]

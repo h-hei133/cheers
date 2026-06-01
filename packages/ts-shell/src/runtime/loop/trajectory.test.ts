@@ -7,7 +7,9 @@ import {
   unknownProviderCompatibilityFlags,
 } from "../../provider/registry/provider.js";
 import {
+  createRepairApplyRequest,
   observeRepairApply,
+  observeRepairAuthority,
   observeRepairProposal,
   projectRepairRequiredHandoff,
 } from "../../repair/handoff/boundary.js";
@@ -316,13 +318,40 @@ describe("loop trajectory projection", () => {
           runtimeReceiptIds: ["receipt-trajectory-repair"],
         });
         const repairRequired = projectRepairRequiredHandoff({ verification: result });
-        const repairProposal = observeRepairProposal({ handoff: repairRequired });
+        const repairProposal = observeRepairProposal({
+          handoff: repairRequired,
+          readinessStatus: "exact_ready",
+        });
+        const repairAuthority = observeRepairAuthority({
+          proposal: repairProposal,
+          authorityDecision: "granted",
+          authoritySource: "explicit_repair_authority",
+        });
+        const repairApplyRequest = createRepairApplyRequest({
+          proposal: repairProposal,
+          authority: repairAuthority,
+          expectedEditOperationKind: "hunk_set",
+        });
         const repairApply = observeRepairApply({
           proposal: repairProposal,
-          repairApplyStatus: "applied",
+          authority: repairAuthority,
+          request: repairApplyRequest,
+          editApplyObservation: {
+            status: "hunk-set-applied",
+            changedFiles: ["src/app.ts"],
+            evidence: ["edit-owner-receipt:receipt-trajectory-apply"],
+          },
           postRepairVerificationStatus: "not_run",
         });
-        return { intent, result, repairRequired, repairProposal, repairApply };
+        return {
+          intent,
+          result,
+          repairRequired,
+          repairProposal,
+          repairAuthority,
+          repairApplyRequest,
+          repairApply,
+        };
       },
     });
     const trajectory = projectLoopTrajectory({
@@ -359,6 +388,36 @@ describe("loop trajectory projection", () => {
             postRepairVerificationStatus: "not_run",
             originalFailureClass: "test-failed",
             runtimeReceiptIds: ["receipt-trajectory-repair"],
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "loop-repair-handoff-observed",
+          facts: expect.objectContaining({
+            authorityDecision: "granted",
+            authoritySource: "explicit_repair_authority",
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "loop-repair-handoff-observed",
+          facts: expect.objectContaining({
+            expectedEditOperationKind: "hunk_set",
+            applyReadiness: "ready",
+            applyBlocker: "none",
+            postRepairVerificationStatus: "not_run",
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "loop-repair-handoff-observed",
+          facts: expect.objectContaining({
+            repairApplyStatus: "applied",
+            applyAttempted: true,
+            applyReceiptIds: ["edit-owner-receipt:receipt-trajectory-apply"],
+            touchedTargetSummaries: ["src/app.ts"],
+            originalFailureClass: "test-failed",
+            originalFailurePreserved: true,
             terminalSuccessClaim: false,
           }),
         }),

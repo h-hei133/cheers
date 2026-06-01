@@ -45,6 +45,39 @@ export type RepairBlocker =
 
 export type RepairRisk = "low" | "medium" | "high" | "unknown";
 
+export type RepairAuthorityDecision =
+  | "required"
+  | "missing"
+  | "granted"
+  | "denied"
+  | "blocked"
+  | "not_proven";
+
+export type RepairAuthoritySource =
+  | "explicit_repair_authority"
+  | "edit_owner"
+  | "prompt_text_only"
+  | "none"
+  | "unknown";
+
+export type RepairApplyReadiness = "ready" | "blocked" | "not_ready" | "not_proven";
+
+export type RepairApplyBlocker =
+  | "none"
+  | "authority-missing"
+  | "authority-denied"
+  | "authority-blocked"
+  | "proposal-not-ready"
+  | "proposal-unsupported"
+  | "edit-owner-not-supplied"
+  | "not-proven";
+
+export type RepairExpectedEditOperationKind =
+  | "single_target"
+  | "target_set"
+  | "hunk_set"
+  | "unknown";
+
 export interface RepairRequiredHandoff {
   readonly handoffId: string;
   readonly sourceVerificationId: string;
@@ -87,16 +120,81 @@ export interface RepairProposalObservation {
   readonly terminalSuccessClaim: false;
 }
 
+export interface RepairAuthorityObservation {
+  readonly authorityId: string;
+  readonly proposalId: string;
+  readonly sourceFailureId: string;
+  readonly sourceVerificationId: string;
+  readonly authorityRequired: boolean;
+  readonly authorityDecision: RepairAuthorityDecision;
+  readonly authoritySource: RepairAuthoritySource;
+  readonly authorityMissingReason: string;
+  readonly authorityRisk: RepairRisk;
+  readonly originalFailureClass: string;
+  readonly originalFailureSummary: string;
+  readonly taskRelevanceStatus: RepairProposalObservation["taskRelevanceStatus"];
+  readonly coverageStatus: RepairProposalObservation["coverageStatus"];
+  readonly runtimeReceiptIds: readonly string[];
+  readonly redactionStatus: "report-safe" | "redacted";
+  readonly notProvenClaims: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
+export interface RepairApplyRequestObservation {
+  readonly requestId: string;
+  readonly proposalId: string;
+  readonly sourceFailureId: string;
+  readonly sourceVerificationId: string;
+  readonly targetSummary: string;
+  readonly expectedEditOperationKind: RepairExpectedEditOperationKind;
+  readonly authorityState: RepairAuthorityDecision;
+  readonly authoritySource: RepairAuthoritySource;
+  readonly applyReadiness: RepairApplyReadiness;
+  readonly applyBlocker: RepairApplyBlocker;
+  readonly risk: RepairRisk;
+  readonly originalFailureClass: string;
+  readonly originalFailureSummary: string;
+  readonly taskRelevanceStatus: RepairProposalObservation["taskRelevanceStatus"];
+  readonly coverageStatus: RepairProposalObservation["coverageStatus"];
+  readonly runtimeReceiptIds: readonly string[];
+  readonly postRepairVerificationStatus: "not_run";
+  readonly redactionStatus: "report-safe" | "redacted";
+  readonly notProvenClaims: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
 export interface RepairApplyObservation {
   readonly repairApplyId: string;
   readonly proposalId: string;
+  readonly sourceFailureId: string;
+  readonly sourceVerificationId: string;
+  readonly targetSummary: string;
+  readonly authorityState: RepairAuthorityDecision;
+  readonly authoritySource: RepairAuthoritySource;
+  readonly applyReadiness: RepairApplyReadiness;
+  readonly applyBlocker: RepairApplyBlocker;
+  readonly applyAttempted: boolean;
   readonly repairApplyStatus: RepairApplyObservationStatus;
   readonly repairAuthorityStatus: "required" | "granted" | "denied" | "not_required" | "unknown";
+  readonly applyReceiptIds: readonly string[];
+  readonly touchedTargetSummaries: readonly string[];
   readonly postRepairVerificationStatus: PostRepairVerificationObservationStatus;
+  readonly originalFailureClass: string;
+  readonly originalFailureSummary: string;
+  readonly taskRelevanceStatus: RepairProposalObservation["taskRelevanceStatus"];
+  readonly coverageStatus: RepairProposalObservation["coverageStatus"];
+  readonly runtimeReceiptIds: readonly string[];
   readonly originalFailurePreserved: true;
   readonly redactionStatus: "report-safe" | "redacted";
   readonly notProvenClaims: readonly string[];
   readonly terminalSuccessClaim: false;
+}
+
+export interface EditOwnerApplyObservationInput {
+  readonly status: string;
+  readonly changedFiles?: readonly string[];
+  readonly evidence?: readonly string[];
+  readonly transcriptSummary?: string;
 }
 
 export function projectRepairRequiredHandoff(input: {
@@ -208,6 +306,119 @@ export function observeRepairProposal(input: {
   });
 }
 
+export function observeRepairAuthority(input: {
+  readonly proposal: RepairProposalObservation;
+  readonly authorityDecision?: RepairAuthorityDecision;
+  readonly authoritySource?: RepairAuthoritySource;
+  readonly authorityMissingReason?: string;
+  readonly authorityRisk?: RepairRisk;
+  readonly notProvenClaims?: readonly string[];
+}): RepairAuthorityObservation {
+  const redactions = new Set<string>();
+  const authoritySource = input.authoritySource ?? "none";
+  const authorityDecision = normalizeAuthorityDecision({
+    required: input.proposal.authorityRequirement === "required",
+    decision: input.authorityDecision,
+    source: authoritySource,
+  });
+  return freeze({
+    authorityId: sanitizeId(`${input.proposal.proposalId}:authority`, redactions),
+    proposalId: sanitizeText(input.proposal.proposalId, redactions, 180),
+    sourceFailureId: sanitizeText(input.proposal.sourceFailureId, redactions, 180),
+    sourceVerificationId: sanitizeText(input.proposal.sourceVerificationId, redactions, 180),
+    authorityRequired: input.proposal.authorityRequirement === "required",
+    authorityDecision,
+    authoritySource,
+    authorityMissingReason: sanitizeText(
+      input.authorityMissingReason ??
+        authorityMissingReason(authorityDecision, authoritySource),
+      redactions,
+      180,
+    ),
+    authorityRisk: input.authorityRisk ?? input.proposal.proposalRisk,
+    originalFailureClass: sanitizeText(input.proposal.originalFailureClass, redactions, 120),
+    originalFailureSummary: sanitizeText(input.proposal.originalFailureSummary, redactions, 180),
+    taskRelevanceStatus: input.proposal.taskRelevanceStatus,
+    coverageStatus: input.proposal.coverageStatus,
+    runtimeReceiptIds: input.proposal.runtimeReceiptIds.map((id) =>
+      sanitizeText(id, redactions, 180)
+    ),
+    redactionStatus:
+      redactions.size > 0 || input.proposal.redactionStatus === "redacted"
+        ? "redacted"
+        : "report-safe",
+    notProvenClaims: unique([
+      "terminal-success",
+      "task-success",
+      "repair-success",
+      "repair-authority-is-not-apply",
+      "authority-requested-is-not-granted",
+      "authority-granted-is-not-apply",
+      "prompt-text-alone-is-not-repair-authority",
+      "original-failure-preserved",
+      ...(input.proposal.notProvenClaims ?? []),
+      ...(input.notProvenClaims ?? []),
+    ], redactions),
+    terminalSuccessClaim: false,
+  });
+}
+
+export function createRepairApplyRequest(input: {
+  readonly proposal: RepairProposalObservation;
+  readonly authority: RepairAuthorityObservation;
+  readonly expectedEditOperationKind?: RepairExpectedEditOperationKind;
+  readonly applyReadiness?: RepairApplyReadiness;
+  readonly applyBlocker?: RepairApplyBlocker;
+  readonly risk?: RepairRisk;
+  readonly notProvenClaims?: readonly string[];
+}): RepairApplyRequestObservation {
+  const redactions = new Set<string>();
+  const applyBlocker = input.applyBlocker ??
+    applyBlockerFromProposalAndAuthority(input.proposal, input.authority);
+  return freeze({
+    requestId: sanitizeId(`${input.proposal.proposalId}:apply-request`, redactions),
+    proposalId: sanitizeText(input.proposal.proposalId, redactions, 180),
+    sourceFailureId: sanitizeText(input.proposal.sourceFailureId, redactions, 180),
+    sourceVerificationId: sanitizeText(input.proposal.sourceVerificationId, redactions, 180),
+    targetSummary: sanitizeText(input.proposal.targetSummary, redactions, 180),
+    expectedEditOperationKind: input.expectedEditOperationKind ?? "unknown",
+    authorityState: input.authority.authorityDecision,
+    authoritySource: input.authority.authoritySource,
+    applyReadiness: input.applyReadiness ??
+      (applyBlocker === "none" ? "ready" : "blocked"),
+    applyBlocker,
+    risk: input.risk ?? input.proposal.proposalRisk,
+    originalFailureClass: sanitizeText(input.proposal.originalFailureClass, redactions, 120),
+    originalFailureSummary: sanitizeText(input.proposal.originalFailureSummary, redactions, 180),
+    taskRelevanceStatus: input.proposal.taskRelevanceStatus,
+    coverageStatus: input.proposal.coverageStatus,
+    runtimeReceiptIds: input.proposal.runtimeReceiptIds.map((id) =>
+      sanitizeText(id, redactions, 180)
+    ),
+    postRepairVerificationStatus: "not_run",
+    redactionStatus:
+      redactions.size > 0 ||
+        input.proposal.redactionStatus === "redacted" ||
+        input.authority.redactionStatus === "redacted"
+        ? "redacted"
+        : "report-safe",
+    notProvenClaims: unique([
+      "terminal-success",
+      "task-success",
+      "repair-success",
+      "apply-request-is-not-apply-attempted",
+      "authority-granted-is-not-apply",
+      "repair-proposal-is-not-apply",
+      "post-repair-verification-not-run-is-not-success",
+      "original-failure-preserved",
+      ...(input.proposal.notProvenClaims ?? []),
+      ...(input.authority.notProvenClaims ?? []),
+      ...(input.notProvenClaims ?? []),
+    ], redactions),
+    terminalSuccessClaim: false,
+  });
+}
+
 function repairBlockerFromVerification(
   verification: VerificationResultObservation,
 ): RepairBlocker {
@@ -279,24 +490,60 @@ function repairRiskFromVerification(
 
 export function observeRepairApply(input: {
   readonly proposal: RepairProposalObservation;
+  readonly authority?: RepairAuthorityObservation;
+  readonly request?: RepairApplyRequestObservation;
   readonly repairApplyStatus?: RepairApplyObservationStatus;
   readonly repairAuthorityStatus?: RepairApplyObservation["repairAuthorityStatus"];
+  readonly applyReceiptIds?: readonly string[];
+  readonly touchedTargetSummaries?: readonly string[];
   readonly postRepairVerificationStatus?: PostRepairVerificationObservationStatus;
+  readonly editApplyObservation?: EditOwnerApplyObservationInput;
   readonly repairIteration?: ProductRepairIterationProjection;
   readonly notProvenClaims?: readonly string[];
 }): RepairApplyObservation {
   const redactions = new Set<string>();
   const repairApplyStatus = input.repairApplyStatus ??
+    applyStatusFromEditOwner(input.editApplyObservation) ??
     applyStatusFromIteration(input.repairIteration);
   const postRepairVerificationStatus = input.postRepairVerificationStatus ??
     postRepairStatusFromIteration(input.repairIteration);
+  const authorityState = input.request?.authorityState ??
+    input.authority?.authorityDecision ??
+    "not_proven";
+  const applyBlocker = input.request?.applyBlocker ??
+    applyBlockerFromAuthorityDecision(authorityState);
+  const touchedTargetSummaries = input.touchedTargetSummaries ??
+    input.editApplyObservation?.changedFiles ??
+    input.repairIteration?.changedFiles ??
+    [];
   return freeze({
     repairApplyId: sanitizeId(`${input.proposal.proposalId}:apply`, redactions),
     proposalId: sanitizeText(input.proposal.proposalId, redactions, 180),
+    sourceFailureId: sanitizeText(input.proposal.sourceFailureId, redactions, 180),
+    sourceVerificationId: sanitizeText(input.proposal.sourceVerificationId, redactions, 180),
+    targetSummary: sanitizeText(input.request?.targetSummary ?? input.proposal.targetSummary, redactions, 180),
+    authorityState,
+    authoritySource: input.request?.authoritySource ?? input.authority?.authoritySource ?? "unknown",
+    applyReadiness: input.request?.applyReadiness ??
+      (repairApplyStatus === "not_applied" ? "not_ready" : "not_proven"),
+    applyBlocker,
+    applyAttempted: repairApplyStatus === "applied" || repairApplyStatus === "failed",
     repairApplyStatus,
     repairAuthorityStatus: input.repairAuthorityStatus ??
-      (repairApplyStatus === "authority_required" ? "required" : "unknown"),
+      repairAuthorityStatusFromAuthority(authorityState, repairApplyStatus),
+    applyReceiptIds: (input.applyReceiptIds ?? receiptIdsFromEditOwner(input.editApplyObservation))
+      .map((id) => sanitizeText(id, redactions, 180)),
+    touchedTargetSummaries: touchedTargetSummaries.map((target) =>
+      sanitizeText(target, redactions, 180)
+    ),
     postRepairVerificationStatus,
+    originalFailureClass: sanitizeText(input.proposal.originalFailureClass, redactions, 120),
+    originalFailureSummary: sanitizeText(input.proposal.originalFailureSummary, redactions, 180),
+    taskRelevanceStatus: input.proposal.taskRelevanceStatus,
+    coverageStatus: input.proposal.coverageStatus,
+    runtimeReceiptIds: input.proposal.runtimeReceiptIds.map((id) =>
+      sanitizeText(id, redactions, 180)
+    ),
     originalFailurePreserved: true,
     redactionStatus:
       redactions.size > 0 || input.proposal.redactionStatus === "redacted"
@@ -307,13 +554,114 @@ export function observeRepairApply(input: {
       "task-success",
       "repair-success",
       "verification-success",
+      "repair-proposal-is-not-apply",
+      "authority-requested-is-not-granted",
+      "authority-granted-is-not-apply",
+      "apply-request-is-not-apply-attempted",
+      "apply-attempted-is-not-success",
+      "apply-applied-is-not-repair-success",
+      "readback-is-not-post-repair-verification",
       "repair-apply-without-post-repair-verification-is-not-success",
       "post-repair-verification-observed-is-not-terminal-success",
+      "post-repair-verification-not-run-is-not-success",
+      "original-failure-preserved",
+      ...(input.authority?.notProvenClaims ?? []),
+      ...(input.request?.notProvenClaims ?? []),
+      ...(input.editApplyObservation?.evidence ?? []),
       ...(input.repairIteration?.notProvenClaims ?? []),
       ...(input.notProvenClaims ?? []),
     ], redactions),
     terminalSuccessClaim: false,
   });
+}
+
+function normalizeAuthorityDecision(input: {
+  readonly required: boolean;
+  readonly decision?: RepairAuthorityDecision;
+  readonly source: RepairAuthoritySource;
+}): RepairAuthorityDecision {
+  if (input.source === "prompt_text_only" && input.decision === "granted") {
+    return "blocked";
+  }
+  if (input.decision) return input.decision;
+  if (input.required) return "missing";
+  return "not_proven";
+}
+
+function authorityMissingReason(
+  decision: RepairAuthorityDecision,
+  source: RepairAuthoritySource,
+): string {
+  if (source === "prompt_text_only") return "prompt text alone is not repair authority";
+  if (decision === "missing") return "explicit repair authority is missing";
+  if (decision === "denied") return "explicit repair authority was denied";
+  if (decision === "blocked") return "repair authority is blocked";
+  if (decision === "required") return "repair authority is required";
+  if (decision === "not_proven") return "repair authority is not proven";
+  return "none";
+}
+
+function applyBlockerFromProposalAndAuthority(
+  proposal: RepairProposalObservation,
+  authority: RepairAuthorityObservation,
+): RepairApplyBlocker {
+  if (proposal.readinessStatus !== "exact_ready") return "proposal-not-ready";
+  return applyBlockerFromAuthorityDecision(authority.authorityDecision);
+}
+
+function applyBlockerFromAuthorityDecision(
+  decision: RepairAuthorityDecision,
+): RepairApplyBlocker {
+  if (decision === "granted") return "none";
+  if (decision === "denied") return "authority-denied";
+  if (decision === "blocked") return "authority-blocked";
+  if (decision === "missing" || decision === "required") return "authority-missing";
+  return "not-proven";
+}
+
+function repairAuthorityStatusFromAuthority(
+  decision: RepairAuthorityDecision,
+  applyStatus: RepairApplyObservationStatus,
+): RepairApplyObservation["repairAuthorityStatus"] {
+  if (decision === "granted") return "granted";
+  if (decision === "denied") return "denied";
+  if (decision === "missing" || decision === "required" || applyStatus === "authority_required") {
+    return "required";
+  }
+  return "unknown";
+}
+
+function applyStatusFromEditOwner(
+  observation?: EditOwnerApplyObservationInput,
+): RepairApplyObservationStatus | undefined {
+  if (!observation) return undefined;
+  if (
+    observation.status === "hunk-set-applied" ||
+    observation.status === "single-target-applied" ||
+    observation.status === "target-set-applied"
+  ) {
+    return "applied";
+  }
+  if (observation.status.includes("failed") || observation.status.includes("partial-failure")) {
+    return "failed";
+  }
+  if (
+    observation.status.includes("stopped") ||
+    observation.status === "unconfirmed-no-write" ||
+    observation.status === "invalid-selection"
+  ) {
+    return "blocked";
+  }
+  if (observation.status === "unsupported-for-apply") return "unsupported";
+  return "not_proven";
+}
+
+function receiptIdsFromEditOwner(
+  observation?: EditOwnerApplyObservationInput,
+): readonly string[] {
+  return (observation?.evidence ?? []).filter((item) =>
+    item.includes("receipt:") || item.includes("receipt-")
+  );
 }
 
 function applyStatusFromIteration(

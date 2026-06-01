@@ -884,7 +884,19 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
   );
   const repairProposalEvent = trajectory.events.find((event) =>
     event.type === "loop-repair-handoff-observed" &&
-    event.facts.proposalId !== undefined
+    event.facts.readinessStatus !== undefined
+  );
+  const repairAuthorityEvent = trajectory.events.find((event) =>
+    event.type === "loop-repair-handoff-observed" &&
+    event.facts.authorityDecision !== undefined
+  );
+  const repairApplyRequestEvent = trajectory.events.find((event) =>
+    event.type === "loop-repair-handoff-observed" &&
+    event.facts.requestId !== undefined
+  );
+  const repairApplyEvent = trajectory.events.find((event) =>
+    event.type === "loop-repair-handoff-observed" &&
+    event.facts.repairApplyId !== undefined
   );
   const verificationRuntimeReceiptIds =
     verificationResultEvent?.facts.runtimeReceiptIds;
@@ -986,12 +998,43 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
         },
         {
           label: "apply",
-          value: factValue(repairProposalEvent?.facts.applyStatus),
+          value: factValue(
+            repairApplyEvent?.facts.repairApplyStatus ??
+              repairProposalEvent?.facts.applyStatus,
+          ),
+        },
+        {
+          label: "authority",
+          value: factValue(
+            repairApplyEvent?.facts.authorityState ??
+              repairApplyRequestEvent?.facts.authorityState ??
+              repairAuthorityEvent?.facts.authorityDecision,
+          ),
+        },
+        {
+          label: "applyReadiness",
+          value: factValue(
+            repairApplyEvent?.facts.applyReadiness ??
+              repairApplyRequestEvent?.facts.applyReadiness,
+          ),
+        },
+        {
+          label: "applyBlocker",
+          value: factValue(
+            repairApplyEvent?.facts.applyBlocker ??
+              repairApplyRequestEvent?.facts.applyBlocker,
+          ),
+        },
+        {
+          label: "applyAttempted",
+          value: factValue(repairApplyEvent?.facts.applyAttempted),
         },
         {
           label: "postRepairVerification",
           value: factValue(
-            repairProposalEvent?.facts.postRepairVerificationStatus ??
+            repairApplyEvent?.facts.postRepairVerificationStatus ??
+              repairApplyRequestEvent?.facts.postRepairVerificationStatus ??
+              repairProposalEvent?.facts.postRepairVerificationStatus ??
               observed("post-repair-verification"),
           ),
         },
@@ -999,12 +1042,16 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       machineEventCorrelationIds: [
         ...(stage("repair-handoff")?.eventIds ?? []),
         ...(stage("repair-proposal")?.eventIds ?? []),
+        ...(stage("repair-authority")?.eventIds ?? []),
+        ...(stage("repair-apply-request")?.eventIds ?? []),
         ...(stage("repair-apply")?.eventIds ?? []),
         ...(stage("post-repair-verification")?.eventIds ?? []),
       ],
       notProvenClaims: [
         ...(stage("repair-handoff")?.notProvenClaims ?? []),
         ...(stage("repair-proposal")?.notProvenClaims ?? []),
+        ...(stage("repair-authority")?.notProvenClaims ?? []),
+        ...(stage("repair-apply-request")?.notProvenClaims ?? []),
         ...(stage("repair-apply")?.notProvenClaims ?? []),
         ...(stage("post-repair-verification")?.notProvenClaims ?? []),
       ],
