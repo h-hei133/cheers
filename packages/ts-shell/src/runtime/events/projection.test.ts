@@ -25,7 +25,10 @@ import { projectModelBoundaryPhase } from "../loop/modelBoundary.js";
 import { runProviderStreamAdapter } from "../loop/providerStreamAdapter.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createModelResponseBoundary } from "../../provider/response/boundary.js";
-import { createModelRequestBoundary } from "../../provider/request/boundary.js";
+import {
+  createModelRequestBoundary,
+  prepareNextTurnModelRequest,
+} from "../../provider/request/boundary.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy } from "../../turn/deliveryPolicy.js";
 import { projectFollowUpQueue } from "../../turn/followUpQueue.js";
@@ -1001,5 +1004,59 @@ describe("runtime event projection", () => {
     );
     expect(events.every((event) => event.facts.terminalSuccessClaim !== true)).toBe(true);
     expect(JSON.stringify(events)).not.toContain('"success":true');
+  });
+
+  it("projects next-turn request preparation and safe request messages as observation-only events", () => {
+    const nextTurnBundle = prepareNextTurnBundle({
+      bundleId: "bundle-request-events",
+      turnId: "turn-request-events",
+      toolResultMessages: {
+        batchId: "tool-result-message-batch:batch-a",
+        dispatchPlanId: "plan-a",
+        messages: [{
+          messageId: "tool-result-message:call-a",
+          role: "tool",
+          toolCallId: "call-a",
+          toolName: "read",
+          safeContentSummary: "safe tool result",
+          category: "executed_tool_fact",
+          deliveryStatus: "prepared",
+          redactionStatus: "report-safe",
+          notProvenClaims: ["task-success"],
+          terminalSuccessClaim: false,
+        }],
+        preparedCount: 1,
+        blockedCount: 0,
+        terminalSuccessClaim: false,
+        notProvenClaims: ["next-turn-success"],
+      },
+    });
+    const requestBoundary = createModelRequestBoundary({
+      requestId: "request-events",
+      providerSafeLabel: "Provider",
+      modelSafeLabel: "Model",
+      providerReadinessStatus: "ready",
+    });
+    const preparation = prepareNextTurnModelRequest({
+      nextTurnBundle,
+      modelRequestBoundary: requestBoundary,
+      instructionSummary: "safe instruction",
+      taskSummary: "safe task",
+    });
+    const events = projectRuntimeEvents({
+      nextTurnRequestPreparations: [preparation],
+    });
+
+    expect(events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "next-turn-request-preparation-observed",
+        "request-input-message-prepared",
+        "provider-metadata-observed",
+        "provider-opt-in-required",
+        "request-ready-for-explicit-invocation",
+      ]),
+    );
+    expect(events.every((event) => event.facts.terminalSuccessClaim !== true)).toBe(true);
+    expect(JSON.stringify(events)).not.toMatch(/provider\.env|hidden reasoning|token=secret/i);
   });
 });

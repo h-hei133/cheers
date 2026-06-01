@@ -8,7 +8,10 @@ import type {
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { ModelResponseBoundary } from "../../provider/response/boundary.js";
 import type { ProviderResponseStreamProjection } from "../../provider/response/stream.js";
-import type { ModelRequestBoundary } from "../../provider/request/boundary.js";
+import type {
+  ModelRequestBoundary,
+  NextTurnModelRequestPreparation,
+} from "../../provider/request/boundary.js";
 import type { ExtensionHookPolicyOutcome } from "../extensions/lifecycle.js";
 import type { StaticResourceProjection } from "../resources/projection.js";
 import type { PackageInventoryProjection } from "../resources/inventory.js";
@@ -74,6 +77,13 @@ export type RuntimeProjectionEventType =
   | "compaction-unsupported"
   | "terminal-verdict-observed"
   | "model-request-prepared"
+  | "next-turn-request-preparation-observed"
+  | "request-input-message-prepared"
+  | "request-blocked"
+  | "provider-metadata-observed"
+  | "provider-opt-in-required"
+  | "redaction-blocked-request"
+  | "request-ready-for-explicit-invocation"
   | "provider-readiness-observed"
   | "provider-fetch-blocked"
   | "provider-fetch-attempted"
@@ -205,6 +215,7 @@ export function projectRuntimeEvents(input: {
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
   readonly modelRequestBoundaries?: readonly ModelRequestBoundary[];
+  readonly nextTurnRequestPreparations?: readonly NextTurnModelRequestPreparation[];
   readonly providerResponseStreams?: readonly ProviderResponseStreamProjection[];
   readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjection[];
   readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjection[];
@@ -343,6 +354,103 @@ export function projectRuntimeEvents(input: {
       },
       request.notProvenClaims,
     );
+  }
+
+  for (const preparation of input.nextTurnRequestPreparations ?? []) {
+    append(
+      "next-turn-request-preparation-observed",
+      {
+        requestPreparationId: preparation.requestPreparationId,
+        sourceNextTurnBundleId: preparation.sourceNextTurnBundleId,
+        modelRequestBoundaryId: preparation.modelRequestBoundaryId,
+        readinessStatus: preparation.readinessStatus,
+        includedMessageCount: preparation.includedToolResultMessageIds.length,
+        excludedMessageCount: preparation.excludedMessageIds.length,
+        steeringIds: preparation.steeringIds,
+        followUpIds: preparation.followUpIds,
+        contextConstraintIds: preparation.contextConstraintIds,
+        planningConstraintIds: preparation.planningConstraintIds,
+        providerMetadataId: preparation.providerMetadataId,
+        modelMetadataId: preparation.modelMetadataId,
+        blockedReasons: preparation.blockedReasons,
+        redactionStatus: preparation.redaction.status,
+        terminalSuccessClaim: preparation.terminalSuccessClaim,
+      },
+      preparation.notProvenClaims,
+    );
+    for (const message of preparation.safeRequestMessages) {
+      append(
+        "request-input-message-prepared",
+        {
+          requestPreparationId: preparation.requestPreparationId,
+          messageId: message.messageId,
+          source: message.source,
+          safeSummary: message.safeSummary,
+          terminalSuccessClaim: message.terminalSuccessClaim,
+        },
+        preparation.notProvenClaims,
+      );
+    }
+    append(
+      "provider-metadata-observed",
+      {
+        requestPreparationId: preparation.requestPreparationId,
+        providerSafeLabel: preparation.providerMetadata.providerSafeLabel,
+        modelSafeLabel: preparation.providerMetadata.modelSafeLabel,
+        authReadiness: preparation.providerMetadata.authReadiness,
+        streamingCapability: preparation.providerMetadata.streamingCapability,
+        providerOptInState: preparation.providerMetadata.providerOptInState,
+        missingProviderFacts: preparation.providerMetadata.missingProviderFacts,
+        terminalSuccessClaim: preparation.providerMetadata.terminalSuccessClaim,
+      },
+      preparation.providerMetadata.notProvenClaims,
+    );
+    if (preparation.providerMetadata.providerOptInState === "required") {
+      append(
+        "provider-opt-in-required",
+        {
+          requestPreparationId: preparation.requestPreparationId,
+          providerSafeLabel: preparation.providerMetadata.providerSafeLabel,
+          terminalSuccessClaim: preparation.providerMetadata.terminalSuccessClaim,
+        },
+        preparation.providerMetadata.notProvenClaims,
+      );
+    }
+    if (preparation.readinessStatus === "ready_for_explicit_model_invocation") {
+      append(
+        "request-ready-for-explicit-invocation",
+        {
+          requestPreparationId: preparation.requestPreparationId,
+          sourceNextTurnBundleId: preparation.sourceNextTurnBundleId,
+          terminalSuccessClaim: preparation.terminalSuccessClaim,
+        },
+        preparation.notProvenClaims,
+      );
+    }
+    if (preparation.blockedReasons.length > 0 || preparation.readinessStatus.startsWith("blocked")) {
+      append(
+        "request-blocked",
+        {
+          requestPreparationId: preparation.requestPreparationId,
+          readinessStatus: preparation.readinessStatus,
+          blockedReasons: preparation.blockedReasons,
+          terminalSuccessClaim: preparation.terminalSuccessClaim,
+        },
+        preparation.notProvenClaims,
+      );
+    }
+    if (preparation.readinessStatus === "blocked_by_redaction") {
+      append(
+        "redaction-blocked-request",
+        {
+          requestPreparationId: preparation.requestPreparationId,
+          excludedMessageIds: preparation.excludedMessageIds,
+          exclusionReasons: preparation.exclusionReasons,
+          terminalSuccessClaim: preparation.terminalSuccessClaim,
+        },
+        preparation.notProvenClaims,
+      );
+    }
   }
 
   for (const adapter of input.providerStreamAdapters ?? []) {

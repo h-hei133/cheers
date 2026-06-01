@@ -3,6 +3,12 @@ import {
   prepareToolOutcomeSavePointInput,
   type RuntimeEvidenceSavePoint,
 } from "../../evidence/savepoint/model.js";
+import {
+  createModelRequestBoundary,
+  prepareNextTurnModelRequest,
+  type NextTurnModelRequestPreparation,
+} from "../../provider/request/boundary.js";
+import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/response/boundary.js";
 import {
   type RepairApplyObservation,
@@ -128,6 +134,8 @@ export interface AgentLoopContractInput {
   readonly providerOptIn: boolean;
   readonly providerMode?: "synthetic" | "real" | "default";
   readonly modelLabel?: string;
+  readonly providerRegistry?: ProviderRegistryProjection;
+  readonly providerId?: string;
   readonly maxTurns?: number;
   readonly queuedMessages?: readonly AgentLoopContractQueuedMessage[];
   readonly toolBatchPolicy?: "sequential" | "parallel" | "metadata-only";
@@ -196,6 +204,7 @@ export interface AgentLoopContractTurnProjection {
     readonly prepared: boolean;
     readonly pendingFacts: readonly string[];
     readonly bundle?: NextTurnBundleProjection;
+    readonly requestPreparation?: NextTurnModelRequestPreparation;
     readonly steeringQueue: SteeringQueueProjection;
     readonly followUpQueue: FollowUpQueueProjection;
     readonly deliveryPolicy: NextTurnDeliveryPolicyProjection;
@@ -654,11 +663,38 @@ export async function runAgentLoopContract(
         deliveryPolicy,
         deliveryStatus: input.executePreparedNextTurn ? "delivered" : "waiting",
       });
+      const modelRequestBoundary = createModelRequestBoundary({
+        requestId: `${nextTurnBundleId}:model-request`,
+        turnId: `${input.sessionId}:turn:${turn}:next`,
+        loopId: input.sessionId,
+        providerId: input.providerId,
+        providerMode: input.providerMode,
+        providerSafeLabel: input.providerId,
+        modelSafeLabel: input.modelLabel,
+        providerReadinessStatus: input.providerOptIn ? "ready" : "missing",
+        providerRegistry: input.providerRegistry,
+        planningConstraints: nextTurnBundle.blockingFacts,
+        missingRequiredFacts: nextTurnBundle.readinessStatus === "not_ready"
+          ? ["next-turn-bundle:not-ready"]
+          : [],
+        notProvenClaims: nextTurnBundle.notProvenClaims,
+      });
+      const requestPreparation = prepareNextTurnModelRequest({
+        nextTurnBundle,
+        modelRequestBoundary,
+        providerRegistry: input.providerRegistry,
+        providerId: input.providerId,
+        instructionSummary: "prepare explicit model invocation from safe next-turn facts",
+        taskSummary: input.prompt,
+        planningConstraintIds: nextTurnBundle.blockingFacts,
+      });
       appendProjectedEvents(events, projectRuntimeEvents({
         steeringQueues: [steeringQueue],
         followUpQueues: [followUpQueue],
         nextTurnDeliveryPolicies: [deliveryPolicy],
         nextTurnBundles: [nextTurnBundle],
+        modelRequestBoundaries: [modelRequestBoundary],
+        nextTurnRequestPreparations: [requestPreparation],
       }));
       const verification = input.verificationBoundary
         ? await input.verificationBoundary({
@@ -690,6 +726,8 @@ export async function runAgentLoopContract(
       appendEvent(events, "agent-loop-next-turn-prepared", {
         turn,
         bundleId: nextTurnBundle.bundleId,
+        requestPreparationId: requestPreparation.requestPreparationId,
+        requestReadinessStatus: requestPreparation.readinessStatus,
         pendingFactCount: pendingNextTurnFacts.length,
         deliveryStatus: nextTurnBundle.deliveryStatus,
         nextTurnExecuted: false,
@@ -715,6 +753,7 @@ export async function runAgentLoopContract(
           prepared: true,
           pendingFacts: Object.freeze([...pendingNextTurnFacts]),
           bundle: nextTurnBundle,
+          requestPreparation,
           steeringQueue,
           followUpQueue,
           deliveryPolicy,

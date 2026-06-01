@@ -12,7 +12,11 @@ import {
   projectProviderRegistry,
   unknownProviderCompatibilityFlags,
 } from "../../provider/registry/provider.js";
-import { createModelRequestBoundary } from "../../provider/request/boundary.js";
+import {
+  createModelRequestBoundary,
+  prepareNextTurnModelRequest,
+} from "../../provider/request/boundary.js";
+import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
 import { projectModelBoundaryPhase } from "../../runtime/loop/modelBoundary.js";
@@ -644,6 +648,60 @@ describe("product surface view model", () => {
     expect(rendered).toContain("Tool outcome");
     expect(rendered).toContain("outcome=mixed_success_and_non_success");
     expect(rendered).toContain("nextTurn=ready_with_partial_tool_results");
+    expect(rendered).toContain("terminalSuccessClaim=false");
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
+  });
+
+  it("renders request preparation facts without provider success inflation", () => {
+    const nextTurnBundle = prepareNextTurnBundle({
+      bundleId: "bundle-request-surface",
+      turnId: "turn-request-surface",
+      toolResultMessages: {
+        batchId: "tool-result-message-batch:batch-a",
+        dispatchPlanId: "plan-a",
+        messages: [{
+          messageId: "tool-result-message:call-a",
+          role: "tool",
+          toolCallId: "call-a",
+          toolName: "read",
+          safeContentSummary: "safe tool result",
+          category: "executed_tool_fact",
+          deliveryStatus: "prepared",
+          redactionStatus: "report-safe",
+          notProvenClaims: ["task-success"],
+          terminalSuccessClaim: false,
+        }],
+        preparedCount: 1,
+        blockedCount: 0,
+        terminalSuccessClaim: false,
+        notProvenClaims: ["next-turn-success"],
+      },
+    });
+    const preparation = prepareNextTurnModelRequest({
+      nextTurnBundle,
+      modelRequestBoundary: createModelRequestBoundary({
+        requestId: "request-surface",
+        providerSafeLabel: "Provider",
+        modelSafeLabel: "Model",
+        providerReadinessStatus: "ready",
+      }),
+      instructionSummary: "safe instruction",
+      taskSummary: "safe task",
+    });
+    const runtimeEvents = projectRuntimeEvents({
+      nextTurnRequestPreparations: [preparation],
+    });
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped",
+      terminalClassification: "stopped",
+      terminalReason: "stopped_error",
+      runtimeEvents,
+    });
+    const rendered = viewModel ? renderTerminalMessage(viewModel).lines.join("\n") : "";
+
+    expect(rendered).toContain("Request preparation");
+    expect(rendered).toContain("readiness=ready_for_explicit_model_invocation");
+    expect(rendered).toContain("provider=Provider");
     expect(rendered).toContain("terminalSuccessClaim=false");
     expect(viewModel?.terminalSuccessClaim).toBe(false);
   });

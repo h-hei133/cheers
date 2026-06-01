@@ -1,4 +1,5 @@
 import type { ContextPlanningBlockSummary } from "../../context/acquisition/summary.js";
+import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
 import type { ProviderRegistryProjection } from "../registry/provider.js";
 
 export type ModelRequestReadinessStatus =
@@ -47,6 +48,63 @@ export interface ModelRequestBoundary {
   readonly mutationAuthority: "not-granted";
   readonly missingRequiredFacts: readonly string[];
   readonly missingOptionalFacts: readonly string[];
+  readonly redaction: {
+    readonly status: "report-safe" | "redacted";
+    readonly excluded: readonly string[];
+  };
+  readonly notProvenClaims: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
+export type NextTurnRequestReadinessStatus =
+  | "ready_for_explicit_model_invocation"
+  | "ready_with_partial_tool_results"
+  | "blocked_by_policy"
+  | "blocked_by_authority"
+  | "blocked_by_failed_tool"
+  | "blocked_by_missing_context"
+  | "blocked_by_provider_unavailable"
+  | "blocked_by_redaction"
+  | "unsupported"
+  | "not_ready";
+
+export interface NextTurnRequestInputMessage {
+  readonly messageId: string;
+  readonly source: "system" | "task" | "tool-result" | "steering" | "follow-up";
+  readonly safeSummary: string;
+  readonly terminalSuccessClaim: false;
+}
+
+export interface NextTurnRequestProviderMetadata {
+  readonly providerSafeLabel: string;
+  readonly modelSafeLabel: string;
+  readonly providerOptInState: "required" | "not-granted";
+  readonly authReadiness: "resolved" | "missing" | "expired" | "unsupported" | "unknown";
+  readonly compatibilityFlags: readonly string[];
+  readonly streamingCapability: string;
+  readonly missingProviderFacts: readonly string[];
+  readonly fallbackMetadata: readonly string[];
+  readonly notProvenClaims: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
+export interface NextTurnModelRequestPreparation {
+  readonly requestPreparationId: string;
+  readonly sourceNextTurnBundleId: string;
+  readonly modelRequestBoundaryId: string;
+  readonly includedToolResultMessageIds: readonly string[];
+  readonly excludedMessageIds: readonly string[];
+  readonly exclusionReasons: readonly string[];
+  readonly steeringIds: readonly string[];
+  readonly followUpIds: readonly string[];
+  readonly contextConstraintIds: readonly string[];
+  readonly planningConstraintIds: readonly string[];
+  readonly providerMetadataId?: string;
+  readonly modelMetadataId?: string;
+  readonly readinessStatus: NextTurnRequestReadinessStatus;
+  readonly blockedReasons: readonly string[];
+  readonly providerMetadata: NextTurnRequestProviderMetadata;
+  readonly safeRequestMessages: readonly NextTurnRequestInputMessage[];
   readonly redaction: {
     readonly status: "report-safe" | "redacted";
     readonly excluded: readonly string[];
@@ -142,6 +200,301 @@ export function createModelRequestBoundary(
     ]),
     terminalSuccessClaim: false,
   });
+}
+
+export function prepareNextTurnModelRequest(input: {
+  readonly nextTurnBundle: NextTurnBundleProjection;
+  readonly modelRequestBoundary: ModelRequestBoundary;
+  readonly providerRegistry?: ProviderRegistryProjection;
+  readonly providerId?: string;
+  readonly modelId?: string;
+  readonly instructionSummary?: string;
+  readonly taskSummary?: string;
+  readonly contextConstraintIds?: readonly string[];
+  readonly planningConstraintIds?: readonly string[];
+  readonly notProvenClaims?: readonly string[];
+}): NextTurnModelRequestPreparation {
+  const redactions = new Set<string>();
+  const provider = input.providerRegistry?.providers.find((candidate) =>
+    candidate.providerId === input.providerId ||
+    candidate.safeLabel === input.modelRequestBoundary.providerSafeLabel
+  ) ?? input.providerRegistry?.providers[0];
+  const model = input.providerRegistry?.models.find((candidate) =>
+    candidate.modelId === input.modelId ||
+    candidate.safeLabel === input.modelRequestBoundary.modelSafeLabel ||
+    candidate.providerId === provider?.providerId
+  );
+  const auth = input.providerRegistry?.auth.find((candidate) =>
+    candidate.providerId === provider?.providerId
+  );
+  const providerMetadata = createProviderMetadata({
+    boundary: input.modelRequestBoundary,
+    providerRegistry: input.providerRegistry,
+    provider,
+    model,
+    auth,
+    redactions,
+  });
+  const safeMessages = createSafeRequestMessages({
+    bundle: input.nextTurnBundle,
+    instructionSummary: input.instructionSummary,
+    taskSummary: input.taskSummary,
+    redactions,
+  });
+  const excludedMessageIds = unique([
+    ...input.nextTurnBundle.excludedToolResultMessageIds,
+    ...(input.nextTurnBundle.redaction.status === "redacted" &&
+        input.nextTurnBundle.includedToolResultMessageIds.length === 0
+      ? input.nextTurnBundle.sourceToolResultMessageIds
+      : []),
+  ].map((value) => sanitizeText(value, redactions)));
+  const exclusionReasons = unique([
+    ...input.nextTurnBundle.messageExclusionReasons,
+    ...(excludedMessageIds.length > 0 && input.nextTurnBundle.messageExclusionReasons.length === 0
+      ? ["message-excluded:redaction"]
+      : []),
+  ].map((value) => sanitizeText(value, redactions)));
+  const blockedReasons = blockedRequestReasons({
+    bundle: input.nextTurnBundle,
+    boundary: input.modelRequestBoundary,
+    excludedMessageIds,
+    redactionStatus: redactions.size > 0 || input.nextTurnBundle.redaction.status === "redacted"
+      ? "redacted"
+      : "report-safe",
+  });
+  const readinessStatus = requestReadiness({
+    bundle: input.nextTurnBundle,
+    boundary: input.modelRequestBoundary,
+    blockedReasons,
+    providerMetadata,
+    excludedMessageIds,
+  });
+
+  return deepFreeze({
+    requestPreparationId: sanitizeText(
+      `next-turn-request:${input.nextTurnBundle.bundleId}`,
+      redactions,
+    ),
+    sourceNextTurnBundleId: sanitizeText(input.nextTurnBundle.bundleId, redactions),
+    modelRequestBoundaryId: sanitizeText(input.modelRequestBoundary.requestId, redactions),
+    includedToolResultMessageIds: Object.freeze(
+      input.nextTurnBundle.includedToolResultMessageIds.map((id) => sanitizeText(id, redactions)),
+    ),
+    excludedMessageIds: Object.freeze(excludedMessageIds),
+    exclusionReasons: Object.freeze(exclusionReasons),
+    steeringIds: Object.freeze(
+      input.nextTurnBundle.steeringMessageIds.map((id) => sanitizeText(id, redactions)),
+    ),
+    followUpIds: Object.freeze(
+      input.nextTurnBundle.followUpMessageIds.map((id) => sanitizeText(id, redactions)),
+    ),
+    contextConstraintIds: Object.freeze(
+      (input.contextConstraintIds ?? []).map((id) => sanitizeText(id, redactions)),
+    ),
+    planningConstraintIds: Object.freeze(
+      (input.planningConstraintIds ?? input.modelRequestBoundary.planningConstraints)
+        .map((id) => sanitizeText(id, redactions)),
+    ),
+    ...(provider ? { providerMetadataId: sanitizeText(provider.providerId, redactions) } : {}),
+    ...(model ? { modelMetadataId: sanitizeText(model.modelId, redactions) } : {}),
+    readinessStatus,
+    blockedReasons: Object.freeze(blockedReasons),
+    providerMetadata,
+    safeRequestMessages: Object.freeze(safeMessages),
+    redaction: {
+      status: redactions.size > 0 ||
+          input.nextTurnBundle.redaction.status === "redacted" ||
+          input.modelRequestBoundary.redaction.status === "redacted" ||
+          input.providerRegistry?.redaction.status === "redacted"
+        ? "redacted"
+        : "report-safe",
+      excluded: REDACTION_EXCLUSIONS,
+    },
+    notProvenClaims: unique([
+      "next-turn-ready-is-not-provider-call",
+      "request-prepared-is-not-provider-call",
+      "provider-metadata-is-not-provider-success",
+      "opt-in-available-is-not-opt-in-granted",
+      "safe-message-prepared-is-not-model-response",
+      "product-surface-rendered-is-not-success",
+      "terminal-success",
+      ...input.nextTurnBundle.notProvenClaims,
+      ...input.modelRequestBoundary.notProvenClaims,
+      ...providerMetadata.notProvenClaims,
+      ...(input.providerRegistry?.notProvenClaims ?? []),
+      ...(input.notProvenClaims ?? []),
+    ]),
+    terminalSuccessClaim: false,
+  });
+}
+
+function createProviderMetadata(input: {
+  readonly boundary: ModelRequestBoundary;
+  readonly providerRegistry?: ProviderRegistryProjection;
+  readonly provider?: ProviderRegistryProjection["providers"][number];
+  readonly model?: ProviderRegistryProjection["models"][number];
+  readonly auth?: ProviderRegistryProjection["auth"][number];
+  readonly redactions: Set<string>;
+}): NextTurnRequestProviderMetadata {
+  const compatibility = input.model?.compatibility ?? input.provider?.compatibility;
+  const flags = compatibility
+    ? [
+        `toolCalls:${compatibility.toolCalls}`,
+        `parallelToolCalls:${compatibility.parallelToolCalls}`,
+        `structuredJsonOutput:${compatibility.structuredJsonOutput}`,
+        `streaming:${compatibility.streaming}`,
+        `strictMessageRoles:${compatibility.strictMessageRoles}`,
+      ]
+    : [];
+  const fallback = input.provider?.fallbackPolicy
+    ? [
+        `executesFallback:${input.provider.fallbackPolicy.executesFallback}`,
+        `requiresExplicitOptIn:${input.provider.fallbackPolicy.requiresExplicitOptIn}`,
+        `retryRelation:${input.provider.fallbackPolicy.retryRelation}`,
+      ]
+    : [];
+  const missingProviderFacts = unique([
+    ...(input.provider ? [] : ["provider-metadata-missing"]),
+    ...(input.model ? [] : ["model-metadata-missing"]),
+    ...(input.auth ? [] : ["auth-projection-missing"]),
+    ...(input.boundary.providerReadinessStatus === "ready" ? [] : [
+      `provider-readiness:${input.boundary.providerReadinessStatus}`,
+    ]),
+  ].map((value) => sanitizeText(value, input.redactions)));
+
+  return deepFreeze({
+    providerSafeLabel: sanitizeText(
+      input.provider?.safeLabel ?? input.boundary.providerSafeLabel,
+      input.redactions,
+    ),
+    modelSafeLabel: sanitizeText(
+      input.model?.safeLabel ?? input.boundary.modelSafeLabel,
+      input.redactions,
+    ),
+    providerOptInState: "required",
+    authReadiness: input.auth?.resolutionStatus ?? "unknown",
+    compatibilityFlags: Object.freeze(flags.map((value) => sanitizeText(value, input.redactions))),
+    streamingCapability: sanitizeText(compatibility?.streaming ?? "unknown", input.redactions),
+    missingProviderFacts: Object.freeze(missingProviderFacts),
+    fallbackMetadata: Object.freeze(fallback.map((value) => sanitizeText(value, input.redactions))),
+    notProvenClaims: unique([
+      "provider-metadata-is-not-provider-success",
+      "provider-readiness-is-not-provider-success",
+      "opt-in-available-is-not-opt-in-granted",
+      ...(input.provider?.notProvenClaims ?? []),
+      ...(input.model?.notProvenClaims ?? []),
+      ...(input.auth?.notProvenClaims ?? []),
+      ...(input.providerRegistry?.notProvenClaims ?? []),
+    ]),
+    terminalSuccessClaim: false,
+  });
+}
+
+function createSafeRequestMessages(input: {
+  readonly bundle: NextTurnBundleProjection;
+  readonly instructionSummary?: string;
+  readonly taskSummary?: string;
+  readonly redactions: Set<string>;
+}): readonly NextTurnRequestInputMessage[] {
+  const messages: NextTurnRequestInputMessage[] = [];
+  if (input.instructionSummary) {
+    messages.push({
+      messageId: "request-message:system-summary",
+      source: "system",
+      safeSummary: sanitizeText(input.instructionSummary, input.redactions),
+      terminalSuccessClaim: false,
+    });
+  }
+  if (input.taskSummary ?? input.bundle.assistantResponseSummary) {
+    messages.push({
+      messageId: "request-message:task-summary",
+      source: "task",
+      safeSummary: sanitizeText(
+        input.taskSummary ?? input.bundle.assistantResponseSummary ?? "",
+        input.redactions,
+      ),
+      terminalSuccessClaim: false,
+    });
+  }
+  for (const message of input.bundle.safeToolResultMessages) {
+    messages.push({
+      messageId: sanitizeText(`request-message:${message.messageId}`, input.redactions),
+      source: "tool-result",
+      safeSummary: sanitizeText(message.safeContentSummary, input.redactions),
+      terminalSuccessClaim: false,
+    });
+  }
+  for (const fact of input.bundle.deliveryFacts) {
+    messages.push({
+      messageId: sanitizeText(`request-message:${fact.deliveryId}`, input.redactions),
+      source: fact.deliveryKind,
+      safeSummary: sanitizeText(fact.safeUserFacingSummary, input.redactions),
+      terminalSuccessClaim: false,
+    });
+  }
+  return Object.freeze(messages);
+}
+
+function requestReadiness(input: {
+  readonly bundle: NextTurnBundleProjection;
+  readonly boundary: ModelRequestBoundary;
+  readonly providerMetadata: NextTurnRequestProviderMetadata;
+  readonly blockedReasons: readonly string[];
+  readonly excludedMessageIds: readonly string[];
+}): NextTurnRequestReadinessStatus {
+  if (input.boundary.missingRequiredFacts.length > 0) {
+    return "blocked_by_missing_context";
+  }
+  if (input.boundary.providerReadinessStatus === "missing" ||
+    input.boundary.providerReadinessStatus === "blocked") {
+    return "blocked_by_provider_unavailable";
+  }
+  if (
+    input.bundle.redaction.status === "redacted" &&
+    input.bundle.includedToolResultMessageIds.length === 0 &&
+    input.excludedMessageIds.length > 0
+  ) {
+    return "blocked_by_redaction";
+  }
+  switch (input.bundle.readinessStatus) {
+    case "ready":
+      return input.boundary.providerReadinessStatus === "ready"
+        ? "ready_for_explicit_model_invocation"
+        : "not_ready";
+    case "ready_with_partial_tool_results":
+      return "ready_with_partial_tool_results";
+    case "blocked_by_policy":
+      return "blocked_by_policy";
+    case "blocked_by_authority":
+      return "blocked_by_authority";
+    case "blocked_by_failed_tool":
+      return "blocked_by_failed_tool";
+    case "blocked_by_malformed_tool_call":
+      return "blocked_by_policy";
+    case "blocked_by_unsupported_tool":
+    case "unsupported":
+      return "unsupported";
+    case "not_ready":
+      return "not_ready";
+  }
+}
+
+function blockedRequestReasons(input: {
+  readonly bundle: NextTurnBundleProjection;
+  readonly boundary: ModelRequestBoundary;
+  readonly excludedMessageIds: readonly string[];
+  readonly redactionStatus: "report-safe" | "redacted";
+}): readonly string[] {
+  return unique([
+    ...input.bundle.blockingFacts,
+    ...input.boundary.missingRequiredFacts.map((fact) => `missing-context:${fact}`),
+    ...(input.boundary.providerReadinessStatus === "missing" ||
+        input.boundary.providerReadinessStatus === "blocked"
+      ? [`provider-readiness:${input.boundary.providerReadinessStatus}`]
+      : []),
+    ...(input.excludedMessageIds.length > 0 ? ["unsafe-message-excluded"] : []),
+    ...(input.redactionStatus === "redacted" ? ["redaction-applied"] : []),
+  ]);
 }
 
 function selectReadinessStatus(input: {

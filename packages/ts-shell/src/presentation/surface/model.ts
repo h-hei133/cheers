@@ -150,6 +150,7 @@ export function projectProductSurfaceViewModel(
     ...packageSections(input),
     ...sessionSections(input),
     ...toolOutcomeEventSections(input),
+    ...requestPreparationEventSections(input),
     ...eventSections(input),
     section({
       kind: "verdict",
@@ -289,6 +290,71 @@ function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSec
 
 function factValue(value: unknown): string {
   return safeText(String(value ?? "not-observed"), 120);
+}
+
+function requestPreparationEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const events = input.runtimeEvents ?? [];
+  const request = events.find((event) => event.type === "next-turn-request-preparation-observed");
+  const provider = events.find((event) => event.type === "provider-metadata-observed");
+  if (!request && !provider) {
+    return [];
+  }
+  const blocked = events.find((event) => event.type === "request-blocked");
+  return [section({
+    kind: "model_boundary",
+    title: "Request preparation",
+    severity: blocked ? "warning" : "info",
+    status: "observed",
+    summary: [
+      request ? `readiness=${factValue(request.facts.readinessStatus)}` : undefined,
+      provider ? `provider=${factValue(provider.facts.providerSafeLabel)}` : undefined,
+      provider ? `model=${factValue(provider.facts.modelSafeLabel)}` : undefined,
+      request ? `included=${factValue(request.facts.includedMessageCount)}` : undefined,
+      request ? `excluded=${factValue(request.facts.excludedMessageCount)}` : undefined,
+      blocked ? `blocked=${factValue(blocked.facts.readinessStatus)}` : undefined,
+      "terminalSuccessClaim=false",
+    ].filter(Boolean).join("; "),
+    facts: [
+      ...(request
+        ? [
+            {
+              label: "requestPreparation",
+              value: factValue(request.facts.requestPreparationId),
+              machineEventCorrelationId: request.id,
+            },
+            {
+              label: "requiredUserAction",
+              value: blocked ? "resolve-request-blocker" : "explicit-invocation-required",
+              machineEventCorrelationId: request.id,
+            },
+          ]
+        : []),
+      ...(provider
+        ? [
+            {
+              label: "auth",
+              value: factValue(provider.facts.authReadiness),
+              machineEventCorrelationId: provider.id,
+            },
+            {
+              label: "optIn",
+              value: factValue(provider.facts.providerOptInState),
+              machineEventCorrelationId: provider.id,
+            },
+          ]
+        : []),
+    ],
+    machineEventCorrelationIds: [request?.id, provider?.id, blocked?.id]
+      .filter((id): id is string => Boolean(id)),
+    notProvenClaims: events
+      .filter((event) =>
+        event.type === "next-turn-request-preparation-observed" ||
+        event.type === "provider-metadata-observed" ||
+        event.type === "provider-opt-in-required" ||
+        event.type === "request-input-message-prepared"
+      )
+      .flatMap((event) => event.notProvenClaims),
+  })];
 }
 
 function providerStreamAdapterSections(
