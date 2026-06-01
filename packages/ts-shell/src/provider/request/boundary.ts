@@ -1,4 +1,5 @@
 import type { ContextPlanningBlockSummary } from "../../context/acquisition/summary.js";
+import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
 import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
 import type { ProviderRegistryProjection } from "../registry/provider.js";
 
@@ -20,6 +21,7 @@ export interface ModelRequestBoundaryInput {
   readonly providerReadinessStatus?: "ready" | "missing" | "blocked" | "unknown";
   readonly providerRegistry?: ProviderRegistryProjection;
   readonly contextPlanningSummary?: ContextPlanningBlockSummary;
+  readonly continuationReadiness?: ContinuationReadinessProjection;
   readonly planningConstraints?: readonly string[];
   readonly noWriteStatus?: string;
   readonly missingRequiredFacts?: readonly string[];
@@ -43,6 +45,9 @@ export interface ModelRequestBoundary {
   readonly registryModelCount: number;
   readonly contextPlanningSummaryId?: string;
   readonly contextPlanningStatus?: string;
+  readonly continuationReadinessId?: string;
+  readonly continuationReadinessStatus?: ContinuationReadinessProjection["status"];
+  readonly continuationContextReadinessStatus?: ContinuationReadinessProjection["contextReadinessStatus"];
   readonly planningConstraints: readonly string[];
   readonly noWriteStatus: string;
   readonly mutationAuthority: "not-granted";
@@ -70,7 +75,7 @@ export type NextTurnRequestReadinessStatus =
 
 export interface NextTurnRequestInputMessage {
   readonly messageId: string;
-  readonly source: "system" | "task" | "tool-result" | "steering" | "follow-up";
+  readonly source: "system" | "task" | "tool-result" | "steering" | "follow-up" | "continuation";
   readonly safeSummary: string;
   readonly terminalSuccessClaim: false;
 }
@@ -99,6 +104,9 @@ export interface NextTurnModelRequestPreparation {
   readonly followUpIds: readonly string[];
   readonly contextConstraintIds: readonly string[];
   readonly planningConstraintIds: readonly string[];
+  readonly continuationReadinessId?: string;
+  readonly continuationReadinessStatus?: ContinuationReadinessProjection["status"];
+  readonly continuationBlockedReasons: readonly string[];
   readonly providerMetadataId?: string;
   readonly modelMetadataId?: string;
   readonly readinessStatus: NextTurnRequestReadinessStatus;
@@ -130,9 +138,14 @@ export function createModelRequestBoundary(
   input: ModelRequestBoundaryInput,
 ): ModelRequestBoundary {
   const redactions = new Set<string>();
+  const continuationMissing = continuationMissingFacts(input.continuationReadiness)
+    .map((item) => sanitizeText(item, redactions));
+  const continuationConstraints = continuationPlanningConstraints(input.continuationReadiness)
+    .map((item) => sanitizeText(item, redactions));
   const requiredMissing = unique([
     ...(input.contextPlanningSummary?.acquisition.requiredMissingFacts ?? []),
     ...(input.missingRequiredFacts ?? []),
+    ...continuationMissing,
   ].map((item) => sanitizeText(item, redactions)));
   const optionalMissing = unique([
     ...(input.contextPlanningSummary?.acquisition.optionalMissingFacts ?? []),
@@ -141,6 +154,7 @@ export function createModelRequestBoundary(
   const constraints = unique([
     ...(input.contextPlanningSummary?.planning.constraints ?? []),
     ...(input.planningConstraints ?? []),
+    ...continuationConstraints,
   ].map((item) => sanitizeText(item, redactions)));
   const providerReadinessStatus = input.providerReadinessStatus ?? "unknown";
   const noWriteStatus = sanitizeText(
@@ -174,6 +188,13 @@ export function createModelRequestBoundary(
           contextPlanningStatus: input.contextPlanningSummary.status,
         }
       : {}),
+    ...(input.continuationReadiness
+      ? {
+          continuationReadinessId: sanitizeText(input.continuationReadiness.readinessId, redactions),
+          continuationReadinessStatus: input.continuationReadiness.status,
+          continuationContextReadinessStatus: input.continuationReadiness.contextReadinessStatus,
+        }
+      : {}),
     planningConstraints: Object.freeze(constraints),
     noWriteStatus,
     mutationAuthority: "not-granted",
@@ -193,9 +214,12 @@ export function createModelRequestBoundary(
       "cp-plan-handoff-is-not-mutation-authority",
       "request-ready-is-not-task-success",
       "fallback-eligible-is-not-fallback-executed",
+      "continuation-readiness-is-not-provider-success",
+      "continuation-readiness-is-not-task-success",
       "terminal-success",
       ...(input.providerRegistry?.notProvenClaims ?? []),
       ...(input.contextPlanningSummary?.notProvenClaims ?? []),
+      ...(input.continuationReadiness?.notProvenClaims ?? []),
       ...(input.notProvenClaims ?? []),
     ]),
     terminalSuccessClaim: false,
@@ -208,6 +232,7 @@ export function prepareNextTurnModelRequest(input: {
   readonly providerRegistry?: ProviderRegistryProjection;
   readonly providerId?: string;
   readonly modelId?: string;
+  readonly continuationReadiness?: ContinuationReadinessProjection;
   readonly instructionSummary?: string;
   readonly taskSummary?: string;
   readonly contextConstraintIds?: readonly string[];
@@ -237,8 +262,14 @@ export function prepareNextTurnModelRequest(input: {
   });
   const safeMessages = createSafeRequestMessages({
     bundle: input.nextTurnBundle,
+    continuationReadiness: input.continuationReadiness,
     instructionSummary: input.instructionSummary,
     taskSummary: input.taskSummary,
+    redactions,
+  });
+  const continuationBlockedReasons = continuationRequestBlockers({
+    boundary: input.modelRequestBoundary,
+    continuationReadiness: input.continuationReadiness,
     redactions,
   });
   const excludedMessageIds = unique([
@@ -250,6 +281,7 @@ export function prepareNextTurnModelRequest(input: {
   ].map((value) => sanitizeText(value, redactions)));
   const exclusionReasons = unique([
     ...input.nextTurnBundle.messageExclusionReasons,
+    ...continuationBlockedReasons,
     ...(excludedMessageIds.length > 0 && input.nextTurnBundle.messageExclusionReasons.length === 0
       ? ["message-excluded:redaction"]
       : []),
@@ -258,6 +290,7 @@ export function prepareNextTurnModelRequest(input: {
     bundle: input.nextTurnBundle,
     boundary: input.modelRequestBoundary,
     excludedMessageIds,
+    continuationBlockedReasons,
     redactionStatus: redactions.size > 0 || input.nextTurnBundle.redaction.status === "redacted"
       ? "redacted"
       : "report-safe",
@@ -295,6 +328,19 @@ export function prepareNextTurnModelRequest(input: {
       (input.planningConstraintIds ?? input.modelRequestBoundary.planningConstraints)
         .map((id) => sanitizeText(id, redactions)),
     ),
+    ...(input.continuationReadiness ?? input.modelRequestBoundary.continuationReadinessId
+      ? {
+          continuationReadinessId: sanitizeText(
+            input.continuationReadiness?.readinessId ??
+              input.modelRequestBoundary.continuationReadinessId ?? "",
+            redactions,
+          ),
+          continuationReadinessStatus:
+            input.continuationReadiness?.status ??
+            input.modelRequestBoundary.continuationReadinessStatus,
+        }
+      : {}),
+    continuationBlockedReasons: Object.freeze(continuationBlockedReasons),
     ...(provider ? { providerMetadataId: sanitizeText(provider.providerId, redactions) } : {}),
     ...(model ? { modelMetadataId: sanitizeText(model.modelId, redactions) } : {}),
     readinessStatus,
@@ -317,9 +363,12 @@ export function prepareNextTurnModelRequest(input: {
       "opt-in-available-is-not-opt-in-granted",
       "safe-message-prepared-is-not-model-response",
       "product-surface-rendered-is-not-success",
+      "continuation-readiness-is-not-provider-call",
+      "continuation-readiness-is-not-task-success",
       "terminal-success",
       ...input.nextTurnBundle.notProvenClaims,
       ...input.modelRequestBoundary.notProvenClaims,
+      ...(input.continuationReadiness?.notProvenClaims ?? []),
       ...providerMetadata.notProvenClaims,
       ...(input.providerRegistry?.notProvenClaims ?? []),
       ...(input.notProvenClaims ?? []),
@@ -392,6 +441,7 @@ function createProviderMetadata(input: {
 
 function createSafeRequestMessages(input: {
   readonly bundle: NextTurnBundleProjection;
+  readonly continuationReadiness?: ContinuationReadinessProjection;
   readonly instructionSummary?: string;
   readonly taskSummary?: string;
   readonly redactions: Set<string>;
@@ -432,6 +482,20 @@ function createSafeRequestMessages(input: {
       terminalSuccessClaim: false,
     });
   }
+  if (input.continuationReadiness) {
+    messages.push({
+      messageId: sanitizeText(
+        `request-message:${input.continuationReadiness.readinessId}`,
+        input.redactions,
+      ),
+      source: "continuation",
+      safeSummary: sanitizeText(
+        `continuation:${input.continuationReadiness.status}; context:${input.continuationReadiness.contextReadinessStatus}`,
+        input.redactions,
+      ),
+      terminalSuccessClaim: false,
+    });
+  }
   return Object.freeze(messages);
 }
 
@@ -448,6 +512,9 @@ function requestReadiness(input: {
   if (input.boundary.providerReadinessStatus === "missing" ||
     input.boundary.providerReadinessStatus === "blocked") {
     return "blocked_by_provider_unavailable";
+  }
+  if (input.blockedReasons.some((reason) => reason.startsWith("continuation:"))) {
+    return "blocked_by_missing_context";
   }
   if (
     input.bundle.redaction.status === "redacted" &&
@@ -483,11 +550,13 @@ function blockedRequestReasons(input: {
   readonly bundle: NextTurnBundleProjection;
   readonly boundary: ModelRequestBoundary;
   readonly excludedMessageIds: readonly string[];
+  readonly continuationBlockedReasons?: readonly string[];
   readonly redactionStatus: "report-safe" | "redacted";
 }): readonly string[] {
   return unique([
     ...input.bundle.blockingFacts,
     ...input.boundary.missingRequiredFacts.map((fact) => `missing-context:${fact}`),
+    ...(input.continuationBlockedReasons ?? []),
     ...(input.boundary.providerReadinessStatus === "missing" ||
         input.boundary.providerReadinessStatus === "blocked"
       ? [`provider-readiness:${input.boundary.providerReadinessStatus}`]
@@ -495,6 +564,71 @@ function blockedRequestReasons(input: {
     ...(input.excludedMessageIds.length > 0 ? ["unsafe-message-excluded"] : []),
     ...(input.redactionStatus === "redacted" ? ["redaction-applied"] : []),
   ]);
+}
+
+function continuationMissingFacts(
+  readiness?: ContinuationReadinessProjection,
+): readonly string[] {
+  if (!readiness) {
+    return [];
+  }
+  if (
+    readiness.status === "blocked_missing_required_facts" ||
+    readiness.status === "blocked_unsafe_context" ||
+    readiness.status === "blocked_stale_session" ||
+    readiness.status === "not_ready" ||
+    readiness.status === "unsupported" ||
+    readiness.status === "not_proven"
+  ) {
+    return unique([
+      `continuation-status:${readiness.status}`,
+      ...readiness.requiredMissingFacts.map((fact) => `continuation-required:${fact}`),
+      ...readiness.staleFacts.map((fact) => `continuation-stale:${fact}`),
+      ...readiness.unsafeFactsExcluded.map((fact) => `continuation-unsafe-excluded:${fact}`),
+    ]);
+  }
+  return [];
+}
+
+function continuationPlanningConstraints(
+  readiness?: ContinuationReadinessProjection,
+): readonly string[] {
+  if (!readiness) {
+    return [];
+  }
+  return unique([
+    `continuation-readiness:${readiness.status}`,
+    `continuation-context:${readiness.contextReadinessStatus}`,
+    ...readiness.requiredRefreshReads.map((read) => `continuation-required-refresh:${read}`),
+    ...readiness.optionalRefreshReads.map((read) => `continuation-optional-refresh:${read}`),
+  ]);
+}
+
+function continuationRequestBlockers(input: {
+  readonly boundary: ModelRequestBoundary;
+  readonly continuationReadiness?: ContinuationReadinessProjection;
+  readonly redactions: Set<string>;
+}): readonly string[] {
+  const readinessStatus =
+    input.continuationReadiness?.status ?? input.boundary.continuationReadinessStatus;
+  const contextStatus =
+    input.continuationReadiness?.contextReadinessStatus ??
+    input.boundary.continuationContextReadinessStatus;
+  if (!readinessStatus) {
+    return [];
+  }
+  const blockers = [
+    ...(readinessStatus.startsWith("blocked") ||
+        readinessStatus === "unsupported" ||
+        readinessStatus === "not_ready" ||
+        readinessStatus === "not_proven"
+      ? [`continuation:${readinessStatus}`]
+      : []),
+    ...(contextStatus?.startsWith("blocked") || contextStatus === "unsupported"
+      ? [`continuation-context:${contextStatus}`]
+      : []),
+  ];
+  return unique(blockers.map((value) => sanitizeText(value, input.redactions)));
 }
 
 function selectReadinessStatus(input: {

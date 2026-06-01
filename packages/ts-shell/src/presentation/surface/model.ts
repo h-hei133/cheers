@@ -619,6 +619,9 @@ function requestPreparationEventSections(input: ProductSurfaceInput): ProductSur
       provider ? `model=${factValue(provider.facts.modelSafeLabel)}` : undefined,
       request ? `included=${factValue(request.facts.includedMessageCount)}` : undefined,
       request ? `excluded=${factValue(request.facts.excludedMessageCount)}` : undefined,
+      request?.facts.continuationReadinessStatus !== undefined
+        ? `continuation=${factValue(request.facts.continuationReadinessStatus)}`
+        : undefined,
       blocked ? `blocked=${factValue(blocked.facts.readinessStatus)}` : undefined,
       "terminalSuccessClaim=false",
     ].filter(Boolean).join("; "),
@@ -635,6 +638,13 @@ function requestPreparationEventSections(input: ProductSurfaceInput): ProductSur
               value: blocked ? "resolve-request-blocker" : "explicit-invocation-required",
               machineEventCorrelationId: request.id,
             },
+            ...(request.facts.continuationReadinessStatus !== undefined
+              ? [{
+                  label: "continuationReadiness",
+                  value: factValue(request.facts.continuationReadinessStatus),
+                  machineEventCorrelationId: request.id,
+                }]
+              : []),
           ]
         : []),
       ...(provider
@@ -1139,7 +1149,7 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       title: "Provider",
       severity: "not_proven",
       status: "not_proven",
-      summary: `metadata=${trajectory.providerMetadataIds.length}; modelResponses=${stage("model-boundary")?.sourceIds.length ?? 0}; providerCalled=not-proven`,
+      summary: `metadata=${trajectory.providerMetadataIds.length}; requestPreparations=${trajectory.requestPreparationIds.length}; modelResponses=${stage("model-boundary")?.sourceIds.length ?? 0}; providerCalled=not-proven`,
       notProvenClaims: [
         ...(stage("provider-metadata")?.notProvenClaims ?? ["provider-called"]),
         ...(stage("model-boundary")?.notProvenClaims ?? []),

@@ -1117,6 +1117,30 @@ describe("product surface view model", () => {
   });
 
   it("renders request preparation facts without provider success inflation", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-request-surface",
+        projectRoot: "/workspace",
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "continue" }],
+      },
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({
+      sessionProjection,
+      requiredFacts: ["latest-save-point"],
+    });
+    const rebuildInput = buildLoopContextRebuildInput({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const continuationReadiness = evaluateContinuationReadiness({
+      sessionProjection,
+      contextRebuildProjection,
+      rebuildInput,
+      requiredFacts: ["latest-save-point"],
+    });
     const nextTurnBundle = prepareNextTurnBundle({
       bundleId: "bundle-request-surface",
       turnId: "turn-request-surface",
@@ -1148,7 +1172,9 @@ describe("product surface view model", () => {
         providerSafeLabel: "Provider",
         modelSafeLabel: "Model",
         providerReadinessStatus: "ready",
+        continuationReadiness,
       }),
+      continuationReadiness,
       instructionSummary: "safe instruction",
       taskSummary: "safe task",
     });
@@ -1164,7 +1190,8 @@ describe("product surface view model", () => {
     const rendered = viewModel ? renderTerminalMessage(viewModel).lines.join("\n") : "";
 
     expect(rendered).toContain("Request preparation");
-    expect(rendered).toContain("readiness=ready_for_explicit_model_invocation");
+    expect(rendered).toContain("readiness=blocked_by_missing_context");
+    expect(rendered).toContain("continuation=blocked_missing_required_facts");
     expect(rendered).toContain("provider=Provider");
     expect(rendered).toContain("terminalSuccessClaim=false");
     expect(viewModel?.terminalSuccessClaim).toBe(false);

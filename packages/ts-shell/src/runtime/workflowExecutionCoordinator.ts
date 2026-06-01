@@ -37,6 +37,10 @@ import {
 } from "./loop/trajectory.js";
 import { appendSingleFileEditRepairObservability } from "../evidence/turnEvidenceLedger.js";
 import { createModelResponseBoundary } from "../provider/response/boundary.js";
+import {
+  createModelRequestBoundary,
+  prepareNextTurnModelRequest,
+} from "../provider/request/boundary.js";
 import { projectProviderRegistry } from "../provider/registry/provider.js";
 import { projectWorkflowExecutionResultContract } from "../result/projection/workflow/runtime.js";
 import { evaluateContinuationReadiness } from "../session/continuation/readiness.js";
@@ -713,6 +717,86 @@ function projectProductPathLoopTrajectory(input: {
     rebuildInput: contextRebuildInput,
     optionalFacts: ["storage-backed-branch-navigation", "storage-backed-compaction"],
   });
+  const providerRegistry = projectProviderRegistry({
+    providers: [
+      {
+        providerId: input.providerMode === "real"
+          ? input.realProvider?.provider ?? "real-provider"
+          : "synthetic",
+        safeLabel: input.providerMode === "real"
+          ? input.realProvider?.provider ?? "real-provider"
+          : "synthetic-provider",
+        providerKind:
+          input.realProvider?.provider === "openai" ||
+            input.realProvider?.provider === "anthropic" ||
+            input.realProvider?.provider === "google" ||
+            input.realProvider?.provider === "openai-compatible"
+            ? input.realProvider.provider
+            : "unknown",
+        endpointClass: input.realProvider?.provider === "openai-compatible"
+          ? "openai-compatible"
+          : input.providerMode === "real"
+            ? "default"
+            : "unknown",
+        authMode: input.providerMode === "real"
+          ? input.realProvider?.accountAuth
+            ? "account-auth"
+            : input.realProvider?.apiKey
+              ? "api-key"
+              : "unknown"
+          : "none",
+        defaultEnabled: false,
+        requiresExplicitOptIn: true,
+        supportsFallback: "unknown",
+        compatibility: providerCompatibilityNotProven(),
+        riskLevel: input.providerMode === "real" ? "medium" : "low",
+      },
+    ],
+    models: input.realProvider?.model
+      ? [
+          {
+            modelId: input.realProvider.model,
+            safeLabel: input.realProvider.model,
+            providerId: input.realProvider.provider,
+            family: input.realProvider.provider,
+            compatibility: providerCompatibilityNotProven(),
+            knownLimitations: ["model-compatibility-not-proven-by-loop-observation"],
+          },
+        ]
+      : [],
+  });
+  const modelRequestBoundary = createModelRequestBoundary({
+    requestId: `workflow-request:${hashStableId(`${input.sessionId}:${input.turn}`)}`,
+    turnId: `${input.sessionId}:turn:${input.turn}:next`,
+    loopId: input.sessionId,
+    providerId: input.providerMode === "real"
+      ? input.realProvider?.provider ?? "real-provider"
+      : "synthetic",
+    providerMode: input.providerMode,
+    providerSafeLabel: input.providerMode === "real"
+      ? input.realProvider?.provider ?? "real-provider"
+      : "synthetic-provider",
+    modelSafeLabel: input.realProvider?.model ?? "model-not-selected",
+    providerReadinessStatus: input.realProvider ? "ready" : "missing",
+    providerRegistry,
+    continuationReadiness,
+    planningConstraints: nextTurnBundle.blockingFacts,
+    notProvenClaims: nextTurnBundle.notProvenClaims,
+  });
+  const requestPreparation = prepareNextTurnModelRequest({
+    nextTurnBundle,
+    modelRequestBoundary,
+    providerRegistry,
+    providerId: input.providerMode === "real"
+      ? input.realProvider?.provider ?? "real-provider"
+      : "synthetic",
+    modelId: input.realProvider?.model,
+    continuationReadiness,
+    instructionSummary: "safe continuation request facts prepared",
+    taskSummary: input.prompt,
+    contextConstraintIds: contextRebuildInput.missingFacts,
+    planningConstraintIds: modelRequestBoundary.planningConstraints,
+  });
   const resultFacts = input.execution.codingResult
     ? {
         status: input.execution.codingResult.taskSatisfaction.verdict,
@@ -733,6 +817,7 @@ function projectProductPathLoopTrajectory(input: {
     rebuildInput: contextRebuildInput,
     savePoint: input.savePoint,
     nextTurnBundle,
+    requestPreparation,
     verificationIntents: [verificationIntent],
     verificationResults: [verificationResult],
     repairRequiredHandoffs: repairRequired ? [repairRequired] : [],
@@ -773,6 +858,7 @@ function projectProductPathLoopTrajectory(input: {
           prepared: true,
           pendingFacts: input.savePoint.pendingNextTurnFacts,
           bundle: nextTurnBundle,
+          requestPreparation,
           steeringQueue,
           followUpQueue,
           deliveryPolicy,
@@ -819,54 +905,7 @@ function projectProductPathLoopTrajectory(input: {
     contextRebuildInput,
     continuationReadiness,
     replaySafeLoopStateSummary,
-    providerRegistry: projectProviderRegistry({
-      providers: [
-        {
-          providerId: input.providerMode === "real"
-            ? input.realProvider?.provider ?? "real-provider"
-            : "synthetic",
-          safeLabel: input.providerMode === "real"
-            ? input.realProvider?.provider ?? "real-provider"
-            : "synthetic-provider",
-          providerKind:
-            input.realProvider?.provider === "openai" ||
-              input.realProvider?.provider === "anthropic" ||
-              input.realProvider?.provider === "google" ||
-              input.realProvider?.provider === "openai-compatible"
-              ? input.realProvider.provider
-              : "unknown",
-          endpointClass: input.realProvider?.provider === "openai-compatible"
-            ? "openai-compatible"
-            : input.providerMode === "real"
-              ? "default"
-              : "unknown",
-          authMode: input.providerMode === "real"
-            ? input.realProvider?.accountAuth
-              ? "account-auth"
-              : input.realProvider?.apiKey
-                ? "api-key"
-                : "unknown"
-            : "none",
-          defaultEnabled: false,
-          requiresExplicitOptIn: true,
-          supportsFallback: "unknown",
-          compatibility: providerCompatibilityNotProven(),
-          riskLevel: input.providerMode === "real" ? "medium" : "low",
-        },
-      ],
-      models: input.realProvider?.model
-        ? [
-            {
-              modelId: input.realProvider.model,
-              safeLabel: input.realProvider.model,
-              providerId: input.realProvider.provider,
-              family: input.realProvider.provider,
-              compatibility: providerCompatibilityNotProven(),
-              knownLimitations: ["model-compatibility-not-proven-by-loop-observation"],
-            },
-          ]
-        : [],
-    }),
+    providerRegistry,
     resultFacts,
   });
 }

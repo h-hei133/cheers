@@ -87,6 +87,7 @@ export interface LoopTrajectoryProjection {
   readonly contextRebuildProjectionIds: readonly string[];
   readonly continuationReadinessIds: readonly string[];
   readonly replaySafeLoopStateSummaryIds: readonly string[];
+  readonly requestPreparationIds: readonly string[];
   readonly providerMetadataIds: readonly string[];
   readonly productSurfaceSectionIds: readonly string[];
   readonly stages: readonly LoopTrajectoryStage[];
@@ -429,6 +430,26 @@ export function projectLoopTrajectory(
       turn.nextTurn.bundle?.notProvenClaims ?? ["terminal-success", "next-turn-success"],
       turn.nextTurn.bundle ? [turn.nextTurn.bundle.bundleId] : [`turn:${turn.turn}`],
     );
+    if (turn.nextTurn.requestPreparation) {
+      append(
+        "provider-metadata",
+        "loop-provider-boundary-observed",
+        {
+          turn: turn.turn,
+          requestPreparationId: turn.nextTurn.requestPreparation.requestPreparationId,
+          requestReadinessStatus: turn.nextTurn.requestPreparation.readinessStatus,
+          continuationReadinessId: turn.nextTurn.requestPreparation.continuationReadinessId,
+          continuationReadinessStatus:
+            turn.nextTurn.requestPreparation.continuationReadinessStatus,
+          blockedReasons: turn.nextTurn.requestPreparation.blockedReasons,
+          providerMetadataId: turn.nextTurn.requestPreparation.providerMetadataId,
+          modelMetadataId: turn.nextTurn.requestPreparation.modelMetadataId,
+          terminalSuccessClaim: false,
+        },
+        turn.nextTurn.requestPreparation.notProvenClaims,
+        [turn.nextTurn.requestPreparation.requestPreparationId],
+      );
+    }
     append(
       "steering-queue",
       "loop-steering-queue-observed",
@@ -1170,6 +1191,11 @@ export function projectLoopTrajectory(
   const nextTurnBundleIds = turns.flatMap((turn) =>
     turn.nextTurn.bundle ? [turn.nextTurn.bundle.bundleId] : []
   );
+  const requestPreparationIds = turns.flatMap((turn) =>
+    turn.nextTurn.requestPreparation
+      ? [turn.nextTurn.requestPreparation.requestPreparationId]
+      : []
+  );
   const steeringMessageIds = turns.flatMap((turn) =>
     turn.nextTurn.steeringQueue.items.map((item) => item.steeringId)
   );
@@ -1279,10 +1305,12 @@ export function projectLoopTrajectory(
     replaySafeLoopStateSummaryIds: Object.freeze(input.replaySafeLoopStateSummary ? [
       input.replaySafeLoopStateSummary.summaryId,
     ] : []),
-    providerMetadataIds: Object.freeze(input.providerRegistry ? [
-      ...input.providerRegistry.providers.map((provider) => provider.providerId),
-      ...input.providerRegistry.models.map((model) => model.modelId),
-    ] : []),
+    requestPreparationIds: Object.freeze(Array.from(new Set(requestPreparationIds))),
+    providerMetadataIds: Object.freeze([
+      ...requestPreparationIds,
+      ...(input.providerRegistry?.providers.map((provider) => provider.providerId) ?? []),
+      ...(input.providerRegistry?.models.map((model) => model.modelId) ?? []),
+    ]),
     productSurfaceSectionIds,
     stages: Object.freeze(stages),
     events: Object.freeze(events),

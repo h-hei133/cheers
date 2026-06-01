@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import { createEvidenceOnlySavePoint } from "../../evidence/savepoint/model.js";
+import { createModelRequestBoundary, prepareNextTurnModelRequest } from "../../provider/request/boundary.js";
+import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { evaluateContinuationReadiness } from "../continuation/readiness.js";
 import { summarizeReplaySafeLoopState } from "./state.js";
@@ -78,6 +80,64 @@ describe("replay-safe loop state summary", () => {
     expect(summary.notProvenClaims).toContain("replay-safe-summary-is-not-success");
     expect(summary.notProvenClaims).toContain("replay-state-available-is-not-plan-validity");
     expect(summary.notProvenClaims).toContain("replayed-verification-intent-is-not-verification-passed");
+  });
+
+  it("carries request preparation blockers as replay-safe facts only", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-replay-request",
+        projectRoot: "/workspace",
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "continue" }],
+      },
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({
+      sessionProjection,
+      requiredFacts: ["latest-save-point"],
+    });
+    const rebuildInput = buildLoopContextRebuildInput({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const continuationReadiness = evaluateContinuationReadiness({
+      sessionProjection,
+      contextRebuildProjection,
+      rebuildInput,
+      requiredFacts: ["latest-save-point"],
+    });
+    const nextTurnBundle = prepareNextTurnBundle({
+      bundleId: "bundle-replay-request",
+      turnId: "turn-replay-request",
+      deliveryStatus: "waiting",
+    });
+    const requestPreparation = prepareNextTurnModelRequest({
+      nextTurnBundle,
+      modelRequestBoundary: createModelRequestBoundary({
+        requestId: "request-replay",
+        providerReadinessStatus: "ready",
+        continuationReadiness,
+      }),
+      continuationReadiness,
+    });
+    const summary = summarizeReplaySafeLoopState({
+      sessionProjection,
+      contextRebuildProjection,
+      continuationReadiness,
+      rebuildInput,
+      nextTurnBundle,
+      requestPreparation,
+    });
+
+    expect(summary.requestPreparationId).toBe(requestPreparation.requestPreparationId);
+    expect(summary.requestReadinessStatus).toBe("blocked_by_missing_context");
+    expect(summary.requestBlockedReasons).toEqual(
+      expect.arrayContaining(["continuation:blocked_missing_required_facts"]),
+    );
+    expect(summary.continuationReadinessStatus).toBe("blocked_missing_required_facts");
+    expect(summary.terminalSuccessClaim).toBe(false);
+    expect(summary.notProvenClaims).toContain("request-prepared-is-not-provider-call");
   });
 
   it("carries product completion packet facts without terminal truth", () => {

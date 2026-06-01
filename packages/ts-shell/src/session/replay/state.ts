@@ -1,6 +1,7 @@
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
+import type { NextTurnModelRequestPreparation } from "../../provider/request/boundary.js";
 import type { ReplaySafePlanningStateFacts } from "../../context/memory/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../../repair/handoff/boundary.js";
 import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
@@ -15,6 +16,10 @@ export interface ReplaySafeLoopStateSummary {
   readonly activePathId: string;
   readonly latestSavePointId?: string;
   readonly nextTurnBundleId?: string;
+  readonly requestPreparationId?: string;
+  readonly requestReadinessStatus?: string;
+  readonly requestBlockedReasons: readonly string[];
+  readonly continuationReadinessStatus?: string;
   readonly steeringMessageIds: readonly string[];
   readonly followUpMessageIds: readonly string[];
   readonly toolResultMessageIds: readonly string[];
@@ -74,6 +79,7 @@ export function summarizeReplaySafeLoopState(input: {
   readonly rebuildInput?: LoopContextRebuildInput;
   readonly savePoint?: RuntimeEvidenceSavePoint;
   readonly nextTurnBundle?: NextTurnBundleProjection;
+  readonly requestPreparation?: NextTurnModelRequestPreparation;
   readonly toolResultMessages?: ToolResultMessageBatch;
   readonly verificationIntents?: readonly VerificationLoopIntent[];
   readonly verificationResults?: readonly VerificationResultObservation[];
@@ -103,6 +109,16 @@ export function summarizeReplaySafeLoopState(input: {
     activePathId: `${input.sessionProjection.sessionIdentity}:active-path:${input.sessionProjection.activeLeafId}`,
     ...(input.savePoint ? { latestSavePointId: input.savePoint.id } : {}),
     ...(input.nextTurnBundle ? { nextTurnBundleId: input.nextTurnBundle.bundleId } : {}),
+    ...(input.requestPreparation
+      ? {
+          requestPreparationId: input.requestPreparation.requestPreparationId,
+          requestReadinessStatus: input.requestPreparation.readinessStatus,
+        }
+      : {}),
+    requestBlockedReasons: input.requestPreparation?.blockedReasons ?? [],
+    ...(input.requestPreparation?.continuationReadinessStatus
+      ? { continuationReadinessStatus: input.requestPreparation.continuationReadinessStatus }
+      : {}),
     steeringMessageIds: input.nextTurnBundle?.steeringMessageIds ?? [],
     followUpMessageIds: input.nextTurnBundle?.followUpMessageIds ?? [],
     toolResultMessageIds: input.toolResultMessages?.messages.map((message) => message.messageId) ?? [],
@@ -135,6 +151,7 @@ export function summarizeReplaySafeLoopState(input: {
       ...input.sessionProjection.terminal.notProvenClaims,
       ...input.contextRebuildProjection.notProvenClaims,
       ...input.continuationReadiness.notProvenClaims,
+      ...(input.requestPreparation?.notProvenClaims ?? []),
     ],
     redaction: {
       status:

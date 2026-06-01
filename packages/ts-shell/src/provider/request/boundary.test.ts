@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { ContextPlanningBlockSummary } from "../../context/acquisition/summary.js";
+import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
+import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
+import { evaluateContinuationReadiness } from "../../session/continuation/readiness.js";
+import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectProviderRegistry, unknownProviderCompatibilityFlags } from "../registry/provider.js";
 import { createModelRequestBoundary, prepareNextTurnModelRequest } from "./boundary.js";
@@ -135,6 +139,78 @@ describe("model request boundary", () => {
         "request-prepared-is-not-provider-call",
         "provider-metadata-is-not-provider-success",
         "safe-message-prepared-is-not-model-response",
+      ]),
+    );
+  });
+
+  it("uses continuation readiness to block unsafe next-turn requests without success inflation", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-request-continuation",
+        projectRoot: "/workspace",
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "continue" }],
+      },
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({
+      sessionProjection,
+      requiredFacts: ["latest-save-point"],
+      staleFacts: ["workspace-index"],
+    });
+    const rebuildInput = buildLoopContextRebuildInput({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const continuationReadiness = evaluateContinuationReadiness({
+      sessionProjection,
+      contextRebuildProjection,
+      rebuildInput,
+      requiredFacts: ["latest-save-point"],
+      staleFacts: ["workspace-index"],
+    });
+    const nextTurnBundle = prepareNextTurnBundle({
+      bundleId: "bundle-continuation",
+      turnId: "turn-continuation",
+      toolResultMessages: toolMessages("report-safe"),
+      deliveryStatus: "waiting",
+    });
+    const boundary = createModelRequestBoundary({
+      requestId: "request-continuation",
+      providerSafeLabel: "Synthetic provider",
+      modelSafeLabel: "Fixture model",
+      providerReadinessStatus: "ready",
+      providerRegistry: providerRegistry(),
+      continuationReadiness,
+    });
+    const preparation = prepareNextTurnModelRequest({
+      nextTurnBundle,
+      modelRequestBoundary: boundary,
+      providerRegistry: providerRegistry(),
+      continuationReadiness,
+    });
+
+    expect(boundary).toMatchObject({
+      readinessStatus: "blocked_missing_required_facts",
+      continuationReadinessId: continuationReadiness.readinessId,
+      continuationReadinessStatus: "blocked_missing_required_facts",
+      terminalSuccessClaim: false,
+    });
+    expect(preparation).toMatchObject({
+      readinessStatus: "blocked_by_missing_context",
+      continuationReadinessId: continuationReadiness.readinessId,
+      continuationReadinessStatus: "blocked_missing_required_facts",
+      terminalSuccessClaim: false,
+    });
+    expect(preparation.continuationBlockedReasons).toEqual(
+      expect.arrayContaining(["continuation:blocked_missing_required_facts"]),
+    );
+    expect(preparation.safeRequestMessages.map((message) => message.source)).toContain("continuation");
+    expect(preparation.notProvenClaims).toEqual(
+      expect.arrayContaining([
+        "continuation-readiness-is-not-provider-call",
+        "continuation-readiness-is-not-task-success",
       ]),
     );
   });

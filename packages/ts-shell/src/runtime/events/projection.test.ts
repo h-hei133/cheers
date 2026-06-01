@@ -1493,6 +1493,30 @@ describe("runtime event projection", () => {
   });
 
   it("projects next-turn request preparation and safe request messages as observation-only events", () => {
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-request-events",
+        projectRoot: "/workspace",
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "continue" }],
+      },
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({
+      sessionProjection,
+      requiredFacts: ["latest-save-point"],
+    });
+    const rebuildInput = buildLoopContextRebuildInput({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const continuationReadiness = evaluateContinuationReadiness({
+      sessionProjection,
+      contextRebuildProjection,
+      rebuildInput,
+      requiredFacts: ["latest-save-point"],
+    });
     const nextTurnBundle = prepareNextTurnBundle({
       bundleId: "bundle-request-events",
       turnId: "turn-request-events",
@@ -1522,10 +1546,12 @@ describe("runtime event projection", () => {
       providerSafeLabel: "Provider",
       modelSafeLabel: "Model",
       providerReadinessStatus: "ready",
+      continuationReadiness,
     });
     const preparation = prepareNextTurnModelRequest({
       nextTurnBundle,
       modelRequestBoundary: requestBoundary,
+      continuationReadiness,
       instructionSummary: "safe instruction",
       taskSummary: "safe task",
     });
@@ -1539,8 +1565,17 @@ describe("runtime event projection", () => {
         "request-input-message-prepared",
         "provider-metadata-observed",
         "provider-opt-in-required",
-        "request-ready-for-explicit-invocation",
+        "request-blocked",
       ]),
+    );
+    const requestEvent = events.find((event) =>
+      event.type === "next-turn-request-preparation-observed"
+    );
+    expect(requestEvent?.facts.continuationReadinessStatus).toBe(
+      "blocked_missing_required_facts",
+    );
+    expect(requestEvent?.facts.continuationBlockedReasons).toEqual(
+      expect.arrayContaining(["continuation:blocked_missing_required_facts"]),
     );
     expect(events.every((event) => event.facts.terminalSuccessClaim !== true)).toBe(true);
     expect(JSON.stringify(events)).not.toMatch(/provider\.env|hidden reasoning|token=secret/i);
