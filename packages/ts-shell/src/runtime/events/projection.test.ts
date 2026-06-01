@@ -1096,6 +1096,40 @@ describe("runtime event projection", () => {
       contextRebuildProjection,
       continuationReadiness: missingRequiredReadiness,
       rebuildInput,
+      toolOutcomeBundle: {
+        bundleId: "tool-outcome-bundle:events-replay",
+        sourceBatchId: "tool-result-batch:events-replay",
+        resultMessageIds: ["tool-result-message:call-read"],
+        receiptIds: [],
+        executedCount: 0,
+        failedCount: 1,
+        blockedCount: 0,
+        authorityRequiredCount: 0,
+        unsupportedCount: 0,
+        malformedCount: 0,
+        unknownCount: 0,
+        notDispatchedCount: 0,
+        mixedOutcomeStatus: "single_non_success",
+        nextAction: "review_failed_result",
+        nextActionReason: "failed tool needs review",
+        redactionStatus: "report-safe",
+        detailStatuses: [{
+          toolCallId: "call-read",
+          toolName: "read",
+          resultStatus: "executed_failed",
+          terminalSuccessClaim: false,
+        }],
+        carryForwardFacts: {
+          status: "single_non_success",
+          nextAction: "review_failed_result",
+          resultMessageIds: ["tool-result-message:call-read"],
+          blockedReasons: ["call-read:executed_failed"],
+          terminalSuccessClaim: false,
+        },
+        blockingFacts: ["call-read:executed_failed"],
+        notProvenClaims: ["tool-outcome-bundle-is-not-task-success"],
+        terminalSuccessClaim: false,
+      },
       terminalResultFacts: {
         status: "stopped_error",
         terminalClassification: "stopped",
@@ -1127,6 +1161,14 @@ describe("runtime event projection", () => {
         "replay-safe-summary-is-not-success",
       ]),
     );
+    expect(events.find((event) => event.type === "replay-safe-loop-state-summarized")?.facts)
+      .toMatchObject({
+        toolOutcomeBundleId: "tool-outcome-bundle:events-replay",
+        toolOutcomeStatus: "single_non_success",
+        toolOutcomeNextAction: "review_failed_result",
+        toolOutcomeBlockedReasons: ["call-read:executed_failed"],
+        terminalSuccessClaim: false,
+      });
     expect(serialized).not.toMatch(/private-agents-real|secret branch summary/i);
   });
 

@@ -9,6 +9,7 @@ export type LoopInfrastructureCategory =
   | "execution-receipt"
   | "tool-result-details"
   | "tool-result-messages"
+  | "tool-outcome"
   | "after-tool-annotation"
   | "save-point"
   | "next-turn-preparation"
@@ -76,6 +77,7 @@ export const LOOP_INFRASTRUCTURE_CATEGORIES = [
   "execution-receipt",
   "tool-result-details",
   "tool-result-messages",
+  "tool-outcome",
   "after-tool-annotation",
   "save-point",
   "next-turn-preparation",
@@ -138,6 +140,11 @@ export function createLoopInfrastructureMap(): LoopInfrastructureMap {
     entry("tool-result-messages", "turn", "next_turn", "connected", "ToolResultMessageBatch", [
       "next-turn-success",
       "tool-success",
+    ]),
+    entry("tool-outcome", "tools", "tools", "connected", "ToolOutcomeBundleProjection", [
+      "tool-success",
+      "task-success",
+      "next-turn-success",
     ]),
     entry("after-tool-annotation", "tools", "tools", "connected", "ToolAfterObservationAnnotation", [
       "tool-success",

@@ -2,6 +2,7 @@ import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
 import type { NextTurnModelRequestPreparation } from "../../provider/request/boundary.js";
+import type { ToolOutcomeBundleProjection } from "../../tools/toolOutcomeBundle.js";
 import type { ReplaySafePlanningStateFacts } from "../../context/memory/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../../repair/handoff/boundary.js";
 import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
@@ -19,6 +20,10 @@ export interface ReplaySafeLoopStateSummary {
   readonly requestPreparationId?: string;
   readonly requestReadinessStatus?: string;
   readonly requestBlockedReasons: readonly string[];
+  readonly toolOutcomeBundleId?: string;
+  readonly toolOutcomeStatus?: string;
+  readonly toolOutcomeNextAction?: string;
+  readonly toolOutcomeBlockedReasons: readonly string[];
   readonly continuationReadinessStatus?: string;
   readonly steeringMessageIds: readonly string[];
   readonly followUpMessageIds: readonly string[];
@@ -80,6 +85,7 @@ export function summarizeReplaySafeLoopState(input: {
   readonly savePoint?: RuntimeEvidenceSavePoint;
   readonly nextTurnBundle?: NextTurnBundleProjection;
   readonly requestPreparation?: NextTurnModelRequestPreparation;
+  readonly toolOutcomeBundle?: ToolOutcomeBundleProjection;
   readonly toolResultMessages?: ToolResultMessageBatch;
   readonly verificationIntents?: readonly VerificationLoopIntent[];
   readonly verificationResults?: readonly VerificationResultObservation[];
@@ -116,6 +122,14 @@ export function summarizeReplaySafeLoopState(input: {
         }
       : {}),
     requestBlockedReasons: input.requestPreparation?.blockedReasons ?? [],
+    ...(input.toolOutcomeBundle
+      ? {
+          toolOutcomeBundleId: input.toolOutcomeBundle.bundleId,
+          toolOutcomeStatus: input.toolOutcomeBundle.carryForwardFacts.status,
+          toolOutcomeNextAction: input.toolOutcomeBundle.carryForwardFacts.nextAction,
+        }
+      : {}),
+    toolOutcomeBlockedReasons: input.toolOutcomeBundle?.carryForwardFacts.blockedReasons ?? [],
     ...(input.requestPreparation?.continuationReadinessStatus
       ? { continuationReadinessStatus: input.requestPreparation.continuationReadinessStatus }
       : {}),
@@ -152,6 +166,7 @@ export function summarizeReplaySafeLoopState(input: {
       ...input.contextRebuildProjection.notProvenClaims,
       ...input.continuationReadiness.notProvenClaims,
       ...(input.requestPreparation?.notProvenClaims ?? []),
+      ...(input.toolOutcomeBundle?.notProvenClaims ?? []),
     ],
     redaction: {
       status:

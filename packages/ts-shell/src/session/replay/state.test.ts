@@ -121,6 +121,40 @@ describe("replay-safe loop state summary", () => {
       }),
       continuationReadiness,
     });
+    const toolOutcomeBundle = {
+      bundleId: "tool-outcome-bundle:replay",
+      sourceBatchId: "tool-result-batch:replay",
+      resultMessageIds: ["tool-result-message:call-read"],
+      receiptIds: [],
+      executedCount: 0,
+      failedCount: 1,
+      blockedCount: 0,
+      authorityRequiredCount: 0,
+      unsupportedCount: 0,
+      malformedCount: 0,
+      unknownCount: 0,
+      notDispatchedCount: 0,
+      mixedOutcomeStatus: "single_non_success" as const,
+      nextAction: "review_failed_result" as const,
+      nextActionReason: "failed tool needs review",
+      redactionStatus: "report-safe" as const,
+      detailStatuses: [{
+        toolCallId: "call-read",
+        toolName: "read",
+        resultStatus: "executed_failed" as const,
+        terminalSuccessClaim: false as const,
+      }],
+      carryForwardFacts: {
+        status: "single_non_success" as const,
+        nextAction: "review_failed_result" as const,
+        resultMessageIds: ["tool-result-message:call-read"],
+        blockedReasons: ["call-read:executed_failed"],
+        terminalSuccessClaim: false as const,
+      },
+      blockingFacts: ["call-read:executed_failed"],
+      notProvenClaims: ["tool-outcome-bundle-is-not-task-success"],
+      terminalSuccessClaim: false as const,
+    };
     const summary = summarizeReplaySafeLoopState({
       sessionProjection,
       contextRebuildProjection,
@@ -128,6 +162,7 @@ describe("replay-safe loop state summary", () => {
       rebuildInput,
       nextTurnBundle,
       requestPreparation,
+      toolOutcomeBundle,
     });
 
     expect(summary.requestPreparationId).toBe(requestPreparation.requestPreparationId);
@@ -136,8 +171,12 @@ describe("replay-safe loop state summary", () => {
       expect.arrayContaining(["continuation:blocked_missing_required_facts"]),
     );
     expect(summary.continuationReadinessStatus).toBe("blocked_missing_required_facts");
+    expect(summary.toolOutcomeStatus).toBe("single_non_success");
+    expect(summary.toolOutcomeNextAction).toBe("review_failed_result");
+    expect(summary.toolOutcomeBlockedReasons).toEqual(["call-read:executed_failed"]);
     expect(summary.terminalSuccessClaim).toBe(false);
     expect(summary.notProvenClaims).toContain("request-prepared-is-not-provider-call");
+    expect(summary.notProvenClaims).toContain("tool-outcome-bundle-is-not-task-success");
   });
 
   it("carries product completion packet facts without terminal truth", () => {

@@ -45,6 +45,13 @@ export interface ToolOutcomeBundleProjection {
     readonly resultStatus: ToolResultDetail["resultStatus"];
     readonly terminalSuccessClaim: false;
   }[];
+  readonly carryForwardFacts: {
+    readonly status: ToolOutcomeMixedStatus;
+    readonly nextAction: ToolOutcomeNextAction;
+    readonly resultMessageIds: readonly string[];
+    readonly blockedReasons: readonly string[];
+    readonly terminalSuccessClaim: false;
+  };
   readonly blockingFacts: readonly string[];
   readonly notProvenClaims: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -106,13 +113,21 @@ export function createToolOutcomeBundle(input: {
     resultMessageCount: resultMessages.length,
   });
 
+  const resultMessageIds = freeze(unique(resultMessages.map((message) => message.messageId)));
+  const blockedReasons = freeze(blockingFacts(details));
+  const outcomeStatus = mixedStatus({
+    callCount: plan.calls.length,
+    executedSuccessCount,
+    nonSuccessCount,
+  });
+
   return freeze({
     bundleId: sanitizeId(`tool-outcome-bundle:${input.dispatchResult.resultBatchId}`),
     sourceBatchId: sanitizeId(input.dispatchResult.resultBatchId),
     ...(input.sourceModelBoundaryId ?? plan.responseId
       ? { sourceModelBoundaryId: sanitizeText(input.sourceModelBoundaryId ?? plan.responseId, 160) }
       : {}),
-    resultMessageIds: freeze(unique(resultMessages.map((message) => message.messageId))),
+    resultMessageIds,
     receiptIds: freeze(unique(input.dispatchResult.executionReceipts.map(receiptId))),
     executedCount,
     failedCount,
@@ -122,11 +137,7 @@ export function createToolOutcomeBundle(input: {
     malformedCount,
     unknownCount,
     notDispatchedCount,
-    mixedOutcomeStatus: mixedStatus({
-      callCount: plan.calls.length,
-      executedSuccessCount,
-      nonSuccessCount,
-    }),
+    mixedOutcomeStatus: outcomeStatus,
     nextAction: nextAction.action,
     nextActionReason: nextAction.reason,
     redactionStatus: redactionStatus(plan, details, input.dispatchResult.executionReceipts),
@@ -138,7 +149,14 @@ export function createToolOutcomeBundle(input: {
         terminalSuccessClaim: false as const,
       })
     )),
-    blockingFacts: freeze(blockingFacts(details)),
+    carryForwardFacts: freeze({
+      status: outcomeStatus,
+      nextAction: nextAction.action,
+      resultMessageIds,
+      blockedReasons,
+      terminalSuccessClaim: false,
+    }),
+    blockingFacts: blockedReasons,
     notProvenClaims: unique([
       "terminal-success",
       "task-success",

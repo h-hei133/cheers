@@ -75,6 +75,17 @@ describe("tool outcome bundle", () => {
         "call-bad:unsupported_tool",
       ]),
     );
+    expect(bundle.carryForwardFacts).toMatchObject({
+      status: "mixed_success_and_non_success",
+      nextAction: "surface_blocked_result",
+      terminalSuccessClaim: false,
+    });
+    expect(bundle.carryForwardFacts.blockedReasons).toEqual(
+      expect.arrayContaining([
+        "call-blocked:blocked_by_policy",
+        "call-bad:unsupported_tool",
+      ]),
+    );
     expect(bundle.notProvenClaims).toEqual(
       expect.arrayContaining([
         "task-success",
@@ -83,6 +94,39 @@ describe("tool outcome bundle", () => {
         "tool-outcome-next-action-is-not-task-success",
       ]),
     );
+  });
+
+  it("keeps failed tool carry-forward as review-only and non-terminal", async () => {
+    const dispatchResult = await dispatchToolBatch({
+      batch: batch([{ id: "call-read", name: "read", arguments: { path: "a.ts" } }]),
+      context: { taskId: "task", workspaceRoot: "/workspace" },
+      dispatchPolicy: "sequential",
+      dispatch: async () => ({
+        success: false,
+        error: "safe failure",
+      }),
+    });
+    const resultMessages = prepareToolResultMessages({
+      dispatchPlan: dispatchResult.dispatchPlan,
+      resultDetails: dispatchResult.resultDetails,
+    });
+    const bundle = createToolOutcomeBundle({
+      dispatchResult,
+      resultMessages,
+      sourceModelBoundaryId: "response-failed-tool",
+    });
+
+    expect(bundle.nextAction).toBe("review_failed_result");
+    expect(bundle.carryForwardFacts).toMatchObject({
+      status: "single_non_success",
+      nextAction: "review_failed_result",
+      terminalSuccessClaim: false,
+    });
+    expect(bundle.carryForwardFacts.blockedReasons).toEqual([
+      "call-read:executed_failed",
+    ]);
+    expect(bundle.notProvenClaims).toContain("terminal-success");
+    expect(JSON.stringify(bundle)).not.toContain('"success":true');
   });
 
   it("redacts unsafe report fields and keeps claims evidence-only", async () => {

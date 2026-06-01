@@ -199,6 +199,7 @@ export function projectProductSurfaceViewModel(
     ...sessionSections(input),
     ...toolOutcomeEventSections(input),
     ...requestPreparationEventSections(input),
+    ...replayCarryForwardEventSections(input),
     ...modelInvocationEventSections(input),
     ...controlledInvocationEventSections(input),
     ...responseReentryEventSections(input),
@@ -672,6 +673,52 @@ function requestPreparationEventSections(input: ProductSurfaceInput): ProductSur
         event.type === "request-input-message-prepared"
       )
       .flatMap((event) => event.notProvenClaims),
+  })];
+}
+
+function replayCarryForwardEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const summary = (input.runtimeEvents ?? []).find((event) =>
+    event.type === "replay-safe-loop-state-summarized"
+  );
+  if (!summary) {
+    return [];
+  }
+  return [section({
+    kind: "session",
+    title: "Replay carry forward",
+    severity: "info",
+    status: "observed",
+    summary: [
+      `summary=${factValue(summary.facts.summaryId)}`,
+      `request=${factValue(summary.facts.requestReadinessStatus)}`,
+      `toolOutcome=${factValue(summary.facts.toolOutcomeStatus)}`,
+      `nextAction=${factValue(summary.facts.toolOutcomeNextAction)}`,
+      "terminalSuccessClaim=false",
+    ].join("; "),
+    facts: [
+      {
+        label: "activePath",
+        value: factValue(summary.facts.activePathId),
+        machineEventCorrelationId: summary.id,
+      },
+      {
+        label: "requestPreparation",
+        value: factValue(summary.facts.requestPreparationId),
+        machineEventCorrelationId: summary.id,
+      },
+      {
+        label: "toolOutcome",
+        value: factValue(summary.facts.toolOutcomeBundleId),
+        machineEventCorrelationId: summary.id,
+      },
+      {
+        label: "blockedReasons",
+        value: factValue(summary.facts.toolOutcomeBlockedReasons),
+        machineEventCorrelationId: summary.id,
+      },
+    ],
+    machineEventCorrelationIds: [summary.id],
+    notProvenClaims: summary.notProvenClaims,
   })];
 }
 
@@ -1166,11 +1213,12 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
           observed("tool-result-details") === "observed"
         ? "observed"
         : "not_proven",
-      summary: `toolBatches=${stage("tool-call-batch")?.sourceIds.length ?? 0}; dispatch=${observed("before-tool-policy")}; toolResults=${observed("tool-result-details")}; resultMessages=${trajectory.toolResultMessageIds.length}; receipts=${trajectory.receiptIds.length}; executed=${executedTools}; blocked=${blockedTools}; authorityRequired=${authorityRequiredTools}; failed=${failedTools}; unsupported=${unsupportedTools}; notDispatched=${notDispatchedTools}; toolSuccess=not-proven`,
+      summary: `toolBatches=${stage("tool-call-batch")?.sourceIds.length ?? 0}; dispatch=${observed("before-tool-policy")}; toolResults=${observed("tool-result-details")}; outcomes=${trajectory.toolOutcomeBundleIds.length}; resultMessages=${trajectory.toolResultMessageIds.length}; receipts=${trajectory.receiptIds.length}; executed=${executedTools}; blocked=${blockedTools}; authorityRequired=${authorityRequiredTools}; failed=${failedTools}; unsupported=${unsupportedTools}; notDispatched=${notDispatchedTools}; toolSuccess=not-proven`,
       notProvenClaims: [
         ...(stage("tool-call-batch")?.notProvenClaims ?? []),
         ...(stage("tool-result-details")?.notProvenClaims ?? []),
         ...(stage("tool-result-messages")?.notProvenClaims ?? []),
+        ...(stage("tool-outcome")?.notProvenClaims ?? []),
       ],
     }),
     section({

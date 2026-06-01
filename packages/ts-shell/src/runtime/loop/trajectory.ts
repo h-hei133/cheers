@@ -63,6 +63,7 @@ export interface LoopTrajectoryProjection {
   readonly eventIds: readonly string[];
   readonly receiptIds: readonly string[];
   readonly toolPolicyIds: readonly string[];
+  readonly toolOutcomeBundleIds: readonly string[];
   readonly toolResultMessageIds: readonly string[];
   readonly savePointIds: readonly string[];
   readonly nextTurnBundleIds: readonly string[];
@@ -400,6 +401,24 @@ export function projectLoopTrajectory(
           },
           annotation.notProvenClaims,
           [annotation.annotationId],
+        );
+      }
+      if (turn.toolResultBatch.outcomeBundle) {
+        append(
+          "tool-outcome",
+          "tool-outcome-bundle-observed",
+          {
+            turn: turn.turn,
+            bundleId: turn.toolResultBatch.outcomeBundle.bundleId,
+            sourceBatchId: turn.toolResultBatch.outcomeBundle.sourceBatchId,
+            mixedOutcomeStatus: turn.toolResultBatch.outcomeBundle.mixedOutcomeStatus,
+            nextAction: turn.toolResultBatch.outcomeBundle.nextAction,
+            resultMessageIds: turn.toolResultBatch.outcomeBundle.resultMessageIds,
+            blockedReasons: turn.toolResultBatch.outcomeBundle.blockingFacts,
+            terminalSuccessClaim: false,
+          },
+          turn.toolResultBatch.outcomeBundle.notProvenClaims,
+          [turn.toolResultBatch.outcomeBundle.bundleId],
         );
       }
     }
@@ -1051,6 +1070,12 @@ export function projectLoopTrajectory(
         activePathId: input.replaySafeLoopStateSummary.activePathId,
         latestSavePointId: input.replaySafeLoopStateSummary.latestSavePointId,
         nextTurnBundleId: input.replaySafeLoopStateSummary.nextTurnBundleId,
+        requestPreparationId: input.replaySafeLoopStateSummary.requestPreparationId,
+        requestReadinessStatus: input.replaySafeLoopStateSummary.requestReadinessStatus,
+        toolOutcomeBundleId: input.replaySafeLoopStateSummary.toolOutcomeBundleId,
+        toolOutcomeStatus: input.replaySafeLoopStateSummary.toolOutcomeStatus,
+        toolOutcomeNextAction: input.replaySafeLoopStateSummary.toolOutcomeNextAction,
+        toolOutcomeBlockedReasons: input.replaySafeLoopStateSummary.toolOutcomeBlockedReasons,
         contextRebuildProjectionId:
           input.replaySafeLoopStateSummary.contextRebuildProjectionId,
         continuationReadinessId:
@@ -1188,6 +1213,9 @@ export function projectLoopTrajectory(
   const toolResultMessageIds = turns.flatMap((turn) =>
     turn.toolResultBatch?.resultMessages?.messages.map((message) => message.messageId) ?? []
   );
+  const toolOutcomeBundleIds = turns.flatMap((turn) =>
+    turn.toolResultBatch?.outcomeBundle ? [turn.toolResultBatch.outcomeBundle.bundleId] : []
+  );
   const nextTurnBundleIds = turns.flatMap((turn) =>
     turn.nextTurn.bundle ? [turn.nextTurn.bundle.bundleId] : []
   );
@@ -1256,6 +1284,7 @@ export function projectLoopTrajectory(
     eventIds: Object.freeze(events.map((event) => event.id)),
     receiptIds: Object.freeze(receiptIds),
     toolPolicyIds: Object.freeze(Array.from(new Set(toolPolicyIds))),
+    toolOutcomeBundleIds: Object.freeze(Array.from(new Set(toolOutcomeBundleIds))),
     toolResultMessageIds: Object.freeze(Array.from(new Set(toolResultMessageIds))),
     savePointIds: Object.freeze(turns.map((turn) => turn.savePoint.id)),
     nextTurnBundleIds: Object.freeze(Array.from(new Set(nextTurnBundleIds))),

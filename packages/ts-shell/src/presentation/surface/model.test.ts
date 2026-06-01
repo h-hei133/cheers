@@ -757,6 +757,40 @@ describe("product surface view model", () => {
       contextRebuildProjection,
       continuationReadiness,
       rebuildInput: contextRebuildInput,
+      toolOutcomeBundle: {
+        bundleId: "tool-outcome-bundle:surface-replay",
+        sourceBatchId: "tool-result-batch:surface-replay",
+        resultMessageIds: ["tool-result-message:call-read"],
+        receiptIds: [],
+        executedCount: 1,
+        failedCount: 0,
+        blockedCount: 0,
+        authorityRequiredCount: 0,
+        unsupportedCount: 0,
+        malformedCount: 0,
+        unknownCount: 0,
+        notDispatchedCount: 0,
+        mixedOutcomeStatus: "single_success",
+        nextAction: "prepare_next_turn",
+        nextActionReason: "safe tool result message is ready",
+        redactionStatus: "report-safe",
+        detailStatuses: [{
+          toolCallId: "call-read",
+          toolName: "read",
+          resultStatus: "executed_success",
+          terminalSuccessClaim: false,
+        }],
+        carryForwardFacts: {
+          status: "single_success",
+          nextAction: "prepare_next_turn",
+          resultMessageIds: ["tool-result-message:call-read"],
+          blockedReasons: [],
+          terminalSuccessClaim: false,
+        },
+        blockingFacts: [],
+        notProvenClaims: ["tool-outcome-bundle-is-not-task-success"],
+        terminalSuccessClaim: false,
+      },
       terminalResultFacts: {
         status: "stopped_error",
         terminalClassification: "stopped",
@@ -772,6 +806,9 @@ describe("product surface view model", () => {
       continuationReadiness,
       replaySafeLoopStateSummary,
     });
+    const runtimeEvents = projectRuntimeEvents({
+      replaySafeLoopStateSummaries: [replaySafeLoopStateSummary],
+    });
 
     const viewModel = projectProductSurfaceViewModel({
       status: "stopped_error",
@@ -779,6 +816,7 @@ describe("product surface view model", () => {
       terminalReason: "stopped_error",
       codingResult: codingResult(),
       loopTrajectory: trajectory,
+      runtimeEvents,
     });
     const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
 
@@ -788,6 +826,9 @@ describe("product surface view model", () => {
     expect(rendered).toContain("compaction=observed");
     expect(rendered).toContain("rebuildInputs=1");
     expect(rendered).toContain("contextSuccess=not-proven");
+    expect(rendered).toContain("Replay carry forward");
+    expect(rendered).toContain("toolOutcome=single_success");
+    expect(rendered).toContain("nextAction=prepare_next_turn");
     expect(rendered).not.toContain("Outcome: success");
     expect(viewModel?.terminalSuccessClaim).toBe(false);
   });

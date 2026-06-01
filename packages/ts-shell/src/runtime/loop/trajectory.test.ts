@@ -18,6 +18,8 @@ import {
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { evaluateContinuationReadiness } from "../../session/continuation/readiness.js";
 import { summarizeReplaySafeLoopState } from "../../session/replay/state.js";
+import { projectProductSurfaceViewModel } from "../../presentation/surface/model.js";
+import { renderTerminalMessage } from "../../presentation/terminal/renderer.js";
 import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,
@@ -33,6 +35,7 @@ import {
 } from "../../verification/result/boundary.js";
 import { projectVerificationReceipt } from "../../verification/verificationFacade.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
+import { projectRuntimeEvents } from "../events/projection.js";
 import {
   projectPackageResourceInventory,
   type PackageManifestContract,
@@ -49,6 +52,140 @@ import {
 import { projectLoopTrajectory } from "./trajectory.js";
 
 describe("loop trajectory projection", () => {
+  it("connects a turn lane through request preparation, tool outcome, replay, surface, and result truth", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-lane",
+      workspaceRoot: "/workspace",
+      prompt: "read a safe file and continue",
+      providerOptIn: false,
+      maxTurns: 1,
+      toolBatchPolicy: "sequential",
+      modelBoundary: async () => ({
+        responseId: "response-lane",
+        stopReason: "tool-calls",
+        toolCalls: [{ id: "call-read", name: "read", arguments: { path: "src/app.ts" } }],
+      }),
+      toolBatchDispatch: async () => ({
+        success: true,
+        content: "safe file summary",
+      }),
+    });
+    const turn = loop.turns[0];
+    expect(turn).toBeDefined();
+    const sessionProjection = projectSessionTree({
+      session: {
+        id: "sess-lane",
+        projectRoot: "/workspace",
+        createdAt: "2026-06-02T00:00:00.000Z",
+        updatedAt: "2026-06-02T00:00:01.000Z",
+        status: "active",
+        turns: [{ role: "user", content: "read a safe file and continue" }],
+      },
+    });
+    const contextRebuildProjection = projectSessionContextRebuild({ sessionProjection });
+    const contextRebuildInput = buildLoopContextRebuildInput({
+      sessionProjection,
+      contextRebuildProjection,
+    });
+    const continuationReadiness = evaluateContinuationReadiness({
+      sessionProjection,
+      contextRebuildProjection,
+      rebuildInput: contextRebuildInput,
+    });
+    const replaySafeLoopStateSummary = summarizeReplaySafeLoopState({
+      sessionProjection,
+      contextRebuildProjection,
+      continuationReadiness,
+      rebuildInput: contextRebuildInput,
+      savePoint: turn!.savePoint,
+      nextTurnBundle: turn!.nextTurn.bundle,
+      requestPreparation: turn!.nextTurn.requestPreparation,
+      toolOutcomeBundle: turn!.toolResultBatch?.outcomeBundle,
+      toolResultMessages: turn!.toolResultBatch?.resultMessages,
+      terminalResultFacts: {
+        status: "stopped",
+        terminalClassification: "stopped",
+        terminalReason: "stopped_error",
+      },
+    });
+    const runtimeEvents = projectRuntimeEvents({
+      toolOutcomeBundles: turn!.toolResultBatch?.outcomeBundle
+        ? [turn!.toolResultBatch.outcomeBundle]
+        : [],
+      nextTurnBundles: turn!.nextTurn.bundle ? [turn!.nextTurn.bundle] : [],
+      nextTurnRequestPreparations: turn!.nextTurn.requestPreparation
+        ? [turn!.nextTurn.requestPreparation]
+        : [],
+      replaySafeLoopStateSummaries: [replaySafeLoopStateSummary],
+      resultFacts: {
+        status: "stopped",
+        terminalClassification: "stopped",
+        terminalReason: "stopped_error",
+        verdictSource: "result",
+      },
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "loop-lane",
+      prompt: "read a safe file and continue",
+      loop,
+      sessionProjection,
+      contextRebuildProjection,
+      contextRebuildInput,
+      continuationReadiness,
+      replaySafeLoopStateSummary,
+      resultFacts: {
+        status: "stopped",
+        terminalClassification: "stopped",
+        terminalReason: "stopped_error",
+        verdictSource: "result",
+      },
+    });
+    const surface = projectProductSurfaceViewModel({
+      status: "stopped_error",
+      terminalClassification: "stopped",
+      terminalReason: "stopped_error",
+      runtimeEvents,
+      loopTrajectory: trajectory,
+    });
+    const rendered = surface ? renderTerminalMessage(surface).lines.join("\n") : "";
+
+    expect(turn!.toolResultBatch?.outcomeBundle?.nextAction).toBe("prepare_next_turn");
+    expect(turn!.nextTurn.requestPreparation?.readinessStatus).toBe(
+      "blocked_by_provider_unavailable",
+    );
+    expect(replaySafeLoopStateSummary).toMatchObject({
+      toolOutcomeStatus: "single_success",
+      toolOutcomeNextAction: "prepare_next_turn",
+      terminalSuccessClaim: false,
+    });
+    expect(trajectory.toolOutcomeBundleIds).toEqual([
+      turn!.toolResultBatch?.outcomeBundle?.bundleId,
+    ]);
+    expect(trajectory.requestPreparationIds).toEqual([
+      turn!.nextTurn.requestPreparation?.requestPreparationId,
+    ]);
+    expect(runtimeEvents.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "tool-outcome-bundle-observed",
+        "tool-result-next-action-observed",
+        "next-turn-request-preparation-observed",
+        "replay-safe-loop-state-summarized",
+        "terminal-verdict-observed",
+      ]),
+    );
+    expect(rendered).toContain("Tool outcome");
+    expect(rendered).toContain("Replay carry forward");
+    expect(rendered).toContain("toolOutcome=single_success");
+    expect(surface?.terminalSuccessClaim).toBe(false);
+    expect(trajectory.finalObservedFacts).toMatchObject({
+      resultStatus: "stopped",
+      terminalClassification: "stopped",
+      terminalSuccessClaim: false,
+    });
+    expect(JSON.stringify({ runtimeEvents, replaySafeLoopStateSummary, surface }))
+      .not.toContain('"success":true');
+  });
+
   it("maps every loop infrastructure category or marks it not-proven", () => {
     const map = createLoopInfrastructureMap();
 
