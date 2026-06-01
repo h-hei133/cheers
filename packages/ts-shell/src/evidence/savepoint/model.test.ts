@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import { createCommandExecutionReceipt } from "../../runtime/execution/receipt.js";
-import { createEvidenceOnlySavePoint } from "./model.js";
+import { createEvidenceOnlySavePoint, prepareToolOutcomeSavePointInput } from "./model.js";
 
 describe("runtime evidence save point", () => {
   it("redacts unsafe evidence content and remains evidence-only", () => {
@@ -157,6 +157,45 @@ describe("runtime evidence save point", () => {
     expect(savePoint.pendingNextTurnFacts).toContain("next-turn:not-executed");
     expect(savePoint.terminalSuccessClaim).toBe(false);
     expect(savePoint.notProvenClaims).toContain("next-turn-execution");
+    expect(JSON.stringify(savePoint)).not.toContain('"success":true');
+  });
+
+  it("carries tool outcome save point input as evidence-only facts", () => {
+    const snapshot = createRuntimeTurnSnapshot({
+      sessionId: "sess-tool-outcome-save-point",
+      turn: 6,
+      phase: "turn",
+      workspaceRoot: "/tmp/workspace",
+      providerOptIn: false,
+    });
+    const toolOutcomeInput = prepareToolOutcomeSavePointInput({
+      sourceBundleId: "tool-outcome-bundle:batch-a",
+      receiptIds: ["receipt-a"],
+      resultMessageIds: ["tool-result-message:call-a"],
+      partialOutcomeFacts: ["mixed-outcome:mixed_success_and_non_success"],
+      blockedFacts: ["call-b:blocked_by_policy"],
+      failedFacts: ["call-c"],
+      redactionStatus: "report-safe",
+      notProvenClaims: ["tool-executed-is-not-task-success"],
+    });
+    const savePoint = createEvidenceOnlySavePoint({
+      turnSnapshot: snapshot,
+      phase: "save_point",
+      evidenceIds: ["tool-result-batch:batch-a"],
+      toolOutcomeInput,
+    });
+
+    expect(savePoint.toolOutcomeInput).toMatchObject({
+      inputId: "tool-outcome-bundle:batch-a:save-point-input",
+      sourceBundleId: "tool-outcome-bundle:batch-a",
+      evidenceOnly: true,
+      terminalSuccessClaim: false,
+    });
+    expect(savePoint.toolOutcomeInput?.partialOutcomeFacts).toEqual([
+      "mixed-outcome:mixed_success_and_non_success",
+    ]);
+    expect(savePoint.toolOutcomeInput?.blockedFacts).toEqual(["call-b:blocked_by_policy"]);
+    expect(savePoint.notProvenClaims).toContain("verification-success");
     expect(JSON.stringify(savePoint)).not.toContain('"success":true');
   });
 });

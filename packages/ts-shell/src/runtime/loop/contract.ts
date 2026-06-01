@@ -1,4 +1,8 @@
-import { createEvidenceOnlySavePoint, type RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
+import {
+  createEvidenceOnlySavePoint,
+  prepareToolOutcomeSavePointInput,
+  type RuntimeEvidenceSavePoint,
+} from "../../evidence/savepoint/model.js";
 import { createModelResponseBoundary, type ModelResponseBoundary } from "../../provider/response/boundary.js";
 import {
   type RepairApplyObservation,
@@ -18,6 +22,10 @@ import {
   type ToolBatchDispatchSeam,
   type ToolResultDetail,
 } from "../../tools/toolBatchDispatch.js";
+import {
+  createToolOutcomeBundle,
+  type ToolOutcomeBundleProjection,
+} from "../../tools/toolOutcomeBundle.js";
 import type { ToolAfterObservationAnnotation } from "../../tools/policy/interception.js";
 import { extractToolCallBatch, type NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import { createRuntimeTurnSnapshot, type RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
@@ -85,6 +93,7 @@ export interface AgentLoopContractToolResultBatch {
   readonly results: readonly ToolExecutionResult[];
   readonly resultDetails?: readonly ToolResultDetail[];
   readonly resultMessages?: ToolResultMessageBatch;
+  readonly outcomeBundle?: ToolOutcomeBundleProjection;
   readonly afterAnnotations?: readonly ToolAfterObservationAnnotation[];
   readonly executionReceipts: readonly RuntimeExecutionReceiptProjection[];
   readonly failedToolCallIds: readonly string[];
@@ -434,6 +443,11 @@ export async function runAgentLoopContract(
             dispatchPlan: dispatchResult.dispatchPlan,
             resultDetails: dispatchResult.resultDetails,
           });
+          const outcomeBundle = createToolOutcomeBundle({
+            dispatchResult,
+            resultMessages,
+            sourceModelBoundaryId: responseBoundary.responseId,
+          });
           toolResultBatch = {
             id: dispatchResult.resultBatchId,
             callBatchId: toolCallBatch.id,
@@ -441,6 +455,7 @@ export async function runAgentLoopContract(
             results: dispatchResult.results,
             resultDetails: dispatchResult.resultDetails,
             resultMessages,
+            outcomeBundle,
             afterAnnotations: dispatchResult.afterAnnotations,
             executionReceipts: dispatchResult.executionReceipts,
             failedToolCallIds: dispatchResult.failedToolCallIds,
@@ -467,6 +482,22 @@ export async function runAgentLoopContract(
             dispatchPlan,
             resultDetails: [],
           });
+          const outcomeBundle = createToolOutcomeBundle({
+            dispatchResult: {
+              resultBatchId: `${dispatchPlan.planId}:result-batch`,
+              dispatchPlan,
+              results: [],
+              resultDetails: [],
+              executionReceipts: [],
+              afterAnnotations: [],
+              failedToolCallIds: [],
+              notDispatchedToolCallIds: normalizedToolCallBatch.calls.map((call) => call.id),
+              terminalSuccessClaim: false,
+              notProvenClaims: dispatchPlan.notProvenClaims,
+            },
+            resultMessages,
+            sourceModelBoundaryId: responseBoundary.responseId,
+          });
           toolResultBatch = {
             id: `${dispatchPlan.planId}:result-batch`,
             callBatchId: toolCallBatch.id,
@@ -474,6 +505,7 @@ export async function runAgentLoopContract(
             results: [],
             resultDetails: [],
             resultMessages,
+            outcomeBundle,
             afterAnnotations: [],
             executionReceipts: [],
             failedToolCallIds: [],
@@ -489,6 +521,7 @@ export async function runAgentLoopContract(
             resultCount: toolResultBatch.results.length,
             resultDetailCount: toolResultBatch.resultDetails?.length ?? 0,
             resultMessageCount: toolResultBatch.resultMessages?.messages.length ?? 0,
+            outcomeBundleId: toolResultBatch.outcomeBundle?.bundleId,
             failedToolCallIds: toolResultBatch.failedToolCallIds,
             notDispatchedToolCallIds: toolResultBatch.notDispatchedToolCallIds ?? [],
             executionReceiptCount: toolResultBatch.executionReceipts.length,
@@ -506,6 +539,9 @@ export async function runAgentLoopContract(
               toolResultDetails: toolResultBatch.resultDetails ?? [],
               toolResultMessages: toolResultBatch.resultMessages
                 ? [toolResultBatch.resultMessages]
+                : [],
+              toolOutcomeBundles: toolResultBatch.outcomeBundle
+                ? [toolResultBatch.outcomeBundle]
                 : [],
               toolResultAnnotations: toolResultBatch.afterAnnotations ?? [],
             }),
@@ -537,6 +573,12 @@ export async function runAgentLoopContract(
         pendingNextTurnFacts: [
           `turn:${turn}`,
           `model-response:${modelBoundary.stopReason}`,
+          ...(toolResultBatch?.outcomeBundle
+            ? [
+                `tool-outcome-bundle:${toolResultBatch.outcomeBundle.bundleId}`,
+                `tool-outcome-status:${toolResultBatch.outcomeBundle.mixedOutcomeStatus}`,
+              ]
+            : []),
           ...(toolResultBatch
             ? [
                 `tool-result-count:${toolResultBatch.results.length}`,
@@ -544,6 +586,24 @@ export async function runAgentLoopContract(
               ]
             : []),
         ],
+        ...(toolResultBatch?.outcomeBundle
+          ? {
+              toolOutcomeInput: prepareToolOutcomeSavePointInput({
+                sourceBundleId: toolResultBatch.outcomeBundle.bundleId,
+                receiptIds: toolResultBatch.outcomeBundle.receiptIds,
+                resultMessageIds: toolResultBatch.outcomeBundle.resultMessageIds,
+                partialOutcomeFacts: [
+                  `mixed-outcome:${toolResultBatch.outcomeBundle.mixedOutcomeStatus}`,
+                  `executed-count:${toolResultBatch.outcomeBundle.executedCount}`,
+                  `not-dispatched-count:${toolResultBatch.outcomeBundle.notDispatchedCount}`,
+                ],
+                blockedFacts: toolResultBatch.outcomeBundle.blockingFacts,
+                failedFacts: toolResultBatch.failedToolCallIds,
+                redactionStatus: toolResultBatch.outcomeBundle.redactionStatus,
+                notProvenClaims: toolResultBatch.outcomeBundle.notProvenClaims,
+              }),
+            }
+          : {}),
         notProvenClaims: [
           "terminal-success",
           "loop-contract-only",
@@ -586,6 +646,7 @@ export async function runAgentLoopContract(
         bundleId: nextTurnBundleId,
         turnId: `${input.sessionId}:turn:${turn}`,
         toolResultMessages: toolResultBatch?.resultMessages,
+        toolOutcomeBundle: toolResultBatch?.outcomeBundle,
         assistantResponse,
         steeringQueue,
         followUpQueue,

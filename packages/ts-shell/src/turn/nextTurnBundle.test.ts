@@ -42,6 +42,7 @@ describe("next turn preparation boundaries", () => {
     const serialized = JSON.stringify(bundle);
 
     expect(bundle.deliveryStatus).toBe("waiting");
+    expect(bundle.readinessStatus).toBe("not_ready");
     expect(bundle.steeringMessageIds).toEqual(["steering:steer-a"]);
     expect(bundle.followUpMessageIds).toEqual(["follow-up:follow-a"]);
     expect(policy.nextTurnExecuted).toBe(false);
@@ -54,6 +55,86 @@ describe("next turn preparation boundaries", () => {
       ]),
     );
     expect(serialized).not.toMatch(/token=secret|oldText=before|newText=after/i);
+  });
+
+  it("includes safe tool messages and excludes redacted messages from next-turn facts", () => {
+    const bundle = prepareNextTurnBundle({
+      bundleId: "bundle-a",
+      turnId: "sess:turn:1",
+      toolResultMessages: {
+        batchId: "tool-result-message-batch:batch-a",
+        dispatchPlanId: "plan-a",
+        messages: [
+          {
+            messageId: "tool-result-message:call-safe",
+            role: "tool",
+            toolCallId: "call-safe",
+            toolName: "read",
+            safeContentSummary: "read completed",
+            category: "executed_tool_fact",
+            deliveryStatus: "prepared",
+            redactionStatus: "report-safe",
+            notProvenClaims: ["task-success"],
+            terminalSuccessClaim: false,
+          },
+          {
+            messageId: "tool-result-message:call-redacted",
+            role: "tool",
+            toolCallId: "call-redacted",
+            toolName: "bash",
+            safeContentSummary: "token=secret raw provider output: hidden reasoning",
+            category: "not_dispatched",
+            deliveryStatus: "blocked",
+            redactionStatus: "redacted",
+            notProvenClaims: ["task-success"],
+            terminalSuccessClaim: false,
+          },
+        ],
+        preparedCount: 1,
+        blockedCount: 1,
+        terminalSuccessClaim: false,
+        notProvenClaims: ["next-turn-success"],
+      },
+      toolOutcomeBundle: {
+        bundleId: "tool-outcome-bundle:batch-a",
+        sourceBatchId: "tool-result-batch:batch-a",
+        resultMessageIds: [
+          "tool-result-message:call-safe",
+          "tool-result-message:call-redacted",
+        ],
+        receiptIds: [],
+        executedCount: 1,
+        failedCount: 0,
+        blockedCount: 1,
+        authorityRequiredCount: 0,
+        unsupportedCount: 0,
+        malformedCount: 0,
+        unknownCount: 0,
+        notDispatchedCount: 0,
+        mixedOutcomeStatus: "mixed_success_and_non_success",
+        redactionStatus: "redacted",
+        detailStatuses: [],
+        blockingFacts: ["call-redacted:blocked_by_policy"],
+        notProvenClaims: ["tool-outcome-bundle-is-not-task-success"],
+        terminalSuccessClaim: false,
+      },
+    });
+    const serialized = JSON.stringify(bundle);
+
+    expect(bundle.readinessStatus).toBe("blocked_by_policy");
+    expect(bundle.requiredUserAction).toBe("policy-blocker-must-be-resolved");
+    expect(bundle.sourceToolOutcomeBundleId).toBe("tool-outcome-bundle:batch-a");
+    expect(bundle.includedToolResultMessageIds).toEqual([
+      "tool-result-message:call-safe",
+    ]);
+    expect(bundle.excludedToolResultMessageIds).toEqual([
+      "tool-result-message:call-redacted",
+    ]);
+    expect(bundle.blockingFacts).toEqual(
+      expect.arrayContaining(["call-redacted:blocked_by_policy"]),
+    );
+    expect(bundle.terminalSuccessClaim).toBe(false);
+    expect(serialized).not.toMatch(/token=secret|hidden reasoning/i);
   });
 
   it("represents steering and follow-up statuses without success claims", () => {
@@ -104,6 +185,25 @@ describe("next turn preparation boundaries", () => {
         (item) => item.terminalSuccessClaim === false,
       ),
     ).toBe(true);
+    const bundle = prepareNextTurnBundle({
+      bundleId: "bundle-a",
+      turnId: "sess:turn:1",
+      steeringQueue,
+      followUpQueue,
+    });
+    expect(bundle.deliveryFacts.map((fact) => ({
+      kind: fact.deliveryKind,
+      queued: fact.queued,
+      delivered: fact.delivered,
+      blocked: fact.blocked,
+    }))).toEqual(expect.arrayContaining([
+      { kind: "steering", queued: true, delivered: false, blocked: false },
+      { kind: "steering", queued: false, delivered: true, blocked: false },
+      { kind: "steering", queued: false, delivered: false, blocked: true },
+      { kind: "follow-up", queued: true, delivered: false, blocked: false },
+      { kind: "follow-up", queued: false, delivered: true, blocked: false },
+      { kind: "follow-up", queued: false, delivered: false, blocked: true },
+    ]));
   });
 
   it("keeps delivery policy order deterministic and observation-only", () => {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createEvidenceOnlySavePoint } from "../../evidence/savepoint/model.js";
+import {
+  createEvidenceOnlySavePoint,
+  prepareToolOutcomeSavePointInput,
+} from "../../evidence/savepoint/model.js";
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import {
@@ -35,6 +38,7 @@ import {
 } from "../../verification/result/boundary.js";
 import { extractToolCallBatch } from "../../tools/toolCallBatch.js";
 import { dispatchToolBatch, planToolBatchDispatch } from "../../tools/toolBatchDispatch.js";
+import { createToolOutcomeBundle } from "../../tools/toolOutcomeBundle.js";
 import {
   createToolAfterObservationAnnotation,
   createToolBeforePolicyDecision,
@@ -923,5 +927,79 @@ describe("runtime event projection", () => {
       events.find((event) => event.type === "tool-authority-requested")
         ?.notProvenClaims,
     ).toContain("terminal-success");
+  });
+
+  it("projects tool outcome, save point input, next-turn blockers, and delivery blockers as observations only", async () => {
+    const responseBoundary = createModelResponseBoundary({
+      responseId: "response-events",
+      turnId: "turn-events",
+      source: "fake_default_safe",
+      toolCallCount: 1,
+    });
+    const dispatchResult = await dispatchToolBatch({
+      batch: extractToolCallBatch({
+        responseBoundary,
+        assistantResponse: accumulateAssistantResponse({
+          responseBoundary,
+          chunks: [{ toolCalls: [{ id: "call-a", name: "mcp__missing__tool" }] }],
+        }),
+      }),
+      context: { taskId: "task", workspaceRoot: "/tmp/workspace" },
+      dispatchPolicy: "sequential",
+    });
+    const dispatchPlan = dispatchResult.dispatchPlan;
+    const messages = prepareToolResultMessages({ dispatchPlan, resultDetails: [] });
+    const outcomeBundle = createToolOutcomeBundle({
+      dispatchResult,
+      resultMessages: messages,
+      sourceModelBoundaryId: "response-events",
+    });
+    const snapshot = createRuntimeTurnSnapshot({
+      sessionId: "sess-events-tool-outcome",
+      turn: 2,
+      phase: "turn",
+      workspaceRoot: "/tmp/workspace",
+      providerOptIn: false,
+    });
+    const savePoint = createEvidenceOnlySavePoint({
+      turnSnapshot: snapshot,
+      phase: "save_point",
+      evidenceIds: ["tool-result-batch:events"],
+      toolOutcomeInput: prepareToolOutcomeSavePointInput({
+        sourceBundleId: outcomeBundle.bundleId,
+        receiptIds: outcomeBundle.receiptIds,
+        resultMessageIds: outcomeBundle.resultMessageIds,
+        blockedFacts: outcomeBundle.blockingFacts,
+      }),
+    });
+    const steeringQueue = projectSteeringQueue({
+      turnId: "turn-events",
+      messages: [{ id: "steer-a", mode: "steer", text: "blocked" }],
+      blockedMessageIds: ["steer-a"],
+    });
+    const nextTurnBundle = prepareNextTurnBundle({
+      bundleId: "bundle-events",
+      turnId: "turn-events",
+      toolResultMessages: messages,
+      toolOutcomeBundle: outcomeBundle,
+      steeringQueue,
+    });
+    const events = projectRuntimeEvents({
+      toolOutcomeBundles: [outcomeBundle],
+      savePoint,
+      steeringQueues: [steeringQueue],
+      nextTurnBundles: [nextTurnBundle],
+    });
+
+    expect(events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "tool-outcome-bundle-observed",
+        "save-point-input-prepared",
+        "delivery-blocked",
+        "next-turn-bundle-blocked",
+      ]),
+    );
+    expect(events.every((event) => event.facts.terminalSuccessClaim !== true)).toBe(true);
+    expect(JSON.stringify(events)).not.toContain('"success":true');
   });
 });

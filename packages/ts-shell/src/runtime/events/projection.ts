@@ -26,6 +26,7 @@ import type {
   ToolBatchDispatchPlan,
   ToolResultDetail,
 } from "../../tools/toolBatchDispatch.js";
+import type { ToolOutcomeBundleProjection } from "../../tools/toolOutcomeBundle.js";
 import type { ToolResultMessageBatch } from "../../turn/toolResultMessage.js";
 import type { ToolExecutionResult } from "../../tools/types.js";
 import type {
@@ -104,13 +105,18 @@ export type RuntimeProjectionEventType =
   | "tool-execution-completed"
   | "tool-result-message-prepared"
   | "tool-batch-completed"
+  | "tool-outcome-bundle-observed"
   | "tool-batch-save-point-observed"
+  | "save-point-input-prepared"
   | "post-tool-save-point-observed"
   | "next-turn-bundle-prepared"
+  | "next-turn-bundle-blocked"
   | "steering-queued"
   | "steering-delivered"
   | "follow-up-queued"
   | "follow-up-delivered"
+  | "delivery-blocked"
+  | "partial-tool-outcome-carried-forward"
   | "next-turn-delivery-policy-evaluated"
   | "next-turn-waiting"
   | "next-turn-delivery-unsupported"
@@ -188,6 +194,7 @@ export function projectRuntimeEvents(input: {
   readonly toolDispatchPlans?: readonly ToolBatchDispatchPlan[];
   readonly toolResultDetails?: readonly ToolResultDetail[];
   readonly toolResultMessages?: readonly ToolResultMessageBatch[];
+  readonly toolOutcomeBundles?: readonly ToolOutcomeBundleProjection[];
   readonly nextTurnBundles?: readonly NextTurnBundleProjection[];
   readonly steeringQueues?: readonly SteeringQueueProjection[];
   readonly followUpQueues?: readonly FollowUpQueueProjection[];
@@ -842,6 +849,42 @@ export function projectRuntimeEvents(input: {
     );
   }
 
+  for (const bundle of input.toolOutcomeBundles ?? []) {
+    append(
+      "tool-outcome-bundle-observed",
+      {
+        bundleId: bundle.bundleId,
+        sourceBatchId: bundle.sourceBatchId,
+        sourceModelBoundaryId: bundle.sourceModelBoundaryId,
+        resultMessageIds: bundle.resultMessageIds,
+        receiptIds: bundle.receiptIds,
+        executedCount: bundle.executedCount,
+        failedCount: bundle.failedCount,
+        blockedCount: bundle.blockedCount,
+        authorityRequiredCount: bundle.authorityRequiredCount,
+        unsupportedCount: bundle.unsupportedCount,
+        malformedCount: bundle.malformedCount,
+        unknownCount: bundle.unknownCount,
+        notDispatchedCount: bundle.notDispatchedCount,
+        mixedOutcomeStatus: bundle.mixedOutcomeStatus,
+        redactionStatus: bundle.redactionStatus,
+        terminalSuccessClaim: bundle.terminalSuccessClaim,
+      },
+      bundle.notProvenClaims,
+    );
+    if (bundle.mixedOutcomeStatus === "mixed_success_and_non_success") {
+      append(
+        "partial-tool-outcome-carried-forward",
+        {
+          bundleId: bundle.bundleId,
+          blockingFacts: bundle.blockingFacts,
+          terminalSuccessClaim: bundle.terminalSuccessClaim,
+        },
+        bundle.notProvenClaims,
+      );
+    }
+  }
+
   for (const decision of input.toolPolicyDecisions ?? []) {
     appendToolPolicyDecision(decision);
   }
@@ -881,6 +924,24 @@ export function projectRuntimeEvents(input: {
       input.savePoint.notProvenClaims,
     );
     if (input.savePoint.safeEvidenceIds.some((id) => id.includes("tool-result-batch"))) {
+      if (input.savePoint.toolOutcomeInput) {
+        append(
+          "save-point-input-prepared",
+          {
+            savePointInputId: input.savePoint.toolOutcomeInput.inputId,
+            sourceBundleId: input.savePoint.toolOutcomeInput.sourceBundleId,
+            receiptIds: input.savePoint.toolOutcomeInput.receiptIds,
+            resultMessageIds: input.savePoint.toolOutcomeInput.resultMessageIds,
+            partialOutcomeFacts: input.savePoint.toolOutcomeInput.partialOutcomeFacts,
+            blockedFacts: input.savePoint.toolOutcomeInput.blockedFacts,
+            failedFacts: input.savePoint.toolOutcomeInput.failedFacts,
+            redactionStatus: input.savePoint.toolOutcomeInput.redactionStatus,
+            evidenceOnly: input.savePoint.toolOutcomeInput.evidenceOnly,
+            terminalSuccessClaim: input.savePoint.toolOutcomeInput.terminalSuccessClaim,
+          },
+          input.savePoint.toolOutcomeInput.notProvenClaims,
+        );
+      }
       append(
         "tool-batch-save-point-observed",
         {
@@ -926,6 +987,23 @@ export function projectRuntimeEvents(input: {
         },
         item.notProvenClaims,
       );
+      if (
+        item.deliveryStatus === "blocked" ||
+        item.deliveryStatus === "unsupported" ||
+        item.deliveryStatus === "redacted"
+      ) {
+        append(
+          "delivery-blocked",
+          {
+            queueId: queue.queueId,
+            steeringId: item.steeringId,
+            deliveryStatus: item.deliveryStatus,
+            redactionStatus: item.redactionStatus,
+            terminalSuccessClaim: false,
+          },
+          item.notProvenClaims,
+        );
+      }
     }
   }
 
@@ -945,6 +1023,23 @@ export function projectRuntimeEvents(input: {
         },
         item.notProvenClaims,
       );
+      if (
+        item.deliveryStatus === "blocked" ||
+        item.deliveryStatus === "unsupported" ||
+        item.deliveryStatus === "redacted"
+      ) {
+        append(
+          "delivery-blocked",
+          {
+            queueId: queue.queueId,
+            followUpId: item.followUpId,
+            deliveryStatus: item.deliveryStatus,
+            redactionStatus: item.redactionStatus,
+            terminalSuccessClaim: false,
+          },
+          item.notProvenClaims,
+        );
+      }
     }
   }
 
@@ -1004,6 +1099,12 @@ export function projectRuntimeEvents(input: {
         bundleId: bundle.bundleId,
         turnId: bundle.turnId,
         sourceToolResultMessageIds: bundle.sourceToolResultMessageIds,
+        sourceToolOutcomeBundleId: bundle.sourceToolOutcomeBundleId,
+        includedToolResultMessageIds: bundle.includedToolResultMessageIds,
+        excludedToolResultMessageIds: bundle.excludedToolResultMessageIds,
+        readinessStatus: bundle.readinessStatus,
+        blockingFacts: bundle.blockingFacts,
+        requiredUserAction: bundle.requiredUserAction,
         steeringMessageIds: bundle.steeringMessageIds,
         followUpMessageIds: bundle.followUpMessageIds,
         contextRebuildProjectionId: bundle.contextRebuildProjectionId,
@@ -1015,6 +1116,19 @@ export function projectRuntimeEvents(input: {
       },
       bundle.notProvenClaims,
     );
+    if (bundle.readinessStatus.startsWith("blocked") || bundle.readinessStatus === "unsupported") {
+      append(
+        "next-turn-bundle-blocked",
+        {
+          bundleId: bundle.bundleId,
+          readinessStatus: bundle.readinessStatus,
+          blockingFacts: bundle.blockingFacts,
+          requiredUserAction: bundle.requiredUserAction,
+          terminalSuccessClaim: bundle.terminalSuccessClaim,
+        },
+        bundle.notProvenClaims,
+      );
+    }
   }
 
   for (const intent of input.verificationIntents ?? []) {

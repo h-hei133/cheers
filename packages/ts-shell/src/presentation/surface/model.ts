@@ -119,7 +119,7 @@ export function projectProductSurfaceViewModel(
   input: ProductSurfaceInput,
 ): ProductSurfaceViewModel | undefined {
   const codingResult = input.codingResult;
-  if (!codingResult && !input.loopTrajectory && !input.productLoopAdapter && !input.contextPlanningSummary && !input.modelBoundaryPhase && !input.providerStreamAdapter) {
+  if (!codingResult && !input.loopTrajectory && !input.productLoopAdapter && !input.contextPlanningSummary && !input.modelBoundaryPhase && !input.providerStreamAdapter && !input.runtimeEvents) {
     return undefined;
   }
 
@@ -149,6 +149,7 @@ export function projectProductSurfaceViewModel(
     ...modelBoundarySections(input.modelBoundaryPhase),
     ...packageSections(input),
     ...sessionSections(input),
+    ...toolOutcomeEventSections(input),
     ...eventSections(input),
     section({
       kind: "verdict",
@@ -218,6 +219,76 @@ export function projectProductSurfaceViewModel(
     redaction: sections.some((item) => item.redaction !== "none") ? "applied" : "none",
     terminalSuccessClaim: false,
   };
+}
+
+function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const events = input.runtimeEvents ?? [];
+  const outcome = events.find((event) => event.type === "tool-outcome-bundle-observed");
+  const nextTurn = events.find((event) => event.type === "next-turn-bundle-prepared");
+  const savePointInput = events.find((event) => event.type === "save-point-input-prepared");
+  if (!outcome && !nextTurn && !savePointInput) {
+    return [];
+  }
+
+  return [section({
+    kind: "tools",
+    title: "Tool outcome",
+    severity: events.some((event) =>
+      event.type === "next-turn-bundle-blocked" || event.type === "delivery-blocked"
+    )
+      ? "warning"
+      : "info",
+    status: "observed",
+    summary: [
+      outcome ? `outcome=${factValue(outcome.facts.mixedOutcomeStatus)}` : undefined,
+      savePointInput ? `savePointInput=${factValue(savePointInput.facts.savePointInputId)}` : undefined,
+      nextTurn ? `nextTurn=${factValue(nextTurn.facts.readinessStatus)}` : undefined,
+      "terminalSuccessClaim=false",
+    ].filter(Boolean).join("; "),
+    facts: [
+      ...(outcome
+        ? [
+            {
+              label: "executed",
+              value: factValue(outcome.facts.executedCount),
+              machineEventCorrelationId: outcome.id,
+            },
+            {
+              label: "blocked",
+              value: factValue(outcome.facts.blockedCount),
+              machineEventCorrelationId: outcome.id,
+            },
+            {
+              label: "failed",
+              value: factValue(outcome.facts.failedCount),
+              machineEventCorrelationId: outcome.id,
+            },
+          ]
+        : []),
+      ...(nextTurn
+        ? [
+            {
+              label: "readiness",
+              value: factValue(nextTurn.facts.readinessStatus),
+              machineEventCorrelationId: nextTurn.id,
+            },
+          ]
+        : []),
+    ],
+    machineEventCorrelationIds: [outcome?.id, savePointInput?.id, nextTurn?.id]
+      .filter((id): id is string => Boolean(id)),
+    notProvenClaims: events
+      .filter((event) =>
+        event.type === "tool-outcome-bundle-observed" ||
+        event.type === "save-point-input-prepared" ||
+        event.type === "next-turn-bundle-prepared"
+      )
+      .flatMap((event) => event.notProvenClaims),
+  })];
+}
+
+function factValue(value: unknown): string {
+  return safeText(String(value ?? "not-observed"), 120);
 }
 
 function providerStreamAdapterSections(

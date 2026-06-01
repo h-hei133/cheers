@@ -589,6 +589,64 @@ describe("product surface view model", () => {
     expect(viewModel?.terminalSuccessClaim).toBe(false);
     expect(viewModel?.notProvenClaims).toContain("provider-stream-projected-is-not-task-success");
   });
+
+  it("renders tool outcome and next-turn facts without terminal success", () => {
+    const runtimeEvents = projectRuntimeEvents({
+      toolOutcomeBundles: [{
+        bundleId: "tool-outcome-bundle:batch-a",
+        sourceBatchId: "tool-result-batch:batch-a",
+        resultMessageIds: ["tool-result-message:call-a"],
+        receiptIds: ["receipt-a"],
+        executedCount: 1,
+        failedCount: 0,
+        blockedCount: 1,
+        authorityRequiredCount: 0,
+        unsupportedCount: 0,
+        malformedCount: 0,
+        unknownCount: 0,
+        notDispatchedCount: 0,
+        mixedOutcomeStatus: "mixed_success_and_non_success",
+        redactionStatus: "report-safe",
+        detailStatuses: [],
+        blockingFacts: ["call-b:blocked_by_policy"],
+        notProvenClaims: ["tool-outcome-bundle-is-not-task-success"],
+        terminalSuccessClaim: false,
+      }],
+      nextTurnBundles: [{
+        bundleId: "bundle-a",
+        turnId: "turn-a",
+        sourceToolOutcomeBundleId: "tool-outcome-bundle:batch-a",
+        sourceToolResultMessageIds: ["tool-result-message:call-a"],
+        safeToolResultMessages: [],
+        includedToolResultMessageIds: ["tool-result-message:call-a"],
+        excludedToolResultMessageIds: [],
+        messageExclusionReasons: [],
+        readinessStatus: "ready_with_partial_tool_results",
+        blockingFacts: ["call-b:blocked_by_policy"],
+        deliveryFacts: [],
+        steeringMessageIds: [],
+        followUpMessageIds: [],
+        providerMetadataIds: [],
+        deliveryStatus: "waiting",
+        redaction: { status: "report-safe", excluded: [] },
+        notProvenClaims: ["next-turn-ready-is-not-provider-execution"],
+        terminalSuccessClaim: false,
+      }],
+    });
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped",
+      terminalClassification: "stopped",
+      terminalReason: "stopped_error",
+      runtimeEvents,
+    });
+    const rendered = viewModel ? renderTerminalMessage(viewModel).lines.join("\n") : "";
+
+    expect(rendered).toContain("Tool outcome");
+    expect(rendered).toContain("outcome=mixed_success_and_non_success");
+    expect(rendered).toContain("nextTurn=ready_with_partial_tool_results");
+    expect(rendered).toContain("terminalSuccessClaim=false");
+    expect(viewModel?.terminalSuccessClaim).toBe(false);
+  });
 });
 
 async function withPlanningFixture<T>(

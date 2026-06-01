@@ -4,6 +4,20 @@ import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 
 export type RuntimeSavePointRedactionStatus = "report-safe" | "redacted";
 
+export interface RuntimeToolOutcomeSavePointInput {
+  readonly inputId: string;
+  readonly sourceBundleId: string;
+  readonly receiptIds: readonly string[];
+  readonly resultMessageIds: readonly string[];
+  readonly partialOutcomeFacts: readonly string[];
+  readonly blockedFacts: readonly string[];
+  readonly failedFacts: readonly string[];
+  readonly redactionStatus: RuntimeSavePointRedactionStatus;
+  readonly evidenceOnly: true;
+  readonly notProvenClaims: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
 export interface RuntimeSavePointInput {
   readonly turnSnapshot: RuntimeTurnSnapshot;
   readonly phase: RuntimePhase;
@@ -28,6 +42,7 @@ export interface RuntimeSavePointInput {
   readonly sessionProjectionIds?: readonly string[];
   readonly contextProjectionIds?: readonly string[];
   readonly pendingNextTurnFacts?: readonly string[];
+  readonly toolOutcomeInput?: RuntimeToolOutcomeSavePointInput;
   readonly notProvenClaims?: readonly string[];
 }
 
@@ -65,6 +80,7 @@ export interface RuntimeEvidenceSavePoint {
   readonly sessionProjectionIds: readonly string[];
   readonly contextProjectionIds: readonly string[];
   readonly pendingNextTurnFacts: readonly string[];
+  readonly toolOutcomeInput?: RuntimeToolOutcomeSavePointInput;
   readonly notProvenClaims: readonly string[];
   readonly redaction: {
     readonly status: RuntimeSavePointRedactionStatus;
@@ -112,6 +128,9 @@ export function createEvidenceOnlySavePoint(
       evidenceCorrelationId: sanitizeEvidenceId(receipt.evidenceCorrelationId, redactions),
     }),
   );
+  const toolOutcomeInput = input.toolOutcomeInput
+    ? sanitizeToolOutcomeInput(input.toolOutcomeInput, redactions)
+    : undefined;
   return deepFreeze({
     id: `${input.turnSnapshot.id}:save-point`,
     phase: input.phase,
@@ -162,6 +181,7 @@ export function createEvidenceOnlySavePoint(
         sanitizeEvidenceId(fact, redactions),
       ),
     ),
+    ...(toolOutcomeInput ? { toolOutcomeInput } : {}),
     notProvenClaims: Object.freeze([
       ...new Set([
         "provider-success",
@@ -178,6 +198,79 @@ export function createEvidenceOnlySavePoint(
       status: redactions.size > 0 ? "redacted" : "report-safe",
       redactions: Object.freeze(Array.from(redactions).sort()),
     }),
+    terminalSuccessClaim: false,
+  });
+}
+
+export function prepareToolOutcomeSavePointInput(input: {
+  readonly sourceBundleId: string;
+  readonly receiptIds: readonly string[];
+  readonly resultMessageIds: readonly string[];
+  readonly partialOutcomeFacts?: readonly string[];
+  readonly blockedFacts?: readonly string[];
+  readonly failedFacts?: readonly string[];
+  readonly redactionStatus?: RuntimeSavePointRedactionStatus;
+  readonly notProvenClaims?: readonly string[];
+}): RuntimeToolOutcomeSavePointInput {
+  const redactions = new Set<string>();
+  const sourceBundleId = sanitizeEvidenceId(input.sourceBundleId, redactions);
+  return deepFreeze({
+    inputId: `${sourceBundleId}:save-point-input`,
+    sourceBundleId,
+    receiptIds: Object.freeze(
+      input.receiptIds.map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    resultMessageIds: Object.freeze(
+      input.resultMessageIds.map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    partialOutcomeFacts: Object.freeze(
+      (input.partialOutcomeFacts ?? []).map((fact) => sanitizeEvidenceId(fact, redactions)),
+    ),
+    blockedFacts: Object.freeze(
+      (input.blockedFacts ?? []).map((fact) => sanitizeEvidenceId(fact, redactions)),
+    ),
+    failedFacts: Object.freeze(
+      (input.failedFacts ?? []).map((fact) => sanitizeEvidenceId(fact, redactions)),
+    ),
+    redactionStatus: redactions.size > 0 ? "redacted" : input.redactionStatus ?? "report-safe",
+    evidenceOnly: true,
+    notProvenClaims: Object.freeze([
+      ...new Set([
+        "terminal-success",
+        "task-success",
+        "save-point-success",
+        "next-turn-success",
+        "verification-success",
+        ...(input.notProvenClaims ?? []).map((claim) => sanitizeEvidenceId(claim, redactions)),
+      ]),
+    ]),
+    terminalSuccessClaim: false,
+  });
+}
+
+function sanitizeToolOutcomeInput(
+  input: RuntimeToolOutcomeSavePointInput,
+  redactions: Set<string>,
+): RuntimeToolOutcomeSavePointInput {
+  return deepFreeze({
+    inputId: sanitizeEvidenceId(input.inputId, redactions),
+    sourceBundleId: sanitizeEvidenceId(input.sourceBundleId, redactions),
+    receiptIds: Object.freeze(input.receiptIds.map((id) => sanitizeEvidenceId(id, redactions))),
+    resultMessageIds: Object.freeze(
+      input.resultMessageIds.map((id) => sanitizeEvidenceId(id, redactions)),
+    ),
+    partialOutcomeFacts: Object.freeze(
+      input.partialOutcomeFacts.map((fact) => sanitizeEvidenceId(fact, redactions)),
+    ),
+    blockedFacts: Object.freeze(input.blockedFacts.map((fact) => sanitizeEvidenceId(fact, redactions))),
+    failedFacts: Object.freeze(input.failedFacts.map((fact) => sanitizeEvidenceId(fact, redactions))),
+    redactionStatus: input.redactionStatus === "redacted" || redactions.size > 0
+      ? "redacted"
+      : "report-safe",
+    evidenceOnly: true,
+    notProvenClaims: Object.freeze(
+      input.notProvenClaims.map((claim) => sanitizeEvidenceId(claim, redactions)),
+    ),
     terminalSuccessClaim: false,
   });
 }
