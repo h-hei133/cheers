@@ -13,10 +13,17 @@ describe("verification loop boundary", () => {
     const statuses: VerificationIntentDispatchStatus[] = [
       "planned",
       "selected",
+      "selected_not_run",
       "authority_required",
       "not_run",
       "unsupported",
       "dispatched",
+      "passed",
+      "failed",
+      "timed_out",
+      "cancelled",
+      "skipped",
+      "unavailable",
     ];
 
     const intents = statuses.map((dispatchStatus) =>
@@ -30,6 +37,9 @@ describe("verification loop boundary", () => {
     );
 
     expect(intents.map((intent) => intent.dispatchStatus)).toEqual(statuses);
+    expect(intents.map((intent) => intent.coverageStatus)).toEqual(
+      statuses.map(() => "not_proven"),
+    );
     expect(intents.every((intent) => intent.terminalSuccessClaim === false)).toBe(true);
     expect(intents.flatMap((intent) => intent.notProvenClaims)).toContain(
       "verification-selected-is-not-success",
@@ -67,6 +77,10 @@ describe("verification loop boundary", () => {
       "passed",
       "failed",
       "blocked",
+      "timed_out",
+      "cancelled",
+      "skipped",
+      "unavailable",
       "not_run",
       "selected_not_run",
       "unsupported",
@@ -75,6 +89,8 @@ describe("verification loop boundary", () => {
     const results = statuses.map((status) => observeVerificationResult({ intent, status }));
 
     expect(results.map((result) => result.status)).toEqual(statuses);
+    expect(results.every((result) => result.runtimeReceiptIds.length === 0)).toBe(true);
+    expect(results.every((result) => result.repairEligible === false)).toBe(true);
     expect(results.every((result) => result.terminalSuccessClaim === false)).toBe(true);
     expect(JSON.stringify(results)).not.toContain('"success":true');
   });
@@ -101,5 +117,86 @@ describe("verification loop boundary", () => {
     );
     expect(intent.redactionStatus).toBe("redacted");
     expect(result.redactionStatus).toBe("redacted");
+  });
+
+  it("projects task-relevant receipt facts without success upgrade", () => {
+    const intent = projectVerificationIntent({
+      sourceTurnId: "turn-receipt",
+      targetSummary: "target",
+      receipt: {
+        facadeVersion: "v1",
+        selectedCommand: "npm test -w packages/ts-shell -- src/verification/boundary.test.ts",
+        authority: "explicitly-approved",
+        dispatchStatus: "dispatched",
+        runtimeStatus: "timeout",
+        runtimeReceiptIds: ["receipt-1"],
+        relevanceStatus: "relevant",
+        coverageStatus: "partially-covered",
+        coveredFiles: ["packages/ts-shell/src/verification/boundary.ts"],
+        uncoveredFiles: ["packages/ts-shell/src/verification/other.ts"],
+        failureClass: "command-timed-out",
+        repairEligible: false,
+        notProvenClaims: ["task success"],
+        verdictStatus: "blocked",
+        verdict: {
+          status: "BLOCKED",
+          terminalClassification: "stopped",
+          reason: "blocked",
+          provenance: { source: "product-runtime", adapter: "verification-facade" },
+          redaction: "raw-content-excluded",
+          cleanup: "not-applicable",
+          notProvenReasons: [],
+          partialReasons: [],
+          blockedReasons: ["blocked"],
+        },
+        selectedNotRunIsSuccess: false,
+        oneFileSuccessCanHideAnotherFailure: false,
+        mutationDuringVerification: "not-run",
+        providerCallDuringVerification: "not-run",
+      },
+    });
+    const result = observeVerificationResult({
+      intent,
+      receipt: {
+        facadeVersion: "v1",
+        selectedCommand: "npm test -w packages/ts-shell -- src/verification/boundary.test.ts",
+        authority: "explicitly-approved",
+        dispatchStatus: "dispatched",
+        runtimeStatus: "timeout",
+        runtimeReceiptIds: ["receipt-1"],
+        relevanceStatus: "relevant",
+        coverageStatus: "partially-covered",
+        coveredFiles: ["packages/ts-shell/src/verification/boundary.ts"],
+        uncoveredFiles: ["packages/ts-shell/src/verification/other.ts"],
+        failureClass: "command-timed-out",
+        repairEligible: false,
+        notProvenClaims: ["task success"],
+        verdictStatus: "blocked",
+        verdict: {
+          status: "BLOCKED",
+          terminalClassification: "stopped",
+          reason: "blocked",
+          provenance: { source: "product-runtime", adapter: "verification-facade" },
+          redaction: "raw-content-excluded",
+          cleanup: "not-applicable",
+          notProvenReasons: [],
+          partialReasons: [],
+          blockedReasons: ["blocked"],
+        },
+        selectedNotRunIsSuccess: false,
+        oneFileSuccessCanHideAnotherFailure: false,
+        mutationDuringVerification: "not-run",
+        providerCallDuringVerification: "not-run",
+      },
+    });
+
+    expect(intent.dispatchStatus).toBe("timed_out");
+    expect(intent.relevanceStatus).toBe("task_relevant");
+    expect(intent.coverageStatus).toBe("partially_covered");
+    expect(result.status).toBe("timed_out");
+    expect(result.runtimeReceiptIds).toEqual(["receipt-1"]);
+    expect(result.failureClass).toBe("command-timed-out");
+    expect(result.verdictStatus).toBe("blocked");
+    expect(result.terminalSuccessClaim).toBe(false);
   });
 });

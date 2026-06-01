@@ -49,10 +49,12 @@ import { createRuntimeTurnSnapshot, type RuntimeTurnSnapshot } from "../../turn/
 import type { ToolExecutionResult } from "../../tools/types.js";
 import {
   observeVerificationResult,
+  projectVerificationObservationFromReceipt,
   projectVerificationIntent,
   type VerificationLoopIntent,
   type VerificationResultObservation,
 } from "../../verification/result/boundary.js";
+import type { ProductVerificationReceipt } from "../../verification/verificationFacade.js";
 import { projectRuntimeEvents, type RuntimeProjectionEvent } from "../events/projection.js";
 import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
 import {
@@ -163,6 +165,8 @@ export interface AgentLoopContractInput {
   readonly toolBatchDispatch?: ToolBatchDispatchSeam;
   readonly controlledModelInvocationExecutor?: ControlledModelInvocationExecutor;
   readonly executePreparedNextTurn?: boolean;
+  readonly verificationReceipt?: ProductVerificationReceipt;
+  readonly verificationRuntimeReceiptIds?: readonly string[];
   readonly verificationBoundary?: (
     input: AgentLoopContractVerificationBoundaryInput,
   ) => Promise<AgentLoopContractVerificationProjection>;
@@ -580,7 +584,7 @@ export async function runAgentLoopContract(
 
       transition("saving_point", `turn-${turn}-save-point`);
       const nextTurnBundleId = `${snapshot.id}:next-turn-bundle`;
-      const savePoint = createEvidenceOnlySavePoint({
+      const savePointInput = {
         turnSnapshot: snapshot,
         phase: "save_point",
         executionReceipts: toolResultBatch?.executionReceipts,
@@ -638,7 +642,8 @@ export async function runAgentLoopContract(
           "loop-contract-only",
           ...(modelBoundary.notProvenClaims ?? []),
         ],
-      });
+      } as const;
+      const savePoint = createEvidenceOnlySavePoint(savePointInput);
       appendEvent(events, "agent-loop-save-point-requested", {
         turn,
         savePointId: savePoint.id,
@@ -763,7 +768,31 @@ export async function runAgentLoopContract(
           turnId: `${input.sessionId}:turn:${turn}`,
           savePoint,
           nextTurnBundle,
+          receipt: input.verificationReceipt,
+          runtimeReceiptIds: input.verificationRuntimeReceiptIds,
         });
+      const verificationSavePoint = createEvidenceOnlySavePoint({
+        ...savePointInput,
+        verificationIntentIds: [verification.intent.intentId],
+        verificationResultIds: [verification.result.verificationId],
+        repairHandoffIds: verification.repairRequired
+          ? [verification.repairRequired.handoffId]
+          : [],
+        repairProposalIds: verification.repairProposal
+          ? [verification.repairProposal.proposalId]
+          : [],
+        repairApplyIds: verification.repairApply
+          ? [verification.repairApply.repairApplyId]
+          : [],
+        notProvenClaims: [
+          ...savePoint.notProvenClaims,
+          ...verification.intent.notProvenClaims,
+          ...verification.result.notProvenClaims,
+          ...(verification.repairRequired?.notProvenClaims ?? []),
+          ...(verification.repairProposal?.notProvenClaims ?? []),
+          ...(verification.repairApply?.notProvenClaims ?? []),
+        ],
+      });
       appendProjectedEvents(events, projectRuntimeEvents({
         verificationIntents: [verification.intent],
         verificationResults: [verification.result],
@@ -802,7 +831,7 @@ export async function runAgentLoopContract(
         ...(toolCallBatch ? { toolCallBatch } : {}),
         normalizedToolCallBatch,
         ...(toolResultBatch ? { toolResultBatch } : {}),
-        savePoint,
+        savePoint: verificationSavePoint,
         nextTurn: {
           prepared: true,
           pendingFacts: Object.freeze([...pendingNextTurnFacts]),
@@ -889,7 +918,20 @@ function createDefaultVerificationProjection(input: {
   readonly turnId: string;
   readonly savePoint: RuntimeEvidenceSavePoint;
   readonly nextTurnBundle?: NextTurnBundleProjection;
+  readonly receipt?: ProductVerificationReceipt;
+  readonly runtimeReceiptIds?: readonly string[];
 }): AgentLoopContractVerificationProjection {
+  if (input.receipt) {
+    return projectVerificationObservationFromReceipt({
+      sourceTurnId: input.turnId,
+      targetSummary: input.nextTurnBundle
+        ? `nextTurnBundle=${input.nextTurnBundle.bundleId}`
+        : `savePoint=${input.savePoint.id}`,
+      receipt: input.receipt,
+      runtimeReceiptIds: input.runtimeReceiptIds,
+      notProvenClaims: ["verification-boundary-observation-only"],
+    });
+  }
   const intent = projectVerificationIntent({
     sourceTurnId: input.turnId,
     targetSummary: input.nextTurnBundle

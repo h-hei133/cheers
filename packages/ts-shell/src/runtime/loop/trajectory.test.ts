@@ -24,6 +24,7 @@ import {
   observeVerificationResult,
   projectVerificationIntent,
 } from "../../verification/result/boundary.js";
+import { projectVerificationReceipt } from "../../verification/verificationFacade.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import {
   projectPackageResourceInventory,
@@ -342,6 +343,60 @@ describe("loop trajectory projection", () => {
       expect.arrayContaining(["repair-success", "verification-success"]),
     );
     expect(trajectory.terminalSuccessClaim).toBe(false);
+  });
+
+  it("projects task-relevant verification receipt facts on the loop trajectory", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-verification-trajectory",
+      workspaceRoot: "/workspace",
+      prompt: "verify",
+      providerOptIn: false,
+      maxTurns: 1,
+      verificationReceipt: projectVerificationReceipt({
+        selectedCommand:
+          "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
+        authority: "explicitly-approved",
+        dispatchStatus: "dispatched",
+        runtimeStatus: "failed",
+        runtimeReceiptIds: ["receipt-verification-trajectory"],
+        relevanceStatus: "relevant",
+        coverageStatus: "covered",
+        coveredFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
+        uncoveredFiles: [],
+        failureClass: "test-failed",
+        repairEligible: true,
+        notProvenClaims: ["task success"],
+        verdictStatus: "verification-failed",
+      }),
+      modelBoundary: async () => ({
+        responseId: "response-verification-trajectory",
+        stopReason: "stop",
+      }),
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "loop-verification-trajectory",
+      prompt: "verify",
+      loop,
+    });
+    const resultEvent = trajectory.events.find((event) =>
+      event.type === "loop-verification-result-observed"
+    );
+
+    expect(resultEvent?.facts).toEqual(
+      expect.objectContaining({
+        status: "failed",
+        relevanceStatus: "task_relevant",
+        coverageStatus: "covered",
+        authorityRequirement: "granted",
+        runtimeReceiptIds: ["receipt-verification-trajectory"],
+        failureClass: "test-failed",
+        repairEligible: true,
+        verdictStatus: "verification-failed",
+        terminalSuccessClaim: false,
+      }),
+    );
+    expect(trajectory.terminalSuccessClaim).toBe(false);
+    expect(trajectory.notProvenClaims).toContain("task success");
   });
 
   it("connects PL008 context rebuild, readiness, replay-safe state, and gap stages", () => {

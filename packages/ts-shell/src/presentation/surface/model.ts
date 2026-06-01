@@ -875,6 +875,14 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
   const notDispatchedTools = toolResultStatusCount("not_dispatched") +
     toolResultStatusCount("execution_unavailable") +
     toolResultStatusCount("malformed_arguments");
+  const verificationResultEvent = trajectory.events.find((event) =>
+    event.type === "loop-verification-result-observed"
+  );
+  const verificationRuntimeReceiptIds =
+    verificationResultEvent?.facts.runtimeReceiptIds;
+  const verificationRuntimeReceiptCount = Array.isArray(verificationRuntimeReceiptIds)
+    ? verificationRuntimeReceiptIds.length
+    : 0;
   return [
     section({
       kind: "task",
@@ -935,7 +943,7 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       title: "Verification",
       severity: observed("verification-result") === "observed" ? "info" : "not_proven",
       status: observed("verification-result") === "observed" ? "observed" : "not_proven",
-      summary: `intents=${trajectory.verificationIntentIds.length}; results=${trajectory.verificationResultIds.length}; selected=${observed("verification-intent")}; commandExitZeroIsTaskSuccess=false; verificationSuccess=not-proven`,
+      summary: `verificationSuccess=not-proven; taskRelevant=${factValue(verificationResultEvent?.facts.relevanceStatus)}; coverage=${factValue(verificationResultEvent?.facts.coverageStatus)}; authority=${factValue(verificationResultEvent?.facts.authorityRequirement)}; runtimeReceipts=${verificationRuntimeReceiptCount}; repairEligible=${verificationResultEvent?.facts.repairEligible === true ? "yes" : "no"}; commandExitZeroIsTaskSuccess=false; intents=${trajectory.verificationIntentIds.length}; results=${trajectory.verificationResultIds.length}; selected=${observed("verification-intent")}`,
       machineEventCorrelationIds: [
         ...(stage("verification-intent")?.eventIds ?? []),
         ...(stage("verification-result")?.eventIds ?? []),

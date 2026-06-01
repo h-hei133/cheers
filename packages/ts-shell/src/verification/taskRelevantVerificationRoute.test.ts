@@ -222,6 +222,8 @@ describe("taskRelevantVerificationRoute", () => {
 
     expect(result.verdict).toBe("verified");
     expect(result.productVerification.verdict.status).toBe("COMPLETE");
+    expect(result.productVerification.runtimeReceiptIds.length).toBeGreaterThan(0);
+    expect(result.productVerification.repairEligible).toBe(false);
     expect(result.resultSurface.status).toBe("completed");
     expect(result.resultSurface.codingResult?.verification.status).toBe("passed");
     expect(result.resultSurface.codingResult?.verifiedFiles).toEqual([

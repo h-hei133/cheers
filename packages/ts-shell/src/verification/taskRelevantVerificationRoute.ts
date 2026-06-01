@@ -160,11 +160,13 @@ export async function runTaskRelevantVerificationRoute(input: {
       authority: input.authority.state,
       dispatchStatus: run?.toolResult ? "dispatched" : "not-run",
       runtimeStatus: run?.result.outcome,
+      runtimeReceiptIds: runtimeReceiptIdsFromRun(run),
       relevanceStatus: commandPlan.relevanceStatus,
       coverageStatus: commandPlan.coverageStatus,
       coveredFiles: commandPlan.coveredFiles,
       uncoveredFiles: commandPlan.uncoveredFiles,
       failureClass: run?.result.failureClassification?.failureClass,
+      repairEligible: run?.result.repairEligible ?? false,
       notProvenClaims,
       verdictStatus: verdict,
     });
@@ -343,6 +345,16 @@ function buildNotProvenClaims(input: {
   claims.add("provider execution");
   claims.add("workspace mutation");
   return [...claims];
+}
+
+function runtimeReceiptIdsFromRun(
+  run: VerificationCommandRun | undefined,
+): readonly string[] {
+  if (!run) return [];
+  if (run.result.runtimeReceiptMarkers.length === 0) return [];
+  return run.result.runtimeReceiptMarkers.map((_, index) =>
+    `${run.result.verificationId}:runtime-receipt:${index + 1}`
+  );
 }
 
 function buildTaskRelevantVerificationSurface(input: {

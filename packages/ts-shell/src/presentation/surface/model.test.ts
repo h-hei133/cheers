@@ -24,6 +24,7 @@ import { runControlledModelInvocationAdapter } from "../../provider/request/atte
 import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
+import { projectVerificationReceipt } from "../../verification/verificationFacade.js";
 import { projectModelBoundaryPhase } from "../../runtime/loop/modelBoundary.js";
 import { runProviderStreamAdapter } from "../../runtime/loop/providerStreamAdapter.js";
 import { projectProductLoopAdapter } from "../../runtime/loop/adapter.js";
@@ -233,6 +234,55 @@ describe("product surface view model", () => {
     expect(rendered).toContain("nextTurnExecuted=false");
     expect(rendered).toContain("[not_proven] Verdict:");
     expect(rendered).toContain("terminalSuccessClaim=false");
+    expect(rendered).not.toContain("Outcome: success");
+  });
+
+  it("renders task-relevant verification boundary facts without success inflation", async () => {
+    const loop = await runAgentLoopContract({
+      sessionId: "sess_surface_verification",
+      workspaceRoot: "/workspace",
+      prompt: "summarize verification",
+      providerOptIn: false,
+      verificationReceipt: projectVerificationReceipt({
+        selectedCommand:
+          "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
+        authority: "explicitly-approved",
+        dispatchStatus: "dispatched",
+        runtimeStatus: "failed",
+        runtimeReceiptIds: ["receipt-surface-verification"],
+        relevanceStatus: "relevant",
+        coverageStatus: "covered",
+        coveredFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
+        uncoveredFiles: [],
+        failureClass: "test-failed",
+        repairEligible: true,
+        notProvenClaims: ["task success"],
+        verdictStatus: "verification-failed",
+      }),
+      modelBoundary: async () => ({
+        responseId: "response-surface-verification",
+        stopReason: "stop",
+      }),
+    });
+    const trajectory = projectLoopTrajectory({
+      loopId: "surface-verification",
+      prompt: "summarize verification",
+      loop,
+    });
+    const viewModel = projectProductSurfaceViewModel({
+      status: "stopped",
+      terminalClassification: "stopped",
+      terminalReason: "waiting_for_input",
+      loopTrajectory: trajectory,
+    });
+    const rendered = renderTerminalMessage(viewModel!, { mode: "detailed" }).lines.join("\n");
+
+    expect(rendered).toContain("taskRelevant=task_relevant");
+    expect(rendered).toContain("coverage=covered");
+    expect(rendered).toContain("authority=granted");
+    expect(rendered).toContain("runtimeReceipts=1");
+    expect(rendered).toContain("repairEligible=yes");
+    expect(rendered).toContain("verificationSuccess=not-proven");
     expect(rendered).not.toContain("Outcome: success");
   });
 

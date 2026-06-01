@@ -46,11 +46,13 @@ export interface ProductVerificationReceipt {
   readonly authority: ProductVerificationAuthorityStatus;
   readonly dispatchStatus: ProductVerificationDispatchStatus;
   readonly runtimeStatus: ProductVerificationRuntimeStatus;
+  readonly runtimeReceiptIds: readonly string[];
   readonly relevanceStatus: ProductVerificationRelevanceStatus;
   readonly coverageStatus: ProductVerificationCoverageStatus;
   readonly coveredFiles: readonly string[];
   readonly uncoveredFiles: readonly string[];
   readonly failureClass?: string;
+  readonly repairEligible: boolean;
   readonly notProvenClaims: readonly string[];
   readonly verdictStatus: ProductVerificationVerdictStatus;
   readonly verdict: ProductVerdict;
@@ -65,11 +67,13 @@ export function projectVerificationReceipt(input: {
   readonly authority: ProductVerificationAuthorityStatus;
   readonly dispatchStatus: ProductVerificationDispatchStatus;
   readonly runtimeStatus?: ProductVerificationRuntimeStatus;
+  readonly runtimeReceiptIds?: readonly string[];
   readonly relevanceStatus: ProductVerificationRelevanceStatus;
   readonly coverageStatus: ProductVerificationCoverageStatus;
   readonly coveredFiles: readonly string[];
   readonly uncoveredFiles: readonly string[];
   readonly failureClass?: string;
+  readonly repairEligible?: boolean;
   readonly notProvenClaims: readonly string[];
   readonly verdictStatus: ProductVerificationVerdictStatus;
 }): ProductVerificationReceipt {
@@ -95,11 +99,13 @@ export function projectVerificationReceipt(input: {
     authority: input.authority,
     dispatchStatus: input.dispatchStatus,
     runtimeStatus,
+    runtimeReceiptIds: input.runtimeReceiptIds ?? [],
     relevanceStatus: input.relevanceStatus,
     coverageStatus: input.coverageStatus,
     coveredFiles: input.coveredFiles,
     uncoveredFiles: input.uncoveredFiles,
     failureClass: input.failureClass,
+    repairEligible: input.repairEligible ?? false,
     notProvenClaims: input.notProvenClaims,
     verdictStatus: input.verdictStatus,
     verdict: projectProductVerdictFromClaims({

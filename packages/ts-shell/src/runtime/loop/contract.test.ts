@@ -10,6 +10,7 @@ import {
   observeVerificationResult,
   projectVerificationIntent,
 } from "../../verification/result/boundary.js";
+import { projectVerificationReceipt } from "../../verification/verificationFacade.js";
 import { projectJsonRuntimeEventStream } from "../events/stream.js";
 import { createCommandExecutionReceipt } from "../execution/receipt.js";
 import {
@@ -296,6 +297,64 @@ describe("agent loop contract", () => {
       ]),
     );
     expect(JSON.stringify(loop)).not.toContain('"success":true');
+  });
+
+  it("observes task-relevant verification receipt facts without terminal success", async () => {
+    const receipt = projectVerificationReceipt({
+      selectedCommand:
+        "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
+      authority: "explicitly-approved",
+      dispatchStatus: "dispatched",
+      runtimeStatus: "success",
+      runtimeReceiptIds: ["receipt-task-relevant-1"],
+      relevanceStatus: "relevant",
+      coverageStatus: "covered",
+      coveredFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
+      uncoveredFiles: [],
+      repairEligible: false,
+      notProvenClaims: ["task success remains verdict-owned"],
+      verdictStatus: "verified",
+    });
+    const loop = await runAgentLoopContract({
+      sessionId: "sess-loop-verification-receipt",
+      workspaceRoot: "/workspace",
+      prompt: "verify",
+      providerOptIn: false,
+      maxTurns: 1,
+      verificationReceipt: receipt,
+      modelBoundary: async () => ({
+        responseId: "response-verification-receipt",
+        stopReason: "stop",
+      }),
+    });
+    const turn = loop.turns[0];
+    const event = loop.events.find((item) =>
+      item.type === "verification-result-observed"
+    );
+
+    expect(turn?.verification.intent.dispatchStatus).toBe("passed");
+    expect(turn?.verification.intent.coverageStatus).toBe("covered");
+    expect(turn?.verification.result.status).toBe("passed");
+    expect(turn?.verification.result.runtimeReceiptIds).toEqual([
+      "receipt-task-relevant-1",
+    ]);
+    expect(turn?.verification.result.repairEligible).toBe(false);
+    expect(turn?.savePoint.verificationIntentIds).toEqual([
+      turn?.verification.intent.intentId,
+    ]);
+    expect(turn?.savePoint.verificationResultIds).toEqual([
+      turn?.verification.result.verificationId,
+    ]);
+    expect(event?.facts).toEqual(
+      expect.objectContaining({
+        coverageStatus: "covered",
+        authorityRequirement: "granted",
+        runtimeReceiptIds: ["receipt-task-relevant-1"],
+        repairEligible: false,
+        terminalSuccessClaim: false,
+      }),
+    );
+    expect(loop.terminalSuccessClaim).toBe(false);
   });
 
   it("delivers next-turn, steering, and follow-up messages when explicitly enabled", async () => {

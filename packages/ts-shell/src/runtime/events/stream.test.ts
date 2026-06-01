@@ -406,6 +406,45 @@ describe("JSON runtime event stream projection", () => {
     );
   });
 
+  it("serializes verification boundary receipt facts as observation only", () => {
+    const stream = projectJsonRuntimeEventStream({
+      events: [
+        {
+          id: "event-verification-boundary",
+          sequence: 1,
+          type: "verification-result-observed",
+          facts: {
+            verificationId: "verification-1",
+            status: "passed",
+            relevanceStatus: "task_relevant",
+            coverageStatus: "covered",
+            authorityRequirement: "granted",
+            runtimeReceiptIds: ["receipt-1"],
+            repairEligible: false,
+            commandExitZeroIsTaskSuccess: false,
+            terminalSuccessClaim: false,
+          },
+          notProvenClaims: ["task-success", "verification-success"],
+          redaction: {
+            status: "report-safe",
+            excluded: [],
+          },
+        },
+      ],
+    });
+
+    expect(stream[0]?.facts).toEqual(
+      expect.objectContaining({
+        runtimeReceiptIds: ["receipt-1"],
+        repairEligible: false,
+        commandExitZeroIsTaskSuccess: false,
+      }),
+    );
+    expect(stream[0]?.truthfulness.observationOnly).toBe(true);
+    expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
+    expect(stream[0]?.notProvenClaims).toContain("terminal-success");
+  });
+
   it("serializes PL008 continuation observations without unsafe context or success claims", () => {
     const stream = projectJsonRuntimeEventStream({
       events: [
