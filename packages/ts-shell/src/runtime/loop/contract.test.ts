@@ -78,7 +78,7 @@ describe("agent loop contract", () => {
       terminalSuccessClaim: false,
     });
     expect(turn?.toolResultBatch?.resultDetails?.map((detail) => detail.resultStatus))
-      .toEqual(["not_executed", "rejected", "unsupported", "unsupported"]);
+      .toEqual(["not_dispatched", "malformed_arguments", "unknown_tool", "unsupported_tool"]);
     expect(turn?.toolResultBatch?.resultMessages?.messages.map((message) => message.deliveryStatus))
       .toEqual(["not_prepared", "blocked", "unsupported", "unsupported"]);
     expect(loop.events.map((event) => event.type)).toEqual(

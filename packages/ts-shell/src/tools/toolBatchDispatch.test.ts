@@ -6,6 +6,7 @@ import { accumulateAssistantResponse } from "../turn/assistantResponse.js";
 import { createCommandToolResultSplit } from "./result/split.js";
 import { extractToolCallBatch } from "./toolCallBatch.js";
 import {
+  createToolDispatcherBatchDispatch,
   dispatchToolBatch,
   planToolBatchDispatch,
   type ToolBatchPolicy,
@@ -70,8 +71,8 @@ describe("tool batch dispatch", () => {
     expect(dispatched).toBe(1);
     expect(result.notDispatchedToolCallIds).toEqual(["call-write"]);
     expect(result.resultDetails.map((detail) => detail.resultStatus)).toEqual([
-      "succeeded",
-      "blocked",
+      "executed_success",
+      "blocked_by_policy",
     ]);
     expect(result.afterAnnotations.every((annotation) =>
       annotation.terminalSuccessClaim === false
@@ -98,7 +99,7 @@ describe("tool batch dispatch", () => {
     ]);
     expect(result.resultDetails[0]).toMatchObject({
       toolCallId: "call-bash",
-      resultStatus: "succeeded",
+      resultStatus: "executed_success",
       systemDetails: { executionReceiptId: receipt.receiptId },
       terminalSuccessClaim: false,
     });
@@ -106,6 +107,39 @@ describe("tool batch dispatch", () => {
       expect.arrayContaining(["terminal-success", "verification-success"]),
     );
     expect(serialized).not.toMatch(/hidden reasoning|token=secret|provider\.env/i);
+  });
+
+  it("bridges eligible report-safe calls through a sanctioned dispatcher seam", async () => {
+    const dispatched: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const result = await dispatchToolBatch({
+      batch: batch([
+        { id: "call-read", name: "read", arguments: { path: "a.ts" } },
+        {
+          id: "call-redacted",
+          name: "bash",
+          arguments: { command: "printf token=secret" },
+        },
+      ]),
+      context: { taskId: "task", workspaceRoot: "/workspace" },
+      dispatchPolicy: "sequential",
+      dispatch: createToolDispatcherBatchDispatch({
+        async dispatch(name, args) {
+          dispatched.push({ name, args });
+          return { success: true, content: "safe result" };
+        },
+      }),
+    });
+
+    expect(dispatched).toEqual([{ name: "read", args: { path: "a.ts" } }]);
+    expect(result.dispatchPlan.calls.map((call) => call.notDispatchedReason)).toEqual([
+      undefined,
+      "arguments_not_report_safe",
+    ]);
+    expect(result.resultDetails.map((detail) => detail.resultStatus)).toEqual([
+      "executed_success",
+      "not_dispatched",
+    ]);
+    expect(result.notDispatchedToolCallIds).toEqual(["call-redacted"]);
   });
 });
 

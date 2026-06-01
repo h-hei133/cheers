@@ -494,6 +494,22 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
   const stage = (kind: string) =>
     trajectory.stages.find((item) => item.category === kind);
   const observed = (kind: string) => stage(kind)?.observationStatus ?? "not_proven";
+  const toolResultStatusCount = (status: string) =>
+    trajectory.events.filter((event) =>
+      event.type === "loop-tool-result-observed" &&
+      event.facts.resultStatus === status
+    ).length;
+  const executedTools = toolResultStatusCount("executed_success") +
+    toolResultStatusCount("executed_failed");
+  const blockedTools = toolResultStatusCount("blocked_by_policy") +
+    toolResultStatusCount("authority_denied");
+  const authorityRequiredTools = toolResultStatusCount("authority_required");
+  const failedTools = toolResultStatusCount("executed_failed");
+  const unsupportedTools = toolResultStatusCount("unsupported_tool") +
+    toolResultStatusCount("unknown_tool");
+  const notDispatchedTools = toolResultStatusCount("not_dispatched") +
+    toolResultStatusCount("execution_unavailable") +
+    toolResultStatusCount("malformed_arguments");
   return [
     section({
       kind: "task",
@@ -533,7 +549,7 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
           observed("tool-result-details") === "observed"
         ? "observed"
         : "not_proven",
-      summary: `toolBatches=${stage("tool-call-batch")?.sourceIds.length ?? 0}; policyDecisions=${trajectory.toolPolicyIds.length}; receipts=${trajectory.receiptIds.length}; resultMessages=${trajectory.toolResultMessageIds.length}; dispatch=${observed("before-tool-policy")}; toolResults=${observed("tool-result-details")}; toolSuccess=not-proven`,
+      summary: `toolBatches=${stage("tool-call-batch")?.sourceIds.length ?? 0}; dispatch=${observed("before-tool-policy")}; toolResults=${observed("tool-result-details")}; resultMessages=${trajectory.toolResultMessageIds.length}; receipts=${trajectory.receiptIds.length}; executed=${executedTools}; blocked=${blockedTools}; authorityRequired=${authorityRequiredTools}; failed=${failedTools}; unsupported=${unsupportedTools}; notDispatched=${notDispatchedTools}; toolSuccess=not-proven`,
       notProvenClaims: [
         ...(stage("tool-call-batch")?.notProvenClaims ?? []),
         ...(stage("tool-result-details")?.notProvenClaims ?? []),

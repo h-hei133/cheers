@@ -110,13 +110,22 @@ function messageDeliveryStatus(
   if (resultStatus === "redacted") {
     return "redacted";
   }
-  if (resultStatus === "blocked" || resultStatus === "authority_required" || resultStatus === "rejected") {
+  if (
+    resultStatus === "blocked_by_policy" ||
+    resultStatus === "authority_required" ||
+    resultStatus === "authority_denied" ||
+    resultStatus === "malformed_arguments"
+  ) {
     return "blocked";
   }
-  if (resultStatus === "unsupported" || dispatchStatus === "unsupported") {
+  if (
+    resultStatus === "unsupported_tool" ||
+    resultStatus === "unknown_tool" ||
+    dispatchStatus === "unsupported"
+  ) {
     return "unsupported";
   }
-  if (resultStatus === "not_executed") {
+  if (resultStatus === "not_dispatched" || resultStatus === "execution_unavailable") {
     return "not_prepared";
   }
   return "prepared";
@@ -127,17 +136,21 @@ function messageCategory(
   detail?: ToolResultDetail,
 ): ToolResultMessageCategory {
   if (detail?.systemDetails.executionReceiptId) {
-    return detail.resultStatus === "succeeded"
+    return detail.resultStatus === "executed_success"
       ? "execution_receipt_observed"
       : "execution_failed";
   }
-  if (call.malformed || detail?.resultStatus === "rejected") {
+  if (call.malformed || detail?.resultStatus === "malformed_arguments") {
     return "malformed_arguments";
   }
   if (call.unknownTool) {
     return "unknown_tool";
   }
-  if (call.dispatchStatus === "blocked" || detail?.resultStatus === "blocked") {
+  if (
+    call.dispatchStatus === "blocked" ||
+    detail?.resultStatus === "blocked_by_policy" ||
+    detail?.resultStatus === "authority_denied"
+  ) {
     return "blocked_by_policy";
   }
   if (
@@ -146,16 +159,16 @@ function messageCategory(
   ) {
     return "authority_required";
   }
-  if (call.dispatchStatus === "unsupported" || detail?.resultStatus === "unsupported") {
+  if (call.dispatchStatus === "unsupported" || detail?.resultStatus === "unsupported_tool") {
     return "unsupported_tool";
   }
   if (call.executionState === "execution_unavailable") {
     return "execution_unavailable";
   }
-  if (detail?.resultStatus === "failed") {
+  if (detail?.resultStatus === "executed_failed") {
     return "execution_failed";
   }
-  if (detail?.resultStatus === "succeeded") {
+  if (detail?.resultStatus === "executed_success") {
     return "executed_tool_fact";
   }
   return "not_dispatched";

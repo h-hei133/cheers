@@ -97,17 +97,18 @@ describe("runtime event projection", () => {
       "turn-snapshot-observed",
       "phase-observed",
       "execution-receipt-observed",
+      "tool-execution-receipt-observed",
       "save-point-observed",
       "result-facts-observed",
       "terminal-verdict-observed",
     ]);
-    expect(events.map((event) => event.sequence)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(events.map((event) => event.sequence)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(events[2]?.facts).toMatchObject({
       receiptId: receipt.receiptId,
       executionStatus: "success",
       errorClass: "success",
     });
-    expect(events[4]?.facts).toMatchObject({
+    expect(events[5]?.facts).toMatchObject({
       terminalSuccessClaim: false,
       terminalClassification: "stopped",
     });

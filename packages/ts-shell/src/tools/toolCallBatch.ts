@@ -20,6 +20,7 @@ export interface NormalizedToolCall {
   readonly kind: "allowlisted" | "unsupported" | "unknown";
   readonly status: NormalizedToolCallStatus;
   readonly argumentKeys: readonly string[];
+  readonly reportSafeArguments?: Readonly<Record<string, unknown>>;
   readonly argumentSummary: string;
   readonly riskLevel: "low" | "medium" | "unknown";
   readonly beforeToolPolicy: "pending";
@@ -160,6 +161,9 @@ function normalizeToolCall(
       kind: nameValue ? classifyToolKind(name) : "unknown",
       status: "malformed",
       argumentKeys: argumentProjection.keys,
+      ...(argumentProjection.reportSafeArguments
+        ? { reportSafeArguments: argumentProjection.reportSafeArguments }
+        : {}),
       argumentSummary: argumentProjection.summary,
       riskLevel: "unknown",
       beforeToolPolicy: "pending",
@@ -185,6 +189,9 @@ function normalizeToolCall(
       kind,
       status: "unsupported",
       argumentKeys: argumentProjection.keys,
+      ...(argumentProjection.reportSafeArguments
+        ? { reportSafeArguments: argumentProjection.reportSafeArguments }
+        : {}),
       argumentSummary: argumentProjection.summary,
       riskLevel: "unknown",
       beforeToolPolicy: "pending",
@@ -207,6 +214,9 @@ function normalizeToolCall(
       kind,
       status: "unknown",
       argumentKeys: argumentProjection.keys,
+      ...(argumentProjection.reportSafeArguments
+        ? { reportSafeArguments: argumentProjection.reportSafeArguments }
+        : {}),
       argumentSummary: argumentProjection.summary,
       riskLevel: "unknown",
       beforeToolPolicy: "pending",
@@ -229,6 +239,9 @@ function normalizeToolCall(
     kind,
     status: "prepared",
     argumentKeys: argumentProjection.keys,
+    ...(argumentProjection.reportSafeArguments
+      ? { reportSafeArguments: argumentProjection.reportSafeArguments }
+      : {}),
     argumentSummary: argumentProjection.summary,
     riskLevel: "unknown",
     beforeToolPolicy: "pending",
@@ -283,6 +296,7 @@ function classifyToolKind(name: string): NormalizedToolCall["kind"] {
 
 function projectArguments(value: unknown): {
   readonly keys: readonly string[];
+  readonly reportSafeArguments?: Readonly<Record<string, unknown>>;
   readonly summary: string;
   readonly redacted: boolean;
 } {
@@ -298,20 +312,58 @@ function projectArguments(value: unknown): {
     };
   }
   let redacted = false;
-  const keys = Object.keys(value as Record<string, unknown>).map((key) => {
+  const source = value as Record<string, unknown>;
+  const projected: Record<string, unknown> = {};
+  const keys = Object.keys(source).map((key) => {
     const sanitized = sanitizeText(key);
     redacted ||= sanitized.redacted;
+    const child = projectReportSafeValue(source[key]);
+    redacted ||= child.redacted;
+    if (!child.redacted) {
+      projected[sanitized.value] = child.value;
+    }
     return sanitized.value;
   }).sort();
-  for (const child of Object.values(value as Record<string, unknown>)) {
-    const sanitized = sanitizeText(String(child));
-    redacted ||= sanitized.redacted;
-  }
   return {
     keys: Object.freeze(keys),
+    ...(redacted ? {} : { reportSafeArguments: deepFreeze(projected) }),
     summary: `argumentKeys=${keys.join(",") || "none"}; redacted=${redacted}`,
     redacted,
   };
+}
+
+function projectReportSafeValue(value: unknown): {
+  readonly value?: unknown;
+  readonly redacted: boolean;
+} {
+  if (value === null || typeof value === "boolean" || typeof value === "number") {
+    return { value, redacted: false };
+  }
+  if (typeof value === "string") {
+    const sanitized = sanitizeText(value);
+    return sanitized.redacted
+      ? { redacted: true }
+      : { value: sanitized.value, redacted: false };
+  }
+  if (Array.isArray(value)) {
+    const projected = value.map(projectReportSafeValue);
+    return projected.some((item) => item.redacted)
+      ? { redacted: true }
+      : { value: projected.map((item) => item.value), redacted: false };
+  }
+  if (value && typeof value === "object") {
+    const projected: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      const safeKey = sanitizeText(key);
+      const safeChild = projectReportSafeValue(child);
+      if (safeKey.redacted || safeChild.redacted) {
+        return { redacted: true };
+      }
+      projected[safeKey.value] = safeChild.value;
+    }
+    return { value: deepFreeze(projected), redacted: false };
+  }
+  return { redacted: true };
 }
 
 function sanitizeText(value: string): { readonly value: string; readonly redacted: boolean } {

@@ -156,6 +156,7 @@ describe("JSON runtime event stream projection", () => {
       "turn-snapshot-observed",
       "phase-observed",
       "execution-receipt-observed",
+      "tool-execution-receipt-observed",
       "save-point-observed",
       "result-facts-observed",
       "terminal-verdict-observed",

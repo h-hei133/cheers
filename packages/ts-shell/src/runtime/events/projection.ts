@@ -94,10 +94,16 @@ export type RuntimeProjectionEventType =
   | "non-executed-result-message-prepared"
   | "tool-batch-observation-completed"
   | "tool-batch-dispatch-planned"
+  | "tool-dispatch-eligibility-observed"
   | "before-tool-policy-decided"
   | "tool-call-authority-required"
   | "tool-call-dispatched"
+  | "tool-execution-started"
+  | "tool-execution-receipt-observed"
+  | "tool-execution-failed"
+  | "tool-execution-completed"
   | "tool-result-message-prepared"
+  | "tool-batch-completed"
   | "tool-batch-save-point-observed"
   | "post-tool-save-point-observed"
   | "next-turn-bundle-prepared"
@@ -667,13 +673,19 @@ export function projectRuntimeEvents(input: {
         toolCallId: call.toolCallId,
         toolName: call.toolName,
         callStatus: call.callStatus,
+        knownToolStatus: call.knownToolStatus,
+        supportedStatus: call.supportedStatus,
         dispatchStatus: call.dispatchStatus,
+        dispatchEligibility: call.dispatchEligibility,
+        authorityGrantStatus: call.authorityGrantStatus,
+        notDispatchedReason: call.notDispatchedReason,
         decisionId: call.beforePolicyDecision.decisionId,
         decisionStatus: call.beforePolicyDecision.status,
         authorityRequirement: call.authorityRequirement,
         redactionStatus: call.redactionStatus,
         terminalSuccessClaim: false,
       };
+      append("tool-dispatch-eligibility-observed", facts, call.notProvenClaims);
       append("before-tool-policy-decided", facts, call.notProvenClaims);
       if (call.dispatchStatus === "authority_required") {
         append("tool-call-authority-required", facts, call.notProvenClaims);
@@ -706,6 +718,20 @@ export function projectRuntimeEvents(input: {
       },
       receipt.notProvenClaims,
     );
+    append(
+      "tool-execution-receipt-observed",
+      {
+        receiptId: receipt.receiptId,
+        operationKind: receipt.operationKind,
+        executionStatus: receipt.executionStatus,
+        errorClass: receipt.errorClass,
+        exitCode: receipt.exitCode,
+        authorityMode: receipt.authorityMode,
+        redactionStatus: receipt.redaction.status,
+        terminalSuccessClaim: false,
+      },
+      receipt.notProvenClaims,
+    );
   }
 
   for (const result of input.toolResults ?? []) {
@@ -725,6 +751,20 @@ export function projectRuntimeEvents(input: {
   }
 
   for (const detail of input.toolResultDetails ?? []) {
+    if (detail.systemDetails.executionReceiptId) {
+      append(
+        "tool-execution-started",
+        {
+          resultDetailsId: detail.resultDetailsId,
+          toolCallId: detail.toolCallId,
+          toolName: detail.toolName,
+          executionReceiptId: detail.systemDetails.executionReceiptId,
+          resultStatus: detail.resultStatus,
+          terminalSuccessClaim: false,
+        },
+        detail.notProvenClaims,
+      );
+    }
     append(
       "tool-result-observed",
       {
@@ -740,6 +780,34 @@ export function projectRuntimeEvents(input: {
       },
       detail.notProvenClaims,
     );
+    if (detail.resultStatus === "executed_failed") {
+      append(
+        "tool-execution-failed",
+        {
+          resultDetailsId: detail.resultDetailsId,
+          toolCallId: detail.toolCallId,
+          toolName: detail.toolName,
+          executionReceiptId: detail.systemDetails.executionReceiptId,
+          resultStatus: detail.resultStatus,
+          terminalSuccessClaim: false,
+        },
+        detail.notProvenClaims,
+      );
+    }
+    if (detail.resultStatus === "executed_success") {
+      append(
+        "tool-execution-completed",
+        {
+          resultDetailsId: detail.resultDetailsId,
+          toolCallId: detail.toolCallId,
+          toolName: detail.toolName,
+          executionReceiptId: detail.systemDetails.executionReceiptId,
+          resultStatus: detail.resultStatus,
+          terminalSuccessClaim: false,
+        },
+        detail.notProvenClaims,
+      );
+    }
   }
 
   for (const batch of input.toolResultMessages ?? []) {
@@ -760,6 +828,18 @@ export function projectRuntimeEvents(input: {
         message.notProvenClaims,
       );
     }
+    append(
+      "tool-batch-completed",
+      {
+        batchId: batch.batchId,
+        dispatchPlanId: batch.dispatchPlanId,
+        toolResultMessageCount: batch.messages.length,
+        preparedCount: batch.preparedCount,
+        blockedCount: batch.blockedCount,
+        terminalSuccessClaim: batch.terminalSuccessClaim,
+      },
+      batch.notProvenClaims,
+    );
   }
 
   for (const decision of input.toolPolicyDecisions ?? []) {
