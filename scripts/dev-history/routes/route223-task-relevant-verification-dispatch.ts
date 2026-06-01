@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { createCommandRuntimeReceipt } from "../../../packages/ts-shell/src/core/runtime/runtimeReceipt.js";
 import { projectRuntimeReceipt } from "../../../packages/ts-shell/src/core/runtime/runtimeReceiptProjection.js";
-import type { ToolDispatcher } from "../../../packages/ts-shell/src/tools/dispatcher.js";
+import type { ToolDispatcher } from "../../../packages/ts-shell/src/tools/dispatch/dispatcher.js";
 import type {
   ToolExecutionContext,
   ToolExecutionResult,

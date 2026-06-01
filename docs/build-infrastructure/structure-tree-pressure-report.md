@@ -1378,3 +1378,99 @@ Target internally imported compatibility files after:
 ### Recommended Next Step
 
 Review zero-internal root `tools` entries only if package-facing safety is explicitly in scope.
+
+## Tools Entry Cleanup
+
+Status: structure-only cleanup for root tools export entries. Product behavior was preserved. No tool execution semantics, tool authority, command allowlists, provider configuration, provider calls, fallback behavior, edit/apply/write approval behavior, verification execution, repair execution, result truthfulness, session schema, CLI behavior, package scripts, build config, workflow coordinator behavior, or session manager behavior changed.
+
+Initial status:
+
+- `git status --short --branch` reported `## main...origin/main`.
+- No pre-edit push was attempted because the branch was not ahead.
+- The worktree was clean before editing.
+
+Inspection summary:
+
+- Latest pressure report, root tools files, concrete `tools/dispatch`, `tools/policy`, and `tools/result` owner files, `core/tools` import-adjacent files, package metadata, documented public entry references, internal imports, script/test/string module-path mentions, direct file counts, and long basenames were inspected.
+- Serena targeted inspection confirmed `tools/dispatcher.ts`, `tools/interception.ts`, and `tools/resultSplit.ts` had no symbol bodies and only re-exported concrete owner files.
+- Serena targeted inspection confirmed the concrete owner files contain the real symbols.
+- `packages/ts-shell/package.json` exposes `dist`, `src`, and a CLI binary, with no documented package export for the removed deep files.
+
+### Before Snapshot
+
+Before measurements:
+
+| Measurement | Before |
+|---|---:|
+| Export-only compatibility files | 82 |
+| Zero-internal-import compatibility files | 82 |
+| Internally imported compatibility files | 0 |
+| `tools` direct files | 9 |
+| `core/tools` direct files | 20 |
+| Tests importing root tools entries | 0 |
+| Long basenames in target areas | 0 |
+
+Target root tools entries before:
+
+| Path | Internal imports | Script/test real-module imports |
+|---|---:|---:|
+| `tools/dispatcher.ts` | 0 | 1 |
+| `tools/interception.ts` | 0 | 0 |
+| `tools/resultSplit.ts` | 0 | 0 |
+| `tools/index.ts` | 0 | 0 |
+
+### After Snapshot
+
+After measurements:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Export-only compatibility files | 82 | 79 |
+| Zero-internal-import compatibility files | 82 | 79 |
+| Internally imported compatibility files | 0 | 0 |
+| `tools` direct files | 9 | 6 |
+| `core/tools` direct files | 20 | 20 |
+| Tests importing root tools entries | 0 | 0 |
+| Long basenames in target areas | 0 | 0 |
+
+Target root tools entries after:
+
+| Path | Internal imports | Status |
+|---|---:|---|
+| `tools/index.ts` | 0 | kept |
+
+### Compatibility Files Considered
+
+| Path | Status | Internal imports before | Internal imports after | Package-facing status | Reason | Deletion condition |
+|---|---|---:|---:|---|---|---|
+| `tools/dispatcher.ts` | removed | 0 | 0 | no documented package export found | historical script import now targets `tools/dispatch/dispatcher.ts` directly | already met |
+| `tools/interception.ts` | removed | 0 | 0 | no documented package export found | product imports already target `tools/policy/interception.ts` | already met |
+| `tools/resultSplit.ts` | removed | 0 | 0 | no documented package export found | product imports already target `tools/result/split.ts` | already met |
+| `tools/index.ts` | kept | 0 | 0 | root owner aggregation surface | retains a concise owner entry without internal pressure | remove only if package-facing aggregation safety is proven disposable |
+
+### Files Removed
+
+- `packages/ts-shell/src/tools/dispatcher.ts`
+- `packages/ts-shell/src/tools/interception.ts`
+- `packages/ts-shell/src/tools/resultSplit.ts`
+
+### Files Moved
+
+- None.
+
+### Tests Moved
+
+- None.
+
+### Imports Updated
+
+- `scripts/dev-history/routes/route223-task-relevant-verification-dispatch.ts` now imports `ToolDispatcher` from `packages/ts-shell/src/tools/dispatch/dispatcher.ts`.
+
+### Remaining Visible Debt
+
+- Root `tools/index.ts` remains as the only export-only root tools entry.
+- Historical documentation still mentions old root tools filenames; those entries were left unchanged as history rather than active module paths.
+
+### Recommended Next Step
+
+Review other zero-internal root owner indexes only with explicit package-facing aggregation scope.
