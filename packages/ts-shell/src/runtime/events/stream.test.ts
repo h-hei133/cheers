@@ -678,12 +678,19 @@ describe("JSON runtime event stream projection", () => {
           terminalClassification: "success",
           productVerdictStatus: "COMPLETE",
         }, ["rendered-output-is-not-success"]),
+        makeEvent(3, "loop-finalization-decision-observed", {
+          decisionId: "decision:repair",
+          decision: "stop_complete",
+          nextAction: "stop loop after result-owned verified repair projection",
+          originalFailureClass: "test-failed",
+        }, ["loop-decision-is-not-terminal-truth"]),
       ],
     });
 
     expect(stream.map((entry) => entry.eventType)).toEqual([
       "repair-verdict-proof-input-observed",
       "repair-verdict-terminal-projected",
+      "loop-finalization-decision-observed",
     ]);
     expect(stream.every((entry) => entry.truthfulness.terminalSuccessClaim === false))
       .toBe(true);

@@ -400,6 +400,7 @@ describe("loop trajectory projection", () => {
     expect(trajectory.postRepairVerificationResultIds).toHaveLength(1);
     expect(trajectory.repairVerdictProofInputIds).toHaveLength(1);
     expect(trajectory.repairVerdictTerminalProjectionIds).toHaveLength(1);
+    expect(trajectory.loopFinalizationDecisionIds).toHaveLength(1);
     expect(trajectory.events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -441,6 +442,16 @@ describe("loop trajectory projection", () => {
             originalFailureClass: "test-failed",
             repairApplyState: "applied",
             postRepairVerificationState: "passed",
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "loop-finalization-observed",
+          facts: expect.objectContaining({
+            decision: "stop_complete",
+            resultTerminalStatus: "verified_with_repair",
+            proofComplete: true,
+            originalFailureClass: "test-failed",
             terminalSuccessClaim: false,
           }),
         }),
@@ -513,6 +524,7 @@ describe("loop trajectory projection", () => {
         "verification-success",
         "post-repair-verification-passed-is-verdict-input-only",
         "evidence-input-is-not-terminal-result",
+        "loop-decision-is-not-terminal-truth",
         "rendered-output-is-not-success",
       ]),
     );

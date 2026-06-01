@@ -421,6 +421,8 @@ describe("product surface view model", () => {
     expect(rendered).toContain("resultStatus=verified_with_repair");
     expect(rendered).toContain("originalFailure=test-failed");
     expect(rendered).toContain("missingProof=");
+    expect(rendered).toContain("loopDecision=stop_complete");
+    expect(rendered).toContain("nextAction=stop loop after result-owned verified repair projection");
     expect(rendered).toContain("repairSuccess=not-proven");
     expect(rendered).not.toContain("Outcome: success");
   });

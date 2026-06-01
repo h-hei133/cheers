@@ -377,6 +377,22 @@ describe("agent loop contract", () => {
       originalFailureClass: "test-failure",
       terminalSuccessClaim: false,
     });
+    expect(turn?.finalization?.input).toMatchObject({
+      resultTerminalStatus: "verified_with_repair",
+      proofComplete: true,
+      originalFailurePreserved: true,
+      repairApplyPreserved: true,
+      postRepairVerificationPreserved: true,
+      terminalSuccessClaim: false,
+    });
+    expect(turn?.finalization?.decision).toMatchObject({
+      decision: "stop_complete",
+      pendingUserAuthority: false,
+      pendingVerification: false,
+      pendingRepair: false,
+      originalFailureClass: "test-failure",
+      terminalSuccessClaim: false,
+    });
     expect(turn?.savePoint.repairHandoffIds).toEqual([
       turn?.verification.repairRequired?.handoffId,
     ]);
@@ -419,11 +435,21 @@ describe("agent loop contract", () => {
         "repair-verdict-terminal-status:verified_with_repair",
         "repair-verdict-terminal-classification:success",
         "repair-verdict-terminal-success:false",
+        "loop-finalization-decision:stop_complete",
+        "pending-user-authority:no",
+        "pending-verification:no",
+        "pending-repair:no",
+        "loop-finalization-terminal-success:false",
       ]),
     );
     expect(
       turn?.savePoint.pendingNextTurnFacts.some((fact) =>
         fact.startsWith("repair-verdict-terminal-projection:")
+      ),
+    ).toBe(true);
+    expect(
+      turn?.savePoint.pendingNextTurnFacts.some((fact) =>
+        fact.startsWith("loop-finalization-input:")
       ),
     ).toBe(true);
     expect(turn?.nextTurn.pendingFacts).toEqual(
@@ -449,6 +475,8 @@ describe("agent loop contract", () => {
         "post-repair-verification-verdict-candidate-observed",
         "repair-verdict-proof-input-observed",
         "repair-verdict-terminal-projected",
+        "loop-finalization-input-observed",
+        "loop-finalization-decision-observed",
         "original-failure-preserved",
       ]),
     );

@@ -43,6 +43,10 @@ import {
   createModelInvocationGate,
 } from "../../provider/request/invocation.js";
 import { runControlledModelInvocationAdapter } from "../../provider/request/attempt.js";
+import {
+  createLoopFinalizationInput,
+  decideLoopFinalization,
+} from "../loop/finalization.js";
 import { accumulateAssistantResponse } from "../../turn/assistantResponse.js";
 import { evaluateNextTurnDeliveryPolicy } from "../../turn/deliveryPolicy.js";
 import { projectFollowUpQueue } from "../../turn/followUpQueue.js";
@@ -633,6 +637,10 @@ describe("runtime event projection", () => {
       postRepairVerification: postResult,
     });
     const terminalProjection = projectRepairVerdictTerminal({ proofInput });
+    const finalizationInput = createLoopFinalizationInput({
+      resultProjection: terminalProjection,
+    });
+    const finalizationDecision = decideLoopFinalization({ finalizationInput });
     const events = projectRuntimeEvents({
       verificationIntents: [intent],
       verificationResults: [result],
@@ -641,6 +649,8 @@ describe("runtime event projection", () => {
       postRepairVerificationResults: [postResult],
       repairVerdictProofInputs: [proofInput],
       repairVerdictTerminalProjections: [terminalProjection],
+      loopFinalizationInputs: [finalizationInput],
+      loopFinalizationDecisions: [finalizationDecision],
       repairRequiredHandoffs: [handoff],
       repairProposals: [proposal],
       repairAuthorities: [authority],
@@ -657,6 +667,8 @@ describe("runtime event projection", () => {
       "post-repair-verification-verdict-candidate-observed",
       "repair-verdict-proof-input-observed",
       "repair-verdict-terminal-projected",
+      "loop-finalization-input-observed",
+      "loop-finalization-decision-observed",
       "repair-required",
       "original-failure-preserved",
       "repair-proposal-observed",
@@ -717,6 +729,16 @@ describe("runtime event projection", () => {
             status: "verified_with_repair",
             terminalClassification: "success",
             productVerdictStatus: "COMPLETE",
+            originalFailureClass: "test-failed",
+            terminalSuccessClaim: false,
+          }),
+        }),
+        expect.objectContaining({
+          type: "loop-finalization-decision-observed",
+          facts: expect.objectContaining({
+            decisionId: finalizationDecision.decisionId,
+            decision: "stop_complete",
+            nextAction: "stop loop after result-owned verified repair projection",
             originalFailureClass: "test-failed",
             terminalSuccessClaim: false,
           }),

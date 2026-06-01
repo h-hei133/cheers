@@ -19,6 +19,7 @@ export type LoopInfrastructureCategory =
   | "verification-result"
   | "evidence-proof-input"
   | "result-terminal-projection"
+  | "loop-finalization"
   | "repair-handoff"
   | "repair-proposal"
   | "repair-authority"
@@ -83,6 +84,7 @@ export const LOOP_INFRASTRUCTURE_CATEGORIES = [
   "verification-result",
   "evidence-proof-input",
   "result-terminal-projection",
+  "loop-finalization",
   "repair-handoff",
   "repair-proposal",
   "repair-authority",
@@ -169,6 +171,11 @@ export function createLoopInfrastructureMap(): LoopInfrastructureMap {
     ]),
     entry("result-terminal-projection", "result", "result", "connected", "RepairVerdictTerminalProjection", [
       "rendered-output-is-not-success",
+    ]),
+    entry("loop-finalization", "runtime/loop", "control", "connected", "LoopFinalizationDecision", [
+      "loop-decision-is-not-terminal-truth",
+      "await-user-is-not-success",
+      "continue-next-turn-is-not-success",
     ]),
     entry("repair-handoff", "repair", "repair", "connected", "RepairRequiredHandoff", [
       "repair-success",

@@ -68,6 +68,12 @@ import {
   projectModelResponseReentryCycle,
   type ModelResponseReentryCycleProjection,
 } from "./reentry.js";
+import {
+  createLoopFinalizationInput,
+  decideLoopFinalization,
+  type LoopFinalizationDecision,
+  type LoopFinalizationInput,
+} from "./finalization.js";
 
 export type AgentLoopContractState =
   | "idle"
@@ -249,6 +255,10 @@ export interface AgentLoopContractTurnProjection {
     readonly executed: false;
   };
   readonly verification: AgentLoopContractVerificationProjection;
+  readonly finalization?: {
+    readonly input: LoopFinalizationInput;
+    readonly decision: LoopFinalizationDecision;
+  };
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
 }
@@ -865,11 +875,31 @@ export async function runAgentLoopContract(
             ]
           : []),
       ];
+      const finalizationInput = verification.repairVerdictTerminalProjection
+        ? createLoopFinalizationInput({
+            resultProjection: verification.repairVerdictTerminalProjection,
+          })
+        : undefined;
+      const finalizationDecision = finalizationInput
+        ? decideLoopFinalization({
+            finalizationInput,
+            pendingHandoffFacts: repairCarryForwardFacts,
+          })
+        : undefined;
+      const finalizationCarryForwardFacts = finalizationDecision
+        ? [
+            `loop-finalization-input:${finalizationDecision.sourceInputId}`,
+            `loop-finalization-decision:${finalizationDecision.decision}`,
+            `loop-finalization-next-action:${finalizationDecision.nextAction}`,
+            ...finalizationDecision.sessionCarryForwardFacts,
+          ]
+        : [];
       const verificationSavePoint = createEvidenceOnlySavePoint({
         ...savePointInput,
         pendingNextTurnFacts: [
           ...savePoint.pendingNextTurnFacts,
           ...repairCarryForwardFacts,
+          ...finalizationCarryForwardFacts,
         ],
         verificationIntentIds: [verification.intent.intentId],
         verificationResultIds: [verification.result.verificationId],
@@ -905,6 +935,8 @@ export async function runAgentLoopContract(
           ...(verification.postRepairVerificationResult?.notProvenClaims ?? []),
           ...(verification.repairVerdictProofInput?.notProvenClaims ?? []),
           ...(verification.repairVerdictTerminalProjection?.notProvenClaims ?? []),
+          ...(finalizationInput?.notProvenClaims ?? []),
+          ...(finalizationDecision?.notProvenClaims ?? []),
         ],
       });
       appendProjectedEvents(events, projectRuntimeEvents({
@@ -925,6 +957,8 @@ export async function runAgentLoopContract(
         repairVerdictTerminalProjections: verification.repairVerdictTerminalProjection
           ? [verification.repairVerdictTerminalProjection]
           : [],
+        loopFinalizationInputs: finalizationInput ? [finalizationInput] : [],
+        loopFinalizationDecisions: finalizationDecision ? [finalizationDecision] : [],
         repairRequiredHandoffs: verification.repairRequired
           ? [verification.repairRequired]
           : [],
@@ -984,8 +1018,11 @@ export async function runAgentLoopContract(
           deliveryPolicy,
           executed: false,
         },
-        verification,
-        terminalSuccessClaim: false,
+          verification,
+          ...(finalizationInput && finalizationDecision
+            ? { finalization: { input: finalizationInput, decision: finalizationDecision } }
+            : {}),
+          terminalSuccessClaim: false,
         notProvenClaims: Object.freeze([
           "terminal-success",
           "loop-contract-only",

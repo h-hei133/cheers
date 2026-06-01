@@ -57,6 +57,10 @@ import type { ProductLoopAdapterProjection } from "../loop/adapter.js";
 import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
 import type { ProviderStreamAdapterProjection } from "../loop/providerStreamAdapter.js";
 import type { ModelResponseReentryCycleProjection } from "../loop/reentry.js";
+import type {
+  LoopFinalizationDecision,
+  LoopFinalizationInput,
+} from "../loop/finalization.js";
 import type { RepairVerdictTerminalProjection } from "../../result/projection/repair/verdict.js";
 
 export type RuntimeProjectionEventType =
@@ -187,6 +191,8 @@ export type RuntimeProjectionEventType =
   | "post-repair-verification-verdict-candidate-observed"
   | "repair-verdict-proof-input-observed"
   | "repair-verdict-terminal-projected"
+  | "loop-finalization-input-observed"
+  | "loop-finalization-decision-observed"
   | "original-failure-preserved"
   | "tool-dispatch-not-run"
   | "agent-loop-started"
@@ -217,6 +223,7 @@ export type RuntimeProjectionEventType =
   | "loop-verification-result-observed"
   | "loop-evidence-proof-input-observed"
   | "loop-result-terminal-projection-observed"
+  | "loop-finalization-observed"
   | "loop-repair-handoff-observed"
   | "loop-session-context-projected"
   | "loop-product-surface-projected"
@@ -264,6 +271,8 @@ export function projectRuntimeEvents(input: {
   readonly postRepairVerificationResults?: readonly PostRepairVerificationResultObservation[];
   readonly repairVerdictProofInputs?: readonly RepairVerdictProofInput[];
   readonly repairVerdictTerminalProjections?: readonly RepairVerdictTerminalProjection[];
+  readonly loopFinalizationInputs?: readonly LoopFinalizationInput[];
+  readonly loopFinalizationDecisions?: readonly LoopFinalizationDecision[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
@@ -1906,6 +1915,53 @@ export function projectRuntimeEvents(input: {
         terminalSuccessClaim: projection.terminalSuccessClaim,
       },
       projection.notProvenClaims,
+    );
+  }
+
+  for (const finalizationInput of input.loopFinalizationInputs ?? []) {
+    append(
+      "loop-finalization-input-observed",
+      {
+        inputId: finalizationInput.inputId,
+        resultProjectionId: finalizationInput.resultProjectionId,
+        resultTerminalStatus: finalizationInput.resultTerminalStatus,
+        resultTerminalClassification: finalizationInput.resultTerminalClassification,
+        proofComplete: finalizationInput.proofComplete,
+        originalFailurePreserved: finalizationInput.originalFailurePreserved,
+        repairApplyPreserved: finalizationInput.repairApplyPreserved,
+        postRepairVerificationPreserved:
+          finalizationInput.postRepairVerificationPreserved,
+        originalVerificationFailureId:
+          finalizationInput.originalVerificationFailureId,
+        originalFailureClass: finalizationInput.originalFailureClass,
+        repairApplyState: finalizationInput.repairApplyState,
+        postRepairVerificationState: finalizationInput.postRepairVerificationState,
+        missingProofItems: finalizationInput.missingProofItems,
+        terminalSuccessClaim: finalizationInput.terminalSuccessClaim,
+      },
+      finalizationInput.notProvenClaims,
+    );
+  }
+
+  for (const decision of input.loopFinalizationDecisions ?? []) {
+    append(
+      "loop-finalization-decision-observed",
+      {
+        decisionId: decision.decisionId,
+        sourceInputId: decision.sourceInputId,
+        decision: decision.decision,
+        reason: decision.reason,
+        nextAction: decision.nextAction,
+        pendingUserAuthority: decision.pendingUserAuthority,
+        pendingVerification: decision.pendingVerification,
+        pendingRepair: decision.pendingRepair,
+        sessionCarryForwardFacts: decision.sessionCarryForwardFacts,
+        originalVerificationFailureId: decision.originalVerificationFailureId,
+        originalFailureClass: decision.originalFailureClass,
+        missingProofItems: decision.missingProofItems,
+        terminalSuccessClaim: decision.terminalSuccessClaim,
+      },
+      decision.notProvenClaims,
     );
   }
 

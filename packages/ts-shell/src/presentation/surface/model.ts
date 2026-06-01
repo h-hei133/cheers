@@ -132,6 +132,11 @@ export function projectProductSurfaceViewModel(
   ) ?? input.runtimeEvents?.find((event) =>
     event.type === "repair-verdict-terminal-projected"
   );
+  const loopFinalizationEvent = input.loopTrajectory?.events.find((event) =>
+    event.type === "loop-finalization-observed"
+  ) ?? input.runtimeEvents?.find((event) =>
+    event.type === "loop-finalization-decision-observed"
+  );
 
   const sections = [
     ...(codingResult ? [
@@ -218,10 +223,13 @@ export function projectProductSurfaceViewModel(
         : "info",
       status: "observed",
       summary: sessionFacts?.nextAction ??
+        (loopFinalizationEvent
+          ? `loopDecision=${factValue(loopFinalizationEvent.facts.decision)}; nextAction=${factValue(loopFinalizationEvent.facts.nextAction)}; resultStatus=${factValue(repairVerdictEvent?.facts.status ?? loopFinalizationEvent.facts.resultTerminalStatus)}; missingProof=${factValue(loopFinalizationEvent.facts.missingProofItems)}; originalFailure=${factValue(loopFinalizationEvent.facts.originalFailureClass)}; terminalSuccessClaim=false`
+          :
         input.contextPlanningSummary?.nextAction ??
         input.providerStreamAdapter?.nextAction ??
         input.productLoopAdapter?.nextAction ??
-        "keep loop trajectory observation separate from terminal success",
+        "keep loop trajectory observation separate from terminal success"),
     }),
   ];
 
@@ -236,10 +244,13 @@ export function projectProductSurfaceViewModel(
       input.loopTrajectory?.notProvenClaims ??
       input.productLoopAdapter?.notProvenClaims ?? [],
     nextAction: sessionFacts?.nextAction ??
+      (loopFinalizationEvent
+        ? String(loopFinalizationEvent.facts.nextAction ?? "preserve loop finalization facts")
+        :
       input.contextPlanningSummary?.nextAction ??
       input.providerStreamAdapter?.nextAction ??
       input.productLoopAdapter?.nextAction ??
-      "keep loop trajectory observation separate from terminal success",
+      "keep loop trajectory observation separate from terminal success"),
     redaction: sections.some((item) => item.redaction !== "none") ? "applied" : "none",
     terminalSuccessClaim: false,
   };

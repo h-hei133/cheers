@@ -76,6 +76,7 @@ export interface LoopTrajectoryProjection {
   readonly postRepairVerificationResultIds: readonly string[];
   readonly repairVerdictProofInputIds: readonly string[];
   readonly repairVerdictTerminalProjectionIds: readonly string[];
+  readonly loopFinalizationDecisionIds: readonly string[];
   readonly repairHandoffIds: readonly string[];
   readonly repairProposalIds: readonly string[];
   readonly repairApplyIds: readonly string[];
@@ -778,6 +779,32 @@ export function projectLoopTrajectory(
         [turn.verification.repairVerdictTerminalProjection.projectionId],
       );
     }
+    if (turn.finalization) {
+      append(
+        "loop-finalization",
+        "loop-finalization-observed",
+        {
+          turn: turn.turn,
+          inputId: turn.finalization.input.inputId,
+          resultProjectionId: turn.finalization.input.resultProjectionId,
+          resultTerminalStatus: turn.finalization.input.resultTerminalStatus,
+          proofComplete: turn.finalization.input.proofComplete,
+          decisionId: turn.finalization.decision.decisionId,
+          decision: turn.finalization.decision.decision,
+          nextAction: turn.finalization.decision.nextAction,
+          pendingUserAuthority: turn.finalization.decision.pendingUserAuthority,
+          pendingVerification: turn.finalization.decision.pendingVerification,
+          pendingRepair: turn.finalization.decision.pendingRepair,
+          originalVerificationFailureId:
+            turn.finalization.decision.originalVerificationFailureId,
+          originalFailureClass: turn.finalization.decision.originalFailureClass,
+          missingProofItems: turn.finalization.decision.missingProofItems,
+          terminalSuccessClaim: false,
+        },
+        turn.finalization.decision.notProvenClaims,
+        [turn.finalization.decision.decisionId],
+      );
+    }
   }
 
   if (input.providerRegistry) {
@@ -1113,6 +1140,9 @@ export function projectLoopTrajectory(
       ? [turn.verification.repairVerdictTerminalProjection.projectionId]
       : []
   );
+  const loopFinalizationDecisionIds = turns.flatMap((turn) =>
+    turn.finalization ? [turn.finalization.decision.decisionId] : []
+  );
   const repairHandoffIds = turns.flatMap((turn) =>
     turn.verification.repairRequired ? [turn.verification.repairRequired.handoffId] : []
   );
@@ -1150,6 +1180,9 @@ export function projectLoopTrajectory(
     repairVerdictProofInputIds: Object.freeze(Array.from(new Set(repairVerdictProofInputIds))),
     repairVerdictTerminalProjectionIds: Object.freeze(
       Array.from(new Set(repairVerdictTerminalProjectionIds)),
+    ),
+    loopFinalizationDecisionIds: Object.freeze(
+      Array.from(new Set(loopFinalizationDecisionIds)),
     ),
     repairHandoffIds: Object.freeze(Array.from(new Set(repairHandoffIds))),
     repairProposalIds: Object.freeze(Array.from(new Set(repairProposalIds))),
