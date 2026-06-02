@@ -432,6 +432,28 @@ export function projectRuntimeEvents(input: {
       },
       request.notProvenClaims,
     );
+    if (
+      request.readinessStatus.startsWith("blocked_") ||
+      request.providerReadinessStatus === "blocked" ||
+      request.missingRequiredFacts.length > 0
+    ) {
+      append(
+        "request-blocked",
+        {
+          requestId: request.requestId,
+          readinessStatus: request.readinessStatus,
+          providerReadinessStatus: request.providerReadinessStatus,
+          blockedReasons: [
+            ...request.missingRequiredFacts,
+            ...(request.providerReadinessStatus === "blocked"
+              ? ["provider-readiness:blocked"]
+              : []),
+          ],
+          terminalSuccessClaim: false,
+        },
+        request.notProvenClaims,
+      );
+    }
   }
 
   for (const preparation of input.nextTurnRequestPreparations ?? []) {

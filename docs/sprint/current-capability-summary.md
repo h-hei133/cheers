@@ -35,9 +35,10 @@ owner. Python is offline evaluation only.
 | CLI/session status envelope | Proven for a structured terminal-facing envelope derived from product surface owner facts. The envelope carries terminal verdict, loop control status, next action, request/continuation/replay/tool/verification/repair status, missing proof, not-proven claims, safe details, user-action-needed, blocked/failed, and complete-proof state, and is consumed by the existing CLI session product surface path. | `packages/ts-shell/src/session/presentation/envelope.ts`, `packages/ts-shell/src/core/shell/cliSessionProductSurface.ts`, `packages/ts-shell/src/presentation/terminal/renderer.ts`, `packages/ts-shell/src/session/presentation/envelope.test.ts`, `packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts` |
 | Agent Loop governed substrate | Proven as a broad observation/control substrate with infrastructure categories, finalization, completion packet, trajectory, and events. Product-loop truth propagation is now matrix-tested; this does not prove every CLI, host, storage, provider, or dynamic execution path. | `packages/ts-shell/src/runtime/loop/infrastructure.ts`, `packages/ts-shell/src/runtime/loop/contract.ts`, `packages/ts-shell/src/runtime/loop/finalization.ts`, `packages/ts-shell/src/runtime/loop/trajectory.ts` |
 | Context and planning substrate | Proven for report-safe context rebuild and planning fact handoff; not a guarantee of context completeness. | `packages/ts-shell/src/context/sessionContextRebuildProjection.ts`, `packages/ts-shell/src/context/rebuildInput.ts`, `packages/ts-shell/src/context/acquisition/summary.ts` |
-| Provider request boundary | Proven for default-off request preparation, provider metadata, safe request messages, blockers, redaction, and explicit invocation readiness. It does not prove provider calls. | `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/provider/request/invocation.ts` |
+| Provider request boundary | Proven for default-off request preparation, provider metadata, safe request messages, blockers, redaction, explicit invocation readiness, and synthetic request blocker projection. It does not prove live provider calls. | `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/provider/request/invocation.ts`, `packages/ts-shell/src/runtime/events/projection.ts` |
+| Synthetic provider response lane | Proven for deterministic synthetic completed text, tool calls, provider failure facts, provider stream events, model boundary phase projection, assistant accumulation, tool extraction, and request blocker carry-forward without live provider credentials. | `packages/ts-shell/src/provider/response/synthetic.ts`, `packages/ts-shell/src/runtime/loop/providerBoundary.ts`, `packages/ts-shell/src/provider/response/synthetic.test.ts`, `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts` |
 | Continuation-aware request handoff | Proven as projection from continuation readiness into request preparation, replay-safe facts, trajectory/events, and presentation. | `packages/ts-shell/src/session/continuation/readiness.ts`, `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/session/replay/state.ts`, `packages/ts-shell/src/runtime/events/projection.ts` |
-| End-to-end turn lane | Partially proven as an integrated observation lane: model boundary, tool batch, dispatch/results, outcome, save point, next-turn preparation, verification/repair/finalization, events, and surface. It remains observation/control unless evidence/result prove success. | `packages/ts-shell/src/runtime/loop/contract.ts`, `packages/ts-shell/src/runtime/loop/modelBoundary.ts`, `packages/ts-shell/src/tools/toolOutcomeBundle.ts`, `packages/ts-shell/src/turn/nextTurnBundle.ts` |
+| End-to-end turn lane | Proven for a controlled synthetic provider-to-tool-to-next-turn runtime lane: user turn request boundary, deterministic synthetic response intake, assistant accumulation, tool extraction, allowed dispatch through the sanctioned seam, tool result message preparation, next-turn request preparation, optional continuation to the next turn, runtime events, replay-safe carry-forward, product surface, and CLI/session status envelope. It remains observation/control unless evidence/result prove success. | `packages/ts-shell/src/runtime/loop/contract.ts`, `packages/ts-shell/src/runtime/loop/providerBoundary.ts`, `packages/ts-shell/src/runtime/loop/modelBoundary.ts`, `packages/ts-shell/src/tools/toolBatchDispatch.ts`, `packages/ts-shell/src/tools/toolOutcomeBundle.ts`, `packages/ts-shell/src/turn/toolResultMessage.ts`, `packages/ts-shell/src/turn/nextTurnBundle.ts`, `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts` |
 | Tool outcome next action | Proven in `tools`: outcome status derives next action and carry-forward facts; loop/events/presentation only project them. | `packages/ts-shell/src/tools/toolOutcomeBundle.ts`, `packages/ts-shell/src/tools/toolOutcomeBundle.test.ts` |
 | Runtime event projection | Proven for many observation events, JSON stream entries, redaction, and non-success claims. Event emission is not terminal truth. | `packages/ts-shell/src/runtime/events/projection.ts`, `packages/ts-shell/src/runtime/events/stream.ts` |
 | Replay-safe carry-forward | Proven for IDs, statuses, blocker summaries, request facts, tool outcome facts, product completion facts, and redaction exclusions. Raw transcripts, secrets, raw provider output, patch text, and command output are excluded. | `packages/ts-shell/src/session/replay/state.ts` |
@@ -55,15 +56,17 @@ owner. Python is offline evaluation only.
   present beyond runtime event/JSON projection.
 - Storage-backed branch navigation and compaction summaries are projection-only
   or unsupported in the current runtime path.
-- Provider/model registry metadata exists, but broad provider compatibility,
-  auth refresh, fallback execution, and default live provider behavior are not
-  product capabilities.
+- Synthetic provider-to-tool-to-next-turn execution is proven through controlled
+  deterministic provider facts, but broad provider compatibility, auth refresh,
+  fallback execution, and default live provider behavior are not product
+  capabilities.
 - Dynamic extensions, package loading, executable hooks, and external tool
   server behavior are intentionally not enabled.
 - Tool execution is bounded by policy and `ExecutionService`; broad parallel
   mutation, file mutation queues, and snapshot/revert-backed wide editing are
   not proven.
-- Product-loop truth propagation and the CLI/session status envelope are proven
-  for the repair-to-result matrix, but the host contract, branch/compaction
-  runtime, broad provider compatibility, and dynamic execution areas remain
-  unproven.
+- Product-loop truth propagation, the CLI/session status envelope, and the
+  synthetic provider tool lane are proven for bounded owner-tested paths, but
+  the host contract, branch/compaction runtime, broad provider compatibility,
+  live-provider default behavior, mutation rollback, and dynamic execution areas
+  remain unproven.

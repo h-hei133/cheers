@@ -72,6 +72,7 @@ import {
   projectModelResponseReentryCycle,
   type ModelResponseReentryCycleProjection,
 } from "./reentry.js";
+import type { ModelBoundaryPhaseProjection } from "./modelBoundary.js";
 import {
   buildProductCompletionPacket,
   type ProductCompletionPacket,
@@ -154,9 +155,11 @@ export interface AgentLoopContractModelResponseBoundary {
   readonly stopReason: "stop" | "tool-calls" | "aborted" | "failed";
   readonly toolCalls?: readonly AgentLoopContractToolCallRequest[];
   readonly safeSummary?: string;
+  readonly requestBoundary?: ModelBoundaryPhaseProjection["requestBoundary"];
   readonly responseBoundary?: ModelResponseBoundary;
   readonly assistantResponse?: AssistantResponseState;
   readonly toolCallBatch?: NormalizedToolCallBatch;
+  readonly modelBoundaryPhase?: ModelBoundaryPhaseProjection;
   readonly notProvenClaims?: readonly string[];
 }
 
@@ -166,6 +169,7 @@ export interface AgentLoopContractTurnInput {
   readonly prompt: string;
   readonly deliveredMessages: readonly AgentLoopContractQueuedMessage[];
   readonly pendingNextTurnFacts: readonly string[];
+  readonly pendingPreparedRequest?: NextTurnModelRequestPreparation;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -298,6 +302,7 @@ export async function runAgentLoopContract(
   const turns: AgentLoopContractTurnProjection[] = [];
   const queued = [...(input.queuedMessages ?? [])];
   const pendingNextTurnFacts: string[] = [];
+  let pendingPreparedRequest: NextTurnModelRequestPreparation | undefined;
   const maxTurns = Math.max(1, input.maxTurns ?? 4);
   let state: AgentLoopContractState = "idle";
 
@@ -378,6 +383,7 @@ export async function runAgentLoopContract(
         prompt: turn === 1 ? input.prompt : "",
         deliveredMessages: delivered,
         pendingNextTurnFacts,
+        ...(pendingPreparedRequest ? { pendingPreparedRequest } : {}),
         abortSignal: input.abortSignal,
       });
       const responseBoundary = modelBoundary.responseBoundary ??
@@ -415,9 +421,21 @@ export async function runAgentLoopContract(
           notProvenClaims: modelBoundary.notProvenClaims,
         });
       appendProjectedEvents(events, projectRuntimeEvents({
+        modelRequestBoundaries: modelBoundary.requestBoundary
+          ? [modelBoundary.requestBoundary]
+          : [],
+        providerResponseStreams: modelBoundary.modelBoundaryPhase
+          ? [modelBoundary.modelBoundaryPhase.stream]
+          : [],
+        modelBoundaryPhases: modelBoundary.modelBoundaryPhase
+          ? [modelBoundary.modelBoundaryPhase]
+          : [],
         modelResponseBoundaries: [responseBoundary],
         assistantResponses: [assistantResponse],
         toolCallBatches: [normalizedToolCallBatch],
+        toolBatchHandoffs: modelBoundary.modelBoundaryPhase
+          ? [modelBoundary.modelBoundaryPhase.toolBatchHandoff]
+          : [],
       }));
       appendEvent(events, "agent-loop-model-boundary-observed", {
         turn,
@@ -753,6 +771,7 @@ export async function runAgentLoopContract(
         taskSummary: input.prompt,
         planningConstraintIds: nextTurnBundle.blockingFacts,
       });
+      pendingPreparedRequest = requestPreparation;
       const invocationGate = createModelInvocationGate({
         requestPreparation,
         explicitOptIn: {

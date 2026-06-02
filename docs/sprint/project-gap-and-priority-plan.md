@@ -8,9 +8,11 @@ completion.
 
 ## Major Gaps
 
-- Product loop truth and the CLI/session status envelope are consolidated for
-  the repair-to-result matrix, but the host contract, branch/compaction runtime,
-  broad provider compatibility, and dynamic execution areas remain unproven.
+- Product loop truth, the CLI/session status envelope, and a bounded synthetic
+  provider-to-tool-to-next-turn runtime lane are consolidated, but the host
+  contract, branch/compaction runtime, broad provider compatibility, live
+  provider defaults, mutation rollback, and dynamic execution areas remain
+  unproven.
 - CLI/session UX now has a structured status envelope for product-loop truth,
   but full queue ergonomics, branch navigation, compact/resume controls, and
   broader session management remain narrower than the runtime fact model.
@@ -62,6 +64,31 @@ completion.
 - Boundary: terminal truth still belongs to `evidence`/`result`; the CLI,
   shell, session envelope, events, replay, request readiness, tool outcome,
   proposal, authority, and apply-only states remain non-success consumers.
+
+### Completed Batch: Synthetic Provider Tool Runtime
+
+- Proven result: a deterministic synthetic provider response can enter the
+  provider response stream, project a model boundary phase, accumulate assistant
+  output, extract tool calls, dispatch allowed tools through the sanctioned seam,
+  prepare tool result messages, prepare the next model request, continue to a
+  next turn when explicitly enabled, and feed runtime events, replay-safe
+  carry-forward, product surface, and CLI/session status from the same facts.
+- User-facing value: controlled provider/tool loops can now be tested without
+  live credentials while blocked request, text-only stop, tool-call continue,
+  allowed tool result, malformed tool call, provider failure, tool execution
+  failure, next-turn request preparation, missing proof, and complete proof
+  remain distinct.
+- Owner domains: `provider/response`, `provider/request`, `runtime/loop`,
+  `runtime/events`, `tools`, `tools/policy`, `turn`, `session/replay`,
+  `session/presentation`, `presentation`, `evidence`, `result`.
+- Evidence: `packages/ts-shell/src/provider/response/synthetic.test.ts` and
+  `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts`, alongside the
+  focused provider, runtime, tool, turn, replay, surface, status, and truth
+  owner tests.
+- Boundary: live providers remain default-off and explicit opt-in only; broad
+  provider compatibility, fallback execution, mutation rollback, dynamic
+  execution, and terminal success from provider/tool/request facts remain
+  unproven.
 
 ### Batch 1: Branch/Compaction Context Readiness
 
