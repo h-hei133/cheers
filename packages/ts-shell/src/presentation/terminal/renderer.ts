@@ -75,6 +75,8 @@ export function renderSessionStatusEnvelope(
     `[request] Request: ${envelope.requestPreparation.summary}`,
     `[provider] Model: ${envelope.providerModel.summary}`,
     `[continuation] Readiness: ${envelope.continuationReadiness}`,
+    `[branch] Session: ${envelope.sessionBranch.summary}`,
+    `[compaction] Session: ${envelope.sessionCompaction.summary}`,
     `[replay] Carry-forward: ${envelope.replayCarryForward.summary}`,
     `[tools] Outcome: ${envelope.toolOutcome.summary}`,
     `[mutation] Recovery: ${envelope.mutationRecovery.summary}`,

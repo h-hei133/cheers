@@ -968,9 +968,13 @@ export function projectLoopTrajectory(
       {
         sessionIdentity: input.sessionProjection.sessionIdentity,
         activeLeafId: input.sessionProjection.activeLeafId,
+        activeBranchId: input.sessionProjection.activeBranchId,
+        branchSupport: input.sessionProjection.branchSupport,
         pathLength: input.sessionProjection.activePathProjection.pathLength,
         contextRebuildReadiness:
           input.sessionProjection.activePathProjection.contextRebuildReadiness,
+        activeLeafResolution: input.sessionProjection.activePathProjection.activeLeafResolution,
+        missingParentIds: input.sessionProjection.activePathProjection.missingParentIds,
       },
       [
         "terminal-success",
@@ -1030,6 +1034,8 @@ export function projectLoopTrajectory(
         requiredMissingFacts: input.continuationReadiness.requiredMissingFacts,
         optionalMissingFacts: input.continuationReadiness.optionalMissingFacts,
         staleFacts: input.continuationReadiness.staleFacts,
+        branchGapStatus: input.continuationReadiness.branchGapStatus,
+        compactionGapStatus: input.continuationReadiness.compactionGapStatus,
         nextTurnExecuted: input.continuationReadiness.nextTurnExecuted,
         terminalSuccessClaim: false,
       },

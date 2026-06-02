@@ -2627,6 +2627,12 @@ export function projectRuntimeEvents(input: {
         activePathLength: input.sessionProjection.activePath.length,
         treeSupport: input.sessionProjection.treeSupport,
         branchSupport: input.sessionProjection.branchSupport,
+        activeBranchId: input.sessionProjection.activeBranchId,
+        branchCount: input.sessionProjection.branchFacts.branchIds.length,
+        activeLeafResolution: input.sessionProjection.branchFacts.activeLeafResolution,
+        branchMissingParentCount: input.sessionProjection.branchFacts.missingParentIds.length,
+        compactionStatus: input.sessionProjection.compaction.availability,
+        compactionCount: input.sessionProjection.compaction.records.length,
         continuationState: input.sessionProjection.continuation.state,
         terminalSuccessClaim: input.sessionProjection.terminal.terminalSuccessClaim,
       },
@@ -2642,6 +2648,8 @@ export function projectRuntimeEvents(input: {
         redactionStatus: input.sessionProjection.activePathProjection.redactionStatus,
         contextRebuildReadiness:
           input.sessionProjection.activePathProjection.contextRebuildReadiness,
+        activeLeafResolution: input.sessionProjection.activePathProjection.activeLeafResolution,
+        missingParentIds: input.sessionProjection.activePathProjection.missingParentIds,
         terminalSuccessClaim: false,
       },
       [
@@ -2649,7 +2657,23 @@ export function projectRuntimeEvents(input: {
         ...input.sessionProjection.activePathProjection.unsupportedClaims,
       ],
     );
-    if (input.sessionProjection.branchSummary.records.length > 0) {
+    if (input.sessionProjection.branchFacts.branchIds.length > 0) {
+      for (const branchId of input.sessionProjection.branchFacts.branchIds) {
+        append(
+          "session-branch-summary-observed",
+          {
+            branchSummaryId: branchId,
+            sourceBranchIdentity: input.sessionProjection.sessionIdentity,
+            activeBranchId: input.sessionProjection.activeBranchId,
+            activeLeafId: input.sessionProjection.activeLeafId,
+            summaryAvailability: "available",
+            redactionStatus: input.sessionProjection.redaction.status,
+            terminalSuccessClaim: false,
+          },
+          input.sessionProjection.branchFacts.notProvenClaims,
+        );
+      }
+    } else if (input.sessionProjection.branchSummary.records.length > 0) {
       for (const record of input.sessionProjection.branchSummary.records) {
         append(
           "session-branch-summary-observed",
@@ -2686,6 +2710,13 @@ export function projectRuntimeEvents(input: {
             firstKeptEntryId: record.firstKeptEntryId,
             summaryAvailability: record.summaryAvailability,
             evidence: record.evidence,
+            retainedContextFactCount: record.retainedContextFactIds.length,
+            excludedContextFactCount: record.excludedContextFactIds.length,
+            staleInputCount: record.staleInputIds.length,
+            unsafeInputCount: record.unsafeInputIds.length,
+            missingFactCount: record.missingFactIds.length,
+            unsupportedFactCount: record.unsupportedFactIds.length,
+            summaryProvenance: record.summaryProvenance,
             redactionStatus: record.redaction.status,
             terminalSuccessClaim: record.terminalSuccessClaim,
           },

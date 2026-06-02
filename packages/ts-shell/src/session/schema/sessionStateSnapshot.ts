@@ -9,6 +9,10 @@ import type {
 } from "../../orchestration/types.js";
 import { projectDurableStatus } from "../lifecycle/durableStatusProjection.js";
 import type { Session } from "./sessionRecord.js";
+import {
+  buildLinearSessionThreadSnapshot,
+  type SessionThreadSnapshot,
+} from "./sessionThread.js";
 
 export interface SessionStateSnapshot {
   status: Session["status"];
@@ -23,6 +27,7 @@ export interface SessionStateSnapshot {
   terminalClassification?: TerminalClassification;
   lastContinuationReason?: ContinuationReason;
   pendingLifecycle?: DurableLifecycleIndex;
+  thread?: SessionThreadSnapshot;
 }
 
 export interface TerminalPersistence {
@@ -40,6 +45,7 @@ export type SessionStateSnapshotOverrides = Partial<
     | "terminalClassification"
     | "lastContinuationReason"
     | "pendingLifecycle"
+    | "thread"
   >
 >;
 
@@ -95,6 +101,10 @@ export function buildSessionStateSnapshot(
       Object.prototype.hasOwnProperty.call(overrides, "pendingLifecycle")
         ? overrides.pendingLifecycle
         : (current?.pendingLifecycle ?? createEmptyLifecycleIndex()),
+    thread:
+      overrides && Object.prototype.hasOwnProperty.call(overrides, "thread")
+        ? overrides.thread
+        : (current?.thread ?? buildLinearSessionThreadSnapshot(session)),
     workingMemory: current?.workingMemory,
   };
 }

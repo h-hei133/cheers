@@ -29,6 +29,8 @@ export interface SessionStatusEnvelope {
   readonly requestPreparation: SessionStatusEnvelopeDetail;
   readonly providerModel: SessionStatusEnvelopeDetail;
   readonly continuationReadiness: string;
+  readonly sessionBranch: SessionStatusEnvelopeDetail;
+  readonly sessionCompaction: SessionStatusEnvelopeDetail;
   readonly replayCarryForward: SessionStatusEnvelopeDetail;
   readonly toolOutcome: SessionStatusEnvelopeDetail;
   readonly mutationRecovery: SessionStatusEnvelopeDetail;
@@ -53,6 +55,7 @@ export function projectSessionStatusEnvelope(
   const providerModel = findSection(viewModel, "Controlled invocation") ??
     findSection(viewModel, "Invocation gate");
   const replay = findSection(viewModel, "Replay carry forward");
+  const session = findSection(viewModel, "Session");
   const toolOutcome = findSection(viewModel, "Tool outcome");
   const mutationRecovery = findSection(viewModel, "Mutation recovery");
   const verification = firstSection(viewModel, "verification");
@@ -86,6 +89,25 @@ export function projectSessionStatusEnvelope(
         valueFromSummary(request, "continuation") ??
         "not_observed",
     ),
+    sessionBranch: detailFrom({
+      status: fact(session, "branchSupport") ?? valueFromSummary(session, "branch") ?? "not_observed",
+      summary: [
+        `branch=${fact(session, "branchSupport") ?? valueFromSummary(session, "branch") ?? "not_observed"}`,
+        `activeLeaf=${valueFromSummary(session, "activeLeaf") ?? "not_observed"}`,
+        `activeBranch=${fact(session, "activeBranchId") ?? "none"}`,
+      ].join("; "),
+      blockers: valueFromSummary(session, "missingParents") === "0" ? [] : [`missingParents=${valueFromSummary(session, "missingParents") ?? "not_observed"}`],
+      notProvenClaims: session?.notProvenClaims ?? [],
+    }),
+    sessionCompaction: detailFrom({
+      status: fact(session, "compactionStatus") ?? valueFromSummary(session, "compaction") ?? "not_observed",
+      summary: [
+        `compaction=${fact(session, "compactionStatus") ?? valueFromSummary(session, "compaction") ?? "not_observed"}`,
+        `retainedContext=${valueFromSummary(session, "retainedContext") ?? "0"}`,
+      ].join("; "),
+      blockers: [],
+      notProvenClaims: session?.notProvenClaims ?? [],
+    }),
     replayCarryForward: detail(replay),
     toolOutcome: detail(toolOutcome),
     mutationRecovery: detail(mutationRecovery),
@@ -137,6 +159,15 @@ function detail(section: ProductSurfaceSection | undefined): SessionStatusEnvelo
     summary: safe(section?.summary ?? "not observed", 240),
     blockers: blockersFor(section),
     notProvenClaims: uniqueSafe(section?.notProvenClaims ?? []),
+  };
+}
+
+function detailFrom(input: SessionStatusEnvelopeDetail): SessionStatusEnvelopeDetail {
+  return {
+    status: safe(input.status),
+    summary: safe(input.summary, 240),
+    blockers: uniqueSafe(input.blockers),
+    notProvenClaims: uniqueSafe(input.notProvenClaims),
   };
 }
 

@@ -44,6 +44,7 @@ owner. Python is offline evaluation only.
 | Tool outcome next action | Proven in `tools`: outcome status derives next action and carry-forward facts; loop/events/presentation only project them. | `packages/ts-shell/src/tools/toolOutcomeBundle.ts`, `packages/ts-shell/src/tools/toolOutcomeBundle.test.ts` |
 | Runtime event projection | Proven for many observation events, JSON stream entries, redaction, and non-success claims. Event emission is not terminal truth. | `packages/ts-shell/src/runtime/events/projection.ts`, `packages/ts-shell/src/runtime/events/stream.ts` |
 | Replay-safe carry-forward | Proven for IDs, statuses, blocker summaries, request facts, provider invocation/fallback status, tool outcome facts, product completion facts, and redaction exclusions. Raw transcripts, secrets, raw provider output, patch text, and command output are excluded. | `packages/ts-shell/src/session/replay/state.ts` |
+| Storage-backed session branch and compaction runtime | Proven for durable thread facts in session state, parent/child turn relationships, explicit active leaf selection, branch creation and switching, compaction records with retained/excluded/stale/unsafe/missing/unsupported/provenance facts, context rebuild, continuation readiness, provider request preparation, runtime events, replay-safe carry-forward, product surface, CLI/session status, and non-success truth preservation in controlled synthetic lanes. | `packages/ts-shell/src/session/schema/sessionThread.ts`, `packages/ts-shell/src/session/store/threadState.ts`, `packages/ts-shell/src/session/sessionTreeProjection.ts`, `packages/ts-shell/src/context/sessionContextRebuildProjection.ts`, `packages/ts-shell/src/session/continuation/readiness.ts`, `packages/ts-shell/src/runtime/loop/sessionContinuity.test.ts`, `packages/ts-shell/src/session/store/threadState.test.ts` |
 | Product surface rendering | Proven for rendering coding result, loop trajectory, provider/model, fallback, request, tool, replay, event, verdict, and next-action facts without owning success. | `packages/ts-shell/src/presentation/surface/model.ts`, `packages/ts-shell/src/session/presentation/envelope.ts`, `packages/ts-shell/src/presentation/terminal/renderer.ts` |
 | Verification and repair readiness | Proven for verification intent/result observations, repair handoff/proposal/authority/apply observations, post-repair verification, proof input, and result verdict projection. | `packages/ts-shell/src/verification/result/boundary.ts`, `packages/ts-shell/src/repair/handoff/boundary.ts`, `packages/ts-shell/src/evidence/projection/repair/verdict.ts`, `packages/ts-shell/src/result/projection/repair/verdict.ts` |
 | Not-proven claim preservation | Proven across loop infrastructure, request preparation, tool outcomes, replay, completion packet, and surface. | `packages/ts-shell/src/runtime/loop/infrastructure.ts`, `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/session/replay/state.ts`, `packages/ts-shell/src/presentation/surface/model.ts` |
@@ -52,12 +53,17 @@ owner. Python is offline evaluation only.
 
 ## Current Missing Areas
 
-- A mature interactive CLI with full queue ergonomics, branch navigation, rich
-  session management, and compact/resume controls is not proven.
+- A mature interactive CLI with full queue ergonomics, rich session management,
+  and interactive compact/resume controls is not proven. Storage-backed branch
+  and compaction facts now reach the product surface and CLI/session status, but
+  broad interactive branch navigation UX remains narrower than the runtime fact
+  model.
 - Programmatic SDK, RPC, and stable machine-readable host contracts are not
   present beyond runtime event/JSON projection.
-- Storage-backed branch navigation and compaction summaries are projection-only
-  or unsupported in the current runtime path.
+- Storage-backed branch and compaction runtime is proven for controlled session
+  state, context rebuild, continuation, request-preparation, events, replay,
+  product surface, and CLI/session status lanes. Broader interactive branch
+  navigation UX and host SDK/RPC contracts remain unproven.
 - Synthetic provider-to-tool-to-next-turn execution and the controlled provider
   model boundary are proven through deterministic and injected provider facts,
   including fallback decision and attempted fallback response normalization.
@@ -72,6 +78,6 @@ owner. Python is offline evaluation only.
 - Product-loop truth propagation, the CLI/session status envelope, the
   synthetic provider tool lane, the controlled provider/model runtime boundary,
   and controlled mutation recovery are proven for bounded owner-tested paths.
-  The host contract, branch/compaction runtime, broad real-provider
-  compatibility, live-provider default behavior, broad parallel mutation, and
+  The host contract, broad real-provider compatibility, live-provider default
+  behavior, broad parallel mutation, interactive branch navigation UX, and
   dynamic execution areas remain unproven.

@@ -543,7 +543,15 @@ function createSafeRequestMessages(input: {
       ),
       source: "continuation",
       safeSummary: sanitizeText(
-        `continuation:${input.continuationReadiness.status}; context:${input.continuationReadiness.contextReadinessStatus}`,
+        [
+          `continuation:${input.continuationReadiness.status}`,
+          `context:${input.continuationReadiness.contextReadinessStatus}`,
+          `branch:${input.continuationReadiness.branchGapStatus}`,
+          `compaction:${input.continuationReadiness.compactionGapStatus}`,
+          `missingRequired:${input.continuationReadiness.missingRequiredFacts.length}`,
+          `unsafeExcluded:${input.continuationReadiness.unsafeFactsExcluded.length}`,
+          `stale:${input.continuationReadiness.staleFacts.length}`,
+        ].join("; "),
         input.redactions,
       ),
       terminalSuccessClaim: false,

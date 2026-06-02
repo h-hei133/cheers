@@ -16,6 +16,12 @@ export interface SessionContextRebuildProjection {
     readonly compactionId: string;
     readonly summaryAvailability: "available" | "missing" | "not-proven";
     readonly evidence: "observed" | "planned" | "not-proven";
+    readonly retainedContextFactIds: readonly string[];
+    readonly excludedContextFactIds: readonly string[];
+    readonly staleInputIds: readonly string[];
+    readonly unsafeInputIds: readonly string[];
+    readonly missingFactIds: readonly string[];
+    readonly unsupportedFactIds: readonly string[];
   }[];
   readonly branchSummariesConsidered: readonly {
     readonly branchSummaryId: string;
@@ -61,6 +67,12 @@ export function projectSessionContextRebuild(input: {
       compactionId: record.compactionId,
       summaryAvailability: record.summaryAvailability,
       evidence: record.evidence,
+      retainedContextFactIds: record.retainedContextFactIds,
+      excludedContextFactIds: record.excludedContextFactIds,
+      staleInputIds: record.staleInputIds,
+      unsafeInputIds: record.unsafeInputIds,
+      missingFactIds: record.missingFactIds,
+      unsupportedFactIds: record.unsupportedFactIds,
     }));
   const branchSummariesConsidered =
     input.sessionProjection.branchSummary.records.map((record) => ({
@@ -68,7 +80,7 @@ export function projectSessionContextRebuild(input: {
       summaryAvailability: record.summaryAvailability,
     }));
   const unsupportedBranchFacts = [
-    ...(input.sessionProjection.branchSupport === "not-proven"
+    ...(input.sessionProjection.branchSupport !== "storage-backed"
       ? ["storage-backed-branch-navigation"]
       : []),
     ...(input.sessionProjection.branchSummary.availability === "not-supported-by-current-schema"
@@ -91,10 +103,17 @@ export function projectSessionContextRebuild(input: {
   const missingFacts = [
     ...unsupportedBranchFacts,
     ...unsupportedCompactionFacts,
-    ...(input.sessionProjection.branchSummary.records.length === 0
+    ...(input.sessionProjection.branchSummary.records.length === 0 &&
+        input.sessionProjection.branchSupport !== "storage-backed"
       ? ["branch-summary-record"]
       : []),
+    ...input.sessionProjection.branchFacts.missingParentIds.map((id) => `branch-parent-missing:${id}`),
+    ...(input.sessionProjection.branchFacts.activeLeafResolution === "missing"
+      ? ["active-leaf-missing"]
+      : []),
+    ...compactionSummariesConsidered.flatMap((record) => record.missingFactIds),
     ...excludedUnsafeFacts,
+    ...compactionSummariesConsidered.flatMap((record) => record.unsafeInputIds),
     ...(input.requiredFacts ?? []),
     ...(input.optionalFacts ?? []),
   ];
@@ -125,17 +144,27 @@ export function projectSessionContextRebuild(input: {
       `active-path:${activePathEntriesConsidered.length}`,
       `branch-summaries:${branchSummariesConsidered.length}`,
       `compactions:${compactionSummariesConsidered.length}`,
+      `retained-context:${compactionSummariesConsidered.flatMap((record) => record.retainedContextFactIds).length}`,
+      `excluded-context:${compactionSummariesConsidered.flatMap((record) => record.excludedContextFactIds).length}`,
     ],
     missingRequiredFacts: input.requiredFacts ?? [],
     missingOptionalFacts: input.optionalFacts ?? [
       ...unsupportedBranchFacts,
       ...unsupportedCompactionFacts,
-      "branch-summary-record",
+      ...(input.sessionProjection.branchSupport === "storage-backed"
+        ? []
+        : ["branch-summary-record"]),
     ],
     excludedUnsafeFacts,
-    staleFacts: input.staleFacts ?? [],
+    staleFacts: [
+      ...(input.staleFacts ?? []),
+      ...compactionSummariesConsidered.flatMap((record) => record.staleInputIds),
+    ],
     unsupportedBranchFacts,
-    unsupportedCompactionFacts,
+    unsupportedCompactionFacts: [
+      ...unsupportedCompactionFacts,
+      ...compactionSummariesConsidered.flatMap((record) => record.unsupportedFactIds),
+    ],
     missingFacts,
     redaction: {
       status: redacted ? "redacted" : "report-safe",
@@ -146,6 +175,8 @@ export function projectSessionContextRebuild(input: {
       "terminal-success",
       "context-rebuild-execution",
       "storage-backed-branch-navigation",
+      "active-leaf-selected-is-not-success",
+      "compaction-summary-truth",
       "context-rebuilt-is-not-success",
       "context-completeness",
     ],

@@ -450,6 +450,12 @@ describe("session substrate projections", () => {
         compactionId: "compact_rebuild",
         summaryAvailability: "available",
         evidence: "planned",
+        retainedContextFactIds: [],
+        excludedContextFactIds: [],
+        staleInputIds: [],
+        unsafeInputIds: [],
+        missingFactIds: [],
+        unsupportedFactIds: [],
       },
     ]);
     expect(rebuild.policy).toEqual({

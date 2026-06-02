@@ -10,6 +10,10 @@ import {
   prepareNextTurnModelRequest,
   type NextTurnModelRequestPreparation,
 } from "../../provider/request/boundary.js";
+import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
+import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
+import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
+import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import {
   createModelInvocationAttemptEnvelope,
   createModelInvocationGate,
@@ -194,6 +198,10 @@ export interface AgentLoopContractInput {
     batch: AgentLoopContractToolCallBatch,
   ) => Promise<AgentLoopContractToolResultBatch>;
   readonly toolBatchDispatch?: ToolBatchDispatchSeam;
+  readonly sessionProjection?: SessionTreeProjection;
+  readonly contextRebuildProjection?: SessionContextRebuildProjection;
+  readonly contextRebuildInput?: LoopContextRebuildInput;
+  readonly continuationReadiness?: ContinuationReadinessProjection;
   readonly controlledModelInvocationExecutor?: ControlledModelInvocationExecutor;
   readonly controlledModelFallbackExecutor?: ControlledModelInvocationExecutor;
   readonly executePreparedNextTurn?: boolean;
@@ -342,6 +350,12 @@ export async function runAgentLoopContract(
     providerOptIn: input.providerOptIn,
     terminalSuccessClaim: false,
   });
+  appendProjectedEvents(events, projectRuntimeEvents({
+    ...(input.sessionProjection ? { sessionProjection: input.sessionProjection } : {}),
+    ...(input.contextRebuildProjection ? { contextRebuildProjection: input.contextRebuildProjection } : {}),
+    contextRebuildInputs: input.contextRebuildInput ? [input.contextRebuildInput] : [],
+    continuationReadiness: input.continuationReadiness ? [input.continuationReadiness] : [],
+  }));
   for (const message of queued) {
     appendEvent(events, "agent-loop-delivery-queued", {
       mode: message.mode,
@@ -774,6 +788,7 @@ export async function runAgentLoopContract(
         modelSafeLabel: input.modelLabel,
         providerReadinessStatus: input.providerOptIn ? "ready" : "missing",
         providerRegistry: input.providerRegistry,
+        continuationReadiness: input.continuationReadiness,
         planningConstraints: nextTurnBundle.blockingFacts,
         missingRequiredFacts: nextTurnBundle.readinessStatus === "not_ready"
           ? ["next-turn-bundle:not-ready"]
@@ -785,6 +800,7 @@ export async function runAgentLoopContract(
         modelRequestBoundary,
         providerRegistry: input.providerRegistry,
         providerId: input.providerId,
+        continuationReadiness: input.continuationReadiness,
         instructionSummary: "prepare explicit model invocation from safe next-turn facts",
         taskSummary: input.prompt,
         planningConstraintIds: nextTurnBundle.blockingFacts,

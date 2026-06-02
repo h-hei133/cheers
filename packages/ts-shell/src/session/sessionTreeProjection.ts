@@ -1,5 +1,9 @@
 import type { Session } from "./schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
+import type {
+  SessionCompactionRecord,
+} from "./schema/sessionThread.js";
+import { buildLinearSessionThreadSnapshot } from "./schema/sessionThread.js";
 
 export interface ProjectedSessionNode {
   readonly id: string;
@@ -12,8 +16,8 @@ export interface ProjectedSessionNode {
   readonly activeLeaf: boolean;
   readonly activePath: boolean;
   readonly payloadSummary: "metadata-only";
-  readonly branchSummaryAvailability: "not-supported-by-current-schema";
-  readonly compactionAvailability: "not-proven";
+  readonly branchSummaryAvailability: "not-supported-by-current-schema" | "storage-backed";
+  readonly compactionAvailability: "not-proven" | "storage-backed";
   readonly notProvenClaims: readonly string[];
 }
 
@@ -27,6 +31,15 @@ export interface SessionCompactionRecordProjection {
     readonly sizeBefore?: number;
   };
   readonly evidence: "observed" | "planned" | "not-proven";
+  readonly retainedEntryIds: readonly string[];
+  readonly excludedEntryIds: readonly string[];
+  readonly retainedContextFactIds: readonly string[];
+  readonly excludedContextFactIds: readonly string[];
+  readonly staleInputIds: readonly string[];
+  readonly unsafeInputIds: readonly string[];
+  readonly missingFactIds: readonly string[];
+  readonly unsupportedFactIds: readonly string[];
+  readonly summaryProvenance?: SessionCompactionRecord["summaryProvenance"];
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
   readonly redaction: {
@@ -50,27 +63,38 @@ export interface SessionBranchSummaryProjection {
 
 export interface SessionTreeProjection {
   readonly sessionIdentity: string;
-  readonly treeSupport: "linear-path";
-  readonly branchSupport: "not-proven";
+  readonly treeSupport: "linear-path" | "branching";
+  readonly branchSupport: "not-proven" | "storage-backed";
   readonly activeLeafId: string;
+  readonly activeBranchId?: string;
   readonly activePath: readonly string[];
   readonly activePathProjection: {
     readonly activeLeafId: string;
     readonly pathLength: number;
     readonly entryKinds: readonly ProjectedSessionNode["kind"][];
     readonly redactionStatus: "report-safe";
-    readonly contextRebuildReadiness: "projection-ready";
+    readonly contextRebuildReadiness: "projection-ready" | "blocked";
+    readonly missingParentIds: readonly string[];
+    readonly activeLeafResolution: "resolved" | "missing";
     readonly unsupportedClaims: readonly string[];
   };
   readonly nodes: readonly ProjectedSessionNode[];
   readonly branchSummary: {
-    readonly availability: "not-supported-by-current-schema" | "observed";
+    readonly availability: "not-supported-by-current-schema" | "observed" | "storage-backed";
     readonly records: readonly SessionBranchSummaryProjection[];
     readonly terminalSuccessClaim: false;
     readonly notProvenClaims: readonly string[];
   };
+  readonly branchFacts: {
+    readonly activeBranchId?: string;
+    readonly branchIds: readonly string[];
+    readonly missingParentIds: readonly string[];
+    readonly activeLeafResolution: "resolved" | "missing";
+    readonly terminalSuccessClaim: false;
+    readonly notProvenClaims: readonly string[];
+  };
   readonly compaction: {
-    readonly availability: "not-proven" | "observed";
+    readonly availability: "not-proven" | "observed" | "storage-backed";
     readonly records: readonly SessionCompactionRecordProjection[];
     readonly terminalSuccessClaim: false;
     readonly notProvenClaims: readonly string[];
@@ -91,6 +115,26 @@ export interface SessionTreeProjection {
   };
 }
 
+interface NormalizedCompactionInput {
+  readonly id: string;
+  readonly firstKeptEntryId?: string;
+  readonly summary?: string;
+  readonly tokensBefore?: number;
+  readonly sizeBefore?: number;
+  readonly evidence: "observed" | "planned" | "not-proven";
+  readonly sourceActivePath: readonly string[];
+  readonly retainedEntryIds: readonly string[];
+  readonly excludedEntryIds: readonly string[];
+  readonly retainedContextFactIds: readonly string[];
+  readonly excludedContextFactIds: readonly string[];
+  readonly staleInputIds: readonly string[];
+  readonly unsafeInputIds: readonly string[];
+  readonly missingFactIds: readonly string[];
+  readonly unsupportedFactIds: readonly string[];
+  readonly summaryAvailability: "available" | "missing" | "not-proven";
+  readonly summaryProvenance?: SessionCompactionRecord["summaryProvenance"];
+}
+
 export function projectSessionTree(input: {
   readonly session: Session;
   readonly stateSnapshot?: SessionStateSnapshot;
@@ -109,45 +153,59 @@ export function projectSessionTree(input: {
     readonly summary?: string;
   }[];
 }): SessionTreeProjection {
+  const thread = input.stateSnapshot?.thread ?? buildLinearSessionThreadSnapshot(input.session);
+  const branchSupport = input.stateSnapshot?.thread ? "storage-backed" : "not-proven";
+  const treeSupport = input.stateSnapshot?.thread ? "branching" : "linear-path";
   const rootId = `${input.session.id}:root`;
-  const turnNodes = input.session.turns.map((turn, index): ProjectedSessionNode => {
-    const order = index + 1;
+  const threadNodes = thread.entries.map((entry): ProjectedSessionNode => {
     return {
-      id: `${input.session.id}:turn-${order}`,
-      parentId: index === 0 ? rootId : `${input.session.id}:turn-${index}`,
-      kind: "turn-message",
-      role: turn.role,
-      order,
-      ...(turn.timestamp ? { timestamp: turn.timestamp } : {}),
+      id: sanitizeIdentifier(entry.id, "entry"),
+      ...(entry.parentId ? { parentId: sanitizeIdentifier(entry.parentId, "entry") } : {}),
+      kind: entry.kind,
+      ...(entry.role ? { role: entry.role } : {}),
+      order: entry.order,
+      ...(entry.timestamp ? { timestamp: entry.timestamp } : {}),
       sourceSessionIdentity: input.session.id,
       activeLeaf: false,
-      activePath: true,
+      activePath: false,
       payloadSummary: "metadata-only",
-      branchSummaryAvailability: "not-supported-by-current-schema",
-      compactionAvailability: "not-proven",
-      notProvenClaims: ["raw-transcript", "branching-support"],
+      branchSummaryAvailability: branchSupport === "storage-backed"
+        ? "storage-backed"
+        : "not-supported-by-current-schema",
+      compactionAvailability: thread.compactions.length > 0
+        ? "storage-backed"
+        : "not-proven",
+      notProvenClaims: [
+        "raw-transcript",
+        ...(branchSupport === "storage-backed" ? [] : ["branching-support"]),
+      ],
     };
   });
-  const projectedNodes: ProjectedSessionNode[] = [
-    {
-      id: rootId,
-      kind: "session-root",
-      order: 0,
-      timestamp: input.session.createdAt,
-      sourceSessionIdentity: input.session.id,
-      activeLeaf: false,
-      activePath: true,
-      payloadSummary: "metadata-only",
-      branchSummaryAvailability: "not-supported-by-current-schema",
-      compactionAvailability: "not-proven",
-      notProvenClaims: ["branching-support"],
-    },
-    ...turnNodes,
-  ];
-  const activeLeafId = projectedNodes[projectedNodes.length - 1]?.id ?? rootId;
+  const projectedNodes: ProjectedSessionNode[] = threadNodes.length > 0
+    ? threadNodes
+    : [{
+        id: rootId,
+        kind: "session-root",
+        order: 0,
+        timestamp: input.session.createdAt,
+        sourceSessionIdentity: input.session.id,
+        activeLeaf: false,
+        activePath: false,
+        payloadSummary: "metadata-only",
+        branchSummaryAvailability: "not-supported-by-current-schema",
+        compactionAvailability: "not-proven",
+        notProvenClaims: ["branching-support"],
+      }];
+  const activeLeafId = sanitizeIdentifier(
+    thread.activeLeafId ?? projectedNodes[projectedNodes.length - 1]?.id ?? rootId,
+    "active-leaf",
+  );
+  const activePathResult = resolveActivePath(projectedNodes, activeLeafId);
+  const activePathSet = new Set(activePathResult.path);
   const nodes = projectedNodes.map((node) => ({
     ...node,
     activeLeaf: node.id === activeLeafId,
+    activePath: activePathSet.has(node.id),
   }));
   const redactionExcluded = [
     "raw-transcript",
@@ -159,13 +217,54 @@ export function projectSessionTree(input: {
     "hidden-reasoning",
     "arbitrary-file-contents",
   ];
-  const activePath = nodes.map((node) => node.id);
-  const compactionRecords = (input.compactions ?? []).map(
+  const activePath = activePathResult.path.length > 0 ? activePathResult.path : [rootId];
+  const durableCompactions: NormalizedCompactionInput[] = thread.compactions.map((record) => ({
+    id: record.compactionId,
+    ...(record.firstRetainedEntryId ? { firstKeptEntryId: record.firstRetainedEntryId } : {}),
+    ...(record.summaryAvailability === "available" ? { summary: record.compactionId } : {}),
+    evidence: "observed" as const,
+    sourceActivePath: record.sourceActivePath,
+    retainedEntryIds: record.retainedEntryIds,
+    excludedEntryIds: record.excludedEntryIds,
+    retainedContextFactIds: record.retainedContextFacts.map((fact) => fact.factId),
+    excludedContextFactIds: record.excludedContextFacts.map((fact) => fact.factId),
+    staleInputIds: record.staleInputIds,
+    unsafeInputIds: record.unsafeInputIds,
+    missingFactIds: record.missingFactIds,
+    unsupportedFactIds: record.unsupportedFactIds,
+    summaryAvailability: record.summaryAvailability,
+    summaryProvenance: record.summaryProvenance,
+    ...(record.tokenMetadata?.tokensBefore !== undefined
+      ? { tokensBefore: record.tokenMetadata.tokensBefore }
+      : {}),
+    ...(record.tokenMetadata?.sizeBefore !== undefined
+      ? { sizeBefore: record.tokenMetadata.sizeBefore }
+      : {}),
+  }));
+  const legacyCompactions: NormalizedCompactionInput[] = (input.compactions ?? []).map((record) => ({
+    id: record.id,
+    ...(record.firstKeptEntryId ? { firstKeptEntryId: record.firstKeptEntryId } : {}),
+    ...(record.summary ? { summary: record.summary } : {}),
+    ...(record.tokensBefore !== undefined ? { tokensBefore: record.tokensBefore } : {}),
+    ...(record.sizeBefore !== undefined ? { sizeBefore: record.sizeBefore } : {}),
+    evidence: record.evidence ?? "not-proven",
+    sourceActivePath: activePath,
+    retainedEntryIds: [],
+    excludedEntryIds: [],
+    retainedContextFactIds: [],
+    excludedContextFactIds: [],
+    staleInputIds: [],
+    unsafeInputIds: [],
+    missingFactIds: [],
+    unsupportedFactIds: [],
+    summaryAvailability: record.summary ? "available" : "missing",
+  }));
+  const compactionRecords = [...durableCompactions, ...legacyCompactions].map(
     (compaction): SessionCompactionRecordProjection => {
       const redacted = needsRedaction(compaction.summary);
       return {
         compactionId: sanitizeIdentifier(compaction.id, "compaction"),
-        sourceActivePath: activePath,
+        sourceActivePath: compaction.sourceActivePath.map((id) => sanitizeIdentifier(id, "entry")),
         ...(compaction.firstKeptEntryId
           ? {
               firstKeptEntryId: sanitizeIdentifier(
@@ -174,7 +273,7 @@ export function projectSessionTree(input: {
               ),
             }
           : {}),
-        summaryAvailability: compaction.summary ? "available" : "missing",
+        summaryAvailability: compaction.summaryAvailability,
         ...(compaction.tokensBefore !== undefined ||
         compaction.sizeBefore !== undefined
           ? {
@@ -189,6 +288,17 @@ export function projectSessionTree(input: {
             }
           : {}),
         evidence: compaction.evidence ?? "not-proven",
+        retainedEntryIds: compaction.retainedEntryIds.map((id) => sanitizeIdentifier(id, "entry")),
+        excludedEntryIds: compaction.excludedEntryIds.map((id) => sanitizeIdentifier(id, "entry")),
+        retainedContextFactIds: compaction.retainedContextFactIds.map((id) => sanitizeIdentifier(id, "fact")),
+        excludedContextFactIds: compaction.excludedContextFactIds.map((id) => sanitizeIdentifier(id, "fact")),
+        staleInputIds: compaction.staleInputIds.map((id) => sanitizeIdentifier(id, "input")),
+        unsafeInputIds: compaction.unsafeInputIds.map((id) => sanitizeIdentifier(id, "input")),
+        missingFactIds: compaction.missingFactIds.map((id) => sanitizeIdentifier(id, "fact")),
+        unsupportedFactIds: compaction.unsupportedFactIds.map((id) => sanitizeIdentifier(id, "fact")),
+        ...(compaction.summaryProvenance
+          ? { summaryProvenance: compaction.summaryProvenance }
+          : {}),
         terminalSuccessClaim: false,
         notProvenClaims: [
           "terminal-success",
@@ -237,26 +347,40 @@ export function projectSessionTree(input: {
 
   return deepFreeze({
     sessionIdentity: input.session.id,
-    treeSupport: "linear-path",
-    branchSupport: "not-proven",
+    treeSupport,
+    branchSupport,
     activeLeafId,
+    ...(thread.activeBranchId
+      ? { activeBranchId: sanitizeIdentifier(thread.activeBranchId, "branch") }
+      : {}),
     activePath,
     activePathProjection: {
       activeLeafId,
       pathLength: activePath.length,
-      entryKinds: nodes.map((node) => node.kind),
+      entryKinds: activePath.map((entryId) =>
+        nodes.find((node) => node.id === entryId)?.kind ?? "turn-message"
+      ),
       redactionStatus: "report-safe",
-      contextRebuildReadiness: "projection-ready",
-      unsupportedClaims: [
-        "branch-navigation",
-        "storage-backed-branch-tree",
-      ],
+      contextRebuildReadiness: activePathResult.resolution === "resolved" &&
+          activePathResult.missingParentIds.length === 0
+        ? "projection-ready"
+        : "blocked",
+      missingParentIds: activePathResult.missingParentIds,
+      activeLeafResolution: activePathResult.resolution,
+      unsupportedClaims: branchSupport === "storage-backed"
+        ? []
+        : [
+            "branch-navigation",
+            "storage-backed-branch-tree",
+          ],
     },
     nodes,
     branchSummary: {
       availability:
         branchSummaryRecords.length > 0
           ? "observed"
+          : branchSupport === "storage-backed"
+          ? "storage-backed"
           : "not-supported-by-current-schema",
       records: branchSummaryRecords,
       terminalSuccessClaim: false,
@@ -267,13 +391,29 @@ export function projectSessionTree(input: {
       ],
     },
     compaction: {
-      availability: compactionRecords.length > 0 ? "observed" : "not-proven",
+      availability: compactionRecords.length > 0
+        ? branchSupport === "storage-backed" ? "storage-backed" : "observed"
+        : "not-proven",
       records: compactionRecords,
       terminalSuccessClaim: false,
       notProvenClaims: [
         "terminal-success",
         "compaction-summary-truth",
         "storage-backed-compaction",
+      ],
+    },
+    branchFacts: {
+      ...(thread.activeBranchId
+        ? { activeBranchId: sanitizeIdentifier(thread.activeBranchId, "branch") }
+        : {}),
+      branchIds: thread.branches.map((branch) => sanitizeIdentifier(branch.branchId, "branch")),
+      missingParentIds: activePathResult.missingParentIds,
+      activeLeafResolution: activePathResult.resolution,
+      terminalSuccessClaim: false,
+      notProvenClaims: [
+        "terminal-success",
+        "branch-created-is-not-success",
+        "active-leaf-selected-is-not-success",
       ],
     },
     continuation: {
@@ -299,6 +439,38 @@ export function projectSessionTree(input: {
       excluded: redactionExcluded,
     },
   });
+}
+
+function resolveActivePath(
+  nodes: readonly ProjectedSessionNode[],
+  activeLeafId: string,
+): {
+  readonly path: readonly string[];
+  readonly missingParentIds: readonly string[];
+  readonly resolution: "resolved" | "missing";
+} {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const path: string[] = [];
+  const missingParentIds: string[] = [];
+  let cursor = byId.get(activeLeafId);
+  if (!cursor) {
+    return { path: [], missingParentIds: [activeLeafId], resolution: "missing" };
+  }
+  while (cursor) {
+    path.unshift(cursor.id);
+    if (!cursor.parentId) break;
+    const parent = byId.get(cursor.parentId);
+    if (!parent) {
+      missingParentIds.push(cursor.parentId);
+      break;
+    }
+    cursor = parent;
+  }
+  return {
+    path,
+    missingParentIds,
+    resolution: missingParentIds.length === 0 ? "resolved" : "missing",
+  };
 }
 
 function projectContinuationState(

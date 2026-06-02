@@ -73,12 +73,19 @@ export function buildLoopContextRebuildInput(input: {
     ...(input.missingFacts ?? []),
     ...(input.contextRebuildProjection?.missingRequiredFacts ?? []),
     ...(input.contextRebuildProjection?.missingOptionalFacts ?? []),
-    ...(input.sessionProjection.branchSupport === "not-proven"
+    ...(input.sessionProjection.branchSupport !== "storage-backed"
       ? ["storage-backed-branch-navigation"]
       : []),
-    ...(input.sessionProjection.compaction.availability === "not-proven"
+    ...(input.sessionProjection.compaction.records.length === 0
       ? ["storage-backed-compaction"]
       : []),
+    ...input.sessionProjection.branchFacts.missingParentIds.map((id) => `branch-parent-missing:${id}`),
+    ...(input.sessionProjection.branchFacts.activeLeafResolution === "missing"
+      ? ["active-leaf-missing"]
+      : []),
+    ...input.sessionProjection.compaction.records.flatMap((record) => record.missingFactIds),
+    ...input.sessionProjection.compaction.records.flatMap((record) => record.unsafeInputIds),
+    ...input.sessionProjection.compaction.records.flatMap((record) => record.unsupportedFactIds),
   ];
 
   return deepFreeze({
@@ -100,6 +107,9 @@ export function buildLoopContextRebuildInput(input: {
     packageMetadataIds: freeze((input.packageMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
     includedFactsSummary: freeze([
       `activePath=${input.sessionProjection.activePathProjection.pathLength}`,
+      `activeLeaf=${input.sessionProjection.activePathProjection.activeLeafResolution}`,
+      `branch=${input.sessionProjection.branchSupport}`,
+      `compaction=${input.sessionProjection.compaction.availability}`,
       `nextTurnBundle=${input.nextTurnBundle ? "available" : "missing"}`,
       `savePoint=${input.savePoint ? "available" : "missing"}`,
       `toolResultMessages=${input.toolResultMessages?.messages.length ?? 0}`,

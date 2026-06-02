@@ -1529,7 +1529,7 @@ function loopTrajectorySections(input: ProductSurfaceInput): ProductSurfaceSecti
       title: "Session",
       severity: trajectory.sessionProjectionIds.length > 0 ? "info" : "not_proven",
       status: trajectory.sessionProjectionIds.length > 0 ? "observed" : "not_proven",
-      summary: `projections=${trajectory.sessionProjectionIds.length}; readiness=${trajectory.continuationReadinessIds.length}; replaySummaries=${trajectory.replaySafeLoopStateSummaryIds.length}; branch=${observed("branch-gap")}; compaction=${observed("compaction-gap")}; storageBackedBranching=not-proven`,
+      summary: `projections=${trajectory.sessionProjectionIds.length}; readiness=${trajectory.continuationReadinessIds.length}; replaySummaries=${trajectory.replaySafeLoopStateSummaryIds.length}; branch=${observed("branch-gap")}; compaction=${observed("compaction-gap")}; branchFacts=${observed("session-active-path")}`,
       notProvenClaims: [
         ...(stage("session-active-path")?.notProvenClaims ?? []),
         ...(stage("continuation-readiness")?.notProvenClaims ?? []),
@@ -1849,7 +1849,18 @@ function sessionSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
     title: "Session",
     severity: projection.terminal.terminalSuccessClaim ? "warning" : "info",
     status: "observed",
-    summary: `activePath=${projection.activePath.length}; tree=${projection.treeSupport}; branch=${projection.branchSupport}; terminalSuccessClaim=${projection.terminal.terminalSuccessClaim}`,
+    summary: `activePath=${projection.activePath.length}; tree=${projection.treeSupport}; branch=${projection.branchSupport}; activeLeaf=${projection.branchFacts.activeLeafResolution}; compaction=${projection.compaction.availability}; retainedContext=${projection.compaction.records.flatMap((record) => record.retainedContextFactIds).length}; missingParents=${projection.branchFacts.missingParentIds.length}; terminalSuccessClaim=${projection.terminal.terminalSuccessClaim}`,
+    facts: [
+      { label: "activeLeafId", value: safeText(projection.activeLeafId) },
+      { label: "activeBranchId", value: projection.activeBranchId ? safeText(projection.activeBranchId) : "none" },
+      { label: "branchSupport", value: projection.branchSupport },
+      { label: "compactionStatus", value: projection.compaction.availability },
+    ],
+    notProvenClaims: [
+      ...projection.branchFacts.notProvenClaims,
+      ...projection.compaction.notProvenClaims,
+      ...projection.terminal.notProvenClaims,
+    ].map((item) => safeText(item)),
   })];
 }
 

@@ -17,6 +17,15 @@ export interface ReplaySafeLoopStateSummary {
   readonly summaryId: string;
   readonly sourceSessionId: string;
   readonly activePathId: string;
+  readonly activeBranchId?: string;
+  readonly branchSupport: string;
+  readonly branchFactIds: readonly string[];
+  readonly branchBlockedReasons: readonly string[];
+  readonly compactionStatus: string;
+  readonly compactionIds: readonly string[];
+  readonly retainedContextFactIds: readonly string[];
+  readonly excludedContextFactIds: readonly string[];
+  readonly compactionBlockedReasons: readonly string[];
   readonly latestSavePointId?: string;
   readonly nextTurnBundleId?: string;
   readonly requestPreparationId?: string;
@@ -143,6 +152,27 @@ export function summarizeReplaySafeLoopState(input: {
     summaryId: `replay-safe-loop-state:${input.sessionProjection.sessionIdentity}:${input.sessionProjection.activeLeafId}`,
     sourceSessionId: input.sessionProjection.sessionIdentity,
     activePathId: `${input.sessionProjection.sessionIdentity}:active-path:${input.sessionProjection.activeLeafId}`,
+    ...(input.sessionProjection.activeBranchId
+      ? { activeBranchId: input.sessionProjection.activeBranchId }
+      : {}),
+    branchSupport: input.sessionProjection.branchSupport,
+    branchFactIds: input.sessionProjection.branchFacts.branchIds,
+    branchBlockedReasons: [
+      ...input.sessionProjection.branchFacts.missingParentIds.map((id) => `branch-parent-missing:${id}`),
+      ...(input.sessionProjection.branchFacts.activeLeafResolution === "missing"
+        ? ["active-leaf-missing"]
+        : []),
+    ],
+    compactionStatus: input.sessionProjection.compaction.availability,
+    compactionIds: input.sessionProjection.compaction.records.map((record) => record.compactionId),
+    retainedContextFactIds: input.sessionProjection.compaction.records.flatMap((record) => record.retainedContextFactIds),
+    excludedContextFactIds: input.sessionProjection.compaction.records.flatMap((record) => record.excludedContextFactIds),
+    compactionBlockedReasons: [
+      ...input.sessionProjection.compaction.records.flatMap((record) => record.staleInputIds.map((id) => `compaction-stale:${id}`)),
+      ...input.sessionProjection.compaction.records.flatMap((record) => record.unsafeInputIds.map((id) => `compaction-unsafe:${id}`)),
+      ...input.sessionProjection.compaction.records.flatMap((record) => record.missingFactIds.map((id) => `compaction-missing:${id}`)),
+      ...input.sessionProjection.compaction.records.flatMap((record) => record.unsupportedFactIds.map((id) => `compaction-unsupported:${id}`)),
+    ],
     ...(input.savePoint ? { latestSavePointId: input.savePoint.id } : {}),
     ...(input.nextTurnBundle ? { nextTurnBundleId: input.nextTurnBundle.bundleId } : {}),
     ...(input.requestPreparation
@@ -226,6 +256,8 @@ export function summarizeReplaySafeLoopState(input: {
       "replayed-edit-handoff-is-not-mutation-authority",
       "replayed-verification-intent-is-not-verification-passed",
       "session-carry-forward-is-not-terminal-truth",
+      "branch-facts-are-not-terminal-truth",
+      "compaction-facts-are-not-terminal-truth",
       "context-completeness",
       ...replaySafePlanningStates.flatMap((state) => state.notProvenClaims),
       ...input.sessionProjection.terminal.notProvenClaims,

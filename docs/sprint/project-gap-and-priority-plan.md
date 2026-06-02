@@ -10,16 +10,20 @@ completion.
 
 - Product loop truth, the CLI/session status envelope, a bounded synthetic
   provider-to-tool-to-next-turn runtime lane, a controlled provider/model
-  runtime boundary, and a controlled mutation recovery lane are consolidated,
-  but the host contract, branch/compaction runtime, broad real-provider
-  compatibility, live provider defaults, broad parallel mutation, and dynamic
-  execution areas remain unproven.
-- CLI/session UX now has a structured status envelope for product-loop truth,
-  but full queue ergonomics, branch navigation, compact/resume controls, and
-  broader session management remain narrower than the runtime fact model.
+  runtime boundary, a controlled mutation recovery lane, and a storage-backed
+  branch/compaction runtime lane are consolidated, but the host contract, broad
+  real-provider compatibility, live provider defaults, broad parallel mutation,
+  broad interactive branch navigation UX, and dynamic execution areas remain
+  unproven.
+- CLI/session UX now has a structured status envelope for product-loop truth and
+  branch/compaction runtime facts, but full queue ergonomics, broad interactive
+  branch navigation, compact/resume controls, and broader session management
+  remain narrower than the runtime fact model.
 - JSON event projection exists, but no stable SDK/RPC host contract exists.
-- Session branch and compaction support are projection-only or unsupported in the
-  current runtime path.
+- Session branch and compaction support is storage-backed for controlled
+  runtime facts that drive context rebuild, continuation readiness, provider
+  request preparation, events, replay, product surface, and CLI/session status.
+  Broad interactive navigation commands and host contracts remain unproven.
 - Provider/model compatibility, auth readiness, invocation gating, response
   normalization, fallback decision/attempt facts, replay, surface, and status
   are proven for the controlled runtime lane. Live execution remains explicit
@@ -120,9 +124,9 @@ completion.
   status, evidence, and result owner tests.
 - Boundary: the proven lane is controlled and deterministic. Live providers,
   broad provider compatibility, broad parallel mutation, dynamic execution,
-  external tool servers, host SDK/RPC behavior, and storage-backed
-  branch/compaction runtime remain unproven. Apply, rollback, repair, events,
-  replay, surface, and CLI/session status are still not terminal success.
+  external tool servers, and host SDK/RPC behavior remain unproven. Apply,
+  rollback, repair, events, replay, surface, and CLI/session status are still
+  not terminal success.
 
 ### Completed Batch: Provider/Model Runtime Boundary
 
@@ -153,29 +157,35 @@ completion.
   completed lane uses deterministic synthetic responses and injected controlled
   executors for proof. Broad real-provider compatibility, auth refresh,
   default live provider behavior, dynamic execution, external tool servers,
-  host SDK/RPC behavior, and storage-backed branch/compaction runtime remain
-  unproven. Provider selection, request readiness, invocation, stream,
-  fallback, replay, surface, and CLI/session status are still not terminal
-  success.
+  and host SDK/RPC behavior remain unproven. Provider selection, request
+  readiness, invocation, stream, fallback, replay, surface, and CLI/session
+  status are still not terminal success.
 
-### Batch 1: Branch/Compaction Context Readiness
+### Completed Batch: Branch/Compaction Context Readiness
 
-- Goal: make branch and compaction facts more structured across session,
-  context rebuild, continuation readiness, request preparation, replay, events,
-  and surface.
-- User-facing value: resume/continue can say what context was retained, missing,
-  stale, unsafe, or unsupported before a next model request.
-- Owner domains: `session`, `session/continuation`, `session/replay`, `context`,
-  `provider/request`, `runtime/events`, `presentation`.
-- Expected areas: `session/sessionTreeProjection.ts`,
-  `context/sessionContextRebuildProjection.ts`,
-  `session/continuation/readiness.ts`, `provider/request/boundary.ts`.
-- Required tests: projection tests for observed/missing/stale/unsafe summaries
-  and request-blocking propagation.
-- Forbidden shortcuts: storage migration as the first step, treating summaries as
-  evidence, raw transcript carry-forward.
-- Completion condition: continuation and request preparation block or proceed
-  strictly from safe branch/compaction facts, with missing proof preserved.
+- Proven result: session state now carries durable thread facts for parent/child
+  turns, active leaf, branch creation and switching, and compaction records.
+  Context rebuild, continuation readiness, provider request preparation,
+  runtime events, replay-safe carry-forward, product surface, and CLI/session
+  status consume the same retained/excluded/stale/unsafe/missing/unsupported
+  and provenance facts.
+- User-facing value: resume/continue status can distinguish active branch,
+  retained context, excluded context, stale or unsafe compaction, missing facts,
+  unsupported facts, request blockers, and next action before any model request.
+- Owner domains: `session/schema`, `session/store`, `session`,
+  `session/continuation`, `session/replay`, `context`, `provider/request`,
+  `runtime/loop`, `runtime/events`, `presentation`, `session/presentation`, and
+  `core/shell`.
+- Evidence: `packages/ts-shell/src/runtime/loop/sessionContinuity.test.ts`,
+  `packages/ts-shell/src/session/store/threadState.test.ts`, and the focused
+  session/context/continuation/provider/request/events/replay/surface/status
+  owner suite.
+- Boundary: branch creation, active leaf selection, compaction creation, context
+  rebuild, continuation readiness, provider request preparation, events, replay,
+  product surface, and CLI/session status remain non-success facts. Terminal
+  truth still belongs to `evidence`/`result`. Raw transcript, raw provider
+  output, raw command output, raw edit text, patch bodies, and secrets remain
+  excluded from report-safe surfaces.
 
 ## Medium-Term Runtime Capability Batches
 
@@ -293,25 +303,28 @@ completion.
   projected, and every forbidden effect is rejected with `terminalSuccessClaim:
   false`.
 
-### Batch 8: Storage-Backed Branching And Compaction
+### Batch 8: Interactive Branch And Compaction Controls
 
-- Goal: implement durable branch navigation and compaction entries after the
-  projection path is proven.
-- User-facing value: resume and continue can safely target alternate leaves and
-  reduced context without losing stale/unsafe/missing fact visibility.
-- Owner domains: `session/store`, `session/replay`, `session/continuation`,
-  `context`.
-- Expected areas: session store schema, active leaf state, branch summary
-  records, compaction records, replay/context rebuild projections.
-- Required tests: session tree persistence, active leaf switching, branch
-  summaries, compaction summaries, stale/unsafe facts, resume replay.
+- Goal: add mature CLI/session controls for selecting branches, inspecting active
+  leaves, and requesting compact/resume actions on top of the proven durable
+  branch/compaction fact model.
+- User-facing value: users can intentionally navigate alternate leaves and
+  compacted context without losing stale/unsafe/missing fact visibility.
+- Owner domains: `core/shell`, `session/store`, `session/replay`,
+  `session/continuation`, `context`, `presentation`.
+- Expected areas: branch selection commands or actions, compact/resume controls,
+  active leaf status, replay/context rebuild projections, and CLI/session status
+  rendering.
+- Required tests: branch selection UX, active leaf switching through shell
+  actions, compact/resume controls, stale/unsafe facts, resume replay, and
+  terminal-success preservation.
 - Forbidden shortcuts: summary-as-evidence, raw transcript carry-forward,
   unplanned schema migration, success claims from compacted context.
 - Conservative boundary: migration and backward compatibility must be explicit;
   summaries are context aids, not evidence.
-- Completion condition: persisted branch and compaction records rebuild a safe
-  continuation context, preserve unsupported/stale/unsafe facts, and do not
-  create terminal success.
+- Completion condition: interactive controls consume persisted branch and
+  compaction records, rebuild safe continuation context, preserve
+  unsupported/stale/unsafe facts, and do not create terminal success.
 
 ### Batch 9: Host API And Distribution
 

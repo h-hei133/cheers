@@ -39,8 +39,8 @@ export interface ContinuationReadinessProjection {
   readonly optionalRefreshReads: readonly string[];
   readonly missingRequiredFacts: readonly string[];
   readonly missingOptionalFacts: readonly string[];
-  readonly branchGapStatus: "branch_unsupported" | "branch_projection_only" | "not_proven";
-  readonly compactionGapStatus: "compaction_unsupported" | "compaction_projection_only" | "not_proven";
+  readonly branchGapStatus: "storage_backed" | "branch_unsupported" | "branch_projection_only" | "not_proven";
+  readonly compactionGapStatus: "storage_backed" | "compaction_unsupported" | "compaction_projection_only" | "not_proven";
   readonly nextTurnExecuted: false;
   readonly redaction: {
     readonly status: "report-safe" | "redacted";
@@ -87,9 +87,26 @@ export function evaluateContinuationReadiness(input: {
   ) ?? [];
   const unsafeFactsExcluded = [
     ...input.contextRebuildProjection.excludedUnsafeFacts,
+    ...input.sessionProjection.compaction.records.flatMap((record) => record.unsafeInputIds),
+    ...input.sessionProjection.compaction.records.flatMap((record) => record.excludedContextFactIds),
     ...(input.rebuildInput?.excludedFactsSummary ?? []),
   ];
   const staleFacts = input.staleFacts ?? input.contextRebuildProjection.staleFacts;
+  const requiredBranchFacts = [
+    ...input.sessionProjection.branchFacts.missingParentIds.map((id) => `branch-parent-missing:${id}`),
+    ...(input.sessionProjection.branchFacts.activeLeafResolution === "missing"
+      ? ["active-leaf-missing"]
+      : []),
+  ];
+  const requiredCompactionFacts = [
+    ...input.sessionProjection.compaction.records.flatMap((record) => record.missingFactIds),
+    ...input.sessionProjection.compaction.records.flatMap((record) => record.unsupportedFactIds),
+  ];
+  const allRequiredMissingFacts = unique([
+    ...requiredMissingFacts,
+    ...requiredBranchFacts,
+    ...requiredCompactionFacts,
+  ]);
   const memoryRequiredRefreshReads = (input.sourceMemories ?? []).flatMap((memory) =>
     memory.reuseEligibility.requiredRefreshSuggestions
   );
@@ -99,7 +116,7 @@ export function evaluateContinuationReadiness(input: {
   const requiredRefreshReads = unique([
     ...memoryRequiredRefreshReads,
     ...staleFacts.map((fact) => `refresh stale fact: ${fact}`),
-    ...requiredMissingFacts.map((fact) => `refresh required fact: ${fact}`),
+    ...allRequiredMissingFacts.map((fact) => `refresh required fact: ${fact}`),
   ]);
   const optionalRefreshReads = unique([
     ...memoryOptionalRefreshReads,
@@ -111,17 +128,17 @@ export function evaluateContinuationReadiness(input: {
     redacted:
       input.contextRebuildProjection.redaction.status === "redacted" ||
       input.rebuildInput?.redaction.status === "redacted",
-    requiredMissingFacts,
+    requiredMissingFacts: allRequiredMissingFacts,
     optionalMissingFacts,
     staleFacts,
     hasTurnMessages: input.sessionProjection.activePathProjection.entryKinds.includes("turn-message"),
   });
   const contextReadinessStatus = continuationContextReadinessStatus({
-    unsupported: input.unsupported,
-    workspaceMismatch: input.workspaceMismatch,
-    ambiguousTarget: input.ambiguousTarget,
+    ...(input.unsupported !== undefined ? { unsupported: input.unsupported } : {}),
+    ...(input.workspaceMismatch !== undefined ? { workspaceMismatch: input.workspaceMismatch } : {}),
+    ...(input.ambiguousTarget !== undefined ? { ambiguousTarget: input.ambiguousTarget } : {}),
     staleFacts,
-    requiredMissingFacts,
+    requiredMissingFacts: allRequiredMissingFacts,
     requiredRefreshReads,
     optionalRefreshReads,
   });
@@ -130,7 +147,7 @@ export function evaluateContinuationReadiness(input: {
     readinessId: `continuation-readiness:${input.sessionProjection.sessionIdentity}:${input.sessionProjection.activeLeafId}`,
     sourceSessionId: input.sessionProjection.sessionIdentity,
     status,
-    requiredMissingFacts,
+    requiredMissingFacts: allRequiredMissingFacts,
     optionalMissingFacts,
     staleFacts,
     unsafeFactsExcluded,
@@ -145,14 +162,18 @@ export function evaluateContinuationReadiness(input: {
     ],
     requiredRefreshReads,
     optionalRefreshReads,
-    missingRequiredFacts: requiredMissingFacts,
+    missingRequiredFacts: allRequiredMissingFacts,
     missingOptionalFacts: optionalMissingFacts,
     branchGapStatus:
-      input.sessionProjection.branchSummary.availability === "observed"
+      input.sessionProjection.branchSupport === "storage-backed"
+        ? "storage_backed"
+        : input.sessionProjection.branchSummary.availability === "observed"
         ? "branch_projection_only"
         : "branch_unsupported",
     compactionGapStatus:
-      input.sessionProjection.compaction.availability === "observed"
+      input.sessionProjection.compaction.availability === "storage-backed"
+        ? "storage_backed"
+        : input.sessionProjection.compaction.availability === "observed"
         ? "compaction_projection_only"
         : "compaction_unsupported",
     nextTurnExecuted: false,
