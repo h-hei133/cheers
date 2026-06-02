@@ -1,0 +1,66 @@
+# Current Capability Summary
+
+This document summarizes current proven capabilities for the sprint knowledge
+base. Code and focused tests remain the source of truth; this document is not
+itself product evidence.
+
+## Current Shape
+
+The project is a TypeScript-first coding-agent runtime and control plane. The
+root package still describes a three-layer workspace, but current product
+behavior lives mainly in `packages/ts-shell/src`:
+
+- Runtime loop and control facts: `runtime/loop/`.
+- Runtime events and JSON projection: `runtime/events/`.
+- Execution boundary and report-safe receipts: `runtime/execution/`.
+- Session, replay, continuation, and presentation facts: `session/`.
+- Context rebuild and planning substrate: `context/`, `planning/`.
+- Provider registry/request/response boundaries: `provider/`.
+- Tool call, policy, dispatch, result-message, and outcome ownership: `tools/`,
+  `turn/`.
+- Terminal truth and verdict ownership: `evidence/`, `result/`.
+- Product-facing rendering: `presentation/`.
+
+Rust remains a native executor candidate, not the current general execution
+owner. Python is offline evaluation only.
+
+## Proven Or Partially Proven Capabilities
+
+| Area | Current status | Evidence |
+|---|---|---|
+| TypeScript runtime/control plane | Proven as the primary product runtime and shell/control surface. | `package.json`, `packages/ts-shell/src/runtime/`, `packages/ts-shell/src/cli/`, `packages/ts-shell/src/session/` |
+| Explicit execution boundary | Proven for command/file/tool side-effect receipts through `ExecutionService` and runtime receipts. | `packages/ts-shell/src/runtime/execution/executionService.ts`, `packages/ts-shell/src/runtime/execution/receipt.ts` |
+| Evidence/result terminal truth | Proven as the only success-verdict owner for repair-to-success. Presentation and runtime keep `terminalSuccessClaim: false`. | `packages/ts-shell/src/evidence/projection/repair/verdict.ts`, `packages/ts-shell/src/result/projection/repair/verdict.ts`, `packages/ts-shell/src/runtime/loop/completionPacket.ts` |
+| Agent Loop governed substrate | Proven as a broad observation/control substrate with infrastructure categories, finalization, completion packet, trajectory, and events. It is not yet a full replacement for every product path. | `packages/ts-shell/src/runtime/loop/infrastructure.ts`, `packages/ts-shell/src/runtime/loop/contract.ts`, `packages/ts-shell/src/runtime/loop/finalization.ts`, `packages/ts-shell/src/runtime/loop/trajectory.ts` |
+| Context and planning substrate | Proven for report-safe context rebuild and planning fact handoff; not a guarantee of context completeness. | `packages/ts-shell/src/context/sessionContextRebuildProjection.ts`, `packages/ts-shell/src/context/rebuildInput.ts`, `packages/ts-shell/src/context/acquisition/summary.ts` |
+| Provider request boundary | Proven for default-off request preparation, provider metadata, safe request messages, blockers, redaction, and explicit invocation readiness. It does not prove provider calls. | `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/provider/request/invocation.ts` |
+| Continuation-aware request handoff | Proven as projection from continuation readiness into request preparation, replay-safe facts, trajectory/events, and presentation. | `packages/ts-shell/src/session/continuation/readiness.ts`, `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/session/replay/state.ts`, `packages/ts-shell/src/runtime/events/projection.ts` |
+| End-to-end turn lane | Partially proven as an integrated observation lane: model boundary, tool batch, dispatch/results, outcome, save point, next-turn preparation, verification/repair/finalization, events, and surface. It remains observation/control unless evidence/result prove success. | `packages/ts-shell/src/runtime/loop/contract.ts`, `packages/ts-shell/src/runtime/loop/modelBoundary.ts`, `packages/ts-shell/src/tools/toolOutcomeBundle.ts`, `packages/ts-shell/src/turn/nextTurnBundle.ts` |
+| Tool outcome next action | Proven in `tools`: outcome status derives next action and carry-forward facts; loop/events/presentation only project them. | `packages/ts-shell/src/tools/toolOutcomeBundle.ts`, `packages/ts-shell/src/tools/toolOutcomeBundle.test.ts` |
+| Runtime event projection | Proven for many observation events, JSON stream entries, redaction, and non-success claims. Event emission is not terminal truth. | `packages/ts-shell/src/runtime/events/projection.ts`, `packages/ts-shell/src/runtime/events/stream.ts` |
+| Replay-safe carry-forward | Proven for IDs, statuses, blocker summaries, request facts, tool outcome facts, product completion facts, and redaction exclusions. Raw transcripts, secrets, raw provider output, patch text, and command output are excluded. | `packages/ts-shell/src/session/replay/state.ts` |
+| Product surface rendering | Proven for rendering coding result, loop trajectory, provider/model, request, tool, replay, event, verdict, and next-action facts without owning success. | `packages/ts-shell/src/presentation/surface/model.ts` |
+| Verification and repair readiness | Proven for verification intent/result observations, repair handoff/proposal/authority/apply observations, post-repair verification, proof input, and result verdict projection. | `packages/ts-shell/src/verification/result/boundary.ts`, `packages/ts-shell/src/repair/handoff/boundary.ts`, `packages/ts-shell/src/evidence/projection/repair/verdict.ts`, `packages/ts-shell/src/result/projection/repair/verdict.ts` |
+| Not-proven claim preservation | Proven across loop infrastructure, request preparation, tool outcomes, replay, completion packet, and surface. | `packages/ts-shell/src/runtime/loop/infrastructure.ts`, `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/session/replay/state.ts`, `packages/ts-shell/src/presentation/surface/model.ts` |
+| Static package/resource governance | Proven only as explicit static inventory and trust/policy projection. Package install/load, dynamic discovery, plugin execution, scripts, network lookup, and provider default enablement remain disabled. | `packages/ts-shell/src/runtime/resources/inventory.ts`, `packages/ts-shell/src/runtime/resources/projection.ts` |
+| Extension/hook governance | Proven only as metadata/policy contract. Hooks are static, internal, non-executable, unsupported for runtime plugin execution, and forbidden effects are rejected. | `packages/ts-shell/src/runtime/extensions/lifecycle.ts` |
+
+## Current Missing Areas
+
+- A mature interactive CLI with full queue/status ergonomics, branch navigation,
+  rich session management, and compact/resume controls is not proven.
+- Programmatic SDK, RPC, and stable machine-readable host contracts are not
+  present beyond runtime event/JSON projection.
+- Storage-backed branch navigation and compaction summaries are projection-only
+  or unsupported in the current runtime path.
+- Provider/model registry metadata exists, but broad provider compatibility,
+  auth refresh, fallback execution, and default live provider behavior are not
+  product capabilities.
+- Dynamic extensions, package loading, executable hooks, and external tool
+  server behavior are intentionally not enabled.
+- Tool execution is bounded by policy and `ExecutionService`; broad parallel
+  mutation, file mutation queues, and snapshot/revert-backed wide editing are
+  not proven.
+- Product-loop replacement is explicitly not proven; existing product paths still
+  need careful owner-by-owner integration before the loop substrate can be called
+  complete.

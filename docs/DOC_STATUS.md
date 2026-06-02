@@ -67,6 +67,15 @@ It does not claim every historical note is perfectly classified.
 | `docs/dev-history/routes/route222*.md` through `docs/dev-history/routes/route226*.md` | historical | Reading quarantined Route222-226 route documents; old `docs/agent-routes/` paths are compatibility pointers. |  | Product Architecture Reset |
 | `docs/evidence/history/route-reports/README.md` | historical | Finding historical route report provenance and compatibility status. |  | Product Architecture Reset |
 
+## Sprint Knowledge Base
+
+| Path | Status | When to read | Superseded by | Owner |
+|---|---|---|---|---|
+| `docs/sprint/sprint-working-index.md` | active | Starting sprint capability planning or checking which sprint docs are current. |  | Sprint Knowledge Base |
+| `docs/sprint/current-capability-summary.md` | active | Checking code-backed current capability status and missing areas before planning new capability batches. |  | Sprint Knowledge Base |
+| `docs/sprint/mature-agent-capability-map.md` | active | Checking the full mature capability target extracted from the local implementation and public docs named in the blueprint. |  | Sprint Knowledge Base |
+| `docs/sprint/project-gap-and-priority-plan.md` | active | Selecting aggressive capability batches, owner domains, validation expectations, and anti-goals. |  | Sprint Knowledge Base |
+
 ## Implementation Context
 
 | Path | Status | When to read | Superseded by | Owner |
