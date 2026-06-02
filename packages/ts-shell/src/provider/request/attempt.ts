@@ -21,6 +21,10 @@ import {
   type ModelInvocationMode,
   type ModelInvocationRetryEligibility,
 } from "./invocation.js";
+import {
+  decideProviderFallback,
+  type ProviderFallbackDecision,
+} from "./fallback.js";
 
 export type ControlledInvocationAttemptDecision =
   | "not_attempted"
@@ -70,6 +74,8 @@ export interface ControlledModelInvocationAdapterInput {
   readonly gate: ModelInvocationGateFacts;
   readonly invocationMode?: ModelInvocationMode;
   readonly executor?: ControlledModelInvocationExecutor;
+  readonly fallbackExecutor?: ControlledModelInvocationExecutor;
+  readonly fallbackExplicitOptIn?: boolean;
   readonly request?: ModelRequest;
   readonly responseId?: string;
   readonly turnId?: string;
@@ -86,7 +92,8 @@ export interface ControlledModelInvocationOutcomeFacts {
   readonly failureClass?: ProviderFailureClass;
   readonly retryEligibility: ModelInvocationRetryEligibility;
   readonly fallbackEligibility: ModelInvocationFallbackEligibility;
-  readonly fallbackAttempted: false;
+  readonly fallbackAttempted: boolean;
+  readonly fallbackStatus?: ProviderFallbackDecision["status"];
   readonly responseHandoffId?: string;
   readonly redactionState: "report-safe" | "redacted";
   readonly notProvenClaims: readonly string[];
@@ -121,6 +128,8 @@ export interface ControlledModelInvocationAdapterProjection {
   readonly redactionState: "report-safe" | "redacted";
   readonly outcome: ControlledModelInvocationOutcomeFacts;
   readonly responseHandoff?: ProviderResponseHandoffFacts;
+  readonly fallbackDecision?: ProviderFallbackDecision;
+  readonly fallbackResponseHandoff?: ProviderResponseHandoffFacts;
   readonly modelResponseBoundary?: ModelResponseBoundary;
   readonly attemptEnvelope: ModelInvocationAttemptEnvelope;
   readonly notProvenClaims: readonly string[];
@@ -247,13 +256,30 @@ export async function runControlledModelInvocationAdapter(
       toolCallCount: streamEvents.filter((event) => event.kind === "tool_call_completed").length,
       notProvenClaims,
     });
+    const fallbackDecision = await fallbackDecisionForAttempt({
+      input,
+      attemptId,
+      primaryFailureClass: classified.failureClass,
+      primaryStatus: classified.status,
+      redactions,
+      notProvenClaims,
+    });
+    const effectiveHandoff = fallbackDecision.fallbackResponseHandoff ?? handoff.responseHandoff;
     const outcomeFacts = createOutcome({
       gate: input.gate,
       attemptId,
-      status: classified.status,
-      failureClass: classified.failureClass,
-      responseHandoffId: handoff.responseHandoff.responseHandoffId,
-      redactionState: handoff.responseHandoff.redactionStatus,
+      status: fallbackDecision.fallbackDecision?.status === "fallback_completed"
+        ? "completed"
+        : classified.status,
+      failureClass: fallbackDecision.fallbackDecision?.status === "fallback_completed"
+        ? undefined
+        : classified.failureClass,
+      responseHandoffId: effectiveHandoff.responseHandoffId,
+      redactionState: effectiveHandoff.redactionStatus,
+      fallbackAttempted: fallbackDecision.fallbackDecision?.status === "fallback_attempted" ||
+        fallbackDecision.fallbackDecision?.status === "fallback_failed" ||
+        fallbackDecision.fallbackDecision?.status === "fallback_completed",
+      fallbackStatus: fallbackDecision.fallbackDecision?.status,
       notProvenClaims,
     });
     const attemptEnvelope = createModelInvocationAttemptEnvelope({
@@ -271,6 +297,12 @@ export async function runControlledModelInvocationAdapter(
       attemptId,
       outcome: outcomeFacts,
       responseHandoff: handoff.responseHandoff,
+      ...(fallbackDecision.fallbackDecision
+        ? { fallbackDecision: fallbackDecision.fallbackDecision }
+        : {}),
+      ...(fallbackDecision.fallbackResponseHandoff
+        ? { fallbackResponseHandoff: fallbackDecision.fallbackResponseHandoff }
+        : {}),
       modelResponseBoundary: responseBoundary,
       attemptEnvelope,
       notProvenClaims,
@@ -287,6 +319,15 @@ export async function runControlledModelInvocationAdapter(
       status,
       failureClass,
       redactionState: base.redactionState,
+      fallbackAttempted: false,
+      notProvenClaims,
+    });
+    const fallbackDecision = await fallbackDecisionForAttempt({
+      input,
+      attemptId,
+      primaryFailureClass: failureClass,
+      primaryStatus: status,
+      redactions,
       notProvenClaims,
     });
     const attemptEnvelope = createModelInvocationAttemptEnvelope({
@@ -302,7 +343,32 @@ export async function runControlledModelInvocationAdapter(
       ...base,
       attemptDecision: "execute_via_provider_fetch",
       attemptId,
-      outcome,
+      outcome: fallbackDecision.fallbackDecision?.status
+        ? createOutcome({
+            gate: input.gate,
+            attemptId,
+            status: fallbackDecision.fallbackDecision.status === "fallback_completed"
+              ? "completed"
+              : status,
+            failureClass: fallbackDecision.fallbackDecision.status === "fallback_completed"
+              ? undefined
+              : failureClass,
+            responseHandoffId: fallbackDecision.fallbackResponseHandoff?.responseHandoffId,
+            redactionState: fallbackDecision.fallbackResponseHandoff?.redactionStatus ??
+              base.redactionState,
+            fallbackAttempted: fallbackDecision.fallbackDecision.status === "fallback_attempted" ||
+              fallbackDecision.fallbackDecision.status === "fallback_failed" ||
+              fallbackDecision.fallbackDecision.status === "fallback_completed",
+            fallbackStatus: fallbackDecision.fallbackDecision.status,
+            notProvenClaims,
+          })
+        : outcome,
+      ...(fallbackDecision.fallbackDecision
+        ? { fallbackDecision: fallbackDecision.fallbackDecision }
+        : {}),
+      ...(fallbackDecision.fallbackResponseHandoff
+        ? { fallbackResponseHandoff: fallbackDecision.fallbackResponseHandoff }
+        : {}),
       attemptEnvelope,
       notProvenClaims,
       terminalSuccessClaim: false,
@@ -327,6 +393,115 @@ function adapterBlockedReason(
     return "provider-executor-not-supplied";
   }
   return undefined;
+}
+
+async function fallbackDecisionForAttempt(input: {
+  readonly input: ControlledModelInvocationAdapterInput;
+  readonly attemptId: string;
+  readonly primaryFailureClass?: ProviderFailureClass;
+  readonly primaryStatus: ControlledInvocationOutcomeStatus;
+  readonly redactions: Set<string>;
+  readonly notProvenClaims: readonly string[];
+}): Promise<{
+  readonly fallbackDecision?: ProviderFallbackDecision;
+  readonly fallbackResponseHandoff?: ProviderResponseHandoffFacts;
+}> {
+  if (!input.primaryFailureClass || input.primaryStatus === "completed") {
+    return {};
+  }
+  const eligibleFailureClasses =
+    input.input.requestPreparation.providerMetadata.fallbackEligibleFailureClasses
+      .filter(isProviderFailureClass);
+  const ineligibleFailureClasses =
+    input.input.requestPreparation.providerMetadata.fallbackIneligibleFailureClasses
+      .filter(isProviderFailureClass);
+  const baseDecision = {
+    decisionId: `provider-fallback:${input.attemptId}`,
+    sourceAttemptId: input.attemptId,
+    primaryFailureClass: input.primaryFailureClass,
+    fallbackEligibility: input.input.gate.fallbackEligibility,
+    eligibleFailureClasses,
+    ineligibleFailureClasses,
+    fallbackProviderSafeLabel:
+      input.input.requestPreparation.providerMetadata.fallbackProviderSafeLabel,
+    fallbackModelSafeLabel:
+      input.input.requestPreparation.providerMetadata.fallbackModelSafeLabel,
+    explicitOptIn: input.input.fallbackExplicitOptIn === true,
+    notProvenClaims: input.notProvenClaims,
+  } as const;
+
+  if (!input.input.fallbackExecutor) {
+    return {
+      fallbackDecision: decideProviderFallback(baseDecision),
+    };
+  }
+
+  const selected = decideProviderFallback({
+    ...baseDecision,
+    fallbackAttempted: false,
+  });
+  if (selected.status === "fallback_blocked" || selected.status === "no_fallback") {
+    return { fallbackDecision: selected };
+  }
+
+  const fallbackAttemptId = sanitizeText(
+    `${input.attemptId}:fallback`,
+    input.redactions,
+  );
+  try {
+    const request = input.input.request ?? buildModelRequest(
+      input.input.requestPreparation,
+      input.redactions,
+    );
+    const outcome = await input.input.fallbackExecutor(request, input.input.signal);
+    const responseId = `${fallbackAttemptId}:response`;
+    const streamEvents = await providerFetchOutcomeToStreamEvents({
+      requestId: input.input.requestPreparation.modelRequestBoundaryId,
+      responseId,
+      turnId: input.input.turnId,
+      outcome,
+    });
+    const classified = classifyStreamEvents(streamEvents);
+    const fallbackHandoff = createResponseHandoff({
+      attemptId: fallbackAttemptId,
+      gate: input.input.gate,
+      streamEvents,
+      classification: classified.classification,
+      failureClass: classified.failureClass,
+      responseId,
+      redactions: input.redactions,
+      notProvenClaims: input.notProvenClaims,
+    });
+    return {
+      fallbackDecision: decideProviderFallback({
+        ...baseDecision,
+        fallbackAttempted: true,
+        fallbackCompleted: classified.status === "completed",
+        fallbackFailed: classified.status !== "completed",
+        responseHandoffId: fallbackHandoff.responseHandoff.responseHandoffId,
+      }),
+      fallbackResponseHandoff: fallbackHandoff.responseHandoff,
+    };
+  } catch (error) {
+    const failureClass = input.input.signal?.aborted
+      ? "provider_cancelled"
+      : classifyProviderAttemptError(error);
+    return {
+      fallbackDecision: decideProviderFallback({
+        ...baseDecision,
+        fallbackAttempted: true,
+        fallbackFailed: true,
+        notProvenClaims: [
+          ...input.notProvenClaims,
+          `fallback-failure:${failureClass}`,
+        ],
+      }),
+    };
+  }
+}
+
+function isProviderFailureClass(value: string): value is ProviderFailureClass {
+  return value.startsWith("provider_");
 }
 
 function buildModelRequest(
@@ -478,6 +653,8 @@ function createOutcome(input: {
   readonly failureClass?: ProviderFailureClass;
   readonly responseHandoffId?: string;
   readonly redactionState: "report-safe" | "redacted";
+  readonly fallbackAttempted?: boolean;
+  readonly fallbackStatus?: ProviderFallbackDecision["status"];
   readonly notProvenClaims: readonly string[];
 }): ControlledModelInvocationOutcomeFacts {
   return deepFreeze({
@@ -489,7 +666,8 @@ function createOutcome(input: {
     ...(input.failureClass ? { failureClass: input.failureClass } : {}),
     retryEligibility: input.gate.retryEligibility,
     fallbackEligibility: input.gate.fallbackEligibility,
-    fallbackAttempted: false,
+    fallbackAttempted: input.fallbackAttempted ?? false,
+    ...(input.fallbackStatus ? { fallbackStatus: input.fallbackStatus } : {}),
     ...(input.responseHandoffId ? { responseHandoffId: input.responseHandoffId } : {}),
     redactionState: input.redactionState,
     notProvenClaims: input.notProvenClaims,

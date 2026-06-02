@@ -9,18 +9,21 @@ completion.
 ## Major Gaps
 
 - Product loop truth, the CLI/session status envelope, a bounded synthetic
-  provider-to-tool-to-next-turn runtime lane, and a controlled mutation recovery
-  lane are consolidated, but the host contract, branch/compaction runtime,
-  broad provider compatibility, live provider defaults, broad parallel
-  mutation, and dynamic execution areas remain unproven.
+  provider-to-tool-to-next-turn runtime lane, a controlled provider/model
+  runtime boundary, and a controlled mutation recovery lane are consolidated,
+  but the host contract, branch/compaction runtime, broad real-provider
+  compatibility, live provider defaults, broad parallel mutation, and dynamic
+  execution areas remain unproven.
 - CLI/session UX now has a structured status envelope for product-loop truth,
   but full queue ergonomics, branch navigation, compact/resume controls, and
   broader session management remain narrower than the runtime fact model.
 - JSON event projection exists, but no stable SDK/RPC host contract exists.
 - Session branch and compaction support are projection-only or unsupported in the
   current runtime path.
-- Provider/model compatibility is metadata-first and default-off; live execution
-  remains explicit opt-in.
+- Provider/model compatibility, auth readiness, invocation gating, response
+  normalization, fallback decision/attempt facts, replay, surface, and status
+  are proven for the controlled runtime lane. Live execution remains explicit
+  opt-in and broad real-provider compatibility is still unproven.
 - Extension/package support is governance-only; dynamic execution is absent by
   design.
 - Tool execution has policy/receipt/outcome boundaries, and bounded mutation
@@ -121,6 +124,40 @@ completion.
   branch/compaction runtime remain unproven. Apply, rollback, repair, events,
   replay, surface, and CLI/session status are still not terminal success.
 
+### Completed Batch: Provider/Model Runtime Boundary
+
+- Proven result: provider/model selection, registry resolution, compatibility
+  and auth readiness, safe request preparation, explicit invocation gating,
+  controlled synthetic or injected invocation, normalized response facts,
+  assistant accumulation, text and tool-call handling, failure classification,
+  fallback eligibility, fallback blocking, fallback selection, attempted
+  fallback response normalization, next runtime action, events, replay-safe
+  carry-forward, product surface, CLI/session status, and evidence/result truth
+  boundaries now share one tested lane.
+- User-facing value: missing provider, missing model, unsupported mode, missing
+  auth, missing opt-in, malformed stream/tool deltas, provider failures,
+  cancellation, fallback eligible-not-attempted, fallback selected, fallback
+  blocked, fallback completed, text-only responses, tool-call responses, and
+  not-proven provider facts remain distinct.
+- Owner domains: `provider/registry`, `provider/request`, `provider/response`,
+  `runtime/loop`, `runtime/events`, `turn`, `tools`, `session/replay`,
+  `session/presentation`, `presentation`, `core/shell`, `evidence`, and
+  `result`.
+- Evidence: `packages/ts-shell/src/provider/request/fallback.test.ts`,
+  `packages/ts-shell/src/provider/request/attempt.test.ts`,
+  `packages/ts-shell/src/provider/request/boundary.test.ts`, and
+  `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts`, alongside the
+  focused registry, response, runtime event, replay, surface, status, and truth
+  owner tests.
+- Boundary: live providers remain default-off and explicit opt-in only. The
+  completed lane uses deterministic synthetic responses and injected controlled
+  executors for proof. Broad real-provider compatibility, auth refresh,
+  default live provider behavior, dynamic execution, external tool servers,
+  host SDK/RPC behavior, and storage-backed branch/compaction runtime remain
+  unproven. Provider selection, request readiness, invocation, stream,
+  fallback, replay, surface, and CLI/session status are still not terminal
+  success.
+
 ### Batch 1: Branch/Compaction Context Readiness
 
 - Goal: make branch and compaction facts more structured across session,
@@ -142,7 +179,7 @@ completion.
 
 ## Medium-Term Runtime Capability Batches
 
-### Batch 2: Provider/Model Compatibility Registry
+### Completed Planning Item: Provider/Model Compatibility Registry
 
 - Goal: expand provider/model metadata, auth readiness, compatibility flags,
   fallback eligibility, and request blockers without enabling real providers by
@@ -156,8 +193,10 @@ completion.
   redaction tests, no-provider-call assertions.
 - Forbidden shortcuts: reading private provider homes, default real-provider
   enablement, treating readiness/fallback eligibility as execution.
-- Completion condition: request preparation can explain compatibility/auth
-  blockers and explicit opt-in requirements with no live call.
+- Completion condition: request preparation explains compatibility/auth
+  blockers and explicit opt-in requirements with no live call. The completed
+  provider/model runtime boundary also proves controlled fallback decision and
+  response normalization facts.
 
 ### Batch 3: Programmatic Runtime Event Contract
 

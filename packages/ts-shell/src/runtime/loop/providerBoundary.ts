@@ -1,4 +1,5 @@
 import { createModelRequestBoundary } from "../../provider/request/boundary.js";
+import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import {
   selectSyntheticProviderStep,
   syntheticProviderStepToStreamEvents,
@@ -16,6 +17,7 @@ import type {
 export interface SyntheticModelBoundaryInput {
   readonly program: SyntheticProviderProgram;
   readonly providerId?: string;
+  readonly providerRegistry?: ProviderRegistryProjection;
   readonly providerSafeLabel?: string;
   readonly modelSafeLabel?: string;
   readonly loopId?: string;
@@ -41,6 +43,7 @@ export function createSyntheticModelBoundary(
       providerSafeLabel: input.providerSafeLabel ?? "synthetic-provider",
       modelSafeLabel: input.modelSafeLabel ?? "synthetic-model",
       providerReadinessStatus: "ready",
+      providerRegistry: input.providerRegistry,
       planningConstraints: turnInput.pendingNextTurnFacts,
       missingRequiredFacts: turnInput.pendingPreparedRequest?.blockedReasons ?? [],
       notProvenClaims: [

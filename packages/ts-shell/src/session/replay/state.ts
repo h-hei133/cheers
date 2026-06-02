@@ -3,6 +3,7 @@ import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/m
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
 import type { NextTurnModelRequestPreparation } from "../../provider/request/boundary.js";
+import type { ControlledModelInvocationAdapterProjection } from "../../provider/request/attempt.js";
 import type { ToolOutcomeBundleProjection } from "../../tools/toolOutcomeBundle.js";
 import type { ReplaySafePlanningStateFacts } from "../../context/memory/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../../repair/handoff/boundary.js";
@@ -21,6 +22,17 @@ export interface ReplaySafeLoopStateSummary {
   readonly requestPreparationId?: string;
   readonly requestReadinessStatus?: string;
   readonly requestBlockedReasons: readonly string[];
+  readonly providerInvocationIds: readonly string[];
+  readonly providerInvocationStatus?: {
+    readonly gateId: string;
+    readonly attemptStatus: string;
+    readonly failureClass?: string;
+    readonly fallbackEligibility: string;
+    readonly fallbackStatus?: string;
+    readonly fallbackAttempted: boolean;
+    readonly responseHandoffId?: string;
+    readonly terminalSuccessClaim: false;
+  };
   readonly toolOutcomeBundleId?: string;
   readonly toolOutcomeStatus?: string;
   readonly toolOutcomeNextAction?: string;
@@ -105,6 +117,7 @@ export function summarizeReplaySafeLoopState(input: {
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
   readonly mutationRecoveries?: readonly ControlledMutationRecoveryProjection[];
+  readonly controlledModelInvocations?: readonly ControlledModelInvocationAdapterProjection[];
   readonly replaySafePlanningStates?: readonly ReplaySafePlanningStateFacts[];
   readonly terminalResultFacts?: {
     readonly status?: string;
@@ -123,6 +136,8 @@ export function summarizeReplaySafeLoopState(input: {
   ];
   const mutationRecoveries = input.mutationRecoveries ?? [];
   const latestMutationRecovery = mutationRecoveries.at(-1);
+  const controlledInvocations = input.controlledModelInvocations ?? [];
+  const latestInvocation = controlledInvocations.at(-1);
   const replaySafePlanningStates = input.replaySafePlanningStates ?? [];
   return deepFreeze({
     summaryId: `replay-safe-loop-state:${input.sessionProjection.sessionIdentity}:${input.sessionProjection.activeLeafId}`,
@@ -137,6 +152,27 @@ export function summarizeReplaySafeLoopState(input: {
         }
       : {}),
     requestBlockedReasons: input.requestPreparation?.blockedReasons ?? [],
+    providerInvocationIds: controlledInvocations.map((item) => item.adapterId),
+    ...(latestInvocation
+      ? {
+          providerInvocationStatus: {
+            gateId: latestInvocation.sourceGateId,
+            attemptStatus: latestInvocation.outcome.status,
+            ...(latestInvocation.outcome.failureClass
+              ? { failureClass: latestInvocation.outcome.failureClass }
+              : {}),
+            fallbackEligibility: latestInvocation.outcome.fallbackEligibility,
+            ...(latestInvocation.outcome.fallbackStatus
+              ? { fallbackStatus: latestInvocation.outcome.fallbackStatus }
+              : {}),
+            fallbackAttempted: latestInvocation.outcome.fallbackAttempted,
+            ...(latestInvocation.outcome.responseHandoffId
+              ? { responseHandoffId: latestInvocation.outcome.responseHandoffId }
+              : {}),
+            terminalSuccessClaim: false,
+          },
+        }
+      : {}),
     ...(input.toolOutcomeBundle
       ? {
           toolOutcomeBundleId: input.toolOutcomeBundle.bundleId,

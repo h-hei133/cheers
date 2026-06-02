@@ -42,7 +42,7 @@ export interface ProviderFallbackPolicyMetadata {
   readonly maxAttempts: number;
   readonly retryRelation: "none" | "same-request" | "new-request";
   readonly requiresExplicitOptIn: true;
-  readonly executesFallback: false;
+  readonly executesFallback: boolean;
   readonly redaction: ProviderRegistryRedaction;
   readonly notProvenClaims: readonly string[];
 }
@@ -336,7 +336,7 @@ function sanitizeFallbackPolicy(
     maxAttempts: Math.max(0, input.maxAttempts),
     retryRelation: input.retryRelation,
     requiresExplicitOptIn: true,
-    executesFallback: false,
+    executesFallback: input.executesFallback === true,
     redaction: {
       status: redactions.size > 0 ? "redacted" : "report-safe",
       excluded: REDACTION_EXCLUSIONS,

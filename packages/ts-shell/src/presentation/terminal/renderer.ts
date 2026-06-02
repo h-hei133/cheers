@@ -73,6 +73,7 @@ export function renderSessionStatusEnvelope(
     `[control] Loop: ${envelope.controlStatus}`,
     `[action] Next: ${envelope.nextAction}`,
     `[request] Request: ${envelope.requestPreparation.summary}`,
+    `[provider] Model: ${envelope.providerModel.summary}`,
     `[continuation] Readiness: ${envelope.continuationReadiness}`,
     `[replay] Carry-forward: ${envelope.replayCarryForward.summary}`,
     `[tools] Outcome: ${envelope.toolOutcome.summary}`,

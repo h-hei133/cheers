@@ -52,12 +52,13 @@ describe("CLI session product surface", () => {
       codingResult: result,
     });
 
-    expect(surface?.lines.map((line) => line.replace(/:.*/, "")).slice(0, 13)).toEqual([
+    expect(surface?.lines.map((line) => line.replace(/:.*/, "")).slice(0, 14)).toEqual([
       "Session status",
       "[blocked] Verdict",
       "[control] Loop",
       "[action] Next",
       "[request] Request",
+      "[provider] Model",
       "[continuation] Readiness",
       "[replay] Carry-forward",
       "[tools] Outcome",

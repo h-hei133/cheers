@@ -169,6 +169,79 @@ describe("controlled model invocation adapter", () => {
     );
   });
 
+  it("selects and completes an explicit fallback after primary provider failure", async () => {
+    const preparation = fallbackReadyPreparation();
+    const gate = createModelInvocationGate({
+      requestPreparation: preparation,
+      explicitOptIn: { state: "present", sourceSafeLabel: "approved-safe-label" },
+    });
+
+    const adapter = await runControlledModelInvocationAdapter({
+      gate,
+      requestPreparation: preparation,
+      invocationMode: "controlled_provider_fetch",
+      fallbackExplicitOptIn: true,
+      executor: () => {
+        throw new Error("network unreachable");
+      },
+      fallbackExecutor: () => ({
+        kind: "completed",
+        response: {
+          content: "fallback safe content",
+          finishReason: "stop",
+        },
+      }),
+    });
+
+    expect(adapter.outcome).toMatchObject({
+      status: "completed",
+      fallbackAttempted: true,
+      fallbackStatus: "fallback_completed",
+      terminalSuccessClaim: false,
+    });
+    expect(adapter.fallbackDecision).toMatchObject({
+      status: "fallback_completed",
+      nextAction: "continue",
+      selectedProviderSafeLabel: "Fallback Provider",
+      selectedModelSafeLabel: "Fallback Model",
+      terminalSuccessClaim: false,
+    });
+    expect(adapter.fallbackResponseHandoff).toMatchObject({
+      responseClassification: "completed",
+      rawOutputExcluded: true,
+      terminalSuccessClaim: false,
+    });
+  });
+
+  it("blocks fallback when explicit fallback opt-in is missing", async () => {
+    const preparation = fallbackReadyPreparation();
+    const gate = createModelInvocationGate({
+      requestPreparation: preparation,
+      explicitOptIn: { state: "present", sourceSafeLabel: "approved-safe-label" },
+    });
+
+    const adapter = await runControlledModelInvocationAdapter({
+      gate,
+      requestPreparation: preparation,
+      invocationMode: "controlled_provider_fetch",
+      executor: () => {
+        throw new Error("timeout");
+      },
+      fallbackExecutor: () => ({
+        kind: "completed",
+        response: { content: "not reached", finishReason: "stop" },
+      }),
+    });
+
+    expect(adapter.outcome).toMatchObject({
+      status: "failed",
+      fallbackAttempted: false,
+      fallbackStatus: "fallback_blocked",
+    });
+    expect(adapter.fallbackDecision?.blockedReasons).toContain("fallback-explicit-opt-in-missing");
+    expect(adapter.fallbackResponseHandoff).toBeUndefined();
+  });
+
   it("redacts unsafe facts from controlled invocation reports", async () => {
     const preparation = readyPreparation({
       taskSummary:
@@ -273,5 +346,109 @@ function readyPreparation(input: {
     providerId: "provider-a",
     modelId: "model-a",
     taskSummary: input.taskSummary,
+  });
+}
+
+function fallbackReadyPreparation() {
+  const registry = projectProviderRegistry({
+    providers: [
+      {
+        providerId: "provider-a",
+        safeLabel: "Primary Provider",
+        providerKind: "custom",
+        endpointClass: "unknown",
+        authMode: "none",
+        defaultEnabled: false,
+        requiresExplicitOptIn: true,
+        supportsFallback: "supported",
+        compatibility: unknownProviderCompatibilityFlags(),
+        fallbackPolicy: {
+          fallbackProviderId: "provider-b",
+          eligibleFailureClasses: ["provider_network", "provider_timeout"],
+          ineligibleFailureClasses: ["provider_auth"],
+          maxAttempts: 1,
+          retryRelation: "new-request",
+          requiresExplicitOptIn: true,
+          executesFallback: true,
+          redaction: { status: "report-safe", excluded: [] },
+          notProvenClaims: [],
+        },
+        riskLevel: "low",
+      },
+      {
+        providerId: "provider-b",
+        safeLabel: "Fallback Provider",
+        providerKind: "custom",
+        endpointClass: "unknown",
+        authMode: "none",
+        defaultEnabled: false,
+        requiresExplicitOptIn: true,
+        supportsFallback: "unknown",
+        compatibility: unknownProviderCompatibilityFlags(),
+        riskLevel: "low",
+      },
+    ],
+    models: [
+      {
+        modelId: "model-a",
+        safeLabel: "Primary Model",
+        providerId: "provider-a",
+        family: "fixture",
+        compatibility: unknownProviderCompatibilityFlags(),
+        knownLimitations: [],
+      },
+      {
+        modelId: "model-b",
+        safeLabel: "Fallback Model",
+        providerId: "provider-b",
+        family: "fixture",
+        compatibility: unknownProviderCompatibilityFlags(),
+        knownLimitations: [],
+      },
+    ],
+    auth: [{
+      providerId: "provider-a",
+      authSourceKind: "none",
+      authMode: "none",
+      resolutionStatus: "resolved",
+    }],
+  });
+  const boundary = createModelRequestBoundary({
+    requestId: "request-fallback",
+    providerId: "provider-a",
+    providerSafeLabel: "Primary Provider",
+    modelSafeLabel: "Primary Model",
+    providerReadinessStatus: "ready",
+    providerRegistry: registry,
+  });
+  return prepareNextTurnModelRequest({
+    nextTurnBundle: prepareNextTurnBundle({
+      bundleId: "bundle-fallback",
+      turnId: "turn-fallback",
+      toolResultMessages: {
+        batchId: "messages-fallback",
+        dispatchPlanId: "plan-fallback",
+        messages: [{
+          messageId: "message-fallback",
+          role: "tool",
+          toolCallId: "call-fallback",
+          toolName: "read",
+          safeContentSummary: "safe summary",
+          category: "executed_tool_fact",
+          deliveryStatus: "prepared",
+          redactionStatus: "report-safe",
+          notProvenClaims: [],
+          terminalSuccessClaim: false,
+        }],
+        preparedCount: 1,
+        blockedCount: 0,
+        terminalSuccessClaim: false,
+        notProvenClaims: [],
+      },
+    }),
+    modelRequestBoundary: boundary,
+    providerRegistry: registry,
+    providerId: "provider-a",
+    modelId: "model-a",
   });
 }

@@ -376,7 +376,7 @@ describe("runtime event projection", () => {
       "model-invocation-attempt-prepared",
     ]);
     expect(events.every((event) => event.facts.terminalSuccessClaim === false)).toBe(true);
-    expect(JSON.stringify(events)).toContain('"attemptStatus":"blocked"');
+    expect(JSON.stringify(events)).toContain('"attemptStatus":"unsupported"');
     expect(JSON.stringify(events)).not.toMatch(/provider\.env|raw provider output|hidden reasoning/i);
   });
 

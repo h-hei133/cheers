@@ -27,6 +27,7 @@ export interface SessionStatusEnvelope {
   readonly state: SessionStatusEnvelopeState;
   readonly nextAction: string;
   readonly requestPreparation: SessionStatusEnvelopeDetail;
+  readonly providerModel: SessionStatusEnvelopeDetail;
   readonly continuationReadiness: string;
   readonly replayCarryForward: SessionStatusEnvelopeDetail;
   readonly toolOutcome: SessionStatusEnvelopeDetail;
@@ -49,6 +50,8 @@ export function projectSessionStatusEnvelope(
   const completion = findSection(viewModel, "Product completion packet");
   const verdict = firstSection(viewModel, "verdict");
   const request = findSection(viewModel, "Request preparation");
+  const providerModel = findSection(viewModel, "Controlled invocation") ??
+    findSection(viewModel, "Invocation gate");
   const replay = findSection(viewModel, "Replay carry forward");
   const toolOutcome = findSection(viewModel, "Tool outcome");
   const mutationRecovery = findSection(viewModel, "Mutation recovery");
@@ -77,6 +80,7 @@ export function projectSessionStatusEnvelope(
     state,
     nextAction: safe(viewModel.nextAction, 240),
     requestPreparation: detail(request),
+    providerModel: detail(providerModel),
     continuationReadiness: safe(
       fact(request, "continuationReadiness") ??
         valueFromSummary(request, "continuation") ??

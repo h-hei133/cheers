@@ -122,6 +122,11 @@ export type RuntimeProjectionEventType =
   | "provider-response-handoff-prepared"
   | "provider-retry-eligible-not-attempted"
   | "provider-fallback-eligible-not-attempted"
+  | "provider-fallback-blocked"
+  | "provider-fallback-selected"
+  | "provider-fallback-attempted"
+  | "provider-fallback-failed"
+  | "provider-fallback-completed-as-provider-fact"
   | "response-reentry-observed"
   | "model-boundary-processing-observed"
   | "assistant-accumulation-observed"
@@ -662,7 +667,11 @@ export function projectRuntimeEvents(input: {
       },
       attempt.notProvenClaims,
     );
-    if (attempt.attemptStatus !== "not_attempted" && attempt.attemptStatus !== "blocked") {
+    if (
+      attempt.attemptStatus !== "not_attempted" &&
+      attempt.attemptStatus !== "blocked" &&
+      attempt.attemptStatus !== "unsupported"
+    ) {
       append(
         "model-invocation-attempt-observed",
         {
@@ -719,6 +728,7 @@ export function projectRuntimeEvents(input: {
         failureClass: adapter.outcome.failureClass,
         retryEligibility: adapter.outcome.retryEligibility,
         fallbackEligibility: adapter.outcome.fallbackEligibility,
+        fallbackStatus: adapter.outcome.fallbackStatus,
         fallbackAttempted: adapter.outcome.fallbackAttempted,
         responseHandoffId: adapter.outcome.responseHandoffId,
         redactionStatus: adapter.redactionState,
@@ -800,6 +810,23 @@ export function projectRuntimeEvents(input: {
         adapter.responseHandoff.notProvenClaims,
       );
     }
+    if (adapter.fallbackResponseHandoff) {
+      append(
+        "provider-response-handoff-prepared",
+        {
+          responseHandoffId: adapter.fallbackResponseHandoff.responseHandoffId,
+          sourceAttemptId: adapter.fallbackResponseHandoff.sourceAttemptId,
+          responseClassification: adapter.fallbackResponseHandoff.responseClassification,
+          assistantContentAvailability: adapter.fallbackResponseHandoff.assistantContentAvailability,
+          toolCallExtractionReadiness: adapter.fallbackResponseHandoff.toolCallExtractionReadiness,
+          modelResponseBoundaryId: adapter.fallbackResponseHandoff.modelResponseBoundaryId,
+          redactionStatus: adapter.fallbackResponseHandoff.redactionStatus,
+          rawOutputExcluded: adapter.fallbackResponseHandoff.rawOutputExcluded,
+          terminalSuccessClaim: false,
+        },
+        adapter.fallbackResponseHandoff.notProvenClaims,
+      );
+    }
     if (adapter.outcome.retryEligibility === "retry_eligible") {
       append(
         "provider-retry-eligible-not-attempted",
@@ -824,6 +851,40 @@ export function projectRuntimeEvents(input: {
         },
         adapter.outcome.notProvenClaims,
       );
+    }
+    if (adapter.fallbackDecision) {
+      const fallbackFacts = {
+        decisionId: adapter.fallbackDecision.decisionId,
+        sourceAttemptId: adapter.fallbackDecision.sourceAttemptId,
+        primaryFailureClass: adapter.fallbackDecision.primaryFailureClass,
+        fallbackStatus: adapter.fallbackDecision.status,
+        fallbackEligibility: adapter.fallbackDecision.fallbackEligibility,
+        nextAction: adapter.fallbackDecision.nextAction,
+        selectedProviderSafeLabel: adapter.fallbackDecision.selectedProviderSafeLabel,
+        selectedModelSafeLabel: adapter.fallbackDecision.selectedModelSafeLabel,
+        responseHandoffId: adapter.fallbackDecision.responseHandoffId,
+        blockedReasons: adapter.fallbackDecision.blockedReasons,
+        terminalSuccessClaim: false,
+      };
+      if (adapter.fallbackDecision.status === "fallback_blocked") {
+        append("provider-fallback-blocked", fallbackFacts, adapter.fallbackDecision.notProvenClaims);
+      }
+      if (adapter.fallbackDecision.status === "fallback_selected") {
+        append("provider-fallback-selected", fallbackFacts, adapter.fallbackDecision.notProvenClaims);
+      }
+      if (adapter.fallbackDecision.status === "fallback_attempted") {
+        append("provider-fallback-attempted", fallbackFacts, adapter.fallbackDecision.notProvenClaims);
+      }
+      if (adapter.fallbackDecision.status === "fallback_failed") {
+        append("provider-fallback-failed", fallbackFacts, adapter.fallbackDecision.notProvenClaims);
+      }
+      if (adapter.fallbackDecision.status === "fallback_completed") {
+        append(
+          "provider-fallback-completed-as-provider-fact",
+          fallbackFacts,
+          adapter.fallbackDecision.notProvenClaims,
+        );
+      }
     }
   }
 
@@ -2759,6 +2820,8 @@ export function projectRuntimeEvents(input: {
         requestPreparationId: summary.requestPreparationId,
         requestReadinessStatus: summary.requestReadinessStatus,
         requestBlockedReasons: summary.requestBlockedReasons,
+        providerInvocationIds: summary.providerInvocationIds,
+        providerInvocationStatus: summary.providerInvocationStatus,
         toolOutcomeBundleId: summary.toolOutcomeBundleId,
         toolOutcomeStatus: summary.toolOutcomeStatus,
         toolOutcomeNextAction: summary.toolOutcomeNextAction,

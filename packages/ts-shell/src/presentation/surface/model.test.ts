@@ -576,7 +576,7 @@ describe("product surface view model", () => {
       status: "blocked",
       severity: "blocked",
     });
-    expect(section?.summary).toContain("attempt=blocked");
+    expect(section?.summary).toContain("attempt=unsupported");
     expect(viewModel?.terminalSuccessClaim).toBe(false);
     expect(JSON.stringify(viewModel)).not.toContain('"success":true');
   });

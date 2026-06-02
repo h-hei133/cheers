@@ -143,6 +143,85 @@ describe("model request boundary", () => {
     );
   });
 
+  it("distinguishes missing provider, missing model, missing auth, and unsupported model mode", () => {
+    const compatibility = unknownProviderCompatibilityFlags();
+    const registry = projectProviderRegistry({
+      providers: [{
+        providerId: "provider-a",
+        safeLabel: "Provider A",
+        providerKind: "custom",
+        endpointClass: "unknown",
+        authMode: "api-key",
+        defaultEnabled: false,
+        requiresExplicitOptIn: true,
+        supportsFallback: "unknown",
+        compatibility,
+        riskLevel: "low",
+      }],
+      models: [{
+        modelId: "model-a",
+        safeLabel: "Model A",
+        providerId: "provider-a",
+        family: "fixture",
+        compatibility: {
+          ...compatibility,
+          streaming: "unsupported",
+          toolCalls: "unsupported",
+        },
+        knownLimitations: [],
+      }],
+      auth: [{
+        providerId: "provider-a",
+        authSourceKind: "none",
+        authMode: "api-key",
+        resolutionStatus: "missing",
+      }],
+    });
+    const boundary = createModelRequestBoundary({
+      requestId: "request-provider-state",
+      providerId: "provider-a",
+      providerSafeLabel: "Provider A",
+      modelSafeLabel: "Model A",
+      providerReadinessStatus: "ready",
+      providerRegistry: registry,
+    });
+    const missingProvider = prepareNextTurnModelRequest({
+      nextTurnBundle: prepareNextTurnBundle({ bundleId: "bundle-missing-provider", turnId: "turn-a" }),
+      modelRequestBoundary: boundary,
+      providerRegistry: registry,
+      providerId: "missing-provider",
+    });
+    const missingModel = prepareNextTurnModelRequest({
+      nextTurnBundle: prepareNextTurnBundle({ bundleId: "bundle-missing-model", turnId: "turn-a" }),
+      modelRequestBoundary: boundary,
+      providerRegistry: registry,
+      providerId: "provider-a",
+      modelId: "missing-model",
+    });
+    const unsupported = prepareNextTurnModelRequest({
+      nextTurnBundle: prepareNextTurnBundle({ bundleId: "bundle-unsupported", turnId: "turn-a" }),
+      modelRequestBoundary: boundary,
+      providerRegistry: registry,
+      providerId: "provider-a",
+      modelId: "model-a",
+    });
+
+    expect(missingProvider.readinessStatus).toBe("unsupported");
+    expect(missingProvider.blockedReasons).toContain("provider-fact:provider-metadata-missing");
+    expect(missingModel.readinessStatus).toBe("unsupported");
+    expect(missingModel.blockedReasons).toContain("provider-fact:model-metadata-missing");
+    expect(unsupported.readinessStatus).toBe("unsupported");
+    expect(unsupported.providerMetadata.authReadiness).toBe("missing");
+    expect(unsupported.blockedReasons).toEqual(
+      expect.arrayContaining([
+        "provider-fact:auth-readiness:missing",
+        "provider-fact:unsupported-model-mode:streaming",
+        "provider-fact:unsupported-model-mode:tool-calls",
+      ]),
+    );
+    expect(JSON.stringify({ missingProvider, missingModel, unsupported })).not.toContain('"success":true');
+  });
+
   it("uses continuation readiness to block unsafe next-turn requests without success inflation", () => {
     const sessionProjection = projectSessionTree({
       session: {

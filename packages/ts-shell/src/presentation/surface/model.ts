@@ -469,19 +469,36 @@ function controlledInvocationEventSections(input: ProductSurfaceInput): ProductS
     event.type === "controlled-invocation-attempt-completed-as-provider-fact"
   );
   const handoff = events.find((event) => event.type === "provider-response-handoff-prepared");
+  const fallback = events.find((event) =>
+    event.type === "provider-fallback-blocked" ||
+    event.type === "provider-fallback-selected" ||
+    event.type === "provider-fallback-attempted" ||
+    event.type === "provider-fallback-failed" ||
+    event.type === "provider-fallback-completed-as-provider-fact"
+  );
 
   return [section({
     kind: "provider",
     title: "Controlled invocation",
-    severity: failed ? "error" : blocked ? "blocked" : completed ? "not_proven" : "info",
-    status: failed ? "failed" : blocked ? "blocked" : "observed",
+    severity: fallback?.type === "provider-fallback-failed"
+      ? "error"
+      : fallback?.type === "provider-fallback-blocked"
+        ? "blocked"
+        : failed ? "error" : blocked ? "blocked" : completed ? "not_proven" : "info",
+    status: fallback?.type === "provider-fallback-failed"
+      ? "failed"
+      : fallback?.type === "provider-fallback-blocked"
+        ? "blocked"
+        : failed ? "failed" : blocked ? "blocked" : "observed",
     summary: [
       `decision=${factValue(adapter.facts.attemptDecision)}`,
       `attempt=${factValue(adapter.facts.attemptStatus)}`,
-      `provider=${factValue(adapter.facts.providerSafeLabel)}`,
-      `model=${factValue(adapter.facts.modelSafeLabel)}`,
+      `fallbackStatus=${factValue(adapter.facts.fallbackStatus)}`,
       `fallbackAttempted=${factValue(adapter.facts.fallbackAttempted)}`,
       handoff ? `handoff=${factValue(handoff.facts.responseClassification)}` : undefined,
+      `provider=${factValue(adapter.facts.providerSafeLabel)}`,
+      `model=${factValue(adapter.facts.modelSafeLabel)}`,
+      fallback ? `fallbackNext=${factValue(fallback.facts.nextAction)}` : undefined,
       `failure=${factValue(adapter.facts.failureClass)}`,
       `retry=${factValue(adapter.facts.retryEligibility)}`,
       `fallback=${factValue(adapter.facts.fallbackEligibility)}`,
@@ -512,18 +529,44 @@ function controlledInvocationEventSections(input: ProductSurfaceInput): ProductS
             },
           ]
         : []),
+      ...(fallback
+        ? [
+            {
+              label: "fallbackDecision",
+              value: factValue(fallback.facts.decisionId),
+              machineEventCorrelationId: fallback.id,
+            },
+            {
+              label: "fallbackStatus",
+              value: factValue(fallback.facts.fallbackStatus),
+              machineEventCorrelationId: fallback.id,
+            },
+          ]
+        : []),
     ],
     redaction: adapter.redaction.status === "redacted" || handoff?.redaction.status === "redacted"
       ? "applied"
       : "none",
-    machineEventCorrelationIds: [adapter.id, blocked?.id, failed?.id, completed?.id, handoff?.id]
+    machineEventCorrelationIds: [
+      adapter.id,
+      blocked?.id,
+      failed?.id,
+      completed?.id,
+      handoff?.id,
+      fallback?.id,
+    ]
       .filter((id): id is string => Boolean(id)),
     notProvenClaims: events
       .filter((event) =>
         event.type === "controlled-invocation-adapter-observed" ||
         event.type === "controlled-invocation-attempt-completed-as-provider-fact" ||
         event.type === "controlled-invocation-attempt-failed-as-provider-fact" ||
-        event.type === "provider-response-handoff-prepared"
+        event.type === "provider-response-handoff-prepared" ||
+        event.type === "provider-fallback-blocked" ||
+        event.type === "provider-fallback-selected" ||
+        event.type === "provider-fallback-attempted" ||
+        event.type === "provider-fallback-failed" ||
+        event.type === "provider-fallback-completed-as-provider-fact"
       )
       .flatMap((event) => event.notProvenClaims),
   })];
@@ -547,11 +590,11 @@ function modelInvocationEventSections(input: ProductSurfaceInput): ProductSurfac
     status: blocked ? "blocked" : "observed",
     summary: [
       gate ? `eligibility=${factValue(gate.facts.eligibilityStatus)}` : undefined,
+      attempt ? `attempt=${factValue(attempt.facts.attemptStatus)}` : undefined,
       gate ? `provider=${factValue(gate.facts.providerSafeLabel)}` : undefined,
       gate ? `model=${factValue(gate.facts.modelSafeLabel)}` : undefined,
       gate ? `optIn=${factValue(gate.facts.optInState)}` : undefined,
       gate ? `auth=${factValue(gate.facts.authReadiness)}` : undefined,
-      attempt ? `attempt=${factValue(attempt.facts.attemptStatus)}` : undefined,
       attempt ? `retry=${factValue(attempt.facts.retryEligibility)}` : undefined,
       attempt ? `fallback=${factValue(attempt.facts.fallbackEligibility)}` : undefined,
       "terminalSuccessClaim=false",
@@ -812,6 +855,7 @@ function replayCarryForwardEventSections(input: ProductSurfaceInput): ProductSur
       `request=${factValue(summary.facts.requestReadinessStatus)}`,
       `toolOutcome=${factValue(summary.facts.toolOutcomeStatus)}`,
       `nextAction=${factValue(summary.facts.toolOutcomeNextAction)}`,
+      `provider=${factValue(summary.facts.providerInvocationStatus)}`,
       "terminalSuccessClaim=false",
     ].join("; "),
     facts: [
@@ -823,6 +867,16 @@ function replayCarryForwardEventSections(input: ProductSurfaceInput): ProductSur
       {
         label: "requestPreparation",
         value: factValue(summary.facts.requestPreparationId),
+        machineEventCorrelationId: summary.id,
+      },
+      {
+        label: "providerInvocations",
+        value: factValue(summary.facts.providerInvocationIds),
+        machineEventCorrelationId: summary.id,
+      },
+      {
+        label: "providerInvocationStatus",
+        value: factValue(summary.facts.providerInvocationStatus),
         machineEventCorrelationId: summary.id,
       },
       {

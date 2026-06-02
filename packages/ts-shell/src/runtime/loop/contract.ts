@@ -179,6 +179,7 @@ export interface AgentLoopContractInput {
   readonly workspaceRoot: string;
   readonly prompt: string;
   readonly providerOptIn: boolean;
+  readonly providerFallbackOptIn?: boolean;
   readonly providerMode?: "synthetic" | "real" | "default";
   readonly modelLabel?: string;
   readonly providerRegistry?: ProviderRegistryProjection;
@@ -194,6 +195,7 @@ export interface AgentLoopContractInput {
   ) => Promise<AgentLoopContractToolResultBatch>;
   readonly toolBatchDispatch?: ToolBatchDispatchSeam;
   readonly controlledModelInvocationExecutor?: ControlledModelInvocationExecutor;
+  readonly controlledModelFallbackExecutor?: ControlledModelInvocationExecutor;
   readonly executePreparedNextTurn?: boolean;
   readonly verificationReceipt?: ProductVerificationReceipt;
   readonly verificationRuntimeReceiptIds?: readonly string[];
@@ -808,6 +810,8 @@ export async function runAgentLoopContract(
           ? "controlled_provider_fetch"
           : "metadata_only",
         executor: input.controlledModelInvocationExecutor,
+        fallbackExecutor: input.controlledModelFallbackExecutor,
+        fallbackExplicitOptIn: input.providerFallbackOptIn,
         turnId: `${input.sessionId}:turn:${turn}:next`,
         signal: input.abortSignal,
       });

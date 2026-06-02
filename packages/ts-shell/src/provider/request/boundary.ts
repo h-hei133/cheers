@@ -87,6 +87,10 @@ export interface NextTurnRequestProviderMetadata {
   readonly authReadiness: "resolved" | "missing" | "expired" | "unsupported" | "unknown";
   readonly compatibilityFlags: readonly string[];
   readonly streamingCapability: string;
+  readonly fallbackProviderSafeLabel?: string;
+  readonly fallbackModelSafeLabel?: string;
+  readonly fallbackEligibleFailureClasses: readonly string[];
+  readonly fallbackIneligibleFailureClasses: readonly string[];
   readonly missingProviderFacts: readonly string[];
   readonly fallbackMetadata: readonly string[];
   readonly notProvenClaims: readonly string[];
@@ -240,17 +244,27 @@ export function prepareNextTurnModelRequest(input: {
   readonly notProvenClaims?: readonly string[];
 }): NextTurnModelRequestPreparation {
   const redactions = new Set<string>();
-  const provider = input.providerRegistry?.providers.find((candidate) =>
-    candidate.providerId === input.providerId ||
-    candidate.safeLabel === input.modelRequestBoundary.providerSafeLabel
-  ) ?? input.providerRegistry?.providers[0];
-  const model = input.providerRegistry?.models.find((candidate) =>
-    candidate.modelId === input.modelId ||
-    candidate.safeLabel === input.modelRequestBoundary.modelSafeLabel ||
-    candidate.providerId === provider?.providerId
-  );
+  const providerMatch = input.providerId
+    ? input.providerRegistry?.providers.find((candidate) => candidate.providerId === input.providerId)
+    : input.providerRegistry?.providers.find((candidate) =>
+      candidate.safeLabel === input.modelRequestBoundary.providerSafeLabel
+    );
+  const provider = providerMatch ?? (input.providerId ? undefined : input.providerRegistry?.providers[0]);
+  const modelMatch = input.modelId
+    ? input.providerRegistry?.models.find((candidate) => candidate.modelId === input.modelId)
+    : input.providerRegistry?.models.find((candidate) =>
+      candidate.safeLabel === input.modelRequestBoundary.modelSafeLabel ||
+      candidate.providerId === provider?.providerId
+    );
+  const model = modelMatch ?? (input.modelId ? undefined : input.providerRegistry?.models[0]);
   const auth = input.providerRegistry?.auth.find((candidate) =>
     candidate.providerId === provider?.providerId
+  );
+  const fallbackProvider = input.providerRegistry?.providers.find((candidate) =>
+    candidate.providerId === provider?.fallbackPolicy?.fallbackProviderId
+  );
+  const fallbackModel = input.providerRegistry?.models.find((candidate) =>
+    candidate.providerId === fallbackProvider?.providerId
   );
   const providerMetadata = createProviderMetadata({
     boundary: input.modelRequestBoundary,
@@ -258,6 +272,8 @@ export function prepareNextTurnModelRequest(input: {
     provider,
     model,
     auth,
+    fallbackProvider,
+    fallbackModel,
     redactions,
   });
   const safeMessages = createSafeRequestMessages({
@@ -289,6 +305,7 @@ export function prepareNextTurnModelRequest(input: {
   const blockedReasons = blockedRequestReasons({
     bundle: input.nextTurnBundle,
     boundary: input.modelRequestBoundary,
+    providerMetadata,
     excludedMessageIds,
     continuationBlockedReasons,
     redactionStatus: redactions.size > 0 || input.nextTurnBundle.redaction.status === "redacted"
@@ -383,6 +400,8 @@ function createProviderMetadata(input: {
   readonly provider?: ProviderRegistryProjection["providers"][number];
   readonly model?: ProviderRegistryProjection["models"][number];
   readonly auth?: ProviderRegistryProjection["auth"][number];
+  readonly fallbackProvider?: ProviderRegistryProjection["providers"][number];
+  readonly fallbackModel?: ProviderRegistryProjection["models"][number];
   readonly redactions: Set<string>;
 }): NextTurnRequestProviderMetadata {
   const compatibility = input.model?.compatibility ?? input.provider?.compatibility;
@@ -397,15 +416,33 @@ function createProviderMetadata(input: {
     : [];
   const fallback = input.provider?.fallbackPolicy
     ? [
+        ...(input.provider.fallbackPolicy.fallbackProviderId
+          ? [`fallbackProviderId:${input.provider.fallbackPolicy.fallbackProviderId}`]
+          : []),
         `executesFallback:${input.provider.fallbackPolicy.executesFallback}`,
         `requiresExplicitOptIn:${input.provider.fallbackPolicy.requiresExplicitOptIn}`,
         `retryRelation:${input.provider.fallbackPolicy.retryRelation}`,
+        `eligibleFailureClasses:${input.provider.fallbackPolicy.eligibleFailureClasses.join(",") || "none"}`,
+        `ineligibleFailureClasses:${input.provider.fallbackPolicy.ineligibleFailureClasses.join(",") || "none"}`,
+      ]
+    : [];
+  const unsupportedCompatibilityFacts = compatibility
+    ? [
+        ...(compatibility.streaming === "unsupported" ? ["unsupported-model-mode:streaming"] : []),
+        ...(compatibility.toolCalls === "unsupported" ? ["unsupported-model-mode:tool-calls"] : []),
+        ...(compatibility.strictMessageRoles === "unsupported"
+          ? ["unsupported-model-mode:message-roles"]
+          : []),
       ]
     : [];
   const missingProviderFacts = unique([
     ...(input.provider ? [] : ["provider-metadata-missing"]),
     ...(input.model ? [] : ["model-metadata-missing"]),
     ...(input.auth ? [] : ["auth-projection-missing"]),
+    ...(input.auth && input.auth.resolutionStatus !== "resolved"
+      ? [`auth-readiness:${input.auth.resolutionStatus}`]
+      : []),
+    ...unsupportedCompatibilityFacts,
     ...(input.boundary.providerReadinessStatus === "ready" ? [] : [
       `provider-readiness:${input.boundary.providerReadinessStatus}`,
     ]),
@@ -424,6 +461,22 @@ function createProviderMetadata(input: {
     authReadiness: input.auth?.resolutionStatus ?? "unknown",
     compatibilityFlags: Object.freeze(flags.map((value) => sanitizeText(value, input.redactions))),
     streamingCapability: sanitizeText(compatibility?.streaming ?? "unknown", input.redactions),
+    ...(input.fallbackProvider
+      ? { fallbackProviderSafeLabel: sanitizeText(input.fallbackProvider.safeLabel, input.redactions) }
+      : {}),
+    ...(input.fallbackModel
+      ? { fallbackModelSafeLabel: sanitizeText(input.fallbackModel.safeLabel, input.redactions) }
+      : {}),
+    fallbackEligibleFailureClasses: Object.freeze(
+      (input.provider?.fallbackPolicy?.eligibleFailureClasses ?? []).map((value) =>
+        sanitizeText(value, input.redactions)
+      ),
+    ),
+    fallbackIneligibleFailureClasses: Object.freeze(
+      (input.provider?.fallbackPolicy?.ineligibleFailureClasses ?? []).map((value) =>
+        sanitizeText(value, input.redactions)
+      ),
+    ),
     missingProviderFacts: Object.freeze(missingProviderFacts),
     fallbackMetadata: Object.freeze(fallback.map((value) => sanitizeText(value, input.redactions))),
     notProvenClaims: unique([
@@ -513,15 +566,27 @@ function requestReadiness(input: {
     input.boundary.providerReadinessStatus === "blocked") {
     return "blocked_by_provider_unavailable";
   }
-  if (input.blockedReasons.some((reason) => reason.startsWith("continuation:"))) {
-    return "blocked_by_missing_context";
-  }
   if (
     input.bundle.redaction.status === "redacted" &&
     input.bundle.includedToolResultMessageIds.length === 0 &&
     input.excludedMessageIds.length > 0
   ) {
     return "blocked_by_redaction";
+  }
+  if (
+    input.providerMetadata.missingProviderFacts.some((fact) =>
+      fact === "provider-metadata-missing" ||
+      fact === "model-metadata-missing" ||
+      fact.startsWith("unsupported-model-mode:")
+    )
+  ) {
+    return "unsupported";
+  }
+  if (input.providerMetadata.authReadiness !== "resolved") {
+    return "blocked_by_provider_unavailable";
+  }
+  if (input.blockedReasons.some((reason) => reason.startsWith("continuation:"))) {
+    return "blocked_by_missing_context";
   }
   switch (input.bundle.readinessStatus) {
     case "ready":
@@ -549,6 +614,7 @@ function requestReadiness(input: {
 function blockedRequestReasons(input: {
   readonly bundle: NextTurnBundleProjection;
   readonly boundary: ModelRequestBoundary;
+  readonly providerMetadata: NextTurnRequestProviderMetadata;
   readonly excludedMessageIds: readonly string[];
   readonly continuationBlockedReasons?: readonly string[];
   readonly redactionStatus: "report-safe" | "redacted";
@@ -557,6 +623,11 @@ function blockedRequestReasons(input: {
     ...input.bundle.blockingFacts,
     ...input.boundary.missingRequiredFacts.map((fact) => `missing-context:${fact}`),
     ...(input.continuationBlockedReasons ?? []),
+    ...input.boundary.missingOptionalFacts.map((fact) => `missing-optional:${fact}`),
+    ...input.boundary.notProvenClaims
+      .filter((fact) => fact.includes("provider") || fact.includes("model"))
+      .map((fact) => `request-fact:${fact}`),
+    ...input.providerMetadata.missingProviderFacts.map((fact) => `provider-fact:${fact}`),
     ...(input.boundary.providerReadinessStatus === "missing" ||
         input.boundary.providerReadinessStatus === "blocked"
       ? [`provider-readiness:${input.boundary.providerReadinessStatus}`]
