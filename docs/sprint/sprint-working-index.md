@@ -19,6 +19,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp006-complete-provider-model-runtime.md` | completed route input | Controlled provider/model runtime boundary objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp007-complete-session-branch-compaction-runtime.md` | completed route input | Storage-backed session branch and compaction runtime objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp008-complete-host-contract-and-evaluation-runtime.md` | completed route input | Host command contract and deterministic evaluation runtime objective now reflected in current capability and priority docs. |
+| `docs/sprint/route/sp009-real-provider-compatibility-and-evaluation-hardening.md` | completed route input | Provider compatibility and evaluation hardening objective now reflected in current capability and priority docs. |
 
 ## Removed Or Merged Content
 

@@ -12,10 +12,11 @@ completion.
   provider-to-tool-to-next-turn runtime lane, a controlled provider/model
   runtime boundary, a controlled mutation recovery lane, and a storage-backed
   branch/compaction runtime lane are consolidated. The in-process host command
-  contract and deterministic evaluation runtime are now proven for controlled
-  local lanes, while broad real-provider compatibility, live provider defaults,
-  SDK/RPC servers, broad parallel mutation, broad interactive branch navigation
-  UX, and dynamic execution areas remain unproven.
+  contract, deterministic evaluation runtime, and controlled provider
+  compatibility/evaluation hardening are now proven for local synthetic and
+  injected lanes, while live provider defaults, broad auth refresh, SDK/RPC
+  servers, broad parallel mutation, broad interactive branch navigation UX, and
+  dynamic execution areas remain unproven.
 - CLI/session UX now has a structured status envelope for product-loop truth and
   branch/compaction runtime facts, but full queue ergonomics, broad interactive
   branch navigation, compact/resume controls, and broader session management
@@ -27,10 +28,11 @@ completion.
   request preparation, events, replay, product surface, and CLI/session status.
   Broad interactive navigation commands and SDK/RPC host contracts remain
   unproven.
-- Provider/model compatibility, auth readiness, invocation gating, response
-  normalization, fallback decision/attempt facts, replay, surface, and status
-  are proven for the controlled runtime lane. Live execution remains explicit
-  opt-in and broad real-provider compatibility is still unproven.
+- Provider/model compatibility matrix facts, config/auth readiness, invocation
+  gating, response normalization, failure taxonomy, fallback
+  decision/attempt/failure facts, replay, surface, CLI/session status, and host
+  evaluation outcomes are proven for controlled synthetic and injected lanes.
+  Live execution remains explicit opt-in and default-off.
 - Extension/package support is governance-only; dynamic execution is absent by
   design.
 - Tool execution has policy/receipt/outcome boundaries, and bounded mutation
@@ -218,6 +220,43 @@ completion.
   dynamic loading, external tool servers, browser automation, command allowlist
   expansion, arbitrary writers, broad parallel mutation, and terminal-text APIs
   remain out of scope.
+
+### Completed Batch: Provider Compatibility And Evaluation Hardening
+
+- Proven result: provider registry now projects explicit compatibility matrix
+  and readiness facts for provider/model pairs. Request preparation consumes
+  compatibility, config readiness, auth readiness, unsupported modes, redaction,
+  and opt-in facts before invocation. Controlled synthetic or injected provider
+  execution remains the default validation lane; optional live behavior remains
+  skipped unless an explicit external gate is selected.
+- User-facing value: host evaluation can exercise compatibility happy,
+  readiness blocked, fallback completed, fallback failed, redaction, skipped
+  live gate, unsupported provider mode, and missing-proof lanes without terminal
+  scraping or live credentials. Evaluation results can now report passed,
+  failed, blocked, unsupported, skipped, and not-proven.
+- Owner domains: `provider/registry`, `provider/request`,
+  `provider/response`, `runtime/api`, `runtime/evaluation`, `runtime/events`,
+  `runtime/loop`, `session/replay`, `session/presentation`, `presentation`,
+  `core/shell`, `evidence`, and `result`.
+- Evidence: `packages/ts-shell/src/provider/registry/provider.test.ts`,
+  `packages/ts-shell/src/provider/request/boundary.test.ts`,
+  `packages/ts-shell/src/provider/request/invocation.test.ts`,
+  `packages/ts-shell/src/provider/request/attempt.test.ts`,
+  `packages/ts-shell/src/provider/request/fallback.test.ts`,
+  `packages/ts-shell/src/provider/response/adapter.test.ts`,
+  `packages/ts-shell/src/runtime/api/host/runtime.test.ts`,
+  `packages/ts-shell/src/runtime/events/projection.test.ts`,
+  `packages/ts-shell/src/session/replay/state.test.ts`,
+  `packages/ts-shell/src/session/presentation/envelope.test.ts`,
+  `packages/ts-shell/src/presentation/surface/model.test.ts`, and the focused
+  evidence/result truth tests.
+- Boundary: compatibility, readiness, invocation eligibility, response
+  normalization, fallback, evaluation execution, events, replay, surface, and
+  CLI/session status remain provider/control facts, not task success. Terminal
+  truth remains owned by `evidence`/`result`. Live provider execution is not
+  required for completion and remains default-off; broad SDK/RPC servers,
+  dynamic execution, browser automation, external tool servers, and broad
+  parallel mutation remain unproven.
 
 ## Medium-Term Runtime Capability Batches
 

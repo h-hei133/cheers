@@ -747,6 +747,8 @@ function statusForFailureClass(failureClass: ProviderFailureClass): ControlledIn
   switch (failureClass) {
     case "provider_cancelled":
       return "cancelled";
+    case "provider_safety_block":
+    case "provider_response_malformed":
     case "provider_output_invalid":
     case "provider_stream_event_malformed":
     case "provider_stream_protocol_error":
@@ -756,6 +758,8 @@ function statusForFailureClass(failureClass: ProviderFailureClass): ControlledIn
     case "provider_redaction_failure":
       return "redaction_failed";
     case "provider_config":
+    case "provider_config_invalid":
+    case "provider_config_unsafe":
     case "provider_auth":
     case "provider_network":
     case "provider_endpoint":

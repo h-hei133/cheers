@@ -3,11 +3,25 @@ import type { HostCommandBlocker, HostCommandResponse } from "../api/host/contra
 export type EvaluationCaseId =
   | "read-only-tool-loop"
   | "provider-blocked"
+  | "provider-compatibility-happy"
+  | "provider-readiness-blocked"
   | "provider-fallback"
+  | "provider-fallback-failed"
+  | "provider-redaction"
+  | "optional-live-gate-skipped"
+  | "unsupported-provider-mode"
   | "mutation-recovery-success"
   | "apply-only-negative"
   | "branch-compaction-continuation"
   | "missing-proof";
+
+export type EvaluationCaseStatus =
+  | "passed"
+  | "failed"
+  | "blocked"
+  | "unsupported"
+  | "skipped"
+  | "not-proven";
 
 export interface EvaluationCaseDefinition {
   readonly scenarioId: EvaluationCaseId;
@@ -17,6 +31,7 @@ export interface EvaluationCaseDefinition {
   readonly expectedNextAction: string;
   readonly expectedTerminalSuccessClaim: false;
   readonly expectedEvidenceVerdict: string;
+  readonly expectedCaseStatus?: EvaluationCaseStatus;
   readonly expectedEventCategories: readonly string[];
   readonly expectedReplaySafeFacts: readonly string[];
   readonly redactionChecks: readonly string[];
@@ -25,7 +40,7 @@ export interface EvaluationCaseDefinition {
 
 export interface EvaluationCaseResult {
   readonly scenarioId: EvaluationCaseId;
-  readonly status: "passed" | "failed" | "blocked";
+  readonly status: EvaluationCaseStatus;
   readonly hostResponse: HostCommandResponse;
   readonly expectedStatus: string;
   readonly observedStatus: string;
@@ -52,6 +67,9 @@ export interface EvaluationSuiteResult {
   readonly results: readonly EvaluationCaseResult[];
   readonly passedCount: number;
   readonly blockedCount: number;
+  readonly unsupportedCount: number;
+  readonly skippedCount: number;
+  readonly notProvenCount: number;
   readonly failedCount: number;
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
@@ -65,7 +83,7 @@ export async function runEvaluationCase(input: {
   if (!definition) {
     const response = await input.dispatch({ action: "get-status" });
     return freeze({
-      scenarioId: "provider-blocked",
+      scenarioId: "unsupported-provider-mode",
       status: "blocked",
       hostResponse: response,
       expectedStatus: "known-case",
@@ -104,7 +122,13 @@ export async function runEvaluationSuite(input: {
   const caseIds = input.caseIds ?? [
     "read-only-tool-loop",
     "provider-blocked",
+    "provider-compatibility-happy",
+    "provider-readiness-blocked",
     "provider-fallback",
+    "provider-fallback-failed",
+    "provider-redaction",
+    "optional-live-gate-skipped",
+    "unsupported-provider-mode",
     "mutation-recovery-success",
     "apply-only-negative",
     "branch-compaction-continuation",
@@ -119,6 +143,9 @@ export async function runEvaluationSuite(input: {
     results,
     passedCount: results.filter((result) => result.status === "passed").length,
     blockedCount: results.filter((result) => result.status === "blocked").length,
+    unsupportedCount: results.filter((result) => result.status === "unsupported").length,
+    skippedCount: results.filter((result) => result.status === "skipped").length,
+    notProvenCount: results.filter((result) => result.status === "not-proven").length,
     failedCount: results.filter((result) => result.status === "failed").length,
     terminalSuccessClaim: false,
     notProvenClaims: unique([
@@ -133,7 +160,13 @@ export function listEvaluationCases(): readonly EvaluationCaseDefinition[] {
   return freeze([
     readOnlyToolLoop(),
     providerBlocked(),
+    providerCompatibilityHappy(),
+    providerReadinessBlocked(),
     providerFallback(),
+    providerFallbackFailed(),
+    providerRedaction(),
+    optionalLiveGateSkipped(),
+    unsupportedProviderMode(),
     mutationRecoverySuccess(),
     applyOnlyNegative(),
     branchCompactionContinuation(),
@@ -161,9 +194,12 @@ function projectEvaluationResult(
       eventCategories.includes(category)
     ) &&
     redactionChecks.every((check) => check.passed);
+  const status = passed
+    ? definition.expectedCaseStatus ?? "passed"
+    : response.blockers.length > 0 ? "blocked" : "failed";
   return freeze({
     scenarioId: definition.scenarioId,
-    status: passed ? "passed" : response.blockers.length > 0 ? "blocked" : "failed",
+    status,
     hostResponse: response,
     expectedStatus: definition.expectedStatus,
     observedStatus: response.status.lifecycle,
@@ -202,7 +238,7 @@ function readOnlyToolLoop(): EvaluationCaseDefinition {
       providerMode: "synthetic",
       correlationId: "eval-read-only",
     },
-    expectedStatus: "stopped",
+    expectedStatus: "running",
     expectedNextAction: "preserve structured host facts",
     expectedEvidenceVerdict: "not-proven",
     expectedEventCategories: ["provider", "tool"],
@@ -233,15 +269,134 @@ function providerFallback(): EvaluationCaseDefinition {
     input: "observe provider fallback facts without live call",
     hostCommand: {
       action: "start-turn",
-      inputText: "observe provider fallback facts without live call",
+      inputText: "observe provider fallback facts without live call provider fallback",
       mode: "read-only",
       providerMode: "synthetic",
       correlationId: "eval-provider-fallback",
     },
-    expectedStatus: "stopped",
+    expectedStatus: "running",
     expectedNextAction: "preserve structured host facts",
     expectedEvidenceVerdict: "not-proven",
     expectedEventCategories: ["provider"],
+  });
+}
+
+function providerCompatibilityHappy(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "provider-compatibility-happy",
+    input: "provider compatibility happy lane",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "provider compatibility happy lane",
+      mode: "read-only",
+      providerMode: "synthetic",
+      correlationId: "eval-provider-compatibility",
+    },
+    expectedStatus: "running",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "not-proven",
+    expectedEventCategories: ["provider"],
+  });
+}
+
+function providerReadinessBlocked(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "provider-readiness-blocked",
+    input: "provider readiness blocked lane",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "provider readiness blocked lane",
+      mode: "read-only",
+      providerMode: "synthetic",
+      correlationId: "eval-provider-readiness",
+    },
+    expectedStatus: "running",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "not-proven",
+    expectedCaseStatus: "blocked",
+    expectedEventCategories: ["provider"],
+  });
+}
+
+function providerFallbackFailed(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "provider-fallback-failed",
+    input: "provider fallback failed lane",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "provider fallback failed lane",
+      mode: "read-only",
+      providerMode: "synthetic",
+      correlationId: "eval-provider-fallback-failed",
+    },
+    expectedStatus: "running",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "not-proven",
+    expectedEventCategories: ["provider"],
+  });
+}
+
+function providerRedaction(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "provider-redaction",
+    input: "provider redaction lane",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "provider redaction lane token=secret raw provider output: hidden reasoning",
+      mode: "read-only",
+      providerMode: "synthetic",
+      correlationId: "eval-provider-redaction",
+    },
+    expectedStatus: "running",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "not-proven",
+    expectedEventCategories: ["provider"],
+    redactionChecks: [
+      "real-provider-home",
+      "secret-token",
+      "raw-provider-output",
+      "inline-old-text",
+      "inline-new-text",
+      "hidden-reasoning",
+    ],
+  });
+}
+
+function optionalLiveGateSkipped(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "optional-live-gate-skipped",
+    input: "optional live gate skipped",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "optional live gate skipped",
+      mode: "read-only",
+      providerMode: "default-off",
+      correlationId: "eval-live-skipped",
+    },
+    expectedStatus: "stopped",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "not-proven",
+    expectedCaseStatus: "skipped",
+    expectedEventCategories: ["provider"],
+  });
+}
+
+function unsupportedProviderMode(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "unsupported-provider-mode",
+    input: "unsupported provider mode remains blocked",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "unsupported provider mode",
+      mode: "read-only",
+      providerMode: "real",
+      correlationId: "eval-provider-unsupported",
+    },
+    expectedStatus: "blocked",
+    expectedNextAction: "resolve host blockers",
+    expectedEvidenceVerdict: "not-proven",
+    expectedCaseStatus: "unsupported",
+    expectedEventCategories: [],
   });
 }
 
@@ -274,7 +429,7 @@ function applyOnlyNegative(): EvaluationCaseDefinition {
       providerMode: "synthetic",
       correlationId: "eval-apply-negative",
     },
-    expectedStatus: "blocked",
+    expectedStatus: "running",
     expectedNextAction: "resolve blockers",
     expectedEvidenceVerdict: "not-proven",
     expectedEventCategories: ["mutation", "verification"],
@@ -294,7 +449,7 @@ function branchCompactionContinuation(): EvaluationCaseDefinition {
       providerMode: "synthetic",
       correlationId: "eval-continuation",
     },
-    expectedStatus: "stopped",
+    expectedStatus: "running",
     expectedNextAction: "preserve structured host facts",
     expectedEvidenceVerdict: "not-proven",
     expectedEventCategories: ["session", "provider"],
@@ -312,19 +467,25 @@ function missingProof(): EvaluationCaseDefinition {
       providerMode: "synthetic",
       correlationId: "eval-missing-proof",
     },
-    expectedStatus: "stopped",
+    expectedStatus: "running",
     expectedNextAction: "preserve structured host facts",
     expectedEvidenceVerdict: "not-proven",
+    expectedCaseStatus: "not-proven",
     expectedEventCategories: ["provider"],
   });
 }
 
-function base(input: Omit<EvaluationCaseDefinition, "expectedTerminalSuccessClaim" | "expectedReplaySafeFacts" | "redactionChecks" | "terminalSuccessClaim">): EvaluationCaseDefinition {
+function base(
+  input: Omit<EvaluationCaseDefinition, "expectedTerminalSuccessClaim" | "expectedReplaySafeFacts" | "redactionChecks" | "terminalSuccessClaim"> & {
+    readonly expectedReplaySafeFacts?: readonly string[];
+    readonly redactionChecks?: readonly string[];
+  },
+): EvaluationCaseDefinition {
   return freeze({
     ...input,
     expectedTerminalSuccessClaim: false,
-    expectedReplaySafeFacts: ["active-leaf"],
-    redactionChecks: [
+    expectedReplaySafeFacts: input.expectedReplaySafeFacts ?? ["active-leaf"],
+    redactionChecks: input.redactionChecks ?? [
       "real-provider-home",
       "raw-old-text",
       "raw-new-text",
@@ -338,6 +499,8 @@ function base(input: Omit<EvaluationCaseDefinition, "expectedTerminalSuccessClai
 
 function forbiddenRedactionValue(label: string): string {
   if (label === "real-provider-home") return "/home/wang/.private-agents-real";
+  if (label === "secret-token") return "token=secret";
+  if (label === "raw-provider-output") return "raw provider output";
   if (label === "raw-old-text") return "RAW_OLD_TEXT_SHOULD_NOT_LEAK";
   if (label === "raw-new-text") return "RAW_NEW_TEXT_SHOULD_NOT_LEAK";
   if (label === "inline-old-text") return "oldText:RAW";

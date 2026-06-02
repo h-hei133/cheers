@@ -242,6 +242,42 @@ describe("controlled model invocation adapter", () => {
     expect(adapter.fallbackResponseHandoff).toBeUndefined();
   });
 
+  it("keeps fallback failure distinct from primary failure and task success", async () => {
+    const preparation = fallbackReadyPreparation();
+    const gate = createModelInvocationGate({
+      requestPreparation: preparation,
+      explicitOptIn: { state: "present", sourceSafeLabel: "approved-safe-label" },
+    });
+
+    const adapter = await runControlledModelInvocationAdapter({
+      gate,
+      requestPreparation: preparation,
+      invocationMode: "controlled_provider_fetch",
+      fallbackExplicitOptIn: true,
+      executor: () => {
+        throw new Error("network unreachable");
+      },
+      fallbackExecutor: () => {
+        throw new Error("timeout");
+      },
+    });
+
+    expect(adapter.outcome).toMatchObject({
+      status: "failed",
+      failureClass: "provider_network",
+      fallbackAttempted: true,
+      fallbackStatus: "fallback_failed",
+      terminalSuccessClaim: false,
+    });
+    expect(adapter.fallbackDecision).toMatchObject({
+      status: "fallback_failed",
+      nextAction: "fail",
+      terminalSuccessClaim: false,
+    });
+    expect(adapter.fallbackResponseHandoff).toBeUndefined();
+    expect(adapter.notProvenClaims).toContain("terminal-success");
+  });
+
   it("redacts unsafe facts from controlled invocation reports", async () => {
     const preparation = readyPreparation({
       taskSummary:

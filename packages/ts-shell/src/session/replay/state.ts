@@ -31,6 +31,16 @@ export interface ReplaySafeLoopStateSummary {
   readonly requestPreparationId?: string;
   readonly requestReadinessStatus?: string;
   readonly requestBlockedReasons: readonly string[];
+  readonly providerRequestFacts?: {
+    readonly providerSafeLabel: string;
+    readonly modelSafeLabel: string;
+    readonly configReadiness: string;
+    readonly authReadiness: string;
+    readonly compatibilityState: string;
+    readonly supportedModes: readonly string[];
+    readonly knownUnsupportedStates: readonly string[];
+    readonly terminalSuccessClaim: false;
+  };
   readonly providerInvocationIds: readonly string[];
   readonly providerInvocationStatus?: {
     readonly gateId: string;
@@ -182,6 +192,20 @@ export function summarizeReplaySafeLoopState(input: {
         }
       : {}),
     requestBlockedReasons: input.requestPreparation?.blockedReasons ?? [],
+    ...(input.requestPreparation
+      ? {
+          providerRequestFacts: {
+            providerSafeLabel: input.requestPreparation.providerMetadata.providerSafeLabel,
+            modelSafeLabel: input.requestPreparation.providerMetadata.modelSafeLabel,
+            configReadiness: input.requestPreparation.providerMetadata.configReadiness,
+            authReadiness: input.requestPreparation.providerMetadata.authReadiness,
+            compatibilityState: input.requestPreparation.providerMetadata.compatibilityState,
+            supportedModes: input.requestPreparation.providerMetadata.supportedModes,
+            knownUnsupportedStates: input.requestPreparation.providerMetadata.knownUnsupportedStates,
+            terminalSuccessClaim: false,
+          },
+        }
+      : {}),
     providerInvocationIds: controlledInvocations.map((item) => item.adapterId),
     ...(latestInvocation
       ? {

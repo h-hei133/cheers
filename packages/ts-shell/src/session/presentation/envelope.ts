@@ -53,7 +53,10 @@ export function projectSessionStatusEnvelope(
   const verdict = firstSection(viewModel, "verdict");
   const request = findSection(viewModel, "Request preparation");
   const providerModel = findSection(viewModel, "Controlled invocation") ??
-    findSection(viewModel, "Invocation gate");
+    findSection(viewModel, "Response cycle") ??
+    findSection(viewModel, "Provider stream adapter") ??
+    findSection(viewModel, "Invocation gate") ??
+    findSection(viewModel, "Provider");
   const replay = findSection(viewModel, "Replay carry forward");
   const session = findSection(viewModel, "Session");
   const toolOutcome = findSection(viewModel, "Tool outcome");

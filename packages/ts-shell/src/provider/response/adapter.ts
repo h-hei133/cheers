@@ -160,7 +160,7 @@ function completedResponseToStreamEvents(input: {
     events.push({
       eventId: `${input.responseId}:invalid`,
       kind: "output_invalid",
-      failureClass: "provider_output_invalid",
+      failureClass: "provider_safety_block",
       fallbackEligible: false,
       ...base,
     });
@@ -222,7 +222,7 @@ function normalizedStreamEventToProviderEvent(input: {
         return {
           ...base,
           kind: "output_invalid",
-          failureClass: "provider_output_invalid",
+          failureClass: "provider_safety_block",
           fallbackEligible: false,
         };
       }

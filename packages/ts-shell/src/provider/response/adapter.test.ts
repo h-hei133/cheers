@@ -79,4 +79,21 @@ describe("provider fetch outcome stream adapter", () => {
       retry: "not_allowed",
     });
   });
+
+  it("classifies content filtering as a safety block without raw output exposure", async () => {
+    const events = await providerFetchOutcomeToStreamEvents({
+      requestId: "request-safety",
+      responseId: "response-safety",
+      outcome: {
+        kind: "completed",
+        response: { content: "safe summary only", finishReason: "content_filter" },
+      },
+    });
+
+    expect(events.at(-1)).toMatchObject({
+      kind: "output_invalid",
+      failureClass: "provider_safety_block",
+      fallbackEligible: false,
+    });
+  });
 });

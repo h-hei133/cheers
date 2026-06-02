@@ -140,13 +140,23 @@ describe("host command runtime", () => {
     expect(suite.results.map((result) => result.scenarioId)).toEqual([
       "read-only-tool-loop",
       "provider-blocked",
+      "provider-compatibility-happy",
+      "provider-readiness-blocked",
       "provider-fallback",
+      "provider-fallback-failed",
+      "provider-redaction",
+      "optional-live-gate-skipped",
+      "unsupported-provider-mode",
       "mutation-recovery-success",
       "apply-only-negative",
       "branch-compaction-continuation",
       "missing-proof",
     ]);
-    expect(suite.results.length).toBe(7);
+    expect(suite.results.length).toBe(13);
+    expect(suite.blockedCount).toBeGreaterThanOrEqual(1);
+    expect(suite.unsupportedCount).toBeGreaterThanOrEqual(1);
+    expect(suite.skippedCount).toBeGreaterThanOrEqual(1);
+    expect(suite.notProvenCount).toBeGreaterThanOrEqual(1);
     expect(suite.results.every((result) => result.terminalSuccessClaim === false)).toBe(true);
     expect(suite.results.every((result) => result.redactionChecks.every((check) => check.passed))).toBe(true);
     expect(suite.results.find((result) => result.scenarioId === "mutation-recovery-success")?.observedEvidenceVerdict).toBe("complete");
@@ -156,6 +166,25 @@ describe("host command runtime", () => {
         .find((result) => result.scenarioId === "provider-fallback")
         ?.hostResponse.events.map((event) => event.eventType),
     ).toContain("provider-fallback-completed-as-provider-fact");
+    expect(
+      suite.results
+        .find((result) => result.scenarioId === "provider-readiness-blocked")
+        ?.hostResponse.events.map((event) => event.eventType),
+    ).toContain("model-invocation-blocked");
+    expect(
+      suite.results
+        .find((result) => result.scenarioId === "provider-fallback-failed")
+        ?.hostResponse.events.map((event) => event.eventType),
+    ).toContain("provider-fallback-failed");
+    expect(
+      suite.results
+        .find((result) => result.scenarioId === "provider-redaction")
+        ?.hostResponse.details.replayFacts,
+    ).toMatchObject({
+      providerRequestFacts: {
+        terminalSuccessClaim: false,
+      },
+    });
     expect(JSON.stringify(suite)).not.toMatch(
       /private-agents-real|RAW_OLD_TEXT_SHOULD_NOT_LEAK|RAW_NEW_TEXT_SHOULD_NOT_LEAK|oldText:RAW|newText:RAW|hidden reasoning/i,
     );
@@ -199,10 +228,32 @@ describe("host command runtime", () => {
       "status snapshot",
       "session head listing",
       "provider blocked",
+      "provider compatibility supported",
+      "provider compatibility unsupported",
+      "missing provider config",
+      "invalid provider config",
+      "missing auth",
+      "auth redacted present",
+      "explicit opt-in required",
+      "live opt-in blocked",
       "synthetic provider streaming",
+      "injected controlled execution",
+      "optional live gate skipped",
+      "response normalized",
+      "malformed response",
+      "network or timeout failure",
+      "rate limit failure",
+      "safety block",
+      "fallback eligible",
+      "fallback blocked",
+      "fallback failed",
       "tool result next turn",
       "mutation recovery complete",
       "apply-only non-success",
+      "evaluation case passed",
+      "evaluation case blocked",
+      "evaluation case unsupported",
+      "evaluation case skipped",
       "branch and compaction continuation",
       "missing proof",
       "cancellation or stop requested",
@@ -211,7 +262,7 @@ describe("host command runtime", () => {
       "evidence/result-only complete proof",
     ]);
 
-    expect(coveredStates.size).toBeGreaterThanOrEqual(17);
+    expect(coveredStates.size).toBeGreaterThanOrEqual(24);
     expect(complete.details.truth).toMatchObject({
       completeProof: true,
       evidenceStatus: "complete",

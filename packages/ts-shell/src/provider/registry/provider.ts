@@ -4,12 +4,16 @@ export type ProviderCapabilityState = "supported" | "unsupported" | "unknown";
 
 export type ProviderFailureClass =
   | "provider_config"
+  | "provider_config_invalid"
+  | "provider_config_unsafe"
   | "provider_auth"
   | "provider_network"
   | "provider_endpoint"
   | "provider_rate_limited"
   | "provider_timeout"
   | "provider_cancelled"
+  | "provider_response_malformed"
+  | "provider_safety_block"
   | "provider_stream_protocol_error"
   | "provider_stream_event_malformed"
   | "provider_output_invalid"
@@ -32,6 +36,62 @@ export interface ProviderCompatibilityFlags {
   readonly openAICompatibleShape: ProviderCapabilityState;
   readonly customHeaders: ProviderCapabilityState;
   readonly providerSpecificQuirks: readonly string[];
+  readonly notProvenClaims: readonly string[];
+}
+
+export type ProviderSupportedMode =
+  | "synthetic"
+  | "injected"
+  | "live-opt-in"
+  | "streaming"
+  | "tool-calls"
+  | "structured-output";
+
+export type ProviderCompatibilityState =
+  | "supported"
+  | "unsupported"
+  | "not-proven";
+
+export interface ProviderCompatibilityMatrixEntry {
+  readonly providerId: string;
+  readonly modelId?: string;
+  readonly providerSafeLabel: string;
+  readonly modelSafeLabel?: string;
+  readonly state: ProviderCompatibilityState;
+  readonly supportedModes: readonly ProviderSupportedMode[];
+  readonly streamingSupport: ProviderCapabilityState;
+  readonly toolCallSupport: ProviderCapabilityState;
+  readonly structuredOutputSupport: ProviderCapabilityState;
+  readonly authRequirement: ProviderDescriptor["authMode"];
+  readonly optInRequirement: "required";
+  readonly fallbackEligibility: ProviderCapabilityState;
+  readonly knownUnsupportedStates: readonly string[];
+  readonly redaction: ProviderRegistryRedaction;
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims: readonly string[];
+}
+
+export type ProviderConfigReadinessState =
+  | "ready"
+  | "missing-config"
+  | "invalid-config"
+  | "missing-auth"
+  | "auth-redacted-present"
+  | "unsafe-config"
+  | "unsupported-provider"
+  | "unsupported-model"
+  | "unsupported-mode"
+  | "opt-in-required"
+  | "unknown";
+
+export interface ProviderReadinessMatrixEntry {
+  readonly providerId: string;
+  readonly modelId?: string;
+  readonly configState: ProviderConfigReadinessState;
+  readonly authState: ProviderRequestAuthProjection["resolutionStatus"] | "redacted-present";
+  readonly blockers: readonly string[];
+  readonly redaction: ProviderRegistryRedaction;
+  readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
 }
 
@@ -94,6 +154,8 @@ export interface ProviderRegistryProjection {
   readonly providers: readonly ProviderDescriptor[];
   readonly models: readonly ModelDescriptor[];
   readonly auth: readonly ProviderRequestAuthProjection[];
+  readonly compatibilityMatrix: readonly ProviderCompatibilityMatrixEntry[];
+  readonly readinessMatrix: readonly ProviderReadinessMatrixEntry[];
   readonly fallbackPolicies: readonly ProviderFallbackPolicyMetadata[];
   readonly failureTaxonomy: readonly ProviderFailureClass[];
   readonly resourceDescriptors: readonly StaticResourceDescriptor[];
@@ -115,12 +177,16 @@ export interface ProviderRegistryInput {
 
 export const PROVIDER_FAILURE_TAXONOMY: readonly ProviderFailureClass[] = Object.freeze([
   "provider_config",
+  "provider_config_invalid",
+  "provider_config_unsafe",
   "provider_auth",
   "provider_network",
   "provider_endpoint",
   "provider_rate_limited",
   "provider_timeout",
   "provider_cancelled",
+  "provider_response_malformed",
+  "provider_safety_block",
   "provider_stream_protocol_error",
   "provider_stream_event_malformed",
   "provider_output_invalid",
@@ -188,6 +254,12 @@ export function classifyProviderFailure(input: {
 }): ProviderFailureClass {
   if (input.routeBug) return "provider_route_error";
   if (input.redactionFailed) return "provider_redaction_failure";
+  if (/safety|content filter|content_filter/i.test(input.message ?? "")) {
+    return "provider_safety_block";
+  }
+  if (/malformed response|invalid response json|response schema/i.test(input.message ?? "")) {
+    return "provider_response_malformed";
+  }
   if (input.malformedStreamEvent) return "provider_stream_event_malformed";
   if (input.streamProtocolError) return "provider_stream_protocol_error";
   if (input.cancelled) return "provider_cancelled";
@@ -229,6 +301,8 @@ export function projectProviderRegistry(
   const auth = (input.auth ?? []).map((authProjection) =>
     sanitizeAuthProjection(authProjection, redactions),
   );
+  const compatibilityMatrix = createCompatibilityMatrix({ providers, models, redactions });
+  const readinessMatrix = createReadinessMatrix({ providers, models, auth, redactions });
   const fallbackPolicies = providers.flatMap((provider) =>
     provider.fallbackPolicy ? [provider.fallbackPolicy] : [],
   );
@@ -245,6 +319,8 @@ export function projectProviderRegistry(
     providers,
     models,
     auth,
+    compatibilityMatrix,
+    readinessMatrix,
     fallbackPolicies,
     failureTaxonomy: PROVIDER_FAILURE_TAXONOMY,
     resourceDescriptors,
@@ -371,6 +447,161 @@ function sanitizeAuthProjection(
       "auth-secret-available",
       "provider-success",
       "terminal-success",
+    ]),
+  });
+}
+
+function createCompatibilityMatrix(input: {
+  readonly providers: readonly ProviderDescriptor[];
+  readonly models: readonly ModelDescriptor[];
+  readonly redactions: Set<string>;
+}): readonly ProviderCompatibilityMatrixEntry[] {
+  const entries: ProviderCompatibilityMatrixEntry[] = [];
+  for (const provider of input.providers) {
+    const providerModels = input.models.filter((model) => model.providerId === provider.providerId);
+    if (providerModels.length === 0) {
+      entries.push(compatibilityEntry({ provider, redactions: input.redactions }));
+    }
+    for (const model of providerModels) {
+      entries.push(compatibilityEntry({ provider, model, redactions: input.redactions }));
+    }
+  }
+  return Object.freeze(entries);
+}
+
+function compatibilityEntry(input: {
+  readonly provider: ProviderDescriptor;
+  readonly model?: ModelDescriptor;
+  readonly redactions: Set<string>;
+}): ProviderCompatibilityMatrixEntry {
+  const flags = input.model?.compatibility ?? input.provider.compatibility;
+  const knownUnsupportedStates = [
+    ...(flags.streaming === "unsupported" ? ["unsupported-mode:streaming"] : []),
+    ...(flags.toolCalls === "unsupported" ? ["unsupported-mode:tool-calls"] : []),
+    ...(flags.structuredJsonOutput === "unsupported" ? ["unsupported-mode:structured-output"] : []),
+    ...(flags.strictMessageRoles === "unsupported" ? ["unsupported-mode:message-roles"] : []),
+  ].map((value) => sanitizeText(value, input.redactions));
+  const supportedModes: ProviderSupportedMode[] = [
+    "synthetic",
+    "injected",
+    "live-opt-in",
+    ...(flags.streaming === "supported" ? ["streaming"] as ProviderSupportedMode[] : []),
+    ...(flags.toolCalls === "supported" ? ["tool-calls"] as ProviderSupportedMode[] : []),
+    ...(flags.structuredJsonOutput === "supported" ? ["structured-output"] as ProviderSupportedMode[] : []),
+  ];
+  const unknown = [
+    flags.streaming,
+    flags.toolCalls,
+    flags.structuredJsonOutput,
+    flags.strictMessageRoles,
+  ].includes("unknown");
+  return deepFreeze({
+    providerId: input.provider.providerId,
+    ...(input.model ? { modelId: input.model.modelId } : {}),
+    providerSafeLabel: input.provider.safeLabel,
+    ...(input.model ? { modelSafeLabel: input.model.safeLabel } : {}),
+    state: knownUnsupportedStates.length > 0 ? "unsupported" : unknown ? "not-proven" : "supported",
+    supportedModes: Object.freeze(supportedModes),
+    streamingSupport: flags.streaming,
+    toolCallSupport: flags.toolCalls,
+    structuredOutputSupport: flags.structuredJsonOutput,
+    authRequirement: input.provider.authMode,
+    optInRequirement: "required",
+    fallbackEligibility: input.provider.supportsFallback,
+    knownUnsupportedStates: Object.freeze(knownUnsupportedStates),
+    redaction: {
+      status: input.redactions.size > 0 ? "redacted" : "report-safe",
+      excluded: REDACTION_EXCLUSIONS,
+    },
+    terminalSuccessClaim: false,
+    notProvenClaims: uniqueSorted([
+      "provider-compatibility-is-not-provider-success",
+      "model-compatibility-is-not-task-success",
+      "live-opt-in-eligibility-is-not-live-execution",
+      "terminal-success",
+      ...input.provider.notProvenClaims,
+      ...(input.model?.notProvenClaims ?? []),
+    ]),
+  });
+}
+
+function createReadinessMatrix(input: {
+  readonly providers: readonly ProviderDescriptor[];
+  readonly models: readonly ModelDescriptor[];
+  readonly auth: readonly ProviderRequestAuthProjection[];
+  readonly redactions: Set<string>;
+}): readonly ProviderReadinessMatrixEntry[] {
+  const entries: ProviderReadinessMatrixEntry[] = [];
+  for (const provider of input.providers) {
+    const providerModels = input.models.filter((model) => model.providerId === provider.providerId);
+    if (providerModels.length === 0) {
+      entries.push(readinessEntry({ provider, auth: input.auth, redactions: input.redactions }));
+    }
+    for (const model of providerModels) {
+      entries.push(readinessEntry({ provider, model, auth: input.auth, redactions: input.redactions }));
+    }
+  }
+  return Object.freeze(entries);
+}
+
+function readinessEntry(input: {
+  readonly provider: ProviderDescriptor;
+  readonly model?: ModelDescriptor;
+  readonly auth: readonly ProviderRequestAuthProjection[];
+  readonly redactions: Set<string>;
+}): ProviderReadinessMatrixEntry {
+  const auth = input.auth.find((item) => item.providerId === input.provider.providerId);
+  const compatibility = input.model?.compatibility ?? input.provider.compatibility;
+  const unsupportedModes = [
+    ...(compatibility.streaming === "unsupported" ? ["streaming"] : []),
+    ...(compatibility.toolCalls === "unsupported" ? ["tool-calls"] : []),
+    ...(compatibility.structuredJsonOutput === "unsupported" ? ["structured-output"] : []),
+  ];
+  const unsafe = input.provider.redaction.status === "redacted" ||
+    input.model?.redaction.status === "redacted" ||
+    auth?.redaction.status === "redacted";
+  const authState = auth?.resolutionStatus === "resolved" && auth.redaction.status === "redacted"
+    ? "redacted-present"
+    : auth?.resolutionStatus ?? "unknown";
+  const configState: ProviderConfigReadinessState =
+    unsafe ? "unsafe-config"
+      : !input.provider ? "unsupported-provider"
+      : !input.model ? "unsupported-model"
+      : unsupportedModes.length > 0 ? "unsupported-mode"
+      : authState === "missing" ? "missing-auth"
+      : authState === "redacted-present" ? "auth-redacted-present"
+      : authState === "resolved" ? "opt-in-required"
+      : authState === "unsupported" ? "invalid-config"
+      : "unknown";
+  const blockers = [
+    ...(input.model ? [] : ["unsupported-model"]),
+    ...unsupportedModes.map((mode) => `unsupported-mode:${mode}`),
+    ...(auth ? [] : ["missing-config:auth-projection"]),
+    ...(auth?.resolutionStatus === "missing" ? ["missing-auth"] : []),
+    ...(auth?.resolutionStatus === "unsupported" ? ["invalid-config:auth-unsupported"] : []),
+    ...(unsafe ? ["unsafe-config:redaction-applied"] : []),
+    "opt-in-required",
+  ].map((value) => sanitizeText(value, input.redactions));
+
+  return deepFreeze({
+    providerId: input.provider.providerId,
+    ...(input.model ? { modelId: input.model.modelId } : {}),
+    configState,
+    authState,
+    blockers: Object.freeze(blockers),
+    redaction: {
+      status: input.redactions.size > 0 || unsafe ? "redacted" : "report-safe",
+      excluded: REDACTION_EXCLUSIONS,
+    },
+    terminalSuccessClaim: false,
+    notProvenClaims: uniqueSorted([
+      "config-readiness-is-not-provider-success",
+      "auth-readiness-is-not-provider-success",
+      "opt-in-required-is-not-provider-execution",
+      "terminal-success",
+      ...input.provider.notProvenClaims,
+      ...(input.model?.notProvenClaims ?? []),
+      ...(auth?.notProvenClaims ?? []),
     ]),
   });
 }

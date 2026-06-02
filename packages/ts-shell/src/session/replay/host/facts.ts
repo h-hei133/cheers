@@ -6,6 +6,7 @@ export interface HostReplayFacts {
   readonly sessionId: string;
   readonly activeLeafId: string;
   readonly retainedFactIds: readonly string[];
+  readonly providerRequestFacts?: ReplaySafeLoopStateSummary["providerRequestFacts"];
   readonly excluded: readonly string[];
   readonly replayReady: boolean;
   readonly terminalSuccessClaim: false;
@@ -30,6 +31,9 @@ export function projectHostReplayFacts(input: {
           ...replay.repairHandoffIds,
         ]
       : [input.record.thread.activeLeafId],
+    ...(replay?.providerRequestFacts
+      ? { providerRequestFacts: replay.providerRequestFacts }
+      : {}),
     excluded: [
       "raw-transcript",
       "raw-provider-output",

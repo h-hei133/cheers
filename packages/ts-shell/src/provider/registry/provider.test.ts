@@ -90,6 +90,21 @@ describe("provider registry metadata", () => {
 
     expect(projection.models[0]?.compatibility.toolCalls).toBe("unknown");
     expect(projection.models[0]?.compatibility.structuredJsonOutput).toBe("unknown");
+    expect(projection.compatibilityMatrix[0]).toMatchObject({
+      providerId: "openai",
+      modelId: "gpt-safe",
+      state: "not-proven",
+      supportedModes: ["synthetic", "injected", "live-opt-in"],
+      optInRequirement: "required",
+      terminalSuccessClaim: false,
+    });
+    expect(projection.readinessMatrix[0]).toMatchObject({
+      providerId: "openai",
+      modelId: "gpt-safe",
+      configState: "unknown",
+      authState: "unknown",
+      terminalSuccessClaim: false,
+    });
     expect(projection.models[0]?.notProvenClaims).toEqual(
       expect.arrayContaining([
         "model-compatibility-proven",
@@ -107,6 +122,8 @@ describe("provider registry metadata", () => {
     expect(classifyProviderFailure({ status: 429 })).toBe("provider_rate_limited");
     expect(classifyProviderFailure({ errorName: "AbortError" })).toBe("provider_timeout");
     expect(classifyProviderFailure({ cancelled: true })).toBe("provider_cancelled");
+    expect(classifyProviderFailure({ message: "malformed response schema" })).toBe("provider_response_malformed");
+    expect(classifyProviderFailure({ message: "content_filter safety block" })).toBe("provider_safety_block");
     expect(classifyProviderFailure({ streamProtocolError: true })).toBe("provider_stream_protocol_error");
     expect(classifyProviderFailure({ malformedStreamEvent: true })).toBe("provider_stream_event_malformed");
     expect(classifyProviderFailure({ invalidOutput: true })).toBe("provider_output_invalid");

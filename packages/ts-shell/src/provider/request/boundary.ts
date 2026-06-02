@@ -85,7 +85,11 @@ export interface NextTurnRequestProviderMetadata {
   readonly modelSafeLabel: string;
   readonly providerOptInState: "required" | "not-granted";
   readonly authReadiness: "resolved" | "missing" | "expired" | "unsupported" | "unknown";
+  readonly configReadiness: string;
+  readonly compatibilityState: string;
   readonly compatibilityFlags: readonly string[];
+  readonly supportedModes: readonly string[];
+  readonly knownUnsupportedStates: readonly string[];
   readonly streamingCapability: string;
   readonly fallbackProviderSafeLabel?: string;
   readonly fallbackModelSafeLabel?: string;
@@ -405,6 +409,14 @@ function createProviderMetadata(input: {
   readonly redactions: Set<string>;
 }): NextTurnRequestProviderMetadata {
   const compatibility = input.model?.compatibility ?? input.provider?.compatibility;
+  const matrixEntry = input.providerRegistry?.compatibilityMatrix.find((entry) =>
+    entry.providerId === input.provider?.providerId &&
+      (!input.model || entry.modelId === input.model.modelId)
+  );
+  const readinessEntry = input.providerRegistry?.readinessMatrix.find((entry) =>
+    entry.providerId === input.provider?.providerId &&
+      (!input.model || entry.modelId === input.model.modelId)
+  );
   const flags = compatibility
     ? [
         `toolCalls:${compatibility.toolCalls}`,
@@ -433,6 +445,9 @@ function createProviderMetadata(input: {
         ...(compatibility.strictMessageRoles === "unsupported"
           ? ["unsupported-model-mode:message-roles"]
           : []),
+        ...(compatibility.structuredJsonOutput === "unsupported"
+          ? ["unsupported-model-mode:structured-output"]
+          : []),
       ]
     : [];
   const missingProviderFacts = unique([
@@ -442,6 +457,13 @@ function createProviderMetadata(input: {
     ...(input.auth && input.auth.resolutionStatus !== "resolved"
       ? [`auth-readiness:${input.auth.resolutionStatus}`]
       : []),
+    ...(readinessEntry && readinessEntry.configState !== "opt-in-required" &&
+        readinessEntry.configState !== "auth-redacted-present"
+      ? [`config-readiness:${readinessEntry.configState}`]
+      : []),
+    ...(matrixEntry?.state === "unsupported" ? [`compatibility-state:${matrixEntry.state}`] : []),
+    ...(matrixEntry?.knownUnsupportedStates ?? []),
+    ...(readinessEntry?.blockers.filter((blocker) => blocker !== "opt-in-required") ?? []),
     ...unsupportedCompatibilityFacts,
     ...(input.boundary.providerReadinessStatus === "ready" ? [] : [
       `provider-readiness:${input.boundary.providerReadinessStatus}`,
@@ -459,7 +481,17 @@ function createProviderMetadata(input: {
     ),
     providerOptInState: "required",
     authReadiness: input.auth?.resolutionStatus ?? "unknown",
+    configReadiness: sanitizeText(readinessEntry?.configState ?? "unknown", input.redactions),
+    compatibilityState: sanitizeText(matrixEntry?.state ?? "not-proven", input.redactions),
     compatibilityFlags: Object.freeze(flags.map((value) => sanitizeText(value, input.redactions))),
+    supportedModes: Object.freeze(
+      (matrixEntry?.supportedModes ?? ["synthetic", "injected"])
+        .map((value) => sanitizeText(value, input.redactions)),
+    ),
+    knownUnsupportedStates: Object.freeze(
+      (matrixEntry?.knownUnsupportedStates ?? unsupportedCompatibilityFacts)
+        .map((value) => sanitizeText(value, input.redactions)),
+    ),
     streamingCapability: sanitizeText(compatibility?.streaming ?? "unknown", input.redactions),
     ...(input.fallbackProvider
       ? { fallbackProviderSafeLabel: sanitizeText(input.fallbackProvider.safeLabel, input.redactions) }
@@ -482,7 +514,11 @@ function createProviderMetadata(input: {
     notProvenClaims: unique([
       "provider-metadata-is-not-provider-success",
       "provider-readiness-is-not-provider-success",
+      "provider-compatibility-is-not-provider-success",
+      "config-readiness-is-not-provider-success",
       "opt-in-available-is-not-opt-in-granted",
+      ...(matrixEntry?.notProvenClaims ?? []),
+      ...(readinessEntry?.notProvenClaims ?? []),
       ...(input.provider?.notProvenClaims ?? []),
       ...(input.model?.notProvenClaims ?? []),
       ...(input.auth?.notProvenClaims ?? []),

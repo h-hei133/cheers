@@ -14,7 +14,7 @@ import {
   type HostSessionState,
 } from "../../../session/store/host/state.js";
 import { projectHostReplayFacts } from "../../../session/replay/host/facts.js";
-import { summarizeReplaySafeLoopState } from "../../../session/replay/state.js";
+import { summarizeReplaySafeLoopState, type ReplaySafeLoopStateSummary } from "../../../session/replay/state.js";
 import { buildLoopContextRebuildInput } from "../../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../../context/sessionContextRebuildProjection.js";
 import { evaluateContinuationReadiness } from "../../../session/continuation/readiness.js";
@@ -56,6 +56,7 @@ export interface HostRuntimeOptions {
 interface HostRunProjection {
   readonly loop?: AgentLoopContractProjection;
   readonly events?: readonly RuntimeProjectionEvent[];
+  readonly replay?: ReplaySafeLoopStateSummary;
   readonly statusEnvelope?: SessionStatusEnvelope;
 }
 
@@ -278,7 +279,7 @@ export function createHostRuntime(options: HostRuntimeOptions = {}): HostRuntime
     });
     const result = resultSummaryFor(truth, input.blockers ?? []);
     const replayFacts = input.record
-      ? projectHostReplayFacts({ record: input.record })
+      ? projectHostReplayFacts({ record: input.record, replay: input.loop?.replay })
       : undefined;
     return freeze({
       schemaVersion: "host-command-response.v1",
@@ -333,8 +334,11 @@ async function runSharedLane(input: {
   const syntheticBoundary = createSyntheticModelBoundary({
     program: programFor(input.envelope),
   });
-  const fallbackRequested = Boolean(input.envelope.inputText?.includes("fallback"));
-  const providerRegistry = fallbackRequested ? createFallbackRegistry() : undefined;
+  const providerCase = providerCaseFor(input.envelope);
+  const fallbackRequested = providerCase === "fallback" || providerCase === "fallback-failed";
+  const providerRegistry = providerCase === "default"
+    ? undefined
+    : createProviderRegistry(providerCase);
   const memory = new Map<string, string>([["/workspace/src/target.ts", "before\n"]]);
   const loop = await runAgentLoopContract({
     sessionId: input.record.session.id,
@@ -343,7 +347,7 @@ async function runSharedLane(input: {
     providerOptIn: input.envelope.providerMode === "synthetic",
     providerFallbackOptIn: fallbackRequested,
     providerMode: "synthetic",
-    ...(providerRegistry ? { providerRegistry, providerId: "provider-a" } : {}),
+    ...(providerRegistry ? { providerRegistry, providerId: "provider-a", modelLabel: "Primary Model" } : {}),
     maxTurns: input.envelope.mode === "read-only" ? 2 : 1,
     executePreparedNextTurn: input.envelope.mode === "read-only",
     toolBatchPolicy: "sequential",
@@ -360,7 +364,30 @@ async function runSharedLane(input: {
         notProvenClaims: ["tool-result-is-not-task-success"],
       },
     }),
-    ...(fallbackRequested
+    ...(providerCase === "compatibility-happy"
+      ? {
+          controlledModelInvocationExecutor: () => ({
+            kind: "completed" as const,
+            response: {
+              content: "provider compatibility safe content",
+              finishReason: "stop" as const,
+            },
+          }),
+        }
+      : {}),
+    ...(providerCase === "redaction"
+      ? {
+          controlledModelInvocationExecutor: () => ({
+            kind: "completed" as const,
+            response: {
+              content:
+                "token=secret raw provider output: hidden reasoning oldText=before newText=after",
+              finishReason: "stop" as const,
+            },
+          }),
+        }
+      : {}),
+    ...(providerCase === "fallback"
       ? {
           controlledModelInvocationExecutor: () => {
             throw new Error("network unavailable");
@@ -372,6 +399,16 @@ async function runSharedLane(input: {
               finishReason: "stop" as const,
             },
           }),
+        }
+      : {}),
+    ...(providerCase === "fallback-failed"
+      ? {
+          controlledModelInvocationExecutor: () => {
+            throw new Error("network unavailable");
+          },
+          controlledModelFallbackExecutor: () => {
+            throw new Error("timeout");
+          },
         }
       : {}),
     ...(input.envelope.mode === "mutation"
@@ -419,23 +456,30 @@ async function runSharedLane(input: {
         }
       : {}),
   });
+  const latestTurn = loop.turns.at(-1);
+  const latestProviderTurn = [...loop.turns].reverse().find((turn) =>
+    turn.nextTurn.requestPreparation || turn.nextTurn.controlledInvocation
+  );
   const replay = summarizeReplaySafeLoopState({
     sessionProjection,
     contextRebuildProjection,
     continuationReadiness,
     rebuildInput,
-    savePoint: loop.turns.at(-1)?.savePoint,
-    nextTurnBundle: loop.turns.at(-1)?.nextTurn.bundle,
-    requestPreparation: loop.turns.at(-1)?.nextTurn.requestPreparation,
-    toolOutcomeBundle: loop.turns.at(-1)?.toolResultBatch?.outcomeBundle,
-    toolResultMessages: loop.turns.at(-1)?.toolResultBatch?.resultMessages,
-    mutationRecoveries: loop.turns.at(-1)?.mutationRecovery
-      ? [loop.turns.at(-1)!.mutationRecovery!]
+    savePoint: latestTurn?.savePoint,
+    nextTurnBundle: latestProviderTurn?.nextTurn.bundle,
+    requestPreparation: latestProviderTurn?.nextTurn.requestPreparation,
+    controlledModelInvocations: latestProviderTurn?.nextTurn.controlledInvocation
+      ? [latestProviderTurn.nextTurn.controlledInvocation]
+      : [],
+    toolOutcomeBundle: latestTurn?.toolResultBatch?.outcomeBundle,
+    toolResultMessages: latestTurn?.toolResultBatch?.resultMessages,
+    mutationRecoveries: latestTurn?.mutationRecovery
+      ? [latestTurn.mutationRecovery]
       : [],
     terminalResultFacts: {
-      status: loop.turns.at(-1)?.verification.repairVerdictTerminalProjection?.status ?? "not_proven",
+      status: latestTurn?.verification.repairVerdictTerminalProjection?.status ?? "not_proven",
       terminalClassification:
-        loop.turns.at(-1)?.verification.repairVerdictTerminalProjection?.terminalClassification ?? "stopped",
+        latestTurn?.verification.repairVerdictTerminalProjection?.terminalClassification ?? "stopped",
       terminalReason: "completed",
     },
   });
@@ -447,43 +491,83 @@ async function runSharedLane(input: {
       loop.turns.at(-1)?.verification.repairVerdictTerminalProjection?.terminalClassification ?? "stopped",
     terminalReason: "completed",
     runtimeEvents,
+    ...(providerRegistry ? { providerRegistry } : {}),
   });
   return {
     loop,
     events: runtimeEvents,
+    replay,
     ...(surface ? { statusEnvelope: projectSessionStatusEnvelope(surface) } : {}),
   };
 }
 
-function createFallbackRegistry() {
-  const compatibility = unknownProviderCompatibilityFlags();
+type HostProviderCase =
+  | "default"
+  | "compatibility-happy"
+  | "readiness-blocked"
+  | "fallback"
+  | "fallback-failed"
+  | "redaction";
+
+function providerCaseFor(envelope: HostCommandEnvelope): HostProviderCase {
+  const text = envelope.inputText ?? "";
+  if (text.includes("provider compatibility happy")) return "compatibility-happy";
+  if (text.includes("provider readiness blocked")) return "readiness-blocked";
+  if (text.includes("provider fallback failed")) return "fallback-failed";
+  if (text.includes("provider fallback")) return "fallback";
+  if (text.includes("provider redaction")) return "redaction";
+  return "default";
+}
+
+function createProviderRegistry(providerCase: HostProviderCase) {
+  const compatibility = {
+    ...unknownProviderCompatibilityFlags(),
+    streaming: "supported" as const,
+    toolCalls: "supported" as const,
+    structuredJsonOutput: "supported" as const,
+    strictMessageRoles: "supported" as const,
+  };
+  const readinessBlocked = providerCase === "readiness-blocked";
+  const fallbackEnabled = providerCase === "fallback" || providerCase === "fallback-failed";
+  const redactionCase = providerCase === "redaction";
   return projectProviderRegistry({
     providers: [
       {
         providerId: "provider-a",
-        safeLabel: "Primary Provider",
+        safeLabel: redactionCase
+          ? "Primary Provider Authorization: Bearer unsafe-token"
+          : "Primary Provider",
         providerKind: "custom",
         endpointClass: "unknown",
-        authMode: "none",
+        authMode: readinessBlocked ? "api-key" : "none",
         defaultEnabled: false,
         requiresExplicitOptIn: true,
-        supportsFallback: "supported",
+        supportsFallback: fallbackEnabled ? "supported" : "unknown",
         compatibility: {
           ...compatibility,
-          streaming: "supported",
-          toolCalls: "supported",
+          ...(readinessBlocked
+            ? {
+                streaming: "unsupported" as const,
+                toolCalls: "unsupported" as const,
+                structuredJsonOutput: "unsupported" as const,
+              }
+            : {}),
         },
-        fallbackPolicy: {
-          fallbackProviderId: "provider-b",
-          eligibleFailureClasses: ["provider_network", "provider_timeout"],
-          ineligibleFailureClasses: ["provider_auth"],
-          maxAttempts: 1,
-          retryRelation: "new-request",
-          requiresExplicitOptIn: true,
-          executesFallback: true,
-          redaction: { status: "report-safe", excluded: [] },
-          notProvenClaims: [],
-        },
+        ...(fallbackEnabled
+          ? {
+              fallbackPolicy: {
+                fallbackProviderId: "provider-b",
+                eligibleFailureClasses: ["provider_network", "provider_timeout"],
+                ineligibleFailureClasses: ["provider_auth", "provider_config"],
+                maxAttempts: 1,
+                retryRelation: "new-request",
+                requiresExplicitOptIn: true,
+                executesFallback: true,
+                redaction: { status: "report-safe", excluded: [] },
+                notProvenClaims: [],
+              },
+            }
+          : {}),
         riskLevel: "low",
       },
       {
@@ -511,10 +595,15 @@ function createFallbackRegistry() {
         family: "host",
         compatibility: {
           ...compatibility,
-          streaming: "supported",
-          toolCalls: "supported",
+          ...(readinessBlocked
+            ? {
+                streaming: "unsupported" as const,
+                toolCalls: "unsupported" as const,
+                structuredJsonOutput: "unsupported" as const,
+              }
+            : {}),
         },
-        knownLimitations: [],
+        knownLimitations: readinessBlocked ? ["streaming unsupported"] : [],
       },
       {
         modelId: "model-b",
@@ -531,9 +620,9 @@ function createFallbackRegistry() {
     ],
     auth: [{
       providerId: "provider-a",
-      authSourceKind: "none",
-      authMode: "none",
-      resolutionStatus: "resolved",
+      authSourceKind: readinessBlocked ? "config" : "none",
+      authMode: readinessBlocked ? "api-key" : "none",
+      resolutionStatus: readinessBlocked ? "missing" : "resolved",
     }],
   });
 }
