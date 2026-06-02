@@ -14,6 +14,8 @@ import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
+import type { NormalizedToolCall } from "../../tools/toolCallBatch.js";
+import type { ToolExecutionResult } from "../../tools/types.js";
 import { projectRuntimeEvents } from "../events/projection.js";
 import { runAgentLoopContract } from "./contract.js";
 import { createSyntheticModelBoundary } from "./providerBoundary.js";
@@ -250,6 +252,166 @@ describe("provider model boundary", () => {
     expect(status.envelope.terminalSuccessClaim).toBe(false);
     expect(status.surface?.terminalSuccessClaim).toBe(false);
     expect(JSON.stringify({ loop, status })).not.toContain('"terminalSuccessClaim":true');
+  });
+
+  it("runs independent read-only tool calls in parallel while preserving deterministic result order", async () => {
+    const finished: string[] = [];
+    const loop = await runParallelToolLane({
+      sessionId: "sess-parallel-happy",
+      toolCalls: [
+        { id: "call-read-a", name: "read", arguments: { path: "src/a.ts" } },
+        { id: "call-read-b", name: "read", arguments: { path: "src/b.ts" } },
+        { id: "call-glob", name: "glob", arguments: { pattern: "src/*.ts" } },
+      ],
+      dispatch: async (call) => {
+        if (call.id === "call-read-a") {
+          await new Promise((resolve) => setTimeout(resolve, 15));
+        }
+        finished.push(call.id);
+        return { success: true, content: `safe result ${call.id}` };
+      },
+      maxTurns: 2,
+      executePreparedNextTurn: true,
+    });
+    const first = loop.turns[0]!;
+    const status = projectStatus(loop, first);
+
+    expect(first.toolResultBatch?.dispatchPlan?.schedulingPlan.executionMode).toBe("parallel_read_only");
+    expect(first.toolResultBatch?.dispatchPlan?.schedulingPlan.parallelGroupIds.length).toBe(1);
+    expect(finished[0]).not.toBe("call-read-a");
+    expect(first.toolResultBatch?.resultMessages?.messages.map((message) => message.toolCallId)).toEqual([
+      "call-read-a",
+      "call-read-b",
+      "call-glob",
+    ]);
+    expect(first.nextTurn.requestPreparation?.safeRequestMessages.map((message) => message.source)).toContain("tool-result");
+    expect(loop.events.map((event) => event.type)).toEqual(expect.arrayContaining([
+      "tool-scheduling-plan-observed",
+      "tool-scheduling-group-observed",
+      "tool-call-dispatched",
+      "tool-result-message-prepared",
+      "agent-loop-next-turn-prepared",
+    ]));
+    expect(status.replay.toolSchedulingStatus).toBe("parallel_read_only");
+    expect(status.envelope.toolOutcome.summary).toContain("schedule=parallel_read_only");
+    expect(status.envelope.completeProof).toBe(false);
+    expect(JSON.stringify({ loop, status })).not.toContain('"terminalSuccessClaim":true');
+  });
+
+  it("forces ordered read-only dependencies into deterministic sequential groups", async () => {
+    const dispatched: string[] = [];
+    const loop = await runParallelToolLane({
+      sessionId: "sess-parallel-dependency",
+      toolCalls: [
+        { id: "call-read-a", name: "read", arguments: { path: "src/a.ts" } },
+        {
+          id: "call-read-b",
+          name: "read",
+          arguments: { path: "src/b.ts", afterCallIds: ["call-read-a"] },
+        },
+      ],
+      dispatch: async (call) => {
+        dispatched.push(call.id);
+        return { success: true, content: `safe result ${call.id}` };
+      },
+    });
+    const first = loop.turns[0]!;
+    const plan = first.toolResultBatch!.dispatchPlan!;
+    const status = projectStatus(loop, first);
+
+    expect(plan.schedulingPlan.calls.map((call) => call.dependency.kind)).toEqual([
+      "independent",
+      "ordered_after",
+    ]);
+    expect(plan.schedulingPlan.calls.map((call) => call.decision)).toEqual([
+      "parallel_allowed",
+      "forced_sequential",
+    ]);
+    expect(dispatched).toEqual(["call-read-a", "call-read-b"]);
+    expect(first.toolResultBatch?.resultMessages?.messages.map((message) => message.toolCallId)).toEqual(dispatched);
+    expect(status.replay.toolSchedulingDeterministicOrder).toEqual(["call-read-a", "call-read-b"]);
+    expect(status.envelope.state).not.toBe("complete_proof");
+  });
+
+  it("keeps mutation, unknown, unsupported, and conflicting tools out of parallel execution", async () => {
+    const dispatched: string[] = [];
+    const loop = await runParallelToolLane({
+      sessionId: "sess-parallel-blocked",
+      toolCalls: [
+        { id: "call-read-a", name: "read", arguments: { path: "src/a.ts", conflictsWithCallIds: ["call-read-b"] } },
+        { id: "call-read-b", name: "read", arguments: { path: "src/b.ts", conflictsWithCallIds: ["call-read-a"] } },
+        { id: "call-edit", name: "edit", arguments: { path: "src/a.ts", oldText: "old", newText: "new" } },
+        { id: "call-unknown", name: "unknown-tool", arguments: { dependency: "unknown" } },
+      ],
+      dispatch: async (call) => {
+        dispatched.push(call.id);
+        return { success: true, content: `safe result ${call.id}` };
+      },
+    });
+    const first = loop.turns[0]!;
+    const plan = first.toolResultBatch!.dispatchPlan!;
+    const status = projectStatus(loop, first);
+
+    expect(dispatched).toEqual([]);
+    expect(plan.schedulingPlan.calls.map((call) => call.decision)).toEqual([
+      "blocked",
+      "blocked",
+      "blocked",
+      "unsupported",
+    ]);
+    expect(plan.calls.find((call) => call.toolCallId === "call-edit")?.effect).toBe("mutation");
+    expect(plan.dispatchedCallIds).toEqual([]);
+    expect(first.toolResultBatch?.notDispatchedToolCallIds).toEqual([
+      "call-read-a",
+      "call-read-b",
+      "call-edit",
+      "call-unknown",
+    ]);
+    expect(loop.events.map((event) => event.type)).toEqual(expect.arrayContaining([
+      "tool-call-blocked",
+      "tool-scheduling-plan-observed",
+    ]));
+    expect(status.envelope.toolOutcome.status).toBe("observed");
+    expect(status.envelope.completeProof).toBe(false);
+  });
+
+  it("preserves partial read-only failures without upgrading tool completion to success", async () => {
+    const loop = await runParallelToolLane({
+      sessionId: "sess-parallel-partial",
+      toolCalls: [
+        { id: "call-read-a", name: "read", arguments: { path: "src/a.ts" } },
+        { id: "call-read-b", name: "read", arguments: { path: "src/b.ts" } },
+        { id: "call-read-c", name: "read", arguments: { path: "src/c.ts" } },
+      ],
+      dispatch: async (call) => ({
+        success: call.id !== "call-read-b",
+        content: call.id === "call-read-b" ? "safe failure summary" : `safe result ${call.id}`,
+        ...(call.id === "call-read-b" ? { error: "read-only tool failed" } : {}),
+        reportSafe: {
+          redactionStatus: "report-safe",
+          notProvenClaims: ["tool-result-is-not-task-success"],
+        },
+      }),
+    });
+    const first = loop.turns[0]!;
+    const status = projectStatus(loop, first);
+
+    expect(first.toolResultBatch?.failedToolCallIds).toEqual(["call-read-b"]);
+    expect(first.toolResultBatch?.resultDetails?.map((detail) => detail.resultStatus)).toEqual([
+      "executed_success",
+      "executed_failed",
+      "executed_success",
+    ]);
+    expect(first.toolResultBatch?.outcomeBundle?.mixedOutcomeStatus).toBe("mixed_success_and_non_success");
+    expect(first.toolResultBatch?.outcomeBundle?.nextAction).toBe("review_failed_result");
+    expect(first.nextTurn.bundle?.blockingFacts).toEqual(expect.arrayContaining([
+      "call-read-b:executed_failed",
+    ]));
+    expect(status.envelope.state).not.toBe("complete_proof");
+    expect(status.envelope.terminalSuccessClaim).toBe(false);
+    expect(JSON.stringify({ loop, status })).not.toMatch(
+      /RAW_OLD_TEXT_SHOULD_NOT_LEAK|RAW_NEW_TEXT_SHOULD_NOT_LEAK|token=secret|hidden reasoning/i,
+    );
   });
 
   it("integrates synthetic streaming, registry resolution, replay, surface, and status without success", async () => {
@@ -497,6 +659,48 @@ function turnInput() {
   };
 }
 
+async function runParallelToolLane(input: {
+  readonly sessionId: string;
+  readonly toolCalls: readonly { readonly id: string; readonly name: string; readonly arguments?: Record<string, unknown> }[];
+  readonly dispatch: (call: NormalizedToolCall) => Promise<ToolExecutionResult>;
+  readonly maxTurns?: number;
+  readonly executePreparedNextTurn?: boolean;
+}) {
+  const syntheticBoundary = createSyntheticModelBoundary({
+    program: {
+      steps: [
+        {
+          kind: "completed",
+          response: {
+            content: "parallel safe context",
+            toolCalls: input.toolCalls,
+            finishReason: "tool_calls",
+          },
+        },
+        {
+          kind: "completed",
+          response: {
+            content: "safe final response",
+            finishReason: "stop",
+          },
+        },
+      ],
+    },
+  });
+  return runAgentLoopContract({
+    sessionId: input.sessionId,
+    workspaceRoot: "/workspace",
+    prompt: "parallel read-only tool lane",
+    providerOptIn: false,
+    providerMode: "synthetic",
+    maxTurns: input.maxTurns ?? 1,
+    executePreparedNextTurn: input.executePreparedNextTurn,
+    toolBatchPolicy: "parallel",
+    modelBoundary: syntheticBoundary,
+    toolBatchDispatch: async (call) => input.dispatch(call),
+  });
+}
+
 function blockedPreparedRequest() {
   const nextTurnBundle = prepareNextTurnBundle({
     bundleId: "bundle-blocked",
@@ -636,6 +840,7 @@ function projectStatus(
     controlledModelInvocations: turn.nextTurn.controlledInvocation
       ? [turn.nextTurn.controlledInvocation]
       : [],
+    toolDispatchPlan: turn.toolResultBatch?.dispatchPlan,
     toolOutcomeBundle: turn.toolResultBatch?.outcomeBundle,
     toolResultMessages: turn.toolResultBatch?.resultMessages,
     terminalResultFacts: {

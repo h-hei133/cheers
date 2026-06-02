@@ -609,6 +609,12 @@ export async function runAgentLoopContract(
             dispatchResult: {
               resultBatchId: `${dispatchPlan.planId}:result-batch`,
               dispatchPlan,
+              schedulingPlan: dispatchPlan.schedulingPlan,
+              schedulingStates: dispatchPlan.calls.map((planned) => ({
+                toolCallId: planned.toolCallId,
+                executionState: "skipped",
+                terminalSuccessClaim: false as const,
+              })),
               results: [],
               resultDetails: [],
               executionReceipts: [],

@@ -10,6 +10,14 @@ import {
   type ToolAfterObservationAnnotation,
   type ToolBeforePolicyDecision,
 } from "./policy/interception.js";
+import { classifyToolEffect, type ToolEffectFacts } from "./policy/effects.js";
+import {
+  planToolScheduling,
+  type ToolDependencyFacts,
+  type ToolSchedulingCallFacts,
+  type ToolSchedulingExecutionState,
+  type ToolSchedulingPlan,
+} from "./scheduling/plan.js";
 
 export type ToolBatchDispatchStatus =
   | "planned"
@@ -33,6 +41,9 @@ export type ToolCallDispatchStatus =
 export type ToolResultDetailStatus =
   | "executed_success"
   | "executed_failed"
+  | "cancelled"
+  | "timed_out"
+  | "skipped"
   | "blocked_by_policy"
   | "authority_required"
   | "authority_denied"
@@ -46,6 +57,13 @@ export type ToolResultDetailStatus =
 export type ToolArgumentSafetyState = "report-safe" | "redacted";
 
 export type ToolExecutionState =
+  | "scheduled"
+  | "started"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "timed_out"
+  | "skipped"
   | "not_dispatched"
   | "blocked"
   | "authority_required"
@@ -69,6 +87,12 @@ export interface ToolDispatchPlanCall {
   readonly beforePolicyDecision: ToolBeforePolicyDecision;
   readonly policyDecisionId: string;
   readonly authorityRequirement: ToolBeforePolicyDecision["authorityRequirement"];
+  readonly effect: ToolEffectFacts["effect"];
+  readonly effectReason: string;
+  readonly dependency: ToolDependencyFacts;
+  readonly schedulingDecision: ToolSchedulingCallFacts["decision"];
+  readonly schedulingGroupId?: string;
+  readonly schedulingGroupMode: ToolSchedulingCallFacts["groupMode"];
   readonly argumentSafety: ToolArgumentSafetyState;
   readonly redactionStatus: "report-safe" | "redacted";
   readonly malformed: boolean;
@@ -84,7 +108,9 @@ export interface ToolBatchDispatchPlan {
   readonly batchId: string;
   readonly responseId: string;
   readonly turnId?: string;
-  readonly dispatchPolicy: "sequential" | "parallel-unsupported" | "metadata-only";
+  readonly dispatchPolicy: "sequential" | "parallel" | "metadata-only";
+  readonly requestedDispatchPolicy: "sequential" | "parallel" | "metadata-only";
+  readonly schedulingPlan: ToolSchedulingPlan;
   readonly dispatchStatus: ToolBatchDispatchStatus;
   readonly calls: readonly ToolDispatchPlanCall[];
   readonly authorityRequiredCallIds: readonly string[];
@@ -95,6 +121,7 @@ export interface ToolBatchDispatchPlan {
   readonly notDispatchedCallIds: readonly string[];
   readonly dispatchedCallIds: readonly string[];
   readonly executionStatus: "not_dispatched" | "partially_dispatched" | "dispatched";
+  readonly schedulingStatus: ToolSchedulingPlan["executionMode"];
   readonly redactionStatus: "report-safe" | "redacted";
   readonly notProvenClaims: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -128,6 +155,12 @@ export interface ToolBatchDispatchResult {
   readonly dispatchPlan: ToolBatchDispatchPlan;
   readonly results: readonly ToolExecutionResult[];
   readonly resultDetails: readonly ToolResultDetail[];
+  readonly schedulingPlan: ToolSchedulingPlan;
+  readonly schedulingStates: readonly {
+    readonly toolCallId: string;
+    readonly executionState: ToolSchedulingExecutionState;
+    readonly terminalSuccessClaim: false;
+  }[];
   readonly executionReceipts: readonly RuntimeExecutionReceiptProjection[];
   readonly afterAnnotations: readonly ToolAfterObservationAnnotation[];
   readonly failedToolCallIds: readonly string[];
@@ -190,10 +223,8 @@ export function planToolBatchDispatch(input: {
   readonly policy?: ToolBatchPolicy;
   readonly caller?: string;
 }): ToolBatchDispatchPlan {
-  const dispatchPolicy = input.dispatchPolicy === "parallel"
-    ? "parallel-unsupported"
-    : input.dispatchPolicy ?? "metadata-only";
-  const calls = input.batch.calls.map((call) => {
+  const dispatchPolicy = input.dispatchPolicy ?? "metadata-only";
+  const policyInputs = input.batch.calls.map((call) => {
     const intent = createToolInterceptionIntent({
       toolId: call.id,
       toolKind: call.name,
@@ -206,12 +237,24 @@ export function planToolBatchDispatch(input: {
     });
     const beforePolicyDecision = input.policy?.(call, intent) ??
       defaultPolicyDecision(call, intent, dispatchPolicy);
+    const effectFacts = classifyToolEffect({ call, decision: beforePolicyDecision });
+    return { call, beforePolicyDecision, effectFacts };
+  });
+  const schedulingPlan = planToolScheduling({
+    batchId: input.batch.batchId,
+    requestedPolicy: dispatchPolicy,
+    calls: policyInputs.map(({ call, effectFacts }) => ({ call, effect: effectFacts })),
+  });
+  const calls = policyInputs.map(({ call, beforePolicyDecision, effectFacts }) => {
+    const schedulingFacts = schedulingPlan.calls.find((candidate) =>
+      candidate.toolCallId === call.id
+    );
     const redactionStatus: "report-safe" | "redacted" =
       call.redaction.status === "redacted" ||
       beforePolicyDecision.redactionStatus === "redacted"
         ? "redacted"
         : "report-safe";
-    const dispatchStatus = statusFromPolicy(call, beforePolicyDecision, dispatchPolicy);
+    const dispatchStatus = statusFromPolicy(call, beforePolicyDecision, dispatchPolicy, schedulingFacts);
     const knownToolStatus: ToolDispatchPlanCall["knownToolStatus"] =
       call.status === "unknown" || call.kind === "unknown" ? "unknown" : "known";
     const supportedStatus: ToolDispatchPlanCall["supportedStatus"] =
@@ -233,6 +276,18 @@ export function planToolBatchDispatch(input: {
       beforePolicyDecision,
       policyDecisionId: beforePolicyDecision.decisionId,
       authorityRequirement: beforePolicyDecision.authorityRequirement,
+      effect: effectFacts.effect,
+      effectReason: effectFacts.reason,
+      dependency: schedulingFacts?.dependency ?? {
+        kind: "unknown" as const,
+        afterCallIds: [],
+        conflictCallIds: [],
+        reason: "dependency facts unavailable",
+        terminalSuccessClaim: false as const,
+      },
+      schedulingDecision: schedulingFacts?.decision ?? "blocked",
+      ...(schedulingFacts?.groupId ? { schedulingGroupId: schedulingFacts.groupId } : {}),
+      schedulingGroupMode: schedulingFacts?.groupMode ?? "blocked",
       argumentSafety: call.redaction.status,
       redactionStatus,
       malformed: call.status === "malformed",
@@ -254,6 +309,8 @@ export function planToolBatchDispatch(input: {
     responseId: input.batch.responseId,
     ...(input.batch.turnId ? { turnId: input.batch.turnId } : {}),
     dispatchPolicy,
+    requestedDispatchPolicy: dispatchPolicy,
+    schedulingPlan,
     dispatchStatus,
     calls: freeze(calls),
     authorityRequiredCallIds: freeze(calls.filter((call) =>
@@ -282,6 +339,7 @@ export function planToolBatchDispatch(input: {
         ? "dispatched"
         : "partially_dispatched"
       : "not_dispatched",
+    schedulingStatus: schedulingPlan.executionMode,
     redactionStatus:
       input.batch.redaction.status === "redacted" ||
       calls.some((call) => call.redactionStatus === "redacted")
@@ -294,6 +352,7 @@ export function planToolBatchDispatch(input: {
       "tool-success",
       ...(dispatchStatus === "not_dispatched" ? ["tool-dispatch-not-run"] : []),
       ...input.batch.notProvenClaims,
+      ...schedulingPlan.notProvenClaims,
       ...calls.flatMap((call) => call.notProvenClaims),
     ]),
     terminalSuccessClaim: false,
@@ -309,27 +368,50 @@ export async function dispatchToolBatch(input: {
   readonly caller?: string;
 }): Promise<ToolBatchDispatchResult> {
   const dispatchPlan = planToolBatchDispatch(input);
-  const results: ToolExecutionResult[] = [];
-  const resultDetails: ToolResultDetail[] = [];
+  const byCallId = new Map<string, {
+    readonly result: ToolExecutionResult;
+    readonly detail: ToolResultDetail;
+    readonly annotation: ToolAfterObservationAnnotation;
+    readonly receipt?: RuntimeExecutionReceiptProjection;
+  }>();
   const executionReceipts: RuntimeExecutionReceiptProjection[] = [];
-  const afterAnnotations: ToolAfterObservationAnnotation[] = [];
   const failedToolCallIds: string[] = [];
   const notDispatchedToolCallIds: string[] = [];
+  const schedulingStates = new Map<string, ToolSchedulingExecutionState>();
+  const callById = new Map(input.batch.calls.map((call) => [call.id, call]));
 
-  for (const planned of dispatchPlan.calls) {
-    const call = input.batch.calls.find((candidate) => candidate.id === planned.toolCallId);
+  const executePlanned = async (planned: ToolDispatchPlanCall): Promise<void> => {
+    if (byCallId.has(planned.toolCallId)) {
+      return;
+    }
+    const call = callById.get(planned.toolCallId);
     if (!call) {
-      continue;
+      return;
     }
     let result: ToolExecutionResult;
     if (shouldPreventToolExecution(planned.beforePolicyDecision)) {
       result = createBlockedToolInterceptionResult(planned.beforePolicyDecision);
       notDispatchedToolCallIds.push(call.id);
-    } else if (!input.dispatch || planned.dispatchStatus !== "dispatched") {
+      schedulingStates.set(call.id, "blocked");
+    } else if (
+      !input.dispatch ||
+      planned.dispatchStatus !== "dispatched" ||
+      (
+        dispatchPlan.dispatchPolicy === "parallel" &&
+        planned.schedulingDecision !== "parallel_allowed" &&
+        planned.schedulingDecision !== "forced_sequential"
+      )
+    ) {
       result = createNotDispatchedResult(planned);
       notDispatchedToolCallIds.push(call.id);
+      schedulingStates.set(call.id, planned.schedulingDecision === "blocked" ? "blocked" : "skipped");
+    } else if (input.context.abortSignal?.aborted) {
+      result = createCancelledResult(planned);
+      failedToolCallIds.push(call.id);
+      schedulingStates.set(call.id, "cancelled");
     } else {
       try {
+        schedulingStates.set(call.id, "started");
         result = await input.dispatch(call, planned.beforePolicyDecision, input.context);
       } catch (error) {
         result = createDispatchFailedResult(planned, error);
@@ -347,6 +429,7 @@ export async function dispatchToolBatch(input: {
     if (!result.success) {
       failedToolCallIds.push(call.id);
     }
+    schedulingStates.set(call.id, stateFromResultStatus(resultStatus, result));
     const detail = createToolResultDetail({
       planned,
       result,
@@ -387,16 +470,56 @@ export async function dispatchToolBatch(input: {
         reportSafeSummary: detail.reportSafe.summary,
       });
 
-    results.push(result);
-    resultDetails.push(detail);
-    afterAnnotations.push(annotation);
+    byCallId.set(call.id, { result, detail, annotation, ...(receipt ? { receipt } : {}) });
+  };
+
+  if (dispatchPlan.dispatchPolicy === "parallel") {
+    for (const group of dispatchPlan.schedulingPlan.groups) {
+      const plannedGroup = group.toolCallIds
+        .map((toolCallId) => dispatchPlan.calls.find((planned) =>
+          planned.toolCallId === toolCallId
+        ))
+        .filter((planned): planned is ToolDispatchPlanCall => Boolean(planned));
+      if (input.context.abortSignal?.aborted) {
+        await Promise.all(plannedGroup.map(async (planned) => executePlanned(planned)));
+        continue;
+      }
+      if (group.mode === "parallel") {
+        await Promise.allSettled(plannedGroup.map(async (planned) => executePlanned(planned)));
+      } else {
+        for (const planned of plannedGroup) {
+          await executePlanned(planned);
+        }
+      }
+    }
+  } else {
+    for (const planned of dispatchPlan.calls) {
+      await executePlanned(planned);
+    }
   }
+
+  for (const planned of dispatchPlan.calls) {
+    await executePlanned(planned);
+  }
+
+  const ordered = dispatchPlan.calls
+    .map((planned) => byCallId.get(planned.toolCallId))
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  const results = ordered.map((item) => item.result);
+  const resultDetails = ordered.map((item) => item.detail);
+  const afterAnnotations = ordered.map((item) => item.annotation);
 
   return freeze({
     resultBatchId: sanitizeId(`tool-result-batch:${dispatchPlan.batchId}`),
     dispatchPlan,
     results: freeze(results),
     resultDetails: freeze(resultDetails),
+    schedulingPlan: dispatchPlan.schedulingPlan,
+    schedulingStates: freeze(dispatchPlan.calls.map((planned) => freeze({
+      toolCallId: planned.toolCallId,
+      executionState: schedulingStates.get(planned.toolCallId) ?? "skipped",
+      terminalSuccessClaim: false as const,
+    }))),
     executionReceipts: freeze(uniqueReceipts(executionReceipts)),
     afterAnnotations: freeze(afterAnnotations),
     failedToolCallIds: freeze(Array.from(new Set(failedToolCallIds))),
@@ -539,7 +662,7 @@ function defaultPolicyDecision(
       notProvenClaims: ["tool-dispatch-unsupported"],
     });
   }
-  if (dispatchPolicy !== "sequential") {
+  if (dispatchPolicy === "metadata-only") {
     return createToolBeforePolicyDecision({
       intent,
       status: "observe_only",
@@ -552,7 +675,9 @@ function defaultPolicyDecision(
   return createToolBeforePolicyDecision({
     intent,
     status: "allow",
-    reason: "sanctioned sequential dispatch boundary required",
+    reason: dispatchPolicy === "parallel"
+      ? "sanctioned read-only dispatch boundary required"
+      : "sanctioned sequential dispatch boundary required",
     policySource: "tool-batch-dispatch",
     reportSafeSummary: call.argumentSummary,
     notProvenClaims: ["task-success", "verification-success"],
@@ -563,6 +688,7 @@ function statusFromPolicy(
   call: NormalizedToolCall,
   decision: ToolBeforePolicyDecision,
   dispatchPolicy: ToolBatchDispatchPlan["dispatchPolicy"],
+  schedulingFacts?: ToolSchedulingCallFacts,
 ): ToolCallDispatchStatus {
   if (call.status === "malformed" || decision.status === "rejected") {
     return "blocked";
@@ -576,12 +702,31 @@ function statusFromPolicy(
   if (decision.status === "block") {
     return "blocked";
   }
+  if (decision.status === "observe_only") {
+    return "not_dispatched";
+  }
   if (call.redaction.status === "redacted" || !call.reportSafeArguments) {
     return "not_dispatched";
   }
-  if (dispatchPolicy !== "sequential" || decision.status === "observe_only") {
+  if (dispatchPolicy === "parallel") {
+    if (schedulingFacts?.decision === "authority_required") {
+      return "authority_required";
+    }
+    if (schedulingFacts?.decision === "unsupported") {
+      return "unsupported";
+    }
+    if (schedulingFacts?.decision === "blocked") {
+      return "blocked";
+    }
+  }
+  if (
+    dispatchPolicy === "parallel" &&
+    schedulingFacts?.decision !== "parallel_allowed" &&
+    schedulingFacts?.decision !== "forced_sequential"
+  ) {
     return "not_dispatched";
   }
+  if (dispatchPolicy === "metadata-only") return "not_dispatched";
   return "dispatched";
 }
 
@@ -746,6 +891,28 @@ function createNotDispatchedResult(planned: ToolDispatchPlanCall): ToolExecution
   };
 }
 
+function createCancelledResult(planned: ToolDispatchPlanCall): ToolExecutionResult {
+  return {
+    success: false,
+    content: planned.beforePolicyDecision.reportSafeSummary,
+    error: "tool dispatch cancelled",
+    reportSafe: {
+      redactionStatus: planned.redactionStatus,
+      notProvenClaims: unique([
+        ...planned.notProvenClaims,
+        "tool-dispatch-cancelled",
+      ]),
+      toolInterception: {
+        beforeDecision: planned.beforePolicyDecision,
+      },
+    },
+    metadata: {
+      executionStatus: "cancelled",
+      dispatchStatus: planned.dispatchStatus,
+    },
+  };
+}
+
 function createDispatchFailedResult(
   planned: ToolDispatchPlanCall,
   error: unknown,
@@ -840,16 +1007,58 @@ function detailStatusFromResult(
       ? "authority_denied"
       : "blocked_by_policy";
   }
+  if (planned.dispatchStatus === "blocked") {
+    return "blocked_by_policy";
+  }
+  if (planned.dispatchStatus === "authority_required") {
+    return "authority_required";
+  }
+  if (planned.dispatchStatus === "unsupported") {
+    return planned.unknownTool ? "unknown_tool" : "unsupported_tool";
+  }
   if (planned.dispatchStatus === "not_dispatched") {
     return "not_dispatched";
   }
+  const executionStatus = inputMetadataExecutionStatus(result);
+  if (executionStatus === "cancelled" || executionStatus === "canceled") {
+    return "cancelled";
+  }
+  if (executionStatus === "timeout" || executionStatus === "timed-out") {
+    return "timed_out";
+  }
+  if (executionStatus === "skipped") {
+    return "skipped";
+  }
   if (
     planned.dispatchStatus === "dispatched" &&
-    inputMetadataExecutionStatus(result) === "not-executed"
+    executionStatus === "not-executed"
   ) {
     return "execution_unavailable";
   }
   return result.success ? "executed_success" : "executed_failed";
+}
+
+function stateFromResultStatus(
+  status: ToolResultDetailStatus,
+  result: ToolExecutionResult,
+): ToolSchedulingExecutionState {
+  if (status === "executed_success") return "completed";
+  if (status === "executed_failed") return "failed";
+  if (status === "cancelled") return "cancelled";
+  if (status === "timed_out") return "timed_out";
+  if (status === "skipped" || status === "not_dispatched") return "skipped";
+  if (
+    status === "blocked_by_policy" ||
+    status === "authority_required" ||
+    status === "authority_denied" ||
+    status === "unsupported_tool" ||
+    status === "unknown_tool" ||
+    status === "malformed_arguments" ||
+    status === "execution_unavailable"
+  ) {
+    return "blocked";
+  }
+  return result.success ? "completed" : "failed";
 }
 
 function inputMetadataExecutionStatus(result: ToolExecutionResult): string | undefined {

@@ -156,6 +156,8 @@ export type RuntimeProjectionEventType =
   | "non-executed-result-message-prepared"
   | "tool-batch-observation-completed"
   | "tool-batch-dispatch-planned"
+  | "tool-scheduling-plan-observed"
+  | "tool-scheduling-group-observed"
   | "tool-dispatch-eligibility-observed"
   | "before-tool-policy-decided"
   | "tool-call-authority-required"
@@ -1335,6 +1337,8 @@ export function projectRuntimeEvents(input: {
         turnId: plan.turnId,
         dispatchPolicy: plan.dispatchPolicy,
         dispatchStatus: plan.dispatchStatus,
+        schedulingStatus: plan.schedulingStatus,
+        schedulingPlanId: plan.schedulingPlan.scheduleId,
         callCount: plan.calls.length,
         blockedCallIds: plan.blockedCallIds,
         authorityRequiredCallIds: plan.authorityRequiredCallIds,
@@ -1345,6 +1349,37 @@ export function projectRuntimeEvents(input: {
       },
       plan.notProvenClaims,
     );
+    append(
+      "tool-scheduling-plan-observed",
+      {
+        scheduleId: plan.schedulingPlan.scheduleId,
+        batchId: plan.schedulingPlan.batchId,
+        requestedPolicy: plan.schedulingPlan.requestedPolicy,
+        executionMode: plan.schedulingPlan.executionMode,
+        parallelGroupIds: plan.schedulingPlan.parallelGroupIds,
+        sequentialGroupIds: plan.schedulingPlan.sequentialGroupIds,
+        blockedCallIds: plan.schedulingPlan.blockedCallIds,
+        skippedCallIds: plan.schedulingPlan.skippedCallIds,
+        deterministicOrder: plan.schedulingPlan.deterministicOrder,
+        terminalSuccessClaim: false,
+      },
+      plan.schedulingPlan.notProvenClaims,
+    );
+    for (const group of plan.schedulingPlan.groups) {
+      append(
+        "tool-scheduling-group-observed",
+        {
+          scheduleId: plan.schedulingPlan.scheduleId,
+          groupId: group.groupId,
+          mode: group.mode,
+          toolCallIds: group.toolCallIds,
+          dependsOnGroupIds: group.dependsOnGroupIds,
+          executionState: group.executionState,
+          terminalSuccessClaim: false,
+        },
+        plan.schedulingPlan.notProvenClaims,
+      );
+    }
     for (const call of plan.calls) {
       const facts = {
         planId: plan.planId,
@@ -1361,6 +1396,13 @@ export function projectRuntimeEvents(input: {
         decisionId: call.beforePolicyDecision.decisionId,
         decisionStatus: call.beforePolicyDecision.status,
         authorityRequirement: call.authorityRequirement,
+        effect: call.effect,
+        dependencyKind: call.dependency.kind,
+        dependencyAfterCallIds: call.dependency.afterCallIds,
+        dependencyConflictCallIds: call.dependency.conflictCallIds,
+        schedulingDecision: call.schedulingDecision,
+        schedulingGroupId: call.schedulingGroupId,
+        schedulingGroupMode: call.schedulingGroupMode,
         redactionStatus: call.redactionStatus,
         terminalSuccessClaim: false,
       };
@@ -2860,6 +2902,12 @@ export function projectRuntimeEvents(input: {
         toolOutcomeBundleId: summary.toolOutcomeBundleId,
         toolOutcomeStatus: summary.toolOutcomeStatus,
         toolOutcomeNextAction: summary.toolOutcomeNextAction,
+        toolSchedulingPlanId: summary.toolSchedulingPlanId,
+        toolSchedulingStatus: summary.toolSchedulingStatus,
+        toolSchedulingParallelGroupIds: summary.toolSchedulingParallelGroupIds,
+        toolSchedulingSequentialGroupIds: summary.toolSchedulingSequentialGroupIds,
+        toolSchedulingBlockedCallIds: summary.toolSchedulingBlockedCallIds,
+        toolSchedulingDeterministicOrder: summary.toolSchedulingDeterministicOrder,
         toolOutcomeBlockedReasons: summary.toolOutcomeBlockedReasons,
         contextRebuildInputId: summary.contextRebuildInputId,
         contextRebuildProjectionId: summary.contextRebuildProjectionId,

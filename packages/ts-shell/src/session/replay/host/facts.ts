@@ -27,6 +27,9 @@ export function projectHostReplayFacts(input: {
           replay.summaryId,
           ...replay.retainedContextFactIds,
           ...replay.toolResultMessageIds,
+          ...(replay.toolSchedulingPlanId ? [replay.toolSchedulingPlanId] : []),
+          ...(replay.toolSchedulingParallelGroupIds ?? []),
+          ...(replay.toolSchedulingSequentialGroupIds ?? []),
           ...replay.verificationHandoffIds,
           ...replay.repairHandoffIds,
         ]

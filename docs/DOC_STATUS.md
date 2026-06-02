@@ -73,6 +73,7 @@ It does not claim every historical note is perfectly classified.
 |---|---|---|---|---|
 | `docs/sprint/sprint-working-index.md` | active | Starting sprint capability planning or checking which sprint docs are current. |  | Sprint Knowledge Base |
 | `docs/sprint/current-capability-summary.md` | active | Checking code-backed current capability status and missing areas before planning new capability batches. |  | Sprint Knowledge Base |
+| `docs/sprint/component-adoption-log.md` | active | Checking controlled component or behavior adoption decisions, boundaries, validation evidence, and rollback plans for sprint capability work. |  | Sprint Knowledge Base |
 | `docs/sprint/mature-agent-capability-map.md` | active | Checking the full mature capability target extracted from the local implementation and public docs named in the blueprint. |  | Sprint Knowledge Base |
 | `docs/sprint/project-gap-and-priority-plan.md` | active | Selecting aggressive capability batches, owner domains, validation expectations, and anti-goals. |  | Sprint Knowledge Base |
 

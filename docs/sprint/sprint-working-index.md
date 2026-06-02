@@ -9,6 +9,7 @@ sections instead of appending progress logs.
 | Document | Status | Purpose |
 |---|---|---|
 | `docs/sprint/current-capability-summary.md` | current | Code-backed summary of what this project has already absorbed and what remains unproven. |
+| `docs/sprint/component-adoption-log.md` | current | Controlled component and behavior adoption decisions, modes, boundaries, validation, and rollback plans. |
 | `docs/sprint/mature-agent-capability-map.md` | current | Capability extraction from the mature local implementation and public docs named in the blueprint. |
 | `docs/sprint/project-gap-and-priority-plan.md` | current | Aggressive but bounded batch plan for moving toward the mature capability set. |
 | `docs/sprint/route/sp001-agent-capability-map-and-plan.md` | current route input | Original sprint objective and completion requirements. |
@@ -20,6 +21,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp007-complete-session-branch-compaction-runtime.md` | completed route input | Storage-backed session branch and compaction runtime objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp008-complete-host-contract-and-evaluation-runtime.md` | completed route input | Host command contract and deterministic evaluation runtime objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp009-real-provider-compatibility-and-evaluation-hardening.md` | completed route input | Provider compatibility and evaluation hardening objective now reflected in current capability and priority docs. |
+| `docs/sprint/route/sp010-controlled-component-adoption-and-parallel-tool-runtime.md` | completed route input | Controlled component adoption and read-only parallel tool runtime objective now reflected in current capability, priority, and adoption-log docs. |
 
 ## Removed Or Merged Content
 
@@ -48,6 +50,9 @@ sections instead of appending progress logs.
 - Product code must stay owner-domain-first and avoid route, process-history,
   comparison, or outside-project vocabulary.
 - Real provider behavior stays default-off and explicit opt-in only.
+- Component adoption must be logged in `docs/sprint/component-adoption-log.md`
+  with mode, owner, side-effect boundary, truth boundary, validation evidence,
+  and rollback plan.
 - Terminal truth stays in `evidence`/`result`; provider calls, tool outcomes,
   mutation apply, rollback, repair observations, events, replay, summaries, and
   presentation are not success.

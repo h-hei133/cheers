@@ -139,6 +139,10 @@ describe("host command runtime", () => {
     expect(suite.suiteId).toBe("deterministic-host-evaluation");
     expect(suite.results.map((result) => result.scenarioId)).toEqual([
       "read-only-tool-loop",
+      "parallel-tool-happy",
+      "parallel-tool-dependency",
+      "parallel-tool-blocked",
+      "parallel-tool-partial-failure",
       "provider-blocked",
       "provider-compatibility-happy",
       "provider-readiness-blocked",
@@ -152,7 +156,7 @@ describe("host command runtime", () => {
       "branch-compaction-continuation",
       "missing-proof",
     ]);
-    expect(suite.results.length).toBe(13);
+    expect(suite.results.length).toBe(17);
     expect(suite.blockedCount).toBeGreaterThanOrEqual(1);
     expect(suite.unsupportedCount).toBeGreaterThanOrEqual(1);
     expect(suite.skippedCount).toBeGreaterThanOrEqual(1);
@@ -166,6 +170,18 @@ describe("host command runtime", () => {
         .find((result) => result.scenarioId === "provider-fallback")
         ?.hostResponse.events.map((event) => event.eventType),
     ).toContain("provider-fallback-completed-as-provider-fact");
+    expect(
+      suite.results
+        .find((result) => result.scenarioId === "parallel-tool-happy")
+        ?.hostResponse.events.map((event) => event.eventType),
+    ).toContain("tool-scheduling-plan-observed");
+    expect(
+      suite.results
+        .find((result) => result.scenarioId === "parallel-tool-happy")
+        ?.hostResponse.details.replayFacts?.retainedFactIds.some((id) =>
+          id.includes("tool-schedule:")
+        ),
+    ).toBe(true);
     expect(
       suite.results
         .find((result) => result.scenarioId === "provider-readiness-blocked")

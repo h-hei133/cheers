@@ -2,6 +2,10 @@ import type { HostCommandBlocker, HostCommandResponse } from "../api/host/contra
 
 export type EvaluationCaseId =
   | "read-only-tool-loop"
+  | "parallel-tool-happy"
+  | "parallel-tool-dependency"
+  | "parallel-tool-blocked"
+  | "parallel-tool-partial-failure"
   | "provider-blocked"
   | "provider-compatibility-happy"
   | "provider-readiness-blocked"
@@ -121,6 +125,10 @@ export async function runEvaluationSuite(input: {
 }): Promise<EvaluationSuiteResult> {
   const caseIds = input.caseIds ?? [
     "read-only-tool-loop",
+    "parallel-tool-happy",
+    "parallel-tool-dependency",
+    "parallel-tool-blocked",
+    "parallel-tool-partial-failure",
     "provider-blocked",
     "provider-compatibility-happy",
     "provider-readiness-blocked",
@@ -159,6 +167,10 @@ export async function runEvaluationSuite(input: {
 export function listEvaluationCases(): readonly EvaluationCaseDefinition[] {
   return freeze([
     readOnlyToolLoop(),
+    parallelToolHappy(),
+    parallelToolDependency(),
+    parallelToolBlocked(),
+    parallelToolPartialFailure(),
     providerBlocked(),
     providerCompatibilityHappy(),
     providerReadinessBlocked(),
@@ -241,6 +253,80 @@ function readOnlyToolLoop(): EvaluationCaseDefinition {
     expectedStatus: "running",
     expectedNextAction: "preserve structured host facts",
     expectedEvidenceVerdict: "not-proven",
+    expectedEventCategories: ["provider", "tool"],
+  });
+}
+
+function parallelToolHappy(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "parallel-tool-happy",
+    input: "parallel tool happy",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "parallel tool happy",
+      mode: "read-only",
+      providerMode: "synthetic",
+      correlationId: "eval-parallel-tool-happy",
+    },
+    expectedStatus: "running",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "not-proven",
+    expectedEventCategories: ["provider", "tool"],
+  });
+}
+
+function parallelToolDependency(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "parallel-tool-dependency",
+    input: "parallel tool dependency",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "parallel tool dependency",
+      mode: "read-only",
+      providerMode: "synthetic",
+      correlationId: "eval-parallel-tool-dependency",
+    },
+    expectedStatus: "running",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "not-proven",
+    expectedEventCategories: ["provider", "tool"],
+  });
+}
+
+function parallelToolBlocked(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "parallel-tool-blocked",
+    input: "parallel tool blocked",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "parallel tool blocked",
+      mode: "read-only",
+      providerMode: "synthetic",
+      correlationId: "eval-parallel-tool-blocked",
+    },
+    expectedStatus: "running",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "not-proven",
+    expectedCaseStatus: "blocked",
+    expectedEventCategories: ["provider", "tool"],
+  });
+}
+
+function parallelToolPartialFailure(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "parallel-tool-partial-failure",
+    input: "parallel tool partial failure",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "parallel tool partial failure",
+      mode: "read-only",
+      providerMode: "synthetic",
+      correlationId: "eval-parallel-tool-partial-failure",
+    },
+    expectedStatus: "running",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "not-proven",
+    expectedCaseStatus: "not-proven",
     expectedEventCategories: ["provider", "tool"],
   });
 }

@@ -293,10 +293,11 @@ export function projectProductSurfaceViewModel(
 function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
   const events = input.runtimeEvents ?? [];
   const outcome = events.find((event) => event.type === "tool-outcome-bundle-observed");
+  const schedule = events.find((event) => event.type === "tool-scheduling-plan-observed");
   const nextAction = events.find((event) => event.type === "tool-result-next-action-observed");
   const nextTurn = events.find((event) => event.type === "next-turn-bundle-prepared");
   const savePointInput = events.find((event) => event.type === "save-point-input-prepared");
-  if (!outcome && !nextAction && !nextTurn && !savePointInput) {
+  if (!outcome && !schedule && !nextAction && !nextTurn && !savePointInput) {
     return [];
   }
 
@@ -311,6 +312,7 @@ function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSec
     status: "observed",
     summary: [
       outcome ? `outcome=${factValue(outcome.facts.mixedOutcomeStatus)}` : undefined,
+      schedule ? `schedule=${factValue(schedule.facts.executionMode)}` : undefined,
       nextAction ? `nextAction=${factValue(nextAction.facts.nextAction)}` : undefined,
       savePointInput ? `savePointInput=${factValue(savePointInput.facts.savePointInputId)}` : undefined,
       nextTurn ? `nextTurn=${factValue(nextTurn.facts.readinessStatus)}` : undefined,
@@ -333,6 +335,25 @@ function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSec
               label: "failed",
               value: factValue(outcome.facts.failedCount),
               machineEventCorrelationId: outcome.id,
+            },
+          ]
+        : []),
+      ...(schedule
+        ? [
+            {
+              label: "schedule",
+              value: factValue(schedule.facts.executionMode),
+              machineEventCorrelationId: schedule.id,
+            },
+            {
+              label: "parallelGroups",
+              value: factValue(schedule.facts.parallelGroupIds),
+              machineEventCorrelationId: schedule.id,
+            },
+            {
+              label: "deterministicOrder",
+              value: factValue(schedule.facts.deterministicOrder),
+              machineEventCorrelationId: schedule.id,
             },
           ]
         : []),
@@ -360,11 +381,12 @@ function toolOutcomeEventSections(input: ProductSurfaceInput): ProductSurfaceSec
           ]
         : []),
     ],
-    machineEventCorrelationIds: [outcome?.id, nextAction?.id, savePointInput?.id, nextTurn?.id]
+    machineEventCorrelationIds: [outcome?.id, schedule?.id, nextAction?.id, savePointInput?.id, nextTurn?.id]
       .filter((id): id is string => Boolean(id)),
     notProvenClaims: events
       .filter((event) =>
         event.type === "tool-outcome-bundle-observed" ||
+        event.type === "tool-scheduling-plan-observed" ||
         event.type === "tool-result-next-action-observed" ||
         event.type === "save-point-input-prepared" ||
         event.type === "next-turn-bundle-prepared"
@@ -854,10 +876,13 @@ function replayCarryForwardEventSections(input: ProductSurfaceInput): ProductSur
       `summary=${factValue(summary.facts.summaryId)}`,
       `request=${factValue(summary.facts.requestReadinessStatus)}`,
       `toolOutcome=${factValue(summary.facts.toolOutcomeStatus)}`,
+      summary.facts.toolSchedulingStatus
+        ? `toolSchedule=${factValue(summary.facts.toolSchedulingStatus)}`
+        : undefined,
       `nextAction=${factValue(summary.facts.toolOutcomeNextAction)}`,
       `provider=${factValue(summary.facts.providerInvocationStatus)}`,
       "terminalSuccessClaim=false",
-    ].join("; "),
+    ].filter(Boolean).join("; "),
     facts: [
       {
         label: "activePath",
@@ -882,6 +907,16 @@ function replayCarryForwardEventSections(input: ProductSurfaceInput): ProductSur
       {
         label: "toolOutcome",
         value: factValue(summary.facts.toolOutcomeBundleId),
+        machineEventCorrelationId: summary.id,
+      },
+      {
+        label: "toolSchedule",
+        value: factValue(summary.facts.toolSchedulingPlanId),
+        machineEventCorrelationId: summary.id,
+      },
+      {
+        label: "toolScheduleOrder",
+        value: factValue(summary.facts.toolSchedulingDeterministicOrder),
         machineEventCorrelationId: summary.id,
       },
       {

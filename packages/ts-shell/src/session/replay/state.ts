@@ -5,6 +5,7 @@ import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js
 import type { NextTurnModelRequestPreparation } from "../../provider/request/boundary.js";
 import type { ControlledModelInvocationAdapterProjection } from "../../provider/request/attempt.js";
 import type { ToolOutcomeBundleProjection } from "../../tools/toolOutcomeBundle.js";
+import type { ToolBatchDispatchPlan } from "../../tools/toolBatchDispatch.js";
 import type { ReplaySafePlanningStateFacts } from "../../context/memory/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../../repair/handoff/boundary.js";
 import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
@@ -55,6 +56,12 @@ export interface ReplaySafeLoopStateSummary {
   readonly toolOutcomeBundleId?: string;
   readonly toolOutcomeStatus?: string;
   readonly toolOutcomeNextAction?: string;
+  readonly toolSchedulingPlanId?: string;
+  readonly toolSchedulingStatus?: string;
+  readonly toolSchedulingParallelGroupIds?: readonly string[];
+  readonly toolSchedulingSequentialGroupIds?: readonly string[];
+  readonly toolSchedulingBlockedCallIds?: readonly string[];
+  readonly toolSchedulingDeterministicOrder?: readonly string[];
   readonly toolOutcomeBlockedReasons: readonly string[];
   readonly continuationReadinessStatus?: string;
   readonly steeringMessageIds: readonly string[];
@@ -129,6 +136,7 @@ export function summarizeReplaySafeLoopState(input: {
   readonly nextTurnBundle?: NextTurnBundleProjection;
   readonly requestPreparation?: NextTurnModelRequestPreparation;
   readonly toolOutcomeBundle?: ToolOutcomeBundleProjection;
+  readonly toolDispatchPlan?: ToolBatchDispatchPlan;
   readonly toolResultMessages?: ToolResultMessageBatch;
   readonly verificationIntents?: readonly VerificationLoopIntent[];
   readonly verificationResults?: readonly VerificationResultObservation[];
@@ -234,6 +242,16 @@ export function summarizeReplaySafeLoopState(input: {
           toolOutcomeNextAction: input.toolOutcomeBundle.carryForwardFacts.nextAction,
         }
       : {}),
+    ...(input.toolDispatchPlan
+      ? {
+          toolSchedulingPlanId: input.toolDispatchPlan.schedulingPlan.scheduleId,
+          toolSchedulingStatus: input.toolDispatchPlan.schedulingPlan.executionMode,
+          toolSchedulingParallelGroupIds: input.toolDispatchPlan.schedulingPlan.parallelGroupIds,
+          toolSchedulingSequentialGroupIds: input.toolDispatchPlan.schedulingPlan.sequentialGroupIds,
+          toolSchedulingBlockedCallIds: input.toolDispatchPlan.schedulingPlan.blockedCallIds,
+          toolSchedulingDeterministicOrder: input.toolDispatchPlan.schedulingPlan.deterministicOrder,
+        }
+      : {}),
     toolOutcomeBlockedReasons: input.toolOutcomeBundle?.carryForwardFacts.blockedReasons ?? [],
     ...(input.requestPreparation?.continuationReadinessStatus
       ? { continuationReadinessStatus: input.requestPreparation.continuationReadinessStatus }
@@ -289,6 +307,7 @@ export function summarizeReplaySafeLoopState(input: {
       ...input.continuationReadiness.notProvenClaims,
       ...(input.requestPreparation?.notProvenClaims ?? []),
       ...(input.toolOutcomeBundle?.notProvenClaims ?? []),
+      ...(input.toolDispatchPlan?.notProvenClaims ?? []),
       ...mutationRecoveries.flatMap((item) => item.notProvenClaims),
     ],
     redaction: {

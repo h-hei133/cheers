@@ -350,20 +350,35 @@ async function runSharedLane(input: {
     ...(providerRegistry ? { providerRegistry, providerId: "provider-a", modelLabel: "Primary Model" } : {}),
     maxTurns: input.envelope.mode === "read-only" ? 2 : 1,
     executePreparedNextTurn: input.envelope.mode === "read-only",
-    toolBatchPolicy: "sequential",
+    toolBatchPolicy: input.envelope.inputText?.includes("parallel tool")
+      ? "parallel"
+      : "sequential",
     sessionProjection,
     contextRebuildProjection,
     contextRebuildInput: rebuildInput,
     continuationReadiness,
     modelBoundary: syntheticBoundary,
-    toolBatchDispatch: async (call) => ({
-      success: true,
-      content: call.name === "read" ? "safe file summary" : "controlled mutation request observed",
-      reportSafe: {
-        redactionStatus: "report-safe",
-        notProvenClaims: ["tool-result-is-not-task-success"],
-      },
-    }),
+    toolBatchDispatch: async (call) => {
+      if (input.envelope.inputText?.includes("parallel tool partial failure") && call.id === "call-read-b") {
+        return {
+          success: false,
+          content: "safe failure summary",
+          error: "read-only tool failed",
+          reportSafe: {
+            redactionStatus: "report-safe" as const,
+            notProvenClaims: ["tool-result-is-not-task-success"],
+          },
+        };
+      }
+      return {
+        success: true,
+        content: call.name === "read" ? `safe file summary ${call.id}` : "controlled mutation request observed",
+        reportSafe: {
+          redactionStatus: "report-safe",
+          notProvenClaims: ["tool-result-is-not-task-success"],
+        },
+      };
+    },
     ...(providerCase === "compatibility-happy"
       ? {
           controlledModelInvocationExecutor: () => ({
@@ -457,6 +472,7 @@ async function runSharedLane(input: {
       : {}),
   });
   const latestTurn = loop.turns.at(-1);
+  const latestToolTurn = [...loop.turns].reverse().find((turn) => turn.toolResultBatch);
   const latestProviderTurn = [...loop.turns].reverse().find((turn) =>
     turn.nextTurn.requestPreparation || turn.nextTurn.controlledInvocation
   );
@@ -471,8 +487,9 @@ async function runSharedLane(input: {
     controlledModelInvocations: latestProviderTurn?.nextTurn.controlledInvocation
       ? [latestProviderTurn.nextTurn.controlledInvocation]
       : [],
-    toolOutcomeBundle: latestTurn?.toolResultBatch?.outcomeBundle,
-    toolResultMessages: latestTurn?.toolResultBatch?.resultMessages,
+    toolDispatchPlan: latestToolTurn?.toolResultBatch?.dispatchPlan,
+    toolOutcomeBundle: latestToolTurn?.toolResultBatch?.outcomeBundle,
+    toolResultMessages: latestToolTurn?.toolResultBatch?.resultMessages,
     mutationRecoveries: latestTurn?.mutationRecovery
       ? [latestTurn.mutationRecovery]
       : [],
@@ -651,6 +668,83 @@ function programFor(envelope: HostCommandEnvelope) {
           finishReason: "tool_calls" as const,
         },
       }],
+    };
+  }
+  if (envelope.inputText?.includes("parallel tool dependency")) {
+    return {
+      steps: [
+        {
+          kind: "completed" as const,
+          response: {
+            content: "read dependent safe context",
+            toolCalls: [
+              { id: "call-read-a", name: "read", arguments: { path: "src/a.ts" } },
+              {
+                id: "call-read-b",
+                name: "read",
+                arguments: { path: "src/b.ts", afterCallIds: ["call-read-a"] },
+              },
+            ],
+            finishReason: "tool_calls" as const,
+          },
+        },
+        { kind: "completed" as const, response: { content: "safe final response", finishReason: "stop" as const } },
+      ],
+    };
+  }
+  if (envelope.inputText?.includes("parallel tool blocked")) {
+    return {
+      steps: [
+        {
+          kind: "completed" as const,
+          response: {
+            content: "blocked tool mix",
+            toolCalls: [
+              { id: "call-read-a", name: "read", arguments: { path: "src/a.ts" } },
+              { id: "call-edit", name: "edit", arguments: { path: "src/a.ts", oldText: "old", newText: "new" } },
+              { id: "call-unknown", name: "unknown-tool", arguments: { dependency: "unknown" } },
+            ],
+            finishReason: "tool_calls" as const,
+          },
+        },
+      ],
+    };
+  }
+  if (envelope.inputText?.includes("parallel tool partial failure")) {
+    return {
+      steps: [
+        {
+          kind: "completed" as const,
+          response: {
+            content: "read partial safe context",
+            toolCalls: [
+              { id: "call-read-a", name: "read", arguments: { path: "src/a.ts" } },
+              { id: "call-read-b", name: "read", arguments: { path: "src/b.ts" } },
+              { id: "call-read-c", name: "read", arguments: { path: "src/c.ts" } },
+            ],
+            finishReason: "tool_calls" as const,
+          },
+        },
+      ],
+    };
+  }
+  if (envelope.inputText?.includes("parallel tool happy")) {
+    return {
+      steps: [
+        {
+          kind: "completed" as const,
+          response: {
+            content: "read independent safe context",
+            toolCalls: [
+              { id: "call-read-a", name: "read", arguments: { path: "src/a.ts" } },
+              { id: "call-read-b", name: "read", arguments: { path: "src/b.ts" } },
+              { id: "call-glob", name: "glob", arguments: { pattern: "src/*.ts" } },
+            ],
+            finishReason: "tool_calls" as const,
+          },
+        },
+        { kind: "completed" as const, response: { content: "safe final response", finishReason: "stop" as const } },
+      ],
     };
   }
   return {

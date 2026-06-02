@@ -13,10 +13,11 @@ completion.
   runtime boundary, a controlled mutation recovery lane, and a storage-backed
   branch/compaction runtime lane are consolidated. The in-process host command
   contract, deterministic evaluation runtime, and controlled provider
-  compatibility/evaluation hardening are now proven for local synthetic and
-  injected lanes, while live provider defaults, broad auth refresh, SDK/RPC
-  servers, broad parallel mutation, broad interactive branch navigation UX, and
-  dynamic execution areas remain unproven.
+  compatibility/evaluation hardening and controlled read-only parallel tool
+  runtime are now proven for local synthetic and injected lanes, while live
+  provider defaults, broad auth refresh, SDK/RPC servers, broad parallel
+  mutation, broad interactive branch navigation UX, and dynamic execution areas
+  remain unproven.
 - CLI/session UX now has a structured status envelope for product-loop truth and
   branch/compaction runtime facts, but full queue ergonomics, broad interactive
   branch navigation, compact/resume controls, and broader session management
@@ -35,11 +36,16 @@ completion.
   Live execution remains explicit opt-in and default-off.
 - Extension/package support is governance-only; dynamic execution is absent by
   design.
-- Tool execution has policy/receipt/outcome boundaries, and bounded mutation
-  recovery now connects policy, authority, stale-read, snapshot/restore
-  planning, apply observation, verification, rollback or repair, post-repair
-  verification, and result verdict. Broad parallel mutation, conflict queues,
-  and wide snapshot/revert-backed editing remain unproven.
+- Tool execution has policy/receipt/outcome boundaries. Controlled read-only
+  parallel execution now connects effect and dependency classification, policy,
+  scheduling, sanctioned dispatch, deterministic result ordering, partial
+  failure/cancel/timeout/skipped facts, result messages, next-turn preparation,
+  events, host evaluation, replay, product surface, and CLI/session status.
+  Bounded mutation recovery connects policy, authority, stale-read,
+  snapshot/restore planning, apply observation, verification, rollback or
+  repair, post-repair verification, and result verdict. Broad parallel
+  mutation, conflict queues, and wide snapshot/revert-backed editing remain
+  unproven.
 - Verification/repair can prove repair-to-success through the product path for
   controlled mutation recovery; broader task-relevant verification planning
   across arbitrary tools and live-provider cases remains unproven.
@@ -257,6 +263,41 @@ completion.
   required for completion and remains default-off; broad SDK/RPC servers,
   dynamic execution, browser automation, external tool servers, and broad
   parallel mutation remain unproven.
+
+### Completed Batch: Controlled Read-Only Parallel Tool Runtime
+
+- Proven result: controlled synthetic provider tool calls now flow through
+  effect classification, dependency facts, policy, read-only parallel scheduling,
+  sanctioned dispatch, deterministic result ordering, partial
+  failure/cancel/timeout/skipped facts, tool result messages, next-turn
+  preparation, runtime events, host evaluation, replay-safe carry-forward,
+  product surface, CLI/session status, and evidence/result truth boundaries.
+- User-facing value: independent read-only tools can run in parallel without
+  changing model-facing result order, while ordered dependencies run
+  deterministically, mutation/unknown/authority/unsupported/conflicting tools do
+  not enter parallel execution, partial failures stay visible, and missing proof
+  remains not-proven.
+- Owner domains: `tools/policy`, `tools/scheduling`, `tools`, `turn`,
+  `runtime/loop`, `runtime/events`, `runtime/api`, `runtime/evaluation`,
+  `session/replay`, `session/presentation`, `presentation`, `core/shell`,
+  `evidence`, and `result`.
+- Evidence: `packages/ts-shell/src/tools/toolBatchDispatch.test.ts`,
+  `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts`,
+  `packages/ts-shell/src/runtime/api/host/runtime.test.ts`,
+  `packages/ts-shell/src/runtime/events/projection.test.ts`,
+  `packages/ts-shell/src/session/replay/state.test.ts`,
+  `packages/ts-shell/src/session/presentation/envelope.test.ts`,
+  `packages/ts-shell/src/presentation/surface/model.test.ts`,
+  `packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts`, and the
+  focused evidence/result truth tests.
+- Boundary: only read-only tool calls with safe independent dependency facts can
+  run in parallel. Mutation tools, unknown-effect tools, authority-required
+  tools, unsupported tools, and conflicting tools remain outside parallel
+  execution. Scheduling, policy allow, dispatch, result messages, next-turn
+  preparation, host evaluation, events, replay, product surface, and CLI/session
+  status are not terminal success. Live provider behavior, external tool
+  servers, dynamic loading, browser automation, command allowlist expansion,
+  arbitrary writer behavior, and broad parallel mutation remain unproven.
 
 ## Medium-Term Runtime Capability Batches
 

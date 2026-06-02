@@ -141,6 +141,134 @@ describe("tool batch dispatch", () => {
     ]);
     expect(result.notDispatchedToolCallIds).toEqual(["call-redacted"]);
   });
+
+  it("plans independent read-only calls as one parallel group and excludes mutation from parallel dispatch", async () => {
+    const dispatched: string[] = [];
+    const result = await dispatchToolBatch({
+      batch: batch([
+        { id: "call-read-a", name: "read", arguments: { path: "a.ts" } },
+        { id: "call-read-b", name: "read", arguments: { path: "b.ts" } },
+        { id: "call-edit", name: "edit", arguments: { path: "a.ts", oldText: "old", newText: "new" } },
+      ]),
+      context: { taskId: "task", workspaceRoot: "/workspace" },
+      dispatchPolicy: "parallel",
+      dispatch: async (call) => {
+        dispatched.push(call.id);
+        return { success: true, content: `safe ${call.id}` };
+      },
+    });
+
+    expect(result.dispatchPlan.schedulingPlan.executionMode).toBe("parallel_read_only");
+    expect(result.dispatchPlan.schedulingPlan.parallelGroupIds).toHaveLength(1);
+    expect(result.dispatchPlan.calls.map((call) => call.effect)).toEqual([
+      "read_only",
+      "read_only",
+      "mutation",
+    ]);
+    expect(dispatched).toEqual(["call-read-a", "call-read-b"]);
+    expect(result.dispatchPlan.calls.find((call) => call.toolCallId === "call-edit")?.dispatchStatus).not.toBe("dispatched");
+    expect(result.resultDetails.map((detail) => detail.toolCallId)).toEqual([
+      "call-read-a",
+      "call-read-b",
+      "call-edit",
+    ]);
+    expect(result.terminalSuccessClaim).toBe(false);
+  });
+
+  it("keeps deterministic result order when parallel completions arrive out of order", async () => {
+    const finished: string[] = [];
+    const result = await dispatchToolBatch({
+      batch: batch([
+        { id: "call-read-slow", name: "read", arguments: { path: "slow.ts" } },
+        { id: "call-read-fast", name: "read", arguments: { path: "fast.ts" } },
+      ]),
+      context: { taskId: "task", workspaceRoot: "/workspace" },
+      dispatchPolicy: "parallel",
+      dispatch: async (call) => {
+        if (call.id === "call-read-slow") {
+          await new Promise((resolve) => setTimeout(resolve, 15));
+        }
+        finished.push(call.id);
+        return { success: true, content: `safe ${call.id}` };
+      },
+    });
+
+    expect(finished).toEqual(["call-read-fast", "call-read-slow"]);
+    expect(result.dispatchPlan.schedulingPlan.deterministicOrder).toEqual([
+      "call-read-slow",
+      "call-read-fast",
+    ]);
+    expect(result.resultDetails.map((detail) => detail.toolCallId)).toEqual([
+      "call-read-slow",
+      "call-read-fast",
+    ]);
+  });
+
+  it("records cancellation, timeout, skipped dependent, blocked conflict, and partial failure facts", async () => {
+    const controllerBefore = new AbortController();
+    controllerBefore.abort();
+    const cancelledBefore = await dispatchToolBatch({
+      batch: batch([{ id: "call-read", name: "read", arguments: { path: "a.ts" } }]),
+      context: { taskId: "task", workspaceRoot: "/workspace", abortSignal: controllerBefore.signal },
+      dispatchPolicy: "parallel",
+      dispatch: async () => ({ success: true, content: "not reached" }),
+    });
+    const controllerDuring = new AbortController();
+    const cancelledDuring = await dispatchToolBatch({
+      batch: batch([
+        { id: "call-read-a", name: "read", arguments: { path: "a.ts", afterCallIds: ["call-read-missing"] } },
+        { id: "call-read-b", name: "read", arguments: { path: "b.ts", afterCallIds: ["call-read-a"] } },
+      ]),
+      context: { taskId: "task", workspaceRoot: "/workspace", abortSignal: controllerDuring.signal },
+      dispatchPolicy: "parallel",
+      dispatch: async (call) => {
+        if (call.id === "call-read-a") {
+          controllerDuring.abort();
+          return { success: true, content: "safe before cancellation" };
+        }
+        return { success: true, content: "not reached" };
+      },
+    });
+    const timeout = await dispatchToolBatch({
+      batch: batch([{ id: "call-read-timeout", name: "read", arguments: { path: "timeout.ts" } }]),
+      context: { taskId: "task", workspaceRoot: "/workspace" },
+      dispatchPolicy: "parallel",
+      dispatch: async () => ({
+        success: false,
+        content: "safe timeout summary",
+        metadata: { executionStatus: "timeout" },
+      }),
+    });
+    const blocked = await dispatchToolBatch({
+      batch: batch([
+        { id: "call-read-conflict", name: "read", arguments: { path: "a.ts", conflictsWithCallIds: ["call-read-other"] } },
+        { id: "call-unsupported-dependent", name: "unsupported-tool", arguments: { afterCallIds: ["call-read-conflict"] } },
+      ]),
+      context: { taskId: "task", workspaceRoot: "/workspace" },
+      dispatchPolicy: "parallel",
+      dispatch: async () => ({ success: true, content: "not reached" }),
+    });
+
+    expect(cancelledBefore.resultDetails.map((detail) => detail.resultStatus)).toEqual(["cancelled"]);
+    expect(cancelledDuring.resultDetails.map((detail) => detail.resultStatus)).toEqual([
+      "executed_success",
+      "cancelled",
+    ]);
+    expect(cancelledDuring.schedulingStates.map((state) => state.executionState)).toEqual([
+      "completed",
+      "cancelled",
+    ]);
+    expect(timeout.resultDetails[0]?.resultStatus).toBe("timed_out");
+    expect(blocked.dispatchPlan.schedulingPlan.calls.map((call) => call.dependency.kind)).toEqual([
+      "conflicts_with",
+      "ordered_after",
+    ]);
+    expect(blocked.dispatchPlan.schedulingPlan.skippedCallIds).toEqual(["call-unsupported-dependent"]);
+    expect(blocked.resultDetails.map((detail) => detail.resultStatus)).toEqual([
+      "blocked_by_policy",
+      "unknown_tool",
+    ]);
+  });
 });
 
 function batch(candidates: readonly unknown[]) {
