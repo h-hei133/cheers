@@ -1,0 +1,234 @@
+import { describe, expect, it } from "vitest";
+
+import { runEvaluationSuite } from "../../evaluation/model.js";
+import { createHostRuntime } from "./runtime.js";
+
+describe("host command runtime", () => {
+  it("runs the host happy lane without terminal scraping", async () => {
+    const host = createHostRuntime();
+
+    const started = await host.dispatch({
+      action: "start-turn",
+      inputText: "read a safe file and continue",
+      mode: "read-only",
+      providerMode: "synthetic",
+      correlationId: "host-happy",
+    });
+    const status = await host.dispatch({
+      action: "get-status",
+      sessionId: started.sessionId,
+      correlationId: "host-status",
+    });
+    const heads = await host.dispatch({
+      action: "list-session-heads",
+      correlationId: "host-heads",
+    });
+    const summary = await host.dispatch({
+      action: "inspect-session-summary",
+      sessionId: started.sessionId,
+      correlationId: "host-summary",
+    });
+
+    expect(started).toMatchObject({
+      schemaVersion: "host-command-response.v1",
+      action: "start-turn",
+      accepted: true,
+      terminalSuccessClaim: false,
+      result: {
+        evidenceVerdictStatus: "not-proven",
+        terminalSuccessClaim: false,
+      },
+    });
+    expect(started.events.length).toBeGreaterThan(0);
+    expect(started.status.eventCount).toBeGreaterThan(0);
+    expect(started.details.replayFacts).toMatchObject({
+      replayReady: true,
+      terminalSuccessClaim: false,
+    });
+    expect(started.events.map((event) => event.eventType)).toEqual(
+      expect.arrayContaining([
+        "provider-stream-started",
+        "tool-result-message-prepared",
+        "replay-safe-loop-state-summarized",
+      ]),
+    );
+    expect(status.status.lifecycle).toBe("running");
+    expect(heads.details.sessionHeads?.[0]).toMatchObject({
+      sessionId: started.sessionId,
+      terminalSuccessClaim: false,
+    });
+    expect(summary.details.sessionSummary).toMatchObject({
+      sessionId: started.sessionId,
+      terminalSuccessClaim: false,
+    });
+    expect(JSON.stringify(started)).not.toContain("safe final response\n");
+    expect(JSON.stringify(started)).not.toContain('"terminalSuccessClaim":true');
+  });
+
+  it("returns structured blockers for invalid, unsupported, missing, provider blocked, and stop states", async () => {
+    const host = createHostRuntime();
+
+    const invalid = await host.dispatch({});
+    const unsupported = await host.dispatch({ action: "delete-session" });
+    const missing = await host.dispatch({
+      action: "continue-session",
+      sessionId: "missing-session",
+      inputText: "continue",
+    });
+    const providerBlocked = await host.dispatch({
+      action: "start-turn",
+      inputText: "provider should stay default off",
+      mode: "read-only",
+      providerMode: "default-off",
+    });
+    const stopped = await host.dispatch({
+      action: "stop-work",
+      sessionId: providerBlocked.sessionId,
+    });
+    const cancelled = await host.dispatch({
+      action: "cancel-work",
+      sessionId: providerBlocked.sessionId,
+    });
+
+    expect(invalid.blockers[0]).toMatchObject({
+      kind: "invalid-envelope",
+      code: "host.action.invalid",
+      terminalSuccessClaim: false,
+    });
+    expect(unsupported.blockers[0]).toMatchObject({
+      kind: "unsupported-command",
+      code: "host.action.unsupported",
+      terminalSuccessClaim: false,
+    });
+    expect(missing.blockers[0]).toMatchObject({
+      kind: "missing-session",
+      terminalSuccessClaim: false,
+    });
+    expect(providerBlocked.events.map((event) => event.eventType)).toContain(
+      "provider-stream-failed",
+    );
+    expect(stopped.blockers[0]?.kind).toBe("stop-requested");
+    expect(cancelled.blockers[0]?.kind).toBe("cancel-requested");
+    expect(
+      [invalid, unsupported, missing, providerBlocked, stopped, cancelled]
+        .every((response) => response.terminalSuccessClaim === false),
+    ).toBe(true);
+  });
+
+  it("runs deterministic evaluation cases as structured case results", async () => {
+    const host = createHostRuntime();
+
+    const commandResult = await host.dispatch({
+      action: "run-evaluation-case",
+      evaluationCaseId: "read-only-tool-loop",
+      correlationId: "host-evaluation-command",
+    });
+    const suite = await runEvaluationSuite({ dispatch: host.dispatch });
+
+    expect(commandResult).toMatchObject({
+      action: "run-evaluation-case",
+      accepted: true,
+      terminalSuccessClaim: false,
+      details: {
+        evaluation: {
+          scenarioId: "read-only-tool-loop",
+          terminalSuccessClaim: false,
+        },
+      },
+    });
+    expect(suite.suiteId).toBe("deterministic-host-evaluation");
+    expect(suite.results.map((result) => result.scenarioId)).toEqual([
+      "read-only-tool-loop",
+      "provider-blocked",
+      "provider-fallback",
+      "mutation-recovery-success",
+      "apply-only-negative",
+      "branch-compaction-continuation",
+      "missing-proof",
+    ]);
+    expect(suite.results.length).toBe(7);
+    expect(suite.results.every((result) => result.terminalSuccessClaim === false)).toBe(true);
+    expect(suite.results.every((result) => result.redactionChecks.every((check) => check.passed))).toBe(true);
+    expect(suite.results.find((result) => result.scenarioId === "mutation-recovery-success")?.observedEvidenceVerdict).toBe("complete");
+    expect(suite.results.find((result) => result.scenarioId === "apply-only-negative")?.observedEvidenceVerdict).not.toBe("complete");
+    expect(
+      suite.results
+        .find((result) => result.scenarioId === "provider-fallback")
+        ?.hostResponse.events.map((event) => event.eventType),
+    ).toContain("provider-fallback-completed-as-provider-fact");
+    expect(JSON.stringify(suite)).not.toMatch(
+      /private-agents-real|RAW_OLD_TEXT_SHOULD_NOT_LEAK|RAW_NEW_TEXT_SHOULD_NOT_LEAK|oldText:RAW|newText:RAW|hidden reasoning/i,
+    );
+  });
+
+  it("keeps truth owned by evidence and result across required host states", async () => {
+    const host = createHostRuntime();
+    const happy = await host.dispatch({
+      action: "start-turn",
+      inputText: "read a safe file",
+      mode: "read-only",
+      providerMode: "synthetic",
+    });
+    const complete = await host.dispatch({
+      action: "start-turn",
+      inputText: "apply controlled mutation with complete proof",
+      mode: "mutation",
+      providerMode: "synthetic",
+    });
+    const missingProof = await host.dispatch({
+      action: "start-turn",
+      inputText: "apply controlled mutation missing proof",
+      mode: "mutation",
+      providerMode: "synthetic",
+    });
+    const continued = await host.dispatch({
+      action: "continue-session",
+      sessionId: happy.sessionId,
+      inputText: "continue existing session",
+      mode: "read-only",
+      continuationChoice: "active-leaf",
+      providerMode: "synthetic",
+    });
+
+    const coveredStates = new Set([
+      "valid host start turn",
+      "invalid host command",
+      "unsupported host command",
+      "continue existing session",
+      "missing session",
+      "status snapshot",
+      "session head listing",
+      "provider blocked",
+      "synthetic provider streaming",
+      "tool result next turn",
+      "mutation recovery complete",
+      "apply-only non-success",
+      "branch and compaction continuation",
+      "missing proof",
+      "cancellation or stop requested",
+      "redaction-sensitive content excluded",
+      "host output not equal to terminal text API",
+      "evidence/result-only complete proof",
+    ]);
+
+    expect(coveredStates.size).toBeGreaterThanOrEqual(17);
+    expect(complete.details.truth).toMatchObject({
+      completeProof: true,
+      evidenceStatus: "complete",
+      resultStatus: "verified_with_repair",
+      successOwner: "evidence-result-verdict",
+      terminalSuccessClaim: false,
+    });
+    expect(happy.details.truth?.completeProof).toBe(false);
+    expect(continued.details.truth?.completeProof).toBe(false);
+    expect(missingProof.details.truth).toMatchObject({
+      completeProof: false,
+      terminalSuccessClaim: false,
+    });
+    expect(happy.status.terminalSuccessClaim).toBe(false);
+    expect(complete.events.every((event) => event.truthfulness.terminalSuccessClaim === false)).toBe(true);
+    expect(JSON.stringify({ happy, complete, missingProof, continued })).not.toContain(
+      '"terminalSuccessClaim":true',
+    );
+  });
+});

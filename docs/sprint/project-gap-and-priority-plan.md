@@ -11,19 +11,22 @@ completion.
 - Product loop truth, the CLI/session status envelope, a bounded synthetic
   provider-to-tool-to-next-turn runtime lane, a controlled provider/model
   runtime boundary, a controlled mutation recovery lane, and a storage-backed
-  branch/compaction runtime lane are consolidated, but the host contract, broad
-  real-provider compatibility, live provider defaults, broad parallel mutation,
-  broad interactive branch navigation UX, and dynamic execution areas remain
-  unproven.
+  branch/compaction runtime lane are consolidated. The in-process host command
+  contract and deterministic evaluation runtime are now proven for controlled
+  local lanes, while broad real-provider compatibility, live provider defaults,
+  SDK/RPC servers, broad parallel mutation, broad interactive branch navigation
+  UX, and dynamic execution areas remain unproven.
 - CLI/session UX now has a structured status envelope for product-loop truth and
   branch/compaction runtime facts, but full queue ergonomics, broad interactive
   branch navigation, compact/resume controls, and broader session management
   remain narrower than the runtime fact model.
-- JSON event projection exists, but no stable SDK/RPC host contract exists.
+- JSON event projection and a stable in-process host command contract exist,
+  but no broad SDK/RPC host server exists.
 - Session branch and compaction support is storage-backed for controlled
   runtime facts that drive context rebuild, continuation readiness, provider
   request preparation, events, replay, product surface, and CLI/session status.
-  Broad interactive navigation commands and host contracts remain unproven.
+  Broad interactive navigation commands and SDK/RPC host contracts remain
+  unproven.
 - Provider/model compatibility, auth readiness, invocation gating, response
   normalization, fallback decision/attempt facts, replay, surface, and status
   are proven for the controlled runtime lane. Live execution remains explicit
@@ -187,6 +190,35 @@ completion.
   output, raw command output, raw edit text, patch bodies, and secrets remain
   excluded from report-safe surfaces.
 
+### Completed Batch: Host Contract And Deterministic Evaluation Runtime
+
+- Proven result: a structured host command boundary now validates envelopes,
+  supports start turn, continue session, status, session head listing, session
+  summary inspection, stop/cancel requests, and deterministic evaluation case
+  execution. The same lane carries synthetic provider/tool/mutation runtime
+  facts through events, status snapshots, final host responses, replay-safe
+  facts, evaluation case results, and evidence/result truth projections without
+  terminal scraping.
+- User-facing value: future non-interactive callers can consume typed host
+  facts for happy, blocked, evaluation, and truth lanes while missing proof,
+  provider blockers, tool outcomes, mutation apply, replay, status, and
+  evaluation execution remain non-success.
+- Owner domains: `runtime/api`, `runtime/events`, `runtime/evaluation`,
+  `runtime/loop`, `session/store`, `session/replay`, `session/presentation`,
+  `provider/request`, `provider/response`, `tools`, `edit`, `verification`,
+  `repair`, `evidence`, and `result`.
+- Evidence: `packages/ts-shell/src/runtime/api/host/runtime.test.ts` covers the
+  host happy lane, blocked lane, deterministic evaluation lane, and truth lane
+  across the required host/session/provider/tool/mutation/replay/redaction
+  states. The focused owner suite also covers runtime events, loop lanes,
+  session replay/status, provider synthetic/request, tool outcomes, edit
+  recovery, and evidence/result verdicts.
+- Boundary: this is an in-process host contract and deterministic evaluation
+  runtime, not a broad SDK/RPC server. Live providers remain default-off;
+  dynamic loading, external tool servers, browser automation, command allowlist
+  expansion, arbitrary writers, broad parallel mutation, and terminal-text APIs
+  remain out of scope.
+
 ## Medium-Term Runtime Capability Batches
 
 ### Completed Planning Item: Provider/Model Compatibility Registry
@@ -208,22 +240,14 @@ completion.
   provider/model runtime boundary also proves controlled fallback decision and
   response normalization facts.
 
-### Batch 3: Programmatic Runtime Event Contract
+### Completed Batch: Programmatic Runtime Event Contract
 
-- Goal: stabilize a machine-readable event envelope for host consumption before
-  SDK/RPC behavior.
-- User-facing value: future non-interactive integrations can consume structured
-  state rather than scraping terminal text.
-- Owner domains: `runtime/events`, `runtime/loop`, `contracts` only if a real
-  cross-runtime consumer exists, `presentation`.
-- Expected areas: event stream entries, schema/version metadata, redaction,
-  correlation ids.
-- Required tests: JSON event stream snapshots for representative lifecycle,
-  blocked, repair, request, and replay cases.
-- Forbidden shortcuts: broad RPC server, external tool server, dynamic plugin
-  loading, terminal-output parsing.
-- Completion condition: a stable JSON envelope is tested as a host contract and
-  remains observation-only.
+- Proven result: machine-readable JSON runtime events and host event envelopes
+  carry schema/version metadata, ordering, event ids, event types, redaction,
+  not-proven claims, and `terminalSuccessClaim: false` for host consumption.
+- Boundary: the event contract remains observation-only. Broad RPC servers,
+  external tool servers, dynamic plugin loading, and terminal-output parsing are
+  still not enabled.
 
 ### Batch 4: Tool Policy And Read-Only Parallelism
 

@@ -1,0 +1,55 @@
+import type { RepairVerdictProofInput } from "../projection/repair/verdict.js";
+
+export interface HostEvidenceProof {
+  readonly proofId: string;
+  readonly status: "complete" | "incomplete" | "blocked" | "failed" | "not-proven";
+  readonly missingProof: readonly string[];
+  readonly evidenceOwner: "evidence";
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims: readonly string[];
+}
+
+export function projectHostEvidenceProof(input: {
+  readonly proofInput?: RepairVerdictProofInput;
+  readonly missingProof?: readonly string[];
+}): HostEvidenceProof {
+  const proofInput = input.proofInput;
+  const missingProof = proofInput?.missingProofItems ?? input.missingProof ?? ["evidence-result-verdict"];
+  return freeze({
+    proofId: proofInput?.proofInputId ?? "host-evidence:not-proven",
+    status: statusFor(proofInput?.proofStatus, missingProof),
+    missingProof,
+    evidenceOwner: "evidence",
+    terminalSuccessClaim: false,
+    notProvenClaims: unique([
+      "terminal-success",
+      "host-proof-is-not-terminal-result",
+      ...(proofInput?.notProvenClaims ?? []),
+    ]),
+  });
+}
+
+function statusFor(
+  status: RepairVerdictProofInput["proofStatus"] | undefined,
+  missingProof: readonly string[],
+): HostEvidenceProof["status"] {
+  if (status === "complete" && missingProof.length === 0) return "complete";
+  if (status === "blocked") return "blocked";
+  if (status === "failed") return "failed";
+  if (status === "incomplete") return "incomplete";
+  return "not-proven";
+}
+
+function unique(values: readonly string[]): readonly string[] {
+  return Array.from(new Set(values)).sort();
+}
+
+function freeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) {
+      freeze(child);
+    }
+  }
+  return value;
+}
