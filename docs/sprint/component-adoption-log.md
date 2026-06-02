@@ -135,3 +135,54 @@ focused validation.
 - Rollback plan: disable the explicit bounded parallel input and fall back to
   one-target sequential groups while preserving graph, eligibility, settlement,
   blocked, and not-proven facts for diagnosis.
+
+## Host JSON Framing And Package Readiness
+
+- Selected mode: structured port.
+- Owner domain: `packages/ts-shell/src/runtime/api/host/` for host JSON and
+  exit classification, `packages/ts-shell/src/cli/host/` for CLI delegation,
+  `packages/ts-shell/src/runtime/distribution/` for package readiness, and
+  `scripts/` for repository smoke.
+- Reason for use: the existing in-process host contract and deterministic
+  evaluation runtime needed a package-facing non-interactive surface with
+  stable JSON framing, event envelopes, exit classification, package readiness,
+  default-off provider checks, redaction, and truth boundaries.
+- Behavior ported: command JSON parsing delegates to host validation, host
+  runtime dispatch remains the execution owner, runtime events are projected
+  into host event envelopes with ordering/category/severity, exit classification
+  is derived from host blockers/status/evidence/result truth, and package
+  readiness checks built importability, CLI artifact availability, host command
+  availability, JSON shape, default-off provider blocking, evaluation, and
+  redaction without live providers.
+- Rejected alternatives:
+  - Dependency use: rejected because the framing, blocker taxonomy, redaction,
+    replay, and evidence/result truth boundaries are local product semantics.
+  - Isolated source adoption: rejected because no source copy is needed and no
+    license/notice obligations should enter product code for this surface.
+  - Broad SDK/RPC server: rejected because SP013 proves a package/CLI host API
+    surface, not server behavior, dynamic loading, external tool servers, or
+    default live-provider execution.
+- Expected callers: package consumers, repository smoke scripts, future narrow
+  host adapters, runtime evaluation, session replay/status, and evidence/result
+  truth tests.
+- Side-effect boundary: host execution remains inside `createHostRuntime` and
+  existing provider/tool/edit/session owners. The smoke script imports the built
+  package and does not spawn live providers, load dynamic packages, launch
+  browser automation, expand command allowlists, or bypass `ExecutionService`.
+- Truthfulness boundary: command accepted, JSON emitted, CLI exit zero, event
+  envelope, status snapshot, final response, package smoke, distribution
+  readiness, provider facts, tool facts, mutation facts, evaluation cases,
+  replay facts, and terminal rendering remain `terminalSuccessClaim: false`.
+  Evidence/result remains the only complete-proof owner, and missing proof stays
+  not-proven.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- result/host/verdict.test.ts runtime/api/host/runtime.test.ts runtime/api/host/io.test.ts cli/host/runner.test.ts runtime/distribution/model.test.ts smoke.test.ts entrypoints/cliArgs.test.ts`
+  - `rtk npm run test -w packages/ts-shell -- runtime/events/projection.test.ts runtime/events/stream.test.ts session/replay/state.test.ts session/presentation/envelope.test.ts core/shell/cliSessionProductSurface.test.ts provider/response/synthetic.test.ts runtime/loop/providerBoundary.test.ts tools/toolBatchDispatch.test.ts edit/multifile/model.test.ts runtime/loop/mutationRuntime.test.ts evidence/projection/repair/verdict.test.ts result/projection/repair/verdict.test.ts`
+  - `rtk npm run build -w packages/ts-shell`
+  - `rtk npm run verify:host-surface`
+  - `rtk npm run verify:route221-anti-false-success-gate`
+  - `rtk npm run verify:result-contract`
+- Rollback plan: remove the `--host-command` CLI option and package readiness
+  script while keeping the in-process host runtime and deterministic evaluation
+  contract intact; package consumers would fall back to direct owner tests until
+  a corrected host surface is restored.

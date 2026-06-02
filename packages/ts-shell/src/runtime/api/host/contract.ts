@@ -16,6 +16,16 @@ export type HostTurnMode = "read-only" | "mutation";
 export type HostContinuationChoice = "active-leaf" | "new-child";
 export type HostProviderMode = "synthetic" | "default-off";
 export type HostOutputPreference = "structured" | "structured-with-diagnostics";
+export type HostExitClassification =
+  | "success-proof"
+  | "completed-without-proof"
+  | "blocked"
+  | "failed"
+  | "invalid-input"
+  | "unsupported"
+  | "cancelled"
+  | "stopped"
+  | "internal-error";
 
 export interface HostCommandEnvelope {
   readonly action: HostCommandAction;
@@ -106,6 +116,13 @@ export interface HostResultSummary {
   readonly terminalClassification: "success" | "stopped" | "error";
   readonly evidenceVerdictStatus: string;
   readonly resultVerdictStatus: string;
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims: readonly string[];
+}
+
+export interface HostExitSummary {
+  readonly classification: HostExitClassification;
+  readonly code: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 70;
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
 }

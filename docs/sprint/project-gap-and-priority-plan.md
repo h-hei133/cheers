@@ -12,7 +12,8 @@ completion.
   provider-to-tool-to-next-turn runtime lane, a controlled provider/model
   runtime boundary, a controlled mutation recovery lane, and a storage-backed
   branch/compaction runtime lane are consolidated. The in-process host command
-  contract, deterministic evaluation runtime, and controlled provider
+  contract, deterministic evaluation runtime, non-interactive host/package JSON
+  surface, package readiness checks, and controlled provider
   compatibility/evaluation hardening, controlled read-only parallel tool
   runtime, and bounded parallel multi-target mutation runtime are now proven for
   local synthetic and injected lanes, while live provider defaults, broad auth
@@ -23,8 +24,9 @@ completion.
   branch/compaction runtime facts, but full queue ergonomics, broad interactive
   branch navigation, compact/resume controls, and broader session management
   remain narrower than the runtime fact model.
-- JSON event projection and a stable in-process host command contract exist,
-  but no broad SDK/RPC host server exists.
+- JSON event projection, a stable in-process host command contract, a
+  non-interactive host JSON output surface, exit classification, and package
+  readiness smoke exist, but no broad SDK/RPC host server exists.
 - Session branch and compaction support is storage-backed for controlled
   runtime facts that drive context rebuild, continuation readiness, provider
   request preparation, events, replay, product surface, and CLI/session status.
@@ -296,6 +298,37 @@ completion.
   expansion, arbitrary writers, uncontrolled broad parallel mutation, and
   terminal-text APIs remain out of scope.
 
+### Completed Batch: Runtime Host API And Package Readiness Surface
+
+- Proven result: non-interactive host input can enter through a package/CLI
+  surface, validate a command envelope, select or create a session, execute the
+  runtime host lane, project structured host event envelopes, status snapshot,
+  final response, result summary, diagnostics, blockers, redacted details,
+  replay facts, truth facts, evaluation results, and explicit exit
+  classification without scraping terminal text.
+- User-facing value: scripts and package consumers can use `host-json-response.v1`
+  and package readiness facts for happy, blocked, evaluation, package smoke,
+  and truth lanes while CLI exit zero, JSON emission, smoke, readiness, events,
+  replay, provider/tool/mutation/evaluation facts, and terminal rendering remain
+  non-success unless evidence/result prove completion.
+- Owner domains: `cli`, `runtime/api`, `runtime/events`,
+  `runtime/evaluation`, `runtime/distribution`, `session/store`,
+  `session/replay`, `provider/request`, `provider/response`, `tools`, `edit`,
+  `verification`, `repair`, `evidence`, `result`, `presentation`, `scripts`,
+  and package metadata.
+- Evidence: `packages/ts-shell/src/runtime/api/host/runtime.test.ts`,
+  `packages/ts-shell/src/runtime/api/host/io.test.ts`,
+  `packages/ts-shell/src/cli/host/runner.test.ts`,
+  `packages/ts-shell/src/runtime/distribution/model.test.ts`,
+  `packages/ts-shell/src/result/host/verdict.test.ts`,
+  `packages/ts-shell/src/smoke.test.ts`, and
+  `scripts/verify-host-surface.mjs`.
+- Boundary: package readiness is a static/package host smoke, not package
+  installation, dynamic loading, executable plugin behavior, broad SDK/RPC
+  server behavior, browser automation, external tool server behavior, command
+  allowlist expansion, arbitrary writers, or default live-provider behavior.
+  Terminal truth still belongs only to `evidence`/`result`.
+
 ### Completed Batch: Provider Compatibility And Evaluation Hardening
 
 - Proven result: provider registry now projects explicit compatibility matrix
@@ -500,25 +533,30 @@ completion.
   compaction records, rebuild safe continuation context, preserve
   unsupported/stale/unsafe facts, and do not create terminal success.
 
-### Batch 9: Host API And Distribution
+### Batch 9: SDK Or RPC Host Integration
 
-- Goal: expose stable non-interactive host behavior and package/distribution
-  readiness after event contracts and truth boundaries are stable.
-- User-facing value: scripts and future hosts can consume structured status and
-  run release/package checks without scraping CLI prose.
-- Owner domains: `cli`, future host API owner, `runtime/events`,
-  `presentation`, release scripts.
-- Expected areas: non-interactive CLI envelope, JSON event stream contract,
-  package smoke scripts, release readiness checks.
-- Required tests: JSON/non-interactive contract, CLI smoke, packaging smoke,
-  no-live-provider default.
+- Goal: decide whether a narrow SDK or RPC host integration should sit on top of
+  the proven host JSON/package surface, without broad server behavior or dynamic
+  execution.
+- User-facing value: future external callers can use the same structured host
+  facts without depending on terminal output or package smoke internals.
+- Owner domains: `runtime/api`, `contracts` only if a real cross-runtime
+  consumer exists, `session/store`, `session/replay`, `evidence`, `result`, and
+  package metadata.
+- Expected areas: versioned host request/response schema, transport-neutral
+  adapters, cancellation/stop mapping, replay-safe status reads, and package
+  compatibility checks.
+- Required tests: SDK/RPC contract tests if scoped, status/replay continuity,
+  blocked/unsupported/default-off provider lanes, redaction, and result-owned
+  truth.
 - Forbidden shortcuts: broad SDK/RPC server, external tool server behavior,
-  dynamic package loading, live-provider default gates.
-- Conservative boundary: no broad SDK/RPC server or external tool server before
-  host contract and permission model are proven.
-- Completion condition: non-interactive host output and package smoke checks are
-  stable, tested, default-off for real providers, and independent of terminal
-  wording.
+  dynamic package loading, live-provider default gates, terminal-text parsing,
+  or compatibility-shim business logic.
+- Conservative boundary: no server or dynamic execution should be added unless
+  a concrete consumer and side-effect boundary are explicitly scoped.
+- Completion condition: any new host integration delegates to the existing host
+  API, preserves `host-json-response.v1` truth semantics or a versioned
+  successor, and keeps evidence/result as the only success owner.
 
 ## Validation Expectations
 

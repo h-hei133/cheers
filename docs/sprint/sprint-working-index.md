@@ -24,6 +24,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp010-controlled-component-adoption-and-parallel-tool-runtime.md` | completed route input | Controlled component adoption and read-only parallel tool runtime objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp011-controlled-multi-target-mutation-runtime.md` | completed route input | Controlled multi-target mutation runtime objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp012-bounded-parallel-mutation-runtime.md` | completed route input | Bounded parallel multi-target mutation runtime objective now reflected in current capability, priority, and adoption-log docs. |
+| `docs/sprint/route/sp013-runtime-host-api-and-distribution-surface.md` | completed route input | Runtime host API and package readiness surface objective now reflected in current capability, priority, and adoption-log docs. |
 
 ## Removed Or Merged Content
 

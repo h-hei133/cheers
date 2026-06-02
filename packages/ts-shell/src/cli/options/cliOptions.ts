@@ -23,6 +23,7 @@ export interface CliOptions {
   readonly planningMutationLiveProviderProposal?: boolean;
   readonly planningMutationProposalPath?: string;
   readonly planningMutationVerifyCommand?: string;
+  readonly hostCommand?: string;
 }
 
 export interface CliArgs {

@@ -48,6 +48,7 @@ owner. Python is offline evaluation only.
 | Replay-safe carry-forward | Proven for IDs, statuses, blocker summaries, request facts, provider compatibility/readiness facts, provider invocation/fallback status, tool outcome facts, product completion facts, and redaction exclusions. Raw transcripts, secrets, raw provider output, patch text, and command output are excluded. | `packages/ts-shell/src/session/replay/state.ts`, `packages/ts-shell/src/session/replay/host/facts.ts` |
 | Storage-backed session branch and compaction runtime | Proven for durable thread facts in session state, parent/child turn relationships, explicit active leaf selection, branch creation and switching, compaction records with retained/excluded/stale/unsafe/missing/unsupported/provenance facts, context rebuild, continuation readiness, provider request preparation, runtime events, replay-safe carry-forward, product surface, CLI/session status, and non-success truth preservation in controlled synthetic lanes. | `packages/ts-shell/src/session/schema/sessionThread.ts`, `packages/ts-shell/src/session/store/threadState.ts`, `packages/ts-shell/src/session/sessionTreeProjection.ts`, `packages/ts-shell/src/context/sessionContextRebuildProjection.ts`, `packages/ts-shell/src/session/continuation/readiness.ts`, `packages/ts-shell/src/runtime/loop/sessionContinuity.test.ts`, `packages/ts-shell/src/session/store/threadState.test.ts` |
 | Host command contract and deterministic evaluation runtime | Proven for an in-process structured host boundary that validates command envelopes, starts and continues sessions, reports status, lists heads, inspects session summaries, records stop/cancel requests, runs deterministic evaluation cases, streams JSON-safe events, carries replay-safe provider compatibility/readiness/fallback facts, reports passed/failed/blocked/unsupported/skipped/not-proven evaluation results, and preserves evidence/result as the only complete-proof owner. | `packages/ts-shell/src/runtime/api/host/contract.ts`, `packages/ts-shell/src/runtime/api/host/runtime.ts`, `packages/ts-shell/src/runtime/evaluation/model.ts`, `packages/ts-shell/src/runtime/events/host/envelope.ts`, `packages/ts-shell/src/session/store/host/state.ts`, `packages/ts-shell/src/session/replay/host/facts.ts`, `packages/ts-shell/src/evidence/host/proof.ts`, `packages/ts-shell/src/result/host/verdict.ts`, `packages/ts-shell/src/runtime/api/host/runtime.test.ts` |
+| Non-interactive host API and package readiness surface | Proven for a structured `--host-command` package/CLI-facing lane that parses host JSON input, delegates to the in-process host runtime, emits `host-json-response.v1` with command/session/turn ids, event ordering, event category/severity envelopes, status snapshot, final response, result summary, diagnostics, blockers, redaction details, replay facts, truth facts, evaluation results, and exit classification. Package readiness checks prove built package importability, CLI artifact availability, host command availability, JSON shape, default-off live provider blocking, deterministic evaluation through the package surface, redaction, and evidence/result-owned truth. | `packages/ts-shell/src/cli/host/runner.ts`, `packages/ts-shell/src/runtime/api/host/io.ts`, `packages/ts-shell/src/runtime/distribution/model.ts`, `packages/ts-shell/src/index.ts`, `scripts/verify-host-surface.mjs`, `packages/ts-shell/src/runtime/api/host/io.test.ts`, `packages/ts-shell/src/cli/host/runner.test.ts`, `packages/ts-shell/src/runtime/distribution/model.test.ts`, `packages/ts-shell/src/result/host/verdict.test.ts`, `packages/ts-shell/src/smoke.test.ts` |
 | Product surface rendering | Proven for rendering coding result, loop trajectory, provider/model, fallback, request, tool, replay, event, verdict, and next-action facts without owning success. | `packages/ts-shell/src/presentation/surface/model.ts`, `packages/ts-shell/src/session/presentation/envelope.ts`, `packages/ts-shell/src/presentation/terminal/renderer.ts` |
 | Verification and repair readiness | Proven for verification intent/result observations, repair handoff/proposal/authority/apply observations, post-repair verification, proof input, and result verdict projection. | `packages/ts-shell/src/verification/result/boundary.ts`, `packages/ts-shell/src/repair/handoff/boundary.ts`, `packages/ts-shell/src/evidence/projection/repair/verdict.ts`, `packages/ts-shell/src/result/projection/repair/verdict.ts` |
 | Not-proven claim preservation | Proven across loop infrastructure, request preparation, tool outcomes, replay, completion packet, and surface. | `packages/ts-shell/src/runtime/loop/infrastructure.ts`, `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/session/replay/state.ts`, `packages/ts-shell/src/presentation/surface/model.ts` |
@@ -61,8 +62,10 @@ owner. Python is offline evaluation only.
   and compaction facts now reach the product surface and CLI/session status, but
   broad interactive branch navigation UX remains narrower than the runtime fact
   model.
-- A stable in-process host command contract is proven for deterministic local
-  lanes and evaluation cases. Programmatic SDK packages, RPC servers, and broad
+- A stable in-process host command contract and non-interactive package/CLI
+  host JSON surface are proven for deterministic local lanes, evaluation cases,
+  package readiness checks, default-off provider blocking, redaction, replay
+  facts, and evidence/result truth boundaries. Broad SDK/RPC servers and
   external host integration remain unproven.
 - Storage-backed branch and compaction runtime is proven for controlled session
   state, context rebuild, continuation, request-preparation, events, replay,
@@ -87,7 +90,8 @@ owner. Python is offline evaluation only.
   synthetic provider tool lane, the controlled provider/model runtime boundary,
   controlled read-only parallel tool runtime, controlled mutation recovery,
   bounded parallel multi-target mutation runtime, storage-backed branch/compaction facts, the deterministic host/evaluation
-  lane, and controlled provider compatibility hardening are proven for bounded
-  owner-tested paths. Live-provider default behavior, broad auth refresh, broad
-  uncontrolled parallel mutation, interactive branch navigation UX, SDK/RPC
-  servers, and dynamic execution areas remain unproven.
+  lane, the non-interactive host/package readiness surface, and controlled
+  provider compatibility hardening are proven for bounded owner-tested paths.
+  Live-provider default behavior, broad auth refresh, broad uncontrolled
+  parallel mutation, interactive branch navigation UX, SDK/RPC servers, and
+  dynamic execution areas remain unproven.

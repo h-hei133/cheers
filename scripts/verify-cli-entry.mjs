@@ -335,8 +335,8 @@ async function runPrintToolExecutionSurface() {
     'Changed files: cli-entry-tool-execution.txt',
     'Verification: status=skipped',
     'Verdict: Partial',
-    'Not proven: relevant verification did not pass',
-    'Next action:',
+    '[not_proven] relevant verification did not pass',
+    '[action] Next:',
   ]
   const missing = requiredMarkers.filter((marker) => !result.output.includes(marker))
   if (missing.length > 0) {

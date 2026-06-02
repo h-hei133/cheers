@@ -124,6 +124,8 @@ describe("cli args parser", () => {
       "proposal.json",
       "--planning-mutation-verify-command",
       "node --version",
+      "--host-command",
+      "{\"action\":\"get-status\",\"sessionId\":\"s1\"}",
       "ignored prompt",
     ]);
 
@@ -142,6 +144,7 @@ describe("cli args parser", () => {
       planningMutationLiveProviderProposal: true,
       planningMutationProposalPath: "proposal.json",
       planningMutationVerifyCommand: "node --version",
+      hostCommand: "{\"action\":\"get-status\",\"sessionId\":\"s1\"}",
       promptArg: "ignored prompt",
     });
     expect(isPrintModeRequested(parsed)).toBe(true);
@@ -204,6 +207,9 @@ describe("cli args parser", () => {
     );
     expect(expectParseError(["--planning-mutation-verify-command"]).message).toBe(
       "Missing value for --planning-mutation-verify-command. Provide an allowlisted verification command.",
+    );
+    expect(expectParseError(["--host-command"]).message).toBe(
+      "Missing value for --host-command. Provide a structured host command JSON object.",
     );
     expect(expectParseError(["--provider", "bad-provider"]).message).toBe(
       "Invalid --provider value: bad-provider. Expected openai, anthropic, openai-compatible, google, antigravity, or claudecode.",
