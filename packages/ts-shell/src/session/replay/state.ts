@@ -74,10 +74,16 @@ export interface ReplaySafeLoopStateSummary {
   readonly mutationRuntimeStatus?: {
     readonly targetCount: number;
     readonly conflictCount: number;
+    readonly eligibleCount: number;
+    readonly forcedSequentialCount: number;
+    readonly groupCount: number;
+    readonly parallelGroupCount: number;
+    readonly settlementCount: number;
     readonly readyCount: number;
     readonly appliedCount: number;
     readonly failedCount: number;
     readonly revertedCount: number;
+    readonly groupVerification: readonly string[];
     readonly wholeTaskVerification: string;
     readonly verdict: string;
     readonly terminalSuccessClaim: false;
@@ -283,10 +289,16 @@ export function summarizeReplaySafeLoopState(input: {
           mutationRuntimeStatus: {
             targetCount: latestMutationRuntime.plan.targetCount,
             conflictCount: latestMutationRuntime.conflicts.length,
+            eligibleCount: latestMutationRuntime.parallelEligibility.filter((item) => item.status === "eligible").length,
+            forcedSequentialCount: latestMutationRuntime.parallelEligibility.filter((item) => item.status === "forced_sequential").length,
+            groupCount: latestMutationRuntime.executionGroups.length,
+            parallelGroupCount: latestMutationRuntime.executionGroups.filter((item) => item.mode === "parallel").length,
+            settlementCount: latestMutationRuntime.settlements.length,
             readyCount: latestMutationRuntime.queue.filter((item) => item.state === "ready").length,
             appliedCount: latestMutationRuntime.queue.filter((item) => item.state === "applied").length,
             failedCount: latestMutationRuntime.queue.filter((item) => item.state === "failed").length,
             revertedCount: latestMutationRuntime.queue.filter((item) => item.state === "reverted").length,
+            groupVerification: latestMutationRuntime.groupVerificationResults.map((item) => item.status),
             wholeTaskVerification: latestMutationRuntime.wholeTaskVerificationResult.status,
             verdict: latestMutationRuntime.verdictStatus,
             terminalSuccessClaim: false,

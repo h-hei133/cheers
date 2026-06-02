@@ -14,7 +14,10 @@ export interface MultiTargetMutationProofInput {
   readonly failedCount: number;
   readonly revertedCount: number;
   readonly perTargetVerificationPassed: boolean;
+  readonly perGroupVerificationPassed: boolean;
   readonly wholeTaskVerificationPassed: boolean;
+  readonly boundedGroupProof: boolean;
+  readonly deterministicSettlementProof: boolean;
   readonly missingProofItems: readonly string[];
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
@@ -28,7 +31,10 @@ export function buildMultiTargetMutationProofInput(input: {
   readonly revertedCount: number;
   readonly blockedCount: number;
   readonly perTargetVerificationPassed: boolean;
+  readonly perGroupVerificationPassed?: boolean;
   readonly wholeTaskVerificationPassed: boolean;
+  readonly boundedGroupProof?: boolean;
+  readonly deterministicSettlementProof?: boolean;
   readonly repairSatisfied: boolean;
   readonly notProvenClaims?: readonly string[];
 }): MultiTargetMutationProofInput {
@@ -38,7 +44,10 @@ export function buildMultiTargetMutationProofInput(input: {
     input.failedCount > 0 ? "successful-apply-for-every-ready-target" : undefined,
     input.appliedCount < input.targetCount ? "applied-target-count" : undefined,
     !input.perTargetVerificationPassed ? "per-target-verification" : undefined,
+    input.perGroupVerificationPassed === false ? "per-group-verification" : undefined,
     !input.wholeTaskVerificationPassed ? "whole-task-verification" : undefined,
+    input.boundedGroupProof === false ? "bounded-group-proof" : undefined,
+    input.deterministicSettlementProof === false ? "deterministic-settlement-proof" : undefined,
     !input.repairSatisfied ? "repair-facts" : undefined,
   ].filter((item): item is string => Boolean(item));
   const proofStatus: MultiTargetMutationProofStatus = missingProofItems.length === 0
@@ -59,7 +68,10 @@ export function buildMultiTargetMutationProofInput(input: {
     failedCount: input.failedCount,
     revertedCount: input.revertedCount,
     perTargetVerificationPassed: input.perTargetVerificationPassed,
+    perGroupVerificationPassed: input.perGroupVerificationPassed ?? true,
     wholeTaskVerificationPassed: input.wholeTaskVerificationPassed,
+    boundedGroupProof: input.boundedGroupProof ?? true,
+    deterministicSettlementProof: input.deterministicSettlementProof ?? true,
     missingProofItems,
     terminalSuccessClaim: false,
     notProvenClaims: unique([

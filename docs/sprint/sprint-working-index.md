@@ -23,6 +23,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp009-real-provider-compatibility-and-evaluation-hardening.md` | completed route input | Provider compatibility and evaluation hardening objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp010-controlled-component-adoption-and-parallel-tool-runtime.md` | completed route input | Controlled component adoption and read-only parallel tool runtime objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp011-controlled-multi-target-mutation-runtime.md` | completed route input | Controlled multi-target mutation runtime objective now reflected in current capability, priority, and adoption-log docs. |
+| `docs/sprint/route/sp012-bounded-parallel-mutation-runtime.md` | completed route input | Bounded parallel multi-target mutation runtime objective now reflected in current capability, priority, and adoption-log docs. |
 
 ## Removed Or Merged Content
 
@@ -55,8 +56,9 @@ sections instead of appending progress logs.
   with mode, owner, side-effect boundary, truth boundary, validation evidence,
   and rollback plan.
 - Terminal truth stays in `evidence`/`result`; provider calls, tool outcomes,
-  mutation apply, rollback, repair observations, events, replay, summaries, and
-  presentation are not success.
+  mutation graph, eligibility, group creation, apply, settlement, rollback,
+  repair observations, events, replay, summaries, and presentation are not
+  success.
 - Dynamic plugin loading, package execution, broad SDK/RPC server behavior,
   browser automation, command allowlist expansion, and broad writer behavior are
   anti-goals until explicitly scoped.

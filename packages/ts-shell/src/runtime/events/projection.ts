@@ -179,7 +179,11 @@ export type RuntimeProjectionEventType =
   | "multi-target-mutation-authority-observed"
   | "multi-target-mutation-stale-read-observed"
   | "multi-target-mutation-snapshot-observed"
+  | "multi-target-mutation-graph-observed"
+  | "multi-target-mutation-eligibility-observed"
+  | "multi-target-mutation-group-observed"
   | "multi-target-mutation-queue-observed"
+  | "multi-target-mutation-settlement-observed"
   | "multi-target-mutation-partial-failure-observed"
   | "multi-target-mutation-rollback-observed"
   | "multi-target-mutation-verification-observed"
@@ -1986,6 +1990,55 @@ export function projectRuntimeEvents(input: {
         snapshot.notProvenClaims,
       );
     }
+    for (const graphNode of mutation.graph) {
+      append(
+        "multi-target-mutation-graph-observed",
+        {
+          laneId: mutation.laneId,
+          nodeId: graphNode.nodeId,
+          targetId: graphNode.targetId,
+          targetSummary: graphNode.targetSummary,
+          operation: graphNode.operation,
+          relation: graphNode.relation,
+          conflictIds: graphNode.conflictIds,
+          dependsOnTargetIds: graphNode.dependsOnTargetIds,
+          terminalSuccessClaim: graphNode.terminalSuccessClaim,
+        },
+        graphNode.notProvenClaims,
+      );
+    }
+    for (const eligibility of mutation.parallelEligibility) {
+      append(
+        "multi-target-mutation-eligibility-observed",
+        {
+          laneId: mutation.laneId,
+          eligibilityId: eligibility.eligibilityId,
+          targetId: eligibility.targetId,
+          status: eligibility.status,
+          reason: eligibility.reason,
+          groupable: eligibility.groupable,
+          terminalSuccessClaim: eligibility.terminalSuccessClaim,
+        },
+        eligibility.notProvenClaims,
+      );
+    }
+    for (const group of mutation.executionGroups) {
+      append(
+        "multi-target-mutation-group-observed",
+        {
+          laneId: mutation.laneId,
+          groupId: group.groupId,
+          mode: group.mode,
+          status: group.status,
+          targetIds: group.targetIds,
+          order: group.order,
+          maxGroupSize: group.maxGroupSize,
+          blockedReason: group.blockedReason,
+          terminalSuccessClaim: group.terminalSuccessClaim,
+        },
+        group.notProvenClaims,
+      );
+    }
     for (const queueEntry of mutation.queue) {
       append(
         "multi-target-mutation-queue-observed",
@@ -2001,6 +2054,24 @@ export function projectRuntimeEvents(input: {
           terminalSuccessClaim: queueEntry.terminalSuccessClaim,
         },
         queueEntry.notProvenClaims,
+      );
+    }
+    for (const settlement of mutation.settlements) {
+      append(
+        "multi-target-mutation-settlement-observed",
+        {
+          laneId: mutation.laneId,
+          settlementId: settlement.settlementId,
+          groupId: settlement.groupId,
+          targetId: settlement.targetId,
+          status: settlement.status,
+          order: settlement.order,
+          targetSummary: settlement.targetSummary,
+          originalFailure: settlement.originalFailure,
+          contentFingerprint: settlement.contentFingerprint,
+          terminalSuccessClaim: settlement.terminalSuccessClaim,
+        },
+        settlement.notProvenClaims,
       );
     }
     if (mutation.queue.some((item) => item.state === "failed") &&
@@ -2032,16 +2103,18 @@ export function projectRuntimeEvents(input: {
     );
     append(
       "multi-target-mutation-verification-observed",
-      {
-        laneId: mutation.laneId,
-        perTargetStatuses: mutation.verificationResults.map((item) => item.status),
-        wholeTaskStatus: mutation.wholeTaskVerificationResult.status,
-        terminalSuccessClaim: false,
-      },
-      [
-        ...mutation.verificationResults.flatMap((item) => item.notProvenClaims),
-        ...mutation.wholeTaskVerificationResult.notProvenClaims,
-      ],
+        {
+          laneId: mutation.laneId,
+          perTargetStatuses: mutation.verificationResults.map((item) => item.status),
+          perGroupStatuses: mutation.groupVerificationResults.map((item) => item.status),
+          wholeTaskStatus: mutation.wholeTaskVerificationResult.status,
+          terminalSuccessClaim: false,
+        },
+        [
+          ...mutation.verificationResults.flatMap((item) => item.notProvenClaims),
+          ...mutation.groupVerificationResults.flatMap((item) => item.notProvenClaims),
+          ...mutation.wholeTaskVerificationResult.notProvenClaims,
+        ],
     );
     append(
       "multi-target-mutation-repair-eligibility-observed",

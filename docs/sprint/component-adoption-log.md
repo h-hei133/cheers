@@ -89,3 +89,49 @@ focused validation.
 - Rollback plan: remove the optional `mutationRuntimeBoundary` connection and
   keep the existing single-target mutation recovery lane while preserving
   report-safe blocked/not-proven facts for multi-target attempts.
+
+## Bounded Mutation Group Settlement
+
+- Selected mode: behavior-only alignment.
+- Owner domain: `packages/ts-shell/src/edit/multifile/` with proof facts under
+  `evidence/projection/mutation/`, result verdicts under
+  `result/projection/mutation/`, and consumer projections under runtime,
+  replay, and presentation owners.
+- Reason for use: bounded multi-target mutation needs async group collection
+  for independent targets while preserving deterministic target-order
+  settlement, explicit blockers, rollback facts, and evidence/result-owned
+  terminal truth.
+- Behavior aligned: eligible independent targets enter capped groups, group
+  attempts settle after all member attempts finish, settlement facts are emitted
+  in original target order, later groups skip after a prior group failure, and
+  rollback observations preserve the original failure instead of becoming task
+  success.
+- Rejected alternatives:
+  - Dependency use: rejected because mutation authority, stale-read,
+    snapshot/restore, rollback, redaction, and proof semantics are local product
+    responsibilities.
+  - Isolated source adoption: rejected because no source copy is needed and
+    product code must stay domain-named.
+  - Uncontrolled broad parallel mutation: rejected because only independently
+    eligible targets with authority, stale-read, snapshot, rollback, conflict,
+    and bounded-group proof may run together.
+- Expected callers: runtime loop, runtime events, host evaluation, replay,
+  product surface, CLI/session status, evidence proof, and result verdict.
+- Side-effect boundary: file reads and writes still enter only through
+  sanctioned `ExecutionService` file methods. This adoption does not add live
+  provider behavior, command allowlist entries, browser automation, external
+  tool servers, dynamic loading, arbitrary writers, or execution-boundary
+  bypasses.
+- Truthfulness boundary: mutation graph, parallel eligibility, group creation,
+  target apply, group apply, settlement, rollback, verification observations,
+  repair eligibility, events, host evaluation, replay, product surface, and
+  CLI/session status remain `terminalSuccessClaim: false`. Evidence/result
+  remains the only complete proof owner.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- edit/multifile/model.test.ts runtime/loop/mutationRuntime.test.ts runtime/api/host/runtime.test.ts runtime/events/projection.test.ts session/replay/state.test.ts presentation/surface/model.test.ts session/presentation/envelope.test.ts core/shell/cliSessionProductSurface.test.ts`
+  - `rtk npm run build -w packages/ts-shell`
+  - `rtk npm run verify:route221-anti-false-success-gate`
+  - `rtk npm run verify:result-contract`
+- Rollback plan: disable the explicit bounded parallel input and fall back to
+  one-target sequential groups while preserving graph, eligibility, settlement,
+  blocked, and not-proven facts for diagnosis.

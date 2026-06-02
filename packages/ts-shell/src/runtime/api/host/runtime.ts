@@ -453,6 +453,7 @@ async function runSharedLane(input: {
                 },
               },
               authority: { status: "granted" },
+              parallel: { enabled: true, maxGroupSize: 2 },
               targets: [
                 {
                   targetId: "target-a",

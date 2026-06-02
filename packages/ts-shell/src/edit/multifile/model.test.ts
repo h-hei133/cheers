@@ -72,6 +72,93 @@ describe("controlled multi-target mutation model", () => {
     expect(rendered).not.toContain('"terminalSuccessClaim":true');
   });
 
+  it("runs independent targets in bounded groups and settles in deterministic target order", async () => {
+    const workspaceRoot = workspace("multi-target-bounded");
+    write(workspaceRoot, "src/a.ts", "before a\n");
+    write(workspaceRoot, "src/b.ts", "before b\n");
+    write(workspaceRoot, "src/c.ts", "before c\n");
+
+    const projection = await runControlledMultiTargetMutation({
+      laneId: "multi-target-bounded",
+      turnId: "turn-1",
+      workspaceRoot,
+      executionService: slowFirstWrite(createDefaultExecutionService()),
+      authority: { status: "granted" },
+      parallel: { enabled: true, maxGroupSize: 2 },
+      targets: [
+        updateTarget("target-a", "src/a.ts", "before a\n", "after a\n"),
+        updateTarget("target-b", "src/b.ts", "before b\n", "after b\n"),
+        updateTarget("target-c", "src/c.ts", "before c\n", "after c\n"),
+      ],
+      verification: { wholeTaskStatus: "passed" },
+    });
+
+    expect(projection.plan).toMatchObject({
+      parallelMutation: "bounded",
+      ordering: "bounded_parallel",
+      maxGroupSize: 2,
+      terminalSuccessClaim: false,
+    });
+    expect(projection.graph.map((item) => item.relation)).toEqual([
+      "independent",
+      "independent",
+      "independent",
+    ]);
+    expect(projection.parallelEligibility.map((item) => item.status)).toEqual([
+      "eligible",
+      "eligible",
+      "eligible",
+    ]);
+    expect(projection.executionGroups.map((item) => item.targetIds)).toEqual([
+      ["target-a", "target-b"],
+      ["target-c"],
+    ]);
+    expect(projection.executionGroups[0]?.mode).toBe("parallel");
+    expect(projection.settlements.map((item) => item.targetId)).toEqual([
+      "target-a",
+      "target-b",
+      "target-c",
+    ]);
+    expect(projection.resultVerdict.status).toBe("complete");
+  });
+
+  it("forces dependency targets through deterministic sequential groups", async () => {
+    const workspaceRoot = workspace("multi-target-dependency");
+    write(workspaceRoot, "src/a.ts", "before a\n");
+    write(workspaceRoot, "src/b.ts", "before b\n");
+
+    const projection = await runControlledMultiTargetMutation({
+      laneId: "multi-target-dependency",
+      turnId: "turn-1",
+      workspaceRoot,
+      executionService: createDefaultExecutionService(),
+      authority: { status: "granted" },
+      parallel: { enabled: true, maxGroupSize: 2 },
+      targets: [
+        updateTarget("target-a", "src/a.ts", "before a\n", "after a\n"),
+        {
+          ...updateTarget("target-b", "src/b.ts", "before b\n", "after b\n"),
+          dependsOnTargetIds: ["target-a"],
+        },
+      ],
+      verification: { wholeTaskStatus: "passed" },
+    });
+
+    expect(projection.graph.map((item) => item.relation)).toEqual([
+      "independent",
+      "dependency",
+    ]);
+    expect(projection.parallelEligibility.map((item) => item.status)).toEqual([
+      "eligible",
+      "forced_sequential",
+    ]);
+    expect(projection.executionGroups.map((item) => item.mode)).toEqual([
+      "parallel",
+      "sequential",
+    ]);
+    expect(projection.resultVerdict.status).toBe("complete");
+  });
+
   it("blocks conflicts and unsafe targets before apply without success", async () => {
     const workspaceRoot = workspace("multi-target-conflict");
     write(workspaceRoot, "src/a.ts", "before a\n");
@@ -212,6 +299,53 @@ describe("controlled multi-target mutation model", () => {
     expect(projection.resultVerdict.status).toBe("blocked");
   });
 
+  it("keeps stale, unknown, missing rollback, and unsafe targets out of bounded groups", async () => {
+    const workspaceRoot = workspace("multi-target-eligibility-blocked");
+    write(workspaceRoot, "src/a.ts", "current a\n");
+    write(workspaceRoot, "src/b.ts", "before b\n");
+
+    const projection = await runControlledMultiTargetMutation({
+      laneId: "multi-target-eligibility-blocked",
+      turnId: "turn-1",
+      workspaceRoot,
+      executionService: createDefaultExecutionService(),
+      authority: { status: "granted" },
+      parallel: { enabled: true, maxGroupSize: 2 },
+      targets: [
+        updateTarget("target-stale", "src/a.ts", "before a\n", "after a\n"),
+        {
+          targetId: "target-unknown",
+          relativePath: "src/unknown.ts",
+          operation: "unknown",
+          proposedContent: "unknown\n",
+          verification: { status: "not_run" },
+        },
+        {
+          ...updateTarget("target-no-rollback", "src/b.ts", "before b\n", "after b\n"),
+          snapshot: { available: false, reason: "restore plan missing" },
+        },
+        {
+          targetId: "target-escape",
+          relativePath: "../escape.ts",
+          operation: "create",
+          proposedContent: "escape\n",
+          verification: { status: "not_run" },
+        },
+      ],
+      verification: { wholeTaskStatus: "not_run" },
+    });
+
+    expect(projection.parallelEligibility.map((item) => item.status)).toEqual([
+      "stale",
+      "unknown",
+      "snapshot_missing",
+      "unsafe",
+    ]);
+    expect(projection.executionGroups.every((item) => item.mode === "blocked")).toBe(true);
+    expect(projection.settlements).toEqual([]);
+    expect(projection.resultVerdict.status).toBe("blocked");
+  });
+
   it("keeps verification and repair lanes non-success until post-repair proof is present", async () => {
     const workspaceRoot = workspace("multi-target-repair");
     write(workspaceRoot, "src/a.ts", "before a\n");
@@ -298,6 +432,22 @@ function failSecondWrite(
       writes += 1;
       if (writes === 2) {
         throw new Error("SanctionedWriteFailed");
+      }
+      await base.writeTextFile(request);
+    },
+  };
+}
+
+function slowFirstWrite(
+  base: ExecutionService,
+): Pick<ExecutionService, "readTextFile" | "writeTextFile"> {
+  let writes = 0;
+  return {
+    readTextFile: base.readTextFile,
+    writeTextFile: async (request) => {
+      writes += 1;
+      if (writes === 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
       await base.writeTextFile(request);
     },

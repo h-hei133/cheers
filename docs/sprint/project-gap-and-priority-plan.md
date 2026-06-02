@@ -13,11 +13,12 @@ completion.
   runtime boundary, a controlled mutation recovery lane, and a storage-backed
   branch/compaction runtime lane are consolidated. The in-process host command
   contract, deterministic evaluation runtime, and controlled provider
-  compatibility/evaluation hardening and controlled read-only parallel tool
-  runtime are now proven for local synthetic and injected lanes, while live
-  provider defaults, broad auth refresh, SDK/RPC servers, broad parallel
-  mutation, broad interactive branch navigation UX, and dynamic execution areas
-  remain unproven.
+  compatibility/evaluation hardening, controlled read-only parallel tool
+  runtime, and bounded parallel multi-target mutation runtime are now proven for
+  local synthetic and injected lanes, while live provider defaults, broad auth
+  refresh, SDK/RPC servers, uncontrolled broad parallel mutation, broad
+  interactive branch navigation UX, and dynamic execution areas remain
+  unproven.
 - CLI/session UX now has a structured status envelope for product-loop truth and
   branch/compaction runtime facts, but full queue ergonomics, broad interactive
   branch navigation, compact/resume controls, and broader session management
@@ -43,12 +44,14 @@ completion.
   events, host evaluation, replay, product surface, and CLI/session status.
   Bounded mutation recovery connects policy, authority, stale-read,
   snapshot/restore planning, apply observation, verification, rollback or
-  repair, post-repair verification, and result verdict. Controlled multi-target
-  mutation connects plan, classification, conflict detection, authority,
-  stale-read, snapshot/restore, deterministic sequential queue, apply, partial
-  failure, rollback, verification, repair eligibility, evidence/result verdict,
-  events, host evaluation, replay, product surface, and CLI/session status.
-  Broad parallel mutation remains unproven and unsupported.
+  repair, post-repair verification, and result verdict. Bounded parallel
+  multi-target mutation connects plan, classification, conflict detection,
+  mutation graph, authority, stale-read, snapshot/restore, parallel eligibility,
+  capped groups, sanctioned target apply, deterministic settlement, partial
+  group failure, skipped follow-on targets, rollback, per-target/per-group/
+  whole-task verification, repair eligibility, evidence/result verdict, events,
+  host evaluation, replay, product surface, and CLI/session status.
+  Uncontrolled broad parallel mutation remains unproven and unsupported.
 - Verification/repair can prove repair-to-success through the product path for
   controlled mutation recovery; broader task-relevant verification planning
   across arbitrary tools and live-provider cases remains unproven.
@@ -137,10 +140,10 @@ completion.
   focused edit, provider, tool policy/dispatch, runtime event, replay, surface,
   status, evidence, and result owner tests.
 - Boundary: the proven lane is controlled and deterministic. Live providers,
-  broad provider compatibility, broad parallel mutation, dynamic execution,
-  external tool servers, and host SDK/RPC behavior remain unproven. Apply,
-  rollback, repair, events, replay, surface, and CLI/session status are still
-  not terminal success.
+  broad provider compatibility, uncontrolled broad parallel mutation, dynamic
+  execution, external tool servers, and host SDK/RPC behavior remain unproven.
+  Apply, rollback, repair, events, replay, surface, and CLI/session status are
+  still not terminal success.
 
 ### Completed Batch: Controlled Multi-Target Mutation Runtime
 
@@ -164,13 +167,46 @@ completion.
   `packages/ts-shell/src/runtime/loop/mutationRuntime.test.ts`, and
   `packages/ts-shell/src/runtime/api/host/runtime.test.ts`, alongside focused
   event, replay, surface, status, and build validation.
-- Boundary: broad parallel mutation remains unsupported unless future work
-  proves conflict, authority, snapshot, ordering, and rollback safety. Plan,
-  queue, apply, rollback, verification, repair eligibility, events, host
-  evaluation, replay, product surface, and CLI/session status remain
-  non-success unless evidence/result produce complete proof. Live providers,
-  browser automation, external tool servers, dynamic loading, command allowlist
-  expansion, and arbitrary writer behavior remain out of scope.
+- Boundary: this completed batch proves the prior deterministic sequential
+  queue. Bounded parallel mutation is proven by the later batch below;
+  uncontrolled broad parallel mutation remains unsupported. Plan, queue, apply,
+  rollback, verification, repair eligibility, events, host evaluation, replay,
+  product surface, and CLI/session status remain non-success unless
+  evidence/result produce complete proof. Live providers, browser automation,
+  external tool servers, dynamic loading, command allowlist expansion, and
+  arbitrary writer behavior remain out of scope.
+
+### Completed Batch: Bounded Parallel Multi-Target Mutation Runtime
+
+- Proven result: a deterministic synthetic edit intent can flow through a
+  mutation graph, target eligibility, explicit capped parallel groups,
+  deterministic settlement ordering, sanctioned `ExecutionService` target
+  apply, partial group failure, skipped follow-on targets, rollback with
+  original failure preservation, per-target/per-group/whole-task verification,
+  repair eligibility, evidence proof input, result-owned verdict, runtime
+  events, host evaluation, replay, product surface, and CLI/session status.
+- User-facing value: independent targets can apply in bounded parallel groups
+  while same-file/overlap/path/dependency/stale/snapshot/rollback/authority/
+  unsupported/unknown blockers remain explicit and non-success. Fast and slow
+  target completion settles deterministically in target order.
+- Owner domains: `edit/multifile`, `runtime/loop`, `runtime/events`,
+  `runtime/api`, `runtime/evaluation`, `verification`, `evidence`, `result`,
+  `session/replay`, `session/presentation`, `presentation`, and `core/shell`.
+- Evidence: `packages/ts-shell/src/edit/multifile/model.test.ts`,
+  `packages/ts-shell/src/runtime/loop/mutationRuntime.test.ts`,
+  `packages/ts-shell/src/runtime/api/host/runtime.test.ts`,
+  `packages/ts-shell/src/runtime/events/projection.test.ts`,
+  `packages/ts-shell/src/session/replay/state.test.ts`,
+  `packages/ts-shell/src/presentation/surface/model.test.ts`,
+  `packages/ts-shell/src/session/presentation/envelope.test.ts`, and
+  `packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts`.
+- Boundary: uncontrolled or broad parallel mutation remains unsupported.
+  Eligibility, group creation, target apply, group apply, settlement, rollback,
+  verification, repair eligibility, host evaluation, events, replay, product
+  surface, and CLI/session status remain non-success unless evidence/result
+  produce complete proof. Live providers, browser automation, external tool
+  servers, dynamic loading, command allowlist expansion, arbitrary writers, and
+  execution-boundary bypass remain out of scope.
 
 ### Completed Batch: Provider/Model Runtime Boundary
 
@@ -257,8 +293,8 @@ completion.
 - Boundary: this is an in-process host contract and deterministic evaluation
   runtime, not a broad SDK/RPC server. Live providers remain default-off;
   dynamic loading, external tool servers, browser automation, command allowlist
-  expansion, arbitrary writers, broad parallel mutation, and terminal-text APIs
-  remain out of scope.
+  expansion, arbitrary writers, uncontrolled broad parallel mutation, and
+  terminal-text APIs remain out of scope.
 
 ### Completed Batch: Provider Compatibility And Evaluation Hardening
 
@@ -330,7 +366,8 @@ completion.
   preparation, host evaluation, events, replay, product surface, and CLI/session
   status are not terminal success. Live provider behavior, external tool
   servers, dynamic loading, browser automation, command allowlist expansion,
-  arbitrary writer behavior, and broad parallel mutation remain unproven.
+  arbitrary writer behavior, and uncontrolled broad parallel mutation remain
+  unproven.
 
 ## Medium-Term Runtime Capability Batches
 

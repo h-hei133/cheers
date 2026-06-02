@@ -36,17 +36,35 @@ describe("multi-target mutation runtime loop lane", () => {
           verification: { status: "passed" },
         },
       ],
+      parallel: { enabled: true, maxGroupSize: 2 },
       verification: { wholeTaskStatus: "passed" },
     });
     const status = projectStatus(run.loop, run.mutation);
 
     expect(run.mutation.resultVerdict.status).toBe("complete");
+    expect(run.mutation.plan.parallelMutation).toBe("bounded");
+    expect(run.mutation.executionGroups).toEqual([
+      expect.objectContaining({
+        mode: "parallel",
+        targetIds: ["target-a", "target-b"],
+        maxGroupSize: 2,
+        terminalSuccessClaim: false,
+      }),
+    ]);
+    expect(run.mutation.settlements.map((item) => item.targetId)).toEqual([
+      "target-a",
+      "target-b",
+    ]);
     expect(run.loop.events.map((event) => event.type)).toEqual(
       expect.arrayContaining([
         "multi-target-mutation-lane-observed",
         "multi-target-mutation-plan-observed",
+        "multi-target-mutation-graph-observed",
+        "multi-target-mutation-eligibility-observed",
+        "multi-target-mutation-group-observed",
         "multi-target-mutation-target-classified",
         "multi-target-mutation-queue-observed",
+        "multi-target-mutation-settlement-observed",
         "multi-target-mutation-verification-observed",
         "multi-target-mutation-proof-input-observed",
         "multi-target-mutation-verdict-projected",
@@ -55,12 +73,18 @@ describe("multi-target mutation runtime loop lane", () => {
     expect(status.replay.mutationRuntimeStatus).toMatchObject({
       targetCount: 2,
       conflictCount: 0,
+      eligibleCount: 2,
+      groupCount: 1,
+      parallelGroupCount: 1,
       appliedCount: 2,
+      settlementCount: 2,
       wholeTaskVerification: "passed",
       verdict: "complete",
       terminalSuccessClaim: false,
     });
     expect(status.envelope.mutationRuntime.status).toBe("passed");
+    expect(status.envelope.mutationRuntime.summary).toContain("parallel=bounded");
+    expect(status.envelope.mutationRuntime.summary).toContain("parallelGroups=1");
     expect(status.envelope.completeProof).toBe(true);
     expect(status.envelope.terminalSuccessClaim).toBe(false);
     expect(JSON.stringify({ mutation: run.mutation, status })).not.toContain(
@@ -109,7 +133,16 @@ describe("multi-target mutation runtime loop lane", () => {
           dependsOnTargetIds: ["target-z"],
           verification: { status: "not_run" },
         },
+        {
+          targetId: "target-f",
+          relativePath: "src/f.ts",
+          operation: "create",
+          proposedContent: "created f\n",
+          authority: { status: "missing" },
+          verification: { status: "not_run" },
+        },
       ],
+      parallel: { enabled: true, maxGroupSize: 2 },
       verification: { wholeTaskStatus: "not_run" },
     });
     const status = projectStatus(run.loop, run.mutation);
@@ -124,6 +157,15 @@ describe("multi-target mutation runtime loop lane", () => {
       ]),
     );
     expect(run.mutation.queue.some((item) => item.state === "applying")).toBe(false);
+    expect(run.mutation.parallelEligibility.map((item) => item.status)).toEqual(
+      expect.arrayContaining([
+        "conflict",
+        "authority_required",
+        "unsupported",
+        "dependency_blocked",
+      ]),
+    );
+    expect(run.mutation.executionGroups.some((item) => item.mode === "parallel")).toBe(false);
     expect(status.envelope.completeProof).toBe(false);
     expect(status.envelope.state).toBe("blocked");
     expect(status.envelope.mutationRuntime.blockers.join(",")).toContain(
@@ -143,12 +185,20 @@ describe("multi-target mutation runtime loop lane", () => {
         updateTarget("target-a", "src/a.ts", "before a\n", "after a\n"),
         updateTarget("target-b", "src/b.ts", "before b\n", "after b\n"),
       ],
+      parallel: { enabled: true, maxGroupSize: 2 },
       verification: { wholeTaskStatus: "not_run" },
       recovery: { rollbackOnPartialFailure: true },
     });
     const status = projectStatus(run.loop, run.mutation);
 
     expect(run.mutation.queue.map((item) => item.state)).toEqual(
+      expect.arrayContaining(["applied", "failed", "reverted"]),
+    );
+    expect(run.mutation.executionGroups[0]).toMatchObject({
+      mode: "parallel",
+      targetIds: ["target-a", "target-b"],
+    });
+    expect(run.mutation.settlements.map((item) => item.status)).toEqual(
       expect.arrayContaining(["applied", "failed", "reverted"]),
     );
     expect(run.mutation.rollback.status).toBe("succeeded");
@@ -163,11 +213,44 @@ describe("multi-target mutation runtime loop lane", () => {
     });
   });
 
+  it("preserves original failure when group rollback fails without terminal success", async () => {
+    const run = await runMutationRuntimeLane({
+      label: "rollback-failed",
+      files: [
+        ["src/a.ts", "before a\n"],
+        ["src/b.ts", "before b\n"],
+      ],
+      executionService: failSecondAndRollbackWrite(createDefaultExecutionService()),
+      targets: [
+        updateTarget("target-a", "src/a.ts", "before a\n", "after a\n"),
+        updateTarget("target-b", "src/b.ts", "before b\n", "after b\n"),
+      ],
+      parallel: { enabled: true, maxGroupSize: 2 },
+      verification: { wholeTaskStatus: "not_run" },
+      recovery: { rollbackOnPartialFailure: true },
+    });
+    const status = projectStatus(run.loop, run.mutation);
+
+    expect(run.mutation.rollback).toMatchObject({
+      status: "failed",
+      targetIds: ["target-a"],
+      failedTargetIds: ["target-a"],
+      preservesOriginalFailure: true,
+      terminalSuccessClaim: false,
+    });
+    expect(run.mutation.settlements.map((item) => item.status)).toEqual(
+      expect.arrayContaining(["applied", "failed", "revert_failed"]),
+    );
+    expect(run.mutation.resultVerdict.status).toBe("failed");
+    expect(status.envelope.completeProof).toBe(false);
+  });
+
   it("lets post-repair verification control the result-owned verdict", async () => {
     const run = await runMutationRuntimeLane({
       label: "repair",
       files: [["src/a.ts", "before a\n"]],
       targets: [updateTarget("target-a", "src/a.ts", "before a\n", "after a\n", "failed")],
+      parallel: { enabled: true, maxGroupSize: 2 },
       verification: { wholeTaskStatus: "failed", failureClass: "owner-verification-failed" },
       recovery: {
         repairTargetIds: ["target-a"],
@@ -195,6 +278,7 @@ async function runMutationRuntimeLane(input: {
   readonly files: readonly (readonly [string, string])[];
   readonly targets: MultiTargetMutationInput["targets"];
   readonly authority?: MultiTargetMutationInput["authority"];
+  readonly parallel?: MultiTargetMutationInput["parallel"];
   readonly verification: MultiTargetMutationInput["verification"];
   readonly recovery?: MultiTargetMutationInput["recovery"];
   readonly executionService?: Pick<ExecutionService, "readTextFile" | "writeTextFile">;
@@ -247,6 +331,7 @@ async function runMutationRuntimeLane(input: {
         workspaceRoot,
         executionService: input.executionService ?? createDefaultExecutionService(),
         authority: input.authority ?? { status: "granted" },
+        ...(input.parallel ? { parallel: input.parallel } : {}),
         targets: input.targets,
         verification: input.verification,
         ...(input.recovery ? { recovery: input.recovery } : {}),
@@ -298,10 +383,12 @@ function projectStatus(
     toolResultMessages: turn.toolResultBatch?.resultMessages,
     verificationIntents: [
       ...mutation.verificationIntents,
+      ...mutation.groupVerificationIntents,
       mutation.wholeTaskVerificationIntent,
     ],
     verificationResults: [
       ...mutation.verificationResults,
+      ...mutation.groupVerificationResults,
       mutation.wholeTaskVerificationResult,
     ],
     multiTargetMutations: [mutation],
@@ -371,6 +458,22 @@ function failSecondWrite(
     writeTextFile: async (request) => {
       writes += 1;
       if (writes === 2) {
+        throw new Error("SanctionedWriteFailed");
+      }
+      await base.writeTextFile(request);
+    },
+  };
+}
+
+function failSecondAndRollbackWrite(
+  base: ExecutionService,
+): Pick<ExecutionService, "readTextFile" | "writeTextFile"> {
+  let writes = 0;
+  return {
+    readTextFile: base.readTextFile,
+    writeTextFile: async (request) => {
+      writes += 1;
+      if (writes >= 2) {
         throw new Error("SanctionedWriteFailed");
       }
       await base.writeTextFile(request);

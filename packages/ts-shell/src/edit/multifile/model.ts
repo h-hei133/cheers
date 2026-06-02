@@ -55,6 +55,39 @@ export type MultiTargetQueueState =
   | "reverted"
   | "revert_failed"
   | "unknown";
+export type MultiTargetGraphRelationKind =
+  | "independent"
+  | "dependency"
+  | "conflict"
+  | "blocked";
+export type MultiTargetParallelEligibilityStatus =
+  | "eligible"
+  | "forced_sequential"
+  | "blocked"
+  | "unsupported"
+  | "unknown"
+  | "authority_required"
+  | "stale"
+  | "conflict"
+  | "dependency_blocked"
+  | "snapshot_missing"
+  | "rollback_missing"
+  | "unsafe";
+export type MultiTargetGroupMode = "parallel" | "sequential" | "blocked";
+export type MultiTargetGroupStatus =
+  | "created"
+  | "ready"
+  | "applying"
+  | "settled"
+  | "failed"
+  | "skipped"
+  | "blocked";
+export type MultiTargetSettlementStatus =
+  | "applied"
+  | "failed"
+  | "skipped"
+  | "reverted"
+  | "revert_failed";
 export type MultiTargetVerificationStatus = VerificationResultObservation["status"];
 export type MultiTargetRepairEligibilityStatus = "eligible" | "not_eligible" | "not_needed" | "blocked";
 export type MultiTargetVerdictStatus = "complete" | "blocked" | "failed" | "partial" | "not_proven";
@@ -96,6 +129,10 @@ export interface MultiTargetMutationInput {
     readonly status: MultiTargetAuthorityStatus;
     readonly reason?: string;
   };
+  readonly parallel?: {
+    readonly enabled?: boolean;
+    readonly maxGroupSize?: number;
+  };
   readonly verification: {
     readonly wholeTaskStatus: MultiTargetVerificationStatus;
     readonly failureClass?: string;
@@ -112,8 +149,9 @@ export interface MultiTargetMutationPlan {
   readonly planId: string;
   readonly targetCount: number;
   readonly operationKinds: readonly MultiTargetOperationKind[];
-  readonly parallelMutation: "unsupported";
-  readonly ordering: "sequential";
+  readonly parallelMutation: "unsupported" | "bounded";
+  readonly ordering: "sequential" | "bounded_parallel";
+  readonly maxGroupSize: number;
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
 }
@@ -185,6 +223,53 @@ export interface MultiTargetQueueObservation {
   readonly notProvenClaims: readonly string[];
 }
 
+export interface MultiTargetGraphNode {
+  readonly nodeId: string;
+  readonly targetId: string;
+  readonly targetSummary: string;
+  readonly operation: MultiTargetOperationKind;
+  readonly relation: MultiTargetGraphRelationKind;
+  readonly conflictIds: readonly string[];
+  readonly dependsOnTargetIds: readonly string[];
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims: readonly string[];
+}
+
+export interface MultiTargetParallelEligibility {
+  readonly eligibilityId: string;
+  readonly targetId: string;
+  readonly status: MultiTargetParallelEligibilityStatus;
+  readonly reason: string;
+  readonly groupable: boolean;
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims: readonly string[];
+}
+
+export interface MultiTargetExecutionGroup {
+  readonly groupId: string;
+  readonly mode: MultiTargetGroupMode;
+  readonly status: MultiTargetGroupStatus;
+  readonly targetIds: readonly string[];
+  readonly order: number;
+  readonly maxGroupSize: number;
+  readonly blockedReason?: string;
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims: readonly string[];
+}
+
+export interface MultiTargetSettlementObservation {
+  readonly settlementId: string;
+  readonly groupId: string;
+  readonly targetId: string;
+  readonly status: MultiTargetSettlementStatus;
+  readonly order: number;
+  readonly targetSummary: string;
+  readonly originalFailure?: string;
+  readonly contentFingerprint?: string;
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims: readonly string[];
+}
+
 export interface MultiTargetRollbackObservation {
   readonly rollbackId: string;
   readonly status: "not_required" | "required" | "succeeded" | "failed";
@@ -214,10 +299,16 @@ export interface MultiTargetMutationProjection {
   readonly authority: MultiTargetAuthorityObservation;
   readonly staleReads: readonly MultiTargetStaleReadObservation[];
   readonly snapshots: readonly MultiTargetSnapshotObservation[];
+  readonly graph: readonly MultiTargetGraphNode[];
+  readonly parallelEligibility: readonly MultiTargetParallelEligibility[];
+  readonly executionGroups: readonly MultiTargetExecutionGroup[];
   readonly queue: readonly MultiTargetQueueObservation[];
+  readonly settlements: readonly MultiTargetSettlementObservation[];
   readonly rollback: MultiTargetRollbackObservation;
   readonly verificationIntents: readonly VerificationLoopIntent[];
   readonly verificationResults: readonly VerificationResultObservation[];
+  readonly groupVerificationIntents: readonly VerificationLoopIntent[];
+  readonly groupVerificationResults: readonly VerificationResultObservation[];
   readonly wholeTaskVerificationIntent: VerificationLoopIntent;
   readonly wholeTaskVerificationResult: VerificationResultObservation;
   readonly repairEligibility: MultiTargetRepairEligibility;
@@ -243,7 +334,11 @@ export async function runControlledMultiTargetMutation(
     "stale-read-is-not-success",
     "snapshot-is-not-success",
     "apply-queue-is-not-success",
+    "parallel-eligibility-is-not-success",
+    "bounded-group-is-not-success",
+    "settlement-is-not-success",
     "target-apply-is-not-success",
+    "group-apply-is-not-success",
     "rollback-is-not-success",
     "verification-required-for-success",
     "result-verdict-required-for-success",
@@ -305,46 +400,41 @@ export async function runControlledMultiTargetMutation(
       notProvenClaims,
     }));
   }
-
-  const appliedTargets: MultiTargetMutationTargetInput[] = [];
-  for (const target of input.targets) {
-    const latest = latestQueueEntry(queue, target.targetId)!;
-    if (latest.state !== "ready") {
-      continue;
-    }
-    queue.push(queueObservation({
-      laneId,
-      target,
-      state: "applying",
-      order: queue.length,
-      targetSummary: latest.targetSummary,
-      notProvenClaims,
-    }));
-    try {
-      await applyTarget({ input, target, laneId, targetSummary: latest.targetSummary });
-      appliedTargets.push(target);
-      queue.push(queueObservation({
-        laneId,
-        target,
-        state: "applied",
-        order: queue.length,
-        targetSummary: latest.targetSummary,
-        contentFingerprint: fingerprint(target.proposedContent ?? ""),
-        notProvenClaims,
-      }));
-    } catch (error) {
-      queue.push(queueObservation({
-        laneId,
-        target,
-        state: "failed",
-        order: queue.length,
-        targetSummary: latest.targetSummary,
-        blocker: error instanceof Error ? sanitizeText(error.name, 80) : "unknown",
-        notProvenClaims,
-      }));
-      break;
-    }
-  }
+  const graph = buildGraph({
+    laneId,
+    input,
+    classifications,
+    conflicts,
+    notProvenClaims,
+  });
+  const parallelEligibility = buildParallelEligibility({
+    laneId,
+    input,
+    classifications,
+    conflicts,
+    authority,
+    staleReads,
+    snapshots,
+    queue,
+    notProvenClaims,
+  });
+  const executionGroups = createExecutionGroups({
+    laneId,
+    input,
+    queue,
+    parallelEligibility,
+    maxGroupSize: plan.maxGroupSize,
+    notProvenClaims,
+  });
+  const settlements: MultiTargetSettlementObservation[] = [];
+  const appliedTargets = await applyExecutionGroups({
+    laneId,
+    input,
+    queue,
+    executionGroups,
+    settlements,
+    notProvenClaims,
+  });
 
   const partialFailure = queue.some((item) => item.state === "failed") && appliedTargets.length > 0;
   const rollback = await observeRollback({
@@ -365,6 +455,15 @@ export async function runControlledMultiTargetMutation(
       targetSummary,
       notProvenClaims,
     }));
+    settlements.push(settlementObservation({
+      laneId,
+      groupId: rollback.rollbackId,
+      target,
+      status: "reverted",
+      order: settlements.length,
+      targetSummary,
+      notProvenClaims,
+    }));
   }
   for (const targetId of rollback.failedTargetIds) {
     const target = input.targets.find((item) => item.targetId === targetId)!;
@@ -375,6 +474,16 @@ export async function runControlledMultiTargetMutation(
       state: "revert_failed",
       order: queue.length,
       targetSummary,
+      notProvenClaims,
+    }));
+    settlements.push(settlementObservation({
+      laneId,
+      groupId: rollback.rollbackId,
+      target,
+      status: "revert_failed",
+      order: settlements.length,
+      targetSummary,
+      originalFailure: "rollback-failed",
       notProvenClaims,
     }));
   }
@@ -405,6 +514,45 @@ export async function runControlledMultiTargetMutation(
       safeSummary: applied
         ? `target verification ${target.verification?.status ?? "not_run"}`
         : "target did not reach verification",
+      notProvenClaims,
+    });
+  });
+  const groupVerificationIntents = executionGroups
+    .filter((group) => group.mode !== "blocked")
+    .map((group) =>
+      projectVerificationIntent({
+        sourceTurnId: input.turnId,
+        targetSummary: `verify mutation group ${sanitizeTargetSummary(group.groupId)}`,
+        verificationKind: "owner_projection",
+        authorityRequirement: "granted",
+        dispatchStatus: groupTargetsApplied(queue, group) ? "dispatched" : "blocked",
+        relevanceStatus: "task_relevant",
+        coverageStatus: "covered",
+        notProvenClaims,
+      })
+    );
+  const groupVerificationResults = groupVerificationIntents.map((intent, index) => {
+    const group = executionGroups.filter((item) => item.mode !== "blocked")[index]!;
+    const applied = groupTargetsApplied(queue, group);
+    const groupTargetStatuses = group.targetIds.map((targetId) =>
+      verificationResults.find((item, targetIndex) =>
+        sanitizeId(input.targets[targetIndex]!.targetId) === targetId
+      )?.status ?? "blocked"
+    );
+    const failed = groupTargetStatuses.some((status) => status === "failed");
+    return observeVerificationResult({
+      intent,
+      status: applied ? failed ? "failed" : "passed" : "blocked",
+      failureClass: applied
+        ? failed ? "group-target-verification-failed" : undefined
+        : "group-apply-not-complete",
+      repairEligible: group.targetIds.some((targetId) =>
+        input.recovery?.repairTargetIds?.map(sanitizeId).includes(targetId)
+      ),
+      runtimeReceiptIds: applied ? [`${laneId}:group:${group.order}:verification`] : [],
+      safeSummary: applied
+        ? failed ? "group verification failed" : "group verification passed"
+        : "group did not reach verification",
       notProvenClaims,
     });
   });
@@ -451,9 +599,16 @@ export async function runControlledMultiTargetMutation(
     blockedCount: countState(queue, "blocked") + countState(queue, "skipped"),
     perTargetVerificationPassed: verificationResults.every((item) => item.status === "passed") ||
       input.recovery?.postRepairWholeTaskStatus === "passed",
+    perGroupVerificationPassed: groupVerificationResults.every((item) => item.status === "passed") ||
+      input.recovery?.postRepairWholeTaskStatus === "passed",
     wholeTaskVerificationPassed:
       wholeTaskVerificationResult.status === "passed" ||
       input.recovery?.postRepairWholeTaskStatus === "passed",
+    boundedGroupProof: input.parallel?.enabled
+      ? executionGroups.some((item) => item.mode === "parallel") &&
+        executionGroups.every((item) => item.mode !== "parallel" || item.targetIds.length <= item.maxGroupSize)
+      : true,
+    deterministicSettlementProof: deterministicSettlementOrder({ input, settlements }),
     repairSatisfied:
       repairEligibility.status === "not_needed" ||
       input.recovery?.postRepairWholeTaskStatus === "passed",
@@ -469,10 +624,16 @@ export async function runControlledMultiTargetMutation(
     authority,
     staleReads,
     snapshots,
+    graph,
+    parallelEligibility,
+    executionGroups,
     queue,
+    settlements,
     rollback,
     verificationIntents,
     verificationResults,
+    groupVerificationIntents,
+    groupVerificationResults,
     wholeTaskVerificationIntent,
     wholeTaskVerificationResult,
     repairEligibility,
@@ -489,9 +650,14 @@ export async function runControlledMultiTargetMutation(
       ...authority.notProvenClaims,
       ...staleReads.flatMap((item) => item.notProvenClaims),
       ...snapshots.flatMap((item) => item.notProvenClaims),
+      ...graph.flatMap((item) => item.notProvenClaims),
+      ...parallelEligibility.flatMap((item) => item.notProvenClaims),
+      ...executionGroups.flatMap((item) => item.notProvenClaims),
       ...queue.flatMap((item) => item.notProvenClaims),
+      ...settlements.flatMap((item) => item.notProvenClaims),
       ...rollback.notProvenClaims,
       ...verificationResults.flatMap((item) => item.notProvenClaims),
+      ...groupVerificationResults.flatMap((item) => item.notProvenClaims),
       ...wholeTaskVerificationResult.notProvenClaims,
       ...repairEligibility.notProvenClaims,
       ...proofInput.notProvenClaims,
@@ -509,12 +675,15 @@ function createPlan(input: {
     planId: `${input.laneId}:plan`,
     targetCount: input.input.targets.length,
     operationKinds: unique(input.input.targets.map((target) => target.operation)),
-    parallelMutation: "unsupported",
-    ordering: "sequential",
+    parallelMutation: input.input.parallel?.enabled ? "bounded" : "unsupported",
+    ordering: input.input.parallel?.enabled ? "bounded_parallel" : "sequential",
+    maxGroupSize: boundedGroupSize(input.input.parallel?.maxGroupSize),
     terminalSuccessClaim: false,
     notProvenClaims: unique([
       "plan-created-is-not-success",
-      "parallel-mutation-unsupported-without-conflict-authority-rollback-proof",
+      input.input.parallel?.enabled
+        ? "bounded-parallel-plan-is-not-success"
+        : "parallel-mutation-unsupported-without-conflict-authority-rollback-proof",
       ...input.notProvenClaims,
     ]),
   });
@@ -901,6 +1070,391 @@ function queueObservation(input: {
   });
 }
 
+function buildGraph(input: {
+  readonly laneId: string;
+  readonly input: MultiTargetMutationInput;
+  readonly classifications: readonly MultiTargetClassification[];
+  readonly conflicts: readonly MultiTargetConflict[];
+  readonly notProvenClaims: readonly string[];
+}): readonly MultiTargetGraphNode[] {
+  return deepFreeze(input.input.targets.map((target, index) => {
+    const targetId = sanitizeId(target.targetId);
+    const targetConflicts = input.conflicts.filter((item) => item.targetIds.includes(targetId));
+    const classification = input.classifications[index]!;
+    const dependsOnTargetIds = (target.dependsOnTargetIds ?? []).map(sanitizeId);
+    const relation: MultiTargetGraphRelationKind = targetConflicts.length > 0
+      ? targetConflicts.some((item) => item.kind === "dependency_ordering")
+        ? "blocked"
+        : "conflict"
+      : dependsOnTargetIds.length > 0
+        ? "dependency"
+        : "independent";
+    return {
+      nodeId: `${input.laneId}:graph:${targetId}`,
+      targetId,
+      targetSummary: sanitizeTargetSummary(target.reportSafeTargetSummary ?? target.relativePath),
+      operation: classification.operation,
+      relation,
+      conflictIds: targetConflicts.map((item) => item.conflictId),
+      dependsOnTargetIds,
+      terminalSuccessClaim: false,
+      notProvenClaims: unique(["mutation-graph-is-not-success", ...input.notProvenClaims]),
+    };
+  }));
+}
+
+function buildParallelEligibility(input: {
+  readonly laneId: string;
+  readonly input: MultiTargetMutationInput;
+  readonly classifications: readonly MultiTargetClassification[];
+  readonly conflicts: readonly MultiTargetConflict[];
+  readonly authority: MultiTargetAuthorityObservation;
+  readonly staleReads: readonly MultiTargetStaleReadObservation[];
+  readonly snapshots: readonly MultiTargetSnapshotObservation[];
+  readonly queue: readonly MultiTargetQueueObservation[];
+  readonly notProvenClaims: readonly string[];
+}): readonly MultiTargetParallelEligibility[] {
+  return deepFreeze(input.input.targets.map((target, index) => {
+    const targetId = sanitizeId(target.targetId);
+    const classification = input.classifications[index]!;
+    const targetAuthority = input.authority.targetStatuses[index];
+    const staleRead = input.staleReads[index]!;
+    const snapshot = input.snapshots[index]!;
+    const queueEntry = latestQueueEntry(input.queue, targetId);
+    const targetConflicts = input.conflicts.filter((item) => item.targetIds.includes(targetId));
+    const status = parallelEligibilityStatus({
+      target,
+      classification,
+      targetAuthority,
+      staleRead,
+      snapshot,
+      queueEntry,
+      targetConflicts,
+    });
+    const groupable = input.input.parallel?.enabled === true && status === "eligible";
+    return {
+      eligibilityId: `${input.laneId}:eligibility:${targetId}`,
+      targetId,
+      status,
+      reason: parallelEligibilityReason(status, targetConflicts, staleRead, snapshot, targetAuthority),
+      groupable,
+      terminalSuccessClaim: false,
+      notProvenClaims: unique([
+        `parallel-eligibility-${status}-is-not-success`,
+        ...input.notProvenClaims,
+      ]),
+    };
+  }));
+}
+
+function createExecutionGroups(input: {
+  readonly laneId: string;
+  readonly input: MultiTargetMutationInput;
+  readonly queue: readonly MultiTargetQueueObservation[];
+  readonly parallelEligibility: readonly MultiTargetParallelEligibility[];
+  readonly maxGroupSize: number;
+  readonly notProvenClaims: readonly string[];
+}): readonly MultiTargetExecutionGroup[] {
+  const groups: MultiTargetExecutionGroup[] = [];
+  const readyTargets = input.input.targets.filter((target) =>
+    latestQueueEntry(input.queue, target.targetId)?.state === "ready"
+  );
+  if (!input.input.parallel?.enabled) {
+    for (const target of readyTargets) {
+      groups.push(executionGroup({
+        laneId: input.laneId,
+        mode: "sequential",
+        status: "ready",
+        targetIds: [target.targetId],
+        order: groups.length,
+        maxGroupSize: 1,
+        notProvenClaims: input.notProvenClaims,
+      }));
+    }
+    return deepFreeze(groups);
+  }
+
+  let pendingParallel: string[] = [];
+  const flushParallel = (): void => {
+    if (pendingParallel.length === 0) return;
+    groups.push(executionGroup({
+      laneId: input.laneId,
+      mode: "parallel",
+      status: "ready",
+      targetIds: pendingParallel,
+      order: groups.length,
+      maxGroupSize: input.maxGroupSize,
+      notProvenClaims: input.notProvenClaims,
+    }));
+    pendingParallel = [];
+  };
+
+  for (const target of readyTargets) {
+    const eligibility = input.parallelEligibility.find((item) =>
+      item.targetId === sanitizeId(target.targetId)
+    );
+    if (eligibility?.groupable) {
+      pendingParallel.push(target.targetId);
+      if (pendingParallel.length >= input.maxGroupSize) {
+        flushParallel();
+      }
+      continue;
+    }
+    flushParallel();
+    groups.push(executionGroup({
+      laneId: input.laneId,
+      mode: "sequential",
+      status: "ready",
+      targetIds: [target.targetId],
+      order: groups.length,
+      maxGroupSize: 1,
+      notProvenClaims: input.notProvenClaims,
+    }));
+  }
+  flushParallel();
+
+  for (const blocked of input.parallelEligibility.filter((item) =>
+    item.status !== "eligible" && latestQueueEntry(input.queue, item.targetId)?.state !== "ready"
+  )) {
+    groups.push(executionGroup({
+      laneId: input.laneId,
+      mode: "blocked",
+      status: "blocked",
+      targetIds: [blocked.targetId],
+      order: groups.length,
+      maxGroupSize: input.maxGroupSize,
+      blockedReason: blocked.status,
+      notProvenClaims: input.notProvenClaims,
+    }));
+  }
+  return deepFreeze(groups);
+}
+
+async function applyExecutionGroups(input: {
+  readonly laneId: string;
+  readonly input: MultiTargetMutationInput;
+  readonly queue: MultiTargetQueueObservation[];
+  readonly executionGroups: readonly MultiTargetExecutionGroup[];
+  readonly settlements: MultiTargetSettlementObservation[];
+  readonly notProvenClaims: readonly string[];
+}): Promise<readonly MultiTargetMutationTargetInput[]> {
+  const appliedTargets: MultiTargetMutationTargetInput[] = [];
+  let stopAfterFailure = false;
+  for (const group of input.executionGroups) {
+    if (group.mode === "blocked") {
+      continue;
+    }
+    const targets = group.targetIds.map((targetId) =>
+      input.input.targets.find((item) => sanitizeId(item.targetId) === targetId)
+    ).filter((target): target is MultiTargetMutationTargetInput => Boolean(target));
+    if (stopAfterFailure) {
+      for (const target of targets) {
+        const latest = latestQueueEntry(input.queue, target.targetId);
+        input.queue.push(queueObservation({
+          laneId: input.laneId,
+          target,
+          state: "skipped",
+          order: input.queue.length,
+          targetSummary: latest?.targetSummary ?? sanitizeTargetSummary(target.reportSafeTargetSummary ?? target.relativePath),
+          blocker: "earlier-group-failure",
+          notProvenClaims: input.notProvenClaims,
+        }));
+        input.settlements.push(settlementObservation({
+          laneId: input.laneId,
+          groupId: group.groupId,
+          target,
+          status: "skipped",
+          order: input.settlements.length,
+          targetSummary: latest?.targetSummary ?? sanitizeTargetSummary(target.reportSafeTargetSummary ?? target.relativePath),
+          originalFailure: "earlier-group-failure",
+          notProvenClaims: input.notProvenClaims,
+        }));
+      }
+      continue;
+    }
+    for (const target of targets) {
+      const latest = latestQueueEntry(input.queue, target.targetId)!;
+      input.queue.push(queueObservation({
+        laneId: input.laneId,
+        target,
+        state: "applying",
+        order: input.queue.length,
+        targetSummary: latest.targetSummary,
+        notProvenClaims: input.notProvenClaims,
+      }));
+    }
+    const attempts = await Promise.allSettled(targets.map((target) => {
+      const latest = latestQueueEntry(input.queue, target.targetId)!;
+      return applyTarget({ input: input.input, target, laneId: input.laneId, targetSummary: latest.targetSummary });
+    }));
+    let groupFailed = false;
+    for (const [index, target] of targets.entries()) {
+      const latest = latestQueueEntry(input.queue, target.targetId)!;
+      const attempt = attempts[index]!;
+      if (attempt.status === "fulfilled") {
+        appliedTargets.push(target);
+        const contentFingerprint = fingerprint(target.proposedContent ?? "");
+        input.queue.push(queueObservation({
+          laneId: input.laneId,
+          target,
+          state: "applied",
+          order: input.queue.length,
+          targetSummary: latest.targetSummary,
+          contentFingerprint,
+          notProvenClaims: input.notProvenClaims,
+        }));
+        input.settlements.push(settlementObservation({
+          laneId: input.laneId,
+          groupId: group.groupId,
+          target,
+          status: "applied",
+          order: input.settlements.length,
+          targetSummary: latest.targetSummary,
+          contentFingerprint,
+          notProvenClaims: input.notProvenClaims,
+        }));
+      } else {
+        groupFailed = true;
+        const originalFailure = attempt.reason instanceof Error
+          ? sanitizeText(attempt.reason.name, 80)
+          : "unknown";
+        input.queue.push(queueObservation({
+          laneId: input.laneId,
+          target,
+          state: "failed",
+          order: input.queue.length,
+          targetSummary: latest.targetSummary,
+          blocker: originalFailure,
+          notProvenClaims: input.notProvenClaims,
+        }));
+        input.settlements.push(settlementObservation({
+          laneId: input.laneId,
+          groupId: group.groupId,
+          target,
+          status: "failed",
+          order: input.settlements.length,
+          targetSummary: latest.targetSummary,
+          originalFailure,
+          notProvenClaims: input.notProvenClaims,
+        }));
+      }
+    }
+    if (groupFailed) {
+      stopAfterFailure = true;
+    }
+  }
+  return appliedTargets;
+}
+
+function executionGroup(input: {
+  readonly laneId: string;
+  readonly mode: MultiTargetGroupMode;
+  readonly status: MultiTargetGroupStatus;
+  readonly targetIds: readonly string[];
+  readonly order: number;
+  readonly maxGroupSize: number;
+  readonly blockedReason?: string;
+  readonly notProvenClaims: readonly string[];
+}): MultiTargetExecutionGroup {
+  return deepFreeze({
+    groupId: `${input.laneId}:group:${input.order}`,
+    mode: input.mode,
+    status: input.status,
+    targetIds: input.targetIds.map(sanitizeId),
+    order: input.order,
+    maxGroupSize: input.maxGroupSize,
+    ...(input.blockedReason ? { blockedReason: sanitizeText(input.blockedReason, 160) } : {}),
+    terminalSuccessClaim: false,
+    notProvenClaims: unique([`group-${input.status}-is-not-success`, ...input.notProvenClaims]),
+  });
+}
+
+function settlementObservation(input: {
+  readonly laneId: string;
+  readonly groupId: string;
+  readonly target: MultiTargetMutationTargetInput;
+  readonly status: MultiTargetSettlementStatus;
+  readonly order: number;
+  readonly targetSummary: string;
+  readonly originalFailure?: string;
+  readonly contentFingerprint?: string;
+  readonly notProvenClaims: readonly string[];
+}): MultiTargetSettlementObservation {
+  return deepFreeze({
+    settlementId: `${input.laneId}:settlement:${sanitizeId(input.target.targetId)}:${input.order}`,
+    groupId: input.groupId,
+    targetId: sanitizeId(input.target.targetId),
+    status: input.status,
+    order: input.order,
+    targetSummary: input.targetSummary,
+    ...(input.originalFailure ? { originalFailure: sanitizeText(input.originalFailure, 120) } : {}),
+    ...(input.contentFingerprint ? { contentFingerprint: input.contentFingerprint } : {}),
+    terminalSuccessClaim: false,
+    notProvenClaims: unique([`settlement-${input.status}-is-not-success`, ...input.notProvenClaims]),
+  });
+}
+
+function parallelEligibilityStatus(input: {
+  readonly target: MultiTargetMutationTargetInput;
+  readonly classification: MultiTargetClassification;
+  readonly targetAuthority?: MultiTargetAuthorityObservation["targetStatuses"][number];
+  readonly staleRead: MultiTargetStaleReadObservation;
+  readonly snapshot: MultiTargetSnapshotObservation;
+  readonly queueEntry?: MultiTargetQueueObservation;
+  readonly targetConflicts: readonly MultiTargetConflict[];
+}): MultiTargetParallelEligibilityStatus {
+  if (input.classification.status === "blocked") return "unsafe";
+  if (input.targetConflicts.some((item) => item.kind === "dependency_ordering")) return "dependency_blocked";
+  if (input.targetConflicts.some((item) => item.kind === "unsupported_operation")) {
+    return input.target.operation === "unknown" ? "unknown" : "unsupported";
+  }
+  if (input.targetConflicts.length > 0) return "conflict";
+  if (input.classification.status === "authority_required" || input.targetAuthority?.status !== "granted") {
+    return "authority_required";
+  }
+  if (input.staleRead.status === "stale" || input.staleRead.status === "target_missing" ||
+      input.staleRead.status === "target_exists") {
+    return "stale";
+  }
+  if (input.staleRead.status !== "passed") return "blocked";
+  if (input.snapshot.status === "unavailable") return "snapshot_missing";
+  if (input.snapshot.status !== "planned") return "blocked";
+  if (!input.snapshot.restorePlanAvailable) return "rollback_missing";
+  if (
+    input.target.operation === "delete" || input.target.operation === "move" ||
+    input.target.operation === "unsupported"
+  ) {
+    return "unsupported";
+  }
+  if (input.target.operation === "unknown" || input.queueEntry?.state === "unknown") return "unknown";
+  if (input.queueEntry?.state !== "ready") return "blocked";
+  if ((input.target.dependsOnTargetIds?.length ?? 0) > 0) return "forced_sequential";
+  return "eligible";
+}
+
+function parallelEligibilityReason(
+  status: MultiTargetParallelEligibilityStatus,
+  conflicts: readonly MultiTargetConflict[],
+  staleRead: MultiTargetStaleReadObservation,
+  snapshot: MultiTargetSnapshotObservation,
+  targetAuthority?: MultiTargetAuthorityObservation["targetStatuses"][number],
+): string {
+  if (conflicts[0]) return sanitizeText(conflicts[0].kind, 160);
+  if (targetAuthority?.status !== "granted") return `authority:${targetAuthority?.status ?? "missing"}`;
+  if (staleRead.status !== "passed") return `stale-read:${staleRead.status}`;
+  if (snapshot.status !== "planned") return `snapshot:${snapshot.status}`;
+  return status === "eligible"
+    ? "target independent and bounded group eligible"
+    : status === "forced_sequential"
+      ? "target dependency requires deterministic ordering"
+      : status;
+}
+
+function boundedGroupSize(value: number | undefined): number {
+  if (!Number.isFinite(value)) return 2;
+  return Math.max(1, Math.min(8, Math.floor(value ?? 2)));
+}
+
 async function applyTarget(input: {
   readonly input: MultiTargetMutationInput;
   readonly target: MultiTargetMutationTargetInput;
@@ -1058,6 +1612,27 @@ function allReadyTargetsApplied(
     const targetId = sanitizeId(target.targetId);
     return !readyTargetIds.has(targetId) || targetReachedState(queue, targetId, "applied");
   });
+}
+
+function groupTargetsApplied(
+  queue: readonly MultiTargetQueueObservation[],
+  group: MultiTargetExecutionGroup,
+): boolean {
+  return group.targetIds.length > 0 &&
+    group.targetIds.every((targetId) => targetReachedState(queue, targetId, "applied"));
+}
+
+function deterministicSettlementOrder(input: {
+  readonly input: MultiTargetMutationInput;
+  readonly settlements: readonly MultiTargetSettlementObservation[];
+}): boolean {
+  const finalTargetOrder = input.settlements
+    .filter((item) => item.status === "applied" || item.status === "failed" || item.status === "skipped")
+    .map((item) => item.targetId);
+  const expectedOrder = input.input.targets
+    .map((target) => sanitizeId(target.targetId))
+    .filter((targetId) => finalTargetOrder.includes(targetId));
+  return finalTargetOrder.every((targetId, index) => targetId === expectedOrder[index]);
 }
 
 function countState(

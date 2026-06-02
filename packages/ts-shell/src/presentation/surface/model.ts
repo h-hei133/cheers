@@ -812,6 +812,15 @@ function mutationRuntimeEventSections(input: ProductSurfaceInput): ProductSurfac
   const queue = events.filter((event) =>
     event.type === "multi-target-mutation-queue-observed"
   );
+  const groups = events.filter((event) =>
+    event.type === "multi-target-mutation-group-observed"
+  );
+  const eligibility = events.filter((event) =>
+    event.type === "multi-target-mutation-eligibility-observed"
+  );
+  const settlements = events.filter((event) =>
+    event.type === "multi-target-mutation-settlement-observed"
+  );
   const rollback = events.find((event) =>
     event.type === "multi-target-mutation-rollback-observed"
   );
@@ -857,11 +866,16 @@ function mutationRuntimeEventSections(input: ProductSurfaceInput): ProductSurfac
       `targets=${factValue(lane.facts.targetCount)}`,
       plan ? `ordering=${factValue(plan.facts.ordering)}` : undefined,
       plan ? `parallel=${factValue(plan.facts.parallelMutation)}` : undefined,
+      `groups=${groups.length}`,
+      `parallelGroups=${groups.filter((event) => factValue(event.facts.mode) === "parallel").length}`,
+      `eligible=${eligibility.filter((event) => factValue(event.facts.status) === "eligible").length}`,
       `conflicts=${conflicts.length}`,
       `ready=${queue.filter((event) => factValue(event.facts.state) === "ready").length}`,
       `applied=${queue.filter((event) => factValue(event.facts.state) === "applied").length}`,
       `failed=${queue.filter((event) => factValue(event.facts.state) === "failed").length}`,
+      `settlements=${settlements.length}`,
       rollback ? `rollback=${factValue(rollback.facts.status)}` : undefined,
+      verification ? `groupVerification=${factValue(verification.facts.perGroupStatuses)}` : undefined,
       verification ? `wholeTaskVerification=${factValue(verification.facts.wholeTaskStatus)}` : undefined,
       proof ? `proof=${factValue(proof.facts.proofStatus)}` : undefined,
       `verdict=${status}`,
@@ -891,6 +905,26 @@ function mutationRuntimeEventSections(input: ProductSurfaceInput): ProductSurfac
         machineEventCorrelationId: plan?.id,
       },
       {
+        label: "groups",
+        value: String(groups.length),
+        machineEventCorrelationId: groups[0]?.id,
+      },
+      {
+        label: "parallelGroups",
+        value: String(groups.filter((event) => factValue(event.facts.mode) === "parallel").length),
+        machineEventCorrelationId: groups[0]?.id,
+      },
+      {
+        label: "settlements",
+        value: String(settlements.length),
+        machineEventCorrelationId: settlements[0]?.id,
+      },
+      {
+        label: "groupVerification",
+        value: verification ? factValue(verification.facts.perGroupStatuses) : "not-observed",
+        machineEventCorrelationId: verification?.id,
+      },
+      {
         label: "wholeTaskVerification",
         value: verification ? factValue(verification.facts.wholeTaskStatus) : "not-observed",
         machineEventCorrelationId: verification?.id,
@@ -915,7 +949,9 @@ function mutationRuntimeEventSections(input: ProductSurfaceInput): ProductSurfac
       proof?.id,
       verdict?.id,
       ...conflicts.map((event) => event.id),
+      ...groups.map((event) => event.id),
       ...queue.map((event) => event.id),
+      ...settlements.map((event) => event.id),
     ].filter((id): id is string => Boolean(id)),
     notProvenClaims: events
       .filter((event) => event.type.startsWith("multi-target-mutation-"))
