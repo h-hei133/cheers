@@ -1,4 +1,5 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
+import type { MultiTargetMutationProjection } from "../../edit/multifile/model.js";
 import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/model.js";
 import type { RepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
@@ -171,6 +172,20 @@ export type RuntimeProjectionEventType =
   | "tool-outcome-bundle-observed"
   | "tool-result-next-action-observed"
   | "tool-batch-save-point-observed"
+  | "multi-target-mutation-lane-observed"
+  | "multi-target-mutation-plan-observed"
+  | "multi-target-mutation-target-classified"
+  | "multi-target-mutation-conflict-observed"
+  | "multi-target-mutation-authority-observed"
+  | "multi-target-mutation-stale-read-observed"
+  | "multi-target-mutation-snapshot-observed"
+  | "multi-target-mutation-queue-observed"
+  | "multi-target-mutation-partial-failure-observed"
+  | "multi-target-mutation-rollback-observed"
+  | "multi-target-mutation-verification-observed"
+  | "multi-target-mutation-repair-eligibility-observed"
+  | "multi-target-mutation-proof-input-observed"
+  | "multi-target-mutation-verdict-projected"
   | "mutation-recovery-lane-observed"
   | "mutation-authority-observed"
   | "mutation-permission-pending"
@@ -309,6 +324,7 @@ export function projectRuntimeEvents(input: {
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
   readonly repairApplyRequests?: readonly RepairApplyRequestObservation[];
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
+  readonly multiTargetMutations?: readonly MultiTargetMutationProjection[];
   readonly mutationRecoveries?: readonly ControlledMutationRecoveryProjection[];
   readonly modelRequestBoundaries?: readonly ModelRequestBoundary[];
   readonly nextTurnRequestPreparations?: readonly NextTurnModelRequestPreparation[];
@@ -1863,6 +1879,205 @@ export function projectRuntimeEvents(input: {
         bundle.notProvenClaims,
       );
     }
+  }
+
+  for (const mutation of input.multiTargetMutations ?? []) {
+    append(
+      "multi-target-mutation-lane-observed",
+      {
+        laneId: mutation.laneId,
+        turnId: mutation.turnId,
+        targetCount: mutation.plan.targetCount,
+        conflictCount: mutation.conflicts.length,
+        queueEntryCount: mutation.queue.length,
+        verdictStatus: mutation.verdictStatus,
+        redactionStatus: mutation.redactionStatus,
+        terminalSuccessClaim: mutation.terminalSuccessClaim,
+      },
+      mutation.notProvenClaims,
+    );
+    append(
+      "multi-target-mutation-plan-observed",
+      {
+        laneId: mutation.laneId,
+        planId: mutation.plan.planId,
+        targetCount: mutation.plan.targetCount,
+        operationKinds: mutation.plan.operationKinds,
+        parallelMutation: mutation.plan.parallelMutation,
+        ordering: mutation.plan.ordering,
+        terminalSuccessClaim: mutation.plan.terminalSuccessClaim,
+      },
+      mutation.plan.notProvenClaims,
+    );
+    for (const classification of mutation.classifications) {
+      append(
+        "multi-target-mutation-target-classified",
+        {
+          laneId: mutation.laneId,
+          targetId: classification.targetId,
+          targetSummary: classification.targetSummary,
+          operation: classification.operation,
+          status: classification.status,
+          reason: classification.reason,
+          terminalSuccessClaim: classification.terminalSuccessClaim,
+        },
+        classification.notProvenClaims,
+      );
+    }
+    for (const conflict of mutation.conflicts) {
+      append(
+        "multi-target-mutation-conflict-observed",
+        {
+          laneId: mutation.laneId,
+          conflictId: conflict.conflictId,
+          kind: conflict.kind,
+          targetIds: conflict.targetIds,
+          blocked: conflict.blocked,
+          reason: conflict.reason,
+          terminalSuccessClaim: conflict.terminalSuccessClaim,
+        },
+        conflict.notProvenClaims,
+      );
+    }
+    append(
+      "multi-target-mutation-authority-observed",
+      {
+        laneId: mutation.laneId,
+        authorityId: mutation.authority.authorityId,
+        authorityStatus: mutation.authority.status,
+        targetStatuses: mutation.authority.targetStatuses.map((item) => ({
+          targetId: item.targetId,
+          status: item.status,
+        })),
+        terminalSuccessClaim: mutation.authority.terminalSuccessClaim,
+      },
+      mutation.authority.notProvenClaims,
+    );
+    for (const staleRead of mutation.staleReads) {
+      append(
+        "multi-target-mutation-stale-read-observed",
+        {
+          laneId: mutation.laneId,
+          staleReadId: staleRead.staleReadId,
+          targetId: staleRead.targetId,
+          status: staleRead.status,
+          targetSummary: staleRead.targetSummary,
+          expectedFingerprint: staleRead.expectedFingerprint,
+          currentFingerprint: staleRead.currentFingerprint,
+          terminalSuccessClaim: staleRead.terminalSuccessClaim,
+        },
+        staleRead.notProvenClaims,
+      );
+    }
+    for (const snapshot of mutation.snapshots) {
+      append(
+        "multi-target-mutation-snapshot-observed",
+        {
+          laneId: mutation.laneId,
+          snapshotId: snapshot.snapshotId,
+          targetId: snapshot.targetId,
+          status: snapshot.status,
+          restorePlanAvailable: snapshot.restorePlanAvailable,
+          targetSummary: snapshot.targetSummary,
+          contentFingerprint: snapshot.contentFingerprint,
+          blocker: snapshot.blocker,
+          terminalSuccessClaim: snapshot.terminalSuccessClaim,
+        },
+        snapshot.notProvenClaims,
+      );
+    }
+    for (const queueEntry of mutation.queue) {
+      append(
+        "multi-target-mutation-queue-observed",
+        {
+          laneId: mutation.laneId,
+          queueId: queueEntry.queueId,
+          targetId: queueEntry.targetId,
+          state: queueEntry.state,
+          targetSummary: queueEntry.targetSummary,
+          order: queueEntry.order,
+          blocker: queueEntry.blocker,
+          contentFingerprint: queueEntry.contentFingerprint,
+          terminalSuccessClaim: queueEntry.terminalSuccessClaim,
+        },
+        queueEntry.notProvenClaims,
+      );
+    }
+    if (mutation.queue.some((item) => item.state === "failed") &&
+        mutation.queue.some((item) => item.state === "applied")) {
+      append(
+        "multi-target-mutation-partial-failure-observed",
+        {
+          laneId: mutation.laneId,
+          appliedTargetIds: mutation.queue.filter((item) => item.state === "applied").map((item) => item.targetId),
+          failedTargetIds: mutation.queue.filter((item) => item.state === "failed").map((item) => item.targetId),
+          terminalSuccessClaim: false,
+        },
+        mutation.notProvenClaims,
+      );
+    }
+    append(
+      "multi-target-mutation-rollback-observed",
+      {
+        laneId: mutation.laneId,
+        rollbackId: mutation.rollback.rollbackId,
+        status: mutation.rollback.status,
+        targetIds: mutation.rollback.targetIds,
+        revertedTargetIds: mutation.rollback.revertedTargetIds,
+        failedTargetIds: mutation.rollback.failedTargetIds,
+        preservesOriginalFailure: mutation.rollback.preservesOriginalFailure,
+        terminalSuccessClaim: mutation.rollback.terminalSuccessClaim,
+      },
+      mutation.rollback.notProvenClaims,
+    );
+    append(
+      "multi-target-mutation-verification-observed",
+      {
+        laneId: mutation.laneId,
+        perTargetStatuses: mutation.verificationResults.map((item) => item.status),
+        wholeTaskStatus: mutation.wholeTaskVerificationResult.status,
+        terminalSuccessClaim: false,
+      },
+      [
+        ...mutation.verificationResults.flatMap((item) => item.notProvenClaims),
+        ...mutation.wholeTaskVerificationResult.notProvenClaims,
+      ],
+    );
+    append(
+      "multi-target-mutation-repair-eligibility-observed",
+      {
+        laneId: mutation.laneId,
+        eligibilityId: mutation.repairEligibility.eligibilityId,
+        status: mutation.repairEligibility.status,
+        targetIds: mutation.repairEligibility.targetIds,
+        originalFailureIds: mutation.repairEligibility.originalFailureIds,
+        terminalSuccessClaim: mutation.repairEligibility.terminalSuccessClaim,
+      },
+      mutation.repairEligibility.notProvenClaims,
+    );
+    append(
+      "multi-target-mutation-proof-input-observed",
+      {
+        laneId: mutation.laneId,
+        proofInputId: mutation.proofInput.proofInputId,
+        proofStatus: mutation.proofInput.proofStatus,
+        missingProofItems: mutation.proofInput.missingProofItems,
+        terminalSuccessClaim: mutation.proofInput.terminalSuccessClaim,
+      },
+      mutation.proofInput.notProvenClaims,
+    );
+    append(
+      "multi-target-mutation-verdict-projected",
+      {
+        laneId: mutation.laneId,
+        projectionId: mutation.resultVerdict.projectionId,
+        status: mutation.resultVerdict.status,
+        terminalClassification: mutation.resultVerdict.terminalClassification,
+        missingProofItems: mutation.resultVerdict.missingProofItems,
+        terminalSuccessClaim: mutation.resultVerdict.terminalSuccessClaim,
+      },
+      mutation.resultVerdict.notProvenClaims,
+    );
   }
 
   for (const recovery of input.mutationRecoveries ?? []) {

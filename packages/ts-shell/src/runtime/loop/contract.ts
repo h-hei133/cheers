@@ -3,6 +3,7 @@ import {
   prepareToolOutcomeSavePointInput,
   type RuntimeEvidenceSavePoint,
 } from "../../evidence/savepoint/model.js";
+import type { MultiTargetMutationProjection } from "../../edit/multifile/model.js";
 import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/model.js";
 import type { RepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
 import {
@@ -213,6 +214,9 @@ export interface AgentLoopContractInput {
   readonly mutationRecoveryBoundary?: (
     input: AgentLoopContractMutationRecoveryBoundaryInput,
   ) => Promise<ControlledMutationRecoveryProjection | undefined>;
+  readonly mutationRuntimeBoundary?: (
+    input: AgentLoopContractMutationRecoveryBoundaryInput,
+  ) => Promise<MultiTargetMutationProjection | undefined>;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -296,6 +300,7 @@ export interface AgentLoopContractTurnProjection {
     readonly deliveryPolicy: NextTurnDeliveryPolicyProjection;
     readonly executed: false;
   };
+  readonly mutationRuntime?: MultiTargetMutationProjection;
   readonly mutationRecovery?: ControlledMutationRecoveryProjection;
   readonly verification: AgentLoopContractVerificationProjection;
   readonly finalization?: {
@@ -856,6 +861,18 @@ export async function runAgentLoopContract(
         controlledModelInvocations: [controlledInvocation],
         responseReentryCycles: responseReentryCycle ? [responseReentryCycle] : [],
       }));
+      const mutationRuntime = input.mutationRuntimeBoundary
+        ? await input.mutationRuntimeBoundary({
+          sessionId: input.sessionId,
+          turn,
+          turnId: `${input.sessionId}:turn:${turn}`,
+          savePoint,
+          nextTurnBundle,
+          ...(toolCallBatch ? { toolCallBatch } : {}),
+          normalizedToolCallBatch,
+          ...(toolResultBatch ? { toolResultBatch } : {}),
+        })
+        : undefined;
       const mutationRecovery = input.mutationRecoveryBoundary
         ? await input.mutationRecoveryBoundary({
           sessionId: input.sessionId,
@@ -935,6 +952,20 @@ export async function runAgentLoopContract(
             "repair-readiness-terminal-success:false",
           ];
       const repairCarryForwardFacts = [
+        ...(mutationRuntime
+          ? [
+              `mutation-runtime:${mutationRuntime.laneId}`,
+              `mutation-runtime-targets:${mutationRuntime.plan.targetCount}`,
+              `mutation-runtime-conflicts:${mutationRuntime.conflicts.length}`,
+              `mutation-runtime-ready:${mutationRuntime.queue.filter((item) => item.state === "ready").length}`,
+              `mutation-runtime-applied:${mutationRuntime.queue.filter((item) => item.state === "applied").length}`,
+              `mutation-runtime-failed:${mutationRuntime.queue.filter((item) => item.state === "failed").length}`,
+              `mutation-runtime-rollback:${mutationRuntime.rollback.status}`,
+              `mutation-runtime-whole-task-verification:${mutationRuntime.wholeTaskVerificationResult.status}`,
+              `mutation-runtime-verdict:${mutationRuntime.verdictStatus}`,
+              "mutation-runtime-terminal-success:false",
+            ]
+          : []),
         ...(mutationRecovery
           ? [
               `mutation-recovery:${mutationRecovery.laneId}`,
@@ -1150,10 +1181,12 @@ export async function runAgentLoopContract(
           ...(closeoutInput?.notProvenClaims ?? []),
           ...(closeout?.notProvenClaims ?? []),
           ...(completionPacket?.notProvenClaims ?? []),
+          ...(mutationRuntime?.notProvenClaims ?? []),
           ...(mutationRecovery?.notProvenClaims ?? []),
         ],
       });
       appendProjectedEvents(events, projectRuntimeEvents({
+        multiTargetMutations: mutationRuntime ? [mutationRuntime] : [],
         mutationRecoveries: mutationRecovery ? [mutationRecovery] : [],
         verificationIntents: [verification.intent],
         verificationResults: [verification.result],
@@ -1236,6 +1269,7 @@ export async function runAgentLoopContract(
           deliveryPolicy,
           executed: false,
           },
+          ...(mutationRuntime ? { mutationRuntime } : {}),
           ...(mutationRecovery ? { mutationRecovery } : {}),
           verification: {
             ...verification,

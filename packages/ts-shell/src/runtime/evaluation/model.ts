@@ -14,6 +14,7 @@ export type EvaluationCaseId =
   | "provider-redaction"
   | "optional-live-gate-skipped"
   | "unsupported-provider-mode"
+  | "multi-target-mutation-success"
   | "mutation-recovery-success"
   | "apply-only-negative"
   | "branch-compaction-continuation"
@@ -137,6 +138,7 @@ export async function runEvaluationSuite(input: {
     "provider-redaction",
     "optional-live-gate-skipped",
     "unsupported-provider-mode",
+    "multi-target-mutation-success",
     "mutation-recovery-success",
     "apply-only-negative",
     "branch-compaction-continuation",
@@ -179,6 +181,7 @@ export function listEvaluationCases(): readonly EvaluationCaseDefinition[] {
     providerRedaction(),
     optionalLiveGateSkipped(),
     unsupportedProviderMode(),
+    multiTargetMutationSuccess(),
     mutationRecoverySuccess(),
     applyOnlyNegative(),
     branchCompactionContinuation(),
@@ -483,6 +486,24 @@ function unsupportedProviderMode(): EvaluationCaseDefinition {
     expectedEvidenceVerdict: "not-proven",
     expectedCaseStatus: "unsupported",
     expectedEventCategories: [],
+  });
+}
+
+function multiTargetMutationSuccess(): EvaluationCaseDefinition {
+  return base({
+    scenarioId: "multi-target-mutation-success",
+    input: "apply controlled multi-target mutation with complete proof",
+    hostCommand: {
+      action: "start-turn",
+      inputText: "apply controlled multi-target mutation with complete proof",
+      mode: "mutation",
+      providerMode: "synthetic",
+      correlationId: "eval-mutation-runtime-success",
+    },
+    expectedStatus: "completed",
+    expectedNextAction: "preserve structured host facts",
+    expectedEvidenceVerdict: "complete",
+    expectedEventCategories: ["mutation", "verification", "result"],
   });
 }
 

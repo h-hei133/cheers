@@ -22,6 +22,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp008-complete-host-contract-and-evaluation-runtime.md` | completed route input | Host command contract and deterministic evaluation runtime objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp009-real-provider-compatibility-and-evaluation-hardening.md` | completed route input | Provider compatibility and evaluation hardening objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp010-controlled-component-adoption-and-parallel-tool-runtime.md` | completed route input | Controlled component adoption and read-only parallel tool runtime objective now reflected in current capability, priority, and adoption-log docs. |
+| `docs/sprint/route/sp011-controlled-multi-target-mutation-runtime.md` | completed route input | Controlled multi-target mutation runtime objective now reflected in current capability, priority, and adoption-log docs. |
 
 ## Removed Or Merged Content
 

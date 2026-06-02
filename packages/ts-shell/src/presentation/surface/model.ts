@@ -132,6 +132,9 @@ export function projectProductSurfaceViewModel(
   ) ?? input.runtimeEvents?.find((event) =>
     event.type === "repair-verdict-terminal-projected"
   );
+  const mutationVerdictEvent = input.runtimeEvents?.find((event) =>
+    event.type === "multi-target-mutation-verdict-projected"
+  );
   const loopFinalizationEvent = input.loopTrajectory?.events.find((event) =>
     event.type === "loop-finalization-observed"
   ) ?? input.runtimeEvents?.find((event) =>
@@ -198,6 +201,7 @@ export function projectProductSurfaceViewModel(
     ...packageSections(input),
     ...sessionSections(input),
     ...toolOutcomeEventSections(input),
+    ...mutationRuntimeEventSections(input),
     ...mutationRecoveryEventSections(input),
     ...requestPreparationEventSections(input),
     ...replayCarryForwardEventSections(input),
@@ -210,20 +214,26 @@ export function projectProductSurfaceViewModel(
       title: "Verdict",
       severity: sessionFacts
         ? verdictSeverity(sessionFacts.truthStatus)
+        : mutationVerdictEvent?.facts.status === "complete"
+          ? "success"
         : repairVerdictEvent?.facts.status === "verified_with_repair"
           ? "success"
-          : repairVerdictEvent
+          : mutationVerdictEvent || repairVerdictEvent
             ? "partial"
             : "not_proven",
       status: sessionFacts
         ? verdictStatus(sessionFacts.truthStatus)
+        : mutationVerdictEvent?.facts.status === "complete"
+          ? "passed"
         : repairVerdictEvent?.facts.status === "verified_with_repair"
           ? "passed"
-          : repairVerdictEvent
+          : mutationVerdictEvent || repairVerdictEvent
             ? "partial"
             : "not_proven",
       summary: sessionFacts?.verdict ??
-        (repairVerdictEvent
+        (mutationVerdictEvent
+          ? `resultStatus=${factValue(mutationVerdictEvent.facts.status)}; classification=${factValue(mutationVerdictEvent.facts.terminalClassification)}; missingProof=${factValue(mutationVerdictEvent.facts.missingProofItems)}; terminalSuccessClaim=false`
+          : repairVerdictEvent
           ? `resultStatus=${factValue(repairVerdictEvent.facts.status)}; originalFailure=${factValue(repairVerdictEvent.facts.originalFailureClass)}; repairApply=${factValue(repairVerdictEvent.facts.repairApplyState)}; postRepair=${factValue(repairVerdictEvent.facts.postRepairVerificationState)}; missingProof=${factValue(repairVerdictEvent.facts.missingProofItems)}; terminalSuccessClaim=false`
           : `loopState=${input.loopTrajectory?.finalObservedFacts.loopState ?? input.productLoopAdapter?.adapterId ?? "not-observed"}; terminalSuccessClaim=false`
         ),
@@ -781,6 +791,134 @@ function mutationRecoveryEventSections(input: ProductSurfaceInput): ProductSurfa
     ].filter((id): id is string => Boolean(id)),
     notProvenClaims: events
       .filter((event) => event.type.startsWith("mutation-"))
+      .flatMap((event) => event.notProvenClaims),
+  })];
+}
+
+function mutationRuntimeEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const events = input.runtimeEvents ?? [];
+  const lane = events.find((event) =>
+    event.type === "multi-target-mutation-lane-observed"
+  );
+  if (!lane) {
+    return [];
+  }
+  const plan = events.find((event) =>
+    event.type === "multi-target-mutation-plan-observed"
+  );
+  const conflicts = events.filter((event) =>
+    event.type === "multi-target-mutation-conflict-observed"
+  );
+  const queue = events.filter((event) =>
+    event.type === "multi-target-mutation-queue-observed"
+  );
+  const rollback = events.find((event) =>
+    event.type === "multi-target-mutation-rollback-observed"
+  );
+  const verification = events.find((event) =>
+    event.type === "multi-target-mutation-verification-observed"
+  );
+  const proof = events.find((event) =>
+    event.type === "multi-target-mutation-proof-input-observed"
+  );
+  const verdict = events.find((event) =>
+    event.type === "multi-target-mutation-verdict-projected"
+  );
+  const status = factValue(verdict?.facts.status ?? lane.facts.verdictStatus);
+  const failed = queue.some((event) => factValue(event.facts.state) === "failed");
+  const blocked = conflicts.length > 0 ||
+    queue.some((event) =>
+      factValue(event.facts.state) === "blocked" ||
+      factValue(event.facts.state) === "skipped"
+    );
+  return [section({
+    kind: "apply",
+    title: "Mutation runtime",
+    severity: status === "complete"
+      ? "success"
+      : failed
+        ? "error"
+        : blocked
+          ? "blocked"
+          : status === "partial"
+            ? "partial"
+            : "not_proven",
+    status: status === "complete"
+      ? "passed"
+      : failed
+        ? "failed"
+        : blocked
+          ? "blocked"
+          : status === "partial"
+            ? "partial"
+            : "not_proven",
+    summary: [
+      `lane=${factValue(lane.facts.laneId)}`,
+      `targets=${factValue(lane.facts.targetCount)}`,
+      plan ? `ordering=${factValue(plan.facts.ordering)}` : undefined,
+      plan ? `parallel=${factValue(plan.facts.parallelMutation)}` : undefined,
+      `conflicts=${conflicts.length}`,
+      `ready=${queue.filter((event) => factValue(event.facts.state) === "ready").length}`,
+      `applied=${queue.filter((event) => factValue(event.facts.state) === "applied").length}`,
+      `failed=${queue.filter((event) => factValue(event.facts.state) === "failed").length}`,
+      rollback ? `rollback=${factValue(rollback.facts.status)}` : undefined,
+      verification ? `wholeTaskVerification=${factValue(verification.facts.wholeTaskStatus)}` : undefined,
+      proof ? `proof=${factValue(proof.facts.proofStatus)}` : undefined,
+      `verdict=${status}`,
+      "terminalSuccessClaim=false",
+    ].filter(Boolean).join("; "),
+    facts: [
+      {
+        label: "lane",
+        value: factValue(lane.facts.laneId),
+        machineEventCorrelationId: lane.id,
+      },
+      {
+        label: "targetCount",
+        value: factValue(lane.facts.targetCount),
+        machineEventCorrelationId: lane.id,
+      },
+      {
+        label: "blockedReasons",
+        value: conflicts.map((event) => factValue(event.facts.kind)).join(",") ||
+          queue.filter((event) => factValue(event.facts.blocker) !== "not-observed")
+            .map((event) => factValue(event.facts.blocker)).join(",") ||
+          "none",
+      },
+      {
+        label: "parallel",
+        value: plan ? factValue(plan.facts.parallelMutation) : "not-observed",
+        machineEventCorrelationId: plan?.id,
+      },
+      {
+        label: "wholeTaskVerification",
+        value: verification ? factValue(verification.facts.wholeTaskStatus) : "not-observed",
+        machineEventCorrelationId: verification?.id,
+      },
+      {
+        label: "verdict",
+        value: status,
+        machineEventCorrelationId: verdict?.id ?? lane.id,
+      },
+    ],
+    redaction: events.some((event) =>
+      event.type.startsWith("multi-target-mutation-") &&
+      event.redaction.status === "redacted"
+    )
+      ? "applied"
+      : "excluded",
+    machineEventCorrelationIds: [
+      lane.id,
+      plan?.id,
+      rollback?.id,
+      verification?.id,
+      proof?.id,
+      verdict?.id,
+      ...conflicts.map((event) => event.id),
+      ...queue.map((event) => event.id),
+    ].filter((id): id is string => Boolean(id)),
+    notProvenClaims: events
+      .filter((event) => event.type.startsWith("multi-target-mutation-"))
       .flatMap((event) => event.notProvenClaims),
   })];
 }

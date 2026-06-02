@@ -1,10 +1,15 @@
 import type { HostEvidenceProof } from "../../evidence/host/proof.js";
+import type { MultiTargetMutationTerminalProjection } from "../projection/mutation/verdict.js";
 import type { RepairVerdictTerminalProjection } from "../projection/repair/verdict.js";
+
+type HostResultProjection =
+  | RepairVerdictTerminalProjection
+  | MultiTargetMutationTerminalProjection;
 
 export interface HostTruthProjection {
   readonly truthId: string;
   readonly evidenceStatus: HostEvidenceProof["status"];
-  readonly resultStatus: RepairVerdictTerminalProjection["status"] | "not_proven";
+  readonly resultStatus: HostResultProjection["status"] | "not_proven";
   readonly terminalClassification: "success" | "stopped" | "error";
   readonly completeProof: boolean;
   readonly successOwner: "evidence-result-verdict";
@@ -14,11 +19,12 @@ export interface HostTruthProjection {
 
 export function projectHostTruth(input: {
   readonly evidence: HostEvidenceProof;
-  readonly result?: RepairVerdictTerminalProjection;
+  readonly result?: HostResultProjection;
 }): HostTruthProjection {
   const completeProof = Boolean(
     input.evidence.status === "complete" &&
-      input.result?.status === "verified_with_repair" &&
+      (input.result?.status === "verified_with_repair" ||
+        input.result?.status === "complete") &&
       input.result.terminalClassification === "success",
   );
   return freeze({

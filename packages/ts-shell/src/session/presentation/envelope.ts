@@ -33,6 +33,7 @@ export interface SessionStatusEnvelope {
   readonly sessionCompaction: SessionStatusEnvelopeDetail;
   readonly replayCarryForward: SessionStatusEnvelopeDetail;
   readonly toolOutcome: SessionStatusEnvelopeDetail;
+  readonly mutationRuntime: SessionStatusEnvelopeDetail;
   readonly mutationRecovery: SessionStatusEnvelopeDetail;
   readonly verification: SessionStatusEnvelopeDetail;
   readonly repair: SessionStatusEnvelopeDetail;
@@ -60,6 +61,7 @@ export function projectSessionStatusEnvelope(
   const replay = findSection(viewModel, "Replay carry forward");
   const session = findSection(viewModel, "Session");
   const toolOutcome = findSection(viewModel, "Tool outcome");
+  const mutationRuntime = findSection(viewModel, "Mutation runtime");
   const mutationRecovery = findSection(viewModel, "Mutation recovery");
   const verification = firstSection(viewModel, "verification");
   const repair = firstSection(viewModel, "repair");
@@ -67,6 +69,10 @@ export function projectSessionStatusEnvelope(
   const completeProof = Boolean(
     completion?.status === "passed" &&
       fact(completion, "resultStatus") === "verified_with_repair" &&
+      verdict?.severity === "success",
+  ) || Boolean(
+    mutationRuntime?.status === "passed" &&
+      fact(mutationRuntime, "verdict") === "complete" &&
       verdict?.severity === "success",
   );
   const blocked = hasSeverity(viewModel, "blocked") ||
@@ -113,6 +119,7 @@ export function projectSessionStatusEnvelope(
     }),
     replayCarryForward: detail(replay),
     toolOutcome: detail(toolOutcome),
+    mutationRuntime: detail(mutationRuntime),
     mutationRecovery: detail(mutationRecovery),
     verification: detail(verification),
     repair: detail(repair),

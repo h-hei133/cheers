@@ -151,12 +151,13 @@ describe("host command runtime", () => {
       "provider-redaction",
       "optional-live-gate-skipped",
       "unsupported-provider-mode",
+      "multi-target-mutation-success",
       "mutation-recovery-success",
       "apply-only-negative",
       "branch-compaction-continuation",
       "missing-proof",
     ]);
-    expect(suite.results.length).toBe(17);
+    expect(suite.results.length).toBe(18);
     expect(suite.blockedCount).toBeGreaterThanOrEqual(1);
     expect(suite.unsupportedCount).toBeGreaterThanOrEqual(1);
     expect(suite.skippedCount).toBeGreaterThanOrEqual(1);
@@ -164,6 +165,7 @@ describe("host command runtime", () => {
     expect(suite.results.every((result) => result.terminalSuccessClaim === false)).toBe(true);
     expect(suite.results.every((result) => result.redactionChecks.every((check) => check.passed))).toBe(true);
     expect(suite.results.find((result) => result.scenarioId === "mutation-recovery-success")?.observedEvidenceVerdict).toBe("complete");
+    expect(suite.results.find((result) => result.scenarioId === "multi-target-mutation-success")?.observedEvidenceVerdict).toBe("complete");
     expect(suite.results.find((result) => result.scenarioId === "apply-only-negative")?.observedEvidenceVerdict).not.toBe("complete");
     expect(
       suite.results

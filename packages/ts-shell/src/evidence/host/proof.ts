@@ -1,4 +1,5 @@
 import type { RepairVerdictProofInput } from "../projection/repair/verdict.js";
+import type { MultiTargetMutationProofInput } from "../projection/mutation/proof.js";
 
 export interface HostEvidenceProof {
   readonly proofId: string;
@@ -10,7 +11,7 @@ export interface HostEvidenceProof {
 }
 
 export function projectHostEvidenceProof(input: {
-  readonly proofInput?: RepairVerdictProofInput;
+  readonly proofInput?: RepairVerdictProofInput | MultiTargetMutationProofInput;
   readonly missingProof?: readonly string[];
 }): HostEvidenceProof {
   const proofInput = input.proofInput;
@@ -30,13 +31,13 @@ export function projectHostEvidenceProof(input: {
 }
 
 function statusFor(
-  status: RepairVerdictProofInput["proofStatus"] | undefined,
+  status: RepairVerdictProofInput["proofStatus"] | MultiTargetMutationProofInput["proofStatus"] | undefined,
   missingProof: readonly string[],
 ): HostEvidenceProof["status"] {
   if (status === "complete" && missingProof.length === 0) return "complete";
   if (status === "blocked") return "blocked";
   if (status === "failed") return "failed";
-  if (status === "incomplete") return "incomplete";
+  if (status === "incomplete" || status === "partial") return "incomplete";
   return "not-proven";
 }
 

@@ -46,3 +46,46 @@ focused validation.
 - Rollback plan: disable `parallel` scheduling back to metadata-only or
   sequential dispatch in `tools/toolBatchDispatch.ts` while preserving the
   report-safe scheduling facts for diagnosis.
+
+## Multi-Target Mutation Settlement Ordering
+
+- Selected mode: behavior-only alignment.
+- Owner domain: `packages/ts-shell/src/edit/multifile/` with proof and verdict
+  facts under `evidence/projection/mutation/` and
+  `result/projection/mutation/`.
+- Reason for use: controlled multi-target mutation needs deterministic ordered
+  settlement that preserves every target outcome, including partial failure and
+  rollback facts, while keeping caller-facing evidence stable.
+- Behavior aligned: the runtime records an ordered target queue, executes
+  mutation targets sequentially, preserves applied and failed target facts,
+  records rollback observations after partial failure, and projects the
+  evidence/result verdict from the settled facts instead of treating apply or
+  rollback as success.
+- Rejected alternatives:
+  - Dependency use: rejected because mutation authority, stale-read, restore
+    planning, verification, redaction, and truth boundaries are local product
+    semantics.
+  - Isolated source adoption: rejected because no external source copy is needed
+    and product code must stay domain-named.
+  - Broad parallel mutation: rejected because SP011 does not prove concurrent
+    mutation safety for conflict, authority, snapshot, ordering, and rollback.
+- Expected callers: runtime loop, runtime events, host evaluation, replay,
+  product surface, CLI/session status, and host evidence/result projection.
+- Side-effect boundary: file reads and writes enter only through sanctioned
+  `ExecutionService` file methods. This adoption does not add live provider
+  behavior, command allowlist entries, browser automation, external tool
+  servers, dynamic loading, arbitrary writers, or uncontrolled parallel
+  mutation.
+- Truthfulness boundary: plan creation, classification, conflict pass,
+  authority, stale-read, snapshot, queue readiness, target apply, rollback,
+  verification observations, repair eligibility, events, host evaluation,
+  replay, product surface, and CLI/session status remain
+  `terminalSuccessClaim: false`. Evidence/result remains the only complete
+  proof owner.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- edit/multifile/model.test.ts runtime/loop/mutationRuntime.test.ts runtime/api/host/runtime.test.ts`
+  - `rtk npm run test -w packages/ts-shell -- edit/multifile/model.test.ts runtime/loop/mutationRuntime.test.ts runtime/events/projection.test.ts session/replay/state.test.ts presentation/surface/model.test.ts session/presentation/envelope.test.ts core/shell/cliSessionProductSurface.test.ts`
+  - `rtk npm run build -w packages/ts-shell`
+- Rollback plan: remove the optional `mutationRuntimeBoundary` connection and
+  keep the existing single-target mutation recovery lane while preserving
+  report-safe blocked/not-proven facts for multi-target attempts.

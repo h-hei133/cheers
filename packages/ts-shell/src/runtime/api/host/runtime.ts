@@ -19,6 +19,7 @@ import { buildLoopContextRebuildInput } from "../../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../../context/sessionContextRebuildProjection.js";
 import { evaluateContinuationReadiness } from "../../../session/continuation/readiness.js";
 import { projectProductSurfaceViewModel } from "../../../presentation/surface/model.js";
+import { runControlledMultiTargetMutation } from "../../../edit/multifile/model.js";
 import { runControlledMutationRecovery } from "../../../edit/recovery/model.js";
 import { projectHostEvidenceProof } from "../../../evidence/host/proof.js";
 import { projectHostTruth } from "../../../result/host/verdict.js";
@@ -270,12 +271,15 @@ export function createHostRuntime(options: HostRuntimeOptions = {}): HostRuntime
       blockerCount: input.blockers?.length ?? 0,
       envelopeState: input.loop?.statusEnvelope,
     });
+    const latestTurn = input.loop?.loop?.turns.at(-1);
     const proof = projectHostEvidenceProof({
-      proofInput: input.loop?.loop?.turns.at(-1)?.verification.repairVerdictProofInput,
+      proofInput: latestTurn?.mutationRuntime?.proofInput ??
+        latestTurn?.verification.repairVerdictProofInput,
     });
     const truth = projectHostTruth({
       evidence: proof,
-      result: input.loop?.loop?.turns.at(-1)?.verification.repairVerdictTerminalProjection,
+      result: latestTurn?.mutationRuntime?.resultVerdict ??
+        latestTurn?.verification.repairVerdictTerminalProjection,
     });
     const result = resultSummaryFor(truth, input.blockers ?? []);
     const replayFacts = input.record
@@ -339,7 +343,11 @@ async function runSharedLane(input: {
   const providerRegistry = providerCase === "default"
     ? undefined
     : createProviderRegistry(providerCase);
-  const memory = new Map<string, string>([["/workspace/src/target.ts", "before\n"]]);
+  const memory = new Map<string, string>([
+    ["/workspace/src/target.ts", "before\n"],
+    ["/workspace/src/a.ts", "before a\n"],
+  ]);
+  const multiTargetRequested = input.envelope.inputText?.includes("multi-target mutation") ?? false;
   const loop = await runAgentLoopContract({
     sessionId: input.record.session.id,
     workspaceRoot: input.record.session.projectRoot,
@@ -426,7 +434,49 @@ async function runSharedLane(input: {
           },
         }
       : {}),
-    ...(input.envelope.mode === "mutation"
+    ...(input.envelope.mode === "mutation" && multiTargetRequested
+      ? {
+          mutationRuntimeBoundary: async ({ turnId }) =>
+            runControlledMultiTargetMutation({
+              laneId: `${input.record.session.id}:mutation-runtime`,
+              turnId,
+              workspaceRoot: input.record.session.projectRoot,
+              executionService: {
+                readTextFile: async (request) => {
+                  if (!memory.has(request.absolutePath)) {
+                    throw new Error("missing file");
+                  }
+                  return memory.get(request.absolutePath)!;
+                },
+                writeTextFile: async (request) => {
+                  memory.set(request.absolutePath, request.content);
+                },
+              },
+              authority: { status: "granted" },
+              targets: [
+                {
+                  targetId: "target-a",
+                  relativePath: "src/a.ts",
+                  operation: "update",
+                  expectedContent: "before a\n",
+                  proposedContent: "after a\n",
+                  reportSafeTargetSummary: "src/a.ts",
+                  verification: { status: "passed" },
+                },
+                {
+                  targetId: "target-b",
+                  relativePath: "src/b.ts",
+                  operation: "create",
+                  proposedContent: "created b\n",
+                  reportSafeTargetSummary: "src/b.ts",
+                  verification: { status: "passed" },
+                },
+              ],
+              verification: { wholeTaskStatus: "passed" },
+            }),
+        }
+      : {}),
+    ...(input.envelope.mode === "mutation" && !multiTargetRequested
       ? {
           mutationRecoveryBoundary: async ({ turnId, toolResultBatch }) => {
             const policyDecision = toolResultBatch?.dispatchPlan?.calls[0]?.beforePolicyDecision;
@@ -490,13 +540,20 @@ async function runSharedLane(input: {
     toolDispatchPlan: latestToolTurn?.toolResultBatch?.dispatchPlan,
     toolOutcomeBundle: latestToolTurn?.toolResultBatch?.outcomeBundle,
     toolResultMessages: latestToolTurn?.toolResultBatch?.resultMessages,
+    multiTargetMutations: latestTurn?.mutationRuntime
+      ? [latestTurn.mutationRuntime]
+      : [],
     mutationRecoveries: latestTurn?.mutationRecovery
       ? [latestTurn.mutationRecovery]
       : [],
     terminalResultFacts: {
-      status: latestTurn?.verification.repairVerdictTerminalProjection?.status ?? "not_proven",
+      status: latestTurn?.mutationRuntime?.resultVerdict.status ??
+        latestTurn?.verification.repairVerdictTerminalProjection?.status ??
+        "not_proven",
       terminalClassification:
-        latestTurn?.verification.repairVerdictTerminalProjection?.terminalClassification ?? "stopped",
+        latestTurn?.mutationRuntime?.resultVerdict.terminalClassification ??
+        latestTurn?.verification.repairVerdictTerminalProjection?.terminalClassification ??
+        "stopped",
       terminalReason: "completed",
     },
   });
@@ -505,7 +562,9 @@ async function runSharedLane(input: {
   const surface = projectProductSurfaceViewModel({
     status: "completed",
     terminalClassification:
-      loop.turns.at(-1)?.verification.repairVerdictTerminalProjection?.terminalClassification ?? "stopped",
+      loop.turns.at(-1)?.mutationRuntime?.resultVerdict.terminalClassification ??
+      loop.turns.at(-1)?.verification.repairVerdictTerminalProjection?.terminalClassification ??
+      "stopped",
     terminalReason: "completed",
     runtimeEvents,
     ...(providerRegistry ? { providerRegistry } : {}),

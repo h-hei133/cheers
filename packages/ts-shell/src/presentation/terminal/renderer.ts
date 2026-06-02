@@ -79,6 +79,7 @@ export function renderSessionStatusEnvelope(
     `[compaction] Session: ${envelope.sessionCompaction.summary}`,
     `[replay] Carry-forward: ${envelope.replayCarryForward.summary}`,
     `[tools] Outcome: ${envelope.toolOutcome.summary}`,
+    `[mutation] Runtime: ${envelope.mutationRuntime.summary}`,
     `[mutation] Recovery: ${envelope.mutationRecovery.summary}`,
     `[verification] Status: ${envelope.verification.summary}`,
     `[repair] Status: ${envelope.repair.summary}`,

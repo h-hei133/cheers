@@ -43,9 +43,12 @@ completion.
   events, host evaluation, replay, product surface, and CLI/session status.
   Bounded mutation recovery connects policy, authority, stale-read,
   snapshot/restore planning, apply observation, verification, rollback or
-  repair, post-repair verification, and result verdict. Broad parallel
-  mutation, conflict queues, and wide snapshot/revert-backed editing remain
-  unproven.
+  repair, post-repair verification, and result verdict. Controlled multi-target
+  mutation connects plan, classification, conflict detection, authority,
+  stale-read, snapshot/restore, deterministic sequential queue, apply, partial
+  failure, rollback, verification, repair eligibility, evidence/result verdict,
+  events, host evaluation, replay, product surface, and CLI/session status.
+  Broad parallel mutation remains unproven and unsupported.
 - Verification/repair can prove repair-to-success through the product path for
   controlled mutation recovery; broader task-relevant verification planning
   across arbitrary tools and live-provider cases remains unproven.
@@ -138,6 +141,36 @@ completion.
   external tool servers, and host SDK/RPC behavior remain unproven. Apply,
   rollback, repair, events, replay, surface, and CLI/session status are still
   not terminal success.
+
+### Completed Batch: Controlled Multi-Target Mutation Runtime
+
+- Proven result: a deterministic synthetic edit intent can flow through a
+  multi-target plan, target classification, conflict detection, batch and
+  target authority, per-target stale-read, per-target snapshot/restore plan,
+  deterministic sequential apply queue, sanctioned `ExecutionService` apply,
+  partial failure classification, rollback, per-target and whole-task
+  verification, repair eligibility, evidence proof input, result-owned verdict,
+  runtime events, host evaluation, replay, product surface, and CLI/session
+  status.
+- User-facing value: multi-file happy, same-file/overlap/path/dependency
+  conflict blockers, partial failure rollback, failed verification, repair
+  eligibility, post-repair proof, redaction, and non-success mutation facts are
+  distinct in the tested product path.
+- Owner domains: `edit/multifile`, `runtime/loop`, `runtime/events`,
+  `runtime/api`, `runtime/evaluation`, `verification`, `evidence`, `result`,
+  `session/replay`, `session/presentation`, `presentation`, `core/shell`, and
+  host evidence/result.
+- Evidence: `packages/ts-shell/src/edit/multifile/model.test.ts`,
+  `packages/ts-shell/src/runtime/loop/mutationRuntime.test.ts`, and
+  `packages/ts-shell/src/runtime/api/host/runtime.test.ts`, alongside focused
+  event, replay, surface, status, and build validation.
+- Boundary: broad parallel mutation remains unsupported unless future work
+  proves conflict, authority, snapshot, ordering, and rollback safety. Plan,
+  queue, apply, rollback, verification, repair eligibility, events, host
+  evaluation, replay, product surface, and CLI/session status remain
+  non-success unless evidence/result produce complete proof. Live providers,
+  browser automation, external tool servers, dynamic loading, command allowlist
+  expansion, and arbitrary writer behavior remain out of scope.
 
 ### Completed Batch: Provider/Model Runtime Boundary
 

@@ -1,4 +1,5 @@
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
+import type { MultiTargetMutationProjection } from "../../edit/multifile/model.js";
 import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/model.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
@@ -69,6 +70,18 @@ export interface ReplaySafeLoopStateSummary {
   readonly toolResultMessageIds: readonly string[];
   readonly verificationHandoffIds: readonly string[];
   readonly repairHandoffIds: readonly string[];
+  readonly mutationRuntimeIds: readonly string[];
+  readonly mutationRuntimeStatus?: {
+    readonly targetCount: number;
+    readonly conflictCount: number;
+    readonly readyCount: number;
+    readonly appliedCount: number;
+    readonly failedCount: number;
+    readonly revertedCount: number;
+    readonly wholeTaskVerification: string;
+    readonly verdict: string;
+    readonly terminalSuccessClaim: false;
+  };
   readonly mutationRecoveryIds: readonly string[];
   readonly mutationRecoveryStatus?: {
     readonly authority: string;
@@ -143,6 +156,7 @@ export function summarizeReplaySafeLoopState(input: {
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
+  readonly multiTargetMutations?: readonly MultiTargetMutationProjection[];
   readonly mutationRecoveries?: readonly ControlledMutationRecoveryProjection[];
   readonly controlledModelInvocations?: readonly ControlledModelInvocationAdapterProjection[];
   readonly replaySafePlanningStates?: readonly ReplaySafePlanningStateFacts[];
@@ -161,6 +175,8 @@ export function summarizeReplaySafeLoopState(input: {
     ...(input.repairProposals ?? []).map((item) => item.proposalId),
     ...(input.repairApplyObservations ?? []).map((item) => item.repairApplyId),
   ];
+  const mutationRuntimes = input.multiTargetMutations ?? [];
+  const latestMutationRuntime = mutationRuntimes.at(-1);
   const mutationRecoveries = input.mutationRecoveries ?? [];
   const latestMutationRecovery = mutationRecoveries.at(-1);
   const controlledInvocations = input.controlledModelInvocations ?? [];
@@ -261,6 +277,22 @@ export function summarizeReplaySafeLoopState(input: {
     toolResultMessageIds: input.toolResultMessages?.messages.map((message) => message.messageId) ?? [],
     verificationHandoffIds,
     repairHandoffIds,
+    mutationRuntimeIds: mutationRuntimes.map((item) => item.laneId),
+    ...(latestMutationRuntime
+      ? {
+          mutationRuntimeStatus: {
+            targetCount: latestMutationRuntime.plan.targetCount,
+            conflictCount: latestMutationRuntime.conflicts.length,
+            readyCount: latestMutationRuntime.queue.filter((item) => item.state === "ready").length,
+            appliedCount: latestMutationRuntime.queue.filter((item) => item.state === "applied").length,
+            failedCount: latestMutationRuntime.queue.filter((item) => item.state === "failed").length,
+            revertedCount: latestMutationRuntime.queue.filter((item) => item.state === "reverted").length,
+            wholeTaskVerification: latestMutationRuntime.wholeTaskVerificationResult.status,
+            verdict: latestMutationRuntime.verdictStatus,
+            terminalSuccessClaim: false,
+          },
+        }
+      : {}),
     mutationRecoveryIds: mutationRecoveries.map((item) => item.laneId),
     ...(latestMutationRecovery
       ? {
@@ -308,6 +340,7 @@ export function summarizeReplaySafeLoopState(input: {
       ...(input.requestPreparation?.notProvenClaims ?? []),
       ...(input.toolOutcomeBundle?.notProvenClaims ?? []),
       ...(input.toolDispatchPlan?.notProvenClaims ?? []),
+      ...mutationRuntimes.flatMap((item) => item.notProvenClaims),
       ...mutationRecoveries.flatMap((item) => item.notProvenClaims),
     ],
     redaction: {
