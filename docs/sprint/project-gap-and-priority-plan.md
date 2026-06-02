@@ -8,11 +8,11 @@ completion.
 
 ## Major Gaps
 
-- Product loop truth, the CLI/session status envelope, and a bounded synthetic
-  provider-to-tool-to-next-turn runtime lane are consolidated, but the host
-  contract, branch/compaction runtime, broad provider compatibility, live
-  provider defaults, mutation rollback, and dynamic execution areas remain
-  unproven.
+- Product loop truth, the CLI/session status envelope, a bounded synthetic
+  provider-to-tool-to-next-turn runtime lane, and a controlled mutation recovery
+  lane are consolidated, but the host contract, branch/compaction runtime,
+  broad provider compatibility, live provider defaults, broad parallel
+  mutation, and dynamic execution areas remain unproven.
 - CLI/session UX now has a structured status envelope for product-loop truth,
   but full queue ergonomics, branch navigation, compact/resume controls, and
   broader session management remain narrower than the runtime fact model.
@@ -23,10 +23,14 @@ completion.
   remains explicit opt-in.
 - Extension/package support is governance-only; dynamic execution is absent by
   design.
-- Tool execution has policy/receipt/outcome boundaries, but broad parallel
-  mutation, conflict queues, and snapshot/revert-backed editing are not proven.
-- Verification/repair can prove repair-to-success, but broader task-relevant
-  verification planning and recovery loops still need product-path integration.
+- Tool execution has policy/receipt/outcome boundaries, and bounded mutation
+  recovery now connects policy, authority, stale-read, snapshot/restore
+  planning, apply observation, verification, rollback or repair, post-repair
+  verification, and result verdict. Broad parallel mutation, conflict queues,
+  and wide snapshot/revert-backed editing remain unproven.
+- Verification/repair can prove repair-to-success through the product path for
+  controlled mutation recovery; broader task-relevant verification planning
+  across arbitrary tools and live-provider cases remains unproven.
 
 ## Immediate Sprint Batches
 
@@ -89,6 +93,33 @@ completion.
   provider compatibility, fallback execution, mutation rollback, dynamic
   execution, and terminal success from provider/tool/request facts remain
   unproven.
+
+### Completed Batch: Controlled Mutation Recovery Runtime
+
+- Proven result: a deterministic synthetic provider tool call can flow through
+  tool policy, explicit mutation authority, final stale-read, snapshot or
+  restore planning, sanctioned `ExecutionService` apply observation,
+  task-relevant verification, rollback or repair decision, repair authority,
+  repair apply, post-repair verification, result-owned verdict, events,
+  replay-safe carry-forward, product surface, and CLI/session status.
+- User-facing value: mutation denied, permission pending, stale-read blocked,
+  snapshot unavailable, apply failed, apply-only missing proof, verification
+  failed after apply, rollback required, rollback succeeded but not complete,
+  repair proposed only, repair applied without post-repair verification,
+  post-repair verification failed, and post-repair verified completion remain
+  distinct.
+- Owner domains: `edit/recovery`, `runtime/loop`, `runtime/events`,
+  `tools/policy`, `tools`, `verification`, `repair`, `evidence`, `result`,
+  `session/replay`, `session/presentation`, `presentation`, and `core/shell`.
+- Evidence: `packages/ts-shell/src/edit/recovery/model.test.ts` and
+  `packages/ts-shell/src/runtime/loop/mutationRecovery.test.ts`, alongside the
+  focused edit, provider, tool policy/dispatch, runtime event, replay, surface,
+  status, evidence, and result owner tests.
+- Boundary: the proven lane is controlled and deterministic. Live providers,
+  broad provider compatibility, broad parallel mutation, dynamic execution,
+  external tool servers, host SDK/RPC behavior, and storage-backed
+  branch/compaction runtime remain unproven. Apply, rollback, repair, events,
+  replay, surface, and CLI/session status are still not terminal success.
 
 ### Batch 1: Branch/Compaction Context Readiness
 

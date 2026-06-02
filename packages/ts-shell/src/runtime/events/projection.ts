@@ -1,4 +1,5 @@
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
+import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/model.js";
 import type { RepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type {
@@ -163,6 +164,19 @@ export type RuntimeProjectionEventType =
   | "tool-outcome-bundle-observed"
   | "tool-result-next-action-observed"
   | "tool-batch-save-point-observed"
+  | "mutation-recovery-lane-observed"
+  | "mutation-authority-observed"
+  | "mutation-permission-pending"
+  | "mutation-denied"
+  | "mutation-stale-read-observed"
+  | "mutation-stale-read-blocked"
+  | "mutation-snapshot-observed"
+  | "mutation-snapshot-unavailable"
+  | "mutation-apply-observed"
+  | "mutation-apply-failed"
+  | "mutation-recovery-decision-observed"
+  | "mutation-rollback-required"
+  | "mutation-rollback-observed"
   | "save-point-input-prepared"
   | "post-tool-save-point-observed"
   | "next-turn-bundle-prepared"
@@ -288,6 +302,7 @@ export function projectRuntimeEvents(input: {
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
   readonly repairApplyRequests?: readonly RepairApplyRequestObservation[];
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
+  readonly mutationRecoveries?: readonly ControlledMutationRecoveryProjection[];
   readonly modelRequestBoundaries?: readonly ModelRequestBoundary[];
   readonly nextTurnRequestPreparations?: readonly NextTurnModelRequestPreparation[];
   readonly modelInvocationGates?: readonly ModelInvocationGateFacts[];
@@ -1741,6 +1756,178 @@ export function projectRuntimeEvents(input: {
         bundle.notProvenClaims,
       );
     }
+  }
+
+  for (const recovery of input.mutationRecoveries ?? []) {
+    append(
+      "mutation-recovery-lane-observed",
+      {
+        laneId: recovery.laneId,
+        turnId: recovery.turnId,
+        toolCallId: recovery.toolCallId,
+        targetSummary: recovery.targetSummary,
+        toolPolicyDecisionId: recovery.toolPolicyDecisionId,
+        recoveryDecision: recovery.recoveryDecision,
+        verdictStatus: recovery.verdictStatus,
+        redactionStatus: recovery.redactionStatus,
+        terminalSuccessClaim: recovery.terminalSuccessClaim,
+      },
+      recovery.notProvenClaims,
+    );
+    append(
+      "mutation-authority-observed",
+      {
+        laneId: recovery.laneId,
+        authorityId: recovery.authority.authorityId,
+        authorityStatus: recovery.authority.status,
+        authoritySource: recovery.authority.source,
+        reason: recovery.authority.reason,
+        terminalSuccessClaim: recovery.authority.terminalSuccessClaim,
+      },
+      recovery.authority.notProvenClaims,
+    );
+    if (recovery.authority.status === "permission_pending") {
+      append(
+        "mutation-permission-pending",
+        {
+          laneId: recovery.laneId,
+          authorityId: recovery.authority.authorityId,
+          terminalSuccessClaim: recovery.authority.terminalSuccessClaim,
+        },
+        recovery.authority.notProvenClaims,
+      );
+    }
+    if (recovery.authority.status === "denied" || recovery.authority.status === "blocked") {
+      append(
+        "mutation-denied",
+        {
+          laneId: recovery.laneId,
+          authorityId: recovery.authority.authorityId,
+          authorityStatus: recovery.authority.status,
+          terminalSuccessClaim: recovery.authority.terminalSuccessClaim,
+        },
+        recovery.authority.notProvenClaims,
+      );
+    }
+    append(
+      "mutation-stale-read-observed",
+      {
+        laneId: recovery.laneId,
+        staleReadId: recovery.staleRead.staleReadId,
+        status: recovery.staleRead.status,
+        targetSummary: recovery.staleRead.targetSummary,
+        expectedFingerprint: recovery.staleRead.expectedFingerprint,
+        currentFingerprint: recovery.staleRead.currentFingerprint,
+        terminalSuccessClaim: recovery.staleRead.terminalSuccessClaim,
+      },
+      recovery.staleRead.notProvenClaims,
+    );
+    if (
+      recovery.staleRead.status === "stale" ||
+      recovery.staleRead.status === "target_missing" ||
+      recovery.staleRead.status === "failed"
+    ) {
+      append(
+        "mutation-stale-read-blocked",
+        {
+          laneId: recovery.laneId,
+          staleReadId: recovery.staleRead.staleReadId,
+          status: recovery.staleRead.status,
+          terminalSuccessClaim: recovery.staleRead.terminalSuccessClaim,
+        },
+        recovery.staleRead.notProvenClaims,
+      );
+    }
+    append(
+      "mutation-snapshot-observed",
+      {
+        laneId: recovery.laneId,
+        snapshotId: recovery.snapshot.snapshotId,
+        status: recovery.snapshot.status,
+        restorePlanAvailable: recovery.snapshot.restorePlanAvailable,
+        targetSummary: recovery.snapshot.targetSummary,
+        contentFingerprint: recovery.snapshot.contentFingerprint,
+        blocker: recovery.snapshot.blocker,
+        terminalSuccessClaim: recovery.snapshot.terminalSuccessClaim,
+      },
+      recovery.snapshot.notProvenClaims,
+    );
+    if (recovery.snapshot.status === "unavailable") {
+      append(
+        "mutation-snapshot-unavailable",
+        {
+          laneId: recovery.laneId,
+          snapshotId: recovery.snapshot.snapshotId,
+          blocker: recovery.snapshot.blocker,
+          terminalSuccessClaim: recovery.snapshot.terminalSuccessClaim,
+        },
+        recovery.snapshot.notProvenClaims,
+      );
+    }
+    append(
+      "mutation-apply-observed",
+      {
+        laneId: recovery.laneId,
+        applyId: recovery.apply.applyId,
+        status: recovery.apply.status,
+        attempted: recovery.apply.attempted,
+        targetSummary: recovery.apply.targetSummary,
+        contentFingerprint: recovery.apply.contentFingerprint,
+        blocker: recovery.apply.blocker,
+        failureClass: recovery.apply.failureClass,
+        terminalSuccessClaim: recovery.apply.terminalSuccessClaim,
+      },
+      recovery.apply.notProvenClaims,
+    );
+    if (recovery.apply.status === "failed") {
+      append(
+        "mutation-apply-failed",
+        {
+          laneId: recovery.laneId,
+          applyId: recovery.apply.applyId,
+          failureClass: recovery.apply.failureClass,
+          terminalSuccessClaim: recovery.apply.terminalSuccessClaim,
+        },
+        recovery.apply.notProvenClaims,
+      );
+    }
+    append(
+      "mutation-recovery-decision-observed",
+      {
+        laneId: recovery.laneId,
+        recoveryDecision: recovery.recoveryDecision,
+        verificationStatus: recovery.verificationResult.status,
+        rollbackStatus: recovery.rollback.status,
+        verdictStatus: recovery.verdictStatus,
+        terminalSuccessClaim: recovery.terminalSuccessClaim,
+      },
+      recovery.notProvenClaims,
+    );
+    if (recovery.recoveryDecision === "rollback_required") {
+      append(
+        "mutation-rollback-required",
+        {
+          laneId: recovery.laneId,
+          recoveryDecision: recovery.recoveryDecision,
+          restorePlanAvailable: recovery.rollback.restorePlanAvailable,
+          terminalSuccessClaim: recovery.rollback.terminalSuccessClaim,
+        },
+        recovery.rollback.notProvenClaims,
+      );
+    }
+    append(
+      "mutation-rollback-observed",
+      {
+        laneId: recovery.laneId,
+        rollbackId: recovery.rollback.rollbackId,
+        status: recovery.rollback.status,
+        targetSummary: recovery.rollback.targetSummary,
+        restorePlanAvailable: recovery.rollback.restorePlanAvailable,
+        preservesOriginalFailure: recovery.rollback.preservesOriginalFailure,
+        terminalSuccessClaim: recovery.rollback.terminalSuccessClaim,
+      },
+      recovery.rollback.notProvenClaims,
+    );
   }
 
   for (const intent of input.verificationIntents ?? []) {

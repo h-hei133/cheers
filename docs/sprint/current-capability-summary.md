@@ -39,6 +39,7 @@ owner. Python is offline evaluation only.
 | Synthetic provider response lane | Proven for deterministic synthetic completed text, tool calls, provider failure facts, provider stream events, model boundary phase projection, assistant accumulation, tool extraction, and request blocker carry-forward without live provider credentials. | `packages/ts-shell/src/provider/response/synthetic.ts`, `packages/ts-shell/src/runtime/loop/providerBoundary.ts`, `packages/ts-shell/src/provider/response/synthetic.test.ts`, `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts` |
 | Continuation-aware request handoff | Proven as projection from continuation readiness into request preparation, replay-safe facts, trajectory/events, and presentation. | `packages/ts-shell/src/session/continuation/readiness.ts`, `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/session/replay/state.ts`, `packages/ts-shell/src/runtime/events/projection.ts` |
 | End-to-end turn lane | Proven for a controlled synthetic provider-to-tool-to-next-turn runtime lane: user turn request boundary, deterministic synthetic response intake, assistant accumulation, tool extraction, allowed dispatch through the sanctioned seam, tool result message preparation, next-turn request preparation, optional continuation to the next turn, runtime events, replay-safe carry-forward, product surface, and CLI/session status envelope. It remains observation/control unless evidence/result prove success. | `packages/ts-shell/src/runtime/loop/contract.ts`, `packages/ts-shell/src/runtime/loop/providerBoundary.ts`, `packages/ts-shell/src/runtime/loop/modelBoundary.ts`, `packages/ts-shell/src/tools/toolBatchDispatch.ts`, `packages/ts-shell/src/tools/toolOutcomeBundle.ts`, `packages/ts-shell/src/turn/toolResultMessage.ts`, `packages/ts-shell/src/turn/nextTurnBundle.ts`, `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts` |
+| Controlled mutation and recovery runtime | Proven for a bounded synthetic-provider tool lane that carries tool policy, explicit mutation authority, final stale-read, snapshot/restore planning, sanctioned `ExecutionService` apply observation, task-relevant verification, rollback or repair decision, optional repair apply, post-repair verification, result-owned verdict, runtime events, replay-safe carry-forward, product surface, and CLI/session status from the same owner facts. Apply, rollback, repair, events, replay, surface, and status remain non-success unless evidence/result produce complete proof. | `packages/ts-shell/src/edit/recovery/model.ts`, `packages/ts-shell/src/runtime/loop/contract.ts`, `packages/ts-shell/src/runtime/events/projection.ts`, `packages/ts-shell/src/session/replay/state.ts`, `packages/ts-shell/src/presentation/surface/model.ts`, `packages/ts-shell/src/session/presentation/envelope.ts`, `packages/ts-shell/src/edit/recovery/model.test.ts`, `packages/ts-shell/src/runtime/loop/mutationRecovery.test.ts` |
 | Tool outcome next action | Proven in `tools`: outcome status derives next action and carry-forward facts; loop/events/presentation only project them. | `packages/ts-shell/src/tools/toolOutcomeBundle.ts`, `packages/ts-shell/src/tools/toolOutcomeBundle.test.ts` |
 | Runtime event projection | Proven for many observation events, JSON stream entries, redaction, and non-success claims. Event emission is not terminal truth. | `packages/ts-shell/src/runtime/events/projection.ts`, `packages/ts-shell/src/runtime/events/stream.ts` |
 | Replay-safe carry-forward | Proven for IDs, statuses, blocker summaries, request facts, tool outcome facts, product completion facts, and redaction exclusions. Raw transcripts, secrets, raw provider output, patch text, and command output are excluded. | `packages/ts-shell/src/session/replay/state.ts` |
@@ -62,11 +63,14 @@ owner. Python is offline evaluation only.
   capabilities.
 - Dynamic extensions, package loading, executable hooks, and external tool
   server behavior are intentionally not enabled.
-- Tool execution is bounded by policy and `ExecutionService`; broad parallel
-  mutation, file mutation queues, and snapshot/revert-backed wide editing are
-  not proven.
+- Tool execution is bounded by policy and `ExecutionService`; the controlled
+  single-target mutation recovery lane is proven, but broad parallel mutation,
+  file mutation queues, and snapshot/revert-backed wide editing remain
+  unproven.
 - Product-loop truth propagation, the CLI/session status envelope, and the
-  synthetic provider tool lane are proven for bounded owner-tested paths, but
-  the host contract, branch/compaction runtime, broad provider compatibility,
-  live-provider default behavior, mutation rollback, and dynamic execution areas
-  remain unproven.
+  synthetic provider tool lane are proven for bounded owner-tested paths. The
+  controlled mutation recovery lane now proves rollback and repair decisions for
+  bounded deterministic mutation cases, but the host contract,
+  branch/compaction runtime, broad provider compatibility, live-provider
+  default behavior, broad parallel mutation, and dynamic execution areas remain
+  unproven.

@@ -3,6 +3,7 @@ import {
   prepareToolOutcomeSavePointInput,
   type RuntimeEvidenceSavePoint,
 } from "../../evidence/savepoint/model.js";
+import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/model.js";
 import type { RepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
 import {
   createModelRequestBoundary,
@@ -199,6 +200,9 @@ export interface AgentLoopContractInput {
   readonly verificationBoundary?: (
     input: AgentLoopContractVerificationBoundaryInput,
   ) => Promise<AgentLoopContractVerificationProjection>;
+  readonly mutationRecoveryBoundary?: (
+    input: AgentLoopContractMutationRecoveryBoundaryInput,
+  ) => Promise<ControlledMutationRecoveryProjection | undefined>;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -208,6 +212,17 @@ export interface AgentLoopContractVerificationBoundaryInput {
   readonly turnId: string;
   readonly savePoint: RuntimeEvidenceSavePoint;
   readonly nextTurnBundle?: NextTurnBundleProjection;
+  readonly toolResultBatch?: AgentLoopContractToolResultBatch;
+}
+
+export interface AgentLoopContractMutationRecoveryBoundaryInput {
+  readonly sessionId: string;
+  readonly turn: number;
+  readonly turnId: string;
+  readonly savePoint: RuntimeEvidenceSavePoint;
+  readonly nextTurnBundle: NextTurnBundleProjection;
+  readonly toolCallBatch?: AgentLoopContractToolCallBatch;
+  readonly normalizedToolCallBatch: NormalizedToolCallBatch;
   readonly toolResultBatch?: AgentLoopContractToolResultBatch;
 }
 
@@ -271,6 +286,7 @@ export interface AgentLoopContractTurnProjection {
     readonly deliveryPolicy: NextTurnDeliveryPolicyProjection;
     readonly executed: false;
   };
+  readonly mutationRecovery?: ControlledMutationRecoveryProjection;
   readonly verification: AgentLoopContractVerificationProjection;
   readonly finalization?: {
     readonly input: LoopFinalizationInput;
@@ -814,6 +830,18 @@ export async function runAgentLoopContract(
         controlledModelInvocations: [controlledInvocation],
         responseReentryCycles: responseReentryCycle ? [responseReentryCycle] : [],
       }));
+      const mutationRecovery = input.mutationRecoveryBoundary
+        ? await input.mutationRecoveryBoundary({
+          sessionId: input.sessionId,
+          turn,
+          turnId: `${input.sessionId}:turn:${turn}`,
+          savePoint,
+          nextTurnBundle,
+          ...(toolCallBatch ? { toolCallBatch } : {}),
+          normalizedToolCallBatch,
+          ...(toolResultBatch ? { toolResultBatch } : {}),
+        })
+        : undefined;
       const verification = input.verificationBoundary
         ? await input.verificationBoundary({
           sessionId: input.sessionId,
@@ -823,6 +851,8 @@ export async function runAgentLoopContract(
           nextTurnBundle,
           ...(toolResultBatch ? { toolResultBatch } : {}),
         })
+        : mutationRecovery
+        ? verificationProjectionFromMutationRecovery(mutationRecovery)
         : createDefaultVerificationProjection({
           turnId: `${input.sessionId}:turn:${turn}`,
           savePoint,
@@ -879,6 +909,18 @@ export async function runAgentLoopContract(
             "repair-readiness-terminal-success:false",
           ];
       const repairCarryForwardFacts = [
+        ...(mutationRecovery
+          ? [
+              `mutation-recovery:${mutationRecovery.laneId}`,
+              `mutation-authority:${mutationRecovery.authority.status}`,
+              `mutation-stale-read:${mutationRecovery.staleRead.status}`,
+              `mutation-snapshot:${mutationRecovery.snapshot.status}`,
+              `mutation-apply:${mutationRecovery.apply.status}`,
+              `mutation-recovery-decision:${mutationRecovery.recoveryDecision}`,
+              `mutation-rollback:${mutationRecovery.rollback.status}`,
+              `mutation-verdict:${mutationRecovery.verdictStatus}`,
+            ]
+          : []),
         ...repairReadinessCarryForwardFacts,
         ...(verification.repairRequired
           ? [
@@ -1082,9 +1124,11 @@ export async function runAgentLoopContract(
           ...(closeoutInput?.notProvenClaims ?? []),
           ...(closeout?.notProvenClaims ?? []),
           ...(completionPacket?.notProvenClaims ?? []),
+          ...(mutationRecovery?.notProvenClaims ?? []),
         ],
       });
       appendProjectedEvents(events, projectRuntimeEvents({
+        mutationRecoveries: mutationRecovery ? [mutationRecovery] : [],
         verificationIntents: [verification.intent],
         verificationResults: [verification.result],
         postRepairVerificationRequirements: verification.postRepairVerificationRequirement
@@ -1165,7 +1209,8 @@ export async function runAgentLoopContract(
           followUpQueue,
           deliveryPolicy,
           executed: false,
-        },
+          },
+          ...(mutationRecovery ? { mutationRecovery } : {}),
           verification: {
             ...verification,
             repairReadiness,
@@ -1246,6 +1291,40 @@ export async function runAgentLoopContract(
   transition("stopped", "turn-limit");
   return finalizeProjection("stopped", turns, events, queued, {
     stopReason: "turn-limit",
+  });
+}
+
+function verificationProjectionFromMutationRecovery(
+  recovery: ControlledMutationRecoveryProjection,
+): AgentLoopContractVerificationProjection {
+  return deepFreeze({
+    intent: recovery.verificationIntent,
+    result: recovery.verificationResult,
+    ...(recovery.repairRequired ? { repairRequired: recovery.repairRequired } : {}),
+    ...(recovery.repairProposal ? { repairProposal: recovery.repairProposal } : {}),
+    ...(recovery.repairAuthority ? { repairAuthority: recovery.repairAuthority } : {}),
+    ...(recovery.repairApplyRequest
+      ? { repairApplyRequest: recovery.repairApplyRequest }
+      : {}),
+    ...(recovery.repairApply ? { repairApply: recovery.repairApply } : {}),
+    ...(recovery.postRepairVerificationRequirement
+      ? {
+          postRepairVerificationRequirement:
+            recovery.postRepairVerificationRequirement,
+        }
+      : {}),
+    ...(recovery.postRepairVerificationRequest
+      ? { postRepairVerificationRequest: recovery.postRepairVerificationRequest }
+      : {}),
+    ...(recovery.postRepairVerificationResult
+      ? { postRepairVerificationResult: recovery.postRepairVerificationResult }
+      : {}),
+    ...(recovery.repairVerdictProofInput
+      ? { repairVerdictProofInput: recovery.repairVerdictProofInput }
+      : {}),
+    ...(recovery.repairVerdictTerminalProjection
+      ? { repairVerdictTerminalProjection: recovery.repairVerdictTerminalProjection }
+      : {}),
   });
 }
 

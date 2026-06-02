@@ -15,6 +15,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp002-product-loop-truth-consolidation.md` | completed route input | Product loop truth consolidation objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp003-cli-status-envelope.md` | completed route input | CLI status envelope objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp004-complete-provider-tool-loop-runtime.md` | completed route input | Synthetic provider tool loop runtime objective now reflected in current capability and priority docs. |
+| `docs/sprint/route/sp005-complete-code-mutation-recovery-runtime.md` | completed route input | Controlled code mutation recovery runtime objective now reflected in current capability and priority docs. |
 
 ## Removed Or Merged Content
 
@@ -44,7 +45,8 @@ sections instead of appending progress logs.
   comparison, or outside-project vocabulary.
 - Real provider behavior stays default-off and explicit opt-in only.
 - Terminal truth stays in `evidence`/`result`; provider calls, tool outcomes,
-  events, replay, summaries, and presentation are not success.
+  mutation apply, rollback, repair observations, events, replay, summaries, and
+  presentation are not success.
 - Dynamic plugin loading, package execution, broad SDK/RPC server behavior,
   browser automation, command allowlist expansion, and broad writer behavior are
   anti-goals until explicitly scoped.

@@ -30,6 +30,7 @@ export interface SessionStatusEnvelope {
   readonly continuationReadiness: string;
   readonly replayCarryForward: SessionStatusEnvelopeDetail;
   readonly toolOutcome: SessionStatusEnvelopeDetail;
+  readonly mutationRecovery: SessionStatusEnvelopeDetail;
   readonly verification: SessionStatusEnvelopeDetail;
   readonly repair: SessionStatusEnvelopeDetail;
   readonly missingProof: readonly string[];
@@ -50,6 +51,7 @@ export function projectSessionStatusEnvelope(
   const request = findSection(viewModel, "Request preparation");
   const replay = findSection(viewModel, "Replay carry forward");
   const toolOutcome = findSection(viewModel, "Tool outcome");
+  const mutationRecovery = findSection(viewModel, "Mutation recovery");
   const verification = firstSection(viewModel, "verification");
   const repair = firstSection(viewModel, "repair");
   const missingProof = parseMissingProof(fact(completion, "missingProof"));
@@ -82,6 +84,7 @@ export function projectSessionStatusEnvelope(
     ),
     replayCarryForward: detail(replay),
     toolOutcome: detail(toolOutcome),
+    mutationRecovery: detail(mutationRecovery),
     verification: detail(verification),
     repair: detail(repair),
     missingProof,

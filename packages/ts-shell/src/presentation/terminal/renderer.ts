@@ -76,6 +76,7 @@ export function renderSessionStatusEnvelope(
     `[continuation] Readiness: ${envelope.continuationReadiness}`,
     `[replay] Carry-forward: ${envelope.replayCarryForward.summary}`,
     `[tools] Outcome: ${envelope.toolOutcome.summary}`,
+    `[mutation] Recovery: ${envelope.mutationRecovery.summary}`,
     `[verification] Status: ${envelope.verification.summary}`,
     `[repair] Status: ${envelope.repair.summary}`,
     `[proof] Missing: ${envelope.missingProof.length > 0 ? envelope.missingProof.join(",") : "none"}`,

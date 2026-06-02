@@ -1,4 +1,5 @@
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
+import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/model.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
 import type { NextTurnModelRequestPreparation } from "../../provider/request/boundary.js";
@@ -30,6 +31,17 @@ export interface ReplaySafeLoopStateSummary {
   readonly toolResultMessageIds: readonly string[];
   readonly verificationHandoffIds: readonly string[];
   readonly repairHandoffIds: readonly string[];
+  readonly mutationRecoveryIds: readonly string[];
+  readonly mutationRecoveryStatus?: {
+    readonly authority: string;
+    readonly staleRead: string;
+    readonly snapshot: string;
+    readonly apply: string;
+    readonly recoveryDecision: string;
+    readonly rollback: string;
+    readonly verdict: string;
+    readonly terminalSuccessClaim: false;
+  };
   readonly contextRebuildInputId?: string;
   readonly contextRebuildProjectionId: string;
   readonly continuationReadinessId: string;
@@ -92,6 +104,7 @@ export function summarizeReplaySafeLoopState(input: {
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
+  readonly mutationRecoveries?: readonly ControlledMutationRecoveryProjection[];
   readonly replaySafePlanningStates?: readonly ReplaySafePlanningStateFacts[];
   readonly terminalResultFacts?: {
     readonly status?: string;
@@ -108,6 +121,8 @@ export function summarizeReplaySafeLoopState(input: {
     ...(input.repairProposals ?? []).map((item) => item.proposalId),
     ...(input.repairApplyObservations ?? []).map((item) => item.repairApplyId),
   ];
+  const mutationRecoveries = input.mutationRecoveries ?? [];
+  const latestMutationRecovery = mutationRecoveries.at(-1);
   const replaySafePlanningStates = input.replaySafePlanningStates ?? [];
   return deepFreeze({
     summaryId: `replay-safe-loop-state:${input.sessionProjection.sessionIdentity}:${input.sessionProjection.activeLeafId}`,
@@ -138,6 +153,21 @@ export function summarizeReplaySafeLoopState(input: {
     toolResultMessageIds: input.toolResultMessages?.messages.map((message) => message.messageId) ?? [],
     verificationHandoffIds,
     repairHandoffIds,
+    mutationRecoveryIds: mutationRecoveries.map((item) => item.laneId),
+    ...(latestMutationRecovery
+      ? {
+          mutationRecoveryStatus: {
+            authority: latestMutationRecovery.authority.status,
+            staleRead: latestMutationRecovery.staleRead.status,
+            snapshot: latestMutationRecovery.snapshot.status,
+            apply: latestMutationRecovery.apply.status,
+            recoveryDecision: latestMutationRecovery.recoveryDecision,
+            rollback: latestMutationRecovery.rollback.status,
+            verdict: latestMutationRecovery.verdictStatus,
+            terminalSuccessClaim: false,
+          },
+        }
+      : {}),
     ...(input.rebuildInput ? { contextRebuildInputId: input.rebuildInput.rebuildInputId } : {}),
     contextRebuildProjectionId: `${input.contextRebuildProjection.rebuildSource.sessionIdentity}:context-rebuild:${input.contextRebuildProjection.rebuildSource.activeLeafId}`,
     continuationReadinessId: input.continuationReadiness.readinessId,
@@ -167,6 +197,7 @@ export function summarizeReplaySafeLoopState(input: {
       ...input.continuationReadiness.notProvenClaims,
       ...(input.requestPreparation?.notProvenClaims ?? []),
       ...(input.toolOutcomeBundle?.notProvenClaims ?? []),
+      ...mutationRecoveries.flatMap((item) => item.notProvenClaims),
     ],
     redaction: {
       status:

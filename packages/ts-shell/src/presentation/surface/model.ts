@@ -198,6 +198,7 @@ export function projectProductSurfaceViewModel(
     ...packageSections(input),
     ...sessionSections(input),
     ...toolOutcomeEventSections(input),
+    ...mutationRecoveryEventSections(input),
     ...requestPreparationEventSections(input),
     ...replayCarryForwardEventSections(input),
     ...modelInvocationEventSections(input),
@@ -597,6 +598,124 @@ function modelInvocationEventSections(input: ProductSurfaceInput): ProductSurfac
         event.type === "model-invocation-blocked" ||
         event.type === "model-invocation-explicit-opt-in-required"
       )
+      .flatMap((event) => event.notProvenClaims),
+  })];
+}
+
+function mutationRecoveryEventSections(input: ProductSurfaceInput): ProductSurfaceSection[] {
+  const events = input.runtimeEvents ?? [];
+  const lane = events.find((event) => event.type === "mutation-recovery-lane-observed");
+  if (!lane) {
+    return [];
+  }
+  const authority = events.find((event) => event.type === "mutation-authority-observed");
+  const staleRead = events.find((event) => event.type === "mutation-stale-read-observed");
+  const snapshot = events.find((event) => event.type === "mutation-snapshot-observed");
+  const apply = events.find((event) => event.type === "mutation-apply-observed");
+  const rollback = events.find((event) => event.type === "mutation-rollback-observed");
+  const decision = events.find((event) =>
+    event.type === "mutation-recovery-decision-observed"
+  );
+  const blocked = events.find((event) =>
+    event.type === "mutation-denied" ||
+    event.type === "mutation-permission-pending" ||
+    event.type === "mutation-stale-read-blocked" ||
+    event.type === "mutation-snapshot-unavailable"
+  );
+  const failed = events.find((event) =>
+    event.type === "mutation-apply-failed" ||
+    (event.type === "mutation-recovery-decision-observed" &&
+      factValue(event.facts.verdictStatus) === "failed")
+  );
+  const verdictStatus = factValue(lane.facts.verdictStatus);
+  return [section({
+    kind: "apply",
+    title: "Mutation recovery",
+    severity: verdictStatus === "complete"
+      ? "success"
+      : failed
+        ? "error"
+        : blocked
+          ? "blocked"
+          : "not_proven",
+    status: verdictStatus === "complete"
+      ? "passed"
+      : failed
+        ? "failed"
+        : blocked
+          ? "blocked"
+          : "not_proven",
+    summary: [
+      `lane=${factValue(lane.facts.laneId)}`,
+      authority ? `authority=${factValue(authority.facts.authorityStatus)}` : undefined,
+      staleRead ? `staleRead=${factValue(staleRead.facts.status)}` : undefined,
+      snapshot ? `snapshot=${factValue(snapshot.facts.status)}` : undefined,
+      apply ? `apply=${factValue(apply.facts.status)}` : undefined,
+      decision ? `decision=${factValue(decision.facts.recoveryDecision)}` : undefined,
+      rollback ? `rollback=${factValue(rollback.facts.status)}` : undefined,
+      `verdict=${verdictStatus}`,
+      "terminalSuccessClaim=false",
+    ].filter(Boolean).join("; "),
+    facts: [
+      {
+        label: "lane",
+        value: factValue(lane.facts.laneId),
+        machineEventCorrelationId: lane.id,
+      },
+      {
+        label: "target",
+        value: factValue(lane.facts.targetSummary),
+        machineEventCorrelationId: lane.id,
+      },
+      {
+        label: "authority",
+        value: authority ? factValue(authority.facts.authorityStatus) : "not-observed",
+        machineEventCorrelationId: authority?.id,
+      },
+      {
+        label: "staleRead",
+        value: staleRead ? factValue(staleRead.facts.status) : "not-observed",
+        machineEventCorrelationId: staleRead?.id,
+      },
+      {
+        label: "snapshot",
+        value: snapshot ? factValue(snapshot.facts.status) : "not-observed",
+        machineEventCorrelationId: snapshot?.id,
+      },
+      {
+        label: "apply",
+        value: apply ? factValue(apply.facts.status) : "not-observed",
+        machineEventCorrelationId: apply?.id,
+      },
+      {
+        label: "rollback",
+        value: rollback ? factValue(rollback.facts.status) : "not-observed",
+        machineEventCorrelationId: rollback?.id,
+      },
+      {
+        label: "verdict",
+        value: verdictStatus,
+        machineEventCorrelationId: lane.id,
+      },
+    ],
+    redaction: events.some((event) =>
+      event.type.startsWith("mutation-") && event.redaction.status === "redacted"
+    )
+      ? "applied"
+      : "excluded",
+    machineEventCorrelationIds: [
+      lane.id,
+      authority?.id,
+      staleRead?.id,
+      snapshot?.id,
+      apply?.id,
+      decision?.id,
+      rollback?.id,
+      blocked?.id,
+      failed?.id,
+    ].filter((id): id is string => Boolean(id)),
+    notProvenClaims: events
+      .filter((event) => event.type.startsWith("mutation-"))
       .flatMap((event) => event.notProvenClaims),
   })];
 }
