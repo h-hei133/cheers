@@ -3,6 +3,7 @@ import type {
   ProductSurfaceSeverity,
   ProductSurfaceViewModel,
 } from "../surface/model.js";
+import type { SessionStatusEnvelope } from "../../session/presentation/envelope.js";
 
 export type TerminalMessageRenderMode = "compact" | "detailed";
 
@@ -58,6 +59,38 @@ export function renderTerminalMessage(
     ...ordered.flatMap((section) => renderSection(section, mode)),
     "",
   ];
+  return { lines };
+}
+
+export function renderSessionStatusEnvelope(
+  envelope: SessionStatusEnvelope,
+  options: TerminalMessageRendererOptions = {},
+): TerminalMessageRenderResult {
+  const mode = options.mode ?? "compact";
+  const lines = [
+    "Session status",
+    `[${envelope.state}] Verdict: ${envelope.terminalVerdict}`,
+    `[control] Loop: ${envelope.controlStatus}`,
+    `[action] Next: ${envelope.nextAction}`,
+    `[request] Request: ${envelope.requestPreparation.summary}`,
+    `[continuation] Readiness: ${envelope.continuationReadiness}`,
+    `[replay] Carry-forward: ${envelope.replayCarryForward.summary}`,
+    `[tools] Outcome: ${envelope.toolOutcome.summary}`,
+    `[verification] Status: ${envelope.verification.summary}`,
+    `[repair] Status: ${envelope.repair.summary}`,
+    `[proof] Missing: ${envelope.missingProof.length > 0 ? envelope.missingProof.join(",") : "none"}`,
+    `[truth] terminalSuccessClaim=${envelope.terminalSuccessClaim}`,
+  ];
+
+  if (mode === "detailed") {
+    lines.push(
+      `[flags] userActionNeeded=${envelope.userActionNeeded}; blocked=${envelope.blocked}; failed=${envelope.failed}; completeProof=${envelope.completeProof}`,
+      `[not_proven] ${envelope.notProvenClaims.length > 0 ? envelope.notProvenClaims.join("; ") : "none"}`,
+      ...envelope.safeDetails.map((detail) => `[detail] ${detail}`),
+    );
+  }
+
+  lines.push("");
   return { lines };
 }
 

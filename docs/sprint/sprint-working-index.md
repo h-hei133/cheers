@@ -13,6 +13,7 @@ sections instead of appending progress logs.
 | `docs/sprint/project-gap-and-priority-plan.md` | current | Aggressive but bounded batch plan for moving toward the mature capability set. |
 | `docs/sprint/route/sp001-agent-capability-map-and-plan.md` | current route input | Original sprint objective and completion requirements. |
 | `docs/sprint/route/sp002-product-loop-truth-consolidation.md` | completed route input | Product loop truth consolidation objective now reflected in current capability and priority docs. |
+| `docs/sprint/route/sp003-cli-status-envelope.md` | completed route input | CLI status envelope objective now reflected in current capability and priority docs. |
 
 ## Removed Or Merged Content
 

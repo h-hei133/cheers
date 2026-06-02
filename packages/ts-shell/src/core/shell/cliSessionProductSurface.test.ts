@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { CodingResultSummary } from "../../orchestration/types.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
+import {
+  PRODUCT_TRUTH_MATRIX,
+  PRODUCT_TRUTH_NEGATIVE_CASES,
+} from "../../runtime/loop/truthMatrix.test.js";
 import { projectStaticResourceRegistry } from "../../runtime/resources/projection.js";
 import { projectSessionTree } from "../../session/sessionTreeProjection.js";
 import { createRuntimeEventDigest } from "./sessionEventSurface.js";
@@ -9,7 +13,10 @@ import {
   createSessionTerminalState,
   renderSessionTerminalSurface,
 } from "./sessionTerminalState.js";
-import { projectCliSessionProductSurface } from "./cliSessionProductSurface.js";
+import {
+  projectCliSessionProductStatus,
+  projectCliSessionProductSurface,
+} from "./cliSessionProductSurface.js";
 
 describe("CLI session product surface", () => {
   it("renders the required phase sections in order without implying authority success", () => {
@@ -45,24 +52,26 @@ describe("CLI session product surface", () => {
       codingResult: result,
     });
 
-    expect(surface?.lines.map((line) => line.replace(/:.*/, ""))).toEqual([
-      "Product surface",
-      "[info] Task",
-      "[info] Context",
-      "[info] Plan",
-      "[info] Proposal",
-      "[blocked] Authority",
-      "[info] Apply",
-      "[blocked] Verification",
-      "[info] Repair",
-      "[info] Tools",
+    expect(surface?.lines.map((line) => line.replace(/:.*/, "")).slice(0, 12)).toEqual([
+      "Session status",
       "[blocked] Verdict",
-      "[not_proven] Not proven",
-      "[info] Next action",
-      "",
+      "[control] Loop",
+      "[action] Next",
+      "[request] Request",
+      "[continuation] Readiness",
+      "[replay] Carry-forward",
+      "[tools] Outcome",
+      "[verification] Status",
+      "[repair] Status",
+      "[proof] Missing",
+      "[truth] terminalSuccessClaim=false",
     ]);
-    expect(surface?.lines.join("\n")).toContain("authority required");
-    expect(surface?.lines.join("\n")).toContain("Apply: not-run");
+    expect(surface?.lines.join("\n")).toContain("[flags] userActionNeeded=true");
+    expect(surface?.lines.join("\n")).toContain("[detail] Verification");
+    expect(surface?.lines.join("\n")).toContain("explicit authority");
+    expect(surface?.envelope.verification.summary).toContain("status=blocked");
+    expect(surface?.productSurface.sections.find((section) => section.title === "Apply")?.summary)
+      .toBe("not-run");
     expect(surface?.verdict).toBe("Stopped: explicit authority is required before continuing.");
   });
 
@@ -95,7 +104,9 @@ describe("CLI session product surface", () => {
     expect(surface?.notProvenClaims).toContain("live provider exact proposal");
     expect(surface?.notProvenClaims).toContain("relevant verification did not pass");
     expect(surface?.notProvenClaims).toContain("external-live tool execution");
-    expect(surface?.lines.join("\n")).toContain("Tools: receipts=");
+    expect(surface?.envelope.verification.summary).toContain("status=failed");
+    expect(surface?.productSurface.sections.find((section) => section.title === "Tools")?.summary)
+      .toContain("receipts=");
   });
 
   it("keeps skipped verification as partial instead of CLI/session success", () => {
@@ -129,7 +140,8 @@ describe("CLI session product surface", () => {
       "Partial: some work completed, but required evidence is incomplete.",
     );
     expect(surface?.notProvenClaims).toContain("relevant verification did not pass");
-    expect(surface?.lines.join("\n")).toContain("[partial] Verification: status=skipped");
+    expect(surface?.envelope.state).toBe("partial");
+    expect(surface?.envelope.verification.summary).toContain("status=skipped");
     expect(surface?.lines.join("\n")).not.toContain("Outcome: success");
   });
 
@@ -216,9 +228,13 @@ describe("CLI session product surface", () => {
     });
     const rendered = surface?.lines.join("\n") ?? "";
 
-    expect(rendered).toContain("[info] Session: activePath=2; tree=linear-path");
-    expect(rendered).toContain("[info] Events: count=");
-    expect(rendered).toContain("[info] Resources: count=1; registry=explicit-static; dynamic=disabled; execution=disabled; providerDefault=disabled");
+    expect(rendered).toContain("Session status");
+    expect(surface?.productSurface.sections.find((section) => section.title === "Session")?.summary)
+      .toContain("activePath=2; tree=linear-path");
+    expect(surface?.productSurface.sections.find((section) => section.title === "Events")?.summary)
+      .toContain("count=");
+    expect(surface?.productSurface.sections.find((section) => section.title === "Resources")?.summary)
+      .toContain("count=1; registry=explicit-static; dynamic=disabled; execution=disabled; providerDefault=disabled");
     expect(rendered).toContain("terminalSuccessClaim=false");
     expect(rendered).not.toMatch(/secret|oldText=raw/);
     expect(surface?.verdict).toBe(
@@ -253,9 +269,18 @@ describe("CLI session product surface", () => {
     expect(rendered).not.toContain("/home/wang/.private-agents-real");
     expect(rendered).not.toContain("abc123");
     expect(rendered).not.toContain("<html>");
-    expect(rendered).toContain("[redacted]");
-    expect(rendered).toContain("[redacted-real-provider-home]");
-    expect(rendered).toContain("[raw-content-excluded]");
+    const envelope = projectCliSessionProductSurface({
+      status: "stopped_error",
+      terminalClassification: "stopped",
+      terminalReason: "stopped_error",
+      stopReason: "not verified",
+      codingResult: result,
+    })?.envelope;
+    const safeEnvelope = JSON.stringify(envelope);
+
+    expect(safeEnvelope).toContain("[redacted]");
+    expect(safeEnvelope).toContain("[redacted-real-provider-home]");
+    expect(safeEnvelope).toContain("[raw-content-excluded]");
   });
 
   it("renders through the session terminal path after query.completed", () => {
@@ -304,25 +329,66 @@ describe("CLI session product surface", () => {
       startedRendering: false,
     });
 
-    expect(lines).toContain("Product surface");
+    expect(lines).toContain("Session status");
     for (const label of [
-      "Task",
-      "Context",
-      "Plan",
-      "Proposal",
-      "Authority",
-      "Apply",
-      "Verification",
-      "Repair",
-      "Tools",
       "Verdict",
-      "Not proven",
-      "Next action",
+      "Loop",
+      "Next",
+      "Request",
+      "Readiness",
+      "Carry-forward",
+      "Outcome",
+      "Status",
+      "Missing",
     ]) {
-      expect(lines.some((line) => /^\[[a-z_]+\] [^:]+:/.test(line) && line.includes(`] ${label}:`))).toBe(true);
+      expect(lines.some((line) => line.includes(`] ${label}:`))).toBe(true);
     }
     expect(lines.join("\n")).toContain("Verified success: relevant verification passed.");
   });
+
+  it.each([
+    "complete_proof",
+    "blocked_request_preparation",
+    "failed_tool_outcome",
+    "missing_proof",
+    "proposal_only",
+    "apply_without_post_repair_verification",
+    "post_repair_failed_verification",
+    "partial_stopped_loop",
+    "waiting_for_user",
+  ] as const)(
+    "aligns terminal status envelope with product surface owner facts for %s",
+    (name) => {
+      const item = PRODUCT_TRUTH_MATRIX.find((candidate) => candidate.name === name)!;
+      const surface = projectCliSessionProductStatus(item.productSurface);
+      const rendered = surface.lines.join("\n");
+      const completion = surface.productSurface.sections.find((section) =>
+        section.title === "Product completion packet"
+      );
+
+      expect(surface.envelope.controlStatus).toBe(item.expected.loopDecision);
+      expect(surface.envelope.terminalVerdict).toBe(surface.productSurface.verdict);
+      expect(surface.envelope.nextAction).toBe(surface.productSurface.nextAction);
+      expect(surface.envelope.missingProof).toEqual(item.expected.missingProofItems);
+      expect(surface.envelope.completeProof).toBe(item.expected.terminalSuccess);
+      expect(completion?.summary).toContain(`resultStatus=${item.expected.resultStatus}`);
+      expect(rendered).toContain("Session status");
+      expect(rendered).toContain("terminalSuccessClaim=false");
+      expect(rendered).not.toContain("Outcome: success");
+    },
+  );
+
+  it.each(PRODUCT_TRUTH_NEGATIVE_CASES)(
+    "keeps non-success matrix case visibly non-success in CLI envelope for $name",
+    (item) => {
+      const surface = projectCliSessionProductStatus(item.productSurface);
+
+      expect(surface.envelope.completeProof).toBe(false);
+      expect(surface.envelope.state).not.toBe("complete_proof");
+      expect(surface.envelope.terminalSuccessClaim).toBe(false);
+      expect(surface.lines.join("\n")).not.toContain("[complete_proof]");
+    },
+  );
 });
 
 function codingResult(overrides: Partial<CodingResultSummary> = {}): CodingResultSummary {

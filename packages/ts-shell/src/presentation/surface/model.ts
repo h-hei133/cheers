@@ -1041,7 +1041,7 @@ function productLoopCloseoutSections(
         },
         {
           label: "missingProof",
-          value: factValue(event.facts.missingProofItems),
+          value: safeText(String(event.facts.missingProofItems ?? "not-observed"), 320),
         },
       ],
       machineEventCorrelationIds: [event.id],
@@ -1103,7 +1103,7 @@ function productCompletionPacketSections(
         },
         {
           label: "missingProof",
-          value: factValue(event.facts.missingProofItems),
+          value: safeText(String(event.facts.missingProofItems ?? "not-observed"), 320),
         },
       ],
       machineEventCorrelationIds: [event.id],

@@ -32,6 +32,7 @@ owner. Python is offline evaluation only.
 | Explicit execution boundary | Proven for command/file/tool side-effect receipts through `ExecutionService` and runtime receipts. | `packages/ts-shell/src/runtime/execution/executionService.ts`, `packages/ts-shell/src/runtime/execution/receipt.ts` |
 | Evidence/result terminal truth | Proven as the only success-verdict owner for repair-to-success. Presentation, runtime, events, replay, request preparation, tool outcome, proposal, authority, and apply-only states keep `terminalSuccessClaim: false`. | `packages/ts-shell/src/evidence/projection/repair/verdict.ts`, `packages/ts-shell/src/result/projection/repair/verdict.ts`, `packages/ts-shell/src/runtime/loop/truthMatrix.test.ts` |
 | Product loop truth consolidation | Proven for a shared product path matrix covering complete proof, failed verification, repair required, proposal-only, authority-only, apply without post-repair verification, post-repair failed verification, blocked request preparation, failed tool outcome, partial/stopped loop, waiting for user, and missing proof. Complete proof is the only matrix path that reaches result-owned `COMPLETE`; all consumers remain observation/control surfaces. | `packages/ts-shell/src/runtime/loop/truthMatrix.test.ts`, `packages/ts-shell/src/runtime/loop/completionPacket.test.ts`, `packages/ts-shell/src/runtime/events/projection.test.ts`, `packages/ts-shell/src/runtime/events/stream.test.ts`, `packages/ts-shell/src/session/replay/state.test.ts`, `packages/ts-shell/src/presentation/surface/model.test.ts`, `packages/ts-shell/src/evidence/projection/repair/verdict.test.ts`, `packages/ts-shell/src/result/projection/repair/verdict.test.ts` |
+| CLI/session status envelope | Proven for a structured terminal-facing envelope derived from product surface owner facts. The envelope carries terminal verdict, loop control status, next action, request/continuation/replay/tool/verification/repair status, missing proof, not-proven claims, safe details, user-action-needed, blocked/failed, and complete-proof state, and is consumed by the existing CLI session product surface path. | `packages/ts-shell/src/session/presentation/envelope.ts`, `packages/ts-shell/src/core/shell/cliSessionProductSurface.ts`, `packages/ts-shell/src/presentation/terminal/renderer.ts`, `packages/ts-shell/src/session/presentation/envelope.test.ts`, `packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts` |
 | Agent Loop governed substrate | Proven as a broad observation/control substrate with infrastructure categories, finalization, completion packet, trajectory, and events. Product-loop truth propagation is now matrix-tested; this does not prove every CLI, host, storage, provider, or dynamic execution path. | `packages/ts-shell/src/runtime/loop/infrastructure.ts`, `packages/ts-shell/src/runtime/loop/contract.ts`, `packages/ts-shell/src/runtime/loop/finalization.ts`, `packages/ts-shell/src/runtime/loop/trajectory.ts` |
 | Context and planning substrate | Proven for report-safe context rebuild and planning fact handoff; not a guarantee of context completeness. | `packages/ts-shell/src/context/sessionContextRebuildProjection.ts`, `packages/ts-shell/src/context/rebuildInput.ts`, `packages/ts-shell/src/context/acquisition/summary.ts` |
 | Provider request boundary | Proven for default-off request preparation, provider metadata, safe request messages, blockers, redaction, and explicit invocation readiness. It does not prove provider calls. | `packages/ts-shell/src/provider/request/boundary.ts`, `packages/ts-shell/src/provider/request/invocation.ts` |
@@ -48,8 +49,8 @@ owner. Python is offline evaluation only.
 
 ## Current Missing Areas
 
-- A mature interactive CLI with full queue/status ergonomics, branch navigation,
-  rich session management, and compact/resume controls is not proven.
+- A mature interactive CLI with full queue ergonomics, branch navigation, rich
+  session management, and compact/resume controls is not proven.
 - Programmatic SDK, RPC, and stable machine-readable host contracts are not
   present beyond runtime event/JSON projection.
 - Storage-backed branch navigation and compaction summaries are projection-only
@@ -62,6 +63,7 @@ owner. Python is offline evaluation only.
 - Tool execution is bounded by policy and `ExecutionService`; broad parallel
   mutation, file mutation queues, and snapshot/revert-backed wide editing are
   not proven.
-- Product-loop truth propagation is proven for the repair-to-result matrix, but
-  the CLI envelope, host contract, branch/compaction runtime, broad provider
-  compatibility, and dynamic execution areas remain unproven.
+- Product-loop truth propagation and the CLI/session status envelope are proven
+  for the repair-to-result matrix, but the host contract, branch/compaction
+  runtime, broad provider compatibility, and dynamic execution areas remain
+  unproven.

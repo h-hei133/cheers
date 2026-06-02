@@ -8,10 +8,12 @@ completion.
 
 ## Major Gaps
 
-- Product loop truth is consolidated for the repair-to-result matrix, but the
-  CLI envelope, host contract, branch/compaction runtime, broad provider
-  compatibility, and dynamic execution areas remain unproven.
-- CLI/session UX is narrower than the runtime fact model.
+- Product loop truth and the CLI/session status envelope are consolidated for
+  the repair-to-result matrix, but the host contract, branch/compaction runtime,
+  broad provider compatibility, and dynamic execution areas remain unproven.
+- CLI/session UX now has a structured status envelope for product-loop truth,
+  but full queue ergonomics, branch navigation, compact/resume controls, and
+  broader session management remain narrower than the runtime fact model.
 - JSON event projection exists, but no stable SDK/RPC host contract exists.
 - Session branch and compaction support are projection-only or unsupported in the
   current runtime path.
@@ -42,24 +44,26 @@ completion.
   replay, presentation, request readiness, tool outcome, proposal, authority,
   and apply-only states remain non-success consumers.
 
-### Batch 1: CLI Status Envelope
+### Completed Batch: CLI Status Envelope
 
-- Goal: align interactive/terminal output with product surface and JSON event
-  facts without turning terminal text into the runtime API.
-- User-facing value: users can see next action, blockers, request readiness,
-  replay carry-forward, tool outcome, and verification state in one coherent
-  surface.
+- Proven result: terminal/session-facing status now uses a structured envelope
+  derived from product surface owner facts, not terminal prose.
+- User-facing value: users can see terminal verdict, loop control, next action,
+  blockers, request readiness, replay carry-forward, tool outcome, verification
+  and repair state, missing proof, and not-proven claims in one coherent
+  status surface.
 - Owner domains: `cli`, `core/shell`, `session/presentation`, `presentation`,
   `runtime/events`.
-- Expected areas: CLI/session surface bridges and product surface input plumbing.
-- Required tests: CLI/session rendering tests with stopped, blocked, not-proven,
-  and verified repair cases.
-- Forbidden shortcuts: terminal-specific reinterpretation of success, direct
-  reads of raw transcripts/secrets/provider output, broad CLI rewrite.
-- Completion condition: terminal and product surface render the same owner facts
-  for the same fixture with no success upgrades.
+- Evidence: `packages/ts-shell/src/session/presentation/envelope.test.ts` and
+  `packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts` reuse the
+  product truth matrix across complete proof, blocked request, failed tool
+  outcome, missing proof, proposal-only, apply-only, post-repair failed
+  verification, partial/stopped, and waiting-for-user states.
+- Boundary: terminal truth still belongs to `evidence`/`result`; the CLI,
+  shell, session envelope, events, replay, request readiness, tool outcome,
+  proposal, authority, and apply-only states remain non-success consumers.
 
-### Batch 2: Branch/Compaction Context Readiness
+### Batch 1: Branch/Compaction Context Readiness
 
 - Goal: make branch and compaction facts more structured across session,
   context rebuild, continuation readiness, request preparation, replay, events,
@@ -80,7 +84,7 @@ completion.
 
 ## Medium-Term Runtime Capability Batches
 
-### Batch 3: Provider/Model Compatibility Registry
+### Batch 2: Provider/Model Compatibility Registry
 
 - Goal: expand provider/model metadata, auth readiness, compatibility flags,
   fallback eligibility, and request blockers without enabling real providers by
@@ -97,7 +101,7 @@ completion.
 - Completion condition: request preparation can explain compatibility/auth
   blockers and explicit opt-in requirements with no live call.
 
-### Batch 4: Programmatic Runtime Event Contract
+### Batch 3: Programmatic Runtime Event Contract
 
 - Goal: stabilize a machine-readable event envelope for host consumption before
   SDK/RPC behavior.
@@ -114,7 +118,7 @@ completion.
 - Completion condition: a stable JSON envelope is tested as a host contract and
   remains observation-only.
 
-### Batch 5: Tool Policy And Read-Only Parallelism
+### Batch 4: Tool Policy And Read-Only Parallelism
 
 - Goal: strengthen tool policy interception, dispatch ordering, receipts,
   outcome next action, and read-only parallel execution before mutation
@@ -132,7 +136,7 @@ completion.
 - Completion condition: read-only parallel tool paths produce ordered,
   report-safe result messages and preserve non-success outcomes.
 
-### Batch 6: Verification And Repair Recovery Loop
+### Batch 5: Verification And Repair Recovery Loop
 
 - Goal: carry verification failures, repair eligibility, authority, apply
   observations, and post-repair verification through the loop until result-owned
@@ -153,7 +157,7 @@ completion.
 
 ## Large Future Capability Areas
 
-### Batch 7: Capability Inventory Governance
+### Batch 6: Capability Inventory Governance
 
 - Goal: move from static resource/package projections to a robust governance
   model for installed/enabled/disabled/conflicting/unsupported resources.
@@ -172,7 +176,7 @@ completion.
   conflicting, unsupported, and rejected resources without executing any package
   or plugin behavior.
 
-### Batch 8: Extension Contract Without Execution
+### Batch 7: Extension Contract Without Execution
 
 - Goal: define non-executable lifecycle and hook contracts that can observe,
   annotate, block, redact, or suggest next actions without mutating truth.
@@ -192,7 +196,7 @@ completion.
   projected, and every forbidden effect is rejected with `terminalSuccessClaim:
   false`.
 
-### Batch 9: Storage-Backed Branching And Compaction
+### Batch 8: Storage-Backed Branching And Compaction
 
 - Goal: implement durable branch navigation and compaction entries after the
   projection path is proven.
@@ -212,7 +216,7 @@ completion.
   continuation context, preserve unsupported/stale/unsafe facts, and do not
   create terminal success.
 
-### Batch 10: Host API And Distribution
+### Batch 9: Host API And Distribution
 
 - Goal: expose stable non-interactive host behavior and package/distribution
   readiness after event contracts and truth boundaries are stable.
