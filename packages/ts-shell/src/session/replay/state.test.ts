@@ -6,6 +6,7 @@ import { createEvidenceOnlySavePoint } from "../../evidence/savepoint/model.js";
 import { createModelRequestBoundary, prepareNextTurnModelRequest } from "../../provider/request/boundary.js";
 import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { createRuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
+import { PRODUCT_TRUTH_MATRIX, PRODUCT_TRUTH_NEGATIVE_CASES } from "../../runtime/loop/truthMatrix.test.js";
 import { evaluateContinuationReadiness } from "../continuation/readiness.js";
 import { summarizeReplaySafeLoopState } from "./state.js";
 import { projectSessionTree } from "../sessionTreeProjection.js";
@@ -253,4 +254,39 @@ describe("replay-safe loop state summary", () => {
     );
     expect(summary.terminalSuccessClaim).toBe(false);
   });
+
+  it.each(PRODUCT_TRUTH_MATRIX)(
+    "summarizes shared product truth matrix replay facts safely for $name",
+    (item) => {
+      const serialized = JSON.stringify(item.replaySafeLoopStateSummary);
+
+      expect(item.replaySafeLoopStateSummary.productCompletionCarryForwardFacts)
+        .toMatchObject({
+          status: item.expected.completionStatus,
+          resultOwnedTerminalStatus: item.expected.resultStatus,
+          loopDecision: item.expected.loopDecision,
+          terminalSuccessClaim: false,
+        });
+      expect(item.replaySafeLoopStateSummary.terminalSuccessClaim).toBe(false);
+      expect(serialized).not.toMatch(
+        /raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+      );
+    },
+  );
+
+  it.each(PRODUCT_TRUTH_NEGATIVE_CASES)(
+    "keeps shared non-success matrix replay facts non-success for $name",
+    (item) => {
+      expect(item.replaySafeLoopStateSummary.productCompletionCarryForwardFacts?.status)
+        .not.toBe("complete");
+      expect(item.replaySafeLoopStateSummary.terminalResultFacts).toMatchObject({
+        status: item.expected.resultStatus,
+        terminalClassification: item.expected.resultClassification,
+        terminalSuccessClaim: false,
+      });
+      expect(item.replaySafeLoopStateSummary.notProvenClaims).toContain(
+        "replay-safe-summary-is-not-success",
+      );
+    },
+  );
 });

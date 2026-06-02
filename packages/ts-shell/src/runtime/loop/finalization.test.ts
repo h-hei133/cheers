@@ -7,6 +7,7 @@ import {
   decideLoopFinalization,
   projectProductLoopCloseout,
 } from "./finalization.js";
+import { PRODUCT_TRUTH_MATRIX, PRODUCT_TRUTH_NEGATIVE_CASES } from "./truthMatrix.test.js";
 
 describe("loop finalization decision", () => {
   it("produces stop_complete only for result-owned verified repair projection", () => {
@@ -139,6 +140,28 @@ describe("loop finalization decision", () => {
     expect(closeout.missingProofItems).toContain("post-repair-verification");
     expect(closeout.notProvenClaims).toContain("incomplete-closeout-is-not-success");
   });
+
+  it.each(PRODUCT_TRUTH_MATRIX)(
+    "matches shared product truth matrix loop decision for $name",
+    (item) => {
+      expect(item.loopFinalizationDecision.decision).toBe(item.expected.loopDecision);
+      expect(item.loopFinalizationDecision.terminalSuccessClaim).toBe(false);
+      expect(item.productLoopCloseout.status).toBe(item.expected.completionStatus);
+      expect(item.productLoopCloseout.complete).toBe(item.expected.completionComplete);
+      expect(item.productLoopCloseout.terminalSuccessClaim).toBe(false);
+    },
+  );
+
+  it.each(PRODUCT_TRUTH_NEGATIVE_CASES)(
+    "does not stop complete for shared non-success matrix case $name",
+    (item) => {
+      expect(item.loopFinalizationDecision.decision).not.toBe("stop_complete");
+      expect(item.productLoopCloseout.complete).toBe(false);
+      expect(item.productLoopCloseout.notProvenClaims).toContain(
+        "incomplete-closeout-is-not-success",
+      );
+    },
+  );
 });
 
 function projection(

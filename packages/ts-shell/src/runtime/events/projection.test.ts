@@ -26,6 +26,7 @@ import { runAgentLoopContract } from "../loop/contract.js";
 import { buildProductCompletionPacket } from "../loop/completionPacket.js";
 import { projectProductLoopAdapter } from "../loop/adapter.js";
 import { projectLoopTrajectory } from "../loop/trajectory.js";
+import { PRODUCT_TRUTH_MATRIX, PRODUCT_TRUTH_NEGATIVE_CASES } from "../loop/truthMatrix.test.js";
 import { projectModelBoundaryPhase } from "../loop/modelBoundary.js";
 import { projectModelResponseReentryCycle } from "../loop/reentry.js";
 import { runProviderStreamAdapter } from "../loop/providerStreamAdapter.js";
@@ -582,6 +583,42 @@ describe("runtime event projection", () => {
       expect.arrayContaining(["next-turn-success", "terminal-success"]),
     );
   });
+
+  it.each(PRODUCT_TRUTH_MATRIX)(
+    "projects shared product truth matrix events as observation-only for $name",
+    (item) => {
+      expect(item.runtimeEvents.length).toBeGreaterThan(0);
+      expect(item.runtimeEvents.every((event) =>
+        event.facts.terminalSuccessClaim === false
+      )).toBe(true);
+      expect(item.runtimeEvents.flatMap((event) => event.notProvenClaims)).toEqual(
+        expect.arrayContaining(["terminal-success"]),
+      );
+      expect(JSON.stringify(item.runtimeEvents)).not.toContain('"success":true');
+    },
+  );
+
+  it.each(PRODUCT_TRUTH_NEGATIVE_CASES)(
+    "keeps shared non-success matrix event facts non-success for $name",
+    (item) => {
+      const packetEvent = item.runtimeEvents.find((event) =>
+        event.type === "product-completion-packet-observed"
+      );
+      const resultEvent = item.runtimeEvents.find((event) =>
+        event.type === "repair-verdict-terminal-projected"
+      );
+
+      expect(packetEvent?.facts).toMatchObject({
+        status: item.expected.completionStatus,
+        terminalSuccessClaim: false,
+      });
+      expect(resultEvent?.facts).toMatchObject({
+        status: item.expected.resultStatus,
+        terminalClassification: item.expected.resultClassification,
+        terminalSuccessClaim: false,
+      });
+    },
+  );
 
   it("projects verification and repair handoff events as observation-only", () => {
     const intent = projectVerificationIntent({

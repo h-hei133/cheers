@@ -14,6 +14,7 @@ import type {
   ProductLoopCloseoutProjection,
 } from "./finalization.js";
 import { buildProductCompletionPacket } from "./completionPacket.js";
+import { PRODUCT_TRUTH_MATRIX, PRODUCT_TRUTH_NEGATIVE_CASES } from "./truthMatrix.test.js";
 
 describe("product completion packet", () => {
   it("builds a complete packet only from the full verified repair chain", () => {
@@ -110,6 +111,30 @@ describe("product completion packet", () => {
     expect(packet.originalFailure.summary).toContain("verification:failed");
     expect(packet.terminalSuccessClaim).toBe(false);
   });
+
+  it.each(PRODUCT_TRUTH_MATRIX)(
+    "matches the shared product truth matrix for $name",
+    (item) => {
+      expect(item.productCompletionPacket.status).toBe(item.expected.completionStatus);
+      expect(item.productCompletionPacket.complete).toBe(item.expected.completionComplete);
+      expect(item.productCompletionPacket.nextAction).toBe(item.expected.nextAction);
+      expect(item.productCompletionPacket.missingProofItems).toEqual(
+        item.expected.missingProofItems,
+      );
+      expect(item.productCompletionPacket.terminalSuccessClaim).toBe(false);
+    },
+  );
+
+  it.each(PRODUCT_TRUTH_NEGATIVE_CASES)(
+    "keeps non-success product packet state non-complete for $name",
+    (item) => {
+      expect(item.productCompletionPacket.complete).toBe(false);
+      expect(item.productCompletionPacket.status).not.toBe("complete");
+      expect(item.productCompletionPacket.notProvenClaims).toContain(
+        "incomplete-proof-cannot-become-complete",
+      );
+    },
+  );
 });
 
 function completeInput(

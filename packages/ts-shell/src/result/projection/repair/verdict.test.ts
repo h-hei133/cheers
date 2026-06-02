@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RepairVerdictProofInput } from "../../../evidence/projection/repair/verdict.js";
+import { PRODUCT_TRUTH_MATRIX, PRODUCT_TRUTH_NEGATIVE_CASES } from "../../../runtime/loop/truthMatrix.test.js";
 import { projectRepairVerdictTerminal } from "./verdict.js";
 
 describe("repair verdict terminal projection", () => {
@@ -73,6 +74,38 @@ describe("repair verdict terminal projection", () => {
     expect(repairAppliedOnly.productVerdict.status).not.toBe("COMPLETE");
     expect(verdictCandidateOnly.productVerdict.status).not.toBe("COMPLETE");
   });
+
+  it.each(PRODUCT_TRUTH_MATRIX)(
+    "matches shared product truth matrix terminal projection for $name",
+    (item) => {
+      expect(item.repairVerdictTerminalProjection.status).toBe(item.expected.resultStatus);
+      expect(item.repairVerdictTerminalProjection.terminalClassification).toBe(
+        item.expected.resultClassification,
+      );
+      expect(item.expected.missingProofItems).toEqual(
+        expect.arrayContaining(
+          item.repairVerdictTerminalProjection.missingProofItems,
+        ),
+      );
+      expect(item.repairVerdictTerminalProjection.productVerdict.status === "COMPLETE")
+        .toBe(item.expected.terminalSuccess);
+      expect(item.repairVerdictTerminalProjection.terminalSuccessClaim).toBe(false);
+    },
+  );
+
+  it.each(PRODUCT_TRUTH_NEGATIVE_CASES)(
+    "keeps shared non-success matrix verdict non-complete for $name",
+    (item) => {
+      expect(item.repairVerdictTerminalProjection.status).not.toBe(
+        "verified_with_repair",
+      );
+      expect(item.repairVerdictTerminalProjection.productVerdict.status).not.toBe(
+        "COMPLETE",
+      );
+      expect(item.repairVerdictTerminalProjection.notProvenClaims.length)
+        .toBeGreaterThan(0);
+    },
+  );
 });
 
 function proofInput(

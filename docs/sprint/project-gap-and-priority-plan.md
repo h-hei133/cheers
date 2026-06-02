@@ -8,7 +8,9 @@ completion.
 
 ## Major Gaps
 
-- The loop substrate is broad but not yet the complete product-loop owner.
+- Product loop truth is consolidated for the repair-to-result matrix, but the
+  CLI envelope, host contract, branch/compaction runtime, broad provider
+  compatibility, and dynamic execution areas remain unproven.
 - CLI/session UX is narrower than the runtime fact model.
 - JSON event projection exists, but no stable SDK/RPC host contract exists.
 - Session branch and compaction support are projection-only or unsupported in the
@@ -24,26 +26,23 @@ completion.
 
 ## Immediate Sprint Batches
 
-### Batch 1: Product Loop Truth Consolidation
+### Completed Batch: Product Loop Truth Consolidation
 
-- Goal: make the current loop trajectory, completion packet, replay-safe facts,
-  and product surface line up as one audited product-path story.
-- User-facing value: status output becomes less ambiguous; stopped, blocked,
-  waiting, repaired, and complete states remain distinct.
+- Proven result: the current loop trajectory, completion packet, runtime events,
+  JSON stream, replay-safe facts, product surface, and evidence/result verdicts
+  line up against one audited product-path matrix.
+- User-facing value: stopped, blocked, waiting, repaired, and complete states are
+  distinct in the tested product truth path.
 - Owner domains: `runtime/loop`, `runtime/events`, `session/replay`,
   `presentation`, `evidence`, `result`.
-- Expected areas: `runtime/loop/trajectory.ts`, `runtime/loop/completionPacket.ts`,
-  `runtime/events/projection.ts`, `session/replay/state.ts`,
-  `presentation/surface/model.ts`, owner tests.
-- Required tests: focused owner tests plus evidence/result anti-false-success
-  tests when terminal wording changes.
-- Forbidden shortcuts: presentation-only success, loop-owned terminal success,
-  event-emission-as-success, replay-as-success, weakening missing-proof checks.
-- Completion condition: a product-path fixture proves result-owned success only
-  when evidence/result proof is complete, and proves all partial/not-proven
-  variants remain non-success.
+- Evidence: `packages/ts-shell/src/runtime/loop/truthMatrix.test.ts` feeds
+  owner tests for loop packet/finalization, events/stream, replay, surface, and
+  evidence/result verdicts.
+- Boundary: terminal truth still belongs to `evidence`/`result`; loop, events,
+  replay, presentation, request readiness, tool outcome, proposal, authority,
+  and apply-only states remain non-success consumers.
 
-### Batch 2: CLI Status Envelope
+### Batch 1: CLI Status Envelope
 
 - Goal: align interactive/terminal output with product surface and JSON event
   facts without turning terminal text into the runtime API.
@@ -60,7 +59,7 @@ completion.
 - Completion condition: terminal and product surface render the same owner facts
   for the same fixture with no success upgrades.
 
-### Batch 3: Branch/Compaction Context Readiness
+### Batch 2: Branch/Compaction Context Readiness
 
 - Goal: make branch and compaction facts more structured across session,
   context rebuild, continuation readiness, request preparation, replay, events,
@@ -81,7 +80,7 @@ completion.
 
 ## Medium-Term Runtime Capability Batches
 
-### Batch 4: Provider/Model Compatibility Registry
+### Batch 3: Provider/Model Compatibility Registry
 
 - Goal: expand provider/model metadata, auth readiness, compatibility flags,
   fallback eligibility, and request blockers without enabling real providers by
@@ -98,7 +97,7 @@ completion.
 - Completion condition: request preparation can explain compatibility/auth
   blockers and explicit opt-in requirements with no live call.
 
-### Batch 5: Programmatic Runtime Event Contract
+### Batch 4: Programmatic Runtime Event Contract
 
 - Goal: stabilize a machine-readable event envelope for host consumption before
   SDK/RPC behavior.
@@ -115,7 +114,7 @@ completion.
 - Completion condition: a stable JSON envelope is tested as a host contract and
   remains observation-only.
 
-### Batch 6: Tool Policy And Read-Only Parallelism
+### Batch 5: Tool Policy And Read-Only Parallelism
 
 - Goal: strengthen tool policy interception, dispatch ordering, receipts,
   outcome next action, and read-only parallel execution before mutation
@@ -133,7 +132,7 @@ completion.
 - Completion condition: read-only parallel tool paths produce ordered,
   report-safe result messages and preserve non-success outcomes.
 
-### Batch 7: Verification And Repair Recovery Loop
+### Batch 6: Verification And Repair Recovery Loop
 
 - Goal: carry verification failures, repair eligibility, authority, apply
   observations, and post-repair verification through the loop until result-owned
@@ -154,7 +153,7 @@ completion.
 
 ## Large Future Capability Areas
 
-### Batch 8: Capability Inventory Governance
+### Batch 7: Capability Inventory Governance
 
 - Goal: move from static resource/package projections to a robust governance
   model for installed/enabled/disabled/conflicting/unsupported resources.
@@ -173,7 +172,7 @@ completion.
   conflicting, unsupported, and rejected resources without executing any package
   or plugin behavior.
 
-### Batch 9: Extension Contract Without Execution
+### Batch 8: Extension Contract Without Execution
 
 - Goal: define non-executable lifecycle and hook contracts that can observe,
   annotate, block, redact, or suggest next actions without mutating truth.
@@ -193,7 +192,7 @@ completion.
   projected, and every forbidden effect is rejected with `terminalSuccessClaim:
   false`.
 
-### Batch 10: Storage-Backed Branching And Compaction
+### Batch 9: Storage-Backed Branching And Compaction
 
 - Goal: implement durable branch navigation and compaction entries after the
   projection path is proven.
@@ -213,7 +212,7 @@ completion.
   continuation context, preserve unsupported/stale/unsafe facts, and do not
   create terminal success.
 
-### Batch 11: Host API And Distribution
+### Batch 10: Host API And Distribution
 
 - Goal: expose stable non-interactive host behavior and package/distribution
   readiness after event contracts and truth boundaries are stable.

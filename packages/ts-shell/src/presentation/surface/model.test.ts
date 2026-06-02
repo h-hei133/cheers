@@ -26,6 +26,7 @@ import { runControlledModelInvocationAdapter } from "../../provider/request/atte
 import { prepareNextTurnBundle } from "../../turn/nextTurnBundle.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
+import { PRODUCT_TRUTH_MATRIX, PRODUCT_TRUTH_NEGATIVE_CASES } from "../../runtime/loop/truthMatrix.test.js";
 import {
   createRepairApplyRequest,
   observeRepairApply,
@@ -579,6 +580,34 @@ describe("product surface view model", () => {
     expect(viewModel?.terminalSuccessClaim).toBe(false);
     expect(JSON.stringify(viewModel)).not.toContain('"success":true');
   });
+
+  it.each(PRODUCT_TRUTH_MATRIX)(
+    "renders shared product truth matrix facts without surface success claims for $name",
+    (item) => {
+      const rendered = renderTerminalMessage(item.productSurface, {
+        mode: "detailed",
+      }).lines.join("\n");
+
+      expect(item.productSurface.terminalSuccessClaim).toBe(false);
+      expect(rendered).toContain("terminalSuccessClaim=false");
+      expect(rendered).toContain(`resultStatus=${item.expected.resultStatus}`);
+      expect(rendered).not.toContain("Outcome: success");
+      expect(JSON.stringify(item.productSurface)).not.toContain('"success":true');
+    },
+  );
+
+  it.each(PRODUCT_TRUTH_NEGATIVE_CASES)(
+    "does not reinterpret shared non-success matrix case as successful surface for $name",
+    (item) => {
+      const verdictSection = item.productSurface.sections.find((section) =>
+        section.kind === "verdict"
+      );
+
+      expect(item.productSurface.terminalSuccessClaim).toBe(false);
+      expect(verdictSection?.severity).not.toBe("success");
+      expect(verdictSection?.summary).not.toContain("success");
+    },
+  );
 
   it("renders controlled invocation facts without claiming provider or task success", async () => {
     const registry = projectProviderRegistry({

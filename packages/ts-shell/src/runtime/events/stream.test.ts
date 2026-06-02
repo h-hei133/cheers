@@ -15,6 +15,7 @@ import {
   projectRuntimeEvents,
   type RuntimeProjectionEvent,
 } from "./projection.js";
+import { PRODUCT_TRUTH_MATRIX, PRODUCT_TRUTH_NEGATIVE_CASES } from "../loop/truthMatrix.test.js";
 
 describe("JSON runtime event stream projection", () => {
   it("keeps product completion packet observations JSON-safe and observation-only", () => {
@@ -382,6 +383,45 @@ describe("JSON runtime event stream projection", () => {
       /raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
     );
   });
+
+  it.each(PRODUCT_TRUTH_MATRIX)(
+    "serializes shared product truth matrix events as observation-only JSON for $name",
+    (item) => {
+      const stream = projectJsonRuntimeEventStream({
+        events: item.runtimeEvents,
+        streamId: `matrix-${item.name}`,
+      });
+      const serialized = serializeJsonRuntimeEventStream(stream);
+
+      expect(stream.length).toBeGreaterThan(0);
+      expect(stream.every((entry) =>
+        entry.truthfulness.terminalSuccessClaim === false
+      )).toBe(true);
+      expect(serialized).not.toContain('"success":true');
+      expect(serialized).not.toMatch(
+        /raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+      );
+    },
+  );
+
+  it.each(PRODUCT_TRUTH_NEGATIVE_CASES)(
+    "keeps shared non-success matrix stream entries non-success for $name",
+    (item) => {
+      const stream = projectJsonRuntimeEventStream({ events: item.runtimeEvents });
+      const packetEntry = stream.find((entry) =>
+        entry.eventType === "product-completion-packet-observed"
+      );
+
+      expect(packetEntry?.facts).toMatchObject({
+        status: item.expected.completionStatus,
+        terminalSuccessClaim: false,
+      });
+      expect(packetEntry?.truthfulness).toMatchObject({
+        observationOnly: true,
+        terminalSuccessClaim: false,
+      });
+    },
+  );
 
   it("serializes model invocation gate observations without success claims", () => {
     const stream = projectJsonRuntimeEventStream({

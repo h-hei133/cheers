@@ -7,6 +7,7 @@ import {
   observeRepairProposal,
   projectRepairRequiredHandoff,
 } from "../../../repair/handoff/boundary.js";
+import { PRODUCT_TRUTH_MATRIX, PRODUCT_TRUTH_NEGATIVE_CASES } from "../../../runtime/loop/truthMatrix.test.js";
 import {
   observePostRepairVerificationResult,
   observeVerificationResult,
@@ -64,6 +65,31 @@ describe("repair verdict proof input", () => {
     expect(proofInput.terminalSuccessClaim).toBe(false);
     expect(JSON.stringify(proofInput)).not.toContain('"success":true');
   });
+
+  it.each(PRODUCT_TRUTH_MATRIX)(
+    "matches shared product truth matrix proof input for $name",
+    (item) => {
+      expect(item.expected.missingProofItems).toEqual(
+        expect.arrayContaining(item.repairVerdictProofInput.missingProofItems),
+      );
+      expect(item.repairVerdictProofInput.terminalSuccessClaim).toBe(false);
+      expect(item.repairVerdictProofInput.evidenceInputOnly).toBe(true);
+      expect(item.repairVerdictProofInput.proofStatus === "complete").toBe(
+        item.expected.terminalSuccess,
+      );
+    },
+  );
+
+  it.each(PRODUCT_TRUTH_NEGATIVE_CASES)(
+    "keeps shared non-success matrix proof input incomplete for $name",
+    (item) => {
+      expect(item.repairVerdictProofInput.proofStatus).not.toBe("complete");
+      expect(item.repairVerdictProofInput.notProvenClaims).toContain(
+        "evidence-input-is-not-terminal-result",
+      );
+      expect(JSON.stringify(item.repairVerdictProofInput)).not.toContain('"success":true');
+    },
+  );
 });
 
 function makePostRepairVerification(input: {
