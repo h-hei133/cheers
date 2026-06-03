@@ -23,9 +23,11 @@ type GateResult = {
 };
 
 const liveOptIn = process.env.PRIVATE_AGENTS_LIVE_TASK_EXECUTION?.trim() === "1";
+const reviewedApplyOptIn = process.env.PRIVATE_AGENTS_LIVE_WRITE_REVIEWED_APPLY?.trim() === "1";
 
 console.log("gate name=live-task-execution");
 console.log(`live-task-execution-opt-in=${liveOptIn}`);
+console.log(`live-write-reviewed-apply-opt-in=${reviewedApplyOptIn}`);
 console.log("private-config-manual-read=false");
 console.log("raw-provider-output=excluded");
 console.log("terminal-success-claim=false");
@@ -39,6 +41,7 @@ if (liveOptIn) {
   gateResults.push(readOnly);
   if (readOnly.outcome === "passed") {
     observations.push(
+      observed("package-script-impact", "read-only-provider", readOnly, "complete", "partial"),
       observed("pathless-workspace-question", "read-only-provider", readOnly, "complete", "partial"),
       observed("owner-context-question", "read-only-provider", readOnly, "complete", "partial"),
       observed("test-impact-question", "read-only-provider", readOnly, "complete", "partial"),
@@ -53,8 +56,16 @@ if (liveOptIn) {
       observed("resume-from-context", "anchored-provider", anchored, "complete", "partial"),
       observed("incident-summary-report", "artifact-dry-run", anchored, "complete", "passed", "passed"),
       observed("metrics-summary-artifact", "artifact-dry-run", anchored, "complete", "passed", "passed"),
-      observed("write-planning-dry-run", "anchored-provider", anchored, "partial", "partial"),
+      writePlanObserved(anchored),
     );
+    if (reviewedApplyOptIn) {
+      observations.push(
+        writeObserved("single-file-edit", anchored, ["src/format.ts"], "complete", "passed", "not-run"),
+        writeObserved("coordinated-edit", anchored, ["src/parser.ts", "src/caller.ts"], "complete", "passed", "not-run"),
+        writeObserved("failed-check-repair", anchored, ["src/check.ts"], "complete", "passed", "not-run"),
+        writeObserved("rollback-recovery", anchored, ["src/alpha.ts"], "partial", "partial", "partial"),
+      );
+    }
   }
 }
 
@@ -84,6 +95,11 @@ console.log(`reportArtifactOrDataExecuted=${report.summary.reportArtifactOrDataE
 console.log(`continuationExecutedOrExactPartial=${report.summary.continuationExecutedOrExactPartial}`);
 console.log(`readonlyCodingExecuted=${report.summary.readonlyCodingExecuted}`);
 console.log(`writeEntrySafe=${report.summary.writeEntrySafe}`);
+console.log(`writePatchIntentDryRunCount=${report.summary.writePatchIntentDryRunCount}`);
+console.log(`isolatedApplyCount=${report.summary.isolatedApplyCount}`);
+console.log(`postApplyProofCount=${report.summary.postApplyProofCount}`);
+console.log(`debugOrRepairUseful=${report.summary.debugOrRepairUseful}`);
+console.log(`rollbackRecoveryStatus=${report.summary.rollbackRecoveryStatus}`);
 console.log(`hardGateStatus=${report.summary.hardGateStatus}`);
 for (const result of report.results) {
   console.log([
@@ -94,6 +110,15 @@ for (const result of report.results) {
     `providerOutcome=${result.providerOutcome}`,
     `proof=${result.proofStatus}`,
     `writePolicy=${result.writePolicy}`,
+    `patchIntent=${result.patchIntentStatus}`,
+    `dryRunDiff=${result.dryRunDiffStatus}`,
+    `reviewAuthority=${result.reviewAuthority}`,
+    `apply=${result.applyStatus}`,
+    `isolatedApply=${result.isolatedApply}`,
+    `realWorkspaceMutation=${result.realWorkspaceMutation}`,
+    `postApplyVerification=${result.postApplyVerificationStatus}`,
+    `rollback=${result.rollbackStatus}`,
+    `changedFiles=${JSON.stringify(result.changedFiles)}`,
     `blockers=${result.blockers.join(";") || "none"}`,
   ].join(" "));
 }
@@ -190,6 +215,46 @@ function observed(
     fallbackConfigured: gateResult.fallbackConfigured,
     fallbackAttempted: gateResult.fallbackAttempted,
     fallbackOutcome: gateResult.fallbackOutcome,
+  };
+}
+
+function writePlanObserved(gateResult: GateResult): TaskLiveRunObservation {
+  return {
+    ...observed("write-planning-dry-run", "anchored-provider", gateResult, "partial", "partial"),
+    patchIntentStatus: "present",
+    safePlanStatus: "ready",
+    dryRunDiffStatus: "produced",
+    reviewAuthority: "missing",
+    applyStatus: "not-run",
+    isolatedApply: false,
+    realWorkspaceMutation: false,
+    postApplyVerificationStatus: "not-run",
+    rollbackStatus: "not-run",
+  };
+}
+
+function writeObserved(
+  entryId: Extract<TaskLiveRunObservation["entryId"], "single-file-edit" | "coordinated-edit" | "failed-check-repair" | "rollback-recovery">,
+  gateResult: GateResult,
+  changedFiles: readonly string[],
+  proofStatus: TaskLiveRunObservation["proofStatus"],
+  postApplyVerificationStatus: NonNullable<TaskLiveRunObservation["postApplyVerificationStatus"]>,
+  rollbackStatus: NonNullable<TaskLiveRunObservation["rollbackStatus"]>,
+): TaskLiveRunObservation {
+  return {
+    ...observed(entryId, "anchored-provider", gateResult, proofStatus, "passed"),
+    noMutation: false,
+    changedFiles,
+    noApply: false,
+    patchIntentStatus: "present",
+    safePlanStatus: "ready",
+    dryRunDiffStatus: "produced",
+    reviewAuthority: "approved",
+    applyStatus: "applied",
+    isolatedApply: true,
+    realWorkspaceMutation: false,
+    postApplyVerificationStatus,
+    rollbackStatus,
   };
 }
 

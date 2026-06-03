@@ -28,14 +28,13 @@ deterministic runtime case is not enough.
   task assessment results are 18 complete, 1 skipped, and 1 unsupported, with 4
   pathless workspace/context completions, 3 debug/repair completions, 7
   artifact/report/data completions, and 2 continuation/resume completions. Safe
-  live execution observations are structured for read-only, anchored, and
-  artifact dry-run gates. The repeatable opt-in live run now defines eight
-  exact entries and the current explicit run executed all eight through existing
-  read-only and anchored provider gates; seven reached complete or useful
-  partial with task proof, the write-capable planning entry stayed
-  manual-review/dry-run-only, fallback was configured but skipped because the
-  primary provider passed, no raw provider output leaked, and no write/no apply
-  was preserved.
+  live execution observations are structured for read-only, anchored, artifact
+  dry-run, and reviewed isolated write metadata. The repeatable opt-in live run
+  now defines thirteen exact entries. The no-write entries remain default-off
+  and redacted, and the reviewed write path records only safe metadata for
+  patch intent, dry-run diff, explicit review authority, isolated fixture apply,
+  post-apply verification, task proof, rollback status, fallback metadata, and
+  real-workspace mutation prevention.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, richer context packet facts, plan facts, edit
@@ -50,9 +49,10 @@ deterministic runtime case is not enough.
   durable artifact writing, rendered checks, richer source policy, manual-review
   gates, and evidence/result verdicts over real outputs.
 - Provider prompting and live task recovery are now repeatable for safe
-  no-write/manual-review entries. The provider boundary remains default-off and
-  truth-preserving; task-shaped provider output sufficiency, live debug repair,
-  and live write/artifact completion are not broadly proven.
+  no-write/manual-review entries and reviewed isolated write metadata. The
+  provider boundary remains default-off and truth-preserving; task-shaped
+  provider output sufficiency, durable artifact writing, and broad
+  real-workspace live write completion are not proven.
 - Product loop truth, the CLI/session status envelope, a bounded synthetic
   provider-to-tool-to-next-turn runtime lane, a controlled provider/model
   runtime boundary, a controlled mutation recovery lane, and a storage-backed
@@ -128,22 +128,24 @@ useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Audited SP020, SP021, SP022, and SP023 outcomes now set the immediate order:
+Audited SP020, SP021, SP022, SP023, and SP024 outcomes now set the immediate order:
 `rollback-recovery` and `retry-diagnosis-repair` are complete through explicit
 post-repair validation evidence and evidence/result task verdict. Thirteen
 target cases have exact live gate requirements, including artifact dry-run for
 report/data cases with no write and manual review before any write. Focused
 tests prove the SP022 deterministic mix gates, two no-write live execution
 observations as complete/useful partial with task proof, and richer context
-packet handoff into request shaping. The SP023 live run defines eight exact
-entries and the current opt-in run executed all eight through existing explicit
-gates: seven complete/useful partial with task proof, one write-capable
-planning entry manual-review/dry-run-only, fallback configured but skipped after
-primary success, redaction passed, and no write/no apply preserved.
-Write-capable code/debug cases remain unsafe or dry-run-only, and the
-unsupported export stays unsupported. Live gate execution, provider called,
-fallback metadata, host-observed facts, smoke pass, readiness facts,
-deterministic case count, and live run status are still not success by
+packet handoff into request shaping. The SP024 live run defines thirteen exact
+entries and focused tests prove the reviewed write hard gate: at least three
+write-capable entries produce patch intent and dry-run diff metadata, at least
+two pass explicit review authority and isolated apply, at least two pass
+post-apply verification with task proof, a debug/repair entry reaches useful
+state, rollback recovery reaches useful partial or an exact blocker, no-write
+entries preserve no mutation/no apply, and redaction excludes raw provider
+output and patch bodies. The unsupported export stays unsupported. Live gate
+execution, provider called, fallback metadata, patch intent, dry-run diff,
+review authority, isolated apply, host-observed facts, smoke pass, readiness
+facts, deterministic case count, and live run status are still not success by
 themselves.
 
 ## Immediate Sprint Batches

@@ -11,6 +11,11 @@ describe("task live run report", () => {
     const entries = listTaskLiveEntries();
 
     expect(entries.map((entry) => entry.entryId)).toEqual([
+      "single-file-edit",
+      "coordinated-edit",
+      "failed-check-repair",
+      "rollback-recovery",
+      "package-script-impact",
       "pathless-workspace-question",
       "owner-context-question",
       "test-impact-question",
@@ -34,6 +39,8 @@ describe("task live run report", () => {
       writePolicy: "dry-run-only",
       safetyClass: "manual-review",
     });
+    expect(entries.filter((entry) => entry.writePolicy === "manual-review-required").map((entry) => entry.entryId))
+      .toEqual(expect.arrayContaining(["single-file-edit", "coordinated-edit", "failed-check-repair", "rollback-recovery"]));
   });
 
   it("keeps missing opt-in as exact non-executed blockers", async () => {
@@ -60,6 +67,25 @@ describe("task live run report", () => {
     const report = await runTaskLiveReport({
       dispatch: host.dispatch,
       observations: [
+        writeObservation("single-file-edit", {
+          changedFiles: ["src/format.ts"],
+          postApplyVerificationStatus: "passed",
+        }),
+        writeObservation("coordinated-edit", {
+          changedFiles: ["src/parser.ts", "src/caller.ts"],
+          postApplyVerificationStatus: "passed",
+        }),
+        writeObservation("failed-check-repair", {
+          changedFiles: ["src/check.ts"],
+          postApplyVerificationStatus: "passed",
+        }),
+        writeObservation("rollback-recovery", {
+          changedFiles: ["src/alpha.ts"],
+          postApplyVerificationStatus: "partial",
+          proofStatus: "partial",
+          rollbackStatus: "partial",
+        }),
+        observation("package-script-impact", "read-only-provider", { verificationStatus: "partial" }),
         observation("pathless-workspace-question", "read-only-provider", { verificationStatus: "partial" }),
         observation("owner-context-question", "read-only-provider", { verificationStatus: "partial" }),
         observation("incident-summary-report", "artifact-dry-run", {
@@ -78,19 +104,31 @@ describe("task live run report", () => {
         observation("write-planning-dry-run", "anchored-provider", {
           verificationStatus: "partial",
           proofStatus: "partial",
+          patchIntentStatus: "present",
+          safePlanStatus: "ready",
+          dryRunDiffStatus: "produced",
+          reviewAuthority: "missing",
+          applyStatus: "not-run",
+          isolatedApply: false,
+          realWorkspaceMutation: false,
         }),
       ],
     });
 
     expect(report.summary).toMatchObject({
-      entryCount: 8,
-      executedCount: 7,
-      completeOrUsefulPartialCount: 6,
+      entryCount: 13,
+      executedCount: 12,
+      completeOrUsefulPartialCount: 11,
       pathlessOrContextExecuted: true,
       reportArtifactOrDataExecuted: true,
       continuationExecutedOrExactPartial: true,
       readonlyCodingExecuted: true,
       writeEntrySafe: true,
+      writePatchIntentDryRunCount: 5,
+      isolatedApplyCount: 4,
+      postApplyProofCount: 3,
+      debugOrRepairUseful: true,
+      rollbackRecoveryStatus: "useful-partial",
       hardGateStatus: "passed",
       blockers: [],
       terminalSuccessClaim: false,
@@ -101,8 +139,10 @@ describe("task live run report", () => {
       writePolicy: "dry-run-only",
       noApply: true,
       changedFiles: [],
+      patchIntentStatus: "present",
+      dryRunDiffStatus: "produced",
     });
-    for (const result of report.results.filter((entry) => entry.executed)) {
+    for (const result of report.results.filter((entry) => entry.executed && entry.writePolicy === "no-write")) {
       expect(result).toMatchObject({
         providerAttempted: true,
         noMutation: true,
@@ -119,6 +159,24 @@ describe("task live run report", () => {
         ]),
       );
     }
+    expect(report.results.find((result) => result.entryId === "single-file-edit")).toMatchObject({
+      status: "complete",
+      changedFiles: ["src/format.ts"],
+      reviewAuthority: "approved",
+      applyStatus: "applied",
+      isolatedApply: true,
+      realWorkspaceMutation: false,
+      postApplyVerificationStatus: "passed",
+      proofStatus: "complete",
+      terminalSuccessClaim: false,
+    });
+    expect(report.results.find((result) => result.entryId === "rollback-recovery")).toMatchObject({
+      status: "useful-partial",
+      rollbackStatus: "partial",
+      realWorkspaceMutation: false,
+      terminalSuccessClaim: false,
+    });
+    expect(JSON.stringify(report)).not.toMatch(/Bearer |api[_-]?key|token|headers|raw provider output|diff --git|\*\*\* Begin Patch/i);
   });
 
   it("preserves exact provider and redaction blockers", async () => {
@@ -149,6 +207,60 @@ describe("task live run report", () => {
     });
     expect(JSON.stringify(report)).not.toMatch(/Bearer |api[_-]?key|token|headers|raw provider output/i);
   });
+
+  it("does not treat patch intent or dry-run diff as apply authority", async () => {
+    const host = createHostRuntime();
+    const report = await runTaskLiveReport({
+      dispatch: host.dispatch,
+      observations: [
+        observation("single-file-edit", "anchored-provider", {
+          noMutation: false,
+          noApply: true,
+          patchIntentStatus: "present",
+          safePlanStatus: "ready",
+          dryRunDiffStatus: "produced",
+          reviewAuthority: "missing",
+          applyStatus: "not-run",
+          isolatedApply: false,
+          realWorkspaceMutation: false,
+          postApplyVerificationStatus: "not-run",
+          proofStatus: "partial",
+        }),
+        observation("rollback-recovery", "anchored-provider", {
+          noMutation: false,
+          noApply: true,
+          patchIntentStatus: "present",
+          safePlanStatus: "ready",
+          dryRunDiffStatus: "produced",
+          reviewAuthority: "missing",
+          applyStatus: "not-run",
+          isolatedApply: false,
+          realWorkspaceMutation: false,
+          rollbackStatus: "blocked",
+          exactBlocker: "explicit review authority missing for isolated rollback recovery",
+          proofStatus: "partial",
+        }),
+      ],
+    });
+
+    expect(report.results.find((result) => result.entryId === "single-file-edit")).toMatchObject({
+      executed: false,
+      status: "failed",
+      patchIntentStatus: "present",
+      dryRunDiffStatus: "produced",
+      reviewAuthority: "missing",
+      applyStatus: "not-run",
+      isolatedApply: false,
+      blockers: expect.arrayContaining(["explicit review authority missing", "isolated apply not completed"]),
+      terminalSuccessClaim: false,
+    });
+    expect(report.results.find((result) => result.entryId === "rollback-recovery")).toMatchObject({
+      executed: false,
+      status: "blocked",
+      blockers: ["explicit review authority missing for isolated rollback recovery"],
+      terminalSuccessClaim: false,
+    });
+  });
 });
 
 function observation(
@@ -170,4 +282,27 @@ function observation(
     proofStatus: "complete",
     ...overrides,
   };
+}
+
+function writeObservation(
+  entryId: Extract<TaskLiveRunObservation["entryId"], "single-file-edit" | "coordinated-edit" | "failed-check-repair" | "rollback-recovery">,
+  overrides: Partial<Omit<TaskLiveRunObservation, "entryId" | "gate" | "explicitOptIn">> = {},
+): TaskLiveRunObservation {
+  return observation(entryId, "anchored-provider", {
+    noMutation: false,
+    changedFiles: ["src/app.ts"],
+    noApply: false,
+    verificationStatus: "passed",
+    proofStatus: "complete",
+    patchIntentStatus: "present",
+    safePlanStatus: "ready",
+    dryRunDiffStatus: "produced",
+    reviewAuthority: "approved",
+    applyStatus: "applied",
+    isolatedApply: true,
+    realWorkspaceMutation: false,
+    postApplyVerificationStatus: "passed",
+    rollbackStatus: entryId === "rollback-recovery" ? "complete" : "not-run",
+    ...overrides,
+  });
 }

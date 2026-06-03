@@ -423,21 +423,28 @@ focused validation.
 ## Live Task Run Reporting
 
 - Selected mode: structured port for local live run contracts and behavior-only
-  alignment for existing explicit read-only and anchored provider gates.
+  alignment for existing explicit read-only, anchored provider, and reviewed
+  isolated apply gates.
 - Owner domain: `runtime/evaluation/task`, `runtime/api/host`,
   `provider/request`, `artifacts/workflow`, `evidence/task`, `result/task`, and
   repeatable verification scripts.
 - Reason for use: SP023 required repeatable opt-in live task entries with exact
-  requirements and measured outcomes, not another deterministic case expansion
-  or manual-only smoke note. The local product needed a task-owned report that
-  consumes explicit gate observations, classifies executed/non-executed entries,
-  keeps write-capable work dry-run/manual-review, and preserves terminal truth
-  in evidence/result.
+  requirements and measured outcomes, and SP024 required the same report owner
+  to move write-capable entries through patch intent, dry-run diff, explicit
+  review authority, isolated apply metadata, post-apply verification, and
+  task-proof accounting without granting real-workspace write authority. The
+  local product needed a task-owned report that consumes explicit gate
+  observations, classifies executed/non-executed entries, and preserves terminal
+  truth in evidence/result.
 - Behavior to port: machine-readable live task entry definitions, default-off
   exact blockers, explicit gate observation consumption, safe no-write and
   manual-review classifications, hard gate summary counts, redaction checks,
   fallback metadata, changedFiles empty visibility, no-apply/no-mutation facts,
-  and repeatable script output that excludes raw provider output.
+  patch intent metadata, safe plan state, dry-run diff state, explicit review
+  authority state, isolated fixture apply state, real-workspace mutation
+  prevention, post-apply verification state, rollback status, exact blockers,
+  and repeatable script output that excludes raw provider output and patch
+  bodies.
 - Rejected alternatives:
   - Dependency use: rejected because live gate semantics, task proof,
     redaction, and result truth are local product contracts.
@@ -448,32 +455,39 @@ focused validation.
     execution through existing explicit gates.
   - Default live provider behavior: rejected because live providers must remain
     explicit opt-in with isolated homes and no manual private config inspection.
-  - Write execution: rejected because the current safe path for write-capable
-    work is dry-run/manual-review only.
+  - Unreviewed write execution: rejected because patch intent and dry-run diff
+    are not authority; isolated apply metadata is accepted only behind explicit
+    reviewed-apply opt-in and real-workspace mutation remains forbidden.
 - Expected callers: task assessment, host evaluation summaries, explicit live
   verification scripts, provider request preparation, artifact validation,
   evidence/result proof projection, session/status surfaces, and future
   artifact/manual-review gates.
 - Side-effect boundary: the live run model is deterministic and pure. Actual
   provider calls happen only in the repeatable script through existing explicit
-  read-only and anchored provider gates. The script does not print raw provider
-  output, provider configuration, headers, tokens, or private provider material.
-  This adoption does not add dynamic loading, browser automation, external tool
-  servers, command allowlist expansion, arbitrary writers, default live
-  providers, or execution-boundary bypasses.
+  read-only and anchored provider gates. Reviewed apply observations stay
+  isolated-fixture metadata and require a separate explicit opt-in; they do not
+  authorize real-workspace writes. The script does not print raw provider
+  output, provider configuration, headers, tokens, private provider material, or
+  patch bodies. This adoption does not add dynamic loading, browser automation,
+  external tool servers, command allowlist expansion, arbitrary writers,
+  default live providers, or execution-boundary bypasses.
 - Truthfulness boundary: live entry creation, provider readiness, provider call,
   gate pass, fallback metadata, host output, changedFiles empty, no mutation,
-  no apply, artifact dry-run status, and live run status are not terminal task
-  success. Complete or useful partial live outcomes require task proof handoff,
-  and all affected surfaces keep `terminalSuccessClaim: false`.
+  no apply, patch intent, dry-run diff, review authority, isolated apply,
+  artifact dry-run status, verification attempt, and live run status are not
+  terminal task success. Complete or useful partial live outcomes require task
+  proof handoff, and all affected surfaces keep `terminalSuccessClaim: false`.
 - Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/liveRun.test.ts`
   - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/liveRun.test.ts runtime/evaluation/task/model.test.ts`
   - `PRIVATE_AGENTS_LIVE_TASK_EXECUTION=1 PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-live-task-execution HOME=/tmp/private-agents-live-task-execution-home USERPROFILE=/tmp/private-agents-live-task-execution-home rtk npm run verify:live-task-execution`
-  - The explicit live run reported 8 live entries, 8 executed entries, 7
-    complete or useful partial outcomes with task proof, pathless/context,
-    report/data, continuation, and readonly coding coverage, write planning
-    manual-review/dry-run-only, fallback configured but skipped after primary
-    success, redaction pass, changedFiles empty, no mutation, and no apply.
+  - Focused tests report 13 live entries, 12 executed observations in the
+    reviewed fixture case, 11 complete or useful partial outcomes, 5
+    write-capable patch-intent/dry-run observations, 4 reviewed isolated
+    applies, 3 post-apply verification/task-proof outcomes, rollback useful
+    partial, default-off blockers, redaction pass, and no terminal success from
+    provider calls, patch intent, dry-run diff, review authority, or apply
+    alone.
 - Rollback plan: remove `liveRun.ts`, its focused tests, and
   `verify:live-task-execution`, returning live task assessment to SP021/SP022
   projection-only behavior while keeping deterministic task proof/verdict

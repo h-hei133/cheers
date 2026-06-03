@@ -12,6 +12,11 @@ import {
 } from "./model.js";
 
 export type TaskLiveEntryId =
+  | "single-file-edit"
+  | "coordinated-edit"
+  | "failed-check-repair"
+  | "rollback-recovery"
+  | "package-script-impact"
   | "pathless-workspace-question"
   | "owner-context-question"
   | "test-impact-question"
@@ -22,6 +27,10 @@ export type TaskLiveEntryId =
   | "write-planning-dry-run";
 
 export type TaskLiveEntryKind =
+  | "write-edit"
+  | "write-repair"
+  | "write-rollback"
+  | "write-adjacent"
   | "pathless-context"
   | "report-artifact"
   | "data-artifact"
@@ -60,6 +69,16 @@ export interface TaskLiveRunObservation {
   readonly fallbackConfigured?: boolean;
   readonly fallbackAttempted?: boolean;
   readonly fallbackOutcome?: "passed" | "failed" | "skipped" | "inconclusive";
+  readonly patchIntentStatus?: "present" | "missing" | "invalid";
+  readonly safePlanStatus?: "ready" | "missing" | "blocked";
+  readonly dryRunDiffStatus?: "produced" | "missing" | "failed";
+  readonly reviewAuthority?: "approved" | "missing" | "denied" | "not-required";
+  readonly applyStatus?: "applied" | "not-run" | "blocked" | "failed";
+  readonly isolatedApply?: boolean;
+  readonly realWorkspaceMutation?: boolean;
+  readonly postApplyVerificationStatus?: "passed" | "partial" | "failed" | "not-run";
+  readonly rollbackStatus?: "complete" | "partial" | "blocked" | "not-run";
+  readonly exactBlocker?: string;
 }
 
 export interface TaskLiveRunEntryResult {
@@ -77,6 +96,15 @@ export interface TaskLiveRunEntryResult {
   readonly verificationStatus: "passed" | "partial" | "failed" | "not-run";
   readonly artifactValidationStatus: "passed" | "partial" | "failed" | "not-run";
   readonly proofStatus: "complete" | "partial" | "missing";
+  readonly patchIntentStatus: "present" | "missing" | "invalid" | "not-run";
+  readonly safePlanStatus: "ready" | "missing" | "blocked" | "not-run";
+  readonly dryRunDiffStatus: "produced" | "missing" | "failed" | "not-run";
+  readonly reviewAuthority: "approved" | "missing" | "denied" | "not-required" | "not-run";
+  readonly applyStatus: "applied" | "not-run" | "blocked" | "failed";
+  readonly isolatedApply: boolean;
+  readonly realWorkspaceMutation: boolean;
+  readonly postApplyVerificationStatus: "passed" | "partial" | "failed" | "not-run";
+  readonly rollbackStatus: "complete" | "partial" | "blocked" | "not-run";
   readonly blockers: readonly string[];
   readonly proofItems: readonly string[];
   readonly requirements: readonly string[];
@@ -97,6 +125,11 @@ export interface TaskLiveRunSummary {
   readonly continuationExecutedOrExactPartial: boolean;
   readonly readonlyCodingExecuted: boolean;
   readonly writeEntrySafe: boolean;
+  readonly writePatchIntentDryRunCount: number;
+  readonly isolatedApplyCount: number;
+  readonly postApplyProofCount: number;
+  readonly debugOrRepairUseful: boolean;
+  readonly rollbackRecoveryStatus: "complete" | "useful-partial" | "blocked" | "not-run";
   readonly hardGateStatus: "passed" | "not-passed";
   readonly blockers: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -115,6 +148,57 @@ export interface TaskLiveRunReport {
 
 export function listTaskLiveEntries(): readonly TaskLiveEntry[] {
   return freeze([
+    liveEntry({
+      entryId: "single-file-edit",
+      entryKind: "write-edit",
+      shortPrompt: "Produce and review a single-file edit before isolated apply.",
+      gate: "anchored-provider",
+      safetyClass: "manual-review",
+      writePolicy: "manual-review-required",
+      validationPlan: "patch intent, safe plan, dry-run diff, explicit review authority, isolated apply, and post-apply proof",
+      requirements: ["patch intent", "safe plan", "dry-run diff", "explicit review authority", "isolated apply", "post-apply verification", "task proof"],
+    }),
+    liveEntry({
+      entryId: "coordinated-edit",
+      entryKind: "write-edit",
+      shortPrompt: "Produce and review a coordinated edit before isolated apply.",
+      gate: "anchored-provider",
+      safetyClass: "manual-review",
+      writePolicy: "manual-review-required",
+      validationPlan: "coordinated patch intent, safe plan, dry-run diff, explicit review authority, isolated apply, and whole-task proof",
+      requirements: ["patch intent", "safe plan", "dry-run diff", "explicit review authority", "isolated apply", "post-apply verification", "task proof"],
+    }),
+    liveEntry({
+      entryId: "failed-check-repair",
+      entryKind: "write-repair",
+      shortPrompt: "Repair a failed check through reviewed isolated apply.",
+      gate: "anchored-provider",
+      safetyClass: "manual-review",
+      writePolicy: "manual-review-required",
+      validationPlan: "repair patch intent, dry-run diff, explicit review authority, isolated apply, original failure preservation, and rerun verification",
+      requirements: ["patch intent", "safe plan", "dry-run diff", "explicit review authority", "isolated apply", "post-apply verification", "task proof"],
+    }),
+    liveEntry({
+      entryId: "rollback-recovery",
+      entryKind: "write-rollback",
+      shortPrompt: "Recover or roll back an unsafe change in an isolated fixture.",
+      gate: "anchored-provider",
+      safetyClass: "manual-review",
+      writePolicy: "manual-review-required",
+      validationPlan: "rollback or repair intent, dry-run diff, review authority, isolated action, and exact recovery proof or blocker",
+      requirements: ["patch intent", "safe plan", "dry-run diff", "explicit review authority", "isolated apply or exact blocker", "post-apply verification", "task proof"],
+    }),
+    liveEntry({
+      entryId: "package-script-impact",
+      taskCaseId: "package-script-impact-question",
+      entryKind: "write-adjacent",
+      shortPrompt: "Plan package script impact and verification without mutating the workspace.",
+      gate: "read-only-provider",
+      safetyClass: "safe-no-write",
+      writePolicy: "no-write",
+      validationPlan: "package script impact context, verification candidate selection, no mutation, redaction, and task proof",
+      requirements: ["package script context", "verification candidates", "provider auth readiness", "no mutation", "task proof"],
+    }),
     liveEntry({
       entryId: "pathless-workspace-question",
       taskCaseId: "pathless-workspace-question",
@@ -198,8 +282,8 @@ export function listTaskLiveEntries(): readonly TaskLiveEntry[] {
       gate: "anchored-provider",
       safetyClass: "manual-review",
       writePolicy: "dry-run-only",
-      validationPlan: "write-capable planning remains dry-run, no apply, no mutation, redaction, and manual review",
-      requirements: ["dry-run planning", "provider auth readiness", "no apply", "no mutation", "manual review"],
+      validationPlan: "write-capable planning produces patch intent and dry-run diff, then stops before review authority and apply",
+      requirements: ["patch intent", "safe plan", "dry-run diff", "provider auth readiness", "no real workspace mutation", "manual review"],
     }),
   ]);
 }
@@ -216,23 +300,28 @@ export async function runTaskLiveReport(input: {
     dispatch: input.dispatch,
     caseIds: taskCaseIds,
     liveGateObservations: input.observations
-      ?.filter((observation) => taskCaseIds.includes(observation.entryId as TaskCaseId))
-      .map((observation): TaskLiveGateObservation => ({
-        caseId: observation.entryId as TaskCaseId,
-        gate: observation.gate,
-        explicitOptIn: observation.explicitOptIn,
-        providerAttempted: observation.providerAttempted,
-        providerOutcome: observation.providerOutcome,
-        noMutation: observation.noMutation,
-        changedFiles: observation.changedFiles,
-        noApply: observation.noApply,
-        redactionStatus: observation.redactionStatus,
-        verificationStatus: observation.verificationStatus,
-        artifactValidationStatus: observation.artifactValidationStatus,
-        fallbackConfigured: observation.fallbackConfigured,
-        fallbackAttempted: observation.fallbackAttempted,
-        fallbackOutcome: observation.fallbackOutcome,
-      })),
+      ?.flatMap((observation): TaskLiveGateObservation[] => {
+        const entry = entries.find((candidate) => candidate.entryId === observation.entryId);
+        if (!entry?.taskCaseId || !taskCaseIds.includes(entry.taskCaseId)) return [];
+        return [
+          {
+            caseId: entry.taskCaseId,
+            gate: observation.gate,
+            explicitOptIn: observation.explicitOptIn,
+            providerAttempted: observation.providerAttempted,
+            providerOutcome: observation.providerOutcome,
+            noMutation: observation.noMutation,
+            changedFiles: observation.changedFiles,
+            noApply: observation.noApply,
+            redactionStatus: observation.redactionStatus,
+            verificationStatus: observation.verificationStatus,
+            artifactValidationStatus: observation.artifactValidationStatus,
+            fallbackConfigured: observation.fallbackConfigured,
+            fallbackAttempted: observation.fallbackAttempted,
+            fallbackOutcome: observation.fallbackOutcome,
+          },
+        ];
+      }),
   });
   const resultByCaseId = new Map(assessment.cases.map((result) => [result.caseId, result]));
   const executionByCaseId = new Map(assessment.liveExecutions.map((execution) => [execution.caseId, execution]));
@@ -260,6 +349,15 @@ export async function runTaskLiveReport(input: {
         verificationStatus: execution.verificationStatus,
         artifactValidationStatus: execution.artifactValidationStatus,
         proofStatus: execution.proofStatus,
+        patchIntentStatus: "not-run",
+        safePlanStatus: "not-run",
+        dryRunDiffStatus: "not-run",
+        reviewAuthority: "not-run",
+        applyStatus: "not-run",
+        isolatedApply: false,
+        realWorkspaceMutation: false,
+        postApplyVerificationStatus: "not-run",
+        rollbackStatus: "not-run",
         blockers: execution.blockers,
         proofItems: execution.proofItems,
         requirements: entry.requirements,
@@ -330,6 +428,15 @@ function externalEntryResult(
     verificationStatus: observation.verificationStatus,
     artifactValidationStatus: observation.artifactValidationStatus ?? "not-run",
     proofStatus: observation.proofStatus,
+    patchIntentStatus: observation.patchIntentStatus ?? "not-run",
+    safePlanStatus: observation.safePlanStatus ?? "not-run",
+    dryRunDiffStatus: observation.dryRunDiffStatus ?? "not-run",
+    reviewAuthority: observation.reviewAuthority ?? "not-run",
+    applyStatus: observation.applyStatus ?? "not-run",
+    isolatedApply: observation.isolatedApply === true,
+    realWorkspaceMutation: observation.realWorkspaceMutation === true,
+    postApplyVerificationStatus: observation.postApplyVerificationStatus ?? "not-run",
+    rollbackStatus: observation.rollbackStatus ?? "not-run",
     blockers: freeze(blockers),
     proofItems: freeze(proofItems),
     requirements: entry.requirements,
@@ -362,6 +469,15 @@ function notRunEntry(entry: TaskLiveEntry, blockers: readonly string[]): TaskLiv
     verificationStatus: "not-run",
     artifactValidationStatus: "not-run",
     proofStatus: "missing",
+    patchIntentStatus: "not-run",
+    safePlanStatus: "not-run",
+    dryRunDiffStatus: "not-run",
+    reviewAuthority: "not-run",
+    applyStatus: "not-run",
+    isolatedApply: false,
+    realWorkspaceMutation: false,
+    postApplyVerificationStatus: "not-run",
+    rollbackStatus: "not-run",
     blockers: freeze(blockers),
     proofItems: freeze([]),
     requirements: entry.requirements,
@@ -379,10 +495,15 @@ function externalObservationBlockers(
   observation: TaskLiveRunObservation,
 ): readonly string[] {
   const blockers: string[] = [];
+  const writeEntry = isWriteCapableEntry(entry);
   if (observation.gate !== entry.gate) blockers.push("gate mismatch");
   if (observation.redactionStatus !== "passed") blockers.push("redaction blocked");
-  if (!observation.noMutation || observation.changedFiles.length > 0) blockers.push("no-mutation check failed");
-  if (!observation.noApply) blockers.push("no-apply check failed");
+  if (writeEntry) {
+    if (observation.realWorkspaceMutation === true) blockers.push("real workspace mutation forbidden");
+  } else {
+    if (!observation.noMutation || observation.changedFiles.length > 0) blockers.push("no-mutation check failed");
+    if (!observation.noApply) blockers.push("no-apply check failed");
+  }
   if (observation.providerOutcome === "provider-network-inconclusive") {
     blockers.push(observation.fallbackConfigured === false
       ? "provider network inconclusive and no configured fallback provider"
@@ -391,9 +512,35 @@ function externalObservationBlockers(
   if (observation.providerOutcome === "config-or-skip") blockers.push("provider config or opt-in gate missing");
   if (observation.providerOutcome === "failed") blockers.push("provider or product execution failed");
   if (observation.providerOutcome === "skipped") blockers.push("explicit opt-in gate skipped");
+  if (writeEntry) {
+    if (observation.patchIntentStatus !== "present") blockers.push("patch intent missing");
+    if (observation.safePlanStatus !== "ready") blockers.push("safe plan missing");
+    if (observation.dryRunDiffStatus !== "produced") blockers.push("dry-run diff missing");
+    if (entry.entryKind !== "write-planning") {
+      if (observation.reviewAuthority !== "approved") blockers.push("explicit review authority missing");
+      if (observation.applyStatus !== "applied") blockers.push("isolated apply not completed");
+      if (observation.isolatedApply !== true) blockers.push("isolated apply evidence missing");
+      if (entry.entryKind === "write-rollback") {
+        if (
+          observation.postApplyVerificationStatus !== "passed" &&
+          observation.postApplyVerificationStatus !== "partial"
+        ) blockers.push("post-apply verification missing");
+        if (observation.proofStatus === "missing") blockers.push("task proof missing");
+      } else {
+        if (observation.postApplyVerificationStatus !== "passed") blockers.push("post-apply verification missing");
+        if (observation.proofStatus !== "complete") blockers.push("task proof missing");
+      }
+    } else if (observation.applyStatus === "applied" || observation.isolatedApply === true) {
+      blockers.push("dry-run planning applied unexpectedly");
+    }
+    if (entry.entryKind === "write-rollback" && observation.rollbackStatus === "blocked" && observation.exactBlocker) {
+      return unique([observation.exactBlocker]);
+    }
+  }
   if (entry.entryKind === "readonly-coding" && observation.proofStatus === "missing") {
     blockers.push("task proof missing");
   }
+  if (observation.exactBlocker && blockers.length > 0) blockers.push(observation.exactBlocker);
   return unique(blockers);
 }
 
@@ -401,9 +548,16 @@ function externalProofItems(observation: TaskLiveRunObservation): readonly strin
   const items = ["explicit-opt-in-gate", "redaction-check", "no-mutation-check"];
   if (observation.providerAttempted) items.push("provider-attempt");
   if (observation.noApply) items.push("no-apply-check");
+  if (observation.patchIntentStatus === "present") items.push("patch-intent");
+  if (observation.safePlanStatus === "ready") items.push("safe-plan");
+  if (observation.dryRunDiffStatus === "produced") items.push("dry-run-diff");
+  if (observation.reviewAuthority === "approved") items.push("review-authority");
+  if (observation.applyStatus === "applied" && observation.isolatedApply === true) items.push("isolated-apply");
   if (observation.verificationStatus === "passed" || observation.verificationStatus === "partial") {
     items.push("verification-check");
   }
+  if (observation.postApplyVerificationStatus === "passed") items.push("post-apply-verification");
+  if (observation.rollbackStatus === "complete" || observation.rollbackStatus === "partial") items.push("rollback-recovery");
   if (observation.proofStatus !== "missing") items.push("task-proof");
   return unique(items);
 }
@@ -418,19 +572,80 @@ function externalStatus(
   if (blockers.includes("provider config or opt-in gate missing")) return "provider-readiness-missing";
   if (blockers.includes("explicit opt-in gate skipped")) return "skipped";
   if (blockers.length > 0 && observation.providerOutcome === "provider-network-inconclusive") return "blocked";
+  if (entry.entryKind === "write-rollback" && observation.rollbackStatus === "blocked" && blockers.length > 0) return "blocked";
   if (blockers.length > 0) return "failed";
   if (entry.entryKind === "write-planning") return "manual-review-required";
+  if (entry.entryKind === "write-repair" || entry.entryKind === "write-rollback") {
+    if (observation.proofStatus === "complete" && observation.postApplyVerificationStatus === "passed") return "complete";
+    return "useful-partial";
+  }
+  if (entry.entryKind === "write-edit") {
+    return observation.proofStatus === "complete" && observation.postApplyVerificationStatus === "passed"
+      ? "complete"
+      : "useful-partial";
+  }
   if (observation.proofStatus === "complete" && proofItems.includes("task-proof")) return "complete";
   return proofItems.length > 0 ? "useful-partial" : "provider-output-insufficient";
+}
+
+function isWriteCapableEntry(entry: TaskLiveEntry): boolean {
+  return entry.entryKind === "write-edit" ||
+    entry.entryKind === "write-repair" ||
+    entry.entryKind === "write-rollback" ||
+    entry.entryKind === "write-planning";
 }
 
 function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveRunSummary {
   const executed = results.filter((result) => result.executed);
   const completeOrUseful = executed.filter((result) => result.status === "complete" || result.status === "useful-partial");
+  const writeResults = results.filter((result) =>
+    result.entryKind === "write-edit" ||
+    result.entryKind === "write-repair" ||
+    result.entryKind === "write-rollback" ||
+    result.entryKind === "write-planning"
+  );
+  const writePatchIntentDryRunCount = writeResults.filter((result) =>
+    result.providerAttempted &&
+    result.patchIntentStatus === "present" &&
+    result.safePlanStatus === "ready" &&
+    result.dryRunDiffStatus === "produced" &&
+    result.realWorkspaceMutation === false
+  ).length;
+  const isolatedApplyCount = writeResults.filter((result) =>
+    result.reviewAuthority === "approved" &&
+    result.applyStatus === "applied" &&
+    result.isolatedApply &&
+    result.realWorkspaceMutation === false
+  ).length;
+  const postApplyProofCount = writeResults.filter((result) =>
+    result.reviewAuthority === "approved" &&
+    result.applyStatus === "applied" &&
+    result.isolatedApply &&
+    result.postApplyVerificationStatus === "passed" &&
+    result.proofStatus === "complete"
+  ).length;
+  const rollbackResult = results.find((result) => result.entryKind === "write-rollback");
+  const rollbackRecoveryStatus = rollbackResult?.status === "complete"
+    ? "complete"
+    : rollbackResult?.status === "useful-partial"
+      ? "useful-partial"
+      : rollbackResult?.status === "blocked"
+        ? "blocked"
+        : "not-run";
   const blockers = [
-    ...(results.length >= 6 ? [] : ["fewer than six live task entries"]),
-    ...(executed.length >= 4 ? [] : ["fewer than four entries executed through explicit gates"]),
-    ...(completeOrUseful.length >= 3 ? [] : ["fewer than three executed entries reached complete or useful partial"]),
+    ...(results.length >= 13 ? [] : ["fewer than thirteen live task entries"]),
+    ...(executed.length >= 8 ? [] : ["fewer than eight entries executed through explicit gates"]),
+    ...(completeOrUseful.length >= 5 ? [] : ["fewer than five executed entries reached complete or useful partial"]),
+    ...(writePatchIntentDryRunCount >= 3 ? [] : ["fewer than three write-capable entries produced patch intent and dry-run diff"]),
+    ...(isolatedApplyCount >= 2 ? [] : ["fewer than two write-capable entries passed review authority and isolated apply"]),
+    ...(postApplyProofCount >= 2 ? [] : ["fewer than two applied entries passed verification with task proof"]),
+    ...(writeResults.some((result) =>
+      (result.entryKind === "write-repair" || result.entryKind === "write-rollback") &&
+      (result.status === "complete" || result.status === "useful-partial")
+    )
+      ? []
+      : ["debug or repair entry did not reach complete or useful partial"]),
+    ...(rollbackRecoveryStatus !== "not-run" ? [] : ["rollback recovery did not complete, reach useful partial, or report exact blocker"]),
     ...(executed.some((result) => result.entryKind === "pathless-context") ? [] : ["pathless or context entry did not execute"]),
     ...(executed.some((result) => result.entryKind === "report-artifact" || result.entryKind === "data-artifact")
       ? []
@@ -457,9 +672,25 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
       results.some((result) => result.entryKind === "continuation" && result.status === "useful-partial" && result.blockers.length > 0),
     readonlyCodingExecuted: executed.some((result) => result.entryKind === "readonly-coding"),
     writeEntrySafe: results.some((result) =>
-      result.entryKind === "write-planning" &&
-      (result.status === "manual-review-required" || result.status === "unsafe" || result.status === "blocked" || result.writePolicy === "dry-run-only")
+      (
+        result.entryKind === "write-planning" &&
+        result.status === "manual-review-required" &&
+        result.applyStatus === "not-run" &&
+        result.realWorkspaceMutation === false
+      ) ||
+      (
+        (result.entryKind === "write-edit" || result.entryKind === "write-repair" || result.entryKind === "write-rollback") &&
+        result.realWorkspaceMutation === false
+      )
     ),
+    writePatchIntentDryRunCount,
+    isolatedApplyCount,
+    postApplyProofCount,
+    debugOrRepairUseful: writeResults.some((result) =>
+      (result.entryKind === "write-repair" || result.entryKind === "write-rollback") &&
+      (result.status === "complete" || result.status === "useful-partial")
+    ),
+    rollbackRecoveryStatus,
     hardGateStatus: blockers.length === 0 ? "passed" : "not-passed",
     blockers: freeze(blockers),
     terminalSuccessClaim: false,
