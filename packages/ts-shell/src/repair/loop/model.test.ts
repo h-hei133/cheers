@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decideRepair } from "./model.js";
+import { decideRepair, executeRepair } from "./model.js";
 
 describe("repair loop model", () => {
   it("diagnoses failed verification as repair eligible without claiming success", () => {
@@ -50,5 +50,31 @@ describe("repair loop model", () => {
       failureCategories: ["artifact invalid"],
       hostStatus: "failed",
     }).state).toBe("post-validation-failed");
+  });
+
+  it("executes one bounded repair action and preserves original failure", () => {
+    const decision = decideRepair({
+      taskKind: "debug-repair",
+      verificationState: "selected-failed",
+      failureCategories: ["repair failed"],
+      hostStatus: "failed",
+    });
+
+    expect(executeRepair({
+      decision,
+      actions: ["repair", "verify"],
+      changedTargetCount: 1,
+    })).toMatchObject({
+      attempted: true,
+      postValidation: "passed",
+      originalFailurePreserved: true,
+      terminalSuccessClaim: false,
+    });
+
+    expect(executeRepair({
+      decision,
+      actions: ["repair", "verify"],
+      changedTargetCount: 2,
+    }).postValidation).toBe("partial");
   });
 });

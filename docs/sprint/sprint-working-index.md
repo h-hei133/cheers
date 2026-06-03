@@ -29,7 +29,8 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp013-runtime-host-api-and-distribution-surface.md` | completed route input | Runtime host API and package readiness surface objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp013-task-capability-direction-and-plan.md` | completed route input | Task-capability planning objective now reflected in task capability docs and priority docs. |
 | `docs/sprint/route/sp014-real-task-bench-and-live-capability-triage.md` | completed route input | Real task assessment and live capability triage objective now reflected in current capability and priority docs. |
-| `docs/sprint/route/sp015-task-verification-artifact-and-repair-loop.md` | current route input | Verification selection, artifact receipt, repair decision, and task blocker reclassification objective now reflected in current capability and priority docs. |
+| `docs/sprint/route/sp015-task-verification-artifact-and-repair-loop.md` | completed route input | Verification selection, artifact receipt, repair decision, and task blocker reclassification objective now reflected in current capability and priority docs. |
+| `docs/sprint/route/sp016-autonomous-task-outcome-transplant.md` | completed route input | Deterministic context, planning, request, tool strategy, repair action, artifact correction, verification execution, and task outcome improvement objective now reflected in current capability, priority, and adoption-log docs. |
 
 ## Removed Or Merged Content
 

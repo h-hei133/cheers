@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createArtifactReceipt } from "./model.js";
+import { correctArtifact, createArtifactReceipt } from "./model.js";
 
 describe("artifact workflow model", () => {
   it("records report artifact intent, sources, validation, and non-success truth", () => {
@@ -60,5 +60,24 @@ describe("artifact workflow model", () => {
       verificationState: "selected-not-run",
       failureCategories: [],
     })?.validationState).toBe("not-proven");
+  });
+
+  it("corrects invalid artifacts only when source receipts and artifact action are available", () => {
+    const receipt = createArtifactReceipt({
+      taskKind: "data-artifact",
+      outputKind: "artifact",
+      requiredPaths: ["artifacts/totals.json"],
+      workspacePaths: ["data/input.csv", "artifacts/totals.json"],
+      verificationState: "selected-failed",
+      failureCategories: ["artifact invalid"],
+    });
+
+    expect(correctArtifact({ receipt, actions: ["artifact", "verify"] })).toMatchObject({
+      attempted: true,
+      validationState: "validation-passed",
+      correctedPath: "artifacts/totals.json",
+      terminalSuccessClaim: false,
+    });
+    expect(correctArtifact({ receipt, actions: ["read"] })?.attempted).toBe(false);
   });
 });

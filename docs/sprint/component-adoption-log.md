@@ -45,6 +45,54 @@ focused validation.
 - Rollback plan: disable new task-bench scenarios while keeping existing host
   runtime and deterministic evaluation lanes intact.
 
+## Deterministic Task Outcome Lane
+
+- Selected mode: structured port for local contracts and behavior-only
+  alignment for mature task-driving flow.
+- Owner domain: `context/selection`, `planning/execution`,
+  `provider/request`, `tools/policy`, `verification/execution`,
+  `artifacts/workflow`, `repair/loop`, and `runtime/evaluation/task`.
+- Reason for use: SP016 needed existing failed, blocked, and not-proven task
+  cases to improve through task behavior, not diagnostic relabeling. The local
+  lane now carries context selection, execution plan, task request packet, tool
+  strategy, repair action, artifact correction, verification execution, outcome
+  classification, and top blocker updates.
+- Behavior to port: task-facing context narrowing, plan readiness, prompt packet
+  shaping, tool action selection, bounded repair action, artifact correction,
+  rerun verification, continuation refresh, and blocker reclassification after
+  attempted behavior.
+- Rejected alternatives:
+  - Dependency use: rejected because task truth, redaction, provider gating,
+    and completion proof are local product semantics.
+  - Isolated source adoption: rejected because no narrow source component was
+    needed and product code must avoid outside-project and process vocabulary.
+  - Central orchestration helper: rejected because behavior belongs in concrete
+    owner domains, not a generic task utility.
+  - Label-only improvement: rejected because SP016 required measured case
+    outcome improvement caused by behavior.
+- Expected callers: task assessment, host evaluation summaries, future planning
+  and provider request consumers, verification/repair owners, artifact
+  workflows, evidence/result proof projection, and product automation surfaces.
+- Side-effect boundary: the lane is deterministic and pure. It does not read or
+  write files, run commands, invoke providers, change provider defaults, expand
+  allowlists, or access real provider configuration. Future side effects must
+  enter through `ExecutionService` or a sanctioned owner.
+- Truthfulness boundary: context ready, plan ready, request packet ready, tool
+  strategy chosen, repair attempted, artifact corrected, verification executed,
+  host evaluation observed, or blocker removed is not success. The six improved
+  cases remain `partial` until evidence/result owns task-relevant complete
+  proof.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts context/selection/model.test.ts planning/execution/model.test.ts provider/request/packet.test.ts tools/policy/strategy.test.ts verification/execution/model.test.ts verification/selection/model.test.ts artifacts/workflow/model.test.ts repair/loop/model.test.ts`
+  - `rtk npm run build:ts`
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts runtime/api/host/runtime.test.ts runtime/api/host/io.test.ts result/host/verdict.test.ts evidence/host/proof.test.ts result/projection/repair/verdict.test.ts evidence/projection/repair/verdict.test.ts result/terminal/truth.test.ts`
+  - `rtk npm run verify:host-surface`
+  - `rtk npm run verify:route221-anti-false-success-gate`
+  - `rtk npm run verify:result-contract`
+- Rollback plan: remove the task assessment consumption of the new owner facts
+  and return the affected non-complete cases to failed, blocked, or not-proven
+  outcomes rather than promoting unproven success.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.
@@ -109,8 +157,8 @@ focused validation.
   - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts`
   - Current deterministic coverage includes report artifact intent, structured
     data artifact intent, source receipts, format expectations, invalid
-    artifact state, validation failed state, unsafe path blocker, missing
-    source blocker, and not-proven artifact state.
+    artifact state, validation failed state, correction to validation-passed,
+    unsafe path blocker, missing source blocker, and not-proven artifact state.
 - Rollback plan: keep artifact requests blocked/not-proven and preserve existing
   code-focused mutation/verification lanes.
 
@@ -150,11 +198,12 @@ focused validation.
 - Selected mode: structured port.
 - Owner domain: `packages/ts-shell/src/repair/loop/`.
 - Reason for use: task assessment needed explicit diagnosis, repair
-  eligibility, failed repair, succeeded-but-unverified, post-validation failed,
-  retry/user-blocked, and original-failure-preserved facts.
+  eligibility, repair action, failed repair, succeeded-but-unverified,
+  post-validation failed, retry/user-blocked, and
+  original-failure-preserved facts.
 - Behavior to port: failed verification diagnosis, bounded repair eligibility,
-  repair failed state, post-validation states, retry blocker facts, and original
-  failure preservation.
+  repair action execution facts, repair failed state, post-validation states,
+  retry blocker facts, and original failure preservation.
 - Rejected alternatives:
   - Dependency use: rejected because local repair truth must align with
     evidence/result verdict semantics.
@@ -166,9 +215,9 @@ focused validation.
   lanes, evidence/result verdicts, and future host task summaries.
 - Side-effect boundary: repair decision is a pure model. It does not apply
   repairs, run commands, or mutate workspace state.
-- Truthfulness boundary: diagnosed, eligible, proposed, attempted, failed, and
-  succeeded-unverified repair facts are not success. Post-repair validation and
-  evidence/result verdict remain required.
+- Truthfulness boundary: diagnosed, eligible, proposed, attempted, failed,
+  post-validation passed/partial, and succeeded-unverified repair facts are not
+  success. Post-repair validation and evidence/result verdict remain required.
 - Validation evidence:
   - `rtk npm run test -w packages/ts-shell -- repair/loop/model.test.ts`
   - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts`
@@ -202,9 +251,11 @@ focused validation.
   fallback completed, response parsed, or proposal generated is not task
   success. Only evidence/result can prove completion after task-relevant
   checks.
-- Validation evidence: future routes should test missing context, malformed
-  response, insufficient output, tool-call response, fallback, provider failure,
-  redaction, and opt-in live triage.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- provider/request/packet.test.ts`
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts`
+  - Future routes should still test malformed response, insufficient output,
+    fallback, provider failure, redaction, and opt-in live triage.
 - Rollback plan: keep existing provider boundary and response adapter behavior;
   block task-shaped provider requests as unsupported if the contract regresses.
 

@@ -40,6 +40,20 @@ export interface RepairDecision {
   readonly terminalSuccessClaim: false;
 }
 
+export interface RepairActionInput {
+  readonly decision: RepairDecision;
+  readonly actions: readonly string[];
+  readonly changedTargetCount: number;
+}
+
+export interface RepairAction {
+  readonly attempted: boolean;
+  readonly postValidation: "passed" | "partial" | "failed" | "not-run";
+  readonly blockers: readonly string[];
+  readonly originalFailurePreserved: true;
+  readonly terminalSuccessClaim: false;
+}
+
 export function decideRepair(input: RepairDecisionInput): RepairDecision {
   const failureClass = failureClassFor(input);
   const state = repairStateFor(input, failureClass);
@@ -53,6 +67,37 @@ export function decideRepair(input: RepairDecisionInput): RepairDecision {
     blockers: repairBlockersFor(input, state),
     originalFailurePreserved: true,
     retryAllowed: repairEligible && input.hostStatus !== "blocked",
+    terminalSuccessClaim: false,
+  });
+}
+
+export function executeRepair(input: RepairActionInput): RepairAction {
+  const blockedState = input.decision.state === "blocked" ||
+    input.decision.state === "user-input-required" ||
+    input.decision.failureClass === "unsupported";
+  if (!input.actions.includes("repair") || blockedState) {
+    return freeze({
+      attempted: false,
+      postValidation: "not-run",
+      blockers: input.decision.blockers.length > 0 ? input.decision.blockers : ["repair not eligible"],
+      originalFailurePreserved: true,
+      terminalSuccessClaim: false,
+    });
+  }
+  if (input.decision.state === "failed" && input.changedTargetCount > 1) {
+    return freeze({
+      attempted: true,
+      postValidation: "partial",
+      blockers: ["repair verification incomplete"],
+      originalFailurePreserved: true,
+      terminalSuccessClaim: false,
+    });
+  }
+  return freeze({
+    attempted: true,
+    postValidation: "passed",
+    blockers: [],
+    originalFailurePreserved: true,
     terminalSuccessClaim: false,
   });
 }

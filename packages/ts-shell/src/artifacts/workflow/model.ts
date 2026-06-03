@@ -35,6 +35,19 @@ export interface ArtifactReceipt {
   readonly terminalSuccessClaim: false;
 }
 
+export interface ArtifactCorrectionInput {
+  readonly receipt?: ArtifactReceipt;
+  readonly actions: readonly string[];
+}
+
+export interface ArtifactCorrection {
+  readonly attempted: boolean;
+  readonly validationState: ArtifactValidationState;
+  readonly correctedPath?: string;
+  readonly blockers: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
 export function createArtifactReceipt(input: ArtifactReceiptInput): ArtifactReceipt | undefined {
   if (input.outputKind !== "artifact") {
     return undefined;
@@ -57,6 +70,47 @@ export function createArtifactReceipt(input: ArtifactReceiptInput): ArtifactRece
     validationCheck: validationCheckFor(kind),
     validationState,
     blockers,
+    terminalSuccessClaim: false,
+  });
+}
+
+export function correctArtifact(input: ArtifactCorrectionInput): ArtifactCorrection | undefined {
+  if (!input.receipt) {
+    return undefined;
+  }
+  const canCorrect = input.actions.includes("artifact") && input.receipt.sourceReceipts.every((source) => source.available);
+  if (!canCorrect) {
+    return freeze({
+      attempted: false,
+      validationState: input.receipt.validationState,
+      correctedPath: input.receipt.outputPath,
+      blockers: input.receipt.blockers.length > 0 ? input.receipt.blockers : ["artifact correction unavailable"],
+      terminalSuccessClaim: false,
+    });
+  }
+  if (input.receipt.validationState === "unsafe-path") {
+    return freeze({
+      attempted: false,
+      validationState: "unsafe-path",
+      correctedPath: input.receipt.outputPath,
+      blockers: ["unsafe artifact path"],
+      terminalSuccessClaim: false,
+    });
+  }
+  if (input.receipt.validationState === "source-missing") {
+    return freeze({
+      attempted: false,
+      validationState: "source-missing",
+      correctedPath: input.receipt.outputPath,
+      blockers: ["artifact source missing"],
+      terminalSuccessClaim: false,
+    });
+  }
+  return freeze({
+    attempted: true,
+    validationState: "validation-passed",
+    correctedPath: input.receipt.outputPath,
+    blockers: [],
     terminalSuccessClaim: false,
   });
 }
