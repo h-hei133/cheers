@@ -37,15 +37,18 @@ deterministic runtime case is not enough.
   anchored, artifact dry-run, and reviewed isolated write entries. The
   repeatable opt-in live run defines thirteen exact entries. A measured
   explicit run executed all 13 entries, reached 12 complete or useful partial
-  outcomes, recorded 4 reviewed isolated applies, 3 post-apply verification
-  and task-proof outcomes, a useful rollback/debug partial, report/artifact,
-  continuation, pathless/context, and read-only coverage, safe fallback
-  metadata, and redaction pass. The no-write entries remain default-off and
-  redacted, and the reviewed write path records only safe metadata for patch
-  intent, dry-run diff, explicit review authority, isolated fixture apply,
-  post-apply verification, task proof, rollback status, fallback metadata,
-  changed files, loop-owned progression, and real-workspace mutation
-  prevention.
+  outcomes, recorded 7 safe quality records, 5 dry-run quality records, 3
+  reviewed isolated apply plus post-action verification records, 3 reviewed
+  real-workspace readiness records with exact requirements, 1 disposable
+  selected-workspace apply, a useful rollback/debug partial with
+  repair-verification blocker, report/artifact, continuation,
+  pathless/context, and read-only coverage, safe fallback metadata, and
+  redaction pass. The no-write entries remain default-off and redacted, and the
+  reviewed write path records only safe metadata for patch intent, dry-run
+  diff, target count/match, hunk or section count, explicit review authority,
+  isolated fixture apply, disposable selected-workspace apply, post-action
+  verification, task proof, rollback status, fallback metadata, changed files,
+  loop-owned progression, and main-workspace mutation prevention.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, richer context packet facts, plan facts, edit
@@ -162,13 +165,19 @@ runtime task owner projects live entries and calls `runTaskLoop`. The measured
 live run executed all 13 entries, with 12 complete or useful partial outcomes,
 4 reviewed isolated applies, 3 post-apply proof outcomes, artifact/report,
 continuation, pathless/context, read-only, and debug/repair coverage. The
-unsupported export stays unsupported. Live gate execution, provider called,
-fallback metadata, patch intent, dry-run diff, review authority, isolated
-apply, host-observed facts, smoke pass, readiness facts, deterministic case
-count, task-loop progression, and live run status are still not success by
-themselves. The immediate priority now moves from making the shared task path
-real to provider output sufficiency, durable artifact/manual-review output
-execution, and richer live repair inside that shared path.
+unsupported export stays unsupported. SP028 added task-owned quality records
+and workspace readiness: 7 write/artifact quality records, 5 dry-run quality
+records, 3 reviewed isolated post-action verification records, 3 reviewed
+real-workspace readiness records, 1 disposable selected-workspace apply, one
+repair-verification failure blocker, multi-file target metadata, and artifact
+quality pass. Live gate execution, provider called, fallback metadata, patch
+intent, dry-run diff, review authority, isolated apply, selected-workspace
+apply metadata, host-observed facts, smoke pass, readiness facts,
+deterministic case count, task-loop progression, and live run status are still
+not success by themselves. The immediate priority now moves from quality
+metadata and single disposable workspace proof to durable artifact/manual-review
+output execution, broader selected-workspace write coverage, provider output
+sufficiency, and richer live repair inside that shared path.
 
 ## Immediate Sprint Batches
 

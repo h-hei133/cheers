@@ -17,6 +17,11 @@ import {
   stepOutput,
   type TaskProgression,
 } from "./loop.js";
+import {
+  buildTaskLiveQualityRecord,
+  isWriteCapableEntry,
+  type TaskLiveQualityRecord,
+} from "./quality.js";
 
 export type TaskLiveEntryId =
   | "single-file-edit"
@@ -85,6 +90,8 @@ export interface TaskLiveRunObservation {
   readonly realWorkspaceMutation?: boolean;
   readonly postApplyVerificationStatus?: "passed" | "partial" | "failed" | "not-run";
   readonly rollbackStatus?: "complete" | "partial" | "blocked" | "not-run";
+  readonly realWorkspaceApplyStatus?: "applied" | "not-run" | "blocked" | "failed";
+  readonly realWorkspaceApplyScope?: "isolated-selected-workspace" | "not-run";
   readonly exactBlocker?: string;
 }
 
@@ -99,6 +106,19 @@ export interface TaskLiveGateReceipt {
   readonly fallbackConfigured?: boolean;
   readonly fallbackAttempted?: boolean;
   readonly fallbackOutcome?: "passed" | "failed" | "skipped" | "inconclusive";
+  readonly blocker?: string;
+}
+
+export interface TaskLiveWorkspaceApplyReceipt {
+  readonly gate: "selected-workspace-apply";
+  readonly attempted: boolean;
+  readonly outcome: "passed" | "failed" | "blocked" | "skipped" | "provider-network-inconclusive" | "config-or-skip";
+  readonly entryId: Extract<TaskLiveEntryId, "single-file-edit" | "coordinated-edit">;
+  readonly changedFiles: readonly string[];
+  readonly writerTarget: "isolated-selected-workspace" | "missing-or-unverified";
+  readonly postActionVerificationStatus: "passed" | "partial" | "failed" | "not-run";
+  readonly redactionStatus: "passed" | "failed";
+  readonly repositoryClean: boolean;
   readonly blocker?: string;
 }
 
@@ -126,6 +146,9 @@ export interface TaskLiveRunEntryResult {
   readonly realWorkspaceMutation: boolean;
   readonly postApplyVerificationStatus: "passed" | "partial" | "failed" | "not-run";
   readonly rollbackStatus: "complete" | "partial" | "blocked" | "not-run";
+  readonly realWorkspaceApplyStatus: "applied" | "not-run" | "blocked" | "failed";
+  readonly realWorkspaceApplyScope: "isolated-selected-workspace" | "not-run";
+  readonly qualityRecord?: TaskLiveQualityRecord;
   readonly blockers: readonly string[];
   readonly proofItems: readonly string[];
   readonly progression: TaskProgression;
@@ -152,6 +175,16 @@ export interface TaskLiveRunSummary {
   readonly postApplyProofCount: number;
   readonly debugOrRepairUseful: boolean;
   readonly rollbackRecoveryStatus: "complete" | "useful-partial" | "blocked" | "not-run";
+  readonly qualityRecordCount: number;
+  readonly writeOrArtifactQualityRecordCount: number;
+  readonly dryRunQualityRecordCount: number;
+  readonly reviewedIsolatedPostApplyCount: number;
+  readonly realWorkspaceReadyCount: number;
+  readonly realWorkspaceApplyCount: number;
+  readonly manualCorrectionCount: number;
+  readonly debugRepairFailureProvedCount: number;
+  readonly multiFileQualityRecord: boolean;
+  readonly artifactQualityPassed: boolean;
   readonly hardGateStatus: "passed" | "not-passed";
   readonly blockers: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -313,6 +346,7 @@ export function listTaskLiveEntries(): readonly TaskLiveEntry[] {
 export async function runTaskLiveReport(input: {
   readonly dispatch: (command: unknown) => Promise<HostCommandResponse>;
   readonly gateReceipts?: readonly TaskLiveGateReceipt[];
+  readonly workspaceApplyReceipts?: readonly TaskLiveWorkspaceApplyReceipt[];
   readonly reviewedApplyOptIn?: boolean;
   readonly observations?: readonly TaskLiveRunObservation[];
 }): Promise<TaskLiveRunReport> {
@@ -320,6 +354,7 @@ export async function runTaskLiveReport(input: {
   const observations = input.observations ?? projectLiveObservationsFromGateReceipts({
     entries,
     gateReceipts: input.gateReceipts ?? [],
+    workspaceApplyReceipts: input.workspaceApplyReceipts ?? [],
     reviewedApplyOptIn: input.reviewedApplyOptIn ?? false,
   });
   const taskCaseIds = entries
@@ -388,6 +423,8 @@ export async function runTaskLiveReport(input: {
         realWorkspaceMutation: false,
         postApplyVerificationStatus: "not-run",
         rollbackStatus: "not-run",
+        realWorkspaceApplyStatus: "not-run",
+        realWorkspaceApplyScope: "not-run",
         blockers: execution.blockers,
         proofItems: execution.proofItems,
         requirements: entry.requirements,
@@ -398,8 +435,10 @@ export async function runTaskLiveReport(input: {
         terminalSuccessClaim: false,
         notProvenClaims: execution.notProvenClaims,
       } satisfies Omit<TaskLiveRunEntryResult, "progression">;
+      const qualityRecord = buildTaskLiveQualityRecord({ entry, result: resultWithoutProgression });
       return freeze({
         ...resultWithoutProgression,
+        ...(qualityRecord ? { qualityRecord } : {}),
         progression: await projectLiveProgressionThroughLoop({
           entry,
           result: resultWithoutProgression,
@@ -429,6 +468,7 @@ export async function runTaskLiveReport(input: {
 export function projectLiveObservationsFromGateReceipts(input: {
   readonly entries: readonly TaskLiveEntry[];
   readonly gateReceipts: readonly TaskLiveGateReceipt[];
+  readonly workspaceApplyReceipts?: readonly TaskLiveWorkspaceApplyReceipt[];
   readonly reviewedApplyOptIn: boolean;
 }): readonly TaskLiveRunObservation[] {
   const receiptByGate = new Map(input.gateReceipts.map((receipt) => [receipt.gate, receipt]));
@@ -490,6 +530,18 @@ export function projectLiveObservationsFromGateReceipts(input: {
     }
   }
 
+  for (const receipt of input.workspaceApplyReceipts ?? []) {
+    const existingIndex = observations.findIndex((observation) => observation.entryId === receipt.entryId);
+    const existing = existingIndex >= 0 ? observations[existingIndex] : undefined;
+    const next = workspaceApplyObservation(receipt, existing, anchored);
+    if (!next) continue;
+    if (existingIndex >= 0) {
+      observations[existingIndex] = next;
+    } else {
+      observations.push(next);
+    }
+  }
+
   return freeze(observations.filter((observation) =>
     input.entries.some((entry) => entry.entryId === observation.entryId)
   ));
@@ -541,6 +593,8 @@ function writePlanningObservation(receipt: TaskLiveGateReceipt): TaskLiveRunObse
     realWorkspaceMutation: false,
     postApplyVerificationStatus: "not-run",
     rollbackStatus: "not-run",
+    realWorkspaceApplyStatus: "not-run",
+    realWorkspaceApplyScope: "not-run",
   });
 }
 
@@ -572,6 +626,59 @@ function writeApplyObservation(
     realWorkspaceMutation: false,
     postApplyVerificationStatus,
     rollbackStatus,
+    realWorkspaceApplyStatus: "not-run",
+    realWorkspaceApplyScope: "not-run",
+  });
+}
+
+function workspaceApplyObservation(
+  receipt: TaskLiveWorkspaceApplyReceipt,
+  existing: TaskLiveRunObservation | undefined,
+  anchored: TaskLiveGateReceipt | undefined,
+): TaskLiveRunObservation | undefined {
+  if (!receipt.attempted) return existing;
+  const providerReceipt = anchored ?? {
+    gate: "anchored-provider" as const,
+    attempted: true,
+    outcome: receipt.outcome === "provider-network-inconclusive" || receipt.outcome === "config-or-skip"
+      ? receipt.outcome
+      : receipt.outcome === "passed"
+        ? "passed" as const
+        : "failed" as const,
+    noMutation: false,
+    changedFiles: [],
+    noApply: false,
+    redactionStatus: receipt.redactionStatus,
+  };
+  const base = existing ?? writeApplyObservation(
+    receipt.entryId,
+    providerReceipt,
+    receipt.changedFiles.length > 0 ? receipt.changedFiles : ["src/app.ts"],
+    receipt.outcome === "passed" ? "complete" : "partial",
+    receipt.postActionVerificationStatus,
+    "not-run",
+  );
+  return freeze({
+    ...base,
+    changedFiles: freeze(receipt.changedFiles.length > 0 ? [...receipt.changedFiles] : [...base.changedFiles]),
+    redactionStatus: receipt.redactionStatus,
+    realWorkspaceMutation: false,
+    realWorkspaceApplyStatus: receipt.outcome === "passed"
+      ? "applied"
+      : receipt.outcome === "blocked" || receipt.outcome === "config-or-skip"
+        ? "blocked"
+        : receipt.outcome === "provider-network-inconclusive"
+          ? "blocked"
+        : receipt.outcome === "skipped"
+          ? "not-run"
+          : "failed",
+    realWorkspaceApplyScope: receipt.writerTarget === "isolated-selected-workspace"
+      ? "isolated-selected-workspace"
+      : "not-run",
+    postApplyVerificationStatus: receipt.outcome === "passed"
+      ? receipt.postActionVerificationStatus
+      : base.postApplyVerificationStatus,
+    ...(receipt.blocker ? { exactBlocker: receipt.blocker } : {}),
   });
 }
 
@@ -752,6 +859,8 @@ async function externalEntryResult(
     realWorkspaceMutation: observation.realWorkspaceMutation === true,
     postApplyVerificationStatus: observation.postApplyVerificationStatus ?? "not-run",
     rollbackStatus: observation.rollbackStatus ?? "not-run",
+    realWorkspaceApplyStatus: observation.realWorkspaceApplyStatus ?? "not-run",
+    realWorkspaceApplyScope: observation.realWorkspaceApplyScope ?? "not-run",
     blockers: freeze(blockers),
     proofItems: freeze(proofItems),
     requirements: entry.requirements,
@@ -766,8 +875,10 @@ async function externalEntryResult(
       "terminal-success",
     ]),
   } satisfies Omit<TaskLiveRunEntryResult, "progression">;
+  const qualityRecord = buildTaskLiveQualityRecord({ entry, result: resultWithoutProgression });
   return freeze({
     ...resultWithoutProgression,
+    ...(qualityRecord ? { qualityRecord } : {}),
     progression: await projectLiveProgressionThroughLoop({
       entry,
       result: resultWithoutProgression,
@@ -801,6 +912,8 @@ async function notRunEntry(entry: TaskLiveEntry, blockers: readonly string[]): P
     realWorkspaceMutation: false,
     postApplyVerificationStatus: "not-run",
     rollbackStatus: "not-run",
+    realWorkspaceApplyStatus: "not-run",
+    realWorkspaceApplyScope: "not-run",
     blockers: freeze(blockers),
     proofItems: freeze([]),
     requirements: entry.requirements,
@@ -811,8 +924,10 @@ async function notRunEntry(entry: TaskLiveEntry, blockers: readonly string[]): P
     terminalSuccessClaim: false,
     notProvenClaims: freeze(["live-task-not-executed", "terminal-success"]),
   } satisfies Omit<TaskLiveRunEntryResult, "progression">;
+  const qualityRecord = buildTaskLiveQualityRecord({ entry, result: resultWithoutProgression });
   return freeze({
     ...resultWithoutProgression,
+    ...(qualityRecord ? { qualityRecord } : {}),
     progression: await projectLiveProgressionThroughLoop({
       entry,
       result: resultWithoutProgression,
@@ -830,6 +945,14 @@ function externalObservationBlockers(
   if (observation.redactionStatus !== "passed") blockers.push("redaction blocked");
   if (writeEntry) {
     if (observation.realWorkspaceMutation === true) blockers.push("real workspace mutation forbidden");
+    if (
+      observation.realWorkspaceApplyStatus === "applied" &&
+      observation.realWorkspaceApplyScope !== "isolated-selected-workspace"
+    ) blockers.push("real workspace apply scope missing disposable isolation");
+    if (
+      (observation.realWorkspaceApplyStatus === "blocked" || observation.realWorkspaceApplyStatus === "failed") &&
+      observation.exactBlocker
+    ) blockers.push(observation.exactBlocker);
   } else {
     if (!observation.noMutation || observation.changedFiles.length > 0) blockers.push("no-mutation check failed");
     if (!observation.noApply) blockers.push("no-apply check failed");
@@ -919,6 +1042,7 @@ function externalStatus(
   if (blockers.includes("redaction blocked")) return "redaction-blocked";
   if (blockers.includes("provider config or opt-in gate missing")) return "provider-readiness-missing";
   if (blockers.includes("explicit opt-in gate skipped")) return "skipped";
+  if (blockers.includes("provider network inconclusive")) return "blocked";
   if (blockers.length > 0 && observation.providerOutcome === "provider-network-inconclusive") return "blocked";
   if (entry.entryKind === "write-rollback" && observation.rollbackStatus === "blocked" && blockers.length > 0) return "blocked";
   if (blockers.length > 0) return "failed";
@@ -934,13 +1058,6 @@ function externalStatus(
   }
   if (observation.proofStatus === "complete" && proofItems.includes("task-proof")) return "complete";
   return proofItems.length > 0 ? "useful-partial" : "provider-output-insufficient";
-}
-
-function isWriteCapableEntry(entry: TaskLiveEntry): boolean {
-  return entry.entryKind === "write-edit" ||
-    entry.entryKind === "write-repair" ||
-    entry.entryKind === "write-rollback" ||
-    entry.entryKind === "write-planning";
 }
 
 function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveRunSummary {
@@ -972,6 +1089,62 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     result.postApplyVerificationStatus === "passed" &&
     result.proofStatus === "complete"
   ).length;
+  const qualityRecords = results
+    .map((result) => result.qualityRecord)
+    .filter((record): record is TaskLiveQualityRecord => Boolean(record));
+  const writeOrArtifactQualityRecordCount = qualityRecords.filter((record) =>
+    record.actionKind === "write-edit" ||
+    record.actionKind === "write-repair" ||
+    record.actionKind === "write-rollback" ||
+    record.actionKind === "write-planning" ||
+    record.actionKind === "report-artifact" ||
+    record.actionKind === "data-artifact"
+  ).length;
+  const dryRunQualityRecordCount = results.filter((result) =>
+    (
+      result.entryKind === "write-edit" ||
+      result.entryKind === "write-repair" ||
+      result.entryKind === "write-rollback" ||
+      result.entryKind === "write-planning"
+    ) &&
+    result.qualityRecord !== undefined &&
+    result.dryRunDiffStatus === "produced" &&
+    result.qualityRecord.hunkOrSectionCount > 0 &&
+    result.qualityRecord.targetFileMatch !== "missing"
+  ).length;
+  const reviewedIsolatedPostApplyCount = qualityRecords.filter((record) =>
+    record.applyScope === "isolated-fixture" &&
+    record.isolatedApplyStatus === "applied" &&
+    (record.postActionVerificationStatus === "passed" || record.postActionVerificationStatus === "partial")
+  ).length;
+  const realWorkspaceReadyCount = qualityRecords.filter((record) =>
+    record.finalReadiness === "ready-for-reviewed-real-workspace-apply" &&
+    record.exactRequirements.includes("reviewed real-workspace apply gate") &&
+    record.exactRequirements.includes("disposable isolated selected workspace")
+  ).length;
+  const realWorkspaceApplyCount = qualityRecords.filter((record) =>
+    record.applyScope === "isolated-selected-workspace" &&
+    record.realWorkspaceApplyStatus === "applied" &&
+    record.postActionVerificationStatus === "passed"
+  ).length;
+  const manualCorrectionCount = qualityRecords.filter((record) => record.manualCorrectionNeeded).length;
+  const debugRepairFailureProvedCount = qualityRecords.filter((record) =>
+    (record.actionKind === "write-repair" || record.actionKind === "write-rollback") &&
+    record.manualCorrectionNeeded &&
+    record.manualCorrectionReason === "repair verification did not pass" &&
+    (record.postActionVerificationStatus === "partial" || record.postActionVerificationStatus === "failed")
+  ).length;
+  const multiFileQualityRecord = qualityRecords.some((record) =>
+    record.taskId === "coordinated-edit" &&
+    record.targetFileCount >= 2 &&
+    record.targetFileMatch === "matched"
+  );
+  const artifactQualityPassed = qualityRecords.some((record) =>
+    (record.actionKind === "report-artifact" || record.actionKind === "data-artifact") &&
+    record.verificationRelevance === "task-relevant" &&
+    record.hunkOrSectionCount > 0 &&
+    record.manualCorrectionNeeded === false
+  );
   const rollbackResult = results.find((result) => result.entryKind === "write-rollback");
   const rollbackRecoveryStatus = rollbackResult?.status === "complete"
     ? "complete"
@@ -987,6 +1160,17 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     ...(writePatchIntentDryRunCount >= 3 ? [] : ["fewer than three write-capable entries produced patch intent and dry-run diff"]),
     ...(isolatedApplyCount >= 2 ? [] : ["fewer than two write-capable entries passed review authority and isolated apply"]),
     ...(postApplyProofCount >= 2 ? [] : ["fewer than two applied entries passed verification with task proof"]),
+    ...(writeOrArtifactQualityRecordCount >= 5 ? [] : ["fewer than five write or artifact entries produced quality records"]),
+    ...(dryRunQualityRecordCount >= 3 ? [] : ["fewer than three write-capable entries produced dry-run quality records"]),
+    ...(reviewedIsolatedPostApplyCount >= 3 ? [] : ["fewer than three entries reached reviewed isolated apply plus post-action verification"]),
+    ...(realWorkspaceReadyCount >= 2 ? [] : ["fewer than two entries ready for reviewed real-workspace apply with exact requirements"]),
+    ...(realWorkspaceApplyCount >= 1 ? [] : ["no reviewed real-workspace apply was proven in a disposable isolated selected workspace"]),
+    ...(debugRepairFailureProvedCount >= 1 ? [] : ["debug or repair entry did not prove failure to repair to verification"]),
+    ...(multiFileQualityRecord ? [] : ["multi-file or coordinated edit target-file quality metadata missing"]),
+    ...(artifactQualityPassed ? [] : ["artifact or report entry did not pass quality checks"]),
+    ...(results.every((result) => result.qualityRecord?.manualCorrectionNeeded !== true || result.qualityRecord.blocker.length > 0)
+      ? []
+      : ["manual corrections missing exact blockers"]),
     ...(writeResults.some((result) =>
       (result.entryKind === "write-repair" || result.entryKind === "write-rollback") &&
       (result.status === "complete" || result.status === "useful-partial")
@@ -1039,6 +1223,16 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
       (result.status === "complete" || result.status === "useful-partial")
     ),
     rollbackRecoveryStatus,
+    qualityRecordCount: qualityRecords.length,
+    writeOrArtifactQualityRecordCount,
+    dryRunQualityRecordCount,
+    reviewedIsolatedPostApplyCount,
+    realWorkspaceReadyCount,
+    realWorkspaceApplyCount,
+    manualCorrectionCount,
+    debugRepairFailureProvedCount,
+    multiFileQualityRecord,
+    artifactQualityPassed,
     hardGateStatus: blockers.length === 0 ? "passed" : "not-passed",
     blockers: freeze(blockers),
     terminalSuccessClaim: false,

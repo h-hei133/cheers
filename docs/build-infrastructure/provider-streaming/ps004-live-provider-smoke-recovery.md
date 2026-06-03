@@ -249,10 +249,12 @@ If live provider cannot be safely called, complete the product path with determi
 
 ## Current manual retest status
 
-Status date: 2026-06-03.
+Status date: 2026-06-04.
 
 Latest user-reported manual retest after the live smoke fallback update. This
-documentation update did not inspect private provider configuration.
+documentation update did not inspect private provider configuration, provider
+environment files, request payloads, response bodies, headers, tokens, or raw
+provider output.
 
 - `real-readonly-coding-smoke` passed.
 - The live anchored provider smoke passed with the primary configured provider.
@@ -268,6 +270,8 @@ Interpretation:
 - Fallback configuration visibility and fallback skipped status are safe
   metadata only. They do not prove fallback execution success or
   provider-wide compatibility.
+- The no-write/no-apply result remains a behavior preservation fact, not write
+  authority and not proof of mutation capability.
 - A provider smoke pass remains only smoke evidence; it is not task success,
   mutation authority, apply success, verification success, or repair success.
 

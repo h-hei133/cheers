@@ -72,6 +72,8 @@ describe("task live run report", () => {
         writeObservation("single-file-edit", {
           changedFiles: ["src/format.ts"],
           postApplyVerificationStatus: "passed",
+          realWorkspaceApplyStatus: "applied",
+          realWorkspaceApplyScope: "isolated-selected-workspace",
         }),
         writeObservation("coordinated-edit", {
           changedFiles: ["src/parser.ts", "src/caller.ts"],
@@ -131,6 +133,16 @@ describe("task live run report", () => {
       postApplyProofCount: 3,
       debugOrRepairUseful: true,
       rollbackRecoveryStatus: "useful-partial",
+      qualityRecordCount: 7,
+      writeOrArtifactQualityRecordCount: 7,
+      dryRunQualityRecordCount: 5,
+      reviewedIsolatedPostApplyCount: 3,
+      realWorkspaceReadyCount: 3,
+      realWorkspaceApplyCount: 1,
+      manualCorrectionCount: 2,
+      debugRepairFailureProvedCount: 1,
+      multiFileQualityRecord: true,
+      artifactQualityPassed: true,
       hardGateStatus: "passed",
       blockers: [],
       terminalSuccessClaim: false,
@@ -197,8 +209,20 @@ describe("task live run report", () => {
       applyStatus: "applied",
       isolatedApply: true,
       realWorkspaceMutation: false,
+      realWorkspaceApplyStatus: "applied",
+      realWorkspaceApplyScope: "isolated-selected-workspace",
       postApplyVerificationStatus: "passed",
       proofStatus: "complete",
+      qualityRecord: expect.objectContaining({
+        targetFileCount: 1,
+        targetFileMatch: "matched",
+        hunkOrSectionCount: 1,
+        applyScope: "isolated-selected-workspace",
+        realWorkspaceApplyStatus: "applied",
+        postActionVerificationStatus: "passed",
+        finalReadiness: "applied-in-disposable-workspace",
+        terminalSuccessClaim: false,
+      }),
       terminalSuccessClaim: false,
       progression: {
         mode: "live",
@@ -229,6 +253,7 @@ describe("task live run report", () => {
           fallbackOutcome: "skipped",
         }),
       ],
+      workspaceApplyReceipts: [workspaceApplyReceipt()],
     });
     const report = await runTaskLiveReport({
       dispatch: host.dispatch,
@@ -241,6 +266,7 @@ describe("task live run report", () => {
           fallbackOutcome: "skipped",
         }),
       ],
+      workspaceApplyReceipts: [workspaceApplyReceipt()],
     });
 
     expect(observations.map((observation) => observation.entryId)).toEqual([
@@ -263,6 +289,15 @@ describe("task live run report", () => {
       completeOrUsefulPartialCount: 12,
       isolatedApplyCount: 4,
       postApplyProofCount: 3,
+      qualityRecordCount: 7,
+      writeOrArtifactQualityRecordCount: 7,
+      dryRunQualityRecordCount: 5,
+      reviewedIsolatedPostApplyCount: 3,
+      realWorkspaceReadyCount: 3,
+      realWorkspaceApplyCount: 1,
+      debugRepairFailureProvedCount: 1,
+      multiFileQualityRecord: true,
+      artifactQualityPassed: true,
       hardGateStatus: "passed",
       terminalSuccessClaim: false,
     });
@@ -271,6 +306,12 @@ describe("task live run report", () => {
       changedFiles: ["src/format.ts"],
       isolatedApply: true,
       realWorkspaceMutation: false,
+      realWorkspaceApplyStatus: "applied",
+      realWorkspaceApplyScope: "isolated-selected-workspace",
+      qualityRecord: expect.objectContaining({
+        applyScope: "isolated-selected-workspace",
+        finalReadiness: "applied-in-disposable-workspace",
+      }),
       progression: {
         mode: "live",
         modelSource: "explicit-live-gate",
@@ -281,9 +322,42 @@ describe("task live run report", () => {
       status: "complete",
       artifactValidationStatus: "passed",
       noApply: true,
+      qualityRecord: expect.objectContaining({
+        actionKind: "report-artifact",
+        hunkOrSectionCount: 4,
+        verificationRelevance: "task-relevant",
+        manualCorrectionNeeded: false,
+        finalReadiness: "manual-review-required",
+      }),
     });
     expect(report.results.every((result) => result.terminalSuccessClaim === false)).toBe(true);
     expect(JSON.stringify(report)).not.toMatch(/Bearer |api[_-]?key|token|headers|raw provider output|diff --git|\*\*\* Begin Patch/i);
+  });
+
+  it("keeps SP028 quality hard gate incomplete without disposable selected-workspace apply proof", async () => {
+    const host = createHostRuntime();
+    const report = await runTaskLiveReport({
+      dispatch: host.dispatch,
+      reviewedApplyOptIn: true,
+      gateReceipts: [
+        gateReceipt("read-only-provider"),
+        gateReceipt("anchored-provider"),
+      ],
+    });
+
+    expect(report.summary).toMatchObject({
+      qualityRecordCount: 7,
+      writeOrArtifactQualityRecordCount: 7,
+      dryRunQualityRecordCount: 5,
+      reviewedIsolatedPostApplyCount: 4,
+      realWorkspaceReadyCount: 4,
+      realWorkspaceApplyCount: 0,
+      hardGateStatus: "not-passed",
+      terminalSuccessClaim: false,
+    });
+    expect(report.summary.blockers).toEqual(
+      expect.arrayContaining(["no reviewed real-workspace apply was proven in a disposable isolated selected workspace"]),
+    );
   });
 
   it("preserves exact provider and redaction blockers", async () => {
@@ -427,5 +501,29 @@ function gateReceipt(
     noApply: true,
     redactionStatus: "passed" as const,
     ...overrides,
+  };
+}
+
+function workspaceApplyReceipt(): {
+  readonly gate: "selected-workspace-apply";
+  readonly attempted: true;
+  readonly outcome: "passed";
+  readonly entryId: "single-file-edit";
+  readonly changedFiles: readonly ["src/format.ts"];
+  readonly writerTarget: "isolated-selected-workspace";
+  readonly postActionVerificationStatus: "passed";
+  readonly redactionStatus: "passed";
+  readonly repositoryClean: true;
+} {
+  return {
+    gate: "selected-workspace-apply",
+    attempted: true,
+    outcome: "passed",
+    entryId: "single-file-edit",
+    changedFiles: ["src/format.ts"],
+    writerTarget: "isolated-selected-workspace",
+    postActionVerificationStatus: "passed",
+    redactionStatus: "passed",
+    repositoryClean: true,
   };
 }

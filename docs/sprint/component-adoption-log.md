@@ -622,6 +622,84 @@ focused validation.
   scripts to safe no-execution blockers rather than allowing scripts to own
   task entry success or write metadata.
 
+## Live Quality And Workspace Readiness
+
+- Selected mode: structured port for local write/artifact quality contracts,
+  with behavior-only alignment for mature patch-safety, review/apply,
+  post-action verification, and safe reporting patterns.
+- Owner domain: `runtime/evaluation/task`, delegating action facts to `edit`,
+  `verification/execution`, `repair/loop`, `artifacts/workflow`,
+  `evidence/task`, and `result/task`; scripts remain thin gate callers.
+- Reason for use: SP028 required live write/artifact entries to prove useful
+  quality and reviewed real-workspace readiness, not just execution counts,
+  patch intent, dry-run metadata, or blocker reports. Targeted inspection of
+  local edit/write status, artifact workflow, evidence/result task proof, and
+  the mature capability map showed the useful behavior pattern: bind target
+  facts, classify diff/apply safety, require explicit review and isolation,
+  preserve post-action verification, record exact blockers, and keep raw
+  provider/edit/command material out of report-safe surfaces.
+- Behavior ported: `runtime/evaluation/task/quality.ts` records safe quality
+  facts for live write and artifact entries: task id, action kind, target file
+  count, target match, hunk or section count, expected verification,
+  verification relevance, manual correction status, apply scope, isolated apply
+  status, real-workspace apply status, post-action verification, final
+  readiness, exact requirements, blocker, and terminal-success false. The live
+  report hard gate now requires at least five write/artifact quality records,
+  three dry-run quality records, three reviewed isolated post-action
+  verification records, two reviewed real-workspace readiness records, one
+  disposable selected-workspace apply when the explicit gate is available, one
+  repair-verification blocker, multi-file target metadata, artifact quality
+  pass, exact blockers for manual corrections, and redaction.
+- Rejected alternatives:
+  - Dependency use: rejected because quality, write authority, redaction, and
+    task proof are local product contracts.
+  - Isolated source adoption: rejected because no narrow licensed component was
+    needed; copying mature or reference code would risk unsuitable names,
+    field shapes, dynamic behavior, provider defaults, and write semantics.
+  - Behavior-only alignment alone: rejected because SP028 requires current live
+    entries to emit concrete product-owned quality records and hard gates.
+  - Script-owned quality records: rejected because scripts may invoke existing
+    gates and pass safe receipts only; task behavior belongs to the runtime
+    task owner.
+  - Dry-run-only readiness: rejected because SP028 requires reviewed isolated
+    apply plus post-action verification and one disposable selected-workspace
+    apply when safe.
+- Expected callers: `verify:live-task-execution`, task assessment, host
+  evaluation summaries, future artifact/manual-review gates, future selected
+  workspace apply gates, evidence/result projections, and product status
+  surfaces.
+- Side-effect boundary: quality record construction is deterministic and
+  consumes safe receipts only. Provider calls remain in existing explicit
+  opt-in gates. The selected-workspace apply gate runs only with
+  `PRIVATE_AGENTS_LIVE_REAL_WORKSPACE_APPLY=1` in a disposable clean git
+  worktree and reports safe metadata; it does not mutate the main workspace.
+  This adoption does not add provider defaults, browser automation, external
+  tool servers, dynamic loading, command allowlist expansion, arbitrary
+  writers, broad SDK/RPC behavior, or private provider material access.
+- Truthfulness boundary: quality records, target counts, dry-run diff status,
+  review authority, isolated apply, selected-workspace apply metadata,
+  post-action verification, artifact quality pass, host output, and hard-gate
+  pass are not terminal task success. Complete remains owned by
+  `evidence/task` and `result/task`; missing proof stays partial, blocked, or
+  not-proven.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/liveRun.test.ts runtime/evaluation/task/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts artifacts/workflow/model.test.ts edit/patch/plan/hunkSet.test.ts edit/patch/result/hunk.test.ts`
+  - `rtk npm run build:ts`
+  - `rtk npm run verify:live-task-execution`
+  - `PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real PRIVATE_AGENTS_LIVE_TASK_EXECUTION=1 PRIVATE_AGENTS_LIVE_WRITE_REVIEWED_APPLY=1 PRIVATE_AGENTS_LIVE_REAL_WORKSPACE_APPLY=1 rtk npm run verify:live-task-execution`
+  - Live validation reported 13 executed entries, 12 complete or useful
+    partial, 7 quality records, 5 dry-run quality records, 3 reviewed isolated
+    post-action verification records, 3 reviewed real-workspace readiness
+    records, 1 disposable selected-workspace apply, 2 manual corrections, 1
+    repair-verification blocker, multi-file quality metadata, artifact quality
+    pass, fallback configured/skipped after primary success, and redaction
+    pass.
+- Rollback plan: remove `quality.ts`, quality record projection, and the
+  selected-workspace apply receipt path from `liveRun.ts` and
+  `verify:live-task-execution`, returning live reports to reviewed isolated
+  metadata only while preserving default-off gates, redaction, and
+  evidence/result truth.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

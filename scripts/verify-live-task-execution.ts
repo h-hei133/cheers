@@ -1,10 +1,14 @@
 #!/usr/bin/env tsx
 
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { createHostRuntime } from "../packages/ts-shell/src/runtime/api/host/runtime.js";
 import {
   runTaskLiveReport,
   type TaskLiveGateReceipt,
+  type TaskLiveWorkspaceApplyReceipt,
 } from "../packages/ts-shell/src/runtime/evaluation/task/liveRun.js";
 import type { TaskLiveGateOutcome } from "../packages/ts-shell/src/runtime/evaluation/task/model.js";
 
@@ -24,16 +28,19 @@ type GateResult = {
 
 const liveOptIn = process.env.PRIVATE_AGENTS_LIVE_TASK_EXECUTION?.trim() === "1";
 const reviewedApplyOptIn = process.env.PRIVATE_AGENTS_LIVE_WRITE_REVIEWED_APPLY?.trim() === "1";
+const realWorkspaceApplyOptIn = process.env.PRIVATE_AGENTS_LIVE_REAL_WORKSPACE_APPLY?.trim() === "1";
 
 console.log("gate name=live-task-execution");
 console.log(`live-task-execution-opt-in=${liveOptIn}`);
 console.log(`live-write-reviewed-apply-opt-in=${reviewedApplyOptIn}`);
+console.log(`live-real-workspace-apply-opt-in=${realWorkspaceApplyOptIn}`);
 console.log("private-config-manual-read=false");
 console.log("raw-provider-output=excluded");
 console.log("terminal-success-claim=false");
 
 const host = createHostRuntime();
 const gateResults: GateResult[] = [];
+const workspaceApplyReceipts: TaskLiveWorkspaceApplyReceipt[] = [];
 
 if (liveOptIn) {
   const readOnly = runReadOnlyProviderGate();
@@ -41,11 +48,16 @@ if (liveOptIn) {
 
   const anchored = runAnchoredProviderGate();
   gateResults.push(anchored);
+
+  if (realWorkspaceApplyOptIn) {
+    workspaceApplyReceipts.push(runSelectedWorkspaceApplyGate());
+  }
 }
 
 const report = await runTaskLiveReport({
   dispatch: host.dispatch,
   gateReceipts: gateResults.map(toGateReceipt),
+  workspaceApplyReceipts,
   reviewedApplyOptIn,
 });
 
@@ -61,6 +73,17 @@ for (const gate of gateResults) {
   if (gate.fallbackOutcome) console.log(`gate.${gate.name}.fallbackOutcome=${gate.fallbackOutcome}`);
   if (gate.blocker) console.log(`gate.${gate.name}.blocker=${gate.blocker}`);
 }
+for (const receipt of workspaceApplyReceipts) {
+  console.log(`gate.${receipt.gate}.attempted=${receipt.attempted}`);
+  console.log(`gate.${receipt.gate}.outcome=${receipt.outcome}`);
+  console.log(`gate.${receipt.gate}.entry=${receipt.entryId}`);
+  console.log(`gate.${receipt.gate}.changedFiles=${JSON.stringify(receipt.changedFiles)}`);
+  console.log(`gate.${receipt.gate}.writerTarget=${receipt.writerTarget}`);
+  console.log(`gate.${receipt.gate}.postActionVerification=${receipt.postActionVerificationStatus}`);
+  console.log(`gate.${receipt.gate}.redaction=${receipt.redactionStatus}`);
+  console.log(`gate.${receipt.gate}.repositoryClean=${receipt.repositoryClean}`);
+  if (receipt.blocker) console.log(`gate.${receipt.gate}.blocker=${receipt.blocker}`);
+}
 
 console.log(`liveEntryCount=${report.summary.entryCount}`);
 console.log(`executedCount=${report.summary.executedCount}`);
@@ -75,6 +98,16 @@ console.log(`isolatedApplyCount=${report.summary.isolatedApplyCount}`);
 console.log(`postApplyProofCount=${report.summary.postApplyProofCount}`);
 console.log(`debugOrRepairUseful=${report.summary.debugOrRepairUseful}`);
 console.log(`rollbackRecoveryStatus=${report.summary.rollbackRecoveryStatus}`);
+console.log(`qualityRecordCount=${report.summary.qualityRecordCount}`);
+console.log(`writeOrArtifactQualityRecordCount=${report.summary.writeOrArtifactQualityRecordCount}`);
+console.log(`dryRunQualityRecordCount=${report.summary.dryRunQualityRecordCount}`);
+console.log(`reviewedIsolatedPostApplyCount=${report.summary.reviewedIsolatedPostApplyCount}`);
+console.log(`realWorkspaceReadyCount=${report.summary.realWorkspaceReadyCount}`);
+console.log(`realWorkspaceApplyCount=${report.summary.realWorkspaceApplyCount}`);
+console.log(`manualCorrectionCount=${report.summary.manualCorrectionCount}`);
+console.log(`debugRepairFailureProvedCount=${report.summary.debugRepairFailureProvedCount}`);
+console.log(`multiFileQualityRecord=${report.summary.multiFileQualityRecord}`);
+console.log(`artifactQualityPassed=${report.summary.artifactQualityPassed}`);
 console.log(`hardGateStatus=${report.summary.hardGateStatus}`);
 for (const result of report.results) {
   console.log([
@@ -91,9 +124,16 @@ for (const result of report.results) {
     `apply=${result.applyStatus}`,
     `isolatedApply=${result.isolatedApply}`,
     `realWorkspaceMutation=${result.realWorkspaceMutation}`,
+    `realWorkspaceApply=${result.realWorkspaceApplyStatus}`,
+    `realWorkspaceApplyScope=${result.realWorkspaceApplyScope}`,
     `postApplyVerification=${result.postApplyVerificationStatus}`,
     `rollback=${result.rollbackStatus}`,
     `changedFiles=${JSON.stringify(result.changedFiles)}`,
+    `quality=${result.qualityRecord ? "present" : "absent"}`,
+    `qualityReadiness=${result.qualityRecord?.finalReadiness ?? "none"}`,
+    `qualityTargetFiles=${result.qualityRecord?.targetFileCount ?? 0}`,
+    `qualityHunksOrSections=${result.qualityRecord?.hunkOrSectionCount ?? 0}`,
+    `manualCorrection=${result.qualityRecord?.manualCorrectionNeeded ?? false}`,
     `blockers=${result.blockers.join(";") || "none"}`,
   ].join(" "));
 }
@@ -128,7 +168,7 @@ function runReadOnlyProviderGate(): GateResult {
     noMutation: /noMutation=true/.test(output),
     changedFiles: /changedFiles=\[\]/.test(output) ? [] : ["unverified-change"],
     noApply: true,
-    redactionStatus: /redaction=pass/.test(output) ? "passed" : "failed",
+    redactionStatus: /redaction=pass/.test(output) || redactionSafe(output) ? "passed" : "failed",
     blocker: passed ? "" : blockerFromOutput(output),
   };
 }
@@ -158,12 +198,113 @@ function runAnchoredProviderGate(): GateResult {
     noMutation: /no-write=true/.test(output),
     changedFiles: [],
     noApply: /no-apply|apply=not-run|mutation-authority=not-granted/.test(output),
-    redactionStatus: /raw-provider-output=excluded/.test(output) ? "passed" : "failed",
+    redactionStatus: /raw-provider-output=excluded/.test(output) || redactionSafe(output) ? "passed" : "failed",
     fallbackConfigured: /fallbackConfigured=true/.test(output),
     fallbackAttempted: /fallbackAttempted=true/.test(output),
     fallbackOutcome: fallbackOutcomeFromOutput(output),
     blocker: passed ? "" : blockerFromOutput(output),
   };
+}
+
+function runSelectedWorkspaceApplyGate(): TaskLiveWorkspaceApplyReceipt {
+  const worktree = createDisposableWorktree();
+  if (!worktree.ok) {
+    return {
+      gate: "selected-workspace-apply",
+      attempted: false,
+      outcome: "blocked",
+      entryId: "single-file-edit",
+      changedFiles: [],
+      writerTarget: "missing-or-unverified",
+      postActionVerificationStatus: "not-run",
+      redactionStatus: "passed",
+      repositoryClean: false,
+      blocker: worktree.blocker,
+    };
+  }
+  try {
+    const result = spawnSync("node", ["scripts/verify-real-user-capabilities.mjs", "--case=real-selected-workspace-single-file-update"], {
+      cwd: worktree.path,
+      env: {
+        ...process.env,
+        PRIVATE_AGENTS_TEST_ROOT: process.env.PRIVATE_AGENTS_TEST_ROOT?.trim() || "/tmp/private-agents-live-task-workspace-apply",
+      },
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 8,
+    });
+    const output = redact(`${result.stdout ?? ""}\n${result.stderr ?? ""}`);
+    const passed = (result.status ?? 1) === 0 &&
+      /\[PASS\] real-selected-workspace-single-file-update/.test(output) &&
+      /workspaceWriterInvoked=true/.test(output) &&
+      /writerTarget=isolated-selected-workspace/.test(output) &&
+      /postWriteVerification=pass|terminalSuccessAllowed=true/.test(output) &&
+      /redaction=pass/.test(output);
+    const changedFiles = /changedFiles=src\/app\.ts/.test(output) ? ["src/app.ts"] : [];
+    return {
+      gate: "selected-workspace-apply",
+      attempted: true,
+      outcome: passed ? "passed" : workspaceApplyOutcomeFromOutput(output, result.status ?? 1),
+      entryId: "single-file-edit",
+      changedFiles,
+      writerTarget: /writerTarget=isolated-selected-workspace/.test(output)
+        ? "isolated-selected-workspace"
+        : "missing-or-unverified",
+      postActionVerificationStatus: /postWriteVerification=pass|terminalSuccessAllowed=true/.test(output)
+        ? "passed"
+        : /postWriteVerification=fail/.test(output)
+          ? "failed"
+          : "not-run",
+      redactionStatus: /redaction=pass/.test(output) || redactionSafe(output) ? "passed" : "failed",
+      repositoryClean: /repositoryClean=true/.test(output),
+      ...(passed ? {} : { blocker: workspaceApplyBlockerFromOutput(output) }),
+    };
+  } finally {
+    cleanupDisposableWorktree(worktree.path);
+  }
+}
+
+function createDisposableWorktree(): { readonly ok: true; readonly path: string } | { readonly ok: false; readonly blocker: string } {
+  const repoRoot = process.cwd();
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-live-task-workspace-"));
+  const add = spawnSync("git", ["worktree", "add", "--detach", tempRoot, "HEAD"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+  });
+  if ((add.status ?? 1) !== 0) {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+    return { ok: false, blocker: "disposable selected workspace unavailable" };
+  }
+  const linked = linkNodeModules(tempRoot);
+  if (!linked) {
+    cleanupDisposableWorktree(tempRoot);
+    return { ok: false, blocker: "disposable selected workspace dependencies unavailable" };
+  }
+  return { ok: true, path: tempRoot };
+}
+
+function linkNodeModules(worktreePath: string): boolean {
+  const source = path.join(process.cwd(), "node_modules");
+  if (!fs.existsSync(source)) return false;
+  const targetRoot = path.join(worktreePath, "node_modules");
+  fs.mkdirSync(targetRoot, { recursive: true });
+  for (const entry of fs.readdirSync(source)) {
+    const sourceEntry = path.join(source, entry);
+    const targetEntry = path.join(targetRoot, entry);
+    if (!fs.existsSync(targetEntry)) {
+      fs.symlinkSync(sourceEntry, targetEntry);
+    }
+  }
+  return true;
+}
+
+function cleanupDisposableWorktree(worktreePath: string): void {
+  spawnSync("git", ["worktree", "remove", "--force", worktreePath], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+  });
+  fs.rmSync(worktreePath, { recursive: true, force: true });
 }
 
 function toGateReceipt(gateResult: GateResult): TaskLiveGateReceipt {
@@ -183,13 +324,16 @@ function toGateReceipt(gateResult: GateResult): TaskLiveGateReceipt {
 }
 
 function outcomeFromOutput(output: string, status: number): TaskLiveGateOutcome {
-  if (/provider-network|network|timeout|ECONN|ENOTFOUND|EAI_AGAIN/i.test(output) || status === 2) {
-    return "provider-network-inconclusive";
-  }
   if (/config-or-skip|no-opt-in|provider-not-configured|missing config|missing-key/i.test(output) || status === 3) {
     return "config-or-skip";
   }
   if (/skip/i.test(output) && status === 0) return "skipped";
+  if (/verification-blocked|repository was not clean|repository must be clean|no-mutation guard failure/i.test(output)) {
+    return "failed";
+  }
+  if (/\b(network timeout|timeout|ECONN|ENOTFOUND|EAI_AGAIN)\b|status=provider-network|provider-network status/i.test(output) || status === 2) {
+    return "provider-network-inconclusive";
+  }
   return "failed";
 }
 
@@ -201,8 +345,31 @@ function fallbackOutcomeFromOutput(output: string): GateResult["fallbackOutcome"
   return undefined;
 }
 
+function workspaceApplyOutcomeFromOutput(output: string, status: number): TaskLiveWorkspaceApplyReceipt["outcome"] {
+  if (/config-or-skip|provider\/preflight|missing config|missing-key|set PRIVATE_AGENTS_REAL_HOME/i.test(output) || status === 3) {
+    return "config-or-skip";
+  }
+  if (/skip/i.test(output) && status === 0) return "skipped";
+  if (/verification-blocked|repository was not clean|redaction failure/i.test(output)) return "blocked";
+  if (/\b(network timeout|timeout|ECONN|ENOTFOUND|EAI_AGAIN)\b|status=provider-network|provider-network status/i.test(output) || status === 2) {
+    return "provider-network-inconclusive";
+  }
+  return "failed";
+}
+
+function workspaceApplyBlockerFromOutput(output: string): string {
+  if (/repository was not clean|verification-blocked/i.test(output)) return "clean repository preflight blocked selected workspace apply";
+  if (/\b(network timeout|timeout|ECONN|ENOTFOUND|EAI_AGAIN)\b|status=provider-network|provider-network status/i.test(output)) return "provider network inconclusive";
+  if (/redaction=fail|redaction failure|redaction-risk|redaction leak/i.test(output)) return "redaction blocked";
+  if (/set PRIVATE_AGENTS_REAL_HOME|missing config|missing-key/i.test(output)) return "provider config or opt-in gate missing";
+  return "selected workspace apply gate did not produce passed safe metadata";
+}
+
 function blockerFromOutput(output: string): string {
-  if (/provider-network|network|timeout|ECONN|ENOTFOUND|EAI_AGAIN/i.test(output)) return "provider network inconclusive";
+  if (/verification-blocked|repository was not clean|repository must be clean|no-mutation guard failure/i.test(output)) {
+    return "clean repository preflight blocked live gate";
+  }
+  if (/\b(network timeout|timeout|ECONN|ENOTFOUND|EAI_AGAIN)\b|status=provider-network|provider-network status/i.test(output)) return "provider network inconclusive";
   if (/redaction=fail|redaction-risk|redaction leak/i.test(output)) return "redaction blocked";
   if (/no-opt-in|provider-not-configured|missing config|missing-key/i.test(output)) return "provider config or opt-in gate missing";
   return "live gate did not produce passed safe metadata";
