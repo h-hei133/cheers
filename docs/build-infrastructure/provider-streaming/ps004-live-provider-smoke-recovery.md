@@ -247,6 +247,25 @@ No repeated retries.
 
 If live provider cannot be safely called, complete the product path with deterministic provider outcomes and report live smoke as blocked or unsupported.
 
+## Current manual retest status
+
+Status date: 2026-06-03.
+
+User-reported manual retest after the live smoke fallback update:
+
+- `real-readonly-coding-smoke` passed.
+- The live anchored provider smoke passed with the primary configured provider.
+- Fallback was configured but skipped because the primary provider succeeded.
+- No raw provider output leaked.
+- No-write and no-apply were preserved.
+
+Interpretation:
+
+- `changedFiles=[]` visibility for the read-only no-mutation smoke is fixed.
+- Fallback configuration is report-visible without forcing fallback execution.
+- Primary success correctly leaves fallback as skipped, not attempted.
+- A provider smoke pass remains only smoke evidence; it is not task success, mutation authority, apply success, verification success, or repair success.
+
 ## Validation
 
 Required:
