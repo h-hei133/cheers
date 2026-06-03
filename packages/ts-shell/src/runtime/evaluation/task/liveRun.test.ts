@@ -133,6 +133,14 @@ describe("task live run report", () => {
       blockers: [],
       terminalSuccessClaim: false,
     });
+    const liveProgressions = report.results.filter((result) =>
+      result.progression.mode === "live" &&
+      result.progression.modelSource === "explicit-live-gate" &&
+      result.progression.stages.map((stage) => stage.stage).includes("provider-turn") &&
+      result.progression.stages.map((stage) => stage.stage).includes("verdict")
+    );
+    expect(liveProgressions.length).toBeGreaterThanOrEqual(4);
+    expect(liveProgressions.every((result) => result.progression.terminalSuccessClaim === false)).toBe(true);
     expect(report.results.find((result) => result.entryId === "write-planning-dry-run")).toMatchObject({
       executed: true,
       status: "manual-review-required",
@@ -141,7 +149,18 @@ describe("task live run report", () => {
       changedFiles: [],
       patchIntentStatus: "present",
       dryRunDiffStatus: "produced",
+      progression: {
+        mode: "live",
+        modelSource: "explicit-live-gate",
+        completeProof: false,
+      },
     });
+    expect(report.results.find((result) => result.entryId === "write-planning-dry-run")?.progression.stages)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ stage: "action", owner: "edit", status: "partial" }),
+        expect.objectContaining({ stage: "proof", owner: "evidence/task", status: "partial" }),
+        expect.objectContaining({ stage: "verdict", owner: "result/task", status: "not-proven" }),
+      ]));
     for (const result of report.results.filter((entry) => entry.executed && entry.writePolicy === "no-write")) {
       expect(result).toMatchObject({
         providerAttempted: true,
@@ -169,6 +188,11 @@ describe("task live run report", () => {
       postApplyVerificationStatus: "passed",
       proofStatus: "complete",
       terminalSuccessClaim: false,
+      progression: {
+        mode: "live",
+        modelSource: "explicit-live-gate",
+        completeProof: true,
+      },
     });
     expect(report.results.find((result) => result.entryId === "rollback-recovery")).toMatchObject({
       status: "useful-partial",

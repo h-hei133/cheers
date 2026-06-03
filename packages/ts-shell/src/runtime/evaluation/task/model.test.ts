@@ -180,6 +180,17 @@ describe("task capability assessment", () => {
     });
     expect(result.liveExecutions.every((item) => item.executed === false)).toBe(true);
     expect(result.liveExecutions.every((item) => item.terminalSuccessClaim === false)).toBe(true);
+    const progressedCases = result.cases.filter((taskCase) =>
+      taskCase.progression.mode === "deterministic" &&
+      taskCase.progression.modelSource === "deterministic-evaluation" &&
+      taskCase.progression.stages.map((stage) => stage.stage).includes("provider-turn") &&
+      taskCase.progression.stages.map((stage) => stage.stage).includes("verdict")
+    );
+    expect(progressedCases.length).toBeGreaterThanOrEqual(5);
+    expect(progressedCases.every((taskCase) => taskCase.progression.terminalSuccessClaim === false)).toBe(true);
+    expect(progressedCases.filter((taskCase) => taskCase.outcome === "complete").every((taskCase) =>
+      taskCase.progression.completeProof === true
+    )).toBe(true);
     expect(result.notProvenClaims).toEqual(
       expect.arrayContaining([
         "terminal-success",
@@ -401,6 +412,20 @@ describe("task capability assessment", () => {
       completeProof: true,
       terminalSuccessClaim: false,
     });
+    expect(result.progression.stages.map((stage) => stage.stage)).toEqual([
+      "goal",
+      "state",
+      "context",
+      "plan",
+      "request",
+      "provider-turn",
+      "action",
+      "observation",
+      "verification",
+      "repair",
+      "proof",
+      "verdict",
+    ]);
   });
 
   it("completes rollback recovery through bounded repair and final validation evidence", async () => {

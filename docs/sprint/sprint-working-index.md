@@ -39,6 +39,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp022-autonomous-development-capability-transplant.md` | completed route input | Autonomous development task mix expansion, richer context/request packet behavior, repair/artifact/continuation completions, and measured priorities now reflected in current capability, priority, gap, and adoption-log docs. |
 | `docs/sprint/route/sp023-live-autonomous-task-execution-bench.md` | completed route input | Repeatable opt-in live task execution report, eight exact live entries, executed no-write/manual-review outcomes, and measured live priorities now reflected in current capability, priority, gap, and adoption-log docs. |
 | `docs/sprint/route/sp024-live-write-reviewed-apply.md` | completed route input | Reviewed live write reporting with thirteen entries, patch intent and dry-run metadata, explicit review authority, isolated apply metadata, post-apply verification/task-proof counters, rollback exact blocker handling, and updated measured priorities now reflected in current capability, priority, gap, and adoption-log docs. |
+| `docs/sprint/route/sp025-integrated-autonomous-task-runtime.md` | completed route input | Unified deterministic and explicit live task progression with prompt-to-verdict stage facts, write dry-run/reviewed apply projection, script-thin live reporting, and updated measured priorities now reflected in current capability, priority, gap, and adoption-log docs. |
 
 ## Removed Or Merged Content
 

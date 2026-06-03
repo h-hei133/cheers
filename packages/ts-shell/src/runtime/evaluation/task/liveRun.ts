@@ -10,6 +10,10 @@ import {
   type TaskLivePolicy,
   type TaskLiveSafetyClass,
 } from "./model.js";
+import {
+  projectLiveEntryProgression,
+  type TaskProgression,
+} from "./progression.js";
 
 export type TaskLiveEntryId =
   | "single-file-edit"
@@ -107,6 +111,7 @@ export interface TaskLiveRunEntryResult {
   readonly rollbackStatus: "complete" | "partial" | "blocked" | "not-run";
   readonly blockers: readonly string[];
   readonly proofItems: readonly string[];
+  readonly progression: TaskProgression;
   readonly requirements: readonly string[];
   readonly validationPlan: string;
   readonly writePolicy: TaskLivePolicy;
@@ -331,10 +336,11 @@ export async function runTaskLiveReport(input: {
     if (entry.taskCaseId) {
       const taskResult = resultByCaseId.get(entry.taskCaseId);
       const execution = executionByCaseId.get(entry.taskCaseId);
+      const observation = observationsByEntryId.get(entry.entryId);
       if (!taskResult || !execution) {
         return notRunEntry(entry, ["task case result missing"]);
       }
-      return freeze({
+      const resultWithoutProgression = {
         entryId: entry.entryId,
         entryKind: entry.entryKind,
         gate: entry.gate,
@@ -367,6 +373,14 @@ export async function runTaskLiveReport(input: {
         optInRequired: true,
         terminalSuccessClaim: false,
         notProvenClaims: execution.notProvenClaims,
+      } satisfies Omit<TaskLiveRunEntryResult, "progression">;
+      return freeze({
+        ...resultWithoutProgression,
+        progression: projectLiveEntryProgression({
+          entry,
+          result: resultWithoutProgression,
+          observation,
+        }),
       } satisfies TaskLiveRunEntryResult);
     }
     return externalEntryResult(entry, observationsByEntryId.get(entry.entryId));
@@ -413,7 +427,7 @@ function externalEntryResult(
   const blockers = externalObservationBlockers(entry, observation);
   const executed = blockers.length === 0;
   const proofItems = executed ? externalProofItems(observation) : [];
-  return freeze({
+  const resultWithoutProgression = {
     entryId: entry.entryId,
     entryKind: entry.entryKind,
     gate: entry.gate,
@@ -450,11 +464,19 @@ function externalEntryResult(
       "live-gate-pass-is-not-task-success",
       "terminal-success",
     ]),
-  });
+  } satisfies Omit<TaskLiveRunEntryResult, "progression">;
+  return freeze({
+    ...resultWithoutProgression,
+    progression: projectLiveEntryProgression({
+      entry,
+      result: resultWithoutProgression,
+      observation,
+    }),
+  } satisfies TaskLiveRunEntryResult);
 }
 
 function notRunEntry(entry: TaskLiveEntry, blockers: readonly string[]): TaskLiveRunEntryResult {
-  return freeze({
+  const resultWithoutProgression = {
     entryId: entry.entryId,
     entryKind: entry.entryKind,
     gate: entry.gate,
@@ -487,7 +509,14 @@ function notRunEntry(entry: TaskLiveEntry, blockers: readonly string[]): TaskLiv
     optInRequired: true,
     terminalSuccessClaim: false,
     notProvenClaims: freeze(["live-task-not-executed", "terminal-success"]),
-  });
+  } satisfies Omit<TaskLiveRunEntryResult, "progression">;
+  return freeze({
+    ...resultWithoutProgression,
+    progression: projectLiveEntryProgression({
+      entry,
+      result: resultWithoutProgression,
+    }),
+  } satisfies TaskLiveRunEntryResult);
 }
 
 function externalObservationBlockers(

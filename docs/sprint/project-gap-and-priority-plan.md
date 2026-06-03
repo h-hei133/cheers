@@ -17,7 +17,8 @@ deterministic runtime case is not enough.
   across coding, debugging, documents, reports, data analysis, slides, and other
   artifact workflows.
 - Real task bench coverage is still narrow, but it now reaches the SP022
-  deterministic mix gate and the SP023 repeatable live run gate. Current
+  deterministic mix gate, the SP023 repeatable live run gate, and the SP025
+  shared deterministic/live task progression gate. Current
   deterministic host evaluation has advanced to
   audited deterministic task assessment coverage with richer context packet
   construction, execution planning, task request packets, tool strategy,
@@ -27,14 +28,18 @@ deterministic runtime case is not enough.
   blocker facts, but it still does not prove broad real task completion. Current
   task assessment results are 18 complete, 1 skipped, and 1 unsupported, with 4
   pathless workspace/context completions, 3 debug/repair completions, 7
-  artifact/report/data completions, and 2 continuation/resume completions. Safe
-  live execution observations are structured for read-only, anchored, artifact
-  dry-run, and reviewed isolated write metadata. The repeatable opt-in live run
-  now defines thirteen exact entries. The no-write entries remain default-off
-  and redacted, and the reviewed write path records only safe metadata for
-  patch intent, dry-run diff, explicit review authority, isolated fixture apply,
-  post-apply verification, task proof, rollback status, fallback metadata, and
-  real-workspace mutation prevention.
+  artifact/report/data completions, and 2 continuation/resume completions.
+  Deterministic cases and explicit live entries now expose the same ordered
+  task progression from goal and state through context, plan, request,
+  provider turn, action, observation, verification, repair, proof, and verdict.
+  Safe live execution observations are structured for read-only, anchored,
+  artifact dry-run, and reviewed isolated write metadata. The repeatable opt-in
+  live run defines thirteen exact entries. The no-write entries remain
+  default-off and redacted, and the reviewed write path records only safe
+  metadata for patch intent, dry-run diff, explicit review authority, isolated
+  fixture apply, post-apply verification, task proof, rollback status, fallback
+  metadata, changed files, shared progression, and real-workspace mutation
+  prevention.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, richer context packet facts, plan facts, edit
@@ -128,7 +133,7 @@ useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Audited SP020, SP021, SP022, SP023, and SP024 outcomes now set the immediate order:
+Audited SP020, SP021, SP022, SP023, SP024, and SP025 outcomes now set the immediate order:
 `rollback-recovery` and `retry-diagnosis-repair` are complete through explicit
 post-repair validation evidence and evidence/result task verdict. Thirteen
 target cases have exact live gate requirements, including artifact dry-run for
@@ -145,8 +150,10 @@ entries preserve no mutation/no apply, and redaction excludes raw provider
 output and patch bodies. The unsupported export stays unsupported. Live gate
 execution, provider called, fallback metadata, patch intent, dry-run diff,
 review authority, isolated apply, host-observed facts, smoke pass, readiness
-facts, deterministic case count, and live run status are still not success by
-themselves.
+facts, deterministic case count, task progression, and live run status are
+still not success by themselves. The immediate priority now moves from unifying
+the task path to durable artifact/manual-review output execution and provider
+output sufficiency inside that shared path.
 
 ## Immediate Sprint Batches
 

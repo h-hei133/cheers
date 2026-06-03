@@ -493,6 +493,62 @@ focused validation.
   projection-only behavior while keeping deterministic task proof/verdict
   handoff intact.
 
+## Unified Task Progression Path
+
+- Selected mode: structured port for the local progression contract and
+  behavior-only alignment for mature lifecycle flow.
+- Owner domain: `runtime/evaluation/task`, consuming existing `context`,
+  `planning`, `provider/request`, `provider/response`, `tools/policy`, `edit`,
+  `verification`, `repair`, `artifacts/workflow`, `evidence/task`, and
+  `result/task` facts.
+- Reason for use: SP025 requires deterministic assessment and explicit opt-in
+  live task entries to share one product task path from prompt and task state
+  through context, plan, request, provider turn, action, observation,
+  verification, repair, proof, and verdict. The mature pattern is a single
+  lifecycle fact chain with separate owners for side effects and terminal
+  truth, not script-owned task behavior.
+- Behavior ported: deterministic task cases and live run entries now project a
+  common progression record with the same ordered stages, report-safe owner
+  evidence, model-output source separation, complete-proof state, and
+  non-success claims. Live no-write entries, artifact dry-run entries,
+  continuation, reviewed isolated apply entries, and write planning dry-run all
+  use the same progression projection; only the model-output source differs.
+- Rejected alternatives:
+  - Dependency use: rejected because task proof, redaction, provider gating,
+    write authority, and result truth are local product semantics.
+  - Isolated source adoption: rejected because no narrow source component was
+    needed and copied names or fields would violate local product naming.
+  - Script-owned integration: rejected because verification scripts must remain
+    thin callers and cannot own task progression or terminal truth.
+  - Label-only integration: rejected because SP025 requires the product result
+    objects to expose a shared path across deterministic and live entries.
+- Expected callers: task assessment, live task report, host evaluation
+  summaries, explicit live verification scripts, evidence/result projections,
+  future artifact/manual-review gates, and product status surfaces.
+- Side-effect boundary: the progression path is deterministic and consumes
+  owner facts only. Provider calls remain in existing explicit opt-in gates;
+  file and command effects remain under sanctioned owners and
+  `ExecutionService`. This adoption does not add provider defaults, browser
+  automation, external tool servers, dynamic loading, command allowlist
+  expansion, arbitrary writers, real-workspace write authority, or private
+  provider material access.
+- Truthfulness boundary: progression stage readiness, provider turn, action,
+  observation, verification attempt, repair, dry-run diff, reviewed isolated
+  apply, artifact validation, host output, and live report status are not
+  task success. Complete remains owned by `evidence/task` and `result/task`;
+  missing proof stays partial, blocked, or not-proven.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts runtime/evaluation/task/liveRun.test.ts`
+  - `rtk npm run build:ts`
+  - Focused tests prove at least five deterministic cases carry the shared
+    prompt-to-verdict progression, at least four explicit live entries carry
+    the same progression, write planning reaches dry-run/manual-review without
+    complete proof, reviewed isolated apply entries require post-apply proof,
+    and terminal success remains false outside evidence/result.
+- Rollback plan: remove `progression.ts` and the progression fields from task
+  case and live run results, returning deterministic assessment and live run
+  reporting to separate projections without promoting any unproven success.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

@@ -48,6 +48,10 @@ import {
   type EvaluationCaseId,
   type EvaluationCaseResult,
 } from "../model.js";
+import {
+  projectCaseProgression,
+  type TaskProgression,
+} from "./progression.js";
 
 export type TaskOutcome =
   | "complete"
@@ -258,6 +262,7 @@ export interface TaskCaseResult {
   readonly taskProof: TaskProofInput;
   readonly taskVerdict: TaskVerdict;
   readonly proofRecord: TaskCaseProofRecord;
+  readonly progression: TaskProgression;
   readonly liveReadiness: TaskLiveReadiness;
   readonly hostEvaluation: TaskHostEvaluationSummary;
   readonly setupEvaluations: readonly TaskHostEvaluationSummary[];
@@ -617,7 +622,7 @@ async function runDefinedTaskCase(
       verificationExecution,
     );
 
-  return freeze({
+  const resultWithoutProgression = {
     caseId: definition.caseId,
     taskKind: definition.taskKind,
     taskPath: definition.taskPath,
@@ -663,6 +668,11 @@ async function runDefinedTaskCase(
       ...(outcome === "complete" ? [] : ["task-completion-not-proven"]),
       ...(outcome === "complete" ? [] : taskVerdict.notProvenClaims),
     ]),
+  } satisfies Omit<TaskCaseResult, "progression">;
+
+  return freeze({
+    ...resultWithoutProgression,
+    progression: projectCaseProgression(resultWithoutProgression),
   });
 }
 
