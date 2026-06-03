@@ -11,7 +11,9 @@ sections instead of appending progress logs.
 | `docs/sprint/current-capability-summary.md` | current | Code-backed summary of what this project has already absorbed and what remains unproven. |
 | `docs/sprint/component-adoption-log.md` | current | Controlled component and behavior adoption decisions, modes, boundaries, validation, and rollback plans. |
 | `docs/sprint/mature-agent-capability-map.md` | current | Capability extraction from the mature local implementation and public docs named in the blueprint. |
-| `docs/sprint/project-gap-and-priority-plan.md` | current | Aggressive but bounded batch plan for moving toward the mature capability set. |
+| `docs/sprint/task-capability-map.md` | current | Target model for reliable task completion across coding, non-code artifacts, collaboration, verification, recovery, host automation, and live execution. |
+| `docs/sprint/task-capability-gap-plan.md` | current | Gap assessment and aggressive implementation batches for shifting from trusted runtime facts to trusted task completion. |
+| `docs/sprint/project-gap-and-priority-plan.md` | current | Task-completion-driven priority plan, with historical trusted-runtime batches retained as completed foundation context. |
 | `docs/sprint/route/sp001-agent-capability-map-and-plan.md` | current route input | Original sprint objective and completion requirements. |
 | `docs/sprint/route/sp002-product-loop-truth-consolidation.md` | completed route input | Product loop truth consolidation objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp003-cli-status-envelope.md` | completed route input | CLI status envelope objective now reflected in current capability and priority docs. |
@@ -25,6 +27,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp011-controlled-multi-target-mutation-runtime.md` | completed route input | Controlled multi-target mutation runtime objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp012-bounded-parallel-mutation-runtime.md` | completed route input | Bounded parallel multi-target mutation runtime objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp013-runtime-host-api-and-distribution-surface.md` | completed route input | Runtime host API and package readiness surface objective now reflected in current capability, priority, and adoption-log docs. |
+| `docs/sprint/route/sp013-task-capability-direction-and-plan.md` | current route input | Task-capability planning objective that shifts the sprint from trusted runtime expansion toward trusted task completion. |
 
 ## Removed Or Merged Content
 
@@ -42,8 +45,11 @@ sections instead of appending progress logs.
   verified work proves a capability changed.
 - Update `mature-agent-capability-map.md` when new mature capability extraction
   changes the target capability model.
+- Update `task-capability-map.md` when the target task-completion model changes.
+- Update `task-capability-gap-plan.md` when task-completion gaps, batch gates,
+  or adoption recommendations change.
 - Update `project-gap-and-priority-plan.md` after each completed capability
-  batch so future work does not chase stale priorities.
+  batch so future work does not chase stale infrastructure-first priorities.
 - Keep `docs/DOC_STATUS.md` classified when adding durable sprint docs.
 - Do not use these docs as proof that product behavior exists. Product behavior
   must be proven by code, tests, command output, or runtime evidence.

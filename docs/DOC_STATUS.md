@@ -75,7 +75,9 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/current-capability-summary.md` | active | Checking code-backed current capability status and missing areas before planning new capability batches. |  | Sprint Knowledge Base |
 | `docs/sprint/component-adoption-log.md` | active | Checking controlled component or behavior adoption decisions, boundaries, validation evidence, and rollback plans for sprint capability work. |  | Sprint Knowledge Base |
 | `docs/sprint/mature-agent-capability-map.md` | active | Checking the full mature capability target extracted from the local implementation and public docs named in the blueprint. |  | Sprint Knowledge Base |
-| `docs/sprint/project-gap-and-priority-plan.md` | active | Selecting aggressive capability batches, owner domains, validation expectations, and anti-goals. |  | Sprint Knowledge Base |
+| `docs/sprint/task-capability-map.md` | active | Checking the target model for reliable task completion across coding, artifacts, collaboration, verification, recovery, host automation, and live execution. |  | Sprint Knowledge Base |
+| `docs/sprint/task-capability-gap-plan.md` | active | Selecting task-completion gaps, aggressive batches, adoption modes, completion gates, failure signals, and anti-goals. |  | Sprint Knowledge Base |
+| `docs/sprint/project-gap-and-priority-plan.md` | active | Selecting task-completion-driven priority batches while retaining completed trusted-runtime foundation context. |  | Sprint Knowledge Base |
 
 ## Implementation Context
 

@@ -57,6 +57,35 @@ owner. Python is offline evaluation only.
 
 ## Current Missing Areas
 
+- Real task completion is not broadly proven. Current evidence proves many
+  trusted runtime lanes, context/planning sub-capabilities, host automation
+  facts, and deterministic evaluation cases, but it does not prove that the
+  product can reliably complete underspecified real tasks across coding,
+  debugging, documents, reports, data analysis, slides, or artifact workflows.
+- Task-goal handling and ambiguity collaboration are not proven as a complete
+  product workflow. Planning tests can carry assumptions, constraints, task-kind
+  hints, and handoff facts, but the product does not yet have a broad
+  collaboration policy that asks the smallest useful question, revises plans
+  after user input, and resumes work with task state.
+- Workspace intelligence is partially proven, not complete. Bounded repository
+  discovery, staged context acquisition, graph/test-impact facts, continuation
+  memory, and stale/unsafe memory rejection are owner-tested under
+  `context/discovery`, `context/acquisition`, and `context/memory`, but they do
+  not prove full workspace understanding or target correctness for arbitrary
+  real tasks.
+- Planning is partially proven, not task execution. `planning/runtime` and
+  `planning/quality` can produce grounded analysis, executable plan facts, edit
+  target selection, verification intent, and no-write mutation handoff facts,
+  but those facts do not grant mutation authority, execute verification, or
+  prove task success.
+- Real task evaluation is missing. The deterministic host evaluation suite
+  proves structured runtime lanes and truth boundaries, not a broad real-task
+  bench with coding, debugging, artifact, data/report, and live-provider triage
+  rubrics.
+- Artifact workflow capability is missing as a first-class product owner.
+  Documents, reports, data outputs, slides, and exports do not yet have durable
+  artifact receipts, source policies, format validation, and task-specific
+  evidence/result verdicts.
 - A mature interactive CLI with full queue ergonomics, rich session management,
   and interactive compact/resume controls is not proven. Storage-backed branch
   and compaction facts now reach the product surface and CLI/session status, but
@@ -79,6 +108,10 @@ owner. Python is offline evaluation only.
   result lanes. Live provider behavior remains default-off and optional through
   explicit gates only; broad auth refresh and default live provider behavior are
   not product capabilities.
+- Provider prompting and live task behavior remain weak. Provider request,
+  response, stream, fallback, compatibility, and default-off gates are tested,
+  but provider-shaped task prompts, insufficient-output recovery, live debug
+  repair, and completed opt-in live task evidence are not broadly proven.
 - Dynamic extensions, package loading, executable hooks, and external tool
   server behavior are intentionally not enabled.
 - Tool execution is bounded by policy and `ExecutionService`; controlled

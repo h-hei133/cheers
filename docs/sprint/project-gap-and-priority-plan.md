@@ -1,13 +1,41 @@
 # Project Gap And Priority Plan
 
-This plan is aggressive on capability acquisition and conservative on secrets,
-execution, provider behavior, mutation, and truthfulness. A batch is complete
-only when the runtime path is proven by owner tests or focused integration
-evidence. Adding a field, adding a surface section, or writing docs alone is not
-completion.
+This plan now prioritizes trusted task completion over further trusted-runtime
+surface expansion. The runtime must stay conservative on secrets, execution,
+provider behavior, mutation, and truthfulness, but the next useful product
+milestone is completing real tasks with evidence, not merely reporting safe
+facts. A batch is complete only when task-relevant behavior is proven by owner
+tests, focused integration evidence, task-bench results, or explicitly gated
+live evidence. Adding one field, one surface section, one helper, or one more
+deterministic runtime case is not enough.
 
 ## Major Gaps
 
+- The main gap is no longer a single missing runtime projection. It is that
+  trusted runtime capability is ahead of task completion capability. The product
+  can preserve many distinctions, but cannot yet prove broad real task delivery
+  across coding, debugging, documents, reports, data analysis, slides, and other
+  artifact workflows.
+- Real task bench coverage is missing. Current deterministic host evaluation
+  proves bounded runtime lanes and truth boundaries; it does not prove that an
+  agent can take underspecified user goals through discovery, planning,
+  execution, debugging, verification, artifact delivery, and final proof.
+- Workspace intelligence and planning are partially proven through owner tests
+  for bounded discovery, staged acquisition, graph/test-impact facts,
+  continuation memory, analysis, plan facts, edit target selection, and
+  verification intent. They remain insufficient as broad proof of target
+  correctness, context completeness, or task success.
+- User collaboration and ambiguity handling are narrow. The product needs
+  explicit goal facts, question/assumption/block decisions, plan revision after
+  user input, and continuation of the task state, not just prompt or session
+  continuity.
+- Artifact workflows are missing as first-class owners. Non-code task delivery
+  needs artifact intent, source receipts, durable outputs, format/render checks,
+  and evidence/result verdicts.
+- Provider prompting and live task recovery are weak. The provider boundary is
+  default-off and truth-preserving, but task-shaped prompting, response
+  insufficiency handling, live debug repair, and live-provider task triage are
+  not broadly proven.
 - Product loop truth, the CLI/session status envelope, a bounded synthetic
   provider-to-tool-to-next-turn runtime lane, a controlled provider/model
   runtime boundary, a controlled mutation recovery lane, and a storage-backed
@@ -57,6 +85,25 @@ completion.
 - Verification/repair can prove repair-to-success through the product path for
   controlled mutation recovery; broader task-relevant verification planning
   across arbitrary tools and live-provider cases remains unproven.
+
+## Immediate Task-Completion Batches
+
+The detailed batch definitions are in
+`docs/sprint/task-capability-gap-plan.md`. These are the next priority groups:
+
+1. Real task bench and live-provider capability triage.
+2. Workspace intelligence and context strategy.
+3. Planning, tool policy, and user collaboration.
+4. Live debug and repair loop.
+5. Artifact workflow capability for non-code tasks.
+6. Provider prompting and response shaping.
+7. Product workflow and automation hardening.
+8. Product-layer versus engine-boundary decision.
+
+These batches intentionally merge capabilities that must work together for a
+useful task. Do not split them into tiny routes for one field, one projection,
+one status section, or one helper unless a route is explicitly scoped as a
+sub-step toward one of these batch gates.
 
 ## Immediate Sprint Batches
 
