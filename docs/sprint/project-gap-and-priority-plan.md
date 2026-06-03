@@ -17,12 +17,13 @@ deterministic runtime case is not enough.
   across coding, debugging, documents, reports, data analysis, slides, and other
   artifact workflows.
 - Real task bench coverage is still narrow. Current deterministic host
-  evaluation has advanced to deterministic task assessment coverage with
+  evaluation has advanced to audited deterministic task assessment coverage with
   context selection, execution planning, task request packets, tool strategy,
   verification selection/execution, artifact receipt/correction, repair
-  decision/action, task proof, task verdict, and before/after blocker facts,
-  but it still does not prove broad real task completion. Current task
-  assessment results are 7 complete, 1 partial, 1 skipped, and 1 unsupported.
+  decision/action, task proof, task verdict, proof records, negative controls,
+  default-off live readiness facts, and before/after blocker facts, but it
+  still does not prove broad real task completion. Current task assessment
+  results are 7 complete, 1 partial, 1 skipped, and 1 unsupported.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, plan facts, edit target selection, and
@@ -97,32 +98,37 @@ The detailed batch definitions are in
 1. Complete post-repair verification proof for the remaining partial rollback
    recovery case, now focused on turning bounded partial repair into
    task-relevant final verification without hiding the original failure.
-2. Live debug and repair loop, now focused on real post-repair verification and
+2. Opt-in live task triage through existing gates, now focused on clearing
+   provider/auth readiness, manual-review, verification, and artifact-validation
+   blockers without enabling live defaults.
+3. Live debug and repair loop, now focused on real post-repair verification and
    original-failure preservation beyond deterministic partial progress.
-3. Artifact workflow capability for non-code tasks, now moving from
+4. Artifact workflow capability for non-code tasks, now moving from
    deterministic receipts/correction toward durable artifact production and
    validation.
-4. Real task bench and live-provider capability triage.
-5. Workspace intelligence and context strategy.
-6. Planning, tool policy, and user collaboration.
-7. Provider prompting and response shaping.
-8. Product workflow and automation hardening.
-9. Product-layer versus engine-boundary decision.
+5. Real task bench and live-provider capability triage.
+6. Workspace intelligence and context strategy.
+7. Planning, tool policy, and user collaboration.
+8. Provider prompting and response shaping.
+9. Product workflow and automation hardening.
+10. Product-layer versus engine-boundary decision.
 
 These batches intentionally merge capabilities that must work together for a
 useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Measured SP017 blockers now set the immediate order: `rollback-recovery` is the
+Audited SP018 blockers now set the immediate order: `rollback-recovery` is the
 only remaining deterministic partial case because post-repair verification is
 still partial and the task verdict keeps `completion proof missing`. The skipped
-live triage case still carries environment/provider blockers. The former
-failed, blocked, and not-proven task cases now complete only where task proof
-and result verdict own task-relevant completion; selected, executed, repaired,
-corrected, refreshed, or host-observed facts still are not success by
-themselves. Live triage remains skipped by default and must not be treated as
-live execution proof.
+live triage case still carries provider/auth readiness blockers, write-capable
+cases are unsafe without manual review, read/continuation cases are blocked on
+provider/auth readiness, and the unsupported export stays unsupported. The
+former failed, blocked, and not-proven task cases now complete only where task
+proof records, evidence/task input, and result/task verdict own task-relevant
+completion; selected, executed, repaired, corrected, refreshed, host-observed,
+or live-readiness facts still are not success by themselves. Live triage remains
+skipped by default and must not be treated as live execution proof.
 
 ## Immediate Sprint Batches
 

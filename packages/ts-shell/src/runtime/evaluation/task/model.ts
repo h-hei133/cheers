@@ -58,6 +58,17 @@ export type TaskOutcome =
   | "unsupported"
   | "not-proven";
 
+export type TaskLiveReadinessStatus = "ready" | "blocked" | "skipped" | "unsupported" | "unsafe";
+
+export type TaskLiveReadinessBlocker =
+  | "missing provider config"
+  | "missing auth readiness"
+  | "unsupported task path"
+  | "verification unavailable"
+  | "artifact validation unavailable"
+  | "continuation stale"
+  | "manual review needed";
+
 export type TaskKind =
   | "coding-edit"
   | "debug-repair"
@@ -189,6 +200,8 @@ export interface TaskCaseResult {
   readonly verificationExecution: VerificationExecution;
   readonly taskProof: TaskProofInput;
   readonly taskVerdict: TaskVerdict;
+  readonly proofRecord: TaskCaseProofRecord;
+  readonly liveReadiness: TaskLiveReadiness;
   readonly hostEvaluation: TaskHostEvaluationSummary;
   readonly setupEvaluations: readonly TaskHostEvaluationSummary[];
   readonly failureCategories: readonly TaskFailureCategory[];
@@ -216,6 +229,29 @@ export interface TaskHostEvaluationSummary {
   readonly notProvenClaims: readonly string[];
 }
 
+export interface TaskCaseProofRecord {
+  readonly taskKind: TaskKind;
+  readonly requiredProof: readonly string[];
+  readonly presentProof: readonly string[];
+  readonly missingProof: readonly string[];
+  readonly validationResult: TaskProofInput["status"];
+  readonly evidenceInput: string;
+  readonly resultVerdict: string;
+  readonly incompleteWhen: readonly string[];
+  readonly redactionStatus: "passed" | "failed";
+  readonly liveReadinessStatus: TaskLiveReadinessStatus;
+  readonly terminalSuccessClaim: false;
+}
+
+export interface TaskLiveReadiness {
+  readonly caseId: TaskCaseId;
+  readonly status: TaskLiveReadinessStatus;
+  readonly blockers: readonly TaskLiveReadinessBlocker[];
+  readonly defaultOff: true;
+  readonly optInRequired: true;
+  readonly terminalSuccessClaim: false;
+}
+
 export interface TaskBlockerSummary {
   readonly category: TaskFailureCategory;
   readonly count: number;
@@ -233,6 +269,7 @@ export interface TaskAssessmentResult {
     readonly blockers: readonly string[];
     readonly terminalSuccessClaim: false;
   };
+  readonly liveReadiness: readonly TaskLiveReadiness[];
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
 }
@@ -288,6 +325,7 @@ export async function runTaskAssessment(input: {
     outcomeCounts: outcomeCounts(cases),
     topBlockers: summarizeTopBlockers(cases),
     liveTriage: liveTriageFor(cases),
+    liveReadiness: freeze(cases.map((result) => result.liveReadiness)),
     terminalSuccessClaim: false,
     notProvenClaims: unique([
       "terminal-success",
@@ -408,6 +446,7 @@ async function runDefinedTaskCase(
     hostStatus: hostEvaluation.observedStatus,
   });
   const taskVerdict = projectTaskVerdict({ proof: taskProof });
+  const liveReadiness = liveReadinessFor(definition, contextSelection, verificationExecution, artifactReceipt);
   const outcome = classifyOutcome(
     definition,
     hostEvaluation,
@@ -423,6 +462,14 @@ async function runDefinedTaskCase(
     ...hostEvaluation.redactionChecks,
     ...definition.redactionExpectations.map((label) => ({ label, passed: true })),
   ];
+  const redactionStatus = redactionChecks.every((check) => check.passed) ? "passed" : "failed";
+  const proofRecord = proofRecordFor({
+    definition,
+    taskProof,
+    taskVerdict,
+    redactionStatus,
+    liveReadiness,
+  });
   const beforeBlockers = definition.baselineFailureCategories ?? definition.failureCategories;
   const failureCategories = outcome === "complete"
     ? []
@@ -464,6 +511,8 @@ async function runDefinedTaskCase(
     verificationExecution,
     taskProof,
     taskVerdict,
+    proofRecord,
+    liveReadiness,
     hostEvaluation: projectHostEvaluationSummary(hostEvaluation),
     setupEvaluations,
     failureCategories,
@@ -481,6 +530,82 @@ async function runDefinedTaskCase(
       ...(outcome === "complete" ? [] : ["task-completion-not-proven"]),
       ...(outcome === "complete" ? [] : taskVerdict.notProvenClaims),
     ]),
+  });
+}
+
+function proofRecordFor(input: {
+  readonly definition: TaskCaseDefinition;
+  readonly taskProof: TaskProofInput;
+  readonly taskVerdict: TaskVerdict;
+  readonly redactionStatus: "passed" | "failed";
+  readonly liveReadiness: TaskLiveReadiness;
+}): TaskCaseProofRecord {
+  return freeze({
+    taskKind: input.definition.taskKind,
+    requiredProof: freeze([...input.taskProof.requiredProof]),
+    presentProof: freeze([...input.taskProof.presentProof]),
+    missingProof: freeze([...input.taskProof.missingProof]),
+    validationResult: input.taskProof.status,
+    evidenceInput: input.taskProof.proofId,
+    resultVerdict: input.taskVerdict.verdictId,
+    incompleteWhen: incompleteWhenFor(input.taskProof.requiredProof),
+    redactionStatus: input.redactionStatus,
+    liveReadinessStatus: input.liveReadiness.status,
+    terminalSuccessClaim: false,
+  });
+}
+
+function incompleteWhenFor(requiredProof: readonly string[]): readonly string[] {
+  return freeze(requiredProof.map((item) => `missing ${item}`));
+}
+
+function liveReadinessFor(
+  definition: TaskCaseDefinition,
+  contextSelection: ContextSelection,
+  verificationExecution: VerificationExecution,
+  artifactReceipt: ArtifactReceipt | undefined,
+): TaskLiveReadiness {
+  if (definition.expectedOutcome === "unsupported") {
+    return liveReadiness(definition.caseId, "unsupported", ["unsupported task path"]);
+  }
+  if (definition.taskKind === "live-triage") {
+    return liveReadiness(definition.caseId, "skipped", ["missing provider config", "missing auth readiness"]);
+  }
+  if (definition.allowedWrites.length > 0) {
+    return liveReadiness(definition.caseId, "unsafe", [
+      "missing provider config",
+      "missing auth readiness",
+      "manual review needed",
+    ]);
+  }
+  const blockers: TaskLiveReadinessBlocker[] = ["missing provider config", "missing auth readiness"];
+  if (verificationExecution.state !== "passed" && definition.taskKind !== "continuation") {
+    blockers.push("verification unavailable");
+  }
+  if (
+    artifactReceipt &&
+    artifactReceipt.validationState !== "validation-passed"
+  ) {
+    blockers.push("artifact validation unavailable");
+  }
+  if (definition.taskKind === "continuation" && !contextSelection.refreshed) {
+    blockers.push("continuation stale");
+  }
+  return liveReadiness(definition.caseId, blockers.length === 0 ? "ready" : "blocked", blockers);
+}
+
+function liveReadiness(
+  caseId: TaskCaseId,
+  status: TaskLiveReadinessStatus,
+  blockers: readonly TaskLiveReadinessBlocker[],
+): TaskLiveReadiness {
+  return freeze({
+    caseId,
+    status,
+    blockers: freeze(unique(blockers)),
+    defaultOff: true,
+    optInRequired: true,
+    terminalSuccessClaim: false,
   });
 }
 

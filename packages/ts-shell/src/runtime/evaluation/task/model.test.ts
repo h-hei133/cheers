@@ -89,6 +89,20 @@ describe("task capability assessment", () => {
       terminalSuccessClaim: false,
     });
     expect(result.liveTriage.blockers.length).toBeGreaterThan(0);
+    expect(Object.fromEntries(result.liveReadiness.map((item) => [item.caseId, item.status]))).toMatchObject({
+      "single-file-edit": "unsafe",
+      "coordinated-edit": "unsafe",
+      "failed-check-repair": "unsafe",
+      "rollback-recovery": "unsafe",
+      "pathless-workspace-question": "blocked",
+      "source-report": "unsafe",
+      "structured-artifact": "unsafe",
+      "unsupported-artifact-export": "unsupported",
+      "resume-from-context": "blocked",
+      "live-provider-triage": "skipped",
+    });
+    expect(result.liveReadiness.every((item) => item.defaultOff && item.optInRequired)).toBe(true);
+    expect(result.liveReadiness.every((item) => item.terminalSuccessClaim === false)).toBe(true);
     expect(result.notProvenClaims).toEqual(
       expect.arrayContaining([
         "terminal-success",
@@ -96,6 +110,39 @@ describe("task capability assessment", () => {
         "host-evaluation-output-is-not-task-success",
       ]),
     );
+  });
+
+  it("records task proof facts for every complete case", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskAssessment({ dispatch: host.dispatch });
+    const completeCases = result.cases.filter((taskCase) => taskCase.outcome === "complete");
+
+    expect(completeCases.map((taskCase) => taskCase.caseId)).toEqual([
+      "single-file-edit",
+      "coordinated-edit",
+      "failed-check-repair",
+      "pathless-workspace-question",
+      "source-report",
+      "structured-artifact",
+      "resume-from-context",
+    ]);
+    for (const taskCase of completeCases) {
+      expect(taskCase.proofRecord).toMatchObject({
+        taskKind: taskCase.taskKind,
+        missingProof: [],
+        validationResult: "complete",
+        evidenceInput: taskCase.taskProof.proofId,
+        resultVerdict: taskCase.taskVerdict.verdictId,
+        redactionStatus: "passed",
+        terminalSuccessClaim: false,
+      });
+      expect(taskCase.taskProof.evidenceOwner).toBe("evidence");
+      expect(taskCase.taskVerdict.successOwner).toBe("evidence-result-verdict");
+      expect(taskCase.proofRecord.requiredProof.length).toBeGreaterThan(0);
+      expect(taskCase.proofRecord.incompleteWhen).toEqual(
+        taskCase.proofRecord.requiredProof.map((item) => `missing ${item}`),
+      );
+    }
   });
 
   it("supports selected task subsets without upgrading host output to success", async () => {

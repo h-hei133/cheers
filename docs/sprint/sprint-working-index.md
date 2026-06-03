@@ -32,6 +32,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp015-task-verification-artifact-and-repair-loop.md` | completed route input | Verification selection, artifact receipt, repair decision, and task blocker reclassification objective now reflected in current capability and priority docs. |
 | `docs/sprint/route/sp016-autonomous-task-outcome-transplant.md` | completed route input | Deterministic context, planning, request, tool strategy, repair action, artifact correction, verification execution, and task outcome improvement objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp017-task-path-parity-transplant.md` | completed route input | Task proof and task verdict objective now reflected in current capability, priority, and adoption-log docs. |
+| `docs/sprint/route/sp018-task-proof-audit-and-live-bridge.md` | completed route input | Task proof audit, fake-complete controls, and default-off live readiness bridge objective now reflected in current capability, priority, and adoption-log docs. |
 
 ## Removed Or Merged Content
 

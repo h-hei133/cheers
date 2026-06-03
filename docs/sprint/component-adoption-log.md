@@ -140,6 +140,58 @@ focused validation.
   return the completed target cases to partial rather than allowing host output
   or task-lane progress to stand in for evidence/result completion.
 
+## Task Proof Review And Live Readiness Bridge
+
+- Selected mode: structured port for local proof-record and live-readiness
+  contracts, with behavior-only alignment for opt-in live task triage.
+- Owner domain: `evidence/task`, `result/task`, and
+  `runtime/evaluation/task`.
+- Reason for use: SP018 needed every deterministic complete task case to carry
+  auditable task-relevant proof and needed live task triage facts without
+  enabling live providers or treating readiness as execution proof.
+- Behavior to port: per-case proof records tying required proof, present proof,
+  evidence input, result verdict, redaction status, and live readiness status;
+  negative controls for missing proof classes; default-off readiness facts for
+  ready, blocked, skipped, unsupported, and unsafe live task states.
+- Rejected alternatives:
+  - Dependency use: rejected because proof records, redaction expectations,
+    live gating, and task verdict semantics are local product contracts.
+  - Isolated source adoption: rejected because no narrow source component was
+    needed and external naming or field shapes would not fit local owner
+    boundaries.
+  - Host-output review: rejected because host output remains observation, not
+    task success.
+  - Live-provider run by default: rejected because live providers must remain
+    explicit opt-in with clean homes and no manual secret inspection.
+- Expected callers: task assessment, future host task summaries,
+  evidence/result projections, artifact workflows, repair loops, continuation
+  checks, and future opt-in live triage gates.
+- Side-effect boundary: proof records and live readiness are deterministic and
+  pure. They do not read or write files, run commands, invoke providers,
+  inspect provider configuration, broaden allowlists, enable live defaults, or
+  access real provider material.
+- Truthfulness boundary: proof record creation, host output, task readiness,
+  provider/auth readiness, manual review status, verification attempt, artifact
+  presence, repair attempt, and live-readiness facts are not success. Completion
+  still requires evidence/task proof and result/task verdict with no missing
+  proof.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts`
+  - Current deterministic coverage audits `single-file-edit`,
+    `coordinated-edit`, `failed-check-repair`,
+    `pathless-workspace-question`, `source-report`, `structured-artifact`, and
+    `resume-from-context` as complete through proof records.
+  - Negative controls reject missing final verification, missing post-repair
+    validation, missing source receipts, invalid structured-artifact
+    validation, stale continuation context, host output without task proof, and
+    artifact presence without validation.
+  - Live readiness remains default-off and no live provider is required for
+    normal validation.
+- Rollback plan: remove proof-record and live-readiness fields from task
+  assessment and keep existing task proof/verdict handoff; affected live task
+  claims would return to skipped or blocked rather than becoming unproven
+  success.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.
