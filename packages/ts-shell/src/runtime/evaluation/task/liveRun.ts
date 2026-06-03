@@ -11,9 +11,12 @@ import {
   type TaskLiveSafetyClass,
 } from "./model.js";
 import {
-  projectLiveEntryProgression,
+  projectTaskLoopProgression,
+  runTaskLoop,
+  statusFromString,
+  stepOutput,
   type TaskProgression,
-} from "./progression.js";
+} from "./loop.js";
 
 export type TaskLiveEntryId =
   | "single-file-edit"
@@ -332,13 +335,13 @@ export async function runTaskLiveReport(input: {
   const executionByCaseId = new Map(assessment.liveExecutions.map((execution) => [execution.caseId, execution]));
   const observationsByEntryId = new Map(input.observations?.map((observation) => [observation.entryId, observation]) ?? []);
 
-  const results = entries.map((entry) => {
+  const results = await Promise.all(entries.map(async (entry) => {
     if (entry.taskCaseId) {
       const taskResult = resultByCaseId.get(entry.taskCaseId);
       const execution = executionByCaseId.get(entry.taskCaseId);
       const observation = observationsByEntryId.get(entry.entryId);
       if (!taskResult || !execution) {
-        return notRunEntry(entry, ["task case result missing"]);
+        return await notRunEntry(entry, ["task case result missing"]);
       }
       const resultWithoutProgression = {
         entryId: entry.entryId,
@@ -376,15 +379,15 @@ export async function runTaskLiveReport(input: {
       } satisfies Omit<TaskLiveRunEntryResult, "progression">;
       return freeze({
         ...resultWithoutProgression,
-        progression: projectLiveEntryProgression({
+        progression: await projectLiveProgressionThroughLoop({
           entry,
           result: resultWithoutProgression,
           observation,
         }),
       } satisfies TaskLiveRunEntryResult);
     }
-    return externalEntryResult(entry, observationsByEntryId.get(entry.entryId));
-  });
+    return await externalEntryResult(entry, observationsByEntryId.get(entry.entryId));
+  }));
   const summary = summarizeLiveRun(results);
   return freeze({
     reportId: "task-live-run",
@@ -417,10 +420,138 @@ function liveEntry(input: Omit<TaskLiveEntry, "defaultOff" | "optInRequired" | "
   });
 }
 
-function externalEntryResult(
+async function projectLiveProgressionThroughLoop(input: {
+  readonly entry: TaskLiveEntry;
+  readonly result: Omit<TaskLiveRunEntryResult, "progression">;
+  readonly observation?: TaskLiveRunObservation;
+}): Promise<TaskProgression> {
+  const result = input.result;
+  const observation = input.observation;
+  const completeProof = result.status === "complete" && result.proofStatus === "complete";
+  const loop = await runTaskLoop({
+    mode: "live",
+    modelSource: observation ? "explicit-live-gate" : "not-run",
+    notProvenClaims: result.notProvenClaims,
+    steps: [
+      {
+        key: "goal",
+        stage: "goal",
+        owner: "runtime/evaluation/task",
+        run: () => stepOutput(input.entry, "ready", [
+          input.entry.entryId,
+          input.entry.entryKind,
+          input.entry.writePolicy,
+        ]),
+      },
+      {
+        key: "state",
+        stage: "state",
+        owner: "runtime/evaluation/task",
+        run: () => stepOutput(result.status, statusFromString(result.status), [
+          `executed:${result.executed}`,
+          `defaultOff:${result.defaultOff}`,
+        ]),
+      },
+      {
+        key: "context",
+        stage: "context",
+        owner: "context/selection",
+        run: () => stepOutput(observation, observation ? "ready" : "not-run", [
+          input.entry.gate,
+        ]),
+      },
+      {
+        key: "plan",
+        stage: "plan",
+        owner: "planning/execution",
+        run: () => stepOutput(result.safePlanStatus, statusFromString(result.safePlanStatus), [
+          input.entry.validationPlan,
+        ]),
+      },
+      {
+        key: "request",
+        stage: "request",
+        owner: "provider/request",
+        run: () => stepOutput(result.providerAttempted, observation ? "ready" : "not-run", [
+          `providerAttempted:${result.providerAttempted}`,
+        ]),
+      },
+      {
+        key: "providerTurn",
+        stage: "provider-turn",
+        owner: "provider/response",
+        run: () => stepOutput(result.providerOutcome, statusFromString(result.providerOutcome), [
+          `providerOutcome:${result.providerOutcome}`,
+          `fallbackAttempted:${observation?.fallbackAttempted === true}`,
+        ]),
+      },
+      {
+        key: "action",
+        stage: "action",
+        owner: actionOwner(input.entry),
+        run: () => stepOutput(result, actionStatus(result), [
+          `patchIntent:${result.patchIntentStatus}`,
+          `dryRunDiff:${result.dryRunDiffStatus}`,
+          `apply:${result.applyStatus}`,
+        ]),
+      },
+      {
+        key: "observation",
+        stage: "observation",
+        owner: "runtime/evaluation/task",
+        run: () => stepOutput(result.changedFiles, result.executed ? "passed" : statusFromString(result.status), [
+          `changedFiles:${result.changedFiles.length}`,
+          `noMutation:${result.noMutation}`,
+          `noApply:${result.noApply}`,
+        ]),
+      },
+      {
+        key: "verification",
+        stage: "verification",
+        owner: "verification/execution",
+        run: () => stepOutput(result.verificationStatus, statusFromString(result.verificationStatus), [
+          `postApply:${result.postApplyVerificationStatus}`,
+        ]),
+      },
+      {
+        key: "repair",
+        stage: "repair",
+        owner: "repair/loop",
+        run: () => stepOutput(result.rollbackStatus, result.rollbackStatus === "not-run"
+          ? "not-run"
+          : statusFromString(result.rollbackStatus), [
+          `rollback:${result.rollbackStatus}`,
+        ]),
+      },
+      {
+        key: "proof",
+        stage: "proof",
+        owner: "evidence/task",
+        run: () => stepOutput(result.proofStatus, statusFromString(result.proofStatus), [
+          `proofItems:${result.proofItems.length}`,
+        ]),
+      },
+      {
+        key: "verdict",
+        stage: "verdict",
+        owner: "result/task",
+        run: () => stepOutput(result.status, completeProof ? "passed" : "not-proven", [
+          `status:${result.status}`,
+        ]),
+      },
+    ],
+  });
+  return projectTaskLoopProgression({
+    loop,
+    completeProof,
+    notProvenClaims: result.notProvenClaims,
+  });
+}
+
+async function externalEntryResult(
   entry: TaskLiveEntry,
   observation: TaskLiveRunObservation | undefined,
-): TaskLiveRunEntryResult {
+): Promise<TaskLiveRunEntryResult> {
   if (!observation) {
     return notRunEntry(entry, [`explicit opt-in gate not executed: ${entry.gate}`]);
   }
@@ -467,7 +598,7 @@ function externalEntryResult(
   } satisfies Omit<TaskLiveRunEntryResult, "progression">;
   return freeze({
     ...resultWithoutProgression,
-    progression: projectLiveEntryProgression({
+    progression: await projectLiveProgressionThroughLoop({
       entry,
       result: resultWithoutProgression,
       observation,
@@ -475,7 +606,7 @@ function externalEntryResult(
   } satisfies TaskLiveRunEntryResult);
 }
 
-function notRunEntry(entry: TaskLiveEntry, blockers: readonly string[]): TaskLiveRunEntryResult {
+async function notRunEntry(entry: TaskLiveEntry, blockers: readonly string[]): Promise<TaskLiveRunEntryResult> {
   const resultWithoutProgression = {
     entryId: entry.entryId,
     entryKind: entry.entryKind,
@@ -512,7 +643,7 @@ function notRunEntry(entry: TaskLiveEntry, blockers: readonly string[]): TaskLiv
   } satisfies Omit<TaskLiveRunEntryResult, "progression">;
   return freeze({
     ...resultWithoutProgression,
-    progression: projectLiveEntryProgression({
+    progression: await projectLiveProgressionThroughLoop({
       entry,
       result: resultWithoutProgression,
     }),
@@ -571,6 +702,24 @@ function externalObservationBlockers(
   }
   if (observation.exactBlocker && blockers.length > 0) blockers.push(observation.exactBlocker);
   return unique(blockers);
+}
+
+function actionOwner(entry: TaskLiveEntry): string {
+  if (entry.entryKind === "report-artifact" || entry.entryKind === "data-artifact") return "artifacts/workflow";
+  if (
+    entry.entryKind === "write-edit" ||
+    entry.entryKind === "write-repair" ||
+    entry.entryKind === "write-rollback" ||
+    entry.entryKind === "write-planning"
+  ) return "edit";
+  return "tools/policy";
+}
+
+function actionStatus(result: Omit<TaskLiveRunEntryResult, "progression">) {
+  if (result.applyStatus === "applied") return "passed";
+  if (result.dryRunDiffStatus === "produced") return "partial";
+  if (result.executed) return "passed";
+  return statusFromString(result.status);
 }
 
 function externalProofItems(observation: TaskLiveRunObservation): readonly string[] {

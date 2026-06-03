@@ -139,8 +139,18 @@ describe("task live run report", () => {
       result.progression.stages.map((stage) => stage.stage).includes("provider-turn") &&
       result.progression.stages.map((stage) => stage.stage).includes("verdict")
     );
-    expect(liveProgressions.length).toBeGreaterThanOrEqual(4);
+    expect(liveProgressions.length).toBeGreaterThanOrEqual(6);
     expect(liveProgressions.every((result) => result.progression.terminalSuccessClaim === false)).toBe(true);
+    expect(liveProgressions.every((result) =>
+      result.progression.ownerCalls.includes("runtime/evaluation/task") &&
+      result.progression.ownerCalls.includes("context/selection") &&
+      result.progression.ownerCalls.includes("planning/execution") &&
+      result.progression.ownerCalls.includes("provider/request") &&
+      result.progression.ownerCalls.includes("provider/response") &&
+      result.progression.ownerCalls.includes("verification/execution") &&
+      result.progression.ownerCalls.includes("evidence/task") &&
+      result.progression.ownerCalls.includes("result/task")
+    )).toBe(true);
     expect(report.results.find((result) => result.entryId === "write-planning-dry-run")).toMatchObject({
       executed: true,
       status: "manual-review-required",

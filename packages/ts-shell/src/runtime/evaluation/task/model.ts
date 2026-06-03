@@ -49,6 +49,12 @@ import {
   type EvaluationCaseResult,
 } from "../model.js";
 import {
+  runTaskLoop,
+  stepOutput,
+  statusFromString,
+  type TaskLoopRun,
+} from "./loop.js";
+import {
   projectCaseProgression,
   type TaskProgression,
 } from "./progression.js";
@@ -262,6 +268,7 @@ export interface TaskCaseResult {
   readonly taskProof: TaskProofInput;
   readonly taskVerdict: TaskVerdict;
   readonly proofRecord: TaskCaseProofRecord;
+  readonly taskLoop: TaskLoopRun;
   readonly progression: TaskProgression;
   readonly liveReadiness: TaskLiveReadiness;
   readonly hostEvaluation: TaskHostEvaluationSummary;
@@ -287,6 +294,13 @@ export interface TaskHostEvaluationSummary {
   readonly eventCount: number;
   readonly eventCategories: readonly string[];
   readonly blockerCodes: readonly string[];
+  readonly blockers: readonly {
+    readonly code: string;
+  }[];
+  readonly redactionChecks: readonly {
+    readonly label: string;
+    readonly passed: boolean;
+  }[];
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
 }
@@ -389,6 +403,15 @@ export interface TaskAssessmentResult {
   readonly notProvenClaims: readonly string[];
 }
 
+interface LoopVerificationOutput {
+  readonly verificationSelection: VerificationSelection;
+  readonly artifactReceipt?: ArtifactReceipt;
+  readonly repairDecision: RepairDecision;
+  readonly repairAction: RepairAction;
+  readonly artifactCorrection?: ArtifactCorrection;
+  readonly verificationExecution: VerificationExecution;
+}
+
 export function listTaskCases(): readonly TaskCaseDefinition[] {
   return freeze([
     singleFileEdit(),
@@ -469,114 +492,292 @@ async function runDefinedTaskCase(
   definition: TaskCaseDefinition,
   dispatch: (command: unknown) => Promise<HostCommandResponse>,
 ): Promise<TaskCaseResult> {
-  const setupEvaluations: TaskHostEvaluationSummary[] = [];
-  for (const setupCaseId of definition.setupEvaluationCaseIds ?? []) {
-    setupEvaluations.push(projectHostEvaluationSummary(
-      await runEvaluationCase({ caseId: setupCaseId, dispatch }),
-    ));
-  }
-  const hostEvaluation = await runEvaluationCase({
-    caseId: definition.hostEvaluationCaseId,
-    dispatch,
+  const taskLoop = await runTaskLoop({
+    mode: "deterministic",
+    modelSource: "deterministic-evaluation",
+    notProvenClaims: ["deterministic-task-loop-run-is-not-task-success"],
+    steps: [
+      {
+        key: "goal",
+        stage: "goal",
+        owner: "runtime/evaluation/task",
+        run: () => stepOutput(definition, "ready", [
+          definition.caseId,
+          definition.taskKind,
+          definition.taskPath,
+        ]),
+      },
+      {
+        key: "setupEvaluations",
+        stage: "state",
+        owner: "runtime/evaluation",
+        run: async () => {
+          const setupEvaluations: TaskHostEvaluationSummary[] = [];
+          for (const setupCaseId of definition.setupEvaluationCaseIds ?? []) {
+            setupEvaluations.push(projectHostEvaluationSummary(
+              await runEvaluationCase({ caseId: setupCaseId, dispatch }),
+            ));
+          }
+          return stepOutput(setupEvaluations, statusFromString(definition.baselineOutcome ?? definition.expectedOutcome), [
+            `before:${definition.baselineOutcome ?? definition.expectedOutcome}`,
+            `setup:${setupEvaluations.length}`,
+          ]);
+        },
+      },
+      {
+        key: "contextSelection",
+        stage: "context",
+        owner: "context/selection",
+        run: (outputs) => {
+          const setupEvaluations = loopValue<readonly TaskHostEvaluationSummary[]>(outputs, "setupEvaluations");
+          const contextSelection = selectContext({
+            taskKind: definition.taskKind,
+            taskPath: definition.taskPath,
+            shortPrompt: definition.shortPrompt,
+            workspaceFiles: definition.workspace.files,
+            requiredPaths: definition.expectedOutput.requiredPaths,
+            continuationAvailable: setupEvaluations.length > 0 || definition.taskKind !== "continuation",
+            failureCategories: definition.failureCategories,
+          });
+          return stepOutput(contextSelection, statusFromString(contextSelection.state), [
+            `selected:${contextSelection.selectedPaths.length}`,
+            `refreshed:${contextSelection.refreshed}`,
+          ]);
+        },
+      },
+      {
+        key: "executionPlan",
+        stage: "plan",
+        owner: "planning/execution",
+        run: (outputs) => {
+          const contextSelection = loopValue<ContextSelection>(outputs, "contextSelection");
+          const executionPlan = buildExecutionPlan({
+            taskKind: definition.taskKind,
+            outputKind: definition.expectedOutput.kind,
+            allowedTools: definition.allowedTools,
+            allowedWrites: definition.allowedWrites,
+            successRubric: definition.successRubric,
+            context: contextSelection,
+          });
+          return stepOutput(executionPlan, statusFromString(executionPlan.state), [
+            `steps:${executionPlan.steps.length}`,
+          ]);
+        },
+      },
+      {
+        key: "requestPacket",
+        stage: "request",
+        owner: "provider/request",
+        run: (outputs) => {
+          const contextSelection = loopValue<ContextSelection>(outputs, "contextSelection");
+          const executionPlan = loopValue<ExecutionPlan>(outputs, "executionPlan");
+          const requestPacket = buildTaskRequestPacket({
+            shortPrompt: definition.shortPrompt,
+            taskKind: definition.taskKind,
+            context: contextSelection,
+            plan: executionPlan,
+          });
+          return stepOutput(requestPacket, statusFromString(requestPacket.state), [
+            `contextPaths:${requestPacket.contextPaths.length}`,
+            `planSteps:${requestPacket.planSteps.length}`,
+          ]);
+        },
+      },
+      {
+        key: "hostEvaluation",
+        stage: "provider-turn",
+        owner: "runtime/evaluation",
+        run: async () => {
+          const hostEvaluation = projectHostEvaluationSummary(await runEvaluationCase({
+            caseId: definition.hostEvaluationCaseId,
+            dispatch,
+          }));
+          return stepOutput(hostEvaluation, statusFromString(hostEvaluation.observedStatus), [
+            hostEvaluation.scenarioId,
+            hostEvaluation.observedEvidenceVerdict,
+          ]);
+        },
+      },
+      {
+        key: "toolStrategy",
+        stage: "action",
+        owner: "tools/policy",
+        run: (outputs) => {
+          const executionPlan = loopValue<ExecutionPlan>(outputs, "executionPlan");
+          const requestPacket = loopValue<TaskRequestPacket>(outputs, "requestPacket");
+          const toolStrategy = chooseToolStrategy({
+            allowedTools: definition.allowedTools,
+            plan: executionPlan,
+            request: requestPacket,
+          });
+          return stepOutput(toolStrategy, statusFromString(toolStrategy.state), [
+            `actions:${toolStrategy.actions.length}`,
+          ]);
+        },
+      },
+      {
+        key: "observedVerification",
+        stage: "observation",
+        owner: "runtime/evaluation/task",
+        run: (outputs) => {
+          const hostEvaluation = loopValue<TaskHostEvaluationSummary>(outputs, "hostEvaluation");
+          const observedVerification = {
+            status: observedVerificationStatus(definition, hostEvaluation),
+            taskRelevant: true,
+            evidenceVerdict: hostEvaluation.observedEvidenceVerdict,
+            hostStatus: hostEvaluation.observedStatus,
+          };
+          return stepOutput(observedVerification, statusFromString(observedVerification.status), [
+            observedVerification.evidenceVerdict,
+          ]);
+        },
+      },
+      {
+        key: "verification",
+        stage: "verification",
+        owner: "verification/execution",
+        run: (outputs) => {
+          const hostEvaluation = loopValue<TaskHostEvaluationSummary>(outputs, "hostEvaluation");
+          const toolStrategy = loopValue<ToolStrategy>(outputs, "toolStrategy");
+          const contextSelection = loopValue<ContextSelection>(outputs, "contextSelection");
+          const verificationSelection = selectVerification({
+            taskKind: definition.taskKind,
+            taskPath: definition.taskPath,
+            expectedStatus: definition.expectedVerification.expectedStatus,
+            expectedCheck: definition.expectedVerification.commandOrCheck,
+            hostEvidenceVerdict: hostEvaluation.observedEvidenceVerdict,
+            hostStatus: hostEvaluation.observedStatus,
+            failureCategories: definition.failureCategories,
+          });
+          const artifactReceipt = createArtifactReceipt({
+            taskKind: definition.taskKind,
+            outputKind: definition.expectedOutput.kind,
+            requiredPaths: definition.expectedOutput.requiredPaths,
+            workspacePaths: definition.workspace.files.map((file) => file.path),
+            verificationState: verificationSelection.state,
+            failureCategories: definition.failureCategories,
+          });
+          const repairDecision = decideRepair({
+            taskKind: definition.taskKind,
+            verificationState: verificationSelection.state,
+            artifactValidationState: artifactReceipt?.validationState,
+            failureCategories: definition.failureCategories,
+            hostStatus: hostEvaluation.observedStatus,
+          });
+          const repairAction = executeRepair({
+            decision: repairDecision,
+            actions: toolStrategy.state === "ready" ? toolStrategy.actions : [],
+            changedTargetCount: definition.allowedWrites.length,
+            validationEvidence: definition.repairValidationEvidence,
+          });
+          const artifactCorrection = correctArtifact({
+            receipt: artifactReceipt,
+            actions: toolStrategy.state === "ready" ? toolStrategy.actions : [],
+          });
+          const verificationExecution = executeVerification({
+            selection: verificationSelection,
+            strategy: toolStrategy,
+            repairAction,
+            artifactCorrection,
+            contextReady: contextSelection.state === "ready",
+          });
+          return stepOutput({
+            verificationSelection,
+            artifactReceipt,
+            repairDecision,
+            repairAction,
+            artifactCorrection,
+            verificationExecution,
+          }, statusFromString(verificationExecution.state), [
+            `eligible:${verificationExecution.evidenceInputEligible}`,
+            `artifact:${artifactReceipt?.validationState ?? "not-needed"}`,
+          ]);
+        },
+      },
+      {
+        key: "repair",
+        stage: "repair",
+        owner: "repair/loop",
+        run: (outputs) => {
+          const verification = loopValue<LoopVerificationOutput>(outputs, "verification");
+          return stepOutput(verification, verification.repairAction.attempted
+            ? statusFromString(verification.repairAction.postValidation)
+            : "not-run", [
+            `attempted:${verification.repairAction.attempted}`,
+            `originalFailurePreserved:${verification.repairAction.originalFailurePreserved}`,
+          ]);
+        },
+      },
+      {
+        key: "taskProof",
+        stage: "proof",
+        owner: "evidence/task",
+        run: (outputs) => {
+          const contextSelection = loopValue<ContextSelection>(outputs, "contextSelection");
+          const executionPlan = loopValue<ExecutionPlan>(outputs, "executionPlan");
+          const requestPacket = loopValue<TaskRequestPacket>(outputs, "requestPacket");
+          const toolStrategy = loopValue<ToolStrategy>(outputs, "toolStrategy");
+          const hostEvaluation = loopValue<TaskHostEvaluationSummary>(outputs, "hostEvaluation");
+          const verification = loopValue<LoopVerificationOutput>(outputs, "verification");
+          const taskProof = buildTaskProofInput({
+            caseId: definition.caseId,
+            taskKind: definition.taskKind,
+            outputKind: definition.expectedOutput.kind,
+            contextState: contextSelection.state,
+            contextRefreshed: contextSelection.refreshed,
+            selectedPathCount: contextSelection.selectedPaths.length,
+            planState: executionPlan.state,
+            requestState: requestPacket.state,
+            toolStrategyState: toolStrategy.state,
+            verificationState: verification.verificationExecution.state,
+            verificationEvidenceInputEligible: verification.verificationExecution.evidenceInputEligible,
+            verificationResultInputEligible: verification.verificationExecution.resultInputEligible,
+            repairAttempted: verification.repairAction.attempted,
+            repairPostValidation: verification.repairAction.postValidation,
+            originalFailurePreserved: verification.repairAction.originalFailurePreserved,
+            artifactValidationState: verification.artifactReceipt?.validationState,
+            artifactSourceReceiptsAvailable: verification.artifactReceipt?.sourceReceipts.every((source) => source.available),
+            artifactCorrectionAttempted: verification.artifactCorrection?.attempted,
+            artifactCorrectionValidationState: verification.artifactCorrection?.validationState,
+            hostStatus: hostEvaluation.observedStatus,
+          });
+          return stepOutput(taskProof, taskProof.status === "complete" ? "passed" : statusFromString(taskProof.status), [
+            `missing:${taskProof.missingProof.length}`,
+          ]);
+        },
+      },
+      {
+        key: "taskVerdict",
+        stage: "verdict",
+        owner: "result/task",
+        run: (outputs) => {
+          const taskProof = loopValue<TaskProofInput>(outputs, "taskProof");
+          const taskVerdict = projectTaskVerdict({ proof: taskProof });
+          return stepOutput(taskVerdict, taskVerdict.completeProof ? "passed" : "not-proven", [
+            taskVerdict.verdictId,
+          ]);
+        },
+      },
+    ],
   });
-  const observedVerification = {
-    status: observedVerificationStatus(definition, hostEvaluation),
-    taskRelevant: true,
-    evidenceVerdict: hostEvaluation.observedEvidenceVerdict,
-    hostStatus: hostEvaluation.observedStatus,
-  };
-  const verificationSelection = selectVerification({
-    taskKind: definition.taskKind,
-    taskPath: definition.taskPath,
-    expectedStatus: definition.expectedVerification.expectedStatus,
-    expectedCheck: definition.expectedVerification.commandOrCheck,
-    hostEvidenceVerdict: hostEvaluation.observedEvidenceVerdict,
-    hostStatus: hostEvaluation.observedStatus,
-    failureCategories: definition.failureCategories,
-  });
-  const artifactReceipt = createArtifactReceipt({
-    taskKind: definition.taskKind,
-    outputKind: definition.expectedOutput.kind,
-    requiredPaths: definition.expectedOutput.requiredPaths,
-    workspacePaths: definition.workspace.files.map((file) => file.path),
-    verificationState: verificationSelection.state,
-    failureCategories: definition.failureCategories,
-  });
-  const repairDecision = decideRepair({
-    taskKind: definition.taskKind,
-    verificationState: verificationSelection.state,
-    artifactValidationState: artifactReceipt?.validationState,
-    failureCategories: definition.failureCategories,
-    hostStatus: hostEvaluation.observedStatus,
-  });
-  const contextSelection = selectContext({
-    taskKind: definition.taskKind,
-    taskPath: definition.taskPath,
-    shortPrompt: definition.shortPrompt,
-    workspaceFiles: definition.workspace.files,
-    requiredPaths: definition.expectedOutput.requiredPaths,
-    continuationAvailable: setupEvaluations.length > 0 || definition.taskKind !== "continuation",
-    failureCategories: definition.failureCategories,
-  });
-  const executionPlan = buildExecutionPlan({
-    taskKind: definition.taskKind,
-    outputKind: definition.expectedOutput.kind,
-    allowedTools: definition.allowedTools,
-    allowedWrites: definition.allowedWrites,
-    successRubric: definition.successRubric,
-    context: contextSelection,
-  });
-  const requestPacket = buildTaskRequestPacket({
-    shortPrompt: definition.shortPrompt,
-    taskKind: definition.taskKind,
-    context: contextSelection,
-    plan: executionPlan,
-  });
-  const toolStrategy = chooseToolStrategy({
-    allowedTools: definition.allowedTools,
-    plan: executionPlan,
-    request: requestPacket,
-  });
-  const repairAction = executeRepair({
-    decision: repairDecision,
-    actions: toolStrategy.state === "ready" ? toolStrategy.actions : [],
-    changedTargetCount: definition.allowedWrites.length,
-    validationEvidence: definition.repairValidationEvidence,
-  });
-  const artifactCorrection = correctArtifact({
-    receipt: artifactReceipt,
-    actions: toolStrategy.state === "ready" ? toolStrategy.actions : [],
-  });
-  const verificationExecution = executeVerification({
-    selection: verificationSelection,
-    strategy: toolStrategy,
+  const setupEvaluations = loopValue<readonly TaskHostEvaluationSummary[]>(taskLoop.outputs, "setupEvaluations");
+  const contextSelection = loopValue<ContextSelection>(taskLoop.outputs, "contextSelection");
+  const executionPlan = loopValue<ExecutionPlan>(taskLoop.outputs, "executionPlan");
+  const requestPacket = loopValue<TaskRequestPacket>(taskLoop.outputs, "requestPacket");
+  const hostEvaluation = loopValue<TaskHostEvaluationSummary>(taskLoop.outputs, "hostEvaluation");
+  const toolStrategy = loopValue<ToolStrategy>(taskLoop.outputs, "toolStrategy");
+  const observedVerification = loopValue<TaskCaseResult["observedVerification"]>(taskLoop.outputs, "observedVerification");
+  const verification = loopValue<LoopVerificationOutput>(taskLoop.outputs, "verification");
+  const {
+    verificationSelection,
+    artifactReceipt,
+    repairDecision,
     repairAction,
     artifactCorrection,
-    contextReady: contextSelection.state === "ready",
-  });
-  const taskProof = buildTaskProofInput({
-    caseId: definition.caseId,
-    taskKind: definition.taskKind,
-    outputKind: definition.expectedOutput.kind,
-    contextState: contextSelection.state,
-    contextRefreshed: contextSelection.refreshed,
-    selectedPathCount: contextSelection.selectedPaths.length,
-    planState: executionPlan.state,
-    requestState: requestPacket.state,
-    toolStrategyState: toolStrategy.state,
-    verificationState: verificationExecution.state,
-    verificationEvidenceInputEligible: verificationExecution.evidenceInputEligible,
-    verificationResultInputEligible: verificationExecution.resultInputEligible,
-    repairAttempted: repairAction.attempted,
-    repairPostValidation: repairAction.postValidation,
-    originalFailurePreserved: repairAction.originalFailurePreserved,
-    artifactValidationState: artifactReceipt?.validationState,
-    artifactSourceReceiptsAvailable: artifactReceipt?.sourceReceipts.every((source) => source.available),
-    artifactCorrectionAttempted: artifactCorrection?.attempted,
-    artifactCorrectionValidationState: artifactCorrection?.validationState,
-    hostStatus: hostEvaluation.observedStatus,
-  });
-  const taskVerdict = projectTaskVerdict({ proof: taskProof });
+    verificationExecution,
+  } = verification;
+  const taskProof = loopValue<TaskProofInput>(taskLoop.outputs, "taskProof");
+  const taskVerdict = loopValue<TaskVerdict>(taskLoop.outputs, "taskVerdict");
   const liveReadiness = liveReadinessFor(
     definition,
     contextSelection,
@@ -650,8 +851,9 @@ async function runDefinedTaskCase(
     taskProof,
     taskVerdict,
     proofRecord,
+    taskLoop,
     liveReadiness,
-    hostEvaluation: projectHostEvaluationSummary(hostEvaluation),
+    hostEvaluation,
     setupEvaluations,
     failureCategories,
     beforeBlockers,
@@ -1167,6 +1369,8 @@ function projectHostEvaluationSummary(result: EvaluationCaseResult): TaskHostEva
     eventCount: result.eventCount,
     eventCategories: result.eventCategories,
     blockerCodes: result.blockers.map((blocker) => blocker.code),
+    blockers: result.blockers.map((blocker) => ({ code: blocker.code })),
+    redactionChecks: result.redactionChecks,
     terminalSuccessClaim: false,
     notProvenClaims: result.notProvenClaims,
   });
@@ -1174,7 +1378,7 @@ function projectHostEvaluationSummary(result: EvaluationCaseResult): TaskHostEva
 
 function classifyOutcome(
   definition: TaskCaseDefinition,
-  hostEvaluation: EvaluationCaseResult,
+  hostEvaluation: TaskHostEvaluationSummary,
   verificationStatus: TaskVerificationStatus,
   verificationSelection: VerificationSelection,
   artifactReceipt: ArtifactReceipt | undefined,
@@ -1226,7 +1430,7 @@ function classifyOutcome(
 
 function observedVerificationStatus(
   definition: TaskCaseDefinition,
-  hostEvaluation: EvaluationCaseResult,
+  hostEvaluation: TaskHostEvaluationSummary,
 ): TaskVerificationStatus {
   if (definition.expectedVerification.expectedStatus !== "passed") {
     return definition.expectedVerification.expectedStatus;
@@ -1237,7 +1441,7 @@ function observedVerificationStatus(
 function blockersFor(
   definition: TaskCaseDefinition,
   outcome: TaskOutcome,
-  hostEvaluation: EvaluationCaseResult,
+  hostEvaluation: TaskHostEvaluationSummary,
   verificationSelection: VerificationSelection,
   artifactReceipt: ArtifactReceipt | undefined,
   repairDecision: RepairDecision,
@@ -1945,6 +2149,13 @@ function output(
 
 function freeze<T>(value: T): T {
   return Object.freeze(value);
+}
+
+function loopValue<T>(outputs: Readonly<Record<string, unknown>>, key: string): T {
+  if (!(key in outputs)) {
+    throw new Error(`Task loop output missing: ${key}`);
+  }
+  return outputs[key] as T;
 }
 
 function unique<T extends string>(values: readonly T[]): readonly T[] {

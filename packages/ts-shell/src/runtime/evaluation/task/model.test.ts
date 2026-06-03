@@ -186,8 +186,21 @@ describe("task capability assessment", () => {
       taskCase.progression.stages.map((stage) => stage.stage).includes("provider-turn") &&
       taskCase.progression.stages.map((stage) => stage.stage).includes("verdict")
     );
-    expect(progressedCases.length).toBeGreaterThanOrEqual(5);
+    expect(progressedCases.length).toBeGreaterThanOrEqual(6);
     expect(progressedCases.every((taskCase) => taskCase.progression.terminalSuccessClaim === false)).toBe(true);
+    expect(progressedCases.every((taskCase) =>
+      taskCase.taskLoop.ownerCalls.includes("runtime/evaluation/task") &&
+      taskCase.taskLoop.ownerCalls.includes("context/selection") &&
+      taskCase.taskLoop.ownerCalls.includes("planning/execution") &&
+      taskCase.taskLoop.ownerCalls.includes("provider/request") &&
+      taskCase.taskLoop.ownerCalls.includes("verification/execution") &&
+      taskCase.taskLoop.ownerCalls.includes("evidence/task") &&
+      taskCase.taskLoop.ownerCalls.includes("result/task")
+    )).toBe(true);
+    expect(progressedCases.every((taskCase) =>
+      taskCase.progression.ownerCalls.includes("runtime/evaluation/task") &&
+      taskCase.progression.ownerCalls.includes("result/task")
+    )).toBe(true);
     expect(progressedCases.filter((taskCase) => taskCase.outcome === "complete").every((taskCase) =>
       taskCase.progression.completeProof === true
     )).toBe(true);

@@ -258,7 +258,7 @@ documentation update did not inspect private provider configuration.
 - The live anchored provider smoke passed with the primary configured provider.
 - Fallback was configured but skipped because the primary provider succeeded.
 - No raw provider output leaked.
-- No-write and no-apply were preserved.
+- No write/no apply behavior was preserved.
 
 Interpretation:
 
