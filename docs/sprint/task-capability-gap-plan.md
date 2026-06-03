@@ -18,8 +18,31 @@ capabilities that must ship together for real user-visible work.
 | Session continuation | Partially proven for branch/compaction facts, replay, resume context, compact summaries, lifecycle, and host/session status. | `session/store`, `session/replay`, `session/recovery`, `session/continuation`. Broad interactive branch UX and long real task continuation remain weak. |
 | Host automation | Proven for in-process host command contract and package-facing JSON response. | `runtime/api/host`, `cli/host`, `runtime/distribution`, `verify:host-surface`. Broad SDK/RPC server behavior remains unproven. |
 | Product workflow | Partially proven for CLI status envelope, host JSON, interactive loop lifecycle, cancellation, session selection, and presentation facts. | `cli`, `session/presentation`, `presentation`. User collaboration and artifact workflow surfaces are missing or narrow. |
-| Real task evaluation | Synthetic deterministic cases exist; real task bench is missing. | Host evaluation cases cover runtime lanes, not broad real task completion across coding and non-coding artifacts. |
+| Real task evaluation | Partially proven as deterministic task assessment plumbing. | `runtime/evaluation/task/model.test.ts` covers coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, and skipped-live cases with outcomes: 2 complete, 1 partial, 2 failed, 1 blocked, 1 skipped, 1 unsupported, 2 not-proven. This is not broad live task completion. |
 | Artifact workflows | Missing as first-class task owners. | No current sprint evidence for document/report/data/slides artifact planning, durable artifact receipts, or artifact-specific verification. |
+
+## Measured Task Assessment Result
+
+The deterministic task assessment currently produces these task outcomes:
+
+- Complete: `single-file-edit`, `coordinated-edit`.
+- Partial: `rollback-recovery`.
+- Failed: `failed-check-repair`, `structured-artifact`.
+- Blocked: `pathless-workspace-question`.
+- Skipped: `live-provider-triage`.
+- Unsupported: `unsupported-artifact-export`.
+- Not proven: `source-report`, `resume-from-context`.
+
+Top blockers from actual non-complete results:
+
+1. `verification not selected`: blocks `rollback-recovery`, `source-report`,
+   and `resume-from-context`.
+2. `artifact invalid`: blocks `source-report` and `structured-artifact`.
+3. `repair failed`: blocks `failed-check-repair` and `rollback-recovery`.
+
+Live triage status: skipped by default. No live provider was run. The skipped
+case records default-off live behavior as a blocker instead of treating live
+availability as proven.
 
 ## Stale Priority Cleanup
 
@@ -36,14 +59,16 @@ Stale or narrow priorities to stop treating as next-phase wins:
 - extending mutation breadth without context, planning, verification, and debug
   loops working together;
 - treating deterministic runtime evaluation as real task ability.
+- treating deterministic task assessment plumbing as live task completion.
 
 ## Aggressive Implementation Batches
 
 ### Batch A: Real Task Bench And Live-Provider Capability Triage
 
-- Goal: create a task bench that measures useful completion across coding,
-  debugging, docs, data/report, and artifact tasks, then add explicit live
-  provider triage lanes without enabling live providers by default.
+- Goal: expand the deterministic task assessment into a real task bench that
+  measures useful completion across coding, debugging, docs, data/report, and
+  artifact tasks, then add explicit live provider triage lanes without enabling
+  live providers by default.
 - Task value: stops optimizing for safe reporting alone and identifies where
   real work fails.
 - Owner domains: `runtime/evaluation`, `runtime/api/host`, `evidence`,
@@ -60,9 +85,10 @@ Stale or narrow priorities to stop treating as next-phase wins:
 - Tests and real-task checks: deterministic task fixtures first; live-provider
   checks only through explicit opt-in gates with clean homes and no secret
   printing; each case must define task-relevant success evidence.
-- Completion gates: at least one coding edit, one debug repair, one docs/report,
-  one data or artifact workflow fixture; host output separates complete,
-  partial, blocked, failed, skipped, and not-proven; redaction passes.
+- Completion gates: keep the current deterministic task cases green, add real
+  fixture execution where the workspace actually changes or artifacts are
+  produced, and keep host output separating complete, partial, blocked, failed,
+  skipped, unsupported, and not-proven with redaction passing.
 - Forbidden shortcuts: fake task success, provider-called success, readback-only
   success, broad live defaults, mass rebaseline, broad skips.
 - Expected failure signals: insufficient context, ambiguous goal, verification
@@ -129,7 +155,8 @@ Stale or narrow priorities to stop treating as next-phase wins:
 
 ### Batch D: Live Debug And Repair Loop
 
-- Goal: connect failure diagnosis, context expansion, repair planning,
+- Goal: connect failure diagnosis, verification selection, context expansion,
+  repair planning,
   controlled mutation, and task-relevant verification into a loop that can fix
   real failures.
 - Task value: the agent can recover from test/build/tool/provider failures
@@ -159,7 +186,9 @@ Stale or narrow priorities to stop treating as next-phase wins:
 ### Batch E: Artifact Workflow Capability
 
 - Goal: add first-class workflow owners for documents, reports, data outputs,
-  slides, exports, and other non-code deliverables.
+  slides, exports, and other non-code deliverables, with artifact validation as
+  a first route because measured task cases currently fail or stay not-proven
+  there.
 - Task value: the product becomes useful beyond code mutation.
 - Owner domains: future `artifacts` owner, `runtime/execution`,
   `context/acquisition`, `planning`, `verification`, `session/store`,

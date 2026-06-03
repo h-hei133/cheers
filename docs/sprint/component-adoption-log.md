@@ -34,9 +34,14 @@ focused validation.
   artifact created, event emitted, JSON emitted, and CLI exit zero are not task
   success. Evidence/result verdicts with task-relevant verification remain the
   only complete-proof owners.
-- Validation evidence: future routes must add deterministic task fixtures first
-  and may add live-provider triage only through explicit opt-in gates with clean
-  homes, redaction, and failure attribution.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts`
+  - Deterministic task assessment currently covers complete, partial, failed,
+    blocked, skipped, unsupported, and not-proven outcomes across coding edit,
+    debug repair, pathless workspace understanding, docs/report, data/artifact,
+    continuation, and skipped-live task cases.
+  - Live-provider triage remains skipped by default and no live provider is
+    required for normal validation.
 - Rollback plan: disable new task-bench scenarios while keeping existing host
   runtime and deterministic evaluation lanes intact.
 

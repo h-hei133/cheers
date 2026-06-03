@@ -25,6 +25,15 @@ export {
   type EvaluationSuiteResult,
 } from "./runtime/evaluation/model.js";
 export {
+  listTaskCases,
+  runTaskAssessment,
+  runTaskCase,
+  type TaskAssessmentResult,
+  type TaskCaseDefinition,
+  type TaskCaseResult,
+  type TaskOutcome,
+} from "./runtime/evaluation/task/model.js";
+export {
   assessHostDistributionReadiness,
   classifyDistributionReadiness,
   type DistributionReadinessResult,

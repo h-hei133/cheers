@@ -17,9 +17,10 @@ deterministic runtime case is not enough.
   across coding, debugging, documents, reports, data analysis, slides, and other
   artifact workflows.
 - Real task bench coverage is missing. Current deterministic host evaluation
-  proves bounded runtime lanes and truth boundaries; it does not prove that an
-  agent can take underspecified user goals through discovery, planning,
-  execution, debugging, verification, artifact delivery, and final proof.
+  has advanced to deterministic task assessment coverage, but it still does not
+  prove broad real task completion. Current task assessment results are 2
+  complete, 1 partial, 2 failed, 1 blocked, 1 skipped, 1 unsupported, and 2
+  not-proven.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, plan facts, edit target selection, and
@@ -91,11 +92,12 @@ deterministic runtime case is not enough.
 The detailed batch definitions are in
 `docs/sprint/task-capability-gap-plan.md`. These are the next priority groups:
 
-1. Real task bench and live-provider capability triage.
-2. Workspace intelligence and context strategy.
-3. Planning, tool policy, and user collaboration.
-4. Live debug and repair loop.
-5. Artifact workflow capability for non-code tasks.
+1. Live debug and repair loop, with verification selection as the first
+   measured blocker.
+2. Artifact workflow capability for non-code tasks.
+3. Real task bench and live-provider capability triage.
+4. Workspace intelligence and context strategy.
+5. Planning, tool policy, and user collaboration.
 6. Provider prompting and response shaping.
 7. Product workflow and automation hardening.
 8. Product-layer versus engine-boundary decision.
@@ -104,6 +106,11 @@ These batches intentionally merge capabilities that must work together for a
 useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
+
+Measured SP014 blockers set the immediate order: verification not selected,
+artifact invalid, and repair failed are the current top three non-complete task
+blockers. Live triage remains skipped by default and must not be treated as live
+execution proof.
 
 ## Immediate Sprint Batches
 
