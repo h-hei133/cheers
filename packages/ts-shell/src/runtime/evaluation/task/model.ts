@@ -81,7 +81,31 @@ export type TaskLiveReadinessBlocker =
   | "redaction blocked"
   | "manual review needed";
 
-export type TaskLiveGate = "read-only-provider" | "anchored-provider" | "provider-readiness";
+export type TaskLiveGate = "read-only-provider" | "anchored-provider" | "provider-readiness" | "artifact-dry-run";
+
+export type TaskLiveExecutionStatus =
+  | "not-run"
+  | "complete"
+  | "useful-partial"
+  | "failed"
+  | "blocked"
+  | "skipped"
+  | "unsupported"
+  | "unsafe"
+  | "manual-review-required"
+  | "provider-readiness-missing"
+  | "auth-readiness-missing"
+  | "verification-unavailable"
+  | "artifact-validation-unavailable"
+  | "provider-output-insufficient"
+  | "redaction-blocked";
+
+export type TaskLiveGateOutcome =
+  | "passed"
+  | "failed"
+  | "provider-network-inconclusive"
+  | "config-or-skip"
+  | "skipped";
 
 export type TaskLiveSafetyClass = "safe-no-write" | "manual-review" | "unsafe" | "unsupported";
 
@@ -292,6 +316,45 @@ export interface TaskLiveReadiness {
   readonly terminalSuccessClaim: false;
 }
 
+export interface TaskLiveGateObservation {
+  readonly caseId: TaskCaseId;
+  readonly gate: TaskLiveGate;
+  readonly explicitOptIn: true;
+  readonly providerAttempted: boolean;
+  readonly providerOutcome: TaskLiveGateOutcome;
+  readonly noMutation: boolean;
+  readonly changedFiles: readonly string[];
+  readonly noApply: boolean;
+  readonly redactionStatus: "passed" | "failed";
+  readonly verificationStatus: "passed" | "partial" | "failed" | "not-run";
+  readonly artifactValidationStatus?: "passed" | "partial" | "failed" | "not-run";
+  readonly fallbackConfigured?: boolean;
+  readonly fallbackAttempted?: boolean;
+  readonly fallbackOutcome?: "passed" | "failed" | "skipped" | "inconclusive";
+}
+
+export interface TaskLiveExecution {
+  readonly caseId: TaskCaseId;
+  readonly gate: TaskLiveGate | "missing";
+  readonly status: TaskLiveExecutionStatus;
+  readonly executed: boolean;
+  readonly providerAttempted: boolean;
+  readonly providerOutcome: TaskLiveGateOutcome | "not-run";
+  readonly noMutation: boolean;
+  readonly changedFiles: readonly string[];
+  readonly noApply: boolean;
+  readonly redactionStatus: "passed" | "failed" | "not-run";
+  readonly verificationStatus: "passed" | "partial" | "failed" | "not-run";
+  readonly artifactValidationStatus: "passed" | "partial" | "failed" | "not-run";
+  readonly proofStatus: "complete" | "partial" | "missing";
+  readonly blockers: readonly string[];
+  readonly proofItems: readonly string[];
+  readonly notProvenClaims: readonly string[];
+  readonly defaultOff: true;
+  readonly optInRequired: true;
+  readonly terminalSuccessClaim: false;
+}
+
 export interface TaskBlockerSummary {
   readonly category: TaskFailureCategory;
   readonly count: number;
@@ -310,6 +373,7 @@ export interface TaskAssessmentResult {
     readonly terminalSuccessClaim: false;
   };
   readonly liveReadiness: readonly TaskLiveReadiness[];
+  readonly liveExecutions: readonly TaskLiveExecution[];
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
 }
@@ -347,6 +411,7 @@ export async function runTaskCase(input: {
 export async function runTaskAssessment(input: {
   readonly dispatch: (command: unknown) => Promise<HostCommandResponse>;
   readonly caseIds?: readonly TaskCaseId[];
+  readonly liveGateObservations?: readonly TaskLiveGateObservation[];
 }): Promise<TaskAssessmentResult> {
   const definitions = input.caseIds
     ? input.caseIds.map((caseId) => {
@@ -370,6 +435,10 @@ export async function runTaskAssessment(input: {
     topBlockers: summarizeTopBlockers(cases),
     liveTriage: liveTriageFor(cases),
     liveReadiness: freeze(cases.map((result) => result.liveReadiness)),
+    liveExecutions: freeze(cases.map((result) => projectTaskLiveExecution({
+      result,
+      observation: input.liveGateObservations?.find((observation) => observation.caseId === result.caseId),
+    }))),
     terminalSuccessClaim: false,
     notProvenClaims: unique([
       "terminal-success",
@@ -686,6 +755,22 @@ function liveReadinessFor(
     });
   }
   if (definition.allowedWrites.length > 0) {
+    if (definition.taskPath === "artifact" && artifactReceipt) {
+      return liveReadiness({
+        definition,
+        status: "ready",
+        safetyClass: "manual-review",
+        gate: "artifact-dry-run",
+        writePolicy: "manual-review-required",
+        requestPacket,
+        toolStrategy,
+        validationPlan: "provider artifact proposal, no write, artifact validation, and manual review",
+        blockers: [],
+        requirements: liveGateRequirements("artifact-dry-run"),
+        hardBlocker: "",
+        nextFix: "run artifact dry-run through explicit opt-in, then require manual review before any write",
+      });
+    }
     return liveReadiness({
       definition,
       status: definition.taskPath === "artifact" ? "manual-review-required" : "unsafe",
@@ -794,7 +879,197 @@ function liveGateRequirements(gate: TaskLiveGate): readonly string[] {
       return ["provider config", "auth readiness", "no apply", "anchored output validation"];
     case "provider-readiness":
       return ["provider config", "auth readiness", "provider readiness preflight"];
+    case "artifact-dry-run":
+      return ["provider config", "auth readiness", "no write", "artifact validation", "manual review before write"];
   }
+}
+
+export function projectTaskLiveExecution(input: {
+  readonly result: TaskCaseResult;
+  readonly observation?: TaskLiveGateObservation;
+}): TaskLiveExecution {
+  const readiness = input.result.liveReadiness;
+  const observation = input.observation;
+  if (!observation) {
+    return freeze({
+      caseId: input.result.caseId,
+      gate: readiness.gate,
+      status: liveNotRunStatus(readiness),
+      executed: false,
+      providerAttempted: false,
+      providerOutcome: "not-run",
+      noMutation: input.result.allowedWrites.length === 0,
+      changedFiles: freeze([]),
+      noApply: true,
+      redactionStatus: "not-run",
+      verificationStatus: "not-run",
+      artifactValidationStatus: "not-run",
+      proofStatus: "missing",
+      blockers: freeze(liveNotRunBlockers(readiness)),
+      proofItems: freeze([]),
+      notProvenClaims: freeze([
+        "live-task-not-executed",
+        "terminal-success",
+      ]),
+      defaultOff: true,
+      optInRequired: true,
+      terminalSuccessClaim: false,
+    });
+  }
+
+  const blockers = liveExecutionBlockers(input.result, observation);
+  const executed = blockers.length === 0 && observation.explicitOptIn === true;
+  const proofItems = liveExecutionProofItems(input.result, observation, executed);
+  return freeze({
+    caseId: input.result.caseId,
+    gate: readiness.gate,
+    status: liveExecutionStatus(input.result, observation, blockers, proofItems),
+    executed,
+    providerAttempted: observation.providerAttempted,
+    providerOutcome: observation.providerOutcome,
+    noMutation: observation.noMutation,
+    changedFiles: freeze([...observation.changedFiles]),
+    noApply: observation.noApply,
+    redactionStatus: observation.redactionStatus,
+    verificationStatus: observation.verificationStatus,
+    artifactValidationStatus: observation.artifactValidationStatus ?? "not-run",
+    proofStatus: proofItems.length > 0
+      ? (input.result.taskVerdict.completeProof ? "complete" : "partial")
+      : "missing",
+    blockers: freeze(blockers),
+    proofItems: freeze(proofItems),
+    notProvenClaims: freeze(unique([
+      "provider-call-is-not-task-success",
+      "live-gate-pass-is-not-task-success",
+      "host-output-is-not-task-success",
+      "terminal-success",
+      ...(input.result.taskVerdict.completeProof ? [] : input.result.taskVerdict.notProvenClaims),
+    ])),
+    defaultOff: true,
+    optInRequired: true,
+    terminalSuccessClaim: false,
+  });
+}
+
+function liveNotRunStatus(readiness: TaskLiveReadiness): TaskLiveExecutionStatus {
+  if (readiness.status === "unsupported") return "unsupported";
+  if (readiness.status === "unsafe") return "unsafe";
+  if (readiness.status === "manual-review-required") return "manual-review-required";
+  if (readiness.blockers.includes("missing provider config")) return "provider-readiness-missing";
+  if (readiness.blockers.includes("missing auth readiness")) return "auth-readiness-missing";
+  if (readiness.blockers.includes("verification unavailable")) return "verification-unavailable";
+  if (readiness.blockers.includes("artifact validation unavailable")) return "artifact-validation-unavailable";
+  if (readiness.blockers.includes("provider output insufficient")) return "provider-output-insufficient";
+  if (readiness.blockers.includes("redaction blocked")) return "redaction-blocked";
+  if (readiness.blockers.length > 0) return "blocked";
+  return "not-run";
+}
+
+function liveNotRunBlockers(readiness: TaskLiveReadiness): readonly string[] {
+  if (readiness.blockers.length > 0) {
+    return readiness.blockers;
+  }
+  if (readiness.status === "ready") {
+    return [`explicit opt-in gate not executed: ${readiness.gate}`];
+  }
+  return readiness.hardBlocker ? [readiness.hardBlocker] : ["live execution not run"];
+}
+
+function liveExecutionBlockers(
+  result: TaskCaseResult,
+  observation: TaskLiveGateObservation,
+): readonly string[] {
+  const blockers: string[] = [];
+  if (observation.gate !== result.liveReadiness.gate) {
+    blockers.push("gate mismatch");
+  }
+  if (result.liveReadiness.status === "unsupported") {
+    blockers.push("unsupported task path");
+  }
+  if (result.liveReadiness.status === "unsafe") {
+    blockers.push("write safety gate missing for live task execution");
+  }
+  if (observation.redactionStatus !== "passed") {
+    blockers.push("redaction blocked");
+  }
+  if (!observation.noMutation || observation.changedFiles.length > 0) {
+    blockers.push("no-mutation check failed");
+  }
+  if (!observation.noApply) {
+    blockers.push("no-apply check failed");
+  }
+  if (observation.providerOutcome === "provider-network-inconclusive") {
+    blockers.push(observation.fallbackConfigured === false
+      ? "provider network inconclusive and no configured fallback provider"
+      : "provider network inconclusive");
+  }
+  if (observation.providerOutcome === "config-or-skip") {
+    blockers.push("provider config or opt-in gate missing");
+  }
+  if (observation.providerOutcome === "failed") {
+    blockers.push("provider or product execution failed");
+  }
+  if (observation.providerOutcome === "skipped") {
+    blockers.push("explicit opt-in gate skipped");
+  }
+  if (
+    result.taskPath === "artifact" &&
+    observation.artifactValidationStatus !== "passed"
+  ) {
+    blockers.push("artifact validation unavailable");
+  }
+  return unique(blockers);
+}
+
+function liveExecutionProofItems(
+  result: TaskCaseResult,
+  observation: TaskLiveGateObservation,
+  executed: boolean,
+): readonly string[] {
+  if (!executed) return [];
+  const items = [
+    "explicit-opt-in-gate",
+    "redaction-check",
+    "no-mutation-check",
+  ];
+  if (observation.providerAttempted) {
+    items.push("provider-attempt");
+  }
+  if (observation.noApply) {
+    items.push("no-apply-check");
+  }
+  if (observation.verificationStatus === "passed" || observation.verificationStatus === "partial") {
+    items.push("verification-check");
+  }
+  if (observation.artifactValidationStatus === "passed") {
+    items.push("artifact-validation");
+  }
+  if (result.taskVerdict.completeProof) {
+    items.push("task-proof");
+  }
+  return unique(items);
+}
+
+function liveExecutionStatus(
+  result: TaskCaseResult,
+  observation: TaskLiveGateObservation,
+  blockers: readonly string[],
+  proofItems: readonly string[],
+): TaskLiveExecutionStatus {
+  if (blockers.includes("unsupported task path")) return "unsupported";
+  if (blockers.includes("write safety gate missing for live task execution")) return "unsafe";
+  if (blockers.includes("redaction blocked")) return "redaction-blocked";
+  if (blockers.includes("artifact validation unavailable")) return "artifact-validation-unavailable";
+  if (blockers.includes("provider config or opt-in gate missing")) return "provider-readiness-missing";
+  if (blockers.includes("explicit opt-in gate skipped")) return "skipped";
+  if (blockers.length > 0 && observation.providerOutcome === "provider-network-inconclusive") return "blocked";
+  if (blockers.length > 0) return "failed";
+  if (result.taskVerdict.completeProof && proofItems.includes("task-proof")) {
+    return result.taskPath === "artifact" && observation.artifactValidationStatus !== "passed"
+      ? "useful-partial"
+      : "complete";
+  }
+  return proofItems.length > 0 ? "useful-partial" : "provider-output-insufficient";
 }
 
 function measuredFailureCategories(

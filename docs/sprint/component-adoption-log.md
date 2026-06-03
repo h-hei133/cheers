@@ -297,6 +297,64 @@ focused validation.
   consumption, returning rollback recovery to partial and the added cases to
   absent from the assessment rather than allowing unproven success.
 
+## Live Task Execution Projection
+
+- Selected mode: structured port for local live execution observations, with
+  behavior-only alignment for the existing explicit read-only, anchored, and
+  provider-readiness gates.
+- Owner domain: `runtime/evaluation/task`, `provider/request`,
+  `verification`, `artifacts/workflow`, `evidence/task`, and `result/task`.
+- Reason for use: SP021 needed audited no-write and low-risk task paths to move
+  beyond readiness into repeatable opt-in live case outcomes while preserving
+  default-off provider behavior and evidence/result terminal truth.
+- Behavior to port: explicit gate observation metadata, changedFiles empty
+  visibility, no-mutation and no-apply checks, redaction status, provider
+  outcome and fallback metadata, verification/artifact validation status, proof
+  items, complete/useful-partial/blocked/unsafe classification, and exact
+  blockers for non-executed cases.
+- Rejected alternatives:
+  - Dependency use: rejected because live gate semantics, redaction, and task
+    proof are local product contracts.
+  - Isolated source adoption: rejected because no narrow source component was
+    needed and product names must stay domain-based.
+  - Readiness-only update: rejected because SP021 required executed live task
+    cases where safe.
+  - Live-provider default enablement: rejected because provider execution must
+    remain explicit opt-in with isolated runtime homes.
+  - Artifact write execution: rejected until a sanctioned write/manual-review
+    gate exists; report and data cases use no-write artifact dry-run.
+- Expected callers: task assessment, future host task summaries, explicit live
+  gate scripts, provider request preparation, verification/artifact owners,
+  evidence/result verdicts, and product automation surfaces.
+- Side-effect boundary: live execution projection is deterministic and consumes
+  safe metadata only. Actual provider calls remain in existing explicit opt-in
+  scripts and approved adapters; artifact dry-run records validation without
+  writing. This adoption does not add dynamic loading, browser automation,
+  external tool servers, command allowlist expansion, arbitrary writers, or
+  execution-boundary bypasses.
+- Truthfulness boundary: live-ready, provider called, fallback attempted,
+  smoke pass, no-mutation, no-apply, verification attempt, artifact validation,
+  host output, and live execution metadata are not terminal success. Complete
+  or useful partial live outcomes require task proof handoff, and every surface
+  keeps `terminalSuccessClaim: false`.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts`
+  - `rtk npm run build:ts`
+  - Focused tests prove at least four live-ready target cases, at least three
+    safe executed observations, at least two complete or useful partial
+    outcomes with task proof, one artifact/data execution, one
+    pathless/context execution, exact provider-network blockers, changedFiles
+    empty visibility, no mutation, no apply, redaction, and no success from
+    provider calls or gate passes.
+  - Manual live smoke evidence: read-only smoke passed; anchored provider smoke
+    passed with the primary provider; fallback was configured but skipped
+    because the primary passed; no raw provider output leaked; no write/no
+    apply was preserved.
+- Rollback plan: remove `liveExecutions` and artifact dry-run readiness from
+  task assessment, returning affected cases to readiness-only or
+  manual-review-required states while keeping deterministic task proof and
+  verdict handoff intact.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

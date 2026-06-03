@@ -5,6 +5,7 @@ import {
   listTaskCases,
   runTaskAssessment,
   runTaskCase,
+  type TaskLiveGateObservation,
   type TaskOutcome,
 } from "./model.js";
 
@@ -107,10 +108,10 @@ describe("task capability assessment", () => {
       "pathless-workspace-question": "ready",
       "test-impact-question": "ready",
       "owner-context-question": "ready",
-      "source-report": "manual-review-required",
-      "structured-artifact": "manual-review-required",
-      "incident-summary-report": "manual-review-required",
-      "csv-summary-artifact": "manual-review-required",
+      "source-report": "ready",
+      "structured-artifact": "ready",
+      "incident-summary-report": "ready",
+      "csv-summary-artifact": "ready",
       "unsupported-artifact-export": "unsupported",
       "resume-from-context": "ready",
       "live-provider-triage": "ready",
@@ -121,6 +122,10 @@ describe("task capability assessment", () => {
       "pathless-workspace-question",
       "test-impact-question",
       "owner-context-question",
+      "source-report",
+      "structured-artifact",
+      "incident-summary-report",
+      "csv-summary-artifact",
       "resume-from-context",
       "live-provider-triage",
     ]);
@@ -145,10 +150,13 @@ describe("task capability assessment", () => {
       writePolicy: "no-write",
     });
     expect(result.liveReadiness.find((item) => item.caseId === "structured-artifact")).toMatchObject({
-      status: "manual-review-required",
+      status: "ready",
+      gate: "artifact-dry-run",
       writePolicy: "manual-review-required",
-      hardBlocker: "artifact validation gate missing for live write",
+      hardBlocker: "",
     });
+    expect(result.liveExecutions.every((item) => item.executed === false)).toBe(true);
+    expect(result.liveExecutions.every((item) => item.terminalSuccessClaim === false)).toBe(true);
     expect(result.notProvenClaims).toEqual(
       expect.arrayContaining([
         "terminal-success",
@@ -156,6 +164,87 @@ describe("task capability assessment", () => {
         "host-evaluation-output-is-not-task-success",
       ]),
     );
+  });
+
+  it("projects opt-in live task executions without treating gate output as terminal success", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskAssessment({
+      dispatch: host.dispatch,
+      liveGateObservations: [
+        liveObservation("pathless-workspace-question", "read-only-provider"),
+        liveObservation("test-impact-question", "read-only-provider"),
+        liveObservation("resume-from-context", "anchored-provider"),
+        liveObservation("csv-summary-artifact", "artifact-dry-run", {
+          verificationStatus: "passed",
+          artifactValidationStatus: "passed",
+        }),
+      ],
+    });
+
+    const executions = result.liveExecutions.filter((item) => item.executed);
+    expect(executions.map((item) => item.caseId)).toEqual([
+      "pathless-workspace-question",
+      "test-impact-question",
+      "csv-summary-artifact",
+      "resume-from-context",
+    ]);
+    expect(executions.length).toBeGreaterThanOrEqual(3);
+    expect(executions.filter((item) => item.status === "complete" || item.status === "useful-partial").length)
+      .toBeGreaterThanOrEqual(2);
+    expect(executions.some((item) => item.caseId === "csv-summary-artifact")).toBe(true);
+    expect(executions.some((item) => item.caseId === "pathless-workspace-question")).toBe(true);
+    for (const execution of executions) {
+      expect(execution).toMatchObject({
+        noMutation: true,
+        changedFiles: [],
+        noApply: true,
+        redactionStatus: "passed",
+        terminalSuccessClaim: false,
+      });
+      expect(execution.notProvenClaims).toEqual(
+        expect.arrayContaining([
+          "provider-call-is-not-task-success",
+          "live-gate-pass-is-not-task-success",
+          "terminal-success",
+        ]),
+      );
+    }
+  });
+
+  it("keeps live provider blockers exact and does not execute unsafe observations", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskAssessment({
+      dispatch: host.dispatch,
+      liveGateObservations: [
+        liveObservation("owner-context-question", "read-only-provider", {
+          providerOutcome: "provider-network-inconclusive",
+          fallbackConfigured: false,
+        }),
+        liveObservation("failed-check-repair", "read-only-provider"),
+        liveObservation("source-report", "artifact-dry-run", {
+          artifactValidationStatus: "failed",
+        }),
+      ],
+    });
+    const owner = result.liveExecutions.find((item) => item.caseId === "owner-context-question");
+    const repair = result.liveExecutions.find((item) => item.caseId === "failed-check-repair");
+    const report = result.liveExecutions.find((item) => item.caseId === "source-report");
+
+    expect(owner).toMatchObject({
+      status: "blocked",
+      executed: false,
+      providerOutcome: "provider-network-inconclusive",
+      blockers: ["provider network inconclusive and no configured fallback provider"],
+    });
+    expect(repair).toMatchObject({
+      status: "unsafe",
+      executed: false,
+    });
+    expect(report).toMatchObject({
+      status: "artifact-validation-unavailable",
+      executed: false,
+      blockers: ["artifact validation unavailable"],
+    });
   });
 
   it("records task proof facts for every complete case", async () => {
@@ -476,4 +565,24 @@ describe("task capability assessment", () => {
 
 function outcomeMap(cases: readonly { readonly caseId: string; readonly outcome: TaskOutcome }[]) {
   return Object.fromEntries(cases.map((taskCase) => [taskCase.caseId, taskCase.outcome]));
+}
+
+function liveObservation(
+  caseId: TaskLiveGateObservation["caseId"],
+  gate: TaskLiveGateObservation["gate"],
+  overrides: Partial<Omit<TaskLiveGateObservation, "caseId" | "gate" | "explicitOptIn">> = {},
+): TaskLiveGateObservation {
+  return {
+    caseId,
+    gate,
+    explicitOptIn: true,
+    providerAttempted: true,
+    providerOutcome: "passed",
+    noMutation: true,
+    changedFiles: [],
+    noApply: true,
+    redactionStatus: "passed",
+    verificationStatus: "partial",
+    ...overrides,
+  };
 }

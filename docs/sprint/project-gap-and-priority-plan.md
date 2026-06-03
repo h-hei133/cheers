@@ -21,11 +21,14 @@ deterministic runtime case is not enough.
   context selection, execution planning, task request packets, tool strategy,
   verification selection/execution, artifact receipt/correction, repair
   decision/action, task proof, task verdict, proof records, negative controls,
-  default-off live gate plans, and before/after blocker facts, but it still does
-  not prove broad real task completion. Current task assessment results are 7
-  12 complete, 1 skipped, and 1 unsupported. Two explicit opt-in
-  no-write live gates were executed and both stopped on provider-network
-  blockers, with no mutation and redaction preserved.
+  default-off live gate plans, live execution projection, and before/after
+  blocker facts, but it still does not prove broad real task completion. Current
+  task assessment results are 12 complete, 1 skipped, and 1 unsupported. Safe
+  live execution observations are now structured for read-only, anchored, and
+  artifact dry-run gates; manual live smoke passed read-only and anchored
+  no-write paths, with fallback configured but skipped because the primary
+  provider passed, no raw provider output leaked, and no write/no apply
+  preserved.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, plan facts, edit target selection, and
@@ -97,14 +100,14 @@ deterministic runtime case is not enough.
 The detailed batch definitions are in
 `docs/sprint/task-capability-gap-plan.md`. These are the next priority groups:
 
-1. Opt-in live task execution through existing gates, now focused on clearing
-   the observed provider-network blocker after two no-write live gate attempts,
-   while keeping provider defaults disabled.
-2. Live debug and repair loop, now focused on real post-repair verification and
+1. Provider output sufficiency and opt-in live task recovery, now focused on
+   turning safe live observations into task-relevant provider output validation
+   without enabling provider defaults.
+2. Artifact workflow capability for non-code tasks, now moving from
+   deterministic receipts/correction and live artifact dry-run toward durable
+   artifact production, rendered validation, and manual-review/write gates.
+3. Live debug and repair loop, now focused on real post-repair verification and
    original-failure preservation beyond deterministic partial progress.
-3. Artifact workflow capability for non-code tasks, now moving from
-   deterministic receipts/correction toward durable artifact production and
-   validation.
 4. Real task bench and live-provider capability triage.
 5. Workspace intelligence and context strategy.
 6. Planning, tool policy, and user collaboration.
@@ -117,17 +120,18 @@ useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Audited SP020 blockers now set the immediate order: `rollback-recovery` is
-complete through explicit post-repair rollback validation evidence and
-evidence/result task verdict. Five no-write cases now have exact live gate
-requirements. Two existing explicit opt-in gates executed and both reached
-provider interaction or readiness before stopping on provider-network failure;
-no-write/no-apply/redaction boundaries were preserved. `source-report`,
-`structured-artifact`, `incident-summary-report`, and `csv-summary-artifact`
-stay manual-review artifact cases until a sanctioned artifact validation gate
-exists, write-capable code/debug cases remain unsafe or dry-run-only, and the
+Audited SP020 and SP021 outcomes now set the immediate order:
+`rollback-recovery` is complete through explicit post-repair rollback
+validation evidence and evidence/result task verdict. Nine target cases have
+exact live gate requirements, including artifact dry-run for report/data cases
+with no write and manual review before any write. Focused tests prove safe live
+execution projection for at least three observations, at least two complete or
+useful partial outcomes with task proof, one artifact/data case, and one
+pathless/context case. Manual live smoke passed read-only and anchored no-write
+paths. Write-capable code/debug cases remain unsafe or dry-run-only, and the
 unsupported export stays unsupported. Live gate execution, provider called,
-host-observed facts, and readiness facts still are not success by themselves.
+fallback metadata, host-observed facts, smoke pass, and readiness facts still
+are not success by themselves.
 
 ## Immediate Sprint Batches
 
