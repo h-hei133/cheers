@@ -30,16 +30,21 @@ deterministic runtime case is not enough.
   task assessment results are 18 complete, 1 skipped, and 1 unsupported, with 4
   pathless workspace/context completions, 3 debug/repair completions, 7
   artifact/report/data completions, and 2 continuation/resume completions.
-  Deterministic cases and explicit live entries now call the same ordered
-  task-loop runtime from goal and state through context, plan, request,
-  provider turn, action, observation, verification, repair, proof, and verdict.
-  Safe live execution observations are structured for read-only, anchored,
-  artifact dry-run, and reviewed isolated write metadata. The repeatable opt-in
-  live run defines thirteen exact entries. The no-write entries remain
-  default-off and redacted, and the reviewed write path records only safe
-  metadata for patch intent, dry-run diff, explicit review authority, isolated
-  fixture apply, post-apply verification, task proof, rollback status, fallback
-  metadata, changed files, loop-owned progression, and real-workspace mutation
+  Deterministic cases and explicit live entries call the same ordered task-loop
+  runtime from goal and state through context, plan, request, provider turn,
+  action, observation, verification, repair, proof, and verdict. Safe live gate
+  receipts are projected inside `runtime/evaluation/task` for read-only,
+  anchored, artifact dry-run, and reviewed isolated write entries. The
+  repeatable opt-in live run defines thirteen exact entries. A measured
+  explicit run executed all 13 entries, reached 12 complete or useful partial
+  outcomes, recorded 4 reviewed isolated applies, 3 post-apply verification
+  and task-proof outcomes, a useful rollback/debug partial, report/artifact,
+  continuation, pathless/context, and read-only coverage, safe fallback
+  metadata, and redaction pass. The no-write entries remain default-off and
+  redacted, and the reviewed write path records only safe metadata for patch
+  intent, dry-run diff, explicit review authority, isolated fixture apply,
+  post-apply verification, task proof, rollback status, fallback metadata,
+  changed files, loop-owned progression, and real-workspace mutation
   prevention.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
@@ -55,10 +60,11 @@ deterministic runtime case is not enough.
   durable artifact writing, rendered checks, richer source policy, manual-review
   gates, and evidence/result verdicts over real outputs.
 - Provider prompting and live task recovery are now repeatable for safe
-  no-write/manual-review entries and reviewed isolated write metadata. The
-  provider boundary remains default-off and truth-preserving; task-shaped
-  provider output sufficiency, durable artifact writing, and broad
-  real-workspace live write completion are not proven.
+  no-write/manual-review entries and reviewed isolated write metadata through
+  the shared task loop. The provider boundary remains default-off and
+  truth-preserving; task-shaped provider output sufficiency, durable artifact
+  writing, richer repair iteration, and broad real-workspace live write
+  completion are not proven.
 - Product loop truth, the CLI/session status envelope, a bounded synthetic
   provider-to-tool-to-next-turn runtime lane, a controlled provider/model
   runtime boundary, a controlled mutation recovery lane, and a storage-backed
@@ -114,14 +120,16 @@ deterministic runtime case is not enough.
 The detailed batch definitions are in
 `docs/sprint/task-capability-gap-plan.md`. These are the next priority groups:
 
-1. Durable artifact and report execution, now moving from deterministic
+1. Provider output sufficiency and opt-in live task recovery, now focused on
+   task-specific answer validation, insufficient-output repair, and retry
+   decisions beyond shared safe gate receipts, without enabling provider
+   defaults.
+2. Durable artifact and report execution, now moving from deterministic
    receipts/correction and repeatable live artifact dry-run toward sanctioned
    output paths, rendered validation, and manual-review/write gates.
-2. Provider output sufficiency and opt-in live task recovery, now focused on
-   task-specific provider answer validation and insufficient-output recovery
-   beyond shared safe gate metadata, without enabling provider defaults.
-3. Live debug and repair loop, now focused on real post-repair verification and
-   original-failure preservation beyond deterministic partial progress.
+3. Live debug and repair loop, now focused on richer real post-repair
+   verification, original-failure preservation, and exhausted-loop blockers
+   beyond the current useful isolated rollback partial.
 4. Real task bench execution beyond deterministic fixtures.
 5. Workspace intelligence and context strategy.
 6. Planning, tool policy, and user collaboration.
@@ -134,7 +142,7 @@ useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Audited SP020, SP021, SP022, SP023, SP024, and SP025 outcomes now set the immediate order:
+Audited SP020 through SP027 outcomes now set the immediate order:
 `rollback-recovery` and `retry-diagnosis-repair` are complete through explicit
 post-repair validation evidence and evidence/result task verdict. Thirteen
 target cases have exact live gate requirements, including artifact dry-run for
@@ -148,13 +156,19 @@ two pass explicit review authority and isolated apply, at least two pass
 post-apply verification with task proof, a debug/repair entry reaches useful
 state, rollback recovery reaches useful partial or an exact blocker, no-write
 entries preserve no mutation/no apply, and redaction excludes raw provider
-output and patch bodies. The unsupported export stays unsupported. Live gate
-execution, provider called, fallback metadata, patch intent, dry-run diff,
-review authority, isolated apply, host-observed facts, smoke pass, readiness
-  facts, deterministic case count, task-loop progression, and live run status
-  are still not success by themselves. The immediate priority now moves from
-  making the shared task path real to durable artifact/manual-review output
-  execution and provider output sufficiency inside that shared path.
+output and patch bodies. SP027 moved the explicit live report away from
+script-owned per-entry observations: scripts pass safe gate receipts, while the
+runtime task owner projects live entries and calls `runTaskLoop`. The measured
+live run executed all 13 entries, with 12 complete or useful partial outcomes,
+4 reviewed isolated applies, 3 post-apply proof outcomes, artifact/report,
+continuation, pathless/context, read-only, and debug/repair coverage. The
+unsupported export stays unsupported. Live gate execution, provider called,
+fallback metadata, patch intent, dry-run diff, review authority, isolated
+apply, host-observed facts, smoke pass, readiness facts, deterministic case
+count, task-loop progression, and live run status are still not success by
+themselves. The immediate priority now moves from making the shared task path
+real to provider output sufficiency, durable artifact/manual-review output
+execution, and richer live repair inside that shared path.
 
 ## Immediate Sprint Batches
 

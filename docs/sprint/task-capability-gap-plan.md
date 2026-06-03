@@ -18,7 +18,7 @@ capabilities that must ship together for real user-visible work.
 | Session continuation | Partially proven for branch/compaction facts, replay, resume context, compact summaries, lifecycle, and host/session status. | `session/store`, `session/replay`, `session/recovery`, `session/continuation`. Broad interactive branch UX and long real task continuation remain weak. |
 | Host automation | Proven for in-process host command contract and package-facing JSON response. | `runtime/api/host`, `cli/host`, `runtime/distribution`, `verify:host-surface`. Broad SDK/RPC server behavior remains unproven. |
 | Product workflow | Partially proven for CLI status envelope, host JSON, interactive loop lifecycle, cancellation, session selection, and presentation facts. | `cli`, `session/presentation`, `presentation`. User collaboration and artifact workflow surfaces are missing or narrow. |
-| Real task evaluation | Partially proven as deterministic task assessment plumbing and explicit live/live-ready reporting through a shared task-loop runtime. The loop now owns ordered execution from goal/state through context, planning, request shaping, provider turn, action, observation, verification, repair, proof, and verdict while delegating each step to existing owner domains. | `runtime/evaluation/task/loop.ts`, `runtime/evaluation/task/model.test.ts`, `runtime/evaluation/task/liveRun.test.ts`, and `evidence/task/proof.test.ts` cover coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, skipped-live, and opt-in live execution metadata cases with audited deterministic outcomes: 18 complete, 1 skipped, and 1 unsupported. Complete deterministic cases include 4 pathless workspace/context cases, 3 debug/repair cases, 7 artifact/report/data cases, and 2 continuation/resume cases. Focused tests prove at least 6 deterministic cases and at least 6 explicit live entries share the same loop-owned goal/state/context/plan/request/provider-turn/action/observation/verification/repair/proof/verdict progression with owner-call evidence, including write planning dry-run without complete proof. The live run defines 13 exact entries; focused tests also prove 5 write entries with patch intent and dry-run diff metadata, 4 reviewed isolated applies, 3 post-apply verification/task-proof outcomes, a useful rollback partial, and unchanged no-write safety. Provider calls, gate passes, patch intent, dry-run diff, review authority, isolated apply, verification attempt, task-loop stages, and live output metadata remain non-success without evidence/result task proof. This is not broad live task completion. |
+| Real task evaluation | Partially proven as deterministic task assessment plumbing and explicit live task execution through a shared task-loop runtime. The loop owns ordered execution from goal/state through context, planning, request shaping, provider turn, action, observation, verification, repair, proof, and verdict while delegating each step to existing owner domains. | `runtime/evaluation/task/loop.ts`, `runtime/evaluation/task/model.test.ts`, `runtime/evaluation/task/liveRun.test.ts`, and `evidence/task/proof.test.ts` cover coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, skipped-live, and opt-in live execution metadata cases with audited deterministic outcomes: 18 complete, 1 skipped, and 1 unsupported. Complete deterministic cases include 4 pathless workspace/context cases, 3 debug/repair cases, 7 artifact/report/data cases, and 2 continuation/resume cases. Focused tests prove deterministic and live entries share loop-owned goal/state/context/plan/request/provider-turn/action/observation/verification/repair/proof/verdict progression with owner-call evidence, including write planning dry-run without complete proof. The live run defines 13 exact entries and now projects gate receipts inside `runtime/evaluation/task` instead of script-owned per-entry task results. A measured explicit opt-in live run executed all 13 entries, reached 12 complete or useful partial outcomes, produced 5 write-capable patch-intent/dry-run observations, reached 4 reviewed isolated applies, proved 3 post-apply verification/task-proof outcomes, kept rollback useful partial, and preserved no-write safety/redaction. Provider calls, gate passes, patch intent, dry-run diff, review authority, isolated apply, verification attempt, task-loop stages, and live output metadata remain non-success without evidence/result task proof. This is still not broad real-workspace live completion. |
 | Artifact workflows | Partially proven as deterministic receipt, correction, validation facts, and no-write live dry-run readiness for report/data cases. | `artifacts/workflow/model.test.ts` and task assessment integration cover report/structured-data intent, source receipts, format expectation, unsafe/missing/invalid/not-proven states, validation failure, correction, rerun verification, artifact dry-run live execution projection, and seven complete artifact/report/data cases. Durable artifact writing, rendered checks, manual review/write gates, and broad export workflows remain missing. |
 
 ## Measured Task Assessment Result
@@ -148,22 +148,21 @@ provider, fallback was configured but skipped because the primary passed, no raw
 provider output leaked, and no write/no apply was preserved. Write-capable
 code/debug cases stay unsafe or dry-run-only.
 
-Repeatable live run status: `verify:live-task-execution` now reports thirteen
+Repeatable live run status: `verify:live-task-execution` reports thirteen
 target entries with exact requirements: single-file edit, coordinated edit,
 failed-check repair, rollback recovery, package script impact, pathless
 workspace, owner context, test impact, incident report, metrics artifact,
 resume from context, readonly coding, and write-capable dry-run planning. The
 default path is a safe no-provider non-executed report with exact opt-in
-blockers. The reviewed apply path stays separately opt-in; focused tests prove
-patch intent and dry-run diff metadata, explicit review authority, isolated
-fixture apply, post-apply verification, task proof, exact rollback blocker
-handling, no real-workspace mutation, redaction, and no terminal success from
-provider calls, patch intent, dry-run diff, review authority, or apply alone.
-Deterministic assessment and live run entries now call the same ordered
-task-loop runtime in `runtime/evaluation/task/loop.ts`; `progression.ts` is a
-thin adapter over loop output, and the verify script remains a caller for
-existing explicit opt-in gates and safe observations. This is live task-run
-evidence, not broad write authority, script-owned task behavior, or
+blockers. The script now only invokes existing explicit read-only and anchored
+provider gates, passes safe gate receipts to `runtime/evaluation/task`, and
+prints safe metadata; the product live-run owner projects task entries and
+calls `runTaskLoop`. A measured explicit opt-in run executed all 13 entries,
+with 12 complete or useful partial, 4 reviewed isolated applies, 3 post-apply
+verification/task-proof outcomes, 1 debug/repair useful partial, 1 artifact
+or report path, and 1 continuation path. Redaction passed and real-workspace
+mutation stayed false. This is live task-run evidence, not broad
+real-workspace write authority, raw provider output inspection, or
 provider-output-only success.
 
 ## Stale Priority Cleanup

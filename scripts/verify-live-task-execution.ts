@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createHostRuntime } from "../packages/ts-shell/src/runtime/api/host/runtime.js";
 import {
   runTaskLiveReport,
-  type TaskLiveRunObservation,
+  type TaskLiveGateReceipt,
 } from "../packages/ts-shell/src/runtime/evaluation/task/liveRun.js";
 import type { TaskLiveGateOutcome } from "../packages/ts-shell/src/runtime/evaluation/task/model.js";
 
@@ -33,45 +33,20 @@ console.log("raw-provider-output=excluded");
 console.log("terminal-success-claim=false");
 
 const host = createHostRuntime();
-const observations: TaskLiveRunObservation[] = [];
 const gateResults: GateResult[] = [];
 
 if (liveOptIn) {
   const readOnly = runReadOnlyProviderGate();
   gateResults.push(readOnly);
-  if (readOnly.outcome === "passed") {
-    observations.push(
-      observed("package-script-impact", "read-only-provider", readOnly, "complete", "partial"),
-      observed("pathless-workspace-question", "read-only-provider", readOnly, "complete", "partial"),
-      observed("owner-context-question", "read-only-provider", readOnly, "complete", "partial"),
-      observed("test-impact-question", "read-only-provider", readOnly, "complete", "partial"),
-      observed("readonly-coding-check", "read-only-provider", readOnly, "complete", "partial"),
-    );
-  }
 
   const anchored = runAnchoredProviderGate();
   gateResults.push(anchored);
-  if (anchored.outcome === "passed") {
-    observations.push(
-      observed("resume-from-context", "anchored-provider", anchored, "complete", "partial"),
-      observed("incident-summary-report", "artifact-dry-run", anchored, "complete", "passed", "passed"),
-      observed("metrics-summary-artifact", "artifact-dry-run", anchored, "complete", "passed", "passed"),
-      writePlanObserved(anchored),
-    );
-    if (reviewedApplyOptIn) {
-      observations.push(
-        writeObserved("single-file-edit", anchored, ["src/format.ts"], "complete", "passed", "not-run"),
-        writeObserved("coordinated-edit", anchored, ["src/parser.ts", "src/caller.ts"], "complete", "passed", "not-run"),
-        writeObserved("failed-check-repair", anchored, ["src/check.ts"], "complete", "passed", "not-run"),
-        writeObserved("rollback-recovery", anchored, ["src/alpha.ts"], "partial", "partial", "partial"),
-      );
-    }
-  }
 }
 
 const report = await runTaskLiveReport({
   dispatch: host.dispatch,
-  observations,
+  gateReceipts: gateResults.map(toGateReceipt),
+  reviewedApplyOptIn,
 });
 
 for (const gate of gateResults) {
@@ -191,70 +166,19 @@ function runAnchoredProviderGate(): GateResult {
   };
 }
 
-function observed(
-  entryId: TaskLiveRunObservation["entryId"],
-  gate: TaskLiveRunObservation["gate"],
-  gateResult: GateResult,
-  proofStatus: TaskLiveRunObservation["proofStatus"],
-  verificationStatus: TaskLiveRunObservation["verificationStatus"],
-  artifactValidationStatus?: TaskLiveRunObservation["artifactValidationStatus"],
-): TaskLiveRunObservation {
+function toGateReceipt(gateResult: GateResult): TaskLiveGateReceipt {
   return {
-    entryId,
-    gate,
-    explicitOptIn: true,
-    providerAttempted: gateResult.attempted,
-    providerOutcome: gateResult.outcome,
+    gate: gateResult.name,
+    attempted: gateResult.attempted,
+    outcome: gateResult.outcome,
     noMutation: gateResult.noMutation,
     changedFiles: gateResult.changedFiles,
     noApply: gateResult.noApply,
     redactionStatus: gateResult.redactionStatus,
-    verificationStatus,
-    artifactValidationStatus,
-    proofStatus,
     fallbackConfigured: gateResult.fallbackConfigured,
     fallbackAttempted: gateResult.fallbackAttempted,
     fallbackOutcome: gateResult.fallbackOutcome,
-  };
-}
-
-function writePlanObserved(gateResult: GateResult): TaskLiveRunObservation {
-  return {
-    ...observed("write-planning-dry-run", "anchored-provider", gateResult, "partial", "partial"),
-    patchIntentStatus: "present",
-    safePlanStatus: "ready",
-    dryRunDiffStatus: "produced",
-    reviewAuthority: "missing",
-    applyStatus: "not-run",
-    isolatedApply: false,
-    realWorkspaceMutation: false,
-    postApplyVerificationStatus: "not-run",
-    rollbackStatus: "not-run",
-  };
-}
-
-function writeObserved(
-  entryId: Extract<TaskLiveRunObservation["entryId"], "single-file-edit" | "coordinated-edit" | "failed-check-repair" | "rollback-recovery">,
-  gateResult: GateResult,
-  changedFiles: readonly string[],
-  proofStatus: TaskLiveRunObservation["proofStatus"],
-  postApplyVerificationStatus: NonNullable<TaskLiveRunObservation["postApplyVerificationStatus"]>,
-  rollbackStatus: NonNullable<TaskLiveRunObservation["rollbackStatus"]>,
-): TaskLiveRunObservation {
-  return {
-    ...observed(entryId, "anchored-provider", gateResult, proofStatus, "passed"),
-    noMutation: false,
-    changedFiles,
-    noApply: false,
-    patchIntentStatus: "present",
-    safePlanStatus: "ready",
-    dryRunDiffStatus: "produced",
-    reviewAuthority: "approved",
-    applyStatus: "applied",
-    isolatedApply: true,
-    realWorkspaceMutation: false,
-    postApplyVerificationStatus,
-    rollbackStatus,
+    ...(gateResult.blocker ? { blocker: gateResult.blocker } : {}),
   };
 }
 

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createHostRuntime } from "../../api/host/runtime.js";
 import {
   listTaskLiveEntries,
+  projectLiveObservationsFromGateReceipts,
   runTaskLiveReport,
+  type TaskLiveGateReceipt,
   type TaskLiveRunObservation,
 } from "./liveRun.js";
 
@@ -213,6 +215,77 @@ describe("task live run report", () => {
     expect(JSON.stringify(report)).not.toMatch(/Bearer |api[_-]?key|token|headers|raw provider output|diff --git|\*\*\* Begin Patch/i);
   });
 
+  it("projects gate receipts into task-loop live entries inside the runtime owner", async () => {
+    const host = createHostRuntime();
+    const entries = listTaskLiveEntries();
+    const observations = projectLiveObservationsFromGateReceipts({
+      entries,
+      reviewedApplyOptIn: true,
+      gateReceipts: [
+        gateReceipt("read-only-provider"),
+        gateReceipt("anchored-provider", {
+          fallbackConfigured: true,
+          fallbackAttempted: false,
+          fallbackOutcome: "skipped",
+        }),
+      ],
+    });
+    const report = await runTaskLiveReport({
+      dispatch: host.dispatch,
+      reviewedApplyOptIn: true,
+      gateReceipts: [
+        gateReceipt("read-only-provider"),
+        gateReceipt("anchored-provider", {
+          fallbackConfigured: true,
+          fallbackAttempted: false,
+          fallbackOutcome: "skipped",
+        }),
+      ],
+    });
+
+    expect(observations.map((observation) => observation.entryId)).toEqual([
+      "package-script-impact",
+      "pathless-workspace-question",
+      "owner-context-question",
+      "test-impact-question",
+      "readonly-coding-check",
+      "resume-from-context",
+      "incident-summary-report",
+      "metrics-summary-artifact",
+      "write-planning-dry-run",
+      "single-file-edit",
+      "coordinated-edit",
+      "failed-check-repair",
+      "rollback-recovery",
+    ]);
+    expect(report.summary).toMatchObject({
+      executedCount: 13,
+      completeOrUsefulPartialCount: 12,
+      isolatedApplyCount: 4,
+      postApplyProofCount: 3,
+      hardGateStatus: "passed",
+      terminalSuccessClaim: false,
+    });
+    expect(report.results.find((result) => result.entryId === "single-file-edit")).toMatchObject({
+      status: "complete",
+      changedFiles: ["src/format.ts"],
+      isolatedApply: true,
+      realWorkspaceMutation: false,
+      progression: {
+        mode: "live",
+        modelSource: "explicit-live-gate",
+        completeProof: true,
+      },
+    });
+    expect(report.results.find((result) => result.entryId === "incident-summary-report")).toMatchObject({
+      status: "complete",
+      artifactValidationStatus: "passed",
+      noApply: true,
+    });
+    expect(report.results.every((result) => result.terminalSuccessClaim === false)).toBe(true);
+    expect(JSON.stringify(report)).not.toMatch(/Bearer |api[_-]?key|token|headers|raw provider output|diff --git|\*\*\* Begin Patch/i);
+  });
+
   it("preserves exact provider and redaction blockers", async () => {
     const host = createHostRuntime();
     const report = await runTaskLiveReport({
@@ -339,4 +412,20 @@ function writeObservation(
     rollbackStatus: entryId === "rollback-recovery" ? "complete" : "not-run",
     ...overrides,
   });
+}
+
+function gateReceipt(
+  gate: "read-only-provider" | "anchored-provider",
+  overrides: Partial<TaskLiveGateReceipt> = {},
+): TaskLiveGateReceipt {
+  return {
+    gate,
+    attempted: true,
+    outcome: "passed" as const,
+    noMutation: true,
+    changedFiles: [],
+    noApply: true,
+    redactionStatus: "passed" as const,
+    ...overrides,
+  };
 }

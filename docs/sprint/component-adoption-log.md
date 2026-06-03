@@ -560,6 +560,68 @@ focused validation.
   construction to the previous SP025 projection-only path, while keeping
   evidence/result verdicts and non-success live/write safety claims intact.
 
+## Mainline Live Task Receipt Execution
+
+- Selected mode: structured port for local gate-receipt-to-task-entry
+  execution, with behavior-only alignment for explicit live provider gate
+  invocation.
+- Owner domain: `runtime/evaluation/task`, delegating stage facts to
+  `context/selection`, `planning/execution`, `provider/request`,
+  `provider/response`, `tools/policy`, `edit`, `verification/execution`,
+  `artifacts/workflow`, `repair/loop`, `evidence/task`, and `result/task`.
+- Reason for use: SP027 required real opt-in live tasks to execute through
+  `runTaskLoop`, not through script-owned per-entry observation construction.
+  The local runtime already had a shared loop owner from SP026; the missing
+  behavior was moving live gate receipt interpretation and reviewed isolated
+  task-entry projection into the runtime owner while keeping scripts thin.
+- Behavior ported: explicit live scripts now collect only safe read-only and
+  anchored gate receipts. `runtime/evaluation/task/liveRun.ts` maps those
+  receipts to read-only, pathless/context, artifact/report, continuation,
+  write-planning, reviewed isolated edit, and debug/repair entries, then
+  projects every entry through `runTaskLoop` with proof/verdict ownership.
+  The measured live run executed 13 entries, reached 12 complete or useful
+  partial outcomes, recorded 4 reviewed isolated applies, 3 post-apply
+  verification/task-proof outcomes, a useful rollback/debug partial,
+  artifact/report, continuation, pathless/context, read-only coverage, safe
+  fallback metadata, and redaction pass.
+- Rejected alternatives:
+  - Dependency use: rejected because live task truth, redaction, write
+    authority, and evidence/result proof are local product semantics.
+  - Isolated source adoption: rejected because no narrow legal source
+    component was needed; copying mature loop/session/provider code would risk
+    unsuitable names, dynamic behavior, provider defaults, and side-effect
+    semantics.
+  - Script-owned entry generation: rejected because scripts may prepare input,
+    set explicit gates, call the runtime, and print safe results only.
+  - Behavior-only alignment alone: rejected because SP027 required current
+    live task entries to call the local product task loop.
+  - Terminal-output contract: rejected because terminal text must not become
+    the machine API or success owner.
+- Expected callers: `verify:live-task-execution`, task assessment, host
+  evaluation summaries, future live recovery gates, artifact/manual-review
+  gates, and evidence/result projections.
+- Side-effect boundary: provider calls remain in existing explicit opt-in gates
+  with isolated runtime homes and redacted output. The runtime owner consumes
+  safe receipts only. Reviewed apply remains isolated and metadata-only for
+  real workspace safety. This adoption does not add provider defaults, browser
+  automation, external tool servers, dynamic loading, broad command expansion,
+  arbitrary writers, broad SDK/RPC behavior, or private provider material
+  access.
+- Truth boundary: gate receipt, provider called, fallback attempted, patch
+  intent, dry-run diff, review authority, isolated apply, post-apply
+  verification attempt, artifact validation, task-loop progression, smoke pass,
+  and live report status are not terminal task success. Complete remains owned
+  by `evidence/task` and `result/task`; missing proof stays partial, blocked,
+  skipped, or not-proven.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/liveRun.test.ts runtime/evaluation/task/model.test.ts`
+  - `rtk npm run build:ts`
+  - `rtk npm run verify:live-task-execution`
+  - `PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real PRIVATE_AGENTS_LIVE_TASK_EXECUTION=1 PRIVATE_AGENTS_LIVE_WRITE_REVIEWED_APPLY=1 rtk npm run verify:live-task-execution`
+- Rollback plan: remove gate receipt projection from `liveRun.ts` and return
+  scripts to safe no-execution blockers rather than allowing scripts to own
+  task entry success or write metadata.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

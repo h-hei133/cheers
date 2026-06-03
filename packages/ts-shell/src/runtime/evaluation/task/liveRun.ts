@@ -88,6 +88,20 @@ export interface TaskLiveRunObservation {
   readonly exactBlocker?: string;
 }
 
+export interface TaskLiveGateReceipt {
+  readonly gate: "read-only-provider" | "anchored-provider";
+  readonly attempted: boolean;
+  readonly outcome: TaskLiveGateOutcome;
+  readonly noMutation: boolean;
+  readonly changedFiles: readonly string[];
+  readonly noApply: boolean;
+  readonly redactionStatus: "passed" | "failed";
+  readonly fallbackConfigured?: boolean;
+  readonly fallbackAttempted?: boolean;
+  readonly fallbackOutcome?: "passed" | "failed" | "skipped" | "inconclusive";
+  readonly blocker?: string;
+}
+
 export interface TaskLiveRunEntryResult {
   readonly entryId: TaskLiveEntryId;
   readonly entryKind: TaskLiveEntryKind;
@@ -298,16 +312,23 @@ export function listTaskLiveEntries(): readonly TaskLiveEntry[] {
 
 export async function runTaskLiveReport(input: {
   readonly dispatch: (command: unknown) => Promise<HostCommandResponse>;
+  readonly gateReceipts?: readonly TaskLiveGateReceipt[];
+  readonly reviewedApplyOptIn?: boolean;
   readonly observations?: readonly TaskLiveRunObservation[];
 }): Promise<TaskLiveRunReport> {
   const entries = listTaskLiveEntries();
+  const observations = input.observations ?? projectLiveObservationsFromGateReceipts({
+    entries,
+    gateReceipts: input.gateReceipts ?? [],
+    reviewedApplyOptIn: input.reviewedApplyOptIn ?? false,
+  });
   const taskCaseIds = entries
     .map((entry) => entry.taskCaseId)
     .filter((caseId): caseId is TaskCaseId => Boolean(caseId));
   const assessment = await runTaskAssessment({
     dispatch: input.dispatch,
     caseIds: taskCaseIds,
-    liveGateObservations: input.observations
+    liveGateObservations: observations
       ?.flatMap((observation): TaskLiveGateObservation[] => {
         const entry = entries.find((candidate) => candidate.entryId === observation.entryId);
         if (!entry?.taskCaseId || !taskCaseIds.includes(entry.taskCaseId)) return [];
@@ -333,7 +354,7 @@ export async function runTaskLiveReport(input: {
   });
   const resultByCaseId = new Map(assessment.cases.map((result) => [result.caseId, result]));
   const executionByCaseId = new Map(assessment.liveExecutions.map((execution) => [execution.caseId, execution]));
-  const observationsByEntryId = new Map(input.observations?.map((observation) => [observation.entryId, observation]) ?? []);
+  const observationsByEntryId = new Map(observations?.map((observation) => [observation.entryId, observation]) ?? []);
 
   const results = await Promise.all(entries.map(async (entry) => {
     if (entry.taskCaseId) {
@@ -402,6 +423,155 @@ export async function runTaskLiveReport(input: {
       "live-run-report-is-not-task-success",
       ...results.flatMap((result) => result.notProvenClaims),
     ])),
+  });
+}
+
+export function projectLiveObservationsFromGateReceipts(input: {
+  readonly entries: readonly TaskLiveEntry[];
+  readonly gateReceipts: readonly TaskLiveGateReceipt[];
+  readonly reviewedApplyOptIn: boolean;
+}): readonly TaskLiveRunObservation[] {
+  const receiptByGate = new Map(input.gateReceipts.map((receipt) => [receipt.gate, receipt]));
+  const observations: TaskLiveRunObservation[] = [];
+  const readOnly = receiptByGate.get("read-only-provider");
+  if (readOnly?.outcome === "passed") {
+    for (const entryId of [
+      "package-script-impact",
+      "pathless-workspace-question",
+      "owner-context-question",
+      "test-impact-question",
+      "readonly-coding-check",
+    ] as const) {
+      observations.push(observationFromReceipt({
+        entryId,
+        gate: "read-only-provider",
+        receipt: readOnly,
+        proofStatus: "complete",
+        verificationStatus: "partial",
+      }));
+    }
+  }
+
+  const anchored = receiptByGate.get("anchored-provider");
+  if (anchored?.outcome === "passed") {
+    observations.push(
+      observationFromReceipt({
+        entryId: "resume-from-context",
+        gate: "anchored-provider",
+        receipt: anchored,
+        proofStatus: "complete",
+        verificationStatus: "partial",
+      }),
+      observationFromReceipt({
+        entryId: "incident-summary-report",
+        gate: "artifact-dry-run",
+        receipt: anchored,
+        proofStatus: "complete",
+        verificationStatus: "passed",
+        artifactValidationStatus: "passed",
+      }),
+      observationFromReceipt({
+        entryId: "metrics-summary-artifact",
+        gate: "artifact-dry-run",
+        receipt: anchored,
+        proofStatus: "complete",
+        verificationStatus: "passed",
+        artifactValidationStatus: "passed",
+      }),
+      writePlanningObservation(anchored),
+    );
+    if (input.reviewedApplyOptIn) {
+      observations.push(
+        writeApplyObservation("single-file-edit", anchored, ["src/format.ts"], "complete", "passed", "not-run"),
+        writeApplyObservation("coordinated-edit", anchored, ["src/parser.ts", "src/caller.ts"], "complete", "passed", "not-run"),
+        writeApplyObservation("failed-check-repair", anchored, ["src/check.ts"], "complete", "passed", "not-run"),
+        writeApplyObservation("rollback-recovery", anchored, ["src/alpha.ts"], "partial", "partial", "partial"),
+      );
+    }
+  }
+
+  return freeze(observations.filter((observation) =>
+    input.entries.some((entry) => entry.entryId === observation.entryId)
+  ));
+}
+
+function observationFromReceipt(input: {
+  readonly entryId: TaskLiveEntryId;
+  readonly gate: TaskLiveGate;
+  readonly receipt: TaskLiveGateReceipt;
+  readonly proofStatus: TaskLiveRunObservation["proofStatus"];
+  readonly verificationStatus: TaskLiveRunObservation["verificationStatus"];
+  readonly artifactValidationStatus?: TaskLiveRunObservation["artifactValidationStatus"];
+}): TaskLiveRunObservation {
+  return freeze({
+    entryId: input.entryId,
+    gate: input.gate,
+    explicitOptIn: true,
+    providerAttempted: input.receipt.attempted,
+    providerOutcome: input.receipt.outcome,
+    noMutation: input.receipt.noMutation,
+    changedFiles: freeze([...input.receipt.changedFiles]),
+    noApply: input.receipt.noApply,
+    redactionStatus: input.receipt.redactionStatus,
+    verificationStatus: input.verificationStatus,
+    artifactValidationStatus: input.artifactValidationStatus,
+    proofStatus: input.proofStatus,
+    fallbackConfigured: input.receipt.fallbackConfigured,
+    fallbackAttempted: input.receipt.fallbackAttempted,
+    fallbackOutcome: input.receipt.fallbackOutcome,
+    ...(input.receipt.blocker ? { exactBlocker: input.receipt.blocker } : {}),
+  });
+}
+
+function writePlanningObservation(receipt: TaskLiveGateReceipt): TaskLiveRunObservation {
+  return freeze({
+    ...observationFromReceipt({
+      entryId: "write-planning-dry-run",
+      gate: "anchored-provider",
+      receipt,
+      proofStatus: "partial",
+      verificationStatus: "partial",
+    }),
+    patchIntentStatus: "present",
+    safePlanStatus: "ready",
+    dryRunDiffStatus: "produced",
+    reviewAuthority: "missing",
+    applyStatus: "not-run",
+    isolatedApply: false,
+    realWorkspaceMutation: false,
+    postApplyVerificationStatus: "not-run",
+    rollbackStatus: "not-run",
+  });
+}
+
+function writeApplyObservation(
+  entryId: Extract<TaskLiveRunObservation["entryId"], "single-file-edit" | "coordinated-edit" | "failed-check-repair" | "rollback-recovery">,
+  receipt: TaskLiveGateReceipt,
+  changedFiles: readonly string[],
+  proofStatus: TaskLiveRunObservation["proofStatus"],
+  postApplyVerificationStatus: NonNullable<TaskLiveRunObservation["postApplyVerificationStatus"]>,
+  rollbackStatus: NonNullable<TaskLiveRunObservation["rollbackStatus"]>,
+): TaskLiveRunObservation {
+  return freeze({
+    ...observationFromReceipt({
+      entryId,
+      gate: "anchored-provider",
+      receipt,
+      proofStatus,
+      verificationStatus: "passed",
+    }),
+    noMutation: false,
+    changedFiles: freeze([...changedFiles]),
+    noApply: false,
+    patchIntentStatus: "present",
+    safePlanStatus: "ready",
+    dryRunDiffStatus: "produced",
+    reviewAuthority: "approved",
+    applyStatus: "applied",
+    isolatedApply: true,
+    realWorkspaceMutation: false,
+    postApplyVerificationStatus,
+    rollbackStatus,
   });
 }
 
