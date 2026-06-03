@@ -44,6 +44,11 @@ export interface RepairActionInput {
   readonly decision: RepairDecision;
   readonly actions: readonly string[];
   readonly changedTargetCount: number;
+  readonly validationEvidence?: {
+    readonly status: "passed" | "partial" | "failed" | "not-run";
+    readonly check: string;
+    readonly originalFailurePreserved: boolean;
+  };
 }
 
 export interface RepairAction {
@@ -80,6 +85,17 @@ export function executeRepair(input: RepairActionInput): RepairAction {
       attempted: false,
       postValidation: "not-run",
       blockers: input.decision.blockers.length > 0 ? input.decision.blockers : ["repair not eligible"],
+      originalFailurePreserved: true,
+      terminalSuccessClaim: false,
+    });
+  }
+  if (input.validationEvidence) {
+    return freeze({
+      attempted: true,
+      postValidation: input.validationEvidence.status,
+      blockers: input.validationEvidence.status === "passed"
+        ? []
+        : [`post-repair validation ${input.validationEvidence.status}: ${input.validationEvidence.check}`],
       originalFailurePreserved: true,
       terminalSuccessClaim: false,
     });

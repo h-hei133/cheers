@@ -23,7 +23,7 @@ deterministic runtime case is not enough.
   decision/action, task proof, task verdict, proof records, negative controls,
   default-off live gate plans, and before/after blocker facts, but it still does
   not prove broad real task completion. Current task assessment results are 7
-  complete, 1 partial, 1 skipped, and 1 unsupported. Two explicit opt-in
+  12 complete, 1 skipped, and 1 unsupported. Two explicit opt-in
   no-write live gates were executed and both stopped on provider-network
   blockers, with no mutation and redaction preserved.
 - Workspace intelligence and planning are partially proven through owner tests
@@ -97,40 +97,37 @@ deterministic runtime case is not enough.
 The detailed batch definitions are in
 `docs/sprint/task-capability-gap-plan.md`. These are the next priority groups:
 
-1. Complete post-repair verification proof for the remaining partial rollback
-   recovery case, now focused on turning bounded partial repair into
-   task-relevant final verification without hiding the original failure.
-2. Opt-in live task execution through existing gates, now focused on clearing
+1. Opt-in live task execution through existing gates, now focused on clearing
    the observed provider-network blocker after two no-write live gate attempts,
    while keeping provider defaults disabled.
-3. Live debug and repair loop, now focused on real post-repair verification and
+2. Live debug and repair loop, now focused on real post-repair verification and
    original-failure preservation beyond deterministic partial progress.
-4. Artifact workflow capability for non-code tasks, now moving from
+3. Artifact workflow capability for non-code tasks, now moving from
    deterministic receipts/correction toward durable artifact production and
    validation.
-5. Real task bench and live-provider capability triage.
-6. Workspace intelligence and context strategy.
-7. Planning, tool policy, and user collaboration.
-8. Provider prompting and response shaping.
-9. Product workflow and automation hardening.
-10. Product-layer versus engine-boundary decision.
+4. Real task bench and live-provider capability triage.
+5. Workspace intelligence and context strategy.
+6. Planning, tool policy, and user collaboration.
+7. Provider prompting and response shaping.
+8. Product workflow and automation hardening.
+9. Product-layer versus engine-boundary decision.
 
 These batches intentionally merge capabilities that must work together for a
 useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Audited SP019 blockers now set the immediate order: `rollback-recovery` is the
-only remaining deterministic partial case because post-repair verification is
-still partial and the task verdict keeps `completion proof missing`. Three
-no-write cases now have exact live gate requirements. Two existing explicit
-opt-in gates executed and both reached provider interaction or readiness before
-stopping on provider-network failure; no-write/no-apply/redaction boundaries
-were preserved. `source-report` and `structured-artifact` stay manual-review
-artifact cases until a sanctioned artifact validation gate exists, write-capable
-code/debug cases remain unsafe or dry-run-only, and the unsupported export
-stays unsupported. Live gate execution, provider called, host-observed facts,
-and readiness facts still are not success by themselves.
+Audited SP020 blockers now set the immediate order: `rollback-recovery` is
+complete through explicit post-repair rollback validation evidence and
+evidence/result task verdict. Five no-write cases now have exact live gate
+requirements. Two existing explicit opt-in gates executed and both reached
+provider interaction or readiness before stopping on provider-network failure;
+no-write/no-apply/redaction boundaries were preserved. `source-report`,
+`structured-artifact`, `incident-summary-report`, and `csv-summary-artifact`
+stay manual-review artifact cases until a sanctioned artifact validation gate
+exists, write-capable code/debug cases remain unsafe or dry-run-only, and the
+unsupported export stays unsupported. Live gate execution, provider called,
+host-observed facts, and readiness facts still are not success by themselves.
 
 ## Immediate Sprint Batches
 

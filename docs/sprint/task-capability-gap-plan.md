@@ -18,7 +18,7 @@ capabilities that must ship together for real user-visible work.
 | Session continuation | Partially proven for branch/compaction facts, replay, resume context, compact summaries, lifecycle, and host/session status. | `session/store`, `session/replay`, `session/recovery`, `session/continuation`. Broad interactive branch UX and long real task continuation remain weak. |
 | Host automation | Proven for in-process host command contract and package-facing JSON response. | `runtime/api/host`, `cli/host`, `runtime/distribution`, `verify:host-surface`. Broad SDK/RPC server behavior remains unproven. |
 | Product workflow | Partially proven for CLI status envelope, host JSON, interactive loop lifecycle, cancellation, session selection, and presentation facts. | `cli`, `session/presentation`, `presentation`. User collaboration and artifact workflow surfaces are missing or narrow. |
-| Real task evaluation | Partially proven as deterministic task assessment plumbing with context selection, execution planning, request packets, tool strategy, artifact correction, repair action, verification execution, task proof, task verdict facts, proof records, negative controls, default-off live gate plans, and exact live blocker reporting. | `runtime/evaluation/task/model.test.ts` and `evidence/task/proof.test.ts` cover coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, and skipped-live cases with audited outcomes: 7 complete, 1 partial, 1 skipped, and 1 unsupported. Live opt-in commands executed two no-write provider paths, both blocked by provider network failure. This is not broad live task completion. |
+| Real task evaluation | Partially proven as deterministic task assessment plumbing with context selection, execution planning, request packets, tool strategy, artifact correction, repair action, explicit post-repair validation evidence, verification execution, task proof, task verdict facts, proof records, negative controls, default-off live gate plans, and exact live blocker reporting. | `runtime/evaluation/task/model.test.ts` and `evidence/task/proof.test.ts` cover coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, and skipped-live cases with audited outcomes: 12 complete, 1 skipped, and 1 unsupported. Live opt-in commands executed two no-write provider paths, both blocked by provider network failure. This is not broad live task completion. |
 | Artifact workflows | Partially proven as deterministic receipt, correction, and validation facts. | `artifacts/workflow/model.test.ts` and task assessment integration cover report/structured-data intent, source receipts, format expectation, unsafe/missing/invalid/not-proven states, validation failure, correction, and rerun verification. Durable artifact writing, rendered checks, and broad export workflows remain missing. |
 
 ## Measured Task Assessment Result
@@ -31,9 +31,11 @@ task lane:
   `coordinated-edit`.
 - Complete by task proof verdict after audited owner facts:
   `failed-check-repair`,
-  `pathless-workspace-question`, `source-report`, `structured-artifact`,
+  `rollback-recovery`,
+  `pathless-workspace-question`, `test-impact-question`,
+  `owner-context-question`, `source-report`, `structured-artifact`,
+  `incident-summary-report`, `csv-summary-artifact`,
   `resume-from-context`.
-- Partial: `rollback-recovery`.
 - Skipped: `live-provider-triage`.
 - Unsupported: `unsupported-artifact-export`.
 - Failed: none.
@@ -42,16 +44,16 @@ task lane:
 
 Top blockers before the verification/artifact/repair loop:
 
-1. `verification not selected`: blocked `rollback-recovery`, `source-report`,
-   and `resume-from-context`.
+1. `verification not selected`: blocked `source-report` and
+   `resume-from-context`.
 2. `artifact invalid`: blocked `source-report` and `structured-artifact`.
 3. `repair failed`: blocked `failed-check-repair` and `rollback-recovery`.
 
 Top blockers after the deterministic task proof lane:
 
-1. `completion proof missing`: blocks `rollback-recovery`.
-2. `environment issue`: blocks the default-skipped live triage case.
-3. `provider failure`: blocks the default-skipped live triage case.
+1. `environment issue`: blocks the default-skipped live triage case.
+2. `provider failure`: blocks the default-skipped live triage case.
+3. `unsupported capability`: blocks the unsupported export case.
 
 Changed case evidence:
 
@@ -59,17 +61,29 @@ Changed case evidence:
   context, ready execution plan, repair tool strategy, repair action, passed
   rerun verification, preserved original failure, and evidence/result task
   verdict.
-- `rollback-recovery`: before `failed`; after `partial` through bounded partial
-  repair evidence, partial rerun verification, and remaining repair/proof
-  blockers.
+- `rollback-recovery`: before `failed`; after `complete` through bounded repair,
+  original failure preservation, explicit post-repair rollback validation
+  evidence, passed verification execution, and evidence/result task verdict.
 - `pathless-workspace-question`: before `blocked`; after `complete` through
   context selection, task request shaping, search/verify tool strategy, target
   resolution proof, and evidence/result task verdict.
+- `test-impact-question`: before `blocked`; after `complete` through pathless
+  target and focused-check resolution, selected nearby context, no-write policy,
+  and evidence/result task verdict.
+- `owner-context-question`: before `blocked`; after `complete` through
+  pathless owner-domain context resolution, report-safe receipt boundary proof,
+  no-write policy, and evidence/result task verdict.
 - `source-report`: before `failed`; after `complete` through source receipts,
   artifact correction, passed rerun verification, and evidence/result task
   verdict.
 - `structured-artifact`: before `failed`; after `complete` through source
   receipts, artifact correction, passed rerun verification, and evidence/result
+  task verdict.
+- `incident-summary-report`: before `failed`; after `complete` through source
+  receipts, report artifact correction, passed validation, and evidence/result
+  task verdict.
+- `csv-summary-artifact`: before `failed`; after `complete` through structured
+  source receipts, artifact correction, passed validation, and evidence/result
   task verdict.
 - `resume-from-context`: before `not-proven`; after `complete` through
   refreshed continuation context, freshness proof, and evidence/result task
@@ -81,8 +95,9 @@ continuation context, host output without task proof, and artifact presence
 without validation all downgrade away from complete and preserve missing proof
 items.
 
-Live status: default-off. Three no-write cases now have exact live gate
-requirements: `pathless-workspace-question` uses the read-only provider path,
+Live status: default-off. Five no-write cases now have exact live gate
+requirements: `pathless-workspace-question`, `test-impact-question`, and
+`owner-context-question` use the read-only provider path,
 `resume-from-context` uses the anchored provider path, and
 `live-provider-triage` uses provider readiness preflight. Two existing
 explicit opt-in live gates were executed. The read-only provider path reached
@@ -91,9 +106,10 @@ ended with `provider-network-inconclusive` during the model turn. The anchored
 provider path approved the adapter, called the provider, preserved no-write and
 no-apply, excluded raw provider output, passed focused module tests, and ended
 with `live-smoke-provider-network`. `source-report` and
-`structured-artifact` remain manual-review artifact cases because live artifact
-writing needs a sanctioned validation gate. Write-capable code/debug cases stay
-unsafe or dry-run-only.
+`structured-artifact`, `incident-summary-report`, and `csv-summary-artifact`
+remain manual-review artifact cases because live artifact writing needs a
+sanctioned validation gate. Write-capable code/debug cases stay unsafe or
+dry-run-only.
 
 ## Stale Priority Cleanup
 

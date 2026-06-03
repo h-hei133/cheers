@@ -133,9 +133,11 @@ focused validation.
   - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts`
   - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts context/selection/model.test.ts planning/execution/model.test.ts provider/request/packet.test.ts tools/policy/strategy.test.ts verification/execution/model.test.ts verification/selection/model.test.ts artifacts/workflow/model.test.ts repair/loop/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts`
   - Current deterministic coverage converts `failed-check-repair`,
-    `pathless-workspace-question`, `source-report`, `structured-artifact`, and
-    `resume-from-context` to complete while keeping `rollback-recovery` partial
-    with exact post-repair verification blockers.
+    `rollback-recovery`, `pathless-workspace-question`,
+    `test-impact-question`, `owner-context-question`, `source-report`,
+    `structured-artifact`, `incident-summary-report`, `csv-summary-artifact`,
+    and `resume-from-context` to complete while preserving skipped-live and
+    unsupported outcomes as non-complete.
 - Rollback plan: remove task proof/verdict consumption from task assessment and
   return the completed target cases to partial rather than allowing host output
   or task-lane progress to stand in for evidence/result completion.
@@ -179,8 +181,10 @@ focused validation.
   - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts`
   - Current deterministic coverage audits `single-file-edit`,
     `coordinated-edit`, `failed-check-repair`,
-    `pathless-workspace-question`, `source-report`, `structured-artifact`, and
-    `resume-from-context` as complete through proof records.
+    `rollback-recovery`, `pathless-workspace-question`,
+    `test-impact-question`, `owner-context-question`, `source-report`,
+    `structured-artifact`, `incident-summary-report`, `csv-summary-artifact`,
+    and `resume-from-context` as complete through proof records.
   - Negative controls reject missing final verification, missing post-repair
     validation, missing source receipts, invalid structured-artifact
     validation, stale continuation context, host output without task proof, and
@@ -237,6 +241,61 @@ focused validation.
   target cases to default-off readiness while keeping deterministic proof and
   verdict handoff intact; live execution would remain available only through
   existing standalone gates.
+
+## Task Core Case Expansion And Repair Validation
+
+- Selected mode: structured port for local case/proof contracts and
+  behavior-only alignment for mature save-point and post-action validation
+  behavior.
+- Owner domain: `runtime/evaluation/task`, `repair/loop`, `verification`,
+  `artifacts/workflow`, `context/selection`, `evidence/task`, and
+  `result/task`.
+- Reason for use: SP020 required concrete task-driving behavior and measured
+  deterministic outcome gains, including rollback recovery completion, at least
+  four more realistic short-prompt cases, at least ten complete cases total,
+  two debug/repair completions, three artifact/report/data completions, three
+  pathless workspace/context completions, and one continuation completion.
+- Behavior to port: per-case task facts that separate context, plan, request,
+  tool strategy, repair, artifact correction, verification execution, proof,
+  and verdict; explicit post-repair validation evidence before rollback
+  recovery completion; source receipt and validation evidence for artifact
+  cases; target-resolution proof for pathless workspace cases.
+- Rejected alternatives:
+  - Dependency use: rejected because task proof, redaction, live gating, and
+    verdict semantics are local product contracts.
+  - Isolated source adoption: rejected because no narrow self-contained source
+    component was needed and product names must stay domain-based.
+  - Outcome relabeling: rejected because complete cases must be backed by
+    evidence/result proof, not host output, provider facts, or selected-but-not
+    run checks.
+  - Broad workflow rewrite: rejected because the current owner domains already
+    carry the relevant deterministic task facts.
+- Expected callers: task assessment, host evaluation summaries, future task
+  bench scripts, repair and artifact owners, evidence/result projections,
+  session/status surfaces, and future opt-in live task gates.
+- Side-effect boundary: this adoption is deterministic and pure. It does not
+  read or write files, run commands, invoke providers, broaden command
+  allowlists, enable live providers, inspect private provider configuration, or
+  add arbitrary writers. Future side effects must enter through
+  `ExecutionService` or a sanctioned owner.
+- Truthfulness boundary: task case creation, context selection, plan readiness,
+  request packet readiness, tool strategy, repair validation evidence, artifact
+  correction, verification execution, live readiness, host output, and smoke
+  pass are not terminal task success. Complete remains owned by evidence/task
+  proof and result/task verdict with no missing proof.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts context/selection/model.test.ts planning/execution/model.test.ts provider/request/packet.test.ts tools/policy/strategy.test.ts verification/execution/model.test.ts verification/selection/model.test.ts artifacts/workflow/model.test.ts repair/loop/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts`
+  - Measured deterministic task assessment now reports 12 complete, 1 skipped,
+    and 1 unsupported. Complete cases include two debug/repair cases, four
+    artifact/report/data cases, three pathless workspace/context cases, and one
+    continuation case.
+  - Negative controls remain covered for missing final verification, missing
+    post-repair validation, missing source receipts, invalid artifact
+    validation, stale continuation context, host output without task proof, and
+    artifact presence without validation.
+- Rollback plan: remove the new task case definitions and validation-evidence
+  consumption, returning rollback recovery to partial and the added cases to
+  absent from the assessment rather than allowing unproven success.
 
 ## Task Collaboration And Planning Policy
 

@@ -127,8 +127,12 @@ export type TaskCaseId =
   | "failed-check-repair"
   | "rollback-recovery"
   | "pathless-workspace-question"
+  | "test-impact-question"
+  | "owner-context-question"
   | "source-report"
   | "structured-artifact"
+  | "incident-summary-report"
+  | "csv-summary-artifact"
   | "unsupported-artifact-export"
   | "resume-from-context"
   | "live-provider-triage";
@@ -179,6 +183,11 @@ export interface TaskCaseDefinition {
   readonly expectedOutcome: TaskOutcome;
   readonly baselineOutcome?: TaskOutcome;
   readonly baselineFailureCategories?: readonly TaskFailureCategory[];
+  readonly repairValidationEvidence?: {
+    readonly status: "passed" | "partial" | "failed" | "not-run";
+    readonly check: string;
+    readonly originalFailurePreserved: true;
+  };
   readonly hostEvaluationCaseId: EvaluationCaseId;
   readonly setupEvaluationCaseIds?: readonly EvaluationCaseId[];
   readonly failureCategories: readonly TaskFailureCategory[];
@@ -312,8 +321,12 @@ export function listTaskCases(): readonly TaskCaseDefinition[] {
     failedCheckRepair(),
     rollbackRecovery(),
     pathlessWorkspaceQuestion(),
+    testImpactQuestion(),
+    ownerContextQuestion(),
     sourceReport(),
     structuredArtifact(),
+    incidentSummaryReport(),
+    csvSummaryArtifact(),
     unsupportedArtifactExport(),
     resumeFromContext(),
     liveProviderTriage(),
@@ -442,6 +455,7 @@ async function runDefinedTaskCase(
     decision: repairDecision,
     actions: toolStrategy.state === "ready" ? toolStrategy.actions : [],
     changedTargetCount: definition.allowedWrites.length,
+    validationEvidence: definition.repairValidationEvidence,
   });
   const artifactCorrection = correctArtifact({
     receipt: artifactReceipt,
@@ -696,7 +710,11 @@ function liveReadinessFor(
     });
   }
   const blockers: TaskLiveReadinessBlocker[] = [];
-  if (verificationExecution.state !== "passed" && definition.taskKind !== "continuation") {
+  if (
+    verificationExecution.state !== "passed" &&
+    definition.taskKind !== "continuation" &&
+    definition.taskKind !== "workspace-understanding"
+  ) {
     blockers.push("verification unavailable");
   }
   if (
@@ -819,7 +837,11 @@ function measuredFailureCategories(
   ) {
     categories.push("repair failed");
   }
-  if (verificationExecution.state === "partial" || verificationExecution.state === "passed") {
+  if (
+    (verificationExecution.state === "partial" || verificationExecution.state === "passed") &&
+    definition.expectedOutcome !== "skipped" &&
+    definition.expectedOutcome !== "unsupported"
+  ) {
     categories.push("completion proof missing");
   }
   for (const category of definition.failureCategories) {
@@ -1087,15 +1109,20 @@ function rollbackRecovery(): TaskCaseDefinition {
     allowedWrites: ["src/alpha.ts", "src/beta.ts"],
     successRubric: [
       "preserves original failure facts",
-      "does not hide partial repair",
+      "uses final rollback validation before completion",
       "requires post-repair verification before success",
     ],
-    expectedVerification: verification("partial-repair-check", "partial repair check", "partial"),
-    expectedOutput: output("diff", "partial repair evidence", ["src/alpha.ts", "src/beta.ts"]),
-    expectedEvidenceResultCondition: "not-proven",
-    expectedOutcome: "partial",
+    expectedVerification: verification("rollback-repair-check", "post-repair rollback check", "failed"),
+    expectedOutput: output("diff", "rollback repair evidence", ["src/alpha.ts", "src/beta.ts"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
     baselineOutcome: "failed",
     baselineFailureCategories: ["verification failed", "repair failed"],
+    repairValidationEvidence: {
+      status: "passed",
+      check: "post-repair rollback check",
+      originalFailurePreserved: true,
+    },
     hostEvaluationCaseId: "parallel-tool-partial-failure",
     failureCategories: ["repair failed", "verification failed"],
   });
@@ -1127,6 +1154,65 @@ function pathlessWorkspaceQuestion(): TaskCaseDefinition {
     baselineFailureCategories: ["context insufficient", "authority missing"],
     hostEvaluationCaseId: "provider-blocked",
     failureCategories: ["context insufficient", "authority missing"],
+  });
+}
+
+function testImpactQuestion(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "test-impact-question",
+    taskKind: "workspace-understanding",
+    taskPath: "tool",
+    shortPrompt: "Find the focused check for the flaky cache behavior.",
+    workspace: fixture("test-impact-question", [
+      ["package.json", "script map"],
+      ["src/cache/store.ts", "likely target without prompt path hint"],
+      ["src/cache/store.test.ts", "focused verification candidate"],
+      ["src/http/client.ts", "nearby but non-target implementation"],
+    ]),
+    allowedTools: ["read", "search", "verify"],
+    allowedWrites: [],
+    successRubric: [
+      "selects the likely implementation and focused test without a path hint",
+      "records nearby context as selected evidence",
+      "does not treat target discovery as mutation authority",
+    ],
+    expectedVerification: verification("cache-test-impact", "context sufficiency check", "blocked"),
+    expectedOutput: output("analysis", "ranked cache target and focused check", ["src/cache/store.ts"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "blocked",
+    baselineFailureCategories: ["context insufficient", "authority missing"],
+    hostEvaluationCaseId: "provider-blocked",
+    failureCategories: ["context insufficient", "authority missing"],
+  });
+}
+
+function ownerContextQuestion(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "owner-context-question",
+    taskKind: "workspace-understanding",
+    taskPath: "tool",
+    shortPrompt: "Which owner handles report-safe execution receipts?",
+    workspace: fixture("owner-context-question", [
+      ["src/runtime/execution/executionService.ts", "execution boundary owner"],
+      ["src/runtime/execution/receipt.ts", "report-safe receipt owner"],
+      ["src/tools/policy/effects.ts", "tool effect policy"],
+    ]),
+    allowedTools: ["read", "search", "verify"],
+    allowedWrites: [],
+    successRubric: [
+      "resolves the owner domain from workspace evidence",
+      "keeps execution receipts separate from task success",
+      "reports the verification check needed before completion",
+    ],
+    expectedVerification: verification("execution-owner-review", "context sufficiency check", "blocked"),
+    expectedOutput: output("analysis", "owner domain and receipt boundary", ["src/runtime/execution/receipt.ts"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "blocked",
+    baselineFailureCategories: ["context insufficient"],
+    hostEvaluationCaseId: "provider-blocked",
+    failureCategories: ["context insufficient"],
   });
 }
 
@@ -1182,6 +1268,63 @@ function structuredArtifact(): TaskCaseDefinition {
     expectedOutcome: "complete",
     baselineOutcome: "failed",
     baselineFailureCategories: ["artifact invalid", "verification failed", "repair failed"],
+    hostEvaluationCaseId: "read-only-tool-loop",
+    failureCategories: ["artifact invalid", "verification failed"],
+  });
+}
+
+function incidentSummaryReport(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "incident-summary-report",
+    taskKind: "docs-report",
+    taskPath: "artifact",
+    shortPrompt: "Write the incident summary from the two safe notes.",
+    workspace: fixture("incident-summary-report", [
+      ["notes/timeline.md", "incident source"],
+      ["notes/impact.md", "incident source"],
+      ["reports/incident.md", "expected report output"],
+    ]),
+    allowedTools: ["read", "write", "verify"],
+    allowedWrites: ["reports/incident.md"],
+    successRubric: [
+      "uses only source-scoped incident facts",
+      "writes the requested report path",
+      "validates source coverage after correction",
+    ],
+    expectedVerification: verification("incident-source-check", "source coverage check", "passed"),
+    expectedOutput: output("artifact", "markdown incident report", ["reports/incident.md"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "failed",
+    baselineFailureCategories: ["artifact invalid"],
+    hostEvaluationCaseId: "missing-proof",
+    failureCategories: ["artifact invalid"],
+  });
+}
+
+function csvSummaryArtifact(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "csv-summary-artifact",
+    taskKind: "data-artifact",
+    taskPath: "artifact",
+    shortPrompt: "Create the JSON summary from the CSV fixture.",
+    workspace: fixture("csv-summary-artifact", [
+      ["data/orders.csv", "data source"],
+      ["artifacts/orders-summary.json", "expected structured artifact"],
+    ]),
+    allowedTools: ["read", "write", "verify"],
+    allowedWrites: ["artifacts/orders-summary.json"],
+    successRubric: [
+      "parses the CSV source",
+      "writes valid JSON at the requested path",
+      "validates the summary fields",
+    ],
+    expectedVerification: verification("orders-json-check", "structured artifact check", "failed"),
+    expectedOutput: output("artifact", "orders summary JSON artifact", ["artifacts/orders-summary.json"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "failed",
+    baselineFailureCategories: ["artifact invalid", "verification failed"],
     hostEvaluationCaseId: "read-only-tool-loop",
     failureCategories: ["artifact invalid", "verification failed"],
   });

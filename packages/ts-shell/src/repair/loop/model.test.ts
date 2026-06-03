@@ -77,4 +77,46 @@ describe("repair loop model", () => {
       changedTargetCount: 2,
     }).postValidation).toBe("partial");
   });
+
+  it("uses explicit validation evidence for multi-target repair without making repair success terminal", () => {
+    const decision = decideRepair({
+      taskKind: "debug-repair",
+      verificationState: "selected-failed",
+      failureCategories: ["repair failed"],
+      hostStatus: "failed",
+    });
+
+    expect(executeRepair({
+      decision,
+      actions: ["repair", "verify"],
+      changedTargetCount: 2,
+      validationEvidence: {
+        status: "passed",
+        check: "post-repair rollback check",
+        originalFailurePreserved: true,
+      },
+    })).toMatchObject({
+      attempted: true,
+      postValidation: "passed",
+      blockers: [],
+      originalFailurePreserved: true,
+      terminalSuccessClaim: false,
+    });
+
+    expect(executeRepair({
+      decision,
+      actions: ["repair", "verify"],
+      changedTargetCount: 2,
+      validationEvidence: {
+        status: "partial",
+        check: "post-repair rollback check",
+        originalFailurePreserved: true,
+      },
+    })).toMatchObject({
+      attempted: true,
+      postValidation: "partial",
+      blockers: ["post-repair validation partial: post-repair rollback check"],
+      terminalSuccessClaim: false,
+    });
+  });
 });

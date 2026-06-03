@@ -34,6 +34,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp017-task-path-parity-transplant.md` | completed route input | Task proof and task verdict objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp018-task-proof-audit-and-live-bridge.md` | completed route input | Task proof audit, fake-complete controls, and default-off live readiness bridge objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp019-live-task-breakthrough.md` | completed route input | Opt-in no-write live gate execution and exact provider-network blocker objective now reflected in current capability, priority, and adoption-log docs. |
+| `docs/sprint/route/sp020-autonomous-task-core-upgrade.md` | completed route input | Deterministic task-core upgrade, rollback recovery completion, added short-prompt task cases, and measured task-bench priorities now reflected in current capability, priority, gap, and adoption-log docs. |
 
 ## Removed Or Merged Content
 
