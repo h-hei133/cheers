@@ -93,6 +93,53 @@ focused validation.
   and return the affected non-complete cases to failed, blocked, or not-proven
   outcomes rather than promoting unproven success.
 
+## Task Proof And Verdict Handoff
+
+- Selected mode: structured port for local task proof/result contracts and
+  behavior-only alignment for mature task path completion handoff.
+- Owner domain: `evidence/task`, `result/task`, and
+  `runtime/evaluation/task`.
+- Reason for use: SP017 needed existing partial task cases to become complete
+  through task-relevant proof, not host-output relabeling. The local handoff now
+  checks proof items for context readiness, plan/request/tool readiness,
+  verification, repair post-validation, artifact source receipts and validation,
+  workspace target resolution, continuation freshness, and result input before
+  a task verdict can report complete.
+- Behavior to port: mature task paths separate work progress from completion,
+  preserve original failures, keep continuation summaries as context aids, and
+  expose structured machine-readable proof state rather than terminal text.
+- Rejected alternatives:
+  - Dependency use: rejected because proof requirements, redaction, and verdict
+    ownership are local product semantics.
+  - Isolated source adoption: rejected because no narrow source component was
+    needed and copied names or public field shapes would not fit local owner
+    boundaries.
+  - Host verdict override: rejected because host evaluation output is not task
+    success.
+  - Complete-by-verification-attempt: rejected because selected or attempted
+    verification is not proof.
+- Expected callers: task assessment, future host task summaries,
+  evidence/result projections, artifact workflows, repair loops, continuation
+  checks, and product automation surfaces.
+- Side-effect boundary: the proof handoff is deterministic and pure. It does
+  not read or write files, run commands, invoke providers, broaden tool
+  allowlists, enable live providers, or access real provider configuration.
+- Truthfulness boundary: context selected, plan ready, request shaped, tool
+  strategy chosen, repair attempted, artifact corrected, verification attempted,
+  host output observed, or status rendered is not success. `result/task` reports
+  complete only when `evidence/task` has no missing proof items; all verdict
+  surfaces keep `terminalSuccessClaim: false`.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts`
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts context/selection/model.test.ts planning/execution/model.test.ts provider/request/packet.test.ts tools/policy/strategy.test.ts verification/execution/model.test.ts verification/selection/model.test.ts artifacts/workflow/model.test.ts repair/loop/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts`
+  - Current deterministic coverage converts `failed-check-repair`,
+    `pathless-workspace-question`, `source-report`, `structured-artifact`, and
+    `resume-from-context` to complete while keeping `rollback-recovery` partial
+    with exact post-repair verification blockers.
+- Rollback plan: remove task proof/verdict consumption from task assessment and
+  return the completed target cases to partial rather than allowing host output
+  or task-lane progress to stand in for evidence/result completion.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

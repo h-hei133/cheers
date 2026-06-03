@@ -18,18 +18,19 @@ capabilities that must ship together for real user-visible work.
 | Session continuation | Partially proven for branch/compaction facts, replay, resume context, compact summaries, lifecycle, and host/session status. | `session/store`, `session/replay`, `session/recovery`, `session/continuation`. Broad interactive branch UX and long real task continuation remain weak. |
 | Host automation | Proven for in-process host command contract and package-facing JSON response. | `runtime/api/host`, `cli/host`, `runtime/distribution`, `verify:host-surface`. Broad SDK/RPC server behavior remains unproven. |
 | Product workflow | Partially proven for CLI status envelope, host JSON, interactive loop lifecycle, cancellation, session selection, and presentation facts. | `cli`, `session/presentation`, `presentation`. User collaboration and artifact workflow surfaces are missing or narrow. |
-| Real task evaluation | Partially proven as deterministic task assessment plumbing with context selection, execution planning, request packets, tool strategy, artifact correction, repair action, and verification execution facts. | `runtime/evaluation/task/model.test.ts` covers coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, and skipped-live cases with outcomes: 2 complete, 6 partial, 1 skipped, and 1 unsupported. This is not broad live task completion. |
+| Real task evaluation | Partially proven as deterministic task assessment plumbing with context selection, execution planning, request packets, tool strategy, artifact correction, repair action, verification execution, task proof, and task verdict facts. | `runtime/evaluation/task/model.test.ts` covers coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, and skipped-live cases with outcomes: 7 complete, 1 partial, 1 skipped, and 1 unsupported. This is not broad live task completion. |
 | Artifact workflows | Partially proven as deterministic receipt, correction, and validation facts. | `artifacts/workflow/model.test.ts` and task assessment integration cover report/structured-data intent, source receipts, format expectation, unsafe/missing/invalid/not-proven states, validation failure, correction, and rerun verification. Durable artifact writing, rendered checks, and broad export workflows remain missing. |
 
 ## Measured Task Assessment Result
 
 The deterministic task assessment currently produces these task outcomes after
-the context/plan/request/tool/repair/artifact/verification task lane:
+the context/plan/request/tool/repair/artifact/verification/proof task lane:
 
 - Complete: `single-file-edit`, `coordinated-edit`.
-- Partial: `failed-check-repair`, `rollback-recovery`,
+- Complete by task proof verdict: `failed-check-repair`,
   `pathless-workspace-question`, `source-report`, `structured-artifact`,
   `resume-from-context`.
+- Partial: `rollback-recovery`.
 - Skipped: `live-provider-triage`.
 - Unsupported: `unsupported-artifact-export`.
 - Failed: none.
@@ -43,33 +44,33 @@ Top blockers before the verification/artifact/repair loop:
 2. `artifact invalid`: blocked `source-report` and `structured-artifact`.
 3. `repair failed`: blocked `failed-check-repair` and `rollback-recovery`.
 
-Top blockers after the deterministic task lane:
+Top blockers after the deterministic task proof lane:
 
-1. `completion proof missing`: blocks `failed-check-repair`,
-   `rollback-recovery`, `pathless-workspace-question`, `source-report`,
-   `structured-artifact`, and `resume-from-context`.
+1. `completion proof missing`: blocks `rollback-recovery`.
 2. `environment issue`: blocks the default-skipped live triage case.
 3. `provider failure`: blocks the default-skipped live triage case.
 
 Changed case evidence:
 
-- `failed-check-repair`: before `failed`; after `partial` through ready context,
-  ready execution plan, repair tool strategy, repair action, passed rerun
-  verification, and remaining `completion proof missing`.
+- `failed-check-repair`: before `failed`; after `complete` through ready
+  context, ready execution plan, repair tool strategy, repair action, passed
+  rerun verification, preserved original failure, and evidence/result task
+  verdict.
 - `rollback-recovery`: before `failed`; after `partial` through bounded partial
   repair evidence, partial rerun verification, and remaining repair/proof
   blockers.
-- `pathless-workspace-question`: before `blocked`; after `partial` through
-  context selection, task request shaping, search/verify tool strategy, and
-  remaining `completion proof missing`.
-- `source-report`: before `failed`; after `partial` through artifact correction,
-  passed rerun verification, and remaining `completion proof missing`.
-- `structured-artifact`: before `failed`; after `partial` through artifact
-  correction, passed rerun verification, and remaining
-  `completion proof missing`.
-- `resume-from-context`: before `not-proven`; after `partial` through refreshed
-  continuation context, partial freshness verification execution, and remaining
-  `completion proof missing`.
+- `pathless-workspace-question`: before `blocked`; after `complete` through
+  context selection, task request shaping, search/verify tool strategy, target
+  resolution proof, and evidence/result task verdict.
+- `source-report`: before `failed`; after `complete` through source receipts,
+  artifact correction, passed rerun verification, and evidence/result task
+  verdict.
+- `structured-artifact`: before `failed`; after `complete` through source
+  receipts, artifact correction, passed rerun verification, and evidence/result
+  task verdict.
+- `resume-from-context`: before `not-proven`; after `complete` through
+  refreshed continuation context, freshness proof, and evidence/result task
+  verdict.
 
 Live triage status: skipped by default. No live provider was run. The skipped
 case records default-off live behavior as an environment/provider blocker

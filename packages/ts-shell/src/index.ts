@@ -79,6 +79,16 @@ export {
   type ToolStrategyState,
 } from "./tools/policy/strategy.js";
 export {
+  buildTaskProofInput,
+  type TaskProofInput,
+  type TaskProofStatus,
+} from "./evidence/task/proof.js";
+export {
+  projectTaskVerdict,
+  type TaskVerdict,
+  type TaskVerdictStatus,
+} from "./result/task/verdict.js";
+export {
   assessHostDistributionReadiness,
   classifyDistributionReadiness,
   type DistributionReadinessResult,

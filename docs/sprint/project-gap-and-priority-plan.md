@@ -20,9 +20,9 @@ deterministic runtime case is not enough.
   evaluation has advanced to deterministic task assessment coverage with
   context selection, execution planning, task request packets, tool strategy,
   verification selection/execution, artifact receipt/correction, repair
-  decision/action, and before/after blocker facts, but it still does not prove
-  broad real task completion. Current task assessment results are 2 complete,
-  6 partial, 1 skipped, and 1 unsupported.
+  decision/action, task proof, task verdict, and before/after blocker facts,
+  but it still does not prove broad real task completion. Current task
+  assessment results are 7 complete, 1 partial, 1 skipped, and 1 unsupported.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, plan facts, edit target selection, and
@@ -94,9 +94,9 @@ deterministic runtime case is not enough.
 The detailed batch definitions are in
 `docs/sprint/task-capability-gap-plan.md`. These are the next priority groups:
 
-1. Evidence/result proof for partial task outcomes, now focused on converting
-   deterministic repair, artifact, context, and continuation progress into
-   task-relevant complete proof without false success.
+1. Complete post-repair verification proof for the remaining partial rollback
+   recovery case, now focused on turning bounded partial repair into
+   task-relevant final verification without hiding the original failure.
 2. Live debug and repair loop, now focused on real post-repair verification and
    original-failure preservation beyond deterministic partial progress.
 3. Artifact workflow capability for non-code tasks, now moving from
@@ -114,14 +114,15 @@ useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Measured SP016 blockers now set the immediate order: `completion proof missing`
-is the dominant non-complete blocker across the six improved partial cases, and
-the skipped live triage case still carries environment/provider blockers. The
-former failed, blocked, and not-proven task cases now improve to partial where
-the deterministic task lane can act, but selected, executed, repaired,
-corrected, refreshed, or host-observed facts still are not success until
-evidence/result owns task-relevant complete proof. Live triage remains skipped
-by default and must not be treated as live execution proof.
+Measured SP017 blockers now set the immediate order: `rollback-recovery` is the
+only remaining deterministic partial case because post-repair verification is
+still partial and the task verdict keeps `completion proof missing`. The skipped
+live triage case still carries environment/provider blockers. The former
+failed, blocked, and not-proven task cases now complete only where task proof
+and result verdict own task-relevant completion; selected, executed, repaired,
+corrected, refreshed, or host-observed facts still are not success by
+themselves. Live triage remains skipped by default and must not be treated as
+live execution proof.
 
 ## Immediate Sprint Batches
 

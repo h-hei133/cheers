@@ -66,18 +66,18 @@ describe("task capability assessment", () => {
     expect(outcomeMap(result.cases)).toMatchObject({
       "single-file-edit": "complete",
       "coordinated-edit": "complete",
-      "failed-check-repair": "partial",
+      "failed-check-repair": "complete",
       "rollback-recovery": "partial",
-      "pathless-workspace-question": "partial",
-      "source-report": "partial",
-      "structured-artifact": "partial",
+      "pathless-workspace-question": "complete",
+      "source-report": "complete",
+      "structured-artifact": "complete",
       "unsupported-artifact-export": "unsupported",
-      "resume-from-context": "partial",
+      "resume-from-context": "complete",
       "live-provider-triage": "skipped",
     });
     expect(result.outcomeCounts).toMatchObject({
-      complete: 2,
-      partial: 6,
+      complete: 7,
+      partial: 1,
       failed: 0,
       blocked: 0,
       skipped: 1,
@@ -104,7 +104,7 @@ describe("task capability assessment", () => {
       dispatch: host.dispatch,
       caseIds: ["single-file-edit", "live-provider-triage"],
     });
-    const unsupported = await runTaskCase({
+    const workspace = await runTaskCase({
       caseId: "pathless-workspace-question",
       dispatch: host.dispatch,
     });
@@ -112,9 +112,9 @@ describe("task capability assessment", () => {
     expect(result.outcomeCounts.complete).toBe(1);
     expect(result.outcomeCounts.skipped).toBe(1);
     expect(result.outcomeCounts.failed).toBe(0);
-    expect(unsupported.outcome).toBe("partial");
-    expect(unsupported.hostEvaluation.observedEvidenceVerdict).toBe("not-proven");
-    expect(unsupported.notProvenClaims).toContain("task-completion-not-proven");
+    expect(workspace.outcome).toBe("complete");
+    expect(workspace.hostEvaluation.observedEvidenceVerdict).toBe("not-proven");
+    expect(workspace.taskVerdict.completeProof).toBe(true);
   });
 
   it("summarizes top blockers from actual non-complete case results", async () => {
@@ -129,18 +129,9 @@ describe("task capability assessment", () => {
     ]);
     expect(result.topBlockers[0]).toMatchObject({
       category: "completion proof missing",
-      count: 6,
+      count: 1,
+      caseIds: ["rollback-recovery"],
     });
-    expect(result.topBlockers[0].caseIds).toEqual(
-      expect.arrayContaining([
-        "failed-check-repair",
-        "rollback-recovery",
-        "pathless-workspace-question",
-        "source-report",
-        "structured-artifact",
-        "resume-from-context",
-      ]),
-    );
   });
 
   it("integrates code verification with evidence/result proof before completion", async () => {
@@ -157,14 +148,15 @@ describe("task capability assessment", () => {
     });
     expect(result.repairDecision.state).toBe("not-needed");
     expect(result.hostEvaluation.observedEvidenceVerdict).toBe("complete");
+    expect(result.taskVerdict.completeProof).toBe(true);
   });
 
-  it("improves debug repair through repair action and rerun verification", async () => {
+  it("completes debug repair through repair action, rerun verification, and evidence/result verdict", async () => {
     const host = createHostRuntime();
     const result = await runTaskCase({ caseId: "failed-check-repair", dispatch: host.dispatch });
 
     expect(result.beforeOutcome).toBe("failed");
-    expect(result.outcome).toBe("partial");
+    expect(result.outcome).toBe("complete");
     expect(result.verificationSelection).toMatchObject({
       purpose: "debug-repair",
       state: "selected-failed",
@@ -186,8 +178,13 @@ describe("task capability assessment", () => {
     });
     expect(result.verificationExecution.state).toBe("passed");
     expect(result.changedBlockers).toEqual(expect.arrayContaining(["verification failed", "repair failed"]));
-    expect(result.remainingBlockers).toEqual(["completion proof missing"]);
+    expect(result.remainingBlockers).toEqual([]);
     expect(result.hostEvaluation.observedEvidenceVerdict).toBe("not-proven");
+    expect(result.taskProof.status).toBe("complete");
+    expect(result.taskVerdict).toMatchObject({
+      completeProof: true,
+      terminalSuccessClaim: false,
+    });
   });
 
   it("improves rollback recovery through bounded partial repair evidence", async () => {
@@ -204,16 +201,20 @@ describe("task capability assessment", () => {
       originalFailurePreserved: true,
     });
     expect(result.verificationExecution.state).toBe("partial");
+    expect(result.taskVerdict.completeProof).toBe(false);
+    expect(result.taskVerdict.missingProof).toEqual(
+      expect.arrayContaining(["verification-passed", "repair-post-validation"]),
+    );
     expect(result.changedBlockers).toContain("verification failed");
     expect(result.remainingBlockers).toEqual(expect.arrayContaining(["repair failed", "completion proof missing"]));
   });
 
-  it("improves artifact validation through correction and rerun verification", async () => {
+  it("completes artifact validation through correction, rerun verification, and proof verdict", async () => {
     const host = createHostRuntime();
     const result = await runTaskCase({ caseId: "structured-artifact", dispatch: host.dispatch });
 
     expect(result.beforeOutcome).toBe("failed");
-    expect(result.outcome).toBe("partial");
+    expect(result.outcome).toBe("complete");
     expect(result.verificationSelection).toMatchObject({
       purpose: "structured-output",
       state: "selected-failed",
@@ -233,6 +234,10 @@ describe("task capability assessment", () => {
     expect(result.repairDecision.state).toBe("post-validation-failed");
     expect(result.verificationExecution.state).toBe("passed");
     expect(result.changedBlockers).toEqual(expect.arrayContaining(["artifact invalid", "verification failed"]));
+    expect(result.taskProof.presentProof).toEqual(
+      expect.arrayContaining(["artifact-source-receipts", "artifact-validation"]),
+    );
+    expect(result.taskVerdict.completeProof).toBe(true);
   });
 
   it("keeps invalid or unsupported artifacts from becoming success", async () => {
@@ -241,14 +246,15 @@ describe("task capability assessment", () => {
     const unsupported = await runTaskCase({ caseId: "unsupported-artifact-export", dispatch: host.dispatch });
 
     expect(invalid.beforeOutcome).toBe("failed");
-    expect(invalid.outcome).toBe("partial");
+    expect(invalid.outcome).toBe("complete");
     expect(invalid.beforeBlockers).toEqual(["artifact invalid"]);
     expect(invalid.changedBlockers).toEqual(["artifact invalid"]);
-    expect(invalid.remainingBlockers).toEqual(["completion proof missing"]);
+    expect(invalid.remainingBlockers).toEqual([]);
     expect(invalid.verificationSelection.state).toBe("selected-not-run");
     expect(invalid.artifactReceipt?.validationState).toBe("invalid");
     expect(invalid.artifactCorrection?.validationState).toBe("validation-passed");
     expect(invalid.verificationExecution.state).toBe("passed");
+    expect(invalid.taskVerdict.completeProof).toBe(true);
 
     expect(unsupported.outcome).toBe("unsupported");
     expect(unsupported.remainingBlockers).toEqual(["unsupported capability"]);
@@ -257,15 +263,15 @@ describe("task capability assessment", () => {
     expect(unsupported.artifactCorrection?.attempted).toBe(false);
   });
 
-  it("improves continuation by refreshing context but keeps complete proof missing", async () => {
+  it("completes continuation by refreshing context and projecting a proof verdict", async () => {
     const host = createHostRuntime();
     const result = await runTaskCase({ caseId: "resume-from-context", dispatch: host.dispatch });
 
     expect(result.beforeOutcome).toBe("not-proven");
-    expect(result.outcome).toBe("partial");
+    expect(result.outcome).toBe("complete");
     expect(result.beforeBlockers).toEqual(["continuation stale"]);
     expect(result.changedBlockers).toEqual(["continuation stale"]);
-    expect(result.remainingBlockers).toEqual(["completion proof missing"]);
+    expect(result.remainingBlockers).toEqual([]);
     expect(result.contextSelection).toMatchObject({
       state: "ready",
       refreshed: true,
@@ -278,15 +284,16 @@ describe("task capability assessment", () => {
       resultInputEligible: false,
     });
     expect(result.verificationExecution.state).toBe("partial");
-    expect(result.notProvenClaims).toContain("task-completion-not-proven");
+    expect(result.taskProof.presentProof).toContain("continuation-freshness");
+    expect(result.taskVerdict.completeProof).toBe(true);
   });
 
-  it("improves pathless workspace questions through discovery and tool strategy", async () => {
+  it("completes pathless workspace questions through target resolution proof", async () => {
     const host = createHostRuntime();
     const result = await runTaskCase({ caseId: "pathless-workspace-question", dispatch: host.dispatch });
 
     expect(result.beforeOutcome).toBe("blocked");
-    expect(result.outcome).toBe("partial");
+    expect(result.outcome).toBe("complete");
     expect(result.contextSelection).toMatchObject({
       state: "ready",
       targetPaths: ["src/runtime/selector.ts"],
@@ -298,8 +305,10 @@ describe("task capability assessment", () => {
       actions: expect.arrayContaining(["search", "verify"]),
     });
     expect(result.changedBlockers).toEqual(expect.arrayContaining(["context insufficient", "authority missing"]));
-    expect(result.remainingBlockers).toEqual(["completion proof missing"]);
+    expect(result.remainingBlockers).toEqual([]);
     expect(result.hostEvaluation.observedEvidenceVerdict).toBe("not-proven");
+    expect(result.taskProof.presentProof).toContain("workspace-target-resolution");
+    expect(result.taskVerdict.completeProof).toBe(true);
   });
 
   it("keeps unsafe text out of task assessment results", async () => {
