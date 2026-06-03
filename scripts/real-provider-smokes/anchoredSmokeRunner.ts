@@ -6,6 +6,10 @@ import {
   buildLiveSmokeFixture,
 } from "../../packages/ts-shell/src/orchestration/liveProviderSmokeFixture.js";
 import { runLiveProviderSmokeCalibration } from "../../packages/ts-shell/src/orchestration/liveProviderSmokeCalibration.js";
+import {
+  classifyLiveProviderFallbackOutcome,
+  shouldAttemptLiveProviderFallback,
+} from "../../packages/ts-shell/src/orchestration/liveProviderSmokeFallback.js";
 import { createOpenAICompatibleAnchoredSmokeAdapter } from "../../packages/ts-shell/src/orchestration/openAICompatibleAnchoredSmokeAdapter.js";
 import type { ProviderEditAvailability } from "../../packages/ts-shell/src/orchestration/providerEditPlanner.js";
 import type { RealProviderProposalDryRunProvider } from "../../packages/ts-shell/src/orchestration/realProviderProposalDryRun.js";
@@ -28,6 +32,29 @@ interface RunnerConfig {
   readonly apiKey?: string;
   readonly baseUrl?: string;
   readonly model?: string;
+  readonly fallback?: ProviderAttemptConfig;
+}
+
+interface ProviderAttemptConfig {
+  readonly providerKind: string;
+  readonly providerSafeLabel: string;
+  readonly providerConfigSource: string;
+  readonly apiKey?: string;
+  readonly baseUrl?: string;
+  readonly model?: string;
+}
+
+interface ProviderAttemptResult {
+  readonly providerKind: string;
+  readonly providerSafeLabel: string;
+  readonly providerConfigSource: string;
+  readonly readinessStatus: ReadinessStatus;
+  readonly providerCalled: boolean;
+  readonly providerErrorClass: string;
+  readonly status: string;
+  readonly skipReason?: string;
+  readonly exitCode: number;
+  readonly calibration?: Awaited<ReturnType<typeof runLiveProviderSmokeCalibration>>;
 }
 
 async function main(): Promise<void> {
@@ -62,94 +89,48 @@ async function main(): Promise<void> {
     process.exit(exitCodeForCalibration(calibration));
   }
 
-  if (config.providerKind !== "openai-compatible") {
-    printApprovalSkip({
-      providerKind: config.providerKind || "unknown",
-      providerSafeLabel: config.providerSafeLabel,
-      providerConfigSource: config.providerConfigSource,
-      readinessStatus: "ready",
-      skipStatus: "unsupported",
-      skipDetail: `provider ${config.providerKind || "unknown"} is not approved for Route 199 anchored smoke`,
-      exitCode: 0,
-    });
-    return;
-  }
-
-  const missingConfig = firstMissingConfig(config);
-  if (missingConfig) {
-    printApprovalSkip({
-      providerKind: config.providerKind,
-      providerSafeLabel: config.providerSafeLabel,
-      providerConfigSource: config.providerConfigSource,
-      readinessStatus: missingConfig === "api-key" ? "missing-key" : "missing-config",
-      skipStatus: missingConfig === "api-key" ? "missing-key" : "missing-config",
-      skipDetail: `${missingConfig} is missing`,
-      exitCode: 0,
-    });
-    return;
-  }
-
-  const readiness = await checkRealProviderReadiness({
-    provider: "openai-compatible",
-    apiKey: config.apiKey,
-    baseUrl: config.baseUrl,
-    model: config.model,
-  });
-  if (readiness.ok === false) {
-    const readinessStatus = mapReadinessFailure(readiness.failure.kind);
-    printApprovalSkip({
-      providerKind: config.providerKind,
-      providerSafeLabel: config.providerSafeLabel,
-      providerConfigSource: config.providerConfigSource,
-      readinessStatus,
-      skipStatus: readinessStatus,
-      skipDetail: readiness.failure.stopReason,
-      exitCode: readinessStatus === "network" ? 2 : 0,
-    });
-    return;
-  }
-
-  const approval = approveLiveProviderAdapter({
-    explicitLiveSmokeOptIn: true,
-    realProviderSmokeOptIn: true,
-    providerReadinessStatus: "ready",
-    providerKind: "openai-compatible",
-    providerSafeLabel: config.providerSafeLabel,
-    providerConfigSource: config.providerConfigSource,
-    privateConfigManualRead: false,
-    fixtureSafetyStatus: "safe",
-    redactionStatus: "redacted-and-budgeted",
-  });
-
-  if (!approval.adapterApproved) {
-    printApproval(approval);
-    printCommonMarkers({
-      providerKind: approval.providerKind,
-      providerSafeLabel: approval.providerSafeLabel,
-      adapterApproved: false,
-      providerCalled: false,
-      providerErrorClass: approval.providerErrorClass,
-      outputValidation: "none",
-      anchorQuality: "none",
-      skipReason: approval.skipReason,
-    });
-    process.exit(0);
-  }
-
-  const provider = createOpenAICompatibleAnchoredSmokeAdapter({
-    apiKey: config.apiKey!,
-    baseUrl: config.baseUrl!,
-    model: config.model!,
-    providerSafeLabel: config.providerSafeLabel,
-  });
-  const calibration = await runApprovedCalibration({
+  const primary = await runProviderAttempt({
     fixture,
-    provider,
-    approval,
-    providerSafeLabel: config.providerSafeLabel,
+    config,
+    role: "primary",
   });
-  printCalibration(calibration);
-  process.exit(exitCodeForCalibration(calibration));
+  printProviderAttempt(primary);
+
+  const fallbackDecision = shouldAttemptLiveProviderFallback({
+    primaryAttempted: true,
+    providerErrorClass: primary.providerErrorClass,
+    status: primary.status,
+    skipReason: primary.skipReason,
+    fallbackConfigured: Boolean(config.fallback),
+  });
+
+  let finalExitCode = primary.exitCode;
+  let fallbackOutcome = fallbackDecision.fallbackOutcome;
+  if (fallbackDecision.fallbackAttempted && config.fallback) {
+    const fallback = await runProviderAttempt({
+      fixture,
+      config: config.fallback,
+      role: "fallback",
+    });
+    printProviderAttempt(fallback);
+    fallbackOutcome = classifyLiveProviderFallbackOutcome({
+      fallbackAttempted: true,
+      exitCode: fallback.exitCode,
+      providerErrorClass: fallback.providerErrorClass,
+      status: fallback.status,
+    });
+    finalExitCode = fallbackOutcome === "passed" ? 0 : (fallback.exitCode === 0 ? 3 : fallback.exitCode);
+  }
+
+  printFallbackMarkers({
+    primaryAttempted: fallbackDecision.primaryAttempted,
+    primaryFailureClass: fallbackDecision.primaryFailureClass,
+    fallbackConfigured: fallbackDecision.fallbackConfigured,
+    fallbackAttempted: fallbackDecision.fallbackAttempted,
+    fallbackOutcome,
+    blocker: fallbackDecision.blocker,
+  });
+  process.exit(finalExitCode);
 }
 
 function readConfig(): RunnerConfig {
@@ -188,6 +169,27 @@ function readConfig(): RunnerConfig {
       env.OPENAI_COMPATIBLE_MODEL?.trim() ||
       env.OPENAI_MODEL?.trim() ||
       env.MODEL?.trim(),
+    fallback: readFallbackConfig(env, providerKind),
+  };
+}
+
+function readFallbackConfig(env: NodeJS.ProcessEnv, primaryProviderKind: string): ProviderAttemptConfig | undefined {
+  if (env.PRIVATE_AGENTS_REAL_FALLBACK_CONFIGURED?.trim() !== "1") return undefined;
+  const providerKind = normalizeProvider(
+    env.PRIVATE_AGENTS_REAL_FALLBACK_PROVIDER ?? primaryProviderKind,
+  ) ?? "unknown";
+  return {
+    providerKind,
+    providerSafeLabel:
+      env.PRIVATE_AGENTS_ANCHORED_SMOKE_FALLBACK_PROVIDER_SAFE_LABEL?.trim() ||
+      (providerKind === "openai-compatible" ? "openai-compatible-fallback" : `${providerKind}-fallback`),
+    providerConfigSource:
+      env.PRIVATE_AGENTS_ANCHORED_SMOKE_FALLBACK_CONFIG_SOURCE?.trim() ||
+      env.PRIVATE_AGENTS_ANCHORED_SMOKE_CONFIG_SOURCE?.trim() ||
+      "unknown",
+    apiKey: env.PRIVATE_AGENTS_REAL_FALLBACK_API_KEY?.trim(),
+    baseUrl: env.PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL?.trim(),
+    model: env.PRIVATE_AGENTS_REAL_FALLBACK_MODEL?.trim(),
   };
 }
 
@@ -211,7 +213,7 @@ function normalizeProvider(value: string | undefined): RuntimeProvider | undefin
   }
 }
 
-function firstMissingConfig(config: RunnerConfig): "api-key" | "base-url" | "model" | undefined {
+function firstMissingConfig(config: ProviderAttemptConfig): "api-key" | "base-url" | "model" | undefined {
   if (!config.apiKey) return "api-key";
   if (!config.baseUrl) return "base-url";
   if (!config.model) return "model";
@@ -269,7 +271,151 @@ function printApprovalSkip(input: {
     anchorQuality: "none",
     skipReason: approval.skipReason,
   });
-  process.exit(input.exitCode);
+}
+
+async function runProviderAttempt(input: {
+  readonly fixture: ReturnType<typeof buildLiveSmokeFixture>;
+  readonly config: ProviderAttemptConfig;
+  readonly role: "primary" | "fallback";
+}): Promise<ProviderAttemptResult> {
+  if (input.config.providerKind !== "openai-compatible") {
+    return {
+      providerKind: input.config.providerKind || "unknown",
+      providerSafeLabel: input.config.providerSafeLabel,
+      providerConfigSource: input.config.providerConfigSource,
+      readinessStatus: "unsupported",
+      providerCalled: false,
+      providerErrorClass: "unsupported",
+      status: "skipped-provider-unsupported",
+      skipReason: "provider-unsupported",
+      exitCode: 0,
+    };
+  }
+
+  const missingConfig = firstMissingConfig(input.config);
+  if (missingConfig) {
+    const readinessStatus = missingConfig === "api-key" ? "missing-key" : "missing-config";
+    return {
+      providerKind: input.config.providerKind,
+      providerSafeLabel: input.config.providerSafeLabel,
+      providerConfigSource: input.config.providerConfigSource,
+      readinessStatus,
+      providerCalled: false,
+      providerErrorClass: readinessStatus,
+      status: "skipped-provider-not-configured",
+      skipReason: "provider-not-configured",
+      exitCode: 0,
+    };
+  }
+
+  const readiness = await checkRealProviderReadiness({
+    provider: "openai-compatible",
+    apiKey: input.config.apiKey,
+    baseUrl: input.config.baseUrl,
+    model: input.config.model,
+  });
+  if (readiness.ok === false) {
+    const readinessStatus = mapReadinessFailure(readiness.failure.kind);
+    return {
+      providerKind: input.config.providerKind,
+      providerSafeLabel: input.config.providerSafeLabel,
+      providerConfigSource: input.config.providerConfigSource,
+      readinessStatus,
+      providerCalled: false,
+      providerErrorClass: readinessStatus,
+      status: readinessStatus === "network" ? "provider-called-provider-error" : "skipped-provider-not-ready",
+      skipReason:
+        readinessStatus === "auth" ? "provider-auth" :
+        readinessStatus === "unsupported" ? "provider-unsupported" :
+        readinessStatus === "network" ? "provider-network" :
+        "provider-not-configured",
+      exitCode: readinessStatus === "network" ? 2 : 0,
+    };
+  }
+
+  const approval = approveLiveProviderAdapter({
+    explicitLiveSmokeOptIn: true,
+    realProviderSmokeOptIn: true,
+    providerReadinessStatus: "ready",
+    providerKind: "openai-compatible",
+    providerSafeLabel: input.config.providerSafeLabel,
+    providerConfigSource: input.config.providerConfigSource,
+    privateConfigManualRead: false,
+    fixtureSafetyStatus: "safe",
+    redactionStatus: "redacted-and-budgeted",
+  });
+
+  if (!approval.adapterApproved) {
+    return {
+      providerKind: approval.providerKind,
+      providerSafeLabel: approval.providerSafeLabel,
+      providerConfigSource: input.config.providerConfigSource,
+      readinessStatus: "not-ready",
+      providerCalled: false,
+      providerErrorClass: approval.providerErrorClass,
+      status: "skipped-provider-not-ready",
+      skipReason: approval.skipReason,
+      exitCode: 0,
+    };
+  }
+
+  const provider = createOpenAICompatibleAnchoredSmokeAdapter({
+    apiKey: input.config.apiKey!,
+    baseUrl: input.config.baseUrl!,
+    model: input.config.model!,
+    providerSafeLabel: input.config.providerSafeLabel,
+  });
+  const calibration = await runApprovedCalibration({
+    fixture: input.fixture,
+    provider,
+    approval,
+    providerSafeLabel: input.config.providerSafeLabel,
+  });
+  return {
+    providerKind: calibration.result.providerKind,
+    providerSafeLabel: calibration.result.providerSafeLabel,
+    providerConfigSource: input.config.providerConfigSource,
+    readinessStatus: "ready",
+    providerCalled: calibration.result.providerCalled,
+    providerErrorClass: calibration.result.providerErrorClass,
+    status: calibration.result.status,
+    skipReason: calibration.result.skipReason,
+    exitCode: exitCodeForCalibration(calibration),
+    calibration,
+  };
+}
+
+function printProviderAttempt(result: ProviderAttemptResult): void {
+  if (result.calibration) {
+    printCalibration(result.calibration);
+    return;
+  }
+  printApprovalSkip({
+    providerKind: result.providerKind,
+    providerSafeLabel: result.providerSafeLabel,
+    providerConfigSource: result.providerConfigSource,
+    readinessStatus: result.readinessStatus,
+    skipStatus: result.readinessStatus,
+    skipDetail: result.skipReason ?? result.status,
+    exitCode: result.exitCode,
+  });
+}
+
+function printFallbackMarkers(input: {
+  readonly primaryAttempted: boolean;
+  readonly primaryFailureClass: string;
+  readonly fallbackConfigured: boolean;
+  readonly fallbackAttempted: boolean;
+  readonly fallbackOutcome: string;
+  readonly blocker?: string;
+}): void {
+  console.log(`primaryAttempted=${input.primaryAttempted ? "true" : "false"}`);
+  console.log(`primaryFailureClass=${input.primaryFailureClass}`);
+  console.log(`fallbackConfigured=${input.fallbackConfigured ? "true" : "false"}`);
+  console.log(`fallbackAttempted=${input.fallbackAttempted ? "true" : "false"}`);
+  console.log(`fallbackOutcome=${input.fallbackOutcome}`);
+  if (input.blocker) console.log(`fallbackBlocker=${input.blocker}`);
+  console.log("fallbackDoesNotProveTaskSuccess=true");
 }
 
 async function runApprovedCalibration(input: {

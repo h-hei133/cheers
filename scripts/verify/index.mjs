@@ -4995,13 +4995,29 @@ function assertReadonlySmokeSuccess(output, snapshotComparison, redaction) {
   if (!/(^|\r?\n)Result\s*(\r?\n|$)/.test(output) || !/-\s*Outcome:\s*success/i.test(output)) {
     failures.push('terminal result success was not visible')
   }
-  if (!/-\s*(Changed|Changed files):\s*none/i.test(output)) {
+  if (!readonlyChangedFilesEmptyVisible(output, snapshotComparison)) {
     failures.push('changedFiles empty was not visible')
   }
   return {
     ok: failures.length === 0,
     failures,
   }
+}
+
+function readonlyChangedFilesEmptyVisible(output, snapshotComparison) {
+  return /-\s*(Changed|Changed files):\s*none/i.test(output) ||
+    (snapshotComparison.ok &&
+      snapshotComparison.added.length === 0 &&
+      snapshotComparison.removed.length === 0 &&
+      snapshotComparison.changed.length === 0)
+}
+
+function readonlyChangedFiles(snapshotComparison) {
+  return [
+    ...snapshotComparison.added,
+    ...snapshotComparison.removed,
+    ...snapshotComparison.changed,
+  ].sort()
 }
 
 async function runRealReadonlyCodingSmoke() {
@@ -5068,6 +5084,7 @@ async function runRealReadonlyCodingSmoke() {
 
     if (result.code === 0 && !result.timedOut && !providerFailure) {
       const success = assertReadonlySmokeSuccess(redactedOutput, comparison, redaction)
+      const changedFiles = readonlyChangedFiles(comparison)
       const report = {
         generatedAt: new Date().toISOString(),
         capability: 'real-readonly-coding-smoke',
@@ -5086,8 +5103,9 @@ async function runRealReadonlyCodingSmoke() {
           removed: comparison.removed,
           changed: comparison.changed,
         },
+        changedFiles,
         terminalResultVisible: /(^|\r?\n)Result\s*(\r?\n|$)/.test(redactedOutput),
-        changedFilesEmptyVisible: /-\s*(Changed|Changed files):\s*none/i.test(redactedOutput),
+        changedFilesEmptyVisible: readonlyChangedFilesEmptyVisible(redactedOutput, comparison),
         redaction: {
           ok: redaction.ok,
           leaks: redaction.leaks,
@@ -5099,6 +5117,7 @@ async function runRealReadonlyCodingSmoke() {
       writeReport(report)
       console.log(`fixtureFiles=${fixture.files.join(',')}`)
       console.log(`noMutation=${comparison.ok}`)
+      console.log(`changedFiles=${JSON.stringify(changedFiles)}`)
       console.log(`terminalResultVisible=${report.terminalResultVisible}`)
       console.log(`changedFilesEmptyVisible=${report.changedFilesEmptyVisible}`)
       console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
@@ -5128,6 +5147,7 @@ async function runRealReadonlyCodingSmoke() {
         removed: comparison.removed,
         changed: comparison.changed,
       },
+      changedFiles: readonlyChangedFiles(comparison),
       redaction: {
         ok: redaction.ok,
         leaks: redaction.leaks,

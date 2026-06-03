@@ -117,6 +117,7 @@ export function canonicalProviderEnv(env) {
       ...(baseUrl ? { PRIVATE_AGENTS_REAL_BASE_URL: baseUrl } : {}),
       ...(model ? { PRIVATE_AGENTS_REAL_MODEL: model } : {}),
     },
+    fallback: canonicalFallbackProviderEnv(env, provider),
   }
 }
 
@@ -132,12 +133,68 @@ export function sanitizedProviderEnv(source) {
     'GOOGLE_API_KEY',
     'ANTIGRAVITY_API_KEY',
     'CLAUDECODE_API_KEY',
+    'AUTHORIZATION',
+    'Authorization',
+    'authorization',
+    'X_API_KEY',
+    'X-API-KEY',
+    'x-api-key',
+    'ACCESS_TOKEN',
+    'REFRESH_TOKEN',
+    'ID_TOKEN',
+    'PRIVATE_AGENTS_REAL_FALLBACK_API_KEY',
+    'PRIVATE_AGENTS_PROVIDER_FALLBACK_API_KEY',
+    'PRIVATE_AGENTS_FALLBACK_API_KEY',
+    'OPENAI_COMPATIBLE_FALLBACK_API_KEY',
+    'SILICONFLOW_FALLBACK_API_KEY',
     'PRIVATE_AGENTS_PROVIDER_ENV',
     'PRIVATE_AGENTS_REAL_PROVIDER_ENV',
   ]) {
     delete env[key]
   }
   return env
+}
+
+export function canonicalFallbackProviderEnv(env, primaryProvider = 'unknown') {
+  const fallbackProvider = normalizeProvider(getTrimmed(env, [
+    'PRIVATE_AGENTS_REAL_FALLBACK_PROVIDER',
+    'PRIVATE_AGENTS_FALLBACK_PROVIDER',
+    'SILICONFLOW_FALLBACK_PROVIDER',
+  ]) ?? '')
+  const provider = fallbackProvider ?? normalizeProvider(primaryProvider) ?? 'unknown'
+  const apiKey = getTrimmed(env, [
+    'PRIVATE_AGENTS_REAL_FALLBACK_API_KEY',
+    'PRIVATE_AGENTS_PROVIDER_FALLBACK_API_KEY',
+    'PRIVATE_AGENTS_FALLBACK_API_KEY',
+    'OPENAI_COMPATIBLE_FALLBACK_API_KEY',
+    'SILICONFLOW_FALLBACK_API_KEY',
+  ])
+  const baseUrl = getTrimmed(env, [
+    'PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL',
+    'PRIVATE_AGENTS_PROVIDER_FALLBACK_BASE_URL',
+    'PRIVATE_AGENTS_FALLBACK_BASE_URL',
+    'OPENAI_COMPATIBLE_FALLBACK_BASE_URL',
+    'SILICONFLOW_FALLBACK_BASE_URL',
+  ])
+  const model = getTrimmed(env, [
+    'PRIVATE_AGENTS_REAL_FALLBACK_MODEL',
+    'PRIVATE_AGENTS_PROVIDER_FALLBACK_MODEL',
+    'PRIVATE_AGENTS_FALLBACK_MODEL',
+    'OPENAI_COMPATIBLE_FALLBACK_MODEL',
+    'SILICONFLOW_FALLBACK_MODEL',
+  ])
+  const configured = Boolean(fallbackProvider || apiKey || baseUrl || model)
+  if (!configured) return undefined
+  return {
+    providerSafeLabel: provider === 'openai-compatible' ? 'openai-compatible-fallback' : `${provider}-fallback`,
+    env: {
+      PRIVATE_AGENTS_REAL_FALLBACK_CONFIGURED: '1',
+      PRIVATE_AGENTS_REAL_FALLBACK_PROVIDER: provider,
+      ...(apiKey ? { PRIVATE_AGENTS_REAL_FALLBACK_API_KEY: apiKey } : {}),
+      ...(baseUrl ? { PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL: baseUrl } : {}),
+      ...(model ? { PRIVATE_AGENTS_REAL_FALLBACK_MODEL: model } : {}),
+    },
+  }
 }
 
 function chooseProvider(env) {

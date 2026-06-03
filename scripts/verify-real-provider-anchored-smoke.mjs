@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import {
+  approvedRealProviderHome,
   buildEffectiveProviderEnv,
   canonicalProviderEnv,
   fakeReadyHome,
@@ -87,9 +88,11 @@ const liveOptIn = process.env.PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE?.trim(
 const realProviderSmokeOptIn = process.env.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() === '1'
 const realProviderHome = process.env.PRIVATE_AGENTS_REAL_HOME?.trim()
 const fakeReady = realProviderHome === fakeReadyHome
+const approvedRealProviderHomeSelected = realProviderHome === approvedRealProviderHome
+const effectiveRealProviderSmokeOptIn = realProviderSmokeOptIn || (liveOptIn && approvedRealProviderHomeSelected)
 
 console.log(`live-smoke-opt-in=${liveOptIn ? 'true' : 'false'}`)
-console.log(`real-provider-smoke-opt-in=${realProviderSmokeOptIn ? 'true' : 'false'}`)
+console.log(`real-provider-smoke-opt-in=${effectiveRealProviderSmokeOptIn ? 'true' : 'false'}`)
 console.log('private-config-manual-read=false')
 
 let liveExitCode = 0
@@ -101,7 +104,7 @@ if (!liveOptIn) {
     providerSafeLabel: 'not-ready',
     detail: 'Set PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE=1 to request the optional live provider smoke.',
   })
-} else if (!realProviderSmokeOptIn && !fakeReady) {
+} else if (!effectiveRealProviderSmokeOptIn && !fakeReady) {
   printScriptSkip({
     name: 'live-anchored-provider-smoke-real-provider-opt-in',
     skipReason: 'real-provider-smoke-not-enabled',
@@ -118,7 +121,10 @@ if (!liveOptIn) {
     PRIVATE_AGENTS_ANCHORED_SMOKE_CONFIG_SOURCE: 'fake-ready',
   })
 } else {
-  const effective = buildEffectiveProviderEnv(process.env)
+  const providerEnvProcess = effectiveRealProviderSmokeOptIn
+    ? { ...process.env, PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '1' }
+    : process.env
+  const effective = buildEffectiveProviderEnv(providerEnvProcess)
   console.log(`configSource=${effective.configSource}`)
   if (effective.providerEnvError) {
     printScriptSkip({
@@ -133,8 +139,15 @@ if (!liveOptIn) {
     liveExitCode = runAnchoredSmokeRunner({
       ...sanitizedProviderEnv(process.env),
       ...canonical.env,
+      ...(canonical.fallback?.env ?? {}),
       PRIVATE_AGENTS_ANCHORED_SMOKE_CONFIG_SOURCE: effective.configSource,
       PRIVATE_AGENTS_ANCHORED_SMOKE_PROVIDER_SAFE_LABEL: canonical.providerSafeLabel,
+      ...(canonical.fallback
+        ? {
+            PRIVATE_AGENTS_ANCHORED_SMOKE_FALLBACK_CONFIG_SOURCE: effective.configSource,
+            PRIVATE_AGENTS_ANCHORED_SMOKE_FALLBACK_PROVIDER_SAFE_LABEL: canonical.fallback.providerSafeLabel,
+          }
+        : {}),
     })
   }
 }
