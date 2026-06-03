@@ -13,11 +13,11 @@ describe("task capability assessment", () => {
   it("defines required task cases with rubrics, fixtures, verification, outputs, and redaction expectations", () => {
     const cases = listTaskCases();
 
-    expect(cases.length).toBeGreaterThanOrEqual(14);
+    expect(cases.length).toBeGreaterThanOrEqual(20);
     expect(cases.filter((taskCase) => taskCase.taskKind === "coding-edit")).toHaveLength(2);
-    expect(cases.filter((taskCase) => taskCase.taskKind === "debug-repair")).toHaveLength(2);
-    expect(cases.filter((taskCase) => taskCase.taskKind === "workspace-understanding")).toHaveLength(3);
-    expect(cases.filter((taskCase) => taskCase.taskPath === "artifact")).toHaveLength(5);
+    expect(cases.filter((taskCase) => taskCase.taskKind === "debug-repair")).toHaveLength(3);
+    expect(cases.filter((taskCase) => taskCase.taskKind === "workspace-understanding")).toHaveLength(4);
+    expect(cases.filter((taskCase) => taskCase.taskPath === "artifact")).toHaveLength(8);
     expect(cases.map((taskCase) => taskCase.taskKind)).toEqual(
       expect.arrayContaining([
         "workspace-understanding",
@@ -56,15 +56,21 @@ describe("task capability assessment", () => {
       "coordinated-edit",
       "failed-check-repair",
       "rollback-recovery",
+      "retry-diagnosis-repair",
       "pathless-workspace-question",
       "test-impact-question",
       "owner-context-question",
+      "package-script-impact-question",
       "source-report",
       "structured-artifact",
       "incident-summary-report",
       "csv-summary-artifact",
+      "release-note-report",
+      "metrics-summary-artifact",
+      "owner-risk-summary",
       "unsupported-artifact-export",
       "resume-from-context",
+      "resume-after-compaction",
       "live-provider-triage",
     ]);
     expect(result.cases.every((taskCase) => taskCase.terminalSuccessClaim === false)).toBe(true);
@@ -75,19 +81,25 @@ describe("task capability assessment", () => {
       "coordinated-edit": "complete",
       "failed-check-repair": "complete",
       "rollback-recovery": "complete",
+      "retry-diagnosis-repair": "complete",
       "pathless-workspace-question": "complete",
       "test-impact-question": "complete",
       "owner-context-question": "complete",
+      "package-script-impact-question": "complete",
       "source-report": "complete",
       "structured-artifact": "complete",
       "incident-summary-report": "complete",
       "csv-summary-artifact": "complete",
+      "release-note-report": "complete",
+      "metrics-summary-artifact": "complete",
+      "owner-risk-summary": "complete",
       "unsupported-artifact-export": "unsupported",
       "resume-from-context": "complete",
+      "resume-after-compaction": "complete",
       "live-provider-triage": "skipped",
     });
     expect(result.outcomeCounts).toMatchObject({
-      complete: 12,
+      complete: 18,
       partial: 0,
       failed: 0,
       blocked: 0,
@@ -105,15 +117,21 @@ describe("task capability assessment", () => {
       "coordinated-edit": "unsafe",
       "failed-check-repair": "unsafe",
       "rollback-recovery": "unsafe",
+      "retry-diagnosis-repair": "unsafe",
       "pathless-workspace-question": "ready",
       "test-impact-question": "ready",
       "owner-context-question": "ready",
+      "package-script-impact-question": "ready",
       "source-report": "ready",
       "structured-artifact": "ready",
       "incident-summary-report": "ready",
       "csv-summary-artifact": "ready",
+      "release-note-report": "ready",
+      "metrics-summary-artifact": "ready",
+      "owner-risk-summary": "ready",
       "unsupported-artifact-export": "unsupported",
       "resume-from-context": "ready",
+      "resume-after-compaction": "ready",
       "live-provider-triage": "ready",
     });
     expect(result.liveReadiness.every((item) => item.defaultOff && item.optInRequired)).toBe(true);
@@ -122,11 +140,16 @@ describe("task capability assessment", () => {
       "pathless-workspace-question",
       "test-impact-question",
       "owner-context-question",
+      "package-script-impact-question",
       "source-report",
       "structured-artifact",
       "incident-summary-report",
       "csv-summary-artifact",
+      "release-note-report",
+      "metrics-summary-artifact",
+      "owner-risk-summary",
       "resume-from-context",
+      "resume-after-compaction",
       "live-provider-triage",
     ]);
     expect(result.liveReadiness.find((item) => item.caseId === "pathless-workspace-question")).toMatchObject({
@@ -257,14 +280,20 @@ describe("task capability assessment", () => {
       "coordinated-edit",
       "failed-check-repair",
       "rollback-recovery",
+      "retry-diagnosis-repair",
       "pathless-workspace-question",
       "test-impact-question",
       "owner-context-question",
+      "package-script-impact-question",
       "source-report",
       "structured-artifact",
       "incident-summary-report",
       "csv-summary-artifact",
+      "release-note-report",
+      "metrics-summary-artifact",
+      "owner-risk-summary",
       "resume-from-context",
+      "resume-after-compaction",
     ]);
     for (const taskCase of completeCases) {
       expect(taskCase.proofRecord).toMatchObject({
@@ -396,6 +425,33 @@ describe("task capability assessment", () => {
     expect(result.remainingBlockers).toEqual([]);
   });
 
+  it("completes additional debug repair through diagnosis, bounded repair, and post-validation", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskCase({ caseId: "retry-diagnosis-repair", dispatch: host.dispatch });
+
+    expect(result.beforeOutcome).toBe("failed");
+    expect(result.outcome).toBe("complete");
+    expect(result.repairDecision).toMatchObject({
+      failureClass: "verification",
+      state: "failed",
+      originalFailurePreserved: true,
+      retryAllowed: false,
+    });
+    expect(result.repairDecision.diagnosticContextNeeded).toEqual(
+      expect.arrayContaining(["selected check", "failure output summary"]),
+    );
+    expect(result.repairAction).toMatchObject({
+      attempted: true,
+      postValidation: "passed",
+      originalFailurePreserved: true,
+    });
+    expect(result.verificationExecution.state).toBe("passed");
+    expect(result.taskProof.presentProof).toEqual(
+      expect.arrayContaining(["repair-action", "repair-post-validation", "original-failure-preserved"]),
+    );
+    expect(result.taskVerdict.completeProof).toBe(true);
+  });
+
   it("completes artifact validation through correction, rerun verification, and proof verdict", async () => {
     const host = createHostRuntime();
     const result = await runTaskCase({ caseId: "structured-artifact", dispatch: host.dispatch });
@@ -502,6 +558,7 @@ describe("task capability assessment", () => {
     const host = createHostRuntime();
     const testImpact = await runTaskCase({ caseId: "test-impact-question", dispatch: host.dispatch });
     const ownerContext = await runTaskCase({ caseId: "owner-context-question", dispatch: host.dispatch });
+    const packageImpact = await runTaskCase({ caseId: "package-script-impact-question", dispatch: host.dispatch });
 
     expect(testImpact.outcome).toBe("complete");
     expect(testImpact.allowedWrites).toEqual([]);
@@ -517,12 +574,24 @@ describe("task capability assessment", () => {
     expect(ownerContext.contextSelection.targetPaths).toEqual(["src/runtime/execution/receipt.ts"]);
     expect(ownerContext.taskProof.presentProof).toContain("workspace-target-resolution");
     expect(ownerContext.taskVerdict.completeProof).toBe(true);
+
+    expect(packageImpact.outcome).toBe("complete");
+    expect(packageImpact.allowedWrites).toEqual([]);
+    expect(packageImpact.contextSelection.targetPaths).toEqual(["src/runtime/api/host/runtime.ts"]);
+    expect(packageImpact.contextSelection.selectedPaths).toEqual(
+      expect.arrayContaining(["package.json", "src/runtime/api/host/runtime.ts", "src/runtime/api/host/runtime.test.ts"]),
+    );
+    expect(packageImpact.taskProof.presentProof).toContain("workspace-target-resolution");
+    expect(packageImpact.taskVerdict.completeProof).toBe(true);
   });
 
   it("completes additional report and data artifacts through receipts and validation", async () => {
     const host = createHostRuntime();
     const report = await runTaskCase({ caseId: "incident-summary-report", dispatch: host.dispatch });
     const data = await runTaskCase({ caseId: "csv-summary-artifact", dispatch: host.dispatch });
+    const release = await runTaskCase({ caseId: "release-note-report", dispatch: host.dispatch });
+    const metrics = await runTaskCase({ caseId: "metrics-summary-artifact", dispatch: host.dispatch });
+    const ownerRisk = await runTaskCase({ caseId: "owner-risk-summary", dispatch: host.dispatch });
 
     expect(report.outcome).toBe("complete");
     expect(report.artifactReceipt).toMatchObject({
@@ -549,6 +618,61 @@ describe("task capability assessment", () => {
       validationState: "validation-passed",
     });
     expect(data.taskVerdict.completeProof).toBe(true);
+
+    for (const artifact of [release, metrics, ownerRisk]) {
+      expect(artifact.outcome).toBe("complete");
+      expect(artifact.artifactReceipt?.sourceReceipts.every((source) => source.available)).toBe(true);
+      expect(artifact.artifactCorrection).toMatchObject({
+        attempted: true,
+        validationState: "validation-passed",
+      });
+      expect(artifact.taskProof.presentProof).toEqual(
+        expect.arrayContaining(["artifact-source-receipts", "artifact-validation"]),
+      );
+      expect(artifact.taskVerdict.completeProof).toBe(true);
+    }
+    expect(metrics.artifactReceipt).toMatchObject({
+      kind: "structured-data",
+      outputPath: "artifacts/metrics-summary.json",
+    });
+  });
+
+  it("completes additional continuation by rebuilding fresh retained context", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskCase({ caseId: "resume-after-compaction", dispatch: host.dispatch });
+
+    expect(result.beforeOutcome).toBe("not-proven");
+    expect(result.outcome).toBe("complete");
+    expect(result.setupEvaluations.map((setup) => setup.scenarioId)).toEqual(["branch-compaction-continuation"]);
+    expect(result.contextSelection).toMatchObject({
+      state: "ready",
+      refreshed: true,
+      targetPaths: ["src/ownerReview.ts"],
+    });
+    expect(result.taskProof.presentProof).toContain("continuation-freshness");
+    expect(result.taskVerdict.completeProof).toBe(true);
+  });
+
+  it("meets autonomous development task mix gates", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskAssessment({
+      dispatch: host.dispatch,
+      liveGateObservations: [
+        liveObservation("pathless-workspace-question", "read-only-provider"),
+        liveObservation("package-script-impact-question", "read-only-provider"),
+      ],
+    });
+    const complete = result.cases.filter((taskCase) => taskCase.outcome === "complete");
+
+    expect(complete).toHaveLength(18);
+    expect(complete.filter((taskCase) => taskCase.taskKind === "workspace-understanding")).toHaveLength(4);
+    expect(complete.filter((taskCase) => taskCase.taskKind === "debug-repair")).toHaveLength(3);
+    expect(complete.filter((taskCase) => taskCase.taskPath === "artifact")).toHaveLength(7);
+    expect(complete.filter((taskCase) => taskCase.taskKind === "continuation")).toHaveLength(2);
+    expect(result.liveExecutions.filter((execution) =>
+      execution.executed &&
+      (execution.status === "complete" || execution.status === "useful-partial")
+    )).toHaveLength(2);
   });
 
   it("keeps unsafe text out of task assessment results", async () => {

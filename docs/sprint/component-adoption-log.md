@@ -355,6 +355,71 @@ focused validation.
   manual-review-required states while keeping deterministic task proof and
   verdict handoff intact.
 
+## Autonomous Development Task Path Expansion
+
+- Selected mode: structured port for local task-path contracts and
+  behavior-only alignment for mature session/context/tool/verification
+  behavior.
+- Owner domain: `context/selection`, `provider/request`,
+  `runtime/evaluation/task`, `repair/loop`, `artifacts/workflow`,
+  `verification`, `evidence/task`, and `result/task`.
+- Reason for use: SP022 required the project to become visibly better at
+  short-prompt autonomous work, not merely add labels or proof records. The
+  mature implementation patterns inspected were per-turn state snapshots,
+  cwd-bound session runtime setup, read-only tool set assembly, context/resource
+  separation, failure taxonomy, and post-action validation. The local product
+  needed those behaviors translated into current owner domains without copying
+  names, source, dynamic loading, SDK/RPC, or provider defaults.
+- Behavior to port: safe context packet construction with package paths,
+  related paths, verification candidates, omitted-path accounting, and
+  report-safe summaries; request packet handoff of context summary,
+  verification candidates, and omitted context count; six additional
+  short-prompt task cases that exercise pathless workspace discovery, script
+  impact selection, debug repair, report validation, structured-data
+  validation, owner-risk reporting, and continuation freshness; deterministic
+  mix gates for complete counts and live no-write observations.
+- Rejected alternatives:
+  - Dependency use: rejected because task proof, redaction, provider gating,
+    verification, repair, and artifact validation are local product semantics.
+  - Isolated source adoption: rejected because no narrow source component was
+    required and copied field names or product structure would violate local
+    naming and ownership constraints.
+  - Case-only expansion: rejected because SP022 requires concrete
+    task-driving behavior; context and request owners now carry stronger facts
+    consumed by the task lane.
+  - Broad workflow rewrite: rejected because the existing owner domains already
+    carry the relevant safe path and broad rewrite would risk shims, defaults,
+    or arbitrary writers.
+- Expected callers: task assessment, host evaluation summaries, future task
+  bench scripts, context/planning consumers, provider request preparation,
+  verification and repair owners, artifact workflows, evidence/result
+  projections, session/status surfaces, and future explicit live gates.
+- Side-effect boundary: this adoption is deterministic and pure. It does not
+  read or write files, run commands, invoke providers, broaden command
+  allowlists, enable live providers, inspect private provider configuration, add
+  browser automation, add external tool servers, or add arbitrary writers.
+  Future side effects must enter through `ExecutionService` or a sanctioned
+  owner.
+- Truthfulness boundary: context packet construction, request shaping, case
+  creation, tool strategy, repair action, artifact correction, verification
+  execution, live observation, host output, smoke pass, and deterministic count
+  are not terminal task success. Complete remains owned by evidence/task proof
+  and result/task verdict with no missing proof; all affected surfaces keep
+  `terminalSuccessClaim: false`.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- context/selection/model.test.ts provider/request/packet.test.ts runtime/evaluation/task/model.test.ts`
+  - Focused task tests now report 18 deterministic complete cases, 1 skipped,
+    and 1 unsupported. Complete cases include 4 pathless workspace/context
+    cases, 3 debug/repair cases, 7 artifact/report/data cases, and 2
+    continuation/resume cases.
+  - The task mix gate preserves two no-write live execution observations as
+    complete/useful partial with task proof and keeps provider calls and gate
+    passes non-success.
+- Rollback plan: remove the six new task case definitions and the richer
+  context/request packet fields, returning task assessment to the previous 12
+  complete deterministic cases while preserving SP021 live execution projection
+  and existing proof/verdict handoff.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

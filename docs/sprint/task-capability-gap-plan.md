@@ -9,7 +9,7 @@ capabilities that must ship together for real user-visible work.
 | Area | Current status | Evidence or gap |
 |---|---|---|
 | Trusted runtime capability | Proven across many owner-tested lanes. | `runtime/loop`, `runtime/events`, `runtime/execution`, `provider`, `tools`, `edit`, `verification`, `repair`, `evidence`, `result`, `session`, and host tests. |
-| Context discovery and acquisition | Partially proven for bounded local repo scans, ranked candidates, staged reads, graph/test-impact facts, continuation memory, and omission accounting. | `context/discovery/*.test.ts`, `context/acquisition/*.test.ts`, `context/memory/*.test.ts`. This is not proof of complete workspace understanding. |
+| Context discovery and acquisition | Partially proven for bounded local repo scans, ranked candidates, staged reads, graph/test-impact facts, continuation memory, safe context packet construction, verification candidate selection, and omission accounting. | `context/discovery/*.test.ts`, `context/acquisition/*.test.ts`, `context/memory/*.test.ts`, `context/selection/model.test.ts`, and task assessment integration. This is not proof of complete workspace understanding. |
 | Planning quality | Partially proven for analysis brief, executable plan facts, edit target selection, verification intent, plan-quality gates, and no-write mutation handoff. | `planning/runtime/engine.test.ts`, `planning/quality/*.test.ts`, `planning/handoff/*.test.ts`. Planning does not grant mutation, apply, verification, or success. |
 | Tool strategy | Partially proven for policy interception, allowlist blocking, read-only parallel scheduling, result ordering, result-message splitting, and non-success outcome facts. | `tools/dispatch`, `tools/policy`, `tools/scheduling`, `tools/result`, `tools/toolBatchDispatch.test.ts`. |
 | Controlled mutation | Proven for bounded synthetic lanes, including single-target recovery and bounded multi-target mutation. | `edit/recovery`, `edit/multifile`, mutation runtime tests. Broad arbitrary writers and uncontrolled parallel mutation remain unsupported. |
@@ -18,8 +18,8 @@ capabilities that must ship together for real user-visible work.
 | Session continuation | Partially proven for branch/compaction facts, replay, resume context, compact summaries, lifecycle, and host/session status. | `session/store`, `session/replay`, `session/recovery`, `session/continuation`. Broad interactive branch UX and long real task continuation remain weak. |
 | Host automation | Proven for in-process host command contract and package-facing JSON response. | `runtime/api/host`, `cli/host`, `runtime/distribution`, `verify:host-surface`. Broad SDK/RPC server behavior remains unproven. |
 | Product workflow | Partially proven for CLI status envelope, host JSON, interactive loop lifecycle, cancellation, session selection, and presentation facts. | `cli`, `session/presentation`, `presentation`. User collaboration and artifact workflow surfaces are missing or narrow. |
-| Real task evaluation | Partially proven as deterministic task assessment plumbing with context selection, execution planning, request packets, tool strategy, artifact correction, repair action, explicit post-repair validation evidence, verification execution, task proof, task verdict facts, proof records, negative controls, default-off live gate plans, exact live blocker reporting, and explicit live execution projection. | `runtime/evaluation/task/model.test.ts` and `evidence/task/proof.test.ts` cover coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, skipped-live, and opt-in live execution metadata cases with audited outcomes: 12 complete, 1 skipped, and 1 unsupported. Live projection tests cover safe read-only, anchored, and artifact dry-run observations without treating provider calls or gate passes as success. Manual live smoke now passed read-only and anchored no-write gates with no provider output leak and no write/no apply preserved. This is not broad live task completion. |
-| Artifact workflows | Partially proven as deterministic receipt, correction, validation facts, and no-write live dry-run readiness for report/data cases. | `artifacts/workflow/model.test.ts` and task assessment integration cover report/structured-data intent, source receipts, format expectation, unsafe/missing/invalid/not-proven states, validation failure, correction, rerun verification, and artifact dry-run live execution projection. Durable artifact writing, rendered checks, manual review/write gates, and broad export workflows remain missing. |
+| Real task evaluation | Partially proven as deterministic task assessment plumbing with context selection, execution planning, request packets, tool strategy, artifact correction, repair action, explicit post-repair validation evidence, verification execution, task proof, task verdict facts, proof records, negative controls, default-off live gate plans, exact live blocker reporting, and explicit live execution projection. | `runtime/evaluation/task/model.test.ts` and `evidence/task/proof.test.ts` cover coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, skipped-live, and opt-in live execution metadata cases with audited outcomes: 18 complete, 1 skipped, and 1 unsupported. Complete cases include 4 pathless workspace/context cases, 3 debug/repair cases, 7 artifact/report/data cases, and 2 continuation/resume cases. Live projection tests cover two no-write observations as complete/useful partial without treating provider calls or gate passes as success. Manual live smoke now passed read-only and anchored no-write gates with no provider output leak and no write/no apply preserved. This is not broad live task completion. |
+| Artifact workflows | Partially proven as deterministic receipt, correction, validation facts, and no-write live dry-run readiness for report/data cases. | `artifacts/workflow/model.test.ts` and task assessment integration cover report/structured-data intent, source receipts, format expectation, unsafe/missing/invalid/not-proven states, validation failure, correction, rerun verification, artifact dry-run live execution projection, and seven complete artifact/report/data cases. Durable artifact writing, rendered checks, manual review/write gates, and broad export workflows remain missing. |
 
 ## Measured Task Assessment Result
 
@@ -32,10 +32,14 @@ task lane:
 - Complete by task proof verdict after audited owner facts:
   `failed-check-repair`,
   `rollback-recovery`,
+  `retry-diagnosis-repair`,
   `pathless-workspace-question`, `test-impact-question`,
-  `owner-context-question`, `source-report`, `structured-artifact`,
+  `owner-context-question`, `package-script-impact-question`,
+  `source-report`, `structured-artifact`,
   `incident-summary-report`, `csv-summary-artifact`,
-  `resume-from-context`.
+  `release-note-report`, `metrics-summary-artifact`,
+  `owner-risk-summary`,
+  `resume-from-context`, `resume-after-compaction`.
 - Skipped: `live-provider-triage`.
 - Unsupported: `unsupported-artifact-export`.
 - Failed: none.
@@ -64,6 +68,10 @@ Changed case evidence:
 - `rollback-recovery`: before `failed`; after `complete` through bounded repair,
   original failure preservation, explicit post-repair rollback validation
   evidence, passed verification execution, and evidence/result task verdict.
+- `retry-diagnosis-repair`: before `failed`; after `complete` through failure
+  diagnosis, bounded repair, original failure preservation, explicit
+  post-repair validation evidence, passed verification execution, and
+  evidence/result task verdict.
 - `pathless-workspace-question`: before `blocked`; after `complete` through
   context selection, task request shaping, search/verify tool strategy, target
   resolution proof, and evidence/result task verdict.
@@ -73,6 +81,9 @@ Changed case evidence:
 - `owner-context-question`: before `blocked`; after `complete` through
   pathless owner-domain context resolution, report-safe receipt boundary proof,
   no-write policy, and evidence/result task verdict.
+- `package-script-impact-question`: before `blocked`; after `complete` through
+  package script discovery, focused verification candidate selection, pathless
+  host owner context, no-write policy, and evidence/result task verdict.
 - `source-report`: before `failed`; after `complete` through source receipts,
   artifact correction, passed rerun verification, and evidence/result task
   verdict.
@@ -85,9 +96,21 @@ Changed case evidence:
 - `csv-summary-artifact`: before `failed`; after `complete` through structured
   source receipts, artifact correction, passed validation, and evidence/result
   task verdict.
+- `release-note-report`: before `failed`; after `complete` through source
+  receipts, report correction, passed validation, and evidence/result task
+  verdict.
+- `metrics-summary-artifact`: before `failed`; after `complete` through
+  structured source receipts, artifact correction, passed validation, and
+  evidence/result task verdict.
+- `owner-risk-summary`: before `failed`; after `complete` through source
+  receipts, report correction, passed validation, and evidence/result task
+  verdict.
 - `resume-from-context`: before `not-proven`; after `complete` through
   refreshed continuation context, freshness proof, and evidence/result task
   verdict.
+- `resume-after-compaction`: before `not-proven`; after `complete` through
+  retained context rebuild, freshness proof, setup continuation evidence, and
+  evidence/result task verdict.
 
 Proof controls: missing final verification, missing post-repair validation,
 missing source receipts, invalid structured-artifact validation, stale
@@ -95,13 +118,19 @@ continuation context, host output without task proof, and artifact presence
 without validation all downgrade away from complete and preserve missing proof
 items.
 
-Live status: default-off. Nine target cases now have exact live gate
+Measured counts: 18 complete, 1 skipped, and 1 unsupported. Complete cases now
+include 4 pathless workspace/context cases, 3 debug/repair cases, 7
+artifact/report/data cases, and 2 continuation/resume cases.
+
+Live status: default-off. Thirteen target cases now have exact live gate
 requirements: `pathless-workspace-question`, `test-impact-question`, and
-`owner-context-question` use the read-only provider path,
-`resume-from-context` uses the anchored provider path, `live-provider-triage`
-uses provider readiness preflight, and `source-report`,
-`structured-artifact`, `incident-summary-report`, and `csv-summary-artifact`
-use artifact dry-run with no write and manual review before any write. Task
+`owner-context-question`, and `package-script-impact-question` use the
+read-only provider path, `resume-from-context` and `resume-after-compaction`
+use the anchored provider path, `live-provider-triage` uses provider readiness
+preflight, and `source-report`, `structured-artifact`,
+`incident-summary-report`, `csv-summary-artifact`, `release-note-report`,
+`metrics-summary-artifact`, and `owner-risk-summary` use artifact dry-run with
+no write and manual review before any write. Task
 assessment now carries `liveExecutions`, a structured projection from explicit
 gate observations into complete, useful partial, failed, blocked, skipped,
 unsupported, unsafe, provider-readiness-missing, auth-readiness-missing,
@@ -111,7 +140,9 @@ at least four live-ready cases, at least three safe executed observations, at
 least two complete or useful partial executions with task proof, one artifact
 or data execution, one pathless/context execution, exact provider-network
 blockers, changedFiles empty visibility, no mutation, no apply, and no terminal
-success from provider calls or gate passes. Manual live smoke evidence now
+success from provider calls or gate passes. SP022 focused tests preserve two
+no-write live execution observations as complete/useful partial with task
+proof. Manual live smoke evidence now
 shows read-only smoke passed, anchored provider smoke passed with the primary
 provider, fallback was configured but skipped because the primary passed, no raw
 provider output leaked, and no write/no apply was preserved. Write-capable
@@ -132,18 +163,17 @@ Stale or narrow priorities to stop treating as next-phase wins:
 - extending mutation breadth without context, planning, verification, and debug
   loops working together;
 - treating deterministic runtime evaluation as real task ability.
-- treating deterministic task assessment plumbing or live gate execution
-  metadata as broad live task completion.
+- treating deterministic task assessment plumbing, expanded case counts, or
+  live gate execution metadata as broad live task completion.
 
 ## Aggressive Implementation Batches
 
 ### Batch A: Real Task Bench And Live-Provider Capability Triage
 
-- Goal: expand the audited deterministic task assessment and current opt-in live
-  execution projection into a real task bench that measures useful completion
-  across coding, debugging, docs, data/report, and artifact tasks, then improve
-  provider output sufficiency and recovery without enabling live providers by
-  default.
+- Goal: move the audited deterministic task assessment and current opt-in live
+  execution projection toward real task execution that can safely produce
+  durable outputs, diagnose failures, and validate provider-shaped answers
+  without enabling live providers by default.
 - Task value: stops optimizing for safe reporting alone and identifies where
   real work fails.
 - Owner domains: `runtime/evaluation`, `runtime/api/host`, `evidence`,
@@ -160,12 +190,12 @@ Stale or narrow priorities to stop treating as next-phase wins:
 - Tests and real-task checks: deterministic task fixtures first; live-provider
   checks only through explicit opt-in gates with clean homes and no secret
   printing; each case must define task-relevant success evidence.
-- Completion gates: keep the current audited deterministic task cases green,
-  preserve the fake-complete controls, keep no-write and artifact dry-run live
-  gates explicit opt-in, add real fixture execution where the workspace safely
-  changes or artifacts are produced, and keep host output separating complete,
-  useful partial, blocked, failed, skipped, unsupported, unsafe, and not-proven
-  with redaction passing.
+- Completion gates: keep the current 18 complete deterministic task cases
+  green, preserve the fake-complete controls, keep no-write and artifact
+  dry-run live gates explicit opt-in, add real fixture execution where the
+  workspace safely changes or artifacts are produced, and keep host output
+  separating complete, useful partial, blocked, failed, skipped, unsupported,
+  unsafe, and not-proven with redaction passing.
 - Forbidden shortcuts: fake task success, provider-called success, readback-only
   success, broad live defaults, mass rebaseline, broad skips.
 - Expected failure signals: insufficient context, ambiguous goal, verification

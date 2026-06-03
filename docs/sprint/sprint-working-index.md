@@ -36,6 +36,7 @@ sections instead of appending progress logs.
 | `docs/sprint/route/sp019-live-task-breakthrough.md` | completed route input | Opt-in no-write live gate execution and exact provider-network blocker objective now reflected in current capability, priority, and adoption-log docs. |
 | `docs/sprint/route/sp020-autonomous-task-core-upgrade.md` | completed route input | Deterministic task-core upgrade, rollback recovery completion, added short-prompt task cases, and measured task-bench priorities now reflected in current capability, priority, gap, and adoption-log docs. |
 | `docs/sprint/route/sp021-live-autonomous-task-core-execution.md` | completed route input | Opt-in live task execution projection, read-only/anchored/artifact dry-run task gates, and manual live smoke outcomes now reflected in current capability, priority, gap, and adoption-log docs. |
+| `docs/sprint/route/sp022-autonomous-development-capability-transplant.md` | completed route input | Autonomous development task mix expansion, richer context/request packet behavior, repair/artifact/continuation completions, and measured priorities now reflected in current capability, priority, gap, and adoption-log docs. |
 
 ## Removed Or Merged Content
 

@@ -34,8 +34,11 @@ describe("task request packet", () => {
     expect(packet).toMatchObject({
       state: "ready",
       outputContract: "source-scoped report artifact",
+      contextPacketSummary: expect.stringContaining("1 target"),
+      omittedContextCount: 0,
       terminalSuccessClaim: false,
     });
+    expect(packet.contextPaths).toEqual(expect.arrayContaining(["notes/source.md", "reports/summary.md"]));
     expect(packet.redactionRules).toContain("exclude provider output");
   });
 });

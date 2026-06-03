@@ -150,15 +150,21 @@ export type TaskCaseId =
   | "coordinated-edit"
   | "failed-check-repair"
   | "rollback-recovery"
+  | "retry-diagnosis-repair"
   | "pathless-workspace-question"
   | "test-impact-question"
   | "owner-context-question"
+  | "package-script-impact-question"
   | "source-report"
   | "structured-artifact"
   | "incident-summary-report"
   | "csv-summary-artifact"
+  | "release-note-report"
+  | "metrics-summary-artifact"
+  | "owner-risk-summary"
   | "unsupported-artifact-export"
   | "resume-from-context"
+  | "resume-after-compaction"
   | "live-provider-triage";
 
 export type TaskVerificationStatus =
@@ -384,15 +390,21 @@ export function listTaskCases(): readonly TaskCaseDefinition[] {
     coordinatedEdit(),
     failedCheckRepair(),
     rollbackRecovery(),
+    retryDiagnosisRepair(),
     pathlessWorkspaceQuestion(),
     testImpactQuestion(),
     ownerContextQuestion(),
+    packageScriptImpactQuestion(),
     sourceReport(),
     structuredArtifact(),
     incidentSummaryReport(),
     csvSummaryArtifact(),
+    releaseNoteReport(),
+    metricsSummaryArtifact(),
+    ownerRiskSummary(),
     unsupportedArtifactExport(),
     resumeFromContext(),
+    resumeAfterCompaction(),
     liveProviderTriage(),
   ]);
 }
@@ -1403,6 +1415,40 @@ function rollbackRecovery(): TaskCaseDefinition {
   });
 }
 
+function retryDiagnosisRepair(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "retry-diagnosis-repair",
+    taskKind: "debug-repair",
+    taskPath: "edit",
+    shortPrompt: "Diagnose the retry failure and apply the bounded fix.",
+    workspace: fixture("retry-diagnosis-repair", [
+      ["src/retry.ts", "repair target"],
+      ["src/retry.test.ts", "focused failure check"],
+      ["src/backoff.ts", "related context"],
+    ]),
+    allowedTools: ["read", "edit", "verify", "repair"],
+    allowedWrites: ["src/retry.ts"],
+    successRubric: [
+      "preserves the original failed retry check",
+      "applies one bounded repair to the retry target",
+      "requires post-repair verification before completion",
+    ],
+    expectedVerification: verification("retry-repair-check", "post-repair retry check", "failed"),
+    expectedOutput: output("diff", "retry repair evidence", ["src/retry.ts"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "failed",
+    baselineFailureCategories: ["verification failed", "repair failed"],
+    repairValidationEvidence: {
+      status: "passed",
+      check: "post-repair retry check",
+      originalFailurePreserved: true,
+    },
+    hostEvaluationCaseId: "apply-only-negative",
+    failureCategories: ["verification failed", "repair failed"],
+  });
+}
+
 function pathlessWorkspaceQuestion(): TaskCaseDefinition {
   return baseTask({
     caseId: "pathless-workspace-question",
@@ -1488,6 +1534,36 @@ function ownerContextQuestion(): TaskCaseDefinition {
     baselineFailureCategories: ["context insufficient"],
     hostEvaluationCaseId: "provider-blocked",
     failureCategories: ["context insufficient"],
+  });
+}
+
+function packageScriptImpactQuestion(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "package-script-impact-question",
+    taskKind: "workspace-understanding",
+    taskPath: "tool",
+    shortPrompt: "Find which focused script proves the package boundary change.",
+    workspace: fixture("package-script-impact-question", [
+      ["package.json", "script inventory"],
+      ["src/runtime/api/host/runtime.ts", "likely implementation target"],
+      ["src/runtime/api/host/runtime.test.ts", "focused verification candidate"],
+      ["src/runtime/api/host/io.test.ts", "adjacent host surface check"],
+    ]),
+    allowedTools: ["read", "search", "verify"],
+    allowedWrites: [],
+    successRubric: [
+      "discovers the likely owner without a prompt path",
+      "selects the focused package script evidence",
+      "keeps script discovery separate from write authority",
+    ],
+    expectedVerification: verification("host-runtime-script-impact", "context sufficiency check", "blocked"),
+    expectedOutput: output("analysis", "ranked host owner and focused package check", ["src/runtime/api/host/runtime.ts"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "blocked",
+    baselineFailureCategories: ["context insufficient", "verification not selected"],
+    hostEvaluationCaseId: "provider-blocked",
+    failureCategories: ["context insufficient", "verification not selected"],
   });
 }
 
@@ -1605,6 +1681,93 @@ function csvSummaryArtifact(): TaskCaseDefinition {
   });
 }
 
+function releaseNoteReport(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "release-note-report",
+    taskKind: "docs-report",
+    taskPath: "artifact",
+    shortPrompt: "Draft the release note from the accepted change notes.",
+    workspace: fixture("release-note-report", [
+      ["notes/change-summary.md", "release source"],
+      ["notes/validation.md", "validation source"],
+      ["reports/release-note.md", "expected report output"],
+    ]),
+    allowedTools: ["read", "write", "verify"],
+    allowedWrites: ["reports/release-note.md"],
+    successRubric: [
+      "uses only accepted source notes",
+      "writes the requested release note path",
+      "validates scope and required sections",
+    ],
+    expectedVerification: verification("release-note-source-check", "source coverage check", "passed"),
+    expectedOutput: output("artifact", "markdown release note report", ["reports/release-note.md"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "failed",
+    baselineFailureCategories: ["artifact invalid"],
+    hostEvaluationCaseId: "missing-proof",
+    failureCategories: ["artifact invalid"],
+  });
+}
+
+function metricsSummaryArtifact(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "metrics-summary-artifact",
+    taskKind: "data-artifact",
+    taskPath: "artifact",
+    shortPrompt: "Create the JSON metrics summary from the fixture rows.",
+    workspace: fixture("metrics-summary-artifact", [
+      ["data/metrics.csv", "data source"],
+      ["data/thresholds.json", "validation source"],
+      ["artifacts/metrics-summary.json", "expected structured artifact"],
+    ]),
+    allowedTools: ["read", "write", "verify"],
+    allowedWrites: ["artifacts/metrics-summary.json"],
+    successRubric: [
+      "parses the metric rows",
+      "checks the threshold source",
+      "validates the JSON summary format",
+    ],
+    expectedVerification: verification("metrics-json-check", "structured artifact check", "failed"),
+    expectedOutput: output("artifact", "metrics summary JSON artifact", ["artifacts/metrics-summary.json"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "failed",
+    baselineFailureCategories: ["artifact invalid", "verification failed"],
+    hostEvaluationCaseId: "read-only-tool-loop",
+    failureCategories: ["artifact invalid", "verification failed"],
+  });
+}
+
+function ownerRiskSummary(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "owner-risk-summary",
+    taskKind: "docs-report",
+    taskPath: "artifact",
+    shortPrompt: "Summarize owner risk from the two review notes.",
+    workspace: fixture("owner-risk-summary", [
+      ["notes/owner-map.md", "owner source"],
+      ["notes/risk-log.md", "risk source"],
+      ["reports/owner-risk.md", "expected report output"],
+    ]),
+    allowedTools: ["read", "write", "verify"],
+    allowedWrites: ["reports/owner-risk.md"],
+    successRubric: [
+      "keeps owner facts source-scoped",
+      "writes a concise risk report",
+      "validates that every risk has a source receipt",
+    ],
+    expectedVerification: verification("owner-risk-source-check", "source coverage check", "passed"),
+    expectedOutput: output("artifact", "markdown owner risk report", ["reports/owner-risk.md"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "failed",
+    baselineFailureCategories: ["artifact invalid"],
+    hostEvaluationCaseId: "missing-proof",
+    failureCategories: ["artifact invalid"],
+  });
+}
+
 function unsupportedArtifactExport(): TaskCaseDefinition {
   return baseTask({
     caseId: "unsupported-artifact-export",
@@ -1654,6 +1817,36 @@ function resumeFromContext(): TaskCaseDefinition {
     baselineOutcome: "not-proven",
     baselineFailureCategories: ["continuation stale"],
     setupEvaluationCaseIds: ["read-only-tool-loop"],
+    hostEvaluationCaseId: "branch-compaction-continuation",
+    failureCategories: ["continuation stale"],
+  });
+}
+
+function resumeAfterCompaction(): TaskCaseDefinition {
+  return baseTask({
+    caseId: "resume-after-compaction",
+    taskKind: "continuation",
+    taskPath: "continuation",
+    shortPrompt: "Resume from compacted context and finish the owner review.",
+    workspace: fixture("resume-after-compaction", [
+      ["src/ownerReview.ts", "retained target"],
+      ["session/compacted-context", "retained context marker"],
+      ["session/open-blockers", "continuation blocker summary"],
+    ]),
+    allowedTools: ["read", "continue", "verify"],
+    allowedWrites: [],
+    successRubric: [
+      "rebuilds fresh context from retained markers",
+      "keeps compacted summary as context rather than proof",
+      "reports remaining blockers after freshness check",
+    ],
+    expectedVerification: verification("compaction-freshness", "continuation freshness check", "passed"),
+    expectedOutput: output("continuation", "fresh resumed review facts", ["src/ownerReview.ts"]),
+    expectedEvidenceResultCondition: "complete-proof",
+    expectedOutcome: "complete",
+    baselineOutcome: "not-proven",
+    baselineFailureCategories: ["continuation stale"],
+    setupEvaluationCaseIds: ["branch-compaction-continuation"],
     hostEvaluationCaseId: "branch-compaction-continuation",
     failureCategories: ["continuation stale"],
   });

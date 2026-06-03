@@ -22,8 +22,11 @@ describe("context selection model", () => {
       state: "ready",
       selectedPaths: expect.arrayContaining(["src/runtime/selector.ts", "package.json"]),
       targetPaths: ["src/runtime/selector.ts"],
+      verificationPaths: ["src/runtime/selector.test.ts"],
+      packagePaths: ["package.json"],
       terminalSuccessClaim: false,
     });
+    expect(selection.contextPacketSummary).toContain("1 target");
     expect(selection.notProvenClaims).toContain("context-selected-is-not-task-success");
   });
 

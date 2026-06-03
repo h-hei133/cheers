@@ -14,6 +14,9 @@ export interface TaskRequestPacket {
   readonly state: RequestPacketState;
   readonly goalSummary: string;
   readonly contextPaths: readonly string[];
+  readonly contextPacketSummary: string;
+  readonly verificationCandidates: readonly string[];
+  readonly omittedContextCount: number;
   readonly planSteps: readonly string[];
   readonly outputContract: string;
   readonly blockers: readonly string[];
@@ -31,6 +34,9 @@ export function buildTaskRequestPacket(input: TaskRequestPacketInput): TaskReque
     state: blockers.length > 0 ? "blocked" : "ready",
     goalSummary: input.shortPrompt,
     contextPaths: input.context.selectedPaths,
+    contextPacketSummary: input.context.contextPacketSummary,
+    verificationCandidates: input.context.verificationPaths,
+    omittedContextCount: input.context.omittedPaths.length,
     planSteps: input.plan.steps,
     outputContract: outputContractFor(input.taskKind),
     blockers,
