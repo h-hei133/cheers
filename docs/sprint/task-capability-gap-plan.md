@@ -18,7 +18,7 @@ capabilities that must ship together for real user-visible work.
 | Session continuation | Partially proven for branch/compaction facts, replay, resume context, compact summaries, lifecycle, and host/session status. | `session/store`, `session/replay`, `session/recovery`, `session/continuation`. Broad interactive branch UX and long real task continuation remain weak. |
 | Host automation | Proven for in-process host command contract and package-facing JSON response. | `runtime/api/host`, `cli/host`, `runtime/distribution`, `verify:host-surface`. Broad SDK/RPC server behavior remains unproven. |
 | Product workflow | Partially proven for CLI status envelope, host JSON, interactive loop lifecycle, cancellation, session selection, and presentation facts. | `cli`, `session/presentation`, `presentation`. User collaboration and artifact workflow surfaces are missing or narrow. |
-| Real task evaluation | Partially proven as deterministic task assessment plumbing with context selection, execution planning, request packets, tool strategy, artifact correction, repair action, verification execution, task proof, task verdict facts, proof records, negative controls, and default-off live readiness facts. | `runtime/evaluation/task/model.test.ts` and `evidence/task/proof.test.ts` cover coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, and skipped-live cases with audited outcomes: 7 complete, 1 partial, 1 skipped, and 1 unsupported. This is not broad live task completion. |
+| Real task evaluation | Partially proven as deterministic task assessment plumbing with context selection, execution planning, request packets, tool strategy, artifact correction, repair action, verification execution, task proof, task verdict facts, proof records, negative controls, default-off live gate plans, and exact live blocker reporting. | `runtime/evaluation/task/model.test.ts` and `evidence/task/proof.test.ts` cover coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, and skipped-live cases with audited outcomes: 7 complete, 1 partial, 1 skipped, and 1 unsupported. Live opt-in commands executed two no-write provider paths, both blocked by provider network failure. This is not broad live task completion. |
 | Artifact workflows | Partially proven as deterministic receipt, correction, and validation facts. | `artifacts/workflow/model.test.ts` and task assessment integration cover report/structured-data intent, source receipts, format expectation, unsafe/missing/invalid/not-proven states, validation failure, correction, and rerun verification. Durable artifact writing, rendered checks, and broad export workflows remain missing. |
 
 ## Measured Task Assessment Result
@@ -81,12 +81,19 @@ continuation context, host output without task proof, and artifact presence
 without validation all downgrade away from complete and preserve missing proof
 items.
 
-Live readiness status: default-off. No live provider was run. Each task case now
-has a readiness fact: write-capable deterministic cases are unsafe without
-manual review and provider/auth readiness, read/continuation cases are blocked
-on provider/auth readiness, the unsupported export remains unsupported, and the
-live triage case remains skipped until an explicit existing opt-in gate is
-selected.
+Live status: default-off. Three no-write cases now have exact live gate
+requirements: `pathless-workspace-question` uses the read-only provider path,
+`resume-from-context` uses the anchored provider path, and
+`live-provider-triage` uses provider readiness preflight. Two existing
+explicit opt-in live gates were executed. The read-only provider path reached
+provider readiness, kept the fixture unmutated, passed redaction, and then
+ended with `provider-network-inconclusive` during the model turn. The anchored
+provider path approved the adapter, called the provider, preserved no-write and
+no-apply, excluded raw provider output, passed focused module tests, and ended
+with `live-smoke-provider-network`. `source-report` and
+`structured-artifact` remain manual-review artifact cases because live artifact
+writing needs a sanctioned validation gate. Write-capable code/debug cases stay
+unsafe or dry-run-only.
 
 ## Stale Priority Cleanup
 
@@ -109,10 +116,10 @@ Stale or narrow priorities to stop treating as next-phase wins:
 
 ### Batch A: Real Task Bench And Live-Provider Capability Triage
 
-- Goal: expand the audited deterministic task assessment into a real task bench
-  that measures useful completion across coding, debugging, docs, data/report,
-  and artifact tasks, then exercise explicit live provider triage lanes through
-  existing opt-in gates without enabling live providers by default.
+- Goal: expand the audited deterministic task assessment and current opt-in live
+  gate attempts into a real task bench that measures useful completion across
+  coding, debugging, docs, data/report, and artifact tasks, then clear the
+  current provider-network blocker without enabling live providers by default.
 - Task value: stops optimizing for safe reporting alone and identifies where
   real work fails.
 - Owner domains: `runtime/evaluation`, `runtime/api/host`, `evidence`,
@@ -130,15 +137,17 @@ Stale or narrow priorities to stop treating as next-phase wins:
   checks only through explicit opt-in gates with clean homes and no secret
   printing; each case must define task-relevant success evidence.
 - Completion gates: keep the current audited deterministic task cases green,
-  preserve the fake-complete controls, add real fixture execution where the
-  workspace actually changes or artifacts are produced, and keep host output
-  separating complete, partial, blocked, failed, skipped, unsupported, and
-  not-proven with redaction passing.
+  preserve the fake-complete controls, keep no-write live gates executable
+  through explicit opt-in, add real fixture execution where the workspace
+  actually changes or artifacts are produced, and keep host output separating
+  complete, partial, blocked, failed, skipped, unsupported, and not-proven with
+  redaction passing.
 - Forbidden shortcuts: fake task success, provider-called success, readback-only
   success, broad live defaults, mass rebaseline, broad skips.
 - Expected failure signals: insufficient context, ambiguous goal, verification
   selected but not run, insufficient verification, provider output insufficient,
   artifact invalid, repair loop exhausted, live auth/network/provider failure.
+  Current live attempts are blocked specifically by provider network timeout.
 - Improves: task completion, live execution, trusted runtime, product workflow.
 
 ### Batch B: Workspace Intelligence And Context Strategy

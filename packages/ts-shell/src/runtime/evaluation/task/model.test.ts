@@ -85,7 +85,7 @@ describe("task capability assessment", () => {
       "not-proven": 0,
     });
     expect(result.liveTriage).toMatchObject({
-      status: "skipped",
+      status: "ready",
       terminalSuccessClaim: false,
     });
     expect(result.liveTriage.blockers.length).toBeGreaterThan(0);
@@ -94,15 +94,45 @@ describe("task capability assessment", () => {
       "coordinated-edit": "unsafe",
       "failed-check-repair": "unsafe",
       "rollback-recovery": "unsafe",
-      "pathless-workspace-question": "blocked",
-      "source-report": "unsafe",
-      "structured-artifact": "unsafe",
+      "pathless-workspace-question": "ready",
+      "source-report": "manual-review-required",
+      "structured-artifact": "manual-review-required",
       "unsupported-artifact-export": "unsupported",
-      "resume-from-context": "blocked",
-      "live-provider-triage": "skipped",
+      "resume-from-context": "ready",
+      "live-provider-triage": "ready",
     });
     expect(result.liveReadiness.every((item) => item.defaultOff && item.optInRequired)).toBe(true);
     expect(result.liveReadiness.every((item) => item.terminalSuccessClaim === false)).toBe(true);
+    expect(result.liveReadiness.filter((item) => item.status === "ready").map((item) => item.caseId)).toEqual([
+      "pathless-workspace-question",
+      "resume-from-context",
+      "live-provider-triage",
+    ]);
+    expect(result.liveReadiness.find((item) => item.caseId === "pathless-workspace-question")).toMatchObject({
+      safetyClass: "safe-no-write",
+      gate: "read-only-provider",
+      writePolicy: "no-write",
+      providerReadiness: "required-at-gate",
+      authReadiness: "required-at-gate",
+      requestPacketStatus: "ready",
+      evidenceResultStatus: "not-proven",
+      executed: false,
+    });
+    expect(result.liveReadiness.find((item) => item.caseId === "resume-from-context")).toMatchObject({
+      safetyClass: "safe-no-write",
+      gate: "anchored-provider",
+      writePolicy: "no-write",
+    });
+    expect(result.liveReadiness.find((item) => item.caseId === "live-provider-triage")).toMatchObject({
+      safetyClass: "safe-no-write",
+      gate: "provider-readiness",
+      writePolicy: "no-write",
+    });
+    expect(result.liveReadiness.find((item) => item.caseId === "structured-artifact")).toMatchObject({
+      status: "manual-review-required",
+      writePolicy: "manual-review-required",
+      hardBlocker: "artifact validation gate missing for live write",
+    });
     expect(result.notProvenClaims).toEqual(
       expect.arrayContaining([
         "terminal-success",

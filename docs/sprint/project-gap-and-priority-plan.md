@@ -21,9 +21,11 @@ deterministic runtime case is not enough.
   context selection, execution planning, task request packets, tool strategy,
   verification selection/execution, artifact receipt/correction, repair
   decision/action, task proof, task verdict, proof records, negative controls,
-  default-off live readiness facts, and before/after blocker facts, but it
-  still does not prove broad real task completion. Current task assessment
-  results are 7 complete, 1 partial, 1 skipped, and 1 unsupported.
+  default-off live gate plans, and before/after blocker facts, but it still does
+  not prove broad real task completion. Current task assessment results are 7
+  complete, 1 partial, 1 skipped, and 1 unsupported. Two explicit opt-in
+  no-write live gates were executed and both stopped on provider-network
+  blockers, with no mutation and redaction preserved.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, plan facts, edit target selection, and
@@ -98,9 +100,9 @@ The detailed batch definitions are in
 1. Complete post-repair verification proof for the remaining partial rollback
    recovery case, now focused on turning bounded partial repair into
    task-relevant final verification without hiding the original failure.
-2. Opt-in live task triage through existing gates, now focused on clearing
-   provider/auth readiness, manual-review, verification, and artifact-validation
-   blockers without enabling live defaults.
+2. Opt-in live task execution through existing gates, now focused on clearing
+   the observed provider-network blocker after two no-write live gate attempts,
+   while keeping provider defaults disabled.
 3. Live debug and repair loop, now focused on real post-repair verification and
    original-failure preservation beyond deterministic partial progress.
 4. Artifact workflow capability for non-code tasks, now moving from
@@ -118,17 +120,17 @@ useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Audited SP018 blockers now set the immediate order: `rollback-recovery` is the
+Audited SP019 blockers now set the immediate order: `rollback-recovery` is the
 only remaining deterministic partial case because post-repair verification is
-still partial and the task verdict keeps `completion proof missing`. The skipped
-live triage case still carries provider/auth readiness blockers, write-capable
-cases are unsafe without manual review, read/continuation cases are blocked on
-provider/auth readiness, and the unsupported export stays unsupported. The
-former failed, blocked, and not-proven task cases now complete only where task
-proof records, evidence/task input, and result/task verdict own task-relevant
-completion; selected, executed, repaired, corrected, refreshed, host-observed,
-or live-readiness facts still are not success by themselves. Live triage remains
-skipped by default and must not be treated as live execution proof.
+still partial and the task verdict keeps `completion proof missing`. Three
+no-write cases now have exact live gate requirements. Two existing explicit
+opt-in gates executed and both reached provider interaction or readiness before
+stopping on provider-network failure; no-write/no-apply/redaction boundaries
+were preserved. `source-report` and `structured-artifact` stay manual-review
+artifact cases until a sanctioned artifact validation gate exists, write-capable
+code/debug cases remain unsafe or dry-run-only, and the unsupported export
+stays unsupported. Live gate execution, provider called, host-observed facts,
+and readiness facts still are not success by themselves.
 
 ## Immediate Sprint Batches
 

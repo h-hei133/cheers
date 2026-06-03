@@ -32,8 +32,11 @@ export {
   type TaskCaseDefinition,
   type TaskCaseProofRecord,
   type TaskCaseResult,
+  type TaskLiveGate,
+  type TaskLivePolicy,
   type TaskLiveReadiness,
   type TaskLiveReadinessBlocker,
+  type TaskLiveSafetyClass,
   type TaskLiveReadinessStatus,
   type TaskOutcome,
 } from "./runtime/evaluation/task/model.js";

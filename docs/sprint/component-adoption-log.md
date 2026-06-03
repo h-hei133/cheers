@@ -192,6 +192,52 @@ focused validation.
   claims would return to skipped or blocked rather than becoming unproven
   success.
 
+## Live Task Gate Execution
+
+- Selected mode: structured port for local live gate-plan contracts, with
+  behavior-only alignment for existing explicit opt-in provider gates.
+- Owner domain: `runtime/evaluation/task`, `provider/request`,
+  `runtime/api/host`, `verification`, `artifacts/workflow`,
+  `evidence/task`, and `result/task`.
+- Reason for use: SP019 needed no-write audited task paths to move from generic
+  readiness into executable live gate plans and observed live outcomes or exact
+  hard blockers, without enabling provider defaults.
+- Behavior to port: safe class, explicit gate identity, provider/auth
+  requirements, allowed tool and write policy, request-packet status,
+  validation plan, live outcome or hard blocker, evidence/result status,
+  redaction status, and next fix.
+- Rejected alternatives:
+  - Dependency use: rejected because live gating, redaction, task proof, and
+    evidence/result semantics are local product contracts.
+  - Isolated source adoption: rejected because no source component was copied
+    and product code must stay domain-named.
+  - Readiness-only update: rejected because SP019 required real opt-in gate
+    attempts where safe.
+  - Live-provider default enablement: rejected because provider execution must
+    stay explicit opt-in with isolated runtime homes.
+- Expected callers: task assessment, future host task summaries, provider
+  request preparation, verification/artifact owners, evidence/result verdicts,
+  and opt-in live task gates.
+- Side-effect boundary: product live gate plans are deterministic. Actual live
+  execution remains outside default validation and enters only through existing
+  explicit opt-in scripts with isolated runtime homes and redacted output. This
+  adoption does not add dynamic loading, browser automation, external tool
+  servers, command allowlist expansion, arbitrary writers, or execution-boundary
+  bypasses.
+- Truthfulness boundary: live-ready, provider readiness, auth readiness,
+  provider called, model turn attempted, no-mutation check, no-apply check,
+  host output, and gate execution are not task success. Complete remains owned
+  by evidence/result proof with task-relevant validation; the observed live
+  outcomes are provider-network blockers, not live-complete task proof.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts provider/request/packet.test.ts verification/execution/model.test.ts artifacts/workflow/model.test.ts`
+  - `PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1 PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE=1 PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-real-anchored-smoke HOME=/tmp/private-agents-real-anchored-smoke-home USERPROFILE=/tmp/private-agents-real-anchored-smoke-home rtk node scripts/verify-real-provider-anchored-smoke.mjs` reached adapter approval and provider call, preserved no-write/no-apply/raw-output exclusion, passed focused module tests, and exited with provider-network status.
+  - `PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-real-readonly-smoke HOME=/tmp/private-agents-real-readonly-smoke-home USERPROFILE=/tmp/private-agents-real-readonly-smoke-home rtk npm run verify:real-user-capabilities -- --real-readonly-coding-smoke` reached provider readiness, attempted the read-only model turn, preserved no mutation and redaction, and exited with provider-network status.
+- Rollback plan: remove live gate-plan fields from task assessment and return
+  target cases to default-off readiness while keeping deterministic proof and
+  verdict handoff intact; live execution would remain available only through
+  existing standalone gates.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

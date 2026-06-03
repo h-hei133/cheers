@@ -58,7 +58,17 @@ export type TaskOutcome =
   | "unsupported"
   | "not-proven";
 
-export type TaskLiveReadinessStatus = "ready" | "blocked" | "skipped" | "unsupported" | "unsafe";
+export type TaskLiveReadinessStatus =
+  | "ready"
+  | "executed"
+  | "complete"
+  | "partial"
+  | "failed"
+  | "blocked"
+  | "skipped"
+  | "unsupported"
+  | "unsafe"
+  | "manual-review-required";
 
 export type TaskLiveReadinessBlocker =
   | "missing provider config"
@@ -67,7 +77,15 @@ export type TaskLiveReadinessBlocker =
   | "verification unavailable"
   | "artifact validation unavailable"
   | "continuation stale"
+  | "provider output insufficient"
+  | "redaction blocked"
   | "manual review needed";
+
+export type TaskLiveGate = "read-only-provider" | "anchored-provider" | "provider-readiness";
+
+export type TaskLiveSafetyClass = "safe-no-write" | "manual-review" | "unsafe" | "unsupported";
+
+export type TaskLivePolicy = "no-write" | "dry-run-only" | "manual-review-required" | "unsupported";
 
 export type TaskKind =
   | "coding-edit"
@@ -246,7 +264,20 @@ export interface TaskCaseProofRecord {
 export interface TaskLiveReadiness {
   readonly caseId: TaskCaseId;
   readonly status: TaskLiveReadinessStatus;
+  readonly safetyClass: TaskLiveSafetyClass;
+  readonly gate: TaskLiveGate | "missing";
+  readonly providerReadiness: "required-at-gate" | "missing" | "not-required";
+  readonly authReadiness: "required-at-gate" | "missing" | "not-required";
+  readonly toolPolicy: readonly string[];
+  readonly writePolicy: TaskLivePolicy;
+  readonly requestPacketStatus: string;
+  readonly validationPlan: string;
   readonly blockers: readonly TaskLiveReadinessBlocker[];
+  readonly requirements: readonly string[];
+  readonly hardBlocker: string;
+  readonly nextFix: string;
+  readonly executed: false;
+  readonly evidenceResultStatus: "not-proven";
   readonly defaultOff: true;
   readonly optInRequired: true;
   readonly terminalSuccessClaim: false;
@@ -446,7 +477,14 @@ async function runDefinedTaskCase(
     hostStatus: hostEvaluation.observedStatus,
   });
   const taskVerdict = projectTaskVerdict({ proof: taskProof });
-  const liveReadiness = liveReadinessFor(definition, contextSelection, verificationExecution, artifactReceipt);
+  const liveReadiness = liveReadinessFor(
+    definition,
+    contextSelection,
+    requestPacket,
+    toolStrategy,
+    verificationExecution,
+    artifactReceipt,
+  );
   const outcome = classifyOutcome(
     definition,
     hostEvaluation,
@@ -562,23 +600,102 @@ function incompleteWhenFor(requiredProof: readonly string[]): readonly string[] 
 function liveReadinessFor(
   definition: TaskCaseDefinition,
   contextSelection: ContextSelection,
+  requestPacket: TaskRequestPacket,
+  toolStrategy: ToolStrategy,
   verificationExecution: VerificationExecution,
   artifactReceipt: ArtifactReceipt | undefined,
 ): TaskLiveReadiness {
   if (definition.expectedOutcome === "unsupported") {
-    return liveReadiness(definition.caseId, "unsupported", ["unsupported task path"]);
+    return liveReadiness({
+      definition,
+      status: "unsupported",
+      safetyClass: "unsupported",
+      gate: "missing",
+      writePolicy: "unsupported",
+      requestPacket,
+      toolStrategy,
+      validationPlan: "unsupported task path",
+      blockers: ["unsupported task path"],
+      requirements: [],
+      hardBlocker: "unsupported task path",
+      nextFix: "add a sanctioned owner and explicit gate before live execution",
+    });
   }
   if (definition.taskKind === "live-triage") {
-    return liveReadiness(definition.caseId, "skipped", ["missing provider config", "missing auth readiness"]);
+    return liveReadiness({
+      definition,
+      status: "ready",
+      safetyClass: "safe-no-write",
+      gate: "provider-readiness",
+      writePolicy: "no-write",
+      requestPacket,
+      toolStrategy,
+      validationPlan: "provider readiness preflight with redaction checks",
+      blockers: [],
+      requirements: liveGateRequirements("provider-readiness"),
+      hardBlocker: "",
+      nextFix: "run the provider readiness gate with explicit opt-in and isolated runtime home",
+    });
+  }
+  if (definition.caseId === "pathless-workspace-question") {
+    return liveReadiness({
+      definition,
+      status: "ready",
+      safetyClass: "safe-no-write",
+      gate: "read-only-provider",
+      writePolicy: "no-write",
+      requestPacket,
+      toolStrategy,
+      validationPlan: "read-only fixture result, no mutation check, and redaction check",
+      blockers: [],
+      requirements: liveGateRequirements("read-only-provider"),
+      hardBlocker: "",
+      nextFix: "run the read-only provider path through the existing explicit opt-in gate",
+    });
+  }
+  if (definition.caseId === "resume-from-context") {
+    return liveReadiness({
+      definition,
+      status: contextSelection.refreshed ? "ready" : "blocked",
+      safetyClass: "safe-no-write",
+      gate: "anchored-provider",
+      writePolicy: "no-write",
+      requestPacket,
+      toolStrategy,
+      validationPlan: "anchored no-apply result with continuation marker and redaction checks",
+      blockers: contextSelection.refreshed ? [] : ["continuation stale"],
+      requirements: liveGateRequirements("anchored-provider"),
+      hardBlocker: contextSelection.refreshed ? "" : "continuation stale",
+      nextFix: contextSelection.refreshed
+        ? "run the anchored provider path through the existing explicit opt-in gate"
+        : "refresh continuation context before live execution",
+    });
   }
   if (definition.allowedWrites.length > 0) {
-    return liveReadiness(definition.caseId, "unsafe", [
-      "missing provider config",
-      "missing auth readiness",
-      "manual review needed",
-    ]);
+    return liveReadiness({
+      definition,
+      status: definition.taskPath === "artifact" ? "manual-review-required" : "unsafe",
+      safetyClass: definition.taskPath === "artifact" ? "manual-review" : "unsafe",
+      gate: "missing",
+      writePolicy: definition.taskPath === "artifact" ? "manual-review-required" : "dry-run-only",
+      requestPacket,
+      toolStrategy,
+      validationPlan: artifactReceipt
+        ? "artifact validation must run inside a sanctioned artifact owner before live writing"
+        : "write task requires dry-run or manual review before live execution",
+      blockers: definition.taskPath === "artifact"
+        ? ["manual review needed", "artifact validation unavailable"]
+        : ["manual review needed"],
+      requirements: ["manual review", "sanctioned dry-run or no-write gate"],
+      hardBlocker: definition.taskPath === "artifact"
+        ? "artifact validation gate missing for live write"
+        : "write safety gate missing for live task execution",
+      nextFix: definition.taskPath === "artifact"
+        ? "add or select an existing artifact validation gate before live artifact writing"
+        : "keep write-capable task in dry-run until an existing safe write gate is selected",
+    });
   }
-  const blockers: TaskLiveReadinessBlocker[] = ["missing provider config", "missing auth readiness"];
+  const blockers: TaskLiveReadinessBlocker[] = [];
   if (verificationExecution.state !== "passed" && definition.taskKind !== "continuation") {
     blockers.push("verification unavailable");
   }
@@ -591,22 +708,75 @@ function liveReadinessFor(
   if (definition.taskKind === "continuation" && !contextSelection.refreshed) {
     blockers.push("continuation stale");
   }
-  return liveReadiness(definition.caseId, blockers.length === 0 ? "ready" : "blocked", blockers);
+  return liveReadiness({
+    definition,
+    status: blockers.length === 0 ? "ready" : "blocked",
+    safetyClass: "safe-no-write",
+    gate: "read-only-provider",
+    writePolicy: "no-write",
+    requestPacket,
+    toolStrategy,
+    validationPlan: "read-only result with no mutation and redaction checks",
+    blockers,
+    requirements: liveGateRequirements("read-only-provider"),
+    hardBlocker: blockers.join("; "),
+    nextFix: blockers.length === 0
+      ? "run the read-only provider path through the existing explicit opt-in gate"
+      : "resolve live blockers before gate execution",
+  });
 }
 
-function liveReadiness(
-  caseId: TaskCaseId,
-  status: TaskLiveReadinessStatus,
-  blockers: readonly TaskLiveReadinessBlocker[],
-): TaskLiveReadiness {
+function liveReadiness(input: {
+  readonly definition: TaskCaseDefinition;
+  readonly status: TaskLiveReadinessStatus;
+  readonly safetyClass: TaskLiveSafetyClass;
+  readonly gate: TaskLiveGate | "missing";
+  readonly writePolicy: TaskLivePolicy;
+  readonly requestPacket: TaskRequestPacket;
+  readonly toolStrategy: ToolStrategy;
+  readonly validationPlan: string;
+  readonly blockers: readonly TaskLiveReadinessBlocker[];
+  readonly requirements: readonly string[];
+  readonly hardBlocker: string;
+  readonly nextFix: string;
+}): TaskLiveReadiness {
   return freeze({
-    caseId,
-    status,
-    blockers: freeze(unique(blockers)),
+    caseId: input.definition.caseId,
+    status: input.status,
+    safetyClass: input.safetyClass,
+    gate: input.gate,
+    providerReadiness: input.gate === "missing" ? "missing" : "required-at-gate",
+    authReadiness: input.gate === "missing" ? "missing" : "required-at-gate",
+    toolPolicy: freeze([...input.toolStrategy.actions]),
+    writePolicy: input.writePolicy,
+    requestPacketStatus: input.requestPacket.state,
+    validationPlan: input.validationPlan,
+    blockers: freeze(unique(input.blockers)),
+    requirements: freeze(unique([
+      ...input.requirements,
+      "explicit opt-in",
+      "isolated runtime home",
+      "redacted output",
+    ])),
+    hardBlocker: input.hardBlocker,
+    nextFix: input.nextFix,
+    executed: false,
+    evidenceResultStatus: "not-proven",
     defaultOff: true,
     optInRequired: true,
     terminalSuccessClaim: false,
   });
+}
+
+function liveGateRequirements(gate: TaskLiveGate): readonly string[] {
+  switch (gate) {
+    case "read-only-provider":
+      return ["provider config", "auth readiness", "read-only fixture", "no mutation check"];
+    case "anchored-provider":
+      return ["provider config", "auth readiness", "no apply", "anchored output validation"];
+    case "provider-readiness":
+      return ["provider config", "auth readiness", "provider readiness preflight"];
+  }
 }
 
 function measuredFailureCategories(
@@ -803,18 +973,18 @@ function summarizeTopBlockers(cases: readonly TaskCaseResult[]): readonly TaskBl
 
 function liveTriageFor(cases: readonly TaskCaseResult[]): TaskAssessmentResult["liveTriage"] {
   const live = cases.find((result) => result.taskKind === "live-triage");
-  if (!live || live.outcome !== "skipped") {
+  if (!live || live.liveReadiness.status === "ready") {
     return freeze({
       status: "ready",
-      blockers: [],
+      blockers: live?.liveReadiness.requirements ?? [],
       terminalSuccessClaim: false,
     });
   }
   return freeze({
     status: "skipped",
-    blockers: live.blockers.length > 0
-      ? live.blockers
-      : ["live provider triage remains default-off and requires explicit opt-in"],
+    blockers: live.liveReadiness.blockers.length > 0
+      ? live.liveReadiness.blockers
+      : ["live provider triage requires an explicit opt-in gate"],
     terminalSuccessClaim: false,
   });
 }
