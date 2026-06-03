@@ -16,11 +16,12 @@ deterministic runtime case is not enough.
   can preserve many distinctions, but cannot yet prove broad real task delivery
   across coding, debugging, documents, reports, data analysis, slides, and other
   artifact workflows.
-- Real task bench coverage is missing. Current deterministic host evaluation
-  has advanced to deterministic task assessment coverage, but it still does not
-  prove broad real task completion. Current task assessment results are 2
-  complete, 1 partial, 2 failed, 1 blocked, 1 skipped, 1 unsupported, and 2
-  not-proven.
+- Real task bench coverage is still narrow. Current deterministic host
+  evaluation has advanced to deterministic task assessment coverage with
+  verification selection, artifact receipt, repair decision, and before/after
+  blocker facts, but it still does not prove broad real task completion.
+  Current task assessment results are 2 complete, 4 failed, 1 blocked, 1
+  skipped, 1 unsupported, and 1 not-proven.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, plan facts, edit target selection, and
@@ -30,9 +31,9 @@ deterministic runtime case is not enough.
   explicit goal facts, question/assumption/block decisions, plan revision after
   user input, and continuation of the task state, not just prompt or session
   continuity.
-- Artifact workflows are missing as first-class owners. Non-code task delivery
-  needs artifact intent, source receipts, durable outputs, format/render checks,
-  and evidence/result verdicts.
+- Artifact workflows have a first deterministic receipt owner for task
+  assessment, but non-code task delivery still needs durable artifact writing,
+  rendered checks, richer source policy, and evidence/result verdicts.
 - Provider prompting and live task recovery are weak. The provider boundary is
   default-off and truth-preserving, but task-shaped prompting, response
   insufficiency handling, live debug repair, and live-provider task triage are
@@ -92,9 +93,10 @@ deterministic runtime case is not enough.
 The detailed batch definitions are in
 `docs/sprint/task-capability-gap-plan.md`. These are the next priority groups:
 
-1. Live debug and repair loop, with verification selection as the first
-   measured blocker.
-2. Artifact workflow capability for non-code tasks.
+1. Live debug and repair loop, now focused on failed/insufficient verification
+   and repair failure after verification selection is explicit.
+2. Artifact workflow capability for non-code tasks, now moving from
+   deterministic receipts toward durable artifact production and validation.
 3. Real task bench and live-provider capability triage.
 4. Workspace intelligence and context strategy.
 5. Planning, tool policy, and user collaboration.
@@ -107,10 +109,12 @@ useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Measured SP014 blockers set the immediate order: verification not selected,
-artifact invalid, and repair failed are the current top three non-complete task
-blockers. Live triage remains skipped by default and must not be treated as live
-execution proof.
+Measured SP015 blockers now set the immediate order: repair failed,
+verification failed, and artifact invalid are the current top three
+non-complete task blockers. The former `verification not selected` blocker was
+removed from the top blockers by explicit selection facts, but selected-not-run
+and insufficient verification remain non-success evidence gaps. Live triage
+remains skipped by default and must not be treated as live execution proof.
 
 ## Immediate Sprint Batches
 

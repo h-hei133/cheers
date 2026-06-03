@@ -82,9 +82,7 @@ focused validation.
 ## Artifact Workflow Receipts
 
 - Selected mode: structured port.
-- Owner domain: future implementation should create a real artifact owner
-  instead of placing document/report/data behavior in generic runtime,
-  product, helper, or orchestration files.
+- Owner domain: `packages/ts-shell/src/artifacts/workflow/`.
 - Reason for use: non-code task completion needs durable deliverables with
   source receipts, format checks, and task-specific validation.
 - Behavior to port: artifact intent, source receipt policy, output path facts,
@@ -106,11 +104,76 @@ focused validation.
 - Truthfulness boundary: artifact path created, file exists, export emitted, or
   source read is not completion. Task-relevant artifact validation must feed
   evidence/result before success.
-- Validation evidence: future routes should cover markdown report, structured
-  data output, slide/report artifact, invalid format, source omission, unsafe
-  output path, and parsed or rendered validation.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- artifacts/workflow/model.test.ts`
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts`
+  - Current deterministic coverage includes report artifact intent, structured
+    data artifact intent, source receipts, format expectations, invalid
+    artifact state, validation failed state, unsafe path blocker, missing
+    source blocker, and not-proven artifact state.
 - Rollback plan: keep artifact requests blocked/not-proven and preserve existing
   code-focused mutation/verification lanes.
+
+## Task Verification Selection
+
+- Selected mode: structured port.
+- Owner domain: `packages/ts-shell/src/verification/selection/`.
+- Reason for use: task assessment needed a first-class selector that records
+  why a check was selected, what it proves, what it does not prove, blockers,
+  fallback verification, and evidence/result eligibility.
+- Behavior to port: task-kind-specific selection for code edit, debug repair,
+  report/artifact validation, structured output validation, continuation
+  freshness, blocked and unsupported states.
+- Rejected alternatives:
+  - Dependency use: rejected because proof eligibility and false-success
+    boundaries are local product semantics.
+  - Isolated source adoption: rejected because no source copy is needed and
+    product vocabulary must stay domain-based.
+  - Keeping selection inside task evaluation: rejected because verification
+    selection is a verification-domain responsibility.
+- Expected callers: task assessment, verification result boundaries, future
+  planning/context handoff, evidence/result verdict inputs, and host
+  evaluation summaries.
+- Side-effect boundary: selection records facts only. It does not run commands,
+  invoke providers, read files, apply edits, or write artifacts.
+- Truthfulness boundary: selection, selected checks, selected-but-not-run
+  states, failed checks, and insufficient checks are not success. Only passed
+  task-relevant verification can become evidence/result input.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- verification/selection/model.test.ts`
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts`
+- Rollback plan: remove selector consumption from task assessment and keep
+  task cases not-proven or failed rather than upgrading success.
+
+## Task Repair Decision Loop
+
+- Selected mode: structured port.
+- Owner domain: `packages/ts-shell/src/repair/loop/`.
+- Reason for use: task assessment needed explicit diagnosis, repair
+  eligibility, failed repair, succeeded-but-unverified, post-validation failed,
+  retry/user-blocked, and original-failure-preserved facts.
+- Behavior to port: failed verification diagnosis, bounded repair eligibility,
+  repair failed state, post-validation states, retry blocker facts, and original
+  failure preservation.
+- Rejected alternatives:
+  - Dependency use: rejected because local repair truth must align with
+    evidence/result verdict semantics.
+  - Isolated source adoption: rejected because no external repair loop source
+    was required.
+  - Repair proposal as success: rejected because repair apply or proposal is
+    not success without post-repair validation.
+- Expected callers: task assessment, verification result boundary, edit repair
+  lanes, evidence/result verdicts, and future host task summaries.
+- Side-effect boundary: repair decision is a pure model. It does not apply
+  repairs, run commands, or mutate workspace state.
+- Truthfulness boundary: diagnosed, eligible, proposed, attempted, failed, and
+  succeeded-unverified repair facts are not success. Post-repair validation and
+  evidence/result verdict remain required.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- repair/loop/model.test.ts`
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/model.test.ts`
+- Rollback plan: remove repair decision consumption from task assessment and
+  keep failed repair cases failed/not-proven with preserved original blockers.
 
 ## Provider Prompt And Response Contract
 

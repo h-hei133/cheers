@@ -67,9 +67,9 @@ describe("task capability assessment", () => {
       "single-file-edit": "complete",
       "coordinated-edit": "complete",
       "failed-check-repair": "failed",
-      "rollback-recovery": "partial",
+      "rollback-recovery": "failed",
       "pathless-workspace-question": "blocked",
-      "source-report": "not-proven",
+      "source-report": "failed",
       "structured-artifact": "failed",
       "unsupported-artifact-export": "unsupported",
       "resume-from-context": "not-proven",
@@ -77,12 +77,12 @@ describe("task capability assessment", () => {
     });
     expect(result.outcomeCounts).toMatchObject({
       complete: 2,
-      partial: 1,
-      failed: 2,
+      partial: 0,
+      failed: 4,
       blocked: 1,
       skipped: 1,
       unsupported: 1,
-      "not-proven": 2,
+      "not-proven": 1,
     });
     expect(result.liveTriage).toMatchObject({
       status: "skipped",
@@ -123,17 +123,105 @@ describe("task capability assessment", () => {
 
     expect(result.topBlockers).toHaveLength(3);
     expect(result.topBlockers.map((blocker) => blocker.category)).toEqual([
-      "verification not selected",
-      "artifact invalid",
       "repair failed",
+      "verification failed",
+      "artifact invalid",
     ]);
     expect(result.topBlockers[0]).toMatchObject({
-      category: "verification not selected",
+      category: "repair failed",
       count: 3,
     });
     expect(result.topBlockers[0].caseIds).toEqual(
-      expect.arrayContaining(["rollback-recovery", "source-report", "resume-from-context"]),
+      expect.arrayContaining(["failed-check-repair", "rollback-recovery", "structured-artifact"]),
     );
+  });
+
+  it("integrates code verification with evidence/result proof before completion", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskCase({ caseId: "single-file-edit", dispatch: host.dispatch });
+
+    expect(result.outcome).toBe("complete");
+    expect(result.verificationSelection).toMatchObject({
+      purpose: "code-edit",
+      state: "selected-passed",
+      evidenceInputEligible: true,
+      resultInputEligible: true,
+      terminalSuccessClaim: false,
+    });
+    expect(result.repairDecision.state).toBe("not-needed");
+    expect(result.hostEvaluation.observedEvidenceVerdict).toBe("complete");
+  });
+
+  it("integrates debug repair diagnosis, failed repair, and preserved original failure", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskCase({ caseId: "failed-check-repair", dispatch: host.dispatch });
+
+    expect(result.outcome).toBe("failed");
+    expect(result.verificationSelection).toMatchObject({
+      purpose: "debug-repair",
+      state: "selected-failed",
+      evidenceInputEligible: false,
+    });
+    expect(result.repairDecision).toMatchObject({
+      failureClass: "verification",
+      state: "failed",
+      originalFailurePreserved: true,
+      terminalSuccessClaim: false,
+    });
+    expect(result.remainingBlockers).toEqual(expect.arrayContaining(["verification failed", "repair failed"]));
+  });
+
+  it("integrates artifact validation receipts before artifact completion can be proven", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskCase({ caseId: "structured-artifact", dispatch: host.dispatch });
+
+    expect(result.outcome).toBe("failed");
+    expect(result.verificationSelection).toMatchObject({
+      purpose: "structured-output",
+      state: "selected-failed",
+    });
+    expect(result.artifactReceipt).toMatchObject({
+      intent: "produce structured-data artifact",
+      kind: "structured-data",
+      outputPath: "artifacts/totals.json",
+      validationState: "validation-failed",
+      terminalSuccessClaim: false,
+    });
+    expect(result.repairDecision.state).toBe("post-validation-failed");
+  });
+
+  it("keeps invalid or unsupported artifacts from becoming success", async () => {
+    const host = createHostRuntime();
+    const invalid = await runTaskCase({ caseId: "source-report", dispatch: host.dispatch });
+    const unsupported = await runTaskCase({ caseId: "unsupported-artifact-export", dispatch: host.dispatch });
+
+    expect(invalid.outcome).toBe("failed");
+    expect(invalid.beforeBlockers).toEqual(expect.arrayContaining(["verification not selected", "artifact invalid"]));
+    expect(invalid.changedBlockers).toContain("verification not selected");
+    expect(invalid.remainingBlockers).toEqual(["artifact invalid"]);
+    expect(invalid.verificationSelection.state).toBe("selected-not-run");
+    expect(invalid.artifactReceipt?.validationState).toBe("invalid");
+
+    expect(unsupported.outcome).toBe("unsupported");
+    expect(unsupported.remainingBlockers).toEqual(["unsupported capability"]);
+    expect(unsupported.artifactReceipt?.validationState).toBe("not-proven");
+  });
+
+  it("keeps continuation not proven when freshness verification is selected but not run", async () => {
+    const host = createHostRuntime();
+    const result = await runTaskCase({ caseId: "resume-from-context", dispatch: host.dispatch });
+
+    expect(result.outcome).toBe("not-proven");
+    expect(result.beforeBlockers).toEqual(expect.arrayContaining(["continuation stale", "verification not selected"]));
+    expect(result.changedBlockers).toContain("verification not selected");
+    expect(result.remainingBlockers).toEqual(["continuation stale"]);
+    expect(result.verificationSelection).toMatchObject({
+      purpose: "continuation",
+      state: "selected-not-run",
+      evidenceInputEligible: false,
+      resultInputEligible: false,
+    });
+    expect(result.notProvenClaims).toContain("task-completion-not-proven");
   });
 
   it("keeps unsafe text out of task assessment results", async () => {

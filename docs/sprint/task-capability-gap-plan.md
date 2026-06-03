@@ -18,8 +18,8 @@ capabilities that must ship together for real user-visible work.
 | Session continuation | Partially proven for branch/compaction facts, replay, resume context, compact summaries, lifecycle, and host/session status. | `session/store`, `session/replay`, `session/recovery`, `session/continuation`. Broad interactive branch UX and long real task continuation remain weak. |
 | Host automation | Proven for in-process host command contract and package-facing JSON response. | `runtime/api/host`, `cli/host`, `runtime/distribution`, `verify:host-surface`. Broad SDK/RPC server behavior remains unproven. |
 | Product workflow | Partially proven for CLI status envelope, host JSON, interactive loop lifecycle, cancellation, session selection, and presentation facts. | `cli`, `session/presentation`, `presentation`. User collaboration and artifact workflow surfaces are missing or narrow. |
-| Real task evaluation | Partially proven as deterministic task assessment plumbing. | `runtime/evaluation/task/model.test.ts` covers coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, and skipped-live cases with outcomes: 2 complete, 1 partial, 2 failed, 1 blocked, 1 skipped, 1 unsupported, 2 not-proven. This is not broad live task completion. |
-| Artifact workflows | Missing as first-class task owners. | No current sprint evidence for document/report/data/slides artifact planning, durable artifact receipts, or artifact-specific verification. |
+| Real task evaluation | Partially proven as deterministic task assessment plumbing with task-lane selector, artifact, and repair facts. | `runtime/evaluation/task/model.test.ts` covers coding edit, debug repair, pathless workspace understanding, docs/report, data/artifact, continuation, unsupported, and skipped-live cases with outcomes: 2 complete, 4 failed, 1 blocked, 1 skipped, 1 unsupported, 1 not-proven. This is not broad live task completion. |
+| Artifact workflows | Partially proven as deterministic receipt and validation facts. | `artifacts/workflow/model.test.ts` and task assessment integration cover report/structured-data intent, source receipts, format expectation, unsafe/missing/invalid/not-proven states, and failed validation. Durable artifact writing, rendered checks, and broad export workflows remain missing. |
 
 ## Measured Task Assessment Result
 
@@ -33,12 +33,35 @@ The deterministic task assessment currently produces these task outcomes:
 - Unsupported: `unsupported-artifact-export`.
 - Not proven: `source-report`, `resume-from-context`.
 
-Top blockers from actual non-complete results:
+Top blockers before the verification/artifact/repair loop:
 
-1. `verification not selected`: blocks `rollback-recovery`, `source-report`,
+1. `verification not selected`: blocked `rollback-recovery`, `source-report`,
    and `resume-from-context`.
-2. `artifact invalid`: blocks `source-report` and `structured-artifact`.
-3. `repair failed`: blocks `failed-check-repair` and `rollback-recovery`.
+2. `artifact invalid`: blocked `source-report` and `structured-artifact`.
+3. `repair failed`: blocked `failed-check-repair` and `rollback-recovery`.
+
+Top blockers after the deterministic verification/artifact/repair loop:
+
+1. `repair failed`: blocks `failed-check-repair`, `rollback-recovery`, and
+   `structured-artifact`.
+2. `verification failed`: blocks `failed-check-repair`, `rollback-recovery`,
+   and `structured-artifact`.
+3. `artifact invalid`: blocks `source-report` and `structured-artifact`.
+
+Changed case evidence:
+
+- `rollback-recovery`: before `partial` with `verification not selected`; after
+  `failed` with insufficient verification and repair failed.
+- `source-report`: before `not-proven` with `verification not selected`; after
+  `failed` with selected-but-not-run report verification and invalid artifact
+  receipt.
+- `resume-from-context`: remains `not-proven`, but the missing verification
+  blocker is replaced by selected-but-not-run continuation freshness; remaining
+  blocker is `continuation stale`.
+- `failed-check-repair`: remains `failed`, now with selected failed debug
+  verification and repair failed decision facts.
+- `structured-artifact`: remains `failed`, now with structured artifact receipt
+  validation failed and post-validation repair failure.
 
 Live triage status: skipped by default. No live provider was run. The skipped
 case records default-off live behavior as a blocker instead of treating live
@@ -92,8 +115,8 @@ Stale or narrow priorities to stop treating as next-phase wins:
 - Forbidden shortcuts: fake task success, provider-called success, readback-only
   success, broad live defaults, mass rebaseline, broad skips.
 - Expected failure signals: insufficient context, ambiguous goal, verification
-  not selected, provider output insufficient, artifact invalid, repair loop
-  exhausted, live auth/network/provider failure.
+  selected but not run, insufficient verification, provider output insufficient,
+  artifact invalid, repair loop exhausted, live auth/network/provider failure.
 - Improves: task completion, live execution, trusted runtime, product workflow.
 
 ### Batch B: Workspace Intelligence And Context Strategy

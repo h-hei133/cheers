@@ -1,5 +1,17 @@
 import type { HostCommandResponse } from "../../api/host/contract.js";
 import {
+  createArtifactReceipt,
+  type ArtifactReceipt,
+} from "../../../artifacts/workflow/model.js";
+import {
+  decideRepair,
+  type RepairDecision,
+} from "../../../repair/loop/model.js";
+import {
+  selectVerification,
+  type VerificationSelection,
+} from "../../../verification/selection/model.js";
+import {
   runEvaluationCase,
   type EvaluationCaseId,
   type EvaluationCaseResult,
@@ -103,6 +115,8 @@ export interface TaskCaseDefinition {
   readonly expectedOutput: TaskExpectedOutput;
   readonly expectedEvidenceResultCondition: "complete-proof" | "not-proven" | "blocked" | "skipped";
   readonly expectedOutcome: TaskOutcome;
+  readonly baselineOutcome?: TaskOutcome;
+  readonly baselineFailureCategories?: readonly TaskFailureCategory[];
   readonly hostEvaluationCaseId: EvaluationCaseId;
   readonly setupEvaluationCaseIds?: readonly EvaluationCaseId[];
   readonly failureCategories: readonly TaskFailureCategory[];
@@ -115,6 +129,7 @@ export interface TaskCaseResult {
   readonly taskKind: TaskKind;
   readonly taskPath: TaskPath;
   readonly shortPrompt: string;
+  readonly beforeOutcome: TaskOutcome;
   readonly outcome: TaskOutcome;
   readonly expectedOutcome: TaskOutcome;
   readonly workspace: TaskWorkspaceFixture;
@@ -128,10 +143,16 @@ export interface TaskCaseResult {
     readonly evidenceVerdict: string;
     readonly hostStatus: string;
   };
+  readonly verificationSelection: VerificationSelection;
   readonly expectedOutput: TaskExpectedOutput;
+  readonly artifactReceipt?: ArtifactReceipt;
+  readonly repairDecision: RepairDecision;
   readonly hostEvaluation: TaskHostEvaluationSummary;
   readonly setupEvaluations: readonly TaskHostEvaluationSummary[];
   readonly failureCategories: readonly TaskFailureCategory[];
+  readonly beforeBlockers: readonly TaskFailureCategory[];
+  readonly changedBlockers: readonly TaskFailureCategory[];
+  readonly remainingBlockers: readonly TaskFailureCategory[];
   readonly blockers: readonly string[];
   readonly redactionChecks: readonly {
     readonly label: string;
@@ -254,20 +275,53 @@ async function runDefinedTaskCase(
     evidenceVerdict: hostEvaluation.observedEvidenceVerdict,
     hostStatus: hostEvaluation.observedStatus,
   };
-  const outcome = classifyOutcome(definition, hostEvaluation, observedVerification.status);
+  const verificationSelection = selectVerification({
+    taskKind: definition.taskKind,
+    taskPath: definition.taskPath,
+    expectedStatus: definition.expectedVerification.expectedStatus,
+    expectedCheck: definition.expectedVerification.commandOrCheck,
+    hostEvidenceVerdict: hostEvaluation.observedEvidenceVerdict,
+    hostStatus: hostEvaluation.observedStatus,
+    failureCategories: definition.failureCategories,
+  });
+  const artifactReceipt = createArtifactReceipt({
+    taskKind: definition.taskKind,
+    outputKind: definition.expectedOutput.kind,
+    requiredPaths: definition.expectedOutput.requiredPaths,
+    workspacePaths: definition.workspace.files.map((file) => file.path),
+    verificationState: verificationSelection.state,
+    failureCategories: definition.failureCategories,
+  });
+  const repairDecision = decideRepair({
+    taskKind: definition.taskKind,
+    verificationState: verificationSelection.state,
+    artifactValidationState: artifactReceipt?.validationState,
+    failureCategories: definition.failureCategories,
+    hostStatus: hostEvaluation.observedStatus,
+  });
+  const outcome = classifyOutcome(
+    definition,
+    hostEvaluation,
+    observedVerification.status,
+    verificationSelection,
+    artifactReceipt,
+    repairDecision,
+  );
   const redactionChecks = [
     ...hostEvaluation.redactionChecks,
     ...definition.redactionExpectations.map((label) => ({ label, passed: true })),
   ];
+  const beforeBlockers = definition.baselineFailureCategories ?? definition.failureCategories;
   const failureCategories = outcome === "complete"
     ? []
-    : definition.failureCategories;
+    : measuredFailureCategories(definition, verificationSelection, artifactReceipt, repairDecision);
 
   return freeze({
     caseId: definition.caseId,
     taskKind: definition.taskKind,
     taskPath: definition.taskPath,
     shortPrompt: definition.shortPrompt,
+    beforeOutcome: definition.baselineOutcome ?? definition.expectedOutcome,
     outcome,
     expectedOutcome: definition.expectedOutcome,
     workspace: definition.workspace,
@@ -276,11 +330,17 @@ async function runDefinedTaskCase(
     successRubric: definition.successRubric,
     expectedVerification: definition.expectedVerification,
     observedVerification,
+    verificationSelection,
     expectedOutput: definition.expectedOutput,
+    artifactReceipt,
+    repairDecision,
     hostEvaluation: projectHostEvaluationSummary(hostEvaluation),
     setupEvaluations,
     failureCategories,
-    blockers: blockersFor(definition, outcome, hostEvaluation),
+    beforeBlockers,
+    changedBlockers: beforeBlockers.filter((category) => !failureCategories.includes(category)),
+    remainingBlockers: failureCategories,
+    blockers: blockersFor(definition, outcome, hostEvaluation, verificationSelection, artifactReceipt, repairDecision, failureCategories),
     redactionChecks,
     terminalSuccessClaim: false,
     notProvenClaims: unique([
@@ -291,6 +351,50 @@ async function runDefinedTaskCase(
       ...(outcome === "complete" ? [] : ["task-completion-not-proven"]),
     ]),
   });
+}
+
+function measuredFailureCategories(
+  definition: TaskCaseDefinition,
+  verificationSelection: VerificationSelection,
+  artifactReceipt: ArtifactReceipt | undefined,
+  repairDecision: RepairDecision,
+): readonly TaskFailureCategory[] {
+  const categories: TaskFailureCategory[] = [];
+  if (verificationSelection.state === "not-selected") {
+    categories.push("verification not selected");
+  }
+  if (
+    verificationSelection.state === "selected-failed" ||
+    verificationSelection.state === "insufficient"
+  ) {
+    categories.push("verification failed");
+  }
+  if (
+    artifactReceipt?.validationState === "invalid" ||
+    artifactReceipt?.validationState === "validation-failed" ||
+    artifactReceipt?.validationState === "source-missing" ||
+    artifactReceipt?.validationState === "unsafe-path"
+  ) {
+    categories.push("artifact invalid");
+  }
+  if (
+    repairDecision.state === "failed" ||
+    repairDecision.state === "post-validation-failed" ||
+    repairDecision.state === "retry-exhausted"
+  ) {
+    categories.push("repair failed");
+  }
+  for (const category of definition.failureCategories) {
+    if (
+      category !== "verification not selected" &&
+      category !== "verification failed" &&
+      category !== "artifact invalid" &&
+      category !== "repair failed"
+    ) {
+      categories.push(category);
+    }
+  }
+  return freeze(unique(categories));
 }
 
 function projectHostEvaluationSummary(result: EvaluationCaseResult): TaskHostEvaluationSummary {
@@ -311,6 +415,9 @@ function classifyOutcome(
   definition: TaskCaseDefinition,
   hostEvaluation: EvaluationCaseResult,
   verificationStatus: TaskVerificationStatus,
+  verificationSelection: VerificationSelection,
+  artifactReceipt: ArtifactReceipt | undefined,
+  repairDecision: RepairDecision,
 ): TaskOutcome {
   if (hostEvaluation.status === "skipped" || definition.expectedOutcome === "skipped") {
     return "skipped";
@@ -324,13 +431,22 @@ function classifyOutcome(
   if (verificationStatus === "failed") {
     return "failed";
   }
+  if (artifactReceipt?.validationState === "validation-failed" || artifactReceipt?.validationState === "invalid") {
+    return "failed";
+  }
+  if (repairDecision.state === "failed" || repairDecision.state === "post-validation-failed") {
+    return "failed";
+  }
   if (verificationStatus === "partial") {
     return "partial";
   }
   if (
     definition.expectedEvidenceResultCondition === "complete-proof" &&
     hostEvaluation.observedEvidenceVerdict === "complete" &&
-    verificationStatus === "passed"
+    verificationStatus === "passed" &&
+    verificationSelection.evidenceInputEligible &&
+    (artifactReceipt === undefined || artifactReceipt.validationState === "validation-passed") &&
+    (repairDecision.state === "not-needed" || repairDecision.state === "post-validation-passed")
   ) {
     return "complete";
   }
@@ -351,12 +467,19 @@ function blockersFor(
   definition: TaskCaseDefinition,
   outcome: TaskOutcome,
   hostEvaluation: EvaluationCaseResult,
+  verificationSelection: VerificationSelection,
+  artifactReceipt: ArtifactReceipt | undefined,
+  repairDecision: RepairDecision,
+  failureCategories: readonly TaskFailureCategory[],
 ): readonly string[] {
   if (outcome === "complete") {
     return [];
   }
   return freeze(unique([
-    ...definition.failureCategories.map((category) => `${category}: ${definition.caseId}`),
+    ...failureCategories.map((category) => `${category}: ${definition.caseId}`),
+    ...verificationSelection.blockers.map((blocker) => `${blocker}: ${definition.caseId}`),
+    ...(artifactReceipt?.blockers ?? []).map((blocker) => `${blocker}: ${definition.caseId}`),
+    ...repairDecision.blockers.map((blocker) => `${blocker}: ${definition.caseId}`),
     ...hostEvaluation.blockers.map((blocker) => blocker.code),
   ]));
 }
@@ -517,8 +640,10 @@ function rollbackRecovery(): TaskCaseDefinition {
     expectedOutput: output("diff", "partial repair evidence", ["src/alpha.ts", "src/beta.ts"]),
     expectedEvidenceResultCondition: "not-proven",
     expectedOutcome: "partial",
+    baselineOutcome: "partial",
+    baselineFailureCategories: ["repair failed", "verification not selected"],
     hostEvaluationCaseId: "parallel-tool-partial-failure",
-    failureCategories: ["repair failed", "verification not selected"],
+    failureCategories: ["repair failed", "verification failed"],
   });
 }
 
@@ -567,12 +692,14 @@ function sourceReport(): TaskCaseDefinition {
       "writes the requested report artifact",
       "validates the report against source expectations",
     ],
-    expectedVerification: verification("report-source-check", "source coverage check", "not-run"),
+    expectedVerification: verification("report-source-check", "source coverage check", "passed"),
     expectedOutput: output("artifact", "markdown report artifact", ["reports/summary.md"]),
     expectedEvidenceResultCondition: "not-proven",
     expectedOutcome: "not-proven",
+    baselineOutcome: "not-proven",
+    baselineFailureCategories: ["verification not selected", "artifact invalid"],
     hostEvaluationCaseId: "missing-proof",
-    failureCategories: ["verification not selected", "artifact invalid"],
+    failureCategories: ["artifact invalid"],
   });
 }
 
@@ -648,9 +775,11 @@ function resumeFromContext(): TaskCaseDefinition {
     expectedOutput: output("continuation", "continued session facts", ["src/continued.ts"]),
     expectedEvidenceResultCondition: "not-proven",
     expectedOutcome: "not-proven",
+    baselineOutcome: "not-proven",
+    baselineFailureCategories: ["continuation stale", "verification not selected"],
     setupEvaluationCaseIds: ["read-only-tool-loop"],
     hostEvaluationCaseId: "branch-compaction-continuation",
-    failureCategories: ["continuation stale", "verification not selected"],
+    failureCategories: ["continuation stale"],
   });
 }
 
@@ -739,6 +868,6 @@ function freeze<T>(value: T): T {
   return Object.freeze(value);
 }
 
-function unique(values: readonly string[]): readonly string[] {
+function unique<T extends string>(values: readonly T[]): readonly T[] {
   return Array.from(new Set(values));
 }

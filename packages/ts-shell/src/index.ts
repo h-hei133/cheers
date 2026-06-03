@@ -34,6 +34,22 @@ export {
   type TaskOutcome,
 } from "./runtime/evaluation/task/model.js";
 export {
+  selectVerification,
+  type VerificationPurpose,
+  type VerificationRunState,
+  type VerificationSelection,
+} from "./verification/selection/model.js";
+export {
+  createArtifactReceipt,
+  type ArtifactReceipt,
+  type ArtifactValidationState,
+} from "./artifacts/workflow/model.js";
+export {
+  decideRepair,
+  type RepairDecision,
+  type RepairState,
+} from "./repair/loop/model.js";
+export {
   assessHostDistributionReadiness,
   classifyDistributionReadiness,
   type DistributionReadinessResult,
