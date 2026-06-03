@@ -17,7 +17,8 @@ deterministic runtime case is not enough.
   across coding, debugging, documents, reports, data analysis, slides, and other
   artifact workflows.
 - Real task bench coverage is still narrow, but it now reaches the SP022
-  deterministic mix gate. Current deterministic host evaluation has advanced to
+  deterministic mix gate and the SP023 repeatable live run gate. Current
+  deterministic host evaluation has advanced to
   audited deterministic task assessment coverage with richer context packet
   construction, execution planning, task request packets, tool strategy,
   verification selection/execution, artifact receipt/correction, repair
@@ -28,10 +29,13 @@ deterministic runtime case is not enough.
   pathless workspace/context completions, 3 debug/repair completions, 7
   artifact/report/data completions, and 2 continuation/resume completions. Safe
   live execution observations are structured for read-only, anchored, and
-  artifact dry-run gates; manual live smoke passed read-only and anchored
-  no-write paths, with fallback configured but skipped because the primary
-  provider passed, no raw provider output leaked, and no write/no apply
-  preserved.
+  artifact dry-run gates. The repeatable opt-in live run now defines eight
+  exact entries and the current explicit run executed all eight through existing
+  read-only and anchored provider gates; seven reached complete or useful
+  partial with task proof, the write-capable planning entry stayed
+  manual-review/dry-run-only, fallback was configured but skipped because the
+  primary provider passed, no raw provider output leaked, and no write/no apply
+  was preserved.
 - Workspace intelligence and planning are partially proven through owner tests
   for bounded discovery, staged acquisition, graph/test-impact facts,
   continuation memory, analysis, richer context packet facts, plan facts, edit
@@ -41,13 +45,14 @@ deterministic runtime case is not enough.
   explicit goal facts, question/assumption/block decisions, plan revision after
   user input, and continuation of the task state, not just prompt or session
   continuity.
-- Artifact workflows have first deterministic receipt and correction owners for
-  task assessment, but non-code task delivery still needs durable artifact
-  writing, rendered checks, richer source policy, and evidence/result verdicts.
-- Provider prompting and live task recovery are weak. The provider boundary is
-  default-off and truth-preserving, but task-shaped prompting, response
-  insufficiency handling, live debug repair, and live-provider task triage are
-  not broadly proven.
+- Artifact workflows have deterministic receipt/correction owners and repeatable
+  no-write live report/data entries, but non-code task delivery still needs
+  durable artifact writing, rendered checks, richer source policy, manual-review
+  gates, and evidence/result verdicts over real outputs.
+- Provider prompting and live task recovery are now repeatable for safe
+  no-write/manual-review entries. The provider boundary remains default-off and
+  truth-preserving; task-shaped provider output sufficiency, live debug repair,
+  and live write/artifact completion are not broadly proven.
 - Product loop truth, the CLI/session status envelope, a bounded synthetic
   provider-to-tool-to-next-turn runtime lane, a controlled provider/model
   runtime boundary, a controlled mutation recovery lane, and a storage-backed
@@ -104,11 +109,11 @@ The detailed batch definitions are in
 `docs/sprint/task-capability-gap-plan.md`. These are the next priority groups:
 
 1. Durable artifact and report execution, now moving from deterministic
-   receipts/correction and live artifact dry-run toward sanctioned output paths,
-   rendered validation, and manual-review/write gates.
+   receipts/correction and repeatable live artifact dry-run toward sanctioned
+   output paths, rendered validation, and manual-review/write gates.
 2. Provider output sufficiency and opt-in live task recovery, now focused on
-   turning safe live observations into task-relevant provider answer validation
-   without enabling provider defaults.
+   task-specific provider answer validation and insufficient-output recovery
+   beyond shared safe gate metadata, without enabling provider defaults.
 3. Live debug and repair loop, now focused on real post-repair verification and
    original-failure preservation beyond deterministic partial progress.
 4. Real task bench execution beyond deterministic fixtures.
@@ -123,18 +128,22 @@ useful task. Do not split them into tiny routes for one field, one projection,
 one status section, or one helper unless a route is explicitly scoped as a
 sub-step toward one of these batch gates.
 
-Audited SP020, SP021, and SP022 outcomes now set the immediate order:
+Audited SP020, SP021, SP022, and SP023 outcomes now set the immediate order:
 `rollback-recovery` and `retry-diagnosis-repair` are complete through explicit
 post-repair validation evidence and evidence/result task verdict. Thirteen
 target cases have exact live gate requirements, including artifact dry-run for
 report/data cases with no write and manual review before any write. Focused
 tests prove the SP022 deterministic mix gates, two no-write live execution
 observations as complete/useful partial with task proof, and richer context
-packet handoff into request shaping. Manual live smoke passed read-only and
-anchored no-write paths. Write-capable code/debug cases remain unsafe or
-dry-run-only, and the unsupported export stays unsupported. Live gate
-execution, provider called, fallback metadata, host-observed facts, smoke pass,
-readiness facts, and deterministic case count are still not success by
+packet handoff into request shaping. The SP023 live run defines eight exact
+entries and the current opt-in run executed all eight through existing explicit
+gates: seven complete/useful partial with task proof, one write-capable
+planning entry manual-review/dry-run-only, fallback configured but skipped after
+primary success, redaction passed, and no write/no apply preserved.
+Write-capable code/debug cases remain unsafe or dry-run-only, and the
+unsupported export stays unsupported. Live gate execution, provider called,
+fallback metadata, host-observed facts, smoke pass, readiness facts,
+deterministic case count, and live run status are still not success by
 themselves.
 
 ## Immediate Sprint Batches

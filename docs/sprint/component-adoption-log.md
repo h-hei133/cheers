@@ -420,6 +420,65 @@ focused validation.
   complete deterministic cases while preserving SP021 live execution projection
   and existing proof/verdict handoff.
 
+## Live Task Run Reporting
+
+- Selected mode: structured port for local live run contracts and behavior-only
+  alignment for existing explicit read-only and anchored provider gates.
+- Owner domain: `runtime/evaluation/task`, `runtime/api/host`,
+  `provider/request`, `artifacts/workflow`, `evidence/task`, `result/task`, and
+  repeatable verification scripts.
+- Reason for use: SP023 required repeatable opt-in live task entries with exact
+  requirements and measured outcomes, not another deterministic case expansion
+  or manual-only smoke note. The local product needed a task-owned report that
+  consumes explicit gate observations, classifies executed/non-executed entries,
+  keeps write-capable work dry-run/manual-review, and preserves terminal truth
+  in evidence/result.
+- Behavior to port: machine-readable live task entry definitions, default-off
+  exact blockers, explicit gate observation consumption, safe no-write and
+  manual-review classifications, hard gate summary counts, redaction checks,
+  fallback metadata, changedFiles empty visibility, no-apply/no-mutation facts,
+  and repeatable script output that excludes raw provider output.
+- Rejected alternatives:
+  - Dependency use: rejected because live gate semantics, task proof,
+    redaction, and result truth are local product contracts.
+  - Isolated source adoption: rejected because no narrow source component was
+    needed and copied names or public field shapes would violate local product
+    naming boundaries.
+  - Deterministic-only expansion: rejected because SP023 requires opt-in live
+    execution through existing explicit gates.
+  - Default live provider behavior: rejected because live providers must remain
+    explicit opt-in with isolated homes and no manual private config inspection.
+  - Write execution: rejected because the current safe path for write-capable
+    work is dry-run/manual-review only.
+- Expected callers: task assessment, host evaluation summaries, explicit live
+  verification scripts, provider request preparation, artifact validation,
+  evidence/result proof projection, session/status surfaces, and future
+  artifact/manual-review gates.
+- Side-effect boundary: the live run model is deterministic and pure. Actual
+  provider calls happen only in the repeatable script through existing explicit
+  read-only and anchored provider gates. The script does not print raw provider
+  output, provider configuration, headers, tokens, or private provider material.
+  This adoption does not add dynamic loading, browser automation, external tool
+  servers, command allowlist expansion, arbitrary writers, default live
+  providers, or execution-boundary bypasses.
+- Truthfulness boundary: live entry creation, provider readiness, provider call,
+  gate pass, fallback metadata, host output, changedFiles empty, no mutation,
+  no apply, artifact dry-run status, and live run status are not terminal task
+  success. Complete or useful partial live outcomes require task proof handoff,
+  and all affected surfaces keep `terminalSuccessClaim: false`.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/liveRun.test.ts runtime/evaluation/task/model.test.ts`
+  - `PRIVATE_AGENTS_LIVE_TASK_EXECUTION=1 PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-live-task-execution HOME=/tmp/private-agents-live-task-execution-home USERPROFILE=/tmp/private-agents-live-task-execution-home rtk npm run verify:live-task-execution`
+  - The explicit live run reported 8 live entries, 8 executed entries, 7
+    complete or useful partial outcomes with task proof, pathless/context,
+    report/data, continuation, and readonly coding coverage, write planning
+    manual-review/dry-run-only, fallback configured but skipped after primary
+    success, redaction pass, changedFiles empty, no mutation, and no apply.
+- Rollback plan: remove `liveRun.ts`, its focused tests, and
+  `verify:live-task-execution`, returning live task assessment to SP021/SP022
+  projection-only behavior while keeping deterministic task proof/verdict
+  handoff intact.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

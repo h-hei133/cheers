@@ -159,6 +159,7 @@
     "verify:real-user-capabilities:mixed-operation-evidence": "node scripts/verify-mixed-operation-evidence.mjs",
     "verify:real-user-capabilities:three-file-planning-no-write": "node scripts/verify-three-file-planning-no-write.mjs",
     "verify:real-user-capabilities:planned-files-continuity": "node scripts/verify-planned-files-continuity.mjs",
+    "verify:live-task-execution": "tsx scripts/verify-live-task-execution.ts",
     "verify:mutation-continuity:compact": "npm run test -w packages/ts-shell -- src/session/mutationCompactContinuity.test.ts",
     "verify:mutation-recovery:followup": "npm run test -w packages/ts-shell -- src/core/shell/continueShellActionRuntime.test.ts -t \"renders partial mutation recovery details before a stopped-session follow-up prompt\"",
     "verify:real-user-capabilities:real-single-file": "node scripts/verify-real-user-capabilities.mjs --case=real-selected-workspace-single-file-update",
