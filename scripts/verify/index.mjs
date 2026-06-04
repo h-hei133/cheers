@@ -102,6 +102,11 @@ import {
   classifySingleFileUpdatePatchShape,
   classifyTwoFileUpdatePatchShape,
 } from '../real-user-capabilities/candidateMutationPatchShape.mjs'
+import {
+  approvedRealProviderHome,
+  buildEffectiveProviderEnv,
+  canonicalProviderEnv,
+} from '../real-provider-smokes/approvedProviderEnv.mjs'
 
 const runId = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)
 const testRoot = getTestRoot()
@@ -5020,6 +5025,105 @@ function readonlyChangedFiles(snapshotComparison) {
   ].sort()
 }
 
+function buildReadonlyProviderAttempts() {
+  const approvedHomeSelected = realHome === approvedRealProviderHome
+  const effective = buildEffectiveProviderEnv(
+    approvedHomeSelected
+      ? { ...process.env, PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '1' }
+      : process.env,
+  )
+  if (effective.providerEnvError) {
+    return {
+      configSource: effective.configSource,
+      primary: { env: {}, safeLabel: 'real-provider' },
+      fallback: undefined,
+      fallbackConfigured: false,
+    }
+  }
+  const canonical = canonicalProviderEnv(effective.env)
+  return {
+    configSource: effective.configSource,
+    primary: { env: canonical.env, safeLabel: canonical.providerSafeLabel },
+    fallback: canonical.fallback
+      ? {
+          env: fallbackProviderEnvAsPrimary(canonical.fallback.env),
+          safeLabel: canonical.fallback.providerSafeLabel,
+        }
+      : undefined,
+    fallbackConfigured: Boolean(canonical.fallback),
+  }
+}
+
+function fallbackProviderEnvAsPrimary(fallbackEnv) {
+  return {
+    PRIVATE_AGENTS_REAL_PROVIDER:
+      fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_PROVIDER ?? fallbackEnv.PRIVATE_AGENTS_REAL_PROVIDER,
+    ...(fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_API_KEY
+      ? { PRIVATE_AGENTS_REAL_API_KEY: fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_API_KEY }
+      : {}),
+    ...(fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL
+      ? { PRIVATE_AGENTS_REAL_BASE_URL: fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL }
+      : {}),
+    ...(fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_MODEL
+      ? { PRIVATE_AGENTS_REAL_MODEL: fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_MODEL }
+      : {}),
+  }
+}
+
+function shouldAttemptReadonlyFallback(failureStatus, fallbackConfigured) {
+  return fallbackConfigured && failureStatus.exitCode === 2 &&
+    failureStatus.statusDetail === 'provider-network-inconclusive'
+}
+
+function fallbackOutcomeForReadonlyAttempt(attempt) {
+  if (!attempt) return 'skipped'
+  if (attempt.success?.ok) return 'passed'
+  if (attempt.failureStatus?.exitCode === 2) return 'inconclusive'
+  if (attempt.failureStatus?.exitCode === 3) return 'skipped'
+  return 'failed'
+}
+
+async function runReadonlyModelTurnAttempt({ fixture, providerEnv }) {
+  const before = snapshotReadonlyFixture(fixture.fixtureDir)
+  const result = await run(process.execPath, [
+    tsxCliPath,
+    cliEntryPath,
+    '--project',
+    fixture.fixtureDir,
+    '--print',
+    fixture.prompt,
+  ], {
+    cwd: tsShellRoot,
+    env: {
+      HOME: realHome,
+      USERPROFILE: realHome,
+      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      ...providerEnv,
+    },
+    timeoutMs: 420000,
+  })
+  const after = snapshotReadonlyFixture(fixture.fixtureDir)
+  const comparison = compareReadonlySnapshots(before, after)
+  const redaction = redactAndAssertReadonlyProviderOutput(result.output)
+  const redactedOutput = redaction.redacted
+  const providerFailure = classifyProviderReadinessFailure(
+    `read-only model turn exited ${result.code}`,
+    redactedOutput,
+    'real',
+  )
+  if (result.code === 0 && !result.timedOut && !providerFailure) {
+    const success = assertReadonlySmokeSuccess(redactedOutput, comparison, redaction)
+    return { result, comparison, redaction, redactedOutput, success }
+  }
+  return {
+    result,
+    comparison,
+    redaction,
+    redactedOutput,
+    failureStatus: buildReadonlySmokeFailureStatus(result, redactedOutput, redaction),
+  }
+}
+
 async function runRealReadonlyCodingSmoke() {
   console.log('gate name=real-user-capabilities')
   console.log('mode=real-readonly-coding-smoke')
@@ -5027,6 +5131,8 @@ async function runRealReadonlyCodingSmoke() {
   console.log('homeRead=false')
   console.log('defaultSmoke=skipped')
   console.log('realProviderHome=runtime-only')
+  const providerAttempts = buildReadonlyProviderAttempts()
+  console.log(`configSource=${providerAttempts.configSource}`)
 
   const preflight = await runProviderReadinessPreflight()
   const preflightStatus = buildReadonlyPreflightStatus(preflight)
@@ -5055,35 +5161,32 @@ async function runRealReadonlyCodingSmoke() {
 
   const fixture = createReadonlyCodingFixture()
   try {
-    const before = snapshotReadonlyFixture(fixture.fixtureDir)
-    const result = await run(process.execPath, [
-      tsxCliPath,
-      cliEntryPath,
-      '--project',
-      fixture.fixtureDir,
-      '--print',
-      fixture.prompt,
-    ], {
-      cwd: tsShellRoot,
-      env: {
-        HOME: realHome,
-        USERPROFILE: realHome,
-        PRIVATE_AGENTS_PROVIDER_MODE: 'real',
-      },
-      timeoutMs: 420000,
+    const primary = await runReadonlyModelTurnAttempt({
+      fixture,
+      providerEnv: providerAttempts.primary.env,
     })
-    const after = snapshotReadonlyFixture(fixture.fixtureDir)
-    const comparison = compareReadonlySnapshots(before, after)
-    const redaction = redactAndAssertReadonlyProviderOutput(result.output)
-    const redactedOutput = redaction.redacted
-    const providerFailure = classifyProviderReadinessFailure(
-      `read-only model turn exited ${result.code}`,
-      redactedOutput,
-      'real',
-    )
+    let finalAttempt = primary
+    let fallbackAttempted = false
+    let fallbackOutcome = 'skipped'
+    if (
+      primary.failureStatus &&
+      shouldAttemptReadonlyFallback(primary.failureStatus, providerAttempts.fallbackConfigured) &&
+      providerAttempts.fallback
+    ) {
+      fallbackAttempted = true
+      finalAttempt = await runReadonlyModelTurnAttempt({
+        fixture,
+        providerEnv: providerAttempts.fallback.env,
+      })
+      fallbackOutcome = fallbackOutcomeForReadonlyAttempt(finalAttempt)
+    } else {
+      fallbackOutcome = fallbackOutcomeForReadonlyAttempt(undefined)
+    }
 
-    if (result.code === 0 && !result.timedOut && !providerFailure) {
-      const success = assertReadonlySmokeSuccess(redactedOutput, comparison, redaction)
+    const { result, comparison, redaction, redactedOutput } = finalAttempt
+
+    if (finalAttempt.success) {
+      const success = finalAttempt.success
       const changedFiles = readonlyChangedFiles(comparison)
       const report = {
         generatedAt: new Date().toISOString(),
@@ -5106,6 +5209,11 @@ async function runRealReadonlyCodingSmoke() {
         changedFiles,
         terminalResultVisible: /(^|\r?\n)Result\s*(\r?\n|$)/.test(redactedOutput),
         changedFilesEmptyVisible: readonlyChangedFilesEmptyVisible(redactedOutput, comparison),
+        primaryAttempted: true,
+        primaryFailureClass: primary.failureStatus?.statusDetail ?? 'none',
+        fallbackConfigured: providerAttempts.fallbackConfigured,
+        fallbackAttempted,
+        fallbackOutcome,
         redaction: {
           ok: redaction.ok,
           leaks: redaction.leaks,
@@ -5120,6 +5228,11 @@ async function runRealReadonlyCodingSmoke() {
       console.log(`changedFiles=${JSON.stringify(changedFiles)}`)
       console.log(`terminalResultVisible=${report.terminalResultVisible}`)
       console.log(`changedFilesEmptyVisible=${report.changedFilesEmptyVisible}`)
+      console.log('primaryAttempted=true')
+      console.log(`primaryFailureClass=${report.primaryFailureClass}`)
+      console.log(`fallbackConfigured=${providerAttempts.fallbackConfigured ? 'true' : 'false'}`)
+      console.log(`fallbackAttempted=${fallbackAttempted ? 'true' : 'false'}`)
+      console.log(`fallbackOutcome=${fallbackOutcome}`)
       console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
       if (!success.ok) {
         console.log(`failureReason=${report.failureReason}`)
@@ -5128,7 +5241,7 @@ async function runRealReadonlyCodingSmoke() {
       process.exit(success.ok ? 0 : 1)
     }
 
-    const failureStatus = buildReadonlySmokeFailureStatus(result, redactedOutput, redaction)
+    const failureStatus = finalAttempt.failureStatus
     writeReport({
       generatedAt: new Date().toISOString(),
       capability: 'real-readonly-coding-smoke',
@@ -5148,19 +5261,31 @@ async function runRealReadonlyCodingSmoke() {
         changed: comparison.changed,
       },
       changedFiles: readonlyChangedFiles(comparison),
+      primaryAttempted: true,
+      primaryFailureClass: primary.failureStatus?.statusDetail ?? 'none',
+      fallbackConfigured: providerAttempts.fallbackConfigured,
+      fallbackAttempted,
+      fallbackOutcome,
       redaction: {
         ok: redaction.ok,
         leaks: redaction.leaks,
       },
       failureCategory: failureStatus.failureCategory,
       failureReason: failureStatus.failureReason,
-      outputTail: summarizeOutput(redactedOutput),
+      outputTail: failureStatus.exitCode === 2 ? 'provider-network-inconclusive' : summarizeOutput(redactedOutput),
     })
     console.log(`fixtureFiles=${fixture.files.join(',')}`)
     console.log(`noMutation=${comparison.ok}`)
+    console.log(`changedFiles=${JSON.stringify(readonlyChangedFiles(comparison))}`)
+    console.log(`changedFilesEmptyVisible=${readonlyChangedFilesEmptyVisible(redactedOutput, comparison)}`)
+    console.log('primaryAttempted=true')
+    console.log(`primaryFailureClass=${primary.failureStatus?.statusDetail ?? 'none'}`)
+    console.log(`fallbackConfigured=${providerAttempts.fallbackConfigured ? 'true' : 'false'}`)
+    console.log(`fallbackAttempted=${fallbackAttempted ? 'true' : 'false'}`)
+    console.log(`fallbackOutcome=${fallbackOutcome}`)
     console.log(`redaction=${redaction.ok ? 'pass' : 'fail'}`)
     console.log(`[${failureStatus.status}] real-readonly-coding-smoke status=${failureStatus.statusDetail}`)
-    if (redactedOutput) {
+    if (redactedOutput && failureStatus.exitCode !== 2) {
       console.log(summarizeOutput(redactedOutput))
     }
     process.exit(failureStatus.exitCode)

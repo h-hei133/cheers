@@ -173,7 +173,16 @@ export interface TaskLiveRunSummary {
   readonly writePatchIntentDryRunCount: number;
   readonly isolatedApplyCount: number;
   readonly postApplyProofCount: number;
+  readonly completedWithTaskProofCount: number;
+  readonly completedWriteTaskProofCount: number;
+  readonly reviewedDisposablePostApplyProofCount: number;
+  readonly correctionFreeCompletedWriteCount: number;
+  readonly correctionDispositionCount: number;
   readonly debugOrRepairUseful: boolean;
+  readonly debugOrRepairComplete: boolean;
+  readonly multiFileCompleteOrExactPartial: boolean;
+  readonly artifactOrReportComplete: boolean;
+  readonly continuationOrContextComplete: boolean;
   readonly rollbackRecoveryStatus: "complete" | "useful-partial" | "blocked" | "not-run";
   readonly qualityRecordCount: number;
   readonly writeOrArtifactQualityRecordCount: number;
@@ -1063,6 +1072,7 @@ function externalStatus(
 function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveRunSummary {
   const executed = results.filter((result) => result.executed);
   const completeOrUseful = executed.filter((result) => result.status === "complete" || result.status === "useful-partial");
+  const completedWithTaskProof = executed.filter((result) => result.status === "complete" && result.proofStatus === "complete");
   const writeResults = results.filter((result) =>
     result.entryKind === "write-edit" ||
     result.entryKind === "write-repair" ||
@@ -1087,6 +1097,10 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     result.applyStatus === "applied" &&
     result.isolatedApply &&
     result.postApplyVerificationStatus === "passed" &&
+    result.proofStatus === "complete"
+  ).length;
+  const completedWriteTaskProofCount = writeResults.filter((result) =>
+    result.status === "complete" &&
     result.proofStatus === "complete"
   ).length;
   const qualityRecords = results
@@ -1128,6 +1142,20 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     record.postActionVerificationStatus === "passed"
   ).length;
   const manualCorrectionCount = qualityRecords.filter((record) => record.manualCorrectionNeeded).length;
+  const correctionFreeCompletedWriteCount = writeResults.filter((result) =>
+    result.status === "complete" &&
+    result.proofStatus === "complete" &&
+    result.qualityRecord?.manualCorrectionNeeded === false
+  ).length;
+  const correctionDispositionCount = qualityRecords.filter((record) =>
+    record.manualCorrectionNeeded === true &&
+    (
+      record.blocker.length > 0 ||
+      record.finalReadiness === "not-ready" ||
+      record.finalReadiness === "blocked" ||
+      record.finalReadiness === "manual-review-required"
+    )
+  ).length;
   const debugRepairFailureProvedCount = qualityRecords.filter((record) =>
     (record.actionKind === "write-repair" || record.actionKind === "write-rollback") &&
     record.manualCorrectionNeeded &&
@@ -1138,6 +1166,25 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     record.taskId === "coordinated-edit" &&
     record.targetFileCount >= 2 &&
     record.targetFileMatch === "matched"
+  );
+  const multiFileCompleteOrExactPartial = results.some((result) =>
+    result.entryId === "coordinated-edit" &&
+    (
+      result.status === "complete" ||
+      (result.status === "useful-partial" && result.blockers.length > 0)
+    ) &&
+    result.proofStatus !== "missing"
+  );
+  const artifactOrReportComplete = results.some((result) =>
+    (result.entryKind === "report-artifact" || result.entryKind === "data-artifact") &&
+    result.status === "complete" &&
+    result.proofStatus === "complete" &&
+    result.artifactValidationStatus === "passed"
+  );
+  const continuationOrContextComplete = results.some((result) =>
+    (result.entryKind === "continuation" || result.entryKind === "pathless-context") &&
+    result.status === "complete" &&
+    result.proofStatus === "complete"
   );
   const artifactQualityPassed = qualityRecords.some((record) =>
     (record.actionKind === "report-artifact" || record.actionKind === "data-artifact") &&
@@ -1156,10 +1203,13 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
   const blockers = [
     ...(results.length >= 13 ? [] : ["fewer than thirteen live task entries"]),
     ...(executed.length >= 8 ? [] : ["fewer than eight entries executed through explicit gates"]),
-    ...(completeOrUseful.length >= 5 ? [] : ["fewer than five executed entries reached complete or useful partial"]),
+    ...(completedWithTaskProof.length >= 5 ? [] : ["fewer than five executed entries completed with task proof"]),
     ...(writePatchIntentDryRunCount >= 3 ? [] : ["fewer than three write-capable entries produced patch intent and dry-run diff"]),
-    ...(isolatedApplyCount >= 2 ? [] : ["fewer than two write-capable entries passed review authority and isolated apply"]),
-    ...(postApplyProofCount >= 2 ? [] : ["fewer than two applied entries passed verification with task proof"]),
+    ...(isolatedApplyCount >= 3 ? [] : ["fewer than three write-capable entries passed review authority and disposable apply"]),
+    ...(postApplyProofCount >= 3 ? [] : ["fewer than three applied entries passed post-apply verification with task proof"]),
+    ...(completedWriteTaskProofCount >= 3 ? [] : ["fewer than three write-capable entries completed with task proof"]),
+    ...(correctionFreeCompletedWriteCount >= 3 ? [] : ["fewer than three completed write tasks are correction-free"]),
+    ...(manualCorrectionCount === correctionDispositionCount ? [] : ["manual corrections missing automated blocker or failing disposition"]),
     ...(writeOrArtifactQualityRecordCount >= 5 ? [] : ["fewer than five write or artifact entries produced quality records"]),
     ...(dryRunQualityRecordCount >= 3 ? [] : ["fewer than three write-capable entries produced dry-run quality records"]),
     ...(reviewedIsolatedPostApplyCount >= 3 ? [] : ["fewer than three entries reached reviewed isolated apply plus post-action verification"]),
@@ -1167,16 +1217,19 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     ...(realWorkspaceApplyCount >= 1 ? [] : ["no reviewed real-workspace apply was proven in a disposable isolated selected workspace"]),
     ...(debugRepairFailureProvedCount >= 1 ? [] : ["debug or repair entry did not prove failure to repair to verification"]),
     ...(multiFileQualityRecord ? [] : ["multi-file or coordinated edit target-file quality metadata missing"]),
+    ...(multiFileCompleteOrExactPartial ? [] : ["multi-file or coordinated edit did not complete or reach exact useful partial"]),
     ...(artifactQualityPassed ? [] : ["artifact or report entry did not pass quality checks"]),
+    ...(artifactOrReportComplete ? [] : ["artifact or report entry did not complete with task proof"]),
+    ...(continuationOrContextComplete ? [] : ["continuation or context entry did not complete with task proof"]),
     ...(results.every((result) => result.qualityRecord?.manualCorrectionNeeded !== true || result.qualityRecord.blocker.length > 0)
       ? []
       : ["manual corrections missing exact blockers"]),
     ...(writeResults.some((result) =>
       (result.entryKind === "write-repair" || result.entryKind === "write-rollback") &&
-      (result.status === "complete" || result.status === "useful-partial")
+      result.status === "complete"
     )
       ? []
-      : ["debug or repair entry did not reach complete or useful partial"]),
+      : ["debug or repair entry did not complete with task proof"]),
     ...(rollbackRecoveryStatus !== "not-run" ? [] : ["rollback recovery did not complete, reach useful partial, or report exact blocker"]),
     ...(executed.some((result) => result.entryKind === "pathless-context") ? [] : ["pathless or context entry did not execute"]),
     ...(executed.some((result) => result.entryKind === "report-artifact" || result.entryKind === "data-artifact")
@@ -1218,10 +1271,23 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     writePatchIntentDryRunCount,
     isolatedApplyCount,
     postApplyProofCount,
+    completedWithTaskProofCount: completedWithTaskProof.length,
+    completedWriteTaskProofCount,
+    reviewedDisposablePostApplyProofCount: postApplyProofCount,
+    correctionFreeCompletedWriteCount,
+    correctionDispositionCount,
     debugOrRepairUseful: writeResults.some((result) =>
       (result.entryKind === "write-repair" || result.entryKind === "write-rollback") &&
       (result.status === "complete" || result.status === "useful-partial")
     ),
+    debugOrRepairComplete: writeResults.some((result) =>
+      (result.entryKind === "write-repair" || result.entryKind === "write-rollback") &&
+      result.status === "complete" &&
+      result.proofStatus === "complete"
+    ),
+    multiFileCompleteOrExactPartial,
+    artifactOrReportComplete,
+    continuationOrContextComplete,
     rollbackRecoveryStatus,
     qualityRecordCount: qualityRecords.length,
     writeOrArtifactQualityRecordCount,

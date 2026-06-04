@@ -692,13 +692,70 @@ focused validation.
     post-action verification records, 3 reviewed real-workspace readiness
     records, 1 disposable selected-workspace apply, 2 manual corrections, 1
     repair-verification blocker, multi-file quality metadata, artifact quality
-    pass, fallback configured/skipped after primary success, and redaction
-    pass.
+    pass, read-only fallback configured/skipped after primary success, anchored
+    fallback attempted/passed after primary provider-network failure, and
+    redaction pass.
 - Rollback plan: remove `quality.ts`, quality record projection, and the
   selected-workspace apply receipt path from `liveRun.ts` and
   `verify:live-task-execution`, returning live reports to reviewed isolated
   metadata only while preserving default-off gates, redaction, and
   evidence/result truth.
+
+## Live Development Gauntlet Gate Contract
+
+- Selected mode: structured port for local hard-gate summary contracts, with
+  behavior-only alignment for mature task-loop completion discipline.
+- Owner domain: `runtime/evaluation/task`, delegating task proof to
+  `evidence/task` and verdict to `result/task`; scripts remain thin live gate
+  callers.
+- Reason for use: SP029 required the live report to prove real live development
+  task outcomes, not only SP028 readiness, quality records, dry-run facts, or
+  useful partial counts. The runtime summary now encodes the hard gates for
+  completed task proof, reviewed disposable write apply plus post-apply proof,
+  correction-free completed write tasks, completed debug/repair, and correction
+  disposition.
+- Behavior ported: `runTaskLiveReport` now reports and enforces
+  `completedWithTaskProofCount`, `completedWriteTaskProofCount`,
+  `reviewedDisposablePostApplyProofCount`,
+  `correctionFreeCompletedWriteCount`, `correctionDispositionCount`, and
+  `debugOrRepairComplete`. `verify:live-task-execution` prints those safe
+  fields and exits nonzero when the runtime-owned hard gate is not passed under
+  explicit live opt-in.
+- Rejected alternatives:
+  - Script-only threshold checks: rejected because scripts may set gates, call
+    runtime, and print safe results only.
+  - Useful-partial completion: rejected because SP029 requires at least five
+    completed task-proof entries and at least three correction-free completed
+    write tasks.
+  - Manual correction tolerance without disposition: rejected because remaining
+    correction must be carried as automated blocker or failing state.
+  - Provider-output success: rejected because provider output and gate pass are
+    non-terminal facts.
+- Expected callers: `verify:live-task-execution`, task assessment, host
+  evaluation summaries, future live development gates, and docs/status
+  summaries.
+- Side-effect boundary: the summary contract is deterministic and consumes only
+  safe receipts and task-loop results. Provider calls and disposable selected
+  workspace apply remain behind existing explicit opt-in gates and do not read
+  or print private provider material.
+- Truthfulness boundary: hard-gate pass is a live-gauntlet validation result,
+  not terminal task success. Individual task success still requires
+  evidence/task proof and result/task verdict; provider call, fallback metadata,
+  dry-run diff, review authority, apply metadata, and output rendering remain
+  non-success facts.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/liveRun.test.ts`
+  - `PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real PRIVATE_AGENTS_LIVE_TASK_EXECUTION=1 PRIVATE_AGENTS_LIVE_WRITE_REVIEWED_APPLY=1 PRIVATE_AGENTS_LIVE_REAL_WORKSPACE_APPLY=1 rtk npm run verify:live-task-execution`
+  - Live validation reported 13 executed entries, 11 completed with task proof,
+    3 completed write tasks with reviewed disposable apply plus post-apply task
+    proof and zero manual correction, 2 remaining manual corrections with safe
+    disposition, completed debug/repair, artifact/report, continuation/context,
+    selected-workspace apply, read-only fallback configured/skipped after
+    primary success, anchored fallback attempted/passed after primary
+    provider-network failure, and redaction pass.
+- Rollback plan: remove the SP029 summary fields and stricter blockers from
+  `liveRun.ts` and script output, returning the live report to SP028 quality
+  readiness gates without weakening evidence/result task proof.
 
 ## Task Collaboration And Planning Policy
 

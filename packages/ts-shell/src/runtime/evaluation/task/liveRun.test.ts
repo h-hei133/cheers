@@ -131,7 +131,14 @@ describe("task live run report", () => {
       writePatchIntentDryRunCount: 5,
       isolatedApplyCount: 4,
       postApplyProofCount: 3,
+      completedWriteTaskProofCount: 3,
+      reviewedDisposablePostApplyProofCount: 3,
+      correctionFreeCompletedWriteCount: 3,
       debugOrRepairUseful: true,
+      debugOrRepairComplete: true,
+      multiFileCompleteOrExactPartial: true,
+      artifactOrReportComplete: true,
+      continuationOrContextComplete: true,
       rollbackRecoveryStatus: "useful-partial",
       qualityRecordCount: 7,
       writeOrArtifactQualityRecordCount: 7,
@@ -140,8 +147,12 @@ describe("task live run report", () => {
       realWorkspaceReadyCount: 3,
       realWorkspaceApplyCount: 1,
       manualCorrectionCount: 2,
+      correctionDispositionCount: 2,
       debugRepairFailureProvedCount: 1,
       multiFileQualityRecord: true,
+      multiFileCompleteOrExactPartial: true,
+      artifactOrReportComplete: true,
+      continuationOrContextComplete: true,
       artifactQualityPassed: true,
       hardGateStatus: "passed",
       blockers: [],
@@ -289,14 +300,21 @@ describe("task live run report", () => {
       completeOrUsefulPartialCount: 12,
       isolatedApplyCount: 4,
       postApplyProofCount: 3,
+      completedWriteTaskProofCount: 3,
+      reviewedDisposablePostApplyProofCount: 3,
+      correctionFreeCompletedWriteCount: 3,
       qualityRecordCount: 7,
       writeOrArtifactQualityRecordCount: 7,
       dryRunQualityRecordCount: 5,
       reviewedIsolatedPostApplyCount: 3,
       realWorkspaceReadyCount: 3,
       realWorkspaceApplyCount: 1,
+      correctionDispositionCount: 2,
       debugRepairFailureProvedCount: 1,
       multiFileQualityRecord: true,
+      multiFileCompleteOrExactPartial: true,
+      artifactOrReportComplete: true,
+      continuationOrContextComplete: true,
       artifactQualityPassed: true,
       hardGateStatus: "passed",
       terminalSuccessClaim: false,
@@ -334,7 +352,7 @@ describe("task live run report", () => {
     expect(JSON.stringify(report)).not.toMatch(/Bearer |api[_-]?key|token|headers|raw provider output|diff --git|\*\*\* Begin Patch/i);
   });
 
-  it("keeps SP028 quality hard gate incomplete without disposable selected-workspace apply proof", async () => {
+  it("keeps SP029 live development hard gate incomplete without disposable selected-workspace apply proof", async () => {
     const host = createHostRuntime();
     const report = await runTaskLiveReport({
       dispatch: host.dispatch,
@@ -352,6 +370,9 @@ describe("task live run report", () => {
       reviewedIsolatedPostApplyCount: 4,
       realWorkspaceReadyCount: 4,
       realWorkspaceApplyCount: 0,
+      completedWriteTaskProofCount: 3,
+      reviewedDisposablePostApplyProofCount: 3,
+      correctionFreeCompletedWriteCount: 3,
       hardGateStatus: "not-passed",
       terminalSuccessClaim: false,
     });

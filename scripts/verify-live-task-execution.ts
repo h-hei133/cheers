@@ -96,7 +96,16 @@ console.log(`writeEntrySafe=${report.summary.writeEntrySafe}`);
 console.log(`writePatchIntentDryRunCount=${report.summary.writePatchIntentDryRunCount}`);
 console.log(`isolatedApplyCount=${report.summary.isolatedApplyCount}`);
 console.log(`postApplyProofCount=${report.summary.postApplyProofCount}`);
+console.log(`completedWithTaskProofCount=${report.summary.completedWithTaskProofCount}`);
+console.log(`completedWriteTaskProofCount=${report.summary.completedWriteTaskProofCount}`);
+console.log(`reviewedDisposablePostApplyProofCount=${report.summary.reviewedDisposablePostApplyProofCount}`);
+console.log(`correctionFreeCompletedWriteCount=${report.summary.correctionFreeCompletedWriteCount}`);
+console.log(`correctionDispositionCount=${report.summary.correctionDispositionCount}`);
 console.log(`debugOrRepairUseful=${report.summary.debugOrRepairUseful}`);
+console.log(`debugOrRepairComplete=${report.summary.debugOrRepairComplete}`);
+console.log(`multiFileCompleteOrExactPartial=${report.summary.multiFileCompleteOrExactPartial}`);
+console.log(`artifactOrReportComplete=${report.summary.artifactOrReportComplete}`);
+console.log(`continuationOrContextComplete=${report.summary.continuationOrContextComplete}`);
 console.log(`rollbackRecoveryStatus=${report.summary.rollbackRecoveryStatus}`);
 console.log(`qualityRecordCount=${report.summary.qualityRecordCount}`);
 console.log(`writeOrArtifactQualityRecordCount=${report.summary.writeOrArtifactQualityRecordCount}`);
@@ -169,6 +178,9 @@ function runReadOnlyProviderGate(): GateResult {
     changedFiles: /changedFiles=\[\]/.test(output) ? [] : ["unverified-change"],
     noApply: true,
     redactionStatus: /redaction=pass/.test(output) || redactionSafe(output) ? "passed" : "failed",
+    fallbackConfigured: /fallbackConfigured=true/.test(output),
+    fallbackAttempted: /fallbackAttempted=true/.test(output),
+    fallbackOutcome: fallbackOutcomeFromOutput(output),
     blocker: passed ? "" : blockerFromOutput(output),
   };
 }
