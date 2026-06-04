@@ -37,6 +37,15 @@ describe("verificationRepairIterationFlow", () => {
       expect(result.sameVerificationCommandRerun).toBe(true);
       expect(result.postRepairVerification.status).toBe("passed");
       expect(result.productRepair.verdict.status).toBe("COMPLETE");
+      expect(result.productRepair.failureDiagnosis).toBe(
+        "original same relevant verification command failed",
+      );
+      expect(result.productRepair.repairAction).toBe(
+        "generate bounded repair from failure diagnosis",
+      );
+      expect(result.productRepair.reverifyAction).toBe(
+        "rerun same verification command after repair",
+      );
       expect(result.productRepair.repairProposalIsSuccess).toBe(false);
       expect(result.productRepair.repairApplyWithoutReverifyIsSuccess).toBe(false);
       expect(result.unconfirmedResult.status).toBe("stopped_error");

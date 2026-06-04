@@ -38,6 +38,9 @@ export interface ProductRepairIterationProjection {
   readonly finalRepairVerdict: ProductRepairFinalVerdict;
   readonly verificationFailureSummary?: string;
   readonly failureOutputUsedForRetry: boolean;
+  readonly failureDiagnosis?: string;
+  readonly repairAction?: string;
+  readonly reverifyAction?: string;
   readonly verdict: ProductVerdict;
   readonly repairProposalIsSuccess: false;
   readonly repairApplyWithoutReverifyIsSuccess: false;
@@ -58,8 +61,11 @@ export function projectRepairIteration(input: {
   readonly verificationFailureSummary?: string;
 }): ProductRepairIterationProjection {
   const applySucceeded = isRepairApplySuccess(input.applyStatus);
+  const failureDiagnosis = input.verificationFailureSummary?.trim()
+    ? sanitizeSummary(input.verificationFailureSummary)
+    : undefined;
   const failureOutputUsedForRetry =
-    input.retryCount <= 0 || Boolean(input.verificationFailureSummary?.trim());
+    input.retryCount <= 0 || Boolean(failureDiagnosis);
   const claims: ProductClaimInput[] = [
     {
       group: "verification",
@@ -110,8 +116,13 @@ export function projectRepairIteration(input: {
     changedFiles: input.changedFiles,
     notProvenClaims: input.notProvenClaims,
     finalRepairVerdict: input.finalRepairVerdict,
-    ...(input.verificationFailureSummary?.trim()
-      ? { verificationFailureSummary: sanitizeSummary(input.verificationFailureSummary) }
+    ...(failureDiagnosis
+      ? {
+          verificationFailureSummary: failureDiagnosis,
+          failureDiagnosis,
+          repairAction: "generate bounded repair from failure diagnosis",
+          reverifyAction: "rerun same verification command after repair",
+        }
       : {}),
     failureOutputUsedForRetry,
     verdict: projectProductVerdictFromClaims({

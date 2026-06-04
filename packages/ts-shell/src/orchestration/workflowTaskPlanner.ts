@@ -1,6 +1,7 @@
 import type { CodingTaskKind } from "./types.js";
 import type { BrowserAgentPlan } from "../core/context/browserAgent.js";
 import type { GroundedDeliverableMode } from "./runtimeHandoffProjection.js";
+import type { WorkflowActionGraph } from "../planning/action/graph.js";
 
 export type ReflectiveStateQueryKind =
   | "stop-reason"
@@ -99,6 +100,7 @@ export interface WorkflowTaskPlan {
   readonly failedTransforms?: readonly ContinuationTransform[];
   readonly crossFileRepair?: boolean;
   readonly additionalTargetPaths?: readonly string[];
+  readonly actionGraph?: WorkflowActionGraph;
   readonly crossFileConvergedNoop?: boolean;
   readonly previousRemainingTargets?: readonly string[];
   readonly previousFailedEntries?: ReadonlyArray<{
@@ -145,6 +147,10 @@ export function buildWorkflowDecisionTrace(plan: WorkflowTaskPlan): string[] {
   }
   if (plan.previousFailedEntries?.length) {
     parts.push(`failedEntries=${plan.previousFailedEntries.length}`);
+  }
+  if (plan.actionGraph) {
+    parts.push(`actionGraph=${plan.actionGraph.graphId}`);
+    parts.push(`actionNodes=${plan.actionGraph.orderedNodeIds.length}`);
   }
   if (plan.continuationLineage?.length) {
     parts.push(...plan.continuationLineage);

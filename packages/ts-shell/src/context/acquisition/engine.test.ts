@@ -168,6 +168,12 @@ describe("runContextEngine", () => {
     expect(result.discoveryHandoff.ambiguityState).toBe(
       "multiple-plausible-candidates",
     );
+    expect(result.discoveryHandoff.ownerNarrowingSuggestions).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("src/orders/statusPolicy.ts"),
+        expect.stringContaining("src/payments/statusPolicy.ts"),
+      ]),
+    );
     expect(result.bundle).toBeUndefined();
     expect(result.contextAcquisitionHandoff).toBeUndefined();
     expect(result.contextBudget.filesRead).toBe(0);

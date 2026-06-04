@@ -58,6 +58,7 @@ export interface ContextDiscoveryHandoffFacts {
   readonly competingCandidateIds: readonly string[];
   readonly omittedCandidateFacts: readonly string[];
   readonly ambiguityState: RepoTargetRankingAmbiguityState;
+  readonly ownerNarrowingSuggestions: readonly string[];
   readonly missingDiscoveryFacts: readonly string[];
   readonly scanProfileId: string;
   readonly targetRankingEvidenceId: string;
@@ -335,6 +336,9 @@ function buildDiscoveryHandoff(repo: RepoIntelligenceResult): ContextDiscoveryHa
       `${omission.reason}:${omission.count}`
     ),
     ambiguityState: repo.targetRanking.ambiguityState,
+    ownerNarrowingSuggestions: repo.candidates.slice(0, 4).map((candidate, index) =>
+      `${index + 1}:${candidate.safeLabel}`
+    ),
     missingDiscoveryFacts: repo.targetRanking.missingDiscoveryFacts,
     scanProfileId: repo.snapshot.scanProfile.profileId,
     targetRankingEvidenceId: repo.targetRanking.rankingId,

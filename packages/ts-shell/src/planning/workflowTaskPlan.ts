@@ -61,6 +61,7 @@ import {
   normalizeGroundedRepairInstruction,
 } from "../repair/proposal/groundedAnswer.js";
 import { buildBrowserIntentPlan } from "../browser/browserIntentPlanning.js";
+import { buildWorkflowActionGraph } from "./action/graph.js";
 import {
   buildWorkflowContinuationLineage,
   buildWorkflowRepairContinuation,
@@ -216,7 +217,7 @@ export function buildWorkflowTaskPlan(
       hasReplaceDirective: Boolean(effectiveReplaceDirectiveFromPrompt),
     })
   ) {
-    return {
+    return withActionGraph({
       taskKind: "edit-file",
       reason: "target resolution blocked mutation planning",
       inspectFirst: false,
@@ -225,7 +226,7 @@ export function buildWorkflowTaskPlan(
         targetResolution.blocker,
       ),
       targetMissing: true,
-    };
+    });
   }
   const rawContinuityTargetPath = deriveWorkflowContinuationTarget({
     continuity,
@@ -1254,7 +1255,7 @@ export function buildWorkflowTaskPlan(
           : {}),
       };
     }
-    return {
+    return withActionGraph({
       taskKind: hasCreateIntent ? "write-file" : "edit-file",
       reason: allowCrossFileUltraWeakAutoContinuation
         ? "cross-file ultra-weak follow-up auto-activated from single recoverable continuation target"
@@ -1335,7 +1336,7 @@ export function buildWorkflowTaskPlan(
               continuationReopenDecision.prunedCandidateSummary,
           }
         : {}),
-    };
+    });
   }
 
   if (
@@ -1402,7 +1403,7 @@ export function buildWorkflowTaskPlan(
       });
     }
 
-    return {
+    return withActionGraph({
       taskKind: hasWriteTaskIntent ? "write-file" : "edit-file",
       reason: hasWriteTaskIntent
         ? "write intent with explicit target"
@@ -1426,7 +1427,7 @@ export function buildWorkflowTaskPlan(
       ...(!hasCreateIntent ? mutationScopePlanning.requiredFields : {}),
       usedRestoredState,
       continuationLineage: ignoredExplicitTargetLineageOrUndefined,
-    };
+    });
   }
 
   if (hasFileReadIntent && primaryTarget?.inWorkspace) {
@@ -1529,4 +1530,9 @@ function uniquePathList(values: readonly string[]): string[] {
     result.push(value);
   }
   return result;
+}
+
+function withActionGraph(plan: WorkflowTaskPlan): WorkflowTaskPlan {
+  const actionGraph = buildWorkflowActionGraph(plan);
+  return actionGraph ? { ...plan, actionGraph } : plan;
 }

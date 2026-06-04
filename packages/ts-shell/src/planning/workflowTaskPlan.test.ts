@@ -47,6 +47,16 @@ describe("workflowTaskPlan", () => {
     expect(plan.replaceTo).toBeUndefined();
     expect(plan.verifyAfterEdit).toBe(true);
     expect(plan.blockedReason).toBeUndefined();
+    expect(plan.actionGraph?.orderedNodeIds).toEqual([
+      "inspect-target",
+      "edit-primary",
+      "write-related-src_feature.test.ts",
+      "verify-changes",
+    ]);
+    expect(plan.actionGraph?.changedFileIntents).toEqual([
+      "src/feature.ts",
+      "src/feature.test.ts",
+    ]);
   });
 
   it("keeps explicit read requests read-only", () => {

@@ -15,6 +15,7 @@ import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "../orchestration/types.js";
+import type { WorkflowActionGraph } from "../planning/action/graph.js";
 import {
   projectVerificationReceipt,
   type ProductVerificationReceipt,
@@ -61,6 +62,8 @@ export interface PerFileVerificationCoverage {
 
 export interface TaskRelevantCommandPlan {
   readonly changedFiles: readonly string[];
+  readonly sourceActionGraphId?: string;
+  readonly dependencyReasons: readonly string[];
   readonly candidateCommands: readonly string[];
   readonly selectedCommand?: string;
   readonly verificationLadder: readonly VerificationLadderStep[];
@@ -104,6 +107,7 @@ export async function runTaskRelevantVerificationRoute(input: {
   readonly sessionId: string;
   readonly prompt: string;
   readonly changedFiles: readonly string[];
+  readonly actionGraph?: WorkflowActionGraph;
   readonly candidateCommands?: readonly string[];
   readonly authority: TaskRelevantVerificationAuthority;
   readonly dispatcher?: ToolDispatcherType;
@@ -112,6 +116,7 @@ export async function runTaskRelevantVerificationRoute(input: {
 }): Promise<TaskRelevantVerificationResult> {
   const commandPlan = buildTaskRelevantCommandPlan({
     changedFiles: input.changedFiles,
+    actionGraph: input.actionGraph,
     candidateCommands: input.candidateCommands,
   });
   const canDispatch =
@@ -202,9 +207,13 @@ export async function runTaskRelevantVerificationRoute(input: {
 
 export function buildTaskRelevantCommandPlan(input: {
   readonly changedFiles: readonly string[];
+  readonly actionGraph?: WorkflowActionGraph;
   readonly candidateCommands?: readonly string[];
 }): TaskRelevantCommandPlan {
-  const changedFiles = normalizeChangedFiles(input.changedFiles);
+  const changedFiles = normalizeChangedFiles([
+    ...input.changedFiles,
+    ...(input.actionGraph?.changedFileIntents ?? []),
+  ]);
   const candidateCommands =
     input.candidateCommands && input.candidateCommands.length > 0
       ? input.candidateCommands.map((entry) => entry.trim()).filter(Boolean)
@@ -239,6 +248,8 @@ export function buildTaskRelevantCommandPlan(input: {
 
   return {
     changedFiles,
+    ...(input.actionGraph ? { sourceActionGraphId: input.actionGraph.graphId } : {}),
+    dependencyReasons: input.actionGraph?.dependencyReasons ?? [],
     candidateCommands,
     ...(selectedCommand ? { selectedCommand } : {}),
     verificationLadder,
@@ -261,6 +272,12 @@ export function buildTaskRelevantCommandPlan(input: {
     verificationCommandPlan,
     evidence: [
       `task-relevant-verification:changed-files:${changedFiles.join(",")}`,
+      ...(input.actionGraph
+        ? [`task-relevant-verification:action-graph:${input.actionGraph.graphId}`]
+        : []),
+      ...(input.actionGraph?.dependencyReasons.map((reason) =>
+        `task-relevant-verification:dependency:${reason}`,
+      ) ?? []),
       `task-relevant-verification:relevance:${relevanceStatus}`,
       `task-relevant-verification:coverage:${coverage.coverageStatus}`,
       `task-relevant-verification:uncovered-files:${coverage.uncoveredFiles.join(",") || "none"}`,

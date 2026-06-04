@@ -43,6 +43,37 @@ describe("taskRelevantVerificationRoute", () => {
     expect(plan.verificationCommandPlan.commandKind).toBe("npm-build-ts-shell");
   });
 
+  it("selects verification from action graph changed-file intents and dependency facts", () => {
+    const plan = buildTaskRelevantCommandPlan({
+      changedFiles: [],
+      actionGraph: {
+        graphId: "workflow_action_graph_status_pair",
+        orderedNodeIds: ["edit-primary", "write-related-status", "verify-changes"],
+        changedFileIntents: [
+          "packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts",
+        ],
+        dependencyReasons: [
+          "verify-changes<-edit-primary+write-related-status: Verify the changed files after all planned mutations.",
+        ],
+        nodes: [],
+      },
+    });
+
+    expect(plan.sourceActionGraphId).toBe("workflow_action_graph_status_pair");
+    expect(plan.changedFiles).toEqual([
+      "packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts",
+    ]);
+    expect(plan.dependencyReasons).toEqual([
+      "verify-changes<-edit-primary+write-related-status: Verify the changed files after all planned mutations.",
+    ]);
+    expect(plan.selectedCommand).toBe(
+      "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
+    );
+    expect(plan.evidence).toContain(
+      "task-relevant-verification:action-graph:workflow_action_graph_status_pair",
+    );
+  });
+
   it("rejects command-only bypass success as task verification", async () => {
     const dispatches: string[] = [];
     const result = await runTaskRelevantVerificationRoute({

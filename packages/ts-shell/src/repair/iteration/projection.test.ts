@@ -24,6 +24,15 @@ describe("repairFacade", () => {
     expect(projection.verificationFailureSummary).toBe(
       "test failed: expected status to be ready",
     );
+    expect(projection.failureDiagnosis).toBe(
+      "test failed: expected status to be ready",
+    );
+    expect(projection.repairAction).toBe(
+      "generate bounded repair from failure diagnosis",
+    );
+    expect(projection.reverifyAction).toBe(
+      "rerun same verification command after repair",
+    );
     expect(projection.repairProposalIsSuccess).toBe(false);
     expect(projection.repairApplyWithoutReverifyIsSuccess).toBe(false);
   });

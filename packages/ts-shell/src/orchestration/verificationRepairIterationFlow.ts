@@ -271,6 +271,7 @@ export async function runVerificationRepairIterationFlow(input: {
     changedFiles: applyResult.changedFiles,
     notProvenClaims,
     finalRepairVerdict,
+    verificationFailureSummary: originalFailure.reason,
   });
 
   return {
