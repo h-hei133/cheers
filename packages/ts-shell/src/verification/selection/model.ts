@@ -20,11 +20,19 @@ export type VerificationRunState =
 export interface VerificationSelectionInput {
   readonly taskKind: string;
   readonly taskPath: string;
+  readonly taskIntent?: string;
+  readonly changedFiles?: readonly string[];
   readonly expectedStatus: "passed" | "partial" | "failed" | "blocked" | "skipped" | "not-run";
   readonly expectedCheck: string;
   readonly hostEvidenceVerdict: string;
   readonly hostStatus: string;
   readonly failureCategories: readonly string[];
+  readonly failureHistory?: readonly {
+    readonly command: string;
+    readonly status: "failed" | "blocked";
+    readonly changedFiles: readonly string[];
+    readonly reason: string;
+  }[];
 }
 
 export interface VerificationSelection {
@@ -36,6 +44,11 @@ export interface VerificationSelection {
   readonly doesNotProve: readonly string[];
   readonly blockers: readonly string[];
   readonly fallback: string;
+  readonly selectedInputs: {
+    readonly taskIntent: string;
+    readonly changedFiles: readonly string[];
+    readonly failureHistoryUsed: boolean;
+  };
   readonly evidenceInputEligible: boolean;
   readonly resultInputEligible: boolean;
   readonly terminalSuccessClaim: false;
@@ -68,6 +81,11 @@ export function selectVerification(input: VerificationSelectionInput): Verificat
     ],
     blockers,
     fallback: fallbackFor(purpose, state),
+    selectedInputs: freeze({
+      taskIntent: sanitizeIntent(input.taskIntent ?? input.expectedCheck),
+      changedFiles: freeze(uniquePaths(input.changedFiles ?? [])),
+      failureHistoryUsed: failureHistoryUsed(input),
+    }),
     evidenceInputEligible: passed,
     resultInputEligible: passed,
     terminalSuccessClaim: false,
@@ -112,6 +130,9 @@ function verificationStateFor(input: VerificationSelectionInput): VerificationRu
   if (input.failureCategories.includes("verification failed")) {
     return "selected-failed";
   }
+  if (failureHistoryUsed(input) && input.expectedStatus !== "passed") {
+    return "selected-failed";
+  }
   if (input.expectedStatus === "failed") {
     return "selected-failed";
   }
@@ -141,7 +162,10 @@ function verificationBlockersFor(
     return ["verification blocked"];
   }
   if (state === "selected-failed") {
-    return ["verification failed"];
+    return [
+      "verification failed",
+      ...failureHistoryBlockers(input),
+    ];
   }
   if (state === "selected-not-run") {
     return ["verification selected but not run"];
@@ -150,6 +174,32 @@ function verificationBlockersFor(
     return ["insufficient verification"];
   }
   return input.failureCategories.filter((category) => category.startsWith("verification"));
+}
+
+function failureHistoryUsed(input: VerificationSelectionInput): boolean {
+  const changedFiles = uniquePaths(input.changedFiles ?? []);
+  return (input.failureHistory ?? []).some((failure) =>
+    failure.status === "failed" &&
+    uniquePaths(failure.changedFiles).some((path) => changedFiles.includes(path))
+  );
+}
+
+function failureHistoryBlockers(input: VerificationSelectionInput): readonly string[] {
+  const changedFiles = uniquePaths(input.changedFiles ?? []);
+  return (input.failureHistory ?? [])
+    .filter((failure) =>
+      failure.status === "failed" &&
+      uniquePaths(failure.changedFiles).some((path) => changedFiles.includes(path))
+    )
+    .map((failure) => `previous failed verification: ${sanitizeIntent(failure.reason)}`);
+}
+
+function uniquePaths(paths: readonly string[]): readonly string[] {
+  return freeze([...new Set(paths.map((path) => path.replace(/\\/g, "/").replace(/^\.\/+/g, "").trim()).filter(Boolean))]);
+}
+
+function sanitizeIntent(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 180);
 }
 
 function proofFor(purpose: VerificationPurpose): readonly string[] {

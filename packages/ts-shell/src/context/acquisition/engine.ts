@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+
 import type { ContextGraphPlanningBundle } from "./graph.js";
 import type { StagedContextAcquisitionFacts } from "./graph.js";
 import { buildContextGraphPlanningBundle } from "./graph.js";
@@ -32,6 +35,7 @@ export interface ContextEngineResult {
   readonly repo: RepoIntelligenceResult;
   readonly selectedCandidate?: RepoIntelligenceCandidate;
   readonly discoveryHandoff: ContextDiscoveryHandoffFacts;
+  readonly contextRenarrowing?: ContextRenarrowingFacts;
   readonly contextAcquisitionHandoff?: StagedContextAcquisitionFacts;
   readonly workflowPlan: WorkflowTaskPlan;
   readonly bundle?: ContextGraphPlanningBundle;
@@ -39,7 +43,7 @@ export interface ContextEngineResult {
   readonly filesRead: readonly {
     readonly path: string;
     readonly reason: string;
-    readonly source: "repo-intelligence" | "context-graph" | "memory";
+    readonly source: "repo-intelligence" | "context-graph" | "memory" | "owner-renarrowing";
   }[];
   readonly contextBudget: {
     readonly candidateFiles: number;
@@ -48,6 +52,22 @@ export interface ContextEngineResult {
     readonly cacheStatus: "disabled" | "enabled-not-used";
   };
   readonly missingFacts: readonly string[];
+  readonly nextReadSuggestions: readonly string[];
+  readonly evidence: readonly string[];
+}
+
+export interface ContextRenarrowingFacts {
+  readonly renarrowingId: string;
+  readonly status: "refined-owner" | "additional-discovery" | "still-ambiguous";
+  readonly trigger: "ambiguous-context" | "insufficient-context";
+  readonly candidateIdsRead: readonly string[];
+  readonly refinedCandidateIds: readonly string[];
+  readonly confidence: "high" | "medium" | "low";
+  readonly filesRead: readonly {
+    readonly path: string;
+    readonly reason: string;
+    readonly source: "owner-renarrowing";
+  }[];
   readonly nextReadSuggestions: readonly string[];
   readonly evidence: readonly string[];
 }
@@ -199,12 +219,22 @@ export async function runContextEngine(input: {
     repo.targetRanking.ambiguityState === "multiple-plausible-candidates" &&
     shouldHoldForTargetDisambiguation(selectedCandidate)
   ) {
+    const contextRenarrowing = await buildContextRenarrowing({
+      workspaceRoot: input.workspaceRoot,
+      userTask: input.userTask,
+      repo,
+      trigger: "ambiguous-context",
+    });
     const workflowPlan = buildWorkflowPlan({
       userTask: input.userTask,
-      targetPath: selectedCandidate.path,
+      targetPath: contextRenarrowing.refinedCandidateIds[0]
+        ? repo.candidates.find((candidate) => candidate.candidateId === contextRenarrowing.refinedCandidateIds[0])?.path ?? selectedCandidate.path
+        : selectedCandidate.path,
       hasTarget: true,
       taskKindHint: input.taskKindHint,
-      blockedReason: "Multiple plausible in-workspace targets need disambiguation before staged context reads.",
+      blockedReason: contextRenarrowing.status === "refined-owner"
+        ? "Ambiguous context was re-narrowed; staged context reads must use the refined owner."
+        : "Multiple plausible in-workspace targets need disambiguation before staged context reads.",
     });
     const memory = buildInsufficientMemory({
       userTask: input.userTask,
@@ -227,12 +257,13 @@ export async function runContextEngine(input: {
       repo,
       selectedCandidate,
       discoveryHandoff,
+      contextRenarrowing,
       workflowPlan,
       memory,
-      filesRead: [],
+      filesRead: contextRenarrowing.filesRead,
       contextBudget: {
         candidateFiles: repo.candidates.length,
-        filesRead: 0,
+        filesRead: contextRenarrowing.filesRead.length,
         bytesUsed: 0,
         cacheStatus: repo.snapshot.cacheStatus,
       },
@@ -240,6 +271,7 @@ export async function runContextEngine(input: {
       nextReadSuggestions: [
         ...repo.nextReadSuggestions,
         ...memory.discoveryHandoff.nextReadSuggestions,
+        ...contextRenarrowing.nextReadSuggestions,
       ],
       evidence: [
         ...repo.evidence,
@@ -254,6 +286,7 @@ export async function runContextEngine(input: {
         `context-engine:discovery-handoff:${discoveryHandoff.handoffId}`,
         "context-engine:status:ambiguous-context",
         "context-engine:ambiguity:multiple-plausible-candidates",
+        ...contextRenarrowing.evidence,
         "context-engine:mutation-authority:not-granted",
       ],
     };
@@ -328,6 +361,89 @@ export async function runContextEngine(input: {
       "context-engine:mutation-authority:not-granted",
     ],
   };
+}
+
+async function buildContextRenarrowing(input: {
+  readonly workspaceRoot: string;
+  readonly userTask: string;
+  readonly repo: RepoIntelligenceResult;
+  readonly trigger: ContextRenarrowingFacts["trigger"];
+}): Promise<ContextRenarrowingFacts> {
+  const candidates = input.repo.candidates.slice(0, 4);
+  const taskTerms = tokenize(input.userTask);
+  const scored: Array<{
+    readonly candidate: RepoIntelligenceCandidate;
+    readonly score: number;
+    readonly read: ContextRenarrowingFacts["filesRead"][number];
+  }> = [];
+
+  for (const candidate of candidates) {
+    const absolutePath = path.join(input.workspaceRoot, candidate.path);
+    let content = "";
+    try {
+      content = await fs.readFile(absolutePath, "utf8");
+    } catch {
+      content = "";
+    }
+    const haystack = tokenize(`${candidate.safeLabel} ${content.slice(0, 1200)}`);
+    const score = taskTerms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
+    scored.push({
+      candidate,
+      score,
+      read: {
+        path: candidate.safeLabel,
+        reason: "read candidate owner during ambiguity re-narrowing",
+        source: "owner-renarrowing",
+      },
+    });
+  }
+
+  scored.sort((left, right) => right.score - left.score);
+  const top = scored[0];
+  const runnerUp = scored[1];
+  const refined = top && top.score > 0 && top.score > (runnerUp?.score ?? -1);
+  const confidence = refined
+    ? top.score >= 2
+      ? "high"
+      : "medium"
+    : "low";
+  const status = refined
+    ? "refined-owner"
+    : scored.length > 0
+      ? "additional-discovery"
+      : "still-ambiguous";
+  const refinedCandidateIds = refined && top ? [top.candidate.candidateId] : [];
+  const nextReadSuggestions = refined && top
+    ? [top.candidate.safeLabel]
+    : scored.map((item) => item.candidate.safeLabel);
+  const renarrowingId = `context_renarrowing_${input.repo.targetRanking.rankingId.replace(/^target_ranking_/, "")}`;
+
+  return {
+    renarrowingId,
+    status,
+    trigger: input.trigger,
+    candidateIdsRead: scored.map((item) => item.candidate.candidateId),
+    refinedCandidateIds,
+    confidence,
+    filesRead: scored.map((item) => item.read),
+    nextReadSuggestions,
+    evidence: [
+      `context-renarrowing:${renarrowingId}`,
+      `context-renarrowing:trigger:${input.trigger}`,
+      `context-renarrowing:status:${status}`,
+      `context-renarrowing:confidence:${confidence}`,
+      `context-renarrowing:candidates-read:${scored.map((item) => item.candidate.safeLabel).join(",") || "none"}`,
+      `context-renarrowing:refined:${refined && top ? top.candidate.safeLabel : "none"}`,
+      "context-renarrowing:raw-content-excluded",
+    ],
+  };
+}
+
+function tokenize(value: string): readonly string[] {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .filter((part) => part.length >= 3);
 }
 
 function buildDiscoveryHandoff(repo: RepoIntelligenceResult): ContextDiscoveryHandoffFacts {

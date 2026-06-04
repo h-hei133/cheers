@@ -187,8 +187,13 @@ describe("runContextEngine", () => {
     );
     expect(result.bundle).toBeUndefined();
     expect(result.contextAcquisitionHandoff).toBeUndefined();
-    expect(result.contextBudget.filesRead).toBe(0);
-    expect(result.filesRead).toEqual([]);
+    expect(result.contextBudget.filesRead).toBeGreaterThan(0);
+    expect(result.filesRead.map((file) => file.source)).toContain("owner-renarrowing");
+    expect(result.contextRenarrowing).toMatchObject({
+      trigger: "ambiguous-context",
+      status: "additional-discovery",
+      confidence: "low",
+    });
     expect(result.memory.candidateFiles).toEqual(
       expect.arrayContaining([
         "src/orders/statusPolicy.ts",
@@ -205,7 +210,52 @@ describe("runContextEngine", () => {
       "Multiple plausible in-workspace targets",
     );
     expect(result.evidence).toContain("context-engine:status:ambiguous-context");
+    expect(result.evidence).toContain(`context-renarrowing:${result.contextRenarrowing?.renarrowingId}`);
     expect(result.evidence).toContain("context-engine:mutation-authority:not-granted");
+  });
+
+  it("re-narrows ambiguous owners after reading candidate context and refines owner confidence", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "payments"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "src", "orders"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "payments", "statusPolicy.ts"),
+      "export function statusPolicy() { return 'payment-ready'; }\n",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "orders", "statusPolicy.ts"),
+      "export function statusPolicy() { return 'order-ready'; }\n",
+    );
+
+    const result = await runContextEngine({
+      workspaceRoot,
+      userTask: "Fix payment statusPolicy behavior",
+      maxRepoFiles: 80,
+      maxCandidates: 5,
+    });
+
+    expect(result.status).toBe("ambiguous-context");
+    expect(result.contextRenarrowing).toMatchObject({
+      status: "refined-owner",
+      trigger: "ambiguous-context",
+      confidence: "high",
+    });
+    expect(result.contextRenarrowing?.filesRead.map((file) => file.path)).toEqual(
+      expect.arrayContaining([
+        "src/payments/statusPolicy.ts",
+        "src/orders/statusPolicy.ts",
+      ]),
+    );
+    expect(result.contextRenarrowing?.nextReadSuggestions).toEqual([
+      "src/payments/statusPolicy.ts",
+    ]);
+    expect(result.workflowPlan.targetPath).toBe("src/payments/statusPolicy.ts");
+    expect(result.evidence).toEqual(
+      expect.arrayContaining([
+        "context-renarrowing:status:refined-owner",
+        "context-renarrowing:confidence:high",
+        "context-renarrowing:refined:src/payments/statusPolicy.ts",
+      ]),
+    );
   });
 
   it("rejects previous memory when repo snapshot or workspace path boundaries do not match", async () => {

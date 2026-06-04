@@ -108,6 +108,64 @@ describe("verificationRepairIterationFlow", () => {
       await fs.rm(workspaceRoot, { recursive: true, force: true });
     }
   });
+
+  it("uses failed first repair verification output for a bounded second repair and final re-verification", async () => {
+    const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "bounded-second-repair-"));
+    try {
+      const targetPath = "src/repair.ts";
+      const firstRepairContent = "export const repairStatus = 'almost-fixed';\n";
+      const expectedContent = "export const repairStatus = 'fixed';\n";
+      await writeFixture(workspaceRoot, targetPath, "export const repairStatus = 'broken';\n");
+
+      const result = await runVerificationRepairIterationFlow({
+        workspaceRoot,
+        targetPath,
+        expectedContent,
+        repairContents: [firstRepairContent, expectedContent],
+        maxRepairAttempts: 2,
+        taskId: "bounded-second-repair",
+        sessionId: "sess_bounded_second_repair",
+        prompt: "Repair after repeated failed task-relevant verification.",
+        verificationCommand: "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
+        verify: contentVerifier(),
+      });
+
+      expect(result.finalRepairVerdict).toBe("verified-success-with-repair");
+      expect(result.retryCount).toBe(2);
+      expect(result.maxRepairAttempts).toBe(2);
+      expect(result.repairAttempts.map((attempt) => attempt.postRepairVerification.status)).toEqual([
+        "failed",
+        "passed",
+      ]);
+      expect(result.postRepairVerification.status).toBe("passed");
+      expect(result.sameVerificationCommandRerun).toBe(true);
+      expect(result.productRepair.secondRepairReached).toBe(true);
+      expect(result.productRepair.attempts).toEqual([
+        expect.objectContaining({
+          attempt: 1,
+          failureOutputUsedForRetry: true,
+          postRepairVerificationStatus: "failed",
+        }),
+        expect.objectContaining({
+          attempt: 2,
+          failureOutputUsedForRetry: true,
+          postRepairVerificationStatus: "passed",
+        }),
+      ]);
+      expect(result.productRepair.verdict.status).toBe("COMPLETE");
+      expect(result.evidence).toEqual(
+        expect.arrayContaining([
+          "verification-repair-iteration:attempt:1:apply:single-target-applied",
+          "verification-repair-iteration:attempt:2:apply:single-target-applied",
+          "verification-repair-iteration:retry-count:2",
+          "verification-repair-iteration:max-attempts:2",
+          "verification-repair-iteration:final:verified-success-with-repair",
+        ]),
+      );
+    } finally {
+      await fs.rm(workspaceRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 async function writeFixture(

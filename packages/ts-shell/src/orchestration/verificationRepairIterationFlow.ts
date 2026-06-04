@@ -46,8 +46,14 @@ export interface VerificationRepairIterationResult {
   readonly postRepairVerification: RepairIterationVerification;
   readonly postRepairVerificationSource: "same-relevant-command";
   readonly sameVerificationCommandRerun: boolean;
-  readonly retryCount: 1;
-  readonly maxRepairAttempts: 1;
+  readonly repairAttempts: readonly {
+    readonly attempt: number;
+    readonly applyStatus: string;
+    readonly changedFiles: readonly string[];
+    readonly postRepairVerification: RepairIterationVerification;
+  }[];
+  readonly retryCount: number;
+  readonly maxRepairAttempts: number;
   readonly unconfirmedResult: OrchestrationResult;
   readonly unverifiedResult: OrchestrationResult;
   readonly finalResult: OrchestrationResult;
@@ -61,6 +67,8 @@ export async function runVerificationRepairIterationFlow(input: {
   readonly workspaceRoot: string;
   readonly targetPath: string;
   readonly expectedContent: string;
+  readonly repairContents?: readonly string[];
+  readonly maxRepairAttempts?: number;
   readonly taskId: string;
   readonly sessionId: string;
   readonly prompt: string;
@@ -106,10 +114,14 @@ export async function runVerificationRepairIterationFlow(input: {
     throw new Error("repair iteration requires an original failed verification");
   }
 
+  const repairContents = input.repairContents?.length
+    ? input.repairContents
+    : [input.expectedContent];
+  const maxRepairAttempts = input.maxRepairAttempts ?? repairContents.length;
   const repairHunks = deriveRepairHunks({
     targetPath: input.targetPath,
     actualContent: originalRead,
-    expectedContent: input.expectedContent,
+    expectedContent: repairContents[0] ?? input.expectedContent,
   });
   if (repairHunks.length === 0) {
     throw new Error("failed verification did not produce exact failure-derived repair hunks");
@@ -226,13 +238,73 @@ export async function runVerificationRepairIterationFlow(input: {
     applyResult,
   });
 
-  const postRepairVerification = await input.verify({
+  const repairAttempts: Array<{
+    readonly attempt: number;
+    readonly applyStatus: string;
+    readonly changedFiles: readonly string[];
+    readonly postRepairVerification: RepairIterationVerification;
+  }> = [];
+  let currentApplyResult = applyResult;
+  let postRepairVerification = await input.verify({
     workspaceRoot: input.workspaceRoot,
     targetPath: input.targetPath,
     expectedContent: input.expectedContent,
     command: input.verificationCommand,
     phase: "post-repair",
   });
+  repairAttempts.push({
+    attempt: 1,
+    applyStatus: currentApplyResult.status,
+    changedFiles: currentApplyResult.changedFiles,
+    postRepairVerification,
+  });
+
+  for (let attempt = 2; attempt <= maxRepairAttempts && postRepairVerification.status === "failed"; attempt += 1) {
+    const actualContent = authority.readVerifiedFile(input.targetPath);
+    const nextHunks = deriveRepairHunks({
+      targetPath: input.targetPath,
+      actualContent,
+      expectedContent: repairContents[attempt - 1] ?? input.expectedContent,
+    });
+    if (nextHunks.length === 0) break;
+    currentApplyResult = await applyEditProposalSelection({
+      selection: confirmation,
+      mappingByHunkId: new Map(nextHunks.map((hunk) => [
+        hunk.hunkId,
+        {
+          oldText: hunk.oldText,
+          newText: hunk.newText,
+          source: "replace-directive-to-fence" as const,
+        },
+      ])),
+      targetPathByLabel: new Map([[input.targetPath, input.targetPath]]),
+      fencedOptions: {
+        workspaceRoot: input.workspaceRoot,
+        explicitRuntimeOptIn: true,
+        explicitWorkspaceWriteOptIn: true,
+        requestedUserDecision: "approved",
+        defaultProductionRejectionUnchanged: true,
+        readFile: authority.readFile,
+        readVerifiedFile: authority.readVerifiedFile,
+        validateWriteTarget: authority.validateWriteTarget,
+        writeFile: authority.writeFile,
+      },
+    });
+    postRepairVerification = await input.verify({
+      workspaceRoot: input.workspaceRoot,
+      targetPath: input.targetPath,
+      expectedContent: input.expectedContent,
+      command: input.verificationCommand,
+      phase: "post-repair",
+    });
+    repairAttempts.push({
+      attempt,
+      applyStatus: currentApplyResult.status,
+      changedFiles: currentApplyResult.changedFiles,
+      postRepairVerification,
+    });
+  }
+
   const finalResult = buildVerificationRepairResult({
     sessionId: input.sessionId,
     prompt: input.prompt,
@@ -240,7 +312,7 @@ export async function runVerificationRepairIterationFlow(input: {
     plan: handoff,
     review,
     selection: confirmation,
-    applyResult,
+    applyResult: currentApplyResult,
     postApplyVerification: {
       status: postRepairVerification.status === "passed" ? "passed" : "failed",
       command: postRepairVerification.command,
@@ -252,7 +324,7 @@ export async function runVerificationRepairIterationFlow(input: {
     },
   });
   const finalRepairVerdict = classifyFinalRepairVerdict({
-    applyStatus: applyResult.status,
+    applyStatus: currentApplyResult.status,
     postRepairVerification,
   });
   const notProvenClaims =
@@ -263,15 +335,25 @@ export async function runVerificationRepairIterationFlow(input: {
     originalFailurePreserved: true,
     repairProposalSource: "deterministic-from-failure-evidence",
     confirmationSource: "explicit-authority-contract",
-    applyStatus: applyResult.status,
+    applyStatus: currentApplyResult.status,
     postRepairVerificationStatus: postRepairVerification.status,
     sameVerificationCommandRerun: postRepairVerification.command === input.verificationCommand,
-    retryCount: 1,
-    maxRepairAttempts: 1,
-    changedFiles: applyResult.changedFiles,
+    retryCount: repairAttempts.length,
+    maxRepairAttempts,
+    changedFiles: uniquePaths(repairAttempts.flatMap((attempt) => attempt.changedFiles)),
     notProvenClaims,
     finalRepairVerdict,
     verificationFailureSummary: originalFailure.reason,
+    attempts: repairAttempts.map((attempt) => ({
+      attempt: attempt.attempt,
+      verificationFailureSummary: attempt.attempt === 1
+        ? originalFailure.reason
+        : repairAttempts[attempt.attempt - 2]?.postRepairVerification.reason ?? originalFailure.reason,
+      applyStatus: attempt.applyStatus,
+      postRepairVerificationStatus: attempt.postRepairVerification.status,
+      sameVerificationCommandRerun: attempt.postRepairVerification.command === input.verificationCommand,
+      changedFiles: attempt.changedFiles,
+    })),
   });
 
   return {
@@ -284,13 +366,14 @@ export async function runVerificationRepairIterationFlow(input: {
     missingConfirmationState: missingConfirmation.state,
     confirmationState: confirmation.state,
     confirmationSource: "explicit-authority-contract",
-    applyStatus: applyResult.status,
-    changedFiles: applyResult.changedFiles,
+    applyStatus: currentApplyResult.status,
+    changedFiles: uniquePaths(repairAttempts.flatMap((attempt) => attempt.changedFiles)),
     postRepairVerification,
     postRepairVerificationSource: "same-relevant-command",
     sameVerificationCommandRerun: postRepairVerification.command === input.verificationCommand,
-    retryCount: 1,
-    maxRepairAttempts: 1,
+    repairAttempts,
+    retryCount: repairAttempts.length,
+    maxRepairAttempts,
     unconfirmedResult,
     unverifiedResult,
     finalResult,
@@ -305,7 +388,10 @@ export async function runVerificationRepairIterationFlow(input: {
       ...missingConfirmation.evidence,
       ...confirmation.evidence,
       ...handoff.evidence,
-      ...applyResult.evidence,
+      ...repairAttempts.flatMap((attempt) => [
+        `verification-repair-iteration:attempt:${attempt.attempt}:apply:${attempt.applyStatus}`,
+        ...attempt.postRepairVerification.evidence,
+      ]),
       ...postRepairVerification.evidence,
       ...(finalResult.codingResult?.evidence ?? []),
       `verification-repair-iteration:final:${finalRepairVerdict}`,
@@ -314,8 +400,8 @@ export async function runVerificationRepairIterationFlow(input: {
       "verification-repair-iteration:confirmation:explicit-authority-contract",
       "verification-repair-iteration:apply:existing-hunk-set-route",
       "verification-repair-iteration:rerun:same-relevant-command",
-      "verification-repair-iteration:retry-count:1",
-      "verification-repair-iteration:max-attempts:1",
+      `verification-repair-iteration:retry-count:${repairAttempts.length}`,
+      `verification-repair-iteration:max-attempts:${maxRepairAttempts}`,
       "verification-repair-iteration:provider-call-during-apply:not-run",
       "verification-repair-iteration:raw-content-excluded",
     ],
@@ -414,6 +500,10 @@ function deriveRepairHunks(input: {
 function splitComparableLines(content: string): readonly string[] {
   const lines = content.split("\n");
   return lines.at(-1) === "" ? lines.slice(0, -1) : lines;
+}
+
+function uniquePaths(paths: readonly string[]): readonly string[] {
+  return [...new Set(paths.map((item) => item.replace(/\\/g, "/").replace(/^\.\/+/g, "").trim()).filter(Boolean))];
 }
 
 function stableId(...parts: readonly string[]): string {

@@ -5,6 +5,7 @@ import {
   buildWorkflowActionGraph,
   orderedMutationTargetsFromGraph,
   projectWorkflowActionCursor,
+  updateWorkflowActionGraphFromFeedback,
 } from "./graph.js";
 
 describe("workflowActionGraph", () => {
@@ -72,5 +73,68 @@ describe("workflowActionGraph", () => {
       "src/status/producer.ts",
       "src/status/consumer.ts",
     ]);
+  });
+
+  it("updates action graph after context re-narrowing and verification feedback", () => {
+    const graph = buildWorkflowActionGraph({
+      taskKind: "edit-file",
+      reason: "fix status policy",
+      targetPath: "src/statusPolicy.ts",
+      inspectFirst: true,
+      verifyAfterEdit: true,
+    } as WorkflowTaskPlan);
+
+    const renarrowed = updateWorkflowActionGraphFromFeedback({
+      graph: graph!,
+      feedback: {
+        source: "context-renarrowing",
+        refinedTargetPath: "src/payments/statusPolicy.ts",
+        additionalTargetPaths: ["src/payments/statusConsumer.ts"],
+      },
+    });
+    expect(renarrowed.changedFileIntents).toEqual([
+      "src/payments/statusPolicy.ts",
+      "src/statusPolicy.ts",
+      "src/payments/statusConsumer.ts",
+    ]);
+    expect(orderedMutationTargetsFromGraph(renarrowed)).toEqual([
+      "src/payments/statusPolicy.ts",
+      "src/payments/statusConsumer.ts",
+    ]);
+
+    const repaired = updateWorkflowActionGraphFromFeedback({
+      graph: renarrowed,
+      feedback: {
+        source: "verification",
+        failedChangedFiles: ["src/payments/statusConsumer.ts"],
+        verificationFailureSummary: "consumer still imports stale status name",
+      },
+    });
+
+    expect(repaired.orderedNodeIds).toEqual(
+      expect.arrayContaining([
+        "diagnose-failure",
+        "repair-from-diagnosis",
+        "reverify-repair",
+      ]),
+    );
+    expect(repaired.changedFileIntents).toContain("src/payments/statusConsumer.ts");
+    expect(repaired.dependencyReasons).toEqual(
+      expect.arrayContaining([
+        "feedback:context-renarrowing:context-update",
+        "feedback:verification:verification-failure",
+      ]),
+    );
+    expect(projectWorkflowActionCursor({
+      graph: repaired,
+      completedNodeIds: [
+        "inspect-target",
+        "edit-primary",
+        "write-related-src_payments_statusConsumer.ts",
+        "verify-changes",
+      ],
+    }).nextAction).toEqual(
+      expect.objectContaining({ id: "diagnose-failure", kind: "diagnose" }),
+    );
   });
 });

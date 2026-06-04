@@ -102,4 +102,47 @@ describe("repairFacade", () => {
       "verification failure output not used for retry",
     );
   });
+
+  it("records bounded second repair attempt proof from verification failure output", () => {
+    const projection = projectRepairIteration({
+      originalFailurePreserved: true,
+      repairProposalSource: "deterministic-from-failure-evidence",
+      confirmationSource: "explicit-authority-contract",
+      applyStatus: "single-target-applied",
+      postRepairVerificationStatus: "passed",
+      sameVerificationCommandRerun: true,
+      retryCount: 2,
+      maxRepairAttempts: 2,
+      changedFiles: ["src/repair.ts"],
+      notProvenClaims: ["live provider repair proposal"],
+      finalRepairVerdict: "verified-success-with-repair",
+      verificationFailureSummary: "original failed verification",
+      attempts: [
+        {
+          attempt: 1,
+          verificationFailureSummary: "original failed verification",
+          applyStatus: "single-target-applied",
+          postRepairVerificationStatus: "failed",
+          sameVerificationCommandRerun: true,
+          changedFiles: ["src/repair.ts"],
+        },
+        {
+          attempt: 2,
+          verificationFailureSummary: "first repair verification failed",
+          applyStatus: "single-target-applied",
+          postRepairVerificationStatus: "passed",
+          sameVerificationCommandRerun: true,
+          changedFiles: ["src/repair.ts"],
+        },
+      ],
+    });
+
+    expect(projection.secondRepairReached).toBe(true);
+    expect(projection.failureOutputUsedForRetry).toBe(true);
+    expect(projection.attempts.map((attempt) => attempt.failureOutputUsedForRetry)).toEqual([
+      true,
+      true,
+    ]);
+    expect(projection.verdict.status).toBe("COMPLETE");
+  });
 });

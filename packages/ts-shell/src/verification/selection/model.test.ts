@@ -88,4 +88,40 @@ describe("verification selection model", () => {
     expect(selection.blockers).toContain("verification failed");
     expect(selection.proves).toEqual([]);
   });
+
+  it("selects verification from task intent, changed files, and failure history", () => {
+    const selection = selectVerification({
+      taskKind: "coding-edit",
+      taskPath: "edit",
+      taskIntent: "repair payment status consumer after failed test",
+      changedFiles: ["src/payments/status.ts", "src/payments/statusConsumer.ts"],
+      expectedStatus: "failed",
+      expectedCheck: "focused payment status test",
+      hostEvidenceVerdict: "not-proven",
+      hostStatus: "failed",
+      failureCategories: [],
+      failureHistory: [{
+        command: "npm test -- statusConsumer.test.ts",
+        status: "failed",
+        changedFiles: ["src/payments/statusConsumer.ts"],
+        reason: "consumer still imports stale status name",
+      }],
+    });
+
+    expect(selection).toMatchObject({
+      purpose: "code-edit",
+      state: "selected-failed",
+      selectedInputs: {
+        taskIntent: "repair payment status consumer after failed test",
+        changedFiles: ["src/payments/status.ts", "src/payments/statusConsumer.ts"],
+        failureHistoryUsed: true,
+      },
+      evidenceInputEligible: false,
+      resultInputEligible: false,
+    });
+    expect(selection.blockers).toContain(
+      "previous failed verification: consumer still imports stale status name",
+    );
+    expect(selection.fallback).toBe("diagnose failure before bounded repair");
+  });
 });

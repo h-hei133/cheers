@@ -18,6 +18,9 @@ export interface ArtifactReceiptInput {
   readonly workspacePaths: readonly string[];
   readonly verificationState: string;
   readonly failureCategories: readonly string[];
+  readonly requiredContentMarkers?: readonly string[];
+  readonly observedContentMarkers?: readonly string[];
+  readonly verificationEvidence?: readonly string[];
 }
 
 export interface ArtifactReceipt {
@@ -31,6 +34,9 @@ export interface ArtifactReceipt {
   readonly outputPath?: string;
   readonly formatExpectation: string;
   readonly validationCheck: string;
+  readonly requiredContentMarkers: readonly string[];
+  readonly observedContentMarkers: readonly string[];
+  readonly verificationEvidenceReceipts: readonly string[];
   readonly validationState: ArtifactValidationState;
   readonly blockers: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -69,6 +75,9 @@ export function createArtifactReceipt(input: ArtifactReceiptInput): ArtifactRece
     outputPath,
     formatExpectation: formatExpectationFor(kind, outputPath),
     validationCheck: validationCheckFor(kind),
+    requiredContentMarkers: freeze([...(input.requiredContentMarkers ?? [])]),
+    observedContentMarkers: freeze([...(input.observedContentMarkers ?? [])]),
+    verificationEvidenceReceipts: freeze(safeEvidence(input.verificationEvidence ?? [])),
     validationState,
     blockers,
     terminalSuccessClaim: false,
@@ -145,6 +154,12 @@ function artifactValidationStateFor(input: ArtifactReceiptInput): ArtifactValida
   if (input.failureCategories.includes("artifact invalid")) {
     return input.verificationState === "selected-failed" ? "validation-failed" : "invalid";
   }
+  if (!requiredContentSatisfied(input)) {
+    return input.verificationState === "selected-failed" ? "validation-failed" : "invalid";
+  }
+  if ((input.verificationEvidence ?? []).length === 0) {
+    return "not-proven";
+  }
   if (input.verificationState === "selected-passed") {
     return "validation-passed";
   }
@@ -152,6 +167,17 @@ function artifactValidationStateFor(input: ArtifactReceiptInput): ArtifactValida
     return "not-proven";
   }
   return "intent-created";
+}
+
+function requiredContentSatisfied(input: ArtifactReceiptInput): boolean {
+  const required = input.requiredContentMarkers ?? [];
+  if (required.length === 0) return true;
+  const observed = new Set(input.observedContentMarkers ?? []);
+  return required.every((marker) => observed.has(marker));
+}
+
+function safeEvidence(evidence: readonly string[]): readonly string[] {
+  return evidence.map((item) => item.replace(/\s+/g, " ").trim().slice(0, 180));
 }
 
 function artifactBlockersFor(

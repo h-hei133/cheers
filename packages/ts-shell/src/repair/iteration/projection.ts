@@ -33,6 +33,8 @@ export interface ProductRepairIterationProjection {
   readonly sameVerificationCommandRerun: boolean;
   readonly retryCount: number;
   readonly maxRepairAttempts: number;
+  readonly attempts: readonly ProductRepairAttemptProjection[];
+  readonly secondRepairReached: boolean;
   readonly changedFiles: readonly string[];
   readonly notProvenClaims: readonly string[];
   readonly finalRepairVerdict: ProductRepairFinalVerdict;
@@ -45,6 +47,16 @@ export interface ProductRepairIterationProjection {
   readonly verdict: ProductVerdict;
   readonly repairProposalIsSuccess: false;
   readonly repairApplyWithoutReverifyIsSuccess: false;
+}
+
+export interface ProductRepairAttemptProjection {
+  readonly attempt: number;
+  readonly verificationFailureSummary: string;
+  readonly applyStatus: ProductRepairApplyStatus;
+  readonly postRepairVerificationStatus: ProductRepairVerificationStatus;
+  readonly sameVerificationCommandRerun: boolean;
+  readonly changedFiles: readonly string[];
+  readonly failureOutputUsedForRetry: boolean;
 }
 
 export function projectRepairIteration(input: {
@@ -60,13 +72,22 @@ export function projectRepairIteration(input: {
   readonly notProvenClaims: readonly string[];
   readonly finalRepairVerdict: ProductRepairFinalVerdict;
   readonly verificationFailureSummary?: string;
+  readonly attempts?: readonly {
+    readonly attempt: number;
+    readonly verificationFailureSummary?: string;
+    readonly applyStatus: ProductRepairApplyStatus;
+    readonly postRepairVerificationStatus: ProductRepairVerificationStatus;
+    readonly sameVerificationCommandRerun: boolean;
+    readonly changedFiles: readonly string[];
+  }[];
 }): ProductRepairIterationProjection {
+  const attempts = normalizeAttempts(input);
   const applySucceeded = isRepairApplySuccess(input.applyStatus);
   const failureDiagnosis = input.verificationFailureSummary?.trim()
     ? sanitizeSummary(input.verificationFailureSummary)
     : undefined;
   const failureOutputUsedForRetry =
-    input.retryCount <= 0 || Boolean(failureDiagnosis);
+    input.retryCount <= 0 || attempts.every((attempt) => attempt.failureOutputUsedForRetry);
   const reviewedApplyEligibility =
     failureDiagnosis && input.confirmationSource
       ? "eligible"
@@ -118,6 +139,8 @@ export function projectRepairIteration(input: {
     sameVerificationCommandRerun: input.sameVerificationCommandRerun,
     retryCount: input.retryCount,
     maxRepairAttempts: input.maxRepairAttempts,
+    attempts,
+    secondRepairReached: attempts.some((attempt) => attempt.attempt >= 2),
     changedFiles: input.changedFiles,
     notProvenClaims: input.notProvenClaims,
     finalRepairVerdict: input.finalRepairVerdict,
@@ -142,6 +165,46 @@ export function projectRepairIteration(input: {
     repairProposalIsSuccess: false,
     repairApplyWithoutReverifyIsSuccess: false,
   };
+}
+
+function normalizeAttempts(input: {
+  readonly retryCount: number;
+  readonly applyStatus: ProductRepairApplyStatus;
+  readonly postRepairVerificationStatus: ProductRepairVerificationStatus;
+  readonly sameVerificationCommandRerun: boolean;
+  readonly changedFiles: readonly string[];
+  readonly verificationFailureSummary?: string;
+  readonly attempts?: readonly {
+    readonly attempt: number;
+    readonly verificationFailureSummary?: string;
+    readonly applyStatus: ProductRepairApplyStatus;
+    readonly postRepairVerificationStatus: ProductRepairVerificationStatus;
+    readonly sameVerificationCommandRerun: boolean;
+    readonly changedFiles: readonly string[];
+  }[];
+}): readonly ProductRepairAttemptProjection[] {
+  const sourceAttempts = input.attempts?.length
+    ? input.attempts
+    : [{
+        attempt: Math.max(1, input.retryCount),
+        verificationFailureSummary: input.verificationFailureSummary,
+        applyStatus: input.applyStatus,
+        postRepairVerificationStatus: input.postRepairVerificationStatus,
+        sameVerificationCommandRerun: input.sameVerificationCommandRerun,
+        changedFiles: input.changedFiles,
+      }];
+  return sourceAttempts.map((attempt) => {
+    const summary = sanitizeSummary(attempt.verificationFailureSummary ?? "");
+    return {
+      attempt: attempt.attempt,
+      verificationFailureSummary: summary,
+      applyStatus: attempt.applyStatus,
+      postRepairVerificationStatus: attempt.postRepairVerificationStatus,
+      sameVerificationCommandRerun: attempt.sameVerificationCommandRerun,
+      changedFiles: attempt.changedFiles,
+      failureOutputUsedForRetry: summary.length > 0,
+    };
+  });
 }
 
 function sanitizeSummary(value: string): string {

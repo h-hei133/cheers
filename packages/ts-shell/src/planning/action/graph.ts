@@ -35,6 +35,14 @@ export interface WorkflowActionCursor {
   readonly evidence: readonly string[];
 }
 
+export interface WorkflowActionFeedback {
+  readonly source: "context-renarrowing" | "verification";
+  readonly refinedTargetPath?: string;
+  readonly additionalTargetPaths?: readonly string[];
+  readonly failedChangedFiles?: readonly string[];
+  readonly verificationFailureSummary?: string;
+}
+
 export function buildWorkflowActionGraph(plan: WorkflowTaskPlan): WorkflowActionGraph | undefined {
   if (plan.taskKind !== "edit-file" && plan.taskKind !== "write-file") {
     return undefined;
@@ -122,6 +130,106 @@ export function buildWorkflowActionGraph(plan: WorkflowTaskPlan): WorkflowAction
     dependencyReasons: nodes
       .filter((node) => node.dependsOn.length > 0)
       .map((node) => `${node.id}<-${node.dependsOn.join("+")}: ${node.reason}`),
+  };
+}
+
+export function updateWorkflowActionGraphFromFeedback(input: {
+  readonly graph: WorkflowActionGraph;
+  readonly feedback: WorkflowActionFeedback;
+}): WorkflowActionGraph {
+  const changedFileIntents = uniquePaths([
+    ...(input.feedback.refinedTargetPath ? [input.feedback.refinedTargetPath] : []),
+    ...input.graph.changedFileIntents,
+    ...(input.feedback.additionalTargetPaths ?? []),
+    ...(input.feedback.failedChangedFiles ?? []),
+  ]);
+  const nodes = input.graph.nodes.map((node) => {
+    if (
+      input.feedback.source === "context-renarrowing" &&
+      input.feedback.refinedTargetPath &&
+      (node.kind === "edit" || node.kind === "write" || node.kind === "context") &&
+      input.graph.changedFileIntents.includes(node.target ?? "")
+    ) {
+      return {
+        ...node,
+        target: input.feedback.refinedTargetPath,
+        reason: `${node.reason} Refined by renewed owner context.`,
+      };
+    }
+    return node;
+  });
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const verifyNodeId = nodes.find((node) => node.kind === "verify")?.id;
+  const mutationNodeIds = nodes
+    .filter((node) => node.kind === "edit" || node.kind === "write")
+    .map((node) => node.id);
+  const extraNodes: WorkflowActionNode[] = [];
+
+  for (const target of input.feedback.additionalTargetPaths ?? []) {
+    const id = `write-related-${stableId(target)}`;
+    if (nodeIds.has(id)) continue;
+    extraNodes.push({
+      id,
+      kind: "write",
+      target,
+      dependsOn: mutationNodeIds.length > 0 ? [mutationNodeIds[mutationNodeIds.length - 1] as string] : [],
+      reason: "Apply related file update discovered after renewed context.",
+    });
+    nodeIds.add(id);
+  }
+
+  if (input.feedback.source === "verification" && input.feedback.verificationFailureSummary) {
+    if (!nodeIds.has("diagnose-failure")) {
+      extraNodes.push({
+        id: "diagnose-failure",
+        kind: "diagnose",
+        dependsOn: verifyNodeId ? [verifyNodeId] : mutationNodeIds,
+        reason: "Use failed verification output before repair.",
+      });
+      nodeIds.add("diagnose-failure");
+    }
+    if (!nodeIds.has("repair-from-diagnosis")) {
+      extraNodes.push({
+        id: "repair-from-diagnosis",
+        kind: "repair",
+        dependsOn: ["diagnose-failure"],
+        reason: "Generate a bounded repair action from verification feedback.",
+      });
+      nodeIds.add("repair-from-diagnosis");
+    }
+    if (!nodeIds.has("reverify-repair")) {
+      extraNodes.push({
+        id: "reverify-repair",
+        kind: "verify",
+        dependsOn: ["repair-from-diagnosis"],
+        reason: "Rerun relevant verification after the feedback repair.",
+      });
+      nodeIds.add("reverify-repair");
+    }
+  }
+
+  const updatedNodes = [...nodes, ...extraNodes];
+  const feedbackId = stableId([
+    input.graph.graphId,
+    input.feedback.source,
+    input.feedback.refinedTargetPath ?? "",
+    ...(input.feedback.additionalTargetPaths ?? []),
+    ...(input.feedback.failedChangedFiles ?? []),
+    input.feedback.verificationFailureSummary ?? "",
+  ].join("_"));
+
+  return {
+    graphId: `${input.graph.graphId}_updated_${feedbackId}`,
+    nodes: updatedNodes,
+    orderedNodeIds: updatedNodes.map((node) => node.id),
+    changedFileIntents,
+    dependencyReasons: [
+      ...updatedNodes
+        .filter((node) => node.dependsOn.length > 0)
+        .map((node) => `${node.id}<-${node.dependsOn.join("+")}: ${node.reason}`),
+      ...input.graph.dependencyReasons.filter((reason) => reason.startsWith("feedback:")),
+      `feedback:${input.feedback.source}:${input.feedback.verificationFailureSummary ? "verification-failure" : "context-update"}`,
+    ],
   };
 }
 
