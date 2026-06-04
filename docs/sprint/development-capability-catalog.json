@@ -1,0 +1,252 @@
+{
+  "catalogId": "development-capability-catalog",
+  "version": 1,
+  "tasks": [
+    {
+      "entryId": "catalog-label-policy",
+      "caseId": "catalog-label-policy",
+      "baseCaseId": "single-file-edit",
+      "entryKind": "write-edit",
+      "taskKind": "coding-edit",
+      "taskPath": "edit",
+      "shortPrompt": "Normalize a status label in the owner module, update only the smallest policy surface, and prove the focused check.",
+      "gate": "anchored-provider",
+      "safetyClass": "manual-review",
+      "writePolicy": "manual-review-required",
+      "validationPlan": "patch intent, owner-correct target, dry-run diff, explicit review authority, isolated apply, and post-apply proof",
+      "requirements": ["patch intent", "owner-correct target", "dry-run diff", "explicit review authority", "isolated apply", "post-apply verification", "task proof"],
+      "allowedTools": ["read", "edit", "verify"],
+      "allowedWrites": ["src/status/policy.ts"],
+      "expectedOutput": {
+        "kind": "diff",
+        "summary": "single owner policy update",
+        "requiredPaths": ["src/status/policy.ts"]
+      },
+      "expectedVerification": {
+        "verificationId": "label-policy-focused-check",
+        "commandOrCheck": "focused status policy check",
+        "expectedStatus": "passed"
+      },
+      "successRubric": ["owner placement is justified", "single file is changed", "verification proves the label behavior"],
+      "failureCategories": ["edit failure", "verification not selected", "completion proof missing"],
+      "redactionExpectations": ["provider-output", "patch-body"],
+      "hostEvaluationCaseId": "multi-target-mutation-success"
+    },
+    {
+      "entryId": "catalog-status-chain",
+      "caseId": "catalog-status-chain",
+      "baseCaseId": "coordinated-edit",
+      "entryKind": "write-edit",
+      "taskKind": "coding-edit",
+      "taskPath": "edit",
+      "shortPrompt": "Update a status producer and consumer together so the consumer reports the new terminal-neutral state.",
+      "gate": "anchored-provider",
+      "safetyClass": "manual-review",
+      "writePolicy": "manual-review-required",
+      "validationPlan": "coordinated patch intent, dry-run diff, explicit review authority, isolated apply, and producer-consumer verification",
+      "requirements": ["patch intent", "coordinated targets", "dry-run diff", "explicit review authority", "isolated apply", "post-apply verification", "task proof"],
+      "allowedTools": ["read", "edit", "verify"],
+      "allowedWrites": ["src/status/producer.ts", "src/status/consumer.ts"],
+      "expectedOutput": {
+        "kind": "diff",
+        "summary": "producer and consumer status update",
+        "requiredPaths": ["src/status/producer.ts", "src/status/consumer.ts"]
+      },
+      "expectedVerification": {
+        "verificationId": "status-chain-focused-check",
+        "commandOrCheck": "focused status chain check",
+        "expectedStatus": "passed"
+      },
+      "successRubric": ["both sides are accounted for", "changed files list has two paths", "verification proves the shared state"],
+      "failureCategories": ["wrong context selected", "planning weak", "verification failed", "completion proof missing"],
+      "redactionExpectations": ["provider-output", "patch-body"],
+      "hostEvaluationCaseId": "multi-target-mutation-success"
+    },
+    {
+      "entryId": "catalog-assertion-fix",
+      "caseId": "catalog-assertion-fix",
+      "baseCaseId": "failed-check-repair",
+      "entryKind": "write-repair",
+      "taskKind": "debug-repair",
+      "taskPath": "edit",
+      "shortPrompt": "Diagnose a failing assertion, preserve the original failure evidence, apply the bounded repair, and rerun the same check.",
+      "gate": "anchored-provider",
+      "safetyClass": "manual-review",
+      "writePolicy": "manual-review-required",
+      "validationPlan": "original failure, repair intent, dry-run diff, explicit review authority, isolated apply, and rerun verification",
+      "requirements": ["original failure evidence", "patch intent", "dry-run diff", "explicit review authority", "isolated apply", "post-apply verification", "task proof"],
+      "allowedTools": ["read", "edit", "verify"],
+      "allowedWrites": ["src/assertions/check.ts"],
+      "expectedOutput": {
+        "kind": "diff",
+        "summary": "bounded assertion repair",
+        "requiredPaths": ["src/assertions/check.ts"]
+      },
+      "expectedVerification": {
+        "verificationId": "assertion-rerun-check",
+        "commandOrCheck": "rerun original assertion check",
+        "expectedStatus": "passed"
+      },
+      "repairValidationEvidence": {
+        "status": "passed",
+        "check": "rerun original assertion check",
+        "originalFailurePreserved": true
+      },
+      "successRubric": ["original failure is retained", "repair is bounded", "same check passes after repair"],
+      "failureCategories": ["verification failed", "repair failed", "completion proof missing"],
+      "redactionExpectations": ["provider-output", "patch-body"],
+      "hostEvaluationCaseId": "mutation-recovery-success"
+    },
+    {
+      "entryId": "catalog-incident-brief",
+      "caseId": "catalog-incident-brief",
+      "baseCaseId": "incident-summary-report",
+      "entryKind": "report-artifact",
+      "taskKind": "docs-report",
+      "taskPath": "artifact",
+      "shortPrompt": "Create an incident brief from safe fixture notes and validate that every required section is present.",
+      "gate": "artifact-dry-run",
+      "safetyClass": "manual-review",
+      "writePolicy": "manual-review-required",
+      "validationPlan": "source receipts, required report sections, artifact validation, no write, and manual review before write",
+      "requirements": ["source receipts", "artifact validation", "provider auth readiness", "no write", "manual review"],
+      "allowedTools": ["read", "artifact-validate"],
+      "allowedWrites": ["reports/incident-brief.md"],
+      "expectedOutput": {
+        "kind": "artifact",
+        "summary": "incident brief with required sections",
+        "requiredPaths": ["reports/incident-brief.md"]
+      },
+      "expectedVerification": {
+        "verificationId": "incident-brief-shape",
+        "commandOrCheck": "incident brief section validation",
+        "expectedStatus": "passed"
+      },
+      "successRubric": ["source receipts are present", "required sections are validated", "artifact existence alone is not counted"],
+      "failureCategories": ["artifact invalid", "completion proof missing"],
+      "redactionExpectations": ["provider-output"],
+      "hostEvaluationCaseId": "provider-compatibility-happy"
+    },
+    {
+      "entryId": "catalog-rollup-data",
+      "caseId": "catalog-rollup-data",
+      "baseCaseId": "metrics-summary-artifact",
+      "entryKind": "data-artifact",
+      "taskKind": "data-artifact",
+      "taskPath": "artifact",
+      "shortPrompt": "Build a metrics rollup shape from safe rows and validate totals without claiming artifact existence as success.",
+      "gate": "artifact-dry-run",
+      "safetyClass": "manual-review",
+      "writePolicy": "manual-review-required",
+      "validationPlan": "source receipts, structured totals, schema validation, no write, and manual review before write",
+      "requirements": ["source receipts", "schema validation", "provider auth readiness", "no write", "manual review"],
+      "allowedTools": ["read", "artifact-validate"],
+      "allowedWrites": ["reports/metrics-rollup.json"],
+      "expectedOutput": {
+        "kind": "artifact",
+        "summary": "metrics rollup with validated totals",
+        "requiredPaths": ["reports/metrics-rollup.json"]
+      },
+      "expectedVerification": {
+        "verificationId": "metrics-rollup-schema",
+        "commandOrCheck": "metrics rollup schema validation",
+        "expectedStatus": "passed"
+      },
+      "successRubric": ["source receipts are present", "totals are validated", "schema proof is required"],
+      "failureCategories": ["artifact invalid", "verification not selected", "completion proof missing"],
+      "redactionExpectations": ["provider-output"],
+      "hostEvaluationCaseId": "provider-compatibility-happy"
+    },
+    {
+      "entryId": "catalog-review-resume",
+      "caseId": "catalog-review-resume",
+      "baseCaseId": "resume-from-context",
+      "entryKind": "continuation",
+      "taskKind": "continuation",
+      "taskPath": "continuation",
+      "shortPrompt": "Resume from retained context, refresh the target, and complete only the remaining review step without applying changes.",
+      "gate": "anchored-provider",
+      "safetyClass": "safe-no-write",
+      "writePolicy": "no-write",
+      "validationPlan": "fresh continuation context, target freshness, anchored no-apply result, redaction, and task proof",
+      "requirements": ["fresh continuation", "target freshness", "anchored output validation", "provider auth readiness", "no apply", "task proof"],
+      "allowedTools": ["read", "verify"],
+      "allowedWrites": [],
+      "expectedOutput": {
+        "kind": "continuation",
+        "summary": "remaining review step completed",
+        "requiredPaths": []
+      },
+      "expectedVerification": {
+        "verificationId": "resume-target-freshness",
+        "commandOrCheck": "continuation target freshness check",
+        "expectedStatus": "passed"
+      },
+      "successRubric": ["context is refreshed", "no apply occurs", "remaining step is explicit"],
+      "failureCategories": ["continuation stale", "context insufficient", "completion proof missing"],
+      "redactionExpectations": ["provider-output"],
+      "hostEvaluationCaseId": "branch-compaction-continuation",
+      "setupEvaluationCaseIds": ["branch-compaction-continuation"]
+    },
+    {
+      "entryId": "catalog-provider-recovery",
+      "caseId": "catalog-provider-recovery",
+      "baseCaseId": "live-provider-triage",
+      "entryKind": "provider-triage",
+      "taskKind": "live-triage",
+      "taskPath": "provider",
+      "shortPrompt": "Classify a forced primary provider-network failure and report the configured fallback decision through the shared runtime.",
+      "gate": "anchored-provider",
+      "safetyClass": "safe-no-write",
+      "writePolicy": "no-write",
+      "validationPlan": "primary provider-network classification, configured fallback attempt, fallback outcome, no mutation, redaction, and non-terminal proof",
+      "requirements": ["primary failure classification", "fallback decision", "fallback attempt", "provider auth readiness", "no mutation", "task proof"],
+      "allowedTools": ["provider-request", "verify"],
+      "allowedWrites": [],
+      "expectedOutput": {
+        "kind": "analysis",
+        "summary": "provider fallback classification",
+        "requiredPaths": []
+      },
+      "expectedVerification": {
+        "verificationId": "provider-fallback-runtime",
+        "commandOrCheck": "forced primary network failure attempts configured fallback",
+        "expectedStatus": "passed"
+      },
+      "successRubric": ["primary failure class is provider-network", "fallback is attempted when configured", "fallback success is not terminal task success by itself"],
+      "failureCategories": ["provider failure", "verification not selected", "completion proof missing"],
+      "redactionExpectations": ["provider-output", "provider-config"],
+      "hostEvaluationCaseId": "provider-fallback"
+    },
+    {
+      "entryId": "catalog-owner-receipt",
+      "caseId": "catalog-owner-receipt",
+      "baseCaseId": "owner-context-question",
+      "entryKind": "pathless-context",
+      "taskKind": "workspace-understanding",
+      "taskPath": "tool",
+      "shortPrompt": "Identify the owner area for a safe execution receipt summary and select the focused validation gate without mutating files.",
+      "gate": "read-only-provider",
+      "safetyClass": "safe-no-write",
+      "writePolicy": "no-write",
+      "validationPlan": "owner context, focused validation selection, no mutation, redaction, and task proof",
+      "requirements": ["owner context", "verification candidates", "provider auth readiness", "no mutation", "task proof"],
+      "allowedTools": ["read", "verify"],
+      "allowedWrites": [],
+      "expectedOutput": {
+        "kind": "analysis",
+        "summary": "owner and focused validation selection",
+        "requiredPaths": []
+      },
+      "expectedVerification": {
+        "verificationId": "owner-receipt-routing",
+        "commandOrCheck": "owner receipt validation selection",
+        "expectedStatus": "passed"
+      },
+      "successRubric": ["owner domain is identified", "focused validation is task-relevant", "no mutation occurs"],
+      "failureCategories": ["wrong context selected", "verification not selected", "completion proof missing"],
+      "redactionExpectations": ["provider-output"],
+      "hostEvaluationCaseId": "read-only-tool-loop"
+    }
+  ]
+}

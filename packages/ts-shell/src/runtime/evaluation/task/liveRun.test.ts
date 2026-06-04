@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createHostRuntime } from "../../api/host/runtime.js";
+import { parseTaskLiveCatalog } from "./catalog.js";
 import {
   listTaskLiveEntries,
   projectLiveObservationsFromGateReceipts,
@@ -98,6 +99,77 @@ describe("task live run report", () => {
     expect(report.notProvenClaims).toEqual(
       expect.arrayContaining(["terminal-success", "live-run-report-is-not-task-success"]),
     );
+  });
+
+  it("consumes external task catalog entries through the live runtime without opt-in execution", async () => {
+    const host = createHostRuntime();
+    const catalog = parseTaskLiveCatalog(catalogFixture());
+    const report = await runTaskLiveReport({ dispatch: host.dispatch, catalog });
+
+    expect(report.profile).toBe("catalog");
+    expect(report.entries).toHaveLength(8);
+    expect(report.entries.map((entry) => entry.entryId)).toEqual([
+      "catalog-label-policy",
+      "catalog-status-chain",
+      "catalog-assertion-fix",
+      "catalog-incident-brief",
+      "catalog-rollup-data",
+      "catalog-review-resume",
+      "catalog-provider-recovery",
+      "catalog-owner-receipt",
+    ]);
+    expect(report.summary).toMatchObject({
+      entryCount: 8,
+      executedCount: 0,
+      hardGateStatus: "not-passed",
+      terminalSuccessClaim: false,
+    });
+    expect(report.results.find((result) => result.entryId === "catalog-status-chain")?.blockers)
+      .toEqual(["explicit opt-in gate not executed: anchored-provider"]);
+  });
+
+  it("runs catalog entries through receipt projection and keeps fallback non-terminal", async () => {
+    const host = createHostRuntime();
+    const catalog = parseTaskLiveCatalog(catalogFixture());
+    const report = await runTaskLiveReport({
+      dispatch: host.dispatch,
+      catalog,
+      gateReceipts: [
+        gateReceipt("read-only-provider"),
+        primarySuccessFallbackSkippedReceipt(),
+        forcedPrimaryFailureFallbackReceipt(),
+      ],
+      reviewedApplyOptIn: true,
+    });
+
+    expect(report.summary).toMatchObject({
+      profile: "catalog",
+      entryCount: 8,
+      executedCount: 8,
+      completedWithTaskProofCount: 8,
+      completedWriteTaskProofCount: 3,
+      reviewedDisposablePostApplyProofCount: 3,
+      debugOrRepairComplete: true,
+      multiFileCompleteOrExactPartial: true,
+      artifactOrReportComplete: true,
+      continuationOrContextComplete: true,
+      primaryProviderSuccess: true,
+      primarySuccessFallbackSkipped: true,
+      forcedPrimaryFailureFallbackAttempted: true,
+      forcedPrimaryFailureFallbackPassed: true,
+      providerFallbackCoveragePassed: true,
+      hardGateStatus: "passed",
+      terminalSuccessClaim: false,
+    });
+    expect(report.results.find((result) => result.entryId === "catalog-status-chain")?.changedFiles)
+      .toEqual(["src/status/producer.ts", "src/status/consumer.ts"]);
+    expect(report.results.find((result) => result.entryId === "catalog-provider-recovery")?.proofStatus)
+      .toBe("complete");
+    expect(report.notProvenClaims).toEqual(expect.arrayContaining([
+      "terminal-success",
+      "live-run-report-is-not-task-success",
+      "provider-call-is-not-task-success",
+    ]));
   });
 
   it("summarizes executed live entries with proof without treating provider calls as success", async () => {
@@ -786,5 +858,158 @@ function workspaceApplyReceipt(): {
     postActionVerificationStatus: "passed",
     redactionStatus: "passed",
     repositoryClean: true,
+  };
+}
+
+function catalogFixture() {
+  return {
+    catalogId: "test-catalog",
+    version: 1,
+    tasks: [
+      catalogTask({
+        entryId: "catalog-label-policy",
+        caseId: "catalog-label-policy",
+        baseCaseId: "single-file-edit",
+        entryKind: "write-edit",
+        taskKind: "coding-edit",
+        taskPath: "edit",
+        allowedWrites: ["src/status/policy.ts"],
+        requiredPaths: ["src/status/policy.ts"],
+        hostEvaluationCaseId: "multi-target-mutation-success",
+      }),
+      catalogTask({
+        entryId: "catalog-status-chain",
+        caseId: "catalog-status-chain",
+        baseCaseId: "coordinated-edit",
+        entryKind: "write-edit",
+        taskKind: "coding-edit",
+        taskPath: "edit",
+        allowedWrites: ["src/status/producer.ts", "src/status/consumer.ts"],
+        requiredPaths: ["src/status/producer.ts", "src/status/consumer.ts"],
+        hostEvaluationCaseId: "multi-target-mutation-success",
+      }),
+      catalogTask({
+        entryId: "catalog-assertion-fix",
+        caseId: "catalog-assertion-fix",
+        baseCaseId: "failed-check-repair",
+        entryKind: "write-repair",
+        taskKind: "debug-repair",
+        taskPath: "edit",
+        allowedWrites: ["src/assertions/check.ts"],
+        requiredPaths: ["src/assertions/check.ts"],
+        hostEvaluationCaseId: "mutation-recovery-success",
+        repairValidationEvidence: {
+          status: "passed",
+          check: "rerun original assertion check",
+          originalFailurePreserved: true,
+        },
+      }),
+      catalogTask({
+        entryId: "catalog-incident-brief",
+        caseId: "catalog-incident-brief",
+        baseCaseId: "incident-summary-report",
+        entryKind: "report-artifact",
+        taskKind: "docs-report",
+        taskPath: "artifact",
+        gate: "artifact-dry-run",
+        allowedWrites: ["reports/incident-brief.md"],
+        requiredPaths: ["reports/incident-brief.md"],
+        hostEvaluationCaseId: "provider-compatibility-happy",
+      }),
+      catalogTask({
+        entryId: "catalog-rollup-data",
+        caseId: "catalog-rollup-data",
+        baseCaseId: "metrics-summary-artifact",
+        entryKind: "data-artifact",
+        taskKind: "data-artifact",
+        taskPath: "artifact",
+        gate: "artifact-dry-run",
+        allowedWrites: ["reports/metrics-rollup.json"],
+        requiredPaths: ["reports/metrics-rollup.json"],
+        hostEvaluationCaseId: "provider-compatibility-happy",
+      }),
+      catalogTask({
+        entryId: "catalog-review-resume",
+        caseId: "catalog-review-resume",
+        baseCaseId: "resume-from-context",
+        entryKind: "continuation",
+        taskKind: "continuation",
+        taskPath: "continuation",
+        writePolicy: "no-write",
+        safetyClass: "safe-no-write",
+        allowedWrites: [],
+        requiredPaths: [],
+        hostEvaluationCaseId: "branch-compaction-continuation",
+        setupEvaluationCaseIds: ["branch-compaction-continuation"],
+      }),
+      catalogTask({
+        entryId: "catalog-provider-recovery",
+        caseId: "catalog-provider-recovery",
+        baseCaseId: "live-provider-triage",
+        entryKind: "provider-triage",
+        taskKind: "live-triage",
+        taskPath: "provider",
+        writePolicy: "no-write",
+        safetyClass: "safe-no-write",
+        allowedWrites: [],
+        requiredPaths: [],
+        hostEvaluationCaseId: "provider-fallback",
+      }),
+      catalogTask({
+        entryId: "catalog-owner-receipt",
+        caseId: "catalog-owner-receipt",
+        baseCaseId: "owner-context-question",
+        entryKind: "pathless-context",
+        taskKind: "workspace-understanding",
+        taskPath: "tool",
+        gate: "read-only-provider",
+        writePolicy: "no-write",
+        safetyClass: "safe-no-write",
+        allowedWrites: [],
+        requiredPaths: [],
+        hostEvaluationCaseId: "read-only-tool-loop",
+      }),
+    ],
+  };
+}
+
+function catalogTask(input: {
+  readonly entryId: string;
+  readonly caseId: string;
+  readonly baseCaseId: string;
+  readonly entryKind: string;
+  readonly taskKind: string;
+  readonly taskPath: string;
+  readonly gate?: string;
+  readonly safetyClass?: string;
+  readonly writePolicy?: string;
+  readonly allowedWrites: readonly string[];
+  readonly requiredPaths: readonly string[];
+  readonly hostEvaluationCaseId: string;
+  readonly setupEvaluationCaseIds?: readonly string[];
+  readonly repairValidationEvidence?: unknown;
+}) {
+  return {
+    ...input,
+    gate: input.gate ?? "anchored-provider",
+    safetyClass: input.safetyClass ?? "manual-review",
+    writePolicy: input.writePolicy ?? "manual-review-required",
+    shortPrompt: `${input.entryId} task`,
+    validationPlan: `${input.entryId} validation`,
+    requirements: ["task proof"],
+    allowedTools: ["read", "verify"],
+    expectedOutput: {
+      kind: input.taskPath === "continuation" ? "continuation" : input.taskPath === "artifact" ? "artifact" : "diff",
+      summary: `${input.entryId} output`,
+      requiredPaths: input.requiredPaths,
+    },
+    expectedVerification: {
+      verificationId: `${input.entryId}-check`,
+      commandOrCheck: `${input.entryId} focused check`,
+      expectedStatus: "passed",
+    },
+    successRubric: ["proof"],
+    failureCategories: ["completion proof missing"],
+    redactionExpectations: ["provider-output"],
   };
 }

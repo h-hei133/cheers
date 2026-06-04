@@ -155,7 +155,7 @@ export type TaskFailureCategory =
   | "redaction or safety block"
   | "unknown";
 
-export type TaskCaseId =
+export type BuiltinTaskCaseId =
   | "single-file-edit"
   | "coordinated-edit"
   | "failed-check-repair"
@@ -176,6 +176,8 @@ export type TaskCaseId =
   | "resume-from-context"
   | "resume-after-compaction"
   | "live-provider-triage";
+
+export type TaskCaseId = BuiltinTaskCaseId | `catalog-${string}`;
 
 export type TaskVerificationStatus =
   | "passed"
@@ -451,11 +453,15 @@ export async function runTaskCase(input: {
 export async function runTaskAssessment(input: {
   readonly dispatch: (command: unknown) => Promise<HostCommandResponse>;
   readonly caseIds?: readonly TaskCaseId[];
+  readonly caseDefinitions?: readonly TaskCaseDefinition[];
   readonly liveGateObservations?: readonly TaskLiveGateObservation[];
 }): Promise<TaskAssessmentResult> {
+  const caseDefinitionsById = new Map(
+    (input.caseDefinitions ?? []).map((definition) => [definition.caseId, definition]),
+  );
   const definitions = input.caseIds
     ? input.caseIds.map((caseId) => {
-      const definition = taskCaseDefinition(caseId);
+      const definition = caseDefinitionsById.get(caseId) ?? taskCaseDefinition(caseId);
       if (!definition) {
         throw new Error(`Unknown task case: ${caseId}`);
       }

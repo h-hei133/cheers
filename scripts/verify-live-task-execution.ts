@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { parseTaskLiveCatalog } from "../packages/ts-shell/src/runtime/evaluation/task/catalog.js";
 import { createHostRuntime } from "../packages/ts-shell/src/runtime/api/host/runtime.js";
 import {
   runTaskLiveReport,
@@ -13,6 +14,7 @@ import {
   type TaskLiveWorkspaceApplyReceipt,
 } from "../packages/ts-shell/src/runtime/evaluation/task/liveRun.js";
 import type { TaskLiveGateOutcome } from "../packages/ts-shell/src/runtime/evaluation/task/model.js";
+import type { TaskLiveCatalog } from "../packages/ts-shell/src/runtime/evaluation/task/catalog.js";
 
 type GateResult = {
   readonly name: "read-only-provider" | "anchored-provider";
@@ -35,9 +37,12 @@ const liveOptIn = process.env.PRIVATE_AGENTS_LIVE_TASK_EXECUTION?.trim() === "1"
 const reviewedApplyOptIn = process.env.PRIVATE_AGENTS_LIVE_WRITE_REVIEWED_APPLY?.trim() === "1";
 const realWorkspaceApplyOptIn = process.env.PRIVATE_AGENTS_LIVE_REAL_WORKSPACE_APPLY?.trim() === "1";
 const liveProfile = taskLiveProfileFromEnv(process.env.PRIVATE_AGENTS_LIVE_TASK_PROFILE);
+const liveCatalog = readLiveCatalogFromEnv(process.env.PRIVATE_AGENTS_LIVE_TASK_CATALOG);
 
 console.log("gate name=live-task-execution");
-console.log(`live-task-profile=${liveProfile}`);
+console.log(`live-task-profile=${liveCatalog ? "catalog" : liveProfile}`);
+console.log(`live-task-catalog=${liveCatalog?.catalogId ?? "none"}`);
+console.log(`live-task-catalog-entry-count=${liveCatalog?.entries.length ?? 0}`);
 console.log(`live-task-execution-opt-in=${liveOptIn}`);
 console.log(`live-write-reviewed-apply-opt-in=${reviewedApplyOptIn}`);
 console.log(`live-real-workspace-apply-opt-in=${realWorkspaceApplyOptIn}`);
@@ -66,6 +71,7 @@ if (liveOptIn) {
 const report = await runTaskLiveReport({
   dispatch: host.dispatch,
   profile: liveProfile,
+  catalog: liveCatalog,
   gateReceipts: gateResults.map(toGateReceipt),
   workspaceApplyReceipts,
   reviewedApplyOptIn,
@@ -301,6 +307,17 @@ function runSelectedWorkspaceApplyGate(): TaskLiveWorkspaceApplyReceipt {
 
 function taskLiveProfileFromEnv(value: string | undefined): TaskLiveProfile {
   return value?.trim() === "focused" ? "focused" : "broad";
+}
+
+function readLiveCatalogFromEnv(value: string | undefined): TaskLiveCatalog | undefined {
+  const rawPath = value?.trim();
+  if (!rawPath) return undefined;
+  const resolved = path.resolve(process.cwd(), rawPath);
+  const sprintRoot = path.resolve(process.cwd(), "docs/sprint");
+  if (!resolved.startsWith(`${sprintRoot}${path.sep}`) || !resolved.endsWith(".json")) {
+    throw new Error("live task catalog must be a repository docs/sprint JSON file");
+  }
+  return parseTaskLiveCatalog(JSON.parse(fs.readFileSync(resolved, "utf8")));
 }
 
 function selectedWorkspaceApplyEntryId(): Extract<TaskLiveEntryId, "single-file-edit" | "label-normalization"> {

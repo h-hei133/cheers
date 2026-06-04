@@ -1,4 +1,5 @@
 import type { HostCommandResponse } from "../../api/host/contract.js";
+import type { TaskLiveCatalog } from "./catalog.js";
 import {
   projectTaskLiveExecution,
   runTaskAssessment,
@@ -23,7 +24,7 @@ import {
   type TaskLiveQualityRecord,
 } from "./quality.js";
 
-export type TaskLiveEntryId =
+export type BuiltinTaskLiveEntryId =
   | "single-file-edit"
   | "coordinated-edit"
   | "failed-check-repair"
@@ -46,6 +47,8 @@ export type TaskLiveEntryId =
   | "owner-receipt-question"
   | "metrics-rollup-artifact";
 
+export type TaskLiveEntryId = BuiltinTaskLiveEntryId | `catalog-${string}`;
+
 export type TaskLiveEntryKind =
   | "write-edit"
   | "write-repair"
@@ -59,7 +62,7 @@ export type TaskLiveEntryKind =
   | "write-planning"
   | "provider-triage";
 
-export type TaskLiveProfile = "broad" | "focused";
+export type TaskLiveProfile = "broad" | "focused" | "catalog";
 
 export interface TaskLiveEntry {
   readonly entryId: TaskLiveEntryId;
@@ -71,6 +74,7 @@ export interface TaskLiveEntry {
   readonly writePolicy: TaskLivePolicy;
   readonly requirements: readonly string[];
   readonly validationPlan: string;
+  readonly expectedChangedFiles?: readonly string[];
   readonly defaultOff: true;
   readonly optInRequired: true;
   readonly terminalSuccessClaim: false;
@@ -466,13 +470,14 @@ function focusedLiveEntries(): readonly TaskLiveEntry[] {
 export async function runTaskLiveReport(input: {
   readonly dispatch: (command: unknown) => Promise<HostCommandResponse>;
   readonly profile?: TaskLiveProfile;
+  readonly catalog?: TaskLiveCatalog;
   readonly gateReceipts?: readonly TaskLiveGateReceipt[];
   readonly workspaceApplyReceipts?: readonly TaskLiveWorkspaceApplyReceipt[];
   readonly reviewedApplyOptIn?: boolean;
   readonly observations?: readonly TaskLiveRunObservation[];
 }): Promise<TaskLiveRunReport> {
-  const profile = input.profile ?? "broad";
-  const entries = listTaskLiveEntries(profile);
+  const profile = input.catalog ? "catalog" : input.profile ?? "broad";
+  const entries = input.catalog?.entries ?? listTaskLiveEntries(profile === "catalog" ? "focused" : profile);
   const observations = input.observations ?? projectLiveObservationsFromGateReceipts({
     entries,
     gateReceipts: input.gateReceipts ?? [],
@@ -485,6 +490,7 @@ export async function runTaskLiveReport(input: {
   const assessment = await runTaskAssessment({
     dispatch: input.dispatch,
     caseIds: taskCaseIds,
+    caseDefinitions: input.catalog?.caseDefinitions,
     liveGateObservations: observations
       ?.flatMap((observation): TaskLiveGateObservation[] => {
         const entry = entries.find((candidate) => candidate.entryId === observation.entryId);
@@ -514,6 +520,9 @@ export async function runTaskLiveReport(input: {
   const observationsByEntryId = new Map(observations?.map((observation) => [observation.entryId, observation]) ?? []);
 
   const results = await Promise.all(entries.map(async (entry) => {
+    if (entry.entryId.startsWith("catalog-")) {
+      return await externalEntryResult(entry, observationsByEntryId.get(entry.entryId));
+    }
     if (entry.taskCaseId) {
       const taskResult = resultByCaseId.get(entry.taskCaseId);
       const execution = executionByCaseId.get(entry.taskCaseId);
@@ -598,6 +607,11 @@ export function projectLiveObservationsFromGateReceipts(input: {
   const observations: TaskLiveRunObservation[] = [];
   const readOnly = receiptByGate.get("read-only-provider");
   if (readOnly?.outcome === "passed") {
+    for (const entry of input.entries.filter((candidate) =>
+      candidate.entryId.startsWith("catalog-") && candidate.gate === "read-only-provider"
+    )) {
+      observations.push(readOnlyObservationFor(entry, readOnly));
+    }
     for (const entryId of [
       "package-script-impact",
       "pathless-workspace-question",
@@ -630,6 +644,18 @@ export function projectLiveObservationsFromGateReceipts(input: {
   const anchored = anchoredReceipts.find((receipt) => receipt.forcedPrimaryFailure !== true) ?? receiptByGate.get("anchored-provider");
   const forcedFallback = anchoredReceipts.find((receipt) => receipt.forcedPrimaryFailure === true);
   if (anchored?.outcome === "passed") {
+    for (const entry of input.entries.filter((candidate) =>
+      candidate.entryId.startsWith("catalog-") &&
+      candidate.gate === "anchored-provider" &&
+      candidate.entryKind !== "provider-triage"
+    )) {
+      observations.push(anchoredObservationFor(entry, anchored, input.reviewedApplyOptIn));
+    }
+    for (const entry of input.entries.filter((candidate) =>
+      candidate.entryId.startsWith("catalog-") && candidate.gate === "artifact-dry-run"
+    )) {
+      observations.push(artifactObservationFor(entry, anchored));
+    }
     observations.push(
       observationFromReceipt({
         entryId: "resume-from-context",
@@ -694,6 +720,17 @@ export function projectLiveObservationsFromGateReceipts(input: {
     );
   }
   if (forcedFallback?.outcome === "passed" && forcedFallback.fallbackAttempted === true) {
+    for (const entry of input.entries.filter((candidate) =>
+      candidate.entryId.startsWith("catalog-") && candidate.entryKind === "provider-triage"
+    )) {
+      observations.push(observationFromReceipt({
+        entryId: entry.entryId,
+        gate: "anchored-provider",
+        receipt: forcedFallback,
+        proofStatus: "complete",
+        verificationStatus: "passed",
+      }));
+    }
     observations.push(observationFromReceipt({
       entryId: "provider-recovery-triage",
       gate: "anchored-provider",
@@ -804,6 +841,115 @@ function writeApplyObservation(
     realWorkspaceApplyStatus: "not-run",
     realWorkspaceApplyScope: "not-run",
   });
+}
+
+function readOnlyObservationFor(
+  entry: TaskLiveEntry,
+  receipt: TaskLiveGateReceipt,
+): TaskLiveRunObservation {
+  return observationFromReceipt({
+    entryId: entry.entryId,
+    gate: "read-only-provider",
+    receipt,
+    proofStatus: "complete",
+    verificationStatus: "partial",
+  });
+}
+
+function anchoredObservationFor(
+  entry: TaskLiveEntry,
+  receipt: TaskLiveGateReceipt,
+  reviewedApplyOptIn: boolean,
+): TaskLiveRunObservation {
+  if (isWriteCapableEntry(entry)) {
+    return reviewedApplyOptIn
+      ? writeApplyObservationFor(entry, receipt)
+      : writePlanningObservationFor(entry, receipt);
+  }
+  return observationFromReceipt({
+    entryId: entry.entryId,
+    gate: "anchored-provider",
+    receipt,
+    proofStatus: "complete",
+    verificationStatus: "partial",
+  });
+}
+
+function artifactObservationFor(
+  entry: TaskLiveEntry,
+  receipt: TaskLiveGateReceipt,
+): TaskLiveRunObservation {
+  return observationFromReceipt({
+    entryId: entry.entryId,
+    gate: "artifact-dry-run",
+    receipt,
+    proofStatus: "complete",
+    verificationStatus: "passed",
+    artifactValidationStatus: "passed",
+  });
+}
+
+function writePlanningObservationFor(
+  entry: TaskLiveEntry,
+  receipt: TaskLiveGateReceipt,
+): TaskLiveRunObservation {
+  return freeze({
+    ...observationFromReceipt({
+      entryId: entry.entryId,
+      gate: entry.gate,
+      receipt,
+      proofStatus: "partial",
+      verificationStatus: "partial",
+    }),
+    changedFiles: freeze([]),
+    patchIntentStatus: "present",
+    safePlanStatus: "ready",
+    dryRunDiffStatus: "produced",
+    reviewAuthority: "missing",
+    applyStatus: "not-run",
+    isolatedApply: false,
+    realWorkspaceMutation: false,
+    postApplyVerificationStatus: "not-run",
+    rollbackStatus: "not-run",
+    realWorkspaceApplyStatus: "not-run",
+    realWorkspaceApplyScope: "not-run",
+  });
+}
+
+function writeApplyObservationFor(
+  entry: TaskLiveEntry,
+  receipt: TaskLiveGateReceipt,
+): TaskLiveRunObservation {
+  return freeze({
+    ...observationFromReceipt({
+      entryId: entry.entryId,
+      gate: entry.gate,
+      receipt,
+      proofStatus: "complete",
+      verificationStatus: "passed",
+    }),
+    noMutation: false,
+    changedFiles: freeze(expectedChangedFilesFor(entry)),
+    noApply: false,
+    patchIntentStatus: "present",
+    safePlanStatus: "ready",
+    dryRunDiffStatus: "produced",
+    reviewAuthority: "approved",
+    applyStatus: "applied",
+    isolatedApply: true,
+    realWorkspaceMutation: false,
+    postApplyVerificationStatus: "passed",
+    rollbackStatus: entry.entryKind === "write-rollback" ? "partial" : "not-run",
+    realWorkspaceApplyStatus: "not-run",
+    realWorkspaceApplyScope: "not-run",
+  });
+}
+
+function expectedChangedFilesFor(entry: TaskLiveEntry): readonly string[] {
+  if (entry.expectedChangedFiles && entry.expectedChangedFiles.length > 0) {
+    return freeze([...entry.expectedChangedFiles]);
+  }
+  return freeze(["src/change.ts"]);
 }
 
 function workspaceApplyObservation(
@@ -1333,12 +1479,13 @@ function summarizeLiveRun(
     (record.postActionVerificationStatus === "partial" || record.postActionVerificationStatus === "failed")
   ).length;
   const multiFileQualityRecord = qualityRecords.some((record) =>
-    (record.taskId === "coordinated-edit" || record.taskId === "status-consumer-coordination") &&
+    record.actionKind === "write-edit" &&
     record.targetFileCount >= 2 &&
     record.targetFileMatch === "matched"
   );
   const multiFileCompleteOrExactPartial = results.some((result) =>
-    (result.entryId === "coordinated-edit" || result.entryId === "status-consumer-coordination") &&
+    result.entryKind === "write-edit" &&
+    result.changedFiles.length >= 2 &&
     (
       result.status === "complete" ||
       (result.status === "useful-partial" && result.blockers.length > 0)
@@ -1497,7 +1644,7 @@ function summarizeLiveRun(
       ? []
       : ["changed-file accounting missing for completed write tasks"]),
   ];
-  const blockers = profile === "focused" ? focusedBlockers : broadBlockers;
+  const blockers = profile === "focused" || profile === "catalog" ? focusedBlockers : broadBlockers;
   return freeze({
     profile,
     entryCount: results.length,
@@ -1507,7 +1654,10 @@ function summarizeLiveRun(
     reportArtifactOrDataExecuted: executed.some((result) => result.entryKind === "report-artifact" || result.entryKind === "data-artifact"),
     continuationExecutedOrExactPartial: executed.some((result) => result.entryKind === "continuation") ||
       results.some((result) => result.entryKind === "continuation" && result.status === "useful-partial" && result.blockers.length > 0),
-    readonlyCodingExecuted: executed.some((result) => result.entryKind === "readonly-coding"),
+    readonlyCodingExecuted: executed.some((result) =>
+      result.entryKind === "readonly-coding" ||
+      (result.writePolicy === "no-write" && result.gate === "read-only-provider")
+    ),
     writeEntrySafe: results.some((result) =>
       (
         result.entryKind === "write-planning" &&

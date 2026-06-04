@@ -111,6 +111,9 @@ export function isWriteCapableEntry(entry: Pick<TaskLiveEntry, "entryKind">): bo
 }
 
 function expectedTargetFileCount(entry: TaskLiveEntry, result: TaskLiveQualityInput): number {
+  if (entry.expectedChangedFiles && entry.expectedChangedFiles.length > 0) {
+    return Math.max(entry.expectedChangedFiles.length, result.changedFiles.length);
+  }
   if (entry.entryId === "coordinated-edit" || entry.entryId === "status-consumer-coordination") {
     return Math.max(2, result.changedFiles.length);
   }
