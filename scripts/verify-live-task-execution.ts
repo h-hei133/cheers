@@ -7,6 +7,8 @@ import path from "node:path";
 import { createHostRuntime } from "../packages/ts-shell/src/runtime/api/host/runtime.js";
 import {
   runTaskLiveReport,
+  type TaskLiveEntryId,
+  type TaskLiveProfile,
   type TaskLiveGateReceipt,
   type TaskLiveWorkspaceApplyReceipt,
 } from "../packages/ts-shell/src/runtime/evaluation/task/liveRun.js";
@@ -32,8 +34,10 @@ type GateResult = {
 const liveOptIn = process.env.PRIVATE_AGENTS_LIVE_TASK_EXECUTION?.trim() === "1";
 const reviewedApplyOptIn = process.env.PRIVATE_AGENTS_LIVE_WRITE_REVIEWED_APPLY?.trim() === "1";
 const realWorkspaceApplyOptIn = process.env.PRIVATE_AGENTS_LIVE_REAL_WORKSPACE_APPLY?.trim() === "1";
+const liveProfile = taskLiveProfileFromEnv(process.env.PRIVATE_AGENTS_LIVE_TASK_PROFILE);
 
 console.log("gate name=live-task-execution");
+console.log(`live-task-profile=${liveProfile}`);
 console.log(`live-task-execution-opt-in=${liveOptIn}`);
 console.log(`live-write-reviewed-apply-opt-in=${reviewedApplyOptIn}`);
 console.log(`live-real-workspace-apply-opt-in=${realWorkspaceApplyOptIn}`);
@@ -61,6 +65,7 @@ if (liveOptIn) {
 
 const report = await runTaskLiveReport({
   dispatch: host.dispatch,
+  profile: liveProfile,
   gateReceipts: gateResults.map(toGateReceipt),
   workspaceApplyReceipts,
   reviewedApplyOptIn,
@@ -244,7 +249,7 @@ function runSelectedWorkspaceApplyGate(): TaskLiveWorkspaceApplyReceipt {
       gate: "selected-workspace-apply",
       attempted: false,
       outcome: "blocked",
-      entryId: "single-file-edit",
+      entryId: selectedWorkspaceApplyEntryId(),
       changedFiles: [],
       writerTarget: "missing-or-unverified",
       postActionVerificationStatus: "not-run",
@@ -275,7 +280,7 @@ function runSelectedWorkspaceApplyGate(): TaskLiveWorkspaceApplyReceipt {
       gate: "selected-workspace-apply",
       attempted: true,
       outcome: passed ? "passed" : workspaceApplyOutcomeFromOutput(output, result.status ?? 1),
-      entryId: "single-file-edit",
+      entryId: selectedWorkspaceApplyEntryId(),
       changedFiles,
       writerTarget: /writerTarget=isolated-selected-workspace/.test(output)
         ? "isolated-selected-workspace"
@@ -292,6 +297,14 @@ function runSelectedWorkspaceApplyGate(): TaskLiveWorkspaceApplyReceipt {
   } finally {
     cleanupDisposableWorktree(worktree.path);
   }
+}
+
+function taskLiveProfileFromEnv(value: string | undefined): TaskLiveProfile {
+  return value?.trim() === "focused" ? "focused" : "broad";
+}
+
+function selectedWorkspaceApplyEntryId(): Extract<TaskLiveEntryId, "single-file-edit" | "label-normalization"> {
+  return liveProfile === "focused" ? "label-normalization" : "single-file-edit";
 }
 
 function createDisposableWorktree(): { readonly ok: true; readonly path: string } | { readonly ok: false; readonly blocker: string } {

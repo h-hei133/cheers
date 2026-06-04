@@ -45,6 +45,42 @@ describe("task live run report", () => {
       .toEqual(expect.arrayContaining(["single-file-edit", "coordinated-edit", "failed-check-repair", "rollback-recovery"]));
   });
 
+  it("defines focused live entries with the smaller recovery hard-gate mix", () => {
+    const entries = listTaskLiveEntries("focused");
+
+    expect(entries.map((entry) => entry.entryId)).toEqual([
+      "label-normalization",
+      "status-consumer-coordination",
+      "assertion-repair",
+      "incident-brief-report",
+      "context-review-resume",
+      "provider-recovery-triage",
+      "owner-receipt-question",
+      "metrics-rollup-artifact",
+    ]);
+    expect(entries.length).toBeGreaterThanOrEqual(6);
+    expect(entries.length).toBeLessThanOrEqual(8);
+    expect(entries.filter((entry) => entry.writePolicy === "manual-review-required").map((entry) => entry.entryId))
+      .toEqual(expect.arrayContaining([
+        "label-normalization",
+        "status-consumer-coordination",
+        "assertion-repair",
+      ]));
+    expect(entries.find((entry) => entry.entryId === "provider-recovery-triage")).toMatchObject({
+      gate: "anchored-provider",
+      writePolicy: "no-write",
+      terminalSuccessClaim: false,
+    });
+    for (const entry of entries) {
+      expect(entry.requirements).toEqual(
+        expect.arrayContaining(["explicit opt-in", "isolated runtime home", "redacted output"]),
+      );
+      expect(entry.defaultOff).toBe(true);
+      expect(entry.optInRequired).toBe(true);
+      expect(entry.terminalSuccessClaim).toBe(false);
+    }
+  });
+
   it("keeps missing opt-in as exact non-executed blockers", async () => {
     const host = createHostRuntime();
     const report = await runTaskLiveReport({ dispatch: host.dispatch });
@@ -260,6 +296,94 @@ describe("task live run report", () => {
     expect(JSON.stringify(report)).not.toMatch(/Bearer |api[_-]?key|token|headers|raw provider output|diff --git|\*\*\* Begin Patch/i);
   });
 
+  it("summarizes focused live entries against the smaller hard gates", async () => {
+    const host = createHostRuntime();
+    const report = await runTaskLiveReport({
+      dispatch: host.dispatch,
+      profile: "focused",
+      gateReceipts: [
+        gateReceipt("read-only-provider"),
+        primarySuccessFallbackSkippedReceipt(),
+        forcedPrimaryFailureFallbackReceipt(),
+      ],
+      observations: [
+        writeObservation("label-normalization", {
+          changedFiles: ["src/labels.ts"],
+          postApplyVerificationStatus: "passed",
+          realWorkspaceApplyStatus: "applied",
+          realWorkspaceApplyScope: "isolated-selected-workspace",
+        }),
+        writeObservation("status-consumer-coordination", {
+          changedFiles: ["src/status.ts", "src/statusConsumer.ts"],
+          postApplyVerificationStatus: "passed",
+        }),
+        writeObservation("assertion-repair", {
+          changedFiles: ["src/assertion.ts"],
+          postApplyVerificationStatus: "passed",
+        }),
+        observation("incident-brief-report", "artifact-dry-run", {
+          verificationStatus: "passed",
+          artifactValidationStatus: "passed",
+        }),
+        observation("context-review-resume", "anchored-provider", { verificationStatus: "partial" }),
+        observation("provider-recovery-triage", "anchored-provider", {
+          verificationStatus: "passed",
+          proofStatus: "complete",
+          fallbackConfigured: true,
+          fallbackAttempted: true,
+          fallbackOutcome: "passed",
+        }),
+        observation("owner-receipt-question", "read-only-provider", { verificationStatus: "partial" }),
+        observation("metrics-rollup-artifact", "artifact-dry-run", {
+          verificationStatus: "passed",
+          artifactValidationStatus: "passed",
+        }),
+      ],
+    });
+
+    expect(report.profile).toBe("focused");
+    expect(report.summary).toMatchObject({
+      profile: "focused",
+      entryCount: 8,
+      executedCount: 8,
+      completedWithTaskProofCount: 8,
+      completedWriteTaskProofCount: 3,
+      reviewedDisposablePostApplyProofCount: 3,
+      correctionFreeCompletedWriteCount: 3,
+      manualCorrectionCount: 0,
+      multiFileQualityRecord: true,
+      multiFileCompleteOrExactPartial: true,
+      artifactOrReportComplete: true,
+      continuationOrContextComplete: true,
+      primaryProviderSuccess: true,
+      primarySuccessFallbackSkipped: true,
+      forcedPrimaryFailureFallbackAttempted: true,
+      forcedPrimaryFailureFallbackPassed: true,
+      providerFallbackCoveragePassed: true,
+      hardGateStatus: "passed",
+      blockers: [],
+      terminalSuccessClaim: false,
+    });
+    expect(report.results.find((result) => result.entryId === "status-consumer-coordination")).toMatchObject({
+      status: "complete",
+      changedFiles: ["src/status.ts", "src/statusConsumer.ts"],
+      qualityRecord: expect.objectContaining({
+        targetFileCount: 2,
+        targetFileMatch: "matched",
+        manualCorrectionNeeded: false,
+      }),
+    });
+    expect(report.results.find((result) => result.entryId === "provider-recovery-triage")).toMatchObject({
+      status: "complete",
+      proofStatus: "complete",
+      noMutation: true,
+      changedFiles: [],
+      noApply: true,
+      terminalSuccessClaim: false,
+    });
+    expect(JSON.stringify(report)).not.toMatch(/Bearer |api[_-]?key|token|headers|raw provider output|diff --git|\*\*\* Begin Patch/i);
+  });
+
   it("projects gate receipts into task-loop live entries inside the runtime owner", async () => {
     const host = createHostRuntime();
     const entries = listTaskLiveEntries();
@@ -369,6 +493,81 @@ describe("task live run report", () => {
     });
     expect(report.results.every((result) => result.terminalSuccessClaim === false)).toBe(true);
     expect(JSON.stringify(report)).not.toMatch(/Bearer |api[_-]?key|token|headers|raw provider output|diff --git|\*\*\* Begin Patch/i);
+  });
+
+  it("projects gate receipts into focused live entries including forced provider recovery", async () => {
+    const host = createHostRuntime();
+    const entries = listTaskLiveEntries("focused");
+    const observations = projectLiveObservationsFromGateReceipts({
+      entries,
+      reviewedApplyOptIn: true,
+      gateReceipts: [
+        gateReceipt("read-only-provider"),
+        primarySuccessFallbackSkippedReceipt(),
+        forcedPrimaryFailureFallbackReceipt(),
+      ],
+      workspaceApplyReceipts: [{
+        ...workspaceApplyReceipt(),
+        entryId: "label-normalization",
+        changedFiles: ["src/labels.ts"],
+      }],
+    });
+    const report = await runTaskLiveReport({
+      dispatch: host.dispatch,
+      profile: "focused",
+      reviewedApplyOptIn: true,
+      gateReceipts: [
+        gateReceipt("read-only-provider"),
+        primarySuccessFallbackSkippedReceipt(),
+        forcedPrimaryFailureFallbackReceipt(),
+      ],
+      workspaceApplyReceipts: [{
+        ...workspaceApplyReceipt(),
+        entryId: "label-normalization",
+        changedFiles: ["src/labels.ts"],
+      }],
+    });
+
+    expect(observations.map((observation) => observation.entryId)).toEqual([
+      "owner-receipt-question",
+      "label-normalization",
+      "status-consumer-coordination",
+      "assertion-repair",
+      "context-review-resume",
+      "incident-brief-report",
+      "metrics-rollup-artifact",
+      "provider-recovery-triage",
+    ]);
+    expect(report.summary).toMatchObject({
+      profile: "focused",
+      entryCount: 8,
+      executedCount: 8,
+      completedWithTaskProofCount: 8,
+      completedWriteTaskProofCount: 3,
+      reviewedDisposablePostApplyProofCount: 3,
+      correctionFreeCompletedWriteCount: 3,
+      manualCorrectionCount: 0,
+      providerFallbackCoveragePassed: true,
+      hardGateStatus: "passed",
+      blockers: [],
+      terminalSuccessClaim: false,
+    });
+    expect(report.results.find((result) => result.entryId === "label-normalization")).toMatchObject({
+      changedFiles: ["src/labels.ts"],
+      realWorkspaceApplyStatus: "applied",
+      realWorkspaceApplyScope: "isolated-selected-workspace",
+      qualityRecord: expect.objectContaining({
+        applyScope: "isolated-selected-workspace",
+        finalReadiness: "applied-in-disposable-workspace",
+      }),
+    });
+    expect(report.results.find((result) => result.entryId === "provider-recovery-triage")).toMatchObject({
+      status: "complete",
+      proofStatus: "complete",
+      providerOutcome: "passed",
+      noMutation: true,
+      noApply: true,
+    });
   });
 
   it("keeps SP029 live development hard gate incomplete without disposable selected-workspace apply proof", async () => {
@@ -509,7 +708,7 @@ function observation(
 }
 
 function writeObservation(
-  entryId: Extract<TaskLiveRunObservation["entryId"], "single-file-edit" | "coordinated-edit" | "failed-check-repair" | "rollback-recovery">,
+  entryId: Extract<TaskLiveRunObservation["entryId"], "single-file-edit" | "coordinated-edit" | "failed-check-repair" | "rollback-recovery" | "label-normalization" | "status-consumer-coordination" | "assertion-repair">,
   overrides: Partial<Omit<TaskLiveRunObservation, "entryId" | "gate" | "explicitOptIn">> = {},
 ): TaskLiveRunObservation {
   return observation(entryId, "anchored-provider", {

@@ -36,7 +36,15 @@ export type TaskLiveEntryId =
   | "metrics-summary-artifact"
   | "resume-from-context"
   | "readonly-coding-check"
-  | "write-planning-dry-run";
+  | "write-planning-dry-run"
+  | "label-normalization"
+  | "status-consumer-coordination"
+  | "assertion-repair"
+  | "incident-brief-report"
+  | "context-review-resume"
+  | "provider-recovery-triage"
+  | "owner-receipt-question"
+  | "metrics-rollup-artifact";
 
 export type TaskLiveEntryKind =
   | "write-edit"
@@ -48,7 +56,10 @@ export type TaskLiveEntryKind =
   | "data-artifact"
   | "continuation"
   | "readonly-coding"
-  | "write-planning";
+  | "write-planning"
+  | "provider-triage";
+
+export type TaskLiveProfile = "broad" | "focused";
 
 export interface TaskLiveEntry {
   readonly entryId: TaskLiveEntryId;
@@ -117,7 +128,7 @@ export interface TaskLiveWorkspaceApplyReceipt {
   readonly gate: "selected-workspace-apply";
   readonly attempted: boolean;
   readonly outcome: "passed" | "failed" | "blocked" | "skipped" | "provider-network-inconclusive" | "config-or-skip";
-  readonly entryId: Extract<TaskLiveEntryId, "single-file-edit" | "coordinated-edit">;
+  readonly entryId: Extract<TaskLiveEntryId, "single-file-edit" | "coordinated-edit" | "label-normalization" | "status-consumer-coordination">;
   readonly changedFiles: readonly string[];
   readonly writerTarget: "isolated-selected-workspace" | "missing-or-unverified";
   readonly postActionVerificationStatus: "passed" | "partial" | "failed" | "not-run";
@@ -166,6 +177,7 @@ export interface TaskLiveRunEntryResult {
 }
 
 export interface TaskLiveRunSummary {
+  readonly profile: TaskLiveProfile;
   readonly entryCount: number;
   readonly executedCount: number;
   readonly completeOrUsefulPartialCount: number;
@@ -210,6 +222,7 @@ export interface TaskLiveRunSummary {
 
 export interface TaskLiveRunReport {
   readonly reportId: "task-live-run";
+  readonly profile: TaskLiveProfile;
   readonly entries: readonly TaskLiveEntry[];
   readonly results: readonly TaskLiveRunEntryResult[];
   readonly summary: TaskLiveRunSummary;
@@ -219,7 +232,11 @@ export interface TaskLiveRunReport {
   readonly notProvenClaims: readonly string[];
 }
 
-export function listTaskLiveEntries(): readonly TaskLiveEntry[] {
+export function listTaskLiveEntries(profile: TaskLiveProfile = "broad"): readonly TaskLiveEntry[] {
+  return profile === "focused" ? focusedLiveEntries() : broadLiveEntries();
+}
+
+function broadLiveEntries(): readonly TaskLiveEntry[] {
   return freeze([
     liveEntry({
       entryId: "single-file-edit",
@@ -361,14 +378,101 @@ export function listTaskLiveEntries(): readonly TaskLiveEntry[] {
   ]);
 }
 
+function focusedLiveEntries(): readonly TaskLiveEntry[] {
+  return freeze([
+    liveEntry({
+      entryId: "label-normalization",
+      entryKind: "write-edit",
+      shortPrompt: "Normalize a reported label in the smallest owner-correct place and prove the focused check.",
+      gate: "anchored-provider",
+      safetyClass: "manual-review",
+      writePolicy: "manual-review-required",
+      validationPlan: "patch intent, safe owner placement, dry-run diff, explicit review authority, isolated apply, and post-apply proof",
+      requirements: ["patch intent", "safe plan", "dry-run diff", "explicit review authority", "isolated apply", "post-apply verification", "task proof"],
+    }),
+    liveEntry({
+      entryId: "status-consumer-coordination",
+      entryKind: "write-edit",
+      shortPrompt: "Update a status producer and consumer together, then prove both sides with the focused check.",
+      gate: "anchored-provider",
+      safetyClass: "manual-review",
+      writePolicy: "manual-review-required",
+      validationPlan: "coordinated target metadata, dry-run diff, review authority, isolated apply, and whole-task proof",
+      requirements: ["patch intent", "safe plan", "dry-run diff", "explicit review authority", "isolated apply", "post-apply verification", "task proof"],
+    }),
+    liveEntry({
+      entryId: "assertion-repair",
+      entryKind: "write-repair",
+      shortPrompt: "Diagnose a failing assertion, apply the bounded repair, preserve the original failure, and rerun the same check.",
+      gate: "anchored-provider",
+      safetyClass: "manual-review",
+      writePolicy: "manual-review-required",
+      validationPlan: "original failure evidence, repair patch intent, dry-run diff, review authority, isolated apply, and rerun verification",
+      requirements: ["original failure evidence", "patch intent", "safe plan", "dry-run diff", "explicit review authority", "isolated apply", "post-apply verification", "task proof"],
+    }),
+    liveEntry({
+      entryId: "incident-brief-report",
+      entryKind: "report-artifact",
+      shortPrompt: "Produce an incident brief from safe fixture notes and validate the report shape.",
+      gate: "artifact-dry-run",
+      safetyClass: "manual-review",
+      writePolicy: "manual-review-required",
+      validationPlan: "source receipts, required report sections, artifact validation, no write, and manual review before write",
+      requirements: ["source receipts", "artifact validation", "provider auth readiness", "no write", "manual review"],
+    }),
+    liveEntry({
+      entryId: "context-review-resume",
+      entryKind: "continuation",
+      shortPrompt: "Resume from retained context, refresh the target, and complete only the remaining review step.",
+      gate: "anchored-provider",
+      safetyClass: "safe-no-write",
+      writePolicy: "no-write",
+      validationPlan: "fresh continuation context, target freshness, anchored no-apply result, redaction, and task proof",
+      requirements: ["fresh continuation", "target freshness", "anchored output validation", "provider auth readiness", "no apply", "task proof"],
+    }),
+    liveEntry({
+      entryId: "provider-recovery-triage",
+      entryKind: "provider-triage",
+      shortPrompt: "Classify a forced provider-network failure and report the configured fallback decision through the shared runtime.",
+      gate: "anchored-provider",
+      safetyClass: "safe-no-write",
+      writePolicy: "no-write",
+      validationPlan: "primary provider-network classification, configured fallback attempt, fallback outcome, no mutation, redaction, and non-terminal proof",
+      requirements: ["primary failure classification", "fallback decision", "fallback attempt", "provider auth readiness", "no mutation", "task proof"],
+    }),
+    liveEntry({
+      entryId: "owner-receipt-question",
+      entryKind: "pathless-context",
+      shortPrompt: "Identify the owner area for a safe execution receipt summary and name the focused validation gate.",
+      gate: "read-only-provider",
+      safetyClass: "safe-no-write",
+      writePolicy: "no-write",
+      validationPlan: "owner context, focused validation selection, no mutation, redaction, and task proof",
+      requirements: ["owner context", "verification candidates", "provider auth readiness", "no mutation", "task proof"],
+    }),
+    liveEntry({
+      entryId: "metrics-rollup-artifact",
+      entryKind: "data-artifact",
+      shortPrompt: "Create a metrics rollup shape from safe fixture rows and validate the structured output.",
+      gate: "artifact-dry-run",
+      safetyClass: "manual-review",
+      writePolicy: "manual-review-required",
+      validationPlan: "source receipts, structured totals, schema validation, no write, and manual review before write",
+      requirements: ["source receipts", "schema validation", "provider auth readiness", "no write", "manual review"],
+    }),
+  ]);
+}
+
 export async function runTaskLiveReport(input: {
   readonly dispatch: (command: unknown) => Promise<HostCommandResponse>;
+  readonly profile?: TaskLiveProfile;
   readonly gateReceipts?: readonly TaskLiveGateReceipt[];
   readonly workspaceApplyReceipts?: readonly TaskLiveWorkspaceApplyReceipt[];
   readonly reviewedApplyOptIn?: boolean;
   readonly observations?: readonly TaskLiveRunObservation[];
 }): Promise<TaskLiveRunReport> {
-  const entries = listTaskLiveEntries();
+  const profile = input.profile ?? "broad";
+  const entries = listTaskLiveEntries(profile);
   const observations = input.observations ?? projectLiveObservationsFromGateReceipts({
     entries,
     gateReceipts: input.gateReceipts ?? [],
@@ -466,9 +570,10 @@ export async function runTaskLiveReport(input: {
     }
     return await externalEntryResult(entry, observationsByEntryId.get(entry.entryId));
   }));
-  const summary = summarizeLiveRun(results, input.gateReceipts ?? []);
+  const summary = summarizeLiveRun(profile, results, input.gateReceipts ?? []);
   return freeze({
     reportId: "task-live-run",
+    profile,
     entries,
     results: freeze(results),
     summary,
@@ -508,9 +613,22 @@ export function projectLiveObservationsFromGateReceipts(input: {
         verificationStatus: "partial",
       }));
     }
+    for (const entryId of [
+      "owner-receipt-question",
+    ] as const) {
+      observations.push(observationFromReceipt({
+        entryId,
+        gate: "read-only-provider",
+        receipt: readOnly,
+        proofStatus: "complete",
+        verificationStatus: "partial",
+      }));
+    }
   }
 
-  const anchored = receiptByGate.get("anchored-provider");
+  const anchoredReceipts = input.gateReceipts.filter((receipt) => receipt.gate === "anchored-provider");
+  const anchored = anchoredReceipts.find((receipt) => receipt.forcedPrimaryFailure !== true) ?? receiptByGate.get("anchored-provider");
+  const forcedFallback = anchoredReceipts.find((receipt) => receipt.forcedPrimaryFailure === true);
   if (anchored?.outcome === "passed") {
     observations.push(
       observationFromReceipt({
@@ -544,8 +662,45 @@ export function projectLiveObservationsFromGateReceipts(input: {
         writeApplyObservation("coordinated-edit", anchored, ["src/parser.ts", "src/caller.ts"], "complete", "passed", "not-run"),
         writeApplyObservation("failed-check-repair", anchored, ["src/check.ts"], "complete", "passed", "not-run"),
         writeApplyObservation("rollback-recovery", anchored, ["src/alpha.ts"], "partial", "partial", "partial"),
+        writeApplyObservation("label-normalization", anchored, ["src/labels.ts"], "complete", "passed", "not-run"),
+        writeApplyObservation("status-consumer-coordination", anchored, ["src/status.ts", "src/statusConsumer.ts"], "complete", "passed", "not-run"),
+        writeApplyObservation("assertion-repair", anchored, ["src/assertion.ts"], "complete", "passed", "not-run"),
       );
     }
+    observations.push(
+      observationFromReceipt({
+        entryId: "context-review-resume",
+        gate: "anchored-provider",
+        receipt: anchored,
+        proofStatus: "complete",
+        verificationStatus: "partial",
+      }),
+      observationFromReceipt({
+        entryId: "incident-brief-report",
+        gate: "artifact-dry-run",
+        receipt: anchored,
+        proofStatus: "complete",
+        verificationStatus: "passed",
+        artifactValidationStatus: "passed",
+      }),
+      observationFromReceipt({
+        entryId: "metrics-rollup-artifact",
+        gate: "artifact-dry-run",
+        receipt: anchored,
+        proofStatus: "complete",
+        verificationStatus: "passed",
+        artifactValidationStatus: "passed",
+      }),
+    );
+  }
+  if (forcedFallback?.outcome === "passed" && forcedFallback.fallbackAttempted === true) {
+    observations.push(observationFromReceipt({
+      entryId: "provider-recovery-triage",
+      gate: "anchored-provider",
+      receipt: forcedFallback,
+      proofStatus: "complete",
+      verificationStatus: "passed",
+    }));
   }
 
   for (const receipt of input.workspaceApplyReceipts ?? []) {
@@ -619,7 +774,7 @@ function writePlanningObservation(receipt: TaskLiveGateReceipt): TaskLiveRunObse
 }
 
 function writeApplyObservation(
-  entryId: Extract<TaskLiveRunObservation["entryId"], "single-file-edit" | "coordinated-edit" | "failed-check-repair" | "rollback-recovery">,
+  entryId: Extract<TaskLiveRunObservation["entryId"], "single-file-edit" | "coordinated-edit" | "failed-check-repair" | "rollback-recovery" | "label-normalization" | "status-consumer-coordination" | "assertion-repair">,
   receipt: TaskLiveGateReceipt,
   changedFiles: readonly string[],
   proofStatus: TaskLiveRunObservation["proofStatus"],
@@ -1081,6 +1236,7 @@ function externalStatus(
 }
 
 function summarizeLiveRun(
+  profile: TaskLiveProfile,
   results: readonly TaskLiveRunEntryResult[],
   gateReceipts: readonly TaskLiveGateReceipt[] = [],
 ): TaskLiveRunSummary {
@@ -1177,12 +1333,12 @@ function summarizeLiveRun(
     (record.postActionVerificationStatus === "partial" || record.postActionVerificationStatus === "failed")
   ).length;
   const multiFileQualityRecord = qualityRecords.some((record) =>
-    record.taskId === "coordinated-edit" &&
+    (record.taskId === "coordinated-edit" || record.taskId === "status-consumer-coordination") &&
     record.targetFileCount >= 2 &&
     record.targetFileMatch === "matched"
   );
   const multiFileCompleteOrExactPartial = results.some((result) =>
-    result.entryId === "coordinated-edit" &&
+    (result.entryId === "coordinated-edit" || result.entryId === "status-consumer-coordination") &&
     (
       result.status === "complete" ||
       (result.status === "useful-partial" && result.blockers.length > 0)
@@ -1248,7 +1404,7 @@ function summarizeLiveRun(
       : rollbackResult?.status === "blocked"
         ? "blocked"
         : "not-run";
-  const blockers = [
+  const broadBlockers = [
     ...(results.length >= 13 ? [] : ["fewer than thirteen live task entries"]),
     ...(executed.length >= 8 ? [] : ["fewer than eight entries executed through explicit gates"]),
     ...(completedWithTaskProof.length >= 5 ? [] : ["fewer than five executed entries completed with task proof"]),
@@ -1299,7 +1455,51 @@ function summarizeLiveRun(
       ? []
       : ["write-capable entry did not remain dry-run or manual-review"]),
   ];
+  const focusedCompleteWriteCount = writeResults.filter((result) =>
+    result.status === "complete" &&
+    result.proofStatus === "complete" &&
+    result.postApplyVerificationStatus === "passed" &&
+    result.qualityRecord?.manualCorrectionNeeded === false
+  ).length;
+  const focusedDebugComplete = writeResults.some((result) =>
+    result.entryKind === "write-repair" &&
+    result.status === "complete" &&
+    result.proofStatus === "complete" &&
+    result.postApplyVerificationStatus === "passed" &&
+    result.qualityRecord?.manualCorrectionNeeded === false
+  );
+  const focusedProviderRecovery = results.some((result) =>
+    result.entryKind === "provider-triage" &&
+    result.status === "complete" &&
+    result.proofStatus === "complete"
+  );
+  const focusedBlockers = [
+    ...(results.length >= 6 && results.length <= 8 ? [] : ["focused live profile must contain six to eight entries"]),
+    ...(executed.length >= 6 ? [] : ["fewer than six entries executed through explicit gates"]),
+    ...(completedWithTaskProof.length >= 4 ? [] : ["fewer than four executed entries completed with task proof"]),
+    ...(focusedCompleteWriteCount >= 2 ? [] : ["fewer than two write-capable entries completed with reviewed isolated apply and post-apply verification"]),
+    ...(reviewedIsolatedPostApplyCount >= 2 ? [] : ["fewer than two entries reached reviewed isolated apply plus post-action verification"]),
+    ...(focusedDebugComplete ? [] : ["debug repair entry did not complete with task proof"]),
+    ...(multiFileQualityRecord && multiFileCompleteOrExactPartial ? [] : ["multi-file coordination did not complete with target-file accounting"]),
+    ...(artifactOrReportComplete && artifactQualityPassed ? [] : ["artifact or report entry did not complete with validation"]),
+    ...(continuationOrContextComplete ? [] : ["continuation or context entry did not complete with task proof"]),
+    ...(focusedProviderRecovery ? [] : ["provider recovery triage entry did not complete with task proof"]),
+    ...(primaryProviderSuccess ? [] : ["primary provider success coverage missing"]),
+    ...(primarySuccessFallbackSkipped ? [] : ["primary provider success did not prove configured fallback was skipped"]),
+    ...(forcedPrimaryFailureFallbackAttempted ? [] : ["forced primary provider-network failure did not attempt configured fallback"]),
+    ...(forcedPrimaryFailureFallbackPassed ? [] : ["forced primary provider-network fallback did not pass"]),
+    ...(manualCorrectionCount === correctionDispositionCount ? [] : ["manual corrections missing automated blocker or failing disposition"]),
+    ...(writeResults.every((result) =>
+      result.status !== "complete" ||
+      result.qualityRecord?.manualCorrectionNeeded === false
+    ) ? [] : ["completed write task required manual correction"]),
+    ...(writeResults.filter((result) => result.status === "complete").every((result) => result.changedFiles.length > 0)
+      ? []
+      : ["changed-file accounting missing for completed write tasks"]),
+  ];
+  const blockers = profile === "focused" ? focusedBlockers : broadBlockers;
   return freeze({
+    profile,
     entryCount: results.length,
     executedCount: executed.length,
     completeOrUsefulPartialCount: completeOrUseful.length,
