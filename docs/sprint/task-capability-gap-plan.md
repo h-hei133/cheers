@@ -142,10 +142,10 @@ or data execution, one pathless/context execution, exact provider-network
 blockers, changedFiles empty visibility, no mutation, no apply, and no terminal
 success from provider calls or gate passes. SP022 focused tests preserve two
 no-write live execution observations as complete/useful partial with task
-proof. Manual live smoke evidence now shows read-only smoke passed with
-fallback configured/skipped after primary success, anchored provider smoke
-passed with configured fallback attempted after primary provider-network
-failure, no raw provider output leaked, and no write/no apply was preserved.
+proof. Manual live smoke evidence now shows read-only smoke passed, anchored
+provider smoke passed with the primary provider, fallback was configured but
+skipped because primary succeeded, no raw provider output leaked, and no
+write/no apply was preserved.
 Write-capable code/debug cases stay unsafe or dry-run-only.
 
 Repeatable live run status: `verify:live-task-execution` reports thirteen
@@ -165,9 +165,9 @@ disposable apply plus post-apply task proof and zero manual correction, recorded
 quality records, 5 dry-run quality records, 3 reviewed real-workspace readiness
 records, 1 disposable selected-workspace apply, 1 completed debug/repair task,
 1 rollback useful partial with repair-verification status, 1 multi-file quality
-record, 1 artifact quality pass, anchored fallback attempted/passed after
-primary provider-network failure, read-only fallback configured/skipped after
-primary success, and continuation/context coverage. Redaction passed and
+record, 1 artifact quality pass, read-only and anchored provider smokes passed
+with fallback configured/skipped after primary success, and
+continuation/context coverage. Redaction passed and
 main-workspace mutation stayed false. This is live task-run evidence and
 disposable selected-workspace apply proof, not broad real-workspace write
 authority, raw provider output inspection, or provider-output-only success.

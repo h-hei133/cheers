@@ -692,9 +692,8 @@ focused validation.
     post-action verification records, 3 reviewed real-workspace readiness
     records, 1 disposable selected-workspace apply, 2 manual corrections, 1
     repair-verification blocker, multi-file quality metadata, artifact quality
-    pass, read-only fallback configured/skipped after primary success, anchored
-    fallback attempted/passed after primary provider-network failure, and
-    redaction pass.
+    pass, read-only and anchored provider smokes passing with fallback
+    configured/skipped after primary success, and redaction pass.
 - Rollback plan: remove `quality.ts`, quality record projection, and the
   selected-workspace apply receipt path from `liveRun.ts` and
   `verify:live-task-execution`, returning live reports to reviewed isolated
@@ -750,9 +749,8 @@ focused validation.
     3 completed write tasks with reviewed disposable apply plus post-apply task
     proof and zero manual correction, 2 remaining manual corrections with safe
     disposition, completed debug/repair, artifact/report, continuation/context,
-    selected-workspace apply, read-only fallback configured/skipped after
-    primary success, anchored fallback attempted/passed after primary
-    provider-network failure, and redaction pass.
+    selected-workspace apply, read-only and anchored provider smokes passing
+    with fallback configured/skipped after primary success, and redaction pass.
 - Rollback plan: remove the SP029 summary fields and stricter blockers from
   `liveRun.ts` and script output, returning the live report to SP028 quality
   readiness gates without weakening evidence/result task proof.
