@@ -58,7 +58,7 @@ export function extractSecondaryFileWrites(
   const writes: Array<{ path: string; content: string }> = [];
   const primary = normalizePathLike(primaryPath);
   const matches = prompt.matchAll(
-    /\b(?:create|write)\s+(?:file\s+)?((?:\.{1,2}[\\/])?(?:[\w.-]+[\\/])*[\w.-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+with\s+content\s*:\s*([\s\S]*?)(?=(?:[.!?。！？]\s+(?:do\s+not|don't|without|no|verify|confirm|ensure|check|only|then|create|write|update|replace)\b)|$)/gi,
+    /\b(?:create|write|update)\s+(?:file\s+)?((?:\.{1,2}[\\/])?(?:[\w.-]+[\\/])*[\w.-]+\.(?:txt|md|json|yaml|yml|ts|tsx|js|jsx|py|css|html))\s+with\s+content\s*:\s*([\s\S]*?)(?=(?:[.!?。！？]\s+(?:do\s+not|don't|without|no|verify|confirm|ensure|check|only|then|create|write|update|replace)\b)|$)/gi,
   );
   for (const match of matches) {
     const path = match[1]?.trim().replace(/\\/g, "/");

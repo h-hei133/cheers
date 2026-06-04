@@ -37,6 +37,35 @@ describe("secondaryWriteStage", () => {
       "secondary write applied on src/notes.md",
     );
   });
+
+  it("skips secondary writes for files already changed in the current aggregate", async () => {
+    const calls: Array<{ toolName: string; args: Record<string, unknown> }> = [];
+    const aggregate = createAggregate();
+    aggregate.changedFiles.push("src/notes.md");
+    const dispatcher = {
+      dispatch: async (toolName: string, args: Record<string, unknown>) => {
+        calls.push({ toolName, args });
+        return { success: true, output: "" };
+      },
+    } as unknown as ToolDispatcher;
+
+    await runSecondaryWriteStage({
+      prompt: "Update src/app.ts and write src/notes.md with content: hello",
+      targetPath: "src/app.ts",
+      workspaceRoot: "/workspace",
+      sessionId: "sess",
+      turn: 3,
+      dispatcher,
+      events: aggregate.events,
+      aggregate,
+    });
+
+    expect(calls).toEqual([]);
+    expect(aggregate.changedFiles).toEqual(["src/notes.md"]);
+    expect(aggregate.evidence).toContain(
+      "secondary-write-skipped:src/notes.md:already-handled",
+    );
+  });
 });
 
 function createAggregate(): MutationRuntimeAggregate {

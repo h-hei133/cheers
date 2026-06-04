@@ -25,6 +25,13 @@ export async function runSecondaryWriteStage(input: {
     input.targetPath,
   );
   for (const secondary of secondaryWrites) {
+    if (
+      normalizePathLike(secondary.path) === normalizePathLike(input.targetPath) ||
+      input.aggregate.changedFiles.map(normalizePathLike).includes(normalizePathLike(secondary.path))
+    ) {
+      input.aggregate.evidence.push(`secondary-write-skipped:${secondary.path}:already-handled`);
+      continue;
+    }
     const lineCount = secondary.content.split("\n").length;
     const secondaryMutation = await executeFileMutationBranch({
       path: secondary.path,
@@ -51,4 +58,8 @@ export async function runSecondaryWriteStage(input: {
     });
     appendMutationResult(input.aggregate, secondaryMutation);
   }
+}
+
+function normalizePathLike(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^\.\/+/g, "").trim();
 }

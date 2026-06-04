@@ -36,6 +36,8 @@ export interface ProductRepairIterationProjection {
   readonly changedFiles: readonly string[];
   readonly notProvenClaims: readonly string[];
   readonly finalRepairVerdict: ProductRepairFinalVerdict;
+  readonly verificationFailureSummary?: string;
+  readonly failureOutputUsedForRetry: boolean;
   readonly verdict: ProductVerdict;
   readonly repairProposalIsSuccess: false;
   readonly repairApplyWithoutReverifyIsSuccess: false;
@@ -53,8 +55,11 @@ export function projectRepairIteration(input: {
   readonly changedFiles: readonly string[];
   readonly notProvenClaims: readonly string[];
   readonly finalRepairVerdict: ProductRepairFinalVerdict;
+  readonly verificationFailureSummary?: string;
 }): ProductRepairIterationProjection {
   const applySucceeded = isRepairApplySuccess(input.applyStatus);
+  const failureOutputUsedForRetry =
+    input.retryCount <= 0 || Boolean(input.verificationFailureSummary?.trim());
   const claims: ProductClaimInput[] = [
     {
       group: "verification",
@@ -64,9 +69,13 @@ export function projectRepairIteration(input: {
     },
     {
       group: "repair",
-      status: input.repairProposalSource ? "proven" : "not-run",
-      reason: "Repair proposal source must be explicit.",
-      blocker: input.repairProposalSource ? undefined : "repair proposal not proven",
+      status: input.repairProposalSource && failureOutputUsedForRetry ? "proven" : "not-run",
+      reason: "Repair proposal source must be explicit and retry must use verification failure output.",
+      blocker: input.repairProposalSource
+        ? failureOutputUsedForRetry
+          ? undefined
+          : "verification failure output not used for retry"
+        : "repair proposal not proven",
     },
     {
       group: "authority",
@@ -101,6 +110,10 @@ export function projectRepairIteration(input: {
     changedFiles: input.changedFiles,
     notProvenClaims: input.notProvenClaims,
     finalRepairVerdict: input.finalRepairVerdict,
+    ...(input.verificationFailureSummary?.trim()
+      ? { verificationFailureSummary: sanitizeSummary(input.verificationFailureSummary) }
+      : {}),
+    failureOutputUsedForRetry,
     verdict: projectProductVerdictFromClaims({
       claims,
       provenance: { source: "product-runtime", adapter: "repair-facade" },
@@ -112,6 +125,10 @@ export function projectRepairIteration(input: {
     repairProposalIsSuccess: false,
     repairApplyWithoutReverifyIsSuccess: false,
   };
+}
+
+function sanitizeSummary(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
 function isRepairApplySuccess(status: string): boolean {

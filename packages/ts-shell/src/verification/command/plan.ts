@@ -289,9 +289,9 @@ function selectCommandCandidate(input: {
   if (agentPlanCommand) {
     return { source: "agent-plan", command: agentPlanCommand };
   }
-  const testImpactCommand = input.testImpactPlan?.likelyVerificationCommandCandidates.find(
-    (entry) => entry.readiness === "ready" && Boolean(entry.command.trim()),
-  );
+  const testImpactCommand = input.testImpactPlan?.likelyVerificationCommandCandidates
+    .filter((entry) => entry.readiness === "ready" && Boolean(entry.command.trim()))
+    .sort((left, right) => verificationCandidatePriority(right) - verificationCandidatePriority(left))[0];
   if (testImpactCommand) {
     return { source: "test-impact", command: testImpactCommand.command };
   }
@@ -308,6 +308,12 @@ function selectCommandCandidate(input: {
     return { source: "edit-result", command: input.editResultVerificationCommand };
   }
   return { source: "none" };
+}
+
+function verificationCandidatePriority(
+  candidate: TestImpactPlan["likelyVerificationCommandCandidates"][number],
+): number {
+  return candidate.source === "targeted-test" ? 2 : 1;
 }
 
 function classifyPlanState(input: {

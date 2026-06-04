@@ -16,9 +16,14 @@ describe("repairFacade", () => {
       changedFiles: ["src/repair.ts"],
       notProvenClaims: ["live provider repair proposal"],
       finalRepairVerdict: "verified-success-with-repair",
+      verificationFailureSummary: "test failed: expected status to be ready",
     });
 
     expect(projection.verdict.status).toBe("COMPLETE");
+    expect(projection.failureOutputUsedForRetry).toBe(true);
+    expect(projection.verificationFailureSummary).toBe(
+      "test failed: expected status to be ready",
+    );
     expect(projection.repairProposalIsSuccess).toBe(false);
     expect(projection.repairApplyWithoutReverifyIsSuccess).toBe(false);
   });
@@ -36,6 +41,7 @@ describe("repairFacade", () => {
       changedFiles: ["src/repair.ts"],
       notProvenClaims: ["repair success", "post-repair verification passed"],
       finalRepairVerdict: "repair-failed",
+      verificationFailureSummary: "test failed: expected status to be ready",
     });
 
     expect(projection.verdict.status).toBe("PARTIAL");
@@ -56,11 +62,34 @@ describe("repairFacade", () => {
       changedFiles: ["src/repair.ts"],
       notProvenClaims: ["same verification command rerun"],
       finalRepairVerdict: "repair-not-proven",
+      verificationFailureSummary: "test failed: expected status to be ready",
     });
 
     expect(projection.verdict.status).toBe("NOT_PROVEN");
     expect(projection.verdict.notProvenReasons).toContain(
       "same verification command was not rerun",
+    );
+  });
+
+  it("does not count a retry as repair success without verification failure output", () => {
+    const projection = projectRepairIteration({
+      originalFailurePreserved: true,
+      repairProposalSource: "deterministic-from-failure-evidence",
+      confirmationSource: "explicit-authority-contract",
+      applyStatus: "single-target-applied",
+      postRepairVerificationStatus: "passed",
+      sameVerificationCommandRerun: true,
+      retryCount: 1,
+      maxRepairAttempts: 1,
+      changedFiles: ["src/repair.ts"],
+      notProvenClaims: ["verification failure output used for retry"],
+      finalRepairVerdict: "verified-success-with-repair",
+    });
+
+    expect(projection.failureOutputUsedForRetry).toBe(false);
+    expect(projection.verdict.status).toBe("NOT_PROVEN");
+    expect(projection.verdict.notProvenReasons).toContain(
+      "verification failure output not used for retry",
     );
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  extractSecondaryFileWrites,
   extractReplaceDirective,
   resolveMutationInstruction,
 } from "./instructionPlanner.js";
@@ -36,5 +37,19 @@ describe("mutationInstructionPlanner", () => {
     if (!instruction.ok) {
       expect(instruction.reason).toContain("patch-from-not-found");
     }
+  });
+
+  it("extracts update-with-content secondary writes for sequenced edits", () => {
+    expect(
+      extractSecondaryFileWrites(
+        "Edit src/feature.ts with content: export const enabled = true. Then update src/feature.test.ts with content: expect(feature()).toBe(true). Verify after edit.",
+        "src/feature.ts",
+      ),
+    ).toEqual([
+      {
+        path: "src/feature.test.ts",
+        content: "expect(feature()).toBe(true)",
+      },
+    ]);
   });
 });

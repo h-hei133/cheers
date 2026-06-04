@@ -179,6 +179,45 @@ describe("verificationCommandPlan", () => {
     );
   });
 
+  it("prefers focused ready test-impact commands over generic readiness probes", () => {
+    const plan = buildVerificationCommandPlan({
+      testImpactPlan: {
+        impactPlanId: "test_impact_focused",
+        graphId: "ctx_graph_focused",
+        likelyTestFiles: ["packages/ts-shell/src/verification/verificationCommandPlan.test.ts"],
+        likelyVerificationCommandCandidates: [
+          {
+            command: "npm test -- --help",
+            source: "allowlisted-generic",
+            readiness: "ready",
+            reason: "generic readiness probe",
+          },
+          {
+            command:
+              "npm test -w packages/ts-shell -- src/verification/verificationCommandPlan.test.ts",
+            source: "targeted-test",
+            readiness: "ready",
+            reason: "focused command covers changed owner",
+          },
+        ],
+        confidence: "high",
+        missingTestContext: [],
+        suggestedReads: [],
+        commandReadiness: "ready",
+        noWriteEvidence: ["test-impact:commands:not-executed"],
+        replaySafeSummary: "test-impact test_impact_focused",
+        evidence: ["test-impact:id:test_impact_focused"],
+      },
+    });
+
+    expect(plan.state).toBe("ready");
+    expect(plan.source).toBe("test-impact");
+    expect(plan.command).toBe(
+      "npm test -w packages/ts-shell -- src/verification/verificationCommandPlan.test.ts",
+    );
+    expect(plan.commandKind).toBe("npm-test-focused");
+  });
+
   it("can select allowlisted code graph impact verification candidates without executing them", () => {
     const impact = impactFixture();
     const plan = buildVerificationCommandPlan({ codeGraphImpact: impact });

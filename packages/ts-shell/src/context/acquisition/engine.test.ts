@@ -145,6 +145,52 @@ describe("runContextEngine", () => {
     expect(result.evidence).toContain("context-engine:mutation-authority:not-granted");
   });
 
+  it("keeps ambiguous owner selection in a disambiguation state before staged reads", async () => {
+    await fs.mkdir(path.join(workspaceRoot, "src", "payments"), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, "src", "orders"), { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "payments", "statusPolicy.ts"),
+      "export function statusPolicy() { return 'payment'; }\n",
+    );
+    await fs.writeFile(
+      path.join(workspaceRoot, "src", "orders", "statusPolicy.ts"),
+      "export function statusPolicy() { return 'order'; }\n",
+    );
+
+    const result = await runContextEngine({
+      workspaceRoot,
+      userTask: "Fix statusPolicy behavior",
+      maxRepoFiles: 80,
+      maxCandidates: 5,
+    });
+
+    expect(result.status).toBe("ambiguous-context");
+    expect(result.discoveryHandoff.ambiguityState).toBe(
+      "multiple-plausible-candidates",
+    );
+    expect(result.bundle).toBeUndefined();
+    expect(result.contextAcquisitionHandoff).toBeUndefined();
+    expect(result.contextBudget.filesRead).toBe(0);
+    expect(result.filesRead).toEqual([]);
+    expect(result.memory.candidateFiles).toEqual(
+      expect.arrayContaining([
+        "src/orders/statusPolicy.ts",
+        "src/payments/statusPolicy.ts",
+      ]),
+    );
+    expect(result.nextReadSuggestions).toEqual(
+      expect.arrayContaining([
+        "src/orders/statusPolicy.ts",
+        "src/payments/statusPolicy.ts",
+      ]),
+    );
+    expect(result.workflowPlan.blockedReason).toContain(
+      "Multiple plausible in-workspace targets",
+    );
+    expect(result.evidence).toContain("context-engine:status:ambiguous-context");
+    expect(result.evidence).toContain("context-engine:mutation-authority:not-granted");
+  });
+
   it("rejects previous memory when repo snapshot or workspace path boundaries do not match", async () => {
     const first = await runContextEngine({
       workspaceRoot,

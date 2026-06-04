@@ -19,6 +19,7 @@ import {
   extractFencedContent,
   extractInlineWriteContent,
   extractLowRiskRenameRefactor,
+  extractSecondaryFileWrites,
 } from "../edit/planning/instructionPlanner.js";
 import {
   buildLocalMutationScopeBlockedPlan,
@@ -181,6 +182,20 @@ export function buildWorkflowTaskPlan(
     workspaceRoot,
     hasVerifyIntent,
   });
+  const relatedWriteTargets = resolveRelatedWriteTargets(prompt);
+  const relatedWriteTargetSet = new Set(
+    relatedWriteTargets.map((target) => normalizePathLike(target)),
+  );
+  const sequencedMutationTarget =
+    targetResolution.blocker &&
+    relatedWriteTargetSet.size > 0 &&
+    /\b(?:then|and\s+then|also)\b/i.test(prompt)
+      ? (targetResolution.targets.find(
+          (target) =>
+            target.inWorkspace &&
+            !relatedWriteTargetSet.has(normalizePathLike(target.cleaned)),
+        ) ?? null)
+      : null;
   const browserPlan = buildBrowserIntentPlan({
     prompt,
     continuity,
@@ -190,6 +205,7 @@ export function buildWorkflowTaskPlan(
   }
   if (
     targetResolution.blocker &&
+    !sequencedMutationTarget &&
     shouldBlockMutationForTargetResolution({
       blocker: targetResolution.blocker,
       hasCorrectionCue,
@@ -470,6 +486,7 @@ export function buildWorkflowTaskPlan(
     hasEditIntent,
   });
   const primaryTarget =
+    sequencedMutationTarget ??
     mutationIntentTarget ??
     (explicitHasExtension ? explicitPrimaryTarget : null) ??
     promptPathTarget ??
@@ -513,6 +530,15 @@ export function buildWorkflowTaskPlan(
         hasTemporalSuccessorCue ||
         hasResumeTaskContinuityCue) &&
         hasTaskTruthAnchor));
+  const commandIntentPlan = buildCommandIntentPlan({
+    normalizedPrompt: normalized,
+    hasExecutionIntent,
+    unsupportedCommand,
+    usedRestoredState,
+  });
+  if (commandIntentPlan) {
+    return commandIntentPlan;
+  }
   const explicitDeliverableMode = detectGroundedDeliverableMode(prompt);
   const inferredDeliverableModeFromContinuity =
     inferGroundedDeliverableModeFromContinuity(continuity);
@@ -719,6 +745,9 @@ export function buildWorkflowTaskPlan(
     (hasWeakRepairFollowUp && !allowWeakFollowUpInheritedTransform
       ? undefined
       : continuityReplaceDirectiveForExecution);
+  const mutationReplaceDirective = sequencedMutationTarget
+    ? undefined
+    : effectiveReplaceDirective;
   const shouldKeepVerifiedMutationNextStep =
     Boolean(mutationVerificationLineage?.length) &&
     hasPassedVerificationLineage(continuity) &&
@@ -1135,10 +1164,13 @@ export function buildWorkflowTaskPlan(
         ? { verifyCommand: effectiveVerifyCommand }
         : {}),
       continuationRepairReplan: true,
-      ...(effectiveReplaceDirective
+      ...(sequencedMutationTarget && relatedWriteTargets.length > 0
+        ? { additionalTargetPaths: relatedWriteTargets }
+        : {}),
+      ...(mutationReplaceDirective
         ? {
-            replaceFrom: effectiveReplaceDirective.from,
-            replaceTo: effectiveReplaceDirective.to,
+            replaceFrom: mutationReplaceDirective.from,
+            replaceTo: mutationReplaceDirective.to,
           }
         : {}),
       ...mutationScopePlanning.fields,
@@ -1248,10 +1280,13 @@ export function buildWorkflowTaskPlan(
             additionalTargetPaths: crossFileCandidates,
           }
         : {}),
-      ...(effectiveReplaceDirective
+      ...(sequencedMutationTarget && relatedWriteTargets.length > 0
+        ? { additionalTargetPaths: relatedWriteTargets }
+        : {}),
+      ...(mutationReplaceDirective
         ? {
-            replaceFrom: effectiveReplaceDirective.from,
-            replaceTo: effectiveReplaceDirective.to,
+            replaceFrom: mutationReplaceDirective.from,
+            replaceTo: mutationReplaceDirective.to,
           }
         : {}),
       continuationLineage: [
@@ -1333,16 +1368,6 @@ export function buildWorkflowTaskPlan(
     });
   }
 
-  const commandIntentPlan = buildCommandIntentPlan({
-    normalizedPrompt: normalized,
-    hasExecutionIntent,
-    unsupportedCommand,
-    usedRestoredState,
-  });
-  if (commandIntentPlan) {
-    return commandIntentPlan;
-  }
-
   if (hasWriteTaskIntent || hasEditIntent) {
     if (!primaryTarget) {
       return buildMissingMutationTargetPlan({
@@ -1388,11 +1413,14 @@ export function buildWorkflowTaskPlan(
       ...(effectiveVerifyCommand
         ? { verifyCommand: effectiveVerifyCommand }
         : {}),
-      ...(effectiveReplaceDirective
+      ...(mutationReplaceDirective
         ? {
-            replaceFrom: effectiveReplaceDirective.from,
-            replaceTo: effectiveReplaceDirective.to,
+            replaceFrom: mutationReplaceDirective.from,
+            replaceTo: mutationReplaceDirective.to,
           }
+        : {}),
+      ...(sequencedMutationTarget && relatedWriteTargets.length > 0
+        ? { additionalTargetPaths: relatedWriteTargets }
         : {}),
       ...(!hasCreateIntent ? mutationScopePlanning.fields : {}),
       ...(!hasCreateIntent ? mutationScopePlanning.requiredFields : {}),
@@ -1479,4 +1507,26 @@ function normalizePathLike(value: string): string {
     .replace(/\\/g, "/")
     .replace(/^\.\/+/g, "")
     .trim();
+}
+
+function resolveRelatedWriteTargets(prompt: string): readonly string[] {
+  return uniquePathList(
+    extractSecondaryFileWrites(prompt, "")
+      .map((write) => normalizePathLike(write.path))
+      .filter(Boolean),
+  );
+}
+
+function uniquePathList(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const key = normalizePathLike(value);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(value);
+  }
+  return result;
 }

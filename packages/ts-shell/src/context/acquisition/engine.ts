@@ -23,7 +23,11 @@ export type ContextEngineTaskKindHint = Extract<
 
 export interface ContextEngineResult {
   readonly engineId: string;
-  readonly status: "context-built" | "reused-memory" | "insufficient-context";
+  readonly status:
+    | "context-built"
+    | "reused-memory"
+    | "insufficient-context"
+    | "ambiguous-context";
   readonly userTask: string;
   readonly repo: RepoIntelligenceResult;
   readonly selectedCandidate?: RepoIntelligenceCandidate;
@@ -185,6 +189,70 @@ export async function runContextEngine(input: {
     };
   }
 
+  if (
+    repo.targetRanking.ambiguityState === "multiple-plausible-candidates" &&
+    shouldHoldForTargetDisambiguation(selectedCandidate)
+  ) {
+    const workflowPlan = buildWorkflowPlan({
+      userTask: input.userTask,
+      targetPath: selectedCandidate.path,
+      hasTarget: true,
+      taskKindHint: input.taskKindHint,
+      blockedReason: "Multiple plausible in-workspace targets need disambiguation before staged context reads.",
+    });
+    const memory = buildInsufficientMemory({
+      userTask: input.userTask,
+      repo,
+      reason: "multiple plausible context targets",
+      candidateFiles: repo.candidates.slice(0, 4).map((candidate) => candidate.safeLabel),
+      selectedTargetPath: selectedCandidate.safeLabel,
+      missingFacts: [
+        ...repo.missingFacts,
+        "ambiguous candidate set",
+        "target family uncertainty",
+      ],
+      nextReadSuggestions: repo.candidates.slice(0, 4).map((candidate) => candidate.safeLabel),
+      targetStatusMissingFact: "no confirmed target for context graph planning",
+    });
+    return {
+      engineId: `context_engine_${memory.memoryId}`,
+      status: "ambiguous-context",
+      userTask: input.userTask,
+      repo,
+      selectedCandidate,
+      discoveryHandoff,
+      workflowPlan,
+      memory,
+      filesRead: [],
+      contextBudget: {
+        candidateFiles: repo.candidates.length,
+        filesRead: 0,
+        bytesUsed: 0,
+        cacheStatus: repo.snapshot.cacheStatus,
+      },
+      missingFacts: memory.missingFacts,
+      nextReadSuggestions: [
+        ...repo.nextReadSuggestions,
+        ...memory.discoveryHandoff.nextReadSuggestions,
+      ],
+      evidence: [
+        ...repo.evidence,
+        ...reuse.evidence,
+        `context-memory-reuse:eligibility:${reuse.eligibility.status}`,
+        ...(reuse.discoveryHandoff
+          ? [`context-memory-reuse:discovery-handoff:${reuse.discoveryHandoff.handoffId}`]
+          : []),
+        ...(reuse.planningHandoff
+          ? [`context-memory-reuse:planning-handoff:${reuse.planningHandoff.handoffId}`]
+          : []),
+        `context-engine:discovery-handoff:${discoveryHandoff.handoffId}`,
+        "context-engine:status:ambiguous-context",
+        "context-engine:ambiguity:multiple-plausible-candidates",
+        "context-engine:mutation-authority:not-granted",
+      ],
+    };
+  }
+
   const workflowPlan = buildWorkflowPlan({
     userTask: input.userTask,
     targetPath: selectedCandidate.path,
@@ -280,11 +348,18 @@ function buildDiscoveryHandoff(repo: RepoIntelligenceResult): ContextDiscoveryHa
   };
 }
 
+function shouldHoldForTargetDisambiguation(
+  selectedCandidate: RepoIntelligenceResult["candidates"][number],
+): boolean {
+  return selectedCandidate.testAdjacencyHints.length === 0;
+}
+
 function buildWorkflowPlan(input: {
   readonly userTask: string;
   readonly targetPath?: string;
   readonly hasTarget: boolean;
   readonly taskKindHint?: ContextEngineTaskKindHint;
+  readonly blockedReason?: string;
 }): WorkflowTaskPlan {
   const lower = input.userTask.toLowerCase();
   const taskKind = input.taskKindHint ?? inferTaskKind(lower);
@@ -298,6 +373,7 @@ function buildWorkflowPlan(input: {
     verifyAfterEdit: taskKind === "edit-file" ||
       taskKind === "write-file" ||
       /\b(test|verify|regression)\b/.test(lower),
+    ...(input.blockedReason ? { blockedReason: input.blockedReason } : {}),
     ...(input.hasTarget ? {} : { targetMissing: true, blockedReason: "No likely in-workspace target found for vague task." }),
   };
 }
@@ -316,6 +392,11 @@ function buildInsufficientMemory(input: {
   readonly userTask: string;
   readonly repo: RepoIntelligenceResult;
   readonly reason: string;
+  readonly candidateFiles?: readonly string[];
+  readonly selectedTargetPath?: string;
+  readonly missingFacts?: readonly string[];
+  readonly nextReadSuggestions?: readonly string[];
+  readonly targetStatusMissingFact?: string;
 }): ContextWorkingMemory {
   const memoryId = `ctx_mem_insufficient_${input.repo.snapshot.snapshotId}`;
   const invalidation = {
@@ -325,7 +406,7 @@ function buildInsufficientMemory(input: {
     invalidationSignals: ["missing-selected-target"],
     missingFreshnessEvidence: ["no context receipts available"],
     invalidated: true,
-    nextReadSuggestions: ["rerun discovery with an explicit target or symbol"],
+    nextReadSuggestions: input.nextReadSuggestions ?? ["rerun discovery with an explicit target or symbol"],
     notProvenClaims: [
       "memory-exists-is-not-fresh-context",
       "memory-reused-is-not-enough-context",
@@ -360,7 +441,7 @@ function buildInsufficientMemory(input: {
     matchingWorkspaceFacts: [`repoSnapshotId=${input.repo.snapshot.snapshotId}`],
     freshnessRequirement: "unsupported" as const,
     missingFacts: ["selected target", "context packet"],
-    requiredRefreshSuggestions: ["rerun bounded discovery and staged reads"],
+    requiredRefreshSuggestions: input.nextReadSuggestions ?? ["rerun bounded discovery and staged reads"],
     optionalRefreshSuggestions: [],
     notProvenClaims: [
       "reuse-eligible-is-not-fresh-context",
@@ -424,13 +505,14 @@ function buildInsufficientMemory(input: {
     memoryId,
     taskFingerprint: fingerprintTask(input.userTask),
     repoSnapshotId: input.repo.snapshot.snapshotId,
-    selectedTargetPath: "(none)",
-    candidateFiles: [],
+    selectedTargetPath: input.selectedTargetPath ?? "(none)",
+    candidateFiles: [...(input.candidateFiles ?? [])],
     fileReceipts: [],
-    compactSummary: `insufficient-context; reason=${input.reason}; candidates=0`,
+    compactSummary: `insufficient-context; reason=${input.reason}; candidates=${input.candidateFiles?.length ?? 0}`,
     missingFacts: [
       ...input.repo.missingFacts,
-      "no selected target for context graph planning",
+      ...(input.missingFacts ?? []),
+      input.targetStatusMissingFact ?? "no selected target for context graph planning",
     ],
     planningWarnings: [],
     planQualityLevel: "unsupported",
