@@ -81,6 +81,8 @@ export interface TaskLiveRunObservation {
   readonly fallbackConfigured?: boolean;
   readonly fallbackAttempted?: boolean;
   readonly fallbackOutcome?: "passed" | "failed" | "skipped" | "inconclusive";
+  readonly primaryFailureClass?: "none" | "provider-network" | "provider-auth" | "config-or-skip" | "product-regression";
+  readonly forcedPrimaryFailure?: boolean;
   readonly patchIntentStatus?: "present" | "missing" | "invalid";
   readonly safePlanStatus?: "ready" | "missing" | "blocked";
   readonly dryRunDiffStatus?: "produced" | "missing" | "failed";
@@ -106,6 +108,8 @@ export interface TaskLiveGateReceipt {
   readonly fallbackConfigured?: boolean;
   readonly fallbackAttempted?: boolean;
   readonly fallbackOutcome?: "passed" | "failed" | "skipped" | "inconclusive";
+  readonly primaryFailureClass?: "none" | "provider-network" | "provider-auth" | "config-or-skip" | "product-regression";
+  readonly forcedPrimaryFailure?: boolean;
   readonly blocker?: string;
 }
 
@@ -194,6 +198,11 @@ export interface TaskLiveRunSummary {
   readonly debugRepairFailureProvedCount: number;
   readonly multiFileQualityRecord: boolean;
   readonly artifactQualityPassed: boolean;
+  readonly primaryProviderSuccess: boolean;
+  readonly primarySuccessFallbackSkipped: boolean;
+  readonly forcedPrimaryFailureFallbackAttempted: boolean;
+  readonly forcedPrimaryFailureFallbackPassed: boolean;
+  readonly providerFallbackCoveragePassed: boolean;
   readonly hardGateStatus: "passed" | "not-passed";
   readonly blockers: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -457,7 +466,7 @@ export async function runTaskLiveReport(input: {
     }
     return await externalEntryResult(entry, observationsByEntryId.get(entry.entryId));
   }));
-  const summary = summarizeLiveRun(results);
+  const summary = summarizeLiveRun(results, input.gateReceipts ?? []);
   return freeze({
     reportId: "task-live-run",
     entries,
@@ -580,6 +589,8 @@ function observationFromReceipt(input: {
     fallbackConfigured: input.receipt.fallbackConfigured,
     fallbackAttempted: input.receipt.fallbackAttempted,
     fallbackOutcome: input.receipt.fallbackOutcome,
+    primaryFailureClass: input.receipt.primaryFailureClass,
+    forcedPrimaryFailure: input.receipt.forcedPrimaryFailure,
     ...(input.receipt.blocker ? { exactBlocker: input.receipt.blocker } : {}),
   });
 }
@@ -1069,7 +1080,10 @@ function externalStatus(
   return proofItems.length > 0 ? "useful-partial" : "provider-output-insufficient";
 }
 
-function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveRunSummary {
+function summarizeLiveRun(
+  results: readonly TaskLiveRunEntryResult[],
+  gateReceipts: readonly TaskLiveGateReceipt[] = [],
+): TaskLiveRunSummary {
   const executed = results.filter((result) => result.executed);
   const completeOrUseful = executed.filter((result) => result.status === "complete" || result.status === "useful-partial");
   const completedWithTaskProof = executed.filter((result) => result.status === "complete" && result.proofStatus === "complete");
@@ -1192,6 +1206,40 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     record.hunkOrSectionCount > 0 &&
     record.manualCorrectionNeeded === false
   );
+  const primaryProviderSuccess = gateReceipts.some((receipt) =>
+    receipt.attempted &&
+    receipt.outcome === "passed" &&
+    receipt.forcedPrimaryFailure !== true &&
+    (receipt.primaryFailureClass === undefined || receipt.primaryFailureClass === "none")
+  );
+  const primarySuccessFallbackSkipped = gateReceipts.some((receipt) =>
+    receipt.attempted &&
+    receipt.outcome === "passed" &&
+    receipt.forcedPrimaryFailure !== true &&
+    receipt.fallbackConfigured === true &&
+    receipt.fallbackAttempted === false &&
+    receipt.fallbackOutcome === "skipped" &&
+    (receipt.primaryFailureClass === undefined || receipt.primaryFailureClass === "none")
+  );
+  const forcedPrimaryFailureFallbackAttempted = gateReceipts.some((receipt) =>
+    receipt.forcedPrimaryFailure === true &&
+    receipt.primaryFailureClass === "provider-network" &&
+    receipt.fallbackConfigured === true &&
+    receipt.fallbackAttempted === true
+  );
+  const forcedPrimaryFailureFallbackPassed = gateReceipts.some((receipt) =>
+    receipt.forcedPrimaryFailure === true &&
+    receipt.primaryFailureClass === "provider-network" &&
+    receipt.fallbackConfigured === true &&
+    receipt.fallbackAttempted === true &&
+    receipt.fallbackOutcome === "passed" &&
+    receipt.outcome === "passed"
+  );
+  const providerFallbackCoveragePassed =
+    primaryProviderSuccess &&
+    primarySuccessFallbackSkipped &&
+    forcedPrimaryFailureFallbackAttempted &&
+    forcedPrimaryFailureFallbackPassed;
   const rollbackResult = results.find((result) => result.entryKind === "write-rollback");
   const rollbackRecoveryStatus = rollbackResult?.status === "complete"
     ? "complete"
@@ -1221,6 +1269,10 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     ...(artifactQualityPassed ? [] : ["artifact or report entry did not pass quality checks"]),
     ...(artifactOrReportComplete ? [] : ["artifact or report entry did not complete with task proof"]),
     ...(continuationOrContextComplete ? [] : ["continuation or context entry did not complete with task proof"]),
+    ...(primaryProviderSuccess ? [] : ["primary provider success coverage missing"]),
+    ...(primarySuccessFallbackSkipped ? [] : ["primary provider success did not prove configured fallback was skipped"]),
+    ...(forcedPrimaryFailureFallbackAttempted ? [] : ["forced primary provider-network failure did not attempt configured fallback"]),
+    ...(forcedPrimaryFailureFallbackPassed ? [] : ["forced primary provider-network fallback did not pass"]),
     ...(results.every((result) => result.qualityRecord?.manualCorrectionNeeded !== true || result.qualityRecord.blocker.length > 0)
       ? []
       : ["manual corrections missing exact blockers"]),
@@ -1299,6 +1351,11 @@ function summarizeLiveRun(results: readonly TaskLiveRunEntryResult[]): TaskLiveR
     debugRepairFailureProvedCount,
     multiFileQualityRecord,
     artifactQualityPassed,
+    primaryProviderSuccess,
+    primarySuccessFallbackSkipped,
+    forcedPrimaryFailureFallbackAttempted,
+    forcedPrimaryFailureFallbackPassed,
+    providerFallbackCoveragePassed,
     hardGateStatus: blockers.length === 0 ? "passed" : "not-passed",
     blockers: freeze(blockers),
     terminalSuccessClaim: false,

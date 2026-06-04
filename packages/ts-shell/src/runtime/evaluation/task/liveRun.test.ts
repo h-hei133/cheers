@@ -68,6 +68,11 @@ describe("task live run report", () => {
     const host = createHostRuntime();
     const report = await runTaskLiveReport({
       dispatch: host.dispatch,
+      gateReceipts: [
+        gateReceipt("read-only-provider"),
+        primarySuccessFallbackSkippedReceipt(),
+        forcedPrimaryFailureFallbackReceipt(),
+      ],
       observations: [
         writeObservation("single-file-edit", {
           changedFiles: ["src/format.ts"],
@@ -154,6 +159,11 @@ describe("task live run report", () => {
       artifactOrReportComplete: true,
       continuationOrContextComplete: true,
       artifactQualityPassed: true,
+      primaryProviderSuccess: true,
+      primarySuccessFallbackSkipped: true,
+      forcedPrimaryFailureFallbackAttempted: true,
+      forcedPrimaryFailureFallbackPassed: true,
+      providerFallbackCoveragePassed: true,
       hardGateStatus: "passed",
       blockers: [],
       terminalSuccessClaim: false,
@@ -262,7 +272,9 @@ describe("task live run report", () => {
           fallbackConfigured: true,
           fallbackAttempted: false,
           fallbackOutcome: "skipped",
+          primaryFailureClass: "none",
         }),
+        forcedPrimaryFailureFallbackReceipt(),
       ],
       workspaceApplyReceipts: [workspaceApplyReceipt()],
     });
@@ -275,7 +287,9 @@ describe("task live run report", () => {
           fallbackConfigured: true,
           fallbackAttempted: false,
           fallbackOutcome: "skipped",
+          primaryFailureClass: "none",
         }),
+        forcedPrimaryFailureFallbackReceipt(),
       ],
       workspaceApplyReceipts: [workspaceApplyReceipt()],
     });
@@ -316,6 +330,11 @@ describe("task live run report", () => {
       artifactOrReportComplete: true,
       continuationOrContextComplete: true,
       artifactQualityPassed: true,
+      primaryProviderSuccess: true,
+      primarySuccessFallbackSkipped: true,
+      forcedPrimaryFailureFallbackAttempted: true,
+      forcedPrimaryFailureFallbackPassed: true,
+      providerFallbackCoveragePassed: true,
       hardGateStatus: "passed",
       terminalSuccessClaim: false,
     });
@@ -377,7 +396,10 @@ describe("task live run report", () => {
       terminalSuccessClaim: false,
     });
     expect(report.summary.blockers).toEqual(
-      expect.arrayContaining(["no reviewed real-workspace apply was proven in a disposable isolated selected workspace"]),
+      expect.arrayContaining([
+        "no reviewed real-workspace apply was proven in a disposable isolated selected workspace",
+        "forced primary provider-network failure did not attempt configured fallback",
+      ]),
     );
   });
 
@@ -523,6 +545,25 @@ function gateReceipt(
     redactionStatus: "passed" as const,
     ...overrides,
   };
+}
+
+function primarySuccessFallbackSkippedReceipt(): TaskLiveGateReceipt {
+  return gateReceipt("anchored-provider", {
+    fallbackConfigured: true,
+    fallbackAttempted: false,
+    fallbackOutcome: "skipped",
+    primaryFailureClass: "none",
+  });
+}
+
+function forcedPrimaryFailureFallbackReceipt(): TaskLiveGateReceipt {
+  return gateReceipt("anchored-provider", {
+    fallbackConfigured: true,
+    fallbackAttempted: true,
+    fallbackOutcome: "passed",
+    primaryFailureClass: "provider-network",
+    forcedPrimaryFailure: true,
+  });
 }
 
 function workspaceApplyReceipt(): {

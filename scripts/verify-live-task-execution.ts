@@ -14,6 +14,7 @@ import type { TaskLiveGateOutcome } from "../packages/ts-shell/src/runtime/evalu
 
 type GateResult = {
   readonly name: "read-only-provider" | "anchored-provider";
+  readonly label?: string;
   readonly attempted: boolean;
   readonly outcome: TaskLiveGateOutcome;
   readonly noMutation: boolean;
@@ -23,6 +24,8 @@ type GateResult = {
   readonly fallbackConfigured?: boolean;
   readonly fallbackAttempted?: boolean;
   readonly fallbackOutcome?: "passed" | "failed" | "skipped" | "inconclusive";
+  readonly primaryFailureClass?: "none" | "provider-network" | "provider-auth" | "config-or-skip" | "product-regression";
+  readonly forcedPrimaryFailure?: boolean;
   readonly blocker: string;
 };
 
@@ -46,8 +49,10 @@ if (liveOptIn) {
   const readOnly = runReadOnlyProviderGate();
   gateResults.push(readOnly);
 
-  const anchored = runAnchoredProviderGate();
+  const anchored = runAnchoredProviderGate({ forcedPrimaryFailure: false });
   gateResults.push(anchored);
+  const forcedFallback = runAnchoredProviderGate({ forcedPrimaryFailure: true });
+  gateResults.push(forcedFallback);
 
   if (realWorkspaceApplyOptIn) {
     workspaceApplyReceipts.push(runSelectedWorkspaceApplyGate());
@@ -62,16 +67,19 @@ const report = await runTaskLiveReport({
 });
 
 for (const gate of gateResults) {
-  console.log(`gate.${gate.name}.attempted=${gate.attempted}`);
-  console.log(`gate.${gate.name}.outcome=${gate.outcome}`);
-  console.log(`gate.${gate.name}.noMutation=${gate.noMutation}`);
-  console.log(`gate.${gate.name}.changedFiles=${JSON.stringify(gate.changedFiles)}`);
-  console.log(`gate.${gate.name}.noApply=${gate.noApply}`);
-  console.log(`gate.${gate.name}.redaction=${gate.redactionStatus}`);
-  if (gate.fallbackConfigured !== undefined) console.log(`gate.${gate.name}.fallbackConfigured=${gate.fallbackConfigured}`);
-  if (gate.fallbackAttempted !== undefined) console.log(`gate.${gate.name}.fallbackAttempted=${gate.fallbackAttempted}`);
-  if (gate.fallbackOutcome) console.log(`gate.${gate.name}.fallbackOutcome=${gate.fallbackOutcome}`);
-  if (gate.blocker) console.log(`gate.${gate.name}.blocker=${gate.blocker}`);
+  const gateLabel = gate.label ?? gate.name;
+  console.log(`gate.${gateLabel}.attempted=${gate.attempted}`);
+  console.log(`gate.${gateLabel}.outcome=${gate.outcome}`);
+  console.log(`gate.${gateLabel}.noMutation=${gate.noMutation}`);
+  console.log(`gate.${gateLabel}.changedFiles=${JSON.stringify(gate.changedFiles)}`);
+  console.log(`gate.${gateLabel}.noApply=${gate.noApply}`);
+  console.log(`gate.${gateLabel}.redaction=${gate.redactionStatus}`);
+  if (gate.primaryFailureClass) console.log(`gate.${gateLabel}.primaryFailureClass=${gate.primaryFailureClass}`);
+  if (gate.forcedPrimaryFailure !== undefined) console.log(`gate.${gateLabel}.forcedPrimaryFailure=${gate.forcedPrimaryFailure}`);
+  if (gate.fallbackConfigured !== undefined) console.log(`gate.${gateLabel}.fallbackConfigured=${gate.fallbackConfigured}`);
+  if (gate.fallbackAttempted !== undefined) console.log(`gate.${gateLabel}.fallbackAttempted=${gate.fallbackAttempted}`);
+  if (gate.fallbackOutcome) console.log(`gate.${gateLabel}.fallbackOutcome=${gate.fallbackOutcome}`);
+  if (gate.blocker) console.log(`gate.${gateLabel}.blocker=${gate.blocker}`);
 }
 for (const receipt of workspaceApplyReceipts) {
   console.log(`gate.${receipt.gate}.attempted=${receipt.attempted}`);
@@ -117,6 +125,11 @@ console.log(`manualCorrectionCount=${report.summary.manualCorrectionCount}`);
 console.log(`debugRepairFailureProvedCount=${report.summary.debugRepairFailureProvedCount}`);
 console.log(`multiFileQualityRecord=${report.summary.multiFileQualityRecord}`);
 console.log(`artifactQualityPassed=${report.summary.artifactQualityPassed}`);
+console.log(`primaryProviderSuccess=${report.summary.primaryProviderSuccess}`);
+console.log(`primarySuccessFallbackSkipped=${report.summary.primarySuccessFallbackSkipped}`);
+console.log(`forcedPrimaryFailureFallbackAttempted=${report.summary.forcedPrimaryFailureFallbackAttempted}`);
+console.log(`forcedPrimaryFailureFallbackPassed=${report.summary.forcedPrimaryFailureFallbackPassed}`);
+console.log(`providerFallbackCoveragePassed=${report.summary.providerFallbackCoveragePassed}`);
 console.log(`hardGateStatus=${report.summary.hardGateStatus}`);
 for (const result of report.results) {
   console.log([
@@ -185,13 +198,16 @@ function runReadOnlyProviderGate(): GateResult {
   };
 }
 
-function runAnchoredProviderGate(): GateResult {
+function runAnchoredProviderGate(input: { readonly forcedPrimaryFailure: boolean }): GateResult {
   const result = spawnSync("node", ["scripts/verify-real-provider-anchored-smoke.mjs"], {
     cwd: process.cwd(),
     env: {
       ...process.env,
       PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: "1",
       PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE: "1",
+      ...(input.forcedPrimaryFailure
+        ? { PRIVATE_AGENTS_ANCHORED_SMOKE_FORCE_PRIMARY_NETWORK_FAILURE: "1" }
+        : {}),
       PRIVATE_AGENTS_TEST_ROOT: process.env.PRIVATE_AGENTS_TEST_ROOT?.trim() || "/tmp/private-agents-live-task-anchored",
     },
     encoding: "utf8",
@@ -205,6 +221,7 @@ function runAnchoredProviderGate(): GateResult {
     /raw-provider-output=excluded/.test(output);
   return {
     name: "anchored-provider",
+    label: input.forcedPrimaryFailure ? "anchored-provider-forced-fallback" : "anchored-provider",
     attempted: true,
     outcome: passed ? "passed" : outcomeFromOutput(output, result.status ?? 1),
     noMutation: /no-write=true/.test(output),
@@ -214,6 +231,8 @@ function runAnchoredProviderGate(): GateResult {
     fallbackConfigured: /fallbackConfigured=true/.test(output),
     fallbackAttempted: /fallbackAttempted=true/.test(output),
     fallbackOutcome: fallbackOutcomeFromOutput(output),
+    primaryFailureClass: primaryFailureClassFromOutput(output),
+    forcedPrimaryFailure: input.forcedPrimaryFailure,
     blocker: passed ? "" : blockerFromOutput(output),
   };
 }
@@ -331,12 +350,23 @@ function toGateReceipt(gateResult: GateResult): TaskLiveGateReceipt {
     fallbackConfigured: gateResult.fallbackConfigured,
     fallbackAttempted: gateResult.fallbackAttempted,
     fallbackOutcome: gateResult.fallbackOutcome,
+    primaryFailureClass: gateResult.primaryFailureClass,
+    forcedPrimaryFailure: gateResult.forcedPrimaryFailure,
     ...(gateResult.blocker ? { blocker: gateResult.blocker } : {}),
   };
 }
 
+function primaryFailureClassFromOutput(output: string): GateResult["primaryFailureClass"] {
+  if (/primaryFailureClass=provider-network/.test(output)) return "provider-network";
+  if (/primaryFailureClass=provider-auth/.test(output)) return "provider-auth";
+  if (/primaryFailureClass=config-or-skip/.test(output)) return "config-or-skip";
+  if (/primaryFailureClass=product-regression/.test(output)) return "product-regression";
+  if (/primaryFailureClass=none/.test(output)) return "none";
+  return undefined;
+}
+
 function outcomeFromOutput(output: string, status: number): TaskLiveGateOutcome {
-  if (/config-or-skip|no-opt-in|provider-not-configured|missing config|missing-key/i.test(output) || status === 3) {
+  if (/no-opt-in|provider-not-configured|missing config|missing-key/i.test(output) || status === 3) {
     return "config-or-skip";
   }
   if (/skip/i.test(output) && status === 0) return "skipped";

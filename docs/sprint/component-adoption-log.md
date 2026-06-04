@@ -755,6 +755,69 @@ focused validation.
   `liveRun.ts` and script output, returning the live report to SP028 quality
   readiness gates without weakening evidence/result task proof.
 
+## Live Failure Driven Provider Coverage
+
+- Selected mode: structured port for local provider coverage contracts, with
+  behavior-only alignment for forced network failure injection through the
+  existing approved anchored smoke gate.
+- Owner domain: `runtime/evaluation/task`, `provider/request`,
+  `provider/response`, and thin live smoke scripts.
+- Reason for use: SP030 required live failures to drive code changes rather
+  than blocker reporting. The initial explicit live run exposed provider-turn
+  network/inconclusive coverage and a verifier classifier bug that read the
+  safe taxonomy header as a config result. The runtime summary now requires
+  primary provider success, configured fallback skipped on primary success,
+  forced primary provider-network fallback attempted, and forced fallback
+  passed before the hard gate can pass.
+- Behavior ported: `runTaskLiveReport` consumes safe gate receipts and reports
+  `primaryProviderSuccess`, `primarySuccessFallbackSkipped`,
+  `forcedPrimaryFailureFallbackAttempted`,
+  `forcedPrimaryFailureFallbackPassed`, and
+  `providerFallbackCoveragePassed`. `verify:live-task-execution` runs the
+  existing anchored provider smoke twice under explicit opt-in: once for normal
+  primary coverage and once with a forced primary network failure marker that
+  lets the configured fallback execute. The anchored smoke runner injects only
+  a safe primary network classification for that forced path; fallback still
+  uses the configured approved provider environment.
+- Rejected alternatives:
+  - Script-only pass criteria: rejected because SP030 hard gates belong in the
+    runtime live report summary, not terminal parsing.
+  - Default provider fallback: rejected because live provider behavior must
+    remain explicit opt-in and default-off.
+  - Manual provider config inspection: rejected because provider material may
+    only be consumed by approved gates.
+  - Treating fallback as task success: rejected because fallback is provider
+    coverage metadata; evidence/task proof and result/task verdict remain the
+    success owners.
+- Expected callers: `verify:live-task-execution`, future live recovery gates,
+  task assessment summaries, provider request/response tests, and sprint
+  capability docs.
+- Side-effect boundary: provider calls remain behind existing explicit opt-in
+  smoke gates with isolated runtime homes. Forced primary failure does not read
+  private config, print provider material, enable provider defaults, mutate the
+  main workspace, or add command allowlist breadth. The selected-workspace
+  apply gate remains disposable and isolated.
+- Truthfulness boundary: primary success, forced primary failure, fallback
+  attempted, fallback passed, provider output, smoke pass, and hard-gate pass
+  are not terminal task success. Completed live task entries still require
+  task proof, post-action verification where applicable, and evidence/result
+  verdict with `terminalSuccessClaim: false`.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/liveRun.test.ts provider/request/attempt.test.ts provider/request/fallback.test.ts`
+  - `rtk npm run build:ts`
+  - `rtk npm run verify:live-task-execution`
+  - `PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real PRIVATE_AGENTS_LIVE_TASK_EXECUTION=1 PRIVATE_AGENTS_LIVE_WRITE_REVIEWED_APPLY=1 PRIVATE_AGENTS_LIVE_REAL_WORKSPACE_APPLY=1 rtk npm run verify:live-task-execution`
+  - The measured explicit run reported 13 executed entries, 11 completed with
+    task proof, 3 completed write tasks with reviewed disposable apply plus
+    post-apply proof and zero manual correction, primary provider success,
+    configured fallback skipped on primary success, forced primary
+    provider-network fallback attempted/passed, selected-workspace apply,
+    redaction pass, and `hardGateStatus=passed`.
+- Rollback plan: remove the provider coverage fields from `liveRun.ts`, remove
+  the forced-primary-failure smoke flag from the anchored smoke runner, and
+  return `verify:live-task-execution` to a single anchored provider gate while
+  keeping default-off behavior and redaction boundaries intact.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

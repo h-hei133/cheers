@@ -26,6 +26,7 @@ type ReadinessStatus =
 
 interface RunnerConfig {
   readonly fakeReady: boolean;
+  readonly forcePrimaryNetworkFailure: boolean;
   readonly providerKind: string;
   readonly providerSafeLabel: string;
   readonly providerConfigSource: string;
@@ -39,6 +40,7 @@ interface ProviderAttemptConfig {
   readonly providerKind: string;
   readonly providerSafeLabel: string;
   readonly providerConfigSource: string;
+  readonly forcePrimaryNetworkFailure?: boolean;
   readonly apiKey?: string;
   readonly baseUrl?: string;
   readonly model?: string;
@@ -144,6 +146,8 @@ function readConfig(): RunnerConfig {
     (providerKind === "openai-compatible" ? "openai-compatible" : providerKind);
   return {
     fakeReady,
+    forcePrimaryNetworkFailure:
+      env.PRIVATE_AGENTS_ANCHORED_SMOKE_FORCE_PRIMARY_NETWORK_FAILURE?.trim() === "1",
     providerKind,
     providerSafeLabel,
     providerConfigSource:
@@ -308,6 +312,20 @@ async function runProviderAttempt(input: {
     };
   }
 
+  if (input.role === "primary" && input.config.forcePrimaryNetworkFailure === true) {
+    return {
+      providerKind: input.config.providerKind,
+      providerSafeLabel: input.config.providerSafeLabel,
+      providerConfigSource: input.config.providerConfigSource,
+      readinessStatus: "network",
+      providerCalled: true,
+      providerErrorClass: "network",
+      status: "provider-called-provider-error",
+      skipReason: "provider-network",
+      exitCode: 2,
+    };
+  }
+
   const readiness = await checkRealProviderReadiness({
     provider: "openai-compatible",
     apiKey: input.config.apiKey,
@@ -388,6 +406,20 @@ async function runProviderAttempt(input: {
 function printProviderAttempt(result: ProviderAttemptResult): void {
   if (result.calibration) {
     printCalibration(result.calibration);
+    return;
+  }
+  if (result.providerCalled && result.providerErrorClass === "network") {
+    console.log("[provider-network] live-anchored-provider-smoke-calibration - forced-primary-network");
+    printCommonMarkers({
+      providerKind: result.providerKind,
+      providerSafeLabel: result.providerSafeLabel,
+      adapterApproved: true,
+      providerCalled: true,
+      providerErrorClass: result.providerErrorClass,
+      outputValidation: "none",
+      anchorQuality: "none",
+      skipReason: result.skipReason,
+    });
     return;
   }
   printApprovalSkip({

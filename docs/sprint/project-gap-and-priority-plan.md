@@ -35,7 +35,7 @@ deterministic runtime case is not enough.
   action, observation, verification, repair, proof, and verdict. Safe live gate
   receipts are projected inside `runtime/evaluation/task` for read-only,
   anchored, artifact dry-run, and reviewed isolated write entries. The
-  repeatable opt-in live run defines thirteen exact entries. A measured SP029
+  repeatable opt-in live run defines thirteen exact entries. A measured SP030
   explicit gauntlet executed all 13 entries, completed 11 with task proof,
   completed 3 write tasks with reviewed disposable apply plus post-apply task
   proof and zero manual correction, recorded 2 remaining manual corrections
@@ -43,8 +43,10 @@ deterministic runtime case is not enough.
   dry-run quality records, 3 reviewed real-workspace readiness records with
   exact requirements, 1 disposable selected-workspace apply, a completed
   debug/repair task, a useful rollback partial with repair-verification status,
-  report/artifact, continuation, pathless/context, and read-only coverage, safe
-  fallback metadata, and redaction pass. The no-write entries remain
+  report/artifact, continuation, pathless/context, and read-only coverage,
+  primary success with configured fallback skipped, forced primary
+  provider-network fallback attempted and passed, and redaction pass. The
+  no-write entries remain
   default-off and redacted, and the
   reviewed write path records only safe metadata for patch intent, dry-run
   diff, target count/match, hunk or section count, explicit review authority,
@@ -176,12 +178,17 @@ quality pass. SP029 tightened the live hard gate to require 8 executed live
 tasks, 5 completed task-proof entries, 3 completed correction-free write tasks
 with reviewed disposable apply plus post-apply proof, completed debug/repair,
 artifact/report, continuation/context, redaction, and safe correction
-disposition; the measured run passed those gates. Live gate execution, provider
-called, fallback metadata, patch intent, dry-run diff, review authority,
-isolated apply, selected-workspace apply metadata, host-observed facts, smoke
-pass, readiness facts, deterministic case count, task-loop progression, and live
-run status are still not success by themselves. The immediate priority now
-moves from SP029 gauntlet proof to durable artifact/manual-review output
+disposition; the measured run passed those gates. SP030 added failure-driven
+provider coverage: an initial provider-turn network failure and verifier
+classification bug were fixed by adding runtime-owned coverage facts plus a
+forced primary provider-network fallback gate, then rerunning the same live
+batch to pass primary success, fallback skipped, forced fallback, proof,
+verification, and verdict checks. Live gate execution, provider called,
+fallback metadata, patch intent, dry-run diff, review authority, isolated
+apply, selected-workspace apply metadata, host-observed facts, smoke pass,
+readiness facts, deterministic case count, task-loop progression, and live run
+status are still not success by themselves. The immediate priority now moves
+from live fallback coverage proof to durable artifact/manual-review output
 execution, broader selected-workspace write coverage, provider output
 sufficiency, and richer live repair inside that shared path.
 
