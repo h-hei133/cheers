@@ -52,7 +52,7 @@ describe("repair loop model", () => {
     }).state).toBe("post-validation-failed");
   });
 
-  it("executes one bounded repair action and preserves original failure", () => {
+  it("does not pass a bounded repair action until post-validation evidence exists", () => {
     const decision = decideRepair({
       taskKind: "debug-repair",
       verificationState: "selected-failed",
@@ -66,7 +66,8 @@ describe("repair loop model", () => {
       changedTargetCount: 1,
     })).toMatchObject({
       attempted: true,
-      postValidation: "passed",
+      postValidation: "partial",
+      blockers: ["post-repair validation evidence missing"],
       originalFailurePreserved: true,
       terminalSuccessClaim: false,
     });

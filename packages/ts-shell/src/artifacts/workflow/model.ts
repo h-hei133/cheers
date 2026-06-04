@@ -3,6 +3,7 @@ export type ArtifactKind = "report" | "structured-data" | "summary" | "export";
 export type ArtifactValidationState =
   | "not-applicable"
   | "intent-created"
+  | "output-missing"
   | "source-missing"
   | "unsafe-path"
   | "invalid"
@@ -129,6 +130,9 @@ function artifactKindFor(taskKind: string, outputPath: string | undefined): Arti
 }
 
 function artifactValidationStateFor(input: ArtifactReceiptInput): ArtifactValidationState {
+  if (input.requiredPaths.length === 0) {
+    return "output-missing";
+  }
   if (input.requiredPaths.some((path) => path.startsWith("/") || path.includes(".."))) {
     return "unsafe-path";
   }
@@ -155,6 +159,8 @@ function artifactBlockersFor(
   state: ArtifactValidationState,
 ): readonly string[] {
   switch (state) {
+    case "output-missing":
+      return ["artifact output path missing"];
     case "unsafe-path":
       return ["unsafe artifact path"];
     case "source-missing":

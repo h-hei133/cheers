@@ -111,8 +111,8 @@ export function executeRepair(input: RepairActionInput): RepairAction {
   }
   return freeze({
     attempted: true,
-    postValidation: "passed",
-    blockers: [],
+    postValidation: "partial",
+    blockers: ["post-repair validation evidence missing"],
     originalFailurePreserved: true,
     terminalSuccessClaim: false,
   });

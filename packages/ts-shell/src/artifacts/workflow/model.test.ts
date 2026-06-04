@@ -28,6 +28,19 @@ describe("artifact workflow model", () => {
     expect(createArtifactReceipt({
       taskKind: "docs-report",
       outputKind: "artifact",
+      requiredPaths: [],
+      workspacePaths: ["notes/source.md"],
+      verificationState: "selected-passed",
+      failureCategories: [],
+    })).toMatchObject({
+      validationState: "output-missing",
+      blockers: ["artifact output path missing"],
+      terminalSuccessClaim: false,
+    });
+
+    expect(createArtifactReceipt({
+      taskKind: "docs-report",
+      outputKind: "artifact",
       requiredPaths: ["reports/summary.md"],
       workspacePaths: ["reports/summary.md"],
       verificationState: "selected-passed",

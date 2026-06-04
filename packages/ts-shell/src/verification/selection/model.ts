@@ -109,6 +109,9 @@ function verificationStateFor(input: VerificationSelectionInput): VerificationRu
   if (input.expectedStatus === "blocked" || input.hostStatus === "blocked") {
     return "selected-blocked";
   }
+  if (input.failureCategories.includes("verification failed")) {
+    return "selected-failed";
+  }
   if (input.expectedStatus === "failed") {
     return "selected-failed";
   }

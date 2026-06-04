@@ -67,4 +67,25 @@ describe("verification selection model", () => {
       failureCategories: ["verification not selected"],
     }).state).toBe("not-selected");
   });
+
+  it("keeps contradictory verification failure categories from becoming result input", () => {
+    const selection = selectVerification({
+      taskKind: "coding-edit",
+      taskPath: "edit",
+      expectedStatus: "passed",
+      expectedCheck: "focused test",
+      hostEvidenceVerdict: "complete",
+      hostStatus: "complete",
+      failureCategories: ["verification failed"],
+    });
+
+    expect(selection).toMatchObject({
+      state: "selected-failed",
+      evidenceInputEligible: false,
+      resultInputEligible: false,
+      terminalSuccessClaim: false,
+    });
+    expect(selection.blockers).toContain("verification failed");
+    expect(selection.proves).toEqual([]);
+  });
 });

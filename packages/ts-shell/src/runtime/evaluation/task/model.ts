@@ -1596,6 +1596,11 @@ function failedCheckRepair(): TaskCaseDefinition {
     expectedOutcome: "complete",
     baselineOutcome: "failed",
     baselineFailureCategories: ["verification failed", "repair failed"],
+    repairValidationEvidence: {
+      status: "passed",
+      check: "post-repair focused check",
+      originalFailurePreserved: true,
+    },
     hostEvaluationCaseId: "apply-only-negative",
     failureCategories: ["verification failed", "repair failed"],
   });

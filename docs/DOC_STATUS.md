@@ -80,6 +80,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/task-capability-gap-plan.md` | active | Selecting task-completion gaps, aggressive batches, adoption modes, completion gates, failure signals, and anti-goals. |  | Sprint Knowledge Base |
 | `docs/sprint/project-gap-and-priority-plan.md` | active | Selecting task-completion-driven priority batches while retaining completed trusted-runtime foundation context. |  | Sprint Knowledge Base |
 | `docs/sprint/development-capability-catalog.json` | active | Running the externalized live development challenge through the shared task runtime. |  | Sprint Knowledge Base / Runtime Evaluation |
+| `docs/sprint/autonomous-development-gap-map.md` | active | Checking SP034 owner-domain gap diagnosis, playbook and mature-source inputs, selected transplant targets, introduction decisions, and before/after diagnostic evidence. |  | Sprint Knowledge Base / Core Capability |
 
 ## Implementation Context
 
