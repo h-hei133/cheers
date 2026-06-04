@@ -40,6 +40,7 @@ export interface ProductRepairIterationProjection {
   readonly failureOutputUsedForRetry: boolean;
   readonly failureDiagnosis?: string;
   readonly repairAction?: string;
+  readonly reviewedApplyEligibility?: "eligible" | "not-eligible";
   readonly reverifyAction?: string;
   readonly verdict: ProductVerdict;
   readonly repairProposalIsSuccess: false;
@@ -66,6 +67,10 @@ export function projectRepairIteration(input: {
     : undefined;
   const failureOutputUsedForRetry =
     input.retryCount <= 0 || Boolean(failureDiagnosis);
+  const reviewedApplyEligibility =
+    failureDiagnosis && input.confirmationSource
+      ? "eligible"
+      : "not-eligible";
   const claims: ProductClaimInput[] = [
     {
       group: "verification",
@@ -121,6 +126,7 @@ export function projectRepairIteration(input: {
           verificationFailureSummary: failureDiagnosis,
           failureDiagnosis,
           repairAction: "generate bounded repair from failure diagnosis",
+          reviewedApplyEligibility,
           reverifyAction: "rerun same verification command after repair",
         }
       : {}),

@@ -1363,6 +1363,7 @@ async function executeWorkflowTaskPlan(input: {
     prompt: input.prompt,
     targetPath: input.plan.targetPath,
     changedFiles,
+    actionGraph: input.plan.actionGraph,
     explicitVerifyRequested: input.plan.verifyAfterEdit,
     explicitVerifyCommand: input.plan.verifyCommand,
     initialVerification: verification,

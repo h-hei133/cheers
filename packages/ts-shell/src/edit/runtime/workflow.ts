@@ -10,6 +10,7 @@ import type {
 } from "../../orchestration/types.js";
 import type { FileMutationExecutionResult } from "../../orchestration/mutationExecution.js";
 import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
+import { projectWorkflowActionCursor } from "../../planning/action/graph.js";
 import type { ToolDispatcher } from "../../tools/dispatch/dispatcher.js";
 import { runCrossFileRepairStage } from "../../repair/flow/stage.js";
 import { runLowRiskRenameStage } from "./rename.js";
@@ -93,6 +94,17 @@ export async function runWorkflowMutationRuntime(input: {
   });
 
   const targetPath = input.plan.targetPath ?? "(unknown)";
+  if (input.plan.actionGraph) {
+    const cursor = projectWorkflowActionCursor({
+      graph: input.plan.actionGraph,
+    });
+    notes.push(
+      cursor.nextAction
+        ? `action graph next: ${cursor.nextAction.id}`
+        : "action graph complete",
+    );
+    evidence.push(...cursor.evidence);
+  }
   if (input.plan.taskKind === "edit-file" && input.plan.crossFileConvergedNoop) {
     const convergedMessage =
       "Cross-file continuation already converged; no remaining related files require edits.";
@@ -503,6 +515,17 @@ export async function runWorkflowMutationRuntime(input: {
       transformKind,
       ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
     });
+    if (input.plan.actionGraph) {
+      const primaryNodeId = input.plan.taskKind === "write-file"
+        ? "write-primary"
+        : "edit-primary";
+      evidence.push(...projectWorkflowActionCursor({
+        graph: input.plan.actionGraph,
+        completedNodeIds: input.plan.inspectFirst
+          ? ["inspect-target", primaryNodeId]
+          : [primaryNodeId],
+      }).evidence);
+    }
   }
 
   if (!primarySkippedForCrossFile && changedFiles.includes(targetPath)) {
@@ -547,6 +570,7 @@ export async function runWorkflowMutationRuntime(input: {
         mutationResults,
         appliedContentByPath,
       },
+      actionGraph: input.plan.actionGraph,
       ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
     });
   }

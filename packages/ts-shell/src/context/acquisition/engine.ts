@@ -59,6 +59,11 @@ export interface ContextDiscoveryHandoffFacts {
   readonly omittedCandidateFacts: readonly string[];
   readonly ambiguityState: RepoTargetRankingAmbiguityState;
   readonly ownerNarrowingSuggestions: readonly string[];
+  readonly ownerNarrowingAction: {
+    readonly kind: "read-candidate-owner" | "select-owner" | "expand-owner-search";
+    readonly target?: string;
+    readonly reason: string;
+  };
   readonly missingDiscoveryFacts: readonly string[];
   readonly scanProfileId: string;
   readonly targetRankingEvidenceId: string;
@@ -326,6 +331,26 @@ export async function runContextEngine(input: {
 }
 
 function buildDiscoveryHandoff(repo: RepoIntelligenceResult): ContextDiscoveryHandoffFacts {
+  const ownerNarrowingSuggestions = repo.candidates.slice(0, 4).map((candidate, index) =>
+    `${index + 1}:${candidate.safeLabel}`
+  );
+  const ownerNarrowingAction =
+    repo.targetRanking.ambiguityState === "unambiguous-top-candidate" && repo.candidates[0]
+      ? {
+          kind: "select-owner" as const,
+          target: repo.candidates[0].safeLabel,
+          reason: "Use the highest-ranked owner candidate for the next planning step.",
+        }
+      : ownerNarrowingSuggestions.length > 0
+        ? {
+            kind: "read-candidate-owner" as const,
+            ...(repo.candidates[0]?.safeLabel ? { target: repo.candidates[0].safeLabel } : {}),
+            reason: "Read the highest-ranked candidate before selecting an owner.",
+          }
+        : {
+            kind: "expand-owner-search" as const,
+            reason: "No owner candidate is strong enough; gather additional repository facts.",
+          };
   return {
     handoffId: `context_discovery_handoff_${repo.targetRanking.rankingId.replace(/^target_ranking_/, "")}`,
     selectedCandidateIds: repo.targetRanking.selectedCandidateId
@@ -336,9 +361,8 @@ function buildDiscoveryHandoff(repo: RepoIntelligenceResult): ContextDiscoveryHa
       `${omission.reason}:${omission.count}`
     ),
     ambiguityState: repo.targetRanking.ambiguityState,
-    ownerNarrowingSuggestions: repo.candidates.slice(0, 4).map((candidate, index) =>
-      `${index + 1}:${candidate.safeLabel}`
-    ),
+    ownerNarrowingSuggestions,
+    ownerNarrowingAction,
     missingDiscoveryFacts: repo.targetRanking.missingDiscoveryFacts,
     scanProfileId: repo.snapshot.scanProfile.profileId,
     targetRankingEvidenceId: repo.targetRanking.rankingId,

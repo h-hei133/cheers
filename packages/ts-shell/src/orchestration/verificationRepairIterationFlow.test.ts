@@ -43,6 +43,7 @@ describe("verificationRepairIterationFlow", () => {
       expect(result.productRepair.repairAction).toBe(
         "generate bounded repair from failure diagnosis",
       );
+      expect(result.productRepair.reviewedApplyEligibility).toBe("eligible");
       expect(result.productRepair.reverifyAction).toBe(
         "rerun same verification command after repair",
       );

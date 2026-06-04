@@ -174,6 +174,17 @@ describe("runContextEngine", () => {
         expect.stringContaining("src/payments/statusPolicy.ts"),
       ]),
     );
+    expect(result.discoveryHandoff.ownerNarrowingAction).toEqual(
+      expect.objectContaining({
+        kind: "read-candidate-owner",
+        reason: "Read the highest-ranked candidate before selecting an owner.",
+      }),
+    );
+    expect(result.discoveryHandoff.ownerNarrowingSuggestions).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(result.discoveryHandoff.ownerNarrowingAction.target ?? ""),
+      ]),
+    );
     expect(result.bundle).toBeUndefined();
     expect(result.contextAcquisitionHandoff).toBeUndefined();
     expect(result.contextBudget.filesRead).toBe(0);

@@ -7,6 +7,7 @@ import {
 } from "../orchestration/verificationModule.js";
 import type { CodingResultProvenanceCollector } from "../orchestration/toolRuntimeModule.js";
 import type { CodingTaskKind } from "../orchestration/types.js";
+import type { WorkflowActionGraph } from "../planning/action/graph.js";
 import type { ToolDispatcher } from "../tools/dispatch/dispatcher.js";
 import { runCommandVerificationStage } from "./command/verificationStage.js";
 import { runLowRiskVerificationStage } from "./command/lowRisk.js";
@@ -25,6 +26,7 @@ export async function runWorkflowVerificationStage(input: {
   readonly prompt: string;
   readonly targetPath?: string;
   readonly changedFiles: readonly string[];
+  readonly actionGraph?: WorkflowActionGraph;
   readonly explicitVerifyRequested: boolean;
   readonly explicitVerifyCommand?: string;
   readonly initialVerification: CodingVerificationSummary;
@@ -40,10 +42,14 @@ export async function runWorkflowVerificationStage(input: {
   readonly abortSignal?: AbortSignal;
   readonly provenanceCollector: CodingResultProvenanceCollector;
 }): Promise<WorkflowVerificationStageResult> {
+  const changedFiles = uniquePaths([
+    ...input.changedFiles,
+    ...(input.actionGraph?.changedFileIntents ?? []),
+  ]);
   const verificationPlan = planWorkflowVerification({
     taskKind: input.taskKind,
     prompt: input.prompt,
-    changedFiles: input.changedFiles,
+    changedFiles,
     explicitVerifyRequested: input.explicitVerifyRequested,
     explicitVerifyCommand: input.explicitVerifyRequested
       ? input.explicitVerifyCommand
@@ -51,17 +57,27 @@ export async function runWorkflowVerificationStage(input: {
   });
 
   if (verificationPlan.mode === "low-risk") {
-    return runLowRiskVerificationStage(input);
+    const result = await runLowRiskVerificationStage({
+      ...input,
+      changedFiles,
+    });
+    return {
+      ...result,
+      evidence: [
+        ...result.evidence,
+        ...actionGraphVerificationEvidence(input.actionGraph),
+      ],
+    };
   }
 
   if (verificationPlan.mode === "command" && verificationPlan.command) {
-    return runCommandVerificationStage({
+    const result = await runCommandVerificationStage({
       plan: {
         ...verificationPlan,
         mode: "command",
         command: verificationPlan.command,
       },
-      changedFiles: input.changedFiles,
+      changedFiles,
       targetPath: input.targetPath,
       dispatcher: input.dispatcher,
       events: input.events,
@@ -71,6 +87,13 @@ export async function runWorkflowVerificationStage(input: {
       abortSignal: input.abortSignal,
       provenanceCollector: input.provenanceCollector,
     });
+    return {
+      ...result,
+      evidence: [
+        ...result.evidence,
+        ...actionGraphVerificationEvidence(input.actionGraph),
+      ],
+    };
   }
 
   if (
@@ -81,27 +104,27 @@ export async function runWorkflowVerificationStage(input: {
     return {
       verification,
       verifiedFiles: [],
-      unverifiedFiles: input.changedFiles.map((path) => ({
+      unverifiedFiles: changedFiles.map((path) => ({
         path,
         reason: verification.reason ?? "verification skipped",
       })),
       repairNotes: [],
       notes: [`verify skipped: ${verification.reason ?? "not available"}`],
-      evidence: [],
+      evidence: actionGraphVerificationEvidence(input.actionGraph),
     };
   }
 
-  if (input.changedFiles.length > 0) {
+  if (changedFiles.length > 0) {
     return {
       verification: projectNotRequestedWorkflowVerification(verificationPlan),
       verifiedFiles: [],
-      unverifiedFiles: input.changedFiles.map((path) => ({
+      unverifiedFiles: changedFiles.map((path) => ({
         path,
         reason: "verify step was not requested in prompt",
       })),
       repairNotes: [],
       notes: [],
-      evidence: [],
+      evidence: actionGraphVerificationEvidence(input.actionGraph),
     };
   }
 
@@ -113,4 +136,33 @@ export async function runWorkflowVerificationStage(input: {
     notes: [],
     evidence: [],
   };
+}
+
+function uniquePaths(paths: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const path of paths) {
+    const normalized = path.replace(/\\/g, "/").replace(/^\.\/+/g, "").trim();
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    result.push(normalized);
+  }
+  return result;
+}
+
+function actionGraphVerificationEvidence(
+  actionGraph: WorkflowActionGraph | undefined,
+): string[] {
+  if (!actionGraph) {
+    return [];
+  }
+  return [
+    `workflow-verification-action-graph:${actionGraph.graphId}`,
+    `workflow-verification-changed-file-intents:${actionGraph.changedFileIntents.join(",") || "none"}`,
+    ...actionGraph.dependencyReasons.map((reason) =>
+      `workflow-verification-dependency:${reason}`
+    ),
+  ];
 }

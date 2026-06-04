@@ -24,6 +24,17 @@ export interface WorkflowActionGraph {
   readonly dependencyReasons: readonly string[];
 }
 
+export interface WorkflowActionCursor {
+  readonly graphId: string;
+  readonly nextAction?: WorkflowActionNode;
+  readonly completedNodeIds: readonly string[];
+  readonly blockedNodeIds: readonly string[];
+  readonly pendingNodeIds: readonly string[];
+  readonly changedFileIntents: readonly string[];
+  readonly dependencyReasons: readonly string[];
+  readonly evidence: readonly string[];
+}
+
 export function buildWorkflowActionGraph(plan: WorkflowTaskPlan): WorkflowActionGraph | undefined {
   if (plan.taskKind !== "edit-file" && plan.taskKind !== "write-file") {
     return undefined;
@@ -112,6 +123,78 @@ export function buildWorkflowActionGraph(plan: WorkflowTaskPlan): WorkflowAction
       .filter((node) => node.dependsOn.length > 0)
       .map((node) => `${node.id}<-${node.dependsOn.join("+")}: ${node.reason}`),
   };
+}
+
+export function projectWorkflowActionCursor(input: {
+  readonly graph: WorkflowActionGraph;
+  readonly completedNodeIds?: readonly string[];
+}): WorkflowActionCursor {
+  const completed = new Set(input.completedNodeIds ?? []);
+  const pending: string[] = [];
+  const blocked: string[] = [];
+  let nextAction: WorkflowActionNode | undefined;
+
+  for (const id of input.graph.orderedNodeIds) {
+    const node = input.graph.nodes.find((candidate) => candidate.id === id);
+    if (!node || completed.has(node.id)) {
+      continue;
+    }
+    const dependenciesMet = node.dependsOn.every((dependency) =>
+      completed.has(dependency)
+    );
+    if (dependenciesMet && !nextAction) {
+      nextAction = node;
+      pending.push(node.id);
+      continue;
+    }
+    if (dependenciesMet) {
+      pending.push(node.id);
+    } else {
+      blocked.push(node.id);
+    }
+  }
+
+  return {
+    graphId: input.graph.graphId,
+    ...(nextAction ? { nextAction } : {}),
+    completedNodeIds: [...completed],
+    blockedNodeIds: blocked,
+    pendingNodeIds: pending,
+    changedFileIntents: input.graph.changedFileIntents,
+    dependencyReasons: input.graph.dependencyReasons,
+    evidence: [
+      `workflow-action-graph:${input.graph.graphId}`,
+      ...(nextAction
+        ? [`workflow-action-next:${nextAction.id}:${nextAction.kind}`]
+        : ["workflow-action-next:none"]),
+      `workflow-action-completed:${[...completed].join(",") || "none"}`,
+      `workflow-action-pending:${pending.join(",") || "none"}`,
+      `workflow-action-blocked:${blocked.join(",") || "none"}`,
+      `workflow-action-changed-file-intents:${input.graph.changedFileIntents.join(",") || "none"}`,
+      ...input.graph.dependencyReasons.map((reason) =>
+        `workflow-action-dependency:${reason}`
+      ),
+    ],
+  };
+}
+
+export function orderedMutationTargetsFromGraph(
+  graph: WorkflowActionGraph | undefined,
+): string[] {
+  if (!graph) {
+    return [];
+  }
+  const targets: string[] = [];
+  for (const id of graph.orderedNodeIds) {
+    const node = graph.nodes.find((candidate) => candidate.id === id);
+    if (!node || (node.kind !== "edit" && node.kind !== "write") || !node.target) {
+      continue;
+    }
+    if (!targets.includes(node.target)) {
+      targets.push(node.target);
+    }
+  }
+  return targets;
 }
 
 function uniquePaths(paths: readonly string[]): string[] {

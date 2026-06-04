@@ -30,6 +30,7 @@ describe("repairFacade", () => {
     expect(projection.repairAction).toBe(
       "generate bounded repair from failure diagnosis",
     );
+    expect(projection.reviewedApplyEligibility).toBe("eligible");
     expect(projection.reverifyAction).toBe(
       "rerun same verification command after repair",
     );

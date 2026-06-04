@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
-import { buildWorkflowActionGraph } from "./graph.js";
+import {
+  buildWorkflowActionGraph,
+  orderedMutationTargetsFromGraph,
+  projectWorkflowActionCursor,
+} from "./graph.js";
 
 describe("workflowActionGraph", () => {
   it("orders context, primary edit, related writes, verification, diagnosis, repair, and reverify", () => {
@@ -34,5 +38,39 @@ describe("workflowActionGraph", () => {
         "reverify-repair<-repair-from-diagnosis: Rerun relevant verification after the repair action.",
       ]),
     );
+  });
+
+  it("projects the next executable action from completed dependency facts", () => {
+    const graph = buildWorkflowActionGraph({
+      taskKind: "edit-file",
+      reason: "fix status producer and consumer",
+      targetPath: "src/status/producer.ts",
+      additionalTargetPaths: ["src/status/consumer.ts"],
+      inspectFirst: true,
+      verifyAfterEdit: true,
+    } as WorkflowTaskPlan);
+
+    expect(projectWorkflowActionCursor({ graph: graph! }).nextAction).toEqual(
+      expect.objectContaining({ id: "inspect-target", kind: "context" }),
+    );
+    const afterPrimary = projectWorkflowActionCursor({
+      graph: graph!,
+      completedNodeIds: ["inspect-target", "edit-primary"],
+    });
+    expect(afterPrimary.nextAction).toEqual(
+      expect.objectContaining({
+        id: "write-related-src_status_consumer.ts",
+        kind: "write",
+        target: "src/status/consumer.ts",
+      }),
+    );
+    expect(afterPrimary.blockedNodeIds).toContain("verify-changes");
+    expect(afterPrimary.evidence).toContain(
+      "workflow-action-next:write-related-src_status_consumer.ts:write",
+    );
+    expect(orderedMutationTargetsFromGraph(graph)).toEqual([
+      "src/status/producer.ts",
+      "src/status/consumer.ts",
+    ]);
   });
 });
