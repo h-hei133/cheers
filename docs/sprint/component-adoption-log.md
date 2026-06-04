@@ -818,6 +818,70 @@ focused validation.
   return `verify:live-task-execution` to a single anchored provider gate while
   keeping default-off behavior and redaction boundaries intact.
 
+## Live Development Recovery Gauntlet
+
+- Selected mode: structured port for local live recovery gate contracts, with
+  behavior-only alignment for the short-prompt recovery task mix. No isolated
+  source adoption was used in SP031 because the current mature local task-loop
+  owners already carried the needed mechanisms and the measured rerun exposed no
+  new failing stage to transplant.
+- Owner domain: `runtime/evaluation/task` for live entry projection, task-loop
+  progression, quality records, provider coverage summary, and hard gates;
+  existing `context`, `planning`, `provider`, `tools/policy`, `edit`,
+  `verification`, `repair`, `artifacts`, `evidence`, and `result` owners for
+  stage facts; scripts remain thin explicit-gate callers.
+- Reason for use: SP031 required a live development failure-recovery gauntlet,
+  not readiness or blocker reporting. The current explicit live command reran
+  the same product task loop after the SP030 provider-turn/classifier fixes and
+  proved the hard gates without manual correction of completed write tasks.
+- Behavior ported: no new code was ported in SP031. Existing task-loop
+  behavior was validated across single-file edit, coordinated edit,
+  failed-check repair, rollback recovery, package-script impact, owner/context,
+  report/artifact, and resume/continuation entries. The measured run preserved
+  reviewed disposable apply, post-apply verification, changed-file accounting,
+  repair evidence, artifact validation, freshness proof, provider fallback
+  coverage, redaction, and evidence/result verdict boundaries.
+- Rejected alternatives:
+  - Dependency use: rejected because live recovery, mutation authority,
+    redaction, provider fallback, proof, and verdict semantics are local product
+    contracts.
+  - Isolated source adoption: rejected for this route because no missing local
+    mechanism remained after current-state inspection and live rerun.
+  - Script-owned gauntlet success: rejected because scripts may set gates,
+    prepare isolated inputs, call runtime, and print safe metadata only.
+  - Treating fallback or provider output as success: rejected because provider
+    metadata is not task proof.
+- Expected callers: `verify:live-task-execution`, future live development
+  recovery gates, task assessment summaries, host evaluation summaries, and
+  sprint capability status docs.
+- Side-effect boundary: real provider calls remain default-off and use only
+  existing explicit opt-in gates. Disposable selected-workspace apply remains
+  isolated; the main workspace is not mutated. The route did not add provider
+  defaults, browser automation, external tool servers, dynamic loading, command
+  allowlist breadth, arbitrary writers, or broad server behavior.
+- Truthfulness boundary: live run pass, provider call, fallback attempt, dry-run
+  diff, review authority, apply metadata, selected-workspace apply, host output,
+  and rendered status are not terminal task success. Completed entries require
+  task proof and result/task verdict, and all live report surfaces keep
+  `terminalSuccessClaim: false`.
+- Validation evidence:
+  - `rtk npm run test -w packages/ts-shell -- runtime/evaluation/task/liveRun.test.ts runtime/evaluation/task/model.test.ts provider/request/fallback.test.ts provider/request/attempt.test.ts provider/request/boundary.test.ts provider/request/packet.test.ts provider/response/adapter.test.ts provider/response/boundary.test.ts provider/response/stream.test.ts provider/response/synthetic.test.ts tools/policy/strategy.test.ts verification/execution/model.test.ts verification/selection/model.test.ts repair/loop/model.test.ts artifacts/workflow/model.test.ts evidence/task/proof.test.ts result/task/verdict.test.ts runtime/api/host/runtime.test.ts runtime/api/host/io.test.ts`
+  - `rtk npm run verify:live-task-execution`
+  - `PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real PRIVATE_AGENTS_LIVE_TASK_EXECUTION=1 PRIVATE_AGENTS_LIVE_WRITE_REVIEWED_APPLY=1 PRIVATE_AGENTS_LIVE_REAL_WORKSPACE_APPLY=1 rtk npm run verify:live-task-execution`
+  - The measured explicit SP031 run reported `hardGateStatus=passed`,
+    `executedCount=13`, `completedWithTaskProofCount=11`,
+    `completedWriteTaskProofCount=3`,
+    `reviewedDisposablePostApplyProofCount=3`,
+    `correctionFreeCompletedWriteCount=3`, `debugOrRepairComplete=true`,
+    `multiFileCompleteOrExactPartial=true`, `artifactOrReportComplete=true`,
+    `continuationOrContextComplete=true`,
+    `providerFallbackCoveragePassed=true`, `reportRedaction=pass`, read-only
+    `changedFiles=[]`, and disposable selected-workspace apply with repository
+    clean.
+- Rollback plan: remove the SP031 documentation updates and continue to rely on
+  the SP030 provider coverage gates until a future failing live recovery stage
+  requires a new owner-domain mechanism.
+
 ## Task Collaboration And Planning Policy
 
 - Selected mode: behavior-only alignment.

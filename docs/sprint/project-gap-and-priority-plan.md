@@ -35,8 +35,9 @@ deterministic runtime case is not enough.
   action, observation, verification, repair, proof, and verdict. Safe live gate
   receipts are projected inside `runtime/evaluation/task` for read-only,
   anchored, artifact dry-run, and reviewed isolated write entries. The
-  repeatable opt-in live run defines thirteen exact entries. A measured SP030
-  explicit gauntlet executed all 13 entries, completed 11 with task proof,
+  repeatable opt-in live run defines thirteen exact entries. The current
+  measured SP031 explicit recovery gauntlet executed all 13 entries, completed
+  11 with task proof,
   completed 3 write tasks with reviewed disposable apply plus post-apply task
   proof and zero manual correction, recorded 2 remaining manual corrections
   with blocker or failing disposition, recorded 7 safe quality records, 5
@@ -45,7 +46,8 @@ deterministic runtime case is not enough.
   debug/repair task, a useful rollback partial with repair-verification status,
   report/artifact, continuation, pathless/context, and read-only coverage,
   primary success with configured fallback skipped, forced primary
-  provider-network fallback attempted and passed, and redaction pass. The
+  provider-network fallback attempted and passed, read-only changed-files-empty
+  visibility passed, and redaction pass. The
   no-write entries remain
   default-off and redacted, and the
   reviewed write path records only safe metadata for patch intent, dry-run
@@ -183,14 +185,20 @@ provider coverage: an initial provider-turn network failure and verifier
 classification bug were fixed by adding runtime-owned coverage facts plus a
 forced primary provider-network fallback gate, then rerunning the same live
 batch to pass primary success, fallback skipped, forced fallback, proof,
-verification, and verdict checks. Live gate execution, provider called,
+verification, and verdict checks. SP031 reran the current live development
+recovery gauntlet through the same task-loop and found no new missing stage to
+transplant: 13 entries executed, 11 completed with task proof, 3 completed
+reviewed disposable write tasks were correction-free, debug/repair,
+coordinated edit, artifact/report, continuation/context, selected-workspace
+apply, primary/fallback coverage, read-only changed-files-empty visibility,
+redaction, proof, and verdict gates passed. Live gate execution, provider called,
 fallback metadata, patch intent, dry-run diff, review authority, isolated
 apply, selected-workspace apply metadata, host-observed facts, smoke pass,
 readiness facts, deterministic case count, task-loop progression, and live run
-status are still not success by themselves. The immediate priority now moves
-from live fallback coverage proof to durable artifact/manual-review output
-execution, broader selected-workspace write coverage, provider output
-sufficiency, and richer live repair inside that shared path.
+status are still not success by themselves. The immediate priority remains
+durable artifact/manual-review output execution, broader selected-workspace
+write coverage, provider output sufficiency, and richer live repair inside
+that shared path.
 
 ## Immediate Sprint Batches
 
