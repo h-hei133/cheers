@@ -13,13 +13,23 @@ import {
   type TaskVerdict,
 } from "../../../result/task/verdict.js";
 import type { QueryRuntimeActionDecision } from "./decision.js";
-import type { QueryRuntimeState } from "./state.js";
+import { ensureQueryRuntimeObservationState, type QueryRuntimeState } from "./state.js";
 
 export interface QueryRuntimeProofProjection {
   readonly proof: TaskProofInput;
   readonly verdict: TaskVerdict;
   readonly artifactReceipt?: ArtifactReceipt;
   readonly action: QueryRuntimeActionDecision["nextAction"];
+  readonly observationState: {
+    readonly contextPathCount: number;
+    readonly changedFileCount: number;
+    readonly verificationTargetCount: number;
+    readonly failedVerificationCount: number;
+    readonly repairAttemptCount: number;
+    readonly artifactEvidenceCount: number;
+    readonly continuationFactCount: number;
+    readonly pendingAction?: QueryRuntimeActionDecision["nextAction"];
+  };
   readonly proofGap: readonly string[];
   readonly changedFiles: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -31,11 +41,16 @@ export function projectQueryRuntimeProof(input: {
   readonly output: AgentExecutionOutput;
 }): QueryRuntimeProofProjection {
   const result = input.output.codingResult;
+  const observations = ensureQueryRuntimeObservationState(input.state);
   const artifactReceipt = createArtifactReceipt({
     taskKind: input.decision.taskKind,
     outputKind: input.decision.outputKind,
     requiredPaths: requiredArtifactPaths(input.decision, result),
-    workspacePaths: input.decision.selectedPaths,
+    workspacePaths: uniqueStrings([
+      ...input.decision.selectedPaths,
+      ...observations.contextPaths,
+      ...observations.changedFiles,
+    ]),
     verificationState: artifactVerificationState(result),
     failureCategories: failureCategories(result),
     verificationEvidence: result?.evidence ?? [],
@@ -82,10 +97,26 @@ export function projectQueryRuntimeProof(input: {
     verdict,
     ...(artifactReceipt ? { artifactReceipt } : {}),
     action: input.decision.nextAction,
+    observationState: {
+      contextPathCount: observations.contextPaths.length,
+      changedFileCount: observations.changedFiles.length,
+      verificationTargetCount: observations.verificationTargets.length,
+      failedVerificationCount: observations.failedVerificationTargets.length,
+      repairAttemptCount: observations.repairAttempts.length,
+      artifactEvidenceCount: observations.artifactEvidence.length,
+      continuationFactCount: observations.continuationFacts.length,
+      ...(observations.pendingAction
+        ? { pendingAction: observations.pendingAction }
+        : {}),
+    },
     proofGap: input.decision.proofGap,
     changedFiles: input.decision.changedFiles,
     terminalSuccessClaim: false as const,
   });
+}
+
+function uniqueStrings(values: readonly string[]): readonly string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
 function requiredArtifactPaths(

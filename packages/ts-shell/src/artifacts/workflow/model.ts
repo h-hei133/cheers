@@ -194,7 +194,11 @@ function artifactValidationStateFor(input: ArtifactReceiptInput): ArtifactValida
 
 function claimEvidenceSatisfied(input: ArtifactReceiptInput): boolean {
   const claims = input.claimEvidence ?? [];
-  return claims.every((item) => Boolean(item.claim.trim()) && Boolean(item.evidenceId?.trim()));
+  const evidenceIds = claims
+    .map((item) => item.evidenceId?.trim())
+    .filter((value): value is string => Boolean(value));
+  return claims.every((item) => Boolean(item.claim.trim()) && Boolean(item.evidenceId?.trim())) &&
+    new Set(evidenceIds).size === evidenceIds.length;
 }
 
 function claimEvidenceReceiptsFor(input: ArtifactReceiptInput): readonly {

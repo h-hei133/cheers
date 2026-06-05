@@ -18,6 +18,8 @@ export interface ToolStrategyInput {
   readonly request: TaskRequestPacket;
   readonly proofGap?: readonly string[];
   readonly changedFiles?: readonly string[];
+  readonly observedContextPaths?: readonly string[];
+  readonly completedActions?: readonly ToolActionKind[];
   readonly taskIntent?: string;
   readonly pendingAction?: ToolActionKind;
   readonly continuationFacts?: readonly string[];
@@ -26,6 +28,16 @@ export interface ToolStrategyInput {
     readonly evidenceIds: readonly string[];
   };
   readonly failureHistory?: readonly {
+    readonly action: ToolActionKind;
+    readonly signature: string;
+    readonly reason: string;
+  }[];
+  readonly observationFailures?: readonly {
+    readonly action: ToolActionKind;
+    readonly signature: string;
+    readonly reason: string;
+  }[];
+  readonly repairAttempts?: readonly {
     readonly action: ToolActionKind;
     readonly signature: string;
     readonly reason: string;
@@ -111,7 +123,7 @@ function chooseNextAction(input: ToolStrategyInput & {
     return "stop-not-proven";
   }
   if (input.blockers.some((blocker) => blocker.includes("missing required context")) ||
-    input.proofGap.some((gap) => gap.includes("context")) ||
+    input.proofGap.some((gap) => gap.includes("context evidence incomplete")) ||
     failedReasonIncludes(input, "missing context")) {
     return input.allowedTools.includes("search") ? "search" : "read";
   }
@@ -121,15 +133,24 @@ function chooseNextAction(input: ToolStrategyInput & {
   if (input.pendingAction) {
     return input.pendingAction;
   }
-  if (repeatedFailure(input, "repair")) {
+  if (repeatedFailure(input, "repair") || observedRepairAttempt(input)) {
     return input.allowedTools.includes("search") ? "search" : "read";
+  }
+  if (input.proofGap.some((gap) => gap.includes("repair")) || failedReasonIncludes(input, "verification")) {
+    return input.actionPlans.some((plan) => plan.action === "repair") ? "repair" : "verify";
   }
   if (input.changedFiles && input.changedFiles.length > 0 &&
     input.proofGap.some((gap) => gap.includes("verification") || gap.includes("proof"))) {
     return "verify";
   }
-  if (input.proofGap.some((gap) => gap.includes("repair")) || failedReasonIncludes(input, "verification")) {
-    return input.actionPlans.some((plan) => plan.action === "repair") ? "repair" : "verify";
+  if ((input.observedContextPaths ?? []).length > 0 &&
+    (input.completedActions ?? []).includes("read") &&
+    input.actionPlans.some((plan) => plan.action === "edit")) {
+    return "edit";
+  }
+  if ((input.observedContextPaths ?? []).length > 0 &&
+    input.actionPlans.some((plan) => plan.action === "read")) {
+    return "read";
   }
   if (input.proofGap.some((gap) => gap.includes("continuation") || gap.includes("pending"))) {
     return "continue";
@@ -179,13 +200,26 @@ function missingArtifactEvidence(contract: { readonly claims: readonly string[];
 
 function repeatedFailure(input: ToolStrategyInput, action: ToolActionKind): boolean {
   const intent = sanitize(input.taskIntent ?? input.request.goalSummary);
-  return (input.failureHistory ?? []).filter((failure) =>
+  const failures = [
+    ...(input.failureHistory ?? []),
+    ...(input.observationFailures ?? []),
+    ...(input.repairAttempts ?? []),
+  ];
+  return failures.filter((failure) =>
     failure.action === action && sanitize(failure.signature || failure.reason || intent) === intent
   ).length > 0;
 }
 
 function failedReasonIncludes(input: ToolStrategyInput, value: string): boolean {
-  return (input.failureHistory ?? []).some((failure) => failure.reason.toLowerCase().includes(value));
+  return [
+    ...(input.failureHistory ?? []),
+    ...(input.observationFailures ?? []),
+    ...(input.repairAttempts ?? []),
+  ].some((failure) => failure.reason.toLowerCase().includes(value));
+}
+
+function observedRepairAttempt(input: ToolStrategyInput): boolean {
+  return (input.repairAttempts ?? []).some((failure) => failure.action === "repair");
 }
 
 function uniqueActions(actions: readonly ToolActionKind[]): readonly ToolActionKind[] {

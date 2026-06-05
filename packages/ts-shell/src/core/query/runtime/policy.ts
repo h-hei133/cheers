@@ -11,26 +11,38 @@ import {
   type ToolStrategy,
 } from "../../../tools/policy/strategy.js";
 import type { QueryRuntimeActionDecision } from "./decision.js";
-import type { QueryRuntimeState } from "./state.js";
+import { ensureQueryRuntimeObservationState, type QueryRuntimeState } from "./state.js";
 
 export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntimeActionDecision {
   const taskIntent = compact(state.config.initialPrompt);
   const latestCodingResult = latestResult(state.transcript);
+  const observations = ensureQueryRuntimeObservationState(state);
   const taskKind = taskKindFor(taskIntent, latestCodingResult);
   const changedFiles = uniqueStrings([
+    ...observations.changedFiles,
     ...(latestCodingResult?.changedFiles ?? []),
     ...(latestCodingResult?.changeSet.changedFiles ?? []),
   ]);
-  const failedFiles = uniqueStrings(latestCodingResult?.failedFiles.map((file) => file.path) ?? []);
-  const unverifiedFiles = uniqueStrings(latestCodingResult?.unverifiedFiles.map((file) => file.path) ?? []);
+  const failedFiles = uniqueStrings([
+    ...observations.failedVerificationTargets,
+    ...(latestCodingResult?.failedFiles.map((file) => file.path) ?? []),
+  ]);
+  const unverifiedFiles = uniqueStrings([
+    ...observations.failedVerificationTargets,
+    ...(latestCodingResult?.unverifiedFiles.map((file) => file.path) ?? []),
+  ]);
   const verificationTargets = uniqueStrings([
+    ...observations.verificationTargets,
     ...changedFiles,
     ...unverifiedFiles,
     ...(latestCodingResult?.verifiedFiles ?? []),
   ]);
   const failureCategories = failureCategoriesFor(latestCodingResult, taskIntent);
-  const pendingAction = pendingActionFor(state, latestCodingResult);
-  const continuationFacts = continuationFactsFor(state, latestCodingResult);
+  const pendingAction = observations.pendingAction ?? pendingActionFor(state, latestCodingResult);
+  const continuationFacts = uniqueStrings([
+    ...observations.continuationFacts,
+    ...continuationFactsFor(state, latestCodingResult),
+  ]);
   const proofGap = proofGapFor(state, latestCodingResult, {
     changedFiles,
     failedFiles,
@@ -50,10 +62,12 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
       unverifiedFiles,
       verificationTargets,
       latestCodingResult,
+      observationPaths: observations.contextPaths,
     }),
     requiredPaths: requiredPathsFor(taskKind, changedFiles, failedFiles, taskIntent),
     continuationAvailable: continuationFacts.length > 0,
     failureCategories,
+    observedPaths: observations.contextPaths,
   });
   const outputKind = taskKind === "data-artifact" ? "artifact" : changedFiles.length > 0 ? "diff" : "verified-result";
   const allowedTools = ["read", "search", "edit", "repair", "verify", "artifact", "continue", "write"];
@@ -64,6 +78,7 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     allowedWrites: changedFiles,
     successRubric: latestCodingResult?.taskSatisfaction.requiredEvidence ?? ["task-relevant proof"],
     context,
+    observedGaps: proofGap,
   });
   const request = buildTaskRequestPacket({
     shortPrompt: taskIntent,
@@ -77,11 +92,19 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     request,
     proofGap: uniqueStrings([...context.proofGap, ...proofGap]),
     changedFiles,
+    observedContextPaths: observations.contextPaths,
+    completedActions: observations.completedActions,
     taskIntent,
     pendingAction,
     continuationFacts,
     artifactContract,
-    failureHistory: failureHistoryFor(state.transcript, taskIntent),
+    observationFailures: observations.toolFailures,
+    repairAttempts: observations.repairAttempts,
+    failureHistory: [
+      ...failureHistoryFor(state.transcript, taskIntent),
+      ...observations.toolFailures,
+      ...observations.repairAttempts,
+    ],
     budget: { remainingSteps: Math.max(0, state.config.maxTurns - state.turn + 1) },
   });
 
@@ -207,7 +230,7 @@ function continuationFactsFor(
   result: CodingResultSummary | undefined,
 ): readonly string[] {
   return uniqueStrings([
-    ...(state.lastContinuationReason ? [`continuation reason: ${state.lastContinuationReason}`] : []),
+    ...(state.lastContinuationReason === "retryable-error" ? [`continuation reason: ${state.lastContinuationReason}`] : []),
     ...(Object.keys(state.pendingLifecycle.pendingTools).length > 0 ? ["pending tool lifecycle"] : []),
     ...(Object.keys(state.pendingLifecycle.pendingApprovals).length > 0 ? ["pending approval lifecycle"] : []),
     ...(result?.continuation.status === "failed-after-bounded-continuation"
@@ -273,12 +296,14 @@ function workspaceFilesFor(input: {
   readonly unverifiedFiles: readonly string[];
   readonly verificationTargets: readonly string[];
   readonly latestCodingResult: CodingResultSummary | undefined;
+  readonly observationPaths?: readonly string[];
 }): readonly { readonly path: string; readonly purpose: string }[] {
   const paths = uniqueStrings([
     ...input.changedFiles,
     ...input.failedFiles,
     ...input.unverifiedFiles,
     ...input.verificationTargets,
+    ...(input.observationPaths ?? []),
     ...(input.latestCodingResult?.diagnosis?.candidateFiles ?? []),
     ...(input.latestCodingResult?.diagnosis?.evidenceFiles ?? []),
   ]);

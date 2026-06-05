@@ -9,6 +9,7 @@ export interface ExecutionPlanInput {
   readonly allowedWrites: readonly string[];
   readonly successRubric: readonly string[];
   readonly context: ContextSelection;
+  readonly observedGaps?: readonly string[];
 }
 
 export interface ExecutionPlan {
@@ -98,13 +99,22 @@ function preconditionsFor(action: string, input: ExecutionPlanInput): readonly s
 
 function expectedObservationsFor(action: string, input: ExecutionPlanInput): readonly string[] {
   if (action === "verify") {
-    return freeze(input.context.verificationPaths.length > 0 ? input.context.verificationPaths : ["task-relevant check result"]);
+    return freeze(unique([
+      ...(input.context.verificationPaths.length > 0 ? input.context.verificationPaths : ["task-relevant check result"]),
+      ...(input.observedGaps ?? []).filter((gap) => gap.includes("verification") || gap.includes("proof")),
+    ]));
   }
   if (action === "edit" || action === "repair") {
-    return freeze(input.allowedWrites.length > 0 ? input.allowedWrites : ["changed target accounting"]);
+    return freeze(unique([
+      ...(input.allowedWrites.length > 0 ? input.allowedWrites : ["changed target accounting"]),
+      ...(input.observedGaps ?? []).filter((gap) => gap.includes("repair")),
+    ]));
   }
   if (action === "artifact") {
-    return freeze(input.allowedWrites.length > 0 ? input.allowedWrites : ["artifact validation receipt"]);
+    return freeze(unique([
+      ...(input.allowedWrites.length > 0 ? input.allowedWrites : ["artifact validation receipt"]),
+      ...(input.observedGaps ?? []).filter((gap) => gap.includes("artifact") || gap.includes("claim")),
+    ]));
   }
   return freeze(input.context.selectedPaths.length > 0 ? input.context.selectedPaths : ["context evidence"]);
 }
@@ -170,4 +180,8 @@ function stepsFor(input: ExecutionPlanInput): readonly string[] {
 
 function freeze<T>(value: T): Readonly<T> {
   return Object.freeze(value);
+}
+
+function unique(values: readonly string[]): readonly string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

@@ -1,9 +1,10 @@
 import type { AgentExecutionOutput, AgentRunner, AgentRole } from '../../../orchestration/types.js'
 import type { QueryEvent } from './events.js'
-import type { QueryRuntimeState } from './state.js'
+import { ensureQueryRuntimeObservationState, type QueryRuntimeState } from './state.js'
 import { applyLifecycleEventToIndex } from '../../tools/toolResultLifecycle.js'
 import type { QueryRuntimeActionDecision } from './decision.js'
 import { decideQueryRuntimeAction, hasOpenRuntimeProofGap } from './policy.js'
+import { observeQueryRuntimeOutput } from './observation.js'
 import { projectQueryRuntimeProof } from './proof.js'
 import {
   ALLOWED_HANDOFFS,
@@ -53,6 +54,7 @@ export async function runQueryLoop(
 
     state.transcript.push(output)
     appendNotes(state, output)
+    observeQueryRuntimeOutput(ensureQueryRuntimeObservationState(state), output)
     await emitOutputEvents(state, output, deps)
     await emitMessageDeltas(output, deps)
     await deps.onEvent?.({

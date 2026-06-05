@@ -8,6 +8,11 @@ import {
   createEmptyLifecycleIndex,
   type DurableLifecycleIndex,
 } from '../../tools/toolResultLifecycle.js'
+import {
+  createEmptyQueryRuntimeObservationState,
+  deriveQueryRuntimeObservationState,
+  type QueryRuntimeObservationState,
+} from './observation.js'
 
 export interface QueryRuntimeConfig {
   readonly sessionId: string
@@ -23,6 +28,7 @@ export interface QueryRuntimeState {
   lastContinuationReason?: ContinuationReason
   pendingLifecycle: DurableLifecycleIndex
   readonly sharedContext: SharedContext
+  observations?: QueryRuntimeObservationState
   readonly transcript: AgentExecutionOutput[]
   readonly visitedTransitions: Set<string>
 }
@@ -162,6 +168,7 @@ export function createQueryRuntimeState(
       notes: [],
       handoffs: [],
     },
+    observations: createEmptyQueryRuntimeObservationState(),
     transcript: [],
     visitedTransitions: new Set<string>(),
   }
@@ -172,6 +179,8 @@ export function createQueryRuntimeStateFromSeed(
 ): QueryRuntimeState {
   const derivedContext = deriveQueryContextFromTranscript(seed)
   const policy = CONTINUATION_SAFETY_POLICY[seed.truthBoundary.continuationSafety]
+
+  const transcript = policy.allowDerivedContext ? [...seed.derivedState.transcript] : []
 
   return {
     config: seed.config,
@@ -184,9 +193,17 @@ export function createQueryRuntimeStateFromSeed(
       taskStates: { ...seed.pendingLifecycle.taskStates },
     },
     sharedContext: derivedContext.sharedContext,
-    transcript: policy.allowDerivedContext ? [...seed.derivedState.transcript] : [],
+    observations: deriveQueryRuntimeObservationState(transcript),
+    transcript,
     visitedTransitions: new Set(derivedContext.visitedTransitions),
   }
+}
+
+export function ensureQueryRuntimeObservationState(
+  state: QueryRuntimeState,
+): QueryRuntimeObservationState {
+  state.observations ??= deriveQueryRuntimeObservationState(state.transcript)
+  return state.observations
 }
 
 function deriveQueryContextFromTranscript(seed: QueryRuntimeStateSeed): DerivedQueryContext {

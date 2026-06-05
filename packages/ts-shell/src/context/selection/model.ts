@@ -9,6 +9,7 @@ export interface ContextSelectionInput {
     readonly purpose: string;
   }[];
   readonly requiredPaths: readonly string[];
+  readonly observedPaths?: readonly string[];
   readonly continuationAvailable: boolean;
   readonly failureCategories: readonly string[];
 }
@@ -20,6 +21,7 @@ export interface ContextSelection {
   readonly targetPaths: readonly string[];
   readonly relatedPaths: readonly string[];
   readonly ownerPaths: readonly string[];
+  readonly observedPaths: readonly string[];
   readonly verificationPaths: readonly string[];
   readonly packagePaths: readonly string[];
   readonly omittedPaths: readonly string[];
@@ -48,8 +50,11 @@ export function selectContext(input: ContextSelectionInput): ContextSelection {
   const relatedPaths = input.workspaceFiles
     .filter((file) => relatedCandidate(file.path, file.purpose, input.shortPrompt, targetPaths, input.taskKind))
     .map((file) => file.path);
-  const selectedPaths = unique([...targetPaths, ...packagePaths, ...sourcePaths, ...ownerPaths, ...verificationPaths, ...relatedPaths]);
-  const missingRequiredPaths = input.requiredPaths.filter((path) => !workspacePaths.includes(path));
+  const observedPaths = (input.observedPaths ?? []).filter((path) => workspacePaths.includes(path));
+  const selectedPaths = unique([...targetPaths, ...packagePaths, ...sourcePaths, ...ownerPaths, ...verificationPaths, ...relatedPaths, ...observedPaths]);
+  const missingRequiredPaths = observedPaths.length > 0
+    ? []
+    : input.requiredPaths.filter((path) => !workspacePaths.includes(path));
   const continuationBlocked = input.taskKind === "continuation" && !input.continuationAvailable;
   const state: ContextSelectionState = missingRequiredPaths.length > 0 || continuationBlocked
     ? "blocked"
@@ -64,6 +69,7 @@ export function selectContext(input: ContextSelectionInput): ContextSelection {
     targetPaths,
     relatedPaths: unique(relatedPaths),
     ownerPaths: unique(ownerPaths),
+    observedPaths: unique(observedPaths),
     verificationPaths: unique(verificationPaths),
     packagePaths: unique(packagePaths),
     omittedPaths: workspacePaths.filter((path) => !selectedPaths.includes(path)),

@@ -493,19 +493,27 @@ describe('core QueryEngine migration (W1)', () => {
   it('passes missing context runtime action to the normal agent runner', async () => {
     const seenActions: string[] = []
     const runAgent: AgentRunner = async ({ role, runtimeAction }) => {
-      seenActions.push(runtimeAction.nextAction)
+      seenActions.push(`${runtimeAction.nextAction}:${runtimeAction.selectedPaths.join(',')}`)
       return {
         role,
         content: 'context needed',
+        handoffTo: 'coder',
+        handoffReason: 'context gathered',
+        codingResult: codingResult({
+          evidenceFiles: ['src/owner.ts'],
+          observedEvidence: ['owner context'],
+          lastAction: { actionKind: 'repo-explain', target: 'src/owner.ts' },
+        }),
       }
     }
 
     const engine = new QueryEngine({ runAgent })
     await engine.submitMessage('sess_missing_context_action', 'inspect missing context for src/unknown.ts', {
-      maxTurns: 1,
+      maxTurns: 2,
     })
 
-    expect(seenActions[0]).toBe('search')
+    expect(seenActions[0]).toBe('search:')
+    expect(seenActions).toContain('read:src/owner.ts')
   })
 
   it('selects targeted verification for changed files before the next normal runtime turn', async () => {
@@ -537,6 +545,76 @@ describe('core QueryEngine migration (W1)', () => {
     expect(seenActions).toContain('2:verify:src/app.ts')
   })
 
+  it('records edit observation into task proof before targeted verification', async () => {
+    const proofStates: string[] = []
+    const runAgent: AgentRunner = async ({ role, turn }) => {
+      if (turn === 1) {
+        return {
+          role,
+          content: 'changed file',
+          handoffTo: 'coder',
+          handoffReason: 'needs verification',
+          codingResult: codingResult({
+            changedFiles: ['src/edit-target.ts'],
+            verification: { status: 'not-requested', reason: 'No check ran.' },
+            requiredEvidence: ['post-change verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              changedFiles: ['src/edit-target.ts'],
+              target: 'src/edit-target.ts',
+            },
+          }),
+        }
+      }
+      return { role, content: 'verify selected' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_edit_observation_proof', 'edit src/edit-target.ts', { maxTurns: 2 })) {
+      if (event.type === 'runtime.task-proof') {
+        proofStates.push([
+          event.turn,
+          event.projection.action,
+          event.projection.observationState.changedFileCount,
+          event.projection.observationState.verificationTargetCount,
+        ].join(':'))
+      }
+    }
+
+    expect(proofStates).toContain('1:search:1:1')
+  })
+
+  it('uses verification failure observation to choose repair in the next normal runtime turn', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'verification failed',
+          handoffTo: 'coder',
+          handoffReason: 'repair needed',
+          codingResult: codingResult({
+            changedFiles: ['src/app.ts'],
+            failedFiles: [{ path: 'src/app.ts', reason: 'verification failed' }],
+            verification: { status: 'failed', reason: 'verification failed' },
+            requiredEvidence: ['post-change verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return { role, content: 'repair selected' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_verify_failure_repair', 'debug src/app.ts verification failure', {
+      maxTurns: 3,
+    })
+
+    expect(seenActions).toContain('2:repair')
+  })
+
   it('switches repeated repair failure toward discovery instead of repeating repair', async () => {
     const seenActions: string[] = []
     const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
@@ -566,6 +644,36 @@ describe('core QueryEngine migration (W1)', () => {
     })
 
     expect(seenActions).toContain('2:search')
+  })
+
+  it('uses recovered repair observation to rerun verification', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'repair recovered',
+          handoffTo: 'coder',
+          handoffReason: 'needs post repair verification',
+          codingResult: codingResult({
+            changedFiles: ['src/app.ts'],
+            repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/app.ts'] },
+            verification: { status: 'not-requested', reason: 'Post repair check not run.' },
+            requiredEvidence: ['post-repair verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return { role, content: 'verify selected' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_repair_reverify', 'debug repair src/app.ts', {
+      maxTurns: 3,
+    })
+
+    expect(seenActions).toContain('2:verify')
   })
 
   it('restores continuation pending action into normal runtime decision', async () => {
@@ -643,6 +751,157 @@ describe('core QueryEngine migration (W1)', () => {
     })
 
     expect(seenActions).toContain('2:artifact:true')
+  })
+
+  it('keeps duplicate artifact claim evidence as missing evidence', async () => {
+    const artifactStates: string[] = []
+    const runAgent: AgentRunner = async ({ role, turn }) => {
+      if (turn === 1) {
+        return {
+          role,
+          content: 'artifact with repeated evidence',
+          codingResult: codingResult({
+            taskKind: 'data-artifact',
+            changedFiles: ['reports/summary.md'],
+            evidenceFiles: ['notes/source.md'],
+            verification: { status: 'passed', reason: 'Artifact format check passed.' },
+            requiredEvidence: ['claim alpha', 'claim beta'],
+            observedEvidence: ['same-source', 'same-source'],
+          }),
+        }
+      }
+      return { role, content: 'done' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_duplicate_artifact_evidence', 'produce artifact report')) {
+      if (event.type === 'runtime.task-proof') {
+        artifactStates.push([
+          event.projection.artifactReceipt?.validationState,
+          event.projection.artifactReceipt?.blockers.join('|'),
+          event.projection.verdict.completeProof,
+        ].join(':'))
+      }
+    }
+
+    expect(artifactStates).toContain('claim-evidence-missing:artifact claim evidence missing:false')
+  })
+
+  it('uses failed tool observation to select a safe next action without success claim', async () => {
+    const seenActions: string[] = []
+    const terminalSuccessClaims: boolean[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'tool failed',
+          handoffTo: 'coder',
+          handoffReason: 'recover from tool failure',
+          events: [
+            { type: 'tool.started', toolName: 'verify', taskId: 'task_verify_failed' },
+            { type: 'tool.result', toolName: 'verify', taskId: 'task_verify_failed', success: false },
+          ],
+          codingResult: codingResult({
+            changedFiles: ['src/app.ts'],
+            verification: { status: 'failed', reason: 'verification failed' },
+            requiredEvidence: ['post-change verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return { role, content: 'safe action selected' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_tool_failure_safe_action', 'debug src/app.ts verification failure', { maxTurns: 3 })) {
+      if (event.type === 'runtime.next-action') {
+        terminalSuccessClaims.push(event.decision.terminalSuccessClaim)
+      }
+    }
+
+    expect(seenActions).toContain('2:repair')
+    expect(terminalSuccessClaims.length).toBeGreaterThanOrEqual(2)
+    expect(terminalSuccessClaims.every((claim) => claim === false)).toBe(true)
+  })
+
+  it('completes a multi-step mission through search read edit and verify observations', async () => {
+    const seenActions: string[] = []
+    const proofStates: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'found owner',
+          handoffTo: 'coder',
+          handoffReason: 'owner found',
+          codingResult: codingResult({
+            evidenceFiles: ['src/app.ts'],
+            observedEvidence: ['owner context'],
+            lastAction: { actionKind: 'repo-explain', target: 'src/app.ts' },
+          }),
+        }
+      }
+      if (turn === 2) {
+        return {
+          role,
+          content: 'read owner',
+          handoffTo: 'reviewer',
+          handoffReason: 'owner read',
+          codingResult: codingResult({
+            evidenceFiles: ['src/app.ts'],
+            observedEvidence: ['owner content'],
+            lastAction: { actionKind: 'read-file', target: 'src/app.ts' },
+          }),
+        }
+      }
+      if (turn === 3) {
+        return {
+          role,
+          content: 'edited owner',
+          handoffTo: 'coder',
+          handoffReason: 'verify edit',
+          codingResult: codingResult({
+            changedFiles: ['src/app.ts'],
+            verification: { status: 'not-requested', reason: 'No check ran.' },
+            requiredEvidence: ['post-change verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              changedFiles: ['src/app.ts'],
+              target: 'src/app.ts',
+            },
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'verified owner edit',
+        codingResult: codingResult({
+          changedFiles: ['src/app.ts'],
+          verification: { status: 'passed', reason: 'Focused check passed.' },
+          requiredEvidence: ['post-change verification'],
+          observedEvidence: ['post-change verification'],
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_three_step_observation', 'edit src/app.ts after finding owner', { maxTurns: 5 })) {
+      if (event.type === 'runtime.task-proof') {
+        proofStates.push([
+          event.turn,
+          event.projection.observationState.contextPathCount,
+          event.projection.observationState.changedFileCount,
+          event.projection.observationState.verificationTargetCount,
+          event.projection.verdict.status,
+        ].join(':'))
+      }
+    }
+
+    expect(seenActions).toEqual(['1:search', '2:read', '3:edit', '4:verify'])
+    expect(proofStates).toContain('4:1:1:1:complete')
   })
 
   it('emits runtime next-action evidence without treating policy output as terminal success', async () => {
@@ -793,6 +1052,7 @@ function codingResult(input: {
   verification?: Partial<CodingResultSummary['verification']>
   requiredEvidence?: string[]
   observedEvidence?: string[]
+  lastAction?: CodingResultSummary['lastActionResultSeed']
 }): CodingResultSummary {
   const changedFiles = input.changedFiles ?? []
   const failedFiles = input.failedFiles ?? []
@@ -851,5 +1111,6 @@ function codingResult(input: {
       nextAction: input.verification?.nextAction,
     },
     evidence: observedEvidence,
+    lastActionResultSeed: input.lastAction,
   }
 }
