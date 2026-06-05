@@ -27,10 +27,11 @@ export function continueQuery(
   reason: string,
   continuationReason: ContinuationReason = 'handoff',
 ): QueryContinue {
+  const normalizedReason = reason.replace(/\s+/g, ' ').trim().slice(0, 120)
   return {
     action: 'continue',
     nextRole: to,
-    signature: `${from}->${to}`,
+    signature: `${from}->${to}:${normalizedReason}`,
     continuationReason,
     reason,
   }

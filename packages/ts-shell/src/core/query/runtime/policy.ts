@@ -190,7 +190,10 @@ function latestResult(transcript: readonly AgentExecutionOutput[]): CodingResult
 }
 
 function taskKindFor(taskIntent: string, latestCodingResult: CodingResultSummary | undefined): string {
-  if (latestCodingResult?.taskKind === "run-command" || includesAny(taskIntent, ["debug", "repair", "failure"])) {
+  if (latestCodingResult?.taskKind === "run-command" ||
+    latestCodingResult?.verification.status === "failed" ||
+    latestCodingResult?.repair.status === "failed" ||
+    includesAny(taskIntent, ["debug", "repair", "failure"])) {
     return "debug-repair";
   }
   if (includesAny(taskIntent, ["artifact", "report", "writeup"])) {

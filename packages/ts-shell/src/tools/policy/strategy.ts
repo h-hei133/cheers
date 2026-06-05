@@ -123,6 +123,11 @@ function chooseNextAction(input: ToolStrategyInput & {
   if (input.budget && input.budget.remainingSteps <= 0) {
     return "stop-not-proven";
   }
+  if (input.proofGap.some((gap) => gap.includes("verification failed")) &&
+    input.actionPlans.some((plan) => plan.action === "repair") &&
+    !observedRepairAttempt(input)) {
+    return "repair";
+  }
   if (input.blockers.some((blocker) => blocker.includes("missing required context")) ||
     input.proofGap.some((gap) => gap.includes("context evidence incomplete")) ||
     failedReasonIncludes(input, "missing context")) {
@@ -130,6 +135,12 @@ function chooseNextAction(input: ToolStrategyInput & {
   }
   if (input.pendingAction && pendingActionAllowed(input, input.pendingAction)) {
     return input.pendingAction;
+  }
+  if ((input.observedContextPaths ?? []).length === 0 &&
+    !(input.changedFiles && input.changedFiles.length > 0) &&
+    (input.actionPlans.some((plan) => plan.action === "edit") ||
+      (input.proofGap.length > 0 && input.actionPlans.some((plan) => plan.action === "repair")))) {
+    return input.allowedTools.includes("search") ? "search" : "read";
   }
   if (input.artifactContract && missingArtifactEvidence(input.artifactContract)) {
     if ((input.completedActions ?? []).includes("artifact")) {

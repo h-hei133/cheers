@@ -151,6 +151,7 @@ export interface QueryRuntimeStateSeed {
   readonly recoveryBoundary: QueryRuntimeRecoveryBoundary
   readonly truthBoundary: QueryRuntimeSeedTruthBoundary
   readonly derivedState: QueryRuntimeSeedDerivedState
+  readonly observations?: QueryRuntimeObservationState
 }
 
 export function createQueryRuntimeState(
@@ -193,10 +194,42 @@ export function createQueryRuntimeStateFromSeed(
       taskStates: { ...seed.pendingLifecycle.taskStates },
     },
     sharedContext: derivedContext.sharedContext,
-    observations: deriveQueryRuntimeObservationState(transcript),
+    observations: mergeSeedObservations(
+      deriveQueryRuntimeObservationState(transcript),
+      seed.observations,
+    ),
     transcript,
     visitedTransitions: new Set(derivedContext.visitedTransitions),
   }
+}
+
+function mergeSeedObservations(
+  derived: QueryRuntimeObservationState,
+  seed: QueryRuntimeObservationState | undefined,
+): QueryRuntimeObservationState {
+  if (!seed) return derived
+  return {
+    contextPaths: uniqueStrings([...derived.contextPaths, ...seed.contextPaths]),
+    changedFiles: uniqueStrings([...derived.changedFiles, ...seed.changedFiles]),
+    verificationTargets: uniqueStrings([...derived.verificationTargets, ...seed.verificationTargets]),
+    failedVerificationTargets: uniqueStrings([...derived.failedVerificationTargets, ...seed.failedVerificationTargets]),
+    repairAttempts: [...derived.repairAttempts, ...seed.repairAttempts],
+    toolFailures: [...derived.toolFailures, ...seed.toolFailures],
+    artifactEvidence: uniqueStrings([...derived.artifactEvidence, ...seed.artifactEvidence]),
+    artifactClaims: uniqueStrings([...derived.artifactClaims, ...seed.artifactClaims]),
+    artifactClaimEvidence: [...derived.artifactClaimEvidence, ...seed.artifactClaimEvidence],
+    continuationFacts: uniqueStrings([...derived.continuationFacts, ...seed.continuationFacts]),
+    completedActions: uniqueList([...derived.completedActions, ...seed.completedActions]),
+    pendingAction: seed.pendingAction ?? derived.pendingAction,
+  }
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+}
+
+function uniqueList<T extends string>(values: readonly T[]): T[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean) as T[])]
 }
 
 export function ensureQueryRuntimeObservationState(

@@ -1814,6 +1814,412 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.terminalClassification).toBe('stopped')
     expect(result.stopReason).toContain('proof gap')
   })
+
+  it('final real task trial repairs a dependent contract change before complete proof', async () => {
+    const seenActions: string[] = []
+    const proofStates: string[] = []
+    const changedTargets = [
+      'src/status/contract.ts',
+      'src/status/model.ts',
+      'src/status/render.ts',
+      'src/status/render.test.ts',
+    ]
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.verificationTargets.join(',')}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'located typed status contract owners',
+          handoffTo: 'coder',
+          handoffReason: 'read contract and consumers',
+          codingResult: codingResult({
+            evidenceFiles: changedTargets,
+            observedEvidence: ['owner graph located'],
+            lastAction: { actionKind: 'repo-explain', target: 'src/status/contract.ts' },
+          }),
+        }
+      }
+      if (turn === 2) {
+        return {
+          role,
+          content: 'read dependent consumer and test',
+          handoffTo: 'reviewer',
+          handoffReason: 'edit contract graph',
+          codingResult: codingResult({
+            evidenceFiles: changedTargets,
+            observedEvidence: ['contract consumer read'],
+            lastAction: { actionKind: 'read-file', target: 'src/status/render.ts' },
+          }),
+        }
+      }
+      if (turn === 3) {
+        return {
+          role,
+          content: 'changed contract implementation consumer and test',
+          handoffTo: 'coder',
+          handoffReason: 'verify dependent contract graph',
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            verification: { status: 'not-requested', reason: 'Dependent contract check not run.' },
+            requiredEvidence: ['dependent contract verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              changedFiles: changedTargets,
+              target: 'src/status/contract.ts',
+            },
+          }),
+        }
+      }
+      if (turn === 4) {
+        return {
+          role,
+          content: 'focused dependent check failed in render consumer',
+          handoffTo: 'reviewer',
+          handoffReason: 'repair failed consumer',
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            failedFiles: [{ path: 'src/status/render.ts', reason: 'consumer expected old contract shape' }],
+            verifiedFiles: [
+              'src/status/contract.ts',
+              'src/status/model.ts',
+              'src/status/render.test.ts',
+            ],
+            verification: {
+              status: 'failed',
+              reason: 'Consumer still expects the old contract shape.',
+              command: 'npm test -- src/status/render.test.ts',
+              selectionScope: 'focused',
+              selectionSource: 'changed-file-impact',
+            },
+            requiredEvidence: ['dependent contract verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      if (turn === 5) {
+        return {
+          role,
+          content: 'consumer repaired',
+          handoffTo: 'coder',
+          handoffReason: 'reverify repaired consumer',
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            failedFiles: [{ path: 'src/status/render.ts', reason: 'consumer repair requires recheck' }],
+            repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/status/render.ts'] },
+            verification: { status: 'not-requested', reason: 'Post-repair dependent check not run.' },
+            requiredEvidence: ['dependent contract verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'repair',
+              changedFiles: ['src/status/render.ts'],
+              target: 'src/status/render.ts',
+            },
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'dependent contract graph verified',
+        codingResult: codingResult({
+          changedFiles: changedTargets,
+          repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/status/render.ts'] },
+          verification: {
+            status: 'passed',
+            reason: 'Focused dependent contract check passed after repair.',
+            command: 'npm test -- src/status/render.test.ts',
+            selectionScope: 'focused',
+            selectionSource: 'changed-file-impact',
+          },
+          verifiedFiles: changedTargets,
+          requiredEvidence: ['dependent contract verification'],
+          observedEvidence: ['dependent contract verification'],
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_final_contract_repair', 'change status contract and update dependent renderer', {
+      maxTurns: 7,
+    })) {
+      if (event.type === 'runtime.task-proof') {
+        proofStates.push([
+          event.turn,
+          event.projection.action,
+          event.projection.changedFiles.join(','),
+          event.projection.verdict.status,
+        ].join(':'))
+      }
+    }
+
+    expect(seenActions).toContain('4:verify:src/status/contract.ts,src/status/model.ts,src/status/render.ts,src/status/render.test.ts')
+    expect(seenActions.some((action) => action.startsWith('5:repair:') && action.includes('src/status/render.ts'))).toBe(true)
+    expect(seenActions.some((action) => action.startsWith('6:verify:') && action.includes('src/status/render.ts'))).toBe(true)
+    expect(proofStates).toContain('6:verify:src/status/contract.ts,src/status/model.ts,src/status/render.ts,src/status/render.test.ts:complete')
+  })
+
+  it('final real task trial rediscovers after stale tool failure and changes repair strategy', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.changedFiles.join(',')}:${runtimeAction.proofGap.join('|')}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'stale owner read failed',
+          handoffTo: 'coder',
+          handoffReason: 'renew owner discovery',
+          events: [
+            { type: 'tool.started', toolName: 'read', taskId: 'task_read_stale' },
+            { type: 'tool.result', toolName: 'read', taskId: 'task_read_stale', success: false },
+          ],
+          codingResult: codingResult({
+            evidenceFiles: ['src/old/status.ts'],
+            verification: { status: 'not-requested', reason: 'Read failed before safe mutation.' },
+            requiredEvidence: ['fresh owner context', 'targeted verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      if (turn === 2) {
+        return {
+          role,
+          content: 'fresh owners discovered',
+          handoffTo: 'reviewer',
+          handoffReason: 'read fresh owners',
+          codingResult: codingResult({
+            evidenceFiles: ['src/status/model.ts', 'src/status/model.test.ts'],
+            observedEvidence: ['fresh owner context'],
+            lastAction: { actionKind: 'repo-explain', target: 'src/status/model.ts' },
+          }),
+        }
+      }
+      if (turn === 3) {
+        return {
+          role,
+          content: 'failed edit attempt on stale target',
+          handoffTo: 'coder',
+          handoffReason: 'recover before mutation',
+          events: [
+            { type: 'tool.started', toolName: 'edit', taskId: 'task_edit_stale' },
+            { type: 'tool.result', toolName: 'edit', taskId: 'task_edit_stale', success: false },
+          ],
+          codingResult: codingResult({
+            evidenceFiles: ['src/status/model.ts', 'src/status/model.test.ts'],
+            verification: { status: 'not-requested', reason: 'Edit failed before mutation.' },
+            requiredEvidence: ['fresh owner context', 'targeted verification'],
+            observedEvidence: ['fresh owner context'],
+          }),
+        }
+      }
+      if (turn === 4) {
+        return {
+          role,
+          content: 'updated model and test after recovery but focused verification failed',
+          handoffTo: 'reviewer',
+          handoffReason: 'repair status model',
+          codingResult: codingResult({
+            changedFiles: ['src/status/model.ts', 'src/status/model.test.ts'],
+            failedFiles: [{ path: 'src/status/model.ts', reason: 'model edge case failed' }],
+            verification: {
+              status: 'failed',
+              reason: 'Focused status model test failed.',
+              command: 'npm test -- src/status/model.test.ts',
+              selectionScope: 'focused',
+              selectionSource: 'changed-file-impact',
+            },
+            requiredEvidence: ['targeted verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              changedFiles: ['src/status/model.ts', 'src/status/model.test.ts'],
+              target: 'src/status/model.ts',
+            },
+          }),
+        }
+      }
+      if (turn === 5) {
+        return {
+          role,
+          content: 'repair failed because more owner context is needed',
+          handoffTo: 'coder',
+          handoffReason: 'change repair strategy',
+          codingResult: codingResult({
+            changedFiles: ['src/status/model.ts', 'src/status/model.test.ts'],
+            failedFiles: [{ path: 'src/status/model.ts', reason: 'related formatter owner missing' }],
+            repair: { status: 'failed', attempts: 1, notes: ['related formatter owner missing'] },
+            verification: { status: 'failed', reason: 'Repair did not address formatter path.' },
+            requiredEvidence: ['targeted verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      if (turn === 6) {
+        return {
+          role,
+          content: 'missing formatter owner discovered',
+          handoffTo: 'reviewer',
+          handoffReason: 'repair with fresh formatter context',
+          codingResult: codingResult({
+            evidenceFiles: ['src/status/format.ts'],
+            observedEvidence: ['formatter owner context'],
+            lastAction: { actionKind: 'repo-explain', target: 'src/status/format.ts' },
+          }),
+        }
+      }
+      if (turn === 7) {
+        return {
+          role,
+          content: 'status model repaired',
+          handoffTo: 'coder',
+          handoffReason: 'reverify repaired status model',
+          codingResult: codingResult({
+            changedFiles: ['src/status/model.ts', 'src/status/model.test.ts'],
+            failedFiles: [{ path: 'src/status/model.ts', reason: 'recheck repaired model' }],
+            repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/status/model.ts'] },
+            verification: { status: 'not-requested', reason: 'Post-repair focused check not run.' },
+            requiredEvidence: ['targeted verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'focused status verification passed',
+        codingResult: codingResult({
+          changedFiles: ['src/status/model.ts', 'src/status/model.test.ts'],
+          repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/status/model.ts'] },
+          verification: {
+            status: 'passed',
+            reason: 'Focused status model check passed.',
+            command: 'npm test -- src/status/model.test.ts',
+            selectionScope: 'focused',
+            selectionSource: 'changed-file-impact',
+          },
+          verifiedFiles: ['src/status/model.ts', 'src/status/model.test.ts'],
+          requiredEvidence: ['targeted verification'],
+          observedEvidence: ['targeted verification'],
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_final_stale_tool_repair', 'fix ambiguous status model after stale tool failure', {
+      maxTurns: 11,
+    })
+
+    expect(seenActions[0]?.startsWith('1:search:')).toBe(true)
+    expect(seenActions[1]?.startsWith('2:search:')).toBe(true)
+    expect(seenActions.some((action) => action.startsWith('4:search:'))).toBe(true)
+    expect(seenActions.some((action) => action.startsWith('5:repair:') && action.includes('src/status/model.ts'))).toBe(true)
+    expect(seenActions.some((action) => action.startsWith('6:search:') && action.includes('repair proof missing'))).toBe(true)
+    expect(seenActions.some((action) => action.startsWith('8:verify:') && action.includes('src/status/model.ts'))).toBe(true)
+    expect(result.status).toBe('completed')
+    expect(result.terminalClassification).toBe('success')
+  })
+
+  it('final real task trial resumes artifact verification with semantic claim evidence', async () => {
+    const seenActions: string[] = []
+    const artifactStates: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction }) => {
+      seenActions.push(`${runtimeAction.nextAction}:${runtimeAction.changedFiles.join(',')}:${runtimeAction.verificationTargets.join(',')}`)
+      return {
+        role,
+        content: 'resumed artifact verification complete',
+        codingResult: codingResult({
+          taskKind: 'data-artifact',
+          changedFiles: ['src/status/model.ts', 'reports/status-summary.md'],
+          evidenceFiles: ['src/status/model.ts', 'reports/status-summary.md', 'docs/status-source.md'],
+          verification: {
+            status: 'passed',
+            reason: 'Focused status artifact verification passed.',
+            command: 'npm test -- src/status/model.test.ts && npm run check -- reports/status-summary.md',
+            selectionScope: 'focused',
+            selectionSource: 'changed-file-impact',
+          },
+          verifiedFiles: ['src/status/model.ts', 'reports/status-summary.md'],
+          requiredEvidence: [
+            'status claim backed by source receipt',
+          'status claim backed by verification receipt',
+          ],
+          observedEvidence: [
+            'status claim backed by source receipt',
+            'status claim backed by verification receipt',
+          ],
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_final_artifact_continue', 'resume status artifact verification', {
+      maxTurns: 3,
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_final_artifact_continue',
+          initialPrompt: 'resume status artifact verification',
+          maxTurns: 3,
+          startingRole: 'coder',
+        },
+        currentRole: 'coder',
+        turn: 1,
+        lastContinuationReason: 'retryable-error',
+        pendingLifecycle: {
+          pendingApprovals: {},
+          pendingTools: { task_pending_artifact: { toolName: 'verify', startedAt: 'now' } },
+          taskStates: {},
+        },
+        recoveryBoundary: 'mid-turn-reentry',
+        truthBoundary: {
+          source: 'durable-replay',
+          normalizedEventCount: 4,
+          pairedTurnCount: 0,
+          policyEvidence: new Set(['open-turn']),
+          repairSummary: {
+            insertedPromptMessage: false,
+            insertedQueryStarted: false,
+            strippedInterruptedTerminalEvents: 0,
+            insertedRunInterrupted: false,
+            ignoredDuplicateTurnStarts: 0,
+            ignoredUnpairedTurnCompletions: 0,
+            ignoredRoleMismatchedTurnCompletions: 0,
+          },
+          continuationSafety: 'mid-turn-safe',
+          openTurn: { role: 'coder', turn: 1 },
+        },
+        derivedState: { transcript: [] },
+        observations: {
+          contextPaths: ['src/status/model.ts', 'reports/status-summary.md', 'docs/status-source.md'],
+          changedFiles: ['src/status/model.ts', 'reports/status-summary.md'],
+          verificationTargets: ['src/status/model.ts', 'reports/status-summary.md'],
+          failedVerificationTargets: [],
+          repairAttempts: [],
+          toolFailures: [],
+          artifactEvidence: [],
+          artifactClaims: [
+            'status claim backed by source receipt',
+            'status claim backed by verification receipt',
+          ],
+          artifactClaimEvidence: [],
+          continuationFacts: ['pending artifact verification'],
+          completedActions: [],
+          pendingAction: 'continue',
+        },
+      },
+    })) {
+      if (event.type === 'runtime.task-proof') {
+        artifactStates.push([
+          event.turn,
+          event.projection.action,
+          event.projection.artifactReceipt?.validationState,
+          event.projection.artifactReceipt?.claimEvidenceReceipts.length ?? 0,
+          event.projection.artifactReceipt?.claimEvidenceReceipts.filter(receipt => receipt.proven).length ?? 0,
+          event.projection.verdict.status,
+        ].join(':'))
+      }
+    }
+
+    expect(seenActions).toEqual(['continue:src/status/model.ts,reports/status-summary.md:src/status/model.ts,reports/status-summary.md'])
+    expect(artifactStates).toContain('1:continue:validation-passed:2:2:complete')
+  })
 })
 
 function codingResult(input: {
