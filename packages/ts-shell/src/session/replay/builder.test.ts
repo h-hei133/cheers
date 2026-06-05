@@ -110,6 +110,28 @@ describe("session replay builder", () => {
     expect(seed.truthBoundary.pairedTurnCount).toBe(2);
   });
 
+  it("restores reason-qualified transition identity from completed replay turns", () => {
+    const plannerOutput = makeOutput("planner", "plan", "coder", "inspect contract");
+    const coderOutput = makeOutput("coder", "patch ready", "reviewer", "verify target");
+    const snapshot = makeSnapshot([
+      turnStarted("planner", 1),
+      turnCompleted(plannerOutput),
+      turnStarted("coder", 2),
+      turnCompleted(coderOutput),
+    ]);
+
+    const seed = buildResumeReplayInput({
+      sessionId: "sess_replay_transitions",
+      snapshot,
+    });
+    const state = createQueryRuntimeStateFromSeed(seed);
+
+    expect([...state.visitedTransitions]).toEqual([
+      "planner->coder:inspect contract",
+      "coder->reviewer:verify target",
+    ]);
+  });
+
   it("downgrades unsafe replay to fresh entry when turn pairing drifts", () => {
     const snapshot = makeSnapshot([
       turnStarted("planner", 1),
@@ -268,10 +290,11 @@ function makeOutput(
   role: "planner" | "coder" | "reviewer",
   content: string,
   handoffTo?: "planner" | "coder" | "reviewer",
+  handoffReason = "next",
 ): AgentExecutionOutput {
   return {
     role,
     content,
-    ...(handoffTo ? { handoffTo, handoffReason: "next" } : {}),
+    ...(handoffTo ? { handoffTo, handoffReason } : {}),
   };
 }

@@ -279,6 +279,8 @@ function deriveQueryContextFromTranscript(seed: QueryRuntimeStateSeed): DerivedQ
       notes,
       handoffs,
     },
-    visitedTransitions: handoffs.map(handoff => `${handoff.from}->${handoff.to}`),
+    visitedTransitions: handoffs.map(handoff =>
+      `${handoff.from}->${handoff.to}:${handoff.reason.replace(/\s+/g, ' ').trim().slice(0, 120)}`
+    ),
   }
 }
