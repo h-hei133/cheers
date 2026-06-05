@@ -516,6 +516,37 @@ describe('core QueryEngine migration (W1)', () => {
     expect(seenActions).toContain('read:src/owner.ts')
   })
 
+  it('resolves ambiguous owner discovery through search then read', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.selectedPaths.join(',')}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'ambiguous owner narrowed',
+          handoffTo: 'coder',
+          handoffReason: 'read selected owner',
+          codingResult: codingResult({
+            evidenceFiles: ['src/runtime/owner.ts'],
+            observedEvidence: ['owner context'],
+            lastAction: { actionKind: 'repo-explain', target: 'src/runtime/owner.ts' },
+          }),
+        }
+      }
+      return { role, content: 'owner read selected' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_hard_ambiguous_owner', 'inspect missing context for runtime owner', {
+      maxTurns: 2,
+    })
+
+    expect(seenActions).toEqual([
+      '1:search:',
+      '2:read:src/runtime/owner.ts',
+    ])
+  })
+
   it('keeps explicit task path ahead of stale observed context paths', async () => {
     const seenActions: string[] = []
     const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
@@ -674,6 +705,38 @@ describe('core QueryEngine migration (W1)', () => {
     expect(seenActions).toContain('2:search')
   })
 
+  it('changes strategy after repeated repair failure without explicit missing-context wording', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'repair failed with same patch',
+          handoffTo: 'coder',
+          handoffReason: 'needs different strategy',
+          codingResult: codingResult({
+            changedFiles: ['src/app.ts'],
+            failedFiles: [{ path: 'src/app.ts', reason: 'patch still fails' }],
+            repair: { status: 'failed', attempts: 1, notes: ['same repair failed'] },
+            verification: { status: 'failed', reason: 'post-repair verification failed' },
+            requiredEvidence: ['post-repair verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return { role, content: 'new strategy selected' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_repair_strategy_switch', 'debug repair src/app.ts failure', {
+      maxTurns: 3,
+    })
+
+    expect(seenActions).toContain('2:search')
+    expect(seenActions).not.toContain('2:repair')
+  })
+
   it('uses recovered repair observation to rerun verification', async () => {
     const seenActions: string[] = []
     const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
@@ -702,6 +765,30 @@ describe('core QueryEngine migration (W1)', () => {
     })
 
     expect(seenActions).toContain('2:verify')
+  })
+
+  it('stops repair completion when original failure proof is missing', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'repair passed without original failure proof',
+      codingResult: codingResult({
+        taskKind: 'debug-repair',
+        changedFiles: ['src/app.ts'],
+        repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/app.ts'] },
+        verification: { status: 'passed', reason: 'Post repair verification passed.' },
+        requiredEvidence: ['post-repair verification'],
+        observedEvidence: ['post-repair verification'],
+      }),
+    })
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_repair_missing_original_failure', 'debug repair src/app.ts', {
+      maxTurns: 2,
+    })
+
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.terminalClassification).toBe('stopped')
+    expect(result.stopReason).toContain('original-failure-preserved')
   })
 
   it('restores continuation pending action into normal runtime decision', async () => {
@@ -794,7 +881,7 @@ describe('core QueryEngine migration (W1)', () => {
             evidenceFiles: ['notes/source.md'],
             verification: { status: 'passed', reason: 'Artifact format check passed.' },
             requiredEvidence: ['claim alpha', 'claim beta'],
-            observedEvidence: ['same-source', 'same-source'],
+            observedEvidence: ['claim-alpha-receipt', 'claim-alpha-receipt'],
           }),
         }
       }
@@ -856,6 +943,26 @@ describe('core QueryEngine migration (W1)', () => {
     expect(seenActions).toContain('2:repair')
     expect(terminalSuccessClaims.length).toBeGreaterThanOrEqual(2)
     expect(terminalSuccessClaims.every((claim) => claim === false)).toBe(true)
+  })
+
+  it('stops terminal success after failed tool output without task proof', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'tool failed without proof',
+      events: [
+        { type: 'tool.started', toolName: 'verify', taskId: 'task_failed_tool' },
+        { type: 'tool.result', toolName: 'verify', taskId: 'task_failed_tool', success: false },
+      ],
+    })
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_failed_tool_terminal', 'verify src/app.ts', {
+      maxTurns: 1,
+    })
+
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.terminalClassification).toBe('stopped')
+    expect(result.stopReason).toContain('failed tool')
   })
 
   it('completes a multi-step mission through search read edit and verify observations', async () => {
@@ -1017,6 +1124,66 @@ describe('core QueryEngine migration (W1)', () => {
     expect(proofStates).toContain('4:verify:src/source.ts,src/dependent.ts:2:2:complete')
   })
 
+  it('keeps partial changed-file verification not proven', async () => {
+    const proofStates: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      if (turn === 1) {
+        return {
+          role,
+          content: 'changed source and dependent target',
+          handoffTo: 'coder',
+          handoffReason: 'verify changed targets',
+          codingResult: codingResult({
+            changedFiles: ['src/source.ts', 'src/dependent.ts'],
+            verification: { status: 'not-requested', reason: 'No check ran.' },
+            requiredEvidence: ['post-change verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              changedFiles: ['src/source.ts', 'src/dependent.ts'],
+              target: 'src/source.ts',
+            },
+          }),
+        }
+      }
+
+      const partial = codingResult({
+        changedFiles: ['src/source.ts', 'src/dependent.ts'],
+        verification: { status: 'passed', reason: 'Only the source target was checked.' },
+        requiredEvidence: ['post-change verification'],
+        observedEvidence: ['post-change verification'],
+      })
+      return {
+        role,
+        content: 'partial verification complete',
+        codingResult: {
+          ...partial,
+          verifiedFiles: ['src/source.ts'],
+          unverifiedFiles: [{ path: 'src/dependent.ts', reason: 'Dependent target was not checked.' }],
+        },
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_hard_partial_verification', 'edit source and dependent target', { maxTurns: 3 })) {
+      if (event.type === 'runtime.task-proof') {
+        proofStates.push([
+          event.turn,
+          event.projection.action,
+          event.projection.proof.status,
+          event.projection.verdict.status,
+          event.projection.verdict.completeProof,
+          event.projection.proof.missingProof.join('|'),
+          event.projection.proofGap.join('|'),
+        ].join(':'))
+      }
+    }
+
+    expect(proofStates).toContain(
+      '2:verify:partial:partial:false:changed-file-verification-complete:verification target missing|missing proof: post-change verification|verification proof missing for changed files|verification proof missing for src/source.ts|verification proof missing for src/dependent.ts',
+    )
+  })
+
   it('continues a pending mission, reruns verification, and completes with proof', async () => {
     const seenActions: string[] = []
     const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
@@ -1078,6 +1245,62 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.terminalClassification).toBe('success')
   })
 
+  it('keeps resumed changed files not proven until verification runs', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'resumed edit without verification',
+      codingResult: codingResult({
+        changedFiles: ['src/resumed.ts'],
+        verification: { status: 'not-requested', reason: 'Resumed verification did not run.' },
+        requiredEvidence: ['resumed verification'],
+        observedEvidence: [],
+      }),
+    })
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_continue_unverified_change', 'resume pending verification', {
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_continue_unverified_change',
+          initialPrompt: 'resume pending verification',
+          maxTurns: 1,
+          startingRole: 'coder',
+        },
+        currentRole: 'coder',
+        turn: 1,
+        lastContinuationReason: 'retryable-error',
+        pendingLifecycle: {
+          pendingApprovals: {},
+          pendingTools: { task_pending: { toolName: 'verify', startedAt: 'now' } },
+          taskStates: {},
+        },
+        recoveryBoundary: 'mid-turn-reentry',
+        truthBoundary: {
+          source: 'durable-replay',
+          normalizedEventCount: 3,
+          pairedTurnCount: 0,
+          policyEvidence: new Set(['open-turn']),
+          repairSummary: {
+            insertedPromptMessage: false,
+            insertedQueryStarted: false,
+            strippedInterruptedTerminalEvents: 0,
+            insertedRunInterrupted: false,
+            ignoredDuplicateTurnStarts: 0,
+            ignoredUnpairedTurnCompletions: 0,
+            ignoredRoleMismatchedTurnCompletions: 0,
+          },
+          continuationSafety: 'mid-turn-safe',
+          openTurn: { role: 'coder', turn: 1 },
+        },
+        derivedState: { transcript: [] },
+      },
+    })
+
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.terminalClassification).toBe('stopped')
+    expect(result.stopReason).toContain('proof gap')
+  })
+
   it('resumes pending artifact mission state before artifact correction', async () => {
     const seenActions: string[] = []
     const runAgent: AgentRunner = async ({ role, runtimeAction }) => {
@@ -1088,6 +1311,7 @@ describe('core QueryEngine migration (W1)', () => {
         codingResult: codingResult({
           taskKind: 'data-artifact',
           changedFiles: ['reports/summary.md'],
+          evidenceFiles: ['notes/source.md'],
           verification: { status: 'passed', reason: 'Pending artifact verification passed.' },
           requiredEvidence: ['artifact verification'],
           observedEvidence: ['artifact verification receipt'],
@@ -1308,6 +1532,30 @@ describe('core QueryEngine migration (W1)', () => {
     expect(artifactStates).toContain('2:artifact:validation-passed::true')
   })
 
+  it('stops artifact output when claim evidence is mismatched', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'artifact with mismatched proof',
+      codingResult: codingResult({
+        taskKind: 'data-artifact',
+        changedFiles: ['reports/summary.md'],
+        evidenceFiles: ['notes/source.md'],
+        verification: { status: 'passed', reason: 'Artifact format check passed.' },
+        requiredEvidence: ['source covered', 'verification passed'],
+        observedEvidence: ['artifact-check:source-coverage:passed', 'source-receipt'],
+      }),
+    })
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_artifact_mismatched_terminal', 'produce artifact report', {
+      maxTurns: 2,
+    })
+
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.terminalClassification).toBe('stopped')
+    expect(result.stopReason).toContain('artifact claim evidence missing')
+  })
+
   it('stops as not proven when proof gap remains and no safe budget remains', async () => {
     const runAgent: AgentRunner = async ({ role }) => ({
       role,
@@ -1330,6 +1578,28 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.status).toBe('stopped_not_proven')
     expect(result.terminalClassification).toBe('stopped')
     expect(result.stopReason).toContain('no safe action remains')
+  })
+
+  it('stops proof gap without terminal success', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'unverified terminal edit',
+      codingResult: codingResult({
+        changedFiles: ['src/proof-gap.ts'],
+        verification: { status: 'not-requested', reason: 'No verification.' },
+        requiredEvidence: ['post-change verification'],
+        observedEvidence: [],
+      }),
+    })
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_hard_proof_gap_stop', 'edit src/proof-gap.ts', {
+      maxTurns: 2,
+    })
+
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.terminalClassification).toBe('stopped')
+    expect(result.stopReason).toContain('proof gap')
   })
 
   it('stops as not proven when a terminal turn still has a proof gap', async () => {

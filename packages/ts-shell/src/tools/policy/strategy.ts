@@ -132,6 +132,9 @@ function chooseNextAction(input: ToolStrategyInput & {
     return input.pendingAction;
   }
   if (input.artifactContract && missingArtifactEvidence(input.artifactContract)) {
+    if ((input.completedActions ?? []).includes("artifact")) {
+      return input.allowedTools.includes("read") ? "read" : "search";
+    }
     return "artifact";
   }
   if (repeatedFailure(input, "repair") || observedRepairAttempt(input)) {

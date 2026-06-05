@@ -57,16 +57,21 @@ export async function runQueryLoop(
     observeQueryRuntimeOutput(ensureQueryRuntimeObservationState(state), output)
     await emitOutputEvents(state, output, deps)
     await emitMessageDeltas(output, deps)
+    const proofProjection = projectQueryRuntimeProof({ state, decision: runtimeAction, output })
     await deps.onEvent?.({
       type: 'runtime.task-proof',
       role: state.currentRole,
       turn: state.turn,
-      projection: projectQueryRuntimeProof({ state, decision: runtimeAction, output }),
+      projection: proofProjection,
     })
     await deps.onEvent?.({ type: 'turn.completed', output })
 
     const transition = getTransition(state, output)
     if (transition.action === 'terminal') {
+      const proofBlocker = terminalProofBlocker(output, proofProjection)
+      if (proofBlocker) {
+        return terminalQuery('stopped_not_proven', proofBlocker)
+      }
       return transition
     }
     if (state.turn >= state.config.maxTurns && hasOpenRuntimeProofGap(output)) {
@@ -89,6 +94,34 @@ export async function runQueryLoop(
     'stopped_max_turns',
     `Maximum turns reached (${state.config.maxTurns})`,
   )
+}
+
+function terminalProofBlocker(
+  output: AgentExecutionOutput,
+  projection: ReturnType<typeof projectQueryRuntimeProof>,
+): string | undefined {
+  if (output.events?.some((event) => event.type === 'tool.result' && event.success === false)) {
+    return 'failed tool output has no task proof'
+  }
+  if (!output.codingResult) {
+    return undefined
+  }
+  if (projection.artifactReceipt && projection.artifactReceipt.validationState !== 'validation-passed') {
+    return projection.artifactReceipt.blockers[0] ?? 'artifact proof gap remains'
+  }
+  if (
+    output.codingResult.repair.status !== 'not-needed' &&
+    output.codingResult.repair.attempts > 0 &&
+    !projection.verdict.completeProof
+  ) {
+    return projection.verdict.missingProof.find((item) => item.includes('repair') || item.includes('original-failure')) ??
+      projection.verdict.missingProof[0] ??
+      'repair proof gap remains'
+  }
+  if (hasOpenRuntimeProofGap(output)) {
+    return 'proof gap remains'
+  }
+  return undefined
 }
 
 async function executeTurn(

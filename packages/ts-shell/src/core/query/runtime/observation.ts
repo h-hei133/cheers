@@ -166,7 +166,7 @@ function observeRepair(
     reason,
   })
   if (result.repair.status === 'failed') {
-    state.pendingAction = reason.toLowerCase().includes('missing context') ? 'search' : 'repair'
+    state.pendingAction = 'search'
   }
   if (result.repair.status === 'recovered') {
     state.pendingAction = 'verify'

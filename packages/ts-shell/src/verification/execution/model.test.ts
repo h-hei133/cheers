@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { executeVerification } from "./model.js";
+import { executeVerification, verifyChangedFileCoverage } from "./model.js";
 
 describe("verification execution model", () => {
   it("passes after post-repair validation while keeping truth non-terminal", () => {
@@ -101,6 +101,21 @@ describe("verification execution model", () => {
       state: "partial",
       blockers: ["verification rerun required for complete proof"],
       evidenceInputEligible: false,
+    });
+  });
+
+  it("requires every changed target to be covered by verification proof", () => {
+    const coverage = verifyChangedFileCoverage({
+      changedFiles: ["src/source.ts", "src/dependent.ts"],
+      verifiedFiles: ["src/source.ts"],
+      unverifiedFiles: ["src/dependent.ts"],
+      verificationState: "passed",
+    });
+
+    expect(coverage).toEqual({
+      complete: false,
+      coveredFiles: ["src/source.ts"],
+      missingFiles: ["src/dependent.ts"],
     });
   });
 });

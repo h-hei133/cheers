@@ -224,4 +224,40 @@ describe("tool strategy", () => {
       },
     }).nextAction).toBe("artifact");
   });
+
+  it("collects claim evidence instead of repeating artifact action after artifact proof remains missing", () => {
+    const context = selectContext({
+      taskKind: "data-artifact",
+      taskPath: "artifact",
+      shortPrompt: "Validate artifact claims.",
+      workspaceFiles: [
+        { path: "notes/source.md", purpose: "source" },
+        { path: "reports/summary.md", purpose: "target" },
+      ],
+      requiredPaths: ["reports/summary.md"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "data-artifact",
+      outputKind: "artifact",
+      allowedTools: ["read", "artifact", "verify"],
+      allowedWrites: ["reports/summary.md"],
+      successRubric: ["artifact evidence"],
+      context,
+    });
+    const request = buildTaskRequestPacket({ shortPrompt: "Validate artifact claims.", taskKind: "data-artifact", context, plan });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "artifact", "verify"],
+      plan,
+      request,
+      completedActions: ["artifact"],
+      artifactContract: {
+        claims: ["source covered", "verification passed"],
+        evidenceIds: ["verification-receipt"],
+        missingClaims: ["source covered"],
+      },
+    }).nextAction).toBe("read");
+  });
 });

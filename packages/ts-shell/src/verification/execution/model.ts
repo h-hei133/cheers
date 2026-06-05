@@ -22,6 +22,19 @@ export interface VerificationExecution {
   readonly terminalSuccessClaim: false;
 }
 
+export interface ChangedFileVerificationCoverage {
+  readonly complete: boolean;
+  readonly coveredFiles: readonly string[];
+  readonly missingFiles: readonly string[];
+}
+
+export interface ChangedFileVerificationCoverageInput {
+  readonly changedFiles: readonly string[];
+  readonly verifiedFiles?: readonly string[];
+  readonly unverifiedFiles?: readonly string[];
+  readonly verificationState: string;
+}
+
 export function executeVerification(input: VerificationExecutionInput): VerificationExecution {
   if (input.strategy.state === "blocked" || !input.contextReady) {
     return result("blocked", ["verification blocked"]);
@@ -62,6 +75,21 @@ export function executeVerification(input: VerificationExecutionInput): Verifica
   return result("blocked", input.selection.blockers);
 }
 
+export function verifyChangedFileCoverage(
+  input: ChangedFileVerificationCoverageInput,
+): ChangedFileVerificationCoverage {
+  const changedFiles = uniquePaths(input.changedFiles);
+  const verified = new Set(uniquePaths(input.verifiedFiles ?? []));
+  const unverified = new Set(uniquePaths(input.unverifiedFiles ?? []));
+  const coveredFiles = changedFiles.filter((path) => verified.has(path) && !unverified.has(path));
+  const missingFiles = changedFiles.filter((path) => !verified.has(path) || unverified.has(path));
+  return freeze({
+    complete: input.verificationState === "passed" && missingFiles.length === 0,
+    coveredFiles,
+    missingFiles,
+  });
+}
+
 function result(
   state: VerificationExecutionState,
   blockers: readonly string[],
@@ -78,4 +106,8 @@ function result(
 
 function freeze<T>(value: T): Readonly<T> {
   return Object.freeze(value);
+}
+
+function uniquePaths(values: readonly string[]): readonly string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

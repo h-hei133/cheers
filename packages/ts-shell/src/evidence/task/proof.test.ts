@@ -17,6 +17,7 @@ describe("task proof input", () => {
       verificationState: "passed",
       verificationEvidenceInputEligible: true,
       verificationResultInputEligible: true,
+      changedFileVerificationComplete: true,
       repairAttempted: true,
       repairPostValidation: "passed",
       originalFailurePreserved: true,
@@ -45,6 +46,7 @@ describe("task proof input", () => {
       verificationState: "partial",
       verificationEvidenceInputEligible: false,
       verificationResultInputEligible: false,
+      changedFileVerificationComplete: false,
       repairAttempted: true,
       repairPostValidation: "partial",
       originalFailurePreserved: true,
@@ -69,6 +71,7 @@ describe("task proof input", () => {
       verificationState: "passed",
       verificationEvidenceInputEligible: true,
       verificationResultInputEligible: true,
+      changedFileVerificationComplete: true,
       repairAttempted: false,
       repairPostValidation: "not-run",
       originalFailurePreserved: true,
@@ -97,6 +100,7 @@ describe("task proof input", () => {
       verificationState: "partial",
       verificationEvidenceInputEligible: false,
       verificationResultInputEligible: false,
+      changedFileVerificationComplete: false,
       repairAttempted: false,
       repairPostValidation: "not-run",
       originalFailurePreserved: true,
@@ -124,6 +128,23 @@ describe("task proof input", () => {
     expect(proof.missingProof).toEqual(
       expect.arrayContaining(["task-relevant-verification", "verification-passed", "result-input"]),
     );
+  });
+
+  it("rejects diff completion when changed-file verification is incomplete", () => {
+    const proof = buildTaskProofInput({
+      ...baseFacts(),
+      caseId: "partial-target-check",
+      taskKind: "coding-edit",
+      outputKind: "diff",
+      verificationState: "passed",
+      verificationEvidenceInputEligible: true,
+      verificationResultInputEligible: true,
+      changedFileVerificationComplete: false,
+      hostStatus: "passed",
+    });
+
+    expect(proof.status).toBe("partial");
+    expect(proof.missingProof).toEqual(["changed-file-verification-complete"]);
   });
 
   it("rejects debug completion when post-repair validation is missing", () => {
@@ -275,6 +296,7 @@ function baseFacts() {
     verificationState: "passed",
     verificationEvidenceInputEligible: true,
     verificationResultInputEligible: true,
+    changedFileVerificationComplete: true,
     repairAttempted: false,
     repairPostValidation: "not-run",
     originalFailurePreserved: true,

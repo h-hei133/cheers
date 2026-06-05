@@ -12,6 +12,7 @@ import {
   projectTaskVerdict,
   type TaskVerdict,
 } from "../../../result/task/verdict.js";
+import { verifyChangedFileCoverage } from "../../../verification/execution/model.js";
 import type { QueryRuntimeActionDecision } from "./decision.js";
 import { ensureQueryRuntimeObservationState, type QueryRuntimeState } from "./state.js";
 
@@ -77,6 +78,7 @@ export function projectQueryRuntimeProof(input: {
     verificationState,
     verificationEvidenceInputEligible: verificationState === "passed",
     verificationResultInputEligible: verificationState === "passed" && (result?.evidence.length ?? 0) > 0,
+    changedFileVerificationComplete: changedFileVerificationComplete(input.decision.changedFiles, result),
     repairAttempted: (result?.repair.attempts ?? 0) > 0,
     repairPostValidation: verificationState,
     originalFailurePreserved: Boolean(result && (result.failedFiles.length > 0 || result.verification.status === "failed")),
@@ -134,6 +136,26 @@ function artifactVerificationState(result: CodingResultSummary | undefined): str
   if (result?.verification.status === "failed") return "selected-failed";
   if (result?.verification.status === "not-requested") return "selected-not-run";
   return "not-selected";
+}
+
+function changedFileVerificationComplete(
+  changedFiles: readonly string[],
+  result: CodingResultSummary | undefined,
+): boolean {
+  const targets = uniqueStrings([
+    ...changedFiles,
+    ...(result?.changedFiles ?? []),
+    ...(result?.changeSet.changedFiles ?? []),
+  ]);
+  if (targets.length === 0) {
+    return result?.verification.status === "passed";
+  }
+  return verifyChangedFileCoverage({
+    changedFiles: targets,
+    verifiedFiles: result?.verifiedFiles,
+    unverifiedFiles: result?.unverifiedFiles.map((file) => file.path),
+    verificationState: result?.verification.status ?? "not-requested",
+  }).complete;
 }
 
 function failureCategories(result: CodingResultSummary | undefined): readonly string[] {

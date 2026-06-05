@@ -7,6 +7,7 @@ export type TaskProofItem =
   | "tool-strategy-ready"
   | "task-relevant-verification"
   | "verification-passed"
+  | "changed-file-verification-complete"
   | "repair-action"
   | "repair-post-validation"
   | "original-failure-preserved"
@@ -43,6 +44,7 @@ export interface TaskProofInputFacts {
   readonly verificationState: string;
   readonly verificationEvidenceInputEligible: boolean;
   readonly verificationResultInputEligible: boolean;
+  readonly changedFileVerificationComplete?: boolean;
   readonly repairAttempted: boolean;
   readonly repairPostValidation: string;
   readonly originalFailurePreserved: boolean;
@@ -94,9 +96,16 @@ function requiredProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] 
   if (facts.taskKind === "debug-repair") {
     return freeze([
       ...common,
+      "changed-file-verification-complete",
       "repair-action",
       "repair-post-validation",
       "original-failure-preserved",
+    ]);
+  }
+  if (facts.outputKind === "diff") {
+    return freeze([
+      ...common,
+      "changed-file-verification-complete",
     ]);
   }
   if (facts.outputKind === "artifact") {
@@ -152,6 +161,9 @@ function presentProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] {
   }
   if (facts.verificationState === "passed") {
     present.push("verification-passed");
+  }
+  if (facts.changedFileVerificationComplete) {
+    present.push("changed-file-verification-complete");
   }
   if (facts.repairAttempted) {
     present.push("repair-action");

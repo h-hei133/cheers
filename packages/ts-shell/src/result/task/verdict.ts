@@ -37,6 +37,7 @@ export function projectTaskVerdict(input: {
       "host-output-is-not-task-success",
       ...(input.proof.notProvenClaims ?? []),
       ...(input.notProvenClaims ?? []),
+      ...input.proof.missingProof.map((item) => `missing-proof:${item}`),
       ...(completeProof ? [] : ["missing-task-complete-proof"]),
     ]),
   });

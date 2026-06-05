@@ -194,11 +194,8 @@ function artifactValidationStateFor(input: ArtifactReceiptInput): ArtifactValida
 
 function claimEvidenceSatisfied(input: ArtifactReceiptInput): boolean {
   const claims = input.claimEvidence ?? [];
-  const evidenceIds = claims
-    .map((item) => item.evidenceId?.trim())
-    .filter((value): value is string => Boolean(value));
-  return claims.every((item) => Boolean(item.claim.trim()) && Boolean(item.evidenceId?.trim())) &&
-    new Set(evidenceIds).size === evidenceIds.length;
+  const usedEvidenceIds = new Set<string>();
+  return claims.every((item) => claimEvidenceProven(item, usedEvidenceIds));
 }
 
 function claimEvidenceReceiptsFor(input: ArtifactReceiptInput): readonly {
@@ -219,11 +216,31 @@ function claimEvidenceProven(
   usedEvidenceIds: Set<string>,
 ): boolean {
   const evidenceId = item.evidenceId?.trim();
-  if (!item.claim.trim() || !evidenceId || usedEvidenceIds.has(evidenceId)) {
+  const claim = item.claim.trim();
+  if (!claim || !evidenceId || usedEvidenceIds.has(evidenceId) || !claimEvidenceMatches(claim, evidenceId)) {
     return false;
   }
   usedEvidenceIds.add(evidenceId);
   return true;
+}
+
+function claimEvidenceMatches(claim: string, evidenceId: string): boolean {
+  const normalizedClaim = claim.toLowerCase();
+  const normalizedEvidence = evidenceId.toLowerCase();
+  if (normalizedClaim.includes("verification")) {
+    return normalizedEvidence.includes("verification") ||
+      normalizedEvidence.includes("check") ||
+      normalizedEvidence.includes("passed");
+  }
+  if (normalizedClaim.includes("source")) {
+    return normalizedEvidence.includes("source") ||
+      normalizedEvidence.includes("receipt") ||
+      normalizedEvidence.includes("covered");
+  }
+  return normalizedClaim
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 4)
+    .some((token) => normalizedEvidence.includes(token));
 }
 
 function requiredContentSatisfied(input: ArtifactReceiptInput): boolean {
