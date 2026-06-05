@@ -331,4 +331,76 @@ describe("tool strategy", () => {
       proofGap: ["changed files need verification proof"],
     }).nextAction).toBe("verify");
   });
+
+  it("uses discovery after a failed edit observation instead of repeating the same mutation", () => {
+    const context = selectContext({
+      taskKind: "coding-edit",
+      taskPath: "edit",
+      shortPrompt: "Update status mapper after failed mutation.",
+      workspaceFiles: [
+        { path: "src/status.ts", purpose: "target" },
+        { path: "src/status.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/status.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "coding-edit",
+      outputKind: "diff",
+      allowedTools: ["read", "search", "edit", "verify"],
+      allowedWrites: ["src/status.ts"],
+      successRubric: ["targeted verification"],
+      context,
+    });
+    const request = buildTaskRequestPacket({ shortPrompt: "Update status mapper after failed mutation.", taskKind: "coding-edit", context, plan });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "search", "edit", "verify"],
+      plan,
+      request,
+      observationFailures: [{
+        action: "edit",
+        signature: "src/status.ts",
+        reason: "tool result failed",
+      }],
+      proofGap: ["mutation did not apply"],
+    }).nextAction).toBe("search");
+  });
+
+  it("switches from a repeated repair failure in history to discovery", () => {
+    const context = selectContext({
+      taskKind: "debug-repair",
+      taskPath: "edit",
+      shortPrompt: "Fix status mapper verification.",
+      workspaceFiles: [
+        { path: "src/status.ts", purpose: "target" },
+        { path: "src/status.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/status.ts"],
+      continuationAvailable: true,
+      failureCategories: ["verification failed"],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "debug-repair",
+      outputKind: "diff",
+      allowedTools: ["read", "search", "repair", "verify"],
+      allowedWrites: ["src/status.ts"],
+      successRubric: ["repair", "verify"],
+      context,
+    });
+    const request = buildTaskRequestPacket({ shortPrompt: "Fix status mapper verification.", taskKind: "debug-repair", context, plan });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "search", "repair", "verify"],
+      plan,
+      request,
+      proofGap: ["repair proof missing", "verification failed"],
+      failureHistory: [{
+        action: "repair",
+        signature: "src/status.ts",
+        reason: "same repair already failed against src/status.ts",
+      }],
+    }).nextAction).toBe("search");
+  });
 });

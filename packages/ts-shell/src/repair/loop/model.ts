@@ -159,6 +159,9 @@ function repairStateFor(input: RepairDecisionInput, failureClass: RepairFailureC
   if (failureClass === "unsupported") {
     return "blocked";
   }
+  if (failedRepairNeedsContext(input)) {
+    return "retry-exhausted";
+  }
   if (input.failureCategories.includes("repair failed")) {
     return repeatedRepair(input) ? "retry-exhausted" : "failed";
   }
@@ -201,6 +204,9 @@ function nextActionFor(
   if (input.failureCategories.includes("missing context") || repeatedRepair(input)) {
     return "search";
   }
+  if (state === "retry-exhausted") {
+    return "search";
+  }
   if (state === "succeeded-unverified") {
     return "verify";
   }
@@ -219,6 +225,18 @@ function repeatedRepair(input: RepairDecisionInput): boolean {
   return repairs.length >= 2 || repairs.some((failure) =>
     failure.action === "repair" && sanitize(failure.signature || failure.reason) === signature
   );
+}
+
+function failedRepairNeedsContext(input: RepairDecisionInput): boolean {
+  return (input.failureHistory ?? []).some((failure) =>
+    failure.action === "repair" && contextMissing(failure.reason)
+  );
+}
+
+function contextMissing(value: string): boolean {
+  const normalized = value.toLowerCase();
+  return normalized.includes("missing context") ||
+    (normalized.includes("context") && normalized.includes("missing"));
 }
 
 function sanitize(value: string): string {

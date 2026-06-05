@@ -187,4 +187,33 @@ describe("workflowActionGraph", () => {
       }),
     ]));
   });
+
+  it("targets re-verification at the failed changed file after repair feedback", () => {
+    const graph = buildWorkflowActionGraph({
+      taskKind: "edit-file",
+      reason: "change status contract with consumer update",
+      targetPath: "src/status/contract.ts",
+      additionalTargetPaths: ["src/orders/statusConsumer.ts"],
+      inspectFirst: true,
+      verifyAfterEdit: true,
+      verifyCommand: "vitest run src/status/contract.test.ts",
+    } as WorkflowTaskPlan);
+
+    const repaired = updateWorkflowActionGraphFromFeedback({
+      graph: graph!,
+      feedback: {
+        source: "verification",
+        failedChangedFiles: ["src/orders/statusConsumer.ts"],
+        verificationFailureSummary: "consumer still imports stale status name",
+      },
+    });
+
+    expect(repaired.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "reverify-repair",
+        kind: "verify",
+        target: "src/orders/statusConsumer.ts",
+      }),
+    ]));
+  });
 });

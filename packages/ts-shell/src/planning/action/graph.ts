@@ -202,11 +202,15 @@ export function updateWorkflowActionGraphFromFeedback(input: {
       nodeIds.add("repair-from-diagnosis");
     }
     if (!nodeIds.has("reverify-repair")) {
+      const [failedChangedFile] = input.feedback.failedChangedFiles ?? [];
       extraNodes.push({
         id: "reverify-repair",
         kind: "verify",
+        ...(failedChangedFile ? { target: failedChangedFile } : {}),
         dependsOn: ["repair-from-diagnosis"],
-        reason: "Rerun relevant verification after the feedback repair.",
+        reason: failedChangedFile
+          ? "Rerun verification for the failed changed file after the feedback repair."
+          : "Rerun relevant verification after the feedback repair.",
       });
       nodeIds.add("reverify-repair");
     }

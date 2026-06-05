@@ -112,6 +112,7 @@ function requiredProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] 
   if (facts.outputKind === "artifact") {
     return freeze([
       ...common,
+      "changed-file-verification-complete",
       "artifact-source-receipts",
       "artifact-validation",
     ]);

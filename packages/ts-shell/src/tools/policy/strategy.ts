@@ -147,6 +147,9 @@ function chooseNextAction(input: ToolStrategyInput & {
     input.proofGap.some((gap) => gap.includes("verification") || gap.includes("proof"))) {
     return "verify";
   }
+  if (failedAction(input, "edit")) {
+    return input.allowedTools.includes("search") ? "search" : "read";
+  }
   if (failedAction(input, "read") || failedAction(input, "search")) {
     return input.allowedTools.includes("search") ? "search" : "read";
   }
@@ -253,7 +256,11 @@ function failedReasonIncludes(input: ToolStrategyInput, value: string): boolean 
 }
 
 function observedRepairAttempt(input: ToolStrategyInput): boolean {
-  return (input.repairAttempts ?? []).some((failure) => failure.action === "repair");
+  return [
+    ...(input.failureHistory ?? []),
+    ...(input.observationFailures ?? []),
+    ...(input.repairAttempts ?? []),
+  ].some((failure) => failure.action === "repair");
 }
 
 function uniqueActions(actions: readonly ToolActionKind[]): readonly ToolActionKind[] {

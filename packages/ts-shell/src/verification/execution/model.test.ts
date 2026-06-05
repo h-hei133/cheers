@@ -133,4 +133,19 @@ describe("verification execution model", () => {
       missingFiles: ["src/status.test.ts"],
     });
   });
+
+  it("keeps verification incomplete when changed files are only present as selected targets", () => {
+    const coverage = verifyChangedFileCoverage({
+      changedFiles: ["src/source.ts", "src/dependent.ts"],
+      verificationTargets: ["src/source.ts", "src/dependent.ts", "src/source.test.ts"],
+      verifiedFiles: ["src/source.test.ts"],
+      verificationState: "passed",
+    });
+
+    expect(coverage).toEqual({
+      complete: false,
+      coveredFiles: ["src/source.test.ts"],
+      missingFiles: ["src/source.ts", "src/dependent.ts"],
+    });
+  });
 });

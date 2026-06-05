@@ -224,6 +224,27 @@ describe("task proof input", () => {
     expect(proof.missingProof).toEqual(["artifact-source-receipts"]);
   });
 
+  it("rejects artifact completion when changed-file verification is incomplete", () => {
+    const proof = buildTaskProofInput({
+      ...baseFacts(),
+      caseId: "artifact-changed-file-proof",
+      taskKind: "data-artifact",
+      outputKind: "artifact",
+      verificationState: "passed",
+      verificationEvidenceInputEligible: true,
+      verificationResultInputEligible: true,
+      changedFileVerificationComplete: false,
+      artifactSourceReceiptsAvailable: true,
+      artifactSourceReceiptsComplete: true,
+      artifactCorrectionAttempted: true,
+      artifactCorrectionValidationState: "validation-passed",
+      hostStatus: "passed",
+    });
+
+    expect(proof.status).toBe("partial");
+    expect(proof.missingProof).toEqual(["changed-file-verification-complete"]);
+  });
+
   it("rejects structured artifacts when format validation fails", () => {
     const proof = buildTaskProofInput({
       ...baseFacts(),

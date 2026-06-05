@@ -206,4 +206,27 @@ describe("repair loop model", () => {
       terminalSuccessClaim: false,
     });
   });
+
+  it("switches to discovery after one failed repair reports missing context", () => {
+    const decision = decideRepair({
+      taskKind: "debug-repair",
+      verificationState: "selected-failed",
+      failureCategories: ["repair failed"],
+      hostStatus: "failed",
+      repairSignature: "update-consumer-import",
+      failureHistory: [{
+        action: "repair",
+        signature: "rename-export",
+        reason: "repair failed because dependent owner context is missing",
+      }],
+    });
+
+    expect(decision).toMatchObject({
+      state: "retry-exhausted",
+      repairEligible: false,
+      retryAllowed: false,
+      nextAction: "search",
+      terminalSuccessClaim: false,
+    });
+  });
 });

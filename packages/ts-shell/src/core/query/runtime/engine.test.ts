@@ -1001,6 +1001,47 @@ describe('core QueryEngine migration (W1)', () => {
     expect(seenActions).not.toContain('2:edit')
   })
 
+  it('recovers from failed edit with renewed discovery before another mutation', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'edit tool failed before mutation proof',
+          handoffTo: 'coder',
+          handoffReason: 'recover mutation target',
+          events: [
+            { type: 'tool.started', toolName: 'edit', taskId: 'task_edit_status' },
+            { type: 'tool.result', toolName: 'edit', taskId: 'task_edit_status', success: false },
+          ],
+          codingResult: codingResult({
+            verification: { status: 'not-requested', reason: 'Edit did not apply.' },
+            requiredEvidence: ['mutation applied', 'targeted verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'renewed owner discovery selected',
+        codingResult: codingResult({
+          evidenceFiles: ['src/status.ts', 'src/status.test.ts'],
+          observedEvidence: ['owner context'],
+          lastAction: { actionKind: 'repo-explain', target: 'src/status.ts' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_failed_edit_recovery', 'edit src/status.ts after failed mutation', {
+      maxTurns: 3,
+    })
+
+    expect(seenActions).toContain('2:search')
+    expect(seenActions).not.toContain('2:edit')
+  })
+
   it('completes a multi-step mission through search read edit and verify observations', async () => {
     const seenActions: string[] = []
     const proofStates: string[] = []
@@ -1643,6 +1684,37 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.status).toBe('stopped_not_proven')
     expect(result.terminalClassification).toBe('stopped')
     expect(result.stopReason).toContain('artifact claim evidence missing')
+  })
+
+  it('stops artifact completion when changed artifact output lacks verification proof', async () => {
+    const runAgent: AgentRunner = async ({ role }) => {
+      const artifact = codingResult({
+        taskKind: 'data-artifact',
+        changedFiles: ['reports/summary.md'],
+        evidenceFiles: ['notes/source.md'],
+        verification: { status: 'passed', reason: 'Only source receipts were checked.' },
+        verifiedFiles: ['notes/source.md'],
+        requiredEvidence: ['source covered', 'verification passed'],
+        observedEvidence: ['source receipt', 'verification receipt'],
+      })
+      return {
+        role,
+        content: 'artifact proof without changed output verification',
+        codingResult: {
+          ...artifact,
+          unverifiedFiles: [{ path: 'reports/summary.md', reason: 'Artifact output was not checked.' }],
+        },
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_artifact_unverified_output', 'produce artifact report', {
+      maxTurns: 2,
+    })
+
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.terminalClassification).toBe('stopped')
+    expect(result.stopReason).toContain('proof gap')
   })
 
   it('stops as not proven when proof gap remains and no safe budget remains', async () => {
