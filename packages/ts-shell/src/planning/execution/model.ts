@@ -80,7 +80,7 @@ function actionForStep(step: string): string {
   if (step.includes("artifact") || step.includes("sources")) return "artifact";
   if (step.includes("continuation")) return "continue";
   if (step.includes("rank") || step.includes("select")) return "search";
-  if (step.includes("act") || step.includes("correct")) return "edit";
+  if (step.includes("edit") || step.includes("act") || step.includes("correct")) return "edit";
   return "read";
 }
 
@@ -100,6 +100,9 @@ function preconditionsFor(action: string, input: ExecutionPlanInput): readonly s
 function expectedObservationsFor(action: string, input: ExecutionPlanInput): readonly string[] {
   if (action === "verify") {
     return freeze(unique([
+      ...(input.context.verificationPaths.length > 0
+        ? ["targeted verification selected", "impacted test result"]
+        : []),
       ...(input.context.verificationPaths.length > 0 ? input.context.verificationPaths : ["task-relevant check result"]),
       ...(input.observedGaps ?? []).filter((gap) => gap.includes("verification") || gap.includes("proof")),
     ]));
@@ -174,6 +177,9 @@ function stepsFor(input: ExecutionPlanInput): readonly string[] {
   }
   if (input.taskKind === "workspace-understanding") {
     return ["rank workspace targets", "narrow owner context", "check context sufficiency"];
+  }
+  if (input.outputKind === "diff" && input.context.verificationPaths.length > 0) {
+    return ["inspect target", "edit changed target", "select impacted verification", "run targeted verification"];
   }
   return ["inspect target", "act", "verify"];
 }

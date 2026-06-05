@@ -260,4 +260,42 @@ describe("tool strategy", () => {
       },
     }).nextAction).toBe("read");
   });
+
+  it("does not let an earlier read failure override pending verification", () => {
+    const context = selectContext({
+      taskKind: "coding-edit",
+      taskPath: "edit",
+      shortPrompt: "Verify changed status mapper.",
+      workspaceFiles: [
+        { path: "src/status.ts", purpose: "target" },
+        { path: "src/status.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/status.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "coding-edit",
+      outputKind: "diff",
+      allowedTools: ["read", "search", "edit", "verify"],
+      allowedWrites: ["src/status.ts"],
+      successRubric: ["targeted verification"],
+      context,
+    });
+    const request = buildTaskRequestPacket({ shortPrompt: "Verify changed status mapper.", taskKind: "coding-edit", context, plan });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "search", "edit", "verify"],
+      plan,
+      request,
+      changedFiles: ["src/status.ts"],
+      pendingAction: "verify",
+      proofGap: ["changed files need verification proof"],
+      observationFailures: [{
+        action: "read",
+        signature: "task_read_owner",
+        reason: "tool result failed",
+      }],
+    }).nextAction).toBe("verify");
+  });
 });

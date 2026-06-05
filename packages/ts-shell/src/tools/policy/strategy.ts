@@ -147,6 +147,9 @@ function chooseNextAction(input: ToolStrategyInput & {
     input.proofGap.some((gap) => gap.includes("verification") || gap.includes("proof"))) {
     return "verify";
   }
+  if (failedAction(input, "read") || failedAction(input, "search")) {
+    return input.allowedTools.includes("search") ? "search" : "read";
+  }
   if ((input.observedContextPaths ?? []).length > 0 &&
     (input.completedActions ?? []).includes("read") &&
     input.actionPlans.some((plan) => plan.action === "edit")) {
@@ -205,6 +208,14 @@ function missingArtifactEvidence(contract: {
 }): boolean {
   return (contract.missingClaims?.length ?? 0) > 0 ||
     (contract.claims.length > 0 && contract.evidenceIds.length < contract.claims.length);
+}
+
+function failedAction(input: ToolStrategyInput, action: ToolActionKind): boolean {
+  return [
+    ...(input.failureHistory ?? []),
+    ...(input.observationFailures ?? []),
+    ...(input.repairAttempts ?? []),
+  ].some((failure) => failure.action === action);
 }
 
 function repeatedFailure(input: ToolStrategyInput, action: ToolActionKind): boolean {

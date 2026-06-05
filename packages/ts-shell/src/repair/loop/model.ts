@@ -171,6 +171,9 @@ function repairStateFor(input: RepairDecisionInput, failureClass: RepairFailureC
   if (input.verificationState === "selected-passed") {
     return "not-needed";
   }
+  if (repeatedRepair(input)) {
+    return "retry-exhausted";
+  }
   if (input.verificationState === "selected-failed") {
     return "eligible";
   }
@@ -192,6 +195,9 @@ function nextActionFor(
   state: RepairState,
   repairEligible: boolean,
 ): "repair" | "search" | "read" | "verify" | "stop-not-proven" {
+  if (state === "not-needed" || state === "post-validation-passed") {
+    return "read";
+  }
   if (input.failureCategories.includes("missing context") || repeatedRepair(input)) {
     return "search";
   }
@@ -209,7 +215,8 @@ function nextActionFor(
 
 function repeatedRepair(input: RepairDecisionInput): boolean {
   const signature = sanitize(input.repairSignature ?? input.failureCategories.join("|"));
-  return (input.failureHistory ?? []).some((failure) =>
+  const repairs = (input.failureHistory ?? []).filter((failure) => failure.action === "repair");
+  return repairs.length >= 2 || repairs.some((failure) =>
     failure.action === "repair" && sanitize(failure.signature || failure.reason) === signature
   );
 }

@@ -89,11 +89,15 @@ export function buildWorkflowActionGraph(plan: WorkflowTaskPlan): WorkflowAction
     .filter((node) => node.kind === "edit" || node.kind === "write")
     .map((node) => node.id);
   if (plan.verifyAfterEdit || plan.verifyCommand) {
+    const verificationTarget = verificationTargetFromCommand(plan.verifyCommand);
     nodes.push({
       id: "verify-changes",
       kind: "verify",
+      ...(verificationTarget ? { target: verificationTarget } : {}),
       dependsOn: mutationIds,
-      reason: "Verify the changed files after all planned mutations.",
+      reason: verificationTarget
+        ? "Verify the changed files and impacted tests after all planned mutations."
+        : "Verify the changed files after all planned mutations.",
     });
   }
 
@@ -321,4 +325,8 @@ function uniquePaths(paths: readonly string[]): string[] {
 
 function stableId(value: string): string {
   return value.replace(/[^a-zA-Z0-9._:-]+/g, "_").slice(0, 96) || "unknown";
+}
+
+function verificationTargetFromCommand(command: string | undefined): string | undefined {
+  return command?.match(/([\w./-]+\.(?:test|spec)\.(?:ts|tsx|js|jsx))(?:\s|$)/)?.[1];
 }

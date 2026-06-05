@@ -112,6 +112,53 @@ describe("context selection model", () => {
     expect(selection.terminalSuccessClaim).toBe(false);
   });
 
+  it("selects dependent API contract usage as related context before mutation", () => {
+    const selection = selectContext({
+      taskKind: "coding",
+      taskPath: "edit",
+      shortPrompt: "Change the status contract and update callers.",
+      workspaceFiles: [
+        { path: "src/status/contract.ts", purpose: "target type contract" },
+        { path: "src/status/adapter.ts", purpose: "implementation" },
+        { path: "src/orders/statusConsumer.ts", purpose: "dependent usage" },
+        { path: "src/status/contract.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/status/contract.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+
+    expect(selection.relatedPaths).toEqual(expect.arrayContaining([
+      "src/status/adapter.ts",
+      "src/orders/statusConsumer.ts",
+    ]));
+    expect(selection.selectedPaths).toEqual(expect.arrayContaining([
+      "src/status/contract.ts",
+      "src/status/adapter.ts",
+      "src/orders/statusConsumer.ts",
+      "src/status/contract.test.ts",
+    ]));
+  });
+
+  it("does not mark every workspace file related from prompt-only contract wording", () => {
+    const selection = selectContext({
+      taskKind: "coding",
+      taskPath: "edit",
+      shortPrompt: "Change the status contract.",
+      workspaceFiles: [
+        { path: "src/status/contract.ts", purpose: "target type contract" },
+        { path: "src/orders/statusConsumer.ts", purpose: "dependent usage" },
+        { path: "src/billing/unrelated.ts", purpose: "billing helper" },
+      ],
+      requiredPaths: ["src/status/contract.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+
+    expect(selection.relatedPaths).toContain("src/orders/statusConsumer.ts");
+    expect(selection.relatedPaths).not.toContain("src/billing/unrelated.ts");
+  });
+
   it("keeps verification failure as proof gap with repair and verify actions", () => {
     const selection = selectContext({
       taskKind: "debug-repair",

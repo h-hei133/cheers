@@ -109,4 +109,44 @@ describe("execution planning model", () => {
       expect.objectContaining({ action: "verify" }),
     ]));
   });
+
+  it("plans targeted verification selection after source edits with impacted tests", () => {
+    const context = selectContext({
+      taskKind: "coding",
+      taskPath: "edit",
+      shortPrompt: "Change status mapper and run impacted tests.",
+      workspaceFiles: [
+        { path: "src/status.ts", purpose: "target" },
+        { path: "src/status.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/status.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+
+    const plan = buildExecutionPlan({
+      taskKind: "coding",
+      outputKind: "diff",
+      allowedTools: ["read", "edit", "verify"],
+      allowedWrites: ["src/status.ts"],
+      successRubric: ["targeted verification"],
+      context,
+    });
+
+    expect(plan.steps).toEqual([
+      "inspect target",
+      "edit changed target",
+      "select impacted verification",
+      "run targeted verification",
+    ]);
+    expect(plan.actionContracts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "verify",
+        expectedObservations: expect.arrayContaining([
+          "targeted verification selected",
+          "impacted test result",
+        ]),
+      }),
+    ]));
+  });
 });

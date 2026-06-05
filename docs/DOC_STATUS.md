@@ -82,6 +82,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/development-capability-catalog.json` | active | Running the externalized live development challenge through the shared task runtime. |  | Sprint Knowledge Base / Runtime Evaluation |
 | `docs/sprint/autonomous-development-gap-map.md` | active | Checking SP034 owner-domain gap diagnosis, playbook and mature-source inputs, selected transplant targets, introduction decisions, and before/after diagnostic evidence. |  | Sprint Knowledge Base / Core Capability |
 | `docs/sprint/hard-mission-gauntlet.md` | active | Checking the SP044 hard normal-runtime mission set, initial weaknesses, and same-mission rerun outcomes. |  | Sprint Knowledge Base / Core Capability |
+| `docs/sprint/real-development-mission-pack.md` | active | Checking the SP045 real development mission set, baseline weaknesses, same-mission reruns, and introduction decisions. |  | Sprint Knowledge Base / Core Capability |
 
 ## Implementation Context
 

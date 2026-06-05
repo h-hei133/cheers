@@ -78,7 +78,11 @@ export function projectQueryRuntimeProof(input: {
     verificationState,
     verificationEvidenceInputEligible: verificationState === "passed",
     verificationResultInputEligible: verificationState === "passed" && (result?.evidence.length ?? 0) > 0,
-    changedFileVerificationComplete: changedFileVerificationComplete(input.decision.changedFiles, result),
+    changedFileVerificationComplete: changedFileVerificationComplete(
+      input.decision.changedFiles,
+      input.decision.verificationTargets,
+      result,
+    ),
     repairAttempted: (result?.repair.attempts ?? 0) > 0,
     repairPostValidation: verificationState,
     originalFailurePreserved: Boolean(result && (result.failedFiles.length > 0 || result.verification.status === "failed")),
@@ -140,10 +144,12 @@ function artifactVerificationState(result: CodingResultSummary | undefined): str
 
 function changedFileVerificationComplete(
   changedFiles: readonly string[],
+  verificationTargets: readonly string[],
   result: CodingResultSummary | undefined,
 ): boolean {
   const targets = uniqueStrings([
     ...changedFiles,
+    ...verificationTargets,
     ...(result?.changedFiles ?? []),
     ...(result?.changeSet.changedFiles ?? []),
   ]);
@@ -152,6 +158,7 @@ function changedFileVerificationComplete(
   }
   return verifyChangedFileCoverage({
     changedFiles: targets,
+    verificationTargets,
     verifiedFiles: result?.verifiedFiles,
     unverifiedFiles: result?.unverifiedFiles.map((file) => file.path),
     verificationState: result?.verification.status ?? "not-requested",

@@ -965,6 +965,42 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.stopReason).toContain('failed tool')
   })
 
+  it('turns failed read feedback into renewed discovery before edit or terminal result', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'read failed before owner context',
+          handoffTo: 'coder',
+          handoffReason: 'recover context',
+          events: [
+            { type: 'tool.started', toolName: 'read', taskId: 'task_read_owner' },
+            { type: 'tool.result', toolName: 'read', taskId: 'task_read_owner', success: false },
+          ],
+        }
+      }
+      return {
+        role,
+        content: 'renewed discovery selected',
+        codingResult: codingResult({
+          evidenceFiles: ['src/runtime/owner.ts'],
+          observedEvidence: ['owner context'],
+          lastAction: { actionKind: 'repo-explain', target: 'src/runtime/owner.ts' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_failed_read_recovery', 'edit runtime owner after failed read', {
+      maxTurns: 3,
+    })
+
+    expect(seenActions).toContain('2:search')
+    expect(seenActions).not.toContain('2:edit')
+  })
+
   it('completes a multi-step mission through search read edit and verify observations', async () => {
     const seenActions: string[] = []
     const proofStates: string[] = []
@@ -1122,6 +1158,59 @@ describe('core QueryEngine migration (W1)', () => {
 
     expect(seenActions).toContain('4:verify:src/source.ts,src/dependent.ts')
     expect(proofStates).toContain('4:verify:src/source.ts,src/dependent.ts:2:2:complete')
+  })
+
+  it('selects impacted tests after source changes before claiming completion', async () => {
+    const seenTargets: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenTargets.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.verificationTargets.join(',')}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'status source changed; impacted test identified',
+          handoffTo: 'coder',
+          handoffReason: 'run impacted test',
+          codingResult: codingResult({
+            changedFiles: ['src/status.ts'],
+            evidenceFiles: ['src/status.test.ts'],
+            verification: { status: 'not-requested', reason: 'Impacted test not run.' },
+            requiredEvidence: ['targeted verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              changedFiles: ['src/status.ts'],
+              target: 'src/status.ts',
+            },
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'targeted verification complete',
+        codingResult: codingResult({
+          changedFiles: ['src/status.ts'],
+          verification: {
+            status: 'passed',
+            reason: 'Impacted test passed.',
+            command: 'npm test -- src/status.test.ts',
+            selectionScope: 'focused',
+            selectionSource: 'changed-file-impact',
+          },
+          verifiedFiles: ['src/status.test.ts', 'src/status.ts'],
+          requiredEvidence: ['targeted verification'],
+          observedEvidence: ['targeted verification'],
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_targeted_test_selection', 'change src/status.ts and run impacted tests', {
+      maxTurns: 4,
+    })
+
+    expect(seenTargets).toContain('2:verify:src/status.test.ts,src/status.ts')
+    expect(result.status).toBe('completed')
+    expect(result.terminalClassification).toBe('success')
   })
 
   it('keeps partial changed-file verification not proven', async () => {
@@ -1662,6 +1751,7 @@ function codingResult(input: {
   evidenceFiles?: string[]
   repair?: Partial<CodingResultSummary['repair']>
   verification?: Partial<CodingResultSummary['verification']>
+  verifiedFiles?: string[]
   requiredEvidence?: string[]
   observedEvidence?: string[]
   lastAction?: CodingResultSummary['lastActionResultSeed']
@@ -1709,7 +1799,7 @@ function codingResult(input: {
       requiredEvidence,
       observedEvidence,
     },
-    verifiedFiles: input.verification?.status === 'passed' ? changedFiles : [],
+    verifiedFiles: input.verifiedFiles ?? (input.verification?.status === 'passed' ? changedFiles : []),
     unverifiedFiles: input.verification?.status === 'passed'
       ? []
       : changedFiles.map(path => ({ path, reason: input.verification?.reason ?? 'Not verified.' })),

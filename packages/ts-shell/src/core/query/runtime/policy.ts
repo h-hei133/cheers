@@ -32,6 +32,7 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     ...(latestCodingResult?.unverifiedFiles.map((file) => file.path) ?? []),
   ]);
   const verificationTargets = uniqueStrings([
+    ...(latestCodingResult?.diagnosis?.evidenceFiles.filter(isVerificationPath) ?? []),
     ...observations.verificationTargets,
     ...changedFiles,
     ...unverifiedFiles,
@@ -353,6 +354,13 @@ function purposeFor(
   if (input.unverifiedFiles.includes(path)) return "verification target";
   if (input.verificationTargets.includes(path)) return "verification candidate";
   return "related source context";
+}
+
+function isVerificationPath(path: string): boolean {
+  const normalized = path.toLowerCase();
+  return /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(normalized) ||
+    normalized.includes("/test/") ||
+    normalized.includes("/tests/");
 }
 
 function requiredPathsFor(

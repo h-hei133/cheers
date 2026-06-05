@@ -145,4 +145,65 @@ describe("repair loop model", () => {
       terminalSuccessClaim: false,
     });
   });
+
+  it("changes strategy after two failed repair decisions even when signatures differ", () => {
+    const decision = decideRepair({
+      taskKind: "debug-repair",
+      verificationState: "selected-failed",
+      failureCategories: ["test failed"],
+      hostStatus: "failed",
+      repairSignature: "update-consumer-import",
+      failureHistory: [
+        {
+          action: "repair",
+          signature: "rename-export",
+          reason: "renamed export but consumer still failed",
+        },
+        {
+          action: "repair",
+          signature: "update-consumer-import",
+          reason: "updated import but type contract still failed",
+        },
+      ],
+    });
+
+    expect(decision).toMatchObject({
+      state: "retry-exhausted",
+      repairEligible: false,
+      retryAllowed: false,
+      diagnosticContextNeeded: expect.arrayContaining(["task blocker summary"]),
+      nextAction: "search",
+      terminalSuccessClaim: false,
+    });
+  });
+
+  it("does not downgrade passed re-verification because earlier repairs failed", () => {
+    const decision = decideRepair({
+      taskKind: "debug-repair",
+      verificationState: "selected-passed",
+      failureCategories: ["test passed"],
+      hostStatus: "passed",
+      repairSignature: "update-consumer-import",
+      failureHistory: [
+        {
+          action: "repair",
+          signature: "rename-export",
+          reason: "renamed export but consumer still failed",
+        },
+        {
+          action: "repair",
+          signature: "update-consumer-import",
+          reason: "updated import then verification passed",
+        },
+      ],
+    });
+
+    expect(decision).toMatchObject({
+      state: "not-needed",
+      repairEligible: false,
+      blockers: [],
+      nextAction: "read",
+      terminalSuccessClaim: false,
+    });
+  });
 });

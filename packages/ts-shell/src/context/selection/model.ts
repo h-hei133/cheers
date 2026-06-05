@@ -159,7 +159,7 @@ function sourceCandidate(path: string, purpose: string, taskPath: string): boole
 function relatedCandidate(
   path: string,
   purpose: string,
-  shortPrompt: string,
+  _shortPrompt: string,
   targetPaths: readonly string[],
   taskKind: string,
 ): boolean {
@@ -169,15 +169,20 @@ function relatedCandidate(
   if (taskKind === "continuation") {
     return path.startsWith("session/");
   }
-  const normalized = `${path} ${purpose} ${shortPrompt}`.toLowerCase();
+  const normalized = `${path} ${purpose}`.toLowerCase();
   const targetStem = targetPaths
     .map((target) => target.split("/").at(-1)?.replace(/\.[^.]+$/, "").toLowerCase())
     .filter((value): value is string => Boolean(value));
+  const tokens = normalized.split(/[^a-z0-9]+/).filter(Boolean);
   return targetStem.some((stem) => normalized.includes(stem)) ||
-    normalized.includes("related") ||
-    normalized.includes("nearby") ||
-    normalized.includes("owner") ||
-    normalized.includes("risk");
+    tokens.includes("related") ||
+    tokens.includes("dependent") ||
+    tokens.includes("consumer") ||
+    tokens.includes("implementation") ||
+    tokens.includes("contract") ||
+    tokens.includes("nearby") ||
+    tokens.includes("owner") ||
+    tokens.includes("risk");
 }
 
 function ownerCandidate(

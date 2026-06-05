@@ -137,4 +137,54 @@ describe("workflowActionGraph", () => {
       expect.objectContaining({ id: "diagnose-failure", kind: "diagnose" }),
     );
   });
+
+  it("keeps contract, implementation, consumer, and verification nodes distinct", () => {
+    const graph = buildWorkflowActionGraph({
+      taskKind: "edit-file",
+      reason: "change status contract with implementation and consumer updates",
+      targetPath: "src/status/contract.ts",
+      additionalTargetPaths: [
+        "src/status/adapter.ts",
+        "src/orders/statusConsumer.ts",
+      ],
+      inspectFirst: true,
+      verifyAfterEdit: true,
+      verifyCommand: "npm test -- src/status/contract.test.ts",
+    } as WorkflowTaskPlan);
+
+    expect(graph?.changedFileIntents).toEqual([
+      "src/status/contract.ts",
+      "src/status/adapter.ts",
+      "src/orders/statusConsumer.ts",
+    ]);
+    expect(graph?.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "verify-changes",
+        kind: "verify",
+        target: "src/status/contract.test.ts",
+      }),
+    ]));
+    expect(graph?.dependencyReasons).toEqual(expect.arrayContaining([
+      "verify-changes<-edit-primary+write-related-src_status_adapter.ts+write-related-src_orders_statusConsumer.ts: Verify the changed files and impacted tests after all planned mutations.",
+    ]));
+  });
+
+  it("recognizes spec files as impacted verification targets", () => {
+    const graph = buildWorkflowActionGraph({
+      taskKind: "edit-file",
+      reason: "change status mapper and run spec",
+      targetPath: "src/status.ts",
+      inspectFirst: true,
+      verifyAfterEdit: true,
+      verifyCommand: "vitest run src/status.spec.ts",
+    } as WorkflowTaskPlan);
+
+    expect(graph?.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "verify-changes",
+        kind: "verify",
+        target: "src/status.spec.ts",
+      }),
+    ]));
+  });
 });

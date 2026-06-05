@@ -30,6 +30,7 @@ export interface ChangedFileVerificationCoverage {
 
 export interface ChangedFileVerificationCoverageInput {
   readonly changedFiles: readonly string[];
+  readonly verificationTargets?: readonly string[];
   readonly verifiedFiles?: readonly string[];
   readonly unverifiedFiles?: readonly string[];
   readonly verificationState: string;
@@ -78,7 +79,10 @@ export function executeVerification(input: VerificationExecutionInput): Verifica
 export function verifyChangedFileCoverage(
   input: ChangedFileVerificationCoverageInput,
 ): ChangedFileVerificationCoverage {
-  const changedFiles = uniquePaths(input.changedFiles);
+  const changedFiles = uniquePaths([
+    ...input.changedFiles,
+    ...(input.verificationTargets ?? []),
+  ]);
   const verified = new Set(uniquePaths(input.verifiedFiles ?? []));
   const unverified = new Set(uniquePaths(input.unverifiedFiles ?? []));
   const coveredFiles = changedFiles.filter((path) => verified.has(path) && !unverified.has(path));
