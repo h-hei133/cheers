@@ -1,4 +1,5 @@
 import type { QueryEvent } from '../core/query/runtime/events.js'
+import type { QueryRuntimeActionDecision } from '../core/query/runtime/decision.js'
 import type { RecoverySurfaceSummary } from './patchRecovery/recoverySurfaceProjection.js'
 import type { PerFilePatchResultProjection } from '../edit/result/perFilePatchResultProjection.js'
 import type { ProductLoopAdapterProjection } from '../runtime/loop/adapter.js'
@@ -11,6 +12,7 @@ export type TerminalReason =
   | 'stopped_cycle'
   | 'stopped_max_turns'
   | 'stopped_invalid_handoff'
+  | 'stopped_not_proven'
   | 'stopped_error'
 export type TerminalClassification = 'success' | 'stopped' | 'error'
 
@@ -33,6 +35,7 @@ export interface AgentExecutionInput {
   readonly rolePrompt: string
   readonly turn: number
   readonly maxTurns: number
+  readonly runtimeAction: QueryRuntimeActionDecision
   readonly sharedContext: Readonly<SharedContext>
   readonly transcript: readonly AgentExecutionOutput[]
 }

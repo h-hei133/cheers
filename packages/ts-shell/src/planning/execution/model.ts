@@ -146,6 +146,9 @@ function requiredToolsFor(input: ExecutionPlanInput): readonly string[] {
   if (input.taskKind === "workspace-understanding") {
     return ["read", "search", "verify"];
   }
+  if (input.outputKind === "diff") {
+    return ["read", "edit", "verify"];
+  }
   return ["read", "verify"];
 }
 

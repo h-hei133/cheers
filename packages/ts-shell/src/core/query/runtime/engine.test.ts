@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentRunner } from '../../../orchestration/types.js'
+import type { AgentRunner, CodingResultSummary } from '../../../orchestration/types.js'
 import { QueryEngine } from './engine.js'
 
 describe('core QueryEngine migration (W1)', () => {
@@ -132,6 +132,7 @@ describe('core QueryEngine migration (W1)', () => {
 
     expect(events).toEqual([
       'query.started',
+      'runtime.next-action',
       'turn.started',
       'mcp.snapshot',
       'tool.started',
@@ -487,4 +488,261 @@ describe('core QueryEngine migration (W1)', () => {
       },
     ])
   })
+
+  it('passes missing context runtime action to the normal agent runner', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction }) => {
+      seenActions.push(runtimeAction.nextAction)
+      return {
+        role,
+        content: 'context needed',
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_missing_context_action', 'inspect missing context for src/unknown.ts', {
+      maxTurns: 1,
+    })
+
+    expect(seenActions[0]).toBe('search')
+  })
+
+  it('selects targeted verification for changed files before the next normal runtime turn', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.changedFiles.join(',')}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'changed file',
+          handoffTo: 'coder',
+          handoffReason: 'needs verification',
+          codingResult: codingResult({
+            changedFiles: ['src/app.ts'],
+            verification: { status: 'not-requested', reason: 'No check ran.' },
+            requiredEvidence: ['post-change verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return { role, content: 'verification selected' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_changed_file_verify', 'edit src/app.ts', {
+      maxTurns: 3,
+    })
+
+    expect(seenActions).toContain('2:verify:src/app.ts')
+  })
+
+  it('switches repeated repair failure toward discovery instead of repeating repair', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'repair failed',
+          handoffTo: 'coder',
+          handoffReason: 'needs context',
+          codingResult: codingResult({
+            changedFiles: ['src/app.ts'],
+            failedFiles: [{ path: 'src/app.ts', reason: 'missing context for repair' }],
+            repair: { status: 'failed', attempts: 1, notes: ['missing context for repair'] },
+            verification: { status: 'failed', reason: 'verification failed after repair' },
+            requiredEvidence: ['post-repair verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return { role, content: 'discovery selected' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_repair_discovery', 'debug repair src/app.ts failure', {
+      maxTurns: 3,
+    })
+
+    expect(seenActions).toContain('2:search')
+  })
+
+  it('restores continuation pending action into normal runtime decision', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction }) => {
+      seenActions.push(runtimeAction.nextAction)
+      return { role, content: 'continued' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_pending_continue', 'resume pending verification', {
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_pending_continue',
+          initialPrompt: 'resume pending verification',
+          maxTurns: 3,
+          startingRole: 'coder',
+        },
+        currentRole: 'coder',
+        turn: 1,
+        lastContinuationReason: 'retryable-error',
+        pendingLifecycle: {
+          pendingApprovals: {},
+          pendingTools: { task_pending: { toolName: 'verify', startedAt: 'now' } },
+          taskStates: {},
+        },
+        recoveryBoundary: 'mid-turn-reentry',
+        truthBoundary: {
+          source: 'durable-replay',
+          normalizedEventCount: 3,
+          pairedTurnCount: 0,
+          policyEvidence: new Set(['open-turn']),
+          repairSummary: {
+            insertedPromptMessage: false,
+            insertedQueryStarted: false,
+            strippedInterruptedTerminalEvents: 0,
+            insertedRunInterrupted: false,
+            ignoredDuplicateTurnStarts: 0,
+            ignoredUnpairedTurnCompletions: 0,
+            ignoredRoleMismatchedTurnCompletions: 0,
+          },
+          continuationSafety: 'mid-turn-safe',
+          openTurn: { role: 'coder', turn: 1 },
+        },
+        derivedState: { transcript: [] },
+      },
+    })
+
+    expect(seenActions[0]).toBe('continue')
+  })
+
+  it('selects artifact validation when artifact claims lack evidence', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.artifactRequired}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'artifact incomplete',
+          handoffTo: 'coder',
+          handoffReason: 'validate artifact',
+          codingResult: codingResult({
+            verification: { status: 'not-requested', reason: 'Artifact was not checked.' },
+            requiredEvidence: ['claim backed by source', 'claim backed by verification'],
+            observedEvidence: ['claim backed by source'],
+          }),
+        }
+      }
+      return { role, content: 'artifact action selected' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_artifact_action', 'produce artifact report', {
+      maxTurns: 3,
+    })
+
+    expect(seenActions).toContain('2:artifact:true')
+  })
+
+  it('emits runtime next-action evidence without treating policy output as terminal success', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({ role, content: 'done' })
+    const engine = new QueryEngine({ runAgent })
+    const decisions: string[] = []
+    const terminalEvents: string[] = []
+
+    for await (const event of engine.streamMessage('sess_next_action_event', 'inspect missing context')) {
+      if (event.type === 'runtime.next-action') {
+        decisions.push(`${event.turn}:${event.decision.nextAction}:${event.decision.terminalSuccessClaim}`)
+      }
+      if (event.type === 'query.completed') {
+        terminalEvents.push(event.result.terminalClassification)
+      }
+    }
+
+    expect(decisions[0]).toBe('1:search:false')
+    expect(terminalEvents).toEqual(['success'])
+  })
+
+  it('stops as not proven when proof gap remains and no safe budget remains', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'unverified edit',
+      handoffTo: role === 'planner' ? 'coder' : 'reviewer',
+      handoffReason: 'needs verification',
+      codingResult: codingResult({
+        changedFiles: ['src/app.ts'],
+        verification: { status: 'not-requested', reason: 'No verification.' },
+        requiredEvidence: ['post-change verification'],
+        observedEvidence: [],
+      }),
+    })
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_stop_not_proven', 'edit src/app.ts', {
+      maxTurns: 2,
+    })
+
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.terminalClassification).toBe('stopped')
+    expect(result.stopReason).toContain('no safe action remains')
+  })
 })
+
+function codingResult(input: {
+  changedFiles?: string[]
+  failedFiles?: Array<{ path: string; reason: string }>
+  repair?: Partial<CodingResultSummary['repair']>
+  verification?: Partial<CodingResultSummary['verification']>
+  requiredEvidence?: string[]
+  observedEvidence?: string[]
+}): CodingResultSummary {
+  const changedFiles = input.changedFiles ?? []
+  const failedFiles = input.failedFiles ?? []
+  const requiredEvidence = input.requiredEvidence ?? []
+  const observedEvidence = input.observedEvidence ?? []
+  return {
+    taskKind: 'edit-file',
+    changedFiles,
+    failedFiles,
+    repair: {
+      status: input.repair?.status ?? 'not-needed',
+      attempts: input.repair?.attempts ?? 0,
+      recoveredItems: input.repair?.recoveredItems ?? [],
+      failedItems: input.repair?.failedItems ?? [],
+      notes: input.repair?.notes ?? [],
+    },
+    continuation: {
+      status: 'first-pass-success',
+      attempts: 0,
+      evidence: [],
+    },
+    changeSet: {
+      gitAware: true,
+      preExistingDirtyFiles: [],
+      postRunDirtyFiles: changedFiles,
+      attemptedFiles: [...changedFiles, ...failedFiles.map(file => file.path)],
+      changedFiles,
+      unchangedAttemptedFiles: [],
+    },
+    taskSatisfaction: {
+      verdict: observedEvidence.length >= requiredEvidence.length ? 'satisfied' : 'insufficient-evidence',
+      reasons: observedEvidence.length >= requiredEvidence.length ? [] : ['Missing required proof.'],
+      requiredEvidence,
+      observedEvidence,
+    },
+    verifiedFiles: input.verification?.status === 'passed' ? changedFiles : [],
+    unverifiedFiles: input.verification?.status === 'passed'
+      ? []
+      : changedFiles.map(path => ({ path, reason: input.verification?.reason ?? 'Not verified.' })),
+    verification: {
+      status: input.verification?.status ?? 'not-requested',
+      command: input.verification?.command,
+      reason: input.verification?.reason,
+      selectionScope: input.verification?.selectionScope,
+      selectionSource: input.verification?.selectionSource,
+      blockerKind: input.verification?.blockerKind,
+      nextAction: input.verification?.nextAction,
+    },
+    evidence: observedEvidence,
+  }
+}

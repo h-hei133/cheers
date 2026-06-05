@@ -52,4 +52,21 @@ describe("turnContinuationFacts", () => {
     expect(facts.nextAction).toBe("artifact");
     expect(facts.proofGap).toContain("claim evidence missing");
   });
+
+  it("prefers discovery when continuation proof gap says context is missing", () => {
+    const facts = deriveWorkflowTurnContinuationFacts({
+      continuity: {
+        lastTaskKind: "edit-file",
+        recentFailedFiles: [{ path: "src/app.ts", reason: "missing context" }],
+        pendingProofGap: ["context evidence incomplete"],
+      },
+    });
+
+    expect(facts.pendingAction).toBe("search");
+    expect(facts.nextAction).toBe("search");
+    expect(facts.proofGap).toEqual(expect.arrayContaining([
+      "context evidence incomplete",
+      "recent failure unresolved",
+    ]));
+  });
 });

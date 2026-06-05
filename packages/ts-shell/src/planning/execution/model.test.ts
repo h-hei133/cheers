@@ -68,4 +68,44 @@ describe("execution planning model", () => {
     expect(plan.state).toBe("blocked");
     expect(plan.blockers).toEqual(expect.arrayContaining(["missing tool: write", "write authority missing"]));
   });
+
+  it("requires edit capability for diff tasks before verification", () => {
+    const context = selectContext({
+      taskKind: "coding",
+      taskPath: "edit",
+      shortPrompt: "Change src/app.ts.",
+      workspaceFiles: [
+        { path: "src/app.ts", purpose: "target" },
+        { path: "src/app.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/app.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+
+    const blocked = buildExecutionPlan({
+      taskKind: "coding",
+      outputKind: "diff",
+      allowedTools: ["read", "verify"],
+      allowedWrites: ["src/app.ts"],
+      successRubric: ["edit", "verify"],
+      context,
+    });
+    const ready = buildExecutionPlan({
+      taskKind: "coding",
+      outputKind: "diff",
+      allowedTools: ["read", "edit", "verify"],
+      allowedWrites: ["src/app.ts"],
+      successRubric: ["edit", "verify"],
+      context,
+    });
+
+    expect(blocked.requiredTools).toEqual(["read", "edit", "verify"]);
+    expect(blocked.blockers).toContain("missing tool: edit");
+    expect(ready.state).toBe("ready");
+    expect(ready.actionContracts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: "edit" }),
+      expect.objectContaining({ action: "verify" }),
+    ]));
+  });
 });

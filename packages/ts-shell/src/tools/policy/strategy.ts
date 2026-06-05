@@ -19,6 +19,8 @@ export interface ToolStrategyInput {
   readonly proofGap?: readonly string[];
   readonly changedFiles?: readonly string[];
   readonly taskIntent?: string;
+  readonly pendingAction?: ToolActionKind;
+  readonly continuationFacts?: readonly string[];
   readonly artifactContract?: {
     readonly claims: readonly string[];
     readonly evidenceIds: readonly string[];
@@ -72,6 +74,8 @@ export function chooseToolStrategy(input: ToolStrategyInput): ToolStrategy {
     proofGap,
     changedFiles: safeList(input.changedFiles ?? []),
     taskIntent: sanitize(input.taskIntent ?? input.request.goalSummary),
+    pendingAction: input.pendingAction,
+    continuationFacts: safeList(input.continuationFacts ?? []),
     blockers,
     terminalSuccessClaim: false,
   });
@@ -114,6 +118,9 @@ function chooseNextAction(input: ToolStrategyInput & {
   if (input.artifactContract && missingArtifactEvidence(input.artifactContract)) {
     return "artifact";
   }
+  if (input.pendingAction) {
+    return input.pendingAction;
+  }
   if (input.changedFiles && input.changedFiles.length > 0 &&
     input.proofGap.some((gap) => gap.includes("verification") || gap.includes("proof"))) {
     return "verify";
@@ -125,6 +132,9 @@ function chooseNextAction(input: ToolStrategyInput & {
     return input.actionPlans.some((plan) => plan.action === "repair") ? "repair" : "verify";
   }
   if (input.proofGap.some((gap) => gap.includes("continuation") || gap.includes("pending"))) {
+    return "continue";
+  }
+  if (input.continuationFacts && input.continuationFacts.length > 0) {
     return "continue";
   }
   if (input.actionPlans.some((plan) => plan.action === "repair")) {

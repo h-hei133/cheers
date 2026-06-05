@@ -2,6 +2,8 @@ import type { AgentExecutionOutput, AgentRunner, AgentRole } from '../../../orch
 import type { QueryEvent } from './events.js'
 import type { QueryRuntimeState } from './state.js'
 import { applyLifecycleEventToIndex } from '../../tools/toolResultLifecycle.js'
+import type { QueryRuntimeActionDecision } from './decision.js'
+import { decideQueryRuntimeAction, hasOpenRuntimeProofGap } from './policy.js'
 import {
   ALLOWED_HANDOFFS,
   continueQuery,
@@ -28,9 +30,20 @@ export async function runQueryLoop(
   deps: QueryLoopDependencies,
 ): Promise<QueryTerminal> {
   while (state.turn <= state.config.maxTurns) {
+    const runtimeAction = decideQueryRuntimeAction(state)
+    await deps.onEvent?.({
+      type: 'runtime.next-action',
+      role: state.currentRole,
+      turn: state.turn,
+      decision: runtimeAction,
+    })
+    if (runtimeAction.nextAction === 'stop-not-proven') {
+      return terminalQuery('stopped_not_proven', runtimeAction.reason)
+    }
+
     await deps.onEvent?.({ type: 'turn.started', role: state.currentRole, turn: state.turn })
 
-    const execution = await executeTurn(state, deps)
+    const execution = await executeTurn(state, deps, runtimeAction)
     if (execution.action === 'terminal') {
       return execution.terminal
     }
@@ -46,6 +59,9 @@ export async function runQueryLoop(
     const transition = getTransition(state, output)
     if (transition.action === 'terminal') {
       return transition
+    }
+    if (state.turn >= state.config.maxTurns && hasOpenRuntimeProofGap(output)) {
+      return terminalQuery('stopped_not_proven', 'no safe action remains for the current proof gap')
     }
 
     state.sharedContext.handoffs.push({
@@ -69,6 +85,7 @@ export async function runQueryLoop(
 async function executeTurn(
   state: QueryRuntimeState,
   deps: QueryLoopDependencies,
+  runtimeAction: QueryRuntimeActionDecision,
 ): Promise<{ action: 'completed'; output: AgentExecutionOutput } | { action: 'terminal'; terminal: QueryTerminal }> {
   for (let attempt = 1; attempt <= DEFAULT_MAX_RETRIES_PER_TURN + 1; attempt += 1) {
     try {
@@ -77,6 +94,7 @@ async function executeTurn(
         rolePrompt: deps.getRolePrompt(state.currentRole),
         turn: state.turn,
         maxTurns: state.config.maxTurns,
+        runtimeAction,
         sharedContext: state.sharedContext,
         transcript: state.transcript,
       })

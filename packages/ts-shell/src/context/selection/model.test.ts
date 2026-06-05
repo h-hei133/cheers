@@ -67,4 +67,23 @@ describe("context selection model", () => {
     expect(selection.suggestedActions).toEqual(["search", "read"]);
     expect(selection.terminalSuccessClaim).toBe(false);
   });
+
+  it("keeps verification failure as proof gap with repair and verify actions", () => {
+    const selection = selectContext({
+      taskKind: "debug-repair",
+      taskPath: "edit",
+      shortPrompt: "Fix failing check.",
+      workspaceFiles: [
+        { path: "src/parser.ts", purpose: "target" },
+        { path: "src/parser.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/parser.ts"],
+      continuationAvailable: true,
+      failureCategories: ["verification failed"],
+    });
+
+    expect(selection.proofGap).toContain("verification evidence incomplete");
+    expect(selection.suggestedActions).toEqual(["repair", "verify"]);
+    expect(selection.terminalSuccessClaim).toBe(false);
+  });
 });

@@ -89,6 +89,8 @@ function proofGapFor(
     ...(missingRequiredPaths.length > 0 ? ["required context missing"] : []),
     ...(input.failureCategories.includes("context insufficient") ? ["context evidence incomplete"] : []),
     ...(input.failureCategories.includes("missing context") ? ["failure needs more context"] : []),
+    ...(input.failureCategories.includes("verification failed") ? ["verification evidence incomplete"] : []),
+    ...(input.failureCategories.includes("verification blocked") ? ["verification blocker unresolved"] : []),
     ...(input.taskKind === "continuation" && !input.continuationAvailable ? ["continuation facts unavailable"] : []),
     ...(state !== "blocked" && verificationPaths.length === 0 ? ["verification target missing"] : []),
   ]);
@@ -105,6 +107,12 @@ function suggestedActionsFor(
   }
   if (state === "partial" || input.failureCategories.includes("context insufficient")) {
     return freeze(["search"]);
+  }
+  if (input.failureCategories.includes("verification failed")) {
+    return freeze(["repair", "verify"]);
+  }
+  if (input.failureCategories.includes("verification blocked")) {
+    return freeze(["verify"]);
   }
   if (verificationPaths.length === 0) {
     return freeze(["search", "verify"]);

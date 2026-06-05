@@ -16,6 +16,7 @@ describe("resultMapper Result Surface facades", () => {
   it("keeps terminal classification labels stable", () => {
     expect(classifyTerminalReason("completed")).toBe("success");
     expect(classifyTerminalReason("stopped")).toBe("stopped");
+    expect(classifyTerminalReason("stopped_not_proven")).toBe("stopped");
     expect(classifyTerminalReason("stopped_error")).toBe("error");
     expect(classifyTerminalReason("stopped_error", "retryable-error")).toBe(
       "stopped",

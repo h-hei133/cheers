@@ -94,6 +94,9 @@ function pendingActionFor(continuity: ContinuityStateLike, proofGap: readonly st
   if (continuity.pendingAction) {
     return continuity.pendingAction;
   }
+  if (proofGap.some((gap) => gap.includes("context"))) {
+    return "search";
+  }
   if (proofGap.some((gap) => gap.includes("verified") || gap.includes("verification"))) {
     return "verify";
   }
