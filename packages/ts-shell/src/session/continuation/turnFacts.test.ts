@@ -7,6 +7,9 @@ describe("turnContinuationFacts", () => {
     const facts = deriveWorkflowTurnContinuationFacts({
       continuity: {
         lastTaskKind: "edit-file",
+        recentChangedFiles: ["src/changed.ts"],
+        recentVerifiedFiles: [],
+        pendingProofGap: ["artifact evidence missing"],
         lastActionResultSeed: {
           actionKind: "read-file",
           verification: { status: "skipped" },
@@ -25,5 +28,28 @@ describe("turnContinuationFacts", () => {
     expect(facts.seedVerificationStatus).toBe("skipped");
     expect(facts.diagnosticVerifyStatus).toBe("blocked");
     expect(facts.diagnosticHasVerifySignal).toBe(true);
+    expect(facts.proofGap).toEqual(expect.arrayContaining([
+      "artifact evidence missing",
+      "changed files not verified",
+      "seed verification not passed",
+      "diagnostic verification not passed",
+    ]));
+    expect(facts.pendingAction).toBe("verify");
+    expect(facts.nextAction).toBe("verify");
+  });
+
+  it("restores explicit pending action and proof gap across continuation", () => {
+    const facts = deriveWorkflowTurnContinuationFacts({
+      continuity: {
+        lastTaskKind: "write-file",
+        pendingAction: "artifact",
+        pendingNextAction: "artifact",
+        pendingProofGap: ["claim evidence missing"],
+      },
+    });
+
+    expect(facts.pendingAction).toBe("artifact");
+    expect(facts.nextAction).toBe("artifact");
+    expect(facts.proofGap).toContain("claim evidence missing");
   });
 });

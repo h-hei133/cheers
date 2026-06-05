@@ -100,6 +100,7 @@ describe("verification selection model", () => {
       hostEvidenceVerdict: "not-proven",
       hostStatus: "failed",
       failureCategories: [],
+      proofGap: ["changed files need verification proof"],
       failureHistory: [{
         command: "npm test -- statusConsumer.test.ts",
         status: "failed",
@@ -111,10 +112,12 @@ describe("verification selection model", () => {
     expect(selection).toMatchObject({
       purpose: "code-edit",
       state: "selected-failed",
+      rerunReason: "changed files need task-relevant verification",
       selectedInputs: {
         taskIntent: "repair payment status consumer after failed test",
         changedFiles: ["src/payments/status.ts", "src/payments/statusConsumer.ts"],
         failureHistoryUsed: true,
+        proofGap: ["changed files need verification proof"],
       },
       evidenceInputEligible: false,
       resultInputEligible: false,
@@ -123,5 +126,28 @@ describe("verification selection model", () => {
       "previous failed verification: consumer still imports stale status name",
     );
     expect(selection.fallback).toBe("diagnose failure before bounded repair");
+  });
+
+  it("selects a not-run targeted check when changed files leave a proof gap", () => {
+    const selection = selectVerification({
+      taskKind: "coding-edit",
+      taskPath: "edit",
+      taskIntent: "update parser branch",
+      changedFiles: ["src/parser.ts"],
+      proofGap: ["changed target proof missing"],
+      expectedStatus: "not-run",
+      expectedCheck: "parser focused test",
+      hostEvidenceVerdict: "not-proven",
+      hostStatus: "partial",
+      failureCategories: [],
+    });
+
+    expect(selection).toMatchObject({
+      state: "selected-not-run",
+      rerunReason: "changed files need task-relevant verification",
+      evidenceInputEligible: false,
+      resultInputEligible: false,
+    });
+    expect(selection.selectedInputs.changedFiles).toEqual(["src/parser.ts"]);
   });
 });

@@ -14,6 +14,10 @@ describe("artifact workflow model", () => {
       requiredContentMarkers: ["source-a", "source-b", "verification-evidence"],
       observedContentMarkers: ["source-a", "source-b", "verification-evidence"],
       verificationEvidence: ["artifact-check:source-coverage:passed"],
+      claimEvidence: [
+        { claim: "source-a covered", evidenceId: "source-a" },
+        { claim: "verification passed", evidenceId: "artifact-check:source-coverage:passed" },
+      ],
     });
 
     expect(receipt).toMatchObject({
@@ -32,6 +36,7 @@ describe("artifact workflow model", () => {
     expect(receipt?.verificationEvidenceReceipts).toEqual([
       "artifact-check:source-coverage:passed",
     ]);
+    expect(receipt?.claimEvidenceReceipts.every((item) => item.proven)).toBe(true);
     expect(receipt?.blockers).toEqual([]);
   });
 
@@ -108,6 +113,19 @@ describe("artifact workflow model", () => {
       observedContentMarkers: ["source-receipt"],
       verificationEvidence: [],
     })?.validationState).toBe("not-proven");
+
+    expect(createArtifactReceipt({
+      taskKind: "docs-report",
+      outputKind: "artifact",
+      requiredPaths: ["reports/summary.md"],
+      workspacePaths: ["notes/source.md", "reports/summary.md"],
+      verificationState: "selected-passed",
+      failureCategories: [],
+      requiredContentMarkers: ["source-receipt"],
+      observedContentMarkers: ["source-receipt"],
+      verificationEvidence: ["artifact-check:source-coverage:passed"],
+      claimEvidence: [{ claim: "verification passed" }],
+    })?.validationState).toBe("invalid");
   });
 
   it("corrects invalid artifacts only when source receipts and artifact action are available", () => {

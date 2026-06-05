@@ -9,6 +9,9 @@ export interface WorkflowTurnContinuationFacts {
   readonly seedVerificationStatus?: string;
   readonly diagnosticVerifyStatus?: string;
   readonly diagnosticHasVerifySignal: boolean;
+  readonly pendingAction?: string;
+  readonly proofGap: readonly string[];
+  readonly nextAction?: string;
 }
 
 export function deriveWorkflowTurnContinuationFacts(input: {
@@ -48,6 +51,12 @@ export function deriveWorkflowTurnContinuationFacts(input: {
       diagnosticVerifyStatus &&
       diagnosticVerifyStatus !== "not-requested",
   );
+  const proofGap = proofGapFor(input.continuity, {
+    diagnosticHasVerifySignal,
+    seedVerificationStatus,
+    diagnosticVerifyStatus,
+  });
+  const pendingAction = pendingActionFor(input.continuity, proofGap);
 
   return {
     seedActionKind,
@@ -58,5 +67,45 @@ export function deriveWorkflowTurnContinuationFacts(input: {
     seedVerificationStatus,
     diagnosticVerifyStatus,
     diagnosticHasVerifySignal,
+    pendingAction,
+    proofGap,
+    nextAction: input.continuity.pendingNextAction ?? pendingAction ?? input.continuity.lastVerificationNextAction,
   };
+}
+
+function proofGapFor(
+  continuity: ContinuityStateLike,
+  input: {
+    readonly diagnosticHasVerifySignal: boolean;
+    readonly seedVerificationStatus?: string;
+    readonly diagnosticVerifyStatus?: string;
+  },
+): readonly string[] {
+  return freeze([
+    ...(continuity.pendingProofGap ?? []),
+    ...(continuity.recentChangedFiles?.length && !continuity.recentVerifiedFiles?.length ? ["changed files not verified"] : []),
+    ...(continuity.recentFailedFiles?.length ? ["recent failure unresolved"] : []),
+    ...(input.seedVerificationStatus && input.seedVerificationStatus !== "passed" ? ["seed verification not passed"] : []),
+    ...(input.diagnosticHasVerifySignal && input.diagnosticVerifyStatus !== "passed" ? ["diagnostic verification not passed"] : []),
+  ].map((value) => value.replace(/\s+/g, " ").trim()).filter(Boolean));
+}
+
+function pendingActionFor(continuity: ContinuityStateLike, proofGap: readonly string[]): string | undefined {
+  if (continuity.pendingAction) {
+    return continuity.pendingAction;
+  }
+  if (proofGap.some((gap) => gap.includes("verified") || gap.includes("verification"))) {
+    return "verify";
+  }
+  if (continuity.recentFailedFiles?.length) {
+    return "repair";
+  }
+  if (continuity.lastVerificationNextAction) {
+    return continuity.lastVerificationNextAction;
+  }
+  return undefined;
+}
+
+function freeze<T>(value: T): Readonly<T> {
+  return Object.freeze(value);
 }

@@ -27,6 +27,7 @@ export interface VerificationSelectionInput {
   readonly hostEvidenceVerdict: string;
   readonly hostStatus: string;
   readonly failureCategories: readonly string[];
+  readonly proofGap?: readonly string[];
   readonly failureHistory?: readonly {
     readonly command: string;
     readonly status: "failed" | "blocked";
@@ -44,10 +45,12 @@ export interface VerificationSelection {
   readonly doesNotProve: readonly string[];
   readonly blockers: readonly string[];
   readonly fallback: string;
+  readonly rerunReason?: string;
   readonly selectedInputs: {
     readonly taskIntent: string;
     readonly changedFiles: readonly string[];
     readonly failureHistoryUsed: boolean;
+    readonly proofGap?: readonly string[];
   };
   readonly evidenceInputEligible: boolean;
   readonly resultInputEligible: boolean;
@@ -81,10 +84,12 @@ export function selectVerification(input: VerificationSelectionInput): Verificat
     ],
     blockers,
     fallback: fallbackFor(purpose, state),
+    rerunReason: rerunReasonFor(input, state),
     selectedInputs: freeze({
       taskIntent: sanitizeIntent(input.taskIntent ?? input.expectedCheck),
       changedFiles: freeze(uniquePaths(input.changedFiles ?? [])),
       failureHistoryUsed: failureHistoryUsed(input),
+      proofGap: freeze(safeList(input.proofGap ?? [])),
     }),
     evidenceInputEligible: passed,
     resultInputEligible: passed,
@@ -133,6 +138,11 @@ function verificationStateFor(input: VerificationSelectionInput): VerificationRu
   if (failureHistoryUsed(input) && input.expectedStatus !== "passed") {
     return "selected-failed";
   }
+  if ((input.changedFiles?.length ?? 0) > 0 && proofGapNeedsVerification(input)) {
+    return input.expectedStatus === "passed" && input.hostEvidenceVerdict === "complete"
+      ? "selected-passed"
+      : "selected-not-run";
+  }
   if (input.expectedStatus === "failed") {
     return "selected-failed";
   }
@@ -146,6 +156,30 @@ function verificationStateFor(input: VerificationSelectionInput): VerificationRu
     return "selected-blocked";
   }
   return input.hostEvidenceVerdict === "complete" ? "selected-passed" : "selected-not-run";
+}
+
+function proofGapNeedsVerification(input: VerificationSelectionInput): boolean {
+  return (input.proofGap ?? []).some((gap) =>
+    gap.toLowerCase().includes("proof") ||
+    gap.toLowerCase().includes("verification") ||
+    gap.toLowerCase().includes("changed")
+  );
+}
+
+function rerunReasonFor(input: VerificationSelectionInput, state: VerificationRunState): string {
+  if (state === "selected-passed") {
+    return "none";
+  }
+  if ((input.changedFiles?.length ?? 0) > 0 && proofGapNeedsVerification(input)) {
+    return "changed files need task-relevant verification";
+  }
+  if (failureHistoryUsed(input)) {
+    return "failure history overlaps changed files";
+  }
+  if (state === "selected-not-run") {
+    return "selected check has not run";
+  }
+  return "not-applicable";
 }
 
 function verificationBlockersFor(
@@ -196,6 +230,10 @@ function failureHistoryBlockers(input: VerificationSelectionInput): readonly str
 
 function uniquePaths(paths: readonly string[]): readonly string[] {
   return freeze([...new Set(paths.map((path) => path.replace(/\\/g, "/").replace(/^\.\/+/g, "").trim()).filter(Boolean))]);
+}
+
+function safeList(values: readonly string[]): readonly string[] {
+  return values.map((value) => sanitizeIntent(value)).filter(Boolean);
 }
 
 function sanitizeIntent(value: string): string {

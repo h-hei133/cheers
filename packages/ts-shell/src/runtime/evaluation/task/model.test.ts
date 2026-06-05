@@ -411,6 +411,7 @@ describe("task capability assessment", () => {
     expect(result.contextSelection.state).toBe("ready");
     expect(result.executionPlan.state).toBe("ready");
     expect(result.toolStrategy.actions).toContain("repair");
+    expect(result.toolStrategy.nextAction).toBe("repair");
     expect(result.repairAction).toMatchObject({
       attempted: true,
       postValidation: "passed",
@@ -475,6 +476,7 @@ describe("task capability assessment", () => {
       originalFailurePreserved: true,
       retryAllowed: false,
     });
+    expect(result.toolStrategy.nextAction).toBe("repair");
     expect(result.repairDecision.diagnosticContextNeeded).toEqual(
       expect.arrayContaining(["selected check", "failure output summary"]),
     );
@@ -533,6 +535,7 @@ describe("task capability assessment", () => {
     expect(invalid.remainingBlockers).toEqual([]);
     expect(invalid.verificationSelection.state).toBe("selected-not-run");
     expect(invalid.artifactReceipt?.validationState).toBe("invalid");
+    expect(invalid.toolStrategy.nextAction).toBe("artifact");
     expect(invalid.artifactCorrection?.validationState).toBe("validation-passed");
     expect(invalid.verificationExecution.state).toBe("passed");
     expect(invalid.taskVerdict.completeProof).toBe(true);
@@ -541,6 +544,7 @@ describe("task capability assessment", () => {
     expect(unsupported.remainingBlockers).toEqual(["unsupported capability"]);
     expect(unsupported.artifactReceipt?.validationState).toBe("not-proven");
     expect(unsupported.toolStrategy.state).toBe("blocked");
+    expect(unsupported.toolStrategy.nextAction).toBe("artifact");
     expect(unsupported.artifactCorrection?.attempted).toBe(false);
   });
 
@@ -584,6 +588,7 @@ describe("task capability assessment", () => {
     expect(result.toolStrategy).toMatchObject({
       state: "ready",
       actions: expect.arrayContaining(["search", "verify"]),
+      nextAction: "search",
     });
     expect(result.changedBlockers).toEqual(expect.arrayContaining(["context insufficient", "authority missing"]));
     expect(result.remainingBlockers).toEqual([]);

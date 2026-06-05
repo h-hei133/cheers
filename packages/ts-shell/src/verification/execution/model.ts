@@ -11,6 +11,7 @@ export interface VerificationExecutionInput {
   readonly repairAction?: RepairAction;
   readonly artifactCorrection?: ArtifactCorrection;
   readonly contextReady: boolean;
+  readonly changedFiles?: readonly string[];
 }
 
 export interface VerificationExecution {
@@ -48,6 +49,9 @@ export function executeVerification(input: VerificationExecutionInput): Verifica
   }
   if (input.selection.state === "selected-not-run") {
     return result("partial", ["verification rerun required for complete proof"]);
+  }
+  if ((input.changedFiles?.length ?? 0) > 0 && input.strategy.nextAction === "verify") {
+    return result("partial", ["changed files require targeted verification"]);
   }
   if (input.selection.state === "selected-blocked" && input.contextReady) {
     return result("partial", ["verification blocked after context selection"]);

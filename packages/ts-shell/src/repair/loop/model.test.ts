@@ -17,6 +17,7 @@ describe("repair loop model", () => {
       repairEligible: true,
       originalFailurePreserved: true,
       retryAllowed: true,
+      nextAction: "repair",
       terminalSuccessClaim: false,
     });
   });
@@ -77,6 +78,30 @@ describe("repair loop model", () => {
       actions: ["repair", "verify"],
       changedTargetCount: 2,
     }).postValidation).toBe("partial");
+  });
+
+  it("rejects a repeated failed repair and selects new discovery for missing context", () => {
+    const decision = decideRepair({
+      taskKind: "debug-repair",
+      verificationState: "selected-failed",
+      failureCategories: ["repair failed", "missing context"],
+      hostStatus: "failed",
+      repairSignature: "parser-owner-fix",
+      failureHistory: [{
+        action: "repair",
+        signature: "parser-owner-fix",
+        reason: "same repair did not find owner context",
+      }],
+    });
+
+    expect(decision).toMatchObject({
+      state: "retry-exhausted",
+      repairEligible: false,
+      retryAllowed: false,
+      nextAction: "search",
+      terminalSuccessClaim: false,
+    });
+    expect(decision.blockers).toContain("retry exhausted");
   });
 
   it("uses explicit validation evidence for multi-target repair without making repair success terminal", () => {

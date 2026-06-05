@@ -609,15 +609,30 @@ async function runDefinedTaskCase(
         stage: "action",
         owner: "tools/policy",
         run: (outputs) => {
+          const contextSelection = loopValue<ContextSelection>(outputs, "contextSelection");
           const executionPlan = loopValue<ExecutionPlan>(outputs, "executionPlan");
           const requestPacket = loopValue<TaskRequestPacket>(outputs, "requestPacket");
           const toolStrategy = chooseToolStrategy({
             allowedTools: definition.allowedTools,
             plan: executionPlan,
             request: requestPacket,
+            proofGap: contextSelection.proofGap,
+            changedFiles: definition.allowedWrites,
+            taskIntent: definition.shortPrompt,
+            artifactContract: definition.expectedOutput.kind === "artifact"
+              ? {
+                claims: definition.successRubric,
+                evidenceIds: definition.expectedVerification.expectedStatus === "passed"
+                  ? [definition.expectedVerification.verificationId]
+                  : [],
+              }
+              : undefined,
+            failureHistory: failureHistoryFor(definition),
+            budget: { remainingSteps: Math.max(0, definition.allowedTools.length + definition.allowedWrites.length) },
           });
           return stepOutput(toolStrategy, statusFromString(toolStrategy.state), [
             `actions:${toolStrategy.actions.length}`,
+            `next:${toolStrategy.nextAction ?? "none"}`,
           ]);
         },
       },
@@ -654,6 +669,13 @@ async function runDefinedTaskCase(
             hostEvidenceVerdict: hostEvaluation.observedEvidenceVerdict,
             hostStatus: hostEvaluation.observedStatus,
             failureCategories: definition.failureCategories,
+            changedFiles: definition.allowedWrites,
+            taskIntent: definition.shortPrompt,
+            proofGap: [
+              ...contextSelection.proofGap,
+              ...(definition.expectedEvidenceResultCondition === "complete-proof" ? ["completion proof required"] : []),
+            ],
+            failureHistory: verificationFailureHistoryFor(definition),
           });
           const artifactReceipt = createArtifactReceipt({
             taskKind: definition.taskKind,
@@ -662,6 +684,19 @@ async function runDefinedTaskCase(
             workspacePaths: definition.workspace.files.map((file) => file.path),
             verificationState: verificationSelection.state,
             failureCategories: definition.failureCategories,
+            requiredContentMarkers: definition.successRubric,
+            observedContentMarkers: definition.expectedVerification.expectedStatus === "passed"
+              ? definition.successRubric
+              : [],
+            verificationEvidence: definition.expectedVerification.expectedStatus === "passed"
+              ? [definition.expectedVerification.verificationId]
+              : [],
+            claimEvidence: definition.successRubric.map((claim) => ({
+              claim,
+              ...(definition.expectedVerification.expectedStatus === "passed"
+                ? { evidenceId: definition.expectedVerification.verificationId }
+                : {}),
+            })),
           });
           const repairDecision = decideRepair({
             taskKind: definition.taskKind,
@@ -669,6 +704,8 @@ async function runDefinedTaskCase(
             artifactValidationState: artifactReceipt?.validationState,
             failureCategories: definition.failureCategories,
             hostStatus: hostEvaluation.observedStatus,
+            repairSignature: definition.shortPrompt,
+            failureHistory: failureHistoryFor(definition),
           });
           const repairAction = executeRepair({
             decision: repairDecision,
@@ -686,6 +723,7 @@ async function runDefinedTaskCase(
             repairAction,
             artifactCorrection,
             contextReady: contextSelection.state === "ready",
+            changedFiles: definition.allowedWrites,
           });
           return stepOutput({
             verificationSelection,
@@ -882,6 +920,40 @@ async function runDefinedTaskCase(
     ...resultWithoutProgression,
     progression: projectCaseProgression(resultWithoutProgression),
   });
+}
+
+function failureHistoryFor(definition: TaskCaseDefinition): readonly {
+  readonly action: "repair" | "verify" | "read" | "search" | "edit" | "artifact" | "continue";
+  readonly signature: string;
+  readonly reason: string;
+}[] {
+  if (!definition.failureCategories.includes("repair failed") || definition.repairValidationEvidence) {
+    return [];
+  }
+  return [{
+    action: "repair",
+    signature: definition.shortPrompt,
+    reason: definition.failureCategories.includes("context insufficient")
+      ? "missing context for repair"
+      : "repair failed",
+  }];
+}
+
+function verificationFailureHistoryFor(definition: TaskCaseDefinition): readonly {
+  readonly command: string;
+  readonly status: "failed" | "blocked";
+  readonly changedFiles: readonly string[];
+  readonly reason: string;
+}[] {
+  if (!definition.failureCategories.includes("verification failed")) {
+    return [];
+  }
+  return [{
+    command: definition.expectedVerification.commandOrCheck,
+    status: "failed",
+    changedFiles: definition.allowedWrites,
+    reason: "task-relevant verification failed",
+  }];
 }
 
 function proofRecordFor(input: {

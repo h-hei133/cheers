@@ -21,6 +21,10 @@ export interface ArtifactReceiptInput {
   readonly requiredContentMarkers?: readonly string[];
   readonly observedContentMarkers?: readonly string[];
   readonly verificationEvidence?: readonly string[];
+  readonly claimEvidence?: readonly {
+    readonly claim: string;
+    readonly evidenceId?: string;
+  }[];
 }
 
 export interface ArtifactReceipt {
@@ -37,6 +41,11 @@ export interface ArtifactReceipt {
   readonly requiredContentMarkers: readonly string[];
   readonly observedContentMarkers: readonly string[];
   readonly verificationEvidenceReceipts: readonly string[];
+  readonly claimEvidenceReceipts: readonly {
+    readonly claim: string;
+    readonly evidenceId?: string;
+    readonly proven: boolean;
+  }[];
   readonly validationState: ArtifactValidationState;
   readonly blockers: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -78,6 +87,7 @@ export function createArtifactReceipt(input: ArtifactReceiptInput): ArtifactRece
     requiredContentMarkers: freeze([...(input.requiredContentMarkers ?? [])]),
     observedContentMarkers: freeze([...(input.observedContentMarkers ?? [])]),
     verificationEvidenceReceipts: freeze(safeEvidence(input.verificationEvidence ?? [])),
+    claimEvidenceReceipts: freeze(claimEvidenceReceiptsFor(input)),
     validationState,
     blockers,
     terminalSuccessClaim: false,
@@ -157,6 +167,9 @@ function artifactValidationStateFor(input: ArtifactReceiptInput): ArtifactValida
   if (!requiredContentSatisfied(input)) {
     return input.verificationState === "selected-failed" ? "validation-failed" : "invalid";
   }
+  if (!claimEvidenceSatisfied(input)) {
+    return input.verificationState === "selected-failed" ? "validation-failed" : "invalid";
+  }
   if ((input.verificationEvidence ?? []).length === 0) {
     return "not-proven";
   }
@@ -167,6 +180,23 @@ function artifactValidationStateFor(input: ArtifactReceiptInput): ArtifactValida
     return "not-proven";
   }
   return "intent-created";
+}
+
+function claimEvidenceSatisfied(input: ArtifactReceiptInput): boolean {
+  const claims = input.claimEvidence ?? [];
+  return claims.every((item) => Boolean(item.claim.trim()) && Boolean(item.evidenceId?.trim()));
+}
+
+function claimEvidenceReceiptsFor(input: ArtifactReceiptInput): readonly {
+  readonly claim: string;
+  readonly evidenceId?: string;
+  readonly proven: boolean;
+}[] {
+  return (input.claimEvidence ?? []).map((item) => freeze({
+    claim: item.claim.replace(/\s+/g, " ").trim().slice(0, 180),
+    ...(item.evidenceId?.trim() ? { evidenceId: item.evidenceId.trim().slice(0, 180) } : {}),
+    proven: Boolean(item.claim.trim()) && Boolean(item.evidenceId?.trim()),
+  }));
 }
 
 function requiredContentSatisfied(input: ArtifactReceiptInput): boolean {

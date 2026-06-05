@@ -51,4 +51,20 @@ describe("context selection model", () => {
       failureCategories: [],
     }).blockers).toContain("missing required context: reports/summary.md");
   });
+
+  it("turns missing context failure into discovery actions and proof gap", () => {
+    const selection = selectContext({
+      taskKind: "debug-repair",
+      taskPath: "edit",
+      shortPrompt: "Fix parser failure after missing owner context.",
+      workspaceFiles: [{ path: "src/parser.ts", purpose: "target" }],
+      requiredPaths: ["src/parser.ts"],
+      continuationAvailable: true,
+      failureCategories: ["missing context"],
+    });
+
+    expect(selection.proofGap).toContain("failure needs more context");
+    expect(selection.suggestedActions).toEqual(["search", "read"]);
+    expect(selection.terminalSuccessClaim).toBe(false);
+  });
 });

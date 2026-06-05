@@ -172,6 +172,84 @@ describe("task live run report", () => {
     ]));
   });
 
+  it("uses safe owner receipt validation when read-only provider metadata is unavailable", async () => {
+    const host = createHostRuntime();
+    const catalog = parseTaskLiveCatalog(catalogFixture());
+    const report = await runTaskLiveReport({
+      dispatch: host.dispatch,
+      catalog,
+      gateReceipts: [
+        gateReceipt("read-only-provider", {
+          outcome: "config-or-skip",
+          noMutation: false,
+          changedFiles: ["unverified-change"],
+          blocker: "live gate did not produce passed safe metadata",
+        }),
+        primarySuccessFallbackSkippedReceipt(),
+        forcedPrimaryFailureFallbackReceipt(),
+      ],
+      reviewedApplyOptIn: true,
+    });
+
+    const ownerReceipt = report.results.find((result) => result.entryId === "catalog-owner-receipt");
+    expect(ownerReceipt).toMatchObject({
+      status: "complete",
+      executed: true,
+      providerOutcome: "config-or-skip",
+      noMutation: true,
+      changedFiles: [],
+      noApply: true,
+      redactionStatus: "passed",
+      proofStatus: "complete",
+      blockers: [],
+      terminalSuccessClaim: false,
+    });
+    expect(ownerReceipt?.proofItems).toEqual(expect.arrayContaining([
+      "owner-receipt-validation",
+      "task-proof",
+      "no-mutation-check",
+      "no-apply-check",
+    ]));
+    expect(report.summary).toMatchObject({
+      profile: "catalog",
+      entryCount: 8,
+      executedCount: 8,
+      completedWithTaskProofCount: 8,
+      completedWriteTaskProofCount: 3,
+      reviewedDisposablePostApplyProofCount: 3,
+      manualCorrectionCount: 0,
+      providerFallbackCoveragePassed: true,
+      hardGateStatus: "passed",
+      terminalSuccessClaim: false,
+    });
+  });
+
+  it("reports exact missing proof when owner receipt fallback has no safe source", async () => {
+    const host = createHostRuntime();
+    const catalog = parseTaskLiveCatalog(catalogFixture());
+    const report = await runTaskLiveReport({
+      dispatch: host.dispatch,
+      catalog,
+      gateReceipts: [
+        gateReceipt("read-only-provider", {
+          outcome: "config-or-skip",
+          noMutation: false,
+          changedFiles: ["unverified-change"],
+          blocker: "live gate did not produce passed safe metadata",
+        }),
+      ],
+      reviewedApplyOptIn: true,
+    });
+
+    expect(report.results.find((result) => result.entryId === "catalog-owner-receipt")).toMatchObject({
+      status: "failed",
+      executed: false,
+      proofStatus: "missing",
+      blockers: ["owner receipt proof missing: safe no-write receipt source unavailable"],
+      terminalSuccessClaim: false,
+    });
+  });
+
   it("summarizes executed live entries with proof without treating provider calls as success", async () => {
     const host = createHostRuntime();
     const report = await runTaskLiveReport({

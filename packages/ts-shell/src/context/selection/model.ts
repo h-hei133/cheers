@@ -24,6 +24,8 @@ export interface ContextSelection {
   readonly omittedPaths: readonly string[];
   readonly contextPacketSummary: string;
   readonly refreshed: boolean;
+  readonly proofGap: readonly string[];
+  readonly suggestedActions: readonly string[];
   readonly blockers: readonly string[];
   readonly notProvenClaims: readonly string[];
   readonly terminalSuccessClaim: false;
@@ -62,6 +64,8 @@ export function selectContext(input: ContextSelectionInput): ContextSelection {
     omittedPaths: workspacePaths.filter((path) => !selectedPaths.includes(path)),
     contextPacketSummary: `${targetPaths.length} target(s), ${sourcePaths.length} source(s), ${verificationPaths.length} verification candidate(s), ${relatedPaths.length} related path(s)`,
     refreshed: input.taskKind === "continuation" && input.continuationAvailable,
+    proofGap: proofGapFor(input, state, missingRequiredPaths, verificationPaths),
+    suggestedActions: suggestedActionsFor(input, state, missingRequiredPaths, verificationPaths),
     blockers: [
       ...missingRequiredPaths.map((path) => `missing required context: ${path}`),
       ...(continuationBlocked ? ["continuation context unavailable"] : []),
@@ -73,6 +77,39 @@ export function selectContext(input: ContextSelectionInput): ContextSelection {
     ],
     terminalSuccessClaim: false,
   });
+}
+
+function proofGapFor(
+  input: ContextSelectionInput,
+  state: ContextSelectionState,
+  missingRequiredPaths: readonly string[],
+  verificationPaths: readonly string[],
+): readonly string[] {
+  return freeze([
+    ...(missingRequiredPaths.length > 0 ? ["required context missing"] : []),
+    ...(input.failureCategories.includes("context insufficient") ? ["context evidence incomplete"] : []),
+    ...(input.failureCategories.includes("missing context") ? ["failure needs more context"] : []),
+    ...(input.taskKind === "continuation" && !input.continuationAvailable ? ["continuation facts unavailable"] : []),
+    ...(state !== "blocked" && verificationPaths.length === 0 ? ["verification target missing"] : []),
+  ]);
+}
+
+function suggestedActionsFor(
+  input: ContextSelectionInput,
+  state: ContextSelectionState,
+  missingRequiredPaths: readonly string[],
+  verificationPaths: readonly string[],
+): readonly string[] {
+  if (missingRequiredPaths.length > 0 || input.failureCategories.includes("missing context")) {
+    return freeze(["search", "read"]);
+  }
+  if (state === "partial" || input.failureCategories.includes("context insufficient")) {
+    return freeze(["search"]);
+  }
+  if (verificationPaths.length === 0) {
+    return freeze(["search", "verify"]);
+  }
+  return freeze(["read", "verify"]);
 }
 
 function packagePath(path: string): boolean {

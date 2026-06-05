@@ -107,6 +107,9 @@ export interface ContinuityStateLike {
   lastContinuationEvidence?: readonly string[];
   unresolvedItems?: readonly string[];
   freshnessHistoryCount?: number;
+  pendingAction?: string;
+  pendingProofGap?: readonly string[];
+  pendingNextAction?: string;
 }
 
 export function buildActionResultSeedDecisionTrace(

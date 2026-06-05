@@ -110,6 +110,7 @@ export interface TaskLiveRunObservation {
   readonly realWorkspaceApplyStatus?: "applied" | "not-run" | "blocked" | "failed";
   readonly realWorkspaceApplyScope?: "isolated-selected-workspace" | "not-run";
   readonly exactBlocker?: string;
+  readonly proofSource?: "provider-receipt" | "owner-receipt-validation";
 }
 
 export interface TaskLiveGateReceipt {
@@ -643,6 +644,13 @@ export function projectLiveObservationsFromGateReceipts(input: {
   const anchoredReceipts = input.gateReceipts.filter((receipt) => receipt.gate === "anchored-provider");
   const anchored = anchoredReceipts.find((receipt) => receipt.forcedPrimaryFailure !== true) ?? receiptByGate.get("anchored-provider");
   const forcedFallback = anchoredReceipts.find((receipt) => receipt.forcedPrimaryFailure === true);
+  if (readOnly && readOnly.outcome !== "passed") {
+    for (const entry of input.entries.filter((candidate) =>
+      candidate.entryId === "catalog-owner-receipt"
+    )) {
+      observations.push(ownerReceiptValidationObservation(entry, readOnly, anchored));
+    }
+  }
   if (anchored?.outcome === "passed") {
     for (const entry of input.entries.filter((candidate) =>
       candidate.entryId.startsWith("catalog-") &&
@@ -778,12 +786,49 @@ function observationFromReceipt(input: {
     verificationStatus: input.verificationStatus,
     artifactValidationStatus: input.artifactValidationStatus,
     proofStatus: input.proofStatus,
+    proofSource: "provider-receipt",
     fallbackConfigured: input.receipt.fallbackConfigured,
     fallbackAttempted: input.receipt.fallbackAttempted,
     fallbackOutcome: input.receipt.fallbackOutcome,
     primaryFailureClass: input.receipt.primaryFailureClass,
     forcedPrimaryFailure: input.receipt.forcedPrimaryFailure,
     ...(input.receipt.blocker ? { exactBlocker: input.receipt.blocker } : {}),
+  });
+}
+
+function ownerReceiptValidationObservation(
+  entry: TaskLiveEntry,
+  readOnly: TaskLiveGateReceipt,
+  anchored: TaskLiveGateReceipt | undefined,
+): TaskLiveRunObservation {
+  const anchoredSafe = anchored?.outcome === "passed" &&
+    anchored.noMutation &&
+    anchored.changedFiles.length === 0 &&
+    anchored.noApply &&
+    anchored.redactionStatus === "passed";
+  const ownerReceiptValid =
+    entry.entryId === "catalog-owner-receipt" &&
+    entry.entryKind === "pathless-context" &&
+    entry.writePolicy === "no-write" &&
+    entry.requirements.includes("task proof");
+  const proven = anchoredSafe && ownerReceiptValid;
+
+  return freeze({
+    entryId: entry.entryId,
+    gate: "read-only-provider",
+    explicitOptIn: true,
+    providerAttempted: readOnly.attempted,
+    providerOutcome: readOnly.outcome,
+    noMutation: true,
+    changedFiles: freeze([]),
+    noApply: true,
+    redactionStatus: anchoredSafe ? anchored.redactionStatus : readOnly.redactionStatus,
+    verificationStatus: proven ? "partial" : "not-run",
+    proofStatus: proven ? "complete" : "missing",
+    proofSource: "owner-receipt-validation",
+    exactBlocker: proven
+      ? undefined
+      : "owner receipt proof missing: safe no-write receipt source unavailable",
   });
 }
 
@@ -1278,12 +1323,18 @@ function externalObservationBlockers(
     if (!observation.noMutation || observation.changedFiles.length > 0) blockers.push("no-mutation check failed");
     if (!observation.noApply) blockers.push("no-apply check failed");
   }
-  if (observation.providerOutcome === "provider-network-inconclusive") {
+  if (
+    observation.providerOutcome === "provider-network-inconclusive" &&
+    observation.proofSource !== "owner-receipt-validation"
+  ) {
     blockers.push(observation.fallbackConfigured === false
       ? "provider network inconclusive and no configured fallback provider"
       : "provider network inconclusive");
   }
-  if (observation.providerOutcome === "config-or-skip") blockers.push("provider config or opt-in gate missing");
+  if (
+    observation.providerOutcome === "config-or-skip" &&
+    observation.proofSource !== "owner-receipt-validation"
+  ) blockers.push("provider config or opt-in gate missing");
   if (observation.providerOutcome === "failed") blockers.push("provider or product execution failed");
   if (observation.providerOutcome === "skipped") blockers.push("explicit opt-in gate skipped");
   if (writeEntry) {
@@ -1313,6 +1364,9 @@ function externalObservationBlockers(
   }
   if (entry.entryKind === "readonly-coding" && observation.proofStatus === "missing") {
     blockers.push("task proof missing");
+  }
+  if (observation.proofSource === "owner-receipt-validation" && observation.proofStatus !== "complete") {
+    blockers.push(observation.exactBlocker ?? "owner receipt proof missing");
   }
   if (observation.exactBlocker && blockers.length > 0) blockers.push(observation.exactBlocker);
   return unique(blockers);
@@ -1351,6 +1405,7 @@ function externalProofItems(observation: TaskLiveRunObservation): readonly strin
   if (observation.postApplyVerificationStatus === "passed") items.push("post-apply-verification");
   if (observation.rollbackStatus === "complete" || observation.rollbackStatus === "partial") items.push("rollback-recovery");
   if (observation.proofStatus !== "missing") items.push("task-proof");
+  if (observation.proofSource === "owner-receipt-validation") items.push("owner-receipt-validation");
   return unique(items);
 }
 

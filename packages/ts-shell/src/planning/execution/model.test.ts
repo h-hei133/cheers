@@ -30,6 +30,19 @@ describe("execution planning model", () => {
       writeRequired: true,
       terminalSuccessClaim: false,
     });
+    expect(plan.actionContracts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "repair",
+        preconditions: ["context ready", "write authority available"],
+        proofContribution: "addresses preserved failure before recheck",
+        fallbackAction: "search",
+        budgetImpact: "high",
+      }),
+      expect.objectContaining({
+        action: "verify",
+        proofContribution: "closes task-relevant proof gap",
+      }),
+    ]));
   });
 
   it("blocks artifact plans when write tools or authority are unavailable", () => {

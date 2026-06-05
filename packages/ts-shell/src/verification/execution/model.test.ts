@@ -60,6 +60,7 @@ describe("verification execution model", () => {
       strategy: {
         state: "ready",
         actions: ["continue", "verify"],
+        nextAction: "verify",
         blockers: [],
         terminalSuccessClaim: false,
       },
@@ -68,5 +69,38 @@ describe("verification execution model", () => {
 
     expect(execution.state).toBe("partial");
     expect(execution.evidenceInputEligible).toBe(false);
+  });
+
+  it("keeps changed-file verification partial until targeted rerun proof exists", () => {
+    const execution = executeVerification({
+      selection: {
+        purpose: "code-edit",
+        state: "selected-not-run",
+        selected: true,
+        whySelected: "focused changed-file check",
+        proves: [],
+        doesNotProve: [],
+        blockers: ["verification selected but not run"],
+        fallback: "run selected check",
+        evidenceInputEligible: false,
+        resultInputEligible: false,
+        terminalSuccessClaim: false,
+      },
+      strategy: {
+        state: "ready",
+        actions: ["verify"],
+        nextAction: "verify",
+        blockers: [],
+        terminalSuccessClaim: false,
+      },
+      changedFiles: ["src/parser.ts"],
+      contextReady: true,
+    });
+
+    expect(execution).toMatchObject({
+      state: "partial",
+      blockers: ["verification rerun required for complete proof"],
+      evidenceInputEligible: false,
+    });
   });
 });

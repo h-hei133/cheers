@@ -27,6 +27,12 @@ export interface RepairDecisionInput {
   readonly artifactValidationState?: string;
   readonly failureCategories: readonly string[];
   readonly hostStatus: string;
+  readonly failureHistory?: readonly {
+    readonly action: "repair" | "verify" | "read" | "search" | "edit" | "artifact" | "continue";
+    readonly signature: string;
+    readonly reason: string;
+  }[];
+  readonly repairSignature?: string;
 }
 
 export interface RepairDecision {
@@ -37,6 +43,7 @@ export interface RepairDecision {
   readonly blockers: readonly string[];
   readonly originalFailurePreserved: true;
   readonly retryAllowed: boolean;
+  readonly nextAction: "repair" | "search" | "read" | "verify" | "stop-not-proven";
   readonly terminalSuccessClaim: false;
 }
 
@@ -71,7 +78,8 @@ export function decideRepair(input: RepairDecisionInput): RepairDecision {
     repairEligible,
     blockers: repairBlockersFor(input, state),
     originalFailurePreserved: true,
-    retryAllowed: repairEligible && input.hostStatus !== "blocked",
+    retryAllowed: retryAllowedFor(input, repairEligible),
+    nextAction: nextActionFor(input, state, repairEligible),
     terminalSuccessClaim: false,
   });
 }
@@ -152,7 +160,7 @@ function repairStateFor(input: RepairDecisionInput, failureClass: RepairFailureC
     return "blocked";
   }
   if (input.failureCategories.includes("repair failed")) {
-    return "failed";
+    return repeatedRepair(input) ? "retry-exhausted" : "failed";
   }
   if (input.artifactValidationState === "validation-failed") {
     return "post-validation-failed";
@@ -173,6 +181,41 @@ function repairStateFor(input: RepairDecisionInput, failureClass: RepairFailureC
     return "diagnosed";
   }
   return "diagnosed";
+}
+
+function retryAllowedFor(input: RepairDecisionInput, repairEligible: boolean): boolean {
+  return repairEligible && input.hostStatus !== "blocked" && !repeatedRepair(input);
+}
+
+function nextActionFor(
+  input: RepairDecisionInput,
+  state: RepairState,
+  repairEligible: boolean,
+): "repair" | "search" | "read" | "verify" | "stop-not-proven" {
+  if (input.failureCategories.includes("missing context") || repeatedRepair(input)) {
+    return "search";
+  }
+  if (state === "succeeded-unverified") {
+    return "verify";
+  }
+  if (repairEligible) {
+    return "repair";
+  }
+  if (state === "blocked" || state === "user-input-required") {
+    return "stop-not-proven";
+  }
+  return "read";
+}
+
+function repeatedRepair(input: RepairDecisionInput): boolean {
+  const signature = sanitize(input.repairSignature ?? input.failureCategories.join("|"));
+  return (input.failureHistory ?? []).some((failure) =>
+    failure.action === "repair" && sanitize(failure.signature || failure.reason) === signature
+  );
+}
+
+function sanitize(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 180);
 }
 
 function diagnosticContextFor(failureClass: RepairFailureClass): readonly string[] {
