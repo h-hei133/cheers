@@ -21,7 +21,16 @@ export interface WorkflowActionGraph {
   readonly nodes: readonly WorkflowActionNode[];
   readonly orderedNodeIds: readonly string[];
   readonly changedFileIntents: readonly string[];
+  readonly dependentTargets: readonly WorkflowDependentTarget[];
   readonly dependencyReasons: readonly string[];
+}
+
+export interface WorkflowDependentTarget {
+  readonly path: string;
+  readonly ownerRole: "contract" | "implementation" | "consumer" | "verification" | "artifact";
+  readonly rank: number;
+  readonly reason: string;
+  readonly impactedVerificationTargets: readonly string[];
 }
 
 export interface WorkflowActionCursor {
@@ -31,6 +40,7 @@ export interface WorkflowActionCursor {
   readonly blockedNodeIds: readonly string[];
   readonly pendingNodeIds: readonly string[];
   readonly changedFileIntents: readonly string[];
+  readonly dependentTargets: readonly WorkflowDependentTarget[];
   readonly dependencyReasons: readonly string[];
   readonly evidence: readonly string[];
 }
@@ -48,9 +58,14 @@ export function buildWorkflowActionGraph(plan: WorkflowTaskPlan): WorkflowAction
     return undefined;
   }
 
+  const dependentTargets = normalizeDependentTargets(plan.dependentTargets ?? []);
   const changedFileIntents = uniquePaths([
     ...(plan.targetPath ? [plan.targetPath] : []),
     ...(plan.additionalTargetPaths ?? []),
+    ...dependentTargets.flatMap((target) => [
+      target.path,
+      ...target.impactedVerificationTargets,
+    ]),
   ]);
   const nodes: WorkflowActionNode[] = [];
 
@@ -131,6 +146,7 @@ export function buildWorkflowActionGraph(plan: WorkflowTaskPlan): WorkflowAction
     nodes,
     orderedNodeIds: nodes.map((node) => node.id),
     changedFileIntents,
+    dependentTargets,
     dependencyReasons: nodes
       .filter((node) => node.dependsOn.length > 0)
       .map((node) => `${node.id}<-${node.dependsOn.join("+")}: ${node.reason}`),
@@ -231,6 +247,10 @@ export function updateWorkflowActionGraphFromFeedback(input: {
     nodes: updatedNodes,
     orderedNodeIds: updatedNodes.map((node) => node.id),
     changedFileIntents,
+    dependentTargets: mergeDependentTargets(
+      input.graph.dependentTargets,
+      dependentTargetsFromFeedback(input.feedback),
+    ),
     dependencyReasons: [
       ...updatedNodes
         .filter((node) => node.dependsOn.length > 0)
@@ -277,6 +297,7 @@ export function projectWorkflowActionCursor(input: {
     blockedNodeIds: blocked,
     pendingNodeIds: pending,
     changedFileIntents: input.graph.changedFileIntents,
+    dependentTargets: input.graph.dependentTargets,
     dependencyReasons: input.graph.dependencyReasons,
     evidence: [
       `workflow-action-graph:${input.graph.graphId}`,
@@ -287,11 +308,69 @@ export function projectWorkflowActionCursor(input: {
       `workflow-action-pending:${pending.join(",") || "none"}`,
       `workflow-action-blocked:${blocked.join(",") || "none"}`,
       `workflow-action-changed-file-intents:${input.graph.changedFileIntents.join(",") || "none"}`,
+      ...input.graph.dependentTargets.map((target) =>
+        `workflow-dependent-target:${target.rank}:${target.ownerRole}:${target.path}:${target.impactedVerificationTargets.join(",") || "none"}`
+      ),
       ...input.graph.dependencyReasons.map((reason) =>
         `workflow-action-dependency:${reason}`
       ),
     ],
   };
+}
+
+function normalizeDependentTargets(
+  targets: readonly WorkflowDependentTarget[],
+): WorkflowDependentTarget[] {
+  return targets
+    .map((target, index) => ({
+      path: normalizePath(target.path),
+      ownerRole: target.ownerRole,
+      rank: Number.isFinite(target.rank) ? target.rank : index + 1,
+      reason: target.reason.trim(),
+      impactedVerificationTargets: uniquePaths(target.impactedVerificationTargets),
+    }))
+    .filter((target) => target.path.length > 0)
+    .sort((left, right) => left.rank - right.rank || left.path.localeCompare(right.path));
+}
+
+function mergeDependentTargets(
+  existing: readonly WorkflowDependentTarget[],
+  additional: readonly WorkflowDependentTarget[],
+): WorkflowDependentTarget[] {
+  const merged = [...existing];
+  for (const target of additional) {
+    const index = merged.findIndex((candidate) => candidate.path === target.path);
+    if (index < 0) {
+      merged.push(target);
+      continue;
+    }
+    const current = merged[index] as WorkflowDependentTarget;
+    merged[index] = {
+      ...current,
+      impactedVerificationTargets: uniquePaths([
+        ...current.impactedVerificationTargets,
+        ...target.impactedVerificationTargets,
+      ]),
+    };
+  }
+  return normalizeDependentTargets(merged);
+}
+
+function dependentTargetsFromFeedback(
+  feedback: WorkflowActionFeedback,
+): WorkflowDependentTarget[] {
+  if (feedback.source !== "verification") {
+    return [];
+  }
+  return (feedback.failedChangedFiles ?? []).map((path, index) => ({
+    path,
+    ownerRole: "consumer",
+    rank: index + 1,
+    reason: feedback.verificationFailureSummary
+      ? `Failed dependent verification: ${feedback.verificationFailureSummary}`
+      : "Failed dependent verification target.",
+    impactedVerificationTargets: [path],
+  }));
 }
 
 export function orderedMutationTargetsFromGraph(
@@ -325,6 +404,10 @@ function uniquePaths(paths: readonly string[]): string[] {
     result.push(normalized);
   }
   return result;
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/^\.\/+/g, "").trim();
 }
 
 function stableId(value: string): string {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { createEmptyLifecycleIndex } from '../../tools/toolResultLifecycle.js'
 import type { AgentRunner, CodingResultSummary } from '../../../orchestration/types.js'
+import { buildResumeReplayInput } from '../../../session/replay/builder.js'
 import { QueryEngine } from './engine.js'
 
 describe('core QueryEngine migration (W1)', () => {
@@ -109,6 +111,48 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.terminalReason).toBe('stopped_cycle')
     expect(result.terminalClassification).toBe('stopped')
     expect(result.stopReason).toContain('coder->reviewer')
+  })
+
+  it('allows reason-distinct progress but stops repeated same-reason long-run cycles', async () => {
+    const reviewReasons = ['inspect contract', 'apply repair', 'inspect contract']
+    const seenReasons: string[] = []
+    const runAgent: AgentRunner = async ({ role, turn }) => {
+      if (role === 'planner') {
+        return {
+          role,
+          content: 'plan',
+          handoffTo: 'coder',
+          handoffReason: 'start',
+        }
+      }
+
+      if (role === 'coder') {
+        return {
+          role,
+          content: `code ${turn}`,
+          handoffTo: 'reviewer',
+          handoffReason: `code ${turn}`,
+        }
+      }
+
+      const reason = reviewReasons.shift() ?? 'inspect contract'
+      seenReasons.push(reason)
+      return {
+        role,
+        content: `review ${turn}`,
+        handoffTo: 'coder',
+        handoffReason: reason,
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_reason_distinct_cycle', 'loop with different reasons', {
+      maxTurns: 8,
+    })
+
+    expect(seenReasons).toEqual(['inspect contract', 'apply repair', 'inspect contract'])
+    expect(result.status).toBe('stopped_cycle')
+    expect(result.stopReason).toContain('reviewer->coder:inspect contract')
   })
 
   it('streams custom runtime events and compensates orphaned tool lifecycle before terminal completion', async () => {
@@ -423,6 +467,99 @@ describe('core QueryEngine migration (W1)', () => {
       { from: 'planner', to: 'coder', reason: 'plan-ready', turn: 1 },
       { from: 'coder', to: 'reviewer', reason: 'resume-ready', turn: 2 },
     ])
+  })
+
+  it('uses replay-restored continuation proof facts for normal runtime targeted verification', async () => {
+    const persistedOutput = {
+      role: 'coder',
+      content: 'continuation proof pending',
+      codingResult: {
+        ...codingResult({
+          taskKind: 'write-file',
+          changedFiles: ['reports/report.md'],
+          evidenceFiles: ['src/report.ts'],
+          verifiedFiles: [],
+          requiredEvidence: ['report claim backed by source'],
+          observedEvidence: [],
+          verification: {
+            status: 'not-requested',
+            reason: 'pending continuation verification',
+          },
+        }),
+        continuation: {
+          status: 'failed-after-bounded-continuation',
+          attempts: 1,
+          evidence: ['pending artifact verification'],
+        },
+      },
+    } as const
+    const runtimeSeed = buildResumeReplayInput({
+      sessionId: 'sess_replay_continuation_proof',
+      snapshot: {
+        pendingPrompt: 'continue report proof',
+        runPhase: 'turn-active',
+        interruptedKind: 'turn',
+        pendingLifecycle: createEmptyLifecycleIndex(),
+        repairSummary: {
+          insertedPromptMessage: false,
+          insertedQueryStarted: false,
+          strippedInterruptedTerminalEvents: 0,
+          insertedRunInterrupted: false,
+          ignoredDuplicateTurnStarts: 0,
+          ignoredUnpairedTurnCompletions: 0,
+          ignoredRoleMismatchedTurnCompletions: 0,
+        },
+        lastUserMessage: {
+          role: 'user',
+          content: 'continue report proof',
+          timestamp: '2026-05-13T00:00:00.000Z',
+        },
+        transcriptEvents: [
+          {
+            type: 'query-event',
+            event: { type: 'turn.started', role: 'coder', turn: 1 },
+            timestamp: '2026-05-13T00:00:01.000Z',
+          },
+          {
+            type: 'query-event',
+            event: { type: 'turn.completed', output: persistedOutput },
+            timestamp: '2026-05-13T00:00:02.000Z',
+          },
+        ],
+      },
+      options: { maxTurns: 4 },
+    })
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'targeted verification passed',
+      codingResult: codingResult({
+        taskKind: 'write-file',
+        changedFiles: ['reports/report.md'],
+        evidenceFiles: ['src/report.ts'],
+        verifiedFiles: ['reports/report.md', 'src/report.test.ts'],
+        requiredEvidence: ['report claim backed by source'],
+        observedEvidence: ['artifact-source:src/report.ts'],
+        verification: { status: 'passed', reason: 'targeted report check passed' },
+      }),
+    })
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_replay_continuation_proof', 'ignored fresh prompt', {
+      runtimeSeed,
+    })
+    for await (const event of engine.streamMessage('sess_replay_continuation_proof_stream', 'ignored fresh prompt', {
+      runtimeSeed,
+    })) {
+      if (event.type === 'runtime.next-action') {
+        seenActions.push(`${event.decision.nextAction}:${event.decision.changedFiles.join(',')}:${event.decision.verificationTargets.join(',')}:${event.decision.proofGap.join('|')}`)
+      }
+    }
+
+    expect(runtimeSeed.observations?.pendingAction).toBe('continue')
+    expect(seenActions[0]).toContain('continue:reports/report.md:reports/report.md')
+    expect(seenActions[0]).toContain('pending continuation proof')
+    expect(result.status).toBe('completed')
   })
 
   it('drops compacted transcript and derived context for fresh-only recovery seeds', async () => {

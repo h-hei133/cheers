@@ -148,4 +148,19 @@ describe("verification execution model", () => {
       missingFiles: ["src/source.ts", "src/dependent.ts"],
     });
   });
+
+  it("does not let a global pass hide an unverified dependent impacted target", () => {
+    const coverage = verifyChangedFileCoverage({
+      changedFiles: ["src/status/contract.ts", "src/orders/statusRenderer.ts"],
+      verificationTargets: ["src/orders/statusRenderer.test.ts"],
+      verifiedFiles: ["src/status/contract.ts"],
+      verificationState: "passed",
+    });
+
+    expect(coverage).toEqual({
+      complete: false,
+      coveredFiles: ["src/status/contract.ts"],
+      missingFiles: ["src/orders/statusRenderer.ts", "src/orders/statusRenderer.test.ts"],
+    });
+  });
 });

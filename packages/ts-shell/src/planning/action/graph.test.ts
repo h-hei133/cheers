@@ -216,4 +216,65 @@ describe("workflowActionGraph", () => {
       }),
     ]));
   });
+
+  it("projects owner-ranked dependent targets with impacted verification targets", () => {
+    const graph = buildWorkflowActionGraph({
+      taskKind: "edit-file",
+      reason: "change status contract with implementation and dependent renderer",
+      targetPath: "src/status/contract.ts",
+      additionalTargetPaths: [
+        "src/status/adapter.ts",
+        "src/orders/statusRenderer.ts",
+      ],
+      inspectFirst: true,
+      verifyAfterEdit: true,
+      verifyCommand: "vitest run src/status/contract.test.ts",
+      dependentTargets: [
+        {
+          path: "src/status/adapter.ts",
+          ownerRole: "implementation",
+          rank: 1,
+          reason: "implements exported status contract",
+          impactedVerificationTargets: ["src/status/contract.test.ts"],
+        },
+        {
+          path: "src/orders/statusRenderer.ts",
+          ownerRole: "consumer",
+          rank: 2,
+          reason: "renders the public status label from the contract",
+          impactedVerificationTargets: ["src/orders/statusRenderer.test.ts"],
+        },
+      ],
+    } as WorkflowTaskPlan);
+
+    expect(graph?.dependentTargets).toEqual([
+      {
+        path: "src/status/adapter.ts",
+        ownerRole: "implementation",
+        rank: 1,
+        reason: "implements exported status contract",
+        impactedVerificationTargets: ["src/status/contract.test.ts"],
+      },
+      {
+        path: "src/orders/statusRenderer.ts",
+        ownerRole: "consumer",
+        rank: 2,
+        reason: "renders the public status label from the contract",
+        impactedVerificationTargets: ["src/orders/statusRenderer.test.ts"],
+      },
+    ]);
+    expect(graph?.changedFileIntents).toEqual([
+      "src/status/contract.ts",
+      "src/status/adapter.ts",
+      "src/orders/statusRenderer.ts",
+      "src/status/contract.test.ts",
+      "src/orders/statusRenderer.test.ts",
+    ]);
+
+    const cursor = projectWorkflowActionCursor({ graph: graph! });
+    expect(cursor.evidence).toEqual(expect.arrayContaining([
+      "workflow-dependent-target:1:implementation:src/status/adapter.ts:src/status/contract.test.ts",
+      "workflow-dependent-target:2:consumer:src/orders/statusRenderer.ts:src/orders/statusRenderer.test.ts",
+    ]));
+  });
 });

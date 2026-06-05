@@ -45,6 +45,10 @@ export async function runWorkflowVerificationStage(input: {
   const changedFiles = uniquePaths([
     ...input.changedFiles,
     ...(input.actionGraph?.changedFileIntents ?? []),
+    ...(input.actionGraph?.dependentTargets.flatMap((target) => [
+      target.path,
+      ...target.impactedVerificationTargets,
+    ]) ?? []),
   ]);
   const verificationPlan = planWorkflowVerification({
     taskKind: input.taskKind,
@@ -161,6 +165,9 @@ function actionGraphVerificationEvidence(
   return [
     `workflow-verification-action-graph:${actionGraph.graphId}`,
     `workflow-verification-changed-file-intents:${actionGraph.changedFileIntents.join(",") || "none"}`,
+    ...actionGraph.dependentTargets.map((target) =>
+      `workflow-verification-dependent-target:${target.rank}:${target.ownerRole}:${target.path}:${target.impactedVerificationTargets.join(",") || "none"}`
+    ),
     ...actionGraph.dependencyReasons.map((reason) =>
       `workflow-verification-dependency:${reason}`
     ),

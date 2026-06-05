@@ -52,6 +52,7 @@ describe("taskRelevantVerificationRoute", () => {
         changedFileIntents: [
           "packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts",
         ],
+        dependentTargets: [],
         dependencyReasons: [
           "verify-changes<-edit-primary+write-related-status: Verify the changed files after all planned mutations.",
         ],
@@ -72,6 +73,42 @@ describe("taskRelevantVerificationRoute", () => {
     expect(plan.evidence).toContain(
       "task-relevant-verification:action-graph:workflow_action_graph_status_pair",
     );
+  });
+
+  it("includes owner-ranked dependent verification targets in command planning", () => {
+    const plan = buildTaskRelevantCommandPlan({
+      changedFiles: ["packages/ts-shell/src/planning/action/graph.ts"],
+      actionGraph: {
+        graphId: "workflow_action_graph_dependent_owner",
+        orderedNodeIds: ["edit-primary", "write-related-consumer", "verify-changes"],
+        changedFileIntents: ["packages/ts-shell/src/planning/action/graph.ts"],
+        dependentTargets: [
+          {
+            path: "packages/ts-shell/src/planning/action/graph.test.ts",
+            ownerRole: "verification",
+            rank: 1,
+            reason: "focused diagnostics cover dependent action graph behavior",
+            impactedVerificationTargets: [
+              "packages/ts-shell/src/planning/action/graph.test.ts",
+            ],
+          },
+        ],
+        dependencyReasons: [],
+        nodes: [],
+      },
+      candidateCommands: [
+        "npm test -w packages/ts-shell -- src/planning/action/graph.test.ts",
+      ],
+    });
+
+    expect(plan.changedFiles).toEqual([
+      "packages/ts-shell/src/planning/action/graph.ts",
+      "packages/ts-shell/src/planning/action/graph.test.ts",
+    ]);
+    expect(plan.coverageStatus).toBe("covered");
+    expect(plan.evidence).toEqual(expect.arrayContaining([
+      "task-relevant-verification:dependent-target:1:verification:packages/ts-shell/src/planning/action/graph.test.ts:packages/ts-shell/src/planning/action/graph.test.ts",
+    ]));
   });
 
   it("rejects command-only bypass success as task verification", async () => {

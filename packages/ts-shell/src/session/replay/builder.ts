@@ -1,4 +1,5 @@
 import type { QueryEvent } from "../../core/query/runtime/events.js";
+import { deriveQueryRuntimeObservationState } from "../../core/query/runtime/observation.js";
 import type {
   ContinuationEvidenceToken,
   ContinuationPolicyEvidence,
@@ -371,6 +372,9 @@ export function buildResumeReplayInput(input: {
         ? turnCompletedOutputs
         : [],
     },
+    ...(continuationPolicy.allowDerivedContext
+      ? { observations: deriveQueryRuntimeObservationState(turnCompletedOutputs) }
+      : {}),
   };
 }
 

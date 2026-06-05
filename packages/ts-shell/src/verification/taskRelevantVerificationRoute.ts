@@ -213,6 +213,10 @@ export function buildTaskRelevantCommandPlan(input: {
   const changedFiles = normalizeChangedFiles([
     ...input.changedFiles,
     ...(input.actionGraph?.changedFileIntents ?? []),
+    ...(input.actionGraph?.dependentTargets.flatMap((target) => [
+      target.path,
+      ...target.impactedVerificationTargets,
+    ]) ?? []),
   ]);
   const candidateCommands =
     input.candidateCommands && input.candidateCommands.length > 0
@@ -277,6 +281,9 @@ export function buildTaskRelevantCommandPlan(input: {
         : []),
       ...(input.actionGraph?.dependencyReasons.map((reason) =>
         `task-relevant-verification:dependency:${reason}`,
+      ) ?? []),
+      ...(input.actionGraph?.dependentTargets.map((target) =>
+        `task-relevant-verification:dependent-target:${target.rank}:${target.ownerRole}:${target.path}:${target.impactedVerificationTargets.join(",") || "none"}`
       ) ?? []),
       `task-relevant-verification:relevance:${relevanceStatus}`,
       `task-relevant-verification:coverage:${coverage.coverageStatus}`,
@@ -613,9 +620,7 @@ function commandRelevance(
     const coveredFiles = changedFiles.filter((file) =>
       focusedTestCoversFile({ testPath, changedFile: file }),
     );
-    const coveredPackageArea = testPath.startsWith("src/verification/")
-      ? "packages/ts-shell/src/verification"
-      : "packages/ts-shell/src/orchestration";
+    const coveredPackageArea = `packages/ts-shell/${testPath.replace(/\/[^/]+$/, "")}`;
     return {
       reason: "focused ts-shell test covers the matching changed file/test pair.",
       coveredFiles,
@@ -635,8 +640,7 @@ function focusedTestTargetFromCommand(command: string): string {
 }
 
 function isFocusedTsShellTestCommand(command: string): boolean {
-  return command.startsWith("npm test -w packages/ts-shell -- src/verification/") ||
-    command.startsWith("npm test -w packages/ts-shell -- src/orchestration/");
+  return /^npm test -w packages\/ts-shell -- src\/[\w./-]+\.test\.ts(?:\s|$)/.test(command);
 }
 
 function defaultCandidatesFor(changedFiles: readonly string[]): readonly string[] {

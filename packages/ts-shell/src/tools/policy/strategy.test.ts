@@ -403,4 +403,78 @@ describe("tool strategy", () => {
       }],
     }).nextAction).toBe("search");
   });
+
+  it("rediscovers after failed search observation before mutation", () => {
+    const context = selectContext({
+      taskKind: "coding-edit",
+      taskPath: "edit",
+      shortPrompt: "Update status mapper after failed search.",
+      workspaceFiles: [{ path: "src/status.ts", purpose: "target" }],
+      requiredPaths: ["src/status.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "coding-edit",
+      outputKind: "diff",
+      allowedTools: ["read", "search", "edit", "verify"],
+      allowedWrites: ["src/status.ts"],
+      successRubric: ["targeted verification"],
+      context,
+    });
+    const request = buildTaskRequestPacket({ shortPrompt: "Update status mapper after failed search.", taskKind: "coding-edit", context, plan });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "search", "edit", "verify"],
+      plan,
+      request,
+      observationFailures: [{
+        action: "search",
+        signature: "status owner search",
+        reason: "tool result failed",
+      }],
+      proofGap: ["context evidence incomplete"],
+    }).nextAction).toBe("search");
+  });
+
+  it("collects source evidence after failed artifact observation instead of repeating stale artifact output", () => {
+    const context = selectContext({
+      taskKind: "data-artifact",
+      taskPath: "artifact",
+      shortPrompt: "Validate report claims.",
+      workspaceFiles: [
+        { path: "notes/source.md", purpose: "source" },
+        { path: "reports/summary.md", purpose: "target" },
+      ],
+      requiredPaths: ["reports/summary.md"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "data-artifact",
+      outputKind: "artifact",
+      allowedTools: ["read", "artifact", "verify"],
+      allowedWrites: ["reports/summary.md"],
+      successRubric: ["artifact evidence"],
+      context,
+    });
+    const request = buildTaskRequestPacket({ shortPrompt: "Validate report claims.", taskKind: "data-artifact", context, plan });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "artifact", "verify"],
+      plan,
+      request,
+      completedActions: ["artifact"],
+      observationFailures: [{
+        action: "artifact",
+        signature: "reports/summary.md",
+        reason: "artifact output stale after source change",
+      }],
+      artifactContract: {
+        claims: ["source covered"],
+        evidenceIds: [],
+        missingClaims: ["source covered"],
+      },
+    }).nextAction).toBe("read");
+  });
 });

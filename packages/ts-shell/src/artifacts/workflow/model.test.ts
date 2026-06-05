@@ -250,4 +250,28 @@ describe("artifact workflow model", () => {
       missingClaims: ["verification passed"],
     });
   });
+
+  it("keeps changed artifact output not proven without verification-backed claim evidence", () => {
+    const receipt = createArtifactReceipt({
+      taskKind: "docs-report",
+      outputKind: "artifact",
+      requiredPaths: ["reports/summary.md"],
+      workspacePaths: ["notes/source.md", "reports/summary.md"],
+      verificationState: "selected-not-run",
+      failureCategories: [],
+      requiredContentMarkers: ["source-receipt", "verification-evidence"],
+      observedContentMarkers: ["source-receipt", "verification-evidence"],
+      verificationEvidence: [],
+      claimEvidence: [
+        { claim: "source covered", evidenceId: "source-receipt" },
+        { claim: "verification passed", evidenceId: "verification-evidence" },
+      ],
+    });
+
+    expect(receipt).toMatchObject({
+      validationState: "not-proven",
+      blockers: ["artifact validation not proven"],
+      terminalSuccessClaim: false,
+    });
+  });
 });

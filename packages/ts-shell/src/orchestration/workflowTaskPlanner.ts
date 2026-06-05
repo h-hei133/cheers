@@ -1,7 +1,10 @@
 import type { CodingTaskKind } from "./types.js";
 import type { BrowserAgentPlan } from "../core/context/browserAgent.js";
 import type { GroundedDeliverableMode } from "./runtimeHandoffProjection.js";
-import type { WorkflowActionGraph } from "../planning/action/graph.js";
+import type {
+  WorkflowActionGraph,
+  WorkflowDependentTarget,
+} from "../planning/action/graph.js";
 
 export type ReflectiveStateQueryKind =
   | "stop-reason"
@@ -100,6 +103,7 @@ export interface WorkflowTaskPlan {
   readonly failedTransforms?: readonly ContinuationTransform[];
   readonly crossFileRepair?: boolean;
   readonly additionalTargetPaths?: readonly string[];
+  readonly dependentTargets?: readonly WorkflowDependentTarget[];
   readonly actionGraph?: WorkflowActionGraph;
   readonly crossFileConvergedNoop?: boolean;
   readonly previousRemainingTargets?: readonly string[];

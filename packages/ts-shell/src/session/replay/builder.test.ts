@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
+import {
+  createQueryRuntimeStateFromSeed,
+  ensureQueryRuntimeObservationState,
+} from "../../core/query/runtime/state.js";
 import type { AgentExecutionOutput } from "../../orchestration/types.js";
 import type { RecoverySnapshot, TranscriptEvent } from "../SessionManager.js";
 import {
@@ -159,6 +163,59 @@ describe("session replay builder", () => {
     expect(plan.requiresAssistantSentinel).toBe(true);
     expect(plan.repairSummary.ignoredUnpairedTurnCompletions).toBe(1);
     expect(pairing.ignoredUnpairedTurnCompletions).toBe(1);
+  });
+
+  it("restores pending proof facts from persisted replay outputs into runtime observations", () => {
+    const pendingArtifactOutput: AgentExecutionOutput = {
+      role: "coder",
+      content: "artifact proof still pending",
+      codingResult: {
+        taskKind: "write-file",
+        changedFiles: ["src/report.ts"],
+        changeSet: { changedFiles: ["src/report.ts"], summary: "updated report" },
+        verifiedFiles: [],
+        unverifiedFiles: [{ path: "src/report.test.ts", reason: "not rerun after continuation" }],
+        failedFiles: [],
+        verification: {
+          status: "not-requested",
+          reason: "pending continuation verification",
+        },
+        repair: { status: "not-needed", attempts: 0, notes: [] },
+        diagnosis: undefined,
+        evidence: ["artifact-source:src/report.ts"],
+        taskSatisfaction: {
+          verdict: "partial",
+          requiredEvidence: ["report claim matches source"],
+          observedEvidence: [],
+          reasons: ["missing proof: artifact claim evidence"],
+        },
+        continuation: {
+          status: "failed-after-bounded-continuation",
+          evidence: ["pending artifact verification"],
+        },
+      },
+    };
+    const snapshot = makeSnapshot([
+      turnStarted("coder", 1),
+      turnCompleted(pendingArtifactOutput),
+    ]);
+
+    const seed = buildResumeReplayInput({
+      sessionId: "sess_replay_proof_facts",
+      snapshot,
+      options: { maxTurns: 4 },
+    });
+    const state = createQueryRuntimeStateFromSeed(seed);
+    const observations = ensureQueryRuntimeObservationState(state);
+
+    expect(seed.observations).toBeDefined();
+    expect(observations).toMatchObject({
+      changedFiles: ["src/report.ts"],
+      verificationTargets: ["src/report.ts", "src/report.test.ts"],
+      artifactClaims: ["report claim matches source"],
+      continuationFacts: ["pending artifact verification"],
+      pendingAction: "continue",
+    });
   });
 });
 
