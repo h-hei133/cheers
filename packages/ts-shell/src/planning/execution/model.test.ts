@@ -45,7 +45,7 @@ describe("execution planning model", () => {
     ]));
   });
 
-  it("blocks artifact plans when write tools or authority are unavailable", () => {
+  it("blocks artifact plans when artifact tools or authority are unavailable", () => {
     const context = selectContext({
       taskKind: "data-artifact",
       taskPath: "artifact",
@@ -66,7 +66,8 @@ describe("execution planning model", () => {
     });
 
     expect(plan.state).toBe("blocked");
-    expect(plan.blockers).toEqual(expect.arrayContaining(["missing tool: write", "write authority missing"]));
+    expect(plan.requiredTools).toEqual(["read", "artifact", "verify"]);
+    expect(plan.blockers).toEqual(expect.arrayContaining(["missing tool: artifact", "write authority missing"]));
   });
 
   it("requires edit capability for diff tasks before verification", () => {

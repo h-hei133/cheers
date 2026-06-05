@@ -148,7 +148,7 @@ function requiredToolsFor(input: ExecutionPlanInput): readonly string[] {
     return ["read", "repair", "verify"];
   }
   if (input.outputKind === "artifact") {
-    return ["read", "write", "verify"];
+    return ["read", "artifact", "verify"];
   }
   if (input.taskKind === "continuation") {
     return ["read", "continue", "verify"];

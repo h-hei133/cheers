@@ -206,11 +206,24 @@ function claimEvidenceReceiptsFor(input: ArtifactReceiptInput): readonly {
   readonly evidenceId?: string;
   readonly proven: boolean;
 }[] {
+  const usedEvidenceIds = new Set<string>();
   return (input.claimEvidence ?? []).map((item) => freeze({
     claim: item.claim.replace(/\s+/g, " ").trim().slice(0, 180),
     ...(item.evidenceId?.trim() ? { evidenceId: item.evidenceId.trim().slice(0, 180) } : {}),
-    proven: Boolean(item.claim.trim()) && Boolean(item.evidenceId?.trim()),
+    proven: claimEvidenceProven(item, usedEvidenceIds),
   }));
+}
+
+function claimEvidenceProven(
+  item: { readonly claim: string; readonly evidenceId?: string },
+  usedEvidenceIds: Set<string>,
+): boolean {
+  const evidenceId = item.evidenceId?.trim();
+  if (!item.claim.trim() || !evidenceId || usedEvidenceIds.has(evidenceId)) {
+    return false;
+  }
+  usedEvidenceIds.add(evidenceId);
+  return true;
 }
 
 function requiredContentSatisfied(input: ArtifactReceiptInput): boolean {

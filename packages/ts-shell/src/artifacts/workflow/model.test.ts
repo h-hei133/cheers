@@ -129,6 +129,30 @@ describe("artifact workflow model", () => {
       validationState: "claim-evidence-missing",
       blockers: ["artifact claim evidence missing"],
     });
+
+    const duplicateClaimEvidence = createArtifactReceipt({
+      taskKind: "docs-report",
+      outputKind: "artifact",
+      requiredPaths: ["reports/summary.md"],
+      workspacePaths: ["notes/source.md", "reports/summary.md"],
+      verificationState: "selected-passed",
+      failureCategories: [],
+      requiredContentMarkers: ["source-receipt"],
+      observedContentMarkers: ["source-receipt"],
+      verificationEvidence: ["artifact-check:source-coverage:passed"],
+      claimEvidence: [
+        { claim: "source covered", evidenceId: "same-receipt" },
+        { claim: "verification passed", evidenceId: "same-receipt" },
+      ],
+    });
+    expect(duplicateClaimEvidence).toMatchObject({
+      validationState: "claim-evidence-missing",
+      blockers: ["artifact claim evidence missing"],
+    });
+    expect(duplicateClaimEvidence?.claimEvidenceReceipts).toEqual([
+      { claim: "source covered", evidenceId: "same-receipt", proven: true },
+      { claim: "verification passed", evidenceId: "same-receipt", proven: false },
+    ]);
   });
 
   it("corrects invalid artifacts only when source receipts and artifact action are available", () => {

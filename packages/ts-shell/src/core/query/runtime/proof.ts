@@ -53,8 +53,11 @@ export function projectQueryRuntimeProof(input: {
     ]),
     verificationState: artifactVerificationState(result),
     failureCategories: failureCategories(result),
-    verificationEvidence: result?.evidence ?? [],
-    claimEvidence: claimEvidence(result),
+    verificationEvidence: uniqueStrings([
+      ...observations.artifactEvidence,
+      ...(result?.evidence ?? []),
+    ]),
+    claimEvidence: claimEvidence(result, observations.artifactClaimEvidence),
   });
   const artifactCorrection = correctArtifact({
     receipt: artifactReceipt,
@@ -142,17 +145,45 @@ function failureCategories(result: CodingResultSummary | undefined): readonly st
   ];
 }
 
-function claimEvidence(result: CodingResultSummary | undefined): readonly {
+function claimEvidence(
+  result: CodingResultSummary | undefined,
+  observedClaimEvidence: readonly {
+    readonly claim: string;
+    readonly evidenceId?: string;
+  }[],
+): readonly {
   readonly claim: string;
   readonly evidenceId?: string;
 }[] {
-  return (result?.taskSatisfaction.requiredEvidence ?? []).map((claim, index) => {
-    const evidenceId = result?.taskSatisfaction.observedEvidence[index];
-    return {
-      claim,
-      ...(evidenceId ? { evidenceId } : {}),
-    };
-  });
+  const claimEvidence = [
+    ...observedClaimEvidence,
+    ...(result?.taskSatisfaction.requiredEvidence ?? []).map((claim, index) => {
+      const evidenceId = result?.taskSatisfaction.observedEvidence[index];
+      return {
+        claim,
+        ...(evidenceId ? { evidenceId } : {}),
+      };
+    }),
+  ];
+  const receipts = new Map<string, { claim: string; evidenceId?: string }>();
+  for (const item of claimEvidence) {
+    const claim = item.claim.replace(/\s+/g, " ").trim();
+    const evidenceId = item.evidenceId?.replace(/\s+/g, " ").trim();
+    if (!claim) {
+      continue;
+    }
+    const existing = receipts.get(claim);
+    if (!existing || (!existing.evidenceId && evidenceId)) {
+      receipts.set(claim, {
+        claim,
+        ...(evidenceId ? { evidenceId } : {}),
+      });
+    }
+  }
+  return [...receipts.values()].map((item) => ({
+    claim: item.claim,
+    ...(item.evidenceId ? { evidenceId: item.evidenceId } : {}),
+  }));
 }
 
 function hostStatusFor(result: CodingResultSummary | undefined): string {

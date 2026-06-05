@@ -43,6 +43,7 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     ...observations.continuationFacts,
     ...continuationFactsFor(state, latestCodingResult),
   ]);
+  const requiredPaths = requiredPathsFor(taskKind, changedFiles, failedFiles, taskIntent, observations.contextPaths);
   const proofGap = proofGapFor(state, latestCodingResult, {
     changedFiles,
     failedFiles,
@@ -51,7 +52,7 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     pendingAction,
     taskKind,
   });
-  const artifactContract = artifactContractFor(taskKind, latestCodingResult);
+  const artifactContract = artifactContractFor(taskKind, latestCodingResult, observations);
   const context = selectContext({
     taskKind,
     taskPath: taskKind === "data-artifact" ? "artifact" : "runtime",
@@ -63,8 +64,9 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
       verificationTargets,
       latestCodingResult,
       observationPaths: observations.contextPaths,
+      requiredPaths,
     }),
-    requiredPaths: requiredPathsFor(taskKind, changedFiles, failedFiles, taskIntent),
+    requiredPaths,
     continuationAvailable: continuationFacts.length > 0,
     failureCategories,
     observedPaths: observations.contextPaths,
@@ -277,16 +279,37 @@ function proofGapFor(
 function artifactContractFor(
   taskKind: string,
   result: CodingResultSummary | undefined,
-): { readonly claims: readonly string[]; readonly evidenceIds: readonly string[] } | undefined {
+  observations: ReturnType<typeof ensureQueryRuntimeObservationState>,
+): {
+  readonly claims: readonly string[];
+  readonly evidenceIds: readonly string[];
+  readonly missingClaims: readonly string[];
+} | undefined {
   if (taskKind !== "data-artifact") return undefined;
+  const claims = uniqueStrings([
+    ...observations.artifactClaims,
+    ...(result?.taskSatisfaction.requiredEvidence ?? []),
+    ...(observations.artifactClaims.length === 0 && !result?.taskSatisfaction.requiredEvidence.length
+      ? ["artifact claim"]
+      : []),
+  ]);
+  const claimEvidence = new Map<string, string>();
+  for (const item of observations.artifactClaimEvidence) {
+    if (item.evidenceId) {
+      claimEvidence.set(item.claim, item.evidenceId);
+    }
+  }
+  for (const [index, claim] of (result?.taskSatisfaction.requiredEvidence ?? []).entries()) {
+    const evidenceId = result?.taskSatisfaction.observedEvidence[index];
+    if (evidenceId) {
+      claimEvidence.set(claim, evidenceId);
+    }
+  }
+  const claimEvidenceIds = uniqueStrings([...claimEvidence.values()]);
   return {
-    claims: result?.taskSatisfaction.requiredEvidence.length
-      ? result.taskSatisfaction.requiredEvidence
-      : ["artifact claim"],
-    evidenceIds: uniqueStrings([
-      ...(result?.taskSatisfaction.observedEvidence ?? []),
-      ...(result?.evidence ?? []),
-    ]),
+    claims,
+    evidenceIds: claimEvidenceIds,
+    missingClaims: claims.filter((claim) => !claimEvidence.has(claim)),
   };
 }
 
@@ -297,8 +320,11 @@ function workspaceFilesFor(input: {
   readonly verificationTargets: readonly string[];
   readonly latestCodingResult: CodingResultSummary | undefined;
   readonly observationPaths?: readonly string[];
+  readonly requiredPaths?: readonly string[];
 }): readonly { readonly path: string; readonly purpose: string }[] {
+  const hasObservedContext = (input.observationPaths ?? []).length > 0;
   const paths = uniqueStrings([
+    ...(hasObservedContext ? (input.requiredPaths ?? []) : []),
     ...input.changedFiles,
     ...input.failedFiles,
     ...input.unverifiedFiles,
@@ -334,11 +360,23 @@ function requiredPathsFor(
   changedFiles: readonly string[],
   failedFiles: readonly string[],
   taskIntent: string,
+  observedContextPaths: readonly string[],
 ): readonly string[] {
   if (failedFiles.length > 0) return failedFiles;
   if (changedFiles.length > 0) return changedFiles;
+  const observedOwnerPaths = observedContextPaths.filter((path) => path.toLowerCase().includes("owner"));
+  if (
+    taskKind === "workspace-understanding" &&
+    observedOwnerPaths.length > 0 &&
+    includesAny(taskIntent, ["missing context"])
+  ) {
+    return observedOwnerPaths;
+  }
   const pathMatch = taskIntent.match(/(?:^|\s)([\w./-]+\.(?:ts|tsx|js|json|md|txt))(?:\s|$)/);
   if (pathMatch?.[1]) return [pathMatch[1]];
+  if (taskKind === "workspace-understanding" && observedContextPaths.length > 0) {
+    return observedContextPaths;
+  }
   return taskKind === "workspace-understanding" && includesAny(taskIntent, ["missing context"])
     ? ["missing-context"]
     : [];

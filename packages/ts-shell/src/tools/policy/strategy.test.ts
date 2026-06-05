@@ -154,4 +154,74 @@ describe("tool strategy", () => {
       },
     }).nextAction).toBe("artifact");
   });
+
+  it("resumes pending action before starting artifact correction", () => {
+    const context = selectContext({
+      taskKind: "data-artifact",
+      taskPath: "artifact",
+      shortPrompt: "Resume artifact verification.",
+      workspaceFiles: [
+        { path: "notes/source.md", purpose: "source" },
+        { path: "reports/summary.md", purpose: "target" },
+      ],
+      requiredPaths: ["reports/summary.md"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "data-artifact",
+      outputKind: "artifact",
+      allowedTools: ["read", "artifact", "verify", "continue"],
+      allowedWrites: ["reports/summary.md"],
+      successRubric: ["artifact evidence"],
+      context,
+    });
+    const request = buildTaskRequestPacket({ shortPrompt: "Resume artifact verification.", taskKind: "data-artifact", context, plan });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "artifact", "verify", "continue"],
+      plan,
+      request,
+      pendingAction: "continue",
+      artifactContract: {
+        claims: ["source covered", "verification passed"],
+        evidenceIds: ["source-receipt"],
+      },
+    }).nextAction).toBe("continue");
+  });
+
+  it("keeps artifact action when generic evidence does not cover every claim", () => {
+    const context = selectContext({
+      taskKind: "data-artifact",
+      taskPath: "artifact",
+      shortPrompt: "Validate artifact claims.",
+      workspaceFiles: [
+        { path: "notes/source.md", purpose: "source" },
+        { path: "reports/summary.md", purpose: "target" },
+      ],
+      requiredPaths: ["reports/summary.md"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "data-artifact",
+      outputKind: "artifact",
+      allowedTools: ["read", "artifact", "verify"],
+      allowedWrites: ["reports/summary.md"],
+      successRubric: ["artifact evidence"],
+      context,
+    });
+    const request = buildTaskRequestPacket({ shortPrompt: "Validate artifact claims.", taskKind: "data-artifact", context, plan });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "artifact", "verify"],
+      plan,
+      request,
+      artifactContract: {
+        claims: ["source covered", "verification passed"],
+        evidenceIds: ["source-receipt", "generic-verification-output"],
+        missingClaims: ["verification passed"],
+      },
+    }).nextAction).toBe("artifact");
+  });
 });

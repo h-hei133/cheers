@@ -52,9 +52,10 @@ export function selectContext(input: ContextSelectionInput): ContextSelection {
     .map((file) => file.path);
   const observedPaths = (input.observedPaths ?? []).filter((path) => workspacePaths.includes(path));
   const selectedPaths = unique([...targetPaths, ...packagePaths, ...sourcePaths, ...ownerPaths, ...verificationPaths, ...relatedPaths, ...observedPaths]);
-  const missingRequiredPaths = observedPaths.length > 0
-    ? []
-    : input.requiredPaths.filter((path) => !workspacePaths.includes(path));
+  const observedRequiredPaths = new Set(observedPaths.filter((path) => input.requiredPaths.includes(path)));
+  const missingRequiredPaths = input.requiredPaths.filter((path) =>
+    !workspacePaths.includes(path) && !observedRequiredPaths.has(path)
+  );
   const continuationBlocked = input.taskKind === "continuation" && !input.continuationAvailable;
   const state: ContextSelectionState = missingRequiredPaths.length > 0 || continuationBlocked
     ? "blocked"

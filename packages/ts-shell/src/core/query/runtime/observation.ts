@@ -11,6 +11,11 @@ export interface QueryRuntimeFailureObservation {
   readonly reason: string
 }
 
+export interface QueryRuntimeArtifactClaimObservation {
+  readonly claim: string
+  readonly evidenceId?: string
+}
+
 export interface QueryRuntimeObservationState {
   readonly contextPaths: string[]
   readonly changedFiles: string[]
@@ -20,6 +25,7 @@ export interface QueryRuntimeObservationState {
   readonly toolFailures: QueryRuntimeFailureObservation[]
   readonly artifactEvidence: string[]
   readonly artifactClaims: string[]
+  readonly artifactClaimEvidence: QueryRuntimeArtifactClaimObservation[]
   readonly continuationFacts: string[]
   readonly completedActions: ToolActionKind[]
   pendingAction?: ToolActionKind
@@ -35,6 +41,7 @@ export function createEmptyQueryRuntimeObservationState(): QueryRuntimeObservati
     toolFailures: [],
     artifactEvidence: [],
     artifactClaims: [],
+    artifactClaimEvidence: [],
     continuationFacts: [],
     completedActions: [],
     pendingAction: undefined,
@@ -77,11 +84,21 @@ export function observeQueryRuntimeOutput(
   ])
   pushUnique(state.artifactEvidence, result.evidence)
   pushUnique(state.artifactClaims, result.taskSatisfaction.requiredEvidence)
+  pushUniqueClaimEvidence(state.artifactClaimEvidence, claimEvidenceFor(result))
 
   observeVerification(state, result)
   observeRepair(state, result)
   observeContinuation(state, result)
   observeLastAction(state, result)
+}
+
+function claimEvidenceFor(result: CodingResultSummary): QueryRuntimeArtifactClaimObservation[] {
+  return result.taskSatisfaction.requiredEvidence.map((claim, index) => ({
+    claim,
+    ...(result.taskSatisfaction.observedEvidence[index]
+      ? { evidenceId: result.taskSatisfaction.observedEvidence[index] }
+      : {}),
+  }))
 }
 
 function observeRuntimeEvents(
@@ -239,6 +256,28 @@ function pushUniqueAction(target: ToolActionKind[], values: readonly ToolActionK
   for (const value of values) {
     if (!target.includes(value)) {
       target.push(value)
+    }
+  }
+}
+
+function pushUniqueClaimEvidence(
+  target: QueryRuntimeArtifactClaimObservation[],
+  values: readonly QueryRuntimeArtifactClaimObservation[],
+): void {
+  for (const value of values) {
+    const claim = value.claim.replace(/\s+/g, ' ').trim()
+    const evidenceId = value.evidenceId?.replace(/\s+/g, ' ').trim()
+    if (!claim) {
+      continue
+    }
+    const duplicate = target.some((item) =>
+      item.claim === claim && (item.evidenceId ?? '') === (evidenceId ?? '')
+    )
+    if (!duplicate) {
+      target.push({
+        claim,
+        ...(evidenceId ? { evidenceId } : {}),
+      })
     }
   }
 }

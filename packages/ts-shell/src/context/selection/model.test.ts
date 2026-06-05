@@ -54,6 +54,23 @@ describe("context selection model", () => {
     }).blockers).toContain("missing required context: reports/summary.md");
   });
 
+  it("does not let unrelated observed paths satisfy a missing required owner", () => {
+    const selection = selectContext({
+      taskKind: "workspace-understanding",
+      taskPath: "runtime",
+      shortPrompt: "Find the owner for src/missing.ts.",
+      workspaceFiles: [{ path: "src/nearby.ts", purpose: "observed context" }],
+      requiredPaths: ["src/missing.ts"],
+      observedPaths: ["src/nearby.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+
+    expect(selection.state).toBe("blocked");
+    expect(selection.blockers).toContain("missing required context: src/missing.ts");
+    expect(selection.proofGap).toContain("required context missing");
+  });
+
   it("turns missing context failure into discovery actions and proof gap", () => {
     const selection = selectContext({
       taskKind: "debug-repair",

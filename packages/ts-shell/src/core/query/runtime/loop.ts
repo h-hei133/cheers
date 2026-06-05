@@ -242,6 +242,12 @@ function getTransition(
 ) {
   const handoffTo = output.handoffTo
   if (!handoffTo) {
+    if (hasOpenRuntimeProofGap(output)) {
+      return terminalQuery(
+        'stopped_not_proven',
+        'terminal turn still has an open proof gap',
+      )
+    }
     return terminalQuery('completed')
   }
 

@@ -26,6 +26,7 @@ export interface ToolStrategyInput {
   readonly artifactContract?: {
     readonly claims: readonly string[];
     readonly evidenceIds: readonly string[];
+    readonly missingClaims?: readonly string[];
   };
   readonly failureHistory?: readonly {
     readonly action: ToolActionKind;
@@ -127,11 +128,11 @@ function chooseNextAction(input: ToolStrategyInput & {
     failedReasonIncludes(input, "missing context")) {
     return input.allowedTools.includes("search") ? "search" : "read";
   }
-  if (input.artifactContract && missingArtifactEvidence(input.artifactContract)) {
-    return "artifact";
-  }
   if (input.pendingAction) {
     return input.pendingAction;
+  }
+  if (input.artifactContract && missingArtifactEvidence(input.artifactContract)) {
+    return "artifact";
   }
   if (repeatedFailure(input, "repair") || observedRepairAttempt(input)) {
     return input.allowedTools.includes("search") ? "search" : "read";
@@ -194,8 +195,13 @@ function actionFor(value: string): ToolActionKind {
   return "read";
 }
 
-function missingArtifactEvidence(contract: { readonly claims: readonly string[]; readonly evidenceIds: readonly string[] }): boolean {
-  return contract.claims.length > 0 && contract.evidenceIds.length < contract.claims.length;
+function missingArtifactEvidence(contract: {
+  readonly claims: readonly string[];
+  readonly evidenceIds: readonly string[];
+  readonly missingClaims?: readonly string[];
+}): boolean {
+  return (contract.missingClaims?.length ?? 0) > 0 ||
+    (contract.claims.length > 0 && contract.evidenceIds.length < contract.claims.length);
 }
 
 function repeatedFailure(input: ToolStrategyInput, action: ToolActionKind): boolean {
