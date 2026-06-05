@@ -88,6 +88,7 @@ export function projectQueryRuntimeProof(input: {
     originalFailurePreserved: Boolean(result && (result.failedFiles.length > 0 || result.verification.status === "failed")),
     artifactValidationState: artifactReceipt?.validationState,
     artifactSourceReceiptsAvailable: artifactReceipt?.sourceReceipts.some((receipt) => receipt.available),
+    artifactSourceReceiptsComplete: artifactReceipt?.sourceReceipts.every((receipt) => receipt.available),
     artifactCorrectionAttempted: artifactCorrection?.attempted,
     artifactCorrectionValidationState: artifactCorrection?.validationState,
     hostStatus: hostStatusFor(result),

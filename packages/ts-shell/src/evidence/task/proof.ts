@@ -50,6 +50,7 @@ export interface TaskProofInputFacts {
   readonly originalFailurePreserved: boolean;
   readonly artifactValidationState?: string;
   readonly artifactSourceReceiptsAvailable?: boolean;
+  readonly artifactSourceReceiptsComplete?: boolean;
   readonly artifactCorrectionAttempted?: boolean;
   readonly artifactCorrectionValidationState?: string;
   readonly hostStatus: string;
@@ -174,7 +175,7 @@ function presentProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] {
   if (facts.originalFailurePreserved) {
     present.push("original-failure-preserved");
   }
-  if (facts.artifactSourceReceiptsAvailable) {
+  if (facts.artifactSourceReceiptsComplete ?? facts.artifactSourceReceiptsAvailable) {
     present.push("artifact-source-receipts");
   }
   if (
@@ -202,7 +203,6 @@ function presentProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] {
   }
   if (
     facts.verificationResultInputEligible ||
-    facts.verificationState === "passed" ||
     (
       facts.taskKind === "continuation" &&
       facts.contextRefreshed &&

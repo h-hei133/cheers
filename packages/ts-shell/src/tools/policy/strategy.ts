@@ -128,7 +128,7 @@ function chooseNextAction(input: ToolStrategyInput & {
     failedReasonIncludes(input, "missing context")) {
     return input.allowedTools.includes("search") ? "search" : "read";
   }
-  if (input.pendingAction) {
+  if (input.pendingAction && pendingActionAllowed(input, input.pendingAction)) {
     return input.pendingAction;
   }
   if (input.artifactContract && missingArtifactEvidence(input.artifactContract)) {
@@ -216,6 +216,20 @@ function failedAction(input: ToolStrategyInput, action: ToolActionKind): boolean
     ...(input.observationFailures ?? []),
     ...(input.repairAttempts ?? []),
   ].some((failure) => failure.action === action);
+}
+
+function pendingActionAllowed(input: ToolStrategyInput & {
+  readonly actionPlans: readonly ToolActionPlan[];
+  readonly proofGap: readonly string[];
+}, action: ToolActionKind): boolean {
+  if (!input.allowedTools.includes(action)) return false;
+  if (input.changedFiles && input.changedFiles.length > 0 &&
+    input.proofGap.some((gap) => gap.includes("verification") || gap.includes("proof")) &&
+    action !== "verify" &&
+    action !== "continue") {
+    return false;
+  }
+  return input.actionPlans.some((plan) => plan.action === action) || action === "continue";
 }
 
 function repeatedFailure(input: ToolStrategyInput, action: ToolActionKind): boolean {

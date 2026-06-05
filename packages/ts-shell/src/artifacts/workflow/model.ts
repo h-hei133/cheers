@@ -65,6 +65,11 @@ export interface ArtifactCorrection {
   readonly terminalSuccessClaim: false;
 }
 
+export interface ArtifactClaimEvidenceProjection {
+  readonly evidenceIds: readonly string[];
+  readonly missingClaims: readonly string[];
+}
+
 export function createArtifactReceipt(input: ArtifactReceiptInput): ArtifactReceipt | undefined {
   if (input.outputKind !== "artifact") {
     return undefined;
@@ -136,12 +141,44 @@ export function correctArtifact(input: ArtifactCorrectionInput): ArtifactCorrect
       terminalSuccessClaim: false,
     });
   }
+  if (input.receipt.claimEvidenceReceipts.some((receipt) => !receipt.proven)) {
+    return freeze({
+      attempted: false,
+      validationState: "claim-evidence-missing",
+      correctedPath: input.receipt.outputPath,
+      blockers: ["artifact claim evidence missing"],
+      terminalSuccessClaim: false,
+    });
+  }
   return freeze({
     attempted: true,
     validationState: "validation-passed",
     correctedPath: input.receipt.outputPath,
     blockers: [],
     terminalSuccessClaim: false,
+  });
+}
+
+export function projectArtifactClaimEvidence(input: {
+  readonly claims: readonly string[];
+  readonly evidence: readonly string[];
+}): ArtifactClaimEvidenceProjection {
+  const usedEvidenceIds = new Set<string>();
+  const evidenceIds: string[] = [];
+  const missingClaims: string[] = [];
+
+  for (const claim of input.claims) {
+    const evidenceId = input.evidence.find((item) => claimEvidenceProven({ claim, evidenceId: item }, usedEvidenceIds));
+    if (evidenceId) {
+      evidenceIds.push(evidenceId);
+    } else {
+      missingClaims.push(claim.replace(/\s+/g, " ").trim().slice(0, 180));
+    }
+  }
+
+  return freeze({
+    evidenceIds: freeze(evidenceIds),
+    missingClaims: freeze(missingClaims),
   });
 }
 

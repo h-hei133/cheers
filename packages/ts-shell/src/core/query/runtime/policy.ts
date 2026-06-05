@@ -1,3 +1,4 @@
+import { projectArtifactClaimEvidence } from "../../../artifacts/workflow/model.js";
 import { selectContext } from "../../../context/selection/model.js";
 import { buildExecutionPlan } from "../../../planning/execution/model.js";
 import { buildTaskRequestPacket } from "../../../provider/request/packet.js";
@@ -294,23 +295,17 @@ function artifactContractFor(
       ? ["artifact claim"]
       : []),
   ]);
-  const claimEvidence = new Map<string, string>();
-  for (const item of observations.artifactClaimEvidence) {
-    if (item.evidenceId) {
-      claimEvidence.set(item.claim, item.evidenceId);
-    }
-  }
-  for (const [index, claim] of (result?.taskSatisfaction.requiredEvidence ?? []).entries()) {
-    const evidenceId = result?.taskSatisfaction.observedEvidence[index];
-    if (evidenceId) {
-      claimEvidence.set(claim, evidenceId);
-    }
-  }
-  const claimEvidenceIds = uniqueStrings([...claimEvidence.values()]);
+  const projection = projectArtifactClaimEvidence({
+    claims,
+    evidence: uniqueStrings([
+      ...observations.artifactClaimEvidence.flatMap((item) => item.evidenceId ? [item.evidenceId] : []),
+      ...(result?.taskSatisfaction.observedEvidence ?? []),
+    ]),
+  });
   return {
     claims,
-    evidenceIds: claimEvidenceIds,
-    missingClaims: claims.filter((claim) => !claimEvidence.has(claim)),
+    evidenceIds: projection.evidenceIds,
+    missingClaims: projection.missingClaims,
   };
 }
 

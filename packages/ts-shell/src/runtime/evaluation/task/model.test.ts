@@ -388,6 +388,7 @@ describe("task capability assessment", () => {
     });
     expect(result.repairDecision.state).toBe("not-needed");
     expect(result.hostEvaluation.observedEvidenceVerdict).toBe("complete");
+    expect(result.taskProof.presentProof).toContain("changed-file-verification-complete");
     expect(result.taskVerdict.completeProof).toBe(true);
   });
 
@@ -412,6 +413,7 @@ describe("task capability assessment", () => {
     expect(result.executionPlan.state).toBe("ready");
     expect(result.toolStrategy.actions).toContain("repair");
     expect(result.toolStrategy.nextAction).toBe("repair");
+    expect(result.toolStrategy.proofGap).toContain("verification evidence incomplete");
     expect(result.repairAction).toMatchObject({
       attempted: true,
       postValidation: "passed",
@@ -509,6 +511,7 @@ describe("task capability assessment", () => {
       validationState: "validation-failed",
       terminalSuccessClaim: false,
     });
+    expect(result.toolStrategy.actions).toContain("artifact");
     expect(result.artifactCorrection).toMatchObject({
       attempted: true,
       validationState: "validation-passed",
@@ -535,6 +538,7 @@ describe("task capability assessment", () => {
     expect(invalid.remainingBlockers).toEqual([]);
     expect(invalid.verificationSelection.state).toBe("selected-not-run");
     expect(invalid.artifactReceipt?.validationState).toBe("invalid");
+    expect(invalid.artifactReceipt?.claimEvidenceReceipts.every((receipt) => receipt.proven)).toBe(true);
     expect(invalid.toolStrategy.nextAction).toBe("artifact");
     expect(invalid.artifactCorrection?.validationState).toBe("validation-passed");
     expect(invalid.verificationExecution.state).toBe("passed");

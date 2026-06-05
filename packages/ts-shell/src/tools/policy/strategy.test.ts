@@ -298,4 +298,37 @@ describe("tool strategy", () => {
       }],
     }).nextAction).toBe("verify");
   });
+
+  it("does not carry an unavailable pending action over a proof gap", () => {
+    const context = selectContext({
+      taskKind: "coding-edit",
+      taskPath: "edit",
+      shortPrompt: "Verify changed status mapper.",
+      workspaceFiles: [
+        { path: "src/status.ts", purpose: "target" },
+        { path: "src/status.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/status.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "coding-edit",
+      outputKind: "diff",
+      allowedTools: ["read", "verify"],
+      allowedWrites: ["src/status.ts"],
+      successRubric: ["targeted verification"],
+      context,
+    });
+    const request = buildTaskRequestPacket({ shortPrompt: "Verify changed status mapper.", taskKind: "coding-edit", context, plan });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "verify"],
+      plan,
+      request,
+      changedFiles: ["src/status.ts"],
+      pendingAction: "edit",
+      proofGap: ["changed files need verification proof"],
+    }).nextAction).toBe("verify");
+  });
 });

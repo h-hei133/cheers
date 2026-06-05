@@ -37,6 +37,7 @@ import {
 } from "../../../tools/policy/strategy.js";
 import {
   executeVerification,
+  verifyChangedFileCoverage,
   type VerificationExecution,
 } from "../../../verification/execution/model.js";
 import {
@@ -498,6 +499,7 @@ async function runDefinedTaskCase(
   definition: TaskCaseDefinition,
   dispatch: (command: unknown) => Promise<HostCommandResponse>,
 ): Promise<TaskCaseResult> {
+  const allowedTools = allowedToolsFor(definition);
   const taskLoop = await runTaskLoop({
     mode: "deterministic",
     modelSource: "deterministic-evaluation",
@@ -560,7 +562,7 @@ async function runDefinedTaskCase(
           const executionPlan = buildExecutionPlan({
             taskKind: definition.taskKind,
             outputKind: definition.expectedOutput.kind,
-            allowedTools: definition.allowedTools,
+            allowedTools,
             allowedWrites: definition.allowedWrites,
             successRubric: definition.successRubric,
             context: contextSelection,
@@ -613,7 +615,7 @@ async function runDefinedTaskCase(
           const executionPlan = loopValue<ExecutionPlan>(outputs, "executionPlan");
           const requestPacket = loopValue<TaskRequestPacket>(outputs, "requestPacket");
           const toolStrategy = chooseToolStrategy({
-            allowedTools: definition.allowedTools,
+            allowedTools,
             plan: executionPlan,
             request: requestPacket,
             proofGap: contextSelection.proofGap,
@@ -627,7 +629,14 @@ async function runDefinedTaskCase(
                   : [],
               }
               : undefined,
-            failureHistory: failureHistoryFor(definition),
+            failureHistory: [
+              ...failureHistoryFor(definition),
+              ...verificationFailureHistoryFor(definition).map((failure) => ({
+                action: "verify" as const,
+                signature: failure.command,
+                reason: failure.reason,
+              })),
+            ],
             budget: { remainingSteps: Math.max(0, definition.allowedTools.length + definition.allowedWrites.length) },
           });
           return stepOutput(toolStrategy, statusFromString(toolStrategy.state), [
@@ -691,12 +700,12 @@ async function runDefinedTaskCase(
             verificationEvidence: definition.expectedVerification.expectedStatus === "passed"
               ? [definition.expectedVerification.verificationId]
               : [],
-            claimEvidence: definition.successRubric.map((claim) => ({
-              claim,
-              ...(definition.expectedVerification.expectedStatus === "passed"
-                ? { evidenceId: definition.expectedVerification.verificationId }
-                : {}),
-            })),
+            claimEvidence: definition.expectedVerification.expectedStatus === "passed"
+              ? definition.successRubric.map((claim) => ({
+                claim,
+                evidenceId: `${definition.expectedVerification.verificationId}:${claim}`,
+              }))
+              : [],
           });
           const repairDecision = decideRepair({
             taskKind: definition.taskKind,
@@ -763,6 +772,13 @@ async function runDefinedTaskCase(
           const toolStrategy = loopValue<ToolStrategy>(outputs, "toolStrategy");
           const hostEvaluation = loopValue<TaskHostEvaluationSummary>(outputs, "hostEvaluation");
           const verification = loopValue<LoopVerificationOutput>(outputs, "verification");
+          const changedFileCoverage = verifyChangedFileCoverage({
+            changedFiles: definition.allowedWrites,
+            verifiedFiles: verification.verificationExecution.state === "passed"
+              ? definition.allowedWrites
+              : [],
+            verificationState: verification.verificationExecution.state,
+          });
           const taskProof = buildTaskProofInput({
             caseId: definition.caseId,
             taskKind: definition.taskKind,
@@ -776,11 +792,13 @@ async function runDefinedTaskCase(
             verificationState: verification.verificationExecution.state,
             verificationEvidenceInputEligible: verification.verificationExecution.evidenceInputEligible,
             verificationResultInputEligible: verification.verificationExecution.resultInputEligible,
+            changedFileVerificationComplete: changedFileCoverage.complete,
             repairAttempted: verification.repairAction.attempted,
             repairPostValidation: verification.repairAction.postValidation,
             originalFailurePreserved: verification.repairAction.originalFailurePreserved,
             artifactValidationState: verification.artifactReceipt?.validationState,
             artifactSourceReceiptsAvailable: verification.artifactReceipt?.sourceReceipts.every((source) => source.available),
+            artifactSourceReceiptsComplete: verification.artifactReceipt?.sourceReceipts.every((source) => source.available),
             artifactCorrectionAttempted: verification.artifactCorrection?.attempted,
             artifactCorrectionValidationState: verification.artifactCorrection?.validationState,
             hostStatus: hostEvaluation.observedStatus,
@@ -937,6 +955,13 @@ function failureHistoryFor(definition: TaskCaseDefinition): readonly {
       ? "missing context for repair"
       : "repair failed",
   }];
+}
+
+function allowedToolsFor(definition: TaskCaseDefinition): readonly string[] {
+  return freeze(unique([
+    ...definition.allowedTools,
+    ...(definition.expectedOutput.kind === "artifact" ? ["artifact"] : []),
+  ]));
 }
 
 function verificationFailureHistoryFor(definition: TaskCaseDefinition): readonly {

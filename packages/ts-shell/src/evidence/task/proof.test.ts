@@ -130,6 +130,23 @@ describe("task proof input", () => {
     );
   });
 
+  it("rejects passed verification when result input is not eligible", () => {
+    const proof = buildTaskProofInput({
+      ...baseFacts(),
+      caseId: "unsafe-result-input",
+      taskKind: "coding-edit",
+      outputKind: "diff",
+      verificationState: "passed",
+      verificationEvidenceInputEligible: true,
+      verificationResultInputEligible: false,
+      changedFileVerificationComplete: true,
+      hostStatus: "passed",
+    });
+
+    expect(proof.status).toBe("partial");
+    expect(proof.missingProof).toEqual(["result-input"]);
+  });
+
   it("rejects diff completion when changed-file verification is incomplete", () => {
     const proof = buildTaskProofInput({
       ...baseFacts(),
@@ -178,6 +195,26 @@ describe("task proof input", () => {
       verificationEvidenceInputEligible: true,
       verificationResultInputEligible: true,
       artifactSourceReceiptsAvailable: false,
+      artifactCorrectionAttempted: true,
+      artifactCorrectionValidationState: "validation-passed",
+      hostStatus: "passed",
+    });
+
+    expect(proof.status).toBe("partial");
+    expect(proof.missingProof).toEqual(["artifact-source-receipts"]);
+  });
+
+  it("rejects report completion when artifact source receipts are only partial", () => {
+    const proof = buildTaskProofInput({
+      ...baseFacts(),
+      caseId: "partial-source-report",
+      taskKind: "docs-report",
+      outputKind: "artifact",
+      verificationState: "passed",
+      verificationEvidenceInputEligible: true,
+      verificationResultInputEligible: true,
+      artifactSourceReceiptsAvailable: true,
+      artifactSourceReceiptsComplete: false,
       artifactCorrectionAttempted: true,
       artifactCorrectionValidationState: "validation-passed",
       hostStatus: "passed",
