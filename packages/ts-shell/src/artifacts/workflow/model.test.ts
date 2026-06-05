@@ -125,7 +125,10 @@ describe("artifact workflow model", () => {
       observedContentMarkers: ["source-receipt"],
       verificationEvidence: ["artifact-check:source-coverage:passed"],
       claimEvidence: [{ claim: "verification passed" }],
-    })?.validationState).toBe("invalid");
+    })).toMatchObject({
+      validationState: "claim-evidence-missing",
+      blockers: ["artifact claim evidence missing"],
+    });
   });
 
   it("corrects invalid artifacts only when source receipts and artifact action are available", () => {
@@ -148,5 +151,23 @@ describe("artifact workflow model", () => {
       terminalSuccessClaim: false,
     });
     expect(correctArtifact({ receipt, actions: ["read"] })?.attempted).toBe(false);
+
+    const missingClaimEvidence = createArtifactReceipt({
+      taskKind: "docs-report",
+      outputKind: "artifact",
+      requiredPaths: ["reports/summary.md"],
+      workspacePaths: ["notes/source.md", "reports/summary.md"],
+      verificationState: "selected-passed",
+      failureCategories: [],
+      verificationEvidence: ["artifact-check:source-coverage:passed"],
+      claimEvidence: [{ claim: "verification passed" }],
+    });
+
+    expect(correctArtifact({ receipt: missingClaimEvidence, actions: ["artifact"] })).toMatchObject({
+      attempted: false,
+      validationState: "claim-evidence-missing",
+      blockers: ["artifact claim evidence missing"],
+      terminalSuccessClaim: false,
+    });
   });
 });

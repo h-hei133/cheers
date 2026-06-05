@@ -141,6 +141,7 @@ describe('core QueryEngine migration (W1)', () => {
       'tool.result',
       'tool.result',
       'message.delta',
+      'runtime.task-proof',
       'turn.completed',
       'query.completed',
     ])
@@ -663,6 +664,101 @@ describe('core QueryEngine migration (W1)', () => {
     expect(terminalEvents).toEqual(['success'])
   })
 
+  it('emits normal runtime task proof and result verdict after targeted verification', async () => {
+    const proofEvents: string[] = []
+    const runAgent: AgentRunner = async ({ role, turn }) => {
+      if (turn === 1) {
+        return {
+          role,
+          content: 'changed file',
+          handoffTo: 'coder',
+          handoffReason: 'needs verification',
+          codingResult: codingResult({
+            changedFiles: ['src/app.ts'],
+            verification: { status: 'not-requested', reason: 'No check ran.' },
+            requiredEvidence: ['post-change verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'verified change',
+        codingResult: codingResult({
+          changedFiles: ['src/app.ts'],
+          verification: { status: 'passed', reason: 'Focused check passed.' },
+          requiredEvidence: ['post-change verification'],
+          observedEvidence: ['post-change verification'],
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_runtime_task_proof', 'edit src/app.ts')) {
+      if (event.type === 'runtime.task-proof') {
+        proofEvents.push([
+          event.turn,
+          event.projection.action,
+          event.projection.proof.status,
+          event.projection.verdict.status,
+          event.projection.verdict.completeProof,
+          event.projection.terminalSuccessClaim,
+        ].join(':'))
+      }
+    }
+
+    expect(proofEvents).toContain('2:verify:complete:complete:true:false')
+  })
+
+  it('carries artifact claim-evidence gaps through normal runtime proof without success claim', async () => {
+    const artifactStates: string[] = []
+    const runAgent: AgentRunner = async ({ role, turn }) => {
+      if (turn === 1) {
+        return {
+          role,
+          content: 'artifact drafted',
+          handoffTo: 'coder',
+          handoffReason: 'validate artifact',
+          codingResult: codingResult({
+            taskKind: 'data-artifact',
+            changedFiles: ['reports/summary.md'],
+            evidenceFiles: ['notes/source.md'],
+            verification: { status: 'not-requested', reason: 'Artifact was not checked.' },
+            requiredEvidence: ['claim backed by source', 'claim backed by verification'],
+            observedEvidence: ['claim backed by source'],
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'artifact still missing claim evidence',
+        codingResult: codingResult({
+          taskKind: 'data-artifact',
+          changedFiles: ['reports/summary.md'],
+          evidenceFiles: ['notes/source.md'],
+          verification: { status: 'passed', reason: 'Artifact format check passed.' },
+          requiredEvidence: ['claim backed by source', 'claim backed by verification'],
+          observedEvidence: ['claim backed by source'],
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_runtime_artifact_proof', 'produce artifact report')) {
+      if (event.type === 'runtime.task-proof') {
+        artifactStates.push([
+          event.turn,
+          event.projection.action,
+          event.projection.artifactReceipt?.validationState,
+          event.projection.artifactReceipt?.blockers.join('|'),
+          event.projection.verdict.completeProof,
+        ].join(':'))
+      }
+    }
+
+    expect(artifactStates).toContain('2:artifact:claim-evidence-missing:artifact claim evidence missing:false')
+  })
+
   it('stops as not proven when proof gap remains and no safe budget remains', async () => {
     const runAgent: AgentRunner = async ({ role }) => ({
       role,
@@ -689,8 +785,10 @@ describe('core QueryEngine migration (W1)', () => {
 })
 
 function codingResult(input: {
+  taskKind?: CodingResultSummary['taskKind']
   changedFiles?: string[]
   failedFiles?: Array<{ path: string; reason: string }>
+  evidenceFiles?: string[]
   repair?: Partial<CodingResultSummary['repair']>
   verification?: Partial<CodingResultSummary['verification']>
   requiredEvidence?: string[]
@@ -701,7 +799,16 @@ function codingResult(input: {
   const requiredEvidence = input.requiredEvidence ?? []
   const observedEvidence = input.observedEvidence ?? []
   return {
-    taskKind: 'edit-file',
+    taskKind: input.taskKind ?? 'edit-file',
+    diagnosis: input.evidenceFiles ? {
+      disposition: 'grounded-explanation',
+      candidateFiles: [],
+      evidenceFiles: input.evidenceFiles,
+      searchPattern: 'task evidence',
+      reason: 'Evidence files supplied by focused runtime test.',
+      evidenceNodes: [],
+      evidenceLinks: [],
+    } : undefined,
     changedFiles,
     failedFiles,
     repair: {

@@ -109,7 +109,7 @@ describe("tool strategy", () => {
       plan,
       request,
       taskIntent: "Fix import repair.",
-      proofGap: context.proofGap,
+      proofGap: [...context.proofGap, "repair proof missing"],
       failureHistory: [{
         action: "repair",
         signature: "Fix import repair.",

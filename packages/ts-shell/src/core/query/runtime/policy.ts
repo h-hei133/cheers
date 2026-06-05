@@ -87,7 +87,16 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
 
   return decisionFromStrategy(strategy, {
     changedFiles,
+    selectedPaths: context.selectedPaths,
+    ownerPaths: context.ownerPaths,
+    verificationTargets,
     taskIntent,
+    taskKind,
+    outputKind,
+    contextState: context.state,
+    planState: plan.state,
+    requestState: request.state,
+    toolStrategyState: strategy.state,
     pendingAction,
     artifactRequired: Boolean(artifactContract),
   });
@@ -108,7 +117,16 @@ function decisionFromStrategy(
   strategy: ToolStrategy,
   input: {
     readonly changedFiles: readonly string[];
+    readonly selectedPaths: readonly string[];
+    readonly ownerPaths: readonly string[];
+    readonly verificationTargets: readonly string[];
     readonly taskIntent: string;
+    readonly taskKind: string;
+    readonly outputKind: string;
+    readonly contextState: string;
+    readonly planState: string;
+    readonly requestState: string;
+    readonly toolStrategyState: string;
     readonly pendingAction?: ToolActionKind;
     readonly artifactRequired: boolean;
   },
@@ -119,7 +137,16 @@ function decisionFromStrategy(
     actions: strategy.actions,
     proofGap: strategy.proofGap ?? [],
     changedFiles: input.changedFiles,
+    selectedPaths: input.selectedPaths,
+    ownerPaths: input.ownerPaths,
+    verificationTargets: input.verificationTargets,
     taskIntent: input.taskIntent,
+    taskKind: input.taskKind,
+    outputKind: input.outputKind,
+    contextState: input.contextState,
+    planState: input.planState,
+    requestState: input.requestState,
+    toolStrategyState: input.toolStrategyState,
     pendingAction: input.pendingAction,
     artifactRequired: input.artifactRequired,
     reason: reasonFor(nextAction, strategy.proofGap ?? []),

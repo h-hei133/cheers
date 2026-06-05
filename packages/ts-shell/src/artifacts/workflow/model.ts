@@ -7,6 +7,7 @@ export type ArtifactValidationState =
   | "source-missing"
   | "unsafe-path"
   | "invalid"
+  | "claim-evidence-missing"
   | "validation-failed"
   | "validation-passed"
   | "not-proven";
@@ -126,6 +127,15 @@ export function correctArtifact(input: ArtifactCorrectionInput): ArtifactCorrect
       terminalSuccessClaim: false,
     });
   }
+  if (input.receipt.validationState === "claim-evidence-missing") {
+    return freeze({
+      attempted: false,
+      validationState: "claim-evidence-missing",
+      correctedPath: input.receipt.outputPath,
+      blockers: ["artifact claim evidence missing"],
+      terminalSuccessClaim: false,
+    });
+  }
   return freeze({
     attempted: true,
     validationState: "validation-passed",
@@ -168,7 +178,7 @@ function artifactValidationStateFor(input: ArtifactReceiptInput): ArtifactValida
     return input.verificationState === "selected-failed" ? "validation-failed" : "invalid";
   }
   if (!claimEvidenceSatisfied(input)) {
-    return input.verificationState === "selected-failed" ? "validation-failed" : "invalid";
+    return "claim-evidence-missing";
   }
   if ((input.verificationEvidence ?? []).length === 0) {
     return "not-proven";
@@ -225,6 +235,8 @@ function artifactBlockersFor(
       return ["artifact invalid"];
     case "validation-failed":
       return ["artifact validation failed"];
+    case "claim-evidence-missing":
+      return ["artifact claim evidence missing"];
     case "not-proven":
       return ["artifact validation not proven"];
     case "intent-created":

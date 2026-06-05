@@ -19,6 +19,7 @@ export interface ContextSelection {
   readonly sourcePaths: readonly string[];
   readonly targetPaths: readonly string[];
   readonly relatedPaths: readonly string[];
+  readonly ownerPaths: readonly string[];
   readonly verificationPaths: readonly string[];
   readonly packagePaths: readonly string[];
   readonly omittedPaths: readonly string[];
@@ -41,10 +42,13 @@ export function selectContext(input: ContextSelectionInput): ContextSelection {
   const sourcePaths = input.workspaceFiles
     .filter((file) => !input.requiredPaths.includes(file.path) && sourceCandidate(file.path, file.purpose, input.taskPath))
     .map((file) => file.path);
+  const ownerPaths = input.workspaceFiles
+    .filter((file) => ownerCandidate(file.path, file.purpose, input.shortPrompt, targetPaths))
+    .map((file) => file.path);
   const relatedPaths = input.workspaceFiles
     .filter((file) => relatedCandidate(file.path, file.purpose, input.shortPrompt, targetPaths, input.taskKind))
     .map((file) => file.path);
-  const selectedPaths = unique([...targetPaths, ...packagePaths, ...sourcePaths, ...verificationPaths, ...relatedPaths]);
+  const selectedPaths = unique([...targetPaths, ...packagePaths, ...sourcePaths, ...ownerPaths, ...verificationPaths, ...relatedPaths]);
   const missingRequiredPaths = input.requiredPaths.filter((path) => !workspacePaths.includes(path));
   const continuationBlocked = input.taskKind === "continuation" && !input.continuationAvailable;
   const state: ContextSelectionState = missingRequiredPaths.length > 0 || continuationBlocked
@@ -59,10 +63,11 @@ export function selectContext(input: ContextSelectionInput): ContextSelection {
     sourcePaths,
     targetPaths,
     relatedPaths: unique(relatedPaths),
+    ownerPaths: unique(ownerPaths),
     verificationPaths: unique(verificationPaths),
     packagePaths: unique(packagePaths),
     omittedPaths: workspacePaths.filter((path) => !selectedPaths.includes(path)),
-    contextPacketSummary: `${targetPaths.length} target(s), ${sourcePaths.length} source(s), ${verificationPaths.length} verification candidate(s), ${relatedPaths.length} related path(s)`,
+    contextPacketSummary: `${targetPaths.length} target(s), ${sourcePaths.length} source(s), ${ownerPaths.length} owner hint(s), ${verificationPaths.length} verification candidate(s), ${relatedPaths.length} related path(s)`,
     refreshed: input.taskKind === "continuation" && input.continuationAvailable,
     proofGap: proofGapFor(input, state, missingRequiredPaths, verificationPaths),
     suggestedActions: suggestedActionsFor(input, state, missingRequiredPaths, verificationPaths),
@@ -166,6 +171,25 @@ function relatedCandidate(
     normalized.includes("nearby") ||
     normalized.includes("owner") ||
     normalized.includes("risk");
+}
+
+function ownerCandidate(
+  path: string,
+  purpose: string,
+  shortPrompt: string,
+  targetPaths: readonly string[],
+): boolean {
+  if (targetPaths.includes(path) || packagePath(path) || verificationCandidate(path, purpose)) {
+    return false;
+  }
+  const normalized = `${path} ${purpose} ${shortPrompt}`.toLowerCase();
+  return normalized.includes("owner") ||
+    normalized.includes("boundary") ||
+    normalized.includes("module") ||
+    targetPaths.some((target) => {
+      const [targetRoot] = target.split("/");
+      return Boolean(targetRoot) && path.startsWith(`${targetRoot}/`);
+    });
 }
 
 function unique<T extends string>(values: readonly T[]): readonly T[] {

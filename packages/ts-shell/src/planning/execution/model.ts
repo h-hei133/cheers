@@ -163,7 +163,7 @@ function stepsFor(input: ExecutionPlanInput): readonly string[] {
     return ["refresh retained context", "check continuation freshness", "report remaining proof"];
   }
   if (input.taskKind === "workspace-understanding") {
-    return ["rank workspace targets", "select context packet", "check context sufficiency"];
+    return ["rank workspace targets", "narrow owner context", "check context sufficiency"];
   }
   return ["inspect target", "act", "verify"];
 }

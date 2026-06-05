@@ -11,6 +11,7 @@ describe("context selection model", () => {
       workspaceFiles: [
         { path: "package.json", purpose: "script map" },
         { path: "src/runtime/selector.ts", purpose: "likely target" },
+        { path: "src/runtime/owner.ts", purpose: "owner boundary" },
         { path: "src/runtime/selector.test.ts", purpose: "likely verification" },
       ],
       requiredPaths: ["src/runtime/selector.ts"],
@@ -22,6 +23,7 @@ describe("context selection model", () => {
       state: "ready",
       selectedPaths: expect.arrayContaining(["src/runtime/selector.ts", "package.json"]),
       targetPaths: ["src/runtime/selector.ts"],
+      ownerPaths: expect.arrayContaining(["src/runtime/owner.ts"]),
       verificationPaths: ["src/runtime/selector.test.ts"],
       packagePaths: ["package.json"],
       terminalSuccessClaim: false,
@@ -65,6 +67,31 @@ describe("context selection model", () => {
 
     expect(selection.proofGap).toContain("failure needs more context");
     expect(selection.suggestedActions).toEqual(["search", "read"]);
+    expect(selection.terminalSuccessClaim).toBe(false);
+  });
+
+  it("narrows owner context without treating owner hints as success", () => {
+    const selection = selectContext({
+      taskKind: "workspace-understanding",
+      taskPath: "runtime",
+      shortPrompt: "Find the owner boundary for runtime selector.",
+      workspaceFiles: [
+        { path: "src/runtime/selector.ts", purpose: "target" },
+        { path: "src/runtime/owner.ts", purpose: "owner boundary" },
+        { path: "src/runtime/selector.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/runtime/selector.ts"],
+      continuationAvailable: true,
+      failureCategories: [],
+    });
+
+    expect(selection.ownerPaths).toEqual(["src/runtime/owner.ts"]);
+    expect(selection.selectedPaths).toEqual(expect.arrayContaining([
+      "src/runtime/selector.ts",
+      "src/runtime/owner.ts",
+      "src/runtime/selector.test.ts",
+    ]));
+    expect(selection.contextPacketSummary).toContain("1 owner hint");
     expect(selection.terminalSuccessClaim).toBe(false);
   });
 

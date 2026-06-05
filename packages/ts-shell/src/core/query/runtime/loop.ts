@@ -4,6 +4,7 @@ import type { QueryRuntimeState } from './state.js'
 import { applyLifecycleEventToIndex } from '../../tools/toolResultLifecycle.js'
 import type { QueryRuntimeActionDecision } from './decision.js'
 import { decideQueryRuntimeAction, hasOpenRuntimeProofGap } from './policy.js'
+import { projectQueryRuntimeProof } from './proof.js'
 import {
   ALLOWED_HANDOFFS,
   continueQuery,
@@ -54,6 +55,12 @@ export async function runQueryLoop(
     appendNotes(state, output)
     await emitOutputEvents(state, output, deps)
     await emitMessageDeltas(output, deps)
+    await deps.onEvent?.({
+      type: 'runtime.task-proof',
+      role: state.currentRole,
+      turn: state.turn,
+      projection: projectQueryRuntimeProof({ state, decision: runtimeAction, output }),
+    })
     await deps.onEvent?.({ type: 'turn.completed', output })
 
     const transition = getTransition(state, output)

@@ -121,12 +121,12 @@ function chooseNextAction(input: ToolStrategyInput & {
   if (input.pendingAction) {
     return input.pendingAction;
   }
+  if (repeatedFailure(input, "repair")) {
+    return input.allowedTools.includes("search") ? "search" : "read";
+  }
   if (input.changedFiles && input.changedFiles.length > 0 &&
     input.proofGap.some((gap) => gap.includes("verification") || gap.includes("proof"))) {
     return "verify";
-  }
-  if (repeatedFailure(input, "repair")) {
-    return input.allowedTools.includes("search") ? "search" : "read";
   }
   if (input.proofGap.some((gap) => gap.includes("repair")) || failedReasonIncludes(input, "verification")) {
     return input.actionPlans.some((plan) => plan.action === "repair") ? "repair" : "verify";
