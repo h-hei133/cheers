@@ -50,6 +50,17 @@ export type CodingTaskKind =
   | 'run-command'
   | 'browser'
 
+export type CodingActionKind =
+  | CodingTaskKind
+  | 'search'
+  | 'read'
+  | 'edit'
+  | 'verify'
+  | 'repair'
+  | 'artifact'
+  | 'continue'
+  | 'stop-not-proven'
+
 export type CodingVerificationStatus = 'passed' | 'failed' | 'blocked' | 'skipped' | 'not-requested'
 export type CodingVerificationSelectionScope = 'explicit' | 'focused' | 'broader' | 'none'
 export type CodingVerificationSelectionSource =
@@ -184,7 +195,7 @@ export interface CodingVerificationSummary {
 }
 
 export interface CodingActionResultSeed {
-  readonly actionKind?: CodingTaskKind
+  readonly actionKind?: CodingActionKind
   readonly target?: string
   readonly changedFiles?: readonly string[]
   readonly verifiedFiles?: readonly string[]
