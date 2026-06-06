@@ -87,6 +87,8 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/parity-development-trial.md` | active | Checking SP051 unseen parity trial tasks, initial weak phases, owner upgrades, reference inputs, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/execution-loop-trial.md` | active | Checking SP052 unseen execution-loop tasks, initial weak phases, owner upgrades, reference inputs, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/controlled-unseen-development-gauntlet.md` | active | Checking SP053 controlled unseen development tasks, execution-seam authority diagnostics, introduction decision, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/autonomous-capability-audit.md` | active | Checking SP054 code-grounded autonomous development capability comparison, strongest and weakest areas, top gaps, architecture debts, and evidence list. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/three-sprint-capability-push-plan.md` | active | Selecting the next three aggressive autonomous capability sprints, owner domains, non-substitutable gates, and anti-shortcut rules after SP054. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 
