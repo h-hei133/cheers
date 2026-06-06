@@ -5,6 +5,7 @@ import type {
   TerminalClassification,
   TerminalReason,
 } from "../orchestration/types.js";
+import type { QueryRuntimeTaskState } from "../core/query/runtime/taskState.js";
 
 export type SeedInfluenceDiagnostic =
   | "target-carryover"
@@ -48,6 +49,7 @@ export interface SessionContinuitySnapshot {
   readonly lastSeedInfluenceHandoffSummary?: string;
   readonly lastFailureHandoffDiagnostic?: string;
   readonly lastSuccessHandoffDiagnostic?: string;
+  readonly taskState?: QueryRuntimeTaskState;
   readonly recentChangedFiles: readonly string[];
   readonly recentTargetFiles: readonly string[];
   readonly recentFailedFiles: ReadonlyArray<{ path: string; reason: string }>;

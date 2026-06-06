@@ -56,6 +56,112 @@ describe("session compact module parity", () => {
     expect(summary).toContain("raw-full-content-excluded");
     expect(summary).not.toContain("RAW_SECRET_FILE_CONTENT");
   });
+
+  it("carries safe changed-file task state through compact continuity", () => {
+    const compacted = applySessionCompactRetention({
+      workingMemory: { sourceTurnCount: 1, summary: [] },
+      event: makeCompletedEvent(
+        makeChangedFileCodingResult({
+          changedFiles: ["src/checkout/state.ts"],
+          failedFiles: [
+            {
+              path: "src/checkout/state.test.ts",
+              reason: "expected checked-out status",
+            },
+          ],
+          verifiedFiles: [],
+          unverifiedFiles: ["src/checkout/state.ts"],
+          reason: "expected checked-out status",
+          command: "npm test -- src/checkout/state.test.ts",
+          nextAction: "repair checkout state and rerun focused verification",
+          blockerKind: "test-failed",
+          repairAttempts: 1,
+          repairNotes: ["first repair did not update dependent state"],
+        }),
+      ),
+      turnThreshold: 2,
+      historyLimit: 4,
+      now: "2026-05-21T00:00:00.000Z",
+    }) as {
+      readonly compacted: boolean;
+      readonly continuity: {
+        readonly taskState?: {
+          readonly source: string;
+          readonly changedFiles: readonly string[];
+          readonly proofGap: readonly string[];
+          readonly repairAttempts: readonly unknown[];
+          readonly originalFailureClassification?: string;
+          readonly nextVerificationPlan?: { readonly command?: string };
+          readonly continuationSafety?: { readonly status?: string };
+        };
+      };
+    };
+
+    expect(compacted.compacted).toBe(true);
+    expect(compacted.continuity.taskState).toMatchObject({
+      source: "compact",
+      changedFiles: ["src/checkout/state.ts"],
+      unverifiedFiles: ["src/checkout/state.ts"],
+      originalFailureClassification: "test-failed",
+      nextVerificationPlan: {
+        command: "npm test -- src/checkout/state.test.ts",
+      },
+      continuationSafety: { status: "safe" },
+    });
+    expect(compacted.continuity.taskState?.proofGap).toContain("verification failed");
+    expect(compacted.continuity.taskState?.repairAttempts).toHaveLength(1);
+  });
+
+  it("does not carry compact task state when safety quality is stale", () => {
+    const compacted = applySessionCompactRetention({
+      workingMemory: {
+        sourceTurnCount: 1,
+        summary: [],
+        continuity: {
+          taskState: {
+            source: "compact",
+            pendingAction: "verify",
+            proofGap: ["verification proof missing for changed files"],
+            changedFiles: ["src/stale-compact.ts"],
+            verifiedFiles: [],
+            unverifiedFiles: ["src/stale-compact.ts"],
+            failureCategories: ["verification failed"],
+            originalFailureClassification: "test-failed",
+            repairAttempts: [],
+            nextVerificationPlan: {
+              command: "npm test -- src/stale-compact.test.ts",
+              targetFiles: ["src/stale-compact.ts"],
+            },
+            artifactPendingState: {
+              claims: [],
+              evidenceIds: [],
+              missingClaims: [],
+            },
+            continuationSafety: {
+              status: "stale",
+              reasons: ["older compact state contradicted newer turn"],
+            },
+          },
+        },
+      },
+      event: makeCompletedEvent(
+        makeCodingResult({
+          reason: "newer result has no changed files",
+          nextAction: "discover current owner state",
+          evidence: ["actionable-blocker-kind:stale-state"],
+        }),
+      ),
+      turnThreshold: 2,
+      historyLimit: 4,
+      now: "2026-05-21T00:00:00.000Z",
+    }) as {
+      readonly continuity: {
+        readonly taskState?: { readonly changedFiles?: readonly string[] };
+      };
+    };
+
+    expect(compacted.continuity.taskState?.changedFiles ?? []).toEqual([]);
+  });
 });
 
 function makeCompletedEvent(codingResult: CodingResultSummary): QueryEvent {
@@ -124,5 +230,68 @@ function makeCodingResult(input: {
       nextAction: input.nextAction,
     },
     evidence: [...input.evidence],
+  };
+}
+
+function makeChangedFileCodingResult(input: {
+  readonly changedFiles: readonly string[];
+  readonly failedFiles: ReadonlyArray<{ path: string; reason: string }>;
+  readonly verifiedFiles: readonly string[];
+  readonly unverifiedFiles: readonly string[];
+  readonly reason: string;
+  readonly command: string;
+  readonly nextAction: string;
+  readonly blockerKind: string;
+  readonly repairAttempts: number;
+  readonly repairNotes: readonly string[];
+}): CodingResultSummary {
+  return {
+    taskKind: "edit-file",
+    changedFiles: [...input.changedFiles],
+    failedFiles: [...input.failedFiles],
+    patches: input.changedFiles.map((path) => ({
+      path,
+      operation: "update",
+      status: "applied",
+    })),
+    repair: {
+      status: input.repairAttempts > 0 ? "failed" : "not-needed",
+      attempts: input.repairAttempts,
+      recoveredItems: [],
+      failedItems: input.failedFiles.map((file) => file.path),
+      notes: [...input.repairNotes],
+    },
+    continuation: {
+      status: "failed-after-bounded-continuation",
+      attempts: 1,
+      evidence: ["pending changed-file proof gap"],
+    },
+    changeSet: {
+      gitAware: false,
+      preExistingDirtyFiles: [],
+      postRunDirtyFiles: [...input.changedFiles],
+      attemptedFiles: [...input.changedFiles, ...input.failedFiles.map((file) => file.path)],
+      changedFiles: [...input.changedFiles],
+      unchangedAttemptedFiles: [],
+    },
+    taskSatisfaction: {
+      verdict: "partial",
+      reasons: [input.reason],
+      requiredEvidence: ["focused verification"],
+      observedEvidence: [],
+    },
+    verifiedFiles: [...input.verifiedFiles],
+    unverifiedFiles: input.unverifiedFiles.map((path) => ({
+      path,
+      reason: input.reason,
+    })),
+    verification: {
+      status: "failed",
+      command: input.command,
+      reason: input.reason,
+      blockerKind: input.blockerKind,
+      nextAction: input.nextAction,
+    },
+    evidence: ["focused verification failed"],
   };
 }

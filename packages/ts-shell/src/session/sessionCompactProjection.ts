@@ -1,4 +1,5 @@
 import type { QueryEvent } from "../core/query/runtime/events.js";
+import type { QueryRuntimeTaskState } from "../core/query/runtime/taskState.js";
 import type { SeedInfluenceDiagnostic } from "./sessionContinuityTypes.js";
 import type {
   CompactContinuityApprovalAudit,
@@ -19,6 +20,7 @@ export interface SessionCompactProjectionInput {
   readonly seedInfluenceHandoffSummary?: string;
   readonly failureHandoffDiagnostic?: string;
   readonly successHandoffDiagnostic?: string;
+  readonly taskState?: QueryRuntimeTaskState;
 }
 
 export function projectCompactRetentionPlanInput(
@@ -47,5 +49,6 @@ export function projectCompactRetentionPlanInput(
     ...(input.successHandoffDiagnostic
       ? { successHandoffDiagnostic: input.successHandoffDiagnostic }
       : {}),
+    ...(input.taskState ? { taskState: input.taskState } : {}),
   };
 }

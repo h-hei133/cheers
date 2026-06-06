@@ -13,6 +13,12 @@ import {
   CONTINUATION_SAFETY_POLICY,
   resolveContinuationSafety,
 } from "../../core/query/runtime/state.js";
+import {
+  continuationSafetyForRuntimeState,
+  decodeQueryRuntimeTaskState,
+  projectQueryRuntimeTaskStateFromOutputs,
+  type QueryRuntimeTaskState,
+} from "../../core/query/runtime/taskState.js";
 import type {
   AgentExecutionOutput,
   AgentRole,
@@ -339,6 +345,23 @@ export function buildResumeReplayInput(input: {
     : recoveryBoundary === "mid-turn-reentry"
       ? turnPairing.openTurn!.turn
       : (lastPairedTurn?.turn ?? 0) + 1;
+  const replayTaskState = projectQueryRuntimeTaskStateFromOutputs({
+    source: "replay",
+    outputs: turnCompletedOutputs,
+    continuationSafety: continuationSafetyForRuntimeState({
+      source: "replay",
+      safe: continuationPolicy.allowDerivedContext,
+      reasons: continuationPolicy.allowDerivedContext
+        ? ["replay turn pairing accepted"]
+        : ["replay turn pairing rejected"],
+    }),
+  });
+  const compactTaskState = decodeQueryRuntimeTaskState(input.snapshot.taskState);
+  const taskState = selectRuntimeTaskState({
+    replayTaskState,
+    compactTaskState,
+    continuationAllowsReplayFacts: continuationPolicy.allowDerivedContext,
+  });
 
   return {
     config: {
@@ -375,6 +398,7 @@ export function buildResumeReplayInput(input: {
     ...(continuationPolicy.allowDerivedContext
       ? { observations: deriveQueryRuntimeObservationState(turnCompletedOutputs) }
       : {}),
+    ...(taskState ? { taskState } : {}),
   };
 }
 
@@ -405,4 +429,24 @@ function buildReplayRepairSummary(
     ignoredRoleMismatchedTurnCompletions:
       turnPairing.ignoredRoleMismatchedTurnCompletions,
   };
+}
+
+function selectRuntimeTaskState(input: {
+  readonly replayTaskState?: QueryRuntimeTaskState;
+  readonly compactTaskState?: QueryRuntimeTaskState;
+  readonly continuationAllowsReplayFacts: boolean;
+}): QueryRuntimeTaskState | undefined {
+  if (input.replayTaskState && input.continuationAllowsReplayFacts) {
+    return input.replayTaskState;
+  }
+  if (input.replayTaskState && !input.continuationAllowsReplayFacts) {
+    return {
+      ...input.replayTaskState,
+      continuationSafety: {
+        status: "stale",
+        reasons: ["replay task state rejected by continuation safety"],
+      },
+    };
+  }
+  return input.compactTaskState;
 }

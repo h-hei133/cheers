@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { projectRepairIteration } from "./projection.js";
+import {
+  projectRepairContinuationStrategy,
+  projectRepairIteration,
+} from "./projection.js";
 
 describe("repairFacade", () => {
   it("requires repaired apply and same-command re-verification for success", () => {
@@ -144,5 +147,31 @@ describe("repairFacade", () => {
       true,
     ]);
     expect(projection.verdict.status).toBe("COMPLETE");
+  });
+
+  it("changes repair strategy after repeated failure or missing context", () => {
+    expect(projectRepairContinuationStrategy({
+      failureOutput: "expected ready status",
+      priorAttemptReasons: ["expected ready status"],
+      changedFiles: [],
+      verificationStatus: "failed",
+      contextQuality: "sufficient",
+    })).toBe("change-repair-strategy");
+
+    expect(projectRepairContinuationStrategy({
+      failureOutput: "missing context for formatter owner",
+      priorAttemptReasons: [],
+      changedFiles: [],
+      verificationStatus: "failed",
+      contextQuality: "missing",
+    })).toBe("discover-missing-context");
+
+    expect(projectRepairContinuationStrategy({
+      failureOutput: "repair changed source",
+      priorAttemptReasons: ["original failed check"],
+      changedFiles: ["src/repair.ts"],
+      verificationStatus: "not-requested",
+      contextQuality: "sufficient",
+    })).toBe("verify-after-repair");
   });
 });

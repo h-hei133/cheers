@@ -1,4 +1,5 @@
 import type { QueryEvent } from "../../core/query/runtime/events.js";
+import type { QueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
 import {
   buildCompactContinuitySummary,
   type CompactContinuityApprovalAudit,
@@ -19,6 +20,7 @@ export interface CompactRetentionPlanInput {
   readonly seedInfluenceHandoffSummary?: string;
   readonly failureHandoffDiagnostic?: string;
   readonly successHandoffDiagnostic?: string;
+  readonly taskState?: QueryRuntimeTaskState;
 }
 
 export function applyCompactRetentionPlan(
@@ -71,6 +73,7 @@ export function applyCompactRetentionPlan(
     ...(input.successHandoffDiagnostic
       ? { successHandoffDiagnostic: input.successHandoffDiagnostic }
       : {}),
+    ...(input.taskState ? { taskState: input.taskState } : {}),
   });
   if (compactSummary.approvalAuditHistory) {
     root.approvalAuditHistory = compactSummary.approvalAuditHistory;

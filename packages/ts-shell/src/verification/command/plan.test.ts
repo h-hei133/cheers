@@ -5,7 +5,10 @@ import { normalizeCodeGraphFacts } from "../../context/acquisition/code/facts.js
 import { buildCodeGraphTrace } from "../../context/acquisition/code/trace.js";
 import { buildContextGraph } from "../../orchestration/contextGraph.js";
 import { buildPlanQuality } from "../../planning/quality/model.js";
-import { buildVerificationCommandPlan } from "./plan.js";
+import {
+  buildVerificationCommandPlan,
+  projectTaskStateVerificationPlan,
+} from "./plan.js";
 
 describe("verificationCommandPlan", () => {
   it("selects an allowlisted Agent Plan verification command without granting authority", () => {
@@ -137,6 +140,52 @@ describe("verificationCommandPlan", () => {
     expect(editResultPlan.state).toBe("ready");
     expect(editResultPlan.source).toBe("edit-result");
     expect(editResultPlan.sourceEditTransactionId).toBe("txn_186");
+  });
+
+  it("projects task-state verification targets from changed and failed files", () => {
+    const plan = projectTaskStateVerificationPlan({
+      taskKind: "edit-file",
+      changedFiles: ["src/order/rules.ts"],
+      failedFiles: [{ path: "src/order/rules.test.ts", reason: "expected ready" }],
+      patches: [],
+      repair: { status: "failed", attempts: 1, recoveredItems: [], failedItems: [], notes: [] },
+      continuation: { status: "failed-after-bounded-continuation", attempts: 1, evidence: [] },
+      changeSet: {
+        gitAware: false,
+        preExistingDirtyFiles: [],
+        postRunDirtyFiles: ["src/order/rules.ts"],
+        attemptedFiles: ["src/order/rules.ts"],
+        changedFiles: ["src/order/rules.ts"],
+        unchangedAttemptedFiles: [],
+      },
+      taskSatisfaction: {
+        verdict: "partial",
+        reasons: [],
+        requiredEvidence: ["focused verification"],
+        observedEvidence: [],
+      },
+      verifiedFiles: [],
+      unverifiedFiles: [{ path: "src/order/rules.ts", reason: "not verified" }],
+      verification: {
+        status: "failed",
+        command: "npm test -- src/order/rules.test.ts",
+        reason: "expected ready",
+        blockerKind: "test-failed",
+        nextAction: "repair then rerun focused verification",
+      },
+      evidence: [],
+    });
+
+    expect(plan).toMatchObject({
+      command: "npm test -- src/order/rules.test.ts",
+      failedFiles: ["src/order/rules.test.ts"],
+      status: "failed",
+      nextAction: "repair then rerun focused verification",
+    });
+    expect(plan.targetFiles).toEqual([
+      "src/order/rules.ts",
+      "src/order/rules.test.ts",
+    ]);
   });
 
   it("can select allowlisted test-impact verification candidates without executing them", () => {

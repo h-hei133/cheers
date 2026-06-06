@@ -1,4 +1,9 @@
 import { selectContinuityTerminalSource } from "../../result/terminal/truth.js";
+import {
+  decodeQueryRuntimeTaskState,
+  projectQueryRuntimeTaskStateFromResult,
+  continuationSafetyForRuntimeState,
+} from "../../core/query/runtime/taskState.js";
 import { deriveActionableFailureContinuity } from "../actionableFailureContinuity.js";
 import {
   buildActionHandoffSummary,
@@ -93,6 +98,17 @@ export function buildSessionContinuitySnapshot(input: {
   const lastSuccessHandoffDiagnostic =
     buildSuccessHandoffDiagnostic(lastCodingResult) ??
     extractSuccessHandoffDiagnosticFromMemory(stateSnapshot?.workingMemory);
+  const taskState = lastCodingResult
+    ? projectQueryRuntimeTaskStateFromResult({
+        source: "replay",
+        result: lastCodingResult,
+        continuationSafety: continuationSafetyForRuntimeState({
+          source: "replay",
+          safe: true,
+          reasons: ["session continuity coding result accepted"],
+        }),
+      })
+    : extractTaskStateFromMemory(stateSnapshot?.workingMemory);
   const continuityTerminalSource = selectContinuityTerminalSource({
     lastQueryCompletion,
     lastCodingCompletion,
@@ -161,6 +177,7 @@ export function buildSessionContinuitySnapshot(input: {
     ...(lastSuccessHandoffDiagnostic
       ? { lastSuccessHandoffDiagnostic }
       : {}),
+    ...(taskState ? { taskState } : {}),
     lastGroundedDeliverableMode: readContinuity.lastGroundedDeliverableMode,
     ...(readContinuity.lastReadDeliveredLines !== undefined
       ? { lastReadDeliveredLines: readContinuity.lastReadDeliveredLines }
@@ -271,4 +288,15 @@ export function buildSessionContinuitySnapshot(input: {
     unresolvedItems: unresolvedProjection.unresolvedItems,
     ...(freshnessHistoryCount > 0 ? { freshnessHistoryCount } : {}),
   };
+}
+
+function extractTaskStateFromMemory(workingMemory: unknown) {
+  if (!workingMemory || typeof workingMemory !== "object" || Array.isArray(workingMemory)) {
+    return undefined;
+  }
+  const continuity = (workingMemory as Record<string, unknown>).continuity;
+  if (!continuity || typeof continuity !== "object" || Array.isArray(continuity)) {
+    return undefined;
+  }
+  return decodeQueryRuntimeTaskState((continuity as Record<string, unknown>).taskState);
 }

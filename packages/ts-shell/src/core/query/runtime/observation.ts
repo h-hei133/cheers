@@ -38,6 +38,8 @@ export interface QueryRuntimeObservationState {
   readonly changedFiles: string[]
   readonly verificationTargets: string[]
   readonly failedVerificationTargets: string[]
+  readonly restoredProofGap: string[]
+  readonly failureCategories: string[]
   readonly repairAttempts: QueryRuntimeFailureObservation[]
   readonly toolFailures: QueryRuntimeFailureObservation[]
   readonly artifactEvidence: string[]
@@ -56,6 +58,8 @@ export function createEmptyQueryRuntimeObservationState(): QueryRuntimeObservati
     changedFiles: [],
     verificationTargets: [],
     failedVerificationTargets: [],
+    restoredProofGap: [],
+    failureCategories: [],
     repairAttempts: [],
     toolFailures: [],
     artifactEvidence: [],

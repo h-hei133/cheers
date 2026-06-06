@@ -1,4 +1,8 @@
 import type { QueryEvent } from "../core/query/runtime/events.js";
+import {
+  continuationSafetyForRuntimeState,
+  projectQueryRuntimeTaskStateFromResult,
+} from "../core/query/runtime/taskState.js";
 import { applyCompactRetentionPlan } from "./continuation/retentionPlanner.js";
 import { decodeApprovalMemory, decodeApprovalMemoryHistory } from "./approval/memoryCodec.js";
 import { deriveStoppedSessionContinuitySurface } from "./continuation/stoppedSessionContinuity.js";
@@ -38,6 +42,17 @@ export function applySessionCompactRetention(input: {
   const successHandoffDiagnostic = buildSuccessHandoffDiagnostic(
     queryCompleted?.result.codingResult,
   );
+  const taskState = queryCompleted?.result.codingResult
+    ? projectQueryRuntimeTaskStateFromResult({
+        source: "compact",
+        result: queryCompleted.result.codingResult,
+        continuationSafety: continuationSafetyForRuntimeState({
+          source: "compact",
+          safe: true,
+          reasons: ["compact quality checks passed"],
+        }),
+      })
+    : undefined;
   return applyCompactRetentionPlan(
     projectCompactRetentionPlanInput({
       workingMemory: input.workingMemory,
@@ -59,6 +74,7 @@ export function applySessionCompactRetention(input: {
           }
         : {}),
       ...(successHandoffDiagnostic ? { successHandoffDiagnostic } : {}),
+      ...(taskState ? { taskState } : {}),
     }),
   );
 }

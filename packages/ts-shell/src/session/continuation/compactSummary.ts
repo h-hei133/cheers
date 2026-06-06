@@ -1,4 +1,5 @@
 import type { CodingWriteEffect } from "../../orchestration/types.js";
+import type { QueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
 import { mergeContinuitySummaryEntries } from "./summaryFormatter.js";
 import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
 
@@ -27,6 +28,7 @@ export interface CompactContinuitySummaryInput {
   readonly seedInfluenceHandoffSummary?: string;
   readonly failureHandoffDiagnostic?: string;
   readonly successHandoffDiagnostic?: string;
+  readonly taskState?: QueryRuntimeTaskState;
 }
 
 export interface CompactContinuitySummary {
@@ -78,6 +80,9 @@ export function buildCompactContinuitySummary(
   }
   if (input.successHandoffDiagnostic) {
     continuity.lastSuccessHandoffDiagnostic = input.successHandoffDiagnostic;
+  }
+  if (input.taskState) {
+    continuity.taskState = input.taskState;
   }
 
   return {

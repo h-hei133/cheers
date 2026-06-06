@@ -261,13 +261,153 @@ describe("session replay builder", () => {
     const observations = ensureQueryRuntimeObservationState(state);
 
     expect(seed.observations).toBeDefined();
-    expect(observations).toMatchObject({
-      changedFiles: ["src/report.ts"],
-      verificationTargets: ["src/report.ts", "src/report.test.ts"],
-      artifactClaims: ["report claim matches source"],
-      continuationFacts: ["pending artifact verification"],
-      pendingAction: "continue",
+    expect(observations.changedFiles).toEqual(["src/report.ts"]);
+    expect(observations.verificationTargets).toEqual([
+      "src/report.ts",
+      "src/report.test.ts",
+    ]);
+    expect(observations.artifactClaims).toContain("report claim matches source");
+    expect(observations.continuationFacts).toContain(
+      "pending artifact verification",
+    );
+    expect(observations.pendingAction).toBe("continue");
+  });
+
+  it("restores durable task state from replay and lets normal runtime choose repair", () => {
+    const failedOutput: AgentExecutionOutput = {
+      role: "coder",
+      content: "edited order rules but focused verification failed",
+      codingResult: {
+        taskKind: "edit-file",
+        changedFiles: ["src/order/rules.ts"],
+        changeSet: {
+          changedFiles: ["src/order/rules.ts"],
+          summary: "updated order rules",
+        },
+        verifiedFiles: [],
+        unverifiedFiles: [
+          {
+            path: "src/order/rules.ts",
+            reason: "focused verification failed",
+          },
+        ],
+        failedFiles: [
+          {
+            path: "src/order/rules.test.ts",
+            reason: "expected discounted status",
+          },
+        ],
+        verification: {
+          status: "failed",
+          command: "npm test -- src/order/rules.test.ts",
+          reason: "expected discounted status",
+          blockerKind: "test-failed",
+          nextAction: "repair order rules and rerun focused verification",
+        },
+        repair: {
+          status: "not-needed",
+          attempts: 0,
+          notes: [],
+        },
+        diagnosis: {
+          disposition: "grounded-explanation",
+          candidateFiles: ["src/order/rules.ts"],
+          evidenceFiles: ["src/order/rules.ts", "src/order/rules.test.ts"],
+          searchPattern: "discounted status",
+          reason: "focused failure points at order rules",
+          evidenceNodes: [],
+          evidenceLinks: [],
+        },
+        evidence: ["focused failure receipt"],
+        taskSatisfaction: {
+          verdict: "partial",
+          requiredEvidence: ["focused verification"],
+          observedEvidence: [],
+          reasons: ["focused verification failed"],
+        },
+        continuation: {
+          status: "failed-after-bounded-continuation",
+          evidence: ["pending repair after focused verification failure"],
+        },
+      },
+    };
+    const snapshot = makeSnapshot([
+      turnStarted("coder", 1),
+      turnCompleted(failedOutput),
+    ]);
+
+    const seed = buildResumeReplayInput({
+      sessionId: "sess_replay_task_state_repair",
+      snapshot,
+      options: { maxTurns: 4 },
     });
+    const state = createQueryRuntimeStateFromSeed(seed);
+    const decision = decideQueryRuntimeAction(state);
+
+    expect(seed.taskState).toMatchObject({
+      source: "replay",
+      pendingAction: "repair",
+      changedFiles: ["src/order/rules.ts"],
+      unverifiedFiles: ["src/order/rules.ts"],
+      originalFailureClassification: "test-failed",
+      nextVerificationPlan: {
+        command: "npm test -- src/order/rules.test.ts",
+        targetFiles: ["src/order/rules.ts", "src/order/rules.test.ts"],
+      },
+      continuationSafety: { status: "safe" },
+    });
+    expect(seed.taskState?.proofGap).toContain("verification failed");
+    expect(decision.nextAction).toBe("repair");
+    expect(decision.changedFiles).toEqual(["src/order/rules.ts"]);
+    expect(decision.verificationTargets).toContain("src/order/rules.test.ts");
+  });
+
+  it("rejects stale replay task state before it can restore changed-file facts", () => {
+    const snapshot = {
+      ...makeSnapshot([
+        turnStarted("coder", 1),
+        turnStarted("reviewer", 1),
+        turnCompleted(makeOutput("coder", "drifted output")),
+      ]),
+      taskState: {
+        source: "replay" as const,
+        pendingAction: "verify" as const,
+        proofGap: ["verification proof missing for changed files"],
+        changedFiles: ["src/stale.ts"],
+        verifiedFiles: [],
+        unverifiedFiles: ["src/stale.ts"],
+        failureCategories: ["verification failed"],
+        originalFailureClassification: "test-failed",
+        repairAttempts: [],
+        nextVerificationPlan: {
+          command: "npm test -- src/stale.test.ts",
+          targetFiles: ["src/stale.ts"],
+        },
+        artifactPendingState: {
+          claims: [],
+          evidenceIds: [],
+          missingClaims: [],
+        },
+        continuationSafety: {
+          status: "stale" as const,
+          reasons: ["turn pairing drift"],
+        },
+      },
+    };
+
+    const seed = buildResumeReplayInput({
+      sessionId: "sess_replay_stale_task_state",
+      snapshot,
+    });
+    const state = createQueryRuntimeStateFromSeed(seed);
+    const observations = ensureQueryRuntimeObservationState(state);
+    const decision = decideQueryRuntimeAction(state);
+
+    expect(seed.recoveryBoundary).toBe("fresh-entry");
+    expect(seed.taskState?.continuationSafety.status).toBe("stale");
+    expect(observations.changedFiles).toEqual([]);
+    expect(decision.nextAction).toBe("search");
+    expect(decision.changedFiles).toEqual([]);
   });
 });
 

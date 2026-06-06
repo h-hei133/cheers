@@ -6,6 +6,8 @@ import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "../orchestration/types.js";
+import { createQueryRuntimeStateFromSeed } from "../core/query/runtime/state.js";
+import { decideQueryRuntimeAction } from "../core/query/runtime/policy.js";
 import { buildMultiFileUpdatePlanningRouteResult } from "../edit/patch/plan/result.js";
 import type { MultiFileUpdatePlanningClassification } from "../edit/patch/plan/multiFile.js";
 import { SessionManager, type Session } from "./SessionManager.js";
@@ -123,6 +125,38 @@ describe("mutation compact continuity", () => {
     expect(context).not.toContain("- recent-changed-files: src/a.ts, src/b.ts");
     expect(context).not.toContain("rollback succeeded");
     expect(context).not.toContain("atomic rollback");
+  });
+
+  it("restores compact task state into normal runtime discovery after failed verification", () => {
+    const manager = new SessionManager();
+    const session = createSeededMutationSession(manager, "update two files");
+    const result = makeMutationPartialFailureResult(session);
+
+    appendUntilAutoCompact(manager, session, result);
+    manager.saveError(session.id, partialStopReason, {
+      terminalReason: "stopped_error",
+      terminalClassification: "stopped",
+    });
+
+    const restoredManager = new SessionManager();
+    const seed = restoredManager.buildRuntimeStateSeed(session.id, {
+      maxTurns: 4,
+    });
+    const state = createQueryRuntimeStateFromSeed(seed);
+    const decision = decideQueryRuntimeAction(state);
+
+    expect(seed.taskState).toMatchObject({
+      source: "compact",
+      changedFiles: ["src/a.ts"],
+      verifiedFiles: ["src/a.ts"],
+      unverifiedFiles: ["src/b.ts"],
+      originalFailureClassification: "unknown",
+      continuationSafety: { status: "safe" },
+    });
+    expect(seed.taskState?.proofGap).toContain("repair proof missing");
+    expect(decision.nextAction).toBe("search");
+    expect(decision.changedFiles).toEqual(["src/a.ts"]);
+    expect(seed.taskState?.proofGap).toContain("repair proof missing");
   });
 
   it("preserves exactly-three planning no-write stopped state across compact-equivalent reload and follow-up", () => {

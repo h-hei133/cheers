@@ -1,4 +1,6 @@
 import type { QueryRuntimeRepairSummary } from "../../core/query/runtime/state.js";
+import type { QueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
+import { decodeQueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
 import type { DurableLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
 import type {
   ContinuationReason,
@@ -25,6 +27,7 @@ export interface RecoverySnapshot {
   readonly lastContinuationReason?: ContinuationReason;
   readonly pendingLifecycle: DurableLifecycleIndex;
   readonly repairSummary: QueryRuntimeRepairSummary;
+  readonly taskState?: QueryRuntimeTaskState;
   readonly lastUserMessage?: SessionMessage;
   readonly lastAssistantMessage?: SessionMessage;
   readonly lastLifecycleEvent?: Extract<TranscriptEvent, { type: "lifecycle" }>;
@@ -74,9 +77,24 @@ export function buildSessionRecoverySnapshot(input: {
     lastContinuationReason: input.state.lastContinuationReason,
     pendingLifecycle: readModelLifecycle,
     repairSummary: replayPreparation.repairSummary,
+    ...(decodeCompactTaskState(input.state.workingMemory)
+      ? { taskState: decodeCompactTaskState(input.state.workingMemory) }
+      : {}),
     lastUserMessage,
     lastAssistantMessage,
     lastLifecycleEvent: lifecycleEvents[lifecycleEvents.length - 1],
     transcriptEvents,
   };
+}
+
+function decodeCompactTaskState(workingMemory: unknown): QueryRuntimeTaskState | undefined {
+  if (!workingMemory || typeof workingMemory !== "object" || Array.isArray(workingMemory)) {
+    return undefined;
+  }
+  const root = workingMemory as Record<string, unknown>;
+  const continuity = root.continuity;
+  if (!continuity || typeof continuity !== "object" || Array.isArray(continuity)) {
+    return undefined;
+  }
+  return decodeQueryRuntimeTaskState((continuity as Record<string, unknown>).taskState);
 }

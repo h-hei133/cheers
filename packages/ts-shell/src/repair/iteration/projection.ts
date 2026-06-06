@@ -59,6 +59,38 @@ export interface ProductRepairAttemptProjection {
   readonly failureOutputUsedForRetry: boolean;
 }
 
+export type ProductRepairContinuationStrategy =
+  | "none"
+  | "repair-from-failure"
+  | "verify-after-repair"
+  | "discover-missing-context"
+  | "change-repair-strategy";
+
+export function projectRepairContinuationStrategy(input: {
+  readonly failureOutput?: string;
+  readonly priorAttemptReasons: readonly string[];
+  readonly changedFiles: readonly string[];
+  readonly verificationStatus?: string;
+  readonly contextQuality: "sufficient" | "missing" | "unknown";
+}): ProductRepairContinuationStrategy {
+  if (input.changedFiles.length > 0 && input.verificationStatus !== "passed") {
+    return "verify-after-repair";
+  }
+  if (input.contextQuality === "missing" || mentionsMissingContext(input.failureOutput)) {
+    return "discover-missing-context";
+  }
+  const failure = sanitizeSummary(input.failureOutput ?? "");
+  const repeated = failure.length > 0 &&
+    input.priorAttemptReasons.some((reason) => sanitizeSummary(reason) === failure);
+  if (repeated || input.priorAttemptReasons.length > 0 && input.verificationStatus === "failed") {
+    return "change-repair-strategy";
+  }
+  if (failure.length > 0 && input.verificationStatus === "failed") {
+    return "repair-from-failure";
+  }
+  return "none";
+}
+
 export function projectRepairIteration(input: {
   readonly originalFailurePreserved: boolean;
   readonly repairProposalSource: string;
@@ -209,6 +241,13 @@ function normalizeAttempts(input: {
 
 function sanitizeSummary(value: string): string {
   return value.replace(/\s+/g, " ").trim().slice(0, 240);
+}
+
+function mentionsMissingContext(value: string | undefined): boolean {
+  const normalized = sanitizeSummary(value ?? "").toLowerCase();
+  return normalized.includes("missing context") ||
+    normalized.includes("not enough context") ||
+    normalized.includes("context insufficient");
 }
 
 function isRepairApplySuccess(status: string): boolean {

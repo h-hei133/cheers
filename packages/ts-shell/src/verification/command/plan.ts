@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import type { AgentPlan } from "../../orchestration/agentPlan.js";
+import type { CodingResultSummary } from "../../orchestration/types.js";
 import {
   blockedCommandReason,
   isAllowlistedFocusedTsShellTestCommand,
@@ -81,6 +82,34 @@ export interface VerificationCommandPlan {
   readonly reason: string;
   readonly nextAction: string;
   readonly evidence: readonly string[];
+}
+
+export interface TaskStateVerificationPlanProjection {
+  readonly command?: string;
+  readonly targetFiles: readonly string[];
+  readonly failedFiles: readonly string[];
+  readonly status?: string;
+  readonly nextAction?: string;
+}
+
+export function projectTaskStateVerificationPlan(
+  result: CodingResultSummary,
+): TaskStateVerificationPlanProjection {
+  const command = result.verification.command?.trim();
+  return {
+    ...(command ? { command } : {}),
+    targetFiles: uniquePlanValues([
+      ...result.changedFiles,
+      ...result.changeSet.changedFiles,
+      ...result.verifiedFiles,
+      ...result.unverifiedFiles.map((file) => file.path),
+      ...result.failedFiles.map((file) => file.path),
+      ...(command ? inferCommandTargets(command) : []),
+    ]),
+    failedFiles: uniquePlanValues(result.failedFiles.map((file) => file.path)),
+    ...(result.verification.status ? { status: result.verification.status } : {}),
+    ...(result.verification.nextAction ? { nextAction: result.verification.nextAction } : {}),
+  };
 }
 
 export function buildVerificationCommandPlan(input: {
@@ -434,6 +463,16 @@ function buildNextAction(input: {
 
 function safeLabel(value: string, maxChars: number): string {
   return redactProviderEditText(value).replace(/\s+/g, " ").trim().slice(0, maxChars);
+}
+
+function inferCommandTargets(command: string): readonly string[] {
+  return uniquePlanValues(command.split(/\s+/).filter((part) =>
+    /\.[cm]?[tj]sx?$|\.test\.[cm]?[tj]sx?$/.test(part)
+  ));
+}
+
+function uniquePlanValues(values: readonly string[]): readonly string[] {
+  return [...new Set(values.map((value) => value.replace(/\s+/g, " ").trim()).filter(Boolean))];
 }
 
 function buildPlanId(input: {

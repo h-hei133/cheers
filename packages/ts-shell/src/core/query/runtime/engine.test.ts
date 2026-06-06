@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createEmptyLifecycleIndex } from '../../tools/toolResultLifecycle.js'
 import type { AgentRunner, CodingResultSummary } from '../../../orchestration/types.js'
 import { buildResumeReplayInput } from '../../../session/replay/builder.js'
+import type { QueryRuntimeTaskState } from './taskState.js'
 import { QueryEngine } from './engine.js'
 
 describe('core QueryEngine migration (W1)', () => {
@@ -3323,6 +3324,224 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.status).toBe('stopped_not_proven')
     expect(result.stopReason).toContain('no safe action remains after execution batch failure')
   })
+
+  it('changes repeated repair strategy from restored task state to discovery', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.proofGap.join('|')}`)
+      return {
+        role,
+        content: 'rediscovered formatter owner after repeated repair',
+        codingResult: codingResult({
+          evidenceFiles: ['src/order/formatter.ts'],
+          requiredEvidence: ['fresh repair context'],
+          observedEvidence: [],
+          lastAction: { actionKind: 'repo-explain', target: 'src/order/formatter.ts' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_task_state_repeated_repair', 'continue order repair after failed focused check', {
+      maxTurns: 1,
+      startingRole: 'coder',
+      runtimeSeed: runtimeSeedWithTaskState('sess_task_state_repeated_repair', {
+        source: 'replay',
+        pendingAction: 'repair',
+        proofGap: ['verification failed', 'repair proof missing'],
+        changedFiles: ['src/order/rules.ts'],
+        verifiedFiles: [],
+        unverifiedFiles: ['src/order/rules.ts'],
+        failureCategories: ['verification failed', 'repair failed'],
+        originalFailureClassification: 'test-failed',
+        repairAttempts: [{
+          attempt: 1,
+          signature: 'src/order/rules.ts',
+          reason: 'same focused verification failed after first repair',
+          changedFiles: ['src/order/rules.ts'],
+        }],
+        nextVerificationPlan: {
+          command: 'npm test -- src/order/rules.test.ts',
+          targetFiles: ['src/order/rules.ts', 'src/order/rules.test.ts'],
+          failedFiles: ['src/order/rules.test.ts'],
+          status: 'failed',
+          nextAction: 'repair order rules',
+        },
+        artifactPendingState: {
+          claims: [],
+          evidenceIds: [],
+          missingClaims: [],
+        },
+        continuationSafety: {
+          status: 'safe',
+          reasons: ['replay turn pairing accepted'],
+        },
+      }),
+    })
+
+    expect(seenActions[0]).toContain('1:search:')
+    expect(seenActions[0]).not.toContain('1:repair:')
+    expect(result.status).toBe('stopped_not_proven')
+  })
+
+  it('requires targeted verification after restored repair changed files', async () => {
+    const seenActions: string[] = []
+    const changedTargets = ['src/cart/total.ts', 'src/cart/total.test.ts']
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.verificationTargets.join(',')}`)
+      return {
+        role,
+        content: 'post repair verification still pending',
+        codingResult: codingResult({
+          changedFiles: changedTargets,
+          repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/cart/total.ts'] },
+          verification: { status: 'not-requested', reason: 'post repair targeted check not run' },
+          requiredEvidence: ['post repair targeted verification'],
+          observedEvidence: [],
+          lastAction: { actionKind: 'repair', target: 'src/cart/total.ts', changedFiles: changedTargets },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_task_state_post_repair_verify', 'continue cart repair verification', {
+      maxTurns: 1,
+      startingRole: 'reviewer',
+      runtimeSeed: runtimeSeedWithTaskState('sess_task_state_post_repair_verify', {
+        source: 'replay',
+        pendingAction: 'verify',
+        proofGap: ['verification proof missing for changed files'],
+        changedFiles: changedTargets,
+        verifiedFiles: [],
+        unverifiedFiles: changedTargets,
+        failureCategories: ['verification failed'],
+        originalFailureClassification: 'test-failed',
+        repairAttempts: [{
+          attempt: 1,
+          signature: 'src/cart/total.ts',
+          reason: 'repair changed cart total',
+          changedFiles: changedTargets,
+        }],
+        nextVerificationPlan: {
+          command: 'npm test -- src/cart/total.test.ts',
+          targetFiles: changedTargets,
+          failedFiles: [],
+          status: 'not-requested',
+          nextAction: 'rerun focused verification',
+        },
+        artifactPendingState: {
+          claims: [],
+          evidenceIds: [],
+          missingClaims: [],
+        },
+        continuationSafety: {
+          status: 'safe',
+          reasons: ['replay turn pairing accepted'],
+        },
+      }),
+    })
+
+    expect(seenActions[0]).toBe(`1:verify:${changedTargets.join(',')}`)
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.stopReason).not.toBe('completed')
+  })
+
+  it('switches missing-context repair from restored state to discovery', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.proofGap.join('|')}`)
+      return {
+        role,
+        content: 'read missing pricing owner context',
+        codingResult: codingResult({
+          evidenceFiles: ['src/pricing/source.ts'],
+          requiredEvidence: ['pricing owner context'],
+          observedEvidence: [],
+          lastAction: { actionKind: 'repo-explain', target: 'src/pricing/source.ts' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_task_state_missing_context_repair', 'continue pricing repair', {
+      maxTurns: 1,
+      startingRole: 'coder',
+      runtimeSeed: runtimeSeedWithTaskState('sess_task_state_missing_context_repair', {
+        source: 'compact',
+        pendingAction: 'repair',
+        proofGap: ['context evidence incomplete', 'verification failed'],
+        changedFiles: ['src/pricing/discount.ts'],
+        verifiedFiles: [],
+        unverifiedFiles: ['src/pricing/discount.ts'],
+        failureCategories: ['missing context', 'verification failed'],
+        originalFailureClassification: 'missing-context',
+        repairAttempts: [],
+        nextVerificationPlan: {
+          command: 'npm test -- src/pricing/discount.test.ts',
+          targetFiles: ['src/pricing/discount.ts', 'src/pricing/discount.test.ts'],
+          failedFiles: ['src/pricing/discount.test.ts'],
+          status: 'failed',
+          nextAction: 'inspect pricing source before repair',
+        },
+        artifactPendingState: {
+          claims: [],
+          evidenceIds: [],
+          missingClaims: [],
+        },
+        continuationSafety: {
+          status: 'safe',
+          reasons: ['compact quality checks passed'],
+        },
+      }),
+    })
+
+    expect(seenActions[0]).toContain('1:search:')
+    expect(seenActions[0]).not.toContain('1:repair:')
+    expect(result.status).toBe('stopped_not_proven')
+  })
+
+  it('preserves original failure classification from restored task state in runtime proof gap', async () => {
+    const seenProofGaps: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction }) => {
+      seenProofGaps.push(runtimeAction.proofGap.join('|'))
+      return { role, content: 'classification observed' }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_task_state_original_failure', 'continue inventory verification repair', {
+      maxTurns: 1,
+      startingRole: 'coder',
+      runtimeSeed: runtimeSeedWithTaskState('sess_task_state_original_failure', {
+        source: 'replay',
+        pendingAction: 'repair',
+        proofGap: ['verification failed', 'original failure: test-failed'],
+        changedFiles: ['src/inventory/status.ts'],
+        verifiedFiles: [],
+        unverifiedFiles: ['src/inventory/status.ts'],
+        failureCategories: ['verification failed'],
+        originalFailureClassification: 'test-failed',
+        repairAttempts: [],
+        nextVerificationPlan: {
+          command: 'npm test -- src/inventory/status.test.ts',
+          targetFiles: ['src/inventory/status.ts', 'src/inventory/status.test.ts'],
+          failedFiles: ['src/inventory/status.test.ts'],
+          status: 'failed',
+          nextAction: 'repair inventory status',
+        },
+        artifactPendingState: {
+          claims: [],
+          evidenceIds: [],
+          missingClaims: [],
+        },
+        continuationSafety: {
+          status: 'safe',
+          reasons: ['replay turn pairing accepted'],
+        },
+      }),
+    })
+
+    expect(seenProofGaps[0]).toContain('original failure: test-failed')
+  })
 })
 
 function emptyRuntimeObservations() {
@@ -3331,6 +3550,8 @@ function emptyRuntimeObservations() {
     changedFiles: [],
     verificationTargets: [],
     failedVerificationTargets: [],
+    restoredProofGap: [],
+    failureCategories: [],
     repairAttempts: [],
     toolFailures: [],
     artifactEvidence: [],
@@ -3359,6 +3580,36 @@ function replayTruthBoundary() {
       ignoredRoleMismatchedTurnCompletions: 0,
     },
     continuationSafety: 'completed-turn-only' as const,
+  }
+}
+
+function runtimeSeedWithTaskState(
+  sessionId: string,
+  taskState: QueryRuntimeTaskState,
+) {
+  return {
+    config: {
+      sessionId,
+      initialPrompt: 'continue restored task state',
+      maxTurns: 1,
+      startingRole: 'coder' as const,
+    },
+    currentRole: 'coder' as const,
+    turn: 1,
+    lastContinuationReason: undefined,
+    pendingLifecycle: createEmptyLifecycleIndex(),
+    sharedContext: {
+      sessionId,
+      initialPrompt: 'continue restored task state',
+      notes: [],
+      handoffs: [],
+    },
+    transcript: [],
+    visitedTransitions: [],
+    recoveryBoundary: 'completed-turn-reentry' as const,
+    truthBoundary: replayTruthBoundary(),
+    derivedState: { transcript: [] },
+    taskState,
   }
 }
 

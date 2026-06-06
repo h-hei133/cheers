@@ -39,7 +39,10 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     ...unverifiedFiles,
     ...(latestCodingResult?.verifiedFiles ?? []),
   ]);
-  const failureCategories = failureCategoriesFor(latestCodingResult, taskIntent);
+  const failureCategories = uniqueStrings([
+    ...failureCategoriesFor(latestCodingResult, taskIntent),
+    ...observations.failureCategories,
+  ]);
   const pendingAction = observations.pendingAction ?? pendingActionFor(state, latestCodingResult);
   const continuationFacts = uniqueStrings([
     ...observations.continuationFacts,
@@ -50,6 +53,7 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     changedFiles,
     failedFiles,
     unverifiedFiles,
+    restoredProofGap: observations.restoredProofGap,
     continuationFacts,
     pendingAction,
     taskKind,
@@ -212,7 +216,7 @@ function failureCategoriesFor(result: CodingResultSummary | undefined, taskInten
   return uniqueStrings([
     ...(includesAny(taskIntent, ["missing context", "not enough context"]) ? ["missing context"] : []),
     ...(result?.diagnosis?.disposition === "insufficient-evidence" ? ["context insufficient"] : []),
-    ...(result?.failedFiles.length ? ["missing context"] : []),
+    ...(result?.failedFiles.some((file) => file.reason.toLowerCase().includes("context")) ? ["missing context"] : []),
     ...(result?.verification.status === "failed" ? ["verification failed"] : []),
     ...(result?.verification.status === "blocked" ? ["verification blocked"] : []),
   ]);
@@ -253,6 +257,7 @@ function proofGapFor(
     readonly changedFiles: readonly string[];
     readonly failedFiles: readonly string[];
     readonly unverifiedFiles: readonly string[];
+    readonly restoredProofGap: readonly string[];
     readonly continuationFacts: readonly string[];
     readonly pendingAction?: ToolActionKind;
     readonly taskKind: string;
@@ -260,6 +265,7 @@ function proofGapFor(
 ): readonly string[] {
   if (!result) {
     return uniqueStrings([
+      ...input.restoredProofGap,
       ...(input.taskKind === "workspace-understanding" ? ["context evidence incomplete"] : []),
       ...(state.turn > state.config.maxTurns ? ["runtime budget exhausted"] : []),
     ]);
@@ -268,6 +274,7 @@ function proofGapFor(
   const requiredEvidence = result.taskSatisfaction.requiredEvidence ?? [];
   const observedEvidence = new Set(result.taskSatisfaction.observedEvidence ?? []);
   return uniqueStrings([
+    ...input.restoredProofGap,
     ...requiredEvidence.filter((item) => !observedEvidence.has(item)).map((item) => `missing proof: ${item}`),
     ...(input.changedFiles.length > 0 && result.verification.status !== "passed"
       ? ["verification proof missing for changed files"]

@@ -13,6 +13,10 @@ import {
   deriveQueryRuntimeObservationState,
   type QueryRuntimeObservationState,
 } from './observation.js'
+import {
+  queryRuntimeTaskStateObservationPatch,
+  type QueryRuntimeTaskState,
+} from './taskState.js'
 
 export interface QueryRuntimeConfig {
   readonly sessionId: string
@@ -152,6 +156,7 @@ export interface QueryRuntimeStateSeed {
   readonly truthBoundary: QueryRuntimeSeedTruthBoundary
   readonly derivedState: QueryRuntimeSeedDerivedState
   readonly observations?: QueryRuntimeObservationState
+  readonly taskState?: QueryRuntimeTaskState
 }
 
 export function createQueryRuntimeState(
@@ -200,6 +205,7 @@ export function createQueryRuntimeStateFromSeed(
     observations: mergeSeedObservations(
       deriveQueryRuntimeObservationState(transcript),
       seed.observations,
+      seed.taskState,
     ),
     transcript,
     visitedTransitions: new Set(derivedContext.visitedTransitions),
@@ -209,23 +215,73 @@ export function createQueryRuntimeStateFromSeed(
 function mergeSeedObservations(
   derived: QueryRuntimeObservationState,
   seed: QueryRuntimeObservationState | undefined,
+  taskState: QueryRuntimeTaskState | undefined,
 ): QueryRuntimeObservationState {
-  if (!seed) return derived
+  const taskStatePatch = taskState
+    ? queryRuntimeTaskStateObservationPatch(taskState)
+    : undefined
+  if (!seed && !taskStatePatch) return derived
   return {
-    contextPaths: uniqueStrings([...derived.contextPaths, ...(seed.contextPaths ?? [])]),
-    changedFiles: uniqueStrings([...derived.changedFiles, ...(seed.changedFiles ?? [])]),
-    verificationTargets: uniqueStrings([...derived.verificationTargets, ...(seed.verificationTargets ?? [])]),
-    failedVerificationTargets: uniqueStrings([...derived.failedVerificationTargets, ...(seed.failedVerificationTargets ?? [])]),
-    repairAttempts: [...derived.repairAttempts, ...(seed.repairAttempts ?? [])],
-    toolFailures: [...derived.toolFailures, ...(seed.toolFailures ?? [])],
-    artifactEvidence: uniqueStrings([...derived.artifactEvidence, ...(seed.artifactEvidence ?? [])]),
-    artifactClaims: uniqueStrings([...derived.artifactClaims, ...(seed.artifactClaims ?? [])]),
-    artifactClaimEvidence: [...derived.artifactClaimEvidence, ...(seed.artifactClaimEvidence ?? [])],
-    commandCoverage: [...derived.commandCoverage, ...(seed.commandCoverage ?? [])],
-    toolFeedback: [...derived.toolFeedback, ...(seed.toolFeedback ?? [])],
-    continuationFacts: uniqueStrings([...derived.continuationFacts, ...(seed.continuationFacts ?? [])]),
-    completedActions: uniqueList([...derived.completedActions, ...(seed.completedActions ?? [])]),
-    pendingAction: seed.pendingAction ?? derived.pendingAction,
+    contextPaths: uniqueStrings([
+      ...derived.contextPaths,
+      ...(seed?.contextPaths ?? []),
+      ...(taskStatePatch?.contextPaths ?? []),
+    ]),
+    changedFiles: uniqueStrings([
+      ...derived.changedFiles,
+      ...(seed?.changedFiles ?? []),
+      ...(taskStatePatch?.changedFiles ?? []),
+    ]),
+    verificationTargets: uniqueStrings([
+      ...derived.verificationTargets,
+      ...(seed?.verificationTargets ?? []),
+      ...(taskStatePatch?.verificationTargets ?? []),
+    ]),
+    failedVerificationTargets: uniqueStrings([
+      ...derived.failedVerificationTargets,
+      ...(seed?.failedVerificationTargets ?? []),
+      ...(taskStatePatch?.failedVerificationTargets ?? []),
+    ]),
+    restoredProofGap: uniqueStrings([
+      ...derived.restoredProofGap,
+      ...(seed?.restoredProofGap ?? []),
+      ...(taskStatePatch?.restoredProofGap ?? []),
+    ]),
+    failureCategories: uniqueStrings([
+      ...derived.failureCategories,
+      ...(seed?.failureCategories ?? []),
+      ...(taskStatePatch?.failureCategories ?? []),
+    ]),
+    repairAttempts: [
+      ...derived.repairAttempts,
+      ...(seed?.repairAttempts ?? []),
+      ...(taskStatePatch?.repairAttempts ?? []),
+    ],
+    toolFailures: [
+      ...derived.toolFailures,
+      ...(seed?.toolFailures ?? []),
+      ...(taskStatePatch?.toolFailures ?? []),
+    ],
+    artifactEvidence: uniqueStrings([...derived.artifactEvidence, ...(seed?.artifactEvidence ?? [])]),
+    artifactClaims: uniqueStrings([
+      ...derived.artifactClaims,
+      ...(seed?.artifactClaims ?? []),
+      ...(taskStatePatch?.artifactClaims ?? []),
+    ]),
+    artifactClaimEvidence: [
+      ...derived.artifactClaimEvidence,
+      ...(seed?.artifactClaimEvidence ?? []),
+      ...(taskStatePatch?.artifactClaimEvidence ?? []),
+    ],
+    commandCoverage: [...derived.commandCoverage, ...(seed?.commandCoverage ?? [])],
+    toolFeedback: [...derived.toolFeedback, ...(seed?.toolFeedback ?? [])],
+    continuationFacts: uniqueStrings([
+      ...derived.continuationFacts,
+      ...(seed?.continuationFacts ?? []),
+      ...(taskStatePatch?.continuationFacts ?? []),
+    ]),
+    completedActions: uniqueList([...derived.completedActions, ...(seed?.completedActions ?? [])]),
+    pendingAction: taskStatePatch?.pendingAction ?? seed?.pendingAction ?? derived.pendingAction,
   }
 }
 
