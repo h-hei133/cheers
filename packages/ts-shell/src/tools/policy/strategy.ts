@@ -123,15 +123,15 @@ function chooseNextAction(input: ToolStrategyInput & {
   if (input.budget && input.budget.remainingSteps <= 0) {
     return "stop-not-proven";
   }
+  if (input.blockers.some((blocker) => blocker.includes("missing required context")) ||
+    input.proofGap.some((gap) => gap.includes("context evidence incomplete")) ||
+    failedReasonNeedsContext(input)) {
+    return input.allowedTools.includes("search") ? "search" : "read";
+  }
   if (input.proofGap.some((gap) => gap.includes("verification failed")) &&
     input.actionPlans.some((plan) => plan.action === "repair") &&
     !observedRepairAttempt(input)) {
     return "repair";
-  }
-  if (input.blockers.some((blocker) => blocker.includes("missing required context")) ||
-    input.proofGap.some((gap) => gap.includes("context evidence incomplete")) ||
-    failedReasonIncludes(input, "missing context")) {
-    return input.allowedTools.includes("search") ? "search" : "read";
   }
   if (input.pendingAction && pendingActionAllowed(input, input.pendingAction)) {
     return input.pendingAction;
@@ -264,6 +264,18 @@ function failedReasonIncludes(input: ToolStrategyInput, value: string): boolean 
     ...(input.observationFailures ?? []),
     ...(input.repairAttempts ?? []),
   ].some((failure) => failure.reason.toLowerCase().includes(value));
+}
+
+function failedReasonNeedsContext(input: ToolStrategyInput): boolean {
+  return [
+    ...(input.failureHistory ?? []),
+    ...(input.observationFailures ?? []),
+    ...(input.repairAttempts ?? []),
+  ].some((failure) => {
+    const reason = failure.reason.toLowerCase();
+    return reason.includes("missing context") ||
+      (reason.includes("missing") && reason.includes("context"));
+  });
 }
 
 function observedRepairAttempt(input: ToolStrategyInput): boolean {

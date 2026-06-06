@@ -229,4 +229,25 @@ describe("repair loop model", () => {
       terminalSuccessClaim: false,
     });
   });
+
+  it("switches to discovery when verification failure evidence says context is missing", () => {
+    expect(decideRepair({
+      taskKind: "debug-repair",
+      verificationState: "selected-failed",
+      failureCategories: ["verification failed"],
+      hostStatus: "failed",
+      repairSignature: "update-invoice-summary",
+      failureHistory: [{
+        action: "verify",
+        signature: "npm test -- src/invoice/summary.test.ts",
+        reason: "missing owner context for invoice fixture",
+      }],
+    })).toMatchObject({
+      state: "retry-exhausted",
+      repairEligible: false,
+      retryAllowed: false,
+      nextAction: "search",
+      terminalSuccessClaim: false,
+    });
+  });
 });

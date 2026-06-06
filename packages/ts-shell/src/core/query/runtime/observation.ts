@@ -110,7 +110,7 @@ function observeRuntimeEvents(
       state.toolFailures.push({
         action: actionForTool(event.toolName),
         signature: event.taskId,
-        reason: 'tool result failed',
+        reason: sanitizeFailureReason(event.failureReason ?? 'tool result failed'),
       })
     }
     if (event.type === 'tool.started') {
@@ -207,7 +207,27 @@ function observeLastAction(
       signature: seed.target ?? seed.actionKind,
       reason: seed.reason ?? 'action failed',
     })
+  } else if (seed.reason && failureReason(seed.reason)) {
+    state.toolFailures.push({
+      action,
+      signature: seed.target ?? seed.actionKind ?? action,
+      reason: sanitizeFailureReason(seed.reason),
+    })
   }
+}
+
+function sanitizeFailureReason(reason: string): string {
+  return reason.replace(/\s+/g, ' ').trim().slice(0, 160) || 'tool result failed'
+}
+
+function failureReason(reason: string): boolean {
+  const normalized = reason.toLowerCase()
+  return normalized.includes('failed') ||
+    normalized.includes('missing') ||
+    normalized.includes('stale') ||
+    normalized.includes('mismatch') ||
+    normalized.includes('conflict') ||
+    normalized.includes('blocked')
 }
 
 function actionForSeed(action: string | undefined): ToolActionKind {

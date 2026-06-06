@@ -15,6 +15,7 @@ export type TaskProofItem =
   | "artifact-validation"
   | "continuation-freshness"
   | "workspace-target-resolution"
+  | "staged-action-consistency"
   | "result-input";
 
 export interface TaskProofInput {
@@ -53,6 +54,7 @@ export interface TaskProofInputFacts {
   readonly artifactSourceReceiptsComplete?: boolean;
   readonly artifactCorrectionAttempted?: boolean;
   readonly artifactCorrectionValidationState?: string;
+  readonly stagedActionConsistent?: boolean;
   readonly hostStatus: string;
 }
 
@@ -94,9 +96,13 @@ function requiredProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] 
     "verification-passed",
     "result-input",
   ];
+  const stagedActionProof: TaskProofItem[] = facts.stagedActionConsistent === false
+    ? ["staged-action-consistency"]
+    : [];
   if (facts.taskKind === "debug-repair") {
     return freeze([
       ...common,
+      ...stagedActionProof,
       "changed-file-verification-complete",
       "repair-action",
       "repair-post-validation",
@@ -106,12 +112,14 @@ function requiredProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] 
   if (facts.outputKind === "diff") {
     return freeze([
       ...common,
+      ...stagedActionProof,
       "changed-file-verification-complete",
     ]);
   }
   if (facts.outputKind === "artifact") {
     return freeze([
       ...common,
+      ...stagedActionProof,
       "changed-file-verification-complete",
       "artifact-source-receipts",
       "artifact-validation",
@@ -123,6 +131,7 @@ function requiredProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] 
       "plan-ready",
       "request-ready",
       "tool-strategy-ready",
+      ...stagedActionProof,
       "continuation-freshness",
       "result-input",
     ]);
@@ -133,6 +142,7 @@ function requiredProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] 
       "plan-ready",
       "request-ready",
       "tool-strategy-ready",
+      ...stagedActionProof,
       "task-relevant-verification",
       "workspace-target-resolution",
       "result-input",
@@ -201,6 +211,9 @@ function presentProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] {
     facts.selectedPathCount > 0
   ) {
     present.push("workspace-target-resolution");
+  }
+  if (facts.stagedActionConsistent) {
+    present.push("staged-action-consistency");
   }
   if (
     facts.verificationResultInputEligible ||

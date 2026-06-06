@@ -2357,6 +2357,165 @@ describe('core QueryEngine migration (W1)', () => {
     expect(seenActions).toEqual(['continue:src/status/model.ts,reports/status-summary.md:src/status/model.ts,reports/status-summary.md'])
     expect(artifactStates).toContain('1:continue:validation-passed:2:2:complete')
   })
+
+  it('blocks completion when execution output does not match the staged runtime action', async () => {
+    const seenActions: string[] = []
+    const changedTargets = ['src/billing/rules.ts', 'src/billing/rules.test.ts']
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'billing rule owners located',
+          handoffTo: 'coder',
+          handoffReason: 'edit billing rules',
+          codingResult: codingResult({
+            evidenceFiles: changedTargets,
+            observedEvidence: ['billing owners located'],
+            lastAction: { actionKind: 'repo-explain', target: 'src/billing/rules.ts' },
+          }),
+        }
+      }
+      if (turn === 2) {
+        return {
+          role,
+          content: 'billing rule and focused test updated',
+          handoffTo: 'reviewer',
+          handoffReason: 'run focused billing verification',
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            verification: { status: 'not-requested', reason: 'Focused verification not run.' },
+            requiredEvidence: ['billing focused verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              changedFiles: changedTargets,
+              target: 'src/billing/rules.ts',
+            },
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'verification claimed after an unexpected edit',
+        codingResult: codingResult({
+          changedFiles: changedTargets,
+          verification: {
+            status: 'passed',
+            reason: 'Focused billing verification passed.',
+            command: 'npm test -- src/billing/rules.test.ts',
+            selectionScope: 'focused',
+            selectionSource: 'changed-file-impact',
+          },
+          verifiedFiles: changedTargets,
+          requiredEvidence: ['billing focused verification'],
+          observedEvidence: ['billing focused verification'],
+          lastAction: {
+            actionKind: 'edit-file',
+            changedFiles: changedTargets,
+            target: 'src/billing/rules.ts',
+            reason: 'writer changed code while runtime staged verification',
+          },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_staged_action_consistency', 'update billing rule with focused verification', {
+      maxTurns: 4,
+    })
+
+    expect(seenActions).toEqual(['1:search', '2:read', '3:verify'])
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.stopReason).toContain('staged action')
+  })
+
+  it('uses typed verification tool failure to rediscover missing owner context before repair', async () => {
+    const seenActions: string[] = []
+    const changedTargets = ['src/invoice/summary.ts', 'src/invoice/summary.test.ts']
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.proofGap.join('|')}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'invoice owners located',
+          handoffTo: 'coder',
+          handoffReason: 'edit invoice summary',
+          codingResult: codingResult({
+            evidenceFiles: changedTargets,
+            observedEvidence: ['invoice owners located'],
+            lastAction: { actionKind: 'repo-explain', target: 'src/invoice/summary.ts' },
+          }),
+        }
+      }
+      if (turn === 2) {
+        return {
+          role,
+          content: 'invoice summary updated',
+          handoffTo: 'reviewer',
+          handoffReason: 'verify invoice summary',
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            verification: { status: 'not-requested', reason: 'Focused verification not run.' },
+            requiredEvidence: ['invoice focused verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              changedFiles: changedTargets,
+              target: 'src/invoice/summary.ts',
+            },
+          }),
+        }
+      }
+      if (turn === 3) {
+        return {
+          role,
+          content: 'focused invoice verification could not resolve owner fixture',
+          handoffTo: 'coder',
+          handoffReason: 'find missing fixture owner',
+          events: [
+            { type: 'tool.started', toolName: 'verify', taskId: 'verify_invoice_summary' },
+            {
+              type: 'tool.result',
+              toolName: 'verify',
+              taskId: 'verify_invoice_summary',
+              success: false,
+              failureReason: 'missing owner context for invoice fixture',
+            },
+          ],
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            failedFiles: [{ path: 'src/invoice/summary.test.ts', reason: 'invoice fixture owner missing' }],
+            verification: {
+              status: 'failed',
+              reason: 'Missing owner context for invoice fixture.',
+              command: 'npm test -- src/invoice/summary.test.ts',
+              selectionScope: 'focused',
+              selectionSource: 'changed-file-impact',
+            },
+            requiredEvidence: ['invoice focused verification'],
+            observedEvidence: [],
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'missing invoice fixture owner discovered',
+        codingResult: codingResult({
+          evidenceFiles: ['src/invoice/fixtures.ts'],
+          observedEvidence: ['invoice fixture owner context'],
+          lastAction: { actionKind: 'repo-explain', target: 'src/invoice/fixtures.ts' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    await engine.submitMessage('sess_typed_tool_failure_context', 'update invoice summary with missing fixture owner', {
+      maxTurns: 5,
+    })
+
+    expect(seenActions.some((action) => action.startsWith('4:search:'))).toBe(true)
+  })
 })
 
 function codingResult(input: {

@@ -118,6 +118,10 @@ function terminalProofBlocker(
       projection.verdict.missingProof[0] ??
       'repair proof gap remains'
   }
+  const stagedActionBlocker = projection.verdict.missingProof.find((item) => item.includes('staged-action'))
+  if (stagedActionBlocker) {
+    return 'staged action proof missing'
+  }
   if (hasOpenRuntimeProofGap(output)) {
     return 'proof gap remains'
   }

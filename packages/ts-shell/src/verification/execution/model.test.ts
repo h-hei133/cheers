@@ -163,4 +163,42 @@ describe("verification execution model", () => {
       missingFiles: ["src/orders/statusRenderer.ts", "src/orders/statusRenderer.test.ts"],
     });
   });
+
+  it("keeps passed selection partial when command execution does not cover changed targets", () => {
+    expect(executeVerification({
+      selection: {
+        state: "selected-passed",
+        command: "npm test -- src/invoice/summary.test.ts",
+        targets: ["src/invoice/summary.test.ts"],
+        blockers: [],
+        fallback: "repair",
+        terminalSuccessClaim: false,
+      },
+      strategy: {
+        state: "ready",
+        actions: ["verify"],
+        actionPlans: [],
+        nextAction: "verify",
+        proofGap: [],
+        changedFiles: ["src/invoice/summary.ts"],
+        taskIntent: "Update invoice summary.",
+        continuationFacts: [],
+        blockers: [],
+        terminalSuccessClaim: false,
+      },
+      contextReady: true,
+      changedFiles: ["src/invoice/summary.ts"],
+      commandExecutions: [{
+        command: "npm test -- src/invoice/summary.test.ts",
+        coveredFiles: ["src/invoice/summary.test.ts"],
+        status: "passed",
+      }],
+    })).toEqual({
+      state: "partial",
+      evidenceInputEligible: false,
+      resultInputEligible: false,
+      blockers: ["verification command missing changed target: src/invoice/summary.ts"],
+      terminalSuccessClaim: false,
+    });
+  });
 });

@@ -229,7 +229,7 @@ function repeatedRepair(input: RepairDecisionInput): boolean {
 
 function failedRepairNeedsContext(input: RepairDecisionInput): boolean {
   return (input.failureHistory ?? []).some((failure) =>
-    failure.action === "repair" && contextMissing(failure.reason)
+    (failure.action === "repair" || failure.action === "verify") && contextMissing(failure.reason)
   );
 }
 

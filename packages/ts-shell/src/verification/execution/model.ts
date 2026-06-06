@@ -12,6 +12,11 @@ export interface VerificationExecutionInput {
   readonly artifactCorrection?: ArtifactCorrection;
   readonly contextReady: boolean;
   readonly changedFiles?: readonly string[];
+  readonly commandExecutions?: readonly {
+    readonly command: string;
+    readonly coveredFiles: readonly string[];
+    readonly status: "passed" | "failed" | "blocked" | "not-run";
+  }[];
 }
 
 export interface VerificationExecution {
@@ -39,6 +44,10 @@ export interface ChangedFileVerificationCoverageInput {
 export function executeVerification(input: VerificationExecutionInput): VerificationExecution {
   if (input.strategy.state === "blocked" || !input.contextReady) {
     return result("blocked", ["verification blocked"]);
+  }
+  const commandCoverageBlockers = commandCoverageBlockersFor(input);
+  if (commandCoverageBlockers.length > 0) {
+    return result("partial", commandCoverageBlockers);
   }
   if (input.repairAction?.postValidation === "passed") {
     return result("passed", []);
@@ -74,6 +83,22 @@ export function executeVerification(input: VerificationExecutionInput): Verifica
     return result("not-run", ["verification not selected"]);
   }
   return result("blocked", input.selection.blockers);
+}
+
+function commandCoverageBlockersFor(input: VerificationExecutionInput): readonly string[] {
+  if (!input.commandExecutions || input.commandExecutions.length === 0) {
+    return [];
+  }
+  const passedCoverage = new Set(input.commandExecutions
+    .filter((execution) => execution.status === "passed")
+    .flatMap((execution) => execution.coveredFiles));
+  const requiredTargets = uniquePaths([
+    ...(input.changedFiles ?? []),
+    ...(input.selection.selectedInputs?.changedFiles ?? []),
+  ]);
+  return requiredTargets
+    .filter((target) => !passedCoverage.has(target))
+    .map((target) => `verification command missing changed target: ${target}`);
 }
 
 export function verifyChangedFileCoverage(

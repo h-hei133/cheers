@@ -95,6 +95,7 @@ export function projectQueryRuntimeProof(input: {
     artifactSourceReceiptsComplete: artifactReceipt?.sourceReceipts.every((receipt) => receipt.available),
     artifactCorrectionAttempted: artifactCorrection?.attempted,
     artifactCorrectionValidationState: artifactCorrection?.validationState,
+    stagedActionConsistent: stagedActionConsistent(input.decision, result),
     hostStatus: hostStatusFor(result),
   });
   const verdict = projectTaskVerdict({
@@ -225,4 +226,45 @@ function hostStatusFor(result: CodingResultSummary | undefined): string {
   if (result.verification.status === "failed") return "failed";
   if (result.verification.status === "blocked") return "unsupported";
   return "executed";
+}
+
+function stagedActionConsistent(
+  decision: QueryRuntimeActionDecision,
+  result: CodingResultSummary | undefined,
+): boolean | undefined {
+  const seed = result?.lastActionResultSeed;
+  if (!seed?.actionKind) {
+    return undefined;
+  }
+  const observed = actionForSeed(seed.actionKind);
+  if (decision.nextAction === "search" || decision.nextAction === "read") {
+    return observed === "search" || observed === "read";
+  }
+  return observed === decision.nextAction;
+}
+
+function actionForSeed(action: string): QueryRuntimeActionDecision["nextAction"] {
+  const normalized = action.toLowerCase();
+  if (normalized.includes("repo-explain") || normalized.includes("search") || normalized.includes("find")) {
+    return "search";
+  }
+  if (normalized.includes("read") || normalized.includes("inspect")) {
+    return "read";
+  }
+  if (normalized.includes("edit") || normalized.includes("write") || normalized.includes("apply")) {
+    return "edit";
+  }
+  if (normalized.includes("verify") || normalized.includes("test") || normalized.includes("check")) {
+    return "verify";
+  }
+  if (normalized.includes("repair")) {
+    return "repair";
+  }
+  if (normalized.includes("artifact")) {
+    return "artifact";
+  }
+  if (normalized.includes("continu")) {
+    return "continue";
+  }
+  return "read";
 }

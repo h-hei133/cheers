@@ -84,6 +84,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/hard-mission-gauntlet.md` | active | Checking the SP044 hard normal-runtime mission set, initial weaknesses, and same-mission rerun outcomes. |  | Sprint Knowledge Base / Core Capability |
 | `docs/sprint/real-development-mission-pack.md` | active | Checking the SP045 real development mission set, baseline weaknesses, same-mission reruns, and introduction decisions. |  | Sprint Knowledge Base / Core Capability |
 | `docs/sprint/final-architecture-audit-record.md` | active | Checking SP050 final owner-boundary audit findings, product fixes, no-fix closures, reference inputs, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/parity-development-trial.md` | active | Checking SP051 unseen parity trial tasks, initial weak phases, owner upgrades, reference inputs, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 

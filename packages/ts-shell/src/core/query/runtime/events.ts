@@ -12,7 +12,14 @@ export type QueryEvent =
   | { readonly type: 'tool.started'; readonly toolName: string; readonly taskId: string }
   | { readonly type: 'approval.requested'; readonly toolName: string; readonly taskId: string }
   | { readonly type: 'approval.resolved'; readonly toolName: string; readonly taskId: string; readonly outcome: 'approved' | 'denied'; readonly compensated?: boolean }
-  | { readonly type: 'tool.result'; readonly toolName: string; readonly taskId: string; readonly success: boolean; readonly compensated?: boolean }
+  | {
+    readonly type: 'tool.result';
+    readonly toolName: string;
+    readonly taskId: string;
+    readonly success: boolean;
+    readonly compensated?: boolean;
+    readonly failureReason?: string;
+  }
   | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
   | { readonly type: 'turn.completed'; readonly output: AgentExecutionOutput }
   | { readonly type: 'lifecycle.cancelled'; readonly reason: string }
