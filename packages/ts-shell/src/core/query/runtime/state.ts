@@ -14,6 +14,11 @@ import {
   type QueryRuntimeObservationState,
 } from './observation.js'
 import {
+  createQueryRuntimeHarnessState,
+  harnessObservationPatch,
+  type QueryRuntimeHarnessState,
+} from './harness.js'
+import {
   queryRuntimeTaskStateObservationPatch,
   type QueryRuntimeTaskState,
 } from './taskState.js'
@@ -33,6 +38,7 @@ export interface QueryRuntimeState {
   pendingLifecycle: DurableLifecycleIndex
   readonly sharedContext: SharedContext
   observations?: QueryRuntimeObservationState
+  harness?: QueryRuntimeHarnessState
   readonly transcript: AgentExecutionOutput[]
   readonly visitedTransitions: Set<string>
 }
@@ -156,6 +162,7 @@ export interface QueryRuntimeStateSeed {
   readonly truthBoundary: QueryRuntimeSeedTruthBoundary
   readonly derivedState: QueryRuntimeSeedDerivedState
   readonly observations?: QueryRuntimeObservationState
+  readonly harness?: QueryRuntimeHarnessState
   readonly taskState?: QueryRuntimeTaskState
 }
 
@@ -175,6 +182,7 @@ export function createQueryRuntimeState(
       handoffs: [],
     },
     observations: createEmptyQueryRuntimeObservationState(),
+    harness: createQueryRuntimeHarnessState(),
     transcript: [],
     visitedTransitions: new Set<string>(),
   }
@@ -206,7 +214,9 @@ export function createQueryRuntimeStateFromSeed(
       deriveQueryRuntimeObservationState(transcript),
       seed.observations,
       seed.taskState,
+      seed.harness,
     ),
+    harness: seed.harness ?? createQueryRuntimeHarnessState(),
     transcript,
     visitedTransitions: new Set(derivedContext.visitedTransitions),
   }
@@ -216,31 +226,37 @@ function mergeSeedObservations(
   derived: QueryRuntimeObservationState,
   seed: QueryRuntimeObservationState | undefined,
   taskState: QueryRuntimeTaskState | undefined,
+  harness: QueryRuntimeHarnessState | undefined,
 ): QueryRuntimeObservationState {
   const taskStatePatch = taskState
     ? queryRuntimeTaskStateObservationPatch(taskState)
     : undefined
-  if (!seed && !taskStatePatch) return derived
+  const harnessPatch = harness ? harnessObservationPatch(harness) : undefined
+  if (!seed && !taskStatePatch && !harnessPatch) return derived
   return {
     contextPaths: uniqueStrings([
       ...derived.contextPaths,
       ...(seed?.contextPaths ?? []),
       ...(taskStatePatch?.contextPaths ?? []),
+      ...(harnessPatch?.contextPaths ?? []),
     ]),
     changedFiles: uniqueStrings([
       ...derived.changedFiles,
       ...(seed?.changedFiles ?? []),
       ...(taskStatePatch?.changedFiles ?? []),
+      ...(harnessPatch?.changedFiles ?? []),
     ]),
     verificationTargets: uniqueStrings([
       ...derived.verificationTargets,
       ...(seed?.verificationTargets ?? []),
       ...(taskStatePatch?.verificationTargets ?? []),
+      ...(harnessPatch?.verificationTargets ?? []),
     ]),
     failedVerificationTargets: uniqueStrings([
       ...derived.failedVerificationTargets,
       ...(seed?.failedVerificationTargets ?? []),
       ...(taskStatePatch?.failedVerificationTargets ?? []),
+      ...(harnessPatch?.failedVerificationTargets ?? []),
     ]),
     restoredProofGap: uniqueStrings([
       ...derived.restoredProofGap,
@@ -251,16 +267,19 @@ function mergeSeedObservations(
       ...derived.failureCategories,
       ...(seed?.failureCategories ?? []),
       ...(taskStatePatch?.failureCategories ?? []),
+      ...(harnessPatch?.failureCategories ?? []),
     ]),
     repairAttempts: [
       ...derived.repairAttempts,
       ...(seed?.repairAttempts ?? []),
       ...(taskStatePatch?.repairAttempts ?? []),
+      ...(harnessPatch?.repairAttempts ?? []),
     ],
     toolFailures: [
       ...derived.toolFailures,
       ...(seed?.toolFailures ?? []),
       ...(taskStatePatch?.toolFailures ?? []),
+      ...(harnessPatch?.toolFailures ?? []),
     ],
     artifactEvidence: uniqueStrings([...derived.artifactEvidence, ...(seed?.artifactEvidence ?? [])]),
     artifactClaims: uniqueStrings([
@@ -274,14 +293,15 @@ function mergeSeedObservations(
       ...(taskStatePatch?.artifactClaimEvidence ?? []),
     ],
     commandCoverage: [...derived.commandCoverage, ...(seed?.commandCoverage ?? [])],
-    toolFeedback: [...derived.toolFeedback, ...(seed?.toolFeedback ?? [])],
+    toolFeedback: [...derived.toolFeedback, ...(seed?.toolFeedback ?? []), ...(harnessPatch?.toolFeedback ?? [])],
     continuationFacts: uniqueStrings([
       ...derived.continuationFacts,
       ...(seed?.continuationFacts ?? []),
       ...(taskStatePatch?.continuationFacts ?? []),
+      ...(harnessPatch?.continuationFacts ?? []),
     ]),
     completedActions: uniqueList([...derived.completedActions, ...(seed?.completedActions ?? [])]),
-    pendingAction: taskStatePatch?.pendingAction ?? seed?.pendingAction ?? derived.pendingAction,
+    pendingAction: harnessPatch?.pendingAction ?? taskStatePatch?.pendingAction ?? seed?.pendingAction ?? derived.pendingAction,
   }
 }
 
@@ -298,6 +318,13 @@ export function ensureQueryRuntimeObservationState(
 ): QueryRuntimeObservationState {
   state.observations ??= deriveQueryRuntimeObservationState(state.transcript)
   return state.observations
+}
+
+export function ensureQueryRuntimeHarnessState(
+  state: QueryRuntimeState,
+): QueryRuntimeHarnessState {
+  state.harness ??= createQueryRuntimeHarnessState()
+  return state.harness
 }
 
 function deriveQueryContextFromTranscript(seed: QueryRuntimeStateSeed): DerivedQueryContext {

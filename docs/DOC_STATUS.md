@@ -93,6 +93,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/real-workspace-development-execution.md` | active | Checking SP058 disposable workspace task execution, real ExecutionService file writes and command output, artifact/continuation evidence, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/debug-repair-verification-autonomy.md` | active | Checking SP059 disposable failing workspace tasks, command-output-driven repair, distinct second repair strategy, targeted rerun, artifact/source receipt, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/long-horizon-real-development-trial.md` | active | Checking SP060 long-horizon disposable workspace tasks, replay/compact task-state carry-forward, real repair/rerun, artifact/source receipt, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/harness-spine-adoption.md` | active | Checking SP061 normal-runtime harness spine adoption, turn snapshots, save points, ordered ledger, pending queues, continuation restore, disposable workspace tasks, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 

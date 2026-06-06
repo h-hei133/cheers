@@ -135,13 +135,13 @@ function chooseNextAction(input: ToolStrategyInput & {
       return input.allowedTools.includes("search") ? "search" : "read";
     }
   }
+  if (input.pendingAction && pendingActionAllowed(input, input.pendingAction)) {
+    return input.pendingAction;
+  }
   if (input.proofGap.some((gap) => gap.includes("verification failed")) &&
     input.allowedTools.includes("repair") &&
     !observedRepairAttempt(input)) {
     return "repair";
-  }
-  if (input.pendingAction && pendingActionAllowed(input, input.pendingAction)) {
-    return input.pendingAction;
   }
   if ((input.observedContextPaths ?? []).length === 0 &&
     !(input.changedFiles && input.changedFiles.length > 0) &&

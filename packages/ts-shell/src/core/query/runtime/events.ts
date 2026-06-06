@@ -1,11 +1,30 @@
 import type { AgentExecutionOutput, AgentRole, OrchestrationResult } from '../../../orchestration/types.js'
 import type { QueryRuntimeActionDecision } from './decision.js'
 import type { QueryRuntimeExecutionResult } from './batch.js'
+import type {
+  QueryRuntimeLedgerEntry,
+  QueryRuntimePendingRepair,
+  QueryRuntimePendingVerification,
+  QueryRuntimePendingWrite,
+  QueryRuntimeSavePoint,
+  QueryRuntimeTurnSnapshot,
+} from './harness.js'
 import type { QueryRuntimeProofProjection } from './proof.js'
 
 export type QueryEvent =
   | { readonly type: 'query.started'; readonly sessionId: string; readonly prompt: string }
   | { readonly type: 'runtime.next-action'; readonly turn: number; readonly role: AgentRole; readonly decision: QueryRuntimeActionDecision }
+  | { readonly type: 'runtime.turn-snapshot'; readonly turn: number; readonly role: AgentRole; readonly snapshot: QueryRuntimeTurnSnapshot }
+  | { readonly type: 'runtime.save-point'; readonly turn: number; readonly role: AgentRole; readonly savePoint: QueryRuntimeSavePoint }
+  | { readonly type: 'runtime.ledger-settled'; readonly turn: number; readonly role: AgentRole; readonly ledger: readonly QueryRuntimeLedgerEntry[] }
+  | {
+    readonly type: 'runtime.queue-settled';
+    readonly turn: number;
+    readonly role: AgentRole;
+    readonly pendingWrite: readonly QueryRuntimePendingWrite[];
+    readonly pendingVerification: readonly QueryRuntimePendingVerification[];
+    readonly pendingRepair: readonly QueryRuntimePendingRepair[];
+  }
   | ({
     readonly type: 'runtime.tool-feedback';
     readonly turn: number;

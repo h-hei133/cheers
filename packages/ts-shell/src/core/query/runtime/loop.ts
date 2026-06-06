@@ -1,6 +1,6 @@
 import type { AgentExecutionOutput, AgentRunner, AgentRole } from '../../../orchestration/types.js'
 import type { QueryEvent } from './events.js'
-import { ensureQueryRuntimeObservationState, type QueryRuntimeState } from './state.js'
+import { ensureQueryRuntimeHarnessState, ensureQueryRuntimeObservationState, type QueryRuntimeState } from './state.js'
 import { applyLifecycleEventToIndex } from '../../tools/toolResultLifecycle.js'
 import type { QueryRuntimeActionDecision } from './decision.js'
 import { decideQueryRuntimeAction, hasOpenRuntimeProofGap } from './policy.js'
@@ -25,6 +25,13 @@ import {
   terminalQuery,
   type QueryTerminal,
 } from './transitions.js'
+import {
+  appendHarnessSavePoint,
+  captureHarnessTurnSnapshot,
+  recordHarnessSnapshot,
+  settleHarnessBatch,
+  settleHarnessOutput,
+} from './harness.js'
 
 export interface QueryLoopDependencies {
   readonly runAgent: AgentRunner
@@ -151,6 +158,33 @@ function terminalProofBlocker(
   return undefined
 }
 
+async function emitHarnessSettlement(
+  state: QueryRuntimeState,
+  deps: QueryLoopDependencies,
+): Promise<void> {
+  const harness = ensureQueryRuntimeHarnessState(state)
+  await deps.onEvent?.({
+    type: 'runtime.ledger-settled',
+    role: state.currentRole,
+    turn: state.turn,
+    ledger: harness.ledger,
+  })
+  await deps.onEvent?.({
+    type: 'runtime.queue-settled',
+    role: state.currentRole,
+    turn: state.turn,
+    pendingWrite: harness.pendingWrite,
+    pendingVerification: harness.pendingVerification,
+    pendingRepair: harness.pendingRepair,
+  })
+  await deps.onEvent?.({
+    type: 'runtime.save-point',
+    role: state.currentRole,
+    turn: state.turn,
+    savePoint: harness.savePoints[harness.savePoints.length - 1],
+  })
+}
+
 async function executeTurn(
   state: QueryRuntimeState,
   deps: QueryLoopDependencies,
@@ -161,17 +195,57 @@ async function executeTurn(
     turn: state.turn,
     decision: runtimeAction,
   })
+  state.harness = ensureQueryRuntimeHarnessState(state)
+  const snapshot = captureHarnessTurnSnapshot({
+    harness: state.harness,
+    turn: state.turn,
+    role: state.currentRole,
+    decision: runtimeAction,
+    batch: runtimeBatch,
+    observations: ensureQueryRuntimeObservationState(state),
+  })
+  state.harness = recordHarnessSnapshot(state.harness, snapshot)
+  state.harness = appendHarnessSavePoint(state.harness, {
+    phase: 'before-batch',
+    turn: state.turn,
+    role: state.currentRole,
+    snapshot,
+  })
+  await deps.onEvent?.({
+    type: 'runtime.turn-snapshot',
+    role: state.currentRole,
+    turn: state.turn,
+    snapshot,
+  })
+  await deps.onEvent?.({
+    type: 'runtime.save-point',
+    role: state.currentRole,
+    turn: state.turn,
+    savePoint: state.harness.savePoints[state.harness.savePoints.length - 1],
+  })
   const blockedAction = blockUnsafeRuntimeAction(runtimeAction)
   if (blockedAction) {
     const blockedBatch = blockedRuntimeExecutionBatchResult({
       batch: runtimeBatch,
       block: blockedAction,
     })
+    state.harness = settleHarnessBatch({
+      harness: state.harness,
+      batch: runtimeBatch,
+      result: blockedBatch,
+    })
+    state.harness = appendHarnessSavePoint(state.harness, {
+      phase: 'after-batch',
+      turn: state.turn,
+      role: state.currentRole,
+      snapshot,
+    })
     observeQueryRuntimeExecutionResults(
       ensureQueryRuntimeObservationState(state),
       blockedBatch.results,
     )
     await emitRuntimeToolFeedback(state, deps, blockedBatch)
+    await emitHarnessSettlement(state, deps)
     return {
       action: 'completed',
       output: blockedRuntimeActionOutput({
@@ -188,11 +262,23 @@ async function executeTurn(
       batch: runtimeBatch,
       decision: runtimeAction,
     })
+    state.harness = settleHarnessBatch({
+      harness: state.harness,
+      batch: runtimeBatch,
+      result: batchResult,
+    })
+    state.harness = appendHarnessSavePoint(state.harness, {
+      phase: 'after-batch',
+      turn: state.turn,
+      role: state.currentRole,
+      snapshot,
+    })
     observeQueryRuntimeExecutionResults(
       ensureQueryRuntimeObservationState(state),
       batchResult.results,
     )
     await emitRuntimeToolFeedback(state, deps, batchResult)
+    await emitHarnessSettlement(state, deps)
     if (hasUnsafeRuntimeExecutionFailure(batchResult) && state.turn >= state.config.maxTurns) {
       return {
         action: 'terminal',
@@ -216,7 +302,33 @@ async function executeTurn(
         transcript: state.transcript,
       })
 
-      return { action: 'completed', output: constrainRuntimeActionOutput(runtimeAction, output) }
+      const constrainedOutput = constrainRuntimeActionOutput(runtimeAction, output)
+      state.harness = settleHarnessOutput({
+        harness: state.harness,
+        output: constrainedOutput,
+      })
+      state.harness = appendHarnessSavePoint(state.harness, {
+        phase: 'after-output',
+        turn: state.turn,
+        role: state.currentRole,
+        snapshot,
+      })
+      await deps.onEvent?.({
+        type: 'runtime.queue-settled',
+        role: state.currentRole,
+        turn: state.turn,
+          pendingWrite: state.harness.pendingWrite,
+          pendingVerification: state.harness.pendingVerification,
+          pendingRepair: state.harness.pendingRepair,
+      })
+      await deps.onEvent?.({
+        type: 'runtime.save-point',
+        role: state.currentRole,
+        turn: state.turn,
+        savePoint: state.harness.savePoints[state.harness.savePoints.length - 1],
+      })
+
+      return { action: 'completed', output: constrainedOutput }
     } catch (error) {
       const queryError = toQueryRuntimeError(error)
       const compensationEvents = compensateToolLifecycle(queryError.events ?? [])

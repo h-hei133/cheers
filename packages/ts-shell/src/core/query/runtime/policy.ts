@@ -11,30 +11,36 @@ import {
   type ToolActionKind,
   type ToolStrategy,
 } from "../../../tools/policy/strategy.js";
+import { harnessObservationPatch } from "./harness.js";
 import type { QueryRuntimeActionDecision } from "./decision.js";
-import { ensureQueryRuntimeObservationState, type QueryRuntimeState } from "./state.js";
+import { ensureQueryRuntimeHarnessState, ensureQueryRuntimeObservationState, type QueryRuntimeState } from "./state.js";
 
 export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntimeActionDecision {
   const taskIntent = compact(state.config.initialPrompt);
   const latestCodingResult = latestResult(state.transcript);
   const observations = ensureQueryRuntimeObservationState(state);
+  const harnessPatch = harnessObservationPatch(ensureQueryRuntimeHarnessState(state));
   const taskKind = taskKindFor(taskIntent, latestCodingResult);
   const changedFiles = uniqueStrings([
     ...observations.changedFiles,
+    ...(harnessPatch.changedFiles ?? []),
     ...(latestCodingResult?.changedFiles ?? []),
     ...(latestCodingResult?.changeSet.changedFiles ?? []),
   ]);
   const failedFiles = uniqueStrings([
     ...observations.failedVerificationTargets,
+    ...(harnessPatch.failedVerificationTargets ?? []),
     ...(latestCodingResult?.failedFiles.map((file) => file.path) ?? []),
   ]);
   const unverifiedFiles = uniqueStrings([
     ...observations.failedVerificationTargets,
+    ...(harnessPatch.failedVerificationTargets ?? []),
     ...(latestCodingResult?.unverifiedFiles.map((file) => file.path) ?? []),
   ]);
   const verificationTargets = uniqueStrings([
     ...(latestCodingResult?.diagnosis?.evidenceFiles.filter(isVerificationPath) ?? []),
     ...observations.verificationTargets,
+    ...(harnessPatch.verificationTargets ?? []),
     ...changedFiles,
     ...unverifiedFiles,
     ...(latestCodingResult?.verifiedFiles ?? []),
@@ -42,8 +48,9 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
   const failureCategories = uniqueStrings([
     ...failureCategoriesFor(latestCodingResult, taskIntent),
     ...observations.failureCategories,
+    ...(harnessPatch.failureCategories ?? []),
   ]);
-  const pendingAction = observations.pendingAction ?? pendingActionFor(state, latestCodingResult);
+  const pendingAction = harnessPatch.pendingAction ?? observations.pendingAction ?? pendingActionFor(state, latestCodingResult);
   const continuationFacts = uniqueStrings([
     ...observations.continuationFacts,
     ...continuationFactsFor(state, latestCodingResult),
@@ -110,8 +117,8 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     pendingAction,
     continuationFacts,
     artifactContract,
-    observationFailures: observations.toolFailures,
-    repairAttempts: observations.repairAttempts,
+    observationFailures: [...observations.toolFailures, ...(harnessPatch.toolFailures ?? [])],
+    repairAttempts: [...observations.repairAttempts, ...(harnessPatch.repairAttempts ?? [])],
     failureHistory: [
       ...failureHistoryFor(state.transcript, taskIntent),
       ...observations.toolFailures,
