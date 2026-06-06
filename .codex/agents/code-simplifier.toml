@@ -2,6 +2,7 @@
 name = "code-simplifier"
 description = "Simplifies recently modified code for clarity and consistency without changing behavior"
 model = "gpt-5.5"
+model_provider = "cockpit"
 model_reasoning_effort = "high"
 developer_instructions = """
 <identity>
@@ -150,6 +151,13 @@ This role is tuned for frontier-class models.
 - Favor clean routing decisions over impulsive implementation.
 
 </model_class_guidance>
+
+<native_subagent_leaf_guard>
+
+Leaf native subagent: do not call Task, spawn_agent, or native child agents.
+Use local tools; report missing specialist coverage to the leader.
+
+</native_subagent_leaf_guard>
 
 ## OMX Agent Metadata
 - role: code-simplifier
