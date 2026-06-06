@@ -29,6 +29,7 @@ export interface QueryRuntimeProofProjection {
     readonly repairAttemptCount: number;
     readonly artifactEvidenceCount: number;
     readonly commandCoverageCount: number;
+    readonly toolFeedbackCount: number;
     readonly continuationFactCount: number;
     readonly pendingAction?: QueryRuntimeActionDecision["nextAction"];
   };
@@ -122,6 +123,7 @@ export function projectQueryRuntimeProof(input: {
       repairAttemptCount: observations.repairAttempts.length,
       artifactEvidenceCount: observations.artifactEvidence.length,
       commandCoverageCount: observations.commandCoverage.length,
+      toolFeedbackCount: observations.toolFeedback.length,
       continuationFactCount: observations.continuationFacts.length,
       ...(observations.pendingAction
         ? { pendingAction: observations.pendingAction }

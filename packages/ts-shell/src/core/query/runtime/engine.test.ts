@@ -3325,6 +3325,77 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.stopReason).toContain('no safe action remains after execution batch failure')
   })
 
+  it('does not complete from execution batch coverage without task proof', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'host check ran but no task proof was produced',
+    })
+    const engine = new QueryEngine({
+      runAgent,
+      executeRuntimeBatch: async ({ batch }: any) => ({
+        batchId: batch.batchId,
+        results: [
+          {
+            toolId: 'runtime-verify',
+            actionKind: 'verify',
+            coveredFiles: ['src/ledger/balance.ts'],
+            affectedPaths: ['src/ledger/balance.ts'],
+            exitStatusClass: 'success',
+            redactionStatus: 'report-safe',
+            truncated: false,
+            commandCoverage: {
+              taskId: 'ledger-balance-focused-check',
+              coveredFiles: ['src/ledger/balance.ts'],
+              uncoveredFiles: [],
+              coverageStatus: 'complete',
+            },
+          },
+        ],
+      }),
+    } as any)
+
+    const result = await engine.submitMessage(
+      'sess_execution_batch_without_task_proof',
+      'finish ledger balance verification after edited files',
+      {
+        maxTurns: 1,
+        runtimeSeed: {
+          config: {
+            sessionId: 'sess_execution_batch_without_task_proof',
+            initialPrompt: 'finish ledger balance verification after edited files',
+            maxTurns: 1,
+            startingRole: 'reviewer',
+          },
+          currentRole: 'reviewer',
+          turn: 1,
+          lastContinuationReason: undefined,
+          pendingLifecycle: createEmptyLifecycleIndex(),
+          sharedContext: {
+            sessionId: 'sess_execution_batch_without_task_proof',
+            initialPrompt: 'finish ledger balance verification after edited files',
+            notes: [],
+            handoffs: [],
+          },
+          transcript: [],
+          visitedTransitions: [],
+          recoveryBoundary: 'completed-turn-reentry',
+          truthBoundary: replayTruthBoundary(),
+          derivedState: { transcript: [] },
+          observations: {
+            ...emptyRuntimeObservations(),
+            changedFiles: ['src/ledger/balance.ts'],
+            verificationTargets: ['src/ledger/balance.ts'],
+            pendingAction: 'verify',
+          },
+        },
+      },
+    )
+
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.terminalClassification).toBe('stopped')
+    expect(result.stopReason).toContain('task proof')
+  })
+
   it('changes repeated repair strategy from restored task state to discovery', async () => {
     const seenActions: string[] = []
     const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {

@@ -118,6 +118,15 @@ function terminalProofBlocker(
     return 'failed tool output has no task proof'
   }
   if (!output.codingResult) {
+    const hasExecutionFeedback =
+      projection.observationState.commandCoverageCount > 0 ||
+      projection.observationState.toolFeedbackCount > 0
+    if (hasExecutionFeedback && !projection.verdict.completeProof) {
+      const missingProof = projection.verdict.missingProof[0]
+      return missingProof
+        ? `execution feedback missing task proof: ${missingProof}`
+        : 'execution feedback has no task proof'
+    }
     return undefined
   }
   if (projection.artifactReceipt && projection.artifactReceipt.validationState !== 'validation-passed') {

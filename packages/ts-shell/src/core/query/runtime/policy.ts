@@ -77,7 +77,11 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     failureCategories,
     observedPaths: observations.contextPaths,
   });
-  const outputKind = taskKind === "data-artifact" ? "artifact" : changedFiles.length > 0 ? "diff" : "verified-result";
+  const outputKind = taskKind === "data-artifact"
+    ? "artifact"
+    : changedFiles.length > 0 || writeIntentFor(taskIntent, taskKind)
+      ? "diff"
+      : "verified-result";
   const allowedTools = ["read", "search", "edit", "repair", "verify", "artifact", "continue", "write"];
   const plan = buildExecutionPlan({
     taskKind,
@@ -206,10 +210,33 @@ function taskKindFor(taskIntent: string, latestCodingResult: CodingResultSummary
   if (includesAny(taskIntent, ["continue", "resume", "pending"])) {
     return "continuation";
   }
+  if (writeIntentFor(taskIntent, "coding")) {
+    return "coding";
+  }
   if (latestCodingResult?.taskKind === "repo-explain" || includesAny(taskIntent, ["inspect", "search", "context"])) {
     return "workspace-understanding";
   }
   return "coding";
+}
+
+function writeIntentFor(taskIntent: string, taskKind: string): boolean {
+  if (taskKind === "workspace-understanding" || taskKind === "continuation") {
+    return false;
+  }
+  return taskKind === "debug-repair" ||
+    includesAny(taskIntent, [
+      "add",
+      "apply",
+      "change",
+      "edit",
+      "fix",
+      "implement",
+      "modify",
+      "patch",
+      "repair",
+      "update",
+      "write",
+    ]);
 }
 
 function failureCategoriesFor(result: CodingResultSummary | undefined, taskIntent: string): readonly string[] {

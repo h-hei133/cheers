@@ -170,6 +170,11 @@ function chooseNextAction(input: ToolStrategyInput & {
     return "edit";
   }
   if ((input.observedContextPaths ?? []).length > 0 &&
+    (input.completedActions ?? []).includes("read") &&
+    input.actionPlans.some((plan) => plan.action === "repair")) {
+    return "repair";
+  }
+  if ((input.observedContextPaths ?? []).length > 0 &&
     input.actionPlans.some((plan) => plan.action === "read")) {
     return "read";
   }
