@@ -91,6 +91,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/three-sprint-capability-push-plan.md` | active | Selecting the next three aggressive autonomous capability sprints, owner domains, non-substitutable gates, and anti-shortcut rules after SP054. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/real-unseen-development-gauntlet.md` | active | Checking SP057 unseen disposable development tasks, initial runtime failures, product fixes, rerun outcomes, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/real-workspace-development-execution.md` | active | Checking SP058 disposable workspace task execution, real ExecutionService file writes and command output, artifact/continuation evidence, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/debug-repair-verification-autonomy.md` | active | Checking SP059 disposable failing workspace tasks, command-output-driven repair, distinct second repair strategy, targeted rerun, artifact/source receipt, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 

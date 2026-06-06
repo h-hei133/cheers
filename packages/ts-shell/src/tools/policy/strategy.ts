@@ -126,7 +126,14 @@ function chooseNextAction(input: ToolStrategyInput & {
   if (input.blockers.some((blocker) => blocker.includes("missing required context")) ||
     input.proofGap.some((gap) => gap.includes("context evidence incomplete")) ||
     failedReasonNeedsContext(input)) {
-    return input.allowedTools.includes("search") ? "search" : "read";
+    if ((input.observedContextPaths ?? []).length > 0 &&
+      !(input.completedActions ?? []).includes("read") &&
+      input.allowedTools.includes("read")) {
+      return "read";
+    }
+    if ((input.observedContextPaths ?? []).length === 0) {
+      return input.allowedTools.includes("search") ? "search" : "read";
+    }
   }
   if (input.proofGap.some((gap) => gap.includes("verification failed")) &&
     input.allowedTools.includes("repair") &&
@@ -147,6 +154,12 @@ function chooseNextAction(input: ToolStrategyInput & {
       return input.allowedTools.includes("read") ? "read" : "search";
     }
     return "artifact";
+  }
+  if (readyForDistinctRepairAfterContext(input)) {
+    return "repair";
+  }
+  if (needsSourceReadAfterRepairDiscovery(input)) {
+    return "read";
   }
   if (repeatedFailure(input, "repair") || observedRepairAttempt(input)) {
     return input.allowedTools.includes("search") ? "search" : "read";
@@ -244,6 +257,7 @@ function pendingActionAllowed(input: ToolStrategyInput & {
   if (!input.allowedTools.includes(action)) return false;
   if (input.changedFiles && input.changedFiles.length > 0 &&
     input.proofGap.some((gap) => gap.includes("verification") || gap.includes("proof")) &&
+    !(action === "artifact" && input.proofGap.some((gap) => gap.includes("artifact") || gap.includes("source"))) &&
     action !== "verify" &&
     action !== "continue") {
     return false;
@@ -289,6 +303,30 @@ function observedRepairAttempt(input: ToolStrategyInput): boolean {
     ...(input.observationFailures ?? []),
     ...(input.repairAttempts ?? []),
   ].some((failure) => failure.action === "repair");
+}
+
+function readyForDistinctRepairAfterContext(input: ToolStrategyInput & {
+  readonly actionPlans: readonly ToolActionPlan[];
+  readonly proofGap: readonly string[];
+}): boolean {
+  return observedRepairAttempt(input) &&
+    input.allowedTools.includes("repair") &&
+    input.actionPlans.some((plan) => plan.action === "repair") &&
+    (input.observedContextPaths ?? []).length > 0 &&
+    (input.completedActions ?? []).includes("read") &&
+    input.proofGap.some((gap) => gap.includes("repair") || gap.includes("verification failed"));
+}
+
+function needsSourceReadAfterRepairDiscovery(input: ToolStrategyInput & {
+  readonly actionPlans: readonly ToolActionPlan[];
+  readonly proofGap: readonly string[];
+}): boolean {
+  return observedRepairAttempt(input) &&
+    input.allowedTools.includes("read") &&
+    input.actionPlans.some((plan) => plan.action === "repair") &&
+    (input.observedContextPaths ?? []).length > 0 &&
+    !(input.completedActions ?? []).includes("read") &&
+    input.proofGap.some((gap) => gap.includes("repair") || gap.includes("verification failed"));
 }
 
 function uniqueActions(actions: readonly ToolActionKind[]): readonly ToolActionKind[] {

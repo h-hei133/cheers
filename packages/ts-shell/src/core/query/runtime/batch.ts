@@ -39,6 +39,7 @@ export interface QueryRuntimeExecutionResult {
   readonly affectedPaths: readonly string[]
   readonly exitStatusClass: QueryRuntimeExecutionExitStatusClass
   readonly failureClass: QueryRuntimeExecutionFailureClass
+  readonly diagnosticSummary?: string
   readonly redactionStatus: QueryRuntimeExecutionRedactionStatus
   readonly truncated: boolean
   readonly commandCoverage?: QueryRuntimeCommandCoverage

@@ -29,6 +29,7 @@ export interface QueryRuntimeToolFeedbackObservation {
   readonly truncated: boolean
   readonly exitStatusClass: string
   readonly failureClass: string
+  readonly diagnosticSummary?: string
   readonly affectedPaths: readonly string[]
   readonly redactionStatus: string
 }
@@ -132,6 +133,7 @@ export function observeQueryRuntimeExecutionResults(
       truncated: result.truncated,
       exitStatusClass: result.exitStatusClass,
       failureClass: result.failureClass,
+      ...(result.diagnosticSummary ? { diagnosticSummary: result.diagnosticSummary } : {}),
       affectedPaths: uniqueValues(result.affectedPaths),
       redactionStatus: result.redactionStatus,
     })
@@ -231,7 +233,11 @@ function failureReasonForExecutionResult(
   affectedPaths: readonly string[],
 ): string {
   if (result.actionKind === 'verify' && affectedPaths.length > 0) {
-    return `verification failed for ${affectedPaths.join(',')}`
+    return sanitizeFailureReason(
+      result.diagnosticSummary
+        ? `verification failed for ${affectedPaths.join(',')}: ${result.diagnosticSummary}`
+        : `verification failed for ${affectedPaths.join(',')}`,
+    )
   }
   return sanitizeFailureReason(
     affectedPaths.length > 0
@@ -295,7 +301,7 @@ function observeRepair(
   if (result.repair.status === 'failed') {
     state.pendingAction = 'search'
   }
-  if (result.repair.status === 'recovered') {
+  if (result.repair.status === 'recovered' && result.verification.status !== 'passed') {
     state.pendingAction = 'verify'
   }
 }

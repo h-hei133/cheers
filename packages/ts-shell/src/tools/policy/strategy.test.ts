@@ -404,6 +404,59 @@ describe("tool strategy", () => {
     }).nextAction).toBe("search");
   });
 
+  it("uses fresh source context for a distinct repair after the first repair failed", () => {
+    const context = selectContext({
+      taskKind: "debug-repair",
+      taskPath: "edit",
+      shortPrompt: "Fix serializer verification after inspecting owner context.",
+      workspaceFiles: [
+        { path: "src/serializer.ts", purpose: "target" },
+        { path: "src/schema.ts", purpose: "related source context" },
+        { path: "src/serializer.test.ts", purpose: "verification" },
+      ],
+      requiredPaths: ["src/serializer.ts", "src/schema.ts"],
+      continuationAvailable: true,
+      failureCategories: ["verification failed"],
+      observedPaths: ["src/serializer.ts", "src/schema.ts"],
+    });
+    const plan = buildExecutionPlan({
+      taskKind: "debug-repair",
+      outputKind: "diff",
+      allowedTools: ["read", "search", "repair", "verify"],
+      allowedWrites: ["src/serializer.ts", "src/schema.ts"],
+      successRubric: ["repair", "targeted verification"],
+      context,
+    });
+    const request = buildTaskRequestPacket({
+      shortPrompt: "Fix serializer verification after inspecting owner context.",
+      taskKind: "debug-repair",
+      context,
+      plan,
+    });
+
+    expect(chooseToolStrategy({
+      allowedTools: ["read", "search", "repair", "verify"],
+      plan,
+      request,
+      taskIntent: "Fix serializer verification after inspecting owner context.",
+      changedFiles: ["src/serializer.ts", "src/schema.ts"],
+      observedContextPaths: ["src/serializer.ts", "src/schema.ts"],
+      completedActions: ["search", "read"],
+      proofGap: ["repair proof missing", "verification failed"],
+      failureHistory: [{
+        action: "repair",
+        signature: "src/serializer.ts",
+        reason: "assertion failed: expected schema version v2",
+      }],
+      repairAttempts: [{
+        action: "repair",
+        signature: "src/serializer.ts",
+        reason: "assertion failed: expected schema version v2",
+      }],
+      budget: { remainingSteps: 3 },
+    }).nextAction).toBe("repair");
+  });
+
   it("rediscovers after failed search observation before mutation", () => {
     const context = selectContext({
       taskKind: "coding-edit",

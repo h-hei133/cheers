@@ -2251,7 +2251,7 @@ describe('core QueryEngine migration (W1)', () => {
     expect(seenActions[1]?.startsWith('2:search:')).toBe(true)
     expect(seenActions.some((action) => action.startsWith('4:search:'))).toBe(true)
     expect(seenActions.some((action) => action.startsWith('5:repair:') && action.includes('src/status/model.ts'))).toBe(true)
-    expect(seenActions.some((action) => action.startsWith('6:search:') && action.includes('repair proof missing'))).toBe(true)
+    expect(seenActions.some((action) => action.startsWith('6:read:') && action.includes('repair proof missing'))).toBe(true)
     expect(seenActions.some((action) => action.startsWith('8:verify:') && action.includes('src/status/model.ts'))).toBe(true)
     expect(result.status).toBe('completed')
     expect(result.terminalClassification).toBe('success')
@@ -2518,7 +2518,7 @@ describe('core QueryEngine migration (W1)', () => {
       maxTurns: 5,
     })
 
-    expect(seenActions.some((action) => action.startsWith('4:search:'))).toBe(true)
+    expect(seenActions.some((action) => action.startsWith('4:read:'))).toBe(true)
   })
 
   it('execution loop trial keeps command receipt coverage in runtime proof', async () => {
@@ -2981,7 +2981,7 @@ describe('core QueryEngine migration (W1)', () => {
     expect(seenBatches[0]).toEqual(['1:search:runtime-search'])
     expect(seenActions).toEqual([
       '1:search:',
-      '2:search:src/order/owner.ts',
+      '2:read:src/order/owner.ts',
     ])
   })
 

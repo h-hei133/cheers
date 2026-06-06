@@ -198,6 +198,12 @@ function latestResult(transcript: readonly AgentExecutionOutput[]): CodingResult
 }
 
 function taskKindFor(taskIntent: string, latestCodingResult: CodingResultSummary | undefined): string {
+  if (
+    latestCodingResult?.verification.status === "passed" &&
+    includesAny(taskIntent, ["artifact", "report", "writeup"])
+  ) {
+    return "data-artifact";
+  }
   if (latestCodingResult?.taskKind === "run-command" ||
     latestCodingResult?.verification.status === "failed" ||
     latestCodingResult?.repair.status === "failed" ||
@@ -257,6 +263,7 @@ function pendingActionFor(
   if (Object.keys(state.pendingLifecycle.pendingTools).length > 0) return "continue";
   if (Object.keys(state.pendingLifecycle.pendingApprovals).length > 0) return "continue";
   const nextAction = compact(result?.verification.nextAction ?? "");
+  if (nextAction.includes("artifact") || nextAction.includes("source receipt")) return "artifact";
   if (nextAction.includes("rerun") || nextAction.includes("verify")) return "verify";
   if (nextAction.includes("repair")) return "repair";
   if (nextAction.includes("inspect") || nextAction.includes("read")) return "read";
