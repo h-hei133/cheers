@@ -129,7 +129,7 @@ function chooseNextAction(input: ToolStrategyInput & {
     return input.allowedTools.includes("search") ? "search" : "read";
   }
   if (input.proofGap.some((gap) => gap.includes("verification failed")) &&
-    input.actionPlans.some((plan) => plan.action === "repair") &&
+    input.allowedTools.includes("repair") &&
     !observedRepairAttempt(input)) {
     return "repair";
   }

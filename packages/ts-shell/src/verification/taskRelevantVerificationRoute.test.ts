@@ -289,6 +289,12 @@ describe("taskRelevantVerificationRoute", () => {
     });
 
     expect(result.verdict).toBe("verified");
+    expect(result.run?.coverage).toEqual({
+      taskId: "route223-positive-relevance",
+      coveredFiles: ["packages/ts-shell/src/verification/taskRelevantVerificationRoute.ts"],
+      uncoveredFiles: [],
+      coverageStatus: "covered",
+    });
     expect(result.productVerification.verdict.status).toBe("COMPLETE");
     expect(result.productVerification.runtimeReceiptIds.length).toBeGreaterThan(0);
     expect(result.productVerification.repairEligible).toBe(false);

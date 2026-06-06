@@ -1,10 +1,16 @@
 import type { AgentExecutionOutput, AgentRole, OrchestrationResult } from '../../../orchestration/types.js'
 import type { QueryRuntimeActionDecision } from './decision.js'
+import type { QueryRuntimeExecutionResult } from './batch.js'
 import type { QueryRuntimeProofProjection } from './proof.js'
 
 export type QueryEvent =
   | { readonly type: 'query.started'; readonly sessionId: string; readonly prompt: string }
   | { readonly type: 'runtime.next-action'; readonly turn: number; readonly role: AgentRole; readonly decision: QueryRuntimeActionDecision }
+  | ({
+    readonly type: 'runtime.tool-feedback';
+    readonly turn: number;
+    readonly role: AgentRole;
+  } & QueryRuntimeExecutionResult)
   | { readonly type: 'runtime.task-proof'; readonly turn: number; readonly role: AgentRole; readonly projection: QueryRuntimeProofProjection }
   | { readonly type: 'turn.started'; readonly role: AgentRole; readonly turn: number }
   | { readonly type: 'query.retrying'; readonly role: AgentRole; readonly turn: number; readonly attempt: number; readonly reason: string }

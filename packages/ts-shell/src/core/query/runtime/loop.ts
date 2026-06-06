@@ -4,13 +4,21 @@ import { ensureQueryRuntimeObservationState, type QueryRuntimeState } from './st
 import { applyLifecycleEventToIndex } from '../../tools/toolResultLifecycle.js'
 import type { QueryRuntimeActionDecision } from './decision.js'
 import { decideQueryRuntimeAction, hasOpenRuntimeProofGap } from './policy.js'
-import { observeQueryRuntimeOutput } from './observation.js'
+import { observeQueryRuntimeExecutionResults, observeQueryRuntimeOutput } from './observation.js'
 import { projectQueryRuntimeProof } from './proof.js'
 import {
   blockedRuntimeActionOutput,
   blockUnsafeRuntimeAction,
   constrainRuntimeActionOutput,
 } from './actionAuthority.js'
+import {
+  blockedRuntimeExecutionBatchResult,
+  buildQueryRuntimeExecutionBatch,
+  hasUnsafeRuntimeExecutionFailure,
+  type QueryRuntimeExecutionBatchExecutor,
+  type QueryRuntimeExecutionBatchResult,
+  type QueryRuntimeExecutionResult,
+} from './batch.js'
 import {
   ALLOWED_HANDOFFS,
   continueQuery,
@@ -20,6 +28,7 @@ import {
 
 export interface QueryLoopDependencies {
   readonly runAgent: AgentRunner
+  readonly executeRuntimeBatch?: QueryRuntimeExecutionBatchExecutor
   readonly getRolePrompt: (role: QueryRuntimeState['currentRole']) => string
   readonly onEvent?: (event: QueryEvent) => void | Promise<void>
 }
@@ -138,8 +147,22 @@ async function executeTurn(
   deps: QueryLoopDependencies,
   runtimeAction: QueryRuntimeActionDecision,
 ): Promise<{ action: 'completed'; output: AgentExecutionOutput } | { action: 'terminal'; terminal: QueryTerminal }> {
+  const runtimeBatch = buildQueryRuntimeExecutionBatch({
+    role: state.currentRole,
+    turn: state.turn,
+    decision: runtimeAction,
+  })
   const blockedAction = blockUnsafeRuntimeAction(runtimeAction)
   if (blockedAction) {
+    const blockedBatch = blockedRuntimeExecutionBatchResult({
+      batch: runtimeBatch,
+      block: blockedAction,
+    })
+    observeQueryRuntimeExecutionResults(
+      ensureQueryRuntimeObservationState(state),
+      blockedBatch.results,
+    )
+    await emitRuntimeToolFeedback(state, deps, blockedBatch)
     return {
       action: 'completed',
       output: blockedRuntimeActionOutput({
@@ -148,6 +171,27 @@ async function executeTurn(
         changedFiles: runtimeAction.changedFiles,
         evidenceFiles: runtimeAction.verificationTargets,
       }),
+    }
+  }
+
+  if (deps.executeRuntimeBatch && runtimeBatch.items.length > 0) {
+    const batchResult = await deps.executeRuntimeBatch({
+      batch: runtimeBatch,
+      decision: runtimeAction,
+    })
+    observeQueryRuntimeExecutionResults(
+      ensureQueryRuntimeObservationState(state),
+      batchResult.results,
+    )
+    await emitRuntimeToolFeedback(state, deps, batchResult)
+    if (hasUnsafeRuntimeExecutionFailure(batchResult) && state.turn >= state.config.maxTurns) {
+      return {
+        action: 'terminal',
+        terminal: terminalQuery(
+          'stopped_not_proven',
+          'no safe action remains after execution batch failure',
+        ),
+      }
     }
   }
 
@@ -203,6 +247,38 @@ async function executeTurn(
     action: 'terminal',
     terminal: terminalQuery('stopped_error', 'Retry budget exhausted'),
   }
+}
+
+async function emitRuntimeToolFeedback(
+  state: QueryRuntimeState,
+  deps: QueryLoopDependencies,
+  batchResult: QueryRuntimeExecutionBatchResult,
+): Promise<void> {
+  for (const result of batchResult.results) {
+    await emitRuntimeToolFeedbackResult(state, deps, result)
+  }
+}
+
+async function emitRuntimeToolFeedbackResult(
+  state: QueryRuntimeState,
+  deps: QueryLoopDependencies,
+  result: QueryRuntimeExecutionResult,
+): Promise<void> {
+  await deps.onEvent?.({
+    type: 'runtime.tool-feedback',
+    role: state.currentRole,
+    turn: state.turn,
+    toolId: result.toolId,
+    actionKind: result.actionKind,
+    coveredFiles: result.coveredFiles,
+    affectedPaths: result.affectedPaths,
+    exitStatusClass: result.exitStatusClass,
+    failureClass: result.failureClass,
+    redactionStatus: result.redactionStatus,
+    truncated: result.truncated,
+    ...(result.commandCoverage ? { commandCoverage: result.commandCoverage } : {}),
+    terminalSuccessClaim: false,
+  })
 }
 
 async function emitOutputEvents(

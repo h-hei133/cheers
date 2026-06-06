@@ -272,6 +272,7 @@ function proofGapFor(
     ...(input.changedFiles.length > 0 && result.verification.status !== "passed"
       ? ["verification proof missing for changed files"]
       : []),
+    ...input.failedFiles.map((path) => `verification failed for ${path}`),
     ...input.unverifiedFiles.map((path) => `verification proof missing for ${path}`),
     ...(result.repair.status === "failed" ? ["repair proof missing"] : []),
     ...(result.verification.status === "failed" ? ["verification failed"] : []),

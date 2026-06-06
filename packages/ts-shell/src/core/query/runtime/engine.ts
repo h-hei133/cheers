@@ -12,12 +12,14 @@ import {
   type QueryRuntimeConfig,
   type QueryRuntimeStateSeed,
 } from './state.js'
+import type { QueryRuntimeExecutionBatchExecutor } from './batch.js'
 import { runQueryLoop } from './loop.js'
 
 const DEFAULT_MAX_TURNS = 12
 
 export interface QueryEngineConfig {
   readonly runAgent: AgentRunner
+  readonly executeRuntimeBatch?: QueryRuntimeExecutionBatchExecutor
   readonly getRolePrompt?: typeof getRolePrompt
 }
 
@@ -49,6 +51,7 @@ export class QueryEngine {
       : createQueryRuntimeState(runtimeConfig)
     const terminal = await runQueryLoop(state, {
       runAgent: this.config.runAgent,
+      executeRuntimeBatch: this.config.executeRuntimeBatch,
       getRolePrompt: this.config.getRolePrompt ?? getRolePrompt,
     })
 
@@ -83,6 +86,7 @@ export class QueryEngine {
     try {
       void runQueryLoop(state, {
         runAgent: this.config.runAgent,
+        executeRuntimeBatch: this.config.executeRuntimeBatch,
         getRolePrompt: this.config.getRolePrompt ?? getRolePrompt,
         onEvent: event => {
           queuedEvents.push(event)

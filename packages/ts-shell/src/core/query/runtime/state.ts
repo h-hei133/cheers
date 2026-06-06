@@ -212,18 +212,19 @@ function mergeSeedObservations(
 ): QueryRuntimeObservationState {
   if (!seed) return derived
   return {
-    contextPaths: uniqueStrings([...derived.contextPaths, ...seed.contextPaths]),
-    changedFiles: uniqueStrings([...derived.changedFiles, ...seed.changedFiles]),
-    verificationTargets: uniqueStrings([...derived.verificationTargets, ...seed.verificationTargets]),
-    failedVerificationTargets: uniqueStrings([...derived.failedVerificationTargets, ...seed.failedVerificationTargets]),
-    repairAttempts: [...derived.repairAttempts, ...seed.repairAttempts],
-    toolFailures: [...derived.toolFailures, ...seed.toolFailures],
-    artifactEvidence: uniqueStrings([...derived.artifactEvidence, ...seed.artifactEvidence]),
-    artifactClaims: uniqueStrings([...derived.artifactClaims, ...seed.artifactClaims]),
-    artifactClaimEvidence: [...derived.artifactClaimEvidence, ...seed.artifactClaimEvidence],
-    commandCoverage: [...derived.commandCoverage, ...seed.commandCoverage],
-    continuationFacts: uniqueStrings([...derived.continuationFacts, ...seed.continuationFacts]),
-    completedActions: uniqueList([...derived.completedActions, ...seed.completedActions]),
+    contextPaths: uniqueStrings([...derived.contextPaths, ...(seed.contextPaths ?? [])]),
+    changedFiles: uniqueStrings([...derived.changedFiles, ...(seed.changedFiles ?? [])]),
+    verificationTargets: uniqueStrings([...derived.verificationTargets, ...(seed.verificationTargets ?? [])]),
+    failedVerificationTargets: uniqueStrings([...derived.failedVerificationTargets, ...(seed.failedVerificationTargets ?? [])]),
+    repairAttempts: [...derived.repairAttempts, ...(seed.repairAttempts ?? [])],
+    toolFailures: [...derived.toolFailures, ...(seed.toolFailures ?? [])],
+    artifactEvidence: uniqueStrings([...derived.artifactEvidence, ...(seed.artifactEvidence ?? [])]),
+    artifactClaims: uniqueStrings([...derived.artifactClaims, ...(seed.artifactClaims ?? [])]),
+    artifactClaimEvidence: [...derived.artifactClaimEvidence, ...(seed.artifactClaimEvidence ?? [])],
+    commandCoverage: [...derived.commandCoverage, ...(seed.commandCoverage ?? [])],
+    toolFeedback: [...derived.toolFeedback, ...(seed.toolFeedback ?? [])],
+    continuationFacts: uniqueStrings([...derived.continuationFacts, ...(seed.continuationFacts ?? [])]),
+    completedActions: uniqueList([...derived.completedActions, ...(seed.completedActions ?? [])]),
     pendingAction: seed.pendingAction ?? derived.pendingAction,
   }
 }

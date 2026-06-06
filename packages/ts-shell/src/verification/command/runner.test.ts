@@ -37,6 +37,12 @@ describe("verificationCommandRunner", () => {
 
     expect(calls).toEqual(["node --version"]);
     expect(run.result.outcome).toBe("success");
+    expect(run.coverage).toEqual({
+      taskId: "task_verify",
+      coveredFiles: [],
+      uncoveredFiles: [],
+      coverageStatus: "none",
+    });
     expect(run.evidence).toContain(
       "verification-command-runner:runtime-dispatch:existing-tool-runtime",
     );
@@ -62,6 +68,31 @@ describe("verificationCommandRunner", () => {
     expect(run.evidence).toContain(
       "verification-command-runner:runtime-dispatch:not-run",
     );
+  });
+
+  it("returns typed command coverage supplied by targeted verification", async () => {
+    const run = await runVerificationCommand({
+      plan: buildVerificationCommandPlan({ explicitCommand: "node --version" }),
+      dispatcher: fakeDispatcher(async () => ({ success: true })),
+      events: [],
+      taskId: "task_verify_coverage",
+      workspaceRoot: "/tmp/work",
+      sessionId: "sess_verify",
+      coverage: {
+        coveredFiles: ["packages/ts-shell/src/runtime/batch.ts"],
+        uncoveredFiles: [],
+        coverageStatus: "complete",
+      },
+    });
+
+    expect(run.coverage).toEqual({
+      taskId: "task_verify_coverage",
+      coveredFiles: ["packages/ts-shell/src/runtime/batch.ts"],
+      uncoveredFiles: [],
+      coverageStatus: "complete",
+    });
+    expect(run.providerCall).toBe("not-run");
+    expect(run.mutation).toBe("not-run");
   });
 });
 

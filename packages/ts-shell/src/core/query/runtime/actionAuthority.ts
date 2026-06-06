@@ -43,6 +43,19 @@ export function blockUnsafeRuntimeAction(
     };
   }
 
+  if (decision.nextAction === "artifact" &&
+    decision.pendingAction === "artifact" &&
+    decision.selectedPaths.length === 0 &&
+    decision.ownerPaths.length === 0 &&
+    decision.changedFiles.length === 0 &&
+    decision.verificationTargets.length === 0) {
+    return {
+      action: "artifact",
+      reason: "runtime action blocked: artifact target required",
+      targetFiles: [],
+    };
+  }
+
   return undefined;
 }
 

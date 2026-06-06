@@ -15,10 +15,18 @@ export interface VerificationCommandRun {
   readonly plan: VerificationCommandPlan;
   readonly toolResult?: ToolLifecycleResult;
   readonly result: VerificationCommandResult;
+  readonly coverage: VerificationCommandCoverage;
   readonly changedFiles: readonly [];
   readonly mutation: "not-run";
   readonly providerCall: "not-run";
   readonly evidence: readonly string[];
+}
+
+export interface VerificationCommandCoverage {
+  readonly taskId: string;
+  readonly coveredFiles: readonly string[];
+  readonly uncoveredFiles: readonly string[];
+  readonly coverageStatus: string;
 }
 
 export async function runVerificationCommand(input: {
@@ -28,13 +36,19 @@ export async function runVerificationCommand(input: {
   readonly taskId: string;
   readonly workspaceRoot: string;
   readonly sessionId: string;
+  readonly coverage?: Omit<VerificationCommandCoverage, "taskId">;
   readonly abortSignal?: AbortSignal;
 }): Promise<VerificationCommandRun> {
+  const coverage = buildCommandCoverage({
+    taskId: input.taskId,
+    coverage: input.coverage,
+  });
   if (input.plan.state !== "ready" || !input.plan.command) {
     const result = buildVerificationCommandResult({ plan: input.plan });
     return {
       plan: input.plan,
       result,
+      coverage,
       changedFiles: [],
       mutation: "not-run",
       providerCall: "not-run",
@@ -69,6 +83,7 @@ export async function runVerificationCommand(input: {
     plan: input.plan,
     toolResult,
     result,
+    coverage,
     changedFiles: [],
     mutation: "not-run",
     providerCall: "not-run",
@@ -79,5 +94,25 @@ export async function runVerificationCommand(input: {
       "verification-command-runner:mutation:not-run",
       "verification-command-runner:provider-call:not-run",
     ],
+  };
+}
+
+function buildCommandCoverage(input: {
+  readonly taskId: string;
+  readonly coverage?: Omit<VerificationCommandCoverage, "taskId">;
+}): VerificationCommandCoverage {
+  if (input.coverage) {
+    return {
+      taskId: input.taskId,
+      coveredFiles: [...input.coverage.coveredFiles],
+      uncoveredFiles: [...input.coverage.uncoveredFiles],
+      coverageStatus: input.coverage.coverageStatus,
+    };
+  }
+  return {
+    taskId: input.taskId,
+    coveredFiles: [],
+    uncoveredFiles: [],
+    coverageStatus: "none",
   };
 }

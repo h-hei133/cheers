@@ -136,12 +136,17 @@ export async function runTaskRelevantVerificationRoute(input: {
       ? await runVerificationCommand({
           plan: commandPlan.verificationCommandPlan,
           dispatcher,
-          events,
-          taskId: input.taskId,
-          workspaceRoot: input.workspaceRoot,
-          sessionId: input.sessionId,
-          abortSignal: input.abortSignal,
-        })
+        events,
+        taskId: input.taskId,
+        workspaceRoot: input.workspaceRoot,
+        sessionId: input.sessionId,
+        coverage: {
+          coveredFiles: commandPlan.coveredFiles,
+          uncoveredFiles: commandPlan.uncoveredFiles,
+          coverageStatus: commandPlan.coverageStatus,
+        },
+        abortSignal: input.abortSignal,
+      })
       : undefined;
     const verdict = classifyTaskVerdict({
       commandPlan,

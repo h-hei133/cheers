@@ -3,6 +3,7 @@ import type {
   CodingResultSummary,
 } from '../../../orchestration/types.js'
 import type { ToolActionKind } from '../../../tools/policy/strategy.js'
+import type { QueryRuntimeExecutionResult } from './batch.js'
 import type { QueryEvent } from './events.js'
 
 export interface QueryRuntimeFailureObservation {
@@ -21,6 +22,17 @@ export interface QueryRuntimeCommandCoverageObservation {
   readonly coveredFiles: readonly string[]
 }
 
+export interface QueryRuntimeToolFeedbackObservation {
+  readonly toolId: string
+  readonly actionKind: ToolActionKind
+  readonly coveredFiles: readonly string[]
+  readonly truncated: boolean
+  readonly exitStatusClass: string
+  readonly failureClass: string
+  readonly affectedPaths: readonly string[]
+  readonly redactionStatus: string
+}
+
 export interface QueryRuntimeObservationState {
   readonly contextPaths: string[]
   readonly changedFiles: string[]
@@ -32,6 +44,7 @@ export interface QueryRuntimeObservationState {
   readonly artifactClaims: string[]
   readonly artifactClaimEvidence: QueryRuntimeArtifactClaimObservation[]
   readonly commandCoverage: QueryRuntimeCommandCoverageObservation[]
+  readonly toolFeedback: QueryRuntimeToolFeedbackObservation[]
   readonly continuationFacts: string[]
   readonly completedActions: ToolActionKind[]
   pendingAction?: ToolActionKind
@@ -49,6 +62,7 @@ export function createEmptyQueryRuntimeObservationState(): QueryRuntimeObservati
     artifactClaims: [],
     artifactClaimEvidence: [],
     commandCoverage: [],
+    toolFeedback: [],
     continuationFacts: [],
     completedActions: [],
     pendingAction: undefined,
@@ -99,6 +113,76 @@ export function observeQueryRuntimeOutput(
   observeLastAction(state, result)
 }
 
+export function observeQueryRuntimeExecutionResults(
+  state: QueryRuntimeObservationState,
+  results: readonly QueryRuntimeExecutionResult[],
+): void {
+  if (results.length === 0) {
+    return
+  }
+  for (const result of results) {
+    state.toolFeedback.push({
+      toolId: result.toolId,
+      actionKind: result.actionKind,
+      coveredFiles: uniqueValues(result.coveredFiles),
+      truncated: result.truncated,
+      exitStatusClass: result.exitStatusClass,
+      failureClass: result.failureClass,
+      affectedPaths: uniqueValues(result.affectedPaths),
+      redactionStatus: result.redactionStatus,
+    })
+
+    if (result.exitStatusClass === 'success') {
+      pushUniqueAction(state.completedActions, [result.actionKind])
+      if (result.actionKind === 'verify') {
+        removeValues(state.failedVerificationTargets, [
+          ...result.coveredFiles,
+          ...result.affectedPaths,
+        ])
+      }
+    } else {
+      const affectedPaths = uniqueValues(result.affectedPaths)
+      state.toolFailures.push({
+        action: result.actionKind,
+        signature: result.toolId,
+        reason: failureReasonForExecutionResult(result, affectedPaths),
+      })
+      if (result.actionKind === 'verify') {
+        pushUnique(state.failedVerificationTargets, affectedPaths)
+      }
+    }
+
+    if (result.actionKind === 'read' || result.actionKind === 'search') {
+      pushUnique(state.contextPaths, [
+        ...result.coveredFiles,
+        ...result.affectedPaths,
+      ])
+    }
+
+    if (result.actionKind === 'verify') {
+      pushUnique(state.verificationTargets, [
+        ...result.coveredFiles,
+        ...result.affectedPaths,
+      ])
+      const coveredFiles = uniqueValues(result.commandCoverage?.coveredFiles ?? result.coveredFiles)
+      if (coveredFiles.length > 0) {
+        state.commandCoverage.push({
+          taskId: result.commandCoverage?.taskId ?? result.toolId,
+          coveredFiles,
+        })
+      }
+    }
+
+    if (result.actionKind === 'artifact' && result.exitStatusClass === 'success') {
+      pushUnique(state.artifactEvidence, [
+        ...result.coveredFiles,
+        ...result.affectedPaths,
+      ])
+    }
+  }
+  state.pendingAction = undefined
+}
+
 function claimEvidenceFor(result: CodingResultSummary): QueryRuntimeArtifactClaimObservation[] {
   return result.taskSatisfaction.requiredEvidence.map((claim, index) => ({
     claim,
@@ -138,12 +222,35 @@ function observeRuntimeEvents(
   }
 }
 
+function failureReasonForExecutionResult(
+  result: QueryRuntimeExecutionResult,
+  affectedPaths: readonly string[],
+): string {
+  if (result.actionKind === 'verify' && affectedPaths.length > 0) {
+    return `verification failed for ${affectedPaths.join(',')}`
+  }
+  return sanitizeFailureReason(
+    affectedPaths.length > 0
+      ? `${result.failureClass} for ${affectedPaths.join(',')}`
+      : result.failureClass,
+  )
+}
+
 function observeVerification(
   state: QueryRuntimeObservationState,
   result: CodingResultSummary,
 ): void {
   if (result.verification.status === 'passed') {
-    removeValues(state.failedVerificationTargets, result.verifiedFiles)
+    const failedBatchTargets = new Set(state.toolFeedback
+      .filter((feedback) =>
+        feedback.actionKind === 'verify' &&
+        feedback.exitStatusClass !== 'success'
+      )
+      .flatMap((feedback) => feedback.affectedPaths))
+    removeValues(
+      state.failedVerificationTargets,
+      result.verifiedFiles.filter((file) => !failedBatchTargets.has(file)),
+    )
     if (state.pendingAction === 'verify') {
       state.pendingAction = undefined
     }

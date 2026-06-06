@@ -2927,6 +2927,402 @@ describe('core QueryEngine migration (W1)', () => {
     expect(result.status).toBe('stopped_not_proven')
     expect(result.stopReason).toContain('no safe action')
   })
+
+  it('ingests ordered execution batch results before choosing the next action', async () => {
+    const seenActions: string[] = []
+    const seenBatches: string[][] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.selectedPaths.join(',')}`)
+      return {
+        role,
+        content: `turn ${turn}`,
+        handoffTo: turn === 1 ? 'coder' : undefined,
+        handoffReason: turn === 1 ? 'continue with ordered owner context' : undefined,
+      }
+    }
+
+    const engine = new QueryEngine({
+      runAgent,
+      executeRuntimeBatch: async ({ batch }: any) => {
+        seenBatches.push(batch.items.map((item: any) => `${item.order}:${item.actionKind}:${item.toolId}`))
+        return {
+          batchId: batch.batchId,
+          results: [
+            {
+              toolId: 'runtime-search',
+              actionKind: 'search',
+              coveredFiles: [],
+              affectedPaths: ['src/order/owner.ts'],
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              redactionStatus: 'report-safe',
+              truncated: false,
+            },
+            {
+              toolId: 'runtime-read',
+              actionKind: 'read',
+              coveredFiles: ['src/order/owner.ts'],
+              affectedPaths: ['src/order/owner.ts'],
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              redactionStatus: 'report-safe',
+              truncated: false,
+            },
+          ],
+        }
+      },
+    } as any)
+
+    await engine.submitMessage('sess_runtime_batch_ordered', 'inspect missing order owner context', {
+      maxTurns: 2,
+    })
+
+    expect(seenBatches[0]).toEqual(['1:search:runtime-search'])
+    expect(seenActions).toEqual([
+      '1:search:',
+      '2:search:src/order/owner.ts',
+    ])
+  })
+
+  it('keeps partial execution batch failure visible for the next action', async () => {
+    const seenActions: string[] = []
+    const changedTargets = ['src/batch/source.ts', 'src/batch/source.test.ts']
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.proofGap.join('|')}`)
+      if (turn === 1) {
+        return {
+          role,
+          content: 'batch source changed',
+          handoffTo: 'coder',
+          handoffReason: 'verify changed targets',
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            verification: { status: 'not-requested', reason: 'Focused verification not run.' },
+            requiredEvidence: ['focused verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              target: 'src/batch/source.ts',
+              changedFiles: changedTargets,
+            },
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'provider claimed verification after partial batch',
+        handoffTo: turn === 2 ? 'reviewer' : undefined,
+        handoffReason: turn === 2 ? 'repair partial batch failure' : undefined,
+        codingResult: codingResult({
+          changedFiles: changedTargets,
+          verification: {
+            status: 'passed',
+            command: 'npm test -- src/batch/source.test.ts',
+            reason: 'Later target passed.',
+            selectionScope: 'focused',
+            selectionSource: 'changed-file-impact',
+          },
+          requiredEvidence: ['focused verification'],
+          observedEvidence: ['focused verification'],
+          verifiedFiles: changedTargets,
+          lastAction: { actionKind: 'verify', target: 'src/batch/source.test.ts' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({
+      runAgent,
+      executeRuntimeBatch: async ({ batch }: any) => {
+        if (!batch.items.some((item: any) => item.actionKind === 'verify')) {
+          return { batchId: batch.batchId, results: [] }
+        }
+        return {
+          batchId: batch.batchId,
+          results: [
+            {
+              toolId: 'verify-source',
+              actionKind: 'verify',
+              coveredFiles: ['src/batch/source.ts'],
+              affectedPaths: ['src/batch/source.ts'],
+              exitStatusClass: 'failed',
+              failureClass: 'test-failed',
+              redactionStatus: 'report-safe',
+              truncated: false,
+            },
+            {
+              toolId: 'verify-test',
+              actionKind: 'verify',
+              coveredFiles: ['src/batch/source.test.ts'],
+              affectedPaths: ['src/batch/source.test.ts'],
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              redactionStatus: 'report-safe',
+              truncated: false,
+            },
+          ],
+        }
+      },
+    } as any)
+
+    await engine.submitMessage('sess_runtime_partial_batch_failure', 'update batch source with focused verification', {
+      maxTurns: 3,
+    })
+
+    expect(seenActions[1]).toContain('2:verify:')
+    expect(seenActions[2]).toContain('3:repair:verification failed for src/batch/source.ts')
+    expect(seenActions[2]).not.toContain('src/batch/source.test.ts')
+  })
+
+  it('emits safe execution batch failure details without raw output', async () => {
+    const feedback: string[] = []
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'read failed safely',
+    })
+    const engine = new QueryEngine({
+      runAgent,
+      executeRuntimeBatch: async ({ batch }: any) => ({
+        batchId: batch.batchId,
+        results: [
+          {
+            toolId: 'runtime-read',
+            actionKind: 'read',
+            coveredFiles: [],
+            affectedPaths: ['src/private-redacted.ts'],
+            exitStatusClass: 'failed',
+            failureClass: 'not-found',
+            redactionStatus: 'redacted',
+            truncated: true,
+          },
+        ],
+      }),
+    } as any)
+
+    for await (const event of engine.streamMessage('sess_runtime_safe_tool_feedback', 'inspect missing safe feedback context', {
+      maxTurns: 1,
+    })) {
+      if (event.type === 'runtime.tool-feedback') {
+        feedback.push([
+          event.toolId,
+          event.actionKind,
+          event.exitStatusClass,
+          event.failureClass,
+          event.affectedPaths.join(','),
+          event.redactionStatus,
+          event.truncated ? 'truncated' : 'full',
+        ].join(':'))
+      }
+    }
+
+    expect(feedback).toEqual([
+      'runtime-read:read:failed:not-found:src/private-redacted.ts:redacted:truncated',
+    ])
+  })
+
+  it('hands targeted verification execution to command coverage before proof projection', async () => {
+    const coverageCounts: number[] = []
+    const changedTargets = ['packages/ts-shell/src/runtime/batch.ts']
+    const runAgent: AgentRunner = async ({ role, turn }) => {
+      if (turn === 1) {
+        return {
+          role,
+          content: 'runtime batch changed',
+          handoffTo: 'coder',
+          handoffReason: 'verify runtime batch',
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            verification: { status: 'not-requested', reason: 'Focused verification not run.' },
+            requiredEvidence: ['runtime batch focused verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              target: changedTargets[0],
+              changedFiles: changedTargets,
+            },
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'verification result projected',
+        codingResult: codingResult({
+          changedFiles: changedTargets,
+          verification: {
+            status: 'passed',
+            command: 'npm run test -w packages/ts-shell -- src/core/query/runtime/engine.test.ts',
+            reason: 'Focused runtime test passed.',
+            selectionScope: 'focused',
+            selectionSource: 'changed-file-impact',
+          },
+          requiredEvidence: ['runtime batch focused verification'],
+          observedEvidence: ['runtime batch focused verification'],
+          verifiedFiles: changedTargets,
+          lastAction: { actionKind: 'verify', target: changedTargets[0] },
+        }),
+      }
+    }
+    const engine = new QueryEngine({
+      runAgent,
+      executeRuntimeBatch: async ({ batch }: any) => ({
+        batchId: batch.batchId,
+        results: batch.items.some((item: any) => item.actionKind === 'verify')
+          ? [
+              {
+                toolId: 'verification-command',
+                actionKind: 'verify',
+                coveredFiles: changedTargets,
+                affectedPaths: changedTargets,
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                redactionStatus: 'report-safe',
+                truncated: false,
+                commandCoverage: {
+                  taskId: 'runtime_batch_verify',
+                  coveredFiles: changedTargets,
+                  uncoveredFiles: [],
+                  coverageStatus: 'complete',
+                },
+              },
+            ]
+          : [],
+      }),
+    } as any)
+
+    for await (const event of engine.streamMessage('sess_runtime_targeted_verification_handoff', 'update runtime batch', {
+      maxTurns: 2,
+    })) {
+      if (event.type === 'runtime.task-proof') {
+        coverageCounts.push(event.projection.observationState.commandCoverageCount)
+      }
+    }
+
+    expect(coverageCounts).toEqual([0, 1])
+  })
+
+  it('blocks unsafe execution batch action before calling execution or agent runners', async () => {
+    let batchCalls = 0
+    let agentCalls = 0
+    const feedback: string[] = []
+    const runAgent: AgentRunner = async ({ role }) => {
+      agentCalls += 1
+      return { role, content: 'should not run' }
+    }
+    const engine = new QueryEngine({
+      runAgent,
+      executeRuntimeBatch: async () => {
+        batchCalls += 1
+        return { batchId: 'unexpected', results: [] }
+      },
+    } as any)
+
+    for await (const event of engine.streamMessage('sess_runtime_authority_block', 'artifact without owner context', {
+      maxTurns: 1,
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_runtime_authority_block',
+          initialPrompt: 'artifact without owner context',
+          maxTurns: 1,
+          startingRole: 'coder',
+        },
+        currentRole: 'coder',
+        turn: 1,
+        lastContinuationReason: undefined,
+        pendingLifecycle: createEmptyLifecycleIndex(),
+        sharedContext: {
+          sessionId: 'sess_runtime_authority_block',
+          initialPrompt: 'artifact without owner context',
+          notes: [],
+          handoffs: [],
+        },
+        transcript: [],
+        visitedTransitions: [],
+        recoveryBoundary: 'completed-turn-reentry',
+        truthBoundary: replayTruthBoundary(),
+        derivedState: { transcript: [] },
+        observations: {
+          ...emptyRuntimeObservations(),
+          artifactClaims: ['owner-backed artifact claim'],
+          pendingAction: 'artifact',
+        },
+      },
+    })) {
+      if (event.type === 'runtime.tool-feedback') {
+        feedback.push(`${event.actionKind}:${event.failureClass}:${event.exitStatusClass}`)
+      }
+    }
+
+    expect(batchCalls).toBe(0)
+    expect(agentCalls).toBe(0)
+    expect(feedback).toEqual(['artifact:authority-blocked:blocked'])
+  })
+
+  it('stops as not proven when unsafe execution batch failure leaves no safe next action', async () => {
+    const runAgent: AgentRunner = async ({ role }) => ({
+      role,
+      content: 'should not hide unsafe failure',
+      handoffTo: 'coder',
+      handoffReason: 'unsafe failure remains',
+    })
+    let batchCalls = 0
+    const engine = new QueryEngine({
+      runAgent,
+      executeRuntimeBatch: async ({ batch }: any) => {
+        batchCalls += 1
+        return {
+          batchId: batch.batchId,
+          results: [
+            {
+              toolId: 'runtime-verify',
+              actionKind: 'verify',
+              coveredFiles: [],
+              affectedPaths: ['src/unsafe.ts'],
+              exitStatusClass: 'blocked',
+              failureClass: 'unsafe-output',
+              redactionStatus: 'report-safe',
+              truncated: false,
+            },
+          ],
+        }
+      },
+    } as any)
+
+    const result = await engine.submitMessage('sess_runtime_unsafe_batch_stop', 'verify unsafe target', {
+      maxTurns: 1,
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_runtime_unsafe_batch_stop',
+          initialPrompt: 'verify unsafe target',
+          maxTurns: 1,
+          startingRole: 'reviewer',
+        },
+        currentRole: 'reviewer',
+        turn: 1,
+        lastContinuationReason: undefined,
+        pendingLifecycle: createEmptyLifecycleIndex(),
+        sharedContext: {
+          sessionId: 'sess_runtime_unsafe_batch_stop',
+          initialPrompt: 'verify unsafe target',
+          notes: [],
+          handoffs: [],
+        },
+        transcript: [],
+        visitedTransitions: [],
+        recoveryBoundary: 'completed-turn-reentry',
+        truthBoundary: replayTruthBoundary(),
+        derivedState: { transcript: [] },
+        observations: {
+          ...emptyRuntimeObservations(),
+          changedFiles: ['src/unsafe.ts'],
+          verificationTargets: ['src/unsafe.ts'],
+          pendingAction: 'verify',
+        },
+      },
+    })
+
+    expect(batchCalls).toBe(1)
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.stopReason).toContain('no safe action remains after execution batch failure')
+  })
 })
 
 function emptyRuntimeObservations() {
@@ -2941,6 +3337,7 @@ function emptyRuntimeObservations() {
     artifactClaims: [],
     artifactClaimEvidence: [],
     commandCoverage: [],
+    toolFeedback: [],
     continuationFacts: [],
     completedActions: [],
   }
