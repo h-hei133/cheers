@@ -86,6 +86,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/final-architecture-audit-record.md` | active | Checking SP050 final owner-boundary audit findings, product fixes, no-fix closures, reference inputs, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/parity-development-trial.md` | active | Checking SP051 unseen parity trial tasks, initial weak phases, owner upgrades, reference inputs, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/execution-loop-trial.md` | active | Checking SP052 unseen execution-loop tasks, initial weak phases, owner upgrades, reference inputs, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/controlled-unseen-development-gauntlet.md` | active | Checking SP053 controlled unseen development tasks, execution-seam authority diagnostics, introduction decision, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 

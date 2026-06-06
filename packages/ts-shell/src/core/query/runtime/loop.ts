@@ -7,6 +7,11 @@ import { decideQueryRuntimeAction, hasOpenRuntimeProofGap } from './policy.js'
 import { observeQueryRuntimeOutput } from './observation.js'
 import { projectQueryRuntimeProof } from './proof.js'
 import {
+  blockedRuntimeActionOutput,
+  blockUnsafeRuntimeAction,
+  constrainRuntimeActionOutput,
+} from './actionAuthority.js'
+import {
   ALLOWED_HANDOFFS,
   continueQuery,
   terminalQuery,
@@ -133,6 +138,19 @@ async function executeTurn(
   deps: QueryLoopDependencies,
   runtimeAction: QueryRuntimeActionDecision,
 ): Promise<{ action: 'completed'; output: AgentExecutionOutput } | { action: 'terminal'; terminal: QueryTerminal }> {
+  const blockedAction = blockUnsafeRuntimeAction(runtimeAction)
+  if (blockedAction) {
+    return {
+      action: 'completed',
+      output: blockedRuntimeActionOutput({
+        role: state.currentRole,
+        block: blockedAction,
+        changedFiles: runtimeAction.changedFiles,
+        evidenceFiles: runtimeAction.verificationTargets,
+      }),
+    }
+  }
+
   for (let attempt = 1; attempt <= DEFAULT_MAX_RETRIES_PER_TURN + 1; attempt += 1) {
     try {
       const output = await deps.runAgent({
@@ -145,7 +163,7 @@ async function executeTurn(
         transcript: state.transcript,
       })
 
-      return { action: 'completed', output }
+      return { action: 'completed', output: constrainRuntimeActionOutput(runtimeAction, output) }
     } catch (error) {
       const queryError = toQueryRuntimeError(error)
       const compensationEvents = compensateToolLifecycle(queryError.events ?? [])

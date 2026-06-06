@@ -2689,7 +2689,281 @@ describe('core QueryEngine migration (W1)', () => {
     )
     expect(hasMissingPostValidation, proofStates.join('\n')).toBe(true)
   })
+
+  it('blocks a pending edit at runtime authority when discovery is required', async () => {
+    const seenActions: string[] = []
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.proofGap.join('|')}`)
+      return {
+        role,
+        content: 'owner context discovered after unsafe edit was rejected',
+        codingResult: codingResult({
+          evidenceFiles: ['src/permissions/policy.ts'],
+          requiredEvidence: ['safe edit blocked proof'],
+          observedEvidence: [],
+          lastAction: { actionKind: 'repo-explain', target: 'src/permissions/policy.ts' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_runtime_authority_edit_discovery', 'update permission policy contract', {
+      maxTurns: 2,
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_runtime_authority_edit_discovery',
+          initialPrompt: 'update permission policy contract',
+          maxTurns: 2,
+          startingRole: 'coder',
+        },
+        currentRole: 'coder',
+        turn: 1,
+        sharedContext: {
+          sessionId: 'sess_runtime_authority_edit_discovery',
+          initialPrompt: 'update permission policy contract',
+          notes: [],
+          handoffs: [],
+        },
+        transcript: [],
+        visitedTransitions: [],
+        pendingLifecycle: createEmptyLifecycleIndex(),
+        recoveryBoundary: 'completed-turn-reentry',
+        truthBoundary: replayTruthBoundary(),
+        derivedState: { transcript: [] },
+        observations: {
+          ...emptyRuntimeObservations(),
+          pendingAction: 'edit',
+        },
+      },
+    })
+
+    expect(seenActions[0]).toContain('search:')
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.stopReason).toContain('proof gap')
+  })
+
+  it('blocks generic verification at runtime authority when targeted verification is required', async () => {
+    const seenActions: string[] = []
+    const changedTargets = ['src/scheduler/api.ts', 'src/scheduler/worker.ts', 'src/scheduler/worker.test.ts']
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.verificationTargets.join(',')}`)
+      return {
+        role,
+        content: 'generic verification summary',
+        codingResult: codingResult({
+          changedFiles: changedTargets,
+          verification: {
+            status: 'passed',
+            reason: 'generic workspace check passed but did not prove changed scheduler targets',
+            command: 'npm test',
+            selectionScope: 'broader',
+            selectionSource: 'explicit-user',
+          },
+          verifiedFiles: [],
+          requiredEvidence: ['scheduler targeted verification'],
+          observedEvidence: ['scheduler targeted verification'],
+          lastAction: { actionKind: 'verify', target: 'workspace' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_runtime_authority_targeted_verify', 'verify scheduler api update', {
+      maxTurns: 1,
+      startingRole: 'reviewer',
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_runtime_authority_targeted_verify',
+          initialPrompt: 'verify scheduler api update',
+          maxTurns: 1,
+          startingRole: 'reviewer',
+        },
+        currentRole: 'reviewer',
+        turn: 1,
+        sharedContext: {
+          sessionId: 'sess_runtime_authority_targeted_verify',
+          initialPrompt: 'verify scheduler api update',
+          notes: [],
+          handoffs: [],
+        },
+        transcript: [],
+        visitedTransitions: [],
+        pendingLifecycle: createEmptyLifecycleIndex(),
+        recoveryBoundary: 'completed-turn-reentry',
+        truthBoundary: replayTruthBoundary(),
+        derivedState: { transcript: [] },
+        observations: {
+          ...emptyRuntimeObservations(),
+          changedFiles: [...changedTargets],
+          verificationTargets: [...changedTargets],
+          pendingAction: 'verify',
+        },
+      },
+    })
+
+    expect(seenActions[0]).toContain(`verify:${changedTargets.join(',')}`)
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.stopReason).toContain('no safe action')
+  })
+
+  it('redirects missing-context repair to discovery before repair execution', async () => {
+    const seenActions: string[] = []
+    const changedTargets = ['src/billing/calc.ts', 'src/billing/calc.test.ts']
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.proofGap.join('|')}`)
+      return {
+        role,
+        content: 'billing owner context refreshed',
+        codingResult: codingResult({
+          evidenceFiles: ['src/billing/rules.ts'],
+          requiredEvidence: ['repair target context'],
+          observedEvidence: [],
+          lastAction: { actionKind: 'repo-explain', target: 'src/billing/rules.ts' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_runtime_authority_repair_requires_context', 'repair billing calculation after failed check', {
+      maxTurns: 1,
+      startingRole: 'coder',
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_runtime_authority_repair_requires_context',
+          initialPrompt: 'repair billing calculation after failed check',
+          maxTurns: 1,
+          startingRole: 'coder',
+        },
+        currentRole: 'coder',
+        turn: 1,
+        sharedContext: {
+          sessionId: 'sess_runtime_authority_repair_requires_context',
+          initialPrompt: 'repair billing calculation after failed check',
+          notes: [],
+          handoffs: [],
+        },
+        transcript: [],
+        visitedTransitions: [],
+        pendingLifecycle: createEmptyLifecycleIndex(),
+        recoveryBoundary: 'completed-turn-reentry',
+        truthBoundary: replayTruthBoundary(),
+        derivedState: { transcript: [] },
+        observations: {
+          ...emptyRuntimeObservations(),
+          changedFiles: [...changedTargets],
+          failedVerificationTargets: ['src/billing/calc.test.ts'],
+          toolFailures: [{
+            action: 'verify',
+            signature: 'src/billing/calc.test.ts',
+            reason: 'missing billing rules owner context',
+          }],
+          pendingAction: 'repair',
+        },
+      },
+    })
+
+    expect(seenActions[0]).toContain('search:')
+    expect(seenActions[0]).not.toContain('repair:')
+    expect(result.status).toBe('stopped_not_proven')
+  })
+
+  it('rejects metadata-only artifact completion at runtime authority', async () => {
+    const seenActions: string[] = []
+    const changedTargets = ['src/report/model.ts', 'reports/report.md']
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      seenActions.push(`${turn}:${runtimeAction.nextAction}:${runtimeAction.proofGap.join('|')}`)
+      return {
+        role,
+        content: 'artifact metadata says complete',
+        codingResult: codingResult({
+          taskKind: 'write-file',
+          changedFiles: changedTargets,
+          evidenceFiles: [],
+          verifiedFiles: [],
+          verification: { status: 'not-requested', reason: 'artifact metadata only' },
+          requiredEvidence: ['report claim backed by source', 'report claim backed by verification'],
+          observedEvidence: ['artifact metadata marker', 'artifact output exists'],
+          lastAction: { actionKind: 'write-file', target: 'reports/report.md', changedFiles: changedTargets },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    const result = await engine.submitMessage('sess_runtime_authority_artifact_metadata_only', 'write report artifact with claim proof', {
+      maxTurns: 1,
+      startingRole: 'coder',
+      runtimeSeed: {
+        config: {
+          sessionId: 'sess_runtime_authority_artifact_metadata_only',
+          initialPrompt: 'write report artifact with claim proof',
+          maxTurns: 1,
+          startingRole: 'coder',
+        },
+        currentRole: 'coder',
+        turn: 1,
+        sharedContext: {
+          sessionId: 'sess_runtime_authority_artifact_metadata_only',
+          initialPrompt: 'write report artifact with claim proof',
+          notes: [],
+          handoffs: [],
+        },
+        transcript: [],
+        visitedTransitions: [],
+        pendingLifecycle: createEmptyLifecycleIndex(),
+        recoveryBoundary: 'completed-turn-reentry',
+        truthBoundary: replayTruthBoundary(),
+        derivedState: { transcript: [] },
+        observations: {
+          ...emptyRuntimeObservations(),
+          changedFiles: [...changedTargets],
+          artifactClaims: ['report claim backed by source', 'report claim backed by verification'],
+          artifactClaimEvidence: [],
+          pendingAction: 'artifact',
+        },
+      },
+    })
+
+    expect(seenActions[0]).toContain('artifact:')
+    expect(result.status).toBe('stopped_not_proven')
+    expect(result.stopReason).toContain('no safe action')
+  })
 })
+
+function emptyRuntimeObservations() {
+  return {
+    contextPaths: [],
+    changedFiles: [],
+    verificationTargets: [],
+    failedVerificationTargets: [],
+    repairAttempts: [],
+    toolFailures: [],
+    artifactEvidence: [],
+    artifactClaims: [],
+    artifactClaimEvidence: [],
+    commandCoverage: [],
+    continuationFacts: [],
+    completedActions: [],
+  }
+}
+
+function replayTruthBoundary() {
+  return {
+    source: 'durable-replay' as const,
+    normalizedEventCount: 0,
+    pairedTurnCount: 0,
+    policyEvidence: ['policy:completed-turn-only'] as const,
+    repairSummary: {
+      insertedPromptMessage: false,
+      insertedQueryStarted: false,
+      strippedInterruptedTerminalEvents: 0,
+      insertedRunInterrupted: false,
+      ignoredDuplicateTurnStarts: 0,
+      ignoredUnpairedTurnCompletions: 0,
+      ignoredRoleMismatchedTurnCompletions: 0,
+    },
+    continuationSafety: 'completed-turn-only' as const,
+  }
+}
 
 function codingResult(input: {
   taskKind?: CodingResultSummary['taskKind']
