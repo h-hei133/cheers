@@ -4,6 +4,7 @@ import {
   createQueryRuntimeStateFromSeed,
   ensureQueryRuntimeObservationState,
 } from "../../core/query/runtime/state.js";
+import { decideQueryRuntimeAction } from "../../core/query/runtime/policy.js";
 import type { AgentExecutionOutput } from "../../orchestration/types.js";
 import type { RecoverySnapshot, TranscriptEvent } from "../SessionManager.js";
 import {
@@ -149,6 +150,35 @@ describe("session replay builder", () => {
     expect(seed.turn).toBe(1);
     expect(seed.derivedState.transcript).toEqual([]);
     expect(seed.truthBoundary.repairSummary.ignoredDuplicateTurnStarts).toBe(1);
+  });
+
+  it("does not continue stale pending lifecycle after unsafe replay downgrades to fresh entry", () => {
+    const pendingLifecycle = createEmptyLifecycleIndex();
+    pendingLifecycle.pendingTools.verify_old_turn = {
+      toolName: "verify",
+      startedAt: "2026-05-13T00:00:01.000Z",
+    };
+    const snapshot = {
+      ...makeSnapshot([
+        turnStarted("planner", 1),
+        turnStarted("coder", 1),
+        turnCompleted(makeOutput("planner", "plan")),
+      ]),
+      pendingLifecycle,
+    };
+
+    const seed = buildResumeReplayInput({
+      sessionId: "sess_replay_stale_pending",
+      snapshot,
+    });
+    const state = createQueryRuntimeStateFromSeed(seed);
+    const decision = decideQueryRuntimeAction(state);
+
+    expect(seed.recoveryBoundary).toBe("fresh-entry");
+    expect(seed.truthBoundary.continuationSafety).toBe("fresh-only");
+    expect(state.pendingLifecycle.pendingTools).toEqual({});
+    expect(state.pendingLifecycle.pendingApprovals).toEqual({});
+    expect(decision.nextAction).not.toBe("continue");
   });
 
   it("projects replay plan messages and repair counters from the same pairing logic", () => {

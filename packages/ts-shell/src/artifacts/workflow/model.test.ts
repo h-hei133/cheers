@@ -150,7 +150,7 @@ describe("artifact workflow model", () => {
       blockers: ["artifact claim evidence missing"],
     });
     expect(duplicateClaimEvidence?.claimEvidenceReceipts).toEqual([
-      { claim: "source covered", evidenceId: "same-receipt", proven: true },
+      { claim: "source covered", evidenceId: "same-receipt", proven: false },
       { claim: "verification passed", evidenceId: "same-receipt", proven: false },
     ]);
 
@@ -174,7 +174,7 @@ describe("artifact workflow model", () => {
       blockers: ["artifact claim evidence missing"],
     });
     expect(mismatchedClaimEvidence?.claimEvidenceReceipts).toEqual([
-      { claim: "source covered", evidenceId: "artifact-check:source-coverage:passed", proven: true },
+      { claim: "source covered", evidenceId: "artifact-check:source-coverage:passed", proven: false },
       { claim: "verification passed", evidenceId: "source-receipt", proven: false },
     ]);
   });
@@ -269,9 +269,36 @@ describe("artifact workflow model", () => {
     });
 
     expect(receipt).toMatchObject({
-      validationState: "not-proven",
-      blockers: ["artifact validation not proven"],
+      validationState: "claim-evidence-missing",
+      blockers: ["artifact claim evidence missing"],
       terminalSuccessClaim: false,
     });
+  });
+
+  it("rejects generic artifact claim evidence that is not bound to source paths or verification receipts", () => {
+    const receipt = createArtifactReceipt({
+      taskKind: "docs-report",
+      outputKind: "artifact",
+      requiredPaths: ["reports/summary.md"],
+      workspacePaths: ["notes/source.md", "reports/summary.md"],
+      verificationState: "selected-passed",
+      failureCategories: [],
+      requiredContentMarkers: ["source-receipt", "verification-evidence"],
+      observedContentMarkers: ["source-receipt", "verification-evidence"],
+      verificationEvidence: ["artifact-check:summary:passed"],
+      claimEvidence: [
+        { claim: "source covered", evidenceId: "source receipt" },
+        { claim: "verification passed", evidenceId: "verification receipt" },
+      ],
+    });
+
+    expect(receipt).toMatchObject({
+      validationState: "claim-evidence-missing",
+      blockers: ["artifact claim evidence missing"],
+    });
+    expect(receipt?.claimEvidenceReceipts).toEqual([
+      { claim: "source covered", evidenceId: "source receipt", proven: false },
+      { claim: "verification passed", evidenceId: "verification receipt", proven: false },
+    ]);
   });
 });

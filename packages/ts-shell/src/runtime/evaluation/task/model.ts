@@ -701,10 +701,7 @@ async function runDefinedTaskCase(
               ? [definition.expectedVerification.verificationId]
               : [],
             claimEvidence: definition.expectedVerification.expectedStatus === "passed"
-              ? definition.successRubric.map((claim) => ({
-                claim,
-                evidenceId: `${definition.expectedVerification.verificationId}:${claim}`,
-              }))
+              ? claimEvidenceForDefinition(definition)
               : [],
           });
           const repairDecision = decideRepair({
@@ -2253,6 +2250,35 @@ function output(
   requiredPaths: readonly string[],
 ): TaskExpectedOutput {
   return freeze({ kind, summary, requiredPaths });
+}
+
+function claimEvidenceForDefinition(definition: TaskCaseDefinition): readonly {
+  readonly claim: string;
+  readonly evidenceId?: string;
+  readonly sourcePath?: string;
+  readonly verificationEvidenceId?: string;
+}[] {
+  const requiredPaths = new Set(definition.expectedOutput.requiredPaths);
+  const sourcePaths = definition.workspace.files
+    .filter((file) => !requiredPaths.has(file.path))
+    .map((file) => file.path);
+  let sourceClaimIndex = 0;
+  return definition.successRubric.map((claim) => {
+    const normalized = claim.toLowerCase();
+    if (normalized.includes("verification") || normalized.includes("validat") || normalized.includes("check")) {
+      return {
+        claim,
+        evidenceId: definition.expectedVerification.verificationId,
+        verificationEvidenceId: definition.expectedVerification.verificationId,
+      };
+    }
+    if (normalized.includes("source") && sourcePaths.length > 0) {
+      const sourcePath = sourcePaths[Math.min(sourceClaimIndex, sourcePaths.length - 1)];
+      sourceClaimIndex += 1;
+      return { claim, evidenceId: sourcePath, sourcePath };
+    }
+    return { claim, evidenceId: `${definition.expectedVerification.verificationId}:${claim}` };
+  });
 }
 
 function freeze<T>(value: T): T {

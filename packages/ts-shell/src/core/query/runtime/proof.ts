@@ -28,6 +28,7 @@ export interface QueryRuntimeProofProjection {
     readonly failedVerificationCount: number;
     readonly repairAttemptCount: number;
     readonly artifactEvidenceCount: number;
+    readonly commandCoverageCount: number;
     readonly continuationFactCount: number;
     readonly pendingAction?: QueryRuntimeActionDecision["nextAction"];
   };
@@ -82,9 +83,10 @@ export function projectQueryRuntimeProof(input: {
       input.decision.changedFiles,
       input.decision.verificationTargets,
       result,
+      observations.commandCoverage,
     ),
     repairAttempted: (result?.repair.attempts ?? 0) > 0,
-    repairPostValidation: verificationState,
+    repairPostValidation: repairPostValidationState(result, observations.commandCoverage),
     originalFailurePreserved: Boolean(result && (
       result.failedFiles.length > 0 ||
       result.verification.status === "failed" ||
@@ -119,6 +121,7 @@ export function projectQueryRuntimeProof(input: {
       failedVerificationCount: observations.failedVerificationTargets.length,
       repairAttemptCount: observations.repairAttempts.length,
       artifactEvidenceCount: observations.artifactEvidence.length,
+      commandCoverageCount: observations.commandCoverage.length,
       continuationFactCount: observations.continuationFacts.length,
       ...(observations.pendingAction
         ? { pendingAction: observations.pendingAction }
@@ -152,6 +155,7 @@ function changedFileVerificationComplete(
   changedFiles: readonly string[],
   verificationTargets: readonly string[],
   result: CodingResultSummary | undefined,
+  commandCoverage: readonly { readonly coveredFiles: readonly string[] }[] = [],
 ): boolean {
   const targets = uniqueStrings([
     ...changedFiles,
@@ -161,6 +165,16 @@ function changedFileVerificationComplete(
   ]);
   if (targets.length === 0) {
     return result?.verification.status === "passed";
+  }
+  if (commandCoverage.length > 0) {
+    const coveredFiles = uniqueStrings(commandCoverage.flatMap((receipt) => receipt.coveredFiles));
+    return verifyChangedFileCoverage({
+      changedFiles: targets,
+      verificationTargets,
+      verifiedFiles: coveredFiles,
+      unverifiedFiles: targets.filter((target) => !coveredFiles.includes(target)),
+      verificationState: result?.verification.status ?? "not-requested",
+    }).complete;
   }
   return verifyChangedFileCoverage({
     changedFiles: targets,
@@ -226,6 +240,26 @@ function hostStatusFor(result: CodingResultSummary | undefined): string {
   if (result.verification.status === "failed") return "failed";
   if (result.verification.status === "blocked") return "unsupported";
   return "executed";
+}
+
+function repairPostValidationState(
+  result: CodingResultSummary | undefined,
+  commandCoverage: readonly { readonly coveredFiles: readonly string[] }[],
+): string {
+  if ((result?.repair.attempts ?? 0) <= 0) {
+    return result?.verification.status ?? "not-requested";
+  }
+  if (result?.verification.status !== "passed") {
+    return result?.verification.status ?? "not-requested";
+  }
+  if (commandCoverage.length > 0) {
+    return "passed";
+  }
+  const seed = result.lastActionResultSeed;
+  if (seed?.actionKind && actionForSeed(seed.actionKind) === "verify") {
+    return "passed";
+  }
+  return "partial";
 }
 
 function stagedActionConsistent(

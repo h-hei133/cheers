@@ -182,6 +182,9 @@ export function createQueryRuntimeStateFromSeed(
   const policy = CONTINUATION_SAFETY_POLICY[seed.truthBoundary.continuationSafety]
 
   const transcript = policy.allowDerivedContext ? [...seed.derivedState.transcript] : []
+  const pendingLifecycle = policy.resetToStartingRole
+    ? createEmptyLifecycleIndex()
+    : seed.pendingLifecycle
 
   return {
     config: seed.config,
@@ -189,9 +192,9 @@ export function createQueryRuntimeStateFromSeed(
     turn: seed.turn,
     lastContinuationReason: seed.lastContinuationReason,
     pendingLifecycle: {
-      pendingApprovals: { ...seed.pendingLifecycle.pendingApprovals },
-      pendingTools: { ...seed.pendingLifecycle.pendingTools },
-      taskStates: { ...seed.pendingLifecycle.taskStates },
+      pendingApprovals: { ...pendingLifecycle.pendingApprovals },
+      pendingTools: { ...pendingLifecycle.pendingTools },
+      taskStates: { ...pendingLifecycle.taskStates },
     },
     sharedContext: derivedContext.sharedContext,
     observations: mergeSeedObservations(
@@ -218,6 +221,7 @@ function mergeSeedObservations(
     artifactEvidence: uniqueStrings([...derived.artifactEvidence, ...seed.artifactEvidence]),
     artifactClaims: uniqueStrings([...derived.artifactClaims, ...seed.artifactClaims]),
     artifactClaimEvidence: [...derived.artifactClaimEvidence, ...seed.artifactClaimEvidence],
+    commandCoverage: [...derived.commandCoverage, ...seed.commandCoverage],
     continuationFacts: uniqueStrings([...derived.continuationFacts, ...seed.continuationFacts]),
     completedActions: uniqueList([...derived.completedActions, ...seed.completedActions]),
     pendingAction: seed.pendingAction ?? derived.pendingAction,

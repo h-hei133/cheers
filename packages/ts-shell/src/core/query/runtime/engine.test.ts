@@ -915,6 +915,7 @@ describe('core QueryEngine migration (W1)', () => {
         verification: { status: 'passed', reason: 'Post repair verification passed.' },
         requiredEvidence: ['post-repair verification'],
         observedEvidence: ['post-repair verification'],
+        lastAction: { actionKind: 'verify', target: 'src/app.ts' },
       }),
     })
 
@@ -1759,7 +1760,7 @@ describe('core QueryEngine migration (W1)', () => {
             evidenceFiles: ['notes/source.md'],
             verification: { status: 'not-requested', reason: 'Artifact verification not run.' },
             requiredEvidence: ['claim backed by source', 'claim backed by verification'],
-            observedEvidence: ['source receipt'],
+            observedEvidence: ['notes/source.md'],
           }),
         }
       }
@@ -1832,7 +1833,7 @@ describe('core QueryEngine migration (W1)', () => {
         verification: { status: 'passed', reason: 'Only source receipts were checked.' },
         verifiedFiles: ['notes/source.md'],
         requiredEvidence: ['source covered', 'verification passed'],
-        observedEvidence: ['source receipt', 'verification receipt'],
+        observedEvidence: ['notes/source.md', 'verification receipt'],
       })
       return {
         role,
@@ -2235,6 +2236,7 @@ describe('core QueryEngine migration (W1)', () => {
           verifiedFiles: ['src/status/model.ts', 'src/status/model.test.ts'],
           requiredEvidence: ['targeted verification'],
           observedEvidence: ['targeted verification'],
+          lastAction: { actionKind: 'verify', target: 'src/status/model.test.ts' },
         }),
       }
     }
@@ -2279,8 +2281,8 @@ describe('core QueryEngine migration (W1)', () => {
           'status claim backed by verification receipt',
           ],
           observedEvidence: [
-            'status claim backed by source receipt',
-            'status claim backed by verification receipt',
+            'docs/status-source.md',
+            'status artifact verification receipt',
           ],
         }),
       }
@@ -2336,6 +2338,7 @@ describe('core QueryEngine migration (W1)', () => {
             'status claim backed by verification receipt',
           ],
           artifactClaimEvidence: [],
+          commandCoverage: [],
           continuationFacts: ['pending artifact verification'],
           completedActions: [],
           pendingAction: 'continue',
@@ -2515,6 +2518,176 @@ describe('core QueryEngine migration (W1)', () => {
     })
 
     expect(seenActions.some((action) => action.startsWith('4:search:'))).toBe(true)
+  })
+
+  it('execution loop trial keeps command receipt coverage in runtime proof', async () => {
+    const seenProofStates: string[] = []
+    const changedTargets = ['src/pricing/discount.ts', 'src/pricing/discount.test.ts']
+    const runAgent: AgentRunner = async ({ role, runtimeAction, turn }) => {
+      if (turn === 1) {
+        return {
+          role,
+          content: 'pricing owners located',
+          handoffTo: 'coder',
+          handoffReason: 'edit pricing discount',
+          codingResult: codingResult({
+            evidenceFiles: changedTargets,
+            observedEvidence: ['pricing owners located'],
+            lastAction: { actionKind: 'repo-explain', target: 'src/pricing/discount.ts' },
+          }),
+        }
+      }
+      if (turn === 2) {
+        return {
+          role,
+          content: 'pricing discount and focused test updated',
+          handoffTo: 'reviewer',
+          handoffReason: 'verify pricing discount',
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            verification: { status: 'not-requested', reason: 'Focused verification not run.' },
+            requiredEvidence: ['pricing focused verification'],
+            observedEvidence: [],
+            lastAction: {
+              actionKind: 'edit-file',
+              changedFiles: changedTargets,
+              target: 'src/pricing/discount.ts',
+            },
+          }),
+        }
+      }
+      if (turn === 3) {
+        return {
+          role,
+          content: 'focused pricing verification claimed passed with partial command receipt',
+          events: [
+            { type: 'tool.started', toolName: 'verify', taskId: 'verify_pricing_discount' },
+            {
+              type: 'tool.result',
+              toolName: 'verify',
+              taskId: 'verify_pricing_discount',
+              success: true,
+              coveredFiles: ['src/pricing/discount.test.ts'],
+            },
+          ],
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            verification: {
+              status: 'passed',
+              reason: 'Focused pricing verification passed.',
+              command: 'npm test -- src/pricing/discount.test.ts',
+              selectionScope: 'focused',
+              selectionSource: 'changed-file-impact',
+            },
+            verifiedFiles: changedTargets,
+            requiredEvidence: ['pricing focused verification'],
+            observedEvidence: ['pricing focused verification'],
+            lastAction: { actionKind: 'verify', target: 'src/pricing/discount.test.ts' },
+          }),
+        }
+      }
+      return {
+        role,
+        content: `runtime selected ${runtimeAction.nextAction} for missing command coverage`,
+        codingResult: codingResult({
+          changedFiles: changedTargets,
+          verification: { status: 'not-requested', reason: 'Source target still needs command coverage.' },
+          requiredEvidence: ['pricing focused verification'],
+          observedEvidence: [],
+          lastAction: { actionKind: runtimeAction.nextAction, target: 'src/pricing/discount.ts' },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_execution_loop_command_receipt', 'update pricing discount with focused verification', {
+      maxTurns: 4,
+    })) {
+      if (event.type === 'runtime.task-proof') {
+        seenProofStates.push(`${event.turn}:${event.projection.proof.status}:${event.projection.verdict.status}:${event.projection.proof.missingProof.join('|')}`)
+      }
+    }
+
+    const hasMissingCommandCoverage = seenProofStates.some((state) =>
+      state.startsWith('3:partial:partial:') && state.includes('changed-file-verification-complete')
+    )
+    expect(hasMissingCommandCoverage).toBe(true)
+    expect(seenProofStates.some((state) => state.startsWith('4:'))).toBe(false)
+  })
+
+  it('execution loop trial requires post-repair verification receipt before repair proof completes', async () => {
+    const proofStates: string[] = []
+    const changedTargets = ['src/schedule/clock.ts', 'src/schedule/clock.test.ts']
+    const runAgent: AgentRunner = async ({ role, turn }) => {
+      if (turn === 1) {
+        return {
+          role,
+          content: 'schedule owners located',
+          handoffTo: 'coder',
+          handoffReason: 'edit schedule clock',
+          codingResult: codingResult({
+            evidenceFiles: changedTargets,
+            observedEvidence: ['schedule owners located'],
+            lastAction: { actionKind: 'repo-explain', target: 'src/schedule/clock.ts' },
+          }),
+        }
+      }
+      if (turn === 2) {
+        return {
+          role,
+          content: 'clock edit failed focused verification',
+          handoffTo: 'reviewer',
+          handoffReason: 'repair failed clock test',
+          codingResult: codingResult({
+            changedFiles: changedTargets,
+            failedFiles: [{ path: 'src/schedule/clock.test.ts', reason: 'clock boundary failed' }],
+            verification: {
+              status: 'failed',
+              reason: 'Focused schedule verification failed.',
+              command: 'npm test -- src/schedule/clock.test.ts',
+              selectionScope: 'focused',
+              selectionSource: 'changed-file-impact',
+            },
+            requiredEvidence: ['schedule focused verification'],
+            observedEvidence: [],
+            lastAction: { actionKind: 'verify', target: 'src/schedule/clock.test.ts' },
+          }),
+        }
+      }
+      return {
+        role,
+        content: 'repair reported recovered with optimistic verification summary',
+        codingResult: codingResult({
+          changedFiles: changedTargets,
+          repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/schedule/clock.ts'] },
+          verification: {
+            status: 'passed',
+            reason: 'Summary says schedule verification passed, but no post-repair receipt was emitted.',
+            command: 'npm test -- src/schedule/clock.test.ts',
+            selectionScope: 'focused',
+            selectionSource: 'changed-file-impact',
+          },
+          verifiedFiles: changedTargets,
+          requiredEvidence: ['schedule focused verification'],
+          observedEvidence: ['schedule focused verification'],
+          lastAction: { actionKind: 'repair', target: 'src/schedule/clock.ts', changedFiles: changedTargets },
+        }),
+      }
+    }
+
+    const engine = new QueryEngine({ runAgent })
+    for await (const event of engine.streamMessage('sess_execution_loop_repair_receipt', 'repair schedule clock after focused verification failure', {
+      maxTurns: 4,
+    })) {
+      if (event.type === 'runtime.task-proof') {
+        proofStates.push(`${event.turn}:${event.projection.proof.status}:${event.projection.proof.missingProof.join('|')}`)
+      }
+    }
+
+    const hasMissingPostValidation = proofStates.some((state) =>
+      state.startsWith('3:partial:') && state.includes('repair-post-validation')
+    )
+    expect(hasMissingPostValidation, proofStates.join('\n')).toBe(true)
   })
 })
 

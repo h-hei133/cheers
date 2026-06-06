@@ -19,6 +19,7 @@ export type QueryEvent =
     readonly success: boolean;
     readonly compensated?: boolean;
     readonly failureReason?: string;
+    readonly coveredFiles?: readonly string[];
   }
   | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
   | { readonly type: 'turn.completed'; readonly output: AgentExecutionOutput }

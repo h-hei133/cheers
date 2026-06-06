@@ -25,6 +25,8 @@ export interface ArtifactReceiptInput {
   readonly claimEvidence?: readonly {
     readonly claim: string;
     readonly evidenceId?: string;
+    readonly sourcePath?: string;
+    readonly verificationEvidenceId?: string;
   }[];
 }
 
@@ -232,7 +234,7 @@ function artifactValidationStateFor(input: ArtifactReceiptInput): ArtifactValida
 function claimEvidenceSatisfied(input: ArtifactReceiptInput): boolean {
   const claims = input.claimEvidence ?? [];
   const usedEvidenceIds = new Set<string>();
-  return claims.every((item) => claimEvidenceProven(item, usedEvidenceIds));
+  return claims.every((item) => claimEvidenceProven(item, usedEvidenceIds, input));
 }
 
 function claimEvidenceReceiptsFor(input: ArtifactReceiptInput): readonly {
@@ -244,20 +246,64 @@ function claimEvidenceReceiptsFor(input: ArtifactReceiptInput): readonly {
   return (input.claimEvidence ?? []).map((item) => freeze({
     claim: item.claim.replace(/\s+/g, " ").trim().slice(0, 180),
     ...(item.evidenceId?.trim() ? { evidenceId: item.evidenceId.trim().slice(0, 180) } : {}),
-    proven: claimEvidenceProven(item, usedEvidenceIds),
+    proven: claimEvidenceProven(item, usedEvidenceIds, input),
   }));
 }
 
 function claimEvidenceProven(
-  item: { readonly claim: string; readonly evidenceId?: string },
+  item: {
+    readonly claim: string;
+    readonly evidenceId?: string;
+    readonly sourcePath?: string;
+    readonly verificationEvidenceId?: string;
+  },
   usedEvidenceIds: Set<string>,
+  context?: Pick<ArtifactReceiptInput, "requiredPaths" | "workspacePaths" | "verificationEvidence">,
 ): boolean {
   const evidenceId = item.evidenceId?.trim();
   const claim = item.claim.trim();
-  if (!claim || !evidenceId || usedEvidenceIds.has(evidenceId) || !claimEvidenceMatches(claim, evidenceId)) {
+  if (!claim || !evidenceId || usedEvidenceIds.has(evidenceId)) {
+    return false;
+  }
+  if (context && claimRequiresBoundEvidence(claim)) {
+    if (!claimEvidenceBoundToContext(claim, evidenceId, item, context)) {
+      return false;
+    }
+  } else if (!claimEvidenceMatches(claim, evidenceId)) {
     return false;
   }
   usedEvidenceIds.add(evidenceId);
+  return true;
+}
+
+function claimRequiresBoundEvidence(claim: string): boolean {
+  const normalized = claim.toLowerCase();
+  return normalized.includes("source") ||
+    normalized.includes("verification") ||
+    normalized.includes("validat") ||
+    normalized.includes("check");
+}
+
+function claimEvidenceBoundToContext(
+  claim: string,
+  evidenceId: string,
+  item: { readonly sourcePath?: string; readonly verificationEvidenceId?: string },
+  context: Pick<ArtifactReceiptInput, "requiredPaths" | "workspacePaths" | "verificationEvidence">,
+): boolean {
+  const normalizedClaim = claim.toLowerCase();
+  if (
+    normalizedClaim.includes("verification") ||
+    normalizedClaim.includes("validat") ||
+    normalizedClaim.includes("check")
+  ) {
+    const evidence = item.verificationEvidenceId?.trim() || evidenceId;
+    return (context.verificationEvidence ?? []).some((receipt) => sameEvidence(receipt, evidence));
+  }
+  if (normalizedClaim.includes("source")) {
+    const source = item.sourcePath?.trim() || evidenceId;
+    const sourcePaths = context.workspacePaths.filter((path) => !context.requiredPaths.includes(path));
+    return sourcePaths.some((path) => pathEvidenceMatches(path, source));
+  }
   return true;
 }
 
@@ -278,6 +324,30 @@ function claimEvidenceMatches(claim: string, evidenceId: string): boolean {
     .split(/[^a-z0-9]+/)
     .filter((token) => token.length >= 4)
     .some((token) => normalizedEvidence.includes(token));
+}
+
+function sameEvidence(left: string, right: string): boolean {
+  return normalizeEvidence(left) === normalizeEvidence(right);
+}
+
+function pathEvidenceMatches(path: string, evidence: string): boolean {
+  const normalizedPath = normalizeEvidence(path);
+  const normalizedEvidence = normalizeEvidence(evidence);
+  if (!normalizedPath || !normalizedEvidence) {
+    return false;
+  }
+  return normalizedPath.includes(normalizedEvidence) ||
+    normalizedEvidence.includes(normalizedPath) ||
+    sourceStem(normalizedPath).includes(sourceStem(normalizedEvidence));
+}
+
+function sourceStem(value: string): string {
+  const parts = value.split("/");
+  return parts[parts.length - 1]?.replace(/\.[a-z0-9]+$/i, "") ?? value;
+}
+
+function normalizeEvidence(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9/_.-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
 
 function requiredContentSatisfied(input: ArtifactReceiptInput): boolean {

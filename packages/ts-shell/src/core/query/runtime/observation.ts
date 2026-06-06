@@ -16,6 +16,11 @@ export interface QueryRuntimeArtifactClaimObservation {
   readonly evidenceId?: string
 }
 
+export interface QueryRuntimeCommandCoverageObservation {
+  readonly taskId: string
+  readonly coveredFiles: readonly string[]
+}
+
 export interface QueryRuntimeObservationState {
   readonly contextPaths: string[]
   readonly changedFiles: string[]
@@ -26,6 +31,7 @@ export interface QueryRuntimeObservationState {
   readonly artifactEvidence: string[]
   readonly artifactClaims: string[]
   readonly artifactClaimEvidence: QueryRuntimeArtifactClaimObservation[]
+  readonly commandCoverage: QueryRuntimeCommandCoverageObservation[]
   readonly continuationFacts: string[]
   readonly completedActions: ToolActionKind[]
   pendingAction?: ToolActionKind
@@ -42,6 +48,7 @@ export function createEmptyQueryRuntimeObservationState(): QueryRuntimeObservati
     artifactEvidence: [],
     artifactClaims: [],
     artifactClaimEvidence: [],
+    commandCoverage: [],
     continuationFacts: [],
     completedActions: [],
     pendingAction: undefined,
@@ -112,6 +119,15 @@ function observeRuntimeEvents(
         signature: event.taskId,
         reason: sanitizeFailureReason(event.failureReason ?? 'tool result failed'),
       })
+    }
+    if (event.type === 'tool.result' && event.success === true && actionForTool(event.toolName) === 'verify') {
+      const coveredFiles = uniqueValues(event.coveredFiles ?? [])
+      if (coveredFiles.length > 0) {
+        state.commandCoverage.push({
+          taskId: event.taskId,
+          coveredFiles,
+        })
+      }
     }
     if (event.type === 'tool.started') {
       state.pendingAction = actionForTool(event.toolName)
@@ -270,6 +286,10 @@ function pushUnique(target: string[], values: readonly string[]): void {
       target.push(normalized)
     }
   }
+}
+
+function uniqueValues(values: readonly string[]): readonly string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
 }
 
 function pushUniqueAction(target: ToolActionKind[], values: readonly ToolActionKind[]): void {
