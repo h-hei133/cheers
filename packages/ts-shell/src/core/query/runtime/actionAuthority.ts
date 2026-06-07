@@ -63,15 +63,17 @@ export function constrainRuntimeActionOutput(
   decision: QueryRuntimeActionDecision,
   output: AgentExecutionOutput,
 ): AgentExecutionOutput {
+  const writeBlock = blockMismatchedWrite(decision, output);
   const block = blockMismatchedVerification(decision, output);
   const artifactBlock = blockMismatchedArtifact(decision, output);
-  if (!block && !artifactBlock) {
+  if (!writeBlock && !block && !artifactBlock) {
     return output;
   }
+  const selectedBlock = writeBlock ?? block ?? artifactBlock!;
   return blockedRuntimeActionOutput({
     role: output.role,
-    block: block ?? artifactBlock!,
-    taskKind: taskKindForAction((block ?? artifactBlock!).action),
+    block: selectedBlock,
+    taskKind: taskKindForAction(selectedBlock.action),
     changedFiles: decision.changedFiles,
     evidenceFiles: decision.verificationTargets,
   });
@@ -114,6 +116,32 @@ function nextRoleForBlockedAction(role: AgentRole): AgentRole {
   if (role === "planner") return "coder";
   if (role === "coder") return "reviewer";
   return "coder";
+}
+
+function blockMismatchedWrite(
+  decision: QueryRuntimeActionDecision,
+  output: AgentExecutionOutput,
+): RuntimeActionBlock | undefined {
+  const result = output.codingResult;
+  if (!result) return undefined;
+  if (decision.nextAction === "edit" || decision.nextAction === "repair" || decision.nextAction === "artifact") {
+    return undefined;
+  }
+  const outputAction = result.lastActionResultSeed?.actionKind;
+  if (outputAction !== "edit" && outputAction !== "repair") {
+    return undefined;
+  }
+  const changedFiles = [
+    ...result.changedFiles,
+    ...result.changeSet.changedFiles,
+    ...(result.lastActionResultSeed?.changedFiles ?? []),
+  ];
+  if (changedFiles.length === 0) return undefined;
+  return {
+    action: "edit",
+    reason: "runtime action blocked: discovery required before edit",
+    targetFiles: changedFiles,
+  };
 }
 
 function blockMismatchedVerification(

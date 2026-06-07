@@ -95,6 +95,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/long-horizon-real-development-trial.md` | active | Checking SP060 long-horizon disposable workspace tasks, replay/compact task-state carry-forward, real repair/rerun, artifact/source receipt, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/harness-spine-adoption.md` | active | Checking SP061 normal-runtime harness spine adoption, turn snapshots, save points, ordered ledger, pending queues, continuation restore, disposable workspace tasks, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/durable-session-harness-recovery.md` | active | Checking SP062 durable session harness recovery, session/compact/replay harness state restore, imperfect action correction, diagnostics, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/provider-shaped-harness-trial.md` | active | Checking SP063 provider-shaped imperfect action recovery through QueryEngine, execution seam, durable harness queues, repair strategy, targeted verification, artifact proof, and result verdict. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 

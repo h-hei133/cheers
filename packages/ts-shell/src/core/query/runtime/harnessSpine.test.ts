@@ -150,13 +150,33 @@ describe('query runtime harness spine', () => {
       }),
     })
 
-    for await (const event of engine.streamMessage('sess_harness_write_block', 'update src/profile/name.ts', { maxTurns: 1 })) {
+    const runtimeSeed = seedWithHarness('sess_harness_write_block', createQueryRuntimeHarnessState(), {
+      initialPrompt: 'update src/profile/name.ts after profile owner context was read',
+      observations: {
+        contextPaths: ['src/profile/name.ts'],
+        completedActions: ['read'],
+      },
+    })
+
+    for await (const event of engine.streamMessage('sess_harness_write_block', 'update src/profile/name.ts', {
+      maxTurns: 1,
+      runtimeSeed,
+    })) {
       if (event.type === 'runtime.queue-settled') {
         queues.push(event.pendingVerification.map((item) => item.targetFiles.join(',')))
       }
     }
 
-    const result = await engine.submitMessage('sess_harness_write_block_result', 'update src/profile/name.ts', { maxTurns: 1 })
+    const result = await engine.submitMessage('sess_harness_write_block_result', 'update src/profile/name.ts', {
+      maxTurns: 1,
+      runtimeSeed: {
+        ...runtimeSeed,
+        config: {
+          ...runtimeSeed.config,
+          sessionId: 'sess_harness_write_block_result',
+        },
+      },
+    })
     expect(result.status).toBe('stopped_not_proven')
     expect(queues.at(-1)).toContain('src/profile/name.ts')
   })
@@ -255,6 +275,97 @@ describe('query runtime harness spine', () => {
     })
 
     expect(actions[0]).toBe('read')
+  })
+
+  it('blocks provider edit output while restored repair requires discovery', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/pricing/rules.mjs': 'export const discount = 0.05;\n',
+      'test/pricing.mjs': 'import { discount } from "../src/pricing/rules.mjs";\nif (discount !== 0.1) throw new Error(`expected discount 0.1 got ${discount}`);\n',
+    })
+    try {
+      const initial = await workspace.run('node', ['test/pricing.mjs'], 'node test/pricing.mjs')
+      const actions: string[] = []
+      const batchActions: string[] = []
+      const completedContents: string[] = []
+      const queueSettlements: string[][] = []
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+          actions.push(runtimeAction.nextAction)
+          return output(role, {
+            content: 'incorrectly edited pricing rule without reading required owner context',
+            changedFiles: ['src/pricing/rules.mjs'],
+            verifiedFiles: ['src/pricing/rules.mjs'],
+            verification: {
+              status: 'passed',
+              command: 'node test/pricing.mjs',
+              reason: 'generic green after wrong edit',
+              selectionScope: 'broader',
+            },
+            requiredEvidence: ['pricing owner context', 'targeted pricing verification'],
+            observedEvidence: ['pricing owner context', 'targeted pricing verification'],
+            lastAction: {
+              actionKind: 'edit',
+              target: 'src/pricing/rules.mjs',
+              changedFiles: ['src/pricing/rules.mjs'],
+              verifiedFiles: ['src/pricing/rules.mjs'],
+            },
+          })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          batchActions.push(batch.actionKind)
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: batch.items.map((item) => ({
+              toolId: item.toolId,
+              actionKind: item.actionKind,
+              coveredFiles: ['src/pricing/rules.mjs'],
+              affectedPaths: ['src/pricing/rules.mjs'],
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              diagnosticSummary: safeCommandSummary(initial),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            })),
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_harness_wrong_edit_context', 'continue pricing repair with missing context', {
+        maxTurns: 1,
+        runtimeSeed: seedWithHarness('sess_harness_wrong_edit_context', createQueryRuntimeHarnessState({
+          pendingRepair: [{
+            queueId: 'repair-pricing',
+            failureClass: 'missing-context',
+            failureSummary: 'repair failed because pricing owner was not read',
+            hypothesis: 'inspect pricing rule owner before another repair',
+            priorAttempt: 'src/pricing/rules.mjs:blind-edit',
+            contextNeed: 'src/pricing/rules.mjs',
+            targetFiles: ['src/pricing/rules.mjs'],
+          }],
+        })),
+      })) {
+        if (event.type === 'runtime.queue-settled') {
+          queueSettlements.push(event.pendingVerification.map((item) => item.targetFiles.join(',')))
+        }
+        if (event.type === 'turn.completed') {
+          completedContents.push(event.output.content)
+        }
+        if (event.type === 'query.completed') {
+          expect(event.result.status).toBe('stopped_not_proven')
+        }
+      }
+
+      expect(initial.exitCode).not.toBe(0)
+      expect(actions.every((action) => action === 'read')).toBe(true)
+      expect(batchActions.every((action) => action === 'read')).toBe(true)
+      expect(batchActions).not.toContain('edit')
+      expect(completedContents.at(-1)).toContain('runtime action blocked: discovery required before edit')
+      expect(queueSettlements.at(-1) ?? []).not.toContain('src/pricing/rules.mjs')
+    } finally {
+      await workspace.dispose()
+    }
   })
 
   it('restores a save point after interruption and resumes from the pending verification queue', async () => {
