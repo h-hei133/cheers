@@ -2,6 +2,7 @@ import {
   createQueryRuntimeHarnessState,
   type QueryRuntimeHarnessState,
   type QueryRuntimeLedgerEntry,
+  type QueryRuntimePendingArtifact,
   type QueryRuntimePendingRepair,
   type QueryRuntimePendingVerification,
   type QueryRuntimePendingWrite,
@@ -18,6 +19,7 @@ export interface SessionHarnessState {
   readonly pendingWrite: readonly QueryRuntimePendingWrite[];
   readonly pendingVerification: readonly QueryRuntimePendingVerification[];
   readonly pendingRepair: readonly QueryRuntimePendingRepair[];
+  readonly pendingArtifact: readonly QueryRuntimePendingArtifact[];
 }
 
 export type SessionHarnessDecodeResult =
@@ -43,6 +45,7 @@ export function encodeSessionHarnessState(
     pendingWrite: harness.pendingWrite,
     pendingVerification: harness.pendingVerification,
     pendingRepair: harness.pendingRepair,
+    pendingArtifact: harness.pendingArtifact,
   };
 }
 
@@ -68,6 +71,7 @@ export function decodeSessionHarnessState(value: unknown): SessionHarnessDecodeR
       pendingWrite: state.pendingWrite,
       pendingVerification: state.pendingVerification,
       pendingRepair: state.pendingRepair,
+      pendingArtifact: state.pendingArtifact ?? [],
     }),
   };
 }
@@ -100,6 +104,9 @@ function validateSessionHarnessState(
   validateArray(state.pendingWrite, "pending write", reasons);
   validateArray(state.pendingVerification, "pending verification", reasons);
   validateArray(state.pendingRepair, "pending repair", reasons);
+  if (state.pendingArtifact !== undefined) {
+    validateArray(state.pendingArtifact, "pending artifact", reasons);
+  }
 
   const ledger = state.ledger ?? [];
   for (const [index, entry] of ledger.entries()) {
@@ -140,6 +147,12 @@ function validateSessionHarnessState(
   for (const pending of state.pendingRepair ?? []) {
     if (pending.targetFiles.length === 0 || pending.failureClass.trim().length === 0) {
       reasons.push("pending repair target missing");
+      break;
+    }
+  }
+  for (const pending of state.pendingArtifact ?? []) {
+    if (pending.claims.length === 0) {
+      reasons.push("pending artifact claim missing");
       break;
     }
   }

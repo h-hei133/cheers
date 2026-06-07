@@ -123,6 +123,12 @@ function chooseNextAction(input: ToolStrategyInput & {
   if (input.budget && input.budget.remainingSteps <= 0) {
     return "stop-not-proven";
   }
+  if (
+    input.pendingAction === "read" &&
+    pendingActionAllowed(input, input.pendingAction)
+  ) {
+    return input.pendingAction;
+  }
   if (input.blockers.some((blocker) => blocker.includes("missing required context")) ||
     input.proofGap.some((gap) => gap.includes("context evidence incomplete")) ||
     failedReasonNeedsContext(input)) {
@@ -150,7 +156,7 @@ function chooseNextAction(input: ToolStrategyInput & {
       gap.includes("verification blocked")
     ))
   ) {
-    if ((input.completedActions ?? []).includes("artifact")) {
+    if ((input.completedActions ?? []).includes("artifact") && !(input.completedActions ?? []).includes("read")) {
       return input.allowedTools.includes("read") ? "read" : "search";
     }
     return "artifact";
@@ -270,6 +276,7 @@ function pendingActionAllowed(input: ToolStrategyInput & {
 }, action: ToolActionKind): boolean {
   if (!input.allowedTools.includes(action)) return false;
   if (action === "stop-not-proven") return false;
+  if (action === "read") return true;
   if (input.changedFiles && input.changedFiles.length > 0 &&
     input.proofGap.some((gap) => gap.includes("verification") || gap.includes("proof")) &&
     !(action === "artifact" && input.proofGap.some((gap) => gap.includes("artifact") || gap.includes("source"))) &&

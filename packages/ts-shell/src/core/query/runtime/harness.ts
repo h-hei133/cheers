@@ -29,6 +29,13 @@ export interface QueryRuntimePendingRepair {
   readonly targetFiles: readonly string[]
 }
 
+export interface QueryRuntimePendingArtifact {
+  readonly queueId: string
+  readonly claims: readonly string[]
+  readonly evidenceIds: readonly string[]
+  readonly targetFiles: readonly string[]
+}
+
 export interface QueryRuntimeLedgerEntry {
   readonly sequence: number
   readonly turn: number
@@ -75,6 +82,7 @@ export interface QueryRuntimeSavePoint {
   readonly pendingWrite: readonly QueryRuntimePendingWrite[]
   readonly pendingVerification: readonly QueryRuntimePendingVerification[]
   readonly pendingRepair: readonly QueryRuntimePendingRepair[]
+  readonly pendingArtifact: readonly QueryRuntimePendingArtifact[]
 }
 
 export interface QueryRuntimeHarnessState {
@@ -85,6 +93,7 @@ export interface QueryRuntimeHarnessState {
   readonly pendingWrite: readonly QueryRuntimePendingWrite[]
   readonly pendingVerification: readonly QueryRuntimePendingVerification[]
   readonly pendingRepair: readonly QueryRuntimePendingRepair[]
+  readonly pendingArtifact: readonly QueryRuntimePendingArtifact[]
 }
 
 export interface QueryRuntimeHarnessSeed {
@@ -95,6 +104,7 @@ export interface QueryRuntimeHarnessSeed {
   readonly pendingWrite?: readonly QueryRuntimePendingWrite[]
   readonly pendingVerification?: readonly QueryRuntimePendingVerification[]
   readonly pendingRepair?: readonly QueryRuntimePendingRepair[]
+  readonly pendingArtifact?: readonly QueryRuntimePendingArtifact[]
 }
 
 export function createQueryRuntimeHarnessState(seed: QueryRuntimeHarnessSeed = {}): QueryRuntimeHarnessState {
@@ -106,6 +116,7 @@ export function createQueryRuntimeHarnessState(seed: QueryRuntimeHarnessSeed = {
     pendingWrite: [...(seed.pendingWrite ?? [])],
     pendingVerification: [...(seed.pendingVerification ?? [])],
     pendingRepair: [...(seed.pendingRepair ?? [])],
+    pendingArtifact: [...(seed.pendingArtifact ?? [])],
   })
   return state.savePoints.length > 0
     ? state
@@ -147,9 +158,18 @@ export function captureHarnessTurnSnapshot(input: {
       ...input.harness.pendingRepair.flatMap((item) => item.priorAttempt ? [item.priorAttempt] : []),
     ]),
     artifactPendingState: {
-      claims: input.observations.artifactClaims,
-      evidenceIds: input.observations.artifactClaimEvidence.flatMap((item) => item.evidenceId ? [item.evidenceId] : []),
-      missingClaims: input.observations.artifactClaims.filter((claim) =>
+      claims: uniqueStrings([
+        ...input.observations.artifactClaims,
+        ...input.harness.pendingArtifact.flatMap((item) => item.claims),
+      ]),
+      evidenceIds: uniqueStrings([
+        ...input.observations.artifactClaimEvidence.flatMap((item) => item.evidenceId ? [item.evidenceId] : []),
+        ...input.harness.pendingArtifact.flatMap((item) => item.evidenceIds),
+      ]),
+      missingClaims: uniqueStrings([
+        ...input.observations.artifactClaims,
+        ...input.harness.pendingArtifact.flatMap((item) => item.claims),
+      ]).filter((claim) =>
         !input.observations.artifactClaimEvidence.some((item) => item.claim === claim && item.evidenceId)
       ),
     },
@@ -190,6 +210,7 @@ export function appendHarnessSavePoint(
         pendingWrite: harness.pendingWrite,
         pendingVerification: harness.pendingVerification,
         pendingRepair: harness.pendingRepair,
+        pendingArtifact: harness.pendingArtifact,
       }),
     ],
   })
@@ -203,6 +224,7 @@ export function settleHarnessBatch(input: {
   let pendingWrite = [...input.harness.pendingWrite]
   let pendingVerification = [...input.harness.pendingVerification]
   let pendingRepair = [...input.harness.pendingRepair]
+  let pendingArtifact = [...input.harness.pendingArtifact]
   const nextLedger = [...input.harness.ledger]
 
   for (const result of input.result.results) {
@@ -222,7 +244,7 @@ export function settleHarnessBatch(input: {
       ...(result.diagnosticSummary ? { diagnosticSummary: safeText(result.diagnosticSummary) } : {}),
     }))
 
-    if ((result.actionKind === 'edit' || result.actionKind === 'repair') &&
+    if ((result.actionKind === 'edit' || result.actionKind === 'repair' || result.actionKind === 'artifact') &&
       result.exitStatusClass === 'success' &&
       result.affectedPaths.length > 0) {
       pendingWrite = upsertPendingWrite(pendingWrite, {
@@ -233,8 +255,26 @@ export function settleHarnessBatch(input: {
       })
     }
 
+    if (result.actionKind === 'repair') {
+      pendingRepair = removeCoveredRepair(pendingRepair, [
+        ...result.affectedPaths,
+        ...result.coveredFiles,
+      ])
+    }
+
     if (result.actionKind === 'verify' && result.exitStatusClass === 'success') {
       pendingVerification = removeCoveredVerification(pendingVerification, [
+        ...result.coveredFiles,
+        ...result.affectedPaths,
+      ])
+      pendingArtifact = settleArtifactVerification(pendingArtifact, [
+        ...result.coveredFiles,
+        ...result.affectedPaths,
+      ])
+    }
+
+    if ((result.actionKind === 'read' || result.actionKind === 'search') && result.exitStatusClass === 'success') {
+      pendingRepair = settleRepairContext(pendingRepair, [
         ...result.coveredFiles,
         ...result.affectedPaths,
       ])
@@ -285,6 +325,7 @@ export function settleHarnessBatch(input: {
     pendingWrite,
     pendingVerification,
     pendingRepair,
+    pendingArtifact,
   })
 }
 
@@ -298,6 +339,7 @@ export function settleHarnessOutput(input: {
   let pendingWrite = [...input.harness.pendingWrite]
   let pendingVerification = [...input.harness.pendingVerification]
   let pendingRepair = [...input.harness.pendingRepair]
+  let pendingArtifact = [...input.harness.pendingArtifact]
   const changedFiles = uniqueStrings([
     ...result.changedFiles,
     ...result.changeSet.changedFiles,
@@ -343,11 +385,37 @@ export function settleHarnessOutput(input: {
     }
   }
 
+  const artifactClaims = uniqueStrings(result.taskSatisfaction.requiredEvidence)
+  if (artifactClaims.length > 0) {
+    const evidenceIds = uniqueStrings(result.taskSatisfaction.observedEvidence)
+    const hasArtifactIntent = result.lastActionResultSeed?.actionKind === 'artifact' ||
+      artifactClaims.some((claim) => claim.toLowerCase().includes('artifact') || claim.toLowerCase().includes('source'))
+    const completeArtifactProof = result.taskSatisfaction.verdict === 'satisfied' &&
+      result.verifiedFiles.length > 0 &&
+      (result.diagnosis?.evidenceFiles.length ?? 0) > 0
+    if (hasArtifactIntent && !completeArtifactProof) {
+      pendingArtifact = upsertPendingArtifact(pendingArtifact, {
+        queueId: `artifact:${artifactClaims.join(',')}`,
+        claims: artifactClaims,
+        evidenceIds,
+        targetFiles: uniqueStrings([
+          ...changedFiles,
+          ...(result.diagnosis?.evidenceFiles ?? []),
+          ...result.verifiedFiles,
+        ]),
+      })
+    }
+    if (hasArtifactIntent && completeArtifactProof) {
+      pendingArtifact = removeSatisfiedArtifact(pendingArtifact, artifactClaims)
+    }
+  }
+
   return freezeHarness({
     ...input.harness,
     pendingWrite,
     pendingVerification,
     pendingRepair,
+    pendingArtifact,
   })
 }
 
@@ -382,6 +450,13 @@ export function harnessObservationPatch(harness: QueryRuntimeHarnessState): Part
     continuationFacts: harness.savePoints.length > 0 || harness.ledger.length > 0
       ? ['runtime harness state restored']
       : [],
+    artifactClaims: uniqueStrings(harness.pendingArtifact.flatMap((item) => item.claims)),
+    artifactClaimEvidence: harness.pendingArtifact.flatMap((item) =>
+      item.claims.map((claim, index) => ({
+        claim,
+        ...(item.evidenceIds[index] ? { evidenceId: item.evidenceIds[index] } : {}),
+      }))
+    ),
     pendingAction: pendingActionForHarness(harness),
   }
 }
@@ -398,13 +473,14 @@ export function restoreHarnessSavePoint(
     pendingWrite: [...savePoint.pendingWrite],
     pendingVerification: [...savePoint.pendingVerification],
     pendingRepair: [...savePoint.pendingRepair],
+    pendingArtifact: [...savePoint.pendingArtifact],
   })
 }
 
 function pendingActionForHarness(harness: QueryRuntimeHarnessState): ToolActionKind | undefined {
   if (harness.pendingVerification.length > 0) return 'verify'
+  if (harness.pendingRepair.some((item) => item.contextNeed)) return 'read'
   const repair = harness.pendingRepair[0]
-  if (repair?.contextNeed) return 'read'
   if (repair) return 'repair'
   if (harness.pendingWrite.length > 0) return 'verify'
   return undefined
@@ -465,10 +541,65 @@ function upsertPendingRepair(
   ]
 }
 
+function upsertPendingArtifact(
+  queue: readonly QueryRuntimePendingArtifact[],
+  next: QueryRuntimePendingArtifact,
+): QueryRuntimePendingArtifact[] {
+  return [
+    ...queue.filter((item) => !sameTargets(item.claims, next.claims)),
+    Object.freeze(next),
+  ]
+}
+
+function removeSatisfiedArtifact(
+  queue: readonly QueryRuntimePendingArtifact[],
+  claims: readonly string[],
+): QueryRuntimePendingArtifact[] {
+  return queue.filter((item) => !sameTargets(item.claims, claims))
+}
+
+function settleArtifactVerification(
+  queue: readonly QueryRuntimePendingArtifact[],
+  covered: readonly string[],
+): QueryRuntimePendingArtifact[] {
+  const coveredSet = new Set(covered)
+  return queue.map((item) => {
+    if (item.targetFiles.length === 0 || !item.targetFiles.every((path) => coveredSet.has(path))) {
+      return item
+    }
+    return Object.freeze({
+      ...item,
+      evidenceIds: uniqueStrings([...item.evidenceIds, ...covered]),
+    })
+  })
+}
+
+function settleRepairContext(
+  queue: readonly QueryRuntimePendingRepair[],
+  covered: readonly string[],
+): QueryRuntimePendingRepair[] {
+  const coveredSet = new Set(covered)
+  return queue.map((item) => {
+    if (!item.contextNeed || !coveredSet.has(item.contextNeed)) {
+      return item
+    }
+    const { contextNeed: _contextNeed, ...rest } = item
+    return Object.freeze(rest)
+  })
+}
+
 function removeCoveredVerification(
   queue: readonly QueryRuntimePendingVerification[],
   covered: readonly string[],
 ): QueryRuntimePendingVerification[] {
+  const coveredSet = new Set(covered)
+  return queue.filter((item) => !item.targetFiles.every((path) => coveredSet.has(path)))
+}
+
+function removeCoveredRepair(
+  queue: readonly QueryRuntimePendingRepair[],
+  covered: readonly string[],
+): QueryRuntimePendingRepair[] {
   const coveredSet = new Set(covered)
   return queue.filter((item) => !item.targetFiles.every((path) => coveredSet.has(path)))
 }
@@ -496,6 +627,7 @@ function freezeHarness(state: {
   readonly pendingWrite: readonly QueryRuntimePendingWrite[]
   readonly pendingVerification: readonly QueryRuntimePendingVerification[]
   readonly pendingRepair: readonly QueryRuntimePendingRepair[]
+  readonly pendingArtifact: readonly QueryRuntimePendingArtifact[]
 }): QueryRuntimeHarnessState {
   return Object.freeze({
     taskStateVersion: state.taskStateVersion,
@@ -505,5 +637,6 @@ function freezeHarness(state: {
     pendingWrite: Object.freeze([...state.pendingWrite]),
     pendingVerification: Object.freeze([...state.pendingVerification]),
     pendingRepair: Object.freeze([...state.pendingRepair]),
+    pendingArtifact: Object.freeze([...state.pendingArtifact]),
   })
 }

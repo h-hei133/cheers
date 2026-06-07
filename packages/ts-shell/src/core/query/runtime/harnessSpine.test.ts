@@ -358,10 +358,12 @@ describe('query runtime harness spine', () => {
       }
 
       expect(initial.exitCode).not.toBe(0)
-      expect(actions.every((action) => action === 'read')).toBe(true)
-      expect(batchActions.every((action) => action === 'read')).toBe(true)
+      expect(actions, `actions:${actions.join(',')}`).toEqual(['read', 'repair'])
+      expect(batchActions).toEqual(['read', 'repair'])
       expect(batchActions).not.toContain('edit')
-      expect(completedContents.at(-1)).toContain('runtime action blocked: discovery required before edit')
+      expect(completedContents.some((content) =>
+        content.includes('runtime action blocked: discovery required before edit')
+      )).toBe(true)
       expect(queueSettlements.at(-1) ?? []).not.toContain('src/pricing/rules.mjs')
     } finally {
       await workspace.dispose()
@@ -758,6 +760,374 @@ describe('query runtime harness spine', () => {
     expect(verdict.completeProof).toBe(false)
     expect(verdict.terminalClassification).toBe('stopped')
     expect(verdict.notProvenClaims).toContain('harness-ledger-alone-is-not-success')
+  })
+
+  it('executes allowance repair workspace path through discovery, failed rerun, second strategy, and targeted pass', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/allowance/rules.mjs': 'export function allowanceLabel(value) { return `allowance:${value}`; }\n',
+      'test/allowance.mjs': 'import { allowanceLabel } from "../src/allowance/rules.mjs";\nif (allowanceLabel("paid") !== "ALLOWANCE:PAID") throw new Error(`expected ALLOWANCE:PAID got ${allowanceLabel("paid")}`);\n',
+    })
+    try {
+      const initial = await workspace.run('node', ['test/allowance.mjs'], 'node test/allowance.mjs')
+      const actions: string[] = []
+      const phases: string[] = [`initial-command:${initial.exitCode}`]
+      const blockedOutputs: string[] = []
+      const repairQueues: string[] = []
+      const decisions: string[] = []
+      let finalStatus = ''
+      let finalReason = ''
+      let repairAttempt = 0
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+          actions.push(runtimeAction.nextAction)
+          if (runtimeAction.nextAction === 'read' && actions.length === 1) {
+            return output(role, {
+              content: 'provider claimed an edit while discovery was required',
+              changedFiles: ['src/allowance/rules.mjs'],
+              requiredEvidence: ['allowance owner context', 'allowance targeted rerun'],
+              observedEvidence: ['allowance owner context', 'allowance targeted rerun'],
+              lastAction: { actionKind: 'edit', target: 'src/allowance/rules.mjs', changedFiles: ['src/allowance/rules.mjs'] },
+            })
+          }
+          if (runtimeAction.nextAction === 'read') {
+            return output(role, {
+              content: 'allowance owner context read after failed repair',
+              handoffTo: 'reviewer',
+              handoffReason: 'repair with refreshed allowance context',
+              evidenceFiles: ['src/allowance/rules.mjs'],
+              requiredEvidence: ['allowance owner context', 'allowance targeted rerun'],
+              observedEvidence: ['allowance owner context'],
+              lastAction: { actionKind: 'read', target: 'src/allowance/rules.mjs' },
+            })
+          }
+          if (runtimeAction.nextAction === 'repair' && repairAttempt === 1) {
+            return output(role, {
+              content: 'first allowance repair failed verification from missing context',
+              handoffTo: 'coder',
+              handoffReason: 'discover allowance context before repeating repair',
+              changedFiles: ['src/allowance/rules.mjs'],
+              failedFiles: [{ path: 'test/allowance.mjs', reason: 'missing context after bad repair' }],
+              repair: { status: 'failed', attempts: 1, failedItems: ['src/allowance/rules.mjs'], notes: ['missing context after bad repair'] },
+              verification: { status: 'failed', reason: 'missing context after bad repair', nextAction: 'read allowance context' },
+              requiredEvidence: ['allowance owner context', 'allowance targeted rerun'],
+              observedEvidence: [],
+              lastAction: {
+                actionKind: 'repair',
+                target: 'src/allowance/rules.mjs',
+                changedFiles: ['src/allowance/rules.mjs'],
+                verification: { status: 'failed', reason: 'missing context after bad repair' },
+                reason: 'missing context after bad repair',
+              },
+            })
+          }
+          if (runtimeAction.nextAction === 'repair') {
+            return output(role, {
+              content: 'second allowance repair strategy written',
+              handoffTo: 'coder',
+              handoffReason: 'rerun allowance targeted verification',
+              changedFiles: ['src/allowance/rules.mjs'],
+              repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/allowance/rules.mjs'], notes: ['second allowance strategy'] },
+              verification: { status: 'not-requested', reason: 'allowance targeted rerun queued' },
+              requiredEvidence: ['allowance owner context', 'allowance targeted rerun'],
+              observedEvidence: ['allowance owner context'],
+              lastAction: { actionKind: 'repair', target: 'src/allowance/rules.mjs', changedFiles: ['src/allowance/rules.mjs'] },
+            })
+          }
+          return output(role, {
+            content: 'allowance targeted rerun passed',
+            changedFiles: ['src/allowance/rules.mjs'],
+            verifiedFiles: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
+            evidenceFiles: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
+            repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/allowance/rules.mjs'], notes: ['second allowance strategy'] },
+            verification: { status: 'passed', command: 'node test/allowance.mjs', reason: 'allowance targeted rerun passed' },
+            requiredEvidence: ['allowance owner context', 'allowance targeted rerun'],
+            observedEvidence: ['allowance owner context', 'allowance targeted rerun'],
+            lastAction: { actionKind: 'verify', target: 'test/allowance.mjs', verifiedFiles: ['src/allowance/rules.mjs'] },
+          })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          phases.push(`${batch.turn}:${batch.actionKind}`)
+          const item = batch.items[0]
+          if (!item) {
+            return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+          }
+          if (item.actionKind === 'read') {
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'read',
+                coveredFiles: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
+                affectedPaths: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          if (item.actionKind === 'repair') {
+            repairAttempt += 1
+            await workspace.write({
+              'src/allowance/rules.mjs': repairAttempt === 1
+                ? 'export function allowanceLabel(value) { return `allowance:${value.toLowerCase()}`; }\n'
+                : 'export function allowanceLabel(value) { return `ALLOWANCE:${value.toUpperCase()}`; }\n',
+            })
+            const commandResult = await workspace.run('node', ['test/allowance.mjs'], 'node test/allowance.mjs')
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'repair',
+                coveredFiles: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
+                affectedPaths: ['src/allowance/rules.mjs'],
+                exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+                failureClass: commandResult.exitCode === 0 ? 'none' : 'missing-context',
+                diagnosticSummary: safeCommandSummary(commandResult),
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          const commandResult = await workspace.run('node', ['test/allowance.mjs'], 'node test/allowance.mjs')
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'verify',
+              coveredFiles: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
+              affectedPaths: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_allowance_repair_workspace', 'repair src/allowance/rules.mjs after missing context failure', {
+        maxTurns: 6,
+        runtimeSeed: seedWithHarness('sess_allowance_repair_workspace', createQueryRuntimeHarnessState({
+          pendingRepair: [{
+            queueId: 'repair-allowance',
+            failureClass: 'missing-context',
+            failureSummary: safeCommandSummary(initial),
+            hypothesis: 'read allowance owner before repair',
+            contextNeed: 'src/allowance/rules.mjs',
+            targetFiles: ['src/allowance/rules.mjs'],
+          }],
+        }), {
+          initialPrompt: 'repair src/allowance/rules.mjs after missing context failure',
+          maxTurns: 6,
+        }),
+      })) {
+        if (event.type === 'turn.completed' && event.output.content.includes('runtime action blocked')) {
+          blockedOutputs.push(event.output.content)
+        }
+        if (event.type === 'runtime.next-action') {
+          decisions.push(`${event.turn}:${event.decision.nextAction}:${event.decision.pendingAction ?? 'none'}:${event.decision.proofGap.join('+')}`)
+        }
+        if (event.type === 'runtime.queue-settled') {
+          repairQueues.push(event.pendingRepair
+            .map((item) => `${item.queueId}:${item.contextNeed ?? 'none'}:${item.failureClass}`)
+            .join('|'))
+        }
+        if (event.type === 'query.completed') {
+          finalStatus = event.result.status
+          finalReason = event.result.stopReason ?? ''
+        }
+      }
+
+      expect(finalStatus, `reason:${finalReason};actions:${actions.join(',')};decisions:${decisions.join(' -> ')};repairQueues:${repairQueues.join(' -> ')}`).toBe('completed')
+      expect(actions).toEqual(['read', 'repair', 'read', 'repair', 'verify'])
+      expect(phases.length).toBeGreaterThanOrEqual(6)
+      expect(blockedOutputs.at(0)).toContain('discovery required before edit')
+      expect(repairAttempt).toBe(2)
+      expect(initial.exitCode).not.toBe(0)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('executes receipt artifact workspace path through compact restore, incomplete proof, source completion, and targeted verification', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/receipt/source.mjs': 'export const receiptSource = "draft";\n',
+      'test/receipt.mjs': 'import { receiptSource } from "../src/receipt/source.mjs";\nif (receiptSource !== "complete") throw new Error(`expected complete got ${receiptSource}`);\n',
+    })
+    try {
+      const initial = await workspace.run('node', ['test/receipt.mjs'], 'node test/receipt.mjs')
+      const compact = buildCompactContinuitySummary({
+        summary: undefined,
+        continuity: undefined,
+        approvalAuditHistory: [],
+        harness: createQueryRuntimeHarnessState({
+          pendingArtifact: [{
+            queueId: 'artifact-receipt',
+            claims: ['artifact source receipt', 'artifact verification receipt'],
+            evidenceIds: [],
+            targetFiles: ['src/receipt/source.mjs', 'test/receipt.mjs'],
+          }],
+        }),
+      })
+      const decoded = decodeCompactSessionHarnessState({ continuity: compact.continuity })
+      expect(decoded.status).toBe('accepted')
+      if (decoded.status !== 'accepted') return
+
+      const actions: string[] = []
+      const phases: string[] = [`initial-command:${initial.exitCode}`, 'compact-restore:accepted']
+      const blockedOutputs: string[] = []
+      const decisions: string[] = []
+      let finalStatus = ''
+      let finalReason = ''
+      let artifactAttempt = 0
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        if (runtimeAction.nextAction === 'artifact' && actions.filter((action) => action === 'artifact').length === 1) {
+          return output(role, {
+            content: 'artifact marker only without source or verification',
+            handoffTo: 'reviewer',
+            handoffReason: 'artifact proof incomplete',
+            requiredEvidence: ['artifact source receipt', 'artifact verification receipt'],
+            observedEvidence: ['artifact marker'],
+            lastAction: { actionKind: 'artifact', target: 'artifact' },
+          })
+        }
+        if (runtimeAction.nextAction === 'read') {
+          return output(role, {
+            content: 'receipt source context read',
+            handoffTo: 'coder',
+            handoffReason: 'complete artifact source',
+            evidenceFiles: ['src/receipt/source.mjs'],
+            requiredEvidence: ['artifact source receipt', 'artifact verification receipt'],
+            observedEvidence: ['src/receipt/source.mjs'],
+            lastAction: { actionKind: 'read', target: 'src/receipt/source.mjs' },
+          })
+        }
+        if (runtimeAction.nextAction === 'artifact') {
+          return output(role, {
+            content: 'receipt source completed but verification pending',
+            handoffTo: 'reviewer',
+            handoffReason: 'run receipt verification',
+            changedFiles: ['src/receipt/source.mjs'],
+            verification: { status: 'not-requested', reason: 'receipt verification pending' },
+            requiredEvidence: ['artifact source receipt', 'artifact verification receipt'],
+            observedEvidence: ['artifact source receipt'],
+            lastAction: { actionKind: 'artifact', target: 'src/receipt/source.mjs', changedFiles: ['src/receipt/source.mjs'] },
+          })
+        }
+        return output(role, {
+          content: 'receipt artifact proof completed',
+          changedFiles: ['src/receipt/source.mjs'],
+          verifiedFiles: ['src/receipt/source.mjs', 'test/receipt.mjs'],
+          evidenceFiles: ['src/receipt/source.mjs', 'test/receipt.mjs'],
+          verification: { status: 'passed', command: 'node test/receipt.mjs', reason: 'receipt targeted verification passed' },
+          requiredEvidence: ['artifact source receipt', 'artifact verification receipt'],
+          observedEvidence: ['src/receipt/source.mjs', 'test/receipt.mjs'],
+          lastAction: { actionKind: 'verify', target: 'test/receipt.mjs', verifiedFiles: ['src/receipt/source.mjs'] },
+        })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          const item = batch.items[0]
+          if (!item) {
+            return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+          }
+          if (item.actionKind === 'artifact') {
+            artifactAttempt += 1
+            if (artifactAttempt > 1) {
+              await workspace.write({
+                'src/receipt/source.mjs': 'export const receiptSource = "complete";\n',
+              })
+            }
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'artifact',
+                coveredFiles: artifactAttempt > 1 ? ['src/receipt/source.mjs'] : [],
+                affectedPaths: artifactAttempt > 1 ? ['src/receipt/source.mjs'] : [],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          if (item.actionKind === 'read') {
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'read',
+                coveredFiles: ['src/receipt/source.mjs'],
+                affectedPaths: ['src/receipt/source.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          const commandResult = await workspace.run('node', ['test/receipt.mjs'], 'node test/receipt.mjs')
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'verify',
+              coveredFiles: ['src/receipt/source.mjs', 'test/receipt.mjs'],
+              affectedPaths: ['src/receipt/source.mjs', 'test/receipt.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_receipt_artifact_workspace', 'write artifact report with source and verification receipt', {
+        maxTurns: 5,
+        runtimeSeed: seedWithHarness('sess_receipt_artifact_workspace', decoded.harness, {
+          initialPrompt: 'write artifact report with source and verification receipt',
+          maxTurns: 5,
+        }),
+      })) {
+        if (event.type === 'runtime.next-action') {
+          phases.push(`${event.turn}:${event.decision.nextAction}`)
+          decisions.push(`${event.turn}:${event.decision.nextAction}:${event.decision.pendingAction ?? 'none'}:${event.decision.proofGap.join('+')}`)
+        }
+        if (event.type === 'turn.completed' && event.output.content.includes('runtime action blocked')) {
+          blockedOutputs.push(event.output.content)
+        }
+        if (event.type === 'query.completed') {
+          finalStatus = event.result.status
+          finalReason = event.result.stopReason ?? ''
+        }
+      }
+
+      expect(finalStatus, `reason:${finalReason};actions:${actions.join(',')};decisions:${decisions.join(' -> ')}`).toBe('completed')
+      expect(actions).toEqual(['artifact', 'read', 'artifact', 'verify'])
+      expect(phases.length).toBeGreaterThanOrEqual(6)
+      expect(actions.filter((action) => action === 'artifact')).toHaveLength(2)
+      expect(initial.exitCode).not.toBe(0)
+    } finally {
+      await workspace.dispose()
+    }
   })
 
   it('executes disposable workspace harness tasks with queues, restore, repair, and false-complete blocking', async () => {
@@ -1277,13 +1647,14 @@ async function runArtifactSourceProofRestoreTask(): Promise<HarnessWorkspaceTask
 
 function seedWithHarness(sessionId: string, harness: QueryRuntimeHarnessState, options: {
   readonly initialPrompt?: string
+  readonly maxTurns?: number
   readonly observations?: Partial<QueryRuntimeStateSeed['observations']>
 } = {}): QueryRuntimeStateSeed {
   return {
     config: {
       sessionId,
       initialPrompt: options.initialPrompt ?? 'resume pending harness state',
-      maxTurns: 3,
+      maxTurns: options.maxTurns ?? 3,
       startingRole: 'coder',
     },
     currentRole: 'coder',
@@ -1484,6 +1855,7 @@ function workspaceEngine(
   config: {
     readonly editWrites?: Record<string, string>
     readonly repairWrites?: Record<string, string>
+    readonly artifactWrites?: Record<string, string>
     readonly verifyCommand?: readonly [string, readonly string[]]
   },
 ): QueryEngine {
@@ -1522,6 +1894,24 @@ function workspaceEngine(
             actionKind: 'repair',
             coveredFiles: [],
             affectedPaths: Object.keys(config.repairWrites),
+            exitStatusClass: 'success',
+            failureClass: 'none',
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          }],
+        }
+      }
+      if (result.actionKind === 'artifact' && config.artifactWrites) {
+        await workspace.write(config.artifactWrites)
+        return {
+          batchId: batch.batchId,
+          terminalSuccessClaim: false,
+          results: [{
+            toolId: result.toolId,
+            actionKind: 'artifact',
+            coveredFiles: [],
+            affectedPaths: Object.keys(config.artifactWrites),
             exitStatusClass: 'success',
             failureClass: 'none',
             truncated: false,
