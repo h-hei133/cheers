@@ -1,4 +1,6 @@
 import type { AgentRole } from '../../../orchestration/types.js'
+import type { RuntimeSourceFact } from '../../../context/acquisition/code/source.js'
+import type { RepairHypothesisState } from '../../../repair/flow/hypothesis.js'
 import type { ToolActionKind } from '../../../tools/policy/strategy.js'
 import type { QueryRuntimeActionDecision } from './decision.js'
 import type { RuntimeActionBlock } from './actionAuthority.js'
@@ -13,7 +15,14 @@ export interface QueryRuntimeExecutionBatchItem {
   readonly actionKind: ToolActionKind
   readonly targetPaths: readonly string[]
   readonly coveredFiles: readonly string[]
+  readonly repairPlan?: QueryRuntimeRepairPlan
   readonly terminalSuccessClaim: false
+}
+
+export interface QueryRuntimeRepairPlan {
+  readonly hypothesis: RepairHypothesisState
+  readonly sourceFacts: readonly RuntimeSourceFact[]
+  readonly blockedRepeat: boolean
 }
 
 export interface QueryRuntimeExecutionBatch {
@@ -43,6 +52,7 @@ export interface QueryRuntimeExecutionResult {
   readonly redactionStatus: QueryRuntimeExecutionRedactionStatus
   readonly truncated: boolean
   readonly commandCoverage?: QueryRuntimeCommandCoverage
+  readonly sourceFacts?: readonly RuntimeSourceFact[]
   readonly terminalSuccessClaim?: false
 }
 
@@ -81,6 +91,7 @@ export function buildQueryRuntimeExecutionBatch(input: {
           actionKind,
           targetPaths,
           coveredFiles: actionKind === 'verify' ? input.decision.verificationTargets : [],
+          ...(actionKind === 'repair' && input.decision.repairPlan ? { repairPlan: input.decision.repairPlan } : {}),
           terminalSuccessClaim: false as const,
         })],
     terminalSuccessClaim: false as const,

@@ -10,6 +10,7 @@ import {
   type QueryRuntimeTrajectoryEntry,
   type QueryRuntimeTurnSnapshot,
 } from "../../core/query/runtime/harness.js";
+import type { RuntimeSourceFact } from "../../context/acquisition/code/source.js";
 
 export interface SessionHarnessState {
   readonly version: 1;
@@ -21,6 +22,7 @@ export interface SessionHarnessState {
   readonly pendingVerification: readonly QueryRuntimePendingVerification[];
   readonly pendingRepair: readonly QueryRuntimePendingRepair[];
   readonly pendingArtifact: readonly QueryRuntimePendingArtifact[];
+  readonly sourceFacts: readonly RuntimeSourceFact[];
   readonly trajectory: readonly QueryRuntimeTrajectoryEntry[];
 }
 
@@ -48,6 +50,7 @@ export function encodeSessionHarnessState(
     pendingVerification: harness.pendingVerification,
     pendingRepair: harness.pendingRepair,
     pendingArtifact: harness.pendingArtifact,
+    sourceFacts: harness.sourceFacts,
     trajectory: harness.trajectory,
   };
 }
@@ -75,6 +78,7 @@ export function decodeSessionHarnessState(value: unknown): SessionHarnessDecodeR
       pendingVerification: state.pendingVerification,
       pendingRepair: state.pendingRepair,
       pendingArtifact: state.pendingArtifact ?? [],
+      sourceFacts: state.sourceFacts ?? [],
       trajectory: state.trajectory ?? [],
     }),
   };
@@ -110,6 +114,9 @@ function validateSessionHarnessState(
   validateArray(state.pendingRepair, "pending repair", reasons);
   if (state.pendingArtifact !== undefined) {
     validateArray(state.pendingArtifact, "pending artifact", reasons);
+  }
+  if (state.sourceFacts !== undefined) {
+    validateArray(state.sourceFacts, "source facts", reasons);
   }
   if (state.trajectory !== undefined) {
     validateArray(state.trajectory, "trajectory", reasons);

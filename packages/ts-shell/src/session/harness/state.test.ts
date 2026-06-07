@@ -130,6 +130,7 @@ describe("session harness state", () => {
       "verification:failed",
       "repair:classified",
       "repair:hypothesis",
+      "repair:context-needed",
     ]);
   });
 

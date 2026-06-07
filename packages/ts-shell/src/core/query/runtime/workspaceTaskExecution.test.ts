@@ -44,9 +44,9 @@ describe('workspace task execution', () => {
       {
         taskId: 'metrics-export-artifact',
         verdict: 'completed',
-        actions: ['artifact'],
+        actions: ['artifact', 'read', 'verify', 'artifact'],
         changedFiles: ['reports/metrics-export.md'],
-        commandOutputClassifications: ['success'],
+        commandOutputClassifications: ['success', 'success', 'success'],
         artifactOrContinuationState: 'artifact source receipt plus verification receipt',
       },
       {

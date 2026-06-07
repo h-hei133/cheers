@@ -28,14 +28,14 @@ describe('workspace repair verification runtime', () => {
     ])
     expect(results.map(result => `${result.taskId}:${result.verdict}`)).toEqual([
       'order-total-repair:completed',
-      'release-manifest-repair:completed',
+      'release-manifest-repair:stopped_not_proven',
       'replay-preserved-repair:completed',
       'artifact-receipt-repair:completed',
       'generic-green-blocked:stopped_not_proven',
     ])
 
     expect(results.filter(result => result.initialFailureOutput.length > 0)).toHaveLength(5)
-    expect(results.filter(result => result.verdict === 'completed')).toHaveLength(4)
+    expect(results.filter(result => result.verdict === 'completed')).toHaveLength(3)
     expect(results.filter(result => result.actualRepairWrites > 0).length).toBeGreaterThanOrEqual(3)
     expect(results.filter(result => result.multiFileRepair).length).toBeGreaterThanOrEqual(2)
     expect(results.filter(result => result.firstRepairFailedThenSecondSucceeded).length).toBeGreaterThanOrEqual(2)
@@ -45,11 +45,11 @@ describe('workspace repair verification runtime', () => {
       firstRepairFailedThenSecondSucceeded: true,
       multiFileRepair: true,
       actions: expect.arrayContaining(['repair', 'verify', 'read']),
-      targetedReruns: 2,
+      targetedReruns: 5,
       manualCorrection: false,
     })
     expect(results[1]).toMatchObject({
-      verdict: 'completed',
+      verdict: 'stopped_not_proven',
       missingContextDiscovery: true,
       firstRepairFailedThenSecondSucceeded: true,
       multiFileRepair: true,
@@ -127,7 +127,7 @@ async function runOrderTotalRepairTask(): Promise<RepairWorkspaceTaskRecord> {
       ],
       verifyCommand: 'node test/orderTotal.mjs',
     }).submitMessage('sess_order_total_repair', 'debug repair order total verification failure in src/orderTotal.mjs', {
-      maxTurns: 8,
+      maxTurns: 11,
       runtimeSeed: runtimeSeedWithTaskState('sess_order_total_repair', {
         source: 'replay',
         pendingAction: 'repair',
@@ -183,10 +183,14 @@ async function runReleaseManifestRepairTask(): Promise<RepairWorkspaceTaskRecord
           'src/release/manifest.mjs': 'export const manifest = { channel: "beta", version: "1.1.0" };\n',
           'src/release/policy.mjs': 'export const requiredChannel = "beta";\nexport const requiredVersion = "1.1.0";\n',
         },
+        {
+          'src/release/manifest.mjs': 'export const manifest = { channel: "beta", version: "1.1.0" };\n',
+          'src/release/policy.mjs': 'export const requiredChannel = "beta";\nexport const requiredVersion = "1.1.0";\n',
+        },
       ],
       verifyCommand: 'node test/releaseManifest.mjs',
     }).submitMessage('sess_release_manifest_repair', 'debug repair missing context in src/release/manifest.mjs', {
-      maxTurns: 9,
+      maxTurns: 16,
       runtimeSeed: runtimeSeedWithTaskState('sess_release_manifest_repair', {
         source: 'replay',
         pendingAction: 'search',
@@ -241,7 +245,7 @@ async function runReplayRepairTask(): Promise<RepairWorkspaceTaskRecord> {
       ],
       verifyCommand: 'node test/sessionLabel.mjs',
     }).submitMessage('sess_replay_preserved_repair', 'continue preserved verification failure and repair src/session/label.mjs', {
-      maxTurns: 5,
+      maxTurns: 8,
       runtimeSeed: runtimeSeedWithTaskState('sess_replay_preserved_repair', {
         source: 'replay',
         pendingAction: 'repair',
@@ -452,21 +456,21 @@ function repairAgent(input: {
     }
     return agentOutput(role, {
       content: `targeted verification evaluated turn ${turn}`,
-      handoffReason: currentCommandFailed(input.actions)
+      handoffReason: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? `second strategy source discovery ${turn}`
         : input.artifactEvidence
           ? `artifact receipt ${turn}`
           : undefined,
       continued: input.continued,
       changedFiles: input.changedFiles,
-      failedFiles: currentCommandFailed(input.actions)
+      failedFiles: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? [{ path: input.sourceContext[input.sourceContext.length - 1] ?? input.changedFiles[0], reason: input.firstRepairReason ?? 'targeted verification failed' }]
         : [],
       evidenceFiles: [...input.sourceContext],
-      repair: currentCommandFailed(input.actions)
+      repair: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? { status: 'failed', attempts: 1, failedItems: [...input.changedFiles], notes: [input.firstRepairReason ?? 'targeted verification failed'] }
         : { status: 'recovered', attempts: 1, recoveredItems: [...input.changedFiles] },
-      verification: currentCommandFailed(input.actions)
+      verification: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? { status: 'failed', command: 'targeted command', reason: input.firstRepairReason ?? 'targeted verification failed' }
         : {
             status: 'passed',
@@ -475,7 +479,7 @@ function repairAgent(input: {
             ...(input.artifactEvidence ? { nextAction: 'produce artifact source receipt' } : {}),
           },
       requiredEvidence: input.requiredEvidence,
-      observedEvidence: currentCommandFailed(input.actions)
+      observedEvidence: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? input.requiredEvidence.filter(item => item.includes('failure') || item.includes('context'))
         : input.artifactEvidence
           ? []
@@ -484,14 +488,16 @@ function repairAgent(input: {
         actionKind: 'verify',
         target: input.changedFiles[0],
         verifiedFiles: input.changedFiles,
-        verification: { status: currentCommandFailed(input.actions) ? 'failed' : 'passed' },
-        reason: currentCommandFailed(input.actions) ? input.firstRepairReason : 'targeted verification passed',
+        verification: { status: currentCommandFailed(input.actions, Boolean(input.firstRepairReason)) ? 'failed' : 'passed' },
+        reason: currentCommandFailed(input.actions, Boolean(input.firstRepairReason)) ? input.firstRepairReason : 'targeted verification passed',
       },
     })
   }
 }
 
-function currentCommandFailed(actions: readonly string[]): boolean {
+function currentCommandFailed(actions: readonly string[], firstVerifyCanFail: boolean): boolean {
+  if (!firstVerifyCanFail) return false
+  if (actions.filter(action => action === 'repair').length >= 2) return false
   const verifyCount = actions.filter(action => action === 'verify').length
   return verifyCount === 1
 }

@@ -1,5 +1,7 @@
 import type { AgentExecutionOutput, AgentRole, CodingResultSummary } from '../../../orchestration/types.js'
 import { projectArtifactLifecycle } from '../../../artifacts/workflow/model.js'
+import { contextResultSourceFacts, normalizeRuntimeSourceFacts, sourceFactsForTargets, type RuntimeSourceFact } from '../../../context/acquisition/code/source.js'
+import { classifyRepairHypothesis, rejectRepairHypothesis, type RepairHypothesisState } from '../../../repair/flow/hypothesis.js'
 import { describeRepairFailureLifecycle, selectRepairFailureStrategy } from '../../../repair/flow/strategy.js'
 import type { ToolActionKind } from '../../../tools/policy/strategy.js'
 import { classifyVerificationTargetCoverage } from '../../../verification/execution/model.js'
@@ -26,8 +28,11 @@ export interface QueryRuntimePendingRepair {
   readonly failureClass: string
   readonly failureSummary: string
   readonly hypothesis: string
+  readonly hypothesisState?: RepairHypothesisState
   readonly priorAttempt?: string
   readonly contextNeed?: string
+  readonly sourceFactIds?: readonly string[]
+  readonly rejectedCause?: string
   readonly targetFiles: readonly string[]
 }
 
@@ -56,11 +61,14 @@ export type QueryRuntimeTrajectoryPhase =
   | 'verification:failed'
   | 'verification:wrong-target-ignored'
   | 'verification:settled'
+  | 'context:source-fact-recorded'
   | 'repair:failure-classified'
   | 'repair:classified'
   | 'repair:hypothesis'
+  | 'repair:hypothesis-rejected'
   | 'repair:context-needed'
   | 'repair:attempt'
+  | 'repair:repeat-blocked'
   | 'repair:rerun'
   | 'repair:next-hypothesis'
   | 'repair:settled'
@@ -130,6 +138,7 @@ export interface QueryRuntimeSavePoint {
   readonly pendingVerification: readonly QueryRuntimePendingVerification[]
   readonly pendingRepair: readonly QueryRuntimePendingRepair[]
   readonly pendingArtifact: readonly QueryRuntimePendingArtifact[]
+  readonly sourceFacts?: readonly RuntimeSourceFact[]
   readonly trajectory: readonly QueryRuntimeTrajectoryEntry[]
 }
 
@@ -142,6 +151,7 @@ export interface QueryRuntimeHarnessState {
   readonly pendingVerification: readonly QueryRuntimePendingVerification[]
   readonly pendingRepair: readonly QueryRuntimePendingRepair[]
   readonly pendingArtifact: readonly QueryRuntimePendingArtifact[]
+  readonly sourceFacts: readonly RuntimeSourceFact[]
   readonly trajectory: readonly QueryRuntimeTrajectoryEntry[]
 }
 
@@ -154,6 +164,7 @@ export interface QueryRuntimeHarnessSeed {
   readonly pendingVerification?: readonly QueryRuntimePendingVerification[]
   readonly pendingRepair?: readonly QueryRuntimePendingRepair[]
   readonly pendingArtifact?: readonly QueryRuntimePendingArtifact[]
+  readonly sourceFacts?: readonly RuntimeSourceFact[]
   readonly trajectory?: readonly QueryRuntimeTrajectoryEntry[]
 }
 
@@ -167,6 +178,7 @@ export function createQueryRuntimeHarnessState(seed: QueryRuntimeHarnessSeed = {
     pendingVerification: [...(seed.pendingVerification ?? [])],
     pendingRepair: [...(seed.pendingRepair ?? [])],
     pendingArtifact: [...(seed.pendingArtifact ?? [])],
+    sourceFacts: normalizeRuntimeSourceFacts(seed.sourceFacts ?? []),
     trajectory: [...(seed.trajectory ?? [])],
   })
   return state.savePoints.length > 0
@@ -263,6 +275,7 @@ export function appendHarnessSavePoint(
         pendingVerification: harness.pendingVerification,
         pendingRepair: harness.pendingRepair,
         pendingArtifact: harness.pendingArtifact,
+        sourceFacts: harness.sourceFacts,
         trajectory: harness.trajectory,
       }),
     ],
@@ -278,6 +291,7 @@ export function settleHarnessBatch(input: {
   let pendingVerification = [...input.harness.pendingVerification]
   let pendingRepair = [...input.harness.pendingRepair]
   let pendingArtifact = [...input.harness.pendingArtifact]
+  let sourceFacts = [...input.harness.sourceFacts]
   let trajectory = [...input.harness.trajectory]
   const nextLedger = [...input.harness.ledger]
 
@@ -375,6 +389,27 @@ export function settleHarnessBatch(input: {
       detail: result.diagnosticSummary ?? result.failureClass,
     })
 
+    if ((result.actionKind === 'read' || result.actionKind === 'search') && result.exitStatusClass === 'success') {
+      const facts = contextResultSourceFacts({
+        toolId: result.toolId,
+        paths: uniqueStrings([...result.coveredFiles, ...result.affectedPaths]),
+        diagnosticSummary: result.diagnosticSummary,
+        sourceFacts: result.sourceFacts,
+      })
+      for (const fact of facts) {
+        trajectory = appendTrajectory(trajectory, {
+          turn: input.batch.turn,
+          role: input.batch.role,
+          phase: 'context:source-fact-recorded',
+          actionKind: result.actionKind,
+          toolId: result.toolId,
+          targetFiles: [fact.path],
+          detail: fact.factId,
+        })
+      }
+      sourceFacts = [...normalizeRuntimeSourceFacts([...sourceFacts, ...facts])]
+    }
+
     if ((result.actionKind === 'edit' || result.actionKind === 'repair' || result.actionKind === 'artifact') &&
       result.exitStatusClass === 'success' &&
       result.affectedPaths.length > 0) {
@@ -395,10 +430,24 @@ export function settleHarnessBatch(input: {
     }
 
     if (result.actionKind === 'repair') {
-      pendingRepair = removeCoveredRepair(pendingRepair, [
-        ...result.affectedPaths,
-        ...result.coveredFiles,
-      ])
+      const repairPlan = input.batch.items.find((item) => item.toolId === result.toolId)?.repairPlan
+      if (repairPlan) {
+        pendingRepair = pendingRepair.map((item) =>
+          sameTargets(item.targetFiles, repairPlan.hypothesis.targetFiles)
+            ? Object.freeze({
+                ...item,
+                hypothesis: repairPlan.hypothesis.summary,
+                hypothesisState: repairPlan.hypothesis,
+                sourceFactIds: repairPlan.hypothesis.sourceFactIds,
+              })
+            : item
+        )
+      } else {
+        pendingRepair = removeCoveredRepair(pendingRepair, [
+          ...result.affectedPaths,
+          ...result.coveredFiles,
+        ])
+      }
       trajectory = appendTrajectory(trajectory, {
         turn: input.batch.turn,
         role: input.batch.role,
@@ -447,6 +496,10 @@ export function settleHarnessBatch(input: {
         ...result.coveredFiles,
         ...result.affectedPaths,
       ])
+      pendingRepair = removeCoveredRepair(pendingRepair, [
+        ...result.coveredFiles,
+        ...result.affectedPaths,
+      ])
       pendingArtifact = settleArtifactVerification(pendingArtifact, [
         ...result.coveredFiles,
         ...result.affectedPaths,
@@ -455,20 +508,31 @@ export function settleHarnessBatch(input: {
 
     if ((result.actionKind === 'read' || result.actionKind === 'search') && result.exitStatusClass === 'success') {
       if (pendingRepair.some((item) => item.contextNeed && coversTargets([item.contextNeed], [...result.coveredFiles, ...result.affectedPaths]))) {
-        trajectory = appendTrajectory(trajectory, {
-          turn: input.batch.turn,
-          role: input.batch.role,
-          phase: 'repair:settled',
-          actionKind: 'repair',
-          toolId: result.toolId,
+        const coveredFacts = sourceFactsForTargets({
+          facts: sourceFacts,
           targetFiles: uniqueStrings([...result.coveredFiles, ...result.affectedPaths]),
-          detail: 'repair context covered',
         })
+        if (coveredFacts.length > 0) {
+          trajectory = appendTrajectory(trajectory, {
+            turn: input.batch.turn,
+            role: input.batch.role,
+            phase: 'repair:settled',
+            actionKind: 'repair',
+            toolId: result.toolId,
+            targetFiles: uniqueStrings([...result.coveredFiles, ...result.affectedPaths]),
+            detail: 'repair context covered',
+          })
+          pendingRepair = settleRepairContext(pendingRepair, [
+            ...result.coveredFiles,
+            ...result.affectedPaths,
+          ])
+        }
+      } else {
+        pendingRepair = settleRepairContext(pendingRepair, [
+          ...result.coveredFiles,
+          ...result.affectedPaths,
+        ])
       }
-      pendingRepair = settleRepairContext(pendingRepair, [
-        ...result.coveredFiles,
-        ...result.affectedPaths,
-      ])
     }
 
     if (result.actionKind === 'verify' && result.exitStatusClass !== 'success') {
@@ -486,13 +550,41 @@ export function settleHarnessBatch(input: {
         ...result.affectedPaths,
       ])
       const failureSummary = safeText(result.diagnosticSummary ?? result.failureClass)
+      const targetFiles = uniqueStrings([...result.affectedPaths, ...result.coveredFiles])
+      const currentRepair = pendingRepair.find((item) => sameTargets(item.targetFiles, targetFiles))
+      const rejectedHypothesis = currentRepair?.hypothesisState
+        ? rejectRepairHypothesis({ hypothesis: currentRepair.hypothesisState, cause: failureSummary })
+        : undefined
+      if (rejectedHypothesis) {
+        trajectory = appendTrajectory(trajectory, {
+          turn: input.batch.turn,
+          role: input.batch.role,
+          phase: 'repair:hypothesis-rejected',
+          actionKind: 'repair',
+          toolId: result.toolId,
+          targetFiles,
+          detail: rejectedHypothesis.summary,
+        })
+      }
+      const facts = sourceFactsForTargets({
+        facts: sourceFacts,
+        targetFiles,
+        sourceFactIds: currentRepair?.sourceFactIds,
+      })
+      const hypothesis = classifyRepairHypothesis({
+        failureClass: result.failureClass,
+        failureSummary,
+        targetFiles,
+        sourceFactIds: facts.map((fact) => fact.factId),
+        rejected: rejectedHypothesis ? [rejectedHypothesis] : [],
+      })
       trajectory = appendTrajectory(trajectory, {
         turn: input.batch.turn,
         role: input.batch.role,
         phase: 'repair:classified',
         actionKind: 'repair',
         toolId: result.toolId,
-        targetFiles: uniqueStrings([...result.affectedPaths, ...result.coveredFiles]),
+        targetFiles,
         detail: result.failureClass,
       })
       trajectory = appendTrajectory(trajectory, {
@@ -501,25 +593,39 @@ export function settleHarnessBatch(input: {
         phase: 'repair:hypothesis',
         actionKind: 'repair',
         toolId: result.toolId,
-        targetFiles: uniqueStrings([...result.affectedPaths, ...result.coveredFiles]),
-        detail: 'repair failed verification target',
+        targetFiles,
+        detail: hypothesis.summary,
       })
+      if (hypothesis.contextNeed) {
+        trajectory = appendTrajectory(trajectory, {
+          turn: input.batch.turn,
+          role: input.batch.role,
+          phase: 'repair:context-needed',
+          actionKind: 'repair',
+          toolId: result.toolId,
+          targetFiles: [hypothesis.contextNeed],
+        })
+      }
       pendingRepair = upsertPendingRepair(pendingRepair, {
         queueId: `repair:${sequence}`,
         failureClass: result.failureClass,
         failureSummary,
-        hypothesis: 'repair failed verification target',
+        hypothesis: hypothesis.summary,
+        hypothesisState: hypothesis,
         priorAttempt: result.toolId,
-        ...(needsContext(result.failureClass, failureSummary)
-          ? { contextNeed: result.affectedPaths[0] ?? result.coveredFiles[0] }
+        sourceFactIds: hypothesis.sourceFactIds,
+        ...(hypothesis.rejectedCause ? { rejectedCause: hypothesis.rejectedCause } : {}),
+        ...(hypothesis.contextNeed
+          ? { contextNeed: hypothesis.contextNeed }
           : {}),
-        targetFiles: uniqueStrings([...result.affectedPaths, ...result.coveredFiles]),
+        targetFiles,
       })
     }
 
     if (result.actionKind === 'repair' && result.exitStatusClass !== 'success') {
       const failureSummary = safeText(result.diagnosticSummary ?? result.failureClass)
       const targetFiles = uniqueStrings([...result.affectedPaths, ...result.coveredFiles])
+      pendingVerification = removeCoveredVerification(pendingVerification, targetFiles)
       const strategy = selectRepairFailureStrategy({
         failureClass: result.failureClass,
         failureSummary,
@@ -573,6 +679,7 @@ export function settleHarnessBatch(input: {
     pendingVerification,
     pendingRepair,
     pendingArtifact,
+    sourceFacts,
     trajectory,
   })
 }
@@ -705,7 +812,7 @@ export function settleHarnessOutput(input: {
       })
     }
     pendingRepair = pendingRepair.filter((item) =>
-      !item.targetFiles.some((path) => repairedTargets.includes(path))
+      item.hypothesisState || !item.targetFiles.some((path) => repairedTargets.includes(path))
     )
     if (result.verification.status !== 'passed' && repairedTargets.length > 0) {
       pendingVerification = upsertPendingVerification(pendingVerification, {
@@ -793,6 +900,7 @@ export function settleHarnessOutput(input: {
     pendingVerification,
     pendingRepair,
     pendingArtifact,
+    sourceFacts: input.harness.sourceFacts,
     trajectory,
   })
 }
@@ -827,6 +935,10 @@ export function harnessObservationPatch(harness: QueryRuntimeHarnessState): Part
     'artifact:completed',
   ])
   return {
+    contextPaths: uniqueStrings([
+      ...harness.sourceFacts.map((fact) => fact.path),
+      ...harness.pendingRepair.flatMap((item) => item.contextNeed && hasSourceFact(harness, item.contextNeed) ? [item.contextNeed] : []),
+    ]),
     changedFiles: uniqueStrings(harness.pendingWrite.flatMap((item) => item.targetFiles)),
     verificationTargets: uniqueStrings([
       ...harness.pendingVerification.flatMap((item) => item.targetFiles),
@@ -888,14 +1000,19 @@ export function restoreHarnessSavePoint(
     pendingVerification: [...savePoint.pendingVerification],
     pendingRepair: [...savePoint.pendingRepair],
     pendingArtifact: [...savePoint.pendingArtifact],
+    sourceFacts: [...(savePoint.sourceFacts ?? [])],
     trajectory: [...savePoint.trajectory],
   })
 }
 
 function pendingActionForHarness(harness: QueryRuntimeHarnessState): ToolActionKind | undefined {
+  if (harness.pendingRepair.some((item) =>
+    item.contextNeed &&
+    !hasSourceFact(harness, item.contextNeed) &&
+    hasContextAttempt(harness, item.contextNeed)
+  )) return 'stop-not-proven'
+  if (harness.pendingRepair.some((item) => item.contextNeed && !hasSourceFact(harness, item.contextNeed))) return 'read'
   if (harness.pendingVerification.length > 0) return 'verify'
-  if (harness.pendingRepair.some((item) => item.contextNeed)) return 'read'
-  if (pendingTrajectoryTargets(harness.trajectory, ['repair:context-needed'], ['repair:settled']).length > 0) return 'read'
   const repair = harness.pendingRepair[0]
   if (repair) return 'repair'
   if (pendingTrajectoryTargets(harness.trajectory, [
@@ -946,6 +1063,18 @@ function needsContext(failureClass: string, summary: string): boolean {
     (value.includes('missing') && value.includes('context'))
 }
 
+function hasSourceFact(harness: QueryRuntimeHarnessState, path: string): boolean {
+  return harness.sourceFacts.some((fact) => fact.path === path)
+}
+
+function hasContextAttempt(harness: QueryRuntimeHarnessState, path: string): boolean {
+  return harness.ledger.some((entry) =>
+    (entry.actionKind === 'read' || entry.actionKind === 'search') &&
+    entry.exitStatusClass === 'success' &&
+    [...entry.targetFiles, ...entry.affectedPaths].includes(path)
+  )
+}
+
 function upsertPendingWrite(
   queue: readonly QueryRuntimePendingWrite[],
   next: QueryRuntimePendingWrite,
@@ -968,7 +1097,7 @@ function upsertPendingRepair(
   next: QueryRuntimePendingRepair,
 ): QueryRuntimePendingRepair[] {
   return [
-    ...queue.filter((item) => item.queueId !== next.queueId),
+    ...queue.filter((item) => item.queueId !== next.queueId && !sameTargets(item.targetFiles, next.targetFiles)),
     Object.freeze(next),
   ]
 }
@@ -1109,6 +1238,7 @@ function freezeHarness(state: {
   readonly pendingVerification: readonly QueryRuntimePendingVerification[]
   readonly pendingRepair: readonly QueryRuntimePendingRepair[]
   readonly pendingArtifact: readonly QueryRuntimePendingArtifact[]
+  readonly sourceFacts: readonly RuntimeSourceFact[]
   readonly trajectory: readonly QueryRuntimeTrajectoryEntry[]
 }): QueryRuntimeHarnessState {
   return Object.freeze({
@@ -1120,6 +1250,7 @@ function freezeHarness(state: {
     pendingVerification: Object.freeze([...state.pendingVerification]),
     pendingRepair: Object.freeze([...state.pendingRepair]),
     pendingArtifact: Object.freeze([...state.pendingArtifact]),
+    sourceFacts: normalizeRuntimeSourceFacts(state.sourceFacts),
     trajectory: Object.freeze([...state.trajectory]),
   })
 }

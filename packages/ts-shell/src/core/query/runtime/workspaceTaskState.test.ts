@@ -53,7 +53,7 @@ describe('workspace task state runtime', () => {
       ]),
       firstRepairFailedThenSecondSucceeded: true,
       multiFileWrite: true,
-      targetedReruns: 2,
+      targetedReruns: 3,
       actions: expect.arrayContaining(['repair', 'verify', 'read']),
     })
     expect(results[1]).toMatchObject({
@@ -151,7 +151,7 @@ async function runInvoiceReplayTask(): Promise<LongWorkspaceTaskRecord> {
       ],
       verifyCommand: 'node test/invoiceTotal.mjs',
     }).submitMessage('sess_invoice_replay_task', 'continue invoice repair from restored task state', {
-      maxTurns: 9,
+      maxTurns: 12,
       runtimeSeed: runtimeSeedWithTaskState('sess_invoice_replay_task', taskState),
     })
 
@@ -203,7 +203,7 @@ async function runLocaleCompactTask(): Promise<LongWorkspaceTaskRecord> {
       ],
       verifyCommand: 'node test/localeRender.mjs',
     }).submitMessage('sess_locale_compact_task', 'resume compact carried locale repair state', {
-      maxTurns: 8,
+      maxTurns: 11,
       runtimeSeed: runtimeSeedWithTaskState('sess_locale_compact_task', taskState),
     })
 
@@ -257,7 +257,7 @@ async function runRollupReceiptTask(): Promise<LongWorkspaceTaskRecord> {
       },
       verifyCommand: 'node test/salesRollup.mjs',
     }).submitMessage('sess_rollup_receipt_task', 'debug repair report artifact from data/sales.json', {
-      maxTurns: 9,
+      maxTurns: 12,
       runtimeSeed: runtimeSeedWithTaskState('sess_rollup_receipt_task', taskState, 'debug repair report artifact from data/sales.json'),
     })
 
@@ -502,21 +502,21 @@ function longTaskAgent(input: {
     }
     return agentOutput(role, {
       content: `targeted verification evaluated turn ${turn}`,
-      handoffReason: currentCommandFailed(input.actions)
+      handoffReason: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? `second repair strategy context ${turn}`
         : input.artifactEvidence
           ? `source receipt ${turn}`
           : undefined,
       continued: input.continued,
       changedFiles: [...input.changedFiles],
-      failedFiles: currentCommandFailed(input.actions)
+      failedFiles: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? [{ path: input.sourceContext[input.sourceContext.length - 1] ?? input.changedFiles[0], reason: input.firstRepairReason ?? 'targeted verification failed' }]
         : [],
       evidenceFiles: [...input.sourceContext],
-      repair: currentCommandFailed(input.actions)
+      repair: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? { status: 'failed', attempts: 1, failedItems: [...input.changedFiles], notes: [input.firstRepairReason ?? 'targeted verification failed'] }
         : { status: 'recovered', attempts: 1, recoveredItems: [...input.changedFiles] },
-      verification: currentCommandFailed(input.actions)
+      verification: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? { status: 'failed', command: 'targeted command', reason: input.firstRepairReason ?? 'targeted verification failed' }
         : {
             status: 'passed',
@@ -525,7 +525,7 @@ function longTaskAgent(input: {
             ...(input.artifactEvidence ? { nextAction: 'produce source receipt' } : {}),
           },
       requiredEvidence: input.requiredEvidence,
-      observedEvidence: currentCommandFailed(input.actions)
+      observedEvidence: currentCommandFailed(input.actions, Boolean(input.firstRepairReason))
         ? input.requiredEvidence.filter(item => item.includes('failure') || item.includes('context'))
         : input.artifactEvidence
           ? []
@@ -534,14 +534,16 @@ function longTaskAgent(input: {
         actionKind: 'verify',
         target: input.changedFiles[0],
         verifiedFiles: [...input.changedFiles],
-        verification: { status: currentCommandFailed(input.actions) ? 'failed' : 'passed' },
-        reason: currentCommandFailed(input.actions) ? input.firstRepairReason : 'targeted verification passed',
+        verification: { status: currentCommandFailed(input.actions, Boolean(input.firstRepairReason)) ? 'failed' : 'passed' },
+        reason: currentCommandFailed(input.actions, Boolean(input.firstRepairReason)) ? input.firstRepairReason : 'targeted verification passed',
       },
     })
   }
 }
 
-function currentCommandFailed(actions: readonly string[]): boolean {
+function currentCommandFailed(actions: readonly string[], firstVerifyCanFail: boolean): boolean {
+  if (!firstVerifyCanFail) return false
+  if (actions.filter(action => action === 'repair').length >= 2) return false
   const verifyCount = actions.filter(action => action === 'verify').length
   return verifyCount === 1
 }

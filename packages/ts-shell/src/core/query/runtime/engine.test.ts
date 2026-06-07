@@ -3073,9 +3073,9 @@ describe('core QueryEngine migration (W1)', () => {
       maxTurns: 3,
     })
 
-    expect(seenActions[1]).toContain('2:verify:')
-    expect(seenActions[2]).toContain('3:repair:verification failed for src/batch/source.ts')
-    expect(seenActions[2]).not.toContain('src/batch/source.test.ts')
+    expect(seenActions[1]).toContain('3:read:')
+    expect(seenActions[1]).toContain('verification failed for src/batch/source.ts')
+    expect(seenActions[1]).not.toContain('src/batch/source.test.ts')
   })
 
   it('emits safe execution batch failure details without raw output', async () => {
@@ -3326,7 +3326,7 @@ describe('core QueryEngine migration (W1)', () => {
 
     expect(batchCalls).toBe(1)
     expect(result.status).toBe('stopped_not_proven')
-    expect(result.stopReason).toContain('no safe action remains after execution batch failure')
+    expect(result.stopReason).toContain('no safe action remains for the current proof gap')
   })
 
   it('does not complete from execution batch coverage without task proof', async () => {

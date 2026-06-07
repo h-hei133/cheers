@@ -280,6 +280,16 @@ async function executeTurn(
     )
     await emitRuntimeToolFeedback(state, deps, batchResult)
     await emitHarnessSettlement(state, deps)
+    const failedRuntimeOutput = failedRuntimeBatchOutput({
+      role: state.currentRole,
+      result: batchResult,
+    })
+    if (failedRuntimeOutput) {
+      return {
+        action: 'completed',
+        output: failedRuntimeOutput,
+      }
+    }
     if (hasUnsafeRuntimeExecutionFailure(batchResult) && state.turn >= state.config.maxTurns) {
       return {
         action: 'terminal',
@@ -368,6 +378,75 @@ async function executeTurn(
   return {
     action: 'terminal',
     terminal: terminalQuery('stopped_error', 'Retry budget exhausted'),
+  }
+}
+
+function failedRuntimeBatchOutput(input: {
+  readonly role: AgentRole
+  readonly result: QueryRuntimeExecutionBatchResult
+}): AgentExecutionOutput | undefined {
+  const failed = input.result.results.find((item) => item.exitStatusClass !== 'success')
+  if (!failed || failed.failureClass === 'none') return undefined
+  const targetFiles = [...new Set([...failed.affectedPaths, ...failed.coveredFiles])]
+  const reason = failed.diagnosticSummary ?? failed.failureClass
+  return {
+    role: input.role,
+    content: reason,
+    handoffTo: ALLOWED_HANDOFFS[input.role][0],
+    handoffReason: `runtime ${failed.actionKind} requires follow-up`,
+    codingResult: {
+      taskKind: 'run-command',
+      changedFiles: [],
+      verifiedFiles: [],
+      unverifiedFiles: targetFiles.map((path) => ({ path, reason })),
+      failedFiles: targetFiles.map((path) => ({ path, reason })),
+      evidence: [reason],
+      diagnosis: {
+        disposition: 'needs-edit',
+        candidateFiles: targetFiles,
+        evidenceFiles: targetFiles,
+        searchPattern: failed.actionKind,
+        reason,
+        evidenceNodes: [],
+        evidenceLinks: [],
+      },
+      changeSet: {
+        gitAware: false,
+        preExistingDirtyFiles: [],
+        postRunDirtyFiles: [],
+        attemptedFiles: targetFiles,
+        changedFiles: [],
+        unchangedAttemptedFiles: targetFiles,
+      },
+      patches: [],
+      verification: {
+        status: failed.actionKind === 'verify' ? 'failed' : 'not-requested',
+        reason,
+        nextAction: failed.actionKind === 'verify' ? 'repair' : undefined,
+      },
+      repair: {
+        status: failed.actionKind === 'repair' ? 'failed' : 'not-needed',
+        attempts: failed.actionKind === 'repair' ? 1 : 0,
+        recoveredItems: [],
+        failedItems: failed.actionKind === 'repair' ? targetFiles : [],
+        notes: failed.actionKind === 'repair' ? [reason] : [],
+      },
+      continuation: {
+        status: 'first-pass-success',
+        attempts: 0,
+        evidence: [],
+      },
+      taskSatisfaction: {
+        verdict: 'insufficient-evidence',
+        reasons: [reason],
+        requiredEvidence: ['targeted verification proof'],
+        observedEvidence: [],
+      },
+      lastActionResultSeed: {
+        actionKind: failed.actionKind,
+        target: targetFiles[0] ?? 'runtime',
+      },
+    },
   }
 }
 
@@ -498,11 +577,17 @@ function getTransition(
   const nextRole = ALLOWED_HANDOFFS[state.currentRole][0]
   const canContinuePendingAction = Boolean(
     pendingAction &&
-    pendingAction !== 'verify' &&
     nextRole &&
     state.turn < state.config.maxTurns,
   )
   if (!handoffTo) {
+    if (canContinuePendingAction && pendingAction && nextRole) {
+      return continueQuery(
+        state.currentRole,
+        nextRole,
+        `pending runtime action: ${pendingAction}`,
+      )
+    }
     if (hasOpenRuntimeProofGap(output)) {
       return terminalQuery(
         'stopped_not_proven',

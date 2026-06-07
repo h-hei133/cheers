@@ -1,7 +1,9 @@
 import { projectArtifactClaimEvidence } from "../../../artifacts/workflow/model.js";
+import { sourceFactsForTargets } from "../../../context/acquisition/code/source.js";
 import { selectContext } from "../../../context/selection/model.js";
 import { buildExecutionPlan } from "../../../planning/execution/model.js";
 import { buildTaskRequestPacket } from "../../../provider/request/packet.js";
+import { classifyRepairHypothesis } from "../../../repair/flow/hypothesis.js";
 import type {
   AgentExecutionOutput,
   CodingResultSummary,
@@ -19,7 +21,8 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
   const taskIntent = compact(state.config.initialPrompt);
   const latestCodingResult = latestResult(state.transcript);
   const observations = ensureQueryRuntimeObservationState(state);
-  const harnessPatch = harnessObservationPatch(ensureQueryRuntimeHarnessState(state));
+  const harness = ensureQueryRuntimeHarnessState(state);
+  const harnessPatch = harnessObservationPatch(harness);
   const taskKind = taskKindFor(taskIntent, latestCodingResult);
   const changedFiles = uniqueStrings([
     ...observations.changedFiles,
@@ -55,7 +58,11 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     ...observations.continuationFacts,
     ...continuationFactsFor(state, latestCodingResult),
   ]);
-  const requiredPaths = requiredPathsFor(taskKind, changedFiles, failedFiles, taskIntent, observations.contextPaths);
+  const observedContextPaths = uniqueStrings([
+    ...observations.contextPaths,
+    ...(harnessPatch.contextPaths ?? []),
+  ]);
+  const requiredPaths = requiredPathsFor(taskKind, changedFiles, failedFiles, taskIntent, observedContextPaths);
   const proofGap = proofGapFor(state, latestCodingResult, {
     changedFiles,
     failedFiles,
@@ -76,13 +83,13 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
       unverifiedFiles,
       verificationTargets,
       latestCodingResult,
-      observationPaths: observations.contextPaths,
+      observationPaths: observedContextPaths,
       requiredPaths,
     }),
     requiredPaths,
     continuationAvailable: continuationFacts.length > 0,
     failureCategories,
-    observedPaths: observations.contextPaths,
+    observedPaths: observedContextPaths,
   });
   const outputKind = taskKind === "data-artifact"
     ? "artifact"
@@ -111,7 +118,7 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
     request,
     proofGap: uniqueStrings([...context.proofGap, ...proofGap]),
     changedFiles,
-    observedContextPaths: observations.contextPaths,
+    observedContextPaths,
     completedActions: observations.completedActions,
     taskIntent,
     pendingAction,
@@ -128,6 +135,7 @@ export function decideQueryRuntimeAction(state: QueryRuntimeState): QueryRuntime
   });
 
   return decisionFromStrategy(strategy, {
+    harness,
     changedFiles,
     selectedPaths: context.selectedPaths,
     ownerPaths: context.ownerPaths,
@@ -158,6 +166,7 @@ export function hasOpenRuntimeProofGap(output: AgentExecutionOutput): boolean {
 function decisionFromStrategy(
   strategy: ToolStrategy,
   input: {
+    readonly harness: ReturnType<typeof ensureQueryRuntimeHarnessState>;
     readonly changedFiles: readonly string[];
     readonly selectedPaths: readonly string[];
     readonly ownerPaths: readonly string[];
@@ -174,6 +183,7 @@ function decisionFromStrategy(
   },
 ): QueryRuntimeActionDecision {
   const nextAction = strategy.nextAction ?? "stop-not-proven";
+  const repairPlan = nextAction === "repair" ? repairPlanFor(input.harness) : undefined;
   return Object.freeze({
     nextAction,
     actions: strategy.actions,
@@ -190,9 +200,35 @@ function decisionFromStrategy(
     requestState: input.requestState,
     toolStrategyState: input.toolStrategyState,
     pendingAction: input.pendingAction,
+    ...(repairPlan ? { repairPlan } : {}),
     artifactRequired: input.artifactRequired,
     reason: reasonFor(nextAction, strategy.proofGap ?? []),
     terminalSuccessClaim: false as const,
+  });
+}
+
+function repairPlanFor(
+  harness: ReturnType<typeof ensureQueryRuntimeHarnessState>,
+): QueryRuntimeActionDecision["repairPlan"] | undefined {
+  const repair = harness.pendingRepair.find((item) => item.hypothesisState);
+  if (!repair?.hypothesisState) return undefined;
+  const sourceFacts = sourceFactsForTargets({
+    facts: harness.sourceFacts,
+    targetFiles: repair.targetFiles,
+    sourceFactIds: repair.hypothesisState.sourceFactIds,
+  });
+  const hypothesis = sourceFacts.length > 0 && repair.hypothesisState.sourceFactIds.length === 0
+    ? classifyRepairHypothesis({
+        failureClass: repair.failureClass,
+        failureSummary: repair.failureSummary,
+        targetFiles: repair.targetFiles,
+        sourceFactIds: sourceFacts.map((fact) => fact.factId),
+      })
+    : repair.hypothesisState;
+  return Object.freeze({
+    hypothesis,
+    sourceFacts,
+    blockedRepeat: sourceFacts.length === 0 && repair.hypothesisState.sourceFactIds.length > 0,
   });
 }
 

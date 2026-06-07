@@ -123,6 +123,9 @@ function chooseNextAction(input: ToolStrategyInput & {
   if (input.budget && input.budget.remainingSteps <= 0) {
     return "stop-not-proven";
   }
+  if (input.pendingAction === "stop-not-proven") {
+    return "stop-not-proven";
+  }
   if (
     input.pendingAction === "read" &&
     pendingActionAllowed(input, input.pendingAction)

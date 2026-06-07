@@ -96,6 +96,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/harness-spine-adoption.md` | active | Checking SP061 normal-runtime harness spine adoption, turn snapshots, save points, ordered ledger, pending queues, continuation restore, disposable workspace tasks, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/durable-session-harness-recovery.md` | active | Checking SP062 durable session harness recovery, session/compact/replay harness state restore, imperfect action correction, diagnostics, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/provider-shaped-harness-trial.md` | active | Checking SP063 provider-shaped imperfect action recovery through QueryEngine, execution seam, durable harness queues, repair strategy, targeted verification, artifact proof, and result verdict. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/multi-hypothesis-debug-loop.md` | active | Checking SP066 disposable workspace debug tasks, hypothesis chains, source facts, repair plans, targeted reruns, replay restore, and stopped_not_proven coverage. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 
