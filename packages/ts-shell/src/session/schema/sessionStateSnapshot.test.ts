@@ -3,6 +3,8 @@ import {
   buildSessionStateSnapshot,
   type SessionStateSnapshot,
 } from "./sessionStateSnapshot.js";
+import { createQueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
+import { encodeSessionHarnessState } from "../harness/state.js";
 import type { Session } from "./sessionRecord.js";
 
 describe("sessionStateSnapshot schema codec", () => {
@@ -22,6 +24,14 @@ describe("sessionStateSnapshot schema codec", () => {
       terminalReason: "stopped-by-user",
       terminalClassification: "stopped",
       lastContinuationReason: "handoff",
+      harness: encodeSessionHarnessState(createQueryRuntimeHarnessState({
+        pendingVerification: [
+          {
+            queueId: "verify-session",
+            targetFiles: ["src/session.ts"],
+          },
+        ],
+      })),
       workingMemory: { keep: true },
     };
 
@@ -39,6 +49,7 @@ describe("sessionStateSnapshot schema codec", () => {
         terminalReason: undefined,
         terminalClassification: undefined,
         lastContinuationReason: undefined,
+        harness: current.harness,
         durableStatus: "success",
         workingMemory: { keep: true },
       }),

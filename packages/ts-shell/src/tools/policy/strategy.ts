@@ -135,6 +135,26 @@ function chooseNextAction(input: ToolStrategyInput & {
       return input.allowedTools.includes("search") ? "search" : "read";
     }
   }
+  if (input.pendingAction === "continue" && pendingActionAllowed(input, input.pendingAction)) {
+    return input.pendingAction;
+  }
+  if (input.pendingAction && input.pendingAction !== "verify" && pendingActionAllowed(input, input.pendingAction)) {
+    return input.pendingAction;
+  }
+  if (
+    input.artifactContract &&
+    missingArtifactEvidence(input.artifactContract) &&
+    !(input.pendingAction === "verify" && input.proofGap.some((gap) =>
+      gap.includes("verification proof") ||
+      gap.includes("verification failed") ||
+      gap.includes("verification blocked")
+    ))
+  ) {
+    if ((input.completedActions ?? []).includes("artifact")) {
+      return input.allowedTools.includes("read") ? "read" : "search";
+    }
+    return "artifact";
+  }
   if (input.pendingAction && pendingActionAllowed(input, input.pendingAction)) {
     return input.pendingAction;
   }
@@ -148,12 +168,6 @@ function chooseNextAction(input: ToolStrategyInput & {
     (input.actionPlans.some((plan) => plan.action === "edit") ||
       (input.proofGap.length > 0 && input.actionPlans.some((plan) => plan.action === "repair")))) {
     return input.allowedTools.includes("search") ? "search" : "read";
-  }
-  if (input.artifactContract && missingArtifactEvidence(input.artifactContract)) {
-    if ((input.completedActions ?? []).includes("artifact")) {
-      return input.allowedTools.includes("read") ? "read" : "search";
-    }
-    return "artifact";
   }
   if (readyForDistinctRepairAfterContext(input)) {
     return "repair";
@@ -255,6 +269,7 @@ function pendingActionAllowed(input: ToolStrategyInput & {
   readonly proofGap: readonly string[];
 }, action: ToolActionKind): boolean {
   if (!input.allowedTools.includes(action)) return false;
+  if (action === "stop-not-proven") return false;
   if (input.changedFiles && input.changedFiles.length > 0 &&
     input.proofGap.some((gap) => gap.includes("verification") || gap.includes("proof")) &&
     !(action === "artifact" && input.proofGap.some((gap) => gap.includes("artifact") || gap.includes("source"))) &&
@@ -262,7 +277,7 @@ function pendingActionAllowed(input: ToolStrategyInput & {
     action !== "continue") {
     return false;
   }
-  return input.actionPlans.some((plan) => plan.action === action) || action === "continue";
+  return true;
 }
 
 function repeatedFailure(input: ToolStrategyInput, action: ToolActionKind): boolean {

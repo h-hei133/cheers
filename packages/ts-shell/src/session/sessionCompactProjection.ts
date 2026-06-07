@@ -1,4 +1,5 @@
 import type { QueryEvent } from "../core/query/runtime/events.js";
+import type { QueryRuntimeHarnessState } from "../core/query/runtime/harness.js";
 import type { QueryRuntimeTaskState } from "../core/query/runtime/taskState.js";
 import type { SeedInfluenceDiagnostic } from "./sessionContinuityTypes.js";
 import type {
@@ -20,6 +21,7 @@ export interface SessionCompactProjectionInput {
   readonly seedInfluenceHandoffSummary?: string;
   readonly failureHandoffDiagnostic?: string;
   readonly successHandoffDiagnostic?: string;
+  readonly harness?: QueryRuntimeHarnessState;
   readonly taskState?: QueryRuntimeTaskState;
 }
 
@@ -49,6 +51,7 @@ export function projectCompactRetentionPlanInput(
     ...(input.successHandoffDiagnostic
       ? { successHandoffDiagnostic: input.successHandoffDiagnostic }
       : {}),
+    ...(input.harness ? { harness: input.harness } : {}),
     ...(input.taskState ? { taskState: input.taskState } : {}),
   };
 }

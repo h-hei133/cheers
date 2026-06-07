@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createQueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
 import { buildCompactContinuitySummary } from "./compactSummary.js";
 
 describe("buildCompactContinuitySummary", () => {
@@ -111,5 +112,33 @@ describe("buildCompactContinuitySummary", () => {
     expect(result.summary).toEqual([
       "- last-success-handoff-diagnostic: Success handoff: status=passed; verified=src/a.ts,src/b.ts.",
     ]);
+  });
+
+  it("carries safe harness queues through compact continuity", () => {
+    const result = buildCompactContinuitySummary({
+      summary: undefined,
+      continuity: undefined,
+      approvalAuditHistory: [],
+      harness: createQueryRuntimeHarnessState({
+        pendingVerification: [
+          {
+            queueId: "verify-compact",
+            targetFiles: ["src/compact.ts"],
+            command: "npm test compact",
+          },
+        ],
+      }),
+    });
+
+    expect(result.continuity.harnessState).toMatchObject({
+      version: 1,
+      pendingVerification: [
+        {
+          queueId: "verify-compact",
+          targetFiles: ["src/compact.ts"],
+        },
+      ],
+    });
+    expect(result.summary).toEqual([]);
   });
 });

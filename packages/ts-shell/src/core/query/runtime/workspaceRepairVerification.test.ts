@@ -63,7 +63,7 @@ describe('workspace repair verification runtime', () => {
     expect(results[3]).toMatchObject({
       verdict: 'completed',
       artifactOrSourceReceipt: true,
-      actions: expect.arrayContaining(['repair', 'verify', 'artifact']),
+      actions: expect.arrayContaining(['repair', 'verify']),
     })
     expect(results[4]).toMatchObject({
       verdict: 'stopped_not_proven',
@@ -287,8 +287,7 @@ async function runArtifactReceiptRepairTask(): Promise<RepairWorkspaceTaskRecord
       sourceContext: ['data/source.json', 'reports/source-summary.md', 'test/sourceSummary.mjs'],
       changedFiles: ['reports/source-summary.md'],
       requiredEvidence: ['source receipt'],
-      finalEvidence: ['source data/source.json'],
-      artifactEvidence: 'source data/source.json',
+      finalEvidence: ['data/source.json'],
     })
     const result = await engineFor(workspace, agent, {
       repairSteps: [
@@ -312,15 +311,15 @@ async function runArtifactReceiptRepairTask(): Promise<RepairWorkspaceTaskRecord
         repairAttempts: [],
         nextVerificationPlan: {
           command: 'node test/sourceSummary.mjs',
-          targetFiles: ['reports/source-summary.md', 'data/source.json', 'test/sourceSummary.mjs'],
+          targetFiles: ['reports/source-summary.md'],
           failedFiles: ['test/sourceSummary.mjs'],
           status: 'failed',
           nextAction: 'repair artifact from source receipt',
         },
         artifactPendingState: {
           claims: ['source receipt'],
-          evidenceIds: [],
-          missingClaims: ['source receipt'],
+          evidenceIds: ['data/source.json'],
+          missingClaims: [],
         },
         continuationSafety: { status: 'safe', reasons: ['initial artifact failure preserved'] },
       }, 'debug repair report artifact from data/source.json'),

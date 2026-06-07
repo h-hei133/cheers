@@ -1,6 +1,7 @@
 import type { QueryRuntimeRepairSummary } from "../../core/query/runtime/state.js";
 import type { QueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
 import { decodeQueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
+import type { QueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
 import type { DurableLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
 import type {
   ContinuationReason,
@@ -10,6 +11,10 @@ import type {
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
+import {
+  decodeCompactSessionHarnessState,
+  decodeSessionHarnessState,
+} from "../harness/state.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import {
   normalizeReplayTranscriptEvents,
@@ -27,6 +32,7 @@ export interface RecoverySnapshot {
   readonly lastContinuationReason?: ContinuationReason;
   readonly pendingLifecycle: DurableLifecycleIndex;
   readonly repairSummary: QueryRuntimeRepairSummary;
+  readonly harness?: QueryRuntimeHarnessState;
   readonly taskState?: QueryRuntimeTaskState;
   readonly lastUserMessage?: SessionMessage;
   readonly lastAssistantMessage?: SessionMessage;
@@ -66,6 +72,7 @@ export function buildSessionRecoverySnapshot(input: {
   const lastAssistantMessage = [...messageEvents]
     .reverse()
     .find((event) => event.role === "assistant");
+  const harnessState = decodeSnapshotHarnessState(input.state);
 
   return {
     pendingPrompt: input.session.pendingPrompt,
@@ -77,6 +84,9 @@ export function buildSessionRecoverySnapshot(input: {
     lastContinuationReason: input.state.lastContinuationReason,
     pendingLifecycle: readModelLifecycle,
     repairSummary: replayPreparation.repairSummary,
+    ...(harnessState.status === "accepted"
+      ? { harness: harnessState.harness }
+      : {}),
     ...(decodeCompactTaskState(input.state.workingMemory)
       ? { taskState: decodeCompactTaskState(input.state.workingMemory) }
       : {}),
@@ -85,6 +95,14 @@ export function buildSessionRecoverySnapshot(input: {
     lastLifecycleEvent: lifecycleEvents[lifecycleEvents.length - 1],
     transcriptEvents,
   };
+}
+
+function decodeSnapshotHarnessState(
+  state: SessionStateSnapshot,
+): ReturnType<typeof decodeSessionHarnessState> {
+  const direct = decodeSessionHarnessState(state.harness);
+  if (direct.status === "accepted") return direct;
+  return decodeCompactSessionHarnessState(state.workingMemory);
 }
 
 function decodeCompactTaskState(workingMemory: unknown): QueryRuntimeTaskState | undefined {

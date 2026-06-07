@@ -8,6 +8,7 @@ import type {
   TerminalReason,
 } from "../../orchestration/types.js";
 import { projectDurableStatus } from "../lifecycle/durableStatusProjection.js";
+import type { SessionHarnessState } from "../harness/state.js";
 import type { Session } from "./sessionRecord.js";
 import {
   buildLinearSessionThreadSnapshot,
@@ -27,6 +28,7 @@ export interface SessionStateSnapshot {
   terminalClassification?: TerminalClassification;
   lastContinuationReason?: ContinuationReason;
   pendingLifecycle?: DurableLifecycleIndex;
+  harness?: SessionHarnessState;
   thread?: SessionThreadSnapshot;
 }
 
@@ -45,6 +47,7 @@ export type SessionStateSnapshotOverrides = Partial<
     | "terminalClassification"
     | "lastContinuationReason"
     | "pendingLifecycle"
+    | "harness"
     | "thread"
   >
 >;
@@ -101,6 +104,10 @@ export function buildSessionStateSnapshot(
       Object.prototype.hasOwnProperty.call(overrides, "pendingLifecycle")
         ? overrides.pendingLifecycle
         : (current?.pendingLifecycle ?? createEmptyLifecycleIndex()),
+    harness:
+      overrides && Object.prototype.hasOwnProperty.call(overrides, "harness")
+        ? overrides.harness
+        : current?.harness,
     thread:
       overrides && Object.prototype.hasOwnProperty.call(overrides, "thread")
         ? overrides.thread

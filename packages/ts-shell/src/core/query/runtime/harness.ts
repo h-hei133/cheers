@@ -1,4 +1,5 @@
 import type { AgentExecutionOutput, AgentRole, CodingResultSummary } from '../../../orchestration/types.js'
+import { selectRepairFailureStrategy } from '../../../repair/flow/strategy.js'
 import type { ToolActionKind } from '../../../tools/policy/strategy.js'
 import type { QueryRuntimeExecutionBatch, QueryRuntimeExecutionBatchResult } from './batch.js'
 import type { QueryRuntimeActionDecision } from './decision.js'
@@ -255,6 +256,25 @@ export function settleHarnessBatch(input: {
           ? { contextNeed: result.affectedPaths[0] ?? result.coveredFiles[0] }
           : {}),
         targetFiles: uniqueStrings([...result.affectedPaths, ...result.coveredFiles]),
+      })
+    }
+
+    if (result.actionKind === 'repair' && result.exitStatusClass !== 'success') {
+      const failureSummary = safeText(result.diagnosticSummary ?? result.failureClass)
+      const targetFiles = uniqueStrings([...result.affectedPaths, ...result.coveredFiles])
+      const strategy = selectRepairFailureStrategy({
+        failureClass: result.failureClass,
+        failureSummary,
+        targetFiles,
+      })
+      pendingRepair = upsertPendingRepair(pendingRepair, {
+        queueId: `repair:${sequence}`,
+        failureClass: result.failureClass,
+        failureSummary,
+        hypothesis: strategy.hypothesis,
+        priorAttempt: result.toolId,
+        ...(strategy.contextNeed ? { contextNeed: strategy.contextNeed } : {}),
+        targetFiles,
       })
     }
   }

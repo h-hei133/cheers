@@ -65,7 +65,7 @@ describe('workspace task state runtime', () => {
     expect(results[2]).toMatchObject({
       carryForwardKind: 'replay',
       artifactOrSourceReceipt: true,
-      actions: expect.arrayContaining(['repair', 'verify', 'artifact']),
+      actions: expect.arrayContaining(['repair', 'verify']),
     })
     expect(results[3]).toMatchObject({
       verdict: 'stopped_not_proven',
@@ -232,12 +232,13 @@ async function runRollupReceiptTask(): Promise<LongWorkspaceTaskRecord> {
       originalFailureClassification: initial.summary,
       repairAttempts: [],
       command: 'node test/salesRollup.mjs',
-      targetFiles: ['data/sales.json', 'reports/sales-rollup.md', 'test/salesRollup.mjs'],
+      targetFiles: ['reports/sales-rollup.md'],
       failedFiles: ['reports/sales-rollup.md'],
       nextAction: 'repair report then produce source receipt',
       safetyReason: 'replay restored artifact proof gap',
       artifactClaims: ['sales rollup matches source data'],
-      missingClaims: ['source receipt', 'verification receipt'],
+      artifactEvidenceIds: ['data/sales.json'],
+      missingClaims: ['verification receipt'],
     })
     const actions: string[] = []
     const result = await engineFor(workspace, longTaskAgent({
@@ -245,8 +246,7 @@ async function runRollupReceiptTask(): Promise<LongWorkspaceTaskRecord> {
       sourceContext: ['data/sales.json', 'reports/sales-rollup.md', 'test/salesRollup.mjs'],
       changedFiles: ['reports/sales-rollup.md'],
       requiredEvidence: ['source receipt'],
-      finalEvidence: ['source data/sales.json'],
-      artifactEvidence: 'source data/sales.json',
+      finalEvidence: ['data/sales.json'],
       continued: true,
     }), {
       repairSteps: [
@@ -560,6 +560,7 @@ function taskStateFor(input: {
   readonly nextAction: string
   readonly safetyReason: string
   readonly artifactClaims?: readonly string[]
+  readonly artifactEvidenceIds?: readonly string[]
   readonly missingClaims?: readonly string[]
 }): QueryRuntimeTaskState {
   return {
@@ -581,7 +582,7 @@ function taskStateFor(input: {
     },
     artifactPendingState: {
       claims: input.artifactClaims ?? [],
-      evidenceIds: [],
+      evidenceIds: input.artifactEvidenceIds ?? [],
       missingClaims: input.missingClaims ?? [],
     },
     continuationSafety: { status: 'safe', reasons: [input.safetyReason] },

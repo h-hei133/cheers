@@ -5,6 +5,7 @@ import {
   ensureQueryRuntimeObservationState,
 } from "../../core/query/runtime/state.js";
 import { decideQueryRuntimeAction } from "../../core/query/runtime/policy.js";
+import { createQueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
 import type { AgentExecutionOutput } from "../../orchestration/types.js";
 import type { RecoverySnapshot, TranscriptEvent } from "../SessionManager.js";
 import {
@@ -408,6 +409,65 @@ describe("session replay builder", () => {
     expect(observations.changedFiles).toEqual([]);
     expect(decision.nextAction).toBe("search");
     expect(decision.changedFiles).toEqual([]);
+  });
+
+  it("restores durable harness queues from replay and lets normal runtime choose targeted verification", () => {
+    const snapshot = {
+      ...makeSnapshot([
+        turnStarted("coder", 1),
+        turnCompleted(makeOutput("coder", "write pending verification")),
+      ]),
+      harness: createQueryRuntimeHarnessState({
+        pendingVerification: [
+          {
+            queueId: "verify-replay-harness",
+            targetFiles: ["src/replayHarness.ts"],
+            command: "npm test replay-harness",
+          },
+        ],
+      }),
+    };
+
+    const seed = buildResumeReplayInput({
+      sessionId: "sess_replay_harness_queue",
+      snapshot,
+    });
+    const state = createQueryRuntimeStateFromSeed(seed);
+    const decision = decideQueryRuntimeAction(state);
+
+    expect(seed.harness?.pendingVerification).toHaveLength(1);
+    expect(decision.nextAction).toBe("verify");
+    expect(decision.verificationTargets).toContain("src/replayHarness.ts");
+  });
+
+  it("drops stale replay harness queues before normal runtime can act on them", () => {
+    const snapshot = {
+      ...makeSnapshot([
+        turnStarted("coder", 1),
+        turnStarted("reviewer", 1),
+        turnCompleted(makeOutput("coder", "drifted output")),
+      ]),
+      harness: createQueryRuntimeHarnessState({
+        pendingVerification: [
+          {
+            queueId: "verify-stale-harness",
+            targetFiles: ["src/staleHarness.ts"],
+            command: "npm test stale-harness",
+          },
+        ],
+      }),
+    };
+
+    const seed = buildResumeReplayInput({
+      sessionId: "sess_replay_stale_harness",
+      snapshot,
+    });
+    const state = createQueryRuntimeStateFromSeed(seed);
+    const decision = decideQueryRuntimeAction(state);
+
+    expect(seed.recoveryBoundary).toBe("fresh-entry");
+    expect(seed.harness).toBeUndefined();
+    expect(decision.verificationTargets).not.toContain("src/staleHarness.ts");
   });
 });
 

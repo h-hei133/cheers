@@ -1,5 +1,7 @@
 import type { CodingWriteEffect } from "../../orchestration/types.js";
+import type { QueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
 import type { QueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
+import { encodeSessionHarnessState } from "../harness/state.js";
 import { mergeContinuitySummaryEntries } from "./summaryFormatter.js";
 import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
 
@@ -28,6 +30,7 @@ export interface CompactContinuitySummaryInput {
   readonly seedInfluenceHandoffSummary?: string;
   readonly failureHandoffDiagnostic?: string;
   readonly successHandoffDiagnostic?: string;
+  readonly harness?: QueryRuntimeHarnessState;
   readonly taskState?: QueryRuntimeTaskState;
 }
 
@@ -80,6 +83,9 @@ export function buildCompactContinuitySummary(
   }
   if (input.successHandoffDiagnostic) {
     continuity.lastSuccessHandoffDiagnostic = input.successHandoffDiagnostic;
+  }
+  if (input.harness) {
+    continuity.harnessState = encodeSessionHarnessState(input.harness);
   }
   if (input.taskState) {
     continuity.taskState = input.taskState;

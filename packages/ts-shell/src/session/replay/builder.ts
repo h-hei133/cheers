@@ -19,6 +19,7 @@ import {
   projectQueryRuntimeTaskStateFromOutputs,
   type QueryRuntimeTaskState,
 } from "../../core/query/runtime/taskState.js";
+import type { QueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
 import type {
   AgentExecutionOutput,
   AgentRole,
@@ -362,6 +363,10 @@ export function buildResumeReplayInput(input: {
     compactTaskState,
     continuationAllowsReplayFacts: continuationPolicy.allowDerivedContext,
   });
+  const harness = selectRuntimeHarnessState({
+    harness: input.snapshot.harness,
+    continuationAllowsReplayFacts: continuationPolicy.allowDerivedContext,
+  });
 
   return {
     config: {
@@ -399,6 +404,7 @@ export function buildResumeReplayInput(input: {
       ? { observations: deriveQueryRuntimeObservationState(turnCompletedOutputs) }
       : {}),
     ...(taskState ? { taskState } : {}),
+    ...(harness ? { harness } : {}),
   };
 }
 
@@ -449,4 +455,14 @@ function selectRuntimeTaskState(input: {
     };
   }
   return input.compactTaskState;
+}
+
+function selectRuntimeHarnessState(input: {
+  readonly harness?: QueryRuntimeHarnessState;
+  readonly continuationAllowsReplayFacts: boolean;
+}): QueryRuntimeHarnessState | undefined {
+  if (!input.harness || !input.continuationAllowsReplayFacts) {
+    return undefined;
+  }
+  return input.harness;
 }

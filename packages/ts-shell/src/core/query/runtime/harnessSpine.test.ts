@@ -7,6 +7,12 @@ import type { AgentExecutionOutput, AgentRole, AgentRunner, CodingResultSummary 
 import { buildTaskProofInput } from '../../../evidence/task/proof.js'
 import { projectTaskVerdict } from '../../../result/task/verdict.js'
 import { createDefaultExecutionService, type ExecutionService } from '../../../runtime/execution/service.js'
+import { buildCompactContinuitySummary } from '../../../session/continuation/compactSummary.js'
+import {
+  decodeCompactSessionHarnessState,
+  decodeSessionHarnessState,
+  encodeSessionHarnessState,
+} from '../../../session/harness/state.js'
 import { QueryEngine } from './engine.js'
 import {
   createQueryRuntimeHarnessState,
@@ -298,6 +304,292 @@ describe('query runtime harness spine', () => {
     expect(actions[0]).toBe('verify')
   })
 
+  it('restores durable session harness queues and drives normal targeted verification', async () => {
+    const encoded = encodeSessionHarnessState(createQueryRuntimeHarnessState({
+      pendingVerification: [{ queueId: 'verify-session-durable', targetFiles: ['src/session/durable.ts'], command: 'npm test durable' }],
+    }))
+    const decoded = decodeSessionHarnessState(encoded)
+    expect(decoded.status).toBe('accepted')
+    if (decoded.status !== 'accepted') return
+    const actions: string[] = []
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        return output(role, {
+          content: 'durable session verification passed',
+          changedFiles: ['src/session/durable.ts'],
+          verifiedFiles: ['src/session/durable.ts'],
+          verification: { status: 'passed', command: 'npm test durable', reason: 'durable targeted rerun passed' },
+          requiredEvidence: ['durable targeted rerun'],
+          observedEvidence: ['durable targeted rerun'],
+          lastAction: { actionKind: 'verify', target: 'src/session/durable.ts', verifiedFiles: ['src/session/durable.ts'] },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => ({
+        batchId: batch.batchId,
+        terminalSuccessClaim: false,
+        results: batch.items.map((item) => ({
+          toolId: item.toolId,
+          actionKind: item.actionKind,
+          coveredFiles: ['src/session/durable.ts'],
+          affectedPaths: ['src/session/durable.ts'],
+          exitStatusClass: 'success',
+          failureClass: 'none',
+          truncated: false,
+          redactionStatus: 'redacted',
+          terminalSuccessClaim: false,
+        })),
+      }),
+    })
+
+    const result = await engine.submitMessage('sess_durable_harness_restore', 'continue durable verification', {
+      maxTurns: 2,
+      runtimeSeed: seedWithHarness('sess_durable_harness_restore', decoded.harness),
+    })
+
+    expect(actions[0]).toBe('verify')
+    expect(result.status).toBe('completed')
+  })
+
+  it('restores compact harness queues and rejects stale compact state', async () => {
+    const compact = buildCompactContinuitySummary({
+      summary: undefined,
+      continuity: undefined,
+      approvalAuditHistory: [],
+      harness: createQueryRuntimeHarnessState({
+        pendingVerification: [{ queueId: 'verify-compact-durable', targetFiles: ['src/compact/durable.ts'], command: 'npm test compact' }],
+      }),
+    })
+    const decoded = decodeCompactSessionHarnessState({ continuity: compact.continuity })
+    expect(decoded.status).toBe('accepted')
+    if (decoded.status !== 'accepted') return
+
+    const stale = decodeCompactSessionHarnessState({
+      continuity: {
+        harnessState: {
+          ...encodeSessionHarnessState(decoded.harness),
+          ledger: [{
+            sequence: 3,
+            turn: 1,
+            role: 'coder',
+            actionKind: 'verify',
+            toolId: 'verify-stale',
+            targetFiles: ['src/compact/durable.ts'],
+            affectedPaths: ['src/compact/durable.ts'],
+            exitStatusClass: 'success',
+            failureClass: 'command-failed',
+            truncated: false,
+            redactionStatus: 'raw',
+          }],
+        },
+      },
+    })
+    expect(stale.status).toBe('rejected')
+
+    const actions: string[] = []
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        return output(role, {
+          content: 'compact verification passed',
+          changedFiles: ['src/compact/durable.ts'],
+          verifiedFiles: ['src/compact/durable.ts'],
+          verification: { status: 'passed', command: 'npm test compact', reason: 'compact targeted rerun passed' },
+          requiredEvidence: ['compact targeted rerun'],
+          observedEvidence: ['compact targeted rerun'],
+          lastAction: { actionKind: 'verify', target: 'src/compact/durable.ts', verifiedFiles: ['src/compact/durable.ts'] },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => ({
+        batchId: batch.batchId,
+        terminalSuccessClaim: false,
+        results: batch.items.map((item) => ({
+          toolId: item.toolId,
+          actionKind: item.actionKind,
+          coveredFiles: ['src/compact/durable.ts'],
+          affectedPaths: ['src/compact/durable.ts'],
+          exitStatusClass: 'success',
+          failureClass: 'none',
+          truncated: false,
+          redactionStatus: 'redacted',
+          terminalSuccessClaim: false,
+        })),
+      }),
+    })
+
+    await engine.submitMessage('sess_compact_harness_restore', 'continue compact verification', {
+      maxTurns: 2,
+      runtimeSeed: seedWithHarness('sess_compact_harness_restore', decoded.harness),
+    })
+
+    expect(actions[0]).toBe('verify')
+  })
+
+  it('redirects a wrong edit to discovery when restored repair needs context', async () => {
+    const actions: string[] = []
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        return output(role, {
+          content: 'read restored missing owner context',
+          evidenceFiles: ['src/catalog/rules.ts'],
+          requiredEvidence: ['catalog owner context'],
+          observedEvidence: ['catalog owner context'],
+          lastAction: { actionKind: runtimeAction.nextAction, target: 'src/catalog/rules.ts' },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => ({
+        batchId: batch.batchId,
+        terminalSuccessClaim: false,
+        results: batch.items.map((item) => ({
+          toolId: item.toolId,
+          actionKind: item.actionKind,
+          coveredFiles: ['src/catalog/rules.ts'],
+          affectedPaths: ['src/catalog/rules.ts'],
+          exitStatusClass: 'success',
+          failureClass: 'none',
+          truncated: false,
+          redactionStatus: 'redacted',
+          terminalSuccessClaim: false,
+        })),
+      }),
+    })
+
+    await engine.submitMessage('sess_wrong_edit_redirect', 'continue catalog edit after missing context', {
+      maxTurns: 1,
+      runtimeSeed: seedWithHarness('sess_wrong_edit_redirect', createQueryRuntimeHarnessState({
+        pendingRepair: [{
+          queueId: 'repair-catalog',
+          failureClass: 'missing-context',
+          failureSummary: 'wrong edit attempted before catalog owner context',
+          hypothesis: 'read catalog owner before edit',
+          priorAttempt: 'edit:src/catalog/rules.ts',
+          contextNeed: 'src/catalog/rules.ts',
+          targetFiles: ['src/catalog/rules.ts'],
+        }],
+      }), {
+        initialPrompt: 'edit src/catalog/rules.ts',
+      }),
+    })
+
+    expect(actions[0]).toBe('read')
+    expect(actions).not.toContain('edit')
+  })
+
+  it('keeps targeted verification pending after a generic verification result', async () => {
+    const actions: string[] = []
+    const queues: string[][] = []
+    let verifyAttempts = 0
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        return output(role, {
+          content: verifyAttempts < 2 ? 'generic verification is not enough' : 'targeted verification passed',
+          handoffTo: verifyAttempts < 2 ? 'reviewer' : undefined,
+          handoffReason: verifyAttempts < 2 ? 'targeted rerun still pending' : undefined,
+          changedFiles: ['src/verify/target.ts'],
+          verifiedFiles: verifyAttempts >= 2 ? ['src/verify/target.ts'] : [],
+          verification: verifyAttempts >= 2
+            ? { status: 'passed', command: 'npm test target', reason: 'targeted rerun passed' }
+            : { status: 'not-requested', reason: 'generic command did not cover target' },
+          requiredEvidence: ['targeted verification'],
+          observedEvidence: verifyAttempts >= 2 ? ['targeted verification'] : [],
+          lastAction: { actionKind: runtimeAction.nextAction, target: 'src/verify/target.ts', verifiedFiles: verifyAttempts >= 2 ? ['src/verify/target.ts'] : [] },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => {
+        verifyAttempts += 1
+        return {
+          batchId: batch.batchId,
+          terminalSuccessClaim: false,
+          results: batch.items.map((item) => ({
+            toolId: item.toolId,
+            actionKind: item.actionKind,
+            coveredFiles: verifyAttempts === 1 ? ['package.json'] : ['src/verify/target.ts'],
+            affectedPaths: verifyAttempts === 1 ? ['package.json'] : ['src/verify/target.ts'],
+            exitStatusClass: 'success',
+            failureClass: 'none',
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          })),
+        }
+      },
+    })
+
+    for await (const event of engine.streamMessage('sess_generic_verify_rejected', 'continue targeted verification', {
+      maxTurns: 3,
+      runtimeSeed: seedWithHarness('sess_generic_verify_rejected', createQueryRuntimeHarnessState({
+        pendingVerification: [{ queueId: 'verify-targeted', targetFiles: ['src/verify/target.ts'], command: 'npm test target' }],
+      })),
+    })) {
+      if (event.type === 'runtime.queue-settled') {
+        queues.push(event.pendingVerification.flatMap((item) => item.targetFiles))
+      }
+    }
+
+    expect(actions.filter((action) => action === 'verify')).toHaveLength(2)
+    expect(queues[0]).toContain('src/verify/target.ts')
+    expect(queues.at(-1)).toEqual([])
+  })
+
+  it('changes from bad repair to discovery when repair failure needs missing context', async () => {
+    const actions: string[] = []
+    let repairBatchPending = true
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        const repairTurn = runtimeAction.nextAction === 'repair'
+        return output(role, {
+          content: repairTurn ? 'bad repair failed from missing context' : 'read missing repair context',
+          handoffTo: repairTurn ? 'reviewer' : undefined,
+          handoffReason: repairTurn ? 'missing context after bad repair' : undefined,
+          failedFiles: repairTurn ? [{ path: 'src/repair/context.ts', reason: 'missing context for repair' }] : [],
+          evidenceFiles: repairTurn ? [] : ['src/repair/context.ts'],
+          verification: repairTurn ? { status: 'failed', reason: 'missing context for repair', nextAction: 'read repair context' } : { status: 'not-requested' },
+          requiredEvidence: ['repair context'],
+          observedEvidence: repairTurn ? [] : ['repair context'],
+          lastAction: { actionKind: runtimeAction.nextAction, target: 'src/repair/context.ts' },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => {
+        const isFirst = repairBatchPending
+        repairBatchPending = false
+        return {
+          batchId: batch.batchId,
+          terminalSuccessClaim: false,
+          results: batch.items.map((item) => ({
+            toolId: item.toolId,
+            actionKind: item.actionKind,
+            coveredFiles: ['src/repair/context.ts'],
+            affectedPaths: ['src/repair/context.ts'],
+            exitStatusClass: isFirst ? 'failure' : 'success',
+            failureClass: isFirst ? 'missing-context' : 'none',
+            diagnosticSummary: isFirst ? 'missing context for repair' : 'context read',
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          })),
+        }
+      },
+    })
+
+    await engine.submitMessage('sess_bad_repair_discovery', 'continue failed repair', {
+      maxTurns: 2,
+      runtimeSeed: seedWithHarness('sess_bad_repair_discovery', createQueryRuntimeHarnessState({
+        pendingRepair: [{
+          queueId: 'repair-context',
+          failureClass: 'verification-failed',
+          failureSummary: 'repair needed',
+          hypothesis: 'repair context target',
+          targetFiles: ['src/repair/context.ts'],
+        }],
+      })),
+    })
+
+    expect(actions).toEqual(['repair', 'read'])
+  })
+
   it('does not complete a continuation restored only from harness ledger success', async () => {
     const engine = new QueryEngine({
       runAgent: async ({ role }) => output(role, {
@@ -376,6 +668,29 @@ describe('query runtime harness spine', () => {
     expect(results.some((result) => result.restoreOrContinuation)).toBe(true)
     expect(results.some((result) => result.repairQueueAndTargetedRerun)).toBe(true)
     expect(results.some((result) => result.falseCompleteBlocked)).toBe(true)
+    expect(results.every((result) => result.manualCorrection === false)).toBe(true)
+    for (const result of results) {
+      expect(result.safeSummaries.every((summary) => !summary.includes(result.workspaceRoot))).toBe(true)
+    }
+  })
+
+  it('executes durable session recovery workspace tasks with restore and imperfect actions', async () => {
+    const results = await Promise.all([
+      runSessionLabelRepairRestoreTask(),
+      runCompactTargetedRerunTask(),
+      runArtifactSourceProofRestoreTask(),
+    ])
+
+    expect(results.map((result) => `${result.taskId}:${result.verdict}`)).toEqual([
+      'session-label-repair-restore:completed',
+      'compact-targeted-rerun:completed',
+      'artifact-source-proof-restore:completed',
+    ])
+    expect(results.filter((result) => result.executed)).toHaveLength(3)
+    expect(results.filter((result) => result.restoreOrContinuation)).toHaveLength(3)
+    expect(results.filter((result) => result.taskId !== 'compact-targeted-rerun')).toHaveLength(2)
+    expect(results.filter((result) => result.initialFailureOutput.length > 0)).toHaveLength(3)
+    expect(results.filter((result) => result.repairQueueAndTargetedRerun).length).toBeGreaterThanOrEqual(2)
     expect(results.every((result) => result.manualCorrection === false)).toBe(true)
     for (const result of results) {
       expect(result.safeSummaries.every((summary) => !summary.includes(result.workspaceRoot))).toBe(true)
@@ -620,6 +935,229 @@ async function runFalseCompleteHarnessTask(): Promise<HarnessWorkspaceTaskRecord
 
     return workspaceRecord('false-complete-harness-block', workspace.root, result.status, {
       falseCompleteBlocked: result.status === 'stopped_not_proven',
+    })
+  } finally {
+    await workspace.dispose()
+  }
+}
+
+async function runSessionLabelRepairRestoreTask(): Promise<HarnessWorkspaceTaskRecord> {
+  const workspace = await createHarnessWorkspace({
+    'src/session/label.mjs': 'export function label(value) { return value.toLowerCase(); }\n',
+    'test/session-label.mjs': 'import { label } from "../src/session/label.mjs";\nif (label("paid") !== "PAID") throw new Error(`expected PAID got ${label("paid")}`);\n',
+  })
+  try {
+    const initial = await workspace.run('node', ['test/session-label.mjs'], 'node test/session-label.mjs')
+    const actions: string[] = []
+    const result = await workspaceEngine(workspace, async ({ role, runtimeAction }) => {
+      actions.push(runtimeAction.nextAction)
+      if (runtimeAction.nextAction === 'repair') {
+        return output(role, {
+          content: 'session label repair written after restore',
+          handoffTo: 'reviewer',
+          handoffReason: 'rerun restored label verification',
+          changedFiles: ['src/session/label.mjs'],
+          repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/session/label.mjs'], notes: ['restored repair queue applied'] },
+          verification: { status: 'not-requested', reason: 'targeted rerun queued' },
+          requiredEvidence: ['session label targeted rerun'],
+          observedEvidence: [],
+          lastAction: { actionKind: 'repair', target: 'src/session/label.mjs', changedFiles: ['src/session/label.mjs'] },
+        })
+      }
+      return output(role, {
+        content: 'session label targeted rerun passed',
+        changedFiles: ['src/session/label.mjs'],
+        verifiedFiles: ['src/session/label.mjs', 'test/session-label.mjs'],
+        evidenceFiles: ['src/session/label.mjs', 'test/session-label.mjs'],
+        verification: { status: 'passed', command: 'node test/session-label.mjs', reason: 'session label targeted rerun passed' },
+        requiredEvidence: ['session label targeted rerun'],
+        observedEvidence: ['session label targeted rerun'],
+        lastAction: { actionKind: 'verify', target: 'test/session-label.mjs', verifiedFiles: ['src/session/label.mjs'] },
+      })
+    }, {
+      repairWrites: {
+        'src/session/label.mjs': 'export function label(value) { return value.toUpperCase(); }\n',
+      },
+      verifyCommand: ['node', ['test/session-label.mjs']],
+    }).submitMessage('sess_session_label_repair_restore', 'continue restored label repair', {
+      maxTurns: 4,
+      runtimeSeed: seedWithHarness('sess_session_label_repair_restore', createQueryRuntimeHarnessState({
+        pendingRepair: [{
+          queueId: 'repair-session-label',
+          failureClass: 'command-failed',
+          failureSummary: safeCommandSummary(initial),
+          hypothesis: 'repair session label from restored failure',
+          targetFiles: ['src/session/label.mjs'],
+        }],
+      })),
+    })
+
+    return workspaceRecord('session-label-repair-restore', workspace.root, result.status, {
+      restoreOrContinuation: true,
+      multiFileWrite: false,
+      initialFailureOutput: safeCommandSummary(initial),
+      repairQueueAndTargetedRerun: actions.includes('repair') && actions.includes('verify'),
+      safeSummaries: [safeCommandSummary(initial), `actions:${actions.join(',')}`],
+    })
+  } finally {
+    await workspace.dispose()
+  }
+}
+
+async function runCompactTargetedRerunTask(): Promise<HarnessWorkspaceTaskRecord> {
+  const workspace = await createHarnessWorkspace({
+    'src/compact/target.mjs': 'export const compactTarget = true;\n',
+    'test/compact-target.mjs': 'import { compactTarget } from "../src/compact/target.mjs";\nif (!compactTarget) throw new Error("compact target false");\n',
+    'test/compact-failing.mjs': 'throw new Error("prior compact verification failure");\n',
+  })
+  try {
+    const initial = await workspace.run('node', ['test/compact-failing.mjs'], 'node test/compact-failing.mjs')
+    const compact = buildCompactContinuitySummary({
+      summary: undefined,
+      continuity: undefined,
+      approvalAuditHistory: [],
+      harness: createQueryRuntimeHarnessState({
+        pendingVerification: [{ queueId: 'verify-compact-target', targetFiles: ['src/compact/target.mjs'], command: 'node test/compact-target.mjs' }],
+      }),
+    })
+    const decoded = decodeCompactSessionHarnessState({ continuity: compact.continuity })
+    if (decoded.status !== 'accepted') {
+      throw new Error(`compact harness rejected: ${decoded.reasons.join(',')}`)
+    }
+    const actions: string[] = []
+    let attempt = 0
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        return output(role, {
+          content: attempt < 2 ? 'generic compact verification did not cover target' : 'compact targeted rerun passed',
+          handoffTo: attempt < 2 ? 'reviewer' : undefined,
+          handoffReason: attempt < 2 ? 'target remains pending' : undefined,
+          changedFiles: ['src/compact/target.mjs'],
+          verifiedFiles: attempt >= 2 ? ['src/compact/target.mjs'] : [],
+          verification: attempt >= 2
+            ? { status: 'passed', command: 'node test/compact-target.mjs', reason: 'compact targeted rerun passed' }
+            : { status: 'not-requested', reason: 'generic verification did not cover target' },
+          requiredEvidence: ['compact targeted rerun'],
+          observedEvidence: attempt >= 2 ? ['compact targeted rerun'] : [],
+          lastAction: { actionKind: runtimeAction.nextAction, target: 'src/compact/target.mjs', verifiedFiles: attempt >= 2 ? ['src/compact/target.mjs'] : [] },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => {
+        attempt += 1
+        if (attempt === 1) {
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: batch.items.map((item) => ({
+              toolId: item.toolId,
+              actionKind: item.actionKind,
+              coveredFiles: ['package.json'],
+              affectedPaths: ['package.json'],
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            })),
+          }
+        }
+        const commandResult = await workspace.run('node', ['test/compact-target.mjs'], 'node test/compact-target.mjs')
+        return {
+          batchId: batch.batchId,
+          terminalSuccessClaim: false,
+          results: batch.items.map((item) => ({
+            toolId: item.toolId,
+            actionKind: item.actionKind,
+            coveredFiles: ['src/compact/target.mjs'],
+            affectedPaths: ['src/compact/target.mjs'],
+            exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+            failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+            diagnosticSummary: safeCommandSummary(commandResult),
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          })),
+        }
+      },
+    })
+    const result = await engine.submitMessage('sess_compact_targeted_rerun', 'continue compact targeted rerun', {
+      maxTurns: 3,
+      runtimeSeed: seedWithHarness('sess_compact_targeted_rerun', decoded.harness),
+    })
+
+    return workspaceRecord('compact-targeted-rerun', workspace.root, result.status, {
+      restoreOrContinuation: true,
+      initialFailureOutput: safeCommandSummary(initial),
+      repairQueueAndTargetedRerun: actions.filter((action) => action === 'verify').length === 2,
+      safeSummaries: [safeCommandSummary(initial), `actions:${actions.join(',')}`],
+    })
+  } finally {
+    await workspace.dispose()
+  }
+}
+
+async function runArtifactSourceProofRestoreTask(): Promise<HarnessWorkspaceTaskRecord> {
+  const workspace = await createHarnessWorkspace({
+    'test/artifact-source.mjs': 'import { reportTitle } from "../src/artifact/report.mjs";\nif (reportTitle !== "restored-report") throw new Error(`missing source receipt for ${reportTitle}`);\n',
+  })
+  try {
+    const initial = await workspace.run('node', ['test/artifact-source.mjs'], 'node test/artifact-source.mjs')
+    const actions: string[] = []
+    const result = await workspaceEngine(workspace, async ({ role, runtimeAction }) => {
+      actions.push(runtimeAction.nextAction)
+      if (runtimeAction.nextAction === 'repair') {
+        return output(role, {
+          content: 'artifact source written after restore',
+          handoffTo: 'reviewer',
+          handoffReason: 'verify artifact source receipt',
+          changedFiles: ['src/artifact/report.mjs'],
+          repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/artifact/report.mjs'], notes: ['artifact source created'] },
+          verification: { status: 'not-requested', reason: 'source receipt pending' },
+          requiredEvidence: ['artifact source receipt'],
+          observedEvidence: [],
+          lastAction: { actionKind: 'repair', target: 'src/artifact/report.mjs', changedFiles: ['src/artifact/report.mjs'] },
+        })
+      }
+      return output(role, {
+        content: 'artifact source receipt verified',
+        changedFiles: ['src/artifact/report.mjs'],
+        verifiedFiles: ['src/artifact/report.mjs', 'test/artifact-source.mjs'],
+        evidenceFiles: ['src/artifact/report.mjs', 'test/artifact-source.mjs'],
+        verification: { status: 'passed', command: 'node test/artifact-source.mjs', reason: 'artifact source receipt verified' },
+        requiredEvidence: ['artifact source receipt'],
+        observedEvidence: ['test/artifact-source.mjs'],
+        lastAction: { actionKind: 'verify', target: 'test/artifact-source.mjs', verifiedFiles: ['src/artifact/report.mjs'] },
+      })
+    }, {
+      repairWrites: {
+        'src/artifact/report.mjs': 'export const reportTitle = "restored-report";\n',
+      },
+      verifyCommand: ['node', ['test/artifact-source.mjs']],
+    }).submitMessage('sess_artifact_source_proof_restore', 'continue artifact source proof', {
+      maxTurns: 4,
+      runtimeSeed: seedWithHarness('sess_artifact_source_proof_restore', createQueryRuntimeHarnessState({
+        pendingRepair: [{
+          queueId: 'repair-artifact-source',
+          failureClass: 'artifact-proof-missing',
+          failureSummary: 'artifact source proof missing after restore',
+          hypothesis: 'create artifact source and verify receipt',
+          targetFiles: ['src/artifact/report.mjs'],
+        }],
+      }), {
+        initialPrompt: 'write artifact report source and verify source receipt',
+        observations: {
+          artifactClaims: ['artifact source receipt'],
+          artifactClaimEvidence: [],
+        },
+      }),
+    })
+
+    return workspaceRecord('artifact-source-proof-restore', workspace.root, result.status, {
+      restoreOrContinuation: true,
+      initialFailureOutput: safeCommandSummary(initial),
+      repairQueueAndTargetedRerun: actions.includes('repair') && actions.includes('verify'),
+      safeSummaries: [safeCommandSummary(initial), `actions:${actions.join(',')}`],
     })
   } finally {
     await workspace.dispose()
