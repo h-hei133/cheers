@@ -762,7 +762,7 @@ describe('query runtime harness spine', () => {
     expect(verdict.notProvenClaims).toContain('harness-ledger-alone-is-not-success')
   })
 
-  it('executes allowance repair workspace path through discovery, failed rerun, second strategy, and targeted pass', async () => {
+  it('executes allowance repair workspace path through discovery, failed rerun, generic green rejection, second strategy, and targeted pass', async () => {
     const workspace = await createHarnessWorkspace({
       'src/allowance/rules.mjs': 'export function allowanceLabel(value) { return `allowance:${value}`; }\n',
       'test/allowance.mjs': 'import { allowanceLabel } from "../src/allowance/rules.mjs";\nif (allowanceLabel("paid") !== "ALLOWANCE:PAID") throw new Error(`expected ALLOWANCE:PAID got ${allowanceLabel("paid")}`);\n',
@@ -773,10 +773,12 @@ describe('query runtime harness spine', () => {
       const phases: string[] = [`initial-command:${initial.exitCode}`]
       const blockedOutputs: string[] = []
       const repairQueues: string[] = []
+      const verificationQueues: string[] = []
       const decisions: string[] = []
       let finalStatus = ''
       let finalReason = ''
       let repairAttempt = 0
+      let verifyAttempt = 0
       const engine = new QueryEngine({
         runAgent: async ({ role, runtimeAction }) => {
           actions.push(runtimeAction.nextAction)
@@ -831,6 +833,19 @@ describe('query runtime harness spine', () => {
               requiredEvidence: ['allowance owner context', 'allowance targeted rerun'],
               observedEvidence: ['allowance owner context'],
               lastAction: { actionKind: 'repair', target: 'src/allowance/rules.mjs', changedFiles: ['src/allowance/rules.mjs'] },
+            })
+          }
+          if (verifyAttempt < 2) {
+            return output(role, {
+              content: 'generic allowance green did not cover target',
+              changedFiles: ['src/allowance/rules.mjs'],
+              verifiedFiles: ['package.json'],
+              evidenceFiles: ['package.json'],
+              repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/allowance/rules.mjs'], notes: ['second allowance strategy'] },
+              verification: { status: 'passed', command: 'node --version', reason: 'generic allowance green did not cover target', selectionScope: 'broader' },
+              requiredEvidence: ['allowance owner context', 'allowance targeted rerun'],
+              observedEvidence: ['allowance owner context'],
+              lastAction: { actionKind: 'verify', target: 'package.json', verifiedFiles: ['package.json'] },
             })
           }
           return output(role, {
@@ -893,15 +908,18 @@ describe('query runtime harness spine', () => {
               }],
             }
           }
-          const commandResult = await workspace.run('node', ['test/allowance.mjs'], 'node test/allowance.mjs')
+          verifyAttempt += 1
+          const commandResult = verifyAttempt === 1
+            ? await workspace.run('node', ['--version'], 'node --version')
+            : await workspace.run('node', ['test/allowance.mjs'], 'node test/allowance.mjs')
           return {
             batchId: batch.batchId,
             terminalSuccessClaim: false,
             results: [{
               toolId: item.toolId,
               actionKind: 'verify',
-              coveredFiles: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
-              affectedPaths: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
+              coveredFiles: verifyAttempt === 1 ? ['package.json'] : ['src/allowance/rules.mjs', 'test/allowance.mjs'],
+              affectedPaths: verifyAttempt === 1 ? ['package.json'] : ['src/allowance/rules.mjs', 'test/allowance.mjs'],
               exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
               failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
               diagnosticSummary: safeCommandSummary(commandResult),
@@ -939,6 +957,9 @@ describe('query runtime harness spine', () => {
           repairQueues.push(event.pendingRepair
             .map((item) => `${item.queueId}:${item.contextNeed ?? 'none'}:${item.failureClass}`)
             .join('|'))
+          verificationQueues.push(event.pendingVerification
+            .map((item) => item.targetFiles.join('+'))
+            .join('|'))
         }
         if (event.type === 'query.completed') {
           finalStatus = event.result.status
@@ -946,11 +967,14 @@ describe('query runtime harness spine', () => {
         }
       }
 
-      expect(finalStatus, `reason:${finalReason};actions:${actions.join(',')};decisions:${decisions.join(' -> ')};repairQueues:${repairQueues.join(' -> ')}`).toBe('completed')
-      expect(actions).toEqual(['read', 'repair', 'read', 'repair', 'verify'])
+      expect(finalStatus, `reason:${finalReason};actions:${actions.join(',')};decisions:${decisions.join(' -> ')};repairQueues:${repairQueues.join(' -> ')};verificationQueues:${verificationQueues.join(' -> ')}`).toBe('completed')
+      expect(actions).toEqual(['read', 'repair', 'read', 'repair', 'verify', 'verify'])
       expect(phases.length).toBeGreaterThanOrEqual(6)
       expect(blockedOutputs.at(0)).toContain('discovery required before edit')
+      expect(verificationQueues).toContain('src/allowance/rules.mjs')
+      expect(verificationQueues.at(-1)).toBe('')
       expect(repairAttempt).toBe(2)
+      expect(verifyAttempt).toBe(2)
       expect(initial.exitCode).not.toBe(0)
     } finally {
       await workspace.dispose()
