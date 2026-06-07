@@ -28,6 +28,7 @@ import {
 import {
   appendHarnessSavePoint,
   captureHarnessTurnSnapshot,
+  harnessObservationPatch,
   recordHarnessSnapshot,
   settleHarnessBatch,
   settleHarnessOutput,
@@ -493,6 +494,14 @@ function getTransition(
   output: AgentExecutionOutput,
 ) {
   const handoffTo = output.handoffTo
+  const pendingAction = harnessObservationPatch(ensureQueryRuntimeHarnessState(state)).pendingAction
+  const nextRole = ALLOWED_HANDOFFS[state.currentRole][0]
+  const canContinuePendingAction = Boolean(
+    pendingAction &&
+    pendingAction !== 'verify' &&
+    nextRole &&
+    state.turn < state.config.maxTurns,
+  )
   if (!handoffTo) {
     if (hasOpenRuntimeProofGap(output)) {
       return terminalQuery(
@@ -504,6 +513,13 @@ function getTransition(
   }
 
   if (!ALLOWED_HANDOFFS[state.currentRole].includes(handoffTo)) {
+    if (canContinuePendingAction && pendingAction && nextRole) {
+      return continueQuery(
+        state.currentRole,
+        nextRole,
+        `pending runtime action: ${pendingAction}`,
+      )
+    }
     return terminalQuery(
       'stopped_invalid_handoff',
       `Invalid handoff ${state.currentRole} -> ${handoffTo}`,
@@ -517,6 +533,13 @@ function getTransition(
   )
 
   if (state.visitedTransitions.has(transition.signature)) {
+    if (canContinuePendingAction && pendingAction && nextRole) {
+      return continueQuery(
+        state.currentRole,
+        nextRole,
+        `pending runtime action: ${pendingAction}`,
+      )
+    }
     return terminalQuery(
       'stopped_cycle',
       `Cycle detected at ${transition.signature}`,

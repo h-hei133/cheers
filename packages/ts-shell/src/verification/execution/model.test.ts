@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { executeVerification, verifyChangedFileCoverage } from "./model.js";
+import { classifyVerificationTargetCoverage, executeVerification, verifyChangedFileCoverage } from "./model.js";
 
 describe("verification execution model", () => {
   it("passes after post-repair validation while keeping truth non-terminal", () => {
@@ -199,6 +199,28 @@ describe("verification execution model", () => {
       resultInputEligible: false,
       blockers: ["verification command missing changed target: src/invoice/summary.ts"],
       terminalSuccessClaim: false,
+    });
+  });
+
+  it("classifies wrong-target command coverage without settling targeted verification", () => {
+    expect(classifyVerificationTargetCoverage({
+      pendingTargets: [["src/orders/total.ts"]],
+      coveredFiles: ["package.json"],
+      affectedPaths: ["package.json"],
+    })).toEqual({
+      coveredTargets: [],
+      wrongTargetIgnored: true,
+      settled: false,
+    });
+
+    expect(classifyVerificationTargetCoverage({
+      pendingTargets: [["src/orders/total.ts"]],
+      coveredFiles: ["src/orders/total.ts", "test/orders/total.test.ts"],
+      affectedPaths: ["src/orders/total.ts"],
+    })).toEqual({
+      coveredTargets: ["src/orders/total.ts"],
+      wrongTargetIgnored: false,
+      settled: true,
     });
   });
 });

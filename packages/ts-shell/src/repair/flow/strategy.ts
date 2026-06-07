@@ -9,6 +9,12 @@ export interface RepairFailureStrategy {
   readonly contextNeed?: string;
 }
 
+export interface RepairFailureLifecycle {
+  readonly hypothesis: string;
+  readonly contextNeeded: boolean;
+  readonly contextNeed?: string;
+}
+
 export function selectRepairFailureStrategy(
   input: RepairFailureStrategyInput,
 ): RepairFailureStrategy {
@@ -24,5 +30,15 @@ export function selectRepairFailureStrategy(
     ...(needsContext && input.targetFiles[0]
       ? { contextNeed: input.targetFiles[0] }
       : {}),
+  };
+}
+
+export function describeRepairFailureLifecycle(
+  strategy: RepairFailureStrategy,
+): RepairFailureLifecycle {
+  return {
+    hypothesis: strategy.hypothesis,
+    contextNeeded: Boolean(strategy.contextNeed),
+    ...(strategy.contextNeed ? { contextNeed: strategy.contextNeed } : {}),
   };
 }

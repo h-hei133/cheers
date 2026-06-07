@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectRepairFailureStrategy } from "./strategy.js";
+import { describeRepairFailureLifecycle, selectRepairFailureStrategy } from "./strategy.js";
 
 describe("repair failure strategy", () => {
   it("switches failed repair to context discovery when failure evidence lacks context", () => {
@@ -24,6 +24,19 @@ describe("repair failure strategy", () => {
 
     expect(strategy).toEqual({
       hypothesis: "change repair strategy before another attempt",
+    });
+  });
+
+  it("projects failed repair strategy into lifecycle facts", () => {
+    const lifecycle = describeRepairFailureLifecycle({
+      hypothesis: "read missing repair context before another repair attempt",
+      contextNeed: "src/repair/context.ts",
+    });
+
+    expect(lifecycle).toEqual({
+      hypothesis: "read missing repair context before another repair attempt",
+      contextNeeded: true,
+      contextNeed: "src/repair/context.ts",
     });
   });
 });

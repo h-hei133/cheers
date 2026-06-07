@@ -72,6 +72,23 @@ export interface ArtifactClaimEvidenceProjection {
   readonly missingClaims: readonly string[];
 }
 
+export interface ArtifactLifecycleInput {
+  readonly hasArtifactIntent: boolean;
+  readonly changedFiles: readonly string[];
+  readonly verifiedFiles: readonly string[];
+  readonly evidenceFiles: readonly string[];
+  readonly completeArtifactProof: boolean;
+}
+
+export interface ArtifactLifecycleProjection {
+  readonly written: boolean;
+  readonly sourceMissing: boolean;
+  readonly verificationMissing: boolean;
+  readonly pending: boolean;
+  readonly completed: boolean;
+  readonly targetFiles: readonly string[];
+}
+
 export function createArtifactReceipt(input: ArtifactReceiptInput): ArtifactReceipt | undefined {
   if (input.outputKind !== "artifact") {
     return undefined;
@@ -99,6 +116,32 @@ export function createArtifactReceipt(input: ArtifactReceiptInput): ArtifactRece
     validationState,
     blockers,
     terminalSuccessClaim: false,
+  });
+}
+
+export function projectArtifactLifecycle(input: ArtifactLifecycleInput): ArtifactLifecycleProjection {
+  if (!input.hasArtifactIntent) {
+    return freeze({
+      written: false,
+      sourceMissing: false,
+      verificationMissing: false,
+      pending: false,
+      completed: false,
+      targetFiles: freeze([]),
+    });
+  }
+  const targetFiles = freeze(uniqueEvidence([
+    ...input.changedFiles,
+    ...input.verifiedFiles,
+    ...input.evidenceFiles,
+  ]));
+  return freeze({
+    written: input.changedFiles.length > 0,
+    sourceMissing: !input.completeArtifactProof && input.verifiedFiles.length > 0,
+    verificationMissing: !input.completeArtifactProof && input.verifiedFiles.length === 0,
+    pending: !input.completeArtifactProof,
+    completed: input.completeArtifactProof,
+    targetFiles,
   });
 }
 
@@ -359,6 +402,10 @@ function requiredContentSatisfied(input: ArtifactReceiptInput): boolean {
 
 function safeEvidence(evidence: readonly string[]): readonly string[] {
   return evidence.map((item) => item.replace(/\s+/g, " ").trim().slice(0, 180));
+}
+
+function uniqueEvidence(evidence: readonly string[]): readonly string[] {
+  return [...new Set(safeEvidence(evidence).filter(Boolean))];
 }
 
 function artifactBlockersFor(

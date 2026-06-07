@@ -41,6 +41,18 @@ export interface ChangedFileVerificationCoverageInput {
   readonly verificationState: string;
 }
 
+export interface VerificationTargetCoverageInput {
+  readonly pendingTargets: readonly (readonly string[])[];
+  readonly coveredFiles: readonly string[];
+  readonly affectedPaths: readonly string[];
+}
+
+export interface VerificationTargetCoverage {
+  readonly coveredTargets: readonly string[];
+  readonly wrongTargetIgnored: boolean;
+  readonly settled: boolean;
+}
+
 export function executeVerification(input: VerificationExecutionInput): VerificationExecution {
   if (input.strategy.state === "blocked" || !input.contextReady) {
     return result("blocked", ["verification blocked"]);
@@ -99,6 +111,25 @@ function commandCoverageBlockersFor(input: VerificationExecutionInput): readonly
   return requiredTargets
     .filter((target) => !passedCoverage.has(target))
     .map((target) => `verification command missing changed target: ${target}`);
+}
+
+export function classifyVerificationTargetCoverage(
+  input: VerificationTargetCoverageInput,
+): VerificationTargetCoverage {
+  const covered = uniquePaths([
+    ...input.coveredFiles,
+    ...input.affectedPaths,
+  ]);
+  const coveredTargets = uniquePaths(input.pendingTargets
+    .filter((target) => target.length > 0 && target.every((path) => covered.includes(path)))
+    .flat());
+  return freeze({
+    coveredTargets,
+    wrongTargetIgnored: input.pendingTargets.some((target) =>
+      target.length > 0 && !target.every((path) => covered.includes(path))
+    ),
+    settled: coveredTargets.length > 0,
+  });
 }
 
 export function verifyChangedFileCoverage(

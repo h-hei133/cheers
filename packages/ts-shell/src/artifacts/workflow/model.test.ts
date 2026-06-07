@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { correctArtifact, createArtifactReceipt, projectArtifactClaimEvidence } from "./model.js";
+import { correctArtifact, createArtifactReceipt, projectArtifactClaimEvidence, projectArtifactLifecycle } from "./model.js";
 
 describe("artifact workflow model", () => {
   it("records report artifact intent, sources, validation, and non-success truth", () => {
@@ -300,5 +300,37 @@ describe("artifact workflow model", () => {
       { claim: "source covered", evidenceId: "source receipt", proven: false },
       { claim: "verification passed", evidenceId: "verification receipt", proven: false },
     ]);
+  });
+
+  it("projects artifact lifecycle as pending until source and verification proof exist", () => {
+    expect(projectArtifactLifecycle({
+      hasArtifactIntent: true,
+      changedFiles: [],
+      verifiedFiles: [],
+      evidenceFiles: [],
+      completeArtifactProof: false,
+    })).toEqual({
+      written: false,
+      sourceMissing: false,
+      verificationMissing: true,
+      pending: true,
+      completed: false,
+      targetFiles: [],
+    });
+
+    expect(projectArtifactLifecycle({
+      hasArtifactIntent: true,
+      changedFiles: ["reports/summary.md"],
+      verifiedFiles: ["reports/summary.md"],
+      evidenceFiles: ["notes/source.md"],
+      completeArtifactProof: true,
+    })).toEqual({
+      written: true,
+      sourceMissing: false,
+      verificationMissing: false,
+      pending: false,
+      completed: true,
+      targetFiles: ["reports/summary.md", "notes/source.md"],
+    });
   });
 });

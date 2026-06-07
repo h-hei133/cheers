@@ -122,6 +122,72 @@ describe('query runtime harness spine', () => {
     expect(ledgers.at(-1)).toEqual(['1:failure:command-failed', '2:success:none'])
   })
 
+  it('records append-only verification trajectory when a failed tool result is followed by success', async () => {
+    const trajectories: string[][] = []
+    const engine = new QueryEngine({
+      runAgent: async ({ role }) => output(role, {
+        content: 'inventory verification remains evidence-owned',
+        changedFiles: ['src/inventory/count.ts'],
+        verifiedFiles: ['src/inventory/count.ts'],
+        verification: { status: 'passed', command: 'npm test inventory', reason: 'inventory targeted verification passed' },
+        requiredEvidence: ['inventory targeted verification'],
+        observedEvidence: ['inventory targeted verification'],
+        lastAction: { actionKind: 'verify', target: 'src/inventory/count.ts', verifiedFiles: ['src/inventory/count.ts'] },
+      }),
+      executeRuntimeBatch: async ({ batch }) => ({
+        batchId: batch.batchId,
+        terminalSuccessClaim: false,
+        results: [
+          {
+            toolId: `${batch.batchId}:first`,
+            actionKind: 'verify',
+            coveredFiles: ['src/inventory/count.ts'],
+            affectedPaths: ['src/inventory/count.ts'],
+            exitStatusClass: 'failure',
+            failureClass: 'command-failed',
+            diagnosticSummary: 'expected inventory count 4 got 3',
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          },
+          {
+            toolId: `${batch.batchId}:second`,
+            actionKind: 'verify',
+            coveredFiles: ['src/inventory/count.ts'],
+            affectedPaths: ['src/inventory/count.ts'],
+            exitStatusClass: 'success',
+            failureClass: 'none',
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          },
+        ],
+      }),
+    })
+
+    for await (const event of engine.streamMessage('sess_inventory_lifecycle', 'rerun inventory count verification', {
+      maxTurns: 1,
+      runtimeSeed: seedWithHarness('sess_inventory_lifecycle', createQueryRuntimeHarnessState({
+        pendingVerification: [{ queueId: 'verify-inventory-count', targetFiles: ['src/inventory/count.ts'], command: 'npm test inventory' }],
+      })),
+    })) {
+      if (event.type === 'runtime.save-point') {
+        trajectories.push(event.savePoint.trajectory.map((entry) => `${entry.sequence}:${entry.phase}:${entry.targetFiles.join('+')}`))
+      }
+    }
+
+    const finalTrajectory = trajectories.at(-1) ?? []
+    expect(finalTrajectory.some((entry) => entry.includes('tool:planned'))).toBe(true)
+    expect(finalTrajectory.some((entry) => entry.includes('tool:started'))).toBe(true)
+    expect(finalTrajectory.some((entry) => entry.includes('tool:failed'))).toBe(true)
+    expect(finalTrajectory.some((entry) => entry.includes('tool:completed'))).toBe(true)
+    expect(finalTrajectory.some((entry) => entry.includes('verification:failed'))).toBe(true)
+    expect(finalTrajectory.some((entry) => entry.includes('verification:settled'))).toBe(true)
+    expect(finalTrajectory.map((entry) => Number(entry.split(':')[0]))).toEqual(
+      finalTrajectory.map((_, index) => index + 1),
+    )
+  })
+
   it('keeps changed writes non-terminal until changed files and a verification queue exist', async () => {
     const queues: string[][] = []
     const engine = new QueryEngine({
@@ -226,6 +292,74 @@ describe('query runtime harness spine', () => {
     })
 
     expect(actions[0]).toBe('verify')
+    expect(result.status).toBe('completed')
+  })
+
+  it('restored append-only trajectory drives targeted verification without completing alone', async () => {
+    const actions: string[] = []
+    const batchTargets: string[][] = []
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        return output(role, {
+          content: 'trajectory restored verification target passed',
+          changedFiles: ['src/trajectory/target.ts'],
+          verifiedFiles: ['src/trajectory/target.ts'],
+          evidenceFiles: ['src/trajectory/target.ts'],
+          verification: { status: 'passed', command: 'npm test trajectory', reason: 'trajectory target passed' },
+          requiredEvidence: ['trajectory target verification'],
+          observedEvidence: ['trajectory target verification'],
+          lastAction: { actionKind: runtimeAction.nextAction, target: 'src/trajectory/target.ts', verifiedFiles: ['src/trajectory/target.ts'] },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => {
+        batchTargets.push(batch.items.flatMap((item) => item.targetPaths))
+        return {
+          batchId: batch.batchId,
+          terminalSuccessClaim: false,
+          results: batch.items.map((item) => ({
+            toolId: item.toolId,
+            actionKind: item.actionKind,
+            coveredFiles: ['src/trajectory/target.ts'],
+            affectedPaths: ['src/trajectory/target.ts'],
+            exitStatusClass: 'success',
+            failureClass: 'none',
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          })),
+        }
+      },
+    })
+
+    const result = await engine.submitMessage('sess_trajectory_only_verify', 'continue trajectory verification', {
+      maxTurns: 2,
+      runtimeSeed: seedWithHarness('sess_trajectory_only_verify', createQueryRuntimeHarnessState({
+        trajectory: [
+          {
+            sequence: 1,
+            turn: 1,
+            role: 'reviewer',
+            phase: 'verification:targeted',
+            actionKind: 'verify',
+            toolId: 'runtime-verify',
+            targetFiles: ['src/trajectory/target.ts'],
+          },
+          {
+            sequence: 2,
+            turn: 1,
+            role: 'reviewer',
+            phase: 'verification:wrong-target-ignored',
+            actionKind: 'verify',
+            toolId: 'runtime-verify',
+            targetFiles: ['package.json'],
+          },
+        ],
+      })),
+    })
+
+    expect(actions[0]).toBe('verify')
+    expect(batchTargets[0]).toContain('src/trajectory/target.ts')
     expect(result.status).toBe('completed')
   })
 
@@ -794,7 +928,7 @@ describe('query runtime harness spine', () => {
           if (runtimeAction.nextAction === 'read') {
             return output(role, {
               content: 'allowance owner context read after failed repair',
-              handoffTo: 'reviewer',
+              handoffTo: 'coder',
               handoffReason: 'repair with refreshed allowance context',
               evidenceFiles: ['src/allowance/rules.mjs'],
               requiredEvidence: ['allowance owner context', 'allowance targeted rerun'],
@@ -1148,6 +1282,198 @@ describe('query runtime harness spine', () => {
       expect(actions).toEqual(['artifact', 'read', 'artifact', 'verify'])
       expect(phases.length).toBeGreaterThanOrEqual(6)
       expect(actions.filter((action) => action === 'artifact')).toHaveLength(2)
+      expect(initial.exitCode).not.toBe(0)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('executes rebate lifecycle workspace path through bad repair, ignored generic green, and targeted pass', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/rebate/rule.mjs': 'export function rebateLabel(value) { return `rebate:${value}`; }\n',
+      'test/rebate.mjs': 'import { rebateLabel } from "../src/rebate/rule.mjs";\nif (rebateLabel("vip") !== "REBATE:VIP") throw new Error(`expected REBATE:VIP got ${rebateLabel("vip")}`);\n',
+    })
+    try {
+      const initial = await workspace.run('node', ['test/rebate.mjs'], 'node test/rebate.mjs')
+      const actions: string[] = []
+      const trajectories: string[][] = []
+      let repairAttempt = 0
+      let verifyAttempt = 0
+      let finalStatus = ''
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+          actions.push(runtimeAction.nextAction)
+          if (runtimeAction.nextAction === 'read' && actions.length === 1) {
+            return output(role, {
+              content: 'provider claimed rebate edit while owner read was required',
+              changedFiles: ['src/rebate/rule.mjs'],
+              requiredEvidence: ['rebate owner context', 'rebate targeted verification'],
+              observedEvidence: ['rebate owner context', 'rebate targeted verification'],
+              lastAction: { actionKind: 'edit', target: 'src/rebate/rule.mjs', changedFiles: ['src/rebate/rule.mjs'] },
+            })
+          }
+          if (runtimeAction.nextAction === 'read') {
+            return output(role, {
+              content: 'rebate owner context read',
+              handoffTo: 'reviewer',
+              handoffReason: 'repair rebate with owner context',
+              evidenceFiles: ['src/rebate/rule.mjs'],
+              requiredEvidence: ['rebate owner context', 'rebate targeted verification'],
+              observedEvidence: ['rebate owner context'],
+              lastAction: { actionKind: 'read', target: 'src/rebate/rule.mjs' },
+            })
+          }
+          if (runtimeAction.nextAction === 'repair' && repairAttempt === 1) {
+            return output(role, {
+              content: 'first rebate repair failed rerun from missing context',
+              handoffTo: 'coder',
+              handoffReason: 'read rebate context before next repair',
+              changedFiles: ['src/rebate/rule.mjs'],
+              failedFiles: [{ path: 'test/rebate.mjs', reason: 'missing context after rebate repair' }],
+              repair: { status: 'failed', attempts: 1, failedItems: ['src/rebate/rule.mjs'], notes: ['missing context after rebate repair'] },
+              verification: { status: 'failed', reason: 'missing context after rebate repair', nextAction: 'read rebate context' },
+              requiredEvidence: ['rebate owner context', 'rebate targeted verification'],
+              observedEvidence: [],
+              lastAction: { actionKind: 'repair', target: 'src/rebate/rule.mjs', changedFiles: ['src/rebate/rule.mjs'] },
+            })
+          }
+          if (runtimeAction.nextAction === 'repair') {
+            return output(role, {
+              content: 'second rebate repair written',
+              handoffTo: 'coder',
+              handoffReason: 'rerun rebate verification',
+              changedFiles: ['src/rebate/rule.mjs'],
+              repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/rebate/rule.mjs'], notes: ['second rebate strategy'] },
+              verification: { status: 'not-requested', reason: 'rebate targeted rerun queued' },
+              requiredEvidence: ['rebate owner context', 'rebate targeted verification'],
+              observedEvidence: ['rebate owner context'],
+              lastAction: { actionKind: 'repair', target: 'src/rebate/rule.mjs', changedFiles: ['src/rebate/rule.mjs'] },
+            })
+          }
+          return output(role, {
+            content: verifyAttempt < 2 ? 'generic rebate green did not cover target' : 'rebate targeted rerun passed',
+            changedFiles: ['src/rebate/rule.mjs'],
+            verifiedFiles: verifyAttempt < 2 ? ['package.json'] : ['src/rebate/rule.mjs', 'test/rebate.mjs'],
+            evidenceFiles: verifyAttempt < 2 ? ['package.json'] : ['src/rebate/rule.mjs', 'test/rebate.mjs'],
+            repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/rebate/rule.mjs'], notes: ['second rebate strategy'] },
+            verification: verifyAttempt < 2
+              ? { status: 'passed', command: 'node --version', reason: 'generic rebate green did not cover target', selectionScope: 'broader' }
+              : { status: 'passed', command: 'node test/rebate.mjs', reason: 'rebate targeted rerun passed' },
+            requiredEvidence: ['rebate owner context', 'rebate targeted verification'],
+            observedEvidence: verifyAttempt < 2 ? ['rebate owner context'] : ['rebate owner context', 'rebate targeted verification'],
+            lastAction: { actionKind: 'verify', target: verifyAttempt < 2 ? 'package.json' : 'test/rebate.mjs', verifiedFiles: verifyAttempt < 2 ? ['package.json'] : ['src/rebate/rule.mjs'] },
+          })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          const item = batch.items[0]
+          if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+          if (item.actionKind === 'read') {
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'read',
+                coveredFiles: ['src/rebate/rule.mjs', 'test/rebate.mjs'],
+                affectedPaths: ['src/rebate/rule.mjs', 'test/rebate.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          if (item.actionKind === 'repair') {
+            repairAttempt += 1
+            await workspace.write({
+              'src/rebate/rule.mjs': repairAttempt === 1
+                ? 'export function rebateLabel(value) { return `rebate:${value.toLowerCase()}`; }\n'
+                : 'export function rebateLabel(value) { return `REBATE:${value.toUpperCase()}`; }\n',
+            })
+            const commandResult = await workspace.run('node', ['test/rebate.mjs'], 'node test/rebate.mjs')
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'repair',
+                coveredFiles: ['src/rebate/rule.mjs', 'test/rebate.mjs'],
+                affectedPaths: ['src/rebate/rule.mjs'],
+                exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+                failureClass: commandResult.exitCode === 0 ? 'none' : 'missing-context',
+                diagnosticSummary: safeCommandSummary(commandResult),
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          verifyAttempt += 1
+          const commandResult = verifyAttempt === 1
+            ? await workspace.run('node', ['--version'], 'node --version')
+            : await workspace.run('node', ['test/rebate.mjs'], 'node test/rebate.mjs')
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'verify',
+              coveredFiles: verifyAttempt === 1 ? ['package.json'] : ['src/rebate/rule.mjs', 'test/rebate.mjs'],
+              affectedPaths: verifyAttempt === 1 ? ['package.json'] : ['src/rebate/rule.mjs', 'test/rebate.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_rebate_lifecycle_workspace', 'repair rebate label after failed verification', {
+        maxTurns: 6,
+        runtimeSeed: seedWithHarness('sess_rebate_lifecycle_workspace', createQueryRuntimeHarnessState({
+          pendingRepair: [{
+            queueId: 'repair-rebate',
+            failureClass: 'missing-context',
+            failureSummary: safeCommandSummary(initial),
+            hypothesis: 'read rebate owner before repair',
+            contextNeed: 'src/rebate/rule.mjs',
+            targetFiles: ['src/rebate/rule.mjs'],
+          }],
+        }), {
+          initialPrompt: 'repair src/rebate/rule.mjs after failed test/rebate.mjs',
+          maxTurns: 6,
+        }),
+      })) {
+        if (event.type === 'runtime.save-point') {
+          trajectories.push(event.savePoint.trajectory.map((entry) => entry.phase))
+        }
+        if (event.type === 'query.completed') {
+          finalStatus = event.result.status
+        }
+      }
+
+      const finalTrajectory = trajectories.at(-1) ?? []
+      expect(finalStatus, `actions:${actions.join(',')};trajectory:${finalTrajectory.join(',')}`).toBe('completed')
+      expect(actions).toEqual(['read', 'repair', 'read', 'repair', 'verify', 'verify'])
+      expect(finalTrajectory).toEqual(expect.arrayContaining([
+        'tool:planned',
+        'tool:started',
+        'repair:attempt',
+        'tool:failed',
+        'repair:next-hypothesis',
+        'repair:context-needed',
+        'write:applied',
+        'write:verification-queued',
+        'verification:wrong-target-ignored',
+        'verification:settled',
+        'write:verification-settled',
+      ]))
+      expect(repairAttempt).toBe(2)
+      expect(verifyAttempt).toBe(2)
       expect(initial.exitCode).not.toBe(0)
     } finally {
       await workspace.dispose()

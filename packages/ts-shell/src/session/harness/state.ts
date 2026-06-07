@@ -7,6 +7,7 @@ import {
   type QueryRuntimePendingVerification,
   type QueryRuntimePendingWrite,
   type QueryRuntimeSavePoint,
+  type QueryRuntimeTrajectoryEntry,
   type QueryRuntimeTurnSnapshot,
 } from "../../core/query/runtime/harness.js";
 
@@ -20,6 +21,7 @@ export interface SessionHarnessState {
   readonly pendingVerification: readonly QueryRuntimePendingVerification[];
   readonly pendingRepair: readonly QueryRuntimePendingRepair[];
   readonly pendingArtifact: readonly QueryRuntimePendingArtifact[];
+  readonly trajectory: readonly QueryRuntimeTrajectoryEntry[];
 }
 
 export type SessionHarnessDecodeResult =
@@ -46,6 +48,7 @@ export function encodeSessionHarnessState(
     pendingVerification: harness.pendingVerification,
     pendingRepair: harness.pendingRepair,
     pendingArtifact: harness.pendingArtifact,
+    trajectory: harness.trajectory,
   };
 }
 
@@ -72,6 +75,7 @@ export function decodeSessionHarnessState(value: unknown): SessionHarnessDecodeR
       pendingVerification: state.pendingVerification,
       pendingRepair: state.pendingRepair,
       pendingArtifact: state.pendingArtifact ?? [],
+      trajectory: state.trajectory ?? [],
     }),
   };
 }
@@ -106,6 +110,9 @@ function validateSessionHarnessState(
   validateArray(state.pendingRepair, "pending repair", reasons);
   if (state.pendingArtifact !== undefined) {
     validateArray(state.pendingArtifact, "pending artifact", reasons);
+  }
+  if (state.trajectory !== undefined) {
+    validateArray(state.trajectory, "trajectory", reasons);
   }
 
   const ledger = state.ledger ?? [];
@@ -153,6 +160,16 @@ function validateSessionHarnessState(
   for (const pending of state.pendingArtifact ?? []) {
     if (pending.claims.length === 0) {
       reasons.push("pending artifact claim missing");
+      break;
+    }
+  }
+  for (const [index, entry] of (state.trajectory ?? []).entries()) {
+    if (entry.sequence !== index + 1) {
+      reasons.push("trajectory sequence is not ordered");
+      break;
+    }
+    if (entry.targetFiles.length === 0 && entry.phase !== "tool:settled") {
+      reasons.push("trajectory target missing");
       break;
     }
   }

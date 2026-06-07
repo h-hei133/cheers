@@ -69,6 +69,70 @@ describe("session harness state", () => {
     });
   });
 
+  it("serializes and restores append-only verification trajectory entries", () => {
+    const harness = settleHarnessBatch({
+      harness: createQueryRuntimeHarnessState({
+        pendingVerification: [
+          {
+            queueId: "verify-ledger-total",
+            targetFiles: ["src/ledger-total.ts"],
+            command: "npm test ledger-total",
+          },
+        ],
+      }),
+      batch: {
+        batchId: "batch-ledger-total",
+        turn: 3,
+        role: "reviewer",
+        actionKind: "verify",
+        items: [
+          {
+            order: 1,
+            toolId: "verify-ledger-total",
+            actionKind: "verify",
+            targetPaths: ["src/ledger-total.ts"],
+            coveredFiles: ["src/ledger-total.ts"],
+            terminalSuccessClaim: false,
+          },
+        ],
+        terminalSuccessClaim: false,
+      },
+      result: {
+        batchId: "batch-ledger-total",
+        terminalSuccessClaim: false,
+        results: [
+          {
+            toolId: "verify-ledger-total",
+            actionKind: "verify",
+            coveredFiles: ["src/ledger-total.ts"],
+            affectedPaths: ["src/ledger-total.ts"],
+            exitStatusClass: "failure",
+            failureClass: "command-failed",
+            diagnosticSummary: "ledger total mismatch",
+            truncated: false,
+            redactionStatus: "redacted",
+            terminalSuccessClaim: false,
+          },
+        ],
+      },
+    });
+
+    const decoded = decodeSessionHarnessState(encodeSessionHarnessState(harness));
+
+    expect(decoded.status).toBe("accepted");
+    if (decoded.status !== "accepted") return;
+    expect((decoded.harness as any).trajectory.map((entry: { phase: string }) => entry.phase)).toEqual([
+      "tool:planned",
+      "tool:started",
+      "verification:targeted",
+      "verification:started",
+      "tool:failed",
+      "verification:failed",
+      "repair:classified",
+      "repair:hypothesis",
+    ]);
+  });
+
   it("rejects contradictory compact harness state before it can affect runtime", () => {
     const harness = encodeSessionHarnessState(createQueryRuntimeHarnessState({
       ledger: [
