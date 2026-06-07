@@ -97,6 +97,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/durable-session-harness-recovery.md` | active | Checking SP062 durable session harness recovery, session/compact/replay harness state restore, imperfect action correction, diagnostics, and requirement coverage. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/provider-shaped-harness-trial.md` | active | Checking SP063 provider-shaped imperfect action recovery through QueryEngine, execution seam, durable harness queues, repair strategy, targeted verification, artifact proof, and result verdict. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/multi-hypothesis-debug-loop.md` | active | Checking SP066 disposable workspace debug tasks, hypothesis chains, source facts, repair plans, targeted reruns, replay restore, and stopped_not_proven coverage. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/debug-loop-truth-audit.md` | active | Checking SP067 audit verdict, claim-by-claim evidence, fixes, remaining risk, and next-gauntlet readiness for the debug loop. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 

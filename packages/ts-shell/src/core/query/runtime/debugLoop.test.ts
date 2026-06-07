@@ -23,6 +23,7 @@ describe('query runtime debug loop', () => {
     const actions: string[] = []
     const repairPlans: string[] = []
     const summaries: string[] = []
+    const sourceReads: string[] = []
     let repairWrites = 0
 
     try {
@@ -55,6 +56,8 @@ describe('query runtime debug loop', () => {
           }
 
           if (item.actionKind === 'read') {
+            const source = await workspace.read('src/rate.mjs')
+            sourceReads.push(source)
             return batchResult(batch.batchId, {
               toolId: item.toolId,
               actionKind: 'read',
@@ -68,7 +71,7 @@ describe('query runtime debug loop', () => {
               sourceFacts: [{
                 factId: 'source:rate',
                 path: 'src/rate.mjs',
-                summary: 'rate currently equals 2',
+                summary: source.includes('rate = 2') ? 'rate currently equals 2' : 'rate source read',
                 confidence: 'high',
               }],
               terminalSuccessClaim: false,
@@ -111,8 +114,10 @@ describe('query runtime debug loop', () => {
       }
 
       expect(summaries[0]).toContain('rate mismatch expected 4 received 2')
+      expect(sourceReads[0]).toContain('export const rate = 2')
       expect(actions).toEqual(expect.arrayContaining(['verify', 'read', 'repair']))
       expect(repairWrites).toBe(2)
+      expect(repairPlans[0]).toContain('correct source value using recorded facts')
       expect(repairPlans[0]).toContain('source:rate')
       expect(new Set(repairPlans.map((plan) => plan.split('|')[0])).size).toBeGreaterThan(1)
       expect(events.some((entry) => entry.startsWith('context:source-fact-recorded'))).toBe(true)
@@ -170,6 +175,7 @@ describe('query runtime debug loop', () => {
     })
     const actions: string[] = []
     const repairPlans: string[] = []
+    const sourceReads: string[] = []
     let repairWrites = 0
 
     try {
@@ -227,6 +233,9 @@ describe('query runtime debug loop', () => {
             })
           }
           if (item.actionKind === 'read') {
+            const messageSource = await workspace.read('src/message.mjs')
+            const formatSource = await workspace.read('src/format.mjs')
+            sourceReads.push(messageSource, formatSource)
             return batchResult(batch.batchId, {
               toolId: item.toolId,
               actionKind: 'read',
@@ -238,8 +247,8 @@ describe('query runtime debug loop', () => {
               redactionStatus: 'redacted',
               truncated: false,
               sourceFacts: [
-                { factId: 'source:message', path: 'src/message.mjs', summary: 'message delegates to format', confidence: 'high' },
-                { factId: 'source:format', path: 'src/format.mjs', summary: 'format uppercases input', confidence: 'high' },
+                { factId: 'source:message', path: 'src/message.mjs', summary: messageSource.includes('format("hello")') ? 'message delegates to format' : 'message source read', confidence: 'high' },
+                { factId: 'source:format', path: 'src/format.mjs', summary: formatSource.includes('toUpperCase') ? 'format uppercases input' : 'format source read', confidence: 'high' },
               ],
               terminalSuccessClaim: false,
             })
@@ -278,6 +287,7 @@ describe('query runtime debug loop', () => {
 
       expect(actions.filter((action) => action === 'verify').length).toBeGreaterThanOrEqual(3)
       expect(repairWrites).toBe(2)
+      expect(sourceReads.join('\n')).toContain('toUpperCase')
       expect(repairPlans[0]).toContain('source:message')
       expect(repairPlans[0]).toContain('source:format')
       expect(new Set(repairPlans.map((plan) => plan.split('|')[0])).size).toBeGreaterThan(1)
@@ -296,7 +306,9 @@ describe('query runtime debug loop', () => {
       ].join('\n'),
     })
     const actions: string[] = []
+    const proofGaps: string[] = []
     let repairWrites = 0
+    let finalStatus = ''
 
     try {
       const engine = new QueryEngine({
@@ -450,6 +462,75 @@ describe('query runtime debug loop', () => {
       expect(actions).toEqual(['repair', 'verify'])
       expect(repairWrites).toBe(1)
       expect(result.status).toBe('completed')
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('blocks restored repeat repair when referenced source facts are missing', async () => {
+    const workspace = await createWorkspace({
+      'src/repeat.mjs': 'export const repeatValue = 1;\n',
+      'test/repeat.mjs': [
+        'import { repeatValue } from "../src/repeat.mjs";',
+        'if (repeatValue !== 2) throw new Error(`repeat expected 2 received ${repeatValue}`);',
+        '',
+      ].join('\n'),
+    })
+    const actions: string[] = []
+    const proofGaps: string[] = []
+    let repairWrites = 0
+    let finalStatus = ''
+
+    try {
+      const engine = new QueryEngine({
+        runAgent: runtimeOutput({
+          verifyTarget: 'src/repeat.mjs',
+          evidence: 'repeat targeted rerun',
+        }),
+        executeRuntimeBatch: async ({ batch }) => {
+          const item = batch.items[0]
+          if (!item) return emptyBatch(batch.batchId)
+          actions.push(item.actionKind)
+          if (item.actionKind === 'repair') {
+            repairWrites += 1
+          }
+          return emptyBatch(batch.batchId)
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_debug_repeat_blocked', 'continue repeat repair without source facts', {
+        maxTurns: 3,
+        runtimeSeed: seedWithHarness('sess_debug_repeat_blocked', createQueryRuntimeHarnessState({
+          pendingRepair: [{
+            queueId: 'repair-repeat',
+            failureClass: 'command-failed',
+            failureSummary: 'repeat expected 2 received 1',
+            hypothesis: 'correct source value using recorded facts',
+            targetFiles: ['src/repeat.mjs'],
+            sourceFactIds: ['source:repeat'],
+            hypothesisState: {
+              hypothesisId: 'hypothesis:repeat:1',
+              summary: 'correct source value using recorded facts',
+              confidence: 'medium',
+              targetFiles: ['src/repeat.mjs'],
+              sourceFactIds: ['source:repeat'],
+            },
+          }],
+          sourceFacts: [],
+        })),
+      })) {
+        if (event.type === 'runtime.next-action') {
+          proofGaps.push(...event.decision.proofGap)
+        }
+        if (event.type === 'query.completed') {
+          finalStatus = event.result.status
+        }
+      }
+
+      expect(actions).not.toContain('repair')
+      expect(repairWrites).toBe(0)
+      expect(finalStatus).toBe('stopped_not_proven')
+      expect(proofGaps).toContain('repair source facts missing')
     } finally {
       await workspace.dispose()
     }
@@ -610,6 +691,7 @@ interface Workspace {
   readonly root: string
   readonly execution: ExecutionService
   readonly run: (command: string, args: readonly string[], reportSafeCommand: string) => Promise<{ readonly exitCode: number | null; readonly stdout: string; readonly stderr: string }>
+  readonly read: (relativePath: string) => Promise<string>
   readonly write: (files: Record<string, string>) => Promise<void>
   readonly dispose: () => Promise<void>
 }
@@ -632,6 +714,17 @@ async function createWorkspace(files: Record<string, string>): Promise<Workspace
         reason: 'targeted disposable workspace verification',
         reportSafeCommand,
         timeoutMs: 5000,
+      })
+    },
+    read(relativePath) {
+      return execution.readTextFile({
+        operationKind: 'file.read',
+        workspaceRoot: root,
+        absolutePath: join(root, relativePath),
+        authority: { mode: 'read-only', source: 'workspace-authority', reason: 'debug diagnostic source read' },
+        caller: 'query-runtime-debug-test',
+        reason: 'read disposable workspace source',
+        reportSafeTarget: relativePath,
       })
     },
     async write(nextFiles) {

@@ -182,12 +182,15 @@ function decisionFromStrategy(
     readonly artifactRequired: boolean;
   },
 ): QueryRuntimeActionDecision {
-  const nextAction = strategy.nextAction ?? "stop-not-proven";
-  const repairPlan = nextAction === "repair" ? repairPlanFor(input.harness) : undefined;
+  const selectedAction = strategy.nextAction ?? "stop-not-proven";
+  const repairPlan = selectedAction === "repair" ? repairPlanFor(input.harness) : undefined;
+  const nextAction = repairPlan?.blockedRepeat ? "stop-not-proven" : selectedAction;
   return Object.freeze({
     nextAction,
     actions: strategy.actions,
-    proofGap: strategy.proofGap ?? [],
+    proofGap: repairPlan?.blockedRepeat
+      ? uniqueStrings([...(strategy.proofGap ?? []), "repair source facts missing"])
+      : strategy.proofGap ?? [],
     changedFiles: input.changedFiles,
     selectedPaths: input.selectedPaths,
     ownerPaths: input.ownerPaths,
@@ -200,7 +203,7 @@ function decisionFromStrategy(
     requestState: input.requestState,
     toolStrategyState: input.toolStrategyState,
     pendingAction: input.pendingAction,
-    ...(repairPlan ? { repairPlan } : {}),
+    ...(repairPlan && !repairPlan.blockedRepeat ? { repairPlan } : {}),
     artifactRequired: input.artifactRequired,
     reason: reasonFor(nextAction, strategy.proofGap ?? []),
     terminalSuccessClaim: false as const,
