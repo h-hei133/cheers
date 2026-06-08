@@ -102,6 +102,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/transcript-driven-provider-recovery.md` | active | Checking SP069 primary disposable workspace transcript trajectories, text-claim mistake reduction, artifact proof restore completion, stopped_not_proven honesty, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/live-like-transcript-acceptance-decision.md` | active | Checking SP070 primary live-like transcript trials, compact artifact proof completion, honest stopped_not_proven, no-change decision, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/real-repository-development-pilot.md` | active | Checking SP071 repository-shaped disposable workspace tasks, failed repair second hypothesis, source receipt proof, compact restore, honest stopped_not_proven, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/real-repository-capability-jump.md` | active | Checking SP072 independent repository-subdirectory tasks, structured durable reduction, second-hypothesis repair, source receipt proof, stopped_not_proven honesty, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 

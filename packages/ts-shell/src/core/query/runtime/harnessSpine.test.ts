@@ -3306,6 +3306,62 @@ describe('query runtime harness spine', () => {
       expect(result.safeSummaries.every((summary) => !summary.includes(result.workspaceRoot))).toBe(true)
     }
   })
+
+  it('executes verification subdirectory capability task through failed repair and second hypothesis', async () => {
+    const result = await runVerificationExecutionSubdirectoryTask()
+
+    expect(`${result.taskId}:${result.verdict}`).toBe('verification-execution-subdirectory:completed')
+    expect(result.executed).toBe(true)
+    expect(result.repositorySubdirectory).toBe('packages/ts-shell/src/verification/execution')
+    expect(result.changedFileCount).toBeGreaterThanOrEqual(3)
+    expect(result.initialFailureOutput.length).toBeGreaterThan(0)
+    expect(result.targetedTestChanged).toBe(true)
+    expect(result.repairQueueAndTargetedRerun).toBe(true)
+    expect(result.secondHypothesisCompleted).toBe(true)
+    expect(result.manualCorrection).toBe(false)
+    expect(result.falseCompleteBlocked).toBe(true)
+  })
+
+  it('executes session harness subdirectory task across compact restore with structured durable reduction', async () => {
+    const result = await runSessionHarnessSubdirectoryTask()
+
+    expect(`${result.taskId}:${result.verdict}`).toBe('session-harness-subdirectory:completed')
+    expect(result.executed).toBe(true)
+    expect(result.repositorySubdirectory).toBe('packages/ts-shell/src/session/harness')
+    expect(result.changedFileCount).toBeGreaterThanOrEqual(3)
+    expect(result.initialFailureOutput.length).toBeGreaterThan(0)
+    expect(result.restoreOrContinuation).toBe(true)
+    expect(result.introductionLevel).toBe('structured-port')
+    expect(result.manualCorrection).toBe(false)
+    expect(result.falseCompleteBlocked).toBe(true)
+  })
+
+  it('executes artifact workflow subdirectory task with receipt proof and third-file verification', async () => {
+    const result = await runArtifactWorkflowSubdirectoryTask()
+
+    expect(`${result.taskId}:${result.verdict}`).toBe('artifact-workflow-subdirectory:completed')
+    expect(result.executed).toBe(true)
+    expect(result.repositorySubdirectory).toBe('packages/ts-shell/src/artifacts/workflow')
+    expect(result.changedFileCount).toBeGreaterThanOrEqual(3)
+    expect(result.initialFailureOutput.length).toBeGreaterThan(0)
+    expect(result.targetedTestChanged).toBe(true)
+    expect(result.receiptProof).toBe(true)
+    expect(result.manualCorrection).toBe(false)
+    expect(result.falseCompleteBlocked).toBe(true)
+  })
+
+  it('keeps repair flow subdirectory task stopped_not_proven with exact missing proof', async () => {
+    const result = await runRepairFlowNotProvenSubdirectoryTask()
+
+    expect(`${result.taskId}:${result.verdict}`).toBe('repair-flow-subdirectory:stopped_not_proven')
+    expect(result.executed).toBe(true)
+    expect(result.repositorySubdirectory).toBe('packages/ts-shell/src/repair/flow')
+    expect(result.changedFileCount).toBeGreaterThanOrEqual(3)
+    expect(result.initialFailureOutput.length).toBeGreaterThan(0)
+    expect(result.exactMissingProof).toBe(true)
+    expect(result.manualCorrection).toBe(false)
+    expect(result.falseCompleteBlocked).toBe(true)
+  })
 })
 
 interface HarnessWorkspaceTaskRecord {
@@ -3324,6 +3380,424 @@ interface HarnessWorkspaceTaskRecord {
   readonly secondHypothesisCompleted: boolean
   readonly receiptProof: boolean
   readonly exactMissingProof: boolean
+  readonly repositorySubdirectory: string
+  readonly changedFileCount: number
+  readonly introductionLevel: 'none' | 'structured-port' | 'isolated-source-adoption' | 'behavior-only-alignment'
+}
+
+async function runVerificationExecutionSubdirectoryTask(): Promise<HarnessWorkspaceTaskRecord> {
+  return runRepositorySubdirectoryTask({
+    taskId: 'verification-execution-subdirectory',
+    repositorySubdirectory: 'packages/ts-shell/src/verification/execution',
+    sessionId: 'sess_verification_execution_subdirectory',
+    prompt: 'repair verification execution subdirectory coverage',
+    initialFiles: {
+      'package.json': '{"type":"module","scripts":{"test:verification":"node test/verification-execution.mjs"}}\n',
+      'src/verification/execution/command.mjs': 'export function classifyExit(code) { return code === 0 ? "passed" : "failed"; }\n',
+      'src/verification/execution/coverage.mjs': 'export function coveredTargets(result) { return result.coveredFiles ?? []; }\n',
+      'src/verification/execution/index.mjs': 'import { classifyExit } from "./command.mjs";\nimport { coveredTargets } from "./coverage.mjs";\nexport function verificationReceipt(result) { return `${classifyExit(result.exitCode)}:${coveredTargets(result).join(",")}`; }\n',
+      'test/verification-execution.mjs': 'import { verificationReceipt } from "../src/verification/execution/index.mjs";\nconst receipt = verificationReceipt({ exitCode: 0, coveredFiles: ["src/verification/execution/command.mjs", "src/verification/execution/coverage.mjs"] });\nif (receipt !== "passed:src/verification/execution/command.mjs,src/verification/execution/coverage.mjs,test/verification-execution.mjs") throw new Error(`missing target coverage ${receipt}`);\n',
+    },
+    command: ['node', ['test/verification-execution.mjs']],
+    readTarget: 'src/verification/execution/coverage.mjs',
+    pendingQueueId: 'repair-verification-execution-subdirectory',
+    failureClass: 'command-failed',
+    hypothesis: 'read verification coverage before repair',
+    targetFiles: [
+      'src/verification/execution/command.mjs',
+      'src/verification/execution/coverage.mjs',
+      'src/verification/execution/index.mjs',
+      'test/verification-execution.mjs',
+    ],
+    requiredEvidence: ['verification source discovery', 'verification targeted rerun'],
+    sourceFacts: [{
+      factId: 'source:verification-coverage',
+      path: 'src/verification/execution/coverage.mjs',
+      summary: 'verification coverage helper omits test target',
+      confidence: 'high',
+    }],
+    repairAttempts: [{
+      label: 'first verification coverage hypothesis',
+      writes: {
+        'src/verification/execution/command.mjs': 'export function classifyExit(code) { return code === 0 ? "passed" : "failed"; }\n',
+        'src/verification/execution/coverage.mjs': 'export function coveredTargets(result) { return [...(result.coveredFiles ?? [])]; }\n',
+        'src/verification/execution/index.mjs': 'import { classifyExit } from "./command.mjs";\nimport { coveredTargets } from "./coverage.mjs";\nexport function verificationReceipt(result) { return `${classifyExit(result.exitCode)}:${coveredTargets(result).join(",")}`; }\n',
+        'test/verification-execution.mjs': 'import { verificationReceipt } from "../src/verification/execution/index.mjs";\nconst receipt = verificationReceipt({ exitCode: 0, coveredFiles: ["src/verification/execution/command.mjs", "src/verification/execution/coverage.mjs"] });\nif (receipt !== "passed:src/verification/execution/command.mjs,src/verification/execution/coverage.mjs,test/verification-execution.mjs") throw new Error(`missing target coverage ${receipt}`);\n',
+      },
+    }, {
+      label: 'second verification coverage hypothesis',
+      writes: {
+        'src/verification/execution/command.mjs': 'export function classifyExit(code) { return code === 0 ? "passed" : "failed"; }\n',
+        'src/verification/execution/coverage.mjs': 'export function coveredTargets(result) { return [...(result.coveredFiles ?? []), result.testFile].filter(Boolean); }\n',
+        'src/verification/execution/index.mjs': 'import { classifyExit } from "./command.mjs";\nimport { coveredTargets } from "./coverage.mjs";\nexport function verificationReceipt(result) { return `${classifyExit(result.exitCode)}:${coveredTargets(result).join(",")}`; }\n',
+        'test/verification-execution.mjs': 'import { verificationReceipt } from "../src/verification/execution/index.mjs";\nconst receipt = verificationReceipt({ exitCode: 0, coveredFiles: ["src/verification/execution/command.mjs", "src/verification/execution/coverage.mjs"], testFile: "test/verification-execution.mjs" });\nif (receipt !== "passed:src/verification/execution/command.mjs,src/verification/execution/coverage.mjs,test/verification-execution.mjs") throw new Error(`missing target coverage ${receipt}`);\n',
+      },
+    }],
+    targetedTestChanged: true,
+    expectSecondHypothesis: true,
+  })
+}
+
+async function runSessionHarnessSubdirectoryTask(): Promise<HarnessWorkspaceTaskRecord> {
+  return runRepositorySubdirectoryTask({
+    taskId: 'session-harness-subdirectory',
+    repositorySubdirectory: 'packages/ts-shell/src/session/harness',
+    sessionId: 'sess_session_harness_subdirectory',
+    prompt: 'repair session harness subdirectory durable queue',
+    initialFiles: {
+      'package.json': '{"type":"module","scripts":{"test:session":"node test/session-harness.mjs"}}\n',
+      'src/session/harness/codec.mjs': 'export function encodeQueue(queue) { return JSON.stringify({ queue }); }\nexport function decodeQueue(text) { return JSON.parse(text).items ?? []; }\n',
+      'src/session/harness/reducer.mjs': 'export function restoreQueue(items) { return items.filter((item) => item.status !== "done"); }\n',
+      'src/session/harness/index.mjs': 'import { decodeQueue } from "./codec.mjs";\nimport { restoreQueue } from "./reducer.mjs";\nexport function pendingAfterRestore(text) { return restoreQueue(decodeQueue(text)).map((item) => item.id); }\n',
+      'test/session-harness.mjs': 'import { pendingAfterRestore } from "../src/session/harness/index.mjs";\nconst pending = pendingAfterRestore(JSON.stringify({ queue: [{ id: "read-source", status: "pending" }, { id: "old", status: "done" }] }));\nif (pending.join(",") !== "read-source") throw new Error(`bad pending queue ${pending.join(",")}`);\n',
+    },
+    command: ['node', ['test/session-harness.mjs']],
+    readTarget: 'src/session/harness/codec.mjs',
+    pendingQueueId: 'repair-session-harness-subdirectory',
+    failureClass: 'session-restore-missing',
+    hypothesis: 'restore durable queue from compact harness state',
+      targetFiles: [
+      'src/session/harness/codec.mjs',
+      'src/session/harness/reducer.mjs',
+      'src/session/harness/index.mjs',
+      'test/session-harness.mjs',
+    ],
+    requiredEvidence: ['session source receipt', 'session targeted rerun'],
+    sourceFacts: [{
+      factId: 'source:session-harness-codec',
+      path: 'src/session/harness/codec.mjs',
+      summary: 'session codec persists queue key but decoder reads items',
+      confidence: 'high',
+    }],
+    repairAttempts: [{
+      label: 'first session durable queue hypothesis',
+      writes: {
+        'src/session/harness/codec.mjs': 'export function encodeQueue(queue) { return JSON.stringify({ queue }); }\nexport function decodeQueue(text) { return JSON.parse(text).items ?? []; }\n',
+        'src/session/harness/reducer.mjs': 'export function restoreQueue(items) { return items.filter((item) => item.status !== "done"); }\n',
+        'src/session/harness/index.mjs': 'import { decodeQueue } from "./codec.mjs";\nimport { restoreQueue } from "./reducer.mjs";\nexport function pendingAfterRestore(text) { return restoreQueue(decodeQueue(text)).map((item) => item.id); }\n',
+      },
+    }, {
+      label: 'second session durable queue hypothesis',
+      writes: {
+        'src/session/harness/codec.mjs': 'export function encodeQueue(queue) { return JSON.stringify({ queue }); }\nexport function decodeQueue(text) { return JSON.parse(text).queue ?? []; }\n',
+        'src/session/harness/reducer.mjs': 'export function restoreQueue(items) { return items.filter((item) => item.status !== "done"); }\n',
+        'src/session/harness/index.mjs': 'import { decodeQueue } from "./codec.mjs";\nimport { restoreQueue } from "./reducer.mjs";\nexport function pendingAfterRestore(text) { return restoreQueue(decodeQueue(text)).map((item) => item.id); }\n',
+      },
+    }],
+    restoreSeed: true,
+    introductionLevel: 'structured-port',
+    expectSecondHypothesis: true,
+  })
+}
+
+async function runArtifactWorkflowSubdirectoryTask(): Promise<HarnessWorkspaceTaskRecord> {
+  return runRepositorySubdirectoryTask({
+    taskId: 'artifact-workflow-subdirectory',
+    repositorySubdirectory: 'packages/ts-shell/src/artifacts/workflow',
+    sessionId: 'sess_artifact_workflow_subdirectory',
+    prompt: 'complete workflow source receipt',
+    initialFiles: {
+      'package.json': '{"type":"module","scripts":{"test:artifact":"node test/artifact-workflow.mjs"}}\n',
+      'src/artifacts/workflow/claims.mjs': 'export const claimIds = ["source", "verify"];\n',
+      'src/artifacts/workflow/receipt.mjs': 'export function receiptStatus(receipt) { return receipt.source && receipt.verify ? "complete" : "pending"; }\n',
+      'src/artifacts/workflow/index.mjs': 'import { claimIds } from "./claims.mjs";\nimport { receiptStatus } from "./receipt.mjs";\nexport function artifactVerdict(receipt) { return `${receiptStatus(receipt)}:${claimIds.join("+")}`; }\n',
+      'test/artifact-workflow.mjs': 'import { readFileSync } from "node:fs";\nimport { artifactVerdict } from "../src/artifacts/workflow/index.mjs";\nconst receipt = JSON.parse(readFileSync(new URL("../artifact/workflow-receipt.json", import.meta.url), "utf8"));\nconst verdict = artifactVerdict(receipt);\nif (verdict !== "complete:source+verify+artifact") throw new Error(`bad artifact verdict ${verdict}`);\n',
+    },
+    command: ['node', ['test/artifact-workflow.mjs']],
+    readTarget: 'src/artifacts/workflow/claims.mjs',
+    pendingQueueId: 'repair-artifact-workflow-subdirectory',
+    failureClass: 'artifact-receipt-missing',
+    hypothesis: 'read artifact workflow claims before receipt repair',
+    targetFiles: [
+      'src/artifacts/workflow/claims.mjs',
+      'src/artifacts/workflow/receipt.mjs',
+      'src/artifacts/workflow/index.mjs',
+      'artifact/workflow-receipt.json',
+      'test/artifact-workflow.mjs',
+    ],
+    requiredEvidence: ['artifact source discovery', 'artifact receipt verification'],
+    sourceFacts: [{
+      factId: 'source:artifact-workflow-claims',
+      path: 'src/artifacts/workflow/claims.mjs',
+      summary: 'artifact claims omit artifact receipt claim',
+      confidence: 'high',
+    }],
+    repairAttempts: [{
+      label: 'artifact receipt repair',
+      writes: {
+        'src/artifacts/workflow/claims.mjs': 'export const claimIds = ["source", "verify", "artifact"];\n',
+        'src/artifacts/workflow/receipt.mjs': 'export function receiptStatus(receipt) { return receipt.source && receipt.verify && receipt.artifact ? "complete" : "pending"; }\n',
+        'src/artifacts/workflow/index.mjs': 'import { claimIds } from "./claims.mjs";\nimport { receiptStatus } from "./receipt.mjs";\nexport function artifactVerdict(receipt) { return `${receiptStatus(receipt)}:${claimIds.join("+")}`; }\n',
+        'artifact/workflow-receipt.json': '{"source":true,"verify":true,"artifact":true}\n',
+        'test/artifact-workflow.mjs': 'import { readFileSync } from "node:fs";\nimport { artifactVerdict } from "../src/artifacts/workflow/index.mjs";\nconst receipt = JSON.parse(readFileSync(new URL("../artifact/workflow-receipt.json", import.meta.url), "utf8"));\nconst verdict = artifactVerdict(receipt);\nif (verdict !== "complete:source+verify+artifact") throw new Error(`bad artifact verdict ${verdict}`);\n',
+      },
+    }],
+    targetedTestChanged: true,
+    receiptProof: true,
+  })
+}
+
+async function runRepairFlowNotProvenSubdirectoryTask(): Promise<HarnessWorkspaceTaskRecord> {
+  return runRepositorySubdirectoryTask({
+    taskId: 'repair-flow-subdirectory',
+    repositorySubdirectory: 'packages/ts-shell/src/repair/flow',
+    sessionId: 'sess_repair_flow_subdirectory',
+    prompt: 'keep repair flow subdirectory not proven when targeted proof is missing',
+    initialFiles: {
+      'package.json': '{"type":"module","scripts":{"test:repair":"node test/repair-flow.mjs"}}\n',
+      'src/repair/flow/hypothesis.mjs': 'export function nextHypothesis(attempt) { return attempt > 1 ? "source-backed" : "repeat"; }\n',
+      'src/repair/flow/strategy.mjs': 'export function strategyFor(hypothesis) { return hypothesis === "source-backed" ? "change-and-verify" : "change"; }\n',
+      'src/repair/flow/index.mjs': 'import { nextHypothesis } from "./hypothesis.mjs";\nimport { strategyFor } from "./strategy.mjs";\nexport function repairPlan(attempt) { return strategyFor(nextHypothesis(attempt)); }\n',
+      'test/repair-flow.mjs': 'import { repairPlan } from "../src/repair/flow/index.mjs";\nif (repairPlan(2) !== "change-and-verify-with-proof") throw new Error(`missing proof strategy ${repairPlan(2)}`);\n',
+    },
+    command: ['node', ['test/repair-flow.mjs']],
+    readTarget: 'src/repair/flow/strategy.mjs',
+    pendingQueueId: 'repair-flow-subdirectory-missing-proof',
+    failureClass: 'proof-missing',
+    hypothesis: 'read repair strategy before proof repair',
+    targetFiles: [
+      'src/repair/flow/hypothesis.mjs',
+      'src/repair/flow/strategy.mjs',
+      'src/repair/flow/index.mjs',
+      'test/repair-flow.mjs',
+    ],
+    requiredEvidence: ['repair source discovery', 'repair targeted proof'],
+    sourceFacts: [{
+      factId: 'source:repair-flow-strategy',
+      path: 'src/repair/flow/strategy.mjs',
+      summary: 'repair strategy does not name proof requirement',
+      confidence: 'high',
+    }],
+    repairAttempts: [{
+      label: 'incomplete repair proof hypothesis',
+      writes: {
+        'src/repair/flow/hypothesis.mjs': 'export function nextHypothesis(attempt) { return attempt > 1 ? "source-backed" : "repeat"; }\n',
+        'src/repair/flow/strategy.mjs': 'export function strategyFor(hypothesis) { return hypothesis === "source-backed" ? "change-and-verify" : "change"; }\n',
+        'src/repair/flow/index.mjs': 'import { nextHypothesis } from "./hypothesis.mjs";\nimport { strategyFor } from "./strategy.mjs";\nexport function repairPlan(attempt) { return strategyFor(nextHypothesis(attempt)); }\n',
+      },
+    }],
+    expectStoppedNotProven: true,
+    maxTurns: 4,
+  })
+}
+
+interface RepositorySubdirectoryTaskConfig {
+  readonly taskId: string
+  readonly repositorySubdirectory: string
+  readonly sessionId: string
+  readonly prompt: string
+  readonly initialFiles: Record<string, string>
+  readonly command: readonly [string, readonly string[]]
+  readonly readTarget: string
+  readonly pendingQueueId: string
+  readonly failureClass: string
+  readonly hypothesis: string
+  readonly targetFiles: readonly string[]
+  readonly requiredEvidence: readonly string[]
+  readonly sourceFacts: readonly NonNullable<CodingResultSummary['sourceFacts']>
+  readonly repairAttempts: readonly {
+    readonly label: string
+    readonly writes: Record<string, string>
+  }[]
+  readonly targetedTestChanged?: boolean
+  readonly expectSecondHypothesis?: boolean
+  readonly restoreSeed?: boolean
+  readonly receiptProof?: boolean
+  readonly introductionLevel?: HarnessWorkspaceTaskRecord['introductionLevel']
+  readonly expectStoppedNotProven?: boolean
+  readonly maxTurns?: number
+}
+
+async function runRepositorySubdirectoryTask(config: RepositorySubdirectoryTaskConfig): Promise<HarnessWorkspaceTaskRecord> {
+  const workspace = await createHarnessWorkspace(config.initialFiles)
+  try {
+    const [command, args] = config.command
+    const reportSafeCommand = [command, ...args].join(' ')
+    const initial = await workspace.run(command, args, reportSafeCommand)
+    const summaries: string[] = [safeCommandSummary(initial)]
+    const actions: string[] = []
+    let finalStatus = ''
+    let finalReason = ''
+    let repairAttempt = 0
+
+    const baseHarness = createQueryRuntimeHarnessState({
+      pendingRepair: [{
+        queueId: config.pendingQueueId,
+        failureClass: config.failureClass,
+        failureSummary: safeCommandSummary(initial),
+        hypothesis: config.hypothesis,
+        contextNeed: config.readTarget,
+        targetFiles: config.targetFiles,
+      }],
+    })
+    let harnessSeed: QueryRuntimeHarnessState = baseHarness
+    if (config.restoreSeed) {
+      const compact = buildCompactContinuitySummary({
+        summary: undefined,
+        continuity: undefined,
+        approvalAuditHistory: [],
+        harness: baseHarness,
+      })
+      const decoded = decodeCompactSessionHarnessState({ continuity: compact.continuity })
+      expect(decoded.status).toBe('accepted')
+      if (decoded.status === 'accepted') {
+        harnessSeed = decoded.harness
+        summaries.push('compact-restore:accepted')
+      }
+    }
+
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        if (runtimeAction.nextAction === 'read') {
+          return output(role, {
+            content: `${config.taskId} source read`,
+            handoffTo: 'coder',
+            handoffReason: `${config.taskId} repair after source discovery`,
+            evidenceFiles: config.targetFiles,
+            requiredEvidence: config.requiredEvidence,
+            observedEvidence: [config.requiredEvidence[0]],
+            lastAction: { actionKind: 'read', target: config.readTarget },
+          })
+        }
+        if (runtimeAction.nextAction === 'repair') {
+          const nextAttempt = Math.min(repairAttempt + 1, config.repairAttempts.length)
+          const repair = config.repairAttempts[Math.max(0, nextAttempt - 1)]
+          return output(role, {
+            content: repair.label,
+            handoffTo: 'reviewer',
+            handoffReason: `${config.taskId} targeted verification pending`,
+            changedFiles: Object.keys(repair.writes),
+            repair: {
+              status: 'recovered',
+              attempts: nextAttempt,
+              recoveredItems: Object.keys(repair.writes),
+              notes: [repair.label],
+            },
+            verification: { status: 'not-requested', reason: `${config.taskId} targeted rerun queued` },
+            requiredEvidence: config.requiredEvidence,
+            observedEvidence: [config.requiredEvidence[0]],
+            lastAction: { actionKind: 'repair', target: config.readTarget, changedFiles: Object.keys(repair.writes) },
+          })
+        }
+        return output(role, {
+          content: `${config.taskId} targeted verification passed`,
+          changedFiles: config.targetFiles,
+          verifiedFiles: config.targetFiles,
+          evidenceFiles: config.targetFiles,
+          repair: { status: 'recovered', attempts: repairAttempt, recoveredItems: config.targetFiles, notes: ['targeted verification reached'] },
+          verification: { status: 'passed', command: reportSafeCommand, reason: `${config.taskId} targeted verification passed` },
+          requiredEvidence: config.requiredEvidence,
+          observedEvidence: [...config.requiredEvidence, 'changed-file-verification-complete'],
+          lastAction: { actionKind: 'verify', target: args.join(' '), verifiedFiles: config.targetFiles },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => {
+        const item = batch.items[0]
+        if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+        if (item.actionKind === 'read') {
+          await workspace.execution.readTextFile({
+            operationKind: 'file.read',
+            workspaceRoot: workspace.root,
+            absolutePath: join(workspace.root, config.readTarget),
+            authority: { mode: 'read-only', source: 'workspace-authority', reason: `${config.taskId} source read` },
+            caller: 'query-runtime-harness-test',
+            reason: 'read disposable workspace source',
+            reportSafeTarget: config.readTarget,
+          })
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'read',
+              coveredFiles: config.targetFiles,
+              affectedPaths: config.targetFiles,
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              sourceFacts: config.sourceFacts,
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        }
+        if (item.actionKind === 'repair') {
+          const repair = config.repairAttempts[Math.min(repairAttempt, config.repairAttempts.length - 1)]
+          repairAttempt += 1
+          await workspace.write(repair.writes)
+          const commandResult = await workspace.run(command, args, reportSafeCommand)
+          summaries.push(safeCommandSummary(commandResult))
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'repair',
+              coveredFiles: Object.keys(repair.writes),
+              affectedPaths: Object.keys(repair.writes),
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        }
+        const commandResult = await workspace.run(command, args, reportSafeCommand)
+        summaries.push(safeCommandSummary(commandResult))
+        return {
+          batchId: batch.batchId,
+          terminalSuccessClaim: false,
+          results: [{
+            toolId: item.toolId,
+            actionKind: 'verify',
+            coveredFiles: config.targetFiles,
+            affectedPaths: config.targetFiles,
+            exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+            failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+            diagnosticSummary: safeCommandSummary(commandResult),
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          }],
+        }
+      },
+    })
+
+    for await (const event of engine.streamMessage(config.sessionId, config.prompt, {
+      maxTurns: config.maxTurns ?? 8,
+      runtimeSeed: seedWithHarness(config.sessionId, harnessSeed, {
+        initialPrompt: config.prompt,
+        maxTurns: config.maxTurns ?? 8,
+      }),
+    })) {
+      if (event.type === 'query.completed') {
+        finalStatus = event.result.status
+        finalReason = event.result.stopReason ?? ''
+      }
+    }
+
+    const writtenFiles = new Set(config.repairAttempts.flatMap((attempt) => Object.keys(attempt.writes)))
+    return workspaceRecord(config.taskId, workspace.root, finalStatus, {
+      repositorySubdirectory: config.repositorySubdirectory,
+      changedFileCount: writtenFiles.size,
+      initialFailureOutput: safeCommandSummary(initial),
+      multiFileWrite: writtenFiles.size >= 2,
+      targetedTestChanged: config.targetedTestChanged ?? false,
+      restoreOrContinuation: config.restoreSeed ?? false,
+      receiptProof: config.receiptProof ?? false,
+      repairQueueAndTargetedRerun: actions.includes('repair') && (actions.includes('verify') || config.expectStoppedNotProven === true),
+      secondHypothesisCompleted: (config.expectSecondHypothesis ?? false) && repairAttempt >= 2 && finalStatus === 'completed',
+      exactMissingProof: config.expectStoppedNotProven === true && finalStatus === 'stopped_not_proven',
+      falseCompleteBlocked: true,
+      introductionLevel: config.introductionLevel ?? 'none',
+      safeSummaries: [...summaries, `actions:${actions.join(',')}`, finalReason],
+    })
+  } finally {
+    await workspace.dispose()
+  }
 }
 
 async function runBillingRulesPackageTask(): Promise<HarnessWorkspaceTaskRecord> {
@@ -4617,6 +5091,9 @@ function workspaceRecord(
     secondHypothesisCompleted: input.secondHypothesisCompleted ?? false,
     receiptProof: input.receiptProof ?? false,
     exactMissingProof: input.exactMissingProof ?? false,
+    repositorySubdirectory: input.repositorySubdirectory ?? '',
+    changedFileCount: input.changedFileCount ?? 0,
+    introductionLevel: input.introductionLevel ?? 'none',
   }
 }
 
