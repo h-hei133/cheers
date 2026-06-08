@@ -7,15 +7,18 @@ describe('query runtime trajectory diagnostics', () => {
     const trajectory: QueryRuntimeTrajectoryEntry[] = [
       entry(1, 'tool:planned', ['src/limit/rule.mjs'], 'repair planned'),
       entry(2, 'tool:started', ['src/limit/rule.mjs'], 'repair started'),
-      entry(3, 'verification:failed', ['src/limit/rule.mjs'], 'exit:1 expected LIMIT:10 got limit:5'),
-      entry(4, 'context:source-fact-recorded', ['src/limit/rule.mjs'], 'source:limit'),
-      entry(5, 'repair:attempt', ['src/limit/rule.mjs'], 'bad repair'),
-      entry(6, 'repair:rerun', ['src/limit/rule.mjs'], 'exit:1 expected LIMIT:10 got limit:5'),
-      entry(7, 'repair:next-hypothesis', ['src/limit/rule.mjs'], 'uppercase numeric limit'),
-      entry(8, 'verification:wrong-target-ignored', ['package.json'], 'generic command passed'),
-      entry(9, 'artifact:pending', ['artifact/limit.json'], 'claim evidence missing'),
-      entry(10, 'artifact:completed', ['artifact/limit.json'], 'source and verification receipt'),
-      entry(11, 'verification:passed', ['src/limit/rule.mjs', 'test/limit.mjs'], 'targeted pass'),
+      entry(3, 'output:completion-claim-unproven', ['src/limit/rule.mjs'], 'completion claim lacks required proof'),
+      entry(4, 'output:verification-claim-unsettled', ['src/limit/rule.mjs'], 'verification claim did not settle target'),
+      entry(5, 'output:artifact-claim-incomplete', ['artifact/limit.json'], 'artifact claim lacks source or verification evidence'),
+      entry(6, 'verification:failed', ['src/limit/rule.mjs'], 'exit:1 expected LIMIT:10 got limit:5'),
+      entry(7, 'context:source-fact-recorded', ['src/limit/rule.mjs'], 'source:limit'),
+      entry(8, 'repair:attempt', ['src/limit/rule.mjs'], 'bad repair'),
+      entry(9, 'repair:rerun', ['src/limit/rule.mjs'], 'exit:1 expected LIMIT:10 got limit:5'),
+      entry(10, 'repair:next-hypothesis', ['src/limit/rule.mjs'], 'uppercase numeric limit'),
+      entry(11, 'verification:wrong-target-ignored', ['package.json'], 'generic command passed'),
+      entry(12, 'artifact:pending', ['artifact/limit.json'], 'claim evidence missing'),
+      entry(13, 'artifact:completed', ['artifact/limit.json'], 'source and verification receipt'),
+      entry(14, 'verification:passed', ['src/limit/rule.mjs', 'test/limit.mjs'], 'targeted pass'),
     ]
 
     const summary = summarizeQueryRuntimeTrajectory({
@@ -25,8 +28,12 @@ describe('query runtime trajectory diagnostics', () => {
       missingProof: ['artifact claim evidence missing'],
     })
 
-    expect(summary.phaseCount).toBe(11)
+    expect(summary.phaseCount).toBe(14)
     expect(summary.wrongOrIncompleteActions).toBeGreaterThanOrEqual(2)
+    expect(summary.textClaimMistakes).toBe(3)
+    expect(summary.falseCompletionClaimRejected).toBe(true)
+    expect(summary.genericVerificationClaimRejected).toBe(true)
+    expect(summary.incompleteArtifactClaimRejected).toBe(true)
     expect(summary.sourceDiscoveryBeforeRepair).toBe(true)
     expect(summary.badRepairFailedRerunNextHypothesis).toBe(true)
     expect(summary.genericGreenRejected).toBe(true)

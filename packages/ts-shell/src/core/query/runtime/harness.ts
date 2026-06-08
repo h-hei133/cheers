@@ -50,6 +50,9 @@ export type QueryRuntimeTrajectoryPhase =
   | 'tool:failed'
   | 'tool:retried'
   | 'tool:settled'
+  | 'output:completion-claim-unproven'
+  | 'output:verification-claim-unsettled'
+  | 'output:artifact-claim-incomplete'
   | 'write:intended'
   | 'write:applied'
   | 'write:changed-file-accounted'
@@ -732,6 +735,22 @@ export function settleHarnessOutput(input: {
     ...result.changeSet.changedFiles,
     ...(result.lastActionResultSeed?.changedFiles ?? []),
   ])
+  for (const claim of classifyOutputClaims({
+    content: input.output.content,
+    result,
+    pendingVerification: input.harness.pendingVerification,
+    pendingArtifact: input.harness.pendingArtifact,
+    changedFiles,
+  })) {
+    trajectory = appendTrajectory(trajectory, {
+      turn: input.harness.ledger.length + 1,
+      role: input.output.role,
+      phase: claim.phase,
+      actionKind: claim.actionKind,
+      targetFiles: claim.targetFiles,
+      detail: claim.detail,
+    })
+  }
 
   if (changedFiles.length > 0) {
     for (const write of input.harness.pendingWrite) {
@@ -1103,6 +1122,90 @@ function needsContext(failureClass: string, summary: string): boolean {
   const value = `${failureClass} ${summary}`.toLowerCase()
   return value.includes('missing context') ||
     (value.includes('missing') && value.includes('context'))
+}
+
+function classifyOutputClaims(input: {
+  readonly content: string
+  readonly result: CodingResultSummary
+  readonly pendingVerification: readonly QueryRuntimePendingVerification[]
+  readonly pendingArtifact: readonly QueryRuntimePendingArtifact[]
+  readonly changedFiles: readonly string[]
+}): readonly {
+  readonly phase: Extract<QueryRuntimeTrajectoryPhase, 'output:completion-claim-unproven' | 'output:verification-claim-unsettled' | 'output:artifact-claim-incomplete'>
+  readonly actionKind?: ToolActionKind
+  readonly targetFiles: readonly string[]
+  readonly detail: string
+}[] {
+  const text = input.content.toLowerCase()
+  const claimsCompletion = /\b(done|complete|completed|finished|fixed|all set|no more work)\b/.test(text)
+  const claimsVerification = /\b(tests? pass|verification (?:is )?green|everything is green|green now|quick check|verified)\b/.test(text)
+  const claimsArtifact = /\b(artifact|receipt|proof)\b/.test(text)
+  const pendingTargets = uniqueStrings(input.pendingVerification.flatMap((item) => item.targetFiles))
+  const expectedVerificationTargets = pendingTargets.length > 0
+    ? pendingTargets
+    : uniqueStrings([...input.changedFiles, ...input.result.changedFiles, ...input.result.changeSet.changedFiles])
+  const verifiedTargets = uniqueStrings(input.result.verifiedFiles)
+  const targetedVerificationSettled = input.result.verification.status === 'passed' &&
+    expectedVerificationTargets.length > 0 &&
+    coversTargets(expectedVerificationTargets, verifiedTargets) &&
+    input.result.verification.selectionScope !== 'broader'
+  const proofSatisfied = input.result.taskSatisfaction.verdict === 'satisfied' &&
+    input.result.verifiedFiles.length > 0 &&
+    input.result.taskSatisfaction.requiredEvidence.every((claim) =>
+      input.result.taskSatisfaction.observedEvidence.includes(claim)
+    )
+  const claims: {
+    phase: Extract<QueryRuntimeTrajectoryPhase, 'output:completion-claim-unproven' | 'output:verification-claim-unsettled' | 'output:artifact-claim-incomplete'>
+    actionKind?: ToolActionKind
+    targetFiles: readonly string[]
+    detail: string
+  }[] = []
+
+  if (claimsCompletion && !proofSatisfied) {
+    claims.push({
+      phase: 'output:completion-claim-unproven',
+      actionKind: toToolActionKind(input.result.lastActionResultSeed?.actionKind),
+      targetFiles: uniqueStrings([...expectedVerificationTargets, ...input.result.unverifiedFiles.map((file) => file.path)]),
+      detail: 'completion claim lacks required proof',
+    })
+  }
+
+  if (claimsVerification && !targetedVerificationSettled) {
+    claims.push({
+      phase: 'output:verification-claim-unsettled',
+      actionKind: 'verify',
+      targetFiles: expectedVerificationTargets.length > 0 ? expectedVerificationTargets : verifiedTargets,
+      detail: input.result.verification.reason ?? input.result.verification.command ?? 'verification claim did not settle target',
+    })
+  }
+
+  const artifactTargets = uniqueStrings(input.pendingArtifact.flatMap((item) => item.targetFiles))
+  if (claimsArtifact && input.pendingArtifact.length > 0 && input.result.taskSatisfaction.verdict !== 'satisfied') {
+    claims.push({
+      phase: 'output:artifact-claim-incomplete',
+      actionKind: 'artifact',
+      targetFiles: artifactTargets,
+      detail: 'artifact claim lacks source or verification evidence',
+    })
+  }
+
+  return Object.freeze(claims)
+}
+
+function toToolActionKind(value: string | undefined): ToolActionKind | undefined {
+  if (
+    value === 'read' ||
+    value === 'search' ||
+    value === 'edit' ||
+    value === 'repair' ||
+    value === 'verify' ||
+    value === 'artifact' ||
+    value === 'continue' ||
+    value === 'stop-not-proven'
+  ) {
+    return value
+  }
+  return undefined
 }
 
 function hasSourceFact(harness: QueryRuntimeHarnessState, path: string): boolean {

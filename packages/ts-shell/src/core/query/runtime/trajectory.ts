@@ -4,6 +4,10 @@ import type { QueryTerminal } from './transitions.js'
 export interface QueryRuntimeTrajectorySummary {
   readonly phaseCount: number
   readonly wrongOrIncompleteActions: number
+  readonly textClaimMistakes: number
+  readonly falseCompletionClaimRejected: boolean
+  readonly genericVerificationClaimRejected: boolean
+  readonly incompleteArtifactClaimRejected: boolean
   readonly sourceDiscoveryBeforeRepair: boolean
   readonly badRepairFailedRerunNextHypothesis: boolean
   readonly genericGreenRejected: boolean
@@ -25,9 +29,14 @@ export function summarizeQueryRuntimeTrajectory(input: {
   const firstSourceIndex = firstIndex(phases, (phase) => phase === 'context:source-fact-recorded')
   const pendingArtifactIndex = firstIndex(phases, (phase) => phase === 'artifact:pending')
   const completedArtifactIndex = firstIndex(phases, (phase) => phase === 'artifact:completed')
+  const textClaimMistakePhases = phases.filter((phase) => phase.startsWith('output:'))
   return Object.freeze({
     phaseCount: ordered.length,
     wrongOrIncompleteActions: countWrongOrIncompleteActions(phases),
+    textClaimMistakes: textClaimMistakePhases.length,
+    falseCompletionClaimRejected: phases.includes('output:completion-claim-unproven'),
+    genericVerificationClaimRejected: phases.includes('output:verification-claim-unsettled'),
+    incompleteArtifactClaimRejected: phases.includes('output:artifact-claim-incomplete'),
     sourceDiscoveryBeforeRepair: firstSourceIndex >= 0 && firstRepairIndex >= 0 && firstSourceIndex < firstRepairIndex,
     badRepairFailedRerunNextHypothesis: hasOrderedPhases(phases, [
       'repair:attempt',
@@ -48,6 +57,9 @@ export function summarizeQueryRuntimeTrajectory(input: {
 function countWrongOrIncompleteActions(phases: readonly QueryRuntimeTrajectoryEntry['phase'][]): number {
   return phases.filter((phase) =>
     phase === 'tool:failed' ||
+    phase === 'output:completion-claim-unproven' ||
+    phase === 'output:verification-claim-unsettled' ||
+    phase === 'output:artifact-claim-incomplete' ||
     phase === 'verification:failed' ||
     phase === 'verification:wrong-target-ignored' ||
     phase === 'repair:hypothesis-rejected' ||

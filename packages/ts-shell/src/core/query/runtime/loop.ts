@@ -316,7 +316,9 @@ async function executeTurn(
       const constrainedOutput = constrainRuntimeActionOutput(runtimeAction, output)
       state.harness = settleHarnessOutput({
         harness: state.harness,
-        output: constrainedOutput,
+        output: constrainedOutput === output
+          ? constrainedOutput
+          : { ...constrainedOutput, content: output.content },
       })
       state.harness = appendHarnessSavePoint(state.harness, {
         phase: 'after-output',

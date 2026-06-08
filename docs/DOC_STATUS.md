@@ -99,6 +99,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/multi-hypothesis-debug-loop.md` | active | Checking SP066 disposable workspace debug tasks, hypothesis chains, source facts, repair plans, targeted reruns, replay restore, and stopped_not_proven coverage. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/debug-loop-truth-audit.md` | active | Checking SP067 audit verdict, claim-by-claim evidence, fixes, remaining risk, and next-gauntlet readiness for the debug loop. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/provider-shaped-end-to-end-gauntlet.md` | active | Checking SP068 primary disposable workspace trajectories, source-backed repair hypotheses, artifact proof completion, stopped_not_proven honesty, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/transcript-driven-provider-recovery.md` | active | Checking SP069 primary disposable workspace transcript trajectories, text-claim mistake reduction, artifact proof restore completion, stopped_not_proven honesty, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 
