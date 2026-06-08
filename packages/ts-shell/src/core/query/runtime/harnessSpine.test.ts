@@ -3280,6 +3280,32 @@ describe('query runtime harness spine', () => {
       expect(result.safeSummaries.every((summary) => !summary.includes(result.workspaceRoot))).toBe(true)
     }
   })
+
+  it('executes repository package tasks with repair, receipt proof, restore, and honest not-proven result', async () => {
+    const results = await Promise.all([
+      runBillingRulesPackageTask(),
+      runReportReceiptPackageTask(),
+      runRouterNotProvenPackageTask(),
+    ])
+
+    expect(results.map((result) => `${result.taskId}:${result.verdict}`)).toEqual([
+      'billing-rules-package:completed',
+      'report-receipt-package:completed',
+      'router-guard-package:stopped_not_proven',
+    ])
+    expect(results.filter((result) => result.executed)).toHaveLength(3)
+    expect(results.filter((result) => result.multiFileWrite).length).toBeGreaterThanOrEqual(2)
+    expect(results.filter((result) => result.initialFailureOutput.length > 0).length).toBeGreaterThanOrEqual(2)
+    expect(results.some((result) => result.targetedTestChanged)).toBe(true)
+    expect(results.some((result) => result.secondHypothesisCompleted)).toBe(true)
+    expect(results.some((result) => result.receiptProof)).toBe(true)
+    expect(results.some((result) => result.restoreOrContinuation)).toBe(true)
+    expect(results.some((result) => result.exactMissingProof)).toBe(true)
+    expect(results.every((result) => result.manualCorrection === false)).toBe(true)
+    for (const result of results) {
+      expect(result.safeSummaries.every((summary) => !summary.includes(result.workspaceRoot))).toBe(true)
+    }
+  })
 })
 
 interface HarnessWorkspaceTaskRecord {
@@ -3294,6 +3320,512 @@ interface HarnessWorkspaceTaskRecord {
   readonly falseCompleteBlocked: boolean
   readonly safeSummaries: readonly string[]
   readonly manualCorrection: false
+  readonly targetedTestChanged: boolean
+  readonly secondHypothesisCompleted: boolean
+  readonly receiptProof: boolean
+  readonly exactMissingProof: boolean
+}
+
+async function runBillingRulesPackageTask(): Promise<HarnessWorkspaceTaskRecord> {
+  const workspace = await createHarnessWorkspace({
+    'package.json': '{"type":"module","scripts":{"test:billing":"node test/billing-rules.mjs"}}\n',
+    'src/billing/amounts.mjs': 'export function baseAmount(value) { return Number(value); }\n',
+    'src/billing/discounts.mjs': 'export function discountedAmount(value, tier) { return tier === "vip" ? value * 0.9 : value; }\n',
+    'src/billing/index.mjs': 'import { baseAmount } from "./amounts.mjs";\nimport { discountedAmount } from "./discounts.mjs";\nexport function invoiceAmount(value, tier) { return discountedAmount(baseAmount(value), tier); }\n',
+    'test/billing-rules.mjs': 'import { invoiceAmount } from "../src/billing/index.mjs";\nif (invoiceAmount(100, "vip") !== 80) throw new Error(`expected 80 got ${invoiceAmount(100, "vip")}`);\n',
+  })
+  try {
+    const initial = await workspace.run('node', ['test/billing-rules.mjs'], 'node test/billing-rules.mjs')
+    const actions: string[] = []
+    const summaries: string[] = [safeCommandSummary(initial)]
+    let repairAttempt = 0
+    let verifyAttempt = 0
+    let finalStatus = ''
+    let finalReason = ''
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        if (runtimeAction.nextAction === 'read') {
+          return output(role, {
+            content: 'billing package context read',
+            handoffTo: 'coder',
+            handoffReason: 'repair billing package after source discovery',
+            evidenceFiles: ['src/billing/amounts.mjs', 'src/billing/discounts.mjs', 'src/billing/index.mjs', 'test/billing-rules.mjs'],
+            requiredEvidence: ['billing source discovery', 'billing targeted verification'],
+            observedEvidence: ['billing source discovery'],
+            lastAction: { actionKind: 'read', target: 'src/billing/discounts.mjs' },
+          })
+        }
+        if (runtimeAction.nextAction === 'repair') {
+          return output(role, {
+            content: repairAttempt === 0 ? 'first billing repair hypothesis written' : 'second billing repair hypothesis written',
+            handoffTo: 'reviewer',
+            handoffReason: 'run billing targeted verification',
+            changedFiles: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'],
+            repair: {
+              status: 'recovered',
+              attempts: repairAttempt === 0 ? 1 : 2,
+              recoveredItems: ['src/billing/discounts.mjs'],
+              notes: [repairAttempt === 0 ? 'first discount hypothesis' : 'second discount hypothesis'],
+            },
+            verification: { status: 'not-requested', reason: 'billing targeted rerun queued' },
+            requiredEvidence: ['billing source discovery', 'billing targeted verification'],
+            observedEvidence: ['billing source discovery'],
+            lastAction: { actionKind: 'repair', target: 'src/billing/discounts.mjs', changedFiles: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'] },
+          })
+        }
+        return output(role, {
+          content: 'billing targeted verification passed',
+          changedFiles: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'],
+          verifiedFiles: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'],
+          evidenceFiles: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'],
+          repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/billing/discounts.mjs'], notes: ['second discount hypothesis'] },
+          verification: { status: 'passed', command: 'node test/billing-rules.mjs', reason: 'billing targeted verification passed' },
+          requiredEvidence: ['billing source discovery', 'billing targeted verification'],
+          observedEvidence: ['billing source discovery', 'billing targeted verification'],
+          lastAction: { actionKind: 'verify', target: 'test/billing-rules.mjs', verifiedFiles: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'] },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => {
+        const item = batch.items[0]
+        if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+        if (item.actionKind === 'read') {
+          const source = await workspace.execution.readTextFile({
+            operationKind: 'file.read',
+            workspaceRoot: workspace.root,
+            absolutePath: join(workspace.root, 'src/billing/discounts.mjs'),
+            authority: { mode: 'read-only', source: 'workspace-authority', reason: 'billing package source read' },
+            caller: 'query-runtime-harness-test',
+            reason: 'read disposable workspace source',
+            reportSafeTarget: 'src/billing/discounts.mjs',
+          })
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'read',
+              coveredFiles: ['src/billing/discounts.mjs', 'src/billing/index.mjs', 'test/billing-rules.mjs'],
+              affectedPaths: ['src/billing/discounts.mjs', 'src/billing/index.mjs', 'test/billing-rules.mjs'],
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              sourceFacts: [{
+                factId: 'source:billing-discount',
+                path: 'src/billing/discounts.mjs',
+                summary: source.includes('0.9') ? 'billing discount source uses ten percent discount' : 'billing discount source read',
+                confidence: 'high',
+              }, {
+                factId: 'source:billing-test',
+                path: 'test/billing-rules.mjs',
+                summary: 'billing targeted test expects vip discount and standard passthrough',
+                confidence: 'high',
+              }],
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        }
+        if (item.actionKind === 'repair') {
+          repairAttempt += 1
+          await workspace.write({
+            'src/billing/discounts.mjs': repairAttempt === 1
+              ? 'export function discountedAmount(value, tier) { return tier === "vip" ? value * 0.85 : value; }\n'
+              : 'export function discountedAmount(value, tier) { return tier === "vip" ? value * 0.8 : value; }\n',
+            'test/billing-rules.mjs': 'import { invoiceAmount } from "../src/billing/index.mjs";\nif (invoiceAmount(100, "vip") !== 80) throw new Error(`expected 80 got ${invoiceAmount(100, "vip")}`);\nif (invoiceAmount(50, "standard") !== 50) throw new Error(`expected 50 got ${invoiceAmount(50, "standard")}`);\n',
+          })
+          const commandResult = await workspace.run('node', ['test/billing-rules.mjs'], 'node test/billing-rules.mjs')
+          summaries.push(safeCommandSummary(commandResult))
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'repair',
+              coveredFiles: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'],
+              affectedPaths: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        }
+        verifyAttempt += 1
+        const commandResult = await workspace.run('node', ['test/billing-rules.mjs'], 'node test/billing-rules.mjs')
+        summaries.push(safeCommandSummary(commandResult))
+        return {
+          batchId: batch.batchId,
+          terminalSuccessClaim: false,
+          results: [{
+            toolId: item.toolId,
+            actionKind: 'verify',
+            coveredFiles: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'],
+            affectedPaths: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'],
+            exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+            failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+            diagnosticSummary: safeCommandSummary(commandResult),
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          }],
+        }
+      },
+    })
+
+    for await (const event of engine.streamMessage('sess_billing_rules_package', 'repair billing package discount rule', {
+      maxTurns: 7,
+      runtimeSeed: seedWithHarness('sess_billing_rules_package', createQueryRuntimeHarnessState({
+        pendingRepair: [{
+          queueId: 'repair-billing-discount',
+          failureClass: 'command-failed',
+          failureSummary: safeCommandSummary(initial),
+          hypothesis: 'read billing discount source before repair',
+          contextNeed: 'src/billing/discounts.mjs',
+          targetFiles: ['src/billing/discounts.mjs', 'test/billing-rules.mjs'],
+        }],
+      }), { maxTurns: 7 }),
+    })) {
+      if (event.type === 'query.completed') {
+        finalStatus = event.result.status
+        finalReason = event.result.stopReason ?? ''
+      }
+    }
+
+    return workspaceRecord('billing-rules-package', workspace.root, finalStatus, {
+      initialFailureOutput: safeCommandSummary(initial),
+      multiFileWrite: true,
+      targetedTestChanged: true,
+      repairQueueAndTargetedRerun: actions.includes('repair') && actions.includes('verify'),
+      secondHypothesisCompleted: repairAttempt >= 2 && finalStatus === 'completed',
+      safeSummaries: [...summaries, `actions:${actions.join(',')}`, finalReason],
+    })
+  } finally {
+    await workspace.dispose()
+  }
+}
+
+async function runReportReceiptPackageTask(): Promise<HarnessWorkspaceTaskRecord> {
+  const workspace = await createHarnessWorkspace({
+    'package.json': '{"type":"module","scripts":{"test:report":"node test/report-receipt.mjs"}}\n',
+    'src/report/model.mjs': 'export const reportStatus = "draft";\n',
+    'src/report/template.mjs': 'import { reportStatus } from "./model.mjs";\nexport function reportTitle() { return `report:${reportStatus}`; }\n',
+    'src/report/index.mjs': 'export { reportTitle } from "./template.mjs";\n',
+    'test/report-receipt.mjs': 'import { reportTitle } from "../src/report/index.mjs";\nif (reportTitle() !== "report:complete") throw new Error(`expected report:complete got ${reportTitle()}`);\n',
+  })
+  try {
+    const initial = await workspace.run('node', ['test/report-receipt.mjs'], 'node test/report-receipt.mjs')
+    const compact = buildCompactContinuitySummary({
+      summary: undefined,
+      continuity: undefined,
+      approvalAuditHistory: [],
+      harness: createQueryRuntimeHarnessState({
+        pendingRepair: [{
+          queueId: 'repair-report-receipt',
+          failureClass: 'source-receipt-missing',
+          failureSummary: safeCommandSummary(initial),
+          hypothesis: 'read report source before writing receipt proof',
+          contextNeed: 'src/report/model.mjs',
+          targetFiles: ['src/report/model.mjs', 'artifact/report-summary.json', 'test/report-receipt.mjs'],
+        }],
+      }),
+    })
+    const decoded = decodeCompactSessionHarnessState({ continuity: compact.continuity })
+    expect(decoded.status).toBe('accepted')
+    if (decoded.status !== 'accepted') {
+      return workspaceRecord('report-receipt-package', workspace.root, 'stopped_not_proven', { restoreOrContinuation: true })
+    }
+
+    const actions: string[] = []
+    const summaries: string[] = [safeCommandSummary(initial), 'compact-restore:accepted']
+    let artifactAttempt = 0
+    let finalStatus = ''
+    let finalReason = ''
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        if (runtimeAction.nextAction === 'read') {
+          return output(role, {
+            content: 'report package source read',
+            handoffTo: 'coder',
+            handoffReason: 'complete report source and artifact',
+            evidenceFiles: ['src/report/model.mjs', 'src/report/template.mjs', 'test/report-receipt.mjs'],
+            requiredEvidence: ['report source receipt', 'report verification receipt'],
+            observedEvidence: ['report source receipt'],
+            lastAction: { actionKind: 'read', target: 'src/report/model.mjs' },
+          })
+        }
+        if (runtimeAction.nextAction === 'repair') {
+          return output(role, {
+            content: 'report source and receipt written; verification pending',
+            handoffTo: 'reviewer',
+            handoffReason: 'run report receipt verification',
+            changedFiles: ['src/report/model.mjs', 'artifact/report-summary.json'],
+            repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/report/model.mjs', 'artifact/report-summary.json'], notes: ['source receipt proof written'] },
+            verification: { status: 'not-requested', reason: 'report verification receipt pending' },
+            requiredEvidence: ['report source receipt', 'report verification receipt'],
+            observedEvidence: ['report source receipt'],
+            lastAction: { actionKind: 'repair', target: 'src/report/model.mjs', changedFiles: ['src/report/model.mjs', 'artifact/report-summary.json'] },
+          })
+        }
+        return output(role, {
+          content: 'report receipt verification passed',
+          changedFiles: ['src/report/model.mjs', 'artifact/report-summary.json'],
+          verifiedFiles: ['src/report/model.mjs', 'artifact/report-summary.json', 'test/report-receipt.mjs'],
+          evidenceFiles: ['src/report/model.mjs', 'artifact/report-summary.json', 'test/report-receipt.mjs'],
+          verification: { status: 'passed', command: 'node test/report-receipt.mjs', reason: 'report receipt targeted verification passed' },
+          requiredEvidence: ['report source receipt', 'report verification receipt'],
+          observedEvidence: ['report source receipt', 'report verification receipt'],
+          lastAction: { actionKind: 'verify', target: 'test/report-receipt.mjs', verifiedFiles: ['src/report/model.mjs', 'artifact/report-summary.json'] },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => {
+        const item = batch.items[0]
+        if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+        if (item.actionKind === 'read') {
+          const source = await workspace.execution.readTextFile({
+            operationKind: 'file.read',
+            workspaceRoot: workspace.root,
+            absolutePath: join(workspace.root, 'src/report/model.mjs'),
+            authority: { mode: 'read-only', source: 'workspace-authority', reason: 'report source read' },
+            caller: 'query-runtime-harness-test',
+            reason: 'read disposable workspace source',
+            reportSafeTarget: 'src/report/model.mjs',
+          })
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'read',
+              coveredFiles: ['src/report/model.mjs', 'src/report/template.mjs', 'test/report-receipt.mjs'],
+              affectedPaths: ['src/report/model.mjs', 'src/report/template.mjs', 'test/report-receipt.mjs'],
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              sourceFacts: [{
+                factId: 'source:report-model',
+                path: 'src/report/model.mjs',
+                summary: source.includes('draft') ? 'report source is draft' : 'report source read',
+                confidence: 'high',
+              }],
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        }
+        if (item.actionKind === 'repair') {
+          artifactAttempt += 1
+          await workspace.write({
+            'src/report/model.mjs': 'export const reportStatus = "complete";\n',
+            'artifact/report-summary.json': '{"status":"complete","source":"src/report/model.mjs"}\n',
+          })
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'repair',
+              coveredFiles: ['src/report/model.mjs', 'artifact/report-summary.json'],
+              affectedPaths: ['src/report/model.mjs', 'artifact/report-summary.json'],
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        }
+        const commandResult = await workspace.run('node', ['test/report-receipt.mjs'], 'node test/report-receipt.mjs')
+        summaries.push(safeCommandSummary(commandResult))
+        return {
+          batchId: batch.batchId,
+          terminalSuccessClaim: false,
+          results: [{
+            toolId: item.toolId,
+            actionKind: 'verify',
+            coveredFiles: ['src/report/model.mjs', 'artifact/report-summary.json', 'test/report-receipt.mjs'],
+            affectedPaths: ['src/report/model.mjs', 'artifact/report-summary.json', 'test/report-receipt.mjs'],
+            exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+            failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+            diagnosticSummary: safeCommandSummary(commandResult),
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          }],
+        }
+      },
+    })
+
+    for await (const event of engine.streamMessage('sess_report_receipt_package', 'complete report source receipt proof', {
+      maxTurns: 6,
+      runtimeSeed: seedWithHarness('sess_report_receipt_package', decoded.harness),
+    })) {
+      if (event.type === 'query.completed') {
+        finalStatus = event.result.status
+        finalReason = event.result.stopReason ?? ''
+      }
+    }
+
+    return workspaceRecord('report-receipt-package', workspace.root, finalStatus, {
+      initialFailureOutput: safeCommandSummary(initial),
+      multiFileWrite: true,
+      restoreOrContinuation: true,
+      receiptProof: finalStatus === 'completed',
+      repairQueueAndTargetedRerun: actions.includes('repair') && actions.includes('verify'),
+      safeSummaries: [...summaries, `actions:${actions.join(',')}`, finalReason],
+    })
+  } finally {
+    await workspace.dispose()
+  }
+}
+
+async function runRouterNotProvenPackageTask(): Promise<HarnessWorkspaceTaskRecord> {
+  const workspace = await createHarnessWorkspace({
+    'package.json': '{"type":"module","scripts":{"test:router":"node test/router-guard.mjs"}}\n',
+    'src/router/routes.mjs': 'export const routes = [{ name: "admin", guard: "allow" }];\n',
+    'src/router/guards.mjs': 'export function canEnter(route) { return route.guard === "allow"; }\n',
+    'src/router/index.mjs': 'import { routes } from "./routes.mjs";\nimport { canEnter } from "./guards.mjs";\nexport function adminAllowed() { return canEnter(routes[0]); }\n',
+    'test/router-guard.mjs': 'import { adminAllowed } from "../src/router/index.mjs";\nif (adminAllowed() !== false) throw new Error(`expected blocked admin route got ${adminAllowed()}`);\n',
+  })
+  try {
+    const initial = await workspace.run('node', ['test/router-guard.mjs'], 'node test/router-guard.mjs')
+    const actions: string[] = []
+    const summaries: string[] = [safeCommandSummary(initial)]
+    let finalStatus = ''
+    let finalReason = ''
+    const engine = new QueryEngine({
+      runAgent: async ({ role, runtimeAction }) => {
+        actions.push(runtimeAction.nextAction)
+        if (runtimeAction.nextAction === 'read') {
+          return output(role, {
+            content: 'router guard source read',
+            handoffTo: 'coder',
+            handoffReason: 'repair router guard after source discovery',
+            evidenceFiles: ['src/router/routes.mjs', 'src/router/guards.mjs', 'test/router-guard.mjs'],
+            requiredEvidence: ['router source discovery', 'router targeted verification'],
+            observedEvidence: ['router source discovery'],
+            lastAction: { actionKind: 'read', target: 'src/router/guards.mjs' },
+          })
+        }
+        if (runtimeAction.nextAction === 'repair') {
+          return output(role, {
+            content: 'router guard repair remained incomplete',
+            handoffTo: 'reviewer',
+            handoffReason: 'router targeted verification still required',
+            changedFiles: ['src/router/routes.mjs', 'src/router/guards.mjs'],
+            failedFiles: [{ path: 'test/router-guard.mjs', reason: 'router guard still allows admin' }],
+            repair: { status: 'failed', attempts: 1, failedItems: ['src/router/guards.mjs'], notes: ['guard change incomplete'] },
+            verification: { status: 'failed', reason: 'router targeted rerun failed', nextAction: 'repair router guard again with stronger source facts' },
+            requiredEvidence: ['router source discovery', 'router targeted verification'],
+            observedEvidence: ['router source discovery'],
+            lastAction: { actionKind: 'repair', target: 'src/router/guards.mjs', changedFiles: ['src/router/routes.mjs', 'src/router/guards.mjs'] },
+          })
+        }
+        return output(role, {
+          content: 'router missing targeted proof remains',
+          changedFiles: ['src/router/routes.mjs', 'src/router/guards.mjs'],
+          failedFiles: [{ path: 'test/router-guard.mjs', reason: 'router targeted rerun failed' }],
+          verification: { status: 'failed', command: 'node test/router-guard.mjs', reason: 'router targeted rerun failed', nextAction: 'repair router guard again with stronger source facts' },
+          requiredEvidence: ['router source discovery', 'router targeted verification'],
+          observedEvidence: ['router source discovery'],
+          lastAction: { actionKind: 'verify', target: 'test/router-guard.mjs', verifiedFiles: [] },
+        })
+      },
+      executeRuntimeBatch: async ({ batch }) => {
+        const item = batch.items[0]
+        if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+        if (item.actionKind === 'read') {
+          const source = await workspace.execution.readTextFile({
+            operationKind: 'file.read',
+            workspaceRoot: workspace.root,
+            absolutePath: join(workspace.root, 'src/router/guards.mjs'),
+            authority: { mode: 'read-only', source: 'workspace-authority', reason: 'router guard source read' },
+            caller: 'query-runtime-harness-test',
+            reason: 'read disposable workspace source',
+            reportSafeTarget: 'src/router/guards.mjs',
+          })
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'read',
+              coveredFiles: ['src/router/routes.mjs', 'src/router/guards.mjs', 'test/router-guard.mjs'],
+              affectedPaths: ['src/router/routes.mjs', 'src/router/guards.mjs', 'test/router-guard.mjs'],
+              exitStatusClass: 'success',
+              failureClass: 'none',
+              sourceFacts: [{
+                factId: 'source:router-guard',
+                path: 'src/router/guards.mjs',
+                summary: source.includes('allow') ? 'router guard permits allow route' : 'router guard source read',
+                confidence: 'high',
+              }],
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        }
+        if (item.actionKind === 'repair') {
+          await workspace.write({
+            'src/router/routes.mjs': 'export const routes = [{ name: "admin", guard: "deny" }];\n',
+            'src/router/guards.mjs': 'export function canEnter(route) { return route.guard !== "deny" || route.name !== "admin"; }\n',
+          })
+        }
+        const commandResult = await workspace.run('node', ['test/router-guard.mjs'], 'node test/router-guard.mjs')
+        summaries.push(safeCommandSummary(commandResult))
+        return {
+          batchId: batch.batchId,
+          terminalSuccessClaim: false,
+          results: [{
+            toolId: item.toolId,
+            actionKind: item.actionKind,
+            coveredFiles: ['src/router/routes.mjs', 'src/router/guards.mjs', 'test/router-guard.mjs'],
+            affectedPaths: item.actionKind === 'repair'
+              ? ['src/router/routes.mjs', 'src/router/guards.mjs']
+              : ['src/router/routes.mjs', 'src/router/guards.mjs', 'test/router-guard.mjs'],
+            exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+            failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+            diagnosticSummary: safeCommandSummary(commandResult),
+            truncated: false,
+            redactionStatus: 'redacted',
+            terminalSuccessClaim: false,
+          }],
+        }
+      },
+    })
+
+    for await (const event of engine.streamMessage('sess_router_guard_package', 'repair router guard package without broad proof', {
+      maxTurns: 3,
+      runtimeSeed: seedWithHarness('sess_router_guard_package', createQueryRuntimeHarnessState({
+        pendingRepair: [{
+          queueId: 'repair-router-guard',
+          failureClass: 'command-failed',
+          failureSummary: safeCommandSummary(initial),
+          hypothesis: 'read router guard before repair',
+          contextNeed: 'src/router/guards.mjs',
+          targetFiles: ['src/router/routes.mjs', 'src/router/guards.mjs'],
+        }],
+      })),
+    })) {
+      if (event.type === 'query.completed') {
+        finalStatus = event.result.status
+        finalReason = event.result.stopReason ?? ''
+      }
+    }
+
+    return workspaceRecord('router-guard-package', workspace.root, finalStatus, {
+      initialFailureOutput: safeCommandSummary(initial),
+      multiFileWrite: true,
+      exactMissingProof: finalStatus === 'stopped_not_proven',
+      safeSummaries: [...summaries, `actions:${actions.join(',')}`, finalReason],
+    })
+  } finally {
+    await workspace.dispose()
+  }
 }
 
 async function runTaxRateHarnessTask(): Promise<HarnessWorkspaceTaskRecord> {
@@ -4081,6 +4613,10 @@ function workspaceRecord(
     falseCompleteBlocked: input.falseCompleteBlocked ?? false,
     safeSummaries: input.safeSummaries ?? [],
     manualCorrection: false,
+    targetedTestChanged: input.targetedTestChanged ?? false,
+    secondHypothesisCompleted: input.secondHypothesisCompleted ?? false,
+    receiptProof: input.receiptProof ?? false,
+    exactMissingProof: input.exactMissingProof ?? false,
   }
 }
 

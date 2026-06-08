@@ -525,10 +525,14 @@ export function settleHarnessBatch(input: {
             targetFiles: uniqueStrings([...result.coveredFiles, ...result.affectedPaths]),
             detail: 'repair context covered',
           })
-          pendingRepair = settleRepairContext(pendingRepair, [
-            ...result.coveredFiles,
-            ...result.affectedPaths,
-          ])
+          pendingRepair = settleRepairContext(
+            pendingRepair,
+            [
+              ...result.coveredFiles,
+              ...result.affectedPaths,
+            ],
+            coveredFacts.map((fact) => fact.factId),
+          )
         }
       } else {
         pendingRepair = settleRepairContext(pendingRepair, [
@@ -1291,6 +1295,7 @@ function settleArtifactVerification(
 function settleRepairContext(
   queue: readonly QueryRuntimePendingRepair[],
   covered: readonly string[],
+  sourceFactIds: readonly string[] = [],
 ): QueryRuntimePendingRepair[] {
   const coveredSet = new Set(covered)
   return queue.map((item) => {
@@ -1298,7 +1303,10 @@ function settleRepairContext(
       return item
     }
     const { contextNeed: _contextNeed, ...rest } = item
-    return Object.freeze(rest)
+    return Object.freeze({
+      ...rest,
+      sourceFactIds: uniqueStrings([...(rest.sourceFactIds ?? []), ...sourceFactIds]),
+    })
   })
 }
 

@@ -215,10 +215,13 @@ function repairPlanFor(
 ): QueryRuntimeActionDecision["repairPlan"] | undefined {
   const repair = harness.pendingRepair[0];
   if (!repair) return undefined;
+  const repairSourceFactIds = (repair.hypothesisState?.sourceFactIds.length ?? 0) > 0
+    ? repair.hypothesisState?.sourceFactIds
+    : repair.sourceFactIds;
   const sourceFacts = sourceFactsForTargets({
     facts: harness.sourceFacts,
     targetFiles: repair.targetFiles,
-    sourceFactIds: repair.hypothesisState?.sourceFactIds ?? repair.sourceFactIds,
+    sourceFactIds: repairSourceFactIds,
   });
   const sourceFactIds = sourceFacts.map((fact) => fact.factId);
   const hypothesis = !repair.hypothesisState && sourceFacts.length > 0
@@ -240,7 +243,7 @@ function repairPlanFor(
   return Object.freeze({
     hypothesis,
     sourceFacts,
-    blockedRepeat: sourceFacts.length === 0 && (repair.hypothesisState?.sourceFactIds.length ?? repair.sourceFactIds?.length ?? 0) > 0,
+    blockedRepeat: sourceFacts.length === 0 && (repairSourceFactIds?.length ?? 0) > 0,
   });
 }
 
