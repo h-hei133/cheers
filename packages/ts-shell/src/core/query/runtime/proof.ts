@@ -14,7 +14,7 @@ import {
 } from "../../../result/task/verdict.js";
 import { verifyChangedFileCoverage } from "../../../verification/execution/model.js";
 import type { QueryRuntimeActionDecision } from "./decision.js";
-import { ensureQueryRuntimeObservationState, type QueryRuntimeState } from "./state.js";
+import { ensureQueryRuntimeHarnessState, ensureQueryRuntimeObservationState, type QueryRuntimeState } from "./state.js";
 
 export interface QueryRuntimeProofProjection {
   readonly proof: TaskProofInput;
@@ -45,6 +45,7 @@ export function projectQueryRuntimeProof(input: {
 }): QueryRuntimeProofProjection {
   const result = input.output.codingResult;
   const observations = ensureQueryRuntimeObservationState(input.state);
+  const harness = ensureQueryRuntimeHarnessState(input.state);
   const artifactReceipt = createArtifactReceipt({
     taskKind: input.decision.taskKind,
     outputKind: input.decision.outputKind,
@@ -53,6 +54,7 @@ export function projectQueryRuntimeProof(input: {
       ...input.decision.selectedPaths,
       ...observations.contextPaths,
       ...observations.changedFiles,
+      ...harness.sourceFacts.map((fact) => fact.path),
     ]),
     verificationState: artifactVerificationState(result),
     failureCategories: failureCategories(result),

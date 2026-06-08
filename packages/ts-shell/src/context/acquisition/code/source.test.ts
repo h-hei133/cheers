@@ -27,7 +27,7 @@ describe('runtime source facts', () => {
     expect(facts.map((fact) => fact.factId)).toEqual(['source:rate', 'source:other'])
   })
 
-  it('preserves explicit empty source results while normalizing omitted facts from diagnostics', () => {
+  it('requires explicit source facts instead of synthesizing them from diagnostics', () => {
     expect(contextResultSourceFacts({
       toolId: 'read-empty',
       paths: ['src/rate.mjs'],
@@ -39,21 +39,11 @@ describe('runtime source facts', () => {
       toolId: 'read-rate',
       paths: ['src/rate.mjs'],
       diagnosticSummary: 'rate currently equals 2',
-    })).toEqual([{
-      factId: 'source:read-rate:src/rate.mjs',
-      path: 'src/rate.mjs',
-      summary: 'rate currently equals 2',
-      confidence: 'low',
-    }])
+    })).toEqual([])
 
     expect(contextResultSourceFacts({
       toolId: 'read-path',
       paths: ['src/path.mjs'],
-    })).toEqual([{
-      factId: 'source:read-path:src/path.mjs',
-      path: 'src/path.mjs',
-      summary: 'context read for src/path.mjs',
-      confidence: 'low',
-    }])
+    })).toEqual([])
   })
 })

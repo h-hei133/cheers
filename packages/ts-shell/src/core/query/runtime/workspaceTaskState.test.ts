@@ -24,7 +24,13 @@ describe('workspace task state runtime', () => {
       'rollup-source-receipt',
       'generic-green-incomplete',
     ])
-    expect(results.map(result => `${result.taskId}:${result.verdict}`)).toEqual([
+    expect(results.map(result => `${result.taskId}:${result.verdict}`), JSON.stringify(results.map(result => ({
+      taskId: result.taskId,
+      verdict: result.verdict,
+      missingProof: result.missingProof,
+      actions: result.actions,
+      proofInput: result.proofInput,
+    })))).toEqual([
       'invoice-threshold-replay:completed',
       'locale-label-compact:completed',
       'rollup-source-receipt:completed',
@@ -371,6 +377,9 @@ async function createWorkspace(files: Record<string, string>) {
     batchExecutor: (config: LongWorkspaceBatchConfig) => async ({ batch }: any) => {
       const item = batch.items[0]
       if (!item) return { batchId: batch.batchId, results: [] }
+      const sourceFacts = item.actionKind === 'read' || item.actionKind === 'search'
+        ? await sourceFactsForBatchItem(executionService, root, item)
+        : []
       if (item.actionKind === 'repair' && config.repairSteps?.[repairStep]) {
         const files = config.repairSteps[repairStep]
         await writeAll(executionService, root, files)
@@ -406,6 +415,7 @@ async function createWorkspace(files: Record<string, string>) {
           affectedPaths: item.targetPaths,
           exitStatusClass: commandResult && commandResult.exitCode !== 0 ? 'failed' : 'success',
           failureClass: commandResult && commandResult.exitCode !== 0 ? 'command-failed' : 'none',
+          ...(sourceFacts.length > 0 ? { sourceFacts } : {}),
           ...(commandResult && commandResult.exitCode !== 0 && diagnosticSummary ? { diagnosticSummary } : {}),
           redactionStatus: 'report-safe',
           truncated: false,
@@ -424,6 +434,40 @@ async function createWorkspace(files: Record<string, string>) {
     },
     dispose: () => rm(root, { recursive: true, force: true }),
   }
+}
+
+async function sourceFactsForBatchItem(
+  executionService: Pick<ExecutionService, 'readTextFile'>,
+  root: string,
+  item: { readonly toolId: string; readonly targetPaths: readonly string[]; readonly coveredFiles: readonly string[] },
+) {
+  const facts = []
+  for (const relativePath of [...new Set([...item.targetPaths, ...item.coveredFiles])]) {
+    try {
+      const content = await executionService.readTextFile({
+        operationKind: 'file.read',
+        absolutePath: join(root, relativePath),
+        workspaceRoot: root,
+        authority: {
+          mode: 'read-only',
+          source: 'workspace-authority',
+          reason: 'Disposable workspace source read.',
+        },
+        caller: 'workspace-task-state-test',
+        reason: 'Disposable workspace source read.',
+        reportSafeTarget: relativePath,
+      })
+      facts.push({
+        factId: `source:${item.toolId}:${relativePath}`,
+        path: relativePath,
+        summary: content.trim().slice(0, 120) || `source read for ${relativePath}`,
+        confidence: 'high' as const,
+      })
+    } catch {
+      // Missing candidate paths are not source facts.
+    }
+  }
+  return facts
 }
 
 type DisposableLongWorkspace = Awaited<ReturnType<typeof createWorkspace>>

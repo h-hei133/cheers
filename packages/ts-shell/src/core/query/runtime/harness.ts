@@ -551,7 +551,7 @@ export function settleHarnessBatch(input: {
       ])
       const failureSummary = safeText(result.diagnosticSummary ?? result.failureClass)
       const targetFiles = uniqueStrings([...result.affectedPaths, ...result.coveredFiles])
-      const currentRepair = pendingRepair.find((item) => sameTargets(item.targetFiles, targetFiles))
+      const currentRepair = pendingRepair.find((item) => overlapsTargets(item.targetFiles, targetFiles))
       const rejectedHypothesis = currentRepair?.hypothesisState
         ? rejectRepairHypothesis({ hypothesis: currentRepair.hypothesisState, cause: failureSummary })
         : undefined
@@ -626,6 +626,33 @@ export function settleHarnessBatch(input: {
       const failureSummary = safeText(result.diagnosticSummary ?? result.failureClass)
       const targetFiles = uniqueStrings([...result.affectedPaths, ...result.coveredFiles])
       pendingVerification = removeCoveredVerification(pendingVerification, targetFiles)
+      const currentRepair = pendingRepair.find((item) => overlapsTargets(item.targetFiles, targetFiles))
+      const rejectedHypothesis = currentRepair?.hypothesisState
+        ? rejectRepairHypothesis({ hypothesis: currentRepair.hypothesisState, cause: failureSummary })
+        : undefined
+      if (rejectedHypothesis) {
+        trajectory = appendTrajectory(trajectory, {
+          turn: input.batch.turn,
+          role: input.batch.role,
+          phase: 'repair:hypothesis-rejected',
+          actionKind: 'repair',
+          toolId: result.toolId,
+          targetFiles,
+          detail: rejectedHypothesis.summary,
+        })
+      }
+      const facts = sourceFactsForTargets({
+        facts: sourceFacts,
+        targetFiles,
+        sourceFactIds: currentRepair?.sourceFactIds,
+      })
+      const nextHypothesis = classifyRepairHypothesis({
+        failureClass: result.failureClass,
+        failureSummary,
+        targetFiles,
+        sourceFactIds: facts.map((fact) => fact.factId),
+        rejected: rejectedHypothesis ? [rejectedHypothesis] : [],
+      })
       const strategy = selectRepairFailureStrategy({
         failureClass: result.failureClass,
         failureSummary,
@@ -648,25 +675,29 @@ export function settleHarnessBatch(input: {
         actionKind: result.actionKind,
         toolId: result.toolId,
         targetFiles,
-        detail: repairLifecycle.hypothesis,
+        detail: nextHypothesis.summary,
       })
-      if (repairLifecycle.contextNeeded && repairLifecycle.contextNeed) {
+      const contextNeed = nextHypothesis.contextNeed ?? repairLifecycle.contextNeed
+      if ((repairLifecycle.contextNeeded || nextHypothesis.contextNeed) && contextNeed) {
         trajectory = appendTrajectory(trajectory, {
           turn: input.batch.turn,
           role: input.batch.role,
           phase: 'repair:context-needed',
           actionKind: result.actionKind,
           toolId: result.toolId,
-          targetFiles: [repairLifecycle.contextNeed],
+          targetFiles: [contextNeed],
         })
       }
       pendingRepair = upsertPendingRepair(pendingRepair, {
         queueId: `repair:${sequence}`,
         failureClass: result.failureClass,
         failureSummary,
-        hypothesis: repairLifecycle.hypothesis,
+        hypothesis: nextHypothesis.summary,
+        hypothesisState: nextHypothesis,
         priorAttempt: result.toolId,
-        ...(repairLifecycle.contextNeed ? { contextNeed: repairLifecycle.contextNeed } : {}),
+        sourceFactIds: nextHypothesis.sourceFactIds,
+        ...(nextHypothesis.rejectedCause ? { rejectedCause: nextHypothesis.rejectedCause } : {}),
+        ...(contextNeed ? { contextNeed } : {}),
         targetFiles,
       })
     }
@@ -772,32 +803,43 @@ export function settleHarnessOutput(input: {
 
   if (result.verification.status === 'failed' || result.repair.status === 'failed') {
     const repair = repairForResult(result)
+    const existingRepair = pendingRepair.find((item) => sameTargets(item.targetFiles, repair.targetFiles))
+    const nextRepair = existingRepair?.hypothesisState
+      ? Object.freeze({
+          ...repair,
+          hypothesis: existingRepair.hypothesis,
+          hypothesisState: existingRepair.hypothesisState,
+          sourceFactIds: existingRepair.sourceFactIds,
+          ...(existingRepair.rejectedCause ? { rejectedCause: existingRepair.rejectedCause } : {}),
+          ...(existingRepair.contextNeed ? { contextNeed: existingRepair.contextNeed } : repair.contextNeed ? { contextNeed: repair.contextNeed } : {}),
+        })
+      : repair
     trajectory = appendTrajectory(trajectory, {
       turn: input.harness.ledger.length + 1,
       role: input.output.role,
       phase: 'repair:classified',
       actionKind: 'repair',
-      targetFiles: repair.targetFiles,
-      detail: repair.failureClass,
+      targetFiles: nextRepair.targetFiles,
+      detail: nextRepair.failureClass,
     })
     trajectory = appendTrajectory(trajectory, {
       turn: input.harness.ledger.length + 1,
       role: input.output.role,
       phase: 'repair:hypothesis',
       actionKind: 'repair',
-      targetFiles: repair.targetFiles,
-      detail: repair.hypothesis,
+      targetFiles: nextRepair.targetFiles,
+      detail: nextRepair.hypothesis,
     })
-    if (repair.contextNeed) {
+    if (nextRepair.contextNeed) {
       trajectory = appendTrajectory(trajectory, {
         turn: input.harness.ledger.length + 1,
         role: input.output.role,
         phase: 'repair:context-needed',
         actionKind: 'repair',
-        targetFiles: [repair.contextNeed],
+        targetFiles: [nextRepair.contextNeed],
       })
     }
-    pendingRepair = upsertPendingRepair(pendingRepair, repair)
+    pendingRepair = upsertPendingRepair(pendingRepair, nextRepair)
   }
 
   if (result.repair.status === 'recovered') {
@@ -1097,7 +1139,7 @@ function upsertPendingRepair(
   next: QueryRuntimePendingRepair,
 ): QueryRuntimePendingRepair[] {
   return [
-    ...queue.filter((item) => item.queueId !== next.queueId && !sameTargets(item.targetFiles, next.targetFiles)),
+    ...queue.filter((item) => item.queueId !== next.queueId && !overlapsTargets(item.targetFiles, next.targetFiles)),
     Object.freeze(next),
   ]
 }
@@ -1178,6 +1220,11 @@ function sameTargets(left: readonly string[], right: readonly string[]): boolean
   const normalizedRight = uniqueStrings(right)
   return normalizedLeft.length === normalizedRight.length &&
     normalizedLeft.every((value) => normalizedRight.includes(value))
+}
+
+function overlapsTargets(left: readonly string[], right: readonly string[]): boolean {
+  const normalizedRight = new Set(uniqueStrings(right))
+  return uniqueStrings(left).some((value) => normalizedRight.has(value))
 }
 
 function coversTargets(targets: readonly string[], covered: readonly string[]): boolean {

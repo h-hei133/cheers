@@ -74,7 +74,7 @@ export function constrainRuntimeActionOutput(
     role: output.role,
     block: selectedBlock,
     taskKind: taskKindForAction(selectedBlock.action),
-    changedFiles: decision.changedFiles,
+    changedFiles: selectedBlock.targetFiles,
     evidenceFiles: decision.verificationTargets,
   });
 }
@@ -124,10 +124,25 @@ function blockMismatchedWrite(
 ): RuntimeActionBlock | undefined {
   const result = output.codingResult;
   if (!result) return undefined;
+  const outputAction = result.lastActionResultSeed?.actionKind;
+  if (
+    (decision.nextAction === "edit" || decision.nextAction === "repair" || decision.nextAction === "artifact") &&
+    (outputAction === "edit" || outputAction === "repair" || outputAction === "artifact") &&
+    outputAction !== decision.nextAction
+  ) {
+    return {
+      action: outputAction,
+      reason: "runtime action blocked: selected write action mismatch",
+      targetFiles: [
+        ...result.changedFiles,
+        ...result.changeSet.changedFiles,
+        ...(result.lastActionResultSeed?.changedFiles ?? []),
+      ],
+    };
+  }
   if (decision.nextAction === "edit" || decision.nextAction === "repair" || decision.nextAction === "artifact") {
     return undefined;
   }
-  const outputAction = result.lastActionResultSeed?.actionKind;
   if (outputAction !== "edit" && outputAction !== "repair") {
     return undefined;
   }

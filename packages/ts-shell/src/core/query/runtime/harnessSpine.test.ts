@@ -20,6 +20,7 @@ import {
   type QueryRuntimeHarnessState,
 } from './harness.js'
 import { buildContinuationPolicyEvidence, type QueryRuntimeStateSeed } from './state.js'
+import { summarizeQueryRuntimeTrajectory } from './trajectory.js'
 
 describe('query runtime harness spine', () => {
   it('records a turn snapshot before batch execution and uses settled context for the next action', async () => {
@@ -447,6 +448,17 @@ describe('query runtime harness spine', () => {
         },
         executeRuntimeBatch: async ({ batch }) => {
           batchActions.push(batch.actionKind)
+          const pricingSource = batch.actionKind === 'read'
+            ? await workspace.execution.readTextFile({
+                operationKind: 'file.read',
+                workspaceRoot: workspace.root,
+                absolutePath: join(workspace.root, 'src/pricing/rules.mjs'),
+                authority: { mode: 'read-only', source: 'workspace-authority', reason: 'pricing source read' },
+                caller: 'query-runtime-harness-test',
+                reason: 'read disposable workspace source',
+                reportSafeTarget: 'src/pricing/rules.mjs',
+              })
+            : ''
           return {
             batchId: batch.batchId,
             terminalSuccessClaim: false,
@@ -458,6 +470,12 @@ describe('query runtime harness spine', () => {
               exitStatusClass: 'success',
               failureClass: 'none',
               diagnosticSummary: safeCommandSummary(initial),
+              sourceFacts: item.actionKind === 'read' ? [{
+                factId: 'source:pricing-rules',
+                path: 'src/pricing/rules.mjs',
+                summary: pricingSource.includes('discount') ? 'pricing discount source read' : 'pricing source read',
+                confidence: 'high',
+              }] : undefined,
               truncated: false,
               redactionStatus: 'redacted',
               terminalSuccessClaim: false,
@@ -492,8 +510,8 @@ describe('query runtime harness spine', () => {
       }
 
       expect(initial.exitCode).not.toBe(0)
-      expect(actions, `actions:${actions.join(',')}`).toEqual(['read', 'repair'])
-      expect(batchActions).toEqual(['read', 'repair'])
+      expect(actions, `actions:${actions.join(',')}`).toEqual(['read', 'repair', 'verify'])
+      expect(batchActions).toEqual(['read', 'repair', 'verify'])
       expect(batchActions).not.toContain('edit')
       expect(completedContents.some((content) =>
         content.includes('runtime action blocked: discovery required before edit')
@@ -834,7 +852,7 @@ describe('query runtime harness spine', () => {
       })),
     })
 
-    expect(actions).toEqual(['read', 'repair'])
+    expect(actions).toEqual(['read'])
   })
 
   it('does not complete a continuation restored only from harness ledger success', async () => {
@@ -894,6 +912,551 @@ describe('query runtime harness spine', () => {
     expect(verdict.completeProof).toBe(false)
     expect(verdict.terminalClassification).toBe('stopped')
     expect(verdict.notProvenClaims).toContain('harness-ledger-alone-is-not-success')
+  })
+
+  it('executes quota primary workspace trajectory through discovery, failed rerun, generic green rejection, second strategy, and targeted pass', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/quota/policy.mjs': 'export function quotaLabel(value) { return `quota:${value}`; }\n',
+      'test/quota.mjs': 'import { quotaLabel } from "../src/quota/policy.mjs";\nif (quotaLabel("gold") !== "QUOTA:GOLD") throw new Error(`expected QUOTA:GOLD got ${quotaLabel("gold")}`);\n',
+    })
+    try {
+      const initial = await workspace.run('node', ['test/quota.mjs'], 'node test/quota.mjs')
+      const actions: string[] = []
+      const savePointTrajectories: ReturnType<typeof summarizeQueryRuntimeTrajectory>[] = []
+      const sourceReads: string[] = []
+      const repairPlans: string[] = []
+      let finalStatus = ''
+      let finalReason = ''
+      let repairAttempt = 0
+      let verifyAttempt = 0
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+          actions.push(runtimeAction.nextAction)
+          if (runtimeAction.nextAction === 'read' && actions.length === 1) {
+            return output(role, {
+              content: 'provider claimed quota edit while source discovery was required',
+              changedFiles: ['src/quota/policy.mjs'],
+              requiredEvidence: ['quota source fact', 'quota targeted rerun'],
+              observedEvidence: ['quota source fact', 'quota targeted rerun'],
+              lastAction: { actionKind: 'edit', target: 'src/quota/policy.mjs', changedFiles: ['src/quota/policy.mjs'] },
+            })
+          }
+          if (runtimeAction.nextAction === 'read') {
+            return output(role, {
+              content: 'quota source fact read',
+              handoffTo: 'coder',
+              handoffReason: 'repair quota with source fact',
+              evidenceFiles: ['src/quota/policy.mjs'],
+              requiredEvidence: ['quota source fact', 'quota targeted rerun'],
+              observedEvidence: ['quota source fact'],
+              lastAction: { actionKind: 'read', target: 'src/quota/policy.mjs' },
+            })
+          }
+          if (runtimeAction.nextAction === 'repair' && repairAttempt === 1) {
+            return output(role, {
+              content: 'first quota repair failed targeted rerun',
+              handoffTo: 'coder',
+              handoffReason: 'try distinct quota hypothesis',
+              changedFiles: ['src/quota/policy.mjs'],
+              failedFiles: [{ path: 'test/quota.mjs', reason: 'bad quota repair' }],
+              repair: { status: 'failed', attempts: 1, failedItems: ['src/quota/policy.mjs'], notes: ['bad quota repair'] },
+              verification: { status: 'failed', reason: 'bad quota repair', nextAction: 'repair quota with source fact' },
+              requiredEvidence: ['quota source fact', 'quota targeted rerun'],
+              observedEvidence: ['quota source fact'],
+              lastAction: {
+                actionKind: 'repair',
+                target: 'src/quota/policy.mjs',
+                changedFiles: ['src/quota/policy.mjs'],
+                verification: { status: 'failed', reason: 'bad quota repair' },
+              },
+            })
+          }
+          if (runtimeAction.nextAction === 'repair') {
+            return output(role, {
+              content: 'second quota repair strategy written',
+              handoffTo: 'coder',
+              handoffReason: 'rerun quota targeted verification',
+              changedFiles: ['src/quota/policy.mjs'],
+              repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/quota/policy.mjs'], notes: ['second quota strategy'] },
+              verification: { status: 'not-requested', reason: 'quota targeted rerun queued' },
+              requiredEvidence: ['quota source fact', 'quota targeted rerun'],
+              observedEvidence: ['quota source fact'],
+              lastAction: { actionKind: 'repair', target: 'src/quota/policy.mjs', changedFiles: ['src/quota/policy.mjs'] },
+            })
+          }
+          return output(role, {
+            content: verifyAttempt < 2 ? 'generic quota green did not cover target' : 'quota targeted rerun passed',
+            changedFiles: ['src/quota/policy.mjs'],
+            verifiedFiles: verifyAttempt < 2 ? ['package.json'] : ['src/quota/policy.mjs', 'test/quota.mjs'],
+            evidenceFiles: verifyAttempt < 2 ? ['package.json'] : ['src/quota/policy.mjs', 'test/quota.mjs'],
+            repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/quota/policy.mjs'], notes: ['second quota strategy'] },
+            verification: verifyAttempt < 2
+              ? { status: 'passed', command: 'node --version', reason: 'generic quota green did not cover target', selectionScope: 'broader' }
+              : { status: 'passed', command: 'node test/quota.mjs', reason: 'quota targeted rerun passed', selectionScope: 'targeted' },
+            requiredEvidence: ['quota source fact', 'quota targeted rerun'],
+            observedEvidence: verifyAttempt < 2 ? ['quota source fact'] : ['quota source fact', 'quota targeted rerun'],
+            lastAction: { actionKind: 'verify', target: verifyAttempt < 2 ? 'package.json' : 'test/quota.mjs', verifiedFiles: verifyAttempt < 2 ? ['package.json'] : ['src/quota/policy.mjs'] },
+          })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          const item = batch.items[0]
+          if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+          if (item.actionKind === 'read') {
+            const source = await workspace.execution.readTextFile({
+              operationKind: 'file.read',
+              workspaceRoot: workspace.root,
+              absolutePath: join(workspace.root, 'src/quota/policy.mjs'),
+              authority: { mode: 'read-only', source: 'workspace-authority', reason: 'quota source read' },
+              caller: 'query-runtime-harness-test',
+              reason: 'read disposable workspace source',
+              reportSafeTarget: 'src/quota/policy.mjs',
+            })
+            sourceReads.push(source)
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'read',
+                coveredFiles: ['src/quota/policy.mjs', 'test/quota.mjs'],
+                affectedPaths: ['src/quota/policy.mjs', 'test/quota.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                diagnosticSummary: 'quota source fact read',
+                sourceFacts: [{
+                  factId: 'source:quota-policy',
+                  path: 'src/quota/policy.mjs',
+                  summary: source.includes('quota:') ? 'quota currently lower-case' : 'quota source read',
+                  confidence: 'high',
+                }],
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          if (item.actionKind === 'repair') {
+            repairAttempt += 1
+            repairPlans.push(`${item.repairPlan?.hypothesis.summary ?? ''}|${item.repairPlan?.sourceFacts.map((fact) => fact.factId).join(',') ?? ''}`)
+            await workspace.write({
+              'src/quota/policy.mjs': repairAttempt === 1
+                ? 'export function quotaLabel(value) { return `quota:${value.toUpperCase()}`; }\n'
+                : 'export function quotaLabel(value) { return `QUOTA:${value.toUpperCase()}`; }\n',
+            })
+            const commandResult = await workspace.run('node', ['test/quota.mjs'], 'node test/quota.mjs')
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'repair',
+                coveredFiles: ['src/quota/policy.mjs', 'test/quota.mjs'],
+                affectedPaths: ['src/quota/policy.mjs'],
+                exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+                failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+                diagnosticSummary: safeCommandSummary(commandResult),
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          verifyAttempt += 1
+          const commandResult = verifyAttempt === 1
+            ? await workspace.run('node', ['--version'], 'node --version')
+            : await workspace.run('node', ['test/quota.mjs'], 'node test/quota.mjs')
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'verify',
+              coveredFiles: verifyAttempt === 1 ? ['package.json'] : ['src/quota/policy.mjs', 'test/quota.mjs'],
+              affectedPaths: verifyAttempt === 1 ? ['package.json'] : ['src/quota/policy.mjs', 'test/quota.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_quota_primary_workspace', 'repair quota label after failed targeted command', {
+        maxTurns: 6,
+        runtimeSeed: seedWithHarness('sess_quota_primary_workspace', createQueryRuntimeHarnessState({
+          pendingRepair: [{
+            queueId: 'repair-quota',
+            failureClass: 'command-failed',
+            failureSummary: safeCommandSummary(initial),
+            hypothesis: 'read quota source before repair',
+            contextNeed: 'src/quota/policy.mjs',
+            targetFiles: ['src/quota/policy.mjs'],
+          }],
+        }), {
+          initialPrompt: 'repair src/quota/policy.mjs after failed test/quota.mjs',
+          maxTurns: 6,
+        }),
+      })) {
+        if (event.type === 'runtime.save-point') {
+          savePointTrajectories.push(summarizeQueryRuntimeTrajectory({
+            trajectory: event.savePoint.trajectory,
+          }))
+        }
+        if (event.type === 'query.completed') {
+          finalStatus = event.result.status
+          finalReason = event.result.stopReason ?? ''
+        }
+      }
+
+      const finalSummary = savePointTrajectories.at(-1)
+      expect(finalStatus, `reason:${finalReason};actions:${actions.join(',')};plans:${repairPlans.join(' -> ')}`).toBe('completed')
+      expect(actions).toEqual(['read', 'repair', 'verify', 'verify', 'verify'])
+      expect(initial.exitCode).not.toBe(0)
+      expect(sourceReads[0]).toContain('quota:')
+      expect(repairAttempt).toBe(2)
+      expect(verifyAttempt).toBe(3)
+      expect(repairPlans[0]).toContain('source:quota-policy')
+      expect(new Set(repairPlans.map((plan) => plan.split('|')[0])).size, `plans:${repairPlans.join(' -> ')}`).toBeGreaterThan(1)
+      expect(finalSummary?.phaseCount).toBeGreaterThanOrEqual(6)
+      expect(finalSummary?.wrongOrIncompleteActions).toBeGreaterThanOrEqual(2)
+      expect(finalSummary?.sourceDiscoveryBeforeRepair).toBe(true)
+      expect(finalSummary?.badRepairFailedRerunNextHypothesis).toBe(true)
+      expect(finalSummary?.genericGreenRejected).toBe(true)
+      expect(finalSummary?.settlesSuccess).toBe(false)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('executes ledger artifact primary trajectory through compact restore, incomplete artifact proof, source completion, and targeted pass', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/ledger/source.mjs': 'export const ledgerSource = "complete";\n',
+      'test/ledger.mjs': 'import { readFileSync } from "node:fs";\nimport { ledgerSource } from "../src/ledger/source.mjs";\nconst artifact = JSON.parse(readFileSync(new URL("../artifact/ledger.json", import.meta.url), "utf8"));\nif (artifact.source !== ledgerSource) throw new Error(`expected ${ledgerSource} got ${artifact.source}`);\n',
+    })
+    try {
+      const initial = await workspace.run('node', ['test/ledger.mjs'], 'node test/ledger.mjs')
+      const compact = buildCompactContinuitySummary({
+        summary: undefined,
+        continuity: undefined,
+        approvalAuditHistory: [],
+        harness: createQueryRuntimeHarnessState({
+          pendingArtifact: [{
+            queueId: 'artifact-ledger',
+            claims: ['artifact source receipt', 'artifact verification receipt'],
+            evidenceIds: [],
+            targetFiles: ['src/ledger/source.mjs', 'test/ledger.mjs'],
+          }],
+        }),
+      })
+      const decoded = decodeCompactSessionHarnessState({ continuity: compact.continuity })
+      expect(decoded.status).toBe('accepted')
+      if (decoded.status !== 'accepted') return
+
+      const actions: string[] = []
+      const summaries: ReturnType<typeof summarizeQueryRuntimeTrajectory>[] = []
+      const artifactReceipts: string[] = []
+      let finalStatus = ''
+      let finalReason = ''
+      let artifactAttempt = 0
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+          actions.push(runtimeAction.nextAction)
+          if (runtimeAction.nextAction === 'artifact' && artifactAttempt === 0) {
+            return output(role, {
+              content: 'ledger artifact marker without proof',
+              handoffTo: 'reviewer',
+              handoffReason: 'artifact proof incomplete',
+              requiredEvidence: ['artifact source receipt', 'artifact verification receipt'],
+              observedEvidence: [],
+              lastAction: { actionKind: 'artifact', target: 'artifact' },
+            })
+          }
+          if (runtimeAction.nextAction === 'read') {
+            return output(role, {
+              content: 'ledger source read',
+              handoffTo: 'coder',
+              handoffReason: 'complete ledger source',
+              evidenceFiles: ['src/ledger/source.mjs'],
+              requiredEvidence: ['artifact source receipt', 'artifact verification receipt'],
+              observedEvidence: ['src/ledger/source.mjs'],
+              lastAction: { actionKind: 'read', target: 'src/ledger/source.mjs' },
+            })
+          }
+          if (runtimeAction.nextAction === 'artifact') {
+            return output(role, {
+              content: 'ledger source completed; verification pending',
+              handoffTo: 'reviewer',
+              handoffReason: 'run ledger verification',
+              changedFiles: ['artifact/ledger.json'],
+              verification: { status: 'not-requested', reason: 'ledger verification pending' },
+              requiredEvidence: ['artifact source receipt', 'artifact verification receipt'],
+              observedEvidence: [],
+              lastAction: { actionKind: 'artifact', target: 'artifact/ledger.json', changedFiles: ['artifact/ledger.json'] },
+            })
+          }
+          return output(role, {
+            content: 'ledger artifact proof completed',
+            changedFiles: ['artifact/ledger.json'],
+            verifiedFiles: ['artifact/ledger.json', 'test/ledger.mjs'],
+            evidenceFiles: ['src/ledger/source.mjs', 'test/ledger.mjs'],
+            verification: { status: 'passed', command: 'node test/ledger.mjs', reason: 'ledger targeted verification passed' },
+            requiredEvidence: ['artifact source receipt', 'artifact verification receipt'],
+            observedEvidence: ['src/ledger/source.mjs', 'test/ledger.mjs'],
+            lastAction: { actionKind: 'verify', target: 'test/ledger.mjs', verifiedFiles: ['src/ledger/source.mjs'] },
+          })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          const item = batch.items[0]
+          if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+          if (item.actionKind === 'artifact') {
+            if (artifactAttempt > 0) {
+              await workspace.write({ 'artifact/ledger.json': '{"source":"complete"}\n' })
+            }
+            artifactAttempt += 1
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'artifact',
+                coveredFiles: artifactAttempt > 1 ? ['src/ledger/source.mjs'] : [],
+                affectedPaths: artifactAttempt > 1 ? ['artifact/ledger.json'] : [],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          if (item.actionKind === 'read') {
+            const source = await workspace.execution.readTextFile({
+              operationKind: 'file.read',
+              workspaceRoot: workspace.root,
+              absolutePath: join(workspace.root, 'src/ledger/source.mjs'),
+              authority: { mode: 'read-only', source: 'workspace-authority', reason: 'ledger source read' },
+              caller: 'query-runtime-harness-test',
+              reason: 'read disposable workspace source',
+              reportSafeTarget: 'src/ledger/source.mjs',
+            })
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'read',
+                coveredFiles: ['src/ledger/source.mjs'],
+                affectedPaths: ['src/ledger/source.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                sourceFacts: [{
+                  factId: 'source:ledger-source',
+                  path: 'src/ledger/source.mjs',
+                  summary: source.includes('draft') ? 'ledger source draft' : 'ledger source read',
+                  confidence: 'high',
+                }],
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          const commandResult = await workspace.run('node', ['test/ledger.mjs'], 'node test/ledger.mjs')
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'verify',
+              coveredFiles: ['artifact/ledger.json', 'test/ledger.mjs'],
+              affectedPaths: ['artifact/ledger.json', 'test/ledger.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_ledger_artifact_primary', 'write ledger artifact with source and verification receipt', {
+        maxTurns: 5,
+        runtimeSeed: seedWithHarness('sess_ledger_artifact_primary', decoded.harness, {
+          initialPrompt: 'write ledger artifact with source and verification receipt',
+          maxTurns: 5,
+        }),
+      })) {
+        if (event.type === 'runtime.save-point') {
+          summaries.push(summarizeQueryRuntimeTrajectory({
+            trajectory: event.savePoint.trajectory,
+            restored: true,
+          }))
+        }
+        if (event.type === 'runtime.task-proof' && event.projection.artifactReceipt) {
+          artifactReceipts.push(JSON.stringify({
+            blockers: event.projection.artifactReceipt.blockers,
+            claims: event.projection.artifactReceipt.claimEvidenceReceipts,
+            verification: event.projection.artifactReceipt.verificationEvidenceReceipts,
+            sources: event.projection.artifactReceipt.sourceReceipts,
+          }))
+        }
+        if (event.type === 'query.completed') {
+          finalStatus = event.result.status
+          finalReason = event.result.stopReason ?? ''
+        }
+      }
+
+      const finalSummary = summaries.at(-1)
+      expect(finalStatus, `reason:${finalReason};actions:${actions.join(',')};receipts:${artifactReceipts.join(' -> ')}`).toBe('completed')
+      expect(actions).toEqual(['artifact', 'read', 'artifact', 'verify'])
+      expect(initial.exitCode).not.toBe(0)
+      expect(artifactAttempt).toBe(2)
+      expect(finalSummary?.phaseCount).toBeGreaterThanOrEqual(6)
+      expect(finalSummary?.wrongOrIncompleteActions).toBeGreaterThanOrEqual(2)
+      expect(finalSummary?.artifactPendingThenCompleted).toBe(true)
+      expect(finalSummary?.durableRestore).toBe(true)
+      expect(finalSummary?.settlesSuccess).toBe(false)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('keeps threshold primary workspace trajectory stopped_not_proven after incomplete bad repair chain', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/threshold/value.mjs': 'export const threshold = 1;\n',
+      'test/threshold.mjs': 'import { threshold } from "../src/threshold/value.mjs";\nif (threshold !== 2) throw new Error(`expected threshold 2 got ${threshold}`);\n',
+    })
+    try {
+      const batchActions: string[] = []
+      const summaries: ReturnType<typeof summarizeQueryRuntimeTrajectory>[] = []
+      let finalStatus = ''
+      let finalReason = ''
+      let repairWrites = 0
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+          if (runtimeAction.nextAction === 'read') {
+            return output(role, {
+              content: 'threshold source read before repair',
+              handoffTo: 'coder',
+              handoffReason: 'repair threshold from source fact',
+              evidenceFiles: ['src/threshold/value.mjs'],
+              requiredEvidence: ['threshold targeted rerun'],
+              observedEvidence: [],
+              lastAction: { actionKind: 'read', target: 'src/threshold/value.mjs' },
+            })
+          }
+          return output(role, {
+            content: 'threshold incomplete chain',
+            requiredEvidence: ['threshold targeted rerun'],
+            observedEvidence: [],
+            lastAction: { actionKind: runtimeAction.nextAction, target: 'src/threshold/value.mjs' },
+          })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          const item = batch.items[0]
+          if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+          batchActions.push(item.actionKind)
+          if (item.actionKind === 'read') {
+            const source = await workspace.execution.readTextFile({
+              operationKind: 'file.read',
+              workspaceRoot: workspace.root,
+              absolutePath: join(workspace.root, 'src/threshold/value.mjs'),
+              authority: { mode: 'read-only', source: 'workspace-authority', reason: 'threshold source read' },
+              caller: 'query-runtime-harness-test',
+              reason: 'read disposable workspace source',
+              reportSafeTarget: 'src/threshold/value.mjs',
+            })
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'read',
+                coveredFiles: ['src/threshold/value.mjs'],
+                affectedPaths: ['src/threshold/value.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                sourceFacts: [{
+                  factId: 'source:threshold-value',
+                  path: 'src/threshold/value.mjs',
+                  summary: source.includes('threshold = 1') ? 'threshold currently equals 1' : 'threshold source read',
+                  confidence: 'high',
+                }],
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          if (item.actionKind === 'repair') {
+            repairWrites += 1
+            await workspace.write({ 'src/threshold/value.mjs': 'export const threshold = 3;\n' })
+          }
+          const commandResult = await workspace.run('node', ['test/threshold.mjs'], 'node test/threshold.mjs')
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: item.actionKind,
+              coveredFiles: ['src/threshold/value.mjs', 'test/threshold.mjs'],
+              affectedPaths: item.actionKind === 'repair'
+                ? ['src/threshold/value.mjs', 'test/threshold.mjs']
+                : ['src/threshold/value.mjs', 'test/threshold.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_threshold_incomplete_primary', 'repair threshold value after failed targeted command', {
+        maxTurns: 3,
+        runtimeSeed: seedWithHarness('sess_threshold_incomplete_primary', createQueryRuntimeHarnessState({
+          pendingVerification: [{ queueId: 'verify-threshold', targetFiles: ['src/threshold/value.mjs'], command: 'node test/threshold.mjs' }],
+        }), {
+          initialPrompt: 'repair threshold value after failed targeted command',
+          maxTurns: 3,
+        }),
+      })) {
+        if (event.type === 'runtime.save-point') {
+          summaries.push(summarizeQueryRuntimeTrajectory({
+            trajectory: event.savePoint.trajectory,
+            terminalStatus: finalStatus === 'stopped_not_proven' ? 'stopped_not_proven' : undefined,
+            missingProof: finalReason ? [finalReason] : [],
+          }))
+        }
+        if (event.type === 'query.completed') {
+          finalStatus = event.result.status
+          finalReason = event.result.stopReason ?? ''
+        }
+      }
+
+      const finalSummary = summarizeQueryRuntimeTrajectory({
+        trajectory: [],
+        terminalStatus: finalStatus === 'stopped_not_proven' ? 'stopped_not_proven' : undefined,
+        missingProof: finalReason ? [finalReason] : [],
+      })
+      const trajectorySummary = summaries.at(-1)
+      expect(finalStatus, `reason:${finalReason};batch:${batchActions.join(',')}`).toBe('stopped_not_proven')
+      expect(batchActions).toEqual(['verify', 'read', 'repair'])
+      expect(repairWrites).toBe(1)
+      expect(trajectorySummary?.phaseCount).toBeGreaterThanOrEqual(6)
+      expect(trajectorySummary?.wrongOrIncompleteActions).toBeGreaterThanOrEqual(2)
+      expect(finalSummary.notProvenMissingProof[0]).toContain('no safe action remains')
+      expect(finalSummary.settlesSuccess).toBe(false)
+    } finally {
+      await workspace.dispose()
+    }
   })
 
   it('executes allowance repair workspace path through discovery, failed rerun, generic green rejection, second strategy, and targeted pass', async () => {
@@ -1001,6 +1564,15 @@ describe('query runtime harness spine', () => {
             return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
           }
           if (item.actionKind === 'read') {
+            const source = await workspace.execution.readTextFile({
+              operationKind: 'file.read',
+              workspaceRoot: workspace.root,
+              absolutePath: join(workspace.root, 'src/allowance/rules.mjs'),
+              authority: { mode: 'read-only', source: 'workspace-authority', reason: 'allowance source read' },
+              caller: 'query-runtime-harness-test',
+              reason: 'read disposable workspace source',
+              reportSafeTarget: 'src/allowance/rules.mjs',
+            })
             return {
               batchId: batch.batchId,
               terminalSuccessClaim: false,
@@ -1011,6 +1583,12 @@ describe('query runtime harness spine', () => {
                 affectedPaths: ['src/allowance/rules.mjs', 'test/allowance.mjs'],
                 exitStatusClass: 'success',
                 failureClass: 'none',
+                sourceFacts: [{
+                  factId: 'source:allowance-rules',
+                  path: 'src/allowance/rules.mjs',
+                  summary: source.includes('allowance:') ? 'allowance source currently lower-case' : 'allowance source read',
+                  confidence: 'high',
+                }],
                 truncated: false,
                 redactionStatus: 'redacted',
                 terminalSuccessClaim: false,
@@ -1368,6 +1946,15 @@ describe('query runtime harness spine', () => {
           const item = batch.items[0]
           if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
           if (item.actionKind === 'read') {
+            const source = await workspace.execution.readTextFile({
+              operationKind: 'file.read',
+              workspaceRoot: workspace.root,
+              absolutePath: join(workspace.root, 'src/rebate/rule.mjs'),
+              authority: { mode: 'read-only', source: 'workspace-authority', reason: 'rebate source read' },
+              caller: 'query-runtime-harness-test',
+              reason: 'read disposable workspace source',
+              reportSafeTarget: 'src/rebate/rule.mjs',
+            })
             return {
               batchId: batch.batchId,
               terminalSuccessClaim: false,
@@ -1378,6 +1965,12 @@ describe('query runtime harness spine', () => {
                 affectedPaths: ['src/rebate/rule.mjs', 'test/rebate.mjs'],
                 exitStatusClass: 'success',
                 failureClass: 'none',
+                sourceFacts: [{
+                  factId: 'source:rebate-rule',
+                  path: 'src/rebate/rule.mjs',
+                  summary: source.includes('rebate:') ? 'rebate source currently lower-case' : 'rebate source read',
+                  confidence: 'high',
+                }],
                 truncated: false,
                 redactionStatus: 'redacted',
                 terminalSuccessClaim: false,

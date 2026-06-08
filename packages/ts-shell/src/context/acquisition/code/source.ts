@@ -16,12 +16,7 @@ export function contextResultSourceFacts(input: {
   if (input.sourceFacts !== undefined) {
     return normalizeRuntimeSourceFacts(input.sourceFacts)
   }
-  return normalizeRuntimeSourceFacts(input.paths.map((path) => ({
-    factId: `source:${compact(input.toolId)}:${compactPath(path)}`,
-    path,
-    summary: compact(input.diagnosticSummary ?? `context read for ${path}`),
-    confidence: 'low',
-  })))
+  return []
 }
 
 export function normalizeRuntimeSourceFacts(

@@ -213,25 +213,34 @@ function decisionFromStrategy(
 function repairPlanFor(
   harness: ReturnType<typeof ensureQueryRuntimeHarnessState>,
 ): QueryRuntimeActionDecision["repairPlan"] | undefined {
-  const repair = harness.pendingRepair.find((item) => item.hypothesisState);
-  if (!repair?.hypothesisState) return undefined;
+  const repair = harness.pendingRepair[0];
+  if (!repair) return undefined;
   const sourceFacts = sourceFactsForTargets({
     facts: harness.sourceFacts,
     targetFiles: repair.targetFiles,
-    sourceFactIds: repair.hypothesisState.sourceFactIds,
+    sourceFactIds: repair.hypothesisState?.sourceFactIds ?? repair.sourceFactIds,
   });
-  const hypothesis = sourceFacts.length > 0 && repair.hypothesisState.sourceFactIds.length === 0
+  const sourceFactIds = sourceFacts.map((fact) => fact.factId);
+  const hypothesis = !repair.hypothesisState && sourceFacts.length > 0
     ? classifyRepairHypothesis({
         failureClass: repair.failureClass,
         failureSummary: repair.failureSummary,
         targetFiles: repair.targetFiles,
-        sourceFactIds: sourceFacts.map((fact) => fact.factId),
+        sourceFactIds,
       })
-    : repair.hypothesisState;
+    : sourceFacts.length > 0 && (repair.hypothesisState?.sourceFactIds.length ?? 0) === 0
+      ? classifyRepairHypothesis({
+          failureClass: repair.failureClass,
+          failureSummary: repair.failureSummary,
+          targetFiles: repair.targetFiles,
+          sourceFactIds,
+        })
+      : repair.hypothesisState;
+  if (!hypothesis) return undefined;
   return Object.freeze({
     hypothesis,
     sourceFacts,
-    blockedRepeat: sourceFacts.length === 0 && repair.hypothesisState.sourceFactIds.length > 0,
+    blockedRepeat: sourceFacts.length === 0 && (repair.hypothesisState?.sourceFactIds.length ?? repair.sourceFactIds?.length ?? 0) > 0,
   });
 }
 
