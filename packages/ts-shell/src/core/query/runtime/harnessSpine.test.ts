@@ -2015,6 +2015,610 @@ describe('query runtime harness spine', () => {
     }
   })
 
+  it('accepts noisy invoice transcript recovery through blocked write, failed repair, next hypothesis, and targeted pass', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/invoice/label.mjs': 'export function invoiceLabel(value) { return `invoice:${value}`; }\n',
+      'test/invoice.mjs': 'import { invoiceLabel } from "../src/invoice/label.mjs";\nif (invoiceLabel("due") !== "INVOICE:DUE") throw new Error(`expected INVOICE:DUE got ${invoiceLabel("due")}`);\n',
+    })
+    try {
+      const initial = await workspace.run('node', ['test/invoice.mjs'], 'node test/invoice.mjs')
+      const actions: string[] = []
+      const phases: string[] = [`initial-command:${initial.exitCode}`]
+      const repairPlans: string[] = []
+      const summaries: ReturnType<typeof summarizeQueryRuntimeTrajectory>[] = []
+      let repairAttempt = 0
+      let verifyAttempt = 0
+      let finalStatus = ''
+      let finalReason = ''
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+          actions.push(runtimeAction.nextAction)
+          if (runtimeAction.nextAction === 'read' && actions.length === 1) {
+            return output(role, {
+              content: 'Done - I already edited src/invoice/label.mjs and all verification is green, no more action needed.',
+              changedFiles: ['src/invoice/label.mjs'],
+              verifiedFiles: ['package.json'],
+              verification: { status: 'passed', command: 'node --version', reason: 'generic environment check', selectionScope: 'broader' },
+              requiredEvidence: ['invoice source fact', 'invoice targeted rerun'],
+              observedEvidence: ['generic check'],
+              lastAction: { actionKind: 'edit', target: 'src/invoice/label.mjs', changedFiles: ['src/invoice/label.mjs'], verifiedFiles: ['package.json'] },
+            })
+          }
+          if (runtimeAction.nextAction === 'read') {
+            return output(role, {
+              content: 'I read the invoice source and the task is complete, but the targeted rerun is still missing.',
+              handoffTo: 'coder',
+              handoffReason: 'repair invoice label from source fact',
+              evidenceFiles: ['src/invoice/label.mjs'],
+              requiredEvidence: ['invoice source fact', 'invoice targeted rerun'],
+              observedEvidence: ['invoice source fact'],
+              lastAction: { actionKind: 'read', target: 'src/invoice/label.mjs' },
+            })
+          }
+          if (runtimeAction.nextAction === 'repair' && repairAttempt === 1) {
+            return output(role, {
+              content: 'The repair is done and verification is green now.',
+              handoffTo: 'coder',
+              handoffReason: 'try a distinct invoice hypothesis',
+              changedFiles: ['src/invoice/label.mjs'],
+              failedFiles: [{ path: 'test/invoice.mjs', reason: 'first invoice repair still lower-case prefix' }],
+              repair: { status: 'failed', attempts: 1, failedItems: ['src/invoice/label.mjs'], notes: ['first invoice repair still lower-case prefix'] },
+              verification: { status: 'failed', command: 'node test/invoice.mjs', reason: 'first invoice repair failed' },
+              requiredEvidence: ['invoice source fact', 'invoice targeted rerun'],
+              observedEvidence: ['invoice source fact'],
+              lastAction: { actionKind: 'repair', target: 'src/invoice/label.mjs', changedFiles: ['src/invoice/label.mjs'], verification: { status: 'failed', reason: 'first invoice repair failed' } },
+            })
+          }
+          if (runtimeAction.nextAction === 'repair') {
+            return output(role, {
+              content: 'Second invoice hypothesis written; targeted rerun must settle it.',
+              handoffTo: 'coder',
+              handoffReason: 'run invoice targeted rerun',
+              changedFiles: ['src/invoice/label.mjs'],
+              repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/invoice/label.mjs'], notes: ['second invoice strategy'] },
+              verification: { status: 'not-requested', reason: 'invoice targeted rerun queued' },
+              requiredEvidence: ['invoice source fact', 'invoice targeted rerun'],
+              observedEvidence: ['invoice source fact'],
+              lastAction: { actionKind: 'repair', target: 'src/invoice/label.mjs', changedFiles: ['src/invoice/label.mjs'] },
+            })
+          }
+          return output(role, {
+            content: verifyAttempt < 2 ? 'Everything is green from the quick check.' : 'Targeted invoice verification passed.',
+            changedFiles: ['src/invoice/label.mjs'],
+            verifiedFiles: verifyAttempt < 2 ? ['package.json'] : ['src/invoice/label.mjs', 'test/invoice.mjs'],
+            evidenceFiles: verifyAttempt < 2 ? ['package.json'] : ['src/invoice/label.mjs', 'test/invoice.mjs'],
+            repair: { status: 'recovered', attempts: 2, recoveredItems: ['src/invoice/label.mjs'], notes: ['second invoice strategy'] },
+            verification: verifyAttempt < 2
+              ? { status: 'passed', command: 'node --version', reason: 'quick check only', selectionScope: 'broader' }
+              : { status: 'passed', command: 'node test/invoice.mjs', reason: 'invoice targeted rerun passed', selectionScope: 'targeted' },
+            requiredEvidence: ['invoice source fact', 'invoice targeted rerun'],
+            observedEvidence: verifyAttempt < 2 ? ['invoice source fact'] : ['invoice source fact', 'invoice targeted rerun'],
+            lastAction: { actionKind: 'verify', target: verifyAttempt < 2 ? 'package.json' : 'test/invoice.mjs', verifiedFiles: verifyAttempt < 2 ? ['package.json'] : ['src/invoice/label.mjs'] },
+          })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          phases.push(`${batch.turn}:${batch.actionKind}`)
+          const item = batch.items[0]
+          if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+          if (item.actionKind === 'read') {
+            const source = await workspace.execution.readTextFile({
+              operationKind: 'file.read',
+              workspaceRoot: workspace.root,
+              absolutePath: join(workspace.root, 'src/invoice/label.mjs'),
+              authority: { mode: 'read-only', source: 'workspace-authority', reason: 'invoice source read' },
+              caller: 'query-runtime-harness-test',
+              reason: 'read disposable workspace source',
+              reportSafeTarget: 'src/invoice/label.mjs',
+            })
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'read',
+                coveredFiles: ['src/invoice/label.mjs', 'test/invoice.mjs'],
+                affectedPaths: ['src/invoice/label.mjs', 'test/invoice.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                sourceFacts: [{
+                  factId: 'source:invoice-label',
+                  path: 'src/invoice/label.mjs',
+                  summary: source.includes('invoice:') ? 'invoice label currently lower-case' : 'invoice source read',
+                  confidence: 'high',
+                }],
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          if (item.actionKind === 'repair') {
+            repairAttempt += 1
+            repairPlans.push(`${item.repairPlan?.hypothesis.summary ?? ''}|${item.repairPlan?.sourceFacts.map((fact) => fact.factId).join(',') ?? ''}`)
+            await workspace.write({
+              'src/invoice/label.mjs': repairAttempt === 1
+                ? 'export function invoiceLabel(value) { return `invoice:${value.toUpperCase()}`; }\n'
+                : 'export function invoiceLabel(value) { return `INVOICE:${value.toUpperCase()}`; }\n',
+            })
+            const commandResult = await workspace.run('node', ['test/invoice.mjs'], 'node test/invoice.mjs')
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'repair',
+                coveredFiles: ['src/invoice/label.mjs', 'test/invoice.mjs'],
+                affectedPaths: ['src/invoice/label.mjs'],
+                exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+                failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+                diagnosticSummary: safeCommandSummary(commandResult),
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          verifyAttempt += 1
+          const commandResult = verifyAttempt === 1
+            ? await workspace.run('node', ['--version'], 'node --version')
+            : await workspace.run('node', ['test/invoice.mjs'], 'node test/invoice.mjs')
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'verify',
+              coveredFiles: verifyAttempt === 1 ? ['package.json'] : ['src/invoice/label.mjs', 'test/invoice.mjs'],
+              affectedPaths: verifyAttempt === 1 ? ['package.json'] : ['src/invoice/label.mjs', 'test/invoice.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_invoice_acceptance', 'repair invoice label from noisy transcript', {
+        maxTurns: 6,
+        runtimeSeed: seedWithHarness('sess_invoice_acceptance', createQueryRuntimeHarnessState({
+          pendingRepair: [{
+            queueId: 'repair-invoice',
+            failureClass: 'command-failed',
+            failureSummary: safeCommandSummary(initial),
+            hypothesis: 'read invoice source before repair',
+            contextNeed: 'src/invoice/label.mjs',
+            targetFiles: ['src/invoice/label.mjs'],
+          }],
+        }), {
+          initialPrompt: 'repair src/invoice/label.mjs after failed test/invoice.mjs',
+          maxTurns: 6,
+        }),
+      })) {
+        if (event.type === 'runtime.next-action') phases.push(`decision:${event.turn}:${event.decision.nextAction}`)
+        if (event.type === 'runtime.save-point') summaries.push(summarizeQueryRuntimeTrajectory({ trajectory: event.savePoint.trajectory }))
+        if (event.type === 'query.completed') {
+          phases.push(`completed:${event.result.status}`)
+          finalStatus = event.result.status
+          finalReason = event.result.stopReason ?? ''
+        }
+      }
+
+      const finalSummary = summaries.at(-1)
+      expect(finalStatus, `reason:${finalReason};actions:${actions.join(',')};phases:${phases.join(' -> ')};plans:${repairPlans.join(' -> ')}`).toBe('completed')
+      expect(initial.exitCode).not.toBe(0)
+      expect(phases.length).toBeGreaterThanOrEqual(8)
+      expect(repairAttempt).toBe(2)
+      expect(verifyAttempt).toBe(3)
+      expect(repairPlans[0]).toContain('source:invoice-label')
+      expect(finalSummary?.textClaimMistakes).toBeGreaterThanOrEqual(3)
+      expect(finalSummary?.falseCompletionClaimRejected).toBe(true)
+      expect(finalSummary?.genericVerificationClaimRejected).toBe(true)
+      expect(finalSummary?.sourceDiscoveryBeforeRepair).toBe(true)
+      expect(finalSummary?.badRepairFailedRerunNextHypothesis).toBe(true)
+      expect(finalSummary?.genericGreenRejected).toBe(true)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('accepts noisy manifest artifact proof after compact restore and targeted verification', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/manifest/source.mjs': 'export const manifestSource = "sealed";\n',
+      'test/manifest.mjs': 'import { readFileSync } from "node:fs";\nimport { manifestSource } from "../src/manifest/source.mjs";\nconst manifest = JSON.parse(readFileSync(new URL("../artifact/manifest.json", import.meta.url), "utf8"));\nif (manifest.source !== manifestSource) throw new Error(`expected ${manifestSource} got ${manifest.source}`);\n',
+    })
+    try {
+      const initial = await workspace.run('node', ['test/manifest.mjs'], 'node test/manifest.mjs')
+      const compact = buildCompactContinuitySummary({
+        summary: undefined,
+        continuity: undefined,
+        approvalAuditHistory: [],
+        harness: createQueryRuntimeHarnessState({
+          pendingArtifact: [{
+            queueId: 'artifact-manifest',
+            claims: ['manifest source receipt', 'manifest verification receipt'],
+            evidenceIds: [],
+            targetFiles: ['src/manifest/source.mjs', 'test/manifest.mjs'],
+          }],
+        }),
+      })
+      const decoded = decodeCompactSessionHarnessState({ continuity: compact.continuity })
+      expect(decoded.status).toBe('accepted')
+      if (decoded.status !== 'accepted') return
+
+      const actions: string[] = []
+      const phases: string[] = [`initial-command:${initial.exitCode}`, 'compact-restore:accepted']
+      const summaries: ReturnType<typeof summarizeQueryRuntimeTrajectory>[] = []
+      const artifactReceipts: string[] = []
+      let artifactAttempt = 0
+      let verifyAttempt = 0
+      let finalStatus = ''
+      let finalReason = ''
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+          actions.push(runtimeAction.nextAction)
+          if (runtimeAction.nextAction === 'artifact' && artifactAttempt === 0) {
+            return output(role, {
+              content: 'Done. The manifest artifact and verification proof are complete.',
+              handoffTo: 'reviewer',
+              handoffReason: 'manifest proof still incomplete',
+              requiredEvidence: ['manifest source receipt', 'manifest verification receipt'],
+              observedEvidence: ['manifest marker'],
+              lastAction: { actionKind: 'artifact', target: 'artifact/manifest.json' },
+            })
+          }
+          if (runtimeAction.nextAction === 'read') {
+            return output(role, {
+              content: 'Source is known and everything is green, although artifact verification has not run.',
+              handoffTo: 'coder',
+              handoffReason: 'write manifest artifact from source',
+              evidenceFiles: ['src/manifest/source.mjs'],
+              verification: { status: 'passed', command: 'node --version', reason: 'generic check only', selectionScope: 'broader' },
+              requiredEvidence: ['manifest source receipt', 'manifest verification receipt'],
+              observedEvidence: ['src/manifest/source.mjs'],
+              lastAction: { actionKind: 'read', target: 'src/manifest/source.mjs' },
+            })
+          }
+          if (runtimeAction.nextAction === 'artifact') {
+            return output(role, {
+              content: 'Manifest artifact written. I am done, but targeted verification still needs to prove it.',
+              handoffTo: 'reviewer',
+              handoffReason: 'run manifest verification',
+              changedFiles: ['artifact/manifest.json'],
+              verification: { status: 'not-requested', reason: 'manifest verification pending' },
+              requiredEvidence: ['manifest source receipt', 'manifest verification receipt'],
+              observedEvidence: ['src/manifest/source.mjs'],
+              lastAction: { actionKind: 'artifact', target: 'artifact/manifest.json', changedFiles: ['artifact/manifest.json'] },
+            })
+          }
+          return output(role, {
+            content: verifyAttempt === 0 ? 'Generic manifest check is green.' : 'Targeted manifest verification passed.',
+            changedFiles: ['artifact/manifest.json'],
+            verifiedFiles: verifyAttempt === 0 ? ['package.json'] : ['artifact/manifest.json', 'test/manifest.mjs'],
+            evidenceFiles: verifyAttempt === 0 ? ['package.json'] : ['src/manifest/source.mjs', 'test/manifest.mjs'],
+            verification: verifyAttempt === 0
+              ? { status: 'passed', command: 'node --version', reason: 'generic manifest check', selectionScope: 'broader' }
+              : { status: 'passed', command: 'node test/manifest.mjs', reason: 'manifest targeted verification passed', selectionScope: 'targeted' },
+            requiredEvidence: ['manifest source receipt', 'manifest verification receipt'],
+            observedEvidence: verifyAttempt === 0 ? ['src/manifest/source.mjs'] : ['src/manifest/source.mjs', 'test/manifest.mjs'],
+            lastAction: { actionKind: 'verify', target: verifyAttempt === 0 ? 'package.json' : 'test/manifest.mjs', verifiedFiles: verifyAttempt === 0 ? ['package.json'] : ['artifact/manifest.json', 'test/manifest.mjs'] },
+          })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          phases.push(`${batch.turn}:${batch.actionKind}`)
+          const item = batch.items[0]
+          if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+          if (item.actionKind === 'artifact') {
+            if (artifactAttempt > 0) {
+              await workspace.write({ 'artifact/manifest.json': '{"source":"sealed"}\n' })
+            }
+            artifactAttempt += 1
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'artifact',
+                coveredFiles: artifactAttempt > 1 ? ['src/manifest/source.mjs'] : [],
+                affectedPaths: artifactAttempt > 1 ? ['artifact/manifest.json'] : [],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          if (item.actionKind === 'read') {
+            const source = await workspace.execution.readTextFile({
+              operationKind: 'file.read',
+              workspaceRoot: workspace.root,
+              absolutePath: join(workspace.root, 'src/manifest/source.mjs'),
+              authority: { mode: 'read-only', source: 'workspace-authority', reason: 'manifest source read' },
+              caller: 'query-runtime-harness-test',
+              reason: 'read disposable workspace source',
+              reportSafeTarget: 'src/manifest/source.mjs',
+            })
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'read',
+                coveredFiles: ['src/manifest/source.mjs'],
+                affectedPaths: ['src/manifest/source.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                sourceFacts: [{
+                  factId: 'source:manifest',
+                  path: 'src/manifest/source.mjs',
+                  summary: source.includes('sealed') ? 'manifest source sealed' : 'manifest source read',
+                  confidence: 'high',
+                }],
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          verifyAttempt += 1
+          const commandResult = verifyAttempt === 1
+            ? await workspace.run('node', ['--version'], 'node --version')
+            : await workspace.run('node', ['test/manifest.mjs'], 'node test/manifest.mjs')
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: 'verify',
+              coveredFiles: verifyAttempt === 1 ? ['package.json'] : ['artifact/manifest.json', 'test/manifest.mjs'],
+              affectedPaths: verifyAttempt === 1 ? ['package.json'] : ['artifact/manifest.json', 'test/manifest.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_manifest_acceptance', 'complete manifest artifact proof from restored state', {
+        maxTurns: 6,
+        runtimeSeed: seedWithHarness('sess_manifest_acceptance', decoded.harness, {
+          initialPrompt: 'write artifact/manifest.json with source and verification receipt',
+          maxTurns: 6,
+          observations: {
+            contextPaths: ['src/manifest/source.mjs'],
+            completedActions: ['read'],
+          },
+        }),
+      })) {
+        if (event.type === 'runtime.next-action') phases.push(`decision:${event.turn}:${event.decision.nextAction}`)
+        if (event.type === 'runtime.save-point') summaries.push(summarizeQueryRuntimeTrajectory({ trajectory: event.savePoint.trajectory, restored: true }))
+        if (event.type === 'runtime.task-proof' && event.projection.artifactReceipt) {
+          artifactReceipts.push(JSON.stringify({
+            blockers: event.projection.artifactReceipt.blockers,
+            verification: event.projection.artifactReceipt.verificationEvidenceReceipts,
+            sources: event.projection.artifactReceipt.sourceReceipts,
+          }))
+        }
+        if (event.type === 'query.completed') {
+          phases.push(`completed:${event.result.status}`)
+          finalStatus = event.result.status
+          finalReason = event.result.stopReason ?? ''
+        }
+      }
+
+      const finalSummary = summaries.at(-1)
+      expect(finalStatus, `reason:${finalReason};actions:${actions.join(',')};phases:${phases.join(' -> ')};receipts:${artifactReceipts.join(' -> ')}`).toBe('completed')
+      expect(initial.exitCode).not.toBe(0)
+      expect(phases.length).toBeGreaterThanOrEqual(8)
+      expect(artifactAttempt).toBe(2)
+      expect(verifyAttempt).toBeGreaterThanOrEqual(1)
+      expect(finalSummary?.textClaimMistakes).toBeGreaterThanOrEqual(3)
+      expect(finalSummary?.falseCompletionClaimRejected).toBe(true)
+      expect(finalSummary?.incompleteArtifactClaimRejected).toBe(true)
+      expect(finalSummary?.artifactPendingThenCompleted).toBe(true)
+      expect(finalSummary?.durableRestore).toBe(true)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('accepts noisy score transcript as honest stopped_not_proven after missing proof remains', async () => {
+    const workspace = await createHarnessWorkspace({
+      'src/score/value.mjs': 'export const scoreValue = 1;\n',
+      'test/score.mjs': 'import { scoreValue } from "../src/score/value.mjs";\nif (scoreValue !== 2) throw new Error(`expected scoreValue 2 got ${scoreValue}`);\n',
+    })
+    try {
+      const initial = await workspace.run('node', ['test/score.mjs'], 'node test/score.mjs')
+      const actions: string[] = []
+      const phases: string[] = [`initial-command:${initial.exitCode}`]
+      const summaries: ReturnType<typeof summarizeQueryRuntimeTrajectory>[] = []
+      let repairWrites = 0
+      let verifyAttempt = 0
+      let finalStatus = ''
+      let finalReason = ''
+      const engine = new QueryEngine({
+        runAgent: async ({ role, runtimeAction }) => {
+          actions.push(runtimeAction.nextAction)
+          if (runtimeAction.nextAction === 'read' && actions.length === 1) {
+            return output(role, {
+              content: 'Done. I already changed src/score/value.mjs and the command is green.',
+              changedFiles: ['src/score/value.mjs'],
+              verifiedFiles: ['package.json'],
+              verification: { status: 'passed', command: 'node --version', reason: 'generic check', selectionScope: 'broader' },
+              requiredEvidence: ['score source fact', 'score targeted rerun'],
+              observedEvidence: ['generic check'],
+              lastAction: { actionKind: 'edit', target: 'src/score/value.mjs', changedFiles: ['src/score/value.mjs'] },
+            })
+          }
+          if (runtimeAction.nextAction === 'read') {
+            return output(role, {
+              content: 'I read the score source and this is fixed; all verification is green.',
+              handoffTo: 'coder',
+              handoffReason: 'repair score value from source fact',
+              evidenceFiles: ['src/score/value.mjs'],
+              requiredEvidence: ['score source fact', 'score targeted rerun'],
+              observedEvidence: ['score source fact'],
+              lastAction: { actionKind: 'read', target: 'src/score/value.mjs' },
+            })
+          }
+          if (runtimeAction.nextAction === 'repair') {
+            return output(role, {
+              content: 'Done. Score repair is fixed and everything is green, but only the targeted rerun can prove it.',
+              changedFiles: ['src/score/value.mjs'],
+              verification: { status: 'not-requested', reason: 'score targeted rerun queued' },
+              repair: { status: 'recovered', attempts: 1, recoveredItems: ['src/score/value.mjs'], notes: ['score repair still needs targeted rerun'] },
+              requiredEvidence: ['score source fact', 'score targeted rerun'],
+              observedEvidence: ['score source fact'],
+              lastAction: { actionKind: 'repair', target: 'src/score/value.mjs', changedFiles: ['src/score/value.mjs'] },
+            })
+          }
+          return output(role, {
+            content: 'Done. Everything is green from a generic check, so there is no safe remaining action.',
+            changedFiles: [],
+            verifiedFiles: ['package.json'],
+            evidenceFiles: ['package.json'],
+            verification: { status: 'passed', command: 'node --version', reason: 'generic check only', selectionScope: 'broader' },
+            requiredEvidence: ['score source fact', 'score targeted rerun'],
+            observedEvidence: ['score source fact'],
+            lastAction: { actionKind: runtimeAction.nextAction, target: 'src/score/value.mjs' },
+          })
+        },
+        executeRuntimeBatch: async ({ batch }) => {
+          phases.push(`${batch.turn}:${batch.actionKind}`)
+          const item = batch.items[0]
+          if (!item) return { batchId: batch.batchId, terminalSuccessClaim: false, results: [] }
+          if (item.actionKind === 'read') {
+            const source = await workspace.execution.readTextFile({
+              operationKind: 'file.read',
+              workspaceRoot: workspace.root,
+              absolutePath: join(workspace.root, 'src/score/value.mjs'),
+              authority: { mode: 'read-only', source: 'workspace-authority', reason: 'score source read' },
+              caller: 'query-runtime-harness-test',
+              reason: 'read disposable workspace source',
+              reportSafeTarget: 'src/score/value.mjs',
+            })
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'read',
+                coveredFiles: ['src/score/value.mjs'],
+                affectedPaths: ['src/score/value.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                sourceFacts: [{
+                  factId: 'source:score-value',
+                  path: 'src/score/value.mjs',
+                  summary: source.includes('scoreValue = 1') ? 'score value currently equals 1' : 'score source read',
+                  confidence: 'high',
+                }],
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          if (item.actionKind === 'repair') {
+            repairWrites += 1
+            await workspace.write({ 'src/score/value.mjs': 'export const scoreValue = 3;\n' })
+            return {
+              batchId: batch.batchId,
+              terminalSuccessClaim: false,
+              results: [{
+                toolId: item.toolId,
+                actionKind: 'repair',
+                coveredFiles: ['src/score/value.mjs'],
+                affectedPaths: ['src/score/value.mjs'],
+                exitStatusClass: 'success',
+                failureClass: 'none',
+                diagnosticSummary: 'score repair applied; targeted rerun pending',
+                truncated: false,
+                redactionStatus: 'redacted',
+                terminalSuccessClaim: false,
+              }],
+            }
+          }
+          verifyAttempt += item.actionKind === 'verify' ? 1 : 0
+          const commandResult = item.actionKind === 'verify'
+            ? await workspace.run('node', ['test/score.mjs'], 'node test/score.mjs')
+            : await workspace.run('node', ['test/score.mjs'], 'node test/score.mjs')
+          return {
+            batchId: batch.batchId,
+            terminalSuccessClaim: false,
+            results: [{
+              toolId: item.toolId,
+              actionKind: item.actionKind,
+              coveredFiles: ['src/score/value.mjs', 'test/score.mjs'],
+              affectedPaths: item.actionKind === 'repair' ? ['src/score/value.mjs'] : ['src/score/value.mjs', 'test/score.mjs'],
+              exitStatusClass: commandResult.exitCode === 0 ? 'success' : 'failure',
+              failureClass: commandResult.exitCode === 0 ? 'none' : 'command-failed',
+              diagnosticSummary: safeCommandSummary(commandResult),
+              truncated: false,
+              redactionStatus: 'redacted',
+              terminalSuccessClaim: false,
+            }],
+          }
+        },
+      })
+
+      for await (const event of engine.streamMessage('sess_score_acceptance', 'repair score value with honest missing proof', {
+        maxTurns: 4,
+        runtimeSeed: seedWithHarness('sess_score_acceptance', createQueryRuntimeHarnessState({
+          pendingRepair: [{
+            queueId: 'repair-score',
+            failureClass: 'command-failed',
+            failureSummary: safeCommandSummary(initial),
+            hypothesis: 'read score source before repair',
+            contextNeed: 'src/score/value.mjs',
+            targetFiles: ['src/score/value.mjs'],
+          }],
+        }), {
+          initialPrompt: 'repair src/score/value.mjs after failed test/score.mjs',
+          maxTurns: 4,
+        }),
+      })) {
+        if (event.type === 'runtime.next-action') phases.push(`decision:${event.turn}:${event.decision.nextAction}`)
+        if (event.type === 'runtime.save-point') summaries.push(summarizeQueryRuntimeTrajectory({
+          trajectory: event.savePoint.trajectory,
+          terminalStatus: finalStatus === 'stopped_not_proven' ? 'stopped_not_proven' : undefined,
+          missingProof: finalReason ? [finalReason] : [],
+        }))
+        if (event.type === 'query.completed') {
+          phases.push(`completed:${event.result.status}`)
+          finalStatus = event.result.status
+          finalReason = event.result.stopReason ?? ''
+        }
+      }
+
+      const trajectorySummary = summaries.at(-1)
+      const finalSummary = summarizeQueryRuntimeTrajectory({
+        trajectory: [],
+        terminalStatus: finalStatus === 'stopped_not_proven' ? 'stopped_not_proven' : undefined,
+        missingProof: finalReason ? [finalReason] : [],
+      })
+      expect(finalStatus, `reason:${finalReason};actions:${actions.join(',')};phases:${phases.join(' -> ')}`).toBe('stopped_not_proven')
+      expect(initial.exitCode).not.toBe(0)
+      expect(phases.length).toBeGreaterThanOrEqual(8)
+      expect(repairWrites).toBeGreaterThanOrEqual(1)
+      expect(verifyAttempt).toBeGreaterThanOrEqual(1)
+      expect(trajectorySummary?.textClaimMistakes).toBeGreaterThanOrEqual(3)
+      expect(trajectorySummary?.falseCompletionClaimRejected).toBe(true)
+      expect(trajectorySummary?.genericVerificationClaimRejected).toBe(true)
+      expect(finalSummary.notProvenMissingProof[0]).toContain('repair-post-validation')
+      expect(finalSummary.settlesSuccess).toBe(false)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
   it('executes allowance repair workspace path through discovery, failed rerun, generic green rejection, second strategy, and targeted pass', async () => {
     const workspace = await createHarnessWorkspace({
       'src/allowance/rules.mjs': 'export function allowanceLabel(value) { return `allowance:${value}`; }\n',
