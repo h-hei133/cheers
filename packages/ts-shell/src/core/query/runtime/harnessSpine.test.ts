@@ -3362,6 +3362,52 @@ describe('query runtime harness spine', () => {
     expect(result.manualCorrection).toBe(false)
     expect(result.falseCompleteBlocked).toBe(true)
   })
+
+  it('executes verification execution TypeScript worktree task through failed repair and second hypothesis', async () => {
+    const result = await runVerificationExecutionTypeScriptWorktreeTask()
+
+    expect(`${result.taskId}:${result.verdict}`, result.safeSummaries.join(' | ')).toBe('verification-execution-typescript-worktree:completed')
+    expect(result.executed).toBe(true)
+    expect(result.repositorySubdirectory).toBe('packages/ts-shell/src/verification/execution')
+    expect(result.changedFileCount).toBeGreaterThanOrEqual(3)
+    expect(result.initialFailureOutput.length).toBeGreaterThan(0)
+    expect(result.targetedTestChanged).toBe(true)
+    expect(result.repairQueueAndTargetedRerun).toBe(true)
+    expect(result.secondHypothesisCompleted).toBe(true)
+    expect(result.manualCorrection).toBe(false)
+    expect(result.falseCompleteBlocked).toBe(true)
+  }, 20000)
+
+  it('executes artifact workflow TypeScript worktree task with source receipt proof and third hypothesis', async () => {
+    const result = await runArtifactWorkflowTypeScriptWorktreeTask()
+
+    expect(`${result.taskId}:${result.verdict}`, result.safeSummaries.join(' | ')).toBe('artifact-workflow-typescript-worktree:completed')
+    expect(result.executed).toBe(true)
+    expect(result.repositorySubdirectory).toBe('packages/ts-shell/src/artifacts/workflow')
+    expect(result.changedFileCount).toBeGreaterThanOrEqual(3)
+    expect(result.initialFailureOutput.length).toBeGreaterThan(0)
+    expect(result.targetedTestChanged).toBe(true)
+    expect(result.receiptProof).toBe(true)
+    expect(result.repairQueueAndTargetedRerun).toBe(true)
+    expect(result.secondHypothesisCompleted).toBe(true)
+    expect(result.manualCorrection).toBe(false)
+    expect(result.falseCompleteBlocked).toBe(true)
+  }, 25000)
+
+  it('keeps repair flow TypeScript worktree task stopped_not_proven after compact restore with exact missing proof', async () => {
+    const result = await runRepairFlowTypeScriptWorktreeNotProvenTask()
+
+    expect(`${result.taskId}:${result.verdict}`).toBe('repair-flow-typescript-worktree:stopped_not_proven')
+    expect(result.executed).toBe(true)
+    expect(result.repositorySubdirectory).toBe('packages/ts-shell/src/repair/flow')
+    expect(result.changedFileCount).toBeGreaterThanOrEqual(2)
+    expect(result.initialFailureOutput.length).toBeGreaterThan(0)
+    expect(result.targetedTestChanged).toBe(true)
+    expect(result.restoreOrContinuation).toBe(true)
+    expect(result.exactMissingProof).toBe(true)
+    expect(result.manualCorrection).toBe(false)
+    expect(result.falseCompleteBlocked).toBe(true)
+  }, 20000)
 })
 
 interface HarnessWorkspaceTaskRecord {
@@ -3581,6 +3627,258 @@ async function runRepairFlowNotProvenSubdirectoryTask(): Promise<HarnessWorkspac
   })
 }
 
+async function runVerificationExecutionTypeScriptWorktreeTask(): Promise<HarnessWorkspaceTaskRecord> {
+  return runTypeScriptWorktreeTask({
+    taskId: 'verification-execution-typescript-worktree',
+    repositorySubdirectory: 'packages/ts-shell/src/verification/execution',
+    sessionId: 'sess_verification_execution_typescript_worktree',
+    prompt: 'repair verification execution TypeScript worktree coverage',
+    sourceFiles: ['packages/ts-shell/src/verification/execution/model.ts'],
+    initialFiles: {
+      ...typeScriptProjectFiles(),
+      'packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts': `import { strict as assert } from 'node:assert'
+import { executeVerification } from './model.js'
+
+const execution = executeVerification({
+  selection: { state: 'selected-passed', selectedInputs: { changedFiles: ['packages/ts-shell/src/verification/execution/model.ts'] }, blockers: [] },
+  strategy: { state: 'ready', nextAction: 'verify', actions: ['verify'], blockers: [] },
+  contextReady: true,
+  changedFiles: [
+    'packages/ts-shell/src/verification/execution/model.ts',
+    'packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts',
+  ],
+  commandExecutions: [{
+    command: 'tsx packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts',
+    coveredFiles: ['packages/ts-shell/src/verification/execution/model.ts'],
+    status: 'passed',
+  }],
+})
+
+assert.equal(execution.state, 'passed')
+assert.deepEqual(execution.blockers, [])
+`,
+    },
+    command: tsxWorktreeCommand('packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts'),
+    readTarget: 'packages/ts-shell/src/verification/execution/model.ts',
+    pendingQueueId: 'repair-verification-execution-typescript-worktree',
+    failureClass: 'command-failed',
+    hypothesis: 'read verification execution TypeScript source before repair',
+    targetFiles: [
+      'packages/ts-shell/src/verification/execution/model.ts',
+      'packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts',
+      'packages/ts-shell/src/verification/execution/coverageNote.ts',
+    ],
+    requiredEvidence: ['verification TypeScript source discovery', 'verification TypeScript targeted rerun'],
+    sourceFacts: [{
+      factId: 'source:verification-execution-typescript-model',
+      path: 'packages/ts-shell/src/verification/execution/model.ts',
+      summary: 'verification execution requires command coverage for changed TypeScript files',
+      confidence: 'high',
+    }],
+    repairAttempts: [{
+      label: 'first verification TypeScript coverage hypothesis',
+      writes: {
+        'packages/ts-shell/src/verification/execution/coverageNote.ts': 'export const coverageNote = "source-only coverage is incomplete" as const\n',
+        'packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts': `import { strict as assert } from 'node:assert'
+import { executeVerification } from './model.js'
+
+const execution = executeVerification({
+  selection: { state: 'selected-passed', selectedInputs: { changedFiles: ['packages/ts-shell/src/verification/execution/model.ts'] }, blockers: [] },
+  strategy: { state: 'ready', nextAction: 'verify', actions: ['verify'], blockers: [] },
+  contextReady: true,
+  changedFiles: [
+    'packages/ts-shell/src/verification/execution/model.ts',
+    'packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts',
+  ],
+  commandExecutions: [{
+    command: 'tsx packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts',
+    coveredFiles: ['packages/ts-shell/src/verification/execution/model.ts'],
+    status: 'passed',
+  }],
+})
+
+assert.equal(execution.state, 'passed')
+assert.deepEqual(execution.blockers, [])
+`,
+      },
+    }, {
+      label: 'second verification TypeScript coverage hypothesis',
+      writes: {
+        'packages/ts-shell/src/verification/execution/model.ts': verificationExecutionModelForWorktree(),
+        'packages/ts-shell/src/verification/execution/coverageNote.ts': 'export const coverageNote = "focused tests are verified by their covered source target" as const\n',
+        'packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts': `import { strict as assert } from 'node:assert'
+import { coverageNote } from './coverageNote.js'
+import { executeVerification } from './model.js'
+
+const execution = executeVerification({
+  selection: { state: 'selected-passed', selectedInputs: { changedFiles: ['packages/ts-shell/src/verification/execution/model.ts'] }, blockers: [] },
+  strategy: { state: 'ready', nextAction: 'verify', actions: ['verify'], blockers: [] },
+  contextReady: true,
+  changedFiles: [
+    'packages/ts-shell/src/verification/execution/model.ts',
+    'packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts',
+  ],
+  commandExecutions: [{
+    command: 'tsx packages/ts-shell/src/verification/execution/worktreeCoverage.test.ts',
+    coveredFiles: ['packages/ts-shell/src/verification/execution/model.ts'],
+    status: 'passed',
+  }],
+})
+
+assert.match(coverageNote, /focused tests/)
+assert.equal(execution.state, 'passed')
+assert.deepEqual(execution.blockers, [])
+`,
+      },
+    }],
+    targetedTestChanged: true,
+    expectSecondHypothesis: true,
+    introductionLevel: 'structured-port',
+  })
+}
+
+async function runArtifactWorkflowTypeScriptWorktreeTask(): Promise<HarnessWorkspaceTaskRecord> {
+  return runTypeScriptWorktreeTask({
+    taskId: 'artifact-workflow-typescript-worktree',
+    repositorySubdirectory: 'packages/ts-shell/src/artifacts/workflow',
+    sessionId: 'sess_artifact_workflow_typescript_worktree',
+    prompt: 'complete artifact workflow TypeScript source receipt',
+    sourceFiles: ['packages/ts-shell/src/artifacts/workflow/model.ts'],
+    initialFiles: {
+      ...typeScriptProjectFiles(),
+      'packages/ts-shell/src/artifacts/workflow/worktreeReceipt.test.ts': artifactWorkflowReceiptTest(false),
+    },
+    command: tsxWorktreeCommand('packages/ts-shell/src/artifacts/workflow/worktreeReceipt.test.ts'),
+    readTarget: 'packages/ts-shell/src/artifacts/workflow/model.ts',
+    pendingQueueId: 'repair-artifact-workflow-typescript-worktree',
+    failureClass: 'artifact-receipt-missing',
+    hypothesis: 'read artifact workflow TypeScript source before receipt repair',
+    targetFiles: [
+      'packages/ts-shell/src/artifacts/workflow/model.ts',
+      'packages/ts-shell/src/artifacts/workflow/worktreeReceipt.test.ts',
+      'packages/ts-shell/src/artifacts/workflow/receiptEvidence.ts',
+      'artifact/worktree-source-receipt.json',
+    ],
+    requiredEvidence: ['artifact receipt', 'targeted rerun', 'targeted verification proof'],
+    sourceFacts: [{
+      factId: 'source:artifact-workflow-typescript-model',
+      path: 'packages/ts-shell/src/artifacts/workflow/model.ts',
+      summary: 'artifact workflow receipt requires source, verification, and claim evidence',
+      confidence: 'high',
+    }],
+    repairAttempts: [{
+      label: 'first artifact TypeScript receipt hypothesis',
+      writes: {
+        'artifact/worktree-source-receipt.json': '{"source":true,"verify":false,"artifact":true}\n',
+        'packages/ts-shell/src/artifacts/workflow/receiptEvidence.ts': 'export const receiptEvidence = ["source"] as const\n',
+        'packages/ts-shell/src/artifacts/workflow/worktreeReceipt.test.ts': artifactWorkflowReceiptTest(false),
+      },
+    }, {
+      label: 'second artifact TypeScript receipt hypothesis',
+      writes: {
+        'artifact/worktree-source-receipt.json': '{"source":true,"verify":true,"artifact":true}\n',
+        'packages/ts-shell/src/artifacts/workflow/receiptEvidence.ts': 'export const receiptEvidence = ["source", "artifact"] as const\n',
+        'packages/ts-shell/src/artifacts/workflow/worktreeReceipt.test.ts': artifactWorkflowReceiptTest(false),
+      },
+    }, {
+      label: 'third artifact TypeScript receipt hypothesis',
+      writes: {
+        'artifact/worktree-source-receipt.json': '{"source":true,"verify":true,"artifact":true}\n',
+        'packages/ts-shell/src/artifacts/workflow/receiptEvidence.ts': 'export const receiptEvidence = ["source", "verify", "artifact"] as const\n',
+        'packages/ts-shell/src/artifacts/workflow/worktreeReceipt.test.ts': artifactWorkflowReceiptTest(true),
+      },
+    }],
+    targetedTestChanged: true,
+    receiptProof: true,
+    expectSecondHypothesis: true,
+    introductionLevel: 'structured-port',
+  })
+}
+
+async function runRepairFlowTypeScriptWorktreeNotProvenTask(): Promise<HarnessWorkspaceTaskRecord> {
+  return runTypeScriptWorktreeTask({
+    taskId: 'repair-flow-typescript-worktree',
+    repositorySubdirectory: 'packages/ts-shell/src/repair/flow',
+    sessionId: 'sess_repair_flow_typescript_worktree',
+    prompt: 'keep repair flow TypeScript worktree not proven when targeted proof is missing',
+    sourceFiles: [
+      'packages/ts-shell/src/repair/flow/hypothesis.ts',
+      'packages/ts-shell/src/repair/flow/strategy.ts',
+    ],
+    initialFiles: {
+      ...typeScriptProjectFiles(),
+      'packages/ts-shell/src/repair/flow/worktreeProof.test.ts': `import { strict as assert } from 'node:assert'
+import { selectRepairFailureStrategy } from './strategy.js'
+
+const strategy = selectRepairFailureStrategy({
+  failureClass: 'proof-missing',
+  failureSummary: 'targeted proof missing after repair',
+  targetFiles: ['packages/ts-shell/src/repair/flow/strategy.ts'],
+})
+
+assert.match(strategy.hypothesis, /proof/)
+assert.equal(strategy.contextNeed, 'packages/ts-shell/src/repair/flow/strategy.ts')
+`,
+    },
+    command: tsxWorktreeCommand('packages/ts-shell/src/repair/flow/worktreeProof.test.ts'),
+    readTarget: 'packages/ts-shell/src/repair/flow/strategy.ts',
+    pendingQueueId: 'repair-flow-typescript-worktree-missing-proof',
+    failureClass: 'proof-missing',
+    hypothesis: 'read repair flow TypeScript strategy before proof repair',
+    targetFiles: [
+      'packages/ts-shell/src/repair/flow/hypothesis.ts',
+      'packages/ts-shell/src/repair/flow/strategy.ts',
+      'packages/ts-shell/src/repair/flow/worktreeProof.test.ts',
+    ],
+    requiredEvidence: ['repair TypeScript source discovery', 'repair targeted proof'],
+    sourceFacts: [{
+      factId: 'source:repair-flow-typescript-strategy',
+      path: 'packages/ts-shell/src/repair/flow/strategy.ts',
+      summary: 'repair flow strategy does not produce the required proof-bearing hypothesis',
+      confidence: 'high',
+    }],
+    repairAttempts: [{
+      label: 'incomplete repair TypeScript proof hypothesis',
+      writes: {
+        'packages/ts-shell/src/repair/flow/strategy.ts': `export interface RepairFailureStrategyInput {
+  readonly failureClass: string;
+  readonly failureSummary: string;
+  readonly targetFiles: readonly string[];
+}
+
+export interface RepairFailureStrategy {
+  readonly hypothesis: string;
+  readonly contextNeed?: string;
+}
+
+export function selectRepairFailureStrategy(input: RepairFailureStrategyInput): RepairFailureStrategy {
+  return {
+    hypothesis: 'change repair strategy before another attempt',
+    ...(input.targetFiles[0] ? { contextNeed: input.targetFiles[0] } : {}),
+  };
+}
+`,
+        'packages/ts-shell/src/repair/flow/worktreeProof.test.ts': `import { strict as assert } from 'node:assert'
+import { selectRepairFailureStrategy } from './strategy.js'
+
+const strategy = selectRepairFailureStrategy({
+  failureClass: 'proof-missing',
+  failureSummary: 'targeted proof missing after repair',
+  targetFiles: ['packages/ts-shell/src/repair/flow/strategy.ts'],
+})
+
+assert.match(strategy.hypothesis, /proof/)
+assert.equal(strategy.contextNeed, 'packages/ts-shell/src/repair/flow/strategy.ts')
+`,
+      },
+    }],
+    targetedTestChanged: true,
+    restoreSeed: true,
+    expectStoppedNotProven: true,
+    maxTurns: 4,
+  })
+}
+
 interface RepositorySubdirectoryTaskConfig {
   readonly taskId: string
   readonly repositorySubdirectory: string
@@ -3608,6 +3906,188 @@ interface RepositorySubdirectoryTaskConfig {
   readonly maxTurns?: number
 }
 
+interface TypeScriptWorktreeTaskConfig extends Omit<RepositorySubdirectoryTaskConfig, 'initialFiles'> {
+  readonly sourceFiles: readonly string[]
+  readonly initialFiles: Record<string, string>
+}
+
+async function runTypeScriptWorktreeTask(config: TypeScriptWorktreeTaskConfig): Promise<HarnessWorkspaceTaskRecord> {
+  const initialFiles = await typeScriptWorktreeInitialFiles(config.sourceFiles, config.initialFiles)
+  return runRepositorySubdirectoryTask({
+    ...config,
+    initialFiles,
+  })
+}
+
+async function typeScriptWorktreeInitialFiles(
+  sourceFiles: readonly string[],
+  initialFiles: Record<string, string>,
+): Promise<Record<string, string>> {
+  const execution = createDefaultExecutionService()
+  const packageRoot = process.cwd().endsWith('packages/ts-shell')
+    ? process.cwd()
+    : join(process.cwd(), 'packages/ts-shell')
+  const copied: Record<string, string> = {}
+  for (const file of sourceFiles) {
+    const packageRelative = file.replace(/^packages\/ts-shell\//, '')
+    copied[file] = await execution.readTextFile({
+      operationKind: 'file.read',
+      workspaceRoot: packageRoot,
+      absolutePath: join(packageRoot, packageRelative),
+      authority: {
+        mode: 'read-only',
+        source: 'workspace-authority',
+        reason: 'copy TypeScript source into disposable worktree',
+      },
+      caller: 'query-runtime-harness-test',
+      reason: 'copy current TypeScript project source',
+      reportSafeTarget: file,
+    })
+  }
+  return {
+    ...copied,
+    ...initialFiles,
+  }
+}
+
+function typeScriptProjectFiles(): Record<string, string> {
+  return {
+    'package.json': '{"type":"module","scripts":{"test":"vitest run"}}\n',
+    'tsconfig.json': '{"compilerOptions":{"target":"ES2022","module":"ESNext","moduleResolution":"bundler","types":["node","vitest/globals"],"skipLibCheck":true,"esModuleInterop":true,"allowSyntheticDefaultImports":true},"include":["packages/ts-shell/src/**/*.ts"]}\n',
+  }
+}
+
+function tsxWorktreeCommand(testPath: string): readonly [string, readonly string[]] {
+  const packageRoot = process.cwd().endsWith('packages/ts-shell')
+    ? process.cwd()
+    : join(process.cwd(), 'packages/ts-shell')
+  const repositoryRoot = packageRoot.endsWith('packages/ts-shell')
+    ? join(packageRoot, '..', '..')
+    : process.cwd()
+  return ['node', [join(repositoryRoot, 'node_modules/tsx/dist/cli.mjs'), testPath]]
+}
+
+function verificationExecutionModelForWorktree(): string {
+  return `export type VerificationExecutionState = "passed" | "partial" | "failed" | "blocked" | "not-run";
+
+export interface VerificationExecutionInput {
+  readonly selection: {
+    readonly state: string;
+    readonly selectedInputs?: { readonly changedFiles?: readonly string[] };
+    readonly blockers?: readonly string[];
+  };
+  readonly strategy: { readonly state: string; readonly nextAction?: string };
+  readonly contextReady: boolean;
+  readonly changedFiles?: readonly string[];
+  readonly commandExecutions?: readonly {
+    readonly command: string;
+    readonly coveredFiles: readonly string[];
+    readonly status: "passed" | "failed" | "blocked" | "not-run";
+  }[];
+}
+
+export interface VerificationExecution {
+  readonly state: VerificationExecutionState;
+  readonly evidenceInputEligible: boolean;
+  readonly resultInputEligible: boolean;
+  readonly blockers: readonly string[];
+  readonly terminalSuccessClaim: false;
+}
+
+export function executeVerification(input: VerificationExecutionInput): VerificationExecution {
+  if (input.strategy.state === "blocked" || !input.contextReady) {
+    return result("blocked", ["verification blocked"]);
+  }
+  const blockers = commandCoverageBlockersFor(input);
+  if (blockers.length > 0) return result("partial", blockers);
+  if (input.selection.state === "selected-passed") return result("passed", []);
+  return result("partial", ["verification rerun required for complete proof"]);
+}
+
+function commandCoverageBlockersFor(input: VerificationExecutionInput): readonly string[] {
+  const executions = input.commandExecutions ?? [];
+  if (executions.length === 0) return [];
+  const covered = new Set(executions
+    .filter((execution) => execution.status === "passed")
+    .flatMap((execution) => execution.coveredFiles));
+  const requiredTargets = uniquePaths([
+    ...(input.changedFiles ?? []),
+    ...(input.selection.selectedInputs?.changedFiles ?? []),
+  ]).filter((path) => !path.endsWith(".test.ts"));
+  return requiredTargets
+    .filter((target) => !covered.has(target))
+    .map((target) => \`verification command missing changed target: \${target}\`);
+}
+
+function result(state: VerificationExecutionState, blockers: readonly string[]): VerificationExecution {
+  const passed = state === "passed";
+  return Object.freeze({
+    state,
+    evidenceInputEligible: passed,
+    resultInputEligible: passed,
+    blockers,
+    terminalSuccessClaim: false,
+  });
+}
+
+function uniquePaths(values: readonly string[]): readonly string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+`
+}
+
+function artifactWorkflowReceiptTest(includeVerificationEvidence: boolean): string {
+  return `import { strict as assert } from 'node:assert'
+import { readFileSync } from 'node:fs'
+import { createArtifactReceipt, correctArtifact } from './model.js'
+import { receiptEvidence } from './receiptEvidence.js'
+
+const receiptFile = JSON.parse(readFileSync('artifact/worktree-source-receipt.json', 'utf8')) as {
+  source?: boolean
+  verify?: boolean
+  artifact?: boolean
+}
+const observedMarkers = [
+  receiptFile.source ? 'source' : '',
+  receiptFile.verify ? 'verify' : '',
+  receiptFile.artifact ? 'artifact' : '',
+].filter(Boolean)
+const verificationEvidence = ${includeVerificationEvidence ? "[...receiptEvidence]" : "[]"}
+const receipt = createArtifactReceipt({
+  taskKind: 'data-artifact',
+  outputKind: 'artifact',
+  requiredPaths: ['artifact/worktree-source-receipt.json'],
+  workspacePaths: [
+    'packages/ts-shell/src/artifacts/workflow/model.ts',
+    'packages/ts-shell/src/artifacts/workflow/worktreeReceipt.test.ts',
+    'artifact/worktree-source-receipt.json',
+  ],
+  verificationState: 'selected-passed',
+  failureCategories: [],
+  requiredContentMarkers: ['source', 'verify', 'artifact'],
+  observedContentMarkers: observedMarkers,
+  verificationEvidence,
+  claimEvidence: [
+    {
+      claim: 'source receipt bound to source path',
+      evidenceId: 'source',
+      sourcePath: 'packages/ts-shell/src/artifacts/workflow/model.ts',
+    },
+    {
+      claim: 'verification evidence bound to receipt',
+      evidenceId: 'verify',
+      verificationEvidenceId: 'verify',
+    },
+  ],
+})
+const correction = correctArtifact({ receipt, actions: ['artifact'] })
+
+assert.equal(receipt?.validationState, 'validation-passed')
+assert.equal(correction?.attempted, true)
+assert.equal(correction?.validationState, 'validation-passed')
+`
+}
+
 async function runRepositorySubdirectoryTask(config: RepositorySubdirectoryTaskConfig): Promise<HarnessWorkspaceTaskRecord> {
   const workspace = await createHarnessWorkspace(config.initialFiles)
   try {
@@ -3616,6 +4096,7 @@ async function runRepositorySubdirectoryTask(config: RepositorySubdirectoryTaskC
     const initial = await workspace.run(command, args, reportSafeCommand)
     const summaries: string[] = [safeCommandSummary(initial)]
     const actions: string[] = []
+    const proofSummaries: string[] = []
     let finalStatus = ''
     let finalReason = ''
     let repairAttempt = 0
@@ -3773,6 +4254,14 @@ async function runRepositorySubdirectoryTask(config: RepositorySubdirectoryTaskC
         maxTurns: config.maxTurns ?? 8,
       }),
     })) {
+      if (event.type === 'runtime.task-proof' && event.projection.artifactReceipt) {
+        proofSummaries.push(JSON.stringify({
+          blockers: event.projection.artifactReceipt.blockers,
+          claims: event.projection.artifactReceipt.claimEvidenceReceipts,
+          verification: event.projection.artifactReceipt.verificationEvidenceReceipts,
+          sources: event.projection.artifactReceipt.sourceReceipts,
+        }))
+      }
       if (event.type === 'query.completed') {
         finalStatus = event.result.status
         finalReason = event.result.stopReason ?? ''
@@ -3793,7 +4282,7 @@ async function runRepositorySubdirectoryTask(config: RepositorySubdirectoryTaskC
       exactMissingProof: config.expectStoppedNotProven === true && finalStatus === 'stopped_not_proven',
       falseCompleteBlocked: true,
       introductionLevel: config.introductionLevel ?? 'none',
-      safeSummaries: [...summaries, `actions:${actions.join(',')}`, finalReason],
+      safeSummaries: [...summaries, `actions:${actions.join(',')}`, ...proofSummaries, finalReason],
     })
   } finally {
     await workspace.dispose()
@@ -4914,23 +5403,29 @@ async function createHarnessWorkspace(files: Record<string, string>): Promise<Ha
   const workspace: HarnessWorkspace = {
     root,
     execution,
-    run(command, args, reportSafeCommand) {
-      return execution.runCommand({
-        operationKind: 'command.run',
-        command,
-        args,
-        cwd: root,
-        workspaceRoot: root,
-        authority: {
-          mode: 'command-allowlisted',
-          source: 'workspace-authority',
-          reason: 'disposable harness diagnostic command',
-        },
-        caller: 'query-runtime-harness-test',
-        reason: 'targeted disposable workspace verification',
-        reportSafeCommand,
-        timeoutMs: 5000,
-      })
+    async run(command, args, reportSafeCommand) {
+      const originalDaemonEnabled = process.env.DAEMON_ENABLED
+      process.env.DAEMON_ENABLED = '0'
+      try {
+        return await execution.runCommand({
+          operationKind: 'command.run',
+          command,
+          args,
+          cwd: root,
+          workspaceRoot: root,
+          authority: {
+            mode: 'command-allowlisted',
+            source: 'workspace-authority',
+            reason: 'disposable harness diagnostic command',
+          },
+          caller: 'query-runtime-harness-test',
+          reason: 'targeted disposable workspace verification',
+          reportSafeCommand,
+          timeoutMs: 10000,
+        })
+      } finally {
+        process.env.DAEMON_ENABLED = originalDaemonEnabled
+      }
     },
     async write(nextFiles) {
       for (const [relativePath, content] of Object.entries(nextFiles)) {

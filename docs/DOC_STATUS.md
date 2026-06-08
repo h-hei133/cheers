@@ -103,6 +103,7 @@ It does not claim every historical note is perfectly classified.
 | `docs/sprint/live-like-transcript-acceptance-decision.md` | active | Checking SP070 primary live-like transcript trials, compact artifact proof completion, honest stopped_not_proven, no-change decision, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/real-repository-development-pilot.md` | active | Checking SP071 repository-shaped disposable workspace tasks, failed repair second hypothesis, source receipt proof, compact restore, honest stopped_not_proven, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 | `docs/sprint/real-repository-capability-jump.md` | active | Checking SP072 independent repository-subdirectory tasks, structured durable reduction, second-hypothesis repair, source receipt proof, stopped_not_proven honesty, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
+| `docs/sprint/real-typescript-worktree-execution.md` | active | Checking SP073 primary TypeScript worktree diagnostics, real copied `packages/ts-shell/src` files, failed repair second/third hypothesis, source receipt proof, compact restore, honest stopped_not_proven, and validation ledger. |  | Sprint Knowledge Base / Runtime Capability |
 
 ## Implementation Context
 
