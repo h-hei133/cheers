@@ -7,11 +7,10 @@ on:
   schedule:
     # Daily sweep at 01:30 UTC — the observation instrument, not a release gate.
     - cron: '30 1 * * *'
-  workflow_dispatch:
-
 permissions:
   contents: read
   security-events: write
+  actions: read
 
 jobs:
   normproof:
