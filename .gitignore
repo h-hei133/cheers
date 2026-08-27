@@ -33,3 +33,6 @@ rtk/
 .codex/skills/.system/**
 !.codex/prompts/
 !.codex/prompts/**
+
+# NormProof judge output
+.normproof/out/

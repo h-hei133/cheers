@@ -94,3 +94,23 @@ Detailed rules: [reference repositories](agent-rules/reference-repositories.md).
 - [agent-rules/testing-and-validation.md](agent-rules/testing-and-validation.md)
 - [agent-rules/development-workflow.md](agent-rules/development-workflow.md)
 - [agent-rules/compatibility-and-history.md](agent-rules/compatibility-and-history.md)
+
+## Architectural Norms (NormProof)
+
+Follow these architectural rules:
+1. No dependency cycles. No module may import, directly or transitively, a module that imports it.
+2. Every module import resolves within the declared source graph.
+3. Responsibility ceiling. No single module may declare more than 20 function-like names — counting named functions, functions or arrows bound to a name, and methods. Split a module that would exceed it rather than letting one module accumulate behaviour.
+
+### Architecture Watch Disposition Protocol
+
+`.normproof/dispositions.md` is where findings that you have reviewed and decided NOT to change get recorded. One line per finding:
+
+```
+- <obligation-id> | <finding> | reviewed <date> | decision: fix|defer|ignore | reason: <one line>
+```
+
+Rules:
+- Recording a disposition NEVER changes the verdict — judge keeps reporting the finding every run.
+- If a finding appears repeatedly, first try to fix it; record only when deferring is a real decision.
+- Never delete previous disposition lines; append only.
