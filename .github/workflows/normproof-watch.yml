@@ -7,6 +7,8 @@ on:
   schedule:
     # Daily sweep at 01:30 UTC — the observation instrument, not a release gate.
     - cron: '30 1 * * *'
+  workflow_dispatch:
+
 permissions:
   contents: read
   security-events: write
@@ -34,9 +36,18 @@ jobs:
           echo "exitcode=$?" >> "$GITHUB_OUTPUT"
           exit 0   # Observation mode: record, never gate.
 
-      - name: Upload SARIF to Code Scanning
+      - name: Upload NormProof Output Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: normproof-report
+          path: .normproof/out/
+          retention-days: 14
+
+      - name: Upload SARIF to Code Scanning (if enabled)
         uses: github/codeql-action/upload-sarif@v3
         if: always()
+        continue-on-error: true
         with:
           sarif_file: .normproof/out/sarif.json
 
@@ -44,4 +55,4 @@ jobs:
         run: |
           echo "NormProof exit was ${{ steps.judge.outputs.exitcode }}."
           echo "This workflow is an observation instrument: it records and projects findings"
-          echo "into Security tab but never fails CI during the study window."
+          echo "into artifacts and Code Scanning but never fails CI during the study window."
