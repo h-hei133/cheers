@@ -3,80 +3,34 @@ import {
   writeUserRuntimeConfigFile,
   type ProviderConnectionConfig,
   type RuntimeConfigFile,
-  type RuntimeProvider,
 } from "../../config/runtimeConfig.js";
 import { maskApiKey } from "../shell/providerCredentials.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import {
-  captureApiKeyViaBrowser,
-  type BrowserAuthCaptureResult,
-} from "./browserAuthOnboarding.js";
+import { captureApiKeyViaBrowser } from "./browserAuthOnboarding.js";
 import {
   __setOpenAIProviderAuthLoginForTest,
   runProviderAccountAuthLogin,
 } from "../auth/providerAuthRuntime.js";
+import type { BrowserFlowRunner, ConnectPreset } from "./connect/types.js";
+import {
+  buildConnectionId,
+  isOpenAICompatibleStyleProvider,
+  normalizeBaseUrl,
+  normalizeConnections,
+  normalizeOptional,
+  parseArgsWithFlags,
+  parseFlagValue,
+  resolveProviderTarget,
+} from "./connect/preset.js";
+import {
+  getConnectHelpText,
+  renderConnectionStatus,
+  renderPresetCatalog,
+} from "./connect/renderer.js";
 
-type ConnectPresetId =
-  | "openai"
-  | "anthropic"
-  | "siliconflow"
-  | "google"
-  | "antigravity"
-  | "claudecode";
-
-interface ConnectPreset {
-  readonly id: ConnectPresetId;
-  readonly label: string;
-  readonly provider: RuntimeProvider;
-  readonly defaultBaseUrl?: string;
-  readonly defaultModel?: string;
-}
-
-const CONNECT_PRESETS: readonly ConnectPreset[] = [
-  {
-    id: "openai",
-    label: "OpenAI",
-    provider: "openai",
-    defaultModel: "gpt-4.1-mini",
-  },
-  {
-    id: "anthropic",
-    label: "Anthropic",
-    provider: "anthropic",
-    defaultModel: "claude-sonnet-4-5",
-  },
-  {
-    id: "siliconflow",
-    label: "SiliconFlow (OpenAI Compatible)",
-    provider: "openai-compatible",
-    defaultBaseUrl: "https://api.siliconflow.cn/v1",
-    defaultModel: "deepseek-ai/DeepSeek-V4-Flash",
-  },
-  {
-    id: "google",
-    label: "Google Gemini (OpenAI Compatible)",
-    provider: "google",
-    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    defaultModel: "gemini-2.5-flash",
-  },
-  {
-    id: "antigravity",
-    label: "Antigravity (OpenAI Compatible)",
-    provider: "antigravity",
-  },
-  {
-    id: "claudecode",
-    label: "ClaudeCode (OpenAI Compatible)",
-    provider: "claudecode",
-  },
-];
-
-type BrowserFlowRunner = (options: {
-  readonly provider: RuntimeProvider;
-  readonly presetLabel: string;
-  readonly defaultBaseUrl?: string;
-  readonly defaultModel?: string;
-}) => Promise<BrowserAuthCaptureResult>;
+export * from "./connect/types.js";
+export * from "./connect/preset.js";
+export * from "./connect/renderer.js";
 
 let browserFlowRunner: BrowserFlowRunner = async (options) =>
   captureApiKeyViaBrowser({
@@ -130,7 +84,7 @@ export async function runConnectCommand(
     return { kind: "local", output: renderPresetCatalog() };
   }
 
-  if (action === "login" || action === "add") {
+  if (action === "login") {
     return { kind: "local", output: await addConnection(rest) };
   }
 
@@ -138,11 +92,11 @@ export async function runConnectCommand(
     return { kind: "local", output: await addConnectionFromLegacyAuthSet(rest) };
   }
 
-  if (action === "use") {
+  if (action === "use" || action === "activate") {
     return { kind: "local", output: activateConnection(rest) };
   }
 
-  if (action === "logout" || action === "disconnect" || action === "remove") {
+  if (action === "logout" || action === "remove" || action === "rm") {
     return { kind: "local", output: removeConnection(rest) };
   }
 
@@ -152,178 +106,7 @@ export async function runConnectCommand(
   };
 }
 
-function renderConnectionStatus(): string {
-  const userConfig = readUserRuntimeConfigFile();
-  const connections = normalizeConnections(userConfig);
-  const activeId = userConfig.activeProviderConnectionId?.trim();
-
-  const lines: string[] = [];
-  lines.push("Provider connections");
-  lines.push(
-    `Active connection: ${activeId ? activeId : "none"}${userConfig.provider ? ` (provider=${userConfig.provider})` : ""}`,
-  );
-
-  if (connections.length === 0) {
-    lines.push("");
-    lines.push("No saved connections.");
-    lines.push(
-      "Use /connect login openai --account, /connect login google --account, or /connect login <provider> --api-key <key>.",
-    );
-    lines.push("");
-    lines.push(...renderReadinessGuidance({ connections, activeId }));
-    return lines.join("\n");
-  }
-
-  lines.push("");
-  for (const connection of connections) {
-    const marker = connection.id === activeId ? "*" : " ";
-    const label = connection.label?.trim() || connection.provider;
-    lines.push(
-      `${marker} ${connection.id}  [${connection.provider}]  ${label}  ${connection.authType}  ${connection.status ?? "connected"}`,
-    );
-    if (connection.authType === "account-auth") {
-      const openaiAccount = connection.accountAuth?.openai;
-      const googleAccount = connection.accountAuth?.google;
-      lines.push(
-        `    credential=account-auth${openaiAccount?.accountId ? ` accountId=${openaiAccount.accountId}` : ""}${googleAccount?.accountEmail ? ` email=${googleAccount.accountEmail}` : ""}${googleAccount?.clientId ? ` clientId=${maskClientId(googleAccount.clientId)}` : ""}${connection.baseUrl ? ` baseUrl=${connection.baseUrl}` : ""}${connection.model ? ` model=${connection.model}` : ""}`,
-      );
-    } else {
-      lines.push(
-        `    credential=${renderApiKeyCredentialSummary(connection.apiKey)}${connection.baseUrl ? ` baseUrl=${connection.baseUrl}` : ""}${connection.model ? ` model=${connection.model}` : ""}`,
-      );
-    }
-  }
-
-  lines.push("");
-  lines.push(
-    "Use /connect use <connection-id> to switch runtime provider context.",
-  );
-  lines.push("");
-  lines.push(...renderReadinessGuidance({ connections, activeId }));
-  return lines.join("\n");
-}
-
-function renderReadinessGuidance(input: {
-  readonly connections: readonly ProviderConnectionConfig[];
-  readonly activeId?: string;
-}): string[] {
-  const activeConnection = input.connections.find(
-    (connection) => connection.id === input.activeId,
-  );
-  const lines = ["Provider readiness"];
-
-  if (input.connections.length === 0) {
-    lines.push("- Config status: not configured.");
-    lines.push(
-      "- Next: run /connect login <provider> --api-key <key> or /connect login openai --account.",
-    );
-    return lines;
-  }
-
-  if (!input.activeId) {
-    lines.push("- Config status: no active connection selected.");
-    lines.push("- Next: run /connect use <connection-id|provider>.");
-    return lines;
-  }
-
-  if (!activeConnection) {
-    lines.push(
-      `- Config status: active connection not found (${input.activeId}).`,
-    );
-    lines.push("- Next: run /connect status, then /connect use <connection-id>.");
-    return lines;
-  }
-
-  const missingCredential =
-    activeConnection.authType !== "account-auth" &&
-    !activeConnection.apiKey?.trim();
-  const missingBaseUrl =
-    isOpenAICompatibleStyleProvider(activeConnection.provider) &&
-    !activeConnection.baseUrl?.trim();
-  const missingModel =
-    isOpenAICompatibleStyleProvider(activeConnection.provider) &&
-    !activeConnection.model?.trim();
-
-  if (activeConnection.status === "pending") {
-    lines.push("- Config status: connection setup is pending.");
-    lines.push("- Next: finish the login/browser flow or rerun /connect login.");
-    return lines;
-  }
-
-  if (activeConnection.status === "error") {
-    lines.push("- Config status: connection setup is in error state.");
-    lines.push("- Next: rerun /connect login for this provider.");
-    return lines;
-  }
-
-  if (missingCredential) {
-    lines.push("- Config status: credential missing for active connection.");
-    lines.push(
-      `- Next: run /connect login ${activeConnection.provider} --api-key <key>.`,
-    );
-    return lines;
-  }
-
-  if (missingBaseUrl || missingModel) {
-    lines.push(
-      `- Config status: ${activeConnection.provider} requires ${[
-        missingBaseUrl ? "base URL" : null,
-        missingModel ? "model" : null,
-      ]
-        .filter(Boolean)
-        .join(" and ")}.`,
-    );
-    lines.push(
-      `- Next: run /connect login ${activeConnection.provider} --api-key <key> --base-url <url> --model <model>.`,
-    );
-    return lines;
-  }
-
-  lines.push(
-    "- Config status: configured. Credentials are redacted; live endpoint was not checked by /connect status.",
-  );
-  lines.push(
-    "- Live check: run npm run verify:provider-readiness from the project root.",
-  );
-  lines.push(
-    "- If the live check reports provider-network-inconclusive: retry later or check proxy/firewall/network; do not treat it as a coding capability failure.",
-  );
-  return lines;
-}
-
-function renderApiKeyCredentialSummary(apiKey?: string): string {
-  if (!apiKey?.trim()) {
-    return "api-key:missing";
-  }
-
-  return "api-key:redacted";
-}
-
-function maskClientId(clientId: string): string {
-  const trimmed = clientId.trim();
-  if (trimmed.length <= 10) {
-    return `${trimmed.slice(0, 3)}***`;
-  }
-  return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`;
-}
-
-function renderPresetCatalog(): string {
-  const lines: string[] = [];
-  lines.push("Connect presets");
-  for (const preset of CONNECT_PRESETS) {
-    lines.push(
-      `- ${preset.id}: provider=${preset.provider}${preset.defaultBaseUrl ? `, baseUrl=${preset.defaultBaseUrl}` : ""}${preset.defaultModel ? `, model=${preset.defaultModel}` : ""}`,
-    );
-  }
-  lines.push("");
-  lines.push("Auth contracts:");
-  lines.push("- api-key connection: /connect login <provider> --api-key <key>");
-  lines.push("- account-auth connection: /connect login openai --account");
-  lines.push("- browser-assisted local capture: /connect login <provider> --browser");
-  return lines.join("\n");
-}
-
-async function addConnection(args: string[]): Promise<string> {
+export async function addConnection(args: string[]): Promise<string> {
   const parsed = parseArgsWithFlags(args);
   const target = resolveProviderTarget(parsed.positionals[0]);
   if (!target) {
@@ -413,7 +196,7 @@ async function addConnection(args: string[]): Promise<string> {
   ].join("\n");
 }
 
-async function addConnectionFromLegacyAuthSet(args: string[]): Promise<string> {
+export async function addConnectionFromLegacyAuthSet(args: string[]): Promise<string> {
   const provider = normalizeOptional(args[0]);
   const apiKey = normalizeOptional(args[1]);
   const baseUrl = normalizeOptional(args[2]);
@@ -442,7 +225,7 @@ async function addConnectionFromLegacyAuthSet(args: string[]): Promise<string> {
   ].join("\n");
 }
 
-function activateConnection(args: string[]): string {
+export function activateConnection(args: string[]): string {
   const target = args[0]?.trim();
   if (!target) {
     return "Usage: /connect use <connection-id|provider>";
@@ -483,7 +266,7 @@ function activateConnection(args: string[]): string {
   ].join("\n");
 }
 
-function removeConnection(args: string[]): string {
+export function removeConnection(args: string[]): string {
   const target = args[0]?.trim();
   if (!target) {
     return "Usage: /connect logout <connection-id|provider>";
@@ -524,7 +307,7 @@ function removeConnection(args: string[]): string {
   ].join("\n");
 }
 
-async function runBrowserAssistedCaptureConnection(
+export async function runBrowserAssistedCaptureConnection(
   target: ConnectPreset,
   labelFlag?: string | boolean,
 ): Promise<string> {
@@ -643,7 +426,7 @@ async function runBrowserAssistedCaptureConnection(
   }
 }
 
-async function runAccountAuthConnection(
+export async function runAccountAuthConnection(
   target: ConnectPreset,
   labelFlag?: string | boolean,
 ): Promise<string> {
@@ -653,161 +436,4 @@ async function runAccountAuthConnection(
     defaultModel: target.defaultModel,
     labelOverride: parseFlagValue(labelFlag),
   });
-}
-
-function normalizeConnections(config: RuntimeConfigFile): ProviderConnectionConfig[] {
-  if (!config.providerConnections || config.providerConnections.length === 0) {
-    return [];
-  }
-
-  return config.providerConnections
-    .filter((item) => Boolean(item.id && item.provider))
-    .map((item) => ({
-      ...item,
-      id: item.id.trim(),
-      label: normalizeOptional(item.label),
-      baseUrl: normalizeBaseUrl(item.baseUrl),
-      model: normalizeOptional(item.model),
-      apiKey: normalizeOptional(item.apiKey),
-      status: item.status ?? "connected",
-      createdAt: item.createdAt || new Date().toISOString(),
-      updatedAt: item.updatedAt || new Date().toISOString(),
-    }));
-}
-
-function resolveProviderTarget(input?: string): ConnectPreset | null {
-  const normalized = input?.trim().toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-
-  const preset = CONNECT_PRESETS.find(
-    (candidate) => candidate.id === normalized,
-  );
-  if (preset) {
-    return preset;
-  }
-
-  if (normalized === "openai-compatible") {
-    return {
-      id: "siliconflow",
-      label: "OpenAI Compatible",
-      provider: "openai-compatible",
-    };
-  }
-
-  if (normalized === "google" || normalized === "gemini") {
-    return {
-      id: "google",
-      label: "Google Gemini (OpenAI Compatible)",
-      provider: "google",
-      defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-      defaultModel: "gemini-2.5-flash",
-    };
-  }
-
-  if (normalized === "antigravity") {
-    return {
-      id: "antigravity",
-      label: "Antigravity (OpenAI Compatible)",
-      provider: "antigravity",
-    };
-  }
-
-  if (normalized === "claudecode") {
-    return {
-      id: "claudecode",
-      label: "ClaudeCode (OpenAI Compatible)",
-      provider: "claudecode",
-    };
-  }
-
-  return null;
-}
-
-function buildConnectionId(provider: RuntimeProvider): string {
-  return `${provider}-${Date.now().toString(36)}`;
-}
-
-function parseArgsWithFlags(args: string[]): {
-  positionals: string[];
-  flags: Record<string, string | boolean>;
-} {
-  const positionals: string[] = [];
-  const flags: Record<string, string | boolean> = {};
-
-  for (let index = 0; index < args.length; index += 1) {
-    const token = args[index];
-    if (!token.startsWith("--")) {
-      positionals.push(token);
-      continue;
-    }
-
-    const key = token.slice(2).trim().toLowerCase();
-    const next = args[index + 1];
-    if (!next || next.startsWith("--")) {
-      flags[key] = true;
-      continue;
-    }
-
-    flags[key] = next;
-    index += 1;
-  }
-
-  return { positionals, flags };
-}
-
-function parseFlagValue(value?: string | boolean): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  return normalizeOptional(value);
-}
-
-function normalizeOptional(value?: string): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
-}
-
-function normalizeBaseUrl(baseUrl?: string): string | undefined {
-  const trimmed = normalizeOptional(baseUrl);
-  if (!trimmed) {
-    return undefined;
-  }
-  return trimmed.replace(/\/+$/, "");
-}
-
-function getConnectHelpText(): string {
-  return [
-    "Provider connect and onboarding commands",
-    "/connect status|list",
-    "/connect presets",
-    "/connect login <provider|preset> --api-key <key> [--base-url <url>] [--model <model>] [--label <name>]",
-    "/connect set <provider|preset> <api-key> [base-url] [model]       (legacy /auth set compatibility)",
-    "/connect login openai --account [--label <name>]                 (real ChatGPT account login)",
-    "/connect login google --account [--label <name>]                 (Google OAuth; requires GOOGLE_OAUTH_CLIENT_ID)",
-    "/connect login <provider|preset> --browser [--label <name>]      (browser-assisted local key capture)",
-    "/connect use <connection-id|provider>",
-    "/connect logout <connection-id|provider>",
-    "",
-    "Providers: openai | anthropic | openai-compatible | siliconflow | google | antigravity | claudecode",
-    "Examples:",
-    "- /connect login siliconflow --api-key sk-xxxx",
-    "- /connect login google --api-key <key>",
-    "- /connect login google --account   (requires GOOGLE_OAUTH_CLIENT_ID env)",
-    "- /connect login antigravity --api-key <key> --base-url <url> --model <model>",
-    "- /connect login openai --account",
-    "- /connect login openai --api-key sk-xxxx --model gpt-4.1-mini",
-    "- /connect status",
-  ].join("\n");
-}
-
-function isOpenAICompatibleStyleProvider(provider: RuntimeProvider): boolean {
-  return (
-    provider === "openai-compatible" ||
-    provider === "google" ||
-    provider === "antigravity" ||
-    provider === "claudecode"
-  );
 }

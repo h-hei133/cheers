@@ -4,3 +4,4 @@
 ## [2026-08-28] ingest | Coding Agents Architecture and Sprint Overview (raw/notes/2026-08-28-architecture-and-sprint-overview.md)
 ## [2026-08-28] ingest | Local Reference Repositories Analysis (raw/notes/2026-08-28-reference-projects-matrix.md)
 ## [2026-08-28] compile | 2 sources → 4 new articles (three-layer-agent-architecture, evidence-and-proof-system, normproof-structural-governance, local-reference-repositories)
+## [2026-08-28] refactor | Phase 2 modular decomposition: scan.ts, readWindowContinuation.ts, workflow/model.ts, connectCommandRuntime.ts, daemon/client.ts, providerExactPatchContract.ts

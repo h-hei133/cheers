@@ -3743,7 +3743,12 @@ async function runArtifactWorkflowTypeScriptWorktreeTask(): Promise<HarnessWorks
     repositorySubdirectory: 'packages/ts-shell/src/artifacts/workflow',
     sessionId: 'sess_artifact_workflow_typescript_worktree',
     prompt: 'complete artifact workflow TypeScript source receipt',
-    sourceFiles: ['packages/ts-shell/src/artifacts/workflow/model.ts'],
+    sourceFiles: [
+      'packages/ts-shell/src/artifacts/workflow/model.ts',
+      'packages/ts-shell/src/artifacts/workflow/types.ts',
+      'packages/ts-shell/src/artifacts/workflow/claim.ts',
+      'packages/ts-shell/src/artifacts/workflow/correction.ts',
+    ],
     initialFiles: {
       ...typeScriptProjectFiles(),
       'packages/ts-shell/src/artifacts/workflow/worktreeReceipt.test.ts': artifactWorkflowReceiptTest(false),
