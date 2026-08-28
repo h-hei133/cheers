@@ -8,3 +8,4 @@
 ## [2026-08-28] plan | Phase 3 Reference Architecture Ingestion & Capability Modernization (GOAL.md & raw/notes/2026-08-28-phase-3-reference-architecture.md)
 ## [2026-08-28] refactor | Phase 3 implementation: session/agent (Pi), context/graph (GitNexus), and memory tiering (Mem0)
 ## [2026-08-28] plan | Phase 3 Battle 1: Tool Dispatch, Concurrency & Security Modernization (GOAL.md)
+## [2026-08-28] refactor | Phase 3 Battle 1: Tool dispatch pipeline, fileMutationQueue mutex, and fine-grained approval/store
