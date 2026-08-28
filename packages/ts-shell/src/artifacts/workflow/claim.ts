@@ -131,14 +131,19 @@ export function pathEvidenceMatches(path: string, evidence: string): boolean {
   if (!normalizedPath || !normalizedEvidence) {
     return false;
   }
+  const pathStem = sourceStem(normalizedPath);
+  const evidenceStem = sourceStem(normalizedEvidence);
+  const stemMatch = Boolean(pathStem && evidenceStem && pathStem.includes(evidenceStem));
   return normalizedPath.includes(normalizedEvidence) ||
     normalizedEvidence.includes(normalizedPath) ||
-    sourceStem(normalizedPath).includes(sourceStem(normalizedEvidence));
+    stemMatch;
 }
 
 export function sourceStem(value: string): string {
   const parts = value.split("/");
-  return parts[parts.length - 1]?.replace(/\.[a-z0-9]+$/i, "") ?? value;
+  const basename = parts[parts.length - 1] ?? value;
+  const stripped = basename.replace(/\.[a-z0-9]+$/i, "");
+  return stripped.length > 0 ? stripped : basename;
 }
 
 export function normalizeEvidence(value: string): string {

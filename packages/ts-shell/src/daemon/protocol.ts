@@ -53,7 +53,11 @@ export function parseDaemonExecutionResult(raw: string): DaemonExecutionResult {
     throw new Error('Invalid daemon result stdout/stderr: expected strings')
   }
 
-  const failureKind = payload.failureKind
+  const rawFailureKind = payload.failureKind
+  const failureKind =
+    rawFailureKind === null || rawFailureKind === undefined
+      ? undefined
+      : rawFailureKind
   if (
     failureKind !== undefined
     && failureKind !== 'sandbox_preflight'
