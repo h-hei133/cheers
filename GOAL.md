@@ -1,37 +1,39 @@
-# Goal: Phase 3 Deepening - Special Battle 3: Terminal Surface & Streaming Componentization
+# Goal: Phase 3 Deepening - Special Battle 4: Planning Runtime, Proposal Calibration & Dynamic Retry
 
 ## Strategic Intent & Context
-In **Special Battle 3** of Phase 3, we modernize the terminal presentation and surface modeling subsystem:
-1. **Terminal Presentation Model** (`packages/ts-shell/src/presentation/surface/model.ts` - 51 functions):
-   - Modularize section formatting, event stream classification, status severity evaluation, and view model projection.
-2. **Terminal Componentization (Inspired by `pi`'s `packages/tui`)**:
-   - Introduce structured terminal widgets: status indicator badge, stream spinner, and box container formatting.
+In **Special Battle 4** of Phase 3, we modernize the planning runtime and proposal generation subsystem:
+1. **Planning Runtime Engine** (`packages/ts-shell/src/planning/runtime/engine.ts` - 27 functions):
+   - Decompose task classification, target selection, verification intent summarization, and handoff facts builder.
+2. **Proposal Calibration & Retry** (`packages/ts-shell/src/planning/runtime/proposal.ts` - 28 functions):
+   - Decompose prompt context builder, attempt preflight classification, contract retry logic, and dry-run execution.
+3. **Autonomous Task Progression Loop (Inspired by `mini-swe-agent`)**:
+   - Environment-gated step progression and structured failure classification.
 
 ---
 
 ## 1. Concrete Work Breakdown Structure (WBS)
 
-### Step 1: Terminal Component Primitives (Inspired by `pi`)
-- **Target**: `packages/ts-shell/src/presentation/components/`
+### Step 1: Modular Planning Engine
+- **Target**: `packages/ts-shell/src/planning/runtime/`
 - **Sub-modules**:
-  1. `components/statusBadge.ts`: Colored ANSI status badge with severity mapping (`info`, `success`, `warning`, `error`).
-  2. `components/box.ts`: Text border frames, spacers, and structured terminal layout helpers.
+  1. `planning/runtime/types.ts`: Clean interfaces for `EvidenceBoundPlanStep`, `PlanningRuntimeResult`, `PlanningEditHandoffFacts`.
+  2. `planning/runtime/classifier.ts`: Task kind hint classification, readonly task detection, and unsupported operation detection.
+  3. `planning/runtime/handoff.ts`: Edit and verification handoff fact builders.
+  4. `planning/runtime/engine.ts`: Lightweight backward-compatible facade ($\le 20$ functions).
 
-### Step 2: Modular Surface Section Builders
-- **Target**: `packages/ts-shell/src/presentation/surface/sections/`
+### Step 2: Modular Proposal Calibration & Contract Retry
+- **Target**: `packages/ts-shell/src/planning/runtime/proposal/`
 - **Sub-modules**:
-  1. `sections/types.ts`: Clean definitions for `ProductSurfaceSection`, `ProductSurfaceFact`, `ProductSurfaceViewModel`.
-  2. `sections/events.ts`: Event section builders (tool outcome, controlled invocation, model boundary, mutation recovery).
-  3. `sections/status.ts`: Severity and status evaluation helpers (repair, verdict, verification, context planning).
-  4. `sections/layout.ts`: Section aggregation and view model projection pipeline.
-  5. `presentation/surface/model.ts`: Lightweight backward-compatible facade ($\le 20$ functions).
+  1. `proposal/context.ts`: Prompt context preparation, workspace content bounding, and label normalization.
+  2. `proposal/attempt.ts`: Live provider attempt preflight, dry-run failure classification, and contract retry heuristics.
+  3. `planning/runtime/proposal.ts`: Lightweight backward-compatible facade ($\le 20$ functions).
 
 ---
 
 ## 2. Measurable Acceptance & Verification Criteria
 1. **Zero Type Errors**: `npm run build:ts` cleanly builds CLI binary (`dist/cli.js`).
-2. **100% Test Green**: All existing unit tests pass via `vitest run`.
+2. **100% Test Green**: All vitest unit tests pass.
 3. **NormProof Compliance**:
-   - `normproof judge` continues to show `0` blocking obligations.
-   - Proof gap count reduces from 28 to **27** (`presentation/surface/model.ts` brought under 20 functions).
+   - `normproof judge` continues with 0 blocking obligations.
+   - Proof gap count reduces from 28 to **26** (`planning/runtime/engine.ts` and `proposal.ts` brought under 20 functions).
 4. **Audit & Log**: Formal updates in `.normproof/dispositions.md` and `.wiki/log.md`.
