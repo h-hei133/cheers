@@ -117,7 +117,24 @@ import {
   saveSessionCompleted,
   saveSessionError,
 } from "./lifecycle/sessionTerminalStore.js";
-
+import {
+  handleAddTurn,
+  handleMarkRecoveryReentry,
+  handleMarkRunStarted,
+  handleMarkTurnActive,
+  handlePersistUserPromptBarrier,
+  handleSaveCompleted,
+  handleSaveError,
+  handleSaveInterrupted,
+  handleSaveTerminated,
+} from "./agent/lifecycle.js";
+import {
+  handleAppendQueryEvent,
+  handleAppendTranscriptEvent,
+  handleApplyQueryEventToState,
+  handleGetTranscriptEvents,
+} from "./agent/persistence.js";
+import { applyAutoCompactRetention } from "./agent/compaction.js";
 export type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
 export type {
   ApprovalAuditMemoryState,
@@ -290,15 +307,7 @@ export class SessionManager {
   }
 
   addTurn(sessionId: string, message: SessionMessage): void {
-    const session = this.store.load(sessionId);
-    appendSessionTurn({
-      session,
-      message,
-      timestamp: new Date().toISOString(),
-      append: (event) => this.appendTranscriptEvent(sessionId, event),
-      writeMetadata: (nextSession) => this.store.writeSessionMetadata(nextSession),
-      writeState: (nextSession) => this.store.writeSessionState(nextSession),
-    });
+    handleAddTurn(this.createSessionLifecycleCallbacks(), sessionId, message);
   }
 
   recordApprovalAuditDecision(
@@ -323,34 +332,26 @@ export class SessionManager {
   }
 
   markRunStarted(sessionId: string, prompt: string): void {
-    markSessionRunStarted(this.createSessionLifecycleCallbacks(), sessionId, prompt);
+    handleMarkRunStarted(this.createSessionLifecycleCallbacks(), sessionId, prompt);
   }
 
   persistUserPromptBarrier(sessionId: string, prompt: string): void {
-    const session = this.store.load(sessionId);
-    const timestamp = new Date().toISOString();
-    persistSessionUserPromptBarrier({
-      session,
+    handlePersistUserPromptBarrier(
+      this.createSessionLifecycleCallbacks(),
+      sessionId,
       prompt,
-      timestamp,
-      appendTranscriptEvent: (event) =>
-        this.appendTranscriptEvent(sessionId, event),
-      writeSessionMetadata: (nextSession) =>
-        this.store.writeSessionMetadata(nextSession),
-      writeSessionState: (nextSession, overrides) =>
-        this.store.writeSessionState(nextSession, overrides),
-    });
+    );
   }
 
   markTurnActive(sessionId: string): void {
-    markSessionTurnActive(this.createSessionLifecycleCallbacks(), sessionId);
+    handleMarkTurnActive(this.createSessionLifecycleCallbacks(), sessionId);
   }
 
   markRecoveryReentry(
     sessionId: string,
     boundary: QueryRuntimeRecoveryBoundary,
   ): void {
-    markSessionRecoveryReentry(
+    handleMarkRecoveryReentry(
       this.createSessionLifecycleCallbacks(),
       sessionId,
       boundary,
@@ -361,7 +362,7 @@ export class SessionManager {
     sessionId: string,
     interruptedKind: "prompt" | "turn" = "prompt",
   ): void {
-    saveSessionInterrupted(
+    handleSaveInterrupted(
       this.createSessionLifecycleCallbacks(),
       sessionId,
       interruptedKind,
@@ -369,12 +370,13 @@ export class SessionManager {
   }
 
   saveCompleted(sessionId: string, terminal?: TerminalPersistence): void {
-    saveSessionCompleted(
+    handleSaveCompleted(
       this.createSessionLifecycleCallbacks(),
       sessionId,
       terminal,
     );
   }
+
 
   renameSession(sessionId: string, title: string): Session {
     const session = this.store.load(sessionId);
@@ -394,7 +396,7 @@ export class SessionManager {
     error: string,
     terminal?: TerminalPersistence,
   ): void {
-    saveSessionError(
+    handleSaveError(
       this.createSessionLifecycleCallbacks(),
       sessionId,
       error,
@@ -403,8 +405,9 @@ export class SessionManager {
   }
 
   saveTerminated(sessionId: string): void {
-    saveSessionTerminated(this.createSessionLifecycleCallbacks(), sessionId);
+    handleSaveTerminated(this.createSessionLifecycleCallbacks(), sessionId);
   }
+
 
   reconcilePendingLifecycle(sessionId: string): DurableLifecycleIndex {
     const snapshot = this.getRecoverySnapshot(sessionId);
@@ -420,20 +423,13 @@ export class SessionManager {
   }
 
   appendQueryEvent(sessionId: string, event: QueryEvent): void {
-    appendSessionQueryEvent({
-      event,
-      timestamp: new Date().toISOString(),
-      transcriptEvents: this.getTranscriptEvents(sessionId),
-      appendTranscriptEvent: (transcriptEvent) =>
-        this.appendTranscriptEvent(sessionId, transcriptEvent),
-      applyQueryEventToState: (queryEvent) =>
-        this.applyQueryEventToState(sessionId, queryEvent),
-    });
+    handleAppendQueryEvent(this.store, sessionId, event);
   }
 
   getTranscriptEvents(sessionId: string): TranscriptEvent[] {
-    return readTranscriptEvents(this.store.transcriptPath(sessionId));
+    return handleGetTranscriptEvents(this.store, sessionId);
   }
+
 
   getRecoverySnapshot(sessionId: string): RecoverySnapshot {
     return buildRecoverySnapshotForSession({
@@ -659,42 +655,20 @@ export class SessionManager {
     sessionId: string,
     event: TranscriptEvent,
   ): void {
-    appendTranscriptEvent(this.store.transcriptPath(sessionId), event);
+    handleAppendTranscriptEvent(this.store, sessionId, event);
   }
 
   private applyQueryEventToState(sessionId: string, event: QueryEvent): void {
-    const session = this.store.load(sessionId);
-    applySessionQueryEventToState({
-      session,
-      event,
-      withSessionStateLock: (write) =>
-        this.store.withSessionStateLock(sessionId, write),
-      readCurrentState: () =>
-        this.store.readStateSnapshotSafely(this.store.statePath(sessionId)),
-      buildSessionStateSnapshot: (nextSession, current, overrides) =>
-        this.buildSessionStateSnapshot(nextSession, current, overrides),
-      applyAutoCompactRetention: (workingMemory, queryEvent) =>
-        this.applyAutoCompactRetention(workingMemory, queryEvent),
-      writeSnapshot: (snapshot) =>
-        this.store.writeJsonFileAtomic(this.store.statePath(sessionId), snapshot),
-    });
+    handleApplyQueryEventToState(this.store, sessionId, event);
   }
 
   private applyAutoCompactRetention(
     workingMemory: unknown,
     event: QueryEvent,
   ): unknown {
-    return applySessionCompactRetention({
-      workingMemory,
-      event,
-      turnThreshold: SessionManager.AUTO_COMPACT_TURN_THRESHOLD,
-      historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
-      now: new Date().toISOString(),
-      seedInfluence: extractSeedInfluenceFromQueryResult(
-        event.type === "query.completed" ? event.result : undefined,
-      ),
-    });
+    return applyAutoCompactRetention(workingMemory, event);
   }
+
   private buildSessionStateSnapshot(
     session: Session,
     current: SessionStateSnapshot | undefined,

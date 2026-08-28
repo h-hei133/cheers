@@ -230,6 +230,7 @@ export function rankRepoCandidates(input: {
   readonly files: readonly RepoIntelligenceFile[];
   readonly userTask: string;
   readonly maxCandidates?: number;
+  readonly graphScores?: ReadonlyMap<string, number>;
 }): readonly RepoIntelligenceCandidate[] {
   const tokens = tokenize(input.userTask);
   const actionBoosts = classifyTaskBoosts(input.userTask);
@@ -248,13 +249,17 @@ export function rankRepoCandidates(input: {
           ? 40
           : 0;
       const freshness = file.mtimeMs > 0 ? 3 : 0;
-      const score = overlap * 14 + roleBoost + scriptBoost + exactNameBoost + primarySourceNameBoost + freshness;
+      const graphBoost = input.graphScores?.has(file.path)
+        ? Math.round((input.graphScores.get(file.path) ?? 0) * 30)
+        : 0;
+      const score = overlap * 14 + roleBoost + scriptBoost + exactNameBoost + primarySourceNameBoost + freshness + graphBoost;
       const reasons = [
         overlap > 0 ? `task-token-overlap:${overlap}` : undefined,
         roleBoost > 0 ? `role:${file.role}` : undefined,
         scriptBoost > 0 ? "package-script-query" : undefined,
         exactNameBoost > 0 ? "path-name-match" : undefined,
         primarySourceNameBoost > 0 ? "primary-source-name-match" : undefined,
+        graphBoost > 0 ? `symbol-graph-relevance:${graphBoost}` : undefined,
       ].filter((reason): reason is string => Boolean(reason));
       return {
         candidateId: `repo_candidate_${buildSnapshotId({ path: file.safeLabel, score }).slice("repo_intel_".length)}`,
