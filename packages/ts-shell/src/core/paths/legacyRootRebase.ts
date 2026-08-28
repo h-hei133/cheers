@@ -1,9 +1,19 @@
+import fs from "node:fs";
 import path from "node:path";
 
+const projectLocalMarkers = [
+  "/src/",
+  "/packages/",
+  "/app/",
+  "/tests/",
+  "/test/",
+];
+
 function stripDriveSlash(value: string): string {
-  return value.startsWith("/") && /^[A-Za-z]:[\\/]/.test(value.slice(1))
-    ? value.slice(1)
-    : value;
+  const trimmed = value.trim();
+  return trimmed.startsWith("/") && /^[A-Za-z]:[\\/]/.test(trimmed.slice(1))
+    ? trimmed.slice(1)
+    : trimmed;
 }
 
 export function normalizePathText(value: string): string {
@@ -20,43 +30,119 @@ export function isAbsolutePathLike(value: string): boolean {
 export function rebindPathLikeToWorkspace(
   candidatePath: string,
   workspaceRoot: string,
-): string {
+): string | undefined {
   const normalizedCandidate = normalizePathText(candidatePath);
-  const normalizedWorkspace = normalizePathText(workspaceRoot);
-
-  if (!isAbsolutePathLike(candidatePath)) {
-    return normalizedCandidate;
+  if (!normalizedCandidate) {
+    return undefined;
   }
 
-  if (normalizedCandidate.startsWith(normalizedWorkspace + "/")) {
+  const workspaceAbsolute = path.resolve(workspaceRoot);
+  const normalizedWorkspace = normalizePathText(workspaceAbsolute);
+
+  // If candidate is a relative path
+  if (!isAbsolutePathLike(candidatePath)) {
+    const candidateAbsolute = path.resolve(
+      workspaceAbsolute,
+      normalizedCandidate,
+    );
+    const normalizedCandidateAbsolute = normalizePathText(candidateAbsolute);
+    if (
+      normalizedCandidateAbsolute === normalizedWorkspace ||
+      normalizedCandidateAbsolute.startsWith(normalizedWorkspace + "/")
+    ) {
+      return normalizePathText(
+        path.relative(workspaceAbsolute, candidateAbsolute),
+      );
+    }
+  }
+
+  // If candidate is directly inside workspace
+  const candidateLower = normalizedCandidate.toLowerCase();
+  const workspaceLower = normalizedWorkspace.toLowerCase();
+  if (candidateLower.startsWith(workspaceLower + "/")) {
     return normalizedCandidate.slice(normalizedWorkspace.length + 1);
   }
 
-  return path.basename(normalizedCandidate);
+  // Check project local marker suffixes on disk
+  for (const marker of projectLocalMarkers) {
+    const markerIndex = candidateLower.indexOf(marker);
+    if (markerIndex > 0) {
+      const suffix = normalizedCandidate.slice(markerIndex + 1);
+      const candidateResolved = path.resolve(workspaceAbsolute, suffix);
+      if (fs.existsSync(candidateResolved)) {
+        return normalizePathText(suffix);
+      }
+    }
+  }
+
+  return undefined;
 }
 
 export function normalizeSubjectTargetWithRootPath(input: {
-  target?: string;
-  root?: string;
+  readonly target?: string;
+  readonly root?: string;
 }): {
   readonly target?: string;
   readonly partial: boolean;
 } {
-  if (!input.target) {
+  const target = input.target?.trim();
+  const root = input.root?.trim();
+  if (!target) {
     return { partial: false };
   }
-  const target = input.root
-    ? rebindPathLikeToWorkspace(input.target, input.root)
-    : normalizePathText(input.target);
-  return {
-    target,
-    partial: false,
-  };
+  if (!root || !isAbsolutePathLike(target) || !isAbsolutePathLike(root)) {
+    return { target, partial: false };
+  }
+
+  const normalizedTarget = normalizePathText(target).toLowerCase();
+  const normalizedRoot = normalizePathText(root).toLowerCase();
+
+  if (
+    normalizedTarget === normalizedRoot ||
+    normalizedTarget.startsWith(normalizedRoot + "/")
+  ) {
+    return { target: normalizePathText(target), partial: false };
+  }
+
+  // Check marker match
+  for (const marker of projectLocalMarkers) {
+    const markerIndex = normalizedTarget.indexOf(marker);
+    if (markerIndex > 0) {
+      const suffix = normalizePathText(target).slice(markerIndex + 1);
+      const candidate = path.resolve(path.resolve(root), suffix);
+      if (fs.existsSync(candidate)) {
+        return { target: candidate, partial: false };
+      }
+    }
+  }
+
+  return { target, partial: true };
 }
 
 export function rebaseLegacyPermissionRootsInWorkingMemory(
   workingMemory: unknown,
-  _nextProjectRoot: string,
+  sessionProjectRoot: string,
 ): unknown {
-  return workingMemory;
+  if (!workingMemory || typeof workingMemory !== "object") {
+    return workingMemory;
+  }
+  const nextRoot = normalizePathText(path.resolve(sessionProjectRoot));
+  return rebaseRootInValue(workingMemory, nextRoot);
+}
+
+function rebaseRootInValue(value: unknown, nextRoot: string): unknown {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => rebaseRootInValue(item, nextRoot));
+  }
+  if (value && typeof value === "object") {
+    const nextEntries = Object.entries(value).map(([k, v]) => [
+      k,
+      rebaseRootInValue(v, nextRoot),
+    ]);
+    return Object.fromEntries(nextEntries);
+  }
+  return value;
 }
