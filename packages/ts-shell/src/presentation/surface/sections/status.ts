@@ -52,7 +52,10 @@ export function verificationStatus(status?: string): ProductSurfaceStatus {
     case "blocked":
       return "blocked";
     case "partial":
+    case "skipped":
       return "partial";
+    case "not-requested":
+      return "not_proven";
     case "not_run":
     default:
       return "not_run";
@@ -68,7 +71,10 @@ export function verificationSeverity(status?: string): ProductSurfaceSeverity {
     case "blocked":
       return "blocked";
     case "partial":
+    case "skipped":
       return "warning";
+    case "not-requested":
+      return "not_proven";
     case "not_run":
     default:
       return "info";

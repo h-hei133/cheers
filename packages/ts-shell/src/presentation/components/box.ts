@@ -10,8 +10,9 @@ export function createBox(
 ): readonly string[] {
   const width = options?.width ?? 72;
   const horizontal = "─".repeat(Math.max(0, width - 2));
+  // ┌─ title ─...─┐ -> "┌─ " (3) + title + " " (1) + "┐" (1) = title.length + 5 chars total
   const top = options?.title
-    ? `┌─ ${options.title} ${"─".repeat(Math.max(0, width - options.title.length - 6))}┐`
+    ? `┌─ ${options.title} ${"─".repeat(Math.max(0, width - options.title.length - 5))}┐`
     : `┌${horizontal}┐`;
   const bottom = `└${horizontal}┘`;
 

@@ -81,16 +81,55 @@ export function createExecutionGroups(input: {
   }
 
   if (dependentNodes.length > 0) {
+    const sortedDependentIds = topologicalSortNodes(dependentNodes);
     groups.push({
       groupId: `${input.laneId}:group:1`,
       mode: "sequential",
-      targetIds: dependentNodes.map((n) => n.targetId),
+      targetIds: sortedDependentIds,
       status: "created",
       reason: "Dependent targets require ordered sequential application.",
     });
   }
 
   return groups;
+}
+
+export function topologicalSortNodes(
+  nodes: readonly MultiTargetGraphNode[],
+): readonly string[] {
+  const result: string[] = [];
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+  const nodeMap = new Map(nodes.map((n) => [n.targetId, n]));
+
+  function visit(nodeId: string): void {
+    if (visited.has(nodeId)) return;
+    if (visiting.has(nodeId)) {
+      // Cycle fallback: push to avoid infinite recursion
+      result.push(nodeId);
+      visited.add(nodeId);
+      return;
+    }
+
+    visiting.add(nodeId);
+    const node = nodeMap.get(nodeId);
+    if (node) {
+      for (const depId of node.dependencies) {
+        if (nodeMap.has(depId)) {
+          visit(depId);
+        }
+      }
+    }
+    visiting.delete(nodeId);
+    visited.add(nodeId);
+    result.push(nodeId);
+  }
+
+  for (const node of nodes) {
+    visit(node.targetId);
+  }
+
+  return result;
 }
 
 export function evaluateParallelEligibility(
@@ -105,12 +144,33 @@ export function evaluateParallelEligibility(
     };
   }
 
-  const hasParallelGroup = groups.some((g) => g.mode === "parallel");
+  const allParallel =
+    groups.length > 0 && groups.every((g) => g.mode === "parallel");
+  const hasParallel = groups.some((g) => g.mode === "parallel");
+
+  if (allParallel) {
+    return {
+      status: "eligible",
+      allowed: true,
+      reasons: [
+        "All targets are independent and eligible for full parallel execution.",
+      ],
+    };
+  }
+
+  if (hasParallel) {
+    return {
+      status: "forced_sequential",
+      allowed: false,
+      reasons: [
+        "Batch contains mixed independent and dependent targets; execution will proceed with grouped ordering.",
+      ],
+    };
+  }
+
   return {
-    status: hasParallelGroup ? "eligible" : "forced_sequential",
-    allowed: hasParallelGroup,
-    reasons: hasParallelGroup
-      ? ["Targets without overlapping paths or dependencies are eligible for parallel execution."]
-      : ["Targets have sequential ordering constraints."],
+    status: "forced_sequential",
+    allowed: false,
+    reasons: ["Targets have sequential ordering constraints."],
   };
 }

@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { PlanningRuntimeEditTarget } from "../types.js";
 
 export function readWorkspaceFile(
@@ -5,9 +6,18 @@ export function readWorkspaceFile(
   relativePath: string,
   readFile: (absolutePath: string) => string | undefined,
 ): string | undefined {
-  const normalized = relativePath.replace(/^[/\\]+/, "");
-  const absolute = `${workspaceRoot}/${normalized}`;
-  return readFile(absolute);
+  const resolvedWorkspace = path.resolve(workspaceRoot);
+  const resolvedTarget = path.resolve(resolvedWorkspace, relativePath);
+
+  // Prevent directory traversal attacks
+  if (
+    !resolvedTarget.startsWith(resolvedWorkspace + path.sep) &&
+    resolvedTarget !== resolvedWorkspace
+  ) {
+    return undefined;
+  }
+
+  return readFile(resolvedTarget);
 }
 
 export function boundedTargetContent(
@@ -36,7 +46,9 @@ export function buildLiveProviderPromptContext(input: {
       target.path,
       input.readFile,
     );
-    sections.push(`--- File: ${target.path} ---\n${boundedTargetContent(content)}`);
+    sections.push(
+      `--- File: ${target.path} ---\n${boundedTargetContent(content)}`,
+    );
   }
 
   return sections.join("\n\n");

@@ -14,7 +14,8 @@ export function restoreLineEndings(
   text: string,
   ending: "\r\n" | "\n",
 ): string {
-  return ending === "\r\n" ? text.replace(/\n/g, "\r\n") : text;
+  const lfText = normalizeToLF(text);
+  return ending === "\r\n" ? lfText.replace(/\n/g, "\r\n") : lfText;
 }
 
 /**

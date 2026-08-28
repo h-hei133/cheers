@@ -41,8 +41,12 @@ export function buildEvidenceBoundPlanSteps(input: {
     stepKind: "understand-task",
     safeTargetLabel: input.context.selectedCandidate?.safeLabel ?? "workspace",
     evidenceSourceIds: input.context.filesRead.map((f) => f.path),
-    contextPacketIds: input.context.bundle ? [input.context.bundle.packet.packetId] : [],
-    candidateIds: input.context.selectedCandidate ? [input.context.selectedCandidate.candidateId] : [],
+    contextPacketIds: input.context.bundle
+      ? [input.context.bundle.packet.packetId]
+      : [],
+    candidateIds: input.context.selectedCandidate
+      ? [input.context.selectedCandidate.candidateId]
+      : [],
     missingFactsReferenced: input.context.missingFacts,
     expectedResult: "Understand task context and constraints.",
     riskLevel: "low",
@@ -50,17 +54,19 @@ export function buildEvidenceBoundPlanSteps(input: {
     notProvenClaims: ["task-understanding-unverified"],
   });
 
-  if (input.editTargets.length > 0) {
+  // Support all edit targets in multi-target mutation scenarios
+  for (let i = 0; i < input.editTargets.length; i++) {
+    const target = input.editTargets[i]!;
     steps.push({
-      stepId: "step-2:prepare-edit-handoff",
+      stepId: `step-${i + 2}:prepare-edit-handoff:${target.path}`,
       stepKind: "prepare-edit-handoff",
-      targetFile: input.editTargets[0]?.path,
-      safeTargetLabel: input.editTargets[0]?.path ?? "target",
+      targetFile: target.path,
+      safeTargetLabel: target.path,
       evidenceSourceIds: [],
       contextPacketIds: [],
       candidateIds: [],
       missingFactsReferenced: [],
-      expectedResult: "Prepare bounded edit intent for downstream mutation runtime.",
+      expectedResult: `Prepare bounded edit intent for target ${target.path}.`,
       riskLevel: "medium",
       executionStatus: "review-only",
       notProvenClaims: ["edit-intent-unverified"],

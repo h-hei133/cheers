@@ -42,7 +42,10 @@ export async function withFileMutationQueue<T>(
     const nextQueue = new Promise<void>((resolveQueue) => {
       releaseNext = resolveQueue;
     });
-    const chainedQueue = currentQueue.then(() => nextQueue);
+    const chainedQueue = currentQueue.then(
+      () => nextQueue,
+      () => nextQueue,
+    );
     fileMutationQueues.set(key, chainedQueue);
 
     return { key, currentQueue, chainedQueue, releaseNext };
@@ -54,8 +57,8 @@ export async function withFileMutationQueue<T>(
   );
 
   const { key, currentQueue, chainedQueue, releaseNext } = await registration;
-  await currentQueue;
   try {
+    await currentQueue;
     return await fn();
   } finally {
     releaseNext();
