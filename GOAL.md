@@ -1,57 +1,44 @@
-# Goal: Phase 3 Deepening - Special Battle 1: Tool Dispatch, Concurrency & Security Modernization
+# Goal: Phase 3 Deepening - Special Battle 2: Multi-File Mutation Graph & Per-File Patch Planning
 
 ## Strategic Intent & Context
-Following initial exploration of reference architectures (`/home/wang/projects/pi` and `/home/wang/projects/source-claudecode`), we are executing **Special Battle 1** to eliminate the capability gap in **Tool Dispatch, File Mutation Concurrency, and Permission Security Boundaries**.
+In **Special Battle 2** of Phase 3, we modernize the code mutation subsystem:
+1. **Multi-File Mutation Planning & Conflict Detection** (`packages/ts-shell/src/edit/multifile/model.ts` - 39 functions):
+   - Modularize multi-target conflict detection, dependency graph construction, and settlement ordering.
+2. **Per-File Patch Planning & Verification** (`packages/ts-shell/src/edit/patch/plan/perFile.ts` - 38 functions):
+   - Decompose operation validation (Add, Update, Move, Delete), broad patch heuristics, and failure taxonomy.
+3. **Fuzzy Diff Normalization** (Inspired by `pi`'s `edit-diff.ts`):
+   - Unicode space/quote normalization, line ending resilience (`\r\n` vs `\n`), and span reanchoring.
 
 ---
 
-## 1. Problem Statement & Reference Ingestion
+## 1. Concrete Work Breakdown Structure (WBS)
 
-### A. Current Deficiencies in `coding-agents`:
-1. **Monolithic Tool Dispatcher** (`packages/ts-shell/src/tools/toolBatchDispatch.ts` - 29 functions):
-   - Combines dispatch planning, security authority checking, sequential execution, and JSON receipt generation in a single monolithic file.
-2. **Coarse-grained Approval Policy** (`packages/ts-shell/src/core/shell/approvalTrustPolicy.ts` - 22 functions):
-   - Flat cache keys, lacks permission behavioral classification (`allow`, `deny`, `ask`), and lacks rule-based scope evaluation.
-3. **No File Mutation Concurrency Lock**:
-   - Multiple parallel tool calls touching the same workspace path can race and corrupt files.
+### Step 1: Fuzzy Diff Normalization & Line Span Utilities (Inspired by `pi`)
+- **Target**: `packages/ts-shell/src/edit/patch/normalization/diffNormalize.ts`
+- **Implementation**: NFKC normalization, smart quote/dash normalization, line-ending preservation.
 
-### B. Reference Architecture Ingestion:
-1. **Pi's `withFileMutationQueue`** (`/home/wang/projects/pi/packages/coding-agent/src/core/tools/file-mutation-queue.ts`):
-   - Path-level mutex serialization for safe concurrent tool execution across different files while guaranteeing strict sequencing per path.
-2. **Claude Code's Permission & Trust State Machine** (`/home/wang/projects/source-claudecode/types/permissions.ts` & `permissionsLoader.ts`):
-   - Multi-tier permission evaluation: `allow` (read-only/safe), `ask` (destructive write/command), `deny` (sandbox violation).
-
----
-
-## 2. Concrete Work Breakdown Structure (WBS)
-
-### Step 1: File Mutation Concurrency & Lock Management
-- **Target**: `packages/ts-shell/src/tools/concurrency/fileMutationQueue.ts`
-- **Implementation**: Realpath-normalized path-keyed Promise chain mutex matching Pi's architecture.
-
-### Step 2: Fine-grained Permission & Trust Policy Engine
-- **Target**: `packages/ts-shell/src/core/shell/approval/`
+### Step 2: Modular Multi-File Mutation Graph
+- **Target**: `packages/ts-shell/src/edit/multifile/`
 - **Sub-modules**:
-  1. `approval/types.ts`: Formal definitions for `PermissionBehavior` (`allow` | `ask` | `deny`), `PermissionRuleSource`, and `ApprovalEvaluation`.
-  2. `approval/evaluator.ts`: Rule-matching engine against tool names, paths, and bash command patterns.
-  3. `approval/store.ts`: Thread-safe persistence of user trust decisions and grant scopes.
-  4. `approvalTrustPolicy.ts`: Lightweight backward-compatible facade ($\le 20$ functions).
+  1. `multifile/types.ts`: Formal interfaces for `MultiTargetMutationPlan`, `MultiTargetConflict`, `MultiTargetExecutionGroup`.
+  2. `multifile/conflict.ts`: Path collision, range overlap, and stale read detection.
+  3. `multifile/graph.ts`: Dependency graph builder and topological execution group scheduler.
+  4. `multifile/model.ts`: Facade wrapper retaining backward compatibility ($\le 20$ functions).
 
-### Step 3: Modular Tool Batch Dispatcher
-- **Target**: `packages/ts-shell/src/tools/dispatch/`
+### Step 3: Modular Per-File Patch Planning
+- **Target**: `packages/ts-shell/src/edit/patch/plan/`
 - **Sub-modules**:
-  1. `dispatch/types.ts`: Clean interfaces for `ToolBatchDispatchPlan`, `ToolDispatchPlanCall`, and `ToolResultDetail`.
-  2. `dispatch/planner.ts`: Plan preparation, argument safety sanitization, and dependency ordering.
-  3. `dispatch/executor.ts`: Execution orchestrator leveraging `fileMutationQueue` for path-safe concurrency.
-  4. `dispatch/projector.ts`: Mapping tool outcomes to verifiable runtime receipts and metadata.
-  5. `toolBatchDispatch.ts`: Lightweight backward-compatible facade ($\le 20$ functions).
+  1. `patch/plan/types.ts`: Typed operations for file patch mutations (Add, Update, Delete, Move).
+  2. `patch/plan/operation.ts`: Individual operation validators and path resolution.
+  3. `patch/plan/validator.ts`: Broad patch detection, mixed-operation support checks, and structured failure classes.
+  4. `patch/plan/perFile.ts`: Facade wrapper retaining backward compatibility ($\le 20$ functions).
 
 ---
 
-## 3. Measurable Acceptance & Verification Criteria
-1. **Zero Type Errors**: `npm run build:ts` cleanly builds CLI binary (`dist/cli.js`).
-2. **100% Test Green**: All existing unit tests pass via `vitest run`.
+## 2. Measurable Acceptance & Verification Criteria
+1. **Zero Type Errors**: `npm run build:ts` builds CLI binary cleanly.
+2. **100% Test Green**: All vitest unit tests pass.
 3. **NormProof Compliance**:
-   - `normproof judge` continues to show `0` blocking obligations.
-   - Proof gap count reduces from 30 to **28** (`toolBatchDispatch.ts` and `approvalTrustPolicy.ts` both brought under 20 functions).
+   - `normproof judge` continues with 0 blocking obligations.
+   - Proof gap count reduces from 28 to **26** (`multifile/model.ts` and `patch/plan/perFile.ts` brought under 20 functions).
 4. **Audit & Log**: Formal updates in `.normproof/dispositions.md` and `.wiki/log.md`.
