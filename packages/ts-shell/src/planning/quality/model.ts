@@ -6,7 +6,11 @@ import type { ContextGraphScore } from "../../orchestration/contextGraphScore.js
 import { buildContextGraphReadinessFacts, type ContextGraphReadinessFacts } from "../../orchestration/contextGraphReadiness.js";
 import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
 import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
-import type { VerificationCommandPlan } from "../../verification/command/plan.js";
+
+export interface VerificationCommandPlanLike {
+  readonly verificationPlanId?: string;
+  readonly state?: string;
+}
 import type { VerificationRepairContext } from "../../orchestration/verificationRepairContext.js";
 import type { CodeGraphTrace } from "../../context/acquisition/code/trace.js";
 import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
@@ -188,7 +192,7 @@ export function buildPlanQuality(input: {
   readonly analysisCalibration?: AnalysisBriefCalibration;
   readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
-  readonly verificationCommandPlan?: VerificationCommandPlan;
+  readonly verificationCommandPlan?: VerificationCommandPlanLike;
   readonly repairContext?: VerificationRepairContext;
   readonly providerReadiness?: "ready" | "missing" | "blocked" | "unsupported";
 }): PlanQuality {
@@ -439,7 +443,7 @@ function buildDimensions(input: {
   readonly analysisCalibration?: AnalysisBriefCalibration;
   readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
-  readonly verificationCommandPlan?: VerificationCommandPlan;
+  readonly verificationCommandPlan?: VerificationCommandPlanLike;
   readonly repairContext?: VerificationRepairContext;
   readonly providerReadiness?: "ready" | "missing" | "blocked" | "unsupported";
   readonly graphReadiness?: ContextGraphReadinessFacts;
@@ -481,7 +485,7 @@ function classifyLevel(input: {
   readonly analysisCalibration?: AnalysisBriefCalibration;
   readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
-  readonly verificationCommandPlan?: VerificationCommandPlan;
+  readonly verificationCommandPlan?: VerificationCommandPlanLike;
   readonly repairContext?: VerificationRepairContext;
   readonly score: number;
 }): PlanQualityLevel {

@@ -1,6 +1,12 @@
+import type { RuntimeSourceFact } from "../../../context/acquisition/code/source.js";
+import type { RepairHypothesisState } from "../../../repair/flow/hypothesis.js";
 import type { ToolActionKind } from "../../../tools/policy/strategy.js";
-import type { QueryRuntimeRepairPlan } from "./batch.js";
 
+export interface QueryRuntimeRepairPlan {
+  readonly hypothesis: RepairHypothesisState;
+  readonly sourceFacts: readonly RuntimeSourceFact[];
+  readonly blockedRepeat: boolean;
+}
 export interface QueryRuntimeActionDecision {
   readonly nextAction: ToolActionKind;
   readonly actions: readonly ToolActionKind[];

@@ -2,9 +2,17 @@ import type { RuntimeEvidenceSavePoint } from "../evidence/savepoint/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../repair/handoff/boundary.js";
 import type { SessionTreeProjection } from "../session/sessionTreeProjection.js";
 import type { SessionContextRebuildProjection } from "./sessionContextRebuildProjection.js";
-import type { NextTurnBundleProjection } from "../turn/nextTurnBundle.js";
-import type { ToolResultMessageBatch } from "../turn/toolResultMessage.js";
 import type { VerificationLoopIntent, VerificationResultObservation } from "../verification/result/boundary.js";
+
+export interface NextTurnBundleLike {
+  readonly bundleId: string;
+  readonly redaction: { readonly status: "report-safe" | "redacted" | string };
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface ToolResultMessageBatchLike {
+  readonly messages: readonly { readonly messageId: string }[];
+}
 
 export interface LoopContextRebuildInput {
   readonly rebuildInputId: string;
@@ -45,9 +53,9 @@ const REDACTION_EXCLUSIONS = [
 export function buildLoopContextRebuildInput(input: {
   readonly sessionProjection: SessionTreeProjection;
   readonly contextRebuildProjection?: SessionContextRebuildProjection;
-  readonly nextTurnBundle?: NextTurnBundleProjection;
+  readonly nextTurnBundle?: NextTurnBundleLike;
   readonly savePoint?: RuntimeEvidenceSavePoint;
-  readonly toolResultMessages?: ToolResultMessageBatch;
+  readonly toolResultMessages?: ToolResultMessageBatchLike;
   readonly verificationIntents?: readonly VerificationLoopIntent[];
   readonly verificationResults?: readonly VerificationResultObservation[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];

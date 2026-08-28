@@ -1,4 +1,8 @@
-import type { AgentLoopContractQueuedMessage } from "../runtime/loop/contract.js";
+export interface FollowUpQueuedMessageLike {
+  readonly id: string;
+  readonly text: string;
+  readonly mode?: "follow-up" | "steering" | string;
+}
 
 export type FollowUpDeliveryStatus =
   | "queued"
@@ -32,7 +36,7 @@ export interface FollowUpQueueProjection {
 export function projectFollowUpQueue(input: {
   readonly turnId: string;
   readonly pendingBundleId: string;
-  readonly messages: readonly AgentLoopContractQueuedMessage[];
+  readonly messages: readonly FollowUpQueuedMessageLike[];
   readonly deliveredMessageIds?: readonly string[];
   readonly unsupportedMessageIds?: readonly string[];
   readonly abandonedMessageIds?: readonly string[];

@@ -8,7 +8,7 @@ import type {
   PerFilePatchOperationKind,
   PerFilePatchPlan,
   PerFilePatchSupportStatus,
-} from "../patch/plan/perFile.js";
+} from "../patch/plan/types.js";
 import type { RouteScopedEditJournal } from "./journal/model.js";
 
 export interface PerFilePatchResultProjection {

@@ -1,6 +1,8 @@
 import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
-import type { BrowserExternalRunnerCommand } from "../../runtime/external/manifest.js";
-import type { BrowserExternalRunnerAction } from "../../runtime/external/protocol.js";
+import type {
+  BrowserExternalRunnerAction,
+  BrowserExternalRunnerCommand,
+} from "../../runtime/external/protocol.js";
 import { browserExternalRunnerHasForbiddenContent } from "../../runtime/external/protocol.js";
 import type { BrowserSkillRunnerMetadata } from "./metadata.js";
 

@@ -122,7 +122,8 @@ function terminalProofBlocker(
   output: AgentExecutionOutput,
   projection: ReturnType<typeof projectQueryRuntimeProof>,
 ): string | undefined {
-  if (output.events?.some((event) => event.type === 'tool.result' && event.success === false)) {
+  const outputEvents = output.events as readonly QueryEvent[] | undefined
+  if (outputEvents?.some((event) => event.type === 'tool.result' && event.success === false)) {
     return 'failed tool output has no task proof'
   }
   if (!output.codingResult) {
@@ -489,12 +490,13 @@ async function emitOutputEvents(
   output: AgentExecutionOutput,
   deps: QueryLoopDependencies,
 ): Promise<void> {
-  for (const event of output.events ?? []) {
+  const outputEvents = (output.events ?? []) as readonly QueryEvent[]
+  for (const event of outputEvents) {
     state.pendingLifecycle = applyLifecycleEventToIndex(state.pendingLifecycle, event)
     await deps.onEvent?.(event)
   }
 
-  for (const event of compensateToolLifecycle(output.events ?? [])) {
+  for (const event of compensateToolLifecycle(outputEvents)) {
     state.pendingLifecycle = applyLifecycleEventToIndex(state.pendingLifecycle, event)
     await deps.onEvent?.(event)
   }

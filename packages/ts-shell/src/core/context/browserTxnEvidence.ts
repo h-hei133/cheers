@@ -2,36 +2,8 @@ import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import { createBrowserTxnTrace, type BrowserTxnTrace } from "./browserTrace.js";
 import { renderBrowserTxnReport } from "./browserTxnReport.js";
 import type { BrowserTxnPlannerDecision } from "./browserPlan.js";
-
-export type BrowserTxnStatus = "success" | "stopped" | "failed";
-
-export interface BrowserTxnStepSummary {
-  readonly kind: string;
-  readonly status: BrowserTxnStatus;
-  readonly target: string;
-  readonly summary: string;
-  readonly reasonCode: string;
-  readonly repairStatus?: "not-needed" | "attempted" | "succeeded" | "failed";
-}
-
-export interface BrowserTxnResult {
-  readonly status: BrowserTxnStatus;
-  readonly transactionId: string;
-  readonly controlledTarget: string;
-  readonly planner: BrowserTxnPlannerDecision;
-  readonly plannedSteps: readonly string[];
-  readonly stepSummaries: readonly BrowserTxnStepSummary[];
-  readonly finalSummary: string;
-  readonly reasonCode: string;
-  readonly cleanupStatus: string;
-  readonly redactionStatus: string;
-  readonly repairStatus: "not-needed" | "attempted" | "succeeded" | "failed";
-  readonly durationMs: number;
-  readonly evidenceId: string;
-  readonly trace: BrowserTxnTrace;
-  readonly nextActions: readonly string[];
-  readonly evidence: readonly string[];
-}
+export type { BrowserTxnStatus, BrowserTxnStepSummary, BrowserTxnResult } from "./browserTxnTypes.js";
+import type { BrowserTxnResult, BrowserTxnStatus, BrowserTxnStepSummary } from "./browserTxnTypes.js";
 
 export function createBrowserTxnResult(input: {
   readonly status: BrowserTxnStatus;

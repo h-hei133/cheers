@@ -1,4 +1,4 @@
-import type { SchemaVersion } from "../../../../contracts/typescript/types.js";
+import type { SchemaVersion } from "../model-adapters/types.js";
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,

@@ -4,7 +4,22 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isRustDaemonEnabled } from './client.js'
-import { getExecutionPathLabel } from '../../../../scripts/toolchain.mjs'
+function getExecutionPathLabel(rootDir: string): string {
+  const configFile = path.join(rootDir, '.private-agents.json')
+  let daemonEnabledFromConfig: boolean | undefined
+  if (fs.existsSync(configFile)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(configFile, 'utf8'))
+      if (typeof parsed.daemonEnabled === 'boolean') {
+        daemonEnabledFromConfig = parsed.daemonEnabled
+      }
+    } catch {}
+  }
+  const daemonEnabled = process.env.DAEMON_ENABLED === undefined
+    ? daemonEnabledFromConfig ?? true
+    : process.env.DAEMON_ENABLED === '1'
+  return daemonEnabled ? 'rust-daemon' : 'ts-local'
+}
 
 interface MockDaemonHarness {
   readonly spawnMock: ReturnType<typeof vi.fn>

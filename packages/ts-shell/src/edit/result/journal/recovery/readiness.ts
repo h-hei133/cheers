@@ -6,11 +6,10 @@ import {
   projectOriginalContentAuthority,
   type OriginalContentAuthorityProjection,
 } from "../authority/original.js";
-import type { JournalRecoveryPlanProjection } from "./plan.js";
 import type { RouteScopedEditJournal } from "../model.js";
 
 export interface JournalRecoveryReadinessProjection {
-  readonly recoveryPlanMode: "plan-only";
+  readonly recoveryPlanMode: "readiness-only" | "plan-only" | "manual-review";
   readonly authorityKind: JournalDurableAuthorityDescriptor["authorityKind"];
   readonly authorityAvailability: JournalDurableAuthorityDescriptor["availability"];
   readonly persistence: JournalDurableAuthorityDescriptor["persistence"];
@@ -29,10 +28,11 @@ export interface JournalRecoveryReadinessProjection {
 
 export function projectJournalRecoveryReadiness(input: {
   readonly journal: RouteScopedEditJournal;
-  readonly recoveryPlan: Pick<
-    JournalRecoveryPlanProjection,
-    "mode" | "blockers" | "evidence"
-  >;
+  readonly recoveryPlan: {
+    readonly mode: "readiness-only" | "plan-only" | "manual-review";
+    readonly blockers: readonly string[];
+    readonly evidence: readonly string[];
+  };
   readonly durableAuthority?: JournalDurableAuthorityDescriptor;
   readonly originalContentAuthority?: OriginalContentAuthorityProjection;
 }): JournalRecoveryReadinessProjection {

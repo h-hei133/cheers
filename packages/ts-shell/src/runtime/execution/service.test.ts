@@ -1,8 +1,15 @@
 import fs from 'node:fs/promises'
+import fsSync from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import executionCommandContractFixture from '../../../../../contracts/tests/fixtures/valid/execution.command.contract.json'
+
+const executionCommandContractFixture = JSON.parse(
+  fsSync.readFileSync(
+    new URL('../../../../../contracts/tests/fixtures/valid/execution.command.contract.json', import.meta.url),
+    'utf8',
+  ),
+)
 import {
   createDefaultExecutionService,
   type CommandExecutionRequest,

@@ -8,21 +8,15 @@ import {
 } from "./browserEvidenceBundle.js";
 import {
   classifyBrowserReplayReadiness,
+  type BrowserExecutionReceiptStatus,
   type BrowserReplayReadiness,
 } from "./browserReplayReadiness.js";
 import type { BrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
 import type { BrowserSkillRunnerReadiness } from "./browser/skill/runner/readiness.js";
 
+export type { BrowserExecutionReceiptStatus } from "./browserReplayReadiness.js";
 export type BrowserExecutionReceiptId = string;
 export type BrowserExecutionReceiptVersion = "browser-execution-receipt/v1";
-export type BrowserExecutionReceiptStatus =
-  | "executed"
-  | "blocked"
-  | "failed"
-  | "timed-out"
-  | "invalid-response"
-  | "unavailable"
-  | "unsafe-output";
 export type BrowserExecutionReceiptSource =
   | "external-runner"
   | "skill-managed"

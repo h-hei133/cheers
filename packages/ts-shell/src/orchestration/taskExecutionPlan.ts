@@ -2,7 +2,12 @@ import crypto from "node:crypto";
 
 import type { AgentPlan } from "./agentPlan.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
-import type { PlanQuality } from "../planning/quality/model.js";
+
+export interface PlanQualityLike {
+  readonly qualityId?: string;
+  readonly level?: string;
+  readonly missingFacts?: readonly string[];
+}
 import type { TaskLifecycle } from "./taskLifecycle.js";
 import type { TaskReadPlan } from "./taskReadPlan.js";
 
@@ -37,7 +42,7 @@ export function buildTaskExecutionPlan(input: {
   readonly readPlan: TaskReadPlan;
   readonly lifecycle?: TaskLifecycle;
   readonly agentPlan?: AgentPlan;
-  readonly planQuality?: PlanQuality;
+  readonly planQuality?: PlanQualityLike;
   readonly scorecardId?: string;
 }): TaskExecutionPlan {
   const missingFacts = unique([
@@ -140,7 +145,7 @@ export function buildTaskExecutionPlan(input: {
 
 function classifyProposalReadiness(
   brief: AnalysisBrief,
-  quality: PlanQuality | undefined,
+  quality: PlanQualityLike | undefined,
 ): TaskExecutionReadiness {
   if (brief.missingFacts.length > 0 || brief.confidence === "low") {
     return "needs-evidence";

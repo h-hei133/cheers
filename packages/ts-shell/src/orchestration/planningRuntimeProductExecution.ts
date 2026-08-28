@@ -6,8 +6,15 @@ import type { ProviderEditRawProposal } from "./providerEditProposal.js";
 import type { ProviderEditAvailability } from "./providerEditPlanner.js";
 import type { PlanningMutationHandoffProjection } from "../planning/handoff/mutation.js";
 import type {
+  PlanningRuntimeProductLiveProviderAttempt,
+  PlanningRuntimeProductLiveProviderProposal,
   PlanningRuntimeProductProposalPreparation,
   PlanningRuntimeProductProposalSource,
+} from "../planning/runtime/proposal.js";
+
+export type {
+  PlanningRuntimeProductLiveProviderAttempt,
+  PlanningRuntimeProductLiveProviderProposal,
 } from "../planning/runtime/proposal.js";
 import type { LiveProviderReadinessStatus } from "./liveProviderAdapterApproval.js";
 import type { RealProviderProposalDryRunProvider } from "./realProviderProposalDryRun.js";
@@ -36,34 +43,6 @@ export interface PlanningRuntimeProductVerificationCommand {
   readonly source: "runtime-option" | "cli-flag" | "benchmark";
 }
 
-export interface PlanningRuntimeProductLiveProviderAttempt {
-  readonly role: "primary" | "fallback";
-  readonly providerSafeLabel: string;
-  readonly providerConfigSource: string;
-  readonly providerAvailability: ProviderEditAvailability;
-  readonly readinessStatus?: LiveProviderReadinessStatus;
-  readonly evidenceSource?: "live-provider" | "fake-provider";
-  readonly provider?: RealProviderProposalDryRunProvider;
-}
-
-export interface PlanningRuntimeProductLiveProviderProposal {
-  readonly optIn: true;
-  readonly source: "runtime-option" | "cli-flag" | "benchmark";
-  readonly attempts?: readonly PlanningRuntimeProductLiveProviderAttempt[];
-  readonly fallbackPolicy?: {
-    readonly enabled: boolean;
-    readonly reason: string;
-  };
-  readonly taskEvidence?: {
-    readonly mode: "single-file-exact-patch" | "small-target-set-exact-patch";
-    readonly targetContentMaxChars?: number;
-    readonly taskIntentSummary?: string;
-  };
-  readonly calibration?: {
-    readonly mode: "exact-patch-author";
-    readonly targetContentMaxChars?: number;
-  };
-}
 
 export interface PlanningRuntimeProductExecutionOptions {
   readonly confirmation?: PlanningMutationProofConfirmation;

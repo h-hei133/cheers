@@ -1,5 +1,6 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
-import type { BrowserTxnResult } from "./browserTxnEvidence.js";
+import type { BrowserTxnResult } from "./browserTxnTypes.js";
+import type { BrowserTxnTrace } from "./browserTrace.js";
 
 export function renderBrowserTxnReport(result: BrowserTxnResult): string {
   const title = result.status === "success"
@@ -9,10 +10,9 @@ export function renderBrowserTxnReport(result: BrowserTxnResult): string {
     title,
     `- Outcome: ${outcomeLabel(result)}`,
     `- Transaction: ${result.status}`,
-    `- TransactionId: ${result.transactionId}`,
-    `- TraceId: ${result.trace.traceId}`,
+    `- TraceId: ${(result.trace as BrowserTxnTrace)?.traceId ?? "none"}`,
     `- Target: ${result.controlledTarget}`,
-    `- Plan: ${result.trace.plan.sequence.join(" -> ") || "none"}`,
+    `- Plan: ${(result.trace as BrowserTxnTrace)?.plan?.sequence?.join(" -> ") || "none"}`,
     `- Planner: ${result.planner.confidence} (${sanitizeBrowserText(result.planner.reason, 140)})`,
     `- Repair: ${result.repairStatus}`,
     `- Result: ${result.finalSummary}`,

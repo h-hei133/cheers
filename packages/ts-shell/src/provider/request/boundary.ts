@@ -1,6 +1,56 @@
-import type { ContextPlanningBlockSummary } from "../../context/acquisition/summary.js";
+export interface ContextPlanningBlockSummaryLike {
+  readonly summaryId: string;
+  readonly status: string;
+  readonly acquisition?: {
+    readonly requiredMissingFacts?: readonly string[];
+    readonly optionalMissingFacts?: readonly string[];
+  };
+  readonly planning?: {
+    readonly constraints?: readonly string[];
+  };
+  readonly handoff?: {
+    readonly editNoWriteStatus?: string;
+  };
+  readonly notProvenClaims?: readonly string[];
+}
 import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
-import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
+export interface NextTurnDeliveryFactLike {
+  readonly deliveryId: string;
+  readonly deliveryKind: "steering" | "follow-up";
+  readonly safeUserFacingSummary: string;
+}
+
+export interface NextTurnBundleLike {
+  readonly bundleId: string;
+  readonly assistantResponseSummary?: string;
+  readonly safeToolResultMessages: readonly {
+    readonly messageId: string;
+    readonly safeContentSummary: string;
+  }[];
+  readonly sourceToolResultMessageIds?: readonly string[];
+  readonly includedToolResultMessageIds: readonly string[];
+  readonly excludedToolResultMessageIds?: readonly string[];
+  readonly messageExclusionReasons?: readonly string[];
+  readonly steeringMessageIds?: readonly string[];
+  readonly followUpMessageIds?: readonly string[];
+  readonly deliveryFacts: readonly NextTurnDeliveryFactLike[];
+  readonly readinessStatus:
+    | "ready"
+    | "ready_with_partial_tool_results"
+    | "blocked_by_policy"
+    | "blocked_by_authority"
+    | "blocked_by_failed_tool"
+    | "blocked_by_malformed_tool_call"
+    | "blocked_by_unsupported_tool"
+    | "unsupported"
+    | "not_ready"
+    | string;
+  readonly blockingFacts: readonly string[];
+  readonly notProvenClaims: readonly string[];
+  readonly redaction: {
+    readonly status: "report-safe" | "redacted";
+  };
+}
 import type { ProviderRegistryProjection } from "../registry/provider.js";
 
 export type ModelRequestReadinessStatus =
@@ -20,7 +70,7 @@ export interface ModelRequestBoundaryInput {
   readonly modelSafeLabel?: string;
   readonly providerReadinessStatus?: "ready" | "missing" | "blocked" | "unknown";
   readonly providerRegistry?: ProviderRegistryProjection;
-  readonly contextPlanningSummary?: ContextPlanningBlockSummary;
+  readonly contextPlanningSummary?: ContextPlanningBlockSummaryLike;
   readonly continuationReadiness?: ContinuationReadinessProjection;
   readonly planningConstraints?: readonly string[];
   readonly noWriteStatus?: string;
@@ -235,7 +285,7 @@ export function createModelRequestBoundary(
 }
 
 export function prepareNextTurnModelRequest(input: {
-  readonly nextTurnBundle: NextTurnBundleProjection;
+  readonly nextTurnBundle: NextTurnBundleLike;
   readonly modelRequestBoundary: ModelRequestBoundary;
   readonly providerRegistry?: ProviderRegistryProjection;
   readonly providerId?: string;
@@ -529,7 +579,7 @@ function createProviderMetadata(input: {
 }
 
 function createSafeRequestMessages(input: {
-  readonly bundle: NextTurnBundleProjection;
+  readonly bundle: NextTurnBundleLike;
   readonly continuationReadiness?: ContinuationReadinessProjection;
   readonly instructionSummary?: string;
   readonly taskSummary?: string;
@@ -597,7 +647,7 @@ function createSafeRequestMessages(input: {
 }
 
 function requestReadiness(input: {
-  readonly bundle: NextTurnBundleProjection;
+  readonly bundle: NextTurnBundleLike;
   readonly boundary: ModelRequestBoundary;
   readonly providerMetadata: NextTurnRequestProviderMetadata;
   readonly blockedReasons: readonly string[];
@@ -656,7 +706,7 @@ function requestReadiness(input: {
 }
 
 function blockedRequestReasons(input: {
-  readonly bundle: NextTurnBundleProjection;
+  readonly bundle: NextTurnBundleLike;
   readonly boundary: ModelRequestBoundary;
   readonly providerMetadata: NextTurnRequestProviderMetadata;
   readonly excludedMessageIds: readonly string[];

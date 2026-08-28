@@ -1,4 +1,9 @@
-import type { AgentLoopContractQueuedMessage } from "../runtime/loop/contract.js";
+export interface SteeringQueuedMessageLike {
+  readonly id: string;
+  readonly text: string;
+  readonly mode?: "steering" | "follow-up" | string;
+  readonly priority?: "normal" | "high" | string;
+}
 
 export type SteeringDeliveryStatus =
   | "queued"
@@ -31,7 +36,7 @@ export interface SteeringQueueProjection {
 
 export function projectSteeringQueue(input: {
   readonly turnId: string;
-  readonly messages: readonly AgentLoopContractQueuedMessage[];
+  readonly messages: readonly SteeringQueuedMessageLike[];
   readonly deliveredMessageIds?: readonly string[];
   readonly unsupportedMessageIds?: readonly string[];
   readonly abandonedMessageIds?: readonly string[];

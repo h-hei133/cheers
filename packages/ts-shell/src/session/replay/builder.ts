@@ -25,8 +25,8 @@ import type {
   AgentRole,
   ContinuationReason,
 } from "../../orchestration/types.js";
-import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
-import type { ReplayPlan } from "./sessionReplayFacade.js";
+import type { RecoverySnapshot } from "../recovery/types.js";
+import type { ReplayPlan } from "./types.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 

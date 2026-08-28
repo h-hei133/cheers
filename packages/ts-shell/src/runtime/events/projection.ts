@@ -28,11 +28,105 @@ import type { PackageInventoryProjection } from "../resources/inventory.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
 import type { ReplaySafeLoopStateSummary } from "../../session/replay/state.js";
-import type { AssistantResponseState } from "../../turn/assistantResponse.js";
-import type { NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
-import type { FollowUpQueueProjection } from "../../turn/followUpQueue.js";
-import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
-import type { SteeringQueueProjection } from "../../turn/steeringQueue.js";
+export interface AssistantResponseStateLike {
+  readonly responseId: string;
+  readonly turnId?: string;
+  readonly chunkCount?: number;
+  readonly textDeltaCount?: number;
+  readonly contentSummary?: string;
+  readonly toolCallCandidates?: readonly unknown[];
+  readonly accumulationStatus?: string;
+  readonly redaction?: { readonly status: string };
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface NextTurnDeliveryPolicyProjectionLike {
+  readonly policyId: string;
+  readonly bundleId: string;
+  readonly entries?: readonly unknown[];
+  readonly deliveryStatus?: string;
+  readonly providerCalled?: boolean;
+  readonly nextTurnExecuted?: boolean;
+  readonly nextTurnEligible?: boolean;
+  readonly reason?: string;
+  readonly steeringDeliveredCount?: number;
+  readonly steeringPendingCount?: number;
+  readonly steeringBlockedCount?: number;
+  readonly followUpDeliveredCount?: number;
+  readonly followUpPendingCount?: number;
+  readonly followUpBlockedCount?: number;
+  readonly terminalSuccessClaim?: false;
+  readonly redaction?: { readonly status: string };
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface FollowUpQueueProjectionLike {
+  readonly queueId: string;
+  readonly items: readonly {
+    readonly followUpId: string;
+    readonly source: string;
+    readonly targetTurnId?: string;
+    readonly safeSummary: string;
+    readonly deliveryStatus: string;
+    readonly redactionStatus: string;
+    readonly notProvenClaims: readonly string[];
+  }[];
+}
+
+export interface NextTurnBundleProjectionLike {
+  readonly bundleId: string;
+  readonly turnId: string;
+  readonly sourceToolOutcomeBundleId?: string;
+  readonly sourceToolResultMessageIds?: readonly string[];
+  readonly safeToolResultMessages?: readonly {
+    readonly messageId: string;
+    readonly toolCallId: string;
+    readonly toolName: string;
+    readonly safeContentSummary: string;
+    readonly terminalSuccessClaim: false;
+  }[];
+  readonly steeringMessageIds?: readonly string[];
+  readonly followUpMessageIds?: readonly string[];
+  readonly deliveryFacts?: readonly {
+    readonly deliveryId: string;
+    readonly sourceNextTurnBundleId: string;
+    readonly deliveryKind: "steering" | "follow-up";
+    readonly queued: boolean;
+    readonly delivered: boolean;
+    readonly blocked: boolean;
+    readonly reason: string;
+    readonly safeUserFacingSummary: string;
+    readonly notProvenClaims: readonly string[];
+    readonly terminalSuccessClaim: false;
+  }[];
+  readonly assistantResponseSummary?: string;
+  readonly includedToolResultMessageIds?: readonly string[];
+  readonly excludedToolResultMessageIds?: readonly string[];
+  readonly readinessStatus: string;
+  readonly blockingFacts?: readonly string[];
+  readonly requiredUserAction?: unknown;
+  readonly contextRebuildProjectionId?: string;
+  readonly sessionActivePathId?: string;
+  readonly providerMetadataIds?: readonly string[];
+  readonly deliveryPolicyId?: string;
+  readonly deliveryStatus?: string;
+  readonly notProvenClaims?: readonly string[];
+  readonly terminalSuccessClaim?: false;
+  readonly redaction?: { readonly status: string };
+}
+
+export interface SteeringQueueProjectionLike {
+  readonly queueId: string;
+  readonly items: readonly {
+    readonly steeringId: string;
+    readonly source: string;
+    readonly priority: string;
+    readonly safeSummary: string;
+    readonly deliveryStatus: string;
+    readonly redactionStatus: string;
+    readonly notProvenClaims: readonly string[];
+  }[];
+}
 import type { NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import type { ToolBatchHandoffProjection } from "../../tools/toolHandoff.js";
 import type {
@@ -40,13 +134,46 @@ import type {
   ToolResultDetail,
 } from "../../tools/toolBatchDispatch.js";
 import type { ToolOutcomeBundleProjection } from "../../tools/toolOutcomeBundle.js";
-import type { ToolResultMessageBatch } from "../../turn/toolResultMessage.js";
+export interface ToolResultMessageBatchLike {
+  readonly batchId: string;
+  readonly sourceToolOutcomeBundleId?: string;
+  readonly turnId?: string;
+  readonly extractionStatus?: string;
+  readonly dispatchPlanId?: string;
+  readonly preparedCount?: number;
+  readonly blockedCount?: number;
+  readonly messageCount?: number;
+  readonly terminalSuccessClaim?: false;
+  readonly messages: readonly {
+    readonly messageId: string;
+    readonly toolCallId?: string;
+    readonly toolName?: string;
+    readonly role?: string;
+    readonly deliveryStatus?: string;
+    readonly redactionStatus?: string;
+    readonly contentRedacted?: boolean;
+    readonly safeContentSummary?: string;
+    readonly notProvenClaims?: readonly string[];
+  }[];
+  readonly notProvenClaims?: readonly string[];
+  readonly redaction?: { readonly status: string };
+}
 import type { ToolExecutionResult } from "../../tools/types.js";
 import type {
   ToolAfterObservationAnnotation,
   ToolBeforePolicyDecision,
 } from "../../tools/policy/interception.js";
-import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
+export interface RuntimeTurnSnapshotLike {
+  readonly id: string;
+  readonly sessionId: string;
+  readonly turn: number;
+  readonly phase: string;
+  readonly provider: {
+    readonly mode: string;
+    readonly optIn: boolean;
+  };
+  readonly executionBoundaryMode: string;
+}
 import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
 import type {
   PostRepairVerificationRequirementObservation,
@@ -55,29 +182,226 @@ import type {
   VerificationLoopIntent,
   VerificationResultObservation,
 } from "../../verification/result/boundary.js";
-import type { ProductLoopAdapterProjection } from "../loop/adapter.js";
-import type { ProductCompletionPacket } from "../loop/completionPacket.js";
-import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
-import type { ProviderStreamAdapterProjection } from "../loop/providerStreamAdapter.js";
-import type { ModelResponseReentryCycleProjection } from "../loop/reentry.js";
-import type {
-  LoopFinalizationDecision,
-  LoopFinalizationInput,
-  ProductLoopCloseoutInput,
-  ProductLoopCloseoutProjection,
-} from "../loop/finalization.js";
 import type { RepairVerdictTerminalProjection } from "../../result/projection/repair/verdict.js";
+export interface LoopFinalizationInputLike {
+  readonly inputId: string;
+  readonly resultProjectionId?: string;
+  readonly resultTerminalStatus?: string;
+  readonly resultTerminalClassification?: string;
+  readonly proofComplete: boolean;
+  readonly originalFailurePreserved?: boolean;
+  readonly repairApplyPreserved?: boolean;
+  readonly postRepairVerificationPreserved?: boolean;
+  readonly originalVerificationFailureId?: string;
+  readonly originalFailureClass?: string;
+  readonly repairApplyState?: string;
+  readonly postRepairVerificationState?: string;
+  readonly missingProofItems?: readonly string[];
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface LoopFinalizationDecisionLike {
+  readonly decisionId: string;
+  readonly sourceInputId: string;
+  readonly decision: string;
+  readonly reason: string;
+  readonly nextAction: string;
+  readonly pendingUserAuthority?: boolean;
+  readonly pendingVerification?: boolean;
+  readonly pendingRepair?: boolean;
+  readonly sessionCarryForwardFacts?: readonly string[];
+  readonly originalVerificationFailureId?: string;
+  readonly originalFailureClass?: string;
+  readonly missingProofItems?: readonly string[];
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface ProductLoopCloseoutInputLike {
+  readonly inputId: string;
+  readonly loopDecisionId?: string;
+  readonly resultProjectionId?: string;
+  readonly resultTerminalStatus?: string;
+  readonly resultTerminalClassification?: string;
+  readonly loopControlDecision?: string;
+  readonly nextAction?: string;
+  readonly pendingUserAction?: boolean;
+  readonly pendingVerification?: boolean;
+  readonly pendingRepair?: boolean;
+  readonly preservedOriginalFailure?: unknown;
+  readonly preservedRepairFacts?: unknown;
+  readonly verificationSummary?: unknown;
+  readonly missingProofItems?: readonly string[];
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface ProductLoopCloseoutProjectionLike {
+  readonly closeoutId: string;
+  readonly sourceInputId: string;
+  readonly status: string;
+  readonly resultOwnedTerminalStatus?: string;
+  readonly resultOwnedTerminalClassification?: string;
+  readonly loopOwnedControlDecision?: string;
+  readonly complete: boolean;
+  readonly nextAction?: string;
+  readonly pendingHandoff?: unknown;
+  readonly sessionCarryForwardFacts?: readonly string[];
+  readonly originalFailureSummary?: string;
+  readonly repairChainSummary?: string;
+  readonly verificationSummary?: string;
+  readonly missingProofItems?: readonly string[];
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface ProductCompletionPacketLike {
+  readonly packetId: string;
+  readonly resultProjectionId?: string;
+  readonly resultOwnedTerminalStatus?: string;
+  readonly resultOwnedTerminalClassification?: string;
+  readonly loopDecisionId?: string;
+  readonly loopDecision?: string;
+  readonly closeoutId?: string;
+  readonly closeoutState?: string;
+  readonly status: string;
+  readonly complete: boolean;
+  readonly originalFailure?: unknown;
+  readonly repairRequiredFacts?: unknown;
+  readonly proposalFacts?: unknown;
+  readonly authorityFacts?: unknown;
+  readonly applyRequestFacts?: unknown;
+  readonly applyObservationFacts?: unknown;
+  readonly postRepairVerificationFacts?: unknown;
+  readonly evidenceFacts?: unknown;
+  readonly missingProofItems?: readonly string[];
+  readonly nextAction?: string;
+  readonly sessionCarryForwardFacts?: readonly string[];
+  readonly terminalSuccessClaim: false;
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface ProductLoopAdapterProjectionLike {
+  readonly adapterId: string;
+  readonly observationMode: string;
+  readonly phaseStatus: readonly unknown[];
+  readonly unsupportedPhaseIds: readonly string[];
+  readonly featureContractAvailable: boolean;
+  readonly featureContracts: readonly unknown[];
+  readonly completionConsumer: {
+    readonly observed: boolean;
+    readonly viewStatus: string;
+    readonly packetIds: readonly string[];
+    readonly resultOwnedTerminalStatus?: string;
+    readonly loopDecision?: string;
+    readonly closeoutState?: string;
+    readonly missingProofItems?: readonly string[];
+    readonly originalFailureSummary?: string;
+  };
+  readonly continuationBoundary: {
+    readonly readinessReferenced: boolean;
+    readonly replaySafeStateReferenced: boolean;
+    readonly nextTurnExecuted: boolean;
+  };
+  readonly notProvenClaims: readonly string[];
+}
+
+export interface ModelBoundaryPhaseProjectionLike {
+  readonly phaseId: string;
+  readonly requestBoundary?: { readonly requestId: string };
+  readonly responseBoundary?: { readonly responseId: string };
+  readonly stream?: { readonly status: string };
+  readonly assistantResponse?: { readonly accumulationStatus: string };
+  readonly toolCallBatch?: { readonly extractionStatus: string };
+  readonly toolBatchHandoffPrepared?: boolean;
+  readonly terminalSuccessClaim?: false;
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface ProviderStreamAdapterProjectionLike {
+  readonly adapterId: string;
+  readonly requestId?: string;
+  readonly responseId?: string;
+  readonly explicitOptIn?: boolean;
+  readonly readinessStatus?: string;
+  readonly failureClass?: string;
+  readonly liveClassification?: string;
+  readonly retryEligibility?: string;
+  readonly fallbackEligibility?: string;
+  readonly fallbackStatus?: string;
+  readonly recoveryFacts?: string;
+  readonly streamProjected?: boolean;
+  readonly fetchAttempted?: boolean;
+  readonly assistantAccumulationStatus?: string;
+  readonly toolCallExtractionStatus?: string;
+  readonly redaction?: { readonly status: string };
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface ModelResponseReentryCycleProjectionLike {
+  readonly cycleId: string;
+  readonly responseReentry?: {
+    readonly reentryId: string;
+    readonly sourceAttemptId?: string;
+    readonly sourceResponseHandoffId?: string;
+    readonly responseClassification?: string;
+    readonly assistantContentAvailability?: string;
+    readonly toolExtractionReadiness?: string;
+    readonly reentryStatus?: string;
+    readonly redactionState?: string;
+    readonly rawOutputExcluded?: boolean;
+    readonly notProvenClaims?: readonly string[];
+  };
+  readonly responseBoundary?: {
+    readonly responseId: string;
+    readonly status: string;
+  };
+  readonly assistantAccumulation?: {
+    readonly accumulationId: string;
+    readonly sourceReentryId: string;
+    readonly contentAvailability: string;
+    readonly contentSummarySafeLabel: string;
+    readonly contentRedactionState: string;
+    readonly hiddenChannelExcluded: boolean;
+    readonly completionStatus?: string;
+    readonly notProvenClaims?: readonly string[];
+  };
+  readonly toolExtraction?: {
+    readonly extractionId?: string;
+    readonly sourceAssistantAccumulationId?: string;
+    readonly extractedCallIds?: readonly string[];
+    readonly malformedCallIds?: readonly string[];
+    readonly unsupportedCallIds?: readonly string[];
+    readonly unknownToolIds?: readonly string[];
+    readonly noToolStatus?: string;
+    readonly extractionConfidence?: string;
+    readonly handoffReadiness?: string;
+    readonly notProvenClaims?: readonly string[];
+  };
+  readonly cycleBoundary?: {
+    readonly cycleId?: string;
+    readonly sourceInvocationAttemptId?: string;
+    readonly responseReentryId?: string;
+    readonly assistantAccumulationId?: string;
+    readonly toolExtractionId?: string;
+    readonly nextHandoffKind?: string;
+    readonly cycleStatus?: string;
+    readonly stopReason?: string;
+    readonly continuationRequirement?: string;
+    readonly notProvenClaims?: readonly string[];
+  };
+  readonly notProvenClaims?: readonly string[];
+}
 
 export type RuntimeProjectionEventType =
+  | (string & {})
+  | "tool-policy-decision-observed"
+  | "tool-authority-requested"
   | "turn-snapshot-observed"
   | "phase-observed"
   | "execution-receipt-observed"
   | "tool-result-observed"
-  | "tool-policy-decision-observed"
-  | "tool-authority-requested"
-  | "tool-call-blocked"
-  | "tool-result-annotated"
-  | "tool-interception-unsupported"
   | "save-point-observed"
   | "result-facts-observed"
   | "resource-projection-observed"
@@ -298,19 +622,19 @@ export interface RuntimeResultFactsProjection {
 }
 
 export function projectRuntimeEvents(input: {
-  readonly turnSnapshot?: RuntimeTurnSnapshot;
+  readonly turnSnapshot?: RuntimeTurnSnapshotLike;
   readonly executionReceipts?: readonly RuntimeExecutionReceiptProjection[];
   readonly toolResults?: readonly ToolExecutionResult[];
   readonly toolPolicyDecisions?: readonly ToolBeforePolicyDecision[];
   readonly toolResultAnnotations?: readonly ToolAfterObservationAnnotation[];
   readonly toolDispatchPlans?: readonly ToolBatchDispatchPlan[];
   readonly toolResultDetails?: readonly ToolResultDetail[];
-  readonly toolResultMessages?: readonly ToolResultMessageBatch[];
+  readonly toolResultMessages?: readonly ToolResultMessageBatchLike[];
   readonly toolOutcomeBundles?: readonly ToolOutcomeBundleProjection[];
-  readonly nextTurnBundles?: readonly NextTurnBundleProjection[];
-  readonly steeringQueues?: readonly SteeringQueueProjection[];
-  readonly followUpQueues?: readonly FollowUpQueueProjection[];
-  readonly nextTurnDeliveryPolicies?: readonly NextTurnDeliveryPolicyProjection[];
+  readonly nextTurnBundles?: readonly NextTurnBundleProjectionLike[];
+  readonly steeringQueues?: readonly SteeringQueueProjectionLike[];
+  readonly followUpQueues?: readonly FollowUpQueueProjectionLike[];
+  readonly nextTurnDeliveryPolicies?: readonly NextTurnDeliveryPolicyProjectionLike[];
   readonly verificationIntents?: readonly VerificationLoopIntent[];
   readonly verificationResults?: readonly VerificationResultObservation[];
   readonly postRepairVerificationRequirements?: readonly PostRepairVerificationRequirementObservation[];
@@ -318,11 +642,11 @@ export function projectRuntimeEvents(input: {
   readonly postRepairVerificationResults?: readonly PostRepairVerificationResultObservation[];
   readonly repairVerdictProofInputs?: readonly RepairVerdictProofInput[];
   readonly repairVerdictTerminalProjections?: readonly RepairVerdictTerminalProjection[];
-  readonly loopFinalizationInputs?: readonly LoopFinalizationInput[];
-  readonly loopFinalizationDecisions?: readonly LoopFinalizationDecision[];
-  readonly productLoopCloseoutInputs?: readonly ProductLoopCloseoutInput[];
-  readonly productLoopCloseouts?: readonly ProductLoopCloseoutProjection[];
-  readonly productCompletionPackets?: readonly ProductCompletionPacket[];
+  readonly loopFinalizationInputs?: readonly LoopFinalizationInputLike[];
+  readonly loopFinalizationDecisions?: readonly LoopFinalizationDecisionLike[];
+  readonly productLoopCloseoutInputs?: readonly ProductLoopCloseoutInputLike[];
+  readonly productLoopCloseouts?: readonly ProductLoopCloseoutProjectionLike[];
+  readonly productCompletionPackets?: readonly ProductCompletionPacketLike[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
@@ -335,12 +659,12 @@ export function projectRuntimeEvents(input: {
   readonly modelInvocationGates?: readonly ModelInvocationGateFacts[];
   readonly modelInvocationAttempts?: readonly ModelInvocationAttemptEnvelope[];
   readonly controlledModelInvocations?: readonly ControlledModelInvocationAdapterProjection[];
-  readonly responseReentryCycles?: readonly ModelResponseReentryCycleProjection[];
+  readonly responseReentryCycles?: readonly ModelResponseReentryCycleProjectionLike[];
   readonly providerResponseStreams?: readonly ProviderResponseStreamProjection[];
-  readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjection[];
-  readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjection[];
+  readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjectionLike[];
+  readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjectionLike[];
   readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
-  readonly assistantResponses?: readonly AssistantResponseState[];
+  readonly assistantResponses?: readonly AssistantResponseStateLike[];
   readonly toolCallBatches?: readonly NormalizedToolCallBatch[];
   readonly toolBatchHandoffs?: readonly ToolBatchHandoffProjection[];
   readonly savePoint?: RuntimeEvidenceSavePoint;
@@ -353,7 +677,7 @@ export function projectRuntimeEvents(input: {
   readonly contextRebuildInputs?: readonly LoopContextRebuildInput[];
   readonly continuationReadiness?: readonly ContinuationReadinessProjection[];
   readonly replaySafeLoopStateSummaries?: readonly ReplaySafeLoopStateSummary[];
-  readonly productLoopAdapters?: readonly ProductLoopAdapterProjection[];
+  readonly productLoopAdapters?: readonly ProductLoopAdapterProjectionLike[];
 }): readonly RuntimeProjectionEvent[] {
   const events: RuntimeProjectionEvent[] = [];
   const append = (

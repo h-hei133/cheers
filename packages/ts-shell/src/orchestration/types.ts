@@ -1,9 +1,5 @@
-import type { QueryEvent } from '../core/query/runtime/events.js'
-import type { QueryRuntimeActionDecision } from '../core/query/runtime/decision.js'
 import type { RecoverySurfaceSummary } from './patchRecovery/recoverySurfaceProjection.js'
 import type { PerFilePatchResultProjection } from '../edit/result/perFilePatchResultProjection.js'
-import type { ProductLoopAdapterProjection } from '../runtime/loop/adapter.js'
-import type { LoopTrajectoryProjection } from '../runtime/loop/trajectory.js'
 
 export type AgentRole = 'planner' | 'coder' | 'reviewer'
 export type ContinuationReason = 'handoff' | 'retryable-error'
@@ -35,7 +31,7 @@ export interface AgentExecutionInput {
   readonly rolePrompt: string
   readonly turn: number
   readonly maxTurns: number
-  readonly runtimeAction: QueryRuntimeActionDecision
+  readonly runtimeAction?: unknown
   readonly sharedContext: Readonly<SharedContext>
   readonly transcript: readonly AgentExecutionOutput[]
 }
@@ -290,10 +286,10 @@ export interface AgentExecutionOutput {
   readonly handoffTo?: AgentRole
   readonly handoffReason?: string
   readonly notes?: readonly string[]
-  readonly events?: readonly QueryEvent[]
+  readonly events?: readonly unknown[]
   readonly codingResult?: CodingResultSummary
-  readonly loopTrajectory?: LoopTrajectoryProjection
-  readonly productLoopAdapter?: ProductLoopAdapterProjection
+  readonly loopTrajectory?: unknown
+  readonly productLoopAdapter?: unknown
 }
 
 export type OrchestrationStatus = TerminalReason
@@ -308,8 +304,8 @@ export interface OrchestrationResult {
   readonly sharedContext: Readonly<SharedContext>
   readonly finalOutput: string
   readonly codingResult?: CodingResultSummary
-  readonly loopTrajectory?: LoopTrajectoryProjection
-  readonly productLoopAdapter?: ProductLoopAdapterProjection
+  readonly loopTrajectory?: unknown
+  readonly productLoopAdapter?: unknown
 }
 
 export interface OrchestratorOptions {

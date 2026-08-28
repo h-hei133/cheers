@@ -1,4 +1,36 @@
-import type { QueryEvent } from '../query/runtime/events.js'
+export type LifecycleEventLike =
+  | {
+      readonly type: 'approval.requested'
+      readonly taskId: string
+      readonly toolName: string
+    }
+  | {
+      readonly type: 'approval.resolved'
+      readonly taskId: string
+      readonly toolName: string
+      readonly outcome?: 'approved' | 'denied'
+      readonly compensated?: boolean
+    }
+  | {
+      readonly type: 'tool.started'
+      readonly taskId: string
+      readonly toolName: string
+    }
+  | {
+      readonly type: 'tool.result'
+      readonly taskId: string
+      readonly toolName: string
+      readonly success?: boolean
+      readonly compensated?: boolean
+    }
+  | {
+      readonly type: string
+      readonly taskId?: string
+      readonly toolName?: string
+      readonly outcome?: 'approved' | 'denied'
+      readonly success?: boolean
+      readonly compensated?: boolean
+    }
 import type { ToolExecutionResult } from '../../tools/types.js'
 
 export interface PendingApprovalEntry {
@@ -40,7 +72,7 @@ export function createEmptyLifecycleIndex(): DurableLifecycleIndex {
 
 export function applyLifecycleEventToIndex(
   index: DurableLifecycleIndex,
-  event: QueryEvent,
+  event: LifecycleEventLike,
 ): DurableLifecycleIndex {
   if (
     event.type !== 'approval.requested' &&

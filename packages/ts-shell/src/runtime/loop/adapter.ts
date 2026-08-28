@@ -4,7 +4,6 @@ import type { ProviderRegistryProjection } from "../../provider/registry/provide
 import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
 import type { ReplaySafeLoopStateSummary } from "../../session/replay/state.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
-import type { RuntimeProjectionEvent } from "../events/projection.js";
 import type { AgentLoopContractProjection } from "./contract.js";
 import type { FutureFeatureIntegrationContract } from "./feature.js";
 import {
@@ -342,11 +341,30 @@ function factOriginalFailureSummary(value: unknown): string | undefined {
   const summary = factString(facts.summary) ?? "not-recorded";
   return `id=${verificationFailureId}; class=${failureClass}; status=${status}; summary=${summary}`;
 }
+export interface RuntimeProductLoopAdapterObservationEvent {
+  readonly id: string;
+  readonly sequence: number;
+  readonly type: "product-loop-adapter-observed";
+  readonly facts: {
+    readonly adapterId: string;
+    readonly observationMode: string;
+    readonly phaseStatusCount: number;
+    readonly unsupportedPhaseIds: readonly string[];
+    readonly featureContractAvailable: boolean;
+    readonly notProvenClaims: readonly string[];
+    readonly terminalSuccessClaim: false;
+  };
+  readonly notProvenClaims: readonly string[];
+  readonly redaction: {
+    readonly status: "report-safe" | "redacted";
+    readonly excluded: readonly string[];
+  };
+}
 
 export function projectProductLoopAdapterObservationEvent(
   adapter: ProductLoopAdapterProjection,
   sequence: number,
-): RuntimeProjectionEvent {
+): RuntimeProductLoopAdapterObservationEvent {
   return deepFreeze({
     id: `product-loop-adapter-observed-${sequence}`,
     sequence,

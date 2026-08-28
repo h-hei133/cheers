@@ -8,13 +8,44 @@ import type { PlanningMutationHandoffProjection } from "../handoff/mutation.js";
 import { hashContent } from "../../orchestration/patchRecovery/recoveryAuthorityStore.js";
 import type { ProviderExactPatchClassification } from "../../orchestration/providerExactPatchContract.js";
 import type { ProviderEditRawProposal } from "../../orchestration/providerEditProposal.js";
-import type { PlanningRuntimeProductLiveProviderProposal } from "../../orchestration/planningRuntimeProductExecution.js";
+import type { ProviderEditAvailability } from "../../orchestration/providerEditPlanner.js";
+import type { LiveProviderReadinessStatus } from "../../orchestration/liveProviderAdapterApproval.js";
+
+export interface PlanningRuntimeProductLiveProviderAttempt {
+  readonly role: "primary" | "fallback";
+  readonly providerSafeLabel: string;
+  readonly providerConfigSource: string;
+  readonly providerAvailability: ProviderEditAvailability;
+  readonly readinessStatus?: LiveProviderReadinessStatus;
+  readonly evidenceSource?: "live-provider" | "fake-provider";
+  readonly provider?: RealProviderProposalDryRunProvider;
+}
+
+export interface PlanningRuntimeProductLiveProviderProposal {
+  readonly optIn: true;
+  readonly source: "runtime-option" | "cli-flag" | "benchmark";
+  readonly attempts?: readonly PlanningRuntimeProductLiveProviderAttempt[];
+  readonly fallbackPolicy?: {
+    readonly enabled: boolean;
+    readonly reason: string;
+  };
+  readonly taskEvidence?: {
+    readonly mode: "single-file-exact-patch" | "small-target-set-exact-patch";
+    readonly targetContentMaxChars?: number;
+    readonly taskIntentSummary?: string;
+  };
+  readonly calibration?: {
+    readonly mode: "exact-patch-author";
+    readonly targetContentMaxChars?: number;
+  };
+}
 import {
   projectProviderProposalBoundaryFromPreparation,
   type ProductProviderProposalBoundary,
 } from "../../proposal/providerProposalFacade.js";
 import {
   runRealProviderProposalDryRun,
+  type RealProviderProposalDryRunProvider,
   type RealProviderProposalDryRunResult,
 } from "../../orchestration/realProviderProposalDryRun.js";
 

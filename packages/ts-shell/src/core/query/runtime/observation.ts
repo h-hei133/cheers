@@ -4,8 +4,29 @@ import type {
 } from '../../../orchestration/types.js'
 import type { ToolActionKind } from '../../../tools/policy/strategy.js'
 import type { QueryRuntimeExecutionResult } from './batch.js'
-import type { QueryEvent } from './events.js'
 
+export type RuntimeObservationEvent =
+  | {
+      readonly type: 'tool.result'
+      readonly toolName: string
+      readonly taskId: string
+      readonly success?: boolean
+      readonly failureReason?: string
+      readonly coveredFiles?: readonly string[]
+    }
+  | {
+      readonly type: 'tool.started'
+      readonly toolName: string
+      readonly taskId?: string
+    }
+  | {
+      readonly type: string
+      readonly toolName?: string
+      readonly taskId?: string
+      readonly success?: boolean
+      readonly failureReason?: string
+      readonly coveredFiles?: readonly string[]
+    }
 export interface QueryRuntimeFailureObservation {
   readonly action: ToolActionKind
   readonly signature: string
@@ -89,7 +110,7 @@ export function observeQueryRuntimeOutput(
   output: AgentExecutionOutput,
 ): void {
   const result = output.codingResult
-  observeRuntimeEvents(state, output.events ?? [])
+  observeRuntimeEvents(state, (output.events ?? []) as readonly RuntimeObservationEvent[])
   if (!result) {
     return
   }
@@ -200,7 +221,7 @@ function claimEvidenceFor(result: CodingResultSummary): QueryRuntimeArtifactClai
 
 function observeRuntimeEvents(
   state: QueryRuntimeObservationState,
-  events: readonly QueryEvent[],
+  events: readonly RuntimeObservationEvent[],
 ): void {
   for (const event of events) {
     if (event.type === 'tool.result' && event.success === false) {

@@ -9,6 +9,7 @@ import {
 import {
   browserExternalRunnerHasForbiddenContent,
   type BrowserExternalRunnerAction,
+  type BrowserExternalRunnerCommand,
   type BrowserExternalRunnerMode,
 } from "./protocol.js";
 import {
@@ -31,11 +32,7 @@ export type BrowserExternalRunnerManifestSource =
   | "skill-managed"
   | "test-only";
 
-export interface BrowserExternalRunnerCommand {
-  readonly command: string;
-  readonly args: readonly string[];
-  readonly cwd?: string;
-}
+export type { BrowserExternalRunnerCommand } from "./protocol.js";
 
 export interface BrowserExternalRunnerManifestFixture {
   readonly id: string;

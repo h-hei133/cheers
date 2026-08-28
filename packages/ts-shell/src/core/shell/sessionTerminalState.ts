@@ -56,8 +56,8 @@ export function applyTerminalQueryEvent(
   state.terminalClassification = event.result.terminalClassification;
   state.lastContinuationReason = event.result.lastContinuationReason;
   state.terminalCodingResult = event.result.codingResult;
-  state.terminalLoopTrajectory = event.result.loopTrajectory;
-  state.terminalProductLoopAdapter = event.result.productLoopAdapter;
+  state.terminalLoopTrajectory = event.result.loopTrajectory as LoopTrajectoryProjection | undefined;
+  state.terminalProductLoopAdapter = event.result.productLoopAdapter as ProductLoopAdapterProjection | undefined;
   state.terminalNotes = event.result.sharedContext.notes;
 }
 

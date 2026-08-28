@@ -1,16 +1,18 @@
-import type { SchemaVersion } from "../../../../contracts/typescript/types.js";
 import { OpenAIModelAdapter } from "../model-adapters/providers/openai/OpenAIModelAdapter.js";
-import type { NormalizedProviderError } from "../model-adapters/types.js";
+import type { NormalizedProviderError, SchemaVersion } from "../model-adapters/types.js";
 import type { ContextAwareProviderPromptContext } from "../provider/request/prompt.js";
 import {
   buildProviderExactPatchSystemPrompt,
   parseProviderExactPatchOutput,
 } from "./providerExactPatchContract.js";
 import type { ProviderEditRawProposal } from "./providerEditProposal.js";
-import type { RealProviderProposalDryRunProvider } from "./realProviderProposalDryRun.js";
-
 const CONTRACT_VERSION: SchemaVersion = "1.0.0";
 
+export interface RealProviderProposalDryRunProvider {
+  readonly proposeEdit: (
+    context: ContextAwareProviderPromptContext,
+  ) => ProviderEditRawProposal | Promise<ProviderEditRawProposal>;
+}
 export type OpenAICompatibleAnchoredSmokeProviderErrorClass =
   | "auth"
   | "missing-key"

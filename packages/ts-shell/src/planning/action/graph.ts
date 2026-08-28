@@ -1,4 +1,3 @@
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
 
 export type WorkflowActionKind =
   | "context"
@@ -46,14 +45,29 @@ export interface WorkflowActionCursor {
 }
 
 export interface WorkflowActionFeedback {
-  readonly source: "context-renarrowing" | "verification";
+  readonly source: "context-renarrowing" | "verification" | "execution" | "user" | string;
   readonly refinedTargetPath?: string;
   readonly additionalTargetPaths?: readonly string[];
   readonly failedChangedFiles?: readonly string[];
   readonly verificationFailureSummary?: string;
+  readonly diagnostics?: readonly string[];
+  readonly dependentTargets?: readonly WorkflowDependentTarget[];
 }
 
-export function buildWorkflowActionGraph(plan: WorkflowTaskPlan): WorkflowActionGraph | undefined {
+export interface WorkflowActionPlanInput {
+  readonly taskKind?: string;
+  readonly targetPath?: string;
+  readonly additionalTargetPaths?: readonly string[];
+  readonly dependentTargets?: readonly WorkflowDependentTarget[];
+  readonly inspectFirst?: boolean;
+  readonly verifyAfterEdit?: boolean;
+  readonly verifyCommand?: string;
+  readonly continuationRepairReplan?: boolean;
+  readonly crossFileRepair?: boolean;
+  readonly repairTargetFiles?: readonly string[];
+}
+
+export function buildWorkflowActionGraph(plan: WorkflowActionPlanInput): WorkflowActionGraph | undefined {
   if (plan.taskKind !== "edit-file" && plan.taskKind !== "write-file") {
     return undefined;
   }

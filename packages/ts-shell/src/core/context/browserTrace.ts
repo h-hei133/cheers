@@ -1,60 +1,12 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
+export type { BrowserTxnTrace, BrowserTxnTraceStep } from "./browserTxnTypes.js";
 import type {
   BrowserTxnResult,
   BrowserTxnStatus,
   BrowserTxnStepSummary,
-} from "./browserTxnEvidence.js";
-
-export interface BrowserTxnTraceStep {
-  readonly index: number;
-  readonly kind: string;
-  readonly phase: "observation" | "action" | "extraction";
-  readonly status: BrowserTxnStatus;
-  readonly target: string;
-  readonly summary: string;
-  readonly reasonCode: string;
-  readonly repairStatus?: "not-needed" | "attempted" | "succeeded" | "failed";
-}
-
-export interface BrowserTxnTrace {
-  readonly traceId: string;
-  readonly transactionId: string;
-  readonly evidenceId: string;
-  readonly controlledTarget: string;
-  readonly plan: {
-    readonly sequence: readonly string[];
-    readonly plannerConfidence: string;
-    readonly plannerReason: string;
-    readonly repairAllowed: boolean;
-    readonly policyLevel: string;
-  };
-  readonly steps: readonly BrowserTxnTraceStep[];
-  readonly observations: readonly string[];
-  readonly actions: readonly string[];
-  readonly repair: {
-    readonly status: BrowserTxnResult["repairStatus"];
-    readonly attempted: boolean;
-    readonly evidence: readonly string[];
-  };
-  readonly final: {
-    readonly status: BrowserTxnStatus;
-    readonly summary: string;
-    readonly reasonCode: string;
-  };
-  readonly cleanup: {
-    readonly status: string;
-    readonly evidence: readonly string[];
-  };
-  readonly redaction: {
-    readonly status: string;
-    readonly evidence: readonly string[];
-  };
-  readonly timing: {
-    readonly durationMs: number;
-    readonly budget: "bounded-transaction";
-  };
-  readonly boundaries: readonly string[];
-}
+  BrowserTxnTrace,
+  BrowserTxnTraceStep,
+} from "./browserTxnTypes.js";
 
 export function createBrowserTxnTrace(result: Omit<BrowserTxnResult, "trace">): BrowserTxnTrace {
   const steps = result.stepSummaries.map(traceStep);

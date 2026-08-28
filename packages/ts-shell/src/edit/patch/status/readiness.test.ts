@@ -5,7 +5,7 @@ import { parseApplyPatchText } from "../../../orchestration/patchParsing/parser.
 import type {
   ParsedPatch,
   PatchVerificationResult,
-} from "../../../orchestrati../../../orchestration/patchParsing/types.js";
+} from "../../../orchestration/patchParsing/types.js";
 import { verifyParsedPatch } from "../../../orchestration/patchVerification/verify.js";
 import { buildPatchPreview } from "../result/preview.js";
 import { buildSingleFileUpdatePatchReadinessContract } from "./readiness.js";

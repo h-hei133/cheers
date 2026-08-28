@@ -1,16 +1,55 @@
-import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
+export interface LoopContextRebuildInputStateLike {
+  readonly rebuildInputId: string;
+  readonly redaction?: { readonly status: string };
+}
+
+export interface NextTurnBundleStateLike {
+  readonly bundleId: string;
+  readonly steeringMessageIds?: readonly string[];
+  readonly followUpMessageIds?: readonly string[];
+}
+
+export interface ToolResultMessageBatchStateLike {
+  readonly messages: readonly { readonly messageId: string }[];
+}
+
+export interface NextTurnModelRequestPreparationStateLike {
+  readonly requestPreparationId: string;
+  readonly readinessStatus: string;
+  readonly blockedReasons: readonly string[];
+  readonly continuationReadinessStatus?: string;
+  readonly providerMetadata: {
+    readonly providerSafeLabel: string;
+    readonly modelSafeLabel: string;
+    readonly configReadiness: string;
+    readonly authReadiness: string;
+    readonly compatibilityState: string;
+    readonly supportedModes: readonly string[];
+    readonly knownUnsupportedStates: readonly string[];
+  };
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface ControlledModelInvocationAdapterStateLike {
+  readonly adapterId: string;
+  readonly sourceGateId: string;
+  readonly outcome: {
+    readonly status: string;
+    readonly failureClass?: string;
+    readonly fallbackEligibility: string;
+    readonly fallbackStatus?: string;
+    readonly fallbackAttempted: boolean;
+    readonly responseHandoffId?: string;
+  };
+}
 import type { MultiTargetMutationProjection } from "../../edit/multifile/model.js";
 import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/model.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
-import type { NextTurnModelRequestPreparation } from "../../provider/request/boundary.js";
-import type { ControlledModelInvocationAdapterProjection } from "../../provider/request/attempt.js";
 import type { ToolOutcomeBundleProjection } from "../../tools/toolOutcomeBundle.js";
 import type { ToolBatchDispatchPlan } from "../../tools/toolBatchDispatch.js";
 import type { ReplaySafePlanningStateFacts } from "../../context/memory/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../../repair/handoff/boundary.js";
-import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
-import type { ToolResultMessageBatch } from "../../turn/toolResultMessage.js";
 import type { VerificationLoopIntent, VerificationResultObservation } from "../../verification/result/boundary.js";
 import type { ContinuationReadinessProjection } from "../continuation/readiness.js";
 import type { SessionTreeProjection } from "../sessionTreeProjection.js";
@@ -150,13 +189,13 @@ export function summarizeReplaySafeLoopState(input: {
   readonly sessionProjection: SessionTreeProjection;
   readonly contextRebuildProjection: SessionContextRebuildProjection;
   readonly continuationReadiness: ContinuationReadinessProjection;
-  readonly rebuildInput?: LoopContextRebuildInput;
+  readonly rebuildInput?: LoopContextRebuildInputStateLike;
   readonly savePoint?: RuntimeEvidenceSavePoint;
-  readonly nextTurnBundle?: NextTurnBundleProjection;
-  readonly requestPreparation?: NextTurnModelRequestPreparation;
+  readonly nextTurnBundle?: NextTurnBundleStateLike;
+  readonly requestPreparation?: NextTurnModelRequestPreparationStateLike;
   readonly toolOutcomeBundle?: ToolOutcomeBundleProjection;
   readonly toolDispatchPlan?: ToolBatchDispatchPlan;
-  readonly toolResultMessages?: ToolResultMessageBatch;
+  readonly toolResultMessages?: ToolResultMessageBatchStateLike;
   readonly verificationIntents?: readonly VerificationLoopIntent[];
   readonly verificationResults?: readonly VerificationResultObservation[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
@@ -164,7 +203,7 @@ export function summarizeReplaySafeLoopState(input: {
   readonly repairApplyObservations?: readonly RepairApplyObservation[];
   readonly multiTargetMutations?: readonly MultiTargetMutationProjection[];
   readonly mutationRecoveries?: readonly ControlledMutationRecoveryProjection[];
-  readonly controlledModelInvocations?: readonly ControlledModelInvocationAdapterProjection[];
+  readonly controlledModelInvocations?: readonly ControlledModelInvocationAdapterStateLike[];
   readonly replaySafePlanningStates?: readonly ReplaySafePlanningStateFacts[];
   readonly terminalResultFacts?: {
     readonly status?: string;

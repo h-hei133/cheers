@@ -1,6 +1,11 @@
 import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
 import type { BrowserExecutionRequest } from "../../../browserExecutionContract.js";
 import { sanitizeBrowserEvidenceText } from "../../../browserLocalFixture.js";
+export interface BrowserExternalRunnerCommand {
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly cwd?: string;
+}
 
 export type BrowserExternalRunnerAction = "observe" | "extract" | "navigate-local";
 export type BrowserExternalRunnerMode = "external-local" | "skill-managed" | "test-local";

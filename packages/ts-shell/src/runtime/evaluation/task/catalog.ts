@@ -17,7 +17,7 @@ import type {
   TaskLiveEntry,
   TaskLiveEntryId,
   TaskLiveEntryKind,
-} from "./liveRun.js";
+} from "./liveTypes.js";
 
 export interface TaskLiveCatalog {
   readonly catalogId: string;

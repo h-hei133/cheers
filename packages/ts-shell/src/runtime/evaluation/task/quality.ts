@@ -2,7 +2,7 @@ import type {
   TaskLiveEntry,
   TaskLiveEntryId,
   TaskLiveEntryKind,
-} from "./liveRun.js";
+} from "./liveTypes.js";
 import type { TaskLivePolicy } from "./model.js";
 
 export type TaskLiveQualityTargetMatch = "matched" | "partial" | "missing" | "not-applicable";

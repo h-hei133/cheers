@@ -1,5 +1,4 @@
 import type { HostCommandResponse } from "../../api/host/contract.js";
-import type { TaskLiveCatalog } from "./catalog.js";
 import {
   projectTaskLiveExecution,
   runTaskAssessment,
@@ -10,7 +9,14 @@ import {
   type TaskLiveGateOutcome,
   type TaskLivePolicy,
   type TaskLiveSafetyClass,
+  type TaskCaseDefinition,
 } from "./model.js";
+
+export interface TaskLiveCatalogLike {
+  readonly catalogId: string;
+  readonly entries: readonly TaskLiveEntry[];
+  readonly caseDefinitions?: readonly TaskCaseDefinition[];
+}
 import {
   projectTaskLoopProgression,
   runTaskLoop,
@@ -24,61 +30,14 @@ import {
   type TaskLiveQualityRecord,
 } from "./quality.js";
 
-export type BuiltinTaskLiveEntryId =
-  | "single-file-edit"
-  | "coordinated-edit"
-  | "failed-check-repair"
-  | "rollback-recovery"
-  | "package-script-impact"
-  | "pathless-workspace-question"
-  | "owner-context-question"
-  | "test-impact-question"
-  | "incident-summary-report"
-  | "metrics-summary-artifact"
-  | "resume-from-context"
-  | "readonly-coding-check"
-  | "write-planning-dry-run"
-  | "label-normalization"
-  | "status-consumer-coordination"
-  | "assertion-repair"
-  | "incident-brief-report"
-  | "context-review-resume"
-  | "provider-recovery-triage"
-  | "owner-receipt-question"
-  | "metrics-rollup-artifact";
-
-export type TaskLiveEntryId = BuiltinTaskLiveEntryId | `catalog-${string}`;
-
-export type TaskLiveEntryKind =
-  | "write-edit"
-  | "write-repair"
-  | "write-rollback"
-  | "write-adjacent"
-  | "pathless-context"
-  | "report-artifact"
-  | "data-artifact"
-  | "continuation"
-  | "readonly-coding"
-  | "write-planning"
-  | "provider-triage";
-
-export type TaskLiveProfile = "broad" | "focused" | "catalog";
-
-export interface TaskLiveEntry {
-  readonly entryId: TaskLiveEntryId;
-  readonly taskCaseId?: TaskCaseId;
-  readonly entryKind: TaskLiveEntryKind;
-  readonly shortPrompt: string;
-  readonly gate: TaskLiveGate;
-  readonly safetyClass: TaskLiveSafetyClass;
-  readonly writePolicy: TaskLivePolicy;
-  readonly requirements: readonly string[];
-  readonly validationPlan: string;
-  readonly expectedChangedFiles?: readonly string[];
-  readonly defaultOff: true;
-  readonly optInRequired: true;
-  readonly terminalSuccessClaim: false;
-}
+export * from "./liveTypes.js";
+import type {
+  BuiltinTaskLiveEntryId,
+  TaskLiveEntry,
+  TaskLiveEntryId,
+  TaskLiveEntryKind,
+  TaskLiveProfile,
+} from "./liveTypes.js";
 
 export interface TaskLiveRunObservation {
   readonly entryId: TaskLiveEntryId;
@@ -471,7 +430,7 @@ function focusedLiveEntries(): readonly TaskLiveEntry[] {
 export async function runTaskLiveReport(input: {
   readonly dispatch: (command: unknown) => Promise<HostCommandResponse>;
   readonly profile?: TaskLiveProfile;
-  readonly catalog?: TaskLiveCatalog;
+  readonly catalog?: TaskLiveCatalogLike;
   readonly gateReceipts?: readonly TaskLiveGateReceipt[];
   readonly workspaceApplyReceipts?: readonly TaskLiveWorkspaceApplyReceipt[];
   readonly reviewedApplyOptIn?: boolean;

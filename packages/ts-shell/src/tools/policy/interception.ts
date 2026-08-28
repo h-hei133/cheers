@@ -3,7 +3,6 @@ import type {
   ExecutionPolicyMetadata,
 } from "../../runtime/execution/service.js";
 import type { RuntimeExecutionReceiptProjection } from "../../runtime/execution/receipt.js";
-import type { ToolExecutionResult } from "../types.js";
 
 export type ToolInterceptionDecisionStatus =
   | "allow"
@@ -260,9 +259,30 @@ export function createToolAfterObservationAnnotation(input: {
   });
 }
 
+export interface BlockedToolInterceptionResult {
+  readonly success: false;
+  readonly error?: string;
+  readonly content?: string;
+  readonly metadata?: Record<string, unknown>;
+  readonly details?: {
+    readonly toolInterception?: {
+      readonly beforeDecision?: ToolBeforePolicyDecision;
+      readonly afterAnnotation?: ToolAfterObservationAnnotation;
+    };
+  };
+  readonly reportSafe?: {
+    readonly redactionStatus: "report-safe" | "redacted";
+    readonly notProvenClaims: readonly string[];
+    readonly toolInterception?: {
+      readonly beforeDecision?: ToolBeforePolicyDecision;
+      readonly afterAnnotation?: ToolAfterObservationAnnotation;
+    };
+  };
+}
+
 export function createBlockedToolInterceptionResult(
   decision: ToolBeforePolicyDecision,
-): ToolExecutionResult {
+): BlockedToolInterceptionResult {
   const annotation = createToolAfterObservationAnnotation({
     decision,
     toolId: decision.intent.toolId,

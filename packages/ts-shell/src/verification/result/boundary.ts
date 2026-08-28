@@ -1,5 +1,4 @@
 import type { ProductVerificationReceipt } from "../verificationFacade.js";
-import type { RepairApplyObservation } from "../../repair/handoff/boundary.js";
 
 export type VerificationIntentDispatchStatus =
   | "planned"
@@ -36,6 +35,36 @@ export type VerificationResultObservationStatus =
   | "unsupported"
   | "selected_not_run"
   | "relevance_rejected";
+
+export type RepairApplyObservationStatus =
+  | "not_applied"
+  | "authority_required"
+  | "applied"
+  | "failed"
+  | "blocked"
+  | "unsupported"
+  | "not_proven";
+
+export interface RepairApplyObservationLike {
+  readonly repairApplyId?: string;
+  readonly proposalId?: string;
+  readonly sourceFailureId?: string;
+  readonly sourceVerificationId?: string;
+  readonly targetSummary?: string;
+  readonly repairApplyStatus: RepairApplyObservationStatus;
+  readonly repairAuthorityStatus?: "required" | "granted" | "denied" | "not_required" | "unknown";
+  readonly applyReceiptIds?: readonly string[];
+  readonly touchedTargetSummaries?: readonly string[];
+  readonly originalFailureClass?: string;
+  readonly originalFailureSummary?: string;
+  readonly originalRuntimeReceiptIds?: readonly string[];
+  readonly runtimeReceiptIds?: readonly string[];
+  readonly taskRelevanceStatus?: VerificationIntentRelevanceStatus;
+  readonly coverageStatus?: VerificationCoverageObservationStatus;
+  readonly originalFailurePreserved?: true;
+  readonly notProvenClaims?: readonly string[];
+  readonly redactionStatus?: "report-safe" | "redacted";
+}
 
 export type VerificationCoverageObservationStatus =
   | "covered"
@@ -126,8 +155,8 @@ export interface PostRepairVerificationRequirementObservation {
   readonly sourceVerificationId: string;
   readonly originalFailureClass: string;
   readonly originalFailureStatus: "failed";
-  readonly repairApplyState: RepairApplyObservation["repairApplyStatus"];
-  readonly repairAuthorityState: RepairApplyObservation["repairAuthorityStatus"];
+  readonly repairApplyState: RepairApplyObservationStatus;
+  readonly repairAuthorityState: "required" | "granted" | "denied" | "not_required" | "unknown" | undefined;
   readonly verificationRequired: boolean;
   readonly requirementStatus: PostRepairVerificationRequirementStatus;
   readonly verificationBlocker: PostRepairVerificationBlocker;
@@ -189,8 +218,8 @@ export interface PostRepairVerificationResultObservation {
   readonly originalTaskRelevanceStatus: VerificationIntentRelevanceStatus;
   readonly originalCoverageStatus: VerificationCoverageObservationStatus;
   readonly originalRuntimeReceiptIds: readonly string[];
-  readonly repairApplyState: RepairApplyObservation["repairApplyStatus"];
-  readonly repairAuthorityState: RepairApplyObservation["repairAuthorityStatus"];
+  readonly repairApplyState: RepairApplyObservationStatus;
+  readonly repairAuthorityState: "required" | "granted" | "denied" | "not_required" | "unknown" | undefined;
   readonly repairApplyReceiptIds: readonly string[];
   readonly touchedTargetSummaries: readonly string[];
   readonly status: PostRepairVerificationResultStatus;
@@ -358,7 +387,7 @@ export function projectVerificationObservationFromReceipt(input: {
 }
 
 export function requirePostRepairVerification(input: {
-  readonly repairApply: RepairApplyObservation;
+  readonly repairApply: RepairApplyObservationLike;
   readonly requirementStatus?: PostRepairVerificationRequirementStatus;
   readonly verificationBlocker?: PostRepairVerificationBlocker;
   readonly taskRelevanceExpectation?: VerificationIntentRelevanceStatus;
@@ -660,7 +689,7 @@ function resultStatusFromReceipt(
 }
 
 function requirementStatusFromRepairApply(
-  repairApply: RepairApplyObservation,
+  repairApply: RepairApplyObservationLike,
 ): PostRepairVerificationRequirementStatus {
   if (repairApply.repairApplyStatus === "applied") return "required";
   if (
@@ -676,7 +705,7 @@ function requirementStatusFromRepairApply(
 
 function blockerFromRequirement(
   status: PostRepairVerificationRequirementStatus,
-  repairApply: RepairApplyObservation,
+  repairApply: RepairApplyObservationLike,
 ): PostRepairVerificationBlocker {
   if (status === "required") return "none";
   if (repairApply.repairApplyStatus !== "applied") return "repair-not-applied";

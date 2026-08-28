@@ -1,7 +1,14 @@
 import type { BrowserExecutionActionKind, BrowserExecutionMode } from "./browserExecutionContract.js";
 import type { BrowserExecutorKind } from "./browserExecutor.js";
 import type { BrowserEvidenceBundle } from "./browserEvidenceBundle.js";
-import type { BrowserExecutionReceiptStatus } from "./browserExecutionReceipt.js";
+export type BrowserExecutionReceiptStatus =
+  | "executed"
+  | "blocked"
+  | "failed"
+  | "timed-out"
+  | "invalid-response"
+  | "unavailable"
+  | "unsafe-output";
 
 export type BrowserReplayReadinessStatus =
   | "replay-ready"
