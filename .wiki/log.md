@@ -14,3 +14,4 @@
 ## [2026-08-28] plan | Phase 3 Battle 3: Terminal Surface & Streaming Componentization (GOAL.md)
 ## [2026-08-28] refactor | Phase 3 Battle 3: Terminal surface modular sections, status badges, and box frame components
 ## [2026-08-28] plan | Phase 3 Battle 4: Planning Runtime, Proposal Calibration & Dynamic Retry (GOAL.md)
+## [2026-08-28] refactor | Phase 3 Battle 4: Planning runtime decomposition, proposal context, and retry loop
