@@ -106,18 +106,6 @@ import {
   repairReplayTranscript,
 } from "./replay/sessionReplayRuntime.js";
 import {
-  markSessionRecoveryReentry,
-  markSessionRunStarted,
-  markSessionTurnActive,
-  saveSessionInterrupted,
-  saveSessionTerminated,
-} from "./lifecycle/sessionLifecycleStore.js";
-import { persistSessionUserPromptBarrier } from "./lifecycle/sessionPromptBarrier.js";
-import {
-  saveSessionCompleted,
-  saveSessionError,
-} from "./lifecycle/sessionTerminalStore.js";
-import {
   handleAddTurn,
   handleMarkRecoveryReentry,
   handleMarkRunStarted,

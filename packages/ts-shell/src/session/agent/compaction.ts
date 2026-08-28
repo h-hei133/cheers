@@ -1,9 +1,10 @@
 import type { QueryEvent } from "../../core/query/runtime/events.js";
+import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "../approval/sessionApprovalMemory.js";
 import { extractSeedInfluenceFromQueryResult } from "../continuation/sessionSeedInfluence.js";
 import { applySessionCompactRetention } from "../sessionCompactModule.js";
 
 export const AUTO_COMPACT_TURN_THRESHOLD = 12;
-export const DEFAULT_APPROVAL_AUDIT_HISTORY_LIMIT = 50;
+export const DEFAULT_APPROVAL_AUDIT_HISTORY_LIMIT = SESSION_APPROVAL_AUDIT_HISTORY_LIMIT;
 
 export function applyAutoCompactRetention(
   workingMemory: unknown,

@@ -32,11 +32,21 @@ export function extractSymbolsFromSource(
     const line = lines[i] ?? "";
     const trimmed = line.trim();
 
+    // Ignore comment lines
+    if (
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("/*") ||
+      trimmed.startsWith("*") ||
+      trimmed.startsWith("*/")
+    ) {
+      continue;
+    }
+
     // Check export modifiers
     const isExported = trimmed.startsWith("export ");
 
     // Match function declarations: function foo( or export function foo(
-    const funcMatch = trimmed.match(/(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)/);
+    const funcMatch = trimmed.match(/^(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)/);
     if (funcMatch && funcMatch[1]) {
       symbols.push({
         name: funcMatch[1],
@@ -49,7 +59,7 @@ export function extractSymbolsFromSource(
     }
 
     // Match class declarations: class Foo or export class Foo
-    const classMatch = trimmed.match(/(?:export\s+)?(?:abstract\s+)?class\s+([a-zA-Z0-9_$]+)/);
+    const classMatch = trimmed.match(/^(?:export\s+)?(?:abstract\s+)?class\s+([a-zA-Z0-9_$]+)/);
     if (classMatch && classMatch[1]) {
       symbols.push({
         name: classMatch[1],
@@ -62,7 +72,7 @@ export function extractSymbolsFromSource(
     }
 
     // Match interface declarations: interface Foo or export interface Foo
-    const interfaceMatch = trimmed.match(/(?:export\s+)?interface\s+([a-zA-Z0-9_$]+)/);
+    const interfaceMatch = trimmed.match(/^(?:export\s+)?interface\s+([a-zA-Z0-9_$]+)/);
     if (interfaceMatch && interfaceMatch[1]) {
       symbols.push({
         name: interfaceMatch[1],
@@ -75,7 +85,7 @@ export function extractSymbolsFromSource(
     }
 
     // Match type alias declarations: type Foo = or export type Foo =
-    const typeMatch = trimmed.match(/(?:export\s+)?type\s+([a-zA-Z0-9_$]+)\s*=/);
+    const typeMatch = trimmed.match(/^(?:export\s+)?type\s+([a-zA-Z0-9_$]+)\s*=/);
     if (typeMatch && typeMatch[1]) {
       symbols.push({
         name: typeMatch[1],
@@ -88,7 +98,7 @@ export function extractSymbolsFromSource(
     }
 
     // Match const/let declarations: const foo = or export const foo =
-    const varMatch = trimmed.match(/(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*[:=]/);
+    const varMatch = trimmed.match(/^(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*[:=]/);
     if (varMatch && varMatch[1]) {
       symbols.push({
         name: varMatch[1],

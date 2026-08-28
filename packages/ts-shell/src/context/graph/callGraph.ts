@@ -34,8 +34,9 @@ export function buildCallGraph(
         continue;
       }
 
-      // Check if caller mentions the symbol as a whole word
-      const wordRegex = new RegExp(`\\b${symbolName}\\b`);
+      // Check if caller mentions the symbol as a whole token/identifier
+      const escaped = symbolName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const wordRegex = new RegExp(`(^|[^a-zA-Z0-9_$])${escaped}([^a-zA-Z0-9_$]|$)`);
       if (wordRegex.test(file.sourceText)) {
         for (const targetDecl of externalDecls) {
           const calleePath = targetDecl.filePath;
@@ -95,7 +96,7 @@ export function rankFilesByGraphRelevance(
     const nextFrontier = new Map<string, number>();
     const currentWeight = Math.pow(decay, depth);
 
-    for (const [currentFile, weight] of currentFrontier.entries()) {
+    for (const currentFile of currentFrontier.keys()) {
       const neighbors = [
         ...(graph.incomingReferences.get(currentFile) ?? []),
         ...(graph.outgoingReferences.get(currentFile) ?? []),
@@ -103,9 +104,8 @@ export function rankFilesByGraphRelevance(
 
       for (const neighbor of neighbors) {
         if (!scores.has(neighbor)) {
-          const score = weight * currentWeight;
-          scores.set(neighbor, score);
-          nextFrontier.set(neighbor, score);
+          scores.set(neighbor, currentWeight);
+          nextFrontier.set(neighbor, currentWeight);
         }
       }
     }
