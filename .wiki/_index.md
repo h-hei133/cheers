@@ -6,8 +6,8 @@ Last updated: 2026-08-28
 
 ## Statistics
 
-- Sources: 2 raw documents
-- Articles: 4 compiled wiki articles
+- Sources: 7 raw documents
+- Articles: 5 compiled wiki articles
 - Inventory records: 0 tracked items
 - Datasets: 0 manifests
 - Outputs: 0 generated artifacts
@@ -25,6 +25,7 @@ Last updated: 2026-08-28
 
 ## Featured Articles
 
+- [[top-tier-coding-agent-gap-analysis|Top-Tier Coding Agent Architecture Gap Analysis & Evolution Blueprint]] ([Gap Analysis](wiki/concepts/top-tier-coding-agent-gap-analysis.md))
 - [[three-layer-agent-architecture|Three-Layer Agent Architecture]] ([Three-Layer Agent Architecture](wiki/concepts/three-layer-agent-architecture.md))
 - [[evidence-and-proof-system|Evidence and Proof System]] ([Evidence and Proof System](wiki/concepts/evidence-and-proof-system.md))
 - [[normproof-structural-governance|NormProof Structural Governance]] ([NormProof Structural Governance](wiki/topics/normproof-structural-governance.md))
@@ -32,5 +33,6 @@ Last updated: 2026-08-28
 
 ## Recent Activity
 
+- 2026-08-28: Ingested deep research audit on architectural debts and compiled Top-Tier Coding Agent Architecture Gap Analysis
 - 2026-08-28: Ingested 2 source notes and compiled 4 foundational wiki articles
 - 2026-08-28: Initialized project wiki structure and category indexes

@@ -16,3 +16,4 @@
 ## [2026-08-28] plan | Phase 3 Battle 4: Planning Runtime, Proposal Calibration & Dynamic Retry (GOAL.md)
 ## [2026-08-28] refactor | Phase 3 Battle 4: Planning runtime decomposition, proposal context, and retry loop
 ## [2026-08-28] docs | NormProof user experience & architectural retrospective (.normproof/EXPERIENCE.md)
+## [2026-08-28] compile | Deep research on architectural debts, dead code, and SOTA gap analysis → wiki/concepts/top-tier-coding-agent-gap-analysis.md
