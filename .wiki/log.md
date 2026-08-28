@@ -11,3 +11,4 @@
 ## [2026-08-28] refactor | Phase 3 Battle 1: Tool dispatch pipeline, fileMutationQueue mutex, and fine-grained approval/store
 ## [2026-08-28] plan | Phase 3 Battle 2: Multi-File Mutation Graph & Per-File Patch Planning (GOAL.md)
 ## [2026-08-28] refactor | Phase 3 Battle 2: Multi-file mutation graph, per-file patch planning, and diffNormalize
+## [2026-08-28] plan | Phase 3 Battle 3: Terminal Surface & Streaming Componentization (GOAL.md)
