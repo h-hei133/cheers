@@ -108,3 +108,74 @@ graph TD
 ### 3. 清算与重构定论
 - **彻底废除 `lightweightChat.ts` 及其上游 `routeDecision.ts`**。
 - 全面收敛为**统一的标准 ReAct Agent Loop**（永远挂载标准 Tools，由大模型自主决策调用工具或直接回答）。
+
+---
+
+## 五、 基础 Slash 命令现状与 Plan 模式的深度缺陷剖析
+
+### 1. 基础命令现状（为什么目前命令体验差？）
+- 目前系统缺少最基础的全局生命周期控制命令：
+  - **`/exit` / `/quit`**：没有标准化实现优雅退出、终端屏幕状态恢复与会话保存。
+  - **`/plan`**：没有作为一等公民的权限拦截模式与交互式切换开关。
+- 应当遵循奥卡姆剃刀原则：**先不做花哨的高级命令（如 `/goal`, `/loop`, `/review`, `/usage`），优先把最基础的 `/exit` 与 `/plan` 做到极致工业级**。
+
+---
+
+### 2. 当前 Plan 模式的现状：它处于什么情况？能够限制写操作吗？
+
+#### 现状实测结论：**当前系统的 Plan 模式完全是“伪 Plan”，处于严重残废状态！**
+
+```mermaid
+graph TD
+  subgraph "当前系统残废的 Plan 模式 (Fatal Flaw)"
+    P1[开启 agentMode === 'plan'] --> R1[routeDecision.ts 判定为 mode: plan]
+    R1 --> L1[路由至 lightweightChat.ts (通用对话通道)]
+    L1 --> Blind[请求大模型时剥夺全部 Tools (tools: undefined)<br/>【致命】: 模型连 read/glob/grep 都无法使用, 变成两眼一抹黑!]
+    Blind --> Hallucination[无法读取真实代码 -> 只能凭记忆臆想与幻觉输出伪计划]
+  end
+```
+
+- **能否限制写操作？**
+  - 表象上它确实没有写文件（因为根本没有给模型挂载 `write`/`edit` 工具）。
+  - **致命代价**：它**把只读工具（`read`, `glob`, `grep`）也一并剥夺了**！
+  - 导致模型在制定计划时，**根本无法探索代码库、无法阅读真实配置文件、无法查看目录结构**，只能靠大模型通用预训练知识来凭空捏造假想计划，完全违背了 Plan 模式的初衷。
+
+---
+
+### 3. 顶尖项目（Claude Code / Pi）的 Plan 模式是怎么设计的？
+
+在 **Claude Code** 与 **Pi** 中，Plan 模式本质是一种**细粒度权限策略（Permission Policy Mode）**，而不是一个阉割工具的裸聊通道：
+
+```mermaid
+graph TD
+  subgraph "顶尖项目: 工业级 Plan 模式 (Claude Code / Pi)"
+    UserPlan[用户进入 /plan 模式] --> PermGate[权限控制模式切换: PermissionMode = 'plan']
+    
+    PermGate --> ReadTools["只读工具完全放行 (allow)<br/>read, glob, grep, ls, AST ScopeTree<br/>【模型获得完整探索权, 真实理解代码库】"]
+    PermGate --> WriteTools["写操作严格拦截 (deny / pending)<br/>write, edit, rm, bash(带副作用指令)<br/>【杜绝一切未授权的文件修改与破坏】"]
+    
+    ReadTools --> RealPlan[大模型深入阅读代码后生成精确的实施计划规范]
+    RealPlan --> UserApprove{用户审核并批准计划}
+    UserApprove -->|批准实施 /build| Execute[恢复写权限, 严格按计划执行修改]
+  end
+```
+
+#### 顶尖项目 Plan 模式四大核心设计要素：
+1. **只读权限全开（Full Read Capabilities）**：
+   - 模型在 Plan 模式下拥有完整的 `read`, `glob`, `grep` 工具调用权，允许其遍历目录、查看 AST 符号定义、分析现有测试。
+2. **写操作物理硬拦截（Hard Write Barrier）**：
+   - 任何 `write`, `edit` 或带写副作用的 `bash` 指令在权限层（`approvalTrustPolicy`）直接被硬拦截（返回 `PermissionBehavior: "deny"` 或挂起等待用户显式批准），**模型想写也写不进去**。
+3. **结构化计划输出**：
+   - 计划最终沉淀为受控的计划文件（如 `local://<slug>-plan.md`），明确列出步骤、受影响文件、改动逻辑与验证方案。
+4. **一键审批切换（Seamless Mode Transition）**：
+   - 用户审核计划后，输入批准指令（如 `/plan exit` 或 `/build`），权限系统自动切回正常模式并解锁写权限，开始执行修改。
+
+---
+
+### 4. 改进目标清单
+
+| 改进项 | 优先级 | 目标描述 |
+| :--- | :---: | :--- |
+| **`/exit` 命令** | **P0** | 优雅释放终端 Alt-Screen、保存 Session 快照并正常退出进程。 |
+| **`/plan` 模式** | **P0** | 彻底重构 Plan 模式：**开放只读探索工具（`read/glob/grep`），硬拦截写操作（`write/edit/bash`）**。 |
+| **无缝切换** | **P1** | 支持在交互界面中通过 `/plan` 自由切换 `plan`（只读规划）与 `build`（全权限编码）状态。 |

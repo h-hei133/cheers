@@ -27,3 +27,4 @@
 ## [2026-08-28] feat | Phase 6-8 Completed: Differential TUI (Pi), AST Gauntlet & LSP Self-Repair (Claude Code), and Sub-Agent Swarm (mini-swe-agent)
 ## [2026-08-28] feat | Unified Settings Subsystem Delivered: AgentSettings schema, env interpolation, cascading 3-tier loader, and unit tests
 ## [2026-08-29] docs | Problem diagnosis & retrospective on eliminating lightweightChat anti-pattern (problem.md)
+## [2026-08-29] docs | Added Section 5 on Slash Commands and SOTA Plan Mode design analysis (problem.md)
