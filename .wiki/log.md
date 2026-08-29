@@ -33,3 +33,4 @@
 ## [2026-08-29] fix | Code review fixes: glob regex matching, Windows/POSIX shell dispatch, combined stdout/err, guarded process.exit, and plan mode security
 ## [2026-08-29] docs | Added Section 7 (Web Search/Fetch vs OpenCode) and Section 8 (Browser granularity vs Playwright-MCP) into problem.md
 ## [2026-08-29] docs | Added Section 9 on 2-Layer Progressive Compaction Architecture (Microcompact + 8-Section Checkpoint) from DeepSeek-Harness/Claude Code/Pi/OpenCode into problem.md
+## [2026-08-29] plan | Updated GOAL.md with 3-Phase Modernization Roadmap (Toolchain Hardening, Lightweight Web, 2-Layer Compaction) based on Pi, Claude Code, OpenCode, Playwright-MCP & DeepSeek-Harness
