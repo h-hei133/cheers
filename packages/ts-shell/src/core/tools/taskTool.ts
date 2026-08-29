@@ -40,21 +40,21 @@ export function createTaskToolDefinition(): ToolDefinition {
       if (!description || !prompt) {
         return deniedResult("Error: description and prompt are required for task tool.");
       }
-
-      const subtaskId = `task_${Math.random().toString(36).slice(2, 8)}`;
+      const randomSuffix = Math.random().toString(36).slice(2, 8).padEnd(6, "0");
+      const subtaskId = `task_${randomSuffix}`;
       const mode = args.agentMode === "plan" ? "PLAN (Read-Only)" : "BUILD (Standard)";
+      const contextStr = typeof args.context === "string" ? args.context.trim() : "";
 
       const lines: string[] = [
         `# Subagent Task Executed (\`${subtaskId}\`)`,
         "",
         `- **Description**: ${description}`,
         `- **Mode**: \`${mode}\``,
-        ...(args.context ? [`- **Context Attached**: ${args.context}`] : []),
+        ...(contextStr ? [`- **Context Attached**: ${contextStr}`] : []),
         "",
         "## Subagent Execution Result:",
         `Task "${description}" was processed in an isolated subagent sandbox. Relevant facts and findings have been summarized and returned to the main context.`,
       ];
-
       return approvedResult(lines.join("\n"));
     },
   };

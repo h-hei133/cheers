@@ -64,20 +64,23 @@ export function createAskToolDefinition(): ToolDefinition {
       }
 
       const formattedQuestions: string[] = [];
-
       questions.forEach((q, idx) => {
-        formattedQuestions.push(`### Question ${idx + 1} [${q.id}]: ${q.question}`);
-        if (q.options && q.options.length > 0) {
+        if (!q || typeof q !== "object") return;
+        const qId = typeof q.id === "string" ? q.id : `q_${idx + 1}`;
+        const qText = typeof q.question === "string" ? q.question : "Unspecified question";
+        formattedQuestions.push(`### Question ${idx + 1} [${qId}]: ${qText}`);
+        if (Array.isArray(q.options) && q.options.length > 0) {
           q.options.forEach((opt, optIdx) => {
+            if (!opt || typeof opt !== "object") return;
+            const label = typeof opt.label === "string" ? opt.label : `Option ${optIdx + 1}`;
             const isRec = q.recommended === optIdx ? " (Recommended)" : "";
             formattedQuestions.push(
-              `  - **[${optIdx + 1}] ${opt.label}**${isRec}${opt.description ? `: ${opt.description}` : ""}`,
+              `  - **[${optIdx + 1}] ${label}**${isRec}${opt.description ? `: ${opt.description}` : ""}`,
             );
           });
         }
         formattedQuestions.push("");
       });
-
       const output = [
         "# User Decision & Clarification Requested",
         "",

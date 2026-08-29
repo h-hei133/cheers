@@ -6,8 +6,8 @@ import { createLspToolDefinition } from "./lsp.js";
 import { createAskToolDefinition } from "./ask.js";
 import { createTodoToolDefinition } from "./todoTool.js";
 import { createTaskToolDefinition } from "./taskTool.js";
+import { runTodoCommand } from "../commands/todoCommandRuntime.js";
 import { createDefaultExecutionService } from "../../runtime/execution/service.js";
-
 describe("High-Value Modern Built-in Tools Subsystem", () => {
   let tempDir: string;
 
@@ -22,6 +22,7 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
   });
 
   afterEach(async () => {
+    await runTodoCommand(["clear"], { cwd: tempDir });
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
@@ -59,6 +60,17 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       expect(refResult.success).toBe(true);
       expect(refResult.output).toContain("References to `UserService`");
     });
+
+    it("rejects documentSymbol when filePath is missing", async () => {
+      const tool = createLspToolDefinition(createDefaultExecutionService());
+      const result = await tool.execute(
+        { operation: "documentSymbol" },
+        { workspaceRoot: tempDir, taskId: "task-1" },
+      );
+      expect(result.success).toBe(false);
+      const err = result.error || result.output;
+      expect(err).toContain("filePath parameter is required");
+    });
   });
 
   describe("ask tool", () => {
@@ -87,6 +99,14 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       expect(result.output).toContain("[1] SQLite** (Recommended): Embedded zero-config database");
       expect(result.output).toContain("[2] PostgreSQL**: Full relational database server");
     });
+
+    it("handles missing questions array gracefully", async () => {
+      const tool = createAskToolDefinition();
+      const result = await tool.execute({ questions: [] }, { workspaceRoot: tempDir, taskId: "task-1" });
+      expect(result.success).toBe(false);
+      const err = result.error || result.output;
+      expect(err).toContain("questions array is required");
+    });
   });
 
   describe("todo tool", () => {
@@ -109,6 +129,17 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       expect(listRes.success).toBe(true);
       expect(listRes.output).toContain("Session Task Checklist");
       expect(listRes.output).toContain("Implement OAuth provider");
+    });
+
+    it("rejects unsupported actions", async () => {
+      const tool = createTodoToolDefinition();
+      const result = await tool.execute(
+        { action: "invalid_action" },
+        { workspaceRoot: tempDir, taskId: "task-1" },
+      );
+      expect(result.success).toBe(false);
+      const err = result.error || result.output;
+      expect(err).toContain("action must be one of");
     });
   });
 

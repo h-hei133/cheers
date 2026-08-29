@@ -59,9 +59,16 @@ export function createLspToolDefinition(
       const filePath = typeof args.filePath === "string" ? args.filePath.trim() : "";
       const symbolQuery = typeof args.symbol === "string" ? args.symbol.trim() : "";
 
-      if (op === "documentSymbol" && filePath) {
+      if (op === "documentSymbol") {
+        if (!filePath) {
+          return deniedResult("Error: filePath parameter is required for documentSymbol operation.");
+        }
         const fullPath = path.resolve(context.workspaceRoot, filePath);
         try {
+          const stat = await fs.stat(fullPath);
+          if (stat.size > 5 * 1024 * 1024) {
+            return deniedResult(`File ${filePath} exceeds maximum 5MB size limit for documentSymbol.`);
+          }
           const content = await fs.readFile(fullPath, "utf8");
           const lines = content.split("\n");
           const symbols: string[] = [];
@@ -90,10 +97,14 @@ export function createLspToolDefinition(
 
       if (op === "definition" || op === "references" || op === "workspaceSymbol") {
         if (!symbolQuery && !filePath) {
-          return deniedResult("Error: symbol or filePath is required for definition/references.");
+          return deniedResult("Error: symbol or filePath parameter is required for definition/references/workspaceSymbol.");
         }
 
         const query = symbolQuery || (filePath ? path.basename(filePath, path.extname(filePath)) : "");
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const symbolWordRegex = new RegExp(`\\b${escapedQuery}\\b`);
+        const defRegex = new RegExp(`(?:function|class|interface|type|const|let|var|enum)\\s+${escapedQuery}\\b`);
+
         const allFiles = await executionService.listFilesRecursive({
           operationKind: "file.list",
           absoluteRoot: context.workspaceRoot,
@@ -121,19 +132,19 @@ export function createLspToolDefinition(
         const matches: Array<{ file: string; line: number; text: string; isDef: boolean }> = [];
 
         for (const rel of targetFiles) {
+          if (matches.length >= 100) break;
+          const fullPath = path.resolve(context.workspaceRoot, rel);
           try {
-            const content = await fs.readFile(path.resolve(context.workspaceRoot, rel), "utf8");
+            const stat = await fs.stat(fullPath);
+            if (stat.size > 5 * 1024 * 1024) continue;
+            const content = await fs.readFile(fullPath, "utf8");
             const lines = content.split("\n");
             for (let i = 0; i < lines.length; i++) {
               const l = lines[i];
-              if (l.includes(query)) {
-                const isDef =
-                  l.includes(`function ${query}`) ||
-                  l.includes(`class ${query}`) ||
-                  l.includes(`interface ${query}`) ||
-                  l.includes(`type ${query}`) ||
-                  l.includes(`const ${query}`);
+              if (symbolWordRegex.test(l)) {
+                const isDef = defRegex.test(l);
                 matches.push({ file: rel, line: i + 1, text: l.trim(), isDef });
+                if (matches.length >= 100) break;
               }
             }
           } catch {
