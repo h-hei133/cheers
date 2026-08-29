@@ -57,6 +57,16 @@ export async function buildCliCommandExecution(
   input: BuildCliCommandExecutionInput,
   bridge: CliCommandExecutionBridge = defaultCliCommandExecutionBridge,
 ): Promise<CliCommandExecution> {
+  const repoAwareResponse = bridge.resolveRepoAwarePromptResponse(
+    input.prompt,
+    input.cwd,
+  );
+  if (repoAwareResponse) {
+    input.renderer.renderLine(
+      input.printMode ? repoAwareResponse : `\n${repoAwareResponse}\n`,
+    );
+    return { kind: "handled" };
+  }
 
   const browserCliExecutionBridge = createBrowserCliExecutionBridge(
     loadBrowserCliExecutorInjectionFromEnv({ env: input.env }),

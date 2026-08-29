@@ -12,7 +12,8 @@ import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
 import { runAutonomousReActLoop } from "../core/query/agentLoop.js";
-
+import { decideQueryRoute } from "../core/query/routeDecision.js";
+import { validateLightweightProviderCredential } from "../core/query/lightweightRoute.js";
 export type CliApplyPatchRuntimeRouteOptions = ApplyPatchRuntimeRouteOptions;
 
 type ProviderMode = "synthetic" | "real";
@@ -96,8 +97,33 @@ async function* streamCliRuntimeInvocation(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
 ): AsyncIterable<QueryEvent> {
-  // If explicitly requested via legacy patch route, run integrated flow
-  if (request.applyPatchRuntimeRoute) {
+  // If in synthetic test mode or explicitly requested via legacy patch route, run integrated flow or lightweight test mock
+  if (request.applyPatchRuntimeRoute || request.providerMode === "synthetic") {
+    const routeDecision = decideQueryRoute({
+      prompt: request.prompt,
+      agentMode: request.agentMode,
+      hasRuntimeSeed: Boolean(request.runtimeSeed),
+    });
+
+    if (
+      !request.applyPatchRuntimeRoute &&
+      routeDecision.mode === "chat" &&
+      validateLightweightProviderCredential({
+        providerMode: request.providerMode,
+        providerCredentialResolution: request.providerCredentialResolution,
+      }).ok
+    ) {
+      yield* dependencies.streamLightweight({
+        sessionId: request.sessionId,
+        prompt: request.prompt,
+        mode: "chat",
+        providerMode: request.providerMode,
+        providerCredential: request.providerCredentialResolution.credential,
+        signal: request.signal,
+      });
+      return;
+    }
+
     yield* dependencies.streamIntegratedFlow({
       sessionId: request.sessionId,
       prompt: request.prompt,

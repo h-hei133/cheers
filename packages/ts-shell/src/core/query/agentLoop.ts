@@ -104,12 +104,13 @@ export async function* runAutonomousReActLoop(
       break;
     }
 
-    // On the final turn before maxTurns, force tool_choice: "none" to guarantee synthesis
+    // On the final turn before maxTurns, set tool_choice to "none" while retaining tool definitions for schema validation
     const isLastTurn = turn === maxTurns;
     const payload = {
       model: modelName,
       messages,
-      ...(isLastTurn ? {} : { tools: openAiTools, tool_choice: "auto" }),
+      tools: openAiTools,
+      tool_choice: isLastTurn ? "none" : "auto",
     };
     let responseJson: any;
     try {
@@ -176,12 +177,16 @@ export async function* runAutonomousReActLoop(
 
     // Execute each tool call
     for (const toolCall of toolCalls) {
+      if (!toolCall || !toolCall.function || !toolCall.function.name) {
+        continue;
+      }
       const funcName = toolCall.function.name;
       let funcArgs: Record<string, unknown> = {};
+      let parseError: string | null = null;
       try {
         funcArgs = JSON.parse(toolCall.function.arguments || "{}");
-      } catch {
-        funcArgs = {};
+      } catch (err) {
+        parseError = err instanceof Error ? err.message : String(err);
       }
 
       yield {
@@ -194,30 +199,37 @@ export async function* runAutonomousReActLoop(
       let outputContent = "";
       let isSuccess = false;
 
-      if (!tool) {
+      if (parseError) {
+        outputContent = `Error: Malformed JSON arguments for tool '${funcName}': ${parseError}. Raw: ${toolCall.function.arguments}`;
+        isSuccess = false;
+      } else if (!tool) {
         outputContent = `Error: Tool '${funcName}' is not registered.`;
+        isSuccess = false;
+      } else if (
+        options.agentMode === "plan" &&
+        funcName !== "read" &&
+        funcName !== "glob" &&
+        funcName !== "grep" &&
+        funcName !== "git-status" &&
+        funcName !== "git-diff"
+      ) {
+        outputContent = `Blocked: Plan mode is active. Tool '${funcName}' is not a read-only inspection tool. Only read-only tools (read, glob, grep, git-status, git-diff) are permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
+        isSuccess = false;
       } else {
         try {
-          // In plan mode, block write/edit mutations
-          if (
-            options.agentMode === "plan" &&
-            (funcName === "write" || funcName === "edit" || funcName === "rm")
-          ) {
-            outputContent = `Blocked: Plan mode is active. File modification via '${funcName}' is disabled. Use /build to enable editing.`;
-          } else {
-            const execResult = await tool.execute(funcArgs, {
-              workspaceRoot: options.workspaceRoot,
-              taskId: toolCall.id,
-              abortSignal: options.abortSignal,
-            });
-            outputContent =
-              execResult.output || execResult.content || "Success";
-            isSuccess = Boolean(execResult.success);
-          }
+          const execResult = await tool.execute(funcArgs, {
+            workspaceRoot: options.workspaceRoot,
+            taskId: toolCall.id,
+            abortSignal: options.abortSignal,
+          });
+          outputContent =
+            execResult.output || execResult.content || "Success";
+          isSuccess = Boolean(execResult.success);
         } catch (execErr) {
           const errStr =
             execErr instanceof Error ? execErr.message : String(execErr);
           outputContent = `Tool execution error: ${errStr}`;
+          isSuccess = false;
         }
       }
 

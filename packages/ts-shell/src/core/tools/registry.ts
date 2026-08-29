@@ -46,22 +46,48 @@ function inferFailureKind(result: {
       return undefined
   }
 }
+function matchGlobPattern(filePath: string, pattern: string): boolean {
+  if (!pattern || pattern === '*' || pattern === '**' || pattern === '**/*') {
+    return true
+  }
+  const cleanPattern = pattern.trim().replace(/^\.\//, '')
+  const regexStr = cleanPattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*\*\//g, '(.+/)?')
+    .replace(/\*\*/g, '.*')
+    .replace(/\*/g, '[^/]*')
+    .replace(/\?/g, '[^/]')
+  const regex = new RegExp(`^${regexStr}$`, 'i')
+  return regex.test(filePath) || regex.test(filePath.replace(/^[/]+/, ''))
+}
 
 async function runCommandTool(
   executionService: ExecutionService,
   command: string,
   context: ToolExecutionContext,
 ) {
+  if (!command || !command.trim()) {
+    return deniedResult('Error: No command provided to execute.', {
+      status: 'failed',
+      exitCode: 1,
+    })
+  }
+
+  const isWindows = process.platform === 'win32'
+  const shellBin = isWindows ? 'cmd.exe' : 'sh'
+  const shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command]
+
   const result = await executionService.runCommand({
     operationKind: 'command.run',
-    command: 'sh',
-    args: ['-c', command],
+    command: shellBin,
+    args: shellArgs,
     cwd: context.workspaceRoot,
     workspaceRoot: context.workspaceRoot,
     authority: TOOL_APPROVED_COMMAND_AUTHORITY,
     caller: 'core-tool:bash',
     reason: 'Run an approved workspace command.',
     reportSafeCommand: command,
+    timeoutMs: 60_000,
     abortSignal: context.abortSignal,
   })
   if (result.status === 'completed' && result.exitCode === 0) {
@@ -73,7 +99,12 @@ async function runCommandTool(
     })
   }
 
-  return deniedResult(result.stderr || result.stdout || result.recoveryReason || `Command failed with exit code ${result.exitCode}`, {
+  const combinedOutput =
+    [result.stderr, result.stdout].filter(Boolean).join('\n') ||
+    result.recoveryReason ||
+    `Command failed with exit code ${result.exitCode}`
+
+  return deniedResult(combinedOutput, {
     status: result.status,
     exitCode: result.exitCode,
     stdout: result.stdout,
@@ -251,8 +282,8 @@ export function createCoreToolRegistry(options?: {
       },
       permissions: { check: () => [] },
       async execute(args, context) {
-        const pattern = typeof args.pattern === 'string' ? args.pattern : ''
-        const suffix = pattern.replace(/^\*+/, '')
+        const rawPattern = typeof args.pattern === 'string' ? args.pattern.trim() : ''
+        const pattern = rawPattern.replace(/^[./\\]+/, '') || '*'
         const files = await executionService.listFilesRecursive({
           operationKind: 'file.list',
           absoluteRoot: context.workspaceRoot,
@@ -262,8 +293,20 @@ export function createCoreToolRegistry(options?: {
           reason: 'List approved workspace files for glob matching.',
           reportSafeTarget: context.workspaceRoot,
         })
-        const matches = suffix ? files.filter(file => file.endsWith(suffix)) : files
-        return approvedResult(matches.join('\n'))
+        const rootPath = context.workspaceRoot.replace(/\\/g, '/').replace(/\/+$/, '')
+        const relativeFiles = files.map(file => {
+          const normalized = file.replace(/\\/g, '/')
+          return normalized.startsWith(rootPath + '/')
+            ? normalized.slice(rootPath.length + 1)
+            : normalized
+        })
+        const filtered = relativeFiles.filter(file => {
+          if (file.includes('node_modules/') || file.includes('.git/') || file.includes('dist/')) {
+            return false
+          }
+          return matchGlobPattern(file, pattern)
+        })
+        return approvedResult(filtered.length > 0 ? filtered.join('\n') : 'No files matched the pattern.')
       },
     },
     {
