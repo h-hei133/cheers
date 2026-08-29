@@ -19,12 +19,14 @@ It does not claim every historical note is perfectly classified.
 
 | Path | Status | When to read | Superseded by | Owner |
 |---|---|---|---|---|
-| `docs/ACTIVE_CONTEXT.md` | active | First doc for future routes. |  | Documentation / Capability Contract Architecture |
+| `GOAL.md` | active | Strategic Evolution Roadmap: SOTA benchmark alignment, Phase 4-7 deliverables, and NormProof governance. |  | Architecture / Project Leadership |
+| `.wiki/_index.md` | active | Master project knowledge base, architecture concepts, RFCs, and references. |  | Documentation / Wiki Manager |
+| `.normproof/EXPERIENCE.md` | active | Retrospective on formal structural proof vs runtime semantic review. |  | Architecture / NormProof |
+| `.normproof/dispositions.md` | active | Formal register of reviewed module ceiling obligations and modular decomposition decisions. |  | Architecture / NormProof |
 | `docs/DOC_STATUS.md` | active | Select route-relevant docs and avoid broad history loading. |  | Documentation / Capability Contract Architecture |
-| `docs/agent-routes/module-route-template.md` | active | Drafting or executing module routes. |  | Capability Contract Architecture |
-| `docs/architecture/module-backlog.md` | active | Choosing the next module route or checking completed route families. |  | Capability Contract Architecture |
+| `docs/ACTIVE_CONTEXT.md` | historical | Legacy route context superseded by GOAL.md and .wiki/. | `GOAL.md` | Documentation |
+| `docs/agent-routes/module-route-template.md` | historical | Historical module route draft template. |  | Capability Contract Architecture |
 | `docs/archive/README.md` | archived | Understanding archive policy or adding archive pointers. |  | Documentation |
-
 ## Active Architecture
 
 | Path | Status | When to read | Superseded by | Owner |

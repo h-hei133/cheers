@@ -31,11 +31,11 @@ Detailed rules: [provider and secret boundary](agent-rules/provider-and-secret-b
 ## Architecture Summary
 
 - TypeScript is the primary product runtime and control plane: shell, session, orchestration, query loop, slash commands, permission UX, recovery, replay, runtime durability, result mapping, terminal/session surface, high-level capability routing, and most current execution adapters.
-- Execution is an explicit runtime boundary/interface, currently implemented mostly in TypeScript.
+- Execution is an explicit runtime boundary/interface, currently implemented in TypeScript (`packages/ts-shell/src/`).
 - Rust is a future native executor candidate for OS/process/sandbox/isolation/distribution-critical responsibilities; do not claim Rust owns current execution unless the code path proves it.
 - `contracts` carries schemas, events, lifecycle states, permission semantics, and serialization rules only when there is a real cross-runtime consumer.
-- `packages/python-eval/` is offline evaluation only, not a production runtime owner.
-
+- `packages/python-eval/` is isolated offline benchmark evaluation only, not a production workspace member.
+- Project master knowledge base, technical RFCs (RFC-001 through RFC-004), and architecture specifications live in `.wiki/` (`.wiki/_index.md`).
 Detailed rules: [architecture boundaries](agent-rules/architecture-boundaries.md).
 
 ## Ownership And Naming Summary
