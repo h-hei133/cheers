@@ -15,6 +15,12 @@ import { runCostCommand } from "./costCommandRuntime.js";
 import { runUndoCommand } from "./undoCommandRuntime.js";
 import { runExportCommand } from "./exportCommandRuntime.js";
 import { runCopyCommand } from "./copyCommandRuntime.js";
+import { runGoalCommand } from "./goalCommandRuntime.js";
+import { runLoopCommand } from "./loopCommandRuntime.js";
+import { runTodoCommand } from "./todoCommandRuntime.js";
+import { runFastCommand } from "./fastCommandRuntime.js";
+import { runContextCommand } from "./contextCommandRuntime.js";
+import { runBtwCommand } from "./btwCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -326,6 +332,60 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runCopyCommand(args, context),
+    },
+    {
+      name: "goal",
+      aliases: ["objective", "target"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runGoalCommand(args, context),
+    },
+    {
+      name: "loop",
+      aliases: ["ralph", "autoloop"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runLoopCommand(args, context),
+    },
+    {
+      name: "todo",
+      aliases: ["tasks", "checklist"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runTodoCommand(args, context),
+    },
+    {
+      name: "fast",
+      aliases: ["turbo", "speed"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runFastCommand(args, context),
+    },
+    {
+      name: "context",
+      aliases: ["ctx", "tokens-map"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runContextCommand(args, context),
+    },
+    {
+      name: "btw",
+      aliases: ["side", "ask"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runBtwCommand(args, context),
     },
   ];
 

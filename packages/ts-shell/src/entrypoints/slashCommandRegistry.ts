@@ -162,6 +162,42 @@ export const SLASH_COMMANDS = [
     group: "session",
     summary: "copy last assistant response to clipboard",
   },
+  {
+    name: "goal",
+    aliases: ["objective", "target"],
+    group: "workflow",
+    summary: "manage active goal state machine and prevent goal drift",
+  },
+  {
+    name: "loop",
+    aliases: ["ralph", "autoloop"],
+    group: "workflow",
+    summary: "run autonomous edit-and-verify loops until test pass",
+  },
+  {
+    name: "todo",
+    aliases: ["tasks", "checklist"],
+    group: "workflow",
+    summary: "manage structured task checklist and view progress",
+  },
+  {
+    name: "fast",
+    aliases: ["turbo", "speed"],
+    group: "workflow",
+    summary: "toggle low-latency fast model tier on or off",
+  },
+  {
+    name: "context",
+    aliases: ["ctx", "tokens-map"],
+    group: "diagnostics",
+    summary: "visualize context window allocation and token categories",
+  },
+  {
+    name: "btw",
+    aliases: ["side", "ask"],
+    group: "session",
+    summary: "ask a quick side question out of band without history pollution",
+  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];
