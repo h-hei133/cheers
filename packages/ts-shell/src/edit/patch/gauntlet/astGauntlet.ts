@@ -6,6 +6,20 @@ export interface ASTGauntletValidationResult {
   readonly parsedSymbolCount: number;
 }
 
+function stripCommentsAndStrings(code: string): string {
+  return code
+    // Block comments
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    // Line comments
+    .replace(/\/\/.*$/gm, "")
+    // Double-quoted strings
+    .replace(/"(?:\\.|[^"\\])*"/g, '""')
+    // Single-quoted strings
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    // Template literals
+    .replace(/`(?:\\.|[^`\\])*`/g, "``");
+}
+
 /**
  * Preflight AST validator simulating patch application in memory.
  * Rejects broken syntax (unclosed brackets, invalid grammar) before disk write.
@@ -16,16 +30,27 @@ export function validatePatchASTPreflight(
 ): ASTGauntletValidationResult {
   try {
     const parseResult = parseSourceSymbols(filePath, proposedContent);
+    const lower = filePath.toLowerCase();
+    const isCodeFile =
+      lower.endsWith(".ts") ||
+      lower.endsWith(".tsx") ||
+      lower.endsWith(".js") ||
+      lower.endsWith(".jsx") ||
+      lower.endsWith(".mjs") ||
+      lower.endsWith(".cjs");
 
-    // Basic heuristic: if file is non-empty but zero valid symbols/structures could be extracted and contains unclosed braces
-    const openBraces = (proposedContent.match(/{/g) || []).length;
-    const closeBraces = (proposedContent.match(/}/g) || []).length;
-    if (openBraces !== closeBraces && (filePath.endsWith(".ts") || filePath.endsWith(".js"))) {
-      return {
-        valid: false,
-        error: `Unmatched curly braces detected: ${openBraces} open vs ${closeBraces} close`,
-        parsedSymbolCount: parseResult.symbols.length,
-      };
+    if (isCodeFile) {
+      const stripped = stripCommentsAndStrings(proposedContent);
+      const openBraces = (stripped.match(/{/g) || []).length;
+      const closeBraces = (stripped.match(/}/g) || []).length;
+
+      if (openBraces !== closeBraces) {
+        return {
+          valid: false,
+          error: `Unmatched curly braces detected: ${openBraces} open vs ${closeBraces} close`,
+          parsedSymbolCount: parseResult.symbols.length,
+        };
+      }
     }
 
     return {

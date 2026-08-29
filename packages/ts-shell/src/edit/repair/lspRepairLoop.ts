@@ -33,64 +33,84 @@ export async function executeWithLspSelfRepair(
   const maxAttempts = options.maxAttempts ?? 2;
   let currentContent = options.proposedContent;
   let attempts = 0;
+  let lastRecordedErrors: readonly DiagnosticItem[] = [];
 
   return withFileMutationQueue(options.filePath, async () => {
-    while (attempts < maxAttempts) {
-      attempts++;
+    try {
+      while (attempts < maxAttempts) {
+        attempts++;
 
-      // 1. Preflight AST syntax validation
-      const preflight = validatePatchASTPreflight(options.filePath, currentContent);
-      if (!preflight.valid) {
-        // Rollback and report syntax failure
-        await options.writeFile(options.filePath, options.originalContent);
-        return {
-          success: false,
-          attempts,
-          finalContent: options.originalContent,
-          errors: [{
-            filePath: options.filePath,
-            line: 1,
-            column: 1,
-            code: "AST_SYNTAX_ERROR",
-            message: preflight.error ?? "Invalid AST syntax",
-          }],
-          rolledBack: true,
-        };
+        // 1. Preflight AST syntax validation
+        const preflight = validatePatchASTPreflight(options.filePath, currentContent);
+        if (!preflight.valid) {
+          await options.writeFile(options.filePath, options.originalContent);
+          return {
+            success: false,
+            attempts,
+            finalContent: options.originalContent,
+            errors: [{
+              filePath: options.filePath,
+              line: 1,
+              column: 1,
+              code: "AST_SYNTAX_ERROR",
+              message: preflight.error ?? "Invalid AST syntax",
+            }],
+            rolledBack: true,
+          };
+        }
+
+        // 2. Perform write under queue lock
+        await options.writeFile(options.filePath, currentContent);
+
+        // 3. Post-mutation LSP diagnostics
+        const diagnostics = await options.getDiagnostics(options.filePath);
+        lastRecordedErrors = diagnostics;
+
+        if (diagnostics.length === 0) {
+          return {
+            success: true,
+            attempts,
+            finalContent: currentContent,
+            errors: [],
+            rolledBack: false,
+          };
+        }
+
+        // 4. Trigger model self-repair with compiler errors
+        const repaired = await options.retryWithCompilerFeedback(diagnostics);
+        if (!repaired) {
+          break;
+        }
+        currentContent = repaired;
       }
 
-      // 2. Perform write under queue lock
-      await options.writeFile(options.filePath, currentContent);
+      // 5. Exceeded retry attempts: atomic rollback
+      await options.writeFile(options.filePath, options.originalContent);
 
-      // 3. Post-mutation LSP diagnostics
-      const diagnostics = await options.getDiagnostics(options.filePath);
-      if (diagnostics.length === 0) {
-        return {
-          success: true,
-          attempts,
-          finalContent: currentContent,
-          errors: [],
-          rolledBack: false,
-        };
-      }
-
-      // 4. Trigger model self-repair with compiler errors
-      const repaired = await options.retryWithCompilerFeedback(diagnostics);
-      if (!repaired) {
-        break;
-      }
-      currentContent = repaired;
+      return {
+        success: false,
+        attempts,
+        finalContent: options.originalContent,
+        errors: lastRecordedErrors,
+        rolledBack: true,
+      };
+    } catch (err) {
+      // 6. Exception guard: ensure rollback on any unexpected failure
+      await options.writeFile(options.filePath, options.originalContent);
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        attempts,
+        finalContent: options.originalContent,
+        errors: [{
+          filePath: options.filePath,
+          line: 1,
+          column: 1,
+          code: "UNHANDLED_REPAIR_EXCEPTION",
+          message: msg,
+        }],
+        rolledBack: true,
+      };
     }
-
-    // 5. Exceeded retry attempts: atomic rollback
-    await options.writeFile(options.filePath, options.originalContent);
-    const finalDiagnostics = await options.getDiagnostics(options.filePath);
-
-    return {
-      success: false,
-      attempts,
-      finalContent: options.originalContent,
-      errors: finalDiagnostics,
-      rolledBack: true,
-    };
   });
 }

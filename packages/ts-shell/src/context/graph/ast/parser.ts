@@ -14,6 +14,7 @@ export interface ASTParsedSymbol {
   readonly span: ASTTokenSpan;
   readonly isExported: boolean;
   readonly parentName?: string;
+  readonly filePath: string;
 }
 
 export interface ASTFileParseResult {
@@ -31,7 +32,7 @@ export interface ASTFileParseResult {
 export function detectLanguageFromPath(filePath: string): ASTLanguage {
   const lower = filePath.toLowerCase();
   if (lower.endsWith(".ts") || lower.endsWith(".tsx")) return "typescript";
-  if (lower.endsWith(".js") || lower.endsWith(".jsx") || lower.endsWith(".mjs")) return "javascript";
+  if (lower.endsWith(".js") || lower.endsWith(".jsx") || lower.endsWith(".mjs") || lower.endsWith(".cjs")) return "javascript";
   if (lower.endsWith(".py")) return "python";
   if (lower.endsWith(".rs")) return "rust";
   if (lower.endsWith(".json")) return "json";
@@ -51,6 +52,7 @@ export function parseSourceSymbols(
   const lines = sourceText.split(/\r?\n/);
 
   let currentClass: string | undefined;
+  let classBraceDepth = 0;
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
     const rawLine = lines[lineIndex] ?? "";
@@ -95,15 +97,17 @@ export function parseSourceSymbols(
       continue;
     }
 
-    // Class Declarations (TS, JS, Python, Rust struct)
-    const classMatch = trimmed.match(/^(?:export\s+)?(?:abstract\s+)?(?:class|struct)\s+([a-zA-Z0-9_$]+)/);
+    // Class / Struct Declarations (TS, JS, Python, Rust struct)
+    const classMatch = trimmed.match(/^(?:export\s+|pub(?:\([a-z_]+\))?\s+)?(?:abstract\s+)?(?:class|struct)\s+([a-zA-Z0-9_$]+)/);
     if (classMatch && classMatch[1]) {
       const name = classMatch[1];
       currentClass = name;
+      classBraceDepth = 1;
       symbols.push({
         name,
         qualifiedName: name,
         kind: "class",
+        filePath,
         span: {
           startLine: lineIndex + 1,
           startColumn: 0,
@@ -115,15 +119,27 @@ export function parseSourceSymbols(
       continue;
     }
 
+    // Track braces inside class to avoid premature class reset
+    if (currentClass) {
+      const opens = (trimmed.match(/{/g) || []).length;
+      const closes = (trimmed.match(/}/g) || []).length;
+      classBraceDepth += opens - closes;
+
+      if (classBraceDepth <= 0 && language !== "python") {
+        currentClass = undefined;
+      }
+    }
+
     // Method Declarations inside Class
     if (currentClass) {
-      const methodMatch = trimmed.match(/^(?:(?:public|private|protected|async|static|readonly)\s+)*([a-zA-Z0-9_$]+)\s*\(/);
-      if (methodMatch && methodMatch[1] && methodMatch[1] !== "if" && methodMatch[1] !== "for" && methodMatch[1] !== "while") {
+      const methodMatch = trimmed.match(/^(?:(?:public|private|protected|async|static|readonly|pub(?:\([a-z_]+\))?)\s+)*([a-zA-Z0-9_$]+)\s*\(/);
+      if (methodMatch && methodMatch[1] && methodMatch[1] !== "if" && methodMatch[1] !== "for" && methodMatch[1] !== "while" && methodMatch[1] !== "switch") {
         const name = methodMatch[1];
         symbols.push({
           name,
           qualifiedName: `${currentClass}.${name}`,
           kind: "method",
+          filePath,
           span: {
             startLine: lineIndex + 1,
             startColumn: 0,
@@ -135,19 +151,17 @@ export function parseSourceSymbols(
         });
         continue;
       }
-      if (trimmed === "}" || trimmed === "") {
-        currentClass = undefined;
-      }
     }
 
     // Standalone Function Declarations (TS, JS, Python def, Rust fn)
-    const funcMatch = trimmed.match(/^(?:export\s+)?(?:async\s+)?(?:function|def|fn)\s+([a-zA-Z0-9_$]+)/);
+    const funcMatch = trimmed.match(/^(?:export\s+|pub(?:\([a-z_]+\))?\s+)?(?:async\s+)?(?:function|def|fn)\s+([a-zA-Z0-9_$]+)/);
     if (funcMatch && funcMatch[1]) {
       const name = funcMatch[1];
       symbols.push({
         name,
         qualifiedName: name,
         kind: "function",
+        filePath,
         span: {
           startLine: lineIndex + 1,
           startColumn: 0,
@@ -160,13 +174,14 @@ export function parseSourceSymbols(
     }
 
     // Interfaces & Types
-    const ifaceMatch = trimmed.match(/^(?:export\s+)?(?:interface|type)\s+([a-zA-Z0-9_$]+)/);
+    const ifaceMatch = trimmed.match(/^(?:export\s+|pub(?:\([a-z_]+\))?\s+)?(?:interface|type)\s+([a-zA-Z0-9_$]+)/);
     if (ifaceMatch && ifaceMatch[1]) {
       const name = ifaceMatch[1];
       symbols.push({
         name,
         qualifiedName: name,
         kind: trimmed.includes("interface") ? "interface" : "type",
+        filePath,
         span: {
           startLine: lineIndex + 1,
           startColumn: 0,

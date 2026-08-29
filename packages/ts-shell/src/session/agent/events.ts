@@ -54,7 +54,8 @@ export function createAgentEventEmitter(): AgentEventEmitter {
   const listeners = new Set<(event: AgentEvent) => void>();
   return {
     emit(event: AgentEvent) {
-      for (const listener of listeners) {
+      const snapshot = Array.from(listeners);
+      for (const listener of snapshot) {
         listener(event);
       }
     },

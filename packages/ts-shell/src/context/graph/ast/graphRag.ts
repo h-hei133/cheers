@@ -45,7 +45,7 @@ export function rankFilesByHybridGraphRAG(
     }
   }
 
-  // 2. Graph Topological Expansion (Multi-hop Walk with Decay)
+  // 2. Graph Topological Expansion (Multi-hop Walk with Decay across Files)
   let currentFrontier = new Set(input.seedFiles);
   for (let depth = 1; depth <= maxDepth; depth++) {
     const nextFrontier = new Set<string>();
@@ -56,10 +56,11 @@ export function rankFilesByHybridGraphRAG(
       for (const symName of outgoingSymbols) {
         const decls = input.graph.index.byShortName.get(symName) ?? [];
         for (const decl of decls) {
-          if (!scores.has(decl.name)) {
+          const targetFilePath = decl.filePath;
+          if (targetFilePath !== file && !scores.has(targetFilePath)) {
             const currentScore = scores.get(file) ?? 10;
-            scores.set(decl.name, currentScore * weight);
-            nextFrontier.add(decl.name);
+            scores.set(targetFilePath, currentScore * weight);
+            nextFrontier.add(targetFilePath);
           }
         }
       }
