@@ -1,8 +1,6 @@
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
-import { decideQueryRoute, type TaskMode } from "../core/query/routeDecision.js";
 import { streamLightweightChat } from "../core/query/lightweightChat.js";
-import { validateLightweightProviderCredential } from "../core/query/lightweightRoute.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import {
@@ -13,6 +11,7 @@ import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/pl
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
+import { runAutonomousReActLoop } from "../core/query/agentLoop.js";
 
 export type CliApplyPatchRuntimeRouteOptions = ApplyPatchRuntimeRouteOptions;
 
@@ -97,6 +96,7 @@ async function* streamCliRuntimeInvocation(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
 ): AsyncIterable<QueryEvent> {
+  // If explicitly requested via legacy patch route, run integrated flow
   if (request.applyPatchRuntimeRoute) {
     yield* dependencies.streamIntegratedFlow({
       sessionId: request.sessionId,
@@ -112,40 +112,6 @@ async function* streamCliRuntimeInvocation(
       runtimeSeed: request.runtimeSeed,
       applyPatchRuntimeRoute: request.applyPatchRuntimeRoute,
       planningMutationExecution: request.planningMutationExecution,
-    });
-    return;
-  }
-
-  const routeDecision = decideQueryRoute({
-    prompt: request.prompt,
-    agentMode: request.agentMode,
-    hasRuntimeSeed: Boolean(request.runtimeSeed),
-  });
-
-  if (routeDecision.route === "lightweight") {
-    const localReadiness = validateLightweightProviderCredential({
-      providerMode: request.providerMode,
-      providerCredentialResolution: request.providerCredentialResolution,
-    });
-    if ("stopReason" in localReadiness) {
-      yield dependencies.createReadinessTerminalEvent({
-        sessionId: request.sessionId,
-        prompt: request.prompt,
-        stopReason: localReadiness.stopReason,
-      });
-      return;
-    }
-    yield* dependencies.streamLightweight({
-      sessionId: request.sessionId,
-      prompt: request.prompt,
-      mode: routeDecision.mode as Extract<
-        TaskMode,
-        "chat" | "analysis" | "plan"
-      >,
-      providerMode: request.providerMode,
-      providerCredential: request.providerCredentialResolution.credential,
-      continuityState: request.continuityState,
-      signal: request.signal,
     });
     return;
   }
@@ -168,19 +134,22 @@ async function* streamCliRuntimeInvocation(
     }
   }
 
-  yield* dependencies.streamIntegratedFlow({
+  // Unified Autonomous ReAct Agent Loop: Always injects full tools and drives iterative tool-calling
+  yield* runAutonomousReActLoop({
     sessionId: request.sessionId,
     prompt: request.prompt,
-    continuityState: request.continuityState,
     workspaceRoot: request.workspaceRoot,
-    abortSignal: request.signal,
-    escalationPromptHandler: request.escalationPromptHandler,
-    providerMode: request.providerMode,
-    maxTurns: request.maxTurns,
-    realProvider: request.providerCredentialResolution.credential,
     agentMode: request.agentMode,
-    runtimeSeed: request.runtimeSeed,
-    applyPatchRuntimeRoute: request.applyPatchRuntimeRoute,
-    planningMutationExecution: request.planningMutationExecution,
+    realProvider: {
+      apiKey: request.providerCredentialResolution.credential?.apiKey,
+      baseUrl:
+        request.providerCredentialResolution.baseUrl ??
+        request.providerCredentialResolution.credential?.baseUrl,
+      model:
+        request.providerCredentialResolution.model ??
+        request.providerCredentialResolution.credential?.model,
+    },
+    maxTurns: request.maxTurns,
+    abortSignal: request.signal,
   });
 }

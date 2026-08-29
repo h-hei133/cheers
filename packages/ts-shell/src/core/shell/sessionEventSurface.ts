@@ -91,9 +91,7 @@ export function renderSessionQueryEventSurface(input: {
       }
       break;
     case "tool.started":
-      if (input.viewMode === "verbose") {
-        input.renderer.renderLine(`\n[tool:start] ${input.event.toolName}`);
-      }
+      input.renderer.renderLine(`\n⠹ [tool: ${input.event.toolName}]`);
       break;
     case "approval.requested":
       if (input.viewMode === "verbose") {
@@ -110,11 +108,11 @@ export function renderSessionQueryEventSurface(input: {
       }
       break;
     case "tool.result":
-      if (input.viewMode === "verbose") {
-        input.renderer.renderLine(
-          `\n[tool:result] ${input.event.toolName} success=${input.event.success}`,
-        );
-      }
+      input.renderer.renderLine(
+        input.event.success
+          ? `✓ [tool: ${input.event.toolName} done]`
+          : `✗ [tool: ${input.event.toolName} failed: ${input.event.failureReason ?? "unknown"}]`,
+      );
       break;
     case "query.retrying":
       if (input.viewMode === "verbose") {

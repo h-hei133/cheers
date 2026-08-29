@@ -7,6 +7,7 @@ import { runModelCommand } from "./modelCommandRuntime.js";
 import { runRestoreLocalCommand } from "./restoreCommandRuntime.js";
 import { runSidebarLocalCommand } from "./sidebarCommandRuntime.js";
 import { runWarmupLocalCommand } from "./warmupCommandRuntime.js";
+import { runExitCommand } from "./exitCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -237,6 +238,15 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runAgentModeShellAction(args, context),
+    },
+    {
+      name: "exit",
+      aliases: ["quit", "q"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: async (_args, context) => runExitCommand(context),
     },
     {
       name: "permissions",

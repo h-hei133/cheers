@@ -114,6 +114,12 @@ export const SLASH_COMMANDS = [
     group: "diagnostics",
     summary: "show full command guide",
   },
+  {
+    name: "exit",
+    aliases: ["quit", "q"],
+    group: "session",
+    summary: "gracefully exit session and restore terminal",
+  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];

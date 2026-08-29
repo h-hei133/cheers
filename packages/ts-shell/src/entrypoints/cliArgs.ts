@@ -49,8 +49,10 @@ const RESERVED_SHELL_SLASH_COMMANDS = new Set([
   "/workspace",
   "/help",
   "/pwd",
+  "/exit",
+  "/quit",
+  "/q",
 ]);
-
 export function parseCliArgs(
   rawArgs: readonly string[],
   parseOptions: ParseCliArgsOptions,

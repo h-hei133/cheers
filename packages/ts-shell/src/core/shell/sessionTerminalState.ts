@@ -162,23 +162,25 @@ export function renderSessionTerminalSurface(input: {
     loopTrajectory: terminalState.terminalLoopTrajectory,
     productLoopAdapter: terminalState.terminalProductLoopAdapter,
   });
-  renderContinuationSeedSummary(input.renderer, {
-    codingResult: terminalState.terminalCodingResult,
-    notes: terminalState.terminalNotes,
-    handoffSummary: input.continuityState?.lastActionHandoffSummary
-      ? input.continuityState.lastActionHandoffSummary
-      : undefined,
-    seedInfluenceHandoffSummary: input.continuityState
-      ?.lastSeedInfluenceHandoffSummary
-      ? input.continuityState.lastSeedInfluenceHandoffSummary
-      : undefined,
-    failureHandoffDiagnostic: input.continuityState?.lastFailureHandoffDiagnostic
-      ? input.continuityState.lastFailureHandoffDiagnostic
-      : undefined,
-    successHandoffDiagnostic: input.continuityState?.lastSuccessHandoffDiagnostic
-      ? input.continuityState.lastSuccessHandoffDiagnostic
-      : undefined,
-  });
+  if (input.viewMode === "verbose") {
+    renderContinuationSeedSummary(input.renderer, {
+      codingResult: terminalState.terminalCodingResult,
+      notes: terminalState.terminalNotes,
+      handoffSummary: input.continuityState?.lastActionHandoffSummary
+        ? input.continuityState.lastActionHandoffSummary
+        : undefined,
+      seedInfluenceHandoffSummary: input.continuityState
+        ?.lastSeedInfluenceHandoffSummary
+        ? input.continuityState.lastSeedInfluenceHandoffSummary
+        : undefined,
+      failureHandoffDiagnostic: input.continuityState?.lastFailureHandoffDiagnostic
+        ? input.continuityState.lastFailureHandoffDiagnostic
+        : undefined,
+      successHandoffDiagnostic: input.continuityState?.lastSuccessHandoffDiagnostic
+        ? input.continuityState.lastSuccessHandoffDiagnostic
+        : undefined,
+    });
+  }
   renderTerminalNextSteps(input.renderer, terminalState);
 }
 

@@ -2,7 +2,6 @@ import path from "node:path";
 import type {
   ApprovalEvaluation,
   ApprovalTrustGrantView,
-  PermissionBehavior,
 } from "./types.js";
 
 export const READONLY_TOOLS: Record<string, true> = {
@@ -13,6 +12,8 @@ export const READONLY_TOOLS: Record<string, true> = {
   list: true,
   view: true,
   status: true,
+  "git-status": true,
+  "git-diff": true,
 };
 
 export const DESTRUCTIVE_TOOLS: Record<string, true> = {
@@ -67,9 +68,30 @@ export function evaluatePermission(input: {
   readonly selector: string;
   readonly grants: readonly ApprovalTrustGrantView[];
   readonly autoApproveReadOnly?: boolean;
+  readonly agentMode?: "plan" | "build";
 }): ApprovalEvaluation {
-  // Check read-only tool auto-approval
-  if (input.autoApproveReadOnly && READONLY_TOOLS[input.toolName]) {
+  const isReadOnly = Boolean(READONLY_TOOLS[input.toolName]);
+
+  // Plan mode enforcement (Inspired by Claude Code permissions):
+  // Read-only tools are allowed freely to explore the codebase.
+  // Write/destructive tools are hard-blocked with an explicit explanation.
+  if (input.agentMode === "plan") {
+    if (isReadOnly) {
+      return {
+        behavior: "allow",
+        granted: true,
+        reason: `Plan mode allows read-only tool '${input.toolName}' for codebase exploration.`,
+      };
+    }
+    return {
+      behavior: "deny",
+      granted: false,
+      reason: `Plan mode is active: file modifications via '${input.toolName}' are disabled. Use /build to enable editing.`,
+    };
+  }
+
+  // Check read-only tool auto-approval in build/default mode
+  if (input.autoApproveReadOnly && isReadOnly) {
     return {
       behavior: "allow",
       granted: true,

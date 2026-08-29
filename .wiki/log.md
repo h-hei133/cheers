@@ -29,3 +29,4 @@
 ## [2026-08-29] docs | Problem diagnosis & retrospective on eliminating lightweightChat anti-pattern (problem.md)
 ## [2026-08-29] docs | Added Section 5 on Slash Commands and SOTA Plan Mode design analysis (problem.md)
 ## [2026-08-29] docs | Added diagnosis of completely missing /exit /quit commands and plan mode limitations (problem.md)
+## [2026-08-29] feat | SOTA Autonomous ReAct Tool Loop, JSON Schema args, /exit & /plan commands, and clean output delivery

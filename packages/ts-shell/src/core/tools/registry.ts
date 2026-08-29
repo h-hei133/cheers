@@ -3,30 +3,11 @@ import {
   type ExecutionAuthority,
   type ExecutionService,
 } from '../../runtime/execution/service.js'
-import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
-import {
-  classifyMcpFailure,
-  classifyUnknownMcpFailure,
-  mcpFailureMetadata,
-} from '../mcp/errorTaxonomy.js'
 import { createBrowserToolDefinitions } from '../context/browserTool.js'
 import type { PwRuntimeStatus } from '../context/pwRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
-import {
-  createCommandRuntimeReceipt,
-  createMcpRuntimeFailureReceipt,
-} from '../runtime/runtimeReceipt.js'
-import { projectRuntimeReceipt } from '../runtime/runtimeReceiptProjection.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
-import { createCommandToolResultSplit } from '../../tools/result/split.js'
-import {
-  createToolAfterObservationAnnotation,
-  createToolBeforePolicyDecision,
-  createToolInterceptionIntent,
-  executionPolicyMetadataFromToolDecision,
-} from '../../tools/policy/interception.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
-import { buildExecutionFailedResult } from './toolPolicyResult.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
@@ -71,106 +52,35 @@ async function runCommandTool(
   command: string,
   context: ToolExecutionContext,
 ) {
-  const toolIntent = createToolInterceptionIntent({
-    toolId: 'bash',
-    toolKind: 'core-tool',
-    caller: 'core-tool:bash',
-    operationKind: 'command.run',
-    requestedActionSummary: command,
-    authorityMode: TOOL_APPROVED_COMMAND_AUTHORITY.mode,
-    riskLevel: 'high',
-    input: { command },
-    notProvenClaims: ['command-result-success'],
-  })
-  const beforeDecision = createToolBeforePolicyDecision({
-    intent: toolIntent,
-    status: 'allow',
-    reason: 'ToolRuntime allowlist and process permission checks passed before ExecutionService was called.',
-    policySource: 'tool-runtime-approval',
-    authorityRequirement: TOOL_APPROVED_COMMAND_AUTHORITY.mode,
-    reportSafeSummary: command,
-  })
   const result = await executionService.runCommand({
     operationKind: 'command.run',
-    command: process.platform === 'win32' ? 'cmd' : 'sh',
-    args: process.platform === 'win32' ? ['/C', command] : ['-c', command],
+    command: 'sh',
+    args: ['-c', command],
     cwd: context.workspaceRoot,
     workspaceRoot: context.workspaceRoot,
     authority: TOOL_APPROVED_COMMAND_AUTHORITY,
     caller: 'core-tool:bash',
-    reason: 'Execute an approved shell command tool request inside the workspace.',
+    reason: 'Run an approved workspace command.',
     reportSafeCommand: command,
-    timeoutMs: 30_000,
     abortSignal: context.abortSignal,
-    policy: executionPolicyMetadataFromToolDecision(beforeDecision),
   })
-  const receipt = createCommandRuntimeReceipt({
-    runtimeKind: result.executionPath === 'rust-daemon' ? 'daemon' : 'local-command',
-    command,
+  if (result.status === 'completed' && result.exitCode === 0) {
+    return approvedResult(result.stdout || 'Command completed with no output', {
+      status: result.status,
+      exitCode: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    })
+  }
+
+  return deniedResult(result.stderr || result.stdout || result.recoveryReason || `Command failed with exit code ${result.exitCode}`, {
     status: result.status,
-    executionPath: result.executionPath,
     exitCode: result.exitCode,
     stdout: result.stdout,
     stderr: result.stderr,
-    timeoutMs: 30_000,
-    reason: result.recoveryReason,
-    evidence: result.recoveryReason ? ['runtime-receipt:daemon-unavailable'] : undefined,
+    failureKind: inferFailureKind(result),
+    recoveryReason: result.recoveryReason,
   })
-  const modelVisibleOutput = result.executionPath === 'rust-daemon'
-    ? result.stdout
-    : `${result.stdout}${result.stderr}`.trim()
-  const afterAnnotation = createToolAfterObservationAnnotation({
-    decision: beforeDecision,
-    toolId: 'bash',
-    resultStatus: result.status === 'completed'
-      ? 'tool-success-observed'
-      : 'tool-failure-observed',
-    executionReceipt: result.receipt,
-    resultDetailsId: result.receipt.receiptId,
-    annotations: ['execution-service:receipt-observed'],
-    nextActionSuggestions: result.status === 'completed'
-      ? []
-      : ['Inspect the execution receipt error class before retrying.'],
-    reportSafeSummary: result.receipt.requestedActionSummary,
-  })
-  const split = createCommandToolResultSplit({
-    content: modelVisibleOutput,
-    receipt: result.receipt,
-    runtimeFacts: {
-      executionPath: result.executionPath,
-      status: result.status,
-      exitCode: result.exitCode,
-      errorClass: result.errorClass,
-      legacyFailureKind: inferFailureKind(result),
-    },
-    toolInterception: {
-      beforeDecision,
-      afterAnnotation,
-    },
-  })
-
-  return {
-    success: result.status === 'completed',
-    output: modelVisibleOutput,
-    error: result.status === 'completed' ? undefined : result.stderr,
-    content: split.content,
-    details: split.details,
-    reportSafe: split.reportSafe,
-    metadata: {
-      executionPath: result.executionPath,
-      status: result.status,
-      exitCode: result.exitCode,
-      failureKind: inferFailureKind(result),
-      errorClass: result.errorClass,
-      daemonInstanceId: result.daemonInstanceId,
-      daemonPid: result.daemonPid,
-      daemonRequestSeq: result.daemonRequestSeq,
-      daemonExecutionId: result.daemonExecutionId,
-      recoveryReason: result.recoveryReason,
-      runtimeReceipt: projectRuntimeReceipt(receipt),
-      executionReceipt: result.receipt,
-    },
-  }
 }
 
 async function runGitCommand(
@@ -178,24 +88,33 @@ async function runGitCommand(
   command: string,
   context: ToolExecutionContext,
 ) {
+  const parts = command.trim().split(/\s+/)
+  const bin = parts[0] || 'git'
+  const args = parts.slice(1)
+
   const result = await executionService.runCommand({
     operationKind: 'command.run',
-    command: process.platform === 'win32' ? 'cmd' : 'sh',
-    args: process.platform === 'win32' ? ['/C', command] : ['-c', command],
+    command: bin,
+    args,
     cwd: context.workspaceRoot,
     workspaceRoot: context.workspaceRoot,
     authority: TOOL_APPROVED_COMMAND_AUTHORITY,
-    caller: `core-tool:${command === 'git status --short' ? 'git-status' : 'git-diff'}`,
-    reason: 'Execute an approved read-only git inspection command inside the workspace.',
+    caller: 'core-tool:git',
+    reason: 'Run an approved git inspection command.',
     reportSafeCommand: command,
-    timeoutMs: 30_000,
     abortSignal: context.abortSignal,
   })
-  if (result.status === 'completed') {
-    return approvedResult(result.stdout.trim())
+
+  if (result.status === 'completed' && result.exitCode === 0) {
+    return approvedResult(result.stdout || 'No changes', {
+      status: result.status,
+      exitCode: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    })
   }
+
   return deniedResult(result.stderr || result.recoveryReason || 'Command failed', {
-    executionPath: result.executionPath,
     status: result.status,
     exitCode: result.exitCode,
     failureKind: inferFailureKind(result),
@@ -205,7 +124,6 @@ async function runGitCommand(
 
 export function createCoreToolRegistry(options?: {
   mcpTools?: readonly McpToolDescriptor[]
-  mcpGateway?: CoreMcpGateway
   browserRuntimeStatus?: PwRuntimeStatus
   executionService?: ExecutionService
 }): ReadonlyMap<string, ToolDefinition> {
@@ -213,8 +131,17 @@ export function createCoreToolRegistry(options?: {
   const tools: ToolDefinition[] = [
     {
       name: 'read',
-      description: 'Read a file from the workspace',
-      argsSchema: { type: 'object', required: ['path'] },
+      description: 'Read the contents of a file in the workspace.',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'The relative path of the file to read (e.g. package.json, src/index.ts).',
+          },
+        },
+        required: ['path'],
+      },
       permissions: {
         check(args, context) {
           return pathPermission('read', args, context)
@@ -235,8 +162,21 @@ export function createCoreToolRegistry(options?: {
     },
     {
       name: 'write',
-      description: 'Write a file in the workspace',
-      argsSchema: { type: 'object', required: ['path', 'content'] },
+      description: 'Create or overwrite a file in the workspace with content.',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'The relative path of the file to write.',
+          },
+          content: {
+            type: 'string',
+            description: 'The full file content to write.',
+          },
+        },
+        required: ['path', 'content'],
+      },
       permissions: {
         check(args, context) {
           return pathPermission('write', args, context)
@@ -260,8 +200,21 @@ export function createCoreToolRegistry(options?: {
     },
     {
       name: 'edit',
-      description: 'Edit a file in the workspace by replacing its content',
-      argsSchema: { type: 'object', required: ['path', 'content'] },
+      description: 'Edit or replace the content of an existing file in the workspace.',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'The relative path of the file to edit.',
+          },
+          content: {
+            type: 'string',
+            description: 'The new replacement content for the file.',
+          },
+        },
+        required: ['path', 'content'],
+      },
       permissions: {
         check(args, context) {
           return pathPermission('write', args, context)
@@ -285,8 +238,17 @@ export function createCoreToolRegistry(options?: {
     },
     {
       name: 'glob',
-      description: 'List files in the workspace matching a suffix pattern',
-      argsSchema: { type: 'object', required: ['pattern'] },
+      description: 'List files in the workspace matching a path pattern or suffix (e.g. **/*.ts, package.json).',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          pattern: {
+            type: 'string',
+            description: 'The file pattern or suffix to match (e.g. *.json, src/**/*.ts).',
+          },
+        },
+        required: ['pattern'],
+      },
       permissions: { check: () => [] },
       async execute(args, context) {
         const pattern = typeof args.pattern === 'string' ? args.pattern : ''
@@ -306,8 +268,17 @@ export function createCoreToolRegistry(options?: {
     },
     {
       name: 'bash',
-      description: 'Run a shell command inside the workspace',
-      argsSchema: { type: 'object', required: ['command'] },
+      description: 'Run a shell command inside the workspace (e.g. ls, git status, npm test).',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          command: {
+            type: 'string',
+            description: 'The shell command line to execute.',
+          },
+        },
+        required: ['command'],
+      },
       permissions: {
         check(args, context) {
           return processPermission(args, context)
@@ -320,8 +291,11 @@ export function createCoreToolRegistry(options?: {
     },
     {
       name: 'git-status',
-      description: 'Run git status in the workspace',
-      argsSchema: { type: 'object' },
+      description: 'Run git status to inspect working tree changes in the workspace.',
+      argsSchema: {
+        type: 'object',
+        properties: {},
+      },
       permissions: {
         check(args, context) {
           return processPermission({ ...args, command: 'git status --short' }, context)
@@ -333,8 +307,11 @@ export function createCoreToolRegistry(options?: {
     },
     {
       name: 'git-diff',
-      description: 'Run git diff in the workspace',
-      argsSchema: { type: 'object' },
+      description: 'Run git diff to inspect unstaged changes in the workspace.',
+      argsSchema: {
+        type: 'object',
+        properties: {},
+      },
       permissions: {
         check(args, context) {
           return processPermission({ ...args, command: 'git diff' }, context)
@@ -349,130 +326,6 @@ export function createCoreToolRegistry(options?: {
   tools.push(...createBrowserToolDefinitions({
     runtimeStatus: options?.browserRuntimeStatus,
   }))
-
-  for (const tool of options?.mcpTools ?? []) {
-    tools.push({
-      name: tool.qualifiedName,
-      description: `[MCP:${tool.serverName}] ${tool.description}`,
-      argsSchema: tool.inputSchema ?? { type: 'object' },
-      permissions: {
-        check(_args, _context) {
-          return []
-        },
-      },
-      async execute(args, _context) {
-        if (!options?.mcpGateway) {
-          throw new Error(`Missing MCP gateway for ${tool.qualifiedName}`)
-        }
-
-        try {
-          const result = await options.mcpGateway.invokeTool(tool.serverName, tool.toolName, args)
-          if (result.isError) {
-            const taxonomy = classifyMcpFailure({
-              failureClass: 'tool-is-error',
-              detail: result.content,
-            })
-            const receipt = buildExecutionFailedResult({
-              capability: 'mcp',
-              label: tool.qualifiedName,
-              reasonCode: 'mcp-tool-is-error',
-              reason: result.content,
-              doNext: `Inspect MCP tool ${tool.qualifiedName} error output, refresh ${tool.serverName}, and retry only if the request is still valid.`,
-              evidence: ['mcp:tool-is-error'],
-            })
-            return deniedResult(result.content, {
-              executionPath: 'mcp-stdio',
-              serverName: tool.serverName,
-              toolName: tool.toolName,
-              status: 'failed',
-              failureKind: 'execution_failure',
-              reason: receipt.reason,
-              ...mcpFailureMetadata(taxonomy),
-              doNext: receipt.doNext,
-              runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
-                serverName: tool.serverName,
-                toolName: tool.toolName,
-                failureClass: taxonomy.failureClass,
-                failurePlane: taxonomy.failurePlane,
-                safeDetail: taxonomy.safeDetail,
-                doNext: receipt.doNext,
-              })),
-            })
-          }
-          return approvedResult(result.content, {
-            executionPath: 'mcp-stdio',
-            serverName: tool.serverName,
-            toolName: tool.toolName,
-          })
-        } catch (error) {
-          if (error instanceof McpGatewayBlockedError) {
-            return deniedResult(error.message, {
-              executionPath: 'mcp-stdio',
-              serverName: tool.serverName,
-              toolName: tool.toolName,
-              blockerKind: error.blockerKind,
-              reason: error.message,
-              ...mcpFailureMetadata({
-                failureClass: error.mcpFailureClass,
-                failurePlane: error.mcpFailurePlane,
-                safeDetail: error.mcpSafeDetail,
-              }),
-              doNext: error.doNext,
-              runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
-                serverName: tool.serverName,
-                toolName: tool.toolName,
-                failureClass: error.mcpFailureClass,
-                failurePlane: error.mcpFailurePlane,
-                safeDetail: error.mcpSafeDetail,
-                doNext: error.doNext,
-                protocolFailure: error.mcpFailureClass === 'protocol' || error.mcpFailureClass === 'malformed-result',
-              })),
-            })
-          }
-          const taxonomy = classifyUnknownMcpFailure(error)
-          const reason = taxonomy.safeDetail
-          const receipt = buildExecutionFailedResult({
-            capability: 'mcp',
-            label: tool.qualifiedName,
-            reasonCode:
-              taxonomy.failureClass === 'protocol' ||
-              taxonomy.failureClass === 'malformed-result'
-                ? 'mcp-protocol-failed'
-                : 'mcp-execution-failed',
-            reason,
-            doNext: `Inspect MCP tool ${tool.qualifiedName} error output, refresh ${tool.serverName}, and retry only if the request is still valid.`,
-            evidence: [`mcp:failure-class:${taxonomy.failureClass}`],
-          })
-          return deniedResult(reason, {
-            executionPath: 'mcp-stdio',
-            serverName: tool.serverName,
-            toolName: tool.toolName,
-            status: 'failed',
-            failureKind: 'execution_failure',
-            reason: receipt.reason,
-            ...mcpFailureMetadata(
-              taxonomy.failureClass === 'unknown'
-                ? classifyMcpFailure({
-                    failureClass: 'tool-execution',
-                    detail: reason,
-                  })
-                : taxonomy,
-            ),
-            doNext: receipt.doNext,
-            runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
-              serverName: tool.serverName,
-              toolName: tool.toolName,
-              failureClass: taxonomy.failureClass,
-              failurePlane: taxonomy.failurePlane,
-              safeDetail: taxonomy.safeDetail,
-              doNext: receipt.doNext,
-              protocolFailure: taxonomy.failureClass === 'protocol' || taxonomy.failureClass === 'malformed-result',
-            })),
-          })
-        }
-      },
-    })
-  }
 
   return new Map(tools.map(tool => [tool.name, tool]))
 }
