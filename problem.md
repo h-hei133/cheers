@@ -87,9 +87,8 @@
 
 ---
 
-## 问题 11：高阶工作流与交互式 Slash 命令套件深度分析（Goal, Loop, Todo, Fast, Context, Btw）
-- **状态**：📌 **待处理（Backlog / Next Sprint）**
-- **背景与各大顶尖项目实现细节深度剖析**：
+- **状态**：✅ 已修复 (`aada736`)
+- **交付**：实现了 `/goal`、`/loop`、`/todo`、`/fast`、`/context`、`/btw` 6 大高阶工作流命令与对应测试套件。
 
 ### 1. `/goal`（高阶目标持久化管理）
 - **标杆参考**：**DeepSeek-Harness** (`packages/goal/command-goal/`)
@@ -148,3 +147,20 @@
 | **`/fast`** | `/turbo`, `/speed` | **Claude Code** | `core/commands/fastCommandRuntime.ts` | 一键在高性能主力模型与极速轻量模型之间快速切换 |
 | **`/context`** | `/ctx`, `/tokens-map` | **Claude Code** | `core/commands/contextCommandRuntime.ts` | 上下文 Token 分布图表与使用量全景透视 |
 | **`/btw`** | `/side`, `/ask` | **Claude Code** | `core/commands/btwCommandRuntime.ts` | 侧信道单次临时问答，回答完毕即丢弃，0 污染主历史 |
+
+---
+
+## 问题 12：缺乏生命周期 Hook 拦截与编译器/测试级物理验证自愈闭环（已修复）
+- **状态**：✅ 已修复
+- **背景与顶尖项目对比**：
+  - **Claude Code 官方最新 Hooks 规范**（经 TinyFish 查证）：定义了三级生命周期节拍（SessionStart/End, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PostToolBatch, Stop），支持 Shell 命令与 JSON stdin/stdout 双向决策交互。
+  - **早期 docs/ 宝藏资产（sp059, VR001~VR011）**：沉淀了深厚的编译器诊断自愈、受影响单测自动定位与 Claim Ledger 确定性物理证据链。
+- **落地交付方案**：
+  1. **Hook 核心调度引擎** (`core/hooks/hookDispatcher.ts` & `types.ts`)：
+     - 支持 `UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Stop` 全生命周期事件拦截；
+     - 支持 `allow`, `block`, `retry` 决策判定。
+  2. **三大开箱即用内置验证 Hook** (`core/hooks/builtin/`)：
+     - `postMutationLspGuard.ts`：写后自动校验语法/括号平衡，发现错误自动生成 `[Verification Guard]` 反馈触发自愈。
+     - `affectedUnitTestRunner.ts`：修改源文件后自动推断匹配的单元测试文件并提供针对性测试推荐。
+     - `evidenceReceiptCollector.ts`：自动沉淀物理执行成功回执（Receipt），确保交付真实无幻觉。
+  3. **与自主 ReAct 循环打通**：在 `agentLoop.ts` 中无缝调度，写后错误自动进入下一轮进行自我修复。

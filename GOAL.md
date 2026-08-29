@@ -76,9 +76,9 @@ graph TD
 
 ---
 
-### Phase 5：高阶工作流与交互式 Slash 命令套件 (High-Level Workflow & Interactive Suite) — 【当前攻坚 🎯】
+### Phase 5：高阶工作流与交互式 Slash 命令套件 (High-Level Workflow & Interactive Suite) — 【已交付 ✅】
 - **目标**：引入高阶工作流控制（目标管理、自动测试迭代循环、任务清单追踪、极速档位、上下文透视与侧信道问答），彻底对齐行业天花板体验。
-- **详细落地与代码复用设计**：
+- **已交付**：`/goal`、`/loop`、`/todo`、`/fast`、`/context`、`/btw` 6 个命令已全量实现并测试通过。
 
 #### 1. `/goal` (别名: `/objective`, `/target`) — 高阶目标持久化与防漂移
 - **复用与参考**：参考 **DeepSeek-Harness** (`packages/goal/command-goal/`)。
@@ -132,3 +132,19 @@ graph TD
 2. **测试与质量矩阵**：
    - 针对 Phase 5 的 6 个高阶命令编写专用 Vitest 测试套件。
    - 保证全仓所有单元测试与 CLI 交互 100% 稳定运行。
+
+---
+
+### Phase 6：企业级生命周期 Hook 调度引擎与物理验证自愈体系 (Enterprise Hook & Verification Engine) — 【已交付 ✅】
+- **目标**：将 Claude Code 官方最新 Hooks 规范（Session/Turn/Tool 全生命周期事件拦截与 JSON 决策控制）与本项目早期 `docs/` 沉淀的深厚验证存证资产（sp059, VR001~VR011）深度融合，构建业内领先的零幻觉物理证据链与自愈闭环。
+- **落地架构与实现**：
+  1. **核心 Hook 调度引擎** (`core/hooks/hookDispatcher.ts` & `types.ts`)：
+     - 支持 `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PostToolBatch`, `Stop`, `StopFailure` 全生命周期事件；
+     - 支持 Shell 命令（JSON stdin/stdout）与 In-Process 高性能处理器双通道；
+     - 支持 `allow`, `block`, `retry` 决策控制及携带 feedback 注入。
+  2. **三大内置物理验证钩子** (`core/hooks/builtin/`)：
+     - `postMutationLspGuard.ts`：写后自动语法/括号与类型校验，报错毫秒级回传大模型触发自动自愈；
+     - `affectedUnitTestRunner.ts`：代码修改后自动探测并推荐对应单元测试；
+     - `evidenceReceiptCollector.ts`：自动收集物理成功凭据（Receipt: exit 0），维护确定性证据账本。
+  3. **自主 ReAct 循环打通** (`core/query/agentLoop.ts`)：
+     - 在 Tool 执行前后自动分发 `PreToolUse` / `PostToolUse`，写后错误自动进入下一轮闭环修复。

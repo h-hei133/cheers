@@ -7,7 +7,8 @@ import {
   formatCheckpointMessage,
   parseCompactedSummary,
 } from "./compaction/summarizer.js";
-
+import { HookDispatcher, defaultHookDispatcher } from "../hooks/hookDispatcher.js";
+import { setupBuiltinVerificationHooks } from "../hooks/builtin/index.js";
 export interface ReActAgentLoopOptions {
   readonly sessionId: string;
   readonly prompt: string;
@@ -22,6 +23,7 @@ export interface ReActAgentLoopOptions {
   readonly contextWindow?: number;
   readonly autoCompactPercent?: number;
   readonly reserveTokens?: number;
+  readonly hookDispatcher?: HookDispatcher;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -63,9 +65,19 @@ export async function* runAutonomousReActLoop(
     prompt: options.prompt,
   };
 
+  const hookDispatcher = options.hookDispatcher ?? defaultHookDispatcher;
+  setupBuiltinVerificationHooks(hookDispatcher);
+
+  await hookDispatcher.dispatch({
+    eventName: "UserPromptSubmit",
+    sessionId: options.sessionId,
+    workspaceRoot: options.workspaceRoot,
+    timestamp: new Date().toISOString(),
+    prompt: options.prompt,
+  });
+
   const toolRegistry = createCoreToolRegistry();
   const openAiTools = buildOpenAITools(toolRegistry);
-
   const messages: Array<{
     role: "system" | "user" | "assistant" | "tool";
     content?: string | null;
@@ -345,7 +357,6 @@ export async function* runAutonomousReActLoop(
       const tool = toolRegistry.get(funcName);
       let outputContent = "";
       let isSuccess = false;
-
       if (parseError) {
         outputContent = `Error: Malformed JSON arguments for tool '${funcName}': ${parseError}. Raw: ${toolCall.function.arguments}`;
         isSuccess = false;
@@ -360,30 +371,68 @@ export async function* runAutonomousReActLoop(
         funcName !== "lsp" &&
         funcName !== "git-status" &&
         funcName !== "git-diff" &&
+        funcName !== "browser" &&
         funcName !== "web_fetch" &&
         funcName !== "web_search" &&
-        funcName !== "browser" &&
         funcName !== "ask" &&
         funcName !== "todo" &&
         funcName !== "task"
       ) {
         outputContent = `Blocked: Plan mode is active. Tool '${funcName}' is not a read-only inspection tool. Only read-only tools (read, glob, grep, lsp, git-status, git-diff, browser, web_fetch, web_search, ask, todo, task) are permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
+        isSuccess = false;
       } else {
-        try {
-          const execResult = await tool.execute(funcArgs, {
-            workspaceRoot: options.workspaceRoot,
-            taskId: toolCall.id,
-            abortSignal: options.abortSignal,
-          });
-          outputContent =
-            execResult.output || execResult.content || "Success";
-          isSuccess = Boolean(execResult.success);
-        } catch (execErr) {
-          const errStr =
-            execErr instanceof Error ? execErr.message : String(execErr);
-          outputContent = `Tool execution error: ${errStr}`;
+        // PreToolUse Hook interceptor
+        const preDecision = await hookDispatcher.dispatch({
+          eventName: "PreToolUse",
+          sessionId: options.sessionId,
+          workspaceRoot: options.workspaceRoot,
+          timestamp: new Date().toISOString(),
+          toolName: funcName,
+          toolCallId: toolCall.id,
+          args: funcArgs,
+        });
+
+        if (preDecision && preDecision.decision === "block") {
+          outputContent = `Blocked by Hook: ${preDecision.reason || "Action rejected by security/verification hook policy."}`;
           isSuccess = false;
+        } else {
+          try {
+            const execResult = await tool.execute(funcArgs, {
+              workspaceRoot: options.workspaceRoot,
+              taskId: toolCall.id,
+              abortSignal: options.abortSignal,
+            });
+            outputContent =
+              execResult.output || execResult.content || "Success";
+            isSuccess = Boolean(execResult.success);
+          } catch (execErr) {
+            const errStr =
+              execErr instanceof Error ? execErr.message : String(execErr);
+            outputContent = `Tool execution error: ${errStr}`;
+            isSuccess = false;
+          }
         }
+      }
+
+      // PostToolUse Hook Dispatcher
+      const postDecision = await hookDispatcher.dispatch({
+        eventName: "PostToolUse",
+        sessionId: options.sessionId,
+        workspaceRoot: options.workspaceRoot,
+        timestamp: new Date().toISOString(),
+        toolName: funcName,
+        toolCallId: toolCall.id,
+        args: funcArgs,
+        output: outputContent,
+        success: isSuccess,
+      });
+
+      // If a verification hook (such as compiler guard) returned feedback/retry, attach it to message history for auto-repair
+      if (postDecision && postDecision.feedback) {
+        messages.push({
+          role: "user",
+          content: postDecision.feedback,
+        });
       }
 
       messages.push({
@@ -401,6 +450,15 @@ export async function* runAutonomousReActLoop(
       };
     }
   }
+
+  await hookDispatcher.dispatch({
+    eventName: "Stop",
+    sessionId: options.sessionId,
+    workspaceRoot: options.workspaceRoot,
+    timestamp: new Date().toISOString(),
+    turnsExecuted: turn,
+    finalOutput: lastAssistantText,
+  });
 
   yield {
     type: "query.completed",

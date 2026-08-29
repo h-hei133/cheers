@@ -46,3 +46,4 @@
 ## [2026-08-29] feat | Delivered 4 High-Value Modern Built-in Tools: lsp (Code intelligence), ask (Interactive multi-choice user decision), todo (Programmatic task checklist), and task (Isolated subagent delegation)
 ## [2026-08-29] fix | Code review fixes for b755966: lsp word boundary regex, ask Array.isArray guards, todo action validation, task random ID padding, and test isolation
 ## [2026-08-29] feat | Modernized Browser Subsystem: Persistent Browser Session Manager, unified stateful browser tool (open, observe, click, type, select, hover, press, close) with [ref=eN] element mapping
+## [2026-08-29] feat | Phase 6 delivered: Enterprise Lifecycle Hook & Verification Engine (Session/Turn/Tool events, PreToolUse block, PostToolUse compiler guard, affected test runner, and evidence receipt ledger)
