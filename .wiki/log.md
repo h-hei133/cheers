@@ -31,3 +31,4 @@
 ## [2026-08-29] docs | Added diagnosis of completely missing /exit /quit commands and plan mode limitations (problem.md)
 ## [2026-08-29] feat | SOTA Autonomous ReAct Tool Loop, JSON Schema args, /exit & /plan commands, and clean output delivery
 ## [2026-08-29] fix | Code review fixes: glob regex matching, Windows/POSIX shell dispatch, combined stdout/err, guarded process.exit, and plan mode security
+## [2026-08-29] docs | Added Section 7 (Web Search/Fetch vs OpenCode) and Section 8 (Browser granularity vs Playwright-MCP) into problem.md

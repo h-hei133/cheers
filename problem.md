@@ -1,182 +1,125 @@
-# 项目运行问题分析与缺陷诊断报告 (problem.md)
+# 项目核心使用与架构能力问题清单 (problem.md)
 
-**记录时间**：2026-08-29  
-**测试模型**：`deepseek-ai/DeepSeek-V4-Flash` (SiliconFlow API)  
-**测试入口**：`node dist/cli.js` (Interactive Shell Mode)  
+本文档记录用户在实际使用本项目时暴露出的核心缺陷、体验病灶以及与顶尖业界 Agent（如 **Pi**、**Claude Code**、**OpenCode**、**Playwright-MCP**）对比发现的架构级能力差距。
 
 ---
 
-## 一、 用户真实使用复现与异常现象
-
-### 现象 1：输入“检查一下当前目录下的项目使用的架构是什么”返回了死模板信息
-- **用户输入**：
-  ```text
-  [coding-agents|e7b34612|build] > 检查一下当前目录下的项目使用的架构是什么
-  ```
-- **实际输出**：
-  ```text
-  Current working directory: /home/wang/projects/coding-agents
-  Project root: /home/wang/projects/coding-agents
-  Use /cd <path> (or /workspace attach <path>) to switch target project.
-  ```
-- **异常原因**：该输入完全**没有被传递给大模型**，而是被底层静态规则直接截胡拦截。
+## 目录
+1. [问题 1：静态规则拦截（Prompt 被硬编码规则截胡）](#问题-1静态规则拦截prompt-被硬编码规则截胡)（已修复）
+2. [问题 2：自主 ReAct 工具调用循环缺失（纯文本裸聊）](#问题-2自主-react-工具调用循环缺失纯文本裸聊)（已修复）
+3. [问题 3：工具参数缺失 JSON Schema 定义](#问题-3工具参数缺失-json-schema-定义)（已修复）
+4. [问题 4：终端交互转义序列与内部 Continuation 转储污染](#问题-4终端交互转义序列与内部-continuation-转储污染)（已修复）
+5. [问题 5：基础 Slash 命令与 Plan Mode 安全机制缺陷](#问题-5基础-slash-命令与-plan-mode-安全机制缺陷)（已修复）
+6. [问题 6：内置文件工具链与 Pi Agent 的核心能力差距（待补齐）](#问题-6内置文件工具链与-pi-agent-的核心能力差距待补齐)（待处理）
+7. [问题 7：Web 搜索与轻量网页抓取能力缺失（对比 OpenCode）](#问题-7web-搜索与轻量网页抓取能力缺失对比-opencode)（待处理）
+8. [问题 8：浏览器自动化工具粒度与交互能力差距（对比 Playwright-MCP）](#问题-8浏览器自动化工具粒度与交互能力差距对比-playwright-mcp)（待处理）
 
 ---
 
-### 现象 2：输入“检查一下当前项目使用的架构是什么”，大模型回复“没有访问本地文件的能力”
-- **用户输入**：
-  ```text
-  [coding-agents|e7b34612|build] > 检查一下当前项目使用的架构是什么
-  ```
-- **大模型输出**：
-  > “我目前没有访问你本地文件的能力，因此无法直接检查当前项目的架构。你可以通过以下任一方式提供信息：1. 粘贴关键配置文件... 2. 粘贴项目目录结构...”
-- **尾部附加了极长的审计追踪日志**：
-  输出尾部自动附加了数百行的 `Continuation`, `context-packet`, `context-graph`, `harness-trace`, `task-lifecycle` 等内部状态转储。
+## 问题 1：静态规则拦截（Prompt 被硬编码规则截胡）
+- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
+- **现象**：当用户输入"检查一下当前目录下的项目使用的架构是什么"时，系统被 `repoAwareRouting.ts` 内部的静态正则表达式截胡，直接返回固定文本 `"Use /cd <path>..."`，完全未发给大模型。
+- **根因**：使用了脆弱的关键词正则匹配试图拦截所谓的"仓库状态"问题。
+- **修复**：彻底废除静态规则对自然语言的截胡，所有用户提示词 100% 直通大模型 ReAct 决策循环。
 
 ---
 
-## 二、 深度代码级根本原因分析 (Root Cause Analysis)
-
-经过 Serena MCP 对代码链路的端到端逆向分析，明确了以下三大底层病灶：
-
-```mermaid
-graph TD
-  subgraph "病灶 1: 静态规则拦截 (repoAwareRouting.ts)"
-    P1[用户包含 '当前状态/项目/检查' 关键词] --> Hook[resolveRepoAwarePromptResponse 劫持]
-    Hook --> DeadReturn[返回死模板字符串: Use /cd <path>...<br/>根本没发给大模型!]
-  end
-
-  subgraph "病灶 2: 裸聊路由未注入任何 Tools (lightweightChat.ts)"
-    P2[自然问答被分类为 mode: chat] --> Route[routeDecision.ts: 判定为 lightweight]
-    Route --> NoTools[发给 LLM 时 tools: undefined<br/>模型根本不知道自己有 read/glob/grep 工具!]
-  end
-
-  subgraph "病灶 3: 复杂的 Harness 审计日志泄露至终端"
-    P3[历史 Sprint 评测遗留的 Trace 渲染] --> Leaked[每次交互末尾自动打印数百行内部 Evidence 状态]
-  end
-```
-
-### 1. 为什么现象 1 被死模板拦截？（病灶 1）
-- **代码定位**：`packages/ts-shell/src/core/shell/repoAwareRouting.ts:13-31`
-- **机制机理**：系统内置了一个名为 `resolveRepoAwarePromptResponse` 的静态规则拦截器。只要提示词中命中“项目/当前状态/检查”等正则词汇，且没有包含具体文件名，就会被它当作“纯终端本地命令”截胡，直接返回固定字符串，**根本不会发起任何大模型网络请求**！
-
-### 2. 为什么大模型说自己“没有读写文件的能力”？这是幻觉吗？（病灶 2）
-- **答：这不是模型的幻觉，模型说的是大实话——因为系统发请求给它时，压根没有给它挂载任何工具！**
-- **代码定位**：
-  - `packages/ts-shell/src/core/query/routeDecision.ts`
-  - `packages/ts-shell/src/core/query/lightweightChat.ts`
-- **机制机理**：
-  - 当你问“检查项目架构”时，`routeDecision.ts` 将其归类为 `mode: "chat"` 并路由到 `lightweightChat.ts`。
-  - `lightweightChat.ts` 在向大模型 API（`/v1/chat/completions`）发起请求时，传递的参数仅有 `messages: [...]`，**`tools` 字段完全为空（`undefined`）**！
-  - 模型在没有任何 Tool Calling 定义（没有 `read`, `glob`, `grep` 等 function schema）的情况下，只能像裸聊网页版 ChatGPT 一样，如实回答“我没有本地文件访问权限，请把代码贴给我”。
-
-### 3. 为什么尾部会打印长达数百行的参数转储？（病灶 3）
-- **代码定位**：`packages/ts-shell/src/presentation/surface/model.ts` 与 `cliDisplayProjection.ts`
-- **机制机理**：这是历史 Sprint 做评测和形式化证明（Harness Trace）时遗留的调试信息导出逻辑。系统在单轮结束后，默认将内部状态机、证据账本（Evidence Ledger）、生命周期阶段全部 dump 到了终端，没有做面向最终用户的洁净展示过滤。
+## 问题 2：自主 ReAct 工具调用循环缺失（纯文本裸聊）
+- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
+- **现象**：自然语言模式下大模型没有挂载任何读写工具，退化为纯文本问答，无法读取本地任何真实文件。
+- **根因**：先前依赖多轮 P-C-R（Planner-Coder-Reviewer）复杂的抽象流，普通交互路径未注入 OpenAI 格式标准 Tools。
+- **修复**：实现统一的 `runAutonomousReActLoop`（`core/query/agentLoop.ts`），永久向大模型挂载完整标准工具集，支持自主多轮 `tool_calls` 执行与结果自动回传。
 
 ---
 
-## 三、 问题汇总与整改目标清单
-
-| 问题编号 | 严重级别 | 问题描述 | 核心整改方向 |
-| :--- | :---: | :--- | :--- |
-| **BUG-01** | **Blocker** | `repoAwareRouting.ts` 静态劫持自然语言提问 | **彻底废除/移除** `resolveRepoAwarePromptResponse` 静态正则拦截，所有自然语言提问必须直通模型。 |
-| **BUG-02** | **Blocker** | 普通对话与问答未向大模型提供基础工具 (Toolless) | **全量挂载标准 Tools**：无论任何问答模式，统一向模型注入 `read`, `glob`, `grep`, `bash`, `write`, `edit` 工具定义，使模型可自主调用工具探索项目。 |
-| **BUG-03** | **Major** | 终端输出泄露冗长的内部 Harness 审计状态机 | **终端输出洁净化**：普通交互模式下默认仅渲染模型的正文回答与工具卡片，隐藏底层内部 Debug Trace。 |
-| **BUG-04** | **Major** | 缺乏标准 ReAct 自动工具循环（Tool Calling Loop） | 实现当模型触发 `tool_calls` 时，自动执行工具并将结果回传模型，直至生成最终结论。 |
+## 问题 3：工具参数缺失 JSON Schema 定义
+- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
+- **现象**：大模型发起 tool_calls 时频繁出现参数缺失或不敢调用工具。
+- **根因**：`createCoreToolRegistry` 中各个工具的 `argsSchema` 仅声明了 `required: [...]`，缺少各参数在 `properties` 中的字段名与语义说明。
+- **修复**：为所有工具补全了标准 JSON Schema `properties` 声明与清晰的参数描述。
 
 ---
 
-## 四、 专项反思：为什么“通用对话（lightweightChat）”在 Agent 中毫无存在必要？
-
-### 1. 它最初为什么被设计出来？（历史诱因）
-- **省 Token / 省费用**：早期设计者认为用户问“你好”或基础概念时，请求体带上几千 Token 的 Tool Schemas 纯属浪费，于是做了个不带工具的裸聊通道。
-- **绕开旧编排的重重门禁**：因为旧的 `workflowExecutionCoordinator` 静态门禁极严（稍微缺少精准行号或字符就直接抛出 `ambiguous-target` 并强行阻断），设计者为了让普通聊天能跑通，开辟了一条不走编排的旁路。
-
-### 2. 为什么在真实 Agent 中它完全是负资产？（致命弊端）
-1. **静态正则永远无法猜透人类自然语言的意图**：
-   - 用户问：`“检查一下当前项目使用的架构是什么”`。
-   - 静态路由（`routeDecision.ts`）因为没看到具体文件名，强行归类为 `mode: "chat"` 并打入 `lightweightChat`。
-   - 结果：模型因为请求中没有挂载 `read/glob/grep` 工具定义，只能如实回答“我没有读取本地文件的权限”。
-2. **现代 LLM 本身具备极高成熟度的 Tool-Calling 自治决策能力**：
-   - 在 **Pi** 和 **Claude Code** 等顶尖开源项目中，**根本不存在割裂的“聊天模式”与“编码模式”**。
-   - 系统发给模型的每个 Turn 永远配备全套工具定义：
-     - 用户问 `“你好”` 时，模型自主选择**直接回复文本**（不发起 Tool Call）；
-     - 用户问 `“当前项目用的什么框架”` 时，模型自主发起 `read package.json` 或 `glob` 工具，读完再回答。
-   - 用死板的外部正则去替模型做主，不仅容易误判，更是彻底废掉了 Agent 的自主性。
-
-### 3. 清算与重构定论
-- **彻底废除 `lightweightChat.ts` 及其上游 `routeDecision.ts`**。
-- 全面收敛为**统一的标准 ReAct Agent Loop**（永远挂载标准 Tools，由大模型自主决策调用工具或直接回答）。
+## 问题 4：终端交互转义序列与内部 Continuation 转储污染
+- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
+- **现象**：终端输出充斥大量未格式化的内部 Continuation Seed、Handoff 审计日志与混乱的转义字符。
+- **修复**：`sessionEventSurface.ts` 与 `sessionTerminalState.ts` 采用现代化的动态徽章（`⠹ [tool: name]`, `✓ [tool: name done]`），默认隐藏内部状态转储。
 
 ---
 
-## 五、 基础 Slash 命令现状与 Plan 模式的深度缺陷剖析
-
-### 1. 基础命令现状（为什么目前命令体验极差？）
-- **彻底缺失 `/exit` 与 `/quit` 命令**：
-  - **代码实证**：在 `packages/ts-shell/src/core/commands/registry.ts` 的命令注册表中，注册了 `/doctor`, `/diagnose`, `/view`, `/build`, `/plan`, `/permissions` 等，但**根本没有任何 `/exit` 或 `/quit` 命令的注册定义**！
-  - **用户后果**：用户在终端输入 `/exit` 时，系统会报错 `Unknown command: /exit. Try /help...`，根本无法通过标准命令退出程序，只能靠 `Ctrl+C` 强杀或 `Ctrl+D`（EOF）断开，极易导致终端 Alt-Screen 状态残留或未保存 Session。
-- **命令优先级倒置**：
-  - 早期开发了许多低频甚至无用的过渡命令（如 `/warmup`, `/sidebar`, `/restore`），而最核心高频的 `/exit` 和 `/plan` 却处于缺失或残废状态。
-- **重构原则**：遵循奥卡姆剃刀原则——**先不做花哨的高级命令（如 `/goal`, `/loop`, `/review`, `/usage`），优先把最基础、最关键的 `/exit`（退出）与 `/plan`（规划）做到工业级完备**。
----
-
-### 2. 当前 Plan 模式的现状：它处于什么情况？能够限制写操作吗？
-
-#### 现状实测结论：**当前系统的 Plan 模式完全是“伪 Plan”，处于严重残废状态！**
-
-```mermaid
-graph TD
-  subgraph "当前系统残废的 Plan 模式 (Fatal Flaw)"
-    P1[开启 agentMode === 'plan'] --> R1[routeDecision.ts 判定为 mode: plan]
-    R1 --> L1[路由至 lightweightChat.ts (通用对话通道)]
-    L1 --> Blind[请求大模型时剥夺全部 Tools (tools: undefined)<br/>【致命】: 模型连 read/glob/grep 都无法使用, 变成两眼一抹黑!]
-    Blind --> Hallucination[无法读取真实代码 -> 只能凭记忆臆想与幻觉输出伪计划]
-  end
-```
-
-- **能否限制写操作？**
-  - 表象上它确实没有写文件（因为根本没有给模型挂载 `write`/`edit` 工具）。
-  - **致命代价**：它**把只读工具（`read`, `glob`, `grep`）也一并剥夺了**！
-  - 导致模型在制定计划时，**根本无法探索代码库、无法阅读真实配置文件、无法查看目录结构**，只能靠大模型通用预训练知识来凭空捏造假想计划，完全违背了 Plan 模式的初衷。
+## 问题 5：基础 Slash 命令与 Plan Mode 安全机制缺陷
+- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
+- **现象**：缺少 `/exit`、`/quit` 命令退出 CLI；Plan 模式在执行层未拦截 `bash` 命令。
+- **修复**：实现标准 `/exit` 优雅退出；并在 `agentLoop.ts` 与 `evaluator.ts` 中严格限制 Plan 模式下的只读白名单（只允许 `read`, `glob`, `grep`, `git-status`, `git-diff`）。
 
 ---
 
-### 3. 顶尖项目（Claude Code / Pi）的 Plan 模式是怎么设计的？
+## 问题 6：内置文件工具链与 Pi Agent 的核心能力差距（待补齐）
+- **状态**：📌 **待处理（Backlog / Next Sprint）**
+- **背景与对比**：
+  对比顶级开源 Agent **Pi**（内置 8 个核心工具：`read`, `bash`, `powershell`, `edit`, `write`, `grep`, `find`, `ls`），我们当前内置了 11 个原生工具（7 个 Workspace 工具 + 4 个 Playwright 浏览器自动化工具）。
+  虽然我们的工具覆盖了主要场景且拥有专用的 `git-status`/`git-diff` 与 `browser.*` 优势，但与 Pi 相比依然存在 **2 个工业级关键细节差距**：
 
-在 **Claude Code** 与 **Pi** 中，Plan 模式本质是一种**细粒度权限策略（Permission Policy Mode）**，而不是一个阉割工具的裸聊通道：
+### 差距 1：原生跨文件内容正则检索工具（`grep`）缺失
+- **现象与病灶**：
+  目前工作区只有路径检索工具（`glob`），没有内容搜索工具（`grep`）。
+  当模型需要按文本或正则表达式在全项目中搜索某个符号、函数调用或配置项时，只能被迫通过 `bash` 工具调用外部系统命令（如 `rg` 或 `grep`）。
+- **严重危害**：
+  1. **Plan 模式（只读模式）瘫痪**：在 Plan 模式下，为了系统安全 `bash` 命令被完全禁用，导致大模型在规划阶段**完全无法搜索项目代码内容**。
+  2. **跨平台兼容性脆弱**：依赖主机环境是否安装了 `grep`/`ripgrep`，在 Windows 等环境下表现不一致。
+- **改进建议**：
+  实现纯 Node.js/TypeScript 原生的内置 `grep` 工具，支持：
+  - 正则表达式或纯文本跨文件搜索
+  - 输出格式标准：`filepath:line_number: matched_line_content`
+  - 支持可选的 `include`/`exclude` 路径通配过滤
+  - 原生列入 Plan 模式的只读安全白名单。
 
-```mermaid
-graph TD
-  subgraph "顶尖项目: 工业级 Plan 模式 (Claude Code / Pi)"
-    UserPlan[用户进入 /plan 模式] --> PermGate[权限控制模式切换: PermissionMode = 'plan']
-    
-    PermGate --> ReadTools["只读工具完全放行 (allow)<br/>read, glob, grep, ls, AST ScopeTree<br/>【模型获得完整探索权, 真实理解代码库】"]
-    PermGate --> WriteTools["写操作严格拦截 (deny / pending)<br/>write, edit, rm, bash(带副作用指令)<br/>【杜绝一切未授权的文件修改与破坏】"]
-    
-    ReadTools --> RealPlan[大模型深入阅读代码后生成精确的实施计划规范]
-    RealPlan --> UserApprove{用户审核并批准计划}
-    UserApprove -->|批准实施 /build| Execute[恢复写权限, 严格按计划执行修改]
-  end
-```
-
-#### 顶尖项目 Plan 模式四大核心设计要素：
-1. **只读权限全开（Full Read Capabilities）**：
-   - 模型在 Plan 模式下拥有完整的 `read`, `glob`, `grep` 工具调用权，允许其遍历目录、查看 AST 符号定义、分析现有测试。
-2. **写操作物理硬拦截（Hard Write Barrier）**：
-   - 任何 `write`, `edit` 或带写副作用的 `bash` 指令在权限层（`approvalTrustPolicy`）直接被硬拦截（返回 `PermissionBehavior: "deny"` 或挂起等待用户显式批准），**模型想写也写不进去**。
-3. **结构化计划输出**：
-   - 计划最终沉淀为受控的计划文件（如 `local://<slug>-plan.md`），明确列出步骤、受影响文件、改动逻辑与验证方案。
-4. **一键审批切换（Seamless Mode Transition）**：
-   - 用户审核计划后，输入批准指令（如 `/plan exit` 或 `/build`），权限系统自动切回正常模式并解锁写权限，开始执行修改。
+### 差距 2：大文件截断与分页读取保护（`read` 保护机制）缺失
+- **现象与病灶**：
+  当前内置的 `read` 工具是全量读取目标文件的全部文本内容。
+- **严重危害**：
+  当用户或大模型尝试读取大型依赖文件（如 lock 文件）、日志、编译产物或超过 1000 行的源文件时，整个大文件内容一次性灌入上下文，导致：
+  1. **上下文窗口溢出（Context Overflow）**
+  2. **消耗巨额 Token**
+  3. 大模型迷失在海量无关代码中（Lost in the Middle）。
+- **Pi 的成熟设计**：
+  Pi 的 `read` 工具支持 `offset`（起始行）、`limit`（读取行数），并在底层有 `truncateHead`/`truncateTail` 保护（默认限制最大字节数和最大行数），超出时截断并提示剩余行数。
+- **改进建议**：
+  升级现有 `read` 工具：
+  - 增加可选参数 `offset`（从第 N 行开始读取）与 `limit`（最多读取 M 行）。
+  - 内置单次最大字符数（如 30KB / 1000 行）安全截断阈值，超出时在末尾附加 `[File truncated: showing lines X-Y of Z. Use offset/limit to view more]`。
 
 ---
 
-### 4. 改进目标清单
+## 问题 7：Web 搜索与轻量网页抓取能力缺失（对比 OpenCode）
+- **状态**：📌 **待处理（Backlog / Next Sprint）**
+- **背景与对比**：
+  对比顶级终端 Agent **OpenCode**（内置 `websearch` 与 `webfetch`）：
+  - OpenCode 的 `websearch` 对接了 Exa AI 与 Parallel.ai，返回专为 LLM 提炼清洗后的结构化上下文，并设置了 10,000 字符上下文保护。
+  - OpenCode 的 `webfetch` 是毫秒级纯 HTTP 抓取，配合 `turndown` 自动将 HTML 转换为精简的 Markdown 文本，开销极低。
+- **现象与病灶**：
+  1. **缺少原生 Web 搜索**：当前项目没有任何原生内置的 `web_search` 工具，当大模型遇到新出现的库、最新 API 规范或报错时，无法联网搜索，只能依赖外部挂载 MCP 或由用户手动喂入。
+  2. **缺少轻量 Web Fetch（大材小用）**：当模型仅需要读取一个技术文档 URL、查看一段博客或 GitHub Issue 时，目前只能启动庞大的 Playwright Chromium 无头浏览器，面临启动慢（1~3秒）、内存消耗大（数百MB）以及 SPA DOM 噪音多的问题。
+- **改进建议**：
+  - **实现轻量 `web_fetch` 工具**：基于纯 Node.js `fetch` + `turndown` HTML 转 Markdown，毫秒级响应，自动限制 50KB/10000 字符返回，专用于纯静态文档查阅。
+  - **实现标准 `web_search` 适配层**：支持对接主流 LLM Search API（如 Exa / Tavily / Serper）或通过统一搜索引擎适配器返回格式化摘要。
 
-| 改进项 | 优先级 | 目标描述 |
-| :--- | :---: | :--- |
-| **`/exit` 命令** | **P0** | 优雅释放终端 Alt-Screen、保存 Session 快照并正常退出进程。 |
-| **`/plan` 模式** | **P0** | 彻底重构 Plan 模式：**开放只读探索工具（`read/glob/grep`），硬拦截写操作（`write/edit/bash`）**。 |
-| **无缝切换** | **P1** | 支持在交互界面中通过 `/plan` 自由切换 `plan`（只读规划）与 `build`（全权限编码）状态。 |
+---
+
+## 问题 8：浏览器自动化工具粒度与交互能力差距（对比 Playwright-MCP）
+- **状态**：📌 **待处理（Backlog / Next Sprint）**
+- **背景与对比**：
+  对比微软官方 **`@playwright/mcp`**：
+  - 微软 Playwright-MCP 提供了 24+ 个细粒度原子工具（覆盖 `browser_navigate`, `browser_click`, `browser_type`, `browser_fill_form`, `browser_select_option`, `browser_hover`, `browser_drag`, `browser_file_upload`, `browser_press_key`, `browser_console_messages`, `browser_pdf_save` 等）。
+  - 我们的项目在架构韧性上远超微软（我们拥有独创的 **自愈 Self-Healing、事务 Txn、录制回放 Replay、出站网络防火墙 Egress Guard 与收执存证 Receipts**）。
+- **现象与病灶**：
+  我们在模型可见的原子交互能力上过于收敛（仅暴露了 `observe`, `extract`, `click`, `type` 4 个工具）：
+  1. **缺少复杂表单操作**：无法直接操作 `<select>` 下拉选框（缺少 `select_option`），无法进行文件选择上传（缺少 `file_upload`）。
+  2. **缺少菜单与键盘交互**：无法触发悬停下拉菜单（缺少 `hover`），无法精确按键（如回车 `Enter`、`Tab`、`Escape`，缺少 `press_key`）。
+  3. **缺少控制台与网络调试**：虽然内核有 Egress 审计，但大模型在前端调试时无法主动读取浏览器的 `console.error` 日志和网络请求失败信息。
+- **改进建议**：
+  保持我们自愈和安全架构优势的前提下，补齐 4 个最高频的浏览器原子工具：
+  - `browser.select`：支持操作下拉选框
+  - `browser.hover`：支持鼠标悬停激活浮层/菜单
+  - `browser.press`：支持键盘按键模拟（Enter, Tab, Escape, ArrowDown 等）
+  - `browser.upload`：支持文件上传自动化
