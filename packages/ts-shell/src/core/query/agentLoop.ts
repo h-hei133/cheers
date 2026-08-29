@@ -157,19 +157,24 @@ export async function* runAutonomousReActLoop(
 
       const { rawSummary } = parseCompactedSummary(summaryContent);
       const checkpointMsg = formatCheckpointMessage(rawSummary);
-
-      // Keep system prompt, replace compacted middle history with Checkpoint, keep last user prompt
+      // Find last user message boundary to preserve conversational integrity without orphaned tools
       const systemMsg = messages[0];
-      const recentMessages = messages.slice(-2);
-
+      let lastUserIndex = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "user") {
+          lastUserIndex = i;
+          break;
+        }
+      }
+      const preservedTail = lastUserIndex > 0 ? messages.slice(lastUserIndex) : [];
       messages.length = 0;
       messages.push(systemMsg);
       messages.push({
         role: "user",
         content: checkpointMsg,
       });
-      for (const m of recentMessages) {
-        if (m !== systemMsg) messages.push(m);
+      for (const m of preservedTail) {
+        messages.push(m);
       }
       return true;
     } catch {
@@ -182,18 +187,17 @@ export async function* runAutonomousReActLoop(
     if (options.abortSignal?.aborted) {
       break;
     }
-
-    // Layer 1: Apply Microcompact (0ms in-memory pruning of older tool outputs)
-    const { messages: preparedMessages, prunedCount } = microcompactMessages(messages, {
-      keepRecentTurns: 3,
-      maxOutputChars: 1000,
-    });
-
-    // Layer 2: Check Token-Aware Dynamic Budget Threshold
-    const estimatedTokens = estimateTokens(preparedMessages);
+    // Check Token-Aware Dynamic Budget Threshold before message prep
+    const estimatedTokens = estimateTokens(messages);
     if (estimatedTokens >= compactThresholdTokens && messages.length > 4) {
       await executeFullCompaction();
     }
+
+    // Layer 1: Apply Microcompact (0ms in-memory pruning of older tool outputs)
+    const { messages: preparedMessages } = microcompactMessages(messages, {
+      keepRecentTurns: 3,
+      maxOutputChars: 1000,
+    });
 
     // On the final turn before maxTurns, set tool_choice to "none" while retaining tool definitions for schema validation
     const isLastTurn = turn === maxTurns;
@@ -274,7 +278,6 @@ export async function* runAutonomousReActLoop(
 
     messages.push(assistantMessage);
 
-    // If assistant returned text content, yield output
     let textContent = assistantMessage.content || "";
     const textToolCalls: Array<{
       id: string;
@@ -282,10 +285,10 @@ export async function* runAutonomousReActLoop(
       function: { name: string; arguments: string };
     }> = [];
 
-    // Extract DSML tool calls if present in content
+    // Extract DSML tool calls with constrained inner tags to prevent cross-invocation hijacking
     if (textContent.includes("<｜DSML｜invoke")) {
       const dsmlMatches = textContent.matchAll(
-        /<｜DSML｜invoke\s+name=["']([^"']+)["']>[\s\S]*?<｜DSML｜parameter\s+name=["']arguments["'][^>]*>([\s\S]*?)<\/｜DSML｜parameter>[\s\S]*?<\/｜DSML｜invoke>/gi,
+        /<｜DSML｜invoke\s+name=["']([^"']+)["']>(?:(?!<\/｜DSML｜invoke>)[\s\S])*?<｜DSML｜parameter\s+name=["']arguments["'][^>]*>([\s\S]*?)<\/｜DSML｜parameter>(?:(?!<\/｜DSML｜invoke>)[\s\S])*?<\/｜DSML｜invoke>/gi,
       );
       for (const m of dsmlMatches) {
         textToolCalls.push({

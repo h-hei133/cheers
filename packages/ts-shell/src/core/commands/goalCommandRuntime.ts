@@ -27,9 +27,10 @@ export async function runGoalCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const subCommand = args[0]?.toLowerCase();
+  const isSingleWord = args.length === 1;
+  const subCommand = isSingleWord ? args[0]?.toLowerCase() : undefined;
 
-  if (!subCommand) {
+  if (args.length === 0) {
     if (!currentSessionGoal) {
       return {
         kind: "local",
@@ -49,7 +50,6 @@ export async function runGoalCommand(
       ].join("\n"),
     };
   }
-
   if (subCommand === "clear") {
     currentSessionGoal = null;
     return {

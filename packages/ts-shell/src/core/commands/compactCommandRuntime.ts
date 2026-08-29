@@ -21,9 +21,13 @@ export async function runCompactLocalCommand(
   context: CommandContext,
 ): Promise<LocalCommandResult> {
   try {
-    const customInstructions = args.join(" ").trim();
+    const nonFlagArgs = args.filter((a) => !a.startsWith("--"));
+    const firstArg = nonFlagArgs[0]?.toLowerCase();
+    const instructionArgs = (firstArg === "preview" || firstArg === "render" || firstArg === "json")
+      ? nonFlagArgs.slice(1)
+      : nonFlagArgs;
+    const customInstructions = instructionArgs.join(" ").trim();
     const request = parseCompactCommandArgs(args, {
-      source: "session",
       projectInfo: {
         projectRoot: context.cwd,
         safeToPersistProjectRoot: true,

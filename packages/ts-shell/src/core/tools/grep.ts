@@ -18,6 +18,9 @@ function matchPathPattern(filePath: string, pattern: string): boolean {
     return true;
   }
   const cleanPattern = pattern.trim().replace(/^\.\//, "");
+  const baseName = path.basename(filePath);
+
+  // If pattern has no directory separators, match either against the full path or the basename
   const regexStr = cleanPattern
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
     .replace(/\*\*\//g, "(.+/)?")
@@ -25,7 +28,12 @@ function matchPathPattern(filePath: string, pattern: string): boolean {
     .replace(/\*/g, "[^/]*")
     .replace(/\?/g, "[^/]");
   const regex = new RegExp(`^${regexStr}$`, "i");
-  return regex.test(filePath) || regex.test(filePath.replace(/^[/]+/, ""));
+
+  return (
+    regex.test(filePath) ||
+    regex.test(filePath.replace(/^[/]+/, "")) ||
+    regex.test(baseName)
+  );
 }
 
 export function createGrepToolDefinition(

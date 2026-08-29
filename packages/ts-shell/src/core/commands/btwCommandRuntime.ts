@@ -16,10 +16,19 @@ export async function runBtwCommand(
     };
   }
 
-  const apiKey = process.env.SILICONFLOW_API_KEY || process.env.OPENAI_API_KEY || "";
-  const baseUrl = process.env.SILICONFLOW_BASE_URL || "https://api.siliconflow.cn/v1";
-  const model = "deepseek-ai/DeepSeek-V4-Flash";
+  let apiKey = "";
+  let baseUrl = "";
+  let model = "";
 
+  if (process.env.SILICONFLOW_API_KEY) {
+    apiKey = process.env.SILICONFLOW_API_KEY;
+    baseUrl = process.env.SILICONFLOW_BASE_URL || "https://api.siliconflow.cn/v1";
+    model = "deepseek-ai/DeepSeek-V4-Flash";
+  } else if (process.env.OPENAI_API_KEY) {
+    apiKey = process.env.OPENAI_API_KEY;
+    baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
+    model = "gpt-4o-mini";
+  }
   let answer = "";
   if (apiKey && !process.env.VITEST && process.env.NODE_ENV !== "test") {
     const controller = new AbortController();

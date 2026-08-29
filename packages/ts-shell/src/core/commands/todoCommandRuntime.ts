@@ -21,9 +21,7 @@ export async function runTodoCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const subCommand = args[0]?.toLowerCase();
-
-  if (!subCommand) {
+  if (args.length === 0) {
     if (sessionTodoList.length === 0) {
       return {
         kind: "local",
@@ -50,7 +48,8 @@ export async function runTodoCommand(
     };
   }
 
-  if (subCommand === "clear") {
+  const firstArg = args[0]?.toLowerCase();
+  if (firstArg === "clear" && args.length === 1) {
     sessionTodoList = [];
     nextTodoId = 1;
     return {
@@ -58,8 +57,7 @@ export async function runTodoCommand(
       output: "Todo checklist cleared.",
     };
   }
-
-  if (subCommand === "add") {
+  if (firstArg === "add") {
     const text = args.slice(1).join(" ").trim();
     if (!text) {
       return { kind: "local", output: "Usage: /todo add <task description>" };
@@ -76,11 +74,14 @@ export async function runTodoCommand(
     };
   }
 
-  if (subCommand === "done" || subCommand === "complete") {
+  if (firstArg === "done" || firstArg === "complete") {
     const targetId = parseInt(args[1], 10);
+    if (isNaN(targetId)) {
+      return { kind: "local", output: "Usage: /todo done <id> (e.g. /todo done 1)" };
+    }
     const item = sessionTodoList.find((t) => t.id === targetId);
     if (!item) {
-      return { kind: "local", output: `Task #${args[1]} not found.` };
+      return { kind: "local", output: `Task #${targetId} not found.` };
     }
     item.status = "done";
     return {
@@ -89,11 +90,14 @@ export async function runTodoCommand(
     };
   }
 
-  if (subCommand === "start") {
+  if (firstArg === "start") {
     const targetId = parseInt(args[1], 10);
+    if (isNaN(targetId)) {
+      return { kind: "local", output: "Usage: /todo start <id> (e.g. /todo start 1)" };
+    }
     const item = sessionTodoList.find((t) => t.id === targetId);
     if (!item) {
-      return { kind: "local", output: `Task #${args[1]} not found.` };
+      return { kind: "local", output: `Task #${targetId} not found.` };
     }
     item.status = "in_progress";
     return {

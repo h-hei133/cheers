@@ -214,12 +214,12 @@ export function createCoreToolRegistry(options?: {
 
         let resultText = selectedLines.join('\n')
         const MAX_BYTES = 30 * 1024 // 30KB safety truncate
-        if (Buffer.byteLength(resultText, 'utf8') > MAX_BYTES) {
-          resultText = resultText.slice(0, MAX_BYTES) + '\n[Content truncated to 30KB. Use offset/limit to read in smaller chunks]'
+        const buf = Buffer.from(resultText, 'utf8')
+        if (buf.length > MAX_BYTES) {
+          resultText = buf.subarray(0, MAX_BYTES).toString('utf8') + '\n[Content truncated to 30KB. Use offset/limit to read in smaller chunks]'
         } else if (startIdx > 0 || endIdx < totalLines) {
           resultText += `\n[Showing lines ${startIdx + 1}-${endIdx} of ${totalLines}. Use offset/limit to view other sections]`
         }
-
         return approvedResult(resultText)
       },
     },

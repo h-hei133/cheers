@@ -71,11 +71,10 @@ export function htmlToMarkdown(html: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  // 10. Restore code blocks with exact indentation
+  // 10. Restore code blocks with exact indentation using replacer function to prevent $& expansion
   codeBlocks.forEach((block, index) => {
-    text = text.replace(`__CODE_BLOCK_${index}__`, block);
+    text = text.replace(`__CODE_BLOCK_${index}__`, () => block);
   });
-
   return text;
 }
 
