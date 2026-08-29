@@ -21,3 +21,4 @@
 ## [2026-08-28] refactor | Phase 4 Dead Code Elimination: Streamlined legacyRootRebase and proof gap reduced to 27
 ## [2026-08-28] compile | Master Thesis: SOTA Coding Agent Architecture (RFC-001 to RFC-004) → wiki/theses/sota-coding-agent-architectural-evolution.md
 ## [2026-08-28] refactor | Phase 4 Executed: Deleted legacyPermissionRebase, isolated python-eval from workspaces, created AgentEvent bus
+## [2026-08-28] feat | Phase 5 Implemented: Tree-sitter AST parser, ScopeResolutionIndex, and Hybrid Graph RAG ranker
