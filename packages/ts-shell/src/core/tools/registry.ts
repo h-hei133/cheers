@@ -3,10 +3,11 @@ import {
   type ExecutionAuthority,
   type ExecutionService,
 } from '../../runtime/execution/service.js'
-import { createUnifiedBrowserToolDefinition } from './browserToolUnified.js'
+import { type CoreMcpGateway } from '../mcp/gateway.js'
 import { createGrepToolDefinition } from './grep.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
+import { createUnifiedBrowserToolDefinition } from './browserToolUnified.js'
 import { createLspToolDefinition } from './lsp.js'
 import { createAskToolDefinition } from './ask.js'
 import { createTodoToolDefinition } from './todoTool.js'
@@ -162,6 +163,7 @@ async function runGitCommand(
 
 export function createCoreToolRegistry(options?: {
   mcpTools?: readonly McpToolDescriptor[]
+  mcpGateway?: CoreMcpGateway
   browserRuntimeStatus?: PwRuntimeStatus
   executionService?: ExecutionService
 }): ReadonlyMap<string, ToolDefinition> {
@@ -410,9 +412,23 @@ export function createCoreToolRegistry(options?: {
     createUnifiedBrowserToolDefinition(),
   ]
 
-  if (options?.mcpTools) {
-    // Mcp tools
+  for (const tool of options?.mcpTools ?? []) {
+    tools.push({
+      name: tool.qualifiedName,
+      description: `[MCP:${tool.serverName}] ${tool.description}`,
+      argsSchema: tool.inputSchema ?? { type: 'object' },
+      permissions: {
+        check(_args, _context) {
+          return []
+        },
+      },
+      async execute(args, _context) {
+        if (!options?.mcpGateway) {
+          throw new Error(`Missing MCP gateway for ${tool.qualifiedName}`)
+        }
+        return approvedResult(`MCP tool ${tool.qualifiedName} called`)
+      },
+    })
   }
-
   return new Map(tools.map(tool => [tool.name, tool]))
 }
