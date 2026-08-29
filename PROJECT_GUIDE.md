@@ -132,12 +132,11 @@ node dist/cli.js /memory list
 
 ```text
 packages/ts-shell/src/
+├── config/                       # 统一配置中心 (types, schema, settingsLoader, runtimeConfig)
 ├── session/                      # 会话与智能体核心循环
 │   ├── SessionManager.ts         # 会话状态管理门面
 │   └── agent/                    # 统一 Agent 引擎 (types, lifecycle, compaction, persistence, events)
 ├── context/                      # 上下文感知与代码知识图谱
-│   ├── graph/ast/                # AST 解析器 (parser), 作用域树 (scopeTree), Graph RAG (graphRag)
-│   └── discovery/                # 候选文件扫描、分词加权与排名器 (scanner, scorer, ranker)
 ├── tools/                        # 工具调度与并发控制
 │   ├── concurrency/              # 路径级并发互斥队列 (fileMutationQueue.ts)
 │   ├── dispatch/                 # 批调度管道 (planner, executor, projector, types)
