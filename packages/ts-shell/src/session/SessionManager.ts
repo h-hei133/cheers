@@ -70,7 +70,6 @@ import {
 } from "./store/projectBindingPolicy.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { buildSessionContinuitySnapshot } from "./continuation/sessionContinuitySnapshot.js";
-import { normalizeLegacyPermissionStateForSession } from "./continuation/legacyPermissionRebase.js";
 import { extractSeedInfluenceFromQueryResult } from "./continuation/sessionSeedInfluence.js";
 import { rebindSessionProjectRootContinuity } from "./continuation/sessionProjectRootRebind.js";
 import {
@@ -571,9 +570,8 @@ export class SessionManager {
 
   buildContinuitySnapshot(sessionId: string): SessionContinuitySnapshot {
     const session = this.store.load(sessionId);
-    const stateSnapshot = this.normalizeLegacyPermissionStateForSession(
-      session,
-      this.store.readStateSnapshotSafely(this.store.statePath(sessionId)),
+    const stateSnapshot = this.store.readStateSnapshotSafely(
+      this.store.statePath(sessionId),
     );
     return buildSessionContinuitySnapshot({
       session,
@@ -581,22 +579,6 @@ export class SessionManager {
       recoverySnapshot: this.getRecoverySnapshot(sessionId),
       transcriptEvents: this.getTranscriptEvents(sessionId),
       approvalHistoryLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
-    });
-  }
-
-  private normalizeLegacyPermissionStateForSession(
-    session: Session,
-    snapshot: SessionStateSnapshot | undefined,
-  ): SessionStateSnapshot | undefined {
-    const statePath = this.store.statePath(session.id);
-    return normalizeLegacyPermissionStateForSession({
-      session,
-      snapshot,
-      withStateLock: (targetSessionId, update) =>
-        this.store.withSessionStateLock(targetSessionId, update),
-      readLatestSnapshot: () => this.store.readStateSnapshotSafely(statePath),
-      writeSnapshot: (nextSnapshot) =>
-        this.store.writeJsonFileAtomic(statePath, nextSnapshot),
     });
   }
 

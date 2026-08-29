@@ -9,7 +9,8 @@
     "cheer": "./dist/cli.js"
   },
   "workspaces": [
-    "packages/*"
+    "packages/ts-shell",
+    "packages/rust-core"
   ],
   "scripts": {
     "bootstrap": "node scripts/bootstrap.mjs",
