@@ -112,13 +112,22 @@ export function parseCompactCommandArgs(
       "/compact does not accept raw content fields.",
     );
   }
+  if (options.has("preview") && options.has("json")) {
+    throw new CompactCommandContractError(
+      "compact-command-mode-conflict",
+      "Cannot specify both --preview and --json.",
+    );
+  }
   const positional = args.filter((arg) => !arg.startsWith("--"));
-  let mode: CompactCommandMode = "preview";
+  let mode: CompactCommandMode = defaults.mode ?? "render";
   const firstPos = positional[0]?.toLowerCase();
   if (firstPos === "preview" || firstPos === "render" || firstPos === "json") {
     mode = firstPos;
+  } else if (options.has("json")) {
+    mode = "json";
+  } else if (options.has("preview")) {
+    mode = "preview";
   }
-
   const source =
     parseSource(optionValue(options.get("source"))) ?? defaults.source ?? "session";
   const includeJson = mode === "json" || defaults.includeJson === true;
