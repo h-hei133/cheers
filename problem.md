@@ -1,6 +1,6 @@
 # 项目核心使用与架构能力问题清单 (problem.md)
 
-本文档记录用户在实际使用本项目时暴露出的核心缺陷、体验病灶以及与顶尖业界 Agent（如 **Pi**、**Claude Code**、**OpenCode**、**Playwright-MCP**）对比发现的架构级能力差距。
+本文档记录用户在实际使用本项目时暴露出的核心缺陷、体验病灶以及与顶尖业界 Agent（如 **Pi**、**Claude Code**、**OpenCode**、**Playwright-MCP**、**DeepSeek-Harness**）对比发现的架构级能力差距与落地设计规范。
 
 ---
 
@@ -13,7 +13,7 @@
 6. [问题 6：内置文件工具链与 Pi Agent 的核心能力差距（待补齐）](#问题-6内置文件工具链与-pi-agent-的核心能力差距待补齐)（待处理）
 7. [问题 7：Web 搜索与轻量网页抓取能力缺失（对比 OpenCode）](#问题-7web-搜索与轻量网页抓取能力缺失对比-opencode)（待处理）
 8. [问题 8：浏览器自动化工具粒度与交互能力差距（对比 Playwright-MCP）](#问题-8浏览器自动化工具粒度与交互能力差距对比-playwright-mcp)（待处理）
-9. [问题 9：上下文压缩（Compact）与自动压缩（Auto-Compact）能力差距及动态阈值配置缺失](#问题-9上下文压缩compact与自动压缩auto-compact能力差距及动态阈值配置缺失)（待处理）
+9. [问题 9：上下文压缩（Compact）与自动压缩（Auto-Compact）两层渐进式架构规范（对比 Claude Code / Pi / DeepSeek-Harness）](#问题-9上下文压缩compact与自动压缩auto-compact两层渐进式架构规范对比-claude-code--pi--deepseek-harness)（待处理）
 
 ---
 
@@ -127,25 +127,91 @@
 
 ---
 
-## 问题 9：上下文压缩（Compact）与自动压缩（Auto-Compact）能力差距及动态阈值配置缺失
+## 问题 9：上下文压缩（Compact）与自动压缩（Auto-Compact）两层渐进式架构规范（对比 Claude Code / Pi / DeepSeek-Harness）
 - **状态**：📌 **待处理（Backlog / Next Sprint）**
-- **背景与对比**：
-  对比三大标杆 Agent：
-  - **Claude Code**：支持自定义上下文窗口上限（通过环境变量 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 或百分比 `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` 重写），默认留出 13k Token 缓冲，并具备微压缩（Microcompact）清洗旧工具输出和断路器。
-  - **Pi Agent**：支持配置 `compactionSettings`（阈值百分比/自定义上下文窗口），支持提取操作文件集（`readFiles`/`modifiedFiles`），且拥有 **Context Overflow 运行时自动剔除报错帧 $\rightarrow$ 压缩 $\rightarrow$ 自动重发本轮** 的无感恢复机制。
-  - **OpenCode**：支持细粒度滑动窗口，单工具输出超 2000 字符立即截断。
-- **现象与病灶**：
-  1. **硬编码静态轮数触发（缺乏 Token 预算意识）**：
-     - 当前代码使用 `AUTO_COMPACT_TURN_THRESHOLD = 12`（每 12 轮触发一次）。
-     - 若模型在第 2 轮读取了海量代码产生 6 万 Token，由于“不到 12 轮”系统不会压缩，直接发生 Context Overflow 崩溃；反之简短对话满 12 轮却被强制触发无意义压缩。
-  2. **缺少自定义上下文大小与阈值配置**：
-     - 无法针对不同模型（如 32k 上下文的轻量模型 vs 128k/200k 的大型模型）或用户在 Settings 中自定义的 `contextWindow` 进行动态自适应。
-  3. **缺少微压缩（Microcompact）机制**：
-     - 几十轮之前的历史工具调用（大量 `read` 代码或 `bash` 输出）原样堆积在上下文，白白消耗 70%+ 的 Token。
-  4. **缺少 Context Overflow 运行时自愈与重发**：
-     - 当遇到 API 上下文溢出报错时，直接报错终止，无法自动压缩自愈并重试。
-- **改进建议**：
-  - **支持层叠自定义配置**：在 Settings 与 CLI 参数中支持 `autoCompactWindow`（如自定义 64k tokens）或 `autoCompactPercent`（如到达上下文窗口的 80% 时触发）。
-  - **模型感知动态阈值**：自动根据当前选定模型的上下文上限（如 DeepSeek 64k、Claude 200k），动态计算压缩触发线 `Threshold = EffectiveWindow - BufferTokens`。
-  - **实现 Microcompact（旧工具输出修剪）**：在发送 API 前将 N 轮前的工具结果替换为 `[Old tool output omitted: N lines]`，极大节约 Token 并保护 Prompt Cache。
-  - **实现 Overflow 自动恢复闭环**：捕获 Provider 上下文溢出错误，自动剔除错误消息，触发紧急压缩并重新执行当前回合。
+- **背景与标杆解构**：
+  解构业界四大顶级项目的成熟压缩方案：
+  - **Claude Code**：三级渐进防御。**Microcompact（微压缩）**在发往 API 前原地修剪历史旧工具输出，**0 额外延迟且不破坏 Prompt Cache**；**Full Auto-Compact** 动态基于 `ContextWindow - 13k Buffer` 触发大模型总结；内置连续 3 次失败熔断器（Circuit Breaker）。
+  - **DeepSeek-Harness**：**结构化 8 段 Checkpoint Schema**（严谨规范的 Intent / Tech / Files / Errors / Pending / Current / NextStep / Critical Context），保证被压缩后的上下文信息密度极高且无损；**ToolResultPruner** 采用 `Head(500字) + Tail(500字)` 双向修剪。
+  - **Pi Agent**：从历史 tool_calls 中提取 `readFiles` 与 `modifiedFiles` 文件集清单；具备 **Context Overflow 运行时自动剔除报错帧 $\rightarrow$ 压缩 $\rightarrow$ 自动重发本轮** 的无感恢复机制。
+  - **OpenCode**：优雅的命令行交互 `/compact [custom_instructions]`。
+
+- **我们项目的核心病灶**：
+  1. **硬编码静态轮数触发**：当前代码硬编码 `AUTO_COMPACT_TURN_THRESHOLD = 12`（每 12 轮静态触发），无法感知真实 Token 消耗，在大文件读取冲击下直接发生 Context Overflow 崩溃；在简短对话下又产生无意义打断。
+  2. **不支持自定义上下文窗口与阈值**：无法根据选定模型（如 32k、64k、128k、200k）或用户配置动态计算安全水位线。
+  3. **缺少日常微压缩（Microcompact）**：几十轮之前的旧 `read`/`bash` 大段输出原样堆积在上下文中，浪费 70%+ Token。
+  4. **缺少结构化 Checkpoint 生成**：压缩仅做纯代码静态拼接，缺少大模型语义提炼，丢失关键技术决策。
+  5. **缺少 Overflow 运行时自愈重发**：API 报超限时直接报错退出，用户体验中断。
+
+- **不缝合、最优雅的“双层渐进压缩架构”落地设计规范**：
+
+### 1. 架构分层
+```text
+[用户 Prompt / 自动决策]
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 第 1 层: 零成本 Microcompact (日常降噪, 0ms 纯内存)           │
+│ - 发送给 LLM 前, 仅保留最近 3 轮完整工具输出                │
+│ - 3 轮之前的旧工具输出修剪为 Head(500字) + [Omitted] + Tail(500字) │
+│ - 节省 60%+ 无效 Token, 维持 Prompt Cache 高命中率          │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼ (Token 预算监控)
+┌─────────────────────────────────────────────────────────────┐
+│ 第 2 层: 结构化 8-Section Checkpoint (Full Compact)         │
+│ - 触发条件:                                                 │
+│   a) 用户手动输入 /compact [自定义指令]                     │
+│   b) 自动触发: 当前 Token >= EffectiveWindow * 80%          │
+│   c) 运行时自愈: 捕获 Provider Context Overflow 错误        │
+│ - 执行 DeepSeek-Harness 8 段标准总结 Prompt                 │
+│ - 写入 compact_boundary, 归档旧历史, 仅保留 Checkpoint 续跑 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2. 标准 8-Section Checkpoint Schema 规范
+压缩总结由辅助模型严格输出以下 Markdown 结构：
+```markdown
+<compacted-summary>
+## Primary Request and Intent
+- [用户的核心目标与演进意图]
+
+## Key Technical Concepts
+- [涉及的技术栈、架构模式与约定]
+
+## Files and Code
+- [涉及的关键文件路径、作用与已完成的修改]
+
+## Errors and Fixes
+- [遇到的错误、排查结论与修复方案]
+
+## Pending Jobs
+- [明确要求但尚未完成的遗留任务]
+
+## Current Work
+- [当前正在进行的具体工作]
+
+## Next Step
+- [下一步唯一的明确执行动作]
+
+## Critical Context
+- [架构决策、用户偏好、重要约束与未决问题]
+</compacted-summary>
+```
+
+### 3. 配置规范定义 (`settings.json` 与 CLI 参数)
+```json
+{
+  "compaction": {
+    "enabled": true,
+    "contextWindow": 64000,
+    "autoCompactPercent": 80,
+    "reserveTokens": 8000,
+    "microcompact": {
+      "enabled": true,
+      "keepRecentTurns": 3,
+      "maxOutputChars": 1000
+    }
+  }
+}
+```
