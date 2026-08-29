@@ -24,3 +24,4 @@
 ## [2026-08-28] feat | Phase 5 Implemented: Tree-sitter AST parser, ScopeResolutionIndex, and Hybrid Graph RAG ranker
 ## [2026-08-28] docs | Updated AGENTS.md and docs/DOC_STATUS.md to reflect Phase 1-5 modernization, .wiki/ master index, and RFCs 001-004
 ## [2026-08-28] docs | Created PROJECT_GUIDE.md quick-start and architecture overview
+## [2026-08-28] feat | Phase 6-8 Completed: Differential TUI (Pi), AST Gauntlet & LSP Self-Repair (Claude Code), and Sub-Agent Swarm (mini-swe-agent)

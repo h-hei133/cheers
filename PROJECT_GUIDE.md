@@ -48,7 +48,7 @@ graph TD
 
 ## 二、 当前演进进展与完成情况
 
-项目近期经历了系统性的架构重构与能力现代化，**已圆满完成 Phase 1 至 Phase 5 的全量攻坚**：
+项目近期经历了系统性的架构重构与能力现代化，**已圆满完成 Phase 1 至 Phase 8 的全量攻坚**：
 
 ```mermaid
 timeline
@@ -58,6 +58,9 @@ timeline
   Phase 3 : 业界顶尖架构摄取 : Pi 并发互斥队列 (fileMutationQueue) : Claude Code 三态权限 (allow/ask/deny) : Mem0 分层工作记忆
   Phase 4 : 架构债务清算 : 彻底删除 legacy 兼容死代码 : 扁平化事件总线 (AgentEvent) : 隔离 python-eval
   Phase 5 : AST 代码图谱引擎 : 跨语言 AST 解析 (TS/JS/Py/Rust) : 作用域索引 (ScopeTree/DefIndex) : 混合 Graph RAG 检索
+  Phase 6 : 差分流式 TUI : 差分 ANSI 屏幕缓冲区 (DifferentialTerminalBuffer) : 可折叠 Thinking 块 : 模态权限弹窗
+  Phase 7 : LSP 自愈与 AST 补丁 : 前置 AST 语法验证 (astGauntlet) : 编译器错误自动回传自愈 (lspRepairLoop)
+  Phase 8 : 多智能体 Swarm 协同 : 子智能体分发器 (SubAgentDispatcher) : 轨迹收敛共识验证 (verifySwarmConvergence)
 ```
 
 ### 已落地交付的核心能力清单：

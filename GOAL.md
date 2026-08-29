@@ -66,32 +66,25 @@ graph TD
 
 ---
 
-### 🖥️ Phase 6: Differential TUI & Reactive Streaming Surface (Inspired by `pi`)
-- **Objective**: Deliver a fluid terminal UI with real-time collapsible thinking, markdown streaming, and interactive permission prompts.
-- **Deliverables**:
-  1. **Differential ANSI Screen Buffer**:
-     - Port Pi's `packages/tui` differential buffer (`tui.ts`) to minimize screen flicker on complex updates.
-  2. **Streaming Widget Components**:
-     - Implement live-updating collapsible Thinking blocks, real-time tool progress bars, and syntax-highlighted diff widgets.
-  3. **Interactive Permission Prompt Dialog**:
-     - Wire `approval/evaluator.ts` (`behavior === 'ask'`) to interactive keyboard prompt dialogs (`[y/n/always/never]`).
-- **Acceptance Invariant**: Alt-screen rendering under 16ms per frame, seamless terminal resize handling.
+### 🖥️ Phase 6: Differential TUI & Reactive Streaming Surface (Completed)
+- **Delivered**:
+  1. `DifferentialTerminalBuffer` (`presentation/tui/buffer.ts`): Row delta diffing emitting targeted cursor repositioning without screen flicker.
+  2. `Terminal` (`presentation/tui/terminal.ts`): Alt-screen lifecycle management and cursor toggles.
+  3. Streaming UI widgets (`presentation/tui/components/`): `thinkingWidget.ts`, `toolCard.ts`, and modal `permissionDialog.ts`.
 
 ---
 
-### 🛡️ Phase 7: AST Patch Gauntlet & Autonomous LSP Self-Repair (Inspired by `Claude Code`)
-- **Objective**: Eliminate syntax regressions during code generation via structural AST patch verification and automated LSP error feedback loops.
-- **Deliverables**:
-  1. **Structural Patch Gauntlet**:
-     - Validate proposed file mutations via AST before disk write; reject invalid AST mutations preflight.
-  2. **Autonomous LSP Loopback**:
-     - Automatically execute LSP diagnostics on modified files post-mutation.
-     - On diagnostic errors, automatically trigger model retry with compiler diagnostics attached.
-  3. **Multi-Target Atomic Rollback**:
-     - Integrate `fileMutationQueue` with rollback snapshots to revert entire multi-file changesets if verification fails.
-- **Acceptance Invariant**: Zero malformed code writes survive to disk; automatic self-repair on syntax/type errors within $\le 2$ retry turns.
+### 🛡️ Phase 7: AST Patch Gauntlet & Autonomous LSP Self-Repair (Completed)
+- **Delivered**:
+  1. `validatePatchASTPreflight` (`edit/patch/gauntlet/astGauntlet.ts`): In-memory AST preflight verification rejecting syntax-broken edits before disk write.
+  2. `executeWithLspSelfRepair` (`edit/repair/lspRepairLoop.ts`): Post-mutation compiler diagnostic interception, 2-turn self-repair loopback, and automatic rollback on unresolvable errors.
 
 ---
+
+### 👥 Phase 8: Multi-Agent Swarm & Convergence Verification (Completed)
+- **Delivered**:
+  1. `SubAgentDispatcher` (`orchestration/swarm/dispatcher.ts`): Scoped role execution for child agents (`scout`, `coder`, `reviewer`, `tester`).
+  2. `verifySwarmConvergence` (`orchestration/swarm/convergence.ts`): Multi-agent consensus verification and proof convergence.
 
 ## 3. NormProof & Structural Governance Target
 - **Blocking Obligations**: `0` (strictly maintained across all phases).
