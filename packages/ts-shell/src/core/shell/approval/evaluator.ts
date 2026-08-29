@@ -14,6 +14,10 @@ export const READONLY_TOOLS: Record<string, true> = {
   status: true,
   web_fetch: true,
   web_search: true,
+  lsp: true,
+  ask: true,
+  todo: true,
+  task: true,
   "git-status": true,
   "git-diff": true,
 };

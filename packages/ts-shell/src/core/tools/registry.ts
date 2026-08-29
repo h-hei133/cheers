@@ -7,6 +7,10 @@ import { createBrowserToolDefinitions } from '../context/browserTool.js'
 import { createGrepToolDefinition } from './grep.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
+import { createLspToolDefinition } from './lsp.js'
+import { createAskToolDefinition } from './ask.js'
+import { createTodoToolDefinition } from './todoTool.js'
+import { createTaskToolDefinition } from './taskTool.js'
 import type { PwRuntimeStatus } from '../context/pwRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
@@ -399,8 +403,11 @@ export function createCoreToolRegistry(options?: {
     },
     createWebFetchToolDefinition(),
     createWebSearchToolDefinition(),
+    createLspToolDefinition(executionService),
+    createAskToolDefinition(),
+    createTodoToolDefinition(),
+    createTaskToolDefinition(),
   ]
-
   tools.push(...createBrowserToolDefinitions({
     runtimeStatus: options?.browserRuntimeStatus,
   }))

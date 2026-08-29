@@ -7,7 +7,7 @@ import type { ExecutionAuthority, ExecutionService } from "../../runtime/executi
 const DEFAULT_GREP_LIMIT = 100;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit per file
 
-const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
+export const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
   mode: "read-only",
   source: "tool-runtime-approval",
   reason: "ToolRuntime approved the filesystem read before ExecutionService was called.",

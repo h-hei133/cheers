@@ -43,3 +43,4 @@
 ## [2026-08-29] plan | Added Phase 5 Roadmap in GOAL.md: High-level workflow suite (/goal, /loop, /todo, /fast, /context, /btw) synthesized from DeepSeek-Harness, Oh-My-Pi, OpenCode, and Claude Code
 ## [2026-08-29] feat | Phase 5 delivered: 6 High-Level Workflow Commands (/goal, /loop, /todo, /fast, /context, /btw) synthesized from DeepSeek-Harness, Oh-My-Pi, OpenCode, and Claude Code
 ## [2026-08-29] fix | Code review fixes: DSML regex isolation, compaction role sequencing, reserved slash command set completeness, grep basename globs, and safe out-of-band credentials
+## [2026-08-29] feat | Delivered 4 High-Value Modern Built-in Tools: lsp (Code intelligence), ask (Interactive multi-choice user decision), todo (Programmatic task checklist), and task (Isolated subagent delegation)

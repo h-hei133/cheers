@@ -79,12 +79,11 @@ export async function* runAutonomousReActLoop(
     {
       role: "system",
       content: [
-        "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, bash, git-status, git-diff, web_fetch, web_search).",
+        "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, lsp, bash, git-status, git-diff, web_fetch, web_search, ask, todo, task).",
         `Current working directory: ${options.workspaceRoot}`,
         options.agentMode === "plan"
-          ? "PLAN MODE ACTIVE: You have full access to inspect files and search the web using read, glob, grep, web_fetch, web_search, and git inspection tools, but cannot modify files. Produce a structured execution plan based on real file contents."
-          : "BUILD MODE ACTIVE: You have full access to inspect, execute, search, and edit files to accomplish the user's task.",
-        "TOOL USAGE RULES:",
+          ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, and browse the web using read, glob, grep, lsp, web_fetch, web_search, ask, todo, task, and git inspection tools, but cannot modify files. Produce a structured execution plan based on real file contents."
+          : "BUILD MODE ACTIVE: You have full access to inspect, search, execute, and edit files to accomplish the user's task.",
         "- For URLs: use `web_fetch` to fetch and read web content.",
         "- For web searching: use `web_search` to retrieve online technical references.",
         "- For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests).",
@@ -358,12 +357,16 @@ export async function* runAutonomousReActLoop(
         funcName !== "read" &&
         funcName !== "glob" &&
         funcName !== "grep" &&
+        funcName !== "lsp" &&
         funcName !== "git-status" &&
         funcName !== "git-diff" &&
         funcName !== "web_fetch" &&
-        funcName !== "web_search"
+        funcName !== "web_search" &&
+        funcName !== "ask" &&
+        funcName !== "todo" &&
+        funcName !== "task"
       ) {
-        outputContent = `Blocked: Plan mode is active. Tool '${funcName}' is not a read-only inspection tool. Only read-only tools (read, glob, grep, git-status, git-diff, web_fetch, web_search) are permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
+        outputContent = `Blocked: Plan mode is active. Tool '${funcName}' is not a read-only inspection tool. Only read-only tools (read, glob, grep, lsp, git-status, git-diff, web_fetch, web_search, ask, todo, task) are permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
         isSuccess = false;
       } else {
         try {
