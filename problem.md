@@ -14,7 +14,8 @@
 7. [问题 7：Web 搜索与轻量网页抓取能力缺失（对比 OpenCode）](#问题-7web-搜索与轻量网页抓取能力缺失对比-opencode)（已修复）
 8. [问题 8：浏览器自动化工具粒度与交互能力差距（对比 Playwright-MCP）](#问题-8浏览器自动化工具粒度与交互能力差距对比-playwright-mcp)（已修复）
 9. [问题 9：上下文压缩（Compact）与自动压缩（Auto-Compact）两层渐进式架构规范（对比 Claude Code / Pi / DeepSeek-Harness）](#问题-9上下文压缩compact与自动压缩auto-compact两层渐进式架构规范对比-claude-code--pi--deepseek-harness)（已修复）
-10. [问题 10：Slash 命令体系与顶尖项目（Pi / Claude Code / OpenCode / DeepSeek-Harness / Oh-My-Pi）的综合对比与缺失清单](#问题-10slash-命令体系与顶尖项目pi--claude-code--opencode--deepseek-harness--oh-my-pi的综合对比与缺失清单)（待处理）
+10. [问题 10：Slash 命令体系与顶尖项目（Pi / Claude Code / OpenCode / DeepSeek-Harness / Oh-My-Pi）的综合对比与缺失清单](#问题-10slash-命令体系与顶尖项目pi--claude-code--opencode--deepseek-harness--oh-my-pi的综合对比与缺失清单)（已修复）
+11. [问题 11：高阶工作流与交互式 Slash 命令套件深度分析（Goal, Loop, Todo, Fast, Context, Btw）](#问题-11高阶工作流与交互式-slash-命令套件深度分析goal-loop-todo-fast-context-btw)（待处理）
 
 ---
 
@@ -81,34 +82,69 @@
 ---
 
 ## 问题 10：Slash 命令体系与顶尖项目（Pi / Claude Code / OpenCode / DeepSeek-Harness / Oh-My-Pi）的综合对比与缺失清单
+- **状态**：✅ 已修复 (`facdc1b`)
+- **交付**：落地了 7 大核心高频命令：`/clear`、`/review`、`/init`、`/cost`、`/undo`、`/export`、`/copy`。
+
+---
+
+## 问题 11：高阶工作流与交互式 Slash 命令套件深度分析（Goal, Loop, Todo, Fast, Context, Btw）
 - **状态**：📌 **待处理（Backlog / Next Sprint）**
-- **背景与各大顶尖项目命令剖析**：
-  我们深度排查了五大标杆项目的全部内置 Slash 命令：
-  1. **Pi Agent** (`core/slash-commands.ts`)：
-     - 会话管理：`/new`, `/resume`, `/fork`, `/clone`, `/tree`, `/session`, `/export`, `/import`, `/share`, `/name`
-     - 模型与思维：`/model`, `/thinking`, `/scoped-models`
-     - 扩展与配置：`/settings`, `/trust`, `/login`, `/logout`, `/reload`, `/hotkeys`, `/compact`, `/quit`
-  2. **Claude Code** (`commands/`)：
-     - 工作流与代码控制：`/init` (生成 CLAUDE.md 与架构规则), `/review` (代码审查), `/cost` (Token 与费用统计), `/clear` (清空屏幕/会话), `/rewind` (回滚指定回合), `/vim` (切换按键模式), `/insights` (分析历史模式)
-  3. **OpenCode** (`command/index.ts`)：
-     - 模板命令：`/init` (初始化项目), `/review` (快速 review 变更)
-  4. **DeepSeek-Harness** (`packages/goal/` & `interaction/commands/`)：
-     - 目标与任务：`/goal` (设定与追踪高阶目标), `/feedback` (结构化反馈)
-  5. **Oh-My-Pi** (`scripts/` & `python/robomp/`):
-     - 自动化流水线：`/verify` (自动化验证), `/triage` (任务分诊), `/status`
+- **背景与各大顶尖项目实现细节深度剖析**：
 
-- **去重与合并后，我们当前项目（已有 17 个命令）真正缺失的高价值核心 Slash 命令清单**：
-  *(去除了功能重复或纯别名的命令，提炼出 7 个最具杀手级价值的缺失命令)*
+### 1. `/goal`（高阶目标持久化管理）
+- **标杆参考**：**DeepSeek-Harness** (`packages/goal/command-goal/`)
+- **实现剖析**：
+  - DeepSeek-Harness 将目标建模为状态机：`active`（执行中）、`paused`（暂停）、`blocked`（受阻）、`complete`（完成）。
+  - 支持 `/goal <objective>`（新建或切换目标）、`/goal edit <objective>`（重写当前目标）、`/goal pause` / `/goal resume` / `/goal clear`。
+  - **核心价值**：防止大模型在多轮复杂重构任务中发生“目标漂移（Goal Drift）”，每次决策前将当前活跃目标置顶注入系统提示词。
 
-| 缺失命令 | 推荐主命令 | 别名 (Aliases) | 来源参考 | 职能定义与落地方案 |
+### 2. `/loop`（自主循环执行与迭代直到达标）
+- **标杆参考**：**Oh-My-Pi** (`scripts/run-rs-task.ts`, `loop-phase.test.ts`) 与 Ralph / Auto-loop 模式
+- **实现剖析**：
+  - 设定最大迭代轮数与验收判定标准（例如：`npm test` 退出码必须为 0）。
+  - 每一轮由 Agent 执行修改，自动运行验证命令，未通过则将报错再次作为输入驱动下一轮，直至全部绿灯或达到轮数上限。
+  - **核心价值**：实现真正全自动无人值守的代码修复与测试驱动开发（TDD）。
+
+### 3. `/todo`（任务清单与阶段拆解追踪）
+- **标杆参考**：**OpenCode** (`tool/todo.ts` 与 `session/todo.ts`)
+- **实现剖析**：
+  - 将大任务拆解为结构化项：`[{ id, content, status: "pending" | "in_progress" | "completed" }]`。
+  - 支持 `/todo`（查看当前任务进度）、`/todo add <task>`、`/todo done <id>`、`/todo clear`。
+  - **核心价值**：让长任务的进度完全透明可视化，并在每次 Turn 结束时向用户展示清晰的勾选清单。
+
+### 4. `/fast`（快速模式切换 / 模型极速档）
+- **标杆参考**：**Claude Code** (`commands/fast/fast.tsx`)
+- **实现剖析**：
+  - 一键切换当前会话至低延迟、低成本的轻量快速模型（如从 Claude 3.7 Sonnet / DeepSeek-V3 切换至 Haiku / DeepSeek-V4-Flash / Mini-model）。
+  - 支持 `/fast on`、`/fast off` 或带有参数的快速切换。
+  - **核心价值**：适合简单查代码、小文件修改或快速问答，极大降低 API 费用并提升响应速度。
+
+### 5. `/context`（上下文可视化与 Token 分布透视）
+- **标杆参考**：**Claude Code** (`commands/context/context.tsx` & `context-noninteractive.ts`)
+- **实现剖析**：
+  - 结构化透视当前上下文窗口中每一部分的 Token 占比：
+    - System Prompt & Tools Schema 占用
+    - 历史用户/助手对话占用
+    - 工具调用输出（Tool Results）占用
+    - 剩余可用空间（Free Space）与 预留自动压缩缓冲（Autocompact Buffer）
+  - **核心价值**：帮助开发者和 Agent 准确洞察当前 Token 瓶颈，决定何时运行 `/compact`。
+
+### 6. `/btw`（侧信道提问 / 零上下文污染轻量问答）
+- **标杆参考**：**Claude Code** (`commands/btw/btw.tsx` 与 `runSideQuestion.ts`)
+- **实现剖析**：
+  - 用户在长会话进行中，突然想问一个临时性问题（如“这个环境变量是什么意思？”或“Rust 中的 unwrap 会 panic 吗？”），但**绝不想把这个临时问题和回答写入主会话上下文**，以免污染长任务的历史。
+  - `/btw <question>`：拉起单次轻量独立调用（Side-question），在悬浮窗/临时控制台渲染回答，按任意键关闭，**主历史 0 污染**。
+  - **核心价值**：极致保护长任务上下文纯净度，避免无意义问答占用 Token。
+
+---
+
+## 阶段规划与架构落地设计（纳入 GOAL.md Phase 5）
+
+| 命令 | 别名 (Aliases) | 标杆复用来源 | 架构落地文件 | 核心职责 |
 | :--- | :--- | :--- | :--- | :--- |
-| **1. 会话重置/清空** | `/clear` | `/reset`, `/cls` | Claude Code, Pi (`/new`) | **清空当前对话历史**，释放上下文内存，开启崭新会话（保持当前工作区与模型配置不变）。 |
-| **2. 代码变更审查** | `/review` | `/audit`, `/check` | Claude Code, OpenCode | **一键审查当前工作树变更**：自动读取 `git-diff`，调用 Reviewer 提示词对修改的代码进行安全性、正确性、规范性审查。 |
-| **3. 项目规则初始化** | `/init` | `/setup` | Claude Code, OpenCode | **分析当前项目并生成/更新 `AGENTS.md` / `CLAUDE.md`**：自动识别技术栈、包管理器、构建与测试命令，生成标准架构规则。 |
-| **4. Token 与消耗统计** | `/cost` | `/tokens`, `/stats` | Claude Code, Pi (`/session`) | **展示当前会话与历史累计的 Token 消耗、调用轮数与预估成本**。 |
-| **5. 历史回滚与撤销** | `/undo` | `/rewind`, `/revert` | Claude Code (`/rewind`), Pi (`/fork`) | **撤销上一步操作或回滚到指定历史回合**（丢弃最后一次有害的代码修改或无效回答）。 |
-| **6. 会话导出与归档** | `/export` | `/save` | Pi (`/export`), Claude Code | **将当前会话历史导出为 Markdown / HTML / JSONL 归档文件**，便于事后复盘或知识留存。 |
-| **7. 剪贴板快速复制** | `/copy` | `/cp` | Pi (`/copy`), Claude Code | **快速将大模型最后一条回答的内容复制到系统剪贴板**，提升终端开发流转效率。 |
-
-- **改进建议与落地设计**：
-  在 `packages/ts-shell/src/core/commands/` 下按模块化规范（单文件 $\le 20$ 函数）实现上述 7 个高频核心命令，并注册到 `registry.ts` 和 `slashCommandRegistry.ts`。
+| **`/goal`** | `/objective`, `/target` | **DeepSeek-Harness** | `core/commands/goalCommandRuntime.ts` | 目标设定、阶段状态机（active/paused/complete）与防漂移系统提示词置顶注入 |
+| **`/loop`** | `/ralph`, `/autoloop` | **Oh-My-Pi** | `core/commands/loopCommandRuntime.ts` | 自主迭代执行循环：直到指定测试命令通过或达到指定最大轮数 |
+| **`/todo`** | `/tasks`, `/checklist` | **OpenCode** | `core/commands/todoCommandRuntime.ts` | 结构化任务拆解、实时进度展示与状态更新 |
+| **`/fast`** | `/turbo`, `/speed` | **Claude Code** | `core/commands/fastCommandRuntime.ts` | 一键在高性能主力模型与极速轻量模型之间快速切换 |
+| **`/context`** | `/ctx`, `/tokens-map` | **Claude Code** | `core/commands/contextCommandRuntime.ts` | 上下文 Token 分布图表与使用量全景透视 |
+| **`/btw`** | `/side`, `/ask` | **Claude Code** | `core/commands/btwCommandRuntime.ts` | 侧信道单次临时问答，回答完毕即丢弃，0 污染主历史 |

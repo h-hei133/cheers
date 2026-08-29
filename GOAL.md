@@ -30,17 +30,20 @@ graph TD
     C4["Manual: 现代化 /compact [custom_instructions] 自定义指令支持"]
   end
 
-  subgraph "Phase 4: 顶尖 Slash 命令体系现代化 (当前攻坚 🎯)"
-    S1["1. /clear (清空对话历史与上下文, 开启全新对话)"]
-    S2["2. /review (提取 git-diff 进行安全性/正确性/规范性代码审查)"]
-    S3["3. /init (智能扫描项目技术栈生成 AGENTS.md / CLAUDE.md)"]
-    S4["4. /cost (实时统计当前会话与历史 Token 消耗及预估费用)"]
-    S5["5. /undo (撤销上一步操作或回滚到指定历史回合)"]
-    S6["6. /export (将当前会话导出为 Markdown / HTML / JSONL 归档文件)"]
-    S7["7. /copy (快速复制大模型最后一条回答到系统剪贴板)"]
+  subgraph "Phase 4: 基础 Slash 命令体系 (已交付 ✅)"
+    S1["/clear, /review, /init, /cost, /undo, /export, /copy 全部 7 个高频命令落地并测试全绿"]
   end
 
-  T1 & T2 & T3 --> W1 & W2 --> C1 & C2 & C3 & C4 --> S1 & S2 & S3 & S4 & S5 & S6 & S7
+  subgraph "Phase 5: 高阶工作流与交互式 Slash 命令套件 (当前攻坚 🎯)"
+    H1["1. /goal (目标持久化管理与防漂移状态机, 借鉴 DeepSeek-Harness)"]
+    H2["2. /loop (自主迭代循环直到测试达标, 借鉴 Oh-My-Pi Ralph Loop)"]
+    H3["3. /todo (任务清单与阶段拆解追踪, 借鉴 OpenCode)"]
+    H4["4. /fast (一键快速模型切换档位, 借鉴 Claude Code)"]
+    H5["5. /context (上下文 Token 占用全景透视与分析, 借鉴 Claude Code)"]
+    H6["6. /btw (侧信道零污染轻量临时问答, 借鉴 Claude Code Side Question)"]
+  end
+
+  T1 & T2 & T3 --> W1 & W2 --> C1 & C2 & C3 & C4 --> S1 --> H1 & H2 & H3 & H4 & H5 & H6
 ```
 
 ---
@@ -64,72 +67,68 @@ graph TD
 - **第 1 层：零成本微压缩（Microcompact）**：每轮请求在发往大模型前，纯内存修剪 3 轮前的旧工具输出为 `Head(500字) + [Omitted] + Tail(500字)`，节省 60%+ 无效 Token，不破坏 Prompt Cache。
 - **第 2 层：结构化 8-Section Checkpoint**：严格按照 8 大核心维度生成 `<compacted-summary>`。
 - **控制平面与自愈**：支持自定义 `contextWindow` 与 `autoCompactPercent`，捕获 Context Overflow 自动重试。
-- **手动 `/compact`**：支持用户传入自由文本自定义指令。
+- **手动 `/compact`**：支持用户传入自由文本自定义指令与结构化存证。
 
 ---
 
-### Phase 4：顶尖 Slash 命令体系现代化 (Top-tier Slash Commands Modernization) — 【当前攻坚 🎯】
-- **目标**：对齐 Pi、Claude Code、OpenCode、DeepSeek-Harness、Oh-My-Pi 核心体验，补齐 7 大杀手级高频命令，杜绝功能重叠。
+### Phase 4：基础 Slash 命令体系 (Top-tier Basic Slash Commands) — 【已交付 ✅】
+- **7 个高频命令**：`/clear`、`/review`、`/init`、`/cost`、`/undo`、`/export`、`/copy` 全量交付，具备跨平台兼容与自动化测试。
+
+---
+
+### Phase 5：高阶工作流与交互式 Slash 命令套件 (High-Level Workflow & Interactive Suite) — 【当前攻坚 🎯】
+- **目标**：引入高阶工作流控制（目标管理、自动测试迭代循环、任务清单追踪、极速档位、上下文透视与侧信道问答），彻底对齐行业天花板体验。
 - **详细落地与代码复用设计**：
 
-#### 1. `/clear` (别名: `/reset`, `/cls`) — 会话重置
-- **复用与参考**：参考 Claude Code 的 `commands/clear/` 与 Pi 的 `/new`。
-- **实现方案**：
-  - 在 `packages/ts-shell/src/core/commands/clearCommandRuntime.ts` 中实现：
-  - 清空当前内存消息队列与 Agent 状态，生成新的 `sessionId`。
-  - 保留当前工作区路径、模型选择与权限配置不变，输出 `"Session reset. Starting a fresh conversation."`。
+#### 1. `/goal` (别名: `/objective`, `/target`) — 高阶目标持久化与防漂移
+- **复用与参考**：参考 **DeepSeek-Harness** (`packages/goal/command-goal/`)。
+- **实现方案** (`core/commands/goalCommandRuntime.ts`)：
+  - 目标状态机管理：`active`（执行中）、`paused`（暂停）、`complete`（完成）。
+  - 支持 `/goal <objective>`（新建或切换目标）、`/goal pause`、`/goal resume`、`/goal clear`。
+  - 将活跃目标置顶注入当前 Agent 系统提示词中，彻底杜绝多轮对话中的目标漂移（Goal Drift）。
 
-#### 2. `/review` (别名: `/audit`, `/check`) — 变更代码审查
-- **复用与参考**：参考 Claude Code 的 `commands/review.ts` 与 OpenCode 的 `command/template/review.txt`。
-- **实现方案**：
-  - 在 `packages/ts-shell/src/core/commands/reviewCommandRuntime.ts` 中实现：
-  - 自动调用 `git status` 与 `git diff` 提取未暂存及已暂存代码变更。
-  - 构建结构化审查 Prompt（涵盖：代码正确性、性能与资源泄漏、项目既有架构规范一致性、潜在 Bug 与回归风险）。
-  - 直通 Reviewer 角色大模型生成 Markdown 代码审查报告。
+#### 2. `/loop` (别名: `/ralph`, `/autoloop`) — 闭环自主迭代与自动验收
+- **复用与参考**：参考 **Oh-My-Pi** (`scripts/run-rs-task.ts`, `loop-phase.test.ts`) 与 Ralph Loop。
+- **实现方案** (`core/commands/loopCommandRuntime.ts`)：
+  - 支持参数 `/loop <maxTurns> <verifyCommand>`（例如 `/loop 5 npm test`）。
+  - Agent 自主执行代码编写 $\rightarrow$ 自动触发 `verifyCommand` 运行 $\rightarrow$ 若失败将报错作为下一轮输入自动自愈，直到测试 100% 成功或到达最大轮数。
 
-#### 3. `/init` (别名: `/setup`) — 架构规则初始化
-- **复用与参考**：参考 Claude Code 的 `commands/init.ts` 与 OpenCode 的 `command/template/initialize.txt`。
-- **实现方案**：
-  - 在 `packages/ts-shell/src/core/commands/initCommandRuntime.ts` 中实现：
-  - 自动扫描当前工作区根目录的 `package.json`、`Cargo.toml`、`pyproject.toml`、`tsconfig.json`、`Makefile` 等关键清单。
-  - 智能推断技术栈、包管理器、Build/Lint/Test 常用命令。
-  - 引导生成或更新标准的 `AGENTS.md` / `CLAUDE.md` 规则指南文件。
+#### 3. `/todo` (别名: `/tasks`, `/checklist`) — 结构化任务清单追踪
+- **复用与参考**：参考 **OpenCode** (`tool/todo.ts` 与 `session/todo.ts`)。
+- **实现方案** (`core/commands/todoCommandRuntime.ts`)：
+  - 维护任务状态列表：`[{ id, text, status: "pending" | "in_progress" | "done" }]`。
+  - 支持 `/todo`（查看清单）、`/todo add <item>`、`/todo done <id>`、`/todo clear`。
+  - 并在每轮交互结束时向用户展示清晰透明的进度勾选框。
 
-#### 4. `/cost` (别名: `/tokens`, `/stats`) — Token 与费用消耗统计
-- **复用与参考**：参考 Claude Code 的 `commands/cost/` 与 Pi 的 `usage-totals.ts`。
-- **实现方案**：
-  - 在 `packages/ts-shell/src/core/commands/costCommandRuntime.ts` 中实现：
-  - 统计当前会话已消耗的 Prompt Tokens、Completion Tokens 与总轮数。
-  - 按照各主流模型计费标准（如 DeepSeek、OpenAI、Claude）输出预估花费与 Token 分布图表。
+#### 4. `/fast` (别名: `/turbo`, `/speed`) — 极速轻量模型切换档位
+- **复用与参考**：参考 **Claude Code** (`commands/fast/fast.tsx`)。
+- **实现方案** (`core/commands/fastCommandRuntime.ts`)：
+  - 支持 `/fast on` / `/fast off` / `/fast toggle`。
+  - 开启时一键将当前主力大模型平滑切换至低延迟、低成本的极速模型（如 DeepSeek-V4-Flash / Mini-model / Haiku），适合快速问答或小修补。
 
-#### 5. `/undo` (别名: `/rewind`, `/revert`) — 历史回滚与撤销
-- **复用与参考**：参考 Claude Code 的 `commands/rewind/` 与 Pi 的 `branch-summarization.ts`。
-- **实现方案**：
-  - 在 `packages/ts-shell/src/core/commands/undoCommandRuntime.ts` 中实现：
-  - 弹出或执行回滚到上一轮消息状态（丢弃最后一次有害的执行或无效回复）。
-  - 若伴随文件修改，提供 Git 差异撤销建议。
+#### 5. `/context` (别名: `/ctx`, `/tokens-map`) — 上下文 Token 占用全景透视
+- **复用与参考**：参考 **Claude Code** (`commands/context/context.tsx` & `context-noninteractive.ts`)。
+- **实现方案** (`core/commands/contextCommandRuntime.ts`)：
+  - 结构化分析并输出当前上下文窗口的 Token 构成：
+    - System Prompt & Tools Schema 占用
+    - 历史用户/助手对话占用
+    - 工具调用输出（Tool Outputs）占用
+    - 剩余空闲空间（Free Space）与 预留自动压缩缓冲（Autocompact Buffer）
+  - 绘制 ASCII / 表格化 Token 占用分布条。
 
-#### 6. `/export` (别名: `/save`) — 会话归档与导出
-- **复用与参考**：参考 Pi 的 `core/session-export.ts` 与 `exportSessionToJsonl`。
-- **实现方案**：
-  - 在 `packages/ts-shell/src/core/commands/exportCommandRuntime.ts` 中实现：
-  - 支持 `/export markdown [path]` 与 `/export jsonl [path]`。
-  - 将当前会话历史转为精美渲染的 Markdown 文档或标准 JSONL 训练格式。
-
-#### 7. `/copy` (别名: `/cp`) — 剪贴板快速复制
-- **复用与参考**：参考 Pi 的 `commands/copy` 与 Claude Code 的 `copy`。
-- **实现方案**：
-  - 在 `packages/ts-shell/src/core/commands/copyCommandRuntime.ts` 中实现：
-  - 提取最后一条助手消息的干净文本（剔除内部 tool 标签与转义符）。
-  - 调用跨平台剪贴板指令（`xclip` / `pbcopy` / `clip.exe`）写入系统剪贴板。
+#### 6. `/btw` (别名: `/side`, `/ask`) — 侧信道零污染轻量临时问答
+- **复用与参考**：参考 **Claude Code** (`commands/btw/btw.tsx` 与 `runSideQuestion.ts`)。
+- **实现方案** (`core/commands/btwCommandRuntime.ts`)：
+  - 支持 `/btw <question>` 发起单次独立的轻量问答调用（Side Question）。
+  - 回答直接输出给用户，**完全不写入主会话上下文和历史记录**，实现对长任务主历史的 0 污染。
 
 ---
 
 ## 4. 架构一致性与治理准则 (NormProof & Agents Policy)
 
 1. **严格遵循 NormProof 规则**：
-   - 每一个新增命令单独成文件（如 `clearCommandRuntime.ts`、`reviewCommandRuntime.ts`），单文件函数数严格控制在 $\le 20$。
+   - 每一个新增命令单独成文件（如 `goalCommandRuntime.ts`、`loopCommandRuntime.ts`、`todoCommandRuntime.ts` 等），单文件函数数严格控制在 $\le 20$。
    - 所有命令在 `packages/ts-shell/src/core/commands/registry.ts` 和 `entrypoints/slashCommandRegistry.ts` 中集中注册。
 2. **测试与质量矩阵**：
-   - 为 7 个新命令编写针对性的 Vitest 单元测试。
-   - 通过 CLI 进行真实输入交互端到端验证。
+   - 针对 Phase 5 的 6 个高阶命令编写专用 Vitest 测试套件。
+   - 保证全仓所有单元测试与 CLI 交互 100% 稳定运行。
