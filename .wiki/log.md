@@ -45,3 +45,4 @@
 ## [2026-08-29] fix | Code review fixes: DSML regex isolation, compaction role sequencing, reserved slash command set completeness, grep basename globs, and safe out-of-band credentials
 ## [2026-08-29] feat | Delivered 4 High-Value Modern Built-in Tools: lsp (Code intelligence), ask (Interactive multi-choice user decision), todo (Programmatic task checklist), and task (Isolated subagent delegation)
 ## [2026-08-29] fix | Code review fixes for b755966: lsp word boundary regex, ask Array.isArray guards, todo action validation, task random ID padding, and test isolation
+## [2026-08-29] feat | Modernized Browser Subsystem: Persistent Browser Session Manager, unified stateful browser tool (open, observe, click, type, select, hover, press, close) with [ref=eN] element mapping

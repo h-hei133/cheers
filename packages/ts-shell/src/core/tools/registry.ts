@@ -3,7 +3,7 @@ import {
   type ExecutionAuthority,
   type ExecutionService,
 } from '../../runtime/execution/service.js'
-import { createBrowserToolDefinitions } from '../context/browserTool.js'
+import { createUnifiedBrowserToolDefinition } from './browserToolUnified.js'
 import { createGrepToolDefinition } from './grep.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
@@ -407,10 +407,12 @@ export function createCoreToolRegistry(options?: {
     createAskToolDefinition(),
     createTodoToolDefinition(),
     createTaskToolDefinition(),
+    createUnifiedBrowserToolDefinition(),
   ]
-  tools.push(...createBrowserToolDefinitions({
-    runtimeStatus: options?.browserRuntimeStatus,
-  }))
+
+  if (options?.mcpTools) {
+    // Mcp tools
+  }
 
   return new Map(tools.map(tool => [tool.name, tool]))
 }
