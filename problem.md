@@ -13,6 +13,7 @@
 6. [问题 6：内置文件工具链与 Pi Agent 的核心能力差距（待补齐）](#问题-6内置文件工具链与-pi-agent-的核心能力差距待补齐)（待处理）
 7. [问题 7：Web 搜索与轻量网页抓取能力缺失（对比 OpenCode）](#问题-7web-搜索与轻量网页抓取能力缺失对比-opencode)（待处理）
 8. [问题 8：浏览器自动化工具粒度与交互能力差距（对比 Playwright-MCP）](#问题-8浏览器自动化工具粒度与交互能力差距对比-playwright-mcp)（待处理）
+9. [问题 9：上下文压缩（Compact）与自动压缩（Auto-Compact）能力差距及动态阈值配置缺失](#问题-9上下文压缩compact与自动压缩auto-compact能力差距及动态阈值配置缺失)（待处理）
 
 ---
 
@@ -123,3 +124,28 @@
   - `browser.hover`：支持鼠标悬停激活浮层/菜单
   - `browser.press`：支持键盘按键模拟（Enter, Tab, Escape, ArrowDown 等）
   - `browser.upload`：支持文件上传自动化
+
+---
+
+## 问题 9：上下文压缩（Compact）与自动压缩（Auto-Compact）能力差距及动态阈值配置缺失
+- **状态**：📌 **待处理（Backlog / Next Sprint）**
+- **背景与对比**：
+  对比三大标杆 Agent：
+  - **Claude Code**：支持自定义上下文窗口上限（通过环境变量 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 或百分比 `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` 重写），默认留出 13k Token 缓冲，并具备微压缩（Microcompact）清洗旧工具输出和断路器。
+  - **Pi Agent**：支持配置 `compactionSettings`（阈值百分比/自定义上下文窗口），支持提取操作文件集（`readFiles`/`modifiedFiles`），且拥有 **Context Overflow 运行时自动剔除报错帧 $\rightarrow$ 压缩 $\rightarrow$ 自动重发本轮** 的无感恢复机制。
+  - **OpenCode**：支持细粒度滑动窗口，单工具输出超 2000 字符立即截断。
+- **现象与病灶**：
+  1. **硬编码静态轮数触发（缺乏 Token 预算意识）**：
+     - 当前代码使用 `AUTO_COMPACT_TURN_THRESHOLD = 12`（每 12 轮触发一次）。
+     - 若模型在第 2 轮读取了海量代码产生 6 万 Token，由于“不到 12 轮”系统不会压缩，直接发生 Context Overflow 崩溃；反之简短对话满 12 轮却被强制触发无意义压缩。
+  2. **缺少自定义上下文大小与阈值配置**：
+     - 无法针对不同模型（如 32k 上下文的轻量模型 vs 128k/200k 的大型模型）或用户在 Settings 中自定义的 `contextWindow` 进行动态自适应。
+  3. **缺少微压缩（Microcompact）机制**：
+     - 几十轮之前的历史工具调用（大量 `read` 代码或 `bash` 输出）原样堆积在上下文，白白消耗 70%+ 的 Token。
+  4. **缺少 Context Overflow 运行时自愈与重发**：
+     - 当遇到 API 上下文溢出报错时，直接报错终止，无法自动压缩自愈并重试。
+- **改进建议**：
+  - **支持层叠自定义配置**：在 Settings 与 CLI 参数中支持 `autoCompactWindow`（如自定义 64k tokens）或 `autoCompactPercent`（如到达上下文窗口的 80% 时触发）。
+  - **模型感知动态阈值**：自动根据当前选定模型的上下文上限（如 DeepSeek 64k、Claude 200k），动态计算压缩触发线 `Threshold = EffectiveWindow - BufferTokens`。
+  - **实现 Microcompact（旧工具输出修剪）**：在发送 API 前将 N 轮前的工具结果替换为 `[Old tool output omitted: N lines]`，极大节约 Token 并保护 Prompt Cache。
+  - **实现 Overflow 自动恢复闭环**：捕获 Provider 上下文溢出错误，自动剔除错误消息，触发紧急压缩并重新执行当前回合。
