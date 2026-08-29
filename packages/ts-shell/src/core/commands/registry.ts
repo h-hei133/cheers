@@ -8,6 +8,13 @@ import { runRestoreLocalCommand } from "./restoreCommandRuntime.js";
 import { runSidebarLocalCommand } from "./sidebarCommandRuntime.js";
 import { runWarmupLocalCommand } from "./warmupCommandRuntime.js";
 import { runExitCommand } from "./exitCommandRuntime.js";
+import { runClearCommand } from "./clearCommandRuntime.js";
+import { runReviewCommand } from "./reviewCommandRuntime.js";
+import { runInitCommand } from "./initCommandRuntime.js";
+import { runCostCommand } from "./costCommandRuntime.js";
+import { runUndoCommand } from "./undoCommandRuntime.js";
+import { runExportCommand } from "./exportCommandRuntime.js";
+import { runCopyCommand } from "./copyCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -256,6 +263,69 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runPermissionsShellAction(args, context),
+    },
+    {
+      name: "clear",
+      aliases: ["reset", "cls"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runClearCommand(args, context),
+    },
+    {
+      name: "review",
+      aliases: ["audit", "check"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runReviewCommand(args, context),
+    },
+    {
+      name: "init",
+      aliases: ["setup"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runInitCommand(args, context),
+    },
+    {
+      name: "cost",
+      aliases: ["tokens", "stats"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runCostCommand(args, context),
+    },
+    {
+      name: "undo",
+      aliases: ["rewind", "revert"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runUndoCommand(args, context),
+    },
+    {
+      name: "export",
+      aliases: ["save"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runExportCommand(args, context),
+    },
+    {
+      name: "copy",
+      aliases: ["cp"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runCopyCommand(args, context),
     },
   ];
 

@@ -120,6 +120,48 @@ export const SLASH_COMMANDS = [
     group: "session",
     summary: "gracefully exit session and restore terminal",
   },
+  {
+    name: "clear",
+    aliases: ["reset", "cls"],
+    group: "session",
+    summary: "clear conversation context and start fresh",
+  },
+  {
+    name: "review",
+    aliases: ["audit", "check"],
+    group: "workflow",
+    summary: "review working tree code changes and diffs",
+  },
+  {
+    name: "init",
+    aliases: ["setup"],
+    group: "workflow",
+    summary: "inspect tech stack and initialize AGENTS.md rules",
+  },
+  {
+    name: "cost",
+    aliases: ["tokens", "stats"],
+    group: "session",
+    summary: "display session token usage and estimated cost",
+  },
+  {
+    name: "undo",
+    aliases: ["rewind", "revert"],
+    group: "session",
+    summary: "rewind the last conversational turn or changes",
+  },
+  {
+    name: "export",
+    aliases: ["save"],
+    group: "session",
+    summary: "export session history as markdown or jsonl",
+  },
+  {
+    name: "copy",
+    aliases: ["cp"],
+    group: "session",
+    summary: "copy last assistant response to clipboard",
+  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];
