@@ -4,6 +4,7 @@ import {
   type ExecutionService,
 } from '../../runtime/execution/service.js'
 import { createBrowserToolDefinitions } from '../context/browserTool.js'
+import { createGrepToolDefinition } from './grep.js'
 import type { PwRuntimeStatus } from '../context/pwRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
@@ -162,13 +163,21 @@ export function createCoreToolRegistry(options?: {
   const tools: ToolDefinition[] = [
     {
       name: 'read',
-      description: 'Read the contents of a file in the workspace.',
+      description: 'Read the contents of a file in the workspace, with optional line offset/limit pagination and safe truncation protection.',
       argsSchema: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
             description: 'The relative path of the file to read (e.g. package.json, src/index.ts).',
+          },
+          offset: {
+            type: 'number',
+            description: 'The 1-based starting line number to read from (default: 1).',
+          },
+          limit: {
+            type: 'number',
+            description: 'The maximum number of lines to read (default: 500, max: 1000).',
           },
         },
         required: ['path'],
@@ -180,7 +189,7 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        return approvedResult(await executionService.readTextFile({
+        const rawContent = await executionService.readTextFile({
           operationKind: 'file.read',
           absolutePath: target,
           workspaceRoot: context.workspaceRoot,
@@ -188,7 +197,28 @@ export function createCoreToolRegistry(options?: {
           caller: 'core-tool:read',
           reason: 'Read an approved workspace file target.',
           reportSafeTarget: target,
-        }))
+        })
+
+        const lines = rawContent.split('\n')
+        const totalLines = lines.length
+        const offset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 1
+        const maxLimit = 1000
+        const defaultLimit = 500
+        const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), maxLimit) : defaultLimit
+
+        const startIdx = Math.max(0, offset - 1)
+        const endIdx = Math.min(totalLines, startIdx + limit)
+        const selectedLines = lines.slice(startIdx, endIdx)
+
+        let resultText = selectedLines.join('\n')
+        const MAX_BYTES = 30 * 1024 // 30KB safety truncate
+        if (Buffer.byteLength(resultText, 'utf8') > MAX_BYTES) {
+          resultText = resultText.slice(0, MAX_BYTES) + '\n[Content truncated to 30KB. Use offset/limit to read in smaller chunks]'
+        } else if (startIdx > 0 || endIdx < totalLines) {
+          resultText += `\n[Showing lines ${startIdx + 1}-${endIdx} of ${totalLines}. Use offset/limit to view other sections]`
+        }
+
+        return approvedResult(resultText)
       },
     },
     {
@@ -309,6 +339,7 @@ export function createCoreToolRegistry(options?: {
         return approvedResult(filtered.length > 0 ? filtered.join('\n') : 'No files matched the pattern.')
       },
     },
+    createGrepToolDefinition(executionService),
     {
       name: 'bash',
       description: 'Run a shell command inside the workspace (e.g. ls, git status, npm test).',

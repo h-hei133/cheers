@@ -70,7 +70,7 @@ export async function* runAutonomousReActLoop(
     {
       role: "system",
       content: [
-        "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, bash, git-status, git-diff).",
+        "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, bash, git-status, git-diff).",
         `Current working directory: ${options.workspaceRoot}`,
         options.agentMode === "plan"
           ? "PLAN MODE ACTIVE: You have full access to inspect files using read, glob, grep, and git inspection tools, but cannot modify files. Produce a structured execution plan based on real file contents."
