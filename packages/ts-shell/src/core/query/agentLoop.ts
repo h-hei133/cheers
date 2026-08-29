@@ -427,20 +427,20 @@ export async function* runAutonomousReActLoop(
         success: isSuccess,
       });
 
-      // If a verification hook (such as compiler guard) returned feedback/retry, attach it to message history for auto-repair
-      if (postDecision && postDecision.feedback) {
-        messages.push({
-          role: "user",
-          content: postDecision.feedback,
-        });
-      }
-
+      // Push tool message immediately to satisfy OpenAI protocol (tool message must follow assistant tool_call)
       messages.push({
         role: "tool",
         tool_call_id: toolCall.id,
         content: outputContent.slice(0, 10000), // Protect token budget
       });
 
+      // If a verification hook (such as compiler guard) returned feedback/retry, attach user message after tool result
+      if (postDecision && postDecision.feedback) {
+        messages.push({
+          role: "user",
+          content: postDecision.feedback,
+        });
+      }
       yield {
         type: "tool.result",
         toolName: funcName,

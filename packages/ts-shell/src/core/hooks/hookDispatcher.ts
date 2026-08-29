@@ -69,14 +69,24 @@ export class HookDispatcher {
    */
   async dispatch(payload: HookEventPayload): Promise<HookDecision | null> {
     const relevantEvent = payload.eventName;
+    let accumulatedDecision: HookDecision | null = null;
 
     // 1. Execute In-Process Hooks
     for (const hook of this.inProcessHooks) {
       if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
         try {
           const decision = await hook.handler(payload);
-          if (decision && (decision.decision !== "allow" || decision.hookSpecificOutput || decision.feedback)) {
-            return decision;
+          if (decision) {
+            // If any hook blocks or requests retry, immediately stop and return
+            if (decision.decision === "block" || decision.decision === "retry") {
+              return decision;
+            }
+            // Only accumulate if decision carries actionable feedback or specific output
+            if (decision.feedback || decision.hookSpecificOutput) {
+              if (!accumulatedDecision) {
+                accumulatedDecision = decision;
+              }
+            }
           }
         } catch (err: any) {
           // Log hook error without crashing the main loop
@@ -122,7 +132,7 @@ export class HookDispatcher {
       }
     }
 
-    return null;
+    return accumulatedDecision;
   }
 }
 

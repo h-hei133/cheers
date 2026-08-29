@@ -32,6 +32,7 @@ export function createPostMutationLspGuard(): InProcessHookConfig {
         if (filePath.endsWith(".json")) {
           try {
             JSON.parse(content);
+            return null;
           } catch (jsonErr: any) {
             return {
               decision: "retry",
@@ -40,9 +41,14 @@ export function createPostMutationLspGuard(): InProcessHookConfig {
           }
         }
 
-        // 2. JavaScript / TypeScript basic syntax bracket balance check
-        const openBraces = (content.match(/\{/g) || []).length;
-        const closeBraces = (content.match(/\}/g) || []).length;
+        // 2. JavaScript / TypeScript: Strip comments, strings, template literals, and regexes before counting braces
+        const strippedCode = content
+          .replace(/\/\*[\s\S]*?\*\//g, "") // multi-line comments
+          .replace(/\/\/[^\n]*/g, "") // single-line comments
+          .replace(/(["'`])(?:\\.|(?!\1)[^\\])*\1/g, '""'); // strings & template literals
+
+        const openBraces = (strippedCode.match(/\{/g) || []).length;
+        const closeBraces = (strippedCode.match(/\}/g) || []).length;
         if (openBraces !== closeBraces) {
           return {
             decision: "retry",

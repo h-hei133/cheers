@@ -77,13 +77,15 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
             `# Browser Page State (\`${state.url}\`)\n\n${state.outline}`,
           );
         }
-
         case "click": {
           const selector = typeof args.selector === "string" ? args.selector.trim() : "";
           if (!selector) {
             return deniedResult("Error: selector parameter (e.g. 'e1' or CSS selector) is required for 'click' action.");
           }
           const result = await defaultBrowserSessionManager.click(selector);
+          if (result.startsWith("Click attempt failed")) {
+            return deniedResult(result);
+          }
           return approvedResult(result);
         }
 
@@ -94,6 +96,9 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
             return deniedResult("Error: selector parameter is required for 'type' action.");
           }
           const result = await defaultBrowserSessionManager.type(selector, text);
+          if (result.startsWith("Type attempt failed")) {
+            return deniedResult(result);
+          }
           return approvedResult(result);
         }
 
@@ -104,6 +109,9 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
             return deniedResult("Error: selector and value parameters are required for 'select' action.");
           }
           const result = await defaultBrowserSessionManager.selectOption(selector, value);
+          if (result.startsWith("Select option failed")) {
+            return deniedResult(result);
+          }
           return approvedResult(result);
         }
 
@@ -113,6 +121,9 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
             return deniedResult("Error: selector parameter is required for 'hover' action.");
           }
           const result = await defaultBrowserSessionManager.hover(selector);
+          if (result.startsWith("Hover failed")) {
+            return deniedResult(result);
+          }
           return approvedResult(result);
         }
 
@@ -122,6 +133,9 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
             return deniedResult("Error: key parameter is required for 'press' action.");
           }
           const result = await defaultBrowserSessionManager.pressKey(key);
+          if (result.startsWith("Key press failed")) {
+            return deniedResult(result);
+          }
           return approvedResult(result);
         }
 

@@ -22,6 +22,7 @@ class BrowserSessionManager {
   private currentTitle = "Blank Page";
   private elementRefs: Map<string, string> = new Map();
   private mockHtmlContent: string | null = null;
+  private initPromise: Promise<PwPage | null> | null = null;
 
   /**
    * Set mock HTML content for testing or simulated environments
@@ -32,30 +33,42 @@ class BrowserSessionManager {
   }
 
   /**
-   * Get active page or initialize browser instance
+   * Get active page or initialize browser instance with concurrency mutex
    */
   async getOrCreatePage(): Promise<PwPage | null> {
     if (this.currentPage) {
       return this.currentPage;
     }
-
-    try {
-      // Dynamic import to support environments with or without playwright-core
-      const pw = await (Function('return import("playwright-core")')().catch(
-        () => Function('return import("playwright")')().catch(() => null),
-      ));
-
-      if (pw?.chromium) {
-        this.browser = await pw.chromium.launch({ headless: true });
-        this.context = await this.browser!.newContext();
-        this.currentPage = await this.context!.newPage();
-        return this.currentPage;
-      }
-    } catch {
-      // Playwright not installed or executable unavailable
+    if (this.initPromise) {
+      return this.initPromise;
     }
 
-    return null;
+    this.initPromise = (async () => {
+      try {
+        const pw = await (Function('return import("playwright-core")')().catch(
+          () => Function('return import("playwright")')().catch(() => null),
+        ));
+
+        if (pw?.chromium) {
+          this.browser = await pw.chromium.launch({ headless: true });
+          this.context = await this.browser!.newContext();
+          this.currentPage = await this.context!.newPage();
+          return this.currentPage;
+        }
+      } catch (err) {
+        if (this.browser) {
+          await this.browser.close().catch(() => {});
+          this.browser = null;
+          this.context = null;
+          this.currentPage = null;
+        }
+      } finally {
+        this.initPromise = null;
+      }
+      return null;
+    })();
+
+    return this.initPromise;
   }
 
   /**
@@ -89,6 +102,17 @@ class BrowserSessionManager {
   async observe(): Promise<ObservedPageState> {
     this.elementRefs.clear();
     const elements: BrowserElementRef[] = [];
+
+    const page = await this.getOrCreatePage();
+    if (page) {
+      try {
+        this.currentUrl = (await (page as any).url?.()) || this.currentUrl;
+        this.currentTitle = (await (page as any).title?.()) || this.currentTitle;
+      } catch {
+        // Keep existing
+      }
+    }
+
     const outlineLines: string[] = [
       `Page URL: ${this.currentUrl}`,
       `Page Title: ${this.currentTitle}`,
@@ -96,7 +120,6 @@ class BrowserSessionManager {
       "Interactive Elements:",
     ];
 
-    const page = await this.getOrCreatePage();
     if (page) {
       try {
         const rawElements = (await (page as any).evaluate(() => {
@@ -108,19 +131,27 @@ class BrowserSessionManager {
           interactive.slice(0, 50).forEach((el) => {
             const tagName = el.tagName.toLowerCase();
             let role = tagName;
-            let name = (el.textContent || (el as HTMLInputElement).placeholder || (el as HTMLInputElement).value || "").trim();
+            const inputType = (el as HTMLInputElement).type || "text";
+            let name = "";
+
+            if (tagName === "input" && (inputType === "password" || inputType === "hidden")) {
+              name = `[${inputType}]`;
+            } else {
+              name = (el.textContent || (el as HTMLInputElement).placeholder || (el as HTMLInputElement).value || "").trim();
+            }
 
             if (tagName === "a") role = "link";
             if (tagName === "button" || el.getAttribute("role") === "button") role = "button";
-            if (tagName === "input") role = `input[${(el as HTMLInputElement).type || "text"}]`;
+            if (tagName === "input") role = `input[${inputType}]`;
             if (tagName.startsWith("h")) role = `heading[${tagName}]`;
 
-            // Build a stable selector
+            // Build a stable escaped selector
             let selector = tagName;
-            if (el.id) {
+            if (el.id && /^[a-zA-Z0-9_-]+$/.test(el.id)) {
               selector = `#${el.id}`;
-            } else if (name) {
-              selector = `${tagName}:has-text("${name.slice(0, 20)}")`;
+            } else if (name && !name.startsWith("[")) {
+              const cleanText = name.slice(0, 20).replace(/["\\]/g, "");
+              selector = `${tagName}:has-text("${cleanText}")`;
             }
 
             items.push({ role, name: name.slice(0, 40), selector });
@@ -141,12 +172,12 @@ class BrowserSessionManager {
 
     if (elements.length === 0) {
       if (this.mockHtmlContent) {
-        // Parse mock HTML for simulated element refs
-        const mockMatches = Array.from(this.mockHtmlContent.matchAll(/<(button|a|input|h1|h2)[^>]*>([^<]*)<\/\1>/gi));
+        // Support both paired tags and void input/img tags
+        const mockMatches = Array.from(this.mockHtmlContent.matchAll(/<(button|a|h1|h2)[^>]*>([^<]*)<\/\1>|<(input)[^>]*>/gi));
         mockMatches.slice(0, 20).forEach((m, idx) => {
           const ref = `e${idx + 1}`;
-          const role = m[1];
-          const name = m[2].trim() || "Item";
+          const role = m[1] || m[3];
+          const name = (m[2] || "").trim() || (role === "input" ? "Input Field" : "Item");
           const selector = `${role}:text("${name}")`;
           this.elementRefs.set(ref, selector);
           elements.push({ ref, role, name, selector });
