@@ -5,6 +5,8 @@ import {
 } from '../../runtime/execution/service.js'
 import { createBrowserToolDefinitions } from '../context/browserTool.js'
 import { createGrepToolDefinition } from './grep.js'
+import { createWebFetchToolDefinition } from './webFetch.js'
+import { createWebSearchToolDefinition } from './webSearch.js'
 import type { PwRuntimeStatus } from '../context/pwRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
@@ -395,6 +397,8 @@ export function createCoreToolRegistry(options?: {
         return runGitCommand(executionService, 'git diff', context)
       },
     },
+    createWebFetchToolDefinition(),
+    createWebSearchToolDefinition(),
   ]
 
   tools.push(...createBrowserToolDefinitions({

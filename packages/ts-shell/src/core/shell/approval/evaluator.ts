@@ -12,10 +12,11 @@ export const READONLY_TOOLS: Record<string, true> = {
   list: true,
   view: true,
   status: true,
+  web_fetch: true,
+  web_search: true,
   "git-status": true,
   "git-diff": true,
 };
-
 export const DESTRUCTIVE_TOOLS: Record<string, true> = {
   bash: true,
   eval: true,

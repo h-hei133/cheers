@@ -1,6 +1,12 @@
 import type { QueryEvent } from "./runtime/events.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../../tools/types.js";
+import { microcompactMessages } from "./microCompact.js";
+import {
+  EIGHT_SECTION_COMPACTION_PROMPT,
+  formatCheckpointMessage,
+  parseCompactedSummary,
+} from "./compaction/summarizer.js";
 
 export interface ReActAgentLoopOptions {
   readonly sessionId: string;
@@ -13,6 +19,9 @@ export interface ReActAgentLoopOptions {
     readonly model?: string;
   };
   readonly maxTurns?: number;
+  readonly contextWindow?: number;
+  readonly autoCompactPercent?: number;
+  readonly reserveTokens?: number;
   readonly abortSignal?: AbortSignal;
 }
 
@@ -70,12 +79,16 @@ export async function* runAutonomousReActLoop(
     {
       role: "system",
       content: [
-        "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, bash, git-status, git-diff).",
+        "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, bash, git-status, git-diff, web_fetch, web_search).",
         `Current working directory: ${options.workspaceRoot}`,
         options.agentMode === "plan"
-          ? "PLAN MODE ACTIVE: You have full access to inspect files using read, glob, grep, and git inspection tools, but cannot modify files. Produce a structured execution plan based on real file contents."
-          : "BUILD MODE ACTIVE: You have full access to inspect, execute, and edit files to accomplish the user's task.",
-        "CRITICAL: When asked to inspect, analyze, check architecture, find files, or modify code, YOU MUST ACTIVELY CALL YOUR TOOLS (e.g. call glob to list directories/files, or read to read package.json/configs) instead of asking the user to paste code or claiming you cannot access files. You have full access through your tool calls.",
+          ? "PLAN MODE ACTIVE: You have full access to inspect files and search the web using read, glob, grep, web_fetch, web_search, and git inspection tools, but cannot modify files. Produce a structured execution plan based on real file contents."
+          : "BUILD MODE ACTIVE: You have full access to inspect, execute, search, and edit files to accomplish the user's task.",
+        "TOOL USAGE RULES:",
+        "- For URLs: use `web_fetch` to fetch and read web content.",
+        "- For web searching: use `web_search` to retrieve online technical references.",
+        "- For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests).",
+        "- Directly fulfill the user's immediate question without unnecessary side explorations.",
       ].join("\n"),
     },
     {
@@ -85,6 +98,13 @@ export async function* runAutonomousReActLoop(
   ];
 
   const maxTurns = options.maxTurns ?? 15;
+  const contextWindow =
+    options.contextWindow ??
+    (parseInt(process.env.AUTO_COMPACT_WINDOW || "", 10) || 64_000);
+  const autoCompactPercent = options.autoCompactPercent ?? 80;
+  const reserveTokens = options.reserveTokens ?? 8_000;
+  const compactThresholdTokens = Math.floor(contextWindow * (autoCompactPercent / 100)) - reserveTokens;
+
   let turn = 0;
   const apiKey =
     options.realProvider?.apiKey ??
@@ -97,6 +117,65 @@ export async function* runAutonomousReActLoop(
     options.realProvider?.model ?? "deepseek-ai/DeepSeek-V4-Flash";
 
   let lastAssistantText = "";
+  function estimateTokens(msgs: ReadonlyArray<{ readonly content?: string | null }>): number {
+    let totalChars = 0;
+    for (const m of msgs) {
+      if (m.content) totalChars += m.content.length;
+    }
+    return Math.ceil(totalChars / 3.5);
+  }
+
+  async function executeFullCompaction(): Promise<boolean> {
+    if (messages.length <= 3) return false;
+
+    try {
+      const summarizerPayload = {
+        model: modelName,
+        messages: [
+          ...messages,
+          {
+            role: "user" as const,
+            content: EIGHT_SECTION_COMPACTION_PROMPT,
+          },
+        ],
+      };
+
+      const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(summarizerPayload),
+        signal: options.abortSignal,
+      });
+
+      if (!res.ok) return false;
+      const data = await res.json() as any;
+      const summaryContent = data.choices?.[0]?.message?.content;
+      if (!summaryContent) return false;
+
+      const { rawSummary } = parseCompactedSummary(summaryContent);
+      const checkpointMsg = formatCheckpointMessage(rawSummary);
+
+      // Keep system prompt, replace compacted middle history with Checkpoint, keep last user prompt
+      const systemMsg = messages[0];
+      const recentMessages = messages.slice(-2);
+
+      messages.length = 0;
+      messages.push(systemMsg);
+      messages.push({
+        role: "user",
+        content: checkpointMsg,
+      });
+      for (const m of recentMessages) {
+        if (m !== systemMsg) messages.push(m);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   while (turn < maxTurns) {
     turn++;
@@ -104,15 +183,28 @@ export async function* runAutonomousReActLoop(
       break;
     }
 
+    // Layer 1: Apply Microcompact (0ms in-memory pruning of older tool outputs)
+    const { messages: preparedMessages, prunedCount } = microcompactMessages(messages, {
+      keepRecentTurns: 3,
+      maxOutputChars: 1000,
+    });
+
+    // Layer 2: Check Token-Aware Dynamic Budget Threshold
+    const estimatedTokens = estimateTokens(preparedMessages);
+    if (estimatedTokens >= compactThresholdTokens && messages.length > 4) {
+      await executeFullCompaction();
+    }
+
     // On the final turn before maxTurns, set tool_choice to "none" while retaining tool definitions for schema validation
     const isLastTurn = turn === maxTurns;
     const payload = {
       model: modelName,
-      messages,
+      messages: preparedMessages,
       tools: openAiTools,
       tool_choice: isLastTurn ? "none" : "auto",
     };
     let responseJson: any;
+    let isOverflowError = false;
     try {
       const res = await fetch(
         `${baseUrl.replace(/\/+$/, "")}/chat/completions`,
@@ -129,14 +221,23 @@ export async function* runAutonomousReActLoop(
 
       if (!res.ok) {
         const errorText = await res.text();
-        yield {
-          type: "query.failed",
-          error: `Provider HTTP ${res.status}: ${errorText.slice(0, 200)}`,
-        };
-        return;
+        if (
+          errorText.includes("context_length_exceeded") ||
+          errorText.includes("context_overflow") ||
+          errorText.includes("maximum context length") ||
+          errorText.includes("prompt_too_long")
+        ) {
+          isOverflowError = true;
+        } else {
+          yield {
+            type: "query.failed",
+            error: `Provider HTTP ${res.status}: ${errorText.slice(0, 200)}`,
+          };
+          return;
+        }
+      } else {
+        responseJson = await res.json();
       }
-
-      responseJson = await res.json();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       yield {
@@ -144,6 +245,21 @@ export async function* runAutonomousReActLoop(
         error: `Network error: ${msg}`,
       };
       return;
+    }
+
+    // Self-Healing Context Overflow Recovery (learning from Pi Agent)
+    if (isOverflowError) {
+      const recovered = await executeFullCompaction();
+      if (recovered) {
+        // Retry current turn with fresh compacted context
+        continue;
+      } else {
+        yield {
+          type: "query.failed",
+          error: "Context overflow error: could not compact context automatically.",
+        };
+        return;
+      }
     }
 
     const choice = responseJson.choices?.[0];
@@ -159,22 +275,51 @@ export async function* runAutonomousReActLoop(
     messages.push(assistantMessage);
 
     // If assistant returned text content, yield output
-    if (assistantMessage.content) {
-      lastAssistantText = assistantMessage.content;
+    let textContent = assistantMessage.content || "";
+    const textToolCalls: Array<{
+      id: string;
+      type: "function";
+      function: { name: string; arguments: string };
+    }> = [];
+
+    // Extract DSML tool calls if present in content
+    if (textContent.includes("<｜DSML｜invoke")) {
+      const dsmlMatches = textContent.matchAll(
+        /<｜DSML｜invoke\s+name=["']([^"']+)["']>[\s\S]*?<｜DSML｜parameter\s+name=["']arguments["'][^>]*>([\s\S]*?)<\/｜DSML｜parameter>[\s\S]*?<\/｜DSML｜invoke>/gi,
+      );
+      for (const m of dsmlMatches) {
+        textToolCalls.push({
+          id: `call_${Math.random().toString(36).slice(2, 9)}`,
+          type: "function",
+          function: {
+            name: m[1],
+            arguments: m[2].trim(),
+          },
+        });
+      }
+      textContent = textContent
+        .replace(/<｜DSML｜tool_calls>[\s\S]*?<\/｜DSML｜tool_calls>/gi, "")
+        .replace(/<｜DSML｜invoke[\s\S]*?<\/｜DSML｜invoke>/gi, "")
+        .trim();
+    }
+
+    // If assistant returned clean text content, yield output
+    if (textContent) {
+      lastAssistantText = textContent;
       yield {
         type: "message.delta",
         role: "coder",
-        delta: assistantMessage.content,
+        delta: textContent,
       };
     }
 
-    // Check for tool calls
-    const toolCalls = assistantMessage.tool_calls;
-    if (!toolCalls || toolCalls.length === 0) {
+    // Check for tool calls (OpenAI tool_calls + parsed DSML tool calls)
+    const rawToolCalls = assistantMessage.tool_calls || [];
+    const toolCalls = [...rawToolCalls, ...textToolCalls];
+    if (toolCalls.length === 0) {
       // Model finished without tool calls
       break;
     }
-
     // Execute each tool call
     for (const toolCall of toolCalls) {
       if (!toolCall || !toolCall.function || !toolCall.function.name) {
@@ -211,9 +356,11 @@ export async function* runAutonomousReActLoop(
         funcName !== "glob" &&
         funcName !== "grep" &&
         funcName !== "git-status" &&
-        funcName !== "git-diff"
+        funcName !== "git-diff" &&
+        funcName !== "web_fetch" &&
+        funcName !== "web_search"
       ) {
-        outputContent = `Blocked: Plan mode is active. Tool '${funcName}' is not a read-only inspection tool. Only read-only tools (read, glob, grep, git-status, git-diff) are permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
+        outputContent = `Blocked: Plan mode is active. Tool '${funcName}' is not a read-only inspection tool. Only read-only tools (read, glob, grep, git-status, git-diff, web_fetch, web_search) are permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
         isSuccess = false;
       } else {
         try {

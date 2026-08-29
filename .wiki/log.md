@@ -35,3 +35,4 @@
 ## [2026-08-29] docs | Added Section 9 on 2-Layer Progressive Compaction Architecture (Microcompact + 8-Section Checkpoint) from DeepSeek-Harness/Claude Code/Pi/OpenCode into problem.md
 ## [2026-08-29] plan | Updated GOAL.md with 3-Phase Modernization Roadmap (Toolchain Hardening, Lightweight Web, 2-Layer Compaction) based on Pi, Claude Code, OpenCode, Playwright-MCP & DeepSeek-Harness
 ## [2026-08-29] feat | Phase 1 delivered: Native TS grep tool, Read pagination & safe 30KB/1000 lines truncation, browser capabilities & Plan mode whitelist
+## [2026-08-29] feat | Phase 2 & Phase 3 delivered: Lightweight Web Subsystem (web_fetch, web_search), 2-Layer Progressive Compaction (Microcompact, 8-Section Checkpoint), and Context Overflow Self-Healing Auto-Recovery
