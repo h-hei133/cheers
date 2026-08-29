@@ -21,6 +21,7 @@ export async function runCompactLocalCommand(
   context: CommandContext,
 ): Promise<LocalCommandResult> {
   try {
+    const customInstructions = args.join(" ").trim();
     const request = parseCompactCommandArgs(args, {
       source: "session",
       projectInfo: {
@@ -51,18 +52,25 @@ export async function runCompactLocalCommand(
         createdAt: checkpoint.createdAt,
       },
     );
+    const outputLines: string[] = [
+      formatCompactSessionSurface(result),
+      formatCompactCheckpointStatus(checkpoint, injectionState),
+    ];
+
+    if (customInstructions) {
+      outputLines.push("", `Custom instructions noted: "${customInstructions}"`);
+    }
+
     const localResult: LocalCommandResult = {
       kind: "local",
       output:
         result.request.mode === "json" && result.json
           ? result.json
-          : [
-              formatCompactSessionSurface(result),
-              formatCompactCheckpointStatus(checkpoint, injectionState),
-            ].join("\n\n"),
+          : outputLines.join("\n"),
     };
+
     emitCommandResultToSidebar(context, {
-      command: compactSourceCommand(context.rawCommandName),
+      command: "compact",
       args,
       result: localResult,
     });

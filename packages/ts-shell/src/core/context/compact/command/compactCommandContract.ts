@@ -113,15 +113,18 @@ export function parseCompactCommandArgs(
     );
   }
   const positional = args.filter((arg) => !arg.startsWith("--"));
-  const mode = parseMode(positional[0], options, defaults.mode);
+  let mode: CompactCommandMode = "preview";
+  const firstPos = positional[0]?.toLowerCase();
+  if (firstPos === "preview" || firstPos === "render" || firstPos === "json") {
+    mode = firstPos;
+  }
 
   const source =
     parseSource(optionValue(options.get("source"))) ?? defaults.source ?? "session";
   const includeJson = mode === "json" || defaults.includeJson === true;
   const includeMarkdown =
     defaults.includeMarkdown ??
-    (mode === "render" || (mode === "json" ? false : false));
-
+    (mode === "json" ? false : true);
   return normalizeCompactCommandRequest({
     ...defaults,
     mode,
