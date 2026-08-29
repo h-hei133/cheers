@@ -37,3 +37,4 @@
 ## [2026-08-29] feat | Phase 1 delivered: Native TS grep tool, Read pagination & safe 30KB/1000 lines truncation, browser capabilities & Plan mode whitelist
 ## [2026-08-29] feat | Phase 2 & Phase 3 delivered: Lightweight Web Subsystem (web_fetch, web_search), 2-Layer Progressive Compaction (Microcompact, 8-Section Checkpoint), and Context Overflow Self-Healing Auto-Recovery
 ## [2026-08-29] feat | Modernized manual /compact command with custom instructions support and 8-section checkpoint handoffs
+## [2026-08-29] docs | Added Section 10 on Slash Command synthesis vs Pi/Claude Code/OpenCode/DeepSeek-Harness/Oh-My-Pi into problem.md
