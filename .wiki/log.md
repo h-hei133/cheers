@@ -57,3 +57,4 @@
 ## [2026-08-30] fix | Code review fixes for adaa3ad & e6de80d: Jaccard overlap similarity, Unicode tokenization, recency decay bounds, explicit update superseding in memory_edit, rawCommandName aliases, and plugin name normalization
 ## [2026-08-30] docs | Completed research & thesis on AI Coding Agent Workflow, Agentic SDLC, and orchestrator implementations across Oh-My-Pi, Claude Code, Codex, DeepSeek-Harness, and Pi in .wiki/wiki/theses/agentic-workflow-and-sdlc-orchestration.md
 ## [2026-08-30] docs | Completed comprehensive analysis of latest Claude Code 2026 (August 2026 releases): dynamic workflows, fork subagents, cross-session messaging, dual-TTL prompt caching, and Pre/PostModelSwitch hooks in .wiki/wiki/theses/claude-code-2026-architecture-and-evolution.md
+## [2026-08-30] docs | Established modern Workflow & Agentic SDLC upgrade plan in GOAL.md (synthesizing OMP, Claude Code 2026, Codex, DeepSeek-Harness, and Pi)
