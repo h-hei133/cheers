@@ -101,17 +101,29 @@ export class AnthropicModelAdapter implements ModelProviderAdapter {
         }
       })
 
-    const anthropicTools = (request.tools || []).map((t) => ({
+    const anthropicTools = (request.tools || []).map((t, idx, arr) => ({
       name: t.name,
       description: t.description,
       input_schema: t.inputSchema,
+      // Annotate the last tool definition with ephemeral cache breakpoint
+      ...(idx === arr.length - 1 ? { cache_control: { type: 'ephemeral' } } : {}),
     }))
+
+    const systemBlock = systemPrompt
+      ? [
+          {
+            type: 'text' as const,
+            text: systemPrompt,
+            cache_control: { type: 'ephemeral' as const },
+          },
+        ]
+      : undefined
 
     const payload: Record<string, unknown> = {
       model,
       max_tokens: request.maxOutputTokens || 4096,
       messages: anthropicMessages,
-      ...(systemPrompt ? { system: systemPrompt } : {}),
+      ...(systemBlock ? { system: systemBlock } : {}),
       ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
       ...(request.temperature != null ? { temperature: request.temperature } : {}),
     }

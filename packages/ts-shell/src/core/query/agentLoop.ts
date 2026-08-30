@@ -97,14 +97,11 @@ export async function* runAutonomousReActLoop(
     }>;
     tool_call_id?: string;
   }> = [
+    // Layer 1: Static Core Identity & Execution Rules (100% stable prefix for Prompt Caching)
     {
       role: "system",
       content: [
         "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, lsp, bash, web_fetch, web_search, browser, ask, todo, task).",
-        `Current working directory: ${options.workspaceRoot}`,
-        ...(getActiveSessionGoal()?.phase === "active"
-          ? [`CRITICAL ACTIVE GOAL (PINNED): ${getActiveSessionGoal()!.objective}`]
-          : []),
         options.agentMode === "plan"
           ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, run safe read-only commands (like git status, git diff) via bash, and explore websites via browser and web tools, but cannot modify files. Produce a structured execution plan based on real file contents."
           : "BUILD MODE ACTIVE: You have full access to inspect, search, execute, browse, and edit files to accomplish the user's task.",
@@ -115,12 +112,16 @@ export async function* runAutonomousReActLoop(
         "4. For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests/git).",
       ].join("\n"),
     },
+    // Layer 3 & 4: Invariant Environment Context + User Prompt
     {
       role: "user",
-      content: options.prompt,
+      content: [
+        `[Environment Context: cwd=${options.workspaceRoot}${getActiveSessionGoal()?.phase === "active" ? ` | active_goal=${getActiveSessionGoal()!.objective}` : ""}]`,
+        "",
+        options.prompt,
+      ].join("\n"),
     },
   ];
-
   const maxTurns = options.maxTurns ?? 15;
   const contextWindow =
     options.contextWindow ??

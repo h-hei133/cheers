@@ -28,15 +28,20 @@ export function buildCallGraph(
 
   for (const file of files) {
     const callerPath = file.filePath;
-    const isCode =
-      callerPath.endsWith(".ts") ||
-      callerPath.endsWith(".tsx") ||
-      callerPath.endsWith(".js") ||
-      callerPath.endsWith(".jsx");
+    const lower = callerPath.toLowerCase();
+    const isTsJs =
+      lower.endsWith(".ts") ||
+      lower.endsWith(".tsx") ||
+      lower.endsWith(".js") ||
+      lower.endsWith(".jsx");
+    const isOtherCode =
+      lower.endsWith(".py") ||
+      lower.endsWith(".rs") ||
+      lower.endsWith(".go");
 
     const calledIdentifiers = new Set<string>();
 
-    if (isCode) {
+    if (isTsJs) {
       const scriptKind = callerPath.endsWith(".tsx")
         ? ts.ScriptKind.TSX
         : callerPath.endsWith(".ts")
@@ -44,7 +49,6 @@ export function buildCallGraph(
           : callerPath.endsWith(".jsx")
             ? ts.ScriptKind.JSX
             : ts.ScriptKind.JS;
-
       try {
         const sourceFile = ts.createSourceFile(
           callerPath,
@@ -80,10 +84,17 @@ export function buildCallGraph(
 
         ts.forEachChild(sourceFile, extractCalls);
       } catch {
-        // Fallback for unparseable files
+        // Fallback
+      }
+    } else if (isOtherCode) {
+      // Regex call pattern for Python, Rust, Go: foo(...) or obj.foo(...)
+      const callMatches = file.sourceText.matchAll(/(?:[a-zA-Z0-9_]+(?:\.|\:\:))?([a-zA-Z0-9_]{3,})\s*\(/g);
+      for (const m of callMatches) {
+        if (m[1]) {
+          calledIdentifiers.add(m[1]);
+        }
       }
     }
-
     for (const [symbolName, decls] of symbolTable.byName.entries()) {
       const externalDecls = decls.filter(
         (d) => d.filePath !== callerPath && d.isExported && symbolName.length >= 3,

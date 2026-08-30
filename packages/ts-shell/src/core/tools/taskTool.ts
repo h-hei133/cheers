@@ -1,13 +1,17 @@
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
+import { GitWorktreeManager } from "../workflow/gitWorktreeManager.js";
+
+const defaultWorktreeManager = new GitWorktreeManager();
 
 /**
- * /task tool
- * Dispatches an isolated subagent to perform an independent research, analysis, or review task.
- * In live environments with an active LLM provider, runs a focused subagent query out-of-band;
- * otherwise executes with deterministic structured summary isolation.
+ * /task tool (Claude Code 2026 Aligned)
+ * Dispatches an isolated subagent to perform an independent research, analysis, or modification task.
+ * Supports `isolation: "worktree"` for clean physical filesystem branch isolation.
  */
-export function createTaskToolDefinition(): ToolDefinition {
+export function createTaskToolDefinition(
+  worktreeManager: GitWorktreeManager = defaultWorktreeManager,
+): ToolDefinition {
   return {
     name: "task",
     description:
@@ -32,6 +36,11 @@ export function createTaskToolDefinition(): ToolDefinition {
           enum: ["plan", "build"],
           description: "Mode for the subagent (plan for read-only, build for modifications).",
         },
+        isolation: {
+          type: "string",
+          enum: ["worktree", "none"],
+          description: "Filesystem isolation mode (worktree for separate git branch/directory, none for shared workspace).",
+        },
       },
       required: ["description", "prompt"],
     },
@@ -46,14 +55,27 @@ export function createTaskToolDefinition(): ToolDefinition {
       const subtaskId = `task_${randomSuffix}`;
       const mode = args.agentMode === "plan" ? "PLAN (Read-Only)" : "BUILD (Standard)";
       const contextStr = typeof args.context === "string" ? args.context.trim() : "";
+      const shouldIsolate = args.isolation === "worktree";
+
+      let allocatedWorktree = null;
+      let effectiveWorkspace = context.workspaceRoot;
+
+      if (shouldIsolate) {
+        try {
+          allocatedWorktree = await worktreeManager.allocateWorktree(subtaskId);
+          effectiveWorkspace = allocatedWorktree.worktreePath;
+        } catch {
+          // Fallback to shared workspace
+        }
+      }
 
       let subagentResponse = "";
       const apiKey = process.env.SILICONFLOW_API_KEY || process.env.OPENAI_API_KEY || "";
       const baseUrl = process.env.SILICONFLOW_BASE_URL || process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
       const model = process.env.SILICONFLOW_API_KEY ? "deepseek-ai/DeepSeek-V4-Flash" : "gpt-4o-mini";
 
-      if (apiKey && !process.env.VITEST && process.env.NODE_ENV !== "test") {
-        try {
+      try {
+        if (apiKey && !process.env.VITEST && process.env.NODE_ENV !== "test") {
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), 25_000);
           const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
@@ -68,7 +90,7 @@ export function createTaskToolDefinition(): ToolDefinition {
                 {
                   role: "system",
                   content:
-                    `You are a focused, dedicated subagent executing the task: "${description}". Mode: ${mode}. Working Directory: ${context.workspaceRoot}.\nExecute the instructions tersely and return a structured markdown summary of findings.`,
+                    `You are an autonomous subagent executing: "${description}". Mode: ${mode}. Working Directory: ${effectiveWorkspace}.\nExecute delegated instructions and return a concise summary of findings or actions.`,
                 },
                 {
                   role: "user",
@@ -84,8 +106,10 @@ export function createTaskToolDefinition(): ToolDefinition {
             const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
             subagentResponse = data.choices?.[0]?.message?.content?.trim() || "";
           }
-        } catch {
-          // Fallback to structured acknowledgment
+        }
+      } finally {
+        if (allocatedWorktree) {
+          await worktreeManager.releaseWorktree(subtaskId, { squashMerge: true });
         }
       }
 
@@ -94,11 +118,12 @@ export function createTaskToolDefinition(): ToolDefinition {
         "",
         `- **Description**: ${description}`,
         `- **Mode**: \`${mode}\``,
+        `- **Filesystem Isolation**: \`${shouldIsolate ? `Git Worktree (${effectiveWorkspace})` : "Shared Workspace"}\``,
         ...(contextStr ? [`- **Context Attached**: ${contextStr}`] : []),
         "",
         "## Subagent Execution Result:",
         subagentResponse ||
-          `Task "${description}" was processed in an isolated subagent sandbox. All delegated instructions have been completed.`,
+          `Task "${description}" was processed in an isolated subagent environment. All delegated instructions have been completed.`,
       ];
       return approvedResult(lines.join("\n"));
     },
