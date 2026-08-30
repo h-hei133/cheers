@@ -63,7 +63,7 @@ export async function runBrainstormCommand(
   }
 
   // 2. Default & Save Mode: Generate Full Synthesis
-  const solution = CreativeSynthesizer.synthesize(challenge);
+  const solution = await CreativeSynthesizer.synthesize(challenge, { cwd: context.cwd });
   const hypotheses = HypothesisGenerator.generateHypotheses(challenge);
 
   const lines: string[] = [

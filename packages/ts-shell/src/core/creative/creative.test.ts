@@ -44,8 +44,8 @@ describe("Creative Reasoning & Multi-Hypothesis Exploration Test Suite", () => {
   });
 
   describe("CreativeSynthesizer", () => {
-    it("synthesizes an optimal high-taste solution with key decisions and checklist", () => {
-      const solution = CreativeSynthesizer.synthesize(sampleProblem);
+    it("synthesizes an optimal high-taste solution with key decisions and checklist", async () => {
+      const solution = await CreativeSynthesizer.synthesize(sampleProblem);
 
       expect(solution.challenge).toBe(sampleProblem);
       expect(solution.selectedPerspective).toBe("boring-minimalist");

@@ -163,16 +163,26 @@ export class DeepResearcher {
   }
 
   private static extractLearningsFromContent(content: string, url: string): AtomicLearning[] {
-    const lines = content
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.length > 20 && !l.startsWith("#") && !l.startsWith("```"));
+    if (!content || !content.trim()) return [];
 
-    return lines.slice(0, 3).map((statement, idx) => ({
+    // Split by punctuation sentences and clean markdown noise
+    const sentences = content
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Clean markdown links
+      .replace(/[`*_~#]/g, "") // Clean markdown formatting
+      .split(/(?<=[.!?。！？\n])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => {
+        // Must be a substantive informational sentence
+        if (s.length < 25 || s.length > 250) return false;
+        if (/^(cookie|subscribe|login|sign in|privacy|terms|copyright|all rights reserved)/i.test(s)) return false;
+        return true;
+      });
+
+    return sentences.slice(0, 5).map((statement, idx) => ({
       id: `learning_${Math.random().toString(36).slice(2, 8)}_${idx}`,
       statement,
       sourceUrl: url,
-      confidence: 0.9,
+      confidence: 0.85,
     }));
   }
 }
