@@ -50,17 +50,11 @@ export function buildScope(prompt: EscalationPrompt): {
   const toolName = prompt.context.toolName.trim().toLowerCase();
   const operation = prompt.context.operation.trim().toLowerCase();
   const target = prompt.context.target.trim();
-  const processMatch =
-    toolName === "bash" ? target.match(/^\s*([^\s]+)/) : undefined;
-  const processScope = processMatch?.[1]?.toLowerCase();
   const normalizedTarget = target.toLowerCase();
-  const scopeKey = processScope
-    ? `${toolName}:${operation}:process:${processScope}`
-    : `${toolName}:${operation}:target:${normalizedTarget}`;
-  const scopeLabel = processScope
-    ? `${toolName}/${operation}/process(${processScope})`
-    : `${toolName}/${operation}/target(${target})`;
 
+  // For bash commands, scope must be exact command signature to prevent wildcard escalation backdoors
+  const scopeKey = `${toolName}:${operation}:cmd:${normalizedTarget}`;
+  const scopeLabel = `${toolName}/${operation}(${target})`;
   return {
     toolName,
     operation,

@@ -155,9 +155,9 @@ export function createWebSearchToolDefinition(): ToolDefinition {
         } else if (tavilyKey) {
           results = await searchWithTavily(query, tavilyKey, numResults, context.abortSignal);
         } else {
-          return approvedResult(
-            `Web search executed for "${query}".\n` +
-            `[Note: To enable live web search providers, set EXA_API_KEY or TAVILY_API_KEY in your environment. You can also use web_fetch to read specific URLs directly.]`,
+          return deniedResult(
+            `Web search is not configured: missing EXA_API_KEY / TAVILY_API_KEY environment variables.\n` +
+            `Please configure your search provider API keys or use web_fetch to read specific URLs directly.`,
           );
         }
 

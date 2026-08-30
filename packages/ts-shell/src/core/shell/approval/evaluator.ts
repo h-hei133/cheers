@@ -15,10 +15,7 @@ export const READONLY_TOOLS: Record<string, true> = {
   web_fetch: true,
   web_search: true,
   lsp: true,
-  ask: true,
   todo: true,
-  task: true,
-  browser: true,
 };
 export const DESTRUCTIVE_TOOLS: Record<string, true> = {
   bash: true,

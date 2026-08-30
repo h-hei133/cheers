@@ -85,7 +85,7 @@ export function createAskToolDefinition(): ToolDefinition {
         "# User Decision & Clarification Requested",
         "",
         ...formattedQuestions,
-        "> *Auto-default choice chosen based on recommendation for autonomous workflow execution.*",
+        "> *Status: Autonomous execution mode - selected default recommended choices to prevent blocking.*",
       ].join("\n");
 
       return approvedResult(output);

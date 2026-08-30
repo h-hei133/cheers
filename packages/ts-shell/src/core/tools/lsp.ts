@@ -1,8 +1,10 @@
+import * as fsSync from "node:fs";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import type { ExecutionService } from "../../runtime/execution/service.js";
+import { parseSourceSymbols } from "../../context/graph/ast/parser.js";
 import { TOOL_APPROVED_READ_AUTHORITY } from "./grep.js";
 
 /**
@@ -185,10 +187,41 @@ export function createLspToolDefinition(
       }
 
       if (op === "hover") {
-        return approvedResult(
-          `# Symbol Signature (\`${symbolQuery || "symbol"}\`)\n` +
-            `Type signature and documentation resolved for \`${symbolQuery || filePath}\`.`,
-        );
+        if (!filePath) {
+          return deniedResult("Error: filePath parameter is required for hover operation.");
+        }
+        const resolvedPath = path.isAbsolute(filePath)
+          ? filePath
+          : path.join(context.workspaceRoot, filePath);
+
+        if (!fsSync.existsSync(resolvedPath)) {
+          return deniedResult(`File not found for hover: ${filePath}`);
+        }
+
+        try {
+          const content = fsSync.readFileSync(resolvedPath, "utf8");
+          const parseResult = parseSourceSymbols(filePath, content);
+          const matchedSymbol = parseResult.symbols.find(
+            (s) => s.name === symbolQuery || s.qualifiedName === symbolQuery,
+          );
+          if (matchedSymbol) {
+            return approvedResult(
+              `# Hover Symbol Information (\`${matchedSymbol.name}\`)\n` +
+              `- **Kind**: \`${matchedSymbol.kind}\`\n` +
+              `- **Qualified Name**: \`${matchedSymbol.qualifiedName}\`\n` +
+              `- **Exported**: ${matchedSymbol.isExported ? "Yes" : "No"}\n` +
+              `- **File Span**: Line ${matchedSymbol.span.startLine}:${matchedSymbol.span.startColumn} - Line ${matchedSymbol.span.endLine}:${matchedSymbol.span.endColumn}\n` +
+              (matchedSymbol.parentName ? `- **Parent Scope**: \`${matchedSymbol.parentName}\`\n` : ""),
+            );
+          }
+
+          return approvedResult(
+            `# Hover Information for \`${symbolQuery || filePath}\`\n` +
+            `Target symbol is part of \`${filePath}\` (Language: ${parseResult.language}, Total symbols in module: ${parseResult.symbols.length}).`,
+          );
+        } catch (err) {
+          return deniedResult(`Failed to extract hover information: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
 
       return deniedResult(`Unknown LSP operation: ${op}`);
