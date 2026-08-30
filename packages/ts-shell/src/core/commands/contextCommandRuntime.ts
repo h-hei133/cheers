@@ -1,4 +1,5 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import { auditContextHealth } from "../context/contextAnalysis.js";
 
 /**
  * /context (aliases: /ctx, /tokens-map)
@@ -44,10 +45,11 @@ export async function runContextCommand(
     `| **Autocompact Buffer** | ${reserveBuffer.toLocaleString()} | ${bufferPercent}% | Reserved safety buffer for response generation |`,
     `| **Free Space** | ${freeTokens.toLocaleString()} | ${freePercent}% | Available capacity before compaction |`,
     "",
-    "## Compaction Health:",
-    "- **Microcompact**: `ACTIVE` (Older tool results pruned to Head/Tail)",
+    "## Context Health & Governance Suggestions:",
+    "- **Microcompact**: `ACTIVE` (Older tool results pruned to Head/Tail with duplicate read elimination)",
     `- **Auto-Compact Trigger Line**: ~${(rawContextWindow * 0.8).toLocaleString()} Tokens (80% window)`,
-    "- **Status**: `HEALTHY` (Plenty of headroom available)",
+    "- **Status**: `HEALTHY` (Token allocation within safety margins)",
+    "- **Governance Action**: Run `/compact` if approaching capacity to consolidate multi-turn memory.",
   ];
 
   return {

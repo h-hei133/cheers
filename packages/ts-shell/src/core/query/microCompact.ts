@@ -77,11 +77,28 @@ export function microcompactMessages<T extends ChatMessageLike>(
   let prunedCount = 0;
   let savedChars = 0;
 
+  // Track seen tool result signatures to deduplicate identical repeated tool outputs in older turns
+  const seenOlderToolOutputs = new Set<string>();
+
   const result: T[] = messages.map((msg, index) => {
     // Only prune tool messages that occur before the recent turn boundary
     if (index < boundaryIndex && msg.role === "tool" && typeof msg.content === "string") {
-      if (msg.content.length > maxOutputChars) {
-        const originalLen = msg.content.length;
+      const originalLen = msg.content.length;
+
+      // Deduplicate identical outputs in older history
+      const contentHash = msg.content.slice(0, 200);
+      if (seenOlderToolOutputs.has(contentHash) && originalLen > 300) {
+        prunedCount++;
+        const deduplicated = `[... Duplicate tool output omitted: ${originalLen} characters previously shown ...]`;
+        savedChars += originalLen - deduplicated.length;
+        return {
+          ...msg,
+          content: deduplicated,
+        };
+      }
+      seenOlderToolOutputs.add(contentHash);
+
+      if (originalLen > maxOutputChars) {
         const pruned = pruneToolContent(msg.content, headChars, tailChars);
         const diff = originalLen - pruned.length;
         if (diff > 0) {

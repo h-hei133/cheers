@@ -9,6 +9,8 @@ import {
 } from "./compaction/summarizer.js";
 import { HookDispatcher, defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../hooks/builtin/index.js";
+import { getActiveSessionGoal } from "../commands/goalCommandRuntime.js";
+
 export interface ReActAgentLoopOptions {
   readonly sessionId: string;
   readonly prompt: string;
@@ -93,10 +95,12 @@ export async function* runAutonomousReActLoop(
       content: [
         "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, lsp, bash, git-status, git-diff, web_fetch, web_search, browser, ask, todo, task).",
         `Current working directory: ${options.workspaceRoot}`,
+        ...(getActiveSessionGoal()?.phase === "active"
+          ? [`CRITICAL ACTIVE GOAL (PINNED): ${getActiveSessionGoal()!.objective}`]
+          : []),
         options.agentMode === "plan"
           ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, and explore websites via browser and web tools using read, glob, grep, lsp, browser, web_fetch, web_search, ask, todo, task, and git inspection tools, but cannot modify files. Produce a structured execution plan based on real file contents."
           : "BUILD MODE ACTIVE: You have full access to inspect, search, execute, browse, and edit files to accomplish the user's task.",
-        "- For URLs: use `web_fetch` to fetch and read web content.",
         "- For web searching: use `web_search` to retrieve online technical references.",
         "- For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests).",
         "- Directly fulfill the user's immediate question without unnecessary side explorations.",
