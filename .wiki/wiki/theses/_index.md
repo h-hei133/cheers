@@ -13,3 +13,4 @@ Last updated: 2026-08-28
 ## Recent Changes
 
 - 2026-08-28: Compiled master thesis on SOTA Coding Agent Architecture and RFCs 001-004
+- [统一可观测性与日志系统架构演进](unified-logging-and-observability-architecture.md)
