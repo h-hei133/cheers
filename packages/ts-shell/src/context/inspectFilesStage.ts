@@ -32,7 +32,7 @@ export async function runInspectFilesStage(input: {
     events: input.events,
     toolName: "glob",
     taskId: `task_${input.sessionId}_${input.turn}_glob`,
-    args: { pattern: ".ts" },
+    args: { pattern: "**/*.{ts,tsx,js,jsx,py,rs,json,md}" },
     workspaceRoot: input.workspaceRoot,
     sessionId: input.sessionId,
     abortSignal: input.abortSignal,
@@ -41,8 +41,8 @@ export async function runInspectFilesStage(input: {
   if (globStep.success) {
     const delivery = buildInspectFilesDelivery(globStep.output ?? "");
     const inspectCompleted = !delivery.startsWith("Task not completed:");
-    input.notes.push("inspect candidates collected via glob(.ts)");
-    input.evidence.push("inspect: glob(.ts) executed");
+    input.notes.push("inspect candidates collected via multi-language glob");
+    input.evidence.push("inspect: glob candidate discovery executed");
     return {
       events: input.events,
       notes: input.notes,

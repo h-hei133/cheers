@@ -45,7 +45,7 @@ export async function runRepoExplainRuntimeStage(input: {
     events: input.events,
     toolName: "glob",
     taskId: `task_${input.sessionId}_${input.turn}_repo_explain_glob`,
-    args: { pattern: ".ts" },
+    args: { pattern: "**/*.{ts,tsx,js,jsx,py,rs,json,md}" },
     workspaceRoot: input.workspaceRoot,
     sessionId: input.sessionId,
     abortSignal: input.abortSignal,
@@ -55,8 +55,8 @@ export async function runRepoExplainRuntimeStage(input: {
     ? parseRepoCandidateFiles(globStep.output ?? "")
     : [];
   if (globStep.success) {
-    input.notes.push("tool: approved glob(.ts) for repo diagnosis");
-    input.evidence.push("repo-explain: glob(.ts) executed");
+    input.notes.push("tool: approved multi-language glob for repo diagnosis");
+    input.evidence.push("repo-explain: glob candidates executed");
   } else {
     input.notes.push(
       `repo-explain glob failed: ${globStep.error ?? "glob failed"}`,
