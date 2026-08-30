@@ -119,6 +119,11 @@ const RESERVED_SHELL_SLASH_COMMANDS = new Set([
   "/btw",
   "/side",
   "/ask",
+  "/marketplace",
+  "/marketplaces",
+  "/market",
+  "/plugin",
+  "/plugins",
 ]);
 export function parseCliArgs(
   rawArgs: readonly string[],

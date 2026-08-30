@@ -198,6 +198,18 @@ export const SLASH_COMMANDS = [
     group: "session",
     summary: "ask a quick side question out of band without history pollution",
   },
+  {
+    name: "marketplace",
+    aliases: ["marketplaces", "market"],
+    group: "workflow",
+    summary: "manage and discover plugin marketplace sources",
+  },
+  {
+    name: "plugin",
+    aliases: ["plugins"],
+    group: "workflow",
+    summary: "install, list, enable, or disable plugin capabilities",
+  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];

@@ -51,12 +51,19 @@ export async function runModelCommand(
     return { kind: "local", output: setModel(rest) };
   }
 
+  if (action === "help" || action === "--help" || action === "-h") {
+    return {
+      kind: "local",
+      output: getModelHelpText(),
+    };
+  }
+
+  // Direct model switching support (e.g. /model deepseek-ai/DeepSeek-V4-Flash or /model gpt-4o)
   return {
     kind: "local",
-    output: getModelHelpText(),
+    output: setModel([action, ...rest]),
   };
 }
-
 function renderModelStatus(): string {
   const config = readUserRuntimeConfigFile();
   const connections = normalizeConnections(config);

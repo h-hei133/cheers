@@ -21,6 +21,8 @@ import { runTodoCommand } from "./todoCommandRuntime.js";
 import { runFastCommand } from "./fastCommandRuntime.js";
 import { runContextCommand } from "./contextCommandRuntime.js";
 import { runBtwCommand } from "./btwCommandRuntime.js";
+import { runMarketplaceCommand } from "./marketplaceCommandRuntime.js";
+import { runPluginCommand } from "./pluginCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -386,6 +388,24 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runBtwCommand(args, context),
+    },
+    {
+      name: "marketplace",
+      aliases: ["marketplaces", "market"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runMarketplaceCommand(args, context),
+    },
+    {
+      name: "plugin",
+      aliases: ["plugins"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runPluginCommand(args, context),
     },
   ];
 
