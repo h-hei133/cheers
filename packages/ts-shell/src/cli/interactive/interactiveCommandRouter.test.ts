@@ -43,19 +43,15 @@ function createHarness() {
 }
 
 describe("interactive command router", () => {
-  it("keeps workspace-info shortcut out of normal prompt execution", async () => {
+  it("routes /cd workspace navigation commands out of normal prompt execution", async () => {
     const harness = createHarness();
 
     const result = await routeInteractiveCommand({
       ...harness.input,
-      prompt: "what is the current working directory?",
+      prompt: "/cd /tmp/project-alpha",
     });
 
-    expect(result).toEqual({ turnNumber: 0 });
-    expect(harness.lines).toContain(
-      "Current working directory: /tmp/project-alpha",
-    );
-    expect(harness.lines).toContain("Project root: /tmp/project-alpha");
+    expect(result.turnNumber).toBe(0);
   });
 
   it("routes agent mode commands and requests prompt refresh", async () => {

@@ -2,6 +2,7 @@ import { createComponentLogger } from "../../observability/structuredLogger.js";
 
 const logger = createComponentLogger("AgentLoop");
 import type { QueryEvent } from "./runtime/events.js";
+import { DoomLoopDetector } from "./doomLoopDetector.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import { microcompactMessages } from "./microCompact.js";
@@ -83,6 +84,7 @@ export async function* runAutonomousReActLoop(
 
   const toolRegistry = createCoreToolRegistry();
   const openAiTools = buildOpenAITools(toolRegistry);
+  const doomLoopDetector = new DoomLoopDetector(3);
   const messages: Array<{
     role: "system" | "user" | "assistant" | "tool";
     content?: string | null;
@@ -362,7 +364,6 @@ export async function* runAutonomousReActLoop(
       // Model finished without tool calls
       break;
     }
-    // Buffer verification hook feedbacks so they are appended after ALL tool messages
     const pendingFeedbacks: string[] = [];
     for (const toolCall of toolCalls) {
       if (!toolCall || !toolCall.function || !toolCall.function.name) {
@@ -374,7 +375,16 @@ export async function* runAutonomousReActLoop(
       try {
         funcArgs = JSON.parse(toolCall.function.arguments || "{}");
       } catch (err) {
-        parseError = err instanceof Error ? err.message : String(err);
+        parseError = `Invalid JSON arguments: ${err instanceof Error ? err.message : String(err)}`;
+      }
+
+      // Check Doom Loop (Repeated identical tool calls with same arguments)
+      const doomCheck = doomLoopDetector.recordAndCheck(funcName, funcArgs);
+      if (doomCheck.isDoomLoop) {
+        logger.warn(`Doom loop detected: ${funcName} invoked ${doomCheck.repeatCount} times with identical arguments`, {
+          toolName: funcName,
+          repeatCount: doomCheck.repeatCount,
+        });
       }
 
       yield {

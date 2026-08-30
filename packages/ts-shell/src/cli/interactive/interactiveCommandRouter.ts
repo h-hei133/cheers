@@ -28,7 +28,6 @@ import {
 import { runCliPermissionCommand } from "../../entrypoints/cliPermissionModule.js";
 import { runCliSessionCommand } from "../../entrypoints/cliSessionModule.js";
 import {
-  isWorkspaceInfoPromptStrict,
   runCliWorkspaceCommand,
 } from "../../entrypoints/cliWorkspaceModule.js";
 import { renderUserHelp } from "../../entrypoints/slashCommandRegistry.js";
@@ -65,17 +64,6 @@ export async function routeInteractiveCommand(
   input: InteractiveCommandRouterInput,
 ): Promise<InteractiveCommandRouterResult> {
   let nextTurnNumber = input.turnNumber;
-
-  if (isWorkspaceInfoPromptStrict(input.prompt)) {
-    renderProjectedLines(
-      input.renderer,
-      formatWorkspaceInfoLines({
-        cwd: input.runtimeContext.cwd,
-        projectRoot: input.runtimeContext.projectRoot,
-      }),
-    );
-    return { turnNumber: nextTurnNumber };
-  }
 
   const resolved = await buildCliCommandExecution({
     prompt: input.prompt,
