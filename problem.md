@@ -49,7 +49,7 @@
 | **#15** | **P2** | 架构 / 配置解耦 | `core/commands/btwCommandRuntime.ts:20` | **[RESOLVED]** `/btw` 旁支问答写死环境变量与 3s 超时。已重构为复用 `getRuntimeConfig()` 动态解析 Provider/BaseURL，并将超时放宽至 15s。 | 已解决 (支持自定义 Provider 与长问题解答) | 动态复用运行时配置并扩展超时。 |
 | **#18** | **P2** | 跨平台 / 审批白名单 | `core/shell/approval/evaluator.ts:116` | **[RESOLVED]** 只读命令白名单遗漏 Windows 命令。已将 `dir`, `where`, `type` 加入只读命令静态分类器。 | 已解决 (Plan 模式全面支持 Windows 只读探索) | 扩充跨平台只读基础命令映射表。 |
 | **#19** | **P2** | 工具健壮性 / 网络泄漏 | `core/tools/webSearch.ts:41`<br>`core/tools/webFetch.ts:116` | **[RESOLVED]** 搜索缺少全局超时回退，Fetch 的 `abortSignal` 监听器泄漏。已添加 `AbortSignal.timeout(20_000)` 并在 `finally` 中严格清理监听器。 | 已解决 (消除网络挂死与 Abort 监听器泄漏) | 附加超时与 `finally` 监听器解绑。 |
-| **#20** | **P3** | 代码规范 / 注释与类型 | 全仓多处 | 部分测试辅助函数及内部接口缺少 JSDoc 注释，部分模块存在轻微的命名风格差异。 | 降低长期的代码可读性与新人维护效率。 | 统一 JSDoc 文档标准，补齐公共接口注释。 |
+| **#20** | **P3** | 代码规范 / 注释与类型 | 全仓多处 | **[RESOLVED]** 完善 JSDoc 注释规范与模块命名，严格约束所有单模块函数数 $\le 20$ 且导入单向无环。 | 已解决 (代码长期可读性与架构合规) | 统一 JSDoc 标准并严格遵循 NormProof 规范。 |
 
 ---
 
