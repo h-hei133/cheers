@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { blockedCommandReason, isAllowlistedRunCommand } from "../../orchestration/capabilityBoundaryProjection.js";
 import type {
   CodingTaskKind,
@@ -188,19 +189,57 @@ function selectAutoVerifyCommand(
     return undefined;
   }
 
-  if (changedFiles.every(isTestFile)) {
+  // Detect project manifest
+  const hasPackageJson = fs.existsSync("package.json");
+  const hasCargoToml = fs.existsSync("Cargo.toml");
+  const hasPyproject = fs.existsSync("pyproject.toml") || fs.existsSync("pytest.ini");
+
+  if (hasPackageJson) {
+    let scriptTest = false;
+    let scriptBuild = false;
+    try {
+      const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")) as {
+        scripts?: Record<string, string>;
+      };
+      scriptTest = Boolean(pkg.scripts?.test);
+      scriptBuild = Boolean(pkg.scripts?.build || pkg.scripts?.["build:ts"] || pkg.scripts?.typecheck);
+    } catch {
+      // Ignore
+    }
+
+    if (changedFiles.every(isTestFile)) {
+      const targetTest = changedFiles[0];
+      const command = scriptTest ? `npm test -- ${targetTest}` : `npx vitest run ${targetTest}`;
+      return {
+        command,
+        selectionScope: "focused",
+        reason: "Smart test verification selected for changed test files",
+      };
+    }
+
+    if (changedFiles.some(isSourceFile)) {
+      const command = scriptBuild ? "npm run build:ts" : scriptTest ? "npm test" : "npx tsc --noEmit";
+      return {
+        command,
+        selectionScope: "broader",
+        reason: "Smart compiler build & test gate selected for modified source files",
+      };
+    }
+  }
+
+  if (hasCargoToml) {
     return {
-      command: "node --version",
-      selectionScope: "focused",
-      reason: "auto verification selected for test-only changes",
+      command: changedFiles.every(isTestFile) ? "cargo test" : "cargo check",
+      selectionScope: changedFiles.every(isTestFile) ? "focused" : "broader",
+      reason: "Cargo verification selected for Rust workspace",
     };
   }
 
-  if (changedFiles.some(isSourceFile)) {
+  if (hasPyproject) {
     return {
-      command: "node --version",
-      selectionScope: "broader",
-      reason: "auto verification selected for source changes",
+      command: "pytest",
+      selectionScope: "focused",
+      reason: "Pytest verification selected for Python workspace",
     };
   }
 

@@ -1,3 +1,4 @@
+import ts from "typescript";
 import type { SymbolTable } from "./symbolTable.js";
 
 export interface SymbolCallEdge {
@@ -13,6 +14,10 @@ export interface WorkspaceCallGraph {
   readonly outgoingReferences: ReadonlyMap<string, readonly string[]>;
 }
 
+/**
+ * Builds a cross-file call graph using true AST CallExpression and Identifier traversal.
+ * Eliminates false positives from comments, markdown, and arbitrary string literals.
+ */
 export function buildCallGraph(
   files: readonly { readonly filePath: string; readonly sourceText: string }[],
   symbolTable: SymbolTable,
@@ -23,10 +28,63 @@ export function buildCallGraph(
 
   for (const file of files) {
     const callerPath = file.filePath;
+    const isCode =
+      callerPath.endsWith(".ts") ||
+      callerPath.endsWith(".tsx") ||
+      callerPath.endsWith(".js") ||
+      callerPath.endsWith(".jsx");
 
-    // Scan caller's source for mentions of exported symbols in other files
+    const calledIdentifiers = new Set<string>();
+
+    if (isCode) {
+      const scriptKind = callerPath.endsWith(".tsx")
+        ? ts.ScriptKind.TSX
+        : callerPath.endsWith(".ts")
+          ? ts.ScriptKind.TS
+          : callerPath.endsWith(".jsx")
+            ? ts.ScriptKind.JSX
+            : ts.ScriptKind.JS;
+
+      try {
+        const sourceFile = ts.createSourceFile(
+          callerPath,
+          file.sourceText,
+          ts.ScriptTarget.Latest,
+          true,
+          scriptKind,
+        );
+
+        const extractCalls = (node: ts.Node): void => {
+          // 1. Function Call Expressions: foo() or obj.foo()
+          if (ts.isCallExpression(node)) {
+            const expr = node.expression;
+            if (ts.isIdentifier(expr)) {
+              calledIdentifiers.add(expr.text);
+            } else if (ts.isPropertyAccessExpression(expr) && ts.isIdentifier(expr.name)) {
+              calledIdentifiers.add(expr.name.text);
+            }
+          }
+
+          // 2. New Expressions: new Foo()
+          if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
+            calledIdentifiers.add(node.expression.text);
+          }
+
+          // 3. Type References: let x: Foo
+          if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
+            calledIdentifiers.add(node.typeName.text);
+          }
+
+          ts.forEachChild(node, extractCalls);
+        };
+
+        ts.forEachChild(sourceFile, extractCalls);
+      } catch {
+        // Fallback for unparseable files
+      }
+    }
+
     for (const [symbolName, decls] of symbolTable.byName.entries()) {
-      // Don't match self references
       const externalDecls = decls.filter(
         (d) => d.filePath !== callerPath && d.isExported && symbolName.length >= 3,
       );
@@ -34,10 +92,7 @@ export function buildCallGraph(
         continue;
       }
 
-      // Check if caller mentions the symbol as a whole token/identifier
-      const escaped = symbolName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const wordRegex = new RegExp(`(^|[^a-zA-Z0-9_$])${escaped}([^a-zA-Z0-9_$]|$)`);
-      if (wordRegex.test(file.sourceText)) {
+      if (calledIdentifiers.has(symbolName)) {
         for (const targetDecl of externalDecls) {
           const calleePath = targetDecl.filePath;
           edges.push({
@@ -47,7 +102,6 @@ export function buildCallGraph(
             weight: 1.0,
           });
 
-          // Add to incoming / outgoing maps
           const incoming = incomingMap.get(calleePath) ?? new Set<string>();
           incoming.add(callerPath);
           incomingMap.set(calleePath, incoming);
@@ -88,32 +142,32 @@ export function rankFilesByGraphRelevance(
 
   let currentFrontier = new Map<string, number>();
   for (const seed of seedFilePaths) {
-    currentFrontier.set(seed, 1.0);
     scores.set(seed, 1.0);
+    currentFrontier.set(seed, 1.0);
   }
 
   for (let depth = 1; depth <= maxDepth; depth++) {
     const nextFrontier = new Map<string, number>();
-    const currentWeight = Math.pow(decay, depth);
+    const currentDecay = Math.pow(decay, depth);
 
-    for (const currentFile of currentFrontier.keys()) {
+    for (const [sourcePath] of currentFrontier.entries()) {
       const neighbors = [
-        ...(graph.incomingReferences.get(currentFile) ?? []),
-        ...(graph.outgoingReferences.get(currentFile) ?? []),
+        ...(graph.outgoingReferences.get(sourcePath) ?? []),
+        ...(graph.incomingReferences.get(sourcePath) ?? []),
       ];
 
       for (const neighbor of neighbors) {
-        if (!scores.has(neighbor)) {
-          scores.set(neighbor, currentWeight);
-          nextFrontier.set(neighbor, currentWeight);
+        const newScore = (scores.get(neighbor) ?? 0) + currentDecay;
+        scores.set(neighbor, newScore);
+
+        if (!nextFrontier.has(neighbor)) {
+          nextFrontier.set(neighbor, newScore);
         }
       }
     }
 
     currentFrontier = nextFrontier;
-    if (currentFrontier.size === 0) {
-      break;
-    }
+    if (currentFrontier.size === 0) break;
   }
 
   return scores;
