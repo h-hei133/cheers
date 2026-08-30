@@ -56,6 +56,11 @@ export class DeepResearcher {
       // 1. Generate orthogonal SERP queries
       const serpQueries = this.generateSerpQueries(currentTopic, currentBreadth);
       totalQueriesExecuted += serpQueries.length;
+      updateProgress({
+        totalQueries: totalQueriesExecuted,
+        currentDepth,
+        currentBreadth,
+      });
       // 2. Execute searches concurrently in bounded pool
       const searchTool = createWebSearchToolDefinition();
       const fetchTool = createWebFetchToolDefinition();
@@ -148,9 +153,10 @@ export class DeepResearcher {
   private static extractUrlsFromSearch(searchOutput: string): string[] {
     const urls: string[] = [];
     const matches = searchOutput.match(/https?:\/\/[^\s)"]+/g) || [];
-    for (const u of matches) {
-      if (!urls.includes(u)) {
-        urls.push(u);
+    for (const raw of matches) {
+      const clean = raw.replace(/[.,;:)\]>]+$/, "");
+      if (!urls.includes(clean) && clean.startsWith("http")) {
+        urls.push(clean);
       }
     }
     return urls.slice(0, 3);

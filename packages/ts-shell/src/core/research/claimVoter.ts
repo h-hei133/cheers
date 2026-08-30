@@ -21,12 +21,12 @@ export class ClaimVoter {
     }> = [];
 
     for (const item of learnings) {
-      const tokens = this.tokenize(item.statement);
+      const tokens = Array.from(new Set(this.tokenize(item.statement)));
       if (tokens.length === 0) continue;
 
       let matchedCluster = null;
       for (const cluster of clusters) {
-        const clusterTokens = this.tokenize(cluster.representative);
+        const clusterTokens = Array.from(new Set(this.tokenize(cluster.representative)));
         const intersection = tokens.filter((t) => clusterTokens.includes(t));
         const unionSize = new Set([...tokens, ...clusterTokens]).size;
         const minSize = Math.min(tokens.length, clusterTokens.length);

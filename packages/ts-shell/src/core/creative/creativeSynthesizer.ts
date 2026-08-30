@@ -15,8 +15,8 @@ export class CreativeSynthesizer {
     // Find the best synthesis: prefer Minimalist core + Defensive bounded safety
     const minimalistHyp = hypotheses.find((h) => h.perspective === "boring-minimalist")!;
     const defensiveHyp = hypotheses.find((h) => h.perspective === "defensive-high-performance")!;
-    const modularCritique = critiques.find((c) => c.hypothesisId === "hyp_extensible_modular")!;
-
+    const modularHyp = hypotheses.find((h) => h.perspective === "extensible-modular")!;
+    const modularCritique = critiques.find((c) => c.hypothesisId === modularHyp.id) ?? critiques[0];
     const keyDecisions = [
       "Adopt Plain TypeScript functions and native Map/Set primitives (zero external dependencies).",
       "Incorporate defensive bound caps: explicit timeout guards and max-size safety limits.",

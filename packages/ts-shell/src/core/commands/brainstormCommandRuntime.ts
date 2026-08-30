@@ -85,7 +85,6 @@ export async function runBrainstormCommand(
     lines.push(`- **Over-engineering Risk Score**: ${(critique.overEngineeringScore * 100).toFixed(0)}%`);
     lines.push("");
   });
-
   lines.push("## 2. Synthesized Architecture & Key Decisions");
   lines.push("");
   solution.keyDecisions.forEach((d) => lines.push(`- ✅ ${d}`));
@@ -103,7 +102,8 @@ export async function runBrainstormCommand(
 
   // 3. Save Mode: Persist ADR and retain in QuadMemory
   if (flags.has("save")) {
-    const slug = challenge.toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 40);
+    const rawSlug = challenge.toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+    const slug = rawSlug || `spec-${Date.now()}`;
     const specsDir = path.join(context.cwd, "docs", "specs");
     const filePath = path.join(specsDir, `${slug}-design.md`);
 
