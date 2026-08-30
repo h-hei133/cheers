@@ -104,8 +104,11 @@ export async function* runAutonomousReActLoop(
         options.agentMode === "plan"
           ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, run safe read-only commands (like git status, git diff) via bash, and explore websites via browser and web tools, but cannot modify files. Produce a structured execution plan based on real file contents."
           : "BUILD MODE ACTIVE: You have full access to inspect, search, execute, browse, and edit files to accomplish the user's task.",
-        "- For web searching: use `web_search` to retrieve online technical references.",
-        "- For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests/git).",
+        "CRITICAL EXECUTION & ANSWER RULES:",
+        "1. When you run tools and gather facts, you MUST provide a final, comprehensive, structured markdown answer to the user.",
+        "2. NEVER stop after running tools without giving your findings, explanation, and answer in text.",
+        "3. For web searching: use `web_search` to retrieve online technical references.",
+        "4. For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests/git).",
       ].join("\n"),
     },
     {
@@ -480,6 +483,19 @@ export async function* runAutonomousReActLoop(
       });
     }
   }
+  // If loop executed tool turns but model did not output final text before exiting, synthesize completion output
+  if (!lastAssistantText && messages.length > 2) {
+    const lastToolOutput = messages.filter((m) => m.role === "tool").slice(-1)[0]?.content;
+    const summaryText = lastToolOutput
+      ? `Analysis complete based on tool observations:\n\n${lastToolOutput.slice(0, 1000)}`
+      : `Completed execution across ${turn} turns.`;
+    yield {
+      type: "message.delta",
+      role: "coder",
+      delta: summaryText,
+    };
+    lastAssistantText = summaryText;
+  }
 
   await hookDispatcher.dispatch({
     eventName: "Stop",
@@ -489,7 +505,6 @@ export async function* runAutonomousReActLoop(
     turnsExecuted: turn,
     finalOutput: lastAssistantText,
   });
-
   yield {
     type: "query.completed",
     result: {

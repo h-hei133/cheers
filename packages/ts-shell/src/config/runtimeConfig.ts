@@ -89,7 +89,7 @@ export interface RuntimeConfigFile {
 const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   provider: "openai",
   daemonEnabled: true,
-  maxTurns: 6,
+  maxTurns: 15,
   disabledTools: [],
   hiddenToolPrefixes: [],
   enableMcpTools: true,
