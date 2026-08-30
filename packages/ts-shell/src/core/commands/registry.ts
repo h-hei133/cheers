@@ -2,7 +2,6 @@ import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
 import { runCompactLocalCommand } from "./compactCommandRuntime.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
-import { runMemoryLocalCommand } from "./memoryCommandRuntime.js";
 import { runModelCommand } from "./modelCommandRuntime.js";
 import { runRestoreLocalCommand } from "./restoreCommandRuntime.js";
 import { runSidebarLocalCommand } from "./sidebarCommandRuntime.js";
@@ -23,6 +22,7 @@ import { runContextCommand } from "./contextCommandRuntime.js";
 import { runBtwCommand } from "./btwCommandRuntime.js";
 import { runMarketplaceCommand } from "./marketplaceCommandRuntime.js";
 import { runPluginCommand } from "./pluginCommandRuntime.js";
+import { runMemoryCommand } from "./memoryCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -85,14 +85,6 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runCompactLocalCommand(args, context),
-    },
-    {
-      name: "memory",
-      kind: "local",
-      availability: "available",
-      enabled: true,
-      bridgeSafe: true,
-      execute: (args, context) => runMemoryLocalCommand(args, context),
     },
     {
       name: "warmup",
@@ -406,6 +398,15 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runPluginCommand(args, context),
+    },
+    {
+      name: "memory",
+      aliases: ["mem", "recall", "retain"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runMemoryCommand(args, context),
     },
   ];
 

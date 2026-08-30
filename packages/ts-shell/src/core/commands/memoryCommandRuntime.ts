@@ -33,6 +33,73 @@ import {
 } from "../context/memory/projectMemoryReviewState.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import {
+  executeMemoryInspect,
+  executeMemoryRetain,
+} from "../memory/memoryTools.js";
+import type { MemoryCategory } from "../memory/types.js";
+
+/**
+ * /memory command
+ * Unified memory engine:
+ * 1. Coordinates ProjectMemoryReview lifecycle (review, save, recall, wake, use, invalidate, delete).
+ * 2. Emits real-time telemetry to sidebar.
+ * 3. Supports QuadMemory bank extensions (/memory stats, /memory add).
+ */
+export async function runMemoryCommand(
+  args: string[],
+  context: CommandContext,
+): Promise<LocalCommandResult> {
+  const sub = args[0]?.toLowerCase();
+
+  // Explicit QuadMemory Stats/Inspect
+  if (sub === "inspect" || sub === "stats") {
+    const statsOutput = await executeMemoryInspect();
+    const localResult: LocalCommandResult = {
+      kind: "local",
+      output: statsOutput,
+    };
+    emitCommandResultToSidebar(context, {
+      command: "/memory",
+      args,
+      result: localResult,
+    });
+    return localResult;
+  }
+
+  // Explicit QuadMemory Add/Retain
+  if (sub === "add" || sub === "retain") {
+    const statement = args.slice(1).join(" ").trim();
+    if (!statement) {
+      return {
+        kind: "local",
+        output: "Usage: `/memory add <statement>`\nExample: `/memory add Project uses Vitest`",
+      };
+    }
+    let category: MemoryCategory = "convention";
+    if (statement.toLowerCase().includes("rule") || statement.toLowerCase().includes("must")) {
+      category = "constraint";
+    } else if (statement.toLowerCase().includes("arch") || statement.toLowerCase().includes("layer")) {
+      category = "architecture";
+    }
+    const output = await executeMemoryRetain({
+      items: [{ statement, category }],
+    });
+    const localResult: LocalCommandResult = {
+      kind: "local",
+      output,
+    };
+    emitCommandResultToSidebar(context, {
+      command: "/memory",
+      args,
+      result: localResult,
+    });
+    return localResult;
+  }
+
+  // Standard Lifecycle & Review Protocol
+  return runMemoryLocalCommand(args, context);
+}
 
 export async function runMemoryLocalCommand(
   args: string[],

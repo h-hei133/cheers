@@ -210,6 +210,12 @@ export const SLASH_COMMANDS = [
     group: "workflow",
     summary: "install, list, enable, or disable plugin capabilities",
   },
+  {
+    name: "memory",
+    aliases: ["mem", "recall", "retain"],
+    group: "session",
+    summary: "inspect, search, retain, or invalidate persistent memory facts",
+  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];

@@ -53,3 +53,4 @@
 ## [2026-08-30] fix | Code review fixes for 97f67a1 & dcf7aa3: microcompact boundary index default, tool_calls token counting, dynamic toString function names in stealth, and context-level preload script inheritance
 ## [2026-08-30] feat | Delivered modern extension ecosystem commands: enhanced /model (direct model switching), /marketplace (plugin marketplace sources management), and /plugin (install/uninstall/enable/disable lifecycle)
 ## [2026-08-30] docs | Completed multi-agent memory architecture synthesis (Claude Code, Pi, Oh My Pi, Mem0, MemPalace, Codex, OpenCode) in .wiki/wiki/theses/agent-memory-architecture-and-synthesis.md
+## [2026-08-30] feat | Delivered Native QuadMemory Engine: FactArbiter (additive conflict resolution), MemoryStore (hybrid BM25 + entity boost), memory tools (retain, recall, edit, inspect), and unified /memory command
