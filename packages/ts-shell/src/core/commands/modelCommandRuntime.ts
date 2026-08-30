@@ -58,6 +58,19 @@ export async function runModelCommand(
     };
   }
 
+  if (action.startsWith("-")) {
+    return {
+      kind: "local",
+      output: [
+        `Unknown flag '${action}'.`,
+        "Usage:",
+        "- `/model` or `/model status` : Inspect active model and provider",
+        "- `/model list` : List all available models",
+        "- `/model <model-name>` : Switch model directly",
+      ].join("\n"),
+    };
+  }
+
   // Direct model switching support (e.g. /model deepseek-ai/DeepSeek-V4-Flash or /model gpt-4o)
   return {
     kind: "local",

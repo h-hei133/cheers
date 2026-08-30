@@ -36,6 +36,7 @@ import type { CommandContext, LocalCommandResult } from "./types.js";
 import {
   executeMemoryInspect,
   executeMemoryRetain,
+  executeMemoryRecall,
 } from "../memory/memoryTools.js";
 import type { MemoryCategory } from "../memory/types.js";
 
@@ -50,7 +51,29 @@ export async function runMemoryCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const rawCmd = (context.rawCommandName ?? "").replace(/^\//, "").toLowerCase();
   const sub = args[0]?.toLowerCase();
+
+  // If invoked via aliases such as /recall <query> or /retain <statement>
+  if (rawCmd === "recall") {
+    const query = args.join(" ").trim();
+    if (!query) {
+      return { kind: "local", output: "Usage: `/recall <query>`\nExample: `/recall NormProof rules`" };
+    }
+    const output = await executeMemoryRecall({ query });
+    return { kind: "local", output };
+  }
+
+  if (rawCmd === "retain") {
+    const statement = args.join(" ").trim();
+    if (!statement) {
+      return { kind: "local", output: "Usage: `/retain <statement>`\nExample: `/retain Project uses Vitest`" };
+    }
+    const output = await executeMemoryRetain({
+      items: [{ statement }],
+    });
+    return { kind: "local", output };
+  }
 
   // Explicit QuadMemory Stats/Inspect
   if (sub === "inspect" || sub === "stats") {

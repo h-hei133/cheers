@@ -108,9 +108,10 @@ export class MemoryStore {
       // 4. Confidence scaling
       score *= 0.5 + fact.confidence * 0.5;
 
-      // 5. Age decay (slight penalty for very old facts)
-      const ageHours = (Date.now() - fact.createdAt) / (1000 * 60 * 60);
-      const recencyFactor = Math.max(0.7, 1 - (ageHours / (24 * 30)) * 0.3);
+      // 5. Age decay (bounded between 0.7 and 1.0, guard against NaN and future dates)
+      const createdAt = Number.isFinite(fact.createdAt) ? fact.createdAt : Date.now();
+      const ageHours = Math.max(0, (Date.now() - createdAt) / (1000 * 60 * 60));
+      const recencyFactor = Math.min(1.0, Math.max(0.7, 1 - (ageHours / (24 * 30)) * 0.3));
       score *= recencyFactor;
 
       if (score > 0 || query.trim() === "") {
@@ -166,7 +167,7 @@ export class MemoryStore {
   private tokenize(text: string): string[] {
     return text
       .toLowerCase()
-      .replace(/[^\w\s-]/g, " ")
+      .replace(/[^\p{L}\p{N}_-]/gu, " ")
       .split(/\s+/)
       .filter((t) => t.length > 1);
   }

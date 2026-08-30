@@ -117,8 +117,18 @@ export async function executeMemoryEdit(input: MemoryEditInput): Promise<string>
       statement: input.replacement,
       category: fact.category,
       scope: fact.scope,
+      confidence: fact.confidence,
     });
-    const updatedFact = arbiter.applyDecision(decision);
+
+    // Ensure target fact is explicitly superseded even if statement wording differs
+    const forcedUpdateDecision = {
+      ...decision,
+      kind: "UPDATE" as const,
+      targetFactId: input.id,
+      reason: input.reason ?? `Updated via memory_edit from '${fact.statement}'`,
+    };
+
+    const updatedFact = arbiter.applyDecision(forcedUpdateDecision);
     return `Memory fact \`${input.id}\` updated to \`${updatedFact?.id}\`: "${input.replacement}".`;
   }
 

@@ -57,20 +57,31 @@ export class FactArbiter {
     let highestOverlapFact: MemoryFact | null = null;
     let maxOverlapRatio = 0;
 
-    for (const f of existingFacts) {
-      if (f.status !== "active") continue;
-      const fTokens = this.tokenize(f.statement);
-      const intersection = fTokens.filter((t) => candidateTokens.has(t));
-      const overlapRatio =
-        intersection.length / Math.min(candidateTokens.size, fTokens.length);
+    if (candidateTokens.size > 0) {
+      for (const f of existingFacts) {
+        if (f.status !== "active") continue;
+        const fTokens = new Set(this.tokenize(f.statement));
+        if (fTokens.size === 0) continue;
 
-      if (overlapRatio > maxOverlapRatio) {
-        maxOverlapRatio = overlapRatio;
-        highestOverlapFact = f;
+        let intersectionCount = 0;
+        for (const t of candidateTokens) {
+          if (fTokens.has(t)) {
+            intersectionCount++;
+          }
+        }
+
+        // Jaccard similarity: intersection / union
+        const unionSize = candidateTokens.size + fTokens.size - intersectionCount;
+        const overlapRatio = unionSize > 0 ? intersectionCount / unionSize : 0;
+
+        if (overlapRatio > maxOverlapRatio) {
+          maxOverlapRatio = overlapRatio;
+          highestOverlapFact = f;
+        }
       }
     }
 
-    if (highestOverlapFact && (maxOverlapRatio >= 0.4 || this.detectContradiction(statement, highestOverlapFact.statement))) {
+    if (highestOverlapFact && (maxOverlapRatio >= 0.2 || (maxOverlapRatio > 0 && this.detectContradiction(statement, highestOverlapFact.statement)))) {
       // Check for contradiction signals (e.g. "no longer", "replaced", "deprecated", "switch to")
       const isContradiction = this.detectContradiction(statement, highestOverlapFact.statement);
       if (isContradiction) {
@@ -87,7 +98,7 @@ export class FactArbiter {
       }
 
       // If category matches and significant token refinement, classify as UPDATE
-      if (highestOverlapFact.category === category) {
+      if (highestOverlapFact.category === category && maxOverlapRatio >= 0.35) {
         return {
           kind: "UPDATE",
           targetFactId: highestOverlapFact.id,
@@ -100,7 +111,6 @@ export class FactArbiter {
         };
       }
     }
-
     // 3. Orthogonal fact (ADD)
     return {
       kind: "ADD",
@@ -173,7 +183,6 @@ export class FactArbiter {
     const entities = new Set<string>();
     for (const w of words) {
       const clean = w.replace(/^[^\w]+|[^\w]+$/g, "");
-      // CamelCase or PascalCase or snake_case or kebab-case or uppercase acronyms
       if (/^[A-Z][a-zA-Z0-9]+$/.test(clean) || /^[a-z]+_[a-z0-9_]+$/.test(clean) || /^[a-z]+-[a-z0-9-]+$/.test(clean)) {
         if (clean.length > 2) {
           entities.add(clean);
@@ -198,8 +207,8 @@ export class FactArbiter {
   private tokenize(text: string): string[] {
     return text
       .toLowerCase()
-      .replace(/[^\w\s-]/g, " ")
+      .replace(/[^\p{L}\p{N}_-]/gu, " ")
       .split(/\s+/)
-      .filter((t) => t.length > 2);
+      .filter((t) => t.length > 1);
   }
 }

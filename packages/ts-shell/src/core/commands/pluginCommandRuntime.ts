@@ -53,9 +53,13 @@ export function resetInstalledPlugins(): void {
   ];
 }
 
+function normalizePluginName(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
 /**
  * /plugin command
- * Manages plugin lifecycle: list, install, uninstall, enable, disable.
+ * Manages plugin lifecycle: list, install, uninstall, enable, disable, search.
  */
 export async function runPluginCommand(
   args: string[],
@@ -90,6 +94,7 @@ export async function runPluginCommand(
       "- `/plugin uninstall <name>` : Remove an installed plugin",
       "- `/plugin enable <name>` : Enable an inactive plugin",
       "- `/plugin disable <name>` : Disable a plugin without uninstalling",
+      "- `/plugin search <keyword>` : Search for available plugins",
     );
 
     return {
@@ -107,7 +112,7 @@ export async function runPluginCommand(
       };
     }
 
-    const pluginName = target.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "-");
+    const pluginName = normalizePluginName(target);
     const existing = installedPlugins.find((p) => p.name === pluginName);
     if (existing) {
       existing.enabled = true;
@@ -132,13 +137,41 @@ export async function runPluginCommand(
     };
   }
 
+  if (subCommand === "search" || subCommand === "find") {
+    const query = args.slice(1).join(" ").trim().toLowerCase();
+    if (!query) {
+      return { kind: "local", output: "Usage: `/plugin search <keyword>`" };
+    }
+
+    const matches = installedPlugins.filter(
+      (p) =>
+        p.name.includes(query) ||
+        p.description?.toLowerCase().includes(query) ||
+        p.capabilities?.some((c) => c.includes(query)),
+    );
+
+    if (matches.length === 0) {
+      return {
+        kind: "local",
+        output: `No matching plugins found for keyword '${query}'.`,
+      };
+    }
+
+    const lines = [`# Plugin Search Results for '${query}':`, ""];
+    matches.forEach((p, idx) => {
+      lines.push(`${idx + 1}. \`${p.name}\` (v${p.version}) - ${p.description ?? "No description"}`);
+    });
+    return { kind: "local", output: lines.join("\n") };
+  }
+
   if (subCommand === "uninstall" || subCommand === "rm" || subCommand === "remove") {
-    const target = args[1]?.trim().toLowerCase();
+    const target = args[1]?.trim();
     if (!target) {
       return { kind: "local", output: "Usage: `/plugin uninstall <name>`" };
     }
 
-    const index = installedPlugins.findIndex((p) => p.name === target);
+    const pluginName = normalizePluginName(target);
+    const index = installedPlugins.findIndex((p) => p.name === pluginName);
     if (index === -1) {
       return {
         kind: "local",
@@ -149,33 +182,35 @@ export async function runPluginCommand(
     installedPlugins.splice(index, 1);
     return {
       kind: "local",
-      output: `Plugin \`${target}\` successfully uninstalled.`,
+      output: `Plugin \`${pluginName}\` successfully uninstalled.`,
     };
   }
 
   if (subCommand === "enable") {
-    const target = args[1]?.trim().toLowerCase();
-    const plugin = installedPlugins.find((p) => p.name === target);
+    const target = args[1]?.trim();
+    const pluginName = target ? normalizePluginName(target) : "";
+    const plugin = installedPlugins.find((p) => p.name === pluginName);
     if (!plugin) {
       return { kind: "local", output: `Plugin '${target}' not found.` };
     }
     plugin.enabled = true;
     return {
       kind: "local",
-      output: `Plugin \`${target}\` is now ENABLED.`,
+      output: `Plugin \`${pluginName}\` is now ENABLED.`,
     };
   }
 
   if (subCommand === "disable") {
-    const target = args[1]?.trim().toLowerCase();
-    const plugin = installedPlugins.find((p) => p.name === target);
+    const target = args[1]?.trim();
+    const pluginName = target ? normalizePluginName(target) : "";
+    const plugin = installedPlugins.find((p) => p.name === pluginName);
     if (!plugin) {
       return { kind: "local", output: `Plugin '${target}' not found.` };
     }
     plugin.enabled = false;
     return {
       kind: "local",
-      output: `Plugin \`${target}\` is now DISABLED.`,
+      output: `Plugin \`${pluginName}\` is now DISABLED.`,
     };
   }
 
@@ -188,6 +223,7 @@ export async function runPluginCommand(
       "- `/plugin uninstall <name>` : Remove a plugin",
       "- `/plugin enable <name>` : Enable a plugin",
       "- `/plugin disable <name>` : Disable a plugin",
+      "- `/plugin search <keyword>` : Search plugins",
     ].join("\n"),
   };
 }
