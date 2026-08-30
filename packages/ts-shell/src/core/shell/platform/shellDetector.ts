@@ -27,11 +27,11 @@ export class ShellDetector {
           activeBackend === "powershell"
             ? (platform === "win32" ? "powershell.exe" : "pwsh")
             : activeBackend === "git-bash"
-            ? "C:\\Program Files\\Git\\bin\\bash.exe"
+            ? (platform === "win32" ? "C:\\Program Files\\Git\\bin\\bash.exe" : "/bin/bash")
             : activeBackend === "wsl"
-            ? "wsl.exe"
+            ? (platform === "win32" ? "wsl.exe" : "/bin/bash")
             : "/bin/bash",
-        isAvailable: true,
+        isAvailable: platform === "win32" ? activeBackend === "powershell" : activeBackend === "bash",
         isDefault: false,
       };
 
@@ -56,7 +56,7 @@ export class ShellDetector {
       const gitBashPaths = [
         "C:\\Program Files\\Git\\bin\\bash.exe",
         "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
-        `${process.env.LOCALAPPDATA ?? ""}\\Programs\\Git\\bin\\bash.exe`,
+        ...(process.env.LOCALAPPDATA ? [`${process.env.LOCALAPPDATA}\\Programs\\Git\\bin\\bash.exe`] : []),
       ];
       let gitBashFound = false;
       for (const p of gitBashPaths) {
@@ -107,12 +107,13 @@ export class ShellDetector {
         isDefault: false,
       });
     } else {
-      // Linux / macOS: Standard POSIX bash / zsh
-      const defaultBash = process.env.SHELL || "/bin/bash";
+      // Linux / macOS: Standard POSIX bash / zsh / sh
+      const defaultBash = process.env.SHELL || (fs.existsSync("/bin/bash") ? "/bin/bash" : fs.existsSync("/bin/sh") ? "/bin/sh" : "/bin/bash");
+      const isAvailable = fs.existsSync(defaultBash) || defaultBash.startsWith("/");
       shells.push({
         kind: "bash",
         executablePath: defaultBash,
-        isAvailable: true,
+        isAvailable,
         isDefault: true,
       });
     }
