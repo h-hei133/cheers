@@ -6,6 +6,7 @@ import {
   type RuntimeProvider,
 } from "../../config/runtimeConfig.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 
 const MODELS_DEV_API_URL = "https://models.dev/api.json";
 const OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS = [
@@ -48,9 +49,8 @@ export async function runModelCommand(
   }
 
   if (action === "use" || action === "set") {
-    return { kind: "local", output: setModel(rest) };
+    return { kind: "local", output: await setModel(rest, _context) };
   }
-
   if (action === "help" || action === "--help" || action === "-h") {
     return {
       kind: "local",
@@ -70,12 +70,11 @@ export async function runModelCommand(
       ].join("\n"),
     };
   }
-
-  // Direct model switching support (e.g. /model deepseek-ai/DeepSeek-V4-Flash or /model gpt-4o)
-  return {
-    kind: "local",
-    output: setModel([action, ...rest]),
-  };
+  const [modelArg] = args;
+  if (!modelArg) {
+    return { kind: "local", output: renderModelStatus() };
+  }
+  return { kind: "local", output: await setModel(args, _context) };
 }
 function renderModelStatus(): string {
   const config = readUserRuntimeConfigFile();
@@ -227,20 +226,34 @@ async function listModels(args: string[]): Promise<string> {
   ].join("\n");
 }
 
-function setModel(args: string[]): string {
-  const model = normalizeText(args[0]);
+async function setModel(args: string[], context?: CommandContext): Promise<string> {
+  const model = args[0]?.trim();
   if (!model) {
     return "Usage: /model use <model-id>";
   }
-
   const config = readUserRuntimeConfigFile();
+  const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
+  const activeConnection = connections.find((item) => item.id === activeId);
+  const provider = activeConnection?.provider ?? config.provider ?? "openai";
+  const fromModel = config.providerCredentials?.[provider]?.model || "default";
+
+  // Dispatch PreModelSwitch Hook
+  const preDecision = await defaultHookDispatcher.dispatch({
+    eventName: "PreModelSwitch",
+    sessionId: context?.sessionId || "model-switch",
+    workspaceRoot: context?.cwd || process.cwd(),
+    timestamp: new Date().toISOString(),
+    fromModel,
+    toModel: model,
+  });
+
+  if (preDecision && preDecision.decision === "block") {
+    return `Model switch blocked by hook policy: ${preDecision.reason || "Switch not allowed."}`;
+  }
   if (!activeId) {
     return "No active connection. Run /connect login ... first.";
   }
-
-  const connections = normalizeConnections(config);
-  const activeConnection = connections.find((item) => item.id === activeId);
   if (!activeConnection) {
     return `Active connection not found: ${activeId}`;
   }
@@ -262,10 +275,10 @@ function setModel(args: string[]): string {
   const nextConnections = connections.map((item) =>
     item.id === activeId ? { ...item, model, updatedAt } : item,
   );
-  const provider = activeConnection.provider;
+  const activeProvider = activeConnection.provider;
   const next: RuntimeConfigFile = {
     ...config,
-    provider,
+    provider: activeProvider,
     activeProviderConnectionId: activeId,
     providerConnections: nextConnections,
     providerCredentials: {
@@ -277,6 +290,16 @@ function setModel(args: string[]): string {
     },
   };
   const configPath = writeUserRuntimeConfigFile(next);
+
+  // Dispatch PostModelSwitch Hook
+  await defaultHookDispatcher.dispatch({
+    eventName: "PostModelSwitch",
+    sessionId: context?.sessionId || "model-switch",
+    workspaceRoot: context?.cwd || process.cwd(),
+    timestamp: new Date().toISOString(),
+    fromModel,
+    toModel: model,
+  });
 
   return [
     `Model switched to ${model}.`,

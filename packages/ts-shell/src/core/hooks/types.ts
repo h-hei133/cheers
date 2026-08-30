@@ -1,19 +1,33 @@
 /**
- * Claude Code Aligned Lifecycle Hook Event Types & Contracts
+ * Claude Code 2026 SOTA Lifecycle Hook Event Types & Contracts
+ * Verified from Anthropic official documentation.
  */
 
 export type HookEventName =
   | "SessionStart"
   | "SessionEnd"
   | "UserPromptSubmit"
+  | "UserPromptExpansion"
   | "PreToolUse"
   | "PostToolUse"
   | "PostToolUseFailure"
   | "PostToolBatch"
+  | "PermissionRequest"
+  | "PermissionDenied"
+  | "PreModelSwitch"
+  | "PostModelSwitch"
+  | "PreCompact"
+  | "PostCompact"
+  | "SubagentStart"
+  | "SubagentStop"
+  | "WorktreeCreate"
+  | "WorktreeRemove"
+  | "TaskCreated"
+  | "TaskCompleted"
   | "Stop"
   | "StopFailure";
 
-export type HookDecisionKind = "allow" | "block" | "retry";
+export type HookDecisionKind = "allow" | "block" | "retry" | "ask" | "defer";
 
 export interface HookDecision {
   readonly decision: HookDecisionKind;
@@ -27,6 +41,8 @@ export interface BaseHookEventPayload {
   readonly sessionId: string;
   readonly workspaceRoot: string;
   readonly timestamp: string;
+  readonly agentId?: string;
+  readonly agentType?: string;
 }
 
 export interface UserPromptSubmitPayload extends BaseHookEventPayload {
@@ -58,6 +74,31 @@ export interface PostToolUseFailurePayload extends BaseHookEventPayload {
   readonly error: string;
 }
 
+export interface PreModelSwitchPayload extends BaseHookEventPayload {
+  readonly eventName: "PreModelSwitch";
+  readonly fromModel: string;
+  readonly toModel: string;
+}
+
+export interface PostModelSwitchPayload extends BaseHookEventPayload {
+  readonly eventName: "PostModelSwitch";
+  readonly fromModel: string;
+  readonly toModel: string;
+}
+
+export interface WorktreeCreatePayload extends BaseHookEventPayload {
+  readonly eventName: "WorktreeCreate";
+  readonly subtaskId: string;
+  readonly worktreePath: string;
+  readonly branch: string;
+}
+
+export interface WorktreeRemovePayload extends BaseHookEventPayload {
+  readonly eventName: "WorktreeRemove";
+  readonly subtaskId: string;
+  readonly worktreePath: string;
+}
+
 export interface StopPayload extends BaseHookEventPayload {
   readonly eventName: "Stop";
   readonly turnsExecuted: number;
@@ -69,27 +110,28 @@ export type HookEventPayload =
   | PreToolUsePayload
   | PostToolUsePayload
   | PostToolUseFailurePayload
+  | PreModelSwitchPayload
+  | PostModelSwitchPayload
+  | WorktreeCreatePayload
+  | WorktreeRemovePayload
   | StopPayload
   | BaseHookEventPayload;
 
-export interface CommandHookConfig {
-  readonly event: HookEventName;
-  readonly matcher?: string; // Regex to match toolName or prompt
-  readonly command: string;
+export interface InProcessHookConfig {
+  readonly name?: string;
   readonly description?: string;
-  readonly timeoutMs?: number;
+  readonly event: HookEventName;
+  readonly matcher?: string;
+  readonly handler: (payload: HookEventPayload) => Promise<HookDecision | null | void> | HookDecision | null | void;
 }
 
-export type InProcessHookHandler = (
-  payload: HookEventPayload,
-) => Promise<HookDecision | null> | HookDecision | null;
-
-export interface InProcessHookConfig {
-  readonly event: HookEventName;
-  readonly name: string;
-  readonly matcher?: string;
-  readonly handler: InProcessHookHandler;
+export interface CommandHookConfig {
+  readonly name?: string;
   readonly description?: string;
+  readonly event: HookEventName;
+  readonly matcher?: string;
+  readonly command: string;
+  readonly timeoutMs?: number;
 }
 
 export interface HooksConfiguration {
