@@ -7,10 +7,12 @@ export interface ToolCallHistoryEntry {
 
 export class DoomLoopDetector {
   private readonly threshold: number;
+  private readonly maxHistorySize: number;
   private readonly callHistory: ToolCallHistoryEntry[] = [];
 
-  constructor(threshold: number = 3) {
+  constructor(threshold: number = 3, maxHistorySize: number = 50) {
     this.threshold = threshold;
+    this.maxHistorySize = maxHistorySize;
   }
 
   recordAndCheck(toolName: string, args: Record<string, unknown>): {
@@ -25,6 +27,9 @@ export class DoomLoopDetector {
     };
 
     this.callHistory.push(entry);
+    if (this.callHistory.length > this.maxHistorySize) {
+      this.callHistory.splice(0, this.callHistory.length - this.maxHistorySize);
+    }
 
     // Count consecutive identical tool calls from the tail
     let repeatCount = 0;
@@ -47,16 +52,27 @@ export class DoomLoopDetector {
     this.callHistory.length = 0;
   }
 
-  private hashArgs(args: Record<string, unknown>): string {
+  private hashArgs(value: unknown): string {
     try {
-      const keys = Object.keys(args).sort();
-      const normalized: Record<string, unknown> = {};
-      for (const k of keys) {
-        normalized[k] = args[k];
-      }
-      return JSON.stringify(normalized);
+      return JSON.stringify(this.canonicalize(value));
     } catch {
-      return String(args);
+      return String(value);
     }
+  }
+
+  private canonicalize(value: unknown): unknown {
+    if (value === null || typeof value !== "object") {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => this.canonicalize(item));
+    }
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    const sorted: Record<string, unknown> = {};
+    for (const key of keys) {
+      sorted[key] = this.canonicalize(obj[key]);
+    }
+    return sorted;
   }
 }

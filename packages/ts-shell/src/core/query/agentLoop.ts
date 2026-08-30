@@ -377,7 +377,6 @@ export async function* runAutonomousReActLoop(
       } catch (err) {
         parseError = `Invalid JSON arguments: ${err instanceof Error ? err.message : String(err)}`;
       }
-
       // Check Doom Loop (Repeated identical tool calls with same arguments)
       const doomCheck = doomLoopDetector.recordAndCheck(funcName, funcArgs);
       if (doomCheck.isDoomLoop) {
@@ -398,6 +397,9 @@ export async function* runAutonomousReActLoop(
       let isSuccess = false;
       if (parseError) {
         outputContent = `Error: Malformed JSON arguments for tool '${funcName}': ${parseError}. Raw: ${toolCall.function.arguments}`;
+        isSuccess = false;
+      } else if (doomCheck.isDoomLoop) {
+        outputContent = `Warning: Doom Loop detected! Tool '${funcName}' has been repeatedly executed ${doomCheck.repeatCount} times with identical arguments without state progression. Please try a different approach, refine your parameters, or formulate a final response based on existing observations.`;
         isSuccess = false;
       } else if (!tool) {
         outputContent = `Error: Tool '${funcName}' is not registered.`;

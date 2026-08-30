@@ -24,7 +24,6 @@ export class RotatingFileSink {
   private readonly pid: number;
   private currentFilePath: string = "";
   private currentFileSize: number = 0;
-  private writeStream: fs.WriteStream | null = null;
   private initialized: boolean = false;
 
   constructor(options: RotatingFileSinkOptions = {}) {

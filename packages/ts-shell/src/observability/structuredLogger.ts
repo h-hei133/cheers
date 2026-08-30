@@ -38,22 +38,32 @@ export function redactSecrets(value: string): string {
   return next
 }
 
-export function redactSecretsFromObject(value: unknown): unknown {
+export function redactSecretsFromObject(value: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
   if (typeof value === 'string') {
     return redactSecrets(value)
   }
 
-  if (Array.isArray(value)) {
-    return value.map(item => redactSecretsFromObject(item))
-  }
-
   if (typeof value === 'object' && value !== null) {
+    if (seen.has(value)) {
+      return '[CIRCULAR]'
+    }
+    seen.add(value)
+
+    if (Array.isArray(value)) {
+      return value.map(item => redactSecretsFromObject(item, seen))
+    }
+
     const redacted: Record<string, unknown> = {}
     for (const [key, item] of Object.entries(value)) {
-      if (sensitiveKeys.includes(key) || sensitiveKeys.includes(key.toLowerCase())) {
+      const lowerKey = key.toLowerCase()
+      const isSensitive =
+        sensitiveKeys.some(s => lowerKey.includes(s.toLowerCase())) ||
+        /token|secret|password|apikey|auth/i.test(key)
+
+      if (isSensitive) {
         redacted[key] = '[REDACTED]'
       } else {
-        redacted[key] = redactSecretsFromObject(item)
+        redacted[key] = redactSecretsFromObject(item, seen)
       }
     }
     return redacted
