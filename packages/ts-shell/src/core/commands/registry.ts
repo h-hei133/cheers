@@ -26,6 +26,7 @@ import { runMemoryCommand } from "./memoryCommandRuntime.js";
 import { runWorkflowCommand } from "./workflowCommandRuntime.js";
 import { runDeepResearchCommand } from "./deepResearchCommandRuntime.js";
 import { runBrainstormCommand } from "./brainstormCommandRuntime.js";
+import { runShellCommand } from "./shellCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -436,6 +437,15 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runBrainstormCommand(args, context),
+    },
+    {
+      name: "shell",
+      aliases: ["sh", "platform"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runShellCommand(args, context),
     },
   ];
 

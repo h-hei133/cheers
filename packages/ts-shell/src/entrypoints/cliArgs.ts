@@ -138,6 +138,9 @@ const RESERVED_SHELL_SLASH_COMMANDS = new Set([
   "/brainstorm",
   "/explore",
   "/brainstorming",
+  "/shell",
+  "/sh",
+  "/platform",
 ]);
 export function parseCliArgs(
   rawArgs: readonly string[],

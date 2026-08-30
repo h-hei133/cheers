@@ -234,6 +234,12 @@ export const SLASH_COMMANDS = [
     group: "workflow",
     summary: "multi-perspective design exploration and anti-pattern red-teaming",
   },
+  {
+    name: "shell",
+    aliases: ["sh", "platform"],
+    group: "workflow",
+    summary: "inspect and control cross-platform shell backends and diagnostics",
+  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];
