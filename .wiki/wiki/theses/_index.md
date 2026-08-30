@@ -20,3 +20,4 @@ Last updated: 2026-08-28
 - [全仓底层基础设施“伪算法与伪校验”深度穿透审计报告](deep-audit-of-core-infrastructure-and-pseudo-algorithms.md)
 - [SOTA 编译器级 AST 前检、动态验证门禁与真实代码图谱架构演进](sota-ast-verification-and-code-graph-architecture.md)
 - [全仓第三轮深层渗透审计报告与 SOTA 标杆解决方案](deep-audit-round-3-security-and-tool-realization.md)
+- [全仓第四轮深层架构渗透审计报告与多 Provider 协议适配方案](deep-audit-round-4-provider-protocols-and-boundary-projection.md)
