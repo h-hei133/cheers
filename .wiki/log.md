@@ -52,3 +52,4 @@
 ## [2026-08-30] feat | Phase 8 delivered: Browser Anti-Detection & Stealth Engine (WAF/Cloudflare bypass, stealth launch args scrubbing, navigator.webdriver masking, window.chrome runtime emulation, WebGL GPU spoofing, and native toString protection)
 ## [2026-08-30] fix | Code review fixes for 97f67a1 & dcf7aa3: microcompact boundary index default, tool_calls token counting, dynamic toString function names in stealth, and context-level preload script inheritance
 ## [2026-08-30] feat | Delivered modern extension ecosystem commands: enhanced /model (direct model switching), /marketplace (plugin marketplace sources management), and /plugin (install/uninstall/enable/disable lifecycle)
+## [2026-08-30] docs | Completed multi-agent memory architecture synthesis (Claude Code, Pi, Oh My Pi, Mem0, MemPalace, Codex, OpenCode) in .wiki/wiki/theses/agent-memory-architecture-and-synthesis.md
