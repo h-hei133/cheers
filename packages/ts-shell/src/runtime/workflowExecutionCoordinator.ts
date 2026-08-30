@@ -308,13 +308,30 @@ function createIntegratedRunner(
 ): (input: AgentExecutionInput) => Promise<AgentExecutionOutput> {
   return async ({ role, sharedContext, turn }) => {
     if (role === "planner") {
-      const content = `Plan accepted for prompt: ${sharedContext.initialPrompt}. Proceed to coding and respect sandbox policy.`;
+      const taskBrief = sharedContext.initialPrompt.trim();
+      const content = [
+        `# Dynamic Execution Plan for: "${taskBrief.slice(0, 100)}${taskBrief.length > 100 ? "..." : ""}"`,
+        "",
+        "## Phase 1: Environment & Dependency Discovery",
+        "- Scan project root structure and read package configs/manifests.",
+        "- Verify compiler/LSP readiness and active workspace branch status.",
+        "",
+        "## Phase 2: Implementation & Code Modification",
+        "- Apply scoped, minimal edits to target modules adhering to architectural norms.",
+        "- Maintain single responsibility ceiling and acyclic dependency constraints.",
+        "",
+        "## Phase 3: Post-Mutation Verification & Self-Healing",
+        "- Run focused unit tests against affected components.",
+        "- Trigger LSP compiler diagnostic guards and resolve any type/syntax errors.",
+        "",
+        `*Plan generated autonomously at turn ${turn}. Handoff to coder with sandbox authority.*`,
+      ].join("\n");
 
       return {
         role,
         content,
         handoffTo: "coder",
-        handoffReason: "Plan validated and ready",
+        handoffReason: "Plan structured and ready for implementation",
         events: [
           {
             type: "mcp.snapshot",

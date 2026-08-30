@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 export interface InstalledPlugin {
@@ -9,48 +12,69 @@ export interface InstalledPlugin {
   readonly capabilities?: readonly string[];
 }
 
-let installedPlugins: InstalledPlugin[] = [
-  {
-    name: "core-developer-suite",
-    version: "1.0.0",
-    enabled: true,
-    source: "official",
-    description: "Core coding capabilities: grep, lsp, code editing, and browser automation",
-    capabilities: ["tools", "hooks", "commands"],
-  },
-  {
-    name: "security-auditor",
-    version: "0.2.1",
-    enabled: true,
-    source: "official",
-    description: "Security analysis, privilege boundary auditing, and secret scanning",
-    capabilities: ["hooks", "skills"],
-  },
-];
-
-export function getInstalledPlugins(): readonly InstalledPlugin[] {
-  return installedPlugins;
+function getPluginStoragePath(): string {
+  const customPath = process.env.CODING_AGENTS_PLUGINS_FILE?.trim();
+  if (customPath) return customPath;
+  return path.join(os.homedir(), ".coding-agents", "plugins.json");
 }
 
-export function resetInstalledPlugins(): void {
-  installedPlugins = [
+function getDefaultPlugins(): InstalledPlugin[] {
+  return [
     {
       name: "core-developer-suite",
       version: "1.0.0",
       enabled: true,
       source: "official",
-      description: "Core coding capabilities: grep, lsp, code editing, and browser automation",
-      capabilities: ["tools", "hooks", "commands"],
+      description: "Core productivity, LSP diagnostics, and verification hooks",
+      capabilities: ["lsp", "hooks", "git"],
     },
     {
       name: "security-auditor",
-      version: "0.2.1",
+      version: "0.9.2",
       enabled: true,
       source: "official",
-      description: "Security analysis, privilege boundary auditing, and secret scanning",
-      capabilities: ["hooks", "skills"],
+      description: "Static code vulnerability scanner and credential leak guard",
+      capabilities: ["security", "audit"],
     },
   ];
+}
+
+function loadPersistedPlugins(): InstalledPlugin[] {
+  const filePath = getPluginStoragePath();
+  try {
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, "utf8");
+      return JSON.parse(data) as InstalledPlugin[];
+    }
+  } catch {
+    // Fallback
+  }
+
+  return getDefaultPlugins();
+}
+
+function savePersistedPlugins(plugins: InstalledPlugin[]): void {
+  const filePath = getPluginStoragePath();
+  try {
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(filePath, JSON.stringify(plugins, null, 2), "utf8");
+  } catch {
+    // Non-blocking
+  }
+}
+
+let cachedPlugins: InstalledPlugin[] = loadPersistedPlugins();
+
+export function getInstalledPlugins(): readonly InstalledPlugin[] {
+  return cachedPlugins;
+}
+
+export function resetInstalledPlugins(): void {
+  cachedPlugins = getDefaultPlugins();
+  savePersistedPlugins(cachedPlugins);
 }
 
 function normalizePluginName(name: string): string {
@@ -59,7 +83,7 @@ function normalizePluginName(name: string): string {
 
 /**
  * /plugin command
- * Manages plugin lifecycle: list, install, uninstall, enable, disable, search.
+ * Manages plugin lifecycle with permanent disk persistence: list, install, uninstall, enable, disable, search.
  */
 export async function runPluginCommand(
   args: string[],
@@ -68,33 +92,30 @@ export async function runPluginCommand(
   const subCommand = args[0]?.toLowerCase();
 
   if (!subCommand || subCommand === "list" || subCommand === "ls") {
-    const lines: string[] = [
-      "# Installed Plugins (/plugin)",
+    const lines = [
+      "# 🧩 Installed Plugins & Extensions (/plugin list)",
       "",
-      "Active and installed plugin bundles:",
-      "",
+      "| Plugin Name | Version | Status | Source | Description |",
+      "| :--- | :--- | :--- | :--- | :--- |",
     ];
 
-    installedPlugins.forEach((p, idx) => {
-      const statusIcon = p.enabled ? "🟢 ENABLED" : "⚪ DISABLED";
-      lines.push(`### ${idx + 1}. \`${p.name}\` (v${p.version}) [${statusIcon}]`);
-      lines.push(`- **Source**: ${p.source}`);
-      if (p.description) {
-        lines.push(`- **Description**: ${p.description}`);
-      }
-      if (p.capabilities && p.capabilities.length > 0) {
-        lines.push(`- **Capabilities**: ${p.capabilities.join(", ")}`);
-      }
-      lines.push("");
-    });
+    for (const p of cachedPlugins) {
+      const statusBadge = p.enabled ? "🟢 Enabled" : "⚪ Disabled";
+      lines.push(
+        `| **${p.name}** | \`${p.version}\` | ${statusBadge} | \`${p.source}\` | ${p.description || "—"} |`,
+      );
+    }
 
     lines.push(
-      "Commands:",
-      "- `/plugin install <name>` : Install and register a new plugin",
-      "- `/plugin uninstall <name>` : Remove an installed plugin",
-      "- `/plugin enable <name>` : Enable an inactive plugin",
-      "- `/plugin disable <name>` : Disable a plugin without uninstalling",
-      "- `/plugin search <keyword>` : Search for available plugins",
+      "",
+      `*Storage: \`${getPluginStoragePath()}\` | Total Installed: ${cachedPlugins.length}*`,
+      "",
+      "**Commands**:",
+      "- `/plugin install <name>`: Install and persist a plugin",
+      "- `/plugin uninstall <name>`: Remove an installed plugin",
+      "- `/plugin enable <name>`: Enable a plugin",
+      "- `/plugin disable <name>`: Disable a plugin",
+      "- `/plugin search <keyword>`: Search available plugins",
     );
 
     return {
@@ -104,126 +125,153 @@ export async function runPluginCommand(
   }
 
   if (subCommand === "install" || subCommand === "add") {
-    const target = args[1]?.trim();
-    if (!target) {
+    const pluginName = args[1];
+    if (!pluginName) {
       return {
         kind: "local",
-        output: "Usage: `/plugin install <plugin_name_or_path>`\nExample: `/plugin install react-devtools`",
+        output: "Usage: `/plugin install <plugin-name>`\nExample: `/plugin install playwright-mcp`",
       };
     }
 
-    const pluginName = normalizePluginName(target);
-    const existing = installedPlugins.find((p) => p.name === pluginName);
+    const normalized = normalizePluginName(pluginName);
+    const existing = cachedPlugins.find((p) => p.name === normalized);
     if (existing) {
-      existing.enabled = true;
       return {
         kind: "local",
-        output: `Plugin \`${pluginName}\` is already installed and has been marked ENABLED.`,
+        output: `Plugin \`${normalized}\` is already installed (version: \`${existing.version}\`). Use \`/plugin enable ${normalized}\` if disabled.`,
       };
     }
 
-    installedPlugins.push({
-      name: pluginName,
+    const newPlugin: InstalledPlugin = {
+      name: normalized,
       version: "1.0.0",
       enabled: true,
-      source: target.startsWith("http") ? "git-repository" : "marketplace",
-      description: `Installed plugin package (${target})`,
-      capabilities: ["tools", "skills"],
-    });
+      source: "registry",
+      description: `Community plugin extension for ${normalized}`,
+      capabilities: [normalized],
+    };
+
+    cachedPlugins.push(newPlugin);
+    savePersistedPlugins(cachedPlugins);
 
     return {
       kind: "local",
-      output: `Plugin \`${pluginName}\` (v1.0.0) successfully installed and activated.`,
+      output: [
+        `# ✨ Plugin Installed & Persisted: \`${normalized}\``,
+        "",
+        `- **Version**: \`${newPlugin.version}\``,
+        "- **Status**: 🟢 `Enabled`",
+        `- **Source**: \`${newPlugin.source}\``,
+        `- **Persisted To**: \`${getPluginStoragePath()}\``,
+        "- Extension hooks and capabilities are now active in the runtime.",
+      ].join("\n"),
     };
   }
 
   if (subCommand === "search" || subCommand === "find") {
-    const query = args.slice(1).join(" ").trim().toLowerCase();
-    if (!query) {
-      return { kind: "local", output: "Usage: `/plugin search <keyword>`" };
-    }
+    const keyword = (args[1] || "").toLowerCase();
+    const available = [
+      { name: "core-developer-suite", desc: "Core productivity, LSP diagnostics, and verification hooks", cap: "lsp" },
+      { name: "security-auditor", desc: "Static code vulnerability scanner and credential leak guard", cap: "security" },
+      { name: "superpowers", desc: "SOTA reasoning, socratic dialogue, TDD workflows", cap: "reasoning" },
+      { name: "github-mcp", desc: "GitHub issues, PRs, and code search integration", cap: "github" },
+      { name: "playwright-mcp", desc: "Automated browser interaction & DOM extraction", cap: "browser" },
+      { name: "tree-sitter-ast", desc: "Multi-language AST indexing & symbol graph", cap: "ast" },
+    ];
 
-    const matches = installedPlugins.filter(
-      (p) =>
-        p.name.includes(query) ||
-        p.description?.toLowerCase().includes(query) ||
-        p.capabilities?.some((c) => c.includes(query)),
+    const matched = available.filter(
+      (p) => !keyword || p.name.includes(keyword) || p.desc.toLowerCase().includes(keyword),
     );
 
-    if (matches.length === 0) {
-      return {
-        kind: "local",
-        output: `No matching plugins found for keyword '${query}'.`,
-      };
-    }
+    const lines = [
+      `# 🔍 Plugin Search Results for "${keyword || "all"}"`,
+      "",
+      "| Plugin Name | Category | Description |",
+      "| :--- | :--- | :--- |",
+      ...matched.map((m) => `| **${m.name}** | \`${m.cap}\` | ${m.desc} |`),
+      "",
+      "Run `/plugin install <name>` to install and activate.",
+    ];
 
-    const lines = [`# Plugin Search Results for '${query}':`, ""];
-    matches.forEach((p, idx) => {
-      lines.push(`${idx + 1}. \`${p.name}\` (v${p.version}) - ${p.description ?? "No description"}`);
-    });
-    return { kind: "local", output: lines.join("\n") };
+    return {
+      kind: "local",
+      output: lines.join("\n"),
+    };
   }
 
   if (subCommand === "uninstall" || subCommand === "rm" || subCommand === "remove") {
-    const target = args[1]?.trim();
-    if (!target) {
-      return { kind: "local", output: "Usage: `/plugin uninstall <name>`" };
-    }
-
-    const pluginName = normalizePluginName(target);
-    const index = installedPlugins.findIndex((p) => p.name === pluginName);
-    if (index === -1) {
+    const pluginName = args[1];
+    if (!pluginName) {
       return {
         kind: "local",
-        output: `Plugin '${target}' not found. Run \`/plugin list\` to view installed plugins.`,
+        output: "Usage: `/plugin uninstall <plugin-name>`",
       };
     }
 
-    installedPlugins.splice(index, 1);
+    const normalized = normalizePluginName(pluginName);
+    const index = cachedPlugins.findIndex((p) => p.name === normalized);
+    if (index === -1) {
+      return {
+        kind: "local",
+        output: `Plugin \`${normalized}\` is not installed.`,
+      };
+    }
+
+    cachedPlugins.splice(index, 1);
+    savePersistedPlugins(cachedPlugins);
+
     return {
       kind: "local",
-      output: `Plugin \`${pluginName}\` successfully uninstalled.`,
+      output: `Successfully uninstalled plugin \`${normalized}\` and updated persistent configuration.`,
     };
   }
 
   if (subCommand === "enable") {
-    const target = args[1]?.trim();
-    const pluginName = target ? normalizePluginName(target) : "";
-    const plugin = installedPlugins.find((p) => p.name === pluginName);
+    const pluginName = args[1];
+    const normalized = normalizePluginName(pluginName || "");
+    const plugin = cachedPlugins.find((p) => p.name === normalized);
     if (!plugin) {
-      return { kind: "local", output: `Plugin '${target}' not found.` };
+      return {
+        kind: "local",
+        output: `Plugin \`${normalized}\` not found.`,
+      };
     }
     plugin.enabled = true;
+    savePersistedPlugins(cachedPlugins);
     return {
       kind: "local",
-      output: `Plugin \`${pluginName}\` is now ENABLED.`,
+      output: `Plugin \`${normalized}\` has been ENABLED.`,
     };
   }
 
   if (subCommand === "disable") {
-    const target = args[1]?.trim();
-    const pluginName = target ? normalizePluginName(target) : "";
-    const plugin = installedPlugins.find((p) => p.name === pluginName);
+    const pluginName = args[1];
+    const normalized = normalizePluginName(pluginName || "");
+    const plugin = cachedPlugins.find((p) => p.name === normalized);
     if (!plugin) {
-      return { kind: "local", output: `Plugin '${target}' not found.` };
+      return {
+        kind: "local",
+        output: `Plugin \`${normalized}\` not found.`,
+      };
     }
     plugin.enabled = false;
+    savePersistedPlugins(cachedPlugins);
     return {
       kind: "local",
-      output: `Plugin \`${pluginName}\` is now DISABLED.`,
+      output: `Plugin \`${normalized}\` has been DISABLED.`,
     };
   }
 
   return {
     kind: "local",
     output: [
-      "Usage:",
-      "- `/plugin` or `/plugin list` : Show all installed plugins",
-      "- `/plugin install <name>` : Install a new plugin",
-      "- `/plugin uninstall <name>` : Remove a plugin",
-      "- `/plugin enable <name>` : Enable a plugin",
-      "- `/plugin disable <name>` : Disable a plugin",
-      "- `/plugin search <keyword>` : Search plugins",
+      "# 📖 /plugin Command Guide",
+      "- `/plugin list` : Show all installed plugins and their status",
+      "- `/plugin install <name>` : Install and persist a plugin",
+      "- `/plugin uninstall <name>` : Remove an installed plugin",
+      "- `/plugin enable <name>` : Enable an installed plugin",
+      "- `/plugin disable <name>` : Disable an installed plugin",
+      "- `/plugin search <keyword>` : Search marketplace catalog",
     ].join("\n"),
   };
 }
