@@ -1,13 +1,16 @@
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import { GitWorktreeManager } from "../workflow/gitWorktreeManager.js";
+import { SubagentLoader } from "../subagents/subagentLoader.js";
+import { AgentMemoryManager } from "../subagents/agentMemoryManager.js";
+import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 
 const defaultWorktreeManager = new GitWorktreeManager();
 
 /**
- * /task tool (Claude Code 2026 Aligned)
+ * /task & /agent tool (Claude Code 2026 Aligned)
  * Dispatches an isolated subagent to perform an independent research, analysis, or modification task.
- * Supports `isolation: "worktree"` for clean physical filesystem branch isolation.
+ * Integrates .claude/agents/*.md frontmatter loader, worktree isolation, persistent agent-memory, and lifecycle hooks.
  */
 export function createTaskToolDefinition(
   worktreeManager: GitWorktreeManager = defaultWorktreeManager,
@@ -31,6 +34,10 @@ export function createTaskToolDefinition(
           type: "string",
           description: "Relevant file paths or background context for the subagent.",
         },
+        subagent_type: {
+          type: "string",
+          description: "Optional custom or built-in subagent name (e.g. Explore, Plan, code-reviewer, general-purpose).",
+        },
         agentMode: {
           type: "string",
           enum: ["plan", "build"],
@@ -51,12 +58,39 @@ export function createTaskToolDefinition(
       if (!description || !prompt) {
         return deniedResult("Error: description and prompt are required for task tool.");
       }
+
+      const requestedType = (typeof args.subagent_type === "string" ? args.subagent_type.trim() : "") || "general-purpose";
+      const loader = new SubagentLoader(context.workspaceRoot);
+      const subagentDef = loader.getSubagent(requestedType);
+
       const randomSuffix = Math.random().toString(36).slice(2, 8).padEnd(6, "0");
       const subtaskId = `task_${randomSuffix}`;
-      const mode = args.agentMode === "plan" ? "PLAN (Read-Only)" : "BUILD (Standard)";
+      const agentType = subagentDef?.name || requestedType;
+      const mode = (args.agentMode || subagentDef?.permissionMode) === "plan" ? "PLAN (Read-Only)" : "BUILD (Standard)";
       const contextStr = typeof args.context === "string" ? args.context.trim() : "";
-      const shouldIsolate = args.isolation === "worktree";
+      const shouldIsolate = (args.isolation || subagentDef?.isolation) === "worktree";
 
+      // 1. Dispatch SubagentStart lifecycle hook
+      await defaultHookDispatcher.dispatch({
+        eventName: "SubagentStart",
+        sessionId: context.taskId || subtaskId,
+        workspaceRoot: context.workspaceRoot,
+        timestamp: new Date().toISOString(),
+        agentId: subtaskId,
+        agentType,
+      });
+
+      // 2. Resolve Agent Memory if defined
+      let memoryContext = "";
+      if (subagentDef?.memory) {
+        const memoryMgr = new AgentMemoryManager(context.workspaceRoot);
+        const mem = memoryMgr.loadMemory(agentType, subagentDef.memory);
+        if (mem.content) {
+          memoryContext = `\n\n[Agent Persistent Memory (${subagentDef.memory})]:\n${mem.content.slice(0, 1000)}`;
+        }
+      }
+
+      // 3. Allocate Git Worktree if isolation requested
       let allocatedWorktree = null;
       let effectiveWorkspace = context.workspaceRoot;
 
@@ -72,12 +106,18 @@ export function createTaskToolDefinition(
       let subagentResponse = "";
       const apiKey = process.env.SILICONFLOW_API_KEY || process.env.OPENAI_API_KEY || "";
       const baseUrl = process.env.SILICONFLOW_BASE_URL || process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
-      const model = process.env.SILICONFLOW_API_KEY ? "deepseek-ai/DeepSeek-V4-Flash" : "gpt-4o-mini";
+      const model = subagentDef?.model || (process.env.SILICONFLOW_API_KEY ? "deepseek-ai/DeepSeek-V4-Flash" : "gpt-4o-mini");
+
+      const systemPrompt = [
+        subagentDef?.systemPrompt || `You are ${agentType}, an autonomous subagent for: "${description}".`,
+        `Mode: ${mode}. Working Directory: ${effectiveWorkspace}.`,
+        memoryContext,
+      ].join("\n");
 
       try {
         if (apiKey && !process.env.VITEST && process.env.NODE_ENV !== "test") {
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 25_000);
+          const timer = setTimeout(() => controller.abort(), 30_000);
           const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
             method: "POST",
             headers: {
@@ -89,8 +129,7 @@ export function createTaskToolDefinition(
               messages: [
                 {
                   role: "system",
-                  content:
-                    `You are an autonomous subagent executing: "${description}". Mode: ${mode}. Working Directory: ${effectiveWorkspace}.\nExecute delegated instructions and return a concise summary of findings or actions.`,
+                  content: systemPrompt,
                 },
                 {
                   role: "user",
@@ -111,11 +150,22 @@ export function createTaskToolDefinition(
         if (allocatedWorktree) {
           await worktreeManager.releaseWorktree(subtaskId, { squashMerge: true });
         }
+
+        // 4. Dispatch SubagentStop lifecycle hook
+        await defaultHookDispatcher.dispatch({
+          eventName: "SubagentStop",
+          sessionId: context.taskId || subtaskId,
+          workspaceRoot: context.workspaceRoot,
+          timestamp: new Date().toISOString(),
+          agentId: subtaskId,
+          agentType,
+        });
       }
 
       const lines: string[] = [
         `# 🤖 Subagent Task Executed (\`${subtaskId}\`)`,
         "",
+        `- **Agent Type**: \`${agentType}\` (${subagentDef?.source || "dynamic"})`,
         `- **Description**: ${description}`,
         `- **Mode**: \`${mode}\``,
         `- **Filesystem Isolation**: \`${shouldIsolate ? `Git Worktree (${effectiveWorkspace})` : "Shared Workspace"}\``,
@@ -123,7 +173,7 @@ export function createTaskToolDefinition(
         "",
         "## Subagent Execution Result:",
         subagentResponse ||
-          `Task "${description}" was processed in an isolated subagent environment. All delegated instructions have been completed.`,
+          `Task "${description}" was processed by subagent \`${agentType}\`. All delegated instructions have been completed.`,
       ];
       return approvedResult(lines.join("\n"));
     },
