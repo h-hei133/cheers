@@ -137,9 +137,10 @@ export async function runRealTaskLoopRuntime(input: {
     );
     const applyStatus = classifyRealTaskLoopApplyStatus(applyResult);
     const verificationStatus = classifyRealTaskLoopVerificationStatus(readback);
+    const isSyntheticFallback = input.providerMode === "real-opt-in" && !input.provider;
     const evidenceSource = resolveClaimLedgerEvidenceSource({
       ...input,
-      syntheticProviderFallback: input.providerMode === "real-opt-in" && !input.provider,
+      syntheticProviderFallback: isSyntheticFallback,
     });
     const repair =
       input.runRepairAfterVerificationFailure &&

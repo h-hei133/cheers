@@ -181,7 +181,20 @@ export async function runTargetSetEditRoute(
   const failedFiles: Array<{ path: string; reason: string }> = [];
   const unattemptedFiles: Array<{ path: string; reason: string }> = [];
   const journal: TargetSetEditJournalEntry[] = [...preflightJournal];
+  const originalFileContents: Map<string, string> = new Map();
+
   for (const target of plan.targets) {
+    if (options.readFile && !originalFileContents.has(target.targetPath)) {
+      try {
+        const initial = await options.readFile(target.targetPath);
+        if (typeof initial === "string") {
+          originalFileContents.set(target.targetPath, initial);
+        }
+      } catch {
+        // Untracked or new file
+      }
+    }
+
     journal.push(
       buildTargetSetEditExecutionJournalEntry({
         transactionId,
@@ -223,7 +236,6 @@ export async function runTargetSetEditRoute(
       ...(options.snapshotStorage ? { snapshotStorage: options.snapshotStorage } : {}),
       ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
     });
-
     if (route.status === "written") {
       changedFiles.push(...route.changedFiles);
       journal.push(
@@ -308,9 +320,24 @@ export async function runTargetSetEditRoute(
         ...route.evidence,
       ],
     });
+    // True Atomicity Rollback: If any file in multi-target set fails, revert all previously modified files
+    if (changedFiles.length > 0) {
+      for (const writtenResult of fileResults) {
+        if (writtenResult.status === "written") {
+          const original = originalFileContents.get(writtenResult.targetPath);
+          if (typeof original === "string" && options.writeFile) {
+            try {
+              await options.writeFile(writtenResult.targetPath, original);
+            } catch {
+              // Best effort rollback
+            }
+          }
+        }
+      }
+      changedFiles.length = 0; // Workspace cleanly reverted to pre-transaction state
+    }
     break;
   }
-
   const skippedTargets = plan.targets.slice(fileResults.length);
   for (const target of skippedTargets) {
     unattemptedFiles.push({
