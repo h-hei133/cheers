@@ -77,5 +77,26 @@ describe("Creative Reasoning & Multi-Hypothesis Exploration Test Suite", () => {
         expect(routed.output).toContain("Synthesized Architecture & Key Decisions");
       }
     });
+
+    it("supports interactive Socratic exploration with -i flag", async () => {
+      const res = await runBrainstormCommand(
+        ["-i", "Distributed lock with TTL expiry"],
+        { cwd: process.cwd() },
+      );
+      expect(res.kind).toBe("local");
+      expect(res.output).toContain("# Socratic Design Exploration");
+      expect(res.output).toContain("Scope & Primary Purpose");
+      expect(res.output).toContain("Boundaries & Non-Goals");
+    });
+
+    it("supports saving ADR spec and retaining in QuadMemory with -s flag", async () => {
+      const res = await runBrainstormCommand(
+        ["-s", "High-throughput ring buffer"],
+        { cwd: process.cwd() },
+      );
+      expect(res.kind).toBe("local");
+      expect(res.output).toContain("Spec Saved");
+      expect(res.output).toContain("Retained in QuadMemory");
+    });
   });
 });
