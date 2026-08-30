@@ -27,6 +27,7 @@ import { runWorkflowCommand } from "./workflowCommandRuntime.js";
 import { runDeepResearchCommand } from "./deepResearchCommandRuntime.js";
 import { runBrainstormCommand } from "./brainstormCommandRuntime.js";
 import { runShellCommand } from "./shellCommandRuntime.js";
+import { runLogCommand } from "./logCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -446,6 +447,15 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runShellCommand(args, context),
+    },
+    {
+      name: "log",
+      aliases: ["logs"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runLogCommand(args, context),
     },
   ];
 

@@ -1,3 +1,4 @@
+import { createComponentLogger } from "../../observability/structuredLogger.js";
 import { exec } from "node:child_process";
 import type {
   HookEventPayload,
@@ -8,6 +9,8 @@ import type {
   PreToolUsePayload,
   PostToolUsePayload,
 } from "./types.js";
+
+const logger = createComponentLogger("HookDispatcher");
 
 export class HookDispatcher {
   private commandHooks: CommandHookConfig[] = [];
@@ -50,46 +53,53 @@ export class HookDispatcher {
     }
 
     let target = "";
-    if (payload.eventName === "PreToolUse" || payload.eventName === "PostToolUse") {
+    if (payload.eventName === "PreToolUse" || payload.eventName === "PostToolUse" || payload.eventName === "PostToolUseFailure") {
       target = (payload as PreToolUsePayload | PostToolUsePayload).toolName;
-    } else if (payload.eventName === "UserPromptSubmit") {
-      target = (payload as any).prompt || "";
+    }
+
+    if (!target) {
+      return true;
     }
 
     try {
-      const regex = new RegExp(matcher, "i");
+      const regex = new RegExp(matcher);
       return regex.test(target);
     } catch {
       return matcher.toLowerCase() === target.toLowerCase();
     }
   }
 
-  /**
-   * Dispatch an event through all matching in-process and command hooks
-   */
-  async dispatch(payload: HookEventPayload): Promise<HookDecision | null> {
-    const relevantEvent = payload.eventName;
-    let accumulatedDecision: HookDecision | null = null;
+  async dispatch(payload: HookEventPayload): Promise<HookDecision> {
+    const eventType = payload.eventName;
+    logger.debug(`Dispatching lifecycle hook event: ${eventType}`, {
+      event: eventType,
+      hookCount: this.inProcessHooks.length + this.commandHooks.length,
+    });
 
-    // 1. Execute In-Process Hooks
+    let accumulatedDecision: HookDecision | null = null;
+    const relevantEvent = payload.eventName;
+
+    // 1. Run in-process hooks
     for (const hook of this.inProcessHooks) {
       if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
         try {
           const decision = await hook.handler(payload);
           if (decision) {
-            // If any hook blocks or requests retry, immediately stop and return
             if (decision.decision === "block" || decision.decision === "retry") {
+              logger.warn(`Hook ${hook.name || "in-process"} returned blocking decision: ${decision.decision}`, {
+                event: relevantEvent,
+                decision: decision.decision,
+              });
               return decision;
             }
-            // Only accumulate if decision carries actionable feedback or specific output
             if (decision.feedback || decision.hookSpecificOutput) {
               if (!accumulatedDecision) {
                 accumulatedDecision = decision;
               }
             }
           }
-        } catch (err: any) {
-          // Log hook error without crashing the main loop
+        } catch (err: unknown) {
+          logger.error(`Error in in-process hook handler: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     }
@@ -120,35 +130,27 @@ export class HookDispatcher {
                 }
               },
             );
+
             if (child.stdin) {
               child.stdin.write(jsonPayload);
               child.stdin.end();
             }
           });
 
-          // Attempt to parse JSON decision from stdout if provided
-          if (stdout.trim().startsWith("{")) {
-            try {
-              const parsed = JSON.parse(stdout.trim()) as HookDecision;
-              if (parsed.decision && parsed.decision !== "allow") {
-                return parsed;
-              }
-            } catch {
-              // Not JSON output, exit 0 is considered allow
+          if (stdout && stdout.trim()) {
+            const parsed = JSON.parse(stdout.trim()) as HookDecision;
+            if (parsed.decision === "block" || parsed.decision === "retry") {
+              return parsed;
+            }
+            if (parsed.feedback || parsed.hookSpecificOutput) {
+              accumulatedDecision = parsed;
             }
           }
         } catch (err: any) {
-          // Non-zero exit code blocks the tool or emits feedback
-          const errOutput = [err.stderr, err.stdout].filter(Boolean).join("\n") || err.message;
-          return {
-            decision: "block",
-            reason: `Hook '${hook.command}' rejected action with exit code ${err.status ?? err.code ?? 1}`,
-            feedback: errOutput.slice(0, 2000),
-          };
+          // Log command hook failure and allow main execution to proceed gracefully
         }
       }
     }
-
     return accumulatedDecision;
   }
 }

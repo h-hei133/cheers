@@ -1,3 +1,6 @@
+import { createComponentLogger } from "../../observability/structuredLogger.js";
+
+const logger = createComponentLogger("AgentLoop");
 import type { QueryEvent } from "./runtime/events.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../../tools/types.js";
@@ -198,12 +201,19 @@ export async function* runAutonomousReActLoop(
 
   while (turn < maxTurns) {
     turn++;
+    logger.info(`Starting agent loop turn ${turn}/${maxTurns}`, {
+      turn,
+      maxTurns,
+      sessionId: options.sessionId,
+    });
     if (options.abortSignal?.aborted) {
+      logger.warn(`Agent loop aborted on turn ${turn}`);
       break;
     }
     // Check Token-Aware Dynamic Budget Threshold before message prep
     const estimatedTokens = estimateTokens(messages);
     if (estimatedTokens >= compactThresholdTokens && messages.length > 4) {
+      logger.info(`Compacting context: estimated tokens ${estimatedTokens} exceeds threshold ${compactThresholdTokens}`);
       await executeFullCompaction();
     }
 
