@@ -84,7 +84,7 @@ describe("Native QuadMemory Architecture Test Suite", () => {
 
       // 2. Contradict
       const d2 = arbiter.arbitrate({
-        statement: "Project no longer uses Mocha, replaced by Vitest",
+        statement: "Project no longer uses Mocha for test execution across packages, replaced by Vitest",
         category: "convention",
       });
       expect(d2.kind).toBe("INVALIDATE");

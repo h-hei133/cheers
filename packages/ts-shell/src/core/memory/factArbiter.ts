@@ -81,37 +81,35 @@ export class FactArbiter {
       }
     }
 
-    if (highestOverlapFact && (maxOverlapRatio >= 0.2 || (maxOverlapRatio > 0 && this.detectContradiction(statement, highestOverlapFact.statement)))) {
-      // Check for contradiction signals (e.g. "no longer", "replaced", "deprecated", "switch to")
-      const isContradiction = this.detectContradiction(statement, highestOverlapFact.statement);
-      if (isContradiction) {
-        return {
-          kind: "INVALIDATE",
-          targetFactId: highestOverlapFact.id,
-          reason: `Contradicts or deprecates prior fact '${highestOverlapFact.statement}'`,
-          statement,
-          category,
-          scope,
-          confidence,
-          entities,
-        };
-      }
+    const isContradiction = highestOverlapFact ? this.detectContradiction(statement, highestOverlapFact.statement) : false;
 
-      // If category matches and significant token refinement, classify as UPDATE
-      if (highestOverlapFact.category === category && maxOverlapRatio >= 0.35) {
-        return {
-          kind: "UPDATE",
-          targetFactId: highestOverlapFact.id,
-          reason: `Refines or updates existing fact '${highestOverlapFact.statement}'`,
-          statement,
-          category,
-          scope,
-          confidence,
-          entities,
-        };
-      }
+    // Contradiction invalidation requires both significant semantic overlap AND positive contradiction signal
+    if (highestOverlapFact && maxOverlapRatio >= 0.35 && isContradiction) {
+      return {
+        kind: "INVALIDATE",
+        targetFactId: highestOverlapFact.id,
+        reason: `Contradicts or deprecates prior fact '${highestOverlapFact.statement}'`,
+        statement,
+        category,
+        scope,
+        confidence,
+        entities,
+      };
     }
-    // 3. Orthogonal fact (ADD)
+
+    // Update requires category match and high token overlap
+    if (highestOverlapFact && highestOverlapFact.category === category && maxOverlapRatio >= 0.35) {
+      return {
+        kind: "UPDATE",
+        targetFactId: highestOverlapFact.id,
+        reason: `Refines or updates existing fact '${highestOverlapFact.statement}'`,
+        statement,
+        category,
+        scope,
+        confidence,
+        entities,
+      };
+    }
     return {
       kind: "ADD",
       reason: "New orthogonal fact statement",

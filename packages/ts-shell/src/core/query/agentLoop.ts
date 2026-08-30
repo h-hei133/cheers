@@ -290,8 +290,6 @@ export async function* runAutonomousReActLoop(
       return;
     }
 
-    messages.push(assistantMessage);
-
     let textContent = assistantMessage.content || "";
     const textToolCalls: Array<{
       id: string;
@@ -320,6 +318,23 @@ export async function* runAutonomousReActLoop(
         .trim();
     }
 
+    // Combine standard OpenAI tool_calls and parsed DSML tool calls
+    const rawToolCalls = assistantMessage.tool_calls || [];
+    const toolCalls = [...rawToolCalls, ...textToolCalls];
+
+    // Ensure assistantMessage.tool_calls in messages matches all executed toolCalls
+    // to strictly preserve OpenAI chat protocol integrity
+    const messageToPush =
+      toolCalls.length > 0 && toolCalls.length !== rawToolCalls.length
+        ? {
+            ...assistantMessage,
+            content: textContent,
+            tool_calls: toolCalls,
+          }
+        : assistantMessage;
+
+    messages.push(messageToPush);
+
     // If assistant returned clean text content, yield output
     if (textContent) {
       lastAssistantText = textContent;
@@ -330,14 +345,12 @@ export async function* runAutonomousReActLoop(
       };
     }
 
-    // Check for tool calls (OpenAI tool_calls + parsed DSML tool calls)
-    const rawToolCalls = assistantMessage.tool_calls || [];
-    const toolCalls = [...rawToolCalls, ...textToolCalls];
     if (toolCalls.length === 0) {
       // Model finished without tool calls
       break;
     }
-    // Execute each tool call
+    // Buffer verification hook feedbacks so they are appended after ALL tool messages
+    const pendingFeedbacks: string[] = [];
     for (const toolCall of toolCalls) {
       if (!toolCall || !toolCall.function || !toolCall.function.name) {
         continue;
@@ -435,13 +448,11 @@ export async function* runAutonomousReActLoop(
         content: outputContent.slice(0, 10000), // Protect token budget
       });
 
-      // If a verification hook (such as compiler guard) returned feedback/retry, attach user message after tool result
+      // Collect verification feedback without breaking tool message sequence
       if (postDecision && postDecision.feedback) {
-        messages.push({
-          role: "user",
-          content: postDecision.feedback,
-        });
+        pendingFeedbacks.push(postDecision.feedback);
       }
+
       yield {
         type: "tool.result",
         toolName: funcName,
@@ -449,6 +460,14 @@ export async function* runAutonomousReActLoop(
         success: isSuccess,
         failureReason: isSuccess ? undefined : outputContent.slice(0, 120),
       };
+    }
+
+    // Append collected post-tool verification feedbacks as user message after all tool calls resolved
+    if (pendingFeedbacks.length > 0) {
+      messages.push({
+        role: "user",
+        content: pendingFeedbacks.join("\n\n"),
+      });
     }
   }
 
