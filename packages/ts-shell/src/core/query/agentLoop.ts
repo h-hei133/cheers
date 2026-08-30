@@ -93,17 +93,16 @@ export async function* runAutonomousReActLoop(
     {
       role: "system",
       content: [
-        "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, lsp, bash, git-status, git-diff, web_fetch, web_search, browser, ask, todo, task).",
+        "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, lsp, bash, web_fetch, web_search, browser, ask, todo, task).",
         `Current working directory: ${options.workspaceRoot}`,
         ...(getActiveSessionGoal()?.phase === "active"
           ? [`CRITICAL ACTIVE GOAL (PINNED): ${getActiveSessionGoal()!.objective}`]
           : []),
         options.agentMode === "plan"
-          ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, and explore websites via browser and web tools using read, glob, grep, lsp, browser, web_fetch, web_search, ask, todo, task, and git inspection tools, but cannot modify files. Produce a structured execution plan based on real file contents."
+          ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, run safe read-only commands (like git status, git diff) via bash, and explore websites via browser and web tools, but cannot modify files. Produce a structured execution plan based on real file contents."
           : "BUILD MODE ACTIVE: You have full access to inspect, search, execute, browse, and edit files to accomplish the user's task.",
         "- For web searching: use `web_search` to retrieve online technical references.",
-        "- For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests).",
-        "- Directly fulfill the user's immediate question without unnecessary side explorations.",
+        "- For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests/git).",
       ].join("\n"),
     },
     {
@@ -373,16 +372,15 @@ export async function* runAutonomousReActLoop(
         funcName !== "glob" &&
         funcName !== "grep" &&
         funcName !== "lsp" &&
-        funcName !== "git-status" &&
-        funcName !== "git-diff" &&
         funcName !== "browser" &&
         funcName !== "web_fetch" &&
         funcName !== "web_search" &&
         funcName !== "ask" &&
         funcName !== "todo" &&
-        funcName !== "task"
+        funcName !== "task" &&
+        funcName !== "bash"
       ) {
-        outputContent = `Blocked: Plan mode is active. Tool '${funcName}' is not a read-only inspection tool. Only read-only tools (read, glob, grep, lsp, git-status, git-diff, browser, web_fetch, web_search, ask, todo, task) are permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
+        outputContent = `Blocked: Plan mode is active. Tool '${funcName}' is not permitted in plan mode. Switch to build mode via /build to execute modifications.`;
         isSuccess = false;
       } else {
         // PreToolUse Hook interceptor

@@ -19,8 +19,6 @@ export const READONLY_TOOLS: Record<string, true> = {
   todo: true,
   task: true,
   browser: true,
-  "git-status": true,
-  "git-diff": true,
 };
 export const DESTRUCTIVE_TOOLS: Record<string, true> = {
   bash: true,
@@ -68,6 +66,34 @@ export function selectGrantBySelector(
   });
 }
 
+export function isReadOnlyBashCommand(command: string): boolean {
+  const trimmed = command.trim().toLowerCase();
+  // Standard read-only git subcommands
+  const isGitReadOnly =
+    trimmed === "git status" ||
+    trimmed.startsWith("git status ") ||
+    trimmed === "git diff" ||
+    trimmed.startsWith("git diff ") ||
+    trimmed === "git log" ||
+    trimmed.startsWith("git log ") ||
+    trimmed === "git show" ||
+    trimmed.startsWith("git show ") ||
+    trimmed === "git branch" ||
+    trimmed.startsWith("git branch ") ||
+    trimmed.startsWith("git rev-parse");
+
+  // Standard read-only inspection commands
+  const isInspection =
+    trimmed.startsWith("cat ") ||
+    trimmed.startsWith("ls ") ||
+    trimmed === "ls" ||
+    trimmed.startsWith("pwd") ||
+    trimmed.startsWith("echo ") ||
+    trimmed.startsWith("which ");
+
+  return isGitReadOnly || isInspection;
+}
+
 export function evaluatePermission(input: {
   readonly scope: string;
   readonly toolName: string;
@@ -76,10 +102,12 @@ export function evaluatePermission(input: {
   readonly autoApproveReadOnly?: boolean;
   readonly agentMode?: "plan" | "build";
 }): ApprovalEvaluation {
-  const isReadOnly = Boolean(READONLY_TOOLS[input.toolName]);
+  const isReadOnly =
+    Boolean(READONLY_TOOLS[input.toolName]) ||
+    (input.toolName === "bash" && isReadOnlyBashCommand(input.selector));
 
   // Plan mode enforcement (Inspired by Claude Code permissions):
-  // Read-only tools are allowed freely to explore the codebase.
+  // Read-only tools (and read-only bash commands like git status/diff) are allowed freely.
   // Write/destructive tools are hard-blocked with an explicit explanation.
   if (input.agentMode === "plan") {
     if (isReadOnly) {
@@ -92,7 +120,7 @@ export function evaluatePermission(input: {
     return {
       behavior: "deny",
       granted: false,
-      reason: `Plan mode is active: file modifications via '${input.toolName}' are disabled. Use /build to enable editing.`,
+      reason: `Plan mode is active: file modifications or non-read-only commands via '${input.toolName}' are disabled. Use /build to enable editing.`,
     };
   }
 

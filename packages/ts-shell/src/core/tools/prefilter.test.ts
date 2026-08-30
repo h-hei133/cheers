@@ -38,7 +38,7 @@ describe('tool capability prefilter', () => {
 
   it('hides tools by prefix before model exposure', () => {
     const visible = filterVisibleToolNames(
-      ['read', 'git-status', 'mcp__server__danger'],
+      ['read', 'glob', 'mcp__server__danger'],
       {
         provider: 'openai',
         daemonEnabled: false,
@@ -55,7 +55,7 @@ describe('tool capability prefilter', () => {
 
   it('applies combined MCP + disabled + prefix rules deterministically', () => {
     const visible = filterVisibleToolNames(
-      ['read', 'bash', 'git-status', 'mcp__serverA__search', 'mcp__serverB__danger'],
+      ['read', 'bash', 'glob', 'mcp__serverA__search', 'mcp__serverB__danger'],
       {
         provider: 'openai',
         daemonEnabled: true,

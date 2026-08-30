@@ -124,11 +124,10 @@ export interface ToolEcosystemCapabilityResult {
 }
 
 export function classifyToolIntent(toolName: string): ToolEcosystemIntentKind {
-  if (toolName === "read" || toolName === "glob" || toolName === "git-status" || toolName === "git-diff") {
+  if (toolName === "read" || toolName === "glob" || toolName === "grep") {
     return "code-workspace-tool";
   }
   if (toolName === "bash") return "command-runtime-tool";
-  if (toolName.startsWith("mcp__external")) return "mcp-external-tool";
   if (toolName.startsWith("mcp__")) return "mcp-local-tool";
   if (toolName === "browser.observe" || toolName === "browser.extract") return "browser-observation";
   if (toolName === "browser.click" || toolName === "browser.type") return "browser-action";

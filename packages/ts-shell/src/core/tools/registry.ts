@@ -350,7 +350,7 @@ export function createCoreToolRegistry(options?: {
     createGrepToolDefinition(executionService),
     {
       name: 'bash',
-      description: 'Run a shell command inside the workspace (e.g. ls, git status, npm test).',
+      description: 'Execute shell commands (including full Git operations: git status, git diff, git log, git commit, etc.). Safe read-only commands (git status, git diff, etc.) are permitted in plan mode.',
       argsSchema: {
         type: 'object',
         properties: {
@@ -369,38 +369,6 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         const command = typeof args.command === 'string' ? args.command : ''
         return runCommandTool(executionService, command, context)
-      },
-    },
-    {
-      name: 'git-status',
-      description: 'Run git status to inspect working tree changes in the workspace.',
-      argsSchema: {
-        type: 'object',
-        properties: {},
-      },
-      permissions: {
-        check(args, context) {
-          return processPermission({ ...args, command: 'git status --short' }, context)
-        },
-      },
-      async execute(_args, context) {
-        return runGitCommand(executionService, 'git status --short', context)
-      },
-    },
-    {
-      name: 'git-diff',
-      description: 'Run git diff to inspect unstaged changes in the workspace.',
-      argsSchema: {
-        type: 'object',
-        properties: {},
-      },
-      permissions: {
-        check(args, context) {
-          return processPermission({ ...args, command: 'git diff' }, context)
-        },
-      },
-      async execute(_args, context) {
-        return runGitCommand(executionService, 'git diff', context)
       },
     },
     createWebFetchToolDefinition(),
