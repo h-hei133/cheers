@@ -1,4 +1,5 @@
 import { OpenAIModelAdapter } from './providers/openai/OpenAIModelAdapter.js'
+import { AnthropicModelAdapter } from './providers/anthropic/AnthropicModelAdapter.js'
 import type { ModelProviderAdapter, ModelProviderConfig } from './types.js'
 
 export function createModelProviderAdapter(
@@ -6,12 +7,14 @@ export function createModelProviderAdapter(
 ): ModelProviderAdapter {
   switch (config.provider) {
     case 'openai':
-    case 'anthropic':
     case 'openai-compatible':
-    case 'google':
     case 'antigravity':
-    case 'claudecode':
       return new OpenAIModelAdapter(config)
+    case 'anthropic':
+    case 'claudecode':
+      return new AnthropicModelAdapter(config)
+    case 'google':
+      return new OpenAIModelAdapter(config) // Can be extended with Google adapter
     default: {
       const exhaustive: never = config.provider
       throw new Error(`Unsupported model provider: ${String(exhaustive)}`)

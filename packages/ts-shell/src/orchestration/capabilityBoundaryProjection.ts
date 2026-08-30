@@ -20,20 +20,24 @@ const FOCUSED_TS_SHELL_TEST_COMMAND_ALLOWLIST = [
 ] as const;
 
 export function detectCommand(normalizedPrompt: string): string {
-  // Keep command mapping intentionally narrow for controlled runtime policy.
+  const trimmed = normalizedPrompt.trim();
+  if (trimmed.startsWith("node ") || trimmed.startsWith("npm ") || trimmed.startsWith("cargo ") || trimmed.startsWith("pytest") || trimmed.startsWith("git ")) {
+    return trimmed;
+  }
+
   if (normalizedPrompt.includes("version")) {
     return "node --version";
   }
 
   if (normalizedPrompt.includes("test")) {
-    return "npm test -- --help";
+    return "npm test";
   }
 
   if (normalizedPrompt.includes("build")) {
-    return "npm run build -- --help";
+    return "npm run build";
   }
 
-  return "node --version";
+  return trimmed || "node --version";
 }
 
 export function detectUnsupportedCommandIntent(
