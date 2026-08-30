@@ -216,6 +216,12 @@ export const SLASH_COMMANDS = [
     group: "session",
     summary: "inspect, search, retain, or invalidate persistent memory facts",
   },
+  {
+    name: "workflow",
+    aliases: ["wf", "pipeline", "dag"],
+    group: "workflow",
+    summary: "inspect, run, or cancel multi-stage agentic workflows and DAG tasks",
+  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];

@@ -128,6 +128,10 @@ const RESERVED_SHELL_SLASH_COMMANDS = new Set([
   "/mem",
   "/recall",
   "/retain",
+  "/workflow",
+  "/wf",
+  "/pipeline",
+  "/dag",
 ]);
 export function parseCliArgs(
   rawArgs: readonly string[],

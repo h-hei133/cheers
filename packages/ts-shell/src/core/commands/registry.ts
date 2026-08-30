@@ -23,6 +23,7 @@ import { runBtwCommand } from "./btwCommandRuntime.js";
 import { runMarketplaceCommand } from "./marketplaceCommandRuntime.js";
 import { runPluginCommand } from "./pluginCommandRuntime.js";
 import { runMemoryCommand } from "./memoryCommandRuntime.js";
+import { runWorkflowCommand } from "./workflowCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -405,8 +406,16 @@ export function createCommandRegistry(
       kind: "local",
       availability: "available",
       enabled: true,
-      bridgeSafe: true,
       execute: (args, context) => runMemoryCommand(args, context),
+    },
+    {
+      name: "workflow",
+      aliases: ["wf", "pipeline", "dag"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runWorkflowCommand(args, context),
     },
   ];
 
