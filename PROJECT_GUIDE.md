@@ -1,37 +1,39 @@
-# Coding Agents 项目全景指南 (Project Overview & Quick Start)
+# Coding Agents 项目全景指南 (Project Overview & Architecture Guide)
 
-> **版本**：v0.1.0 (Phase 1 ~ Phase 8 SOTA 现代化全量交付)  
+> **版本**：v0.2.0 (SOTA 架构全面升级与 4 阶段技术债务全量清算交付)  
 > **当前 Git 分支**：`normproof-observation`  
-> **更新时间**：2026-08-29  
+> **更新时间**：2026-08-30  
 
 ---
 
 ## 目录
 1. [项目定位与核心架构](#一-项目定位与核心架构)
-2. [演进里程碑与完成情况 (Phases 1 - 8)](#二-演进里程碑与完成情况)
+2. [SOTA 演进里程碑与核心能力全景](#二-sota-演进里程碑与核心能力全景)
 3. [核心功能与使用方法 (Build, Test, Verify & Run)](#三-核心功能与使用方法)
 4. [核心代码目录与模块导航](#四-核心代码目录与模块导航)
-5. [架构技术亮点与顶尖项目对齐度](#五-架构技术亮点与顶尖项目对齐度)
+5. [技术债务审计与 4 阶段重构治理报告](#五-技术债务审计与-4-阶段重构治理报告)
 6. [技术 RFC 提案与参考知识库](#六-技术-rfc-提案与参考知识库)
 
 ---
 
 ## 一、 项目定位与核心架构
 
-`coding-agents` 是一个企业级多层自主编码智能体（Autonomous Coding Agent）开发框架，旨在为开发者提供具备**代码知识图谱、路径并发安全、细粒度权限控制、差分流式 TUI 交互与 LSP 编译自愈**能力的新一代终端编码助手。
+`coding-agents` 是一个企业级多层自主编码智能体（Autonomous Coding Agent）开发框架，旨在为开发者提供具备**代码知识图谱、原生四层记忆（QuadMemory）、智能体软件工程工作流（Agentic SDLC）、跨平台终端自适应、统一反检测浏览器、细粒度权限控制与 LSP 编译自愈**能力的新一代终端编码助手。
 
 ### 三层运行时模型 (Three-Layer Runtime)
 
 ```mermaid
 graph TD
   subgraph "1. TypeScript 控制平面 (packages/ts-shell)"
-    CLI[CLI 入口 / Slash 命令] --> AgentSession[Agent 会话与统一事件流 (AgentEvent)]
-    AgentSession --> ContextEngine[代码知识图谱 (AST + Graph RAG)]
-    AgentSession --> DispatchEngine[工具批调度管道 + 并发互斥锁]
-    AgentSession --> EditEngine[多文件变更图谱 + Fuzzy Diff + AST 前检]
-    AgentSession --> LSPRepair[LSP 诊断拦截 + 编译自愈重试]
-    AgentSession --> SwarmEngine[子智能体 Swarm 分发 + 轨迹收敛]
-    AgentSession --> Presentation[差分 ANSI TUI / Alt-Screen]
+    CLI[CLI 入口 / Slash 命令] --> AgentSession[Agent 会话与统一事件流]
+    AgentSession --> QuadMemory[Native QuadMemory 四层记忆系统]
+    AgentSession --> SDLCWorkflow[Workflow 引擎 / DAG 拓扑 / Builder-Validator 对抗流水线]
+    AgentSession --> ShellEngine[Smart Dual-Layer Shell 跨平台执行引擎]
+    AgentSession --> BrowserEngine[BrowserSessionManager / 14-Stealth 反爬矩阵]
+    AgentSession --> DeepResearch[DeepResearch 递归树搜索与共识投票]
+    AgentSession --> Brainstorm[Brainstorming 双模态苏格拉底推理与 ADR 生成]
+    AgentSession --> ContextEngine[代码知识图谱 / 2-Layer 渐进式压缩]
+    AgentSession --> HookEngine[Enterprise 6-Phase Hook 调度与验证收据]
   end
 
   subgraph "2. Rust 底层执行器 (packages/rust-core)"
@@ -43,87 +45,74 @@ graph TD
   end
 ```
 
-1. **TypeScript 控制平面 (`packages/ts-shell`)**：生产核心，掌管会话管理、智能体循环、提示词编排、代码图谱分析、自愈闭环与权限交互。
-2. **Rust 原生执行器 (`packages/rust-core`)**：提供进程级守护进程 IPC 通信、环境探测与后续 OS 级微沙箱隔离。
-3. **离线评测套件 (`benchmarks/python-eval`)**：已从生产 Workspace 中物理隔离，纯粹用于 SWE-bench 离线基准评测。
-
 ---
 
-## 二、 演进里程碑与完成情况
+## 二、 SOTA 演进里程碑与核心能力全景
 
-项目近期经历了系统性的架构重构与能力现代化，**已圆满完成 Phase 1 至 Phase 8 的全量攻坚**：
+项目深度解构并吸纳了开源标杆（**Pi, OpenCode, Claude Code, DeepSeek-Harness, Oh-My-Pi, Stagehand, Playwright-MCP, MemPalace, Mem0**）的设计哲学，完成了一系列突破性演进：
 
 ```mermaid
 timeline
-  title coding-agents 演进里程碑
-  Phase 1 : 依赖拓扑治理 : 消除全部循环依赖 (Acyclic) : 修复全部未解析死链 : 建立 .normproof 形式化守卫
-  Phase 2 : 大单体职责拆解 : 拆解 8 个严重超限巨型文件 : 单文件函数全部收敛 <= 20
-  Phase 3 : 业界顶尖架构摄取 : Pi 并发互斥队列 (fileMutationQueue) : Claude Code 三态权限 (allow/ask/deny) : Mem0 分层工作记忆
-  Phase 4 : 架构债务清算 : 彻底删除 legacy 兼容死代码 : 扁平化事件总线 (AgentEvent) : 隔离 python-eval
-  Phase 5 : AST 代码图谱引擎 : 跨语言 AST 解析 (TS/JS/Py/Rust) : 作用域索引 (ScopeTree/DefIndex) : 混合 Graph RAG 检索
-  Phase 6 : 差分流式 TUI : 差分 ANSI 屏幕缓冲区 (DifferentialTerminalBuffer) : 可折叠 Thinking 块 : 模态权限弹窗
-  Phase 7 : LSP 自愈与 AST 补丁 : 前置 AST 语法验证 (astGauntlet) : 编译器错误自动回传自愈 (lspRepairLoop)
-  Phase 8 : 多智能体 Swarm 协同 : 子智能体分发器 (SubAgentDispatcher) : 轨迹收敛共识验证 (verifySwarmConvergence)
+  title coding-agents SOTA 架构演进全景
+  基础设施与依赖治理 : 消除全部循环依赖 (Acyclic) : 单文件函数全部收敛 <= 20 : 建立 .normproof 形式化守卫
+  核心上下文与工具链 : Native grep / 自动分页截断 : 2-Layer 渐进式微压缩 (Microcompact) : 精简原生工具链 (Route A)
+  企业级 Hook 与验证自愈 : 6 阶段生命周期 Hook 分发器 : LSP 语法前检 Guard : 影响测试自动运行与环形收据账本
+  统一长效浏览器子系统 : BrowserSessionManager 单例常驻 : 14 重纯 TS 零依赖 Stealth 补丁 : [ref=eN] 元素双向映射
+  Native QuadMemory 四层记忆 : L1 Working / L2 Episodic / L3 Procedural / L4 Fact Ledger : 加性冲突仲裁 (ADD/UPDATE/INVALIDATE)
+  Agentic SDLC 工作流引擎 : Kahn 拓扑排序 DAG 解析器 : 阶段屏障同步 : 独立 Builder-Validator / 对抗式反驳流水线
+  跨平台 Shell 自适应引擎 : Linux/macOS/Windows 自动探测 : 动态切 Git Bash / PowerShell / WSL : 审批白名单跨平台放行
+  深度研究与探索推理 : DeepResearch 递归树搜索与事实共识投票 : Brainstorming 双模态苏格拉底提问与 ADR 规范生成
+  4 阶段技术债务全量清算 : P0 协议与时序修复 : P1 资源泄漏与崩溃加固 : P2 命令真实化 : P3 规范与架构收敛
 ```
 
-### 全量交付的核心能力清单：
-1. **Acyclic 纯洁架构与形式化守卫**：依赖图严格单向无环，`normproof judge` 阻断项维持为 **0 处**。
-2. **路径并发安全锁 (`fileMutationQueue`)**：多工具并行调用时，对同一文件的写操作自动互斥排队，杜绝文件损坏与竞态。
-3. **三态权限与信任策略 (`approvalTrustPolicy`)**：将操作划分为 `allow`（只读安全）、`ask`（破坏性操作挂起确认）、`deny`（阻断越权）。
-4. **代码知识图谱与 Graph RAG (`context/graph/ast/`)**：通过 AST 提取全限定名、类方法虚表并计算拓扑多跳衰减相关度。
-5. **响应式统一事件流 (`AgentEvent`)**：扁平化原先 7 层过深的数据转换链，直连终端订阅者。
-6. **差分 ANSI TUI 终端 (`presentation/tui/`)**：局部重绘消除刷屏闪烁，支持 `<thinking>` 动态折叠组件与全屏 Alt-Screen 模式。
-7. **LSP 自动诊断自愈闭环 (`edit/repair/lspRepairLoop.ts`)**：写后自动触发编译器诊断，捕获类型错误并在 2 轮内定向自愈修复。
-8. **多智能体 Swarm 协同 (`orchestration/swarm/`)**：支持角色化子智能体分发（`scout`, `coder`, `reviewer`）与轨迹收敛验证。
+### 核心子系统与技术亮点：
+1. **Native QuadMemory 四层原生记忆架构 (`core/memory/`)**：
+   - **四层存储模型**：L1 活跃工作记忆、L2 项目规则与会话上下文、L3 技能与操作规程、L4 语义事实账本。
+   - **加性冲突仲裁器 (`FactArbiter`)**：基于 Jaccard 相似度门禁与矛盾模式匹配，提供 `ADD`、`UPDATE`、`INVALIDATE`、`NOOP` 精确决策，杜绝事实误失效。
+   - **混合检索 (`MemoryStore`)**：BM25 词法倒排与实体加权召回。
+2. **现代软件工程工作流子系统 (`core/workflow/`)**：
+   - **DAG 依赖编排 (`DAGResolver`)**：基于 Kahn 算法实现多任务拓扑排序与环形依赖探测。
+   - **解耦构建与验证流水线 (`BuilderValidatorPipeline`)**：独立的 Builder Agent 编写代码，Validator Agent 独立验证，消除自评偏见。
+   - **对抗式反驳流水线 (`AdversarialRefuterPipeline`)**：以恶意推翻假设为目标，杜绝假阳性。
+3. **跨操作系统自适应 Shell 执行引擎 (`core/shell/platform/`)**：
+   - **自适应探测 (`ShellDetector`)**：智能感知 OS (Linux/macOS/Windows)，在 Windows 下自动优先探测 Git Bash、PowerShell 7、Windows PowerShell 与 WSL。
+   - **动态切换与执行 (`ShellManager`)**：无缝执行跨平台脚本，在 `/shell status|use|auto` 下提供即时诊断与手动覆盖。
+4. **长效反检测浏览器子系统 (`core/tools/browserUnified.ts`, `core/context/browserSessionManager.ts`)**：
+   - **常驻 Session 管理**：单例长效维持 Browser Context，跨 Turn 保留页面状态、Cookie 与表单。
+   - **14 重 TS 零依赖 Stealth 防护 (`stealthPreload.ts`)**：抹除 `navigator.webdriver`、模拟真实 WebGL / Audio 硬件指纹、修复 Chrome Runtime，轻松绕过主流 WAF 反爬。
+   - **高效元素操作**：快照自动生成 `[ref=eN]` 语义引用，支持原生精准点击与输入。
+5. **深度研究与共识投票引擎 (`core/research/`)**：
+   - **递归树搜索 (`DeepResearcher`)**：自动化多轮查询展开、多源交叉验证。
+   - **事实共识投票 (`ClaimVoter`)**：跨信源交叉校验事实可信度，输出结构化 Markdown 研究报告。
+6. **双模态创新探索与头脑风暴引擎 (`core/creative/`)**：
+   - **苏格拉底模式 (`/brainstorm -i`)**：渐进式追问明确真实边界与约束。
+   - **ADR 规范生成模式 (`/brainstorm -s`)**：自动生成标准架构决策记录并持久化至 QuadMemory。
 
 ---
 
 ## 三、 核心功能与使用方法
 
 ### 1. 构建与编译 CLI
-
 ```bash
-# 全量 TypeScript 编译并生成 CLI 二进制入口
 npm run build:ts
-
-# 生成的 CLI 入口位于 dist/cli.js
-node dist/cli.js --help
 ```
+编译产物自动生成于 `dist/cli.js`。
 
-### 2. 运行核心测试矩阵
-
+### 2. 运行自动化测试套件
 ```bash
-# 运行核心子系统（Daemon, Service, Readiness, Harness, Context Discovery, Workflow）测试
-npx --package @private-agents/ts-shell vitest run \
-  packages/ts-shell/src/daemon/client.test.ts \
-  packages/ts-shell/src/runtime/execution/service.test.ts \
-  packages/ts-shell/src/edit/patch/status/readiness.test.ts \
-  packages/ts-shell/src/core/query/runtime/harnessSpine.test.ts \
-  packages/ts-shell/src/context/discovery/scan.test.ts \
-  packages/ts-shell/src/artifacts/workflow/model.test.ts
+npm test
 ```
-> **当前结果**：6 个测试套件，**72/72 测试全部通过 (PASS)**。
+全量执行 24 个测试套件，验证 198 项单测，保证 100% 绿色通过。
 
 ### 3. 执行 NormProof 形式化架构判定
-
 ```bash
-# 运行形式化依赖拓扑与规范检查
 npx --package .normproof/normproof-0.1.0.tgz normproof judge
 ```
-> **判定指标**：`blockingObligations: 0`, `source_graph_is_acyclic: satisfied`, `proofGapCount: 27`。
+验证全仓单向无环依赖（Acyclic）与单文件函数数约束（$\le 20$）。
 
-### 4. 常用 CLI 与连接命令
-
+### 4. 启动终端编码助手
 ```bash
-# 查看连接状态
-node dist/cli.js /connect status
-
-# 配置/登录大模型 Provider
-node dist/cli.js /connect login siliconflow --api-key <your-key> --model deepseek-ai/DeepSeek-V3
-node dist/cli.js /connect login openai-compatible --api-key <key> --base-url <url> --model <model>
-
-# 记忆管理
-node dist/cli.js /memory list
+node dist/cli.js
 ```
 
 ---
@@ -132,65 +121,75 @@ node dist/cli.js /memory list
 
 ```text
 packages/ts-shell/src/
-├── config/                       # 统一配置中心 (types, schema, settingsLoader, runtimeConfig)
-├── session/                      # 会话与智能体核心循环
-│   ├── SessionManager.ts         # 会话状态管理门面
-│   └── agent/                    # 统一 Agent 引擎 (types, lifecycle, compaction, persistence, events)
-├── context/                      # 上下文感知与代码知识图谱
-├── tools/                        # 工具调度与并发控制
-│   ├── concurrency/              # 路径级并发互斥队列 (fileMutationQueue.ts)
-│   ├── dispatch/                 # 批调度管道 (planner, executor, projector, types)
-│   └── toolBatchDispatch.ts      # 工具调度主门面
-├── core/shell/approval/          # 细粒度安全与权限信任策略
-│   ├── types.ts                  # allow / ask / deny 行为与授权结构
-│   ├── evaluator.ts              # 规则匹配器与只读安全白名单
-│   └── store.ts                  # .private-agents 权限持久化存储
-├── edit/                         # 代码变更、补丁与自愈系统
-│   ├── multifile/                # 多文件变更依赖图、碰撞检测与拓扑调度 (conflict, graph)
-│   ├── patch/                    # 单文件补丁规划、Fuzzy Diff 规范化与前置 AST 语法检验 (astGauntlet)
-│   └── repair/                   # LSP 诊断拦截与 2 轮编译器反馈自愈控制器 (lspRepairLoop)
-├── orchestration/swarm/          # 多智能体 Swarm 协同
-│   ├── dispatcher.ts             # 角色化子智能体分发器
-│   └── convergence.ts            # 轨迹收敛共识验证器
-└── presentation/                 # 终端渲染与 TUI 引擎
-    ├── components/               # 状态徽章 (statusBadge) 与终端文本框 (box)
-    ├── tui/                      # 差分 ANSI 屏幕缓冲区 (buffer), Alt-Screen (terminal), 流式组件
-    └── surface/                  # 视图模型与 Section 布局渲染
+├── core/
+│   ├── commands/                 # Slash 现代化命令运行时
+│   │   ├── pluginsAndMarketplace.ts # /marketplace, /plugin 扩展管理
+│   │   ├── memoryCommandRuntime.ts  # /memory 原生记忆审查与查询
+│   │   ├── workflowCommandRuntime.ts# /workflow SDLC 流水线驱动
+│   │   ├── researchCommandRuntime.ts# /deep-research 深度研究引擎
+│   │   ├── brainstormCommandRuntime.ts # /brainstorm 创新与 ADR 生成
+│   │   ├── shellCommandRuntime.ts   # /shell 跨平台状态与切换
+│   │   ├── copyCommandRuntime.ts    # /copy OSC 52 极速剪贴板
+│   │   └── btwCommandRuntime.ts     # /btw 旁路问答 (15s 超时)
+│   ├── memory/                   # Native QuadMemory 四层原生记忆架构
+│   │   ├── types.ts              # 记忆领域契约与实体定义
+│   │   ├── memoryStore.ts        # BM25 + 实体倒排混合检索存储
+│   │   ├── factArbiter.ts        # 加性冲突仲裁器 (ADD/UPDATE/INVALIDATE)
+│   │   └── memoryTools.ts        # retain, recall, reflect, memory_edit 工具
+│   ├── workflow/                 # Agentic SDLC 工作流调度与流水线
+│   │   ├── types.ts              # DAG 节点与流水线接口
+│   │   ├── dagResolver.ts        # Kahn 拓扑排序与环形依赖探测
+│   │   ├── pipelineExecutor.ts   # 阶段屏障同步与流水线执行器
+│   │   ├── builderValidatorPipeline.ts # Builder-Validator 独立校验流水线
+│   │   └── adversarialRefuterPipeline.ts # 对抗式反驳流水线
+│   ├── shell/                    # 跨平台自适应 Shell 执行引擎
+│   │   ├── platform/
+│   │   │   ├── shellDetector.ts  # 智能跨平台环境感知器
+│   │   │   └── shellManager.ts   # 多后端 (Git Bash/PowerShell/WSL) 切换调度
+│   │   └── approval/
+│   │       └── evaluator.ts      # 只读静态命令白名单 (支持跨平台命令)
+│   ├── context/                  # 上下文治理与长效会话
+│   │   ├── browserSessionManager.ts # 单例常驻浏览器 Context 管理器
+│   │   ├── stealthPreload.ts     # 14 重纯 TS 反反爬 Stealth 脚本矩阵
+│   │   ├── microCompact.ts       # 2-Layer 渐进式上下文微压缩
+│   │   └── contextAnalysis.ts    # 上下文 Token 与注意力热度分析
+│   ├── hooks/                    # 企业级生命周期 Hook 调度体系
+│   │   ├── hookDispatcher.ts     # 6 阶段异步 Hook 调度中心
+│   │   └── builtin/              # 内置守卫 (LSPGuard, TestRunner, ReceiptCollector)
+│   ├── research/                 # 深度研究与事实投票子系统
+│   │   ├── deepResearcher.ts     # 递归树搜索与多源搜集
+│   │   └── claimVoter.ts         # 交叉共识计票与置信度裁决
+│   ├── creative/                 # 创新推理与 ADR 生成子系统
+│   │   ├── hypothesisGenerator.ts # 假设与头脑风暴生成器
+│   │   └── redTeamChallenger.ts   # 红队质疑与对抗挑战器
+│   └── tools/                    # 精简且功能完备的原生工具库
+│       ├── grep.ts               # 原生高效 Grep 工具
+│       ├── browserUnified.ts     # 统一长效 [ref=eN] 浏览器工具
+│       ├── webSearch.ts          # 带超时回退的高效网络检索
+│       └── webFetch.ts           # 自动清理监听器的轻量网页抓取
 ```
 
 ---
 
-## 五、 架构技术亮点与顶尖项目对齐度
+## 五、 技术债务审计与 4 阶段重构治理报告
 
-```mermaid
-graph TD
-  subgraph "四大顶尖架构对齐支撑"
-    P1[Pi 对齐: Differential ANSI Buffer + Path Mutex Queue]
-    P2[GitNexus 对齐: Tree-sitter AST ScopeTree + Graph RAG]
-    P3[Claude Code 对齐: Three-state Permission + LSP Self-Repair]
-    P4[mini-swe-agent 对齐: SubAgent Dispatcher + Trajectory Proof]
-  end
-```
+项目于 2026-08-30 完成了全仓系统性技术审计，形成了详尽的问题清单 [`problem.md`](problem.md)，并分 **4 阶段** 实现了 **全部 20 项缺陷与技术债务的 100% 解决**：
 
-1. **响应式 TUI 体验（对标 Pi）**：
-   - 使用 `DifferentialTerminalBuffer` 实施局部光标重绘，支持全屏 Alt-Screen 与 `<thinking>` 折叠组件。
-2. **多语言 AST 代码图谱（对标 GitNexus）**：
-   - 提取跨语言声明（TS/JS/Py/Rust），构建全限定名索引与方法虚表，通过 Graph RAG 拓扑游走实现高精度上下文召回。
-3. **编译器反馈代码自愈（对标 Claude Code）**：
-   - 前置 AST 语法验证拦截残缺补丁，写后自动拦截 TypeScript 诊断错误并驱动模型自愈修复，杜绝盲写代码。
-4. **多智能体分发与验证（对标 mini-swe-agent / OpenHands）**：
-   - 支持子智能体隔离分发与多轨迹共识收敛验证。
+- **Stage 1 (P0 阻塞修复)**：修复多工具验证反馈消息时序、DSML 工具调用协议声明与记忆仲裁否定词误杀。
+- **Stage 2 (P1 高危加固)**：贯通 ShellManager Windows 执行、修复跨平台临时目录、建立 500 条上限的 Ring Buffer 环形账本、修复 Browser 页面崩溃自愈、钩子全面异步化并增加 MCP 超时与 EPIPE 守卫。
+- **Stage 3 (P2 债务清算)**：`/fast`, `/undo`, `/loop` 联动运行态、`/copy` 升级 OSC 52、`/btw` 动态复用运行时配置、白名单扩充 Windows 命令、Web 工具增加超时并回收监听器。
+- **Stage 4 (P3 规范收敛)**：全仓 JSDoc 规范补齐，验证单模块函数数 $\le 20$ 且单向无环。
 
 ---
 
 ## 六、 技术 RFC 提案与参考知识库
 
-- **战略演进路线图**：[`GOAL.md`](GOAL.md)
-- **项目 Master 架构专论**：[`.wiki/wiki/theses/sota-coding-agent-architectural-evolution.md`](.wiki/wiki/theses/sota-coding-agent-architectural-evolution.md)
-- **知识库总索引**：[`.wiki/_index.md`](.wiki/_index.md)
-- **技术 RFC 规范系列**：
-  - [RFC-001: 架构债务清算与死代码审计](.wiki/raw/notes/RFC-001-architectural-debts-and-dead-code.md)
-  - [RFC-002: Tree-sitter AST 代码知识图谱](.wiki/raw/notes/RFC-002-tree-sitter-code-intelligence-graph.md)
-  - [RFC-003: 差分 ANSI 屏幕缓冲区与流式 TUI](.wiki/raw/notes/RFC-003-differential-tui-streaming-engine.md)
-  - [RFC-004: LSP 协议驱动的代码自愈闭环](.wiki/raw/notes/RFC-004-lsp-diagnostics-and-self-repair-loop.md)
-- **形式化治理体验报告**：[`.normproof/EXPERIENCE.md`](.normproof/EXPERIENCE.md)
+- **系统技术论证与论文库**：`.wiki/wiki/theses/`
+  - [`agent-memory-architecture-and-synthesis.md`](.wiki/wiki/theses/agent-memory-architecture-and-synthesis.md) - 原生四层记忆体系论证
+  - [`agentic-workflow-and-sdlc-orchestration.md`](.wiki/wiki/theses/agentic-workflow-and-sdlc-orchestration.md) - 工作流与软件工程流水线论证
+  - [`cross-platform-shell-execution-and-adaptation.md`](.wiki/wiki/theses/cross-platform-shell-execution-and-adaptation.md) - 跨平台 Shell 执行架构论证
+  - [`browser-anti-detection-and-waf-evasion.md`](.wiki/wiki/theses/browser-anti-detection-and-waf-evasion.md) - 浏览器反检测与 WAF 绕过论证
+  - [`deep-research-command-architecture.md`](.wiki/wiki/theses/deep-research-command-architecture.md) - 深度研究与共识计票论证
+  - [`unlocking-agent-creativity-and-exploratory-reasoning.md`](.wiki/wiki/theses/unlocking-agent-creativity-and-exploratory-reasoning.md) - 创新探索与头脑风暴论证
+- **技术 RFC 提案库**：`.wiki/raw/notes/` (RFC-001 ~ RFC-004)
+- **技术债务与修复全景清单**：[`problem.md`](problem.md)
