@@ -16,3 +16,4 @@ Last updated: 2026-08-28
 - [统一可观测性与日志系统架构演进](unified-logging-and-observability-architecture.md)
 - [Agent 循环生命周期、交互路由与死循环防御演进](agent-loop-lifecycle-and-interactive-routing.md)
 - [全仓底层“Demo/Mock/伪实现”深度审计报告](deep-audit-of-demo-and-mock-patterns.md)
+- [全仓深层“架构假象、硬编码 Mock 与 Demo 级空壳”无死角审计报告](unsparing-deep-audit-of-architectural-facades-and-demo-shells.md)
