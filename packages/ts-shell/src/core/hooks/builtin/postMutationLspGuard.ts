@@ -41,12 +41,13 @@ export function createPostMutationLspGuard(): InProcessHookConfig {
           }
         }
 
-        // 2. JavaScript / TypeScript: Strip comments, strings, template literals, and regexes before counting braces
+        // 2. JavaScript / TypeScript: Robust multi-line comment & string stripping
         const strippedCode = content
           .replace(/\/\*[\s\S]*?\*\//g, "") // multi-line comments
           .replace(/\/\/[^\n]*/g, "") // single-line comments
-          .replace(/(["'`])(?:\\.|(?!\1)[^\\])*\1/g, '""'); // strings & template literals
-
+          .replace(/`[\s\S]*?`/g, '""') // multi-line template literals
+          .replace(/'(?:\\.|[^\\'])*'/g, '""') // single quotes
+          .replace(/"(?:\\.|[^\\"])*"/g, '""'); // double quotes
         const openBraces = (strippedCode.match(/\{/g) || []).length;
         const closeBraces = (strippedCode.match(/\}/g) || []).length;
         if (openBraces !== closeBraces) {

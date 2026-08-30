@@ -58,11 +58,13 @@ export async function executeLocally(options: {
   cwd: string
   timeoutMs?: number
 }): Promise<NormalizedExecutionResult> {
+  const isWindows = process.platform === 'win32'
   const childPromise = execFileAsync(options.command, options.args, {
     cwd: options.cwd,
     windowsHide: true,
     maxBuffer: 1024 * 1024,
     timeout: options.timeoutMs,
+    shell: isWindows,
   })
 
   try {

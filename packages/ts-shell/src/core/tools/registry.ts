@@ -7,8 +7,9 @@ import { type CoreMcpGateway } from '../mcp/gateway.js'
 import { createGrepToolDefinition } from './grep.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
-import { createUnifiedBrowserToolDefinition } from './browserToolUnified.js'
 import { createLspToolDefinition } from './lsp.js'
+import { createUnifiedBrowserToolDefinition } from './browserToolUnified.js'
+import { ShellManager } from '../shell/platform/shellManager.js'
 import { createAskToolDefinition } from './ask.js'
 import { createTodoToolDefinition } from './todoTool.js'
 import { createTaskToolDefinition } from './taskTool.js'
@@ -80,11 +81,20 @@ async function runCommandTool(
       exitCode: 1,
     })
   }
+  const env = ShellManager.getActiveEnvironment();
+  const isWindows = process.platform === 'win32';
+  const shellBin = env.executionPath;
+  let shellArgs: string[];
 
-  const isWindows = process.platform === 'win32'
-  const shellBin = isWindows ? 'cmd.exe' : 'sh'
-  const shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command]
-
+  if (env.activeBackend === 'powershell') {
+    shellArgs = ['-NoProfile', '-NonInteractive', '-Command', command];
+  } else if (env.activeBackend === 'git-bash' || env.activeBackend === 'bash') {
+    shellArgs = ['-c', command];
+  } else if (env.activeBackend === 'wsl') {
+    shellArgs = ['-e', 'sh', '-c', command];
+  } else {
+    shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command];
+  }
   const result = await executionService.runCommand({
     operationKind: 'command.run',
     command: shellBin,

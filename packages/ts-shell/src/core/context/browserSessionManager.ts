@@ -29,6 +29,7 @@ class BrowserSessionManager {
   private elementRefs: Map<string, string> = new Map();
   private mockHtmlContent: string | null = null;
   private initPromise: Promise<PwPage | null> | null = null;
+  private cleanupRegistered = false;
 
   /**
    * Set mock HTML content for testing or simulated environments
@@ -39,7 +40,7 @@ class BrowserSessionManager {
   }
 
   /**
-   * Get active page or initialize browser instance with concurrency mutex
+   * Get or create active Playwright page instance with full stealth patches
    */
   async getOrCreatePage(): Promise<PwPage | null> {
     if (this.currentPage) {
@@ -72,6 +73,21 @@ class BrowserSessionManager {
           await (this.context as any).addInitScript?.(stealthScript);
 
           this.currentPage = await this.context!.newPage();
+          // Listen for page crash / close to prevent stale dead references
+          (this.currentPage as any).on?.("close", () => {
+            this.currentPage = null;
+          });
+          (this.currentPage as any).on?.("crash", () => {
+            this.currentPage = null;
+          });
+
+          // Ensure process exit cleans up Chromium instances
+          if (!this.cleanupRegistered) {
+            process.once("exit", () => {
+              this.browser?.close().catch(() => {});
+            });
+            this.cleanupRegistered = true;
+          }
           return this.currentPage;
         }
       } catch (err) {

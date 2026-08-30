@@ -1,10 +1,10 @@
-import { execSync } from "node:child_process";
+import { exec } from "node:child_process";
 import type {
-  CommandHookConfig,
-  HookDecision,
   HookEventPayload,
-  HooksConfiguration,
+  HookDecision,
   InProcessHookConfig,
+  CommandHookConfig,
+  HooksConfiguration,
   PreToolUsePayload,
   PostToolUsePayload,
 } from "./types.js";
@@ -101,12 +101,29 @@ export class HookDispatcher {
         const jsonPayload = JSON.stringify(payload);
 
         try {
-          const stdout = execSync(hook.command, {
-            input: jsonPayload,
-            cwd: payload.workspaceRoot,
-            encoding: "utf8",
-            timeout: timeoutMs,
-            stdio: ["pipe", "pipe", "pipe"],
+          const stdout = await new Promise<string>((resolve, reject) => {
+            const child = exec(
+              hook.command,
+              {
+                cwd: payload.workspaceRoot,
+                timeout: timeoutMs,
+                maxBuffer: 1024 * 1024,
+              },
+              (error, stdoutBuf, stderrBuf) => {
+                if (error) {
+                  const errObj = error as any;
+                  errObj.stderr = stderrBuf;
+                  errObj.stdout = stdoutBuf;
+                  reject(errObj);
+                } else {
+                  resolve(stdoutBuf);
+                }
+              },
+            );
+            if (child.stdin) {
+              child.stdin.write(jsonPayload);
+              child.stdin.end();
+            }
           });
 
           // Attempt to parse JSON decision from stdout if provided
@@ -125,7 +142,7 @@ export class HookDispatcher {
           const errOutput = [err.stderr, err.stdout].filter(Boolean).join("\n") || err.message;
           return {
             decision: "block",
-            reason: `Hook '${hook.command}' rejected action with exit code ${err.status ?? 1}`,
+            reason: `Hook '${hook.command}' rejected action with exit code ${err.status ?? err.code ?? 1}`,
             feedback: errOutput.slice(0, 2000),
           };
         }

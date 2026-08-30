@@ -118,41 +118,67 @@ export class CoreMcpClient {
         return
       }
 
+      const isWin = process.platform === 'win32';
+      const timeoutMs = 30_000;
+
       const child = spawn(this.config.command, this.config.args ?? [], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: false,
-      })
+        shell: isWin,
+      });
 
-      let stdout = ''
-      let stderr = ''
+      let stdout = '';
+      let stderr = '';
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          child.kill();
+          reject(new McpClassifiedError(
+            classifyMcpFailure({
+              failureClass: 'stdio-process',
+              detail: `MCP stdio process timed out after ${timeoutMs}ms for ${this.name}`,
+            }),
+          ));
+        }
+      }, timeoutMs);
 
       child.stdout.on('data', data => {
-        stdout += data.toString()
-      })
+        stdout += data.toString();
+      });
       child.stderr.on('data', data => {
-        stderr += data.toString()
-      })
+        stderr += data.toString();
+      });
+      child.stdin.on('error', _err => {
+        // Guard against unhandled EPIPE on early child process exit
+      });
       child.on('error', error => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         reject(new McpClassifiedError(
           classifyMcpFailure({
             failureClass: 'stdio-process',
             detail: `MCP stdio process could not start for ${this.name}: ${error.message}`,
           }),
-        ))
-      })
+        ));
+      });
       child.on('close', code => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         if (code !== 0) {
           reject(new McpClassifiedError(
             classifyMcpFailure({
               failureClass: 'stdio-process',
               detail: stderr || `MCP stdio process for ${this.name} exited with code ${code}`,
             }),
-          ))
-          return
+          ));
+          return;
         }
 
         try {
-          resolve(JSON.parse(stdout) as T)
+          resolve(JSON.parse(stdout) as T);
         } catch (error) {
           reject(new McpClassifiedError(
             classifyMcpFailure({
@@ -161,13 +187,13 @@ export class CoreMcpClient {
                 ? `MCP stdio response from ${this.name} was not valid JSON: ${error.message}`
                 : `MCP stdio response from ${this.name} was not valid JSON`,
             }),
-          ))
+          ));
         }
-      })
+      });
 
-      child.stdin.write(JSON.stringify(payload))
-      child.stdin.end()
-    })
+      child.stdin.write(JSON.stringify(payload));
+      child.stdin.end();
+    });
   }
 }
 

@@ -315,12 +315,21 @@ function runnerCommandIsSafe(
   if (/https?:\/\//i.test(combined) || /\b(mcp|browserbase|chromadb|playwright)\b/i.test(combined)) {
     return false;
   }
+  const isTmpOrLocal = (arg: string) => {
+    const normalized = arg.replace(/\\/g, "/");
+    return (
+      normalized.startsWith("/tmp/") ||
+      normalized.startsWith("./") ||
+      normalized.includes("/temp/") ||
+      normalized.includes("/tmp/") ||
+      normalized.includes("Temp/")
+    );
+  };
   if (mode === "test-local") {
-    return command.args.some((arg) => arg.startsWith("/tmp/"));
+    return command.args.some(isTmpOrLocal);
   }
-  return command.args.some((arg) => arg.startsWith("/tmp/") || arg.startsWith("./"));
+  return command.args.some(isTmpOrLocal);
 }
-
 function isRunnerCommand(value: unknown): value is BrowserExternalRunnerCommand {
   return (
     isRecord(value) &&
