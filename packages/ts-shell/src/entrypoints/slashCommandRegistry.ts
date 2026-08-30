@@ -222,6 +222,12 @@ export const SLASH_COMMANDS = [
     group: "workflow",
     summary: "inspect, run, or cancel multi-stage agentic workflows and DAG tasks",
   },
+  {
+    name: "deep-research",
+    aliases: ["research", "deep"],
+    group: "workflow",
+    summary: "conduct multi-agent tree search and cross-source consensus research",
+  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];

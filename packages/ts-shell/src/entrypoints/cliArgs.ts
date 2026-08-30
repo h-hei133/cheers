@@ -132,6 +132,9 @@ const RESERVED_SHELL_SLASH_COMMANDS = new Set([
   "/wf",
   "/pipeline",
   "/dag",
+  "/deep-research",
+  "/research",
+  "/deep",
 ]);
 export function parseCliArgs(
   rawArgs: readonly string[],

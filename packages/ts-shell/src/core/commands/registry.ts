@@ -24,6 +24,7 @@ import { runMarketplaceCommand } from "./marketplaceCommandRuntime.js";
 import { runPluginCommand } from "./pluginCommandRuntime.js";
 import { runMemoryCommand } from "./memoryCommandRuntime.js";
 import { runWorkflowCommand } from "./workflowCommandRuntime.js";
+import { runDeepResearchCommand } from "./deepResearchCommandRuntime.js";
 import {
   runDiagnoseCommand,
   runDoctorCommand,
@@ -416,6 +417,15 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runWorkflowCommand(args, context),
+    },
+    {
+      name: "deep-research",
+      aliases: ["research", "deep"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runDeepResearchCommand(args, context),
     },
   ];
 
