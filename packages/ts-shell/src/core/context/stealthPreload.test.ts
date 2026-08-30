@@ -21,9 +21,9 @@ describe("Browser Anti-Detection & Stealth Engine", () => {
   it("builds composite preload script covering all detection vectors", () => {
     const script = buildStealthPreloadScript();
 
-    // 1. Mask webdriver
-    expect(script).toContain("navigator, 'webdriver'");
-    expect(script).toContain("get: () => undefined");
+    // 1. Mask webdriver on prototype
+    expect(script).toContain("proto, 'webdriver'");
+    expect(script).toContain("get: () => false");
 
     // 2. Chrome runtime emulation
     expect(script).toContain("window.chrome");
@@ -38,7 +38,11 @@ describe("Browser Anti-Detection & Stealth Engine", () => {
     expect(script).toContain("hardwareConcurrency");
     expect(script).toContain("Intel Iris OpenGL Engine");
 
-    // 5. Native toString protection
+    // 5. Permissions Query & PermissionStatus emulation
+    expect(script).toContain("navigator.permissions.query");
+    expect(script).toContain("notifications");
+
+    // 6. Native toString protection
     expect(script).toContain("Function.prototype.toString");
     expect(script).toContain("[native code]");
   });

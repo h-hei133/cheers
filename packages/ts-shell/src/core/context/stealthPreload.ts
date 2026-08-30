@@ -39,12 +39,14 @@ export const DEFAULT_VIEWPORT = {
 export function buildStealthPreloadScript(): string {
   return `(() => {
     try {
-      // 1. Mask navigator.webdriver
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => undefined,
-        configurable: true,
-      });
-
+      // 1. Mask navigator.webdriver on Navigator.prototype
+      try {
+        const proto = Object.getPrototypeOf(navigator) || navigator;
+        Object.defineProperty(proto, 'webdriver', {
+          get: () => false,
+          configurable: true,
+        });
+      } catch {}
       // 2. Emulate window.chrome runtime
       if (!window.chrome) {
         window.chrome = {
@@ -140,18 +142,28 @@ export function buildStealthPreloadScript(): string {
         };
       }
 
-      // 7. Permissions Query spoofing for notifications
+      // 7. Permissions Query spoofing for notifications returning a compliant PermissionStatus structure
       if (navigator.permissions && navigator.permissions.query) {
         const originalQuery = navigator.permissions.query;
         navigator.permissions.query = function(parameters) {
           if (parameters && parameters.name === 'notifications') {
-            return Promise.resolve({ state: Notification.permission });
+            const notifPermission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+            const state = notifPermission === 'default' ? 'prompt' : notifPermission;
+            const statusObj = {
+              state,
+              name: 'notifications',
+              onchange: null,
+              addEventListener: function() {},
+              removeEventListener: function() {},
+              dispatchEvent: function() { return false; },
+            };
+            return Promise.resolve(statusObj);
           }
           return originalQuery.apply(this, [parameters]);
         };
       }
 
-      // 8. Native toString protection
+      // 8. Native toString protection returning dynamic function name
       const nativeToString = Function.prototype.toString;
       const patchedFunctions = new Set([
         WebGLRenderingContext.prototype.getParameter,
@@ -161,11 +173,11 @@ export function buildStealthPreloadScript(): string {
 
       Function.prototype.toString = function() {
         if (patchedFunctions.has(this)) {
-          return 'function getParameter() { [native code] }';
+          const fnName = this.name || 'query';
+          return 'function ' + fnName + '() { [native code] }';
         }
         return nativeToString.apply(this, arguments);
       };
-    } catch (err) {
       // Ignore errors inside preload
     }
   })();`;

@@ -53,23 +53,29 @@ export function auditContextHealth(
   const largeToolOutputs: Array<{ toolName: string; chars: number }> = [];
 
   for (const msg of messages) {
-    const tokens = estimateTextTokens(msg.content);
+    const contentTokens = estimateTextTokens(msg.content);
     if (msg.role === "tool") {
-      toolOutputsTokens += tokens;
+      toolOutputsTokens += contentTokens;
       const chars = msg.content?.length || 0;
       if (chars > 3_000) {
         largeToolOutputs.push({ toolName: "tool", chars });
       }
     } else if (msg.role === "user" || msg.role === "assistant") {
-      historyTokens += tokens;
+      let turnTokens = contentTokens;
+      if (msg.tool_calls) {
+        for (const call of msg.tool_calls) {
+          turnTokens += estimateTextTokens(call.function?.name) + estimateTextTokens(call.function?.arguments);
+        }
+      }
+      historyTokens += turnTokens;
     }
 
     // Detect duplicate read calls from tool_calls
     if (msg.tool_calls) {
       for (const call of msg.tool_calls) {
-        if (call.function.name === "read") {
+        if (call.function?.name === "read") {
           try {
-            const args = JSON.parse(call.function.arguments || "{}");
+            const args = JSON.parse(call.function?.arguments || "{}");
             if (args.path) {
               const p = String(args.path);
               fileReadCounts.set(p, (fileReadCounts.get(p) || 0) + 1);

@@ -59,9 +59,10 @@ export function microcompactMessages<T extends ChatMessageLike>(
     return { messages: [], prunedCount: 0, savedChars: 0 };
   }
 
-  // Identify user/assistant turn boundaries from newest to oldest
+  // Identify user/assistant turn boundaries from newest to oldest.
+  // Defaults to 0 so histories with fewer turns than keepRecentTurns are preserved intact.
   let turnCount = 0;
-  let boundaryIndex = messages.length;
+  let boundaryIndex = 0;
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
@@ -77,7 +78,7 @@ export function microcompactMessages<T extends ChatMessageLike>(
   let prunedCount = 0;
   let savedChars = 0;
 
-  // Track seen tool result signatures to deduplicate identical repeated tool outputs in older turns
+  // Track seen tool result signatures via full-content hashing to deduplicate identical repeated outputs
   const seenOlderToolOutputs = new Set<string>();
 
   const result: T[] = messages.map((msg, index) => {
@@ -85,8 +86,14 @@ export function microcompactMessages<T extends ChatMessageLike>(
     if (index < boundaryIndex && msg.role === "tool" && typeof msg.content === "string") {
       const originalLen = msg.content.length;
 
-      // Deduplicate identical outputs in older history
-      const contentHash = msg.content.slice(0, 200);
+      // Deduplicate identical outputs in older history using full content hash
+      let hash = 0;
+      for (let c = 0; c < msg.content.length; c++) {
+        hash = ((hash << 5) - hash) + msg.content.charCodeAt(c);
+        hash |= 0;
+      }
+      const contentHash = `${originalLen}:${hash}`;
+
       if (seenOlderToolOutputs.has(contentHash) && originalLen > 300) {
         prunedCount++;
         const deduplicated = `[... Duplicate tool output omitted: ${originalLen} characters previously shown ...]`;

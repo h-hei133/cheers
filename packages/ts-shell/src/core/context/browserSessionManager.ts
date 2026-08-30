@@ -67,12 +67,11 @@ class BrowserSessionManager {
             locale: "en-US",
             timezoneId: "America/New_York",
           });
-          this.currentPage = await this.context!.newPage();
-
-          // Inject composite Anti-Detection stealth preload script
+          // Inject composite Anti-Detection stealth preload script to context so all pages/popups inherit it
           const stealthScript = buildStealthPreloadScript();
-          await (this.currentPage as any).addInitScript?.(stealthScript);
+          await (this.context as any).addInitScript?.(stealthScript);
 
+          this.currentPage = await this.context!.newPage();
           return this.currentPage;
         }
       } catch (err) {
