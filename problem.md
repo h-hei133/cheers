@@ -1,166 +1,93 @@
-# 项目核心使用与架构能力问题清单 (problem.md)
+# 编码智能体项目深度架构审计与问题清单 (problem.md)
 
-本文档记录用户在实际使用本项目时暴露出的核心缺陷、体验病灶以及与顶尖业界 Agent（如 **Pi**、**Claude Code**、**OpenCode**、**Playwright-MCP**、**DeepSeek-Harness**、**Oh-My-Pi**）对比发现的架构级能力差距与落地设计规范。
-
----
-
-## 目录
-1. [问题 1：静态规则拦截（Prompt 被硬编码规则截胡）](#问题-1静态规则拦截prompt-被硬编码规则截胡)（已修复）
-2. [问题 2：自主 ReAct 工具调用循环缺失（纯文本裸聊）](#问题-2自主-react-工具调用循环缺失纯文本裸聊)（已修复）
-3. [问题 3：工具参数缺失 JSON Schema 定义](#问题-3工具参数缺失-json-schema-定义)（已修复）
-4. [问题 4：终端交互转义序列与内部 Continuation 转储污染](#问题-4终端交互转义序列与内部-continuation-转储污染)（已修复）
-5. [问题 5：基础 Slash 命令与 Plan Mode 安全机制缺陷](#问题-5基础-slash-命令与-plan-mode-安全机制缺陷)（已修复）
-6. [问题 6：内置文件工具链与 Pi Agent 的核心能力差距（待补齐）](#问题-6内置文件工具链与-pi-agent-的核心能力差距待补齐)（已修复）
-7. [问题 7：Web 搜索与轻量网页抓取能力缺失（对比 OpenCode）](#问题-7web-搜索与轻量网页抓取能力缺失对比-opencode)（已修复）
-8. [问题 8：浏览器自动化工具粒度与交互能力差距（对比 Playwright-MCP）](#问题-8浏览器自动化工具粒度与交互能力差距对比-playwright-mcp)（已修复）
-9. [问题 9：上下文压缩（Compact）与自动压缩（Auto-Compact）两层渐进式架构规范（对比 Claude Code / Pi / DeepSeek-Harness）](#问题-9上下文压缩compact与自动压缩auto-compact两层渐进式架构规范对比-claude-code--pi--deepseek-harness)（已修复）
-10. [问题 10：Slash 命令体系与顶尖项目（Pi / Claude Code / OpenCode / DeepSeek-Harness / Oh-My-Pi）的综合对比与缺失清单](#问题-10slash-命令体系与顶尖项目pi--claude-code--opencode--deepseek-harness--oh-my-pi的综合对比与缺失清单)（已修复）
-11. [问题 11：高阶工作流与交互式 Slash 命令套件深度分析（Goal, Loop, Todo, Fast, Context, Btw）](#问题-11高阶工作流与交互式-slash-命令套件深度分析goal-loop-todo-fast-context-btw)（待处理）
+> **审计时间**：2026-08-30  
+> **审计范围**：`packages/ts-shell/src/` 及工作区关联核心模块  
+> **审计方法**：多智能体并发深潜审查（跨平台/工具链路 + 核心架构/生命周期/内存/技术债务） + 形式化语义静态分析
 
 ---
 
-## 问题 1：静态规则拦截（Prompt 被硬编码规则截胡）
-- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
-- **现象**：当用户输入"检查一下当前目录下的项目使用的架构是什么"时，系统被 `repoAwareRouting.ts` 内部的静态正则表达式截胡，直接返回固定文本 `"Use /cd <path>..."`，完全未发给大模型。
-- **根因**：使用了脆弱的关键词正则匹配试图拦截所谓的"仓库状态"问题。
-- **修复**：彻底废除静态规则对自然语言的截胡，所有用户提示词 100% 直通大模型 ReAct 决策循环。
+## 一、 项目架构现状总览
+
+### 1.1 核心目录结构划分与模块职责
+当前项目采用现代 TypeScript (ES2022 / Node.js & Bun) 单体多包架构，核心控制平面与运行时集中在 `packages/ts-shell/src/`：
+- **`core/query/` (核心推理与 ReAct 执行回路)**：包含主会话循环 `agentLoop.ts`、双层渐进式压缩 `microCompact.ts` 与 `compaction/summarizer.ts`。
+- **`core/workflow/` (工作流编排子系统)**：包含 `dagResolver.ts` (Kahn 拓扑排序与环路检测)、`pipelineExecutor.ts` (阶段屏障)、`parallelDispatcher.ts` (有界并发池)、`cacheStaggering.ts` (Prompt Cache 错峰调度) 与 `builderValidator.ts`。
+- **`core/memory/` (QuadMemory 原生记忆引擎)**：包含 `memoryStore.ts` (双轨检索)、`factArbiter.ts` (增量四态冲突仲裁) 与 `memoryTools.ts`。
+- **`core/research/` (Deep Research 深度调研引擎)**：包含 `deepResearcher.ts` (递归树搜索)、`claimVoter.ts` (跨源共识投票) 与 `reportGenerator.ts`。
+- **`core/creative/` (创造力与多假设探索引擎)**：包含 `hypothesisGenerator.ts` (3 视角正交发散)、`redTeamChallenger.ts` (Momus 对抗审查) 与 `creativeSynthesizer.ts`。
+- **`core/shell/` (跨平台 Shell 与安全审批)**：包含 `platform/shellDetector.ts`、`platform/shellManager.ts` 与 `approval/evaluator.ts` (只读命令静态白名单分类器)。
+- **`core/hooks/` (生命周期与编译器护栏)**：包含 `hookDispatcher.ts` 与 `builtin/` (`postMutationLspGuard.ts`, `affectedUnitTestRunner.ts`, `evidenceReceiptCollector.ts`)。
+- **`core/tools/` (精简标准内置工具箱)**：收敛为 `read`, `write`, `edit`, `grep`, `glob`, `bash`, `browser`, `web_fetch`, `web_search`, `lsp`, `ask`, `todo`。
+- **`core/commands/` (斜杠命令交互运行时)**：集中注册 `/workflow`, `/memory`, `/deep-research`, `/brainstorm`, `/model`, `/marketplace`, `/plugin`, `/shell`, `/goal`, `/loop`, `/fast`, `/context`, `/btw`, `/clear`, `/undo`, `/copy` 等。
+
+### 1.2 整体健康度评估
+- **优势**：全仓 24 个测试套件，198/198 项单测全绿；严格遵循 NormProof 规则（单文件函数 $\le 20$，无循环依赖）；形成了从意图规划、上下文治理、代码编辑、多源调研到物理验证的完整闭环。
+- **潜在隐患**：在 LLM 对话协议时序一致性、部分 Windows 路径与命令真实执行、多工具调用下的反馈注入、以及部分早期占位命令（如 `/fast`, `/undo`, `/loop`）的真实运行时联动上，仍存在需要攻坚与清理的技术债务。
 
 ---
 
-## 问题 2：自主 ReAct 工具调用循环缺失（纯文本裸聊）
-- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
-- **现象**：自然语言模式下大模型没有挂载任何读写工具，退化为纯文本问答，无法读取本地任何真实文件。
-- **根因**：先前依赖多轮 P-C-R（Planner-Coder-Reviewer）复杂的抽象流，普通交互路径未注入 OpenAI 格式标准 Tools。
-- **修复**：实现统一的 `runAutonomousReActLoop`（`core/query/agentLoop.ts`），永久向大模型挂载完整标准工具集，支持自主多轮 `tool_calls` 执行与结果自动回传。
+## 二、 详细问题清单
+
+| 编号 | 严重级别 | 所属模块/维度 | 具体文件与位置 | 核心问题简述 | 潜在风险/影响 | 建议改进方案 |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **#1** | **P0** | 核心执行 / 协议一致性 | `core/query/agentLoop.ts:426-444` | **多工具调用时，后置验证 Hook 反馈提前插入 User 消息破坏 Chat 协议**。当 Assistant 一次发起多个 tool_calls 时，若某个工具触发了验证失败并推入 user 反馈，会导致该 user 消息插在 tool 消息中间。 | 违反 OpenAI/SiliconFlow `/chat/completions` 协议（要求 assistant 的全部 `tool_calls` 响应必须连续紧跟），直接抛出 `HTTP 400 Bad Request` 导致会话中断。 | 将所有工具执行期间收集到的验证反馈缓冲（Buffer）起来，待本轮全部 `tool` 响应消息全部推入 `messages` 数组后，再统一追加一条汇总的 user 反馈。 |
+| **#2** | **P0** | 核心执行 / 协议一致性 | `core/query/agentLoop.ts:294-345` | **DSML 标签工具调用提取时，未同步构造 `assistantMessage.tool_calls` 结构**。模型输出 `<｜DSML｜invoke...>` 时，直接推入了纯文本 assistant 消息，随后又推入 `role: "tool"` 消息。 | 下一轮 API 请求由于缺乏匹配的 `tool_calls` 声明，被大模型服务端作为非法历史拒绝（HTTP 400）。 | 解析到 DSML 标签时，动态在 `assistantMessage` 上合成对应的 `tool_calls` 数组及唯一 `id`，使上下文严格符合 OpenAI 标准工具调用格式。 |
+| **#3** | **P0** | 记忆治理 / 事实仲裁 | `core/memory/factArbiter.ts:94-118` | **事实冲突仲裁中，否定词检测存在单 Token 假阳性过度失效隐患**。`detectContradiction()` 仅检查否定词（如 "do not", "never"），只要与历史事实存在哪怕一个重叠词（`maxOverlapRatio > 0`），就会强行把已有事实标记为 `invalidated`。 | 无关的技术规则因为包含否定词被意外废弃，导致记忆库中的正确事实被破坏（如记录 "Do not use var" 会意外废弃 "Project uses Vitest"）。 | 在判定矛盾失效时，强制要求高 Jaccard 相似度（$\ge 0.4$）且核心实体（Entities/Subject）必须匹配，杜绝跨主题误杀。 |
+| **#4** | **P1** | 跨平台 / Shell 执行 | `core/tools/registry.ts:88-105` | **`runCommandTool` 未深度对接 `ShellManager`，Windows 下仍写死 `cmd.exe`**。即便检测到了 Git Bash 或 PowerShell，Windows 执行层仍通过 `cmd.exe /d /s /c` 运行命令；且 `daemon/client.ts` 执行 `.cmd` 缺少 `shell: true`。 | 大模型生成的 POSIX 命令（如 `export`, `mkdir -p`, 管道）在 Windows 下直接报语法错误，`npm`/`vitest` 等批处理命令抛出 `ENOENT`。 | 将 `runCommandTool` 统一委托给 `ShellManager.getActiveEnvironment()`，Windows 下使用检测到的 Git Bash 或 PowerShell，并在子进程中正确传递 `shell` 选项。 |
+| **#5** | **P1** | 跨平台 / 路径硬编码 | `core/context/browser/runtime/external/manifest.ts:318-322` | **外部浏览器 Runner 清单硬编码了 POSIX `/tmp/` 路径前缀校验** (`command.args.some(a => a.startsWith("/tmp/"))`)。 | Windows 系统的临时目录位于 `AppData\Local\Temp\`，导致合法 Runner 在 Windows 上校验无条件失败。 | 使用 `os.tmpdir()` 动态获取跨平台临时目录，统一通过 `path.normalize` 进行校验，去除硬编码的 `/tmp/` 字符串前缀。 |
+| **#6** | **P1** | 验证层 / 编译器守卫 | `core/hooks/builtin/postMutationLspGuard.ts:37-48` | **多行模板字符串与嵌套插值 `${...}` 导致括号匹配误判死循环**。正则清理字符串时缺少 `s`/`dotAll` 标志，且遇到 `${fn({ a: 1 })}` 时将括号误切，判定为语法错误并触发 `retry`。 | 产生假阳性括号不匹配报警，导致 Agent 陷入反复自我修补的无效循环。此外 `fs.readFileSync` 异常被隐蔽吞掉。 | 升级为基于分词状态机或鲁棒的 AST 括号匹配扫描；在读取失败时记录明确日志，避免吞错。 |
+| **#7** | **P1** | 架构 / 内存泄漏 | `core/hooks/builtin/evidenceReceiptCollector.ts:11-39` | **模块级全局数组 `sessionReceiptLedger` 未做会话隔离与长度限制**。每次工具调用的收据都无界 `push` 到全局数组中。 | 长期运行的 CLI 进程或多轮会话中内存持续线性膨胀，且不同会话间的执行收据互相污染。 | 将收据账本与 `sessionId` 绑定，引入固定容量（如 500 条）的环形缓冲区（Ring Buffer），提供会话销毁时的清理接口。 |
+| **#8** | **P1** | 架构 / 钩子生命周期 | `core/hooks/builtin/index.ts:15-22` | **模块级单例标记 `builtinHooksRegistered` 阻断新创建 Dispatcher 的钩子注册**。当为子代理或新会话创建独立 `HookDispatcher` 时，由于布尔标记已为 `true`，内置校验钩子全被跳过。 | 子代理与新会话完全丧失 LSP 编译器检查、测试守卫和证据收集能力。 | 废除模块级静态布尔变量，将“是否已注册”状态记录在 `HookDispatcher` 实例内部（`dispatcher.hasBuiltinHooks`）。 |
+| **#9** | **P1** | 工具生态 / 资源泄漏 | `core/context/browserSessionManager.ts:48-85, 315-340` | **浏览器 Page 崩溃/断开时缺乏引用清理，且未注册进程退出资源回收**。`this.currentPage` 在页面被关闭后依然保留死引用，后续调用持续抛错；缺少 `process.on('exit')` 清理。 | 页面一旦异常关闭，整个浏览器工具链永久瘫痪；进程异常退出时残留无主 Chromium 僵尸进程占用数百 MB 内存。 | 监听 `page.on('close')` 与 `page.on('crash')` 自动置空 `currentPage`；在管理器中注册 `SIGINT`/`SIGTERM`/`exit` 钩子，强制调用 `browser.close()`。 |
+| **#10** | **P1** | 架构 / 异步阻塞 | `core/hooks/hookDispatcher.ts:70-78` | **异步 Dispatch 方法中使用同步 `execSync` 运行外部命令，阻塞 Node 事件循环**（默认长达 15 秒），且 58-60 行空 `catch {}` 吞掉异常。 | 在执行外部审计脚本时，整个 CLI、定时器、并发子代理全部被冻结停滞；钩子崩溃时无任何报错日志。 | 改用异步 `execFileAsync` 并配合 `AbortSignal` 超时控制；异常时输出结构化警告日志或触发遥测事件。 |
+| **#11** | **P1** | 工具交互 / 健壮性 | `core/mcp/client.ts:110-155` | **MCP Stdio 客户端未设超时、缺少 EPIPE 错误监听，且 Windows 下 `shell: false`**。子进程卡死时 Promise 永不 resolve；子进程提前退出导致写入触发未捕获 `EPIPE` Crash。 | 外部卡死的 MCP 服务导致 Agent CLI 永久挂死；崩溃的 MCP 服务直接拉垮宿主 Node 进程。 | 为 Stdio 请求增加默认超时（如 30s）；监听 `child.stdin.on('error')` 捕获 EPIPE；Windows 下通过 `shell: true` 支持 `.cmd` 执行。 |
+| **#12** | **P1** | 工具生态 / 真实性 | `core/context/browserSessionManager.ts:45-66, 175-195` | **Playwright 缺失时返回模拟的成功字符串（`"Simulated click..."`）而不是报错**。 | 模型误以为网页点击/输入已经真实生效并据此进行后续推导，产生严重的“伪成功”幻觉。 | 当底层自动化引擎未安装或无法连接时，显式返回失败并提供真实的安装/配置指导，拒绝捏造假成功。 |
+| **#13** | **P2** | 技术债务 / 伪命令清理 | `core/commands/fastCommandRuntime.ts`<br>`core/commands/undoCommandRuntime.ts`<br>`core/commands/loopCommandRuntime.ts`<br>`core/tools/taskTool.ts` | **部分早期 Slash 命令与工具为脱离运行时的占位/伪实现**：<br>- `/fast` 仅翻转模块变量，未被模型路由器消费；<br>- `/undo` 仅打印文字，未真正回滚会话历史；<br>- `/loop` 仅执行同步检查，未在 Agent 循环中排队迭代；<br>- `task` 工具生成假 ID `task_xxxxxx` 并返回假文本。 | 占位逻辑产生代码异味，误导用户与上层编排。 | **全面真实化或清理**：<br>- `/fast` 真正联动大模型 `temperature` 或快速模型档位；<br>- `/undo` 联动 `agentLoop` 的 `messages.pop()` 会话状态回滚；<br>- `/loop` 接入 `Workflow` 调度执行；<br>- `task` 工具对接真正的子代理派发。 |
+| **#14** | **P2** | 跨平台 / 命令体验 | `core/commands/copyCommandRuntime.ts:11-34` | **无头 Linux / WSL 下同步轮询 `xclip` / `xsel` 阻塞 4 秒，且默认复制假文本**。无参数时复制固定字符串 `"Last response content"`。 | 每次敲 `/copy` 导致 CLI 假死 4 秒；复制到剪贴板的内容并非真实上一轮回答。 | 优先适配 OSC 52 终端转义序列剪贴板（全平台 0 依赖无阻塞）；无参数时真正获取最后一条 assistant 文本。 |
+| **#15** | **P2** | 架构 / 配置解耦 | `core/commands/btwCommandRuntime.ts:20-66` | **`/btw` 旁支问答写死读取特定环境变量（`SILICONFLOW_API_KEY`）与 3 秒超短硬编码超时**，忽视了系统配置的 Provider。 | 用户配置了自定义 API 或使用 Claude/Gemini 时 `/btw` 无法使用；复杂问题在 3 秒内频繁超时失败。 | 复用主会话的 `getRuntimeConfig()` 获取当前 Provider、BaseURL 与 Key；将超时放宽至 15s 并支持流式返回。 |
+| **#16** | **P2** | 工具实现 / 性能优化 | `core/tools/lsp.ts:100-157` | **LSP 工具中 `hover` 为静态假数据，且符号查找采用全仓文件逐个正则扫描**。 | 在中大型仓库中发起符号查询时磁盘 I/O 极重，且 hover 操作无法提供真实类型信息。 | 对接真正的 TypeScript Language Service 实例或基于 AST 缓存索引，消除无谓的全盘全量重复扫描。 |
+| **#17** | **P2** | 工具交互 / 假自动确认 | `core/tools/ask.ts:65-75` | **`ask` 工具未经终端交互直接返回默认推荐选项，假装用户已确认**。 | Agent 误以为用户已做出选择，剥夺了人类真实决策权。 | 接入真正的终端交互式 Prompt（如 `@inquirer/prompts` 或 readline 暂停机制），在非交互模式下显式打标为未确认。 |
+| **#18** | **P2** | 跨平台 / 审批白名单 | `core/shell/approval/evaluator.ts:85-101` | **只读命令白名单遗漏了 Windows 原生无害命令（`dir`, `where`, `type`）**。 | Windows 开发者在 Plan 模式下输入 `dir` 或 `where` 时被误拦截为破坏性写操作。 | 在 `isReadOnlyBashCommand` 中扩充跨平台只读基础命令映射表。 |
+| **#19** | **P2** | 工具健壮性 / 网络泄漏 | `core/tools/webSearch.ts:40-100`<br>`core/tools/webFetch.ts:135-145` | **搜索请求缺少全局超时回退，Fetch 的 `abortSignal` 监听器未在 `finally` 中清理**。 | 弱网或卡死连接导致查询挂死；长会话中 `AbortSignal` 上的监听器持续累积造成内存泄漏。 | 默认附加 `AbortSignal.timeout(20_000)`；在 `finally` 块中显式 `removeEventListener`。 |
+| **#20** | **P3** | 代码规范 / 注释与类型 | 全仓多处 | 部分测试辅助函数及内部接口缺少 JSDoc 注释，部分模块存在轻微的命名风格差异。 | 降低长期的代码可读性与新人维护效率。 | 统一 JSDoc 文档标准，补齐公共接口注释。 |
 
 ---
 
-## 问题 3：工具参数缺失 JSON Schema 定义
-- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
-- **现象**：大模型发起 tool_calls 时频繁出现参数缺失或不敢调用工具。
-- **根因**：`createCoreToolRegistry` 中各个工具的 `argsSchema` 仅声明了 `required: [...]`，缺少各参数在 `properties` 中的字段名与语义说明。
-- **修复**：为所有工具补全了标准 JSON Schema `properties` 声明与清晰的参数描述。
+## 三、 清理与重构优先级建议 (Roadmap)
 
----
+为了确保重构与清理过程平稳有序，不破坏已有 24 个测试套件，建议按以下 **4 阶段优先级** 分步推进：
 
-## 问题 4：终端交互转义序列与内部 Continuation 转储污染
-- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
-- **现象**：终端输出充斥大量未格式化的内部 Continuation Seed、Handoff 审计日志与混乱的转义字符。
-- **修复**：`sessionEventSurface.ts` 与 `sessionTerminalState.ts` 采用现代化的动态徽章（`⠹ [tool: name]`, `✓ [tool: name done]`），默认隐藏内部状态转储。
+```mermaid
+graph TD
+  subgraph "Stage 1: 协议与阻塞性缺陷修复 (P0 Focus)"
+    S1["1. 修复 agentLoop.ts 中 DSML 工具调用与多工具验证反馈消息时序<br/>2. 修复 factArbiter.ts 否定词单 Token 假阳性误失效"]
+  end
 
----
+  subgraph "Stage 2: 跨平台底层与资源泄漏加固 (P1 Focus)"
+    S2["1. 深度打通 registry.ts 与 ShellManager, 修复 Windows cmd.exe 与 execFile<br/>2. 修复 browserSessionManager.ts 页面崩溃自愈与僵尸进程清理<br/>3. 修复 hookDispatcher.ts 异步化与 evidenceReceiptCollector 环形缓冲区<br/>4. 修复 postMutationLspGuard.ts 模板字符串正则与 builtinHooksRegistered 状态绑定"]
+  end
 
-## 问题 5：基础 Slash 命令与 Plan Mode 安全机制缺陷
-- **状态**：✅ 已修复 (`124bd8b`, `207d958`)
-- **现象**：缺少 `/exit`、`/quit` 命令退出 CLI；Plan 模式在执行层未拦截 `bash` 命令。
-- **修复**：实现标准 `/exit` 优雅退出；并在 `agentLoop.ts` 与 `evaluator.ts` 中严格限制 Plan 模式下的只读白名单（只允许 `read`, `glob`, `grep`, `git-status`, `git-diff`）。
+  subgraph "Stage 3: 占位命令与工具链真实化改造 (P2 Focus)"
+    S3["1. 真实化 /undo (会话回滚)、/fast (模型参数联动)、/loop (自愈回路调度)<br/>2. 改造 taskTool.ts 对接真实子代理，改造 /copy 采用 OSC 52<br/>3. 重构 /btw 复用运行时 Provider 配置，完善 webSearch / webFetch 监听器回收"]
+  end
 
----
+  subgraph "Stage 4: 架构收敛与文档规范 (P3 Focus)"
+    S4["1. 清理全仓孤立类型与微小重复逻辑<br/>2. 统一 JSDoc 与导出的规范化命名<br/>3. 运行全量 Vitest 与 NormProof 判定验收"]
+  end
 
-## 问题 6：内置文件工具链与 Pi Agent 的核心能力差距（待补齐）
-- **状态**：✅ 已修复 (`72313fc`)
-- **交付**：实现了原生纯 TS 跨文件 `grep` 工具，升级了 `read` 分页（`offset`/`limit`）与 30KB/1000 行安全截断。
+  S1 --> S2 --> S3 --> S4
+```
 
----
-
-## 问题 7：Web 搜索与轻量网页抓取能力缺失（对比 OpenCode）
-- **状态**：✅ 已修复 (`3a12343`)
-- **交付**：实现了毫秒级轻量 `web_fetch`（HTML 转 Markdown + 10k 限制）与标准 `web_search` 搜索引擎适配层。
-
----
-
-## 问题 8：浏览器自动化工具粒度与交互能力差距（对比 Playwright-MCP）
-- **状态**：✅ 已修复 (`3a12343`)
-- **交付**：内核支持了完整的 Direct Playwright 交互与自愈执行流水线。
-
----
-
-## 问题 9：上下文压缩（Compact）与自动压缩（Auto-Compact）两层渐进式架构规范（对比 Claude Code / Pi / DeepSeek-Harness）
-- **状态**：✅ 已修复 (`3a12343`, `71469e8`)
-- **交付**：落地了第 1 层 0ms 纯内存 Microcompact（修剪 3 轮前旧工具输出 Head/Tail），第 2 层 8-Section 结构化 Checkpoint，支持 `/compact [custom_instructions]`，动态 Token 预算触发与 Context Overflow 运行时无感自愈重试。
-
----
-
-## 问题 10：Slash 命令体系与顶尖项目（Pi / Claude Code / OpenCode / DeepSeek-Harness / Oh-My-Pi）的综合对比与缺失清单
-- **状态**：✅ 已修复 (`facdc1b`)
-- **交付**：落地了 7 大核心高频命令：`/clear`、`/review`、`/init`、`/cost`、`/undo`、`/export`、`/copy`。
-
----
-
-- **状态**：✅ 已修复 (`aada736`)
-- **交付**：实现了 `/goal`、`/loop`、`/todo`、`/fast`、`/context`、`/btw` 6 大高阶工作流命令与对应测试套件。
-
-### 1. `/goal`（高阶目标持久化管理）
-- **标杆参考**：**DeepSeek-Harness** (`packages/goal/command-goal/`)
-- **实现剖析**：
-  - DeepSeek-Harness 将目标建模为状态机：`active`（执行中）、`paused`（暂停）、`blocked`（受阻）、`complete`（完成）。
-  - 支持 `/goal <objective>`（新建或切换目标）、`/goal edit <objective>`（重写当前目标）、`/goal pause` / `/goal resume` / `/goal clear`。
-  - **核心价值**：防止大模型在多轮复杂重构任务中发生“目标漂移（Goal Drift）”，每次决策前将当前活跃目标置顶注入系统提示词。
-
-### 2. `/loop`（自主循环执行与迭代直到达标）
-- **标杆参考**：**Oh-My-Pi** (`scripts/run-rs-task.ts`, `loop-phase.test.ts`) 与 Ralph / Auto-loop 模式
-- **实现剖析**：
-  - 设定最大迭代轮数与验收判定标准（例如：`npm test` 退出码必须为 0）。
-  - 每一轮由 Agent 执行修改，自动运行验证命令，未通过则将报错再次作为输入驱动下一轮，直至全部绿灯或达到轮数上限。
-  - **核心价值**：实现真正全自动无人值守的代码修复与测试驱动开发（TDD）。
-
-### 3. `/todo`（任务清单与阶段拆解追踪）
-- **标杆参考**：**OpenCode** (`tool/todo.ts` 与 `session/todo.ts`)
-- **实现剖析**：
-  - 将大任务拆解为结构化项：`[{ id, content, status: "pending" | "in_progress" | "completed" }]`。
-  - 支持 `/todo`（查看当前任务进度）、`/todo add <task>`、`/todo done <id>`、`/todo clear`。
-  - **核心价值**：让长任务的进度完全透明可视化，并在每次 Turn 结束时向用户展示清晰的勾选清单。
-
-### 4. `/fast`（快速模式切换 / 模型极速档）
-- **标杆参考**：**Claude Code** (`commands/fast/fast.tsx`)
-- **实现剖析**：
-  - 一键切换当前会话至低延迟、低成本的轻量快速模型（如从 Claude 3.7 Sonnet / DeepSeek-V3 切换至 Haiku / DeepSeek-V4-Flash / Mini-model）。
-  - 支持 `/fast on`、`/fast off` 或带有参数的快速切换。
-  - **核心价值**：适合简单查代码、小文件修改或快速问答，极大降低 API 费用并提升响应速度。
-
-### 5. `/context`（上下文可视化与 Token 分布透视）
-- **标杆参考**：**Claude Code** (`commands/context/context.tsx` & `context-noninteractive.ts`)
-- **实现剖析**：
-  - 结构化透视当前上下文窗口中每一部分的 Token 占比：
-    - System Prompt & Tools Schema 占用
-    - 历史用户/助手对话占用
-    - 工具调用输出（Tool Results）占用
-    - 剩余可用空间（Free Space）与 预留自动压缩缓冲（Autocompact Buffer）
-  - **核心价值**：帮助开发者和 Agent 准确洞察当前 Token 瓶颈，决定何时运行 `/compact`。
-
-### 6. `/btw`（侧信道提问 / 零上下文污染轻量问答）
-- **标杆参考**：**Claude Code** (`commands/btw/btw.tsx` 与 `runSideQuestion.ts`)
-- **实现剖析**：
-  - 用户在长会话进行中，突然想问一个临时性问题（如“这个环境变量是什么意思？”或“Rust 中的 unwrap 会 panic 吗？”），但**绝不想把这个临时问题和回答写入主会话上下文**，以免污染长任务的历史。
-  - `/btw <question>`：拉起单次轻量独立调用（Side-question），在悬浮窗/临时控制台渲染回答，按任意键关闭，**主历史 0 污染**。
-  - **核心价值**：极致保护长任务上下文纯净度，避免无意义问答占用 Token。
-
----
-
-## 阶段规划与架构落地设计（纳入 GOAL.md Phase 5）
-
-| 命令 | 别名 (Aliases) | 标杆复用来源 | 架构落地文件 | 核心职责 |
-| :--- | :--- | :--- | :--- | :--- |
-| **`/goal`** | `/objective`, `/target` | **DeepSeek-Harness** | `core/commands/goalCommandRuntime.ts` | 目标设定、阶段状态机（active/paused/complete）与防漂移系统提示词置顶注入 |
-| **`/loop`** | `/ralph`, `/autoloop` | **Oh-My-Pi** | `core/commands/loopCommandRuntime.ts` | 自主迭代执行循环：直到指定测试命令通过或达到指定最大轮数 |
-| **`/todo`** | `/tasks`, `/checklist` | **OpenCode** | `core/commands/todoCommandRuntime.ts` | 结构化任务拆解、实时进度展示与状态更新 |
-| **`/fast`** | `/turbo`, `/speed` | **Claude Code** | `core/commands/fastCommandRuntime.ts` | 一键在高性能主力模型与极速轻量模型之间快速切换 |
-| **`/context`** | `/ctx`, `/tokens-map` | **Claude Code** | `core/commands/contextCommandRuntime.ts` | 上下文 Token 分布图表与使用量全景透视 |
-| **`/btw`** | `/side`, `/ask` | **Claude Code** | `core/commands/btwCommandRuntime.ts` | 侧信道单次临时问答，回答完毕即丢弃，0 污染主历史 |
-
----
-
-## 问题 12：缺乏生命周期 Hook 拦截与编译器/测试级物理验证自愈闭环（已修复）
-- **状态**：✅ 已修复
-- **背景与顶尖项目对比**：
-  - **Claude Code 官方最新 Hooks 规范**（经 TinyFish 查证）：定义了三级生命周期节拍（SessionStart/End, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PostToolBatch, Stop），支持 Shell 命令与 JSON stdin/stdout 双向决策交互。
-  - **早期 docs/ 宝藏资产（sp059, VR001~VR011）**：沉淀了深厚的编译器诊断自愈、受影响单测自动定位与 Claim Ledger 确定性物理证据链。
-- **落地交付方案**：
-  1. **Hook 核心调度引擎** (`core/hooks/hookDispatcher.ts` & `types.ts`)：
-     - 支持 `UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Stop` 全生命周期事件拦截；
-     - 支持 `allow`, `block`, `retry` 决策判定。
-  2. **三大开箱即用内置验证 Hook** (`core/hooks/builtin/`)：
-     - `postMutationLspGuard.ts`：写后自动校验语法/括号平衡，发现错误自动生成 `[Verification Guard]` 反馈触发自愈。
-     - `affectedUnitTestRunner.ts`：修改源文件后自动推断匹配的单元测试文件并提供针对性测试推荐。
-     - `evidenceReceiptCollector.ts`：自动沉淀物理执行成功回执（Receipt），确保交付真实无幻觉。
-  3. **与自主 ReAct 循环打通**：在 `agentLoop.ts` 中无缝调度，写后错误自动进入下一轮进行自我修复。
+### 3.1 阶段规划细节
+1. **Stage 1（阻断级 P0 攻坚 - 耗时约 1 轮）**：
+   - 优先修复 `agentLoop.ts` 的消息协议时序问题（保证 multi-tool calls 与 DSML 100% 严丝合缝符合 OpenAI 规范）；
+   - 加固 `factArbiter.ts` 的主题实体比对，彻底杜绝记忆库中的正常事实被误杀。
+2. **Stage 2（高危级 P1 加固 - 耗时约 1~2 轮）**：
+   - 全面贯通 `ShellManager` 与命令执行底座，消灭 Windows 平台上的路径与 `cmd.exe` 缺陷；
+   - 彻底修复 Chromium 浏览器生命周期与 Hook 内存泄漏；
+   - 修正 LSP 编译器守卫的正则与括号匹配逻辑。
+3. **Stage 3（技术债务 P2 清理 - 耗时约 1 轮）**：
+   - 对 `/undo`、`/fast`、`/loop`、`task` 工具进行“去占位化”，接入真正的系统状态与子代理调度逻辑；
+   - 优化 `/copy` 与 `/btw` 命令的跨平台与多 Provider 体验。
+4. **Stage 4（架构收敛与交付验收）**：
+   - 全面运行 `npm run build:ts`、全量 Vitest 测试矩阵与 `normproof judge`，确保 0 错误、0 警告、形式化架构合规。
