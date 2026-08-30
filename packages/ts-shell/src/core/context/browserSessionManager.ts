@@ -1,5 +1,11 @@
 import type { PwBrowser, PwBrowserContext, PwPage } from "./pwRuntime.js";
-
+import {
+  STEALTH_LAUNCH_ARGS,
+  STEALTH_IGNORE_DEFAULT_ARGS,
+  DEFAULT_USER_AGENT,
+  DEFAULT_VIEWPORT,
+  buildStealthPreloadScript,
+} from "./stealthPreload.js";
 export interface BrowserElementRef {
   readonly ref: string;
   readonly role: string;
@@ -50,9 +56,23 @@ class BrowserSessionManager {
         ));
 
         if (pw?.chromium) {
-          this.browser = await pw.chromium.launch({ headless: true });
-          this.context = await this.browser!.newContext();
+          this.browser = await pw.chromium.launch({
+            headless: true,
+            args: [...STEALTH_LAUNCH_ARGS],
+            ignoreDefaultArgs: [...STEALTH_IGNORE_DEFAULT_ARGS],
+          });
+          this.context = await this.browser!.newContext({
+            userAgent: DEFAULT_USER_AGENT,
+            viewport: DEFAULT_VIEWPORT,
+            locale: "en-US",
+            timezoneId: "America/New_York",
+          });
           this.currentPage = await this.context!.newPage();
+
+          // Inject composite Anti-Detection stealth preload script
+          const stealthScript = buildStealthPreloadScript();
+          await (this.currentPage as any).addInitScript?.(stealthScript);
+
           return this.currentPage;
         }
       } catch (err) {
