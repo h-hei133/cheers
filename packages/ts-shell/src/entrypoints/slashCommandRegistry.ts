@@ -228,6 +228,12 @@ export const SLASH_COMMANDS = [
     group: "workflow",
     summary: "conduct multi-agent tree search and cross-source consensus research",
   },
+  {
+    name: "brainstorm",
+    aliases: ["explore", "brainstorming"],
+    group: "workflow",
+    summary: "multi-perspective design exploration and anti-pattern red-teaming",
+  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];
