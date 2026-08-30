@@ -115,11 +115,10 @@ export function createWebFetchToolDefinition(): ToolDefinition {
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const onAbort = () => controller.abort();
 
       if (context.abortSignal) {
-        context.abortSignal.addEventListener("abort", () => controller.abort(), {
-          once: true,
-        });
+        context.abortSignal.addEventListener("abort", onAbort, { once: true });
       }
 
       try {
@@ -176,6 +175,11 @@ export function createWebFetchToolDefinition(): ToolDefinition {
         const errorMsg =
           err instanceof Error ? err.message : String(err);
         return deniedResult(`Web fetch failed for ${rawUrl}: ${errorMsg}`);
+      } finally {
+        clearTimeout(timeoutId);
+        if (context.abortSignal) {
+          context.abortSignal.removeEventListener("abort", onAbort);
+        }
       }
     },
   };

@@ -38,6 +38,7 @@ async function searchWithExa(
   numResults: number,
   signal?: AbortSignal,
 ): Promise<SearchResultItem[]> {
+  const effectiveSignal = signal ?? AbortSignal.timeout(20_000);
   const res = await fetch("https://api.exa.ai/search", {
     method: "POST",
     headers: {
@@ -51,9 +52,8 @@ async function searchWithExa(
       useAutoprompt: true,
       highlights: { numSentences: 2 },
     }),
-    signal,
+    signal: effectiveSignal,
   });
-
   if (!res.ok) {
     throw new Error(`Exa API returned ${res.status}: ${await res.text()}`);
   }
@@ -80,6 +80,7 @@ async function searchWithTavily(
   numResults: number,
   signal?: AbortSignal,
 ): Promise<SearchResultItem[]> {
+  const effectiveSignal = signal ?? AbortSignal.timeout(20_000);
   const res = await fetch("https://api.tavily.com/search", {
     method: "POST",
     headers: {
@@ -91,9 +92,8 @@ async function searchWithTavily(
       max_results: numResults,
       include_snippets: true,
     }),
-    signal,
+    signal: effectiveSignal,
   });
-
   if (!res.ok) {
     throw new Error(`Tavily API returned ${res.status}: ${await res.text()}`);
   }

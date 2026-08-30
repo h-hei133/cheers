@@ -1,12 +1,14 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 
 /**
  * /btw (aliases: /side, /ask)
  * Executes a side-question out of band without polluting or writing to the main conversation history.
+ * Dynamically resolves provider and auth configurations from runtime config and environment.
  */
 export async function runBtwCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
   const question = args.join(" ").trim();
   if (!question) {
@@ -16,23 +18,22 @@ export async function runBtwCommand(
     };
   }
 
-  let apiKey = "";
-  let baseUrl = "";
-  let model = "";
+  const runtimeConfig = getRuntimeConfig(context.cwd);
+  let apiKey = process.env.SILICONFLOW_API_KEY || process.env.OPENAI_API_KEY || "";
+  let baseUrl = process.env.SILICONFLOW_BASE_URL || "https://api.siliconflow.cn/v1";
+  let model = "deepseek-ai/DeepSeek-V4-Flash";
 
-  if (process.env.SILICONFLOW_API_KEY) {
-    apiKey = process.env.SILICONFLOW_API_KEY;
-    baseUrl = process.env.SILICONFLOW_BASE_URL || "https://api.siliconflow.cn/v1";
-    model = "deepseek-ai/DeepSeek-V4-Flash";
-  } else if (process.env.OPENAI_API_KEY) {
-    apiKey = process.env.OPENAI_API_KEY;
+  if (process.env.OPENAI_API_KEY && !process.env.SILICONFLOW_API_KEY) {
     baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
     model = "gpt-4o-mini";
   }
+
   let answer = "";
   if (apiKey && !process.env.VITEST && process.env.NODE_ENV !== "test") {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
+    const timeoutMs = 15_000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
         method: "POST",
@@ -55,19 +56,22 @@ export async function runBtwCommand(
         }),
         signal: controller.signal,
       });
-      clearTimeout(timer);
 
       if (res.ok) {
-        const json = await res.json() as any;
+        const json = (await res.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+        };
         answer = json.choices?.[0]?.message?.content || "";
       }
     } catch {
+      // Graceful fallback on network abort or error
+    } finally {
       clearTimeout(timer);
     }
   }
 
   if (!answer) {
-    answer = `Side question noted: "${question}".\n(Fast out-of-band response channel ready. Answers are ephemeral and 100% excluded from conversation history).`;
+    answer = `Side question noted: "${question}".\n(Fast out-of-band response channel ready. Provider: ${runtimeConfig.provider || "openai-compatible"}).`;
   }
 
   const lines: string[] = [

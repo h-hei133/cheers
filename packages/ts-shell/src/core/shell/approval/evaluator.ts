@@ -113,12 +113,15 @@ export function isReadOnlyBashCommand(command: string): boolean {
     return false;
   }
 
-  // Standard read-only inspection commands
+  // Standard read-only inspection commands (POSIX + Windows)
   if (
     binary === "cat" ||
     binary === "ls" ||
+    binary === "dir" ||
     binary === "pwd" ||
     binary === "which" ||
+    binary === "where" ||
+    binary === "type" ||
     binary === "echo" ||
     binary === "head" ||
     binary === "tail" ||
@@ -126,7 +129,6 @@ export function isReadOnlyBashCommand(command: string): boolean {
   ) {
     return true;
   }
-
   return false;
 }
 
