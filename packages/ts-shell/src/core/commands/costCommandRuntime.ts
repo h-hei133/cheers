@@ -1,31 +1,37 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import { getSessionUsage } from "../../observability/usageTelemetry.js";
 
 /**
  * /cost (aliases: /tokens, /stats)
- * Displays token usage statistics and cost estimations for the current session.
+ * Displays real-time live token usage statistics and cost estimations for the active session.
  */
 export async function runCostCommand(
   _args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
   const sessionId = context.sessionId || "current-session";
+  const telemetry = getSessionUsage(sessionId);
+
+  const promptCost = (telemetry.promptTokens / 1_000_000) * 0.14;
+  const completionCost = (telemetry.completionTokens / 1_000_000) * 0.28;
+  const totalCost = promptCost + completionCost;
 
   const lines: string[] = [
-    "# Session Token Usage & Cost Estimation (/cost)",
+    "# 💰 Session Live Token Usage & Cost Accounting (/cost)",
     "",
     `- **Session ID**: \`${sessionId}\``,
-    "- **Estimated Turns Processed**: Active",
-    "- **Context Window Allocation**: 64,000 Tokens (Default)",
-    "- **Microcompact Status**: Active (Older tool outputs auto-pruned to preserve tokens)",
+    `- **Active Model**: \`${telemetry.model}\``,
+    `- **Turns Completed**: ${telemetry.turnsCount}`,
+    `- **Total Tokens Consumed**: ${telemetry.totalTokens.toLocaleString()} Tokens`,
     "",
-    "## Token & Cost Breakdown (Estimated):",
-    "| Category | Tokens | Unit Rate ($ / MTok) | Estimated Cost ($) |",
+    "## Live Token & Cost Breakdown:",
+    "| Category | Actual Tokens | Unit Rate ($ / MTok) | Actual Cost ($) |",
     "| :--- | :--- | :--- | :--- |",
-    "| Prompt (Input) | ~8,400 | $0.14 / MTok | < $0.002 |",
-    "| Completion (Output) | ~2,100 | $0.28 / MTok | < $0.001 |",
-    "| **Total Estimated** | **~10,500** | — | **< $0.003** |",
+    `| **Prompt (Input)** | ${telemetry.promptTokens.toLocaleString()} | $0.14 / MTok | $${promptCost.toFixed(5)} |`,
+    `| **Completion (Output)** | ${telemetry.completionTokens.toLocaleString()} | $0.28 / MTok | $${completionCost.toFixed(5)} |`,
+    `| **Total Incurred** | **${telemetry.totalTokens.toLocaleString()}** | — | **$${totalCost.toFixed(5)}** |`,
     "",
-    "> *Note: Unit rates reflect DeepSeek/OpenAI compatible standard pricing. Use /compact to compress conversation context when approaching limits.*",
+    "> *Note: Real-time token telemetry recorded directly from provider completions API. Unit rates based on DeepSeek / OpenAI compatible standard tier.*",
   ];
 
   return {

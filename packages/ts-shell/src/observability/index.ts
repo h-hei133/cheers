@@ -24,3 +24,4 @@ export {
 } from './metrics.js'
 export * from "./rotatingFileSink.js";
 export * from "./types.js";
+export * from "./usageTelemetry.js";

@@ -106,10 +106,10 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
     it("renders ASCII token bar and category breakdown", async () => {
       const result = await runContextCommand([], { cwd: tempDir, sessionId: "sess_ctx_test" });
       expect(result.kind).toBe("local");
-      expect(result.output).toContain("Context Window Telemetry & Token Map");
-      expect(result.output).toContain("Token Usage Bar");
+      expect(result.output).toContain("Context Window Live Telemetry & Allocation");
+      expect(result.output).toContain("Live Context Allocation Bar");
       expect(result.output).toContain("64,000 Tokens");
-      expect(result.output).toContain("Autocompact Buffer");
+      expect(result.output).toContain("Autocompact Safety Buffer");
       expect(result.output).toContain("Microcompact**: `ACTIVE`");
     });
   });

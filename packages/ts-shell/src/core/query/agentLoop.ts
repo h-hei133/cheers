@@ -2,6 +2,8 @@ import { createComponentLogger } from "../../observability/structuredLogger.js";
 
 const logger = createComponentLogger("AgentLoop");
 import type { QueryEvent } from "./runtime/events.js";
+import { recordSessionUsage } from "../../observability/usageTelemetry.js";
+import { isFastModeEnabled } from "../commands/fastCommandRuntime.js";
 import { DoomLoopDetector } from "./doomLoopDetector.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../../tools/types.js";
@@ -215,6 +217,7 @@ export async function* runAutonomousReActLoop(
       logger.warn(`Agent loop aborted on turn ${turn}`);
       break;
     }
+
     // Check Token-Aware Dynamic Budget Threshold before message prep
     const estimatedTokens = estimateTokens(messages);
     if (estimatedTokens >= compactThresholdTokens && messages.length > 4) {
@@ -230,11 +233,13 @@ export async function* runAutonomousReActLoop(
 
     // On the final turn before maxTurns, set tool_choice to "none" while retaining tool definitions for schema validation
     const isLastTurn = turn === maxTurns;
+    const activeTemperature = isFastModeEnabled() ? 0.2 : 0.7;
     const payload = {
       model: modelName,
       messages: preparedMessages,
       tools: openAiTools,
       tool_choice: isLastTurn ? "none" : "auto",
+      temperature: activeTemperature,
     };
     let responseJson: any;
     let isOverflowError = false;
@@ -270,6 +275,15 @@ export async function* runAutonomousReActLoop(
         }
       } else {
         responseJson = await res.json();
+        const usage = responseJson.usage;
+        if (usage) {
+          recordSessionUsage(options.sessionId, {
+            promptTokens: usage.prompt_tokens,
+            completionTokens: usage.completion_tokens,
+            totalTokens: usage.total_tokens,
+            model: modelName,
+          });
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

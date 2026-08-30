@@ -42,17 +42,18 @@ describe("Modern Slash Commands Subsystem", () => {
     expect(result.output).toContain("demo-pkg");
   });
 
-  it("/cost displays session token consumption breakdown", async () => {
+  it("/cost displays real-time session token consumption and accounting", async () => {
     const result = await runCostCommand([], { cwd: tempDir, sessionId: "sess_1" });
     expect(result.kind).toBe("local");
-    expect(result.output).toContain("Session Token Usage & Cost Estimation");
-    expect(result.output).toContain("64,000 Tokens");
+    expect(result.output).toContain("Session Live Token Usage & Cost Accounting");
+    expect(result.output).toContain("Prompt (Input)");
+    expect(result.output).toContain("Completion (Output)");
   });
 
   it("/undo provides rollback and git revert guidance", async () => {
     const result = await runUndoCommand([], { cwd: tempDir, sessionId: "sess_1" });
     expect(result.kind).toBe("local");
-    expect(result.output).toContain("Action Undo & Revert Guidance");
+    expect(result.output).toContain("Session & Workspace Rollback Assistant");
   });
 
   it("/export saves session history as markdown and jsonl files", async () => {
