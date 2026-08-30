@@ -20,6 +20,7 @@ export class ParallelDispatcher {
     }
 
     const { maxConcurrency = 4, timeoutMs } = options;
+    const maxPool = Math.max(1, maxConcurrency);
     const results: T[] = new Array(thunks.length);
     let nextIndex = 0;
 
@@ -28,21 +29,27 @@ export class ParallelDispatcher {
         const currentIndex = nextIndex++;
         const thunk = thunks[currentIndex];
 
-        let promise = thunk();
         if (timeoutMs && timeoutMs > 0) {
-          promise = Promise.race([
-            promise,
-            new Promise<T>((_, reject) =>
-              setTimeout(() => reject(new Error(`Task timed out after ${timeoutMs}ms`)), timeoutMs),
-            ),
-          ]);
-        }
+          let timerId: NodeJS.Timeout | number | undefined;
+          const timeoutPromise = new Promise<T>((_, reject) => {
+            timerId = setTimeout(
+              () => reject(new Error(`Task timed out after ${timeoutMs}ms`)),
+              timeoutMs,
+            );
+          });
 
-        results[currentIndex] = await promise;
+          try {
+            results[currentIndex] = await Promise.race([thunk(), timeoutPromise]);
+          } finally {
+            clearTimeout(timerId);
+          }
+        } else {
+          results[currentIndex] = await thunk();
+        }
       }
     };
 
-    const workerCount = Math.min(maxConcurrency, thunks.length);
+    const workerCount = Math.min(maxPool, thunks.length);
     const workers: Promise<void>[] = [];
     for (let i = 0; i < workerCount; i++) {
       workers.push(worker());

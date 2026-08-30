@@ -10,7 +10,7 @@ import {
 import { HookDispatcher, defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../hooks/builtin/index.js";
 import { getActiveSessionGoal } from "../commands/goalCommandRuntime.js";
-
+import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
 export interface ReActAgentLoopOptions {
   readonly sessionId: string;
   readonly prompt: string;
@@ -378,12 +378,11 @@ export async function* runAutonomousReActLoop(
         funcName !== "ask" &&
         funcName !== "todo" &&
         funcName !== "task" &&
-        funcName !== "bash"
+        !(funcName === "bash" && typeof funcArgs?.command === "string" && isReadOnlyBashCommand(funcArgs.command))
       ) {
-        outputContent = `Blocked: Plan mode is active. Tool '${funcName}' is not permitted in plan mode. Switch to build mode via /build to execute modifications.`;
+        outputContent = `Blocked: Plan mode is active. Tool '${funcName}' ${funcName === "bash" ? "with non-read-only command " : ""}is not permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
         isSuccess = false;
       } else {
-        // PreToolUse Hook interceptor
         const preDecision = await hookDispatcher.dispatch({
           eventName: "PreToolUse",
           sessionId: options.sessionId,

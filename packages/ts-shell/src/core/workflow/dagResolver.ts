@@ -17,8 +17,15 @@ export class DAGResolver {
     const inDegree = new Map<string, number>();
     const adjacency = new Map<string, string[]>();
 
-    // 1. Build adjacency list and in-degrees
+    // 1. Build adjacency list, check duplicate task IDs, and build in-degrees
     for (const task of tasks) {
+      if (taskMap.has(task.id)) {
+        return {
+          isValid: false,
+          executionBatches: [],
+          errorMessage: `Duplicate task ID detected: '${task.id}'. Task IDs must be globally unique within a workflow.`,
+        };
+      }
       taskMap.set(task.id, task);
       inDegree.set(task.id, 0);
       adjacency.set(task.id, []);
@@ -33,7 +40,6 @@ export class DAGResolver {
             errorMessage: `Task '${task.id}' depends on non-existent task '${depId}'.`,
           };
         }
-        // depId -> task.id
         adjacency.get(depId)!.push(task.id);
         inDegree.set(task.id, (inDegree.get(task.id) || 0) + 1);
       }

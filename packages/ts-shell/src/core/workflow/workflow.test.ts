@@ -33,6 +33,17 @@ describe("Workflow & Agentic SDLC Subsystem Test Suite", () => {
       expect(res.executionBatches).toEqual([["A"], ["B", "C"], ["D"]]);
     });
 
+    it("detects duplicate task IDs and returns clear error", () => {
+      const duplicateTasks: WorkflowTask[] = [
+        { id: "A", name: "Task A", dependencies: [], status: "pending" },
+        { id: "A", name: "Task A Duplicate", dependencies: [], status: "pending" },
+      ];
+
+      const res = DAGResolver.resolve(duplicateTasks);
+      expect(res.isValid).toBe(false);
+      expect(res.errorMessage).toContain("Duplicate task ID detected");
+    });
+
     it("detects circular dependencies and returns cycle path", () => {
       const cyclicTasks: WorkflowTask[] = [
         { id: "X", name: "Task X", dependencies: ["Z"], status: "pending" },

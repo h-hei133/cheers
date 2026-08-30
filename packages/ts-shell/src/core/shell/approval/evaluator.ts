@@ -67,31 +67,67 @@ export function selectGrantBySelector(
 }
 
 export function isReadOnlyBashCommand(command: string): boolean {
-  const trimmed = command.trim().toLowerCase();
-  // Standard read-only git subcommands
-  const isGitReadOnly =
-    trimmed === "git status" ||
-    trimmed.startsWith("git status ") ||
-    trimmed === "git diff" ||
-    trimmed.startsWith("git diff ") ||
-    trimmed === "git log" ||
-    trimmed.startsWith("git log ") ||
-    trimmed === "git show" ||
-    trimmed.startsWith("git show ") ||
-    trimmed === "git branch" ||
-    trimmed.startsWith("git branch ") ||
-    trimmed.startsWith("git rev-parse");
+  const trimmed = command.trim();
+  if (!trimmed) return false;
+
+  // Disallow shell chaining operators, subshells, substitutions, and redirections
+  if (/[;&|><`$]/.test(trimmed) || trimmed.includes("\n")) {
+    return false;
+  }
+
+  const parts = trimmed.split(/\s+/);
+  const binary = parts[0]?.toLowerCase();
+
+  if (binary === "git") {
+    const sub = parts[1]?.toLowerCase();
+    if (!sub) return false;
+
+    // Safe read-only git subcommands
+    if (sub === "status" || sub === "diff" || sub === "show" || sub === "rev-parse") {
+      return true;
+    }
+
+    if (sub === "log") {
+      // Disallow flags that write output
+      const hasWriteFlag = parts.some((p) => p.startsWith("--output") || p.startsWith("-o"));
+      return !hasWriteFlag;
+    }
+
+    if (sub === "branch") {
+      // Disallow mutating branch flags (-d, -D, -m, -M, -c, -C)
+      const hasMutatingFlag = parts.some(
+        (p) =>
+          p === "-d" ||
+          p === "-D" ||
+          p === "-m" ||
+          p === "-M" ||
+          p === "-c" ||
+          p === "-C" ||
+          p === "--delete" ||
+          p === "--move" ||
+          p === "--copy",
+      );
+      return !hasMutatingFlag;
+    }
+
+    return false;
+  }
 
   // Standard read-only inspection commands
-  const isInspection =
-    trimmed.startsWith("cat ") ||
-    trimmed.startsWith("ls ") ||
-    trimmed === "ls" ||
-    trimmed.startsWith("pwd") ||
-    trimmed.startsWith("echo ") ||
-    trimmed.startsWith("which ");
+  if (
+    binary === "cat" ||
+    binary === "ls" ||
+    binary === "pwd" ||
+    binary === "which" ||
+    binary === "echo" ||
+    binary === "head" ||
+    binary === "tail" ||
+    binary === "wc"
+  ) {
+    return true;
+  }
 
-  return isGitReadOnly || isInspection;
+  return false;
 }
 
 export function evaluatePermission(input: {

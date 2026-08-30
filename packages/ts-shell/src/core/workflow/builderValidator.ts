@@ -50,9 +50,14 @@ export class BuilderValidatorPipeline {
     // 2. Independent Validator execution (without builder internal reasoning)
     const validationReport = await validator(builderOutput, criteria);
 
-    const success =
-      validationReport.passed &&
-      validationReport.criteriaResults.every((c) => (c.passed ? true : !criteria.find((cr) => cr.id === c.criterionId)?.required));
+    // Verify all required criteria exist in the report and passed
+    const requiredCriteria = criteria.filter((c) => c.required);
+    const allRequiredPassed = requiredCriteria.every((rc) => {
+      const result = validationReport.criteriaResults.find((r) => r.criterionId === rc.id);
+      return result !== undefined && result.passed;
+    });
+
+    const success = validationReport.passed && allRequiredPassed;
 
     return {
       builderOutput,
