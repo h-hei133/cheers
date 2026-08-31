@@ -25,3 +25,4 @@ Last updated: 2026-08-28
 - [对标三大开源与商业标杆（Claude Code, GitNexus, Pi）的 SOTA 架构演进与深水区重构方案](sota-architectural-alignment-master-thesis.md)
 - [对标 Claude Code 2026 官方子代理架构规范深度审计与落地设计方案](claude-code-2026-subagent-architecture-and-design.md)
 - [AI Coding Agent SOTA 进阶架构对比研究与方案全景](sota-advanced-comparative-research-and-solutions.md)
+- [SOTA 跨会话通信网格（Cross-Session Mesh）与协同团队（Agent Teams）架构研究与设计方案](cross-session-messaging-and-agent-teams-architecture.md)
