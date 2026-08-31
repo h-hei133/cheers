@@ -1,5 +1,8 @@
 import { verifyPathContainment } from '../security/pathJail.js'
 import { replaceInContent } from './editEngine.js'
+import { truncateHead, truncateTail, truncateLineWidth } from './truncation.js'
+import { ArtifactManager } from '../session/artifactManager.js'
+import { parsePathSelector, sliceLinesBySelector } from './selectorParser.js'
 import {
   createDefaultExecutionService,
   type ExecutionAuthority,
@@ -110,8 +113,22 @@ async function runCommandTool(
     timeoutMs: 60_000,
     abortSignal: context.abortSignal,
   })
-  if (result.status === 'completed' && result.exitCode === 0) {
-    return approvedResult(result.stdout || 'Command completed with no output', {
+  const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
+  const isOk = result.status === 'completed' && result.exitCode === 0
+  const rawOutput = isOk
+    ? (result.stdout || 'Command completed with no output')
+    : ([result.stderr, result.stdout].filter(Boolean).join('\n') || result.recoveryReason || `Command failed with exit code ${result.exitCode}`)
+
+  const truncated = truncateTail(rawOutput, { maxLines: 1500, maxBytes: 50 * 1024 })
+  let finalOutput = truncated.content
+
+  if (truncated.truncated) {
+    const artifact = await artifactManager.save(rawOutput, 'bash')
+    finalOutput += `\n\n[Showing last ${truncated.shownLines} of ${truncated.originalLines} lines (${Math.round(truncated.shownBytes / 1024)}KB of ${Math.round(truncated.originalBytes / 1024)}KB). Full raw output saved: ${artifact.uri}]\n[To read full or earlier sections: read(path="${artifact.uri}:1-500")]`
+  }
+
+  if (isOk) {
+    return approvedResult(finalOutput, {
       status: result.status,
       exitCode: result.exitCode,
       stdout: result.stdout,
@@ -119,12 +136,7 @@ async function runCommandTool(
     })
   }
 
-  const combinedOutput =
-    [result.stderr, result.stdout].filter(Boolean).join('\n') ||
-    result.recoveryReason ||
-    `Command failed with exit code ${result.exitCode}`
-
-  return deniedResult(combinedOutput, {
+  return deniedResult(finalOutput, {
     status: result.status,
     exitCode: result.exitCode,
     stdout: result.stdout,
@@ -208,39 +220,79 @@ export function createCoreToolRegistry(options?: {
         },
       },
       async execute(args, context) {
-        const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        const containment = verifyPathContainment(target, context.workspaceRoot)
-        if (!containment.allowed) {
-          throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+        const rawPath = typeof args.path === 'string' ? args.path : ''
+        const selector = parsePathSelector(rawPath)
+        const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
+        let target = selector.cleanPath
+        let isArtifact = target.startsWith('artifact://')
+        let rawContent = ''
+
+        if (isArtifact) {
+          const resolvedArtifact = artifactManager.resolve(target)
+          if (!resolvedArtifact) {
+            throw new Error(`Artifact '${target}' not found in session storage.`)
+          }
+          rawContent = await executionService.readTextFile({
+            operationKind: 'file.read',
+            absolutePath: resolvedArtifact,
+            workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY,
+            caller: 'core-tool:read:artifact',
+            reason: 'Read session artifact output log.',
+            reportSafeTarget: resolvedArtifact,
+          })
+        } else {
+          target = resolveToolTarget({ path: selector.cleanPath }, 'path', context.workspaceRoot)
+          const containment = verifyPathContainment(target, context.workspaceRoot)
+          if (!containment.allowed) {
+            throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+          }
+          rawContent = await executionService.readTextFile({
+            operationKind: 'file.read',
+            absolutePath: containment.resolvedPath,
+            workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY,
+            caller: 'core-tool:read',
+            reason: 'Read an approved workspace file target.',
+            reportSafeTarget: containment.resolvedPath,
+          })
         }
-        const rawContent = await executionService.readTextFile({
-          operationKind: 'file.read',
-          absolutePath: containment.resolvedPath,
-          workspaceRoot: context.workspaceRoot,
-          authority: TOOL_APPROVED_READ_AUTHORITY,
-          caller: 'core-tool:read',
-          reason: 'Read an approved workspace file target.',
-          reportSafeTarget: containment.resolvedPath,
-        })
+
         const lines = rawContent.split('\n')
         const totalLines = lines.length
-        const offset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 1
-        const maxLimit = 1000
-        const defaultLimit = 500
-        const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), maxLimit) : defaultLimit
 
-        const startIdx = Math.max(0, offset - 1)
-        const endIdx = Math.min(totalLines, startIdx + limit)
-        const selectedLines = lines.slice(startIdx, endIdx)
+        let selectedLines: string[] = []
+        let startLine = 1
+        let endLine = totalLines
+
+        if (selector.hasSelector) {
+          const sliced = sliceLinesBySelector(lines, selector)
+          selectedLines = sliced.selectedLines
+          startLine = sliced.startLine
+          endLine = sliced.endLine
+        } else {
+          const offset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 1
+          const maxLimit = 1000
+          const defaultLimit = 500
+          const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), maxLimit) : defaultLimit
+          const startIdx = Math.max(0, offset - 1)
+          const endIdx = Math.min(totalLines, startIdx + limit)
+          selectedLines = lines.slice(startIdx, endIdx)
+          startLine = startIdx + 1
+          endLine = endIdx
+        }
 
         let resultText = selectedLines.join('\n')
-        const MAX_BYTES = 30 * 1024 // 30KB safety truncate
-        const buf = Buffer.from(resultText, 'utf8')
-        if (buf.length > MAX_BYTES) {
-          resultText = buf.subarray(0, MAX_BYTES).toString('utf8') + '\n[Content truncated to 30KB. Use offset/limit to read in smaller chunks]'
-        } else if (startIdx > 0 || endIdx < totalLines) {
-          resultText += `\n[Showing lines ${startIdx + 1}-${endIdx} of ${totalLines}. Use offset/limit to view other sections]`
+        const truncated = truncateHead(resultText, { maxLines: 1500, maxBytes: 50 * 1024 })
+        resultText = truncated.content
+
+        if (truncated.truncated) {
+          const artifact = await artifactManager.save(rawContent, 'read')
+          resultText += `\n\n[Showing lines ${startLine}-${startLine + truncated.shownLines - 1} of ${totalLines} (${Math.round(truncated.shownBytes / 1024)}KB). Output spilled to ${artifact.uri}]\n[Use selector to read other sections: read(path="${selector.cleanPath}:${startLine + truncated.shownLines}-${startLine + truncated.shownLines + 200}")]`
+        } else if (startLine > 1 || endLine < totalLines) {
+          resultText += `\n[Showing lines ${startLine}-${endLine} of ${totalLines}. Use selector :N-M or offset/limit to view other sections]`
         }
+
         return approvedResult(resultText)
       },
     },

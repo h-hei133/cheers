@@ -3,7 +3,8 @@ import path from "node:path";
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import type { ExecutionAuthority, ExecutionService } from "../../runtime/execution/service.js";
-
+import { truncateLineWidth, truncateHead } from "./truncation.js";
+import { ArtifactManager } from "../session/artifactManager.js";
 const DEFAULT_GREP_LIMIT = 100;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit per file
 
@@ -153,7 +154,8 @@ export function createGrepToolDefinition(
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (regex.test(line)) {
-              results.push(`${relPath}:${i + 1}: ${line}`);
+              const safeLine = truncateLineWidth(line, 500);
+              results.push(`${relPath}:${i + 1}: ${safeLine}`);
               totalMatches++;
               if (totalMatches >= limit) {
                 break;
@@ -169,12 +171,17 @@ export function createGrepToolDefinition(
         return approvedResult("No matches found for the pattern.");
       }
 
-      let output = results.join("\n");
-      if (totalMatches >= limit) {
-        output += `\n[Grep limit reached: showing first ${limit} matches. Use path or glob filter to narrow search]`;
+      const rawResult = results.join("\n");
+      const truncated = truncateHead(rawResult, { maxLines: 500, maxBytes: 50 * 1024 });
+      let outputText = truncated.content;
+
+      if (truncated.truncated) {
+        const artifactManager = ArtifactManager.getShared(context.workspaceRoot);
+        const artifact = await artifactManager.save(rawResult, "grep");
+        outputText += `\n\n[Showing ${truncated.shownLines} of ${results.length} matches (${Math.round(truncated.shownBytes / 1024)}KB). Full grep output spilled to: ${artifact.uri}]`;
       }
 
-      return approvedResult(output);
+      return approvedResult(outputText);
     },
   };
 }
