@@ -1,4 +1,4 @@
-import { Terminal } from "./terminal.js";
+import { ProcessTerminal as Terminal, processTerminal } from "./terminal.js";
 import { DifferentialTerminalBuffer } from "./buffer.js";
 import { renderPermissionDialog, type PermissionDialogProps } from "./components/permissionDialog.js";
 import { renderToolCard, type ToolCardProps } from "./components/toolCard.js";
@@ -27,23 +27,21 @@ export class TuiEngine {
     logMessages: [],
   };
 
-  constructor(terminal: Terminal = new Terminal(), buffer: DifferentialTerminalBuffer = new DifferentialTerminalBuffer()) {
+  constructor(terminal: Terminal = processTerminal, buffer: DifferentialTerminalBuffer = new DifferentialTerminalBuffer()) {
     this.terminal = terminal;
     this.buffer = buffer;
   }
 
   enter(): void {
     if (process.stdout.isTTY && !this.isAltScreenActive) {
-      this.terminal.enterAltScreen();
-      this.terminal.hideCursor();
+      this.terminal.write("\x1b[?1049h\x1b[?25l");
       this.isAltScreenActive = true;
     }
   }
 
   exit(): void {
     if (this.isAltScreenActive) {
-      this.terminal.showCursor();
-      this.terminal.exitAltScreen();
+      this.terminal.write("\x1b[?1049l\x1b[?25h");
       this.isAltScreenActive = false;
     }
   }
@@ -59,7 +57,7 @@ export class TuiEngine {
   render(): string {
     const screenLines: string[] = [];
     const dims = this.terminal.getDimensions();
-    const cols = dims.columns || 80;
+    const cols = dims.cols || 80;
 
     // 1. Header & Title Bar
     const headerLine = `\x1b[44;37;1m ${this.state.title.padEnd(cols - 2, " ")} \x1b[0m`;

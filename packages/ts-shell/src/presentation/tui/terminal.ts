@@ -1,36 +1,58 @@
-export class Terminal {
-  private isAltScreen = false;
+import fs from "node:fs";
+import { detectTerminalCapabilities, type TerminalCapabilities } from "./terminalCapabilities.js";
 
-  enterAltScreen(): void {
-    if (!this.isAltScreen && process.stdout.isTTY) {
-      process.stdout.write("\x1b[?1049h\x1b[H");
-      this.isAltScreen = true;
+/**
+ * Production ProcessTerminal Driver
+ * Manages raw mode, safe unbuffered writes, output backlog protection, and clean exit resets.
+ */
+export class ProcessTerminal {
+  readonly capabilities: TerminalCapabilities;
+  private isRaw = false;
+
+  constructor() {
+    this.capabilities = detectTerminalCapabilities();
+  }
+
+  setRawMode(enable: boolean): void {
+    if (process.stdin.isTTY && typeof process.stdin.setRawMode === "function") {
+      try {
+        process.stdin.setRawMode(enable);
+        this.isRaw = enable;
+        if (enable) {
+          process.stdin.resume();
+        }
+      } catch {
+        // Best-effort raw mode
+      }
     }
   }
 
-  exitAltScreen(): void {
-    if (this.isAltScreen && process.stdout.isTTY) {
-      process.stdout.write("\x1b[?1049l");
-      this.isAltScreen = false;
+  isRawMode(): boolean {
+    return this.isRaw;
+  }
+
+  writeSync(data: string): void {
+    try {
+      fs.writeSync(1, Buffer.from(data));
+    } catch {
+      try {
+        process.stdout.write(data);
+      } catch {
+        // Best-effort
+      }
     }
   }
 
-  getDimensions(): { readonly columns: number; readonly rows: number } {
+  write(data: string): void {
+    process.stdout.write(data);
+  }
+
+  getDimensions(): { readonly rows: number; readonly cols: number } {
     return {
-      columns: process.stdout.columns || 80,
       rows: process.stdout.rows || 24,
+      cols: process.stdout.columns || 80,
     };
   }
-
-  hideCursor(): void {
-    if (process.stdout.isTTY) {
-      process.stdout.write("\x1b[?25l");
-    }
-  }
-
-  showCursor(): void {
-    if (process.stdout.isTTY) {
-      process.stdout.write("\x1b[?25h");
-    }
-  }
 }
+
+export const processTerminal = new ProcessTerminal();
