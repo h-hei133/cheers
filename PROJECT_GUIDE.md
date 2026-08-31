@@ -1,10 +1,10 @@
 # Coding Agents 项目全景指南 (Project Overview & Architecture Guide)
 
-> **版本**：v0.3.0 (SOTA 全栈工业级真实化交付 - 26 项假算法/Mock 全量清退)  
+> **版本**：v0.5.0 (SOTA 全栈工业级智能体架构 - 跨会话通信、大输出溢出、9 阶弹性源码编辑、持久化会话与网络弹性)  
 > **当前 Git 分支**：`normproof-observation`  
-> **更新时间**：2026-08-30  
-> **测试状态**：28 个测试套件，208/208 项单测 100% 绿色通过 (PASS)  
-> **形式化架构**：NormProof SATISFIED (0 阻断项，严格单向无环架构)  
+> **更新时间**：2026-08-31  
+> **测试状态**：38 个测试套件，245/245 项单测 100% 绿色通过 (PASS)  
+> **形式化架构**：NormProof SATISFIED (0 阻断项，严格单向无环架构)
 
 ---
 
@@ -70,20 +70,25 @@ timeline
 
 ## 三、 核心子系统与技术亮点
 
-1. **编译器级 AST 语法守护与真实调用图 (`edit/patch/gauntlet/`, `context/graph/`)**：
-   - **`astGauntlet.ts`**：废除大括号计数法，接入 `typescript.createSourceFile` 在内存中构建真实 AST，读取 `parseDiagnostics` 拦截任何语法截断或关键字破坏。
-   - **`parser.ts` & `callGraph.ts`**：基于完整的 `ts.forEachChild` 遍历真实 AST 节点，仅在 `ts.isCallExpression` 与 `ts.isNewExpression` 时提取调用边，彻底消除注释和字符串字面量对代码图谱的污染。
-2. **多模型原生协议适配器 (`model-adapters/`)**：
-   - **`OpenAIModelAdapter`**：支持 OpenAI `/chat/completions`、JSON Schema 与函数调用。
-   - **`AnthropicModelAdapter`**：严格对齐 Anthropic 官方协议，顶级 `system` 分流、`/v1/messages` 端点、`x-api-key` 鉴权与 `tool_use`/`tool_result` 块流式映射。
-3. **安全审批与全命令作用域 (`core/shell/approval/`)**：
-   - **`store.ts`**：以全指令签名哈希（`Full Command Scoping`）作为权限作用域，彻底堵住“批准 `npm test` 自动放行 `npm publish`”的二进制级越权后门。
-   - **`evaluator.ts`**：严格将可出站写请求的 `browser` 与可派发写操作的 `task` 工具从 `READONLY_TOOLS` 剔除。
-4. **多文件写入原子事务保障 (`orchestration/targetSetEditRoute.ts`)**：
-   - 在执行多目标文件补丁前捕获 `originalFileContents` 暂存快照；一旦任何目标写入失败，**自动反向回滚所有已写入的目标文件**，100% 恢复工作区。
-5. **Native QuadMemory 四层原生记忆架构 (`core/memory/`)**：
-   - **四层模型**：L1 活跃工作记忆、L2 项目规则与会话上下文、L3 技能规程、L4 语义事实账本。
-   - **加性冲突仲裁 (`FactArbiter`)**：基于 Jaccard 门禁与矛盾检测，精确提供 `ADD`、`UPDATE`、`INVALIDATE`、`NOOP` 决策。
+1. **工业级 9 阶弹性源码编辑引擎 (`core/tools/editEngine.ts`)**：
+   - 彻底告别大模型缩进与空白偏差导致的编辑报错，提供 Exact / LineTrimmed / NFKC 智能标点 / Levenshtein 块锚点模糊替换，并配备 `isDisproportionateMatch` 长度防雪崩保护。
+2. **大输出双重预算截断与工件流 (`core/tools/truncation.ts`, `core/session/artifactManager.ts`)**：
+   - 区分方向性截断（`read` 头部截断保留开头，`bash` 尾部截断保留关键错误堆栈，`grep` 单行 500 字符硬约束）。
+   - 超限输出自动原子暂存至 `.ts-shell/sessions/<id>/artifacts/`，生成 `artifact://<id>` 引用并支持嵌入式行选择器（`:50-200`, `:raw`）零内存开销切片回读。
+3. **跨会话通信网格与智能体团队 (`core/messaging/`, `core/workflow/teamStore.ts`)**：
+   - Unix Domain Socket (`/tmp/ts-socks-<uid>/`) / Windows Named Pipes 本地进程间通信。
+   - `list_agents` 与 `send_message` 支持 `notify_when_idle` 零轮询空闲唤醒，搭配 TaskStore 文件锁原子抢占。
+4. **多模型协议与流式残缺 JSON 修复 (`model-adapters/`)**：
+   - `jsonRepair.ts` 5 阶多层容错修复管线，自动转义控制字符并修复残缺 JSON 结构。
+   - Header 感知指数退避重试（支持 `retry-after-ms` / `retry-after`）与 `abortableSleep` 瞬时可打断机制。
+5. **结构化持久会话与崩溃平复 (`session/`)**：
+   - `transcript.jsonl` 原生持久化 `tool_calls` 与 `tool_call_id`。
+   - `CompactionTranscriptEntry` 磁盘记录与压缩锚点裁剪。
+   - `reconcileDanglingToolCalls` 自动平复孤儿工具调用，杜绝大模型 400 校验错误。
+6. **物理安全沙箱 (`core/security/pathJail.ts`)**：
+   - 全量文件工具（`read`, `write`, `edit`, `grep`, `glob`）接入 `verifyPathContainment`，硬拦截符号链接与 `../` 路径逃逸。
+7. **全屏 Alt-Screen 双缓冲差分渲染 (`presentation/tui/`)**：
+   - 差分帧包裹 ANSI Mode 2026 同步序列（`\x1b[?2026h` ... `\x1b[?2026l`），消除高频刷新撕裂。
 
 ---
 
@@ -162,7 +167,7 @@ packages/ts-shell/src/
   - [`sota-ast-verification-and-code-graph-architecture.md`](.wiki/wiki/theses/sota-ast-verification-and-code-graph-architecture.md) - 编译器级 AST 前检与代码图谱论文
   - [`deep-audit-round-4-provider-protocols-and-boundary-projection.md`](.wiki/wiki/theses/deep-audit-round-4-provider-protocols-and-boundary-projection.md) - 多 Provider 协议适配论文
   - [`deep-audit-round-3-security-and-tool-realization.md`](.wiki/wiki/theses/deep-audit-round-3-security-and-tool-realization.md) - 权限后门消除与工具真实化论文
-  - [`agent-loop-lifecycle-and-interactive-routing.md`](.wiki/wiki/theses/agent-loop-lifecycle-and-interactive-routing.md) - 自然收敛主循环与命令路由论文
-  - [`unified-logging-and-observability-architecture.md`](.wiki/wiki/theses/unified-logging-and-observability-architecture.md) - 统一日志与可观测性论文
-- **技术 RFC 提案库**：`.wiki/raw/notes/` (RFC-001 ~ RFC-004)
-- **技术债务与修复全景台账**：[`problem.md`](problem.md)
+- **项目核心行为准则**：[`AGENTS.md`](AGENTS.md)
+- **架构设计全景**：[`ARCHITECTURE.md`](ARCHITECTURE.md)
+- **知识库论文集**：[`.wiki/wiki/theses/`](.wiki/wiki/theses/)
+- **不可变活动日志**：[`.wiki/log.md`](.wiki/log.md)

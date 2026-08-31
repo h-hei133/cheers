@@ -27,7 +27,7 @@
 
 ## 2. Synthesized Architecture & Key Decisions
 
-- ✅ Adopt Plain TypeScript functions and native Map/Set primitives (zero external dependencies).
+- ✅ Adopt Plain TypeScript functions and native Map/Set primitives (zero unnecessary external dependencies).
 - ✅ Incorporate defensive bound caps: explicit timeout guards and max-size safety limits.
 - ✅ Refuse speculative plugin layers; expose standard typed extension points only where required.
 

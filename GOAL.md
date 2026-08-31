@@ -1,9 +1,9 @@
 # GOAL.md - Coding Agents 核心演进目标与当前交付状态
 
-> **状态**：工业级真实化全量交付完成 (All 7 Phases A-G Resolved, 100% De-Mocked Production Quality)  
+> **状态**：SOTA 工业级全栈智能体演进交付完成 (38 套件 / 245 项单测全绿，SOTA 弹性/持久化/通信全量落地)  
 > **分支**：`normproof-observation`  
-> **基准单测**：28/28 passed (208/208 tests green)  
-> **架构判定**：NormProof SATISFIED (0 blocking errors, single-file function count <= 20, acyclic imports)  
+> **基准单测**：38/38 passed (245/245 tests green)  
+> **架构判定**：NormProof SATISFIED (0 blocking errors, single-file function count <= 20, acyclic imports)
 
 ---
 
@@ -31,7 +31,6 @@
 ## 交付产物与导航
 
 - **项目全景与使用指南**：[`PROJECT_GUIDE.md`](PROJECT_GUIDE.md)
-- **技术债务与 26 项去伪存真全景台账**：[`problem.md`](problem.md)
+- **系统架构设计全景**：[`ARCHITECTURE.md`](ARCHITECTURE.md)
 - **学术与架构理论论证库**：[`.wiki/wiki/theses/`](.wiki/wiki/theses/)
-- **技术 RFC 提案库**：[`.wiki/raw/notes/`](.wiki/raw/notes/)
 - **Wiki 活动与演进日志**：[`.wiki/log.md`](.wiki/log.md)
