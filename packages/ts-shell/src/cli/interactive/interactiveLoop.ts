@@ -14,15 +14,12 @@ import {
 } from "../../entrypoints/cliMcpModule.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { handleShellClose } from "../../core/shell/signalHandlers.js";
-import { altScreen } from "../../presentation/tui/altScreen.js";
-import { formatMinimalWelcomeBanner } from "../../presentation/tui/welcomeBanner.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
 import { Editor } from "../../presentation/tui/editor.js";
 import { SelectList } from "../../presentation/tui/selectList.js";
 import { InputController } from "../../presentation/tui/inputController.js";
 import { BUILTIN_SLASH_COMMANDS } from "../../presentation/tui/slashAutocomplete.js";
-import { renderBoxFrame } from "../../presentation/tui/boxComposer.js";
-import { DifferentialTerminalBuffer } from "../../presentation/tui/buffer.js";
+import { InteractiveTuiSession } from "../../presentation/tui/interactiveTuiSession.js";
 
 export async function runInteractiveLoop(input: {
   readonly stdin?: NodeJS.ReadStream;
@@ -43,15 +40,12 @@ export async function runInteractiveLoop(input: {
   readonly exit?: (code?: number) => never;
 }): Promise<void> {
   const stdin = input.stdin ?? process.stdin;
-  const stdout = input.stdout ?? process.stdout;
   const exit = input.exit ?? process.exit;
   let mcpGateway = input.initialMcpGateway;
   let interactiveTurnNumber = 0;
   let interactiveTurnInFlight = false;
-
   const editor = new Editor();
   const selectList = new SelectList();
-  const diffBuffer = new DifferentialTerminalBuffer();
   const stdinBuffer = new StdinBuffer();
 
   const getModelName = (): string => {
@@ -61,10 +55,17 @@ export async function runInteractiveLoop(input: {
     );
   };
 
+  const tuiSession = new InteractiveTuiSession({
+    workspaceRoot: input.runtimeContext.projectRoot,
+    modelName: getModelName(),
+    gitBranch: input.runtimeContext.gitContext.branch ?? undefined,
+    contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64000,
+    exitMode: "replay",
+  });
+
   const redrawTui = (): void => {
-    const totalRows = stdout.rows || 24;
-    const width = stdout.columns || 80;
     const editorText = editor.getText();
+    tuiSession.setPrompt(editorText);
 
     if (editorText.trim().startsWith("/")) {
       const query = editorText.trim().toLowerCase();
@@ -74,60 +75,20 @@ export async function runInteractiveLoop(input: {
         description: c.description,
       }));
       selectList.setItems(matches);
-      if (matches.length > 0) {
-        inputController.setAutocompleteActive(true);
-      }
+      inputController.setAutocompleteActive(matches.length > 0);
     } else {
       inputController.setAutocompleteActive(false);
     }
 
-    const frame = renderBoxFrame({
-      width,
-      promptText: editor.getText() || " ",
-      title: "Coding Agent",
-      status: {
-        modelName: getModelName(),
-        gitBranch: input.runtimeContext.gitContext.branch ?? undefined,
-        projectDir: input.runtimeContext.projectRoot,
-        usedTokens: 0,
-        contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64000,
-      },
-      isExecuting: interactiveTurnInFlight,
-    });
-
-    if (inputController.isAutocompleteActive()) {
-      const menuLines = selectList.render(Math.min(width - 4, 60));
-      // Prepend autocomplete menu above the box
-      frame.unshift(...menuLines);
-    }
-
-    const frameHeight = frame.length;
-    const topAnchor = Math.max(0, totalRows - frameHeight);
-
     const offset = editor.getCursorOffset();
-    const cursorRow = topAnchor + (inputController.isAutocompleteActive() ? selectList.render().length : 0) + (interactiveTurnInFlight ? 1 : 0) + offset.line + 2;
-    const cursorCol = 1 + 1 + 2 + offset.col + 1;
-
-    const diffOutput = diffBuffer.render(frame, { row: cursorRow, col: cursorCol }, { topAnchor });
-    if (diffOutput) {
-      stdout.write(diffOutput);
-    }
+    tuiSession.render(offset.col);
   };
 
-  // 1. Enter AltScreen Buffer and print minimal welcome
-  if (stdout.isTTY) {
-    altScreen.enter({ exitMode: "replay" });
-    const welcome = formatMinimalWelcomeBanner({
-      workspaceRoot: input.runtimeContext.projectRoot,
-      modelName: getModelName(),
-      gitBranch: input.runtimeContext.gitContext.branch ?? undefined,
-    });
-    stdout.write(welcome);
-  }
+  tuiSession.start();
 
   const dummyRl = {
     close() {
-      altScreen.leave();
+      tuiSession.stop();
     },
     prompt() {
       redrawTui();
@@ -146,6 +107,7 @@ export async function runInteractiveLoop(input: {
       input.sessionRuntime.cancelCurrentRun();
     },
     onExit: () => {
+      tuiSession.stop();
       handleShellClose({
         sessionRuntime: input.sessionRuntime,
         renderer: input.renderer,
@@ -156,9 +118,21 @@ export async function runInteractiveLoop(input: {
     },
     onSubmit: async (submittedText: string) => {
       interactiveTurnInFlight = true;
-      redrawTui();
+      tuiSession.setPrompt("");
+      tuiSession.setExecutionState(true, "Executing...");
+      tuiSession.appendUserPrompt(submittedText);
 
       try {
+        let commandOutput = "";
+        const capturingRenderer: StreamingRenderer = {
+          renderLine(line: string) {
+            commandOutput += `${line}\n`;
+          },
+          render(chunk: string) {
+            commandOutput += chunk;
+          },
+        } as unknown as StreamingRenderer;
+
         const result = await routeInteractiveCommand({
           prompt: submittedText,
           readline: dummyRl,
@@ -166,7 +140,7 @@ export async function runInteractiveLoop(input: {
           fallbackSessionId: input.fallbackSessionId,
           sessionManager: input.sessionManager,
           runtimeContext: input.runtimeContext,
-          renderer: input.renderer,
+          renderer: capturingRenderer,
           sessionRuntime: input.sessionRuntime,
           logger: input.logger,
           approvalTrustPolicy: input.approvalTrustPolicy,
@@ -178,8 +152,14 @@ export async function runInteractiveLoop(input: {
         if (result.refreshMcpGateway) {
           refreshMcpGateway();
         }
+
+        if (commandOutput.trim()) {
+          const firstWord = submittedText.split(" ")[0];
+          tuiSession.appendCommandResult(firstWord, commandOutput.trim());
+        }
       } finally {
         interactiveTurnInFlight = false;
+        tuiSession.setExecutionState(false, "");
         redrawTui();
       }
     },
@@ -188,9 +168,7 @@ export async function runInteractiveLoop(input: {
     },
   });
 
-  redrawTui();
-
-  // 2. Connect raw stdin feed
+  // Connect raw stdin feed
   stdinBuffer.onKey((event) => {
     inputController.handleKey(event, interactiveTurnInFlight);
   });
