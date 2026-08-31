@@ -29,11 +29,14 @@ export function handleShellClose(input: {
   sessionRuntime: ShellSessionRuntime;
   renderer: StreamingRenderer;
   runtimeContext: ShellRuntimeContext;
-  readline: Pick<Interface, "close">;
+  readline?: Pick<Interface, "close">;
   exit: (code: number) => never;
 }): void {
-  input.renderer.renderLine("\nExiting...");
-  input.sessionRuntime.terminate(input.runtimeContext.session.id);
-  input.readline.close();
+  const sessionId = input.runtimeContext.session.id;
+  input.sessionRuntime.terminate(sessionId);
+  if (input.readline?.close) {
+    input.readline.close();
+  }
+  input.renderer.renderLine(`\nSession saved. Resume this session with:\n  private-coding-agents --resume ${sessionId}\n`);
   input.exit(0);
 }

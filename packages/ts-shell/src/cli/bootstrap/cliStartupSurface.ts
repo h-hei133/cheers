@@ -47,12 +47,11 @@ export function projectAndRenderCliStartupSurface(
     providerModeEnv: input.providerModeEnv,
     maxTurns: input.bootstrapRuntime.runtimeContext.runtimeConfig.maxTurns,
   });
+  // In interactive TUI mode, suppress console startup surface to prevent terminal pollution
+  const isInteractiveTui = !input.options.printMode && !input.options.replayFile && input.nonInteractivePromptCount === 0;
   const showStartupSurface =
-    !input.options.printMode &&
-    !input.options.replayFile &&
-    input.nonInteractivePromptCount === 0 &&
+    !isInteractiveTui &&
     input.stdinTransportMode !== "capture-batch";
-
   if (showStartupSurface) {
     renderStartupSurface(input.bootstrapRuntime.renderer, {
       runtimeContext: input.bootstrapRuntime.runtimeContext,

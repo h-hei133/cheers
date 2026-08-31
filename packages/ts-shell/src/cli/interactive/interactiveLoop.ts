@@ -12,18 +12,16 @@ import {
   createCliMcpGateway,
   type CliMcpGateway,
 } from "../../entrypoints/cliMcpModule.js";
-import { installInteractiveCancellation } from "./interactiveCancellation.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
-import {
-  installInteractiveCloseHandler,
-  installInteractiveSignalHandlers,
-} from "./interactiveSignals.js";
-import {
-  buildInteractivePromptChrome,
-  refreshInteractivePromptChrome,
-} from "./promptChrome.js";
+import { handleShellClose, handleShellSigint } from "../../core/shell/signalHandlers.js";
 import { altScreen } from "../../presentation/tui/altScreen.js";
 import { formatMinimalWelcomeBanner } from "../../presentation/tui/welcomeBanner.js";
+import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
+import { TextEditor } from "../../presentation/tui/textEditor.js";
+import { AutocompleteController } from "../../presentation/tui/autocompleteController.js";
+import { renderBoxFrame } from "../../presentation/tui/boxComposer.js";
+import { DifferentialTerminalBuffer } from "../../presentation/tui/buffer.js";
+
 export async function runInteractiveLoop(input: {
   readonly stdin?: NodeJS.ReadStream;
   readonly stdout?: NodeJS.WriteStream;
@@ -42,111 +40,253 @@ export async function runInteractiveLoop(input: {
   ) => void;
   readonly exit?: (code?: number) => never;
 }): Promise<void> {
-  const activeProcess = input.process ?? process;
   const stdin = input.stdin ?? process.stdin;
   const stdout = input.stdout ?? process.stdout;
   const exit = input.exit ?? process.exit;
   let mcpGateway = input.initialMcpGateway;
   let interactiveTurnNumber = 0;
   let interactiveTurnInFlight = false;
-  // Enter Alt-Screen buffer with clean transcript replay capability
-  if (process.stdout.isTTY) {
+
+  const editor = new TextEditor();
+  const autocomplete = new AutocompleteController();
+  const diffBuffer = new DifferentialTerminalBuffer();
+  const stdinBuffer = new StdinBuffer();
+
+  const getModelName = (): string => {
+    return (
+      input.runtimeContext.runtimeConfig.providerCredentials?.[input.runtimeContext.runtimeConfig.provider]?.model ||
+      "default-model"
+    );
+  };
+
+  const redrawTui = (): void => {
+    const width = stdout.columns || 80;
+    const editorText = editor.getText();
+    autocomplete.update(editorText);
+
+    const frame = renderBoxFrame({
+      width,
+      promptText: editor.renderWithCursor().join("\n"),
+      title: "Coding Agent",
+      status: {
+        modelName: getModelName(),
+        gitBranch: input.runtimeContext.gitContext.branch ?? undefined,
+        projectDir: input.runtimeContext.projectRoot,
+        usedTokens: 0,
+        contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64000,
+      },
+      isExecuting: interactiveTurnInFlight,
+    });
+
+    if (autocomplete.isActive()) {
+      const menuLines = autocomplete.renderMenu(Math.min(width - 4, 60));
+      frame.push(...menuLines);
+    }
+
+    const diffOutput = diffBuffer.render(frame);
+    if (diffOutput) {
+      stdout.write(diffOutput);
+    }
+  };
+
+  // 1. Enter AltScreen Buffer and print minimal welcome
+  if (stdout.isTTY) {
     altScreen.enter({ exitMode: "replay" });
     const welcome = formatMinimalWelcomeBanner({
       workspaceRoot: input.runtimeContext.projectRoot,
-      modelName: "default-model",
+      modelName: getModelName(),
       gitBranch: input.runtimeContext.gitContext.branch ?? undefined,
     });
-    process.stdout.write(welcome);
+    stdout.write(welcome);
   }
 
-  const rl = readline.createInterface({
-    input: stdin,
-    output: stdout,
-    prompt: "\x1b[36m❯\x1b[0m ",
-  });
-  input.setReadline(rl);
+  redrawTui();
 
-  const refreshPrompt = (): void => {
-    refreshInteractivePromptChrome({
-      readline: rl,
-      projectRoot: input.runtimeContext.projectRoot,
-      sessionId: input.runtimeContext.session.id,
-      agentMode: input.sessionRuntime.getAgentMode(),
-    });
-  };
+  // Create dummy readline proxy for compatibility with existing command routers
+  const dummyRl = {
+    close() {
+      altScreen.leave();
+    },
+    prompt() {
+      redrawTui();
+    },
+    pause() {},
+    resume() {},
+  } as unknown as readline.Interface;
+  input.setReadline(dummyRl);
 
   const refreshMcpGateway = (): void => {
     mcpGateway = createCliMcpGateway(input.runtimeContext.cwd);
   };
 
-  installInteractiveSignalHandlers({
-    process: activeProcess,
-    readline: rl,
-    sessionRuntime: input.sessionRuntime,
-    renderer: input.renderer,
-    runtimeContext: input.runtimeContext,
-    exit,
-  });
-  installInteractiveCloseHandler({
-    readline: rl,
-    sessionRuntime: input.sessionRuntime,
-    renderer: input.renderer,
-    runtimeContext: input.runtimeContext,
-    exit,
-  });
-  installInteractiveCancellation({
-    stdin,
-    readline: rl,
-    sessionRuntime: input.sessionRuntime,
-    renderer: input.renderer,
-  });
-
-  rl.on("line", async (line) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      rl.prompt();
-      return;
-    }
+  // 2. Handle keypress events directly from StdinBuffer
+  stdinBuffer.onKey(async (event) => {
     if (interactiveTurnInFlight) {
-      input.renderer.renderLine(
-        "\nA turn is already running. Please wait for completion before submitting another prompt.\n",
-      );
-      rl.prompt();
+      if (event.keyId === "ctrl+c" || event.keyId === "escape") {
+        input.sessionRuntime.cancelCurrentRun();
+      }
       return;
     }
-    interactiveTurnInFlight = true;
-    rl.pause();
 
-    try {
-      const result = await routeInteractiveCommand({
-        prompt: trimmed,
-        readline: rl,
-        mcpGateway,
-        fallbackSessionId: input.fallbackSessionId,
-        sessionManager: input.sessionManager,
-        runtimeContext: input.runtimeContext,
-        renderer: input.renderer,
+    // A. Intercept keys if Autocomplete popup is active
+    if (autocomplete.isActive()) {
+      const consumed = autocomplete.handleKey(event, editor);
+      if (consumed) {
+        redrawTui();
+        return;
+      }
+    }
+
+    // B. Handle Special Navigation & Editing Keys
+    if (event.keyId === "enter") {
+      const submitted = editor.getText().trim();
+      if (!submitted) {
+        // Empty enter: No-op, do NOT scroll screen
+        redrawTui();
+        return;
+      }
+
+      editor.pushHistory(submitted);
+      editor.clear();
+      autocomplete.dismiss();
+      interactiveTurnInFlight = true;
+      redrawTui();
+
+      try {
+        const result = await routeInteractiveCommand({
+          prompt: submitted,
+          readline: dummyRl,
+          mcpGateway,
+          fallbackSessionId: input.fallbackSessionId,
+          sessionManager: input.sessionManager,
+          runtimeContext: input.runtimeContext,
+          renderer: input.renderer,
+          sessionRuntime: input.sessionRuntime,
+          logger: input.logger,
+          approvalTrustPolicy: input.approvalTrustPolicy,
+          turnNumber: interactiveTurnNumber,
+          setActiveNonInteractiveApprovalMode:
+            input.setActiveNonInteractiveApprovalMode,
+        });
+        interactiveTurnNumber = result.turnNumber;
+        if (result.refreshMcpGateway) {
+          refreshMcpGateway();
+        }
+      } finally {
+        interactiveTurnInFlight = false;
+        redrawTui();
+      }
+      return;
+    }
+
+    if (event.keyId === "backspace") {
+      editor.backspace();
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "delete") {
+      editor.delete();
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "left") {
+      editor.moveLeft();
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "right") {
+      editor.moveRight();
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "up") {
+      const moved = editor.moveUp();
+      if (!moved) {
+        editor.navigateHistory(-1);
+      }
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "down") {
+      const moved = editor.moveDown();
+      if (!moved) {
+        editor.navigateHistory(1);
+      }
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "ctrl+a" || event.keyId === "home") {
+      editor.moveToHome();
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "ctrl+e" || event.keyId === "end") {
+      editor.moveToEnd();
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "alt+left" || event.keyId === "ctrl+left") {
+      editor.moveWordLeft();
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "alt+right" || event.keyId === "ctrl+right") {
+      editor.moveWordRight();
+      redrawTui();
+      return;
+    }
+
+    if (event.keyId === "ctrl+c") {
+      handleShellSigint({
         sessionRuntime: input.sessionRuntime,
-        logger: input.logger,
-        approvalTrustPolicy: input.approvalTrustPolicy,
-        turnNumber: interactiveTurnNumber,
-        setActiveNonInteractiveApprovalMode:
-          input.setActiveNonInteractiveApprovalMode,
+        renderer: input.renderer,
+        runtimeContext: input.runtimeContext,
+        readline: dummyRl,
+        exit,
       });
-      interactiveTurnNumber = result.turnNumber;
-      if (result.refreshMcpGateway) {
-        refreshMcpGateway();
-      }
-      if (result.refreshPromptChrome) {
-        refreshPrompt();
-      }
-      rl.prompt();
-    } finally {
-      interactiveTurnInFlight = false;
-      rl.resume();
+      return;
+    }
+
+    if (event.keyId === "ctrl+d") {
+      handleShellClose({
+        sessionRuntime: input.sessionRuntime,
+        renderer: input.renderer,
+        runtimeContext: input.runtimeContext,
+        readline: dummyRl,
+        exit,
+      });
+      return;
+    }
+
+    // C. Printable Characters
+    if (event.raw && !event.ctrl && !event.alt && !event.meta && event.raw.length === 1) {
+      editor.insertText(event.raw);
+      redrawTui();
     }
   });
 
-  rl.prompt();
+  stdinBuffer.onPaste((pasted) => {
+    if (interactiveTurnInFlight) return;
+    editor.insertText(pasted);
+    redrawTui();
+  });
+
+  // 3. Connect raw stdin feed
+  if (stdin.isTTY && typeof stdin.setRawMode === "function") {
+    stdin.setRawMode(true);
+  }
+  stdin.resume();
+  stdin.on("data", (chunk: Buffer | string) => {
+    const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    stdinBuffer.feed(text);
+  });
 }
