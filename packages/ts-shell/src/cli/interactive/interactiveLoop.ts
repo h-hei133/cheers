@@ -83,7 +83,11 @@ export async function runInteractiveLoop(input: {
       frame.push(...menuLines);
     }
 
-    const diffOutput = diffBuffer.render(frame);
+    const state = editor.getState();
+    const cursorRow = 1 + (interactiveTurnInFlight ? 1 : 0) + state.cursorLine + 1;
+    const cursorCol = 1 + 1 + 2 + state.cursorCol + 1;
+
+    const diffOutput = diffBuffer.render(frame, { row: cursorRow, col: cursorCol });
     if (diffOutput) {
       stdout.write(diffOutput);
     }
@@ -122,7 +126,7 @@ export async function runInteractiveLoop(input: {
   // 2. Handle keypress events directly from StdinBuffer
   stdinBuffer.onKey(async (event) => {
     if (interactiveTurnInFlight) {
-      if (event.keyId === "ctrl+c" || event.keyId === "escape") {
+      if (event.keyId === "escape") {
         input.sessionRuntime.cancelCurrentRun();
       }
       return;
@@ -137,7 +141,25 @@ export async function runInteractiveLoop(input: {
       }
     }
 
-    // B. Handle Special Navigation & Editing Keys
+    // B. Tab Autocomplete Interception (never insert raw \t)
+    if (event.keyId === "tab") {
+      if (autocomplete.isActive()) {
+        autocomplete.handleKey(event, editor);
+      } else if (editor.getText().trim().startsWith("/")) {
+        autocomplete.update(editor.getText());
+      }
+      redrawTui();
+      return;
+    }
+
+    // C. Escape Multi-Tier Cancellation Hierarchy (app.interrupt)
+    if (event.keyId === "escape") {
+      if (autocomplete.isActive()) {
+        autocomplete.dismiss();
+      }
+      redrawTui();
+      return;
+    }
     if (event.keyId === "enter") {
       const submitted = editor.getText().trim();
       if (!submitted) {
@@ -246,7 +268,15 @@ export async function runInteractiveLoop(input: {
     }
 
     if (event.keyId === "ctrl+c") {
-      handleShellSigint({
+      if (editor.getText().length > 0) {
+        // Clear current prompt draft
+        editor.clear();
+        autocomplete.dismiss();
+        redrawTui();
+        return;
+      }
+
+      handleShellClose({
         sessionRuntime: input.sessionRuntime,
         renderer: input.renderer,
         runtimeContext: input.runtimeContext,
@@ -267,8 +297,8 @@ export async function runInteractiveLoop(input: {
       return;
     }
 
-    // C. Printable Characters
-    if (event.raw && !event.ctrl && !event.alt && !event.meta && event.raw.length === 1) {
+    // D. Printable Characters (strictly reject raw tab bytes)
+    if (event.raw && !event.ctrl && !event.alt && !event.meta && event.raw.length === 1 && event.raw !== "\t") {
       editor.insertText(event.raw);
       redrawTui();
     }
@@ -276,7 +306,8 @@ export async function runInteractiveLoop(input: {
 
   stdinBuffer.onPaste((pasted) => {
     if (interactiveTurnInFlight) return;
-    editor.insertText(pasted);
+    const clean = pasted.replace(/\t/g, "  ");
+    editor.insertText(clean);
     redrawTui();
   });
 

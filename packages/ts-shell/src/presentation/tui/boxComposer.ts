@@ -51,9 +51,10 @@ export function renderBoxRows(width: number, promptText: string, gutter: string 
     const lineText = lines[i];
     const textLen = visibleWidth(lineText);
     const pad = Math.max(0, contentWidth - textLen);
+    const safeText = textLen > contentWidth ? lineText.slice(0, contentWidth) : lineText;
 
     rendered.push(
-      `\x1b[90m│\x1b[0m ${currentGutter}${lineText}${" ".repeat(pad)} \x1b[90m│\x1b[0m`,
+      `\x1b[90m│\x1b[0m ${currentGutter}${safeText}${" ".repeat(pad)} \x1b[90m│\x1b[0m`,
     );
   }
 
