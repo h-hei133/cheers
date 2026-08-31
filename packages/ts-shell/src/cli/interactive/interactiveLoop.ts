@@ -62,6 +62,7 @@ export async function runInteractiveLoop(input: {
   };
 
   const redrawTui = (): void => {
+    const totalRows = stdout.rows || 24;
     const width = stdout.columns || 80;
     const editorText = editor.getText();
 
@@ -96,14 +97,18 @@ export async function runInteractiveLoop(input: {
 
     if (inputController.isAutocompleteActive()) {
       const menuLines = selectList.render(Math.min(width - 4, 60));
-      frame.push(...menuLines);
+      // Prepend autocomplete menu above the box
+      frame.unshift(...menuLines);
     }
 
+    const frameHeight = frame.length;
+    const topAnchor = Math.max(0, totalRows - frameHeight);
+
     const offset = editor.getCursorOffset();
-    const cursorRow = 1 + (interactiveTurnInFlight ? 1 : 0) + offset.line + 1;
+    const cursorRow = topAnchor + (inputController.isAutocompleteActive() ? selectList.render().length : 0) + (interactiveTurnInFlight ? 1 : 0) + offset.line + 2;
     const cursorCol = 1 + 1 + 2 + offset.col + 1;
 
-    const diffOutput = diffBuffer.render(frame, { row: cursorRow, col: cursorCol });
+    const diffOutput = diffBuffer.render(frame, { row: cursorRow, col: cursorCol }, { topAnchor });
     if (diffOutput) {
       stdout.write(diffOutput);
     }
