@@ -3,6 +3,7 @@ import { TUI, type TerminalFramePlan, type TerminalFrameProvider } from "../../p
 import { Editor } from "../../presentation/tui/editor.js";
 import { SelectList } from "../../presentation/tui/selectList.js";
 import { InputController } from "../../presentation/tui/inputController.js";
+import { altScreen } from "../../presentation/tui/altScreen.js";
 import { TranscriptContainer } from "../../presentation/tui/transcriptContainer.js";
 import { formatStatusLine, type StatusLineState } from "../../presentation/tui/statusLine.js";
 import { formatMinimalWelcomeBanner } from "../../presentation/tui/welcomeBanner.js";
@@ -78,16 +79,21 @@ export class InteractiveMode implements TerminalFrameProvider {
   }
 
   start(): void {
+    if (process.stdout.isTTY) {
+      altScreen.enter({ exitMode: "replay" });
+    }
     this.tui.start();
   }
-
   stop(): void {
     this.tui.stop();
+    if (process.stdout.isTTY) {
+      altScreen.leave();
+    }
   }
 
   renderFrame(dimensions: { rows: number; cols: number }): TerminalFramePlan {
-    const width = dimensions.cols || 80;
     const totalRows = dimensions.rows || 24;
+    const width = dimensions.cols || 80;
     const editorText = this.editor.getText();
 
     // 1. Update autocomplete state

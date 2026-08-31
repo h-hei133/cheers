@@ -46,4 +46,12 @@ describe("InteractiveMode Orchestrator", () => {
     expect(plan.viewport.some((l) => l.includes("Coding Agent"))).toBe(true);
     expect(plan.viewport.some((l) => l.includes("/workspace"))).toBe(true);
   });
+
+  it("appends command output to transcript container when slash command runs", () => {
+    mode.transcript.appendCommandResult("/help", "Available commands:\n/model\n/cost\n/undo");
+    const plan = mode.renderFrame({ rows: 24, cols: 80 });
+
+    expect(plan.viewport.some((l) => l.includes("Command Output"))).toBe(true);
+    expect(plan.viewport.some((l) => l.includes("/model"))).toBe(true);
+  });
 });

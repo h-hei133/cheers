@@ -66,4 +66,17 @@ describe("InputController & Escape/Tab Action Routing", () => {
     expect(submittedText).toBe("npm test");
     expect(editor.getText()).toBe("");
   });
+
+  it("submits slash command directly upon Enter even if autocomplete was active", () => {
+    editor.setText("/help");
+    controller.setAutocompleteActive(true);
+    selectList.setItems([{ value: "/help", label: "/help" }]);
+
+    const enterKey = parseKeyEvent("\r");
+    controller.handleKey(enterKey, false);
+
+    expect(submittedText).toBe("/help");
+    expect(editor.getText()).toBe("");
+    expect(controller.isAutocompleteActive()).toBe(false);
+  });
 });

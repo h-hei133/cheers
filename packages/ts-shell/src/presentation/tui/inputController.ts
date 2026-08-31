@@ -62,7 +62,7 @@ export class InputController {
         this.callbacks.onRequestRedraw();
         return;
       }
-      if (event.keyId === "tab" || event.keyId === "enter") {
+      if (event.keyId === "tab") {
         const chosen = this.selectList.getSelectedItem();
         if (chosen) {
           this.editor.setText(`${chosen.value} `);
