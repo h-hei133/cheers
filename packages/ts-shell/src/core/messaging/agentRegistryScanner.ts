@@ -5,7 +5,7 @@ import type { AgentDescriptor } from "./types.js";
 import { SubagentLoader } from "../subagents/subagentLoader.js";
 
 /**
- * AgentRegistryScanner (Claude Code 2026 Aligned)
+ * AgentRegistryScanner
  * Discovers reachable agents across local UDS sockets, custom subagents, and active agent teams.
  */
 export class AgentRegistryScanner {

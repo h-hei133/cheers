@@ -1,11 +1,10 @@
 /**
- * Keystroke Parser, Kitty Keyboard Protocol & Sequence Disambiguation
- * (Benchmarked against Pi Agent's `packages/tui/src/keys.ts`)
+ * Keystroke Parser, Terminal Input Protocol & Sequence Disambiguation
  *
  * Handles:
  * 1. Single-byte control codes (Ctrl+A..Z, Esc, Tab, Enter)
  * 2. ANSI CSI / SS3 escape sequences (Arrows, Home, End, F1..F12)
- * 3. Kitty Keyboard Protocol (CSI unicode ; modifier u)
+ * 3. Modern Keyboard Protocol (CSI unicode ; modifier u)
  * 4. Alt/Meta key combinations
  */
 

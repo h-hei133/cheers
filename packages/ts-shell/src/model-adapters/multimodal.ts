@@ -1,6 +1,5 @@
 /**
  * ImageContent & Multimodal Helpers
- * (Benchmarked against Pi Agent's `packages/ai/src/types.ts`)
  *
  * Provides typed multimodal image blocks and multi-provider format converters:
  * - Anthropic: { type: "image", source: { type: "base64", media_type, data } }

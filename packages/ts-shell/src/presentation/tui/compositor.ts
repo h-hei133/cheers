@@ -1,6 +1,5 @@
 /**
  * 2D Terminal Viewport Compositor & Layer Mixer
- * (Benchmarked against Pi Agent's `packages/tui/src/tui.ts` 2D compositing)
  *
  * Implements:
  * 1. ANSI-aware visible column slicing

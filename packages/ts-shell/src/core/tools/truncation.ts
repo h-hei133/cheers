@@ -1,5 +1,5 @@
 /**
- * Directional Dual-Budget Truncation Engine (Benchmarked against Oh-My-Pi & Pi Agent)
+ * Directional Dual-Budget Truncation Engine
  *
  * Implements:
  * 1. Head Truncation: Preserves the first N lines/bytes (ideal for read and grep)

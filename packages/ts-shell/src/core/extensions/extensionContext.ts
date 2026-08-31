@@ -2,7 +2,6 @@ import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
 /**
  * Extension Context & UI Primitives
- * (Benchmarked against Pi Agent's `packages/coding-agent/src/core/extensions/types.ts`)
  *
  * Exposes rich UI interaction primitives, session access, and dynamic registration
  * to plugins and extensions.

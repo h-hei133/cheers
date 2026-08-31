@@ -1,12 +1,11 @@
 import { visibleWidth } from "./compositor.js";
 
 /**
- * Claude Code Style TUI Composer & Chrome Renderer
- * (Benchmarked against Oh-My-Pi's `claudeComposerStyle` and Claude Code 2026 CLI)
+ * Clean Terminal Composer & Chrome Layout Renderer
  *
  * Visual Layout:
  * 1. Top Full-Width Horizontal Rule with Right-Docked Status Chip:
- *    `────────────────────────────────────────── [claude-3.5-sonnet | 12k/200k (6%)] ──`
+ *    `────────────────────────────────────────── [model-name | 12k/200k (6%)] ──`
  * 2. Borderless Input Prompt Area with clean gutter:
  *    `❯ user input text here`
  * 3. Bottom Full-Width Horizontal Rule:
@@ -22,7 +21,7 @@ export interface ComposerTopChip {
   readonly statusText?: string;
 }
 
-export interface ClaudeTuiFrameOptions {
+export interface ComposerFrameOptions {
   readonly width: number;
   readonly promptText: string;
   readonly gutter?: string;
@@ -32,7 +31,7 @@ export interface ClaudeTuiFrameOptions {
   readonly activeToolStatus?: string;
 }
 
-export function renderClaudeTuiTopRule(width: number, chip?: ComposerTopChip): string {
+export function renderComposerTopRule(width: number, chip?: ComposerTopChip): string {
   const safeWidth = Math.max(20, width);
   const hChar = "─";
 
@@ -62,7 +61,11 @@ export function renderClaudeTuiTopRule(width: number, chip?: ComposerTopChip): s
   return `\x1b[90m${hChar.repeat(leftFill)}\x1b[0m${chipContent}\x1b[90m${hChar.repeat(2)}\x1b[0m`;
 }
 
-export function renderClaudeTuiPromptRow(width: number, promptText: string, gutter: string = "\x1b[36m❯\x1b[0m "): string[] {
+export function renderComposerPromptRow(
+  _width: number,
+  promptText: string,
+  gutter: string = "\x1b[36m❯\x1b[0m ",
+): string[] {
   const rawGutterLen = visibleWidth(gutter);
   const lines = (promptText || " ").split("\n");
   const rendered: string[] = [];
@@ -75,23 +78,23 @@ export function renderClaudeTuiPromptRow(width: number, promptText: string, gutt
   return rendered;
 }
 
-export function renderClaudeTuiBottomRule(width: number): string {
+export function renderComposerBottomRule(width: number): string {
   const safeWidth = Math.max(20, width);
   return `\x1b[90m${"─".repeat(safeWidth)}\x1b[0m`;
 }
 
-export function renderClaudeTuiBottomBar(hints?: readonly string[]): string {
+export function renderComposerBottomBar(hints?: readonly string[]): string {
   const defaultHints = ["/help for commands", "Ctrl+C to cancel", "Ctrl+T thinking"];
   const activeHints = hints && hints.length > 0 ? hints : defaultHints;
   return `\x1b[90m ${activeHints.join("  │  ")} \x1b[0m`;
 }
 
-export function renderClaudeTuiFrame(options: ClaudeTuiFrameOptions): string[] {
+export function renderComposerFrame(options: ComposerFrameOptions): string[] {
   const width = options.width || 80;
   const frame: string[] = [];
 
   // 1. Top Rule with Status Chip
-  frame.push(renderClaudeTuiTopRule(width, options.chip));
+  frame.push(renderComposerTopRule(width, options.chip));
 
   // 2. Active Tool Status (if currently executing)
   if (options.isExecuting && options.activeToolStatus) {
@@ -99,14 +102,14 @@ export function renderClaudeTuiFrame(options: ClaudeTuiFrameOptions): string[] {
   }
 
   // 3. Prompt Area
-  const promptRows = renderClaudeTuiPromptRow(width, options.promptText, options.gutter);
+  const promptRows = renderComposerPromptRow(width, options.promptText, options.gutter);
   frame.push(...promptRows);
 
   // 4. Bottom Rule
-  frame.push(renderClaudeTuiBottomRule(width));
+  frame.push(renderComposerBottomRule(width));
 
   // 5. Bottom Hint Bar
-  frame.push(renderClaudeTuiBottomBar(options.bottomHints));
+  frame.push(renderComposerBottomBar(options.bottomHints));
 
   return frame;
 }

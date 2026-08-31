@@ -16,7 +16,6 @@ export interface TrustStoreFile {
 
 /**
  * Project Trust Store & Security Sandbox Gate
- * (Benchmarked against Pi Agent's `src/core/trust-manager.ts`)
  *
  * Enforces security boundaries before executing workspace-local extensions,
  * hooks, or instructions from untrusted repositories.

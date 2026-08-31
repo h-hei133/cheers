@@ -30,7 +30,7 @@ export function estimateTextTokens(text: string | null | undefined): number {
 
 /**
  * Analyzes active message history, extracts token categories, detects duplicate reads & bloat,
- * and generates actionable governance suggestions (inspired by Claude Code contextAnalysis).
+ * and generates actionable governance suggestions.
  */
 export function auditContextHealth(
   messages: readonly ChatMessageLike[],

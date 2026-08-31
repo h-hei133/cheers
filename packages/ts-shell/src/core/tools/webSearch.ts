@@ -212,7 +212,7 @@ async function searchWithTavily(
 }
 
 /**
- * /web_search tool (Oh-My-Pi & OpenCode Aligned)
+ * /web_search tool
  * Resilient multi-provider web search with keyless DuckDuckGo HTML fallback.
  */
 export function createWebSearchToolDefinition(): ToolDefinition {

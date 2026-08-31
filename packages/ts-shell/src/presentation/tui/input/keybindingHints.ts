@@ -2,7 +2,6 @@ import { keybindings } from "./keybindings.js";
 
 /**
  * Platform-Adaptive Keybinding Hints
- * (Benchmarked against Pi Agent's `src/modes/interactive/components/keybinding-hints.ts`)
  *
  * Formats shortcuts adaptively for macOS (Option/Cmd) vs Linux/Windows (Alt/Ctrl).
  */

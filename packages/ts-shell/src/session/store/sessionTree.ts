@@ -1,5 +1,5 @@
 /**
- * Session Tree & Checkpoint Timeline Types (Pi Agent Aligned)
+ * Session Tree & Checkpoint Timeline Types
  */
 
 export interface SessionTreeEntry {

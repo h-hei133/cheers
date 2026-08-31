@@ -1,5 +1,5 @@
 /**
- * 9-Stage Resilient File Replacer Engine (Benchmarked against OpenCode & Pi Agent)
+ * 9-Stage Resilient File Replacer Engine
  *
  * Provides robust, multi-strategy string replacement with:
  * 1. Exact match

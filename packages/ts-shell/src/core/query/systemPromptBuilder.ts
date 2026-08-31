@@ -16,14 +16,13 @@ export interface BuildSystemPromptOptions {
 
 /**
  * Modular System Prompt Assembly Engine
- * (Benchmarked against Pi Agent's `src/core/system-prompt.ts`)
  *
  * Assembles system prompts in strict deterministic layers:
  * 1. Base persona and operational rules
  * 2. Mode declaration (Plan vs Build)
  * 3. Tool catalog & auto-extracted prompt snippets
  * 4. Deduplicated tool guidelines
- * 5. Project context (<project_context> from AGENTS.md / CLAUDE.md)
+ * 5. Project context (<project_context> from AGENTS.md)
  * 6. Dynamic CWD invariant tail
  */
 export function buildSystemPrompt(options: BuildSystemPromptOptions): string {

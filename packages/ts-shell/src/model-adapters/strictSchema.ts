@@ -1,6 +1,5 @@
 /**
  * Strict JSON Schema Compiler & Constrained Sampling Engine
- * (Benchmarked against Pi Agent's `packages/ai/src/api/constrained-sampling.ts`)
  *
  * Enforces strict provider tool schemas by:
  * 1. Recursively ensuring `additionalProperties: false` on all object schemas

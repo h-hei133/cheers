@@ -2,7 +2,6 @@ import fs from "node:fs";
 
 /**
  * Alternate Screen Buffer & Terminal Lifecycle Manager
- * (Benchmarked against Pi Agent's `tui-alt-screen.ts` and Claude Code graceful shutdown)
  *
  * Implements:
  * 1. DECSET 1049 (\x1b[?1049h) - atomic switch to fresh isolated screen buffer

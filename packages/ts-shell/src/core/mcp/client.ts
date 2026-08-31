@@ -13,7 +13,7 @@ import {
 } from './errorTaxonomy.js'
 
 /**
- * Enhanced CoreMcpClient (OpenCode / Claude Code Aligned)
+ * Enhanced CoreMcpClient
  * Features auto-reconnection, strict 30s timeout, EPIPE resilience, and full JSON-RPC lifecycle.
  */
 export class CoreMcpClient {

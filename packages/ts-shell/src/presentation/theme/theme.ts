@@ -1,6 +1,5 @@
 /**
  * Semantic Theme Engine & ANSI Downsampling Palette
- * (Benchmarked against Pi Agent's `src/modes/interactive/theme/theme.ts`)
  *
  * Implements:
  * 1. 40+ Semantic Color Tokens (toolTitle, diffAdded, diffRemoved, syntax, etc.)

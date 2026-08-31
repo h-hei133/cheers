@@ -35,7 +35,7 @@ export function projectTranscriptMessages(
 
   for (const event of events) {
     if (event.type === "compaction") {
-      // Re-anchor context at the compaction checkpoint (Benchmarked against Pi buildSessionContext)
+      // Re-anchor context at the compaction checkpoint
       messages = [
         {
           role: "user",

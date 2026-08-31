@@ -1,6 +1,5 @@
 /**
  * Steerable Prompt & Follow-Up Queues
- * (Benchmarked against Pi Agent's `packages/agent/src/agent.ts` steering queues)
  *
  * Implements:
  * 1. Mid-turn steering message queue (injected at tool boundaries to redirect active turns)

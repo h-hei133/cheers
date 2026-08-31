@@ -1,6 +1,5 @@
 /**
  * Multi-Tier Streaming JSON Repair Engine
- * (Benchmarked against Pi Agent's `json-parse.ts` and OpenCode's `tool-stream.ts`)
  *
  * Tier 1: Native JSON.parse (fast path for complete payloads)
  * Tier 2: repairJson (escapes raw ASCII control chars inside strings, doubles

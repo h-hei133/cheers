@@ -4,7 +4,7 @@ import ts from "typescript";
 import type { HookDecision, InProcessHookConfig, PostToolUsePayload } from "../types.js";
 
 /**
- * Built-in Verification Hook: Post-Mutation Compiler Guard (Codex / OpenCode Aligned)
+ * Built-in Verification Hook: Post-Mutation Compiler Guard
  * Automatically validates syntax and compiler diagnostics for modified files
  * and provides instant self-healing feedback (error codes like TS2322/TS2339 + context lines) to the model.
  */

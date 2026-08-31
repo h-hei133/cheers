@@ -2,7 +2,6 @@ import { defaultTheme, type Theme } from "../../theme/theme.js";
 
 /**
  * Unified Diff & Word-Level Highlight Renderer
- * (Benchmarked against Pi Agent's `src/modes/interactive/components/diff.ts`)
  *
  * Formats multi-line diff additions (+) and deletions (-) with line numbers,
  * and highlights changed words with inverse background styling.

@@ -3,7 +3,6 @@ import path from "node:path";
 
 /**
  * Cross-Platform Process Tree & Orphan Daemon Manager
- * (Benchmarked against Pi Agent's `utils/shell.ts` and `utils/child-process.ts`)
  *
  * Implements:
  * 1. Global detached child PID tracking registry

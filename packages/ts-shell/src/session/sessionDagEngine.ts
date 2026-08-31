@@ -5,7 +5,6 @@ import type { SessionMessage } from "./schema/sessionMessage.js";
 
 /**
  * Unified JSONL Session DAG Engine
- * (Benchmarked against Pi Agent's `packages/coding-agent/src/core/session-manager.ts`)
  *
  * Implements:
  * 1. Single-file JSONL DAG layout (<timestamp>_<sessionId>.jsonl)

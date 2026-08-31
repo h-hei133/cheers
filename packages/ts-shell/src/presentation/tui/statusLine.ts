@@ -8,7 +8,7 @@ export interface StatusLineState {
 }
 
 /**
- * Renders an informative, compact status line adhering to Claude Code / OMP style.
+ * Renders an informative, compact status line with token metrics.
  */
 export function formatStatusLine(state: StatusLineState): string {
   const parts: string[] = [];

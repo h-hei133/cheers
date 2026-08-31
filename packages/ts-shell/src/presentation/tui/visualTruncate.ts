@@ -2,7 +2,6 @@ import { sliceWithWidth, visibleWidth } from "./compositor.js";
 
 /**
  * Visual Line Wrapping & Truncation Engine
- * (Benchmarked against Pi Agent's `src/modes/interactive/components/visual-truncate.ts`)
  *
  * Wraps and truncates lines based on real terminal column width, accounting
  * for ANSI escape codes and CJK characters, returning skipped line counts for

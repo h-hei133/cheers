@@ -1,16 +1,15 @@
 import { altScreen, type AltScreenExitMode } from "./altScreen.js";
-import { renderClaudeTuiFrame } from "./claudeLayout.js";
+import { renderComposerFrame } from "./composerLayout.js";
 import { DifferentialTerminalBuffer } from "./buffer.js";
 
 /**
- * Interactive TUI Session Coordinator (Claude Code / OMP mode)
+ * Interactive TUI Session Coordinator
  *
  * Coordinates:
  * 1. Alt-Screen Buffer lifecycle
  * 2. Differential frame updates with ANSI Mode 2026 atomic sync
  * 3. Real-time status chip & prompt gutter rendering
  */
-
 export interface InteractiveTuiSessionOptions {
   readonly modelName?: string;
   readonly gitBranch?: string;
@@ -63,7 +62,7 @@ export class InteractiveTuiSession {
     const width = process.stdout.columns || 80;
     const tokenStr = this.usedTokens > 0 ? `${Math.round(this.usedTokens / 1000)}k` : undefined;
 
-    const frame = renderClaudeTuiFrame({
+    const frame = renderComposerFrame({
       width,
       promptText: this.currentPrompt,
       chip: {

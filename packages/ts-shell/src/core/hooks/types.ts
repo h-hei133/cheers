@@ -1,6 +1,5 @@
 /**
- * Claude Code 2026 SOTA Lifecycle Hook Event Types & Contracts
- * Verified from Anthropic official documentation.
+ * Lifecycle Hook Event Types & Contracts
  */
 
 export type HookEventName =

@@ -14,7 +14,7 @@ export interface TuiScreenState {
 }
 
 /**
- * TuiEngine (Pi Agent Aligned)
+ * TuiEngine
  * Coordinates terminal state, double-buffered differential rendering, and interactive modal cards.
  */
 export class TuiEngine {

@@ -23,7 +23,8 @@ import {
   refreshInteractivePromptChrome,
 } from "./promptChrome.js";
 import { altScreen } from "../../presentation/tui/altScreen.js";
-import { renderClaudeTuiTopRule } from "../../presentation/tui/claudeLayout.js";
+import { renderComposerTopRule } from "../../presentation/tui/composerLayout.js";
+
 export async function runInteractiveLoop(input: {
   readonly stdin?: NodeJS.ReadStream;
   readonly stdout?: NodeJS.WriteStream;
@@ -53,9 +54,9 @@ export async function runInteractiveLoop(input: {
   // Enter Alt-Screen buffer with clean transcript replay capability
   if (process.stdout.isTTY) {
     altScreen.enter({ exitMode: "replay" });
-    const topBanner = renderClaudeTuiTopRule(process.stdout.columns || 80, {
+    const topBanner = renderComposerTopRule(process.stdout.columns || 80, {
       modelName: "claude-3.5-sonnet",
-      statusText: "Claude Mode",
+      statusText: "Interactive Mode",
     });
     process.stdout.write(`${topBanner}\n`);
   }

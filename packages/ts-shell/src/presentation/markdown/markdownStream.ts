@@ -1,6 +1,5 @@
 /**
  * Streaming Markdown Code Fence Stabilizer
- * (Benchmarked against Pi Agent's `packages/tui/src/components/markdown.ts`)
  *
  * Prevents terminal UI flickering when partial closing fences (e.g. `` ` `` or `` `` ``)
  * arrive at the tail of a streaming chunk before the full closing marker is received.
