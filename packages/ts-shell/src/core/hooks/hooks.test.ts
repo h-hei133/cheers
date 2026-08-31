@@ -98,7 +98,7 @@ describe("Enterprise Hook & Verification Engine", () => {
       });
 
       expect(decision?.decision).toBe("retry");
-      expect(decision?.feedback).toContain("Unbalanced Braces");
+      expect(decision?.feedback).toContain("TypeScript Compiler Syntax Error");
       expect(decision?.feedback).toContain("broken.ts");
     });
 
