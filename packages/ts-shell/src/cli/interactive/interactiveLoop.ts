@@ -23,8 +23,7 @@ import {
   refreshInteractivePromptChrome,
 } from "./promptChrome.js";
 import { altScreen } from "../../presentation/tui/altScreen.js";
-import { renderComposerTopRule } from "../../presentation/tui/composerLayout.js";
-
+import { formatMinimalWelcomeBanner } from "../../presentation/tui/welcomeBanner.js";
 export async function runInteractiveLoop(input: {
   readonly stdin?: NodeJS.ReadStream;
   readonly stdout?: NodeJS.WriteStream;
@@ -50,15 +49,15 @@ export async function runInteractiveLoop(input: {
   let mcpGateway = input.initialMcpGateway;
   let interactiveTurnNumber = 0;
   let interactiveTurnInFlight = false;
-
   // Enter Alt-Screen buffer with clean transcript replay capability
   if (process.stdout.isTTY) {
     altScreen.enter({ exitMode: "replay" });
-    const topBanner = renderComposerTopRule(process.stdout.columns || 80, {
-      modelName: "claude-3.5-sonnet",
-      statusText: "Interactive Mode",
+    const welcome = formatMinimalWelcomeBanner({
+      workspaceRoot: input.runtimeContext.projectRoot,
+      modelName: "default-model",
+      gitBranch: input.runtimeContext.gitContext.branch ?? undefined,
     });
-    process.stdout.write(`${topBanner}\n`);
+    process.stdout.write(welcome);
   }
 
   const rl = readline.createInterface({

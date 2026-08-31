@@ -1,6 +1,7 @@
 import { altScreen, type AltScreenExitMode } from "./altScreen.js";
-import { renderComposerFrame } from "./composerLayout.js";
+import { renderBoxFrame } from "./boxComposer.js";
 import { DifferentialTerminalBuffer } from "./buffer.js";
+import { getSlashCommandSuggestions, renderSlashAutocompleteMenu } from "./slashAutocomplete.js";
 
 /**
  * Interactive TUI Session Coordinator
@@ -60,19 +61,26 @@ export class InteractiveTuiSession {
 
   render(): void {
     const width = process.stdout.columns || 80;
-    const tokenStr = this.usedTokens > 0 ? `${Math.round(this.usedTokens / 1000)}k` : undefined;
 
-    const frame = renderComposerFrame({
+    const frame = renderBoxFrame({
       width,
       promptText: this.currentPrompt,
-      chip: {
+      title: "Coding Agent",
+      status: {
         modelName: this.modelName,
         gitBranch: this.gitBranch,
-        tokenUsage: tokenStr,
+        usedTokens: this.usedTokens,
+        contextWindow: 64000,
       },
       isExecuting: this.isExecuting,
       activeToolStatus: this.activeToolStatus,
     });
+
+    const slashSuggestions = getSlashCommandSuggestions(this.currentPrompt);
+    if (slashSuggestions && slashSuggestions.length > 0) {
+      const menuLines = renderSlashAutocompleteMenu(slashSuggestions, 0, Math.min(width - 4, 60));
+      frame.push(...menuLines);
+    }
 
     const diffOutput = this.buffer.render(frame);
     if (diffOutput) {
