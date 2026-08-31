@@ -1,5 +1,5 @@
 import process from "node:process";
-import * as readline from "node:readline";
+import type * as readline from "node:readline";
 
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -13,12 +13,14 @@ import {
   type CliMcpGateway,
 } from "../../entrypoints/cliMcpModule.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
-import { handleShellClose, handleShellSigint } from "../../core/shell/signalHandlers.js";
+import { handleShellClose } from "../../core/shell/signalHandlers.js";
 import { altScreen } from "../../presentation/tui/altScreen.js";
 import { formatMinimalWelcomeBanner } from "../../presentation/tui/welcomeBanner.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
-import { TextEditor } from "../../presentation/tui/textEditor.js";
-import { AutocompleteController } from "../../presentation/tui/autocompleteController.js";
+import { Editor } from "../../presentation/tui/editor.js";
+import { SelectList } from "../../presentation/tui/selectList.js";
+import { InputController } from "../../presentation/tui/inputController.js";
+import { BUILTIN_SLASH_COMMANDS } from "../../presentation/tui/slashAutocomplete.js";
 import { renderBoxFrame } from "../../presentation/tui/boxComposer.js";
 import { DifferentialTerminalBuffer } from "../../presentation/tui/buffer.js";
 
@@ -47,8 +49,8 @@ export async function runInteractiveLoop(input: {
   let interactiveTurnNumber = 0;
   let interactiveTurnInFlight = false;
 
-  const editor = new TextEditor();
-  const autocomplete = new AutocompleteController();
+  const editor = new Editor();
+  const selectList = new SelectList();
   const diffBuffer = new DifferentialTerminalBuffer();
   const stdinBuffer = new StdinBuffer();
 
@@ -62,11 +64,25 @@ export async function runInteractiveLoop(input: {
   const redrawTui = (): void => {
     const width = stdout.columns || 80;
     const editorText = editor.getText();
-    autocomplete.update(editorText);
+
+    if (editorText.trim().startsWith("/")) {
+      const query = editorText.trim().toLowerCase();
+      const matches = BUILTIN_SLASH_COMMANDS.filter((c) => c.name.toLowerCase().startsWith(query)).map((c) => ({
+        value: c.name,
+        label: c.name,
+        description: c.description,
+      }));
+      selectList.setItems(matches);
+      if (matches.length > 0) {
+        inputController.setAutocompleteActive(true);
+      }
+    } else {
+      inputController.setAutocompleteActive(false);
+    }
 
     const frame = renderBoxFrame({
       width,
-      promptText: editor.renderWithCursor().join("\n"),
+      promptText: editor.getText() || " ",
       title: "Coding Agent",
       status: {
         modelName: getModelName(),
@@ -78,14 +94,14 @@ export async function runInteractiveLoop(input: {
       isExecuting: interactiveTurnInFlight,
     });
 
-    if (autocomplete.isActive()) {
-      const menuLines = autocomplete.renderMenu(Math.min(width - 4, 60));
+    if (inputController.isAutocompleteActive()) {
+      const menuLines = selectList.render(Math.min(width - 4, 60));
       frame.push(...menuLines);
     }
 
-    const state = editor.getState();
-    const cursorRow = 1 + (interactiveTurnInFlight ? 1 : 0) + state.cursorLine + 1;
-    const cursorCol = 1 + 1 + 2 + state.cursorCol + 1;
+    const offset = editor.getCursorOffset();
+    const cursorRow = 1 + (interactiveTurnInFlight ? 1 : 0) + offset.line + 1;
+    const cursorCol = 1 + 1 + 2 + offset.col + 1;
 
     const diffOutput = diffBuffer.render(frame, { row: cursorRow, col: cursorCol });
     if (diffOutput) {
@@ -104,9 +120,6 @@ export async function runInteractiveLoop(input: {
     stdout.write(welcome);
   }
 
-  redrawTui();
-
-  // Create dummy readline proxy for compatibility with existing command routers
   const dummyRl = {
     close() {
       altScreen.leave();
@@ -123,60 +136,26 @@ export async function runInteractiveLoop(input: {
     mcpGateway = createCliMcpGateway(input.runtimeContext.cwd);
   };
 
-  // 2. Handle keypress events directly from StdinBuffer
-  stdinBuffer.onKey(async (event) => {
-    if (interactiveTurnInFlight) {
-      if (event.keyId === "escape") {
-        input.sessionRuntime.cancelCurrentRun();
-      }
-      return;
-    }
-
-    // A. Intercept keys if Autocomplete popup is active
-    if (autocomplete.isActive()) {
-      const consumed = autocomplete.handleKey(event, editor);
-      if (consumed) {
-        redrawTui();
-        return;
-      }
-    }
-
-    // B. Tab Autocomplete Interception (never insert raw \t)
-    if (event.keyId === "tab") {
-      if (autocomplete.isActive()) {
-        autocomplete.handleKey(event, editor);
-      } else if (editor.getText().trim().startsWith("/")) {
-        autocomplete.update(editor.getText());
-      }
-      redrawTui();
-      return;
-    }
-
-    // C. Escape Multi-Tier Cancellation Hierarchy (app.interrupt)
-    if (event.keyId === "escape") {
-      if (autocomplete.isActive()) {
-        autocomplete.dismiss();
-      }
-      redrawTui();
-      return;
-    }
-    if (event.keyId === "enter") {
-      const submitted = editor.getText().trim();
-      if (!submitted) {
-        // Empty enter: No-op, do NOT scroll screen
-        redrawTui();
-        return;
-      }
-
-      editor.pushHistory(submitted);
-      editor.clear();
-      autocomplete.dismiss();
+  const inputController = new InputController(editor, selectList, {
+    onCancelRun: () => {
+      input.sessionRuntime.cancelCurrentRun();
+    },
+    onExit: () => {
+      handleShellClose({
+        sessionRuntime: input.sessionRuntime,
+        renderer: input.renderer,
+        runtimeContext: input.runtimeContext,
+        readline: dummyRl,
+        exit,
+      });
+    },
+    onSubmit: async (submittedText: string) => {
       interactiveTurnInFlight = true;
       redrawTui();
 
       try {
         const result = await routeInteractiveCommand({
-          prompt: submitted,
+          prompt: submittedText,
           readline: dummyRl,
           mcpGateway,
           fallbackSessionId: input.fallbackSessionId,
@@ -198,120 +177,25 @@ export async function runInteractiveLoop(input: {
         interactiveTurnInFlight = false;
         redrawTui();
       }
-      return;
-    }
-
-    if (event.keyId === "backspace") {
-      editor.backspace();
+    },
+    onRequestRedraw: () => {
       redrawTui();
-      return;
-    }
+    },
+  });
 
-    if (event.keyId === "delete") {
-      editor.delete();
-      redrawTui();
-      return;
-    }
+  redrawTui();
 
-    if (event.keyId === "left") {
-      editor.moveLeft();
-      redrawTui();
-      return;
-    }
-
-    if (event.keyId === "right") {
-      editor.moveRight();
-      redrawTui();
-      return;
-    }
-
-    if (event.keyId === "up") {
-      const moved = editor.moveUp();
-      if (!moved) {
-        editor.navigateHistory(-1);
-      }
-      redrawTui();
-      return;
-    }
-
-    if (event.keyId === "down") {
-      const moved = editor.moveDown();
-      if (!moved) {
-        editor.navigateHistory(1);
-      }
-      redrawTui();
-      return;
-    }
-
-    if (event.keyId === "ctrl+a" || event.keyId === "home") {
-      editor.moveToHome();
-      redrawTui();
-      return;
-    }
-
-    if (event.keyId === "ctrl+e" || event.keyId === "end") {
-      editor.moveToEnd();
-      redrawTui();
-      return;
-    }
-
-    if (event.keyId === "alt+left" || event.keyId === "ctrl+left") {
-      editor.moveWordLeft();
-      redrawTui();
-      return;
-    }
-
-    if (event.keyId === "alt+right" || event.keyId === "ctrl+right") {
-      editor.moveWordRight();
-      redrawTui();
-      return;
-    }
-
-    if (event.keyId === "ctrl+c") {
-      if (editor.getText().length > 0) {
-        // Clear current prompt draft
-        editor.clear();
-        autocomplete.dismiss();
-        redrawTui();
-        return;
-      }
-
-      handleShellClose({
-        sessionRuntime: input.sessionRuntime,
-        renderer: input.renderer,
-        runtimeContext: input.runtimeContext,
-        readline: dummyRl,
-        exit,
-      });
-      return;
-    }
-
-    if (event.keyId === "ctrl+d") {
-      handleShellClose({
-        sessionRuntime: input.sessionRuntime,
-        renderer: input.renderer,
-        runtimeContext: input.runtimeContext,
-        readline: dummyRl,
-        exit,
-      });
-      return;
-    }
-
-    // D. Printable Characters (strictly reject raw tab bytes)
-    if (event.raw && !event.ctrl && !event.alt && !event.meta && event.raw.length === 1 && event.raw !== "\t") {
-      editor.insertText(event.raw);
-      redrawTui();
-    }
+  // 2. Connect raw stdin feed
+  stdinBuffer.onKey((event) => {
+    inputController.handleKey(event, interactiveTurnInFlight);
   });
 
   stdinBuffer.onPaste((pasted) => {
     if (interactiveTurnInFlight) return;
-    const clean = pasted.replace(/\t/g, "  ");
-    editor.insertText(clean);
+    editor.insert(pasted);
     redrawTui();
   });
 
-  // 3. Connect raw stdin feed
   if (stdin.isTTY && typeof stdin.setRawMode === "function") {
     stdin.setRawMode(true);
   }
