@@ -1,3 +1,5 @@
+import { verifyPathContainment } from '../security/pathJail.js'
+import { replaceInContent } from './editEngine.js'
 import {
   createDefaultExecutionService,
   type ExecutionAuthority,
@@ -207,16 +209,19 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
+        const containment = verifyPathContainment(target, context.workspaceRoot)
+        if (!containment.allowed) {
+          throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+        }
         const rawContent = await executionService.readTextFile({
           operationKind: 'file.read',
-          absolutePath: target,
+          absolutePath: containment.resolvedPath,
           workspaceRoot: context.workspaceRoot,
           authority: TOOL_APPROVED_READ_AUTHORITY,
           caller: 'core-tool:read',
           reason: 'Read an approved workspace file target.',
-          reportSafeTarget: target,
+          reportSafeTarget: containment.resolvedPath,
         })
-
         const lines = rawContent.split('\n')
         const totalLines = lines.length
         const offset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 1
@@ -263,23 +268,27 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
+        const containment = verifyPathContainment(target, context.workspaceRoot)
+        if (!containment.allowed) {
+          throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+        }
         const content = typeof args.content === 'string' ? args.content : ''
         await executionService.writeTextFile({
           operationKind: 'file.write',
-          absolutePath: target,
+          absolutePath: containment.resolvedPath,
           content,
           workspaceRoot: context.workspaceRoot,
           authority: TOOL_APPROVED_WRITE_AUTHORITY,
           caller: 'core-tool:write',
           reason: 'Write an approved workspace file target.',
-          reportSafeTarget: target,
+          reportSafeTarget: containment.resolvedPath,
         })
-        return approvedResult(target)
+        return approvedResult(containment.resolvedPath)
       },
     },
     {
       name: 'edit',
-      description: 'Edit or replace the content of an existing file in the workspace.',
+      description: 'Edit or replace content in an existing file using either full content or resilient search/replace (oldText/newText).',
       argsSchema: {
         type: 'object',
         properties: {
@@ -289,10 +298,22 @@ export function createCoreToolRegistry(options?: {
           },
           content: {
             type: 'string',
-            description: 'The new replacement content for the file.',
+            description: 'The full replacement content for the file (optional if oldText/newText provided).',
+          },
+          oldText: {
+            type: 'string',
+            description: 'The exact or fuzzy block of text to replace.',
+          },
+          newText: {
+            type: 'string',
+            description: 'The new text to replace oldText with.',
+          },
+          replaceAll: {
+            type: 'boolean',
+            description: 'Whether to replace all occurrences of oldText.',
           },
         },
-        required: ['path', 'content'],
+        required: ['path'],
       },
       permissions: {
         check(args, context) {
@@ -301,18 +322,46 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, context) {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        const content = typeof args.content === 'string' ? args.content : ''
+        const containment = verifyPathContainment(target, context.workspaceRoot)
+        if (!containment.allowed) {
+          throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+        }
+
+        let finalContent = ''
+        if (typeof args.oldText === 'string' && typeof args.newText === 'string') {
+          const original = await executionService.readTextFile({
+            operationKind: 'file.read',
+            absolutePath: containment.resolvedPath,
+            workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY,
+            caller: 'core-tool:edit',
+            reason: 'Read original content for resilient replacement.',
+            reportSafeTarget: containment.resolvedPath,
+          })
+          const replaceRes = replaceInContent(original, args.oldText, args.newText, {
+            replaceAll: Boolean(args.replaceAll),
+          })
+          if (!replaceRes.success) {
+            throw new Error(replaceRes.error ?? 'Failed to apply replacement.')
+          }
+          finalContent = replaceRes.content
+        } else if (typeof args.content === 'string') {
+          finalContent = args.content
+        } else {
+          throw new Error("Must provide either 'content' or both 'oldText' and 'newText'.")
+        }
+
         await executionService.writeTextFile({
           operationKind: 'file.write',
-          absolutePath: target,
-          content,
+          absolutePath: containment.resolvedPath,
+          content: finalContent,
           workspaceRoot: context.workspaceRoot,
           authority: TOOL_APPROVED_WRITE_AUTHORITY,
           caller: 'core-tool:edit',
           reason: 'Replace an approved workspace file target.',
-          reportSafeTarget: target,
+          reportSafeTarget: containment.resolvedPath,
         })
-        return approvedResult(target)
+        return approvedResult(containment.resolvedPath)
       },
     },
     {

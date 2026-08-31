@@ -9,6 +9,10 @@ import { createCoreToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import { microcompactMessages } from "./microCompact.js";
 import {
+  extractFileFootprint,
+  formatFileFootprintXml,
+} from "./compaction/fileFootprint.js";
+import {
   EIGHT_SECTION_COMPACTION_PROMPT,
   formatCheckpointMessage,
   parseCompactedSummary,
@@ -182,10 +186,10 @@ export async function* runAutonomousReActLoop(
       const data = await res.json() as any;
       const summaryContent = data.choices?.[0]?.message?.content;
       if (!summaryContent) return false;
-
       const { rawSummary } = parseCompactedSummary(summaryContent);
-      const checkpointMsg = formatCheckpointMessage(rawSummary);
-      // Find last user message boundary to preserve conversational integrity without orphaned tools
+      const footprint = extractFileFootprint(messages);
+      const footprintXml = formatFileFootprintXml(footprint);
+      const checkpointMsg = formatCheckpointMessage(rawSummary, footprintXml);
       const systemMsg = messages[0];
       let lastUserIndex = -1;
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -385,6 +389,11 @@ export async function* runAutonomousReActLoop(
       // Model finished without tool calls
       break;
     }
+    const isTruncated = choice?.finish_reason === "length";
+    if (isTruncated) {
+      logger.warn(`Turn ${turn} response was truncated by provider token limit (finish_reason=length).`);
+    }
+
     const pendingFeedbacks: string[] = [];
     for (const toolCall of toolCalls) {
       if (!toolCall || !toolCall.function || !toolCall.function.name) {
@@ -416,7 +425,10 @@ export async function* runAutonomousReActLoop(
       const tool = toolRegistry.get(funcName);
       let outputContent = "";
       let isSuccess = false;
-      if (parseError) {
+      if (isTruncated) {
+        outputContent = `Error: Tool invocation aborted because model response was cut off by token limit (finish_reason=length).`;
+        isSuccess = false;
+      } else if (parseError) {
         outputContent = `Error: Malformed JSON arguments for tool '${funcName}': ${parseError}. Raw: ${toolCall.function.arguments}`;
         isSuccess = false;
       } else if (doomCheck.isDoomLoop) {

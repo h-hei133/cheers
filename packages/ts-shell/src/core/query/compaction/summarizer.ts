@@ -63,10 +63,16 @@ export function parseCompactedSummary(text: string): {
 /**
  * Formats a summarized checkpoint into a clean replacement context block
  */
-export function formatCheckpointMessage(summary: string): string {
-  return [
+export function formatCheckpointMessage(summary: string, footprintXml?: string): string {
+  const parts = [
     "This is an established context checkpoint condensing earlier turns in this session to free up context space. Treat the background below as established ground truth and continue the task directly from the subsequent instructions.",
     "",
     `<compacted-summary>\n${summary}\n</compacted-summary>`,
-  ].join("\n");
+  ];
+
+  if (footprintXml && footprintXml.trim()) {
+    parts.push("", footprintXml.trim());
+  }
+
+  return parts.join("\n");
 }

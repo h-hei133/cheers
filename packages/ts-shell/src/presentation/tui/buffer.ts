@@ -16,7 +16,10 @@ export class DifferentialTerminalBuffer {
     }
 
     this.prevScreen = [...nextScreen];
-    return commands.join("");
+    if (commands.length === 0) return "";
+
+    // Wrap frame in ANSI Mode 2026 synchronized output sequence to guarantee tear-free atomic render
+    return `\x1b[?2026h${commands.join("")}\x1b[?2026l`;
   }
 
   clear(): string {
