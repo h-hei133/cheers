@@ -5,9 +5,9 @@ import { formatStatusLine, type StatusLineState } from "./statusLine.js";
  * Full Box Composer Layout Renderer
  *
  * Implements:
- * 1. Top border with title / chip (`╭─── [title] ───╮`)
- * 2. Box enclosed prompt row (`│ ❯ prompt text  │`)
- * 3. Bottom border embedded with real status line (`╰─── [model │ cwd │ branch │ 12k/64k (18%)] ───╯`)
+ * 1. Top border with title (`╭─── [title] ───╮`)
+ * 2. Enclosed prompt row (`│ ❯ prompt text  │`)
+ * 3. Bottom border embedded with multi-segment status line (`╰─── [model │ cwd │ branch │ 12k/64k (18%)] ───╯`)
  * 4. Micro hint bar below box (` /help for commands │ Ctrl+C cancel `)
  */
 
@@ -69,7 +69,7 @@ export function renderBoxBottom(width: number, status?: StatusLineState): string
     return `\x1b[90m${bottomLeft}${"─".repeat(safeWidth - 4)}${bottomRight}\x1b[0m`;
   }
 
-  const statusText = ` ${formatStatusLine(status)} `;
+  const statusText = ` ${formatStatusLine(status, safeWidth - 8)} `;
   const rawStatusWidth = visibleWidth(statusText);
   const fillWidth = Math.max(0, safeWidth - 4 - rawStatusWidth);
 
