@@ -69,6 +69,21 @@ export interface RuntimeConfig {
   readonly providerCredentials: Readonly<
     Partial<Record<RuntimeProvider, ProviderCredentialConfig>>
   >;
+  readonly temperature?: number;
+  readonly topP?: number;
+  readonly maxOutputTokens?: number;
+  readonly thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  readonly thinkingBudgets?: Readonly<Record<string, number>>;
+  readonly contextWindow?: number;
+  readonly autoCompactPercent?: number;
+  readonly reserveTokens?: number;
+  readonly agentMode?: "plan" | "build";
+  readonly permissionMode?: "default" | "plan" | "auto" | "acceptEdits" | "bypassPermissions";
+  readonly subagentIsolation?: "worktree" | "none";
+  readonly promptCacheTtl?: "5m" | "1h";
+  readonly subagentPromptCacheTtl?: "5m" | "1h";
+  readonly theme?: "dark" | "light" | "auto";
+  readonly tuiMode?: "regular" | "fullscreen" | "stream";
   readonly configSources: string[];
 }
 
@@ -84,6 +99,21 @@ export interface RuntimeConfigFile {
   providerCredentials?: Partial<
     Record<RuntimeProvider, ProviderCredentialConfig>
   >;
+  temperature?: number;
+  topP?: number;
+  maxOutputTokens?: number;
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  thinkingBudgets?: Record<string, number>;
+  contextWindow?: number;
+  autoCompactPercent?: number;
+  reserveTokens?: number;
+  agentMode?: "plan" | "build";
+  permissionMode?: "default" | "plan" | "auto" | "acceptEdits" | "bypassPermissions";
+  subagentIsolation?: "worktree" | "none";
+  promptCacheTtl?: "5m" | "1h";
+  subagentPromptCacheTtl?: "5m" | "1h";
+  theme?: "dark" | "light" | "auto";
+  tuiMode?: "regular" | "fullscreen" | "stream";
 }
 
 const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
@@ -96,6 +126,26 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   activeProviderConnectionId: undefined,
   providerConnections: [],
   providerCredentials: {},
+  temperature: 0.7,
+  topP: 1.0,
+  maxOutputTokens: 4096,
+  thinkingLevel: "medium",
+  thinkingBudgets: {
+    minimal: 1024,
+    low: 4096,
+    medium: 10240,
+    high: 32768,
+  },
+  contextWindow: 64_000,
+  autoCompactPercent: 80,
+  reserveTokens: 8_000,
+  agentMode: "build",
+  permissionMode: "default",
+  subagentIsolation: "worktree",
+  promptCacheTtl: "5m",
+  subagentPromptCacheTtl: "5m",
+  theme: "dark",
+  tuiMode: "regular",
 };
 
 export function getRuntimeConfig(

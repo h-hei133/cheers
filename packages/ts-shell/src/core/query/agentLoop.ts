@@ -31,6 +31,9 @@ export interface ReActAgentLoopOptions {
   readonly contextWindow?: number;
   readonly autoCompactPercent?: number;
   readonly reserveTokens?: number;
+  readonly temperature?: number;
+  readonly topP?: number;
+  readonly maxOutputTokens?: number;
   readonly hookDispatcher?: HookDispatcher;
   readonly abortSignal?: AbortSignal;
 }
@@ -234,13 +237,16 @@ export async function* runAutonomousReActLoop(
 
     // On the final turn before maxTurns, set tool_choice to "none" while retaining tool definitions for schema validation
     const isLastTurn = turn === maxTurns;
-    const activeTemperature = isFastModeEnabled() ? 0.2 : 0.7;
+    const baseTemperature = options.temperature ?? 0.7;
+    const activeTemperature = isFastModeEnabled() ? 0.2 : baseTemperature;
     const payload = {
       model: modelName,
       messages: preparedMessages,
       tools: openAiTools,
       tool_choice: isLastTurn ? "none" : "auto",
       temperature: activeTemperature,
+      ...(options.topP != null ? { top_p: options.topP } : {}),
+      ...(options.maxOutputTokens != null ? { max_tokens: options.maxOutputTokens } : {}),
     };
     let responseJson: any;
     let isOverflowError = false;
