@@ -30,8 +30,8 @@ export type ThemeBgToken =
   | "toolPendingBg"
   | "toolSuccessBg"
   | "toolErrorBg"
-  | "selectedBg";
-
+  | "selectedBg"
+  | "userMessageBg";
 const DEFAULT_FG_MAP: Record<ThemeColorToken, string> = {
   accent: "\x1b[36m", // Cyan
   border: "\x1b[90m", // Gray
@@ -57,8 +57,8 @@ const DEFAULT_BG_MAP: Record<ThemeBgToken, string> = {
   toolSuccessBg: "\x1b[42m",
   toolErrorBg: "\x1b[41m",
   selectedBg: "\x1b[44m",
+  userMessageBg: "\x1b[48;5;236m", // Dark slate background for user prompts
 };
-
 export class Theme {
   private readonly fgMap: Map<ThemeColorToken, string>;
   private readonly bgMap: Map<ThemeBgToken, string>;

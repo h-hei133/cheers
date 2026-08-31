@@ -1,5 +1,6 @@
 import { renderDiff } from "./components/diff.js";
-
+import { defaultTheme } from "../theme/theme.js";
+import { visibleWidth } from "./utils.js";
 export type TranscriptItemType = "user" | "command" | "assistant" | "tool";
 
 export interface TranscriptItem {
@@ -69,12 +70,20 @@ export class TranscriptContainer {
     this.items.length = 0;
   }
 
-  render(maxLines?: number): string[] {
+  render(width: number = 80, maxLines?: number): string[] {
     const lines: string[] = [];
+    const safeWidth = Math.max(30, width);
 
     for (const item of this.items) {
       if (item.type === "user") {
-        lines.push(`\x1b[36m❯\x1b[0m \x1b[1m\x1b[37m${item.content}\x1b[0m`);
+        const prefix = `  \x1b[36m❯\x1b[0m \x1b[1m\x1b[37m${item.content}\x1b[0m`;
+        const contentLen = visibleWidth(`  ❯ ${item.content}`);
+        const pad = Math.max(0, safeWidth - contentLen);
+        const paddedLine = `\x1b[48;5;236m${prefix}${" ".repeat(pad)}\x1b[0m`;
+
+        lines.push(`\x1b[48;5;236m${" ".repeat(safeWidth)}\x1b[0m`);
+        lines.push(paddedLine);
+        lines.push(`\x1b[48;5;236m${" ".repeat(safeWidth)}\x1b[0m`);
         lines.push("");
       } else if (item.type === "command") {
         const title = item.title ? ` \x1b[90m[${item.title}]\x1b[0m` : "";

@@ -17,8 +17,8 @@ describe("TranscriptContainer", () => {
     expect(items[0].content).toBe("How do I build the project?");
 
     const lines = container.render();
-    expect(lines[0]).toContain("How do I build the project?");
-    expect(lines[0]).toContain("❯");
+    expect(lines.some((l) => l.includes("How do I build the project?"))).toBe(true);
+    expect(lines.some((l) => l.includes("❯"))).toBe(true);
   });
 
   it("appends slash command outputs without losing history", () => {
