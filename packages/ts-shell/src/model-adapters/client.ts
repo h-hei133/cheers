@@ -1,6 +1,7 @@
 import { createModelProviderAdapter } from './registry.js'
 import { createComponentLogger, recordCount, recordTiming } from '../observability/index.js'
 import {
+  abortableSleep,
   calculateBackoffMs,
   createRetryState,
   DEFAULT_RETRY_POLICY,
@@ -143,7 +144,7 @@ export function createModelClient(config: ModelClientConfig): ModelClient {
           attempt: state.attemptCount,
           backoffMs,
         })
-        await sleepImpl(backoffMs)
+        await (config.sleepImpl ? sleepImpl(backoffMs) : abortableSleep(backoffMs, signal))
       }
     }
   }

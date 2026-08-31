@@ -484,15 +484,26 @@ function getRetryAfterMs(error: unknown): number | undefined {
     'get' in headers &&
     typeof (headers as { get?: unknown }).get === 'function'
   ) {
-    const retryAfter = (headers as { get(name: string): string | null }).get('retry-after')
-    if (!retryAfter) {
-      return undefined
+    const getter = headers as { get(name: string): string | null }
+    const retryAfterMs = getter.get('retry-after-ms')
+    if (retryAfterMs) {
+      const ms = Number.parseFloat(retryAfterMs)
+      if (!Number.isNaN(ms)) {
+        return ms
+      }
     }
-    const seconds = Number.parseInt(retryAfter, 10)
-    if (Number.isNaN(seconds)) {
-      return undefined
+
+    const retryAfter = getter.get('retry-after')
+    if (retryAfter) {
+      const seconds = Number.parseFloat(retryAfter)
+      if (!Number.isNaN(seconds)) {
+        return seconds * 1000
+      }
+      const parsedDate = Date.parse(retryAfter)
+      if (!Number.isNaN(parsedDate)) {
+        return Math.max(0, parsedDate - Date.now())
+      }
     }
-    return seconds * 1000
   }
 
   return undefined

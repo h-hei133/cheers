@@ -194,11 +194,35 @@ export class AnthropicModelAdapter implements ModelProviderAdapter {
 
   normalizeError(error: unknown): NormalizedProviderError {
     const message = error instanceof Error ? error.message : String(error)
+    let statusCode: number | undefined
+    let kind: NormalizedProviderError['kind'] = 'network'
+    let retriable = true
+
+    const statusMatch = message.match(/HTTP (\d{3})/i)
+    if (statusMatch) {
+      statusCode = parseInt(statusMatch[1], 10)
+      if (statusCode === 429) {
+        kind = 'rate_limit'
+        retriable = true
+      } else if (statusCode === 401 || statusCode === 403) {
+        kind = 'authentication'
+        retriable = false
+      } else if (statusCode >= 400 && statusCode < 500) {
+        kind = 'invalid_request'
+        retriable = false
+      } else if (statusCode >= 500) {
+        kind = 'server'
+        retriable = true
+      }
+    }
+
     return {
       provider: 'anthropic',
-      kind: 'network',
+      kind,
       message,
-      retriable: true,
+      statusCode,
+      retriable,
+      cause: error,
     }
   }
 }

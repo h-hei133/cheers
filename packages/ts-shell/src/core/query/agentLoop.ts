@@ -1,3 +1,4 @@
+import { parseJsonWithRepair } from "../../model-adapters/jsonRepair.js";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
 
 const logger = createComponentLogger("AgentLoop");
@@ -403,7 +404,7 @@ export async function* runAutonomousReActLoop(
       let funcArgs: Record<string, unknown> = {};
       let parseError: string | null = null;
       try {
-        funcArgs = JSON.parse(toolCall.function.arguments || "{}");
+        funcArgs = parseJsonWithRepair<Record<string, unknown>>(toolCall.function.arguments || "{}");
       } catch (err) {
         parseError = `Invalid JSON arguments: ${err instanceof Error ? err.message : String(err)}`;
       }
