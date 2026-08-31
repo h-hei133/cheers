@@ -22,7 +22,8 @@ import {
   buildInteractivePromptChrome,
   refreshInteractivePromptChrome,
 } from "./promptChrome.js";
-
+import { altScreen } from "../../presentation/tui/altScreen.js";
+import { renderClaudeTuiTopRule } from "../../presentation/tui/claudeLayout.js";
 export async function runInteractiveLoop(input: {
   readonly stdin?: NodeJS.ReadStream;
   readonly stdout?: NodeJS.WriteStream;
@@ -49,14 +50,20 @@ export async function runInteractiveLoop(input: {
   let interactiveTurnNumber = 0;
   let interactiveTurnInFlight = false;
 
+  // Enter Alt-Screen buffer with clean transcript replay capability
+  if (process.stdout.isTTY) {
+    altScreen.enter({ exitMode: "replay" });
+    const topBanner = renderClaudeTuiTopRule(process.stdout.columns || 80, {
+      modelName: "claude-3.5-sonnet",
+      statusText: "Claude Mode",
+    });
+    process.stdout.write(`${topBanner}\n`);
+  }
+
   const rl = readline.createInterface({
     input: stdin,
     output: stdout,
-    prompt: buildInteractivePromptChrome({
-      projectRoot: input.runtimeContext.projectRoot,
-      sessionId: input.runtimeContext.session.id,
-      agentMode: input.sessionRuntime.getAgentMode(),
-    }),
+    prompt: "\x1b[36m❯\x1b[0m ",
   });
   input.setReadline(rl);
 
