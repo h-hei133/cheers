@@ -9,7 +9,7 @@ export interface ProjectedSessionNode {
   readonly id: string;
   readonly parentId?: string;
   readonly kind: "session-root" | "turn-message";
-  readonly role?: "user" | "assistant";
+  readonly role?: "system" | "user" | "assistant" | "tool";
   readonly order: number;
   readonly timestamp?: string;
   readonly sourceSessionIdentity: string;

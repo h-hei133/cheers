@@ -31,9 +31,45 @@ export function appendTranscriptEvent(
 export function projectTranscriptMessages(
   events: readonly TranscriptEvent[],
 ): SessionMessage[] {
-  return events
-    .map((event) => transcriptEventToSessionMessage(event) ?? null)
-    .filter((event): event is SessionMessage => event !== null);
+  let messages: SessionMessage[] = [];
+
+  for (const event of events) {
+    if (event.type === "compaction") {
+      // Re-anchor context at the compaction checkpoint (Benchmarked against Pi buildSessionContext)
+      messages = [
+        {
+          role: "user",
+          content: `[Context Checkpoint]\n${event.summary}`,
+          timestamp: event.timestamp,
+        },
+      ];
+    } else if (event.type === "message") {
+      const msg = transcriptEventToSessionMessage(event);
+      if (msg) {
+        messages.push(msg);
+      }
+    }
+  }
+
+  return messages;
+}
+
+export function appendCompactionEvent(
+  transcriptPath: string,
+  input: {
+    readonly summary: string;
+    readonly firstKeptEntryId?: string;
+    readonly tokensBefore?: number;
+    readonly timestamp: string;
+  },
+): void {
+  appendTranscriptEvent(transcriptPath, {
+    type: "compaction",
+    summary: input.summary,
+    firstKeptEntryId: input.firstKeptEntryId,
+    tokensBefore: input.tokensBefore,
+    timestamp: input.timestamp,
+  });
 }
 
 export function appendSessionTurn(input: {

@@ -1,6 +1,5 @@
 import type { QueryEvent } from "../core/query/runtime/events.js";
-import type { SessionMessage } from "./schema/sessionMessage.js";
-
+import type { SessionMessage, SessionToolCall } from "./schema/sessionMessage.js";
 export type TranscriptLifecycleEventName =
   | "run-started"
   | "run-interrupted"
@@ -8,11 +7,21 @@ export type TranscriptLifecycleEventName =
   | "run-error"
   | "run-terminated";
 
+export interface CompactionTranscriptEntry {
+  type: "compaction";
+  summary: string;
+  firstKeptEntryId?: string;
+  tokensBefore?: number;
+  timestamp: string;
+}
+
 export type TranscriptEvent =
   | {
       type: "message";
       role: SessionMessage["role"];
       content: string;
+      tool_calls?: readonly SessionToolCall[];
+      tool_call_id?: string;
       timestamp: string;
     }
   | {
@@ -21,7 +30,8 @@ export type TranscriptEvent =
       timestamp: string;
       detail?: string;
     }
-  | { type: "query-event"; event: QueryEvent; timestamp: string };
+  | { type: "query-event"; event: QueryEvent; timestamp: string }
+  | CompactionTranscriptEntry;
 
 export function createMessageTranscriptEvent(
   message: SessionMessage & { timestamp: string },
@@ -30,6 +40,8 @@ export function createMessageTranscriptEvent(
     type: "message",
     role: message.role,
     content: message.content,
+    ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
+    ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
     timestamp: message.timestamp,
   };
 }
@@ -75,6 +87,8 @@ export function transcriptEventToSessionMessage(
   return {
     role: event.role,
     content: event.content,
+    tool_calls: event.tool_calls,
+    tool_call_id: event.tool_call_id,
     timestamp: event.timestamp,
   };
 }

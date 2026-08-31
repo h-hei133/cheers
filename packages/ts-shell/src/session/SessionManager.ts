@@ -73,8 +73,10 @@ import { buildSessionContinuitySnapshot } from "./continuation/sessionContinuity
 import { extractSeedInfluenceFromQueryResult } from "./continuation/sessionSeedInfluence.js";
 import { rebindSessionProjectRootContinuity } from "./continuation/sessionProjectRootRebind.js";
 import {
+  appendCompactionEvent,
   appendSessionTurn,
   appendTranscriptEvent,
+  projectTranscriptMessages,
   readTranscriptEvents,
 } from "./transcript/sessionTranscript.js";
 import {
@@ -416,8 +418,25 @@ export class SessionManager {
   getTranscriptEvents(sessionId: string): TranscriptEvent[] {
     return handleGetTranscriptEvents(this.store, sessionId);
   }
+  appendCompactionEntry(
+    sessionId: string,
+    input: {
+      readonly summary: string;
+      readonly firstKeptEntryId?: string;
+      readonly tokensBefore?: number;
+    },
+  ): void {
+    const transcriptPath = this.store.transcriptPath(sessionId);
+    appendCompactionEvent(transcriptPath, {
+      ...input,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
-
+  loadSessionMessages(sessionId: string): SessionMessage[] {
+    const events = this.getTranscriptEvents(sessionId);
+    return projectTranscriptMessages(events);
+  }
   getRecoverySnapshot(sessionId: string): RecoverySnapshot {
     return buildRecoverySnapshotForSession({
       sessionId,

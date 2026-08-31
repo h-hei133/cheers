@@ -6,7 +6,7 @@ export interface SessionThreadEntry {
   readonly id: string;
   readonly parentId?: string;
   readonly kind: SessionThreadEntryKind;
-  readonly role?: "user" | "assistant";
+  readonly role?: "system" | "user" | "assistant" | "tool";
   readonly order: number;
   readonly timestamp?: string;
 }
@@ -103,7 +103,7 @@ export function buildLinearSessionThreadSnapshot(
 export function appendSessionThreadChild(input: {
   readonly snapshot: SessionThreadSnapshot | undefined;
   readonly session: Session;
-  readonly messageRole: "user" | "assistant";
+  readonly messageRole: "system" | "user" | "assistant" | "tool";
   readonly timestamp: string;
   readonly entryId?: string;
   readonly parentEntryId?: string;
