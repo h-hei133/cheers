@@ -1,29 +1,35 @@
-# Problem & Solutions Ledger
+# Problem & Solutions Ledger (SOTA TUI Root Cause Audit)
 
-## 问题 1：启动 CLI 进入交互模式前，原终端泄漏冗余启动文本
-- **现状与现象**：在进入 Alt-Screen 全屏页面前，终端控制台输出了类似 `Private Coding Agents Shell - Project: coding-agents - Project root: /home/wang/projects/coding-agents` 的多行冗长日志，破坏了启动时的干净视觉。
-- **用户期望**：进入 CLI 之后保持极简干净，不需要打印大量启动元数据；进入终端画布后只需要简要提示当前工作目录（CWD）和当前模型（Model）即可。
-- **OMP 对标与解决方案**：
-  1. 屏蔽/静默 `entrypoints/cliRuntimeInvocation.ts` 及 CLI 顶层打印的冗余 ASCII banner 和 debug 信息。
-  2. 在全屏 Alt-Screen 顶部或 Welcome 区域渲染一个极简、紧凑的 Welcome Header（仅展示当前项目目录和当前已连接模型）。
-
----
-
-## 问题 2：终端头部状态固定硬编码 `[Claude Mode │ claude-3.5-sonnet]`，缺少完整包围框及底部状态栏
-- **现状与现象**：
-  - 顶部分割线芯片写死了 `claude-3.5-sonnet` 和 `Claude Mode`。
-  - 只有一条孤立的顶部横线，未形成完整的全封闭圆角边框（Box Composer）或真正的上下双向规范框。
-  - 缺乏底部完整的状态信息组（当前模型名称、当前目录、当前 Git 分支、Context 窗口使用率与百分比）。
-- **OMP 对标与解决方案**：
-  1. 对标 OMP 的 `box.ts` / `composer` 机制：实现圆角双线外框（`╭─ ... ╮` / `╰─ ... ╯`），将输入提示符 `❯ ` 完整包裹在框内。
-  2. 动态读取当前 Session 的实际配置：模型名称（如从 `runtimeConfig.providerCredentials` 或 active model 读取）、当前工作目录、真实 Git 分支（`gitBranch`）、动态计算的上下文 Token 占用（`kUsed/kTotal (percent%)`）。
-  3. 彻底移除 `Claude Mode` 等固定写死的外部特化标签，将真实状态条（`statusLine.ts`）嵌入到底部横线或底部状态槽中。
+## 1. 启动文本泄漏问题 (Startup Surface Banner Leak)
+- **Root Cause**: `packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts` (line 86) 在进入交互循环前无条件调用了 `projectAndRenderCliStartupSurface()`。在 `cliStartupSurface.ts` 中，交互模式下的 `showStartupSurface` 默认被判定为 `true`，导致 `startupSurfaceRenderer.ts` 直接向 `stdout` 输出多行 `Private Coding Agents Shell - Project: ...` 静态文本，污染了父终端。
+- **Solution**:
+  1. 在交互式终端启动时，将 `showStartupSurface` 设置为 `false`（或在交互模式下静默该输出），确保切入全屏前父终端 0 污染。
+  2. 仅在 Alt-Screen 画布内部渲染微型 Welcome Banner（仅显示工作目录与当前激活模型）。
 
 ---
 
-## 问题 3：缺少 Slash 命令的实时交互式提示与自动补全浮窗
-- **现状与现象**：在输入框中输入 `/` 符号时，终端没有任何反应，必须手动盲打全部命令，缺少现代 Coding Agent 标配的命令联想提示浮窗。
-- **OMP 对标与解决方案**：
-  1. 对标 OMP 的 `autocomplete.ts`：实现 Slash 命令实时匹配器（`findLeadingSlashCommandStart`）。
-  2. 当输入文本以 `/` 开头时，自动过滤内置 Slash 命令列表（如 `/help`, `/model`, `/compact`, `/cost`, `/context`, `/undo`, `/clear`, `/exit` 等），并计算匹配项。
-  3. 通过 2D 视口合成器（`compositor.ts`）在输入框上方/下方弹出悬浮的 Command Picker 菜单，支持上下箭头选择并按 Tab/Enter 自动补全。
+## 2. 缺失全包围 Box Composer、状态条与 Slash 补全浮窗的根本原因
+- **Root Cause**: `packages/ts-shell/src/cli/interactive/interactiveLoop.ts` 内部仍然在使用 Node.js 标准的 `readline.createInterface()`，以行缓冲（Line-buffered Cooked Mode）监听 `rl.on("line")` 事件。
+  - 由于 `readline` 接管了 `stdin` 并且只在用户按回车后才触发事件，导致我们在前期编写的 `StdinBuffer`、`TextEditor`、`AutocompleteController` 与 `InteractiveTuiSession` 完全被绕过。
+  - 用户在敲击单个字符（如 `/`、退格、左右光标）时，系统根本无法捕获按键并实时驱动 2D 图层重绘。
+- **Solution**:
+  1. 彻底废除 `interactiveLoop.ts` 中的 Node.js `readline` 依赖，重构为由 **`StdinBuffer` + `TextEditor` + `AutocompleteController` + `InteractiveTuiSession`** 驱动的纯原生 Raw Mode 事件循环。
+  2. 每次按键（`onKey`）时：
+     - 若 Slash 补全菜单处于激活状态，`AutocompleteController.handleKey` 优先捕获 `Up`/`Down`（切换选项）、`Tab`/`Enter`（补全上屏）、`Escape`（关闭浮窗）。
+     - 否则交给 `TextEditor` 处理字符插入、退格、光标左右移动（Left/Right/Home/End）与历史翻阅。
+     - 触发 `InteractiveTuiSession.render()`，原子绘制完整的圆角包围框（`╭─ ... ╮` / `│ ❯ 输入 │` / `╰─ ... ╯`），下边框实时注入包含当前模型名、当前工作区、当前 Git 分支与 Context 占用百分比的动态状态条。
+
+---
+
+## 3. 退出后缺少 Session Resume 提示的问题
+- **Root Cause**: `packages/ts-shell/src/core/shell/signalHandlers.ts` 中的 `handleShellClose()` 仅向终端打印了 `\nExiting...\n`，并未输出恢复命令。
+- **Solution**:
+  - 在用户按 `Ctrl+D`、输入 `/exit` 或发送 `SIGINT` 退出时，在 `altScreen.leave()` 恢复父终端后，格式化输出：
+    `\nSession saved. Resume with: npx private-coding-agents --resume <sessionId>\n`
+
+---
+
+## 4. 回车空行无响应且持续下滚刷屏的问题
+- **Root Cause**: 在 `readline` 模式下，按 Enter 键终端驱动会自动回显 `\r\n` 换行。
+- **Solution**:
+  - 在纯 Raw 模式的 `TextEditor` 中，当用户在输入框为空时按下 Enter，直接作为 **No-op（空操作）** 拦截，仅就地重新渲染干净的空输入框，绝对不发出换行或导致视口发生偏移下滚。
