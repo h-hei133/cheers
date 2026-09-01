@@ -44,15 +44,28 @@ export interface SessionRuntimeDependencies {
   readonly projectMemoryStore?: ProjectMemoryStore;
 }
 
+export type QueryEventObserver = (event: QueryEvent) => void;
+
 export class ShellSessionRuntime {
   private readonly deps: SessionRuntimeDependencies;
   private readonly stateMachine = new ShellStateMachine();
+  private readonly eventObservers = new Set<QueryEventObserver>();
   private currentRunController: AbortController | null = null;
   private viewMode: "compact" | "verbose" = "compact";
   private agentMode: "plan" | "build" = "build";
 
   constructor(deps: SessionRuntimeDependencies) {
     this.deps = deps;
+  }
+
+  /**
+   * Observe the raw query event stream. A structured observer replaces the prose
+   * event surface for interactive runs: both channels describe the same events,
+   * so rendering both would duplicate every tool call and every token.
+   */
+  observeEvents(observer: QueryEventObserver): () => void {
+    this.eventObservers.add(observer);
+    return () => this.eventObservers.delete(observer);
   }
 
   getState() {
@@ -96,6 +109,7 @@ export class ShellSessionRuntime {
     const printMode = options?.outputMode === "print";
     let enteredQueryPhase = false;
     const eventDigest: RuntimeEventDigest = createRuntimeEventDigest();
+    const structuredOutput = !printMode && this.eventObservers.size > 0;
 
     try {
       const continuityBuilder = (
@@ -180,15 +194,18 @@ export class ShellSessionRuntime {
         }
         this.deps.sessionManager.appendQueryEvent(sessionId, event);
         updateRuntimeEventDigest(eventDigest, event);
-        const renderResult = renderSessionQueryEventSurface({
-          renderer: this.deps.renderer,
-          event,
-          digest: eventDigest,
-          printMode,
-          viewMode: this.viewMode,
-          startedRendering,
-        });
-        startedRendering = renderResult.startedRendering;
+        for (const observer of this.eventObservers) observer(event);
+        if (!structuredOutput) {
+          const renderResult = renderSessionQueryEventSurface({
+            renderer: this.deps.renderer,
+            event,
+            digest: eventDigest,
+            printMode,
+            viewMode: this.viewMode,
+            startedRendering,
+          });
+          startedRendering = renderResult.startedRendering;
+        }
         applyTerminalQueryEvent(terminalState, event);
         switch (event.type) {
           case "query.completed":
@@ -202,15 +219,17 @@ export class ShellSessionRuntime {
         }
       }
 
-      renderSessionTerminalSurface({
-        renderer: this.deps.renderer,
-        terminalState,
-        eventDigest,
-        printMode,
-        viewMode: this.viewMode,
-        startedRendering,
-        continuityState,
-      });
+      if (!structuredOutput) {
+        renderSessionTerminalSurface({
+          renderer: this.deps.renderer,
+          terminalState,
+          eventDigest,
+          printMode,
+          viewMode: this.viewMode,
+          startedRendering,
+          continuityState,
+        });
+      }
 
       const assistantTurn = projectAssistantTurnPersistence(terminalState);
       if (assistantTurn) {

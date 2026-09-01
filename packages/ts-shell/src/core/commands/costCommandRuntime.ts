@@ -1,5 +1,5 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import { getSessionUsage } from "../../observability/usageTelemetry.js";
+import { estimateUsageCost, getSessionUsage, USAGE_RATES } from "../../observability/usageTelemetry.js";
 
 /**
  * /cost (aliases: /tokens, /stats)
@@ -12,9 +12,9 @@ export async function runCostCommand(
   const sessionId = context.sessionId || "current-session";
   const telemetry = getSessionUsage(sessionId);
 
-  const promptCost = (telemetry.promptTokens / 1_000_000) * 0.14;
-  const completionCost = (telemetry.completionTokens / 1_000_000) * 0.28;
-  const totalCost = promptCost + completionCost;
+  const promptCost = (telemetry.promptTokens / 1_000_000) * USAGE_RATES.promptPerMTok;
+  const completionCost = (telemetry.completionTokens / 1_000_000) * USAGE_RATES.completionPerMTok;
+  const totalCost = estimateUsageCost(telemetry);
 
   const lines: string[] = [
     "# 💰 Session Live Token Usage & Cost Accounting (/cost)",
@@ -27,8 +27,8 @@ export async function runCostCommand(
     "## Live Token & Cost Breakdown:",
     "| Category | Actual Tokens | Unit Rate ($ / MTok) | Actual Cost ($) |",
     "| :--- | :--- | :--- | :--- |",
-    `| **Prompt (Input)** | ${telemetry.promptTokens.toLocaleString()} | $0.14 / MTok | $${promptCost.toFixed(5)} |`,
-    `| **Completion (Output)** | ${telemetry.completionTokens.toLocaleString()} | $0.28 / MTok | $${completionCost.toFixed(5)} |`,
+    `| **Prompt (Input)** | ${telemetry.promptTokens.toLocaleString()} | $${USAGE_RATES.promptPerMTok} / MTok | $${promptCost.toFixed(5)} |`,
+    `| **Completion (Output)** | ${telemetry.completionTokens.toLocaleString()} | $${USAGE_RATES.completionPerMTok} / MTok | $${completionCost.toFixed(5)} |`,
     `| **Total Incurred** | **${telemetry.totalTokens.toLocaleString()}** | — | **$${totalCost.toFixed(5)}** |`,
     "",
     "> *Note: Real-time token telemetry recorded directly from provider completions API. Unit rates based on DeepSeek / OpenAI compatible standard tier.*",

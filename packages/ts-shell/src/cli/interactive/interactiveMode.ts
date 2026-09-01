@@ -1,24 +1,47 @@
 import type { Interface as ReadlineInterface } from "node:readline";
-import { TUI, type TerminalFramePlan, type TerminalFrameProvider, type ViewportSize } from "../../presentation/tui/tui.js";
-import { Editor } from "../../presentation/tui/editor.js";
-import { SelectList } from "../../presentation/tui/selectList.js";
-import { InputController } from "../../presentation/tui/inputController.js";
-import { altScreen } from "../../presentation/tui/altScreen.js";
-import { TranscriptContainer } from "../../presentation/tui/transcriptContainer.js";
-import { formatStatusLine, type StatusLineState } from "../../presentation/tui/statusLine.js";
-import { formatMinimalWelcomeBanner } from "../../presentation/tui/welcomeBanner.js";
-import { getComposerStyle } from "../../presentation/tui/composer/registry.js";
-import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
-import { BUILTIN_SLASH_COMMANDS } from "../../presentation/tui/slashAutocomplete.js";
-import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
-import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
-import type { SessionManager } from "../../session/SessionManager.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
-import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
-import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
-import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
+import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
+import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import { handleShellClose } from "../../core/shell/signalHandlers.js";
+import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
+import type { StructuredLogger } from "../../observability/structuredLogger.js";
+import { renderWelcome, type WelcomeState } from "../../presentation/tui/chrome/welcome.js";
+import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
+import { TUI } from "../../presentation/tui/render/engine.js";
+import { processTerminal, type TerminalDevice } from "../../presentation/tui/terminal.js";
+import { textBlock } from "../../presentation/tui/transcript/blocks.js";
+import type { RenderScheduler, ResizeScrollbackMode } from "../../presentation/tui/render/frame.js";
+import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { SessionManager } from "../../session/SessionManager.js";
+import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
+import { InteractiveSurface } from "./frameSurface.js";
+import { routeKey } from "./keymap.js";
+import { QuestionBridge } from "./questionBridge.js";
+import { readBandState } from "./sessionFacts.js";
+import { slashSuggestions } from "./slashSuggestions.js";
+import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
+import { TurnSink } from "./turnSink.js";
+
+/**
+ * Interactive session host.
+ *
+ * Owns the terminal for the lifetime of the session and mediates between three
+ * parties that would otherwise collide: raw stdin, the differential renderer,
+ * and runtime code that expects to write prose and ask readline questions. It
+ * runs on the terminal's normal screen so the transcript retires into real
+ * scrollback, which the alternate buffer would make impossible.
+ */
+
+const DEFAULT_PLACEHOLDER = "Ask anything, or / for commands";
+
+/**
+ * Resize policy for retired scrollback. Rebuilding republishes the ledger at the
+ * new width, which is what a reader wants; `preserve` is for terminals where
+ * clearing scrollback is worse than a stale rewrap of already-retired rows.
+ */
+function resizeScrollbackMode(env: NodeJS.ProcessEnv): ResizeScrollbackMode {
+  return env.TSSHELL_TUI_RESIZE_SCROLLBACK === "preserve" ? "preserve" : "rebuild";
+}
 
 export interface InteractiveModeOptions {
   readonly runtimeContext: ShellRuntimeContext;
@@ -29,217 +52,203 @@ export interface InteractiveModeOptions {
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly fallbackSessionId?: string;
   readonly initialMcpGateway: CliMcpGateway;
-  readonly setReadline?: (readline: unknown) => void;
-  readonly setActiveNonInteractiveApprovalMode?: (mode: unknown) => void;
+  readonly setReadline?: (readline: ReadlineInterface | null) => void;
+  readonly setActiveNonInteractiveApprovalMode?: (mode: ApprovalModeObject | undefined) => void;
   readonly exit?: (code?: number) => never;
+  /** Output device; defaults to the process terminal. */
+  readonly terminal?: TerminalDevice;
+  /** Frame scheduler; defaults to real timers. */
+  readonly scheduler?: RenderScheduler;
 }
 
-/**
- * Production InteractiveMode Coordinator
- * Replaces the old monolithic loop with a decoupled, event-driven TUI runtime.
- */
-export class InteractiveMode implements TerminalFrameProvider {
-  readonly tui = new TUI();
-  readonly editor = new Editor();
-  readonly selectList = new SelectList();
-  readonly transcript = new TranscriptContainer();
-  readonly stdinBuffer = new StdinBuffer();
-  private readonly inputController: InputController;
+export class InteractiveMode {
+  private readonly terminal: TerminalDevice;
+  private readonly tui: TUI;
+  private readonly surface: InteractiveSurface;
+  private readonly stdin = new StdinBuffer();
+  private readonly sink: TurnSink;
+  private readonly questions: QuestionBridge;
+  private readonly readline: ReadlineInterface;
+  private readonly gesture: { lastCancelAt?: number } = {};
 
-  private isExecuting = false;
+  private busy = false;
   private turnNumber = 0;
-  private mcpGateway: CliMcpGateway;
-  private currentHistoryBatchId = 0;
-  private pendingHistoryBatch: string[] = [];
-  private readonly dummyRl: ReadlineInterface;
+  private readonly queue: string[] = [];
 
   constructor(private readonly options: InteractiveModeOptions) {
-    this.mcpGateway = options.initialMcpGateway;
-    this.tui.setFrameProvider(this);
-
-    this.dummyRl = {
-      close: () => this.tui.stop(),
-      prompt: () => this.tui.requestRender(),
-      pause() {},
-      resume() {},
-    } as unknown as ReadlineInterface;
-
-    if (this.options.setReadline) {
-      this.options.setReadline(this.dummyRl);
-    }
-
-    this.inputController = new InputController(this.editor, this.selectList, {
-      onCancelRun: () => {
-        this.options.sessionRuntime.cancelCurrentRun();
-      },
-      onExit: () => {
-        this.tui.stop();
-        handleShellClose({
-          sessionRuntime: this.options.sessionRuntime,
-          renderer: this.options.renderer,
-          runtimeContext: this.options.runtimeContext,
-          exit: this.options.exit,
-        });
-      },
-      onSubmit: (text) => {
-        this.handleSubmit(text);
-      },
-      onRequestRedraw: () => {
-        this.tui.requestRender();
-      },
+    this.terminal = options.terminal ?? processTerminal;
+    this.tui = new TUI(this.terminal, options.scheduler, resizeScrollbackMode(process.env));
+    this.surface = new InteractiveSurface({
+      band: () => readBandState(this.options.runtimeContext),
+      activity: () => this.sink.activity(),
+      busy: () => this.busy,
+      queuedCount: () => this.queue.length,
+      now: () => Date.now(),
     });
-
-    this.setupInputHandling();
+    this.sink = new TurnSink(this.surface.transcript, () => this.tui.requestRender());
+    this.questions = new QuestionBridge({
+      ask: (question) => this.onQuestion(question),
+      settle: () => this.onQuestionSettled(),
+    });
+    this.readline = this.questions.asReadline(() => this.stop());
+    this.options.setReadline?.(this.readline);
+    this.tui.setFrameProvider(this.surface);
+    this.surface.editor.placeholder = DEFAULT_PLACEHOLDER;
   }
 
   start(): void {
-    if (process.stdout.isTTY) {
-      altScreen.enter({ exitMode: "replay" });
-    }
+    // The intro renders itself at the frame width so a resize re-elides the path
+    // instead of keeping the elision it was born with.
+    this.surface.transcript.append({
+      kind: "notice",
+      text: "",
+      finalized: true,
+      rows: (width) => renderWelcome(this.welcomeState(), width),
+    });
+    this.stdin.onKey((event) => this.onKey(event));
+    this.stdin.onPaste((text) => this.onPaste(text));
+    this.tui.onInput((data) => this.stdin.feed(data));
+    this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
     this.tui.start();
   }
 
   stop(): void {
+    this.questions.abandon();
+    this.options.renderer.clearSink();
+    this.stdin.dispose();
     this.tui.stop();
-    if (process.stdout.isTTY) {
-      altScreen.leave();
-    }
   }
 
-  renderFrame(dimensions: ViewportSize): TerminalFramePlan {
-    const totalRows = dimensions.rows || 24;
-    const width = dimensions.columns || 80;
-    const editorText = this.editor.getText();
-
-    // 1. Update autocomplete state
-    if (editorText.trim().startsWith("/")) {
-      const query = editorText.trim().toLowerCase();
-      const matches = BUILTIN_SLASH_COMMANDS.filter((c) => c.name.toLowerCase().startsWith(query)).map((c) => ({
-        value: c.name,
-        label: c.name,
-        description: c.description,
-      }));
-      this.selectList.setItems(matches);
-      this.inputController.setAutocompleteActive(matches.length > 0);
-    } else {
-      this.inputController.setAutocompleteActive(false);
-    }
-
-    // 2. Render Box Composer Chrome
-    const style = getComposerStyle("box");
-    const statusState: StatusLineState = {
-      modelName: this.options.runtimeContext.runtimeConfig.providerCredentials?.[this.options.runtimeContext.runtimeConfig.provider]?.model || "default-model",
-      gitBranch: this.options.runtimeContext.gitContext.branch ?? undefined,
-      projectDir: this.options.runtimeContext.projectRoot,
-      usedTokens: 0,
-      contextWindow: this.options.runtimeContext.runtimeConfig.contextWindow ?? 64000,
-    };
-
-    const topBorder = style.renderTop({ width, topTitle: "Coding Agent" });
-    const rowLines = this.editor.renderWithSentinel().map((line) =>
-      style.renderRow({ text: line, width }),
-    );
-    const bottomBorder = style.renderBottom({ width, statusText: formatStatusLine(statusState, width - 8) });
-    const hints = ["/help for commands", "Esc to cancel", "Tab autocomplete"];
-    const hintLine = `\x1b[90m ${hints.join("  │  ")} \x1b[0m`;
-
-    const composerLines = [topBorder, ...rowLines, bottomBorder, hintLine];
-
-    // 3. Render Autocomplete Dropdown if active
-    const menuLines = this.inputController.isAutocompleteActive()
-      ? this.selectList.render(Math.min(width - 4, 60))
-      : [];
-
-    // 4. Calculate upper transcript available rows
-    const bottomRows = composerLines.length + menuLines.length;
-    const availableTranscriptRows = Math.max(0, totalRows - bottomRows);
-
-    // 5. Build transcript view with welcome header
-    const welcomeHeader = formatMinimalWelcomeBanner({
-      workspaceRoot: this.options.runtimeContext.projectRoot,
-      modelName: statusState.modelName,
-      gitBranch: statusState.gitBranch,
-    }).split("\n").filter(Boolean);
-
-    const fullTranscript = [...welcomeHeader, "", ...this.transcript.render()];
-    const visibleTranscript = fullTranscript.length > availableTranscriptRows
-      ? fullTranscript.slice(-availableTranscriptRows)
-      : fullTranscript;
-
-    const viewport = [
-      ...visibleTranscript,
-      ...menuLines,
-      ...composerLines,
-    ];
-
+  /** Intro facts, resolved at paint time so a mid-session change is reflected. */
+  private welcomeState(): WelcomeState {
+    const facts = readBandState(this.options.runtimeContext);
     return {
-      history: this.pendingHistoryBatch.length > 0
-        ? { id: ++this.currentHistoryBatchId, rows: this.pendingHistoryBatch }
+      model: facts.model,
+      directory: facts.directory ?? this.options.runtimeContext.projectRoot,
+      branch: facts.branch,
+      resumeHint: this.options.fallbackSessionId
+        ? `/resume to continue session ${this.options.fallbackSessionId}`
         : undefined,
-      viewport,
     };
   }
 
-  acknowledgeHistory(_id: number): void {
-    this.pendingHistoryBatch = [];
+  private onKey(event: Parameters<typeof routeKey>[0]): void {
+    routeKey(event, {
+      surface: this.surface,
+      busy: this.busy,
+      now: () => Date.now(),
+      gesture: this.gesture,
+      actions: {
+        submit: (text) => this.onSubmit(text),
+        interrupt: () => this.interrupt(),
+        exit: () => this.shutdown(),
+        redraw: () => this.tui.requestRender(),
+        clearScreen: () => this.clearScreen(),
+        refreshSuggestions: () => this.refreshSuggestions(),
+      },
+    });
   }
 
-  private async handleSubmit(text: string): Promise<void> {
-    this.isExecuting = true;
-    this.transcript.appendUserPrompt(text);
+  /** Publish a runtime question as a transcript block and retarget the prompt. */
+  private onQuestion(question: string): void {
+    this.surface.transcript.append(textBlock("notice", `  ${question}`));
+    this.surface.editor.placeholder = "Answer above, then press Enter";
     this.tui.requestRender();
+  }
 
-    let outputBuffer = "";
-    const capturingRenderer: StreamingRenderer = {
-      renderLine(line: string) {
-        outputBuffer += `${line}\n`;
-      },
-      render(chunk: string) {
-        outputBuffer += chunk;
-      },
-    } as unknown as StreamingRenderer;
+  private onQuestionSettled(): void {
+    this.surface.editor.placeholder = DEFAULT_PLACEHOLDER;
+    this.tui.requestRender();
+  }
 
+  private onPaste(text: string): void {
+    this.surface.editor.insert(text);
+    this.refreshSuggestions();
+    this.tui.requestRender();
+  }
+
+  /** Completion candidates for the current draft, or none when not applicable. */
+  private refreshSuggestions(): void {
+    const draft = this.surface.editor.getText();
+    const matches = slashSuggestions(draft);
+    if (!matches) {
+      this.surface.setSuggesting(false);
+      return;
+    }
+    this.surface.suggestions.setItems(matches);
+    this.surface.setSuggesting(true);
+  }
+
+  private onSubmit(text: string): void {
+    if (this.questions.answer(text)) {
+      this.tui.requestRender();
+      return;
+    }
+    this.surface.transcript.append(textBlock("user", text));
+    if (this.busy) {
+      this.queue.push(text);
+      this.tui.requestRender();
+      return;
+    }
+    void this.run(text);
+  }
+
+  /** Execute one submission, then drain anything typed while it ran. */
+  private async run(text: string): Promise<void> {
+    this.busy = true;
+    const command = text.startsWith("/") ? text.split(/\s+/)[0]! : "turn";
+    this.sink.begin(text.startsWith("/") ? "command" : "turn", command);
+    this.options.renderer.setSink(this.sink);
     try {
       const result = await routeInteractiveCommand({
         prompt: text,
-        readline: this.dummyRl,
-        mcpGateway: this.mcpGateway,
+        readline: this.readline,
+        mcpGateway: this.options.initialMcpGateway,
         fallbackSessionId: this.options.fallbackSessionId,
         sessionManager: this.options.sessionManager,
         runtimeContext: this.options.runtimeContext,
-        renderer: capturingRenderer,
+        renderer: this.options.renderer,
         sessionRuntime: this.options.sessionRuntime,
         logger: this.options.logger,
         approvalTrustPolicy: this.options.approvalTrustPolicy,
         turnNumber: this.turnNumber,
-        setActiveNonInteractiveApprovalMode: (this.options.setActiveNonInteractiveApprovalMode ?? (() => {})) as never,
+        setActiveNonInteractiveApprovalMode:
+          this.options.setActiveNonInteractiveApprovalMode ?? (() => {}),
       });
       this.turnNumber = result.turnNumber;
-
-      if (outputBuffer.trim()) {
-        const cmdName = text.startsWith("/") ? text.split(" ")[0] : "Agent";
-        this.transcript.appendCommandResult(cmdName, outputBuffer.trim());
-      }
+    } catch (error) {
+      this.surface.transcript.append(
+        textBlock("error", error instanceof Error ? error.message : String(error), "error"),
+      );
     } finally {
-      this.isExecuting = false;
+      this.options.renderer.clearSink();
+      this.sink.end();
+      this.busy = false;
       this.tui.requestRender();
+      const next = this.queue.shift();
+      if (next !== undefined) void this.run(next);
     }
   }
 
-  private setupInputHandling(): void {
-    this.stdinBuffer.onKey((event) => {
-      this.inputController.handleKey(event, this.isExecuting);
-    });
+  private interrupt(): void {
+    if (!this.busy) return;
+    this.sink.markCancelling();
+    this.options.sessionRuntime.cancelCurrentRun();
+  }
 
-    this.stdinBuffer.onPaste((pasted) => {
-      if (this.isExecuting) return;
-      this.editor.insert(pasted);
-      this.tui.requestRender();
-    });
+  /** Drop the visible transcript and the terminal's scrollback together. */
+  private clearScreen(): void {
+    this.surface.transcript.clear();
+    this.tui.requestRender({ force: true, clearScrollback: true });
+  }
 
-    process.stdin.on("data", (chunk: Buffer | string) => {
-      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
-      this.stdinBuffer.feed(text);
+  private shutdown(): void {
+    this.stop();
+    handleShellClose({
+      sessionRuntime: this.options.sessionRuntime,
+      renderer: this.options.renderer,
+      runtimeContext: this.options.runtimeContext,
+      exit: this.options.exit,
     });
   }
 }

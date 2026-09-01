@@ -1,57 +1,68 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { InteractiveMode } from "./interactiveMode.js";
-import type { SessionManager } from "../../session/SessionManager.js";
-import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
-import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
-import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
+import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
+import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
+import type { SessionManager } from "../../session/SessionManager.js";
+import type { StructuredLogger } from "../../observability/structuredLogger.js";
+import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 
-describe("InteractiveMode Orchestrator", () => {
-  let mode: InteractiveMode;
-
-  beforeEach(() => {
-    const dummySessionManager = {
-      describeSessionReentry: () => ({ id: "sess_1", status: "active", resumeDisposition: "ready" }),
-    } as unknown as SessionManager;
-
-    const dummySessionRuntime = {
-      getAgentMode: () => "build",
-      cancelCurrentRun: () => {},
-      terminate: () => {},
-    } as unknown as ShellSessionRuntime;
-
-    const dummyRuntimeContext = {
+function build(overrides: { observeEvents?: () => () => void } = {}): {
+  mode: InteractiveMode;
+  renderer: StreamingRenderer;
+  readline: { current: unknown };
+} {
+  const renderer = new StreamingRenderer();
+  const readline: { current: unknown } = { current: null };
+  const mode = new InteractiveMode({
+    runtimeContext: {
+      cwd: "/workspace",
       projectRoot: "/workspace",
       session: { id: "sess_1" },
       gitContext: { branch: "main" },
-      runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64000 },
-    } as unknown as ShellRuntimeContext;
+      runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64_000 },
+    } as unknown as ShellRuntimeContext,
+    sessionRuntime: {
+      observeEvents: overrides.observeEvents ?? (() => () => {}),
+      cancelCurrentRun: () => {},
+      getAgentMode: () => "build",
+      getCurrentRunController: () => null,
+    } as unknown as ShellSessionRuntime,
+    sessionManager: {} as unknown as SessionManager,
+    renderer,
+    logger: { info: () => {}, warn: () => {}, error: () => {} } as unknown as StructuredLogger,
+    approvalTrustPolicy: {} as unknown as ApprovalTrustPolicy,
+    initialMcpGateway: {} as unknown as CliMcpGateway,
+    setReadline: (value) => {
+      readline.current = value;
+    },
+  });
+  return { mode, renderer, readline };
+}
 
-    mode = new InteractiveMode({
-      runtimeContext: dummyRuntimeContext,
-      sessionRuntime: dummySessionRuntime,
-      sessionManager: dummySessionManager,
-      renderer: { renderLine: () => {}, render: () => {} } as unknown as StreamingRenderer,
-      logger: { info: () => {}, warn: () => {}, error: () => {} } as unknown as StructuredLogger,
-      approvalTrustPolicy: {} as unknown as ApprovalTrustPolicy,
-      initialMcpGateway: {} as unknown as CliMcpGateway,
-    });
+describe("session wiring", () => {
+  it("installs a readline stand-in that can answer runtime questions", () => {
+    // Runtime code asks through readline.question; without a working stand-in the
+    // approval flow throws instead of prompting.
+    const { readline } = build();
+    const stub = readline.current as { question?: unknown; close?: unknown };
+    expect(typeof stub.question).toBe("function");
+    expect(typeof stub.close).toBe("function");
   });
 
-  it("renders frame with bottom-pinned box composer and welcome header", () => {
-    const plan = mode.renderFrame({ rows: 24, cols: 80 });
-    expect(plan.viewport.length).toBeGreaterThanOrEqual(4);
-    expect(plan.viewport.some((l) => l.includes("Coding Agent"))).toBe(true);
-    expect(plan.viewport.some((l) => l.includes("/workspace"))).toBe(true);
+  it("subscribes to the structured event stream on start", () => {
+    const observeEvents = vi.fn(() => () => {});
+    const { mode } = build({ observeEvents });
+    mode.start();
+    expect(observeEvents).toHaveBeenCalledOnce();
+    mode.stop();
   });
 
-  it("appends command output to transcript container when slash command runs", () => {
-    mode.transcript.appendCommandResult("/help", "Available commands:\n/model\n/cost\n/undo");
-    const plan = mode.renderFrame({ rows: 24, cols: 80 });
-
-    expect(plan.viewport.some((l) => l.includes("Command Output"))).toBe(true);
-    expect(plan.viewport.some((l) => l.includes("/model"))).toBe(true);
+  it("leaves the renderer writing to stdout while idle", () => {
+    const { mode, renderer } = build();
+    mode.start();
+    expect(renderer.captured).toBe(false);
+    mode.stop();
   });
 });

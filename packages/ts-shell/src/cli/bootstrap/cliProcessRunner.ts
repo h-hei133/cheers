@@ -116,6 +116,8 @@ export async function runCliProcess(
   });
   projectAndRenderCliStartupSurface({
     options,
+    stdin: input.stdin,
+    stdout: input.process.stdout,
     cliModePlan: stdinPromptCapture.cliModePlan,
     stdinTransportMode: stdinPromptCapture.stdinTransportMode,
     nonInteractivePromptCount:
@@ -161,6 +163,7 @@ export async function runCliProcess(
 
   await runInteractiveLoop({
     stdin: input.stdin,
+    stdout: input.process.stdout,
     process: input.process,
     sessionManager,
     renderer,

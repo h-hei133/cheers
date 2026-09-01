@@ -1,29 +1,137 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { StdinBuffer } from "./stdinBuffer.js";
-import type { ParsedKeyEvent } from "./keys.js";
 
-describe("StdinBuffer Chunk Assembly", () => {
-  it("buffers fragmented multi-byte ANSI sequences and emits complete keys", () => {
-    const buffer = new StdinBuffer();
-    const emitted: ParsedKeyEvent[] = [];
-    buffer.onKey((e) => emitted.push(e));
+interface Harness {
+  readonly buffer: StdinBuffer;
+  readonly keys: string[];
+  readonly pastes: string[];
+  fire(): void;
+}
 
-    // Feed fragmented Arrow Up sequence '\x1b', '[', 'A'
-    buffer.feed("\x1b");
-    expect(emitted.length).toBe(0); // Held in buffer
+function harness(): Harness {
+  let timers: Array<{ id: number; run: () => void }> = [];
+  let nextId = 1;
+  const keys: string[] = [];
+  const pastes: string[] = [];
+  const buffer = new StdinBuffer({
+    setTimer: (run) => {
+      const id = nextId++;
+      timers.push({ id, run });
+      return id;
+    },
+    clearTimer: (handle) => {
+      timers = timers.filter((timer) => timer.id !== handle);
+    },
+  });
+  buffer.onKey((event) => keys.push(event.keyId));
+  buffer.onPaste((text) => pastes.push(text));
+  return {
+    buffer,
+    keys,
+    pastes,
+    fire: () => {
+      const due = timers;
+      timers = [];
+      for (const timer of due) timer.run();
+    },
+  };
+}
 
-    buffer.feed("[A");
-    expect(emitted.length).toBe(1);
-    expect(emitted[0].keyId).toBe("up");
+describe("keystroke assembly", () => {
+  it("splits a fused chunk into one event per character", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("abc");
+    expect(keys).toEqual(["a", "b", "c"]);
   });
 
-  it("handles bracketed paste mode cleanly", () => {
-    const buffer = new StdinBuffer();
-    const pasted: string[] = [];
-    buffer.onPaste((p) => pasted.push(p));
+  it("delivers a scalar above the BMP as one event", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("\u{1f680}");
+    expect(keys).toEqual(["\u{1f680}"]);
+  });
 
-    buffer.feed("\x1b[200~const a = 1;\nconst b = 2;\x1b[201~");
-    expect(pasted.length).toBe(1);
-    expect(pasted[0]).toBe("const a = 1;\nconst b = 2;");
+  it("reassembles a sequence split across chunks", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("\x1b");
+    buffer.feed("[A");
+    expect(keys).toEqual(["up"]);
+  });
+
+  it("reassembles a tilde sequence split mid-parameters", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("\x1b[");
+    buffer.feed("3~");
+    expect(keys).toEqual(["delete"]);
+  });
+});
+
+describe("the lone escape ambiguity", () => {
+  it("holds a bare escape rather than guessing", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("\x1b");
+    expect(keys).toEqual([]);
+  });
+
+  it("delivers it as the Escape key once the hold expires", () => {
+    // Holding forever is the failure that makes Escape do nothing at all.
+    const { buffer, keys, fire } = harness();
+    buffer.feed("\x1b");
+    fire();
+    expect(keys).toEqual(["escape"]);
+  });
+
+  it("splits a meta-escape chord into escape then the key", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("\x1b\x1b[A");
+    expect(keys).toEqual(["escape", "up"]);
+  });
+
+  it("discards an incomplete sequence on flush rather than leaking its bytes", () => {
+    // No terminal sends a truncated CSI, so releasing "[" as typed text would
+    // only ever corrupt the draft.
+    const { buffer, keys } = harness();
+    buffer.feed("\x1b[");
+    buffer.flush();
+    expect(keys).toEqual([]);
+    buffer.feed("x");
+    expect(keys).toEqual(["x"]);
+  });
+
+  it("releases a held escape on an explicit flush", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("\x1b");
+    buffer.flush();
+    expect(keys).toEqual(["escape"]);
+  });
+});
+
+describe("bracketed paste", () => {
+  it("emits the block as one paste and resumes keys after it", () => {
+    const { buffer, keys, pastes } = harness();
+    buffer.feed("\x1b[200~hello\nworld\x1b[201~x");
+    expect(pastes).toEqual(["hello\nworld"]);
+    expect(keys).toEqual(["x"]);
+  });
+
+  it("waits for a terminator split across chunks", () => {
+    const { buffer, pastes } = harness();
+    buffer.feed("\x1b[200~abc\x1b[201");
+    expect(pastes).toEqual([]);
+    buffer.feed("~");
+    expect(pastes).toEqual(["abc"]);
+  });
+
+  it("releases an unterminated block as text instead of holding it", () => {
+    const { buffer, pastes, fire } = harness();
+    buffer.feed("\x1b[200~abc");
+    expect(pastes).toEqual([]);
+    fire();
+    expect(pastes).toEqual(["abc"]);
+  });
+
+  it("holds a partial start marker without emitting its bytes", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("\x1b[200");
+    expect(keys).toEqual([]);
   });
 });

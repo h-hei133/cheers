@@ -1,136 +1,231 @@
 import fs from "node:fs";
 import { detectTerminalCapabilities, type TerminalCapabilities } from "./terminalCapabilities.js";
 
+/**
+ * Terminal device driver.
+ *
+ * Owns raw mode, stdin fan-out, resize notification, and the mode-restore
+ * battery that must run however the process leaves — including a crash, where
+ * only an unbuffered `writeSync` is guaranteed to reach the device. Writes are
+ * accounted so the renderer can back off instead of queueing frames a slow link
+ * will never drain.
+ */
+
+/** Queued bytes past which the link is treated as gone rather than slow. */
 const MAX_BACKLOG_BYTES = 64 * 1024 * 1024;
 
-type InputHandler = (data: string) => void;
-type ResizeHandler = () => void;
-type DisconnectHandler = () => void;
+/** Restores every private mode this driver may have set, in reverse order. */
+const RESTORE_MODES = [
+  "\x1b[?2026l", // synchronized output
+  "\x1b[?7h", // autowrap
+  "\x1b[?1l\x1b>", // application cursor keys / keypad
+  "\x1b[?2004l", // bracketed paste
+  "\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l", // mouse reporting
+  "\x1b[?25h", // cursor visibility
+  "\x1b[0m", // attributes
+].join("");
 
-export class Terminal {
+export interface TerminalStartOptions {
+  /** Leave stdin in cooked mode; {@link Terminal.enableInput} takes it over later. */
+  readonly deferInput?: boolean;
+}
+
+export type InputHandler = (data: string) => void;
+export type ResizeHandler = () => void;
+export type DisconnectHandler = () => void;
+
+/**
+ * The surface the renderer depends on. Narrower than {@link Terminal} so a frame
+ * can be rendered against a recording device in a test without a real tty.
+ */
+export interface TerminalDevice {
   readonly capabilities: TerminalCapabilities;
-  private wasRaw = false;
+  getDimensions(): { readonly columns: number; readonly rows: number };
+  getPendingOutputBytes(): number;
+  write(data: string): void;
+  start(
+    onInput: InputHandler,
+    onResize: ResizeHandler,
+    onDisconnect: DisconnectHandler,
+    options?: TerminalStartOptions,
+  ): void;
+  stop(): void;
+  enableInput(): void;
+}
+
+export class Terminal implements TerminalDevice {
+  readonly capabilities: TerminalCapabilities;
+
   private started = false;
   private disconnected = false;
-  private pendingOutputBytes = 0;
-  private readonly inputHandlers: InputHandler[] = [];
-  private readonly resizeHandlers: ResizeHandler[] = [];
-  private readonly disconnectHandlers: DisconnectHandler[] = [];
+  private rawOwned = false;
+  private inputEnabled = false;
+  private pendingBytes = 0;
+  private deferredInput: string[] = [];
 
-  constructor() {
-    this.capabilities = detectTerminalCapabilities();
+  private onInput: InputHandler = () => {};
+  private onResize: ResizeHandler = () => {};
+  private onDisconnect: DisconnectHandler = () => {};
+
+  private readonly handleData = (chunk: Buffer | string): void => {
+    const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    if (!this.inputEnabled) {
+      this.deferredInput.push(text);
+      return;
+    }
+    this.onInput(text);
+  };
+
+  private readonly handleResize = (): void => {
+    this.onResize();
+  };
+
+  private readonly handleEnd = (): void => {
+    this.fireDisconnect();
+  };
+
+  private readonly handleExit = (): void => {
+    this.restoreSync();
+  };
+
+  constructor(capabilities: TerminalCapabilities = detectTerminalCapabilities()) {
+    this.capabilities = capabilities;
   }
 
-  start(onInput: InputHandler, onResize: ResizeHandler, onDisconnect: DisconnectHandler): void {
+  /** Whether there is no terminal attached, so nothing should be painted. */
+  get headless(): boolean {
+    return !process.stdout.isTTY;
+  }
+
+  get columns(): number {
+    return process.stdout.columns || 80;
+  }
+
+  get rows(): number {
+    return process.stdout.rows || 24;
+  }
+
+  getDimensions(): { readonly columns: number; readonly rows: number } {
+    return { columns: this.columns, rows: this.rows };
+  }
+
+  getPendingOutputBytes(): number {
+    return this.pendingBytes;
+  }
+
+  start(
+    onInput: InputHandler,
+    onResize: ResizeHandler,
+    onDisconnect: DisconnectHandler,
+    options?: TerminalStartOptions,
+  ): void {
+    if (this.started) return;
     this.started = true;
+    // However the process leaves — clean exit, crash, or a signal — the terminal
+    // must not be left in raw mode with the cursor hidden and autowrap off.
+    process.once("exit", this.handleExit);
     this.disconnected = false;
-    this.inputHandlers.push(onInput);
-    this.resizeHandlers.push(onResize);
-    this.disconnectHandlers.push(onDisconnect);
+    this.onInput = onInput;
+    this.onResize = onResize;
+    this.onDisconnect = onDisconnect;
+    this.inputEnabled = options?.deferInput !== true;
 
-    if (process.stdin.isTTY) {
-      this.wasRaw = Boolean(process.stdin.isRaw);
-      process.stdin.setRawMode(true);
-      process.stdin.resume();
-      process.stdin.on("data", (chunk: Buffer | string) => {
-        const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
-        for (const handler of this.inputHandlers) {
-          handler(text);
-        }
-      });
-      process.stdin.on("end", () => this.fireDisconnect());
-      process.stdin.on("close", () => this.fireDisconnect());
-      process.stdout.on("resize", () => {
-        for (const handler of this.resizeHandlers) {
-          handler();
-        }
-      });
-    }
+    process.stdout.on("resize", this.handleResize);
+    if (!process.stdin.isTTY) return;
+
+    if (this.inputEnabled) this.takeRawMode();
+    process.stdin.on("data", this.handleData);
+    process.stdin.on("end", this.handleEnd);
+    process.stdin.on("close", this.handleEnd);
+    process.stdin.resume();
   }
 
+  /** Take over stdin after a deferred start and replay anything typed meanwhile. */
   enableInput(): void {
-    if (process.stdin.isTTY && typeof process.stdin.setRawMode === "function") {
-      process.stdin.setRawMode(true);
-    }
+    if (this.inputEnabled) return;
+    this.inputEnabled = true;
+    this.takeRawMode();
+    const buffered = this.deferredInput;
+    this.deferredInput = [];
+    for (const chunk of buffered) this.onInput(chunk);
   }
 
   stop(): void {
     if (!this.started) return;
     this.started = false;
-
-    this.write("\x1b[?2026l\x1b[?7h");
-    this.write("\x1b[?1l\x1b>");
-    this.write("\x1b[?2004l");
-    this.write("\x1b[?1000l\x1b[?1003l\x1b[?1006l");
-    this.write("\x1b[?25h");
-
-    try {
-      if (process.stdin.isTTY && typeof process.stdin.setRawMode === "function") {
-        process.stdin.setRawMode(this.wasRaw);
-      }
-      process.stdin.pause();
-    } catch {
-      // Best-effort restore
-    }
+    process.off("exit", this.handleExit);
+    process.stdout.off("resize", this.handleResize);
+    process.stdin.off("data", this.handleData);
+    process.stdin.off("end", this.handleEnd);
+    process.stdin.off("close", this.handleEnd);
+    this.writeSync(RESTORE_MODES);
+    this.releaseRawMode();
   }
 
-  drainInput(_timeoutMs: number = 1000): void {
-    // Drain pending stdin events to prevent escape sequence leaks over SSH
-    try {
-      if (process.stdin.readableFlowing) {
-        process.stdin.pause();
-        setTimeout(() => process.stdin.resume(), Math.min(_timeoutMs, 200));
-      }
-    } catch {
-      // Best-effort
-    }
+  /** Unbuffered restore for exit and crash handlers, where queued writes are lost. */
+  restoreSync(): void {
+    this.writeSync(RESTORE_MODES);
+    this.releaseRawMode();
   }
 
   write(data: string): void {
-    if (this.disconnected) return;
-    if (this.pendingOutputBytes > MAX_BACKLOG_BYTES) {
+    if (this.disconnected || data.length === 0) return;
+    const bytes = Buffer.byteLength(data, "utf8");
+    if (this.pendingBytes + bytes > MAX_BACKLOG_BYTES) {
       this.fireDisconnect();
       return;
     }
+    this.pendingBytes += bytes;
     process.stdout.write(data, () => {
-      this.pendingOutputBytes = Math.max(0, this.pendingOutputBytes - Buffer.byteLength(data, "utf8"));
+      this.pendingBytes = Math.max(0, this.pendingBytes - bytes);
     });
   }
 
   writeSync(data: string): void {
-    if (this.disconnected || !process.stdout.isTTY) return;
+    if (!process.stdout.isTTY) return;
     try {
-      fs.writeSync(1, Buffer.from(data));
+      fs.writeSync(1, data);
     } catch {
       try {
         process.stdout.write(data);
       } catch {
-        // Best-effort
+        // The device is gone; nothing further can be restored.
       }
     }
   }
 
-  isHeadless(): boolean {
-    return !process.stdout.isTTY;
+  hideCursor(): void {
+    this.write("\x1b[?25l");
   }
 
-  getDimensions(): { readonly columns: number; readonly rows: number } {
-    return {
-      columns: process.stdout.columns || 80,
-      rows: process.stdout.rows || 24,
-    };
+  showCursor(): void {
+    this.write("\x1b[?25h");
   }
 
-  getPendingOutputBytes(): number {
-    return this.pendingOutputBytes;
+  private takeRawMode(): void {
+    if (typeof process.stdin.setRawMode !== "function") return;
+    if (!process.stdin.isRaw) {
+      process.stdin.setRawMode(true);
+      this.rawOwned = true;
+    }
+  }
+
+  private releaseRawMode(): void {
+    try {
+      if (this.rawOwned && typeof process.stdin.setRawMode === "function") {
+        process.stdin.setRawMode(false);
+      }
+      this.rawOwned = false;
+      process.stdin.pause();
+    } catch {
+      // Best-effort: the stream may already be torn down.
+    }
   }
 
   private fireDisconnect(): void {
     if (this.disconnected) return;
     this.disconnected = true;
-    for (const handler of this.disconnectHandlers) {
-      handler();
-    }
+    this.onDisconnect();
   }
 }
 

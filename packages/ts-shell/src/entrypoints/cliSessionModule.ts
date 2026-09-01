@@ -75,7 +75,10 @@ export async function runCliSessionCommand(input: {
     return;
   }
 
-  if (!input.readline) {
+  // The interactive panel drives stdin keypresses itself. A host that captures
+  // renderer output owns raw stdin, so the panel would fight it for keystrokes;
+  // such hosts get the non-interactive overview instead.
+  if (!input.readline || input.renderer.captured) {
     renderSessionSurfaceOverview(
       input.renderer,
       input.sessionManager,

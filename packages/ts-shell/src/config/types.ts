@@ -30,7 +30,13 @@ export interface PermissionSettings {
 
 export interface TuiSettings {
   readonly mode?: "differential" | "plain";
-  readonly altScreen?: boolean;
+  /**
+   * How a settled width change refreshes rows already retired into the
+   * terminal's scrollback. `rebuild` clears and republishes them at the new
+   * width; `preserve` repaints only the viewport and leaves the terminal's own
+   * rewrap of the retired rows in place.
+   */
+  readonly resizeScrollback?: "rebuild" | "preserve";
   readonly showThinking?: boolean;
   readonly theme?: "dark" | "light";
 }
@@ -68,7 +74,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   },
   tui: {
     mode: "differential",
-    altScreen: true,
+    resizeScrollback: "rebuild",
     showThinking: true,
     theme: "dark",
   },

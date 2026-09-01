@@ -1,7 +1,10 @@
 import { execSync } from "node:child_process";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
-import { renderDiff } from "../../presentation/tui/components/diff.js";
+import { renderDiff } from "../../presentation/tui/transcript/diff.js";
+
+/** Preview width for the undo diff, which renders into command text rather than a frame. */
+const DIFF_PREVIEW_WIDTH = 120;
 
 /**
  * /undo (aliases: /rewind, /revert)
@@ -73,7 +76,7 @@ export async function runUndoCommand(
         stdio: ["pipe", "pipe", "ignore"],
       }).trim();
       if (rawDiff) {
-        diffPreview = `\n### 📝 Modified Changes (Diff Preview):\n${renderDiff(rawDiff)}`;
+        diffPreview = `\n### 📝 Modified Changes (Diff Preview):\n${renderDiff(rawDiff, DIFF_PREVIEW_WIDTH).join("\n")}`;
       }
     } catch {
       // Diff best-effort

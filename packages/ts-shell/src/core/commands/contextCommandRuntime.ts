@@ -16,8 +16,9 @@ export async function runContextCommand(
     parseInt(process.env.AUTO_COMPACT_WINDOW || "", 10) || 64_000;
   const reserveBuffer = 8_000;
 
-  // Live calculation: If session has telemetry, use actual prompt tokens footprint; otherwise base estimate
-  const currentPromptFootprint = telemetry.promptTokens > 0 ? telemetry.promptTokens : 2_500;
+  // The live footprint is the most recent request's prompt size. Summing prompt
+  // tokens across turns would count the resent conversation once per turn.
+  const currentPromptFootprint = telemetry.lastPromptTokens > 0 ? telemetry.lastPromptTokens : 2_500;
   const systemPromptTokens = Math.min(1_500, Math.round(currentPromptFootprint * 0.35));
   const toolsSchemaTokens = 1_200;
   const historyTokens = Math.max(0, currentPromptFootprint - systemPromptTokens - toolsSchemaTokens);

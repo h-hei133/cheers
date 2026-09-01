@@ -380,12 +380,16 @@ export async function executeResolvedPromptTurn(options: {
       turn: turnLabel,
       turnOrigin,
     });
-    options.renderer.renderLine(
-      formatTurnStartBoundary({
-        turnNumber: turnLabel,
-        origin: turnOrigin,
-      }),
-    );
+    // A host that captures output draws its own turn boundaries; emitting these
+    // as prose too would put duplicate chrome inside its transcript.
+    if (!options.renderer.captured) {
+      options.renderer.renderLine(
+        formatTurnStartBoundary({
+          turnNumber: turnLabel,
+          origin: turnOrigin,
+        }),
+      );
+    }
   }
   options.logger.info(
     options.source === "interactive"
@@ -424,7 +428,7 @@ export async function executeResolvedPromptTurn(options: {
       });
       return;
     }
-    if (!options.printMode) {
+    if (!options.printMode && !options.renderer.captured) {
       options.renderer.renderLine(formatExecutionStartedLine(turnOrigin));
     }
     recordCount("cli.prompts", 1, {
@@ -480,7 +484,7 @@ export async function executeResolvedPromptTurn(options: {
         turnEndStatus,
       },
     );
-    if (interactiveTurn) {
+    if (interactiveTurn && !options.renderer.captured) {
       options.renderer.renderLine(
         formatTurnEndBoundary({
           turnNumber: turnLabel,
