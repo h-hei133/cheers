@@ -1,52 +1,53 @@
-# Problem & Solutions Ledger (5 Core TUI Defects & Native Resolution)
+# Problem & Solutions Ledger (Full-Fidelity Production TUI Engine 1:1 Clean Adaptation)
 
-## 1. Slash 命令浮窗残留与无法滚动查看完整列表问题 (Menu Ghosting & Scrollability)
-- **Root Cause 深度诊断**：
-  1. **残影残留（Ghosting）**：当补全浮窗打开时，视口包含 12 行（`topAnchor = H - 12`）；当浮窗关闭时，视口缩小为 5 行（`topAnchor = H - 5`）。`DifferentialTerminalBuffer` 仅重绘新视口范围内的行，而此前在物理行号 `H - 12` 到 `H - 5` 上绘制的边框线**从未被发送 `\x1b[2K` 清除**，导致残影永久留存在终端屏幕上。
-  2. **无法滚动**：`selectList.ts` 简单截取前 6 项，缺少 `scrollOffset` 滚动视口管理与滚动条指示器，超出 6 个的命令永远无法被翻阅。
-- **解决方案**：
-  1. 在 `DifferentialTerminalBuffer` 与 `tui.ts` 中维护上一次绘制的绝对行范围 `[prevTopAnchor, prevTopAnchor + prevLen)`。在新一帧中，任何属于上一帧但不在当前帧内的物理行，**强制发送 `\x1b[${row};1H\x1b[2K` 进行彻底擦除**！
-  2. 在 `selectList.ts` 中引入 `scrollOffset` 动态窗口滑动，当方向键选中项超出可视区域时自动平滑滚动，并渲染 `↑ N more` / `↓ M more` 提示。
+## 1. 根本问题：103 行的 tui.ts 与 2000+ 行的生产引擎之间的巨大鸿沟
 
----
+经过 5 个并行专家子代理对成熟标杆项目 `packages/tui/src/tui.ts`（2,980 行）与 `terminal.ts`（2,006 行）的全文穿透审计，对照我们当前 `packages/ts-shell/src/presentation/tui/tui.ts`（仅 103 行），共发现 **20 项核心架构缺陷**：
 
-## 2. 中文 (CJK) 输入导致光标位置错乱与框体破损问题 (CJK East Asian Width)
-- **Root Cause 深度诊断**：
-  1. 当前 `utils.ts` 中的 `visibleWidth(text)` 只是简单调用 `stripAnsi(text).length`。
-  2. JavaScript 的 `string.length` 是按 UTF-16 Code Unit 计算的（1 个汉字为 1），而终端栅格遵循 **Unicode UAX #11 (East Asian Width)** 标准，中文字符（如 `你`、`好`、`中`、`文`）**实际占用 2 个物理终端列宽**！
-  3. 当用户输入中文时，`visibleWidth` 少算了列数：
-     - 光标钉扎 `\x1b[row;colH` 计算的列号偏小，导致硬件光标倒退并直接压在汉字上方乱跳；
-     - `boxComposer.ts` 计算的右填充空格过多，导致右边框 `│` 被挤出超宽，破坏了圆角框结构。
-- **解决方案**：
-  1. 在 `utils.ts` 中实现标准 East Asian Width 算法：检测 CJK 统一表意文字（`0x4E00 - 0x9FFF`）、全角符号（`0xFF01 - 0xFF60`）及宽字符 Emoji，准确计为 **2 列宽**。
-  2. 修复 `sliceWithWidth` 与 `boxComposer.ts`，确保无论输入纯英、中文还是混合 Emoji，光标与右边框 100% 精确对齐！
-
----
-
-## 3. 用户输入与模型输出缺少视觉背景区分问题 (User Message Shading)
-- **Root Cause 深度诊断**：
-  `TranscriptContainer.render()` 渲染用户提问时，仅在行首加了青色 `❯ ` 提示符，背景依然是终端默认的透明/黑色，与模型输出和工具执行日志混在一起，视觉对比度差。
-- **解决方案**：
-  1. 在 `theme.ts` 中新增 `userMessageBg` 专属背景 Token（如深蓝灰 `\x1b[48;5;236m` / `\x1b[48;2;31;35;53m`）。
-  2. 在 `TranscriptContainer` 中以 **通栏背景色块气泡（Full-Width Shaded Bubble）** 渲染用户提问，模型输出保持默认背景，形成极其清晰的层次区分。
+### 核心缺陷清单
+| # | 缺陷 | 生产引擎行为（我们缺失的） |
+|---|---|---|
+| 1 | History 批量提交逐行 `\n` 写入 | 单次原子写入，含历史+视口帧 |
+| 2 | 每次 History 提交后 prevViewport=[] 导致全量重绘 | 增量 acceptedHistoryBatchId 门控，视口保持可差分 |
+| 3 | 视口绝对寻址 `rows - viewport.length` 假设占满底部 | 视口锚定在保留历史下方，滚动仅推入已提交行 |
+| 4 | 无 resize 处理（无监听、无重排、无锚点恢复） | 完整事务：alt-borrow + 擦除 + 突发追踪 + 标签 CPR 锚点探测 |
+| 5 | 无帧调度——每次 requestRender 同步绘制 | setImmediate 合并、30fps 节奏、自适应成本、输入宽限、256KB backlog 门控 |
+| 6 | 无 Overlay 栈 | 完整 showOverlay/hideOverlay/anchors/fullscreen/mouse |
+| 7 | 无焦点模型，CURSOR_MARKER 仅首次行内提取 | Focusable/OverlayFocusOwner，bottom-first 多行标记提取 |
+| 8 | 输入未流经 TUI，interactiveMode 直接 `process.stdin.on("data")` | TUI #handleInput：CPR 过滤、监听链、焦点路由、key-release 过滤 |
+| 9 | 无行准备：无 normalizeTerminalOutput、无截断、无宽度适配 | 完整行管线；长行当前损坏布局 |
+| 10 | 无 SGR 合并；无逐行 reset/link 终结符（样式溢出风险） | 完整 SGR 合并管线 |
+| 11 | 光标钉扎在 paint-end 之后（同步括号之外） | 光标移动+可见性在原子帧内 |
+| 12 | 无 clearScrollback/force/resetDisplay 语义 | 完整 ED2→ED3 顺序 |
+| 13 | stop() 留下模式、无 History flush、无光标恢复 | 完整生命周期 |
+| 14 | 无 DECRPM 2026 协商 | 确认报告启用/禁用同步包装器 |
+| 15 | 无 headless 保护：测试时向真实 stdout 写入转义字节 | isTerminalHeadless() 抑制 |
+| 16 | 无断连/积压检测 | safeWrite 守卫 + 64MiB 断连 + ConPTY 16KiB 分块 |
+| 17 | 无崩溃信号紧急恢复 | Postmortem 注册 emergencyTerminalRestore |
+| 18 | Provider 契约不匹配（lines vs rows、无 kind:"replay"） | 完整契约 |
+| 19 | TUI 非 Container——无组件树 | TUI extends Container |
+| 20 | 缺失子系统：LoopWatchdog、inline images、OSC 66、mouse 等 | 完整实现 |
 
 ---
 
-## 4. Slash 命令必须绝对前缀匹配而无法模糊/子串匹配问题 (Fuzzy Matching)
-- **Root Cause 深度诊断**：
-  `slashAutocomplete.ts` 硬编码了 `cmd.name.toLowerCase().startsWith(query)`。如果用户输入后半段（如 `st`、`un`、`mod`），前缀匹配直接返回空，导致用户必须从头输入完整的命令名。
-- **解决方案**：
-  实现分级模糊匹配与打分引擎（Exact -> Prefix -> Substring -> Subsequence Fuzzy -> Description）：
-  - 键入 `st` $\rightarrow$ 自动匹配并高亮 `/cost`；
-  - 键入 `do` $\rightarrow$ 自动匹配 `/undo`；
-  - 键入 `mod` $\rightarrow$ 自动匹配 `/model`。
+## 2. 解决方案：6 阶段 1:1 本地化适配计划
 
----
+### Phase 0 — 支撑层（utils.ts 扩展 + 能力探测 + 循环看门狗 + 帧协议契约冻结）
+- 扩展 `utils.ts`：normalizeTerminalOutput、truncateToWidth、sliceByColumn、extractSegments、coalesceAdjacentSgr
+- 重建 `terminalCapabilities.ts`：终端 ID、多路复用器检测、DECRQM 钩子
+- 新增 `frame-plan.ts`：完整契约类型（TerminalFrameProvider、HistoryBatch、Component 等）
 
-## 5. Alt-Screen 导致无法使用鼠标滚轮向上查看历史记录问题 (Native Scrollback)
-- **Root Cause 深度诊断**：
-  `InteractiveTuiSession` 在启动时强制调用了 `altScreen.enter()`（`\x1b[?1049h`）。备用屏幕缓冲区是固定尺寸的无历史画布，终端仿真器在此模式下会完全禁用原生的滚动条（Scrollback Buffer），超出视口的早期对话被切片丢弃后便无法回看。
-- **解决方案**：
-  遵循 **原生滚动条驱动模式（Native Scrollback Architecture）**：
-  1. 默认在 **主屏幕缓冲区** 中运行交互会话，仅在打开全屏模态选择器时临时借用 Alt-Screen。
-  2. 结合 `HistoryBatch` 机制：当对话历史超出上方可用高度时，已完成的历史块作为不可变批次自然提交给终端标准流（进入系统滚动条），下方固定停靠 Box Composer，用户随时可用鼠标向上翻看所有历史记录！
+### Phase 1 — 终端驱动重写（`terminal.ts`）
+- 完整 Terminal 接口：start/enableInput/stop/drainInput、resize 监听、safeWrite 守卫、恢复电池、紧急恢复注册
+
+### Phase 2 — TUI 核心全量替换（`tui.ts`）
+- Container 组件树、帧调度器、#doRender 状态机、SGR 合并、#emitPlanFrame、start/stop 全生命周期、输入管线、焦点+光标、Overlay 栈
+
+### Phase 3 — Resize 事务
+- Alt-borrow + 突发追踪 + 标签 CPR 锚点探测 + 多路复用器模型 + 回放重排
+
+### Phase 4 — 切换替换（删除手写路径）
+- 迁移 interactiveMode.ts 到新契约，路由输入流经 TUI
+- 删除 buffer.ts、altScreen.ts、tuiEngine.ts 及其测试
+
+### Phase 5 — 可选子系统（内联图像、OSC 66、调试服务器、进度条等）
