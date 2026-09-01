@@ -36,6 +36,8 @@ export async function runInteractiveLoop(input: {
     approvalTrustPolicy: input.approvalTrustPolicy,
     fallbackSessionId: input.fallbackSessionId,
     initialMcpGateway: input.initialMcpGateway,
+    setReadline: input.setReadline,
+    setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
     exit: input.exit,
   });
 

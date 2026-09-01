@@ -1,4 +1,4 @@
-import { ProcessTerminal as Terminal, processTerminal } from "./terminal.js";
+import { Terminal, processTerminal } from "./terminal.js";
 import { DifferentialTerminalBuffer } from "./buffer.js";
 import { renderPermissionDialog, type PermissionDialogProps } from "./components/permissionDialog.js";
 import { renderToolCard, type ToolCardProps } from "./components/toolCard.js";
@@ -57,7 +57,7 @@ export class TuiEngine {
   render(): string {
     const screenLines: string[] = [];
     const dims = this.terminal.getDimensions();
-    const cols = dims.cols || 80;
+    const cols = dims.columns || 80;
 
     // 1. Header & Title Bar
     const headerLine = `\x1b[44;37;1m ${this.state.title.padEnd(cols - 2, " ")} \x1b[0m`;

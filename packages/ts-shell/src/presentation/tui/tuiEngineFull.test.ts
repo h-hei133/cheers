@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { detectTerminalCapabilities } from "./terminalCapabilities.js";
-import { ProcessTerminal } from "./terminal.js";
-import { TUI, type TerminalFrameProvider } from "./tui.js";
+import { processTerminal, Terminal } from "./terminal.js";
+import { TUI } from "./tui.js";
 
 describe("Terminal Capabilities and ProcessTerminal", () => {
   it("detects terminal capabilities from environment", () => {
@@ -11,33 +11,36 @@ describe("Terminal Capabilities and ProcessTerminal", () => {
     expect(caps.supportsDec2026Sync).toBe(true);
   });
 
-  it("handles ProcessTerminal dimensions and raw mode", () => {
-    const term = new ProcessTerminal();
-    expect(term.capabilities).toBeDefined();
-    const dims = term.getDimensions();
+  it("handles ProcessTerminal dimensions", () => {
+    const dims = processTerminal.getDimensions();
     expect(dims.rows).toBeGreaterThan(0);
-    expect(dims.cols).toBeGreaterThan(0);
+    expect(dims.columns).toBeGreaterThan(0);
+  });
+
+  it("constructs Terminal instance", () => {
+    const term = new Terminal();
+    expect(term.capabilities).toBeDefined();
   });
 });
 
 describe("TUI Engine with TerminalFrameProvider", () => {
   it("renders frame and extracts CURSOR_MARKER without throwing", () => {
-    const tui = new TUI();
+    const term = new Terminal();
+    const tui = new TUI(term);
     let historyAcknowledged = false;
 
-    const provider: TerminalFrameProvider = {
+    const provider = {
       renderFrame: () => ({
-        history: { id: 1, lines: ["Welcome line"] },
+        history: { id: 1, rows: ["Welcome line"] },
         viewport: ["╭─ Box ─╮", "│ ❯ \x1b_cursor:c\x07 │", "╰───────╯"],
       }),
-      acknowledgeHistory: (id) => {
+      acknowledgeHistory: (id: number) => {
         if (id === 1) historyAcknowledged = true;
       },
     };
 
     tui.setFrameProvider(provider);
-    tui.start();
-    tui.requestRender();
+    tui.renderNow();
 
     expect(historyAcknowledged).toBe(true);
     tui.stop();

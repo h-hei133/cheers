@@ -1,5 +1,5 @@
 import type { Interface as ReadlineInterface } from "node:readline";
-import { TUI, type TerminalFramePlan, type TerminalFrameProvider } from "../../presentation/tui/tui.js";
+import { TUI, type TerminalFramePlan, type TerminalFrameProvider, type ViewportSize } from "../../presentation/tui/tui.js";
 import { Editor } from "../../presentation/tui/editor.js";
 import { SelectList } from "../../presentation/tui/selectList.js";
 import { InputController } from "../../presentation/tui/inputController.js";
@@ -29,6 +29,8 @@ export interface InteractiveModeOptions {
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly fallbackSessionId?: string;
   readonly initialMcpGateway: CliMcpGateway;
+  readonly setReadline?: (readline: unknown) => void;
+  readonly setActiveNonInteractiveApprovalMode?: (mode: unknown) => void;
   readonly exit?: (code?: number) => never;
 }
 
@@ -49,10 +51,22 @@ export class InteractiveMode implements TerminalFrameProvider {
   private mcpGateway: CliMcpGateway;
   private currentHistoryBatchId = 0;
   private pendingHistoryBatch: string[] = [];
+  private readonly dummyRl: ReadlineInterface;
 
   constructor(private readonly options: InteractiveModeOptions) {
     this.mcpGateway = options.initialMcpGateway;
     this.tui.setFrameProvider(this);
+
+    this.dummyRl = {
+      close: () => this.tui.stop(),
+      prompt: () => this.tui.requestRender(),
+      pause() {},
+      resume() {},
+    } as unknown as ReadlineInterface;
+
+    if (this.options.setReadline) {
+      this.options.setReadline(this.dummyRl);
+    }
 
     this.inputController = new InputController(this.editor, this.selectList, {
       onCancelRun: () => {
@@ -84,6 +98,7 @@ export class InteractiveMode implements TerminalFrameProvider {
     }
     this.tui.start();
   }
+
   stop(): void {
     this.tui.stop();
     if (process.stdout.isTTY) {
@@ -91,9 +106,9 @@ export class InteractiveMode implements TerminalFrameProvider {
     }
   }
 
-  renderFrame(dimensions: { rows: number; cols: number }): TerminalFramePlan {
+  renderFrame(dimensions: ViewportSize): TerminalFramePlan {
     const totalRows = dimensions.rows || 24;
-    const width = dimensions.cols || 80;
+    const width = dimensions.columns || 80;
     const editorText = this.editor.getText();
 
     // 1. Update autocomplete state
@@ -159,7 +174,7 @@ export class InteractiveMode implements TerminalFrameProvider {
 
     return {
       history: this.pendingHistoryBatch.length > 0
-        ? { id: ++this.currentHistoryBatchId, lines: this.pendingHistoryBatch }
+        ? { id: ++this.currentHistoryBatchId, rows: this.pendingHistoryBatch }
         : undefined,
       viewport,
     };
@@ -184,17 +199,10 @@ export class InteractiveMode implements TerminalFrameProvider {
       },
     } as unknown as StreamingRenderer;
 
-    const dummyRl = {
-      close: () => this.tui.stop(),
-      prompt: () => this.tui.requestRender(),
-      pause() {},
-      resume() {},
-    } as unknown as ReadlineInterface;
-
     try {
       const result = await routeInteractiveCommand({
         prompt: text,
-        readline: dummyRl,
+        readline: this.dummyRl,
         mcpGateway: this.mcpGateway,
         fallbackSessionId: this.options.fallbackSessionId,
         sessionManager: this.options.sessionManager,
@@ -204,7 +212,7 @@ export class InteractiveMode implements TerminalFrameProvider {
         logger: this.options.logger,
         approvalTrustPolicy: this.options.approvalTrustPolicy,
         turnNumber: this.turnNumber,
-        setActiveNonInteractiveApprovalMode: () => {},
+        setActiveNonInteractiveApprovalMode: (this.options.setActiveNonInteractiveApprovalMode ?? (() => {})) as never,
       });
       this.turnNumber = result.turnNumber;
 
