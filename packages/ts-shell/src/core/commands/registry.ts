@@ -30,15 +30,12 @@ import { runShellCommand } from "./shellCommandRuntime.js";
 import { runLogCommand } from "./logCommandRuntime.js";
 import {
   runDiagnoseCommand,
-  runDoctorCommand,
-  runWorkflowStatusCommand,
 } from "./localCommandRuntime.js";
 import {
   runContinuePromptCommand,
   runResumePromptCommand,
 } from "./promptCommandRuntime.js";
 import {
-  runAgentModeShellAction,
   runCancelShellAction,
   runCdShellAction,
   runHelpShellAction,
@@ -46,7 +43,6 @@ import {
   runPermissionsShellAction,
   runPwdShellAction,
   runSessionsShellAction,
-  runViewShellAction,
   runWorkspaceShellAction,
 } from "./shellActionRuntime.js";
 import type { CommandDefinition } from "./types.js";
@@ -56,23 +52,6 @@ export function createCommandRegistry(
 ): ReadonlyMap<string, CommandDefinition> {
   const runtimeConfig = getRuntimeConfig(cwd);
   const commands: CommandDefinition[] = [
-    {
-      name: "doctor",
-      kind: "local",
-      availability: "available",
-      enabled: true,
-      bridgeSafe: true,
-      execute: (_args, context) => runDoctorCommand(context),
-    },
-    {
-      name: "workflow-status",
-      aliases: ["status"],
-      kind: "local",
-      availability: "available",
-      enabled: true,
-      bridgeSafe: true,
-      execute: (_args, context) => runWorkflowStatusCommand(context),
-    },
     {
       name: "diagnose",
       aliases: ["repo", "changes"],
@@ -215,41 +194,6 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runHelpShellAction(args, context),
-    },
-    {
-      name: "view",
-      kind: "shell-action",
-      availability: "available",
-      enabled: true,
-      bridgeSafe: true,
-      execute: (args, context) => runViewShellAction(args, context),
-    },
-    {
-      name: "build",
-      aliases: ["mode-build"],
-      kind: "shell-action",
-      availability: "available",
-      enabled: true,
-      bridgeSafe: true,
-      execute: (_args, context) => runAgentModeShellAction(["build"], context),
-    },
-    {
-      name: "plan",
-      aliases: ["mode-plan"],
-      kind: "shell-action",
-      availability: "available",
-      enabled: true,
-      bridgeSafe: true,
-      execute: (_args, context) => runAgentModeShellAction(["plan"], context),
-    },
-    {
-      name: "mode",
-      aliases: ["agent-mode"],
-      kind: "shell-action",
-      availability: "available",
-      enabled: true,
-      bridgeSafe: true,
-      execute: (args, context) => runAgentModeShellAction(args, context),
     },
     {
       name: "exit",

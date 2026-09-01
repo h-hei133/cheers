@@ -1,8 +1,9 @@
 import path from "node:path";
 import os from "node:os";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
-import type { BandState } from "../../presentation/tui/chrome/band.js";
+import type { StatusFacts } from "../../presentation/tui/chrome/items.js";
 import { estimateUsageCost, getSessionUsage } from "../../observability/usageTelemetry.js";
+import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 
 /**
  * Session facts for the status band.
@@ -26,19 +27,25 @@ export function activeModelName(context: ShellRuntimeContext): string {
   return config.providerCredentials?.[config.provider]?.model ?? config.provider;
 }
 
-/** Current band state derived from runtime configuration and recorded usage. */
-export function readBandState(context: ShellRuntimeContext): BandState {
+/** Facts the status band can draw from, derived from runtime state and usage. */
+export function readStatusFacts(context: ShellRuntimeContext): StatusFacts {
   const usage = getSessionUsage(context.session.id);
   const cost = estimateUsageCost(usage);
-  const agentMode = context.runtimeConfig.agentMode;
   return {
     model: activeModelName(context),
+    provider: context.runtimeConfig.provider,
     branch: context.gitContext.branch ?? undefined,
     directory: shortenPath(context.projectRoot || path.resolve(".")),
+    sessionId: context.session.id,
+    agentMode: context.runtimeConfig.agentMode,
+    openTodos: getSessionTodos().filter((todo) => todo.status !== "done").length,
+    // Absent until a real request has been accounted for: a zeroed gauge is a
+    // fabricated fact, not a neutral one.
     ...(usage.lastPromptTokens > 0
-      ? { usedTokens: usage.lastPromptTokens, contextWindow: context.runtimeConfig.contextWindow ?? 64_000 }
+      ? { contextUsed: usage.lastPromptTokens, contextWindow: context.runtimeConfig.contextWindow ?? 64_000 }
       : {}),
+    ...(usage.totalTokens > 0 ? { sessionTokens: usage.totalTokens } : {}),
+    ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
     ...(cost > 0 ? { costUsd: cost } : {}),
-    ...(agentMode && agentMode !== "build" ? { mode: agentMode } : {}),
   };
 }

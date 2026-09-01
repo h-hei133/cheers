@@ -57,29 +57,6 @@ export const SLASH_COMMANDS = [
     summary: "stop only the current run",
   },
   {
-    name: "build",
-    aliases: ["mode-build"],
-    group: "workflow",
-    summary: "switch to build mode",
-  },
-  {
-    name: "plan",
-    aliases: ["mode-plan"],
-    group: "workflow",
-    summary: "switch to plan mode",
-  },
-  {
-    name: "mode",
-    aliases: ["agent-mode"],
-    group: "workflow",
-    summary: "inspect or switch agent mode",
-  },
-  {
-    name: "view",
-    group: "workflow",
-    summary: "switch output verbosity",
-  },
-  {
     name: "diagnose",
     aliases: ["repo", "changes"],
     group: "diagnostics",

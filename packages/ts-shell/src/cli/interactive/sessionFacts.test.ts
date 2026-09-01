@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import os from "node:os";
-import { activeModelName, readBandState, shortenPath } from "./sessionFacts.js";
+import { activeModelName, readStatusFacts, shortenPath } from "./sessionFacts.js";
 import { recordSessionUsage, resetSessionUsage } from "../../observability/usageTelemetry.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 
@@ -40,37 +40,42 @@ describe("model name", () => {
   });
 });
 
-describe("band state", () => {
+describe("status facts", () => {
   it("omits the context gauge until real usage is recorded", () => {
     // Reporting 0% before any request has been accounted for is a fabricated fact.
     resetSessionUsage("fresh");
-    const state = readBandState(context("fresh"));
-    expect(state.usedTokens).toBeUndefined();
+    const state = readStatusFacts(context("fresh"));
+    expect(state.contextUsed).toBeUndefined();
     expect(state.contextWindow).toBeUndefined();
     expect(state.costUsd).toBeUndefined();
+    expect(state.sessionTokens).toBeUndefined();
   });
 
   it("uses the latest request's prompt size as the live footprint", () => {
     resetSessionUsage("used");
     recordSessionUsage("used", { promptTokens: 5_000, completionTokens: 100 });
     recordSessionUsage("used", { promptTokens: 9_000, completionTokens: 100 });
-    const state = readBandState(context("used"));
-    expect(state.usedTokens).toBe(9_000);
+    const state = readStatusFacts(context("used"));
+    expect(state.contextUsed).toBe(9_000);
     expect(state.contextWindow).toBe(200_000);
     expect(state.costUsd).toBeGreaterThan(0);
     resetSessionUsage("used");
   });
 
   it("carries branch and directory", () => {
-    const state = readBandState(context("s2"));
+    const state = readStatusFacts(context("s2"));
     expect(state.branch).toBe("main");
     expect(state.directory).toBe("/workspace/app");
+    expect(state.provider).toBe("openai");
+    expect(state.sessionId).toBe("s2");
   });
 
-  it("shows the agent mode only when it is not the default", () => {
-    expect(readBandState(context("s3")).mode).toBeUndefined();
+  it("carries the agent mode through for the band to decide on", () => {
+    // Whether a mode is worth a segment is a presentation decision, so the facts
+    // report it either way.
+    expect(readStatusFacts(context("s3")).agentMode).toBe("build");
     const planning = context("s4");
     (planning.runtimeConfig as { agentMode: string }).agentMode = "plan";
-    expect(readBandState(planning).mode).toBe("plan");
+    expect(readStatusFacts(planning).agentMode).toBe("plan");
   });
 });

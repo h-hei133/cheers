@@ -15,8 +15,12 @@ import { detectTerminalCapabilities, type TerminalCapabilities } from "./termina
 /** Queued bytes past which the link is treated as gone rather than slow. */
 const MAX_BACKLOG_BYTES = 64 * 1024 * 1024;
 
+/** How long to wait for a keyboard-protocol reply before assuming there is none. */
+const KEYBOARD_REPLY_TIMEOUT_MS = 250;
+
 /** Restores every private mode this driver may have set, in reverse order. */
 const RESTORE_MODES = [
+  "\x1b[?1049l", // alternate screen, in case a modal frame was up
   "\x1b[?2026l", // synchronized output
   "\x1b[?7h", // autowrap
   "\x1b[?1l\x1b>", // application cursor keys / keypad
@@ -65,6 +69,7 @@ export class Terminal implements TerminalDevice {
   private rawOwned = false;
   private inputEnabled = false;
   private pendingBytes = 0;
+  private keyboardTimer: NodeJS.Timeout | undefined;
   private deferredInput: string[] = [];
 
   private onInput: InputHandler = () => {};
@@ -151,7 +156,17 @@ export class Terminal implements TerminalDevice {
     // Ask for modifier reporting before the first keystroke: without it the
     // terminal cannot express Shift+Enter at all, and a bare Escape is
     // indistinguishable from the head of a sequence.
-    if (this.capabilities.supportsBracketedPaste) this.write(this.keyboard.query);
+    if (this.capabilities.supportsBracketedPaste) {
+      this.write(this.keyboard.query);
+      this.keyboardTimer = setTimeout(() => this.expireKeyboardNegotiation(), KEYBOARD_REPLY_TIMEOUT_MS);
+      this.keyboardTimer.unref?.();
+    }
+  }
+
+  /** Stop inspecting input for replies that are evidently not coming. */
+  private expireKeyboardNegotiation(): void {
+    const held = this.keyboard.expire();
+    if (held.length > 0) this.handleData(held);
   }
 
   /** Which modifier-reporting protocol negotiation settled on. */
@@ -172,6 +187,8 @@ export class Terminal implements TerminalDevice {
   stop(): void {
     if (!this.started) return;
     this.started = false;
+    if (this.keyboardTimer) clearTimeout(this.keyboardTimer);
+    this.keyboardTimer = undefined;
     process.off("exit", this.handleExit);
     process.stdout.off("resize", this.handleResize);
     process.stdin.off("data", this.handleData);

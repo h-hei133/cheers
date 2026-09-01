@@ -128,6 +128,22 @@ export function scrollPaint(
   return buffer;
 }
 
+export const ENTER_ALT_SCREEN = "\x1b[?1049h";
+export const EXIT_ALT_SCREEN = "\x1b[?1049l";
+
+/**
+ * A full-screen frame written from the top of the borrowed screen. Every row is
+ * rewritten each frame: the alternate buffer is ours alone, so there is no
+ * history to preserve and no diff worth computing against one modal state.
+ */
+export function modalPaint(rows: readonly string[], height: number): string {
+  let buffer = `${moveTo(0, 0)}${ERASE_TO_END_OF_SCREEN}`;
+  for (let index = 0; index < Math.min(rows.length, height); index++) {
+    buffer += `${moveTo(index, 0)}${rows[index] ?? ""}${ERASE_TO_END_OF_LINE}`;
+  }
+  return buffer;
+}
+
 /** Cursor epilogue: pin and reveal at `target`, or park it hidden at `parkRow`. */
 export function cursorPaint(target: CursorTarget | null, parkRow: number): string {
   if (target) return `${moveTo(target.row, target.column)}${SHOW_CURSOR}`;

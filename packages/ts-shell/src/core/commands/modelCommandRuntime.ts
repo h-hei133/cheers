@@ -183,6 +183,38 @@ function renderProviderReadinessLines(input: {
   ];
 }
 
+export interface ModelCatalog {
+  readonly provider: RuntimeProvider;
+  readonly models: readonly string[];
+  readonly active?: string;
+  /** True when the catalog came from a local fallback rather than the registry. */
+  readonly offline: boolean;
+}
+
+/**
+ * The model catalog as data, for callers that present a chooser rather than
+ * text. Shares the provider, auth, and fallback resolution with `/model list` so
+ * the two can never offer different models.
+ */
+export async function readModelCatalog(refresh = false): Promise<ModelCatalog> {
+  const config = readUserRuntimeConfigFile();
+  const connections = normalizeConnections(config);
+  const activeId = config.activeProviderConnectionId?.trim();
+  const activeConnection = connections.find((item) => item.id === activeId);
+  const provider = activeConnection?.provider ?? config.provider ?? "openai";
+  const authType = activeConnection?.authType;
+  const active =
+    normalizeText(activeConnection?.model) ??
+    normalizeText(config.providerCredentials?.[provider]?.model);
+
+  if (provider === "openai" && authType === "account-auth") {
+    return { provider, models: OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS, active, offline: false };
+  }
+  const fromApi = await fetchModelsFromModelsDev(provider, refresh);
+  if (fromApi.length > 0) return { provider, models: fromApi, active, offline: false };
+  return { provider, models: fallbackModelsForProvider(provider, authType), active, offline: true };
+}
+
 async function listModels(args: string[]): Promise<string> {
   const parsed = parseArgsWithFlags(args);
   const providerHint = normalizeProvider(parsed.positionals[0]);

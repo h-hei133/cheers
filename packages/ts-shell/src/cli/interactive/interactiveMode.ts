@@ -6,6 +6,7 @@ import { handleShellClose } from "../../core/shell/signalHandlers.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { newlineKeyFor } from "../../presentation/tui/chrome/hints.js";
+import type { StatusItemId } from "../../presentation/tui/chrome/items.js";
 import { renderWelcome, type WelcomeState } from "../../presentation/tui/chrome/welcome.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
 import { TUI } from "../../presentation/tui/render/engine.js";
@@ -19,7 +20,10 @@ import { InteractiveSurface } from "./frameSurface.js";
 import { routeKey } from "./keymap.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
-import { readBandState } from "./sessionFacts.js";
+import { OverlayHost, type Picker } from "./overlay.js";
+import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
+import { readStatusItems, writeStatusItems } from "./statusItemStore.js";
+import { readStatusFacts } from "./sessionFacts.js";
 import { slashSuggestions } from "./slashSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
@@ -75,6 +79,8 @@ export class InteractiveMode {
   private readonly questions: QuestionBridge;
   private readonly readline: ReadlineInterface;
   private readonly gesture: { lastCancelAt?: number } = {};
+  private readonly overlay: OverlayHost;
+  private statusItems: readonly StatusItemId[];
 
   private busy = false;
   private turnNumber = 0;
@@ -82,9 +88,12 @@ export class InteractiveMode {
 
   constructor(private readonly options: InteractiveModeOptions) {
     this.terminal = options.terminal ?? processTerminal;
+    this.statusItems = readStatusItems(options.runtimeContext.projectRoot);
+    this.overlay = new OverlayHost(() => this.tui.requestRender());
     this.tui = new TUI(this.terminal, options.scheduler, resizeScrollbackMode(process.env));
     this.surface = new InteractiveSurface({
-      band: () => readBandState(this.options.runtimeContext),
+      facts: () => readStatusFacts(this.options.runtimeContext),
+      statusItems: () => this.statusItems,
       activity: () => this.sink.activity(),
       busy: () => this.busy,
       queuedCount: () => this.queue.length,
@@ -92,6 +101,8 @@ export class InteractiveMode {
       ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
       newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
       cancelArmed: () => this.isCancelArmed(),
+      overlayFullScreen: () => this.overlay.fullScreen,
+      overlayRows: (width, height) => this.overlay.render(width, height),
     });
     this.sink = new TurnSink(this.surface.transcript, () => this.tui.requestRender());
     this.questions = new QuestionBridge({
@@ -135,18 +146,19 @@ export class InteractiveMode {
 
   /** Intro facts, resolved at paint time so a mid-session change is reflected. */
   private welcomeState(): WelcomeState {
-    const facts = readBandState(this.options.runtimeContext);
+    const facts = readStatusFacts(this.options.runtimeContext);
     return {
       model: facts.model,
       directory: facts.directory ?? this.options.runtimeContext.projectRoot,
       branch: facts.branch,
-      resumeHint: this.options.fallbackSessionId
-        ? `/resume to continue session ${this.options.fallbackSessionId}`
-        : undefined,
+      resumeHint: this.options.fallbackSessionId ? "/resume to pick up where you left off" : undefined,
     };
   }
 
   private onKey(event: Parameters<typeof routeKey>[0]): void {
+    // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
+    // every printable character for its filter.
+    if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids))) return;
     routeKey(event, {
       surface: this.surface,
       busy: this.busy,
@@ -158,6 +170,7 @@ export class InteractiveMode {
         exit: () => this.shutdown(),
         redraw: () => this.tui.requestRender(),
         clearScreen: () => this.clearScreen(),
+        cycleAgentMode: () => this.cycleAgentMode(),
         redrawAfter: (delayMs) => {
           setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
         },
@@ -202,6 +215,10 @@ export class InteractiveMode {
   private onSubmit(text: string): void {
     if (this.questions.answer(text)) {
       this.tui.requestRender();
+      return;
+    }
+    if (!this.busy && opensPicker(text)) {
+      this.openPicker(text);
       return;
     }
     this.surface.transcript.append(textBlock("user", text));
@@ -250,10 +267,71 @@ export class InteractiveMode {
     }
   }
 
+  /** Open the chooser a bare command maps to. */
+  private openPicker(command: string): void {
+    const picker = pickerFor(command, this.pickerHost());
+    if (!picker) return;
+    this.overlay.open(picker);
+  }
+
+  /** Hand the choice to the picker that produced it and surface what it reports. */
+  private applyPicker(picker: Picker, ids: readonly string[]): void {
+    void picker
+      .apply(ids)
+      .then((note) => {
+        if (note) this.surface.transcript.append(textBlock("command", note, picker.title));
+      })
+      .catch((error: unknown) => {
+        this.surface.transcript.append(
+          textBlock("error", error instanceof Error ? error.message : String(error), picker.title),
+        );
+      })
+      .finally(() => this.tui.requestRender());
+  }
+
+  /** Everything the pickers need from the session, resolved lazily. */
+  private pickerHost(): PickerHost {
+    return {
+      commandContext: { cwd: this.options.runtimeContext.cwd, sessionId: this.options.runtimeContext.session.id },
+      sessionManager: this.options.sessionManager,
+      mcpGateway: this.options.initialMcpGateway,
+      approvalTrustPolicy: this.options.approvalTrustPolicy,
+      projectRoot: this.options.runtimeContext.projectRoot,
+      statusItems: this.statusItems,
+      resumeSession: (sessionId) => this.runCommandLine(`/resume ${sessionId}`),
+      refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
+      revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
+      saveStatusItems: async (items) => {
+        this.statusItems = items;
+        return `Status band items saved to ${writeStatusItems(this.options.runtimeContext.projectRoot, items)}`;
+      },
+    };
+  }
+
+  /** Route a command line as if the user had typed it, reusing the same path. */
+  private async runCommandLine(line: string): Promise<undefined> {
+    this.surface.transcript.append(textBlock("user", line));
+    await this.run(line);
+    return undefined;
+  }
+
   private interrupt(): void {
     if (!this.busy) return;
     this.sink.markCancelling();
     this.options.sessionRuntime.cancelCurrentRun();
+  }
+
+  /**
+   * Swap between planning and building. This replaces four commands that each
+   * did one leg of the same toggle, and puts it on a key so the mode can be
+   * changed mid-thought without abandoning the draft.
+   */
+  private cycleAgentMode(): void {
+    const next = this.options.sessionRuntime.getAgentMode() === "plan" ? "build" : "plan";
+    this.options.sessionRuntime.setAgentMode(next);
+    const config = this.options.runtimeContext.runtimeConfig as { agentMode?: "plan" | "build" };
+    config.agentMode = next;
+    this.tui.requestRender();
   }
 
   /** Drop the visible transcript and the terminal's scrollback together. */

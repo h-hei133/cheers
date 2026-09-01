@@ -65,6 +65,30 @@ describe("input passthrough during negotiation", () => {
     expect(negotiation.pending).toBe(true);
   });
 
+  it("never holds a bare escape or a bare CSI", () => {
+    // A terminal that answers neither query leaves negotiation pending forever;
+    // holding these would swallow Escape and the arrow keys outright.
+    const negotiation = new KeyboardNegotiation();
+    expect(negotiation.consume("\x1b").forward).toBe("\x1b");
+    expect(negotiation.consume("\x1b[").forward).toBe("\x1b[");
+  });
+
+  it("gives up when no reply arrives, releasing anything held", () => {
+    const negotiation = new KeyboardNegotiation();
+    negotiation.consume("\x1b[?");
+    expect(negotiation.expire()).toBe("\x1b[?");
+    expect(negotiation.pending).toBe(false);
+    expect(negotiation.active).toBe("legacy");
+    expect(negotiation.restore).toBe("");
+  });
+
+  it("expiring after a reply changes nothing", () => {
+    const negotiation = new KeyboardNegotiation(false);
+    negotiation.consume("\x1b[?0u");
+    expect(negotiation.expire()).toBe("");
+    expect(negotiation.active).toBe("enhanced");
+  });
+
   it("holds a reply split across chunks instead of leaking its bytes", () => {
     const negotiation = new KeyboardNegotiation(false);
     expect(negotiation.consume("\x1b[?").forward).toBe("");

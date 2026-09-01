@@ -30,6 +30,13 @@ export interface HistoryBatch {
 export interface TerminalFramePlan {
   readonly history?: HistoryBatch;
   readonly viewport: readonly string[];
+  /**
+   * A full-screen frame that replaces the viewport entirely. While present the
+   * engine borrows the alternate screen, so the transcript and the terminal's
+   * scrollback are untouched and reappear intact when it goes away. Rows are
+   * painted from the top; the surface owns the whole screen.
+   */
+  readonly modal?: readonly string[];
 }
 
 export interface TerminalFrameProvider {

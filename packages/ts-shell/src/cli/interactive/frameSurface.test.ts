@@ -6,7 +6,8 @@ import { CURSOR_MARKER } from "../../presentation/tui/render/paint.js";
 
 function surface(overrides: Partial<SurfaceContext> = {}): InteractiveSurface {
   return new InteractiveSurface({
-    band: () => ({ model: "opus-5", branch: "main", directory: "~/p" }),
+    facts: () => ({ model: "opus-5", provider: "openai", branch: "main", directory: "~/p" }),
+    statusItems: () => ["model", "branch"] as const,
     activity: () => undefined,
     busy: () => false,
     queuedCount: () => 0,
@@ -14,6 +15,8 @@ function surface(overrides: Partial<SurfaceContext> = {}): InteractiveSurface {
     ambient: () => ({ openTodos: 0, peerSessions: 0 }),
     newlineKey: () => "shift+enter",
     cancelArmed: () => false,
+    overlayFullScreen: () => false,
+    overlayRows: () => [],
     ...overrides,
   });
 }

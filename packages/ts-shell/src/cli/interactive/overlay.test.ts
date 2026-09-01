@@ -1,0 +1,153 @@
+import { describe, expect, it, vi } from "vitest";
+import { OverlayHost, type Picker } from "./overlay.js";
+import { parseKeyEvent } from "../../presentation/tui/input/keys.js";
+import type { Option } from "../../presentation/tui/chrome/options.js";
+
+const options: Option[] = [
+  { id: "a", label: "alpha" },
+  { id: "b", label: "beta", selected: true },
+];
+
+function picker(overrides: Partial<Picker> = {}): Picker {
+  return {
+    title: "Pick",
+    form: "panel",
+    empty: "none",
+    load: async () => options,
+    apply: async () => undefined,
+    ...overrides,
+  };
+}
+
+function host(): { overlay: OverlayHost; changes: () => number } {
+  let changes = 0;
+  return { overlay: new OverlayHost(() => (changes += 1)), changes: () => changes };
+}
+
+const press = (overlay: OverlayHost, data: string, apply = vi.fn()): boolean =>
+  overlay.handleKey(parseKeyEvent(data), apply);
+
+describe("lifecycle", () => {
+  it("is inactive until a picker opens", () => {
+    const { overlay } = host();
+    expect(overlay.active).toBe(false);
+    overlay.open(picker());
+    expect(overlay.active).toBe(true);
+  });
+
+  it("reports whether the open picker wants the whole screen", () => {
+    const { overlay } = host();
+    overlay.open(picker());
+    expect(overlay.fullScreen).toBe(false);
+    overlay.open(picker({ form: "modal" }));
+    expect(overlay.fullScreen).toBe(true);
+  });
+
+  it("shows a loading state until the options arrive", async () => {
+    const { overlay } = host();
+    let release: (value: readonly Option[]) => void = () => {};
+    overlay.open(picker({ load: () => new Promise((resolve) => (release = resolve)) }));
+    expect(overlay.render(60, 20).join("\n")).toContain("loading");
+    release(options);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(overlay.render(60, 20).join("\n")).toContain("alpha");
+  });
+
+  it("survives a picker whose load fails", async () => {
+    // A failed load leaves the picker open and empty rather than tearing down
+    // the frame; the user can still press escape.
+    const { overlay } = host();
+    overlay.open(picker({ load: () => Promise.reject(new Error("no")) }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(overlay.active).toBe(true);
+    expect(overlay.render(60, 20).join("\n")).toContain("none");
+  });
+
+  it("renders nothing when closed", () => {
+    const { overlay } = host();
+    expect(overlay.render(60, 20)).toEqual([]);
+  });
+});
+
+describe("key routing", () => {
+  it("claims every key while open, so nothing leaks to the prompt", async () => {
+    const { overlay } = host();
+    overlay.open(picker());
+    await Promise.resolve();
+    for (const key of ["\x1b[A", "\x1b[B", "x", "\r", "\x7f"]) {
+      const fresh = host();
+      fresh.overlay.open(picker());
+      expect(press(fresh.overlay, key)).toBe(true);
+    }
+  });
+
+  it("claims no key while closed", () => {
+    const { overlay } = host();
+    expect(press(overlay, "x")).toBe(false);
+  });
+
+  it("closes on escape without applying", () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker());
+    press(overlay, "\x1b", apply);
+    expect(overlay.active).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("types into the filter", async () => {
+    const { overlay } = host();
+    overlay.open(picker());
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "b");
+    const rows = overlay.render(60, 20).join("\n");
+    expect(rows).toContain("beta");
+    expect(rows).not.toContain("alpha");
+  });
+});
+
+describe("accepting", () => {
+  it("applies the row under the cursor and closes", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker());
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.objectContaining({ title: "Pick" }), ["a"]);
+    expect(overlay.active).toBe(false);
+  });
+
+  it("applies nothing when there is no row to apply", () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker({ load: async () => [] }));
+    press(overlay, "\r", apply);
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("treats space as a toggle only for a multi-answer picker", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker({ multiple: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, " ");
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["a", "b"]);
+  });
+
+  it("applies an empty set from a multi-answer picker, which is a real choice", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker({ multiple: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "\x1b[B");
+    press(overlay, " ");
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), []);
+  });
+});

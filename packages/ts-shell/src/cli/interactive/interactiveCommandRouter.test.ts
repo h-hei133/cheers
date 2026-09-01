@@ -54,23 +54,12 @@ describe("interactive command router", () => {
     expect(result.turnNumber).toBe(0);
   });
 
-  it("routes agent mode commands and requests prompt refresh", async () => {
+  it("treats a retired mode command as an unknown command rather than routing it", () => {
+    // Mode switching moved to Shift+Tab, so /mode no longer exists to route.
     const harness = createHarness();
-
-    const result = await routeInteractiveCommand({
-      ...harness.input,
-      prompt: "/mode plan",
+    return routeInteractiveCommand({ ...harness.input, prompt: "/mode plan" }).then((result) => {
+      expect(result.refreshPromptChrome).toBeUndefined();
+      expect(harness.getAgentMode()).toBe("build");
     });
-
-    expect(result).toEqual({
-      turnNumber: 0,
-      refreshPromptChrome: true,
-    });
-    expect(harness.getAgentMode()).toBe("plan");
-    expect(harness.lines).toEqual([
-      "\nAgent mode updated to plan.",
-      "Plan mode prioritizes planning and diagnosis over direct edits/tool execution.",
-      "",
-    ]);
   });
 });

@@ -20,7 +20,7 @@ describe("command completions", () => {
   });
 
   it("ranks the typed prefix first", () => {
-    expect(slashSuggestions("/mod")?.[0]?.value).toBe("/mode");
+    expect(slashSuggestions("/mod")?.[0]?.value).toBe("/model");
   });
 
   it("stops offering once the user moves on to arguments", () => {

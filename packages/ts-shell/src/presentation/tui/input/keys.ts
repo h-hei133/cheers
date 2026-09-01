@@ -114,6 +114,9 @@ export function parseKeyEvent(data: string): ParsedKeyEvent {
   if (data.charCodeAt(0) === 0x1b) return parseEscapeSequence(data);
   if (data.length <= 2 && data.codePointAt(0)! < 0x20) return parseControl(data);
   if (data === "\x7f") return keyEvent("backspace", data);
+  // Space needs a name so a binding can claim it, while keeping its text so it
+  // still types as a space wherever nothing claims it.
+  if (data === " ") return keyEvent("space", data, NO_MODIFIERS, data);
   return keyEvent(data.toLowerCase(), data, NO_MODIFIERS, data);
 }
 

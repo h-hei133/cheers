@@ -39,14 +39,6 @@ describe("slash router (W4)", () => {
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });
 
-  it("routes local doctor command", async () => {
-    const result = await routeSlashCommand("/doctor", { cwd: workspaceRoot });
-    expect(result).toBeTruthy();
-    expect(result?.kind).toBe("local");
-    if (result?.kind === "local") {
-      expect(result.output).toContain("Private Coding Agents CLI Doctor");
-    }
-  });
 
   it("routes local connect command", async () => {
     const result = await routeSlashCommand("/connect status", {
@@ -1022,7 +1014,7 @@ describe("slash router (W4)", () => {
     }
   });
 
-  it("routes /cancel, /sessions, /workspace, /mcp, /help, /view, and /permissions as shell actions", async () => {
+  it("routes /cancel, /sessions, /workspace, /mcp, /help, and /permissions as shell actions", async () => {
     for (const [command, action] of [
       ["/cancel", "cancel-run"],
       ["/sessions", "list-sessions"],
@@ -1045,13 +1037,6 @@ describe("slash router (W4)", () => {
       ["/mcp reconnect", "show-mcp"],
       ["/mcp refresh localSdk", "show-mcp"],
       ["/help", "show-help"],
-      ["/view", "show-view"],
-      ["/view status", "show-view"],
-      ["/view compact", "set-view"],
-      ["/view user", "set-view"],
-      ["/view verbose", "set-view"],
-      ["/view developer", "set-view"],
-      ["/view dev", "set-view"],
       ["/permissions", "manage-permissions"],
       ["/approval-policy list", "manage-permissions"],
       ["/permissions explain", "manage-permissions"],

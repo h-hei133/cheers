@@ -37,6 +37,8 @@ export interface TuiSettings {
    * rewrap of the retired rows in place.
    */
   readonly resizeScrollback?: "rebuild" | "preserve";
+  /** Status band item ids, in canonical order. Empty or absent means the defaults. */
+  readonly statusItems?: readonly string[];
   readonly showThinking?: boolean;
   readonly theme?: "dark" | "light";
 }

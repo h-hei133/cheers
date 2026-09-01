@@ -55,6 +55,8 @@ export interface KeymapActions {
    * after the press would no longer exit.
    */
   redrawAfter(delayMs: number): void;
+  /** Cycle the agent mode between planning and building. */
+  cycleAgentMode(): void;
   /**
    * Recompute completions for the current draft. `mayOpen` is true only for the
    * gestures that should be able to *open* the list — typing and Tab. Every other
@@ -121,6 +123,11 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
       break;
     case "tab":
       actions.syncSuggestions(true);
+      actions.redraw();
+      return;
+    case "shift+tab":
+      // Tab is completion, so mode cycling takes the shifted form.
+      actions.cycleAgentMode();
       actions.redraw();
       return;
     case "up":

@@ -1,5 +1,6 @@
 import { Editor } from "../../presentation/tui/editor.js";
-import { renderBand, type BandState } from "../../presentation/tui/chrome/band.js";
+import { renderBand } from "../../presentation/tui/chrome/band.js";
+import type { StatusFacts, StatusItemId } from "../../presentation/tui/chrome/items.js";
 import { composerTextWidth, renderComposer } from "../../presentation/tui/chrome/composer.js";
 import { renderHints, type AmbientContext } from "../../presentation/tui/chrome/hints.js";
 import { SuggestionList } from "../../presentation/tui/chrome/suggestions.js";
@@ -22,7 +23,8 @@ import { renderActivity, type TurnActivity } from "../../presentation/tui/transc
  */
 
 export interface SurfaceContext {
-  band(): BandState;
+  facts(): StatusFacts;
+  statusItems(): readonly StatusItemId[];
   activity(): TurnActivity | undefined;
   busy(): boolean;
   queuedCount(): number;
@@ -33,6 +35,10 @@ export interface SurfaceContext {
   newlineKey(): string;
   /** True while a second cancel press would exit. */
   cancelArmed(): boolean;
+  /** True when an open picker wants the whole screen. */
+  overlayFullScreen(): boolean;
+  /** Rows for an open picker, or none when none is open. */
+  overlayRows(width: number, height: number): string[];
 }
 
 /** Minimum transcript rows kept visible however tall the chrome grows. */
@@ -65,7 +71,12 @@ export class InteractiveSurface implements TerminalFrameProvider {
   renderFrame(dimensions: ViewportSize): TerminalFramePlan {
     const width = Math.max(8, dimensions.columns);
     const height = Math.max(4, dimensions.rows);
-    const chrome = this.renderChrome(width);
+    if (this.context.overlayFullScreen()) {
+      // A full-screen picker owns the borrowed alternate screen; the transcript
+      // and its scrollback stay exactly as they were underneath.
+      return { modal: this.context.overlayRows(width, height), viewport: [] };
+    }
+    const chrome = this.renderChrome(width, height);
     const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.length);
     const history = this.transcript.peekBatch(width, capacity);
     const live = this.transcript.renderViewport(width, capacity);
@@ -84,12 +95,17 @@ export class InteractiveSurface implements TerminalFrameProvider {
     this.transcript.beginFlush();
   }
 
-  /** The fixed bottom block: activity, band, prompt, and either hints or completions. */
-  private renderChrome(width: number): string[] {
+  /**
+   * The fixed bottom block: activity, an open panel picker, the band, the prompt,
+   * and either completions or the hint row. The picker sits above the band so the
+   * prompt stays where the user's attention already is.
+   */
+  private renderChrome(width: number, height: number): string[] {
     const busy = this.context.busy();
     const rows = [
       ...renderActivity(this.context.activity(), this.context.now(), width),
-      renderBand(this.context.band(), width),
+      ...this.context.overlayRows(width, height),
+      renderBand(this.context.facts(), this.context.statusItems(), width),
       ...renderComposer(this.editor, { busy }, width),
     ];
     if (this.suggestionsOpen) {

@@ -107,6 +107,12 @@ describe("printable input", () => {
     expect(parseKeyEvent("\u{1f680}").text).toBe("\u{1f680}");
   });
 
+  it("names space while keeping it typable", () => {
+    // A picker binds space to toggle; the editor still needs its text.
+    expect(id(" ")).toBe("space");
+    expect(parseKeyEvent(" ").text).toBe(" ");
+  });
+
   it("matches against a canonical id", () => {
     expect(matchesKey("\x1b[3~", "delete")).toBe(true);
     expect(matchesKey("\x1b[3~", "insert")).toBe(false);

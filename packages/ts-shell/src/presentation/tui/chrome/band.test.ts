@@ -1,52 +1,104 @@
 import { describe, expect, it } from "vitest";
-import { contextUsage, renderBand } from "./band.js";
+import { renderBand } from "./band.js";
+import {
+  DEFAULT_STATUS_ITEMS,
+  normalizeStatusItems,
+  renderStatusItem,
+  STATUS_ITEMS,
+  type StatusFacts,
+} from "./items.js";
 import { visibleWidth } from "../text/measure.js";
+import { stripAnsi } from "../text/ansi.js";
 
-const state = { model: "opus-5", branch: "main", directory: "~/project" };
+const facts: StatusFacts = {
+  model: "opus-5",
+  provider: "openai",
+  branch: "main",
+  directory: "~/project",
+  agentMode: "build",
+};
 
 describe("status band", () => {
   it("fills exactly the terminal width", () => {
     for (const width of [20, 40, 80, 120]) {
-      expect(visibleWidth(renderBand(state, width))).toBe(width);
+      expect(visibleWidth(renderBand(facts, DEFAULT_STATUS_ITEMS, width))).toBe(width);
     }
   });
 
   it("stays exact when a segment holds wide characters", () => {
-    expect(visibleWidth(renderBand({ ...state, directory: "~/项目/子目录" }, 60))).toBe(60);
+    const wide = { ...facts, directory: "~/项目/子目录" };
+    expect(visibleWidth(renderBand(wide, DEFAULT_STATUS_ITEMS, 60))).toBe(60);
   });
 
-  it("keeps the model when width forces segments out", () => {
-    // The model decides what answers, so it is the last fact worth dropping.
-    expect(renderBand(state, 16)).toContain("opus-5");
+  it("keeps the first configured item when width forces segments out", () => {
+    // Segments drop from the right, so the model survives longest.
+    expect(stripAnsi(renderBand(facts, DEFAULT_STATUS_ITEMS, 16))).toContain("opus-5");
   });
 
-  it("omits the context gauge until real usage is recorded", () => {
-    expect(renderBand(state, 80)).not.toContain("%");
+  it("shows only the items that were configured", () => {
+    const band = stripAnsi(renderBand(facts, ["model", "provider"], 80));
+    expect(band).toContain("opus-5");
+    expect(band).toContain("openai");
+    expect(band).not.toContain("main");
   });
 
-  it("shows the gauge once usage exists", () => {
-    const band = renderBand({ ...state, usedTokens: 18_000, contextWindow: 200_000 }, 80);
-    expect(band).toContain("9%");
-  });
-
-  it("omits cost until something has been spent", () => {
-    expect(renderBand({ ...state, costUsd: 0 }, 80)).not.toContain("$");
-    expect(renderBand({ ...state, costUsd: 0.0142 }, 80)).toContain("$0.0142");
-  });
-
-  it("shows a non-default agent mode", () => {
-    expect(renderBand({ ...state, mode: "plan" }, 80)).toContain("plan");
+  it("never renders as an empty coloured stripe", () => {
+    // Every configured item having nothing to say would otherwise read as a bug.
+    expect(stripAnsi(renderBand(facts, ["cost"], 40)).trim()).toBe("opus-5");
   });
 });
 
-describe("context usage", () => {
-  it("is undefined without both a count and a window", () => {
-    expect(contextUsage({ model: "m" })).toBeUndefined();
-    expect(contextUsage({ model: "m", usedTokens: 10 })).toBeUndefined();
+describe("status items", () => {
+  it("omits the context gauge until real usage is recorded", () => {
+    expect(renderStatusItem("context", facts)).toBeUndefined();
   });
 
-  it("is a rounded percentage, capped at full", () => {
-    expect(contextUsage({ model: "m", usedTokens: 5_000, contextWindow: 20_000 })).toBe(25);
-    expect(contextUsage({ model: "m", usedTokens: 40_000, contextWindow: 20_000 })).toBe(100);
+  it("shows the gauge once usage exists", () => {
+    const used = { ...facts, contextUsed: 18_000, contextWindow: 200_000 };
+    expect(stripAnsi(renderStatusItem("context", used) ?? "")).toBe("18k/200k 9%");
+  });
+
+  it("omits cost until something has been spent", () => {
+    expect(renderStatusItem("cost", facts)).toBeUndefined();
+    expect(stripAnsi(renderStatusItem("cost", { ...facts, costUsd: 0.0142 }) ?? "")).toBe("$0.0142");
+  });
+
+  it("shows the agent mode only when it is not the default", () => {
+    expect(renderStatusItem("agent-mode", facts)).toBeUndefined();
+    expect(stripAnsi(renderStatusItem("agent-mode", { ...facts, agentMode: "plan" }) ?? "")).toBe("plan");
+  });
+
+  it("shortens the session id to the part /resume needs", () => {
+    const withSession = { ...facts, sessionId: "sess_abcdef0123456789" };
+    expect(stripAnsi(renderStatusItem("session", withSession) ?? "")).toBe("abcdef01");
+  });
+
+  it("singularises nothing it cannot count", () => {
+    expect(renderStatusItem("turns", facts)).toBeUndefined();
+    expect(stripAnsi(renderStatusItem("turns", { ...facts, turns: 1 }) ?? "")).toBe("1 turn");
+    expect(stripAnsi(renderStatusItem("turns", { ...facts, turns: 4 }) ?? "")).toBe("4 turns");
+  });
+
+  it("offers every item with a real source", () => {
+    for (const item of STATUS_ITEMS) {
+      expect(item.label.length).toBeGreaterThan(0);
+      expect(item.describe.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("item normalisation", () => {
+  it("falls back to the defaults for an empty or unknown selection", () => {
+    expect(normalizeStatusItems(undefined)).toEqual(DEFAULT_STATUS_ITEMS);
+    expect(normalizeStatusItems([])).toEqual(DEFAULT_STATUS_ITEMS);
+    expect(normalizeStatusItems(["nonsense"])).toEqual(DEFAULT_STATUS_ITEMS);
+  });
+
+  it("returns the chosen items in canonical order, not the order ticked", () => {
+    expect(normalizeStatusItems(["branch", "model"])).toEqual(["model", "branch"]);
+  });
+
+  it("drops ids that name nothing", () => {
+    expect(normalizeStatusItems(["model", "nonsense"])).toEqual(["model"]);
   });
 });

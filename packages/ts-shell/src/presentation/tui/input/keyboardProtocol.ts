@@ -32,6 +32,14 @@ const DISABLE_MODIFY_OTHER_KEYS = "\x1b[>4;0m";
 const ENHANCED_REPLY = /^\x1b\[\?(\d*)u/;
 const DEVICE_ATTRIBUTES_REPLY = /^\x1b\[\?[\d;]*c/;
 
+/**
+ * A partial reply is only held once it has committed to being one. `ESC` and
+ * `ESC [` are overwhelmingly more likely to be a keypress — Escape itself, or the
+ * head of an arrow — and holding those swallows the key outright when no reply is
+ * ever coming.
+ */
+const HELD_REPLY_PREFIX = /^\x1b\[\?[\d;]*$/;
+
 /** Longest reply prefix worth holding while waiting for the rest of it. */
 const MAX_HELD_REPLY = 32;
 
@@ -126,6 +134,18 @@ export class KeyboardNegotiation {
     return held;
   }
 
+  /**
+   * Give up waiting. A terminal that answers neither query speaks neither
+   * protocol, and inspecting every keystroke forever on the chance a reply is
+   * still coming costs work and risks holding a key that will never be claimed.
+   */
+  expire(): string {
+    if (this.settled) return "";
+    this.settled = true;
+    this.protocol = "legacy";
+    return this.flush();
+  }
+
   private settle(protocol: KeyboardProtocol): string {
     if (this.settled) return "";
     this.settled = true;
@@ -140,6 +160,6 @@ export class KeyboardNegotiation {
   /** Whether `tail` is a prefix of a reply this negotiation is waiting for. */
   private couldBecomeReply(tail: string): boolean {
     if (tail.length > MAX_HELD_REPLY) return false;
-    return /^\x1b(\[(\?[\d;]*)?)?$/.test(tail);
+    return HELD_REPLY_PREFIX.test(tail);
   }
 }

@@ -16,7 +16,10 @@ import {
   cursorPaint,
   cursorTarget,
   diffPaint,
+  ENTER_ALT_SCREEN,
   eraseFromRow,
+  EXIT_ALT_SCREEN,
+  modalPaint,
   paintBegin,
   paintEnd,
   prepareRows,
@@ -63,6 +66,7 @@ export class TUI {
   private forceNextFrame = false;
   private resetScrollbackNextFrame = false;
 
+  private modalActive = false;
   private resizeTimer: unknown;
   private resizeWidthChanged = false;
   private resizeMode: ResizeScrollbackMode;
@@ -121,6 +125,7 @@ export class TUI {
     this.started = false;
     this.scheduler.clearTimeout(this.frameTimer);
     this.scheduler.clearTimeout(this.resizeTimer);
+    if (this.modalActive) this.leaveModal();
     this.retireRemainingHistory();
     this.terminal.stop();
   }
@@ -150,7 +155,9 @@ export class TUI {
     const startedAt = this.scheduler.now();
     const dimensions = this.terminal.getDimensions();
     if (this.resetScrollbackNextFrame) this.provider.beginHistoryReplay?.();
-    this.paint(this.provider.renderFrame(dimensions), dimensions);
+    const plan = this.provider.renderFrame(dimensions);
+    if (plan.modal) this.paintModal(plan.modal, dimensions);
+    else this.paint(plan, dimensions);
     this.lastFrameCostMs = this.scheduler.now() - startedAt;
   }
 
@@ -180,7 +187,41 @@ export class TUI {
     this.requestRender(rebuild ? { force: true, clearScrollback: true } : { force: true });
   }
 
+  /**
+   * Paint a full-screen frame on the borrowed alternate screen, entering it on
+   * the first such frame. Nothing about the normal screen changes while a modal
+   * is up, so leaving restores the transcript without repainting it.
+   */
+  private paintModal(rows: readonly string[], dimensions: ViewportSize): void {
+    const height = Math.max(1, dimensions.rows);
+    const width = Math.max(1, dimensions.columns);
+    let buffer = "";
+    if (!this.modalActive) {
+      this.modalActive = true;
+      buffer += ENTER_ALT_SCREEN;
+    }
+    buffer += paintBegin(this.terminal.capabilities.supportsDec2026Sync);
+    buffer += modalPaint(prepareRows(clampToHeight(rows, height), width), height);
+    buffer += cursorPaint(null, 0);
+    buffer += paintEnd(this.terminal.capabilities.supportsDec2026Sync);
+    this.terminal.write(buffer);
+    this.forceNextFrame = false;
+    this.resetScrollbackNextFrame = false;
+  }
+
+  /**
+   * Give the alternate screen back. The normal screen still holds the frame that
+   * was there when the modal opened, so the viewport is repainted from the
+   * engine's own window rather than rebuilt.
+   */
+  private leaveModal(): void {
+    this.modalActive = false;
+    this.terminal.write(EXIT_ALT_SCREEN);
+    this.forceNextFrame = true;
+  }
+
   private paint(plan: TerminalFramePlan, dimensions: ViewportSize): void {
+    if (this.modalActive) this.leaveModal();
     const width = Math.max(1, dimensions.columns);
     const height = Math.max(1, dimensions.rows);
     const reset = this.resetScrollbackNextFrame;
