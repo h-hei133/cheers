@@ -1,7 +1,7 @@
 import { Editor } from "../../presentation/tui/editor.js";
 import { renderBand, type BandState } from "../../presentation/tui/chrome/band.js";
 import { composerTextWidth, renderComposer } from "../../presentation/tui/chrome/composer.js";
-import { renderHints } from "../../presentation/tui/chrome/hints.js";
+import { renderHints, type AmbientContext } from "../../presentation/tui/chrome/hints.js";
 import { SuggestionList } from "../../presentation/tui/chrome/suggestions.js";
 import type {
   TerminalFramePlan,
@@ -27,6 +27,12 @@ export interface SurfaceContext {
   busy(): boolean;
   queuedCount(): number;
   now(): number;
+  /** Background facts for the row under the prompt. */
+  ambient(): AmbientContext;
+  /** Key that inserts a newline on this terminal. */
+  newlineKey(): string;
+  /** True while a second cancel press would exit. */
+  cancelArmed(): boolean;
 }
 
 /** Minimum transcript rows kept visible however tall the chrome grows. */
@@ -84,7 +90,7 @@ export class InteractiveSurface implements TerminalFrameProvider {
     const rows = [
       ...renderActivity(this.context.activity(), this.context.now(), width),
       renderBand(this.context.band(), width),
-      ...renderComposer(this.editor, { busy, queued: this.context.queuedCount() }, width),
+      ...renderComposer(this.editor, { busy }, width),
     ];
     if (this.suggestionsOpen) {
       rows.push(...this.suggestions.render(width));
@@ -93,10 +99,12 @@ export class InteractiveSurface implements TerminalFrameProvider {
       ...renderHints(
         {
           busy,
-          hasDraft: this.editor.getText().trim().length > 0,
           suggesting: this.suggestionsOpen,
-          multiline: this.editor.getText().includes("\n"),
+          cancelArmed: this.context.cancelArmed(),
+          queued: this.context.queuedCount(),
+          newlineKey: this.context.newlineKey(),
         },
+        this.context.ambient(),
         width,
       ),
     );

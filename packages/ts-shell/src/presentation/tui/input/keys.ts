@@ -144,6 +144,11 @@ function parseCsi(data: string): ParsedKeyEvent {
   if (final === "M" || final === "m") return keyEvent("mouse", data);
   const parameters = body.split(";");
   if (final === "~") {
+    // modifyOtherKeys level 2 reports a modified key as `CSI 27 ; mods ; code ~`,
+    // which is the only way an xterm-family terminal can express Shift+Enter.
+    if (parameters[0] === "27" && parameters.length >= 3) {
+      return decodeModifiedKey(Number.parseInt(parameters[2] ?? "", 10), parameters[1], data);
+    }
     const name = TILDE_KEYS[parameters[0] ?? ""];
     return name ? keyEvent(name, data, decodeModifiers(parameters[1])) : keyEvent("", data);
   }
@@ -154,14 +159,13 @@ function parseCsi(data: string): ParsedKeyEvent {
   return keyEvent(name, data, modifiers);
 }
 
-/** CSI-u: `ESC [ code[:shifted[:base]] [; modifiers[:event]] u`. */
-function parseCsiU(body: string, raw: string): ParsedKeyEvent {
-  const [codeField, modifierField] = body.split(";");
-  const code = Number.parseInt((codeField ?? "").split(":")[0] ?? "", 10);
+/**
+ * One key identified by its code point plus a modifier mask, shared by the
+ * enhanced protocol's CSI-u form and the modifyOtherKeys `CSI 27;…~` form.
+ */
+function decodeModifiedKey(code: number, modifierField: string | undefined, raw: string): ParsedKeyEvent {
   if (!Number.isFinite(code)) return keyEvent("", raw);
-  const eventType = (modifierField ?? "").split(":")[1];
-  if (eventType === "3") return keyEvent("", raw);
-  const modifiers = decodeModifiers((modifierField ?? "").split(":")[0]);
+  const modifiers = decodeModifiers(modifierField);
   const named = CSI_U_KEYS[code];
   if (named) return keyEvent(named, raw, modifiers);
   if (code < 32) return keyEvent("", raw);
@@ -170,8 +174,27 @@ function parseCsiU(body: string, raw: string): ParsedKeyEvent {
   return keyEvent(char.toLowerCase(), raw, modifiers, printable ? char : "");
 }
 
+/** CSI-u: `ESC [ code[:shifted[:base]] [; modifiers[:event]] u`. */
+function parseCsiU(body: string, raw: string): ParsedKeyEvent {
+  const [codeField, modifierField] = body.split(";");
+  const eventType = (modifierField ?? "").split(":")[1];
+  if (eventType === "3") return keyEvent("", raw);
+  return decodeModifiedKey(
+    Number.parseInt((codeField ?? "").split(":")[0] ?? "", 10),
+    (modifierField ?? "").split(":")[0],
+    raw,
+  );
+}
+
 function parseControl(data: string): ParsedKeyEvent {
-  if (data === "\r" || data === "\n") return keyEvent("enter", data);
+  if (data === "\r") return keyEvent("enter", data);
+  // Most terminals send DEL for Backspace, but Windows consoles send BS. Taking
+  // both costs Ctrl+H, which no binding uses.
+  if (data === "\b") return keyEvent("backspace", data);
+  // In raw mode the keyboard's Enter is CR, so a bare LF is Ctrl+J — the one
+  // newline key every terminal can express, and the fallback for terminals that
+  // cannot report Shift+Enter at all.
+  if (data === "\n") return keyEvent("j", data, { ...NO_MODIFIERS, ctrl: true });
   if (data === "\t") return keyEvent("tab", data);
   if (data === "\x00") return keyEvent("space", data, { ...NO_MODIFIERS, ctrl: true });
   const code = data.charCodeAt(0);

@@ -49,8 +49,19 @@ export interface KeymapActions {
   redraw(): void;
   /** Clear the visible transcript and the terminal's scrollback. */
   clearScreen(): void;
-  /** Recompute completions after the draft changed. */
-  refreshSuggestions(): void;
+  /**
+   * Schedule a repaint after `delayMs`. Used for hints that expire on a clock
+   * rather than on an event: without it, "press again to exit" stays on screen
+   * after the press would no longer exit.
+   */
+  redrawAfter(delayMs: number): void;
+  /**
+   * Recompute completions for the current draft. `mayOpen` is true only for the
+   * gestures that should be able to *open* the list — typing and Tab. Every other
+   * draft change may refine an open list but must never pop one up, or the list
+   * steals the arrow keys from prompt-history recall.
+   */
+  syncSuggestions(mayOpen: boolean): void;
 }
 
 export interface KeymapContext {
@@ -109,21 +120,40 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
       editor.undo();
       break;
     case "tab":
-      actions.refreshSuggestions();
-      surface.setSuggesting(true);
+      actions.syncSuggestions(true);
       actions.redraw();
       return;
     case "up":
-      if (!editor.move("up")) editor.recall(-1);
-      break;
+      recallOrMove(context, -1);
+      return;
     case "down":
-      if (!editor.move("down")) editor.recall(1);
-      break;
+      recallOrMove(context, 1);
+      return;
     default:
       if (!applyTableKey(event, context)) return;
   }
-  actions.refreshSuggestions();
+  actions.syncSuggestions(opensSuggestions(event));
   actions.redraw();
+}
+
+/**
+ * Arrow keys move within a multi-line draft first, and walk prompt history once
+ * the caret has nowhere left to go. Recall closes any completion list: the draft
+ * it just loaded is a past prompt, not something the user is composing, and
+ * leaving the list open would consume the next arrow press.
+ */
+function recallOrMove(context: KeymapContext, direction: 1 | -1): void {
+  const { surface, actions } = context;
+  const moved = surface.editor.move(direction === -1 ? "up" : "down");
+  if (!moved && surface.editor.recall(direction)) {
+    surface.setSuggesting(false);
+  }
+  actions.redraw();
+}
+
+/** Whether a key is one of the gestures allowed to open the completion list. */
+function opensSuggestions(event: ParsedKeyEvent): boolean {
+  return Boolean(event.text) && !event.ctrl && !event.alt && !event.meta;
 }
 
 /** Motions, kills, newlines, and printable text. Returns false when unhandled. */
@@ -143,7 +173,7 @@ function applyTableKey(event: ParsedKeyEvent, context: KeymapContext): boolean {
     editor.newline();
     return true;
   }
-  if (event.text && !event.ctrl && !event.alt && !event.meta) {
+  if (opensSuggestions(event)) {
     editor.insert(event.text);
     return true;
   }
@@ -197,6 +227,7 @@ function handleCancelKey(context: KeymapContext): void {
   }
   context.gesture.lastCancelAt = at;
   actions.redraw();
+  actions.redrawAfter(DOUBLE_INTERRUPT_MS);
 }
 
 function submitDraft(context: KeymapContext): void {

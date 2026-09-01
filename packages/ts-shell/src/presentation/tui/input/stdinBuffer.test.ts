@@ -65,6 +65,22 @@ describe("keystroke assembly", () => {
   });
 });
 
+describe("newline handling", () => {
+  it("delivers a bare line feed as the newline chord", () => {
+    const { buffer, keys } = harness();
+    buffer.feed("\n");
+    expect(keys).toEqual(["ctrl+j"]);
+  });
+
+  it("collapses a CRLF pair into one Enter", () => {
+    // Otherwise a terminal that sends CRLF for Enter submits and then leaves a
+    // stray newline in the next draft.
+    const { buffer, keys } = harness();
+    buffer.feed("\r\n");
+    expect(keys).toEqual(["enter"]);
+  });
+});
+
 describe("the lone escape ambiguity", () => {
   it("holds a bare escape rather than guessing", () => {
     const { buffer, keys } = harness();

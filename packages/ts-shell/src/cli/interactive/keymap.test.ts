@@ -22,7 +22,8 @@ function build(busy = false): {
     exit: vi.fn(),
     redraw: vi.fn(),
     clearScreen: vi.fn(),
-    refreshSuggestions: vi.fn(),
+    redrawAfter: vi.fn(),
+    syncSuggestions: vi.fn(),
   };
   const clock = { now: 0 };
   const gesture: { lastCancelAt?: number } = {};
@@ -96,6 +97,24 @@ describe("submission", () => {
     expect(surface.editor.getText()).toBe("a\nb");
     expect(actions.submit).not.toHaveBeenCalled();
   });
+
+  it("accepts the universal newline fallback on terminals without the protocol", () => {
+    // Ctrl+J is a bare line feed, which every terminal can send.
+    const { press, surface, actions } = build();
+    press("a");
+    press("\n");
+    press("b");
+    expect(surface.editor.getText()).toBe("a\nb");
+    expect(actions.submit).not.toHaveBeenCalled();
+  });
+
+  it("accepts alt+enter as a newline too", () => {
+    const { press, surface } = build();
+    press("a");
+    press("\x1b\r");
+    press("b");
+    expect(surface.editor.getText()).toBe("a\nb");
+  });
 });
 
 describe("interruption", () => {
@@ -128,6 +147,12 @@ describe("interruption", () => {
     clock.now = 100;
     press("\x03");
     expect(actions.exit).toHaveBeenCalledOnce();
+  });
+
+  it("schedules the repaint that retires the exit hint", () => {
+    const { press, actions } = build();
+    press("\x03");
+    expect(actions.redrawAfter).toHaveBeenCalledOnce();
   });
 
   it("treats a slow second ctrl+c as a fresh press", () => {
@@ -230,6 +255,30 @@ describe("editing shortcuts", () => {
     surface.editor.pushHistory("earlier");
     press("\x1b[A");
     expect(surface.editor.getText()).toBe("earlier");
+  });
+
+  it("keeps walking history past a recalled slash command", () => {
+    // Recalling "/help" used to pop the completion list, which then ate the next
+    // arrow press and stranded the user on that entry.
+    const { press, surface } = build();
+    surface.editor.pushHistory("first prompt");
+    surface.editor.pushHistory("/help");
+    press("\x1b[A");
+    expect(surface.editor.getText()).toBe("/help");
+    expect(surface.suggestionsOpen).toBe(false);
+    press("\x1b[A");
+    expect(surface.editor.getText()).toBe("first prompt");
+  });
+
+
+  it("asks to open the list only for typing and Tab", () => {
+    const { press, actions } = build();
+    press("x");
+    expect(actions.syncSuggestions).toHaveBeenLastCalledWith(true);
+    press("\x7f");
+    expect(actions.syncSuggestions).toHaveBeenLastCalledWith(false);
+    press("\t");
+    expect(actions.syncSuggestions).toHaveBeenLastCalledWith(true);
   });
 
   it("clears the screen on ctrl+l", () => {

@@ -18,8 +18,6 @@ const CONTINUATION = "   ";
 export interface ComposerState {
   /** True while a turn is running, which shows the queued-input affordance. */
   readonly busy: boolean;
-  /** Number of prompts queued behind the running turn. */
-  readonly queued: number;
 }
 
 /** Cells available to prompt text at a terminal width. */
@@ -33,8 +31,5 @@ export function renderComposer(editor: Editor, state: ComposerState, width: numb
   const rows = editor.render(textWidth);
   const cue = state.busy ? defaultTheme.fg("warning", CUE) : defaultTheme.fg("accent", CUE);
   const rendered = rows.map((row, index) => (index === 0 ? cue : CONTINUATION) + row);
-  if (state.queued > 0) {
-    rendered.push(defaultTheme.dim(`   ${state.queued} queued`));
-  }
   return rendered.map((row) => padToWidth(row, width));
 }

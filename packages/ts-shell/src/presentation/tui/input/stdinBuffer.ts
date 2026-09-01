@@ -106,8 +106,12 @@ export class StdinBuffer {
       }
       if (BRACKETED_PASTE_START.startsWith(this.buffer)) return;
       if (this.buffer.charCodeAt(0) !== 0x1b) {
-        const length = scalarLength(this.buffer, 0);
-        this.take(length);
+        // A terminal that still translates Enter to CRLF would otherwise submit
+        // and then insert a newline into the next draft.
+        if (this.buffer.startsWith("\r\n")) {
+          this.buffer = `\r${this.buffer.slice(2)}`;
+        }
+        this.take(scalarLength(this.buffer, 0));
         continue;
       }
       // `ESC ESC` is a meta-Escape chord; take the first ESC alone so the

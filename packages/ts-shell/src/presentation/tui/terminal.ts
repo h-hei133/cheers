@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { KeyboardNegotiation, type KeyboardProtocol } from "./input/keyboardProtocol.js";
 import { detectTerminalCapabilities, type TerminalCapabilities } from "./terminalCapabilities.js";
 
 /**
@@ -40,6 +41,8 @@ export type DisconnectHandler = () => void;
  */
 export interface TerminalDevice {
   readonly capabilities: TerminalCapabilities;
+  /** Negotiated modifier-reporting protocol; absent devices are treated as legacy. */
+  readonly keyboardProtocol?: KeyboardProtocol;
   getDimensions(): { readonly columns: number; readonly rows: number };
   getPendingOutputBytes(): number;
   write(data: string): void;
@@ -56,6 +59,7 @@ export interface TerminalDevice {
 export class Terminal implements TerminalDevice {
   readonly capabilities: TerminalCapabilities;
 
+  private readonly keyboard = new KeyboardNegotiation();
   private started = false;
   private disconnected = false;
   private rawOwned = false;
@@ -68,7 +72,13 @@ export class Terminal implements TerminalDevice {
   private onDisconnect: DisconnectHandler = () => {};
 
   private readonly handleData = (chunk: Buffer | string): void => {
-    const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    let text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    if (this.keyboard.pending) {
+      const step = this.keyboard.consume(text);
+      if (step.write) this.write(step.write);
+      text = step.forward;
+      if (text.length === 0) return;
+    }
     if (!this.inputEnabled) {
       this.deferredInput.push(text);
       return;
@@ -138,6 +148,15 @@ export class Terminal implements TerminalDevice {
     process.stdin.on("end", this.handleEnd);
     process.stdin.on("close", this.handleEnd);
     process.stdin.resume();
+    // Ask for modifier reporting before the first keystroke: without it the
+    // terminal cannot express Shift+Enter at all, and a bare Escape is
+    // indistinguishable from the head of a sequence.
+    if (this.capabilities.supportsBracketedPaste) this.write(this.keyboard.query);
+  }
+
+  /** Which modifier-reporting protocol negotiation settled on. */
+  get keyboardProtocol(): KeyboardProtocol {
+    return this.keyboard.active;
   }
 
   /** Take over stdin after a deferred start and replay anything typed meanwhile. */
@@ -158,13 +177,13 @@ export class Terminal implements TerminalDevice {
     process.stdin.off("data", this.handleData);
     process.stdin.off("end", this.handleEnd);
     process.stdin.off("close", this.handleEnd);
-    this.writeSync(RESTORE_MODES);
+    this.writeSync(`${this.keyboard.restore}${RESTORE_MODES}`);
     this.releaseRawMode();
   }
 
   /** Unbuffered restore for exit and crash handlers, where queued writes are lost. */
   restoreSync(): void {
-    this.writeSync(RESTORE_MODES);
+    this.writeSync(`${this.keyboard.restore}${RESTORE_MODES}`);
     this.releaseRawMode();
   }
 

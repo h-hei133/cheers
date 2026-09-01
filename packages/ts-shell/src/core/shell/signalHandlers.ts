@@ -37,6 +37,8 @@ export function handleShellClose(input: {
   if (input.readline?.close) {
     input.readline.close();
   }
-  input.renderer.renderLine(`\nSession saved. Resume this session with:\n  private-coding-agents --resume ${sessionId}\n`);
+  // One line, and only the line the user needs to come back. Anything more is
+  // noise on the way out.
+  input.renderer.renderLine(`\n  --resume ${sessionId}\n`);
   input.exit(0);
 }

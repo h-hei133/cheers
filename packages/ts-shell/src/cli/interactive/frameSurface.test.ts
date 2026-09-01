@@ -11,6 +11,9 @@ function surface(overrides: Partial<SurfaceContext> = {}): InteractiveSurface {
     busy: () => false,
     queuedCount: () => 0,
     now: () => 1_000,
+    ambient: () => ({ openTodos: 0, peerSessions: 0 }),
+    newlineKey: () => "shift+enter",
+    cancelArmed: () => false,
     ...overrides,
   });
 }

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { composerTextWidth, renderComposer } from "./composer.js";
-import { renderHints } from "./hints.js";
+import { newlineKeyFor, renderHints } from "./hints.js";
 import { renderWelcome } from "./welcome.js";
 import { Editor } from "../editor.js";
 import { visibleWidth } from "../text/measure.js";
 import { CURSOR_MARKER } from "../render/paint.js";
 
-const idle = { busy: false, queued: 0 };
+const idle = { busy: false };
 
 describe("prompt block", () => {
   it("marks the first row with the prompt cue and indents continuations", () => {
@@ -37,33 +37,67 @@ describe("prompt block", () => {
     expect(composerTextWidth(40)).toBe(37);
   });
 
-  it("shows how many prompts are waiting behind a running turn", () => {
-    const editor = new Editor();
-    expect(renderComposer(editor, { busy: true, queued: 2 }, 40).join("")).toContain("2 queued");
-  });
 });
 
-describe("hints", () => {
-  it("offers completion controls while the list is open", () => {
-    const row = renderHints({ busy: false, hasDraft: true, suggesting: true, multiline: false }, 80).join("");
+const quiet = { busy: false, suggesting: false, cancelArmed: false, queued: 0, newlineKey: "shift+enter" };
+const nothing = { openTodos: 0, peerSessions: 0 };
+
+describe("the row under the prompt", () => {
+  it("is omitted entirely when there is nothing to say", () => {
+    // An idle prompt with no pending work should not spend a screen row on filler.
+    expect(renderHints(quiet, nothing, 80)).toEqual([]);
+  });
+
+  it("shows ambient facts that have a real source", () => {
+    const row = renderHints(quiet, { openTodos: 3, peerSessions: 1 }, 80).join("");
+    expect(row).toContain("3 open todos");
+    expect(row).toContain("1 other session");
+  });
+
+  it("singularises counts of one", () => {
+    const row = renderHints(quiet, { openTodos: 1, peerSessions: 0 }, 80).join("");
+    expect(row).toContain("1 open todo");
+    expect(row).not.toContain("todos");
+  });
+
+  it("lets a transient hint displace ambient facts", () => {
+    const row = renderHints({ ...quiet, suggesting: true }, { openTodos: 3, peerSessions: 0 }, 80).join("");
     expect(row).toContain("tab complete");
+    expect(row).not.toContain("open todo");
+  });
+
+  it("puts the exit confirmation above everything else", () => {
+    const row = renderHints(
+      { ...quiet, suggesting: true, cancelArmed: true },
+      { openTodos: 3, peerSessions: 0 },
+      80,
+    ).join("");
+    expect(row).toContain("ctrl+c again");
+  });
+
+  it("says what a queued prompt is waiting for", () => {
+    const row = renderHints({ ...quiet, busy: true, queued: 2 }, nothing, 80).join("");
+    expect(row).toContain("2 queued");
   });
 
   it("offers interruption while a turn runs", () => {
-    const row = renderHints({ busy: true, hasDraft: false, suggesting: false, multiline: false }, 80).join("");
-    expect(row).toContain("esc interrupt");
-  });
-
-  it("offers send only once there is something to send", () => {
-    const empty = renderHints({ busy: false, hasDraft: false, suggesting: false, multiline: false }, 80).join("");
-    const drafted = renderHints({ busy: false, hasDraft: true, suggesting: false, multiline: false }, 80).join("");
-    expect(empty).not.toContain("enter send");
-    expect(drafted).toContain("enter send");
+    expect(renderHints({ ...quiet, busy: true }, nothing, 80).join("")).toContain("esc interrupt");
   });
 
   it("fits the width", () => {
-    const row = renderHints({ busy: false, hasDraft: true, suggesting: false, multiline: true }, 24).join("");
+    const row = renderHints(quiet, { openTodos: 12, peerSessions: 4 }, 24).join("");
     expect(visibleWidth(row)).toBeLessThanOrEqual(24);
+  });
+});
+
+describe("newline key", () => {
+  it("advertises shift+enter only when a protocol can report it", () => {
+    expect(newlineKeyFor("enhanced")).toBe("shift+enter");
+    expect(newlineKeyFor("modify-other-keys")).toBe("shift+enter");
+  });
+
+  it("falls back to the key every terminal can express", () => {
+    expect(newlineKeyFor("legacy")).toBe("ctrl+j");
   });
 });
 

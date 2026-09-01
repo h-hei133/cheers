@@ -6,10 +6,16 @@ const id = (data: string): string => parseKeyEvent(data).keyId;
 describe("control keys", () => {
   it("names the single-byte keys", () => {
     expect(id("\r")).toBe("enter");
-    expect(id("\n")).toBe("enter");
     expect(id("\t")).toBe("tab");
     expect(id("\x1b")).toBe("escape");
     expect(id("\x7f")).toBe("backspace");
+    expect(id("\b")).toBe("backspace");
+  });
+
+  it("keeps a bare line feed distinct from Enter", () => {
+    // Ctrl+J is the only newline key every terminal can express; conflating it
+    // with Enter throws away the universal fallback for Shift+Enter.
+    expect(id("\n")).toBe("ctrl+j");
   });
 
   it("names control chords", () => {
@@ -77,6 +83,20 @@ describe("enhanced keyboard protocol", () => {
 
   it("drops key release events so a keypress is not doubled", () => {
     expect(id("\x1b[97;1:3u")).toBe("");
+  });
+});
+
+describe("modifyOtherKeys fallback", () => {
+  it("decodes a modified key from the CSI 27 form", () => {
+    // This is the only way an xterm-family terminal can report Shift+Enter.
+    expect(id("\x1b[27;2;13~")).toBe("shift+enter");
+    expect(id("\x1b[27;5;13~")).toBe("ctrl+enter");
+    expect(id("\x1b[27;2;9~")).toBe("shift+tab");
+  });
+
+  it("still decodes the ordinary tilde keys", () => {
+    expect(id("\x1b[27~")).toBe("");
+    expect(id("\x1b[3~")).toBe("delete");
   });
 });
 

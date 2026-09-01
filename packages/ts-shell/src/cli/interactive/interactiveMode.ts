@@ -5,6 +5,7 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import { handleShellClose } from "../../core/shell/signalHandlers.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
+import { newlineKeyFor } from "../../presentation/tui/chrome/hints.js";
 import { renderWelcome, type WelcomeState } from "../../presentation/tui/chrome/welcome.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
 import { TUI } from "../../presentation/tui/render/engine.js";
@@ -17,6 +18,7 @@ import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { InteractiveSurface } from "./frameSurface.js";
 import { routeKey } from "./keymap.js";
 import { QuestionBridge } from "./questionBridge.js";
+import { readAmbientFacts } from "./ambientFacts.js";
 import { readBandState } from "./sessionFacts.js";
 import { slashSuggestions } from "./slashSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
@@ -33,6 +35,9 @@ import { TurnSink } from "./turnSink.js";
  */
 
 const DEFAULT_PLACEHOLDER = "Ask anything, or / for commands";
+
+/** Window in which the exit hint stays on screen after one cancel press. */
+const CANCEL_ARMED_MS = 600;
 
 /**
  * Resize policy for retired scrollback. Rebuilding republishes the ledger at the
@@ -84,6 +89,9 @@ export class InteractiveMode {
       busy: () => this.busy,
       queuedCount: () => this.queue.length,
       now: () => Date.now(),
+      ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
+      newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
+      cancelArmed: () => this.isCancelArmed(),
     });
     this.sink = new TurnSink(this.surface.transcript, () => this.tui.requestRender());
     this.questions = new QuestionBridge({
@@ -119,6 +127,12 @@ export class InteractiveMode {
     this.tui.stop();
   }
 
+  /** Whether a second cancel press within the double-press window would exit. */
+  private isCancelArmed(): boolean {
+    const last = this.gesture.lastCancelAt;
+    return last !== undefined && Date.now() - last < CANCEL_ARMED_MS;
+  }
+
   /** Intro facts, resolved at paint time so a mid-session change is reflected. */
   private welcomeState(): WelcomeState {
     const facts = readBandState(this.options.runtimeContext);
@@ -144,7 +158,10 @@ export class InteractiveMode {
         exit: () => this.shutdown(),
         redraw: () => this.tui.requestRender(),
         clearScreen: () => this.clearScreen(),
-        refreshSuggestions: () => this.refreshSuggestions(),
+        redrawAfter: (delayMs) => {
+          setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
+        },
+        syncSuggestions: (mayOpen) => this.syncSuggestions(mayOpen),
       },
     });
   }
@@ -163,18 +180,21 @@ export class InteractiveMode {
 
   private onPaste(text: string): void {
     this.surface.editor.insert(text);
-    this.refreshSuggestions();
+    this.syncSuggestions(false);
     this.tui.requestRender();
   }
 
-  /** Completion candidates for the current draft, or none when not applicable. */
-  private refreshSuggestions(): void {
-    const draft = this.surface.editor.getText();
-    const matches = slashSuggestions(draft);
+  /**
+   * Recompute completions. A list that is not already open only opens when the
+   * gesture was typing or Tab, so arrow-key history recall keeps the arrows.
+   */
+  private syncSuggestions(mayOpen: boolean): void {
+    const matches = slashSuggestions(this.surface.editor.getText());
     if (!matches) {
       this.surface.setSuggesting(false);
       return;
     }
+    if (!mayOpen && !this.surface.suggestionsOpen) return;
     this.surface.suggestions.setItems(matches);
     this.surface.setSuggesting(true);
   }
