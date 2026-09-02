@@ -25,13 +25,15 @@ export async function runFastCommand(
     return {
       kind: "local",
       output: [
-        "# Fast Mode Activated (/fast on)",
+        "### Fast mode is on",
         "",
-        "- **Model Routing**: Prioritizing high-speed, cost-efficient models (e.g. DeepSeek-V4-Flash / Mini)",
-        "- **Latency Profile**: Minimal delay (0.5s - 1.5s per turn)",
-        "- **Best For**: Quick lookups, small edits, simple refactoring, and rapid code exploration",
+        // What this actually changes is sampling temperature. It does not route to a
+        // different model, and saying it did was a claim about the request that
+        // nothing backed — use `/model` to change which model answers.
+        "- Sampling: temperature is lowered, so answers are more direct and arrive sooner",
+        "- Which model answers does not change — use `/model` for that",
         "",
-        "Use `/fast off` to return to default full-reasoning capability model.",
+        "`/fast off` restores the default sampling.",
       ].join("\n"),
     };
   }
@@ -43,7 +45,7 @@ export async function runFastCommand(
       output: [
         "# Fast Mode Deactivated (/fast off)",
         "",
-        "- **Model Routing**: Default full capability reasoning model",
+        "- Sampling is back to the default temperature",
         "- **Best For**: Complex multi-file architecture, subtle bugs, and rigorous code reviews",
       ].join("\n"),
     };

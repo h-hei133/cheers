@@ -209,11 +209,11 @@ export function createCommandRegistry(
     {
       name: "clear",
       aliases: ["reset", "cls"],
-      kind: "local",
+      kind: "shell-action",
       availability: "available",
       enabled: true,
       bridgeSafe: true,
-      execute: (args, context) => runClearCommand(args, context),
+      execute: async (args, context) => runClearCommand(args, context),
     },
     {
       name: "review",

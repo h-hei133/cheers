@@ -64,6 +64,10 @@ export interface InteractiveCommandRouterResult {
   readonly exitRequested?: boolean;
   /** The user asked to run the last turn again; only the host knows what it was. */
   readonly retryRequested?: boolean;
+  /** Start over: a new session, an empty transcript, a screen with nothing on it. */
+  readonly clearRequested?: boolean;
+  /** A different session is now current; its conversation should be put back on screen. */
+  readonly sessionOpened?: boolean;
 }
 
 export async function routeInteractiveCommand(
@@ -86,6 +90,7 @@ export async function routeInteractiveCommand(
   const slashResult = resolved.kind === "shell-action" ? resolved.slashResult : null;
 
   if (isResumeLikeShellAction(slashResult)) {
+    const before = input.runtimeContext.session.id;
     const resumeResult = await runInteractiveResumeAction({
       slashResult,
       fallbackSessionId: input.fallbackSessionId,
@@ -102,11 +107,18 @@ export async function routeInteractiveCommand(
       turnNumber: resumeResult.turnNumber,
       refreshPromptChrome: true,
       refreshMcpGateway: true,
+      // The runtime context is switched in place, so a changed id is the signal
+      // that a different session's conversation now belongs on screen.
+      sessionOpened: input.runtimeContext.session.id !== before,
     };
   }
 
   if (isShellAction(slashResult, "exit-session")) {
     return { turnNumber: nextTurnNumber, exitRequested: true };
+  }
+
+  if (isShellAction(slashResult, "clear-session")) {
+    return { turnNumber: nextTurnNumber, clearRequested: true };
   }
 
   if (isShellAction(slashResult, "retry-turn")) {

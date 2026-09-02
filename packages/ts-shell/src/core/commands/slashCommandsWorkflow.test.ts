@@ -54,12 +54,15 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
   });
 
   describe("/loop command", () => {
-    it("configures autonomous loop with verify command and preflight status", async () => {
+    it("runs the verification gate and reports it, claiming nothing more", async () => {
       const result = await runLoopCommand(["3", "echo 'hello'"], { cwd: tempDir });
       expect(result.kind).toBe("local");
-      expect(result.output).toContain("Autonomous Loop Session Configured");
+      // It runs the gate and reports it. Claiming a driver had been "armed" was a
+      // statement about the runtime that nothing backed.
+      expect(result.output).toContain("Verification gate");
       expect(result.output).toContain("Max Iterations**: 3");
-      expect(result.output).toContain("Verification command is **already passing**");
+      expect(result.output).toContain("already passes");
+      expect(result.output).not.toMatch(/will now drive|Armed autonomous/);
     });
   });
 
@@ -93,11 +96,13 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
   describe("/fast command", () => {
     it("toggles fast mode on and off", async () => {
       const onRes = await runFastCommand(["on"], { cwd: tempDir });
-      expect(onRes.output).toContain("Fast Mode Activated");
+      expect(onRes.output).toContain("Fast mode is on");
+      // What it changes is sampling, not which model answers.
+      expect(onRes.output).not.toMatch(/Model Routing/);
       expect(isFastModeEnabled()).toBe(true);
 
       const offRes = await runFastCommand(["off"], { cwd: tempDir });
-      expect(offRes.output).toContain("Fast Mode Deactivated");
+      expect(offRes.output).toMatch(/Fast Mode Deactivated|fast mode is off/i);
       expect(isFastModeEnabled()).toBe(false);
     });
   });

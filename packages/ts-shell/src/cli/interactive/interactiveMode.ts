@@ -22,6 +22,8 @@ import { InteractiveSurface } from "./frameSurface.js";
 import { routeKey } from "./keymap.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
+import { showConversation, startFreshSession, type HistoryTarget } from "./history.js";
+import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
 import { DraftPane } from "./draftPane.js";
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
@@ -77,9 +79,10 @@ export class InteractiveMode {
   private readonly sink: TurnSink;
   private readonly questions: QuestionBridge;
   private readonly readline: ReadlineInterface;
-  private readonly gesture: { lastCancelAt?: number } = {};
+  private readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number } = {};
   private readonly overlay: OverlayHost;
   private readonly pane = new DraftPane();
+  private readonly pager = new Pager();
   private readonly clipboard: Clipboard;
   private statusItems: readonly StatusItemId[];
   /**
@@ -122,9 +125,13 @@ export class InteractiveMode {
       ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
       newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
       cancelArmed: () => this.isCancelArmed(),
-      overlayFullScreen: () => this.pane.active || this.overlay.fullScreen,
+      overlayFullScreen: () => this.pane.active || this.pager.active || this.overlay.fullScreen,
       overlayRows: (width, height) =>
-        this.pane.active ? this.pane.render(width, height) : this.overlay.render(width, height),
+        this.pane.active
+          ? this.pane.render(width, height)
+          : this.pager.active
+            ? this.pager.render(width, height)
+            : this.overlay.render(width, height),
     });
     this.sink = new TurnSink(this.surface.transcript, () => this.tui.requestRender());
     this.questions = new QuestionBridge({
@@ -187,8 +194,12 @@ export class InteractiveMode {
   private onKey(event: Parameters<typeof routeKey>[0]): void {
     // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
     // every printable character for its filter.
-    // The full-screen editor owns every key while it is up, including Escape.
+    // The full-screen views own every key while they are up, including Escape.
     if (this.pane.handleKey(event)) {
+      this.tui.requestRender();
+      return;
+    }
+    if (this.pager.handleKey(event.keyId, event.text, this.terminal.getDimensions().rows)) {
       this.tui.requestRender();
       return;
     }
@@ -208,6 +219,7 @@ export class InteractiveMode {
         cyclePermissionScope: () => this.cyclePermissionScope(),
         retry: () => this.onSubmit("/retry"),
         expandDraft: () => this.pane.openFrom(this.surface.editor, this.surface.pastes, () => this.tui.requestRender()),
+        openRewind: () => this.openPicker("rewind"),
         redrawAfter: (delayMs) => {
           setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
         },
@@ -271,6 +283,8 @@ export class InteractiveMode {
     this.busy = true;
     let exiting = false;
     let retrying: string | undefined;
+    let clearing = false;
+    let opened = false;
     // `begin` clears the failure flag for the turn that is starting, so whether
     // the *previous* turn failed has to be read before that happens.
     const previousTurnFailed = this.sink.lastTurnFailed;
@@ -297,18 +311,32 @@ export class InteractiveMode {
       });
       this.turnNumber = result.turnNumber;
       if (result.exitRequested) exiting = true;
-      if (result.retryRequested) retrying = this.retryTarget(previousTurnFailed);
+      if (result.retryRequested) retrying = this.sink.retryTarget(this.lastPrompt, previousTurnFailed);
+      if (result.clearRequested) clearing = true;
+      if (result.sessionOpened) opened = true;
     } catch (error) {
       this.surface.transcript.append(
         textBlock("error", error instanceof Error ? error.message : String(error), "error"),
       );
     } finally {
       this.options.renderer.clearSink();
+      // Long command output gets a view of its own: it is read once, and reading it
+      // should not cost the conversation its place on screen.
+      const output = this.sink.commandOutput;
+      if (output) pageLongOutput(this.pager, output.title, output.block);
       this.sink.end();
       this.busy = false;
       if (exiting) {
         this.shutdown();
         return;
+      }
+      if (clearing) {
+        startFreshSession(this.historyTarget());
+        this.sink.reset();
+        this.tui.requestRender({ force: true, clearScrollback: true });
+      } else if (opened) {
+        showConversation(this.historyTarget());
+        this.tui.requestRender({ force: true, clearScrollback: true });
       }
       this.tui.requestRender();
       const next = retrying ?? this.queue.shift();
@@ -316,24 +344,13 @@ export class InteractiveMode {
     }
   }
 
-  /**
-   * The prompt a retry would run, or nothing with a note saying why not.
-   *
-   * A retry that silently re-ran a turn which had in fact succeeded would
-   * duplicate work and spend tokens, so the failure is a precondition rather
-   * than an assumption.
-   */
-  private retryTarget(previousTurnFailed: boolean): string | undefined {
-    if (this.lastPrompt === undefined) {
-      this.sink.notify("Nothing to retry: no prompt has run in this session yet.");
-      return undefined;
-    }
-    if (!previousTurnFailed) {
-      this.sink.notify("Nothing to retry: the last turn finished.");
-      return undefined;
-    }
-    this.surface.transcript.append(textBlock("user", this.lastPrompt));
-    return this.lastPrompt;
+  /** What the history helpers need: the transcript, the store, and the context. */
+  private historyTarget(): HistoryTarget {
+    return {
+      transcript: this.surface.transcript,
+      sessionManager: this.options.sessionManager,
+      context: this.options.runtimeContext,
+    };
   }
 
   /** Open the chooser a bare command maps to. */
@@ -382,6 +399,19 @@ export class InteractiveMode {
       resumeSession: (sessionId) => this.runCommandLine(`/resume ${sessionId}`),
       refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
+      sessionTurns: () =>
+        this.options.sessionManager.getSession(this.options.runtimeContext.session.id)?.turns ?? [],
+      rewind: async (point) => {
+        const dropped = this.options.sessionManager.rewindTo(
+          this.options.runtimeContext.session.id,
+          point.turnIndex,
+        );
+        showConversation(this.historyTarget());
+        this.tui.requestRender({ force: true, clearScrollback: true });
+        return dropped > 0
+          ? `Went back ${dropped} turns. Files are untouched — use /undo to revert what was written.`
+          : "Already at that point in the conversation.";
+      },
       previewStatusItems: (items) => {
         this.previewItems = items;
         this.tui.requestRender();
@@ -443,6 +473,7 @@ export class InteractiveMode {
       sessionRuntime: this.options.sessionRuntime,
       renderer: this.options.renderer,
       runtimeContext: this.options.runtimeContext,
+      sessionManager: this.options.sessionManager,
       exit: this.options.exit,
     });
   }

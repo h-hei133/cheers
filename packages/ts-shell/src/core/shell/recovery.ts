@@ -129,6 +129,8 @@ function guardRuntimeSeedForRecovery<
 export async function resumeShellSession(input: {
   requestedSessionId?: string;
   fallbackSessionId?: string;
+  /** True for `/continue`, which recovers an interrupted run rather than opening a session. */
+  recoveryOnly?: boolean;
   sessionManager: SessionManager;
   runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
@@ -218,10 +220,33 @@ export async function resumeShellSession(input: {
     return { resumed: false };
   }
 
+  // Already here. Saying so is the whole answer — the old path ran the recovery
+  // gate, which refuses a session that is merely *fine*, and reported that as
+  // "not recoverable" for the session the user was sitting in.
+  //
+  // Two exceptions. `/continue` targets the current session by design — continuing
+  // what you are in is the entire point of it. And a session holding a prompt that
+  // never ran has real work to pick up, so refusing that would be the same
+  // unhelpfulness in a different place.
+  const pendingHere = hasPendingPromptHere(input);
+  if (
+    input.recoveryOnly !== true &&
+    !pendingHere &&
+    requestedSessionId === input.runtimeContext.session.id
+  ) {
+    input.renderer.renderLine(
+      `\nAlready in session ${requestedSessionId}. Use /resume list to pick a different one.\n`,
+    );
+    return { resumed: false };
+  }
+
+  // Opening a session is not the same act as recovering an interrupted run.
+  // `/resume` is the first: it makes a session current and restores its context,
+  // whatever state it ended in. `/continue` is the second, and keeps the gate.
   const resumeResult = input.sessionManager.tryResume(
     requestedSessionId,
     input.runtimeContext.projectRoot,
-    { mode: "runtime-recovery" },
+    { mode: input.recoveryOnly === true ? "runtime-recovery" : "continuity-only" },
   );
   if (isFailedResume(resumeResult)) {
     input.renderer.renderLine(`\nResume failed: ${resumeResult.error}`);
@@ -657,4 +682,27 @@ function truncate(value: string, max: number): string {
     return value;
   }
   return `${value.slice(0, max)}...`;
+}
+
+/**
+ * Whether the session the shell is already in holds a prompt that never ran.
+ *
+ * Asked before refusing to re-open the current session: a pending prompt is real
+ * work to pick up, and refusing that would be the same unhelpfulness the recovery
+ * gate used to produce. A session the store cannot describe has nothing pending as
+ * far as anyone can tell, which is the safe reading.
+ */
+function hasPendingPromptHere(input: {
+  readonly sessionManager: SessionManager;
+  readonly runtimeContext: ShellRuntimeContext;
+}): boolean {
+  if (typeof input.sessionManager.describeSessionReentry !== "function") return false;
+  try {
+    const summary = input.sessionManager.describeSessionReentry(
+      input.runtimeContext.session.id,
+    );
+    return Boolean(summary?.pendingPrompt?.trim());
+  } catch {
+    return false;
+  }
 }

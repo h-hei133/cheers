@@ -56,7 +56,10 @@ import {
 } from "./store/sessionCreation.js";
 import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
 import { projectSessionReentrySummary } from "./presentation/sessionReentrySurface.js";
-import type { SessionReentrySummary } from "./presentation/sessionReentrySurface.js";
+import {
+  sessionHasConversation,
+  type SessionReentrySummary,
+} from "./presentation/sessionReentrySurface.js";
 import type { RecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
 import type {
   SessionResumeEligibility,
@@ -216,6 +219,38 @@ export class SessionManager {
 
   getSessionDirPath(sessionId: string): string {
     return this.store.sessionDir(sessionId);
+  }
+
+  /**
+   * Drop everything said after `turnIndex`, keeping the workspace untouched.
+   *
+   * This is the conversational half of going back: the model stops seeing the
+   * turns that followed, so the next answer is built from the shorter history.
+   * Files are deliberately left alone — reverting the work and reconsidering the
+   * question are different decisions, and doing both from one gesture makes the
+   * destructive one impossible to decline.
+   *
+   * Returns how many turns were dropped.
+   */
+  rewindTo(sessionId: string, turnIndex: number): number {
+    const session = this.getSession(sessionId);
+    if (!session) return 0;
+    const keep = Math.max(0, Math.min(turnIndex, session.turns.length));
+    const dropped = session.turns.length - keep;
+    if (dropped <= 0) return 0;
+    session.turns = session.turns.slice(0, keep);
+    session.updatedAt = new Date().toISOString();
+    this.store.writeSessionMetadata(session);
+    return dropped;
+  }
+
+  /** The stored record, or undefined when it is gone or unreadable. */
+  getSession(sessionId: string): Session | undefined {
+    try {
+      return this.store.load(sessionId);
+    } catch {
+      return undefined;
+    }
   }
 
   sessionExists(sessionId: string): boolean {
@@ -393,8 +428,36 @@ export class SessionManager {
     );
   }
 
+  /**
+   * Close a session out.
+   *
+   * A session that never held a conversation is deleted rather than terminated: a
+   * run that only listed commands has nothing to come back to, and leaving those
+   * behind fills the re-entry list with empty rows and hands the user a resume id
+   * that restores nothing.
+   */
   saveTerminated(sessionId: string): void {
     handleSaveTerminated(this.createSessionLifecycleCallbacks(), sessionId);
+    if (this.discardIfEmpty(sessionId)) return;
+  }
+
+  /**
+   * Delete `sessionId` when nothing was ever said in it. Returns whether it went.
+   */
+  discardIfEmpty(sessionId: string): boolean {
+    let session: Session;
+    try {
+      session = this.store.load(sessionId);
+    } catch {
+      return false;
+    }
+    if (sessionHasConversation(session)) return false;
+    const projectRoot = session.projectRoot;
+    this.store.deleteSession(sessionId);
+    // The pointer must not outlive the record it points at.
+    const current = projectRoot ? this.store.getCurrentSessionForProject(projectRoot) : null;
+    if (current?.id === sessionId) this.store.clearCurrentSessionForProject(projectRoot);
+    return true;
   }
 
 
@@ -500,6 +563,28 @@ export class SessionManager {
       preferredProjectRoot: input?.preferredProjectRoot,
       limit: input?.limit,
     });
+  }
+
+  /**
+   * The session a bare `/resume` or `/continue` should land on.
+   *
+   * Recovery eligibility is the wrong filter here: a session that finished
+   * cleanly is exactly what someone means by "the one I was in", and refusing it
+   * because nothing went wrong is why re-entry felt broken. An interrupted
+   * session still wins, because picking up unfinished work is more urgent than
+   * reopening finished work.
+   */
+  getReentryCandidate(input?: {
+    readonly preferredProjectRoot?: string;
+  }): Session | null {
+    const recoverable = this.getSuggestedRecoverySession(input);
+    if (recoverable) return recoverable;
+    const summaries = this.listReentrySummaries({
+      preferredProjectRoot: input?.preferredProjectRoot,
+      limit: 20,
+    });
+    const withContent = summaries.find((summary) => summary.hasConversation === true);
+    return withContent ? this.store.load(withContent.id) : null;
   }
 
   getSuggestedRecoverySession(input?: {

@@ -27,3 +27,4 @@ Last updated: 2026-08-28
 - [AI Coding Agent SOTA 进阶架构对比研究与方案全景](sota-advanced-comparative-research-and-solutions.md)
 - [SOTA 跨会话通信网格（Cross-Session Mesh）与协同团队（Agent Teams）架构研究与设计方案](cross-session-messaging-and-agent-teams-architecture.md)
 - [TUI 实况链路缺陷审计与修复方案](tui-live-path-defects.md)
+- [Slash 命令实现深度审计](slash-command-depth-audit.md) — 15 个命令逐个判定：真实 / 单薄 / 壳，壳在哪一层

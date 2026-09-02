@@ -13,13 +13,13 @@ export async function runLoopCommand(
     return {
       kind: "local",
       output: [
-        "# Autonomous Loop (/loop)",
+        "### /loop",
         "",
-        "Usage: `/loop <maxTurns> <verifyCommand>`",
-        "Example: `/loop 5 npm test`",
-        "Example: `/loop 3 npm run test:unit`",
+        "Runs a verification command and reports whether it passes, so a repair turn has the failure in front of it.",
         "",
-        "The agent will iteratively edit and test until the verification command exits with code 0.",
+        "- `/loop <maxTurns> <verifyCommand>` — e.g. `/loop 5 npm test`",
+        "",
+        "This runs the gate; it does not drive turns on its own.",
       ].join("\n"),
     };
   }
@@ -30,13 +30,12 @@ export async function runLoopCommand(
   const cwd = context.cwd || process.cwd();
 
   const lines: string[] = [
-    "# Autonomous Loop Session Configured (/loop)",
+    "### Verification gate",
     "",
     `- **Max Iterations**: ${maxTurns}`,
     `- **Verification Gate**: \`${verifyCommand}\``,
     `- **Workspace**: \`${cwd}\``,
     "",
-    "## Execution Status:",
   ];
 
   // Run a pre-flight verification check
@@ -56,21 +55,19 @@ export async function runLoopCommand(
   }
 
   if (initialPass) {
-    lines.push(
-      "✅ Verification command is **already passing** (Exit 0).",
-      "",
-      "No autonomous loop iterations needed.",
-    );
+    lines.push("The verification command already passes, so there is nothing to repair.");
   } else {
     lines.push(
-      "❌ Initial verification failed. Armed autonomous loop driver.",
+      "The verification command fails. What follows is its output, unedited:",
       "",
-      "**Initial Failure Diagnostic**:",
       "```text",
       testOutput.slice(0, 1000) + (testOutput.length > 1000 ? "\n...[truncated]" : ""),
       "```",
       "",
-      `The agent will now drive up to ${maxTurns} repair turns to resolve this failure.`,
+      // Saying a driver was "armed" was a claim about the runtime that nothing
+      // backed: this command runs the gate once and reports it. Driving repairs is
+      // a turn the user asks for, with this failure in front of them.
+      `Nothing is driving repairs. Ask for the fix — the failure above is the context — and re-run \`/loop ${maxTurns} ${verifyCommand}\` to check the gate again.`,
     );
   }
 

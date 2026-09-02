@@ -33,6 +33,7 @@ function build(busy = false): {
     redrawAfter: vi.fn(),
     cycleAgentMode: vi.fn(),
     cyclePermissionScope: vi.fn(),
+    openRewind: vi.fn(),
     retry: vi.fn(),
     expandDraft: vi.fn(),
     syncSuggestions: vi.fn(),
@@ -338,5 +339,49 @@ describe("retry key", () => {
     press("\x1b[15~");
 
     expect(actions.retry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("going back in the conversation", () => {
+  it("offers the chooser on a second escape from an empty prompt", () => {
+    const { press, actions, clock } = build();
+    press("\x1b");
+    expect(actions.openRewind).not.toHaveBeenCalled();
+    clock.now += 100;
+    press("\x1b");
+
+    expect(actions.openRewind).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgets the first press once the window has passed", () => {
+    const { press, actions, clock } = build();
+    press("\x1b");
+    clock.now += 5_000;
+    press("\x1b");
+
+    expect(actions.openRewind).not.toHaveBeenCalled();
+  });
+
+  it("never discards a draft, and does not arm from one", () => {
+    const { press, actions, surface, clock } = build();
+    surface.editor.insert("half a thought");
+    press("\x1b");
+    clock.now += 100;
+    press("\x1b");
+
+    expect(surface.editor.getText()).toBe("half a thought");
+    expect(actions.openRewind).not.toHaveBeenCalled();
+  });
+
+  it("dismisses completions first, without arming", () => {
+    const { press, actions, surface, clock } = build();
+    surface.suggestions.setItems([{ value: "/model", label: "/model" }]);
+    surface.setSuggesting(true);
+    press("\x1b");
+    expect(surface.suggestionsOpen).toBe(false);
+    clock.now += 100;
+    press("\x1b");
+
+    expect(actions.openRewind).not.toHaveBeenCalled();
   });
 });

@@ -22,6 +22,7 @@ import { HookDispatcher, defaultHookDispatcher } from "../hooks/hookDispatcher.j
 import { setupBuiltinVerificationHooks } from "../hooks/builtin/index.js";
 import { getActiveSessionGoal } from "../commands/goalCommandRuntime.js";
 import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
+import { isEventStream, readCompletionStream } from "./streamCompletion.js";
 export interface ReActAgentLoopOptions {
   readonly sessionId: string;
   readonly prompt: string;
@@ -249,12 +250,18 @@ export async function* runAutonomousReActLoop(
       messages: preparedMessages,
       tools: openAiTools,
       tool_choice: isLastTurn ? "none" : "auto",
+      // Streamed so the answer appears as it is written. Usage totals only come
+      // back on a stream when they are asked for.
+      stream: true,
+      stream_options: { include_usage: true },
       temperature: activeTemperature,
       ...(options.topP != null ? { top_p: options.topP } : {}),
       ...(options.maxOutputTokens != null ? { max_tokens: options.maxOutputTokens } : {}),
     };
     let responseJson: any;
     let isOverflowError = false;
+    // Text already delivered as deltas; it must not be delivered a second time.
+    let streamedText: string | undefined;
     try {
       const res = await fetch(
         `${baseUrl.replace(/\/+$/, "")}/chat/completions`,
@@ -285,7 +292,35 @@ export async function* runAutonomousReActLoop(
           };
           return;
         }
+      } else if (isEventStream(res)) {
+        // Deltas are forwarded as they arrive, then reassembled into the same
+        // shape a non-streaming response has, so nothing downstream changes.
+        const stream = readCompletionStream(res.body!);
+        streamedText = "";
+        for (;;) {
+          const step = await stream.next();
+          if (step.done === true) {
+            responseJson = {
+              choices: [{ message: step.value.message, finish_reason: step.value.finishReason }],
+              usage: step.value.usage,
+            };
+            break;
+          }
+          streamedText += step.value;
+          yield { type: "message.delta", role: "coder", delta: step.value };
+        }
+        const usage = responseJson.usage;
+        if (usage) {
+          recordSessionUsage(options.sessionId, {
+            promptTokens: usage.prompt_tokens,
+            completionTokens: usage.completion_tokens,
+            totalTokens: usage.total_tokens,
+            model: modelName,
+          });
+        }
       } else {
+        // A provider that ignored `stream: true` answers with one JSON body; read
+        // it rather than failing, and let the text arrive in a single delta.
         responseJson = await res.json();
         const usage = responseJson.usage;
         if (usage) {
@@ -376,14 +411,16 @@ export async function* runAutonomousReActLoop(
 
     messages.push(messageToPush);
 
-    // If assistant returned clean text content, yield output
+    // If assistant returned clean text content, yield output. Streamed text has
+    // already been delivered chunk by chunk; only a correction to it is re-sent,
+    // which happens when DSML tool calls were stripped out of the prose.
     if (textContent) {
       lastAssistantText = textContent;
-      yield {
-        type: "message.delta",
-        role: "coder",
-        delta: textContent,
-      };
+      if (streamedText === undefined) {
+        yield { type: "message.delta", role: "coder", delta: textContent };
+      } else if (textContent !== streamedText) {
+        yield { type: "message.replace", role: "coder", text: textContent };
+      }
     }
 
     if (toolCalls.length === 0) {

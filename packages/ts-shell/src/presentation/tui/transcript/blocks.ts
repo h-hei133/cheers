@@ -145,3 +145,20 @@ function prose(text: string, width: number, indent: string): string[] {
 export function textBlock(kind: BlockKind, text: string, title?: string): Block {
   return { kind, text, title, finalized: true };
 }
+
+const DIFF_FENCE = /```diff\n([\s\S]*?)```/;
+
+/**
+ * Move a fenced diff out of a block's prose and into its diff field.
+ *
+ * Commands that report changes already produce unified diffs; leaving them
+ * fenced renders them as a generic code block, losing the per-line colouring and
+ * the intra-line emphasis that make a diff readable at a glance.
+ */
+export function splitFencedDiff(block: Block): void {
+  if (block.diff) return;
+  const match = DIFF_FENCE.exec(block.text);
+  if (!match) return;
+  block.diff = match[1]!.replace(/\s+$/, "");
+  block.text = block.text.replace(match[0], "").replace(/\n{3,}/g, "\n\n").trim();
+}

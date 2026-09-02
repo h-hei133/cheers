@@ -1,0 +1,98 @@
+import { textBlock, type Block } from "../../presentation/tui/transcript/blocks.js";
+import type { SessionMessage } from "../../session/schema/sessionMessage.js";
+import type { Session } from "../../session/schema/sessionRecord.js";
+import type { WorkspaceRootMode } from "../../session/SessionManager.js";
+import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
+import type { Transcript } from "../../presentation/tui/transcript/container.js";
+
+/**
+ * Putting a session's conversation back on screen.
+ *
+ * Opening a past session and seeing an empty transcript is the same as not having
+ * opened it: the whole point of returning is the conversation. The stored turns are
+ * the record, so they are what the transcript is rebuilt from.
+ *
+ * Only prose is rebuilt. Tool cards and diffs are re-derivable from a live run but
+ * not from the stored messages, and inventing them would put things on screen that
+ * never happened in that shape.
+ */
+
+/** Rows are cheap; a very long history still needs a bound. */
+const MAX_RESTORED = 60;
+
+export interface RestoredHistory {
+  readonly blocks: readonly Block[];
+  /** Turns left out because the history was longer than the bound. */
+  readonly omitted: number;
+}
+
+/** Blocks for a session's conversation, oldest first, bounded. */
+export function restoreConversation(turns: readonly SessionMessage[]): RestoredHistory {
+  const spoken = turns.filter(
+    (turn) => (turn.role === "user" || turn.role === "assistant") && turn.content.trim().length > 0,
+  );
+  const kept = spoken.slice(Math.max(0, spoken.length - MAX_RESTORED));
+  const blocks = kept.map((turn) =>
+    textBlock(turn.role === "user" ? "user" : "assistant", turn.content.trim()),
+  );
+  return { blocks, omitted: spoken.length - kept.length };
+}
+
+export interface HistoryTarget {
+  readonly transcript: Transcript;
+  readonly sessionManager: {
+    getSession(sessionId: string): Session | undefined;
+    createNew(
+      projectRoot: string,
+      options?: {
+        readonly rootMode?: WorkspaceRootMode;
+        readonly requestedWorkspaceRoot?: string;
+        readonly targetPathBase?: string;
+        readonly gitRoot?: string | null;
+      },
+    ): Session;
+    discardIfEmpty(sessionId: string): boolean;
+  };
+  readonly context: ShellRuntimeContext;
+}
+
+/**
+ * Put the current session's conversation on screen, replacing whatever is there.
+ *
+ * Called after a session is opened, which is the only moment the two can disagree:
+ * the runtime context has switched but the transcript still shows the session that
+ * was left behind.
+ */
+export function showConversation(target: HistoryTarget): void {
+  const session = target.sessionManager.getSession(target.context.session.id);
+  if (!session) return;
+  const restored = restoreConversation(session.turns);
+  target.transcript.clear();
+  if (restored.omitted > 0) {
+    target.transcript.append(
+      textBlock("notice", `${restored.omitted} earlier turns are not shown.`),
+    );
+  }
+  for (const block of restored.blocks) target.transcript.append(block);
+  target.transcript.finalizeAll();
+}
+
+/**
+ * Start over: a new session, and an empty transcript.
+ *
+ * The session being left is discarded when nothing was said in it, so clearing an
+ * untouched session leaves nothing behind rather than an empty stub in the
+ * re-entry list.
+ */
+export function startFreshSession(target: HistoryTarget): void {
+  const previous = target.context.session.id;
+  const created = target.sessionManager.createNew(target.context.projectRoot, {
+    rootMode: target.context.rootMode,
+    requestedWorkspaceRoot: target.context.projectRoot,
+    targetPathBase: target.context.projectRoot,
+    gitRoot: target.context.gitContext.root ?? null,
+  });
+  target.sessionManager.discardIfEmpty(previous);
+  target.context.session = created;
+  target.transcript.clear();
+}

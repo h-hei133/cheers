@@ -63,6 +63,8 @@ export interface KeymapActions {
   retry(): void;
   /** Open the long text under the caret — or the whole draft — full screen. */
   expandDraft(): void;
+  /** Offer an earlier point in the conversation to go back to. */
+  openRewind(): void;
   /**
    * Recompute completions for the current draft. `mayOpen` is true only for the
    * gestures that should be able to *open* the list — typing and Tab. Every other
@@ -84,8 +86,49 @@ export interface KeymapContext {
    * `undefined` means no cancel has been pressed yet — distinct from a press at
    * time zero, which would otherwise let the very first Ctrl+C exit.
    */
-  readonly gesture: { lastCancelAt?: number };
+  readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number };
 }
+
+/**
+ * Escape unwinds one level of state per press, and a second press with nothing
+ * left to unwind means "back up" — which is a question about the conversation, not
+ * about the keystroke, so it opens the chooser for going back.
+ */
+function handleEscapeKey(context: KeymapContext): void {
+  const { surface, actions, gesture, now } = context;
+  if (surface.suggestionsOpen) {
+    surface.setSuggesting(false);
+    gesture.lastEscapeAt = undefined;
+    actions.redraw();
+    return;
+  }
+  if (context.busy) {
+    actions.interrupt();
+    gesture.lastEscapeAt = undefined;
+    actions.redraw();
+    return;
+  }
+  // A draft is never discarded by Escape — Ctrl+C is the key that does that, and
+  // losing typing to a dismissal gesture is the worst possible trade. It does mean
+  // going back is only offered from an empty prompt, which is also when a person is
+  // deciding what to ask rather than writing it.
+  if (surface.editor.getText().length > 0) {
+    gesture.lastEscapeAt = undefined;
+    actions.redraw();
+    return;
+  }
+  const last = gesture.lastEscapeAt;
+  if (last !== undefined && now() - last < DOUBLE_ESCAPE_MS) {
+    gesture.lastEscapeAt = undefined;
+    actions.openRewind();
+    return;
+  }
+  gesture.lastEscapeAt = now();
+  actions.redraw();
+}
+
+/** Window in which a second Escape on an empty prompt offers to go back. */
+const DOUBLE_ESCAPE_MS = 600;
 
 /** Window in which a second Ctrl+C on an empty draft exits. */
 const DOUBLE_INTERRUPT_MS = 600;
@@ -127,9 +170,7 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
 
   switch (event.keyId) {
     case "escape":
-      if (surface.suggestionsOpen) surface.setSuggesting(false);
-      else if (context.busy) actions.interrupt();
-      actions.redraw();
+      handleEscapeKey(context);
       return;
     case "ctrl+c":
       handleCancelKey(context);

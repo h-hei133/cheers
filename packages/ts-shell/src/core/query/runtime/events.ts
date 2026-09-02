@@ -47,6 +47,12 @@ export type QueryEvent =
     readonly coveredFiles?: readonly string[];
   }
   | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
+  /**
+   * Replace what has been streamed so far for this message. Sent only when the
+   * assembled text differs from the concatenated deltas — which happens when tool
+   * calls were embedded in the prose and had to be lifted out of it.
+   */
+  | { readonly type: 'message.replace'; readonly role: AgentRole; readonly text: string }
   | { readonly type: 'turn.completed'; readonly output: AgentExecutionOutput }
   | { readonly type: 'lifecycle.cancelled'; readonly reason: string }
   | { readonly type: 'lifecycle.error'; readonly error: string }

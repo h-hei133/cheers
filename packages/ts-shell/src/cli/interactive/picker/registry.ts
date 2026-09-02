@@ -3,6 +3,8 @@ import type { CommandContext } from "../../../core/commands/types.js";
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
 import type { SessionManager } from "../../../session/SessionManager.js";
 import type { StatusItemId } from "../../../presentation/tui/chrome/items.js";
+import type { SessionMessage } from "../../../session/schema/sessionMessage.js";
+import type { RewindPoint } from "./rewind.js";
 import type { Transcript } from "../../../presentation/tui/transcript/container.js";
 import type { Picker } from "../overlay.js";
 import { connectionPicker } from "./connections.js";
@@ -11,6 +13,7 @@ import { modelPicker } from "./model.js";
 import { permissionPicker } from "./permissions.js";
 import { pluginPicker } from "./plugins.js";
 import { restorePicker } from "./restore.js";
+import { rewindPicker } from "./rewind.js";
 import { serverPicker } from "./servers.js";
 import { skillPicker } from "./skills.js";
 import { sourcePicker } from "./sources.js";
@@ -40,6 +43,10 @@ export interface PickerHost {
   saveStatusItems(items: readonly StatusItemId[]): Promise<string | undefined>;
   /** Show `items` in the band without saving; `undefined` restores the saved band. */
   previewStatusItems(items: readonly StatusItemId[] | undefined): void;
+  /** The current session's stored turns, for choosing a point to go back to. */
+  sessionTurns(): readonly SessionMessage[];
+  /** Drop everything after a chosen point, leaving the workspace alone. */
+  rewind(point: RewindPoint): Promise<string | undefined>;
 }
 
 type PickerFactory = (host: PickerHost) => Picker;
@@ -60,6 +67,9 @@ const PICKERS: Record<string, PickerFactory> = {
   marketplace: (host) => sourcePicker(host.commandContext),
   restore: (host) => restorePicker(host.projectRoot),
   skill: (host) => skillPicker(host.commandContext),
+  // Reached by pressing Escape twice rather than by typing a command, so it is
+  // deliberately absent from `opensPicker`'s bare-command set.
+  rewind: (host) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind }),
   statusline: (host) =>
     statusItemPicker({
       current: host.statusItems,
@@ -73,11 +83,15 @@ export function pickerFor(command: string, host: PickerHost): Picker | undefined
   return PICKERS[command.replace(/^\//, "").toLowerCase()]?.(host);
 }
 
+/** Pickers that a typed command must never open, however it is spelled. */
+const KEY_ONLY = new Set(["rewind"]);
+
 /** Whether a submitted line is a bare command that opens a picker. */
 export function opensPicker(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed.startsWith("/")) return false;
   // Arguments mean the user already knows what they want; only the bare form
   // opens a chooser, so `/model use x` still works as typed.
-  return !/\s/.test(trimmed) && trimmed.slice(1).toLowerCase() in PICKERS;
+  const name = trimmed.slice(1).toLowerCase();
+  return !/\s/.test(trimmed) && name in PICKERS && !KEY_ONLY.has(name);
 }

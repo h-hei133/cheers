@@ -138,6 +138,9 @@ export async function runResumeLikeShellAction(options: {
     sessionManager: options.sessionManager,
     runtimeContext: options.runtimeContext,
     renderer: options.renderer,
+    // `/continue` is the recovery door: it exists to pick up an interrupted run,
+    // so it keeps the gate that refuses a session with nothing to continue.
+    recoveryOnly: options.slashResult.action === "continue-session",
   });
   if (!resumed.resumed) {
     return { turnNumber: options.turnNumber ?? 0 };

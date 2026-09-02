@@ -22,10 +22,13 @@ describe("Modern Slash Commands Subsystem", () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it("/clear resets conversation state cleanly", async () => {
+  it("/clear hands the reset to the host rather than reporting one itself", async () => {
     const result = await runClearCommand([], { cwd: tempDir, sessionId: "sess_1" });
-    expect(result.kind).toBe("local");
-    expect(result.output).toContain("Session conversation cleared");
+    // Clearing is a session boundary the host owns: a new session, an empty
+    // transcript, and a screen with nothing on it — including no output from here,
+    // since anything written would be the residue on the cleared screen.
+    expect(result.kind).toBe("shell-action");
+    expect(result).toMatchObject({ action: "clear-session" });
   });
 
   it("/review outputs clean tree status and diff report", async () => {
@@ -50,10 +53,14 @@ describe("Modern Slash Commands Subsystem", () => {
     expect(result.output).toContain("Completion (Output)");
   });
 
-  it("/undo provides rollback and git revert guidance", async () => {
+  it("/undo answers about the most recent edit rather than dumping a report", async () => {
     const result = await runUndoCommand([], { cwd: tempDir, sessionId: "sess_1" });
     expect(result.kind).toBe("local");
-    expect(result.output).toContain("Session & Workspace Rollback Assistant");
+    // The old output was a report: telemetry, a file count, and the whole
+    // `git diff HEAD`. What a person wants is which edit was last and how to
+    // revert exactly it.
+    expect(result.output).toMatch(/Most recent edit|Nothing to undo/);
+    expect(result.output).not.toContain("Rollback Assistant");
   });
 
   it("/export saves session history as markdown and jsonl files", async () => {
@@ -76,7 +83,7 @@ describe("Modern Slash Commands Subsystem", () => {
 
   it("routes all 7 modern slash commands through routeSlashCommand", async () => {
     const clearRoute = await routeSlashCommand("/clear", { cwd: tempDir });
-    expect(clearRoute?.kind).toBe("local");
+    expect(clearRoute?.kind).toBe("shell-action");
 
     const costRoute = await routeSlashCommand("/cost", { cwd: tempDir });
     expect(costRoute?.kind).toBe("local");

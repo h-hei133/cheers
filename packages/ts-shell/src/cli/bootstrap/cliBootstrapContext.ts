@@ -82,8 +82,11 @@ export function createCliBootstrapRuntimeContext(
 ): CliBootstrapRuntimeContext {
   const sessionManager = new SessionManager();
   const renderer = new StreamingRenderer();
+  // What a bare `/resume` or `/continue` falls back to. Recovery eligibility is too
+  // narrow for that: a session that finished cleanly is exactly what someone means
+  // by "the one I was in".
   const recoveryCandidate = !input.options.sessionId
-    ? sessionManager.getSuggestedRecoverySession({
+    ? sessionManager.getReentryCandidate({
         preferredProjectRoot: input.rootContext.workspaceRoot,
       })
     : null;
@@ -109,6 +112,9 @@ export function createCliBootstrapRuntimeContext(
         requestedSessionId: input.options.sessionId,
         allowSessionRootMigration: input.options.migrateSessionRoot === true,
         emitLifecycleMessages: false,
+        // A one-shot run continues where the user left off; an interactive launch
+        // is a new sitting and starts its own session.
+        adoptCurrentSession: input.options.printMode === true,
       });
     } catch (error) {
       handleCliBootstrapError({

@@ -84,6 +84,7 @@ export interface ShellActionResult {
     | 'show-agent-mode'
     | 'exit-session'
     | 'retry-turn'
+    | 'clear-session'
   readonly sessionId?: string
   readonly viewMode?: 'compact' | 'verbose'
   readonly agentMode?: 'plan' | 'build'

@@ -1,105 +1,138 @@
 import { execSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { defaultLedgerRoot } from "./restoreCommandRuntime.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import { getSessionUsage } from "../../observability/usageTelemetry.js";
-
 
 /**
- * /undo (aliases: /rewind, /revert)
- * Inspects workspace changes, provides clean working copy rollback commands,
- * and tracks conversational turn rollbacks.
+ * /undo (aliases: /rewind, /revert) — take back what was just written.
+ *
+ * The old output was a report: session telemetry, a file count, the entire
+ * `git diff HEAD`, and instructions to run something else. None of that is the
+ * thing a person wants when they say undo, and the one action it did offer —
+ * `git checkout -- . && git clean -fd` — discarded the whole working tree,
+ * including work the agent never touched.
+ *
+ * So this answers narrowly: which edit was the most recent, what it touched, and
+ * the exact audited command that reverts it. The revert itself stays behind that
+ * command because it writes to the working tree, and this shell does not turn one
+ * word into a write. Going back in the *conversation* is a different act with its
+ * own gesture — Escape twice — and does not touch files.
  */
 export async function runUndoCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const target = args[0]?.trim();
-  const sessionId = context.sessionId || "current-session";
-  const telemetry = getSessionUsage(sessionId);
-
-  let gitStatusOutput = "";
-  let isGitRepo = false;
-  try {
-    gitStatusOutput = execSync("git status --porcelain", {
-      cwd: context.cwd,
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "ignore"],
-    }).trim();
-    isGitRepo = true;
-  } catch {
-    isGitRepo = false;
+  if (args[0]?.trim() === "--hard" || args[0]?.trim() === "--discard") {
+    return {
+      kind: "local",
+      output: [
+        "`--hard` is gone. It ran `git checkout -- . && git clean -fd`, which discards the whole working tree — including files this session never touched.",
+        "",
+        "Run `/undo` with no arguments to see the most recent edit and the command that reverts exactly it.",
+      ].join("\n"),
+    };
   }
 
-  // If user passed --hard or --restore flag, perform safe checkout of dirty files
-  if (target === "--hard" || target === "--discard" || target === "-f") {
-    if (!isGitRepo) {
-      return {
-        kind: "local",
-        output: "Error: Current workspace is not a Git repository. Cannot perform automated working tree discard.",
-      };
-    }
-    try {
-      execSync("git checkout -- . && git clean -fd", {
-        cwd: context.cwd,
-        encoding: "utf8",
-      });
-      return {
-        kind: "local",
-        output: [
-          "# ⏪ Workspace Changes Discarded Successfully",
-          "- **Action**: Reverted all uncommitted modified files (`git checkout -- .`)",
-          "- **Action**: Removed all untracked artifacts (`git clean -fd`)",
-          `- **Session ID**: \`${sessionId}\``,
-          "- Working directory is now clean and synchronized with latest commit.",
-        ].join("\n"),
-      };
-    } catch (err) {
-      return {
-        kind: "local",
-        output: `Failed to revert workspace changes: ${err instanceof Error ? err.message : String(err)}`,
-      };
-    }
+  const latest = latestEdit(context.cwd);
+  if (!latest) {
+    return {
+      kind: "local",
+      output: [
+        "### Nothing to undo",
+        "",
+        "No edit snapshots were recorded for this project, so there is no recorded change to take back.",
+        "",
+        `Uncommitted changes in the working tree: ${dirtyCount(context.cwd)}. Those were not necessarily made here — inspect them with \`git diff\` before discarding anything.`,
+      ].join("\n"),
+    };
   }
-
-  const modifiedFiles = gitStatusOutput
-    ? gitStatusOutput.split("\n").map((line) => line.trim())
-    : [];
-
-  let diffPreview = "";
-  if (isGitRepo) {
-    try {
-      const rawDiff = execSync("git diff HEAD", {
-        cwd: context.cwd,
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "ignore"],
-      }).trim();
-      if (rawDiff) {
-        // Fenced rather than pre-coloured: the surface owns colour and width,
-        // and a pre-coloured string cannot be refitted when the frame resizes.
-        diffPreview = `\n### Modified changes\n\n\u0060\u0060\u0060diff\n${rawDiff}\n\u0060\u0060\u0060`;
-      }
-    } catch {
-      // Diff best-effort
-    }
-  }
-
-  const lines: string[] = [
-    "# ⏪ Session & Workspace Rollback Assistant (/undo)",
-    "",
-    `- **Session ID**: \`${sessionId}\``,
-    `- **Turns Completed in Session**: ${telemetry.turnsCount}`,
-    `- **Workspace Git Tracking**: ${isGitRepo ? "`Active Git Repository`" : "`Not a git repository`"}`,
-    `- **Uncommitted File Changes**: ${modifiedFiles.length} file(s)`,
-    diffPreview,
-    "",
-    "### 🛠️ Discard Options:",
-    "To immediately discard uncommitted changes made during this session, run:",
-    "```bash",
-    "/undo --hard",
-    "```",
-  ];
 
   return {
     kind: "local",
-    output: lines.filter((l) => l !== "").join("\n"),
+    output: [
+      "### Most recent edit",
+      "",
+      `- When: ${latest.when}`,
+      `- Files: ${latest.files.map((file) => `\`${file}\``).join(", ")}`,
+      "",
+      "Revert exactly those files:",
+      "",
+      "```",
+      `/restore execute --ledger-root ${latest.ledgerRoot} --authority ${latest.authorityId} --all --execute`,
+      "```",
+      "",
+      "`/restore` on its own opens the snapshot list, and previews before it writes. To go back in the conversation instead, without touching files, press Escape twice.",
+    ].join("\n"),
   };
+}
+
+interface LatestEdit {
+  readonly ledgerRoot: string;
+  readonly authorityId: string;
+  readonly when: string;
+  readonly files: readonly string[];
+}
+
+/**
+ * The newest recorded edit, read from the snapshot ledger.
+ *
+ * Read straight off disk rather than through the async index: `/undo` answers one
+ * question about one namespace, and the index exists for listing every record in
+ * every namespace.
+ */
+function latestEdit(workspaceRoot: string): LatestEdit | undefined {
+  const ledgerRoot = defaultLedgerRoot(workspaceRoot);
+  let namespaces: string[];
+  try {
+    namespaces = fs
+      .readdirSync(ledgerRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+  } catch {
+    return undefined;
+  }
+  let newest: LatestEdit | undefined;
+  for (const authorityId of namespaces) {
+    const recordsDir = path.join(ledgerRoot, authorityId, "records");
+    let files: string[];
+    try {
+      files = fs.readdirSync(recordsDir).filter((name) => name.endsWith(".json"));
+    } catch {
+      continue;
+    }
+    const paths: string[] = [];
+    let when = "";
+    for (const name of files) {
+      try {
+        const record = JSON.parse(fs.readFileSync(path.join(recordsDir, name), "utf8")) as {
+          workspaceRelativePath?: string;
+          createdAt?: string;
+        };
+        if (record.workspaceRelativePath) paths.push(record.workspaceRelativePath);
+        if (record.createdAt && record.createdAt > when) when = record.createdAt;
+      } catch {
+        continue;
+      }
+    }
+    if (paths.length === 0 || !when) continue;
+    if (!newest || when > newest.when) {
+      newest = { ledgerRoot, authorityId, when, files: paths };
+    }
+  }
+  return newest;
+}
+
+/** How many files the working tree has uncommitted, or "unknown" outside git. */
+function dirtyCount(cwd: string): string {
+  try {
+    const output = execSync("git status --porcelain", {
+      cwd,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "ignore"],
+    }).trim();
+    return output ? `${output.split("\n").length}` : "0";
+  } catch {
+    return "unknown (not a git repository)";
+  }
 }

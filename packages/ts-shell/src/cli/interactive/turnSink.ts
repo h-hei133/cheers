@@ -1,7 +1,8 @@
 import { recordLastAssistantResponse } from "../../core/commands/copyCommandRuntime.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { RendererSink } from "../../renderer/StreamingRenderer.js";
-import type { Block } from "../../presentation/tui/transcript/blocks.js";
+import { splitFencedDiff, type Block } from "../../presentation/tui/transcript/blocks.js";
+import { ToolCards } from "./toolCards.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
 import type { TurnActivity } from "../../presentation/tui/transcript/live.js";
 
@@ -30,7 +31,7 @@ export class TurnSink implements RendererSink {
   private streamedChars = 0;
   private assistant: Block | undefined;
   private prose: Block | undefined;
-  private readonly tools = new Map<string, Block>();
+  private readonly tools: ToolCards;
   private proseKind: "command" | "error" = "command";
   private proseTitle = "";
   private failed = false;
@@ -39,6 +40,7 @@ export class TurnSink implements RendererSink {
     this.transcript = transcript;
     this.onChange = onChange;
     this.now = now;
+    this.tools = new ToolCards(transcript, onChange);
   }
 
   /** Open a block that collects prose for one submitted input. */
@@ -55,6 +57,38 @@ export class TurnSink implements RendererSink {
     this.proseKind = kind === "turn" ? "error" : "command";
     this.proseTitle = title;
     this.onChange();
+  }
+
+  /**
+   * The prompt a retry should run, or nothing with a note saying why not.
+   *
+   * A retry that re-ran a turn which had in fact succeeded would duplicate work
+   * and spend tokens, so the failure is a precondition rather than an assumption.
+   * `previousFailed` is passed in because starting this turn already cleared the
+   * flag for the turn that is now running.
+   */
+  retryTarget(lastPrompt: string | undefined, previousFailed: boolean): string | undefined {
+    if (lastPrompt === undefined) {
+      this.notify("Nothing to retry: no prompt has run in this session yet.");
+      return undefined;
+    }
+    if (!previousFailed) {
+      this.notify("Nothing to retry: the last turn finished.");
+      return undefined;
+    }
+    this.transcript.append({ kind: "user", text: lastPrompt, finalized: true });
+    return lastPrompt;
+  }
+
+  /** Forget everything: used when the transcript itself is thrown away. */
+  reset(): void {
+    this.running = false;
+    this.cancelling = false;
+    this.failed = false;
+    this.assistant = undefined;
+    this.prose = undefined;
+    this.tools.clear();
+    this.streamedChars = 0;
   }
 
   /** Close the turn: everything still live becomes retirable. */
@@ -92,6 +126,15 @@ export class TurnSink implements RendererSink {
     return this.failed;
   }
 
+  /**
+   * This turn's command output, when the turn was a command rather than an
+   * exchange. Long output is moved out of the transcript by the caller.
+   */
+  get commandOutput(): { readonly title: string; readonly block: Block } | undefined {
+    if (this.proseKind !== "command" || !this.prose) return undefined;
+    return { title: this.proseTitle || "output", block: this.prose };
+  }
+
   /** The live activity row state, or undefined when idle. */
   activity(): TurnActivity | undefined {
     if (!this.running) return undefined;
@@ -126,17 +169,20 @@ export class TurnSink implements RendererSink {
       case "message.delta":
         this.chunk(event.delta);
         return;
+      case "message.replace":
+        this.replaceAssistant(event.text);
+        return;
       case "tool.started":
-        this.startTool(event.toolName, event.taskId);
+        this.openTool(event.toolName, event.taskId);
         return;
       case "approval.requested":
-        this.noteTool(event.taskId, "awaiting approval");
+        this.tools.note(event.taskId, "awaiting approval");
         return;
       case "approval.resolved":
-        this.noteTool(event.taskId, `approval ${event.outcome}`);
+        this.tools.note(event.taskId, `approval ${event.outcome}`);
         return;
       case "tool.result":
-        this.finishTool(event.taskId, event.success, event.failureReason);
+        this.closeTool(event.taskId, event.success, event.failureReason);
         return;
       case "query.retrying":
         this.label = `retrying (attempt ${event.attempt})`;
@@ -182,32 +228,31 @@ export class TurnSink implements RendererSink {
     this.assistant = undefined;
   }
 
-  private startTool(toolName: string, taskId: string): void {
+  /** Close a tool card and put the activity row back to the turn's own label. */
+  private closeTool(taskId: string, success: boolean, failureReason?: string): void {
+    this.tools.finish(taskId, success, failureReason);
+    this.label = "working";
+    this.onChange();
+  }
+
+  /** Open a tool card, closing out any prose the turn had been writing. */
+  private openTool(toolName: string, taskId: string): void {
     this.finalizeAssistant();
     this.prose = undefined;
     this.label = toolName;
-    this.tools.set(
-      taskId,
-      this.transcript.append({ kind: "tool", title: toolName, text: "", status: "running", finalized: false }),
-    );
-    this.onChange();
+    this.tools.start(toolName, taskId);
   }
 
-  private noteTool(taskId: string, note: string): void {
-    const block = this.tools.get(taskId);
-    if (!block) return;
-    block.text = block.text ? `${block.text}\n${note}` : note;
-    this.onChange();
-  }
-
-  private finishTool(taskId: string, success: boolean, failureReason?: string): void {
-    const block = this.tools.get(taskId);
-    if (!block) return;
-    block.status = success ? "ok" : "failed";
-    if (!success && failureReason) block.text = failureReason;
-    block.finalized = true;
-    this.tools.delete(taskId);
-    this.label = "working";
+  /**
+   * Correct the streamed text in place.
+   *
+   * Sent when tool calls turned out to be embedded in the prose: the deltas were
+   * honest as they arrived, and this is the same message without them. Rewriting
+   * the block is right — appending would show the answer twice.
+   */
+  private replaceAssistant(text: string): void {
+    const block = this.assistant ?? this.openAssistant();
+    block.text = text;
     this.onChange();
   }
 
@@ -223,21 +268,4 @@ export class TurnSink implements RendererSink {
     });
     this.onChange();
   }
-}
-
-const DIFF_FENCE = /```diff\n([\s\S]*?)```/;
-
-/**
- * Move a fenced diff out of a block's prose and into its diff field.
- *
- * Commands that report changes already produce unified diffs; leaving them
- * fenced renders them as a generic code block, losing the per-line colouring and
- * the intra-line emphasis that make a diff readable at a glance.
- */
-function splitFencedDiff(block: Block): void {
-  if (block.diff) return;
-  const match = DIFF_FENCE.exec(block.text);
-  if (!match) return;
-  block.diff = match[1]!.replace(/\s+$/, "");
-  block.text = block.text.replace(match[0], "").replace(/\n{3,}/g, "\n\n").trim();
 }

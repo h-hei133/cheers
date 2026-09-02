@@ -36,6 +36,14 @@ export interface SessionReentrySummary {
   readonly stagedRepairNextStep?: number;
   readonly blockedReason?: RecoveryTrustBoundaryBlock["reason"];
   readonly blockedDetail?: string;
+  /**
+   * Whether anything was ever said in this session.
+   *
+   * A run that only used slash commands leaves a session record but no
+   * conversation; those are not worth offering to return to, and are not worth
+   * keeping. This is what tells the two apart.
+   */
+  readonly hasConversation: boolean;
 }
 
 export function projectSessionReentrySummary(input: {
@@ -81,7 +89,15 @@ export function projectSessionReentrySummary(input: {
       : {}),
     blockedReason: trustBoundary.block?.reason,
     blockedDetail: trustBoundary.block?.detail,
+    hasConversation: sessionHasConversation(session),
   };
+}
+
+/** Whether a session holds a real exchange rather than only command bookkeeping. */
+export function sessionHasConversation(session: Session): boolean {
+  return session.turns.some(
+    (turn) => (turn.role === "user" || turn.role === "assistant") && turn.content.trim().length > 0,
+  );
 }
 
 export function scoreSessionReentrySummary(input: {
