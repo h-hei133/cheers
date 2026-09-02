@@ -1,71 +1,75 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
-
-let isFastModeActive = false;
-
-export function isFastModeEnabled(): boolean {
-  return isFastModeActive;
-}
-
-export function setFastModeEnabled(enabled: boolean): void {
-  isFastModeActive = enabled;
-}
+import { readProjectState, writeProjectState } from "../state/projectState.js";
 
 /**
- * /fast (aliases: /turbo, /speed)
- * Toggles or inspects fast mode to switch between high-capability and low-latency models.
+ * /fast — hold sampling down for shorter, more direct answers.
+ *
+ * What this changes is the sampling temperature, and nothing else. It does not
+ * route to a different model; `/model` does that. The choice is kept per project
+ * on disk, because a preference that resets on every start is one the user has to
+ * keep re-making.
  */
+
+/** Whether this project is set to sample at a lower temperature. */
+export function isFastModeEnabled(workspaceRoot: string): boolean {
+  return readProjectState(workspaceRoot).fastSampling === true;
+}
+
+/** Record the choice, returning the file it was written to, or undefined if it was not. */
+export function setFastModeEnabled(workspaceRoot: string, enabled: boolean): string | undefined {
+  return writeProjectState(workspaceRoot, { fastSampling: enabled });
+}
+
+/** The temperature a turn should use, given the base the caller would have used. */
+export function samplingTemperature(workspaceRoot: string, base: number): number {
+  return isFastModeEnabled(workspaceRoot) ? FAST_TEMPERATURE : base;
+}
+
+const FAST_TEMPERATURE = 0.2;
+
 export async function runFastCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const modeArg = args[0]?.toLowerCase();
+  const root = context.cwd;
+  const asked = args[0]?.toLowerCase();
+  const current = isFastModeEnabled(root);
 
-  if (modeArg === "on" || modeArg === "enable" || modeArg === "1") {
-    isFastModeActive = true;
+  const wanted =
+    asked === "on" || asked === "enable" || asked === "1"
+      ? true
+      : asked === "off" || asked === "disable" || asked === "0"
+        ? false
+        : asked === "toggle"
+          ? !current
+          : undefined;
+
+  if (wanted === undefined) {
     return {
       kind: "local",
       output: [
-        "### Fast mode is on",
+        "### Fast mode",
         "",
-        // What this actually changes is sampling temperature. It does not route to a
-        // different model, and saying it did was a claim about the request that
-        // nothing backed — use `/model` to change which model answers.
-        "- Sampling: temperature is lowered, so answers are more direct and arrive sooner",
+        `- Currently \`${current ? "on" : "off"}\` for this project`,
+        `- On: temperature ${FAST_TEMPERATURE}, so answers are more direct and arrive sooner`,
         "- Which model answers does not change — use `/model` for that",
         "",
-        "`/fast off` restores the default sampling.",
+        "`/fast on` · `/fast off` · `/fast toggle`",
       ].join("\n"),
     };
   }
 
-  if (modeArg === "off" || modeArg === "disable" || modeArg === "0") {
-    isFastModeActive = false;
-    return {
-      kind: "local",
-      output: [
-        "# Fast Mode Deactivated (/fast off)",
-        "",
-        "- Sampling is back to the default temperature",
-        "- **Best For**: Complex multi-file architecture, subtle bugs, and rigorous code reviews",
-      ].join("\n"),
-    };
-  }
-
-  if (modeArg === "toggle") {
-    isFastModeActive = !isFastModeActive;
-  }
-
+  const written = setFastModeEnabled(root, wanted);
+  const headline = wanted
+    ? `Fast mode is on: temperature ${FAST_TEMPERATURE} from the next turn.`
+    : "Fast mode is off: sampling is back to the default temperature.";
+  if (written) return { kind: "local", output: headline };
   return {
     kind: "local",
     output: [
-      "# Fast Mode Status (/fast)",
+      headline,
       "",
-      `- **Current State**: \`${isFastModeActive ? "ENABLED (TURBO)" : "DISABLED (DEFAULT)"}\``,
-      "",
-      "Usage:",
-      "- `/fast on` : Switch to low-latency fast model tier",
-      "- `/fast off` : Switch to default full capability tier",
-      "- `/fast toggle` : Toggle between fast and default modes",
+      "It could not be written to disk, so it will be lost when this process ends.",
     ].join("\n"),
   };
 }

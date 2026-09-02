@@ -1,116 +1,128 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
-
-export type GoalPhase = "active" | "paused" | "complete";
-
-export interface GoalState {
-  objective: string;
-  phase: GoalPhase;
-  updatedAt: string;
-}
-
-// In-memory session goal state
-let currentSessionGoal: GoalState | null = null;
-
-export function getActiveSessionGoal(): GoalState | null {
-  return currentSessionGoal;
-}
-
-export function setActiveSessionGoal(goal: GoalState | null): void {
-  currentSessionGoal = goal;
-}
+import {
+  readProjectState,
+  writeProjectState,
+  type GoalPhase,
+  type StoredGoal,
+} from "../state/projectState.js";
 
 /**
- * /goal (aliases: /objective, /target)
- * Goal state machine management (active / paused / complete) to prevent goal drift in long sessions.
+ * /goal — the objective this project is working towards.
+ *
+ * The objective is kept on disk per project rather than in memory. It exists to
+ * stop a long piece of work from drifting, and long work spans restarts: an
+ * objective that only lasts as long as the process is gone exactly when it was
+ * supposed to be doing its job.
  */
+
+export type { GoalPhase };
+export type GoalState = StoredGoal;
+
+/** The objective recorded for this project, or none. */
+export function getActiveSessionGoal(workspaceRoot: string): GoalState | null {
+  return readProjectState(workspaceRoot).goal ?? null;
+}
+
+/** Record `goal`, returning the file it was written to, or undefined if it was not. */
+export function setActiveSessionGoal(
+  workspaceRoot: string,
+  goal: GoalState | null,
+): string | undefined {
+  return writeProjectState(workspaceRoot, { goal });
+}
+
 export async function runGoalCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const isSingleWord = args.length === 1;
-  const subCommand = isSingleWord ? args[0]?.toLowerCase() : undefined;
+  const root = context.cwd;
+  const current = getActiveSessionGoal(root);
+  const subCommand = args.length === 1 ? args[0]?.toLowerCase() : undefined;
 
   if (args.length === 0) {
-    if (!currentSessionGoal) {
+    if (!current) {
       return {
         kind: "local",
-        output: "No active goal set for this session.\nUsage: /goal <objective> | /goal pause | /goal resume | /goal complete | /goal clear",
+        output: [
+          "No objective set for this project.",
+          "",
+          "Usage: `/goal <objective>` · `/goal pause` · `/goal resume` · `/goal complete` · `/goal clear`",
+        ].join("\n"),
       };
     }
     return {
       kind: "local",
       output: [
-        "# Current Session Goal (/goal)",
+        "### Objective",
         "",
-        `- **Objective**: ${currentSessionGoal.objective}`,
-        `- **Status**: \`${currentSessionGoal.phase.toUpperCase()}\``,
-        `- **Last Updated**: ${currentSessionGoal.updatedAt}`,
+        `- ${current.objective}`,
+        `- Status: \`${current.phase}\`${current.updatedAt ? ` · set ${current.updatedAt}` : ""}`,
         "",
-        "Goal is actively injected into agent system prompt to prevent drift.",
+        current.phase === "active"
+          ? "Every turn carries this objective in its environment line, so the model sees it again each time."
+          : "A paused or completed objective is kept but not carried into turns. `/goal resume` puts it back.",
       ].join("\n"),
     };
   }
+
   if (subCommand === "clear") {
-    currentSessionGoal = null;
-    return {
-      kind: "local",
-      output: "Session goal cleared.",
-    };
+    if (!current) return { kind: "local", output: "No objective to clear." };
+    return { kind: "local", output: report(setActiveSessionGoal(root, null), "Objective cleared.") };
   }
 
-  if (subCommand === "pause") {
-    if (!currentSessionGoal) {
-      return { kind: "local", output: "No active goal to pause." };
+  const moved = movePhase(subCommand);
+  if (moved) {
+    if (!current) {
+      return {
+        kind: "local",
+        output: "No objective yet. `/goal <objective>` sets one.",
+      };
     }
-    currentSessionGoal.phase = "paused";
-    currentSessionGoal.updatedAt = new Date().toISOString();
+    const next: GoalState = { ...current, phase: moved, updatedAt: new Date().toISOString() };
     return {
       kind: "local",
-      output: `Goal paused: "${currentSessionGoal.objective}"`,
+      output: report(
+        setActiveSessionGoal(root, next),
+        `Objective ${moved === "active" ? "resumed" : moved}: "${current.objective}"`,
+      ),
     };
   }
 
-  if (subCommand === "resume") {
-    if (!currentSessionGoal) {
-      return { kind: "local", output: "No goal to resume. Use /goal <objective> to set one." };
-    }
-    currentSessionGoal.phase = "active";
-    currentSessionGoal.updatedAt = new Date().toISOString();
-    return {
-      kind: "local",
-      output: `Goal resumed (active): "${currentSessionGoal.objective}"`,
-    };
-  }
-
-  if (subCommand === "complete" || subCommand === "done") {
-    if (!currentSessionGoal) {
-      return { kind: "local", output: "No active goal to complete." };
-    }
-    currentSessionGoal.phase = "complete";
-    currentSessionGoal.updatedAt = new Date().toISOString();
-    return {
-      kind: "local",
-      output: `Goal marked as COMPLETE: "${currentSessionGoal.objective}"`,
-    };
-  }
-
-  // Setting a new goal objective
   const objective = args.join(" ").trim();
-  currentSessionGoal = {
+  if (!objective) return { kind: "local", output: "An objective needs some words." };
+  const written = setActiveSessionGoal(root, {
     objective,
     phase: "active",
     updatedAt: new Date().toISOString(),
-  };
-
+  });
   return {
     kind: "local",
-    output: [
-      "# Goal Established & Armed (/goal)",
-      "",
-      `- **Objective**: ${objective}`,
-      "- **Status**: `ACTIVE`",
-      "",
-      "This goal will be pinned to agent reasoning context across turns.",
-    ].join("\n"),
+    output: report(
+      written,
+      ["### Objective set", "", `- ${objective}`, "- Status: `active`", "", "Every turn from here carries it."].join("\n"),
+    ),
   };
+}
+
+/** The phase a subcommand asks for, or undefined when it is not one. */
+function movePhase(subCommand: string | undefined): GoalPhase | undefined {
+  if (subCommand === "pause") return "paused";
+  if (subCommand === "resume") return "active";
+  if (subCommand === "complete" || subCommand === "done") return "complete";
+  return undefined;
+}
+
+/**
+ * The outcome, with the failure named when there was one.
+ *
+ * An objective that could not be written down has not survived anything, and
+ * saying "set" would be claiming a durability the file system just refused.
+ */
+function report(written: string | undefined, success: string): string {
+  if (written) return success;
+  return [
+    success.split("\n")[0],
+    "",
+    "It could not be written to disk, so it will be lost when this process ends.",
+  ].join("\n");
 }

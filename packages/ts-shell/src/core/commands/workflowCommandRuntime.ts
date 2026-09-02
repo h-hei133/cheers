@@ -1,167 +1,144 @@
+import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import { DAGResolver } from "../workflow/dagResolver.js";
-import type { WorkflowTask, WorkflowStatus } from "../workflow/types.js";
-
-export interface ActiveWorkflowState {
-  id: string;
-  name: string;
-  status: WorkflowStatus;
-  tasks: WorkflowTask[];
-  currentBatchIndex: number;
-  batches: readonly (readonly string[])[];
-}
-
-let currentWorkflow: ActiveWorkflowState | null = null;
-
-export function getActiveWorkflow(): ActiveWorkflowState | null {
-  return currentWorkflow;
-}
-
-export function resetActiveWorkflow(): void {
-  currentWorkflow = null;
-}
+import { definitionExample, listWorkflowNames, readWorkflow, workflowsDir } from "../workflow/definition.js";
+import { runWorkflow, type StepOutcome, type WorkflowRun } from "../workflow/runner.js";
+import { readLastRun, writeRun } from "../workflow/runStore.js";
 
 /**
- * /workflow command
- * Controls and inspects deterministic agentic workflows and DAG pipelines.
+ * /workflow — run a dependency graph of commands declared in this project.
+ *
+ * The graph is resolved into batches, each batch runs together, and a failing
+ * batch stops the run. What is reported is what happened: exit codes, durations,
+ * and the output of whatever failed.
+ *
+ * The previous implementation is worth naming, because the shape of the fix
+ * follows from it. `run` built four sample tasks with their statuses already set
+ * to "completed" and "in_progress", pointed `currentBatchIndex` at the second
+ * batch, and answered "initiated successfully"; `status` then drew ticks against
+ * batches nothing had executed. It resolved a real graph over invented nodes and
+ * displayed invented progress.
  */
+
 export async function runWorkflowCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const root = context.cwd;
   const subCommand = args[0]?.toLowerCase();
 
-  if (!subCommand || subCommand === "status") {
-    if (!currentWorkflow) {
-      return {
-        kind: "local",
-        output: [
-          "# Workflow Subsystem (/workflow)",
-          "",
-          "Status: No active workflow is currently running.",
-          "",
-          "Available templates:",
-          "- `/workflow run feature-delivery` : 3-stage planning, builder-validator execution, and test loop",
-          "- `/workflow run adversarial-review` : Multi-agent defect proposal and refutation pipeline",
-          "- `/workflow run auto-repair` : Autonomous failure reproduction and self-correction",
-          "",
-          "Commands:",
-          "- `/workflow list` : Show all workflow templates",
-          "- `/workflow run <template>` : Start a structured workflow",
-          "- `/workflow cancel` : Abort the active workflow",
-        ].join("\n"),
-      };
-    }
-
-    const lines: string[] = [
-      `# Active Workflow: ${currentWorkflow.name} (ID: \`${currentWorkflow.id}\`)`,
-      `**Status**: ${currentWorkflow.status.toUpperCase()} | **Batch Progress**: ${currentWorkflow.currentBatchIndex + 1}/${currentWorkflow.batches.length}`,
-      "",
-      "### Task Execution Graph (DAG Batches):",
-    ];
-
-    currentWorkflow.batches.forEach((batch, bIdx) => {
-      const isCurrent = bIdx === currentWorkflow!.currentBatchIndex;
-      const isPast = bIdx < currentWorkflow!.currentBatchIndex;
-      const statusIcon = isPast ? "✅" : isCurrent ? "⏳ [ACTIVE]" : "⚪ [QUEUED]";
-
-      lines.push(`- **Batch ${bIdx + 1}** ${statusIcon}: ${batch.map((id) => `\`${id}\``).join(", ")}`);
-    });
-
-    return {
-      kind: "local",
-      output: lines.join("\n"),
-    };
-  }
-
   if (subCommand === "list" || subCommand === "templates") {
-    return {
-      kind: "local",
-      output: [
-        "# Pre-configured Workflow Templates (/workflow)",
-        "",
-        "### 1. `feature-delivery`",
-        "- **Topology**: Context Injection -> Parallel Slices -> Builder-Validator Verification -> Delivery",
-        "- **Stages**: 4 stages with physical stage barriers",
-        "",
-        "### 2. `adversarial-review`",
-        "- **Topology**: Diff Extraction -> Multi-dimension Reviewers -> Refuters -> Confirmed Synthesis",
-        "- **Stages**: 3 stages with zero false-positive refutation",
-        "",
-        "### 3. `auto-repair`",
-        "- **Topology**: Failure Isolation -> Root Cause Hypothesis -> AST Patching -> Affected Test Loop",
-        "- **Stages**: 3 stages with automated regression validation",
-      ].join("\n"),
-    };
+    return { kind: "local", output: renderList(root) };
   }
 
   if (subCommand === "run" || subCommand === "start") {
-    const template = args[1]?.toLowerCase() || "feature-delivery";
-    const sampleTasks: WorkflowTask[] = [
-      {
-        id: "task_1_plan",
-        name: "Plan & Context Engineering",
-        dependencies: [],
-        status: "completed",
-      },
-      {
-        id: "task_2_impl_core",
-        name: "Core Implementation",
-        dependencies: ["task_1_plan"],
-        status: "in_progress",
-      },
-      {
-        id: "task_2_impl_tests",
-        name: "Test Suite Scaffold",
-        dependencies: ["task_1_plan"],
-        status: "in_progress",
-      },
-      {
-        id: "task_3_verify",
-        name: "Builder-Validator Verification",
-        dependencies: ["task_2_impl_core", "task_2_impl_tests"],
-        status: "pending",
-      },
-    ];
-
-    const dagResult = DAGResolver.resolve(sampleTasks);
-    if (!dagResult.isValid) {
-      return {
-        kind: "local",
-        output: `Error resolving workflow DAG: ${dagResult.errorMessage}`,
-      };
-    }
-
-    currentWorkflow = {
-      id: `wf_${Math.random().toString(36).slice(2, 8)}`,
-      name: template,
-      status: "running",
-      tasks: sampleTasks,
-      currentBatchIndex: 1, // at impl stage
-      batches: dagResult.executionBatches,
-    };
-
-    return {
-      kind: "local",
-      output: [
-        `Workflow \`${template}\` initiated successfully (ID: \`${currentWorkflow.id}\`).`,
-        `Computed ${dagResult.executionBatches.length} topological execution batches.`,
-        "Run `/workflow status` to inspect execution telemetry.",
-      ].join("\n"),
-    };
+    const name = args[1];
+    if (!name) return { kind: "local", output: "Which workflow? `/workflow list` shows what this project has." };
+    return { kind: "local", output: await execute(root, name) };
   }
 
-  if (subCommand === "cancel" || subCommand === "stop") {
-    if (!currentWorkflow) {
-      return { kind: "local", output: "No active workflow to cancel." };
+  if (!subCommand || subCommand === "status") {
+    const last = readLastRun(root);
+    if (!last) {
+      return {
+        kind: "local",
+        output: ["No workflow has run in this project yet.", "", renderList(root)].join("\n"),
+      };
     }
-    const name = currentWorkflow.name;
-    currentWorkflow = null;
-    return { kind: "local", output: `Workflow \`${name}\` cancelled.` };
+    return { kind: "local", output: renderRun(last, { finished: true }) };
   }
 
   return {
     kind: "local",
-    output: "Usage: `/workflow [status | list | run <template> | cancel]`",
+    output: "Usage: `/workflow list` · `/workflow run <name>` · `/workflow status`",
   };
+}
+
+/** Load, run, and record one workflow. */
+async function execute(root: string, name: string): Promise<string> {
+  const loaded = readWorkflow(root, name);
+  if ("error" in loaded) return [loaded.error, "", definitionExample()].join("\n");
+
+  const outcome = await runWorkflow(loaded.workflow, root);
+  if ("error" in outcome) return outcome.error;
+
+  const stored = writeRun(root, outcome.run);
+  const lines = [renderRun(outcome.run, { finished: true })];
+  if (!stored) {
+    lines.push("", "The result could not be written to disk, so `/workflow status` will not recall it.");
+  }
+  return lines.join("\n");
+}
+
+/** The workflows this project has, or how to add one. */
+function renderList(root: string): string {
+  const names = listWorkflowNames(root);
+  const where = path.relative(root, workflowsDir(root)) || workflowsDir(root);
+  if (names.length === 0) {
+    return [
+      `No workflows in \`${where}\`.`,
+      "",
+      "A workflow is a list of commands with dependencies between them. Steps that do not depend on each other run together; a failing step stops the run.",
+      "",
+      definitionExample(),
+      "",
+      `Save that as \`${path.join(where, "verify.json")}\` and run it with \`/workflow run verify\`.`,
+    ].join("\n");
+  }
+  const rows = names.map((name) => {
+    const loaded = readWorkflow(root, name);
+    if ("error" in loaded) return `- \`${name}\` — unreadable: ${loaded.error}`;
+    const summary = loaded.workflow.description ? ` — ${loaded.workflow.description}` : "";
+    return `- \`${name}\` (${loaded.workflow.steps.length} steps)${summary}`;
+  });
+  return [`### Workflows in \`${where}\``, "", ...rows, "", "`/workflow run <name>` runs one."].join("\n");
+}
+
+/**
+ * A run, step by step.
+ *
+ * The failing step's output is included in full-enough form to act on, because a
+ * report that says only "failed" sends the reader back to run it again by hand.
+ */
+function renderRun(run: WorkflowRun, options: { readonly finished: boolean }): string {
+  const passed = run.steps.filter((step) => step.status === "passed").length;
+  const failed = run.steps.filter((step) => step.status === "failed");
+  const skipped = run.steps.filter((step) => step.status === "skipped").length;
+  const lines = [
+    `### Workflow \`${run.name}\` — ${run.status}`,
+    "",
+    `- ${passed} passed${failed.length > 0 ? `, ${failed.length} failed` : ""}${skipped > 0 ? `, ${skipped} skipped` : ""}`,
+    `- ${run.batches.length} ${run.batches.length === 1 ? "batch" : "batches"}, ran ${run.startedAt}`,
+    "",
+  ];
+
+  for (const [index, batch] of run.batches.entries()) {
+    lines.push(`**Batch ${index + 1}**`);
+    for (const id of batch) {
+      const outcome = run.steps.find((step) => step.id === id);
+      lines.push(outcome ? `- ${describe(outcome)}` : `- \`${id}\` — no result recorded`);
+    }
+    lines.push("");
+  }
+
+  if (failed.length > 0) {
+    for (const step of failed) {
+      lines.push(`#### \`${step.id}\` failed`, "", "```text", step.output ?? "(no output)", "```", "");
+    }
+    if (skipped > 0) {
+      lines.push(`${skipped} later ${skipped === 1 ? "step" : "steps"} never ran, because what they depend on failed.`, "");
+    }
+  } else if (options.finished) {
+    lines.push("Every step passed.");
+  }
+
+  return lines.join("\n").replace(/\n+$/, "");
+}
+
+/** One step in a line: what happened, how long it took, and why if it failed. */
+function describe(step: StepOutcome): string {
+  const took = step.durationMs === undefined ? "" : ` · ${(step.durationMs / 1000).toFixed(1)}s`;
+  if (step.status === "passed") return `\`${step.id}\` passed${took}`;
+  if (step.status === "skipped") return `\`${step.id}\` skipped — a step it needs failed`;
+  if (step.timedOut) return `\`${step.id}\` killed for running too long${took}`;
+  return `\`${step.id}\` failed${step.exitCode === undefined ? "" : ` (exit ${step.exitCode})`}${took}`;
 }

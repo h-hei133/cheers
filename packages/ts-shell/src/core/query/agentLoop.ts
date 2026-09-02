@@ -4,7 +4,7 @@ import { createComponentLogger } from "../../observability/structuredLogger.js";
 const logger = createComponentLogger("AgentLoop");
 import type { QueryEvent } from "./runtime/events.js";
 import { recordSessionUsage } from "../../observability/usageTelemetry.js";
-import { isFastModeEnabled } from "../commands/fastCommandRuntime.js";
+import { samplingTemperature } from "../commands/fastCommandRuntime.js";
 import { DoomLoopDetector } from "./doomLoopDetector.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../../tools/types.js";
@@ -125,7 +125,7 @@ export async function* runAutonomousReActLoop(
     {
       role: "user",
       content: [
-        `[Environment Context: cwd=${options.workspaceRoot}${getActiveSessionGoal()?.phase === "active" ? ` | active_goal=${getActiveSessionGoal()!.objective}` : ""}]`,
+        environmentLine(options.workspaceRoot),
         "",
         options.prompt,
       ].join("\n"),
@@ -246,8 +246,7 @@ export async function* runAutonomousReActLoop(
 
     // On the final turn before maxTurns, set tool_choice to "none" while retaining tool definitions for schema validation
     const isLastTurn = turn === maxTurns;
-    const baseTemperature = options.temperature ?? 0.7;
-    const activeTemperature = isFastModeEnabled() ? 0.2 : baseTemperature;
+    const activeTemperature = samplingTemperature(options.workspaceRoot, options.temperature ?? 0.7);
     const payload = {
       model: modelName,
       messages: preparedMessages,
@@ -612,6 +611,19 @@ export async function* runAutonomousReActLoop(
       finalOutput: lastAssistantText,
     },
   };
+}
+
+/**
+ * The line that tells the model where it is and what it is working towards.
+ *
+ * The objective is only carried while it is active: a paused one is deliberately
+ * out of the way, and repeating a completed one would keep steering towards work
+ * that is already done.
+ */
+function environmentLine(workspaceRoot: string): string {
+  const goal = getActiveSessionGoal(workspaceRoot);
+  const objective = goal?.phase === "active" ? ` | active_goal=${goal.objective}` : "";
+  return `[Environment Context: cwd=${workspaceRoot}${objective}]`;
 }
 
 /**

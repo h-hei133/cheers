@@ -12,14 +12,26 @@ import { routeSlashCommand } from "./slashRouter.js";
 
 describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
   let tempDir: string;
+  let realHome: string | undefined;
+  let realProfile: string | undefined;
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-workflow-test-"));
-    setActiveSessionGoal(null);
-    setFastModeEnabled(false);
+    // Durable per-project state lands under the home directory, so the home is
+    // moved into the temp tree for the duration: a test must not write into the
+    // state of the machine running it.
+    realHome = process.env.HOME;
+    realProfile = process.env.USERPROFILE;
+    process.env.HOME = tempDir;
+    delete process.env.USERPROFILE;
+    setActiveSessionGoal(tempDir, null);
+    setFastModeEnabled(tempDir, false);
   });
 
   afterEach(async () => {
+    if (realHome === undefined) delete process.env.HOME;
+    else process.env.HOME = realHome;
+    if (realProfile !== undefined) process.env.USERPROFILE = realProfile;
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
@@ -27,42 +39,51 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
     it("creates, pauses, resumes, and completes goal state", async () => {
       // 1. Create goal
       const createRes = await runGoalCommand(["Build", "authentication", "system"], { cwd: tempDir });
-      expect(createRes.output).toContain("Goal Established & Armed");
-      expect(getActiveSessionGoal()?.objective).toBe("Build authentication system");
-      expect(getActiveSessionGoal()?.phase).toBe("active");
+      expect(createRes.output).toContain("Objective set");
+      expect(getActiveSessionGoal(tempDir)?.objective).toBe("Build authentication system");
+      expect(getActiveSessionGoal(tempDir)?.phase).toBe("active");
 
       // 2. Pause goal
       const pauseRes = await runGoalCommand(["pause"], { cwd: tempDir });
-      expect(pauseRes.output).toContain("Goal paused");
-      expect(getActiveSessionGoal()?.phase).toBe("paused");
+      expect(pauseRes.output).toContain("Objective paused");
+      expect(getActiveSessionGoal(tempDir)?.phase).toBe("paused");
 
       // 3. Resume goal
       const resumeRes = await runGoalCommand(["resume"], { cwd: tempDir });
-      expect(resumeRes.output).toContain("Goal resumed (active)");
-      expect(getActiveSessionGoal()?.phase).toBe("active");
+      expect(resumeRes.output).toContain("Objective resumed");
+      expect(getActiveSessionGoal(tempDir)?.phase).toBe("active");
 
       // 4. Complete goal
       const completeRes = await runGoalCommand(["complete"], { cwd: tempDir });
-      expect(completeRes.output).toContain("COMPLETE");
-      expect(getActiveSessionGoal()?.phase).toBe("complete");
+      expect(completeRes.output).toContain("Objective complete");
+      expect(getActiveSessionGoal(tempDir)?.phase).toBe("complete");
 
       // 5. Clear goal
       const clearRes = await runGoalCommand(["clear"], { cwd: tempDir });
       expect(clearRes.output).toContain("cleared");
-      expect(getActiveSessionGoal()).toBeNull();
+      expect(getActiveSessionGoal(tempDir)).toBeNull();
     });
   });
 
   describe("/loop command", () => {
-    it("runs the verification gate and reports it, claiming nothing more", async () => {
+    it("spends no turn on a gate that already passes", async () => {
       const result = await runLoopCommand(["3", "echo 'hello'"], { cwd: tempDir });
+
       expect(result.kind).toBe("local");
-      // It runs the gate and reports it. Claiming a driver had been "armed" was a
-      // statement about the runtime that nothing backed.
-      expect(result.output).toContain("Verification gate");
-      expect(result.output).toContain("Max Iterations**: 3");
-      expect(result.output).toContain("already passes");
-      expect(result.output).not.toMatch(/will now drive|Armed autonomous/);
+      if (result.kind === "local") {
+        expect(result.output).toContain("already passes");
+        expect(result.output).not.toMatch(/will now drive|Armed autonomous/);
+      }
+    });
+
+    it("hands a failing gate to the model with its own output as the evidence", async () => {
+      const result = await runLoopCommand(["2", "echo 'boom' 1>&2; exit 1"], { cwd: tempDir });
+
+      expect(result.kind).toBe("prompt");
+      if (result.kind === "prompt") {
+        expect(result.prompt).toContain("boom");
+        expect(result.prompt).toContain("at most 2 attempts");
+      }
     });
   });
 
@@ -99,11 +120,11 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
       expect(onRes.output).toContain("Fast mode is on");
       // What it changes is sampling, not which model answers.
       expect(onRes.output).not.toMatch(/Model Routing/);
-      expect(isFastModeEnabled()).toBe(true);
+      expect(isFastModeEnabled(tempDir)).toBe(true);
 
       const offRes = await runFastCommand(["off"], { cwd: tempDir });
-      expect(offRes.output).toMatch(/Fast Mode Deactivated|fast mode is off/i);
-      expect(isFastModeEnabled()).toBe(false);
+      expect(offRes.output).toMatch(/fast mode is off/i);
+      expect(isFastModeEnabled(tempDir)).toBe(false);
     });
   });
 
@@ -136,7 +157,9 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
       expect((await routeSlashCommand("/fast toggle", { cwd: tempDir }))?.kind).toBe("local");
       expect((await routeSlashCommand("/context", { cwd: tempDir }))?.kind).toBe("local");
       expect((await routeSlashCommand("/btw explain git merge", { cwd: tempDir }))?.kind).toBe("local");
-      expect((await routeSlashCommand("/loop 2 npm test", { cwd: tempDir }))?.kind).toBe("local");
+      // A passing gate answers locally; a failing one expands into a repair prompt.
+      expect((await routeSlashCommand("/loop 2 exit 0", { cwd: tempDir }))?.kind).toBe("local");
+      expect((await routeSlashCommand("/loop 2 exit 1", { cwd: tempDir }))?.kind).toBe("prompt");
     });
   });
 });

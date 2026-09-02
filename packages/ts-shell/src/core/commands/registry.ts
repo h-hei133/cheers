@@ -307,10 +307,11 @@ export function createCommandRegistry(
     {
       name: "loop",
       aliases: ["ralph", "autoloop"],
-      kind: "local",
+      // A failing gate expands into a repair prompt; a passing one answers locally.
+      kind: "prompt",
       availability: "available",
       enabled: true,
-      bridgeSafe: true,
+      bridgeSafe: false,
       execute: (args, context) => runLoopCommand(args, context),
     },
     {
@@ -396,10 +397,12 @@ export function createCommandRegistry(
     {
       name: "brainstorm",
       aliases: ["explore", "brainstorming"],
-      kind: "local",
+      // It expands into a prompt: the exploration is the model's work, because
+      // trade-offs for a specific problem cannot come from a local template.
+      kind: "prompt",
       availability: "available",
       enabled: true,
-      bridgeSafe: true,
+      bridgeSafe: false,
       execute: (args, context) => runBrainstormCommand(args, context),
     },
     {
