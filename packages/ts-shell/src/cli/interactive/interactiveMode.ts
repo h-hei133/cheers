@@ -132,6 +132,7 @@ export class InteractiveMode {
       overlayFullScreen: () => this.pager.active || this.overlay.fullScreen,
       overlayRows: (width, height) =>
         this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
+      selection: () => this.pointer.selection,
     });
     this.pointer = new Pointer({
       surface: this.surface,

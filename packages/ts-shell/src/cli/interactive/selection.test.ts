@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DragSelection, extractSelection } from "./selection.js";
+import { DragSelection, extractSelection, highlightSelection } from "./selection.js";
 import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
 
 const ROWS = [
@@ -140,5 +140,68 @@ describe("drag tracking", () => {
     selection.handle(parseMouseReport("\x1b[<0;40;3m")!);
 
     expect(copy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("showing what the drag has covered", () => {
+  const plain = ["alpha beta", "", "gamma"];
+
+  it("shades exactly the cells the span covers", () => {
+    const [row] = highlightSelection(["abcdef"], { from: { row: 0, column: 1 }, to: { row: 0, column: 3 } });
+
+    expect(row).toBe("a\x1b[7mbcd\x1b[27mef");
+  });
+
+  it("leaves rows outside the span untouched", () => {
+    const shaded = highlightSelection(plain, { from: { row: 2, column: 0 }, to: { row: 2, column: 1 } });
+
+    expect(shaded[0]).toBe("alpha beta");
+    expect(shaded[1]).toBe("");
+    expect(shaded[2]).toContain("\x1b[7m");
+  });
+
+  it("carries the shading across a blank row so the span reads as one piece", () => {
+    const shaded = highlightSelection(plain, { from: { row: 0, column: 0 }, to: { row: 2, column: 4 } });
+
+    expect(shaded.every((row) => row.includes("\x1b[7m"))).toBe(true);
+  });
+
+  it("re-arms reverse video after a colour reset inside the span", () => {
+    const styled = "\x1b[36mcyan\x1b[39m tail";
+    const [row] = highlightSelection([styled], { from: { row: 0, column: 0 }, to: { row: 0, column: 8 } });
+
+    // Without re-arming, the reset that ends the colour also ends the shading and
+    // the second half of the selection looks unselected.
+    expect(row!.indexOf("\x1b[7m", row!.indexOf("\x1b[39m"))).toBeGreaterThan(0);
+  });
+
+  it("shades what it copies, so the two never disagree", () => {
+    const span = { from: { row: 0, column: 0 }, to: { row: 0, column: 4 } };
+    const [row] = highlightSelection(["alpha beta"], span);
+    const copied = extractSelection(["alpha beta"], span.from, span.to);
+
+    expect(copied).toBe("alpha");
+    expect(row).toBe("\x1b[7malpha\x1b[27m beta");
+  });
+
+  it("publishes a span while the pointer is down and drops it on release", () => {
+    const selection = new DragSelection({ rows: () => ROWS }, () => undefined);
+    expect(selection.span).toBeUndefined();
+
+    selection.handle(parseMouseReport("\x1b[<0;5;3M")!);
+    selection.handle(parseMouseReport("\x1b[<32;20;3M")!);
+    expect(selection.span).toEqual({ from: { row: 2, column: 4 }, to: { row: 2, column: 19 } });
+
+    selection.handle(parseMouseReport("\x1b[<0;20;3m")!);
+    expect(selection.span).toBeUndefined();
+  });
+
+  it("orders the span even when the drag ran backwards", () => {
+    const selection = new DragSelection({ rows: () => ROWS }, () => undefined);
+    selection.handle(parseMouseReport("\x1b[<0;30;4M")!);
+    selection.handle(parseMouseReport("\x1b[<32;10;3M")!);
+
+    expect(selection.span?.from.row).toBe(2);
+    expect(selection.span?.to.row).toBe(3);
   });
 });

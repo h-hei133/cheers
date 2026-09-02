@@ -1,6 +1,6 @@
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
-import { sliceWithWidth } from "../../presentation/tui/text/measure.js";
+import { lineCells, sliceWithWidth, visibleWidth } from "../../presentation/tui/text/measure.js";
 
 /**
  * Drag-to-copy over the rows currently on screen.
@@ -14,6 +14,10 @@ import { sliceWithWidth } from "../../presentation/tui/text/measure.js";
  *
  * Holding Shift bypasses this and hands the drag back to the terminal, which is
  * how a selection is made across scrollback the screen no longer holds.
+ *
+ * A selection nobody can see is indistinguishable from no selection at all, so the
+ * span is also published for the frame to paint. Owning the drag means owning that
+ * too: the terminal is not tracking a selection of its own to shade in for us.
  */
 
 /** Cells a drag must cover before it is treated as a selection rather than a click. */
@@ -21,6 +25,10 @@ const MIN_SELECTION_CELLS = 2;
 
 /** A leading marker that is chrome rather than content. */
 const RAIL = /^[▌│┃]\s?/;
+
+/** Reverse video on and off, which is how a terminal shades a selection. */
+const REVERSE = "\x1b[7m";
+const REVERSE_OFF = "\x1b[27m";
 
 export interface ScreenText {
   /** Painted rows of the whole screen, top row first. */
@@ -30,6 +38,12 @@ export interface ScreenText {
 interface Anchor {
   readonly row: number;
   readonly column: number;
+}
+
+/** A selection in screen coordinates, ordered so `from` precedes `to`. */
+export interface SelectionSpan {
+  readonly from: Anchor;
+  readonly to: Anchor;
 }
 
 export class DragSelection {
@@ -44,6 +58,12 @@ export class DragSelection {
   /** True while a drag is being tracked, so the frame can be left alone. */
   get dragging(): boolean {
     return this.anchor !== undefined;
+  }
+
+  /** The span under the pointer right now, for the frame to shade. */
+  get span(): SelectionSpan | undefined {
+    if (!this.anchor || !this.focus) return undefined;
+    return order(this.anchor, this.focus);
   }
 
   /**
@@ -97,31 +117,98 @@ export function extractSelection(
   anchor: { readonly row: number; readonly column: number },
   focus: { readonly row: number; readonly column: number },
 ): string | undefined {
-  const forward =
-    anchor.row < focus.row || (anchor.row === focus.row && anchor.column <= focus.column);
-  const from = forward ? anchor : focus;
-  const to = forward ? focus : anchor;
-  if (rows.length === 0) return undefined;
-  const first = Math.max(0, Math.min(from.row, rows.length - 1));
-  const last = Math.max(0, Math.min(to.row, rows.length - 1));
-  // A drag that ran off the bottom of the screen ends at the last row it can, and
-  // the column it was released at says nothing about where that row ends.
-  const endColumn = to.row > last ? Number.MAX_SAFE_INTEGER : to.column + 1;
-
-  const selected: string[] = [];
-  for (let row = first; row <= last; row++) {
-    const line = rows[row] ?? "";
-    const start = row === first && from.row >= 0 ? from.column : 0;
-    // The end column is inclusive on screen, so one extra cell is taken.
-    const end = row === last ? endColumn : Number.MAX_SAFE_INTEGER;
-    selected.push(cellRange(line, start, end));
-  }
+  const ranges = selectedRanges(rows, order(anchor, focus));
+  if (ranges.length === 0) return undefined;
+  const selected = ranges.map((range) => cellRange(rows[range.row] ?? "", range.start, range.end));
   // A first row cut mid-indent has already lost part of its gutter, so it cannot
   // speak for what the rows below it share.
-  const cleaned = clean(selected, from.column === 0 || first === last);
+  const cleaned = clean(selected, ranges[0]!.start === 0 || ranges.length === 1);
   if (cleaned.length === 0) return undefined;
   const text = cleaned.join("\n");
   return text.replace(/\s/g, "").length >= MIN_SELECTION_CELLS ? text : undefined;
+}
+
+/**
+ * The same rows with the span shaded, so the drag shows what it has covered.
+ *
+ * The shading is computed from the same ranges the copy is, which is the point:
+ * what the user sees highlighted is exactly the text that reaches the clipboard,
+ * rather than a second approximation of it that can drift.
+ */
+export function highlightSelection(rows: readonly string[], span: SelectionSpan): string[] {
+  const shaded = [...rows];
+  for (const range of selectedRanges(rows, span)) {
+    shaded[range.row] = highlightRow(shaded[range.row] ?? "", range.start, range.end);
+  }
+  return shaded;
+}
+
+/** The anchor and focus of a drag in reading order. */
+function order(anchor: Anchor, focus: Anchor): SelectionSpan {
+  const forward =
+    anchor.row < focus.row || (anchor.row === focus.row && anchor.column <= focus.column);
+  return forward ? { from: anchor, to: focus } : { from: focus, to: anchor };
+}
+
+/**
+ * Which cells of which rows a span covers.
+ *
+ * The shape follows the terminal's own stream model — from the anchor to the end
+ * of its row, whole rows through the middle, then the start of the last row.
+ */
+function selectedRanges(
+  rows: readonly string[],
+  span: SelectionSpan,
+): readonly { readonly row: number; readonly start: number; readonly end: number }[] {
+  if (rows.length === 0) return [];
+  const first = Math.max(0, Math.min(span.from.row, rows.length - 1));
+  const last = Math.max(0, Math.min(span.to.row, rows.length - 1));
+  // A drag that ran off the bottom of the screen ends at the last row it can, and
+  // the column it was released at says nothing about where that row ends.
+  const endColumn = span.to.row > last ? Number.MAX_SAFE_INTEGER : span.to.column + 1;
+  const ranges: { row: number; start: number; end: number }[] = [];
+  for (let row = first; row <= last; row++) {
+    ranges.push({
+      row,
+      start: row === first ? Math.max(0, span.from.column) : 0,
+      // The end column is inclusive on screen, so one extra cell is taken.
+      end: row === last ? endColumn : Number.MAX_SAFE_INTEGER,
+    });
+  }
+  return ranges;
+}
+
+/**
+ * One row with cells `[start, end)` in reverse video.
+ *
+ * Reverse video is re-armed after every escape sequence inside the span, because a
+ * style reset in the middle of a shaded run would otherwise end the shading early
+ * and leave the selection looking like it stopped there.
+ */
+function highlightRow(line: string, start: number, end: number): string {
+  if (end <= start) return line;
+  // A blank row inside the span is still selected, and a paragraph break that
+  // shows no shading at all makes the selection look broken in two.
+  if (visibleWidth(line) === 0) return start === 0 ? `${REVERSE} ${REVERSE_OFF}` : line;
+  let column = 0;
+  let out = "";
+  let inside = false;
+  for (const cell of lineCells(line)) {
+    if (cell.prefix.length > 0) {
+      out += cell.prefix;
+      if (inside) out += REVERSE;
+    }
+    if (cell.cluster === "") continue;
+    const next = column + cell.width;
+    const selected = column >= start && next <= end;
+    if (selected !== inside) {
+      out += selected ? REVERSE : REVERSE_OFF;
+      inside = selected;
+    }
+    out += cell.cluster;
+    column = next;
+  }
+  return inside ? out + REVERSE_OFF : out;
 }
 
 /** Plain text of the cells `[start, end)` of one painted row. */

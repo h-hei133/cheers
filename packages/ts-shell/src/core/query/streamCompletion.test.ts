@@ -171,3 +171,130 @@ describe("reasoning that arrives beside the answer", () => {
     expect(result.message.content).toBe("");
   });
 });
+
+describe("hosts that disagree with the wire contract", () => {
+  it("keeps the name a host sent once and then re-sent as an empty string", async () => {
+    // The shape a real DeepSeek host streams: the opening entry carries id, type
+    // and name; every argument chunk after it repeats the keys as `""` and `null`.
+    // Reading those as values erased the name, the assembled call was dropped as
+    // nameless, and the turn ended with no answer and no tool run.
+    const { result } = await collect(
+      streamOf(
+        chunk({ tool_calls: [{ index: 0, id: "abc", type: "function", function: { name: "bash", arguments: "" } }] }),
+        chunk({ tool_calls: [{ index: 0, id: null, type: null, function: { name: "", arguments: '{"comm' } }] }),
+        chunk({ tool_calls: [{ index: 0, id: null, type: null, function: { name: "", arguments: 'and":"ls"}' } }] }),
+        "data: [DONE]\n\n",
+      ),
+    );
+
+    expect(result.message.tool_calls).toEqual([
+      { id: "abc", type: "function", function: { name: "bash", arguments: '{"command":"ls"}' } },
+    ]);
+  });
+
+  it("continues a call from a host that keys nothing after the first entry", async () => {
+    const { result } = await collect(
+      streamOf(
+        chunk({ tool_calls: [{ id: "a", function: { name: "read", arguments: "{" } }] }),
+        chunk({ tool_calls: [{ function: { arguments: '"path":"x"}' } }] }),
+        "data: [DONE]\n\n",
+      ),
+    );
+
+    expect(result.message.tool_calls).toEqual([
+      { id: "a", type: "function", function: { name: "read", arguments: '{"path":"x"}' } },
+    ]);
+  });
+
+  it("routes an unkeyed multi-entry array by position, so siblings stay apart", async () => {
+    const { result } = await collect(
+      streamOf(
+        chunk({ tool_calls: [{ function: { name: "read", arguments: "{" } }, { function: { name: "grep", arguments: "[" } }] }),
+        chunk({ tool_calls: [{ function: { arguments: "}" } }, { function: { arguments: "]" } }] }),
+        "data: [DONE]\n\n",
+      ),
+    );
+
+    expect(result.message.tool_calls?.map((call) => [call.function.name, call.function.arguments])).toEqual([
+      ["read", "{}"],
+      ["grep", "[]"],
+    ]);
+  });
+
+  it("accepts arguments streamed as an object instead of a JSON string", async () => {
+    const { result } = await collect(
+      streamOf(
+        chunk({ tool_calls: [{ index: 0, id: "a", function: { name: "write", arguments: { path: "x.ts" } } }] }),
+        chunk({ tool_calls: [{ index: 0, function: { arguments: { path: "x.ts", body: "hello" } } }] }),
+        "data: [DONE]\n\n",
+      ),
+    );
+
+    expect(JSON.parse(result.message.tool_calls![0]!.function.arguments)).toEqual({
+      path: "x.ts",
+      body: "hello",
+    });
+  });
+
+  it("orders calls by index even when the host sends them out of order", async () => {
+    const { result } = await collect(
+      streamOf(
+        chunk({ tool_calls: [{ index: 1, id: "second", function: { name: "grep", arguments: "{}" } }] }),
+        chunk({ tool_calls: [{ index: 0, id: "first", function: { name: "read", arguments: "{}" } }] }),
+        "data: [DONE]\n\n",
+      ),
+    );
+
+    expect(result.message.tool_calls?.map((call) => call.id)).toEqual(["first", "second"]);
+  });
+
+  it("reads events separated by CRLF, which a proxy in the path can introduce", async () => {
+    const { deltas } = await collect(
+      streamOf('data: {"choices":[{"delta":{"content":"ok"}}]}\r\n\r\n', "data: [DONE]\r\n\r\n"),
+    );
+
+    expect(deltas).toEqual(["ok"]);
+  });
+
+  it("reads a final event the host never terminated with a blank line", async () => {
+    const { deltas, result } = await collect(
+      streamOf(chunk({ content: "first" }), 'data: {"choices":[{"delta":{"content":"last"}}]}'),
+    );
+
+    expect(deltas).toEqual(["first", "last"]);
+    expect(result.message.content).toBe("firstlast");
+  });
+});
+
+describe("chat-template markers that leak into visible text", () => {
+  it("drops a marker without touching the prose around it", async () => {
+    const { deltas, result } = await collect(
+      streamOf(chunk({ content: "before<｜tool_calls_begin｜>after" }), "data: [DONE]\n\n"),
+    );
+
+    expect(deltas).toEqual(["beforeafter"]);
+    expect(result.message.content).toBe("beforeafter");
+  });
+
+  it("holds back a marker split across two deltas rather than showing half of it", async () => {
+    const { deltas } = await collect(
+      streamOf(chunk({ content: "text<｜end▁of" }), chunk({ content: "▁sentence｜>tail" }), "data: [DONE]\n\n"),
+    );
+
+    expect(deltas).toEqual(["text", "tail"]);
+  });
+
+  it("releases a held partial that turned out to be ordinary text", async () => {
+    const { deltas, result } = await collect(streamOf(chunk({ content: "if a <" }), "data: [DONE]\n\n"));
+
+    expect(deltas.join("")).toBe("if a <");
+    expect(result.message.content).toBe("if a <");
+  });
+
+  it("leaves tool-call markup with attributes alone, since the loop parses it", async () => {
+    const markup = '<｜DSML｜invoke name="read">x</｜DSML｜invoke>';
+    const { result } = await collect(streamOf(chunk({ content: markup }), "data: [DONE]\n\n"));
+
+    expect(result.message.content).toBe(markup);
+  });
+});

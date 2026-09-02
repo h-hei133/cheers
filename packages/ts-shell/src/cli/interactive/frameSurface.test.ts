@@ -17,6 +17,7 @@ function surface(overrides: Partial<SurfaceContext> = {}): InteractiveSurface {
     cancelArmed: () => false,
     overlayFullScreen: () => false,
     overlayRows: () => [],
+    selection: () => undefined,
     ...overrides,
   });
 }

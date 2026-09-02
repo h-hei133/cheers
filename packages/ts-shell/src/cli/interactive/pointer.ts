@@ -1,5 +1,5 @@
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
-import { DragSelection } from "./selection.js";
+import { DragSelection, type SelectionSpan } from "./selection.js";
 import type { InteractiveSurface } from "./frameSurface.js";
 
 /**
@@ -24,10 +24,15 @@ export interface PointerContext {
 }
 
 export class Pointer {
-  private readonly selection: DragSelection;
+  private readonly drag: DragSelection;
 
   constructor(private readonly context: PointerContext) {
-    this.selection = new DragSelection({ rows: () => context.rows() }, (text) => context.copy(text));
+    this.drag = new DragSelection({ rows: () => context.rows() }, (text) => context.copy(text));
+  }
+
+  /** What the pointer has covered so far, for the frame to shade. */
+  get selection(): SelectionSpan | undefined {
+    return this.drag.span;
   }
 
   /** Handle one report. */
@@ -39,7 +44,7 @@ export class Pointer {
     }
     // A drag that covered text is a selection and has been copied. A release that
     // covered nothing was a click, which is how a collapsed block is opened.
-    if (this.selection.handle(report)) {
+    if (this.drag.handle(report)) {
       this.context.redraw();
       return;
     }

@@ -8,7 +8,7 @@
  * that shows a key to the user reads it.
  */
 
-export type KeyGroup = "moving" | "editing" | "sending" | "session";
+export type KeyGroup = "moving" | "editing" | "sending" | "session" | "pointer";
 
 export interface KeyBinding {
   /** Key ids that trigger this, most idiomatic first. */
@@ -35,7 +35,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["backspace"], does: "delete the character before the caret", group: "editing" },
   { keys: ["delete"], does: "delete the character under the caret", group: "editing" },
   { keys: ["ctrl+w", "alt+backspace"], does: "delete the word before the caret", group: "editing" },
-  { keys: ["ctrl+u"], does: "delete to the start of the line", group: "editing" },
+  { keys: ["ctrl+u"], does: "cut back to the start of the line, then the line above", group: "editing" },
   { keys: ["ctrl+k"], does: "delete to the end of the line", group: "editing" },
   { keys: ["ctrl+y"], does: "put back what was last deleted", group: "editing" },
   { keys: ["ctrl+z"], does: "undo the last edit", group: "editing" },
@@ -54,9 +54,16 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["shift+tab"], does: "switch between planning and building", group: "session" },
   { keys: ["alt+p"], does: "cycle how much a turn may do without asking", group: "session" },
   { keys: ["f5"], does: "retry the last turn that failed", group: "session" },
-  { keys: ["ctrl+l"], does: "clear the screen and the terminal's scrollback", group: "session" },
+  { keys: ["ctrl+l"], does: "clear the conversation from the screen", group: "session" },
   { keys: ["ctrl+c"], does: "cancel a run; press twice to leave", group: "session" },
   { keys: ["ctrl+d"], does: "leave the session", group: "session" },
+
+  // The pointer only works because the session has a screen of its own; on the
+  // normal screen the wheel and the drag belong to the terminal.
+  { keys: ["wheel"], does: "scroll the conversation", group: "pointer" },
+  { keys: ["drag"], does: "select and copy, without the layout", group: "pointer" },
+  { keys: ["click"], does: "open or close the block under the pointer", group: "pointer" },
+  { keys: ["shift+drag"], does: "hand the drag to the terminal instead", group: "pointer" },
 ];
 
 const GROUP_TITLES: Record<KeyGroup, string> = {
@@ -64,6 +71,7 @@ const GROUP_TITLES: Record<KeyGroup, string> = {
   editing: "Editing",
   sending: "Sending",
   session: "Session",
+  pointer: "Mouse",
 };
 
 /**

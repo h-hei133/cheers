@@ -28,15 +28,17 @@ export class Clipboard {
     setClipboardSink(undefined);
   }
 
-  /** Put `text` on the clipboard and report how much was taken. */
+  /**
+   * Put `text` on the clipboard and report what actually happened.
+   *
+   * The report comes from the copy itself rather than being written here: a
+   * terminal that silently ignores the escape sequence and a clipboard command
+   * that took the text are different outcomes, and the drag that produced them
+   * looked identical, so the difference has to be said.
+   */
   copy(text: string): void {
     void runCopyCommand([text], { cwd: this.context.cwd, sessionId: this.context.sessionId })
-      .then(() => {
-        const lines = text.split("\n").length;
-        this.context.notify(
-          `Copied ${text.length} characters${lines > 1 ? ` across ${lines} lines` : ""}.`,
-        );
-      })
+      .then((result) => this.context.notify(result.output ?? ""))
       .catch(() => undefined);
   }
 }

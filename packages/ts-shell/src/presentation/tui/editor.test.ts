@@ -143,6 +143,61 @@ describe("kill ring and undo", () => {
   });
 });
 
+describe("cutting back through a multi-line draft", () => {
+  it("takes the row break once the row in front of the caret is empty", () => {
+    const editor = new Editor();
+    editor.insert("first\nsecond");
+    editor.kill("line-start");
+    expect(editor.getText()).toBe("first\n");
+
+    // Nothing left in front of the caret on this row, so the row break is what
+    // goes — the press that used to do nothing and force a manual move up.
+    editor.kill("line-start");
+    expect(editor.getText()).toBe("first");
+
+    // The caret landed at the end of the row it merged into, so the next thing
+    // typed continues that row instead of appearing at its start.
+    editor.insert("!");
+    expect(editor.getText()).toBe("first!");
+  });
+
+  it("keeps going until the whole draft in front of the caret is gone", () => {
+    const editor = new Editor();
+    editor.insert("one\ntwo\nthree");
+    for (let press = 0; press < 5; press++) editor.kill("line-start");
+    expect(editor.getText()).toBe("");
+  });
+
+  it("yanks a run of cuts back as one piece, in the order it was written", () => {
+    const editor = new Editor();
+    editor.insert("one\ntwo");
+    editor.kill("line-start");
+    editor.kill("line-start");
+    editor.kill("line-start");
+    expect(editor.getText()).toBe("");
+    editor.yank();
+    expect(editor.getText()).toBe("one\ntwo");
+  });
+
+  it("starts a new entry when something happened between two cuts", () => {
+    const editor = new Editor();
+    editor.insert("alpha beta");
+    editor.kill("line-start");
+    editor.insert("gamma");
+    editor.kill("line-start");
+    editor.yank();
+    expect(editor.getText()).toBe("gamma");
+  });
+
+  it("stops at the top of the draft rather than reporting a cut it did not make", () => {
+    const editor = new Editor();
+    editor.insert("only");
+    editor.move("line-start");
+    editor.kill("line-start");
+    expect(editor.getText()).toBe("only");
+  });
+});
+
 describe("prompt recall", () => {
   it("walks back through history and restores the stashed draft", () => {
     const editor = new Editor();

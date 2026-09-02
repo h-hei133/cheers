@@ -10,6 +10,7 @@ import type {
   TerminalFrameProvider,
   ViewportSize,
 } from "../../presentation/tui/render/frame.js";
+import { highlightSelection, type SelectionSpan } from "./selection.js";
 import { Transcript } from "../../presentation/tui/transcript/container.js";
 import { renderActivity, type TurnActivity } from "../../presentation/tui/transcript/live.js";
 
@@ -44,6 +45,8 @@ export interface SurfaceContext {
   overlayFullScreen(): boolean;
   /** Rows for an open picker, or none when none is open. */
   overlayRows(width: number, height: number): string[];
+  /** Cells the pointer is currently covering, or none when it is not dragging. */
+  selection(): SelectionSpan | undefined;
 }
 
 /** Minimum transcript rows kept visible however tall the chrome grows. */
@@ -91,7 +94,7 @@ export class InteractiveSurface implements TerminalFrameProvider {
     const width = Math.max(8, dimensions.columns);
     const height = Math.max(4, dimensions.rows);
     if (this.context.overlayFullScreen()) {
-      return { rows: this.context.overlayRows(width, height) };
+      return { rows: this.shade(this.context.overlayRows(width, height)) };
     }
     const chrome = this.renderChrome(width, height);
     const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.length);
@@ -107,7 +110,13 @@ export class InteractiveSurface implements TerminalFrameProvider {
     // The transcript is padded down to its capacity so the chrome stays put: a
     // short conversation should not float the prompt up the middle of the screen.
     const filler = Array.from({ length: Math.max(0, capacity - visible.length) }, () => "");
-    return { rows: [...filler, ...visible, ...chrome] };
+    return { rows: this.shade([...filler, ...visible, ...chrome]) };
+  }
+
+  /** The frame with an in-progress drag shaded, which is the only sign it made one. */
+  private shade(rows: readonly string[]): string[] {
+    const span = this.context.selection();
+    return span ? highlightSelection(rows, span) : [...rows];
   }
 
   /** How far back the window is, in rows; 0 means it is following the newest. */

@@ -4,7 +4,7 @@ category: theses
 sources:
   - raw/notes/2026-08-28-battle-3-terminal-surface-and-tui.md
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-03
 tags: [tui, terminal, rendering, input, defect-audit]
 summary: "以真实 PTY 驱动复现交互式 CLI，定位首帧崩溃、流式渲染缺失、输入解析残缺与孤儿模块四类根因，给出统一修复方案。"
 confidence: high
@@ -527,3 +527,78 @@ surface 组装整块屏幕，引擎画它。退役机制整个消失——备用
 
 代价说清楚：退出后屏幕上不再留下本次对话（它在会话文件里，`/resume` 能回去）；终端自己的回滚
 键不再作用于对话，滚动走上面那些键与滚轮。
+
+
+## 11. 一个 `??` 让整个 agent 停止工作（第七轮）
+
+### 11.1 症状与真正的原因
+
+连续三个回合，每一次都只有推理、没有回答，落到"模型整轮都在思考却没写出答案
+（787 个字符的推理，见上）"。看起来像模型的问题。
+
+从会话记录里把三轮的推理原文取出来，三次的结论都是同一件事：
+"Let me use glob or bash to list files"、"Let me check the workspace"、
+"Let me take a quick look at the project"。**模型每次都要调用工具。** 而
+`tool.started` 一次也没有出现，`messages` 里也没有任何 tool 消息。所以工具调用被丢了。
+
+用真实 provider 抓下原始 SSE，答案就在第二个 tool_calls 分片里：
+
+```
+{"index":0,"id":"01a0…","type":"function","function":{"name":"bash","arguments":""}}
+{"index":0,"id":null,"type":null,"function":{"name":"","arguments":"{"}}
+{"index":0,"id":null,"type":null,"function":{"name":"","arguments":"\"command\": \"ls"}}
+```
+
+首个分片带 id、type 与 name；**之后每个参数分片都把这些键原样重发为 `""` 与 `null`。**
+累积器写的是：
+
+```ts
+name: call.function?.name ?? existing.name,
+```
+
+`"" ?? existing.name` 得到 `""`——空字符串不是 nullish。于是名字被第二个分片擦成空，
+组装完成后被 `filter(call.name.length > 0)` 当作"无名调用"丢掉。`toolCalls.length === 0`
+让回合直接结束，`content` 又是空的（模型这一轮的输出全在 tool call 里），于是落到那句
+解释。27 个分片里 26 个带 `name: ""`。
+
+参考实现（omp 的 `openai-completions.ts`）在同一位置写的是 `||` 而非 `??`，并且
+`if (incomingName) block.name = incomingName;`——只在非空时覆盖。这个差别是这一整轮的全部。
+
+### 11.2 一并补上的其他"静默丢数据"
+
+同一个读取器里还有五处只会丢数据、不会报错的地方，都按真实 host 的行为补齐：
+
+| 现象 | 后果 | 处理 |
+|---|---|---|
+| 重发 `name: ""` / `id: null` | 调用被当作无名丢弃 | 只在非空时覆盖 |
+| 分片不带 `index` 也不带 `id` | 无法归属，另起一个空调用 | index → id → 数组位置 三级路由 |
+| `arguments` 是对象而非 JSON 字符串 | 拼成 `[object Object]` | 逐键合并（更长的字符串胜出，跳过原型键） |
+| 事件以 CRLF 分隔 | 找不到边界，缓冲区无限增长 | 三种分隔符取最早出现的 |
+| 最后一个事件后没有空行 | 该事件整个丢失（短答案里就是答案本身） | 流结束时冲刷残留缓冲 |
+| 聊天模板特殊标记漏进可见文本 | `<｜tool_calls_begin｜>` 直接显示 | 剥离完整标记，跨分片的部分标记先扣住 |
+
+标记剥离刻意只匹配"裸标记"（`<｜…｜>`）：带属性的 `<｜DSML｜invoke name="…">` 不匹配，
+因为回合循环要靠它提取工具调用——剥掉它会换一种方式弄坏同一件事。
+
+### 11.3 拖拽选中看不见
+
+拖拽有在跟踪，也确实复制，但帧里从不画选中态——在备用屏上终端没有自己的选择可以替我们
+着色，所以"看不出选中了什么"和"没有选中"是同一个画面。
+
+现在 `DragSelection` 发布跨度，帧组装时按**同一份行区间**上反显：着色与复制读同一个
+`selectedRanges`，所以看到高亮的正是会进剪贴板的文本，而不是它的第二个近似。
+两个细节是实测逼出来的：跨度内每次样式变化后要重新武装反显（主题的 `\x1b[0m` 会把反显
+一起关掉，选中后半段看起来没被选中），空行要给一格反显（否则跨段落的选择看起来断成两截）。
+
+复制链路也一并修了。原来的回退链是 `xclip … || wl-copy || xsel …` 一条 shell 命令：
+第一个命令在失败前已经把 stdin 读走，回退拿到空流却报告成功。改成逐个尝试、各自一份
+stdin，并补上 `clip.exe`（Linux shell 跑在 Windows 之下时，X11/Wayland 工具通常都不在，
+而它在）。报告也分开了：本地剪贴板命令成功是"已复制"，只写了 OSC 52 是"已交给终端，
+若没粘上则这个终端不接受它"——后者没有任何回执，把它说成已复制就是报告没人观察到的结果。
+
+### 11.4 Ctrl+U 走不过行首
+
+原实现只剪到本行行首，`start === end` 时直接返回，于是要手动移到上一行才能继续。
+现在光标前无内容时剪掉的是**换行本身**，光标落到上一行末尾；并且连续的向后剪切合并成
+一条 kill-ring 记录（向前拼接），所以按四次再 Ctrl+Y 能把整段原样放回。
+"是否连续"用光标是否还停在上次剪切结束的位置判断——打字或移动都会改变它。

@@ -44,6 +44,8 @@ export class Editor {
   private row = 0;
   private column = 0;
   private readonly killRing: string[] = [];
+  /** Where the last cut finished, so the next one can continue the same entry. */
+  private lastKill: { row: number; column: number; target: KillTarget } | undefined;
   private readonly undoStack: EditorSnapshot[] = [];
   private readonly history: string[] = [];
   private historyIndex = -1;
@@ -130,19 +132,41 @@ export class Editor {
     this.lines.splice(this.row + 1, 1);
   }
 
-  /** Cut text into the kill ring so {@link yank} can restore it. */
+  /**
+   * Cut text into the kill ring so {@link yank} can restore it.
+   *
+   * A backward kill that starts where the last one finished continues it rather
+   * than beginning a new entry, so pressing the key repeatedly cuts a growing run
+   * of text that one yank puts back whole. When there is nothing left to cut on
+   * this row, the row break itself is what goes — which is what lets the key walk
+   * back through a multi-line draft instead of stalling at every line start.
+   */
   kill(target: KillTarget): void {
     const line = this.lines[this.row]!;
+    const backward = target !== "line-end";
+    const continuing = backward && this.resumesKill(target);
     let start = this.column;
     let end = this.column;
     if (target === "line-end") end = line.length;
     else if (target === "line-start") start = 0;
     else start = wordStart(line, this.column);
-    if (start === end) return;
+    if (start === end) {
+      if (!backward || this.row === 0) return;
+      this.saveUndo();
+      this.pushKill("\n", continuing);
+      const previous = this.lines[this.row - 1]!;
+      this.lines[this.row - 1] = previous + line;
+      this.lines.splice(this.row, 1);
+      this.row -= 1;
+      this.column = previous.length;
+      this.markKill(target);
+      return;
+    }
     this.saveUndo();
-    this.pushKill(line.slice(start, end));
+    this.pushKill(line.slice(start, end), continuing);
     this.lines[this.row] = line.slice(0, start) + line.slice(end);
     this.column = start;
+    this.markKill(target);
   }
 
   yank(): void {
@@ -276,9 +300,31 @@ export class Editor {
 
 
 
-  private pushKill(text: string): void {
+  private pushKill(text: string, continuing = false): void {
+    const top = this.killRing.length - 1;
+    // A continued backward kill grows the entry in front of what it already held,
+    // because each press cuts the text that came before the last.
+    if (continuing && top >= 0) {
+      this.killRing[top] = text + this.killRing[top]!;
+      return;
+    }
     this.killRing.push(text);
     if (this.killRing.length > MAX_KILL_RING) this.killRing.shift();
+  }
+
+  /** Whether the caret is still exactly where the last kill of this kind left it. */
+  private resumesKill(target: KillTarget): boolean {
+    const last = this.lastKill;
+    return (
+      last !== undefined &&
+      last.target === target &&
+      last.row === this.row &&
+      last.column === this.column
+    );
+  }
+
+  private markKill(target: KillTarget): void {
+    this.lastKill = { row: this.row, column: this.column, target };
   }
 
   private saveUndo(): void {

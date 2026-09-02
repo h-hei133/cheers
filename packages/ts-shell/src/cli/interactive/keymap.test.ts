@@ -23,6 +23,7 @@ function build(busy = false): {
     cancelArmed: () => false,
     overlayFullScreen: () => false,
     overlayRows: () => [],
+    selection: () => undefined,
   });
   const actions = {
     submit: vi.fn(),
