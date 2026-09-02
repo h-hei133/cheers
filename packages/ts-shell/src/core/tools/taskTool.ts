@@ -8,9 +8,9 @@ import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 const defaultWorktreeManager = new GitWorktreeManager();
 
 /**
- * /task & /agent tool (Claude Code 2026 Aligned)
+ * /task & /agent tool
  * Dispatches an isolated subagent to perform an independent research, analysis, or modification task.
- * Integrates .claude/agents/*.md frontmatter loader, worktree isolation, persistent agent-memory, and lifecycle hooks.
+ * Integrates .agents/*.md frontmatter loader, worktree isolation, persistent agent-memory, and lifecycle hooks.
  */
 export function createTaskToolDefinition(
   worktreeManager: GitWorktreeManager = defaultWorktreeManager,

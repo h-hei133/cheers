@@ -41,6 +41,7 @@ function boot(): { mode: InteractiveMode; terminal: RecordingTerminal; scheduler
       observeEvents: () => () => {},
       cancelCurrentRun: () => {},
       getAgentMode: () => "build",
+      getPermissionScope: () => "ask",
     } as unknown as ShellSessionRuntime,
     sessionManager: {} as unknown as SessionManager,
     renderer: new StreamingRenderer(),

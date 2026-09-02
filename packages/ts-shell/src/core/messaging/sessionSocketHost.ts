@@ -5,7 +5,7 @@ import * as os from "node:os";
 import type { MessagingFrame } from "./types.js";
 
 /**
- * SessionSocketHost (Claude Code 2026 Aligned)
+ * SessionSocketHost
  * Listens on local Unix Domain Socket (/tmp/ts-socks-<uid>/session-<id>.sock) or Windows Named Pipe.
  * Authenticates connections via cryptographically secure session tokens.
  */

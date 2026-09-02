@@ -28,6 +28,7 @@ import {
   renderSessionTerminalSurface,
 } from "./sessionTerminalState.js";
 import { ShellStateMachine } from "./stateMachine.js";
+import type { PermissionScope } from "../../cli/approval/permissionScope.js";
 
 export interface SessionRuntimeDependencies {
   readonly sessionManager: SessionManager;
@@ -52,6 +53,7 @@ export class ShellSessionRuntime {
   private readonly eventObservers = new Set<QueryEventObserver>();
   private currentRunController: AbortController | null = null;
   private viewMode: "compact" | "verbose" = "compact";
+  private permissionScope: PermissionScope = "ask";
   private agentMode: "plan" | "build" = "build";
 
   constructor(deps: SessionRuntimeDependencies) {
@@ -90,6 +92,15 @@ export class ShellSessionRuntime {
 
   setAgentMode(mode: "plan" | "build"): void {
     this.agentMode = mode;
+  }
+
+  /** How much this session may do before it has to ask. */
+  getPermissionScope(): PermissionScope {
+    return this.permissionScope;
+  }
+
+  setPermissionScope(scope: PermissionScope): void {
+    this.permissionScope = scope;
   }
 
   async executePrompt(

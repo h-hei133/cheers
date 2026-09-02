@@ -14,6 +14,9 @@ import { runCostCommand } from "./costCommandRuntime.js";
 import { runUndoCommand } from "./undoCommandRuntime.js";
 import { runExportCommand } from "./exportCommandRuntime.js";
 import { runCopyCommand } from "./copyCommandRuntime.js";
+import { runHotkeyCommand } from "./hotkeyCommandRuntime.js";
+import { runRetryCommand } from "./retryCommandRuntime.js";
+import { runSkillCommand } from "./skillCommandRuntime.js";
 import { runGoalCommand } from "./goalCommandRuntime.js";
 import { runLoopCommand } from "./loopCommandRuntime.js";
 import { runTodoCommand } from "./todoCommandRuntime.js";
@@ -256,6 +259,32 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runExportCommand(args, context),
+    },
+    {
+      name: "skill",
+      aliases: ["skills"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runSkillCommand(args, context),
+    },
+    {
+      name: "retry",
+      kind: "shell-action",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: false,
+      execute: (args, context) => runRetryCommand(args, context),
+    },
+    {
+      name: "hotkey",
+      aliases: ["hotkeys", "keys"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runHotkeyCommand(args, context),
     },
     {
       name: "copy",

@@ -12,7 +12,7 @@ import type {
 import {
   classifyFileRole,
   countOverlap,
-  IGNORED_DIRS,
+  isIgnoredDir,
   PATH_PRIORITY_PREFILL_LIMIT,
   PATH_PRIORITY_SCAN_LIMIT,
   scorePathPriority,
@@ -207,7 +207,7 @@ export async function discoverPathPriorityFilePaths(input: {
       const absolutePath = path.join(directory, entry.name);
       const relativePath = normalizeRelative(path.relative(input.workspaceRoot, absolutePath));
       if (entry.isDirectory()) {
-        if (!IGNORED_DIRS.has(entry.name)) {
+        if (!isIgnoredDir(entry.name)) {
           await visit(absolutePath);
         }
         continue;
@@ -298,7 +298,7 @@ export async function discoverRepoFiles(input: {
       const absolutePath = path.join(directory, entry.name);
       const relativePath = normalizeRelative(path.relative(input.workspaceRoot, absolutePath));
       if (entry.isDirectory()) {
-        if (!IGNORED_DIRS.has(entry.name)) {
+        if (!isIgnoredDir(entry.name)) {
           await visit(absolutePath);
         } else {
           addOmission("generated-or-vendor-path-excluded", relativePath);

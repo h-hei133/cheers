@@ -27,6 +27,7 @@ function build(overrides: { observeEvents?: () => () => void } = {}): {
       observeEvents: overrides.observeEvents ?? (() => () => {}),
       cancelCurrentRun: () => {},
       getAgentMode: () => "build",
+      getPermissionScope: () => "ask",
       getCurrentRunController: () => null,
     } as unknown as ShellSessionRuntime,
     sessionManager: {} as unknown as SessionManager,

@@ -20,26 +20,26 @@ export const CONNECT_PRESETS: readonly ConnectPreset[] = [
   },
   {
     id: "siliconflow",
-    label: "SiliconFlow (OpenAI Compatible)",
+    label: "SiliconFlow",
     provider: "openai-compatible",
     defaultBaseUrl: "https://api.siliconflow.cn/v1",
     defaultModel: "deepseek-ai/DeepSeek-V4-Flash",
   },
   {
     id: "google",
-    label: "Google Gemini (OpenAI Compatible)",
+    label: "Google Gemini",
     provider: "google",
     defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     defaultModel: "gemini-2.5-flash",
   },
   {
     id: "antigravity",
-    label: "Antigravity (OpenAI Compatible)",
+    label: "Antigravity",
     provider: "antigravity",
   },
   {
     id: "claudecode",
-    label: "ClaudeCode (OpenAI Compatible)",
+    label: "Anthropic-compatible proxy",
     provider: "claudecode",
   },
 ];
@@ -68,7 +68,7 @@ export function resolveProviderTarget(input?: string): ConnectPreset | null {
   if (normalized === "google" || normalized === "gemini") {
     return {
       id: "google",
-      label: "Google Gemini (OpenAI Compatible)",
+      label: "Google Gemini",
       provider: "google",
       defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
       defaultModel: "gemini-2.5-flash",
@@ -78,7 +78,7 @@ export function resolveProviderTarget(input?: string): ConnectPreset | null {
   if (normalized === "antigravity") {
     return {
       id: "antigravity",
-      label: "Antigravity (OpenAI Compatible)",
+      label: "Antigravity",
       provider: "antigravity",
     };
   }
@@ -86,7 +86,7 @@ export function resolveProviderTarget(input?: string): ConnectPreset | null {
   if (normalized === "claudecode") {
     return {
       id: "claudecode",
-      label: "ClaudeCode (OpenAI Compatible)",
+      label: "Anthropic-compatible proxy",
       provider: "claudecode",
     };
   }

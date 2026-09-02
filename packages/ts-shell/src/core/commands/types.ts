@@ -28,6 +28,8 @@ export type CommandKind = 'local' | 'prompt' | 'shell-action'
 export interface CommandContext {
   readonly cwd: string
   readonly sessionId?: string
+  /** True when the terminal agreed to report modified keys, so chords arrive. */
+  readonly modifierKeysReported?: boolean
   readonly rawCommandName?: string
   readonly compactCheckpointStore?: CompactLiveCheckpointStore
   readonly compactInjectionStateStore?: CompactInjectionStateStore
@@ -81,6 +83,7 @@ export interface ShellActionResult {
     | 'set-agent-mode'
     | 'show-agent-mode'
     | 'exit-session'
+    | 'retry-turn'
   readonly sessionId?: string
   readonly viewMode?: 'compact' | 'verbose'
   readonly agentMode?: 'plan' | 'build'

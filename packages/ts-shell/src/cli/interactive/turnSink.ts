@@ -33,6 +33,7 @@ export class TurnSink implements RendererSink {
   private readonly tools = new Map<string, Block>();
   private proseKind: "command" | "error" = "command";
   private proseTitle = "";
+  private failed = false;
 
   constructor(transcript: Transcript, onChange: () => void, now: () => number = Date.now) {
     this.transcript = transcript;
@@ -47,6 +48,7 @@ export class TurnSink implements RendererSink {
     this.tools.clear();
     this.streamedChars = 0;
     this.cancelling = false;
+    this.failed = false;
     this.label = kind === "turn" ? "working" : title;
     this.turnStartedAt = this.now();
     this.running = true;
@@ -71,7 +73,7 @@ export class TurnSink implements RendererSink {
    * a clipboard write, say. Finalized immediately, so it retires with the rest.
    */
   notify(text: string): void {
-    this.transcript.append({ kind: "notice", text: `  ${text}`, finalized: true });
+    this.transcript.append({ kind: "notice", text, finalized: true });
     this.onChange();
   }
 
@@ -80,6 +82,14 @@ export class TurnSink implements RendererSink {
     if (!this.running) return;
     this.cancelling = true;
     this.onChange();
+  }
+
+  /**
+   * Whether the last turn ended without finishing — failed, errored, or
+   * interrupted. What `/retry` and its key ask before offering to run it again.
+   */
+  get lastTurnFailed(): boolean {
+    return this.failed;
   }
 
   /** The live activity row state, or undefined when idle. */
@@ -203,11 +213,12 @@ export class TurnSink implements RendererSink {
 
   private recordFailure(event: Extract<QueryEvent, { type: "lifecycle.cancelled" | "lifecycle.error" | "query.failed" }>): void {
     this.finalizeAssistant();
+    this.failed = true;
     const cancelled = event.type === "lifecycle.cancelled";
     this.transcript.append({
       kind: cancelled ? "notice" : "error",
       title: cancelled ? "" : "error",
-      text: cancelled ? "  Interrupted before completion." : event.error,
+      text: cancelled ? "Interrupted before completion." : event.error,
       finalized: true,
     });
     this.onChange();

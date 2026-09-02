@@ -18,12 +18,10 @@ import type { ResizeScrollbackMode } from "../../presentation/tui/render/frame.j
 
 const SETTINGS_KEY = "tui";
 const ITEMS_KEY = "statusItems";
-const MOUSE_KEY = "mouseCopy";
 
 interface StoredTuiSettings {
   readonly tui?: {
     readonly statusItems?: readonly string[];
-    readonly mouseCopy?: boolean;
   };
 }
 
@@ -44,24 +42,6 @@ export function writeStatusItems(workspaceRoot: string, items: readonly StatusIt
   return writeTuiSetting(workspaceRoot, ITEMS_KEY, items);
 }
 
-/**
- * Whether drag-to-copy owns the mouse. Off by default: asking for mouse reports
- * takes the wheel away from the terminal, and this surface is built on the
- * terminal's own scrollback, so that trade is the user's to make.
- */
-export function readMouseCopy(workspaceRoot: string): boolean {
-  const { userPath, projectPaths } = getSettingsPaths(workspaceRoot);
-  for (const candidate of [...projectPaths, userPath]) {
-    const stored = readSettingsFileSafely(candidate) as StoredTuiSettings | undefined;
-    if (typeof stored?.tui?.mouseCopy === "boolean") return stored.tui.mouseCopy;
-  }
-  return false;
-}
-
-/** Persist the drag-to-copy choice, returning the path written. */
-export function writeMouseCopy(workspaceRoot: string, enabled: boolean): string {
-  return writeTuiSetting(workspaceRoot, MOUSE_KEY, enabled);
-}
 
 function writeTuiSetting(workspaceRoot: string, key: string, value: unknown): string {
   const { userPath } = getSettingsPaths(workspaceRoot);

@@ -45,6 +45,7 @@ export function createCliSessionRuntime(input: {
         getApprovalModeObject: input.approvalModeState.get,
         sessionManager: input.sessionManager,
         getSessionId: () => input.runtimeContext.session.id,
+        getPermissionScope: () => sessionRuntime.getPermissionScope(),
       });
       return streamCliRuntimePrompt({
         prompt,

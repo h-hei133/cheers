@@ -54,7 +54,10 @@ export function renderBlock(block: Block, width: number): readonly string[] {
     case "error":
       return renderLabelled(block, defaultTheme.fg("error", "!"), width);
     case "notice":
-      return [...prose(block.text, width, ""), ""];
+      // Indented like every other block, and indented by the renderer rather than
+      // by whoever wrote the text — a caller that prefixes its own spaces loses
+      // them the moment the line wraps.
+      return [...prose(block.text, width, GUTTER), ""];
     default:
       return [...renderAssistant(block, width), ""];
   }

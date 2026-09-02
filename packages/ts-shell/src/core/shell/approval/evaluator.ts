@@ -141,7 +141,7 @@ export function evaluatePermission(input: {
     Boolean(READONLY_TOOLS[input.toolName]) ||
     (input.toolName === "bash" && isReadOnlyBashCommand(input.selector));
 
-  // Plan mode enforcement (Inspired by Claude Code permissions):
+  // Plan mode enforcement:
   // Read-only tools (and read-only bash commands like git status/diff) are allowed freely.
   // Write/destructive tools are hard-blocked with an explicit explanation.
   if (input.agentMode === "plan") {

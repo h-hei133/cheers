@@ -20,7 +20,9 @@ export type ApprovalDecisionSource =
   | "allow-once-cache"
   | "allow-always-policy"
   | "default-deny"
-  | "ambiguous-stop";
+  | "ambiguous-stop"
+  /** Answered by the session's permission scope rather than by the user. */
+  | "session-scope";
 
 export interface ApprovalModeSurfaceObject {
   readonly mode: ApprovalDecision;

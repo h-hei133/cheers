@@ -6,7 +6,7 @@ import { SubagentLoader } from "./subagentLoader.js";
 import { AgentMemoryManager } from "./agentMemoryManager.js";
 import { createTaskToolDefinition } from "../tools/taskTool.js";
 
-describe("Claude Code 2026 Subagent Subsystem Test Suite", () => {
+describe("subagent subsystem", () => {
   let tempWorkspace: string;
 
   beforeEach(() => {
@@ -40,8 +40,8 @@ describe("Claude Code 2026 Subagent Subsystem Test Suite", () => {
       expect(explore?.disallowedTools).toContain("write");
     });
 
-    it("parses custom .claude/agents/*.md YAML frontmatter files", () => {
-      const agentsDir = path.join(tempWorkspace, ".claude", "agents");
+    it("parses custom .agents/agents/*.md YAML frontmatter files", () => {
+      const agentsDir = path.join(tempWorkspace, ".agents", "agents");
       fs.mkdirSync(agentsDir, { recursive: true });
 
       const customAgentMd = [

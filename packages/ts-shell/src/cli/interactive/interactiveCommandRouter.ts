@@ -49,6 +49,8 @@ export interface InteractiveCommandRouterInput {
   readonly logger: StructuredLogger;
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly turnNumber: number;
+  /** True when the terminal agreed to report modified keys. */
+  readonly modifierKeysReported?: boolean;
   readonly setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
@@ -60,6 +62,8 @@ export interface InteractiveCommandRouterResult {
   readonly refreshMcpGateway?: boolean;
   /** The user asked to leave; the host owns handing the terminal back. */
   readonly exitRequested?: boolean;
+  /** The user asked to run the last turn again; only the host knows what it was. */
+  readonly retryRequested?: boolean;
 }
 
 export async function routeInteractiveCommand(
@@ -74,6 +78,7 @@ export async function routeInteractiveCommand(
     printMode: false,
     interactive: true,
     sessionId: input.runtimeContext.session.id,
+    modifierKeysReported: input.modifierKeysReported,
   });
   if (resolved.kind === "handled") {
     return { turnNumber: nextTurnNumber };
@@ -102,6 +107,10 @@ export async function routeInteractiveCommand(
 
   if (isShellAction(slashResult, "exit-session")) {
     return { turnNumber: nextTurnNumber, exitRequested: true };
+  }
+
+  if (isShellAction(slashResult, "retry-turn")) {
+    return { turnNumber: nextTurnNumber, retryRequested: true };
   }
 
   if (isShellAction(slashResult, "cancel-run")) {

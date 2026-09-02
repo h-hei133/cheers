@@ -7,6 +7,7 @@ export interface SlashCommandSpec {
   readonly aliases?: readonly string[];
   readonly group:
     | "session"
+    | "context"
     | "workspace"
     | "workflow"
     | "diagnostics";
@@ -24,7 +25,7 @@ export const SLASH_COMMANDS = [
     name: "continue",
     aliases: ["c"],
     group: "session",
-    summary: "resume context and optionally run an immediate follow-up",
+    summary: "pick up this session's stopped work, optionally with a follow-up",
   },
   {
     name: "restore",
@@ -136,6 +137,23 @@ export const SLASH_COMMANDS = [
     summary: "export session history as markdown or jsonl",
   },
   {
+    name: "skill",
+    aliases: ["skills"],
+    group: "workspace",
+    summary: "the written-down ways of working this project and this user have",
+  },
+  {
+    name: "retry",
+    group: "session",
+    summary: "run the last turn again after it failed or was interrupted",
+  },
+  {
+    name: "hotkey",
+    aliases: ["hotkeys", "keys"],
+    group: "workspace",
+    summary: "every key this surface binds, and which ones this terminal delivers",
+  },
+  {
     name: "copy",
     aliases: ["cp"],
     group: "session",
@@ -164,6 +182,31 @@ export const SLASH_COMMANDS = [
     aliases: ["turbo", "speed"],
     group: "workflow",
     summary: "toggle low-latency fast model tier on or off",
+  },
+  {
+    name: "compact",
+    group: "context",
+    summary: "preview or write a handoff that shortens the conversation",
+  },
+  {
+    name: "warmup",
+    group: "context",
+    summary: "prebuild the startup context cache for this project",
+  },
+  {
+    name: "log",
+    group: "workspace",
+    summary: "tail, locate, export, or clear the structured session log",
+  },
+  {
+    name: "sidebar",
+    group: "workspace",
+    summary: "the live panel of session state, tools, and checkpoints",
+  },
+  {
+    name: "browser",
+    group: "workspace",
+    summary: "inspect the guarded browser capability and its receipts",
   },
   {
     name: "context",
@@ -269,6 +312,7 @@ export function renderSessionCommandMap(
 
 const GROUP_TITLES: Record<SlashCommandSpec["group"], string> = {
   session: "Session",
+  context: "Context",
   workspace: "Workspace",
   workflow: "Workflow",
   diagnostics: "Diagnostics",
@@ -293,12 +337,13 @@ export function renderUserHelp(renderer: SlashCommandLineRenderer): void {
       renderer.renderLine(`  /${command.name.padEnd(width)}  ${command.summary}`);
     }
   }
+  // The keys live in one table that the keymap dispatches on; naming a few of
+  // them again here is how a guide ends up advertising a key nothing binds.
   renderer.renderLine("\nKeys");
   renderer.renderLine("  shift+tab   switch between planning and building");
-  renderer.renderLine("  tab         complete a command");
+  renderer.renderLine("  alt+p       cycle how much a turn may do without asking");
   renderer.renderLine("  ctrl+j      insert a newline without sending");
-  renderer.renderLine("  esc         interrupt a run, or dismiss a chooser");
-  renderer.renderLine("  ctrl+l      clear the screen and scrollback");
+  renderer.renderLine("  /hotkey     every key, and which ones this terminal delivers");
   renderer.renderLine("");
 }
 

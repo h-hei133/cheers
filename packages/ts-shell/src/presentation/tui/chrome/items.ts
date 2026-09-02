@@ -21,8 +21,12 @@ export type StatusItemId =
   | "cost"
   | "turns"
   | "agent-mode"
+  | "permission-scope"
   | "session"
-  | "todos";
+  | "todos"
+  | "queued"
+  | "peers"
+  | "worktree";
 
 export interface StatusFacts {
   readonly model: string;
@@ -35,8 +39,16 @@ export interface StatusFacts {
   readonly costUsd?: number;
   readonly turns?: number;
   readonly agentMode?: string;
+  /** How much the session may do before it has to ask. */
+  readonly permissionScope?: string;
   readonly sessionId?: string;
   readonly openTodos?: number;
+  /** Submissions waiting behind the running turn. */
+  readonly queued?: number;
+  /** Other live sessions reachable for cross-session messaging. */
+  readonly peers?: number;
+  /** Whether the working tree has uncommitted changes. */
+  readonly worktreeDirty?: boolean;
 }
 
 export interface StatusItem {
@@ -50,6 +62,7 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
   { id: "model", label: "model", describe: "active model name" },
   { id: "provider", label: "provider", describe: "active provider" },
   { id: "agent-mode", label: "mode", describe: "plan or build" },
+  { id: "permission-scope", label: "permissions", describe: "how much a turn may do without asking" },
   { id: "branch", label: "branch", describe: "current git branch" },
   { id: "directory", label: "directory", describe: "project root, home-relative" },
   { id: "context", label: "context", describe: "context window used, as tokens and percent" },
@@ -57,6 +70,9 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
   { id: "cost", label: "cost", describe: "estimated session spend" },
   { id: "turns", label: "turns", describe: "turns completed this session" },
   { id: "todos", label: "todos", describe: "open todo entries" },
+  { id: "worktree", label: "worktree", describe: "whether the working tree is dirty" },
+  { id: "queued", label: "queued", describe: "submissions waiting behind the running turn" },
+  { id: "peers", label: "peers", describe: "other live sessions you can message" },
   { id: "session", label: "session", describe: "short session id, for /resume" },
 ];
 
@@ -64,6 +80,7 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
 export const DEFAULT_STATUS_ITEMS: readonly StatusItemId[] = [
   "model",
   "agent-mode",
+  "permission-scope",
   "branch",
   "context",
   "directory",
@@ -89,8 +106,27 @@ export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string |
       return facts.agentMode === "plan"
         ? defaultTheme.fg("warning", facts.agentMode)
         : defaultTheme.dim(facts.agentMode);
+    case "permission-scope":
+      // Widening what a turn may do without asking is the one state a user must
+      // never be unsure of, so it is coloured by how much it gives away.
+      if (!facts.permissionScope) return undefined;
+      if (facts.permissionScope === "allow-all") {
+        return defaultTheme.fg("error", facts.permissionScope);
+      }
+      return facts.permissionScope === "accept-edits"
+        ? defaultTheme.fg("warning", facts.permissionScope)
+        : defaultTheme.dim(facts.permissionScope);
     case "branch":
       return facts.branch ? defaultTheme.fg("success", facts.branch) : undefined;
+    case "worktree":
+      if (facts.worktreeDirty === undefined) return undefined;
+      return facts.worktreeDirty
+        ? defaultTheme.fg("warning", "uncommitted")
+        : defaultTheme.dim("clean");
+    case "queued":
+      return facts.queued ? defaultTheme.fg("accent", `${facts.queued} queued`) : undefined;
+    case "peers":
+      return facts.peers ? defaultTheme.dim(`${facts.peers} peers`) : undefined;
     case "directory":
       return facts.directory ? defaultTheme.dim(facts.directory) : undefined;
     case "context":

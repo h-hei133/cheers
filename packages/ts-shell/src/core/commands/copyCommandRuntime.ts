@@ -3,6 +3,21 @@ import type { CommandContext, LocalCommandResult } from "./types.js";
 
 let lastCapturedResponseText = "";
 
+/**
+ * Where the terminal clipboard sequence goes.
+ *
+ * The interactive surface owns the terminal, so an escape sequence written
+ * straight to stdout lands in the middle of whatever frame is being painted. The
+ * host installs its own device here; without one, writing to stdout directly is
+ * still right — that is the non-interactive path, where nothing else is painting.
+ */
+let clipboardSink: ((data: string) => void) | undefined;
+
+/** Install the device the clipboard sequence should be written through. */
+export function setClipboardSink(sink: ((data: string) => void) | undefined): void {
+  clipboardSink = sink;
+}
+
 export function recordLastAssistantResponse(text: string): void {
   if (text && text.trim()) {
     lastCapturedResponseText = text.trim();
@@ -26,11 +41,15 @@ export async function runCopyCommand(
   const contentToCopy = customContent || lastCapturedResponseText || "No recent response content available to copy.";
   const platform = process.platform;
 
-  // 1. Emit universal OSC 52 clipboard sequence (0ms, 0 external dependencies, supported by all modern terminals)
-  if (process.stdout && process.stdout.isTTY && contentToCopy) {
+  // 1. OSC 52 reaches every modern terminal, including over SSH, with no
+  //    external dependency — so it is tried first, through the renderer's device
+  //    when one is installed.
+  if (contentToCopy && (clipboardSink || process.stdout?.isTTY)) {
     try {
       const base64 = Buffer.from(contentToCopy, "utf8").toString("base64");
-      process.stdout.write(`\x1b]52;c;${base64}\x07`);
+      const sequence = `\x1b]52;c;${base64}\x07`;
+      if (clipboardSink) clipboardSink(sequence);
+      else process.stdout.write(sequence);
     } catch {
       // Non-critical fallback
     }

@@ -53,6 +53,7 @@ export class Editor {
     return this.lines.join("\n");
   }
 
+
   setText(text: string): void {
     this.saveUndo();
     this.lines = text.length > 0 ? text.split("\n") : [""];

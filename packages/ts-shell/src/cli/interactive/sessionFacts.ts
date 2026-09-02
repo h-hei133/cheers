@@ -35,7 +35,19 @@ export function activeModelName(context: ShellRuntimeContext): string {
  * configuration does not carry it, and the live value is the one Shift+Tab
  * changes.
  */
-export function readStatusFacts(context: ShellRuntimeContext, agentMode?: string): StatusFacts {
+export interface LiveStatusFacts {
+  readonly agentMode?: string;
+  readonly permissionScope?: string;
+  /** Submissions waiting behind the running turn. */
+  readonly queued?: number;
+  /** Other live sessions reachable for cross-session messaging. */
+  readonly peers?: number;
+}
+
+export function readStatusFacts(
+  context: ShellRuntimeContext,
+  live: LiveStatusFacts = {},
+): StatusFacts {
   const usage = getSessionUsage(context.session.id);
   const cost = estimateUsageCost(usage);
   return {
@@ -44,7 +56,11 @@ export function readStatusFacts(context: ShellRuntimeContext, agentMode?: string
     branch: context.gitContext.branch ?? undefined,
     directory: shortenPath(context.projectRoot || path.resolve(".")),
     sessionId: context.session.id,
-    agentMode: agentMode ?? context.runtimeConfig.agentMode ?? "build",
+    agentMode: live.agentMode ?? context.runtimeConfig.agentMode ?? "build",
+    permissionScope: live.permissionScope ?? "ask",
+    worktreeDirty: context.gitContext.isClean === null ? undefined : !context.gitContext.isClean,
+    queued: live.queued,
+    peers: live.peers,
     openTodos: getSessionTodos().filter((todo) => todo.status !== "done").length,
     // Absent until a real request has been accounted for: a zeroed gauge is a
     // fabricated fact, not a neutral one.
@@ -66,7 +82,7 @@ export function readWelcomeState(
   agentMode: string | undefined,
   hasRecoverableSession: boolean,
 ): WelcomeState {
-  const facts = readStatusFacts(context, agentMode);
+  const facts = readStatusFacts(context, { agentMode });
   return {
     model: facts.model,
     directory: facts.directory ?? context.projectRoot,

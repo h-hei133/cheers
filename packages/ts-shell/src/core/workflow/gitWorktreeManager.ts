@@ -12,7 +12,7 @@ export interface WorktreeAllocation {
 }
 
 /**
- * GitWorktreeManager (Claude Code 2026 Aligned)
+ * GitWorktreeManager
  * Manages isolated physical worktrees (`git worktree add -b <branch> <path>`) for parallel subagents.
  * Prevents file mutation collisions and git index lock contention.
  * Automatically cleans up worktree directories and branches upon task completion.

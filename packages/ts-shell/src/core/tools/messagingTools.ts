@@ -4,7 +4,7 @@ import { AgentRegistryScanner } from "../messaging/agentRegistryScanner.js";
 import { SessionSocketClient } from "../messaging/sessionSocketClient.js";
 
 /**
- * ListAgents tool (Claude Code 2026 Aligned)
+ * ListAgents tool
  * Discovers active reachable peer agents, local sessions, and custom subagents.
  */
 export function createListAgentsToolDefinition(): ToolDefinition {
@@ -57,8 +57,8 @@ export function createListAgentsToolDefinition(): ToolDefinition {
 }
 
 /**
- * SendMessage tool (Claude Code 2026 Aligned)
- * Delivers asynchronous cross-session messages to other active Claude Code sessions or subagents.
+ * SendMessage tool
+ * Delivers asynchronous cross-session messages to other active sessions or subagents.
  * Supports zero-polling `notify_when_idle` completion subscriptions.
  */
 export function createSendMessageToolDefinition(): ToolDefinition {

@@ -2,7 +2,7 @@ import * as net from "node:net";
 import type { MessagingFrame } from "./types.js";
 
 /**
- * SessionSocketClient (Claude Code 2026 Aligned)
+ * SessionSocketClient
  * Transmits JSON-L framed messages and zero-polling idle notification subscriptions over local UDS / Named Pipes.
  */
 export class SessionSocketClient {

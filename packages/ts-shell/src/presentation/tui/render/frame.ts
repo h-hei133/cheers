@@ -48,12 +48,6 @@ export interface TerminalFrameProvider {
   beginHistoryReplay?(): void;
   /** Force every eligible finalized prefix to retire before shutdown. */
   beginHistoryFlush?(): void;
-  /**
-   * The last `rows` rows already retired into scrollback, re-rendered at
-   * `width`. Only what is still on screen above the viewport is asked for, and
-   * only so a drag across it can be turned back into text.
-   */
-  retiredTail?(width: number, rows: number): readonly string[];
 }
 
 export interface TuiStartOptions {

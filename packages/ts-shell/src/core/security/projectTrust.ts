@@ -81,17 +81,38 @@ export class ProjectTrustStore {
 
   hasSensitiveProjectResources(workspaceRoot: string): boolean {
     const normalized = path.resolve(workspaceRoot);
-    const sensitiveIndicators = [
-      ".coding-agents/extensions",
-      ".agents/extensions",
-      ".pi/extensions",
-      ".claude/agents",
-      "SYSTEM.md",
-    ];
+    // Named indicators are the ones with no shape to match on. Everything else
+    // is "some tool keeps runnable definitions in a dot-directory here", which is
+    // checked as a shape so a tool nobody has heard of yet still counts.
+    const sensitiveIndicators = ["SYSTEM.md"];
+    const sensitiveSubdirectories = ["extensions", "agents", "skills", "hooks"];
 
     for (const indicator of sensitiveIndicators) {
       if (fs.existsSync(path.join(normalized, indicator))) {
         return true;
+      }
+    }
+    if (this.hasToolDefinitions(normalized, sensitiveSubdirectories)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Whether any dot-directory here holds one of `subdirectories` — the shape every
+   * tool uses for definitions it will later run.
+   */
+  private hasToolDefinitions(root: string, subdirectories: readonly string[]): boolean {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(root, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.startsWith(".")) continue;
+      for (const subdirectory of subdirectories) {
+        if (fs.existsSync(path.join(root, entry.name, subdirectory))) return true;
       }
     }
     return false;

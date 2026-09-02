@@ -41,6 +41,8 @@ export interface BuildCliCommandExecutionInput {
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
   readonly env?: Readonly<Record<string, string | undefined>>;
+  /** True when the terminal agreed to report modified keys. */
+  readonly modifierKeysReported?: boolean;
 }
 
 export interface CliCommandExecutionBridge {
@@ -92,6 +94,7 @@ export async function buildCliCommandExecution(
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     cwd: input.cwd,
     sessionId: input.sessionId,
+    modifierKeysReported: input.modifierKeysReported,
     compactCheckpointStore: input.compactCheckpointStore,
     compactInjectionStateStore: input.compactInjectionStateStore,
     browserReceiptCacheStore,

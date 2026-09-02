@@ -18,6 +18,15 @@ const MAX_BACKLOG_BYTES = 64 * 1024 * 1024;
 /** How long to wait for a keyboard-protocol reply before assuming there is none. */
 const KEYBOARD_REPLY_TIMEOUT_MS = 250;
 
+/**
+ * Ask the terminal to bracket pasted text.
+ *
+ * Without this a pasted block arrives as ordinary keystrokes, so every newline in
+ * it reads as Enter and submits — a five-line paste runs four turns and leaves
+ * the last line in the prompt. The brackets are what make a paste one event.
+ */
+const ENABLE_BRACKETED_PASTE = "\x1b[?2004h";
+
 /** Restores every private mode this driver may have set, in reverse order. */
 const RESTORE_MODES = [
   "\x1b[?1049l", // alternate screen, in case a modal frame was up
@@ -149,6 +158,7 @@ export class Terminal implements TerminalDevice {
     if (!process.stdin.isTTY) return;
 
     if (this.inputEnabled) this.takeRawMode();
+    if (this.capabilities.supportsBracketedPaste) this.write(ENABLE_BRACKETED_PASTE);
     process.stdin.on("data", this.handleData);
     process.stdin.on("end", this.handleEnd);
     process.stdin.on("close", this.handleEnd);

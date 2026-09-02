@@ -22,7 +22,7 @@ const SYNC_END = "\x1b[?2026l";
 const AUTOWRAP_OFF = "\x1b[?7l";
 const AUTOWRAP_ON = "\x1b[?7h";
 const ERASE_TO_END_OF_LINE = "\x1b[K";
-const ERASE_TO_END_OF_SCREEN = "\x1b[J";
+export const ERASE_TO_END_OF_SCREEN = "\x1b[J";
 
 /** Frame prologue: hide the cursor, hold the paint, and stop the terminal wrapping. */
 export function paintBegin(synchronized: boolean): string {

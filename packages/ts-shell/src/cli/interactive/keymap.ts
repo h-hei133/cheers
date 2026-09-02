@@ -57,6 +57,12 @@ export interface KeymapActions {
   redrawAfter(delayMs: number): void;
   /** Cycle the agent mode between planning and building. */
   cycleAgentMode(): void;
+  /** Cycle how much a turn may do without asking. */
+  cyclePermissionScope(): void;
+  /** Run the last turn again, if the last one failed. */
+  retry(): void;
+  /** Open the long text under the caret — or the whole draft — full screen. */
+  expandDraft(): void;
   /**
    * Recompute completions for the current draft. `mayOpen` is true only for the
    * gestures that should be able to *open* the list — typing and Tab. Every other
@@ -84,6 +90,34 @@ export interface KeymapContext {
 /** Window in which a second Ctrl+C on an empty draft exits. */
 const DOUBLE_INTERRUPT_MS = 600;
 
+/**
+ * Every key id this keymap dispatches on, for the test that keeps the guide and
+ * the bindings from drifting apart.
+ */
+export function dispatchedKeyIds(): readonly string[] {
+  return [
+    ...Object.keys(MOTIONS),
+    ...Object.keys(KILLS),
+    ...NEWLINE_KEYS,
+    "escape",
+    "ctrl+c",
+    "ctrl+d",
+    "ctrl+l",
+    "ctrl+o",
+    "enter",
+    "backspace",
+    "delete",
+    "ctrl+y",
+    "ctrl+z",
+    "tab",
+    "shift+tab",
+    "alt+p",
+    "f5",
+    "up",
+    "down",
+  ];
+}
+
 /** Apply one keystroke to the surface. */
 export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
   const { surface, actions } = context;
@@ -105,6 +139,9 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
       return;
     case "ctrl+l":
       actions.clearScreen();
+      return;
+    case "ctrl+o":
+      actions.expandDraft();
       return;
     case "enter":
       submitDraft(context);
@@ -129,6 +166,15 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
       // Tab is completion, so mode cycling takes the shifted form.
       actions.cycleAgentMode();
       actions.redraw();
+      return;
+    case "alt+p":
+      actions.cyclePermissionScope();
+      actions.redraw();
+      return;
+    case "f5":
+      // A function key rather than a modified chord: every terminal delivers F5
+      // verbatim, while modified Enter and friends get folded or swallowed.
+      actions.retry();
       return;
     case "up":
       recallOrMove(context, -1);
@@ -239,13 +285,16 @@ function handleCancelKey(context: KeymapContext): void {
 
 function submitDraft(context: KeymapContext): void {
   const { surface, actions } = context;
-  const text = surface.editor.getText().trim();
-  if (!text) {
+  const draft = surface.editor.getText().trim();
+  if (!draft) {
     actions.redraw();
     return;
   }
-  surface.editor.pushHistory(text);
+  // History keeps the draft as it looked, so recalling it brings back a short line
+  // rather than the whole pasted file. What is sent is the expansion.
+  const submission = surface.pastes.expand(draft).trim();
+  surface.editor.pushHistory(draft);
   surface.editor.clear();
   surface.setSuggesting(false);
-  actions.submit(text);
+  actions.submit(submission);
 }

@@ -5,7 +5,7 @@ export interface StaggeredExecutionOptions {
 
 /**
  * Cache Staggering Dispatcher
- * Inspired by 2026 Claude Code dynamic workflow prompt cache prefix staggering:
+ * Prompt cache prefix staggering for dynamic workflows:
  * Staggers homogeneous parallel agent dispatch calls by a small delta (e.g. 50ms)
  * to guarantee that subsequent tasks hit the warm Prompt Cache established by the first task.
  */

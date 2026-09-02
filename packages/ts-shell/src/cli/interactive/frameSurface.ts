@@ -1,4 +1,5 @@
 import { Editor } from "../../presentation/tui/editor.js";
+import { PasteStore } from "../../presentation/tui/pastes.js";
 import { renderBand } from "../../presentation/tui/chrome/band.js";
 import type { StatusFacts, StatusItemId } from "../../presentation/tui/chrome/items.js";
 import { composerTextWidth, renderComposer } from "../../presentation/tui/chrome/composer.js";
@@ -35,7 +36,7 @@ export interface SurfaceContext {
   newlineKey(): string;
   /** True while a second cancel press would exit. */
   cancelArmed(): boolean;
-  /** True when an open picker wants the whole screen. */
+  /** True when an open picker or editor wants the whole screen. */
   overlayFullScreen(): boolean;
   /** Rows for an open picker, or none when none is open. */
   overlayRows(width: number, height: number): string[];
@@ -46,6 +47,12 @@ const MIN_TRANSCRIPT_ROWS = 1;
 
 export class InteractiveSurface implements TerminalFrameProvider {
   readonly editor = new Editor();
+  /**
+   * Long pastes held aside behind placeholders. Lives with the editor because the
+   * draft on screen and the text that will be sent are the same object's two
+   * readings, and nothing else should have to know they differ.
+   */
+  readonly pastes = new PasteStore();
   readonly transcript = new Transcript();
   readonly suggestions = new SuggestionList();
 
@@ -89,10 +96,6 @@ export class InteractiveSurface implements TerminalFrameProvider {
 
   beginHistoryReplay(): void {
     this.transcript.beginReplay();
-  }
-
-  retiredTail(width: number, rows: number): readonly string[] {
-    return this.transcript.retiredTail(width, rows);
   }
 
   beginHistoryFlush(): void {

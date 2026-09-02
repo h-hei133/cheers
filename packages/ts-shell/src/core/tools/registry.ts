@@ -23,6 +23,7 @@ import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
+import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
@@ -100,10 +101,18 @@ async function runCommandTool(
   } else {
     shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command];
   }
+  // OS-level isolation, when it has been turned on. The plan says which of the
+  // three states applies, and an unavailable launcher is reported on the result
+  // rather than quietly downgraded to no isolation.
+  const sandbox = planSandboxedCommand({
+    shell: shellBin,
+    shellArgs,
+    workspaceRoot: context.workspaceRoot,
+  })
   const result = await executionService.runCommand({
     operationKind: 'command.run',
-    command: shellBin,
-    args: shellArgs,
+    command: sandbox.command ?? shellBin,
+    args: sandbox.args ?? shellArgs,
     cwd: context.workspaceRoot,
     workspaceRoot: context.workspaceRoot,
     authority: TOOL_APPROVED_COMMAND_AUTHORITY,
@@ -121,6 +130,10 @@ async function runCommandTool(
 
   const truncated = truncateTail(rawOutput, { maxLines: 1500, maxBytes: 50 * 1024 })
   let finalOutput = truncated.content
+  const sandboxNotices = [sandbox.notice, sandbox.state === 'isolated' ? networkNotice(readSandboxRules(context.workspaceRoot)) : undefined].filter(Boolean)
+  if (sandboxNotices.length > 0) {
+    finalOutput = `${sandboxNotices.map(notice => `[sandbox] ${notice}`).join('\n')}\n${finalOutput}`
+  }
 
   if (truncated.truncated) {
     const artifact = await artifactManager.save(rawOutput, 'bash')

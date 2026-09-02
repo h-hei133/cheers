@@ -9,8 +9,8 @@ import { newlineKeyFor } from "../../presentation/tui/chrome/hints.js";
 import type { StatusItemId } from "../../presentation/tui/chrome/items.js";
 import { renderWelcome } from "../../presentation/tui/chrome/welcome.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
+import { nextScope, scopeLabel, scopeMeaning } from "../approval/permissionScope.js";
 import { Clipboard } from "./clipboard.js";
-import { DragSelection } from "./selection.js";
 import { TUI } from "../../presentation/tui/render/engine.js";
 import { processTerminal, type TerminalDevice } from "../../presentation/tui/terminal.js";
 import { textBlock } from "../../presentation/tui/transcript/blocks.js";
@@ -22,11 +22,12 @@ import { InteractiveSurface } from "./frameSurface.js";
 import { routeKey } from "./keymap.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
+import { DraftPane } from "./draftPane.js";
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, resizeScrollbackMode, writeStatusItems } from "./tuiSettings.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
-import { slashSuggestions } from "./slashSuggestions.js";
+import { couldBeCommand, slashSuggestions } from "./slashSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
 
@@ -78,33 +79,42 @@ export class InteractiveMode {
   private readonly readline: ReadlineInterface;
   private readonly gesture: { lastCancelAt?: number } = {};
   private readonly overlay: OverlayHost;
-  private readonly selection: DragSelection;
+  private readonly pane = new DraftPane();
   private readonly clipboard: Clipboard;
   private statusItems: readonly StatusItemId[];
+  /**
+   * The band a still-open chooser is proposing. Present only while the chooser is
+   * open, so the band shows what a toggle would do without the choice being made
+   * — Escape leaves the saved band exactly as it was.
+   */
+  private previewItems: readonly StatusItemId[] | undefined;
 
   private busy = false;
   private turnNumber = 0;
+  /** The last thing submitted that was a prompt rather than a command. */
+  private lastPrompt: string | undefined;
   private readonly queue: string[] = [];
 
   constructor(private readonly options: InteractiveModeOptions) {
     this.terminal = options.terminal ?? processTerminal;
     this.statusItems = readStatusItems(options.runtimeContext.projectRoot);
     this.clipboard = new Clipboard({
-      projectRoot: options.runtimeContext.projectRoot,
       cwd: options.runtimeContext.cwd,
       sessionId: options.runtimeContext.session.id,
-      setTracking: (enabled) => this.tui.setMouseTracking(enabled),
       notify: (text) => this.sink.notify(text),
+      write: (data) => this.terminal.write(data),
     });
-    this.selection = new DragSelection(
-      { rows: () => this.tui.screenRows() },
-      (text) => this.clipboard.copy(text),
-    );
     this.overlay = new OverlayHost(() => this.tui.requestRender());
     this.tui = new TUI(this.terminal, options.scheduler, resizeScrollbackMode(process.env));
     this.surface = new InteractiveSurface({
-      facts: () => readStatusFacts(this.options.runtimeContext, this.options.sessionRuntime.getAgentMode()),
-      statusItems: () => this.statusItems,
+      facts: () =>
+        readStatusFacts(this.options.runtimeContext, {
+          agentMode: this.options.sessionRuntime.getAgentMode(),
+          permissionScope: this.options.sessionRuntime.getPermissionScope(),
+          queued: this.queue.length,
+          peers: readAmbientFacts(this.options.runtimeContext.session.id).peerSessions,
+        }),
+      statusItems: () => this.previewItems ?? this.statusItems,
       activity: () => this.sink.activity(),
       busy: () => this.busy,
       queuedCount: () => this.queue.length,
@@ -112,8 +122,9 @@ export class InteractiveMode {
       ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
       newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
       cancelArmed: () => this.isCancelArmed(),
-      overlayFullScreen: () => this.overlay.fullScreen,
-      overlayRows: (width, height) => this.overlay.render(width, height),
+      overlayFullScreen: () => this.pane.active || this.overlay.fullScreen,
+      overlayRows: (width, height) =>
+        this.pane.active ? this.pane.render(width, height) : this.overlay.render(width, height),
     });
     this.sink = new TurnSink(this.surface.transcript, () => this.tui.requestRender());
     this.questions = new QuestionBridge({
@@ -144,15 +155,23 @@ export class InteractiveMode {
         ),
     });
     this.stdin.onKey((event) => this.onKey(event));
-    this.stdin.onPaste((text) => this.onPaste(text));
-    this.stdin.onMouse((report) => this.selection.handle(report));
+    this.stdin.onPaste((text) => {
+      // A paste while the full-screen editor is up belongs to it, whole; a paste
+      // into the prompt is held aside once it is long enough to bury the draft.
+      if (this.pane.active) this.pane.handlePaste(text);
+      else {
+        this.surface.editor.insert(this.surface.pastes.holdIfLong(text));
+        this.syncSuggestions(false);
+      }
+      this.tui.requestRender();
+    });
     this.tui.onInput((data) => this.stdin.feed(data));
     this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
     this.tui.start();
-    this.clipboard.applyStoredPreference();
   }
 
   stop(): void {
+    this.clipboard.release();
     this.questions.abandon();
     this.options.renderer.clearSink();
     this.stdin.dispose();
@@ -168,6 +187,11 @@ export class InteractiveMode {
   private onKey(event: Parameters<typeof routeKey>[0]): void {
     // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
     // every printable character for its filter.
+    // The full-screen editor owns every key while it is up, including Escape.
+    if (this.pane.handleKey(event)) {
+      this.tui.requestRender();
+      return;
+    }
     if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids))) return;
     routeKey(event, {
       surface: this.surface,
@@ -181,6 +205,9 @@ export class InteractiveMode {
         redraw: () => this.tui.requestRender(),
         clearScreen: () => this.clearScreen(),
         cycleAgentMode: () => this.cycleAgentMode(),
+        cyclePermissionScope: () => this.cyclePermissionScope(),
+        retry: () => this.onSubmit("/retry"),
+        expandDraft: () => this.pane.openFrom(this.surface.editor, this.surface.pastes, () => this.tui.requestRender()),
         redrawAfter: (delayMs) => {
           setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
         },
@@ -191,7 +218,7 @@ export class InteractiveMode {
 
   /** Publish a runtime question as a transcript block and retarget the prompt. */
   private onQuestion(question: string): void {
-    this.surface.transcript.append(textBlock("notice", `  ${question}`));
+    this.surface.transcript.append(textBlock("notice", question));
     this.surface.editor.placeholder = "Answer above, then press Enter";
     this.tui.requestRender();
   }
@@ -201,23 +228,22 @@ export class InteractiveMode {
     this.tui.requestRender();
   }
 
-  private onPaste(text: string): void {
-    this.surface.editor.insert(text);
-    this.syncSuggestions(false);
-    this.tui.requestRender();
-  }
-
   /**
-   * Recompute completions. A list that is not already open only opens when the
-   * gesture was typing or Tab, so arrow-key history recall keeps the arrows.
+   * Recompute completions.
+   *
+   * A closed list reopens on typing, on Tab, and on any edit that leaves a draft
+   * which could still become a command — that last case is what brings the list
+   * back after a typo is deleted, since a backspace carries no text of its own.
+   * History recall is excluded, so the arrows keep working on a recalled prompt.
    */
   private syncSuggestions(mayOpen: boolean): void {
-    const matches = slashSuggestions(this.surface.editor.getText());
+    const draft = this.surface.editor.getText();
+    const matches = slashSuggestions(draft);
     if (!matches) {
       this.surface.setSuggesting(false);
       return;
     }
-    if (!mayOpen && !this.surface.suggestionsOpen) return;
+    if (!mayOpen && !this.surface.suggestionsOpen && !couldBeCommand(draft)) return;
     this.surface.suggestions.setItems(matches);
     this.surface.setSuggesting(true);
   }
@@ -244,6 +270,11 @@ export class InteractiveMode {
   private async run(text: string): Promise<void> {
     this.busy = true;
     let exiting = false;
+    let retrying: string | undefined;
+    // `begin` clears the failure flag for the turn that is starting, so whether
+    // the *previous* turn failed has to be read before that happens.
+    const previousTurnFailed = this.sink.lastTurnFailed;
+    if (!text.startsWith("/")) this.lastPrompt = text;
     const command = text.startsWith("/") ? text.split(/\s+/)[0]! : "turn";
     this.sink.begin(text.startsWith("/") ? "command" : "turn", command);
     this.options.renderer.setSink(this.sink);
@@ -260,11 +291,13 @@ export class InteractiveMode {
         logger: this.options.logger,
         approvalTrustPolicy: this.options.approvalTrustPolicy,
         turnNumber: this.turnNumber,
+        modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
         setActiveNonInteractiveApprovalMode:
           this.options.setActiveNonInteractiveApprovalMode ?? (() => {}),
       });
       this.turnNumber = result.turnNumber;
       if (result.exitRequested) exiting = true;
+      if (result.retryRequested) retrying = this.retryTarget(previousTurnFailed);
     } catch (error) {
       this.surface.transcript.append(
         textBlock("error", error instanceof Error ? error.message : String(error), "error"),
@@ -278,9 +311,29 @@ export class InteractiveMode {
         return;
       }
       this.tui.requestRender();
-      const next = this.queue.shift();
+      const next = retrying ?? this.queue.shift();
       if (next !== undefined) void this.run(next);
     }
+  }
+
+  /**
+   * The prompt a retry would run, or nothing with a note saying why not.
+   *
+   * A retry that silently re-ran a turn which had in fact succeeded would
+   * duplicate work and spend tokens, so the failure is a precondition rather
+   * than an assumption.
+   */
+  private retryTarget(previousTurnFailed: boolean): string | undefined {
+    if (this.lastPrompt === undefined) {
+      this.sink.notify("Nothing to retry: no prompt has run in this session yet.");
+      return undefined;
+    }
+    if (!previousTurnFailed) {
+      this.sink.notify("Nothing to retry: the last turn finished.");
+      return undefined;
+    }
+    this.surface.transcript.append(textBlock("user", this.lastPrompt));
+    return this.lastPrompt;
   }
 
   /** Open the chooser a bare command maps to. */
@@ -315,7 +368,11 @@ export class InteractiveMode {
   /** Everything the pickers need from the session, resolved lazily. */
   private pickerHost(): PickerHost {
     return {
-      commandContext: { cwd: this.options.runtimeContext.cwd, sessionId: this.options.runtimeContext.session.id },
+      commandContext: {
+        cwd: this.options.runtimeContext.cwd,
+        sessionId: this.options.runtimeContext.session.id,
+        modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
+      },
       transcript: this.surface.transcript,
       sessionManager: this.options.sessionManager,
       mcpGateway: this.options.initialMcpGateway,
@@ -325,8 +382,10 @@ export class InteractiveMode {
       resumeSession: (sessionId) => this.runCommandLine(`/resume ${sessionId}`),
       refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
-      mouseCopy: this.clipboard.dragEnabled,
-      setMouseCopy: async (enabled) => this.clipboard.setDragEnabled(enabled),
+      previewStatusItems: (items) => {
+        this.previewItems = items;
+        this.tui.requestRender();
+      },
       saveStatusItems: async (items) => {
         this.statusItems = items;
         return `Status band items saved to ${writeStatusItems(this.options.runtimeContext.projectRoot, items)}`;
@@ -355,6 +414,20 @@ export class InteractiveMode {
   private cycleAgentMode(): void {
     const next = this.options.sessionRuntime.getAgentMode() === "plan" ? "build" : "plan";
     this.options.sessionRuntime.setAgentMode(next);
+    this.tui.requestRender();
+  }
+
+  /**
+   * Widen or narrow what a turn may do without asking.
+   *
+   * Separate from the agent mode on purpose, and announced in the transcript
+   * rather than only in the band: quietly moving to a scope where nothing is put
+   * to the user is not something to learn by noticing a colour change.
+   */
+  private cyclePermissionScope(): void {
+    const next = nextScope(this.options.sessionRuntime.getPermissionScope());
+    this.options.sessionRuntime.setPermissionScope(next);
+    this.sink.notify(`Permission scope is now ${scopeLabel(next)} — ${scopeMeaning(next)}.`);
     this.tui.requestRender();
   }
 

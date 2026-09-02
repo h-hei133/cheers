@@ -12,6 +12,7 @@ import { permissionPicker } from "./permissions.js";
 import { pluginPicker } from "./plugins.js";
 import { restorePicker } from "./restore.js";
 import { serverPicker } from "./servers.js";
+import { skillPicker } from "./skills.js";
 import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
 import { statusItemPicker } from "./statusItems.js";
@@ -33,26 +34,19 @@ export interface PickerHost {
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly projectRoot: string;
   readonly statusItems: readonly StatusItemId[];
-  /** Whether drag-to-copy currently owns the mouse. */
-  readonly mouseCopy: boolean;
   resumeSession(sessionId: string): Promise<string | undefined>;
   refreshServer(serverName: string): Promise<string | undefined>;
   revokeGrant(key: string): Promise<string | undefined>;
   saveStatusItems(items: readonly StatusItemId[]): Promise<string | undefined>;
-  setMouseCopy(enabled: boolean): Promise<string | undefined>;
+  /** Show `items` in the band without saving; `undefined` restores the saved band. */
+  previewStatusItems(items: readonly StatusItemId[] | undefined): void;
 }
 
 type PickerFactory = (host: PickerHost) => Picker;
 
 const PICKERS: Record<string, PickerFactory> = {
   model: (host) => modelPicker(host.commandContext),
-  copy: (host) =>
-    copyPicker({
-      transcript: host.transcript,
-      context: host.commandContext,
-      mouseCopy: host.mouseCopy,
-      toggleMouseCopy: host.setMouseCopy,
-    }),
+  copy: (host) => copyPicker(host.transcript, host.commandContext),
   resume: (host) => sessionPicker({ sessionManager: host.sessionManager, resume: host.resumeSession }),
   mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer }),
   connect: (host) => connectionPicker(host.commandContext),
@@ -65,8 +59,13 @@ const PICKERS: Record<string, PickerFactory> = {
   plugin: (host) => pluginPicker(host.commandContext),
   marketplace: (host) => sourcePicker(host.commandContext),
   restore: (host) => restorePicker(host.projectRoot),
+  skill: (host) => skillPicker(host.commandContext),
   statusline: (host) =>
-    statusItemPicker({ current: host.statusItems, save: host.saveStatusItems }),
+    statusItemPicker({
+      current: host.statusItems,
+      save: host.saveStatusItems,
+      preview: host.previewStatusItems,
+    }),
 };
 
 /** The picker a bare command opens, or undefined when it has none. */

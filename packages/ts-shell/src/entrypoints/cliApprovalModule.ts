@@ -6,6 +6,12 @@ import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import type { ApprovalModeObject } from "../cli/approval/approvalModeContract.js";
 import {
+  scopeAnswer,
+  scopeLabel,
+  scopeMeaning,
+  type PermissionScope,
+} from "../cli/approval/permissionScope.js";
+import {
   createApprovalResponse,
   formatAllowOnceAppliedLine,
   formatApprovalConflictResolutionLine,
@@ -77,6 +83,7 @@ export function createCliEscalationPromptHandler(
     | undefined,
   getApprovalModeObject?: () => ApprovalModeObject | undefined,
   persistApprovalAudit?: (record: ApprovalAuditRecord) => void,
+  getPermissionScope?: () => PermissionScope,
 ): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
   function emitApprovalAudit(record: ApprovalAuditRecord): void {
     renderApprovalAuditSurface(renderer, record);
@@ -178,6 +185,38 @@ export function createCliEscalationPromptHandler(
     const hasAllowOnceCache = trustPolicy.hasAllowOnce(evaluation.cacheKey);
     const hasAllowAlwaysGrant = Boolean(evaluation.matchedGrant);
     const hasCachedGrant = hasAllowOnceCache || hasAllowAlwaysGrant;
+    // A session scope answers before anything is put to the user, and only in the
+    // interactive channel: the non-interactive path has its own explicit policy,
+    // and letting a display-level setting speak for it would hide which authority
+    // actually decided.
+    const scope = getPermissionScope?.() ?? "ask";
+    const scopeDecision = isNonInteractive ? undefined : scopeAnswer(scope, prompt);
+    if (scopeDecision) {
+      renderApprovalRequiredSurface(renderer, {
+        prompt,
+        includeRisk: true,
+        decisionSource: "session-scope",
+        lines: [`- Session permission scope is \`${scopeLabel(scope)}\`: ${scopeMeaning(scope)}.`],
+      });
+      trustPolicy.rememberAllowOnce(evaluation.cacheKey);
+      emitApprovalAudit({
+        channel: "interactive",
+        decision: scopeDecision,
+        decisionSource: `session-scope:${scope}`,
+        persistent: false,
+        cacheEffect: "none",
+        projectRoot,
+        cacheKey: evaluation.cacheKey,
+        scopeLabel: evaluation.scopeLabel,
+      });
+      renderer.renderLine(formatApprovalDecisionLine(scopeDecision));
+      renderer.renderLine("");
+      return createApprovalResponse({
+        promptId: prompt.id,
+        decision: scopeDecision,
+        userComment: `Allowed by the session permission scope (${scopeLabel(scope)}), not by an explicit answer.`,
+      });
+    }
 
     if (isNonInteractive) {
       const nonInteractiveDecisionPlan = resolveNonInteractiveApprovalDecision({

@@ -38,8 +38,8 @@ export interface TeamTask {
 }
 
 /**
- * TeamConfigManager & MailboxMesh (Claude Code 2026 Aligned)
- * Manages team membership (~/.claude/teams/{team}/config.json) and point-to-point inboxes.
+ * TeamConfigManager & MailboxMesh
+ * Manages team membership (~/.private-agents/teams/{team}/config.json) and point-to-point inboxes.
  */
 export class TeamConfigManager {
   private readonly teamId: string;
@@ -47,7 +47,7 @@ export class TeamConfigManager {
 
   constructor(sessionId: string) {
     this.teamId = `session-${sessionId.slice(0, 8)}`;
-    this.baseDir = path.join(os.homedir(), ".claude", "teams", this.teamId);
+    this.baseDir = path.join(os.homedir(), ".private-agents", "teams", this.teamId);
   }
 
   getTeamId(): string {
@@ -113,7 +113,7 @@ export class TeamConfigManager {
 }
 
 /**
- * TaskStore & LockfileClaimer (Claude Code 2026 Aligned)
+ * TaskStore & LockfileClaimer
  * Manages shared task queues with cross-process file-locking atomic claiming.
  */
 export class TaskStore {
@@ -122,7 +122,7 @@ export class TaskStore {
 
   constructor(teamId: string) {
     this.teamId = teamId;
-    this.tasksDir = path.join(os.homedir(), ".claude", "tasks", this.teamId);
+    this.tasksDir = path.join(os.homedir(), ".private-agents", "tasks", this.teamId);
     try {
       if (!fs.existsSync(this.tasksDir)) {
         fs.mkdirSync(this.tasksDir, { recursive: true });

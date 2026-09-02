@@ -125,46 +125,6 @@ describe("replay after a scrollback reset", () => {
   });
 });
 
-describe("reading back what has retired", () => {
-  function retired(): Transcript {
-    const transcript = new Transcript();
-    transcript.append(textBlock("notice", "alpha"));
-    transcript.append(textBlock("notice", "beta"));
-    transcript.append(textBlock("notice", "gamma"));
-    // Retires exactly the first block: the remaining two rows fit the capacity.
-    const batch = transcript.peekBatch(WIDTH, 4);
-    transcript.acknowledge(batch!.id);
-    return transcript;
-  }
-
-  it("re-renders the tail of retired rows so a drag across them is answerable", () => {
-    const tail = retired().retiredTail(WIDTH, 10).join("\n");
-
-    expect(tail).toContain("alpha");
-  });
-
-  it("returns only as many rows as were asked for, ending at the newest", () => {
-    const transcript = retired();
-    const all = transcript.retiredTail(WIDTH, 10);
-    const last = transcript.retiredTail(WIDTH, 1);
-
-    expect(last).toEqual(all.slice(all.length - 1));
-  });
-
-  it("has nothing to offer before anything retires", () => {
-    const transcript = new Transcript();
-    transcript.append(textBlock("notice", "alpha"));
-
-    expect(transcript.retiredTail(WIDTH, 10)).toEqual([]);
-  });
-
-  it("never reports rows a live block would contribute", () => {
-    const tail = retired().retiredTail(WIDTH, 20).join("\n");
-
-    expect(tail).not.toContain("gamma");
-  });
-});
-
 describe("clearing", () => {
   it("forgets retired and live blocks alike", () => {
     const transcript = new Transcript();

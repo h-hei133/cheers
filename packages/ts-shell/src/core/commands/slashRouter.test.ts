@@ -58,7 +58,9 @@ describe("slash router (W4)", () => {
     expect(result).toBeTruthy();
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
-      expect(result.output).toContain("Model selection status");
+      // Bare `/model` answers "what can I use"; `/model status` answers "what am
+      // I using".
+      expect(result.output).toContain("### Providers and models");
     }
   });
 

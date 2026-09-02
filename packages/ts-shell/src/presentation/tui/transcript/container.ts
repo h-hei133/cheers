@@ -54,23 +54,6 @@ export class Transcript {
     return this.blocks.slice(Math.max(0, this.blocks.length - limit)).reverse();
   }
 
-  /**
-   * The last `rows` rows of what has already retired, re-rendered at `width`.
-   *
-   * Retired rows belong to the terminal and cannot be read back from it, so a
-   * drag across the part of them still on screen is answered from the blocks
-   * that produced them. Rendering is deterministic once a block is finalized, so
-   * this reproduces exactly what was written.
-   */
-  retiredTail(width: number, rows: number): readonly string[] {
-    if (rows <= 0 || this.frontier === 0) return EMPTY;
-    const output: string[] = [];
-    for (let index = this.frontier - 1; index >= 0 && output.length < rows; index--) {
-      output.unshift(...this.rowsFor(this.blocks[index]!, width));
-    }
-    return output.length <= rows ? output : output.slice(output.length - rows);
-  }
-
   /** Mark every live block finalized so the turn can retire. */
   finalizeAll(): void {
     for (let index = this.frontier; index < this.blocks.length; index++) {

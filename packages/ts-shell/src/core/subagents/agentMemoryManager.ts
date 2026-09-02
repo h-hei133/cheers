@@ -10,7 +10,7 @@ export interface AgentMemoryContext {
 }
 
 /**
- * AgentMemoryManager (Claude Code 2026 Aligned)
+ * AgentMemoryManager
  * Manages persistent agent memory directories (user, project, local) and MEMORY.md files.
  */
 export class AgentMemoryManager {
@@ -24,13 +24,13 @@ export class AgentMemoryManager {
     const cleanName = agentName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-");
 
     if (scope === "user") {
-      return path.join(os.homedir(), ".claude", "agent-memory", cleanName);
+      return path.join(os.homedir(), ".private-agents", "agent-memory", cleanName);
     }
     if (scope === "local") {
-      return path.join(this.workspaceRoot, ".claude", "agent-memory-local", cleanName);
+      return path.join(this.workspaceRoot, ".agents", "memory-local", cleanName);
     }
     // Default project scope
-    return path.join(this.workspaceRoot, ".claude", "agent-memory", cleanName);
+    return path.join(this.workspaceRoot, ".agents", "memory", cleanName);
   }
 
   loadMemory(agentName: string, scope: SubagentMemoryScope = "project"): AgentMemoryContext {

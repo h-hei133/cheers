@@ -5,6 +5,7 @@ import {
   createCliEscalationPromptHandler,
 } from "../../entrypoints/cliApprovalModule.js";
 import type { ApprovalModeObject } from "./approvalModeContract.js";
+import type { PermissionScope } from "./permissionScope.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
 import type { SessionManager } from "../../session/SessionManager.js";
@@ -24,6 +25,8 @@ export function createCliApprovalEscalationBridge(input: {
   readonly getApprovalModeObject: () => ApprovalModeObject | undefined;
   readonly sessionManager: SessionManager;
   readonly getSessionId: () => string;
+  /** How much the session may do before it has to ask. */
+  readonly getPermissionScope?: () => PermissionScope;
 }): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
   return createCliEscalationPromptHandler(
     input.renderer,
@@ -40,5 +43,6 @@ export function createCliApprovalEscalationBridge(input: {
         record,
       });
     },
+    input.getPermissionScope,
   );
 }

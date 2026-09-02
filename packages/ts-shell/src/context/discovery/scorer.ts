@@ -1,18 +1,25 @@
 import path from "node:path";
 import type { RepoIntelligenceFileRole, RepoScanProfile } from "./types.js";
 
+/**
+ * Directories a repository scan never descends into.
+ *
+ * Only build output is named. Tool state lives in dot-directories, and there is
+ * one of those for every tool anyone might have run here — enumerating them means
+ * the list is wrong the moment a new tool appears, so {@link isIgnoredDir} skips
+ * the whole shape instead.
+ */
 export const IGNORED_DIRS = new Set([
-  ".claude",
-  ".codex",
-  ".git",
-  ".omx",
-  ".sisyphus",
-  ".turbo",
   "coverage",
   "dist",
   "node_modules",
   "target",
 ]);
+
+/** Whether a scan should skip `name`: build output, or any tool's state. */
+export function isIgnoredDir(name: string): boolean {
+  return name.startsWith(".") || IGNORED_DIRS.has(name);
+}
 
 export const PATH_PRIORITY_PREFILL_LIMIT = 96;
 export const PATH_PRIORITY_SCAN_LIMIT = 5_000;

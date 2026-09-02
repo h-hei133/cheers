@@ -28,6 +28,7 @@ describe("interactive loop", () => {
       } as never,
       sessionRuntime: {
         getAgentMode: () => "build",
+      getPermissionScope: () => "ask",
         getCurrentRunController: () => null,
         observeEvents: () => () => undefined,
       } as never,
@@ -78,6 +79,7 @@ describe("interactive loop", () => {
       } as never,
       sessionRuntime: {
         getAgentMode: () => "build",
+      getPermissionScope: () => "ask",
         getCurrentRunController: () => null,
         observeEvents: () => () => undefined,
         terminate: () => undefined,

@@ -38,6 +38,14 @@ export interface Picker {
   load(): Promise<readonly Option[]>;
   /** Apply the choice, reporting what to show or to draft next. */
   apply(ids: readonly string[]): Promise<PickerOutcome | undefined>;
+  /**
+   * The selection changed but has not been applied. A picker whose subject is
+   * visible on screen can show what the choice would look like here — nothing is
+   * saved, and {@link previewEnd} puts the display back.
+   */
+  previewChange?(ids: readonly string[]): void;
+  /** The picker closed without applying; drop any preview. */
+  previewEnd?(): void;
 }
 
 /** Rows the inline panel is allowed to occupy. */
@@ -61,6 +69,7 @@ export class OverlayHost {
 
   /** Open `picker`, loading its options in the background. */
   open(picker: Picker): void {
+    this.picker?.previewEnd?.();
     this.picker = picker;
     this.loading = true;
     this.model.setOptions([]);
@@ -82,6 +91,7 @@ export class OverlayHost {
   }
 
   close(): void {
+    this.picker?.previewEnd?.();
     this.picker = undefined;
     this.loading = false;
     this.onChange();
@@ -121,8 +131,12 @@ export class OverlayHost {
         this.model.step(1);
         break;
       case "space":
-        if (picker.multiple) this.model.toggle();
-        else this.model.appendFilter(" ");
+        if (picker.multiple) {
+          this.model.toggle();
+          picker.previewChange?.(this.model.chosenIds());
+        } else {
+          this.model.appendFilter(" ");
+        }
         break;
       case "backspace":
         this.model.backspaceFilter();
@@ -140,7 +154,11 @@ export class OverlayHost {
 
   private accept(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void): void {
     const ids = picker.multiple ? this.model.chosenIds() : idsOf(this.model.current());
-    this.close();
+    // Applying is what makes a preview real, so the preview is not rolled back
+    // here — `apply` is about to persist exactly what is on screen.
+    this.picker = undefined;
+    this.loading = false;
+    this.onChange();
     // A single-select picker with nothing under the cursor has no answer to
     // apply; a multi-select one applying an empty set is a real choice.
     if (ids.length > 0 || picker.multiple) apply(picker, ids);

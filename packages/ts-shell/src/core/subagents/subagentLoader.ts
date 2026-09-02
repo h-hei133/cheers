@@ -47,7 +47,7 @@ export class SubagentLoader {
 
   constructor(workspaceRoot: string = process.cwd()) {
     this.workspaceRoot = path.resolve(workspaceRoot);
-    this.userAgentsDir = path.join(os.homedir(), ".claude", "agents");
+    this.userAgentsDir = path.join(os.homedir(), ".private-agents", "agents");
   }
 
   loadAllSubagents(): ReadonlyMap<string, SubagentDefinition> {
@@ -58,11 +58,11 @@ export class SubagentLoader {
       registry.set(agent.name.toLowerCase(), agent);
     }
 
-    // 2. User-level agents (~/.claude/agents/*.md)
+    // 2. User-level agents (~/.private-agents/agents/*.md)
     this.scanDirectory(this.userAgentsDir, "user", registry);
 
-    // 3. Project-level agents (.claude/agents/*.md and .agents/*.md) (highest priority)
-    this.scanDirectory(path.join(this.workspaceRoot, ".claude", "agents"), "project", registry);
+    // 3. Project-level agents (.agents/agents/*.md and .agents/*.md) (highest priority)
+    this.scanDirectory(path.join(this.workspaceRoot, ".agents", "agents"), "project", registry);
     this.scanDirectory(path.join(this.workspaceRoot, ".agents"), "project", registry);
 
     return registry;

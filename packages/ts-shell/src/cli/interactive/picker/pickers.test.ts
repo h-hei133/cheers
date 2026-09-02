@@ -38,52 +38,15 @@ describe("copy chooser", () => {
     return transcript;
   }
 
-  it("offers the drag toggle first, so it is reachable with nothing to copy", async () => {
-    const picker = copyPicker({
-      transcript: new Transcript(),
-      context: CONTEXT,
-      mouseCopy: false,
-      toggleMouseCopy: async () => undefined,
-    });
-
-    const options = await picker.load();
-    expect(options[0]?.label).toBe("drag to copy: off");
-  });
-
-  it("names the toggle by what it would become, not what it is", async () => {
-    const picker = copyPicker({
-      transcript: new Transcript(),
-      context: CONTEXT,
-      mouseCopy: true,
-      toggleMouseCopy: async () => undefined,
-    });
-
-    expect((await picker.load())[0]?.label).toBe("drag to copy: on");
-  });
-
-  it("flips the setting when the toggle is chosen", async () => {
-    const toggle = vi.fn(async () => "saved");
-    const picker = copyPicker({
-      transcript: new Transcript(),
-      context: CONTEXT,
-      mouseCopy: false,
-      toggleMouseCopy: toggle,
-    });
-
-    expect(await picker.apply(["drag"])).toEqual({ note: "saved" });
-    expect(toggle).toHaveBeenCalledWith(true);
-  });
-
   it("lists the newest block first and skips empty ones", async () => {
-    const picker = copyPicker({
-      transcript: transcriptWith("older answer", "   ", "newer answer"),
-      context: CONTEXT,
-      mouseCopy: false,
-      toggleMouseCopy: async () => undefined,
-    });
+    const picker = copyPicker(transcriptWith("older answer", "   ", "newer answer"), CONTEXT);
 
-    const details = (await picker.load()).slice(1).map((option) => option.detail);
+    const details = (await picker.load()).map((option) => option.detail);
     expect(details).toEqual(["newer answer", "older answer"]);
+  });
+
+  it("has nothing to offer for an empty transcript", async () => {
+    expect(await copyPicker(new Transcript(), CONTEXT).load()).toEqual([]);
   });
 });
 

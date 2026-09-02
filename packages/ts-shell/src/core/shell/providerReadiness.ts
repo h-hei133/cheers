@@ -271,7 +271,7 @@ function getProviderLabel(provider: RuntimeProvider): string {
     case "antigravity":
       return "Antigravity (OpenAI-compatible)";
     case "claudecode":
-      return "ClaudeCode (OpenAI-compatible)";
+      return "Anthropic-compatible proxy";
     default:
       return "OpenAI";
   }

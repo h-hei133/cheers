@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { routeKey, type KeymapActions } from "./keymap.js";
 import { InteractiveSurface } from "./frameSurface.js";
 import { parseKeyEvent } from "../../presentation/tui/input/keys.js";
+import { KEY_BINDINGS } from "../../presentation/tui/chrome/keys.js";
+import { dispatchedKeyIds } from "./keymap.js";
 
 function build(busy = false): {
   press: (data: string) => void;
@@ -30,6 +32,9 @@ function build(busy = false): {
     clearScreen: vi.fn(),
     redrawAfter: vi.fn(),
     cycleAgentMode: vi.fn(),
+    cyclePermissionScope: vi.fn(),
+    retry: vi.fn(),
+    expandDraft: vi.fn(),
     syncSuggestions: vi.fn(),
   };
   const clock = { now: 0 };
@@ -292,5 +297,46 @@ describe("editing shortcuts", () => {
     const { press, actions } = build();
     press("\x0c");
     expect(actions.clearScreen).toHaveBeenCalledOnce();
+  });
+});
+
+describe("keys the catalogue promises", () => {
+  it("binds every key the guide lists, and lists every key it binds", () => {
+    // The guide is what a user reads to learn the surface. A key in one list and
+    // not the other is either a promise nothing keeps or a feature nobody finds.
+    const advertised = new Set(KEY_BINDINGS.flatMap((binding) => binding.keys));
+    const dispatched = new Set(dispatchedKeyIds());
+
+    expect([...dispatched].filter((key) => !advertised.has(key))).toEqual([]);
+  });
+});
+
+describe("permission scope key", () => {
+  it("cycles the scope without touching the draft", () => {
+    const { press, actions, surface } = build();
+    surface.editor.insert("draft");
+    press("\x1bp");
+
+    expect(actions.cyclePermissionScope).toHaveBeenCalledTimes(1);
+    expect(surface.editor.getText()).toBe("draft");
+  });
+});
+
+describe("expanding the draft", () => {
+  it("hands ctrl+o to the host rather than typing a control character", () => {
+    const { press, actions, surface } = build();
+    press("\x0f");
+
+    expect(actions.expandDraft).toHaveBeenCalledTimes(1);
+    expect(surface.editor.getText()).toBe("");
+  });
+});
+
+describe("retry key", () => {
+  it("asks for a retry on f5", () => {
+    const { press, actions } = build();
+    press("\x1b[15~");
+
+    expect(actions.retry).toHaveBeenCalledTimes(1);
   });
 });

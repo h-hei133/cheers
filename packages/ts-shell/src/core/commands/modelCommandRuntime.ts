@@ -7,6 +7,9 @@ import {
 } from "../../config/runtimeConfig.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
+import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
+import { refreshCatalog } from "../models/catalogRefresh.js";
+import { renderCatalog } from "../models/catalogSurface.js";
 
 const MODELS_DEV_API_URL = "https://models.dev/api.json";
 const OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS = [
@@ -40,8 +43,31 @@ export async function runModelCommand(
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
   const [action, ...rest] = args;
-  if (!action || action === "status") {
+  if (!action) {
+    return { kind: "local", output: renderCatalogView() };
+  }
+  if (action === "status") {
     return { kind: "local", output: renderModelStatus() };
+  }
+  if (action === "refresh") {
+    const result = await refreshCatalog();
+    return {
+      kind: "local",
+      output: result.ok
+        ? `Catalogue refreshed: ${result.providers} providers, ${result.models} models, cached in \`${result.cachePath}\`. Your own entries in \`${userCatalogPath()}\` still win.`
+        : `Catalogue refresh failed (${result.error}). The shipped catalogue is unchanged and still complete.`,
+    };
+  }
+  if (action === "config") {
+    const path = ensureUserCatalog();
+    return {
+      kind: "local",
+      output: [
+        `Your provider file is \`${path}\`.`,
+        "",
+        "An entry with a known provider id patches it — a different base URL, extra models, a different key variable. An unknown id adds a provider outright.",
+      ].join("\n"),
+    };
   }
 
   if (action === "list" || action === "ls") {
@@ -76,6 +102,30 @@ export async function runModelCommand(
   }
   return { kind: "local", output: await setModel(args, _context) };
 }
+/**
+ * The catalogue, with this session's connection state folded in.
+ *
+ * Bare `/model` answers "what can I use", which is a question about providers and
+ * models together — the old bare form answered "what am I using", which is
+ * `/model status`.
+ */
+function renderCatalogView(): string {
+  const config = readUserRuntimeConfigFile();
+  const connections = normalizeConnections(config);
+  const activeId = config.activeProviderConnectionId?.trim();
+  const active = connections.find((item) => item.id === activeId);
+  const activeProvider = active?.provider ?? config.provider;
+  return renderCatalog({
+    providers: loadCatalog(),
+    connected: new Set(connections.map((connection) => connection.provider)),
+    activeProvider,
+    activeModel:
+      normalizeText(active?.model) ??
+      normalizeText(activeProvider ? config.providerCredentials?.[activeProvider]?.model : undefined),
+    configPath: userCatalogPath(),
+  });
+}
+
 function renderModelStatus(): string {
   const config = readUserRuntimeConfigFile();
   const connections = normalizeConnections(config);
@@ -259,9 +309,19 @@ async function listModels(args: string[]): Promise<string> {
 }
 
 async function setModel(args: string[], context?: CommandContext): Promise<string> {
-  const model = args[0]?.trim();
-  if (!model) {
-    return "Usage: /model use <model-id>";
+  const target = args[0]?.trim();
+  if (!target) {
+    return "Usage: /model use <provider>/<model>, or /model use <model> to keep the current provider.";
+  }
+  // A `provider/model` target names both; a bare name keeps the active provider.
+  // Model ids can themselves contain slashes, so only a leading segment that is a
+  // known provider is read as one.
+  const separator = target.indexOf("/");
+  const prefix = separator > 0 ? target.slice(0, separator) : undefined;
+  const namedProvider = prefix && loadCatalog().some((entry) => entry.id === prefix) ? prefix : undefined;
+  const model = namedProvider ? target.slice(separator + 1) : target;
+  if (namedProvider && !model) {
+    return `\`${namedProvider}\` has no models listed. Name one: /model use ${namedProvider}/<model>.`;
   }
   const config = readUserRuntimeConfigFile();
   const connections = normalizeConnections(config);
@@ -288,6 +348,17 @@ async function setModel(args: string[], context?: CommandContext): Promise<strin
   }
   if (!activeConnection) {
     return `Active connection not found: ${activeId}`;
+  }
+  // Switching model and switching provider are different acts with different
+  // consequences — the second needs a credential — so a target naming a provider
+  // that is not the active one is refused rather than half-applied.
+  if (namedProvider && namedProvider !== activeConnection.provider) {
+    return [
+      `\`${model}\` belongs to \`${namedProvider}\`, and the active connection is \`${activeConnection.provider}\`.`,
+      "",
+      `Connect that provider first: /connect login ${namedProvider} --api-key <key>`,
+      "Then switch to it with /connect use <connection-id>.",
+    ].join("\n");
   }
 
   if (
