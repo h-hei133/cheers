@@ -1,3 +1,4 @@
+import { recordLastAssistantResponse } from "../../core/commands/copyCommandRuntime.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { RendererSink } from "../../renderer/StreamingRenderer.js";
 import type { Block } from "../../presentation/tui/transcript/blocks.js";
@@ -155,6 +156,9 @@ export class TurnSink implements RendererSink {
   private finalizeAssistant(): void {
     if (!this.assistant) return;
     this.assistant.finalized = true;
+    // `/copy` with no argument copies the last answer; without this it had
+    // nothing recorded to copy.
+    recordLastAssistantResponse(this.assistant.text);
     this.assistant = undefined;
   }
 

@@ -83,10 +83,12 @@ export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string |
     case "provider":
       return defaultTheme.dim(facts.provider);
     case "agent-mode":
-      // The default mode is not worth a segment; a non-default one always is.
-      return facts.agentMode && facts.agentMode !== "build"
+      // Always shown: Shift+Tab toggles this, and a toggle whose state is
+      // invisible half the time is a toggle nobody trusts.
+      if (!facts.agentMode) return undefined;
+      return facts.agentMode === "plan"
         ? defaultTheme.fg("warning", facts.agentMode)
-        : undefined;
+        : defaultTheme.dim(facts.agentMode);
     case "branch":
       return facts.branch ? defaultTheme.fg("success", facts.branch) : undefined;
     case "directory":

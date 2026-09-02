@@ -58,6 +58,8 @@ export interface InteractiveCommandRouterResult {
   readonly turnNumber: number;
   readonly refreshPromptChrome?: boolean;
   readonly refreshMcpGateway?: boolean;
+  /** The user asked to leave; the host owns handing the terminal back. */
+  readonly exitRequested?: boolean;
 }
 
 export async function routeInteractiveCommand(
@@ -96,6 +98,10 @@ export async function routeInteractiveCommand(
       refreshPromptChrome: true,
       refreshMcpGateway: true,
     };
+  }
+
+  if (isShellAction(slashResult, "exit-session")) {
+    return { turnNumber: nextTurnNumber, exitRequested: true };
   }
 
   if (isShellAction(slashResult, "cancel-run")) {

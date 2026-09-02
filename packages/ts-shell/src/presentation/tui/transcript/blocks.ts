@@ -1,5 +1,5 @@
 import { defaultTheme } from "../../theme/theme.js";
-import { wrapToWidth, widthPad } from "../text/layout.js";
+import { wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { renderDiff } from "./diff.js";
 import { renderMarkdown, trimPartialFence } from "./markdown.js";
@@ -61,18 +61,20 @@ export function renderBlock(block: Block, width: number): readonly string[] {
 }
 
 /**
- * The prompt echo, shaded across the full width so the eye can find turn
- * boundaries while scrolling back through a long session.
+ * The prompt echo, marked by an accent rail rather than a full-width shade.
+ *
+ * A shade has to pad every row out to the frame width, and that padding is what
+ * a terminal hands over when the user drags across several rows — the pasted
+ * text comes back separated by runs of spaces. The rail reads just as clearly and
+ * emits no trailing cells at all.
  */
 function renderUser(block: Block, width: number): readonly string[] {
-  const shade = "\x1b[48;5;236m";
+  const rail = defaultTheme.fg("accent", "▌");
   const rows: string[] = [];
   const bodyWidth = Math.max(1, width - 4);
   const wrapped = block.text.split("\n").flatMap((line) => wrapToWidth(line, bodyWidth));
-  for (let index = 0; index < wrapped.length; index++) {
-    const marker = index === 0 ? "\x1b[36m❯\x1b[39m " : "  ";
-    const body = `${GUTTER}${marker}\x1b[97m${wrapped[index]}\x1b[39m`;
-    rows.push(`${shade}${body}${widthPad(body, width)}\x1b[0m`);
+  for (const line of wrapped) {
+    rows.push(`${GUTTER}${rail} \x1b[97m${line}\x1b[39m`);
   }
   rows.push("");
   return rows;

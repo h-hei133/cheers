@@ -3,7 +3,9 @@ import type { CommandContext } from "../../../core/commands/types.js";
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
 import type { SessionManager } from "../../../session/SessionManager.js";
 import type { StatusItemId } from "../../../presentation/tui/chrome/items.js";
+import type { Transcript } from "../../../presentation/tui/transcript/container.js";
 import type { Picker } from "../overlay.js";
+import { copyPicker } from "./copy.js";
 import { modelPicker } from "./model.js";
 import { permissionPicker } from "./permissions.js";
 import { pluginPicker } from "./plugins.js";
@@ -22,6 +24,7 @@ import { statusItemPicker } from "./statusItems.js";
 
 export interface PickerHost {
   readonly commandContext: CommandContext;
+  readonly transcript: Transcript;
   readonly sessionManager: SessionManager;
   readonly mcpGateway: CliMcpGateway;
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
@@ -37,6 +40,7 @@ type PickerFactory = (host: PickerHost) => Picker;
 
 const PICKERS: Record<string, PickerFactory> = {
   model: (host) => modelPicker(host.commandContext),
+  copy: (host) => copyPicker(host.transcript, host.commandContext),
   resume: (host) => sessionPicker({ sessionManager: host.sessionManager, resume: host.resumeSession }),
   mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer }),
   connect: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer }),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Editor } from "./editor.js";
 import { CURSOR_MARKER } from "./render/paint.js";
+import { stripAnsi } from "./text/ansi.js";
 
 /** Render with the cursor marker made visible as a pipe. */
 function shown(editor: Editor, width: number): string[] {
@@ -21,10 +22,13 @@ describe("text entry", () => {
     expect(editor.getText()).toBe("a  b");
   });
 
-  it("shows a placeholder for an empty prompt", () => {
+  it("shows a dimmed placeholder for an empty prompt", () => {
+    // Dim, because the hint is not the user's text and should not read like it.
     const editor = new Editor();
     editor.placeholder = "Ask anything";
-    expect(shown(editor, 20)).toEqual(["|Ask anything"]);
+    const rendered = shown(editor, 20)[0]!;
+    expect(stripAnsi(rendered)).toBe("|Ask anything");
+    expect(rendered).toContain("\x1b[2");
   });
 
   it("omits the caret marker when it does not hold focus", () => {

@@ -104,6 +104,12 @@ export const SLASH_COMMANDS = [
     summary: "clear conversation context and start fresh",
   },
   {
+    name: "statusline",
+    aliases: ["status"],
+    group: "workspace",
+    summary: "choose which facts the status band keeps in view",
+  },
+  {
     name: "review",
     aliases: ["audit", "check"],
     group: "workflow",
@@ -265,101 +271,44 @@ export function renderSessionCommandMap(
   }
 }
 
+const GROUP_TITLES: Record<SlashCommandSpec["group"], string> = {
+  session: "Session",
+  workspace: "Workspace",
+  workflow: "Workflow",
+  diagnostics: "Diagnostics",
+};
+
+/**
+ * The command guide, generated from the registry.
+ *
+ * A hand-written guide drifts the moment a command is added or retired — it kept
+ * advertising commands the router had already stopped accepting. Generating it
+ * means the guide cannot describe a command that does not exist, and cannot omit
+ * one that does.
+ */
 export function renderUserHelp(renderer: SlashCommandLineRenderer): void {
-  renderer.renderLine("\nSlash command guide");
-  renderer.renderLine("Next actions (start here):");
-  renderer.renderLine(
-    "- /sessions               inspect active + recent sessions.",
-  );
-  renderer.renderLine(
-    "- /resume                 continue best recoverable context.",
-  );
-  renderer.renderLine(
-    "- /workspace status       confirm project/workdir binding.",
-  );
-  renderer.renderLine(
-    "- /diagnose               get actionable repo next step.",
-  );
+  const width = longestName(SLASH_COMMANDS);
+  renderer.renderLine("\nSlash commands");
+  for (const group of Object.keys(GROUP_TITLES) as SlashCommandSpec["group"][]) {
+    const commands = SLASH_COMMANDS.filter((command) => command.group === group);
+    if (commands.length === 0) continue;
+    renderer.renderLine(`\n${GROUP_TITLES[group]}`);
+    for (const command of commands) {
+      renderer.renderLine(`  /${command.name.padEnd(width)}  ${command.summary}`);
+    }
+  }
+  renderer.renderLine("\nKeys");
+  renderer.renderLine("  shift+tab   switch between planning and building");
+  renderer.renderLine("  tab         complete a command");
+  renderer.renderLine("  ctrl+j      insert a newline without sending");
+  renderer.renderLine("  esc         interrupt a run, or dismiss a chooser");
+  renderer.renderLine("  ctrl+l      clear the screen and scrollback");
   renderer.renderLine("");
+}
 
-  renderer.renderLine("Command groups:");
-  renderer.renderLine("1) Session & Continuation");
-  renderer.renderLine(
-    "- /sessions               session surface entrypoint (TTY: panel, non-TTY/print: overview).",
-  );
-  renderer.renderLine(
-    "- /sessions current       active session identity and resume readiness.",
-  );
-  renderer.renderLine(
-    "- /sessions list          recent sessions for current project context.",
-  );
-  renderer.renderLine(
-    "- /sessions switch <id|prefix|title|last>   switch active session + project context.",
-  );
-  renderer.renderLine(
-    "- /resume [id|prefix|title|last] resume recoverable context by reference.",
-  );
-  renderer.renderLine(
-    "- /continue [id] [text]   resume context and optionally run immediate follow-up.",
-  );
-  renderer.renderLine(
-    "- /restore preview --ledger-root <path> --authority-id <id> --all   preview guarded restore eligibility.",
-  );
-  renderer.renderLine(
-    "- /restore execute --ledger-root <path> --authority-id <id> --all --execute   explicitly restore eligible records.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("2) Workspace & Navigation");
-  renderer.renderLine(
-    "- /workspace status       show current project/workdir binding.",
-  );
-  renderer.renderLine(
-    "- /workspace attach <path> attach/switch active project target.",
-  );
-  renderer.renderLine(
-    "- /workspace recent       list recently attached project contexts.",
-  );
-  renderer.renderLine("- /cd <path>              quick attach by path.");
-  renderer.renderLine(
-    "- /pwd                    print current workspace status.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("3) Workflow & Runtime");
-  renderer.renderLine("- /cancel                 stop only the current run.");
-  renderer.renderLine("- /build                  switch to build mode.");
-  renderer.renderLine("- /plan                   switch to plan mode.");
-  renderer.renderLine(
-    "- /mode [status|plan|build] inspect or switch agent mode.",
-  );
-  renderer.renderLine("- /view user|developer    switch output verbosity.");
-  renderer.renderLine("");
-
-  renderer.renderLine("4) Diagnostics & Integrations");
-  renderer.renderLine(
-    "- /diagnose               repo-aware diagnosis and next action.",
-  );
-  renderer.renderLine(
-    "- /model status|list|use  inspect and switch active model.",
-  );
-  renderer.renderLine(
-    "- /mcp status|tools|doctor|refresh [server] inspect and recover MCP state.",
-  );
-  renderer.renderLine(
-    "- /permissions list|explain|revoke|reset inspect trust policy state.",
-  );
-  renderer.renderLine(
-    "- /connect status|login|use|logout|set ... provider connection management.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("Discovery tips:");
-  renderer.renderLine(
-    "- Unknown slash commands now return this guide path with quick actions.",
-  );
-  renderer.renderLine(
-    "- Use /help any time to get back to grouped command navigation.",
-  );
-  renderer.renderLine("");
+/** Longest command name, so summaries line up in one column. */
+function longestName(commands: readonly SlashCommandSpec[]): number {
+  let longest = 0;
+  for (const command of commands) longest = Math.max(longest, command.name.length);
+  return longest;
 }

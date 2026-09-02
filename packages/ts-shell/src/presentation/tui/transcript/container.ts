@@ -46,6 +46,14 @@ export class Transcript {
     return this.blocks[this.blocks.length - 1];
   }
 
+  /**
+   * The newest blocks first, including ones already retired into scrollback:
+   * a user copying an answer usually wants one that has scrolled away.
+   */
+  recent(limit: number): readonly Block[] {
+    return this.blocks.slice(Math.max(0, this.blocks.length - limit)).reverse();
+  }
+
   /** Mark every live block finalized so the turn can retire. */
   finalizeAll(): void {
     for (let index = this.frontier; index < this.blocks.length; index++) {

@@ -101,6 +101,10 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
         setActiveNonInteractiveApprovalMode: options.setActiveNonInteractiveApprovalMode,
       });
       turnNumber = result.turnNumber;
+      if (result.exitRequested) {
+        input.close();
+        return;
+      }
       if (result.refreshMcpGateway) mcpGateway = options.initialMcpGateway;
       if (result.refreshPromptChrome) {
         refreshInteractivePromptChrome({

@@ -1,24 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { renderBlock, textBlock } from "./blocks.js";
 import { visibleWidth } from "../text/measure.js";
+import { stripAnsi } from "../text/ansi.js";
 
 const WIDTH = 40;
 
 describe("prompt echo", () => {
-  it("shades the full width so turn boundaries are findable when scrolling back", () => {
+  it("marks the turn with a rail rather than a full-width shade", () => {
+    // Shading has to pad every row to the frame width, and that padding is what
+    // a terminal hands over when the user copies several rows at once.
     const rows = renderBlock(textBlock("user", "hello"), WIDTH);
-    expect(rows[0]).toContain("\x1b[48;5;236m");
-    expect(visibleWidth(rows[0]!)).toBe(WIDTH);
+    expect(rows[0]).toContain("\u258c");
+    expect(rows[0]).not.toContain("48;5;236");
   });
 
-  it("shades every wrapped row to the same width", () => {
+  it("emits no trailing whitespace on any row", () => {
     const rows = renderBlock(textBlock("user", "a".repeat(120)), WIDTH);
-    for (const row of rows.slice(0, -1)) expect(visibleWidth(row)).toBe(WIDTH);
+    for (const row of rows.filter((candidate) => candidate.length > 0)) {
+      expect(stripAnsi(row)).toBe(stripAnsi(row).trimEnd());
+    }
   });
 
-  it("keeps the shading exact for wide characters", () => {
-    const rows = renderBlock(textBlock("user", "你好世界"), WIDTH);
-    expect(visibleWidth(rows[0]!)).toBe(WIDTH);
+  it("wraps within the frame for wide characters too", () => {
+    for (const row of renderBlock(textBlock("user", "\u4f60\u597d\u4e16\u754c".repeat(20)), WIDTH)) {
+      expect(visibleWidth(row)).toBeLessThanOrEqual(WIDTH);
+    }
   });
 });
 

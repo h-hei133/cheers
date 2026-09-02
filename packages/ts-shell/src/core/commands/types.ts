@@ -80,6 +80,7 @@ export interface ShellActionResult {
     | 'manage-permissions'
     | 'set-agent-mode'
     | 'show-agent-mode'
+    | 'exit-session'
   readonly sessionId?: string
   readonly viewMode?: 'compact' | 'verbose'
   readonly agentMode?: 'plan' | 'build'

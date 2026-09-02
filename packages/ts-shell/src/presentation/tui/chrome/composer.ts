@@ -1,6 +1,6 @@
 import { defaultTheme } from "../../theme/theme.js";
 import type { Editor } from "../editor.js";
-import { padToWidth } from "../text/layout.js";
+import { truncateToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 
 /**
@@ -30,6 +30,8 @@ export function renderComposer(editor: Editor, state: ComposerState, width: numb
   const textWidth = composerTextWidth(width);
   const rows = editor.render(textWidth);
   const cue = state.busy ? defaultTheme.fg("warning", CUE) : defaultTheme.fg("accent", CUE);
-  const rendered = rows.map((row, index) => (index === 0 ? cue : CONTINUATION) + row);
-  return rendered.map((row) => padToWidth(row, width));
+  // No trailing padding: the renderer erases to the end of each row anyway, and
+  // padding is what turns a multi-row selection into text separated by runs of
+  // spaces when the user copies it out of the terminal.
+  return rows.map((row, index) => truncateToWidth((index === 0 ? cue : CONTINUATION) + row, width));
 }

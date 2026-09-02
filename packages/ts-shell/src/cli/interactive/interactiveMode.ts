@@ -92,7 +92,7 @@ export class InteractiveMode {
     this.overlay = new OverlayHost(() => this.tui.requestRender());
     this.tui = new TUI(this.terminal, options.scheduler, resizeScrollbackMode(process.env));
     this.surface = new InteractiveSurface({
-      facts: () => readStatusFacts(this.options.runtimeContext),
+      facts: () => readStatusFacts(this.options.runtimeContext, this.options.sessionRuntime.getAgentMode()),
       statusItems: () => this.statusItems,
       activity: () => this.sink.activity(),
       busy: () => this.busy,
@@ -146,7 +146,7 @@ export class InteractiveMode {
 
   /** Intro facts, resolved at paint time so a mid-session change is reflected. */
   private welcomeState(): WelcomeState {
-    const facts = readStatusFacts(this.options.runtimeContext);
+    const facts = readStatusFacts(this.options.runtimeContext, this.options.sessionRuntime.getAgentMode());
     return {
       model: facts.model,
       directory: facts.directory ?? this.options.runtimeContext.projectRoot,
@@ -233,6 +233,7 @@ export class InteractiveMode {
   /** Execute one submission, then drain anything typed while it ran. */
   private async run(text: string): Promise<void> {
     this.busy = true;
+    let exiting = false;
     const command = text.startsWith("/") ? text.split(/\s+/)[0]! : "turn";
     this.sink.begin(text.startsWith("/") ? "command" : "turn", command);
     this.options.renderer.setSink(this.sink);
@@ -253,6 +254,7 @@ export class InteractiveMode {
           this.options.setActiveNonInteractiveApprovalMode ?? (() => {}),
       });
       this.turnNumber = result.turnNumber;
+      if (result.exitRequested) exiting = true;
     } catch (error) {
       this.surface.transcript.append(
         textBlock("error", error instanceof Error ? error.message : String(error), "error"),
@@ -261,6 +263,10 @@ export class InteractiveMode {
       this.options.renderer.clearSink();
       this.sink.end();
       this.busy = false;
+      if (exiting) {
+        this.shutdown();
+        return;
+      }
       this.tui.requestRender();
       const next = this.queue.shift();
       if (next !== undefined) void this.run(next);
@@ -293,6 +299,7 @@ export class InteractiveMode {
   private pickerHost(): PickerHost {
     return {
       commandContext: { cwd: this.options.runtimeContext.cwd, sessionId: this.options.runtimeContext.session.id },
+      transcript: this.surface.transcript,
       sessionManager: this.options.sessionManager,
       mcpGateway: this.options.initialMcpGateway,
       approvalTrustPolicy: this.options.approvalTrustPolicy,
@@ -329,8 +336,6 @@ export class InteractiveMode {
   private cycleAgentMode(): void {
     const next = this.options.sessionRuntime.getAgentMode() === "plan" ? "build" : "plan";
     this.options.sessionRuntime.setAgentMode(next);
-    const config = this.options.runtimeContext.runtimeConfig as { agentMode?: "plan" | "build" };
-    config.agentMode = next;
     this.tui.requestRender();
   }
 

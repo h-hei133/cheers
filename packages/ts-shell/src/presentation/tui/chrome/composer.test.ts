@@ -4,6 +4,7 @@ import { newlineKeyFor, renderHints } from "./hints.js";
 import { renderWelcome } from "./welcome.js";
 import { Editor } from "../editor.js";
 import { visibleWidth } from "../text/measure.js";
+import { stripAnsi } from "../text/ansi.js";
 import { CURSOR_MARKER } from "../render/paint.js";
 
 const idle = { busy: false };
@@ -19,11 +20,12 @@ describe("prompt block", () => {
     expect(rows[1]).not.toContain("╰─");
   });
 
-  it("pads every row to the full width", () => {
+  it("emits no trailing padding, so a copied region has no runs of spaces", () => {
     const editor = new Editor();
     editor.insert("你好");
     for (const row of renderComposer(editor, idle, 40)) {
-      expect(visibleWidth(row)).toBe(40);
+      expect(visibleWidth(row)).toBeLessThanOrEqual(40);
+      expect(stripAnsi(row)).toBe(stripAnsi(row).trimEnd());
     }
   });
 

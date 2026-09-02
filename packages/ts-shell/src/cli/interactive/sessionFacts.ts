@@ -27,8 +27,14 @@ export function activeModelName(context: ShellRuntimeContext): string {
   return config.providerCredentials?.[config.provider]?.model ?? config.provider;
 }
 
-/** Facts the status band can draw from, derived from runtime state and usage. */
-export function readStatusFacts(context: ShellRuntimeContext): StatusFacts {
+/**
+ * Facts the status band can draw from.
+ *
+ * `agentMode` comes from the caller rather than the resolved configuration: the
+ * configuration does not carry it, and the live value is the one Shift+Tab
+ * changes.
+ */
+export function readStatusFacts(context: ShellRuntimeContext, agentMode?: string): StatusFacts {
   const usage = getSessionUsage(context.session.id);
   const cost = estimateUsageCost(usage);
   return {
@@ -37,7 +43,7 @@ export function readStatusFacts(context: ShellRuntimeContext): StatusFacts {
     branch: context.gitContext.branch ?? undefined,
     directory: shortenPath(context.projectRoot || path.resolve(".")),
     sessionId: context.session.id,
-    agentMode: context.runtimeConfig.agentMode,
+    agentMode: agentMode ?? context.runtimeConfig.agentMode ?? "build",
     openTodos: getSessionTodos().filter((todo) => todo.status !== "done").length,
     // Absent until a real request has been accounted for: a zeroed gauge is a
     // fabricated fact, not a neutral one.

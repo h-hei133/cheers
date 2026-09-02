@@ -63,8 +63,9 @@ describe("status items", () => {
     expect(stripAnsi(renderStatusItem("cost", { ...facts, costUsd: 0.0142 }) ?? "")).toBe("$0.0142");
   });
 
-  it("shows the agent mode only when it is not the default", () => {
-    expect(renderStatusItem("agent-mode", facts)).toBeUndefined();
+  it("always shows the agent mode, because a key toggles it", () => {
+    // A toggle whose state is invisible half the time is a toggle nobody trusts.
+    expect(stripAnsi(renderStatusItem("agent-mode", facts) ?? "")).toBe("build");
     expect(stripAnsi(renderStatusItem("agent-mode", { ...facts, agentMode: "plan" }) ?? "")).toBe("plan");
   });
 

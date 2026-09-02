@@ -235,7 +235,8 @@ export class Editor {
   render(width: number): string[] {
     const cells = Math.max(1, width);
     if (this.lines.length === 1 && this.lines[0] === "" && this.placeholder) {
-      return [this.focused ? `${CURSOR_MARKER}${this.placeholder}` : this.placeholder];
+      const hint = `\x1b[2;90m${this.placeholder}\x1b[0m`;
+      return [this.focused ? `${CURSOR_MARKER}${hint}` : hint];
     }
     const rendered: string[] = [];
     for (let index = 0; index < this.lines.length; index++) {

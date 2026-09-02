@@ -1,21 +1,14 @@
 import type { CommandContext, CommandExecutionResult } from "./types.js";
 
-export function runExitCommand(
-  _context: CommandContext,
-): CommandExecutionResult {
-  if (process.stdout.isTTY && !process.env.VITEST && process.env.NODE_ENV !== "test") {
-    // Restore normal screen if in Alt-screen
-    process.stdout.write("\x1b[?1049l\x1b[?25h\nGoodbye!\n");
-  }
-
-  // Only trigger process.exit if not running inside a test environment
-  if (!process.env.VITEST && process.env.NODE_ENV !== "test") {
-    setTimeout(() => {
-      process.exit(0);
-    }, 50);
-  }
-  return {
-    kind: "local",
-    output: "Exiting session... Goodbye!",
-  };
+/**
+ * `/exit`
+ *
+ * Returns an action rather than leaving on its own. A command that writes to
+ * stdout and then schedules `process.exit` races the host that owns the screen:
+ * the raw bytes scroll the frame, the anchor goes stale, and the shell's next
+ * prompt lands in the middle of the leftover paint. Only the host knows how to
+ * hand the terminal back, so only the host does it.
+ */
+export function runExitCommand(_context: CommandContext): CommandExecutionResult {
+  return { kind: "shell-action", action: "exit-session" };
 }

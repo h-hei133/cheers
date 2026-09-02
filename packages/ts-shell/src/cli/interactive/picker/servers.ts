@@ -20,9 +20,8 @@ export interface ServerPickerOptions {
 export function serverPicker(options: ServerPickerOptions): Picker {
   return {
     title: "Servers",
-    form: "modal",
+    form: "panel",
     empty: "No servers configured.",
-    detailRows: 2,
     async load(): Promise<readonly Option[]> {
       const snapshot = await options.gateway.snapshot();
       const toolCounts = countTools(snapshot.tools);
