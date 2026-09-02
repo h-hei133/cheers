@@ -1,10 +1,7 @@
 import { execSync } from "node:child_process";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
-import { renderDiff } from "../../presentation/tui/transcript/diff.js";
 
-/** Preview width for the undo diff, which renders into command text rather than a frame. */
-const DIFF_PREVIEW_WIDTH = 120;
 
 /**
  * /undo (aliases: /rewind, /revert)
@@ -76,7 +73,9 @@ export async function runUndoCommand(
         stdio: ["pipe", "pipe", "ignore"],
       }).trim();
       if (rawDiff) {
-        diffPreview = `\n### 📝 Modified Changes (Diff Preview):\n${renderDiff(rawDiff, DIFF_PREVIEW_WIDTH).join("\n")}`;
+        // Fenced rather than pre-coloured: the surface owns colour and width,
+        // and a pre-coloured string cannot be refitted when the frame resizes.
+        diffPreview = `\n### Modified changes\n\n\u0060\u0060\u0060diff\n${rawDiff}\n\u0060\u0060\u0060`;
       }
     } catch {
       // Diff best-effort

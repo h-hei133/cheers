@@ -52,7 +52,7 @@ export function renderWorkspaceSummary(
     `- Session project binding: ${runtimeContext.session.projectRoot}`,
   );
   renderer.renderLine(
-    "Next actions: /workspace recent, /workspace attach <path>, /sessions",
+    "Next actions: /workspace recent, /workspace attach <path>, /resume",
   );
   renderer.renderLine("");
 }

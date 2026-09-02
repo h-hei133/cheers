@@ -4,7 +4,7 @@ import {
   type StatusItemId,
 } from "../../../presentation/tui/chrome/items.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
-import type { Picker } from "../overlay.js";
+import type { Picker, PickerOutcome } from "../overlay.js";
 
 /**
  * Status band chooser.
@@ -34,8 +34,9 @@ export function statusItemPicker(options: StatusItemPickerOptions): Picker {
         selected: chosen.has(item.id),
       }));
     },
-    async apply(ids: readonly string[]): Promise<string | undefined> {
-      return options.save(normalizeStatusItems(ids));
+    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
+      const note = await options.save(normalizeStatusItems(ids));
+      return note ? { note } : undefined;
     },
   };
 }

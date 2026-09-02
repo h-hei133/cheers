@@ -1,7 +1,7 @@
 import { getInstalledPlugins, runPluginCommand } from "../../../core/commands/pluginCommandRuntime.js";
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
-import type { Picker } from "../overlay.js";
+import type { Picker, PickerOutcome } from "../overlay.js";
 
 /**
  * Plugin chooser.
@@ -25,7 +25,7 @@ export function pluginPicker(context: CommandContext): Picker {
         selected: plugin.enabled,
       }));
     },
-    async apply(ids: readonly string[]): Promise<string | undefined> {
+    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const wanted = new Set(ids);
       const notes: string[] = [];
       for (const plugin of getInstalledPlugins()) {
@@ -34,7 +34,7 @@ export function pluginPicker(context: CommandContext): Picker {
         const result = await runPluginCommand([shouldEnable ? "enable" : "disable", plugin.name], context);
         if (result.kind === "local") notes.push(result.output);
       }
-      return notes.length > 0 ? notes.join("\n") : "No plugin changes.";
+      return { note: notes.length > 0 ? notes.join("\n") : "No plugin changes." };
     },
   };
 }

@@ -15,14 +15,10 @@ export interface SlashCommandSpec {
 
 export const SLASH_COMMANDS = [
   {
-    name: "sessions",
-    group: "session",
-    summary: "inspect active and recent sessions",
-  },
-  {
     name: "resume",
+    aliases: ["sessions", "session"],
     group: "session",
-    summary: "continue best recoverable context",
+    summary: "pick, inspect, switch, or continue a session",
   },
   {
     name: "continue",
@@ -254,14 +250,14 @@ export function renderSessionCommandMap(
     compact ? "Session command map:" : "\nSession command map",
   );
   renderer.renderLine(
-    "- /sessions            open the session surface (interactive panel in TTY; overview in print/non-TTY).",
+    "- /resume              open the session surface (interactive panel in TTY; overview in print/non-TTY).",
   );
-  renderer.renderLine("- /sessions current    inspect the active session.");
+  renderer.renderLine("- /resume current      inspect the active session.");
   renderer.renderLine(
-    "- /sessions list       inspect recent sessions for this project.",
+    "- /resume list         inspect recent sessions for this project.",
   );
   renderer.renderLine(
-    "- /sessions switch <id|prefix|title|last> switch active session and project context.",
+    "- /resume switch <id|prefix|title|last> switch active session and project context.",
   );
   renderer.renderLine(
     "- /resume [id|prefix|title|last] resume the best recoverable context.",

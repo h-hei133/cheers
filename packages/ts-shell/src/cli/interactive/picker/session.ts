@@ -1,6 +1,6 @@
 import type { SessionManager } from "../../../session/SessionManager.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
-import type { Picker } from "../overlay.js";
+import type { Picker, PickerOutcome } from "../overlay.js";
 
 /**
  * Session chooser for resuming.
@@ -26,9 +26,11 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     async load(): Promise<readonly Option[]> {
       return listSessions(options.sessionManager);
     },
-    async apply(ids: readonly string[]): Promise<string | undefined> {
+    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const sessionId = ids[0];
-      return sessionId ? options.resume(sessionId) : undefined;
+      if (!sessionId) return undefined;
+      const note = await options.resume(sessionId);
+      return note ? { note } : undefined;
     },
   };
 }

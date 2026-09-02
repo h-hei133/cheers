@@ -94,10 +94,23 @@ function renderTool(block: Block, width: number): readonly string[] {
   return rows;
 }
 
-/** A named non-tool block: slash command output, or a runtime error notice. */
+/**
+ * A named non-tool block: slash command output, or a runtime error notice.
+ *
+ * Command output is Markdown — the runtimes emit headings, tables, and fenced
+ * blocks — so it is rendered as Markdown rather than dumped as prose. That is the
+ * difference between a wall of text with literal `##` in it and something a
+ * reader can scan.
+ */
 function renderLabelled(block: Block, glyph: string, width: number): readonly string[] {
   const rows = [`${GUTTER}${glyph} ${defaultTheme.bold(block.title ?? "")}`];
-  rows.push(...prose(block.text, width, BODY_INDENT));
+  const bodyWidth = Math.max(8, width - visibleWidth(BODY_INDENT));
+  for (const row of renderMarkdown(block.text.replace(/\s+$/, ""), bodyWidth)) {
+    rows.push(`${BODY_INDENT}${row}`);
+  }
+  if (block.diff) {
+    rows.push(...renderDiff(block.diff, bodyWidth).map((row) => `${BODY_INDENT}${row}`));
+  }
   rows.push("");
   return rows;
 }

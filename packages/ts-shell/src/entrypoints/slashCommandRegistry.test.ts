@@ -33,10 +33,10 @@ describe("slash command registry CLI surface", () => {
 
     expect(lines).toEqual([
       "Session command map:",
-      "- /sessions            open the session surface (interactive panel in TTY; overview in print/non-TTY).",
-      "- /sessions current    inspect the active session.",
-      "- /sessions list       inspect recent sessions for this project.",
-      "- /sessions switch <id|prefix|title|last> switch active session and project context.",
+      "- /resume              open the session surface (interactive panel in TTY; overview in print/non-TTY).",
+      "- /resume current      inspect the active session.",
+      "- /resume list         inspect recent sessions for this project.",
+      "- /resume switch <id|prefix|title|last> switch active session and project context.",
       "- /resume [id|prefix|title|last] resume the best recoverable context.",
       "- /help                show full command guide.",
     ]);

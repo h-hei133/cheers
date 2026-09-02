@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import { TurnSink } from "./turnSink.js";
 import { Transcript } from "../../presentation/tui/transcript/container.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
@@ -131,6 +132,67 @@ describe("prose channel", () => {
     expect(rendered).toContain("answer text");
     expect(rendered).toContain("blocked: needs approval");
     expect(rendered.indexOf("answer text")).toBeLessThan(rendered.indexOf("blocked"));
+  });
+});
+
+describe("fenced diffs in command output", () => {
+  const OUTPUT = [
+    "### Modified changes",
+    "",
+    "```diff",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "-const old = 1;",
+    "+const next = 2;",
+    "```",
+  ].join("\n");
+
+  it("renders a diff fence as a diff rather than as literal backticks", () => {
+    const { sink, rows } = build();
+    sink.begin("command", "/undo");
+    for (const line of OUTPUT.split("\n")) sink.line(line);
+    sink.end();
+
+    // Intra-line emphasis puts escapes inside the changed span, so the text is
+    // only a substring once the styling is stripped.
+    const rendered = stripAnsi(rows());
+    expect(rendered).not.toContain("```");
+    expect(rendered).toContain("const next = 2;");
+  });
+
+  it("keeps the prose around the diff", () => {
+    const { sink, rows } = build();
+    sink.begin("command", "/undo");
+    for (const line of OUTPUT.split("\n")) sink.line(line);
+    sink.end();
+
+    expect(rows()).toContain("Modified changes");
+  });
+
+  it("leaves output with no fence untouched", () => {
+    const { sink, rows } = build();
+    sink.begin("command", "/workspace");
+    sink.line("- Target: /workspace");
+    sink.end();
+
+    expect(rows()).toContain("Target: /workspace");
+  });
+});
+
+describe("out-of-band notices", () => {
+  it("records a fact that is not turn output as its own finalized block", () => {
+    const { sink, transcript, rows } = build();
+    sink.notify("Copied 42 characters.");
+
+    expect(rows()).toContain("Copied 42 characters.");
+    expect(transcript.last()?.finalized).toBe(true);
+  });
+
+  it("does not open a turn, so the activity row stays quiet", () => {
+    const { sink } = build();
+    sink.notify("Copied 42 characters.");
+
+    expect(sink.activity()).toBeUndefined();
   });
 });
 

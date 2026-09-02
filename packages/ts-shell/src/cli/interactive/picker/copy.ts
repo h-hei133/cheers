@@ -3,7 +3,7 @@ import type { CommandContext } from "../../../core/commands/types.js";
 import type { Block } from "../../../presentation/tui/transcript/blocks.js";
 import type { Transcript } from "../../../presentation/tui/transcript/container.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
-import type { Picker } from "../overlay.js";
+import type { Picker, PickerOutcome } from "../overlay.js";
 
 /**
  * Copy chooser.
@@ -16,26 +16,47 @@ import type { Picker } from "../overlay.js";
 
 const MAX_BLOCKS = 30;
 const SUMMARY_LENGTH = 70;
+const DRAG_ID = "drag";
 
-export function copyPicker(transcript: Transcript, context: CommandContext): Picker {
-  const blocks = transcript.recent(MAX_BLOCKS).filter((block) => block.text.trim().length > 0);
+export interface CopyPickerInput {
+  readonly transcript: Transcript;
+  readonly context: CommandContext;
+  /** Whether drag-to-copy currently owns the mouse. */
+  readonly mouseCopy: boolean;
+  toggleMouseCopy(enabled: boolean): Promise<string | undefined>;
+}
+
+export function copyPicker(input: CopyPickerInput): Picker {
+  const blocks = input.transcript.recent(MAX_BLOCKS).filter((block) => block.text.trim().length > 0);
   return {
-    title: "Copy block",
+    title: "Copy",
     form: "panel",
     empty: "Nothing in the transcript to copy yet.",
     async load(): Promise<readonly Option[]> {
-      return blocks.map<Option>((block, index) => ({
-        id: String(index),
-        label: label(block),
-        detail: summarise(block.text),
-        note: `${block.text.length} chars`,
-      }));
+      return [
+        {
+          id: DRAG_ID,
+          label: input.mouseCopy ? "drag to copy: on" : "drag to copy: off",
+          detail: input.mouseCopy
+            ? "selecting with the mouse copies the text without the layout; shift-drag for the terminal's own selection"
+            : "let a mouse drag copy text directly, stripped of gutters and padding",
+          note: "toggle",
+        },
+        ...blocks.map<Option>((block, index) => ({
+          id: String(index),
+          label: label(block),
+          detail: summarise(block.text),
+          note: `${block.text.length} chars`,
+        })),
+      ];
     },
-    async apply(ids: readonly string[]): Promise<string | undefined> {
-      const block = blocks[Number(ids[0])];
+    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
+      const chosen = ids[0];
+      if (chosen === DRAG_ID) return { note: await input.toggleMouseCopy(!input.mouseCopy) };
+      const block = blocks[Number(chosen)];
       if (!block) return undefined;
-      const result = await runCopyCommand([block.text], context);
-      return result.output;
+      const result = await runCopyCommand([block.text], input.context);
+      return { note: result.output };
     },
   };
 }

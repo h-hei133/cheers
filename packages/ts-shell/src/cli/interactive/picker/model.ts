@@ -2,7 +2,7 @@ import { readModelCatalog } from "../../../core/commands/modelCommandRuntime.js"
 import { runModelCommand } from "../../../core/commands/modelCommandRuntime.js";
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
-import type { Picker } from "../overlay.js";
+import type { Picker, PickerOutcome } from "../overlay.js";
 
 /**
  * Model chooser.
@@ -24,11 +24,11 @@ export function modelPicker(context: CommandContext): Picker {
         note: catalog.offline && model === catalog.active ? "offline catalog" : undefined,
       }));
     },
-    async apply(ids: readonly string[]): Promise<string | undefined> {
+    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const model = ids[0];
       if (!model) return undefined;
       const result = await runModelCommand(["use", model], context);
-      return result.kind === "local" ? result.output : undefined;
+      return result.kind === "local" ? { note: result.output } : undefined;
     },
   };
 }

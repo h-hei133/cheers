@@ -91,6 +91,10 @@ export class InteractiveSurface implements TerminalFrameProvider {
     this.transcript.beginReplay();
   }
 
+  retiredTail(width: number, rows: number): readonly string[] {
+    return this.transcript.retiredTail(width, rows);
+  }
+
   beginHistoryFlush(): void {
     this.transcript.beginFlush();
   }

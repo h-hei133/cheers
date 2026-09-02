@@ -3313,7 +3313,7 @@ describe("CLI streaming baseline (T3)", () => {
             expect(output).toContain("Session: sess_");
             expect(output).toContain("Next actions:");
             expect(output).toContain(
-              "- /resume      continue the best recoverable context.",
+              "- /resume             inspect sessions or continue work.",
             );
 
             const noisyWarnings =
@@ -3373,7 +3373,7 @@ describe("CLI streaming baseline (T3)", () => {
       "Switch target 'definitely-missing-target' was not found.",
     );
     expect(output).toContain(
-      "Hint: run /sessions list, then /sessions switch <id|prefix|title|last>.",
+      "Hint: run /resume list, then /resume switch <id|prefix|title|last>.",
     );
   }, 35000);
 
@@ -5072,7 +5072,7 @@ describe("CLI streaming baseline (T3)", () => {
             expect(output).toContain("Private Coding Agents Shell");
             expect(output).toContain("Next actions:");
             expect(output).toContain(
-              "- /resume      continue the best recoverable context.",
+              "- /resume             inspect sessions or continue work.",
             );
             expect(output.includes("approval> ")).toBe(false);
 

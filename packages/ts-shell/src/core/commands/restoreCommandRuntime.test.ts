@@ -65,7 +65,8 @@ describe("restore command runtime", () => {
       evidence: ["restore-command-runner:no-automatic-recovery"],
     });
 
-    expect(output).toContain("- Restored files: src/a.ts");
+    expect(output).toContain("**Restored**");
+    expect(output).toContain("- `src/a.ts`");
     expect(output).toContain("- Automatic recovery: no");
     expect(output).toContain("- Atomic rollback: no");
     expect(output).not.toContain("secret original content");

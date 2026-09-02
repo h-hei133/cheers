@@ -66,6 +66,15 @@ export class TurnSink implements RendererSink {
     this.onChange();
   }
 
+  /**
+   * Record a short fact that belongs in the transcript but is not turn output —
+   * a clipboard write, say. Finalized immediately, so it retires with the rest.
+   */
+  notify(text: string): void {
+    this.transcript.append({ kind: "notice", text: `  ${text}`, finalized: true });
+    this.onChange();
+  }
+
   /** Mark cancellation requested so the activity row stops implying progress. */
   markCancelling(): void {
     if (!this.running) return;
@@ -90,6 +99,7 @@ export class TurnSink implements RendererSink {
     if (!trimmed) return;
     const block = this.prose ?? this.openProse();
     block.text = block.text ? `${block.text}\n${trimmed}` : trimmed;
+    splitFencedDiff(block);
     this.onChange();
   }
 
@@ -202,4 +212,21 @@ export class TurnSink implements RendererSink {
     });
     this.onChange();
   }
+}
+
+const DIFF_FENCE = /```diff\n([\s\S]*?)```/;
+
+/**
+ * Move a fenced diff out of a block's prose and into its diff field.
+ *
+ * Commands that report changes already produce unified diffs; leaving them
+ * fenced renders them as a generic code block, losing the per-line colouring and
+ * the intra-line emphasis that make a diff readable at a glance.
+ */
+function splitFencedDiff(block: Block): void {
+  if (block.diff) return;
+  const match = DIFF_FENCE.exec(block.text);
+  if (!match) return;
+  block.diff = match[1]!.replace(/\s+$/, "");
+  block.text = block.text.replace(match[0], "").replace(/\n{3,}/g, "\n\n").trim();
 }

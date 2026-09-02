@@ -1,6 +1,6 @@
 import type { ApprovalTrustPolicy } from "../../../core/shell/approvalTrustPolicy.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
-import type { Picker } from "../overlay.js";
+import type { Picker, PickerOutcome } from "../overlay.js";
 
 /**
  * Trust grant chooser.
@@ -38,9 +38,11 @@ export function permissionPicker(options: PermissionPickerOptions): Picker {
         note: grantAge(grant.updatedAt ?? grant.createdAt),
       }));
     },
-    async apply(ids: readonly string[]): Promise<string | undefined> {
+    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const selector = ids[0];
-      return selector ? options.revoke(selector) : undefined;
+      if (!selector) return undefined;
+      const note = await options.revoke(selector);
+      return note ? { note } : undefined;
     },
   };
 }

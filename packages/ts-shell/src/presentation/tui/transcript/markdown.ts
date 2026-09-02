@@ -1,5 +1,5 @@
 import { defaultTheme } from "../../theme/theme.js";
-import { wrapToWidth } from "../text/layout.js";
+import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 
 /**
@@ -22,6 +22,8 @@ const BULLET = /^(\s*)([-*+])\s+(.*)$/;
 const ORDERED = /^(\s*)(\d+)[.)]\s+(.*)$/;
 const QUOTE = /^\s*>\s?(.*)$/;
 const RULE = /^\s*([-*_])\1{2,}\s*$/;
+const TABLE_ROW = /^\s*\|(.+)\|\s*$/;
+const TABLE_RULE = /^\s*\|[\s:|-]+\|\s*$/;
 
 /** Drop a trailing partial code fence so a streaming block does not flicker. */
 export function trimPartialFence(text: string): string {
@@ -53,6 +55,17 @@ export function renderMarkdown(text: string, width: number): string[] {
   let index = 0;
   while (index < lines.length) {
     const line = lines[index]!;
+    if (TABLE_ROW.test(line) && TABLE_RULE.test(lines[index + 1] ?? "")) {
+      const body: string[] = [];
+      let cursor = index + 2;
+      while (cursor < lines.length && TABLE_ROW.test(lines[cursor]!)) {
+        body.push(lines[cursor]!);
+        cursor += 1;
+      }
+      rows.push(...renderTable(line, body, cells));
+      index = cursor;
+      continue;
+    }
     const fence = FENCE.exec(line);
     if (fence) {
       const closing = fence[1]!;
@@ -70,6 +83,54 @@ export function renderMarkdown(text: string, width: number): string[] {
     index += 1;
   }
   return rows;
+}
+
+/**
+ * A pipe table, laid out in aligned columns.
+ *
+ * Left as source text a table is the least readable thing in a terminal — the
+ * pipes carry no alignment and every row wraps differently. Columns are sized to
+ * their content and then squeezed proportionally to fit the frame, because a
+ * table that overflows is worse than one with a truncated cell.
+ */
+function renderTable(header: string, body: readonly string[], cells: number): string[] {
+  const head = splitRow(header);
+  const rowsOfCells = body.map(splitRow);
+  const widths = columnWidths([head, ...rowsOfCells], cells);
+  const line = defaultTheme.fg("border", widths.map((width) => "─".repeat(width)).join("─┼─"));
+  const rows = [formatRow(head, widths, true), line];
+  for (const row of rowsOfCells) rows.push(formatRow(row, widths, false));
+  return rows;
+}
+
+function splitRow(line: string): string[] {
+  const inner = TABLE_ROW.exec(line)?.[1] ?? "";
+  return inner.split("|").map((cell) => cell.trim());
+}
+
+/** Column widths sized to content, then scaled down to fit the frame. */
+function columnWidths(rows: readonly string[][], cells: number): number[] {
+  const count = Math.max(...rows.map((row) => row.length));
+  const widths = new Array<number>(count).fill(0);
+  for (const row of rows) {
+    for (let column = 0; column < count; column++) {
+      widths[column] = Math.max(widths[column]!, visibleWidth(row[column] ?? ""));
+    }
+  }
+  const separators = (count - 1) * 3;
+  const total = widths.reduce((sum, width) => sum + width, 0) + separators;
+  if (total <= cells) return widths;
+  const budget = Math.max(count * 3, cells - separators);
+  const scale = budget / (total - separators);
+  return widths.map((width) => Math.max(3, Math.floor(width * scale)));
+}
+
+function formatRow(row: readonly string[], widths: readonly number[], header: boolean): string {
+  const cellsText = widths.map((width, column) => {
+    const text = row[column] ?? "";
+    return padToWidth(truncateToWidth(header ? defaultTheme.bold(text) : renderInline(text), width), width);
+  });
+  return cellsText.join(defaultTheme.fg("border", " │ "));
 }
 
 /** One non-fence line, resolved to its block kind. */

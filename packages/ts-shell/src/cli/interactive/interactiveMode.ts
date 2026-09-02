@@ -7,12 +7,14 @@ import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { newlineKeyFor } from "../../presentation/tui/chrome/hints.js";
 import type { StatusItemId } from "../../presentation/tui/chrome/items.js";
-import { renderWelcome, type WelcomeState } from "../../presentation/tui/chrome/welcome.js";
+import { renderWelcome } from "../../presentation/tui/chrome/welcome.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
+import { Clipboard } from "./clipboard.js";
+import { DragSelection } from "./selection.js";
 import { TUI } from "../../presentation/tui/render/engine.js";
 import { processTerminal, type TerminalDevice } from "../../presentation/tui/terminal.js";
 import { textBlock } from "../../presentation/tui/transcript/blocks.js";
-import type { RenderScheduler, ResizeScrollbackMode } from "../../presentation/tui/render/frame.js";
+import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
@@ -22,8 +24,8 @@ import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
-import { readStatusItems, writeStatusItems } from "./statusItemStore.js";
-import { readStatusFacts } from "./sessionFacts.js";
+import { readStatusItems, resizeScrollbackMode, writeStatusItems } from "./tuiSettings.js";
+import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
 import { slashSuggestions } from "./slashSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
@@ -48,10 +50,6 @@ const CANCEL_ARMED_MS = 600;
  * new width, which is what a reader wants; `preserve` is for terminals where
  * clearing scrollback is worse than a stale rewrap of already-retired rows.
  */
-function resizeScrollbackMode(env: NodeJS.ProcessEnv): ResizeScrollbackMode {
-  return env.TSSHELL_TUI_RESIZE_SCROLLBACK === "preserve" ? "preserve" : "rebuild";
-}
-
 export interface InteractiveModeOptions {
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionRuntime: ShellSessionRuntime;
@@ -80,6 +78,8 @@ export class InteractiveMode {
   private readonly readline: ReadlineInterface;
   private readonly gesture: { lastCancelAt?: number } = {};
   private readonly overlay: OverlayHost;
+  private readonly selection: DragSelection;
+  private readonly clipboard: Clipboard;
   private statusItems: readonly StatusItemId[];
 
   private busy = false;
@@ -89,6 +89,17 @@ export class InteractiveMode {
   constructor(private readonly options: InteractiveModeOptions) {
     this.terminal = options.terminal ?? processTerminal;
     this.statusItems = readStatusItems(options.runtimeContext.projectRoot);
+    this.clipboard = new Clipboard({
+      projectRoot: options.runtimeContext.projectRoot,
+      cwd: options.runtimeContext.cwd,
+      sessionId: options.runtimeContext.session.id,
+      setTracking: (enabled) => this.tui.setMouseTracking(enabled),
+      notify: (text) => this.sink.notify(text),
+    });
+    this.selection = new DragSelection(
+      { rows: () => this.tui.screenRows() },
+      (text) => this.clipboard.copy(text),
+    );
     this.overlay = new OverlayHost(() => this.tui.requestRender());
     this.tui = new TUI(this.terminal, options.scheduler, resizeScrollbackMode(process.env));
     this.surface = new InteractiveSurface({
@@ -122,13 +133,23 @@ export class InteractiveMode {
       kind: "notice",
       text: "",
       finalized: true,
-      rows: (width) => renderWelcome(this.welcomeState(), width),
+      rows: (width) =>
+        renderWelcome(
+          readWelcomeState(
+            this.options.runtimeContext,
+            this.options.sessionRuntime.getAgentMode(),
+            this.options.fallbackSessionId !== undefined,
+          ),
+          width,
+        ),
     });
     this.stdin.onKey((event) => this.onKey(event));
     this.stdin.onPaste((text) => this.onPaste(text));
+    this.stdin.onMouse((report) => this.selection.handle(report));
     this.tui.onInput((data) => this.stdin.feed(data));
     this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
     this.tui.start();
+    this.clipboard.applyStoredPreference();
   }
 
   stop(): void {
@@ -142,17 +163,6 @@ export class InteractiveMode {
   private isCancelArmed(): boolean {
     const last = this.gesture.lastCancelAt;
     return last !== undefined && Date.now() - last < CANCEL_ARMED_MS;
-  }
-
-  /** Intro facts, resolved at paint time so a mid-session change is reflected. */
-  private welcomeState(): WelcomeState {
-    const facts = readStatusFacts(this.options.runtimeContext, this.options.sessionRuntime.getAgentMode());
-    return {
-      model: facts.model,
-      directory: facts.directory ?? this.options.runtimeContext.projectRoot,
-      branch: facts.branch,
-      resumeHint: this.options.fallbackSessionId ? "/resume to pick up where you left off" : undefined,
-    };
   }
 
   private onKey(event: Parameters<typeof routeKey>[0]): void {
@@ -284,8 +294,15 @@ export class InteractiveMode {
   private applyPicker(picker: Picker, ids: readonly string[]): void {
     void picker
       .apply(ids)
-      .then((note) => {
-        if (note) this.surface.transcript.append(textBlock("command", note, picker.title));
+      .then((outcome) => {
+        if (outcome?.note) {
+          this.surface.transcript.append(textBlock("command", outcome.note, picker.title));
+        }
+        if (outcome?.draft) {
+          // The next step needs a secret, so the picker hands over the exact
+          // command with the caret after it rather than collecting it here.
+          this.surface.editor.setText(outcome.draft);
+        }
       })
       .catch((error: unknown) => {
         this.surface.transcript.append(
@@ -308,6 +325,8 @@ export class InteractiveMode {
       resumeSession: (sessionId) => this.runCommandLine(`/resume ${sessionId}`),
       refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
+      mouseCopy: this.clipboard.dragEnabled,
+      setMouseCopy: async (enabled) => this.clipboard.setDragEnabled(enabled),
       saveStatusItems: async (items) => {
         this.statusItems = items;
         return `Status band items saved to ${writeStatusItems(this.options.runtimeContext.projectRoot, items)}`;

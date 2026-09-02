@@ -3,13 +3,29 @@ import * as path from "node:path";
 import * as os from "node:os";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
+/**
+ * Extension registry.
+ *
+ * An extension is a package name or a directory on disk, the way every reference
+ * implementation resolves one — there is no catalogue service behind this and
+ * nothing is exchanged with a third party. Registering one records an address and
+ * a manifest; this build does not execute extensions, and the output says so
+ * rather than implying a capability arrived.
+ */
+
+export type PluginOrigin = "path" | "package";
+
 export interface InstalledPlugin {
   readonly name: string;
   readonly version: string;
   enabled: boolean;
-  readonly source: string;
+  /** Where the extension resolves from: a local directory, or a package name. */
+  readonly source: PluginOrigin;
+  /** The path or package spec exactly as given. */
+  readonly spec: string;
   readonly description?: string;
-  readonly capabilities?: readonly string[];
+  /** False until the spec has been resolved on disk. */
+  readonly resolved: boolean;
 }
 
 function getPluginStoragePath(): string {
@@ -18,25 +34,55 @@ function getPluginStoragePath(): string {
   return path.join(os.homedir(), ".coding-agents", "plugins.json");
 }
 
+/** Nothing is registered until the user registers it. */
 function getDefaultPlugins(): InstalledPlugin[] {
-  return [
-    {
-      name: "core-developer-suite",
-      version: "1.0.0",
+  return [];
+}
+
+/**
+ * Resolve a spec to a manifest without fetching anything.
+ *
+ * A local directory can be read now, so it is: its own `package.json` names it,
+ * and a spec pointing at nothing is refused rather than recorded. A package name
+ * cannot be checked without the network, so it is recorded unresolved and
+ * reported as such.
+ */
+function describeSpec(spec: string, cwd: string): InstalledPlugin | { readonly error: string } {
+  const local = spec.startsWith(".") || spec.startsWith("/") || spec.startsWith("~");
+  if (!local) {
+    return {
+      name: normalizePluginName(spec),
+      version: "unresolved",
       enabled: true,
-      source: "official",
-      description: "Core productivity, LSP diagnostics, and verification hooks",
-      capabilities: ["lsp", "hooks", "git"],
-    },
-    {
-      name: "security-auditor",
-      version: "0.9.2",
+      source: "package",
+      spec,
+      resolved: false,
+    };
+  }
+  const expanded = spec.startsWith("~") ? path.join(os.homedir(), spec.slice(1)) : spec;
+  const root = path.resolve(cwd, expanded);
+  const manifestPath = path.join(root, "package.json");
+  if (!fs.existsSync(manifestPath)) {
+    return { error: `No \`package.json\` under \`${root}\`, so there is nothing to register.` };
+  }
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+      name?: string;
+      version?: string;
+      description?: string;
+    };
+    return {
+      name: normalizePluginName(manifest.name ?? path.basename(root)),
+      version: manifest.version ?? "0.0.0",
       enabled: true,
-      source: "official",
-      description: "Static code vulnerability scanner and credential leak guard",
-      capabilities: ["security", "audit"],
-    },
-  ];
+      source: "path",
+      spec: root,
+      description: manifest.description,
+      resolved: true,
+    };
+  } catch {
+    return { error: `\`${manifestPath}\` is not readable JSON, so there is nothing to register.` };
+  }
 }
 
 function loadPersistedPlugins(): InstalledPlugin[] {
@@ -87,115 +133,103 @@ function normalizePluginName(name: string): string {
  */
 export async function runPluginCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
   const subCommand = args[0]?.toLowerCase();
 
   if (!subCommand || subCommand === "list" || subCommand === "ls") {
-    const lines = [
-      "# 🧩 Installed Plugins & Extensions (/plugin list)",
-      "",
-      "| Plugin Name | Version | Status | Source | Description |",
-      "| :--- | :--- | :--- | :--- | :--- |",
-    ];
-
-    for (const p of cachedPlugins) {
-      const statusBadge = p.enabled ? "🟢 Enabled" : "⚪ Disabled";
-      lines.push(
-        `| **${p.name}** | \`${p.version}\` | ${statusBadge} | \`${p.source}\` | ${p.description || "—"} |`,
-      );
+    if (cachedPlugins.length === 0) {
+      return {
+        kind: "local",
+        output: [
+          "### Extensions",
+          "",
+          "None registered.",
+          "",
+          "Register one by package name or by path:",
+          "",
+          "- `/plugin add ./tools/my-extension` — read now from its `package.json`",
+          "- `/plugin add some-package` — recorded unresolved until it is installed",
+          "",
+          "Nothing is executed from a registration in this build.",
+        ].join("\n"),
+      };
     }
-
+    const lines = [
+      "### Extensions",
+      "",
+      "| Name | Version | State | From |",
+      "| :--- | :--- | :--- | :--- |",
+    ];
+    for (const plugin of cachedPlugins) {
+      const state = !plugin.resolved ? "unresolved" : plugin.enabled ? "enabled" : "disabled";
+      lines.push(`| ${plugin.name} | ${plugin.version} | ${state} | \`${plugin.spec}\` |`);
+    }
     lines.push(
       "",
-      `*Storage: \`${getPluginStoragePath()}\` | Total Installed: ${cachedPlugins.length}*`,
+      `Registry: \`${getPluginStoragePath()}\``,
       "",
-      "**Commands**:",
-      "- `/plugin install <name>`: Install and persist a plugin",
-      "- `/plugin uninstall <name>`: Remove an installed plugin",
-      "- `/plugin enable <name>`: Enable a plugin",
-      "- `/plugin disable <name>`: Disable a plugin",
-      "- `/plugin search <keyword>`: Search available plugins",
+      "Nothing is executed from a registration in this build.",
     );
-
-    return {
-      kind: "local",
-      output: lines.join("\n"),
-    };
+    return { kind: "local", output: lines.join("\n") };
   }
 
   if (subCommand === "install" || subCommand === "add") {
-    const pluginName = args[1];
-    if (!pluginName) {
+    const spec = args[1]?.trim();
+    if (!spec) {
       return {
         kind: "local",
-        output: "Usage: `/plugin install <plugin-name>`\nExample: `/plugin install playwright-mcp`",
+        output: [
+          "Usage: `/plugin add <path-or-package>`",
+          "",
+          "- `/plugin add ./tools/my-extension`",
+          "- `/plugin add some-package`",
+        ].join("\n"),
       };
     }
 
-    const normalized = normalizePluginName(pluginName);
-    const existing = cachedPlugins.find((p) => p.name === normalized);
+    const described = describeSpec(spec, context.cwd ?? process.cwd());
+    if ("error" in described) return { kind: "local", output: described.error };
+
+    const existing = cachedPlugins.find((plugin) => plugin.name === described.name);
     if (existing) {
       return {
         kind: "local",
-        output: `Plugin \`${normalized}\` is already installed (version: \`${existing.version}\`). Use \`/plugin enable ${normalized}\` if disabled.`,
+        output: `\`${described.name}\` is already registered from \`${existing.spec}\`. Remove it first to point it somewhere else.`,
       };
     }
 
-    const newPlugin: InstalledPlugin = {
-      name: normalized,
-      version: "1.0.0",
-      enabled: true,
-      source: "registry",
-      description: `Community plugin extension for ${normalized}`,
-      capabilities: [normalized],
-    };
-
-    cachedPlugins.push(newPlugin);
+    cachedPlugins.push(described);
     savePersistedPlugins(cachedPlugins);
 
     return {
       kind: "local",
       output: [
-        `# ✨ Plugin Installed & Persisted: \`${normalized}\``,
+        `### Registered \`${described.name}\``,
         "",
-        `- **Version**: \`${newPlugin.version}\``,
-        "- **Status**: 🟢 `Enabled`",
-        `- **Source**: \`${newPlugin.source}\``,
-        `- **Persisted To**: \`${getPluginStoragePath()}\``,
-        "- Extension hooks and capabilities are now active in the runtime.",
+        `- Version: ${described.version}`,
+        `- From: \`${described.spec}\``,
+        `- Resolved: ${described.resolved ? "yes, read from its manifest" : "no — the package has not been fetched"}`,
+        `- Recorded in: \`${getPluginStoragePath()}\``,
+        "",
+        described.resolved
+          ? "The registration is recorded. This build does not execute extensions, so nothing about the running session changed."
+          : "Nothing was downloaded. Install the package with your package manager, then re-register it from its path to have its manifest read.",
       ].join("\n"),
     };
   }
 
   if (subCommand === "search" || subCommand === "find") {
-    const keyword = (args[1] || "").toLowerCase();
-    const available = [
-      { name: "core-developer-suite", desc: "Core productivity, LSP diagnostics, and verification hooks", cap: "lsp" },
-      { name: "security-auditor", desc: "Static code vulnerability scanner and credential leak guard", cap: "security" },
-      { name: "superpowers", desc: "SOTA reasoning, socratic dialogue, TDD workflows", cap: "reasoning" },
-      { name: "github-mcp", desc: "GitHub issues, PRs, and code search integration", cap: "github" },
-      { name: "playwright-mcp", desc: "Automated browser interaction & DOM extraction", cap: "browser" },
-      { name: "tree-sitter-ast", desc: "Multi-language AST indexing & symbol graph", cap: "ast" },
-    ];
-
-    const matched = available.filter(
-      (p) => !keyword || p.name.includes(keyword) || p.desc.toLowerCase().includes(keyword),
-    );
-
-    const lines = [
-      `# 🔍 Plugin Search Results for "${keyword || "all"}"`,
-      "",
-      "| Plugin Name | Category | Description |",
-      "| :--- | :--- | :--- |",
-      ...matched.map((m) => `| **${m.name}** | \`${m.cap}\` | ${m.desc} |`),
-      "",
-      "Run `/plugin install <name>` to install and activate.",
-    ];
-
     return {
       kind: "local",
-      output: lines.join("\n"),
+      output: [
+        "### Search",
+        "",
+        "There is no catalogue service behind this: extensions resolve as packages or as paths, and a source is just an address to look at yourself.",
+        "",
+        "- `/marketplace` lists the registered sources",
+        "- `/plugin add <path-or-package>` registers one by name or location",
+      ].join("\n"),
     };
   }
 
@@ -222,7 +256,7 @@ export async function runPluginCommand(
 
     return {
       kind: "local",
-      output: `Successfully uninstalled plugin \`${normalized}\` and updated persistent configuration.`,
+      output: `Removed \`${normalized}\` from the registry.`,
     };
   }
 
@@ -240,7 +274,7 @@ export async function runPluginCommand(
     savePersistedPlugins(cachedPlugins);
     return {
       kind: "local",
-      output: `Plugin \`${normalized}\` has been ENABLED.`,
+      output: `\`${normalized}\` is marked enabled in the registry.`,
     };
   }
 
@@ -258,20 +292,21 @@ export async function runPluginCommand(
     savePersistedPlugins(cachedPlugins);
     return {
       kind: "local",
-      output: `Plugin \`${normalized}\` has been DISABLED.`,
+      output: `\`${normalized}\` is marked disabled in the registry.`,
     };
   }
 
   return {
     kind: "local",
     output: [
-      "# 📖 /plugin Command Guide",
-      "- `/plugin list` : Show all installed plugins and their status",
-      "- `/plugin install <name>` : Install and persist a plugin",
-      "- `/plugin uninstall <name>` : Remove an installed plugin",
-      "- `/plugin enable <name>` : Enable an installed plugin",
-      "- `/plugin disable <name>` : Disable an installed plugin",
-      "- `/plugin search <keyword>` : Search marketplace catalog",
+      "### /plugin",
+      "",
+      "- `/plugin` — list registered extensions",
+      "- `/plugin add <path-or-package>` — register one by location or name",
+      "- `/plugin remove <name>` — drop a registration",
+      "- `/plugin enable <name>` / `/plugin disable <name>` — mark one for loading",
+      "",
+      "Nothing is executed from a registration in this build.",
     ].join("\n"),
   };
 }

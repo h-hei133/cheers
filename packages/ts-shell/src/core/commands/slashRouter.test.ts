@@ -999,7 +999,7 @@ describe("slash router (W4)", () => {
       expect(result.output).toContain("- DoNext:");
       expect(result.output).toContain("Slash command required");
       expect(result.output).toContain("Quick actions:");
-      expect(result.output).toContain("/sessions");
+      expect(result.output).toContain("/resume");
     }
   });
 
@@ -1014,15 +1014,15 @@ describe("slash router (W4)", () => {
     }
   });
 
-  it("routes /cancel, /sessions, /workspace, /mcp, /help, and /permissions as shell actions", async () => {
+  it("routes /cancel, /resume, /workspace, /mcp, /help, and /permissions as shell actions", async () => {
     for (const [command, action] of [
       ["/cancel", "cancel-run"],
-      ["/sessions", "list-sessions"],
+      ["/resume list", "list-sessions"],
+      ["/resume current", "list-sessions"],
+      ["/resume switch sess_abc", "list-sessions"],
+      ["/resume help", "list-sessions"],
       ["/sessions list", "list-sessions"],
       ["/sessions current", "list-sessions"],
-      ["/sessions switch sess_abc", "list-sessions"],
-      ["/sessions help", "list-sessions"],
-      ["/sessions unknown-mode", "list-sessions"],
       ["/workspace", "show-workspace"],
       ["/workspace status", "show-workspace"],
       ["/workspace recent", "show-workspace"],
@@ -1048,20 +1048,17 @@ describe("slash router (W4)", () => {
       expect(result?.kind).toBe("shell-action");
       if (result?.kind === "shell-action") {
         expect(result.action).toBe(action);
-        if (command === "/sessions list") {
+        if (command === "/resume list" || command === "/sessions list") {
           expect(result.sessionAction).toBe("list");
         }
-        if (command === "/sessions current") {
+        if (command === "/resume current" || command === "/sessions current") {
           expect(result.sessionAction).toBe("current");
         }
-        if (command === "/sessions switch sess_abc") {
+        if (command === "/resume switch sess_abc") {
           expect(result.sessionAction).toBe("switch");
           expect(result.sessionId).toBe("sess_abc");
         }
-        if (command === "/sessions help") {
-          expect(result.sessionAction).toBe("help");
-        }
-        if (command === "/sessions unknown-mode") {
+        if (command === "/resume help") {
           expect(result.sessionAction).toBe("help");
         }
         if (command === "/permissions explain") {

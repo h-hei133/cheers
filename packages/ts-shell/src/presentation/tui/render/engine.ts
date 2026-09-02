@@ -1,3 +1,4 @@
+import { DISABLE_MOUSE, ENABLE_MOUSE } from "../input/mouse.js";
 import type { TerminalDevice } from "../terminal.js";
 import { processTerminal } from "../terminal.js";
 import {
@@ -67,6 +68,7 @@ export class TUI {
   private resetScrollbackNextFrame = false;
 
   private modalActive = false;
+  private mouseTracking = false;
   private resizeTimer: unknown;
   private resizeWidthChanged = false;
   private resizeMode: ResizeScrollbackMode;
@@ -125,6 +127,7 @@ export class TUI {
     this.started = false;
     this.scheduler.clearTimeout(this.frameTimer);
     this.scheduler.clearTimeout(this.resizeTimer);
+    this.setMouseTracking(false);
     if (this.modalActive) this.leaveModal();
     this.retireRemainingHistory();
     this.terminal.stop();
@@ -164,6 +167,25 @@ export class TUI {
   /** Screen row the mutable viewport currently starts on. */
   get viewportTopRow(): number {
     return this.viewportTop;
+  }
+
+  /**
+   * Every row currently on screen, top row first: the tail of retired history
+   * above the anchor, then the mutable window. Reconstructed from our own state
+   * rather than read back from the terminal, which cannot be queried for it.
+   */
+  screenRows(): readonly string[] {
+    const width = Math.max(1, this.terminal.getDimensions().columns);
+    const above = this.viewportTop > 0 ? (this.provider?.retiredTail?.(width, this.viewportTop) ?? []) : [];
+    const padding = Math.max(0, this.viewportTop - above.length);
+    return [...Array.from({ length: padding }, () => ""), ...above, ...this.window];
+  }
+
+  /** Ask for mouse reports, or give the mouse back to the terminal. */
+  setMouseTracking(enabled: boolean): void {
+    if (this.mouseTracking === enabled) return;
+    this.mouseTracking = enabled;
+    this.terminal.write(enabled ? ENABLE_MOUSE : DISABLE_MOUSE);
   }
 
   private onResize(): void {

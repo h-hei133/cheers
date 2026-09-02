@@ -86,7 +86,7 @@ function buildSlashDiscoveryMessage(): string {
     "- Outcome: blocked",
     "- BlockerKind: command-not-allowlisted",
     `- Reason: Slash command required after '/'.`,
-    "- DoNext: Enter a valid slash command such as /help or /sessions.",
+    "- DoNext: Enter a valid slash command such as /help or /resume.",
     "",
     `Slash command required after '/'.`,
     `Try /help to view grouped commands.`,
@@ -98,8 +98,7 @@ function buildSlashDiscoveryMessage(): string {
 function buildSlashDiscoveryLines(): string[] {
   return [
     "Quick actions:",
-    "- /sessions              view active session + recent sessions",
-    "- /resume                continue best recoverable session context",
+    "- /resume                view sessions, or continue recoverable work",
     "- /workspace status      confirm current project/workdir binding",
     "- /diagnose              inspect repo status and suggested next step",
   ];

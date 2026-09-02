@@ -80,3 +80,42 @@ graph TD
 ---
 
 本方案全面吸收了 Oh-My-Pi、Claude Code 与 OpenCode 的最佳实践，直接复用其成熟的指令语义与交互流程，架构清晰、职责单一！
+
+---
+
+## 五、 落地复核（2026-09-02）：市场究竟是什么
+
+### 5.1 结论先行：没有任何一方与"市场"服务合作
+
+把四个参考实现的解析路径追到底，得到的答案是一致的：**"市场"不是一项服务，而是一个地址。**
+
+- 扩展本身按 **npm 包名或本地路径** 解析，交给包管理器（`Npm.add` 一类）落盘，
+  清单就是 `package.json`。没有专有协议，没有中心注册中心，没有账号。
+- "市场源"只是一个仓库地址或目录，里面放一份清单文件。加一个源＝记一个地址。
+- 登录方法（provider 的 OAuth / API key 形态）由**插件自己贡献**，凭据落在
+  provider 为键的 `auth.json`（`oauth` / `api` / `wellknown` 三种形状），
+  模型目录另从公开的 models 目录站取。
+- 规模更大的那个实现额外自建了凭据代理（SQLite 凭据库 + 刷新器 + 远端库），
+  但那是**认证**的复杂度，与"市场"无关。
+
+### 5.2 因此本项目改了什么
+
+原实现是一层假面：默认"已安装"两个不存在的插件，`install` 伪造 `version: 1.0.0`
+并宣称"capabilities are now active in the runtime"，`search` 返回硬编码目录——
+而全仓库**没有任何代码加载这些条目**。这直接违反 AGENTS.md 的
+"Do not hide unverified write outcomes behind success-like terminal or session states"。
+
+已收敛为：
+
+| 面 | 现在的语义 |
+|---|---|
+| 默认注册表 | 空。没有注册就是没有注册 |
+| `/plugin add <路径>` | 真读 `package.json` 取名/版本/描述，`resolved: yes`；没有清单则拒绝登记 |
+| `/plugin add <包名>` | 登记为 `resolved: no`，明说"Nothing was downloaded" |
+| `/plugin enable/disable` | 措辞改为"marked enabled in the registry" |
+| `/plugin search` | 不再伪造目录；直说没有目录服务，指向 `/marketplace` 与 `add` |
+| 每处输出 | 结尾恒为"Nothing is executed from a registration in this build." |
+
+**明确未做**：真正的扩展加载器（本轮不在范围内），以及 `/connect` 的 OAuth 形态——
+参考实现有 `oauth`/`wellknown` 两种登录路径，而我们的 `CONNECT_PRESETS` 目前只有
+API key。这属于 provider/auth 核心，按 AGENTS.md 需要显式任务范围。

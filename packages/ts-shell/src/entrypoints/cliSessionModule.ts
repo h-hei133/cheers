@@ -153,7 +153,7 @@ export function renderSessionSurfaceOverview(
   sessionManager: SessionManager,
   runtimeContext: ShellRuntimeContext,
 ): void {
-  renderer.renderLine("\n/sessions (session surface)");
+  renderer.renderLine("\n/resume (session surface)");
   renderCurrentSessionSurface(renderer, { sessionManager, runtimeContext });
   renderSessionListSurface(renderer, {
     sessionManager,

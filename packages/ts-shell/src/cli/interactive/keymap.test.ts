@@ -10,11 +10,17 @@ function build(busy = false): {
   clock: { now: number };
 } {
   const surface = new InteractiveSurface({
-    band: () => ({ model: "m" }),
+    facts: () => ({ model: "m", provider: "p" }),
+    statusItems: () => ["model"],
     activity: () => undefined,
     busy: () => busy,
     queuedCount: () => 0,
     now: () => 0,
+    ambient: () => ({}),
+    newlineKey: () => "ctrl+j",
+    cancelArmed: () => false,
+    overlayFullScreen: () => false,
+    overlayRows: () => [],
   });
   const actions = {
     submit: vi.fn(),
@@ -23,6 +29,7 @@ function build(busy = false): {
     redraw: vi.fn(),
     clearScreen: vi.fn(),
     redrawAfter: vi.fn(),
+    cycleAgentMode: vi.fn(),
     syncSuggestions: vi.fn(),
   };
   const clock = { now: 0 };

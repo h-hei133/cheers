@@ -2,6 +2,7 @@ import path from "node:path";
 import os from "node:os";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { StatusFacts } from "../../presentation/tui/chrome/items.js";
+import type { WelcomeState } from "../../presentation/tui/chrome/welcome.js";
 import { estimateUsageCost, getSessionUsage } from "../../observability/usageTelemetry.js";
 import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 
@@ -53,5 +54,23 @@ export function readStatusFacts(context: ShellRuntimeContext, agentMode?: string
     ...(usage.totalTokens > 0 ? { sessionTokens: usage.totalTokens } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
     ...(cost > 0 ? { costUsd: cost } : {}),
+  };
+}
+
+/**
+ * Intro facts, resolved at paint time so a mid-session change is reflected. The
+ * resume hint appears only when there is actually a session to go back to.
+ */
+export function readWelcomeState(
+  context: ShellRuntimeContext,
+  agentMode: string | undefined,
+  hasRecoverableSession: boolean,
+): WelcomeState {
+  const facts = readStatusFacts(context, agentMode);
+  return {
+    model: facts.model,
+    directory: facts.directory ?? context.projectRoot,
+    branch: facts.branch,
+    resumeHint: hasRecoverableSession ? "/resume to pick up where you left off" : undefined,
   };
 }

@@ -66,6 +66,38 @@ describe("block structure", () => {
   });
 });
 
+describe("tables", () => {
+  const TABLE = [
+    "| Name | State | From |",
+    "| :--- | :--- | :--- |",
+    "| alpha | enabled | ./tools/alpha |",
+    "| beta | unresolved | beta-package |",
+  ].join("\n");
+
+  it("aligns cells into columns rather than leaving the pipes in place", () => {
+    const rows = plain(renderMarkdown(TABLE, 60)).split("\n");
+    const header = rows.find((row) => row.includes("Name"))!;
+    const alpha = rows.find((row) => row.includes("alpha"))!;
+
+    expect(header.indexOf("State")).toBe(alpha.indexOf("enabled"));
+    expect(header).not.toContain("|");
+  });
+
+  it("keeps a separator rule out of the body", () => {
+    expect(plain(renderMarkdown(TABLE, 60))).not.toContain(":---");
+  });
+
+  it("squeezes wide columns instead of overflowing the frame", () => {
+    for (const row of renderMarkdown(TABLE, 24)) {
+      expect(visibleWidth(row)).toBeLessThanOrEqual(24);
+    }
+  });
+
+  it("leaves a pipe-bearing line alone when no rule follows it", () => {
+    expect(plain(renderMarkdown("| not | a table |", 40))).toContain("| not | a table |");
+  });
+});
+
 describe("streaming stability", () => {
   it("drops a trailing partial fence", () => {
     expect(trimPartialFence("text\n``")).toBe("text");

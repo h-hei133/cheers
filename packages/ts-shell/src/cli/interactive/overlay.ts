@@ -14,6 +14,17 @@ import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 
 export type PickerForm = "panel" | "modal";
 
+export interface PickerOutcome {
+  /** Text to append to the transcript. */
+  readonly note?: string;
+  /**
+   * Text to place in the prompt instead of acting immediately. Used where the
+   * next step needs a secret the picker should not be collecting — the user gets
+   * the exact command with the cursor after it.
+   */
+  readonly draft?: string;
+}
+
 export interface Picker {
   readonly title: string;
   readonly form: PickerForm;
@@ -25,8 +36,8 @@ export interface Picker {
   readonly detailRows?: number;
   /** Options to offer; may hit the network or the filesystem. */
   load(): Promise<readonly Option[]>;
-  /** Apply the choice. Any returned text is appended to the transcript. */
-  apply(ids: readonly string[]): Promise<string | undefined>;
+  /** Apply the choice, reporting what to show or to draft next. */
+  apply(ids: readonly string[]): Promise<PickerOutcome | undefined>;
 }
 
 /** Rows the inline panel is allowed to occupy. */

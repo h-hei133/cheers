@@ -31,10 +31,8 @@ import { runLogCommand } from "./logCommandRuntime.js";
 import {
   runDiagnoseCommand,
 } from "./localCommandRuntime.js";
-import {
-  runContinuePromptCommand,
-  runResumePromptCommand,
-} from "./promptCommandRuntime.js";
+import { runContinuePromptCommand } from "./promptCommandRuntime.js";
+import { runResumeCommand } from "./resumeCommandRuntime.js";
 import {
   runCancelShellAction,
   runCdShellAction,
@@ -42,7 +40,6 @@ import {
   runMcpShellAction,
   runPermissionsShellAction,
   runPwdShellAction,
-  runSessionsShellAction,
   runWorkspaceShellAction,
 } from "./shellActionRuntime.js";
 import type { CommandDefinition } from "./types.js";
@@ -122,11 +119,12 @@ export function createCommandRegistry(
     },
     {
       name: "resume",
+      aliases: ["sessions", "session"],
       kind: "prompt",
       availability: "available",
       enabled: true,
       bridgeSafe: false,
-      execute: (args, context) => runResumePromptCommand(args, context),
+      execute: (args, context) => runResumeCommand(args, context),
     },
     {
       name: "continue",
@@ -144,14 +142,6 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: false,
       execute: (args, context) => runCancelShellAction(args, context),
-    },
-    {
-      name: "sessions",
-      kind: "shell-action",
-      availability: "available",
-      enabled: true,
-      bridgeSafe: false,
-      execute: (args, context) => runSessionsShellAction(args, context),
     },
     {
       name: "workspace",

@@ -1,7 +1,7 @@
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
 import type { McpConnectionState } from "../../../core/mcp/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
-import type { Picker } from "../overlay.js";
+import type { Picker, PickerOutcome } from "../overlay.js";
 
 /**
  * Server chooser.
@@ -32,9 +32,11 @@ export function serverPicker(options: ServerPickerOptions): Picker {
         note: client.type,
       }));
     },
-    async apply(ids: readonly string[]): Promise<string | undefined> {
+    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const name = ids[0];
-      return name ? options.refresh(name) : undefined;
+      if (!name) return undefined;
+      const note = await options.refresh(name);
+      return note ? { note } : undefined;
     },
   };
 }

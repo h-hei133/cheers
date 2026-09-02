@@ -189,14 +189,14 @@ export async function resumeShellSession(input: {
           );
         }
         input.renderer.renderLine(
-          "Hint: use a longer session id prefix or exact session id from /sessions list.\n",
+          "Hint: use a longer session id prefix or exact session id from /resume list.\n",
         );
       } else {
         input.renderer.renderLine(
           `\nResume target '${input.requestedSessionId}' was not found.`,
         );
         input.renderer.renderLine(
-          "Hint: run /sessions list, then /resume <session-id|prefix|title|last>.\n",
+          "Hint: run /resume list, then /resume <session-id|prefix|title|last>.\n",
         );
       }
       return { resumed: false };

@@ -125,10 +125,10 @@ describe("CLI core split projections", () => {
 
   it("projects session switch and current-session display facts exactly", () => {
     expect(formatSessionSwitchUsage({ printMode: true })).toBe(
-      "Usage: /sessions switch <id|prefix|title|last>",
+      "Usage: /resume switch <id|prefix|title|last>",
     );
     expect(formatSessionSwitchUsage({ printMode: false })).toBe(
-      "\nUsage: /sessions switch <id|prefix|title|last>\n",
+      "\nUsage: /resume switch <id|prefix|title|last>\n",
     );
     expect(
       formatSessionSwitchSuccessLines({

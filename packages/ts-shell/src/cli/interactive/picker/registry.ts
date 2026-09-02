@@ -5,11 +5,14 @@ import type { SessionManager } from "../../../session/SessionManager.js";
 import type { StatusItemId } from "../../../presentation/tui/chrome/items.js";
 import type { Transcript } from "../../../presentation/tui/transcript/container.js";
 import type { Picker } from "../overlay.js";
+import { connectionPicker } from "./connections.js";
 import { copyPicker } from "./copy.js";
 import { modelPicker } from "./model.js";
 import { permissionPicker } from "./permissions.js";
 import { pluginPicker } from "./plugins.js";
+import { restorePicker } from "./restore.js";
 import { serverPicker } from "./servers.js";
+import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
 import { statusItemPicker } from "./statusItems.js";
 
@@ -30,20 +33,29 @@ export interface PickerHost {
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly projectRoot: string;
   readonly statusItems: readonly StatusItemId[];
+  /** Whether drag-to-copy currently owns the mouse. */
+  readonly mouseCopy: boolean;
   resumeSession(sessionId: string): Promise<string | undefined>;
   refreshServer(serverName: string): Promise<string | undefined>;
   revokeGrant(key: string): Promise<string | undefined>;
   saveStatusItems(items: readonly StatusItemId[]): Promise<string | undefined>;
+  setMouseCopy(enabled: boolean): Promise<string | undefined>;
 }
 
 type PickerFactory = (host: PickerHost) => Picker;
 
 const PICKERS: Record<string, PickerFactory> = {
   model: (host) => modelPicker(host.commandContext),
-  copy: (host) => copyPicker(host.transcript, host.commandContext),
+  copy: (host) =>
+    copyPicker({
+      transcript: host.transcript,
+      context: host.commandContext,
+      mouseCopy: host.mouseCopy,
+      toggleMouseCopy: host.setMouseCopy,
+    }),
   resume: (host) => sessionPicker({ sessionManager: host.sessionManager, resume: host.resumeSession }),
   mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer }),
-  connect: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer }),
+  connect: (host) => connectionPicker(host.commandContext),
   permissions: (host) =>
     permissionPicker({
       policy: host.approvalTrustPolicy,
@@ -51,6 +63,8 @@ const PICKERS: Record<string, PickerFactory> = {
       revoke: host.revokeGrant,
     }),
   plugin: (host) => pluginPicker(host.commandContext),
+  marketplace: (host) => sourcePicker(host.commandContext),
+  restore: (host) => restorePicker(host.projectRoot),
   statusline: (host) =>
     statusItemPicker({ current: host.statusItems, save: host.saveStatusItems }),
 };

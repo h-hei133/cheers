@@ -74,10 +74,16 @@ function renderRow(
     : active
       ? defaultTheme.bold(option.label)
       : option.label;
-  const detail = option.detail ? defaultTheme.dim(option.detail) : "";
-  const note = option.note ? ` ${defaultTheme.fg("border", option.note)}` : "";
-  const body = `${marker}${padToWidth(label, labelWidth)}${detail}${note}`;
-  const fitted = truncateToWidth(body, width);
+  // The note is a state word — "restorable", "default", "toggle" — so it is
+  // pinned to the right and the detail gives way to it, rather than the note
+  // being the first thing a long detail truncates away.
+  const noteWidth = option.note ? visibleWidth(option.note) + 2 : 0;
+  const detailWidth = Math.max(0, width - visibleWidth(marker) - labelWidth - noteWidth);
+  const detail = option.detail ? defaultTheme.dim(truncateToWidth(option.detail, detailWidth)) : "";
+  const head = truncateToWidth(`${marker}${padToWidth(label, labelWidth)}${detail}`, width - noteWidth);
+  const note = option.note ? defaultTheme.fg("border", option.note) : "";
+  const gap = Math.max(0, width - visibleWidth(head) - visibleWidth(note));
+  const fitted = `${head}${" ".repeat(gap)}${note}`;
   return active ? `\x1b[48;5;238m${padToWidth(fitted, width)}\x1b[0m` : fitted;
 }
 

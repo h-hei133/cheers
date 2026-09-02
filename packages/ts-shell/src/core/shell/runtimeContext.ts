@@ -209,7 +209,7 @@ export function createWorkspaceAttachSwitchDiagnostic(input: {
     explanation:
       `Workspace attach requested ${input.requestedWorkspaceRoot}, which resolves to ${input.resolvedProjectRoot}; the current session is bound to ${input.currentProjectRoot}.`,
     nextAction:
-      "Confirm this project switch is intended. Use /sessions current after attach to inspect the new active session, or stay in the current project and use paths relative to its Target path base.",
+      "Confirm this project switch is intended. Use /resume current after attach to inspect the new active session, or stay in the current project and use paths relative to its Target path base.",
   }
 }
 

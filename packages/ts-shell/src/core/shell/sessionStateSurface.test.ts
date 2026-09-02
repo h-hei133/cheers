@@ -97,7 +97,7 @@ describe("sessionStateSurface", () => {
           activeSessionId: "sess_surface",
         }),
       ).toContain(
-        "* sess_surface  [error] [blocked]  Surface Session  @project  updated=30s ago durable=stopped phase=prompt-persisted terminal=stopped",
+        "- `sess_surface` (active now)  [error] [blocked]  Surface Session  @project  updated=30s ago durable=stopped phase=prompt-persisted terminal=stopped",
       );
 
       expect(formatSwitchedSessionLines(summary)[0]).toBe(
