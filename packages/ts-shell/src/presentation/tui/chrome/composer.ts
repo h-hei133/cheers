@@ -13,7 +13,12 @@ import { visibleWidth } from "../text/measure.js";
  */
 
 const CUE = "╰─ ";
-const CONTINUATION = "   ";
+/**
+ * Wrapped rows start in the first column, like everything else. Aligning them
+ * under the cue would put three cells in front of every continued line, and those
+ * cells come along when the draft is copied.
+ */
+const CONTINUATION = "";
 
 export interface ComposerState {
   /** True while a turn is running, which shows the queued-input affordance. */

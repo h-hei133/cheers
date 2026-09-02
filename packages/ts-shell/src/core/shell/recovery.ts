@@ -37,6 +37,9 @@ export function resolveSessionReference(input: {
       ? input.sessionManager.listReentrySummaries({
           limit: 24,
           preferredProjectRoot: input.preferredProjectRoot,
+          // Resolving a reference is answering an explicit request, so a session
+          // nobody spoke in is still findable by the id or title that named it.
+          includeUntouched: true,
         })
       : [];
 

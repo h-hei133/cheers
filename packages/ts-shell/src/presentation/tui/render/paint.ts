@@ -92,6 +92,13 @@ export function clampToHeight(rows: readonly string[], height: number): readonly
   return rows.length <= height ? rows : rows.slice(rows.length - height);
 }
 
+/** Rows padded to exactly `height`, so a short frame still clears what it replaced. */
+export function padToHeight(rows: readonly string[], height: number): string[] {
+  const padded = [...rows.slice(0, height)];
+  while (padded.length < height) padded.push("");
+  return padded;
+}
+
 /** Absolute rewrites for the rows that differ between two prepared frames. */
 export function diffPaint(previous: readonly string[], next: readonly string[], top: number, height: number): string {
   let buffer = "";
@@ -105,38 +112,11 @@ export function diffPaint(previous: readonly string[], next: readonly string[], 
   return buffer;
 }
 
-/**
- * Sequential write of history followed by viewport rows from `top`, letting the
- * terminal scroll when the two together overflow the screen. Rows pushed off the
- * top land in the terminal's scrollback, which is how retirement is published.
- */
-export function scrollPaint(
-  history: readonly string[],
-  viewport: readonly string[],
-  top: number,
-  height: number,
-): string {
-  let buffer = moveTo(top, 0);
-  let first = true;
-  for (const row of [...history, ...viewport]) {
-    if (!first) buffer += "\r\n";
-    first = false;
-    buffer += `${row}${ERASE_TO_END_OF_LINE}`;
-  }
-  const bottom = Math.max(0, Math.min(height, top + history.length + viewport.length));
-  if (bottom < height) buffer += eraseFromRow(bottom, height);
-  return buffer;
-}
-
 export const ENTER_ALT_SCREEN = "\x1b[?1049h";
 export const EXIT_ALT_SCREEN = "\x1b[?1049l";
 
-/**
- * A full-screen frame written from the top of the borrowed screen. Every row is
- * rewritten each frame: the alternate buffer is ours alone, so there is no
- * history to preserve and no diff worth computing against one modal state.
- */
-export function modalPaint(rows: readonly string[], height: number): string {
+/** Every row rewritten from the top, for a frame with no previous state to diff. */
+export function fullPaint(rows: readonly string[], height: number): string {
   let buffer = `${moveTo(0, 0)}${ERASE_TO_END_OF_SCREEN}`;
   for (let index = 0; index < Math.min(rows.length, height); index++) {
     buffer += `${moveTo(index, 0)}${rows[index] ?? ""}${ERASE_TO_END_OF_LINE}`;

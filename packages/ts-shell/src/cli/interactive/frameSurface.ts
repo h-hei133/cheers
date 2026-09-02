@@ -17,10 +17,14 @@ import { renderActivity, type TurnActivity } from "../../presentation/tui/transc
  * Frame composition for the interactive session.
  *
  * The screen is split once, here: chrome owns the bottom rows and the transcript
- * gets whatever is left. Because the transcript's capacity is known before it
- * renders, retirement is offered in the same frame the rows would have
- * overflowed — so a batch leaves the mutable viewport exactly as it enters the
- * terminal's scrollback, and is never painted twice.
+ * gets whatever is left. Since the screen is ours alone there is no terminal
+ * scrollback to defer to, so this also owns *where* in the transcript the window
+ * sits — which is what makes scrolling back a thing the surface can simply do.
+ *
+ * The window follows the newest rows unless the user has scrolled away from them.
+ * Following is the default because a conversation is read at its end; an explicit
+ * scroll is a statement that the user is reading something else, and new output
+ * must not yank them away from it.
  */
 
 export interface SurfaceContext {
@@ -36,7 +40,7 @@ export interface SurfaceContext {
   newlineKey(): string;
   /** True while a second cancel press would exit. */
   cancelArmed(): boolean;
-  /** True when an open picker or editor wants the whole screen. */
+  /** True when an open picker or reader wants the whole screen. */
   overlayFullScreen(): boolean;
   /** Rows for an open picker, or none when none is open. */
   overlayRows(width: number, height: number): string[];
@@ -57,6 +61,14 @@ export class InteractiveSurface implements TerminalFrameProvider {
   readonly suggestions = new SuggestionList();
 
   private suggesting = false;
+  /** Rows between the bottom of the transcript and the bottom of the window. */
+  private scrollBack = 0;
+  /** Row the transcript window started at last frame, for hit-testing a click. */
+  private lastTop = 0;
+  private lastTranscriptRows = 0;
+  /** How far back the window could go at the last frame, so a key can be honest. */
+  private lastMaxBack = 0;
+  private lastOwners: readonly number[] = [];
 
   constructor(private readonly context: SurfaceContext) {}
 
@@ -79,27 +91,57 @@ export class InteractiveSurface implements TerminalFrameProvider {
     const width = Math.max(8, dimensions.columns);
     const height = Math.max(4, dimensions.rows);
     if (this.context.overlayFullScreen()) {
-      // A full-screen picker owns the borrowed alternate screen; the transcript
-      // and its scrollback stay exactly as they were underneath.
-      return { modal: this.context.overlayRows(width, height), viewport: [] };
+      return { rows: this.context.overlayRows(width, height) };
     }
     const chrome = this.renderChrome(width, height);
     const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.length);
-    const history = this.transcript.peekBatch(width, capacity);
-    const live = this.transcript.renderViewport(width, capacity);
-    return { history, viewport: [...live, ...chrome] };
+    const rendered = this.transcript.render(width);
+    const maxBack = Math.max(0, rendered.rows.length - capacity);
+    this.lastMaxBack = maxBack;
+    this.scrollBack = Math.min(this.scrollBack, maxBack);
+    const top = maxBack - this.scrollBack;
+    this.lastTop = top;
+    this.lastTranscriptRows = capacity;
+    this.lastOwners = rendered.owners;
+    const visible = rendered.rows.slice(top, top + capacity);
+    // The transcript is padded down to its capacity so the chrome stays put: a
+    // short conversation should not float the prompt up the middle of the screen.
+    const filler = Array.from({ length: Math.max(0, capacity - visible.length) }, () => "");
+    return { rows: [...filler, ...visible, ...chrome] };
   }
 
-  acknowledgeHistory(id: number): void {
-    this.transcript.acknowledge(id);
+  /** How far back the window is, in rows; 0 means it is following the newest. */
+  get scrolledBack(): number {
+    return this.scrollBack;
   }
 
-  beginHistoryReplay(): void {
-    this.transcript.beginReplay();
+  /**
+   * Move the window by `rows` (negative scrolls back). Returns whether it moved,
+   * so a key that could not scroll can fall through to something else.
+   */
+  scroll(rows: number): boolean {
+    // Bounded by what the last frame could actually reveal, so a key that had
+    // nowhere to go says so instead of reporting a move that renders identically.
+    const next = Math.min(this.lastMaxBack, Math.max(0, this.scrollBack - rows));
+    if (next === this.scrollBack) return false;
+    this.scrollBack = next;
+    return true;
   }
 
-  beginHistoryFlush(): void {
-    this.transcript.beginFlush();
+  /** Jump to the newest rows, which is also what any new output implies. */
+  scrollToEnd(): void {
+    this.scrollBack = 0;
+  }
+
+  /** Scroll by whole screens, for PageUp and PageDown. */
+  scrollPage(direction: -1 | 1): boolean {
+    return this.scroll(direction * Math.max(1, this.lastTranscriptRows - 1));
+  }
+
+  /** The block under screen row `row`, for a click that lands on the transcript. */
+  blockAtScreenRow(row: number): ReturnType<Transcript["blockAt"]> {
+    const index = this.lastOwners[this.lastTop + row];
+    return index === undefined ? undefined : this.transcript.blockAt(index);
   }
 
   /**

@@ -29,6 +29,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["home", "ctrl+a"], does: "start of line", group: "moving" },
   { keys: ["end", "ctrl+e"], does: "end of line", group: "moving" },
   { keys: ["up", "down"], does: "move between lines, then walk prompt history", group: "moving" },
+  { keys: ["pageup", "pagedown"], does: "scroll the conversation by a screen", group: "moving" },
+  { keys: ["shift+up", "shift+down"], does: "scroll the conversation by a line", group: "moving" },
 
   { keys: ["backspace"], does: "delete the character before the caret", group: "editing" },
   { keys: ["delete"], does: "delete the character under the caret", group: "editing" },

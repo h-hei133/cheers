@@ -38,13 +38,8 @@ export function restoreConversation(turns: readonly SessionMessage[]): RestoredH
   return { blocks, omitted: spoken.length - kept.length };
 }
 
-/** Rows of restored history left on screen; the rest goes to scrollback. */
-const VISIBLE_ON_RESTORE_ROWS = 8;
-
 export interface HistoryTarget {
   readonly transcript: Transcript;
-  /** Current frame width, so restored rows retire at the width they were measured at. */
-  readonly width: number;
   readonly sessionManager: {
     getSession(sessionId: string): Session | undefined;
     createNew(
@@ -80,9 +75,6 @@ export function showConversation(target: HistoryTarget): void {
   }
   for (const block of restored.blocks) target.transcript.append(block);
   target.transcript.finalizeAll();
-  // Restored history belongs above the viewport, where it can be scrolled. Left in
-  // the mutable window it is unreachable until later output happens to overflow.
-  target.transcript.retirePast(target.width, VISIBLE_ON_RESTORE_ROWS);
 }
 
 /**

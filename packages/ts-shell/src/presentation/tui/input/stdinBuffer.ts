@@ -1,5 +1,6 @@
 import { ESC, ESCAPE_INCOMPLETE, ESCAPE_OVERLONG, resolveEscapeEnd, scalarLength } from "./escape.js";
 import { parseKeyEvent, type ParsedKeyEvent } from "./keys.js";
+import { isMouseSequence, parseMouseReport, type MouseReport } from "./mouse.js";
 
 /**
  * Raw stdin reassembler.
@@ -22,6 +23,7 @@ const PASTE_HOLD_MS = 1000;
 
 export type KeyListener = (event: ParsedKeyEvent) => void;
 export type PasteListener = (text: string) => void;
+export type MouseListener = (report: MouseReport) => void;
 
 export interface StdinBufferOptions {
   readonly partialHoldMs?: number;
@@ -39,6 +41,7 @@ export class StdinBuffer {
 
   private readonly keyListeners = new Set<KeyListener>();
   private readonly pasteListeners = new Set<PasteListener>();
+  private readonly mouseListeners = new Set<MouseListener>();
   private readonly partialHoldMs: number;
   private readonly pasteHoldMs: number;
   private readonly setTimer: (callback: () => void, delayMs: number) => unknown;
@@ -59,6 +62,11 @@ export class StdinBuffer {
   onPaste(listener: PasteListener): () => void {
     this.pasteListeners.add(listener);
     return () => this.pasteListeners.delete(listener);
+  }
+
+  onMouse(listener: MouseListener): () => void {
+    this.mouseListeners.add(listener);
+    return () => this.mouseListeners.delete(listener);
   }
 
   feed(chunk: string): void {
@@ -87,6 +95,7 @@ export class StdinBuffer {
     this.pasteTimer = undefined;
     this.keyListeners.clear();
     this.pasteListeners.clear();
+    this.mouseListeners.clear();
   }
 
   /** Consume every sequence the buffer can complete, leaving any partial behind. */
@@ -185,6 +194,13 @@ export class StdinBuffer {
   private take(length: number): void {
     const sequence = this.buffer.slice(0, length);
     this.buffer = this.buffer.slice(length);
+    // A mouse report shares the CSI shape of a keystroke, so it has to be
+    // recognised here or it reaches the editor as typed text.
+    if (isMouseSequence(sequence)) {
+      const report = parseMouseReport(sequence);
+      if (report) for (const listener of this.mouseListeners) listener(report);
+      return;
+    }
     const event = parseKeyEvent(sequence);
     if (!event.keyId) return;
     for (const listener of this.keyListeners) listener(event);

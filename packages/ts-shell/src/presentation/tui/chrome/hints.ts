@@ -61,7 +61,7 @@ export function renderHints(
 ): string[] {
   const text = transientHint(context) ?? ambientFacts(ambient);
   if (!text) return [];
-  return [defaultTheme.dim(truncateToWidth(`  ${text}`, width))];
+  return [defaultTheme.dim(truncateToWidth(text, width))];
 }
 
 /** Newline key to advertise for a negotiated keyboard protocol. */

@@ -51,7 +51,7 @@ export function renderActivity(activity: TurnActivity | undefined, now: number, 
     facts.push(`${activity.estimated ? "~" : ""}${formatTokens(activity.tokens)} tok`);
   }
   const hint = activity.cancelling ? "" : defaultTheme.dim("  esc to interrupt");
-  const row = `  ${glyph} ${defaultTheme.bold(label)} ${defaultTheme.dim(facts.join(" · "))}${hint}`;
+  const row = `${glyph} ${defaultTheme.bold(label)} ${defaultTheme.dim(facts.join(" · "))}${hint}`;
   return [truncateToWidth(row, width), ""];
 }
 

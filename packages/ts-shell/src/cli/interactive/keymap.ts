@@ -59,6 +59,10 @@ export interface KeymapActions {
   cycleAgentMode(): void;
   /** Cycle how much a turn may do without asking. */
   cyclePermissionScope(): void;
+  /** Move the transcript window; negative scrolls back. */
+  scroll(rows: number): void;
+  /** Move the transcript window by whole screens. */
+  scrollPage(direction: -1 | 1): void;
   /** Run the last turn again, if the last one failed. */
   retry(): void;
   /** Offer an earlier point in the conversation to go back to. */
@@ -153,6 +157,10 @@ export function dispatchedKeyIds(): readonly string[] {
     "shift+tab",
     "alt+p",
     "f5",
+    "pageup",
+    "pagedown",
+    "shift+up",
+    "shift+down",
     "up",
     "down",
   ];
@@ -205,6 +213,18 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
     case "alt+p":
       actions.cyclePermissionScope();
       actions.redraw();
+      return;
+    case "pageup":
+      actions.scrollPage(-1);
+      return;
+    case "pagedown":
+      actions.scrollPage(1);
+      return;
+    case "shift+up":
+      actions.scroll(-1);
+      return;
+    case "shift+down":
+      actions.scroll(1);
       return;
     case "f5":
       // A function key rather than a modified chord: every terminal delivers F5

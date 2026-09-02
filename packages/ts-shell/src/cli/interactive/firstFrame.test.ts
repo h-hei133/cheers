@@ -81,11 +81,23 @@ describe("first painted frame", () => {
     mode.stop();
   });
 
-  it("stays on the normal screen so the transcript keeps real scrollback", () => {
+  it("takes a screen of its own, and gives it back", () => {
     const { mode, terminal, scheduler } = boot();
     mode.start();
     scheduler.flush();
-    expect(terminal.drain()).not.toContain("?1049");
+    // A screen of its own is what makes leaving restore the terminal exactly, and
+    // what lets the mouse be ours without costing the user their scrollback.
+    expect(terminal.drain()).toContain("\x1b[?1049h");
+    mode.stop();
+    expect(terminal.drain()).toContain("\x1b[?1049l");
+  });
+
+  it("asks for mouse reports, since the screen is ours to answer for", () => {
+    const { mode, terminal, scheduler } = boot();
+    mode.start();
+    scheduler.flush();
+
+    expect(terminal.drain()).toContain("\x1b[?1002h");
     mode.stop();
   });
 

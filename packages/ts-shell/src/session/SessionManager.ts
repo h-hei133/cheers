@@ -552,8 +552,14 @@ export class SessionManager {
     return this.store.listSessions();
   }
 
+  /**
+   * Sessions worth returning to, newest first.
+   *
+   * A session nobody said anything in is not one of them — offering it would put a
+   * row in the chooser for every time the CLI was opened.
+   */
   listRecentSessions(limit: number = 5): Session[] {
-    return this.listSessions().slice(0, limit);
+    return this.listRealSessions().slice(0, limit);
   }
 
   listRecentProjectContexts(limit: number = 8): ProjectContextSummary[] {
@@ -565,14 +571,21 @@ export class SessionManager {
     });
   }
 
+  /**
+   * Sessions to offer, newest and most relevant first.
+   *
+   * `includeUntouched` exists for resolution rather than offering: hiding a session
+   * nobody spoke in keeps the chooser clean, but refusing to *find* one the user
+   * named by title or id would be refusing an explicit request.
+   */
   listReentrySummaries(input?: {
     readonly limit?: number;
     readonly preferredProjectRoot?: string;
+    readonly includeUntouched?: boolean;
   }): SessionReentrySummary[] {
+    const sessions = input?.includeUntouched === true ? this.listSessions() : this.listRealSessions();
     return projectSortedSessionReentrySummaries({
-      summaries: this.listRealSessions().map((session) =>
-        this.describeSessionReentry(session.id),
-      ),
+      summaries: sessions.map((session) => this.describeSessionReentry(session.id)),
       preferredProjectRoot: input?.preferredProjectRoot,
       limit: input?.limit,
     });

@@ -5,7 +5,6 @@ import {
   normalizeStatusItems,
   type StatusItemId,
 } from "../../presentation/tui/chrome/items.js";
-import type { ResizeScrollbackMode } from "../../presentation/tui/render/frame.js";
 
 /**
  * Display preferences for the interactive surface.
@@ -51,13 +50,4 @@ function writeTuiSetting(workspaceRoot: string, key: string, value: unknown): st
   fs.mkdirSync(path.dirname(userPath), { recursive: true });
   fs.writeFileSync(userPath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
   return userPath;
-}
-
-/**
- * How a settled width change refreshes rows already in scrollback. Rebuilding is
- * right for every terminal that rewraps them; preserving is the escape hatch for
- * one that does not.
- */
-export function resizeScrollbackMode(env: NodeJS.ProcessEnv): ResizeScrollbackMode {
-  return env.TSSHELL_TUI_RESIZE_SCROLLBACK === "preserve" ? "preserve" : "rebuild";
 }

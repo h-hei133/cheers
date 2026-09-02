@@ -11,6 +11,7 @@ import { renderWelcome } from "../../presentation/tui/chrome/welcome.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
 import { nextScope, scopeLabel, scopeMeaning } from "../approval/permissionScope.js";
 import { Clipboard } from "./clipboard.js";
+import { Pointer } from "./pointer.js";
 import { TUI } from "../../presentation/tui/render/engine.js";
 import { processTerminal, type TerminalDevice } from "../../presentation/tui/terminal.js";
 import { textBlock } from "../../presentation/tui/transcript/blocks.js";
@@ -26,7 +27,7 @@ import { showConversation, startFreshSession, type HistoryTarget } from "./histo
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
-import { readStatusItems, resizeScrollbackMode, writeStatusItems } from "./tuiSettings.js";
+import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
 import { couldBeCommand, slashSuggestions } from "./slashSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
@@ -84,6 +85,7 @@ export class InteractiveMode {
   private readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number } = {};
   private readonly overlay: OverlayHost;
   private readonly pager = new Pager();
+  private readonly pointer: Pointer;
   private readonly clipboard: Clipboard;
   private statusItems: readonly StatusItemId[];
   /**
@@ -110,7 +112,7 @@ export class InteractiveMode {
       write: (data) => this.terminal.write(data),
     });
     this.overlay = new OverlayHost(() => this.tui.requestRender());
-    this.tui = new TUI(this.terminal, options.scheduler, resizeScrollbackMode(process.env));
+    this.tui = new TUI(this.terminal, options.scheduler);
     this.surface = new InteractiveSurface({
       facts: () =>
         readStatusFacts(this.options.runtimeContext, {
@@ -131,7 +133,18 @@ export class InteractiveMode {
       overlayRows: (width, height) =>
         this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
     });
-    this.sink = new TurnSink(this.surface.transcript, () => this.tui.requestRender());
+    this.pointer = new Pointer({
+      surface: this.surface,
+      rows: () => this.tui.screenRows(),
+      copy: (text) => this.clipboard.copy(text),
+      redraw: () => this.tui.requestRender(),
+    });
+    this.sink = new TurnSink(this.surface.transcript, () => {
+      // New output brings the window back to the newest rows — unless the user has
+      // scrolled away, which is a statement that they are reading something else.
+      if (this.surface.scrolledBack === 0) this.surface.scrollToEnd();
+      this.tui.requestRender();
+    });
     this.questions = new QuestionBridge({
       ask: (question) => this.onQuestion(question),
       settle: () => this.onQuestionSettled(),
@@ -160,6 +173,7 @@ export class InteractiveMode {
         ),
     });
     this.stdin.onKey((event) => this.onKey(event));
+    this.stdin.onMouse((report) => this.pointer.handle(report));
     this.stdin.onPaste((text) => {
       // A paste while the full-screen editor is up belongs to it, whole; a paste
       // into the prompt is held aside once it is long enough to bury the draft.
@@ -219,6 +233,14 @@ export class InteractiveMode {
         clearScreen: () => this.clearScreen(),
         cycleAgentMode: () => this.cycleAgentMode(),
         cyclePermissionScope: () => this.cyclePermissionScope(),
+        scroll: (rows) => {
+          this.surface.scroll(rows);
+          this.tui.requestRender();
+        },
+        scrollPage: (direction) => {
+          this.surface.scrollPage(direction);
+          this.tui.requestRender();
+        },
         retry: () => this.onSubmit("/retry"),
         openRewind: () => this.openPicker("rewind"),
         redrawAfter: (delayMs) => {
@@ -341,10 +363,10 @@ export class InteractiveMode {
       if (clearing) {
         startFreshSession(this.historyTarget());
         this.sink.end(true);
-        this.tui.requestRender({ force: true, clearScrollback: true });
+        this.tui.requestRender({ force: true });
       } else if (opened) {
         showConversation(this.historyTarget());
-        this.tui.requestRender({ force: true, clearScrollback: true });
+        this.tui.requestRender({ force: true });
       }
       this.tui.requestRender();
       const next = retrying ?? this.queue.shift();
@@ -356,7 +378,6 @@ export class InteractiveMode {
   private historyTarget(): HistoryTarget {
     return {
       transcript: this.surface.transcript,
-      width: Math.max(8, this.terminal.getDimensions().columns),
       sessionManager: this.options.sessionManager,
       context: this.options.runtimeContext,
     };
@@ -416,7 +437,7 @@ export class InteractiveMode {
           point.turnIndex,
         );
         showConversation(this.historyTarget());
-        this.tui.requestRender({ force: true, clearScrollback: true });
+        this.tui.requestRender({ force: true });
         return dropped > 0
           ? "Went back. Files are untouched — /undo reverts what was written."
           : "Already at that point in the conversation.";
@@ -473,7 +494,7 @@ export class InteractiveMode {
   /** Drop the visible transcript and the terminal's scrollback together. */
   private clearScreen(): void {
     this.surface.transcript.clear();
-    this.tui.requestRender({ force: true, clearScrollback: true });
+    this.tui.requestRender({ force: true });
   }
 
   private shutdown(): void {

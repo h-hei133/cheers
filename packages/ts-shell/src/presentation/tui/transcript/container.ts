@@ -1,23 +1,17 @@
-import type { HistoryBatch } from "../render/frame.js";
 import { type Block, renderBlock } from "./blocks.js";
 
 /**
- * Ordered transcript with explicit retirement into terminal scrollback.
+ * Ordered transcript.
  *
- * Blocks stay live — and keep reflowing to the current width — while the screen
- * has room for them. Once the live tail no longer fits, the oldest *finalized*
- * blocks are offered as a history batch; the renderer writes that batch into the
- * terminal's own scrollback and acknowledges it, at which point the transcript
- * stops rendering those blocks entirely. Two invariants make that safe:
- * retirement is strictly in order, and a block is never offered while it can
- * still change, because rows already in scrollback cannot be taken back.
+ * Every block the session has produced, rendered to rows on demand. It used to
+ * retire finished blocks into the terminal's own scrollback, because the session
+ * was drawn on the normal screen; on a screen of our own there is nothing to
+ * retire *into*, so the transcript keeps everything and the surface decides which
+ * part of it is on screen.
+ *
+ * Rendering is memoised per block while the block cannot change, so composing a
+ * frame from a long conversation costs an array walk rather than a re-layout.
  */
-
-interface Offer {
-  readonly id: number;
-  readonly end: number;
-  readonly kind: "append" | "replay";
-}
 
 interface CacheEntry {
   readonly width: number;
@@ -26,14 +20,14 @@ interface CacheEntry {
 
 const EMPTY: readonly string[] = [];
 
+export interface RenderedTranscript {
+  readonly rows: readonly string[];
+  /** For each row, the index of the block that produced it. */
+  readonly owners: readonly number[];
+}
+
 export class Transcript {
   private blocks: Block[] = [];
-  private frontier = 0;
-  private nextBatchId = 1;
-  private offer: Offer | undefined;
-  private replayPending = false;
-  private pendingRetire: number | undefined;
-  private flushing = false;
   private readonly cache = new WeakMap<Block, CacheEntry>();
 
   /** Add a block to the end of the transcript. */
@@ -47,157 +41,50 @@ export class Transcript {
     return this.blocks[this.blocks.length - 1];
   }
 
-  /**
-   * The newest blocks first, including ones already retired into scrollback:
-   * a user copying an answer usually wants one that has scrolled away.
-   */
+  /** The block a rendered row came from, for a click that lands on it. */
+  blockAt(index: number): Block | undefined {
+    return this.blocks[index];
+  }
+
+  /** The newest blocks first, for a chooser over what was said. */
   recent(limit: number): readonly Block[] {
     return this.blocks.slice(Math.max(0, this.blocks.length - limit)).reverse();
   }
 
-  /** Mark every live block finalized so the turn can retire. */
+  /** Mark every block finished, so its rendering is stable and cacheable. */
   finalizeAll(): void {
-    for (let index = this.frontier; index < this.blocks.length; index++) {
-      this.blocks[index]!.finalized = true;
-    }
+    for (const block of this.blocks) block.finalized = true;
   }
 
-  /** Forget everything, including what has already retired. */
+  /** Forget everything. */
   clear(): void {
     this.blocks = [];
-    this.frontier = 0;
-    this.offer = undefined;
-    this.replayPending = false;
-    this.pendingRetire = undefined;
   }
 
-  /** Rows the live tail would occupy at `width`, ignoring any pending offer. */
+  /** Rows the whole transcript occupies at `width`. */
   rowCount(width: number): number {
     let total = 0;
-    for (let index = this.frontier; index < this.blocks.length; index++) {
-      total += this.rowsFor(this.blocks[index]!, width).length;
-    }
+    for (const block of this.blocks) total += this.rowsFor(block, width).length;
     return total;
   }
 
   /**
-   * The live tail, clipped to the last `rows` rows when it overflows.
+   * Every row, with the block each came from.
    *
-   * Blocks in an outstanding append offer are already excluded: they are on
-   * their way into the terminal's scrollback in this very frame, so painting
-   * them here too would show them twice. Call after {@link peekBatch}.
+   * The owner list is what lets a click on a row reach the block under it — a
+   * collapsed reasoning block or a tool card that can be expanded.
    */
-  renderViewport(width: number, rows: number): readonly string[] {
-    if (rows <= 0) return EMPTY;
-    const output: string[] = [];
-    for (let index = this.liveStart(); index < this.blocks.length; index++) {
-      output.push(...this.rowsFor(this.blocks[index]!, width));
-    }
-    return output.length <= rows ? output : output.slice(output.length - rows);
-  }
-
-  /** First block still owned by the mutable viewport. */
-  private liveStart(): number {
-    return this.offer?.kind === "append" ? this.offer.end : this.frontier;
-  }
-
-  /**
-   * The next batch to publish, or undefined when nothing may retire yet.
-   *
-   * Under a flush every finalized prefix is eligible. Otherwise a prefix is only
-   * offered while the live tail exceeds `capacity`, so a short session keeps its
-   * whole transcript reflowable in the viewport.
-   */
-  peekBatch(width: number, capacity: number): HistoryBatch | undefined {
-    if (this.offer) return { id: this.offer.id, rows: this.offeredRows(width), kind: this.offer.kind };
-    if (this.replayPending) return this.offerReplay(width);
-    if (this.pendingRetire !== undefined) return this.offerPending(width);
-
-    let live = this.rowCount(width);
-    let end = this.frontier;
+  render(width: number): RenderedTranscript {
+    if (this.blocks.length === 0) return { rows: EMPTY, owners: EMPTY as unknown as number[] };
     const rows: string[] = [];
-    while (end < this.blocks.length && this.blocks[end]!.finalized) {
-      if (!this.flushing && live <= capacity) break;
-      const blockRows = this.rowsFor(this.blocks[end]!, width);
-      rows.push(...blockRows);
-      live -= blockRows.length;
-      end += 1;
+    const owners: number[] = [];
+    for (let index = 0; index < this.blocks.length; index++) {
+      for (const row of this.rowsFor(this.blocks[index]!, width)) {
+        rows.push(row);
+        owners.push(index);
+      }
     }
-    if (end === this.frontier) return undefined;
-    this.offer = { id: this.nextBatchId++, end, kind: "append" };
-    return { id: this.offer.id, rows, kind: "append" };
-  }
-
-  /** Retire exactly the batch that was offered; any other id is ignored. */
-  acknowledge(id: number): void {
-    if (!this.offer || this.offer.id !== id) return;
-    if (this.offer.kind === "append") this.frontier = this.offer.end;
-    this.offer = undefined;
-  }
-
-  /** Republish the whole committed ledger after a scrollback reset. */
-  beginReplay(): void {
-    this.replayPending = true;
-  }
-
-  /**
-   * Push everything but the last `keep` rows into scrollback now.
-   *
-   * Restored history is history: it belongs above the viewport, where the terminal
-   * can scroll it. Left in the mutable window it is unscrollable until later output
-   * happens to overflow — which is why a restored session looked frozen until the
-   * next keystroke.
-   */
-  retirePast(width: number, keep: number): void {
-    let live = this.rowCount(width);
-    let end = this.frontier;
-    while (end < this.blocks.length && this.blocks[end]!.finalized && live > keep) {
-      live -= this.rowsFor(this.blocks[end]!, width).length;
-      end += 1;
-    }
-    if (end > this.frontier) this.pendingRetire = end;
-  }
-
-  /** Retire every finalized prefix, regardless of viewport pressure. */
-  beginFlush(): void {
-    this.flushing = true;
-    this.replayPending = false;
-  }
-
-  /** Publish the prefix {@link retirePast} asked for, whatever the capacity. */
-  private offerPending(width: number): HistoryBatch | undefined {
-    const end = this.pendingRetire!;
-    this.pendingRetire = undefined;
-    if (end <= this.frontier) return undefined;
-    const rows: string[] = [];
-    for (let index = this.frontier; index < end; index++) {
-      rows.push(...this.rowsFor(this.blocks[index]!, width));
-    }
-    if (rows.length === 0) return undefined;
-    this.offer = { id: this.nextBatchId++, end, kind: "append" };
-    return { id: this.offer.id, rows, kind: "append" };
-  }
-
-  private offerReplay(width: number): HistoryBatch | undefined {
-    this.replayPending = false;
-    if (this.frontier === 0) return undefined;
-    const rows: string[] = [];
-    for (let index = 0; index < this.frontier; index++) {
-      rows.push(...this.rowsFor(this.blocks[index]!, width));
-    }
-    if (rows.length === 0) return undefined;
-    this.offer = { id: this.nextBatchId++, end: this.frontier, kind: "replay" };
-    return { id: this.offer.id, rows, kind: "replay" };
-  }
-
-  private offeredRows(width: number): readonly string[] {
-    const offer = this.offer!;
-    const start = offer.kind === "replay" ? 0 : this.frontier;
-    const rows: string[] = [];
-    for (let index = start; index < offer.end; index++) {
-      rows.push(...this.rowsFor(this.blocks[index]!, width));
-    }
-    return rows;
+    return { rows, owners };
   }
 
   /** Rendered rows for one block, memoised while the block cannot change. */

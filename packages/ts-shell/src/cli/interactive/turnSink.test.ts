@@ -13,7 +13,7 @@ function build(): { sink: TurnSink; transcript: Transcript; rows: () => string }
   return {
     sink,
     transcript,
-    rows: () => transcript.renderViewport(WIDTH, 200).join("\n"),
+    rows: () => transcript.render(WIDTH).rows.join("\n"),
   };
 }
 
@@ -120,7 +120,7 @@ describe("prose channel", () => {
     sink.begin("command", "/help");
     sink.line("");
     sink.line("   ");
-    expect(transcript.renderViewport(WIDTH, 200)).toEqual([]);
+    expect(transcript.render(WIDTH).rows).toEqual([]);
   });
 
   it("keeps prose and streamed text in separate blocks", () => {
@@ -206,12 +206,12 @@ describe("turn boundaries", () => {
     expect(sink.activity()).toBeUndefined();
   });
 
-  it("finalizes everything so the turn can retire into scrollback", () => {
+  it("finalizes everything, so rendering is stable and cacheable", () => {
     const { sink, transcript } = build();
     sink.begin("turn", "turn");
     sink.chunk("streaming");
-    expect(transcript.peekBatch(WIDTH, 0)).toBeUndefined();
+    expect(transcript.last()?.finalized).toBe(false);
     sink.end();
-    expect(transcript.peekBatch(WIDTH, 0)).toBeDefined();
+    expect(transcript.last()?.finalized).toBe(true);
   });
 });

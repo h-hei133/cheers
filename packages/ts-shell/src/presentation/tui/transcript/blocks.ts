@@ -43,8 +43,16 @@ export interface Block {
   rows?: (width: number) => readonly string[];
 }
 
-const GUTTER = "  ";
-const BODY_INDENT = "    ";
+/**
+ * Nothing is indented.
+ *
+ * Indentation is real cells, and cells are what a copy takes: two leading spaces on
+ * every row is two spaces in front of every pasted line. Structure is carried by
+ * the markers instead — a rail, a glyph, a status character — which sit *in* the
+ * first column rather than pushing the text out of it.
+ */
+const GUTTER = "";
+const BODY_INDENT = "";
 
 const STATUS_GLYPH: Record<ToolStatus, string> = { running: "◐", ok: "✔", failed: "✗" };
 
