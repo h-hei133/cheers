@@ -24,7 +24,6 @@ import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
 import { showConversation, startFreshSession, type HistoryTarget } from "./history.js";
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
-import { DraftPane } from "./draftPane.js";
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, resizeScrollbackMode, writeStatusItems } from "./tuiSettings.js";
@@ -46,6 +45,9 @@ import { TurnSink } from "./turnSink.js";
 const DEFAULT_PLACEHOLDER = "Ask anything, or / for commands";
 
 /** Window in which the exit hint stays on screen after one cancel press. */
+/** How often the activity row is repainted while a turn runs, for its clock. */
+const ACTIVITY_TICK_MS = 100;
+
 const CANCEL_ARMED_MS = 600;
 
 /**
@@ -81,7 +83,6 @@ export class InteractiveMode {
   private readonly readline: ReadlineInterface;
   private readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number } = {};
   private readonly overlay: OverlayHost;
-  private readonly pane = new DraftPane();
   private readonly pager = new Pager();
   private readonly clipboard: Clipboard;
   private statusItems: readonly StatusItemId[];
@@ -93,6 +94,7 @@ export class InteractiveMode {
   private previewItems: readonly StatusItemId[] | undefined;
 
   private busy = false;
+  private tick: ReturnType<typeof setInterval> | undefined;
   private turnNumber = 0;
   /** The last thing submitted that was a prompt rather than a command. */
   private lastPrompt: string | undefined;
@@ -125,13 +127,9 @@ export class InteractiveMode {
       ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
       newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
       cancelArmed: () => this.isCancelArmed(),
-      overlayFullScreen: () => this.pane.active || this.pager.active || this.overlay.fullScreen,
+      overlayFullScreen: () => this.pager.active || this.overlay.fullScreen,
       overlayRows: (width, height) =>
-        this.pane.active
-          ? this.pane.render(width, height)
-          : this.pager.active
-            ? this.pager.render(width, height)
-            : this.overlay.render(width, height),
+        this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
     });
     this.sink = new TurnSink(this.surface.transcript, () => this.tui.requestRender());
     this.questions = new QuestionBridge({
@@ -165,8 +163,14 @@ export class InteractiveMode {
     this.stdin.onPaste((text) => {
       // A paste while the full-screen editor is up belongs to it, whole; a paste
       // into the prompt is held aside once it is long enough to bury the draft.
-      if (this.pane.active) this.pane.handlePaste(text);
-      else {
+      // Pasting the same thing twice in quick succession means "show it in full":
+      // the first press left a placeholder, and the second replaces it with the text.
+      const repeat = this.surface.pastes.expandOnRepeat(text);
+      if (repeat) {
+        this.surface.editor.setText(
+          this.surface.editor.getText().replace(repeat.find, repeat.text),
+        );
+      } else {
         this.surface.editor.insert(this.surface.pastes.holdIfLong(text));
         this.syncSuggestions(false);
       }
@@ -178,6 +182,8 @@ export class InteractiveMode {
   }
 
   stop(): void {
+    if (this.tick) clearInterval(this.tick);
+    this.tick = undefined;
     this.clipboard.release();
     this.questions.abandon();
     this.options.renderer.clearSink();
@@ -194,11 +200,7 @@ export class InteractiveMode {
   private onKey(event: Parameters<typeof routeKey>[0]): void {
     // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
     // every printable character for its filter.
-    // The full-screen views own every key while they are up, including Escape.
-    if (this.pane.handleKey(event)) {
-      this.tui.requestRender();
-      return;
-    }
+    // The pager owns every key while it is up, including Escape.
     if (this.pager.handleKey(event.keyId, event.text, this.terminal.getDimensions().rows)) {
       this.tui.requestRender();
       return;
@@ -218,7 +220,6 @@ export class InteractiveMode {
         cycleAgentMode: () => this.cycleAgentMode(),
         cyclePermissionScope: () => this.cyclePermissionScope(),
         retry: () => this.onSubmit("/retry"),
-        expandDraft: () => this.pane.openFrom(this.surface.editor, this.surface.pastes, () => this.tui.requestRender()),
         openRewind: () => this.openPicker("rewind"),
         redrawAfter: (delayMs) => {
           setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
@@ -281,6 +282,11 @@ export class InteractiveMode {
   /** Execute one submission, then drain anything typed while it ran. */
   private async run(text: string): Promise<void> {
     this.busy = true;
+    // The elapsed time is computed at paint time, and paints are driven by events.
+    // Between two events there are none, so without a clock of its own the timer
+    // sits at whatever it read when the turn began.
+    this.tick ??= setInterval(() => this.tui.requestRender(), ACTIVITY_TICK_MS);
+    this.tick.unref?.();
     let exiting = false;
     let retrying: string | undefined;
     let clearing = false;
@@ -320,6 +326,8 @@ export class InteractiveMode {
       );
     } finally {
       this.options.renderer.clearSink();
+      if (this.tick) clearInterval(this.tick);
+      this.tick = undefined;
       // Long command output gets a view of its own: it is read once, and reading it
       // should not cost the conversation its place on screen.
       const output = this.sink.commandOutput;
@@ -332,7 +340,7 @@ export class InteractiveMode {
       }
       if (clearing) {
         startFreshSession(this.historyTarget());
-        this.sink.reset();
+        this.sink.end(true);
         this.tui.requestRender({ force: true, clearScrollback: true });
       } else if (opened) {
         showConversation(this.historyTarget());
@@ -348,6 +356,7 @@ export class InteractiveMode {
   private historyTarget(): HistoryTarget {
     return {
       transcript: this.surface.transcript,
+      width: Math.max(8, this.terminal.getDimensions().columns),
       sessionManager: this.options.sessionManager,
       context: this.options.runtimeContext,
     };
@@ -409,7 +418,7 @@ export class InteractiveMode {
         showConversation(this.historyTarget());
         this.tui.requestRender({ force: true, clearScrollback: true });
         return dropped > 0
-          ? `Went back ${dropped} turns. Files are untouched — use /undo to revert what was written.`
+          ? "Went back. Files are untouched — /undo reverts what was written."
           : "Already at that point in the conversation.";
       },
       previewStatusItems: (items) => {

@@ -151,6 +151,9 @@ export async function* runAutonomousReActLoop(
     options.realProvider?.model ?? "deepseek-ai/DeepSeek-V4-Flash";
 
   let lastAssistantText = "";
+  // Kept so an empty answer can be explained rather than papered over.
+  let lastFinishReason: string | undefined;
+  let lastReasoningLength = 0;
   function estimateTokens(msgs: ReadonlyArray<{ readonly content?: string | null }>): number {
     let totalChars = 0;
     for (const m of msgs) {
@@ -303,11 +306,16 @@ export async function* runAutonomousReActLoop(
             responseJson = {
               choices: [{ message: step.value.message, finish_reason: step.value.finishReason }],
               usage: step.value.usage,
+              reasoning: step.value.reasoning,
             };
             break;
           }
-          streamedText += step.value;
-          yield { type: "message.delta", role: "coder", delta: step.value };
+          if (step.value.kind === "reasoning") {
+            yield { type: "reasoning.delta", role: "coder", delta: step.value.text };
+            continue;
+          }
+          streamedText += step.value.text;
+          yield { type: "message.delta", role: "coder", delta: step.value.text };
         }
         const usage = responseJson.usage;
         if (usage) {
@@ -356,6 +364,8 @@ export async function* runAutonomousReActLoop(
       }
     }
 
+    lastFinishReason = responseJson.choices?.[0]?.finish_reason ?? undefined;
+    lastReasoningLength = typeof responseJson.reasoning === "string" ? responseJson.reasoning.length : 0;
     const choice = responseJson.choices?.[0];
     const assistantMessage = choice?.message;
     if (!assistantMessage) {
@@ -566,17 +576,15 @@ export async function* runAutonomousReActLoop(
       });
     }
   }
-  // If loop executed tool turns but model did not output final text before exiting, synthesize completion output
+  // The model finished without saying anything. Report why, rather than inventing a
+  // summary: "Completed execution across 1 turns" told the user nothing, and told
+  // them it in a vocabulary that only makes sense inside this loop.
   if (!lastAssistantText && messages.length > 2) {
     const lastToolOutput = messages.filter((m) => m.role === "tool").slice(-1)[0]?.content;
     const summaryText = lastToolOutput
-      ? `Analysis complete based on tool observations:\n\n${lastToolOutput.slice(0, 1000)}`
-      : `Completed execution across ${turn} turns.`;
-    yield {
-      type: "message.delta",
-      role: "coder",
-      delta: summaryText,
-    };
+      ? `The tools ran but no answer followed. What the last one returned:\n\n${lastToolOutput.slice(0, 1000)}`
+      : emptyAnswerExplanation(lastFinishReason, lastReasoningLength);
+    yield { type: "message.delta", role: "coder", delta: summaryText };
     lastAssistantText = summaryText;
   }
 
@@ -604,4 +612,24 @@ export async function* runAutonomousReActLoop(
       finalOutput: lastAssistantText,
     },
   };
+}
+
+/**
+ * Why a turn produced no answer, in terms the user can act on.
+ *
+ * Each case has a different remedy, so each is named: a truncated response needs a
+ * shorter context, a refusal needs a different request, and a model that spent the
+ * whole turn reasoning without concluding needs to be asked again.
+ */
+function emptyAnswerExplanation(finishReason: string | undefined, reasoningLength: number): string {
+  if (finishReason === "length") {
+    return "The reply was cut off before any of it arrived — the context is probably full. Run `/compact` and ask again.";
+  }
+  if (finishReason === "content_filter") {
+    return "The provider withheld the reply. Rephrasing the request usually gets past it.";
+  }
+  if (reasoningLength > 0) {
+    return `The model spent the whole turn working and never wrote an answer (${reasoningLength} characters of reasoning, shown above). Asking again usually resolves it.`;
+  }
+  return `The model returned nothing at all${finishReason ? ` (${finishReason})` : ""}. Ask again, or check the provider with \`/connect\`.`;
 }

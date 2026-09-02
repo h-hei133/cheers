@@ -35,7 +35,6 @@ function build(busy = false): {
     cyclePermissionScope: vi.fn(),
     openRewind: vi.fn(),
     retry: vi.fn(),
-    expandDraft: vi.fn(),
     syncSuggestions: vi.fn(),
   };
   const clock = { now: 0 };
@@ -320,16 +319,6 @@ describe("permission scope key", () => {
 
     expect(actions.cyclePermissionScope).toHaveBeenCalledTimes(1);
     expect(surface.editor.getText()).toBe("draft");
-  });
-});
-
-describe("expanding the draft", () => {
-  it("hands ctrl+o to the host rather than typing a control character", () => {
-    const { press, actions, surface } = build();
-    press("\x0f");
-
-    expect(actions.expandDraft).toHaveBeenCalledTimes(1);
-    expect(surface.editor.getText()).toBe("");
   });
 });
 

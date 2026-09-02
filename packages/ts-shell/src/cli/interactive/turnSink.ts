@@ -30,6 +30,8 @@ export class TurnSink implements RendererSink {
   private label = "working";
   private streamedChars = 0;
   private assistant: Block | undefined;
+  private thinking: Block | undefined;
+  private thinkingStartedAt = 0;
   private prose: Block | undefined;
   private readonly tools: ToolCards;
   private proseKind: "command" | "error" = "command";
@@ -47,6 +49,7 @@ export class TurnSink implements RendererSink {
   begin(kind: "command" | "turn", title: string): void {
     this.prose = undefined;
     this.assistant = undefined;
+    this.thinking = undefined;
     this.tools.clear();
     this.streamedChars = 0;
     this.cancelling = false;
@@ -69,37 +72,34 @@ export class TurnSink implements RendererSink {
    */
   retryTarget(lastPrompt: string | undefined, previousFailed: boolean): string | undefined {
     if (lastPrompt === undefined) {
-      this.notify("Nothing to retry: no prompt has run in this session yet.");
+      this.notify("Nothing to retry — nothing has been asked yet.");
       return undefined;
     }
     if (!previousFailed) {
-      this.notify("Nothing to retry: the last turn finished.");
+      this.notify("Nothing to retry — the last answer came back fine. Rephrase and ask again to try a different approach.");
       return undefined;
     }
     this.transcript.append({ kind: "user", text: lastPrompt, finalized: true });
     return lastPrompt;
   }
 
-  /** Forget everything: used when the transcript itself is thrown away. */
-  reset(): void {
+  /**
+   * Close the turn: everything still live becomes retirable.
+   *
+   * `discard` is for when the transcript itself is being thrown away — there is
+   * nothing to finalize, and the failure flag goes with it.
+   */
+  end(discard = false): void {
     this.running = false;
     this.cancelling = false;
-    this.failed = false;
+    if (discard) this.failed = false;
+    else this.transcript.finalizeAll();
     this.assistant = undefined;
+    this.thinking = undefined;
     this.prose = undefined;
     this.tools.clear();
     this.streamedChars = 0;
-  }
-
-  /** Close the turn: everything still live becomes retirable. */
-  end(): void {
-    this.running = false;
-    this.cancelling = false;
-    this.transcript.finalizeAll();
-    this.assistant = undefined;
-    this.prose = undefined;
-    this.tools.clear();
-    this.onChange();
+    if (!discard) this.onChange();
   }
 
   /**
@@ -156,6 +156,28 @@ export class TurnSink implements RendererSink {
     this.onChange();
   }
 
+  /**
+   * Collect what the model is working through. Kept in its own collapsed block:
+   * a turn that produced only reasoning should not look like a turn that produced
+   * nothing, and reasoning that runs longer than the answer should not bury it.
+   */
+  think(text: string): void {
+    if (!text) return;
+    if (!this.thinking) {
+      this.thinkingStartedAt = this.now();
+      this.thinking = this.transcript.append({
+        kind: "thinking",
+        text: "",
+        finalized: false,
+        collapsed: true,
+      });
+      this.label = "thinking";
+    }
+    this.thinking.text += text;
+    this.thinking.elapsedMs = this.now() - this.thinkingStartedAt;
+    this.onChange();
+  }
+
   chunk(text: string): void {
     if (!text) return;
     const block = this.assistant ?? this.openAssistant();
@@ -171,6 +193,9 @@ export class TurnSink implements RendererSink {
         return;
       case "message.replace":
         this.replaceAssistant(event.text);
+        return;
+      case "reasoning.delta":
+        this.think(event.delta);
         return;
       case "tool.started":
         this.openTool(event.toolName, event.taskId);
@@ -220,6 +245,12 @@ export class TurnSink implements RendererSink {
   }
 
   private finalizeAssistant(): void {
+    // Whatever the model was working through is settled once it starts answering.
+    if (this.thinking) {
+      this.thinking.finalized = true;
+      this.thinking = undefined;
+      this.label = "working";
+    }
     if (!this.assistant) return;
     this.assistant.finalized = true;
     // `/copy` with no argument copies the last answer; without this it had

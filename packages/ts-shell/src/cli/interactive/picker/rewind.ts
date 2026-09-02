@@ -43,7 +43,7 @@ export function rewindPicker(input: RewindPickerInput): Picker {
       return points.map<Option>((point) => ({
         id: String(point.turnIndex),
         label: summarise(point.prompt),
-        detail: point.dropped === 0 ? "the most recent question" : `drops ${point.dropped} later turns`,
+        detail: describeCost(point.dropped),
         note: "keeps files",
       }));
     },
@@ -65,6 +65,13 @@ export function rewindPoints(turns: readonly SessionMessage[]): RewindPoint[] {
     points.push({ turnIndex: index, prompt: turn.content.trim(), dropped: turns.length - index });
   }
   return points.reverse().slice(0, MAX_POINTS);
+}
+
+/** What choosing this point costs, in what was said rather than in turn counts. */
+function describeCost(dropped: number): string {
+  if (dropped <= 1) return "the most recent question";
+  const exchanges = Math.max(1, Math.round(dropped / 2));
+  return exchanges === 1 ? "forgets one exchange after it" : `forgets ${exchanges} exchanges after it`;
 }
 
 function summarise(prompt: string): string {

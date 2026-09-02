@@ -48,6 +48,12 @@ export type QueryEvent =
   }
   | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
   /**
+   * What the model said while working the answer out. A separate channel because
+   * it is not the answer: a reasoning model's working can run longer than its
+   * conclusion, and merging the two buries the part that was asked for.
+   */
+  | { readonly type: 'reasoning.delta'; readonly role: AgentRole; readonly delta: string }
+  /**
    * Replace what has been streamed so far for this message. Sent only when the
    * assembled text differs from the concatenated deltas — which happens when tool
    * calls were embedded in the prose and had to be lifted out of it.

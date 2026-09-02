@@ -16,9 +16,13 @@ export const PASTE_PLACEHOLDER_THRESHOLD = 320;
 
 const PLACEHOLDER = /\[#(\d+) [^\]]*\]/g;
 
+/** Window in which a second paste of the same text means "show it in full". */
+const DOUBLE_PASTE_MS = 1200;
+
 export class PasteStore {
   private readonly held = new Map<number, string>();
   private nextId = 1;
+  private lastHeld: { readonly id: number; readonly text: string; readonly at: number } | undefined;
 
   /** Whether `text` is long enough to be worth holding aside. */
   static shouldHold(text: string): boolean {
@@ -26,10 +30,26 @@ export class PasteStore {
   }
 
   /** Hold `text` and return the placeholder that stands for it. */
-  hold(text: string): string {
+  hold(text: string, now: number = Date.now()): string {
     const id = this.nextId++;
     this.held.set(id, text);
+    this.lastHeld = { id, text, at: now };
     return placeholderFor(id, text);
+  }
+
+  /**
+   * A second paste of the same text, close behind the first, asking for it in full.
+   *
+   * Pressing paste twice is the gesture: the first press puts a placeholder in the
+   * draft, and the second says "no, show me". Returns the placeholder to replace and
+   * the text to replace it with, or nothing when this is an ordinary paste.
+   */
+  expandOnRepeat(text: string, now: number = Date.now()): { readonly find: string; readonly text: string } | undefined {
+    const last = this.lastHeld;
+    if (!last || last.text !== text || now - last.at > DOUBLE_PASTE_MS) return undefined;
+    this.lastHeld = undefined;
+    this.held.delete(last.id);
+    return { find: placeholderFor(last.id, last.text), text };
   }
 
   /** Replace what a placeholder stands for, keeping its identity. */

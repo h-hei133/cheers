@@ -32,6 +32,7 @@ export class Transcript {
   private nextBatchId = 1;
   private offer: Offer | undefined;
   private replayPending = false;
+  private pendingRetire: number | undefined;
   private flushing = false;
   private readonly cache = new WeakMap<Block, CacheEntry>();
 
@@ -67,6 +68,7 @@ export class Transcript {
     this.frontier = 0;
     this.offer = undefined;
     this.replayPending = false;
+    this.pendingRetire = undefined;
   }
 
   /** Rows the live tail would occupy at `width`, ignoring any pending offer. */
@@ -109,6 +111,7 @@ export class Transcript {
   peekBatch(width: number, capacity: number): HistoryBatch | undefined {
     if (this.offer) return { id: this.offer.id, rows: this.offeredRows(width), kind: this.offer.kind };
     if (this.replayPending) return this.offerReplay(width);
+    if (this.pendingRetire !== undefined) return this.offerPending(width);
 
     let live = this.rowCount(width);
     let end = this.frontier;
@@ -137,10 +140,42 @@ export class Transcript {
     this.replayPending = true;
   }
 
+  /**
+   * Push everything but the last `keep` rows into scrollback now.
+   *
+   * Restored history is history: it belongs above the viewport, where the terminal
+   * can scroll it. Left in the mutable window it is unscrollable until later output
+   * happens to overflow — which is why a restored session looked frozen until the
+   * next keystroke.
+   */
+  retirePast(width: number, keep: number): void {
+    let live = this.rowCount(width);
+    let end = this.frontier;
+    while (end < this.blocks.length && this.blocks[end]!.finalized && live > keep) {
+      live -= this.rowsFor(this.blocks[end]!, width).length;
+      end += 1;
+    }
+    if (end > this.frontier) this.pendingRetire = end;
+  }
+
   /** Retire every finalized prefix, regardless of viewport pressure. */
   beginFlush(): void {
     this.flushing = true;
     this.replayPending = false;
+  }
+
+  /** Publish the prefix {@link retirePast} asked for, whatever the capacity. */
+  private offerPending(width: number): HistoryBatch | undefined {
+    const end = this.pendingRetire!;
+    this.pendingRetire = undefined;
+    if (end <= this.frontier) return undefined;
+    const rows: string[] = [];
+    for (let index = this.frontier; index < end; index++) {
+      rows.push(...this.rowsFor(this.blocks[index]!, width));
+    }
+    if (rows.length === 0) return undefined;
+    this.offer = { id: this.nextBatchId++, end, kind: "append" };
+    return { id: this.offer.id, rows, kind: "append" };
   }
 
   private offerReplay(width: number): HistoryBatch | undefined {

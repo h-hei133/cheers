@@ -80,3 +80,44 @@ describe("held pastes", () => {
     expect(store.expand(placeholder)).toBe(placeholder);
   });
 });
+
+describe("asking for a paste in full", () => {
+  it("expands on a second paste of the same text", () => {
+    const store = new PasteStore();
+    const placeholder = store.hold(LONG, 1_000);
+
+    const repeat = store.expandOnRepeat(LONG, 1_200);
+
+    expect(repeat).toEqual({ find: placeholder, text: LONG });
+  });
+
+  it("treats a different paste as a new paste, not an expansion", () => {
+    const store = new PasteStore();
+    store.hold(LONG, 1_000);
+
+    expect(store.expandOnRepeat(`${LONG}x`, 1_100)).toBeUndefined();
+  });
+
+  it("does not expand once the window has passed", () => {
+    const store = new PasteStore();
+    store.hold(LONG, 1_000);
+
+    expect(store.expandOnRepeat(LONG, 9_000)).toBeUndefined();
+  });
+
+  it("expands only once, so a third paste inserts rather than expanding again", () => {
+    const store = new PasteStore();
+    store.hold(LONG, 1_000);
+    store.expandOnRepeat(LONG, 1_100);
+
+    expect(store.expandOnRepeat(LONG, 1_200)).toBeUndefined();
+  });
+
+  it("forgets the expanded text, since the draft now carries it", () => {
+    const store = new PasteStore();
+    const placeholder = store.hold(LONG, 1_000);
+    store.expandOnRepeat(LONG, 1_100);
+
+    expect(store.expand(placeholder)).toBe(placeholder);
+  });
+});

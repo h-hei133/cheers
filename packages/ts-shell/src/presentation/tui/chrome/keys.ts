@@ -37,8 +37,12 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["ctrl+k"], does: "delete to the end of the line", group: "editing" },
   { keys: ["ctrl+y"], does: "put back what was last deleted", group: "editing" },
   { keys: ["ctrl+z"], does: "undo the last edit", group: "editing" },
-  { keys: ["ctrl+o"], does: "open the draft in a full-screen editor", group: "editing" },
 
+  {
+    keys: ["paste twice"],
+    does: "show a held paste in full, in the prompt",
+    group: "editing",
+  },
   { keys: ["enter"], does: "send, or queue while a turn is running", group: "sending" },
   { keys: ["ctrl+j"], does: "insert a newline without sending", group: "sending" },
   { keys: ["shift+enter", "alt+enter"], does: "insert a newline", group: "sending", negotiated: true },

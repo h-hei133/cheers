@@ -25,6 +25,8 @@ export interface StreamedCompletion {
     readonly content: string;
     readonly tool_calls?: readonly StreamedToolCall[];
   };
+  /** Everything the model said while working it out, when it reported any. */
+  readonly reasoning: string;
   readonly finishReason?: string;
   readonly usage?: {
     readonly prompt_tokens?: number;
@@ -37,7 +39,6 @@ interface DeltaChunk {
   readonly choices?: readonly {
     readonly delta?: {
       readonly content?: string | null;
-      readonly reasoning_content?: string | null;
       readonly tool_calls?: readonly {
         readonly index?: number;
         readonly id?: string;
@@ -48,6 +49,29 @@ interface DeltaChunk {
   }[];
   readonly usage?: StreamedCompletion["usage"];
 }
+
+/**
+ * Where reasoning arrives, in the order to prefer.
+ *
+ * Providers disagree: some send `reasoning_content`, some `reasoning`, some
+ * `reasoning_text`, and a few send two of them holding the same text. Taking the
+ * first non-empty one is what keeps that from being shown twice.
+ */
+const REASONING_FIELDS = ["reasoning_content", "reasoning", "reasoning_text"] as const;
+
+/** Reasoning in this delta, whichever field the provider chose to put it in. */
+function reasoningDelta(delta: Record<string, unknown>): string | undefined {
+  for (const field of REASONING_FIELDS) {
+    const value = delta[field];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return undefined;
+}
+
+/** What kind of text a fragment is: the answer, or the working out. */
+export type StreamFragment =
+  | { readonly kind: "text"; readonly text: string }
+  | { readonly kind: "reasoning"; readonly text: string };
 
 /** Whether a response body is a server-sent event stream we can read. */
 export function isEventStream(response: { readonly headers: Headers; readonly body: unknown }): boolean {
@@ -65,10 +89,11 @@ export function isEventStream(response: { readonly headers: Headers; readonly bo
  */
 export async function* readCompletionStream(
   body: ReadableStream<Uint8Array>,
-): AsyncGenerator<string, StreamedCompletion, undefined> {
+): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
   const decoder = new TextDecoder();
   const calls = new Map<number, { id?: string; name: string; args: string }>();
   let content = "";
+  let reasoning = "";
   let finishReason: string | undefined;
   let usage: StreamedCompletion["usage"];
   let buffer = "";
@@ -102,7 +127,14 @@ export async function* readCompletionStream(
       }
       if (delta.content) {
         content += delta.content;
-        yield delta.content;
+        yield { kind: "text", text: delta.content };
+      }
+      // A reasoning model can put its entire visible output here and leave
+      // `content` empty. Dropping it meant the turn produced nothing at all.
+      const thinking = reasoningDelta(delta as unknown as Record<string, unknown>);
+      if (thinking) {
+        reasoning += thinking;
+        yield { kind: "reasoning", text: thinking };
       }
     }
   }
@@ -122,6 +154,7 @@ export async function* readCompletionStream(
       content,
       ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
     },
+    reasoning,
     finishReason,
     usage,
   };

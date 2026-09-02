@@ -14,7 +14,7 @@ import { renderMarkdown, trimPartialFence } from "./markdown.js";
  * every time once finalized.
  */
 
-export type BlockKind = "notice" | "user" | "assistant" | "tool" | "command" | "error";
+export type BlockKind = "notice" | "user" | "assistant" | "thinking" | "tool" | "command" | "error";
 
 export type ToolStatus = "running" | "ok" | "failed";
 
@@ -28,6 +28,13 @@ export interface Block {
   status?: ToolStatus;
   /** False while the block may still change, which blocks retirement. */
   finalized: boolean;
+  /**
+   * Collapsed blocks show one summary row instead of their body. Reasoning is
+   * collapsed by default: it is how the answer was reached, not the answer.
+   */
+  collapsed?: boolean;
+  /** Milliseconds the block's work took, when that is a fact worth showing. */
+  elapsedMs?: number;
   /**
    * Self-rendering override, for blocks whose presentation depends on the frame
    * width in a way plain re-wrapping cannot reproduce — an elided path, say.
@@ -47,6 +54,8 @@ export function renderBlock(block: Block, width: number): readonly string[] {
   switch (block.kind) {
     case "user":
       return renderUser(block, width);
+    case "thinking":
+      return renderThinking(block, width);
     case "tool":
       return renderTool(block, width);
     case "command":
@@ -80,6 +89,36 @@ function renderUser(block: Block, width: number): readonly string[] {
     rows.push(`${GUTTER}${rail} \x1b[97m${line}\x1b[39m`);
   }
   rows.push("");
+  return rows;
+}
+
+/**
+ * What the model worked through, collapsed to one row by default.
+ *
+ * A reasoning model's working can be longer than its answer, so showing it in full
+ * would bury what was asked for; hiding it entirely makes a turn that produced only
+ * reasoning look like a turn that produced nothing. One row says it happened and
+ * how long it took, and expanding shows it.
+ */
+function renderThinking(block: Block, width: number): readonly string[] {
+  const seconds = block.elapsedMs ? ` ${(block.elapsedMs / 1000).toFixed(1)}s` : "";
+  const head = `${GUTTER}${defaultTheme.dim(`● thought${seconds}`)}`;
+  if (block.collapsed !== false) {
+    return [`${head} ${defaultTheme.dim("· click to expand")}`, ""];
+  }
+  const bodyWidth = Math.max(8, width - visibleWidth(BODY_INDENT));
+  const rows = [head, ""];
+  for (const row of wrapAll(block.text, bodyWidth)) rows.push(`${BODY_INDENT}${defaultTheme.dim(row)}`);
+  rows.push("");
+  return rows;
+}
+
+/** Every line of `text`, soft-wrapped to `width`. */
+function wrapAll(text: string, width: number): string[] {
+  const rows: string[] = [];
+  for (const line of text.replace(/\s+$/, "").split("\n")) {
+    for (const wrapped of wrapToWidth(line, width)) rows.push(wrapped);
+  }
   return rows;
 }
 

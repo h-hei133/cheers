@@ -222,6 +222,19 @@ export class SessionManager {
   }
 
   /**
+   * Hide a session from re-entry until something is said in it.
+   *
+   * A launch has to create a session so the run has an identity, but a session
+   * nobody said anything in is not a place to go back to. Listing it would put a
+   * row in `/resume` for every time the CLI was opened, and offering its id on the
+   * way out would hand back a session that restores nothing. So an untouched
+   * session exists for the run and is invisible to everything that offers a choice.
+   */
+  private listRealSessions(): Session[] {
+    return this.listSessions().filter((session) => sessionHasConversation(session));
+  }
+
+  /**
    * Drop everything said after `turnIndex`, keeping the workspace untouched.
    *
    * This is the conversational half of going back: the model stops seeing the
@@ -557,7 +570,7 @@ export class SessionManager {
     readonly preferredProjectRoot?: string;
   }): SessionReentrySummary[] {
     return projectSortedSessionReentrySummaries({
-      summaries: this.listSessions().map((session) =>
+      summaries: this.listRealSessions().map((session) =>
         this.describeSessionReentry(session.id),
       ),
       preferredProjectRoot: input?.preferredProjectRoot,

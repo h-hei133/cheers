@@ -61,8 +61,6 @@ export interface KeymapActions {
   cyclePermissionScope(): void;
   /** Run the last turn again, if the last one failed. */
   retry(): void;
-  /** Open the long text under the caret — or the whole draft — full screen. */
-  expandDraft(): void;
   /** Offer an earlier point in the conversation to go back to. */
   openRewind(): void;
   /**
@@ -146,7 +144,6 @@ export function dispatchedKeyIds(): readonly string[] {
     "ctrl+c",
     "ctrl+d",
     "ctrl+l",
-    "ctrl+o",
     "enter",
     "backspace",
     "delete",
@@ -180,9 +177,6 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
       return;
     case "ctrl+l":
       actions.clearScreen();
-      return;
-    case "ctrl+o":
-      actions.expandDraft();
       return;
     case "enter":
       submitDraft(context);
