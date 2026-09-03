@@ -173,6 +173,10 @@ describe("CLI streaming baseline (T3)", () => {
   }
 
   beforeEach(() => {
+    // A developer shell often carries a personal provider key; the synthetic
+    // harness must never attempt a real network call with it (the key belongs
+    // to a different provider and the failure surfaces as fabricated output).
+    delete process.env.OPENAI_API_KEY;
     fakeHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), "private-agents-cli-home-"),
     );

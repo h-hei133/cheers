@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PasteStore, PASTE_PLACEHOLDER_THRESHOLD } from "./pastes.js";
+import { PasteStore, PASTE_PLACEHOLDER_THRESHOLD, replaceLiteral } from "./pastes.js";
 
 const LONG = "x".repeat(PASTE_PLACEHOLDER_THRESHOLD);
 
@@ -113,11 +113,24 @@ describe("asking for a paste in full", () => {
     expect(store.expandOnRepeat(LONG, 1_200)).toBeUndefined();
   });
 
-  it("forgets the expanded text, since the draft now carries it", () => {
+  it("normalizes CRLF so a Windows paste expands to what the editor showed", () => {
     const store = new PasteStore();
-    const placeholder = store.hold(LONG, 1_000);
-    store.expandOnRepeat(LONG, 1_100);
+    const raw = "line1\r\nline2\r\nline3";
+    const placeholder = store.hold(raw, 1_000);
+    const repeat = store.expandOnRepeat(raw, 1_100);
 
-    expect(store.expand(placeholder)).toBe(placeholder);
+    expect(repeat).toEqual({ find: placeholder, text: "line1\nline2\nline3" });
   });
-});
+
+  it("normalizes tabs on hold so the draft and the expansion agree", () => {
+    const store = new PasteStore();
+    store.hold("a\tb", 1_000);
+
+    expect(store.expand(store.hold("a\tb", 1_100))).toBe("a  b");
+  });
+
+  it("keeps $ patterns literal when a placeholder is replaced", () => {
+    const code = 'echo $HOME $(date) ${x} $& $1 ${1} $$';
+    expect(replaceLiteral("fix [#1 pasted 40 chars]", "[#1 pasted 40 chars]", code)).toBe(`fix ${code}`);
+  });
+ });

@@ -19,6 +19,7 @@ import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
+import { replaceLiteral } from "../../presentation/tui/pastes.js";
 import { InteractiveSurface } from "./frameSurface.js";
 import { routeKey } from "./keymap.js";
 import { QuestionBridge } from "./questionBridge.js";
@@ -182,9 +183,17 @@ export class InteractiveMode {
       // the first press left a placeholder, and the second replaces it with the text.
       const repeat = this.surface.pastes.expandOnRepeat(text);
       if (repeat) {
-        this.surface.editor.setText(
-          this.surface.editor.getText().replace(repeat.find, repeat.text),
-        );
+        // The placeholder may have been deleted since the first paste; a replace
+        // would then silently drop the second paste. Re-insert in that case.
+        const draft = this.surface.editor.getText();
+        // A string replacer would interpret $&, $1, $$ and ${...} inside the
+        // pasted code as substitution patterns and silently rewrite them away.
+        const replaced = replaceLiteral(draft, repeat.find, repeat.text);
+        if (replaced === draft) {
+          this.surface.editor.insert(this.surface.pastes.holdIfLong(text));
+        } else {
+          this.surface.editor.setText(replaced);
+        }
       } else {
         this.surface.editor.insert(this.surface.pastes.holdIfLong(text));
         this.syncSuggestions(false);

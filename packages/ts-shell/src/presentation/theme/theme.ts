@@ -81,6 +81,11 @@ export class Theme {
     return `${code}${text}\x1b[0m`;
   }
 
+  /** The opening sequence alone, for rows that re-open the shade after resets. */
+  bgOpen(token: ThemeBgToken): string {
+    return this.bgMap.get(token) ?? "\x1b[49m";
+  }
+
   bold(text: string): string {
     return `\x1b[1m${text}\x1b[22m`;
   }

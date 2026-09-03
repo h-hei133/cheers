@@ -1,5 +1,5 @@
 import { defaultTheme } from "../../theme/theme.js";
-import { wrapToWidth } from "../text/layout.js";
+import { padToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { renderDiff } from "./diff.js";
 import { renderMarkdown, trimPartialFence } from "./markdown.js";
@@ -87,21 +87,25 @@ export function renderBlock(block: Block, width: number): readonly string[] {
 }
 
 /**
- * The prompt echo, marked by an accent rail rather than a full-width shade.
+ * The prompt echo as a full-width bubble, the way a reader tells the turn
+ * apart at a glance.
  *
- * A shade has to pad every row out to the frame width, and that padding is what
- * a terminal hands over when the user drags across several rows — the pasted
- * text comes back separated by runs of spaces. The rail reads just as clearly and
- * emits no trailing cells at all.
+ * The text is padded out to the frame width and the whole row painted with the
+ * user-message background — text plus padding, one continuous board. Interior
+ * attribute resets re-open the background so the board never gaps (the reset
+ * inside a highlight would otherwise punch a hole in it). Copies are safe:
+ * the drag-to-copy path trims trailing cells before rebuilding text, so the
+ * padding never reaches the clipboard.
  */
 function renderUser(block: Block, width: number): readonly string[] {
   const rail = defaultTheme.fg("accent", "▌");
-  const rows: string[] = [];
+  const bg = defaultTheme.bgOpen("userMessageBg");
   const bodyWidth = Math.max(1, width - 4);
   const wrapped = block.text.split("\n").flatMap((line) => wrapToWidth(line, bodyWidth));
-  for (const line of wrapped) {
-    rows.push(`${GUTTER}${rail} \x1b[97m${line}\x1b[39m`);
-  }
+  const rows = wrapped.map((line) => {
+    const padded = padToWidth(`${GUTTER}${rail} \x1b[97m${line}\x1b[39m`, width);
+    return `${bg}${padded.replaceAll("\x1b[0m", `\x1b[0m${bg}`)}\x1b[0m`;
+  });
   rows.push("");
   return rows;
 }

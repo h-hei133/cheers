@@ -6,19 +6,13 @@ import { stripAnsi } from "../text/ansi.js";
 const WIDTH = 40;
 
 describe("prompt echo", () => {
-  it("marks the turn with a rail rather than a full-width shade", () => {
-    // Shading has to pad every row to the frame width, and that padding is what
-    // a terminal hands over when the user copies several rows at once.
+  it("paints the prompt as a full-width bubble", () => {
+    // A shade that stops at the last character reads as a highlight, not as a
+    // turn boundary; padding it to the frame width makes the prompt a board.
     const rows = renderBlock(textBlock("user", "hello"), WIDTH);
     expect(rows[0]).toContain("\u258c");
-    expect(rows[0]).not.toContain("48;5;236");
-  });
-
-  it("emits no trailing whitespace on any row", () => {
-    const rows = renderBlock(textBlock("user", "a".repeat(120)), WIDTH);
-    for (const row of rows.filter((candidate) => candidate.length > 0)) {
-      expect(stripAnsi(row)).toBe(stripAnsi(row).trimEnd());
-    }
+    expect(rows[0]).toContain("48;5;236");
+    expect(visibleWidth(rows[0]!)).toBe(WIDTH);
   });
 
   it("wraps within the frame for wide characters too", () => {

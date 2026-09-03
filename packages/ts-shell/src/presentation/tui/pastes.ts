@@ -31,10 +31,11 @@ export class PasteStore {
 
   /** Hold `text` and return the placeholder that stands for it. */
   hold(text: string, now: number = Date.now()): string {
+    const clean = normalizePaste(text);
     const id = this.nextId++;
-    this.held.set(id, text);
-    this.lastHeld = { id, text, at: now };
-    return placeholderFor(id, text);
+    this.held.set(id, clean);
+    this.lastHeld = { id, text: clean, at: now };
+    return placeholderFor(id, clean);
   }
 
   /**
@@ -46,16 +47,17 @@ export class PasteStore {
    */
   expandOnRepeat(text: string, now: number = Date.now()): { readonly find: string; readonly text: string } | undefined {
     const last = this.lastHeld;
-    if (!last || last.text !== text || now - last.at > DOUBLE_PASTE_MS) return undefined;
+    if (!last || last.text !== normalizePaste(text) || now - last.at > DOUBLE_PASTE_MS) return undefined;
     this.lastHeld = undefined;
     this.held.delete(last.id);
-    return { find: placeholderFor(last.id, last.text), text };
+    return { find: placeholderFor(last.id, last.text), text: last.text };
   }
 
   /** Replace what a placeholder stands for, keeping its identity. */
   update(id: number, text: string): string {
-    this.held.set(id, text);
-    return placeholderFor(id, text);
+    const clean = normalizePaste(text);
+    this.held.set(id, clean);
+    return placeholderFor(id, clean);
   }
 
   get(id: number): string | undefined {
@@ -95,6 +97,30 @@ export class PasteStore {
   clear(): void {
     this.held.clear();
   }
+}
+
+/**
+ * `subject` with the first occurrence of `find` replaced by `text`, literally.
+ *
+ * `String.replace(find, text)` treats `$&`, `$1`, `$``, `$'`, `$$`, and
+ * `${name}` inside `text` as substitution patterns, so pasted shell or template
+ * code carrying a `$` would be silently rewritten away. The function-replacer
+ * form returns `text` byte-for-byte.
+ */
+export function replaceLiteral(subject: string, find: string, text: string): string {
+  return subject.replace(find, () => text);
+}
+
+/**
+ * Line endings and tabs, normalized the same way the editor's insert does.
+ *
+ * A clipboard from Windows carries CRLF, and a code block carries tabs. The
+ * first paste goes through the editor's insert, which expands both; the second
+ * paste's expansion path must produce the same text or the draft changes shape
+ * when the placeholder is replaced.
+ */
+function normalizePaste(text: string): string {
+  return text.replace(/\t/g, "  ").replace(/\r\n?/g, "\n");
 }
 
 /** What the draft shows in place of a held paste. */
