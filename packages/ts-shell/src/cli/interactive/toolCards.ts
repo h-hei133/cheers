@@ -18,12 +18,14 @@ export class ToolCards {
   ) {}
 
   /** Open a card for a call that just started. */
-  start(toolName: string, taskId: string): void {
+  start(toolName: string, taskId: string, args?: Readonly<Record<string, unknown>>): void {
+    const detail = summarize(toolName, args);
     this.cards.set(
       taskId,
       this.transcript.append({
         kind: "tool",
         title: toolName,
+        ...(detail ? { detail } : {}),
         text: "",
         status: "running",
         finalized: false,
@@ -40,12 +42,23 @@ export class ToolCards {
     this.onChange();
   }
 
-  /** Close a card with its outcome. */
-  finish(taskId: string, success: boolean, failureReason?: string): void {
+  /**
+   * Close a card with its outcome and what the tool printed.
+   *
+   * The output is kept on the card and folded away rather than dropped: a card
+   * that shows only a tick cannot be checked against what the model said the tool
+   * returned, and a card that shows everything buries the answer. A failed call
+   * opens by default — its output is the reason it failed.
+   */
+  finish(taskId: string, success: boolean, failureReason?: string, output?: string): void {
     const block = this.cards.get(taskId);
     if (!block) return;
     block.status = success ? "ok" : "failed";
-    if (!success && failureReason) block.text = failureReason;
+    const body = (output ?? (success ? "" : failureReason ?? "")).replace(/\s+$/, "");
+    if (body) {
+      block.text = block.text ? `${block.text}\n${body}` : body;
+      block.collapsed = success;
+    }
     block.finalized = true;
     this.cards.delete(taskId);
     this.onChange();
@@ -55,4 +68,59 @@ export class ToolCards {
   clear(): void {
     this.cards.clear();
   }
+}
+
+/**
+ * What a call is doing, in one line.
+ *
+ * The tool's name says a shell command ran; it does not say which one. The
+ * argument that carries the intent differs per tool, so each is named — and
+ * anything unrecognised falls back to the first short string argument rather than
+ * to nothing, so a new tool is legible before this list learns about it.
+ */
+function summarize(toolName: string, args?: Readonly<Record<string, unknown>>): string | undefined {
+  if (!args) return undefined;
+  const primary = named(toolName, args) ?? firstString(args);
+  return primary ? `${primary}${detailSuffix(toolName, args)}` : undefined;
+}
+
+/** The argument this tool carries its intent in, if it sent one. */
+function named(toolName: string, args: Readonly<Record<string, unknown>>): string | undefined {
+  for (const key of KEYS_BY_TOOL[toolName] ?? []) {
+    const value = args[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+/** The argument that carries the intent, per tool, most telling first. */
+const KEYS_BY_TOOL: Readonly<Record<string, readonly string[]>> = {
+  bash: ["command"],
+  read: ["path", "file_path", "filePath"],
+  write: ["path", "file_path", "filePath"],
+  edit: ["path", "file_path", "filePath"],
+  glob: ["pattern", "globPattern"],
+  grep: ["pattern", "query"],
+  web_fetch: ["url"],
+  web_search: ["query"],
+  browser: ["url", "goal"],
+  task: ["prompt", "description"],
+  todo: ["action"],
+  lsp: ["operation", "path"],
+  ask: ["question"],
+};
+
+/** Extra context worth appending, for tools whose primary argument is not enough. */
+function detailSuffix(toolName: string, args: Readonly<Record<string, unknown>>): string {
+  if (toolName !== "grep") return "";
+  const where = args.path ?? args.glob;
+  return typeof where === "string" && where.trim() ? ` in ${where.trim()}` : "";
+}
+
+/** The first short string argument, as a last resort. */
+function firstString(args: Readonly<Record<string, unknown>>): string | undefined {
+  for (const value of Object.values(args)) {
+    if (typeof value === "string" && value.trim() && value.length <= 400) return value.trim();
+  }
+  return undefined;
 }

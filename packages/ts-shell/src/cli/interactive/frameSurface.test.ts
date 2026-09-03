@@ -118,12 +118,39 @@ describe("scrolling the conversation", () => {
     const view = surface();
     view.transcript.append(textBlock("notice", "clickable"));
     const plan = view.renderFrame(SIZE);
-    // Screen rows are counted from the top of the transcript window, which begins
-    // after the filler that keeps the chrome at the bottom.
     const screenRow = plan.rows.findIndex((candidate) => candidate.includes("clickable"));
-    const filler = plan.rows.findIndex((candidate) => candidate.length > 0);
 
-    expect(view.blockAtScreenRow(screenRow - filler)?.text).toBe("clickable");
+    // The row asked about is the row the mouse reported. A short conversation is
+    // pushed to the bottom of the screen, so the padding above it has to be
+    // subtracted here rather than by every caller — not doing so is what made
+    // clicking a card do nothing until the screen happened to be full.
+    expect(view.blockAtScreenRow(screenRow)?.text).toBe("clickable");
+  });
+
+  it("answers with nothing for the padding above and the chrome below", () => {
+    const view = surface();
+    view.transcript.append(textBlock("notice", "only row"));
+    const plan = view.renderFrame(SIZE);
+    const first = plan.rows.findIndex((candidate) => candidate.includes("only row"));
+
+    expect(view.blockAtScreenRow(first - 1)).toBeUndefined();
+    expect(view.blockAtScreenRow(plan.rows.length - 1)).toBeUndefined();
+  });
+
+  it("keeps hit-testing right after the window has been scrolled back", () => {
+    const view = surface();
+    for (let index = 0; index < 80; index++) {
+      view.transcript.append(textBlock("notice", `row ${index}`));
+    }
+    view.renderFrame(SIZE);
+    view.scroll(-10);
+    const plan = view.renderFrame(SIZE);
+
+    // Whatever the window now shows, the row the mouse reports has to resolve to
+    // the block printed on it — the offset moves with the scroll position.
+    const screenRow = plan.rows.findIndex((candidate) => /row \d+/.test(candidate));
+    const shown = /row \d+/.exec(plan.rows[screenRow]!)![0];
+    expect(view.blockAtScreenRow(screenRow)?.text).toBe(shown);
   });
 });
 

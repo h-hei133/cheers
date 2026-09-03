@@ -68,6 +68,17 @@ export class InteractiveSurface implements TerminalFrameProvider {
   private scrollBack = 0;
   /** Row the transcript window started at last frame, for hit-testing a click. */
   private lastTop = 0;
+  /**
+   * Blank rows padded in above the transcript last frame.
+   *
+   * A short conversation is pushed to the bottom of the screen, so screen row 0 is
+   * not transcript row `lastTop` — it is filler. Hit-testing without subtracting
+   * this looked up the wrong block, or none, which is why clicking a card did
+   * nothing on any screen that was not already full.
+   */
+  private lastFiller = 0;
+  /** Transcript rows actually on screen last frame, which is at most the capacity. */
+  private lastVisible = 0;
   private lastTranscriptRows = 0;
   /** How far back the window could go at the last frame, so a key can be honest. */
   private lastMaxBack = 0;
@@ -107,9 +118,11 @@ export class InteractiveSurface implements TerminalFrameProvider {
     this.lastTranscriptRows = capacity;
     this.lastOwners = rendered.owners;
     const visible = rendered.rows.slice(top, top + capacity);
+    this.lastVisible = visible.length;
     // The transcript is padded down to its capacity so the chrome stays put: a
     // short conversation should not float the prompt up the middle of the screen.
     const filler = Array.from({ length: Math.max(0, capacity - visible.length) }, () => "");
+    this.lastFiller = filler.length;
     return { rows: this.shade([...filler, ...visible, ...chrome]) };
   }
 
@@ -147,9 +160,17 @@ export class InteractiveSurface implements TerminalFrameProvider {
     return this.scroll(direction * Math.max(1, this.lastTranscriptRows - 1));
   }
 
-  /** The block under screen row `row`, for a click that lands on the transcript. */
+  /**
+   * The block under screen row `row`, for a click that lands on the transcript.
+   *
+   * Rows above the transcript window are padding and rows below it are chrome;
+   * both answer with nothing rather than with the nearest block, so a click on the
+   * status band cannot fold away whatever happens to sit at that offset.
+   */
   blockAtScreenRow(row: number): ReturnType<Transcript["blockAt"]> {
-    const index = this.lastOwners[this.lastTop + row];
+    const within = row - this.lastFiller;
+    if (within < 0 || within >= this.lastVisible) return undefined;
+    const index = this.lastOwners[this.lastTop + within];
     return index === undefined ? undefined : this.transcript.blockAt(index);
   }
 

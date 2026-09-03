@@ -34,7 +34,13 @@ export type QueryEvent =
   | { readonly type: 'turn.started'; readonly role: AgentRole; readonly turn: number }
   | { readonly type: 'query.retrying'; readonly role: AgentRole; readonly turn: number; readonly attempt: number; readonly reason: string }
   | { readonly type: 'mcp.snapshot'; readonly clients: number; readonly tools: number }
-  | { readonly type: 'tool.started'; readonly toolName: string; readonly taskId: string }
+  | {
+    readonly type: 'tool.started'
+    readonly toolName: string
+    readonly taskId: string
+    /** Arguments the call was made with, so a card can say what it is doing. */
+    readonly args?: Readonly<Record<string, unknown>>
+  }
   | { readonly type: 'approval.requested'; readonly toolName: string; readonly taskId: string }
   | { readonly type: 'approval.resolved'; readonly toolName: string; readonly taskId: string; readonly outcome: 'approved' | 'denied'; readonly compensated?: boolean }
   | {
@@ -45,6 +51,8 @@ export type QueryEvent =
     readonly compensated?: boolean;
     readonly failureReason?: string;
     readonly coveredFiles?: readonly string[];
+    /** What the tool printed, bounded, so its card can be opened and read. */
+    readonly output?: string;
   }
   | { readonly type: 'message.delta'; readonly role: AgentRole; readonly delta: string }
   /**

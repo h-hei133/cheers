@@ -54,7 +54,7 @@ export class Pointer {
   private toggle(row: number): void {
     const block = this.context.surface.blockAtScreenRow(row);
     if (!block || block.collapsed === undefined) return;
-    block.collapsed = !block.collapsed;
+    this.context.surface.transcript.setCollapsed(block, !block.collapsed);
     this.context.redraw();
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Transcript } from "./container.js";
-import { textBlock } from "./blocks.js";
+import { textBlock, type Block } from "./blocks.js";
 
 const WIDTH = 40;
 
@@ -94,5 +94,54 @@ describe("clearing", () => {
 
     expect(transcript.render(WIDTH).rows).toEqual([]);
     expect(transcript.last()).toBeUndefined();
+  });
+});
+
+describe("folding a finished block", () => {
+  function toolBlock(): Block {
+    return {
+      kind: "tool",
+      title: "bash",
+      detail: "npm test",
+      text: "line one\nline two",
+      status: "ok",
+      collapsed: true,
+      finalized: true,
+    };
+  }
+
+  it("redraws the block instead of serving the rows from before", () => {
+    const transcript = new Transcript();
+    const block = transcript.append(toolBlock());
+    expect(transcript.render(WIDTH).rows.join("\n")).toContain("click to expand");
+
+    transcript.setCollapsed(block, false);
+
+    // The rows are memoised per finished block, keyed by width alone. Mutating
+    // `collapsed` in place changed the model and left the screen as it was, which
+    // is why clicking a card appeared to do nothing.
+    const opened = transcript.render(WIDTH).rows.join("\n");
+    expect(opened).toContain("line two");
+    expect(opened).not.toContain("click to expand");
+  });
+
+  it("folds it back again", () => {
+    const transcript = new Transcript();
+    const block = transcript.append(toolBlock());
+    transcript.setCollapsed(block, false);
+    transcript.setCollapsed(block, true);
+
+    expect(transcript.render(WIDTH).rows.join("\n")).toContain("2 lines · click to expand");
+  });
+
+  it("still owns every row it grew into, so a click on the body lands on it", () => {
+    const transcript = new Transcript();
+    transcript.append(textBlock("notice", "before"));
+    const block = transcript.append(toolBlock());
+    transcript.setCollapsed(block, false);
+    const rendered = transcript.render(WIDTH);
+    const bodyRow = rendered.rows.findIndex((row) => row.includes("line two"));
+
+    expect(rendered.owners[bodyRow]).toBe(1);
   });
 });

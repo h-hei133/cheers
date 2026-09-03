@@ -23,6 +23,9 @@ import { setupBuiltinVerificationHooks } from "../hooks/builtin/index.js";
 import { getActiveSessionGoal } from "../commands/goalCommandRuntime.js";
 import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
 import { isEventStream, readCompletionStream } from "./streamCompletion.js";
+/** How much of a tool's output travels to its card in the transcript. */
+const CARD_OUTPUT_LIMIT = 8_000;
+
 export interface ReActAgentLoopOptions {
   readonly sessionId: string;
   readonly prompt: string;
@@ -467,6 +470,7 @@ export async function* runAutonomousReActLoop(
         type: "tool.started",
         toolName: funcName,
         taskId: toolCall.id,
+        ...(parseError ? {} : { args: funcArgs }),
       };
 
       const tool = toolRegistry.get(funcName);
@@ -564,6 +568,9 @@ export async function* runAutonomousReActLoop(
         taskId: toolCall.id,
         success: isSuccess,
         failureReason: isSuccess ? undefined : outputContent.slice(0, 120),
+        // The whole output, bounded: a card the user can open is only worth
+        // opening if what the tool actually printed is behind it.
+        output: outputContent.slice(0, CARD_OUTPUT_LIMIT),
       };
     }
 

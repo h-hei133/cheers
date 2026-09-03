@@ -198,7 +198,7 @@ export class TurnSink implements RendererSink {
         this.think(event.delta);
         return;
       case "tool.started":
-        this.openTool(event.toolName, event.taskId);
+        this.openTool(event.toolName, event.taskId, event.args);
         return;
       case "approval.requested":
         this.tools.note(event.taskId, "awaiting approval");
@@ -207,7 +207,7 @@ export class TurnSink implements RendererSink {
         this.tools.note(event.taskId, `approval ${event.outcome}`);
         return;
       case "tool.result":
-        this.closeTool(event.taskId, event.success, event.failureReason);
+        this.closeTool(event.taskId, event.success, event.failureReason, event.output);
         return;
       case "query.retrying":
         this.label = `retrying (attempt ${event.attempt})`;
@@ -260,18 +260,27 @@ export class TurnSink implements RendererSink {
   }
 
   /** Close a tool card and put the activity row back to the turn's own label. */
-  private closeTool(taskId: string, success: boolean, failureReason?: string): void {
-    this.tools.finish(taskId, success, failureReason);
+  private closeTool(
+    taskId: string,
+    success: boolean,
+    failureReason?: string,
+    output?: string,
+  ): void {
+    this.tools.finish(taskId, success, failureReason, output);
     this.label = "working";
     this.onChange();
   }
 
   /** Open a tool card, closing out any prose the turn had been writing. */
-  private openTool(toolName: string, taskId: string): void {
+  private openTool(
+    toolName: string,
+    taskId: string,
+    args?: Readonly<Record<string, unknown>>,
+  ): void {
     this.finalizeAssistant();
     this.prose = undefined;
     this.label = toolName;
-    this.tools.start(toolName, taskId);
+    this.tools.start(toolName, taskId, args);
   }
 
   /**

@@ -22,6 +22,12 @@ export interface Block {
   readonly kind: BlockKind;
   /** Tool or command name; unused by prose blocks. */
   title?: string;
+  /**
+   * One line saying what this call is actually doing — the command for a shell
+   * call, the path for a read, the pattern for a search. A card that shows only
+   * the tool's name says that something happened, not what.
+   */
+  detail?: string;
   text: string;
   /** Unified diff rendered below the body, for edit-shaped tools. */
   diff?: string;
@@ -130,18 +136,51 @@ function wrapAll(text: string, width: number): string[] {
   return rows;
 }
 
-/** One tool invocation: status glyph, name, argument summary, then its output. */
+/**
+ * One tool invocation: status, name, what it was asked to do, and its output.
+ *
+ * The output is folded away by default and the header says how much is behind it.
+ * A tool that printed six hundred lines of test output would otherwise push the
+ * answer off the screen, and a card showing nothing at all cannot be checked
+ * against what the model claimed the tool said.
+ */
 function renderTool(block: Block, width: number): readonly string[] {
   const status = block.status ?? "running";
   const glyph = status === "ok" ? defaultTheme.fg("success", STATUS_GLYPH.ok)
     : status === "failed" ? defaultTheme.fg("error", STATUS_GLYPH.failed)
     : defaultTheme.fg("warning", STATUS_GLYPH.running);
-  const header = `${GUTTER}${glyph} ${defaultTheme.bold(block.title ?? "tool")}`;
-  const rows = [header];
-  if (block.text) rows.push(...prose(block.text, width, BODY_INDENT));
+  const name = defaultTheme.bold(block.title ?? "tool");
+  const detail = block.detail ? ` ${defaultTheme.dim(elide(block.detail, headroom(width, block.title)))}` : "";
+  const rows = [`${GUTTER}${glyph} ${name}${detail}`];
+  const body = block.text.replace(/\s+$/, "");
+
+  // Folded only once the call is over. While it is running the body holds status
+  // notes — an approval pause, a progress line — and folding those away would hide
+  // the fact that the turn is waiting for the user.
+  if (body && block.collapsed === true) {
+    const lines = body.split("\n").length;
+    rows.push(`${GUTTER}${defaultTheme.dim(`  ↳ ${lines} ${lines === 1 ? "line" : "lines"} · click to expand`)}`);
+    rows.push("");
+    return rows;
+  }
+  if (body) rows.push(...prose(body, width, BODY_INDENT));
   if (block.diff) rows.push(...renderDiff(block.diff, width - BODY_INDENT.length).map((row) => `${BODY_INDENT}${row}`));
   rows.push("");
   return rows;
+}
+
+/** Cells left on the header row for the detail, after the status and the name. */
+function headroom(width: number, title: string | undefined): number {
+  return Math.max(8, width - (title?.length ?? 4) - 4);
+}
+
+/** `text` shortened from the middle, which is where a long path or command repeats. */
+function elide(text: string, limit: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= limit) return flat;
+  if (limit <= 3) return flat.slice(0, limit);
+  const head = Math.ceil((limit - 1) / 2);
+  return `${flat.slice(0, head)}…${flat.slice(flat.length - (limit - 1 - head))}`;
 }
 
 /**

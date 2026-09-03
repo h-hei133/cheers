@@ -51,6 +51,19 @@ export class Transcript {
     return this.blocks.slice(Math.max(0, this.blocks.length - limit)).reverse();
   }
 
+  /**
+   * Fold or unfold a block, and forget its cached rows.
+   *
+   * The fold is the one thing about a finished block that can still change, and
+   * the cache is keyed only by width — so mutating `collapsed` directly changed
+   * the model and left the screen showing the rows from before. Routing it through
+   * here is what makes that impossible to forget.
+   */
+  setCollapsed(block: Block, collapsed: boolean): void {
+    block.collapsed = collapsed;
+    this.cache.delete(block);
+  }
+
   /** Mark every block finished, so its rendering is stable and cacheable. */
   finalizeAll(): void {
     for (const block of this.blocks) block.finalized = true;

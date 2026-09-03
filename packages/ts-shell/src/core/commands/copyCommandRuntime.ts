@@ -28,6 +28,20 @@ export function getLastAssistantResponse(): string {
   return lastCapturedResponseText;
 }
 
+interface ClipboardCommand {
+  readonly command: string;
+  /**
+   * How the text has to be encoded on the way in.
+   *
+   * Windows' own `clip` reads its input in the console code page, so UTF-8 bytes
+   * arrive as one mojibake character per byte — the exact "copied text is
+   * garbage" symptom, and only for text outside ASCII. It accepts UTF-16LE
+   * correctly, and without a byte-order mark, which it would otherwise paste as a
+   * leading invisible character.
+   */
+  readonly encoding: BufferEncoding;
+}
+
 /**
  * Where the clipboard can be reached on this machine, most reliable first.
  *
@@ -36,26 +50,31 @@ export function getLastAssistantResponse(): string {
  * consumes the text before failing, so the fallback receives an empty stream and
  * reports success having copied nothing.
  */
-function clipboardCommands(): readonly string[] {
-  if (process.platform === "darwin") return ["pbcopy"];
-  if (process.platform === "win32") return ["clip"];
-  // `clip.exe` is present when a Linux shell is running under Windows, where none
-  // of the X11 or Wayland tools usually are.
-  return ["wl-copy", "xclip -selection clipboard", "xsel --clipboard --input", "clip.exe"];
+function clipboardCommands(): readonly ClipboardCommand[] {
+  if (process.platform === "darwin") return [{ command: "pbcopy", encoding: "utf8" }];
+  if (process.platform === "win32") return [{ command: "clip", encoding: "utf16le" }];
+  // `clip.exe` is reachable when a Linux shell runs under Windows, where none of
+  // the X11 or Wayland tools usually are.
+  return [
+    { command: "wl-copy", encoding: "utf8" },
+    { command: "xclip -selection clipboard", encoding: "utf8" },
+    { command: "xsel --clipboard --input", encoding: "utf8" },
+    { command: "clip.exe", encoding: "utf16le" },
+  ];
 }
 
 /** Feed `text` to one clipboard command, reporting whether it took it. */
-async function pipeTo(command: string, text: string): Promise<boolean> {
+async function pipeTo(candidate: ClipboardCommand, text: string): Promise<boolean> {
   return new Promise((resolve) => {
     try {
-      const child = exec(command, { timeout: 1_500 }, (error) => resolve(!error));
+      const child = exec(candidate.command, { timeout: 1_500 }, (error) => resolve(!error));
       child.on("error", () => resolve(false));
       if (!child.stdin) {
         resolve(false);
         return;
       }
       child.stdin.on("error", () => resolve(false));
-      child.stdin.end(text);
+      child.stdin.end(Buffer.from(text, candidate.encoding));
     } catch {
       resolve(false);
     }
@@ -94,8 +113,8 @@ export async function runCopyCommand(
     }
   }
 
-  for (const command of clipboardCommands()) {
-    if (await pipeTo(command, text)) {
+  for (const candidate of clipboardCommands()) {
+    if (await pipeTo(candidate, text)) {
       return {
         kind: "local",
         output: `Copied ${describe(text)} to the clipboard.`,

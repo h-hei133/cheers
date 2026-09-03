@@ -205,3 +205,42 @@ describe("showing what the drag has covered", () => {
     expect(selection.span?.to.row).toBe(3);
   });
 });
+
+describe("selecting text that is not ASCII", () => {
+  const wide = ["一二三四五六七八九十", "\x1b[36m▌\x1b[39m 中文 mixed with ASCII"];
+
+  it("counts a wide character as the two cells it occupies", () => {
+    // Columns 0..3 cover the first two characters, not the first four.
+    expect(extractSelection(wide, { row: 0, column: 0 }, { row: 0, column: 3 })).toBe("一二");
+  });
+
+  it("drops a wide character the drag only half covered", () => {
+    // Cells 0..4 cover 一二 whole and half of 三, so 三 is left out rather than
+    // rendered as half a character.
+    expect(extractSelection(wide, { row: 0, column: 0 }, { row: 0, column: 4 })).toBe("一二");
+  });
+
+  it("treats a drag over a single character as a click, not a selection", () => {
+    // One character is how click-to-expand reaches a block: a selection has to
+    // cover something worth pasting before it is treated as one.
+    expect(extractSelection(wide, { row: 0, column: 0 }, { row: 0, column: 1 })).toBeUndefined();
+  });
+
+  it("keeps a mixed row intact and strips the rail", () => {
+    const text = extractSelection(wide, { row: 1, column: 0 }, { row: 1, column: 40 });
+
+    expect(text).toBe("中文 mixed with ASCII");
+  });
+
+  it("carries a multi-row selection back with its line breaks", () => {
+    const text = extractSelection(wide, { row: 0, column: 0 }, { row: 1, column: 40 });
+
+    expect(text).toBe("一二三四五六七八九十\n中文 mixed with ASCII");
+  });
+
+  it("shades wide characters without splitting one across the boundary", () => {
+    const [row] = highlightSelection(["一二三"], { from: { row: 0, column: 0 }, to: { row: 0, column: 3 } });
+
+    expect(row).toBe("\x1b[7m一二\x1b[27m三");
+  });
+});

@@ -215,3 +215,85 @@ describe("turn boundaries", () => {
     expect(transcript.last()?.finalized).toBe(true);
   });
 });
+
+describe("what a tool card says it is doing", () => {
+  it("shows the command a shell call was given, not just the word bash", () => {
+    const { sink, rows } = build();
+    sink.handleEvent({
+      type: "tool.started",
+      toolName: "bash",
+      taskId: "t1",
+      args: { command: "npm test -- --silent" },
+    });
+
+    // The tool's name says a command ran; it does not say which one.
+    expect(rows()).toContain("npm test -- --silent");
+  });
+
+  it("shows the path for a read and the pattern for a search", () => {
+    const { sink, rows } = build();
+    sink.handleEvent({ type: "tool.started", toolName: "read", taskId: "t1", args: { path: "src/index.ts" } });
+    sink.handleEvent({
+      type: "tool.started",
+      toolName: "grep",
+      taskId: "t2",
+      args: { pattern: "TODO", path: "src" },
+    });
+
+    expect(rows()).toContain("src/index.ts");
+    expect(rows()).toContain("TODO in src");
+  });
+
+  it("falls back to the first string argument for a tool it does not know", () => {
+    const { sink, rows } = build();
+    sink.handleEvent({ type: "tool.started", toolName: "invented", taskId: "t1", args: { target: "somewhere" } });
+
+    expect(rows()).toContain("somewhere");
+  });
+
+  it("keeps a call with no arguments legible rather than blank", () => {
+    const { sink, rows } = build();
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "t1" });
+
+    expect(rows()).toContain("bash");
+  });
+
+  it("folds a successful call's output behind a row that says how much there is", () => {
+    const { sink, rows } = build();
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "t1", args: { command: "ls" } });
+    sink.handleEvent({
+      type: "tool.result",
+      toolName: "bash",
+      taskId: "t1",
+      success: true,
+      output: "one\ntwo\nthree",
+    });
+
+    expect(rows()).toContain("3 lines · click to expand");
+    expect(rows()).not.toContain("three");
+  });
+
+  it("opens a failed call, because its output is the reason it failed", () => {
+    const { sink, rows } = build();
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "t1", args: { command: "false" } });
+    sink.handleEvent({
+      type: "tool.result",
+      toolName: "bash",
+      taskId: "t1",
+      success: false,
+      failureReason: "exit 1",
+      output: "command not found: nope",
+    });
+
+    expect(rows()).toContain("command not found: nope");
+  });
+
+  it("keeps a pause visible while the call is still waiting", () => {
+    const { sink, rows } = build();
+    sink.handleEvent({ type: "tool.started", toolName: "write", taskId: "t1", args: { path: "a.ts" } });
+    sink.handleEvent({ type: "approval.requested", toolName: "write", taskId: "t1" });
+
+    // Folding this away would hide that the turn is waiting for the user.
+    expect(rows()).toContain("awaiting approval");
+  });
+});
