@@ -69,6 +69,20 @@ describe("aiming a repair loop at a gate", () => {
     }
   });
 
+  it("summarises the gate in a line rather than echoing the failure twice", async () => {
+    const result = await runLoopCommand(["2", "node -e \"console.error('SPRAWLING STACK TRACE'); process.exit(7)\""], CONTEXT);
+
+    expect(result.kind).toBe("prompt");
+    if (result.kind === "prompt") {
+      expect(result.notice).toContain("exited 7");
+      expect(result.notice).toContain("at most 2 attempts");
+      // The prompt carries the failure; the notice names the gate and stops, so the
+      // transcript does not show the same output twice above the repair.
+      expect(result.prompt).toContain("SPRAWLING STACK TRACE");
+      expect(result.notice!.split("\n")).toHaveLength(1);
+    }
+  });
+
   it("explains itself when given no gate", async () => {
     const result = await runLoopCommand([], CONTEXT);
 

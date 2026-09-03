@@ -39,8 +39,10 @@ export async function runCommitCommand(
   }
 
   const guidance = args.join(" ").trim();
+  const stat = await git("diff --staged --shortstat", cwd);
   return {
     kind: "prompt",
+    notice: `Read the staged diff (${stat.text.trim() || "no summary available"}). Writing the message.`,
     prompt: commitPrompt({
       cwd,
       branch: branch.text.trim() || "an unknown branch",

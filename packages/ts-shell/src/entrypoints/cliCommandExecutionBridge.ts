@@ -119,8 +119,12 @@ export async function buildCliCommandExecution(
   }
 
   if (slashResult?.kind === "prompt" && input.interactive) {
+    // A command that supplied its own line says what it is doing; one that did not
+    // is handing back text the user wrote, which is worth showing back to them.
     input.renderer.renderLine(
-      `\nSlash command expanded into prompt:\n${slashResult.prompt}\n`,
+      slashResult.notice
+        ? `\n${slashResult.notice}\n`
+        : `\nSlash command expanded into prompt:\n${slashResult.prompt}\n`,
     );
   }
   const rawPrompt =

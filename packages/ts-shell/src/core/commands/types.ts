@@ -65,6 +65,17 @@ export interface LocalCommandResult {
 export interface PromptCommandResult {
   readonly kind: 'prompt'
   readonly prompt: string
+  /**
+   * What to show the user in place of the prompt.
+   *
+   * A command that hands the user's own pending text back (`/resume`,
+   * `/continue`) is worth echoing in full — that is what is being resumed. A
+   * command that expands a template is not: `/commit` would print the entire
+   * staged diff, `/loop` the whole failure, `/brainstorm` twenty lines of
+   * instructions, all of it above the answer they asked for. Those say what they
+   * are doing in a line instead.
+   */
+  readonly notice?: string
 }
 
 export interface ShellActionResult {

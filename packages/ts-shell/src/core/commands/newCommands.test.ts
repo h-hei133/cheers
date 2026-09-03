@@ -93,6 +93,20 @@ describe("/commit", () => {
     }
   });
 
+  it("says what it read instead of printing the whole diff into the transcript", async () => {
+    fs.writeFileSync(path.join(repo, "a.txt"), "x\n", "utf8");
+    execFileSync("git", ["add", "a.txt"], { cwd: repo });
+    const result = await runCommitCommand([], { cwd: repo });
+
+    expect(result.kind).toBe("prompt");
+    if (result.kind === "prompt") {
+      expect(result.notice).toContain("Read the staged diff");
+      // The prompt carries the diff; the notice must not, or the transcript shows
+      // the whole change above the answer that was asked for.
+      expect(result.notice).not.toContain("+x");
+    }
+  });
+
   it("carries what the user said about the commit into the prompt", async () => {
     fs.writeFileSync(path.join(repo, "a.txt"), "x\n", "utf8");
     execFileSync("git", ["add", "a.txt"], { cwd: repo });

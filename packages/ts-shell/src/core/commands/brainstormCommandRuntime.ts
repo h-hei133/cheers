@@ -32,11 +32,17 @@ export async function runBrainstormCommand(
   }
 
   if (flags.has("interactive")) {
-    return { kind: "prompt", prompt: elicitationPrompt(challenge) };
+    return {
+      kind: "prompt",
+      notice: "Working out which questions would change the design.",
+      prompt: elicitationPrompt(challenge),
+    };
   }
+  const saving = flags.has("save");
   return {
     kind: "prompt",
-    prompt: flags.has("save")
+    notice: `Exploring ${APPROACH_COUNT} approaches${saving ? ", then writing the result to docs/specs" : ""}.`,
+    prompt: saving
       ? `${explorationPrompt(challenge)}\n\n${savingInstruction(challenge, context.cwd)}`
       : explorationPrompt(challenge),
   };

@@ -59,6 +59,19 @@ describe("brainstorming a specific problem", () => {
     expect(text).toMatch(/change your mind/i);
   });
 
+  it("announces what it is doing without reprinting the instructions", async () => {
+    const plain = await runBrainstormCommand(["cache", "eviction"], CONTEXT);
+    const saving = await runBrainstormCommand(["-s", "cache", "eviction"], CONTEXT);
+
+    expect(plain.kind).toBe("prompt");
+    if (plain.kind === "prompt") {
+      expect(plain.notice).toBe("Exploring 3 approaches.");
+    }
+    if (saving.kind === "prompt") {
+      expect(saving.notice).toContain("writing the result to docs/specs");
+    }
+  });
+
   it("explains itself when given nothing to explore", async () => {
     const { kind, text } = await run();
 

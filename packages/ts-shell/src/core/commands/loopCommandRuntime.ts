@@ -48,7 +48,12 @@ export async function runLoopCommand(
     };
   }
 
-  return { kind: "prompt", prompt: repairPrompt(gate, cwd, attempts, outcome) };
+  const how = outcome.timedOut ? "did not finish in time" : `exited ${outcome.exitCode ?? "non-zero"}`;
+  return {
+    kind: "prompt",
+    notice: `\`${gate}\` ${how}. Repairing, at most ${attempts} ${attempts === 1 ? "attempt" : "attempts"}.`,
+    prompt: repairPrompt(gate, cwd, attempts, outcome),
+  };
 }
 
 /** The attempt budget and the gate command, in either order of appearance. */
