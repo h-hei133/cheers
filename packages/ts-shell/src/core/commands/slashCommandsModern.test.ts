@@ -45,12 +45,14 @@ describe("Modern Slash Commands Subsystem", () => {
     expect(result.output).toContain("demo-pkg");
   });
 
-  it("/cost displays real-time session token consumption and accounting", async () => {
+  it("/cost counts nothing when no completion has been recorded", async () => {
     const result = await runCostCommand([], { cwd: tempDir, sessionId: "sess_1" });
+
     expect(result.kind).toBe("local");
-    expect(result.output).toContain("Session Live Token Usage & Cost Accounting");
-    expect(result.output).toContain("Prompt (Input)");
-    expect(result.output).toContain("Completion (Output)");
+    expect(result.output).toContain("nothing to count");
+    // The money was headed "Actual Cost" while being a multiplication by a fixed
+    // rate that does not follow the model in use.
+    expect(result.output).not.toContain("Actual Cost");
   });
 
   it("/undo answers about the most recent edit rather than dumping a report", async () => {
@@ -63,16 +65,15 @@ describe("Modern Slash Commands Subsystem", () => {
     expect(result.output).not.toContain("Rollback Assistant");
   });
 
-  it("/export saves session history as markdown and jsonl files", async () => {
-    const mdResult = await runExportCommand(["markdown", "export.md"], { cwd: tempDir, sessionId: "sess_export" });
-    expect(mdResult.kind).toBe("local");
-    expect(mdResult.output).toContain("Session history successfully exported to: `export.md`");
-    expect(await fs.readFile(path.join(tempDir, "export.md"), "utf8")).toContain("# Session Conversation Export");
+  it("/export refuses to report an export when there is no conversation", async () => {
+    const result = await runExportCommand(["markdown", "export.md"], { cwd: tempDir, sessionId: "sess_export" });
 
-    const jsonlResult = await runExportCommand(["jsonl", "export.jsonl"], { cwd: tempDir, sessionId: "sess_export" });
-    expect(jsonlResult.kind).toBe("local");
-    expect(jsonlResult.output).toContain("Session history successfully exported to: `export.jsonl`");
-    expect(await fs.readFile(path.join(tempDir, "export.jsonl"), "utf8")).toContain("session-export");
+    // It used to write a file whose whole body was "(Session transcript recorded
+    // and preserved in working store)" and call that a successful export.
+    expect(result.kind).toBe("local");
+    expect(result.output).toContain("nothing to export");
+    expect(result.output).toContain("Nothing was written");
+    await expect(fs.access(path.join(tempDir, "export.md"))).rejects.toThrow();
   });
 
   it("/copy prepares clipboard payload", async () => {

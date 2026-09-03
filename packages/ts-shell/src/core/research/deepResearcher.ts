@@ -178,11 +178,12 @@ export class DeepResearcher {
         return true;
       });
 
+    // No confidence is attached here. Every extracted sentence used to be stamped
+    // with 0.85, which said nothing about the sentence and was read by nothing.
     return sentences.slice(0, 5).map((statement, idx) => ({
       id: `learning_${Math.random().toString(36).slice(2, 8)}_${idx}`,
       statement,
       sourceUrl: url,
-      confidence: 0.85,
     }));
   }
 }

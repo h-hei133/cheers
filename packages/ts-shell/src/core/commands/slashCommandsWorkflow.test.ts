@@ -129,14 +129,15 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
   });
 
   describe("/context command", () => {
-    it("renders ASCII token bar and category breakdown", async () => {
+    it("says nothing has been measured yet instead of inventing a footprint", async () => {
       const result = await runContextCommand([], { cwd: tempDir, sessionId: "sess_ctx_test" });
+
+      // The old version fell back to a literal 2,500-token footprint and split it
+      // 35/1200/remainder under a heading that called the numbers measured.
       expect(result.kind).toBe("local");
-      expect(result.output).toContain("Context Window Live Telemetry & Allocation");
-      expect(result.output).toContain("Live Context Allocation Bar");
-      expect(result.output).toContain("64,000 Tokens");
-      expect(result.output).toContain("Autocompact Safety Buffer");
-      expect(result.output).toContain("Microcompact**: `ACTIVE`");
+      expect(result.output).toContain("No request has been sent in this session yet");
+      expect(result.output).toContain("64,000 tokens");
+      expect(result.output).toMatch(/Tool schemas sent with every request: ~\d/);
     });
   });
 

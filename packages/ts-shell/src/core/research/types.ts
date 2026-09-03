@@ -13,16 +13,23 @@ export interface AtomicLearning {
   readonly statement: string;
   readonly sourceUrl: string;
   readonly sourceTitle?: string;
-  readonly confidence: number;
   readonly entities?: readonly string[];
 }
 
+/**
+ * One statement and how many independent sources carried it.
+ *
+ * There used to be a `confidenceScore` here, computed as
+ * `0.5 + sourceCount * 0.25` and displayed as a percentage — so two agreeing
+ * pages read as "100% confidence". A count of sources is checkable; a percentage
+ * derived from it by an invented formula only looks like a measurement.
+ */
 export interface VotedClaim {
   readonly statement: string;
+  /** Statements that clustered together, including repeats from one source. */
   readonly voteCount: number;
   readonly sources: readonly string[];
   readonly consensusStatus: "verified" | "unverified" | "disputed";
-  readonly confidenceScore: number;
 }
 
 export interface ResearchProgressState {

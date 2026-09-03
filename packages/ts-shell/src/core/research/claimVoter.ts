@@ -55,13 +55,11 @@ export class ClaimVoter {
 
     for (const cluster of clusters) {
       const uniqueSourceCount = cluster.sources.size;
-      const confidenceScore = Math.min(1.0, 0.5 + uniqueSourceCount * 0.25);
       const claim: VotedClaim = {
         statement: cluster.representative,
         voteCount: cluster.totalCount,
         sources: Array.from(cluster.sources),
         consensusStatus: uniqueSourceCount >= 2 ? "verified" : "unverified",
-        confidenceScore,
       };
 
       if (uniqueSourceCount >= 2) {

@@ -131,3 +131,85 @@ OpenAI 那条已有的授权参数（`originator`、`codex_cli_simplified_flow`�
 
 Google 仍要求用户自带 Desktop OAuth client id（`GOOGLE_OAUTH_CLIENT_ID`）。这比另一种
 做法多一步设置，也是诚实的那一种：另一种是带上别人的 client 凭据，以他们的应用身份登录。
+
+## 五、第三轮：又三个说了没发生的事
+
+前两轮按用户点名的 15 个命令审计。这一轮反过来查那些没被点名、看着"真实"的命令，
+判定标准不变：**输出所声称的事情，是否真的发生了**。
+
+### `/export` 导出了一个不含对话的文件
+
+Markdown 分支的整个正文是一句话——`(Session transcript recorded and preserved in
+working store)`——然后命令回答"Session history successfully exported"。
+JSONL 分支只写一行 header。**文件里没有任何对话，却被描述成对话的导出。**
+这是对一次写入的虚假成功声明。
+
+现在它读会话真正记录的 transcript（`readTranscriptEvents` +
+`projectTranscriptMessages`），Markdown 里工具结果折进 `<details>`（它们是发生过的事，
+但通常比周围一切都长），JSONL 一行一条消息。空 transcript 报告为空并且**不写文件**，
+而不是把"成功导出了零条对话"写出来。用你那个流式 bug 的会话实测：8 条消息、4 问 4 答，
+文件 1255 字节，内容对得上。
+
+### `/context` 把编出来的数字放在"Measured Tokens"表头下
+
+- 没有回合时 footprint 回退到字面量 `2_500`
+- 系统提示词 = `min(1500, footprint * 0.35)`
+- 工具 schema = 固定 `1_200`，说明写"11 core & web tool parameter definitions"（我们有 13 个）
+- history = 剩下的
+
+四行里三行是发明的，而一份上下文报告存在的意义就是被核对。现在只报可测的量：
+工具 schema 按**真正上线的字节**序列化后计数（`buildOpenAITools(createCoreToolRegistry())`），
+prompt 总量取 provider 上报的值，剩下的部分**命名为余数**而不是拆成发明的几份。
+没跑过请求就说没跑过，而不是编一个 2500。
+
+### `/cost` 把固定费率的乘法叫做 "Actual Cost"
+
+token 数是实测的（provider 上报），钱不是——费率表是常量，不随模型变化。
+表头改为 "Estimated" 并把费率显示在旁边，末尾说明"以 provider 账单为准"。
+
+### 顺带清掉的死配置
+
+`TuiSettings` 有五个字段，只有 `statusItems` 被读过：`mode`、`resizeScrollback`
+（随备用屏迁移一起失效）、`showThinking`、`theme` 全都是声明了但无人读取的旋钮。
+**不起作用的旋钮比没有旋钮更糟，因为它是界面没有兑现的承诺**，一长串这样的旋钮就是
+一个配置页面而不是一个好的默认值。删掉四个，剩下的由项目决定：会话独占一屏、
+推理放在可折叠块里、主题跟随终端。
+
+这也是不加 `/settings` 的原因——用户明确说不要那种高自定义形式。
+
+## 六、新增的三个命令
+
+从 omp 的 182 个内置命令里**有意识地挑**，标准是：日常真的会用、能接在已有子系统上、
+不与现有命令重复。
+
+### `/commit`
+
+先在本地读 `git status --short` 与 `git diff --staged`，把 diff 放进提示词。
+**从描述写出来的提交信息说的是这次改动本该是什么，从 diff 写出来的说的是它是什么。**
+协议要求先跑 `git log --oneline -12` 按仓库自己的惯例来（它自己的惯例胜过任何通则）、
+主题行说改了什么和为什么而不是哪些文件动了、用工具提交并读回它打印的东西再报告 hash。
+
+**不代替用户 stage。** stage 决定这次提交包含什么，而那是唯一一件事后无法纠正的事，
+所以空索引报告为空并列出可以 stage 的东西，而不是挑一个。
+
+实测：一个 `Number(value)` 改成严格解析 + 范围检查的改动，它读了仓库只有一条提交的 log、
+判断惯例是小写祈使句而非 Conventional Commits、写出 `validate port range in parsePort`
+加一段说明为什么，用 heredoc 提交让正文换行存活，报告了真实 hash `a67962e`。
+
+### `/tools`
+
+直接读构建请求的那个 registry，所以列表不可能与实际提供的工具漂移——
+手工维护的工具名单在第一次加工具时就错了，而且没人会注意到，直到模型调用一个名单说
+不存在的东西。plan 模式逐工具标注（allowed / blocked / read-only）而不是用散文描述
+"只读工具是允许的"——后者无法核对，前者可以。`/tools <name>` 给出参数表与必填项。
+
+### `/thinking`
+
+发 `reasoning_effort`（OpenAI 兼容拼法）。这里有一个真实的死配置要清理：
+`thinkingBudget` 在 `config/types.ts` 里声明了，**从未被任何请求使用**。
+
+实测 SiliconFlow 的 DeepSeek 确实响应这个字段（同一道题：low 690 / medium 970 /
+high 1721 reasoning tokens，不设为 2028），所以这不是空写。措辞上不声称 token 预算——
+字段收的是级别，级别值多少由 provider 决定。不支持的 provider 忽略它；**拒绝它的
+provider 会被丢掉该字段并原地重试这一回合**（本地 mock 双向实测：接受时发一次即完成，
+拒绝时发两次、第二次不带该字段、用户看到答案而不是 provider 错误）。

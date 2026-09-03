@@ -29,6 +29,9 @@ import { runMemoryCommand } from "./memoryCommandRuntime.js";
 import { runWorkflowCommand } from "./workflowCommandRuntime.js";
 import { runDeepResearchCommand } from "./deepResearchCommandRuntime.js";
 import { runBrainstormCommand } from "./brainstormCommandRuntime.js";
+import { runCommitCommand } from "./commitCommandRuntime.js";
+import { runThinkingCommand } from "./thinkingCommandRuntime.js";
+import { runToolsCommand } from "./toolsCommandRuntime.js";
 import { runShellCommand } from "./shellCommandRuntime.js";
 import { runLogCommand } from "./logCommandRuntime.js";
 import {
@@ -393,6 +396,32 @@ export function createCommandRegistry(
       enabled: true,
       bridgeSafe: true,
       execute: (args, context) => runDeepResearchCommand(args, context),
+    },
+    {
+      name: "commit",
+      // A staged diff expands into a prompt; an empty index answers locally.
+      kind: "prompt",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: false,
+      execute: (args, context) => runCommitCommand(args, context),
+    },
+    {
+      name: "tools",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runToolsCommand(args, context),
+    },
+    {
+      name: "thinking",
+      aliases: ["effort"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      execute: (args, context) => runThinkingCommand(args, context),
     },
     {
       name: "brainstorm",

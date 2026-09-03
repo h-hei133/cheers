@@ -14,19 +14,16 @@ describe("Deep Research Engine & Command Test Suite", () => {
           id: "l1",
           statement: "Node.js v22 introduces WebSocket client globally",
           sourceUrl: "https://nodejs.org/v22",
-          confidence: 0.9,
         },
         {
           id: "l2",
           statement: "Node.js 22 now includes global WebSocket client enabled by default",
           sourceUrl: "https://developer.mozilla.org/nodejs22",
-          confidence: 0.9,
         },
         {
           id: "l3",
           statement: "Some unverified isolated single-source claim",
           sourceUrl: "https://random-blog.com/post",
-          confidence: 0.5,
         },
       ];
 
@@ -35,7 +32,9 @@ describe("Deep Research Engine & Command Test Suite", () => {
       expect(verified.length).toBe(1);
       expect(verified[0].consensusStatus).toBe("verified");
       expect(verified[0].sources.length).toBe(2);
-      expect(verified[0].confidenceScore).toBeGreaterThanOrEqual(0.75);
+      // A count of sources is what is known. The percentage that used to be here
+      // was `0.5 + sources * 0.25`, so two agreeing pages read as 100% confidence.
+      expect(verified[0].voteCount).toBeGreaterThanOrEqual(2);
 
       expect(unverified.length).toBe(1);
       expect(unverified[0].consensusStatus).toBe("unverified");
@@ -52,7 +51,6 @@ describe("Deep Research Engine & Command Test Suite", () => {
             voteCount: 2,
             sources: ["https://nodejs.org", "https://mdn.org"],
             consensusStatus: "verified",
-            confidenceScore: 0.95,
           },
         ],
         unverifiedClaims: [],
@@ -63,7 +61,7 @@ describe("Deep Research Engine & Command Test Suite", () => {
       expect(report.reportMarkdown).toContain("# Deep Technical Research Report: Node.js v22 Features");
       expect(report.reportMarkdown).toContain("1. Executive Summary");
       expect(report.reportMarkdown).toContain("2. Key Findings (Cross-Verified Consensus)");
-      expect(report.reportMarkdown).toContain("**Confidence Score**: 95%");
+      expect(report.reportMarkdown).toContain("Carried by 2 independent sources, in 2 statements");
       expect(report.reportMarkdown).toContain("## 4. References & Sources");
       expect(report.reportMarkdown).toContain("- [1] https://nodejs.org");
     });

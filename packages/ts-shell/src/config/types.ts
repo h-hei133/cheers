@@ -28,19 +28,21 @@ export interface PermissionSettings {
   readonly denyRules?: readonly string[];
 }
 
+/**
+ * What the interactive surface lets the user choose.
+ *
+ * One setting, deliberately. There were five: a render `mode`, a
+ * `resizeScrollback` policy, `showThinking`, and a `theme` — none of which was
+ * read anywhere. A knob that does nothing is worse than no knob, because it is a
+ * promise the interface does not keep, and a long list of them is a configuration
+ * screen instead of a working default.
+ *
+ * The rest is decided rather than asked: the session takes a screen of its own,
+ * reasoning is shown in a block that folds, and the theme follows the terminal.
+ */
 export interface TuiSettings {
-  readonly mode?: "differential" | "plain";
-  /**
-   * How a settled width change refreshes rows already retired into the
-   * terminal's scrollback. `rebuild` clears and republishes them at the new
-   * width; `preserve` repaints only the viewport and leaves the terminal's own
-   * rewrap of the retired rows in place.
-   */
-  readonly resizeScrollback?: "rebuild" | "preserve";
   /** Status band item ids, in canonical order. Empty or absent means the defaults. */
   readonly statusItems?: readonly string[];
-  readonly showThinking?: boolean;
-  readonly theme?: "dark" | "light";
 }
 
 export interface AgentSettings {
@@ -74,10 +76,5 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     allowRules: ["read:*", "glob:*", "grep:*", "bash:git status*", "bash:git diff*"],
     denyRules: [],
   },
-  tui: {
-    mode: "differential",
-    resizeScrollback: "rebuild",
-    showThinking: true,
-    theme: "dark",
-  },
+  tui: {},
 };

@@ -30,10 +30,14 @@ export interface StoredGoal {
   readonly updatedAt: string;
 }
 
+/** How much reasoning to ask the provider for, or nothing to leave it to decide. */
+export type ThinkingEffort = "low" | "medium" | "high";
+
 export interface ProjectState {
   readonly goal?: StoredGoal | null;
   /** Whether sampling is held down for shorter, more direct answers. */
   readonly fastSampling?: boolean;
+  readonly thinkingEffort?: ThinkingEffort | null;
 }
 
 const STATE_FILE = "state.json";
@@ -102,7 +106,11 @@ export function writeProjectState(from: string, patch: ProjectState): string | u
 
 /** Only fields shaped the way this version expects, so a stray value cannot spread. */
 function normalize(raw: Record<string, unknown>): ProjectState {
-  const state: { goal?: StoredGoal | null; fastSampling?: boolean } = {};
+  const state: {
+    goal?: StoredGoal | null;
+    fastSampling?: boolean;
+    thinkingEffort?: ThinkingEffort;
+  } = {};
   const goal = raw.goal;
   if (goal && typeof goal === "object" && !Array.isArray(goal)) {
     const candidate = goal as Record<string, unknown>;
@@ -120,5 +128,8 @@ function normalize(raw: Record<string, unknown>): ProjectState {
     }
   }
   if (typeof raw.fastSampling === "boolean") state.fastSampling = raw.fastSampling;
+  if (raw.thinkingEffort === "low" || raw.thinkingEffort === "medium" || raw.thinkingEffort === "high") {
+    state.thinkingEffort = raw.thinkingEffort;
+  }
   return state;
 }

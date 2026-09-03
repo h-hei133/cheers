@@ -37,7 +37,9 @@ export class ResearchReportGenerator {
     } else {
       verifiedClaims.forEach((claim, idx) => {
         lines.push(`### 2.${idx + 1}. ${claim.statement}`);
-        lines.push(`- **Confidence Score**: ${(claim.confidenceScore * 100).toFixed(0)}% (Verified across ${claim.sources.length} sources)`);
+        lines.push(
+          `- Carried by ${claim.sources.length} independent ${claim.sources.length === 1 ? "source" : "sources"}, in ${claim.voteCount} ${claim.voteCount === 1 ? "statement" : "statements"}`,
+        );
         lines.push(`- **Citations**: ${claim.sources.map((s) => `\`${s}\``).join(", ")}`);
         lines.push("");
       });

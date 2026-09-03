@@ -5,6 +5,7 @@ const logger = createComponentLogger("AgentLoop");
 import type { QueryEvent } from "./runtime/events.js";
 import { recordSessionUsage } from "../../observability/usageTelemetry.js";
 import { samplingTemperature } from "../commands/fastCommandRuntime.js";
+import { getThinkingEffort } from "../commands/thinkingCommandRuntime.js";
 import { DoomLoopDetector } from "./doomLoopDetector.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../../tools/types.js";
@@ -154,6 +155,14 @@ export async function* runAutonomousReActLoop(
     options.realProvider?.model ?? "deepseek-ai/DeepSeek-V4-Flash";
 
   let lastAssistantText = "";
+  /**
+   * Cleared when a host rejects `reasoning_effort`.
+   *
+   * The field is a request, and a host that refuses it should cost one retry
+   * rather than the turn. Once dropped it stays dropped for this run: asking again
+   * would fail again.
+   */
+  let effortAccepted = true;
   // Kept so an empty answer can be explained rather than papered over.
   let lastFinishReason: string | undefined;
   let lastReasoningLength = 0;
@@ -250,6 +259,7 @@ export async function* runAutonomousReActLoop(
     // On the final turn before maxTurns, set tool_choice to "none" while retaining tool definitions for schema validation
     const isLastTurn = turn === maxTurns;
     const activeTemperature = samplingTemperature(options.workspaceRoot, options.temperature ?? 0.7);
+    const effort = effortAccepted ? getThinkingEffort(options.workspaceRoot) : undefined;
     const payload = {
       model: modelName,
       messages: preparedMessages,
@@ -260,11 +270,13 @@ export async function* runAutonomousReActLoop(
       stream: true,
       stream_options: { include_usage: true },
       temperature: activeTemperature,
+      ...(effort ? { reasoning_effort: effort } : {}),
       ...(options.topP != null ? { top_p: options.topP } : {}),
       ...(options.maxOutputTokens != null ? { max_tokens: options.maxOutputTokens } : {}),
     };
     let responseJson: any;
     let isOverflowError = false;
+    let retryWithoutEffort = false;
     // Text already delivered as deltas; it must not be delivered a second time.
     let streamedText: string | undefined;
     try {
@@ -290,6 +302,11 @@ export async function* runAutonomousReActLoop(
           errorText.includes("prompt_too_long")
         ) {
           isOverflowError = true;
+        } else if (effort && /reasoning_effort/i.test(errorText)) {
+          // The host does not take the field. Drop it and run this turn again
+          // rather than reporting a provider error the user cannot act on.
+          effortAccepted = false;
+          retryWithoutEffort = true;
         } else {
           yield {
             type: "query.failed",
@@ -349,6 +366,11 @@ export async function* runAutonomousReActLoop(
         error: `Network error: ${msg}`,
       };
       return;
+    }
+
+    if (retryWithoutEffort) {
+      turn--;
+      continue;
     }
 
     // Self-Healing Context Overflow Recovery (learning from Pi Agent)
