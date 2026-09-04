@@ -29,6 +29,6 @@ describe("inspectFilesStage", () => {
     expect(result?.codingResult.taskKind).toBe("inspect-files");
     expect(result?.codingResult.changedFiles).toEqual([]);
     expect(result?.codingResult.verification.status).toBe("not-requested");
-    expect(result?.codingResult.evidence).toContain("inspect: glob(.ts) executed");
+    expect(result?.codingResult.evidence).toContain("inspect: glob candidate discovery executed");
   });
 });

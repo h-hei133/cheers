@@ -53,10 +53,20 @@ export function deriveActionableBlockerContract(input: {
 
   const kind =
     evidenceKind ??
-    classifyActionableKind(
-      reason,
-      input.codingResult?.verification.status === "failed",
-    );
+    (() => {
+      const verification = input.codingResult?.verification;
+      if (
+        verification.status === "blocked" &&
+        verification.blockerKind === "approval-denied" &&
+        Boolean(verification.nextAction?.trim())
+      ) {
+        return "approval-denied";
+      }
+      return classifyActionableKind(
+        reason,
+        input.codingResult?.verification.status === "failed",
+      );
+    })();
   if (!kind) {
     return undefined;
   }
@@ -216,6 +226,17 @@ export function classifyActionableKind(
   }
   if (normalized.includes("not allowed in the controlled allowlist")) {
     return "command-not-allowlisted";
+  }
+  if (
+    normalized.includes("review-only planning runtime") ||
+    normalized.includes("verification intent only") ||
+    normalized.includes("mutationauthority=not-granted") ||
+    normalized.includes("mutation authority is not granted")
+  ) {
+    // A planning stop with a structured handoff is actionable by design: the
+    // user confirms or supplies what the planner listed. Looping cannot grant
+    // the missing mutation authority.
+    return "unsupported-future-edit";
   }
   if (
     normalized.includes("approval denied") ||

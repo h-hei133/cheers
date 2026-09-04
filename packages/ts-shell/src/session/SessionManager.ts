@@ -58,7 +58,7 @@ import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
 import { projectSessionReentrySummary } from "./presentation/sessionReentrySurface.js";
 import {
   sessionHasConversation,
-  type SessionReentrySummary,
+  sessionHasReentrySurface,
 } from "./presentation/sessionReentrySurface.js";
 import type { RecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
 import type {
@@ -73,6 +73,7 @@ import {
 } from "./store/projectBindingPolicy.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { buildSessionContinuitySnapshot } from "./continuation/sessionContinuitySnapshot.js";
+import { normalizeLegacyPermissionStateForSession } from "./continuation/legacyPermissionRebase.js";
 import { extractSeedInfluenceFromQueryResult } from "./continuation/sessionSeedInfluence.js";
 import { rebindSessionProjectRootContinuity } from "./continuation/sessionProjectRootRebind.js";
 import {
@@ -222,16 +223,19 @@ export class SessionManager {
   }
 
   /**
-   * Hide a session from re-entry until something is said in it.
+   * Hide a session from re-entry until it holds something to return to.
    *
    * A launch has to create a session so the run has an identity, but a session
    * nobody said anything in is not a place to go back to. Listing it would put a
    * row in `/resume` for every time the CLI was opened, and offering its id on the
    * way out would hand back a session that restores nothing. So an untouched
    * session exists for the run and is invisible to everything that offers a choice.
+   *
+   * A run interrupted with a prompt still pending, or one that ended in a
+   * terminal state, is unfinished or diagnosable work and stays offered.
    */
   private listRealSessions(): Session[] {
-    return this.listSessions().filter((session) => sessionHasConversation(session));
+    return this.listSessions().filter((session) => sessionHasReentrySurface(session));
   }
 
   /**
@@ -700,8 +704,10 @@ export class SessionManager {
 
   buildContinuitySnapshot(sessionId: string): SessionContinuitySnapshot {
     const session = this.store.load(sessionId);
-    const stateSnapshot = this.store.readStateSnapshotSafely(
-      this.store.statePath(sessionId),
+    const statePath = this.store.statePath(sessionId);
+    const stateSnapshot = this.normalizeLegacyPermissionStateForSession(
+      session,
+      this.store.readStateSnapshotSafely(statePath),
     );
     return buildSessionContinuitySnapshot({
       session,
@@ -709,6 +715,22 @@ export class SessionManager {
       recoverySnapshot: this.getRecoverySnapshot(sessionId),
       transcriptEvents: this.getTranscriptEvents(sessionId),
       approvalHistoryLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
+    });
+  }
+
+  private normalizeLegacyPermissionStateForSession(
+    session: Session,
+    snapshot: SessionStateSnapshot | undefined,
+  ): SessionStateSnapshot | undefined {
+    const statePath = this.store.statePath(session.id);
+    return normalizeLegacyPermissionStateForSession({
+      session,
+      snapshot,
+      withStateLock: (targetSessionId, update) =>
+        this.store.withSessionStateLock(targetSessionId, update),
+      readLatestSnapshot: () => this.store.readStateSnapshotSafely(statePath),
+      writeSnapshot: (nextSnapshot) =>
+        this.store.writeJsonFileAtomic(statePath, nextSnapshot),
     });
   }
 

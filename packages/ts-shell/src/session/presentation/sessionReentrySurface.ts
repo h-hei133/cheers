@@ -100,6 +100,20 @@ export function sessionHasConversation(session: Session): boolean {
   );
 }
 
+/**
+ * Whether a session is worth offering to return to.
+ *
+ * A real exchange qualifies. So does a run that was interrupted with a prompt
+ * still pending, or one that ended in a terminal state — both are unfinished or
+ * diagnosable work, which is exactly what re-entry exists for. A freshly opened
+ * session with nothing said and nothing pending is not.
+ */
+export function sessionHasReentrySurface(session: Session): boolean {
+  if (sessionHasConversation(session)) return true;
+  if (session.pendingPrompt?.trim()) return true;
+  return session.status !== "active";
+}
+
 export function scoreSessionReentrySummary(input: {
   readonly summary: SessionReentrySummary;
   readonly preferredProjectRoot?: string;

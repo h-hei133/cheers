@@ -39,7 +39,7 @@ describe("runtime config", () => {
     expect(config).toEqual({
       provider: "openai",
       daemonEnabled: true,
-      maxTurns: 6,
+      maxTurns: 15,
       disabledTools: [],
       hiddenToolPrefixes: [],
       enableMcpTools: true,

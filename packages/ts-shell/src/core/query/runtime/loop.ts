@@ -1,3 +1,4 @@
+import { deriveActionableBlockerContract } from '../actionableBlockerModule.js'
 import type { AgentExecutionOutput, AgentRunner, AgentRole } from '../../../orchestration/types.js'
 import type { QueryEvent } from './events.js'
 import { ensureQueryRuntimeHarnessState, ensureQueryRuntimeObservationState, type QueryRuntimeState } from './state.js'
@@ -123,6 +124,13 @@ function terminalProofBlocker(
   projection: ReturnType<typeof projectQueryRuntimeProof>,
 ): string | undefined {
   const outputEvents = output.events as readonly QueryEvent[] | undefined
+  // An actionable blocker names the user's own next step (approve, re-read,
+  // disambiguate). That is a stop with a reason, not a missing proof — the
+  // proof gate must not erase it. `unsafe-output` and other authority blocks
+  // stay proof gaps: the host must not pass a block it cannot explain.
+  if (deriveActionableBlockerContract({ codingResult: output.codingResult })) {
+    return undefined;
+  }
   if (outputEvents?.some((event) => event.type === 'tool.result' && event.success === false)) {
     return 'failed tool output has no task proof'
   }
@@ -585,6 +593,16 @@ function getTransition(
     state.turn < state.config.maxTurns,
   )
   if (!handoffTo) {
+    // An actionable blocker names the user's own next step (re-read, approve,
+    // disambiguate). That is a stop with a reason, not a missing proof — the
+    // run cannot manufacture the missing input by looping, and a pending
+    // repair action must not spin past an explicit block.
+    const blocker = deriveActionableBlockerContract({
+      codingResult: output.codingResult,
+    })
+    if (blocker) {
+      return terminalQuery('stopped_error', blocker.reason)
+    }
     if (canContinuePendingAction && pendingAction && nextRole) {
       return continueQuery(
         state.currentRole,

@@ -148,6 +148,15 @@ function requiredProofFor(facts: TaskProofInputFacts): readonly TaskProofItem[] 
       "result-input",
     ]);
   }
+  if (facts.taskKind === "write-file") {
+    return freeze([
+      "context-ready",
+      "plan-ready",
+      "request-ready",
+      "tool-strategy-ready",
+      "result-input",
+    ]);
+  }
   return freeze(common);
 }
 
