@@ -14,26 +14,33 @@ describe("held pastes", () => {
     expect(PasteStore.shouldHold("a\nb")).toBe(false);
   });
 
-  it("stands in for the text with a placeholder that says how much there is", () => {
+  it("stands in for the text with a compact chip token", () => {
     const store = new PasteStore();
-    const placeholder = store.hold("a\nb\nc");
+    const token = store.hold("a\nb\nc");
 
-    expect(placeholder).toMatch(/^\[#1 pasted 5 chars, 3 lines\]$/);
+    expect(token).toBe("⎘ #1");
+    expect(store.expand(token)).toBe("a\nb\nc");
   });
 
-  it("scales the size to thousands once it is large", () => {
-    expect(new PasteStore().hold("x".repeat(1500))).toContain("1.5k chars");
+  it("describes a held paste to the chip band", () => {
+    const store = new PasteStore();
+    const token = store.hold("first line\nsecond line");
+
+    expect(store.chipsIn(token)).toEqual([
+      { id: 1, token: "⎘ #1", lines: 2, chars: 22, preview: "first line" },
+    ]);
+    expect(store.chipsIn("nothing here")).toEqual([]);
   });
 
   it("puts the text back when the draft is sent", () => {
     const store = new PasteStore();
-    const placeholder = store.hold(LONG);
+    const token = store.hold(LONG);
 
-    expect(store.expand(`fix ${placeholder} please`)).toBe(`fix ${LONG} please`);
+    expect(store.expand(`fix ${token} please`)).toBe(`fix ${LONG} please`);
   });
 
-  it("leaves a placeholder it does not know alone", () => {
-    expect(new PasteStore().expand("see [#7 pasted 1k chars]")).toBe("see [#7 pasted 1k chars]");
+  it("leaves a token it does not know alone", () => {
+    expect(new PasteStore().expand("see ⎘ #7")).toBe("see ⎘ #7");
   });
 
   it("keeps a paste's identity when its text is replaced", () => {
@@ -41,18 +48,18 @@ describe("held pastes", () => {
     const first = store.hold("before");
     const second = store.update(1, "after a longer edit");
 
-    expect(first).toContain("#1");
-    expect(second).toContain("#1");
+    expect(first).toBe("⎘ #1");
+    expect(second).toBe("⎘ #1");
     expect(store.expand(second)).toBe("after a longer edit");
   });
 
-  it("rewrites a placeholder in the draft it sits in", () => {
+  it("rewrites a token in the draft it sits in", () => {
     const store = new PasteStore();
     const draft = `fix ${store.hold("before")} now`;
 
     const rewritten = store.rewrite(draft, 1, "after");
 
-    expect(rewritten).toMatch(/^fix \[#1 pasted 5 chars\] now$/);
+    expect(rewritten).toBe("fix ⎘ #1 now");
     expect(store.expand(rewritten)).toBe("fix after now");
   });
 

@@ -39,6 +39,45 @@ describe("text entry", () => {
   });
 });
 
+describe("atomic tokens", () => {
+  function editorWithTokens(): Editor {
+    const editor = new Editor();
+    editor.atomicTokenStart = (line, column) => {
+      const before = line.slice(0, column);
+      const match = /⎘ #\d+$/.exec(before);
+      return match ? column - match[0].length : undefined;
+    };
+    return editor;
+  }
+
+  it("deletes a whole token with one backspace at its end", () => {
+    const editor = editorWithTokens();
+    editor.insert("fix ⎘ #1 now");
+    for (let index = 0; index < " now".length; index++) editor.move("left");
+    editor.backspace();
+    expect(editor.getText()).toBe("fix  now");
+  });
+
+  it("deletes forward through a token in one press", () => {
+    const editor = editorWithTokens();
+    editor.insert("fix ⎘ #1 now");
+    editor.move("line-start");
+    editor.move("right");
+    editor.move("right");
+    editor.move("right");
+    editor.move("right");
+    editor.deleteForward();
+    expect(editor.getText()).toBe("fix  now");
+  });
+
+  it("keeps a plain backspace one cluster when no token ends there", () => {
+    const editor = editorWithTokens();
+    editor.insert("hello");
+    editor.backspace();
+    expect(editor.getText()).toBe("hell");
+  });
+});
+
 describe("caret motion by grapheme cluster", () => {
   it("steps over a wide character as one stop", () => {
     const editor = new Editor();

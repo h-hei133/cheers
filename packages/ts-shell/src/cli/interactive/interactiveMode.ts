@@ -155,6 +155,13 @@ export class InteractiveMode {
     this.options.setReadline?.(this.readline);
     this.tui.setFrameProvider(this.surface);
     this.surface.editor.placeholder = DEFAULT_PLACEHOLDER;
+    // A chip token deletes whole: the caret sits at its end, and one Backspace
+    // removes the token — and with it the attachment — instead of half a symbol.
+    this.surface.editor.atomicTokenStart = (line, column) => {
+      const before = line.slice(0, column);
+      const match = /⎘ #\d+$/.exec(before);
+      return match ? column - match[0].length : undefined;
+    };
   }
 
   start(): void {

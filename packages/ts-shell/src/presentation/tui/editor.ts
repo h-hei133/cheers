@@ -39,6 +39,12 @@ export class Editor {
   focused = true;
   /** Hint shown in place of an empty first row. */
   placeholder = "";
+  /**
+   * Optional matcher for tokens that delete as one unit — an attachment chip,
+   * say. The host owns what the tokens are; the editor only asks "does a token
+   * end right here, and where does it start?" before a plain cluster delete.
+   */
+  atomicTokenStart?: (line: string, column: number) => number | undefined;
 
   private lines: string[] = [""];
   private row = 0;
@@ -104,7 +110,7 @@ export class Editor {
     if (this.column > 0) {
       this.saveUndo();
       const line = this.lines[this.row]!;
-      const start = previousCluster(line, this.column);
+      const start = this.atomicStart(line) ?? previousCluster(line, this.column);
       this.lines[this.row] = line.slice(0, start) + line.slice(this.column);
       this.column = start;
       return;
@@ -122,7 +128,7 @@ export class Editor {
     const line = this.lines[this.row]!;
     if (this.column < line.length) {
       this.saveUndo();
-      const end = nextCluster(line, this.column);
+      const end = this.atomicEnd(line) ?? nextCluster(line, this.column);
       this.lines[this.row] = line.slice(0, this.column) + line.slice(end);
       return;
     }
@@ -130,6 +136,22 @@ export class Editor {
     this.saveUndo();
     this.lines[this.row] = line + this.lines[this.row + 1]!;
     this.lines.splice(this.row + 1, 1);
+  }
+
+  /** Start of an atomic token ending at the caret, if the host recognises one. */
+  private atomicStart(line: string): number | undefined {
+    return this.atomicTokenStart?.(line, this.column);
+  }
+
+  /** End of an atomic token starting at the caret, if the host recognises one. */
+  private atomicEnd(line: string): number | undefined {
+    const matcher = this.atomicTokenStart;
+    if (!matcher || line.length === 0) return undefined;
+    // Search forward from the caret for a token whose start is the caret.
+    for (let look = this.column; look < line.length; look = nextCluster(line, look)) {
+      if (matcher(line, look) === this.column) return look;
+    }
+    return undefined;
   }
 
   /**

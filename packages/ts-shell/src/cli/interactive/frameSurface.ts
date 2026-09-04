@@ -1,4 +1,5 @@
 import { Editor } from "../../presentation/tui/editor.js";
+import { renderPasteChips } from "../../presentation/tui/chrome/pasteChips.js";
 import { PasteStore } from "../../presentation/tui/pastes.js";
 import { renderBand } from "../../presentation/tui/chrome/band.js";
 import type { StatusFacts, StatusItemId } from "../../presentation/tui/chrome/items.js";
@@ -185,6 +186,7 @@ export class InteractiveSurface implements TerminalFrameProvider {
       ...renderActivity(this.context.activity(), this.context.now(), width),
       ...this.context.overlayRows(width, height),
       renderBand(this.context.facts(), this.context.statusItems(), width),
+      ...renderPasteChips(this.pastes.chipsIn(this.editor.getText()), width),
       ...renderComposer(this.editor, { busy }, width),
     ];
     if (this.suggestionsOpen) {
