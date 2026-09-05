@@ -37,6 +37,7 @@ function build(busy = false): {
     openRewind: vi.fn(),
     retry: vi.fn(),
     syncSuggestions: vi.fn(),
+    scrollToEnd: vi.fn(),
   };
   const clock = { now: 0 };
   const gesture: { lastCancelAt?: number } = {};

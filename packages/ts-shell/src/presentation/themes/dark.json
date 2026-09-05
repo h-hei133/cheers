@@ -1,0 +1,33 @@
+{
+  "name": "dark",
+  "description": "Dark theme (default)",
+  "colors": {
+    "userMessageText": "#ffffff",
+    "assistantText": "#e0e0e0",
+    "thinkingText": "#888888",
+    "toolTitle": "#00ffff",
+    "toolOutput": "#888888",
+    "diffAdded": "#4ade80",
+    "diffRemoved": "#f87171",
+    "diffContext": "#6b7280",
+    "filename": "#60a5fa",
+    "command": "#fbbf24",
+    "commandArg": "#e0e0e0",
+    "success": "#4ade80",
+    "error": "#f87171",
+    "warning": "#fbbf24",
+    "muted": "#6b7280",
+    "dim": "#4b5563",
+    "accent": "#f59e0b",
+    "border": "#374151",
+    "selectedBg": "#1f2937",
+    "userMessageBg": "#111827",
+    "toolPendingBg": "#1f2937",
+    "toolSuccessBg": "#064e3b",
+    "toolErrorBg": "#7f1d1d",
+    "syntaxKeyword": "#c678dd",
+    "syntaxFunction": "#61afef",
+    "syntaxString": "#98c379",
+    "syntaxComment": "#5c6370"
+  }
+}

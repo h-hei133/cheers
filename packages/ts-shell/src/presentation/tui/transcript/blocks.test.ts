@@ -10,8 +10,8 @@ describe("prompt echo", () => {
     // A shade that stops at the last character reads as a highlight, not as a
     // turn boundary; padding it to the frame width makes the prompt a board.
     const rows = renderBlock(textBlock("user", "hello"), WIDTH);
-    expect(rows[0]).toContain("\u258c");
-    expect(rows[0]).toContain("48;5;236");
+    expect(rows[0]).toContain("▌");
+    expect(rows[0]).toContain("\x1b[48;");
     expect(visibleWidth(rows[0]!)).toBe(WIDTH);
   });
 

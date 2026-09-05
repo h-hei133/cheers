@@ -1,0 +1,29 @@
+{
+  "name": "light",
+  "description": "Light theme",
+  "colors": {
+    "userMessageText": "#111827",
+    "assistantText": "#1f2937",
+    "thinkingText": "#6b7280",
+    "toolTitle": "#0891b2",
+    "toolOutput": "#6b7280",
+    "diffAdded": "#16a34a",
+    "diffRemoved": "#dc2626",
+    "diffContext": "#9ca3af",
+    "filename": "#2563eb",
+    "command": "#d97706",
+    "commandArg": "#374151",
+    "success": "#16a34a",
+    "error": "#dc2626",
+    "warning": "#d97706",
+    "muted": "#9ca3af",
+    "dim": "#6b7280",
+    "accent": "#d97706",
+    "border": "#d1d5db",
+    "selectedBg": "#f3f4f6",
+    "userMessageBg": "#f9fafb",
+    "toolPendingBg": "#f3f4f6",
+    "toolSuccessBg": "#dcfce7",
+    "toolErrorBg": "#fee2e2"
+  }
+}

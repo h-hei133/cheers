@@ -63,7 +63,8 @@ export interface KeymapActions {
   scroll(rows: number): void;
   /** Move the transcript window by whole screens. */
   scrollPage(direction: -1 | 1): void;
-  /** Run the last turn again, if the last one failed. */
+  /** Jump to the newest rows. */
+  scrollToEnd(): void;
   retry(): void;
   /** Offer an earlier point in the conversation to go back to. */
   openRewind(): void;
@@ -220,11 +221,12 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
     case "pagedown":
       actions.scrollPage(1);
       return;
-    case "shift+up":
-      actions.scroll(-1);
-      return;
     case "shift+down":
       actions.scroll(1);
+      return;
+    case "ctrl+end":
+      // Page back to the live edge: one key does what many shift-downs do.
+      actions.scrollToEnd();
       return;
     case "f5":
       // A function key rather than a modified chord: every terminal delivers F5

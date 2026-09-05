@@ -55,7 +55,7 @@ import {
   createSessionWithId,
 } from "./store/sessionCreation.js";
 import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
-import { projectSessionReentrySummary } from "./presentation/sessionReentrySurface.js";
+import { projectSessionReentrySummary, type SessionReentrySummary } from "./presentation/sessionReentrySurface.js";
 import {
   sessionHasConversation,
   sessionHasReentrySurface,

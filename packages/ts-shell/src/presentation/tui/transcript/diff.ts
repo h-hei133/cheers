@@ -31,14 +31,14 @@ export function renderDiff(diff: string, width: number): string[] {
     const next = lines[index + 1];
     if (line.startsWith("-") && next?.startsWith("+")) {
       const split = splitEmphasis(line.slice(1), next.slice(1));
-      rows.push(emphasised("-", split.removed, "toolDiffRemoved", width));
-      rows.push(emphasised("+", split.added, "toolDiffAdded", width));
+      rows.push(emphasised("-", split.removed, "diffRemoved", width));
+      rows.push(emphasised("+", split.added, "diffAdded", width));
       index += 1;
       continue;
     }
-    if (line.startsWith("+")) rows.push(plain("+", line.slice(1), "toolDiffAdded", width));
-    else if (line.startsWith("-")) rows.push(plain("-", line.slice(1), "toolDiffRemoved", width));
-    else rows.push(plain(" ", line.replace(/^ /, ""), "toolDiffContext", width));
+    if (line.startsWith("+")) rows.push(plain("+", line.slice(1), "diffAdded", width));
+    else if (line.startsWith("-")) rows.push(plain("-", line.slice(1), "diffRemoved", width));
+    else rows.push(plain(" ", line.replace(/^ /, ""), "diffContext", width));
   }
   return rows;
 }
@@ -67,7 +67,7 @@ function splitEmphasis(removed: string, added: string): { removed: Emphasis; add
 function emphasised(
   marker: string,
   parts: Emphasis,
-  token: "toolDiffAdded" | "toolDiffRemoved",
+  token: "diffAdded" | "diffRemoved",
   width: number,
 ): string {
   const body = parts.body.length > 0 ? defaultTheme.inverse(parts.body) : "";
@@ -81,7 +81,7 @@ function emphasised(
 function plain(
   marker: string,
   text: string,
-  token: "toolDiffAdded" | "toolDiffRemoved" | "toolDiffContext",
+  token: "diffAdded" | "diffRemoved" | "diffContext",
   width: number,
 ): string {
   return defaultTheme.fg(token, truncateToWidth(`${marker}${text}`, width));

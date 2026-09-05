@@ -258,6 +258,10 @@ export class InteractiveMode {
           this.surface.scrollPage(direction);
           this.tui.requestRender();
         },
+        scrollToEnd: () => {
+          this.surface.scrollToEnd();
+          this.tui.requestRender();
+        },
         retry: () => this.onSubmit("/retry"),
         openRewind: () => this.openPicker("rewind"),
         redrawAfter: (delayMs) => {

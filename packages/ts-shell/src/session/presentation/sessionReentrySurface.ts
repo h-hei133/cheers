@@ -55,7 +55,7 @@ export function projectSessionReentrySummary(input: {
   const { session, trustBoundary, recoverySnapshot, continuitySnapshot } = input;
   return {
     id: session.id,
-    title: session.title,
+    title: session.title?.trim() || session.id,
     status: session.status,
     projectRoot: session.projectRoot,
     createdAt: session.createdAt,
