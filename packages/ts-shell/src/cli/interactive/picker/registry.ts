@@ -43,6 +43,10 @@ export interface PickerHost {
   saveStatusItems(items: readonly StatusItemId[]): Promise<string | undefined>;
   /** Show `items` in the band without saving; `undefined` restores the saved band. */
   previewStatusItems(items: readonly StatusItemId[] | undefined): void;
+  /** Drop a session permanently. */
+  deleteSession(sessionId: string): Promise<string | undefined>;
+  /** Rename a session's title. */
+  renameSession(sessionId: string, title: string): Promise<string | undefined>;
   /** The current session's stored turns, for choosing a point to go back to. */
   sessionTurns(): readonly SessionMessage[];
   /** Drop everything after a chosen point, leaving the workspace alone. */
@@ -54,7 +58,13 @@ type PickerFactory = (host: PickerHost) => Picker;
 const PICKERS: Record<string, PickerFactory> = {
   model: (host) => modelPicker(host.commandContext),
   copy: (host) => copyPicker(host.transcript, host.commandContext),
-  resume: (host) => sessionPicker({ sessionManager: host.sessionManager, resume: host.resumeSession }),
+  resume: (host) =>
+    sessionPicker({
+      sessionManager: host.sessionManager,
+      resume: host.resumeSession,
+      delete: host.deleteSession,
+      rename: host.renameSession,
+    }),
   mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer }),
   connect: (host) => connectionPicker(host.commandContext),
   permissions: (host) =>

@@ -18,7 +18,7 @@ function build(busy = false): {
     busy: () => busy,
     queuedCount: () => 0,
     now: () => 0,
-    ambient: () => ({}),
+    ambient: () => ({ openTodos: 0, peerSessions: 0 }),
     newlineKey: () => "ctrl+j",
     cancelArmed: () => false,
     overlayFullScreen: () => false,
@@ -37,6 +37,8 @@ function build(busy = false): {
     openRewind: vi.fn(),
     retry: vi.fn(),
     syncSuggestions: vi.fn(),
+    scroll: vi.fn(),
+    scrollPage: vi.fn(),
     scrollToEnd: vi.fn(),
   };
   const clock = { now: 0 };
@@ -374,5 +376,21 @@ describe("going back in the conversation", () => {
     press("\x1b");
 
     expect(actions.openRewind).not.toHaveBeenCalled();
+  });
+});
+
+describe("scrolling transcript", () => {
+  it("scrolls page up and down", () => {
+    const { press, actions } = build();
+    press("\x1b[5~"); // pageup
+    expect(actions.scrollPage).toHaveBeenCalledWith(-1);
+    press("\x1b[6~"); // pagedown
+    expect(actions.scrollPage).toHaveBeenCalledWith(1);
+  });
+
+  it("jumps to the bottom on ctrl+end", () => {
+    const { press, actions } = build();
+    press("\x1b[1;5F"); // ctrl+end
+    expect(actions.scrollToEnd).toHaveBeenCalled();
   });
 });

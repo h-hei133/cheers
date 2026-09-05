@@ -1,4 +1,4 @@
-import type { Block } from "../../presentation/tui/transcript/blocks.js";
+import { splitFencedDiff, type Block } from "../../presentation/tui/transcript/blocks.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
 
 /**
@@ -57,6 +57,10 @@ export class ToolCards {
     const body = (output ?? (success ? "" : failureReason ?? "")).replace(/\s+$/, "");
     if (body) {
       block.text = block.text ? `${block.text}\n${body}` : body;
+      // An edit-shaped tool reports its change as a fenced diff in the output;
+      // hoisting it onto block.diff turns the fenced wall of text into a
+      // coloured diff the reader can scan.
+      splitFencedDiff(block);
       block.collapsed = success;
     }
     block.finalized = true;

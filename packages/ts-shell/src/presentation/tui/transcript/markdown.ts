@@ -1,4 +1,5 @@
 import { defaultTheme } from "../../theme/theme.js";
+import { formatCommandLine } from "../../theme/commandHighlight.js";
 import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 
@@ -39,11 +40,16 @@ export function trimPartialFence(text: string): string {
 /** Inline emphasis, code spans, and link labels for one line. */
 export function renderInline(text: string): string {
   return text
-    .replace(/`([^`]+)`/g, (_match, code: string) => `\x1b[48;5;238m ${code} \x1b[49m`)
+    .replace(/`([^`]+)`/g, (_match, code: string) => {
+      if (code.includes("/") || code.includes("\\") || /\.[a-zA-Z0-9_-]+$/.test(code)) {
+        return defaultTheme.fg("filename", code);
+      }
+      return defaultTheme.fg("mdCode", code);
+    })
     .replace(/\*\*([^*]+)\*\*/g, (_match, body: string) => defaultTheme.bold(body))
     .replace(/(^|[^*])\*([^*\n]+)\*/g, (_match, lead: string, body: string) => `${lead}\x1b[3m${body}\x1b[23m`)
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, href: string) =>
-      `${defaultTheme.fg("accent", label)}${defaultTheme.dim(` (${href})`)}`,
+      `${defaultTheme.fg("mdLink", label)}${defaultTheme.dim(` (${href})`)}`,
     );
 }
 
@@ -138,7 +144,7 @@ function renderLine(line: string, cells: number): string[] {
   if (RULE.test(line)) return [defaultTheme.fg("border", "─".repeat(cells))];
   const heading = HEADING.exec(line);
   if (heading) {
-    return wrapWithIndent(defaultTheme.bold(defaultTheme.fg("accent", renderInline(heading[2]!))), "", cells);
+    return wrapWithIndent(defaultTheme.bold(defaultTheme.fg("mdHeading", renderInline(heading[2]!))), "", cells);
   }
   const quote = QUOTE.exec(line);
   if (quote) {
@@ -163,9 +169,11 @@ function renderFence(body: readonly string[], language: string, cells: number): 
   const label = language ? ` ${language} ` : " code ";
   const head = defaultTheme.fg("border", `┌${label}${"─".repeat(Math.max(0, cells - visibleWidth(label) - 2))}┐`);
   const rows = [head];
+  const isBash = language === "bash" || language === "sh" || language === "zsh";
   for (const line of body) {
     for (const wrapped of wrapToWidth(line, Math.max(1, cells - 4))) {
-      rows.push(`${defaultTheme.fg("border", "│")} ${wrapped}`);
+      const styled = isBash ? formatCommandLine(wrapped) : defaultTheme.fg("text", wrapped);
+      rows.push(`${defaultTheme.fg("border", "│")} ${styled}`);
     }
   }
   rows.push(defaultTheme.fg("border", `└${"─".repeat(Math.max(0, cells - 2))}┘`));

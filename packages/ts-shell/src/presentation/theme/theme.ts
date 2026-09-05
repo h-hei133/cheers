@@ -4,12 +4,14 @@
  * Implements:
  * 1. Semantic Color Tokens (toolTitle, diffAdded, diffRemoved, syntax, etc.)
  * 2. Theme loading from JSON config files
- * 3. ANSI color escape sequences
+ * 3. Truecolor where the terminal supports it, 256/16-color downsampling otherwise
  */
 
 import { loadTheme, getDefaultTheme, type ThemeConfig } from "../themes/index.js";
+import { detectTerminalCapabilities } from "../tui/terminalCapabilities.js";
 
 export type ThemeColorToken =
+  | "text"
   | "userMessageText"
   | "assistantText"
   | "thinkingText"
@@ -21,6 +23,13 @@ export type ThemeColorToken =
   | "filename"
   | "command"
   | "commandArg"
+  | "commandFlag"
+  | "commandString"
+  | "commandNumber"
+  | "commandPipe"
+  | "mdHeading"
+  | "mdCode"
+  | "mdLink"
   | "success"
   | "error"
   | "warning"
@@ -28,6 +37,8 @@ export type ThemeColorToken =
   | "dim"
   | "accent"
   | "border"
+  | "borderAccent"
+  | "borderMuted"
   | "selectedBg"
   | "userMessageBg"
   | "toolPendingBg"
@@ -35,31 +46,41 @@ export type ThemeColorToken =
   | "toolErrorBg"
   | "syntaxKeyword"
   | "syntaxFunction"
+  | "syntaxVariable"
   | "syntaxString"
-  | "syntaxComment";
+  | "syntaxNumber"
+  | "syntaxComment"
+  | "syntaxOperator";
+
+interface Rgb {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}
 
 export class Theme {
   readonly name: string;
   private readonly colors: Map<ThemeColorToken, string>;
+  private readonly truecolor: boolean;
 
-  constructor(theme: ThemeConfig) {
+  constructor(theme: ThemeConfig, truecolor = detectTerminalCapabilities().hasTrueColor) {
     this.name = theme.name;
+    this.truecolor = truecolor;
     this.colors = new Map(Object.entries(theme.colors) as [ThemeColorToken, string][]);
   }
 
   fg(token: ThemeColorToken, text: string): string {
-    const color = this.colors.get(token) ?? "#ffffff";
+    const color = this.colors.get(token) ?? "#d4d4d4";
     return this.colorToAnsi(color) + text + "\x1b[0m";
   }
 
   bg(token: ThemeColorToken, text: string): string {
-    const color = this.colors.get(token) ?? "#000000";
-    return this.colorToAnsiBg(color) + text + "\x1b[0m";
+    return this.bgOpen(token) + text + "\x1b[0m";
   }
 
   /** The opening sequence alone, for rows that re-open the shade after resets. */
   bgOpen(token: ThemeColorToken): string {
-    const color = this.colors.get(token) ?? "#000000";
+    const color = this.colors.get(token) ?? "#1a1a1a";
     return this.colorToAnsiBg(color);
   }
 
@@ -76,17 +97,14 @@ export class Theme {
   }
 
   private colorToAnsi(color: string): string {
-    // Handle hex colors
     if (color.startsWith("#")) {
-      const r = parseInt(color.slice(1, 3), 16);
-      const g = parseInt(color.slice(3, 5), 16);
-      const b = parseInt(color.slice(5, 7), 16);
-      // Try to find closest 256 color
-      const index = this.closestColor(r, g, b);
-      if (index < 16) {
-        return `\x1b[3${index}m`;
+      const parsed = this.parseHex(color);
+      if (!parsed) return "\x1b[39m";
+      if (this.truecolor) {
+        return `\x1b[38;2;${parsed.r};${parsed.g};${parsed.b}m`;
       }
-      return `\x1b[38;5;${index}m`;
+      const index = this.closestColor(parsed.r, parsed.g, parsed.b);
+      return index < 8 ? `\x1b[${30 + index}m` : `\x1b[38;5;${index}m`;
     }
     // Handle ANSI color names
     const ansiMap: Record<string, string> = {
@@ -109,30 +127,45 @@ export class Theme {
     };
     const ansi = ansiMap[color.toLowerCase()];
     if (ansi) return `\x1b[${ansi}m`;
-    return "\x1b[37m"; // fallback to white
+    return "\x1b[39m"; // default foreground
   }
 
   private colorToAnsiBg(color: string): string {
     if (color.startsWith("#")) {
-      const r = parseInt(color.slice(1, 3), 16);
-      const g = parseInt(color.slice(3, 5), 16);
-      const b = parseInt(color.slice(5, 7), 16);
-      const index = this.closestColor(r, g, b);
-      if (index < 16) {
-        return `\x1b[4${index}m`;
+      const parsed = this.parseHex(color);
+      if (!parsed) return "\x1b[49m";
+      if (this.truecolor) {
+        return `\x1b[48;2;${parsed.r};${parsed.g};${parsed.b}m`;
       }
-      return `\x1b[48;5;${index}m`;
+      const index = this.closestColor(parsed.r, parsed.g, parsed.b);
+      return index < 8 ? `\x1b[${40 + index}m` : `\x1b[48;5;${index}m`;
     }
-    return "\x1b[40m"; // fallback to black
+    return "\x1b[49m";
+  }
+
+  private parseHex(color: string): Rgb | undefined {
+    const body = color.slice(1);
+    if (!/^[0-9a-fA-F]{6}$/.test(body)) return undefined;
+    return {
+      r: parseInt(body.slice(0, 2), 16),
+      g: parseInt(body.slice(2, 4), 16),
+      b: parseInt(body.slice(4, 6), 16),
+    };
   }
 
   private closestColor(r: number, g: number, b: number): number {
-    // Simple mapping: keep values in 16-231 range (256-color palette)
+    // Grayscale ramp (232-255) for dark/light neutrals, preventing blue tint
+    const maxDiff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
+    if (maxDiff < 12) {
+      const avg = (r + g + b) / 3;
+      if (avg < 4) return 16;
+      if (avg > 248) return 231;
+      return Math.round(232 + ((avg - 8) / 240) * 23);
+    }
     const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-    const rn = Math.round(clamp(r) / 255 * 5);
-    const gn = Math.round(clamp(g) / 255 * 5);
-    const bn = Math.round(clamp(b) / 255 * 5);
-    // 256-color palette offset + index
+    const rn = Math.min(5, Math.max(0, Math.round((clamp(r) / 255) * 5)));
+    const gn = Math.min(5, Math.max(0, Math.round((clamp(g) / 255) * 5)));
+    const bn = Math.min(5, Math.max(0, Math.round((clamp(b) / 255) * 5)));
     return 16 + rn * 36 + gn * 6 + bn;
   }
 }

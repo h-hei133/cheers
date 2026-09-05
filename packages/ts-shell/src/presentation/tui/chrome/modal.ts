@@ -19,6 +19,8 @@ export interface ModalChrome {
   readonly empty: string;
   /** Rows each option occupies beyond its first. */
   readonly detailRows: number;
+  /** Optional extra action hints shown in the footer (e.g. ^D delete · ^R rename). */
+  readonly actionHints?: string;
 }
 
 /** A full-screen frame exactly `height` rows tall and `width` columns wide. */
@@ -48,7 +50,7 @@ export function renderModal(
   }
 
   while (rows.length < height - 2) rows.push(edge(inner));
-  rows.push(body(footer(inner), inner));
+  rows.push(body(footer(inner, chrome.actionHints), inner));
   rows.push(bottom(inner));
   return rows.slice(0, height);
 }
@@ -88,13 +90,14 @@ function edge(inner: number): string {
 }
 
 /** One framed content row, padded so the right border lands on the same column. */
-function body(text: string, inner: number): string {
+export function modalBody(text: string, inner: number): string {
   const bar = defaultTheme.fg("border", "│");
   return `${bar} ${padToWidth(truncateToWidth(text, inner - 2), inner - 2)} ${bar}`;
 }
-
-function footer(inner: number): string {
+const body = modalBody;
+function footer(inner: number, actionHints?: string): string {
+  const hints = actionHints ? `  ·  ${actionHints}` : "";
   return defaultTheme.dim(
-    truncateToWidth("type to filter  ·  ↑↓ move  ·  ↵ choose  ·  esc cancel", inner - 2),
+    truncateToWidth(`type to filter  ·  ↑↓ move  ·  ↵ choose${hints}  ·  esc cancel`, inner - 2),
   );
 }

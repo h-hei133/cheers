@@ -7,6 +7,8 @@ import { copyPicker } from "./copy.js";
 import { restorePicker } from "./restore.js";
 import { sourcePicker } from "./sources.js";
 import { opensPicker } from "./registry.js";
+import { sessionPicker } from "./session.js";
+import type { SessionManager } from "../../../session/SessionManager.js";
 import { Transcript } from "../../../presentation/tui/transcript/container.js";
 import { textBlock } from "../../../presentation/tui/transcript/blocks.js";
 
@@ -213,5 +215,51 @@ describe("restore chooser", () => {
     await picker.load();
 
     expect((await picker.apply([]))?.note).toContain("nothing will be restored");
+  });
+});
+
+describe("session chooser", () => {
+  const manager = {
+    listRecentSessions: () => [
+      {
+        id: "sess_abc12345",
+        title: "Fix login flow",
+        status: "interrupted",
+        turns: [{ role: "user", content: "fix login" }],
+        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "sess_def67890",
+        status: "completed",
+        turns: [],
+        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      },
+    ],
+  } as unknown as SessionManager;
+
+  it("labels entries by title, never exposing raw session id", async () => {
+    const picker = sessionPicker({
+      sessionManager: manager,
+      resume: async () => undefined,
+      delete: async () => undefined,
+      rename: async () => undefined,
+    });
+    const options = await picker.load();
+    expect(options[0]!.label).toBe("Fix login flow");
+    expect(options[1]!.label).toBe("New session");
+    expect(options[1]!.detail).toContain("sess_def");
+  });
+
+  it("declares delete and rename handlers", () => {
+    const picker = sessionPicker({
+      sessionManager: manager,
+      resume: async () => undefined,
+      delete: async () => "deleted",
+      rename: async () => "renamed",
+    });
+    expect(typeof picker.onDelete).toBe("function");
+    expect(typeof picker.onRename).toBe("function");
   });
 });

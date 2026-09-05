@@ -7,6 +7,7 @@ import type { RecoveryTrustBoundaryBlock } from "../recovery/recoveryTrustBounda
 import type { SessionResumeEligibility } from "../recovery/sessionResumeEligibility.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionContinuitySnapshot } from "../sessionContinuityTypes.js";
+import { deriveSessionTitleFromPrompt } from "../lifecycle/sessionLifecycleStore.js";
 
 export interface SessionReentrySummary {
   readonly id: string;
@@ -55,7 +56,7 @@ export function projectSessionReentrySummary(input: {
   const { session, trustBoundary, recoverySnapshot, continuitySnapshot } = input;
   return {
     id: session.id,
-    title: session.title?.trim() || session.id,
+    title: resolveSessionTitle(session, recoverySnapshot),
     status: session.status,
     projectRoot: session.projectRoot,
     createdAt: session.createdAt,
@@ -91,6 +92,20 @@ export function projectSessionReentrySummary(input: {
     blockedDetail: trustBoundary.block?.detail,
     hasConversation: sessionHasConversation(session),
   };
+}
+
+/** Resolve an informative human-readable title for a session, never falling back to a raw ID. */
+function resolveSessionTitle(session: Session, recoverySnapshot: RecoverySnapshot): string {
+  if (session.title?.trim()) return session.title.trim();
+  const firstPrompt =
+    session.turns?.find((t) => t.role === "user" && t.content?.trim())?.content ||
+    recoverySnapshot.pendingPrompt ||
+    session.pendingPrompt;
+  if (firstPrompt?.trim()) {
+    const derived = deriveSessionTitleFromPrompt(firstPrompt);
+    if (derived) return derived;
+  }
+  return "New session";
 }
 
 /** Whether a session holds a real exchange rather than only command bookkeeping. */
