@@ -18,6 +18,7 @@ tmp-*
 packages/ts-shell/.tmp-debug-*/
 packages/ts-shell/_cli_input.txt
 status=*
+.ts-shell/
 Microsoft/
 
 .DS_Store

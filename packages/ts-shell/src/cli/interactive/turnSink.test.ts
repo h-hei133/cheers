@@ -194,6 +194,17 @@ describe("out-of-band notices", () => {
 
     expect(sink.activity()).toBeUndefined();
   });
+
+  it("replaces a recent notice with the same tag in-place instead of creating multiple rows", () => {
+    const { sink, transcript, rows } = build();
+    sink.notify("Copied 10 characters.", "clipboard");
+    sink.notify("Copied 20 characters.", "clipboard");
+    sink.notify("Copied 30 characters.", "clipboard");
+
+    expect(rows()).toContain("Copied 30 characters.");
+    expect(rows()).not.toContain("Copied 10 characters.");
+    expect(rows().split("\n").filter((r) => r.includes("Copied")).length).toBe(1);
+  });
 });
 
 describe("turn boundaries", () => {
@@ -225,9 +236,8 @@ describe("what a tool card says it is doing", () => {
       taskId: "t1",
       args: { command: "npm test -- --silent" },
     });
-
     // The tool's name says a command ran; it does not say which one.
-    expect(rows()).toContain("npm test -- --silent");
+    expect(stripAnsi(rows())).toContain("npm test -- --silent");
   });
 
   it("shows the path for a read and the pattern for a search", () => {
@@ -240,8 +250,8 @@ describe("what a tool card says it is doing", () => {
       args: { pattern: "TODO", path: "src" },
     });
 
-    expect(rows()).toContain("src/index.ts");
-    expect(rows()).toContain("TODO in src");
+    expect(stripAnsi(rows())).toContain("src/index.ts");
+    expect(stripAnsi(rows())).toContain("TODO in src");
   });
 
   it("falls back to the first string argument for a tool it does not know", () => {

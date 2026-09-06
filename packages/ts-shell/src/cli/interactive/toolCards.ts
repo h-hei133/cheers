@@ -1,4 +1,4 @@
-import type { Block } from "../../presentation/tui/transcript/blocks.js";
+import { splitFencedDiff, type Block } from "../../presentation/tui/transcript/blocks.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
 
 /**
@@ -57,6 +57,7 @@ export class ToolCards {
     const body = (output ?? (success ? "" : failureReason ?? "")).replace(/\s+$/, "");
     if (body) {
       block.text = block.text ? `${block.text}\n${body}` : body;
+      splitFencedDiff(block);
       block.collapsed = success;
     }
     block.finalized = true;

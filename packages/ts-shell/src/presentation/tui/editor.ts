@@ -249,6 +249,19 @@ export class Editor {
     this.historyIndex = -1;
   }
 
+  /** Populate prompt history from stored entries. */
+  loadHistory(entries: readonly string[]): void {
+    for (const entry of entries) {
+      const trimmed = entry.trim();
+      if (trimmed && this.history[this.history.length - 1] !== trimmed) this.history.push(trimmed);
+    }
+    this.historyIndex = -1;
+  }
+
+  getHistory(): readonly string[] {
+    return [...this.history];
+  }
+
   /**
    * Recall an earlier (-1) or later (+1) prompt. The in-progress draft is stashed
    * on the first step back and restored when navigation returns past the end.

@@ -1,4 +1,5 @@
 import { defaultTheme } from "../../theme/theme.js";
+import { formatCommandLine, formatToolDetail } from "../../theme/commandHighlight.js";
 import { padToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { renderDiff } from "./diff.js";
@@ -153,26 +154,62 @@ function renderTool(block: Block, width: number): readonly string[] {
   const glyph = status === "ok" ? defaultTheme.fg("success", STATUS_GLYPH.ok)
     : status === "failed" ? defaultTheme.fg("error", STATUS_GLYPH.failed)
     : defaultTheme.fg("warning", STATUS_GLYPH.running);
-  const name = defaultTheme.bold(block.title ?? "tool");
-  const detail = block.detail ? ` ${defaultTheme.dim(elide(block.detail, headroom(width, block.title)))}` : "";
-  const rows = [`${GUTTER}${glyph} ${name}${detail}`];
+  const name = defaultTheme.bold(defaultTheme.fg("toolTitle", block.title ?? "tool"));
+  const rawDetail = block.detail ? elide(block.detail, headroom(width, block.title)) : "";
+  const detail = rawDetail ? ` ${formatToolDetail(block.title, rawDetail)}` : "";
   const body = block.text.replace(/\s+$/, "");
 
-  // Folded only once the call is over. While it is running the body holds status
-  // notes — an approval pause, a progress line — and folding those away would hide
-  // the fact that the turn is waiting for the user.
-  if (body && block.collapsed === true) {
-    const lines = body.split("\n").length;
-    rows.push(`${GUTTER}${defaultTheme.dim(`  ↳ ${lines} ${lines === 1 ? "line" : "lines"} · click to expand`)}`);
+  // Folded only once the call is over. While it is running the body holds status notes.
+  if (block.collapsed === true) {
+    const rows = [`${GUTTER}${glyph} ${name}${detail}`];
+    if (block.diff) {
+      rows.push(...renderDiff(block.diff, width - BODY_INDENT.length).map((row) => `${BODY_INDENT}${row}`));
+    } else if (body) {
+      const lines = body.split("\n").length;
+      rows.push(`${GUTTER}${defaultTheme.dim(`  ↳ ${lines} ${lines === 1 ? "line" : "lines"} · click to expand`)}`);
+    }
     rows.push("");
     return rows;
   }
-  if (body) rows.push(...prose(body, width, BODY_INDENT));
-  if (block.diff) rows.push(...renderDiff(block.diff, width - BODY_INDENT.length).map((row) => `${BODY_INDENT}${row}`));
+
+  // Expanded: framed command box with dark border and distinct divider
+  const inner = Math.max(16, width - 2);
+  const headTitle = ` ${glyph} ${name} `;
+  const fill = Math.max(0, inner - visibleWidth(headTitle));
+  const topBar = defaultTheme.fg("border", "╭") + headTitle + defaultTheme.fg("border", `${"─".repeat(fill)}╮`);
+  const rows: string[] = [topBar];
+
+  if (block.detail) {
+    const formattedCmd = block.title === "bash" ? formatCommandLine(block.detail) : defaultTheme.fg("filename", block.detail);
+    for (const wrapped of wrapToWidth(formattedCmd, inner - 2)) {
+      rows.push(`${defaultTheme.fg("border", "│")} ${padToWidth(wrapped, inner - 2)} ${defaultTheme.fg("border", "│")}`);
+    }
+  }
+
+  if (body) {
+    const divLabel = " Output ";
+    const divFill = Math.max(0, inner - visibleWidth(divLabel));
+    rows.push(defaultTheme.fg("borderAccent", `├${divLabel}${"─".repeat(divFill)}┤`));
+    for (const line of body.split("\n")) {
+      for (const wrapped of wrapToWidth(line, inner - 2)) {
+        rows.push(`${defaultTheme.fg("border", "│")} ${padToWidth(defaultTheme.fg("toolOutput", wrapped), inner - 2)} ${defaultTheme.fg("border", "│")}`);
+      }
+    }
+  }
+
+  if (block.diff) {
+    const diffLabel = " Changes ";
+    const diffFill = Math.max(0, inner - visibleWidth(diffLabel));
+    rows.push(defaultTheme.fg("borderAccent", `├${diffLabel}${"─".repeat(diffFill)}┤`));
+    for (const diffRow of renderDiff(block.diff, inner - 2)) {
+      rows.push(`${defaultTheme.fg("border", "│")} ${padToWidth(diffRow, inner - 2)} ${defaultTheme.fg("border", "│")}`);
+    }
+  }
+
+  rows.push(defaultTheme.fg("border", `╰${"─".repeat(inner)}╯`));
   rows.push("");
   return rows;
 }
-
 /** Cells left on the header row for the detail, after the status and the name. */
 function headroom(width: number, title: string | undefined): number {
   return Math.max(8, width - (title?.length ?? 4) - 4);

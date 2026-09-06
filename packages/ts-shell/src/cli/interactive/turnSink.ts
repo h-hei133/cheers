@@ -37,7 +37,7 @@ export class TurnSink implements RendererSink {
   private proseKind: "command" | "error" = "command";
   private proseTitle = "";
   private failed = false;
-
+  private lastNotice: { block: Block; tag?: string; timestamp: number } | undefined;
   constructor(transcript: Transcript, onChange: () => void, now: () => number = Date.now) {
     this.transcript = transcript;
     this.onChange = onChange;
@@ -106,8 +106,17 @@ export class TurnSink implements RendererSink {
    * Record a short fact that belongs in the transcript but is not turn output —
    * a clipboard write, say. Finalized immediately, so it retires with the rest.
    */
-  notify(text: string): void {
-    this.transcript.append({ kind: "notice", text, finalized: true });
+  notify(text: string, tag?: string): void {
+    const now = Date.now();
+    if (tag && this.lastNotice?.tag === tag && now - this.lastNotice.timestamp < 10_000) {
+      this.lastNotice.block.text = text;
+      this.lastNotice.timestamp = now;
+      this.onChange();
+      return;
+    }
+    const block: Block = { kind: "notice", text, finalized: true };
+    this.transcript.append(block);
+    this.lastNotice = { block, tag, timestamp: now };
     this.onChange();
   }
 

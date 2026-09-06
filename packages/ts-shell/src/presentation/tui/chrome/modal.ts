@@ -1,6 +1,7 @@
 import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
+import { CURSOR_MARKER } from "../render/paint.js";
 import type { Option, OptionModel } from "./options.js";
 
 /**
@@ -76,7 +77,7 @@ function highlight(text: string, inner: number): string {
 
 function top(title: string, model: OptionModel, inner: number): string {
   const filter = model.filter ? ` ${defaultTheme.fg("accent", model.filter)}` : "";
-  const label = ` ${defaultTheme.bold(title)}${filter} ${defaultTheme.dim(`${model.total}`)} `;
+  const label = ` ${defaultTheme.bold(title)}${filter}${CURSOR_MARKER} ${defaultTheme.dim(`${model.total}`)} `;
   const fill = Math.max(0, inner - visibleWidth(label));
   return defaultTheme.fg("border", "┌") + label + defaultTheme.fg("border", `${"─".repeat(fill)}┐`);
 }

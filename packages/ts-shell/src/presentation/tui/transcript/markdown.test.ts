@@ -13,7 +13,7 @@ describe("inline styling", () => {
   });
 
   it("renders a code span without its backticks", () => {
-    expect(stripAnsi(renderInline("call `run()` now"))).toBe("call  run()  now");
+    expect(stripAnsi(renderInline("call `run()` now"))).toBe("call run() now");
   });
 
   it("shows a link label with its target", () => {

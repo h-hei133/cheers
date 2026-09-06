@@ -3,6 +3,7 @@ import { renderModal, modalBody } from "../../presentation/tui/chrome/modal.js";
 import { renderPanel } from "../../presentation/tui/chrome/panel.js";
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 import { defaultTheme } from "../../presentation/theme/theme.js";
+import { CURSOR_MARKER } from "../../presentation/tui/render/paint.js";
 
 /**
  * The active picker.
@@ -191,7 +192,7 @@ export class OverlayHost {
       modalBody("", inner),
       modalBody(defaultTheme.dim(`Current: "${this.subTargetLabel ?? ""}"`), inner),
       modalBody("", inner),
-      modalBody(defaultTheme.bold("New title:") + " " + defaultTheme.fg("accent", this.renameDraft) + "█", inner),
+      modalBody(defaultTheme.bold("New title:") + " " + defaultTheme.fg("accent", this.renameDraft) + CURSOR_MARKER + "█", inner),
       modalBody("", inner),
       modalBody(`  ${defaultTheme.fg("success", "[Enter] Save")}    ${defaultTheme.fg("muted", "[Esc] Cancel")}`, inner),
       modalBody("", inner),

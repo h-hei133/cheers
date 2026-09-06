@@ -1,5 +1,7 @@
+import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { replaceInContent } from './editEngine.js'
+import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
 import { truncateHead, truncateTail, truncateLineWidth } from './truncation.js'
 import { ArtifactManager } from '../session/artifactManager.js'
 import { parsePathSelector, sliceLinesBySelector } from './selectorParser.js'
@@ -338,6 +340,19 @@ export function createCoreToolRegistry(options?: {
           throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
         }
         const content = typeof args.content === 'string' ? args.content : ''
+        const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
+        let original = ''
+        try {
+          original = await executionService.readTextFile({
+            operationKind: 'file.read',
+            absolutePath: containment.resolvedPath,
+            workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY,
+            caller: 'core-tool:write',
+            reason: 'Read original content for diff.',
+            reportSafeTarget: containment.resolvedPath,
+          })
+        } catch {}
         await executionService.writeTextFile({
           operationKind: 'file.write',
           absolutePath: containment.resolvedPath,
@@ -348,7 +363,9 @@ export function createCoreToolRegistry(options?: {
           reason: 'Write an approved workspace file target.',
           reportSafeTarget: containment.resolvedPath,
         })
-        return approvedResult(containment.resolvedPath)
+        const diff = original && original !== content ? createUnifiedDiff(relPath, original, content) : ''
+        const output = diff ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\`` : `Wrote ${relPath}`
+        return approvedResult(output)
       },
     },
     {
@@ -392,9 +409,11 @@ export function createCoreToolRegistry(options?: {
           throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
         }
 
+        const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
+        let original = ''
         let finalContent = ''
         if (typeof args.oldText === 'string' && typeof args.newText === 'string') {
-          const original = await executionService.readTextFile({
+          original = await executionService.readTextFile({
             operationKind: 'file.read',
             absolutePath: containment.resolvedPath,
             workspaceRoot: context.workspaceRoot,
@@ -411,6 +430,17 @@ export function createCoreToolRegistry(options?: {
           }
           finalContent = replaceRes.content
         } else if (typeof args.content === 'string') {
+          try {
+            original = await executionService.readTextFile({
+              operationKind: 'file.read',
+              absolutePath: containment.resolvedPath,
+              workspaceRoot: context.workspaceRoot,
+              authority: TOOL_APPROVED_READ_AUTHORITY,
+              caller: 'core-tool:edit',
+              reason: 'Read original content for diff.',
+              reportSafeTarget: containment.resolvedPath,
+            })
+          } catch {}
           finalContent = args.content
         } else {
           throw new Error("Must provide either 'content' or both 'oldText' and 'newText'.")
@@ -426,7 +456,9 @@ export function createCoreToolRegistry(options?: {
           reason: 'Replace an approved workspace file target.',
           reportSafeTarget: containment.resolvedPath,
         })
-        return approvedResult(containment.resolvedPath)
+        const diff = original && original !== finalContent ? createUnifiedDiff(relPath, original, finalContent) : ''
+        const output = diff ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\`` : `Updated ${relPath}`
+        return approvedResult(output)
       },
     },
     {

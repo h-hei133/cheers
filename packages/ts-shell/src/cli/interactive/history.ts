@@ -40,6 +40,9 @@ export function restoreConversation(turns: readonly SessionMessage[]): RestoredH
 
 export interface HistoryTarget {
   readonly transcript: Transcript;
+  readonly editor?: {
+    loadHistory(entries: readonly string[]): void;
+  };
   readonly sessionManager: {
     getSession(sessionId: string): Session | undefined;
     createNew(
@@ -75,6 +78,10 @@ export function showConversation(target: HistoryTarget): void {
   }
   for (const block of restored.blocks) target.transcript.append(block);
   target.transcript.finalizeAll();
+  const userPrompts = session.turns
+    .filter((turn) => turn.role === "user" && turn.content.trim().length > 0)
+    .map((turn) => turn.content.trim());
+  target.editor?.loadHistory(userPrompts);
 }
 
 /**

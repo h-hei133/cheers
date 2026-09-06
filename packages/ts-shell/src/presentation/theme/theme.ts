@@ -10,6 +10,7 @@
 import { loadTheme, getDefaultTheme, type ThemeConfig } from "../themes/index.js";
 
 export type ThemeColorToken =
+  | "text"
   | "userMessageText"
   | "assistantText"
   | "thinkingText"
@@ -21,6 +22,13 @@ export type ThemeColorToken =
   | "filename"
   | "command"
   | "commandArg"
+  | "commandFlag"
+  | "commandString"
+  | "commandNumber"
+  | "commandPipe"
+  | "mdHeading"
+  | "mdCode"
+  | "mdLink"
   | "success"
   | "error"
   | "warning"
@@ -28,6 +36,8 @@ export type ThemeColorToken =
   | "dim"
   | "accent"
   | "border"
+  | "borderAccent"
+  | "borderMuted"
   | "selectedBg"
   | "userMessageBg"
   | "toolPendingBg"
@@ -35,7 +45,9 @@ export type ThemeColorToken =
   | "toolErrorBg"
   | "syntaxKeyword"
   | "syntaxFunction"
+  | "syntaxVariable"
   | "syntaxString"
+  | "syntaxNumber"
   | "syntaxComment";
 
 export class Theme {

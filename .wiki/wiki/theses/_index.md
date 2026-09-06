@@ -28,4 +28,5 @@ Last updated: 2026-08-28
 - [SOTA 跨会话通信网格（Cross-Session Mesh）与协同团队（Agent Teams）架构研究与设计方案](cross-session-messaging-and-agent-teams-architecture.md)
 - [TUI 实况链路缺陷审计与修复方案](tui-live-path-defects.md)
 - [Composer 附件 Chip 条架构研究与移植方案](composer-attachment-chips-adaptation.md)
+- [终端体验对标与视觉交互架构设计](terminal-experience-alignment-and-theme-architecture.md) — 对标 OMP：IME 光标同步、终端原生滚动、历史记录持久化、剪贴板通知与命令框渲染
 - [Slash 命令实现深度审计](slash-command-depth-audit.md) — 15 个命令逐个判定：真实 / 单薄 / 壳，壳在哪一层

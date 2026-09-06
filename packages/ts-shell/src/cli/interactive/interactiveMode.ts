@@ -6,6 +6,7 @@ import { handleShellClose } from "../../core/shell/signalHandlers.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { newlineKeyFor } from "../../presentation/tui/chrome/hints.js";
+import { loadPromptHistory, appendPromptHistory } from "./historyStore.js";
 import type { StatusItemId } from "../../presentation/tui/chrome/items.js";
 import { renderWelcome } from "../../presentation/tui/chrome/welcome.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
@@ -109,7 +110,10 @@ export class InteractiveMode {
     this.clipboard = new Clipboard({
       cwd: options.runtimeContext.cwd,
       sessionId: options.runtimeContext.session.id,
-      notify: (text) => this.sink.notify(text),
+      notify: (text) => {
+        if (this.busy) return;
+        this.sink.notify(text, "clipboard");
+      },
       write: (data) => this.terminal.write(data),
     });
     this.overlay = new OverlayHost(() => this.tui.requestRender());
@@ -162,6 +166,12 @@ export class InteractiveMode {
       const match = /(?:⎘ #\d+|\[#\d+ [^\]]*\])$/.exec(before);
       return match ? column - match[0].length : undefined;
     };
+    const diskHistory = loadPromptHistory(options.runtimeContext.projectRoot);
+    this.surface.editor.loadHistory(diskHistory);
+    const sessionTurns = options.runtimeContext.session.turns
+      ?.filter((t) => t.role === "user" && t.content?.trim())
+      .map((t) => t.content.trim()) ?? [];
+    this.surface.editor.loadHistory(sessionTurns);
   }
 
   start(): void {
@@ -305,6 +315,7 @@ export class InteractiveMode {
   }
 
   private onSubmit(text: string): void {
+    appendPromptHistory(this.options.runtimeContext.projectRoot, text);
     if (this.questions.answer(text)) {
       this.tui.requestRender();
       return;
@@ -399,6 +410,7 @@ export class InteractiveMode {
   private historyTarget(): HistoryTarget {
     return {
       transcript: this.surface.transcript,
+      editor: this.surface.editor,
       sessionManager: this.options.sessionManager,
       context: this.options.runtimeContext,
     };
