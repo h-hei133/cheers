@@ -159,7 +159,7 @@ export class InteractiveMode {
     // removes the token — and with it the attachment — instead of half a symbol.
     this.surface.editor.atomicTokenStart = (line, column) => {
       const before = line.slice(0, column);
-      const match = /⎘ #\d+$/.exec(before);
+      const match = /(?:⎘ #\d+|\[#\d+ [^\]]*\])$/.exec(before);
       return match ? column - match[0].length : undefined;
     };
   }
@@ -448,6 +448,14 @@ export class InteractiveMode {
       projectRoot: this.options.runtimeContext.projectRoot,
       statusItems: this.statusItems,
       resumeSession: (sessionId) => this.runCommandLine(`/resume ${sessionId}`),
+      deleteSession: (sessionId) => {
+        this.options.sessionManager.deleteSession(sessionId);
+        return undefined;
+      },
+      renameSession: (sessionId, title) => {
+        this.options.sessionManager.renameSession(sessionId, title);
+        return undefined;
+      },
       refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
       sessionTurns: () =>

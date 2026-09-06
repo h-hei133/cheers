@@ -127,12 +127,17 @@ export class Theme {
   }
 
   private closestColor(r: number, g: number, b: number): number {
-    // Simple mapping: keep values in 16-231 range (256-color palette)
+    const maxDiff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
+    if (maxDiff < 12) {
+      const avg = (r + g + b) / 3;
+      if (avg < 4) return 16;
+      if (avg > 248) return 231;
+      return Math.round(232 + ((avg - 8) / 240) * 23);
+    }
     const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-    const rn = Math.round(clamp(r) / 255 * 5);
-    const gn = Math.round(clamp(g) / 255 * 5);
-    const bn = Math.round(clamp(b) / 255 * 5);
-    // 256-color palette offset + index
+    const rn = Math.min(5, Math.max(0, Math.round((clamp(r) / 255) * 5)));
+    const gn = Math.min(5, Math.max(0, Math.round((clamp(g) / 255) * 5)));
+    const bn = Math.min(5, Math.max(0, Math.round((clamp(b) / 255) * 5)));
     return 16 + rn * 36 + gn * 6 + bn;
   }
 }

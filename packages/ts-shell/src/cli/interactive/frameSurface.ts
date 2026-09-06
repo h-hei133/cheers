@@ -1,7 +1,6 @@
 import { defaultTheme } from "../../presentation/theme/theme.js";
 import { padToWidth } from "../../presentation/tui/text/layout.js";
 import { Editor } from "../../presentation/tui/editor.js";
-import { renderPasteChips } from "../../presentation/tui/chrome/pasteChips.js";
 import { PasteStore } from "../../presentation/tui/pastes.js";
 import { renderBand } from "../../presentation/tui/chrome/band.js";
 import type { StatusFacts, StatusItemId } from "../../presentation/tui/chrome/items.js";
@@ -126,33 +125,7 @@ export class InteractiveSurface implements TerminalFrameProvider {
     // short conversation should not float the prompt up the middle of the screen.
     const filler = Array.from({ length: Math.max(0, capacity - visible.length) }, () => "");
     this.lastFiller = filler.length;
-    return { rows: this.shade(this.withScrollbar([...filler, ...visible], width, capacity, rendered.rows.length, top).concat(chrome)) };
-  }
-
-  /**
-   * The right-edge scrollbar over the transcript window, borrowed from the
-   * viewport-with-thumb pattern: a `│` track with a `█` thumb whose span
-   * reflects how much of the transcript the window shows and where it sits.
-   * Nothing is drawn while everything fits — a bar that is always there is
-   * furniture, not information.
-   */
-  private withScrollbar(
-    rows: readonly string[],
-    width: number,
-    capacity: number,
-    totalRows: number,
-    top: number,
-  ): string[] {
-    if (totalRows <= capacity || capacity <= 0 || width < 4) return [...rows];
-    const thumbSize = Math.max(1, Math.min(Math.floor((capacity * capacity) / totalRows), capacity));
-    const travel = capacity - thumbSize;
-    const maxOffset = totalRows - capacity;
-    const start = maxOffset === 0 ? 0 : Math.round((top / maxOffset) * travel);
-    return rows.map((row, index) => {
-      const inThumb = index >= start && index < start + thumbSize;
-      const bar = inThumb ? defaultTheme.fg("accent", "█") : defaultTheme.fg("border", "│");
-      return `${padToWidth(row, width - 1)}${bar}`;
-    });
+    return { rows: this.shade([...filler, ...visible, ...chrome]) };
   }
 
   /** The frame with an in-progress drag shaded, which is the only sign it made one. */
@@ -214,7 +187,6 @@ export class InteractiveSurface implements TerminalFrameProvider {
       ...renderActivity(this.context.activity(), this.context.now(), width),
       ...this.context.overlayRows(width, height),
       renderBand(this.context.facts(), this.context.statusItems(), width),
-      ...renderPasteChips(this.pastes.chipsIn(this.editor.getText()), width),
       ...renderComposer(this.editor, { busy }, width),
     ];
     if (this.suggestionsOpen) {

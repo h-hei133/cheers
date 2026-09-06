@@ -74,7 +74,12 @@ async function pipeTo(candidate: ClipboardCommand, text: string): Promise<boolea
         return;
       }
       child.stdin.on("error", () => resolve(false));
-      child.stdin.end(Buffer.from(text, candidate.encoding));
+      if (candidate.encoding === "utf16le") {
+        const bom = Buffer.from([0xff, 0xfe]);
+        child.stdin.end(Buffer.concat([bom, Buffer.from(text, "utf16le")]));
+      } else {
+        child.stdin.end(Buffer.from(text, candidate.encoding));
+      }
     } catch {
       resolve(false);
     }

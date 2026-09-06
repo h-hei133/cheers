@@ -3,12 +3,12 @@
  *
  * A pasted file is not something anyone wants to scroll past to reach the end of
  * their own sentence — but it is also not something to truncate, because it is the
- * substance of the request. So the draft carries a short chip token and the text
+ * substance of the request. So the draft carries a short placeholder and the text
  * is kept here, expanded again only when the draft is sent.
  *
- * The token is the attachment's whole identity: the chip band above the prompt
- * renders one card per token still present in the draft, so deleting the token
- * deletes the attachment, and a token is deleted whole — never half.
+ * Placeholders are ordinary characters in the draft, which is what keeps the caret
+ * honest: moving over one takes as many presses as it looks like it should, and
+ * deleting it deletes the whole paste rather than half of it.
  */
 
 /** Length past which a paste is held aside rather than shown in full. */
@@ -16,27 +16,8 @@ export const PASTE_PLACEHOLDER_THRESHOLD = 320;
 
 const PLACEHOLDER = /\[#(\d+) [^\]]*\]/g;
 
-/** The compact chip token a held paste leaves in the draft. */
-export function pasteChipToken(id: number): string {
-  return `⎘ #${id}`;
-}
-
-/** Full shape of a chip token, with bracketed placeholders accepted for drafts
- *  that predate the compact form. */
-const CHIP_TOKEN = /(?:⎘ #(\d+)|\[#(\d+) [^\]]*\])/g;
-
 /** Window in which a second paste of the same text means "show it in full". */
 const DOUBLE_PASTE_MS = 1200;
-
-/** One chip band card's data, derived from a token still present in the draft. */
-export interface PasteChip {
-  readonly id: number;
-  readonly token: string;
-  readonly lines: number;
-  readonly chars: number;
-  /** Leading non-blank content of the paste, for the card's snippet. */
-  readonly preview: string;
-}
 
 export class PasteStore {
   private readonly held = new Map<number, string>();
@@ -83,51 +64,28 @@ export class PasteStore {
     return this.held.get(id);
   }
 
-  /** The ids whose tokens are still in `draft`, in the order they appear. */
+  /** The placeholder ids present in `draft`, in the order they appear. */
   idsIn(draft: string): number[] {
     const ids: number[] = [];
-    for (const match of draft.matchAll(CHIP_TOKEN)) {
-      const id = Number(match[1] ?? match[2]);
+    for (const match of draft.matchAll(PLACEHOLDER)) {
+      const id = Number(match[1]);
       if (this.held.has(id)) ids.push(id);
     }
     return ids;
   }
 
-  /**
-   * One chip card's worth of facts per token still in the draft. The token's
-   * presence *is* the attachment's liveness: delete the token from the draft
-   * and the chip — and the attachment — is gone, with no extra state machine.
-   */
-  chipsIn(draft: string): readonly PasteChip[] {
-    return this.idsIn(draft).flatMap((id) => {
-      const text = this.held.get(id);
-      if (text === undefined) return [];
-      const lines = text.split("\n").length;
-      return [{
-        id,
-        token: pasteChipToken(id),
-        lines,
-        chars: text.length,
-        preview: firstContentLine(text),
-      }];
-    });
-  }
-
-  /** `draft` with every token replaced by the text it stands for. */
+  /** `draft` with every placeholder replaced by the text it stands for. */
   expand(draft: string): string {
-    return draft.replace(CHIP_TOKEN, (whole, chip, legacy) => {
-      const id = Number(chip ?? legacy);
-      return this.held.get(id) ?? whole;
-    });
+    return draft.replace(PLACEHOLDER, (whole, raw: string) => this.held.get(Number(raw)) ?? whole);
   }
 
   /**
-   * `draft` with paste `id`'s token rewritten for `text`, and the text
+   * `draft` with paste `id`'s placeholder rewritten for `text`, and the text
    * recorded. Keeping the id is what lets the same paste be edited twice.
    */
   rewrite(draft: string, id: number, text: string): string {
-    const token = this.update(id, text);
-    return draft.replace(new RegExp(`(?:⎘ #${id}|\\[#${id} [^\\]]*\\])`), token);
+    const placeholder = this.update(id, text);
+    return draft.replace(new RegExp(`\\[#${id} [^\\]]*\\]`), placeholder);
   }
 
   /** Hold `text` when it is long enough to bury a draft, else return it as-is. */
@@ -165,15 +123,9 @@ function normalizePaste(text: string): string {
   return text.replace(/\t/g, "  ").replace(/\r\n?/g, "\n");
 }
 
-/** What the draft shows in place of a held paste: the compact chip token. The
- *  caption (size, line count) belongs to the chip band card, not the draft. */
-function placeholderFor(id: number, _text: string): string {
-  return pasteChipToken(id);
-}
-
-
-/** The first line of `text` that carries content, collapsed to single spaces. */
-function firstContentLine(text: string): string {
-  const line = text.split("\n").find((candidate) => candidate.trim().length > 0) ?? "";
-  return line.replace(/\s+/g, " ").trim();
+/** What the draft shows in place of a held paste. */
+function placeholderFor(id: number, text: string): string {
+  const lines = text.split("\n").length;
+  const size = text.length >= 1000 ? `${(text.length / 1000).toFixed(1)}k chars` : `${text.length} chars`;
+  return `[#${id} pasted ${size}${lines > 1 ? `, ${lines} lines` : ""}]`;
 }

@@ -9,6 +9,7 @@ import {
   createMessageTranscriptEvent,
   type TranscriptEvent,
 } from "../sessionEventCodec.js";
+import { deriveSessionTitleFromPrompt } from "./sessionLifecycleStore.js";
 
 export function persistSessionUserPromptBarrier(input: {
   readonly session: Session;
@@ -31,6 +32,10 @@ export function persistSessionUserPromptBarrier(input: {
   delete input.session.lastError;
   input.session.pendingPrompt = input.prompt;
   input.session.updatedAt = input.timestamp;
+  if (!input.session.title?.trim()) {
+    const derived = deriveSessionTitleFromPrompt(input.prompt);
+    if (derived) input.session.title = derived;
+  }
   input.session.turns.push(nextMessage);
 
   input.appendTranscriptEvent(
