@@ -56,15 +56,15 @@ export function deriveActionableBlockerContract(input: {
     (() => {
       const verification = input.codingResult?.verification;
       if (
-        verification.status === "blocked" &&
-        verification.blockerKind === "approval-denied" &&
-        Boolean(verification.nextAction?.trim())
+        verification?.status === "blocked" &&
+        verification?.blockerKind === "approval-denied" &&
+        Boolean(verification?.nextAction?.trim())
       ) {
         return "approval-denied";
       }
       return classifyActionableKind(
         reason,
-        input.codingResult?.verification.status === "failed",
+        input.codingResult?.verification?.status === "failed",
       );
     })();
   if (!kind) {

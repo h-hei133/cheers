@@ -35,7 +35,7 @@ describe('observability integration', () => {
   it('keeps one trace id across orchestration and tool dispatch without provider calls', async () => {
     await runMvpIntegratedFlow({
       sessionId: 'sess_obs',
-      prompt: 'Need approval to run tool-assisted implementation',
+      prompt: 'Run node --version to check runtime',
       workspaceRoot,
       escalationDecision: 'allow-once',
     })

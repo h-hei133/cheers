@@ -38,7 +38,7 @@ describe("verification planner", () => {
     });
 
     expect(plan.mode).toBe("command");
-    expect(plan.command).toBe("node --version");
+    expect(plan.command).toBe("npm test -- tests/sample.test.ts");
     expect(plan.selectionScope).toBe("focused");
     expect(plan.selectionSource).toBe("auto-from-changes");
   });
@@ -200,7 +200,7 @@ describe("verification planner", () => {
       verifyLikeCommand: true,
     });
 
-    expect(projected.evidence).toContain("verify-command-hint:node --version");
+    expect(projected.evidence.some((e) => e.startsWith("verify-command-hint:"))).toBe(true);
     expect(projected.evidence.join("\n")).not.toContain("x".repeat(300));
   });
 

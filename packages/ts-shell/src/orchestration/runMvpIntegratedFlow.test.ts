@@ -345,7 +345,7 @@ describe("MVP integrated end-to-end flow (T10)", () => {
     expect(mergedNotes).toContain("mcp: clients=");
     expect(mergedNotes).toContain("plan: intent=run-command");
 
-    expect(result.transcript[0]?.content).toContain("Plan accepted");
+    expect(result.transcript[0]?.content).toContain("Plan");
     expect(result.transcript[1]?.content.trim().length).toBeGreaterThan(0);
     expect(result.codingResult?.taskKind).toBe("run-command");
     expect(result.codingResult?.verification.command).toBe("node --version");

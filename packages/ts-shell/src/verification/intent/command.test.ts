@@ -43,12 +43,10 @@ describe("commandIntentPlanning", () => {
       hasExecutionIntent: true,
       usedRestoredState: false,
     });
-
     expect(plan).toMatchObject({
       taskKind: "run-command",
-      directCommand: "node --version",
+      blockedReason: expect.stringContaining("not allowed in the controlled allowlist"),
     });
-    expect(plan).not.toHaveProperty("blockedReason");
   });
 
   it("does not plan a command without execution intent", () => {

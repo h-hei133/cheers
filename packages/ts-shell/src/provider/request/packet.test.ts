@@ -18,7 +18,7 @@ describe("task request packet", () => {
     const plan = buildExecutionPlan({
       taskKind: "docs-report",
       outputKind: "artifact",
-      allowedTools: ["read", "write", "verify"],
+      allowedTools: ["read", "write", "verify", "artifact"],
       allowedWrites: ["reports/summary.md"],
       successRubric: ["source", "validate"],
       context,

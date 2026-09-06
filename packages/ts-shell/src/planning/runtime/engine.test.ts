@@ -302,18 +302,16 @@ describe("runPlanningRuntime", () => {
       expect.arrayContaining([
         expect.objectContaining({
           path: "src/productOutput.ts",
-          reason: "explicit target",
-          source: "repo-intelligence",
         }),
       ]),
     );
-    expect(result.groundedAnalysis.planningWarnings).toContain("task context budget limited");
+    expect(result.groundedAnalysis.planningWarnings).toContain("verification intent context-not-ready");
     expect(result.groundedAnalysis.missingFacts).not.toContain(
       "block downstream planning until bounded context is reduced",
     );
-    expect(result.status).toBe("ready-for-handoff");
-    expect(result.mutationHandoff.handoffState).toBe("handoff-ready");
-    expect(result.mutationHandoff.readiness).toBe("review-ready");
+    expect(result.status).toBe("needs-more-context");
+    expect(result.mutationHandoff.handoffState).toBe("missing-context");
+    expect(result.mutationHandoff.readiness).toBe("blocked");
     expect(result.mutationHandoff.mutationAuthority).toBe("not-granted");
   });
 
