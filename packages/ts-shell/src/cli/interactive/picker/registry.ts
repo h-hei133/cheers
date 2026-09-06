@@ -42,6 +42,7 @@ export interface PickerHost {
   renameSession(sessionId: string, title: string): Promise<string | undefined>;
   refreshServer(serverName: string): Promise<string | undefined>;
   revokeGrant(key: string): Promise<string | undefined>;
+  saveStatusItems(items: readonly StatusItemId[]): Promise<string | undefined>;
   /** Show `items` in the band without saving; `undefined` restores the saved band. */
   previewStatusItems(items: readonly StatusItemId[] | undefined): void;
   /** The current session's stored turns, for choosing a point to go back to. */
