@@ -1,0 +1,61 @@
+import type { PermissionScope } from "../../../cli/approval/permissionScope.js";
+import type { StatusFacts, StatusItemId } from "../chrome/items.js";
+import type { Block } from "../transcript/blocks.js";
+import type { TurnActivity } from "../transcript/live.js";
+
+export type AgentMessageKind = "user" | "assistant" | "thinking" | "tool" | "notice" | "error";
+
+export interface AgentMessage {
+  readonly kind: AgentMessageKind;
+  readonly text: string;
+  readonly title?: string;
+  readonly detail?: string;
+  readonly diff?: string;
+  readonly collapsed?: boolean;
+  readonly finalized?: boolean;
+}
+
+export interface PermissionRequest {
+  readonly title: string;
+  readonly detail?: string;
+  readonly scope: PermissionScope;
+}
+
+export type PermissionAnswer = "allow" | "deny" | "scope";
+
+export interface SessionFacts {
+  readonly facts: StatusFacts;
+  readonly items: readonly StatusItemId[];
+  readonly activity: TurnActivity | undefined;
+  readonly busy: boolean;
+}
+
+export function toBlock(message: AgentMessage): Block {
+  switch (message.kind) {
+    case "user":
+      return { kind: "user", text: message.text, finalized: message.finalized ?? true };
+    case "assistant":
+      return { kind: "assistant", text: message.text, finalized: message.finalized ?? false };
+    case "thinking":
+      return {
+        kind: "thinking",
+        text: message.text,
+        collapsed: message.collapsed ?? true,
+        finalized: message.finalized ?? false,
+      };
+    case "tool":
+      return {
+        kind: "tool",
+        title: message.title,
+        detail: message.detail,
+        text: message.text,
+        diff: message.diff,
+        finalized: message.finalized ?? false,
+      };
+    case "error":
+      return { kind: "error", text: message.text, finalized: true };
+    case "notice":
+    default:
+      return { kind: "notice", text: message.text, finalized: true };
+  }
+}
