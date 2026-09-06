@@ -2,10 +2,13 @@ import { CURSOR_MARKER } from "../render/paint.js";
 
 export { CURSOR_MARKER };
 
-export type PointerKind = "press" | "release" | "drag" | "wheel";
+export type PointerKind = "press" | "release" | "drag" | "move" | "click" | "wheel";
+
+export type PointerButton = "left" | "middle" | "right" | "none";
 
 export interface PointerEvent {
   readonly kind: PointerKind;
+  readonly button?: PointerButton;
   readonly x: number;
   readonly y: number;
   readonly screenX: number;
@@ -16,10 +19,12 @@ export interface PointerEvent {
   readonly alt: boolean;
   readonly ctrl: boolean;
   readonly wheelDelta?: number;
+  readonly clickCount?: number;
 }
 
 export interface PointerResult {
   readonly handled?: boolean;
+  readonly capture?: boolean;
   readonly focus?: boolean;
   readonly render?: boolean;
 }
@@ -37,7 +42,7 @@ export interface Focusable {
 }
 
 export function isFocusable(component: ViewComponent | null): component is ViewComponent & Focusable {
-  return component !== null && "focused" in component;
+  return component !== null && typeof (component as Partial<Focusable>).focused === "boolean";
 }
 
 export class Container implements ViewComponent {
@@ -71,7 +76,7 @@ export class Container implements ViewComponent {
           y: event.y - childY,
           height,
         });
-        if (result?.handled || result?.focus) return result;
+        if (result?.handled || result?.capture || result?.focus) return result;
         return undefined;
       }
       childY += height;

@@ -1,3 +1,4 @@
+import { isKeyRelease } from "../input/keys.js";
 import type { TerminalDevice } from "../terminal.js";
 import type { TerminalFrameProvider, TuiStartOptions } from "../render/frame.js";
 import { TUI } from "../render/engine.js";
@@ -7,18 +8,19 @@ import { ScrollView, type ScrollOptions } from "./scroll.js";
 
 export interface SurfaceOptions {
   readonly terminal?: TerminalDevice;
-  readonly deferInput?: boolean;
 }
 
 export class Surface extends Container {
   private readonly engine: TUI;
   private readonly overlays = new OverlayStack();
-  private focused: ViewComponent | null = null;
 
   constructor(options: SurfaceOptions = {}) {
     super();
     this.engine = new TUI(options.terminal);
-    void options.deferInput;
+  }
+
+  enableInput(): void {
+    this.engine.enableInput();
   }
 
   setFrameProvider(provider: TerminalFrameProvider | undefined): void {
@@ -41,14 +43,11 @@ export class Surface extends Container {
   }
 
   showOverlay(component: ViewComponent, options?: OverlayOptions): OverlayHandle {
-    const previous = this.focused;
-    if (previous !== null) this.focused = component;
     const handle = this.overlays.show(component, options);
     const stack = this;
     return {
       hide() {
         handle.hide();
-        if (stack.focused === component) stack.focused = previous;
         stack.engine.requestRender();
       },
       setHidden(hidden: boolean) {
@@ -58,12 +57,10 @@ export class Surface extends Container {
       isHidden: () => handle.isHidden(),
       focus() {
         handle.focus();
-        stack.focused = component;
         stack.engine.requestRender();
       },
       unfocus() {
         handle.unfocus();
-        stack.focused = previous;
         stack.engine.requestRender();
       },
       isFocused: () => handle.isFocused(),
@@ -71,11 +68,11 @@ export class Surface extends Container {
   }
 
   setFocus(component: ViewComponent | null): void {
-    this.focused = component;
+    this.overlays.setFocus(component);
   }
 
   get focus(): ViewComponent | null {
-    return this.focused;
+    return this.overlays.focus;
   }
 
   get overlayCount(): number {
@@ -84,7 +81,8 @@ export class Surface extends Container {
 
   onInput(listener: (data: string) => void): () => void {
     return this.engine.onInput((data) => {
-      this.focused?.handleInput?.(data);
+      if (isKeyRelease(data) && this.overlays.focus?.wantsKeyRelease !== true) return;
+      this.overlays.focus?.handleInput?.(data);
       listener(data);
     });
   }
@@ -107,5 +105,10 @@ export class Surface extends Container {
 
   screenRows(): readonly string[] {
     return this.engine.screenRows();
+  }
+
+  override invalidate(): void {
+    super.invalidate();
+    this.overlays.invalidate();
   }
 }

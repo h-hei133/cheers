@@ -170,7 +170,7 @@ export function setTheme(name: string): void {
 }
 
 export function getDefaultThemeInstance(): Theme {
-  return defaultTheme;
+  return currentTheme ?? defaultTheme;
 }
 
 export const defaultTheme = new Theme(getDefaultTheme());

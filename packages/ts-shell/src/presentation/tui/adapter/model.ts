@@ -1,9 +1,10 @@
 import type { PermissionScope } from "../../../cli/approval/permissionScope.js";
+import type { EscalationDecision } from "../../../sandbox/escalationWorkflow.js";
 import type { StatusFacts, StatusItemId } from "../chrome/items.js";
-import type { Block } from "../transcript/blocks.js";
+import type { Block, ToolStatus } from "../transcript/blocks.js";
 import type { TurnActivity } from "../transcript/live.js";
 
-export type AgentMessageKind = "user" | "assistant" | "thinking" | "tool" | "notice" | "error";
+export type AgentMessageKind = "user" | "assistant" | "thinking" | "tool" | "command" | "notice" | "error";
 
 export interface AgentMessage {
   readonly kind: AgentMessageKind;
@@ -11,6 +12,7 @@ export interface AgentMessage {
   readonly title?: string;
   readonly detail?: string;
   readonly diff?: string;
+  readonly status?: ToolStatus;
   readonly collapsed?: boolean;
   readonly finalized?: boolean;
 }
@@ -21,7 +23,7 @@ export interface PermissionRequest {
   readonly scope: PermissionScope;
 }
 
-export type PermissionAnswer = "allow" | "deny" | "scope";
+export type PermissionAnswer = EscalationDecision;
 
 export interface SessionFacts {
   readonly facts: StatusFacts;
@@ -50,8 +52,11 @@ export function toBlock(message: AgentMessage): Block {
         detail: message.detail,
         text: message.text,
         diff: message.diff,
+        status: message.status ?? (message.finalized === true ? "ok" : "running"),
         finalized: message.finalized ?? false,
       };
+    case "command":
+      return { kind: "command", title: message.title, text: message.text, finalized: message.finalized ?? true };
     case "error":
       return { kind: "error", text: message.text, finalized: true };
     case "notice":

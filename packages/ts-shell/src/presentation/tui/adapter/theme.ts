@@ -43,17 +43,7 @@ export function componentTheme(): ComponentTheme {
     warning: style("warning"),
     success: style("success"),
     border: style("border"),
-    selected: style("selectedBg"),
+    selected: background("selectedBg"),
     userBackground: background("userMessageBg"),
   };
-}
-
-let current: ComponentTheme = componentTheme();
-
-export function getComponentTheme(): ComponentTheme {
-  return current;
-}
-
-export function resetComponentTheme(): void {
-  current = componentTheme();
 }

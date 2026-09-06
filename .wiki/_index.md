@@ -31,6 +31,7 @@ Last updated: 2026-08-28
 - [[evidence-and-proof-system|Evidence and Proof System]] ([Evidence and Proof System](wiki/concepts/evidence-and-proof-system.md))
 - [[normproof-structural-governance|NormProof Structural Governance]] ([NormProof Structural Governance](wiki/topics/normproof-structural-governance.md))
 - [[local-reference-repositories|Local Reference Repositories]] ([Local Reference Repositories](wiki/references/local-reference-repositories.md))
+- [[tui-framework-selection|TUI Framework Selection]] ([TUI Framework Selection](articles/tui-framework-selection.md))
 ## Recent Activity
 
 - 2026-08-28: Ingested deep research audit on architectural debts and compiled Top-Tier Coding Agent Architecture Gap Analysis

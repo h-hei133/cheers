@@ -36,14 +36,16 @@ export function compositeLine(
   overlayWidth: number,
   totalWidth: number,
 ): string {
-  const before = sliceWithWidth(baseLine, 0, startCol).text;
+  const before = sliceWithWidth(baseLine, 0, startCol);
   const afterStart = startCol + overlayWidth;
   const after = sliceWithWidth(baseLine, afterStart, Math.max(0, totalWidth - afterStart));
   const overlay = sliceWithWidth(overlayLine, 0, overlayWidth);
+  const beforePad = Math.max(0, startCol - before.width);
   const overlayPad = Math.max(0, overlayWidth - overlay.width);
-  const afterPad = Math.max(0, Math.max(0, totalWidth - startCol - overlayWidth) - after.width);
+  const afterTarget = Math.max(0, totalWidth - startCol - overlayWidth);
+  const afterPad = Math.max(0, afterTarget - after.width);
   const result =
-    before + RESET + overlay.text + " ".repeat(overlayPad) + RESET + after.text + " ".repeat(afterPad);
+    before.text + " ".repeat(beforePad) + RESET + overlay.text + " ".repeat(overlayPad) + RESET + after.text + " ".repeat(afterPad);
   return visibleWidth(result) <= totalWidth ? result : sliceWithWidth(result, 0, totalWidth).text;
 }
 
@@ -68,13 +70,19 @@ export class OverlayStack {
         const index = stack.entries.indexOf(entry);
         if (index === -1) return;
         stack.entries.splice(index, 1);
-        if (stack.focused === component) stack.focused = entry.preFocus;
+        for (const other of stack.entries) {
+          if (other.preFocus === component) other.preFocus = entry.preFocus;
+        }
+        if (stack.focused === component) stack.focused = stack.topmost() ?? entry.preFocus;
       },
       setHidden(hidden: boolean) {
         if (entry.hidden === hidden) return;
         entry.hidden = hidden;
-        if (hidden && stack.focused === component) stack.focused = entry.preFocus;
-        else if (!hidden) stack.focused = component;
+        if (hidden && stack.focused === component) stack.focused = stack.topmost() ?? entry.preFocus;
+        else if (!hidden) {
+          entry.order = ++stack.order;
+          stack.focused = component;
+        }
       },
       isHidden: () => entry.hidden,
       focus() {
@@ -82,14 +90,28 @@ export class OverlayStack {
         stack.focused = component;
       },
       unfocus() {
-        if (stack.focused === component) stack.focused = entry.preFocus;
+        if (stack.focused === component) stack.focused = stack.topmost() ?? entry.preFocus;
       },
       isFocused: () => stack.focused === component,
     };
   }
 
+  /** Frontmost visible overlay, or null when every overlay is hidden. */
+  private topmost(): ViewComponent | null {
+    let top: OverlayEntry | null = null;
+    for (const candidate of this.entries) {
+      if (candidate.hidden) continue;
+      if (top === null || candidate.order > top.order) top = candidate;
+    }
+    return top?.component ?? null;
+  }
+
   get count(): number {
     return this.entries.filter((entry) => !entry.hidden).length;
+  }
+
+  invalidate(): void {
+    for (const entry of this.entries) entry.component.invalidate?.();
   }
 
   get focus(): ViewComponent | null {

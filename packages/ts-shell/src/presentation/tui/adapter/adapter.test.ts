@@ -27,8 +27,10 @@ describe("adapter screen diff", () => {
     expect(diffLines(["a"], ["a"]).noChange).toBe(true);
   });
 
-  it("rejects rows wider than the terminal", () => {
-    expect(() => renderAppendChunk(["toolong"], 0, 3)).toThrow();
+  it("truncates rows wider than the terminal instead of throwing", () => {
+    const chunk = renderAppendChunk(["toolong"], 0, 3);
+    expect(chunk.rows).toBe(1);
+    expect(stripAnsi(chunk.text)).toContain("…");
   });
 
   it("clamps the viewport to content", () => {
@@ -40,20 +42,32 @@ describe("adapter scroll view", () => {
   it("follows the end while new rows arrive", () => {
     const view = new ScrollView(new Rows(["a", "b", "c"]), { follow: "end" });
     expect(view.visible(10, 2)).toEqual(["b", "c"]);
-    expect(view.following).toBe(true);
+    expect(view.isFollowingEnd).toBe(true);
   });
 
   it("holds position once the user scrolls back", () => {
     const view = new ScrollView(new Rows(["a", "b", "c"]), { follow: "end" });
     view.visible(10, 2);
-    view.by(-1);
-    expect(view.offset).toBe(0);
-    expect(view.following).toBe(false);
+    view.scrollBy(-1);
+    expect(view.scrollTop).toBe(0);
+    expect(view.isFollowingEnd).toBe(false);
   });
 
   it("rejects structural changes to its single child", () => {
     const view = new ScrollView(new Rows(["a"]));
     expect(() => view.addChild(new Rows(["b"]))).toThrow();
+  });
+
+  it("scrolls to the start and end", () => {
+    const view = new ScrollView(new Rows(["a", "b", "c"]), { follow: "end" });
+    view.visible(10, 2);
+    view.scrollBy(-1);
+    expect(view.scrollTop).toBe(0);
+    expect(view.isFollowingEnd).toBe(false);
+    view.scrollToEnd();
+    expect(view.scrollTop).toBe(1);
+    view.scrollToStart();
+    expect(view.scrollTop).toBe(0);
   });
 });
 
@@ -75,6 +89,16 @@ describe("adapter overlay stack", () => {
     expect(stack.focus).toBe(base);
   });
 
+  it("falls back to the remaining overlay when the top hides", () => {
+    const stack = new OverlayStack();
+    const first = new Rows(["first"]);
+    const second = new Rows(["second"]);
+    const firstHandle = stack.show(first);
+    stack.show(second);
+    firstHandle.hide();
+    expect(stack.focus).toBe(second);
+  });
+
   it("keeps composite lines within width", () => {
     const line = compositeLine("base", "over", 2, 4, 10);
     expect(stripAnsi(line).length).toBeLessThanOrEqual(10);
@@ -90,5 +114,14 @@ describe("adapter view model", () => {
     const block = toBlock({ kind: "tool", text: "out", title: "read", detail: "a.ts", diff: "@@ x" });
     expect(block.detail).toBe("a.ts");
     expect(block.diff).toBe("@@ x");
+  });
+
+  it("marks a running tool running and a finalized tool ok", () => {
+    expect(toBlock({ kind: "tool", text: "out" }).status).toBe("running");
+    expect(toBlock({ kind: "tool", text: "out", finalized: true }).status).toBe("ok");
+  });
+
+  it("maps command blocks through", () => {
+    expect(toBlock({ kind: "command", text: "out", title: "/x" }).kind).toBe("command");
   });
 });

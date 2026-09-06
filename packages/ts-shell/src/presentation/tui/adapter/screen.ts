@@ -1,4 +1,4 @@
-import { visibleWidth } from "../text/measure.js";
+import { truncateToWidth } from "../text/layout.js";
 
 const MAX_WRITE_CHARS = 1024 * 1024;
 
@@ -94,10 +94,7 @@ export function renderAppendChunk(
   let text = "";
   let rows = 0;
   for (let i = from; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    if (visibleWidth(line) > width) {
-      throw new Error(`Rendered line ${i} exceeds terminal width (${visibleWidth(line)} > ${width}).`);
-    }
+    const line = truncateToWidth(lines[i] ?? "", width);
     text += (rows > 0 ? "\r\n" : "") + "\x1b[2K" + line;
     rows++;
   }

@@ -189,6 +189,28 @@ function parseCsiU(body: string, raw: string): ParsedKeyEvent {
   );
 }
 
+/**
+ * Whether `data` is a key-release report from the enhanced keyboard protocol.
+ *
+ * Releases arrive as `CSI code ; mods : 3` with several finals. The event parser
+ * already drops them to an empty event, but focus dispatch sees the raw bytes,
+ * so it filters here. Bracketed paste content can contain `:3` coincidences
+ * and is never a release.
+ */
+export function isKeyRelease(data: string): boolean {
+  if (data.includes("[200~")) return false;
+  return (
+    data.includes(":3u") ||
+    data.includes(":3~") ||
+    data.includes(":3A") ||
+    data.includes(":3B") ||
+    data.includes(":3C") ||
+    data.includes(":3D") ||
+    data.includes(":3H") ||
+    data.includes(":3F")
+  );
+}
+
 function parseControl(data: string): ParsedKeyEvent {
   if (data === "\r") return keyEvent("enter", data);
   // Most terminals send DEL for Backspace, but Windows consoles send BS. Taking
