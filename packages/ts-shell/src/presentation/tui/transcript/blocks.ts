@@ -1,5 +1,4 @@
 import { defaultTheme } from "../../theme/theme.js";
-import { formatToolDetail } from "../../theme/commandHighlight.js";
 import { padToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { renderDiff } from "./diff.js";
@@ -121,13 +120,13 @@ function renderUser(block: Block, width: number): readonly string[] {
  */
 function renderThinking(block: Block, width: number): readonly string[] {
   const seconds = block.elapsedMs ? ` ${(block.elapsedMs / 1000).toFixed(1)}s` : "";
-  const head = `${GUTTER}${defaultTheme.fg("thinkingText", `● thought${seconds}`)}`;
+  const head = `${GUTTER}${defaultTheme.dim(`● thought${seconds}`)}`;
   if (block.collapsed !== false) {
-    return [`${head} ${defaultTheme.fg("thinkingText", "· click to expand")}`, ""];
+    return [`${head} ${defaultTheme.dim("· click to expand")}`, ""];
   }
   const bodyWidth = Math.max(8, width - visibleWidth(BODY_INDENT));
   const rows = [head, ""];
-  for (const row of wrapAll(block.text, bodyWidth)) rows.push(`${BODY_INDENT}${defaultTheme.fg("thinkingText", row)}`);
+  for (const row of wrapAll(block.text, bodyWidth)) rows.push(`${BODY_INDENT}${defaultTheme.dim(row)}`);
   rows.push("");
   return rows;
 }
@@ -154,26 +153,21 @@ function renderTool(block: Block, width: number): readonly string[] {
   const glyph = status === "ok" ? defaultTheme.fg("success", STATUS_GLYPH.ok)
     : status === "failed" ? defaultTheme.fg("error", STATUS_GLYPH.failed)
     : defaultTheme.fg("warning", STATUS_GLYPH.running);
-  const name = defaultTheme.bold(defaultTheme.fg("toolTitle", block.title ?? "tool"));
-  const rawDetail = block.detail ? elide(block.detail, headroom(width, block.title)) : "";
-  const detail = rawDetail ? ` ${formatToolDetail(block.title, rawDetail)}` : "";
+  const name = defaultTheme.bold(block.title ?? "tool");
+  const detail = block.detail ? ` ${defaultTheme.dim(elide(block.detail, headroom(width, block.title)))}` : "";
   const rows = [`${GUTTER}${glyph} ${name}${detail}`];
   const body = block.text.replace(/\s+$/, "");
 
   // Folded only once the call is over. While it is running the body holds status
   // notes — an approval pause, a progress line — and folding those away would hide
   // the fact that the turn is waiting for the user.
-  if (block.collapsed === true) {
-    if (block.diff) {
-      rows.push(...renderDiff(block.diff, width - BODY_INDENT.length).map((row) => `${BODY_INDENT}${row}`));
-    } else if (body) {
-      const lines = body.split("\n").length;
-      rows.push(`${GUTTER}${defaultTheme.dim(`  ↳ ${lines} ${lines === 1 ? "line" : "lines"} · click to expand`)}`);
-    }
+  if (body && block.collapsed === true) {
+    const lines = body.split("\n").length;
+    rows.push(`${GUTTER}${defaultTheme.dim(`  ↳ ${lines} ${lines === 1 ? "line" : "lines"} · click to expand`)}`);
     rows.push("");
     return rows;
   }
-  if (body) rows.push(...prose(body, width, BODY_INDENT).map((row) => defaultTheme.fg("toolOutput", row)));
+  if (body) rows.push(...prose(body, width, BODY_INDENT));
   if (block.diff) rows.push(...renderDiff(block.diff, width - BODY_INDENT.length).map((row) => `${BODY_INDENT}${row}`));
   rows.push("");
   return rows;

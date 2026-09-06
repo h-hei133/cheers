@@ -29,4 +29,3 @@ Last updated: 2026-08-28
 - [TUI 实况链路缺陷审计与修复方案](tui-live-path-defects.md)
 - [Composer 附件 Chip 条架构研究与移植方案](composer-attachment-chips-adaptation.md)
 - [Slash 命令实现深度审计](slash-command-depth-audit.md) — 15 个命令逐个判定：真实 / 单薄 / 壳，壳在哪一层
-- [终端会话恢复、语义配色体系与差异渲染演进设计](terminal-session-resume-theme-and-diff-rendering.md) — 会话恢复交互、TrueColor 语义配色、命令高亮与代码编辑差异展示规范

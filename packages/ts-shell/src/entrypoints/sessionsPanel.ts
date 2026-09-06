@@ -67,7 +67,7 @@ export async function openSessionsPanel(input: {
       const absoluteIndex = top + i;
       const marker = absoluteIndex === selected ? ">" : " ";
       const active = session.id === runtimeContext.session.id ? "*" : " ";
-      const title = session.title?.trim() || "New session";
+      const title = session.title?.trim() || "(untitled)";
       const projectLabel = path.basename(session.projectRoot) || session.projectRoot;
       const recoverability = session.recoverable ? "recoverable" : "blocked";
       const cue = buildResumeCue(session);
@@ -144,11 +144,10 @@ export async function openSessionsPanel(input: {
           return;
         }
         const current = sessions[selected];
-        const label = current.title?.trim() || current.id.slice(0, 8);
-        const nextTitle = await askLine(`Rename "${label}" to: `);
-        if (nextTitle.trim()) {
-          sessionManager.renameSession(current.id, nextTitle.trim());
-        }
+        const nextTitle = await askLine(
+          `Rename session ${current.id} to: `,
+        );
+        sessionManager.renameSession(current.id, nextTitle);
         sessions = sessionManager.listReentrySummaries({
           preferredProjectRoot: runtimeContext.projectRoot,
         });
@@ -157,9 +156,11 @@ export async function openSessionsPanel(input: {
         return;
       }
       if (key.ctrl && key.name === "d") {
+        if (!sessions[selected]) {
+          return;
+        }
         const current = sessions[selected];
-        const label = current.title?.trim() || current.id.slice(0, 8);
-        const ok = await confirm(`Delete session "${label}"?`);
+        const ok = await confirm(`Delete session ${current.id}?`);
         if (ok) {
           sessionManager.deleteSession(current.id);
           sessions = sessionManager.listReentrySummaries({

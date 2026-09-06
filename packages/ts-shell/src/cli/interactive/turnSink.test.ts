@@ -225,8 +225,9 @@ describe("what a tool card says it is doing", () => {
       taskId: "t1",
       args: { command: "npm test -- --silent" },
     });
+
     // The tool's name says a command ran; it does not say which one.
-    expect(stripAnsi(rows())).toContain("npm test -- --silent");
+    expect(rows()).toContain("npm test -- --silent");
   });
 
   it("shows the path for a read and the pattern for a search", () => {
@@ -238,8 +239,9 @@ describe("what a tool card says it is doing", () => {
       taskId: "t2",
       args: { pattern: "TODO", path: "src" },
     });
-    expect(stripAnsi(rows())).toContain("src/index.ts");
-    expect(stripAnsi(rows())).toContain("TODO in src");
+
+    expect(rows()).toContain("src/index.ts");
+    expect(rows()).toContain("TODO in src");
   });
 
   it("falls back to the first string argument for a tool it does not know", () => {

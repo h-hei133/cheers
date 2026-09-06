@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createUnifiedDiff, renderDiff } from "./diff.js";
+import { renderDiff } from "./diff.js";
 import { stripAnsi } from "../text/ansi.js";
 import { visibleWidth } from "../text/measure.js";
 
@@ -38,19 +38,5 @@ describe("unified diff", () => {
     for (const row of renderDiff("+" + "z".repeat(200), WIDTH)) {
       expect(visibleWidth(row)).toBeLessThanOrEqual(WIDTH);
     }
-  });
-});
-
-describe("createUnifiedDiff", () => {
-  it("returns empty string when content is identical", () => {
-    expect(createUnifiedDiff("a.ts", "hello\n", "hello\n")).toBe("");
-  });
-
-  it("produces standard unified diff with additions and deletions", () => {
-    const diff = createUnifiedDiff("src/app.ts", "const x = 1;\nconst y = 2;\n", "const x = 1;\nconst y = 20;\n");
-    expect(diff).toContain("--- a/src/app.ts");
-    expect(diff).toContain("+++ b/src/app.ts");
-    expect(diff).toContain("-const y = 2;");
-    expect(diff).toContain("+const y = 20;");
   });
 });

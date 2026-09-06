@@ -448,16 +448,8 @@ export class InteractiveMode {
       projectRoot: this.options.runtimeContext.projectRoot,
       statusItems: this.statusItems,
       resumeSession: (sessionId) => this.runCommandLine(`/resume ${sessionId}`),
-      deleteSession: (sessionId) => {
-        this.options.sessionManager.deleteSession(sessionId);
-        return undefined;
-      },
-      renameSession: (sessionId, title) => {
-        this.options.sessionManager.renameSession(sessionId, title);
-        return undefined;
-      },
-      revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
       refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
+      revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
       sessionTurns: () =>
         this.options.sessionManager.getSession(this.options.runtimeContext.session.id)?.turns ?? [],
       rewind: async (point) => {

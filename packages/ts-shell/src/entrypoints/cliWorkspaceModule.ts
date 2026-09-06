@@ -63,13 +63,8 @@ export function isWorkspaceInfoPromptStrict(prompt: string): boolean {
     "当前工作目录是什么？",
     "当前工作区是什么",
     "当前工作区是什么？",
-    "当前目录在哪里",
-    "当前目录在哪里？",
-    "当前工作目录在哪里",
-    "当前工作目录在哪里？",
-    "当前工作区在哪里",
-    "当前工作区在哪里？",
   ];
+
   if (pureDirectoryQueries.includes(normalized)) {
     return true;
   }
