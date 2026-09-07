@@ -80,7 +80,9 @@ describe("phase 3 adapter spike", () => {
     expect(surface.overlayCount).toBe(1);
     surface.start();
     surface.renderNow();
-    expect(terminal.drain()).toContain("Write file");
+    const painted = terminal.drain();
+    expect(painted).toContain("Write file");
+    expect(painted).toContain("delete the file");
     dialog.handleInput("\r");
     expect(answers).toEqual(["allow-once"]);
     handle.hide();

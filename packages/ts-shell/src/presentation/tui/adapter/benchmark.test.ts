@@ -63,14 +63,16 @@ describe("phase 3 long-transcript benchmark", () => {
 
   it("streams one block without re-laying finalized blocks", () => {
     const transcript = buildTranscript(20);
-    transcript.render(100);
+    const settled = transcript.render(100).rows.length;
     const live = textBlock("assistant", "streaming answer...");
     live.finalized = false;
     transcript.append(live);
     const started = performance.now();
     for (let i = 0; i < 20; i++) {
       live.text += " more";
-      transcript.render(100);
+      const rows = transcript.render(100).rows;
+      expect(rows.length).toBeGreaterThan(settled);
+      expect(rows.join("\n")).toContain("streaming answer...");
     }
     const elapsed = performance.now() - started;
     expect(elapsed).toBeLessThan(500);

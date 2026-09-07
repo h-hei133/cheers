@@ -38,7 +38,18 @@ Phase 0/1/2 的 wiki 均记录"未验证真实 CLI，只到组件层"。所以 P
 
 确认无问题：`textBlock` 存在；`TranscriptView` 在 benchmark/spike 各定一次是测试内 7 行 helper，跨文件抽反而增依赖，保留；删除审计结论维持（本次不删）；文件名简洁（`benchmark`/`spike`）；`spike.test.ts` 未用 import 已清理。
 
-验证（本次复核重跑）：适配层 61 项通过；TUI+theme+approval+interactive 回归 530 项通过（45 文件）；`tsc` 通过。
+## 再次复核（a5ef83af → 本次修补）
+
+复核范围：上一轮修补后的 11 项门测试，逐项重验断言强度、helper 语义（`textBlock` 缺省 finalized、`rowsFor` 缓存、`RecordingTerminal.stopped`）、删除审计取证（`new TUI`/`new Editor` 调用点）与外部名卫生。
+
+查出并修复 2 个测试强度问题：
+
+1. **流式基准只测耗时不测内容（MEDIUM）**——"streams one block" 循环 20 次只在最后断耗时：渲染把流式块吞掉也照样通过。循环内加断言：行数大于 settled 基线且含流式正文。耗时预算不变。
+2. **overlay 冒烟只断标题不断合成（LOW）**——"shows a permission overlay" 断 `drain` 含 "Write file"，但标题行即使 overlay 没盖住 transcript 也会出现。加断底 transcript 行（"delete the file"）同帧出现，证明 overlay 是合成而非替换。
+
+确认无问题：上一轮两处修复正确（空 scheduler 测试已删、`terminal.stopped` 真断言；标题 50 turns 与 `buildTranscript(50)` 一致）；删除审计结论维持——`new TUI(` 仅生产链路与 adapter 各一处、`new Editor(` 生产侧仅 frameSurface，删底座即摧毁生产链路与封装对象；产品代码与本文零外部名；文件名简洁；复用均为薄封装。
+
+验证（本次复核重跑）：适配层 61 项通过；TUI+theme+approval+interactive 回归 530 项通过（45 文件）；`tsc` 通过；门测试 3 次重跑无抖动。
 
 ## 删除审计结论：本次不删
 
