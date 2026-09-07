@@ -110,34 +110,73 @@ export function convertSessionMessagesToChat(
       type: "function";
       function: { name: string; arguments: string };
     }>;
-      tool_call_id?: string;
+    tool_call_id?: string;
   }> = [];
+
+  let pendingToolCalls: Array<{ id: string; name: string }> | undefined;
 
   for (const msg of history) {
     if (msg.role === "system") continue;
+
+    // If previous assistant message had tool calls that were not fully answered
+    // before a new non-tool message arrives, synthesize cancelled tool responses
+    // so the OpenAI chat completion schema invariant is never violated.
+    if (msg.role !== "tool" && pendingToolCalls && pendingToolCalls.length > 0) {
+      for (const call of pendingToolCalls) {
+        result.push({
+          role: "tool",
+          tool_call_id: call.id,
+          content: "(Operation cancelled or interrupted)",
+        });
+      }
+      pendingToolCalls = undefined;
+    }
+
     if (msg.role === "user") {
       if (msg.content?.trim()) {
         result.push({ role: "user", content: msg.content.trim() });
       }
     } else if (msg.role === "assistant") {
+      const calls =
+        msg.tool_calls && msg.tool_calls.length > 0
+          ? msg.tool_calls.map((c) => ({
+              id: c.id,
+              type: "function" as const,
+              function: { name: c.function.name, arguments: c.function.arguments },
+            }))
+          : undefined;
       result.push({
         role: "assistant",
         content: msg.content || null,
-        ...(msg.tool_calls && msg.tool_calls.length > 0
-          ? {
-              tool_calls: msg.tool_calls.map((c) => ({
-                id: c.id,
-                type: "function",
-                function: { name: c.function.name, arguments: c.function.arguments },
-              })),
-            }
-          : {}),
+        ...(calls ? { tool_calls: calls } : {}),
       });
+      if (calls && calls.length > 0) {
+        pendingToolCalls = calls.map((c) => ({ id: c.id, name: c.function.name }));
+      }
     } else if (msg.role === "tool") {
+      if (msg.tool_call_id && pendingToolCalls) {
+        const idx = pendingToolCalls.findIndex((c) => c.id === msg.tool_call_id);
+        if (idx !== -1) {
+          pendingToolCalls.splice(idx, 1);
+          if (pendingToolCalls.length === 0) {
+            pendingToolCalls = undefined;
+          }
+          result.push({
+            role: "tool",
+            tool_call_id: msg.tool_call_id,
+            content: msg.content || "",
+          });
+        }
+      }
+    }
+  }
+
+  if (pendingToolCalls && pendingToolCalls.length > 0) {
+    for (const call of pendingToolCalls) {
       result.push({
         role: "tool",
-        tool_call_id: msg.tool_call_id || "",
-        content: msg.content || "",
+        tool_call_id: call.id,
+        content: "(Operation cancelled or interrupted)",
       });
     }
   }

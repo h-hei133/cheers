@@ -90,6 +90,39 @@ describe("restoring a conversation", () => {
     expect(toolBlock.collapsed).toBe(true);
     expect(toolBlock.finalized).toBe(true);
   });
+
+  it("restores failed or blocked tool cards with failed status and expanded state", () => {
+    const turns: SessionMessage[] = [
+      turn("user", "delete root"),
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_bash_1",
+            type: "function",
+            function: {
+              name: "bash",
+              arguments: JSON.stringify({ command: "rm -rf /" }),
+            },
+          },
+        ],
+      },
+      {
+        role: "tool",
+        tool_call_id: "call_bash_1",
+        content: "Blocked: User denied permission for tool 'bash'",
+      },
+    ];
+
+    const { blocks } = restoreConversation(turns);
+    expect(blocks).toHaveLength(2);
+    const toolBlock = blocks[1]!;
+    expect(toolBlock.kind).toBe("tool");
+    expect(toolBlock.status).toBe("failed");
+    expect(toolBlock.collapsed).toBe(false);
+    expect(toolBlock.text).toContain("Blocked: User denied permission");
+  });
 });
 
 describe("points to go back to", () => {

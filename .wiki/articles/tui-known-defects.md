@@ -107,3 +107,29 @@ confidence: high
 - 交互与 TUI 43 套件 532 项测试全部通过（新增 3 项回归测试）。
 - `tsc -p tsconfig.build.json` 全量编译通过。
 - 审计日志与工作区残留已完全复原。
+
+## 独立复核（55d1351c / bbe0619a → 本次修补）
+
+复核范围：A1（权限门控与 toolPolicy）、A2（interactiveAsk 交互问答）、B1（跨轮上下文与 convertSessionMessagesToChat）、B2（resume 工具卡片重构）及相关集成测试，对照 OpenAI/DeepSeek API 协议规范与真实会话终端行为逐项复验。
+
+查出并修复 4 项高危与稳定性问题：
+
+1. **A1 权限安全漏洞：accept-edits 误放行破坏性 shell 命令（toolPolicy.ts）**
+   - 根因：`evaluateToolPermissionScope` 在判定 `scope === "accept-edits"` 时，只检查了 `operation === "write" || operation === "delete"`，而 `bash` 的 `rm/rmdir/unlink` 正好被归类为 `operation = "delete"`，且由于 `target` 解析为相对工作区路径，满足 `isInside = true`，导致修改性与破坏性 shell 命令在 `accept-edits` 下被静默放行免审批。
+   - 修复：严格约束免审批条件：仅当 `(toolName === "write" || toolName === "edit")` 时才允许工作区内文件免审批；任何 shell 进程衍生与破坏性命令在 `accept-edits` 下强制要求用户审批，完全对齐 `permissionScope.ts` 契约。同时补全 `screenshot` 与 `ariasnapshot` 只读动作。
+
+2. **B1 协议坏死漏洞：中断回合引发 API 400 Bad Request（agentLoop.ts）**
+   - 根因：`convertSessionMessagesToChat` 仅简单映射历史消息。若前一轮次助手发出了 `tool_calls` 但因用户中断（Ctrl+C）未产生 `tool` 结果消息，历史将直接后接下一轮 `user` 消息。在 OpenAI/DeepSeek 严格协议规范下，缺少 tool 回复的 assistant 消息会导致 API 抛出 HTTP 400（`tool_calls must be followed by tool messages`），导致会话永久坏死无法再发送任何消息。
+   - 修复：在 `convertSessionMessagesToChat` 中维护待完成工具调用队列。当下条非 tool 消息到达或历史遍历结束时，若仍存在未回复的 `tool_calls`，自动合成 `(Operation cancelled or interrupted)` 的 tool 响应，保证 API 消息序列协议 100% 闭环；同时过滤丢弃无对应调用的孤立 tool 消息。
+
+3. **B2 resume 状态失真：失败/被拦截工具卡片显示为成功（history.ts）**
+   - 根因：`restoreConversation` 在重构工具卡片 Block 时，无条件写死 `status: "ok"` 与 `collapsed: true`。若某工具原先被权限门拦截（`Blocked:`）或执行报错（`Tool execution error:`），resume 恢复后错误地显示为绿勾并折叠，掩盖了真实失败。
+   - 修复：解析工具输出内容，若命中 `Blocked:` 或 `Error:` 等失败标志，将卡片正确置为 `status: "failed"` 且 `collapsed: false`，与实时运行状态对齐。
+
+4. **A2 空输入回退健全度（ask.ts）**
+   - 修复：在 `interactiveAsk` 收集用户回答时，增强空字符串与纯空白输入处理，健全回退到推荐选项或 `No answer provided`，杜绝出现空白决策。
+
+验证：
+- 核心逻辑与回归套件（query/approval/interactive/TUI）全部通过，新增 4 项针对性回归测试。
+- `tsc -p tsconfig.build.json` 编译通过。
+- 审计日志与工作区保持完全干净。

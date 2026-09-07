@@ -51,11 +51,23 @@ describe("toolPolicy", () => {
   });
 
   it("still requires escalation for modifying commands in accept-edits mode", () => {
-    const rmResult = evaluateToolPermissionScope("bash", { command: "npm test" }, "accept-edits", "/repo");
+    const buildResult = evaluateToolPermissionScope("bash", { command: "npm test" }, "accept-edits", "/repo");
+    expect(buildResult.requiresEscalation).toBe(true);
+    expect(buildResult.operation).toBe("execute");
+
+    // Destructive shell commands (rm) must NEVER be auto-approved in accept-edits mode
+    const rmResult = evaluateToolPermissionScope("bash", { command: "rm -rf build" }, "accept-edits", "/repo");
     expect(rmResult.requiresEscalation).toBe(true);
-    expect(rmResult.operation).toBe("execute");
+    expect(rmResult.operation).toBe("delete");
   });
 
+  it("allows read-only browser inspection actions without escalation in accept-edits mode", () => {
+    for (const action of ["observe", "extract", "url", "title", "screenshot", "ariaSnapshot"]) {
+      const result = evaluateToolPermissionScope("browser", { action }, "accept-edits", "/repo");
+      expect(result.requiresEscalation).toBe(false);
+      expect(result.operation).toBe("read");
+    }
+  });
   it("requires escalation for out-of-workspace writes even in accept-edits mode", () => {
     const outsideResult = evaluateToolPermissionScope("write", { path: "/etc/passwd" }, "accept-edits", "/repo");
     expect(outsideResult.requiresEscalation).toBe(true);

@@ -70,8 +70,9 @@ export function createAskToolDefinition(): ToolDefinition {
             const formatted = questions
               .map((q) => {
                 const qId = q.id || "unspecified";
+                const rawDecision = userAnswers[qId];
                 const chosen =
-                  userAnswers[qId] ??
+                  (rawDecision && rawDecision.trim()) ||
                   (q.recommended !== undefined && q.options?.[q.recommended]
                     ? q.options[q.recommended].label
                     : "No answer provided");

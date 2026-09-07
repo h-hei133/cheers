@@ -26,6 +26,8 @@ const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
   extract: true,
   url: true,
   title: true,
+  screenshot: true,
+  ariasnapshot: true,
 };
 
 export function evaluateToolPermissionScope(
@@ -98,7 +100,10 @@ export function evaluateToolPermissionScope(
   }
 
   if (scope === "accept-edits") {
-    if (operation === "write" || operation === "delete") {
+    // accept-edits is strictly a statement about workspace file edits (write/edit).
+    // Process spawns, shell commands (including bash rm), and network operations
+    // must always require user escalation.
+    if ((toolName === "write" || toolName === "edit") && (operation === "write" || operation === "delete")) {
       const resolved = path.isAbsolute(target) ? target : path.resolve(workspaceRoot, target);
       const rel = path.relative(workspaceRoot, resolved);
       const isInside = !rel.startsWith("..") && !path.isAbsolute(rel);

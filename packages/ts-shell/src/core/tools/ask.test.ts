@@ -64,4 +64,39 @@ describe("ask tool", () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain("questions array is required");
   });
+
+  it("falls back to recommended option or placeholder when user provides empty answer", async () => {
+    const askTool = createAskToolDefinition();
+    const interactiveAsk = vi.fn().mockResolvedValue({
+      q_rec: "   ",
+      q_none: "",
+    });
+
+    const result = await askTool.execute(
+      {
+        questions: [
+          {
+            id: "q_rec",
+            question: "Choose format?",
+            options: [{ label: "JSON" }, { label: "YAML" }],
+            recommended: 1,
+          },
+          {
+            id: "q_none",
+            question: "Any thoughts?",
+            options: [],
+          },
+        ],
+      },
+      {
+        taskId: "task_4",
+        workspaceRoot: "/workspace",
+        interactiveAsk,
+      },
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain("### Question [q_rec]: Choose format?\n- **User Decision**: YAML");
+    expect(result.output).toContain("### Question [q_none]: Any thoughts?\n- **User Decision**: No answer provided");
+  });
 });

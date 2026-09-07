@@ -71,6 +71,10 @@ export function restoreConversation(turns: readonly SessionMessage[]): RestoredH
           const body = (turn.content || "").replace(/\s+$/, "");
           toolBlock.text = body;
           splitFencedDiff(toolBlock);
+          if (/^(Blocked:|Tool execution error:|Error:)/.test(body)) {
+            toolBlock.status = "failed";
+            toolBlock.collapsed = false;
+          }
         }
       }
     }

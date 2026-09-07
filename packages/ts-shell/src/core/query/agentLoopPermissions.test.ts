@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { runAutonomousReActLoop } from "./agentLoop.js";
+import { convertSessionMessagesToChat, runAutonomousReActLoop } from "./agentLoop.js";
 import type { QueryEvent } from "./runtime/events.js";
 import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
 
@@ -454,5 +454,43 @@ describe("agentLoop permission enforcement and interactive ask", () => {
       (m) => m.role === "user" && typeof m.content === "string" && m.content.includes("Delete it"),
     );
     expect(hasTurn2Prompt).toBe(true);
+  });
+
+  it("synthesizes cancelled tool messages when assistant tool_calls were interrupted", () => {
+    const history = [
+      { role: "user" as const, content: "do two tasks" },
+      {
+        role: "assistant" as const,
+        content: "Running tools",
+        tool_calls: [
+          { id: "call_1", type: "function" as const, function: { name: "read", arguments: "{}" } },
+          { id: "call_2", type: "function" as const, function: { name: "write", arguments: "{}" } },
+        ],
+      },
+      // Only call_1 finished before interruption
+      { role: "tool" as const, tool_call_id: "call_1", content: "read output" },
+    ];
+
+    const chat = convertSessionMessagesToChat(history);
+    expect(chat).toHaveLength(4);
+    expect(chat[0]!.role).toBe("user");
+    expect(chat[1]!.role).toBe("assistant");
+    expect(chat[2]!.role).toBe("tool");
+    expect(chat[2]!.tool_call_id).toBe("call_1");
+    expect(chat[3]!.role).toBe("tool");
+    expect(chat[3]!.tool_call_id).toBe("call_2");
+    expect(chat[3]!.content).toContain("cancelled or interrupted");
+  });
+
+  it("drops orphaned tool messages that have no preceding assistant tool call", () => {
+    const history = [
+      { role: "tool" as const, tool_call_id: "orphan_call", content: "stray output" },
+      { role: "user" as const, content: "hello" },
+    ];
+
+    const chat = convertSessionMessagesToChat(history);
+    expect(chat).toHaveLength(1);
+    expect(chat[0]!.role).toBe("user");
+    expect(chat[0]!.content).toBe("hello");
   });
 });
