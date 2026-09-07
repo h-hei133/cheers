@@ -41,11 +41,11 @@ confidence: high
 
 ## 独立复核（cbf011c8 → 本次修补）
 
-复核范围：6 个新组件 + 15 项测试，对照自有模块（`text/layout.ts`、`chrome/options.ts`、`chrome/window.ts`、`editor.ts`）与 Pi 上游（`select-list.ts` 指针映射、`scroll-view.ts`、`compositeTuiLine`）逐项取证。
+复核范围：6 个新组件 + 15 项测试，对照自有模块（`text/layout.ts`、`chrome/options.ts`、`chrome/window.ts`、`editor.ts`）与参考实现的选择列表指针映射、滚动视图、行合成逻辑逐项取证。
 
 查出并修复 2 个真问题：
 
-1. **`select.ts` 指针行偏移（HIGH）**——`render` 无标题行（第 0 行即首个 option），`handlePointer` 却用 `window.offset + event.y - 1`，整列表点击下偏一行、首行永远点不中。Pi 上游为 `startIndex + event.y`。改为直接映射。回归测试：首行 click 选中 `a`、次行 press 移动光标到 `b`。
+1. **`select.ts` 指针行偏移（HIGH）**——`render` 无标题行（第 0 行即首个 option），`handlePointer` 却用 `window.offset + event.y - 1`，整列表点击下偏一行、首行永远点不中。参考实现为窗口起点加事件行号。改为直接映射。回归测试：首行 click 选中 `a`、次行 press 移动光标到 `b`。
 2. **`layout.ts` 自造换行器（MEDIUM）**——`wrapPlain` 按 code unit 切分：CJK 无空格长行整行超宽、ANSI 转义序列计入宽度被切断。`Text.render` 改复用自有 `wrapToWidth`（cell 宽度 + grapheme + 样式携带），保留左右 padding 语义。回归测试：CJK 文本按 cells 换行且无超宽行。
 
 确认无问题：dialog 三决策与升级工作流/bridge 菜单一致（裸 `allow` 为旧兼容值，不提供是对的）；loader 读 `Date.now()` 是 spinner 时间驱动本性；`PromptEditor.handleInput` 只吃单字符是 Surface 给 raw bytes 的结构性限制——中文 IME 多字节直达会被丢弃，真修要接 `stdinBuffer` 解码，留给后续输入链路任务，不在组件层扩大范围。

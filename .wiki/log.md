@@ -167,3 +167,4 @@
 ## [2026-09-07] review | TUI Phase 1 独立复核（cbf011c8）：修 select 指针行偏移一行（render 无标题行但 pointer 减一，首行点不中）、Text 自造换行器改复用自有 wrapToWidth（CJK 超宽/ANSI 切断）；确认 dialog 三决策/loader 时间驱动无问题，IME 多字节直达丢弃留给输入链路任务；适配层 35 项、回归 327 项、tsc 通过
 ## [2026-09-07] review | TUI Phase 1 再次复核（67c6748e）：删 layout 重复 StackOptions 声明；select 指针改与 render 同基准并忽略溢出计数行点击；HStack 空子项显式早退；适配层 37 项、TUI 315 项、build:ts 通过
 ## [2026-09-07] review | TUI Phase 2 独立复核（df43329c）：修 Message toggle 缺省与 kind 脱节（包 tool 首次 toggle 无操作）、Composer 有焦点无输入（补可打印单字符插入）、两处控制字符可插入（DEL/C0 守卫）；适配层 49 项、回归 341 项、tsc 通过
+## [2026-09-07] review | TUI Phase 2 再次复核（16b47aa9）：补 commandMessage 工厂；复核记录去外部项目名改称参考实现；确认 toggle 缺省/Composer 空闲无行/输入守卫无问题；适配层 50 项、TUI 328 项、build:ts 通过

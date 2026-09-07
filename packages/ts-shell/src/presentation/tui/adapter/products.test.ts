@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { stripAnsi } from "../text/ansi.js";
 import { Editor } from "../editor.js";
-import { Message, assistantMessage, errorMessage, noticeMessage, thinkingMessage, userMessage } from "./messages.js";
+import { Message, assistantMessage, commandMessage, errorMessage, noticeMessage, thinkingMessage, userMessage } from "./messages.js";
 import { ToolCard } from "./card.js";
 import { Composer, StatusBar } from "./chrome.js";
 
@@ -49,8 +49,12 @@ describe("adapter message components", () => {
     expect(noticeMessage("hi").render(20).join("\n")).toContain("hi");
     expect(errorMessage("boom").render(20).join("\n")).toContain("boom");
   });
-});
 
+  it("renders command blocks through the factory", () => {
+    const rows = commandMessage("/retry", "retrying last turn").render(40).join("\n");
+    expect(rows).toContain("retrying last turn");
+  });
+});
 describe("adapter tool card", () => {
   it("shows a folded summary while collapsed", () => {
     const card = new ToolCard({ title: "read", detail: "a.ts", text: "file-body-line", collapsed: true, finalized: true });

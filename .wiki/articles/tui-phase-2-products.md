@@ -42,7 +42,7 @@ confidence: high
 
 ## 独立复核（df43329c → 本次修补）
 
-复核范围：4 个新组件 + 10 项测试，对照自有渲染器（`blocks.ts`、`band.ts`、`composer.ts`、`hints.ts`、`live.ts`）与 Pi 上游（`select-list.ts` 指针映射）逐项取证。无外部项目名进入产品代码，文件名简洁（`messages`/`card`/`chrome`），跨域 import 均为 type-only 或同级拥有模块。
+复核范围：4 个新组件 + 10 项测试，对照自有渲染器（`blocks.ts`、`band.ts`、`composer.ts`、`hints.ts`、`live.ts`）与参考实现的选择列表指针映射逐项取证。无外部项目名进入产品代码，文件名简洁（`messages`/`card`/`chrome`），跨域 import 均为 type-only 或同级拥有模块。
 
 查出并修复 3 个问题：
 
@@ -50,8 +50,19 @@ confidence: high
 2. **`chrome.ts` Composer 有焦点无输入（LOW）**——`focused = true` 却无 `handleInput`，挂到 Surface 上按键无响应。补与 `PromptEditor` 同形的组件层边界：可打印单字符插入，换行/控制键/转义留给上层 keymap，忙时不吃输入。
 3. **控制字符可插入（LOW，两处同修）**——`PromptEditor`/`Composer` 的单字符守卫放行 `DEL`（0x7f）及 C0 控制字符。加 `>= " "` 下界与 DEL 排除（转义写法 `\u007f`，避免不可见字面量）。
 
-确认无问题：`StatusBar.render` 的 `renderBand` 是单个 string 元素（非 spread），无拆字符 bug；dialog 三决策与升级工作流一致；`ToolCard` press 取焦点/click 切换与 Pi 同形；`card.ts` 下划线参数已正名。
+确认无问题：`StatusBar.render` 的 `renderBand` 是单个 string 元素（非 spread），无拆字符 bug；dialog 三决策与升级工作流一致；`ToolCard` press 取焦点/click 切换与常规选择列表同形；`card.ts` 下划线参数已正名。
 
 已知限制（留给输入链路任务）：组件层只吃单字符，中文 IME 多字节直达仍被丢弃，真修要接 `stdinBuffer` 解码。
 
-验证：适配层 49 项通过；TUI+theme+approval 回归 341 项通过；`tsc -p tsconfig.build.json` 通过。
+## 再次复核（16b47aa9 → 本次修补）
+
+复核范围：上一轮修补后的 4 个组件 + 13 项测试，对照自有渲染器（`blocks.ts` 的 `renderThinking`/`renderTool` 折叠分支、`composer.ts`、`hints.ts`、`band.ts`）逐项重验折叠缺省、输入守卫与提示链。
+
+查出并修复 2 个问题：
+
+1. **`messages.ts` 缺 `command` 工厂（LOW）**——`AgentMessage` 的 `command` kind 在 Phase 0 已映射、`renderBlock` 也有 `command` 分支，但工厂只有 user/assistant/thinking/notice/error 五个，调用方想发命令块只能手拼对象。补 `commandMessage(title, text)`。回归测试：工厂渲染含正文。
+2. **复核记录含外部项目名（卫生）**——产品代码零命中已确认；两篇复核记录里的对照来源表述改为"参考实现"，不点名。选型文档是研究结论本身，保留。
+
+确认无问题：`Message.toggleCollapsed` 按 kind 取缺省与 `toBlock` 对齐（thinking 缺省折叠、tool 缺省展开）；`ToolCard` 的 `?? false` 一致；`Composer` 空闲无提示行是自有 `renderHints` 的"零或一行"语义（空闲且无 ambient 即无行），透传正确，不在此层加行；`StatusBar` 的 `renderBand` 单 string 无拆字符；输入守卫 `>= " "` + DEL 排除正确（测试字节经 `cat -v` 确认为 DEL 与 ESC 转义）。
+
+验证：适配层 50 项通过；TUI 全套件通过；`npm run build:ts` 通过。

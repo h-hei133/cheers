@@ -48,6 +48,10 @@ export function noticeMessage(text: string): Message {
   return new Message({ kind: "notice", text, finalized: true });
 }
 
+export function commandMessage(title: string | undefined, text: string, finalized = true): Message {
+  return new Message({ kind: "command", title, text, finalized });
+}
+
 export function errorMessage(text: string): Message {
   return new Message({ kind: "error", text, finalized: true });
 }
