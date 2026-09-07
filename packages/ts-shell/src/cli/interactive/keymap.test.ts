@@ -38,6 +38,7 @@ function build(busy = false): {
     retry: vi.fn(),
     syncSuggestions: vi.fn(),
     scrollToEnd: vi.fn(),
+    copySelection: vi.fn().mockReturnValue(false),
   };
   const clock = { now: 0 };
   const gesture: { lastCancelAt?: number } = {};
@@ -374,5 +375,16 @@ describe("going back in the conversation", () => {
     press("\x1b");
 
     expect(actions.openRewind).not.toHaveBeenCalled();
+  });
+});
+
+describe("cancel and copy key", () => {
+  it("copies active selection on ctrl+c without clearing draft text", () => {
+    const { press, actions, surface } = build();
+    surface.editor.insert("draft text");
+    actions.copySelection.mockReturnValue(true);
+    press("\x03");
+    expect(actions.copySelection).toHaveBeenCalledOnce();
+    expect(surface.editor.getText()).toBe("draft text");
   });
 });

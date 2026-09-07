@@ -261,3 +261,28 @@ describe("prompt recall", () => {
     expect(editor.recall(-1)).toBe(false);
   });
 });
+
+describe("vertical scrolling and height bounds", () => {
+  it("bounds output rows to maxRows when text exceeds budget", () => {
+    const editor = new Editor();
+    editor.setText(Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n"));
+    const rows = editor.render(40, 5);
+    expect(rows).toHaveLength(5);
+  });
+
+  it("keeps the cursor line in the visible slice when scrolling", () => {
+    const editor = new Editor();
+    editor.setText(Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n"));
+    // Move cursor to line 0
+    for (let i = 0; i < 20; i++) editor.move("up");
+    const topRows = editor.render(40, 5);
+    expect(topRows[0]).toContain("line 0");
+    expect(topRows.join("\n")).toContain(CURSOR_MARKER);
+
+    // Move cursor to bottom
+    for (let i = 0; i < 20; i++) editor.move("down");
+    const bottomRows = editor.render(40, 5);
+    expect(stripAnsi(bottomRows[4]!)).toContain("line 19");
+    expect(bottomRows.join("\n")).toContain(CURSOR_MARKER);
+  });
+});

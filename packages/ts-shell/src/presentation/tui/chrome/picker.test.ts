@@ -92,4 +92,12 @@ describe("full-screen modal", () => {
     expect(rows).toHaveLength(5);
     for (const row of rows) expect(visibleWidth(row)).toBe(40);
   });
+
+  it("renders dedicated search input row above options list", () => {
+    const m = model();
+    m.setFilter("test-query");
+    const rows = stripAnsi(renderModal(m, { title: "Sessions", empty: "none", detailRows: 1 }, 60, 15).join("\n"));
+    expect(rows).toContain("Search: test-query");
+    expect(rows).toContain("├");
+  });
 });

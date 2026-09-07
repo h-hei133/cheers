@@ -75,6 +75,8 @@ export interface KeymapActions {
    * steals the arrow keys from prompt-history recall.
    */
   syncSuggestions(mayOpen: boolean): void;
+  /** Copy active mouse selection to clipboard and clear highlight. Returns true if copied. */
+  copySelection?(): boolean;
 }
 
 export interface KeymapContext {
@@ -318,6 +320,10 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
  */
 function handleCancelKey(context: KeymapContext): void {
   const { surface, actions, now } = context;
+  if (actions.copySelection?.()) {
+    actions.redraw();
+    return;
+  }
   if (context.busy) {
     actions.interrupt();
     actions.redraw();

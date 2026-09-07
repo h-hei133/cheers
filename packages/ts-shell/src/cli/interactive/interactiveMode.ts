@@ -278,6 +278,7 @@ export class InteractiveMode {
           setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
         },
         syncSuggestions: (mayOpen) => this.syncSuggestions(mayOpen),
+        copySelection: () => this.pointer.copySelection(),
       },
     });
   }

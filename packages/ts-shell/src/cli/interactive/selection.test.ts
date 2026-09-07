@@ -204,6 +204,27 @@ describe("showing what the drag has covered", () => {
     expect(selection.span?.from.row).toBe(2);
     expect(selection.span?.to.row).toBe(3);
   });
+
+  it("clears selection when canceled", () => {
+    const selection = new DragSelection({ rows: () => ROWS }, () => undefined);
+    selection.handle(parseMouseReport("\x1b[<0;0;3M")!);
+    selection.handle(parseMouseReport("\x1b[<32;10;3M")!);
+    expect(selection.span).toBeDefined();
+    selection.clear();
+    expect(selection.span).toBeUndefined();
+  });
+
+  it("copies and clears selection programmatically", () => {
+    const copy = vi.fn();
+    const selection = new DragSelection({ rows: () => ["first line", "second line"] }, copy);
+    selection.handle(parseMouseReport("\x1b[<0;0;1M")!);
+    selection.handle(parseMouseReport("\x1b[<32;10;1M")!);
+    expect(selection.span).toBeDefined();
+    const copied = selection.copyAndClear();
+    expect(copied).toBe(true);
+    expect(copy).toHaveBeenCalledOnce();
+    expect(selection.span).toBeUndefined();
+  });
 });
 
 describe("selecting text that is not ASCII", () => {

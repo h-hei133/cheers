@@ -56,7 +56,7 @@ export class Editor {
   private readonly history: string[] = [];
   private historyIndex = -1;
   private draft = "";
-
+  private scrollOffset = 0;
   getText(): string {
     return this.lines.join("\n");
   }
@@ -67,6 +67,7 @@ export class Editor {
     this.lines = text.length > 0 ? text.split("\n") : [""];
     this.row = this.lines.length - 1;
     this.column = this.lines[this.row]!.length;
+    this.scrollOffset = 0;
   }
 
   clear(): void {
@@ -75,6 +76,7 @@ export class Editor {
     this.row = 0;
     this.column = 0;
     this.historyIndex = -1;
+    this.scrollOffset = 0;
   }
 
   /** Insert literal text, expanding tabs and splitting embedded newlines. */
@@ -292,22 +294,41 @@ export class Editor {
   }
 
   /** Soft-wrapped rows at `width`, carrying the cursor marker when focused. */
-  render(width: number): string[] {
+  render(width: number, maxRows?: number): string[] {
     const cells = Math.max(1, width);
     if (this.lines.length === 1 && this.lines[0] === "" && this.placeholder) {
       const hint = `\x1b[2;90m${this.placeholder}\x1b[0m`;
       return [this.focused ? `${CURSOR_MARKER}${hint}` : hint];
     }
     const rendered: string[] = [];
+    let cursorVisualRow = -1;
     for (let index = 0; index < this.lines.length; index++) {
       const rows = wrapToWidth(this.lines[index]!, cells);
       if (index !== this.row || !this.focused) {
         rendered.push(...rows);
         continue;
       }
-      rendered.push(...this.markCursorRow(rows, visibleWidth(this.lines[index]!.slice(0, this.column))));
+      const marked = this.markCursorRow(rows, visibleWidth(this.lines[index]!.slice(0, this.column)));
+      const markedIdx = marked.findIndex((r) => r.includes(CURSOR_MARKER));
+      cursorVisualRow = rendered.length + (markedIdx >= 0 ? markedIdx : 0);
+      rendered.push(...marked);
     }
-    return rendered;
+
+    if (maxRows === undefined || maxRows <= 0 || rendered.length <= maxRows) {
+      this.scrollOffset = 0;
+      return rendered;
+    }
+
+    if (cursorVisualRow >= 0) {
+      if (cursorVisualRow < this.scrollOffset) {
+        this.scrollOffset = cursorVisualRow;
+      } else if (cursorVisualRow >= this.scrollOffset + maxRows) {
+        this.scrollOffset = cursorVisualRow - maxRows + 1;
+      }
+    }
+    const maxScroll = Math.max(0, rendered.length - maxRows);
+    this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, maxScroll));
+    return rendered.slice(this.scrollOffset, this.scrollOffset + maxRows);
   }
 
   private markCursorRow(rows: readonly string[], offset: number): string[] {

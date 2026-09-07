@@ -53,25 +53,32 @@ confidence: high
 - 修复：
   1. 在 `agentLoop.ts` 中通过 `onTurnMessage` 实时将 `assistant` 携 `tool_calls` 与 `tool` 结果消息写入 `sessionManager.addTurn`，完整保留在会话 JSONL 中。
   2. 导出 `toolCards.ts` 中的 `summarize` 函数，重构 `history.ts` 的 `restoreConversation`：遇到带 `tool_calls` 的助手消息时重建工具卡片 `Block` 并按参数推导摘要；遇到对应 `tool_call_id` 的 `tool` 消息时关联回填输出并划分 diff。resume 时完整复原历史工具卡片与命令框。
-### C. 输入与渲染（中）
+### C. 输入与渲染（中）[已修复]
 
-**C1. 拖拽复制时按 Ctrl+C 导致光标残影**
-- 现象：鼠标拖拽选中一段文本时按 Ctrl+C，之后输入框光标处一直显示前一个位置的字符；实际发送的文本正常。
-- 影响：视觉误导，不影响数据。
-- 方向：查 `cli/interactive/pointer.ts` 的拖拽结束与 `editor.ts` 的光标标记渲染，确认 Ctrl+C 是否触发了未清屏的重绘。
+**C1. 拖拽复制时按 Ctrl+C 导致光标残影 [已修复]**
+- 根因：
+  1. `selection.ts` 的 `DragSelection` 仅在鼠标 release 时清除选区；用户在拖拽选区中按键盘 `Ctrl+C` 时未收到 release，选区长期悬挂。
+  2. `frameSurface.ts` 将选区反色（`this.shade`）应用到了包含输入框的整个屏幕，导致反色序列直接注入 `CURSOR_MARKER`，终端双重反色重叠使硬件光标错位显示前一字符。
+  3. `keymap.ts` 的 `ctrl+c` 绑定忽视了活动选区，未执行复制而直接清空了草稿。
+- 修复：
+  1. 在 `DragSelection` 与 `Pointer` 增加 `clear()` 与 `copyAndClear()`。
+  2. 在 `frameSurface.ts` 中隔离选区反色范围：`this.shade` 仅作用于转写区（`[...filler, ...visible]`），严禁浸染 `chrome`。
+  3. 在 `keymap.ts` 的 `handleCancelKey` 中优先响应活动选区：按下 `Ctrl+C` 时立即复制选中内容到剪贴板并清空选区，保留输入框草稿。
 
-**C2. 输入框无滚动**
-- 现象：输入文本过长时输入框一直累加，超出终端高度后看不到屏幕外文本，整个屏幕被输入框占据。
-- 影响：长 prompt 不可用。
-- 方向：查 `cli/interactive/frameSurface.ts` 的 chrome 高度分配，确认 composer 是否有最大高度与内部滚动。
+**C2. 输入框无滚动 [已修复]**
+- 根因：`Editor.render` 未限制最大行数，多行输入或大粘贴时无上限向下铺展，`chrome` 高度吞噬屏幕，`capacity` 压缩到极限，最终超出行数被截断导致光标掉出屏幕。
+- 修复：
+  1. 在 `Editor` 引入 `scrollOffset` 与 `maxRows` 视口控制：总视觉行超过 `maxRows` 时，自动跟踪光标所在行，确保光标始终在 `[scrollOffset, scrollOffset + maxRows)` 视口内平滑卷动。
+  2. 在 `frameSurface.ts` 中设定输入框屏幕占比上限（屏幕高度的 35%，界于 3 至 10 行之间），保证转写历史永远拥有至少 65% 的视口空间。
 
-### D. 界面布局（低）
+### D. 界面布局（低）[已修复]
 
-**D1. resume 筛选框位置不对**
-- 现象：resume 页面的 session 筛选输入框位置不对，应在所有 session 上方一行。
-- 影响：可用性，不阻塞。
-- 方向：查 `cli/interactive/picker/` 或 resume 面板的布局，确认筛选框是否作为独立行渲染在列表上方。
-
+**D1. resume 筛选框位置不对 [已修复]**
+- 根因：`modal.ts` 将筛选文本、光标标记与计数硬塞在顶边框线内（`┌─ Resume session [filter] ──┐`），框内主体第 1 行直接是列表，无独立搜索框。
+- 修复：
+  1. 顶边框线恢复纯净标题与计数（`┌─ Resume session (N) ────────────────────────┐`）。
+  2. 框内第 1 行增加标准独立搜索输入框（`│ Search: <filter><CURSOR_MARKER>              │`），未输入时显示灰度占位提示。
+  3. 增加内部横向分割线（`├────────────────────────────────────────────────────┤`），使搜索与下方 session 列表层级分明。
 ## 与 adapter 的关系
 
 - 不阻塞 adapter 接入：adapter 复用现有底座，这些缺陷在 adapter 接入前后都存在。

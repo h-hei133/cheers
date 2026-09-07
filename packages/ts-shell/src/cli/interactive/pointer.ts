@@ -35,6 +35,17 @@ export class Pointer {
     return this.drag.span;
   }
 
+  /** Clear any active drag selection. Returns true if there was a selection. */
+  clearSelection(): boolean {
+    const hadSelection = this.drag.span !== undefined;
+    this.drag.clear();
+    return hadSelection;
+  }
+
+  /** Copy the active selection to clipboard and clear it. Returns true if copied. */
+  copySelection(): boolean {
+    return this.drag.copyAndClear();
+  }
   /** Handle one report. */
   handle(report: MouseReport): void {
     if (report.kind === "wheel") {

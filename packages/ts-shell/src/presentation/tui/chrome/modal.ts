@@ -13,7 +13,7 @@ import type { Option, OptionModel } from "./options.js";
  * and reappears intact on exit.
  */
 
-const FRAME_ROWS = 6;
+const FRAME_ROWS = 8;
 
 export interface ModalChrome {
   readonly title: string;
@@ -32,7 +32,7 @@ export function renderModal(
   height: number,
 ): string[] {
   const inner = Math.max(20, width - 2);
-  const rows: string[] = [top(chrome.title, model, inner)];
+  const rows: string[] = [top(chrome.title, model, inner), searchRow(model, inner), divider(inner)];
   const perOption = 1 + Math.max(0, chrome.detailRows);
   const listRows = Math.max(perOption, height - FRAME_ROWS);
   const capacity = Math.max(1, Math.floor(listRows / perOption));
@@ -76,10 +76,20 @@ function highlight(text: string, inner: number): string {
 }
 
 function top(title: string, model: OptionModel, inner: number): string {
-  const filter = model.filter ? ` ${defaultTheme.fg("accent", model.filter)}` : "";
-  const label = ` ${defaultTheme.bold(title)}${filter}${CURSOR_MARKER} ${defaultTheme.dim(`${model.total}`)} `;
+  const count = defaultTheme.dim(`(${model.total})`);
+  const label = ` ${defaultTheme.bold(title)} ${count} `;
   const fill = Math.max(0, inner - visibleWidth(label));
   return defaultTheme.fg("border", "┌") + label + defaultTheme.fg("border", `${"─".repeat(fill)}┐`);
+}
+
+function searchRow(model: OptionModel, inner: number): string {
+  const prompt = defaultTheme.fg("accent", "Search: ");
+  const query = model.filter ? defaultTheme.bold(model.filter) : defaultTheme.dim("Type to filter...");
+  return body(`${prompt}${query}${CURSOR_MARKER}`, inner);
+}
+
+function divider(inner: number): string {
+  return defaultTheme.fg("border", `├${"─".repeat(inner)}┤`);
 }
 
 function bottom(inner: number): string {

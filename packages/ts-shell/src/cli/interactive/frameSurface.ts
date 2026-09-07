@@ -125,7 +125,7 @@ export class InteractiveSurface implements TerminalFrameProvider {
     // short conversation should not float the prompt up the middle of the screen.
     const filler = Array.from({ length: Math.max(0, capacity - visible.length) }, () => "");
     this.lastFiller = filler.length;
-    return { rows: this.shade([...filler, ...visible, ...chrome]) };
+    return { rows: [...this.shade([...filler, ...visible]), ...chrome] };
   }
 
   /** The frame with an in-progress drag shaded, which is the only sign it made one. */
@@ -183,11 +183,12 @@ export class InteractiveSurface implements TerminalFrameProvider {
    */
   private renderChrome(width: number, height: number): string[] {
     const busy = this.context.busy();
+    const maxComposerRows = Math.max(3, Math.min(10, Math.floor(height * 0.35)));
     const rows = [
       ...renderActivity(this.context.activity(), this.context.now(), width),
       ...this.context.overlayRows(width, height),
       renderBand(this.context.facts(), this.context.statusItems(), width),
-      ...renderComposer(this.editor, { busy }, width),
+      ...renderComposer(this.editor, { busy }, width, maxComposerRows),
     ];
     if (this.suggestionsOpen) {
       rows.push(...this.suggestions.render(width));

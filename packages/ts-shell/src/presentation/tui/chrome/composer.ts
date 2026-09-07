@@ -31,9 +31,14 @@ export function composerTextWidth(width: number): number {
 }
 
 /** Prompt rows for the current editor contents. */
-export function renderComposer(editor: Editor, state: ComposerState, width: number): string[] {
+export function renderComposer(
+  editor: Editor,
+  state: ComposerState,
+  width: number,
+  maxRows?: number,
+): string[] {
   const textWidth = composerTextWidth(width);
-  const rows = editor.render(textWidth);
+  const rows = editor.render(textWidth, maxRows);
   const cue = state.busy ? defaultTheme.fg("warning", CUE) : defaultTheme.fg("accent", CUE);
   // No trailing padding: the renderer erases to the end of each row anyway, and
   // padding is what turns a multi-row selection into text separated by runs of

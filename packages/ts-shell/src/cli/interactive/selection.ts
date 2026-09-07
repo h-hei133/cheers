@@ -66,6 +66,23 @@ export class DragSelection {
     return order(this.anchor, this.focus);
   }
 
+  /** Cancel any in-progress drag without copying. */
+  clear(): void {
+    this.anchor = undefined;
+    this.focus = undefined;
+  }
+
+  /** Copy the currently selected text and clear the selection. Returns true if text was copied. */
+  copyAndClear(): boolean {
+    const anchor = this.anchor;
+    const focus = this.focus;
+    this.clear();
+    if (!anchor || !focus) return false;
+    const text = extractSelection(this.screen.rows(), anchor, focus);
+    if (!text) return false;
+    this.copy(text);
+    return true;
+  }
   /**
    * Handle one report. Returns false for anything not claimed — a Shift-held
    * drag, the wheel, a non-left button — so the caller can ignore it rather than
