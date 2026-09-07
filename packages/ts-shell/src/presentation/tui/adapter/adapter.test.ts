@@ -103,6 +103,42 @@ describe("adapter overlay stack", () => {
     const line = compositeLine("base", "over", 2, 4, 10);
     expect(stripAnsi(line).length).toBeLessThanOrEqual(10);
   });
+
+  it("restores the base style after the overlay segment", () => {
+    const styled = `\x1b[32mgreen base line here`;
+    const line = compositeLine(styled, "OVER", 6, 4, 22);
+    const afterReset = line.split("]8;;")[2] ?? "";
+    expect(afterReset).toContain("[32m");
+    expect(stripAnsi(line).length).toBeLessThanOrEqual(22);
+  });
+
+  it("reuses render heights for pointer dispatch", () => {
+    let renders = 0;
+    class Counting implements ViewComponent {
+      invalidate(): void {}
+      render(): string[] {
+        renders++;
+        return ["a", "b"];
+      }
+    }
+    const root = new Container();
+    root.addChild(new Counting());
+    root.render(10);
+    const before = renders;
+    root.handlePointer({
+      kind: "press",
+      x: 0,
+      y: 0,
+      screenX: 0,
+      screenY: 0,
+      width: 10,
+      height: 5,
+      shift: false,
+      alt: false,
+      ctrl: false,
+    });
+    expect(renders).toBe(before);
+  });
 });
 
 describe("adapter view model", () => {

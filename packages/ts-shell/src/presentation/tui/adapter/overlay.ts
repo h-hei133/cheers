@@ -1,4 +1,4 @@
-import { sliceWithWidth, visibleWidth } from "../text/measure.js";
+import { lineCells, sliceWithWidth, visibleWidth } from "../text/measure.js";
 import type { ViewComponent } from "./contract.js";
 
 export type OverlayAnchor = "center" | "top" | "bottom" | "left" | "right";
@@ -44,9 +44,30 @@ export function compositeLine(
   const overlayPad = Math.max(0, overlayWidth - overlay.width);
   const afterTarget = Math.max(0, totalWidth - startCol - overlayWidth);
   const afterPad = Math.max(0, afterTarget - after.width);
+  // The overlay segment ends with RESET, so the after segment must re-open the
+  // style the base line carried at the overlay boundary — otherwise text after
+  // a styled base row loses its colour the moment an overlay covers it.
+  const inherited = after.text && !after.text.startsWith("\x1b[") ? styleAt(baseLine, afterStart) : "";
   const result =
-    before.text + " ".repeat(beforePad) + RESET + overlay.text + " ".repeat(overlayPad) + RESET + after.text + " ".repeat(afterPad);
+    before.text + " ".repeat(beforePad) + RESET + overlay.text + " ".repeat(overlayPad) + RESET + inherited + after.text + " ".repeat(afterPad);
   return visibleWidth(result) <= totalWidth ? result : sliceWithWidth(result, 0, totalWidth).text;
+}
+
+/**
+ * SGR state the base line carries at `column`: the escape prefix of the first
+ * cell at or after the boundary, so a segment starting mid-style re-opens it.
+ */
+function styleAt(line: string, column: number): string {
+  let current = 0;
+  let carried = "";
+  for (const cell of lineCells(line)) {
+    carried += cell.prefix;
+    if (cell.cluster === "") continue;
+    if (current >= column) return carried;
+    current += cell.width;
+    carried = "";
+  }
+  return carried;
 }
 
 export class OverlayStack {
