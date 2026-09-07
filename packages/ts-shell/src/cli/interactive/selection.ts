@@ -72,15 +72,18 @@ export class DragSelection {
     this.focus = undefined;
   }
 
-  /** Copy the currently selected text and clear the selection. Returns true if text was copied. */
+  /** Copy the currently selected text and clear the selection. Returns true if a selection was active. */
   copyAndClear(): boolean {
-    const anchor = this.anchor;
-    const focus = this.focus;
+    const span = this.span;
+    if (!span) {
+      this.clear();
+      return false;
+    }
+    const text = extractSelection(this.screen.rows(), span.from, span.to);
     this.clear();
-    if (!anchor || !focus) return false;
-    const text = extractSelection(this.screen.rows(), anchor, focus);
-    if (!text) return false;
-    this.copy(text);
+    if (text) {
+      this.copy(text);
+    }
     return true;
   }
   /**

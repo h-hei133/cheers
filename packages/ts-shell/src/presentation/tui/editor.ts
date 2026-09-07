@@ -304,16 +304,28 @@ export class Editor {
     let cursorVisualRow = -1;
     for (let index = 0; index < this.lines.length; index++) {
       const rows = wrapToWidth(this.lines[index]!, cells);
-      if (index !== this.row || !this.focused) {
+      if (index !== this.row) {
         rendered.push(...rows);
         continue;
       }
-      const marked = this.markCursorRow(rows, visibleWidth(this.lines[index]!.slice(0, this.column)));
-      const markedIdx = marked.findIndex((r) => r.includes(CURSOR_MARKER));
-      cursorVisualRow = rendered.length + (markedIdx >= 0 ? markedIdx : 0);
-      rendered.push(...marked);
+      const offset = visibleWidth(this.lines[index]!.slice(0, this.column));
+      let subRow = 0;
+      let remaining = offset;
+      for (let i = 0; i < rows.length; i++) {
+        const rowWidth = visibleWidth(rows[i]!);
+        if (remaining < rowWidth || i === rows.length - 1) {
+          subRow = i;
+          break;
+        }
+        remaining -= rowWidth;
+      }
+      cursorVisualRow = rendered.length + subRow;
+      if (this.focused) {
+        rendered.push(...this.markCursorRow(rows, offset));
+      } else {
+        rendered.push(...rows);
+      }
     }
-
     if (maxRows === undefined || maxRows <= 0 || rendered.length <= maxRows) {
       this.scrollOffset = 0;
       return rendered;

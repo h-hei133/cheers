@@ -39,6 +39,15 @@ describe("prompt block", () => {
     expect(composerTextWidth(40)).toBe(37);
   });
 
+  it("bounds composer output to maxRows and tracks cursor", () => {
+    const editor = new Editor();
+    editor.setText(Array.from({ length: 15 }, (_, i) => `prompt line ${i}`).join("\n"));
+    const rows = renderComposer(editor, idle, 40, 4);
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toContain("╰─");
+    expect(stripAnsi(rows[3]!)).toContain("prompt line 14");
+    expect(rows.join("")).toContain(CURSOR_MARKER);
+  });
 });
 
 const quiet = { busy: false, suggesting: false, cancelArmed: false, queued: 0, newlineKey: "shift+enter" };

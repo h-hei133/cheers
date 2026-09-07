@@ -225,6 +225,18 @@ describe("showing what the drag has covered", () => {
     expect(copy).toHaveBeenCalledOnce();
     expect(selection.span).toBeUndefined();
   });
+
+  it("consumes and clears an empty-text selection without copying", () => {
+    const copy = vi.fn();
+    const selection = new DragSelection({ rows: () => ["", ""] }, copy);
+    selection.handle(parseMouseReport("\x1b[<0;0;1M")!);
+    selection.handle(parseMouseReport("\x1b[<32;10;1M")!);
+    expect(selection.span).toBeDefined();
+    const copied = selection.copyAndClear();
+    expect(copied).toBe(true);
+    expect(copy).not.toHaveBeenCalled();
+    expect(selection.span).toBeUndefined();
+  });
 });
 
 describe("selecting text that is not ASCII", () => {

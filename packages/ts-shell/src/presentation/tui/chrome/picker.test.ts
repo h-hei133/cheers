@@ -4,7 +4,7 @@ import { renderModal } from "./modal.js";
 import { OptionModel, type Option } from "./options.js";
 import { visibleWidth } from "../text/measure.js";
 import { stripAnsi } from "../text/ansi.js";
-
+import { CURSOR_MARKER } from "../render/paint.js";
 const many: Option[] = Array.from({ length: 30 }, (_, index) => ({
   id: `id-${index}`,
   label: `option ${index}`,
@@ -93,11 +93,18 @@ describe("full-screen modal", () => {
     for (const row of rows) expect(visibleWidth(row)).toBe(40);
   });
 
-  it("renders dedicated search input row above options list", () => {
+  it("renders dedicated search input row with proper cursor placement", () => {
     const m = model();
+    const emptyRows = renderModal(m, { title: "Sessions", empty: "none", detailRows: 1 }, 60, 15);
+    const searchEmpty = emptyRows[1]!;
+    expect(stripAnsi(searchEmpty)).toContain("Search: Type to filter...");
+    expect(searchEmpty.indexOf(CURSOR_MARKER)).toBeLessThan(searchEmpty.indexOf("Type to filter..."));
+
     m.setFilter("test-query");
-    const rows = stripAnsi(renderModal(m, { title: "Sessions", empty: "none", detailRows: 1 }, 60, 15).join("\n"));
-    expect(rows).toContain("Search: test-query");
-    expect(rows).toContain("├");
+    const queryRows = renderModal(m, { title: "Sessions", empty: "none", detailRows: 1 }, 60, 15);
+    const searchQuery = queryRows[1]!;
+    expect(stripAnsi(searchQuery)).toContain("Search: test-query");
+    expect(searchQuery.indexOf(CURSOR_MARKER)).toBeGreaterThan(searchQuery.indexOf("test-query"));
+    expect(stripAnsi(queryRows.join("\n"))).toContain("├");
   });
 });

@@ -84,3 +84,26 @@ confidence: high
 - 不阻塞 adapter 接入：adapter 复用现有底座，这些缺陷在 adapter 接入前后都存在。
 - 接入后需复验：A1/A2（权限弹窗走 overlay）、B2（resume 重建）、C1/C2（输入与渲染）在 adapter 链路下的行为。
 - 修复优先级：A > B > C > D。A/B 影响核心可用性，C 影响体验，D 是布局。
+
+## 独立复核（b1c6a207 → 本次修补）
+
+复核范围：C1（选区反色与 Ctrl+C 复制）、C2（输入框滚动与高度预算）、D1（modal 搜索框布局）及其单元测试，对照真实终端交互与底座模块逐项复验。
+
+查出并修复 3 个次级缺陷：
+
+1. **C1 边界问题：空白选区按 Ctrl+C 误清空草稿（selection.ts）**
+   - 根因：`DragSelection.copyAndClear()` 在选区内字符不足 `MIN_SELECTION_CELLS`（如拖选了空白区域）导致 `extractSelection` 返回 `undefined` 时返回 `false`；`keymap.ts` 的 `handleCancelKey` 误判定为“无活动选区”，落入后序逻辑执行了 `surface.editor.clear()`，抹除了草稿。
+   - 修复：只要存在活动选区（`this.span !== undefined`），即执行清空选区并返回 `true` 消费取消事件，保护草稿不被误删；仅在文本有效时执行复制。补充空白选区取消回归测试。
+
+2. **C2 滚动失步：未聚焦时 Editor 无法跟随光标滚动（editor.ts）**
+   - 根因：`Editor.render` 原先将 `cursorVisualRow` 绑定在 `if (index !== this.row || !this.focused)` 分支内；未聚焦状态下渲染时 `cursorVisualRow` 保持 `-1`，使视口滚动计算失效，留在第一屏（`scrollOffset = 0`）。
+   - 修复：解耦视口行计算与光标高亮：无论是否聚焦均精确计算当前 `(this.row, this.column)` 对应的视觉行；聚焦时注入 `CURSOR_MARKER`，未聚焦时不注入。并在 adapter `ComposerFacts` 支持 `maxRows`。补充未聚焦滚动回归测试。
+
+3. **D1 体验缺陷：搜索框光标位置跳变与超长截断（modal.ts）**
+   - 根因：空筛选时 `searchRow` 将 `CURSOR_MARKER` 拼在 `Type to filter...` 之后，硬件光标漂浮在占位符末尾（第 28 列）；输入第一个字符时光标突跳回第 11 列。且若筛选词过长，外层 `truncateToWidth` 会截掉行末的 `CURSOR_MARKER` 导致光标丢失。
+   - 修复：空筛选时光标置于 `Search:` 之后、占位符之前；有筛选时内层限制文本宽度并将光标置于筛选词之后，彻底消除跳变与光标截断风险。更新回归测试。
+
+验证：
+- 交互与 TUI 43 套件 532 项测试全部通过（新增 3 项回归测试）。
+- `tsc -p tsconfig.build.json` 全量编译通过。
+- 审计日志与工作区残留已完全复原。

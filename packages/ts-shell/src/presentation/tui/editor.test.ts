@@ -285,4 +285,14 @@ describe("vertical scrolling and height bounds", () => {
     expect(stripAnsi(bottomRows[4]!)).toContain("line 19");
     expect(bottomRows.join("\n")).toContain(CURSOR_MARKER);
   });
+
+  it("tracks cursor line when scrolling even while unfocused", () => {
+    const editor = new Editor();
+    editor.focused = false;
+    editor.setText(Array.from({ length: 20 }, (_, i) => `line ${i}`).join("\n"));
+    const bottomRows = editor.render(40, 5);
+    expect(bottomRows).toHaveLength(5);
+    expect(bottomRows[4]).toContain("line 19");
+    expect(bottomRows.join("\n")).not.toContain(CURSOR_MARKER);
+  });
 });

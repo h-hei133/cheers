@@ -84,7 +84,12 @@ function top(title: string, model: OptionModel, inner: number): string {
 
 function searchRow(model: OptionModel, inner: number): string {
   const prompt = defaultTheme.fg("accent", "Search: ");
-  const query = model.filter ? defaultTheme.bold(model.filter) : defaultTheme.dim("Type to filter...");
+  const contentWidth = Math.max(8, inner - 2 - visibleWidth("Search: "));
+  if (!model.filter) {
+    const placeholder = defaultTheme.dim(truncateToWidth("Type to filter...", contentWidth));
+    return body(`${prompt}${CURSOR_MARKER}${placeholder}`, inner);
+  }
+  const query = defaultTheme.bold(truncateToWidth(model.filter, contentWidth));
   return body(`${prompt}${query}${CURSOR_MARKER}`, inner);
 }
 

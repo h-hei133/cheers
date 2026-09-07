@@ -35,6 +35,7 @@ export interface ComposerFacts {
   readonly queued: number;
   readonly newlineKey: string;
   readonly ambient: AmbientContext;
+  readonly maxRows?: number;
 }
 
 export class Composer implements ViewComponent {
@@ -75,7 +76,7 @@ export class Composer implements ViewComponent {
         newlineKey: this.facts.newlineKey,
       };
       return [
-        ...renderComposer(this.editor, { busy: this.facts.busy }, safe),
+        ...renderComposer(this.editor, { busy: this.facts.busy }, safe, this.facts.maxRows),
         ...renderHints(context, this.facts.ambient, safe),
       ];
     } finally {
