@@ -51,6 +51,15 @@ export class Composer implements ViewComponent {
     this.facts = facts;
   }
 
+  handleInput(data: string): void {
+    // Same boundary as PromptEditor: the component layer only takes
+    // printable single characters. Newlines, kills, and escape sequences
+    // belong to the keymap above, which sees parsed key events.
+    if (data.length === 1 && data >= " " && data !== "\u007f" && !this.facts.busy) {
+      this.editor.insert(data);
+    }
+  }
+
   invalidate(): void {}
 
   render(width: number): string[] {

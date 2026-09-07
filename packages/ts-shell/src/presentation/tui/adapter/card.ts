@@ -31,9 +31,9 @@ export class ToolCard implements ViewComponent {
     this.state = { ...this.state, collapsed: !(this.state.collapsed ?? false) };
   }
 
-  handlePointer(_event: PointerEvent): PointerResult | undefined {
-    if (_event.kind !== "click" && _event.kind !== "press") return undefined;
-    if (_event.kind === "press") return { handled: true, focus: true };
+  handlePointer(event: PointerEvent): PointerResult | undefined {
+    if (event.kind !== "click" && event.kind !== "press") return undefined;
+    if (event.kind === "press") return { handled: true, focus: true };
     this.toggleCollapsed();
     return { handled: true };
   }

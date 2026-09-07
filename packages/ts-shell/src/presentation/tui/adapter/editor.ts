@@ -51,7 +51,7 @@ export class PromptEditor implements ViewComponent {
       this.submit();
       return;
     }
-    if (data.length === 1) {
+    if (data.length === 1 && data >= " " && data !== "\u007f") {
       this.editor.insert(data);
       this.callbacks.onChange?.(this.editor.getText());
     }

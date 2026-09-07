@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { stripAnsi } from "../text/ansi.js";
 import { Editor } from "../editor.js";
-import { assistantMessage, errorMessage, noticeMessage, thinkingMessage, userMessage } from "./messages.js";
+import { Message, assistantMessage, errorMessage, noticeMessage, thinkingMessage, userMessage } from "./messages.js";
 import { ToolCard } from "./card.js";
 import { Composer, StatusBar } from "./chrome.js";
 
@@ -35,6 +35,14 @@ describe("adapter message components", () => {
     expect(thinking.render(40).filter((row) => row.trim()).length).toBeLessThanOrEqual(2);
     thinking.toggleCollapsed();
     expect(thinking.render(40).join("\n")).toContain("long reasoning here");
+  });
+
+  it("folds a tool message on first toggle", () => {
+    const message = new Message({ kind: "tool", text: "body-line", title: "read", finalized: true });
+    message.toggleCollapsed();
+    const rows = message.render(50).join("\n");
+    expect(rows).toContain("1 line · click to expand");
+    expect(rows).not.toContain("body-line");
   });
 
   it("renders notice and error rows", () => {
@@ -99,5 +107,21 @@ describe("adapter status bar and composer", () => {
       ambient: { openTodos: 0, peerSessions: 0 },
     });
     expect(composer.render(30).join("\n")).toContain("queued");
+  });
+
+  it("inserts printable input and drops control characters", () => {
+    const editor = new Editor();
+    const composer = new Composer(editor, {
+      busy: false,
+      suggesting: false,
+      cancelArmed: false,
+      queued: 0,
+      newlineKey: "ctrl+j",
+      ambient: { openTodos: 0, peerSessions: 0 },
+    });
+    composer.handleInput?.("a");
+    composer.handleInput?.("");
+    composer.handleInput?.("[A");
+    expect(editor.getText()).toBe("a");
   });
 });

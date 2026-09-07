@@ -18,7 +18,11 @@ export class Message implements ViewComponent {
   }
 
   toggleCollapsed(): void {
-    this.message = { ...this.message, collapsed: !(this.message.collapsed ?? true) };
+    // Match toBlock defaults: thinking starts folded, every other kind
+    // starts expanded. A fixed default would make the first toggle on a
+    // tool message a no-op.
+    const folded = this.message.collapsed ?? this.message.kind === "thinking";
+    this.message = { ...this.message, collapsed: !folded };
   }
 
   invalidate(): void {}

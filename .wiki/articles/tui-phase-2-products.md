@@ -39,3 +39,19 @@ confidence: high
 - 适配层共 47 项通过；现有 TUI 回归 171 项通过（engine/blocks/container/markdown/editor/stdinBuffer/options/band/composer/turnSink）。
 - `tsc -p tsconfig.build.json` 通过；适配层无外部项目名命中。
 - 未验证（留给接入默认链路时）：真实 CLI 长 transcript 基准、大粘贴/IME 真机、非 TTY 管道输出。
+
+## 独立复核（df43329c → 本次修补）
+
+复核范围：4 个新组件 + 10 项测试，对照自有渲染器（`blocks.ts`、`band.ts`、`composer.ts`、`hints.ts`、`live.ts`）与 Pi 上游（`select-list.ts` 指针映射）逐项取证。无外部项目名进入产品代码，文件名简洁（`messages`/`card`/`chrome`），跨域 import 均为 type-only 或同级拥有模块。
+
+查出并修复 3 个问题：
+
+1. **`messages.ts` toggle 缺省与 kind 脱节（MEDIUM）**——`toggleCollapsed` 固定 `?? true`：包 thinking 正确，包 tool 时首次 toggle 成无操作（tool 缺省展开，`!(undefined ?? true)` 仍是展开）。改为按 kind 取缺省（thinking 缺省折叠，其余缺省展开），与 `toBlock` 对齐。`ToolCard` 的 `?? false` 与 tool 缺省展开一致，保留。回归测试：tool 消息首次 toggle 即折叠。
+2. **`chrome.ts` Composer 有焦点无输入（LOW）**——`focused = true` 却无 `handleInput`，挂到 Surface 上按键无响应。补与 `PromptEditor` 同形的组件层边界：可打印单字符插入，换行/控制键/转义留给上层 keymap，忙时不吃输入。
+3. **控制字符可插入（LOW，两处同修）**——`PromptEditor`/`Composer` 的单字符守卫放行 `DEL`（0x7f）及 C0 控制字符。加 `>= " "` 下界与 DEL 排除（转义写法 `\u007f`，避免不可见字面量）。
+
+确认无问题：`StatusBar.render` 的 `renderBand` 是单个 string 元素（非 spread），无拆字符 bug；dialog 三决策与升级工作流一致；`ToolCard` press 取焦点/click 切换与 Pi 同形；`card.ts` 下划线参数已正名。
+
+已知限制（留给输入链路任务）：组件层只吃单字符，中文 IME 多字节直达仍被丢弃，真修要接 `stdinBuffer` 解码。
+
+验证：适配层 49 项通过；TUI+theme+approval 回归 341 项通过；`tsc -p tsconfig.build.json` 通过。
