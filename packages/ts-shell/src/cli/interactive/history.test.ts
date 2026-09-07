@@ -123,6 +123,52 @@ describe("restoring a conversation", () => {
     expect(toolBlock.collapsed).toBe(false);
     expect(toolBlock.text).toContain("Blocked: User denied permission");
   });
+
+  it("restores hook-blocked and cancelled tools with failed status", () => {
+    const turns: SessionMessage[] = [
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_hook_1",
+            type: "function",
+            function: { name: "write", arguments: "{}" },
+          },
+        ],
+      },
+      {
+        role: "tool",
+        tool_call_id: "call_hook_1",
+        content: "Blocked by Hook: security verification rejected",
+      },
+    ];
+    const { blocks } = restoreConversation(turns);
+    expect(blocks[0]!.status).toBe("failed");
+    expect(blocks[0]!.collapsed).toBe(false);
+  });
+
+  it("marks tool calls without any tool response as interrupted on resume", () => {
+    const turns: SessionMessage[] = [
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_killed_1",
+            type: "function",
+            function: { name: "bash", arguments: JSON.stringify({ command: "long_job" }) },
+          },
+        ],
+      },
+      // No tool response recorded because process was killed
+    ];
+    const { blocks } = restoreConversation(turns);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.status).toBe("failed");
+    expect(blocks[0]!.text).toBe("(Operation interrupted)");
+    expect(blocks[0]!.collapsed).toBe(false);
+  });
 });
 
 describe("points to go back to", () => {

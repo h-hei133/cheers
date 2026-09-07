@@ -1,6 +1,7 @@
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
 import { lineCells, sliceWithWidth, visibleWidth } from "../../presentation/tui/text/measure.js";
+import { CURSOR_MARKER } from "../../presentation/tui/render/paint.js";
 
 /**
  * Drag-to-copy over the rows currently on screen.
@@ -206,7 +207,7 @@ function selectedRanges(
  * and leave the selection looking like it stopped there.
  */
 function highlightRow(line: string, start: number, end: number): string {
-  if (end <= start) return line;
+  if (end <= start || line.includes(CURSOR_MARKER)) return line;
   // A blank row inside the span is still selected, and a paragraph break that
   // shows no shading at all makes the selection look broken in two.
   if (visibleWidth(line) === 0) return start === 0 ? `${REVERSE} ${REVERSE_OFF}` : line;

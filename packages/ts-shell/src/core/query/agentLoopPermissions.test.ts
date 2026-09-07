@@ -493,4 +493,15 @@ describe("agentLoop permission enforcement and interactive ask", () => {
     expect(chat[0]!.role).toBe("user");
     expect(chat[0]!.content).toBe("hello");
   });
+
+  it("ensures assistant messages with empty content and no tool_calls have string content rather than null", () => {
+    const history = [
+      { role: "assistant" as const, content: "" },
+    ];
+    const chat = convertSessionMessagesToChat(history);
+    expect(chat).toHaveLength(1);
+    expect(chat[0]!.role).toBe("assistant");
+    expect(typeof chat[0]!.content).toBe("string");
+    expect(chat[0]!.content).toBe("");
+  });
 });

@@ -72,6 +72,20 @@ describe("toolPolicy", () => {
     const outsideResult = evaluateToolPermissionScope("write", { path: "/etc/passwd" }, "accept-edits", "/repo");
     expect(outsideResult.requiresEscalation).toBe(true);
   });
+  it("requires escalation when write or edit has missing, empty, or root path in accept-edits mode", () => {
+    expect(evaluateToolPermissionScope("write", {}, "accept-edits", "/repo").requiresEscalation).toBe(true);
+    expect(evaluateToolPermissionScope("write", { path: "" }, "accept-edits", "/repo").requiresEscalation).toBe(true);
+    expect(evaluateToolPermissionScope("write", { path: "   " }, "accept-edits", "/repo").requiresEscalation).toBe(true);
+    expect(evaluateToolPermissionScope("edit", { path: "." }, "accept-edits", "/repo").requiresEscalation).toBe(true);
+  });
+
+  it("derives clear target for task tool from description or prompt", () => {
+    const withDesc = evaluateToolPermissionScope("task", { description: "Analyze performance" }, "ask");
+    expect(withDesc.target).toBe("Analyze performance");
+    const withPrompt = evaluateToolPermissionScope("task", { prompt: "Find all unused exports" }, "ask");
+    expect(withPrompt.target).toBe("Find all unused exports");
+  });
+
 
   it("allows all tools in allow-all mode", () => {
     expect(evaluateToolPermissionScope("write", { path: "foo.txt" }, "allow-all").requiresEscalation).toBe(false);

@@ -132,4 +132,37 @@ confidence: high
 验证：
 - 核心逻辑与回归套件（query/approval/interactive/TUI）全部通过，新增 4 项针对性回归测试。
 - `tsc -p tsconfig.build.json` 编译通过。
+
+## 再次复核（bccb416c / 596bbf75 → 本次修补）
+
+复核范围：前述 5 个 commit 的全量改动（`toolPolicy.ts`、`agentLoop.ts`、`history.ts`、`selection.ts`、`interactiveAskBridge.ts`、`modal.ts`、`editor.ts` 及相关套件），对照 API 规范、终端边界与安全规则逐项复验。
+
+查出并修复 5 项隐患：
+
+1. **A1 toolPolicy 缺失路径绕过漏洞（toolPolicy.ts）**
+   - 根因：`accept-edits` 模式在检验 `(toolName === "write" || toolName === "edit")` 时，未校验 `args.path` 是否有效。当传参缺失 `path`（如 `{ content: "..." }`）时，`target` 默认取 `(unspecified path)`，被相对路径计算解析为工作区内并静默放行；且对工作区根目录自身（`rel === ""`）未排除。
+   - 修复：强制要求 `typeof args.path === "string" && args.path.trim().length > 0`，缺失路径必须升级审批；同时约束 `rel.length > 0` 杜绝修改根目录。增强 `task` 目标提取（优先使用 `description`、`prompt`）及 safeArgs 防御。
+
+2. **B1 assistant 消息 content: null 协议规范隐患（agentLoop.ts）**
+   - 根因：`convertSessionMessagesToChat` 处理 assistant 消息时使用 `msg.content || null`。若历史中存在无 `tool_calls` 且空文本的 assistant 消息，输出为 `{ role: "assistant", content: null }`，直接违反 OpenAI/DeepSeek 协议（无 tool_calls 时 content 必须为 string），引发 API 400。
+   - 修复：修正为 `msg.content ?? (calls ? null : "")`，无 tool_calls 时严格保证 content 为字符串。
+
+3. **B2 resume 工具卡片失败模式遗漏与未响应卡片修复（history.ts）**
+   - 根因：
+     1. 失败判定正则未覆盖 `Blocked by Hook:`（带空格）、`(Operation cancelled or interrupted)` 和 `Tool '...' is not available`，导致钩子拦截或中断合成的消息恢复后依然显示为成功绿勾。
+     2. 若工具调用在产生 tool 响应前进程被异常终止，恢复后 `toolBlock` 停留在 `status: "ok"` 和空文本。
+   - 修复：
+     1. 正则扩展为 `/^(\(Operation cancelled|Blocked\b|Tool execution error:|Tool '[^']+' is not available|Error\b)/i`。
+     2. 增加 `respondedToolIds` 集合追踪已响应工具调用；对历史中完全无响应的孤立工具调用正确置为 `status: "failed"` 与 `text: "(Operation interrupted)"`，展开卡片。
+
+4. **C1 选区反色与光标残影深度防御（selection.ts）**
+   - 修复：在 `highlightRow` 中增加针对 `CURSOR_MARKER` 的绝对防御：任何包含光标标记的行直接原样返回、严禁反色高亮，防止全屏 modal/overlay 等场景下拖选产生双重反色重叠与硬件光标残影。
+
+5. **A2 interactiveAsk 健壮性保障（interactiveAskBridge.ts）**
+   - 修复：对问题缺少 `id` 自动降级为 `q_${i+1}`，对选项对象及 label 增加可选链保护，防止非结构化异常输入抛错。
+
+验证：
+ - 全量受测模块 75 项测试全部通过（新增 5 项针对性回归测试）。
+ - `tsc -p tsconfig.build.json` 编译通过。
+ - 仓库保持零外部项目名命中。
 - 审计日志与工作区保持完全干净。

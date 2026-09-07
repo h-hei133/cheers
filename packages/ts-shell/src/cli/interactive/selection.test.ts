@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { DragSelection, extractSelection, highlightSelection } from "./selection.js";
 import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
-
+import { CURSOR_MARKER } from "../../presentation/tui/render/paint.js";
 const ROWS = [
   "  \x1b[36m▌\x1b[39m explain the retirement rule",
   "",
@@ -236,6 +236,12 @@ describe("showing what the drag has covered", () => {
     expect(copied).toBe(true);
     expect(copy).not.toHaveBeenCalled();
     expect(selection.span).toBeUndefined();
+  });
+  it("never shades a row containing CURSOR_MARKER to protect against cursor corruption", () => {
+    const rows = [`prompt ${CURSOR_MARKER} draft`];
+    const highlighted = highlightSelection(rows, { from: { row: 0, column: 0 }, to: { row: 0, column: 20 } });
+    expect(highlighted[0]).toBe(`prompt ${CURSOR_MARKER} draft`);
+    expect(highlighted[0]).not.toContain("\x1b[7m");
   });
 });
 

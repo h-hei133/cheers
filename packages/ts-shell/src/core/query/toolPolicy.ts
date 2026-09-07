@@ -36,20 +36,22 @@ export function evaluateToolPermissionScope(
   scope: PermissionScope = "ask",
   workspaceRoot: string = process.cwd(),
 ): ToolPermissionEvaluation {
+  const safeArgs = args && typeof args === "object" ? args : {};
   let operation: "read" | "write" | "delete" | "execute" = "read";
   let target = "";
   let isReadOnly = false;
 
   if (READ_ONLY_TOOLS[toolName]) {
     operation = "read";
-    target = String(args.path ?? args.pattern ?? args.query ?? args.url ?? toolName);
+    target = String(safeArgs.path ?? safeArgs.pattern ?? safeArgs.query ?? safeArgs.url ?? toolName);
     isReadOnly = true;
   } else if (toolName === "write" || toolName === "edit") {
     operation = "write";
-    target = typeof args.path === "string" ? args.path : "(unspecified path)";
+    const rawPath = typeof safeArgs.path === "string" ? safeArgs.path.trim() : "";
+    target = rawPath || "(unspecified path)";
     isReadOnly = false;
   } else if (toolName === "bash") {
-    const cmd = typeof args.command === "string" ? args.command.trim() : "";
+    const cmd = typeof safeArgs.command === "string" ? safeArgs.command.trim() : "";
     target = cmd || "bash";
     if (isReadOnlyBashCommand(cmd)) {
       operation = "read";
@@ -62,8 +64,8 @@ export function evaluateToolPermissionScope(
       isReadOnly = false;
     }
   } else if (toolName === "browser") {
-    const action = typeof args.action === "string" ? args.action.toLowerCase().trim() : "";
-    target = typeof args.url === "string" ? args.url : action || "browser";
+    const action = typeof safeArgs.action === "string" ? safeArgs.action.toLowerCase().trim() : "";
+    target = typeof safeArgs.url === "string" ? safeArgs.url : action || "browser";
     if (READ_ONLY_BROWSER_ACTIONS[action]) {
       operation = "read";
       isReadOnly = true;
@@ -73,7 +75,14 @@ export function evaluateToolPermissionScope(
     }
   } else if (toolName === "task") {
     operation = "execute";
-    target = typeof args.task === "string" ? args.task : "subagent task";
+    target =
+      typeof safeArgs.description === "string" && safeArgs.description.trim()
+        ? safeArgs.description.trim()
+        : typeof safeArgs.prompt === "string" && safeArgs.prompt.trim()
+          ? safeArgs.prompt.trim().slice(0, 80)
+          : typeof safeArgs.task === "string" && safeArgs.task.trim()
+            ? safeArgs.task.trim()
+            : "subagent task";
     isReadOnly = false;
   } else {
     operation = "execute";
@@ -104,9 +113,18 @@ export function evaluateToolPermissionScope(
     // Process spawns, shell commands (including bash rm), and network operations
     // must always require user escalation.
     if ((toolName === "write" || toolName === "edit") && (operation === "write" || operation === "delete")) {
+      const rawPath = typeof safeArgs.path === "string" ? safeArgs.path.trim() : "";
+      if (!rawPath) {
+        return {
+          requiresEscalation: true,
+          operation,
+          target,
+          reason: `Operation '${toolName}' with missing target path requires escalation`,
+        };
+      }
       const resolved = path.isAbsolute(target) ? target : path.resolve(workspaceRoot, target);
       const rel = path.relative(workspaceRoot, resolved);
-      const isInside = !rel.startsWith("..") && !path.isAbsolute(rel);
+      const isInside = rel.length > 0 && !rel.startsWith("..") && !path.isAbsolute(rel);
       if (isInside) {
         return {
           requiresEscalation: false,

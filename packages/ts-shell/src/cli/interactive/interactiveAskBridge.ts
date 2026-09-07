@@ -17,15 +17,20 @@ export async function promptInteractiveQuestions(
 
   const answers: Record<string, string> = {};
   for (let i = 0; i < questions.length; i++) {
-    const q = questions[i]!;
+    const q = questions[i];
+    if (!q || typeof q !== "object") continue;
+    const qId = typeof q.id === "string" && q.id.trim() ? q.id.trim() : `q_${i + 1}`;
     const optionsText =
       Array.isArray(q.options) && q.options.length > 0
         ? q.options
             .map((opt, optIdx) => {
+              if (!opt || typeof opt !== "object") return "";
               const isRec = q.recommended === optIdx ? " (Recommended)" : "";
               const desc = opt.description ? `: ${opt.description}` : "";
-              return `  ${optIdx + 1}. ${opt.label}${isRec}${desc}`;
+              const label = typeof opt.label === "string" ? opt.label : `Option ${optIdx + 1}`;
+              return `  ${optIdx + 1}. ${label}${isRec}${desc}`;
             })
+            .filter(Boolean)
             .join("\n")
         : "";
     const promptText = optionsText
@@ -37,23 +42,23 @@ export async function promptInteractiveQuestions(
     if (Array.isArray(q.options) && q.options.length > 0) {
       const num = Number.parseInt(trimmed, 10);
       if (!Number.isNaN(num) && num >= 1 && num <= q.options.length) {
-        answers[q.id] = q.options[num - 1]!.label;
+        answers[qId] = q.options[num - 1]!.label;
         continue;
       }
       const match = q.options.find(
-        (opt) => opt.label.toLowerCase() === trimmed.toLowerCase(),
+        (opt) => opt?.label && opt.label.toLowerCase() === trimmed.toLowerCase(),
       );
       if (match) {
-        answers[q.id] = match.label;
+        answers[qId] = match.label;
         continue;
       }
     }
     if (trimmed) {
-      answers[q.id] = trimmed;
-    } else if (q.recommended !== undefined && q.options?.[q.recommended]) {
-      answers[q.id] = q.options[q.recommended].label;
+      answers[qId] = trimmed;
+    } else if (q.recommended !== undefined && q.options?.[q.recommended]?.label) {
+      answers[qId] = q.options[q.recommended].label;
     } else {
-      answers[q.id] = trimmed;
+      answers[qId] = trimmed;
     }
   }
 

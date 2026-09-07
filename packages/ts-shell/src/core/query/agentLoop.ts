@@ -145,9 +145,10 @@ export function convertSessionMessagesToChat(
               function: { name: c.function.name, arguments: c.function.arguments },
             }))
           : undefined;
+      const content = msg.content ?? (calls ? null : "");
       result.push({
         role: "assistant",
-        content: msg.content || null,
+        content,
         ...(calls ? { tool_calls: calls } : {}),
       });
       if (calls && calls.length > 0) {

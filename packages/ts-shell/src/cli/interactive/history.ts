@@ -30,7 +30,7 @@ export interface RestoredHistory {
 export function restoreConversation(turns: readonly SessionMessage[]): RestoredHistory {
   const blocks: Block[] = [];
   const toolBlocksById = new Map<string, Block>();
-
+  const respondedToolIds = new Set<string>();
   for (const turn of turns) {
     if (turn.role === "user") {
       const content = turn.content?.trim();
@@ -66,17 +66,26 @@ export function restoreConversation(turns: readonly SessionMessage[]): RestoredH
       }
     } else if (turn.role === "tool") {
       if (turn.tool_call_id) {
+        respondedToolIds.add(turn.tool_call_id);
         const toolBlock = toolBlocksById.get(turn.tool_call_id);
         if (toolBlock) {
           const body = (turn.content || "").replace(/\s+$/, "");
           toolBlock.text = body;
           splitFencedDiff(toolBlock);
-          if (/^(Blocked:|Tool execution error:|Error:)/.test(body)) {
+          if (/^(\(Operation cancelled|Blocked\b|Tool execution error:|Tool '[^']+' is not available|Error\b)/i.test(body)) {
             toolBlock.status = "failed";
             toolBlock.collapsed = false;
           }
         }
       }
+    }
+  }
+
+  for (const [callId, toolBlock] of toolBlocksById) {
+    if (!respondedToolIds.has(callId)) {
+      toolBlock.status = "failed";
+      toolBlock.text = "(Operation interrupted)";
+      toolBlock.collapsed = false;
     }
   }
 
