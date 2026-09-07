@@ -22,12 +22,23 @@ Phase 0/1/2 的 wiki 均记录"未验证真实 CLI，只到组件层"。所以 P
 | 门槛 | 结果 |
 |---|---|
 | golden main path | 1/1 通过 |
-| TUI 全套件 | 339/339 通过（25 文件） |
-| 交互冒烟（loop/mode/firstFrame） | 13/13 通过 |
-| 长 transcript 基准（新增 `adapter/benchmark.test.ts` 6 项） | 通过：200 turn 渲染 < 1s（实测约 24ms 量级），缓存重渲染 < 200ms，20 次流式追加 < 500ms，viewport 切片 30 行 < 1s，流式帧 diff < 30 行 |
-| adapter spike（新增 `adapter/spike.test.ts` 5 项，后续决策点 1） | 通过：transcript+composer+statusbar 同帧、permission overlay、assistant/thinking/tool/loader 流式、editor 提交、启停恢复 |
+| TUI 全套件 | 按本次复核重跑为准（见下） |
+| 交互冒烟（loop/mode/firstFrame） | 13/13 通过（本次复核：`cli/interactive` 随回归重跑通过） |
+| 长 transcript 基准（`adapter/benchmark.test.ts` 6 项） | 通过：50 turn（200 blocks）渲染 < 1s，缓存重渲染 < 200ms，20 次流式追加 < 500ms，viewport 切片 30 行 < 1s，流式帧 diff < 30 行 |
+| adapter spike（`adapter/spike.test.ts` 5 项，后续决策点 1） | 通过：transcript+composer+statusbar 同帧、permission overlay、assistant/thinking/tool/loader 流式、editor 提交、启停恢复 |
 | `tsc -p tsconfig.build.json` | 通过 |
-| 适配层外部项目名 | 零命中 |
+| 适配层外部项目名 | 零命中（本次复核重查：产品代码与本文零命中） |
+
+## 独立复核（61aba79a → 本次修补）
+
+查出并修复 2 个问题：
+
+1. **空测试（MEDIUM）**——`spike.test.ts` 的 "uses a manual scheduler deterministically" 自带 `void scheduler`：`Surface` 构造不接受 scheduler（engine 支持注入但 Surface 未透传），测试与 scheduler 无关，只剩 `now() >= 0` 空断言。改为真断言："restores the terminal on stop"（启停后 `terminal.stopped`），启停恢复本就是验证门槛之一。scheduler 透传属功能新增，Phase 3 只验证不加功能，不做。
+2. **名实不符（LOW）**——benchmark 标题 "renders 200 turns" 但 `buildTranscript(50)`（50 turns × 4 blocks = 200 blocks）。标题改为 50 turns，预算不变；本文表格同步。
+
+确认无问题：`textBlock` 存在；`TranscriptView` 在 benchmark/spike 各定一次是测试内 7 行 helper，跨文件抽反而增依赖，保留；删除审计结论维持（本次不删）；文件名简洁（`benchmark`/`spike`）；`spike.test.ts` 未用 import 已清理。
+
+验证（本次复核重跑）：适配层 61 项通过；TUI+theme+approval+interactive 回归 530 项通过（45 文件）；`tsc` 通过。
 
 ## 删除审计结论：本次不删
 

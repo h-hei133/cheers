@@ -43,7 +43,7 @@ function buildTranscript(turns: number): Transcript {
 }
 
 describe("phase 3 long-transcript benchmark", () => {
-  it("renders 200 turns within a frame budget", () => {
+  it("renders 50 turns within a frame budget", () => {
     const transcript = buildTranscript(50);
     const started = performance.now();
     const rendered = transcript.render(100);

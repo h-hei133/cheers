@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminalDouble.js";
+import { RecordingTerminal } from "../../../test-utils/terminalDouble.js";
 import { Transcript } from "../transcript/container.js";
 import { Editor } from "../editor.js";
 import { Container } from "./contract.js";
@@ -122,12 +122,9 @@ describe("phase 3 adapter spike", () => {
     expect(submitted).toBe("ship it");
   });
 
-  it("uses a manual scheduler deterministically", () => {
+  it("restores the terminal on stop", () => {
     const terminal = new RecordingTerminal();
-    const scheduler = new ManualScheduler();
-    expect(scheduler.now()).toBeGreaterThanOrEqual(0);
     const surface = new Surface({ terminal });
-    void scheduler;
     surface.start();
     surface.stop();
     expect(terminal.stopped).toBe(true);
