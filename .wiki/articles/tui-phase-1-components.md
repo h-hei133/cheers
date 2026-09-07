@@ -52,4 +52,16 @@ confidence: high
 
 卫生：适配层无外部项目名命中；import 均为 type-only 跨域或同级拥有模块，无运行时循环；各文件函数数远低于 20 上限。
 
-验证：适配层 35 项通过；TUI+theme+approval 回归 327 项通过；`tsc -p tsconfig.build.json` 通过。
+## 再次复核（67c6748e → 本次修补）
+
+复核范围：上一轮修补后的 6 个组件 + 19 项测试，逐项重验指针映射、窗口语义与边界渲染。
+
+查出并修复 3 个问题：
+
+1. **`layout.ts` 重复 `StackOptions` 声明（LOW）**——同一接口定义两次，`tsc` 因结构相同未报错，但属实实在在的冗余。删其一。
+2. **`select.ts` 指针窗口基准与溢出计数行（MEDIUM）**——`handlePointer` 用 `model.total`（= `matches.length`，当前等价）而 `render` 用 `visible.length`，过滤变化瞬间两者可脱节；且溢出时 `render` 末尾多一行 `(1/10)` 计数行，点中它会按 `window.offset + y` 误选一个 option。改为与 `render` 同基准（`visible.length`），并对窗口外行（含计数行）直接返回 `undefined`。回归测试：点计数行不触发 `onSelect`。
+3. **`layout.ts` `HStack` 空子项崩溃（LOW）**——`children` 为空时 `Math.max(...[])` 得 `-Infinity`，`for (row < -Infinity)` 不执行，实际返回 `[]` 未崩溃，但语义靠巧合。加显式早退 `if (children.length === 0) return []` 并改 `Math.max(0, ...)`。回归测试：空栈渲染得 `[]`。
+
+确认无问题：dialog 指针行 `event.y - 2` 与 `render` 的标题+详情两行一致；`PromptEditor.handleInput` 单字符限制与上一轮结论一致（Surface 给 raw bytes，需接 `stdinBuffer` 解码，仍留给输入链路任务）；loader `Date.now()` 为 spinner 时间驱动；`Markdown` 缓存键未含 `streaming` 但 `setStreaming` 已清缓存，等价正确。
+
+验证：适配层 37 项通过；TUI 全套件 22 文件 315 项通过；`npm run build:ts` 通过。

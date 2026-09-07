@@ -64,15 +64,17 @@ export class SelectList implements ViewComponent {
       return { handled: true };
     }
     if (event.kind !== "press" && event.kind !== "click") return undefined;
-    const window = scrollWindow(this.model.selectedIndex, this.model.total, this.maxVisible, this.offset);
+    const visible = this.model.visible;
+    const window = scrollWindow(this.model.selectedIndex, visible.length, this.maxVisible, this.offset);
     this.offset = window.offset;
     // Row 0 is the first option: render emits no header, so the event row
-    // maps directly into the window (Pi select-list parity).
+    // maps directly into the window.
     const index = window.offset + event.y;
-    const option = this.model.visible[index];
+    if (index < window.offset || index >= window.offset + window.count) return undefined;
+    const option = visible[index];
     if (!option || option.disabled) return undefined;
     if (event.kind === "press") {
-      const at = this.model.visible.indexOf(option);
+      const at = visible.indexOf(option);
       if (at >= 0) this.moveTo(at);
       return { handled: true, focus: true };
     }

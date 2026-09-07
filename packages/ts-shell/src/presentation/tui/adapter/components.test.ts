@@ -35,6 +35,10 @@ describe("adapter layout components", () => {
     expect(lines.length).toBe(1);
     expect(stripAnsi(lines[0]!).length).toBeLessThanOrEqual(10);
   });
+
+  it("renders an empty horizontal stack without crashing", () => {
+    expect(new HStack([]).render(10)).toEqual([]);
+  });
 });
 
 describe("adapter markdown component", () => {
@@ -137,6 +141,28 @@ describe("adapter select list", () => {
       ctrl: false,
     });
     expect(list.inner.current()?.id).toBe("b");
+  });
+
+  it("ignores pointer hits on the overflow counter row", () => {
+    const m = new OptionModel();
+    m.setOptions(Array.from({ length: 10 }, (_, i) => ({ id: String(i), label: `item-${i}` })));
+    let picked = "";
+    const list = new SelectList(m, 3, { onSelect: (o) => (picked = o.id) });
+    const rows = list.render(30);
+    expect(rows.length).toBe(4);
+    list.handlePointer({
+      kind: "click",
+      x: 0,
+      y: 3,
+      screenX: 0,
+      screenY: 3,
+      width: 30,
+      height: 4,
+      shift: false,
+      alt: false,
+      ctrl: false,
+    });
+    expect(picked).toBe("");
   });
 });
 

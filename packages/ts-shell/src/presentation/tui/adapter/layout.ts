@@ -65,9 +65,6 @@ export interface StackOptions {
   readonly gap?: number;
 }
 
-export interface StackOptions {
-  readonly gap?: number;
-}
 
 function normalizeGap(gap: number | undefined): number {
   return gap === undefined || !Number.isFinite(gap) ? 0 : Math.max(0, Math.floor(gap));
@@ -110,7 +107,7 @@ export class HStack extends Container {
     const gaps = this.gap * (count - 1);
     const each = Math.max(1, Math.floor((safe - gaps) / count));
     const rendered = this.children.map((child) => child.render(each));
-    const height = Math.max(...rendered.map((rows) => rows.length));
+    const height = Math.max(0, ...rendered.map((rows) => rows.length));
     const lines: string[] = [];
     for (let row = 0; row < height; row++) {
       const cells: string[] = [];
