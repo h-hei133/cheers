@@ -50,7 +50,7 @@ async function collect(events: AsyncIterable<QueryEvent>): Promise<QueryEvent[]>
 }
 
 function event(delta: string): QueryEvent {
-  return { type: "message.delta", role: "assistant", delta };
+  return { type: "message.delta", role: "coder", delta };
 }
 
 async function* oneEvent(delta: string): AsyncIterable<QueryEvent> {

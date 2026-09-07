@@ -17,18 +17,26 @@ confidence: high
 
 ## 分类
 
-### A. 权限与安全（高）
+### A. 权限与安全（高）[已修复]
 
-**A1. ask 模式下写操作不询问**
-- 现象：ask 模式下让模型创建/删除文件，直接执行，无权限弹窗。
-- 影响：权限门失效，ask 与 allow-all 无差别。
-- 方向：查 `cli/approval/` 的升级触发条件与 `sandbox/escalationWorkflow.ts` 的接入点，确认写操作是否走了升级路径。
+**A1. ask 模式下写操作不询问 [已修复]**
+- 根因：
+  1. `runAutonomousReActLoop`（在 `cliRuntimeInvocation.ts` 中调用）未接收 `permissionScope` 与 `escalationPromptHandler`，循环中执行工具时直接调用 `tool.execute`，跳过了权限检查。
+  2. `SandboxPolicy.checkFilesystemPermission` 将工作区内修改直接判为 `allowed: true, requiresEscalation: false`，脱离了 `permissionScope`。
+- 修复：
+  1. 引入 `core/query/toolPolicy.ts`：实现 `evaluateToolPermissionScope` 与 `buildToolEscalationPrompt`，严格区分只读工具（`read`/`glob`/`grep`/`lsp`/`web_search`/`web_fetch`/只读 `bash`）与修改工具（`write`/`edit`/修改性 `bash`/`task`）。
+  2. 模式对齐顶尖实践：
+     - `ask` 模式：修改工具必须触发升级弹窗（allow-once/allow-always/deny）。
+     - `accept-edits` 模式：工作区内文件修改放行；修改性命令依然触发弹窗。
+     - `allow-all` 模式：直接放行。
+  3. 调用链打通：`cliSessionRuntimeFactory.ts` → `cliRuntimeInvocationBridge.ts` → `cliRuntimeInvocation.ts` → `agentLoop.ts` 完整传递 `permissionScope` 与 `escalationPromptHandler`。
 
-**A2. ask 工具无交互**
-- 现象：ask 工具一直保持推荐默认值，不与用户交互；plan 模式同样如此。
-- 影响：需要用户决策的场景被静默跳过。
-- 方向：查 ask 工具的交互回调是否接入 `QuestionBridge`/overlay，还是直接取了默认值。
-
+**A2. ask 工具无交互 [已修复]**
+- 根因：`core/tools/ask.ts` 的 `execute` 硬编码了静态 mock 文本（`Autonomous execution mode - selected default recommended choices...`），完全未与用户交互。
+- 修复：
+  1. 在 `ToolExecutionContext` 增加 `interactiveAsk` 回调接口。
+  2. 建立 `cli/interactive/interactiveAskBridge.ts`：通过 `ReadlineInterface`（在交互模式下由 `QuestionBridge` 承接）向用户顺序展示问题与选项，支持按数字编号或完整文本进行交互式选择。
+  3. 在 `ask.ts` 中优先使用 `context.interactiveAsk`，用户回答后格式化为真实决策返回给模型；非交互环境优雅回退到推荐默认值。
 ### B. 会话与上下文（高）
 
 **B1. 跨轮上下文丢失**

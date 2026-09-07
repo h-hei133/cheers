@@ -5,11 +5,13 @@ import type {
   EscalationPrompt,
   EscalationResponse,
 } from "../../sandbox/index.js";
+import type { PermissionScope } from "../approval/permissionScope.js";
+import type { AskQuestion } from "../../core/tools/ask.js";
 import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
+import type { CliOptions } from "../options/cliOptions.js";
 import {
   applyPatchDecisionFromApprovalMode,
 } from "../../entrypoints/cliApprovalModule.js";
-import type { CliOptions } from "../options/cliOptions.js";
 import {
   runCliRuntimeInvocation,
   type CliApplyPatchRuntimeRouteOptions,
@@ -58,6 +60,10 @@ export async function* streamCliRuntimePrompt(input: {
   ) => Promise<EscalationResponse>;
   readonly providerCredentialResolution: ProviderCredentialResolution;
   readonly agentMode: "plan" | "build";
+  readonly permissionScope?: PermissionScope;
+  readonly interactiveAsk?: (
+    questions: AskQuestion[],
+  ) => Promise<Record<string, string>>;
   readonly runtimeSeed?: QueryRuntimeStateSeed;
   readonly continuityState?: SessionContinuitySnapshot;
   readonly options: CliOptions;
@@ -72,6 +78,8 @@ export async function* streamCliRuntimePrompt(input: {
     escalationPromptHandler: input.escalationPromptHandler,
     providerCredentialResolution: input.providerCredentialResolution,
     agentMode: input.agentMode,
+    permissionScope: input.permissionScope,
+    interactiveAsk: input.interactiveAsk,
     runtimeSeed: input.runtimeSeed,
     continuityState: input.continuityState,
     applyPatchRuntimeRoute: buildCliApplyPatchRuntimeRouteOptions({

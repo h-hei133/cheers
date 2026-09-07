@@ -170,3 +170,4 @@
 ## [2026-09-07] review | TUI Phase 2 再次复核（16b47aa9）：补 commandMessage 工厂；复核记录去外部项目名改称参考实现；确认 toggle 缺省/Composer 空闲无行/输入守卫无问题；适配层 50 项、TUI 328 项、build:ts 通过
 ## [2026-09-07] review | TUI Phase 3 独立复核（61aba79a）：删 spike 空 scheduler 测试（Surface 不接受注入，改真断言启停恢复）、benchmark 标题 200 turns 正名为 50 turns；适配层 61 项、回归 530 项、tsc 通过；删除审计维持不删
 ## [2026-09-07] review | TUI Phase 3 再次复核（a5ef83af）：流式基准循环内加内容断言；overlay 冒烟加底 transcript 同帧断言；确认删除审计与上一轮修复；适配层 61 项、回归 530 项、build:ts 通过
+## [2026-09-07] fix | 修复真机验证 A 类缺陷：(1) A1 权限门贯通——创建 toolPolicy.ts 规范只读/修改工具分类与 permissionScope（ask/accept-edits/allow-all）拦截判定，打通 cliSessionRuntimeFactory → invocation → agentLoop 调用链，在 ask 模式下对 write/edit/命令执行真实触发 escalation 审批；(2) A2 ask 工具交互——在 ToolExecutionContext 引入 interactiveAsk，创建 interactiveAskBridge.ts 经由 ReadlineInterface/QuestionBridge 与用户顺序问答并映射数字/标签选项，ask.ts 优先使用用户真实回答，CI/非交互回退保持兼容；新增 13 项单元与集成测试，全套件 367 项通过，build:ts 通过

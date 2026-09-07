@@ -24,6 +24,10 @@ import { setupBuiltinVerificationHooks } from "../hooks/builtin/index.js";
 import { getActiveSessionGoal } from "../commands/goalCommandRuntime.js";
 import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
 import { isEventStream, readCompletionStream } from "./streamCompletion.js";
+import type { PermissionScope } from "../../cli/approval/permissionScope.js";
+import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
+import type { AskQuestion } from "../tools/ask.js";
+import { evaluateToolPermissionScope, buildToolEscalationPrompt } from "./toolPolicy.js";
 /** How much of a tool's output travels to its card in the transcript. */
 const CARD_OUTPUT_LIMIT = 8_000;
 
@@ -46,8 +50,14 @@ export interface ReActAgentLoopOptions {
   readonly maxOutputTokens?: number;
   readonly hookDispatcher?: HookDispatcher;
   readonly abortSignal?: AbortSignal;
+  readonly permissionScope?: PermissionScope;
+  readonly escalationPromptHandler?: (
+    prompt: EscalationPrompt,
+  ) => Promise<EscalationResponse>;
+  readonly interactiveAsk?: (
+    questions: AskQuestion[],
+  ) => Promise<Record<string, string>>;
 }
-
 interface OpenAIToolDefinition {
   readonly type: "function";
   readonly function: {
@@ -527,34 +537,66 @@ export async function* runAutonomousReActLoop(
         outputContent = `Blocked: Plan mode is active. Tool '${funcName}' ${funcName === "bash" ? "with non-read-only command " : ""}is not permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
         isSuccess = false;
       } else {
-        const preDecision = await hookDispatcher.dispatch({
-          eventName: "PreToolUse",
-          sessionId: options.sessionId,
-          workspaceRoot: options.workspaceRoot,
-          timestamp: new Date().toISOString(),
-          toolName: funcName,
-          toolCallId: toolCall.id,
-          args: funcArgs,
-        });
+        const permissionEval = evaluateToolPermissionScope(
+          funcName,
+          funcArgs,
+          options.permissionScope ?? "ask",
+          options.workspaceRoot,
+        );
+        let permissionDenied = false;
 
-        if (preDecision && preDecision.decision === "block") {
-          outputContent = `Blocked by Hook: ${preDecision.reason || "Action rejected by security/verification hook policy."}`;
-          isSuccess = false;
-        } else {
-          try {
-            const execResult = await tool.execute(funcArgs, {
-              workspaceRoot: options.workspaceRoot,
-              taskId: toolCall.id,
-              abortSignal: options.abortSignal,
-            });
-            outputContent =
-              execResult.output || execResult.content || "Success";
-            isSuccess = Boolean(execResult.success);
-          } catch (execErr) {
-            const errStr =
-              execErr instanceof Error ? execErr.message : String(execErr);
-            outputContent = `Tool execution error: ${errStr}`;
+        if (permissionEval.requiresEscalation) {
+          if (options.escalationPromptHandler) {
+            const prompt = buildToolEscalationPrompt(
+              funcName,
+              permissionEval.operation,
+              permissionEval.target,
+              permissionEval.reason,
+            );
+            const response = await options.escalationPromptHandler(prompt);
+            if (response.decision === "deny") {
+              outputContent = `Blocked: User denied permission for tool '${funcName}' (${permissionEval.operation}) on '${permissionEval.target}'.`;
+              isSuccess = false;
+              permissionDenied = true;
+            }
+          } else {
+            outputContent = `Blocked: Tool '${funcName}' requires permission (${permissionEval.reason}), but no interactive handler is available.`;
             isSuccess = false;
+            permissionDenied = true;
+          }
+        }
+
+        if (!permissionDenied) {
+          const preDecision = await hookDispatcher.dispatch({
+            eventName: "PreToolUse",
+            sessionId: options.sessionId,
+            workspaceRoot: options.workspaceRoot,
+            timestamp: new Date().toISOString(),
+            toolName: funcName,
+            toolCallId: toolCall.id,
+            args: funcArgs,
+          });
+
+          if (preDecision && preDecision.decision === "block") {
+            outputContent = `Blocked by Hook: ${preDecision.reason || "Action rejected by security/verification hook policy."}`;
+            isSuccess = false;
+          } else {
+            try {
+              const execResult = await tool.execute(funcArgs, {
+                workspaceRoot: options.workspaceRoot,
+                taskId: toolCall.id,
+                abortSignal: options.abortSignal,
+                interactiveAsk: options.interactiveAsk,
+              });
+              outputContent =
+                execResult.output || execResult.content || "Success";
+              isSuccess = Boolean(execResult.success);
+            } catch (execErr) {
+              const errStr =
+                execErr instanceof Error ? execErr.message : String(execErr);
+              outputContent = `Tool execution error: ${errStr}`;
+              isSuccess = false;
+            }
           }
         }
       }

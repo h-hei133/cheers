@@ -12,6 +12,8 @@ import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
 import { runAutonomousReActLoop } from "../core/query/agentLoop.js";
+import type { PermissionScope } from "../cli/approval/permissionScope.js";
+import type { AskQuestion } from "../core/tools/ask.js";
 import { decideQueryRoute } from "../core/query/routeDecision.js";
 import { validateLightweightProviderCredential } from "../core/query/lightweightRoute.js";
 export type CliApplyPatchRuntimeRouteOptions = ApplyPatchRuntimeRouteOptions;
@@ -29,6 +31,10 @@ export interface CliRuntimeInvocationInput {
   ) => Promise<EscalationResponse>;
   readonly providerCredentialResolution: ProviderCredentialResolution;
   readonly agentMode: "plan" | "build";
+  readonly permissionScope?: PermissionScope;
+  readonly interactiveAsk?: (
+    questions: AskQuestion[],
+  ) => Promise<Record<string, string>>;
   readonly runtimeSeed?: QueryRuntimeStateSeed;
   readonly continuityState?: SessionContinuitySnapshot;
   readonly applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions;
@@ -166,6 +172,9 @@ async function* streamCliRuntimeInvocation(
     prompt: request.prompt,
     workspaceRoot: request.workspaceRoot,
     agentMode: request.agentMode,
+    permissionScope: request.permissionScope,
+    escalationPromptHandler: request.escalationPromptHandler,
+    interactiveAsk: request.interactiveAsk,
     realProvider: {
       apiKey: request.providerCredentialResolution.credential?.apiKey,
       baseUrl:

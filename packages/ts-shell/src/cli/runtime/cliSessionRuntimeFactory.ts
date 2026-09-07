@@ -12,8 +12,8 @@ import {
 } from "../approval/cliApprovalEscalationBridge.js";
 import type { CliApprovalModeState } from "../approval/cliApprovalModeState.js";
 import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
+import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
-
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
@@ -54,6 +54,9 @@ export function createCliSessionRuntime(input: {
         signal,
         maxTurns: input.runtimeContext.runtimeConfig.maxTurns,
         escalationPromptHandler,
+        permissionScope: sessionRuntime.getPermissionScope(),
+        interactiveAsk: (questions) =>
+          promptInteractiveQuestions(input.getReadline(), questions),
         providerCredentialResolution: resolvedCredential,
         agentMode: sessionRuntime.getAgentMode(),
         runtimeSeed,

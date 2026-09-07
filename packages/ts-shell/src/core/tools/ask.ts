@@ -57,12 +57,33 @@ export function createAskToolDefinition(): ToolDefinition {
       required: ["questions"],
     },
     permissions: { check: () => [] },
-    async execute(args, _context) {
+    async execute(args, context) {
       const questions = args.questions as AskQuestion[] | undefined;
       if (!questions || !Array.isArray(questions) || questions.length === 0) {
         return deniedResult("Error: questions array is required for ask tool.");
       }
 
+      if (typeof context?.interactiveAsk === "function") {
+        try {
+          const userAnswers = await context.interactiveAsk(questions);
+          if (userAnswers && Object.keys(userAnswers).length > 0) {
+            const formatted = questions
+              .map((q) => {
+                const qId = q.id || "unspecified";
+                const chosen =
+                  userAnswers[qId] ??
+                  (q.recommended !== undefined && q.options?.[q.recommended]
+                    ? q.options[q.recommended].label
+                    : "No answer provided");
+                return `### Question [${qId}]: ${q.question}\n- **User Decision**: ${chosen}`;
+              })
+              .join("\n\n");
+            return approvedResult(`# User Decisions Received\n\n${formatted}`);
+          }
+        } catch {
+          // Fallback to autonomous mode if interactive ask fails or is cancelled
+        }
+      }
       const formattedQuestions: string[] = [];
       questions.forEach((q, idx) => {
         if (!q || typeof q !== "object") return;

@@ -10,6 +10,14 @@ export interface ToolExecutionContext {
   readonly sessionId?: string
   readonly correlationId?: string
   readonly abortSignal?: AbortSignal
+  readonly interactiveAsk?: (
+    questions: Array<{
+      id: string
+      question: string
+      options?: Array<{ label: string; description?: string }>
+      recommended?: number
+    }>,
+  ) => Promise<Record<string, string>>
 }
 
 export interface ToolExecutionResult {
