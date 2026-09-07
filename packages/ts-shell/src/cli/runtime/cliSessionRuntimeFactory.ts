@@ -47,6 +47,16 @@ export function createCliSessionRuntime(input: {
         getSessionId: () => input.runtimeContext.session.id,
         getPermissionScope: () => sessionRuntime.getPermissionScope(),
       });
+      const existingSession = input.sessionManager.getSession(
+        input.runtimeContext.session.id,
+      );
+      const allTurns = existingSession?.turns ?? [];
+      const historyMessages =
+        allTurns.length > 0 &&
+        allTurns[allTurns.length - 1]?.content === prompt
+          ? allTurns.slice(0, -1)
+          : allTurns;
+
       return streamCliRuntimePrompt({
         prompt,
         sessionId: input.runtimeContext.session.id,
@@ -57,6 +67,9 @@ export function createCliSessionRuntime(input: {
         permissionScope: sessionRuntime.getPermissionScope(),
         interactiveAsk: (questions) =>
           promptInteractiveQuestions(input.getReadline(), questions),
+        historyMessages,
+        onTurnMessage: (message) =>
+          input.sessionManager.addTurn(input.runtimeContext.session.id, message),
         providerCredentialResolution: resolvedCredential,
         agentMode: sessionRuntime.getAgentMode(),
         runtimeSeed,

@@ -37,18 +37,22 @@ confidence: high
   1. 在 `ToolExecutionContext` 增加 `interactiveAsk` 回调接口。
   2. 建立 `cli/interactive/interactiveAskBridge.ts`：通过 `ReadlineInterface`（在交互模式下由 `QuestionBridge` 承接）向用户顺序展示问题与选项，支持按数字编号或完整文本进行交互式选择。
   3. 在 `ask.ts` 中优先使用 `context.interactiveAsk`，用户回答后格式化为真实决策返回给模型；非交互环境优雅回退到推荐默认值。
-### B. 会话与上下文（高）
+### B. 会话与上下文（高）[已修复]
 
-**B1. 跨轮上下文丢失**
-- 现象：先让模型创建文件，再说“删除它”，模型不知道“它”指什么。
-- 影响：多轮对话断裂，agent 无记忆。
-- 方向：查 `session/` 的 turn 累积与 `core/query/` 的上下文组装，确认上一轮的工具结果与文件操作是否进入下一轮 prompt。
+**B1. 跨轮上下文丢失 [已修复]**
+- 根因：`agentLoop.ts` 启动时直接将 `messages` 初始化为 `[system, user(options.prompt)]`，完全丢弃了当前会话在此轮次之前的所有前序消息。
+- 修复：
+  1. 在 `ReActAgentLoopOptions` 增加 `historyMessages` 与 `onTurnMessage` 回调。
+  2. 在 `agentLoop.ts` 中实现 `convertSessionMessagesToChat`：将历史 `SessionMessage` 转换为规范聊天消息（包括 `user`、`assistant` 及其 `tool_calls`，以及 `tool` 返回值），插入在 system prompt 和当前 prompt 之间。
+  3. 在 `cliSessionRuntimeFactory.ts` 中提取当前会话历史消息（排除刚刚持久化的当前 user prompt）并完整传入，模型在后续轮次中完全保留对先前轮次操作文件与回答的记忆。
 
-**B2. resume 后工具记录丢失**
-- 现象：退出重进已有 session，只能看到用户输入与模型输出，之前执行过的命令/工具调用全看不到。
-- 影响：resume 的会话不完整，无法回溯工具历史。
-- 方向：查 `session/` 的持久化 schema 是否存了 tool 块，以及 `cli/interactive/history.ts` 的重建逻辑是否只重建了 user/assistant。
-
+**B2. resume 后工具记录丢失 [已修复]**
+- 根因：
+  1. 每一轮自主循环内的 `tool_calls` 与 `tool` 结果消息之前未持久化到 `session.turns`，会话结束时仅存了最终纯文本。
+  2. `history.ts` 中的 `restoreConversation` 显式过滤了非 `user`/`assistant` 文本，强制还原为纯文本块。
+- 修复：
+  1. 在 `agentLoop.ts` 中通过 `onTurnMessage` 实时将 `assistant` 携 `tool_calls` 与 `tool` 结果消息写入 `sessionManager.addTurn`，完整保留在会话 JSONL 中。
+  2. 导出 `toolCards.ts` 中的 `summarize` 函数，重构 `history.ts` 的 `restoreConversation`：遇到带 `tool_calls` 的助手消息时重建工具卡片 `Block` 并按参数推导摘要；遇到对应 `tool_call_id` 的 `tool` 消息时关联回填输出并划分 diff。resume 时完整复原历史工具卡片与命令框。
 ### C. 输入与渲染（中）
 
 **C1. 拖拽复制时按 Ctrl+C 导致光标残影**

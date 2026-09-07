@@ -14,6 +14,7 @@ import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliS
 import { runAutonomousReActLoop } from "../core/query/agentLoop.js";
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import type { AskQuestion } from "../core/tools/ask.js";
+import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { decideQueryRoute } from "../core/query/routeDecision.js";
 import { validateLightweightProviderCredential } from "../core/query/lightweightRoute.js";
 export type CliApplyPatchRuntimeRouteOptions = ApplyPatchRuntimeRouteOptions;
@@ -35,6 +36,8 @@ export interface CliRuntimeInvocationInput {
   readonly interactiveAsk?: (
     questions: AskQuestion[],
   ) => Promise<Record<string, string>>;
+  readonly historyMessages?: readonly SessionMessage[];
+  readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly runtimeSeed?: QueryRuntimeStateSeed;
   readonly continuityState?: SessionContinuitySnapshot;
   readonly applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions;
@@ -175,6 +178,8 @@ async function* streamCliRuntimeInvocation(
     permissionScope: request.permissionScope,
     escalationPromptHandler: request.escalationPromptHandler,
     interactiveAsk: request.interactiveAsk,
+    historyMessages: request.historyMessages,
+    onTurnMessage: request.onTurnMessage,
     realProvider: {
       apiKey: request.providerCredentialResolution.credential?.apiKey,
       baseUrl:

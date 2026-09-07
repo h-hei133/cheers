@@ -332,4 +332,127 @@ describe("agentLoop permission enforcement and interactive ask", () => {
       expect(toolResult.output).toContain("User Decision**: YAML");
     }
   });
+
+  it("preserves cross-turn conversation context and tool messages across turns", async () => {
+    const recordedMessages: SessionMessage[] = [];
+    const onTurnMessage = vi.fn((msg: SessionMessage) => recordedMessages.push(msg));
+    // Turn 1 mock responses
+    mockProviderResponses([
+      {
+        choices: [
+          {
+            message: {
+              content: "I will create the file.",
+              tool_calls: [
+                {
+                  id: "call_write_turn1",
+                  type: "function",
+                  function: {
+                    name: "write",
+                    arguments: JSON.stringify({
+                      path: path.join(tmpDir, "target.txt"),
+                      content: "important data",
+                    }),
+                  },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+      },
+      {
+        choices: [
+          {
+            message: { content: "Created target.txt with important data." },
+            finish_reason: "stop",
+          },
+        ],
+      },
+    ]);
+
+    // Run Turn 1
+    for await (const _ of runAutonomousReActLoop({
+      sessionId: "sess_multiturn",
+      prompt: "Create file target.txt",
+      workspaceRoot: tmpDir,
+      permissionScope: "allow-all",
+      onTurnMessage,
+      realProvider: { apiKey: "mock-key", baseUrl: "https://mock.api", model: "mock-model" },
+      maxTurns: 3,
+    })) {
+      // consume
+    }
+
+    // Verify onTurnMessage recorded assistant tool call and tool result
+    expect(recordedMessages.length).toBeGreaterThanOrEqual(2);
+    const toolCallMsg = recordedMessages.find((m) => m.role === "assistant" && m.tool_calls);
+    expect(toolCallMsg).toBeDefined();
+    expect(toolCallMsg.tool_calls[0].function.name).toBe("write");
+
+    const toolResultMsg = recordedMessages.find((m) => m.role === "tool");
+    expect(toolResultMsg).toBeDefined();
+    expect(toolResultMsg.tool_call_id).toBe("call_write_turn1");
+
+    // Prepare history for Turn 2
+    const historyForTurn2 = [
+      { role: "user", content: "Create file target.txt" } as const,
+      ...recordedMessages,
+      { role: "assistant", content: "Created target.txt with important data." } as const,
+    ];
+
+    interface ChatPayloadMessage {
+      readonly role?: string;
+      readonly content?: unknown;
+      readonly tool_calls?: readonly Array<{ readonly function?: { readonly name?: string } }>;
+    }
+    let turn2PayloadMessages: readonly ChatPayloadMessage[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (_url: string, init: { body: string }) => {
+        const parsed = JSON.parse(init.body) as { messages: readonly ChatPayloadMessage[] };
+        turn2PayloadMessages = parsed.messages;
+        return {
+          ok: true,
+          headers: new Headers({ "content-type": "application/json" }),
+          json: async () => ({
+            choices: [{ message: { content: "Deleted target.txt." }, finish_reason: "stop" }],
+          }),
+        };
+      }),
+    );
+
+    // Run Turn 2 with prompt "Delete it"
+    for await (const _ of runAutonomousReActLoop({
+      sessionId: "sess_multiturn",
+      prompt: "Delete it",
+      workspaceRoot: tmpDir,
+      permissionScope: "allow-all",
+      historyMessages: historyForTurn2,
+      realProvider: { apiKey: "mock-key", baseUrl: "https://mock.api", model: "mock-model" },
+      maxTurns: 3,
+    })) {
+      // consume
+    }
+
+    // Turn 2's payload sent to LLM must contain Turn 1's history!
+    expect(turn2PayloadMessages.length).toBeGreaterThan(2);
+    const hasTurn1Prompt = turn2PayloadMessages.some(
+      (m) => m.role === "user" && m.content === "Create file target.txt",
+    );
+    expect(hasTurn1Prompt).toBe(true);
+
+    const hasTurn1ToolCall = turn2PayloadMessages.some(
+      (m) =>
+        m.role === "assistant" &&
+        Array.isArray(m.tool_calls) &&
+        m.tool_calls[0]?.function?.name === "write",
+    );
+    expect(hasTurn1ToolCall).toBe(true);
+
+    const hasTurn2Prompt = turn2PayloadMessages.some(
+      (m) => m.role === "user" && typeof m.content === "string" && m.content.includes("Delete it"),
+    );
+    expect(hasTurn2Prompt).toBe(true);
+  });
 });

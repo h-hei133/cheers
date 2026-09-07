@@ -7,6 +7,7 @@ import type {
 } from "../../sandbox/index.js";
 import type { PermissionScope } from "../approval/permissionScope.js";
 import type { AskQuestion } from "../../core/tools/ask.js";
+import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import {
@@ -64,6 +65,8 @@ export async function* streamCliRuntimePrompt(input: {
   readonly interactiveAsk?: (
     questions: AskQuestion[],
   ) => Promise<Record<string, string>>;
+  readonly historyMessages?: readonly SessionMessage[];
+  readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly runtimeSeed?: QueryRuntimeStateSeed;
   readonly continuityState?: SessionContinuitySnapshot;
   readonly options: CliOptions;
@@ -80,8 +83,9 @@ export async function* streamCliRuntimePrompt(input: {
     agentMode: input.agentMode,
     permissionScope: input.permissionScope,
     interactiveAsk: input.interactiveAsk,
+    historyMessages: input.historyMessages,
+    onTurnMessage: input.onTurnMessage,
     runtimeSeed: input.runtimeSeed,
-    continuityState: input.continuityState,
     applyPatchRuntimeRoute: buildCliApplyPatchRuntimeRouteOptions({
       options: input.options,
     }),

@@ -79,7 +79,7 @@ export class ToolCards {
  * anything unrecognised falls back to the first short string argument rather than
  * to nothing, so a new tool is legible before this list learns about it.
  */
-function summarize(toolName: string, args?: Readonly<Record<string, unknown>>): string | undefined {
+export function summarize(toolName: string, args?: Readonly<Record<string, unknown>>): string | undefined {
   if (!args) return undefined;
   const primary = named(toolName, args) ?? firstString(args);
   return primary ? `${primary}${detailSuffix(toolName, args)}` : undefined;

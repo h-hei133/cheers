@@ -1,4 +1,5 @@
-import { textBlock, type Block } from "../../presentation/tui/transcript/blocks.js";
+import { splitFencedDiff, textBlock, type Block } from "../../presentation/tui/transcript/blocks.js";
+import { summarize } from "./toolCards.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import type { Session } from "../../session/schema/sessionRecord.js";
 import type { WorkspaceRootMode } from "../../session/SessionManager.js";
@@ -12,9 +13,8 @@ import type { Transcript } from "../../presentation/tui/transcript/container.js"
  * opened it: the whole point of returning is the conversation. The stored turns are
  * the record, so they are what the transcript is rebuilt from.
  *
- * Only prose is rebuilt. Tool cards and diffs are re-derivable from a live run but
- * not from the stored messages, and inventing them would put things on screen that
- * never happened in that shape.
+ * Reconstructs user prose, tool execution cards with their arguments and outputs,
+ * and assistant responses so resuming a session restores full context.
  */
 
 /** Rows are cheap; a very long history still needs a bound. */
@@ -28,16 +28,57 @@ export interface RestoredHistory {
 
 /** Blocks for a session's conversation, oldest first, bounded. */
 export function restoreConversation(turns: readonly SessionMessage[]): RestoredHistory {
-  const spoken = turns.filter(
-    (turn) => (turn.role === "user" || turn.role === "assistant") && turn.content.trim().length > 0,
-  );
-  const kept = spoken.slice(Math.max(0, spoken.length - MAX_RESTORED));
-  const blocks = kept.map((turn) =>
-    textBlock(turn.role === "user" ? "user" : "assistant", turn.content.trim()),
-  );
-  return { blocks, omitted: spoken.length - kept.length };
-}
+  const blocks: Block[] = [];
+  const toolBlocksById = new Map<string, Block>();
 
+  for (const turn of turns) {
+    if (turn.role === "user") {
+      const content = turn.content?.trim();
+      if (content) {
+        blocks.push(textBlock("user", content));
+      }
+    } else if (turn.role === "assistant") {
+      const content = turn.content?.trim();
+      if (content) {
+        blocks.push(textBlock("assistant", content));
+      }
+      if (turn.tool_calls && turn.tool_calls.length > 0) {
+        for (const call of turn.tool_calls) {
+          let args: Record<string, unknown> | undefined;
+          try {
+            args = JSON.parse(call.function.arguments);
+          } catch {
+            // Ignore malformed tool arguments
+          }
+          const detail = summarize(call.function.name, args);
+          const toolBlock: Block = {
+            kind: "tool",
+            title: call.function.name,
+            ...(detail ? { detail } : {}),
+            text: "",
+            status: "ok",
+            collapsed: true,
+            finalized: true,
+          };
+          toolBlocksById.set(call.id, toolBlock);
+          blocks.push(toolBlock);
+        }
+      }
+    } else if (turn.role === "tool") {
+      if (turn.tool_call_id) {
+        const toolBlock = toolBlocksById.get(turn.tool_call_id);
+        if (toolBlock) {
+          const body = (turn.content || "").replace(/\s+$/, "");
+          toolBlock.text = body;
+          splitFencedDiff(toolBlock);
+        }
+      }
+    }
+  }
+
+  const kept = blocks.slice(Math.max(0, blocks.length - MAX_RESTORED));
+  return { blocks: kept, omitted: blocks.length - kept.length };
+}
 export interface HistoryTarget {
   readonly transcript: Transcript;
   readonly editor?: {

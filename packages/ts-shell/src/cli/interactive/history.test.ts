@@ -51,6 +51,45 @@ describe("restoring a conversation", () => {
       expect(block.finalized).toBe(true);
     }
   });
+
+  it("restores tool cards with arguments and outputs from assistant tool_calls and tool results", () => {
+    const turns: SessionMessage[] = [
+      turn("user", "create files and run tests"),
+      {
+        role: "assistant",
+        content: "I will write the file.",
+        tool_calls: [
+          {
+            id: "call_write_1",
+            type: "function",
+            function: {
+              name: "write",
+              arguments: JSON.stringify({ path: "src/index.ts", content: "export const x = 1;" }),
+            },
+          },
+        ],
+      },
+      {
+        role: "tool",
+        tool_call_id: "call_write_1",
+        content: "Success",
+      },
+      turn("assistant", "File created."),
+    ];
+
+    const { blocks } = restoreConversation(turns);
+    expect(blocks).toHaveLength(4);
+    expect(blocks.map((b) => b.kind)).toEqual(["user", "assistant", "tool", "assistant"]);
+
+    const toolBlock = blocks[2]!;
+    expect(toolBlock.kind).toBe("tool");
+    expect(toolBlock.title).toBe("write");
+    expect(toolBlock.detail).toBe("src/index.ts");
+    expect(toolBlock.text).toBe("Success");
+    expect(toolBlock.status).toBe("ok");
+    expect(toolBlock.collapsed).toBe(true);
+    expect(toolBlock.finalized).toBe(true);
+  });
 });
 
 describe("points to go back to", () => {

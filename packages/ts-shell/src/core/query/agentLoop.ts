@@ -26,6 +26,7 @@ import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
 import { isEventStream, readCompletionStream } from "./streamCompletion.js";
 import type { PermissionScope } from "../../cli/approval/permissionScope.js";
 import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
+import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import type { AskQuestion } from "../tools/ask.js";
 import { evaluateToolPermissionScope, buildToolEscalationPrompt } from "./toolPolicy.js";
 /** How much of a tool's output travels to its card in the transcript. */
@@ -57,6 +58,8 @@ export interface ReActAgentLoopOptions {
   readonly interactiveAsk?: (
     questions: AskQuestion[],
   ) => Promise<Record<string, string>>;
+  readonly historyMessages?: readonly SessionMessage[];
+  readonly onTurnMessage?: (message: SessionMessage) => void;
 }
 interface OpenAIToolDefinition {
   readonly type: "function";
@@ -84,6 +87,61 @@ export function buildOpenAITools(
       },
     });
   }
+  return result;
+}
+
+export function convertSessionMessagesToChat(
+  history: readonly SessionMessage[] = [],
+): Array<{
+  role: "system" | "user" | "assistant" | "tool";
+  content?: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+}> {
+  const result: Array<{
+    role: "system" | "user" | "assistant" | "tool";
+    content?: string | null;
+    tool_calls?: Array<{
+      id: string;
+      type: "function";
+      function: { name: string; arguments: string };
+    }>;
+      tool_call_id?: string;
+  }> = [];
+
+  for (const msg of history) {
+    if (msg.role === "system") continue;
+    if (msg.role === "user") {
+      if (msg.content?.trim()) {
+        result.push({ role: "user", content: msg.content.trim() });
+      }
+    } else if (msg.role === "assistant") {
+      result.push({
+        role: "assistant",
+        content: msg.content || null,
+        ...(msg.tool_calls && msg.tool_calls.length > 0
+          ? {
+              tool_calls: msg.tool_calls.map((c) => ({
+                id: c.id,
+                type: "function",
+                function: { name: c.function.name, arguments: c.function.arguments },
+              })),
+            }
+          : {}),
+      });
+    } else if (msg.role === "tool") {
+      result.push({
+        role: "tool",
+        tool_call_id: msg.tool_call_id || "",
+        content: msg.content || "",
+      });
+    }
+  }
+
   return result;
 }
 
@@ -135,6 +193,7 @@ export async function* runAutonomousReActLoop(
         "4. For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests/git).",
       ].join("\n"),
     },
+    ...convertSessionMessagesToChat(options.historyMessages),
     // Layer 3 & 4: Invariant Environment Context + User Prompt
     {
       role: "user",
@@ -452,9 +511,18 @@ export async function* runAutonomousReActLoop(
             tool_calls: toolCalls,
           }
         : assistantMessage;
-
     messages.push(messageToPush);
-
+    if (toolCalls.length > 0) {
+      options.onTurnMessage?.({
+        role: "assistant",
+        content: textContent,
+        tool_calls: toolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: { name: tc.function.name, arguments: tc.function.arguments },
+        })),
+      });
+    }
     // If assistant returned clean text content, yield output. Streamed text has
     // already been delivered chunk by chunk; only a correction to it is re-sent,
     // which happens when DSML tool calls were stripped out of the prose.
@@ -619,6 +687,11 @@ export async function* runAutonomousReActLoop(
         role: "tool",
         tool_call_id: toolCall.id,
         content: outputContent.slice(0, 10000), // Protect token budget
+      });
+      options.onTurnMessage?.({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        content: outputContent.slice(0, 10000),
       });
 
       // Collect verification feedback without breaking tool message sequence
