@@ -53,6 +53,7 @@ export function toBlock(message: AgentMessage): Block {
         text: message.text,
         diff: message.diff,
         status: message.status ?? (message.finalized === true ? "ok" : "running"),
+        collapsed: message.collapsed,
         finalized: message.finalized ?? false,
       };
     case "command":
