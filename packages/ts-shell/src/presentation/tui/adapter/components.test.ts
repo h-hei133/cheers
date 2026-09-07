@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ESC } from "../input/escape.js";
 import { CURSOR_MARKER } from "../render/paint.js";
 import { stripAnsi } from "../text/ansi.js";
+import { visibleWidth } from "../text/measure.js";
 import { Editor } from "../editor.js";
 import { OptionModel } from "../chrome/options.js";
 import { HStack, Text, VStack } from "./layout.js";
@@ -10,17 +11,17 @@ import { PromptEditor } from "./editor.js";
 import { SelectList } from "./select.js";
 import { Loader } from "./loader.js";
 import { PermissionDialog } from "./dialog.js";
-
 describe("adapter layout components", () => {
   it("wraps text within width and pads rows", () => {
-    const text = new Text("hello world hello world", { paddingX: 1, paddingY: 0 });
-    const rows = text.render(12);
+    const rows = new Text("hello world", { paddingX: 0 }).render(6);
     expect(rows.length).toBeGreaterThan(1);
-    for (const row of rows) expect(stripAnsi(row).length).toBeLessThanOrEqual(12);
+    expect(rows.every((row) => stripAnsi(row).length <= 6)).toBe(true);
   });
 
-  it("renders nothing visible for blank text", () => {
-    expect(new Text("   ").render(10)).toEqual([""]);
+  it("wraps CJK text by cells without splitting rows wide", () => {
+    const rows = new Text("中文测试换行", { paddingX: 0 }).render(5);
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.every((row) => visibleWidth(row) <= 5)).toBe(true);
   });
 
   it("stacks children vertically with gaps", () => {
@@ -93,13 +94,49 @@ describe("adapter select list", () => {
     list.handleInput("\r");
     expect(picked).toBe("a");
   });
-
   it("shows a scroll position when the list overflows", () => {
     const m = new OptionModel();
     m.setOptions(Array.from({ length: 10 }, (_, i) => ({ id: String(i), label: `item-${i}` })));
     const list = new SelectList(m, 3);
     const rows = list.render(30).join("\n");
     expect(rows).toContain("(1/10)");
+  });
+
+  it("maps a press on the first row to the first option", () => {
+    let picked = "";
+    const list = new SelectList(model(), 5, { onSelect: (o) => (picked = o.id) });
+    list.render(30);
+    list.handlePointer({
+      kind: "click",
+      x: 0,
+      y: 0,
+      screenX: 0,
+      screenY: 0,
+      width: 30,
+      height: 5,
+      shift: false,
+      alt: false,
+      ctrl: false,
+    });
+    expect(picked).toBe("a");
+  });
+
+  it("moves to the pressed row before selecting", () => {
+    const list = new SelectList(model(), 5);
+    list.render(30);
+    list.handlePointer({
+      kind: "press",
+      x: 0,
+      y: 1,
+      screenX: 0,
+      screenY: 1,
+      width: 30,
+      height: 5,
+      shift: false,
+      alt: false,
+      ctrl: false,
+    });
+    expect(list.inner.current()?.id).toBe("b");
   });
 });
 

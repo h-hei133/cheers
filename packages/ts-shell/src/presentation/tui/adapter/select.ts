@@ -66,7 +66,9 @@ export class SelectList implements ViewComponent {
     if (event.kind !== "press" && event.kind !== "click") return undefined;
     const window = scrollWindow(this.model.selectedIndex, this.model.total, this.maxVisible, this.offset);
     this.offset = window.offset;
-    const index = window.offset + event.y - 1;
+    // Row 0 is the first option: render emits no header, so the event row
+    // maps directly into the window (Pi select-list parity).
+    const index = window.offset + event.y;
     const option = this.model.visible[index];
     if (!option || option.disabled) return undefined;
     if (event.kind === "press") {

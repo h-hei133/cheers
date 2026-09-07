@@ -1,5 +1,4 @@
-import { padToWidth } from "../text/layout.js";
-import { visibleWidth } from "../text/measure.js";
+import { padToWidth, wrapToWidth } from "../text/layout.js";
 import { Container, type ViewComponent } from "./contract.js";
 
 export interface TextOptions {
@@ -48,7 +47,7 @@ export class Text implements ViewComponent {
     const right = " ".repeat(paddingX);
     const lines: string[] = [];
     for (const raw of this.text.replace(/\t/g, "   ").split("\n")) {
-      const wrapped = wrapPlain(raw, contentWidth);
+      const wrapped = wrapToWidth(raw, contentWidth);
       for (const row of wrapped) {
         const padded = padToWidth(`${left}${row}${right}`, safe);
         lines.push(this.background ? this.background(padded) : padded);
@@ -62,23 +61,8 @@ export class Text implements ViewComponent {
   }
 }
 
-function wrapPlain(line: string, cells: number): string[] {
-  if (cells <= 0) return [""];
-  if (visibleWidth(line) <= cells) return [line];
-  const words = line.split(/(\s+)/);
-  const rows: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const candidate = current + word;
-    if (visibleWidth(candidate) <= cells || current === "") {
-      current = candidate;
-      continue;
-    }
-    rows.push(current);
-    current = word.trimStart();
-  }
-  rows.push(current);
-  return rows.length > 0 ? rows : [""];
+export interface StackOptions {
+  readonly gap?: number;
 }
 
 export interface StackOptions {
