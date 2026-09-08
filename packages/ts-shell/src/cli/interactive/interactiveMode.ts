@@ -29,6 +29,7 @@ import { readAmbientFacts } from "./ambientFacts.js";
 import { showConversation, startFreshSession, type HistoryTarget } from "./history.js";
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
 import { OverlayHost, type Picker } from "./overlay.js";
+import { approvalPicker } from "./picker/approval.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
@@ -137,7 +138,9 @@ export class InteractiveMode {
       now: () => Date.now(),
       ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
       newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
-      cancelArmed: () => this.isCancelArmed(),
+      cancelArmed: () =>
+        this.gesture.lastCancelAt !== undefined &&
+        Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,
       overlayFullScreen: () => this.pager.active || this.overlay.fullScreen,
       overlayRows: (width, height) =>
         this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
@@ -237,11 +240,7 @@ export class InteractiveMode {
     this.tui.stop();
   }
 
-  /** Whether a second cancel press within the double-press window would exit. */
-  private isCancelArmed(): boolean {
-    const last = this.gesture.lastCancelAt;
-    return last !== undefined && Date.now() - last < CANCEL_ARMED_MS;
-  }
+
 
   private onKey(event: Parameters<typeof routeKey>[0]): void {
     // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
@@ -309,40 +308,7 @@ export class InteractiveMode {
         this.overlay.close();
         resolve(decision);
       };
-
-      const target = prompt.context.target ? ` on '${prompt.context.target}'` : "";
-      const picker: Picker = {
-        title: `Permission: ${prompt.context.toolName} (${prompt.context.operation})`,
-        form: "panel",
-        empty: "No options",
-        load: async () => [
-          {
-            id: "allow-once",
-            label: "Allow once",
-            detail: `Allow ${prompt.context.toolName}${target} this time`,
-          },
-          {
-            id: "allow-always",
-            label: "Allow always for this command/session",
-            detail: "Remember this grant and do not ask again in this session",
-          },
-          {
-            id: "deny",
-            label: "Deny",
-            detail: "Block this action and return failure to model",
-          },
-        ],
-        apply: async (ids) => {
-          const choice = ids[0] as "deny" | "allow-once" | "allow-always" | undefined;
-          settle(choice ?? "deny");
-          return undefined;
-        },
-        previewEnd: () => {
-          settle("deny");
-        },
-      };
-
-      this.overlay.open(picker);
+      this.overlay.open(approvalPicker(prompt, settle));
     });
   }
   /**

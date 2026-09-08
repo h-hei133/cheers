@@ -174,3 +174,26 @@ confidence: high
  - `tsc -p tsconfig.build.json` 编译通过。
  - 仓库保持零外部项目名命中。
 - 审计日志与工作区保持完全干净。
+
+## 独立复核（56ac4c70 → 本次修补）
+
+复核范围：A3（交互式权限审批面板、OverlayHost 键位路由、交互循环贯通）及相关单元测试，对照 NormProof 架构规则、Promise 结算生命周期与终端选项面板交互规范逐项复验。
+
+查出并修复 3 项稳定性与架构隐患：
+
+1. **A3 悬挂 Promise 漏洞：未决退出导致 Agent 循环死锁（overlay.ts / approval.ts）**
+   - 根因：`OverlayHost.accept` 在 `ids.length === 0 && !picker.multiple`（例如选项未加载完成即按回车、或未选中项）时，直接置空 `picker` 并返回，既未调用 `apply`，也未调用 `picker.previewEnd?.()`。导致 `InteractiveMode.promptApproval` 的 Promise 无法得到 resolve/reject，在权限升级点永久挂起，阻塞整个 CLI agent 运行。
+   - 修复：在 `accept` 的空选项分支中补充 `picker.previewEnd?.()` 触发；在 `approval.ts` 中由 `previewEnd` 统一调用 `settle("deny")`，确保无论是按 Esc、回车未选中还是面板被覆盖关闭，Promise 均 100% 结算为安全默认值 `"deny"`，消除死锁隐患。
+
+2. **A3 选项过滤扰动与快捷键完善（overlay.ts / approval.ts）**
+   - 根因：原 `isApprovalPicker` 仅通过 `this.model.visible` 选项内容判断，在 `open()` 后的微任务加载期间判定为 false；且审批面板未阻止普通字母键的过滤逻辑（`appendFilter`），键入非快捷键字符会导致 3 个固定选项被过滤隐藏乃至列表变空。此外，快捷键缺失常见的 `d`（deny）以及 `j`/`k` 导航键。
+   - 修复：识别逻辑增加 `picker.title.startsWith("Permission:")` 实现同步即时判定；在审批面板激活期间屏蔽 `space`、`backspace` 和常规文本的过滤操作，保持 3 项标准选项始终常驻可见；增加 `d` 快捷拒绝，增加 `j`/`k` 移动游标；并在选项右侧增加直观操作提示注记（`1 / y`、`2 / a`、`3 / n / esc`）。
+
+3. **架构规范遵守：消除 interactiveMode.ts 函数超限（interactiveMode.ts / approval.ts）**
+   - 根因：`InteractiveMode` 在此前提交中累积了 21 个类方法，违反了 AGENTS.md 规范与 NormProof 规则 3（每个模块最多声明 20 个函数/方法）。
+   - 修复：遵循 `picker/` 现有领域拆分范式，将审批面板构造逻辑独立为 `cli/interactive/picker/approval.ts`；并将仅被一处调用的 2 行辅助方法 `isCancelArmed()` 内联。`InteractiveMode` 声明方法数精准恢复至 20，完全符合架构规范。
+
+验证：
+- 核心套件 61 个测试文件 634 项测试全部通过（新增 5 项审批面板与快捷键测试）。
+- `tsc -p tsconfig.build.json` 编译通过。
+- 仓库保持零外部项目名，工作区保持完全干净。

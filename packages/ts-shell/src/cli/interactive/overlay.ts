@@ -276,8 +276,9 @@ export class OverlayHost {
     }
     // Normal navigation mode
     const isApprovalPicker =
-      this.model.visible.some((o) => o.id === "allow-once") &&
-      this.model.visible.some((o) => o.id === "deny");
+      picker.title.startsWith("Permission:") ||
+      (this.model.visible.some((o) => o.id === "allow-once") &&
+        this.model.visible.some((o) => o.id === "deny"));
 
     if (isApprovalPicker) {
       if (event.keyId === "y" || event.text === "1") {
@@ -288,8 +289,18 @@ export class OverlayHost {
         this.acceptDirect(picker, apply, ["allow-always"]);
         return true;
       }
-      if (event.keyId === "n" || event.text === "3") {
+      if (event.keyId === "n" || event.keyId === "d" || event.text === "3") {
         this.acceptDirect(picker, apply, ["deny"]);
+        return true;
+      }
+      if (event.keyId === "j") {
+        this.model.step(1);
+        this.onChange();
+        return true;
+      }
+      if (event.keyId === "k") {
+        this.model.step(-1);
+        this.onChange();
         return true;
       }
     }
@@ -336,19 +347,26 @@ export class OverlayHost {
         if (picker.multiple) {
           this.model.toggle();
           picker.previewChange?.(this.model.chosenIds());
-        } else {
+        } else if (!isApprovalPicker) {
           this.model.appendFilter(" ");
         }
         break;
       case "backspace":
-        this.model.backspaceFilter();
+        if (!isApprovalPicker) {
+          this.model.backspaceFilter();
+        }
         break;
       case "enter":
         this.accept(picker, apply);
         return true;
       default:
-        if (event.text && !event.ctrl && !event.alt) this.model.appendFilter(event.text);
-        else return true;
+        if (event.text && !event.ctrl && !event.alt) {
+          if (!isApprovalPicker) {
+            this.model.appendFilter(event.text);
+          }
+        } else {
+          return true;
+        }
     }
     this.onChange();
     return true;
@@ -374,9 +392,12 @@ export class OverlayHost {
     this.subMode = "none";
     this.loading = false;
     this.onChange();
-    if (ids.length > 0 || picker.multiple) apply(picker, ids);
+    if (ids.length > 0 || picker.multiple) {
+      apply(picker, ids);
+    } else {
+      picker.previewEnd?.();
+    }
   }
-
   private acceptDirect(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, ids: readonly string[]): void {
     this.picker = undefined;
     this.subMode = "none";

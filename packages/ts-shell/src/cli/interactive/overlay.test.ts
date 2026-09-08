@@ -189,15 +189,17 @@ describe("approval picker key routing", () => {
     expect(overlay.active).toBe(false);
   });
 
-  it("selects deny directly on pressing n or 3", async () => {
-    const { overlay } = host();
-    const apply = vi.fn();
-    overlay.open(approvalPicker());
-    await Promise.resolve();
-    await Promise.resolve();
-    press(overlay, "n", apply);
-    expect(apply).toHaveBeenCalledWith(expect.anything(), ["deny"]);
-    expect(overlay.active).toBe(false);
+  it("selects deny directly on pressing n, d, or 3", async () => {
+    for (const key of ["n", "d", "3"]) {
+      const { overlay } = host();
+      const apply = vi.fn();
+      overlay.open(approvalPicker());
+      await Promise.resolve();
+      await Promise.resolve();
+      press(overlay, key, apply);
+      expect(apply).toHaveBeenCalledWith(expect.anything(), ["deny"]);
+      expect(overlay.active).toBe(false);
+    }
   });
 
   it("supports navigation with down arrow and enter", async () => {
@@ -210,5 +212,45 @@ describe("approval picker key routing", () => {
     press(overlay, "\r", apply);
     expect(apply).toHaveBeenCalledWith(expect.anything(), ["allow-always"]);
     expect(overlay.active).toBe(false);
+  });
+
+  it("supports j and k navigation without filtering options", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "j");
+    press(overlay, "j");
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["deny"]);
+  });
+
+  it("absorbs arbitrary typing without shrinking approval choices", async () => {
+    const { overlay } = host();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "x");
+    const rows = overlay.render(60, 20);
+    expect(rows.join("\n")).toContain("Allow once");
+    expect(rows.join("\n")).toContain("Deny");
+  });
+
+  it("calls previewEnd when an empty selection is accepted", () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    const previewEnd = vi.fn();
+    overlay.open({
+      title: "Empty picker",
+      form: "panel",
+      empty: "none",
+      load: async () => [],
+      apply: async () => undefined,
+      previewEnd,
+    });
+    press(overlay, "\r", apply);
+    expect(apply).not.toHaveBeenCalled();
+    expect(previewEnd).toHaveBeenCalledOnce();
   });
 });

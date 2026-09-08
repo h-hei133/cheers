@@ -6,6 +6,7 @@ import { connectionPicker } from "./connections.js";
 import { copyPicker } from "./copy.js";
 import { restorePicker } from "./restore.js";
 import { sourcePicker } from "./sources.js";
+import { approvalPicker } from "./approval.js";
 import { opensPicker } from "./registry.js";
 import { Transcript } from "../../../presentation/tui/transcript/container.js";
 import { textBlock } from "../../../presentation/tui/transcript/blocks.js";
@@ -213,5 +214,44 @@ describe("restore chooser", () => {
     await picker.load();
 
     expect((await picker.apply([]))?.note).toContain("nothing will be restored");
+  });
+});
+
+describe("approval chooser", () => {
+  const samplePrompt = {
+    id: "esc_sample",
+    title: "write execute",
+    message: "tool wants to write",
+    context: { toolName: "write", operation: "write", target: "src/index.ts" },
+    options: [],
+    defaultOption: "deny" as const,
+    recommendedAction: "deny",
+    severity: "medium" as const,
+  };
+
+  it("offers three standard choices with shortcut notes", async () => {
+    const onSettle = vi.fn();
+    const picker = approvalPicker(samplePrompt, onSettle);
+    const options = await picker.load();
+    expect(options).toHaveLength(3);
+    expect(options.map((o) => o.id)).toEqual(["allow-once", "allow-always", "deny"]);
+    expect(options[0]!.note).toBe("1 / y");
+    expect(options[1]!.note).toBe("2 / a");
+    expect(options[2]!.note).toBe("3 / n / esc");
+    expect(options[0]!.detail).toContain("src/index.ts");
+  });
+
+  it("applies selected choice to onSettle callback", async () => {
+    const onSettle = vi.fn();
+    const picker = approvalPicker(samplePrompt, onSettle);
+    await picker.apply(["allow-always"]);
+    expect(onSettle).toHaveBeenCalledWith("allow-always");
+  });
+
+  it("settles with deny when preview ends or cancelled", () => {
+    const onSettle = vi.fn();
+    const picker = approvalPicker(samplePrompt, onSettle);
+    picker.previewEnd?.();
+    expect(onSettle).toHaveBeenCalledWith("deny");
   });
 });
