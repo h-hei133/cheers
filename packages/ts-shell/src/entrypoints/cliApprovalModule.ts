@@ -89,7 +89,9 @@ export function createCliEscalationPromptHandler(
   ) => Promise<"deny" | "allow-once" | "allow-always">,
 ): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
   function emitApprovalAudit(record: ApprovalAuditRecord): void {
-    renderApprovalAuditSurface(renderer, record);
+    if (!promptInteractiveApproval) {
+      renderApprovalAuditSurface(renderer, record);
+    }
     persistApprovalAudit?.(record);
   }
 
@@ -480,24 +482,26 @@ export function createCliEscalationPromptHandler(
       });
     }
 
-    renderApprovalRequiredSurface(renderer, { prompt, includeRisk: true });
-    for (const line of trustPolicy.explain(
-      evaluation,
-      projectRoot,
-      getViewMode(),
-    )) {
-      renderer.renderLine(`- ${line}`);
+    if (!promptInteractiveApproval) {
+      renderApprovalRequiredSurface(renderer, { prompt, includeRisk: true });
+      for (const line of trustPolicy.explain(
+        evaluation,
+        projectRoot,
+        getViewMode(),
+      )) {
+        renderer.renderLine(`- ${line}`);
+      }
+      if (getViewMode() === "verbose") {
+        renderer.renderLine(`- Recommended default: ${prompt.recommendedAction}`);
+        renderer.renderLine("");
+        renderer.renderLine(prompt.message);
+      } else {
+        renderer.renderLine(
+          "- Tip: use /view developer to see policy and full escalation details.",
+        );
+      }
+      renderer.renderLine(formatApprovalPromptDecisionMenuLine());
     }
-    if (getViewMode() === "verbose") {
-      renderer.renderLine(`- Recommended default: ${prompt.recommendedAction}`);
-      renderer.renderLine("");
-      renderer.renderLine(prompt.message);
-    } else {
-      renderer.renderLine(
-        "- Tip: use /view developer to see policy and full escalation details.",
-      );
-    }
-    renderer.renderLine(formatApprovalPromptDecisionMenuLine());
 
     let decision: "deny" | "allow-once" | "allow-always";
     let decisionInputKey: "y" | "a" | "n" | "other" | undefined;
@@ -541,7 +545,7 @@ export function createCliEscalationPromptHandler(
             : "deny";
     }
 
-    if (decision === "allow-once") {
+    if (!promptInteractiveApproval && decision === "allow-once") {
       renderer.renderLine(formatAllowOnceAppliedLine());
     }
     const interactiveWiring = applyInteractiveApprovalDecisionWiring({
@@ -553,12 +557,14 @@ export function createCliEscalationPromptHandler(
     });
     if (decision === "allow-always" && interactiveWiring.persistedGrant) {
       const persisted = interactiveWiring.persistedGrant;
-      renderer.renderLine(
-        formatTrustPolicyUpdatedLine({
-          scopeLabel: persisted.scopeLabel,
-          projectRoot,
-        }),
-      );
+      if (!promptInteractiveApproval) {
+        renderer.renderLine(
+          formatTrustPolicyUpdatedLine({
+            scopeLabel: persisted.scopeLabel,
+            projectRoot,
+          }),
+        );
+      }
     }
     emitApprovalAudit({
       channel: isNonInteractive ? "non-interactive" : "interactive",
@@ -579,8 +585,10 @@ export function createCliEscalationPromptHandler(
         : {}),
     });
 
-    renderer.renderLine(formatApprovalDecisionLine(decision));
-    renderer.renderLine("");
+    if (!promptInteractiveApproval) {
+      renderer.renderLine(formatApprovalDecisionLine(decision));
+      renderer.renderLine("");
+    }
     return createApprovalResponse({
       promptId: prompt.id,
       decision,

@@ -238,7 +238,7 @@ export async function* runAutonomousReActLoop(
     {
       role: "user",
       content: [
-        environmentLine(options.workspaceRoot),
+        environmentLine(options.workspaceRoot, options.permissionScope),
         "",
         options.prompt,
       ].join("\n"),
@@ -652,6 +652,8 @@ export async function* runAutonomousReActLoop(
           options.workspaceRoot,
         );
         let permissionDenied = false;
+        let escalationApproved = false;
+        let escalationDecision: string | undefined;
 
         if (permissionEval.requiresEscalation) {
           if (options.escalationPromptHandler) {
@@ -666,6 +668,9 @@ export async function* runAutonomousReActLoop(
               outputContent = `Blocked: User denied permission for tool '${funcName}' (${permissionEval.operation}) on '${permissionEval.target}'.`;
               isSuccess = false;
               permissionDenied = true;
+            } else {
+              escalationApproved = true;
+              escalationDecision = response.decision;
             }
           } else {
             outputContent = `Blocked: Tool '${funcName}' requires permission (${permissionEval.reason}), but no interactive handler is available.`;
@@ -699,6 +704,9 @@ export async function* runAutonomousReActLoop(
               outputContent =
                 execResult.output || execResult.content || "Success";
               isSuccess = Boolean(execResult.success);
+              if (escalationApproved && isSuccess) {
+                outputContent = `[User approved ${permissionEval.operation} operation (${escalationDecision})]\n${outputContent}`;
+              }
             } catch (execErr) {
               const errStr =
                 execErr instanceof Error ? execErr.message : String(execErr);
@@ -804,12 +812,12 @@ export async function* runAutonomousReActLoop(
  * out of the way, and repeating a completed one would keep steering towards work
  * that is already done.
  */
-function environmentLine(workspaceRoot: string): string {
+function environmentLine(workspaceRoot: string, permissionScope?: PermissionScope): string {
   const goal = getActiveSessionGoal(workspaceRoot);
   const objective = goal?.phase === "active" ? ` | active_goal=${goal.objective}` : "";
-  return `[Environment Context: cwd=${workspaceRoot}${objective}]`;
+  const perm = permissionScope ? ` | permission_scope=${permissionScope}` : "";
+  return `[Environment Context: cwd=${workspaceRoot}${perm}${objective}]`;
 }
-
 /**
  * Why a turn produced no answer, in terms the user can act on.
  *

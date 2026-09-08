@@ -219,3 +219,22 @@ confidence: high
 验证：
  - `tsc -p tsconfig.build.json` 编译通过。
  - 仓库保持零外部项目名，工作区保持完全干净。
+
+## 交互审批污染消除与人工授权感知（本次修补）
+
+针对真机测试反馈的“同意请求后页面输出大段控制台纯文本”与“模型未感知人工授权产生只读认知偏差”两个问题进行针对性修复：
+
+1. **A4 消除交互式审批终端文本污染（cliApprovalModule.ts）**
+   - 根因：当 `promptInteractiveApproval` 激活（TUI 内联选项面板弹出）时，底层 `createCliEscalationPromptHandler` 未加 `if (!promptInteractiveApproval)` 门控，依然无条件向 `renderer`（标准输出 stdout）打印 `renderApprovalRequiredSurface`、`trustPolicy.explain`、`formatApprovalPromptDecisionMenuLine`、`formatAllowOnceAppliedLine`、`formatTrustPolicyUpdatedLine` 以及全量 `approval-audit:*` 调试文本。由于 TUI 运行在备用屏且接管了屏幕控制，向 stdout 写入的大段控制台纯文本直接覆盖、冲刷了 TUI 页面，造成严重的终端排版错乱与信息污染。
+   - 修复：对所有向 `renderer` 打印审批提示、策略说明、审计表面（`renderApprovalAuditSurface`）及决策状态的调用严格增加 `if (!promptInteractiveApproval)` 门控；当处于 TUI 交互式审批模式时完全静默，审计记录仅通过 `persistApprovalAudit` 写入会话底层日志，彻底保持终端界面干净无杂质。
+
+2. **A5 模型缺乏用户人工授权感知导致结论偏差（agentLoop.ts）**
+   - 根因：当修改性工具触发权限升级并被用户点击“允许一次”/“始终允许”后，工具执行返回的原始文本（如 `Successfully wrote ...`）未包含任何审批凭据与授权标记；且系统提示词环境行未注明当前生效的 `permission_scope`。模型作为纯客户端无法感知外部 Harness 发生了人工弹窗与审批介入，只观测到工具直接成功返回，从而在被提问“当前环境是否只读/是否有权限门”时产生“工具直接执行成功，环境并非只读”的误判。
+   - 修复：
+     1. 在 `environmentLine` 中加入 `permission_scope` 上下文（如 `permission_scope=ask`），让模型知晓当前处于权限询问门控策略下。
+     2. 当工具执行经历过人工审批并成功时，在工具返回结果首行注入 `[User approved <operation> operation (<decision>)]` 授权标记（参考业界智能体标准与人类在环交互协议），使模型精准感知该次执行是经由用户显式授权放行的，消除状态认知偏差。
+
+验证：
+ - 全量受测模块 83 个测试套件 896 项测试全部通过（新增审批结果授权标记断言及 clean renderer 断言）。
+ - `tsc -p tsconfig.build.json` 编译通过。
+ - 仓库保持零外部项目名，工作区保持完全干净。

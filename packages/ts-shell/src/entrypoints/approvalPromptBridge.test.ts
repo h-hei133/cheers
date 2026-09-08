@@ -279,7 +279,7 @@ describe("createCliEscalationPromptHandler with promptInteractiveApproval", () =
     const result = await handler(prompt);
     expect(interactiveApproval).toHaveBeenCalledOnce();
     expect(result.decision).toBe("allow-once");
-    expect(renderer.lines).toContain("- Tool: shell");
+    expect(renderer.lines).toEqual([]);
   });
 
   it("uses promptInteractiveApproval to resolve allow-always and records policy grant", async () => {
@@ -304,6 +304,7 @@ describe("createCliEscalationPromptHandler with promptInteractiveApproval", () =
     expect(interactiveApproval).toHaveBeenCalledOnce();
     expect(result.decision).toBe("allow-always");
     expect(trustPolicy.evaluate(prompt, "/project").matchedGrant).toBeDefined();
+    expect(renderer.lines).toEqual([]);
   });
 
   it("uses promptInteractiveApproval to resolve deny decision", async () => {
@@ -326,6 +327,7 @@ describe("createCliEscalationPromptHandler with promptInteractiveApproval", () =
     const result = await handler(prompt);
     expect(interactiveApproval).toHaveBeenCalledOnce();
     expect(result.decision).toBe("deny");
+    expect(renderer.lines).toEqual([]);
   });
 
   it("safely falls back to deny when promptInteractiveApproval rejects", async () => {

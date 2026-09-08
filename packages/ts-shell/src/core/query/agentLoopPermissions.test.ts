@@ -504,4 +504,63 @@ describe("agentLoop permission enforcement and interactive ask", () => {
     expect(typeof chat[0]!.content).toBe("string");
     expect(chat[0]!.content).toBe("");
   });
+
+  it("annotates tool result with user approval information when escalation is approved", async () => {
+    const targetFile = path.join(tmpDir, "annotated.txt");
+    mockProviderResponses([
+      {
+        choices: [
+          {
+            message: {
+              content: null,
+              tool_calls: [
+                {
+                  id: "call_write_annotated",
+                  type: "function",
+                  function: {
+                    name: "write",
+                    arguments: JSON.stringify({ path: targetFile, content: "hello" }),
+                  },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+      },
+      {
+        choices: [
+          {
+            message: {
+              content: "I have written the file after your approval.",
+              tool_calls: undefined,
+            },
+            finish_reason: "stop",
+          },
+        ],
+      },
+    ]);
+
+    const turnMessages: Array<{ role: string; content?: string | null }> = [];
+    for await (const _ of runAutonomousReActLoop({
+      sessionId: "sess_annotate_test",
+      prompt: "write annotated",
+      workspaceRoot: tmpDir,
+      permissionScope: "ask",
+      escalationPromptHandler: async (p) => ({
+        promptId: p.id,
+        decision: "allow-once",
+        respondedAt: Date.now(),
+      }),
+      onTurnMessage: (m) => turnMessages.push(m),
+      realProvider: { apiKey: "mock", baseUrl: "https://mock.api", model: "m" },
+      maxTurns: 3,
+    })) {
+      // consume
+    }
+
+    const toolMsg = turnMessages.find((m) => m.role === "tool");
+    expect(toolMsg).toBeDefined();
+    expect(toolMsg?.content).toContain("[User approved write operation (allow-once)]");
+  });
 });
