@@ -281,15 +281,15 @@ export class OverlayHost {
         this.model.visible.some((o) => o.id === "deny"));
 
     if (isApprovalPicker) {
-      if (event.keyId === "y" || event.text === "1") {
+      if (event.keyId === "y" || event.keyId === "1" || event.text === "1") {
         this.acceptDirect(picker, apply, ["allow-once"]);
         return true;
       }
-      if (event.keyId === "a" || event.text === "2") {
+      if (event.keyId === "a" || event.keyId === "2" || event.text === "2") {
         this.acceptDirect(picker, apply, ["allow-always"]);
         return true;
       }
-      if (event.keyId === "n" || event.keyId === "d" || event.text === "3") {
+      if (event.keyId === "n" || event.keyId === "d" || event.keyId === "3" || event.text === "3") {
         this.acceptDirect(picker, apply, ["deny"]);
         return true;
       }
@@ -335,6 +335,7 @@ export class OverlayHost {
         break;
       }
       case "escape":
+      case "ctrl+c":
         this.close();
         return true;
       case "up":
@@ -360,6 +361,10 @@ export class OverlayHost {
         this.accept(picker, apply);
         return true;
       default:
+        if (event.ctrl && (event.keyId === "c" || event.keyId === "ctrl+c")) {
+          this.close();
+          return true;
+        }
         if (event.text && !event.ctrl && !event.alt) {
           if (!isApprovalPicker) {
             this.model.appendFilter(event.text);

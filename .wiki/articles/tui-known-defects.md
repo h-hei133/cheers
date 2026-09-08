@@ -196,4 +196,26 @@ confidence: high
 验证：
 - 核心套件 61 个测试文件 634 项测试全部通过（新增 5 项审批面板与快捷键测试）。
 - `tsc -p tsconfig.build.json` 编译通过。
-- 仓库保持零外部项目名，工作区保持完全干净。
+
+## 再次复核（03d58187 → 本次修补）
+
+复核范围：上一轮提交后的交互式审批面板全链路（`approval.ts`、`overlay.ts`、`interactiveMode.ts`、`cliApprovalModule.ts` 及相关测试），对照终端交互直觉、小键盘输入模式、未捕获异常恢复以及架构规则逐项复验。
+
+查出并修复 4 项隐患：
+
+1. **A3 overlay Ctrl+C 吞键与无响应（overlay.ts）**
+   - 根因：`OverlayHost.handleKey` 在 `switch` 中仅捕获了 `escape`，而 `Ctrl+C`（`keyId: "ctrl+c"`，`ctrl: true`）落入 `default` 分支后由于 `event.ctrl === true` 命中 `else { return true; }` 被静默吞掉。导致用户在审批面板或模态框中习惯性按 Ctrl+C 无法退出或拒绝，被迫寻找 Esc 或数字键。
+   - 修复：在 `switch (event.keyId)` 中紧随 `case "escape":` 增加 `case "ctrl+c": this.close(); return true;`，并在 `default` 中增加防御分支。按 Ctrl+C 立即调用 `this.close()`，在审批面板中触发 `previewEnd` 自动将决策结算为 `"deny"`，实现即时安全退出。
+
+2. **A3 数字小键盘及无 text 事件 keyId 映射兼容（overlay.ts）**
+   - 修复：在 `isApprovalPicker` 快捷键判断中，将原本仅依赖 `event.text === "1" | "2" | "3"` 拓展为兼顾 `event.keyId === "1" | "2" | "3"`，使得在无 text 携带的小键盘按键或合成 key 事件下依然能直接选定对应决策。
+
+3. **A3 交互式审批异常兜底（cliApprovalModule.ts）**
+   - 修复：对 `promptInteractiveApproval` 增加 try/catch 保护，若交互式提示发生异常或 Promise 意外拒绝，安全兜底判定为 `"deny"`，避免整个 CLI 调用链发生未决死锁或未捕获拒绝。
+
+4. **A3 approvalPicker 上下文安全与提示对齐（approval.ts）**
+   - 修复：对 `prompt.context` 的属性访问增加可选链与缺省回退（`toolName`、`operation`、`target`），防止畸形或最小化 prompt 对象触发属性读取报错；并将拒绝项注记更新为 `"3 / n / d / esc"`，与实际支持的按键完全对齐。
+
+验证：
+ - `tsc -p tsconfig.build.json` 编译通过。
+ - 仓库保持零外部项目名，工作区保持完全干净。

@@ -253,4 +253,32 @@ describe("approval picker key routing", () => {
     expect(apply).not.toHaveBeenCalled();
     expect(previewEnd).toHaveBeenCalledOnce();
   });
+
+  it("dismisses approval picker on ctrl+c and triggers previewEnd", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    const previewEnd = vi.fn();
+    overlay.open({ ...approvalPicker(), previewEnd });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(overlay.active).toBe(true);
+    press(overlay, "\x03", apply);
+    expect(overlay.active).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+    expect(previewEnd).toHaveBeenCalledOnce();
+  });
+
+  it("selects directly on numeric keyId without text", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    overlay.handleKey(
+      { keyId: "2", raw: "2", ctrl: false, alt: false, shift: false, text: "" },
+      apply,
+    );
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["allow-always"]);
+    expect(overlay.active).toBe(false);
+  });
 });

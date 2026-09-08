@@ -237,7 +237,7 @@ describe("approval chooser", () => {
     expect(options.map((o) => o.id)).toEqual(["allow-once", "allow-always", "deny"]);
     expect(options[0]!.note).toBe("1 / y");
     expect(options[1]!.note).toBe("2 / a");
-    expect(options[2]!.note).toBe("3 / n / esc");
+    expect(options[2]!.note).toBe("3 / n / d / esc");
     expect(options[0]!.detail).toContain("src/index.ts");
   });
 
@@ -253,5 +253,23 @@ describe("approval chooser", () => {
     const picker = approvalPicker(samplePrompt, onSettle);
     picker.previewEnd?.();
     expect(onSettle).toHaveBeenCalledWith("deny");
+  });
+
+  it("gracefully handles prompts with missing context", async () => {
+    const onSettle = vi.fn();
+    const minimalPrompt = {
+      id: "esc_min",
+      title: "minimal",
+      message: "minimal prompt",
+      options: [],
+      defaultOption: "deny" as const,
+      recommendedAction: "deny",
+      severity: "low" as const,
+    } as unknown as EscalationPrompt;
+    const picker = approvalPicker(minimalPrompt, onSettle);
+    expect(picker.title).toBe("Permission: tool");
+    const options = await picker.load();
+    expect(options).toHaveLength(3);
+    expect(options[0]!.detail).toContain("Allow tool");
   });
 });

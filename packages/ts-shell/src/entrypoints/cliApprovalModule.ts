@@ -511,7 +511,11 @@ export function createCliEscalationPromptHandler(
         );
       }
     } else if (promptInteractiveApproval) {
-      decision = await promptInteractiveApproval(prompt);
+      try {
+        decision = await promptInteractiveApproval(prompt);
+      } catch {
+        decision = "deny";
+      }
       decisionInputKey =
         decision === "allow-once"
           ? "y"

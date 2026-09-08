@@ -327,4 +327,26 @@ describe("createCliEscalationPromptHandler with promptInteractiveApproval", () =
     expect(interactiveApproval).toHaveBeenCalledOnce();
     expect(result.decision).toBe("deny");
   });
+
+  it("safely falls back to deny when promptInteractiveApproval rejects", async () => {
+    const renderer = createRenderer();
+    const trustPolicy = new ApprovalTrustPolicy();
+    const interactiveApproval = vi.fn().mockRejectedValue(new Error("UI crashed"));
+    const handler = createCliEscalationPromptHandler(
+      renderer,
+      null,
+      () => "compact",
+      trustPolicy,
+      () => "/project",
+      undefined,
+      undefined,
+      undefined,
+      () => "ask",
+      interactiveApproval,
+    );
+    const prompt = uniquePrompt("crash");
+    const result = await handler(prompt);
+    expect(interactiveApproval).toHaveBeenCalledOnce();
+    expect(result.decision).toBe("deny");
+  });
 });
