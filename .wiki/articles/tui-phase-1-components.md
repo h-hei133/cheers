@@ -2,8 +2,7 @@
 title: "TUI Phase 1：底层组件适配"
 category: article
 sources: [local-tui-state, reference-comparison]
-created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-09-08
 tags: [tui, adapter, components, phase-1]
 summary: "在 Phase 0 适配边界上补齐底层组件：文本/布局、Markdown、编辑器、选择列表、加载器与权限弹窗，全部是对现有自有模块的薄封装。"
 confidence: high
@@ -65,3 +64,9 @@ confidence: high
 确认无问题：dialog 指针行 `event.y - 2` 与 `render` 的标题+详情两行一致；`PromptEditor.handleInput` 单字符限制与上一轮结论一致（Surface 给 raw bytes，需接 `stdinBuffer` 解码，仍留给输入链路任务）；loader `Date.now()` 为 spinner 时间驱动；`Markdown` 缓存键未含 `streaming` 但 `setStreaming` 已清缓存，等价正确。
 
 验证：适配层 37 项通过；TUI 全套件 22 文件 315 项通过；`npm run build:ts` 通过。
+
+## 后续演进与对齐要点（2026-09-08 增补）
+
+随着真实生产终端中完成 A/B/C/D 类缺陷的深度修复，底层组件在向生产主路径收敛时需同步贯彻以下标准：
+1. **Dialog / 审批交互**：底层 `dialog.ts` 已对齐 `allow-once` / `allow-always` / `deny` 三决策，生产链路已进一步通过 `picker/approval.ts` 实现了内联选项面板，支持 `1/2/3/y/a/n/d/esc` 快捷键与安全兜底。
+2. **Editor 视口滚动与中文 IME**：生产底座 `Editor` 已实现 `scrollOffset` 与 `maxRows` 视口滚动控制，`PromptEditor` 在接入生产时需无缝透传该视口限制。

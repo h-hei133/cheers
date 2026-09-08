@@ -2,8 +2,7 @@
 title: "TUI Phase 2：产品组件迁移"
 category: article
 sources: [local-tui-state, reference-comparison]
-created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-09-08
 tags: [tui, adapter, product-components, phase-2]
 summary: "在 Phase 1 底层组件上补齐产品组件：消息、工具卡片、状态栏与输入框，全部是对现有自有渲染器的 ViewComponent 封装。"
 confidence: high
@@ -66,3 +65,9 @@ confidence: high
 确认无问题：`Message.toggleCollapsed` 按 kind 取缺省与 `toBlock` 对齐（thinking 缺省折叠、tool 缺省展开）；`ToolCard` 的 `?? false` 一致；`Composer` 空闲无提示行是自有 `renderHints` 的"零或一行"语义（空闲且无 ambient 即无行），透传正确，不在此层加行；`StatusBar` 的 `renderBand` 单 string 无拆字符；输入守卫 `>= " "` + DEL 排除正确（测试字节经 `cat -v` 确认为 DEL 与 ESC 转义）。
 
 验证：适配层 50 项通过；TUI 全套件通过；`npm run build:ts` 通过。
+
+## 后续演进与对齐要点（2026-09-08 增补）
+
+结合真机实测与生产交互深水区攻坚成果，产品组件在后续演进中需对齐以下新特性：
+1. **Toast 复制提示支持**：生产链路已在 `renderHints` 中引入 `toast` 支持，在用户复制文本时就地渲染强调色提示（`Copied N characters...`），避免生成垃圾对话消息。产品级 `Composer` 在包装提示行时需一并透传该状态。
+2. **工具卡片与 Diff 展开语义**：工具卡片（`ToolCard`）在失败状态（`Blocked:`、`Error:` 或取消中断）时已默认展开并置为 `failed`，在 resume 会话时需保持该语义与完整输出呈现。

@@ -2,8 +2,7 @@
 title: "TUI 框架选型与渐进式迁移方案"
 category: article
 sources: [github-opentui, github-ink, github-pi-tui, local-tui-state]
-created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-09-08
 tags: [tui, opentui, ink, pi, architecture, migration]
 summary: "基于当前 ts-shell TUI 基础与 GitHub 上游资料，选择 Pi TUI 作为近期集成基线，保留 OpenTUI 作为后续性能路线，明确 Ink 不作为核心渲染替换。"
 confidence: high
@@ -106,9 +105,11 @@ confidence: high
 - 不因 OpenTUI 的性能优势提前引入 Zig；除非 Pi TUI 在真实 transcript 压力测试下成为瓶颈，且团队愿意承担 Bun/native 发布矩阵。
 - 不为了使用 Ink 而把现有控制面 React 化；若未来需要 React 组件生态，应在独立 demo/实验包中验证，不改变生产默认路径。
 
-## 后续决策点
+## 后续决策点与当前演进状态
 
-1. 先做 Pi TUI adapter spike，限定为一个可运行的 chat transcript + editor + permission overlay。
-2. 用真实长 transcript、流式工具输出和大粘贴建立基准；基准未通过前不进行全量迁移。
-3. 只有在 adapter 层证明接口稳定后才修改依赖和删除旧 renderer。
-4. 若 benchmark 显示 JS 差分渲染不足，再单独评估 OpenTUI；评估必须包含 Node 20 兼容性、Bun/Zig 构建、Linux/Windows/macOS native 包与 CI 发布成本。
+1. **Adapter Spike 与基线验证（已达成）**：限定 chat transcript + editor + permission overlay 的可运行集成 spike 通过；在 `adapter/benchmark.test.ts` 建立 50 turns（200 blocks）长会话基准（渲染 < 1s，缓存重渲染 < 200ms，20 次流式追加 < 500ms），验证 JS 差分渲染完全胜任。
+2. **删除审计与平稳策略（已确立）**：经过 Phase 3 删除审计，确认当前自有底座 `render/engine.ts` 与 `tui/editor.ts` 为生产主链路与适配层所共有，且无重复冗余实现，确立“不机械删除核心底座，杜绝破坏生产与适配层”的原则。
+3. **真机缺陷闭环与能力沉淀（2026-09-07 ~ 2026-09-08）**：
+   - 在真实高负荷交互实测中，相继定位并彻底修复了 13 项关键缺陷，包括 A 类（权限门控/交互审批面板/终端防冲刷/授权认知）、B 类（跨轮上下文贯通/resume 工具卡片重构/中断 API 400 防死）、C 类（选区内容空间锚定与驻留/Toast 复制反馈/规范级实体滑块与拖拽状态机/行末死区消除）、D 类（搜索框布局重塑）。
+   - 全套件测试达到 567 项全部通过，构建 0 报错。
+4. **后续演进路线调整**：当前架构收敛路线明确为：先将真机打磨成熟的核心交互能力（内容空间选区锚定、Toast 反馈、规范级滚轮条与拖拽状态机、交互式权限面板）同步对齐至适配层，再通过无缝切流验证稳定后，稳步归档历史专用胶水，彻底杜绝破坏性删除或功能倒退。
