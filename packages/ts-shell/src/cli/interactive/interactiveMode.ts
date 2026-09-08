@@ -2,6 +2,7 @@ import type { Interface as ReadlineInterface } from "node:readline";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
+import type { EscalationPrompt } from "../../sandbox/index.js";
 import { handleShellClose } from "../../core/shell/signalHandlers.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
@@ -68,6 +69,9 @@ export interface InteractiveModeOptions {
   readonly fallbackSessionId?: string;
   readonly initialMcpGateway: CliMcpGateway;
   readonly setReadline?: (readline: ReadlineInterface | null) => void;
+  readonly setInteractiveApprovalPrompt?: (
+    handler: ((prompt: EscalationPrompt) => Promise<"deny" | "allow-once" | "allow-always">) | undefined,
+  ) => void;
   readonly setActiveNonInteractiveApprovalMode?: (mode: ApprovalModeObject | undefined) => void;
   readonly exit?: (code?: number) => never;
   /** Output device; defaults to the process terminal. */
@@ -157,6 +161,7 @@ export class InteractiveMode {
     });
     this.readline = this.questions.asReadline(() => this.stop());
     this.options.setReadline?.(this.readline);
+    this.options.setInteractiveApprovalPrompt?.((prompt) => this.promptApproval(prompt));
     this.tui.setFrameProvider(this.surface);
     this.surface.editor.placeholder = DEFAULT_PLACEHOLDER;
     // A chip token deletes whole: the caret sits at its end, and one Backspace
@@ -295,6 +300,51 @@ export class InteractiveMode {
     this.tui.requestRender();
   }
 
+  private promptApproval(prompt: EscalationPrompt): Promise<"deny" | "allow-once" | "allow-always"> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (decision: "deny" | "allow-once" | "allow-always") => {
+        if (settled) return;
+        settled = true;
+        this.overlay.close();
+        resolve(decision);
+      };
+
+      const target = prompt.context.target ? ` on '${prompt.context.target}'` : "";
+      const picker: Picker = {
+        title: `Permission: ${prompt.context.toolName} (${prompt.context.operation})`,
+        form: "panel",
+        empty: "No options",
+        load: async () => [
+          {
+            id: "allow-once",
+            label: "Allow once",
+            detail: `Allow ${prompt.context.toolName}${target} this time`,
+          },
+          {
+            id: "allow-always",
+            label: "Allow always for this command/session",
+            detail: "Remember this grant and do not ask again in this session",
+          },
+          {
+            id: "deny",
+            label: "Deny",
+            detail: "Block this action and return failure to model",
+          },
+        ],
+        apply: async (ids) => {
+          const choice = ids[0] as "deny" | "allow-once" | "allow-always" | undefined;
+          settle(choice ?? "deny");
+          return undefined;
+        },
+        previewEnd: () => {
+          settle("deny");
+        },
+      };
+
+      this.overlay.open(picker);
+    });
+  }
   /**
    * Recompute completions.
    *

@@ -151,3 +151,64 @@ describe("accepting", () => {
     expect(apply).toHaveBeenCalledWith(expect.anything(), []);
   });
 });
+
+describe("approval picker key routing", () => {
+  function approvalPicker(): Picker {
+    return {
+      title: "Permission",
+      form: "panel",
+      empty: "none",
+      load: async () => [
+        { id: "allow-once", label: "Allow once" },
+        { id: "allow-always", label: "Allow always" },
+        { id: "deny", label: "Deny" },
+      ],
+      apply: async () => undefined,
+    };
+  }
+
+  it("selects allow-once directly on pressing y or 1", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "y", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["allow-once"]);
+    expect(overlay.active).toBe(false);
+  });
+
+  it("selects allow-always directly on pressing a or 2", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "a", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["allow-always"]);
+    expect(overlay.active).toBe(false);
+  });
+
+  it("selects deny directly on pressing n or 3", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "n", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["deny"]);
+    expect(overlay.active).toBe(false);
+  });
+
+  it("supports navigation with down arrow and enter", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "\x1b[B");
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["allow-always"]);
+    expect(overlay.active).toBe(false);
+  });
+});

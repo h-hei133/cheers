@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import type { EscalationPrompt } from "../sandbox/index.js";
+import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
+import { createCliEscalationPromptHandler } from "./cliApprovalModule.js";
 import {
   createApprovalResponse,
   formatApprovalConflictResolutionLine,
@@ -238,5 +240,91 @@ describe("approval prompt bridge", () => {
       "approval-audit:input-key=n",
       "approval-audit:stop-reason=Interactive approval denied by user input.",
     ]);
+  });
+});
+
+describe("createCliEscalationPromptHandler with promptInteractiveApproval", () => {
+  function uniquePrompt(tag: string): EscalationPrompt {
+    return {
+      id: `approval_prompt_${tag}`,
+      severity: "high",
+      recommendedAction: "deny",
+      message: "Tool wants to run a unique command.",
+      context: {
+        toolName: "shell",
+        operation: "execute",
+        target: `run-untrusted-${tag}-${Date.now()}`,
+      },
+    };
+  }
+
+  it("uses promptInteractiveApproval to resolve allow-once decision", async () => {
+    const renderer = createRenderer();
+    const trustPolicy = new ApprovalTrustPolicy();
+    const interactiveApproval = vi.fn().mockResolvedValue("allow-once");
+    const handler = createCliEscalationPromptHandler(
+      renderer,
+      null,
+      () => "compact",
+      trustPolicy,
+      () => "/project",
+      undefined,
+      undefined,
+      undefined,
+      () => "ask",
+      interactiveApproval,
+    );
+
+    const prompt = uniquePrompt("once");
+    const result = await handler(prompt);
+    expect(interactiveApproval).toHaveBeenCalledOnce();
+    expect(result.decision).toBe("allow-once");
+    expect(renderer.lines).toContain("- Tool: shell");
+  });
+
+  it("uses promptInteractiveApproval to resolve allow-always and records policy grant", async () => {
+    const renderer = createRenderer();
+    const trustPolicy = new ApprovalTrustPolicy();
+    const interactiveApproval = vi.fn().mockResolvedValue("allow-always");
+    const handler = createCliEscalationPromptHandler(
+      renderer,
+      null,
+      () => "compact",
+      trustPolicy,
+      () => "/project",
+      undefined,
+      undefined,
+      undefined,
+      () => "ask",
+      interactiveApproval,
+    );
+
+    const prompt = uniquePrompt("always");
+    const result = await handler(prompt);
+    expect(interactiveApproval).toHaveBeenCalledOnce();
+    expect(result.decision).toBe("allow-always");
+    expect(trustPolicy.evaluate(prompt, "/project").matchedGrant).toBeDefined();
+  });
+
+  it("uses promptInteractiveApproval to resolve deny decision", async () => {
+    const renderer = createRenderer();
+    const trustPolicy = new ApprovalTrustPolicy();
+    const interactiveApproval = vi.fn().mockResolvedValue("deny");
+    const handler = createCliEscalationPromptHandler(
+      renderer,
+      null,
+      () => "compact",
+      trustPolicy,
+      () => "/project",
+      undefined,
+      undefined,
+      undefined,
+      () => "ask",
+      interactiveApproval,
+    );
+    const prompt = uniquePrompt("deny");
+    const result = await handler(prompt);
+    expect(interactiveApproval).toHaveBeenCalledOnce();
+    expect(result.decision).toBe("deny");
   });
 });

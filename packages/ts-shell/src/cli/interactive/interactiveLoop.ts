@@ -7,6 +7,7 @@ import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
+import type { EscalationPrompt } from "../../sandbox/index.js";
 import { InteractiveMode } from "./interactiveMode.js";
 import { runLineLoop } from "./lineLoop.js";
 import { supportsFullScreenSurface } from "./surfaceCapability.js";
@@ -33,6 +34,9 @@ export interface InteractiveLoopInput {
   readonly fallbackSessionId?: string;
   readonly initialMcpGateway: CliMcpGateway;
   readonly setReadline: (readline: readline.Interface | null) => void;
+  readonly setInteractiveApprovalPrompt?: (
+    handler: ((prompt: EscalationPrompt) => Promise<"deny" | "allow-once" | "allow-always">) | undefined,
+  ) => void;
   readonly setActiveNonInteractiveApprovalMode: (mode: ApprovalModeObject | undefined) => void;
   readonly exit?: (code?: number) => never;
 }
@@ -71,6 +75,7 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
     fallbackSessionId: input.fallbackSessionId,
     initialMcpGateway: input.initialMcpGateway,
     setReadline: input.setReadline,
+    setInteractiveApprovalPrompt: input.setInteractiveApprovalPrompt,
     setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
     exit,
   }).start();

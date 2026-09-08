@@ -12,6 +12,7 @@ import {
 } from "../approval/cliApprovalEscalationBridge.js";
 import type { CliApprovalModeState } from "../approval/cliApprovalModeState.js";
 import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
+import type { EscalationPrompt } from "../../sandbox/index.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 export function createCliSessionRuntime(input: {
@@ -24,6 +25,9 @@ export function createCliSessionRuntime(input: {
   readonly providerRuntimeBridge: CliProviderRuntimeBridge;
   readonly getReadline: () => ReadlineInterface | null;
   readonly isStdinTty?: () => boolean;
+  readonly promptInteractiveApproval?: (
+    prompt: EscalationPrompt,
+  ) => Promise<"deny" | "allow-once" | "allow-always">;
 }): ShellSessionRuntime {
   const isStdinTty = input.isStdinTty ?? (() => Boolean(process.stdin.isTTY));
   const sessionRuntime = new ShellSessionRuntime({
@@ -46,6 +50,7 @@ export function createCliSessionRuntime(input: {
         sessionManager: input.sessionManager,
         getSessionId: () => input.runtimeContext.session.id,
         getPermissionScope: () => sessionRuntime.getPermissionScope(),
+        promptInteractiveApproval: input.promptInteractiveApproval,
       });
       const existingSession = input.sessionManager.getSession(
         input.runtimeContext.session.id,

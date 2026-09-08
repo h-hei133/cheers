@@ -33,6 +33,7 @@ import {
 import {
   runInteractiveLoop,
 } from "../interactive/interactiveLoop.js";
+import type { EscalationPrompt } from "../../sandbox/index.js";
 import {
   runCliPrintModeRouter,
 } from "../print/printModeRouter.js";
@@ -130,6 +131,9 @@ export async function runCliProcess(
   logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
 
   let readline: ReadlineInterface | null = null;
+  let interactiveApprovalPrompt:
+    | ((prompt: EscalationPrompt) => Promise<"deny" | "allow-once" | "allow-always">)
+    | undefined;
 
   const sessionRuntime = createCliSessionRuntime({
     sessionManager,
@@ -141,6 +145,10 @@ export async function runCliProcess(
     providerRuntimeBridge,
     getReadline: () => readline,
     isStdinTty: () => Boolean(input.stdin.isTTY),
+    promptInteractiveApproval: (prompt) =>
+      interactiveApprovalPrompt
+        ? interactiveApprovalPrompt(prompt)
+        : Promise.resolve("deny"),
   });
 
   const handledPrintMode = await runCliPrintModeRouter({
@@ -175,6 +183,9 @@ export async function runCliProcess(
     initialMcpGateway: mcpGateway,
     setReadline: (nextReadline) => {
       readline = nextReadline;
+    },
+    setInteractiveApprovalPrompt: (handler) => {
+      interactiveApprovalPrompt = handler;
     },
     setActiveNonInteractiveApprovalMode: (mode) => {
       approvalModeState.set(mode);

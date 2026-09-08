@@ -37,6 +37,14 @@ confidence: high
   1. 在 `ToolExecutionContext` 增加 `interactiveAsk` 回调接口。
   2. 建立 `cli/interactive/interactiveAskBridge.ts`：通过 `ReadlineInterface`（在交互模式下由 `QuestionBridge` 承接）向用户顺序展示问题与选项，支持按数字编号或完整文本进行交互式选择。
   3. 在 `ask.ts` 中优先使用 `context.interactiveAsk`，用户回答后格式化为真实决策返回给模型；非交互环境优雅回退到推荐默认值。
+
+**A3. 权限询问呈现为文本 prompt 并要求键入字母而不是交互式选项菜单 [已修复]**
+- 根因：`cliApprovalModule.ts` 在交互模式下直接调用 `askReadline(rl, "approval> ")`，通过 `QuestionBridge` 把提示文本当作一条 notice 注入转写历史，并在输入框强制要求用户键入 `y`/`a`/`n`，而非弹出选项面板。
+- 修复：
+  1. 在 `createCliEscalationPromptHandler` 增加 `promptInteractiveApproval` 接口。
+  2. 在 `InteractiveMode` 实现 `promptApproval`：通过 `OverlayHost` 原生弹出 `form: "panel"` 内联选项菜单，直观呈现三项标准选项：① 允许一次（`allow-once`）、② 允许后续同样的命令/不再寻求许可（`allow-always`）、③ 拒绝（`deny`）。
+  3. 键位支持：支持 `↑`/`↓`（或 j/k）上下移动选择游标并按 `Enter` 确认；同时支持直接单键热键（`1`/`y` 允许一次、`2`/`a` 始终允许、`3`/`n` 或 `Esc` 拒绝并关闭）。
+  4. 非交互环境（无 TUI）安全回退至自动策略或标准文本问答。
 ### B. 会话与上下文（高）[已修复]
 
 **B1. 跨轮上下文丢失 [已修复]**

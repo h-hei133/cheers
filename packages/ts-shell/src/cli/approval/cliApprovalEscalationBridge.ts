@@ -27,6 +27,9 @@ export function createCliApprovalEscalationBridge(input: {
   readonly getSessionId: () => string;
   /** How much the session may do before it has to ask. */
   readonly getPermissionScope?: () => PermissionScope;
+  readonly promptInteractiveApproval?: (
+    prompt: EscalationPrompt,
+  ) => Promise<"deny" | "allow-once" | "allow-always">;
 }): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
   return createCliEscalationPromptHandler(
     input.renderer,
@@ -44,5 +47,6 @@ export function createCliApprovalEscalationBridge(input: {
       });
     },
     input.getPermissionScope,
+    input.promptInteractiveApproval,
   );
 }

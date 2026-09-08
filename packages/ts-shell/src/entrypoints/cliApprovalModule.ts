@@ -84,6 +84,9 @@ export function createCliEscalationPromptHandler(
   getApprovalModeObject?: () => ApprovalModeObject | undefined,
   persistApprovalAudit?: (record: ApprovalAuditRecord) => void,
   getPermissionScope?: () => PermissionScope,
+  promptInteractiveApproval?: (
+    prompt: EscalationPrompt,
+  ) => Promise<"deny" | "allow-once" | "allow-always">,
 ): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
   function emitApprovalAudit(record: ApprovalAuditRecord): void {
     renderApprovalAuditSurface(renderer, record);
@@ -177,7 +180,7 @@ export function createCliEscalationPromptHandler(
   return async (prompt) => {
     const projectRoot = getProjectRoot();
     const evaluation = trustPolicy.evaluate(prompt, projectRoot);
-    const isNonInteractive = rl === null;
+    const isNonInteractive = rl === null && !promptInteractiveApproval;
     const cliNonInteractiveDecision = isNonInteractive
       ? getNonInteractiveDecision?.()
       : undefined;
@@ -507,6 +510,14 @@ export function createCliEscalationPromptHandler(
           formatApprovalObjectLine("Non-interactive", approvalModeObject),
         );
       }
+    } else if (promptInteractiveApproval) {
+      decision = await promptInteractiveApproval(prompt);
+      decisionInputKey =
+        decision === "allow-once"
+          ? "y"
+          : decision === "allow-always"
+            ? "a"
+            : "n";
     } else {
       const answer = await askReadline(rl, "approval> ");
       const normalized = answer.trim().toLowerCase();

@@ -274,8 +274,26 @@ export class OverlayHost {
       }
       return true; // absorb all other keys while renaming
     }
-
     // Normal navigation mode
+    const isApprovalPicker =
+      this.model.visible.some((o) => o.id === "allow-once") &&
+      this.model.visible.some((o) => o.id === "deny");
+
+    if (isApprovalPicker) {
+      if (event.keyId === "y" || event.text === "1") {
+        this.acceptDirect(picker, apply, ["allow-once"]);
+        return true;
+      }
+      if (event.keyId === "a" || event.text === "2") {
+        this.acceptDirect(picker, apply, ["allow-always"]);
+        return true;
+      }
+      if (event.keyId === "n" || event.text === "3") {
+        this.acceptDirect(picker, apply, ["deny"]);
+        return true;
+      }
+    }
+
     switch (event.keyId) {
       case "delete":
       case "ctrl+d": {
@@ -357,6 +375,14 @@ export class OverlayHost {
     this.loading = false;
     this.onChange();
     if (ids.length > 0 || picker.multiple) apply(picker, ids);
+  }
+
+  private acceptDirect(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, ids: readonly string[]): void {
+    this.picker = undefined;
+    this.subMode = "none";
+    this.loading = false;
+    this.onChange();
+    apply(picker, ids);
   }
 }
 
