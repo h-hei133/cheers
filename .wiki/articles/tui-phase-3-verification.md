@@ -67,8 +67,20 @@ Phase 0/1/2 阶段完成了底层与产品组件的构造与单测覆盖。Phase
 
 ---
 
+## Phase 2.5 前置条件（2026-09-08）
+
+本次复核确认，原阶段划分缺少“生产表面组装与可逆切流”这一必要阶段。Phase 1/2 证明组件可独立工作，不能证明 adapter 已接管 `InteractiveMode`。因此 Phase 3 的删除条件必须拆成前置阶段：
+
+1. 冻结 `InteractiveView`、`ViewActions`、`ViewSnapshot` 最小合约，解除 `keymap`/`pointer` 对具体 `InteractiveSurface` 的硬编码依赖；
+2. 组装完整 adapter view，补齐生产链路已验证的选区内容坐标、Toast、滚动条拖拽、流式工具卡片和权限 overlay；
+3. 通过 `InteractiveMode` 显式表面工厂接线，保证单终端单写入者、生命周期可恢复、失败可回退；
+4. 在真实 CLI 完成长粘贴、中文输入、滚轮/滑块、选区复制、审批三决策、resume、非 TTY/CI 的连续 smoke；
+5. 重新做删除审计，只删除被替代的专属胶水，不删除共享 `TUI`、文本测量、编辑器和终端底座。
+
+当前结论：**Phase 2.5 仅完成规划，尚未开始执行；Phase 3 删除工作保持阻塞。** 原有 benchmark/spike 继续作为输入证据，但不再被解释为生产切流证明。
+
 ## 下一步路线图
 
-1. **能力增量对齐**：将近期在生产链路验证通过的核心能力（C3 内容空间选区锚定与 Toast 提示、C4 规范级滚轮条几何计算与拖拽状态机、A3 交互式审批面板）反哺并对齐到 `adapter/` 架构中。
-2. **切流验证（Cutover Spike）**：在 `interactiveMode.ts` 中通过无侵入适配器进行主链路切换验证，在真实终端中充分检验长文本输入、中文 IME、复杂滚轮交互与权限审批。
-3. **最终收敛（Cleanup）**：当 adapter 经过生产长期验证无任何退化后，再稳健清理历史专用的旧胶水代码，保证产品平滑演进。
+1. **Phase 2.5-A/B**：冻结兼容合约并组装完整 adapter view。
+2. **Phase 2.5-C/D**：接入 `InteractiveMode` 的显式表面工厂，完成可逆真实 CLI 切流与回退。
+3. **Phase 2.5-E**：满足全部真实终端与非 TTY 门槛后重新进行 Phase 3 删除审计。
