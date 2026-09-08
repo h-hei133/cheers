@@ -93,29 +93,34 @@ export class DragSelection {
    * drag, the wheel, a non-left button — so the caller can ignore it rather than
    * treat it as a selection.
    */
-  handle(report: MouseReport): boolean {
+  handle(report: MouseReport, contentCoord?: { readonly row: number; readonly column: number }): boolean {
     if (report.shift) {
       this.clear();
       return false;
     }
+    const coord = contentCoord ?? { row: report.row, column: report.column };
     switch (report.kind) {
       case "press":
         if (report.button !== 0) return false;
         this.inFlight = true;
-        this.anchor = { row: report.row, column: report.column };
-        this.focus = this.anchor;
+        this.anchor = coord;
+        this.focus = coord;
         return true;
       case "drag":
         if (!this.anchor) return false;
         this.inFlight = true;
-        this.focus = { row: report.row, column: report.column };
+        this.focus = coord;
         return true;
       case "release": {
         this.inFlight = false;
         const anchor = this.anchor;
         if (!anchor) return false;
-        const focus = { row: report.row, column: report.column };
+        const focus = coord;
         this.focus = focus;
+        if (anchor.row === focus.row && anchor.column === focus.column) {
+          this.clear();
+          return false;
+        }
         const text = extractSelection(this.screen.rows(), anchor, focus);
         if (!text) {
           this.clear();

@@ -117,7 +117,8 @@ export class InteractiveMode {
       sessionId: options.runtimeContext.session.id,
       notify: (text) => {
         if (this.busy) return;
-        this.setToast(text);
+        this.toast = text;
+        this.tui.requestRender();
       },
       write: (data) => this.terminal.write(data),
     });
@@ -149,7 +150,7 @@ export class InteractiveMode {
     });
     this.pointer = new Pointer({
       surface: this.surface,
-      rows: () => this.tui.screenRows(),
+      rows: () => this.surface.contentRows(),
       copy: (text) => this.clipboard.copy(text),
       redraw: () => this.tui.requestRender(),
     });
@@ -340,10 +341,7 @@ export class InteractiveMode {
     this.surface.setSuggesting(true);
   }
 
-  private setToast(text: string | undefined): void {
-    this.toast = text;
-    this.tui.requestRender();
-  }
+
 
   private onSubmit(text: string): void {
     this.toast = undefined;

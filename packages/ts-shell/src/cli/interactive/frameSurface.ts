@@ -80,13 +80,13 @@ export class InteractiveSurface implements TerminalFrameProvider {
    * nothing on any screen that was not already full.
    */
   private lastFiller = 0;
-  /** Transcript rows actually on screen last frame, which is at most the capacity. */
   private lastVisible = 0;
   private lastTranscriptRows = 0;
+  private lastWidth = 80;
+  private lastTotalRows = 0;
   /** How far back the window could go at the last frame, so a key can be honest. */
   private lastMaxBack = 0;
   private lastOwners: readonly number[] = [];
-
   constructor(private readonly context: SurfaceContext) {}
 
   /** Whether the completion list is currently intercepting navigation keys. */
@@ -108,19 +108,19 @@ export class InteractiveSurface implements TerminalFrameProvider {
     const width = Math.max(8, dimensions.columns);
     const height = Math.max(4, dimensions.rows);
     if (this.context.overlayFullScreen()) {
-      return { rows: this.shade(this.context.overlayRows(width, height)) };
+      return { rows: this.context.overlayRows(width, height) };
     }
     const chrome = this.renderChrome(width, height);
     const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.length);
-    const hasScrollbar = this.transcript.rowCount(width) > capacity && width >= 10;
-    const contentWidth = hasScrollbar ? width - 1 : width;
-    const rendered = this.transcript.render(contentWidth);
+    const rendered = this.transcript.render(width);
     const totalRows = rendered.rows.length;
     const maxBack = Math.max(0, totalRows - capacity);
     this.lastMaxBack = maxBack;
     this.scrollBack = Math.min(this.scrollBack, maxBack);
     const top = maxBack - this.scrollBack;
     this.lastTop = top;
+    this.lastWidth = width;
+    this.lastTotalRows = totalRows;
     this.lastTranscriptRows = capacity;
     this.lastOwners = rendered.owners;
     const visible = rendered.rows.slice(top, top + capacity);
@@ -129,33 +129,52 @@ export class InteractiveSurface implements TerminalFrameProvider {
     // short conversation should not float the prompt up the middle of the screen.
     const filler = Array.from({ length: Math.max(0, capacity - visible.length) }, () => "");
     this.lastFiller = filler.length;
-    const transcriptRows = this.withScrollbar([...filler, ...visible], width, capacity, totalRows, top);
-    return { rows: [...this.shade(transcriptRows), ...chrome] };
+    return { rows: [...this.shade([...filler, ...visible]), ...chrome] };
   }
 
-  private withScrollbar(
-    rows: readonly string[],
-    width: number,
-    capacity: number,
-    totalRows: number,
-    top: number,
-  ): string[] {
-    if (totalRows <= capacity || capacity <= 0 || width < 10) return [...rows];
-    const thumbSize = Math.max(1, Math.min(Math.floor((capacity * capacity) / totalRows), capacity));
-    const travel = capacity - thumbSize;
-    const maxOffset = totalRows - capacity;
-    const start = maxOffset <= 0 ? 0 : Math.round((top / maxOffset) * travel);
-
-    return rows.map((row, index) => {
-      const inThumb = index >= start && index < start + thumbSize;
-      const bar = inThumb ? defaultTheme.fg("accent", "█") : defaultTheme.fg("border", "│");
-      return `${padToWidth(row, width - 1)}${bar}`;
-    });
+  /** Map a screen row and column to a content row and column in the full transcript. */
+  screenToContent(row: number, column: number): { readonly row: number; readonly column: number } {
+    const within = row - this.lastFiller;
+    if (within < 0) {
+      return { row: this.lastTop, column: 0 };
+    }
+    const maxContentRow = Math.max(0, this.lastTotalRows - 1);
+    const contentRow = Math.min(maxContentRow, this.lastTop + within);
+    return { row: contentRow, column: Math.max(0, column) };
   }
+
+  /** Translate a content-space selection span to the current visible screen rows. */
+  contentToScreenSpan(span: SelectionSpan): SelectionSpan | undefined {
+    if (this.lastVisible <= 0) return undefined;
+    const minVisibleRow = this.lastTop;
+    const maxVisibleRow = this.lastTop + this.lastVisible - 1;
+    if (span.to.row < minVisibleRow || span.from.row > maxVisibleRow) {
+      return undefined;
+    }
+    const fromScreenRow = this.lastFiller + (span.from.row - this.lastTop);
+    const toScreenRow = this.lastFiller + (span.to.row - this.lastTop);
+    const clampedFromRow = Math.max(this.lastFiller, fromScreenRow);
+    const clampedFromCol = fromScreenRow < this.lastFiller ? 0 : span.from.column;
+    const clampedToRow = Math.min(this.lastFiller + this.lastVisible - 1, toScreenRow);
+    const clampedToCol = toScreenRow > maxVisibleRow ? Number.MAX_SAFE_INTEGER : span.to.column;
+
+    return {
+      from: { row: clampedFromRow, column: clampedFromCol },
+      to: { row: clampedToRow, column: clampedToCol },
+    };
+  }
+
+  /** Rendered rows of the full transcript at the last width, for selection copying. */
+  contentRows(): readonly string[] {
+    return this.transcript.render(this.lastWidth || 80).rows;
+  }
+
   /** The frame with an in-progress drag shaded, which is the only sign it made one. */
   private shade(rows: readonly string[]): string[] {
     const span = this.context.selection();
-    return span ? highlightSelection(rows, span) : [...rows];
+    if (!span) return [...rows];
+    const screenSpan = this.contentToScreenSpan(span);
+    return screenSpan ? highlightSelection(rows, screenSpan) : [...rows];
   }
 
   /** How far back the window is, in rows; 0 means it is following the newest. */
@@ -186,22 +205,7 @@ export class InteractiveSurface implements TerminalFrameProvider {
     return this.scroll(direction * Math.max(1, this.lastTranscriptRows - 1));
   }
 
-  get transcriptCapacity(): number {
-    return this.lastTranscriptRows;
-  }
 
-  get canScroll(): boolean {
-    return this.lastMaxBack > 0;
-  }
-
-  scrollToRatio(ratio: number): boolean {
-    if (this.lastMaxBack <= 0) return false;
-    const bounded = Math.max(0, Math.min(1, ratio));
-    const next = Math.round(this.lastMaxBack * (1 - bounded));
-    if (next === this.scrollBack) return false;
-    this.scrollBack = next;
-    return true;
-  }
   /**
    * The block under screen row `row`, for a click that lands on the transcript.
    *

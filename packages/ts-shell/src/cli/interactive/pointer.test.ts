@@ -15,16 +15,13 @@ function build(overrides: Partial<InteractiveSurface> = {}) {
 
   const surface = {
     scroll: vi.fn(),
-    scrollToRatio: vi.fn(),
-    canScroll: true,
-    transcriptCapacity: 4,
+    screenToContent: vi.fn((row: number, column: number) => ({ row, column })),
     blockAtScreenRow: vi.fn(),
     transcript: {
       setCollapsed: vi.fn(),
     },
     ...overrides,
   } as unknown as InteractiveSurface;
-
   const pointer = new Pointer({
     surface,
     rows: () => rows,
@@ -35,33 +32,41 @@ function build(overrides: Partial<InteractiveSurface> = {}) {
   return { pointer, surface, copied, redraws: () => redrawn, rows };
 }
 
-describe("pointer scrollbar interaction", () => {
-  it("clicks on the rightmost scrollbar column and jumps to ratio", () => {
-    const { pointer, surface, redraws, rows } = build();
-    const width = rows[0]!.length; // 80
+describe("pointer drag selection", () => {
+  it("drags across lines and copies on release", () => {
+    const { pointer, copied, redraws } = build();
 
-    // Press on row 2, column 79 (last column of 80)
-    pointer.handle(parseMouseReport(`\x1b[<0;${width};3M`)!); // column is 1-indexed in SGR: width
-    expect(surface.scrollToRatio).toHaveBeenCalledOnce();
-    expect(redraws()).toBe(1);
-    expect(pointer.selection).toBeUndefined(); // Did not start text drag
+    // Press at line 0, col 2
+    pointer.handle(parseMouseReport("\x1b[<0;3;1M")!);
+    expect(pointer.selection).toBeDefined();
+
+    // Drag to line 1, col 20
+    pointer.handle(parseMouseReport("\x1b[<32;21;2M")!);
+    expect(pointer.selection).toBeDefined();
+
+    // Release
+    pointer.handle(parseMouseReport("\x1b[<0;21;2m")!);
+    expect(copied.length).toBe(1);
+    expect(copied[0]).toContain("line 1");
+    expect(redraws()).toBeGreaterThanOrEqual(3);
   });
 
-  it("drags along the rightmost scrollbar column and continuously scrolls", () => {
-    const { pointer, surface, redraws, rows } = build();
-    const width = rows[0]!.length;
+  it("clears selection on single click without drag", () => {
+    const { pointer, copied, redraws } = build();
 
-    // Press on scrollbar
-    pointer.handle(parseMouseReport(`\x1b[<0;${width};1M`)!);
-    expect(surface.scrollToRatio).toHaveBeenCalledTimes(1);
+    // First make a selection
+    pointer.handle(parseMouseReport("\x1b[<0;3;1M")!);
+    pointer.handle(parseMouseReport("\x1b[<32;21;2M")!);
+    pointer.handle(parseMouseReport("\x1b[<0;21;2m")!);
+    expect(pointer.selection).toBeDefined();
 
-    // Drag along scrollbar to row 3
-    pointer.handle(parseMouseReport(`\x1b[<32;${width};3M`)!);
-    expect(surface.scrollToRatio).toHaveBeenCalledTimes(2);
-    expect(redraws()).toBe(2);
+    // Single click (press + release at same position)
+    pointer.handle(parseMouseReport("\x1b[<0;10;3M")!);
+    pointer.handle(parseMouseReport("\x1b[<0;10;3m")!);
+    expect(pointer.selection).toBeUndefined();
+    expect(redraws()).toBeGreaterThanOrEqual(5);
   });
 });
-
 describe("pointer wheel scrolling", () => {
   it("scrolls surface on mouse wheel up and down", () => {
     const { pointer, surface, redraws } = build();
