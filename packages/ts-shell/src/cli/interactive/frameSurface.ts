@@ -49,8 +49,9 @@ export interface SurfaceContext {
   overlayRows(width: number, height: number): string[];
   /** Cells the pointer is currently covering, or none when it is not dragging. */
   selection(): SelectionSpan | undefined;
+  /** Transient status notification (e.g. clipboard copy feedback). */
+  toast?(): string | undefined;
 }
-
 /** Minimum transcript rows kept visible however tall the chrome grows. */
 const MIN_TRANSCRIPT_ROWS = 1;
 
@@ -111,8 +112,11 @@ export class InteractiveSurface implements TerminalFrameProvider {
     }
     const chrome = this.renderChrome(width, height);
     const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.length);
-    const rendered = this.transcript.render(width);
-    const maxBack = Math.max(0, rendered.rows.length - capacity);
+    const hasScrollbar = this.transcript.rowCount(width) > capacity && width >= 10;
+    const contentWidth = hasScrollbar ? width - 1 : width;
+    const rendered = this.transcript.render(contentWidth);
+    const totalRows = rendered.rows.length;
+    const maxBack = Math.max(0, totalRows - capacity);
     this.lastMaxBack = maxBack;
     this.scrollBack = Math.min(this.scrollBack, maxBack);
     const top = maxBack - this.scrollBack;
@@ -125,9 +129,29 @@ export class InteractiveSurface implements TerminalFrameProvider {
     // short conversation should not float the prompt up the middle of the screen.
     const filler = Array.from({ length: Math.max(0, capacity - visible.length) }, () => "");
     this.lastFiller = filler.length;
-    return { rows: [...this.shade([...filler, ...visible]), ...chrome] };
+    const transcriptRows = this.withScrollbar([...filler, ...visible], width, capacity, totalRows, top);
+    return { rows: [...this.shade(transcriptRows), ...chrome] };
   }
 
+  private withScrollbar(
+    rows: readonly string[],
+    width: number,
+    capacity: number,
+    totalRows: number,
+    top: number,
+  ): string[] {
+    if (totalRows <= capacity || capacity <= 0 || width < 10) return [...rows];
+    const thumbSize = Math.max(1, Math.min(Math.floor((capacity * capacity) / totalRows), capacity));
+    const travel = capacity - thumbSize;
+    const maxOffset = totalRows - capacity;
+    const start = maxOffset <= 0 ? 0 : Math.round((top / maxOffset) * travel);
+
+    return rows.map((row, index) => {
+      const inThumb = index >= start && index < start + thumbSize;
+      const bar = inThumb ? defaultTheme.fg("accent", "█") : defaultTheme.fg("border", "│");
+      return `${padToWidth(row, width - 1)}${bar}`;
+    });
+  }
   /** The frame with an in-progress drag shaded, which is the only sign it made one. */
   private shade(rows: readonly string[]): string[] {
     const span = this.context.selection();
@@ -162,6 +186,22 @@ export class InteractiveSurface implements TerminalFrameProvider {
     return this.scroll(direction * Math.max(1, this.lastTranscriptRows - 1));
   }
 
+  get transcriptCapacity(): number {
+    return this.lastTranscriptRows;
+  }
+
+  get canScroll(): boolean {
+    return this.lastMaxBack > 0;
+  }
+
+  scrollToRatio(ratio: number): boolean {
+    if (this.lastMaxBack <= 0) return false;
+    const bounded = Math.max(0, Math.min(1, ratio));
+    const next = Math.round(this.lastMaxBack * (1 - bounded));
+    if (next === this.scrollBack) return false;
+    this.scrollBack = next;
+    return true;
+  }
   /**
    * The block under screen row `row`, for a click that lands on the transcript.
    *
@@ -201,6 +241,7 @@ export class InteractiveSurface implements TerminalFrameProvider {
           cancelArmed: this.context.cancelArmed(),
           queued: this.context.queuedCount(),
           newlineKey: this.context.newlineKey(),
+          toast: this.context.toast?.(),
         },
         this.context.ambient(),
         width,

@@ -79,6 +79,21 @@ confidence: high
   1. 在 `Editor` 引入 `scrollOffset` 与 `maxRows` 视口控制：总视觉行超过 `maxRows` 时，自动跟踪光标所在行，确保光标始终在 `[scrollOffset, scrollOffset + maxRows)` 视口内平滑卷动。
   2. 在 `frameSurface.ts` 中设定输入框屏幕占比上限（屏幕高度的 35%，界于 3 至 10 行之间），保证转写历史永远拥有至少 65% 的视口空间。
 
+**C3. 选区松手即消失与复制通知污染聊天记录 [已修复]**
+- 根因：
+  1. `selection.ts` 在鼠标 release 时无条件把 `anchor` 与 `focus` 清空为 undefined，导致高亮背景无法驻留。
+  2. `turnSink.ts` 将复制提示当成一条 `kind: "notice"` 的对话消息直接追加进 `transcript`，多次复制严重刷屏污染聊天历史。
+- 修复：
+  1. 选区释放持久化：`selection.ts` 在 release 时保留 `anchor` 与 `focus`，高亮背景持续驻留；仅在单机空白处（无有效选区）、键盘打字或开始新一轮交互时清除选区。
+  2. 复制提示改走 Toast 瞬态通知：在 `hints.ts` 引入 `toast` 支持并在 `frameSurface` 中透传；剪贴板通知直接就地更新提示行文本（`Copied N characters...`），多次复制原地覆盖不换行，模型开工或用户提交新提示词时自动清除，转写区 0 污染。
+
+**C4. 备用屏右侧滚动条失效与文本空白断层 [已修复]**
+- 根因：历史代码 revert 误删了 `withScrollbar`；TUI 运行在备用屏下终端原生回滚失效，且转写行由于未补全空格在最右侧形成虚空与无用窗口滚动条。
+- 修复：
+  1. 在 `frameSurface.ts` 重建 `withScrollbar`：当转写行数超出视口容量时，在终端最右一列（`width - 1`）内联绘制 `│` 轨道与 `█` 滑块，位置与滑块大小精确按转写总行数、视口容量与 `scrollBack` 计算。
+  2. 转写行排版在出现滚动条时自然受限在 `width - 1`，消除空白断层。
+  3. 在 `pointer.ts` 中增加滚动条列（`column === width - 1`）的点击与拖拽命中检测，按点击行反算百分比直接调用 `scrollToRatio`，实现点击轨道跳转与滑动定位。
+
 ### D. 界面布局（低）[已修复]
 
 **D1. resume 筛选框位置不对 [已修复]**

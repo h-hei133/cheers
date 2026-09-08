@@ -21,10 +21,9 @@ export interface HintContext {
   readonly cancelArmed: boolean;
   /** Prompts waiting behind the running turn. */
   readonly queued: number;
-  /** Key that inserts a newline, resolved from the negotiated keyboard protocol. */
   readonly newlineKey: string;
+  readonly toast?: string;
 }
-
 export interface AmbientContext {
   /** Todo entries not yet done. */
   readonly openTodos: number;
@@ -59,12 +58,13 @@ export function renderHints(
   ambient: AmbientContext,
   width: number,
 ): string[] {
+  if (context.toast && !context.cancelArmed && !context.suggesting) {
+    return [defaultTheme.fg("accent", truncateToWidth(context.toast, width))];
+  }
   const text = transientHint(context) ?? ambientFacts(ambient);
   if (!text) return [];
   return [defaultTheme.dim(truncateToWidth(text, width))];
 }
-
-/** Newline key to advertise for a negotiated keyboard protocol. */
 export function newlineKeyFor(protocol: "enhanced" | "modify-other-keys" | "legacy"): string {
   // Only a negotiated protocol can carry the Shift modifier on Enter. Claiming
   // shift+enter on a terminal that cannot report it is the defect this replaces.

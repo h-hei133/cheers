@@ -101,8 +101,8 @@ export class InteractiveMode {
    * — Escape leaves the saved band exactly as it was.
    */
   private previewItems: readonly StatusItemId[] | undefined;
-
   private busy = false;
+  private toast?: string;
   private tick: ReturnType<typeof setInterval> | undefined;
   private turnNumber = 0;
   /** The last thing submitted that was a prompt rather than a command. */
@@ -117,7 +117,7 @@ export class InteractiveMode {
       sessionId: options.runtimeContext.session.id,
       notify: (text) => {
         if (this.busy) return;
-        this.sink.notify(text, "clipboard");
+        this.setToast(text);
       },
       write: (data) => this.terminal.write(data),
     });
@@ -145,6 +145,7 @@ export class InteractiveMode {
       overlayRows: (width, height) =>
         this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
       selection: () => this.pointer.selection,
+      toast: () => this.toast,
     });
     this.pointer = new Pointer({
       surface: this.surface,
@@ -251,6 +252,14 @@ export class InteractiveMode {
       return;
     }
     if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids))) return;
+    if (this.pointer.selection && event.keyId !== "ctrl+c") {
+      this.pointer.clearSelection();
+      this.tui.requestRender();
+    }
+    if (this.toast && (event.text || event.keyId === "backspace" || event.keyId === "delete" || event.keyId === "enter")) {
+      this.toast = undefined;
+      this.tui.requestRender();
+    }
     routeKey(event, {
       surface: this.surface,
       busy: this.busy,
@@ -331,7 +340,13 @@ export class InteractiveMode {
     this.surface.setSuggesting(true);
   }
 
+  private setToast(text: string | undefined): void {
+    this.toast = text;
+    this.tui.requestRender();
+  }
+
   private onSubmit(text: string): void {
+    this.toast = undefined;
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
     if (this.questions.answer(text)) {
       this.tui.requestRender();

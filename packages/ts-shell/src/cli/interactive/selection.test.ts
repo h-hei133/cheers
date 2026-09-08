@@ -184,7 +184,7 @@ describe("showing what the drag has covered", () => {
     expect(row).toBe("\x1b[7malpha\x1b[27m beta");
   });
 
-  it("publishes a span while the pointer is down and drops it on release", () => {
+  it("publishes a span while the pointer is down and keeps it on release until cleared", () => {
     const selection = new DragSelection({ rows: () => ROWS }, () => undefined);
     expect(selection.span).toBeUndefined();
 
@@ -193,9 +193,11 @@ describe("showing what the drag has covered", () => {
     expect(selection.span).toEqual({ from: { row: 2, column: 4 }, to: { row: 2, column: 19 } });
 
     selection.handle(parseMouseReport("\x1b[<0;20;3m")!);
+    expect(selection.span).toEqual({ from: { row: 2, column: 4 }, to: { row: 2, column: 19 } });
+
+    selection.clear();
     expect(selection.span).toBeUndefined();
   });
-
   it("orders the span even when the drag ran backwards", () => {
     const selection = new DragSelection({ rows: () => ROWS }, () => undefined);
     selection.handle(parseMouseReport("\x1b[<0;30;4M")!);

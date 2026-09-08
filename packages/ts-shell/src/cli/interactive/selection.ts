@@ -50,6 +50,7 @@ export interface SelectionSpan {
 export class DragSelection {
   private anchor: Anchor | undefined;
   private focus: Anchor | undefined;
+  private inFlight = false;
 
   constructor(
     private readonly screen: ScreenText,
@@ -58,9 +59,8 @@ export class DragSelection {
 
   /** True while a drag is being tracked, so the frame can be left alone. */
   get dragging(): boolean {
-    return this.anchor !== undefined;
+    return this.inFlight;
   }
-
   /** The span under the pointer right now, for the frame to shade. */
   get span(): SelectionSpan | undefined {
     if (!this.anchor || !this.focus) return undefined;
@@ -69,6 +69,7 @@ export class DragSelection {
 
   /** Cancel any in-progress drag without copying. */
   clear(): void {
+    this.inFlight = false;
     this.anchor = undefined;
     this.focus = undefined;
   }
@@ -94,29 +95,32 @@ export class DragSelection {
    */
   handle(report: MouseReport): boolean {
     if (report.shift) {
-      this.anchor = undefined;
+      this.clear();
       return false;
     }
     switch (report.kind) {
       case "press":
         if (report.button !== 0) return false;
+        this.inFlight = true;
         this.anchor = { row: report.row, column: report.column };
         this.focus = this.anchor;
         return true;
       case "drag":
         if (!this.anchor) return false;
+        this.inFlight = true;
         this.focus = { row: report.row, column: report.column };
         return true;
       case "release": {
+        this.inFlight = false;
         const anchor = this.anchor;
-        this.anchor = undefined;
-        this.focus = undefined;
         if (!anchor) return false;
-        // The release carries the final position, which for a drag short enough
-        // to produce no motion report is the only place it appears.
         const focus = { row: report.row, column: report.column };
+        this.focus = focus;
         const text = extractSelection(this.screen.rows(), anchor, focus);
-        if (!text) return false;
+        if (!text) {
+          this.clear();
+          return false;
+        }
         this.copy(text);
         return true;
       }

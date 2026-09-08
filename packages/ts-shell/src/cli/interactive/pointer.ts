@@ -1,4 +1,5 @@
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
+import { visibleWidth } from "../../presentation/tui/text/measure.js";
 import { DragSelection, type SelectionSpan } from "./selection.js";
 import type { InteractiveSurface } from "./frameSurface.js";
 
@@ -46,6 +47,7 @@ export class Pointer {
   copySelection(): boolean {
     return this.drag.copyAndClear();
   }
+
   /** Handle one report. */
   handle(report: MouseReport): void {
     if (report.kind === "wheel") {
@@ -53,6 +55,24 @@ export class Pointer {
       this.context.redraw();
       return;
     }
+
+    // Right-edge scrollbar click and drag
+    if (
+      this.context.surface.canScroll &&
+      (report.kind === "press" || report.kind === "drag") &&
+      report.row < this.context.surface.transcriptCapacity
+    ) {
+      const rows = this.context.rows();
+      const width = rows[0] ? visibleWidth(rows[0]) : 0;
+      if (width > 0 && report.column >= width - 1) {
+        const ratio = report.row / Math.max(1, this.context.surface.transcriptCapacity - 1);
+        this.context.surface.scrollToRatio(ratio);
+        this.drag.clear();
+        this.context.redraw();
+        return;
+      }
+    }
+
     // A drag that covered text is a selection and has been copied. A release that
     // covered nothing was a click, which is how a collapsed block is opened.
     if (this.drag.handle(report)) {
