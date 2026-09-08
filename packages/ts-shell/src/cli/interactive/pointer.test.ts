@@ -15,6 +15,8 @@ function build(overrides: Partial<InteractiveSurface> = {}) {
 
   const surface = {
     scroll: vi.fn(),
+    scrollbarGeometry: vi.fn(() => undefined),
+    scrollToThumb: vi.fn(),
     screenToContent: vi.fn((row: number, column: number) => ({ row, column })),
     blockAtScreenRow: vi.fn(),
     transcript: {
@@ -99,5 +101,36 @@ describe("pointer selection lifecycle", () => {
 
     // clearSelection returns false when no selection is active
     expect(pointer.clearSelection()).toBe(false);
+  });
+});
+
+describe("pointer scrollbar interaction", () => {
+  it("jumps and drags scroll position when clicking/dragging on scrollbar column", () => {
+    const scrollToThumb = vi.fn();
+    const geo = {
+      column: 79,
+      trackTop: 0,
+      trackHeight: 10,
+      thumbTop: 5,
+      thumbHeight: 2,
+      maxScrollTop: 20,
+    };
+    const { pointer, redraws } = build({
+      scrollbarGeometry: () => geo,
+      scrollToThumb,
+    });
+
+    // Press on track above thumb (row 2, column 79)
+    pointer.handle(parseMouseReport("\x1b[<0;80;3M")!);
+    expect(scrollToThumb).toHaveBeenCalledWith(2, 1);
+    expect(pointer.selection).toBeUndefined();
+
+    // Drag to row 8
+    pointer.handle(parseMouseReport("\x1b[<32;80;9M")!);
+    expect(scrollToThumb).toHaveBeenCalledWith(8, 1);
+
+    // Release terminates scrollbar drag
+    pointer.handle(parseMouseReport("\x1b[<0;80;9m")!);
+    expect(redraws()).toBeGreaterThanOrEqual(3);
   });
 });

@@ -25,6 +25,7 @@ export interface PointerContext {
 
 export class Pointer {
   private readonly drag: DragSelection;
+  private scrollbarDrag: { readonly grabOffset: number } | undefined;
 
   constructor(private readonly context: PointerContext) {
     this.drag = new DragSelection({ rows: () => context.rows() }, (text) => context.copy(text));
@@ -37,6 +38,7 @@ export class Pointer {
 
   /** Clear any active drag selection. Returns true if there was a selection. */
   clearSelection(): boolean {
+    this.scrollbarDrag = undefined;
     const hadSelection = this.drag.span !== undefined;
     this.drag.clear();
     return hadSelection;
@@ -55,6 +57,40 @@ export class Pointer {
       return;
     }
 
+    // 1. If currently dragging the scrollbar:
+    if (this.scrollbarDrag) {
+      if (report.kind === "release") {
+        this.scrollbarDrag = undefined;
+        this.context.redraw();
+        return;
+      }
+      this.context.surface.scrollToThumb(report.row, this.scrollbarDrag.grabOffset);
+      this.context.redraw();
+      return;
+    }
+
+    // 2. Click or press on the scrollbar track / thumb:
+    const geo = this.context.surface.scrollbarGeometry();
+    if (
+      geo &&
+      report.kind === "press" &&
+      report.button === 0 &&
+      report.column === geo.column &&
+      report.row >= geo.trackTop &&
+      report.row < geo.trackTop + geo.trackHeight
+    ) {
+      this.clearSelection();
+      const onThumb = report.row >= geo.thumbTop && report.row < geo.thumbTop + geo.thumbHeight;
+      const grabOffset = onThumb ? report.row - geo.thumbTop : Math.floor(geo.thumbHeight / 2);
+      if (!onThumb) {
+        this.context.surface.scrollToThumb(report.row, grabOffset);
+      }
+      this.scrollbarDrag = { grabOffset };
+      this.context.redraw();
+      return;
+    }
+
+    // 3. Normal selection drag and click:
     const contentCoord = this.context.surface.screenToContent(report.row, report.column);
     const handled = this.drag.handle(report, contentCoord);
     if (handled) {

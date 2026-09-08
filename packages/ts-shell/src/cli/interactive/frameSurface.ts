@@ -1,5 +1,6 @@
 import { defaultTheme } from "../../presentation/theme/theme.js";
 import { padToWidth } from "../../presentation/tui/text/layout.js";
+import { visibleWidth } from "../../presentation/tui/text/measure.js";
 import { Editor } from "../../presentation/tui/editor.js";
 import { PasteStore } from "../../presentation/tui/pastes.js";
 import { renderBand } from "../../presentation/tui/chrome/band.js";
@@ -55,6 +56,15 @@ export interface SurfaceContext {
 /** Minimum transcript rows kept visible however tall the chrome grows. */
 const MIN_TRANSCRIPT_ROWS = 1;
 
+export interface ScrollbarGeometry {
+  readonly column: number;
+  readonly trackTop: number;
+  readonly trackHeight: number;
+  readonly thumbTop: number;
+  readonly thumbHeight: number;
+  readonly maxScrollTop: number;
+}
+
 export class InteractiveSurface implements TerminalFrameProvider {
   readonly editor = new Editor();
   /**
@@ -87,6 +97,9 @@ export class InteractiveSurface implements TerminalFrameProvider {
   /** How far back the window could go at the last frame, so a key can be honest. */
   private lastMaxBack = 0;
   private lastOwners: readonly number[] = [];
+  private lastHasScrollbar = false;
+  private lastRenderedRows: readonly string[] = [];
+
   constructor(private readonly context: SurfaceContext) {}
 
   /** Whether the completion list is currently intercepting navigation keys. */
@@ -112,7 +125,10 @@ export class InteractiveSurface implements TerminalFrameProvider {
     }
     const chrome = this.renderChrome(width, height);
     const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.length);
-    const rendered = this.transcript.render(width);
+    const unconstrainedRows = this.transcript.rowCount(width);
+    const hasScrollbar = unconstrainedRows > capacity && width >= 10;
+    const contentWidth = hasScrollbar ? width - 1 : width;
+    const rendered = this.transcript.render(contentWidth);
     const totalRows = rendered.rows.length;
     const maxBack = Math.max(0, totalRows - capacity);
     this.lastMaxBack = maxBack;
@@ -122,6 +138,8 @@ export class InteractiveSurface implements TerminalFrameProvider {
     this.lastWidth = width;
     this.lastTotalRows = totalRows;
     this.lastTranscriptRows = capacity;
+    this.lastHasScrollbar = hasScrollbar;
+    this.lastRenderedRows = rendered.rows;
     this.lastOwners = rendered.owners;
     const visible = rendered.rows.slice(top, top + capacity);
     this.lastVisible = visible.length;
@@ -129,9 +147,10 @@ export class InteractiveSurface implements TerminalFrameProvider {
     // short conversation should not float the prompt up the middle of the screen.
     const filler = Array.from({ length: Math.max(0, capacity - visible.length) }, () => "");
     this.lastFiller = filler.length;
-    return { rows: [...this.shade([...filler, ...visible]), ...chrome] };
+    const shaded = this.shade([...filler, ...visible]);
+    const transcriptRows = this.withScrollbar(shaded, width, capacity, totalRows, top, hasScrollbar);
+    return { rows: [...transcriptRows, ...chrome] };
   }
-
   /** Map a screen row and column to a content row and column in the full transcript. */
   screenToContent(row: number, column: number): { readonly row: number; readonly column: number } {
     const within = row - this.lastFiller;
@@ -140,7 +159,10 @@ export class InteractiveSurface implements TerminalFrameProvider {
     }
     const maxContentRow = Math.max(0, this.lastTotalRows - 1);
     const contentRow = Math.min(maxContentRow, this.lastTop + within);
-    return { row: contentRow, column: Math.max(0, column) };
+    const line = this.lastRenderedRows[contentRow] ?? "";
+    const lineWidth = visibleWidth(line);
+    const contentCol = Math.max(0, Math.min(column, lineWidth));
+    return { row: contentRow, column: contentCol };
   }
 
   /** Translate a content-space selection span to the current visible screen rows. */
@@ -166,7 +188,9 @@ export class InteractiveSurface implements TerminalFrameProvider {
 
   /** Rendered rows of the full transcript at the last width, for selection copying. */
   contentRows(): readonly string[] {
-    return this.transcript.render(this.lastWidth || 80).rows;
+    if (this.lastRenderedRows.length > 0) return this.lastRenderedRows;
+    const contentWidth = this.lastHasScrollbar ? Math.max(1, this.lastWidth - 1) : (this.lastWidth || 80);
+    return this.transcript.render(contentWidth).rows;
   }
 
   /** The frame with an in-progress drag shaded, which is the only sign it made one. */
@@ -203,6 +227,71 @@ export class InteractiveSurface implements TerminalFrameProvider {
   /** Scroll by whole screens, for PageUp and PageDown. */
   scrollPage(direction: -1 | 1): boolean {
     return this.scroll(direction * Math.max(1, this.lastTranscriptRows - 1));
+  }
+
+  private withScrollbar(
+    rows: readonly string[],
+    width: number,
+    capacity: number,
+    totalRows: number,
+    top: number,
+    hasScrollbar: boolean,
+  ): string[] {
+    if (!hasScrollbar || totalRows <= capacity || capacity <= 0 || width < 10) {
+      return [...rows];
+    }
+    const trackHeight = capacity;
+    const minThumbHeight = 1;
+    const thumbHeight = Math.max(
+      minThumbHeight,
+      Math.min(trackHeight, Math.round((trackHeight * trackHeight) / totalRows)),
+    );
+    const maxScrollTop = Math.max(0, totalRows - trackHeight);
+    const maxThumbTop = trackHeight - thumbHeight;
+    const thumbOffset = maxScrollTop === 0 ? 0 : Math.round((top / maxScrollTop) * maxThumbTop);
+
+    return rows.map((row, index) => {
+      const isThumb = index >= thumbOffset && index < thumbOffset + thumbHeight;
+      const barChar = isThumb ? "█" : "│";
+      const bar = isThumb ? defaultTheme.fg("accent", barChar) : defaultTheme.fg("border", barChar);
+      return `${padToWidth(row, width - 1)}${bar}`;
+    });
+  }
+
+  scrollbarGeometry(): ScrollbarGeometry | undefined {
+    if (!this.lastHasScrollbar || this.lastTranscriptRows <= 0) return undefined;
+    const trackHeight = this.lastTranscriptRows;
+    const totalRows = this.lastTotalRows;
+    if (totalRows <= trackHeight) return undefined;
+    const minThumbHeight = 1;
+    const thumbHeight = Math.max(
+      minThumbHeight,
+      Math.min(trackHeight, Math.round((trackHeight * trackHeight) / totalRows)),
+    );
+    const maxScrollTop = Math.max(0, totalRows - trackHeight);
+    const maxThumbTop = trackHeight - thumbHeight;
+    const thumbOffset = maxScrollTop === 0 ? 0 : Math.round((this.lastTop / maxScrollTop) * maxThumbTop);
+    return {
+      column: this.lastWidth - 1,
+      trackTop: 0,
+      trackHeight,
+      thumbTop: thumbOffset,
+      thumbHeight,
+      maxScrollTop,
+    };
+  }
+
+  scrollToThumb(pointerRow: number, grabOffset = 0): boolean {
+    const geo = this.scrollbarGeometry();
+    if (!geo || geo.maxScrollTop <= 0) return false;
+    const maxThumbOffset = geo.trackHeight - geo.thumbHeight;
+    if (maxThumbOffset <= 0) return false;
+    const thumbOffset = Math.max(0, Math.min(maxThumbOffset, pointerRow - geo.trackTop - grabOffset));
+    const targetTop = Math.round((thumbOffset / maxThumbOffset) * geo.maxScrollTop);
+    const nextBack = Math.max(0, Math.min(this.lastMaxBack, geo.maxScrollTop - targetTop));
+    if (nextBack === this.scrollBack) return false;
+    this.scrollBack = nextBack;
+    return true;
   }
 
 

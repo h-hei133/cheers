@@ -21,8 +21,19 @@ function createContext(overrides: Partial<SurfaceContext> = {}): SurfaceContext 
   };
 }
 
-describe("InteractiveSurface clean full-width rendering", () => {
-  it("renders transcript across full width without in-buffer scrollbar", () => {
+describe("InteractiveSurface scrollbar and full-width rendering", () => {
+  it("renders transcript without scrollbar when content fits capacity", () => {
+    const surface = new InteractiveSurface(createContext());
+    surface.transcript.append({ kind: "user", text: "short message", finalized: true });
+
+    const plan = surface.renderFrame({ columns: 60, rows: 15 });
+    const content = plan.rows.join("\n");
+    expect(content).not.toContain("█");
+    expect(content).not.toContain("│");
+    expect(surface.scrollbarGeometry()).toBeUndefined();
+  });
+
+  it("renders right-edge scrollbar with track and thumb when content overflows", () => {
     const surface = new InteractiveSurface(createContext());
     for (let i = 0; i < 40; i++) {
       surface.transcript.append({ kind: "user", text: `line ${i}`, finalized: true });
@@ -30,21 +41,40 @@ describe("InteractiveSurface clean full-width rendering", () => {
 
     const plan = surface.renderFrame({ columns: 60, rows: 15 });
     const content = plan.rows.join("\n");
-    // No fake in-buffer scrollbar characters
-    expect(content).not.toContain("█");
-    expect(content).not.toContain("│");
+    expect(content).toContain("█");
+    expect(content).toContain("│");
+
+    const geo = surface.scrollbarGeometry();
+    expect(geo).toBeDefined();
+    expect(geo!.column).toBe(59);
+    expect(geo!.thumbHeight).toBeGreaterThanOrEqual(1);
+    expect(geo!.maxScrollTop).toBeGreaterThan(0);
   });
 
-  it("maps screen coordinates to content coordinates", () => {
+  it("scrolls to thumb position on scrollToThumb", () => {
     const surface = new InteractiveSurface(createContext());
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       surface.transcript.append({ kind: "user", text: `line ${i}`, finalized: true });
     }
     surface.renderFrame({ columns: 60, rows: 15 });
+    const initialBack = surface.scrolledBack;
+    expect(initialBack).toBe(0); // initially following newest
 
-    const coord = surface.screenToContent(5, 10);
+    // Scroll to top of thumb track
+    surface.scrollToThumb(0);
+    expect(surface.scrolledBack).toBeGreaterThan(0);
+  });
+
+  it("clamps screenToContent column to the actual visible line width", () => {
+    const surface = new InteractiveSurface(createContext());
+    surface.transcript.append({ kind: "user", text: "hello", finalized: true });
+    surface.renderFrame({ columns: 60, rows: 15 });
+
+    // Clicking in the blank area far past "hello" (e.g. column 50)
+    const coord = surface.screenToContent(13, 50);
     expect(coord.row).toBeGreaterThanOrEqual(0);
-    expect(coord.column).toBe(10);
+    // Clamped to the line length rather than floating in unselectable void
+    expect(coord.column).toBeLessThan(50);
   });
 
   it("projects content-space selection to screen-space and tracks scrolling", () => {
