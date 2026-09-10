@@ -1,19 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { Transcript } from "../transcript/container.js";
+import { diffPaint, prepareRows } from "../render/paint.js";
 import { textBlock } from "../transcript/blocks.js";
-import { ScrollView } from "./scroll.js";
-import { diffLines } from "./screen.js";
-import { Message } from "./messages.js";
-import { ToolCard } from "./card.js";
-import type { ViewComponent } from "./contract.js";
+import { Transcript } from "../transcript/container.js";
+import { TranscriptPane } from "./pane.js";
 
-class TranscriptView implements ViewComponent {
-  constructor(private readonly transcript: Transcript) {}
-  invalidate(): void {}
-  render(width: number): string[] {
-    return [...this.transcript.render(Math.max(1, width)).rows];
-  }
-}
+/**
+ * Frame budgets over a long conversation.
+ *
+ * A session that has run for an hour must still paint like one that just
+ * started: finalized blocks come from cache, a streaming block re-lays only
+ * itself, the pane slices a window without rendering twice, and the engine's
+ * row diff touches only the rows that changed.
+ */
 
 function buildTranscript(turns: number): Transcript {
   const transcript = new Transcript();
@@ -42,7 +40,16 @@ function buildTranscript(turns: number): Transcript {
   return transcript;
 }
 
-describe("phase 3 long-transcript benchmark", () => {
+/** Indices of the rows that differ, the same rows the engine would rewrite. */
+function changedRows(before: readonly string[], after: readonly string[]): number[] {
+  const changed: number[] = [];
+  for (let index = 0; index < Math.max(before.length, after.length); index++) {
+    if (before[index] !== after[index]) changed.push(index);
+  }
+  return changed;
+}
+
+describe("long-transcript budget", () => {
   it("renders 50 turns within a frame budget", () => {
     const transcript = buildTranscript(50);
     const started = performance.now();
@@ -78,37 +85,30 @@ describe("phase 3 long-transcript benchmark", () => {
     expect(elapsed).toBeLessThan(500);
   });
 
-  it("scrolls a long transcript through a viewport", () => {
+  it("windows a long transcript through the pane", () => {
     const transcript = buildTranscript(50);
-    const view = new ScrollView(new TranscriptView(transcript), { follow: "end" });
+    const pane = new TranscriptPane(transcript);
     const started = performance.now();
-    const visible = view.visible(100, 30);
+    const visible = pane.render(100, 30, undefined);
     const elapsed = performance.now() - started;
-    expect(visible.length).toBe(30);
+    expect(visible).toHaveLength(30);
+    expect(pane.scrolledBack).toBe(0);
+    expect(pane.scrollbarGeometry()).toBeDefined();
     expect(elapsed).toBeLessThan(1000);
   });
 
   it("diffs a streaming frame to a small changed range", () => {
     const transcript = buildTranscript(20);
-    const before = transcript.render(100).rows;
+    const before = prepareRows(transcript.render(100).rows, 100);
     const live = textBlock("assistant", "streaming...");
     live.finalized = false;
     transcript.append(live);
-    const after = transcript.render(100).rows;
-    const diff = diffLines(before, after);
-    expect(diff.noChange).toBe(false);
-    expect(diff.lastChanged - diff.firstChanged).toBeLessThan(30);
-  });
-
-  it("renders product components over a long transcript", () => {
-    const transcript = buildTranscript(10);
-    const rows = transcript.render(100).rows;
-    const message = new Message({ kind: "assistant", text: "# Summary\n\nDone.", finalized: true });
-    const card = new ToolCard({ title: "bash", detail: "sleep 1", text: "ok", collapsed: true, finalized: true });
-    const started = performance.now();
-    const composed = [...rows, ...message.render(100), ...card.render(100)];
-    const elapsed = performance.now() - started;
-    expect(composed.length).toBeGreaterThan(rows.length);
-    expect(elapsed).toBeLessThan(200);
+    const after = prepareRows(transcript.render(100).rows, 100);
+    const changed = changedRows(before, after);
+    expect(changed.length).toBeGreaterThan(0);
+    expect(changed.length).toBeLessThan(30);
+    // The engine rewrites exactly those rows: one cursor move per changed row.
+    const paint = diffPaint(before, after, 0, after.length);
+    expect(paint.split("\x1b[").length - 1).toBeLessThan(changed.length * 3);
   });
 });
