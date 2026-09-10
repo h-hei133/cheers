@@ -242,7 +242,7 @@ export class InteractiveMode {
         if (replaced === draft) {
           this.state.editor.insert(this.state.pastes.holdIfLong(text));
         } else {
-          this.state.editor.setText(replaced);
+          this.state.editor.setDraftText(replaced);
         }
       } else {
         this.state.editor.insert(this.state.pastes.holdIfLong(text));

@@ -9,7 +9,6 @@ import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import {
   executeResolvedPromptTurn,
 } from "../../entrypoints/cliRuntimeModule.js";
-import { normalizePromptForExecution } from "../../entrypoints/cliCommandExecutionBridge.js";
 import { renderSessionCommandMap } from "../../entrypoints/slashCommandRegistry.js";
 import { switchRuntimeSessionProjectContext } from "../../entrypoints/cliSessionModule.js";
 
@@ -35,7 +34,6 @@ export async function runInteractiveResumeAction(input: {
     runtimeContext: input.runtimeContext,
     renderer: input.renderer,
     turnNumber: input.turnNumber,
-    normalizePromptForExecution,
     switchRuntimeSessionProjectContext,
     renderSessionCommandMap,
     executeResolvedPromptTurn: (turnInput) => {

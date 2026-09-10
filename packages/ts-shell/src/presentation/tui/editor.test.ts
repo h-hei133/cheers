@@ -260,6 +260,34 @@ describe("prompt recall", () => {
     editor.recall(-1);
     expect(editor.recall(-1)).toBe(false);
   });
+
+  it("marks recalled entries as browsing until edited", () => {
+    const editor = new Editor();
+    editor.pushHistory("first");
+    editor.insert("draft");
+    editor.recall(-1);
+    expect(editor.browsingHistory).toBe(true);
+    editor.insert("!");
+    expect(editor.browsingHistory).toBe(false);
+    expect(editor.getText()).toBe("first!");
+  });
+
+  it("snaps vertical moves to grapheme boundaries", () => {
+    const editor = new Editor();
+    editor.setText("AB\uD83D\uDE00CD\nxyz");
+    editor.move("up");
+    editor.move("down");
+    expect(editor.getText()).toBe("AB\uD83D\uDE00CD\nxyz");
+  });
+
+  it("jumps to document edges", () => {
+    const editor = new Editor();
+    editor.setText("one\ntwo\nthree");
+    editor.move("doc-start");
+    editor.move("right");
+    editor.move("doc-end");
+    expect(editor.getText()).toBe("one\ntwo\nthree");
+  });
 });
 
 describe("vertical scrolling and height bounds", () => {

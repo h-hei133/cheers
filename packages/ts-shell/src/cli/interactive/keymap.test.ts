@@ -272,6 +272,35 @@ describe("editing shortcuts", () => {
     expect(surface.editor.getText()).toBe("earlier");
   });
 
+  it("keeps a draft in progress on up instead of losing it to history", () => {
+    const { press, surface } = build();
+    surface.editor.pushHistory("earlier");
+    for (const char of "typing") press(char);
+    press("\x1b[A");
+    expect(surface.editor.getText()).toBe("typing");
+  });
+
+  it("keeps walking history once browsing has started", () => {
+    const { press, surface } = build();
+    surface.editor.pushHistory("first");
+    surface.editor.pushHistory("second");
+    press("\x1b[A");
+    expect(surface.editor.getText()).toBe("second");
+    for (const char of " edited") press(char);
+    press("\x1b[A");
+    // The edit adopted the entry as the draft, so up now pins at line start.
+    expect(surface.editor.getText()).toBe("second edited");
+  });
+
+  it("jumps to document edges on ctrl+home and ctrl+end", () => {
+    const { press, surface } = build();
+    surface.editor.setText("one\ntwo\nthree");
+    press("\x1b[1;5H");
+    expect(surface.editor.getText()).toBe("one\ntwo\nthree");
+    press("\x1b[1;5F");
+    expect(surface.editor.getText()).toBe("one\ntwo\nthree");
+  });
+
   it("keeps walking history past a recalled slash command", () => {
     // Recalling "/help" used to pop the completion list, which then ate the next
     // arrow press and stranded the user on that entry.

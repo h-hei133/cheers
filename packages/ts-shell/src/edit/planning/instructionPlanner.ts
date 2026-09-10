@@ -181,13 +181,7 @@ export function resolveMutationInstruction(
   | { ok: false; reason: string } {
   if (plan.taskKind === "write-file") {
     const inlineContent = extractInlineWriteContent(rawPrompt);
-    const resolvedContent =
-      fencedContent ??
-      inlineContent ??
-      inferLowRiskExampleFileContent({
-        targetPath: plan.targetPath,
-        prompt: rawPrompt,
-      });
+    const resolvedContent = fencedContent ?? inlineContent;
     if (!resolvedContent) {
       return {
         ok: false,
@@ -296,18 +290,6 @@ export function resolveMutationInstruction(
       };
     }
 
-    const constrainedAddition = inferLowRiskConstrainedAddition({
-      targetPath: plan.targetPath,
-      prompt: rawPrompt,
-      originalContent,
-    });
-    if (constrainedAddition) {
-      return {
-        ok: true,
-        content: constrainedAddition,
-        ...computeLineDelta(originalContent, constrainedAddition),
-      };
-    }
   }
 
   if (typeof originalContent === "string" && replaceDirective) {
@@ -775,108 +757,6 @@ function trimTrailingVerifyInstruction(content: string): string {
     )
     .replace(/[.!?。！？]\s*$/, "")
     .trim();
-}
-
-function inferLowRiskConstrainedAddition(input: {
-  targetPath?: string;
-  prompt: string;
-  originalContent: string;
-}): string | undefined {
-  const normalizedTarget = normalizePathLike(input.targetPath ?? "");
-  if (
-    normalizedTarget.endsWith("examples.md") &&
-    /\bexpected\s+outputs?\b/i.test(input.prompt) &&
-    /\bdouble\s*\(\s*3\s*\)/.test(input.prompt) &&
-    /\bsquare\s*\(\s*4\s*\)/.test(input.prompt)
-  ) {
-    return buildLowRiskMathExamplesContent({ includeOutputs: true });
-  }
-
-  if (
-    normalizedTarget.endsWith("README.md") &&
-    /\b(?:add|show|primary\s+example|second\s+example)\b[\s\S]{0,120}\b(?:usage\s+section|example)\b/i.test(
-      input.prompt,
-    ) &&
-    /\b(?:greet|welcome)\(\)/.test(input.prompt) &&
-    /(?:greet|welcome)\((?:["“']?Ada["”']?)\)/.test(input.prompt)
-  ) {
-    const functionName = /\bwelcome\(\)/.test(input.prompt)
-      ? "welcome"
-      : "greet";
-    const usageSection = [
-      "## Usage",
-      "",
-      `- \`${functionName}()\``,
-      `- \`${functionName}(\"Ada\")\``,
-    ].join("\n");
-    if (
-      input.originalContent.includes(`${functionName}()`) &&
-      input.originalContent.includes(`${functionName}(\"Ada\")`)
-    ) {
-      return input.originalContent;
-    }
-    const separator =
-      input.originalContent.length > 0 && !input.originalContent.endsWith("\n")
-        ? "\n\n"
-        : "\n";
-    return `${input.originalContent}${separator}${usageSection}`;
-  }
-
-  if (
-    normalizedTarget.endsWith("utils.js") &&
-    /\badd\b[\s\S]{0,120}\bexported\s+function\b[\s\S]{0,80}\bshout\s*\(\s*message\s*\)/i.test(
-      input.prompt,
-    ) &&
-    /message\.toUpperCase\s*\(\s*\)/.test(input.prompt)
-  ) {
-    if (/export\s+function\s+shout\s*\(/.test(input.originalContent)) {
-      return input.originalContent;
-    }
-    const functionBlock = [
-      "export function shout(message) {",
-      "  return message.toUpperCase();",
-      "}",
-    ].join("\n");
-    const separator =
-      input.originalContent.length > 0 && !input.originalContent.endsWith("\n")
-        ? "\n\n"
-        : "\n";
-    return `${input.originalContent}${separator}${functionBlock}`;
-  }
-
-  return undefined;
-}
-
-function inferLowRiskExampleFileContent(input: {
-  targetPath?: string;
-  prompt: string;
-}): string | undefined {
-  const normalizedTarget = normalizePathLike(input.targetPath ?? "");
-  if (
-    normalizedTarget.endsWith("examples.md") &&
-    /\bcreate\b[\s\S]{0,80}\bexamples\.md\b/i.test(input.prompt) &&
-    /\bdouble\b/i.test(input.prompt) &&
-    /\bsquare\b/i.test(input.prompt)
-  ) {
-    return buildLowRiskMathExamplesContent({
-      includeOutputs: /\bexpected\s+outputs?\b/i.test(input.prompt),
-    });
-  }
-  return undefined;
-}
-
-function buildLowRiskMathExamplesContent(input: {
-  includeOutputs: boolean;
-}): string {
-  if (input.includeOutputs) {
-    return [
-      "# Examples",
-      "",
-      "- `double(3)` returns `6`.",
-      "- `square(4)` returns `16`.",
-    ].join("\n");
-  }
-  return ["# Examples", "", "- `double(3)`", "- `square(4)`"].join("\n");
 }
 
 function inferLowRiskSmallBugfix(input: {

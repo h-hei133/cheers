@@ -15,6 +15,8 @@ import type { InteractiveView, ViewActions } from "../../presentation/tui/view.j
 const MOTIONS: Record<string, CursorMove> = {
   left: "left",
   right: "right",
+  "ctrl+home": "doc-start",
+  "ctrl+end": "doc-end",
   "ctrl+b": "left",
   "ctrl+f": "right",
   "alt+left": "word-left",
@@ -189,8 +191,26 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
       actions.scroll(1);
       return;
     case "ctrl+end":
-      // Page back to the live edge: one key does what many shift-downs do.
+      // With a non-empty draft the caret jumps inside the draft; on an empty
+      // prompt the same chord pages back to the live edge of the conversation.
+      if (view.editor.getText().length > 0) {
+        view.editor.move("doc-end");
+        actions.syncSuggestions(opensSuggestions(event));
+        actions.redraw();
+        return;
+      }
       actions.scrollToEnd();
+      return;
+    case "ctrl+home":
+      // Mirror of ctrl+end: jump inside a non-empty draft, else scroll the
+      // conversation to its oldest rows.
+      if (view.editor.getText().length > 0) {
+        view.editor.move("doc-start");
+        actions.syncSuggestions(opensSuggestions(event));
+        actions.redraw();
+        return;
+      }
+      actions.scroll(1_000_000);
       return;
     case "f5":
       // A function key rather than a modified chord: every terminal delivers F5
@@ -219,7 +239,19 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
 function recallOrMove(context: KeymapContext, direction: 1 | -1): void {
   const { view, actions } = context;
   const moved = view.editor.move(direction === -1 ? "up" : "down");
-  if (!moved && view.editor.recall(direction)) {
+  if (moved) {
+    actions.redraw();
+    return;
+  }
+  // A draft in progress pins recall at the newest entry: pressing up from the
+  // first line must not throw away what is being typed for a history entry.
+  // An empty prompt, or one already showing a recalled entry, walks history.
+  if (direction === -1 && view.editor.getText().trim().length > 0 && !view.editor.browsingHistory) {
+    view.editor.move("line-start");
+    actions.redraw();
+    return;
+  }
+  if (view.editor.recall(direction)) {
     view.setSuggesting(false);
   }
   actions.redraw();

@@ -20,6 +20,8 @@ export type CursorMove =
   | "word-right"
   | "line-start"
   | "line-end"
+  | "doc-start"
+  | "doc-end"
   | "up"
   | "down";
 
@@ -56,7 +58,40 @@ export class Editor {
   private readonly history: string[] = [];
   private historyIndex = -1;
   private draft = "";
+  /**
+   * True while the text on screen is a recalled history entry rather than the
+   * user's in-progress draft. Any edit turns the entry into the new draft and
+   * leaves browsing, so a recalled line that gets changed is kept as edited
+   * rather than written back over the history it came from.
+   */
+  private browsing = false;
   private scrollOffset = 0;
+
+  /** Whether the caret sits on a recalled history entry. */
+  get browsingHistory(): boolean {
+    return this.browsing;
+  }
+
+  /** Leave history-browsing: the current text becomes the in-progress draft. */
+  private adoptAsDraft(): void {
+    if (!this.browsing) return;
+    this.browsing = false;
+    this.historyIndex = -1;
+    this.draft = this.getText();
+  }
+
+  /** Clamp `column` to a grapheme boundary of `line`. */
+  private static snapColumn(line: string, column: number): number {
+    if (column <= 0) return 0;
+    if (column >= line.length) return line.length;
+    const boundaries = graphemeBoundaries(line);
+    let snapped = 0;
+    for (const boundary of boundaries) {
+      if (boundary > column) break;
+      snapped = boundary;
+    }
+    return snapped;
+  }
   getText(): string {
     return this.lines.join("\n");
   }
@@ -70,18 +105,26 @@ export class Editor {
     this.scrollOffset = 0;
   }
 
+  /** Programmatic text replacement that also adopts the text as the draft. */
+  setDraftText(text: string): void {
+    this.setText(text);
+    this.adoptAsDraft();
+  }
+
   clear(): void {
     this.saveUndo();
     this.lines = [""];
     this.row = 0;
     this.column = 0;
     this.historyIndex = -1;
+    this.browsing = false;
     this.scrollOffset = 0;
   }
 
   /** Insert literal text, expanding tabs and splitting embedded newlines. */
   insert(text: string): void {
     if (!text) return;
+    this.adoptAsDraft();
     this.saveUndo();
     const clean = text.replace(/\t/g, "  ").replace(/\r\n?/g, "\n");
     const line = this.lines[this.row]!;
@@ -101,6 +144,7 @@ export class Editor {
 
   /** Split the current line at the cursor, as Shift+Enter does. */
   newline(): void {
+    this.adoptAsDraft();
     this.saveUndo();
     const line = this.lines[this.row]!;
     this.lines.splice(this.row, 1, line.slice(0, this.column), line.slice(this.column));
@@ -110,6 +154,7 @@ export class Editor {
 
   backspace(): void {
     if (this.column > 0) {
+      this.adoptAsDraft();
       this.saveUndo();
       const line = this.lines[this.row]!;
       const start = this.atomicStart(line) ?? previousCluster(line, this.column);
@@ -118,6 +163,7 @@ export class Editor {
       return;
     }
     if (this.row === 0) return;
+    this.adoptAsDraft();
     this.saveUndo();
     const previous = this.lines[this.row - 1]!;
     this.column = previous.length;
@@ -129,12 +175,14 @@ export class Editor {
   deleteForward(): void {
     const line = this.lines[this.row]!;
     if (this.column < line.length) {
+      this.adoptAsDraft();
       this.saveUndo();
       const end = this.atomicEnd(line) ?? nextCluster(line, this.column);
       this.lines[this.row] = line.slice(0, this.column) + line.slice(end);
       return;
     }
     if (this.row >= this.lines.length - 1) return;
+    this.adoptAsDraft();
     this.saveUndo();
     this.lines[this.row] = line + this.lines[this.row + 1]!;
     this.lines.splice(this.row + 1, 1);
@@ -176,6 +224,7 @@ export class Editor {
     else start = wordStart(line, this.column);
     if (start === end) {
       if (!backward || this.row === 0) return;
+      this.adoptAsDraft();
       this.saveUndo();
       this.pushKill("\n", continuing);
       const previous = this.lines[this.row - 1]!;
@@ -186,6 +235,7 @@ export class Editor {
       this.markKill(target);
       return;
     }
+    this.adoptAsDraft();
     this.saveUndo();
     this.pushKill(line.slice(start, end), continuing);
     this.lines[this.row] = line.slice(0, start) + line.slice(end);
@@ -231,15 +281,21 @@ export class Editor {
         return this.setColumn(0);
       case "line-end":
         return this.setColumn(line.length);
+      case "doc-start":
+        this.row = 0;
+        return this.setColumn(0);
+      case "doc-end":
+        this.row = this.lines.length - 1;
+        return this.setColumn(this.lines[this.row]!.length);
       case "up":
         if (this.row === 0) return false;
         this.row -= 1;
-        this.column = Math.min(this.column, this.lines[this.row]!.length);
+        this.column = Editor.snapColumn(this.lines[this.row]!, Math.min(this.column, this.lines[this.row]!.length));
         return true;
       default:
         if (this.row >= this.lines.length - 1) return false;
         this.row += 1;
-        this.column = Math.min(this.column, this.lines[this.row]!.length);
+        this.column = Editor.snapColumn(this.lines[this.row]!, Math.min(this.column, this.lines[this.row]!.length));
         return true;
     }
   }
@@ -267,6 +323,8 @@ export class Editor {
   /**
    * Recall an earlier (-1) or later (+1) prompt. The in-progress draft is stashed
    * on the first step back and restored when navigation returns past the end.
+   * A recalled entry is browsing state: editing it adopts the edit as the new
+   * draft instead of writing back over the history entry.
    */
   recall(direction: -1 | 1): boolean {
     if (this.history.length === 0) return false;
@@ -280,15 +338,18 @@ export class Editor {
         return false;
       }
       this.setText(this.history[this.historyIndex]!);
+      this.browsing = true;
       return true;
     }
     if (this.historyIndex === -1) return false;
     if (this.historyIndex < this.history.length - 1) {
       this.historyIndex += 1;
       this.setText(this.history[this.historyIndex]!);
+      this.browsing = true;
       return true;
     }
     this.historyIndex = -1;
+    this.browsing = false;
     this.setText(this.draft);
     return true;
   }

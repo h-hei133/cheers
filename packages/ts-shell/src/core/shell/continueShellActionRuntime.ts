@@ -37,7 +37,6 @@ export async function runResumeLikeShellAction(options: {
   runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   turnNumber?: number;
-  normalizePromptForExecution: (prompt: string) => string;
   switchRuntimeSessionProjectContext: (
     runtimeContext: ShellRuntimeContext,
     session: Session,
@@ -99,10 +98,8 @@ export async function runResumeLikeShellAction(options: {
       }
 
       const nextTurn = (options.turnNumber ?? 0) + 1;
-      const effectiveFollowUp =
-        options.normalizePromptForExecution(continuationPrompt);
       await options.executeResolvedPromptTurn({
-        effectivePrompt: effectiveFollowUp,
+        effectivePrompt: continuationPrompt,
         continuityState: options.sessionManager.buildContinuitySnapshot(
           resumeResult.session.id,
         ),
@@ -148,10 +145,8 @@ export async function runResumeLikeShellAction(options: {
 
   if (continuationPrompt) {
     const nextTurn = (options.turnNumber ?? 0) + 1;
-    const effectiveFollowUp =
-      options.normalizePromptForExecution(continuationPrompt);
     await options.executeResolvedPromptTurn({
-      effectivePrompt: effectiveFollowUp,
+      effectivePrompt: continuationPrompt,
       turnNumber: options.source === "interactive" ? nextTurn : undefined,
       turnOrigin: "continued",
     });

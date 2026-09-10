@@ -38,7 +38,6 @@ import {
 } from "./cliApprovalModule.js";
 import {
   buildCliCommandExecution as resolveTurnInputForExecution,
-  normalizePromptForExecution,
 } from "./cliCommandExecutionBridge.js";
 import { formatCliContextTag } from "./cliInteractiveLoopState.js";
 import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
@@ -307,7 +306,6 @@ export async function runNonInteractivePrompt(options: {
         sessionManager: options.sessionManager,
         runtimeContext: options.runtimeContext,
         renderer: options.renderer,
-        normalizePromptForExecution,
         switchRuntimeSessionProjectContext,
         renderSessionCommandMap,
         executeResolvedPromptTurn: (turnInput) => {

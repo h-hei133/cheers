@@ -28,7 +28,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   },
   { keys: ["home", "ctrl+a"], does: "start of line", group: "moving" },
   { keys: ["end", "ctrl+e"], does: "end of line", group: "moving" },
-  { keys: ["up", "down"], does: "move between lines, then walk prompt history", group: "moving" },
+  { keys: ["up", "down"], does: "move between lines, then walk prompt history (a draft in progress stays put)", group: "moving" },
+  { keys: ["ctrl+home", "ctrl+end"], does: "first/last line of the draft, or oldest/newest conversation when empty", group: "moving" },
   { keys: ["pageup", "pagedown"], does: "scroll the conversation by a screen", group: "moving" },
   { keys: ["shift+up", "shift+down"], does: "scroll the conversation by a line", group: "moving" },
 

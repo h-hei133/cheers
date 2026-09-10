@@ -208,7 +208,6 @@ async function runContinue(
     runtimeContext,
     renderer: new CapturingRenderer(lines),
     turnNumber: 4,
-    normalizePromptForExecution: (prompt) => prompt.trim(),
     switchRuntimeSessionProjectContext: (context, nextSession) => {
       context.session = nextSession;
       context.projectRoot = nextSession.projectRoot;
