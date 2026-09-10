@@ -150,3 +150,64 @@ Phase 0/1/2 阶段完成了底层与产品组件的构造与单测覆盖。Phase
 
 - 两条表面 E1~E6 全过，且同一操作序列下逐帧行为无未解释差异，方可解除 Phase 3 删除阻塞。
 - 任一差异先记入 `tui-known-defects.md` 再修，不带病进入删除审计。
+
+## Phase 3 删除审计（2026-09-10）
+
+### 审计方法
+
+- 以 import 图为唯一证据：对 `presentation/tui/**` 与 `cli/interactive/**` 的每个非测试模块列出**生产（非测试）导入方**；只被测试导入的模块视为"未接入生产"。
+- 对每个候选回答三个问题：谁替代了它；它是否是两条表面共享的底座；删除后哪些测试覆盖需要移植而不是丢弃。
+- 基线：`tsc -p tsconfig.build.json` 通过；`vitest run src/presentation/tui src/cli/interactive` 50 套件 626 项，2 项既有失败（`picker/pickers.test.ts` 审批 chooser 仍断言字符串形态，而拒绝理由特性已把结算结果改为 `{ decision, reason? }`，属 stale expectation，先修正断言再开始删除）。
+
+### 事实：两条表面是同一算法
+
+`cli/interactive/frameSurface.ts`（`InteractiveSurface`）与 `adapter/view.ts`（`ComposedView`）逐方法对照：两者都持有 `TranscriptPane`，全部几何问题（scroll / page / thumb / screenToContent / contentToScreenSpan / contentRows / blockAtScreenRow / composerGeometry）原样委托；帧组装同为"pane 行 + chrome 行"；`surface.test.ts` 六组逐帧对照已证明输出逐字节相同。
+
+差异只有一处：`ComposedView` 把 chrome 经 `adapter/chrome.ts` 的 `StatusBar` / `Composer` 两个包装类绘制，而这两个类每帧由 `setFacts` 灌入同一份事实，再调用同一组 `renderActivity` / `renderBand` / `renderComposer` / `renderHints`；`ViewComponent` 合约里的 `handleInput` / `handlePointer` / `focused` 在生产路径上无人调用（2.5-A 已冻结"宿主拥有全部输入决策"）。副作用：`ComposedView.renderChrome` 每帧调用两次 `renderComposer`（一次取几何、一次在 `Composer.render` 内），是重复工作。
+
+结论：组件包装层没有带来任何能力，只带来第二条一模一样的链路——这正是选型文档"迁移期间不得保留两套渲染链路"所指。收敛为唯一表面，保留直接渲染的实现体。
+
+### 删除清单（被替代的专属职责）
+
+| 文件 | 生产导入方 | 被谁替代 | 处置 |
+|---|---|---|---|
+| `adapter/card.ts`（`ToolCard`） | 无，仅测试 | `transcript/blocks.ts` 工具块 + `turnSink.ts` / `toolCards.ts` | 删除 |
+| `adapter/messages.ts`（`Message` 与工厂） | 无 | `transcript/blocks.ts` + `textBlock` | 删除 |
+| `adapter/dialog.ts`（`PermissionDialog`） | 无 | `picker/approval.ts` + `overlay.ts` 面板（含快捷键与拒绝理由） | 删除 |
+| `adapter/select.ts`（`SelectList`） | 无 | `chrome/options.ts` + `chrome/modal.ts` / `panel.ts` + `OverlayHost` | 删除 |
+| `adapter/loader.ts`（`Loader`） | 无 | `transcript/live.ts` `renderActivity` | 删除 |
+| `adapter/markdown.ts`（`Markdown` 包装） | 无 | `transcript/markdown.ts` 由 blocks 直接使用 | 删除 |
+| `adapter/editor.ts`（`PromptEditor` 包装） | 无 | `tui/editor.ts` + `chrome/composer.ts`，keymap 直接驱动 `Editor` | 删除 |
+| `adapter/layout.ts`（`Text` / `VStack` / `HStack`） | 无 | 帧即行数组拼接，无堆叠消费者 | 删除 |
+| `adapter/screen.ts`（主屏差分 / `BoundedWriter`） | 无 | `render/engine.ts` + `render/paint.ts` 备用屏差分 | 删除（选型文档点名的"重复 scroll/ANSI 逻辑"） |
+| `adapter/overlay.ts`（`OverlayStack`） | 无 | `cli/interactive/overlay.ts` `OverlayHost` | 删除 |
+| `adapter/surface.ts`（`Surface`） | 无 | `render/engine.ts` `TUI` 由 `InteractiveMode` 直接使用 | 删除 |
+| `adapter/theme.ts` | 仅上述死模块 | `presentation/theme/theme.ts` | 删除 |
+| `adapter/chrome.ts`（`StatusBar` / `Composer` 包装） | `adapter/view.ts` | `chrome/*` 纯渲染函数 | 随表面收敛删除 |
+| `adapter/contract.ts`（`ViewComponent` / `Container`） | `scroll.ts` / `transcript.ts` / `chrome.ts` | 无生产消费者 | 删除 |
+| `adapter/transcript.ts`（`TranscriptView`） | `pane.ts` | `Transcript.render` 已返回 owners | 并入 pane |
+| `adapter/model.ts` | `chrome.ts` / `view.ts` | 无 | 删除 |
+| `cli/interactive/frameSurface.ts` | `surface.ts` | 与 `adapter/view.ts` 合并为唯一表面 | 删除 |
+| `cli/interactive/surface.ts`（`ViewHost` / `createView`） | `interactiveMode.ts` | 只剩一条表面后无选择与回退对象 | 删除 |
+| `tuiSettings.ts` 的表面选择（`SurfaceChoice` / `readSurfaceChoice` / `writeSurfaceChoice` / `CODING_AGENTS_TUI_SURFACE` / `tui.surface`） | `interactiveMode.ts` | 同上 | 删除，`statusItems` 保留 |
+
+### 保留清单（共享底座，不删）
+
+`render/engine.ts`、`render/frame.ts`、`render/paint.ts`、`terminal.ts`、`text/*`、`editor.ts`、`pastes.ts`、`input/*`、`chrome/*`、`transcript/*`（blocks / container / live / markdown / diff / selection / viewport）、`view.ts` 合约、`adapter/pane.ts`、`adapter/scroll.ts`（简化为纯滚动模型，去掉容器继承与无人使用的 `visible`）。
+
+### 测试覆盖移植
+
+- `adapter.test.ts` 的滚动视图用例 → `surface/scroll.test.ts`；主屏差分、overlay 栈、视图模型用例随被删模块删除（生产差分由 `render/engine.test.ts` 覆盖，overlay 由 `cli/interactive/overlay.test.ts` 覆盖）。
+- `benchmark.test.ts` 的性能预算 → 改为对 `Transcript` + `TranscriptPane` + `InteractiveSurface.renderFrame` + `diffPaint` 的预算（去掉 `Message` / `ToolCard` / `diffLines`）。
+- `components.test.ts` / `products.test.ts` / `spike.test.ts` 随模块删除；其覆盖的 band / composer / hints / options / modal 各自已有 `chrome/*.test.ts`。
+- `view.test.ts` + `frameSurface.test.ts` + `surface.test.ts` 的对照脚本 → 合并为唯一表面的行为测试（把"两者相同"改写为对具体行为的直接断言）。
+- `firstFrame.test.ts` 删去"composed 经宿主"三项（回退不再存在）。
+
+### 收敛后的布局
+
+`presentation/tui/surface/contract.ts`（原 `view.ts`）、`surface/view.ts`（`InteractiveSurface`）、`surface/pane.ts`、`surface/scroll.ts`。目录名从 `adapter` 改为 `surface`：删除之后它不再适配任何东西。
+
+### 顺带修复（先看参考实现再动手）
+
+- 退出时转写不见了：备用屏 `?1049l` 原样恢复终端，会话内容一个字都不留在回滚区，用户退出后只看到一行 `--resume` 提示。参考实现的备用屏 stop 在恢复主屏后把完整逻辑文档逐行打印到主屏，其规划文档把这列为硬性目标。照此实现：`TUI.stop({ document })` 在离开备用屏后打印转写全部行，宿主在 stop 时传入当前宽度下的转写行。
+- `InteractiveMode` 头注释仍写着"运行在普通屏幕、转写退役进回滚区"，与备用屏架构不符，随修改一并纠正。
