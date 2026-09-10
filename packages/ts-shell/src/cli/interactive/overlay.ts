@@ -4,6 +4,7 @@ import { renderPanel } from "../../presentation/tui/chrome/panel.js";
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 import { defaultTheme } from "../../presentation/theme/theme.js";
 import { CURSOR_MARKER } from "../../presentation/tui/render/paint.js";
+import { truncateToWidth } from "../../presentation/tui/text/layout.js";
 
 /**
  * The active picker.
@@ -65,6 +66,11 @@ export interface Picker {
    * The user pressed Ctrl+R to rename the selected option to `newTitle`.
    */
   onRename?(id: string, newTitle: string): Promise<string | undefined> | void;
+  /**
+   * The user denied permission. If implemented, user can provide an optional
+   * reason string, or undefined when denied without reason.
+   */
+  onDeny?(reason: string | undefined): Promise<void> | void;
 }
 
 /** Rows the inline panel is allowed to occupy. */
@@ -76,11 +82,11 @@ export class OverlayHost {
   private loading = false;
 
   // In-TUI modal sub-modes for interactive delete confirmation and rename
-  private subMode: "none" | "confirm-delete" | "rename" = "none";
+  private subMode: "none" | "confirm-delete" | "rename" | "deny-reason" = "none";
   private subTargetId: string | undefined;
   private subTargetLabel: string | undefined;
   private renameDraft = "";
-
+  private denyDraft = "";
   constructor(private readonly onChange: () => void) {}
 
   get active(): boolean {
@@ -101,7 +107,7 @@ export class OverlayHost {
     this.subTargetId = undefined;
     this.subTargetLabel = undefined;
     this.renameDraft = "";
-    this.model.setOptions([]);
+    this.denyDraft = "";
     this.model.setFilter("");
     this.onChange();
     void picker
@@ -141,7 +147,9 @@ export class OverlayHost {
     if (this.subMode === "rename") {
       return this.renderRename(width, height);
     }
-
+    if (this.subMode === "deny-reason") {
+      return this.renderDenyReason(width, height);
+    }
     const empty = this.loading ? "loading…" : picker.empty;
     const actionHints =
       picker.onDelete || picker.onRename
@@ -218,6 +226,38 @@ export class OverlayHost {
     return rows.slice(0, height);
   }
 
+  private renderDenyReason(width: number, height: number): string[] {
+    const isModal = this.picker?.form === "modal";
+    if (isModal) {
+      const inner = Math.max(20, width - 2);
+      const title = defaultTheme.bold(defaultTheme.fg("warning", " Deny Permission "));
+      const fill = Math.max(0, inner - 19);
+      const rows: string[] = [
+        defaultTheme.fg("border", "┌") + title + defaultTheme.fg("border", `${"─".repeat(fill)}┐`),
+        modalBody("", inner),
+        modalBody(defaultTheme.bold("Explain why this was denied (optional):"), inner),
+        modalBody("", inner),
+        modalBody(`  > ${defaultTheme.fg("accent", this.denyDraft)}${CURSOR_MARKER}█`, inner),
+        modalBody("", inner),
+        modalBody(`  ${defaultTheme.fg("success", "[Enter] Submit")}    ${defaultTheme.fg("muted", "[Esc] Skip (no reason)")}`, inner),
+        modalBody("", inner),
+      ];
+      while (rows.length < height - 1) rows.push(modalBody("", inner));
+      rows.push(defaultTheme.fg("border", `└${"─".repeat(inner)}┘`));
+      return rows.slice(0, height);
+    }
+    const title = defaultTheme.bold(`  Permission Denied: ${this.picker?.title.replace(/^Permission:\s*/, "") ?? ""}`);
+    const prompt = defaultTheme.dim("  Explain why this was denied (optional, press Enter to skip):");
+    const input = `  > ${defaultTheme.fg("accent", this.denyDraft)}${CURSOR_MARKER}█`;
+    const hints = defaultTheme.dim("  [Enter] Submit reason    [Esc] Deny without reason");
+    return [
+      truncateToWidth(title, width),
+      truncateToWidth(prompt, width),
+      truncateToWidth(input, width),
+      truncateToWidth(hints, width),
+    ];
+  }
+
   /**
    * Route one key. Returns false only for keys the picker does not claim, which
    * currently means nothing: a picker owns the keyboard while it is open.
@@ -290,6 +330,36 @@ export class OverlayHost {
       }
       return true; // absorb all other keys while renaming
     }
+    // Sub-mode: deny with optional reason
+    if (this.subMode === "deny-reason") {
+      if (event.keyId === "enter") {
+        const reason = this.denyDraft.trim();
+        const onDeny = this.picker?.onDeny;
+        this.close();
+        void onDeny?.(reason || undefined);
+        return true;
+      }
+      if (event.keyId === "escape" || (event.ctrl && (event.keyId === "c" || event.keyId === "ctrl+c"))) {
+        const onDeny = this.picker?.onDeny;
+        this.close();
+        void onDeny?.(undefined);
+        return true;
+      }
+      if (event.keyId === "backspace") {
+        if (this.denyDraft.length > 0) {
+          this.denyDraft = this.denyDraft.slice(0, -1);
+          this.onChange();
+        }
+        return true;
+      }
+      if (event.text && !event.ctrl && !event.alt) {
+        this.denyDraft += event.text;
+        this.onChange();
+        return true;
+      }
+      return true; // absorb all other keys while typing reason
+    }
+
     // Normal navigation mode
     const isApprovalPicker =
       picker.title.startsWith("Permission:") ||
@@ -308,6 +378,12 @@ export class OverlayHost {
         return true;
       }
       if (key === "n" || key === "d" || key === "3" || text === "3" || text === "n" || text === "d") {
+        if (picker.onDeny) {
+          this.subMode = "deny-reason";
+          this.denyDraft = "";
+          this.onChange();
+          return true;
+        }
         this.acceptDirect(picker, apply, ["deny"]);
         return true;
       }
@@ -354,6 +430,9 @@ export class OverlayHost {
       }
       case "escape":
       case "ctrl+c":
+        if (isApprovalPicker && picker.onDeny) {
+          void picker.onDeny(undefined);
+        }
         this.close();
         return true;
       case "up":
@@ -376,6 +455,12 @@ export class OverlayHost {
         }
         break;
       case "enter":
+        if (isApprovalPicker && this.model.current()?.id === "deny" && picker.onDeny) {
+          this.subMode = "deny-reason";
+          this.denyDraft = "";
+          this.onChange();
+          return true;
+        }
         this.accept(picker, apply);
         return true;
       default:

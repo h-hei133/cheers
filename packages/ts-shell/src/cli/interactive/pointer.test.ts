@@ -134,3 +134,48 @@ describe("pointer scrollbar interaction", () => {
     expect(redraws()).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe("pointer composer drag selection", () => {
+  it("drags across composer rows and copies draft text on release", () => {
+    const compRows = [
+      "╰─ line 1 of input draft",
+      "line 2 of input draft",
+    ];
+    const { pointer, copied, redraws } = build({
+      composerGeometry: () => ({ top: 10, bottom: 11, rows: compRows }),
+    });
+
+    // Press at row 10 (screen row 10, 1-based is 11), col 0 (1-based is 1)
+    pointer.handle(parseMouseReport("\x1b[<0;1;11M")!);
+    expect(pointer.composerSelection).toBeDefined();
+    expect(pointer.selection).toBeUndefined();
+
+    // Drag to col 20 (1-based is 21)
+    pointer.handle(parseMouseReport("\x1b[<32;21;11M")!);
+    expect(pointer.composerSelection).toBeDefined();
+
+    // Release
+    pointer.handle(parseMouseReport("\x1b[<0;21;11m")!);
+    expect(copied.length).toBe(1);
+    expect(copied[0]).toContain("line 1");
+    expect(redraws()).toBeGreaterThanOrEqual(3);
+  });
+
+  it("clears composer selection on single click without drag", () => {
+    const compRows = ["╰─ draft text"];
+    const { pointer } = build({
+      composerGeometry: () => ({ top: 10, bottom: 10, rows: compRows }),
+    });
+
+    // Make selection
+    pointer.handle(parseMouseReport("\x1b[<0;5;11M")!);
+    pointer.handle(parseMouseReport("\x1b[<32;15;11M")!);
+    pointer.handle(parseMouseReport("\x1b[<0;15;11m")!);
+    expect(pointer.composerSelection).toBeDefined();
+
+    // Single click
+    pointer.handle(parseMouseReport("\x1b[<0;6;11M")!);
+    pointer.handle(parseMouseReport("\x1b[<0;6;11m")!);
+    expect(pointer.composerSelection).toBeUndefined();
+  });
+});

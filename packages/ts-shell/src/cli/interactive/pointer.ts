@@ -24,32 +24,68 @@ export interface PointerContext {
   redraw(): void;
 }
 
+function cleanComposerSelection(text: string): string {
+  return text.replace(/^(?:\x1b\[[0-9;]*m)*╰─\s*(?:\x1b\[[0-9;]*m)*/u, "");
+}
+
 export class Pointer {
   private readonly drag: DragSelection;
+  private readonly composerDrag: DragSelection;
+  private dragTarget: "transcript" | "composer" | undefined;
   private scrollbarDrag: { readonly grabOffset: number } | undefined;
 
   constructor(private readonly context: PointerContext) {
     this.drag = new DragSelection({ rows: () => context.rows() }, (text) => context.copy(text));
+    this.composerDrag = new DragSelection(
+      {
+        rows: () => {
+          const geo = context.view().composerGeometry?.();
+          return geo ? geo.rows : [];
+        },
+      },
+      (text) => {
+        const clean = cleanComposerSelection(text);
+        if (clean.trim().length > 0) context.copy(clean);
+      },
+    );
   }
 
-  /** What the pointer has covered so far, for the frame to shade. */
+  /** What the pointer has covered in the transcript, for the frame to shade. */
   get selection(): SelectionSpan | undefined {
-    return this.drag.span;
+    return this.dragTarget === "transcript" || (this.dragTarget === undefined && this.drag.span)
+      ? this.drag.span
+      : undefined;
+  }
+
+  /** What the pointer has covered in the composer, for the frame to shade. */
+  get composerSelection(): SelectionSpan | undefined {
+    return this.dragTarget === "composer" || (this.dragTarget === undefined && this.composerDrag.span)
+      ? this.composerDrag.span
+      : undefined;
   }
 
   /** Clear any active drag selection. Returns true if there was a selection. */
   clearSelection(): boolean {
     this.scrollbarDrag = undefined;
-    const hadSelection = this.drag.span !== undefined;
+    const hadSelection = this.drag.span !== undefined || this.composerDrag.span !== undefined;
     this.drag.clear();
+    this.composerDrag.clear();
+    this.dragTarget = undefined;
     return hadSelection;
   }
 
   /** Copy the active selection to clipboard and clear it. Returns true if copied. */
   copySelection(): boolean {
-    return this.drag.copyAndClear();
+    if (this.composerDrag.span) {
+      this.dragTarget = undefined;
+      return this.composerDrag.copyAndClear();
+    }
+    if (this.drag.span) {
+      this.dragTarget = undefined;
+      return this.drag.copyAndClear();
+    }
+    return false;
   }
-
   /** Handle one report. */
   handle(report: MouseReport): void {
     if (report.kind === "wheel") {
@@ -90,19 +126,58 @@ export class Pointer {
       this.context.redraw();
       return;
     }
+    // 3. Normal selection drag in composer or transcript:
+    const compGeo = this.context.view().composerGeometry?.();
+    const isComposerRow = compGeo !== undefined && report.row >= compGeo.top && report.row <= compGeo.bottom;
 
-    // 3. Normal selection drag and click:
-    const contentCoord = this.context.view().screenToContent(report.row, report.column);
-    const handled = this.drag.handle(report, contentCoord);
-    if (handled) {
+    if (report.kind === "press") {
+      if (isComposerRow && compGeo) {
+        this.dragTarget = "composer";
+        this.drag.clear();
+        const coord = {
+          row: Math.max(0, Math.min(compGeo.rows.length - 1, report.row - compGeo.top)),
+          column: report.column,
+        };
+        this.composerDrag.handle(report, coord);
+        this.context.redraw();
+        return;
+      }
+      this.dragTarget = "transcript";
+      this.composerDrag.clear();
+      const contentCoord = this.context.view().screenToContent(report.row, report.column);
+      this.drag.handle(report, contentCoord);
       this.context.redraw();
       return;
     }
+
+    if (this.dragTarget === "composer" && compGeo) {
+      const clampedRow = Math.max(compGeo.top, Math.min(compGeo.bottom, report.row));
+      const coord = {
+        row: Math.max(0, Math.min(compGeo.rows.length - 1, clampedRow - compGeo.top)),
+        column: report.column,
+      };
+      const handled = this.composerDrag.handle(report, coord);
+      if (handled) {
+        this.context.redraw();
+        return;
+      }
+    } else if (this.dragTarget === "transcript") {
+      const maxTranscriptRow = compGeo ? compGeo.top - 1 : Infinity;
+      const clampedRow = Math.min(maxTranscriptRow, report.row);
+      const contentCoord = this.context.view().screenToContent(clampedRow, report.column);
+      const handled = this.drag.handle(report, contentCoord);
+      if (handled) {
+        this.context.redraw();
+        return;
+      }
+    }
+
     if (report.kind === "release" && !report.shift) {
       this.toggle(report.row);
       this.context.redraw();
     }
   }
+
   private toggle(row: number): void {
     const block = this.context.view().blockAtScreenRow(row);
     if (!block || block.collapsed === undefined) return;

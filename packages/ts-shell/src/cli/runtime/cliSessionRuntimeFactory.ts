@@ -16,6 +16,7 @@ import type { EscalationPrompt } from "../../sandbox/index.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { compactSessionHistory } from "../../core/shell/compaction.js";
+import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
@@ -28,7 +29,7 @@ export function createCliSessionRuntime(input: {
   readonly isStdinTty?: () => boolean;
   readonly promptInteractiveApproval?: (
     prompt: EscalationPrompt,
-  ) => Promise<"deny" | "allow-once" | "allow-always">;
+  ) => Promise<InteractiveApprovalResult>;
 }): ShellSessionRuntime {
   const isStdinTty = input.isStdinTty ?? (() => Boolean(process.stdin.isTTY));
   const sessionRuntime = new ShellSessionRuntime({

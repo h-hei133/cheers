@@ -262,6 +262,74 @@ describe("approval picker key routing", () => {
     expect(apply).toHaveBeenCalledWith(expect.anything(), ["allow-once"]);
   });
 
+  it("transitions to deny-reason sub-mode when onDeny is present and submits with reason", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    const onDeny = vi.fn();
+    overlay.open({
+      ...approvalPicker(),
+      onDeny,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "3");
+    expect(overlay.active).toBe(true);
+    const rows = overlay.render(60, 20);
+    expect(rows.join("\n")).toContain("Explain why this was denied");
+    for (const ch of "not safe") press(overlay, ch);
+    press(overlay, "\r", apply);
+    expect(onDeny).toHaveBeenCalledWith("not safe");
+    expect(overlay.active).toBe(false);
+  });
+
+  it("denies without reason on Enter with empty input in deny-reason sub-mode", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    const onDeny = vi.fn();
+    overlay.open({
+      ...approvalPicker(),
+      onDeny,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "n");
+    expect(overlay.active).toBe(true);
+    press(overlay, "\r", apply);
+    expect(onDeny).toHaveBeenCalledWith(undefined);
+    expect(overlay.active).toBe(false);
+  });
+
+  it("denies without reason on Escape in deny-reason sub-mode", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    const onDeny = vi.fn();
+    overlay.open({
+      ...approvalPicker(),
+      onDeny,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "d");
+    expect(overlay.active).toBe(true);
+    press(overlay, "\x1b", apply);
+    expect(onDeny).toHaveBeenCalledWith(undefined);
+    expect(overlay.active).toBe(false);
+  });
+
+  it("denies directly without reason on Escape from the main approval menu", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    const onDeny = vi.fn();
+    overlay.open({
+      ...approvalPicker(),
+      onDeny,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "\x1b", apply);
+    expect(onDeny).toHaveBeenCalledWith(undefined);
+    expect(overlay.active).toBe(false);
+  });
   it("calls previewEnd when an empty selection is accepted", () => {
     const { overlay } = host();
     const apply = vi.fn();

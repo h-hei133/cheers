@@ -5,6 +5,7 @@ import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import type { ApprovalModeObject } from "../cli/approval/approvalModeContract.js";
+import type { InteractiveApprovalResult } from "../cli/interactive/picker/approval.js";
 import {
   scopeAnswer,
   scopeLabel,
@@ -86,7 +87,7 @@ export function createCliEscalationPromptHandler(
   getPermissionScope?: () => PermissionScope,
   promptInteractiveApproval?: (
     prompt: EscalationPrompt,
-  ) => Promise<"deny" | "allow-once" | "allow-always">,
+  ) => Promise<InteractiveApprovalResult>,
 ): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
   function emitApprovalAudit(record: ApprovalAuditRecord): void {
     if (!promptInteractiveApproval) {
@@ -505,6 +506,7 @@ export function createCliEscalationPromptHandler(
 
     let decision: "deny" | "allow-once" | "allow-always";
     let decisionInputKey: "y" | "a" | "n" | "other" | undefined;
+    let denialReason: string | undefined;
     if (isNonInteractive) {
       decision = "deny";
       decisionInputKey = "n";
@@ -516,7 +518,15 @@ export function createCliEscalationPromptHandler(
       }
     } else if (promptInteractiveApproval) {
       try {
-        decision = await promptInteractiveApproval(prompt);
+        const res = await promptInteractiveApproval(prompt);
+        if (typeof res === "object" && res !== null) {
+          decision = res.decision;
+          denialReason = res.reason;
+        } else if (typeof res === "string") {
+          decision = res;
+        } else {
+          decision = "deny";
+        }
       } catch {
         decision = "deny";
       }
@@ -581,7 +591,11 @@ export function createCliEscalationPromptHandler(
       lineage: approvalModeObject?.verifyLineage,
       ...(decisionInputKey ? { inputKey: decisionInputKey } : {}),
       ...(decision === "deny"
-        ? { stopReason: "Interactive approval denied by user input." }
+        ? {
+            stopReason: denialReason
+              ? `Interactive approval denied by user: ${denialReason}`
+              : "Interactive approval denied by user input.",
+          }
         : {}),
     });
 
@@ -592,10 +606,12 @@ export function createCliEscalationPromptHandler(
     return createApprovalResponse({
       promptId: prompt.id,
       decision,
-      userComment: formatExplicitApprovalComment({
-        decision,
-        hasApprovalModeObject: Boolean(getApprovalModeObject?.()),
-      }),
+      userComment: denialReason
+        ? `User denied with reason: ${denialReason}`
+        : formatExplicitApprovalComment({
+            decision,
+            hasApprovalModeObject: Boolean(getApprovalModeObject?.()),
+          }),
     });
   };
 }

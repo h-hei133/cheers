@@ -24,13 +24,13 @@ import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
 import { ViewHost, readSurfaceChoice, type SurfaceChoice, type ViewFactory } from "./surface.js";
 import { createViewState, type ViewState } from "../../presentation/tui/view.js";
+import { approvalPicker, type InteractiveApprovalResult } from "./picker/approval.js";
 import { routeKey } from "./keymap.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
 import { showConversation, startFreshSession, type HistoryTarget } from "./history.js";
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
 import { OverlayHost, type Picker } from "./overlay.js";
-import { approvalPicker } from "./picker/approval.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
@@ -72,7 +72,7 @@ export interface InteractiveModeOptions {
   readonly initialMcpGateway: CliMcpGateway;
   readonly setReadline?: (readline: ReadlineInterface | null) => void;
   readonly setInteractiveApprovalPrompt?: (
-    handler: ((prompt: EscalationPrompt) => Promise<"deny" | "allow-once" | "allow-always">) | undefined,
+    handler: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined,
   ) => void;
   readonly setActiveNonInteractiveApprovalMode?: (mode: ApprovalModeObject | undefined) => void;
   readonly exit?: (code?: number) => never;
@@ -168,6 +168,7 @@ export class InteractiveMode {
         overlayRows: (width, height) =>
           this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
         selection: () => this.pointer.selection,
+        composerSelection: () => this.pointer.composerSelection,
         toast: () => this.toast,
       },
     });
@@ -276,7 +277,7 @@ export class InteractiveMode {
       return;
     }
     if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids))) return;
-    if (this.pointer.selection && event.keyId !== "ctrl+c") {
+    if ((this.pointer.selection || this.pointer.composerSelection) && event.keyId !== "ctrl+c") {
       this.pointer.clearSelection();
       this.tui.requestRender();
     }
@@ -332,20 +333,19 @@ export class InteractiveMode {
     this.tui.requestRender();
   }
 
-  private promptApproval(prompt: EscalationPrompt): Promise<"deny" | "allow-once" | "allow-always"> {
+  private promptApproval(prompt: EscalationPrompt): Promise<InteractiveApprovalResult> {
     return new Promise((resolve) => {
       let settled = false;
-      const settle = (decision: "deny" | "allow-once" | "allow-always") => {
+      const settle = (result: InteractiveApprovalResult) => {
         if (settled) return;
         settled = true;
         this.overlay.close();
-        resolve(decision);
+        resolve(result);
       };
       this.overlay.open(approvalPicker(prompt, settle));
     });
   }
   /**
-   * Recompute completions.
    *
    * A closed list reopens on typing, on Tab, and on any edit that leaves a draft
    * which could still become a command — that last case is what brings the list

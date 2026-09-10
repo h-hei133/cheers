@@ -69,10 +69,10 @@ export function extractSelection(
 }
 
 /** The same rows with the span shaded, so the drag shows what it has covered. */
-export function highlightSelection(rows: readonly string[], span: SelectionSpan): string[] {
+export function highlightSelection(rows: readonly string[], span: SelectionSpan, allowCursor = false): string[] {
   const shaded = [...rows];
   for (const range of selectedRanges(rows, span)) {
-    shaded[range.row] = highlightRow(shaded[range.row] ?? "", range.start, range.end);
+    shaded[range.row] = highlightRow(shaded[range.row] ?? "", range.start, range.end, allowCursor);
   }
   return shaded;
 }
@@ -112,8 +112,8 @@ function selectedRanges(
  * style reset in the middle of a shaded run would otherwise end the shading early
  * and leave the selection looking like it stopped there.
  */
-function highlightRow(line: string, start: number, end: number): string {
-  if (end <= start || line.includes(CURSOR_MARKER)) return line;
+function highlightRow(line: string, start: number, end: number, allowCursor = false): string {
+  if (end <= start || (!allowCursor && line.includes(CURSOR_MARKER))) return line;
   // A blank row inside the span is still selected, and a paragraph break that
   // shows no shading at all makes the selection look broken in two.
   if (visibleWidth(line) === 0) return start === 0 ? `${REVERSE} ${REVERSE_OFF}` : line;

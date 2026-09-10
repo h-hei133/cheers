@@ -7,7 +7,7 @@ import type { Block } from "../../presentation/tui/transcript/blocks.js";
 import { renderActivity } from "../../presentation/tui/transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../../presentation/tui/transcript/selection.js";
 import type { ScrollbarGeometry } from "../../presentation/tui/transcript/viewport.js";
-import { createViewState, type InteractiveView, type ViewContext, type ViewState } from "../../presentation/tui/view.js";
+import { createViewState, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "../../presentation/tui/view.js";
 
 export type { ScrollbarGeometry } from "../../presentation/tui/transcript/viewport.js";
 /** Kept for callers that named the facts by this surface rather than by the seam. */
@@ -32,7 +32,7 @@ export class InteractiveSurface implements InteractiveView {
   readonly suggestions: ViewState["suggestions"];
   private readonly pane: TranscriptPane;
   private suggesting = false;
-
+  private lastComposerGeometry: ComposerGeometry | undefined;
   constructor(
     private readonly context: ViewContext,
     state: ViewState = createViewState(),
@@ -65,10 +65,15 @@ export class InteractiveSurface implements InteractiveView {
     if (this.context.overlayFullScreen()) {
       return { rows: this.context.overlayRows(width, height) };
     }
-    const chrome = this.renderChrome(width, height);
-    const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.length);
+    const chromeResult = this.renderChrome(width, height);
+    const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chromeResult.rows.length);
+    this.lastComposerGeometry = {
+      top: capacity + chromeResult.composerOffset,
+      bottom: capacity + chromeResult.composerOffset + chromeResult.composerRows.length - 1,
+      rows: chromeResult.composerRows,
+    };
     const transcriptRows = this.pane.render(width, capacity, this.context.selection());
-    return { rows: [...transcriptRows, ...chrome] };
+    return { rows: [...transcriptRows, ...chromeResult.rows] };
   }
 
   screenToContent(row: number, column: number): SelectionPoint {
@@ -111,20 +116,34 @@ export class InteractiveSurface implements InteractiveView {
     return this.pane.blockAtScreenRow(row);
   }
 
+  composerGeometry(): ComposerGeometry | undefined {
+    return this.lastComposerGeometry;
+  }
   /**
    * The fixed bottom block: activity, an open panel picker, the band, the prompt,
    * and either completions or the hint row. The picker sits above the band so the
    * prompt stays where the user's attention already is.
    */
-  private renderChrome(width: number, height: number): string[] {
+  private renderChrome(width: number, height: number): {
+    readonly rows: string[];
+    readonly composerOffset: number;
+    readonly composerRows: string[];
+  } {
     const busy = this.context.busy();
     const maxComposerRows = Math.max(3, Math.min(10, Math.floor(height * 0.35)));
-    const rows = [
+    const statusRows = [
       ...renderActivity(this.context.activity(), this.context.now(), width),
       ...this.context.overlayRows(width, height),
       renderBand(this.context.facts(), this.context.statusItems(), width),
-      ...renderComposer(this.editor, { busy }, width, maxComposerRows),
     ];
+    const composerRows = renderComposer(
+      this.editor,
+      { busy },
+      width,
+      maxComposerRows,
+      this.context.composerSelection?.(),
+    );
+    const rows = [...statusRows, ...composerRows];
     if (this.suggestionsOpen) {
       rows.push(...this.suggestions.render(width));
     }
@@ -142,6 +161,6 @@ export class InteractiveSurface implements InteractiveView {
         width,
       ),
     );
-    return rows;
+    return { rows, composerOffset: statusRows.length, composerRows };
   }
 }

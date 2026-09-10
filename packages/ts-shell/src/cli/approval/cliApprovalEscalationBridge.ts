@@ -10,7 +10,7 @@ import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import { persistApprovalAuditDecision } from "./cliApprovalAuditBridge.js";
-
+import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 export function createCliApprovalEscalationBridge(input: {
   readonly renderer: StreamingRenderer;
   readonly readline: () => ReadlineInterface | null;
@@ -29,7 +29,7 @@ export function createCliApprovalEscalationBridge(input: {
   readonly getPermissionScope?: () => PermissionScope;
   readonly promptInteractiveApproval?: (
     prompt: EscalationPrompt,
-  ) => Promise<"deny" | "allow-once" | "allow-always">;
+  ) => Promise<InteractiveApprovalResult>;
 }): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
   return createCliEscalationPromptHandler(
     input.renderer,

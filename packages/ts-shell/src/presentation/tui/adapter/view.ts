@@ -2,7 +2,8 @@ import type { TerminalFramePlan, ViewportSize } from "../render/frame.js";
 import type { Block } from "../transcript/blocks.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
-import { createViewState, type InteractiveView, type ViewContext, type ViewState } from "../view.js";
+import { createViewState, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "../view.js";
+import { renderComposer } from "../chrome/composer.js";
 import { Composer, StatusBar, type ComposerFacts } from "./chrome.js";
 import type { ViewComponent } from "./contract.js";
 import type { SessionFacts } from "./model.js";
@@ -44,6 +45,7 @@ export class ComposedView implements InteractiveView {
   private readonly status: StatusBar;
   private readonly composer: Composer;
   private suggesting = false;
+  private lastComposerGeometry: ComposerGeometry | undefined;
 
   constructor(
     private readonly context: ViewContext,
@@ -80,10 +82,15 @@ export class ComposedView implements InteractiveView {
     if (this.context.overlayFullScreen()) {
       return { rows: this.context.overlayRows(width, height) };
     }
-    const chrome = this.renderChrome(width, height);
-    const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.length);
+    const chromeResult = this.renderChrome(width, height);
+    const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chromeResult.rows.length);
+    this.lastComposerGeometry = {
+      top: capacity + chromeResult.composerOffset,
+      bottom: capacity + chromeResult.composerOffset + chromeResult.composerRows.length - 1,
+      rows: chromeResult.composerRows,
+    };
     const transcriptRows = this.pane.render(width, capacity, this.context.selection());
-    return { rows: [...transcriptRows, ...chrome] };
+    return { rows: [...transcriptRows, ...chromeResult.rows] };
   }
 
   get scrolledBack(): number {
@@ -126,14 +133,28 @@ export class ComposedView implements InteractiveView {
     return this.pane.blockAtScreenRow(row);
   }
 
+  composerGeometry(): ComposerGeometry | undefined {
+    return this.lastComposerGeometry;
+  }
   /** The bottom block: status bar (activity, panel picker, band) then the composer. */
-  private renderChrome(width: number, height: number): string[] {
+  private renderChrome(width: number, height: number): {
+    readonly rows: string[];
+    readonly composerOffset: number;
+    readonly composerRows: string[];
+  } {
     this.panel.height = height;
     this.status.setFacts(this.sessionFacts());
-    this.composer.setFacts(this.composerFacts(height));
-    return [...this.status.render(width), ...this.composer.render(width)];
+    const facts = this.composerFacts(height);
+    this.composer.setFacts(facts);
+    const statusRows = this.status.render(width);
+    const composerRows = renderComposer(this.editor, { busy: facts.busy }, width, facts.maxRows, facts.selection);
+    const fullComposerRows = this.composer.render(width);
+    return {
+      rows: [...statusRows, ...fullComposerRows],
+      composerOffset: statusRows.length,
+      composerRows,
+    };
   }
-
   private sessionFacts(): SessionFacts {
     return {
       facts: this.context.facts(),
@@ -154,6 +175,7 @@ export class ComposedView implements InteractiveView {
       ambient: this.context.ambient(),
       maxRows: Math.max(3, Math.min(10, Math.floor(height * 0.35))),
       toast: this.context.toast?.(),
+      selection: this.context.composerSelection?.(),
     };
   }
 }

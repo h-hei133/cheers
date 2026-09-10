@@ -330,6 +330,33 @@ describe("createCliEscalationPromptHandler with promptInteractiveApproval", () =
     expect(renderer.lines).toEqual([]);
   });
 
+  it("passes denial reason from promptInteractiveApproval into userComment and audit record", async () => {
+    const renderer = createRenderer();
+    const trustPolicy = new ApprovalTrustPolicy();
+    const audited: ApprovalAuditRecord[] = [];
+    const interactiveApproval = vi.fn().mockResolvedValue({
+      decision: "deny",
+      reason: "command is destructive",
+    });
+    const handler = createCliEscalationPromptHandler(
+      renderer,
+      null,
+      () => "compact",
+      trustPolicy,
+      () => "/project",
+      undefined,
+      undefined,
+      (record) => audited.push(record),
+      () => "ask",
+      interactiveApproval,
+    );
+    const prompt = uniquePrompt("deny_reason");
+    const result = await handler(prompt);
+    expect(interactiveApproval).toHaveBeenCalledOnce();
+    expect(result.decision).toBe("deny");
+    expect(result.userComment).toContain("command is destructive");
+    expect(audited[0]?.stopReason).toContain("command is destructive");
+  });
   it("safely falls back to deny when promptInteractiveApproval rejects", async () => {
     const renderer = createRenderer();
     const trustPolicy = new ApprovalTrustPolicy();

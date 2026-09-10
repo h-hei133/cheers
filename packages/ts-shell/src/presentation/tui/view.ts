@@ -65,6 +65,8 @@ export interface ViewContext {
   selection(): SelectionSpan | undefined;
   /** Transient status notification (e.g. clipboard copy feedback). */
   toast?(): string | undefined;
+  /** Active mouse selection within the composer / input box. */
+  composerSelection?(): SelectionSpan | undefined;
 }
 
 /** What the host does in response to input. Routed by the keymap and the pointer. */
@@ -141,4 +143,12 @@ export interface InteractiveView extends TerminalFrameProvider {
   contentRows(): readonly string[];
   /** The block under screen row `row`, for a click that lands on the transcript. */
   blockAtScreenRow(row: number): Block | undefined;
+  /** Screen row bounds and visual rows of the composer, for mouse drag selection. */
+  composerGeometry?(): ComposerGeometry | undefined;
+}
+
+export interface ComposerGeometry {
+  readonly top: number;
+  readonly bottom: number;
+  readonly rows: readonly string[];
 }

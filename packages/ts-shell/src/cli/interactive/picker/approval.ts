@@ -8,9 +8,18 @@ import type { Picker } from "../overlay.js";
  * Prompts the user with three clear choices (allow-once, allow-always, deny)
  * when a modifying tool requests escalation in ask mode.
  */
+export type ApprovalDecision = "deny" | "allow-once" | "allow-always";
+
+export interface ApprovalSettleResult {
+  readonly decision: ApprovalDecision;
+  readonly reason?: string;
+}
+
+export type InteractiveApprovalResult = ApprovalDecision | ApprovalSettleResult;
+
 export function approvalPicker(
   prompt: EscalationPrompt,
-  onSettle: (decision: "deny" | "allow-once" | "allow-always") => void,
+  onSettle: (result: ApprovalSettleResult) => void,
 ): Picker {
   const toolName = prompt.context?.toolName || "tool";
   const operation = prompt.context?.operation ? ` (${prompt.context.operation})` : "";
@@ -41,12 +50,15 @@ export function approvalPicker(
       },
     ],
     apply: async (ids): Promise<undefined> => {
-      const choice = ids[0] as "deny" | "allow-once" | "allow-always" | undefined;
-      onSettle(choice ?? "deny");
+      const choice = ids[0] as ApprovalDecision | undefined;
+      onSettle({ decision: choice ?? "deny" });
       return undefined;
     },
+    onDeny: (reason?: string) => {
+      onSettle({ decision: "deny", reason });
+    },
     previewEnd: () => {
-      onSettle("deny");
+      onSettle({ decision: "deny" });
     },
   };
 }

@@ -637,7 +637,10 @@ export async function* runAutonomousReActLoop(
             );
             const response = await options.escalationPromptHandler(prompt);
             if (response.decision === "deny") {
-              outputContent = `Blocked: User denied permission for tool '${funcName}' (${permissionEval.operation}) on '${permissionEval.target}'.`;
+              const reasonSuffix = response.userComment && !response.userComment.startsWith("CLI explicit approval")
+                ? ` (${response.userComment})`
+                : "";
+              outputContent = `Blocked: User denied permission for tool '${funcName}' (${permissionEval.operation}) on '${permissionEval.target}'.${reasonSuffix}`;
               isSuccess = false;
               permissionDenied = true;
             } else {

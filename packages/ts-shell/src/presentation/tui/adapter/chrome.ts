@@ -1,6 +1,7 @@
 import { renderActivity } from "../transcript/live.js";
 import { renderBand } from "../chrome/band.js";
 import { renderComposer } from "../chrome/composer.js";
+import type { SelectionSpan } from "../transcript/selection.js";
 import { renderHints, type AmbientContext, type HintContext } from "../chrome/hints.js";
 import type { Editor } from "../editor.js";
 import type { SuggestionList } from "../chrome/suggestions.js";
@@ -46,6 +47,7 @@ export interface ComposerFacts {
   readonly maxRows?: number;
   /** Transient status notification shown in place of the hint row. */
   readonly toast?: string;
+  readonly selection?: SelectionSpan;
 }
 
 /**
@@ -93,7 +95,7 @@ export class Composer implements ViewComponent {
         newlineKey: this.facts.newlineKey,
         toast: this.facts.toast,
       };
-      const rows = renderComposer(this.editor, { busy: this.facts.busy }, safe, this.facts.maxRows);
+      const rows = renderComposer(this.editor, { busy: this.facts.busy }, safe, this.facts.maxRows, this.facts.selection);
       if (this.facts.suggesting && this.suggestions) rows.push(...this.suggestions.render(safe));
       rows.push(...renderHints(context, this.facts.ambient, safe));
       return rows;

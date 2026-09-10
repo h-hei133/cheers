@@ -188,6 +188,67 @@ describe("agentLoop permission enforcement and interactive ask", () => {
     }
   });
 
+  it("in ask mode: includes user denial reason in tool blocked output when provided", async () => {
+    mockProviderResponses([
+      {
+        choices: [
+          {
+            message: {
+              content: null,
+              tool_calls: [
+                {
+                  id: "call_write_deny_reason",
+                  type: "function",
+                  function: {
+                    name: "write",
+                    arguments: JSON.stringify({ path: "protected.txt", content: "data" }),
+                  },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+      },
+      {
+        choices: [
+          {
+            message: { content: "Understood, will not write protected file." },
+            finish_reason: "stop",
+          },
+        ],
+      },
+    ]);
+
+    const escalationHandler = vi.fn().mockImplementation(
+      async (prompt: EscalationPrompt): Promise<EscalationResponse> => ({
+        promptId: prompt.id,
+        decision: "deny",
+        userComment: "User denied with reason: file is strictly protected",
+        respondedAt: Date.now(),
+      }),
+    );
+
+    const events: QueryEvent[] = [];
+    for await (const ev of runAutonomousReActLoop({
+      sessionId: "sess_test_deny_reason",
+      prompt: "write protected file",
+      workspaceRoot: tmpDir,
+      permissionScope: "ask",
+      escalationPromptHandler: escalationHandler,
+      realProvider: { apiKey: "mock-key", baseUrl: "https://mock.api", model: "mock-model" },
+      maxTurns: 5,
+    })) {
+      events.push(ev);
+    }
+
+    const toolResult = events.find((ev) => ev.type === "tool.result");
+    expect(toolResult).toBeDefined();
+    if (toolResult && toolResult.type === "tool.result") {
+      expect(toolResult.success).toBe(false);
+      expect(toolResult.output).toContain("User denied with reason: file is strictly protected");
+    }
+  });
   it("in accept-edits mode: allows in-workspace write without escalation, but escalates modifying bash", async () => {
     mockProviderResponses([
       {

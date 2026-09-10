@@ -2,6 +2,7 @@ import { defaultTheme } from "../../theme/theme.js";
 import type { Editor } from "../editor.js";
 import { truncateToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
+import { highlightSelection, type SelectionSpan } from "../transcript/selection.js";
 
 /**
  * Prompt block.
@@ -36,6 +37,7 @@ export function renderComposer(
   state: ComposerState,
   width: number,
   maxRows?: number,
+  selection?: SelectionSpan,
 ): string[] {
   const textWidth = composerTextWidth(width);
   const rows = editor.render(textWidth, maxRows);
@@ -43,5 +45,7 @@ export function renderComposer(
   // No trailing padding: the renderer erases to the end of each row anyway, and
   // padding is what turns a multi-row selection into text separated by runs of
   // spaces when the user copies it out of the terminal.
-  return rows.map((row, index) => truncateToWidth((index === 0 ? cue : CONTINUATION) + row, width));
+  const rendered = rows.map((row, index) => truncateToWidth((index === 0 ? cue : CONTINUATION) + row, width));
+  if (!selection) return rendered;
+  return highlightSelection(rendered, selection, true);
 }
