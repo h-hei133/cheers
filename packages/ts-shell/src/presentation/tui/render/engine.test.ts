@@ -49,6 +49,47 @@ describe("taking the screen", () => {
     expect(written).toContain("\x1b[?1006l");
   });
 
+  it("leaves the document under the restored screen, one row per line", () => {
+    const { tui, terminal, scheduler } = boot();
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+    tui.stop({ document: ["first row", `second ${CURSOR_MARKER}row`, ""] });
+    const written = terminal.drain();
+
+    const left = written.indexOf("\x1b[?1049l");
+    expect(left).toBeGreaterThan(-1);
+    const document = written.slice(left);
+    expect(document).toContain("\x1b[?7l\r\x1b[2Kfirst row");
+    expect(document).toContain("\r\n\r\x1b[2Ksecond row");
+    expect(document).not.toContain(CURSOR_MARKER);
+    // The tail: reset, autowrap back on, a fresh line, and the cursor shown.
+    expect(document).toMatch(/\x1b\[0m\x1b\[\?7h\r\n\x1b\[\?25h\x1b\[\?2026l$/);
+  });
+
+  it("fits document rows to the width the same way a frame is fitted", () => {
+    const { tui, terminal, scheduler } = boot();
+    terminal.columns = 10;
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+    tui.stop({ document: ["0123456789abcdef"] });
+    const written = terminal.drain();
+    expect(written).toContain("012345678…");
+    expect(written).not.toContain("9abcdef");
+  });
+
+  it("only gives the screen back when there is no document", () => {
+    const { tui, terminal, scheduler } = boot();
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+    tui.stop();
+    const written = terminal.drain();
+    expect(written).toContain("\x1b[?1049l");
+    expect(written).not.toContain("\x1b[2K");
+  });
+
   it("paints nothing once stopped", () => {
     const { tui, terminal, scheduler } = boot();
     tui.start();

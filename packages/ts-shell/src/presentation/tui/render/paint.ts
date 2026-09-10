@@ -6,10 +6,11 @@ import { coalesceAdjacentSgr, LINE_TERMINATOR } from "../text/sgr.js";
  * Escape-sequence construction for one painted frame.
  *
  * The engine decides *what* the screen should hold; this module turns that into
- * bytes. Two paint shapes exist. A diff paint addresses changed rows absolutely
- * and is used whenever geometry is stable and no history is being retired. A
- * scroll paint writes rows separated by CR/LF from an anchor, letting the
- * terminal scroll naturally so retired rows travel into its own scrollback.
+ * bytes. Two paint shapes exist while the session runs: a diff paint addresses
+ * changed rows absolutely and is used whenever geometry is stable, and a full
+ * paint rewrites every row after a resize or a forced frame. A third shape runs
+ * once, on leaving: the screen is given back and the document is written below
+ * whatever the terminal had, so it lands in scrollback the user keeps.
  */
 
 /** Zero-width marker a focused component emits where the hardware cursor belongs. */
@@ -22,6 +23,7 @@ const SYNC_END = "\x1b[?2026l";
 const AUTOWRAP_OFF = "\x1b[?7l";
 const AUTOWRAP_ON = "\x1b[?7h";
 const ERASE_TO_END_OF_LINE = "\x1b[K";
+const ERASE_LINE = "\x1b[2K";
 export const ERASE_TO_END_OF_SCREEN = "\x1b[J";
 
 /** Frame prologue: hide the cursor, hold the paint, and stop the terminal wrapping. */
@@ -122,6 +124,26 @@ export function fullPaint(rows: readonly string[], height: number): string {
     buffer += `${moveTo(index, 0)}${rows[index] ?? ""}${ERASE_TO_END_OF_LINE}`;
   }
   return buffer;
+}
+
+/**
+ * Give the screen back and leave `rows` under whatever the terminal had.
+ *
+ * The alternate screen has no scrollback, so everything on it is lost the moment
+ * it is left; the document written here is what the user gets to scroll back to
+ * and copy from once the session is over. Autowrap is off while the rows go out
+ * so a row that fills the width cannot spill into an empty line, and each row
+ * erases its line first because the restored screen may still hold the tail of
+ * what was there before the session began. The rows must already be prepared.
+ */
+export function leaveScreen(rows: readonly string[], synchronized: boolean): string {
+  if (rows.length === 0) return EXIT_ALT_SCREEN;
+  let buffer = `${synchronized ? SYNC_BEGIN : ""}${EXIT_ALT_SCREEN}${AUTOWRAP_OFF}`;
+  for (let index = 0; index < rows.length; index++) {
+    if (index > 0) buffer += "\r\n";
+    buffer += `\r${ERASE_LINE}${rows[index] ?? ""}`;
+  }
+  return `${buffer}\x1b[0m${AUTOWRAP_ON}\r\n${SHOW_CURSOR}${synchronized ? SYNC_END : ""}`;
 }
 
 /** Cursor epilogue: pin and reveal at `target`, or park it hidden at `parkRow`. */

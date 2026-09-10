@@ -242,7 +242,11 @@ export class InteractiveMode {
     this.questions.abandon();
     this.options.renderer.clearSink();
     this.stdin.dispose();
-    this.tui.stop();
+    // The conversation outlives the screen it was read on: rendered once more at
+    // the full width, it is left in the terminal where the user can scroll back
+    // to it and copy from it after the session is over.
+    const width = Math.max(1, this.terminal.getDimensions().columns);
+    this.tui.stop({ document: this.state.transcript.render(width).rows });
   }
 
 

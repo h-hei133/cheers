@@ -7,6 +7,7 @@ import {
   type RenderScheduler,
   type TerminalFrameProvider,
   type TuiStartOptions,
+  type TuiStopOptions,
   type ViewportSize,
 } from "./frame.js";
 import {
@@ -14,8 +15,8 @@ import {
   cursorTarget,
   diffPaint,
   ENTER_ALT_SCREEN,
-  EXIT_ALT_SCREEN,
   fullPaint,
+  leaveScreen,
   padToHeight,
   paintBegin,
   paintEnd,
@@ -103,16 +104,22 @@ export class TUI {
     this.requestRender({ force: true });
   }
 
-  stop(): void {
+  stop(options?: TuiStopOptions): void {
     if (!this.started || this.stopped) return;
     this.stopped = true;
     this.started = false;
     this.scheduler.clearTimeout(this.frameTimer);
     this.setMouseTracking(false);
-    // Leaving the screen is what restores whatever the user had before, which is
-    // why nothing has to be cleaned up on it first.
-    this.terminal.write(EXIT_ALT_SCREEN);
+    // The driver restores every mode it may have set, unbuffered, and that
+    // battery includes leaving the screen — which on most terminals also puts the
+    // cursor back where it was when the screen was taken. So the driver goes
+    // first, and only then is the screen left (again, harmlessly) and the
+    // document written under it: written before the battery, it would be
+    // overprinted by whatever came next at the restored cursor.
     this.terminal.stop();
+    const width = Math.max(1, this.terminal.getDimensions().columns);
+    const document = prepareRows(options?.document ?? [], width);
+    this.terminal.write(leaveScreen(document, this.terminal.capabilities.supportsDec2026Sync));
   }
 
   requestRender(options?: RenderRequestOptions): void {

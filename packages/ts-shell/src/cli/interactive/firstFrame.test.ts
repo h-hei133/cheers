@@ -132,6 +132,25 @@ describe("first painted frame", () => {
     mode.stop();
   });
 
+  it("leaves the conversation in the terminal on stop", () => {
+    const { mode, terminal, scheduler } = boot();
+    mode.start();
+    scheduler.flush();
+    terminal.input("hello there");
+    scheduler.flush();
+    terminal.drain();
+    mode.stop();
+    const written = terminal.drain();
+    const left = written.indexOf("\x1b[?1049l");
+    expect(left).toBeGreaterThan(-1);
+    const document = written.slice(left);
+    // The intro is a transcript block, so it is the first thing left behind; the
+    // prompt and band are chrome and stay on the screen that was given back.
+    expect(document).toContain("Coding Agent");
+    expect(document).not.toContain("hello there");
+    expect(document).not.toContain("╰─");
+  });
+
   it("restores the device on stop", () => {
     const { mode, terminal, scheduler } = boot();
     mode.start();
