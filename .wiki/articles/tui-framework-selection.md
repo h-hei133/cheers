@@ -170,24 +170,20 @@ Phase 2.5 完成后，才允许重新进行 Phase 3 删除审计。必须同时�
 - 不设置默认双渲染或运行时同时绘制两套表面；实验路径必须显式、可逆、单写入者。
 - 不以单元测试或 benchmark 单独宣布切流完成；真实 CLI 行为与回退证明是硬门槛。
 
-## 当前演进状态（2026-09-10）
+## 当前演进状态（2026-09-10，Phase 3 完成）
 
-Phase 2.5-A 至 2.5-E 已全面落地并通过真机与自动化双重验证，进入 Phase 3 准备阶段：
+Phase 2.5-A 至 2.5-E 交付并真机验证后，Phase 3 按删除审计（见 `tui-phase-3-verification.md`）完成收敛：
 
-1. **2.5-A 合约已冻结**：`presentation/tui/view.ts` 定义 `ViewState`、`ViewContext`、`ViewActions` 与 `InteractiveView`。最新补充 `ComposerGeometry` 与 `composerSelection`，`keymap.ts` 与 `pointer.ts` 只依赖合约；输入框选区与转写区选区共享同一套高亮与复制提取契约。
-2. **2.5-B 组装模块已存在**：`adapter/view.ts` 的 `ComposedView` 与直接渲染表面 `frameSurface.ts` 均接入 `adapter/pane.ts`（共享 `TranscriptPane`），滚动条几何、内容坐标映射、选区着色收敛为 `transcript/viewport.ts` 与 `transcript/selection.ts`，两套表面不存在两份算法。
-3. **2.5-C 接线已完成**：`cli/interactive/surface.ts` 的 `ViewHost` 是唯一帧提供者，`InteractiveMode` 只持有 `ViewHost` 与 `ViewState`；表面通过 `CODING_AGENTS_TUI_SURFACE` 环境变量或设置项 `tui.surface`（`frame` | `composed`）选择，默认仍为 `frame`，单写入者契约成立。
-4. **2.5-D 回退与对照已具备证据**：`ViewHost` 在实验表面渲染抛错时于同一帧内换回默认表面，保留 transcript 与草稿，在 transcript 追加错误说明；默认表面失败直抛不吞。`cli/interactive/surface.test.ts` 逐帧对照覆盖首帧、流式增量、失败工具、翻页/滑块、选区、Toast、补全与全屏 overlay。
-5. **2.5-E 全门槛实测闭环**：
-   - 连续多轮流式对话与安静中断正常，跨轮历史连贯；
-   - 审批三决策正常，支持单键快捷直达，支持拒绝时可选输入理由并直接将用户指令反馈给模型（避免重复错误动作）；
-   - 选区内容坐标锚定（新输出不推走阅读行），输入框内支持鼠标拖选复制，拖拽到达上下边缘支持 70ms 自动平滑滚屏；
-   - 长粘贴占位符展开、中文无光标重影；真实 `/compact` 压缩后 gauge 实时重置；
-   - 删除了所有关键词内置默认回复，提示直通模型；
-   - 非 TTY 管道输出纯文本无转义残留，退出码 0。
+1. **唯一表面**：`presentation/tui/surface/view.ts` 的 `InteractiveSurface` 是唯一帧提供者，`InteractiveMode` 直接持有它与 `ViewState`；`surface/contract.ts`（原 `tui/view.ts`）承载 `ViewState` / `ViewContext` / `ViewActions` / `InteractiveView` 合约，`keymap.ts` 与 `pointer.ts` 只依赖合约。
+2. **表面选择已删除**：`CODING_AGENTS_TUI_SURFACE`、设置项 `tui.surface`、`ViewHost` 与同帧回退全部移除。两条表面曾被逐帧对照证明逐字节相同；第二条只多了两层惰性包装并每帧重复渲染 composer，没有保留价值。
+3. **适配层收敛**：`adapter/` 中 12 个从未接入生产的组件（消息、工具卡片、权限弹窗、选择列表、加载器、Markdown 与编辑器包装、布局堆叠、主屏差分、overlay 栈、Surface、主题）连同其测试删除；目录改名 `surface/`，只剩 `contract.ts`、`view.ts`、`pane.ts`（转写窗口）、`scroll.ts`（滚动模型）。
+4. **共享底座原样保留**：`render/engine.ts`、`render/paint.ts`、`terminal.ts`、`text/*`、`editor.ts`、`chrome/*`、`transcript/*` 未动。
+5. **退出留下转写**：离开备用屏后把转写按当前宽度逐行写到主屏（与参考备用屏渲染器打印最终文档的做法一致），用户退出后可回滚阅读与复制，之后才是 `--resume` 提示。
+
+Phase 2.5 期间落地并保留的能力：合约冻结、`TranscriptPane` 的绝对内容行滚动锚定、滚动条几何与内容坐标映射收敛到 `transcript/viewport.ts` 与 `transcript/selection.ts`、审批三决策与拒绝理由、输入框拖选与边缘自动滚屏、长粘贴与中文输入、非 TTY 可读输出。
 
 ## 后续决策点
 
-1. **Phase 2.5 正式交付**：Phase 2.5 功能与稳定性已满足全部预设门槛，**无需再次进行运行时代码功能开发**。
-2. **Phase 3 准入与删除审计**：删除阻塞已解除。下一步启动 Phase 3 删除审计，严格限定审计范围为“被替代的专属胶水”，共享底座（`TUI` 引擎、`TranscriptPane`、`viewport.ts`、`selection.ts`、文本测量、`Editor`、终端驱动）永久保留。
-3. **灰度切流策略**：默认生产表面维持 `frame`，用户或测试可显式配置 `composed` 体验组件表面；在真实长周期压力下持续收集两者稳定性差异。
+1. **选型结论不变**：参考 TUI 的组件契约与备用屏语义已经以自有实现落地；不引入其 npm 包，不引入 native 路线。
+2. **不再有灰度切流**：任何新的表面能力直接落在 `surface/` 与 `chrome/`，不再开第二条链路；表面的行为测试在 `surface/view.test.ts`。
+3. **观察项**：退出文档在 tmux / SSH / Windows Terminal 下的表现；超长会话退出时的一次性写入量（驱动 64MB 积压阈值之内）。

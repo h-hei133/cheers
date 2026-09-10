@@ -158,17 +158,18 @@ packages/ts-shell/src/
 ├── context/graph/                # 真实 AST 语法树代码图谱与调用分析
 │   ├── ast/parser.ts                # ts.forEachChild AST Visitor 符号提取
 │   └── callGraph.ts                 # ts.isCallExpression / NewExpression 真实调用图
-├── presentation/tui/             # 原生回滚差分终端引擎
+├── presentation/tui/             # 备用屏差分终端引擎
 │   ├── text/                        # width(UAX#11) / ansi / measure / layout / sgr / motion
-│   ├── render/                      # frame(帧契约) / paint(序列构造) / engine(差分引擎)
+│   ├── render/                      # frame(帧契约) / paint(序列构造与退出文档) / engine(差分引擎)
 │   ├── input/                       # escape(边界状态机) / keys(按键规范化) / stdinBuffer(重组器)
 │   ├── chrome/                      # band(状态带) / composer / hints / suggestions / welcome
-│   ├── transcript/                  # blocks / container(退役容器) / live / markdown / diff
+│   ├── transcript/                  # blocks / container(转写容器) / live / markdown / diff / viewport / selection
+│   ├── surface/                     # contract(宿主-表面合约) / view(唯一表面) / pane(转写窗口) / scroll(滚动模型)
 │   ├── editor.ts                    # 簇级光标 + 软换行 + kill-ring 多行编辑器
 │   └── terminal.ts                  # 终端驱动（模式恢复电池 / 输出积压计量）
 ├── cli/interactive/              # 交互会话宿主
 │   ├── interactiveLoop.ts           # 按终端能力选择全屏宿主或行式循环
-│   ├── frameSurface.ts              # 帧组装与转写容量分配
+│   ├── interactiveMode.ts           # 全屏宿主：持有 ViewState 与唯一表面，路由输入与回合
 │   ├── keymap.ts                     # 按键路由与拦截层级
 │   ├── turnSink.ts                   # 回合输出路由（事件 + 散文双通道去重）
 │   └── questionBridge.ts             # readline 替身，授权问答走宿主提示符

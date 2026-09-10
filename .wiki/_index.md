@@ -2,7 +2,7 @@
 
 > Compiled knowledge base for the three-layer autonomous coding agent architecture, proof grounding, and reference models.
 
-Last updated: 2026-09-08
+Last updated: 2026-09-10
 
 ## Statistics
 
@@ -34,7 +34,7 @@ Last updated: 2026-09-08
 - [[tui-framework-selection|TUI Framework Selection]] ([TUI Framework Selection](articles/tui-framework-selection.md))
 - [[tui-phase-1-components|TUI Phase 1: Component Adapters]] ([Phase 1 Components](articles/tui-phase-1-components.md))
 - [[tui-phase-2-products|TUI Phase 2: Product Components]] ([Phase 2 Products](articles/tui-phase-2-products.md))
-- [[tui-phase-3-verification|TUI Phase 3: Baseline Verification & Deletion Audit]] ([Phase 3 Verification](articles/tui-phase-3-verification.md))
+- [[tui-phase-3-verification|TUI Phase 3: Deletion Audit & Convergence]] ([Phase 3 Verification](articles/tui-phase-3-verification.md))
 - [[tui-known-defects|TUI Known Defects & Root-Cause Fixes]] ([Known Defects & Fixes](articles/tui-known-defects.md))
 - [[tui-resume-scroll-theme|TUI Interaction & Theme Specification]] ([Interaction & Theme Specification](articles/tui-resume-scroll-theme.md))
 

@@ -10,6 +10,8 @@ confidence: high
 
 # TUI Phase 1：底层组件适配
 
+> **状态（2026-09-10）**：本文描述的组件已在 Phase 3 删除（见 `tui-phase-3-verification.md` 的删除审计）。它们从未被生产路径导入；其职责由 `transcript/blocks.ts`、`chrome/*`、`cli/interactive/overlay.ts` 与审批面板承担。本文保留为历史记录。
+
 ## 范围
 
 按 `tui-framework-selection.md` 阶段 1 的接入顺序执行，只做底层终端能力，不碰产品组件迁移（阶段 2）与旧 renderer 删除（阶段 3）。

@@ -10,6 +10,8 @@ confidence: high
 
 # TUI Phase 2：产品组件迁移
 
+> **状态（2026-09-10）**：本文描述的组件已在 Phase 3 删除（见 `tui-phase-3-verification.md` 的删除审计）。它们从未被生产路径导入；其职责由 `transcript/blocks.ts`、`chrome/*`、`cli/interactive/overlay.ts` 与审批面板承担。本文保留为历史记录。
+
 ## 范围
 
 按 `tui-framework-selection.md` 阶段 2 执行：迁移产品组件，不复制整个应用。控制面依然冻结——组件只消费 `AgentMessage`/`SessionFacts` view model 和发出用户动作，不碰模型、工具、权限、会话状态。

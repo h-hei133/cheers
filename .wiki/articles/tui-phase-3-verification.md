@@ -5,7 +5,7 @@ sources: [local-tui-state, verification-gates, cli-interactive]
 created: 2026-09-07
 updated: 2026-09-10
 tags: [tui, adapter, phase-3, verification]
-summary: "执行选型文档阶段 3 的前置验证：golden 主路径、交互冒烟、长 transcript 基准、adapter 集成 spike，结合真机实测缺陷修复深度复验；审计结论为不进行破坏性删除，平稳推进收敛。"
+summary: "Phase 3：先以 import 图审计，再收敛为唯一表面——删除 12 个未接入生产的适配层模块与第二条同算法表面，adapter/ 改名 surface/，退出时把转写留在主屏；聚焦 45 套件 567 项、golden 门与 PTY 实测通过。"
 confidence: high
 ---
 
@@ -96,7 +96,7 @@ Phase 0/1/2 阶段完成了底层与产品组件的构造与单测覆盖。Phase
 
 ## 下一步路线图
 
-1. **Phase 3 删除审计**：门槛已满足，开始启动 Phase 3 删除审计与收敛；`TranscriptPane`、`viewport.ts`、`selection.ts`、`render/engine.ts` 等已是两条表面的共享底座，不属删除对象；仅审计并清理被替代的专属胶水职责。
+1. ~~**Phase 3 删除审计**：门槛已满足，开始启动 Phase 3 删除审计与收敛~~ — 已于 2026-09-10 完成，见文末「Phase 3 删除审计」与「执行记录」。
 
 ## Phase 2.5-E 手动测试清单（Phase 3 启动门）
 
@@ -211,3 +211,27 @@ Phase 0/1/2 阶段完成了底层与产品组件的构造与单测覆盖。Phase
 
 - 退出时转写不见了：备用屏 `?1049l` 原样恢复终端，会话内容一个字都不留在回滚区，用户退出后只看到一行 `--resume` 提示。参考实现的备用屏 stop 在恢复主屏后把完整逻辑文档逐行打印到主屏，其规划文档把这列为硬性目标。照此实现：`TUI.stop({ document })` 在离开备用屏后打印转写全部行，宿主在 stop 时传入当前宽度下的转写行。
 - `InteractiveMode` 头注释仍写着"运行在普通屏幕、转写退役进回滚区"，与备用屏架构不符，随修改一并纠正。
+
+### 执行记录（2026-09-10）
+
+按审计清单分五次提交落地，每步 `tsc -p tsconfig.build.json` 与 `vitest run src/presentation/tui src/cli/interactive` 通过：
+
+| 步骤 | 提交 | 内容 | 验证 |
+|---|---|---|---|
+| 修正 stale expectation | `5cb1d8ca` | `pickers.test.ts` 两处审批 chooser 断言改为 `{ decision }` 形态 | 25/25 |
+| 删除未接入生产的组件 | `7452a140` | 删 card / messages / dialog / select / loader / markdown / editor / layout / screen / overlay / surface / theme 及 adapter / components / products / spike 四个测试文件；`benchmark.test.ts` 改为对 `Transcript`、`TranscriptPane`、`diffPaint` 的预算 | 10/10 |
+| 收敛为唯一表面 | `49c0bfe6` | 删 `frameSurface.ts`、`cli/interactive/surface.ts`（`ViewHost`）、`adapter/chrome.ts`、`contract.ts`、`model.ts`、`transcript.ts`；`tuiSettings.ts` 去掉表面选择（`CODING_AGENTS_TUI_SURFACE`、`tui.surface`），只剩状态带项；`ScrollView` 收敛为不继承容器的 `ScrollModel`；`TranscriptView` 并入 pane（`Transcript.render` 本就返回 owners）；两表面对照脚本改写为唯一表面的行为测试 | 45 套件 563 项、golden 1/1 |
+| 目录改名 | `f5da42f9` | `presentation/tui/adapter/` → `presentation/tui/surface/`；`tui/view.ts` → `surface/contract.ts`；仅改导入 | 45 套件 563 项 |
+| 退出留下转写 | `3802e036` | `TUI.stop({ document })`：驱动先跑模式恢复电池，再离开备用屏并逐行写入转写（`\r\x1b[2K` 擦行、`\r\n` 连接、autowrap 先关后开、末尾复位并显示光标，与参考备用屏渲染器打印最终文档的形状一致）；`InteractiveMode.stop` 传入当前宽度下的转写行 | 45 套件 567 项、golden 1/1、PTY 实测 |
+
+净变化：`packages/ts-shell/src` 相对 `fb236f14` 为 45 个文件、+698 / −3243 行；表面相关源文件由 22 个（`adapter/` 19 个 + `frameSurface.ts` + `cli/interactive/surface.ts` + `tui/view.ts`）缩至 4 个（`surface/contract.ts`、`view.ts`、`pane.ts`、`scroll.ts`）。`InteractiveMode` 仍在 20 个声明名上限内。
+
+#### PTY 实测（退出文档）
+
+隔离 HOME、临时 git 项目、synthetic provider、`--non-interactive-approval allow-once`、100×30：输入一句含中文的提问并回车，双击 Ctrl+C 退出。退出码 0；最后一个 `?1049l` 之后主屏依次出现欢迎头（`Coding Agent` 与项目路径）、用户消息块（含中文）、回复行，再是 `--resume` 提示；7 行擦行写入；无提示框、无状态带；autowrap 先关后开。
+
+**实测抓到的一处错误**：第一版把文档写在 `terminal.stop()` 之前。驱动的模式恢复电池本身含 `?1049l`（保险），它把光标放回进入备用屏时的位置，随后的 `--resume` 行就把文档覆盖掉——PTY 输出里文档字节存在、但最终屏幕上看不到。调整为驱动先恢复、再离开备用屏并写文档后通过；对应单元测试断言了文档在 `?1049l` 之后、以复位与显示光标收尾。
+
+#### 结论
+
+Phase 3 完成。生产路径上只有一条渲染链路：`InteractiveMode` → `InteractiveSurface`（`surface/view.ts`）→ `TranscriptPane` + `chrome/*` → `TUI` 差分引擎。共享底座（`render/engine.ts`、`render/paint.ts`、`terminal.ts`、`text/*`、`editor.ts`、`chrome/*`、`transcript/*`）未动。后续新的表面能力直接落在 `surface/` 与 `chrome/`，不再开第二条链路。
