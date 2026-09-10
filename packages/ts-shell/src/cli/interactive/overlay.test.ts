@@ -237,6 +237,31 @@ describe("approval picker key routing", () => {
     expect(rows.join("\n")).toContain("Deny");
   });
 
+  it("absorbs typing on a non-filterable approval picker without showing a filter", async () => {
+    const { overlay } = host();
+    overlay.open({
+      title: "Permission: test",
+      form: "panel",
+      empty: "none",
+      filterable: false,
+      load: async () => [
+        { id: "allow-once", label: "Allow once", note: "1 / y" },
+        { id: "deny", label: "Deny", note: "3 / n" },
+      ],
+      apply: async () => undefined,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "x");
+    const rows = overlay.render(60, 20);
+    // The shortcut hints stay on the right; no typed filter text appears.
+    expect(rows.join("\n")).toContain("1 / y");
+    expect(rows.join("\n")).not.toContain("x");
+    const apply = vi.fn();
+    press(overlay, "1", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["allow-once"]);
+  });
+
   it("calls previewEnd when an empty selection is accepted", () => {
     const { overlay } = host();
     const apply = vi.fn();

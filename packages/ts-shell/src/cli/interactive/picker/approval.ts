@@ -19,6 +19,7 @@ export function approvalPicker(
     title: `Permission: ${toolName}${operation}`,
     form: "panel",
     empty: "No options",
+    filterable: false,
     load: async (): Promise<readonly Option[]> => [
       {
         id: "allow-once",
