@@ -10,15 +10,7 @@ import { DoomLoopDetector } from "./doomLoopDetector.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import { microcompactMessages } from "./microCompact.js";
-import {
-  extractFileFootprint,
-  formatFileFootprintXml,
-} from "./compaction/fileFootprint.js";
-import {
-  EIGHT_SECTION_COMPACTION_PROMPT,
-  formatCheckpointMessage,
-  parseCompactedSummary,
-} from "./compaction/summarizer.js";
+import { requestCompactionSummary } from "./compaction/summarize.js";
 import { HookDispatcher, defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../hooks/builtin/index.js";
 import { getActiveSessionGoal } from "../commands/goalCommandRuntime.js";
@@ -287,35 +279,12 @@ export async function* runAutonomousReActLoop(
     if (messages.length <= 3) return false;
 
     try {
-      const summarizerPayload = {
-        model: modelName,
-        messages: [
-          ...messages,
-          {
-            role: "user" as const,
-            content: EIGHT_SECTION_COMPACTION_PROMPT,
-          },
-        ],
-      };
-
-      const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(summarizerPayload),
+      const checkpointMsg = await requestCompactionSummary({
+        provider: { baseUrl, apiKey, model: modelName },
+        messages,
         signal: options.abortSignal,
       });
-
-      if (!res.ok) return false;
-      const data = await res.json() as any;
-      const summaryContent = data.choices?.[0]?.message?.content;
-      if (!summaryContent) return false;
-      const { rawSummary } = parseCompactedSummary(summaryContent);
-      const footprint = extractFileFootprint(messages);
-      const footprintXml = formatFileFootprintXml(footprint);
-      const checkpointMsg = formatCheckpointMessage(rawSummary, footprintXml);
+      if (!checkpointMsg) return false;
       const systemMsg = messages[0];
       let lastUserIndex = -1;
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -469,6 +438,9 @@ export async function* runAutonomousReActLoop(
         }
       }
     } catch (err) {
+      // The user's own cancel aborts the request in flight. That is not a
+      // network failure to report; the runtime records the interruption.
+      if (options.abortSignal?.aborted) return;
       const msg = err instanceof Error ? err.message : String(err);
       yield {
         type: "query.failed",
@@ -767,6 +739,8 @@ export async function* runAutonomousReActLoop(
       });
     }
   }
+  // An interrupted turn did not finish; nothing below may pretend it did.
+  if (options.abortSignal?.aborted) return;
   // The model finished without saying anything. Report why, rather than inventing a
   // summary: "Completed execution across 1 turns" told the user nothing, and told
   // them it in a vocabulary that only makes sense inside this loop.

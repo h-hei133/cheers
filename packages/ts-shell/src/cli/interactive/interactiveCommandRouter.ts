@@ -36,6 +36,7 @@ import {
   runInteractivePromptExecution,
   runInteractiveResumeAction,
 } from "./interactivePromptRunner.js";
+import { describeCompaction, parseCompactCommand } from "./compact.js";
 
 export interface InteractiveCommandRouterInput {
   readonly prompt: string;
@@ -74,6 +75,18 @@ export async function routeInteractiveCommand(
   input: InteractiveCommandRouterInput,
 ): Promise<InteractiveCommandRouterResult> {
   let nextTurnNumber = input.turnNumber;
+
+  // Compaction changes the live context, which only the session runtime can do;
+  // the registry's handoff forms keep their artifact-writing behaviour.
+  const compaction = parseCompactCommand(input.prompt);
+  if (compaction) {
+    const outcome = await input.sessionRuntime.compactHistory(
+      input.runtimeContext.session.id,
+      compaction.instructions,
+    );
+    for (const line of describeCompaction(outcome)) input.renderer.renderLine(line);
+    return { turnNumber: nextTurnNumber, refreshPromptChrome: true };
+  }
 
   const resolved = await buildCliCommandExecution({
     prompt: input.prompt,

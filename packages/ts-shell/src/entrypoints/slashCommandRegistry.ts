@@ -186,7 +186,7 @@ export const SLASH_COMMANDS = [
   {
     name: "compact",
     group: "context",
-    summary: "preview or write a handoff that shortens the conversation",
+    summary: "condense earlier turns into a checkpoint to free context",
   },
   {
     name: "warmup",

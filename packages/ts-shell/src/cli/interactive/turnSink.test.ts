@@ -26,13 +26,45 @@ describe("streaming assistant text", () => {
     expect(rows()).toContain("Hello");
   });
 
-  it("estimates streamed tokens for the activity row", () => {
+  it("shows no token figure while streaming", () => {
+    // A count that ticks up per character is a guess; the band carries the
+    // provider's own numbers once the request is accounted for.
     const { sink } = build();
     sink.begin("turn", "turn");
     sink.handleEvent({ type: "message.delta", role: "coder", delta: "x".repeat(400) } as QueryEvent);
-    const activity = sink.activity();
-    expect(activity?.tokens).toBe(100);
-    expect(activity?.estimated).toBe(true);
+    expect(sink.activity()?.tokens).toBe(0);
+  });
+});
+
+describe("interruption", () => {
+  it("records the interruption once when the turn ends without a terminal event", () => {
+    const { sink, rows } = build();
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "message.delta", role: "coder", delta: "partial" } as QueryEvent);
+    sink.markCancelling();
+    sink.end();
+    const text = rows();
+    expect(text).toContain("partial");
+    expect(text.split("Interrupted before completion.").length - 1).toBe(1);
+    expect(sink.lastTurnFailed).toBe(true);
+  });
+
+  it("does not repeat the notice when the runtime already reported the cancellation", () => {
+    const { sink, rows } = build();
+    sink.begin("turn", "turn");
+    sink.markCancelling();
+    sink.handleEvent({ type: "lifecycle.cancelled", reason: "user" } as QueryEvent);
+    sink.end();
+    expect(rows().split("Interrupted before completion.").length - 1).toBe(1);
+  });
+
+  it("stays silent when the turn finished normally", () => {
+    const { sink, rows } = build();
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "message.delta", role: "coder", delta: "done" } as QueryEvent);
+    sink.end();
+    expect(rows()).not.toContain("Interrupted");
+    expect(sink.lastTurnFailed).toBe(false);
   });
 });
 

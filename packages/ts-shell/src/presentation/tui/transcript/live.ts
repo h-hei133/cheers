@@ -22,8 +22,6 @@ export interface TurnActivity {
   readonly tokens: number;
   /** True once cancellation was requested but the turn has not yet unwound. */
   readonly cancelling: boolean;
-  /** True when `tokens` is a streamed-character estimate rather than a provider count. */
-  readonly estimated?: boolean;
 }
 
 /** Spinner frame for a wall-clock instant, so animation is time-driven not frame-driven. */
@@ -48,7 +46,7 @@ export function renderActivity(activity: TurnActivity | undefined, now: number, 
   const label = activity.cancelling ? "interrupting" : activity.label;
   const facts = [formatElapsed(now - activity.startedAt)];
   if (activity.tokens > 0) {
-    facts.push(`${activity.estimated ? "~" : ""}${formatTokens(activity.tokens)} tok`);
+    facts.push(`${formatTokens(activity.tokens)} tok`);
   }
   const hint = activity.cancelling ? "" : defaultTheme.dim("  esc to interrupt");
   const row = `${glyph} ${defaultTheme.bold(label)} ${defaultTheme.dim(facts.join(" · "))}${hint}`;

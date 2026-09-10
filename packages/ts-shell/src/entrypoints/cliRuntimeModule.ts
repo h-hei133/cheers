@@ -448,12 +448,16 @@ export async function executeResolvedPromptTurn(options: {
     const shellState = options.sessionRuntime.getState();
     if (interactiveTurn && shellState === "interrupted") {
       turnEndStatus = "interrupted";
-      renderTurnResultFallback(options.renderer, {
-        outcome: "interrupted",
-        detail: "Current request was cancelled before completion.",
-        doNext:
-          "Use /resume to continue the interrupted session, or enter a new prompt.",
-      });
+      // A surface that captures output announces the interruption in its own
+      // transcript; only a plain terminal needs the fallback block.
+      if (!options.renderer.captured) {
+        renderTurnResultFallback(options.renderer, {
+          outcome: "interrupted",
+          detail: "Current request was cancelled before completion.",
+          doNext:
+            "Use /resume to continue the interrupted session, or enter a new prompt.",
+        });
+      }
       return;
     }
     turnEndStatus = "error";

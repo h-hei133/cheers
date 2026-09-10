@@ -43,6 +43,25 @@ function createHarness() {
 }
 
 describe("interactive command router", () => {
+  it("routes /compact to the session runtime and prints the outcome", async () => {
+    const harness = createHarness();
+    const calls: Array<[string, string | undefined]> = [];
+    const result = await routeInteractiveCommand({
+      ...harness.input,
+      sessionRuntime: {
+        ...(harness.input.sessionRuntime as object),
+        compactHistory: async (sessionId: string, instructions?: string) => {
+          calls.push([sessionId, instructions]);
+          return { status: "compacted", summarized: 6, kept: 4, tokensBefore: 8_000, tokensAfter: 2_000 };
+        },
+      } as never,
+      prompt: "/compact focus on the failing test",
+    });
+    expect(calls).toEqual([["sess_1234567890abcdef", "focus on the failing test"]]);
+    expect(harness.lines.join("\n")).toContain("Condensed 6 earlier messages");
+    expect(result.turnNumber).toBe(0);
+  });
+
   it("routes /cd workspace navigation commands out of normal prompt execution", async () => {
     const harness = createHarness();
 

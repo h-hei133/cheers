@@ -80,3 +80,22 @@ describe("Compaction Transcript Persistence & Projection", () => {
     expect(messages[1].content).toBe("Proceed with the edit");
   });
 });
+
+describe("compaction with a kept tail", () => {
+  it("re-anchors on the checkpoint and keeps the most recent messages verbatim", () => {
+    const messages = projectTranscriptMessages([
+      { type: "message", role: "user", content: "old question", timestamp: "t1" },
+      { type: "message", role: "assistant", content: "old answer", timestamp: "t2" },
+      { type: "message", role: "user", content: "recent question", timestamp: "t3" },
+      { type: "message", role: "assistant", content: "recent answer", timestamp: "t4" },
+      { type: "compaction", summary: "what happened", keptMessages: 2, timestamp: "t5" },
+      { type: "message", role: "user", content: "after", timestamp: "t6" },
+    ]);
+    expect(messages.map((message) => message.content)).toEqual([
+      "[Context Checkpoint]\nwhat happened",
+      "recent question",
+      "recent answer",
+      "after",
+    ]);
+  });
+});

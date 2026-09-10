@@ -82,6 +82,16 @@ export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
   );
 }
 
+/**
+ * Forget the live context footprint without touching the totals. After a
+ * compaction the last request's prompt size describes a context that no longer
+ * exists, so the gauge goes absent until the next response reports a real one.
+ */
+export function markContextUnknown(sessionId: string): void {
+  const existing = sessionTelemetries.get(sessionId);
+  if (existing) existing.lastPromptTokens = 0;
+}
+
 export function resetSessionUsage(sessionId: string): void {
   sessionTelemetries.delete(sessionId);
 }

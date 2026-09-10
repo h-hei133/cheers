@@ -29,6 +29,7 @@ import {
 } from "./sessionTerminalState.js";
 import { ShellStateMachine } from "./stateMachine.js";
 import type { PermissionScope } from "../../cli/approval/permissionScope.js";
+import type { CompactionOutcome } from "./compaction.js";
 
 export interface SessionRuntimeDependencies {
   readonly sessionManager: SessionManager;
@@ -43,6 +44,12 @@ export interface SessionRuntimeDependencies {
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
   readonly projectMemoryInjectionStateStore?: ProjectMemoryInjectionStateStore;
   readonly projectMemoryStore?: ProjectMemoryStore;
+  /** Condense the session's history; absent when no provider can summarize. */
+  readonly compactHistory?: (
+    sessionId: string,
+    signal: AbortSignal,
+    instructions?: string,
+  ) => Promise<CompactionOutcome>;
 }
 
 export type QueryEventObserver = (event: QueryEvent) => void;
@@ -302,6 +309,25 @@ export class ShellSessionRuntime {
   cancelCurrentRun(): void {
     this.currentRunController?.abort();
     this.stateMachine.interruptRun();
+  }
+
+  /**
+   * Condense the history behind the next request. Refused while a run is in
+   * flight, since that run is still adding to the history being condensed; the
+   * cancel gesture aborts the summarization the same way it aborts a run.
+   */
+  async compactHistory(sessionId: string, instructions?: string): Promise<CompactionOutcome> {
+    if (!this.deps.compactHistory) {
+      return { status: "failed", reason: "No provider is available to summarize the conversation." };
+    }
+    if (this.stateMachine.getState() === "running") return { status: "busy" };
+    const controller = new AbortController();
+    this.currentRunController = controller;
+    try {
+      return await this.deps.compactHistory(sessionId, controller.signal, instructions);
+    } finally {
+      if (this.currentRunController === controller) this.currentRunController = null;
+    }
   }
 
   terminate(sessionId: string): void {

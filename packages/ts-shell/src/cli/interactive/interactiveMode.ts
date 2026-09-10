@@ -11,7 +11,7 @@ import { loadPromptHistory, appendPromptHistory } from "./historyStore.js";
 import type { StatusItemId } from "../../presentation/tui/chrome/items.js";
 import { renderWelcome } from "../../presentation/tui/chrome/welcome.js";
 import { StdinBuffer } from "../../presentation/tui/input/stdinBuffer.js";
-import { nextScope, scopeLabel, scopeMeaning } from "../approval/permissionScope.js";
+import { nextScope } from "../approval/permissionScope.js";
 import { Clipboard } from "./clipboard.js";
 import { Pointer } from "./pointer.js";
 import { TUI } from "../../presentation/tui/render/engine.js";
@@ -378,6 +378,9 @@ export class InteractiveMode {
       return;
     }
     this.state.transcript.append(textBlock("user", text));
+    // Sending is a statement that the user is done reading back: the window
+    // returns to the newest rows so the echo and the answer are in view.
+    this.views.current.scrollToEnd();
     if (this.busy) {
       this.queue.push(text);
       this.tui.requestRender();
@@ -550,6 +553,7 @@ export class InteractiveMode {
   /** Route a command line as if the user had typed it, reusing the same path. */
   private async runCommandLine(line: string): Promise<undefined> {
     this.state.transcript.append(textBlock("user", line));
+    this.views.current.scrollToEnd();
     await this.run(line);
     return undefined;
   }
@@ -572,16 +576,13 @@ export class InteractiveMode {
   }
 
   /**
-   * Widen or narrow what a turn may do without asking.
-   *
-   * Separate from the agent mode on purpose, and announced in the transcript
-   * rather than only in the band: quietly moving to a scope where nothing is put
-   * to the user is not something to learn by noticing a colour change.
+   * Widen or narrow what a turn may do without asking. Separate from the agent
+   * mode on purpose. The band is the only place it is shown: a transcript line
+   * per press turned a quick toggle into clutter.
    */
   private cyclePermissionScope(): void {
     const next = nextScope(this.options.sessionRuntime.getPermissionScope());
     this.options.sessionRuntime.setPermissionScope(next);
-    this.sink.notify(`Permission scope is now ${scopeLabel(next)} — ${scopeMeaning(next)}.`);
     this.tui.requestRender();
   }
 

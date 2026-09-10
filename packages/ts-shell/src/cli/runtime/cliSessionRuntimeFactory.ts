@@ -15,6 +15,7 @@ import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBri
 import type { EscalationPrompt } from "../../sandbox/index.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
+import { compactSessionHistory } from "../../core/shell/compaction.js";
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
@@ -33,6 +34,25 @@ export function createCliSessionRuntime(input: {
   const sessionRuntime = new ShellSessionRuntime({
     sessionManager: input.sessionManager,
     renderer: input.renderer,
+    compactHistory: (sessionId, signal, instructions) => {
+      const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
+      const apiKey = resolved.credential?.apiKey;
+      const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl;
+      const model = resolved.model ?? resolved.credential?.model;
+      if (!apiKey || !baseUrl || !model) {
+        return Promise.resolve({
+          status: "failed" as const,
+          reason: `No credential for provider ${resolved.provider}; set ${resolved.expectedEnvVarName} or configure a connection.`,
+        });
+      }
+      return compactSessionHistory({
+        store: input.sessionManager,
+        sessionId,
+        provider: { apiKey, baseUrl, model },
+        signal,
+        instructions,
+      });
+    },
     runPrompt: (prompt, signal, runtimeSeed, continuityState) => {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();

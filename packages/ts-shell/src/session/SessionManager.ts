@@ -503,6 +503,7 @@ export class SessionManager {
     input: {
       readonly summary: string;
       readonly firstKeptEntryId?: string;
+      readonly keptMessages?: number;
       readonly tokensBefore?: number;
     },
   ): void {

@@ -35,13 +35,16 @@ export function projectTranscriptMessages(
 
   for (const event of events) {
     if (event.type === "compaction") {
-      // Re-anchor context at the compaction checkpoint
+      // Re-anchor context at the compaction checkpoint, keeping the most
+      // recent messages verbatim behind it.
+      const kept = event.keptMessages && event.keptMessages > 0 ? messages.slice(-event.keptMessages) : [];
       messages = [
         {
           role: "user",
           content: `[Context Checkpoint]\n${event.summary}`,
           timestamp: event.timestamp,
         },
+        ...kept,
       ];
     } else if (event.type === "message") {
       const msg = transcriptEventToSessionMessage(event);
@@ -59,6 +62,7 @@ export function appendCompactionEvent(
   input: {
     readonly summary: string;
     readonly firstKeptEntryId?: string;
+    readonly keptMessages?: number;
     readonly tokensBefore?: number;
     readonly timestamp: string;
   },
@@ -67,6 +71,7 @@ export function appendCompactionEvent(
     type: "compaction",
     summary: input.summary,
     firstKeptEntryId: input.firstKeptEntryId,
+    keptMessages: input.keptMessages,
     tokensBefore: input.tokensBefore,
     timestamp: input.timestamp,
   });

@@ -99,7 +99,7 @@ describe("surface parity", () => {
     state.transcript.append({ kind: "user", text: "do the thing", finalized: true });
     live.busy = true;
     live.queued = 1;
-    live.activity = { startedAt: 4_000, label: "working", tokens: 120, cancelling: false, estimated: true };
+    live.activity = { startedAt: 4_000, label: "working", tokens: 120, cancelling: false };
     const thinking: Block = state.transcript.append({ kind: "thinking", text: "", collapsed: true, finalized: false });
     const assistant: Block = state.transcript.append({ kind: "assistant", text: "", finalized: false });
     for (const piece of ["Plan", " it\n\n", "- step one\n", "- step two\n"]) {
@@ -119,7 +119,7 @@ describe("surface parity", () => {
     tool.text = "a.ts\nb.ts";
     tool.status = "failed";
     tool.finalized = true;
-    live.activity = { startedAt: 4_000, label: "working", tokens: 300, cancelling: true, estimated: true };
+    live.activity = { startedAt: 4_000, label: "working", tokens: 300, cancelling: true };
     expectSameFrame(frame, composed);
     state.transcript.finalizeAll();
     live.busy = false;

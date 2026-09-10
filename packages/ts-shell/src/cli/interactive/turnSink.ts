@@ -16,9 +16,6 @@ import type { TurnActivity } from "../../presentation/tui/transcript/live.js";
  * that decides which channel owns which content — so nothing is shown twice.
  */
 
-/** Rough tokens per character, used only for the in-flight estimate. */
-const CHARS_PER_TOKEN = 4;
-
 export class TurnSink implements RendererSink {
   private readonly transcript: Transcript;
   private readonly onChange: () => void;
@@ -28,7 +25,6 @@ export class TurnSink implements RendererSink {
   private running = false;
   private cancelling = false;
   private label = "working";
-  private streamedChars = 0;
   private assistant: Block | undefined;
   private thinking: Block | undefined;
   private thinkingStartedAt = 0;
@@ -51,7 +47,6 @@ export class TurnSink implements RendererSink {
     this.assistant = undefined;
     this.thinking = undefined;
     this.tools.clear();
-    this.streamedChars = 0;
     this.cancelling = false;
     this.failed = false;
     this.label = kind === "turn" ? "working" : title;
@@ -91,6 +86,14 @@ export class TurnSink implements RendererSink {
    */
   end(discard = false): void {
     this.running = false;
+    // An interrupted turn ends without a terminal event of its own, so the
+    // interruption is recorded here — once, and only if nothing else already
+    // explained why the turn stopped.
+    if (this.cancelling && !this.failed && !discard) {
+      this.failed = true;
+      this.finalizeAssistant();
+      this.transcript.append({ kind: "notice", text: "Interrupted before completion.", finalized: true });
+    }
     this.cancelling = false;
     if (discard) this.failed = false;
     else this.transcript.finalizeAll();
@@ -98,7 +101,6 @@ export class TurnSink implements RendererSink {
     this.thinking = undefined;
     this.prose = undefined;
     this.tools.clear();
-    this.streamedChars = 0;
     if (!discard) this.onChange();
   }
 
@@ -147,12 +149,14 @@ export class TurnSink implements RendererSink {
   /** The live activity row state, or undefined when idle. */
   activity(): TurnActivity | undefined {
     if (!this.running) return undefined;
+    // No token figure while streaming: a count that ticks up with every
+    // character is a guess dressed as a measurement. The band shows the
+    // provider's own numbers once the request has been accounted for.
     return {
       startedAt: this.turnStartedAt,
       label: this.label,
-      tokens: Math.floor(this.streamedChars / CHARS_PER_TOKEN),
+      tokens: 0,
       cancelling: this.cancelling,
-      estimated: true,
     };
   }
 
@@ -191,7 +195,6 @@ export class TurnSink implements RendererSink {
     if (!text) return;
     const block = this.assistant ?? this.openAssistant();
     block.text += text;
-    this.streamedChars += text.length;
     this.onChange();
   }
 

@@ -11,6 +11,8 @@ export interface CompactionTranscriptEntry {
   type: "compaction";
   summary: string;
   firstKeptEntryId?: string;
+  /** Messages immediately before this entry that stay in the context verbatim. */
+  keptMessages?: number;
   tokensBefore?: number;
   timestamp: string;
 }
