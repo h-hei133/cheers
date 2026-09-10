@@ -20,6 +20,8 @@ export interface PanelChrome {
   readonly empty: string;
   /** True when rows carry a checkbox rather than a single cursor. */
   readonly multiple: boolean;
+  /** Hide the match count in the header. */
+  readonly hideCount?: boolean;
 }
 
 /** Rows for the panel, fitted to `width` and at most `capacity` tall. */
@@ -54,8 +56,9 @@ export function renderPanel(
 /** Title row, carrying the live filter and the match count. */
 function renderHeader(model: OptionModel, chrome: PanelChrome, width: number): string {
   const filter = model.filter ? ` ${defaultTheme.fg("accent", model.filter)}` : "";
-  const count = defaultTheme.dim(`${model.total}`);
+  const count = chrome.hideCount ? "" : defaultTheme.dim(`${model.total}`);
   const left = `  ${defaultTheme.bold(chrome.title)}${filter}`;
+  if (!count) return truncateToWidth(left, width);
   const pad = Math.max(1, width - visibleWidth(left) - visibleWidth(count) - 2);
   return truncateToWidth(`${left}${" ".repeat(pad)}${count}`, width);
 }
@@ -77,13 +80,15 @@ function renderRow(
   // The note is a state word — "restorable", "default", "toggle" — so it is
   // pinned to the right and the detail gives way to it, rather than the note
   // being the first thing a long detail truncates away.
-  const noteWidth = option.note ? visibleWidth(option.note) + 2 : 0;
+  const RIGHT_PAD = option.note ? 2 : 0;
+  const noteWidth = option.note ? visibleWidth(option.note) + RIGHT_PAD : 0;
   const detailWidth = Math.max(0, width - visibleWidth(marker) - labelWidth - noteWidth);
   const detail = option.detail ? defaultTheme.dim(truncateToWidth(option.detail, detailWidth)) : "";
   const head = truncateToWidth(`${marker}${padToWidth(label, labelWidth)}${detail}`, width - noteWidth);
   const note = option.note ? defaultTheme.fg("border", option.note) : "";
-  const gap = Math.max(0, width - visibleWidth(head) - visibleWidth(note));
-  const fitted = `${head}${" ".repeat(gap)}${note}`;
+  const gap = Math.max(0, width - visibleWidth(head) - visibleWidth(note) - RIGHT_PAD);
+  const trailingPad = " ".repeat(RIGHT_PAD);
+  const fitted = `${head}${" ".repeat(gap)}${note}${trailingPad}`;
   return active ? `\x1b[48;5;238m${padToWidth(fitted, width)}\x1b[0m` : fitted;
 }
 

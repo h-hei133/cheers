@@ -44,6 +44,20 @@ describe("inline panel", () => {
     expect(head.trimEnd().endsWith("11")).toBe(true);
   });
 
+  it("omits the match count when hideCount is true", () => {
+    const list = model();
+    const head = stripAnsi(renderPanel(list, { title: "Pick", empty: "none", multiple: false, hideCount: true }, 60, 8)[0]!);
+    expect(head).toBe("  Pick");
+  });
+
+  it("preserves right margin for notes so they are not cut off at the edge", () => {
+    const list = model([
+      { id: "1", label: "Option", detail: "Detail text", note: "1 / y" },
+    ]);
+    const row = stripAnsi(renderPanel(list, { title: "Pick", empty: "none", multiple: false }, 60, 8)[1]!);
+    expect(row.endsWith("1 / y  ")).toBe(true);
+  });
+
   it("marks the cursor row with an arrow when one answer is wanted", () => {
     const rows = renderPanel(model(), { title: "Pick", empty: "none", multiple: false }, 60, 8);
     expect(stripAnsi(rows[1]!)).toContain("▸");

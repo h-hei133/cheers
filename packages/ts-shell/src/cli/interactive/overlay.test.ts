@@ -306,4 +306,43 @@ describe("approval picker key routing", () => {
     expect(apply).toHaveBeenCalledWith(expect.anything(), ["allow-always"]);
     expect(overlay.active).toBe(false);
   });
+
+  it("dismisses approval picker on escape and triggers previewEnd", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    const previewEnd = vi.fn();
+    overlay.open({ ...approvalPicker(), previewEnd });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(overlay.active).toBe(true);
+    press(overlay, "\x1b", apply);
+    expect(overlay.active).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+    expect(previewEnd).toHaveBeenCalledOnce();
+  });
+
+  it("supports up arrow navigation and enter acceptance", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    // Start at index 0 (allow-once). Press up arrow -> wraps to index 2 (deny).
+    press(overlay, "\x1b[A");
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["deny"]);
+    expect(overlay.active).toBe(false);
+  });
+
+  it("omits the count in the approval header row", async () => {
+    const { overlay } = host();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    const rows = overlay.render(80, 10);
+    // Header row should have the title, but not the floating count '3' on the right
+    const header = rows[0]!;
+    expect(header).toContain("Permission");
+    expect(header.trimEnd().endsWith("3")).toBe(false);
+  });
 });

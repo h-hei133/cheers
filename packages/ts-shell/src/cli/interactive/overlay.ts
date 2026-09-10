@@ -161,9 +161,18 @@ export class OverlayHost {
         height,
       );
     }
+    const isApproval =
+      picker.title.startsWith("Permission:") ||
+      (this.model.visible.some((o) => o.id === "allow-once") &&
+        this.model.visible.some((o) => o.id === "deny"));
     return renderPanel(
       this.model,
-      { title: picker.title, empty, multiple: picker.multiple === true },
+      {
+        title: picker.title,
+        empty,
+        multiple: picker.multiple === true,
+        hideCount: isApproval,
+      },
       width,
       Math.min(PANEL_ROWS, Math.max(4, height - 6)),
     );
@@ -288,51 +297,26 @@ export class OverlayHost {
         this.model.visible.some((o) => o.id === "deny"));
 
     if (isApprovalPicker) {
-      if (picker.filterable === false) {
-        if (event.keyId === "y" || event.keyId === "1" || event.text === "1") {
-          this.acceptDirect(picker, apply, ["allow-once"]);
-          return true;
-        }
-        if (event.keyId === "a" || event.keyId === "2" || event.text === "2") {
-          this.acceptDirect(picker, apply, ["allow-always"]);
-          return true;
-        }
-        if (event.keyId === "n" || event.keyId === "d" || event.keyId === "3" || event.text === "3") {
-          this.acceptDirect(picker, apply, ["deny"]);
-          return true;
-        }
-        if (event.keyId === "j") {
-          this.model.step(1);
-          this.onChange();
-          return true;
-        }
-        if (event.keyId === "k") {
-          this.model.step(-1);
-          this.onChange();
-          return true;
-        }
-        // Every other keystroke is absorbed: the panel shows no filter row and
-        // keeps no filter state, so nothing typed can appear on screen.
-        return true;
-      }
-      if (event.keyId === "y" || event.keyId === "1" || event.text === "1") {
+      const key = event.keyId.toLowerCase();
+      const text = (event.text ?? "").toLowerCase();
+      if (key === "y" || key === "1" || text === "1" || text === "y") {
         this.acceptDirect(picker, apply, ["allow-once"]);
         return true;
       }
-      if (event.keyId === "a" || event.keyId === "2" || event.text === "2") {
+      if (key === "a" || key === "2" || text === "2" || text === "a") {
         this.acceptDirect(picker, apply, ["allow-always"]);
         return true;
       }
-      if (event.keyId === "n" || event.keyId === "d" || event.keyId === "3" || event.text === "3") {
+      if (key === "n" || key === "d" || key === "3" || text === "3" || text === "n" || text === "d") {
         this.acceptDirect(picker, apply, ["deny"]);
         return true;
       }
-      if (event.keyId === "j") {
+      if (key === "j") {
         this.model.step(1);
         this.onChange();
         return true;
       }
-      if (event.keyId === "k") {
+      if (key === "k") {
         this.model.step(-1);
         this.onChange();
         return true;
