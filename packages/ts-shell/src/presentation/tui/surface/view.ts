@@ -6,7 +6,7 @@ import type { Block } from "../transcript/blocks.js";
 import { renderActivity } from "../transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
-import { createViewState, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "../view.js";
+import { createViewState, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "./contract.js";
 import { TranscriptPane } from "./pane.js";
 
 /**

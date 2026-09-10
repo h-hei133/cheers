@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { stripAnsi } from "../text/ansi.js";
 import type { Block } from "../transcript/blocks.js";
-import { createViewState, type ViewContext } from "../view.js";
+import { createViewState, type ViewContext } from "./contract.js";
 import { InteractiveSurface } from "./view.js";
 
 /** Facts a test can change between frames; the surface reads them at paint time. */

@@ -1,14 +1,14 @@
-import { Editor } from "./editor.js";
-import { PasteStore } from "./pastes.js";
-import type { AmbientContext } from "./chrome/hints.js";
-import type { StatusFacts, StatusItemId } from "./chrome/items.js";
-import { SuggestionList } from "./chrome/suggestions.js";
-import type { TerminalFrameProvider } from "./render/frame.js";
-import type { Block } from "./transcript/blocks.js";
-import { Transcript } from "./transcript/container.js";
-import type { TurnActivity } from "./transcript/live.js";
-import type { SelectionPoint, SelectionSpan } from "./transcript/selection.js";
-import type { ScrollbarGeometry } from "./transcript/viewport.js";
+import { Editor } from "../editor.js";
+import { PasteStore } from "../pastes.js";
+import type { AmbientContext } from "../chrome/hints.js";
+import type { StatusFacts, StatusItemId } from "../chrome/items.js";
+import { SuggestionList } from "../chrome/suggestions.js";
+import type { TerminalFrameProvider } from "../render/frame.js";
+import type { Block } from "../transcript/blocks.js";
+import { Transcript } from "../transcript/container.js";
+import type { TurnActivity } from "../transcript/live.js";
+import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
+import type { ScrollbarGeometry } from "../transcript/viewport.js";
 
 /**
  * The seam between the interactive host and whichever surface draws it.

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Pointer } from "./pointer.js";
 import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
-import type { InteractiveView } from "../../presentation/tui/view.js";
+import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
 
 function build(overrides: Partial<InteractiveView> = {}) {
   const copied: string[] = [];

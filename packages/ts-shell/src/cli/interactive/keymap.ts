@@ -1,6 +1,6 @@
 import type { CursorMove, KillTarget } from "../../presentation/tui/editor.js";
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
-import type { InteractiveView, ViewActions } from "../../presentation/tui/view.js";
+import type { InteractiveView, ViewActions } from "../../presentation/tui/surface/contract.js";
 
 /**
  * Key routing for the interactive view.

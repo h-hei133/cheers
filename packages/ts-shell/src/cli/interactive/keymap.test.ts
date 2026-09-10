@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { routeKey, type KeymapActions } from "./keymap.js";
-import { InteractiveSurface } from "../../presentation/tui/adapter/view.js";
+import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { parseKeyEvent } from "../../presentation/tui/input/keys.js";
 import { KEY_BINDINGS } from "../../presentation/tui/chrome/keys.js";
 import { dispatchedKeyIds } from "./keymap.js";

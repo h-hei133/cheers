@@ -1,6 +1,6 @@
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
 import { DragSelection, type SelectionSpan } from "./selection.js";
-import type { InteractiveView } from "../../presentation/tui/view.js";
+import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
 
 /**
  * What the mouse does.
