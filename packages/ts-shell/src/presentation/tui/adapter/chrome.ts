@@ -3,14 +3,21 @@ import { renderBand } from "../chrome/band.js";
 import { renderComposer } from "../chrome/composer.js";
 import { renderHints, type AmbientContext, type HintContext } from "../chrome/hints.js";
 import type { Editor } from "../editor.js";
+import type { SuggestionList } from "../chrome/suggestions.js";
 import type { ViewComponent } from "./contract.js";
 import type { SessionFacts } from "./model.js";
 
+/**
+ * Activity row, an optional panel (an inline picker), then the band. The panel
+ * sits above the band so the prompt stays where the user's attention already is.
+ */
 export class StatusBar implements ViewComponent {
   private facts: SessionFacts;
+  private readonly panel: ViewComponent | undefined;
 
-  constructor(facts: SessionFacts) {
+  constructor(facts: SessionFacts, panel?: ViewComponent) {
     this.facts = facts;
+    this.panel = panel;
   }
 
   setFacts(facts: SessionFacts): void {
@@ -22,7 +29,8 @@ export class StatusBar implements ViewComponent {
   render(width: number): string[] {
     const safe = Math.max(1, Math.floor(width));
     return [
-      ...renderActivity(this.facts.activity, Date.now(), safe),
+      ...renderActivity(this.facts.activity, this.facts.now ?? Date.now(), safe),
+      ...(this.panel?.render(safe) ?? []),
       renderBand(this.facts.facts, this.facts.items, safe),
     ];
   }
@@ -36,16 +44,25 @@ export interface ComposerFacts {
   readonly newlineKey: string;
   readonly ambient: AmbientContext;
   readonly maxRows?: number;
+  /** Transient status notification shown in place of the hint row. */
+  readonly toast?: string;
 }
 
+/**
+ * The prompt area: the draft, the completion list while one is open, and the
+ * hint row. The list sits between the two because it completes the draft above
+ * it and the hints below describe how to use the list.
+ */
 export class Composer implements ViewComponent {
   focused = true;
   private readonly editor: Editor;
+  private readonly suggestions: SuggestionList | undefined;
   private facts: ComposerFacts;
 
-  constructor(editor: Editor, facts: ComposerFacts) {
+  constructor(editor: Editor, facts: ComposerFacts, suggestions?: SuggestionList) {
     this.editor = editor;
     this.facts = facts;
+    this.suggestions = suggestions;
   }
 
   setFacts(facts: ComposerFacts): void {
@@ -74,11 +91,12 @@ export class Composer implements ViewComponent {
         cancelArmed: this.facts.cancelArmed,
         queued: this.facts.queued,
         newlineKey: this.facts.newlineKey,
+        toast: this.facts.toast,
       };
-      return [
-        ...renderComposer(this.editor, { busy: this.facts.busy }, safe, this.facts.maxRows),
-        ...renderHints(context, this.facts.ambient, safe),
-      ];
+      const rows = renderComposer(this.editor, { busy: this.facts.busy }, safe, this.facts.maxRows);
+      if (this.facts.suggesting && this.suggestions) rows.push(...this.suggestions.render(safe));
+      rows.push(...renderHints(context, this.facts.ambient, safe));
+      return rows;
     } finally {
       this.editor.focused = previous;
     }

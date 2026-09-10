@@ -2,7 +2,7 @@
 title: "TUI 框架选型与渐进式迁移方案"
 category: article
 sources: [github-opentui, github-ink, github-pi-tui, local-tui-state]
-updated: 2026-09-08
+updated: 2026-09-10
 tags: [tui, opentui, ink, pi, architecture, migration]
 summary: "基于当前 ts-shell TUI 基础与 GitHub 上游资料，选择 Pi TUI 作为近期集成基线，保留 OpenTUI 作为后续性能路线，明确 Ink 不作为核心渲染替换。"
 confidence: high
@@ -170,14 +170,20 @@ Phase 2.5 完成后，才允许重新进行 Phase 3 删除审计。必须同时�
 - 不设置默认双渲染或运行时同时绘制两套表面；实验路径必须显式、可逆、单写入者。
 - 不以单元测试或 benchmark 单独宣布切流完成；真实 CLI 行为与回退证明是硬门槛。
 
-## 当前演进状态
+## 当前演进状态（2026-09-10）
 
-1. Adapter Spike 与基线 benchmark 已通过，但仍属于手工组装验证，不能视为生产接管。
-2. Phase 1/2 的组件与产品封装已完成；生产链路近期验证的权限、选区、Toast、滚动条能力尚未全部汇入 adapter。
-3. 因此当前状态是：**Phase 2.5 规划完成，尚未开始执行；Phase 3 暂不启动。**
+Phase 2.5-A 至 2.5-D 已在代码中落地，2.5-E 的真实终端多轮门槛仍未全部满足：
+
+1. **2.5-A 合约已冻结**：`presentation/tui/view.ts` 定义 `ViewState`（transcript、editor、pastes、suggestions，由控制面持有）、`ViewContext`（渲染时读取的事实 thunk；规划中称 ViewSnapshot，因其为按需求值而非快照，落地时改名）、`ViewActions`（键盘与指针可触达的控制面动作）与 `InteractiveView`（帧提供者 + 滚动/几何/选区查询）。`keymap.ts` 与 `pointer.ts` 只依赖 `InteractiveView`，不再引用具体表面类型；`pointer` 通过 `view()` 每次事件重新读取当前表面，以便切换后立即生效。
+2. **2.5-B 组装模块已存在**：`adapter/view.ts` 的 `ComposedView` 由 `StatusBar`（活动行 + 内联面板 + 状态带）、`Composer`（提示 + 补全列表 + 提示行）与共享的 `adapter/pane.ts` 组成。滚动条几何、内容坐标映射、选区着色收敛为 `transcript/viewport.ts` 与 `transcript/selection.ts` 两个窄模块，直接渲染表面 `frameSurface.ts` 与组件表面共用同一 `TranscriptPane`，不存在两份算法。
+3. **2.5-C 接线已完成**：`cli/interactive/surface.ts` 的 `ViewHost` 是唯一帧提供者，`InteractiveMode` 只持有 `ViewHost` 与 `ViewState`；表面通过 `CODING_AGENTS_TUI_SURFACE` 环境变量或设置项 `tui.surface`（`frame` | `composed`）选择，默认仍为 `frame`。终端引擎、原始输入、粘贴、IME 字节解码、overlay 焦点与 `requestRender` 调度均由控制面统一持有，两条表面从不同时写终端。
+4. **2.5-D 回退与对照已具备证据**：`ViewHost` 在实验表面渲染抛错时于同一帧内换回默认表面，保留 transcript 与草稿，在 transcript 追加一条错误说明并记录 warn 日志；默认表面的异常不被吞掉。`cli/interactive/surface.test.ts` 用同一状态与同一输入脚本驱动两条表面，逐帧断言行内容、滚动位置、滚动条几何、选区投影与命中块完全一致，覆盖首帧、流式 assistant/thinking/tool、失败工具、队列提示、翻页与滑块拖拽、Toast、取消提示、补全列表、内联面板与全屏 overlay。
+5. **真实 CLI 冒烟（单轮）**：以隔离 HOME 与临时项目目录在伪终端中分别启动两条表面：备用屏进入/退出、鼠标上报开关、硬件光标固定、欢迎信息、提示符、`/help` 全屏阅读器、中文输入、双击 Ctrl+C 退出均正常，两者字节量仅差目录名长度。尚未完成的是连续两轮、含 resume、审批三决策、长粘贴与非 TTY 的完整门槛。
+
+顺带修正一处与文档意图不符的旧行为：此前向上滚动后新输出到来时窗口保持“距末尾的距离”，导致正在阅读的行被推走；现改为与参考实现的滚动视图一致，保持绝对内容行，新输出只增加“可回到末尾”的距离。该行为由对照测试固定。
 
 ## 后续决策点
 
-1. 按 2.5-A → 2.5-B → 2.5-C → 2.5-D 顺序执行，每个阶段独立验证并保留回退路径。
-2. 只有 2.5-E 全部满足后，才重新评估 Phase 3，而不是自动进入删除。
-3. 若 adapter 不能在既定性能与交互预算内接管，保留当前生产表面并记录差异，不为满足迁移目标强行删除。
+1. 完成 2.5-E 门槛：连续两轮真实 CLI smoke（启动/退出、流式消息、工具输出、权限三决策、resume、滚轮/滑块、内容空间选区、Toast、长粘贴、中文输入），以及非 TTY/CI/管道输出可读性核对。
+2. 门槛满足后再进行 Phase 3 删除审计；审计对象仅限被替代的专属胶水，`TUI` 引擎、文本测量、编辑器、终端底座与 `TranscriptPane` 均为共享底座。
+3. 若组件表面在真实压力下不能维持与默认表面的逐帧一致，保留 `frame` 为默认并记录差异，不为迁移目标强行切换。

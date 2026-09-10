@@ -3,7 +3,7 @@ title: "TUI Phase 3：基线验证与删除审计"
 category: article
 sources: [local-tui-state, verification-gates, cli-interactive]
 created: 2026-09-07
-updated: 2026-09-08
+updated: 2026-09-10
 tags: [tui, adapter, phase-3, verification]
 summary: "执行选型文档阶段 3 的前置验证：golden 主路径、交互冒烟、长 transcript 基准、adapter 集成 spike，结合真机实测缺陷修复深度复验；审计结论为不进行破坏性删除，平稳推进收敛。"
 confidence: high
@@ -77,10 +77,24 @@ Phase 0/1/2 阶段完成了底层与产品组件的构造与单测覆盖。Phase
 4. 在真实 CLI 完成长粘贴、中文输入、滚轮/滑块、选区复制、审批三决策、resume、非 TTY/CI 的连续 smoke；
 5. 重新做删除审计，只删除被替代的专属胶水，不删除共享 `TUI`、文本测量、编辑器和终端底座。
 
-当前结论：**Phase 2.5 仅完成规划，尚未开始执行；Phase 3 删除工作保持阻塞。** 原有 benchmark/spike 继续作为输入证据，但不再被解释为生产切流证明。
+## Phase 2.5 执行记录（2026-09-10）
+
+| 阶段 | 落地位置 | 证据 |
+|---|---|---|
+| 2.5-A 合约 | `presentation/tui/view.ts`；`keymap.ts`/`pointer.ts` 改依赖 `InteractiveView` | `keymap.test.ts` 35 项、`pointer.test.ts` 5 项在合约类型下通过 |
+| 2.5-B 组装 | `adapter/view.ts`（`ComposedView`）、`adapter/pane.ts`（共享 `TranscriptPane`）、`adapter/transcript.ts`、`transcript/viewport.ts`、`transcript/selection.ts` | `adapter/view.test.ts` 5 项、`transcript/viewport.test.ts` 11 项 |
+| 2.5-C 接线 | `cli/interactive/surface.ts`（`ViewHost`、`createView`）、`tuiSettings.ts`（`readSurfaceChoice`）、`InteractiveMode` 改持有 `ViewHost` 与 `ViewState` | `firstFrame.test.ts` 新增 3 项：组件表面首帧与默认表面逐字节相同、键入/补全/翻页经组件表面、失败回退 |
+| 2.5-D 对照与回退 | `ViewHost.renderFrame` 同帧回退；`surface.test.ts` 逐帧对照 | `surface.test.ts` 12 项（6 项对照、3 项回退、3 项选择读取） |
+
+验证：
+- `tsc -p tsconfig.build.json` 通过。
+- 交互与 TUI 49 套件 598 项全部通过（较上轮新增 31 项）。
+- golden main path 门 1/1 通过。
+- 真实 CLI 伪终端单轮冒烟（隔离 HOME、临时项目目录）：`frame` 与 `composed` 两条表面均正常进入/退出备用屏、开关鼠标上报、固定硬件光标、显示欢迎与提示符、执行 `/help` 全屏阅读器、输入中文、双击 Ctrl+C 退出，退出码 0，无回退提示；两者输出字节仅差临时目录名长度。
+
+当前结论：**Phase 2.5-A 至 2.5-D 已执行；2.5-E 尚未满足（缺连续两轮含 resume、审批三决策、长粘贴与非 TTY 的完整门槛）；Phase 3 删除工作保持阻塞。**
 
 ## 下一步路线图
 
-1. **Phase 2.5-A/B**：冻结兼容合约并组装完整 adapter view。
-2. **Phase 2.5-C/D**：接入 `InteractiveMode` 的显式表面工厂，完成可逆真实 CLI 切流与回退。
-3. **Phase 2.5-E**：满足全部真实终端与非 TTY 门槛后重新进行 Phase 3 删除审计。
+1. **Phase 2.5-E**：在真实终端完成连续两轮完整 smoke 与非 TTY 核对，记录两条表面的差异（预期为零）。
+2. **Phase 3 删除审计**：门槛满足后重新审计；`TranscriptPane`、`viewport.ts`、`selection.ts` 已是两条表面的共享底座，不属删除对象。

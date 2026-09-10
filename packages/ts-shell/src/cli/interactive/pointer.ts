@@ -1,6 +1,6 @@
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
 import { DragSelection, type SelectionSpan } from "./selection.js";
-import type { InteractiveSurface } from "./frameSurface.js";
+import type { InteractiveView } from "../../presentation/tui/view.js";
 
 /**
  * What the mouse does.
@@ -16,7 +16,8 @@ import type { InteractiveSurface } from "./frameSurface.js";
 const WHEEL_ROWS = 3;
 
 export interface PointerContext {
-  readonly surface: InteractiveSurface;
+  /** The surface currently on screen, read per event so a swapped view is honoured. */
+  view(): InteractiveView;
   /** Every row currently on screen, for turning a drag back into text. */
   rows(): readonly string[];
   copy(text: string): void;
@@ -52,7 +53,7 @@ export class Pointer {
   /** Handle one report. */
   handle(report: MouseReport): void {
     if (report.kind === "wheel") {
-      this.context.surface.scroll(report.button * WHEEL_ROWS);
+      this.context.view().scroll(report.button * WHEEL_ROWS);
       this.context.redraw();
       return;
     }
@@ -64,13 +65,13 @@ export class Pointer {
         this.context.redraw();
         return;
       }
-      this.context.surface.scrollToThumb(report.row, this.scrollbarDrag.grabOffset);
+      this.context.view().scrollToThumb(report.row, this.scrollbarDrag.grabOffset);
       this.context.redraw();
       return;
     }
 
     // 2. Click or press on the scrollbar track / thumb:
-    const geo = this.context.surface.scrollbarGeometry();
+    const geo = this.context.view().scrollbarGeometry();
     if (
       geo &&
       report.kind === "press" &&
@@ -83,7 +84,7 @@ export class Pointer {
       const onThumb = report.row >= geo.thumbTop && report.row < geo.thumbTop + geo.thumbHeight;
       const grabOffset = onThumb ? report.row - geo.thumbTop : Math.floor(geo.thumbHeight / 2);
       if (!onThumb) {
-        this.context.surface.scrollToThumb(report.row, grabOffset);
+        this.context.view().scrollToThumb(report.row, grabOffset);
       }
       this.scrollbarDrag = { grabOffset };
       this.context.redraw();
@@ -91,7 +92,7 @@ export class Pointer {
     }
 
     // 3. Normal selection drag and click:
-    const contentCoord = this.context.surface.screenToContent(report.row, report.column);
+    const contentCoord = this.context.view().screenToContent(report.row, report.column);
     const handled = this.drag.handle(report, contentCoord);
     if (handled) {
       this.context.redraw();
@@ -103,9 +104,9 @@ export class Pointer {
     }
   }
   private toggle(row: number): void {
-    const block = this.context.surface.blockAtScreenRow(row);
+    const block = this.context.view().blockAtScreenRow(row);
     if (!block || block.collapsed === undefined) return;
-    this.context.surface.transcript.setCollapsed(block, !block.collapsed);
+    this.context.view().transcript.setCollapsed(block, !block.collapsed);
     this.context.redraw();
   }
 }

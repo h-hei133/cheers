@@ -1,106 +1,48 @@
-import { defaultTheme } from "../../presentation/theme/theme.js";
-import { padToWidth } from "../../presentation/tui/text/layout.js";
-import { visibleWidth } from "../../presentation/tui/text/measure.js";
-import { Editor } from "../../presentation/tui/editor.js";
-import { PasteStore } from "../../presentation/tui/pastes.js";
 import { renderBand } from "../../presentation/tui/chrome/band.js";
-import type { StatusFacts, StatusItemId } from "../../presentation/tui/chrome/items.js";
 import { composerTextWidth, renderComposer } from "../../presentation/tui/chrome/composer.js";
-import { renderHints, type AmbientContext } from "../../presentation/tui/chrome/hints.js";
-import { SuggestionList } from "../../presentation/tui/chrome/suggestions.js";
-import type {
-  TerminalFramePlan,
-  TerminalFrameProvider,
-  ViewportSize,
-} from "../../presentation/tui/render/frame.js";
-import { highlightSelection, type SelectionSpan } from "./selection.js";
-import { Transcript } from "../../presentation/tui/transcript/container.js";
-import { renderActivity, type TurnActivity } from "../../presentation/tui/transcript/live.js";
+import { renderHints } from "../../presentation/tui/chrome/hints.js";
+import { TranscriptPane } from "../../presentation/tui/adapter/pane.js";
+import type { TerminalFramePlan, ViewportSize } from "../../presentation/tui/render/frame.js";
+import type { Block } from "../../presentation/tui/transcript/blocks.js";
+import { renderActivity } from "../../presentation/tui/transcript/live.js";
+import type { SelectionPoint, SelectionSpan } from "../../presentation/tui/transcript/selection.js";
+import type { ScrollbarGeometry } from "../../presentation/tui/transcript/viewport.js";
+import { createViewState, type InteractiveView, type ViewContext, type ViewState } from "../../presentation/tui/view.js";
+
+export type { ScrollbarGeometry } from "../../presentation/tui/transcript/viewport.js";
+/** Kept for callers that named the facts by this surface rather than by the seam. */
+export type SurfaceContext = ViewContext;
 
 /**
- * Frame composition for the interactive session.
+ * Frame composition by direct rendering.
  *
  * The screen is split once, here: chrome owns the bottom rows and the transcript
- * gets whatever is left. Since the screen is ours alone there is no terminal
- * scrollback to defer to, so this also owns *where* in the transcript the window
- * sits — which is what makes scrolling back a thing the surface can simply do.
- *
- * The window follows the newest rows unless the user has scrolled away from them.
- * Following is the default because a conversation is read at its end; an explicit
- * scroll is a statement that the user is reading something else, and new output
- * must not yank them away from it.
+ * pane gets whatever is left. Since the screen is ours alone there is no terminal
+ * scrollback to defer to, so the pane also owns *where* in the transcript the
+ * window sits — which is what makes scrolling back a thing the surface can simply do.
  */
 
-export interface SurfaceContext {
-  facts(): StatusFacts;
-  statusItems(): readonly StatusItemId[];
-  activity(): TurnActivity | undefined;
-  busy(): boolean;
-  queuedCount(): number;
-  now(): number;
-  /** Background facts for the row under the prompt. */
-  ambient(): AmbientContext;
-  /** Key that inserts a newline on this terminal. */
-  newlineKey(): string;
-  /** True while a second cancel press would exit. */
-  cancelArmed(): boolean;
-  /** True when an open picker or reader wants the whole screen. */
-  overlayFullScreen(): boolean;
-  /** Rows for an open picker, or none when none is open. */
-  overlayRows(width: number, height: number): string[];
-  /** Cells the pointer is currently covering, or none when it is not dragging. */
-  selection(): SelectionSpan | undefined;
-  /** Transient status notification (e.g. clipboard copy feedback). */
-  toast?(): string | undefined;
-}
 /** Minimum transcript rows kept visible however tall the chrome grows. */
 const MIN_TRANSCRIPT_ROWS = 1;
 
-export interface ScrollbarGeometry {
-  readonly column: number;
-  readonly trackTop: number;
-  readonly trackHeight: number;
-  readonly thumbTop: number;
-  readonly thumbHeight: number;
-  readonly maxScrollTop: number;
-}
-
-export class InteractiveSurface implements TerminalFrameProvider {
-  readonly editor = new Editor();
-  /**
-   * Long pastes held aside behind placeholders. Lives with the editor because the
-   * draft on screen and the text that will be sent are the same object's two
-   * readings, and nothing else should have to know they differ.
-   */
-  readonly pastes = new PasteStore();
-  readonly transcript = new Transcript();
-  readonly suggestions = new SuggestionList();
-
+export class InteractiveSurface implements InteractiveView {
+  readonly editor: ViewState["editor"];
+  readonly pastes: ViewState["pastes"];
+  readonly transcript: ViewState["transcript"];
+  readonly suggestions: ViewState["suggestions"];
+  private readonly pane: TranscriptPane;
   private suggesting = false;
-  /** Rows between the bottom of the transcript and the bottom of the window. */
-  private scrollBack = 0;
-  /** Row the transcript window started at last frame, for hit-testing a click. */
-  private lastTop = 0;
-  /**
-   * Blank rows padded in above the transcript last frame.
-   *
-   * A short conversation is pushed to the bottom of the screen, so screen row 0 is
-   * not transcript row `lastTop` — it is filler. Hit-testing without subtracting
-   * this looked up the wrong block, or none, which is why clicking a card did
-   * nothing on any screen that was not already full.
-   */
-  private lastFiller = 0;
-  private lastVisible = 0;
-  private lastTranscriptRows = 0;
-  private lastWidth = 80;
-  private lastTotalRows = 0;
-  /** How far back the window could go at the last frame, so a key can be honest. */
-  private lastMaxBack = 0;
-  private lastOwners: readonly number[] = [];
-  private lastHasScrollbar = false;
-  private lastRenderedRows: readonly string[] = [];
 
-  constructor(private readonly context: SurfaceContext) {}
+  constructor(
+    private readonly context: ViewContext,
+    state: ViewState = createViewState(),
+  ) {
+    this.editor = state.editor;
+    this.pastes = state.pastes;
+    this.transcript = state.transcript;
+    this.suggestions = state.suggestions;
+    this.pane = new TranscriptPane(state.transcript);
+  }
 
   /** Whether the completion list is currently intercepting navigation keys. */
   get suggestionsOpen(): boolean {
@@ -125,188 +67,48 @@ export class InteractiveSurface implements TerminalFrameProvider {
     }
     const chrome = this.renderChrome(width, height);
     const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.length);
-    const unconstrainedRows = this.transcript.rowCount(width);
-    const hasScrollbar = unconstrainedRows > capacity && width >= 10;
-    const contentWidth = hasScrollbar ? width - 1 : width;
-    const rendered = this.transcript.render(contentWidth);
-    const totalRows = rendered.rows.length;
-    const maxBack = Math.max(0, totalRows - capacity);
-    this.lastMaxBack = maxBack;
-    this.scrollBack = Math.min(this.scrollBack, maxBack);
-    const top = maxBack - this.scrollBack;
-    this.lastTop = top;
-    this.lastWidth = width;
-    this.lastTotalRows = totalRows;
-    this.lastTranscriptRows = capacity;
-    this.lastHasScrollbar = hasScrollbar;
-    this.lastRenderedRows = rendered.rows;
-    this.lastOwners = rendered.owners;
-    const visible = rendered.rows.slice(top, top + capacity);
-    this.lastVisible = visible.length;
-    // The transcript is padded down to its capacity so the chrome stays put: a
-    // short conversation should not float the prompt up the middle of the screen.
-    const filler = Array.from({ length: Math.max(0, capacity - visible.length) }, () => "");
-    this.lastFiller = filler.length;
-    const shaded = this.shade([...filler, ...visible]);
-    const transcriptRows = this.withScrollbar(shaded, width, capacity, totalRows, top, hasScrollbar);
+    const transcriptRows = this.pane.render(width, capacity, this.context.selection());
     return { rows: [...transcriptRows, ...chrome] };
   }
-  /** Map a screen row and column to a content row and column in the full transcript. */
-  screenToContent(row: number, column: number): { readonly row: number; readonly column: number } {
-    const within = row - this.lastFiller;
-    if (within < 0) {
-      return { row: this.lastTop, column: 0 };
-    }
-    const maxContentRow = Math.max(0, this.lastTotalRows - 1);
-    const contentRow = Math.min(maxContentRow, this.lastTop + within);
-    const line = this.lastRenderedRows[contentRow] ?? "";
-    const lineWidth = visibleWidth(line);
-    const contentCol = Math.max(0, Math.min(column, lineWidth));
-    return { row: contentRow, column: contentCol };
+
+  screenToContent(row: number, column: number): SelectionPoint {
+    return this.pane.screenToContent(row, column);
   }
 
-  /** Translate a content-space selection span to the current visible screen rows. */
   contentToScreenSpan(span: SelectionSpan): SelectionSpan | undefined {
-    if (this.lastVisible <= 0) return undefined;
-    const minVisibleRow = this.lastTop;
-    const maxVisibleRow = this.lastTop + this.lastVisible - 1;
-    if (span.to.row < minVisibleRow || span.from.row > maxVisibleRow) {
-      return undefined;
-    }
-    const fromScreenRow = this.lastFiller + (span.from.row - this.lastTop);
-    const toScreenRow = this.lastFiller + (span.to.row - this.lastTop);
-    const clampedFromRow = Math.max(this.lastFiller, fromScreenRow);
-    const clampedFromCol = fromScreenRow < this.lastFiller ? 0 : span.from.column;
-    const clampedToRow = Math.min(this.lastFiller + this.lastVisible - 1, toScreenRow);
-    const clampedToCol = toScreenRow > maxVisibleRow ? Number.MAX_SAFE_INTEGER : span.to.column;
-
-    return {
-      from: { row: clampedFromRow, column: clampedFromCol },
-      to: { row: clampedToRow, column: clampedToCol },
-    };
+    return this.pane.contentToScreenSpan(span);
   }
 
-  /** Rendered rows of the full transcript at the last width, for selection copying. */
   contentRows(): readonly string[] {
-    if (this.lastRenderedRows.length > 0) return this.lastRenderedRows;
-    const contentWidth = this.lastHasScrollbar ? Math.max(1, this.lastWidth - 1) : (this.lastWidth || 80);
-    return this.transcript.render(contentWidth).rows;
+    return this.pane.contentRows();
   }
 
-  /** The frame with an in-progress drag shaded, which is the only sign it made one. */
-  private shade(rows: readonly string[]): string[] {
-    const span = this.context.selection();
-    if (!span) return [...rows];
-    const screenSpan = this.contentToScreenSpan(span);
-    return screenSpan ? highlightSelection(rows, screenSpan) : [...rows];
-  }
-
-  /** How far back the window is, in rows; 0 means it is following the newest. */
   get scrolledBack(): number {
-    return this.scrollBack;
+    return this.pane.scrolledBack;
   }
 
-  /**
-   * Move the window by `rows` (negative scrolls back). Returns whether it moved,
-   * so a key that could not scroll can fall through to something else.
-   */
   scroll(rows: number): boolean {
-    // Bounded by what the last frame could actually reveal, so a key that had
-    // nowhere to go says so instead of reporting a move that renders identically.
-    const next = Math.min(this.lastMaxBack, Math.max(0, this.scrollBack - rows));
-    if (next === this.scrollBack) return false;
-    this.scrollBack = next;
-    return true;
+    return this.pane.scroll(rows);
   }
 
-  /** Jump to the newest rows, which is also what any new output implies. */
   scrollToEnd(): void {
-    this.scrollBack = 0;
+    this.pane.scrollToEnd();
   }
 
-  /** Scroll by whole screens, for PageUp and PageDown. */
   scrollPage(direction: -1 | 1): boolean {
-    return this.scroll(direction * Math.max(1, this.lastTranscriptRows - 1));
-  }
-
-  private withScrollbar(
-    rows: readonly string[],
-    width: number,
-    capacity: number,
-    totalRows: number,
-    top: number,
-    hasScrollbar: boolean,
-  ): string[] {
-    if (!hasScrollbar || totalRows <= capacity || capacity <= 0 || width < 10) {
-      return [...rows];
-    }
-    const trackHeight = capacity;
-    const minThumbHeight = 1;
-    const thumbHeight = Math.max(
-      minThumbHeight,
-      Math.min(trackHeight, Math.round((trackHeight * trackHeight) / totalRows)),
-    );
-    const maxScrollTop = Math.max(0, totalRows - trackHeight);
-    const maxThumbTop = trackHeight - thumbHeight;
-    const thumbOffset = maxScrollTop === 0 ? 0 : Math.round((top / maxScrollTop) * maxThumbTop);
-
-    return rows.map((row, index) => {
-      const isThumb = index >= thumbOffset && index < thumbOffset + thumbHeight;
-      const barChar = isThumb ? "█" : "│";
-      const bar = isThumb ? defaultTheme.fg("accent", barChar) : defaultTheme.fg("border", barChar);
-      return `${padToWidth(row, width - 1)}${bar}`;
-    });
+    return this.pane.scrollPage(direction);
   }
 
   scrollbarGeometry(): ScrollbarGeometry | undefined {
-    if (!this.lastHasScrollbar || this.lastTranscriptRows <= 0) return undefined;
-    const trackHeight = this.lastTranscriptRows;
-    const totalRows = this.lastTotalRows;
-    if (totalRows <= trackHeight) return undefined;
-    const minThumbHeight = 1;
-    const thumbHeight = Math.max(
-      minThumbHeight,
-      Math.min(trackHeight, Math.round((trackHeight * trackHeight) / totalRows)),
-    );
-    const maxScrollTop = Math.max(0, totalRows - trackHeight);
-    const maxThumbTop = trackHeight - thumbHeight;
-    const thumbOffset = maxScrollTop === 0 ? 0 : Math.round((this.lastTop / maxScrollTop) * maxThumbTop);
-    return {
-      column: this.lastWidth - 1,
-      trackTop: 0,
-      trackHeight,
-      thumbTop: thumbOffset,
-      thumbHeight,
-      maxScrollTop,
-    };
+    return this.pane.scrollbarGeometry();
   }
 
   scrollToThumb(pointerRow: number, grabOffset = 0): boolean {
-    const geo = this.scrollbarGeometry();
-    if (!geo || geo.maxScrollTop <= 0) return false;
-    const maxThumbOffset = geo.trackHeight - geo.thumbHeight;
-    if (maxThumbOffset <= 0) return false;
-    const thumbOffset = Math.max(0, Math.min(maxThumbOffset, pointerRow - geo.trackTop - grabOffset));
-    const targetTop = Math.round((thumbOffset / maxThumbOffset) * geo.maxScrollTop);
-    const nextBack = Math.max(0, Math.min(this.lastMaxBack, geo.maxScrollTop - targetTop));
-    if (nextBack === this.scrollBack) return false;
-    this.scrollBack = nextBack;
-    return true;
+    return this.pane.scrollToThumb(pointerRow, grabOffset);
   }
 
-
-  /**
-   * The block under screen row `row`, for a click that lands on the transcript.
-   *
-   * Rows above the transcript window are padding and rows below it are chrome;
-   * both answer with nothing rather than with the nearest block, so a click on the
-   * status band cannot fold away whatever happens to sit at that offset.
-   */
-  blockAtScreenRow(row: number): ReturnType<Transcript["blockAt"]> {
-    const within = row - this.lastFiller;
-    if (within < 0 || within >= this.lastVisible) return undefined;
-    const index = this.lastOwners[this.lastTop + within];
-    return index === undefined ? undefined : this.transcript.blockAt(index);
+  blockAtScreenRow(row: number): Block | undefined {
+    return this.pane.blockAtScreenRow(row);
   }
 
   /**

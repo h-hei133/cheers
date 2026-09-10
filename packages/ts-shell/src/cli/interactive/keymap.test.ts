@@ -48,7 +48,7 @@ function build(busy = false): {
     clock,
     press: (data: string) =>
       routeKey(parseKeyEvent(data), {
-        surface,
+        view: surface,
         actions: actions as unknown as KeymapActions,
         busy,
         now: () => clock.now,

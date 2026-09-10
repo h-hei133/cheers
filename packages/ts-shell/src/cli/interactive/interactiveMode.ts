@@ -22,7 +22,8 @@ import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
-import { InteractiveSurface } from "./frameSurface.js";
+import { ViewHost, readSurfaceChoice, type SurfaceChoice, type ViewFactory } from "./surface.js";
+import { createViewState, type ViewState } from "../../presentation/tui/view.js";
 import { routeKey } from "./keymap.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
@@ -79,12 +80,18 @@ export interface InteractiveModeOptions {
   readonly terminal?: TerminalDevice;
   /** Frame scheduler; defaults to real timers. */
   readonly scheduler?: RenderScheduler;
+  /** Which surface draws the session; defaults to the configured or default surface. */
+  readonly surface?: SurfaceChoice;
+  /** Builds the surface; injectable so a test can hand in one that fails. */
+  readonly viewFactory?: ViewFactory;
 }
 
 export class InteractiveMode {
   private readonly terminal: TerminalDevice;
   private readonly tui: TUI;
-  private readonly surface: InteractiveSurface;
+  private readonly views: ViewHost;
+  /** The transcript, draft, pastes, and completions every surface projects. */
+  private readonly state: ViewState;
   private readonly stdin = new StdinBuffer();
   private readonly sink: TurnSink;
   private readonly questions: QuestionBridge;
@@ -124,40 +131,56 @@ export class InteractiveMode {
     });
     this.overlay = new OverlayHost(() => this.tui.requestRender());
     this.tui = new TUI(this.terminal, options.scheduler);
-    this.surface = new InteractiveSurface({
-      facts: () =>
-        readStatusFacts(this.options.runtimeContext, {
-          agentMode: this.options.sessionRuntime.getAgentMode(),
-          permissionScope: this.options.sessionRuntime.getPermissionScope(),
-          queued: this.queue.length,
-          peers: readAmbientFacts(this.options.runtimeContext.session.id).peerSessions,
-        }),
-      statusItems: () => this.previewItems ?? this.statusItems,
-      activity: () => this.sink.activity(),
-      busy: () => this.busy,
-      queuedCount: () => this.queue.length,
-      now: () => Date.now(),
-      ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
-      newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
-      cancelArmed: () =>
-        this.gesture.lastCancelAt !== undefined &&
-        Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,
-      overlayFullScreen: () => this.pager.active || this.overlay.fullScreen,
-      overlayRows: (width, height) =>
-        this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
-      selection: () => this.pointer.selection,
-      toast: () => this.toast,
+    this.state = createViewState();
+    this.views = new ViewHost({
+      state: this.state,
+      choice: options.surface ?? readSurfaceChoice(options.runtimeContext.projectRoot),
+      factory: options.viewFactory,
+      // A surface that cannot paint is swapped for the default over the same
+      // transcript and draft; the swap is announced where the user will see it.
+      onFallback: (error, from) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        options.logger.warn("interactive surface fell back to the default", { surface: from, reason });
+        this.state.transcript.append(
+          textBlock("error", `The ${from} surface failed to paint (${reason}); showing the default surface instead.`, "surface"),
+        );
+        this.tui.requestRender({ force: true });
+      },
+      context: {
+        facts: () =>
+          readStatusFacts(this.options.runtimeContext, {
+            agentMode: this.options.sessionRuntime.getAgentMode(),
+            permissionScope: this.options.sessionRuntime.getPermissionScope(),
+            queued: this.queue.length,
+            peers: readAmbientFacts(this.options.runtimeContext.session.id).peerSessions,
+          }),
+        statusItems: () => this.previewItems ?? this.statusItems,
+        activity: () => this.sink.activity(),
+        busy: () => this.busy,
+        queuedCount: () => this.queue.length,
+        now: () => Date.now(),
+        ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
+        newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
+        cancelArmed: () =>
+          this.gesture.lastCancelAt !== undefined &&
+          Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,
+        overlayFullScreen: () => this.pager.active || this.overlay.fullScreen,
+        overlayRows: (width, height) =>
+          this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
+        selection: () => this.pointer.selection,
+        toast: () => this.toast,
+      },
     });
     this.pointer = new Pointer({
-      surface: this.surface,
-      rows: () => this.surface.contentRows(),
+      view: () => this.views.current,
+      rows: () => this.views.current.contentRows(),
       copy: (text) => this.clipboard.copy(text),
       redraw: () => this.tui.requestRender(),
     });
-    this.sink = new TurnSink(this.surface.transcript, () => {
+    this.sink = new TurnSink(this.state.transcript, () => {
       // New output brings the window back to the newest rows — unless the user has
       // scrolled away, which is a statement that they are reading something else.
-      if (this.surface.scrolledBack === 0) this.surface.scrollToEnd();
+      if (this.views.current.scrolledBack === 0) this.views.current.scrollToEnd();
       this.tui.requestRender();
     });
     this.questions = new QuestionBridge({
@@ -167,27 +190,27 @@ export class InteractiveMode {
     this.readline = this.questions.asReadline(() => this.stop());
     this.options.setReadline?.(this.readline);
     this.options.setInteractiveApprovalPrompt?.((prompt) => this.promptApproval(prompt));
-    this.tui.setFrameProvider(this.surface);
-    this.surface.editor.placeholder = DEFAULT_PLACEHOLDER;
+    this.tui.setFrameProvider(this.views);
+    this.state.editor.placeholder = DEFAULT_PLACEHOLDER;
     // A chip token deletes whole: the caret sits at its end, and one Backspace
     // removes the token — and with it the attachment — instead of half a symbol.
-    this.surface.editor.atomicTokenStart = (line, column) => {
+    this.state.editor.atomicTokenStart = (line, column) => {
       const before = line.slice(0, column);
       const match = /(?:⎘ #\d+|\[#\d+ [^\]]*\])$/.exec(before);
       return match ? column - match[0].length : undefined;
     };
     const diskHistory = loadPromptHistory(options.runtimeContext.projectRoot);
-    this.surface.editor.loadHistory(diskHistory);
+    this.state.editor.loadHistory(diskHistory);
     const sessionTurns = options.runtimeContext.session.turns
       ?.filter((t) => t.role === "user" && t.content?.trim())
       .map((t) => t.content.trim()) ?? [];
-    this.surface.editor.loadHistory(sessionTurns);
+    this.state.editor.loadHistory(sessionTurns);
   }
 
   start(): void {
     // The intro renders itself at the frame width so a resize re-elides the path
     // instead of keeping the elision it was born with.
-    this.surface.transcript.append({
+    this.state.transcript.append({
       kind: "notice",
       text: "",
       finalized: true,
@@ -208,21 +231,21 @@ export class InteractiveMode {
       // into the prompt is held aside once it is long enough to bury the draft.
       // Pasting the same thing twice in quick succession means "show it in full":
       // the first press left a placeholder, and the second replaces it with the text.
-      const repeat = this.surface.pastes.expandOnRepeat(text);
+      const repeat = this.state.pastes.expandOnRepeat(text);
       if (repeat) {
         // The placeholder may have been deleted since the first paste; a replace
         // would then silently drop the second paste. Re-insert in that case.
-        const draft = this.surface.editor.getText();
+        const draft = this.state.editor.getText();
         // A string replacer would interpret $&, $1, $$ and ${...} inside the
         // pasted code as substitution patterns and silently rewrite them away.
         const replaced = replaceLiteral(draft, repeat.find, repeat.text);
         if (replaced === draft) {
-          this.surface.editor.insert(this.surface.pastes.holdIfLong(text));
+          this.state.editor.insert(this.state.pastes.holdIfLong(text));
         } else {
-          this.surface.editor.setText(replaced);
+          this.state.editor.setText(replaced);
         }
       } else {
-        this.surface.editor.insert(this.surface.pastes.holdIfLong(text));
+        this.state.editor.insert(this.state.pastes.holdIfLong(text));
         this.syncSuggestions(false);
       }
       this.tui.requestRender();
@@ -262,7 +285,7 @@ export class InteractiveMode {
       this.tui.requestRender();
     }
     routeKey(event, {
-      surface: this.surface,
+      view: this.views.current,
       busy: this.busy,
       now: () => Date.now(),
       gesture: this.gesture,
@@ -275,15 +298,15 @@ export class InteractiveMode {
         cycleAgentMode: () => this.cycleAgentMode(),
         cyclePermissionScope: () => this.cyclePermissionScope(),
         scroll: (rows) => {
-          this.surface.scroll(rows);
+          this.views.current.scroll(rows);
           this.tui.requestRender();
         },
         scrollPage: (direction) => {
-          this.surface.scrollPage(direction);
+          this.views.current.scrollPage(direction);
           this.tui.requestRender();
         },
         scrollToEnd: () => {
-          this.surface.scrollToEnd();
+          this.views.current.scrollToEnd();
           this.tui.requestRender();
         },
         retry: () => this.onSubmit("/retry"),
@@ -299,13 +322,13 @@ export class InteractiveMode {
 
   /** Publish a runtime question as a transcript block and retarget the prompt. */
   private onQuestion(question: string): void {
-    this.surface.transcript.append(textBlock("notice", question));
-    this.surface.editor.placeholder = "Answer above, then press Enter";
+    this.state.transcript.append(textBlock("notice", question));
+    this.state.editor.placeholder = "Answer above, then press Enter";
     this.tui.requestRender();
   }
 
   private onQuestionSettled(): void {
-    this.surface.editor.placeholder = DEFAULT_PLACEHOLDER;
+    this.state.editor.placeholder = DEFAULT_PLACEHOLDER;
     this.tui.requestRender();
   }
 
@@ -330,15 +353,15 @@ export class InteractiveMode {
    * History recall is excluded, so the arrows keep working on a recalled prompt.
    */
   private syncSuggestions(mayOpen: boolean): void {
-    const draft = this.surface.editor.getText();
+    const draft = this.state.editor.getText();
     const matches = slashSuggestions(draft);
     if (!matches) {
-      this.surface.setSuggesting(false);
+      this.views.current.setSuggesting(false);
       return;
     }
-    if (!mayOpen && !this.surface.suggestionsOpen && !couldBeCommand(draft)) return;
-    this.surface.suggestions.setItems(matches);
-    this.surface.setSuggesting(true);
+    if (!mayOpen && !this.views.current.suggestionsOpen && !couldBeCommand(draft)) return;
+    this.state.suggestions.setItems(matches);
+    this.views.current.setSuggesting(true);
   }
 
 
@@ -354,7 +377,7 @@ export class InteractiveMode {
       this.openPicker(text);
       return;
     }
-    this.surface.transcript.append(textBlock("user", text));
+    this.state.transcript.append(textBlock("user", text));
     if (this.busy) {
       this.queue.push(text);
       this.tui.requestRender();
@@ -405,7 +428,7 @@ export class InteractiveMode {
       if (result.clearRequested) clearing = true;
       if (result.sessionOpened) opened = true;
     } catch (error) {
-      this.surface.transcript.append(
+      this.state.transcript.append(
         textBlock("error", error instanceof Error ? error.message : String(error), "error"),
       );
     } finally {
@@ -439,8 +462,8 @@ export class InteractiveMode {
   /** What the history helpers need: the transcript, the store, and the context. */
   private historyTarget(): HistoryTarget {
     return {
-      transcript: this.surface.transcript,
-      editor: this.surface.editor,
+      transcript: this.state.transcript,
+      editor: this.state.editor,
       sessionManager: this.options.sessionManager,
       context: this.options.runtimeContext,
     };
@@ -459,16 +482,16 @@ export class InteractiveMode {
       .apply(ids)
       .then((outcome) => {
         if (outcome?.note) {
-          this.surface.transcript.append(textBlock("command", outcome.note, picker.title));
+          this.state.transcript.append(textBlock("command", outcome.note, picker.title));
         }
         if (outcome?.draft) {
           // The next step needs a secret, so the picker hands over the exact
           // command with the caret after it rather than collecting it here.
-          this.surface.editor.setText(outcome.draft);
+          this.state.editor.setText(outcome.draft);
         }
       })
       .catch((error: unknown) => {
-        this.surface.transcript.append(
+        this.state.transcript.append(
           textBlock("error", error instanceof Error ? error.message : String(error), picker.title),
         );
       })
@@ -483,7 +506,7 @@ export class InteractiveMode {
         sessionId: this.options.runtimeContext.session.id,
         modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
       },
-      transcript: this.surface.transcript,
+      transcript: this.state.transcript,
       sessionManager: this.options.sessionManager,
       mcpGateway: this.options.initialMcpGateway,
       approvalTrustPolicy: this.options.approvalTrustPolicy,
@@ -526,7 +549,7 @@ export class InteractiveMode {
 
   /** Route a command line as if the user had typed it, reusing the same path. */
   private async runCommandLine(line: string): Promise<undefined> {
-    this.surface.transcript.append(textBlock("user", line));
+    this.state.transcript.append(textBlock("user", line));
     await this.run(line);
     return undefined;
   }
@@ -564,7 +587,7 @@ export class InteractiveMode {
 
   /** Drop the visible transcript and the terminal's scrollback together. */
   private clearScreen(): void {
-    this.surface.transcript.clear();
+    this.state.transcript.clear();
     this.tui.requestRender({ force: true });
   }
 

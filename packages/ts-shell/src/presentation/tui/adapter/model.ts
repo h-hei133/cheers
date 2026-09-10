@@ -30,6 +30,8 @@ export interface SessionFacts {
   readonly items: readonly StatusItemId[];
   readonly activity: TurnActivity | undefined;
   readonly busy: boolean;
+  /** Wall-clock instant the activity row is drawn for; defaults to now. */
+  readonly now?: number;
 }
 
 export function toBlock(message: AgentMessage): Block {

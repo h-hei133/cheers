@@ -299,3 +299,19 @@ confidence: high
  - 交互与 TUI 46 套件 567 项测试全部通过（包含滚轮条渲染、几何计算、滑块跳转拖拽与选区末端夹逼回归测试）。
  - `tsc -p tsconfig.build.json` 编译通过。
  - 仓库保持零外部项目名，工作区保持完全干净。
+
+## 滚动锚定修正与表面合约（本次修补）
+
+在执行 Phase 2.5 合约冻结时发现一处旧行为与其自身注释相悖：
+
+1. **C6 向上滚动后新输出推走正在阅读的行（frameSurface.ts）**
+   - 现象：用户向上滚动阅读历史时，若流式输出继续到达，窗口内容会随之上移，阅读位置被推走。
+   - 根因：旧实现以“距末尾的行数”（`scrollBack`）保存滚动位置，内容增长时窗口顶行随之前移，与注释所述“新输出不得把用户拉走”不符。
+   - 对照：参考实现的滚动视图以绝对 `scrollTop` 加“是否跟随末尾”标志保存位置，内容增长时仅在跟随态才移动窗口。
+   - 修复：滚动状态改由 `adapter/scroll.ts` 的 `ScrollView` 持有（与参考实现同一模型），并由 `adapter/pane.ts` 的 `TranscriptPane` 统一提供给两条表面；`scrolledBack` 改为由总行数、容量与 `scrollTop` 推算。`surface.test.ts` 固定该行为：向上滚动 10 行后追加 10 行输出，窗口顶行不变，`scrolledBack` 增大。
+
+2. **表面合约与共享几何**：`ScrollbarGeometry` 与滑块拖拽映射、内容坐标映射、选区着色分别收敛到 `transcript/viewport.ts` 与 `transcript/selection.ts`，`cli/interactive/selection.ts` 只保留拖拽手势并再导出，旧导入路径不变。
+
+验证：
+- 交互与 TUI 49 套件 598 项通过；`tsc -p tsconfig.build.json` 通过；golden main path 门通过。
+- 真实 CLI 伪终端单轮冒烟两条表面均通过（详见 `tui-phase-3-verification.md`）。

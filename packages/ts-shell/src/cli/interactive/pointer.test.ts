@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { Pointer } from "./pointer.js";
 import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
-import type { InteractiveSurface } from "./frameSurface.js";
+import type { InteractiveView } from "../../presentation/tui/view.js";
 
-function build(overrides: Partial<InteractiveSurface> = {}) {
+function build(overrides: Partial<InteractiveView> = {}) {
   const copied: string[] = [];
   let redrawn = 0;
   const rows = [
@@ -23,9 +23,9 @@ function build(overrides: Partial<InteractiveSurface> = {}) {
       setCollapsed: vi.fn(),
     },
     ...overrides,
-  } as unknown as InteractiveSurface;
+  } as unknown as InteractiveView;
   const pointer = new Pointer({
-    surface,
+    view: () => surface,
     rows: () => rows,
     copy: (text) => copied.push(text),
     redraw: () => (redrawn += 1),

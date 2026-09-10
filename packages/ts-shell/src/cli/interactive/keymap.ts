@@ -1,9 +1,9 @@
 import type { CursorMove, KillTarget } from "../../presentation/tui/editor.js";
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
-import type { InteractiveSurface } from "./frameSurface.js";
+import type { InteractiveView, ViewActions } from "../../presentation/tui/view.js";
 
 /**
- * Key routing for the interactive surface.
+ * Key routing for the interactive view.
  *
  * One table maps keys to editor motions and one to kill commands, so adding a
  * binding is a data change rather than another branch. The ordering of the
@@ -38,49 +38,11 @@ const KILLS: Record<string, KillTarget> = {
 
 const NEWLINE_KEYS = new Set(["shift+enter", "alt+enter", "ctrl+j"]);
 
-export interface KeymapActions {
-  /** Submit the current draft; the host decides whether it runs or queues. */
-  submit(text: string): void;
-  /** Escape while a turn is running. */
-  interrupt(): void;
-  /** Leave the session. */
-  exit(): void;
-  /** Repaint after a state change. */
-  redraw(): void;
-  /** Clear the visible transcript and the terminal's scrollback. */
-  clearScreen(): void;
-  /**
-   * Schedule a repaint after `delayMs`. Used for hints that expire on a clock
-   * rather than on an event: without it, "press again to exit" stays on screen
-   * after the press would no longer exit.
-   */
-  redrawAfter(delayMs: number): void;
-  /** Cycle the agent mode between planning and building. */
-  cycleAgentMode(): void;
-  /** Cycle how much a turn may do without asking. */
-  cyclePermissionScope(): void;
-  /** Move the transcript window; negative scrolls back. */
-  scroll(rows: number): void;
-  /** Move the transcript window by whole screens. */
-  scrollPage(direction: -1 | 1): void;
-  /** Jump to the newest rows. */
-  scrollToEnd(): void;
-  retry(): void;
-  /** Offer an earlier point in the conversation to go back to. */
-  openRewind(): void;
-  /**
-   * Recompute completions for the current draft. `mayOpen` is true only for the
-   * gestures that should be able to *open* the list — typing and Tab. Every other
-   * draft change may refine an open list but must never pop one up, or the list
-   * steals the arrow keys from prompt-history recall.
-   */
-  syncSuggestions(mayOpen: boolean): void;
-  /** Copy active mouse selection to clipboard and clear highlight. Returns true if copied. */
-  copySelection?(): boolean;
-}
+/** The host actions a key can reach; the seam names them once for every surface. */
+export type KeymapActions = ViewActions;
 
 export interface KeymapContext {
-  readonly surface: InteractiveSurface;
+  readonly view: InteractiveView;
   readonly actions: KeymapActions;
   /** True while a turn is running. */
   readonly busy: boolean;
@@ -100,9 +62,9 @@ export interface KeymapContext {
  * about the keystroke, so it opens the chooser for going back.
  */
 function handleEscapeKey(context: KeymapContext): void {
-  const { surface, actions, gesture, now } = context;
-  if (surface.suggestionsOpen) {
-    surface.setSuggesting(false);
+  const { view, actions, gesture, now } = context;
+  if (view.suggestionsOpen) {
+    view.setSuggesting(false);
     gesture.lastEscapeAt = undefined;
     actions.redraw();
     return;
@@ -117,7 +79,7 @@ function handleEscapeKey(context: KeymapContext): void {
   // losing typing to a dismissal gesture is the worst possible trade. It does mean
   // going back is only offered from an empty prompt, which is also when a person is
   // deciding what to ask rather than writing it.
-  if (surface.editor.getText().length > 0) {
+  if (view.editor.getText().length > 0) {
     gesture.lastEscapeAt = undefined;
     actions.redraw();
     return;
@@ -169,12 +131,12 @@ export function dispatchedKeyIds(): readonly string[] {
   ];
 }
 
-/** Apply one keystroke to the surface. */
+/** Apply one keystroke to the view. */
 export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
-  const { surface, actions } = context;
-  const editor = surface.editor;
+  const { view, actions } = context;
+  const editor = view.editor;
 
-  if (surface.suggestionsOpen && consumeSuggestionKey(event, context)) return;
+  if (view.suggestionsOpen && consumeSuggestionKey(event, context)) return;
 
   switch (event.keyId) {
     case "escape":
@@ -255,10 +217,10 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
  * leaving the list open would consume the next arrow press.
  */
 function recallOrMove(context: KeymapContext, direction: 1 | -1): void {
-  const { surface, actions } = context;
-  const moved = surface.editor.move(direction === -1 ? "up" : "down");
-  if (!moved && surface.editor.recall(direction)) {
-    surface.setSuggesting(false);
+  const { view, actions } = context;
+  const moved = view.editor.move(direction === -1 ? "up" : "down");
+  if (!moved && view.editor.recall(direction)) {
+    view.setSuggesting(false);
   }
   actions.redraw();
 }
@@ -270,7 +232,7 @@ function opensSuggestions(event: ParsedKeyEvent): boolean {
 
 /** Motions, kills, newlines, and printable text. Returns false when unhandled. */
 function applyTableKey(event: ParsedKeyEvent, context: KeymapContext): boolean {
-  const editor = context.surface.editor;
+  const editor = context.view.editor;
   const motion = MOTIONS[event.keyId];
   if (motion) {
     editor.move(motion);
@@ -294,20 +256,20 @@ function applyTableKey(event: ParsedKeyEvent, context: KeymapContext): boolean {
 
 /** Navigation and acceptance while the completion list is open. */
 function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): boolean {
-  const { surface, actions } = context;
+  const { view, actions } = context;
   if (event.keyId === "up" || event.keyId === "down") {
-    surface.suggestions.step(event.keyId === "up" ? -1 : 1);
+    view.suggestions.step(event.keyId === "up" ? -1 : 1);
     actions.redraw();
     return true;
   }
   // Tab always completes. Enter completes only when a candidate was actively
   // selected; otherwise it submits, so typing a whole command still sends on the
   // first press.
-  if (event.keyId === "tab" || (event.keyId === "enter" && surface.suggestions.chosen)) {
-    const chosen = surface.suggestions.current();
+  if (event.keyId === "tab" || (event.keyId === "enter" && view.suggestions.chosen)) {
+    const chosen = view.suggestions.current();
     if (!chosen) return false;
-    surface.editor.setText(`${chosen.value} `);
-    surface.setSuggesting(false);
+    view.editor.setText(`${chosen.value} `);
+    view.setSuggesting(false);
     actions.redraw();
     return true;
   }
@@ -319,7 +281,7 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
  * on an empty prompt a second press within the double-press window exits.
  */
 function handleCancelKey(context: KeymapContext): void {
-  const { surface, actions, now } = context;
+  const { view, actions, now } = context;
   if (actions.copySelection?.()) {
     actions.redraw();
     return;
@@ -329,9 +291,9 @@ function handleCancelKey(context: KeymapContext): void {
     actions.redraw();
     return;
   }
-  if (surface.editor.getText().length > 0) {
-    surface.editor.clear();
-    surface.setSuggesting(false);
+  if (view.editor.getText().length > 0) {
+    view.editor.clear();
+    view.setSuggesting(false);
     actions.redraw();
     return;
   }
@@ -347,17 +309,17 @@ function handleCancelKey(context: KeymapContext): void {
 }
 
 function submitDraft(context: KeymapContext): void {
-  const { surface, actions } = context;
-  const draft = surface.editor.getText().trim();
+  const { view, actions } = context;
+  const draft = view.editor.getText().trim();
   if (!draft) {
     actions.redraw();
     return;
   }
   // History keeps the draft as it looked, so recalling it brings back a short line
   // rather than the whole pasted file. What is sent is the expansion.
-  const submission = surface.pastes.expand(draft).trim();
-  surface.editor.pushHistory(draft);
-  surface.editor.clear();
-  surface.setSuggesting(false);
+  const submission = view.pastes.expand(draft).trim();
+  view.editor.pushHistory(draft);
+  view.editor.clear();
+  view.setSuggesting(false);
   actions.submit(submission);
 }
