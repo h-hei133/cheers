@@ -68,6 +68,25 @@ describe("pointer drag selection", () => {
     expect(pointer.selection).toBeUndefined();
     expect(redraws()).toBeGreaterThanOrEqual(5);
   });
+
+  it("scrolls view automatically when dragging near the top or bottom edges", () => {
+    const { pointer, surface } = build({
+      composerGeometry: () => ({ top: 15, bottom: 16, rows: [] }),
+    });
+    pointer.handle(parseMouseReport("\x1b[<0;11;6M")!);
+    expect(pointer.selection).toBeDefined();
+
+    // Drag to top edge (row 0, 1-based is 1)
+    pointer.handle(parseMouseReport("\x1b[<32;11;1M")!);
+    expect(surface.scroll).toHaveBeenCalledWith(-1);
+
+    // Drag to bottom edge (row 20, 1-based is 21)
+    pointer.handle(parseMouseReport("\x1b[<32;11;21M")!);
+    expect(surface.scroll).toHaveBeenCalledWith(1);
+
+    // Release terminates drag and stops auto-scroll
+    pointer.handle(parseMouseReport("\x1b[<0;11;21m")!);
+  });
 });
 describe("pointer wheel scrolling", () => {
   it("scrolls surface on mouse wheel up and down", () => {

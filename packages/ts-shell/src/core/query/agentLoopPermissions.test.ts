@@ -246,7 +246,7 @@ describe("agentLoop permission enforcement and interactive ask", () => {
     expect(toolResult).toBeDefined();
     if (toolResult && toolResult.type === "tool.result") {
       expect(toolResult.success).toBe(false);
-      expect(toolResult.output).toContain("User denied with reason: file is strictly protected");
+      expect(toolResult.output).toContain("file is strictly protected");
     }
   });
   it("in accept-edits mode: allows in-workspace write without escalation, but escalates modifying bash", async () => {

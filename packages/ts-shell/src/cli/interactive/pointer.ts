@@ -33,7 +33,7 @@ export class Pointer {
   private readonly composerDrag: DragSelection;
   private dragTarget: "transcript" | "composer" | undefined;
   private scrollbarDrag: { readonly grabOffset: number } | undefined;
-
+  private autoScrollTimer: ReturnType<typeof setInterval> | undefined;
   constructor(private readonly context: PointerContext) {
     this.drag = new DragSelection({ rows: () => context.rows() }, (text) => context.copy(text));
     this.composerDrag = new DragSelection(
@@ -66,6 +66,7 @@ export class Pointer {
 
   /** Clear any active drag selection. Returns true if there was a selection. */
   clearSelection(): boolean {
+    this.stopAutoScroll();
     this.scrollbarDrag = undefined;
     const hadSelection = this.drag.span !== undefined || this.composerDrag.span !== undefined;
     this.drag.clear();
@@ -76,6 +77,7 @@ export class Pointer {
 
   /** Copy the active selection to clipboard and clear it. Returns true if copied. */
   copySelection(): boolean {
+    this.stopAutoScroll();
     if (this.composerDrag.span) {
       this.dragTarget = undefined;
       return this.composerDrag.copyAndClear();
@@ -86,6 +88,7 @@ export class Pointer {
     }
     return false;
   }
+
   /** Handle one report. */
   handle(report: MouseReport): void {
     if (report.kind === "wheel") {
@@ -131,6 +134,7 @@ export class Pointer {
     const isComposerRow = compGeo !== undefined && report.row >= compGeo.top && report.row <= compGeo.bottom;
 
     if (report.kind === "press") {
+      this.stopAutoScroll();
       if (isComposerRow && compGeo) {
         this.dragTarget = "composer";
         this.drag.clear();
@@ -163,8 +167,30 @@ export class Pointer {
       }
     } else if (this.dragTarget === "transcript") {
       const maxTranscriptRow = compGeo ? compGeo.top - 1 : Infinity;
-      const clampedRow = Math.min(maxTranscriptRow, report.row);
-      const contentCoord = this.context.view().screenToContent(clampedRow, report.column);
+      const isTopEdge = report.row <= 1;
+      const isBottomEdge = report.row >= maxTranscriptRow - 1;
+
+      if (isTopEdge) {
+        this.context.view().scroll(-1);
+        const contentCoord = this.context.view().screenToContent(0, report.column);
+        this.drag.handle(report, contentCoord);
+        this.startAutoScroll(-1, 0, report.column);
+        this.context.redraw();
+        return;
+      }
+
+      if (isBottomEdge) {
+        this.context.view().scroll(1);
+        const clampedRow = Math.min(maxTranscriptRow, report.row);
+        const contentCoord = this.context.view().screenToContent(clampedRow, report.column);
+        this.drag.handle(report, contentCoord);
+        this.startAutoScroll(1, clampedRow, report.column);
+        this.context.redraw();
+        return;
+      }
+
+      this.stopAutoScroll();
+      const contentCoord = this.context.view().screenToContent(report.row, report.column);
       const handled = this.drag.handle(report, contentCoord);
       if (handled) {
         this.context.redraw();
@@ -172,10 +198,38 @@ export class Pointer {
       }
     }
 
-    if (report.kind === "release" && !report.shift) {
-      this.toggle(report.row);
-      this.context.redraw();
+    if (report.kind === "release") {
+      this.stopAutoScroll();
+      if (!report.shift) {
+        this.toggle(report.row);
+        this.context.redraw();
+      }
     }
+  }
+
+  private stopAutoScroll(): void {
+    if (this.autoScrollTimer) {
+      clearInterval(this.autoScrollTimer);
+      this.autoScrollTimer = undefined;
+    }
+  }
+
+  private startAutoScroll(direction: -1 | 1, targetRow: number, column: number): void {
+    this.stopAutoScroll();
+    this.autoScrollTimer = setInterval(() => {
+      const moved = this.context.view().scroll(direction);
+      if (moved) {
+        const contentCoord = this.context.view().screenToContent(targetRow, column);
+        this.drag.handle(
+          { kind: "drag", button: 0, row: targetRow, column, shift: false, alt: false, ctrl: false },
+          contentCoord,
+        );
+        this.context.redraw();
+      } else {
+        this.stopAutoScroll();
+      }
+    }, 70);
+    this.autoScrollTimer.unref?.();
   }
 
   private toggle(row: number): void {

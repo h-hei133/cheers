@@ -223,6 +223,7 @@ export async function* runAutonomousReActLoop(
         "2. NEVER stop after running tools without giving your findings, explanation, and answer in text.",
         "3. For web searching: use `web_search` to retrieve online technical references.",
         "4. For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests/git).",
+        "5. User Permission & Denial Feedback: When a tool execution is denied by the user, immediately respect the decision. If the user provided feedback or alternative instructions (e.g. changing filenames, using different arguments, or avoiding certain actions), you MUST strictly follow their feedback and not retry the rejected action.",
       ].join("\n"),
     },
     ...convertSessionMessagesToChat(options.historyMessages),
@@ -637,10 +638,14 @@ export async function* runAutonomousReActLoop(
             );
             const response = await options.escalationPromptHandler(prompt);
             if (response.decision === "deny") {
-              const reasonSuffix = response.userComment && !response.userComment.startsWith("CLI explicit approval")
-                ? ` (${response.userComment})`
+              const rawFeedback = response.userComment && !response.userComment.startsWith("CLI explicit approval")
+                ? response.userComment.replace(/^User denied with reason:\s*/i, "").trim()
                 : "";
-              outputContent = `Blocked: User denied permission for tool '${funcName}' (${permissionEval.operation}) on '${permissionEval.target}'.${reasonSuffix}`;
+              if (rawFeedback) {
+                outputContent = `[User Denied Permission]: The user explicitly rejected this tool call.\nUser feedback / instructions: "${rawFeedback}"\nYou MUST follow the user's instructions above instead of repeating the rejected action.`;
+              } else {
+                outputContent = `Blocked: User denied permission for tool '${funcName}' (${permissionEval.operation}) on '${permissionEval.target}'.`;
+              }
               isSuccess = false;
               permissionDenied = true;
             } else {
