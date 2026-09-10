@@ -22,7 +22,7 @@ import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
-import { ViewHost, readSurfaceChoice, type SurfaceChoice, type ViewFactory } from "./surface.js";
+import { InteractiveSurface } from "../../presentation/tui/adapter/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/view.js";
 import { approvalPicker, type InteractiveApprovalResult } from "./picker/approval.js";
 import { routeKey } from "./keymap.js";
@@ -44,23 +44,18 @@ import { TurnSink } from "./turnSink.js";
  * Owns the terminal for the lifetime of the session and mediates between three
  * parties that would otherwise collide: raw stdin, the differential renderer,
  * and runtime code that expects to write prose and ask readline questions. It
- * runs on the terminal's normal screen so the transcript retires into real
- * scrollback, which the alternate buffer would make impossible.
+ * runs on a screen of its own, the alternate buffer, so the transcript is ours
+ * to scroll and nothing the user had in the terminal is disturbed.
  */
 
 const DEFAULT_PLACEHOLDER = "Ask anything, or / for commands";
 
-/** Window in which the exit hint stays on screen after one cancel press. */
 /** How often the activity row is repainted while a turn runs, for its clock. */
 const ACTIVITY_TICK_MS = 100;
 
+/** Window in which the exit hint stays on screen after one cancel press. */
 const CANCEL_ARMED_MS = 600;
 
-/**
- * Resize policy for retired scrollback. Rebuilding republishes the ledger at the
- * new width, which is what a reader wants; `preserve` is for terminals where
- * clearing scrollback is worse than a stale rewrap of already-retired rows.
- */
 export interface InteractiveModeOptions {
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionRuntime: ShellSessionRuntime;
@@ -80,17 +75,13 @@ export interface InteractiveModeOptions {
   readonly terminal?: TerminalDevice;
   /** Frame scheduler; defaults to real timers. */
   readonly scheduler?: RenderScheduler;
-  /** Which surface draws the session; defaults to the configured or default surface. */
-  readonly surface?: SurfaceChoice;
-  /** Builds the surface; injectable so a test can hand in one that fails. */
-  readonly viewFactory?: ViewFactory;
 }
 
 export class InteractiveMode {
   private readonly terminal: TerminalDevice;
   private readonly tui: TUI;
-  private readonly views: ViewHost;
-  /** The transcript, draft, pastes, and completions every surface projects. */
+  private readonly view: InteractiveSurface;
+  /** The transcript, draft, pastes, and completions the surface projects. */
   private readonly state: ViewState;
   private readonly stdin = new StdinBuffer();
   private readonly sink: TurnSink;
@@ -132,21 +123,8 @@ export class InteractiveMode {
     this.overlay = new OverlayHost(() => this.tui.requestRender());
     this.tui = new TUI(this.terminal, options.scheduler);
     this.state = createViewState();
-    this.views = new ViewHost({
-      state: this.state,
-      choice: options.surface ?? readSurfaceChoice(options.runtimeContext.projectRoot),
-      factory: options.viewFactory,
-      // A surface that cannot paint is swapped for the default over the same
-      // transcript and draft; the swap is announced where the user will see it.
-      onFallback: (error, from) => {
-        const reason = error instanceof Error ? error.message : String(error);
-        options.logger.warn("interactive surface fell back to the default", { surface: from, reason });
-        this.state.transcript.append(
-          textBlock("error", `The ${from} surface failed to paint (${reason}); showing the default surface instead.`, "surface"),
-        );
-        this.tui.requestRender({ force: true });
-      },
-      context: {
+    this.view = new InteractiveSurface(
+      {
         facts: () =>
           readStatusFacts(this.options.runtimeContext, {
             agentMode: this.options.sessionRuntime.getAgentMode(),
@@ -171,17 +149,18 @@ export class InteractiveMode {
         composerSelection: () => this.pointer.composerSelection,
         toast: () => this.toast,
       },
-    });
+      this.state,
+    );
     this.pointer = new Pointer({
-      view: () => this.views.current,
-      rows: () => this.views.current.contentRows(),
+      view: () => this.view,
+      rows: () => this.view.contentRows(),
       copy: (text) => this.clipboard.copy(text),
       redraw: () => this.tui.requestRender(),
     });
     this.sink = new TurnSink(this.state.transcript, () => {
       // New output brings the window back to the newest rows — unless the user has
       // scrolled away, which is a statement that they are reading something else.
-      if (this.views.current.scrolledBack === 0) this.views.current.scrollToEnd();
+      if (this.view.scrolledBack === 0) this.view.scrollToEnd();
       this.tui.requestRender();
     });
     this.questions = new QuestionBridge({
@@ -191,7 +170,7 @@ export class InteractiveMode {
     this.readline = this.questions.asReadline(() => this.stop());
     this.options.setReadline?.(this.readline);
     this.options.setInteractiveApprovalPrompt?.((prompt) => this.promptApproval(prompt));
-    this.tui.setFrameProvider(this.views);
+    this.tui.setFrameProvider(this.view);
     this.state.editor.placeholder = DEFAULT_PLACEHOLDER;
     // A chip token deletes whole: the caret sits at its end, and one Backspace
     // removes the token — and with it the attachment — instead of half a symbol.
@@ -286,7 +265,7 @@ export class InteractiveMode {
       this.tui.requestRender();
     }
     routeKey(event, {
-      view: this.views.current,
+      view: this.view,
       busy: this.busy,
       now: () => Date.now(),
       gesture: this.gesture,
@@ -299,15 +278,15 @@ export class InteractiveMode {
         cycleAgentMode: () => this.cycleAgentMode(),
         cyclePermissionScope: () => this.cyclePermissionScope(),
         scroll: (rows) => {
-          this.views.current.scroll(rows);
+          this.view.scroll(rows);
           this.tui.requestRender();
         },
         scrollPage: (direction) => {
-          this.views.current.scrollPage(direction);
+          this.view.scrollPage(direction);
           this.tui.requestRender();
         },
         scrollToEnd: () => {
-          this.views.current.scrollToEnd();
+          this.view.scrollToEnd();
           this.tui.requestRender();
         },
         retry: () => this.onSubmit("/retry"),
@@ -356,12 +335,12 @@ export class InteractiveMode {
     const draft = this.state.editor.getText();
     const matches = slashSuggestions(draft);
     if (!matches) {
-      this.views.current.setSuggesting(false);
+      this.view.setSuggesting(false);
       return;
     }
-    if (!mayOpen && !this.views.current.suggestionsOpen && !couldBeCommand(draft)) return;
+    if (!mayOpen && !this.view.suggestionsOpen && !couldBeCommand(draft)) return;
     this.state.suggestions.setItems(matches);
-    this.views.current.setSuggesting(true);
+    this.view.setSuggesting(true);
   }
 
 
@@ -380,7 +359,7 @@ export class InteractiveMode {
     this.state.transcript.append(textBlock("user", text));
     // Sending is a statement that the user is done reading back: the window
     // returns to the newest rows so the echo and the answer are in view.
-    this.views.current.scrollToEnd();
+    this.view.scrollToEnd();
     if (this.busy) {
       this.queue.push(text);
       this.tui.requestRender();
@@ -553,7 +532,7 @@ export class InteractiveMode {
   /** Route a command line as if the user had typed it, reusing the same path. */
   private async runCommandLine(line: string): Promise<undefined> {
     this.state.transcript.append(textBlock("user", line));
-    this.views.current.scrollToEnd();
+    this.view.scrollToEnd();
     await this.run(line);
     return undefined;
   }

@@ -9,62 +9,53 @@ import {
   TranscriptWindow,
   type ScrollbarGeometry,
 } from "../transcript/viewport.js";
-import { ScrollView } from "./scroll.js";
-import { TranscriptView } from "./transcript.js";
+import { ScrollModel } from "./scroll.js";
 
 /**
- * The scrolling transcript area every surface shares.
+ * The scrolling transcript area.
  *
- * The window follows the newest rows unless the user has scrolled away from them.
- * Following is the default because a conversation is read at its end; an explicit
- * scroll is a statement that the user is reading something else, and new output
- * must not move it — so a scrolled-back window keeps its content rows, not its
- * distance from the end.
+ * The window follows the newest rows unless the user has scrolled away from
+ * them. Following is the default because a conversation is read at its end; an
+ * explicit scroll is a statement that the user is reading something else, and
+ * new output must not move it — so a scrolled-back window keeps its content
+ * rows, not its distance from the end.
  *
- * A short conversation is padded down to the bottom so the chrome stays put, and
- * a long one gets a scrollbar in the last column. Both surfaces compose their
- * frame from this one object, which is what keeps their geometry identical.
+ * A short conversation is padded down to the bottom so the chrome stays put,
+ * and a long one gets a scrollbar in the last column. Every geometry question
+ * the host asks — which block is under a row, where a content selection sits on
+ * screen — is answered against the window this last drew.
  */
 export class TranscriptPane {
-  private readonly document: TranscriptView;
-  private readonly scroller: ScrollView;
+  private readonly scroller = new ScrollModel();
   private window = TranscriptWindow.EMPTY;
   private geometry: ScrollbarGeometry | undefined;
   private capacity = 0;
   private width = 80;
   private total = 0;
 
-  constructor(private readonly transcript: Transcript) {
-    this.document = new TranscriptView(transcript);
-    this.scroller = new ScrollView(this.document, { follow: "end", primary: true });
-  }
+  constructor(private readonly transcript: Transcript) {}
 
   /**
    * The transcript rows for one frame: `capacity` rows at `width`, padded to
    * the bottom, shaded with `selection`, and carrying a scrollbar when needed.
    */
   render(width: number, capacity: number, selection: SelectionSpan | undefined): string[] {
+    const safeWidth = Math.max(1, Math.floor(width));
     const safeCapacity = Math.max(1, capacity);
-    const hasScrollbar = needsScrollbar(this.document.rowCount(width), safeCapacity, width);
-    const contentWidth = hasScrollbar ? width - 1 : width;
-    const rows = this.document.render(contentWidth);
-    this.scroller.updateLayout(rows.length, safeCapacity, () => {});
+    const hasScrollbar = needsScrollbar(this.transcript.rowCount(safeWidth), safeCapacity, safeWidth);
+    const contentWidth = hasScrollbar ? Math.max(1, safeWidth - 1) : safeWidth;
+    const { rows, owners } = this.transcript.render(contentWidth);
+    this.scroller.updateLayout(rows.length, safeCapacity);
     const top = this.scroller.scrollTop;
     const visible = rows.slice(top, top + safeCapacity);
     const filler = Math.max(0, safeCapacity - visible.length);
-    this.window = new TranscriptWindow({
-      top,
-      filler,
-      visible: visible.length,
-      rows,
-      owners: this.document.owners,
-    });
+    this.window = new TranscriptWindow({ top, filler, visible: visible.length, rows, owners });
     this.capacity = safeCapacity;
-    this.width = width;
+    this.width = safeWidth;
     this.total = rows.length;
-    this.geometry = hasScrollbar ? scrollbarGeometry(rows.length, safeCapacity, top, width - 1) : undefined;
+    this.geometry = hasScrollbar ? scrollbarGeometry(rows.length, safeCapacity, top, safeWidth - 1) : undefined;
     const shaded = this.window.shade([...Array<string>(filler).fill(""), ...visible], selection);
-    return this.geometry ? paintScrollbar(shaded, this.geometry, width) : shaded;
+    return this.geometry ? paintScrollbar(shaded, this.geometry, safeWidth) : shaded;
   }
 
   /** How far back the window is, in rows; 0 means it is following the newest. */
@@ -113,7 +104,7 @@ export class TranscriptPane {
   /** Rendered rows of the full transcript at the last width, for selection copying. */
   contentRows(): readonly string[] {
     if (this.window.layout.rows.length > 0) return this.window.layout.rows;
-    return this.document.render(this.geometry ? Math.max(1, this.width - 1) : this.width);
+    return this.transcript.render(this.geometry ? Math.max(1, this.width - 1) : this.width).rows;
   }
 
   /** The block under screen row `row`, or nothing for padding and chrome. */

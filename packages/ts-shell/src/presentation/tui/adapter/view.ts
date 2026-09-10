@@ -1,49 +1,34 @@
+import { renderBand } from "../chrome/band.js";
+import { renderComposer } from "../chrome/composer.js";
+import { renderHints } from "../chrome/hints.js";
 import type { TerminalFramePlan, ViewportSize } from "../render/frame.js";
 import type { Block } from "../transcript/blocks.js";
+import { renderActivity } from "../transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
 import { createViewState, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "../view.js";
-import { renderComposer } from "../chrome/composer.js";
-import { Composer, StatusBar, type ComposerFacts } from "./chrome.js";
-import type { ViewComponent } from "./contract.js";
-import type { SessionFacts } from "./model.js";
 import { TranscriptPane } from "./pane.js";
 
 /**
- * Frame composition from components.
+ * The surface: one frame from host-owned state.
  *
- * The same screen as the direct-render surface — transcript pane above, chrome
- * below — but the chrome is a status bar and a composer that implement the
- * component contract, so the host talks to them only through facts and the frame
- * is theirs to lay out. The pane is shared with the other surface, which is what
- * keeps scrolling, selection, and the scrollbar identical between the two.
+ * The screen is split once, here: chrome owns the bottom rows and the transcript
+ * pane gets whatever is left. Since the screen is ours alone there is no terminal
+ * scrollback to defer to, so the pane also owns *where* in the transcript the
+ * window sits — which is what makes scrolling back a thing the surface can simply
+ * do. Facts are read from the context at paint time, never copied, so a frame can
+ * never show something the host no longer believes.
  */
 
 /** Minimum transcript rows kept visible however tall the chrome grows. */
 const MIN_TRANSCRIPT_ROWS = 1;
 
-/** Rows for an open panel picker, sized to the screen the frame is being drawn for. */
-class PanelRows implements ViewComponent {
-  height = 0;
-
-  constructor(private readonly rows: (width: number, height: number) => string[]) {}
-
-  invalidate(): void {}
-
-  render(width: number): string[] {
-    return this.rows(width, this.height);
-  }
-}
-
-export class ComposedView implements InteractiveView {
-  readonly transcript: ViewState["transcript"];
+export class InteractiveSurface implements InteractiveView {
   readonly editor: ViewState["editor"];
   readonly pastes: ViewState["pastes"];
+  readonly transcript: ViewState["transcript"];
   readonly suggestions: ViewState["suggestions"];
   private readonly pane: TranscriptPane;
-  private readonly panel: PanelRows;
-  private readonly status: StatusBar;
-  private readonly composer: Composer;
   private suggesting = false;
   private lastComposerGeometry: ComposerGeometry | undefined;
 
@@ -51,22 +36,14 @@ export class ComposedView implements InteractiveView {
     private readonly context: ViewContext,
     state: ViewState = createViewState(),
   ) {
-    this.transcript = state.transcript;
     this.editor = state.editor;
     this.pastes = state.pastes;
+    this.transcript = state.transcript;
     this.suggestions = state.suggestions;
     this.pane = new TranscriptPane(state.transcript);
-    this.panel = new PanelRows((width, height) => context.overlayRows(width, height));
-    // Facts are read at paint time only: the host hands over its context before
-    // the parties those thunks reach into exist, so nothing here may call them.
-    this.status = new StatusBar({ facts: { model: "", provider: "" }, items: [], activity: undefined, busy: false }, this.panel);
-    this.composer = new Composer(
-      state.editor,
-      { busy: false, suggesting: false, cancelArmed: false, queued: 0, newlineKey: "", ambient: { openTodos: 0, peerSessions: 0 } },
-      state.suggestions,
-    );
   }
 
+  /** Whether the completion list is currently intercepting navigation keys. */
   get suggestionsOpen(): boolean {
     return this.suggesting && this.suggestions.length > 0;
   }
@@ -82,15 +59,15 @@ export class ComposedView implements InteractiveView {
     if (this.context.overlayFullScreen()) {
       return { rows: this.context.overlayRows(width, height) };
     }
-    const chromeResult = this.renderChrome(width, height);
-    const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chromeResult.rows.length);
+    const chrome = this.renderChrome(width, height);
+    const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.rows.length);
     this.lastComposerGeometry = {
-      top: capacity + chromeResult.composerOffset,
-      bottom: capacity + chromeResult.composerOffset + chromeResult.composerRows.length - 1,
-      rows: chromeResult.composerRows,
+      top: capacity + chrome.composerOffset,
+      bottom: capacity + chrome.composerOffset + chrome.composerRows.length - 1,
+      rows: chrome.composerRows,
     };
     const transcriptRows = this.pane.render(width, capacity, this.context.selection());
-    return { rows: [...transcriptRows, ...chromeResult.rows] };
+    return { rows: [...transcriptRows, ...chrome.rows] };
   }
 
   get scrolledBack(): number {
@@ -136,46 +113,49 @@ export class ComposedView implements InteractiveView {
   composerGeometry(): ComposerGeometry | undefined {
     return this.lastComposerGeometry;
   }
-  /** The bottom block: status bar (activity, panel picker, band) then the composer. */
+
+  /**
+   * The fixed bottom block: activity, an open panel picker, the band, the prompt,
+   * and either completions or the hint row. The picker sits above the band so the
+   * prompt stays where the user's attention already is.
+   */
   private renderChrome(width: number, height: number): {
     readonly rows: string[];
     readonly composerOffset: number;
     readonly composerRows: string[];
   } {
-    this.panel.height = height;
-    this.status.setFacts(this.sessionFacts());
-    const facts = this.composerFacts(height);
-    this.composer.setFacts(facts);
-    const statusRows = this.status.render(width);
-    const composerRows = renderComposer(this.editor, { busy: facts.busy }, width, facts.maxRows, facts.selection);
-    const fullComposerRows = this.composer.render(width);
-    return {
-      rows: [...statusRows, ...fullComposerRows],
-      composerOffset: statusRows.length,
-      composerRows,
-    };
-  }
-  private sessionFacts(): SessionFacts {
-    return {
-      facts: this.context.facts(),
-      items: this.context.statusItems(),
-      activity: this.context.activity(),
-      busy: this.context.busy(),
-      now: this.context.now(),
-    };
-  }
-
-  private composerFacts(height: number): ComposerFacts {
-    return {
-      busy: this.context.busy(),
-      suggesting: this.suggestionsOpen,
-      cancelArmed: this.context.cancelArmed(),
-      queued: this.context.queuedCount(),
-      newlineKey: this.context.newlineKey(),
-      ambient: this.context.ambient(),
-      maxRows: Math.max(3, Math.min(10, Math.floor(height * 0.35))),
-      toast: this.context.toast?.(),
-      selection: this.context.composerSelection?.(),
-    };
+    const busy = this.context.busy();
+    const maxComposerRows = Math.max(3, Math.min(10, Math.floor(height * 0.35)));
+    const statusRows = [
+      ...renderActivity(this.context.activity(), this.context.now(), width),
+      ...this.context.overlayRows(width, height),
+      renderBand(this.context.facts(), this.context.statusItems(), width),
+    ];
+    const composerRows = renderComposer(
+      this.editor,
+      { busy },
+      width,
+      maxComposerRows,
+      this.context.composerSelection?.(),
+    );
+    const rows = [...statusRows, ...composerRows];
+    if (this.suggestionsOpen) {
+      rows.push(...this.suggestions.render(width));
+    }
+    rows.push(
+      ...renderHints(
+        {
+          busy,
+          suggesting: this.suggestionsOpen,
+          cancelArmed: this.context.cancelArmed(),
+          queued: this.context.queuedCount(),
+          newlineKey: this.context.newlineKey(),
+          toast: this.context.toast?.(),
+        },
+        this.context.ambient(),
+        width,
+      ),
+    );
+    return { rows, composerOffset: statusRows.length, composerRows };
   }
 }

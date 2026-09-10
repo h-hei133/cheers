@@ -17,54 +17,11 @@ import {
 
 const SETTINGS_KEY = "tui";
 const ITEMS_KEY = "statusItems";
-const SURFACE_KEY = "surface";
-/** Environment override for the surface, so one run can try the other without a settings edit. */
-const SURFACE_ENV = "CODING_AGENTS_TUI_SURFACE";
-
-/**
- * Which surface draws the session. `frame` renders the chrome directly and is
- * the default; `composed` builds the same frame from components. Both project
- * the same host-owned state, and the host falls back to `frame` if `composed`
- * fails to paint.
- */
-export type SurfaceChoice = "frame" | "composed";
-
-export const DEFAULT_SURFACE: SurfaceChoice = "frame";
 
 interface StoredTuiSettings {
   readonly tui?: {
     readonly statusItems?: readonly string[];
-    readonly surface?: string;
   };
-}
-
-function isSurfaceChoice(value: unknown): value is SurfaceChoice {
-  return value === "frame" || value === "composed";
-}
-
-/**
- * The configured surface: the environment wins, then project settings, then
- * user settings, then the default. Anything unrecognised is the default rather
- * than an error, since a typo in a preference must not stop the session.
- */
-export function readSurfaceChoice(
-  workspaceRoot: string,
-  env: NodeJS.ProcessEnv = process.env,
-): SurfaceChoice {
-  const forced = env[SURFACE_ENV]?.trim();
-  if (isSurfaceChoice(forced)) return forced;
-  const { userPath, projectPaths } = getSettingsPaths(workspaceRoot);
-  for (const candidate of [...projectPaths, userPath]) {
-    const stored = readSettingsFileSafely(candidate) as StoredTuiSettings | undefined;
-    const surface = stored?.tui?.surface;
-    if (isSurfaceChoice(surface)) return surface;
-  }
-  return DEFAULT_SURFACE;
-}
-
-/** Persist the surface for this user, returning the path written. */
-export function writeSurfaceChoice(workspaceRoot: string, surface: SurfaceChoice): string {
-  return writeTuiSetting(workspaceRoot, SURFACE_KEY, surface);
 }
 
 /** The configured items, or the default set when nothing is stored. */
@@ -83,7 +40,6 @@ export function readStatusItems(workspaceRoot: string): readonly StatusItemId[] 
 export function writeStatusItems(workspaceRoot: string, items: readonly StatusItemId[]): string {
   return writeTuiSetting(workspaceRoot, ITEMS_KEY, items);
 }
-
 
 function writeTuiSetting(workspaceRoot: string, key: string, value: unknown): string {
   const { userPath } = getSettingsPaths(workspaceRoot);

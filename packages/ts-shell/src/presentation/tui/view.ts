@@ -16,9 +16,9 @@ import type { ScrollbarGeometry } from "./transcript/viewport.js";
  * The host owns the facts — the transcript, the draft, held pastes, the
  * completion list — and owns every decision about what a keystroke or a mouse
  * report means. A view projects those facts into rows and answers geometry
- * questions about what it last drew. Two views can therefore be swapped under
- * the same host without either knowing the other exists, and neither can be
- * handed a fact the host did not produce.
+ * questions about what it last drew. The surface can therefore be driven by a
+ * test without a terminal, and it can never be handed a fact the host did not
+ * produce.
  */
 
 /** Models the host owns and every view projects. */
