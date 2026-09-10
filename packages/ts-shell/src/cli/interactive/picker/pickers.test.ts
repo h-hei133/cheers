@@ -245,14 +245,14 @@ describe("approval chooser", () => {
     const onSettle = vi.fn();
     const picker = approvalPicker(samplePrompt, onSettle);
     await picker.apply(["allow-always"]);
-    expect(onSettle).toHaveBeenCalledWith("allow-always");
+    expect(onSettle).toHaveBeenCalledWith({ decision: "allow-always" });
   });
 
   it("settles with deny when preview ends or cancelled", () => {
     const onSettle = vi.fn();
     const picker = approvalPicker(samplePrompt, onSettle);
     picker.previewEnd?.();
-    expect(onSettle).toHaveBeenCalledWith("deny");
+    expect(onSettle).toHaveBeenCalledWith({ decision: "deny" });
   });
 
   it("gracefully handles prompts with missing context", async () => {
