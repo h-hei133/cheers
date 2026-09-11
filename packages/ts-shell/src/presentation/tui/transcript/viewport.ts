@@ -51,7 +51,7 @@ export function scrollbarGeometry(
   return { column, trackTop: 0, trackHeight, thumbTop, thumbHeight, maxScrollTop };
 }
 
-/** The rows with a track and thumb painted in the last column. */
+/** The rows with a high-contrast track and thumb painted in the last column. */
 export function paintScrollbar(
   rows: readonly string[],
   geometry: ScrollbarGeometry,
@@ -59,7 +59,9 @@ export function paintScrollbar(
 ): string[] {
   return rows.map((row, index) => {
     const isThumb = index >= geometry.thumbTop && index < geometry.thumbTop + geometry.thumbHeight;
-    const bar = isThumb ? defaultTheme.fg("accent", "█") : defaultTheme.fg("border", "│");
+    // Keep the bar legible against both dark and light terminal palettes. The
+    // geometry remains theme-independent; ANSI gray/white are terminal-native.
+    const bar = isThumb ? "\x1b[37m█\x1b[0m" : "\x1b[90m│\x1b[0m";
     return `${padToWidth(row, width - 1)}${bar}`;
   });
 }

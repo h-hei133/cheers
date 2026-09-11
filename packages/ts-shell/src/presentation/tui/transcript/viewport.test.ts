@@ -59,6 +59,16 @@ describe("scrollbar geometry", () => {
   });
 });
 
+describe("scrollbar visibility", () => {
+  it("uses a high-contrast thumb and track that remain visible in the default theme", () => {
+    const geometry = scrollbarGeometry(40, 10, 0, 39)!;
+    const rows = paintScrollbar(Array.from({ length: 10 }, () => "content"), geometry, 40);
+    const ansi = rows[0]!;
+    expect(ansi).toContain("\x1b[37m█\x1b[0m");
+    expect(rows[9]).toContain("\x1b[90m│\x1b[0m");
+  });
+});
+
 describe("transcript window", () => {
   const rows = ["row 0", "row 1 is longer", "row 2", "row 3", "row 4", "row 5"];
   const owners = [0, 0, 1, 1, 2, 2];
