@@ -67,6 +67,23 @@ describe("scrollbar visibility", () => {
     expect(ansi).toContain("\x1b[37m█\x1b[0m");
     expect(rows[9]).toContain("\x1b[90m│\x1b[0m");
   });
+
+  it("supports auto, always, and never visibility models", () => {
+    expect(needsScrollbar(40, 10, 80, "auto")).toBe(true);
+    expect(needsScrollbar(5, 10, 80, "auto")).toBe(false);
+    expect(needsScrollbar(5, 10, 80, "always")).toBe(true);
+    expect(needsScrollbar(40, 10, 80, "never")).toBe(false);
+    expect(needsScrollbar(40, 10, 9, "always")).toBe(false);
+  });
+
+  it("accepts caller-provided track and thumb styling", () => {
+    const geometry = scrollbarGeometry(40, 10, 0, 39)!;
+    const rows = paintScrollbar(["content"], geometry, 40, {
+      track: "<track>",
+      thumb: "<thumb>",
+    });
+    expect(rows[0]).toContain("<thumb>");
+  });
 });
 
 describe("transcript window", () => {

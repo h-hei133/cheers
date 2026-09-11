@@ -1,4 +1,3 @@
-import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { highlightSelection, type SelectionPoint, type SelectionSpan } from "./selection.js";
@@ -22,18 +21,47 @@ export interface ScrollbarGeometry {
   readonly maxScrollTop: number;
 }
 
+export type ScrollbarMode = "auto" | "always" | "never";
+
+export interface ScrollbarTheme {
+  readonly track: (text: string) => string;
+  readonly thumb: (text: string) => string;
+}
+
+export interface ScrollbarStyle {
+  readonly track: string;
+  readonly thumb: string;
+}
+
 /** Narrowest screen on which a scrollbar column is worth its cell. */
 const MIN_SCROLLBAR_WIDTH = 10;
 
 /** Whether a transcript of `totalRows` needs a scrollbar in `capacity` rows at `width`. */
-export function needsScrollbar(totalRows: number, capacity: number, width: number): boolean {
-  return totalRows > capacity && width >= MIN_SCROLLBAR_WIDTH;
+export function needsScrollbar(
+  totalRows: number,
+  capacity: number,
+  width: number,
+  mode: ScrollbarMode = "auto",
+): boolean {
+  if (capacity <= 0 || width < MIN_SCROLLBAR_WIDTH) return false;
+  if (mode === "never") return false;
+  if (mode === "always") return true;
+  return totalRows > capacity;
 }
 
-/**
- * Thumb placement for a window whose first visible content row is `top`, or
- * nothing when the content fits and there is no bar to draw.
- */
+/** The rows with a viewport scrollbar painted in the last column. */
+export function paintScrollbar(
+  rows: readonly string[],
+  geometry: ScrollbarGeometry,
+  width: number,
+  style: ScrollbarStyle = { track: "\x1b[90m│\x1b[0m", thumb: "\x1b[37m█\x1b[0m" },
+): string[] {
+  return rows.map((row, index) => {
+    const isThumb = index >= geometry.thumbTop && index < geometry.thumbTop + geometry.thumbHeight;
+    return `${padToWidth(row, width - 1)}${isThumb ? style.thumb : style.track}`;
+  });
+}
+
 export function scrollbarGeometry(
   totalRows: number,
   trackHeight: number,
@@ -51,20 +79,6 @@ export function scrollbarGeometry(
   return { column, trackTop: 0, trackHeight, thumbTop, thumbHeight, maxScrollTop };
 }
 
-/** The rows with a high-contrast track and thumb painted in the last column. */
-export function paintScrollbar(
-  rows: readonly string[],
-  geometry: ScrollbarGeometry,
-  width: number,
-): string[] {
-  return rows.map((row, index) => {
-    const isThumb = index >= geometry.thumbTop && index < geometry.thumbTop + geometry.thumbHeight;
-    // Keep the bar legible against both dark and light terminal palettes. The
-    // geometry remains theme-independent; ANSI gray/white are terminal-native.
-    const bar = isThumb ? "\x1b[37m█\x1b[0m" : "\x1b[90m│\x1b[0m";
-    return `${padToWidth(row, width - 1)}${bar}`;
-  });
-}
 
 /**
  * The content row the window should start at when the thumb is dragged so that
