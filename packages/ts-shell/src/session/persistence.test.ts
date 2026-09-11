@@ -3,6 +3,7 @@ import type { AgentLifecycleEvent } from "../core/agent/events.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import {
   createTranscriptWriter,
+  findDanglingToolCalls,
   type TranscriptRecord,
 } from "./persistence.js";
 
@@ -146,5 +147,62 @@ describe("createTranscriptWriter", () => {
       keptMessages: 2,
       tokensBefore: 120,
     });
+  });
+});
+
+describe("transcript writer pairing and sequencing", () => {
+  it("keeps assistant tool calls for replay pairing", () => {
+    const { records, writer } = collect();
+    replay(writer, [
+      userMessage("read it"),
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          { id: "call-1", type: "function", function: { name: "read", arguments: "{}" } },
+        ],
+      },
+      toolMessage("call-1", "file!"),
+    ]);
+
+    const assistant = records[1];
+    expect(assistant.kind).toBe("message");
+    if (assistant.kind === "message") {
+      expect(assistant.toolCalls).toEqual([
+        { id: "call-1", name: "read", args: "{}" },
+      ]);
+    }
+    expect(findDanglingToolCalls(records)).toEqual([]);
+  });
+
+  it("flags tool calls left without results", () => {
+    const { records, writer } = collect();
+    replay(writer, [
+      userMessage("read it"),
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          { id: "call-1", type: "function", function: { name: "read", arguments: "{}" } },
+        ],
+      },
+    ]);
+
+    expect(findDanglingToolCalls(records)).toEqual(["call-1"]);
+  });
+
+  it("resumes sequence numbers from the given seed", () => {
+    const records: TranscriptRecord[] = [];
+    const writer = createTranscriptWriter(
+      {
+        append: (record) => {
+          records.push(record);
+        },
+      },
+      41,
+    );
+    replay(writer, [userMessage("hi")]);
+
+    expect(records[0].seq).toBe(41);
   });
 });

@@ -144,6 +144,83 @@ describe("createCompactionStep", () => {
   });
 });
 
+describe("compaction pairing and policy guards", () => {
+  it("applies the default reserve when the policy omits it", () => {
+    const long = userMessage("background ".repeat(300));
+    const messages = [long, ...history(4)];
+    expect(
+      planCompaction(messages, { contextWindow: 2000, reserveTokens: 0 }),
+    ).toBeUndefined();
+    expect(planCompaction(messages, { contextWindow: 2000 })).not.toBeUndefined();
+  });
+
+  it("skips cuts when a tool call has no result anywhere", () => {
+    const dangling: AgentMessage[] = [
+      userMessage("start"),
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          { id: "call-1", type: "function", function: { name: "read", arguments: "{}" } },
+        ],
+      },
+      userMessage("tail prompt"),
+    ];
+    expect(findCompactionCut(dangling, 1)).toBeUndefined();
+  });
+
+  it("keeps the opening system prompt ahead of the checkpoint", () => {
+    const messages: AgentMessage[] = [
+      { role: "system", content: "behave" },
+      ...history(4),
+    ];
+    const plan = planCompaction(messages, policy)!;
+    const compacted = applyCompaction(messages, plan, "older work summary");
+    expect(compacted[0].role).toBe("system");
+    expect(compacted[0].content).toBe("behave");
+    expect(compacted[1].content).toContain("older work summary");
+  });
+
+  it("reports summarizer failures through onError", async () => {
+    const errors: unknown[] = [];
+    const step = createCompactionStep(
+      policy,
+      async () => {
+        throw new Error("provider down");
+      },
+      (error) => {
+        errors.push(error);
+      },
+    );
+    const messages = history(4);
+    await step(
+      { message: messages[messages.length - 1], toolResults: [], messages },
+      undefined,
+    );
+    expect(errors).toHaveLength(1);
+  });
+
+  it("stays silent on abort without reporting failure", async () => {
+    const errors: unknown[] = [];
+    const controller = new AbortController();
+    controller.abort();
+    const step = createCompactionStep(
+      policy,
+      async () => "never",
+      (error) => {
+        errors.push(error);
+      },
+    );
+    const messages = history(4);
+    const summary = step(
+      { message: messages[messages.length - 1], toolResults: [], messages },
+      controller.signal,
+    );
+    await expect(summary).resolves.toBeUndefined();
+    expect(errors).toHaveLength(0);
+  });
+});
+
 describe("compaction through the kernel hook", () => {
   it("shrinks the context the next model step sees", async () => {
     const call: AgentToolCall = { id: "call-1", name: "read", args: { path: "a.txt" } };
