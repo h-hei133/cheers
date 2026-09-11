@@ -65,6 +65,46 @@ describe("findCompactionCut", () => {
   });
 });
 
+  it("accepts a cut whose head closes its own tool calls", () => {
+    const messages: AgentMessage[] = [
+      userMessage("read it"),
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          { id: "call-1", type: "function", function: { name: "read", arguments: "{}" } },
+        ],
+      },
+      { role: "tool", tool_call_id: "call-1", content: "file!" },
+      assistantMessage("got it"),
+      userMessage("next question"),
+      assistantMessage("answer"),
+    ];
+    const cut = findCompactionCut(messages, 2);
+    expect(cut).toBe(4);
+  });
+
+  it("notifies the transcript record when compaction applies", async () => {
+    const seen: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }[] = [];
+    const step = createCompactionStep(
+      policy,
+      async () => "older work",
+      undefined,
+      (input) => {
+        seen.push(input);
+      },
+    );
+    const messages = history(4);
+    const update = await step(
+      { message: messages[messages.length - 1], toolResults: [], messages },
+      undefined,
+    );
+    expect(update).not.toBeUndefined();
+    expect(seen).toHaveLength(1);
+    expect(seen[0].summary).toBe("older work");
+    expect(seen[0].keptMessages).toBeGreaterThan(0);
+  });
+
 describe("planCompaction", () => {
   it("returns nothing under the threshold", () => {
     expect(planCompaction(history(4), { contextWindow: 10_000, reserveTokens: 10 })).toBeUndefined();

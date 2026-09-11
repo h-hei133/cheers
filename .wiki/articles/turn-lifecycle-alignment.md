@@ -371,3 +371,25 @@ export class AgentCore {
 
 - 新增 8 项回归测试（tool 消息事件×2、hook 抛错、空转写队列启动、reset 清屏障、运行时切 mode、loop 全序列锁定、截断标记更新×2），内核 5 套件 62 项全部通过。
 - 内核 + 会话 67 套件 361 项全部通过；`build:ts` 通过；AgentCore 方法数 18，合规。
+
+---
+
+## 8. Phase 2 双子代理探索复核记录（aeeb2330 / d79b73f5 → 本次修补）
+
+两路只读子代理对照参考项目的压缩与持久化机制，裁决与修补如下。参考的 DAG/Entry 树/Usage 账本/预留 ID 强校验属远期架构（Phase 4+），本次只修 Phase 2 范围内真实缺陷：
+
+### 8.1 确认修补（HIGH/MEDIUM）
+
+1. **配对判定方向反了（HIGH，compaction.ts）**——`hasDanglingCalls` 要求切点前所有调用的结果必须落在切点之后，但切点之后是保留尾、切点之前才是被丢弃头；任何含工具调用的历史都找不到合法切点，工具场景下压缩永不触发。修复：改为头部自闭合判定——切点前的调用必须在切点前已有结果；切点后的配对随保留尾完整保留。
+2. **压缩落盘无接线（MEDIUM，compaction.ts）**——`createCompactionStep` 压缩成功后从不通知转写器，`recordCompaction` 无生产调用方，转写里永远没有 compaction 条目。修复：新增可选 `onCompact` 回调，成功时透出 summary/keptMessages/tokensBefore，调用方直连 `recordCompaction` 即可闭环。
+
+### 8.2 经核实排除/延后项
+
+- 摘要 user 角色混入、token 预算切点、溢出自愈重试、Usage 账本、预留 ID 强校验、torn 尾物理修复：均为参考远期形态，本地简化版（按条数切 + user 检查点 + fail-open）在 Phase 2 设计文档范围内，不在本轮改动；已记入 Phase 4+ 演进。
+- `estimateTokens` 未计 id/timestamp：体积极小，可接受。
+- `findCompactionCut` 负下标与 `reserveTokens: 0` 语义：已验证正确（`??` 保留 0，负起始直接返回 undefined）。
+
+### 8.3 验证
+
+- 新增 2 项回归测试（头部自闭合切点可用、onCompact 透出记录），会话 3 套件 36 项通过。
+- 会话 + 内核 70 套件 397 项全部通过；`build:ts` 通过。

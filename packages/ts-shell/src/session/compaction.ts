@@ -50,24 +50,27 @@ export function findCompactionCut(
   return undefined;
 }
 
+/**
+ * Whether the compacted head leaves calls without results behind.
+ *
+ * Only the head is dropped, so only the head must be self-closed: every
+ * tool call before `cut` needs its result before `cut` as well. Results
+ * after the cut stay paired with their own assistant message in the kept
+ * tail, which always starts on a user boundary.
+ */
 function hasDanglingCalls(messages: readonly AgentMessage[], cut: number): boolean {
-  const headCalls = new Set<string>();
+  const calls = new Set<string>();
+  const results = new Set<string>();
   for (const message of messages.slice(0, cut)) {
     for (const call of message.tool_calls ?? []) {
-      headCalls.add(call.id);
+      calls.add(call.id);
     }
-  }
-  if (headCalls.size === 0) {
-    return false;
-  }
-  const tailResults = new Set<string>();
-  for (const message of messages.slice(cut)) {
     if (message.tool_call_id) {
-      tailResults.add(message.tool_call_id);
+      results.add(message.tool_call_id);
     }
   }
-  for (const id of headCalls) {
-    if (!tailResults.has(id)) {
+  for (const id of calls) {
+    if (!results.has(id)) {
       return true;
     }
   }
@@ -103,10 +106,12 @@ export function applyCompaction(
   const head = messages[0]?.role === "system" ? [messages[0]] : [];
   return [...head, checkpoint, ...messages.slice(plan.cut)];
 }
+
 export function createCompactionStep(
   policy: CompactionPolicy,
   summarize: SummarizeHistory,
   onError?: (error: unknown) => void,
+  onCompact?: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void,
 ): (snapshot: NextStepSnapshot, signal?: AbortSignal) => Promise<NextStepUpdate | undefined> {
   return async (snapshot, signal) => {
     if (signal?.aborted) {
@@ -129,6 +134,7 @@ export function createCompactionStep(
     if (!summary) {
       return undefined;
     }
+    onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
     return { messages: applyCompaction(snapshot.messages, plan, summary) };
   };
 }
