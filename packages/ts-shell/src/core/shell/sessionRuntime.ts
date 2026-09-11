@@ -59,6 +59,8 @@ export class ShellSessionRuntime {
   private readonly stateMachine = new ShellStateMachine();
   private readonly eventObservers = new Set<QueryEventObserver>();
   private currentRunController: AbortController | null = null;
+  private currentRun: Promise<string> | null = null;
+  private lastRun: Promise<string> | null = null;
   private viewMode: "compact" | "verbose" = "compact";
   private permissionScope: PermissionScope = "ask";
   private agentMode: "plan" | "build" = "build";
@@ -84,6 +86,25 @@ export class ShellSessionRuntime {
   getCurrentRunController(): AbortController | null {
     return this.currentRunController;
   }
+
+  /** Settles when the active run finishes, or immediately when idle. */
+  waitForIdle(): Promise<void> {
+    const run = this.currentRun ?? this.lastRun;
+    if (!run) return Promise.resolve();
+    return run.then(
+      () => undefined,
+      (error) => {
+        throw error;
+      },
+    );
+  }
+
+  /** Abort the active run and wait until it has settled. */
+  async cancelAndWait(): Promise<void> {
+    this.cancelCurrentRun();
+    await this.waitForIdle().catch(() => undefined);
+  }
+
 
   getViewMode(): "compact" | "verbose" {
     return this.viewMode;
@@ -111,6 +132,38 @@ export class ShellSessionRuntime {
   }
 
   async executePrompt(
+    sessionId: string,
+    prompt: string,
+    options?: {
+      runtimeSeed?: QueryRuntimeStateSeed;
+      continuityState?: SessionContinuitySnapshot;
+      outputMode?: "interactive" | "print";
+    },
+  ): Promise<string> {
+    const run = this.trackRun(this.drivePrompt(sessionId, prompt, options));
+    return run;
+  }
+
+  private trackRun(run: Promise<string>): Promise<string> {
+    this.currentRun = run;
+    run.then(
+      () => {
+        if (this.currentRun === run) this.currentRun = null;
+        this.lastRun = run;
+      },
+      () => {
+        if (this.currentRun === run) this.currentRun = null;
+        this.lastRun = run;
+      },
+    );
+    // Mark the rejection handled up front: waitForIdle() still surfaces it
+    // to explicit awaiters, but callers that only await executePrompt() no
+    // longer trigger an unhandledRejection warning.
+    run.catch(() => {});
+    return run;
+  }
+
+  private async drivePrompt(
     sessionId: string,
     prompt: string,
     options?: {

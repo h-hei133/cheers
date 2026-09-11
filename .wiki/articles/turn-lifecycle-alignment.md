@@ -393,3 +393,31 @@ export class AgentCore {
 
 - 新增 2 项回归测试（头部自闭合切点可用、onCompact 透出记录），会话 3 套件 36 项通过。
 - 会话 + 内核 70 套件 397 项全部通过；`build:ts` 通过。
+---
+
+## 9. Phase 2 三路审计与 Phase 3 交互升级记录（fcab75a5 → 本次）
+
+三路只读子代理（内核审计 / 持久化审计 / 交互表面测绘）对照参考语义逐项核查，裁决如下：
+
+### 9.1 Phase 2 无需修补
+
+1. **内核审计：无 HIGH/MEDIUM**——工具结果消息事件、abort 配对、截断防御、终态屏障、双队列消费、失败历史携带全部成立；6 个 LOW 均为可接受分歧（steering-skip 实现层不同而效果等价、lastRun 拒绝透出优于参考吞掉、失败 agent_end 携带全量历史、省略 schema 强校验、onUpdate fire-and-forget、空转写队列启动为刻意改进）。
+2. **持久化审计 scout 失败**（模型不可用，非结论性失败）——亲补：生产写路径已有 tmp+fsync+rename 原子保护（sessionFileStore.ts），新 writer 为纯内存订阅器、Phase 4 前不接生产路径，无双写 hazard；writer 丢弃字段（tool_calls 数组等）仅影响新内核回放，不碰生产转写。
+3. **Phase 2 基线 98/98 全绿**，确认无需修补，直接进入 Phase 3。
+
+### 9.2 Phase 3 落地（HIGH 三项）
+
+1. **可等待 idle（sessionRuntime.ts）**——`executePrompt` 拆分为 track（`trackRun` 登记 currentRun/lastRun，预挂 catch 防 unhandledRejection）与 `drivePrompt`（原方法体）；新增 `waitForIdle()`（显式 await 透出失败，对齐 AgentCore）与 `cancelAndWait()`（abort 后等待结算，内部吞错）。`cancelCurrentRun()` 同步语义不变，5 处调用方零改动。
+2. **队列类型化（interactiveMode.ts）**——`queue: string[]` 改为 `{ text, disposition: "followUp" }` 数组；busy 时输入记 followUp 语义（运行中输入默认跟进），drain 取 text，`queuedCount` 行为不变。为后续 steering 路由留扩展位。
+3. **中断等待（interactiveMode.ts）**——`interrupt()` 改异步：`markCancelling` 后 `await cancelAndWait()`，消除 drain 与 run 结算竞态；keymap 合约 `interrupt(): void` 不变，host 侧 `void` 显式标记 fire-and-forget（`cancelAndWait` 内部已吞错，无拒绝风险）。
+
+### 9.3 刻意延后（非门禁）
+
+- turnSink `tokens: 0`、QueryEvent 缺口（turn.completed/mcp.snapshot/retrying.reason）、tool partial 通道、消息边界 stopReason：均为 MEDIUM 及以下，且 usage 事件生产侧根本未发，改 sink 属伪修，留待生产路径收敛时一并处理。
+- host 队列行为白盒测试：需驱动 run() 全链路，成本过高；runtime 层等待语义已由 sessionIdle 测试锁定，触点文件既有 49 项测试全绿。
+
+### 9.4 验证
+
+- 新增 sessionIdle 4 项测试（idle 即时返回、cancel 后等待结算、cancelAndWait 语义、失败透出），全部通过。
+- 相关回归（shell + interactive）中 6 项失败经 stash 基线对照确认为历史遗留，与本次零关联（基线同样失败）。
+- `build:ts` 通过；新文件零外部项目名称。

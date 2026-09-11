@@ -106,7 +106,7 @@ export class InteractiveMode {
   private turnNumber = 0;
   /** The last thing submitted that was a prompt rather than a command. */
   private lastPrompt: string | undefined;
-  private readonly queue: string[] = [];
+  private readonly queue: Array<{ text: string; disposition: "followUp" }> = [];
   private releaseEvents: (() => void) | undefined;
 
   constructor(private readonly options: InteractiveModeOptions) {
@@ -281,7 +281,7 @@ export class InteractiveMode {
       gesture: this.gesture,
       actions: {
         submit: (text) => this.onSubmit(text),
-        interrupt: () => this.interrupt(),
+        interrupt: () => void this.interrupt(),
         exit: () => this.shutdown(),
         redraw: () => this.tui.requestRender(),
         clearScreen: () => this.clearScreen(),
@@ -371,7 +371,7 @@ export class InteractiveMode {
     // returns to the newest rows so the echo and the answer are in view.
     this.view.scrollToEnd();
     if (this.busy) {
-      this.queue.push(text);
+      this.queue.push({ text, disposition: "followUp" });
       this.tui.requestRender();
       return;
     }
@@ -446,7 +446,7 @@ export class InteractiveMode {
         this.tui.requestRender({ force: true });
       }
       this.tui.requestRender();
-      const next = retrying ?? this.queue.shift();
+      const next = retrying ?? this.queue.shift()?.text;
       if (next !== undefined) void this.run(next);
     }
   }
@@ -547,10 +547,10 @@ export class InteractiveMode {
     return undefined;
   }
 
-  private interrupt(): void {
+  private async interrupt(): Promise<void> {
     if (!this.busy) return;
     this.sink.markCancelling();
-    this.options.sessionRuntime.cancelCurrentRun();
+    await this.options.sessionRuntime.cancelAndWait();
   }
 
   /**
