@@ -217,6 +217,22 @@ describe("the cursor", () => {
   });
 });
 
+describe("disconnect lifecycle", () => {
+  it("delegates terminal disconnect to the host handler", () => {
+    const { tui, terminal, scheduler } = boot();
+    let hostCleaned = 0;
+    tui.setDisconnectHandler(() => {
+      hostCleaned += 1;
+      tui.stop();
+    });
+    tui.start();
+    scheduler.flush();
+    terminal.disconnect();
+    expect(hostCleaned).toBe(1);
+    expect(terminal.stopped).toBe(true);
+  });
+});
+
 describe("backpressure", () => {
   it("defers a frame while the link is behind", () => {
     const { tui, terminal, scheduler } = boot();

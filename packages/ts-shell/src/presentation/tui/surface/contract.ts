@@ -11,14 +11,12 @@ import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
 
 /**
- * The seam between the interactive host and whichever surface draws it.
+ * The seam between the interactive host and its stateful presentation surface.
  *
- * The host owns the facts — the transcript, the draft, held pastes, the
- * completion list — and owns every decision about what a keystroke or a mouse
- * report means. A view projects those facts into rows and answers geometry
- * questions about what it last drew. The surface can therefore be driven by a
- * test without a terminal, and it can never be handed a fact the host did not
- * produce.
+ * The host owns lifecycle, business actions, and input decisions. The surface
+ * owns the presentation model used to compose rows and answer geometry queries;
+ * its mutable transcript, editor, paste, suggestion, and scroll state are kept
+ * together so the view and pointer coordinates cannot drift apart.
  */
 
 /** Models the host owns and every view projects. */

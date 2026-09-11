@@ -77,14 +77,16 @@ Phase 0/1/2 阶段完成了底层与产品组件的构造与单测覆盖。Phase
 4. 在真实 CLI 完成长粘贴、中文输入、滚轮/滑块、选区复制、审批三决策、resume、非 TTY/CI 的连续 smoke；
 5. 重新做删除审计，只删除被替代的专属胶水，不删除共享 `TUI`、文本测量、编辑器和终端底座。
 
-## Phase 2.5 执行记录（2026-09-10）
+## Phase 2.5 执行记录（历史）
 
-| 阶段 | 落地位置 | 证据 |
+> 本节保留当时的生产组装、双表面对照与可逆切流证据。Phase 3 已删除第二条表面及其选择/回退机制；当前架构见文末「结论」。下列旧路径和环境变量仅用于历史审计，不是当前可用接口。
+
+| 阶段 | 当时落地位置 | 当时证据 |
 |---|---|---|
-| 2.5-A 合约 | `presentation/tui/view.ts`；`keymap.ts`/`pointer.ts` 改依赖 `InteractiveView` | `keymap.test.ts` 35 项、`pointer.test.ts` 5 项在合约类型下通过 |
-| 2.5-B 组装 | `adapter/view.ts`（`ComposedView`）、`adapter/pane.ts`（共享 `TranscriptPane`）、`adapter/transcript.ts`、`transcript/viewport.ts`、`transcript/selection.ts` | `adapter/view.test.ts` 5 项、`transcript/viewport.test.ts` 11 项 |
-| 2.5-C 接线 | `cli/interactive/surface.ts`（`ViewHost`、`createView`）、`tuiSettings.ts`（`readSurfaceChoice`）、`InteractiveMode` 改持有 `ViewHost` 与 `ViewState` | `firstFrame.test.ts` 新增 3 项：组件表面首帧与默认表面逐字节相同、键入/补全/翻页经组件表面、失败回退 |
-| 2.5-D 对照与回退 | `ViewHost.renderFrame` 同帧回退；`surface.test.ts` 逐帧对照 | `surface.test.ts` 12 项（6 项对照、3 项回退、3 项选择读取） |
+| 2.5-A 合约 | `presentation/tui/view.ts`（后移至 `surface/contract.ts`） | `keymap.ts` / `pointer.ts` 合约测试 |
+| 2.5-B 组装 | `adapter/view.ts`、`adapter/pane.ts`（后移至 `surface/`） | 组件表面与共享转写窗口测试 |
+| 2.5-C 接线 | `cli/interactive/surface.ts`、`ViewHost`（已删除） | 双表面首帧与输入回归 |
+| 2.5-D 对照与回退 | `surface.test.ts`（已删除） | 双表面逐帧对照与回退验证 |
 
 验证：
 - `tsc -p tsconfig.build.json` 通过。
@@ -96,18 +98,11 @@ Phase 0/1/2 阶段完成了底层与产品组件的构造与单测覆盖。Phase
 
 ## 下一步路线图
 
-1. ~~**Phase 3 删除审计**：门槛已满足，开始启动 Phase 3 删除审计与收敛~~ — 已于 2026-09-10 完成，见文末「Phase 3 删除审计」与「执行记录」。
+## Phase 2.5-E 手动测试清单（历史）
 
-## Phase 2.5-E 手动测试清单（Phase 3 启动门）
+> 以下清单记录 Phase 3 前的两条表面验证。第二条表面、环境变量和回退机制已删除；不要按本节启动当前程序。当前生产链路只有 `InteractiveMode → InteractiveSurface → TUI`。
 
-每条表面（`frame` 默认、`composed` 经 `CODING_AGENTS_TUI_SURFACE=composed`）各跑一遍，两轮之间不清屏不清会话。任一表面任一项失败即回退该表面并记录差异，不进入 Phase 3。
-
-> 已完成（2026-09-10 真机与 PTY 全面实测验证，包含真实 provider 会话与 synthetic 管道验证，两条表面均通过）：
-> E0 全过：备用屏进出、欢迎、提示符、/help 全屏、中文输入、双击 Ctrl+C 退出码 0、无回退提示。
-> E1 全过：连续多轮流式提问、上下文跨轮贯通、安静中断与 /resume 继续均正常。
-> E2 全过：审批面板选项交互正常，支持 1/y、2/a、3/n/d 快捷直达；新增拒绝可选输入理由并直接将用户指令反馈给模型避免重试。
-> E3 全过：内容坐标锚定，新输出到达不推走阅读行；支持输入框内部拖选复制，支持拖拽到达窗口上下边缘时 70ms 自动平滑滚屏。
-> E4 全过：长粘贴占位符展开、中文无光标重影；真实 /compact 压缩后实时重置 gauge，下一轮历史连贯。
+> 历史验证结果（2026-09-10）：E0~E6 均通过，包括备用屏启停、流式会话、审批、滚动选区、长粘贴、压缩、模式切换、resume 和非 TTY 输出。
 > E5 全过：模式切换仅更新状态带无多余文本提示；/resume 完整重建工具卡片与折叠态。
 > E6 全过：管道重定向输出纯文本无转义残留，退出码 0。
 
@@ -146,54 +141,19 @@ Phase 0/1/2 阶段完成了底层与产品组件的构造与单测覆盖。Phase
 
 - [x] 管道/重定向下（`echo "提问" | agents ...`）得到可读最终文本，无备用屏转义残留，退出码 0（2026-09-10 实测通过）。
 
-### 通过标准
+### 通过标准（历史）
 
-- 两条表面 E1~E6 全过，且同一操作序列下逐帧行为无未解释差异，方可解除 Phase 3 删除阻塞。
-- 任一差异先记入 `tui-known-defects.md` 再修，不带病进入删除审计。
+> 本标准用于 Phase 2.5 的双表面对照，现已完成；当前生产路径不再有表面选择或回退。
 
 ## Phase 3 删除审计（2026-09-10）
 
 ### 审计方法
 
-- 以 import 图为唯一证据：对 `presentation/tui/**` 与 `cli/interactive/**` 的每个非测试模块列出**生产（非测试）导入方**；只被测试导入的模块视为"未接入生产"。
-- 对每个候选回答三个问题：谁替代了它；它是否是两条表面共享的底座；删除后哪些测试覆盖需要移植而不是丢弃。
-- 基线：`tsc -p tsconfig.build.json` 通过；`vitest run src/presentation/tui src/cli/interactive` 50 套件 626 项，2 项既有失败（`picker/pickers.test.ts` 审批 chooser 仍断言字符串形态，而拒绝理由特性已把结算结果改为 `{ decision, reason? }`，属 stale expectation，先修正断言再开始删除）。
-
-### 事实：两条表面是同一算法
-
-`cli/interactive/frameSurface.ts`（`InteractiveSurface`）与 `adapter/view.ts`（`ComposedView`）逐方法对照：两者都持有 `TranscriptPane`，全部几何问题（scroll / page / thumb / screenToContent / contentToScreenSpan / contentRows / blockAtScreenRow / composerGeometry）原样委托；帧组装同为"pane 行 + chrome 行"；`surface.test.ts` 六组逐帧对照已证明输出逐字节相同。
-
-差异只有一处：`ComposedView` 把 chrome 经 `adapter/chrome.ts` 的 `StatusBar` / `Composer` 两个包装类绘制，而这两个类每帧由 `setFacts` 灌入同一份事实，再调用同一组 `renderActivity` / `renderBand` / `renderComposer` / `renderHints`；`ViewComponent` 合约里的 `handleInput` / `handlePointer` / `focused` 在生产路径上无人调用（2.5-A 已冻结"宿主拥有全部输入决策"）。副作用：`ComposedView.renderChrome` 每帧调用两次 `renderComposer`（一次取几何、一次在 `Composer.render` 内），是重复工作。
-
-结论：组件包装层没有带来任何能力，只带来第二条一模一样的链路——这正是选型文档"迁移期间不得保留两套渲染链路"所指。收敛为唯一表面，保留直接渲染的实现体。
-
-### 删除清单（被替代的专属职责）
-
-| 文件 | 生产导入方 | 被谁替代 | 处置 |
-|---|---|---|---|
-| `adapter/card.ts`（`ToolCard`） | 无，仅测试 | `transcript/blocks.ts` 工具块 + `turnSink.ts` / `toolCards.ts` | 删除 |
-| `adapter/messages.ts`（`Message` 与工厂） | 无 | `transcript/blocks.ts` + `textBlock` | 删除 |
-| `adapter/dialog.ts`（`PermissionDialog`） | 无 | `picker/approval.ts` + `overlay.ts` 面板（含快捷键与拒绝理由） | 删除 |
-| `adapter/select.ts`（`SelectList`） | 无 | `chrome/options.ts` + `chrome/modal.ts` / `panel.ts` + `OverlayHost` | 删除 |
-| `adapter/loader.ts`（`Loader`） | 无 | `transcript/live.ts` `renderActivity` | 删除 |
-| `adapter/markdown.ts`（`Markdown` 包装） | 无 | `transcript/markdown.ts` 由 blocks 直接使用 | 删除 |
-| `adapter/editor.ts`（`PromptEditor` 包装） | 无 | `tui/editor.ts` + `chrome/composer.ts`，keymap 直接驱动 `Editor` | 删除 |
-| `adapter/layout.ts`（`Text` / `VStack` / `HStack`） | 无 | 帧即行数组拼接，无堆叠消费者 | 删除 |
-| `adapter/screen.ts`（主屏差分 / `BoundedWriter`） | 无 | `render/engine.ts` + `render/paint.ts` 备用屏差分 | 删除（选型文档点名的"重复 scroll/ANSI 逻辑"） |
-| `adapter/overlay.ts`（`OverlayStack`） | 无 | `cli/interactive/overlay.ts` `OverlayHost` | 删除 |
-| `adapter/surface.ts`（`Surface`） | 无 | `render/engine.ts` `TUI` 由 `InteractiveMode` 直接使用 | 删除 |
-| `adapter/theme.ts` | 仅上述死模块 | `presentation/theme/theme.ts` | 删除 |
-| `adapter/chrome.ts`（`StatusBar` / `Composer` 包装） | `adapter/view.ts` | `chrome/*` 纯渲染函数 | 随表面收敛删除 |
-| `adapter/contract.ts`（`ViewComponent` / `Container`） | `scroll.ts` / `transcript.ts` / `chrome.ts` | 无生产消费者 | 删除 |
-| `adapter/transcript.ts`（`TranscriptView`） | `pane.ts` | `Transcript.render` 已返回 owners | 并入 pane |
-| `adapter/model.ts` | `chrome.ts` / `view.ts` | 无 | 删除 |
-| `cli/interactive/frameSurface.ts` | `surface.ts` | 与 `adapter/view.ts` 合并为唯一表面 | 删除 |
-| `cli/interactive/surface.ts`（`ViewHost` / `createView`） | `interactiveMode.ts` | 只剩一条表面后无选择与回退对象 | 删除 |
-| `tuiSettings.ts` 的表面选择（`SurfaceChoice` / `readSurfaceChoice` / `writeSurfaceChoice` / `CODING_AGENTS_TUI_SURFACE` / `tui.surface`） | `interactiveMode.ts` | 同上 | 删除，`statusItems` 保留 |
-
+- 以 import 图为唯一证据：对交互与 TUI 模块列出生产导入方；只被测试导入的模块视为未接入生产。
+- 对每个候选回答三个问题：谁替代了它；它是否属于共享终端底座；删除后哪些行为测试需要保留。
 ### 保留清单（共享底座，不删）
 
-`render/engine.ts`、`render/frame.ts`、`render/paint.ts`、`terminal.ts`、`text/*`、`editor.ts`、`pastes.ts`、`input/*`、`chrome/*`、`transcript/*`（blocks / container / live / markdown / diff / selection / viewport）、`view.ts` 合约、`adapter/pane.ts`、`adapter/scroll.ts`（简化为纯滚动模型，去掉容器继承与无人使用的 `visible`）。
+`render/engine.ts`、`render/frame.ts`、`render/paint.ts`、`terminal.ts`、`text/*`、`editor.ts`、`pastes.ts`、`input/*`、`chrome/*`、`transcript/*`，以及 `surface/contract.ts`、`surface/pane.ts`、`surface/scroll.ts`、`surface/view.ts`。这些模块共同组成当前唯一备用屏渲染链路。
 
 ### 测试覆盖移植
 
@@ -214,17 +174,9 @@ Phase 0/1/2 阶段完成了底层与产品组件的构造与单测覆盖。Phase
 
 ### 执行记录（2026-09-10）
 
-按审计清单分五次提交落地，每步 `tsc -p tsconfig.build.json` 与 `vitest run src/presentation/tui src/cli/interactive` 通过：
+按审计清单完成删除与收敛：删除未接入生产的组件包装与第二条表面，目录统一为 `surface/`，退出时将最终转写写回主屏。Focused TUI tests、golden 门和 PTY 冒烟均通过。
 
-| 步骤 | 提交 | 内容 | 验证 |
-|---|---|---|---|
-| 修正 stale expectation | `5cb1d8ca` | `pickers.test.ts` 两处审批 chooser 断言改为 `{ decision }` 形态 | 25/25 |
-| 删除未接入生产的组件 | `7452a140` | 删 card / messages / dialog / select / loader / markdown / editor / layout / screen / overlay / surface / theme 及 adapter / components / products / spike 四个测试文件；`benchmark.test.ts` 改为对 `Transcript`、`TranscriptPane`、`diffPaint` 的预算 | 10/10 |
-| 收敛为唯一表面 | `49c0bfe6` | 删 `frameSurface.ts`、`cli/interactive/surface.ts`（`ViewHost`）、`adapter/chrome.ts`、`contract.ts`、`model.ts`、`transcript.ts`；`tuiSettings.ts` 去掉表面选择（`CODING_AGENTS_TUI_SURFACE`、`tui.surface`），只剩状态带项；`ScrollView` 收敛为不继承容器的 `ScrollModel`；`TranscriptView` 并入 pane（`Transcript.render` 本就返回 owners）；两表面对照脚本改写为唯一表面的行为测试 | 45 套件 563 项、golden 1/1 |
-| 目录改名 | `f5da42f9` | `presentation/tui/adapter/` → `presentation/tui/surface/`；`tui/view.ts` → `surface/contract.ts`；仅改导入 | 45 套件 563 项 |
-| 退出留下转写 | `3802e036` | `TUI.stop({ document })`：驱动先跑模式恢复电池，再离开备用屏并逐行写入转写（`\r\x1b[2K` 擦行、`\r\n` 连接、autowrap 先关后开、末尾复位并显示光标，与参考备用屏渲染器打印最终文档的形状一致）；`InteractiveMode.stop` 传入当前宽度下的转写行 | 45 套件 567 项、golden 1/1、PTY 实测 |
-
-净变化：`packages/ts-shell/src` 相对 `fb236f14` 为 45 个文件、+698 / −3243 行；表面相关源文件由 22 个（`adapter/` 19 个 + `frameSurface.ts` + `cli/interactive/surface.ts` + `tui/view.ts`）缩至 4 个（`surface/contract.ts`、`view.ts`、`pane.ts`、`scroll.ts`）。`InteractiveMode` 仍在 20 个声明名上限内。
+净变化：`packages/ts-shell/src` 相对 Phase 2.5 基线删除重复表面职责，当前表面相关源文件为 `surface/contract.ts`、`surface/view.ts`、`surface/pane.ts`、`surface/scroll.ts`。
 
 #### PTY 实测（退出文档）
 

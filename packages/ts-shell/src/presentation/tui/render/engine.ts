@@ -60,6 +60,15 @@ export class TUI {
   private forceNextFrame = false;
   private mouseTracking = false;
   private readonly inputListeners = new Set<(data: string) => void>();
+  private disconnectHandler?: () => void;
+
+  private handleDisconnect = (): void => {
+    if (this.disconnectHandler) {
+      this.disconnectHandler();
+    } else {
+      this.stop();
+    }
+  };
 
   constructor(
     terminal: TerminalDevice = processTerminal,
@@ -71,6 +80,9 @@ export class TUI {
 
   setFrameProvider(provider: TerminalFrameProvider | undefined): void {
     this.provider = provider;
+  }
+  setDisconnectHandler(handler: (() => void) | undefined): void {
+    this.disconnectHandler = handler;
   }
 
   /**
@@ -96,7 +108,7 @@ export class TUI {
         for (const listener of this.inputListeners) listener(data);
       },
       () => this.onResize(),
-      () => this.stop(),
+      this.handleDisconnect,
       { deferInput: options?.deferInput === true },
     );
     this.terminal.write(ENTER_ALT_SCREEN);

@@ -26,6 +26,7 @@ export class RecordingTerminal implements TerminalDevice {
   rows = 10;
   pending = 0;
   stopped = false;
+  disconnect: () => void = () => {};
   resize: () => void = () => {};
   input: (data: string) => void = () => {};
 
@@ -44,11 +45,12 @@ export class RecordingTerminal implements TerminalDevice {
   start(
     onInput: (data: string) => void,
     onResize: () => void,
-    _onDisconnect: () => void,
+    onDisconnect: () => void,
     _options?: TerminalStartOptions,
   ): void {
     this.input = onInput;
     this.resize = onResize;
+    this.disconnect = onDisconnect;
   }
 
   stop(): void {

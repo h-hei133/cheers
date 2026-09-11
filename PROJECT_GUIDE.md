@@ -87,9 +87,10 @@ timeline
    - `reconcileDanglingToolCalls` 自动平复孤儿工具调用，杜绝大模型 400 校验错误。
 6. **物理安全沙箱 (`core/security/pathJail.ts`)**：
    - 全量文件工具（`read`, `write`, `edit`, `grep`, `glob`）接入 `verifyPathContainment`，硬拦截符号链接与 `../` 路径逃逸。
-7. **原生回滚差分终端引擎 (`presentation/tui/`)**：
-   - 不进备用屏：可变视口锚定在终端普通屏底部，已定稿的转写区块在容量压力下按序退役进终端**原生回滚缓冲**，因此滚轮回看、框选复制与退出后留存全部由终端本身提供。
-   - 几何稳定且无历史追加时走纯行差分快路径；帧整体包裹 ANSI Mode 2026 同步序列（`\x1b[?2026h` … `\x1b[?2026l`）与 DECAWM 关闭，消除撕裂与折行。
+7. **备用屏差分终端引擎 (`presentation/tui/`)**：
+   - 交互会话运行在独立备用屏中，由 `surface/` 组合完整视口；内容滚动、选区和复制由应用自身管理，不依赖终端原生回滚缓冲。
+   - 会话结束时，宿主先恢复终端模式，再将最终转写写回主屏，确保退出后仍可回看和复制。
+   - 几何稳定且无历史追加时走纯行差分快路径；帧整体包裹 ANSI Mode 2026 同步序列与 DECAWM 关闭，消除撕裂与折行。
    - 单一文本度量层（`text/`）：UAX #11 东亚宽度表 + `Intl.Segmenter` 字素簇，光标步进、软换行、截断与边框对齐共用同一套列宽语义。
    - 完整输入栈（`input/`）：逃逸序列边界状态机 + 部分序列超时冲刷，覆盖 CSI `~` 族、修饰参数、SS3、CSI-u 增强键盘协议与括号粘贴。
    - 非 TTY 会话（管道 / CI / 脚本）自动降级为行式循环，不向字节流写入控制序列。
@@ -160,11 +161,11 @@ packages/ts-shell/src/
 │   └── callGraph.ts                 # ts.isCallExpression / NewExpression 真实调用图
 ├── presentation/tui/             # 备用屏差分终端引擎
 │   ├── text/                        # width(UAX#11) / ansi / measure / layout / sgr / motion
-│   ├── render/                      # frame(帧契约) / paint(序列构造与退出文档) / engine(差分引擎)
-│   ├── input/                       # escape(边界状态机) / keys(按键规范化) / stdinBuffer(重组器)
-│   ├── chrome/                      # band(状态带) / composer / hints / suggestions / welcome
-│   ├── transcript/                  # blocks / container(转写容器) / live / markdown / diff / viewport / selection
-│   ├── surface/                     # contract(宿主-表面合约) / view(唯一表面) / pane(转写窗口) / scroll(滚动模型)
+│   ├── render/                      # frame / paint / engine（差分绘制与退出转写）
+│   ├── input/                       # escape / keys / stdinBuffer（输入解析）
+│   ├── chrome/                      # band / composer / hints / suggestions / welcome
+│   ├── transcript/                  # blocks / container / live / markdown / diff / viewport / selection
+│   ├── surface/                     # contract / view / pane / scroll（唯一交互表面）
 │   ├── editor.ts                    # 簇级光标 + 软换行 + kill-ring 多行编辑器
 │   └── terminal.ts                  # 终端驱动（模式恢复电池 / 输出积压计量）
 ├── cli/interactive/              # 交互会话宿主

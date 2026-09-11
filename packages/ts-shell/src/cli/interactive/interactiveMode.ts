@@ -99,6 +99,7 @@ export class InteractiveMode {
    * — Escape leaves the saved band exactly as it was.
    */
   private previewItems: readonly StatusItemId[] | undefined;
+  private stopped = false;
   private busy = false;
   private toast?: string;
   private tick: ReturnType<typeof setInterval> | undefined;
@@ -122,6 +123,7 @@ export class InteractiveMode {
     });
     this.overlay = new OverlayHost(() => this.tui.requestRender());
     this.tui = new TUI(this.terminal, options.scheduler);
+    this.tui.setDisconnectHandler(() => this.stop());
     this.state = createViewState();
     this.view = new InteractiveSurface(
       {
@@ -234,8 +236,9 @@ export class InteractiveMode {
     this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
     this.tui.start();
   }
-
   stop(): void {
+    if (this.stopped) return;
+    this.stopped = true;
     if (this.tick) clearInterval(this.tick);
     this.tick = undefined;
     this.clipboard.release();
