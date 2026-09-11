@@ -23,11 +23,6 @@ export interface ScrollbarGeometry {
 
 export type ScrollbarMode = "auto" | "always" | "never";
 
-export interface ScrollbarTheme {
-  readonly track: (text: string) => string;
-  readonly thumb: (text: string) => string;
-}
-
 export interface ScrollbarStyle {
   readonly track: string;
   readonly thumb: string;
@@ -43,9 +38,9 @@ export function needsScrollbar(
   width: number,
   mode: ScrollbarMode = "auto",
 ): boolean {
-  if (capacity <= 0 || width < MIN_SCROLLBAR_WIDTH) return false;
   if (mode === "never") return false;
   if (mode === "always") return true;
+  if (capacity <= 0 || width < MIN_SCROLLBAR_WIDTH) return false;
   return totalRows > capacity;
 }
 

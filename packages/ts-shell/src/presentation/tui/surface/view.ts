@@ -5,7 +5,7 @@ import type { TerminalFramePlan, ViewportSize } from "../render/frame.js";
 import type { Block } from "../transcript/blocks.js";
 import { renderActivity } from "../transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
-import type { ScrollbarGeometry, ScrollbarMode, ScrollbarStyle } from "../transcript/viewport.js";
+import type { ScrollbarGeometry } from "../transcript/viewport.js";
 import { createViewState, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "./contract.js";
 import { TranscriptPane } from "./pane.js";
 
@@ -92,14 +92,6 @@ export class InteractiveSurface implements InteractiveView {
 
   scrollToThumb(pointerRow: number, grabOffset = 0): boolean {
     return this.pane.scrollToThumb(pointerRow, grabOffset);
-  }
-
-  setScrollbarMode(mode: ScrollbarMode): void {
-    this.pane.setScrollbarMode(mode);
-  }
-
-  setScrollbarStyle(style: ScrollbarStyle): void {
-    this.pane.setScrollbarStyle(style);
   }
 
   screenToContent(row: number, column: number): SelectionPoint {

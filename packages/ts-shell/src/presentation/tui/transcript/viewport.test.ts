@@ -73,7 +73,7 @@ describe("scrollbar visibility", () => {
     expect(needsScrollbar(5, 10, 80, "auto")).toBe(false);
     expect(needsScrollbar(5, 10, 80, "always")).toBe(true);
     expect(needsScrollbar(40, 10, 80, "never")).toBe(false);
-    expect(needsScrollbar(40, 10, 9, "always")).toBe(false);
+    expect(needsScrollbar(40, 10, 9, "always")).toBe(true);
   });
 
   it("accepts caller-provided track and thumb styling", () => {

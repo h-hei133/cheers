@@ -8,8 +8,6 @@ import {
   thumbTargetTop,
   TranscriptWindow,
   type ScrollbarGeometry,
-  type ScrollbarMode,
-  type ScrollbarStyle,
 } from "../transcript/viewport.js";
 import { ScrollModel } from "./scroll.js";
 
@@ -34,21 +32,8 @@ export class TranscriptPane {
   private capacity = 0;
   private width = 80;
   private total = 0;
-  private scrollbarMode: ScrollbarMode = "auto";
-  private scrollbarStyle: ScrollbarStyle = {
-    track: "\x1b[90m│\x1b[0m",
-    thumb: "\x1b[37m█\x1b[0m",
-  };
 
   constructor(private readonly transcript: Transcript) {}
-
-  setScrollbarMode(mode: ScrollbarMode): void {
-    this.scrollbarMode = mode;
-  }
-
-  setScrollbarStyle(style: ScrollbarStyle): void {
-    this.scrollbarStyle = style;
-  }
 
   /**
    * The transcript rows for one frame: `capacity` rows at `width`, padded to
@@ -61,7 +46,6 @@ export class TranscriptPane {
       this.transcript.rowCount(safeWidth),
       safeCapacity,
       safeWidth,
-      this.scrollbarMode,
     );
     const contentWidth = hasScrollbar ? Math.max(1, safeWidth - 1) : safeWidth;
     const { rows, owners } = this.transcript.render(contentWidth);
@@ -75,7 +59,7 @@ export class TranscriptPane {
     this.total = rows.length;
     this.geometry = hasScrollbar ? scrollbarGeometry(rows.length, safeCapacity, top, safeWidth - 1) : undefined;
     const shaded = this.window.shade([...Array<string>(filler).fill(""), ...visible], selection);
-    return this.geometry ? paintScrollbar(shaded, this.geometry, safeWidth, this.scrollbarStyle) : shaded;
+    return this.geometry ? paintScrollbar(shaded, this.geometry, safeWidth) : shaded;
   }
 
   /** How far back the window is, in rows; 0 means it is following the newest. */

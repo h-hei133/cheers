@@ -8,7 +8,7 @@ import type { Block } from "../transcript/blocks.js";
 import { Transcript } from "../transcript/container.js";
 import type { TurnActivity } from "../transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
-import type { ScrollbarGeometry, ScrollbarMode, ScrollbarStyle } from "../transcript/viewport.js";
+import type { ScrollbarGeometry } from "../transcript/viewport.js";
 
 /**
  * The seam between the interactive host and its stateful presentation surface.
@@ -133,10 +133,6 @@ export interface InteractiveView extends TerminalFrameProvider {
   scrollbarGeometry(): ScrollbarGeometry | undefined;
   /** Move the window so the thumb's grab point sits on `pointerRow`. Returns whether it moved. */
   scrollToThumb(pointerRow: number, grabOffset?: number): boolean;
-  /** Select the viewport scrollbar visibility model. */
-  setScrollbarMode(mode: ScrollbarMode): void;
-  /** Override the viewport scrollbar track/thumb styling. */
-  setScrollbarStyle(style: ScrollbarStyle): void;
   /** Map a screen cell to a content cell in the full transcript. */
   screenToContent(row: number, column: number): SelectionPoint;
   /** A content-space selection on the current screen rows, or nothing when off screen. */
