@@ -1,0 +1,98 @@
+import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
+import type { AgentMessage } from "../core/agent/state.js";
+import { estimateTokens } from "./context.js";
+
+export const KEEP_RECENT_MESSAGES = 4;
+
+export interface CompactionPolicy {
+  readonly contextWindow: number;
+  readonly reserveTokens?: number;
+  readonly keepRecentMessages?: number;
+  readonly enabled?: boolean;
+}
+
+export interface CompactionPlan {
+  readonly cut: number;
+  readonly keptMessages: number;
+  readonly tokensBefore: number;
+}
+
+export type SummarizeHistory = (
+  messages: readonly AgentMessage[],
+  signal?: AbortSignal,
+) => Promise<string | undefined>;
+
+export function shouldCompact(
+  tokens: number,
+  contextWindow: number,
+  reserveTokens: number,
+  enabled = true,
+): boolean {
+  if (!enabled) {
+    return false;
+  }
+  return tokens > contextWindow - reserveTokens;
+}
+
+export function findCompactionCut(
+  messages: readonly AgentMessage[],
+  keepRecent: number,
+): number | undefined {
+  for (let index = messages.length - keepRecent; index >= 2; index -= 1) {
+    if (messages[index]?.role === "user") {
+      return index;
+    }
+  }
+  return undefined;
+}
+
+export function planCompaction(
+  messages: readonly AgentMessage[],
+  policy: CompactionPolicy,
+): CompactionPlan | undefined {
+  const reserve = policy.reserveTokens ?? 0;
+  const keepRecent = policy.keepRecentMessages ?? KEEP_RECENT_MESSAGES;
+  const tokensBefore = estimateTokens(messages);
+  if (!shouldCompact(tokensBefore, policy.contextWindow, reserve, policy.enabled ?? true)) {
+    return undefined;
+  }
+  const cut = findCompactionCut(messages, keepRecent);
+  if (cut === undefined) {
+    return undefined;
+  }
+  return { cut, keptMessages: messages.length - cut, tokensBefore };
+}
+
+export function applyCompaction(
+  messages: readonly AgentMessage[],
+  plan: CompactionPlan,
+  summary: string,
+): AgentMessage[] {
+  const checkpoint: AgentMessage = {
+    role: "user",
+    content: `[Context checkpoint: ${summary}]`,
+  };
+  return [checkpoint, ...messages.slice(plan.cut)];
+}
+
+export function createCompactionStep(
+  policy: CompactionPolicy,
+  summarize: SummarizeHistory,
+): (snapshot: NextStepSnapshot, signal?: AbortSignal) => Promise<NextStepUpdate | undefined> {
+  return async (snapshot, signal) => {
+    const plan = planCompaction(snapshot.messages, policy);
+    if (!plan) {
+      return undefined;
+    }
+    let summary: string | undefined;
+    try {
+      summary = await summarize(snapshot.messages.slice(0, plan.cut), signal);
+    } catch {
+      return undefined;
+    }
+    if (!summary) {
+      return undefined;
+    }
+    return { messages: applyCompaction(snapshot.messages, plan, summary) };
+  };
+}
