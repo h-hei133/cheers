@@ -410,3 +410,28 @@ export class AgentCore {
 1. **可等待 idle（sessionRuntime.ts）**——`executePrompt` 拆分为 track（`trackRun` 登记 currentRun/lastRun，预挂 catch 防 unhandledRejection）与 `drivePrompt`（原方法体）；新增 `waitForIdle()`（显式 await 透出失败，对齐 AgentCore）与 `cancelAndWait()`（abort 后等待结算，内部吞错：Esc 与 provider 失败竞态时 interrupt 方恒成功，失败归因以 run 侧为准）。`cancelCurrentRun()` 同步语义不变，3 处生产调用方（signalHandlers/interactiveCancellation/interactiveCommandRouter）零改动，interrupt 一处切异步。已知语义：lastRun 失败后粘滞（每次 waitForIdle 都 reject 直至下一 run 登记），本模块无清理通道；空闲 cancel 会无条件翻状态机为 interrupted（历史行为）。
 2. **队列类型化（interactiveMode.ts）**——`queue: string[]` 改为 `{ text, disposition: "followUp" }` 数组；busy 时输入记 followUp 语义（运行中输入默认跟进），drain 取 text，`queuedCount` 行为不变。`disposition` 当前只写不读：steering 路由尚未实现，为后续扩展留字段位。§5 Phase 3 门禁中的“转向指令注入下一步进”判未过，移至后续阶段。
 3. **中断等待（interactiveMode.ts）**——`interrupt()` 改异步：`markCancelling` 后 `await cancelAndWait()`，消除 drain 与 run 结算竞态；keymap 合约 `interrupt(): void` 不变，host 侧 `void` 显式标记 fire-and-forget（`cancelAndWait` 内部已吞错，无拒绝风险）。渲染面“无红字”尚未被测试锁定（sessionIdle 只断 promise 结算；run 侧 abort 仍 throw，经 run catch 追加 error 文块）：全链路渲染测试成本过高，留待生产路径收敛时一并处理，门禁前半判部分通过。
+
+---
+
+## 9. Phase 3 双子代理探索复核记录（ec2af0e0 / 99cfcfb8 → 本次修补）
+
+两路只读子代理对照参考项目的中断取消与输入队列机制，裁决如下。
+
+### 9.1 探索结论
+
+1. **中断语义**——参考分两层：内核 abort 纯同步（仅触发 AbortController），会话层 async abort（同步 abort 各域 + await 永 resolve 的 idle 门闩）；中断合成 `stopReason: aborted` 标准消息，`prompt()` 不抛；`waitForIdle` 永 resolve、无 lastRun、无 reject；Escape 为唯一逐 run 中断链（Ctrl+C 不中断）；防护靠永不 reject 的观察柄，无全局句柄。
+2. **队列语义**——参考为 steering/followUp 双队列：busy 默认 Enter=steer（本轮内插队）、Alt+Enter=followUp（run 边界起新轮）；本仓 interactiveMode 自建第三个本地字符串队列，busy 输入只进本地队列、run 结束后顺序重放，与内核双队列（AgentCore / steerableQueue）零接线；`disposition` 字段只写不读。
+
+### 9.2 本次修补（LOW）
+
+1. **队列项 disposition 扩展为联合类型**（interactiveMode.ts）——`"followUp"` 单字面量连表达 steer 的能力都没有；扩展为 `"steer" | "followUp"` 并注释当前语义（全部按 followUp 重放）与未来接线方向。零行为变化，为 Phase 4 接线留好形状。
+
+### 9.3 经核实排除/延后项
+
+- **waitForIdle 透错 + lastRun 粘滞**：与参考语义相反，但 Phase 1 已有测试锁定透错契约（agent.test.ts），sessionIdle 同样锁定 reject；改语义等于推翻已锁定契约。本仓选择显式失败面（调用方必须处理失败），与参考的静默成功面是 deliberate 分歧，不动。
+- **本地队列与内核双队列接通**：属 Phase 3 设计文档 §9 明确列为"转向路由未动"的遗留工作；旧轨生产路径（drivePrompt）无 steering 消费点，接通需先动生产循环。延后至 Phase 4，不动生产接线。
+- **cancelAndWait 内吞错 / trackRun 预挂 catch**：与本仓透错语义配套（中断方恒成功、观察方可按需拿失败），正确，不动。
+
+### 9.4 验证
+
+- `build:ts` 通过；会话屏障 4 项 + 交互 21 套件 241 项全部通过。

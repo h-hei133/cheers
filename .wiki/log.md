@@ -205,3 +205,4 @@
 ## [2026-09-11] review | Phase 2 会话层提交 aeeb2330 双子代理复核修补：11 条 findings 全属实；修补 reserve 默认接 DEFAULT_RESERVE_TOKENS、切点配对保护（逐 cut 跳过悬挂）、保留首条 system、落盘透传 tool_calls 与 id/timestamp、findDanglingToolCalls 悬挂校验、writer initialSeq 种子、summarize 失败 onError 回调与取消优先；新增 8 项回归测试；build:ts 通过、会话与内核 395 项通过
 ## [2026-09-11] review | turn Phase 2 双子代理探索复核（aeeb2330/d79b73f5）：修补配对判定方向反转致工具场景压缩永不触发（改头部自闭合）、压缩成功无落盘接线（新增 onCompact 直连 recordCompaction）；远期 DAG/账本/溢出自愈记入 Phase 4+；新增 2 项回归测试，会话内核 397 项通过、build:ts 通过
 ## [2026-09-11] review | Phase 3 提交 ec2af0e0 复核（一路审计完成、一路失败亲补）：屏障机制成立，修补 cancelAndWait 时序断言缺失；修正 §9 口径——生产调用方 3 处非 5 处、disposition 只写不读致转向门禁判未过、无红字未被测试锁定判部分通过，并注明 lastRun 粘滞与空闲误翻状态机；241 项通过、build:ts 通过
+## [2026-09-11] review | turn Phase 3 双子代理探索复核（ec2af0e0/99cfcfb8）：中断屏障与可等待中断机制成立无 HIGH 缺陷；修补队列 disposition 单字面量死字段为联合类型备 Phase 4 接线；waitForIdle 透错与本地队列未接通为 deliberate 分歧/延后项；241 项通过、build:ts 通过

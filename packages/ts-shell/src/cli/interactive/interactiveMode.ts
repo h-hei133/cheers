@@ -106,7 +106,13 @@ export class InteractiveMode {
   private turnNumber = 0;
   /** The last thing submitted that was a prompt rather than a command. */
   private lastPrompt: string | undefined;
-  private readonly queue: Array<{ text: string; disposition: "followUp" }> = [];
+  /**
+   * Prompts submitted while a run is in flight. Every entry currently
+   * replays as a follow-up turn once the run settles; the `disposition`
+   * union reserves the steering shape for the later queue wiring
+   * (steering injects into the running turn, follow-up starts the next).
+   */
+  private readonly queue: Array<{ text: string; disposition: "steer" | "followUp" }> = [];
   private releaseEvents: (() => void) | undefined;
 
   constructor(private readonly options: InteractiveModeOptions) {
