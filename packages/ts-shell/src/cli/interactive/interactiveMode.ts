@@ -107,6 +107,7 @@ export class InteractiveMode {
   /** The last thing submitted that was a prompt rather than a command. */
   private lastPrompt: string | undefined;
   private readonly queue: string[] = [];
+  private releaseEvents: (() => void) | undefined;
 
   constructor(private readonly options: InteractiveModeOptions) {
     this.terminal = options.terminal ?? processTerminal;
@@ -233,7 +234,7 @@ export class InteractiveMode {
       this.tui.requestRender();
     });
     this.tui.onInput((data) => this.stdin.feed(data));
-    this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
+    this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
     this.tui.start();
   }
   stop(): void {
@@ -241,6 +242,8 @@ export class InteractiveMode {
     this.stopped = true;
     if (this.tick) clearInterval(this.tick);
     this.tick = undefined;
+    this.releaseEvents?.();
+    this.releaseEvents = undefined;
     this.clipboard.release();
     this.questions.abandon();
     this.options.renderer.clearSink();

@@ -293,4 +293,17 @@ describe("lifecycle stress", () => {
     expect(cleanups).toBe(1);
     expect(terminal.stopped).toBe(true);
   });
+
+  it("prepares a long exit document within a bounded budget", () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    provider.rows = Array.from({ length: 2000 }, (_, index) => `history row ${index}`);
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+    const started = scheduler.now();
+    tui.stop({ document: provider.rows });
+    const elapsed = scheduler.now() - started;
+    expect(terminal.drain()).toContain("\x1b[?1049l");
+    expect(elapsed).toBeLessThan(1000);
+  });
 });

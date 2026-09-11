@@ -70,6 +70,16 @@ describe("session wiring", () => {
     expect(renderer.captured).toBe(false);
     mode.stop();
   });
+  it("releases the session event subscription on stop", () => {
+    let released = 0;
+    const { mode } = build({ observeEvents: () => () => {
+      released += 1;
+    } });
+    mode.start();
+    mode.stop();
+    mode.stop();
+    expect(released).toBe(1);
+  });
   it("cleans up host resources when the terminal disconnects", () => {
     const { mode, renderer, readline, terminal } = build();
     mode.start();

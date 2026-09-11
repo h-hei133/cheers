@@ -23,9 +23,9 @@ function host(): { overlay: OverlayHost; changes: () => number } {
   let changes = 0;
   return { overlay: new OverlayHost(() => (changes += 1)), changes: () => changes };
 }
-
 const press = (overlay: OverlayHost, data: string, apply = vi.fn()): boolean =>
   overlay.handleKey(parseKeyEvent(data), apply);
+
 
 describe("lifecycle", () => {
   it("is inactive until a picker opens", () => {
@@ -412,5 +412,13 @@ describe("approval picker key routing", () => {
     const header = rows[0]!;
     expect(header).toContain("Permission");
     expect(header.trimEnd().endsWith("3")).toBe(false);
+  });
+  it("settles approval as deny on escape and ctrl+c", async () => {
+    const { overlay } = host();
+    overlay.open(approvalPicker());
+    await Promise.resolve();
+    await Promise.resolve();
+    press(overlay, "\x1b");
+    expect(overlay.active).toBe(false);
   });
 });

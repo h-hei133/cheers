@@ -111,4 +111,15 @@ describe("long-transcript budget", () => {
     const paint = diffPaint(before, after, 0, after.length);
     expect(paint.split("\x1b[").length - 1).toBeLessThan(changed.length * 3);
   });
+
+  it("windows a 200-turn transcript without re-laying the whole history", () => {
+    const transcript = buildTranscript(200);
+    const pane = new TranscriptPane(transcript);
+    const started = performance.now();
+    const visible = pane.render(100, 30, undefined);
+    const elapsed = performance.now() - started;
+    expect(visible).toHaveLength(30);
+    expect(transcript.render(100).rows.length).toBeGreaterThan(2000);
+    expect(elapsed).toBeLessThan(1000);
+  });
 });
