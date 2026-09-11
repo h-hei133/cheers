@@ -129,6 +129,42 @@ describe("AgentCore abort", () => {
     ]);
   });
 
+  it("carries the full transcript in the failure agent_end", async () => {
+    const { events, listener } = collect();
+    const core = new AgentCore({
+      streamStep: async () => {
+        throw new Error("provider exploded");
+      },
+    });
+    core.subscribe(listener);
+
+    await core.prompt([userMessage("hi")]);
+
+    const end = events.find((event) => event.type === "agent_end");
+    expect(end?.type).toBe("agent_end");
+    if (end?.type === "agent_end") {
+      expect(end.messages.map((message) => message.role)).toEqual([
+        "user",
+        "assistant",
+      ]);
+      expect(end.messages[end.messages.length - 1].stopReason).toBe("error");
+    }
+  });
+
+  it("rejects waitForIdle when a listener fails", async () => {
+    const core = new AgentCore({ streamStep: async () => answer("hi") });
+    core.subscribe(async (event) => {
+      if (event.type === "agent_end") {
+        throw new Error("listener exploded");
+      }
+    });
+
+    await expect(core.prompt([userMessage("hi")])).rejects.toThrow(
+      "listener exploded",
+    );
+    await expect(core.waitForIdle()).rejects.toThrow("listener exploded");
+  });
+
   it("waits for slow listeners before going idle", async () => {
     const order: string[] = [];
     let release!: () => void;

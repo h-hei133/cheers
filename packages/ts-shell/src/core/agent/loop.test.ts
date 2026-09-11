@@ -223,9 +223,9 @@ describe("runAgentLoop", () => {
     const assistantEnds = events.filter(
       (event) => event.type === "message_end" && event.message.role === "assistant",
     );
+    expect(assistantEnds).toHaveLength(1);
     expect(eventTypes(events).slice(-1)).toEqual(["agent_end"]);
   });
-
   it("lets prepareNextStep replace the context for the next turn", async () => {
     const call: AgentToolCall = { id: "call-1", name: "read", args: { path: "a.txt" } };
     const { seen, streamStep } = scriptedStream([toolStep([call]), textStep("done")]);

@@ -72,21 +72,10 @@ describe("createToolResultMessage", () => {
 
 describe("failTruncatedCalls", () => {
   it("never executes tools and returns re-issue errors", async () => {
-    let executed = 0;
-    const tools = [
-      makeTool({
-        execute: async () => {
-          executed += 1;
-          return { output: "must not run", isError: false };
-        },
-      }),
-    ];
-    void tools;
     const { events, emit } = collect();
 
     const results = await failTruncatedCalls([makeCall()], emit);
 
-    expect(executed).toBe(0);
     expect(results).toHaveLength(1);
     expect(results[0].role).toBe("tool");
     expect(results[0].tool_call_id).toBe("call-1");
@@ -308,6 +297,69 @@ describe("executeToolBatch", () => {
     );
 
     expect(order).toEqual(["first", "second"]);
+  });
+
+  it("bounds oversized tool output at the pairing point", async () => {
+    const tools = [
+      makeTool({
+        execute: async () => ({ output: "x".repeat(10_500), isError: false }),
+      }),
+    ];
+    const { emit } = collect();
+
+    const batch = await executeToolBatch(
+      tools,
+      assistantMessage(),
+      [makeCall()],
+      undefined,
+      "sequential",
+      undefined,
+      emit,
+    );
+
+    expect(batch.messages).toHaveLength(1);
+    expect(batch.messages[0].content).toHaveLength(10_000);
+  });
+
+  it("synthesizes aborted results for every call left unpaired", async () => {
+    let gate!: () => void;
+    const started = new Promise<void>((resolve) => {
+      gate = resolve;
+    });
+    const tools = [
+      makeTool({
+        execute: async () => {
+          await started;
+          return { output: "late", isError: false };
+        },
+      }),
+    ];
+    const controller = new AbortController();
+    const { events, emit } = collect();
+
+    const pending = executeToolBatch(
+      tools,
+      assistantMessage(),
+      [makeCall({ id: "call-a" }), makeCall({ id: "call-b" })],
+      undefined,
+      "sequential",
+      controller.signal,
+      emit,
+    );
+    controller.abort();
+    gate();
+    const batch = await pending;
+
+    expect(batch.messages.map((message) => message.tool_call_id)).toEqual([
+      "call-a",
+      "call-b",
+    ]);
+    expect(
+      batch.messages.every((message) => message.content === "Operation aborted"),
+    ).toBe(true);
+    expect(
+      events.filter((event) => event.type === "tool_execution_end"),
+    ).toHaveLength(2);
   });
 
   it("lets the after hook override the executed outcome", async () => {

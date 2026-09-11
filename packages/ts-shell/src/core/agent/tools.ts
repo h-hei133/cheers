@@ -185,10 +185,28 @@ export async function executeToolBatch(
   const forcedSequential = calls.some((call) =>
     tools.find((tool) => tool.name === call.name)?.executionMode === "sequential",
   );
-  if (requested === "sequential" || forcedSequential) {
-    return runSequential(tools, assistantMessage, calls, hooks, signal, emit);
+  const batch =
+    requested === "sequential" || forcedSequential
+      ? await runSequential(tools, assistantMessage, calls, hooks, signal, emit)
+      : await runParallel(tools, assistantMessage, calls, hooks, signal, emit);
+  const bounded = batch.messages.map((message) => ({
+    ...message,
+    content: boundText(message.content),
+  }));
+  if (!signal?.aborted) {
+    return { messages: bounded, terminate: batch.terminate };
   }
-  return runParallel(tools, assistantMessage, calls, hooks, signal, emit);
+  const pairedIds = bounded.map((message) => message.tool_call_id);
+  const messages = [...bounded];
+  for (const call of calls) {
+    if (pairedIds.includes(call.id)) {
+      continue;
+    }
+    await emit({ type: "tool_execution_start", toolCallId: call.id, toolName: call.name, args: call.args });
+    await emitExecutionEnd(emit, call, true);
+    messages.push(createToolResultMessage(call.id, abortedResult().output));
+  }
+  return { messages, terminate: batch.terminate };
 }
 
 export function shouldTerminateBatch(results: readonly AgentToolResult[]): boolean {

@@ -1,7 +1,6 @@
 import type { AgentEventSink } from "./events.js";
-import type { AgentMessage } from "./state.js";
+import type { AgentMessage, AgentStopReason } from "./state.js";
 import {
-  createToolResultMessage,
   executeToolBatch,
   failTruncatedCalls,
   type AgentTool,
@@ -13,10 +12,9 @@ import {
 export interface AssistantStep {
   readonly text: string;
   readonly toolCalls: readonly AgentToolCall[];
-  readonly stopReason: "stop" | "length" | "error" | "aborted";
+  readonly stopReason: AgentStopReason;
   readonly errorMessage?: string;
 }
-
 export interface NextStepSnapshot {
   readonly message: AgentMessage;
   readonly toolResults: readonly AgentMessage[];
@@ -37,6 +35,7 @@ export interface AgentLoopConfig {
     snapshot: NextStepSnapshot,
     signal?: AbortSignal,
   ) => NextStepUpdate | undefined | Promise<NextStepUpdate | undefined>;
+  readonly onContextReplaced?: (messages: readonly AgentMessage[]) => void;
   readonly getSteeringMessages?: () => Promise<AgentMessage[]>;
   readonly getFollowUpMessages?: () => Promise<AgentMessage[]>;
   readonly streamStep: (
@@ -111,6 +110,7 @@ async function driveLoop(
         const update = await config.prepareNextStep?.(completedStep, signal);
         if (update?.messages) {
           replaceContext(context, update.messages);
+          config.onContextReplaced?.(update.messages);
         }
         if (pending.length === 0) {
           pending = await pollSteering(config);
@@ -173,10 +173,15 @@ async function driveLoop(
           toolResults.push(...batch.messages);
           hasMoreToolCalls = !batch.terminate;
         }
-        for (const result of toolResults) {
-          context.push(result);
-          produced.push(result);
-        }
+      }
+      for (const result of toolResults) {
+        context.push(result);
+        produced.push(result);
+      }
+      if (signal?.aborted) {
+        await emit({ type: "turn_end", message: assistant, toolResults });
+        await emit({ type: "agent_end", messages: [...produced] });
+        return;
       }
 
       await emit({ type: "turn_end", message: assistant, toolResults });
@@ -214,10 +219,7 @@ async function pollFollowUp(config: AgentLoopConfig): Promise<AgentMessage[]> {
     return [];
   }
 }
-
 function replaceContext(context: AgentMessage[], next: readonly AgentMessage[]): void {
   context.length = 0;
   context.push(...next);
 }
-
-export { createToolResultMessage };

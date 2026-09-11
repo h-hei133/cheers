@@ -2,11 +2,12 @@ import { runAgentLoop, runAgentLoopContinue, type AgentLoopConfig } from "./loop
 import { PendingQueue } from "./queue.js";
 import { createAgentState, type AgentMessage, type AgentState, type InitialAgentState } from "./state.js";
 import type { AgentEventListener } from "./events.js";
-import type { AgentTool, ToolHooks } from "./tools.js";
+import type { AgentTool, AgentToolExecutionMode, ToolHooks } from "./tools.js";
 
 export interface AgentCoreOptions {
   readonly initialState?: InitialAgentState;
   readonly tools?: readonly AgentTool[];
+  readonly toolExecution?: AgentToolExecutionMode;
   readonly streamStep: AgentLoopConfig["streamStep"];
   readonly beforeToolCall?: ToolHooks["beforeToolCall"];
   readonly afterToolCall?: ToolHooks["afterToolCall"];
@@ -19,6 +20,7 @@ export interface AgentCoreOptions {
 interface ActiveRun {
   readonly promise: Promise<void>;
   readonly resolve: () => void;
+  readonly reject: (reason?: unknown) => void;
   readonly abortController: AbortController;
 }
 
@@ -29,6 +31,7 @@ export class AgentCore {
   private readonly followUpQueue: PendingQueue<AgentMessage>;
   private readonly options: AgentCoreOptions;
   private activeRun?: ActiveRun;
+  private lastRun?: Promise<void>;
 
   constructor(options: AgentCoreOptions) {
     this.options = options;
@@ -89,12 +92,16 @@ export class AgentCore {
     return this.steeringQueue.hasItems() || this.followUpQueue.hasItems();
   }
 
+  /**
+   * Best-effort cancel: signals the run and returns immediately. Pair with
+   * `waitForIdle()` to wait until the aborted turn has settled.
+   */
   public abort(): void {
     this.activeRun?.abortController.abort();
   }
 
   public waitForIdle(): Promise<void> {
-    return this.activeRun?.promise ?? Promise.resolve();
+    return this.activeRun?.promise ?? this.lastRun ?? Promise.resolve();
   }
 
   public reset(): void {
@@ -112,10 +119,14 @@ export class AgentCore {
   private createLoopConfig(): AgentLoopConfig {
     return {
       tools: this.options.tools,
+      toolExecution: this.options.toolExecution,
       beforeToolCall: this.options.beforeToolCall,
       afterToolCall: this.options.afterToolCall,
       shouldStopAfterStep: this.options.shouldStopAfterStep,
       prepareNextStep: this.options.prepareNextStep,
+      onContextReplaced: (messages) => {
+        this.internalState.messages = [...messages];
+      },
       streamStep: this.options.streamStep,
       getSteeringMessages: async () => this.steeringQueue.drain(),
       getFollowUpMessages: async () => this.followUpQueue.drain(),
@@ -128,20 +139,27 @@ export class AgentCore {
     }
     const abortController = new AbortController();
     let resolvePromise = (): void => {};
-    const promise = new Promise<void>((resolve) => {
+    let rejectPromise = (_reason?: unknown): void => {};
+    const promise = new Promise<void>((resolve, reject) => {
       resolvePromise = resolve;
+      rejectPromise = reject;
     });
-    this.activeRun = { promise, resolve: resolvePromise, abortController };
+    this.activeRun = { promise, resolve: resolvePromise, reject: rejectPromise, abortController };
+    this.lastRun = promise;
     this.internalState.isStreaming = true;
     this.internalState.streamingMessage = undefined;
     this.internalState.errorMessage = undefined;
     try {
       await executor(abortController.signal);
     } catch (error) {
-      await this.handleRunFailure(error, abortController.signal.aborted);
-    } finally {
-      this.finishRun();
+      try {
+        await this.handleRunFailure(error, abortController.signal.aborted);
+      } catch (fatal) {
+        this.finishRun(fatal);
+        throw fatal;
+      }
     }
+    this.finishRun();
   }
 
   private async handleRunFailure(error: unknown, aborted: boolean): Promise<void> {
@@ -154,15 +172,20 @@ export class AgentCore {
     await this.processEvents({ type: "message_start", message: failure });
     await this.processEvents({ type: "message_end", message: failure });
     await this.processEvents({ type: "turn_end", message: failure, toolResults: [] });
-    await this.processEvents({ type: "agent_end", messages: [failure] });
+    await this.processEvents({ type: "agent_end", messages: [...this.internalState.messages] });
   }
 
-  private finishRun(): void {
+  private finishRun(error?: unknown): void {
     this.internalState.isStreaming = false;
     this.internalState.streamingMessage = undefined;
     this.internalState.pendingToolCalls = new Set<string>();
-    this.activeRun?.resolve();
+    const run = this.activeRun;
     this.activeRun = undefined;
+    if (error !== undefined) {
+      run?.reject(error);
+    } else {
+      run?.resolve();
+    }
   }
 
   private async processEvents(event: Parameters<AgentEventListener>[0]): Promise<void> {

@@ -10,7 +10,12 @@ export type AgentLifecycleEvent =
       readonly toolResults: readonly AgentMessage[];
     }
   | { readonly type: "message_start"; readonly message: AgentMessage }
-  | { readonly type: "message_update"; readonly message: AgentMessage }
+  /**
+   * Streaming progress. Produced by the `streamStep` implementation pushing
+   * partial text straight to the sink; the loop itself only emits whole
+   * `message_start` / `message_end` pairs.
+   */
+  | { readonly type: "message_update"; readonly message: AgentMessage; readonly delta?: string }
   | { readonly type: "message_end"; readonly message: AgentMessage }
   | {
       readonly type: "tool_execution_start";
