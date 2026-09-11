@@ -316,3 +316,30 @@ export class AgentCore {
    - 清理代码注释中所有残留的外部项目提及。
 2. **全量回归验证**：
    - 运行针对会话、执行、TUI 交互与持久化的全量集成测试，确保 NormProof 架构合规验证通过。
+
+---
+
+## 6. 内核提交复核记录（76c11617 / b5805314 → 本次修补）
+
+对 Phase 1 内核两笔提交进行逐文件对照复核，确认双队列、截断防御、异步取消与终态屏障均已按第 3 节机制落地；发现并修补一处行为缺口：
+
+### 6.1 发现与修补
+
+1. **continue() 拒绝队列重启**（agent.ts）
+   - 现象：运行中断或异常结束后，转写以 assistant 结尾，此时调用 `continue()` 即使 steering/followUp 队列中仍有待办输入也直接抛出 `Cannot continue from message role: assistant`，用户排队指令被死锁，只能手动重新 prompt（造成上下文重复）。
+   - 修复：对齐标杆语义——continue 时先检查队列：steering 非空则以其为新 prompt 重启（并跳过首轮 steering 轮询避免重复消费）；否则回退 followUp；两者皆空才维持拒绝。转写为空但队列有输入时同样允许启动。
+   - 配套：`runAgentLoop` 新增 `skipInitialSteeringPoll` 选项；`prompt()` 与队列重启路径统一收敛至私有 `runPromptMessages()`，消除重复执行体。
+
+### 6.2 复核确认无误的机制清单
+
+- 截断防御：`stopReason === "length"` 时 `failTruncatedCalls` 全批拒绝并回传重发指引（tools.ts / loop.ts）。
+- 中断配对：`executeToolBatch` 在 abort 后为未获结果调用补齐 aborted 工具结果，杜绝悬挂 tool_call；失败路径 `handleRunFailure` 合成 `stopReason: aborted/error` 的标准 assistant 消息并依次派发 turn_end / agent_end。
+- 终态屏障：`waitForIdle()` 返回活动 run 的 promise；监听器异常经 reject 透出且保留上轮终态。
+- 双队列消费：steering 在每步完成后、下一助手生成前注入；follow-up 仅在停止点消费；mode 支持 one-at-a-time / all。
+- 历史完整：失败 `agent_end` 携带全量已产生消息而非仅失败消息。
+
+### 6.3 验证
+
+- 新增 3 项回归测试（steering 队列重启 / followUp 回退 / 空队列拒绝），内核 5 套件 57 项全部通过。
+- `core/agent` 模块 tsc 无错误（仓库存量两处测试类型错误属历史遗留，与本次无关）。
+- `build:ts` 通过。

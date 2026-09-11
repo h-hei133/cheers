@@ -256,6 +256,38 @@ describe("AgentCore queues", () => {
     await core.prompt([userMessage("go")]);
     expect(core.state.messages).toHaveLength(2);
   });
+
+  it("restarts from queued steering when continuing after an assistant ending", async () => {
+    const core = new AgentCore({ streamStep: async () => answer("done") });
+    core.steer(userMessage("pick this back up"));
+
+    await core.continue();
+    await core.waitForIdle();
+
+    expect(core.hasQueuedMessages()).toBe(false);
+    const roles = core.state.messages.map((message) => message.role);
+    expect(roles[roles.length - 2]).toBe("user");
+    expect(roles[roles.length - 1]).toBe("assistant");
+  });
+
+  it("falls back to queued follow-up when steering is empty", async () => {
+    const core = new AgentCore({ streamStep: async () => answer("done") });
+    core.followUp(userMessage("next task"));
+
+    await core.continue();
+    await core.waitForIdle();
+
+    expect(core.hasQueuedMessages()).toBe(false);
+    const roles = core.state.messages.map((message) => message.role);
+    expect(roles[roles.length - 2]).toBe("user");
+  });
+
+  it("still rejects continue with no queued input after an assistant ending", async () => {
+    const core = new AgentCore({ streamStep: async () => answer("hi") });
+    await core.prompt([userMessage("go")]);
+
+    await expect(core.continue()).rejects.toThrow("assistant");
+  });
 });
 
 describe("AgentCore continue and reset", () => {

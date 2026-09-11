@@ -50,6 +50,7 @@ export async function runAgentLoop(
   config: AgentLoopConfig,
   emit: AgentEventSink,
   signal: AbortSignal | undefined,
+  options: { readonly skipInitialSteeringPoll?: boolean } = {},
 ): Promise<AgentMessage[]> {
   const produced: AgentMessage[] = [];
   const context: AgentMessage[] = [...seed, ...prompts];
@@ -61,8 +62,7 @@ export async function runAgentLoop(
     await emit({ type: "message_end", message: prompt });
     produced.push(prompt);
   }
-
-  await driveLoop(context, produced, config, emit, signal, true);
+  await driveLoop(context, produced, config, emit, signal, !options.skipInitialSteeringPoll);
   return produced;
 }
 

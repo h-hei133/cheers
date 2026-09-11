@@ -53,9 +53,7 @@ export class AgentCore {
 
   public async prompt(input: AgentMessage | readonly AgentMessage[]): Promise<void> {
     const messages = Array.isArray(input) ? [...input] : [input];
-    await this.runWithLifecycle(async (signal) => {
-      await runAgentLoop(messages, [...this.internalState.messages], this.createLoopConfig(), (event) => this.processEvents(event), signal);
-    });
+    await this.runPromptMessages(messages);
   }
 
   public async continue(): Promise<void> {
@@ -64,14 +62,44 @@ export class AgentCore {
     }
     const transcript = this.internalState.messages;
     const last = transcript[transcript.length - 1];
-    if (!last) {
+    if (!last && !this.hasQueuedMessages()) {
       throw new Error("Cannot continue: no messages in context");
     }
-    if (last.role === "assistant") {
+    if (!last || last.role === "assistant") {
+      // After an aborted or stopped run the transcript may end on the
+      // assistant; queued input is still actionable, so restart from it
+      // instead of failing. Steering is drained first; only fall back to
+      // follow-ups when no steering was waiting.
+      const queuedSteering = this.steeringQueue.drain();
+      if (queuedSteering.length > 0) {
+        await this.runPromptMessages(queuedSteering, { skipInitialSteeringPoll: true });
+        return;
+      }
+      const queuedFollowUps = this.followUpQueue.drain();
+      if (queuedFollowUps.length > 0) {
+        await this.runPromptMessages(queuedFollowUps);
+        return;
+      }
       throw new Error("Cannot continue from message role: assistant");
     }
     await this.runWithLifecycle(async (signal) => {
       await runAgentLoopContinue([...transcript], this.createLoopConfig(), (event) => this.processEvents(event), signal);
+    });
+  }
+
+  private async runPromptMessages(
+    messages: readonly AgentMessage[],
+    options: { readonly skipInitialSteeringPoll?: boolean } = {},
+  ): Promise<void> {
+    await this.runWithLifecycle(async (signal) => {
+      await runAgentLoop(
+        [...messages],
+        [...this.internalState.messages],
+        this.createLoopConfig(),
+        (event) => this.processEvents(event),
+        signal,
+        options,
+      );
     });
   }
 
