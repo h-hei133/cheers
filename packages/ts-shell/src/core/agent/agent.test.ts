@@ -352,4 +352,48 @@ describe("AgentCore continue and reset", () => {
     release();
     await running;
   });
+
+  it("starts from queued steering on an empty transcript", async () => {
+    const core = new AgentCore({ streamStep: async () => answer("started") });
+    core.steer(userMessage("begin"));
+
+    await core.continue();
+    await core.waitForIdle();
+
+    expect(core.hasQueuedMessages()).toBe(false);
+    expect(core.state.messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+  });
+
+  it("clears the failed run barrier on reset", async () => {
+    const core = new AgentCore({ streamStep: async () => answer("hi") });
+    core.subscribe(async (event) => {
+      if (event.type === "agent_end") {
+        throw new Error("listener exploded");
+      }
+    });
+
+    await expect(core.prompt([userMessage("hi")])).rejects.toThrow(
+      "listener exploded",
+    );
+    core.reset();
+    await core.waitForIdle();
+    expect(core.state.messages).toEqual([]);
+  });
+
+  it("switches queue drain strategy at runtime", async () => {
+    const core = new AgentCore({ streamStep: async () => answer("hi") });
+    core.setQueueMode("steering", "all");
+    core.steer(userMessage("first"));
+    core.steer(userMessage("second"));
+
+    await core.continue();
+    await core.waitForIdle();
+
+    expect(
+      core.state.messages.filter((message) => message.role === "user"),
+    ).toHaveLength(2);
+  });
 });

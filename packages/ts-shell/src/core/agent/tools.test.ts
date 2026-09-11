@@ -57,7 +57,7 @@ describe("boundText", () => {
   });
 
   it("truncates long output to the limit", () => {
-    expect(boundText("abcdef", 4)).toBe("abcd");
+    expect(boundText("abcdef", 4)).toBe("abcd\n\n[... output truncated to 4 chars]");
   });
 });
 
@@ -84,6 +84,8 @@ describe("failTruncatedCalls", () => {
     expect(events.map((event) => event.type)).toEqual([
       "tool_execution_start",
       "tool_execution_end",
+      "message_start",
+      "message_end",
     ]);
     expect(events[1].type).toBe("tool_execution_end");
     if (events[1].type === "tool_execution_end") {
@@ -318,7 +320,8 @@ describe("executeToolBatch", () => {
     );
 
     expect(batch.messages).toHaveLength(1);
-    expect(batch.messages[0].content).toHaveLength(10_000);
+    expect(batch.messages[0].content.startsWith("x".repeat(10_000))).toBe(true);
+    expect(batch.messages[0].content).toContain("[... output truncated to 10000 chars]");
   });
 
   it("synthesizes aborted results for every call left unpaired", async () => {
@@ -379,6 +382,51 @@ describe("executeToolBatch", () => {
     );
 
     expect(batch.messages[0].content).toBe("redacted");
+    expect(batch.terminate).toBe(false);
+  });
+
+  it("emits message events for each tool result", async () => {
+    const tools = [makeTool()];
+    const { events, emit } = collect();
+
+    const batch = await executeToolBatch(
+      tools,
+      assistantMessage(),
+      [makeCall({ id: "call-1" }), makeCall({ id: "call-2" })],
+      undefined,
+      "sequential",
+      undefined,
+      emit,
+    );
+
+    expect(batch.messages).toHaveLength(2);
+    expect(
+      events.filter((event) => event.type === "message_start"),
+    ).toHaveLength(2);
+    expect(events.filter((event) => event.type === "message_end")).toHaveLength(
+      2,
+    );
+  });
+
+  it("marks the batch failed when the after hook throws", async () => {
+    const tools = [makeTool()];
+    const { emit } = collect();
+
+    const batch = await executeToolBatch(
+      tools,
+      assistantMessage(),
+      [makeCall()],
+      {
+        afterToolCall: async () => {
+          throw new Error("hook exploded");
+        },
+      },
+      "sequential",
+      undefined,
+      emit,
+    );
+
+    expect(batch.messages[0].content).toContain("hook exploded");
     expect(batch.terminate).toBe(false);
   });
 

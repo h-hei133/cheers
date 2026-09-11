@@ -343,3 +343,31 @@ export class AgentCore {
 - 新增 3 项回归测试（steering 队列重启 / followUp 回退 / 空队列拒绝），内核 5 套件 57 项全部通过。
 - `core/agent` 模块 tsc 无错误（仓库存量两处测试类型错误属历史遗留，与本次无关）。
 - `build:ts` 通过。
+
+---
+
+## 7. 三子代理并行深审复核记录（76c11617 / b5805314 / 1f07cd99 → 本次修补）
+
+三路只读子代理对照标杆逐项核查，裁决与修补如下（误报与延后项已排除）：
+
+### 7.1 确认修补（HIGH/MEDIUM）
+
+1. **工具结果缺消息事件（HIGH，loop/tools）**——tool 结果只 push context/produced，从不 emit message_start/end，导致 AgentCore 状态机经 processEvents 永远收不到 tool 消息，`internalState.messages` 丢失工具结果。修复：在创建点（runSequential / runParallel / failTruncatedCalls / abort 配对合成）统一经 `emitToolResultMessage` 补发 message_start/end，与标杆 `emitToolResultMessage` 顺序一致（execution_end → message_start → message_end）。
+2. **截断无标记（MEDIUM，tools.ts）**——`boundText` 硬切 10000 字符无任何标记，模型无法感知截断。修复：追加 `[... output truncated to N chars]` 后缀；配对点位置不变。
+3. **afterToolCall 抛错被吞（MEDIUM，tools.ts）**——catch 后静默返回原结果，与标杆转错误结果不一致。修复：对齐标杆，返回 `Tool result hook error: ...` 的 isError 结果。
+4. **lastRun 未处理拒绝（MEDIUM，agent.ts）**——监听器抛错时 prompt 与 lastRun 双拒绝，只消费 prompt 的调用方触发 unhandledRejection。修复：创建后预挂 `promise.catch(() => {})`，await 语义不变。
+5. **reset 未清 lastRun（LOW，agent.ts）**——失败后 reset 再 waitForIdle 仍 reject 旧失败。修复：reset 末尾清 `lastRun`。
+6. **缺运行时队列模式切换（LOW，agent.ts）**——构造后无法切换 drain 策略。修复：新增 `setQueueMode(queue, mode)` 单方法（方法数 18，合规）。
+7. **abort 配对 O(n²)（LOW，tools.ts）**——`pairedIds.includes` 改为 Set。
+
+### 7.2 经核实排除项
+
+- F1-loop（streamStep/prepareNextStep 抛错无终态事件）：误报。`runWithLifecycle` catch → `handleRunFailure` 已保证 turn_end/agent_end 合成，abort/error 测试即为证明。
+- 双轨残留（agentLoop / query/runtime/loop / turnFacade / turnKernel 仍在生产路径）：属实但按第 5 节 Phase 4 路线图延后，本次不动生产路径；新内核零生产接入状态不变。
+- 空转写+有队列启动与参考分歧：刻意改进（已在 6.1 记录），本次补测试锁定。
+- 脱敏哨兵 `private-agents-real` 字面量：属安全脱敏逻辑与测试中毒字符串，非外部项目标签，不处理。
+
+### 7.3 验证
+
+- 新增 8 项回归测试（tool 消息事件×2、hook 抛错、空转写队列启动、reset 清屏障、运行时切 mode、loop 全序列锁定、截断标记更新×2），内核 5 套件 62 项全部通过。
+- 内核 + 会话 67 套件 361 项全部通过；`build:ts` 通过；AgentCore 方法数 18，合规。

@@ -90,7 +90,10 @@ export function parseToolArgs(
 }
 
 export function boundText(text: string, limit: number = TOOL_OUTPUT_LIMIT): string {
-  return text.length > limit ? text.slice(0, limit) : text;
+  if (text.length <= limit) {
+    return text;
+  }
+  return `${text.slice(0, limit)}\n\n[... output truncated to ${limit} chars]`;
 }
 
 export function createToolResultMessage(toolCallId: string, output: string): AgentMessage {
@@ -114,6 +117,12 @@ function emitExecutionEnd(
   });
 }
 
+async function emitToolResultMessage(message: AgentMessage, emit: AgentEventSink): Promise<AgentMessage> {
+  await emit({ type: "message_start", message });
+  await emit({ type: "message_end", message });
+  return message;
+}
+
 export async function failTruncatedCalls(
   calls: readonly AgentToolCall[],
   emit: AgentEventSink,
@@ -126,7 +135,7 @@ export async function failTruncatedCalls(
       isError: true,
     };
     await emitExecutionEnd(emit, call, true);
-    messages.push(createToolResultMessage(call.id, result.output));
+    messages.push(await emitToolResultMessage(createToolResultMessage(call.id, result.output), emit));
   }
   return messages;
 }
@@ -196,15 +205,15 @@ export async function executeToolBatch(
   if (!signal?.aborted) {
     return { messages: bounded, terminate: batch.terminate };
   }
-  const pairedIds = bounded.map((message) => message.tool_call_id);
+  const pairedIds = new Set(bounded.map((message) => message.tool_call_id));
   const messages = [...bounded];
   for (const call of calls) {
-    if (pairedIds.includes(call.id)) {
+    if (pairedIds.has(call.id)) {
       continue;
     }
     await emit({ type: "tool_execution_start", toolCallId: call.id, toolName: call.name, args: call.args });
     await emitExecutionEnd(emit, call, true);
-    messages.push(createToolResultMessage(call.id, abortedResult().output));
+    messages.push(await emitToolResultMessage(createToolResultMessage(call.id, abortedResult().output), emit));
   }
   return { messages, terminate: batch.terminate };
 }
@@ -269,8 +278,11 @@ async function finalizeExecutedCall(
       isError: update.isError ?? executed.isError,
       terminate: update.terminate ?? executed.terminate,
     };
-  } catch {
-    return executed;
+  } catch (error) {
+    return {
+      output: `Tool result hook error: ${error instanceof Error ? error.message : String(error)}`,
+      isError: true,
+    };
   }
 }
 
@@ -296,7 +308,7 @@ async function runSequential(
     }
     await emitExecutionEnd(emit, call, result.isError);
     results.push(result);
-    messages.push(createToolResultMessage(call.id, result.output));
+    messages.push(await emitToolResultMessage(createToolResultMessage(call.id, result.output), emit));
     if (signal?.aborted) {
       break;
     }
@@ -346,8 +358,12 @@ async function runParallel(
     }
   }
   const results = await Promise.all(pending.map((run) => run()));
-  const messages = calls
-    .slice(0, results.length)
-    .map((call, index) => createToolResultMessage(call.id, results[index].output));
+  const messages: AgentMessage[] = [];
+  const paired = calls.slice(0, results.length);
+  for (let index = 0; index < paired.length; index += 1) {
+    messages.push(
+      await emitToolResultMessage(createToolResultMessage(paired[index].id, results[index].output), emit),
+    );
+  }
   return { messages, terminate: shouldTerminateBatch(results) };
 }

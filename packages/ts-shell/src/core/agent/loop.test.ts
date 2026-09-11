@@ -112,6 +112,13 @@ describe("runAgentLoop", () => {
     expect(messages[2].content).toBe("file!");
     expect(eventTypes(events)).toContain("tool_execution_start");
     expect(eventTypes(events)).toContain("tool_execution_end");
+    const toolIndex = eventTypes(events).indexOf("tool_execution_start");
+    expect(eventTypes(events).slice(toolIndex, toolIndex + 4)).toEqual([
+      "tool_execution_start",
+      "tool_execution_end",
+      "message_start",
+      "message_end",
+    ]);
     expect(eventTypes(events).filter((type) => type === "turn_end")).toHaveLength(2);
     expect(eventTypes(events).filter((type) => type === "agent_end")).toHaveLength(1);
   });

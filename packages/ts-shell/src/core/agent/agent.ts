@@ -103,6 +103,14 @@ export class AgentCore {
     });
   }
 
+  public setQueueMode(queue: "steering" | "followUp", mode: "one-at-a-time" | "all"): void {
+    if (queue === "steering") {
+      this.steeringQueue.mode = mode;
+    } else {
+      this.followUpQueue.mode = mode;
+    }
+  }
+
   public steer(message: AgentMessage): void {
     this.steeringQueue.enqueue(message);
   }
@@ -141,6 +149,7 @@ export class AgentCore {
     this.internalState.streamingMessage = undefined;
     this.internalState.pendingToolCalls = new Set<string>();
     this.internalState.errorMessage = undefined;
+    this.lastRun = undefined;
     this.clearAllQueues();
   }
 
@@ -172,6 +181,10 @@ export class AgentCore {
       resolvePromise = resolve;
       rejectPromise = reject;
     });
+    // Mark the rejection handled up front: waitForIdle() still surfaces it
+    // to explicit awaiters, but callers that only await prompt() no longer
+    // trigger an unhandledRejection warning.
+    promise.catch(() => {});
     this.activeRun = { promise, resolve: resolvePromise, reject: rejectPromise, abortController };
     this.lastRun = promise;
     this.internalState.isStreaming = true;
