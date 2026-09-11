@@ -1,0 +1,379 @@
+import { describe, expect, it } from "vitest";
+import type { AgentLifecycleEvent } from "./events.js";
+import type { AgentMessage } from "./state.js";
+import {
+  boundText,
+  createToolResultMessage,
+  executeToolBatch,
+  failTruncatedCalls,
+  parseToolArgs,
+  prepareToolCall,
+  shouldTerminateBatch,
+  type AgentTool,
+  type AgentToolCall,
+} from "./tools.js";
+
+function assistantMessage(): AgentMessage {
+  return { role: "assistant", content: "" };
+}
+
+function collect() {
+  const events: AgentLifecycleEvent[] = [];
+  return {
+    events,
+    emit: (event: AgentLifecycleEvent): void => {
+      events.push(event);
+    },
+  };
+}
+
+function makeTool(overrides?: Partial<AgentTool>): AgentTool {
+  return {
+    name: "read",
+    execute: async () => ({ output: "file contents", isError: false }),
+    ...overrides,
+  };
+}
+
+function makeCall(overrides?: Partial<AgentToolCall>): AgentToolCall {
+  return { id: "call-1", name: "read", args: { path: "a.txt" }, ...overrides };
+}
+
+describe("parseToolArgs", () => {
+  it("parses complete JSON arguments", () => {
+    const parsed = parseToolArgs('{"path":"a.txt"}');
+    expect(parsed).toEqual({ args: { path: "a.txt" } });
+  });
+
+  it("reports malformed arguments instead of throwing", () => {
+    const parsed = parseToolArgs("{not json");
+    expect("parseError" in parsed).toBe(true);
+  });
+});
+
+describe("boundText", () => {
+  it("keeps short output untouched", () => {
+    expect(boundText("ok")).toBe("ok");
+  });
+
+  it("truncates long output to the limit", () => {
+    expect(boundText("abcdef", 4)).toBe("abcd");
+  });
+});
+
+describe("createToolResultMessage", () => {
+  it("pairs the result with its tool call id", () => {
+    const message = createToolResultMessage("call-1", "done");
+    expect(message.role).toBe("tool");
+    expect(message.tool_call_id).toBe("call-1");
+    expect(message.content).toBe("done");
+  });
+});
+
+describe("failTruncatedCalls", () => {
+  it("never executes tools and returns re-issue errors", async () => {
+    let executed = 0;
+    const tools = [
+      makeTool({
+        execute: async () => {
+          executed += 1;
+          return { output: "must not run", isError: false };
+        },
+      }),
+    ];
+    void tools;
+    const { events, emit } = collect();
+
+    const results = await failTruncatedCalls([makeCall()], emit);
+
+    expect(executed).toBe(0);
+    expect(results).toHaveLength(1);
+    expect(results[0].role).toBe("tool");
+    expect(results[0].tool_call_id).toBe("call-1");
+    expect(results[0].content).toContain("not executed");
+    expect(results[0].content).toContain("output token limit");
+    expect(events.map((event) => event.type)).toEqual([
+      "tool_execution_start",
+      "tool_execution_end",
+    ]);
+    expect(events[1].type).toBe("tool_execution_end");
+    if (events[1].type === "tool_execution_end") {
+      expect(events[1].isError).toBe(true);
+    }
+  });
+});
+
+describe("prepareToolCall", () => {
+  it("reports unknown tools without executing anything", async () => {
+    const prepared = await prepareToolCall(
+      [makeTool()],
+      assistantMessage(),
+      makeCall({ name: "missing" }),
+      undefined,
+      undefined,
+    );
+    expect(prepared.kind).toBe("immediate");
+    if (prepared.kind === "immediate") {
+      expect(prepared.result.isError).toBe(true);
+      expect(prepared.result.output).toContain("not found");
+    }
+  });
+
+  it("honors a blocking before hook", async () => {
+    const prepared = await prepareToolCall(
+      [makeTool()],
+      assistantMessage(),
+      makeCall(),
+      {
+        beforeToolCall: async () => ({ block: true, reason: "denied by policy" }),
+      },
+      undefined,
+    );
+    expect(prepared.kind).toBe("immediate");
+    if (prepared.kind === "immediate") {
+      expect(prepared.result.isError).toBe(true);
+      expect(prepared.result.output).toContain("denied by policy");
+    }
+  });
+
+  it("turns an aborted signal into an immediate aborted outcome", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const prepared = await prepareToolCall(
+      [makeTool()],
+      assistantMessage(),
+      makeCall(),
+      undefined,
+      controller.signal,
+    );
+    expect(prepared.kind).toBe("immediate");
+    if (prepared.kind === "immediate") {
+      expect(prepared.result.output).toBe("Operation aborted");
+    }
+  });
+
+  it("turns argument preparation failures into immediate errors", async () => {
+    const prepared = await prepareToolCall(
+      [
+        makeTool({
+          prepareArguments: () => {
+            throw new Error("bad shape");
+          },
+        }),
+      ],
+      assistantMessage(),
+      makeCall(),
+      undefined,
+      undefined,
+    );
+    expect(prepared.kind).toBe("immediate");
+    if (prepared.kind === "immediate") {
+      expect(prepared.result.isError).toBe(true);
+      expect(prepared.result.output).toContain("bad shape");
+    }
+  });
+});
+
+describe("executeToolBatch", () => {
+  it("executes calls in parallel while keeping result order", async () => {
+    let concurrent = 0;
+    let maxConcurrent = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tools = [
+      makeTool({
+        name: "first",
+        execute: async () => {
+          concurrent += 1;
+          maxConcurrent = Math.max(maxConcurrent, concurrent);
+          await gate;
+          concurrent -= 1;
+          return { output: "first out", isError: false };
+        },
+      }),
+      makeTool({
+        name: "second",
+        execute: async () => {
+          concurrent += 1;
+          maxConcurrent = Math.max(maxConcurrent, concurrent);
+          await gate;
+          concurrent -= 1;
+          return { output: "second out", isError: false };
+        },
+      }),
+    ];
+    const { emit } = collect();
+
+    const pending = executeToolBatch(
+      tools,
+      assistantMessage(),
+      [
+        makeCall({ id: "call-a", name: "first" }),
+        makeCall({ id: "call-b", name: "second" }),
+      ],
+      undefined,
+      "parallel",
+      undefined,
+      emit,
+    );
+    for (let attempt = 0; attempt < 100 && concurrent < 2; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    expect(concurrent).toBe(2);
+    release();
+    const batch = await pending;
+
+    expect(maxConcurrent).toBe(2);
+    expect(batch.terminate).toBe(false);
+    expect(batch.messages.map((message) => message.tool_call_id)).toEqual([
+      "call-a",
+      "call-b",
+    ]);
+    expect(batch.messages.map((message) => message.content)).toEqual([
+      "first out",
+      "second out",
+    ]);
+  });
+
+  it("executes calls one by one in sequential mode", async () => {
+    const order: string[] = [];
+    const tools = [
+      makeTool({
+        name: "first",
+        execute: async () => {
+          order.push("first");
+          return { output: "first out", isError: false };
+        },
+      }),
+      makeTool({
+        name: "second",
+        execute: async () => {
+          order.push("second");
+          return { output: "second out", isError: false };
+        },
+      }),
+    ];
+    const { emit } = collect();
+
+    await executeToolBatch(
+      tools,
+      assistantMessage(),
+      [
+        makeCall({ id: "call-a", name: "first" }),
+        makeCall({ id: "call-b", name: "second" }),
+      ],
+      undefined,
+      "sequential",
+      undefined,
+      emit,
+    );
+
+    expect(order).toEqual(["first", "second"]);
+  });
+
+  it("forces sequential execution when a tool opts out of parallelism", async () => {
+    const order: string[] = [];
+    const tools = [
+      makeTool({
+        name: "first",
+        execute: async () => {
+          order.push("first");
+          return { output: "first out", isError: false };
+        },
+      }),
+      makeTool({
+        name: "second",
+        executionMode: "sequential",
+        execute: async () => {
+          order.push("second");
+          return { output: "second out", isError: false };
+        },
+      }),
+    ];
+    const { emit } = collect();
+
+    await executeToolBatch(
+      tools,
+      assistantMessage(),
+      [
+        makeCall({ id: "call-a", name: "first" }),
+        makeCall({ id: "call-b", name: "second" }),
+      ],
+      undefined,
+      "parallel",
+      undefined,
+      emit,
+    );
+
+    expect(order).toEqual(["first", "second"]);
+  });
+
+  it("lets the after hook override the executed outcome", async () => {
+    const tools = [makeTool()];
+    const { emit } = collect();
+
+    const batch = await executeToolBatch(
+      tools,
+      assistantMessage(),
+      [makeCall()],
+      {
+        afterToolCall: async () => ({ output: "redacted", isError: true }),
+      },
+      "sequential",
+      undefined,
+      emit,
+    );
+
+    expect(batch.messages[0].content).toBe("redacted");
+    expect(batch.terminate).toBe(false);
+  });
+
+  it("keeps the transcript pairable when the signal is already aborted", async () => {
+    let executed = 0;
+    const tools = [
+      makeTool({
+        execute: async () => {
+          executed += 1;
+          return { output: "must not run", isError: false };
+        },
+      }),
+    ];
+    const controller = new AbortController();
+    controller.abort();
+    const { emit } = collect();
+
+    const batch = await executeToolBatch(
+      tools,
+      assistantMessage(),
+      [makeCall()],
+      undefined,
+      "sequential",
+      controller.signal,
+      emit,
+    );
+
+    expect(executed).toBe(0);
+    expect(batch.messages).toHaveLength(1);
+    expect(batch.messages[0].content).toBe("Operation aborted");
+  });
+});
+
+describe("shouldTerminateBatch", () => {
+  it("stops only when every result asks to terminate", () => {
+    expect(shouldTerminateBatch([])).toBe(false);
+    expect(
+      shouldTerminateBatch([
+        { output: "a", isError: false, terminate: true },
+        { output: "b", isError: false },
+      ]),
+    ).toBe(false);
+    expect(
+      shouldTerminateBatch([
+        { output: "a", isError: false, terminate: true },
+        { output: "b", isError: true, terminate: true },
+      ]),
+    ).toBe(true);
+  });
+});
