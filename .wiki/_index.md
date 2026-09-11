@@ -2,7 +2,7 @@
 
 > Compiled knowledge base for the three-layer autonomous coding agent architecture, proof grounding, and reference models.
 
-Last updated: 2026-09-10
+Last updated: 2026-09-11
 
 ## Statistics
 
@@ -37,6 +37,7 @@ Last updated: 2026-09-10
 - [[tui-phase-3-verification|TUI Phase 3: Deletion Audit & Convergence]] ([Phase 3 Verification](articles/tui-phase-3-verification.md))
 - [[tui-known-defects|TUI Known Defects & Root-Cause Fixes]] ([Known Defects & Fixes](articles/tui-known-defects.md))
 - [[tui-resume-scroll-theme|TUI Interaction & Theme Specification]] ([Interaction & Theme Specification](articles/tui-resume-scroll-theme.md))
+- [[turn-lifecycle-alignment|Turn 生命周期架构对齐与演进方案]] ([Turn Lifecycle Alignment](articles/turn-lifecycle-alignment.md))
 
 ## Recent Activity
 

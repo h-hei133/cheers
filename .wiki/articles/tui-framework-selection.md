@@ -37,8 +37,8 @@ confidence: high
 
 ### 证据来源
 
-- OpenTUI README：<https://github.com/anomalyco/opentui>。项目明确由 Zig 编写，提供 TypeScript/React/Solid 包，并说明 OpenCode 生产使用。
-- OpenTUI core package：<https://github.com/anomalyco/opentui/blob/main/packages/core/package.json>。`@opentui/core` 版本为 0.5.10，包含 native 构建脚本、平台 optionalDependencies，Node engine `>=26.4.0`、Bun `>=1.3.0`。
+- OpenTUI README：<https://github.com/anomalyco/opentui/blob/main/README.md>。项目明确由 Zig 编写，提供 TypeScript/React/Solid 包，并说明 OpenCode 生产使用。
+- OpenTUI core package：<https://github.com/anomalyco/opentui/blob/main/packages/core/package.json>。当前版本为 0.5.11，包含 native 构建脚本、平台 optionalDependencies，Node engine `>=26.4.0`、Bun `>=1.3.0`。
 - Ink README：<https://github.com/vadimdemedes/ink/blob/master/readme.md>。Ink 是 React renderer，使用 Yoga flexbox；提供 `useInput`、`usePaste`、alternate screen、kitty keyboard、测试库与 `renderToString`。
 - Pi TUI README：<https://github.com/earendil-works/pi/blob/main/packages/tui/README.md>。提供共享 `TUI` 接口、`TuiMainScreen`/`TuiAltScreen`、差分渲染、同步输出、应用内滚动、括号粘贴、Component 接口、Editor/Markdown/ScrollView/overlay 等。
 - 本仓库：`packages/ts-shell/src/presentation/tui/`、`packages/ts-shell/package.json`、`.wiki/articles/tui-resume-scroll-theme.md`、`.wiki/raw/articles/RFC-003-differential-tui-streaming-engine.md`。
@@ -187,3 +187,81 @@ Phase 2.5 期间落地并保留的能力：合约冻结、`TranscriptPane` 的�
 1. **选型结论不变**：参考 TUI 的组件契约与备用屏语义已经以自有实现落地；不引入其 npm 包，不引入 native 路线。
 2. **不再有灰度切流**：任何新的表面能力直接落在 `surface/` 与 `chrome/`，不再开第二条链路；表面的行为测试在 `surface/view.test.ts`。
 3. **观察项**：退出文档在 tmux / SSH / Windows Terminal 下的表现；超长会话退出时的一次性写入量（驱动 64MB 积压阈值之内）。
+
+## Phase 4：生产稳定性与能力深化路线（2026-09-11）
+
+### 总体决策
+
+Phase 4 继续使用当前 TypeScript TUI 实现，不引入新的外部渲染运行时。后续工作吸收成熟 TUI 的可验证语义，但所有生产代码继续通过本仓库的 `surface/`、`chrome/`、`transcript/`、`input/` 与 `render/` 边界实现。
+
+这不是再次切换框架，而是从“生产路径已接通”进入“生产行为可证明、可维护、可演进”。
+
+### 设计原则
+
+1. **单一写入者**：`TUI` 仍是唯一终端写入与帧调度边界；不允许第二条默认渲染链路。
+2. **单向状态流**：交互宿主负责会话动作、权限决策和生命周期；`InteractiveSurface` 负责将当前状态组合为帧并回答内容几何问题。
+3. **先证据后替换**：只有 focused profiler 证明当前实现的具体模块超出预算，才允许启动隔离实验；没有性能证据不更换底座。
+4. **兼容优先**：终端模式恢复、备用屏退出、非 TTY 输出、中文宽度、鼠标和键盘协议属于不可回归契约。
+5. **能力窄化**：外部实现的概念只能经过本地类型与本地算法验证后吸收，不让外部类型进入 `core`、`session`、`tools` 或模型控制域。
+
+### 4-A：终端生命周期与异常路径
+
+目标：证明所有退出来源都经过同一个幂等清理出口。
+
+- 自动化覆盖 stdin end、输出积压断开、模型回合中断、审批面板中断、问题询问中断和重复 stop。
+- 保证 host 清理（stdin、question、clipboard、renderer sink）与终端恢复顺序稳定。
+- 记录异常路径的最终 transcript、退出码和残留 ANSI 状态。
+- 任何断开后仍可触发的异步 repaint 必须被忽略。
+
+### 4-B：终端兼容矩阵
+
+目标：建立受支持终端和已知限制的可重复记录。
+
+- 终端：Windows Terminal、Linux terminal、SSH、tmux、screen、zellij。
+- 能力：备用屏、鼠标上报、括号粘贴、增强键盘协议、同步输出、resize。
+- 内容：CJK、组合字符、emoji、超窄宽度、超宽宽度和超长 transcript。
+- 每个环境验证启动、流式输出、滚动、选区复制、overlay、resize、Ctrl+C、断开和退出转写。
+
+这一阶段以手动体验为主；自动化只负责固定输入序列、输出边界和终端恢复信号，不用脚本伪造主观手感。
+
+### 4-C：长会话与流式性能
+
+目标：把现有局部 benchmark 提升为可重复的性能预算。
+
+- 测量 finalized transcript 缓存命中、streaming block 更新、窗口切片、差分绘制和退出文档写入。
+- 覆盖 50、200、1000 轮以及大量工具输出，不以测试名称代替真实工作量。
+- 同时记录帧耗时、输出字节、内存增长和 backlog 重试次数。
+- 性能优化只改变被 profiler 证明的热点，保持 `ViewContext`、`ViewActions` 和 transcript 语义不变。
+
+### 4-D：交互能力深化
+
+按用户价值而非框架迁移推进：
+
+1. 统一 overlay focus、Escape/Ctrl+C 取消阶梯和审批结算；
+2. 完善滚动、内容坐标选区、拖选边缘自动滚屏与 resize 组合；
+3. 完善编辑器的 Unicode 字素、中文输入、长粘贴、历史草稿和光标定位；
+4. 保持 streaming assistant/thinking/tool block 的增量更新和失败状态诚实；
+5. 将 toast、状态带和 composer 的布局预算固定为可测试契约。
+
+### 4-E：可观测性与发布门
+
+在进入下一次大规模 TUI 结构调整前，必须具备：
+
+- focused build 和行为测试证据；
+- 至少一套真实 PTY smoke；
+- 终端兼容矩阵记录；
+- 长会话性能预算与对比基线；
+- 断开、异常退出和重复清理证据；
+- 当前 surface 合约、终端恢复顺序和非 TTY 行为文档。
+
+### 何时重新评估外部运行时
+
+只有同时满足以下条件，才重新评估其他渲染运行时：
+
+1. profiler 证明当前 TypeScript renderer 是主要瓶颈；
+2. 瓶颈无法通过当前模块内的算法或数据结构修复；
+3. 新运行时能在现有 Node 支持范围和发布矩阵内稳定交付；
+4. 能通过相同的 surface 行为契约、PTY 场景和非 TTY 回归；
+5. 迁移收益明确超过 native 依赖、运行时和维护成本。
+
+在这些条件满足前，外部运行时只作为只读研究材料，不进入生产依赖、不进入默认启动路径。

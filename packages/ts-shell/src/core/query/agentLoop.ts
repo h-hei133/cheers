@@ -455,7 +455,7 @@ export async function* runAutonomousReActLoop(
       continue;
     }
 
-    // Self-Healing Context Overflow Recovery (learning from Pi Agent)
+    // Self-healing context overflow recovery
     if (isOverflowError) {
       const recovered = await executeFullCompaction();
       if (recovered) {

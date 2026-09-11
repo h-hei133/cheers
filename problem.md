@@ -116,13 +116,6 @@ browser harness、MCP 网关、orchestration（除上述主簇）、session 持�
 | browser harness 簇 | ~25 | 需真实浏览器/fixture |
 | `registry-rust-bridge.test.ts` | 8 | rust-daemon 超时 |
 | MCP 簇（reconnect/taxonomy/gate） | 12 | 待查 |
-## TUI 体验改进（进行中）
-
-参照 oh-my-pi 项目移植芯片式附件条（chip band）：
-- chip token `⎘ #N` 替代占位符
-- 编辑框上方渲染卡片条（含 snippet + 尺寸）
-- 原子删除（一次 Backspace 删整个 chip）
-- 双击粘贴展开保持兼容
 
 ## 已知未实现
 
@@ -130,25 +123,3 @@ browser harness、MCP 网关、orchestration（除上述主簇）、session 持�
 - 图片/视频缩略图（依赖 Kitty OSC 66）
 - 身份色调色板（待 theme 扩展）
 
-## 真机验证发现的既有缺陷（2026-09-07）
-
-均为既有缺陷，非 adapter 引入；adapter 尚未接入默认链路。详见 `.wiki/articles/tui-known-defects.md`。
-
-### A. 权限与安全（高）
-
-- **A1. ask 模式下写操作不询问**：ask 模式下创建/删除文件直接执行，无权限弹窗。查 `cli/approval/` 升级触发与 `sandbox/escalationWorkflow.ts` 接入点。
-- **A2. ask 工具无交互**：ask 工具一直保持推荐默认值，不与用户交互；plan 模式同样如此。查 ask 工具是否接入 `QuestionBridge`/overlay。
-
-### B. 会话与上下文（高）
-
-- **B1. 跨轮上下文丢失**：先创建文件再说“删除它”，模型不知道“它”指什么。查 `session/` turn 累积与 `core/query/` 上下文组装。
-- **B2. resume 后工具记录丢失**：重进已有 session 只能看到用户输入与模型输出，工具调用全丢。查 `session/` 持久化 schema 与 `cli/interactive/history.ts` 重建逻辑。
-
-### C. 输入与渲染（中）
-
-- **C1. 拖拽复制时按 Ctrl+C 光标残影**：拖拽选中时按 Ctrl+C，之后输入框光标处一直显示前一个位置的字符；发送文本正常。查 `cli/interactive/pointer.ts` 拖拽结束与 `editor.ts` 光标标记渲染。
-- **C2. 输入框无滚动**：输入过长时输入框累加超出终端高度，看不到屏幕外文本，整个屏幕被输入框占据。查 `cli/interactive/frameSurface.ts` 的 chrome 高度分配与 composer 滚动。
-
-### D. 界面布局（低）
-
-- **D1. resume 筛选框位置不对**：应在所有 session 上方一行。查 `cli/interactive/picker/` 或 resume 面板布局。
