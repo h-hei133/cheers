@@ -263,3 +263,34 @@ describe("backpressure", () => {
     expect(terminal.drain()).not.toBe("");
   });
 });
+
+describe("lifecycle stress", () => {
+  it("coalesces repeated resize requests into bounded repaint work", () => {
+    const { tui, terminal, scheduler } = boot();
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+    for (let index = 0; index < 100; index++) {
+      terminal.columns = 20 + (index % 40);
+      terminal.resize();
+    }
+    scheduler.flush();
+    expect(terminal.writes.length).toBeLessThan(6);
+  });
+
+  it("keeps repeated disconnect and stop idempotent", () => {
+    const { tui, terminal, scheduler } = boot();
+    let cleanups = 0;
+    tui.setDisconnectHandler(() => {
+      cleanups += 1;
+      tui.stop();
+    });
+    tui.start();
+    scheduler.flush();
+    terminal.disconnect();
+    tui.stop();
+    tui.stop();
+    expect(cleanups).toBe(1);
+    expect(terminal.stopped).toBe(true);
+  });
+});

@@ -7,14 +7,17 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import { RecordingTerminal } from "../../test-utils/terminalDouble.js";
 
 function build(overrides: { observeEvents?: () => () => void } = {}): {
   mode: InteractiveMode;
   renderer: StreamingRenderer;
   readline: { current: unknown };
+  terminal: RecordingTerminal;
 } {
   const renderer = new StreamingRenderer();
   const readline: { current: unknown } = { current: null };
+  const terminal = new RecordingTerminal();
   const mode = new InteractiveMode({
     runtimeContext: {
       cwd: "/workspace",
@@ -35,11 +38,12 @@ function build(overrides: { observeEvents?: () => () => void } = {}): {
     logger: { info: () => {}, warn: () => {}, error: () => {} } as unknown as StructuredLogger,
     approvalTrustPolicy: {} as unknown as ApprovalTrustPolicy,
     initialMcpGateway: {} as unknown as CliMcpGateway,
+    terminal,
     setReadline: (value) => {
       readline.current = value;
     },
   });
-  return { mode, renderer, readline };
+  return { mode, renderer, readline, terminal };
 }
 
 describe("session wiring", () => {
@@ -64,6 +68,16 @@ describe("session wiring", () => {
     const { mode, renderer } = build();
     mode.start();
     expect(renderer.captured).toBe(false);
+    mode.stop();
+  });
+  it("cleans up host resources when the terminal disconnects", () => {
+    const { mode, renderer, readline, terminal } = build();
+    mode.start();
+    terminal.disconnect();
+    expect(terminal.stopped).toBe(true);
+    expect(renderer.captured).toBe(false);
+    const readlineInterface = readline.current;
+    expect(readlineInterface && typeof readlineInterface === "object" && "close" in readlineInterface).toBe(true);
     mode.stop();
   });
 });
