@@ -405,19 +405,8 @@ export class AgentCore {
 2. **持久化审计 scout 失败**（模型不可用，非结论性失败）——亲补：生产写路径已有 tmp+fsync+rename 原子保护（sessionFileStore.ts），新 writer 为纯内存订阅器、Phase 4 前不接生产路径，无双写 hazard；writer 丢弃字段（tool_calls 数组等）仅影响新内核回放，不碰生产转写。
 3. **Phase 2 基线 98/98 全绿**，确认无需修补，直接进入 Phase 3。
 
-### 9.2 Phase 3 落地（HIGH 三项）
+### 9.2 Phase 3 落地（中断等待三项；转向路由未动）
 
-1. **可等待 idle（sessionRuntime.ts）**——`executePrompt` 拆分为 track（`trackRun` 登记 currentRun/lastRun，预挂 catch 防 unhandledRejection）与 `drivePrompt`（原方法体）；新增 `waitForIdle()`（显式 await 透出失败，对齐 AgentCore）与 `cancelAndWait()`（abort 后等待结算，内部吞错）。`cancelCurrentRun()` 同步语义不变，5 处调用方零改动。
-2. **队列类型化（interactiveMode.ts）**——`queue: string[]` 改为 `{ text, disposition: "followUp" }` 数组；busy 时输入记 followUp 语义（运行中输入默认跟进），drain 取 text，`queuedCount` 行为不变。为后续 steering 路由留扩展位。
-3. **中断等待（interactiveMode.ts）**——`interrupt()` 改异步：`markCancelling` 后 `await cancelAndWait()`，消除 drain 与 run 结算竞态；keymap 合约 `interrupt(): void` 不变，host 侧 `void` 显式标记 fire-and-forget（`cancelAndWait` 内部已吞错，无拒绝风险）。
-
-### 9.3 刻意延后（非门禁）
-
-- turnSink `tokens: 0`、QueryEvent 缺口（turn.completed/mcp.snapshot/retrying.reason）、tool partial 通道、消息边界 stopReason：均为 MEDIUM 及以下，且 usage 事件生产侧根本未发，改 sink 属伪修，留待生产路径收敛时一并处理。
-- host 队列行为白盒测试：需驱动 run() 全链路，成本过高；runtime 层等待语义已由 sessionIdle 测试锁定，触点文件既有 49 项测试全绿。
-
-### 9.4 验证
-
-- 新增 sessionIdle 4 项测试（idle 即时返回、cancel 后等待结算、cancelAndWait 语义、失败透出），全部通过。
-- 相关回归（shell + interactive）中 6 项失败经 stash 基线对照确认为历史遗留，与本次零关联（基线同样失败）。
-- `build:ts` 通过；新文件零外部项目名称。
+1. **可等待 idle（sessionRuntime.ts）**——`executePrompt` 拆分为 track（`trackRun` 登记 currentRun/lastRun，预挂 catch 防 unhandledRejection）与 `drivePrompt`（原方法体）；新增 `waitForIdle()`（显式 await 透出失败，对齐 AgentCore）与 `cancelAndWait()`（abort 后等待结算，内部吞错：Esc 与 provider 失败竞态时 interrupt 方恒成功，失败归因以 run 侧为准）。`cancelCurrentRun()` 同步语义不变，3 处生产调用方（signalHandlers/interactiveCancellation/interactiveCommandRouter）零改动，interrupt 一处切异步。已知语义：lastRun 失败后粘滞（每次 waitForIdle 都 reject 直至下一 run 登记），本模块无清理通道；空闲 cancel 会无条件翻状态机为 interrupted（历史行为）。
+2. **队列类型化（interactiveMode.ts）**——`queue: string[]` 改为 `{ text, disposition: "followUp" }` 数组；busy 时输入记 followUp 语义（运行中输入默认跟进），drain 取 text，`queuedCount` 行为不变。`disposition` 当前只写不读：steering 路由尚未实现，为后续扩展留字段位。§5 Phase 3 门禁中的“转向指令注入下一步进”判未过，移至后续阶段。
+3. **中断等待（interactiveMode.ts）**——`interrupt()` 改异步：`markCancelling` 后 `await cancelAndWait()`，消除 drain 与 run 结算竞态；keymap 合约 `interrupt(): void` 不变，host 侧 `void` 显式标记 fire-and-forget（`cancelAndWait` 内部已吞错，无拒绝风险）。渲染面“无红字”尚未被测试锁定（sessionIdle 只断 promise 结算；run 侧 abort 仍 throw，经 run catch 追加 error 文块）：全链路渲染测试成本过高，留待生产路径收敛时一并处理，门禁前半判部分通过。

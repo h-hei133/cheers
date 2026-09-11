@@ -108,10 +108,16 @@ describe("shell session runtime idle barrier", () => {
 
     const running = runtime.executePrompt("sess_cancel_wait", "hi");
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const cancelled = runtime.cancelAndWait();
+    const order: string[] = [];
+    const cancelled = runtime.cancelAndWait().then(() => {
+      order.push("cancelled");
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(order).toEqual([]);
     release();
     await expect(running).rejects.toThrow("Aborted");
     await cancelled;
+    expect(order).toEqual(["cancelled"]);
     await expect(runtime.waitForIdle()).rejects.toThrow("Aborted");
   });
 
