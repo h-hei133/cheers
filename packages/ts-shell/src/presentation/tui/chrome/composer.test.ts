@@ -48,6 +48,12 @@ describe("prompt block", () => {
     expect(stripAnsi(rows[3]!)).toContain("prompt line 14");
     expect(rows.join("")).toContain(CURSOR_MARKER);
   });
+  it("keeps composer rows within the terminal width", () => {
+    const editor = new Editor();
+    editor.setText("hello world");
+    const rows = renderComposer(editor, idle, 20, 10);
+    for (const row of rows) expect(visibleWidth(stripAnsi(row))).toBeLessThanOrEqual(20);
+  });
 });
 
 const quiet = { busy: false, suggesting: false, cancelArmed: false, queued: 0, newlineKey: "shift+enter" };

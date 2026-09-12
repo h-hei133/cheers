@@ -122,4 +122,22 @@ describe("long-transcript budget", () => {
     expect(transcript.render(100).rows.length).toBeGreaterThan(2000);
     expect(elapsed).toBeLessThan(1000);
   });
+
+  it("windows a large tool output without re-laying the whole history", () => {
+    const transcript = buildTranscript(20);
+    transcript.append({
+      kind: "tool",
+      title: "bash",
+      detail: "npm test",
+      text: Array.from({ length: 10000 }, (_, index) => `output line ${index}`).join("\n"),
+      collapsed: false,
+      finalized: true,
+    });
+    const pane = new TranscriptPane(transcript);
+    const started = performance.now();
+    const visible = pane.render(100, 30, undefined);
+    const elapsed = performance.now() - started;
+    expect(visible).toHaveLength(30);
+    expect(elapsed).toBeLessThan(1000);
+  });
 });

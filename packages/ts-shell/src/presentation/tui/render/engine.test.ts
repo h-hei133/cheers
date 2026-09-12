@@ -306,4 +306,15 @@ describe("lifecycle stress", () => {
     expect(terminal.drain()).toContain("\x1b[?1049l");
     expect(elapsed).toBeLessThan(1000);
   });
+  it("ignores render requests after disconnect", () => {
+    const { tui, terminal, scheduler } = boot();
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+    terminal.disconnect();
+    terminal.drain();
+    tui.requestRender({ force: true });
+    scheduler.flush();
+    expect(terminal.drain()).toBe("");
+  });
 });
