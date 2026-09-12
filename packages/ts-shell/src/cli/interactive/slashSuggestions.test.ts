@@ -35,4 +35,9 @@ describe("command completions", () => {
   it("carries the command summary as the detail line", () => {
     expect(slashSuggestions("/diagnose")?.[0]?.detail).toBeTruthy();
   });
+  it("surfaces argument hints for commands that take arguments", () => {
+    const matches = slashSuggestions("/model");
+    expect(matches?.some((match) => match.value === "/model")).toBe(true);
+    expect(matches?.find((match) => match.value === "/model")?.detail).toContain("<");
+  });
 });

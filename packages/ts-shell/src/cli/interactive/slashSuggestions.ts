@@ -17,7 +17,7 @@ function candidates(): readonly Suggestion[] {
   cached ??= listSlashCommands().map((command) => ({
     value: `/${command.name}`,
     label: `/${command.name}`,
-    detail: command.summary,
+    detail: command.argumentHint ? `${command.summary} ${command.argumentHint}` : command.summary,
   }));
   return cached;
 }

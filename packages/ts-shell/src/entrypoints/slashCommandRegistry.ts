@@ -12,6 +12,7 @@ export interface SlashCommandSpec {
     | "workflow"
     | "diagnostics";
   readonly summary: string;
+  readonly argumentHint?: string;
 }
 
 export const SLASH_COMMANDS = [
@@ -64,6 +65,7 @@ export const SLASH_COMMANDS = [
     aliases: ["models"],
     group: "diagnostics",
     summary: "inspect and switch active model",
+    argumentHint: "<provider/model>",
   },
   {
     name: "mcp",
