@@ -19,8 +19,10 @@ export interface HintContext {
   readonly suggesting: boolean;
   /** Set while a second Ctrl+C within the double-press window would exit. */
   readonly cancelArmed: boolean;
-  /** Prompts waiting behind the running turn. */
+  /** Prompts waiting to run after the current turn. */
   readonly queued: number;
+  /** Prompts waiting to be steered into the current turn. */
+  readonly steering?: number;
   readonly newlineKey: string;
   readonly toast?: string;
 }
@@ -35,10 +37,15 @@ export interface AmbientContext {
 function transientHint(context: HintContext): string | undefined {
   if (context.cancelArmed) return "press ctrl+c again to exit";
   if (context.suggesting) return join(["↑↓ select", "tab complete", "esc dismiss"]);
+  const steering = context.steering ?? 0;
+  if (steering > 0 && context.queued > 0) {
+    return `${steering} steering · ${context.queued} queued`;
+  }
+  if (steering > 0) return `${steering} steering · delivered before the next step`;
   if (context.queued > 0) {
     return `${context.queued} queued · runs when the current turn finishes`;
   }
-  if (context.busy) return join(["esc interrupt", "type to queue"]);
+  if (context.busy) return join(["esc interrupt", "enter steers", "alt+enter queues"]);
   return undefined;
 }
 

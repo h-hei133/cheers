@@ -141,7 +141,7 @@ Examples of compatibility or executable surfaces that must stay thin unless expl
 
 ```text
 packages/ts-shell/src/entrypoints/cli.tsx
-packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts
+packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts
 ```
 
 A compatibility shim is different from a rightful domain manager. For example, `SessionManager` may retain real session lifecycle coordination, public API compatibility, dependency assembly, transaction ordering, and cross-session coordination when those duties are part of its public contract.

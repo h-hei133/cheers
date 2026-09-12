@@ -154,8 +154,17 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
       actions.clearScreen();
       return;
     case "enter":
-      submitDraft(context);
+      submitDraft(context, context.busy ? "steer" : undefined);
       return;
+    case "alt+enter":
+      // Idle, a newline like shift+enter. While a turn runs the same chord
+      // queues the draft to run after it, the way Enter steers into it.
+      if (context.busy) {
+        submitDraft(context, "followUp");
+        return;
+      }
+      if (!applyTableKey(event, context)) return;
+      break;
     case "backspace":
       editor.backspace();
       break;
@@ -340,7 +349,7 @@ function handleCancelKey(context: KeymapContext): void {
   actions.redrawAfter(DOUBLE_INTERRUPT_MS);
 }
 
-function submitDraft(context: KeymapContext): void {
+function submitDraft(context: KeymapContext, disposition?: "steer" | "followUp"): void {
   const { view, actions } = context;
   const draft = view.editor.getText().trim();
   if (!draft) {
@@ -353,5 +362,6 @@ function submitDraft(context: KeymapContext): void {
   view.editor.pushHistory(draft);
   view.editor.clear();
   view.setSuggesting(false);
-  actions.submit(submission);
+  if (disposition) actions.submit(submission, disposition);
+  else actions.submit(submission);
 }

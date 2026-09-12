@@ -13,7 +13,6 @@ import {
 } from "./sessionEventSurface.js";
 import { buildPromptWithFutureTurnInjections } from "./sessionFutureTurnProjection.js";
 import {
-  projectAssistantTurnPersistence,
   projectCompletedSessionSave,
   projectErrorSessionSave,
   projectRuntimeFailureSessionSave,
@@ -359,10 +358,6 @@ describe("session runtime boundary facades", () => {
     completed.terminalClassification = "success";
     completed.lastContinuationReason = "handoff";
 
-    expect(projectAssistantTurnPersistence(completed)).toEqual({
-      role: "assistant",
-      content: "done",
-    });
     expect(projectCompletedSessionSave(completed)).toEqual({
       terminalReason: "completed",
       terminalClassification: "success",

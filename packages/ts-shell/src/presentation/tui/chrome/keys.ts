@@ -46,9 +46,15 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     does: "show a held paste in full, in the prompt",
     group: "editing",
   },
-  { keys: ["enter"], does: "send, or queue while a turn is running", group: "sending" },
+  { keys: ["enter"], does: "send; while a turn runs, steer it before its next step", group: "sending" },
   { keys: ["ctrl+j"], does: "insert a newline without sending", group: "sending" },
-  { keys: ["shift+enter", "alt+enter"], does: "insert a newline", group: "sending", negotiated: true },
+  { keys: ["shift+enter"], does: "insert a newline", group: "sending", negotiated: true },
+  {
+    keys: ["alt+enter"],
+    does: "insert a newline; while a turn runs, queue the draft to run after it",
+    group: "sending",
+    negotiated: true,
+  },
   { keys: ["tab"], does: "complete a command name", group: "sending" },
   { keys: ["escape"], does: "interrupt a run, or dismiss a chooser", group: "sending" },
 

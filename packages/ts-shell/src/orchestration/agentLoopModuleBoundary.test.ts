@@ -128,14 +128,14 @@ describe("agent loop module facades", () => {
     const target = deriveWorkflowContinuationTarget({
       continuity: {
         recentTargetFiles: [
-          "packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+          "packages/ts-shell/src/orchestration/continuationModule.ts",
         ],
       },
       workspaceRoot: process.cwd(),
     });
 
     expect(target).toBe(
-      "packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts",
+      "packages/ts-shell/src/orchestration/continuationModule.ts",
     );
   });
 });

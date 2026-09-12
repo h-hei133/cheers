@@ -4,7 +4,6 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runMvpIntegratedFlow } from "./runMvpIntegratedFlow.js";
 import { runAnchoredProposalRuntime, shouldActivateAnchoredProposalRuntimePrompt } from "./anchoredProposalRuntime.js";
 import { activateTaskLifecycle } from "./taskLifecycleActivation.js";
 import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
@@ -89,24 +88,6 @@ describe("runAnchoredProposalRuntime", () => {
     expect(result.harnessTrace.providerDryRunCalled).toBe(false);
   });
 
-  it("is reachable through the runMvp lifecycle prompt path for explicit fake anchored eval", async () => {
-    const result = await runMvpIntegratedFlow({
-      sessionId: "sess_route195_runmvp",
-      workspaceRoot,
-      prompt: "Analyze src/target.ts and include fake anchored provider proposal runtime evaluation",
-      providerMode: "synthetic",
-      maxTurns: 2,
-    });
-
-    expect(result.finalOutput).toContain("anchored proposal runtime evaluated; mutation did not run.");
-    expect(result.finalOutput).toContain("Activation decision: stop-low-plan-quality");
-    expect(result.codingResult?.changedFiles).toEqual([]);
-    expect(result.codingResult?.evidence).toContain("anchored-proposal-runtime:mutation:not-run");
-    expect(result.codingResult?.evidence).toContain("anchored-proposal-activation:decision:stop-low-plan-quality");
-    expect(result.codingResult?.continuation.evidence.some((entry) =>
-      entry.startsWith("anchored-proposal-scorecard "),
-    )).toBe(true);
-  });
 
   it("routes only explicit anchored proposal fake eval prompts", () => {
     expect(shouldActivateAnchoredProposalRuntimePrompt("Evaluate fake anchored provider proposal runtime dry-run")).toBe(true);

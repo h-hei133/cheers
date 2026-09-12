@@ -160,7 +160,6 @@ describe("shell session runtime (W5)", () => {
     expect(runtime.getState()).toBe("idle");
     expect(calls).toEqual([
       "barrier:sess_1:hello",
-      "turn:sess_1:assistant:done:hello",
       "completed:sess_1",
     ]);
   });
@@ -2114,7 +2113,6 @@ describe("shell session runtime (W5)", () => {
     expect(output).toBe("done:resume me");
     expect(calls).toEqual([
       "reentry:sess_resume:mid-turn-reentry",
-      "turn:sess_resume:assistant:done:resume me",
       "completed:sess_resume",
     ]);
   });
@@ -2252,7 +2250,6 @@ describe("shell session runtime (W5)", () => {
     expect(output).toBe("partial result");
     expect(calls).toEqual([
       "barrier:sess_stop:hello",
-      "turn:sess_stop:assistant:partial result",
       "error:sess_stop:Retry budget exhausted",
     ]);
     expect(

@@ -7,9 +7,9 @@ import {
 } from "./browserModule.js";
 import { projectProviderDiagnosticHandoff } from "./providerModule.js";
 import {
-  projectWorkflowBlockedOutcome,
-  projectWorkflowRuntimeOutcome,
-} from "./resultSurfaceModule.js";
+  projectBlockedRuntimeOutcome as projectWorkflowBlockedOutcome,
+  projectRuntimeCodingOutcome as projectWorkflowRuntimeOutcome,
+} from "./runtimeOutcomeProjection.js";
 import {
   createToolRuntimeProvenanceCollector,
   dispatchRuntimeTool,

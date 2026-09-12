@@ -101,7 +101,7 @@ export function applyCompaction(
 ): AgentMessage[] {
   const checkpoint: AgentMessage = {
     role: "user",
-    content: `[Context checkpoint: ${summary}]`,
+    content: `[Context Checkpoint]\n${summary}`,
   };
   const head = messages[0]?.role === "system" ? [messages[0]] : [];
   return [...head, checkpoint, ...messages.slice(plan.cut)];

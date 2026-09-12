@@ -4,7 +4,6 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { runMvpIntegratedFlow } from "./runMvpIntegratedFlow.js";
 import {
   activateTaskLifecycle,
   formatTaskLifecycleActivationOutput,
@@ -93,24 +92,4 @@ describe("activateTaskLifecycle", () => {
     expect(activation?.taskLifecycleResult.output).toContain("Suggested reads:");
   });
 
-  it("is reachable through the real runMvp agent-loop path", async () => {
-    const result = await runMvpIntegratedFlow({
-      sessionId: "route191-runtime",
-      workspaceRoot,
-      prompt: "Analyze src/target.ts and produce an execution plan with related tests.",
-      providerMode: "synthetic",
-      maxTurns: 2,
-    });
-
-    expect(result.finalOutput).toContain("Task lifecycle:");
-    expect(result.finalOutput).toContain("Analysis brief:");
-    expect(result.finalOutput).toContain("Execution plan:");
-    expect(result.codingResult?.changedFiles).toEqual([]);
-    expect(result.codingResult?.evidence).toContain(
-      "task-lifecycle-activation:mutation-authority:not-granted",
-    );
-    expect(result.codingResult?.continuation.evidence.some((entry) =>
-      entry.startsWith("task-lifecycle task_lifecycle_"),
-    )).toBe(true);
-  });
 });

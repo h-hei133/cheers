@@ -47,7 +47,10 @@ export interface ViewContext {
   statusItems(): readonly StatusItemId[];
   activity(): TurnActivity | undefined;
   busy(): boolean;
+  /** Prompts waiting to run after the current turn. */
   queuedCount(): number;
+  /** Prompts waiting to be steered into the current turn before its next step. */
+  steeringCount?(): number;
   now(): number;
   /** Background facts for the row under the prompt. */
   ambient(): AmbientContext;
@@ -69,8 +72,12 @@ export interface ViewContext {
 
 /** What the host does in response to input. Routed by the keymap and the pointer. */
 export interface ViewActions {
-  /** Submit the current draft; the host decides whether it runs or queues. */
-  submit(text: string): void;
+  /**
+   * Submit the current draft. While a turn runs the disposition says where the
+   * text goes: steered into the running turn before its next model step, or
+   * queued to run after it. Idle submissions carry none and simply run.
+   */
+  submit(text: string, disposition?: "steer" | "followUp"): void;
   /** Escape while a turn is running. */
   interrupt(): void;
   /** Leave the session. */

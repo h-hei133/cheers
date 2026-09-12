@@ -64,7 +64,7 @@ function unwrapResultUrl(href: string): string | undefined {
 }
 
 /**
- * Free, keyless DuckDuckGo HTML search provider (Oh-My-Pi Aligned).
+ * Free, keyless DuckDuckGo HTML search provider.
  * POSTs query to https://html.duckduckgo.com/html/ and parses static result elements.
  */
 async function searchWithDuckDuckGo(
@@ -257,7 +257,7 @@ export function createWebSearchToolDefinition(): ToolDefinition {
         } else if (tavilyKey) {
           results = await searchWithTavily(query, tavilyKey, numResults, context.abortSignal);
         } else {
-          // Free, keyless DuckDuckGo HTML search fallback (Oh-My-Pi aligned)
+          // Free, keyless DuckDuckGo HTML search fallback
           try {
             results = await searchWithDuckDuckGo(query, numResults, context.abortSignal);
           } catch (ddgErr) {

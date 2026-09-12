@@ -8,7 +8,7 @@ export interface MicrocompactOptions {
 export interface ChatMessageLike {
   readonly role: "system" | "user" | "assistant" | "tool";
   readonly content?: string | null;
-  readonly tool_calls?: Array<{
+  readonly tool_calls?: ReadonlyArray<{
     readonly id: string;
     readonly type: "function";
     readonly function: { readonly name: string; readonly arguments: string };

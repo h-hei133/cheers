@@ -7,7 +7,7 @@ export interface ParallelOptions {
 
 /**
  * Parallel Dispatcher
- * Inspired by Oh My Pi's parallel(thunks): runs asynchronous tasks concurrently
+ * parallel(thunks): runs asynchronous tasks concurrently
  * in a bounded worker pool while preserving strict input/output index correspondence.
  */
 export class ParallelDispatcher {

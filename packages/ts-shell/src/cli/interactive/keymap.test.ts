@@ -132,6 +132,30 @@ describe("submission", () => {
   });
 });
 
+describe("input while a turn runs", () => {
+  it("steers the draft into the running turn on enter", () => {
+    const { press, actions } = build(true);
+    press("h");
+    press("\r");
+    expect(actions.submit).toHaveBeenCalledWith("h", "steer");
+  });
+
+  it("queues the draft as a follow-up on alt+enter", () => {
+    const { press, actions, surface } = build(true);
+    press("h");
+    press("\x1b\r");
+    expect(actions.submit).toHaveBeenCalledWith("h", "followUp");
+    expect(surface.editor.getText()).toBe("");
+  });
+
+  it("sends without a disposition when idle", () => {
+    const { press, actions } = build();
+    press("h");
+    press("\r");
+    expect(actions.submit).toHaveBeenCalledWith("h");
+  });
+});
+
 describe("interruption", () => {
   it("escape interrupts a running turn", () => {
     const { press, actions } = build(true);

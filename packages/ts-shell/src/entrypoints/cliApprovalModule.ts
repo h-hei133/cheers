@@ -33,7 +33,6 @@ import {
   type ApprovalAuditRecord,
   type ApprovalDecisionSource,
 } from "./approvalPromptBridge.js";
-import type { CliApplyPatchRuntimeRouteOptions } from "./cliRuntimeInvocation.js";
 
 export type { ApprovalModeObject } from "../cli/approval/approvalModeContract.js";
 
@@ -616,17 +615,6 @@ export function createCliEscalationPromptHandler(
   };
 }
 
-export function applyPatchDecisionFromApprovalMode(
-  mode: "deny" | "allow-once" | "allow-always" | undefined,
-): CliApplyPatchRuntimeRouteOptions["requestedUserDecision"] | undefined {
-  if (mode === "deny") {
-    return "denied";
-  }
-  if (mode === "allow-once" || mode === "allow-always") {
-    return "approved";
-  }
-  return undefined;
-}
 
 export function materializeApprovalModeObject(input: {
   prompt: string;

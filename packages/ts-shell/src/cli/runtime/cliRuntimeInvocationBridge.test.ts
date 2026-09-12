@@ -1,50 +1,28 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCliApplyPatchRuntimeRouteOptions } from "./cliRuntimeInvocationBridge.js";
+import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 
 describe("CLI runtime invocation bridge", () => {
-  it("does not create apply_patch runtime route options without explicit opt-in", () => {
-    expect(
-      buildCliApplyPatchRuntimeRouteOptions({
-        options: {
-          applyPatchRuntimeRoute: false,
-          applyPatchWorkspaceWrite: false,
-          nonInteractiveApproval: undefined,
-        },
-      }),
-    ).toBeUndefined();
-  });
-
-  it("preserves runtime opt-in separately from workspace write opt-in", () => {
-    expect(
-      buildCliApplyPatchRuntimeRouteOptions({
-        options: {
-          applyPatchRuntimeRoute: true,
-          applyPatchWorkspaceWrite: false,
-          nonInteractiveApproval: "allow-once",
-        },
-      }),
-    ).toEqual({
-      explicitRuntimeOptIn: true,
-      requestedUserDecision: "approved",
-      runtimeSource: "production-adjacent",
-    });
-
-    expect(
-      buildCliApplyPatchRuntimeRouteOptions({
-        options: {
-          applyPatchRuntimeRoute: false,
-          applyPatchWorkspaceWrite: true,
-          nonInteractiveApproval: "deny",
-        },
-      }),
-    ).toEqual({
-      explicitRuntimeOptIn: true,
-      requestedUserDecision: "denied",
-      runtimeSource: "production-adjacent",
-      workspaceWrite: {
-        explicitWorkspaceWriteOptIn: true,
+  it("packages provider mode from the provider bridge and returns an input handle", async () => {
+    const result = streamCliRuntimePrompt({
+      prompt: "hello",
+      sessionId: "sess_bridge",
+      workspaceRoot: process.cwd(),
+      signal: new AbortController().signal,
+      maxTurns: 1,
+      escalationPromptHandler: async (prompt) => ({ promptId: prompt.id, decision: "deny", respondedAt: 1 }),
+      providerCredentialResolution: { provider: "openai", expectedEnvVarName: "OPENAI_API_KEY" },
+      agentMode: "build",
+      providerRuntimeBridge: {
+        resolveCredentialSnapshot: () => ({ provider: "openai", expectedEnvVarName: "OPENAI_API_KEY" }),
+        providerModeEnv: () => "synthetic",
+        realProviderSmokeOptIn: () => false,
       },
     });
+    expect(typeof result.input?.steer).toBe("function");
+    const types: string[] = [];
+    for await (const event of result.events) types.push(event.type);
+    expect(types[0]).toBe("query.started");
+    expect(types.at(-1)).toBe("query.completed");
   });
 });

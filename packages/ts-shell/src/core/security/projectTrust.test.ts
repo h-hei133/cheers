@@ -39,7 +39,7 @@ describe("ProjectTrustStore Security Sandbox", () => {
   it("detects sensitive project resources", () => {
     const store = new ProjectTrustStore(customStorePath);
     const fakeRepo = path.join(tempDir, "fake-repo");
-    fs.mkdirSync(path.join(fakeRepo, ".pi", "extensions"), { recursive: true });
+    fs.mkdirSync(path.join(fakeRepo, ".agent-tool", "extensions"), { recursive: true });
 
     expect(store.hasSensitiveProjectResources(fakeRepo)).toBe(true);
     expect(store.hasSensitiveProjectResources(tempDir)).toBe(false);

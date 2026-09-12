@@ -3,7 +3,7 @@ import {
   isEventStream,
   readCompletionStream,
   type StreamedCompletion,
-} from "./streamCompletion.js";
+} from "./completion.js";
 
 function streamOf(...events: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();

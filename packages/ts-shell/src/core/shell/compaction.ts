@@ -1,6 +1,6 @@
 import { markContextUnknown } from "../../observability/usageTelemetry.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
-import { convertSessionMessagesToChat } from "../query/agentLoop.js";
+import { toChatMessages } from "../../turn/prompt.js";
 import {
   requestCompactionSummary,
   type CompactionProvider,
@@ -89,7 +89,7 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
   try {
     summary = await (input.summarize ?? requestCompactionSummary)({
       provider: input.provider,
-      messages: convertSessionMessagesToChat(older),
+      messages: toChatMessages(older),
       signal: input.signal,
       instructions: input.instructions,
     });

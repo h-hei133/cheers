@@ -17,6 +17,10 @@ import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { compactSessionHistory } from "../../core/shell/compaction.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
+import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
+import { markContextUnknown } from "../../observability/usageTelemetry.js";
+import { toChatMessages } from "../../turn/prompt.js";
+import type { CompactionSetup } from "../../turn/session.js";
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
@@ -54,9 +58,37 @@ export function createCliSessionRuntime(input: {
         instructions,
       });
     },
-    runPrompt: (prompt, signal, runtimeSeed, continuityState) => {
+    runPrompt: (prompt, signal) => {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
+      const sessionId = input.runtimeContext.session.id;
+      const compactionProvider = {
+        apiKey: resolvedCredential.credential?.apiKey,
+        baseUrl: resolvedCredential.baseUrl ?? resolvedCredential.credential?.baseUrl,
+        model: resolvedCredential.model ?? resolvedCredential.credential?.model,
+      };
+      // Automatic compaction needs a provider to write the checkpoint; without
+      // one the turn runs with the history it has and overflow reports itself.
+      const compaction: CompactionSetup | undefined =
+        compactionProvider.apiKey && compactionProvider.baseUrl && compactionProvider.model
+          ? {
+              policy: { contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64_000 },
+              summarize: (messages, summarizeSignal) =>
+                requestCompactionSummary({
+                  provider: {
+                    apiKey: compactionProvider.apiKey!,
+                    baseUrl: compactionProvider.baseUrl!,
+                    model: compactionProvider.model!,
+                  },
+                  messages: toChatMessages(messages),
+                  signal: summarizeSignal,
+                }),
+              onCompact: (record) => {
+                input.sessionManager.appendCompactionEntry(sessionId, record);
+                markContextUnknown(sessionId);
+              },
+            }
+          : undefined;
       const escalationPromptHandler = createCliApprovalEscalationBridge({
         renderer: input.renderer,
         readline: input.getReadline,
@@ -85,7 +117,7 @@ export function createCliSessionRuntime(input: {
 
       return streamCliRuntimePrompt({
         prompt,
-        sessionId: input.runtimeContext.session.id,
+        sessionId,
         workspaceRoot: input.runtimeContext.cwd,
         signal,
         maxTurns: input.runtimeContext.runtimeConfig.maxTurns,
@@ -94,13 +126,10 @@ export function createCliSessionRuntime(input: {
         interactiveAsk: (questions) =>
           promptInteractiveQuestions(input.getReadline(), questions),
         historyMessages,
-        onTurnMessage: (message) =>
-          input.sessionManager.addTurn(input.runtimeContext.session.id, message),
+        onTurnMessage: (message) => input.sessionManager.addTurn(sessionId, message),
+        compaction,
         providerCredentialResolution: resolvedCredential,
         agentMode: sessionRuntime.getAgentMode(),
-        runtimeSeed,
-        continuityState,
-        options: input.options,
         providerRuntimeBridge: input.providerRuntimeBridge,
       });
     },

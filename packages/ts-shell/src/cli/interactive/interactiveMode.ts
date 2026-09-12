@@ -107,12 +107,12 @@ export class InteractiveMode {
   /** The last thing submitted that was a prompt rather than a command. */
   private lastPrompt: string | undefined;
   /**
-   * Prompts submitted while a run is in flight. Every entry currently
-   * replays as a follow-up turn once the run settles; the `disposition`
-   * union reserves the steering shape for the later queue wiring
-   * (steering injects into the running turn, follow-up starts the next).
+   * Input submitted while a run that takes none is in flight — a slash
+   * command, say. It runs as its own turn once the current one settles. A
+   * model turn takes input directly: steering reaches it before its next step
+   * and follow-ups run after it, both through the runtime's input handle.
    */
-  private readonly queue: Array<{ text: string; disposition: "steer" | "followUp" }> = [];
+  private readonly queue: string[] = [];
   private releaseEvents: (() => void) | undefined;
 
   constructor(private readonly options: InteractiveModeOptions) {
@@ -138,13 +138,16 @@ export class InteractiveMode {
           readStatusFacts(this.options.runtimeContext, {
             agentMode: this.options.sessionRuntime.getAgentMode(),
             permissionScope: this.options.sessionRuntime.getPermissionScope(),
-            queued: this.queue.length,
+            queued: this.queue.length + (this.options.sessionRuntime.input?.()?.pending().followUps.length ?? 0),
             peers: readAmbientFacts(this.options.runtimeContext.session.id).peerSessions,
           }),
         statusItems: () => this.previewItems ?? this.statusItems,
         activity: () => this.sink.activity(),
         busy: () => this.busy,
-        queuedCount: () => this.queue.length,
+        // Follow-ups wait in two places: the turn's own queue and, for input a
+        // command run cannot take, the host's.
+        queuedCount: () => this.queue.length + (this.options.sessionRuntime.input?.()?.pending().followUps.length ?? 0),
+        steeringCount: () => this.options.sessionRuntime.input?.()?.pending().steering.length ?? 0,
         now: () => Date.now(),
         ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
         newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
@@ -286,7 +289,7 @@ export class InteractiveMode {
       now: () => Date.now(),
       gesture: this.gesture,
       actions: {
-        submit: (text) => this.onSubmit(text),
+        submit: (text, disposition) => this.onSubmit(text, disposition),
         interrupt: () => void this.interrupt(),
         exit: () => this.shutdown(),
         redraw: () => this.tui.requestRender(),
@@ -361,7 +364,7 @@ export class InteractiveMode {
 
 
 
-  private onSubmit(text: string): void {
+  private onSubmit(text: string, disposition?: "steer" | "followUp"): void {
     this.toast = undefined;
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
     if (this.questions.answer(text)) {
@@ -377,12 +380,18 @@ export class InteractiveMode {
     // returns to the newest rows so the echo and the answer are in view.
     this.view.scrollToEnd();
     if (this.busy) {
-      this.queue.push({ text, disposition: "followUp" });
+      // A command is never steered: it is not a message for the model, so it
+      // waits for the run boundary, like any input to a run that takes none.
+      const input = text.startsWith("/") ? undefined : this.options.sessionRuntime.input?.();
+      if (!input) this.queue.push(text);
+      else if (disposition === "steer") input.steer(text);
+      else input.followUp(text);
       this.tui.requestRender();
       return;
     }
     void this.run(text);
   }
+
 
   /** Execute one submission, then drain anything typed while it ran. */
   private async run(text: string): Promise<void> {
@@ -452,7 +461,7 @@ export class InteractiveMode {
         this.tui.requestRender({ force: true });
       }
       this.tui.requestRender();
-      const next = retrying ?? this.queue.shift()?.text;
+      const next = retrying ?? this.queue.shift();
       if (next !== undefined) void this.run(next);
     }
   }
@@ -553,10 +562,19 @@ export class InteractiveMode {
     return undefined;
   }
 
+  /**
+   * Stop the run. Input it had not yet taken comes back to the prompt rather
+   * than running against a turn the user just cancelled.
+   */
   private async interrupt(): Promise<void> {
     if (!this.busy) return;
     this.sink.markCancelling();
+    const undelivered = [...(this.options.sessionRuntime.input?.()?.clearQueue() ?? []), ...this.queue.splice(0)];
     await this.options.sessionRuntime.cancelAndWait();
+    if (undelivered.length === 0) return;
+    const draft = this.state.editor.getText();
+    this.state.editor.setText([...undelivered, draft].filter((part) => part.trim()).join("\n\n"));
+    this.tui.requestRender();
   }
 
   /**

@@ -3,7 +3,7 @@ title: "Turn 生命周期架构对齐与演进方案"
 category: article
 sources: [local-turn-state, reference-session-model, turn-quality-audit, commit-0c66bfe5-review]
 created: 2026-09-11
-updated: 2026-09-11
+updated: 2026-09-12
 tags: [turn, session, lifecycle, alignment, architecture, refactor]
 summary: "对 commit 0c66bfe5 进行深度 review，查清全仓 turn 相关 demo 级代码，完整复盘顶级标杆会话与 turn 核心机制，制定分层收敛与生产级重构方案。"
 confidence: high
@@ -466,3 +466,47 @@ export class AgentCore {
 ### 10.6 验证
 
 - `build:ts` 通过；内核 + 会话 70 套件 397 项通过；新文件零外部项目名称。
+
+---
+
+## 11. Phase 4 落地记录（565a79a1 → 本次）：双轨终结与内核接管生产路径
+
+本轮为 §5 Phase 4 的正式落地：删除全部历史双轨与死投影，生产提示词路径全量切换到 `core/agent/` 内核，新建 `turn/` 领域作为产品级会话门面。设计取自参考项目的两层模型（内核纯循环 + 会话门面拥有持久化/压缩/队列），所有代码为复制适配后的本仓实现，无外部项目名称。
+
+### 11.1 新增 `turn/` 领域（文件名短、职责单一）
+
+| 文件 | 职责 |
+|---|---|
+| `turn/session.ts` | 一次用户轮次：构造内核、工具适配、`message_end` 持久化（跳过开场提示与空助手消息）、`prepareNextStep` 前置压缩、溢出一次压缩重试、`steer/followUp/pending/clearQueue` 输入句柄、运行终态汇报 |
+| `turn/step.ts` | 唯一的模型调用点：流式/整体响应统一成 `AssistantStep`，`stopReason` 映射（`length` 触发内核截断防御），中断返回 `aborted` 并保留已流出的文本，溢出以前缀错误上报，`reasoning_effort` 拒绝仅重试一次，用量记账 |
+| `turn/tools.ts` | 注册表工具 → 内核 `AgentTool`；`beforeToolCall` 依次做计划模式门、死循环熔断、权限范围升级（用户拒绝理由原文回传模型）、PreToolUse 钩子；`afterToolCall` 标注审批并附加 PostToolUse 反馈 |
+| `turn/prompt.ts` | 稳定系统提示前缀、环境行、会话历史 → 聊天消息（悬挂调用合成取消、孤儿工具消息丢弃） |
+| `turn/projection.ts` | 内核事件 → 既有 `QueryEvent`（工具卡片、终态），`concludeRun` 决定 completed/failed 与空答案解释 |
+| `turn/completion.ts` | 原 `core/query/streamCompletion.ts` 整体迁入 |
+| `turn/stream.ts` | 推送式异步通道，内核监听器与 shell 事件流的接缝 |
+| `turn/synthetic.ts` | 无提供商的合成步进，供烟测与演示 |
+
+### 11.2 生产接线变化
+
+- `entrypoints/cliRuntimeInvocation.ts` 重写：真实模式先做就绪检查，再启动同一条轮次；合成模式走合成步进而非旧合约循环。返回 `{ events, input }`，`input` 为运行中输入句柄。
+- `core/shell/sessionRuntime.ts`：`runPrompt` 可返回 `{ events, input }`；新增 `input()` 暴露当前运行的输入句柄；助手最终消息不再由 runtime 落盘（改由轮次在 `message_end` 落盘，工具消息同源）。
+- `cli/runtime/cliSessionRuntimeFactory.ts`：装配自动压缩（阈值策略 + 提供商摘要 + `appendCompactionEntry` 落盘 + 上下文量表置未知）。
+- 交互面：Enter 在运行中改为**转向**（下一步前注入），Alt+Enter 为**跟进**（运行边界后执行），空闲时 Alt+Enter 仍为换行；中断时未投递的输入回填到编辑器；提示行显示 `N steering` / `N queued`；按键指南同步。
+- `session/compaction.ts` 检查点措辞与转写投影统一为 `[Context Checkpoint]`。
+
+### 11.3 删除清单（生产路径零引用后删除）
+
+`core/query/agentLoop.ts`、`core/query/runtime/{loop,engine}.ts`、`orchestration/runMvpIntegratedFlow.ts`、`runtime/workflowExecutionCoordinator.ts`、`runtime/{integratedFlowEnvironment,turnBoundary}.ts`、`orchestration/MultiAgentOrchestrator.ts`、`turn/turnFacade.ts`、`product/turn/`、`orchestration/{turnKernel,turnCapabilityPlan,turnReceiptAggregation,toolEcosystemCapabilityRoute,resultSurfaceModule}.ts`、`core/query/{steerableQueue,systemPromptBuilder,lightweightChat,lightweightRoute,routeDecision}.ts`、`turn/roleDraftStage.ts`、`provider/request/draft.ts`、`result/projection/workflow/runtime.ts`、`result/workflowRuntimeProjection.ts`、`context/{inspectFilesStage,readRuntimeStage,repoExplainRuntimeStage}.ts`、`edit/runtime/workflow.ts`、`verification/command/stage.ts`、`verification/commandStage.ts`、`session/persistence.ts`（Phase 2 内存转写器，已由 SessionManager 落盘替代）、`session/agent/events.ts`、`cli/runtime/cliPlanningMutationBridge.ts`、`entrypoints/{cliPlanningMutationExecution,cliProposalReviewSurface}.ts`，以及 `--apply-patch-*` / `--planning-mutation-*` CLI 标志。连带删除仅覆盖上述模块的测试 30 余个；对既含活模块断言的测试只删除驱动旧流程的用例。
+
+### 11.4 验证
+
+- `tsc -p tsconfig.build.json` 通过；本地图检查：`turn/`、`core/agent`、入口均无环；未解析导入数与改前一致（均为存量测试文件）。
+- 新增测试：`turn/session.test.ts`（8）、`turn/step.test.ts`（6）、`turn/tools.test.ts`（6）、`turn/prompt.test.ts`（4），`entrypoints/cliRuntimeInvocation.test.ts` 重写（5），`keymap.test.ts` 与 `composer.test.ts` 锁定转向/跟进路由与提示。`turn/` 9 套件 59 项通过。
+- 跨域聚合运行（core/session/cli/entrypoints/presentation/turn/orchestration/…）：改前 118 项失败、改后 57 项失败，无新增失败；减少的 61 项为随旧轨删除的用例。
+- CLI 烟测：改前 15 失败/39 通过，改后 15 失败/31 通过（删除 8 个仅断言旧合成流程文本的用例），失败集合完全相同，均为改前既有的真实提供商与 `/continue` 断言；`GOLDEN_MAIN_PATH` 门禁在新内核上通过。
+- NormProof 三条规范：无环、导入闭包不变、触及与新增模块函数名均 ≤ 20（`turn/session.ts` 为 19，`interactiveMode.ts` 方法数 20 不变）。
+
+### 11.5 已知与遗留
+
+- `runtime/loop/*`、`turn/{assistantResponse,toolResultMessage,nextTurnBundle,turnSnapshot,steeringQueue,followUpQueue,deliveryPolicy}.ts` 仍被 `runtime/loop/contract.ts` 与 `evidence/savepoint` 引用，本轮不动。
+- 15 个既有 CLI 烟测失败（真实提供商链、`/continue` 结果面）在改前即失败，属存量，未在本轮范围。

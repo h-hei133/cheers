@@ -25,7 +25,7 @@ export type RefuterFn = (defect: ProposedDefect, diffOrCode: string) => Promise<
 
 /**
  * Adversarial Refuter Pipeline
- * Inspired by Oh My Pi's Adversarial Verification:
+ * Adversarial verification:
  * 1. Reviewer proposes suspected defects / issues.
  * 2. Refuter independently attempts to disprove or refute each defect against codebase ground truth.
  * 3. Only defects that cannot be refuted are confirmed as actionable issues, eliminating false positives.

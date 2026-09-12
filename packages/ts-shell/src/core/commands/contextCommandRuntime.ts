@@ -1,6 +1,6 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
-import { buildOpenAITools } from "../query/agentLoop.js";
+import { toolSchemas } from "../../turn/tools.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 
 /**
@@ -83,7 +83,7 @@ function configuredWindow(): number {
 
 /** Tokens the tool definitions occupy, from the bytes actually sent. */
 function toolSchemaTokens(): number {
-  const serialised = JSON.stringify(buildOpenAITools(createCoreToolRegistry()));
+  const serialised = JSON.stringify(toolSchemas(createCoreToolRegistry()));
   return Math.round(serialised.length / CHARS_PER_TOKEN);
 }
 

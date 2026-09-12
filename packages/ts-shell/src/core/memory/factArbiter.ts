@@ -8,7 +8,7 @@ import { MemoryStore } from "./memoryStore.js";
 
 /**
  * Additive Fact Arbiter
- * Inspired by Mem0 & Mnemopi arbitration machines:
+ * An arbitration machine over candidate facts:
  * Compares candidate facts against existing memories to determine:
  * - ADD: New orthogonal fact
  * - UPDATE: Refines, enriches, or updates existing fact

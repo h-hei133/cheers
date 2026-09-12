@@ -2,7 +2,6 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { runMvpIntegratedFlow } from '../orchestration/runMvpIntegratedFlow.js'
 import { createComponentLogger } from './structuredLogger.js'
 import { safeRemoveDir } from '../test-utils/cleanup.js'
 import {
@@ -30,22 +29,6 @@ describe('observability integration', () => {
     setStructuredLogSink(null)
     resetTraceContext()
     await safeRemoveDir(workspaceRoot)
-  })
-
-  it('keeps one trace id across orchestration and tool dispatch without provider calls', async () => {
-    await runMvpIntegratedFlow({
-      sessionId: 'sess_obs',
-      prompt: 'Run node --version to check runtime',
-      workspaceRoot,
-      escalationDecision: 'allow-once',
-    })
-
-    const traceIds = new Set(captured.map(entry => entry.traceId))
-    expect(traceIds.size).toBe(1)
-    expect(captured.map(entry => entry.component)).toEqual(
-      expect.arrayContaining(['orchestration', 'tool-runtime']),
-    )
-    expect(captured.map(entry => entry.component)).not.toContain('provider-openai')
   })
 
   it('redacts secrets from emitted logs', () => {

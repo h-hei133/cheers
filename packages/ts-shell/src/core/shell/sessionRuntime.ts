@@ -17,7 +17,6 @@ import {
 } from "./sessionEventSurface.js";
 import { buildPromptWithFutureTurnInjections } from "./sessionFutureTurnProjection.js";
 import {
-  projectAssistantTurnPersistence,
   projectCompletedSessionSave,
   projectErrorSessionSave,
   projectRuntimeFailureSessionSave,
@@ -30,6 +29,15 @@ import {
 import { ShellStateMachine } from "./stateMachine.js";
 import type { PermissionScope } from "../../cli/approval/permissionScope.js";
 import type { CompactionOutcome } from "./compaction.js";
+import type { TurnInput } from "../../turn/session.js";
+
+/**
+ * A prompt in flight: its event stream, and the handle through which input
+ * typed while it runs reaches it. A bare stream is a run that takes no input.
+ */
+export type PromptRun =
+  | AsyncIterable<QueryEvent>
+  | { readonly events: AsyncIterable<QueryEvent>; readonly input?: TurnInput };
 
 export interface SessionRuntimeDependencies {
   readonly sessionManager: SessionManager;
@@ -39,7 +47,7 @@ export interface SessionRuntimeDependencies {
     signal: AbortSignal,
     runtimeSeed?: QueryRuntimeStateSeed,
     continuityState?: SessionContinuitySnapshot,
-  ) => AsyncIterable<QueryEvent>;
+  ) => PromptRun;
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
   readonly projectMemoryInjectionStateStore?: ProjectMemoryInjectionStateStore;
@@ -59,6 +67,7 @@ export class ShellSessionRuntime {
   private readonly stateMachine = new ShellStateMachine();
   private readonly eventObservers = new Set<QueryEventObserver>();
   private currentRunController: AbortController | null = null;
+  private currentInput: TurnInput | undefined;
   private currentRun: Promise<string> | null = null;
   private lastRun: Promise<string> | null = null;
   private viewMode: "compact" | "verbose" = "compact";
@@ -85,6 +94,11 @@ export class ShellSessionRuntime {
 
   getCurrentRunController(): AbortController | null {
     return this.currentRunController;
+  }
+
+  /** Where input typed during the active run goes; nothing when no run takes input. */
+  input(): TurnInput | undefined {
+    return this.currentInput;
   }
 
   /** Settles when the active run finishes, or immediately when idle. */
@@ -253,12 +267,10 @@ export class ShellSessionRuntime {
           options.runtimeSeed.recoveryBoundary === "mid-turn-reentry";
       }
 
-      for await (const event of this.deps.runPrompt(
-        promptForModel,
-        signal,
-        options?.runtimeSeed,
-        continuityState,
-      )) {
+      const run = this.deps.runPrompt(promptForModel, signal, options?.runtimeSeed, continuityState);
+      const events = Symbol.asyncIterator in run ? run : run.events;
+      this.currentInput = Symbol.asyncIterator in run ? undefined : run.input;
+      for await (const event of events) {
         if (!enteredQueryPhase) {
           enteredQueryPhase = true;
           this.deps.sessionManager.markTurnActive(sessionId);
@@ -302,11 +314,6 @@ export class ShellSessionRuntime {
         });
       }
 
-      const assistantTurn = projectAssistantTurnPersistence(terminalState);
-      if (assistantTurn) {
-        this.deps.sessionManager.addTurn(sessionId, assistantTurn);
-      }
-
       if (!sawTerminalEvent) {
         throw new Error("Query runtime ended without a terminal event");
       }
@@ -326,6 +333,7 @@ export class ShellSessionRuntime {
       }
       this.stateMachine.completeRun();
       this.currentRunController = null;
+      this.currentInput = undefined;
       return terminalState.finalOutput;
     } catch (error) {
       if (signal.aborted) {
@@ -355,6 +363,7 @@ export class ShellSessionRuntime {
         this.stateMachine.failRun();
       }
       this.currentRunController = null;
+      this.currentInput = undefined;
       throw error;
     }
   }

@@ -91,6 +91,12 @@ describe("the row under the prompt", () => {
     expect(row).toContain("2 queued");
   });
 
+  it("says a steered prompt is delivered before the next step", () => {
+    const row = renderHints({ ...quiet, busy: true, steering: 1 }, nothing, 80).join("");
+    expect(row).toContain("1 steering");
+    expect(row).toContain("before the next step");
+  });
+
   it("offers interruption while a turn runs", () => {
     expect(renderHints({ ...quiet, busy: true }, nothing, 80).join("")).toContain("esc interrupt");
   });

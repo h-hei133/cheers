@@ -128,6 +128,8 @@ node dist/cli.js
 
 ```text
 packages/ts-shell/src/
+├── turn/                         # 产品级会话门面：驱动内核、持久化、压缩、转向/跟进输入
+│   ├── session.ts / step.ts / tools.ts / prompt.ts / projection.ts / completion.ts
 ├── core/
 │   ├── commands/                 # Slash 现代化命令运行时
 │   │   ├── costCommandRuntime.ts    # /cost 真实 completions.usage 计费
@@ -136,9 +138,9 @@ packages/ts-shell/src/
 │   │   ├── fastCommandRuntime.ts    # /fast 联动采样与快速模型
 │   │   ├── pluginCommandRuntime.ts  # /plugin 磁盘持久化 (~/.coding-agents/plugins.json)
 │   │   └── brainstormCommandRuntime.ts # /brainstorm 异步大模型 ADR 推导
-│   ├── query/                    # Agent 主执行循环与死循环防御
-│   │   ├── agentLoop.ts             # Tool-driven 自然收敛循环 (Zero NLP Hijacking)
-│   │   └── doomLoopDetector.ts      # 50 项滑动窗口与规范化参数哈希死循环熔断
+│   ├── agent/                    # 通用执行内核（步进循环、双待办队列、工具批次、终态屏障）
+│   │   ├── loop.ts / agent.ts / queue.ts / tools.ts / state.ts / events.ts
+│   ├── query/doomLoopDetector.ts # 50 项滑动窗口与规范化参数哈希死循环熔断
 │   ├── memory/                   # Native QuadMemory 四层原生记忆
 │   │   ├── types.ts / memoryStore.ts/ factArbiter.ts / memoryTools.ts
 │   ├── tools/                    # 生产级真实工具库

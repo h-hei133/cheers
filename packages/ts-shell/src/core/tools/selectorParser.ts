@@ -1,5 +1,5 @@
 /**
- * Embedded Line Selector Parser (Benchmarked against Oh-My-Pi & Codex)
+ * Embedded Line Selector Parser
  *
  * Supported formats:
  * - `file.ts:50-200` (inclusive line range 50 to 200)

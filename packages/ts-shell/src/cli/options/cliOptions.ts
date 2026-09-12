@@ -15,14 +15,6 @@ export interface CliOptions {
   readonly promptArg?: string;
   readonly migrateSessionRoot?: boolean;
   readonly nonInteractiveApproval?: NonInteractiveApprovalMode;
-  readonly applyPatchRuntimeRoute?: boolean;
-  readonly applyPatchWorkspaceWrite?: boolean;
-  readonly planningMutationConfirm?: boolean;
-  readonly planningMutationControlledWorkspace?: boolean;
-  readonly planningMutationSelectedWorkspace?: boolean;
-  readonly planningMutationLiveProviderProposal?: boolean;
-  readonly planningMutationProposalPath?: string;
-  readonly planningMutationVerifyCommand?: string;
   readonly hostCommand?: string;
 }
 

@@ -10,7 +10,6 @@ import {
   parseTransportPrompts,
   updateFenceState,
 } from "../core/shell/printPromptInput.js";
-import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import type { ShellRuntimeContext } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
 import {
@@ -27,12 +26,10 @@ import {
 import { recordCount } from "../observability/index.js";
 import type { StructuredLogger } from "../observability/structuredLogger.js";
 import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
-import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import {
   analyzeApprovalModeConflict,
-  applyPatchDecisionFromApprovalMode,
   materializeApprovalModeObject,
   type ApprovalModeObject,
 } from "./cliApprovalModule.js";
@@ -41,50 +38,9 @@ import {
 } from "./cliCommandExecutionBridge.js";
 import { formatCliContextTag } from "./cliInteractiveLoopState.js";
 import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
-import {
-  runCliRuntimeInvocation,
-  type CliApplyPatchRuntimeRouteOptions,
-} from "./cliRuntimeInvocation.js";
-import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "./cliSessionModule.js";
 import { runCliWorkspaceCommand } from "./cliWorkspaceModule.js";
 import { renderUserHelp, renderSessionCommandMap } from "./slashCommandRegistry.js";
-
-export async function* streamOrchestratedResponse(
-  prompt: string,
-  sessionId: string,
-  workspaceRoot: string,
-  signal: AbortSignal,
-  maxTurns: number,
-  escalationPromptHandler: (
-    prompt: EscalationPrompt,
-  ) => Promise<EscalationResponse>,
-  providerCredentialResolution: ProviderCredentialResolution,
-  agentMode: "plan" | "build",
-  runtimeSeed?: QueryRuntimeStateSeed,
-  continuityState?: SessionContinuitySnapshot,
-  applyPatchRuntimeRoute?: CliApplyPatchRuntimeRouteOptions,
-  planningMutationExecution?: PlanningRuntimeProductExecutionOptions,
-) {
-  const invocation = runCliRuntimeInvocation({
-    sessionId,
-    prompt,
-    workspaceRoot,
-    signal,
-    maxTurns,
-    escalationPromptHandler,
-    providerCredentialResolution,
-    agentMode,
-    runtimeSeed,
-    continuityState,
-    applyPatchRuntimeRoute,
-    planningMutationExecution,
-    providerModeEnv: process.env.PRIVATE_AGENTS_PROVIDER_MODE,
-  });
-  for await (const event of invocation.events) {
-    yield event;
-  }
-}
 
 export async function runNonTtyPromptStream(options: {
   sessionManager: SessionManager;

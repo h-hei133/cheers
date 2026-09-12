@@ -1,23 +1,20 @@
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
-import { streamLightweightChat } from "../core/query/lightweightChat.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
-import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
-import {
-  type ApplyPatchRuntimeRouteOptions,
-} from "../orchestration/runMvpIntegratedFlow.js";
-import { streamProductTurn } from "../turn/turnFacade.js";
-import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
-import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
-import { runAutonomousReActLoop } from "../core/query/agentLoop.js";
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import type { AskQuestion } from "../core/tools/ask.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
-import { decideQueryRoute } from "../core/query/routeDecision.js";
-import { validateLightweightProviderCredential } from "../core/query/lightweightRoute.js";
-export type CliApplyPatchRuntimeRouteOptions = ApplyPatchRuntimeRouteOptions;
+import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
+import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
+import { createCoreToolRegistry } from "../core/tools/registry.js";
+import type { ToolDefinition } from "../tools/types.js";
+import { buildSystemPrompt } from "../turn/prompt.js";
+import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
+import { createStepFunction, type StepFunction } from "../turn/step.js";
+import { createSyntheticStep } from "../turn/synthetic.js";
+import { toolSchemas } from "../turn/tools.js";
 
 type ProviderMode = "synthetic" | "real";
 
@@ -27,131 +24,75 @@ export interface CliRuntimeInvocationInput {
   readonly workspaceRoot: string;
   readonly signal: AbortSignal;
   readonly maxTurns: number;
-  readonly escalationPromptHandler: (
-    prompt: EscalationPrompt,
-  ) => Promise<EscalationResponse>;
+  readonly escalationPromptHandler: (prompt: EscalationPrompt) => Promise<EscalationResponse>;
   readonly providerCredentialResolution: ProviderCredentialResolution;
   readonly agentMode: "plan" | "build";
   readonly permissionScope?: PermissionScope;
-  readonly interactiveAsk?: (
-    questions: AskQuestion[],
-  ) => Promise<Record<string, string>>;
+  readonly interactiveAsk?: (questions: AskQuestion[]) => Promise<Record<string, string>>;
   readonly historyMessages?: readonly SessionMessage[];
   readonly onTurnMessage?: (message: SessionMessage) => void;
-  readonly runtimeSeed?: QueryRuntimeStateSeed;
-  readonly continuityState?: SessionContinuitySnapshot;
-  readonly applyPatchRuntimeRoute?: ApplyPatchRuntimeRouteOptions;
-  readonly planningMutationExecution?: PlanningRuntimeProductExecutionOptions;
+  readonly compaction?: CompactionSetup;
   readonly providerModeEnv?: string;
 }
 
-export interface CliRuntimeInvocationRequest
-  extends Omit<CliRuntimeInvocationInput, "providerModeEnv"> {
+export interface CliRuntimeInvocationRequest extends Omit<CliRuntimeInvocationInput, "providerModeEnv"> {
   readonly providerMode: ProviderMode;
 }
 
 export interface CliRuntimeInvocationResult {
   readonly events: AsyncIterable<QueryEvent>;
+  /** Input the user can hand the run while it works; absent once it is over. */
+  readonly input?: Pick<TurnRun, "steer" | "followUp" | "pending" | "clearQueue">;
 }
 
-type IntegratedFlowRunner = (
-  input: Parameters<typeof streamProductTurn>[0],
-) => AsyncIterable<QueryEvent>;
-type LightweightRunner = (
-  input: Parameters<typeof streamLightweightChat>[0],
-) => AsyncIterable<QueryEvent>;
 type ProviderReadinessChecker = (
   input: Parameters<typeof checkRealProviderReadiness>[0],
 ) => ReturnType<typeof checkRealProviderReadiness>;
 
 export interface CliRuntimeInvocationDependencies {
-  readonly streamIntegratedFlow: IntegratedFlowRunner;
-  readonly streamLightweight: LightweightRunner;
   readonly checkProviderReadiness: ProviderReadinessChecker;
   readonly createReadinessTerminalEvent: typeof createProviderReadinessCliTerminalEvent;
+  /** The model behind a real run; the default speaks to the configured provider. */
+  readonly createStep?: (request: CliRuntimeInvocationRequest, tools: ReadonlyMap<string, ToolDefinition>) => StepFunction;
+  readonly tools?: () => ReadonlyMap<string, ToolDefinition>;
+  readonly hooks?: HookDispatcher;
 }
 
-const defaultCliRuntimeInvocationDependencies: CliRuntimeInvocationDependencies =
-  {
-    streamIntegratedFlow: streamProductTurn,
-    streamLightweight: streamLightweightChat,
-    checkProviderReadiness: checkRealProviderReadiness,
-    createReadinessTerminalEvent: createProviderReadinessCliTerminalEvent,
-  };
+const defaultDependencies: CliRuntimeInvocationDependencies = {
+  checkProviderReadiness: checkRealProviderReadiness,
+  createReadinessTerminalEvent: createProviderReadinessCliTerminalEvent,
+};
 
-export function buildCliRuntimeInvocation(
-  input: CliRuntimeInvocationInput,
-): CliRuntimeInvocationRequest {
-  const providerMode: ProviderMode =
-    input.providerModeEnv === "synthetic" ? "synthetic" : "real";
+export function buildCliRuntimeInvocation(input: CliRuntimeInvocationInput): CliRuntimeInvocationRequest {
+  const providerMode: ProviderMode = input.providerModeEnv === "synthetic" ? "synthetic" : "real";
   const { providerModeEnv: _providerModeEnv, ...request } = input;
-  return {
-    ...request,
-    providerMode,
-  };
+  return { ...request, providerMode };
 }
 
+/**
+ * Run one prompt.
+ *
+ * A real provider is checked for readiness first, so a missing key stops the
+ * run with one actionable line instead of a request that fails later. Both
+ * modes then drive the same turn; only the model behind it differs.
+ */
 export function runCliRuntimeInvocation(
   input: CliRuntimeInvocationInput,
-  dependencies: CliRuntimeInvocationDependencies =
-    defaultCliRuntimeInvocationDependencies,
+  dependencies: CliRuntimeInvocationDependencies = defaultDependencies,
 ): CliRuntimeInvocationResult {
   const request = buildCliRuntimeInvocation(input);
-  return {
-    events: streamCliRuntimeInvocation(request, dependencies),
-  };
+  if (request.providerMode === "real") {
+    return deferUntilReady(request, dependencies);
+  }
+  return startTurn(request, dependencies);
 }
 
-async function* streamCliRuntimeInvocation(
+function deferUntilReady(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
-): AsyncIterable<QueryEvent> {
-  // If in synthetic test mode or explicitly requested via legacy patch route, run integrated flow or lightweight test mock
-  if (request.applyPatchRuntimeRoute || request.providerMode === "synthetic") {
-    const routeDecision = decideQueryRoute({
-      prompt: request.prompt,
-      agentMode: request.agentMode,
-      hasRuntimeSeed: Boolean(request.runtimeSeed),
-    });
-
-    if (
-      !request.applyPatchRuntimeRoute &&
-      routeDecision.mode === "chat" &&
-      validateLightweightProviderCredential({
-        providerMode: request.providerMode,
-        providerCredentialResolution: request.providerCredentialResolution,
-      }).ok
-    ) {
-      yield* dependencies.streamLightweight({
-        sessionId: request.sessionId,
-        prompt: request.prompt,
-        mode: "chat",
-        providerMode: request.providerMode,
-        providerCredential: request.providerCredentialResolution.credential,
-        signal: request.signal,
-      });
-      return;
-    }
-
-    yield* dependencies.streamIntegratedFlow({
-      sessionId: request.sessionId,
-      prompt: request.prompt,
-      continuityState: request.continuityState,
-      workspaceRoot: request.workspaceRoot,
-      abortSignal: request.signal,
-      escalationPromptHandler: request.escalationPromptHandler,
-      providerMode: request.providerMode,
-      maxTurns: request.maxTurns,
-      realProvider: request.providerCredentialResolution.credential,
-      agentMode: request.agentMode,
-      runtimeSeed: request.runtimeSeed,
-      applyPatchRuntimeRoute: request.applyPatchRuntimeRoute,
-      planningMutationExecution: request.planningMutationExecution,
-    });
-    return;
-  }
-
-  if (request.providerMode === "real") {
+): CliRuntimeInvocationResult {
+  let started: CliRuntimeInvocationResult | undefined;
+  const events = (async function* (): AsyncIterable<QueryEvent> {
     const readiness = await dependencies.checkProviderReadiness({
       provider: request.providerCredentialResolution.provider,
       apiKey: request.providerCredentialResolution.credential?.apiKey,
@@ -167,10 +108,28 @@ async function* streamCliRuntimeInvocation(
       });
       return;
     }
-  }
+    started = startTurn(request, dependencies);
+    yield* started.events;
+  })();
+  return {
+    events,
+    input: {
+      steer: (text) => started?.input?.steer(text),
+      followUp: (text) => started?.input?.followUp(text),
+      pending: () => started?.input?.pending() ?? { steering: [], followUps: [] },
+      clearQueue: () => started?.input?.clearQueue() ?? [],
+    },
+  };
+}
 
-  // Unified Autonomous ReAct Agent Loop: Always injects full tools and drives iterative tool-calling
-  yield* runAutonomousReActLoop({
+function startTurn(
+  request: CliRuntimeInvocationRequest,
+  dependencies: CliRuntimeInvocationDependencies,
+): CliRuntimeInvocationResult {
+  const hooks = dependencies.hooks ?? defaultHookDispatcher;
+  setupBuiltinVerificationHooks(hooks);
+  const tools = dependencies.tools?.() ?? createCoreToolRegistry();
+  const run = runTurn({
     sessionId: request.sessionId,
     prompt: request.prompt,
     workspaceRoot: request.workspaceRoot,
@@ -178,18 +137,29 @@ async function* streamCliRuntimeInvocation(
     permissionScope: request.permissionScope,
     escalationPromptHandler: request.escalationPromptHandler,
     interactiveAsk: request.interactiveAsk,
-    historyMessages: request.historyMessages,
-    onTurnMessage: request.onTurnMessage,
-    realProvider: {
-      apiKey: request.providerCredentialResolution.credential?.apiKey,
-      baseUrl:
-        request.providerCredentialResolution.baseUrl ??
-        request.providerCredentialResolution.credential?.baseUrl,
-      model:
-        request.providerCredentialResolution.model ??
-        request.providerCredentialResolution.credential?.model,
+    history: request.historyMessages ?? [],
+    onMessage: request.onTurnMessage ?? (() => {}),
+    step: request.providerMode === "synthetic" ? createSyntheticStep() : (dependencies.createStep ?? createProviderStep)(request, tools),
+    tools,
+    hooks,
+    maxSteps: request.maxTurns,
+    compaction: request.compaction,
+    signal: request.signal,
+  });
+  return { events: run.events, input: run };
+}
+
+function createProviderStep(request: CliRuntimeInvocationRequest, tools: ReadonlyMap<string, ToolDefinition>): StepFunction {
+  const resolution = request.providerCredentialResolution;
+  return createStepFunction({
+    provider: {
+      apiKey: resolution.credential?.apiKey ?? "",
+      baseUrl: resolution.baseUrl ?? resolution.credential?.baseUrl ?? "",
+      model: resolution.model ?? resolution.credential?.model ?? "",
     },
-    maxTurns: request.maxTurns,
-    abortSignal: request.signal,
+    workspaceRoot: request.workspaceRoot,
+    sessionId: request.sessionId,
+    systemPrompt: buildSystemPrompt(request.agentMode),
+    tools: toolSchemas(tools),
   });
 }
