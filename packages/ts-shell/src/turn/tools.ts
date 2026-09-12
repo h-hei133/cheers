@@ -2,7 +2,7 @@ import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import type { AgentTool, AgentToolResult, ToolHooks } from "../core/agent/tools.js";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { DoomLoopDetector } from "../core/query/doomLoopDetector.js";
-import { buildToolEscalationPrompt, evaluateToolPermissionScope } from "../core/query/toolPolicy.js";
+import { buildToolEscalationPrompt, evaluateToolPermissionScope, READ_ONLY_BROWSER_ACTIONS } from "../core/query/toolPolicy.js";
 import { isReadOnlyBashCommand } from "../core/shell/approval/evaluator.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { AskQuestion } from "../core/tools/ask.js";
@@ -42,9 +42,9 @@ export interface ToolGateOptions {
 }
 
 /** Tools a planning session may call: the ones that only look. */
-const PLAN_MODE_TOOLS = new Set([
-  "read", "glob", "grep", "lsp", "browser", "web_fetch", "web_search", "ask", "todo", "task",
-]);
+const PLAN_MODE_TOOLS: Record<string, true> = {
+  read: true, glob: true, grep: true, lsp: true, web_fetch: true, web_search: true, ask: true, todo: true,
+};
 
 /** Key the step runner uses to carry an argument parse failure into the call. */
 export const PARSE_ERROR_KEY = "__parseError";
@@ -125,13 +125,6 @@ export function createToolHooks(options: ToolGateOptions): ToolHooks {
     beforeToolCall: async ({ call, args }, signal) => {
       const planBlock = planModeBlock(options.agentMode, call.name, args);
       if (planBlock) return { block: true, reason: planBlock };
-      const repeat = doomLoop.recordAndCheck(call.name, args);
-      if (repeat.isDoomLoop) {
-        return {
-          block: true,
-          reason: `Warning: Doom Loop detected! Tool '${call.name}' has been repeatedly executed ${repeat.repeatCount} times with identical arguments without state progression. Please try a different approach, refine your parameters, or formulate a final response based on existing observations.`,
-        };
-      }
       const permission = await askPermission(call.id, call.name, args, options, signal);
       if (permission.blocked) return { block: true, reason: permission.blocked };
       if (permission.approved) approvals.set(call.id, permission.approved);
@@ -145,7 +138,16 @@ export function createToolHooks(options: ToolGateOptions): ToolHooks {
         args,
       });
       if (decision.decision === "block") {
+        approvals.delete(call.id);
         return { block: true, reason: `Blocked by Hook: ${decision.reason || "Action rejected by security/verification hook policy."}` };
+      }
+      const repeat = doomLoop.recordAndCheck(call.name, args);
+      if (repeat.isDoomLoop) {
+        approvals.delete(call.id);
+        return {
+          block: true,
+          reason: `Warning: Doom Loop detected! Tool '${call.name}' has been repeatedly executed ${repeat.repeatCount} times with identical arguments without state progression. Please try a different approach, refine your parameters, or formulate a final response based on existing observations.`,
+        };
       }
       return undefined;
     },
@@ -174,8 +176,9 @@ export function createToolHooks(options: ToolGateOptions): ToolHooks {
 }
 
 function planModeBlock(agentMode: "plan" | "build" | undefined, toolName: string, args: Record<string, unknown>): string | undefined {
-  if (agentMode !== "plan" || PLAN_MODE_TOOLS.has(toolName)) return undefined;
+  if (agentMode !== "plan" || PLAN_MODE_TOOLS[toolName]) return undefined;
   if (toolName === "bash" && typeof args.command === "string" && isReadOnlyBashCommand(args.command)) return undefined;
+  if (toolName === "browser" && typeof args.action === "string" && READ_ONLY_BROWSER_ACTIONS[args.action.toLowerCase().trim()]) return undefined;
   return `Blocked: Plan mode is active. Tool '${toolName}' ${toolName === "bash" ? "with non-read-only command " : ""}is not permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
 }
 

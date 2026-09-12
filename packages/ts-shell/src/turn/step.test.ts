@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createStepFunction, CONTEXT_OVERFLOW_PREFIX } from "./step.js";
+import { createStepFunction, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "./step.js";
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -116,5 +116,12 @@ describe("createStepFunction", () => {
     expect(result.text).toBe("");
     expect(result.errorMessage).toContain("withheld the reply");
     expect(result.stopReason).toBe("stop");
+  });
+
+  it("recognizes overflow markers regardless of provider casing", () => {
+    expect(isContextOverflow("Maximum Context Length exceeded for model m")).toBe(true);
+    expect(isContextOverflow("PROMPT_TOO_LONG: reduce input")).toBe(true);
+    expect(isContextOverflow("context_length_exceeded")).toBe(true);
+    expect(isContextOverflow("rate limited, try again later")).toBe(false);
   });
 });

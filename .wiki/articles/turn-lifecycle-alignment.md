@@ -510,3 +510,27 @@ export class AgentCore {
 
 - `runtime/loop/*`、`turn/{assistantResponse,toolResultMessage,nextTurnBundle,turnSnapshot,steeringQueue,followUpQueue,deliveryPolicy}.ts` 仍被 `runtime/loop/contract.ts` 与 `evidence/savepoint` 引用，本轮不动。
 - 15 个既有 CLI 烟测失败（真实提供商链、`/continue` 结果面）在改前即失败，属存量，未在本轮范围。
+
+### 11.6 双车道复核修补（a7418fcb → 本次）
+
+双车道独立审查（code lane 31 文件 / arch lane 全域）：code lane REQUEST CHANGES（2 HIGH + 4 MEDIUM），arch lane WATCH（结构性债务 4 项，无 BLOCK）。
+
+已修补（生产行为变化）：
+
+1. **计划模式放行子代理调度（HIGH，turn/tools.ts）**——`task` 在允许表但子代理默认 BUILD 可写文件；已从计划允许表移除。旧引擎行为一致，属忠实移植的存量缺陷。
+2. **计划模式放行全部浏览器动作（HIGH，turn/tools.ts）**——仅 bash 有只读豁免，click/type 照跑；现按只读动作表过滤（`READ_ONLY_BROWSER_ACTIONS` 已导出复用）。
+3. **溢出标记大小写敏感（MEDIUM，turn/step.ts）**——`Context length exceeded` 等常见大小写被当普通失败；现统一小写匹配。
+4. **就绪前输入静默丢失（arch WATCH 实为正确性缺陷，cliRuntimeInvocation.ts）**——就绪检查完成前的 steer/followUp 被代理丢弃；现缓冲并在启动后投递，`pending`/`clearQueue` 可见缓冲。
+5. **doom 计数先于门禁（LOW，turn/tools.ts）**——被拒绝的调用也计入死循环并掩盖拒绝原因；现仅对通过门禁的调用计数，hook 拦截时清理审批记录。
+6. **空输入边界（LOW，turn/session.ts）**——空白 steer/followUp 进队列造成存储与上下文分歧；现边界丢弃。
+7. **解析错误回显无界（LOW，turn/step.ts）**——原始参数全文进上下文；现截断 500 字符。
+8. **注释口径（LOW，turn/step.ts）**——`reasoning_effort` 作用域为 step 函数实例而非会话；已正注释。
+
+跟踪中（本次不动，需后续决策）：
+
+- **QueryEvent 旧联合体成为永久契约**：新路径只发 7 种 shell 变体，旧 `runtime.*`/`turn.*`/`query.retrying`/`mcp.snapshot` 变体已无生产者。后续二选一：冻结为 shell 契约并剪除死变体（projection 为文档化 owner），或让内核事件直达新消费者。不得静默双轨并存。
+- **shell → turn 反向依赖**：`sessionRuntime.ts` 引 `TurnInput`（turn/session）、`core/shell/compaction.ts` 引 `toChatMessages`（turn/prompt）。后续将类型与纯函数下沉，恢复单向分层。
+- **名称预算耗尽**：`turn/session.ts` 19/20、`interactiveMode.ts` 20/20。下次改动前先拆分（溢出恢复/conclude/队列句柄；host 历史与 picker 助手），不得为压数内联嵌套。
+- **压缩失败静默**：`session.ts` 传 `undefined` 作 onError。无可用诊断通道（hook 事件无诊断位、transcript 污染不可取），保持静默，待可观测性方案后统一处理。
+- **accept-edits 符号链接穿越**（toolPolicy.ts，本提交未触及）：lexical resolve 可被 workspace 内软链绕过。属存量问题，记入安全 backlog。
+- **已删覆盖的风险接受**：cli-baseline 入口对等用例断言旧合成流程文本（不可移植）；recovery.* 四套件测旧 harness 交互，recovery.ts 本体测试保留。新路径由 turn 59 项 + GOLDEN_MAIN_PATH 覆盖，接受缺口。

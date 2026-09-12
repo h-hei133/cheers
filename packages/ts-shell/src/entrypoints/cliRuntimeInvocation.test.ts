@@ -165,4 +165,25 @@ describe("CLI runtime invocation", () => {
     expect(deltas.some((delta) => delta.includes("steered later"))).toBe(true);
     expect(run.input?.pending().followUps).toEqual([]);
   });
+
+  it("buffers input handed over before the readiness check finishes", async () => {
+    const { deps } = dependencies();
+    const { promise: readinessGate, resolve: releaseReadiness } = Promise.withResolvers<void>();
+    const gatedDeps: CliRuntimeInvocationDependencies = {
+      ...deps,
+      checkProviderReadiness: async () => {
+        await readinessGate;
+        return { ok: true };
+      },
+    };
+    const run = runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "first" }), gatedDeps);
+    run.input?.steer("early steer");
+    run.input?.followUp("early follow-up");
+    expect(run.input?.pending()).toEqual({ steering: ["early steer"], followUps: ["early follow-up"] });
+    const reading = collect(run.events);
+    releaseReadiness();
+    const events = await reading;
+    expect(events.at(-1)?.type).toBe("query.completed");
+    expect(run.input?.pending()).toEqual({ steering: [], followUps: [] });
+  });
 });

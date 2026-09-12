@@ -21,7 +21,7 @@ const READ_ONLY_TOOLS: Record<string, true> = {
   ask: true,
 };
 
-const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
+export const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
   observe: true,
   extract: true,
   url: true,

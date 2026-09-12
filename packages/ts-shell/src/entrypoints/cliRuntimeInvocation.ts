@@ -92,6 +92,8 @@ function deferUntilReady(
   dependencies: CliRuntimeInvocationDependencies,
 ): CliRuntimeInvocationResult {
   let started: CliRuntimeInvocationResult | undefined;
+  const bufferedSteers: string[] = [];
+  const bufferedFollowUps: string[] = [];
   const events = (async function* (): AsyncIterable<QueryEvent> {
     const readiness = await dependencies.checkProviderReadiness({
       provider: request.providerCredentialResolution.provider,
@@ -109,15 +111,30 @@ function deferUntilReady(
       return;
     }
     started = startTurn(request, dependencies);
+    for (const text of bufferedSteers) started.input?.steer(text);
+    for (const text of bufferedFollowUps) started.input?.followUp(text);
+    bufferedSteers.length = 0;
+    bufferedFollowUps.length = 0;
     yield* started.events;
   })();
   return {
     events,
     input: {
-      steer: (text) => started?.input?.steer(text),
-      followUp: (text) => started?.input?.followUp(text),
-      pending: () => started?.input?.pending() ?? { steering: [], followUps: [] },
-      clearQueue: () => started?.input?.clearQueue() ?? [],
+      steer: (text) => {
+        if (started?.input) started.input.steer(text);
+        else bufferedSteers.push(text);
+      },
+      followUp: (text) => {
+        if (started?.input) started.input.followUp(text);
+        else bufferedFollowUps.push(text);
+      },
+      pending: () => started?.input?.pending() ?? { steering: [...bufferedSteers], followUps: [...bufferedFollowUps] },
+      clearQueue: () => {
+        const taken = [...bufferedSteers, ...bufferedFollowUps];
+        bufferedSteers.length = 0;
+        bufferedFollowUps.length = 0;
+        return [...taken, ...(started?.input?.clearQueue() ?? [])];
+      },
     },
   };
 }

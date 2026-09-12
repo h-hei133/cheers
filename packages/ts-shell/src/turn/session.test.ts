@@ -204,4 +204,11 @@ describe("runTurn", () => {
     expect(run.clearQueue()).toEqual(["a", "b"]);
     expect(run.pending()).toEqual({ steering: [], followUps: [] });
   });
+
+  it("drops blank steering and follow-up input at the boundary", () => {
+    const run = runTurn(options({ step: () => new Promise(() => {}) }));
+    run.steer("   ");
+    run.followUp("");
+    expect(run.pending()).toEqual({ steering: [], followUps: [] });
+  });
 });

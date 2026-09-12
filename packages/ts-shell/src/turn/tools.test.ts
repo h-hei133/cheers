@@ -44,6 +44,16 @@ describe("createToolHooks", () => {
     expect(await hooks.beforeToolCall!(call("bash", { command: "git status" }))).toBeUndefined();
   });
 
+  it("blocks subagent dispatch and mutating browser actions in plan mode", async () => {
+    const hooks = createToolHooks(gate({ agentMode: "plan", permissionScope: "allow-all" }));
+    const task = await hooks.beforeToolCall!(call("task", { description: "explore" }));
+    expect(task?.block).toBe(true);
+    expect(task?.reason).toContain("Plan mode is active");
+    const click = await hooks.beforeToolCall!(call("browser", { action: "click", url: "https://x" }));
+    expect(click?.block).toBe(true);
+    expect(await hooks.beforeToolCall!(call("browser", { action: "observe", url: "https://x" }))).toBeUndefined();
+  });
+
   it("asks before a write in ask mode and carries the user's denial reason to the model", async () => {
     const escalationPromptHandler = vi.fn(async (prompt: { id: string }) => ({
       promptId: prompt.id,
@@ -82,6 +92,19 @@ describe("createToolHooks", () => {
     await hooks.beforeToolCall!(call("read", { path: "a" }));
     const third = await hooks.beforeToolCall!(call("read", { path: "a" }));
     expect(third?.reason).toContain("Doom Loop detected");
+  });
+
+  it("does not count denied calls toward the doom loop", async () => {
+    const escalationPromptHandler = vi.fn(async (prompt: { id: string }) => ({
+      promptId: prompt.id,
+      decision: "deny" as const,
+      respondedAt: 1,
+    }));
+    const hooks = createToolHooks(gate({ permissionScope: "ask", escalationPromptHandler }));
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const denied = await hooks.beforeToolCall!(call("write", { path: "a" }));
+      expect(denied?.reason).toContain("User denied permission");
+    }
   });
 });
 

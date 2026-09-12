@@ -216,10 +216,12 @@ export function runTurn(options: TurnOptions): TurnRun {
   return {
     events: channel,
     steer: (text) => {
+      if (!text.trim()) return;
       steering.push(text);
       core.steer({ role: "user", content: text });
     },
     followUp: (text) => {
+      if (!text.trim()) return;
       followUps.push(text);
       core.followUp({ role: "user", content: text });
     },

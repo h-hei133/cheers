@@ -66,7 +66,8 @@ export const CONTEXT_OVERFLOW_PREFIX = "Context overflow: ";
 
 /** Whether a provider failure means the context is too large, not that the request was wrong. */
 export function isContextOverflow(detail: string): boolean {
-  return OVERFLOW_MARKERS.some((marker) => detail.includes(marker));
+  const text = detail.toLowerCase();
+  return OVERFLOW_MARKERS.some((marker) => text.includes(marker));
 }
 
 /** Whether a failed assistant message failed because the context overflowed. */
@@ -89,9 +90,9 @@ interface CompletionShape {
  * Ask the model for its next step.
  *
  * A host that rejects `reasoning_effort` costs one retry rather than the turn;
- * once dropped the field stays dropped for this session, because asking again
- * would fail again. An overflow answer comes back as a failed step with its own
- * prefix so the session can compact and retry rather than report it.
+ * once dropped the field stays dropped for this step function, because asking
+ * again would fail again. An overflow answer comes back as a failed step with
+ * its own prefix so the session can compact and retry rather than report it.
  */
 export function createStepFunction(request: StepRequest): StepFunction {
   let effortAccepted = true;
@@ -209,14 +210,13 @@ export function toStep(completion: CompletionShape, listener: StepListener): Ass
     ...(silent ? { errorMessage: emptyAnswerExplanation(choice?.finish_reason, completion.reasoning?.length ?? 0) } : {}),
   };
 }
-
 function toToolCall(call: StreamedToolCall): AgentToolCall {
   let args: unknown;
   try {
     args = parseJsonWithRepair<Record<string, unknown>>(call.function.arguments || "{}");
   } catch (error) {
     args = {
-      [PARSE_ERROR_KEY]: `Invalid JSON arguments: ${error instanceof Error ? error.message : String(error)}. Raw: ${call.function.arguments}`,
+      [PARSE_ERROR_KEY]: `Invalid JSON arguments: ${error instanceof Error ? error.message : String(error)}. Raw: ${call.function.arguments.slice(0, 500)}`,
     };
   }
   return { id: call.id, name: call.function.name, args };
