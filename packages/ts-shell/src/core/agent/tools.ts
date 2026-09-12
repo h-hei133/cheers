@@ -23,7 +23,7 @@ export interface AgentTool {
     toolCallId: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
-    onUpdate?: (partialResult: unknown) => void,
+    onUpdate?: (partialResult: unknown, options?: { checkpoint?: boolean }) => void,
   ): Promise<AgentToolResult>;
 }
 
