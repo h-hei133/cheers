@@ -189,3 +189,52 @@ confidence: high
 8. 终端矩阵体验记录。
 
 每一步先有 failing test，再改生产代码，最后跑 focused 验证；手感部分由真机体验确认，不用脚本伪造。
+
+## 7. 阶段划分
+
+> 按用户价值与依赖关系划分，不按文件数量划分；每个阶段独立可验证、可发布。
+
+### E1：输入与取消手感
+
+范围：取消阶梯、队列手感、滚动速度分层、编辑器基础手感。
+
+- overlay 打开先关 overlay，turn 运行中再中断，空闲保护草稿；
+- busy 输入 Enter 转向、Alt+Enter 跟进、中断回填、队列状态可见；
+- 滚轮、PgUp/PgDn、Shift+方向键、Home/End 速度分层；
+- 词跳跃、kill-ring、undo/redo 基础能力。
+
+验证：focused 交互测试 + 真机手感确认。
+
+### E2：命令发现与执行
+
+范围：slash 命令补齐、参数提示、命令来源统一、交互形态分离。
+
+- 补齐 settings、model、thinking、tree、fork/clone、trust、login/logout、new/compact/resume/reload/quit、export/import/share/copy/name/session/changelog/hotkeys；
+- 每个命令携带参数提示与前缀补全；
+- 内置、扩展、模板、技能统一注册订阅；
+- 选择器、面板、只读输出、破坏性确认四种形态分离。
+
+验证：注册表测试 + 补全测试 + 真机命令走查。
+
+### E3：状态与风格一致性
+
+范围：状态表达、消息分层、主题语义、布局预算。
+
+- footer/status bar、streaming 加载语、hidden thinking 标签、editor widget；
+- 用户、assistant、thinking、tool、compaction、notice 视觉分层；
+- track/thumb 主题注入与深浅对比度；
+- chrome 高度预算、transcript 最小可见行、overlay 全屏/内联分离、窄屏降级。
+
+验证：chrome/transcript 主题测试 + 真机视觉确认。
+
+### E4：配置与发布准备
+
+范围：显示配置、快捷键配置、会话配置、持久化与发布门。
+
+- thinking 显示、缓存提示、输出内边距、补全可见数、硬件光标、Markdown、警告；
+- 应用级与编辑器级快捷键分离、Windows/WSL 差异、重载、`/hotkeys`、冲突发现；
+- 模型作用域、thinking 等级、外部编辑器、shell 路径、压缩阈值；
+- 全局与项目级分离、修改可感知、重载不丢会话；
+- 终端矩阵记录、长会话预算、断开证据、发布门归档。
+
+验证：配置测试 + 真机矩阵 + 发布门清单。
