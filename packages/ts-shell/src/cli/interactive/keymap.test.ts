@@ -66,6 +66,14 @@ describe("scrolling", () => {
     expect(actions.scroll).toHaveBeenCalledWith(-5);
     expect(actions.scroll).toHaveBeenCalledWith(5);
   });
+
+  it("scrolls faster through the enhanced keyboard form", () => {
+    const { press, actions } = build();
+    press("\x1b[57419;2u");
+    press("\x1b[57420;2u");
+    expect(actions.scroll).toHaveBeenCalledWith(-5);
+    expect(actions.scroll).toHaveBeenCalledWith(5);
+  });
 });
 
 describe("text entry", () => {
