@@ -238,3 +238,28 @@ confidence: high
 - 终端矩阵记录、长会话预算、断开证据、发布门归档。
 
 验证：配置测试 + 真机矩阵 + 发布门清单。
+
+---
+
+## E1 双子代理探索复核记录（d007bece / 3a86e071 → 本次修补）
+
+两路只读子代理对照参考项目的滚动分层与按键体系，裁决如下。
+
+### 探索结论
+
+1. **滚动分层**——参考为 wheel(1) < Alt+wheel(5) < halfPage < page(viewport−4)，另有 line/prompt 跳转/top-bottom；裸 shift+up/down 无默认绑定（仅解析层），ctrl+shift+up/down 是语义 prompt 跳转。本仓 shift+arrow=5 行是自有设计（E1 任务文档 §2.3 明确要求），参考不能作为依据，保留。
+2. **按键冲突**——shift+up/down 与 shift+tab keyId 正交（final 字节 A/B vs Z），无冲突；编辑器无键盘选区模型，无抢占；CSI 1;2A 与 CSI-u 双编码均归一，双路径测试已锁定。
+3. **指南一致**——"a few rows" 与 5 行一致；符号方向正确；dispatched⊆advertised 防漂移测试锁定。
+
+### 本次修补（LOW，1 项）
+
+1. **指南尾注过宽**（chrome/keys.ts）——negotiated 尾注称 "the shifted chords above are available"，legacy 用户会误以为 shift+up/down 也需协商；实际 shift+up/down 走标准 CSI 无需增强协议。收窄为 "the shifted Enter chords above are available"。
+
+### 经核实排除项
+
+- **shift+arrow 无草稿门控**：pageup/pagedown 同样全局滚动，同类接受不对称；未来做键盘选区时须同步收回 shift+up/down（备选 ctrl+shift），已在本文记录决策点。
+- **滚轮基数 3 vs 参考 1**：手感选择，不在本轮改动；真机体验确认后再定。
+
+### 验证
+
+- `build:ts` 通过；keymap + chrome 8 套件 137 项全部通过。

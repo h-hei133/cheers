@@ -100,7 +100,7 @@ export function renderKeyGuide(negotiated: boolean): string {
   }
   lines.push(
     negotiated
-      ? "This terminal reports modified keys, so the shifted chords above are available."
+      ? "This terminal reports modified keys, so the shifted Enter chords above are available."
       : "This terminal does not report modified keys, so `ctrl+j` is the newline that always works.",
   );
   return lines.join("\n");
