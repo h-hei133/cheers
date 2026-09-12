@@ -65,7 +65,7 @@ export const SLASH_COMMANDS = [
     aliases: ["models"],
     group: "diagnostics",
     summary: "inspect and switch active model",
-    argumentHint: "<provider/model>",
+    argumentHint: "use <provider/model>",
   },
   {
     name: "mcp",

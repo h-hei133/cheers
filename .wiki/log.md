@@ -210,3 +210,4 @@
 ## [2026-09-12] review | Phase 4 提交 a7418fcb 双车道复核修补：code lane REQUEST CHANGES（2 HIGH 计划模式放行 task/浏览器写动作 + 4 MEDIUM）+ arch lane WATCH（无 BLOCK）；修补 8 项（计划表收敛 Record、浏览器只读过滤、溢出大小写、就绪前输入缓冲、doom 门禁后计数、空输入丢弃、解析错误截断、注释口径）+ 6 项回归测试；转交跟踪 6 项记入原则文档 §11.6；tsc 通过、触及域 114 项通过、聚合 6 失败与基线一致零回归
 ## [2026-09-12] review | E1 提交 d007bece 双车道复核修补：code lane COMMENT（1 MEDIUM 目录文案漂移 + 1 LOW 增强键盘形态无测试）+ arch lane WATCH（干净的部分交付，无原则违反）；修补目录文案为 few rows、补 CSI-u 57419/57420 测试；固定 5 行中间层成立（keymap 保持布局无关）；scrollToStart 对称与 Home/End 扩展留 E1 完成时；keymap+chrome 137 项通过、tsc 通过
 ## [2026-09-12] review | E1 双子代理探索复核（d007bece/3a86e071）：shift+arrow 5 行系自有设计予以保留，按键无冲突解析双锁定；修补指南尾注过宽为 shifted Enter chords；草稿门控与滚轮基数记决策点延后；137 项通过、build:ts 通过
+## [2026-09-12] review | E2 提交 873da382 双车道复核修补：code lane 2 MEDIUM + 2 LOW（测试弱断言、覆盖部分）+ arch lane WATCH（展示与分发双注册表分歧）；修补 hint 补动词贴合运行语法、测试收紧精确匹配 + 负断言；后续（覆盖 40 命令、注册表合流、hint 列、缓存失效）记入方向文档 E2 进展；89 项通过、tsc 通过

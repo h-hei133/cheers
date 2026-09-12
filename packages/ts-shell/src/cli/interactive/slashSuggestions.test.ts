@@ -38,6 +38,9 @@ describe("command completions", () => {
   it("surfaces argument hints for commands that take arguments", () => {
     const matches = slashSuggestions("/model");
     expect(matches?.some((match) => match.value === "/model")).toBe(true);
-    expect(matches?.find((match) => match.value === "/model")?.detail).toContain("<");
+    expect(matches?.find((match) => match.value === "/model")?.detail).toBe(
+      "inspect and switch active model use <provider/model>",
+    );
+    expect(slashSuggestions("/diagnose")?.[0]?.detail).not.toContain("<");
   });
 });
