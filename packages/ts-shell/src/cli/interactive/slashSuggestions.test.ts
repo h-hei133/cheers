@@ -43,4 +43,19 @@ describe("command completions", () => {
     );
     expect(slashSuggestions("/diagnose")?.[0]?.detail).not.toContain("<");
   });
+
+  it("advertises every dispatchable command, including commit/tools/thinking", () => {
+    const values = new Set(
+      (slashSuggestions("/") ?? []).map((match) => match.value),
+    );
+    expect(values.has("/commit")).toBe(true);
+    expect(values.has("/tools")).toBe(true);
+    expect(values.has("/thinking")).toBe(true);
+  });
+
+  it("hints the thinking levels the router accepts", () => {
+    expect(slashSuggestions("/thinking")?.[0]?.detail).toBe(
+      "inspect or set reasoning effort for the next turn use [low|medium|high|off]",
+    );
+  });
 });

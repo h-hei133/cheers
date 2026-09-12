@@ -274,3 +274,29 @@ confidence: high
 ### 验证
 
 - `build:ts` 通过；keymap + chrome 8 套件 137 项全部通过。
+
+---
+
+## E2 双子代理探索复核记录（873da382 / 33bbc81d → 本次修补）
+
+两路只读子代理对照参考项目的命令提示与注册表机制，裁决如下。
+
+### 探索结论
+
+1. **hint 覆盖率**——参考同样极低（仅 model/thinking/login 三家带 hint），本仓 1/34 起步符合现状；参考错误提示为各 handler 内联、无统一可用值框架；参数前缀补全是第二阶段（精确匹配命令名后调 getArgumentCompletions）。E2 文档"后续补齐"计划成立，不加速。
+2. **双注册表漂移（属实）**——展示侧 43 条 vs 分发侧 45 条：分发独有 commit/tools/thinking 可执行但补全不可见；别名分歧 compact 缺 handoff、log 缺 logs；statusline 反向漂移经核实为 picker 形态（overlay 选择器），展示有分发无正确，排除。
+
+### 本次修补
+
+1. **补齐漂移条目**（slashCommandRegistry.ts）——新增 commit/tools/thinking 展示条目并各带 hint（`use [guidance]` / `use [tool-name]` / `use [low|medium|high|off]`，与各 handler 实际接受的参数一致，thinking 可用值与 "is not a level" 文案一致）；compact 补 handoff 别名，log 补 logs 别名。hint 覆盖 1 → 4。
+2. **回归测试**——补全必含 commit/tools/thinking 断言 + thinking hint 精确匹配。
+
+### 经核实排除项
+
+- **补全不匹配别名**：既有设计（40 个交集命令同样只按 label 匹配），handoff/logs 与其他别名行为一致，不改。
+- **33 个裸奔 hint**：按 E2 文档后续计划逐批补齐，不在本轮。
+- **candidates() 缓存无失效**：注册表静态无突变，当前零影响；动态注册落地时同步加重置（文档已有记录）。
+
+### 验证
+
+- `build:ts` 通过；交互 + 注册表 21 套件 250 项全部通过。

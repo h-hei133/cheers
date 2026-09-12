@@ -187,6 +187,7 @@ export const SLASH_COMMANDS = [
   },
   {
     name: "compact",
+    aliases: ["handoff"],
     group: "context",
     summary: "condense earlier turns into a checkpoint to free context",
   },
@@ -197,6 +198,7 @@ export const SLASH_COMMANDS = [
   },
   {
     name: "log",
+    aliases: ["logs"],
     group: "workspace",
     summary: "tail, locate, export, or clear the structured session log",
   },
@@ -251,6 +253,25 @@ export const SLASH_COMMANDS = [
     aliases: ["research", "deep"],
     group: "workflow",
     summary: "conduct multi-agent tree search and cross-source consensus research",
+  },
+  {
+    name: "commit",
+    group: "workflow",
+    summary: "draft a commit message from the staged diff",
+    argumentHint: "use [guidance]",
+  },
+  {
+    name: "tools",
+    group: "diagnostics",
+    summary: "list available tools or inspect one in detail",
+    argumentHint: "use [tool-name]",
+  },
+  {
+    name: "thinking",
+    aliases: ["effort"],
+    group: "diagnostics",
+    summary: "inspect or set reasoning effort for the next turn",
+    argumentHint: "use [low|medium|high|off]",
   },
   {
     name: "brainstorm",
