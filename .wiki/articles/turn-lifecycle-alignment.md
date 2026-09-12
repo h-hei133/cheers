@@ -435,3 +435,34 @@ export class AgentCore {
 ### 9.4 验证
 
 - `build:ts` 通过；会话屏障 4 项 + 交互 21 套件 241 项全部通过。
+
+---
+
+## 10. Phase 4 前置四路审计门闩（b7daf547 前）
+
+本轮仅做补充与修补，不开 Phase 4 新分支。派四路只读子代理地毯式复核，全部持 file:line 证据。
+
+### 10.1 内核（KernelScout）—— 无 HIGH/MEDIUM
+
+`queue/state/events/tools/loop/agent` 六文件与测试全部复核为 PASS；工具结果消息事件、abort 配对、length 拒执行并继续、退出前全量历史携带、idle 透错 + lastRun 粘滞、双队列 continue/skipInitialSteeringPoll 等均与参考一致。仅 2 个 LOW 为已记载的 deliberate 分歧，不修。
+
+### 10.2 会话（SessionScout）—— 2 个 MEDIUM 已在 §8 记录为 Phase 4 接线工作
+
+压缩策略/持久化 writer/内核钩子/参考对比全部验证；7 项既往修补均在文件。`proactive compaction 未挂载生产路径` 与 `token vs message 保留策略 drift` 属 §8 已知的 Phase 4 接线工作，不在本轮消化；其余 3 个 LOW 为启发式偏差或 schema 形态差异。
+
+### 10.3 表面（SurfaceScout）—— queue 已拓宽、idle 已可等待，disposition 死字段等 3 个 MEDIUM 已在 §9.3 延后
+
+`queue: Array<{text, disposition}>` 联合类型正确但只写不读、busy 默认 followUp 无 steering 消费点、idle 屏障已可等待（`waitForIdle`/`cancelAndWait` + `interrupt` 异步化且保留 sync 合约）、turnSink 边界与取消合成为刻意保形。剩余 MEDIUM 均为 Phase 4 本体工作。
+
+### 10.4 遗留与横切（LegacyScout）—— 双轨待切、R-01..R-06 边际借用已评估
+
+双轨（agentLoop / contract loop / turnFacade / turnKernel 等 D-01..D-10）仍在生产路径，新内核零生产接入——属 Phase 4 消化范围，本轮不切流量。R-02 `onUpdate checkpoint` 值得借用（本轮已拓宽，零行为变化），R-01 schema 校验与 R-03 溢出重试属 Phase 4 增量，R-04/R-05 已正确借用。
+
+### 10.5 本轮修补
+
+1. **tools.ts onUpdate 拓宽**（R-02 借用，LOW）——`onUpdate?: (partial, options?: {checkpoint?: boolean}) => void`，为长运行工具留位；busywait 测试不改（并发成立时机敏感，留 LOW）。
+2. **文档沉淀**为本节。
+
+### 10.6 验证
+
+- `build:ts` 通过；内核 + 会话 70 套件 397 项通过；新文件零外部项目名称。
