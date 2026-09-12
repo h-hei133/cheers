@@ -37,6 +37,8 @@ function build(busy = false): {
     openRewind: vi.fn(),
     retry: vi.fn(),
     syncSuggestions: vi.fn(),
+    scroll: vi.fn(),
+    scrollPage: vi.fn(),
     scrollToEnd: vi.fn(),
     copySelection: vi.fn().mockReturnValue(false),
   };
@@ -56,6 +58,15 @@ function build(busy = false): {
       }),
   };
 }
+describe("scrolling", () => {
+  it("scrolls faster with shift+up and shift+down", () => {
+    const { press, actions } = build();
+    press("\x1b[1;2A");
+    press("\x1b[1;2B");
+    expect(actions.scroll).toHaveBeenCalledWith(-5);
+    expect(actions.scroll).toHaveBeenCalledWith(5);
+  });
+});
 
 describe("text entry", () => {
   it("inserts printable characters", () => {

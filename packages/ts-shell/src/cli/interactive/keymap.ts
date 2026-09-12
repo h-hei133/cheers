@@ -40,6 +40,9 @@ const KILLS: Record<string, KillTarget> = {
 
 const NEWLINE_KEYS = new Set(["shift+enter", "alt+enter", "ctrl+j"]);
 
+/** Rows moved per keystroke for shift+arrow fast scrolling. */
+const FAST_SCROLL_ROWS = 5;
+
 /** The host actions a key can reach; the seam names them once for every surface. */
 export type KeymapActions = ViewActions;
 
@@ -196,8 +199,11 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
     case "pagedown":
       actions.scrollPage(1);
       return;
+    case "shift+up":
+      actions.scroll(-FAST_SCROLL_ROWS);
+      return;
     case "shift+down":
-      actions.scroll(1);
+      actions.scroll(FAST_SCROLL_ROWS);
       return;
     case "ctrl+end":
       // With a non-empty draft the caret jumps inside the draft; on an empty
