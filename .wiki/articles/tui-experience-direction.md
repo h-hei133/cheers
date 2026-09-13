@@ -300,3 +300,29 @@ confidence: high
 ### 验证
 
 - `build:ts` 通过；交互 + 注册表 21 套件 250 项全部通过。
+
+---
+
+## 手动体验记录（2026-09-13）
+
+### E1：Alt+Enter 冲突与 steer 语义不清
+
+- **Alt+Enter 与系统热键冲突**：真机体验中触发了宿主全屏，而不是当前 TUI 的 follow-up 输入。当前实现把 Alt+Enter 作为 busy 时的 follow-up、idle 时的换行，因此该按键不能作为跨终端可靠默认键。
+- **处理方向**：暂不把 Alt+Enter 视为已完成的可用交互；下一轮应先调查终端/桌面环境可稳定传递的替代键，再修改提示、解析和回归测试。不得只改文案掩盖冲突。
+- **Enter steer 说明不足**：`steer` 是 turn 运行期间将新输入交给当前 turn 的下一次模型步骤；它不是立即启动独立 turn，也不是等待当前 turn 结束后再启动。当前提示语只写 `enter steer`，缺少用户可理解的解释，需改成面向行为的提示。
+
+### E2：命令提示的可见性误解
+
+- 当前 `/model` 的 `argumentHint` 只被拼入补全候选的 `detail`，实现位置为 `cli/interactive/slashSuggestions.ts` 与 `presentation/tui/chrome/suggestions.ts`。
+- 它不是输入框中 `/model` 后面自动出现的浅色 inline ghost text，也不是命令执行后的参数帮助。
+- 当前可观察形态是：输入 `/` 或 `/mod` 打开候选列表后，候选行右侧显示命令说明；接受候选后不会自动插入参数提示。
+- 真机未观察到“命令后面的浅色提示”是符合当前实现的，不是终端颜色故障。
+- **处理方向**：后续要单独设计 inline argument hint 或 command help；在设计确定前，不把 `argumentHint` 描述成已完成的命令后提示。
+
+### 当前状态修正
+
+- **E1**：Shift+方向键自动化已实现，但 Alt+Enter 默认交互被真机否定；steer 语义提示需要重写，阶段未完成。
+- **E2**：注册表补全和候选 detail 管道已实现；命令后 inline hint、参数补全、参数错误引导和完整命令走查未实现，阶段未完成。
+- **E3**：本记录暂不新增 E3 功能结论；状态与风格统一仍按阶段计划推进。
+
+后续所有完成声明必须区分“候选 detail 已实现”和“命令后 inline hint 已实现”，也必须区分“内部 steer 语义已接通”和“用户已理解该语义”。
