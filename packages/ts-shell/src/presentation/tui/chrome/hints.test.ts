@@ -89,7 +89,21 @@ describe("renderHints", () => {
       80,
     );
     const text = stripAnsi(rows[0]!);
-    expect(text).toContain("enter steer into next step");
-    expect(text).toContain("ctrl+q queue follow-up");
+    expect(text).toContain("enter add to current step");
+    expect(text).toContain("ctrl+q run after turn");
+  });
+  it("shows queued follow-up counts while busy", () => {
+    const rows = renderHints(
+      {
+        busy: true,
+        suggesting: false,
+        cancelArmed: false,
+        queued: 2,
+        newlineKey: "ctrl+j",
+      },
+      { openTodos: 0, peerSessions: 0 },
+      80,
+    );
+    expect(stripAnsi(rows[0]!)).toContain("2 queued");
   });
 });
