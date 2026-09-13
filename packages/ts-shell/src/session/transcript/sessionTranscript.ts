@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import {
   createMessageTranscriptEvent,
-  decodeTranscriptLine,
+  decodeTranscriptLineSafe,
   encodeTranscriptEvent,
   transcriptEventToSessionMessage,
   type TranscriptEvent,
@@ -14,11 +14,13 @@ export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] 
     return [];
   }
 
-  return fs
-    .readFileSync(transcriptPath, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map(decodeTranscriptLine);
+  const events: TranscriptEvent[] = [];
+  for (const line of fs.readFileSync(transcriptPath, "utf8").split("\n")) {
+    if (!line) continue;
+    const event = decodeTranscriptLineSafe(line);
+    if (event) events.push(event);
+  }
+  return events;
 }
 
 export function appendTranscriptEvent(

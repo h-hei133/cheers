@@ -146,8 +146,13 @@ export class HookDispatcher {
               accumulatedDecision = parsed;
             }
           }
-        } catch (err: any) {
-          // Log command hook failure and allow main execution to proceed gracefully
+        } catch (err: unknown) {
+          logger.error(`Command hook failed for event ${relevantEvent}`, {
+            event: relevantEvent,
+            command: hook.command,
+            timeoutMs,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     }

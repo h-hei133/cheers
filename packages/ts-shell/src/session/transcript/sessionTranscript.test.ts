@@ -80,3 +80,28 @@ describe("sessionTranscript", () => {
     expect(events).toEqual(["append", "metadata", "state"]);
   });
 });
+
+describe("corrupt transcript lines", () => {
+  it("skips truncated and misshapen lines instead of failing the session", async () => {
+    const { readTranscriptEvents } = await import("./sessionTranscript.js");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-corrupt-"));
+    try {
+      const file = path.join(root, "transcript.jsonl");
+      fs.writeFileSync(
+        file,
+        [
+          JSON.stringify({ type: "message", role: "user", content: "hi", timestamp: "t1" }),
+          "{truncated",
+          JSON.stringify({ type: "message", role: "user", timestamp: "t2" }),
+          JSON.stringify([]),
+          JSON.stringify({ type: "message", role: "assistant", content: "ok", timestamp: "t3" }),
+        ].join("\n"),
+        "utf8",
+      );
+      const events = readTranscriptEvents(file);
+      expect(events.map((event) => (event.type === "message" ? event.content : event.type))).toEqual(["hi", "ok"]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

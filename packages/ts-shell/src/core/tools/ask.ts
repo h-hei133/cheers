@@ -64,19 +64,24 @@ export function createAskToolDefinition(): ToolDefinition {
       }
 
       if (typeof context?.interactiveAsk === "function") {
+        const valid = questions.filter(
+          (q): q is AskQuestion => !!q && typeof q === "object" && typeof q.id === "string" && typeof q.question === "string",
+        );
+        if (valid.length === 0) {
+          return deniedResult("Error: questions array contains no valid question entries.");
+        }
         try {
-          const userAnswers = await context.interactiveAsk(questions);
+          const userAnswers = await context.interactiveAsk(valid);
           if (userAnswers && Object.keys(userAnswers).length > 0) {
-            const formatted = questions
+            const formatted = valid
               .map((q) => {
-                const qId = q.id || "unspecified";
-                const rawDecision = userAnswers[qId];
+                const rawDecision = userAnswers[q.id];
                 const chosen =
                   (rawDecision && rawDecision.trim()) ||
                   (q.recommended !== undefined && q.options?.[q.recommended]
                     ? q.options[q.recommended].label
                     : "No answer provided");
-                return `### Question [${qId}]: ${q.question}\n- **User Decision**: ${chosen}`;
+                return `### Question [${q.id}]: ${q.question}\n- **User Decision**: ${chosen}`;
               })
               .join("\n\n");
             return approvedResult(`# User Decisions Received\n\n${formatted}`);

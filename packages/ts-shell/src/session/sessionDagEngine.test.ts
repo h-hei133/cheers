@@ -71,3 +71,22 @@ describe("Unified JSONL SessionDagEngine", () => {
     expect(ctx.messages[2].content).toBe("New response 4");
   });
 });
+
+describe("corrupt DAG lines", () => {
+  it("skips malformed entries but rejects a corrupt header", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-dag-corrupt-"));
+    try {
+      const file = path.join(root, "dag.jsonl");
+      const header = JSON.stringify({ type: "session", version: 3, id: "s1", timestamp: "t0", cwd: "/tmp" });
+      const good = JSON.stringify({ type: "message", id: "m1", parentId: null, message: { role: "user", content: "hi" }, timestamp: "t1" });
+      fs.writeFileSync(file, [header, "{bad", good, JSON.stringify({ type: "nope", id: "x" })].join("\n"), "utf8");
+      const engine = SessionDagEngine.load(file);
+      expect(engine.getActiveLeafId()).toBe("m1");
+      const badHeader = path.join(root, "bad.jsonl");
+      fs.writeFileSync(badHeader, "{bad", "utf8");
+      expect(() => SessionDagEngine.load(badHeader)).toThrow();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

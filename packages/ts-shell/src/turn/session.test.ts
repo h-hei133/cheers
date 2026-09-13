@@ -167,6 +167,25 @@ describe("runTurn", () => {
     if (terminal?.type === "query.completed") expect(terminal.result.finalOutput).toBe("answered after compaction");
   });
 
+  it("reports overflow failure when the summarizer fails", async () => {
+    const history: SessionMessage[] = [];
+    for (let index = 0; index < 4; index += 1) {
+      history.push({ role: "user", content: `q${index}` }, { role: "assistant", content: `a${index}` });
+    }
+    const setup = options({
+      history,
+      step: async () => ({ text: "", toolCalls: [], stopReason: "error" as const, errorMessage: `${CONTEXT_OVERFLOW_PREFIX}too big` }),
+      compaction: {
+        policy: { contextWindow: 1_000_000 },
+        summarize: async () => {
+          throw new Error("summarizer down");
+        },
+        onCompact: () => {},
+      },
+    });
+    const events = await drain(runTurn(setup).events);
+    expect(events.at(-1)).toEqual({ type: "query.failed", error: "Context overflow error: could not compact context automatically." });
+  });
   it("delivers steering before the next step and follow-ups after the run would stop", async () => {
     const seen: string[] = [];
     const setup = options({

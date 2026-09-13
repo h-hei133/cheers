@@ -342,6 +342,7 @@ export function createCoreToolRegistry(options?: {
         const content = typeof args.content === 'string' ? args.content : ''
         const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
         let original = ''
+        let originalUnreadable = false
         try {
           original = await executionService.readTextFile({
             operationKind: 'file.read',
@@ -352,7 +353,9 @@ export function createCoreToolRegistry(options?: {
             reason: 'Read original content for diff.',
             reportSafeTarget: containment.resolvedPath,
           })
-        } catch {}
+        } catch {
+          originalUnreadable = true
+        }
         await executionService.writeTextFile({
           operationKind: 'file.write',
           absolutePath: containment.resolvedPath,
@@ -364,7 +367,11 @@ export function createCoreToolRegistry(options?: {
           reportSafeTarget: containment.resolvedPath,
         })
         const diff = original && original !== content ? createUnifiedDiff(relPath, original, content) : ''
-        const output = diff ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\`` : `Wrote ${relPath}`
+        const output = diff
+          ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\``
+          : originalUnreadable
+            ? `Wrote ${relPath} (original unreadable, no diff)`
+            : `Wrote ${relPath}`
         return approvedResult(output)
       },
     },
@@ -411,6 +418,7 @@ export function createCoreToolRegistry(options?: {
 
         const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
         let original = ''
+        let originalUnreadable = false
         let finalContent = ''
         if (typeof args.oldText === 'string' && typeof args.newText === 'string') {
           original = await executionService.readTextFile({
@@ -440,7 +448,9 @@ export function createCoreToolRegistry(options?: {
               reason: 'Read original content for diff.',
               reportSafeTarget: containment.resolvedPath,
             })
-          } catch {}
+          } catch {
+            originalUnreadable = true
+          }
           finalContent = args.content
         } else {
           throw new Error("Must provide either 'content' or both 'oldText' and 'newText'.")
@@ -457,7 +467,11 @@ export function createCoreToolRegistry(options?: {
           reportSafeTarget: containment.resolvedPath,
         })
         const diff = original && original !== finalContent ? createUnifiedDiff(relPath, original, finalContent) : ''
-        const output = diff ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\`` : `Updated ${relPath}`
+        const output = diff
+          ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\``
+          : originalUnreadable
+            ? `Updated ${relPath} (original unreadable, no diff)`
+            : `Updated ${relPath}`
         return approvedResult(output)
       },
     },

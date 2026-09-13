@@ -48,6 +48,39 @@ export type SessionDagEntry =
       readonly timestamp: string;
     };
 
+function parseSessionHeader(line: string | undefined): SessionHeader {
+  if (!line) throw new Error("Empty session DAG file");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    throw new Error("Corrupt session DAG header: not JSON");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Corrupt session DAG header: bad shape");
+  }
+  const record = parsed as Record<string, unknown>;
+  if (record.type !== "session" || typeof record.id !== "string" || typeof record.timestamp !== "string" || typeof record.cwd !== "string") {
+    throw new Error("Corrupt session DAG header: bad shape");
+  }
+  return parsed as SessionHeader;
+}
+
+function parseSessionDagEntry(line: string | undefined): SessionDagEntry | undefined {
+  if (!line) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+  const record = parsed as Record<string, unknown>;
+  if (typeof record.type !== "string" || typeof record.id !== "string") return undefined;
+  if (record.type !== "message" && record.type !== "compaction" && record.type !== "branch_summary") return undefined;
+  return parsed as SessionDagEntry;
+}
+
 export class SessionDagEngine {
   readonly header: SessionHeader;
   readonly filePath: string;
@@ -94,11 +127,12 @@ export class SessionDagEngine {
       throw new Error(`Empty session DAG file: ${filePath}`);
     }
 
-    const header = JSON.parse(lines[0]) as SessionHeader;
+    const header = parseSessionHeader(lines[0]);
     const engine = new SessionDagEngine(filePath, header);
 
     for (let i = 1; i < lines.length; i++) {
-      const entry = JSON.parse(lines[i]) as SessionDagEntry;
+      const entry = parseSessionDagEntry(lines[i]);
+      if (!entry) continue;
       engine.entriesById.set(entry.id, entry);
       engine.activeLeafId = entry.id;
     }

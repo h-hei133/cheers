@@ -7,6 +7,7 @@
  * - state.json      -> mutable runtime state snapshot
  */
 
+import { createComponentLogger } from "../observability/structuredLogger.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type {
   QueryRuntimeRecoveryBoundary,
@@ -160,6 +161,8 @@ export type ResumeResult = SessionResumeResult;
 
 export interface ResumeOptions extends SessionResumeOptions {}
 
+const sessionLogger = createComponentLogger("SessionManager");
+
 export class SessionManager {
   private static readonly AUTO_COMPACT_TURN_THRESHOLD = 12;
   private static readonly APPROVAL_AUDIT_HISTORY_LIMIT =
@@ -260,12 +263,12 @@ export class SessionManager {
     this.store.writeSessionMetadata(session);
     return dropped;
   }
-
   /** The stored record, or undefined when it is gone or unreadable. */
   getSession(sessionId: string): Session | undefined {
     try {
       return this.store.load(sessionId);
-    } catch {
+    } catch (error) {
+      sessionLogger.warn("Failed to load session", { sessionId, error: error instanceof Error ? error.message : String(error) });
       return undefined;
     }
   }
@@ -465,7 +468,8 @@ export class SessionManager {
     let session: Session;
     try {
       session = this.store.load(sessionId);
-    } catch {
+    } catch (error) {
+      sessionLogger.warn("Failed to load session for discard check", { sessionId, error: error instanceof Error ? error.message : String(error) });
       return false;
     }
     if (sessionHasConversation(session)) return false;

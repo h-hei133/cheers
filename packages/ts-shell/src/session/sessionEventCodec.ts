@@ -80,6 +80,31 @@ export function decodeTranscriptLine(line: string): TranscriptEvent {
   return JSON.parse(line) as TranscriptEvent;
 }
 
+const TRANSCRIPT_ROLES: ReadonlySet<unknown> = new Set(["system", "user", "assistant", "tool"]);
+
+function isTranscriptEvent(value: unknown): value is TranscriptEvent {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (typeof record.type !== "string" || typeof record.timestamp !== "string") return false;
+  if (record.type === "message") {
+    return TRANSCRIPT_ROLES.has(record.role) && typeof record.content === "string";
+  }
+  if (record.type === "lifecycle") return typeof record.event === "string";
+  if (record.type === "query-event") return record.event !== null && typeof record.event === "object";
+  if (record.type === "compaction") return typeof record.summary === "string";
+  return false;
+}
+
+export function decodeTranscriptLineSafe(line: string): TranscriptEvent | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+  return isTranscriptEvent(parsed) ? parsed : undefined;
+}
+
 export function transcriptEventToSessionMessage(
   event: TranscriptEvent,
 ): SessionMessage | undefined {

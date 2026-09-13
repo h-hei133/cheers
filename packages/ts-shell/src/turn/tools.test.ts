@@ -106,6 +106,53 @@ describe("createToolHooks", () => {
       expect(denied?.reason).toContain("User denied permission");
     }
   });
+
+  it("blocks when a PreToolUse hook returns block", async () => {
+    const setup = gate({ permissionScope: "allow-all" });
+    setup.hooks = {
+      dispatch: async (payload: { eventName: string }) => {
+        setup.dispatched.push(payload.eventName);
+        return payload.eventName === "PreToolUse" ? { decision: "block", reason: "policy says no" } : { decision: "allow" };
+      },
+    } as unknown as HookDispatcher;
+    const hooks = createToolHooks(setup);
+    const blocked = await hooks.beforeToolCall!(call("read", { path: "a" }));
+    expect(blocked?.block).toBe(true);
+    expect(blocked?.reason).toContain("policy says no");
+  });
+
+  it("appends PostToolUse feedback to the result", async () => {
+    const setup = gate({ permissionScope: "allow-all" });
+    setup.hooks = {
+      dispatch: async () => ({ decision: "allow", feedback: "fix the import" }),
+    } as unknown as HookDispatcher;
+    const hooks = createToolHooks(setup);
+    await hooks.beforeToolCall!(call("read", { path: "a" }));
+    const after = await hooks.afterToolCall!({ ...call("read", { path: "a" }), result: { output: "ok", isError: false }, isError: false });
+    expect(after?.output).toContain("fix the import");
+  });
+
+  it("blocks writes when no interactive handler exists", async () => {
+    const hooks = createToolHooks(gate({ permissionScope: "ask", escalationPromptHandler: undefined }));
+    const blocked = await hooks.beforeToolCall!(call("write", { path: "a" }));
+    expect(blocked?.block).toBe(true);
+    expect(blocked?.reason).toContain("no interactive handler");
+  });
+
+  it("reports abort when the signal fires during approval", async () => {
+    const controller = new AbortController();
+    const hooks = createToolHooks(
+      gate({
+        permissionScope: "ask",
+        escalationPromptHandler: async () => {
+          controller.abort();
+          return { promptId: "p", decision: "allow-once" as const, respondedAt: 1 };
+        },
+      }),
+    );
+    const blocked = await hooks.beforeToolCall!(call("write", { path: "a" }), controller.signal);
+    expect(blocked?.reason).toBe("Operation aborted");
+  });
 });
 
 describe("adaptTools", () => {
