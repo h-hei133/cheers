@@ -89,8 +89,7 @@ describe("renderHints", () => {
       80,
     );
     const text = stripAnsi(rows[0]!);
-    expect(text).toContain("enter steer");
-    expect(text).toContain("alt+enter follow-up");
-    expect(text).not.toContain("alt+enter queues");
+    expect(text).toContain("enter steer into next step");
+    expect(text).toContain("ctrl+q queue follow-up");
   });
 });

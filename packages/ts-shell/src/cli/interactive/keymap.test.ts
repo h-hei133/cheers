@@ -159,10 +159,10 @@ describe("input while a turn runs", () => {
     expect(actions.submit).toHaveBeenCalledWith("h", "steer");
   });
 
-  it("queues the draft as a follow-up on alt+enter", () => {
+  it("queues the draft as a follow-up on ctrl+q", () => {
     const { press, actions, surface } = build(true);
     press("h");
-    press("\x1b\r");
+    press("\x11");
     expect(actions.submit).toHaveBeenCalledWith("h", "followUp");
     expect(surface.editor.getText()).toBe("");
   });

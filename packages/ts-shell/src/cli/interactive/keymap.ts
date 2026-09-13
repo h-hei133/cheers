@@ -160,8 +160,10 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
       submitDraft(context, context.busy ? "steer" : undefined);
       return;
     case "alt+enter":
-      // Idle, a newline like shift+enter. While a turn runs the same chord
-      // queues the draft to run after it, the way Enter steers into it.
+      // Idle newline fallback; busy follow-up is on ctrl+q for stability.
+      if (!applyTableKey(event, context)) return;
+      break;
+    case "ctrl+q":
       if (context.busy) {
         submitDraft(context, "followUp");
         return;
