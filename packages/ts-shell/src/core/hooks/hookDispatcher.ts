@@ -151,7 +151,7 @@ export class HookDispatcher {
         }
       }
     }
-    return accumulatedDecision;
+    return accumulatedDecision ?? { decision: "allow" };
   }
 }
 

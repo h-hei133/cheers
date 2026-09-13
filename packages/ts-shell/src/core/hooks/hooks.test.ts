@@ -48,7 +48,20 @@ describe("Enterprise Hook & Verification Engine", () => {
       });
 
       expect(visited).toBe(true);
-      expect(decision).toBeNull();
+      expect(decision).toEqual({ decision: "allow" });
+    });
+
+    it("returns an allow decision when no hook matches", async () => {
+      const decision = await dispatcher.dispatch({
+        eventName: "PreToolUse",
+        sessionId: "sess_nomatch",
+        workspaceRoot: tempDir,
+        timestamp: new Date().toISOString(),
+        toolName: "read",
+        toolCallId: "call_1",
+        args: {},
+      });
+      expect(decision.decision).toBe("allow");
     });
 
     it("blocks tool execution when a PreToolUse hook returns block", async () => {
