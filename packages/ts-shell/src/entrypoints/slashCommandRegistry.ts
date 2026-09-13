@@ -107,6 +107,7 @@ export const SLASH_COMMANDS = [
     aliases: ["status"],
     group: "workspace",
     summary: "choose which facts the status band keeps in view",
+    argumentHint: "use <preset|item...>",
   },
   {
     name: "review",
@@ -166,6 +167,7 @@ export const SLASH_COMMANDS = [
     aliases: ["objective", "target"],
     group: "workflow",
     summary: "manage active goal state machine and prevent goal drift",
+    argumentHint: "use <goal instruction>",
   },
   {
     name: "loop",

@@ -58,4 +58,8 @@ describe("command completions", () => {
       "inspect or set reasoning effort for the next turn use [low|medium|high|off]",
     );
   });
+  it("hints goal and statusline arguments", () => {
+    expect(slashSuggestions("/goal")?.[0]?.detail).toContain("<goal instruction>");
+    expect(slashSuggestions("/statusline")?.[0]?.detail).toContain("<preset|item");
+  });
 });
