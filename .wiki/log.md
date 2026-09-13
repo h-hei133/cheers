@@ -212,3 +212,4 @@
 ## [2026-09-12] review | E1 双子代理探索复核（d007bece/3a86e071）：shift+arrow 5 行系自有设计予以保留，按键无冲突解析双锁定；修补指南尾注过宽为 shifted Enter chords；草稿门控与滚轮基数记决策点延后；137 项通过、build:ts 通过
 ## [2026-09-12] review | E2 提交 873da382 双车道复核修补：code lane 2 MEDIUM + 2 LOW（测试弱断言、覆盖部分）+ arch lane WATCH（展示与分发双注册表分歧）；修补 hint 补动词贴合运行语法、测试收紧精确匹配 + 负断言；后续（覆盖 40 命令、注册表合流、hint 列、缓存失效）记入方向文档 E2 进展；89 项通过、tsc 通过
 ## [2026-09-12] review | E2 双子代理探索复核（873da382/33bbc81d）：补齐分发独有 commit/tools/thinking 展示条目与 hint、compact/log 别名分歧，hint 覆盖 1→4；裸奔 hint 与别名匹配按计划延后；250 项通过、build:ts 通过
+## [2026-09-13] review | E1 跟进键两提交 8bee0401/2e823419 双车道复核修补：code lane 2 MEDIUM（指南滞后、hint 动词错误）+ arch lane WATCH（ctrl+q 兼容胜利但半落地）；修补指南 alt+enter 回纯换行 + 新增 ctrl+q 行、dispatched 注册 ctrl+q、hint 冻结"steer before next step"；方向文档记录跟进键决策与措辞冻结；139 项通过、tsc 通过

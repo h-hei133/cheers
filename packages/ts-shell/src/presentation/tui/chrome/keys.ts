@@ -51,10 +51,11 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["shift+enter"], does: "insert a newline", group: "sending", negotiated: true },
   {
     keys: ["alt+enter"],
-    does: "insert a newline; while a turn runs, queue the draft to run after it",
+    does: "insert a newline",
     group: "sending",
     negotiated: true,
   },
+  { keys: ["ctrl+q"], does: "queue the draft to run after the current turn", group: "sending" },
   { keys: ["tab"], does: "complete a command name", group: "sending" },
   { keys: ["escape"], does: "interrupt a run, or dismiss a chooser", group: "sending" },
 

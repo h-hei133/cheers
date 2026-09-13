@@ -49,9 +49,10 @@ confidence: high
    - 每级都有明确视觉反馈。
 2. 队列手感：
    - busy 输入 Enter 转为转向；
-   - Alt+Enter 转为跟进；
+   - 跟进键为 ctrl+q（单字节 C0，全终端零协商可达；原 Alt+Enter 需增强键盘协议，退为纯换行。busy Alt+Enter 现为换行回退，有意为之的多行组合后再转向）；
    - 中断后未投递输入回填；
    - 队列状态在状态带可见。
+   - 措辞冻结：steer 一律用"before the next step"系表述（keys 指南、hints 行、session 注释已统一），不得再造"into/add to current step"变体。
 3. 滚动手感：
    - 滚轮、PgUp/PgDn、Shift+方向键速度分层；
    - Home/End 到达两端；

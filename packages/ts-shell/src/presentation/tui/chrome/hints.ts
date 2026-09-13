@@ -46,7 +46,7 @@ function transientHint(context: HintContext): string | undefined {
     return `${context.queued} queued · runs when the current turn finishes`;
   }
   if (context.busy) {
-    return join(["esc interrupt", "enter add to current step", "ctrl+q run after turn"]);
+    return join(["esc interrupt", "enter steer before next step", "ctrl+q run after turn"]);
   }
 }
 

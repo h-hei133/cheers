@@ -126,7 +126,7 @@ export function dispatchedKeyIds(): readonly string[] {
     "tab",
     "shift+tab",
     "alt+p",
-    "f5",
+    "ctrl+q",
     "pageup",
     "pagedown",
     "shift+up",

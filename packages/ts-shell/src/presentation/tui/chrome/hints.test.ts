@@ -89,7 +89,7 @@ describe("renderHints", () => {
       80,
     );
     const text = stripAnsi(rows[0]!);
-    expect(text).toContain("enter add to current step");
+    expect(text).toContain("enter steer before next step");
     expect(text).toContain("ctrl+q run after turn");
   });
   it("shows queued follow-up counts while busy", () => {
