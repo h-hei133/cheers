@@ -45,8 +45,7 @@ function transientHint(context: HintContext): string | undefined {
   if (context.queued > 0) {
     return `${context.queued} queued · runs when the current turn finishes`;
   }
-  if (context.busy) return join(["esc interrupt", "enter steers", "alt+enter queues"]);
-  return undefined;
+  if (context.busy) return join(["esc interrupt", "enter steer", "alt+enter follow-up"]);
 }
 
 /** Background facts worth a row, or undefined when nothing is pending. */

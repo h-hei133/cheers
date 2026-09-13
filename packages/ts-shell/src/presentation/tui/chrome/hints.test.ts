@@ -76,4 +76,21 @@ describe("renderHints", () => {
     expect(newlineKeyFor("enhanced")).toBe("shift+enter");
     expect(newlineKeyFor("legacy")).toBe("ctrl+j");
   });
+  it("distinguishes steering from follow-up queue actions while busy", () => {
+    const rows = renderHints(
+      {
+        busy: true,
+        suggesting: false,
+        cancelArmed: false,
+        queued: 0,
+        newlineKey: "ctrl+j",
+      },
+      { openTodos: 0, peerSessions: 0 },
+      80,
+    );
+    const text = stripAnsi(rows[0]!);
+    expect(text).toContain("enter steer");
+    expect(text).toContain("alt+enter follow-up");
+    expect(text).not.toContain("alt+enter queues");
+  });
 });
