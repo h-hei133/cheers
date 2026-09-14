@@ -1,3 +1,9 @@
+export interface SlashCommandCompletion {
+  readonly value: string;
+  readonly label: string;
+  readonly detail?: string;
+}
+
 export interface SlashCommandLineRenderer {
   renderLine(line: string): void;
 }
@@ -13,6 +19,9 @@ export interface SlashCommandSpec {
     | "diagnostics";
   readonly summary: string;
   readonly argumentHint?: string;
+  readonly getArgumentCompletions?: (
+    argumentPrefix: string,
+  ) => readonly SlashCommandCompletion[] | null;
 }
 
 export const SLASH_COMMANDS = [
@@ -281,27 +290,42 @@ export const SLASH_COMMANDS = [
     group: "workflow",
     summary: "multi-perspective design exploration and anti-pattern red-teaming",
   },
-  {
-    name: "shell",
-    aliases: ["sh", "platform"],
-    group: "workflow",
-    summary: "inspect and control cross-platform shell backends and diagnostics",
-  },
 ] as const satisfies readonly SlashCommandSpec[];
 
 export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];
 
+const extensions: SlashCommandSpec[] = [];
+const listeners = new Set<(commands: readonly SlashCommandSpec[]) => void>();
+
+function allCommands(): readonly SlashCommandSpec[] {
+  return extensions.length === 0 ? SLASH_COMMANDS : [...SLASH_COMMANDS, ...extensions];
+}
+
 export function listSlashCommands(): readonly SlashCommandSpec[] {
-  return SLASH_COMMANDS;
+  return allCommands();
+}
+
+export function registerSlashCommand(command: SlashCommandSpec): () => void {
+  if (getSlashCommand(command.name)) throw new Error(`Slash command already registered: ${command.name}`);
+  extensions.push(command);
+  for (const listener of listeners) listener(allCommands());
+  return () => {
+    const index = extensions.indexOf(command);
+    if (index < 0) return;
+    extensions.splice(index, 1);
+    for (const listener of listeners) listener(allCommands());
+  };
+}
+
+export function subscribeSlashCommands(listener: (commands: readonly SlashCommandSpec[]) => void): () => void {
+  listeners.add(listener);
+  listener(allCommands());
+  return () => listeners.delete(listener);
 }
 
 export function getSlashCommand(name: string): SlashCommandSpec | undefined {
   const normalized = name.replace(/^\//, "").trim().toLowerCase();
-  return SLASH_COMMANDS.find((command) => {
-    const aliases: readonly string[] | undefined =
-      "aliases" in command ? command.aliases : undefined;
-    return command.name === normalized || aliases?.includes(normalized);
-  });
+  return allCommands().find((command) => command.name === normalized || command.aliases?.includes(normalized));
 }
 
 export function isKnownSlashCommand(name: string): boolean {
