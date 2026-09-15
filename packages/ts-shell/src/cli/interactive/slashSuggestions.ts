@@ -25,7 +25,9 @@ function argumentSuggestions(draft: string): Suggestion[] | null {
   if (!match) return null;
   const command = listSlashCommands().find((entry) => `/${entry.name}` === match[1]);
   const values = command?.getArgumentCompletions?.(match[2]);
-  return values && values.length > 0 ? matchSuggestions(match[2], values) : null;
+  // The provider already filtered by prefix; matchSuggestions would re-filter
+  // with the whole argument text as query, which breaks multi-word arguments.
+  return values && values.length > 0 ? [...values] : null;
 }
 
 export function slashSuggestions(draft: string): Suggestion[] | null {

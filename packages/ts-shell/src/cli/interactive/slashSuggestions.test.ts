@@ -23,9 +23,30 @@ describe("command completions", () => {
     expect(slashSuggestions("/mod")?.[0]?.value).toBe("/model");
   });
 
-  it("stops offering once the user moves on to arguments", () => {
-    expect(slashSuggestions("/model ")).toBeNull();
-    expect(slashSuggestions("/model use x")).toBeNull();
+  it("offers argument completions once the command name is exact", () => {
+    const matches = slashSuggestions("/thinking ");
+    expect(matches).not.toBeNull();
+    expect(matches?.some((match) => match.value === "low")).toBe(true);
+    expect(matches?.some((match) => match.value === "medium")).toBe(true);
+    expect(matches?.some((match) => match.value === "high")).toBe(true);
+    expect(matches?.some((match) => match.value === "off")).toBe(true);
+  });
+
+  it("filters argument completions by prefix", () => {
+    const matches = slashSuggestions("/thinking l");
+    expect(matches).toHaveLength(1);
+    expect(matches?.[0]?.value).toBe("low");
+  });
+
+  it("offers no argument completions for a command that has none", () => {
+    expect(slashSuggestions("/exit ")).toBeNull();
+    expect(slashSuggestions("/help ")).toBeNull();
+  });
+
+  it("offers model pairs from the catalogue", () => {
+    const matches = slashSuggestions("/model anthropic/");
+    expect(matches).not.toBeNull();
+    expect(matches?.some((match) => match.value.startsWith("anthropic/"))).toBe(true);
   });
 
   it("offers nothing when nothing matches", () => {
@@ -35,6 +56,7 @@ describe("command completions", () => {
   it("carries the command summary as the detail line", () => {
     expect(slashSuggestions("/diagnose")?.[0]?.detail).toBeTruthy();
   });
+
   it("surfaces argument hints for commands that take arguments", () => {
     const matches = slashSuggestions("/model");
     expect(matches?.some((match) => match.value === "/model")).toBe(true);
@@ -55,11 +77,28 @@ describe("command completions", () => {
 
   it("hints the thinking levels the router accepts", () => {
     expect(slashSuggestions("/thinking")?.[0]?.detail).toBe(
-      "inspect or set reasoning effort for the next turn use [low|medium|high|off]",
+      "inspect or set reasoning effort for the next turn [low|medium|high|off]",
     );
   });
-  it("hints goal and statusline arguments", () => {
+
+  it("hints goal arguments", () => {
     expect(slashSuggestions("/goal")?.[0]?.detail).toContain("<goal instruction>");
-    expect(slashSuggestions("/statusline")?.[0]?.detail).toContain("<preset|item");
+  });
+
+  it("shows the picker-only statusline command", () => {
+    const matches = slashSuggestions("/statusline");
+    expect(matches?.some((match) => match.value === "/statusline")).toBe(true);
+  });
+
+  it("completes subcommands for commands with an enumerable set", () => {
+    const matches = slashSuggestions("/log t");
+    expect(matches).toHaveLength(1);
+    expect(matches?.[0]?.value).toBe("tail");
+  });
+
+  it("completes shell backends after the use subcommand", () => {
+    const matches = slashSuggestions("/shell use p");
+    expect(matches).not.toBeNull();
+    expect(matches?.some((match) => match.value === "powershell")).toBe(true);
   });
 });

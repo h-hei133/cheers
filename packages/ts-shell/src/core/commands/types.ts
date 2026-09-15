@@ -111,6 +111,12 @@ export interface ShellActionResult {
 
 export type CommandExecutionResult = LocalCommandResult | PromptCommandResult | ShellActionResult
 
+export interface CommandArgumentCompletion {
+  readonly value: string
+  readonly label: string
+  readonly detail?: string
+}
+
 export interface CommandDefinition {
   readonly name: string
   readonly aliases?: readonly string[]
@@ -118,5 +124,19 @@ export interface CommandDefinition {
   readonly availability?: 'available' | 'hidden'
   readonly enabled?: boolean
   readonly bridgeSafe?: boolean
+  /** One-line summary shown in the command guide and completion list. */
+  readonly summary: string
+  /** Guide grouping. */
+  readonly group: 'session' | 'context' | 'workspace' | 'workflow' | 'diagnostics'
+  /** Argument grammar shown next to the summary, e.g. `use <provider/model>`. */
+  readonly argumentHint?: string
+  /**
+   * Argument candidates once the command name is typed in full and a space
+   * follows. Returning null means no candidates; an empty array the same.
+   * Synchronous so the completion list never waits on I/O.
+   */
+  readonly getArgumentCompletions?: (
+    argumentPrefix: string,
+  ) => readonly CommandArgumentCompletion[] | null
   execute(args: string[], context: CommandContext): Promise<CommandExecutionResult>
 }

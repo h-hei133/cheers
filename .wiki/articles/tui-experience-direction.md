@@ -217,16 +217,22 @@ confidence: high
 
 验证：注册表测试 + 补全测试 + 真机命令走查。
 
-#### E2 进展（873da382 → 本次复核）
+#### E2 进展（873da382 → 33bbc81d → 本次落地）
 
 管道已通：`argumentHint` 可选字段 → 补全 detail 拼接 → 截断安全（整行截宽），`/model` 首家携带（`use <provider/model>`，与运行语法一致）。复核修补：测试收紧为精确匹配 + 无参数命令负断言。
 
+本次落地（注册表合流 + 参数补全）：
+
+- **注册表合流**：`CommandDefinition` 增加 `summary`/`group`/`argumentHint`/`getArgumentCompletions`，展示侧 `slashCommandRegistry.ts` 改为 dispatch 注册表的投影——单一来源，漂移不可能。picker-only 的 `/statusline` 作为内建扩展保留在展示侧。
+- **hint 覆盖**：45 个 dispatch 命令全部携带 `summary`/`group`；24 个取参命令携带 `argumentHint`；21 个无参命令无 hint（正确）。
+- **参数补全**：`getArgumentCompletions` 落地 22 个命令——枚举型（thinking/fast/log/todo/goal/workflow/marketplace/plugin/memory/connect/compact/warmup/resume/mcp/permissions/workspace/sidebar/browser/restore/brainstorm/export/shell）走 `SUBCOMMAND_VALUES` 表 + `prefixFilter`，model 走 `loadCatalog()` 同步快照，loop 补 attempts 数。`argumentSuggestions()` 不再双重过滤（provider 已过滤，`matchSuggestions` 再用整段后缀做 query 会破坏多词参数）。
+- **缓存失效**：`candidates()` 进程级缓存随注册表合流自动失效——`listVisibleCommands()` 每次重建，无 stale 缓存。
+
 后续（不进本次）：
 
-- 覆盖：40 个裸命令逐个补 hint（先取参命令，再显式标记无参），可选字段暂留作兼容，补齐后评估必填化；
-- 统一：分发侧 `CommandDefinition` 无 hint 字段，路由不读 hint 做校验——未来参数校验源必须合流，不得开第三处；
 - 渲染：hint 居尾窄屏先被截，后续保留 hint 列或 summary 前截断；
-- 缓存：`candidates()` 进程级缓存无失效，统一注册订阅落地时同步加重置。
+- 静默回退命令（restore/resume/workspace/mcp/permissions/fast/export）的参数错误引导——补全已引导正确值，handler 侧错误消息增强留待 E4 配置阶段；
+- inline argument hint（命令后浅色 ghost text）——形态设计未定，不把候选 detail 描述成已完成的命令后提示。
 
 ### E3：状态与风格一致性
 

@@ -1,4 +1,10 @@
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import {
+  loopArgumentCompletions,
+  modelArgumentCompletions,
+  shellArgumentCompletions,
+  subcommandCompletions,
+} from "./argumentCompletions.js";
 import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
 import { runCompactLocalCommand } from "./compactCommandRuntime.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
@@ -62,6 +68,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "repo-aware diagnosis and next action",
+      group: "diagnostics",
       execute: (_args, context) => runDiagnoseCommand(context),
     },
     {
@@ -71,6 +79,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "condense earlier turns into a checkpoint to free context",
+      group: "context",
+      argumentHint: "[preview|render|json]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("compact", prefix),
       execute: (args, context) => runCompactLocalCommand(args, context),
     },
     {
@@ -79,6 +91,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "prebuild the startup context cache for this project",
+      group: "context",
+      argumentHint: "[status|rebuild]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("warmup", prefix),
       execute: (args, context) => runWarmupLocalCommand(args, context),
     },
     {
@@ -87,6 +103,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "inspect the guarded browser capability and its receipts",
+      group: "workspace",
+      argumentHint: "[status|smoke|preview|execute|replay|repair]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("browser", prefix),
       execute: (args, context) => runBrowserLocalCommand(args, context),
     },
     {
@@ -95,6 +115,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "the live panel of session state, tools, and checkpoints",
+      group: "workspace",
+      argumentHint: "[panel|compact|detail|watch]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("sidebar", prefix),
       execute: (args, context) => runSidebarLocalCommand(args, context),
     },
     {
@@ -104,6 +128,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "provider connection management",
+      group: "diagnostics",
+      argumentHint: "[status|login|set|use|logout]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("connect", prefix),
       execute: (args, context) => runConnectCommand(args, context),
     },
     {
@@ -113,6 +141,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "inspect and switch active model",
+      group: "diagnostics",
+      argumentHint: "use <provider/model>",
+      getArgumentCompletions: modelArgumentCompletions,
       execute: (args, context) => runModelCommand(args, context),
     },
     {
@@ -121,6 +153,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "preview or execute guarded recovery authority restore",
+      group: "session",
+      argumentHint: "[preview|execute]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("restore", prefix),
       execute: (args, context) => runRestoreLocalCommand(args, context),
     },
     {
@@ -130,6 +166,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "pick, inspect, switch, or continue a session",
+      group: "session",
+      argumentHint: "[list|current|switch|help]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("resume", prefix),
       execute: (args, context) => runResumeCommand(args, context),
     },
     {
@@ -139,6 +179,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "pick up this session's stopped work, optionally with a follow-up",
+      group: "session",
       execute: (args, context) => runContinuePromptCommand(args, context),
     },
     {
@@ -147,6 +189,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "stop only the current run",
+      group: "workflow",
       execute: (args, context) => runCancelShellAction(args, context),
     },
     {
@@ -156,6 +200,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "inspect or switch project/workdir binding",
+      group: "workspace",
+      argumentHint: "[status|attach|recent]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("workspace", prefix),
       execute: (args, context) => runWorkspaceShellAction(args, context),
     },
     {
@@ -164,6 +212,9 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "quick attach by path",
+      group: "workspace",
+      argumentHint: "<path>",
       execute: (args, context) => runCdShellAction(args, context),
     },
     {
@@ -172,6 +223,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "print current workspace status",
+      group: "workspace",
       execute: (args, context) => runPwdShellAction(args, context),
     },
     {
@@ -180,6 +233,10 @@ export function createCommandRegistry(
       availability: runtimeConfig.enableMcpTools ? "available" : "hidden",
       enabled: runtimeConfig.enableMcpTools,
       bridgeSafe: true,
+      summary: "inspect and recover MCP state",
+      group: "diagnostics",
+      argumentHint: "[status|tools|doctor|refresh]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("mcp", prefix),
       execute: (args, context) => runMcpShellAction(args, context),
     },
     {
@@ -189,6 +246,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "show full command guide",
+      group: "diagnostics",
       execute: (args, context) => runHelpShellAction(args, context),
     },
     {
@@ -198,6 +257,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "gracefully exit session and restore terminal",
+      group: "session",
       execute: async (_args, context) => runExitCommand(context),
     },
     {
@@ -207,6 +268,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "inspect trust policy state",
+      group: "diagnostics",
+      argumentHint: "[list|explain|revoke|reset]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("permissions", prefix),
       execute: (args, context) => runPermissionsShellAction(args, context),
     },
     {
@@ -216,6 +281,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "clear conversation context and start fresh",
+      group: "session",
       execute: async (args, context) => runClearCommand(args, context),
     },
     {
@@ -225,6 +292,9 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "review working tree code changes and diffs",
+      group: "workflow",
+      argumentHint: "[focus]",
       execute: (args, context) => runReviewCommand(args, context),
     },
     {
@@ -234,6 +304,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "inspect tech stack and initialize AGENTS.md rules",
+      group: "workflow",
       execute: (args, context) => runInitCommand(args, context),
     },
     {
@@ -243,6 +315,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "display session token usage and estimated cost",
+      group: "session",
       execute: (args, context) => runCostCommand(args, context),
     },
     {
@@ -252,6 +326,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "rewind the last conversational turn or changes",
+      group: "session",
       execute: (args, context) => runUndoCommand(args, context),
     },
     {
@@ -261,6 +337,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "export session history as markdown or jsonl",
+      group: "session",
+      argumentHint: "[jsonl] [dest-path]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("export", prefix),
       execute: (args, context) => runExportCommand(args, context),
     },
     {
@@ -270,6 +350,9 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "the written-down ways of working this project and this user have",
+      group: "workspace",
+      argumentHint: "[skill-name]",
       execute: (args, context) => runSkillCommand(args, context),
     },
     {
@@ -278,6 +361,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "run the last turn again after it failed or was interrupted",
+      group: "session",
       execute: (args, context) => runRetryCommand(args, context),
     },
     {
@@ -287,6 +372,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "every key this surface binds, and which ones this terminal delivers",
+      group: "workspace",
       execute: (args, context) => runHotkeyCommand(args, context),
     },
     {
@@ -296,6 +383,9 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "copy last assistant response to clipboard",
+      group: "session",
+      argumentHint: "[text]",
       execute: (args, context) => runCopyCommand(args, context),
     },
     {
@@ -305,6 +395,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "manage active goal state machine and prevent goal drift",
+      group: "workflow",
+      argumentHint: "<goal instruction>",
+      getArgumentCompletions: (prefix) => subcommandCompletions("goal", prefix),
       execute: (args, context) => runGoalCommand(args, context),
     },
     {
@@ -315,6 +409,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "run autonomous edit-and-verify loops until test pass",
+      group: "workflow",
+      argumentHint: "[attempts] <gate-command>",
+      getArgumentCompletions: loopArgumentCompletions,
       execute: (args, context) => runLoopCommand(args, context),
     },
     {
@@ -324,6 +422,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "manage structured task checklist and view progress",
+      group: "workflow",
+      argumentHint: "[add|start|done|clear]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("todo", prefix),
       execute: (args, context) => runTodoCommand(args, context),
     },
     {
@@ -333,6 +435,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "toggle low-latency fast model tier on or off",
+      group: "workflow",
+      argumentHint: "[on|off|toggle]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("fast", prefix),
       execute: (args, context) => runFastCommand(args, context),
     },
     {
@@ -342,6 +448,8 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "visualize context window allocation and token categories",
+      group: "diagnostics",
       execute: (args, context) => runContextCommand(args, context),
     },
     {
@@ -351,6 +459,9 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "ask a quick side question out of band without history pollution",
+      group: "session",
+      argumentHint: "<question>",
       execute: (args, context) => runBtwCommand(args, context),
     },
     {
@@ -360,6 +471,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "manage and discover plugin marketplace sources",
+      group: "workflow",
+      argumentHint: "[list|add|remove]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("marketplace", prefix),
       execute: (args, context) => runMarketplaceCommand(args, context),
     },
     {
@@ -369,6 +484,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "install, list, enable, or disable plugin capabilities",
+      group: "workflow",
+      argumentHint: "[list|install|uninstall|enable|disable]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("plugin", prefix),
       execute: (args, context) => runPluginCommand(args, context),
     },
     {
@@ -377,6 +496,10 @@ export function createCommandRegistry(
       kind: "local",
       availability: "available",
       enabled: true,
+      summary: "inspect, search, retain, or invalidate persistent memory facts",
+      group: "session",
+      argumentHint: "[inspect|add|recall|use|invalidate|save|review]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("memory", prefix),
       execute: (args, context) => runMemoryCommand(args, context),
     },
     {
@@ -386,6 +509,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "inspect, run, or cancel multi-stage agentic workflows and DAG tasks",
+      group: "workflow",
+      argumentHint: "[list|run|status]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("workflow", prefix),
       execute: (args, context) => runWorkflowCommand(args, context),
     },
     {
@@ -395,6 +522,9 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "conduct multi-agent tree search and cross-source consensus research",
+      group: "workflow",
+      argumentHint: "<topic>",
       execute: (args, context) => runDeepResearchCommand(args, context),
     },
     {
@@ -404,6 +534,9 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "draft a commit message from the staged diff",
+      group: "workflow",
+      argumentHint: "[guidance]",
       execute: (args, context) => runCommitCommand(args, context),
     },
     {
@@ -412,6 +545,9 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "list available tools or inspect one in detail",
+      group: "diagnostics",
+      argumentHint: "[tool-name]",
       execute: (args, context) => runToolsCommand(args, context),
     },
     {
@@ -421,6 +557,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "inspect or set reasoning effort for the next turn",
+      group: "diagnostics",
+      argumentHint: "[low|medium|high|off]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("thinking", prefix),
       execute: (args, context) => runThinkingCommand(args, context),
     },
     {
@@ -432,6 +572,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: false,
+      summary: "multi-perspective design exploration and anti-pattern red-teaming",
+      group: "workflow",
+      argumentHint: "[-i] [-s] <problem>",
+      getArgumentCompletions: (prefix) => subcommandCompletions("brainstorm", prefix),
       execute: (args, context) => runBrainstormCommand(args, context),
     },
     {
@@ -441,6 +585,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "inspect or switch the shell backend this session runs commands with",
+      group: "workspace",
+      argumentHint: "[status|use|auto]",
+      getArgumentCompletions: shellArgumentCompletions,
       execute: (args, context) => runShellCommand(args, context),
     },
     {
@@ -450,6 +598,10 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
+      summary: "tail, locate, export, or clear the structured session log",
+      group: "workspace",
+      argumentHint: "[tail|path|export|clear]",
+      getArgumentCompletions: (prefix) => subcommandCompletions("log", prefix),
       execute: (args, context) => runLogCommand(args, context),
     },
   ];
