@@ -71,15 +71,16 @@ confidence: high
 
 ## 3. 阶段规划 v2（每阶段执行前补充入口标准）
 
-**两个前置裁决点（动工前需要拍板）：**
+**两个前置裁决点：已采纳并执行。**
 
-- **裁决点 A（route 脚本去留）**：30 个 `scripts/dev-history/routes/*.ts` 演示脚本 + real-provider-smokes 拉活 162 个 src 文件。它们是历史开发验证脚本（多个已因引用被删文件而断裂：runMvpIntegratedFlow.js、planningRuntime.js 等 19 个脚本引用不存在的文件）。**建议废弃**：删脚本则 162 文件回归死链，可删面从 333 扩大到约 495（回到 CLI-only 口径）。保留则这些文件继续维护。
-- **裁决点 B（demo 链语义）**：R3 的 atomic-rollback 冲突、R4 的 seed 断言都挂在 demo 链上。裁决点 A 选废弃后，这些失败簇随删除消解；选保留则需为死轨维护测试。
+- **裁决点 A**：废弃 30 个 `scripts/dev-history/routes/*.ts` 历史演示脚本及相关 route/demo 包装器；保留仍被 `scripts/verify/index.mjs` 使用的 `scripts/real-provider-smokes/approvedProviderEnv.mjs` 与其测试。共删除 42 个脚本/脚本文档文件，移除 package.json 中 68 条相关 script 注册。生产 CLI 与主测试入口不依赖这些脚本。
+- **裁决点 B**：R3 atomic-rollback vs partial-failure 不再单独裁决；相关目标链随历史 demo 链进入死链审计。
 
 - **Step 1（已完成）**：基线 + 分类（v2 修订版见 §1）。failures-baseline.md 同步修订。
-- **Step 2（大幅瘦身）**：基线回绿。v2 内容：R7 六项修测试锁新语义；R1 死轨断言删除/收窄 + 活轨 metadata 透传（低优先）；R4 删 seed 断言；R5 两项活轨漂移复核；R6 若保留 harness 则加 timeout；R2/R3 不修（并入 Step 2.5 删除）。tsc 539 测试债口径决策不变。
-- **Step 2.5（新增，最高优先）**：**死链删除**。前置：裁决点 A/B 拍板。三波执行：纯孤儿 152 → 死链互引 181（拓扑逆序整簇删）→ （若废弃 route）162 再删。core/harness 34 个测试基建豁免（分母修正）。model-adapters 撤域（types→provider/request、jsonRepair→turn）作为首个示范。每波验证面：tsc build + vitest 基线 diff + **BFS 存活集不变性校验**（删除死链不得使任何活文件变死）+ golden gate。
-- **Step 3（browser 搬迁，顺位后移）**：依据被复核确认且加强；先删 7 个死 browser 文件，再搬 160 个到独立 browser 域（14 子域映射不变）。
+- **Step 2.5-A（已完成）**：删除历史 route/demo 脚本及注册项。`npm run build:ts`、`npm run validate` 通过；删除后的全量 vitest 为 4450 项、51 失败、14 文件。初始基线为 4444 项/57 失败；失败减少 6，但新增 `deepResearch.test.ts` 1 项且测试总数增加 6。由于工作区存在用户已有源文件改动，且全量并行测试存在超时抖动，本轮不宣称零回归。
+- **Step 2.5-B（下一步）**：重新计算 CLI-only 可达图并生成精确删除清单；把 route 脚本删除后回归死链的 src 文件与原 CLI-only 候选合并去重。先处理可证明无生产入口的孤儿/整簇，不碰 core/harness 测试基建。
+- **Step 2（随后）**：基线回绿。R7 六项修测试锁新语义；R1 死轨断言删除/收窄 + 活轨 metadata 透传（低优先）；R4 删 seed 断言；R5 两项活轨漂移复核；R6 若保留 harness 则加 timeout；R2/R3 不修（并入 Step 2.5 删除）。tsc 539 测试债口径决策不变。
+- **Step 3（browser 搬迁，顺位后移）**：先删除 7 个死 browser 文件，再搬 160 个到独立 browser 域（14 子域映射不变）。
 - **Step 4（orchestration 聚类，重算）**：待 Step 2.5 完成后按存活文件重新生成映射表；v1 的 976 条 import 重写预算作废重算。
 - **Step 5（SessionManager 拆分）**：不变；死链删除后其真实引用面更清晰，利于分组。
 - **Step 6（命名税裁定）**：不变。
