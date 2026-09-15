@@ -112,3 +112,17 @@
 4. **R4/R7 投影同步**——按 Phase 4 新契约批量更新测试或补实现。
 5. **R6 超时预算**——纯测试基建，机械。
 6. **R5 环境标记**——real-provider 3 项加跳过条件。
+
+---
+
+## v2 修订（2026-09-15 晚，三子代理复核后）
+
+57 项失败的簇定性有 4 处重大修订，详见 plan.md §1 v2 表。摘要：
+
+- **R2 MCP"产品级缺陷"降级为死轨测试**：生产 CLI 无参建 registry（cliRuntimeInvocation.ts:148），MCP 工具从不注册，"假成功"不存在。
+- **R1 修法方向修正**：补 metadata 透传无法让 8 项通过（它们还断言 details/reportSafe/runtimeReceipt 等死轨字段）；活轨真缺陷仅 registry 丢 executionPath 一处且低优先（turn/tools.ts 末端压扁，模型不可见）。
+- **R4 重定性**：seed 行生产链（workflowTaskPlan→runtimeHandoffProjection）零 importer，活轨从未产 seed 行；"恢复注入"是 feature work 不是修缺陷。
+- **R3 裁决降级**：被测对象仅被 demo 脚本引用；废弃脚本则整簇消解。
+- **R7 全部查明为活轨测试锁旧有意变更的语义**（handoff :reason 后缀 / verbose 渲染格式 / approval exact-command-scope 安全收紧），修测试即可。
+
+配套数据：`.wiki/refactor/reachability-2026-09-15.json`（最终死链 333 + scripts 救回 162 清单）。

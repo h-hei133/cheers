@@ -1,114 +1,97 @@
 ---
 title: "Architecture Refactor Plan"
 category: article
-sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-09-15, failures-baseline]
+sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-09-15, failures-baseline, reachability-audit-2026-09-15, subagent-reviews-2026-09-15]
 created: 2026-09-15
 updated: 2026-09-15
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan: hot-spot inventory, import-blast-radius data, phased migration steps with verification gates. Step 1 records the full-test triage baseline (57 failures classified into 7 clusters)."
+summary: "Module boundary refactor plan v2, revised after three-agent deep re-audit: final dead-link set 333/1366 (24%), 57 failures re-clustered by live/dead track, dead-code removal promoted to top priority, orchestration clustering rescoped to 128 live files."
 confidence: high
 ---
 
-# Architecture Refactor Plan
+# Architecture Refactor Plan (v2)
 
 > 本目录（`.wiki/refactor/`）是整个模块边界重构计划的唯一记录位置。
-> 本轮只规划与基线测量，不改任何生产代码。
-> 后续每一阶段执行前，先在本文件登记入口标准；执行后在 `log.md` 记录实际结果与偏差。
+> v2 (2026-09-15 晚) 基于"生产可达性 BFS + 三子代理语义复核"全面修正 v1。
+> v1 的热点数据（browser 坟场、orchestration 平铺、SessionManager facade、命名税）经复核全部成立，但 v1 缺失了最大的事实：**全仓 24% 的生产文件不在任何运行时可达路径上**。
 
-## 0. 重构对象与证据（2026-09-15 审计）
+## 0. 生产可达性审计（v2 新增，最高优先事实）
 
-仓内架构债不是全局性混乱，而是三个可量化的热点加一个命名税。31 个一级模块、777 个测试文件、owner-domain 结构成立；债集中在"域长大了但没人执行搬迁"的位置。
+方法：从真实入口（`src/entrypoints/*` 26 文件 + `scripts/` 下被 package.json 注册的 ts/mjs 脚本）做 BFS，边 = 静态 `from` + 动态 `import()` + verify-route206 字符串 import 特例。已排除的假阴性来源：worker_threads（零使用）、globalThis 注入（零使用）、createRequire/new Function 动态加载（仅外部包 playwright/playwright-core）、MCP/skills/extensions 加载器（只扫 .md 不加载 TS）、child_process（只拉起外部二进制或入口自身）。
 
-### 热点 1：`core/context` 根目录的 browser 坟场（最大）
-
-- 178 个文件平铺在 `packages/ts-shell/src/core/context/` 根目录，其中 **167 个为 `browser*` 前缀**，约 20k 行源码。
-- 语义聚类为 14 个子域：Action(7) / Execution(11) / Playwright(9) / ExternalNetwork(11) / ControlledNetwork(6) / Network 守卫(4) / PublicReadOnlyWeb(7) / ReadOnly+快照(10) / SelfHealing(14) / Replay(10) / Sandbox+DryRun+Local(8) / Txn+Evidence+Receipt(8) / Tool+Capability+Session(6) / 其余观测追踪(约10)。
-- 跨模块引用面极窄：仅 10 个外部文件 import 这些 browser 模块（`core/commands`、`orchestration` 的投影/规划器、`entrypoints` 桥）。596 处引用是域内互引（`./browserXxx.js`）。
-- 一级模块 `src/browser/` 现仅 61 行。这是"边界画好了，代码没搬进去"。
-- **定性：放错位置的完整域，搬迁风险低、视觉收益最大。**
-- 修正：搬运方式为批量 `git mv` + 一次性脚本重写 import 相对路径（167 文件 × 域内 596 条 + 外部 10 文件），非逐文件 lsp rename。
-
-### 热点 2：`orchestration` 根目录平铺
-
-- 186 个文件 / 42k 行堆在根目录；前缀聚类清晰：`provider*`(20)、`edit*`(19)、`task*`(15)、`context*`(14)、`target*`(10)、`verification*`(9)、`planning*`(9)、`real*`(8)、其余 6 及以下。
-- `patch*` 七个子目录先例已存在（commit 47d361d3 起同方式生长），证明该模式在仓内走过且测试锁定。
-- 引用爆炸半径（已量化）：根内互引 653 条 + 全仓外部引用 323 条（指向 82 个文件）= 约 976 条 import 语句需路径重写。纯机械映射，tsc 为完备验证器。
-- **定性：机械聚类，模式有先例；量真实存在但可脚本化。**
-
-### 热点 3：`SessionManager.ts` facade
-
-- 52 个函数式名称，NormProof dispositions 中两次 defer（2026-08-28、2026-09-02），理由均为"拆分是独立任务不是顺手事"。
-- **定性：唯一需要动脑的拆分，预留为独立阶段。**
-
-### 热点 4：命名税（决策类，最后做）
-
-- `context/` vs `core/context/`；`orchestration/` vs `core/workflow/` vs `workflow/`；`cli/` vs `entrypoints/` vs `renderer/` vs `presentation/`。
-- 概念重叠导致定位成本；属于目录语义决策，不是文件搬运。放在所有物理搬迁完成后统一裁定。
-
-### 非债证据（不需要动的部分）
-
-- 耦合是 hub-spoke 而非面条：`orchestration` 被 import 159 次、`core` 118 次，其余一级模块全部 ≤55。
-- 职责上限（20 函数）治理在运转：dispositions.md 记录的 31 个超标模块中 10+ 个已按 "decision: fix" 拆解。
-
-## 1. Step 1 —— 全量测试基线与问题分类（本轮执行，已完成）
-
-目的：在动任何文件之前把测试面完全摸清。重构期间每步拿基线 diff 对照——失败集与基线一致 = 零回归；基线外新增 = 立刻停下定位。
-
-完整实测结果与 57 项失败逐簇分类见 **[failures-baseline.md](failures-baseline.md)**（唯一回归对照物）。摘要：
-
-| 测量 | 结果 |
+| 指标 | 数值 |
 |---|---|
-| `tsc -p tsconfig.build.json`（生产门控） | **通过，0 错误** |
-| `tsc --noEmit` 全量（含测试） | 539 错误**全部在 .test.ts**，生产 0；build tsconfig 显式排除测试文件，属测试 mock 与类型演进脱节 [known-gap] |
-| `vitest run` 全量 | 4444 项，**57 失败 / 18 文件**，分 7 簇（详见 failures-baseline.md） |
-| golden gate `GOLDEN_MAIN_PATH` | 通过 |
-| `cargo test`（rust-core） | 2/2 通过 |
-| `npm run validate` | 通过 |
-| pytest（python-eval） | 未跑成：无 pytest 环境（toolchain 硬编码 Windows conda 路径）[environment] |
+| 生产源文件总数 | 1366 |
+| CLI 入口可达 | 871 |
+| scripts 入口额外救回 | 162 |
+| **最终死链（CLI+scripts 均不可达）** | **333（24%）** |
+| 其中完全无生产文本引用（纯孤儿） | 152 |
+| 被其他死链互引 | 181 |
 
-57 项失败分类汇总：
+模块死链率（死/总）：edit 53% (49/91)、planning 60% (14/23)、model-adapters 58% (7/12)、verification 47%、repair 50%、runtime 34%、context 35%、orchestration 29% (66/225，其中根目录 58/186)、session 26%、core 15%、presentation 14%。
 
-| 簇 | 项数 | 分类 | 根因（已核实到代码行） |
-|---|---|---|---|
-| R1 rust-daemon 元数据投影断裂 | 11 | real-defect | `registry.ts runCommandTool` 组装 metadata 时丢弃 `executionPath/errorClass` |
-| R2 MCP 工具执行占位桩 | 16 | real-defect | `registry.ts:562-568` MCP execute 返回恒定字符串，`invokeTool` 生产零调用——**真实 MCP 调用全部假成功** |
-| R3 atomic-rollback 契约冲突 | 5 | **contract-conflict** | `3bc2ad5b`(2026-08-30) 引入全量回滚与 partial-failure 测试契约冲突，**提交当日即失败**（已实测复现），提交信息误称 28/28 通过。需裁决保留哪种语义 |
-| R4 seed=action-result 透传丢失 | 9 | real-defect | turn Phase 4 后 stopped continuity 投影未同步（log.md 09-12 已跟踪为 57 项基线的一部分） |
-| R5 非交互 CLI 漂移 + real-provider 环境依赖 | 5 | known-gap/env | deny 默认/落盘断言漂移；3 项依赖真实 provider |
-| R6 harness 场景 5s 超时 | 7 | test-infra | 真实 CLI 子进程场景超 vitest 默认单测预算，并行负载下抖动 +14 项 |
-| R7 handoff/continuity 投影漂移 | 6 | real-defect | Phase 4 语义演进遗留（handoff 带阶段后缀、Continuation 措辞、verbose 开关、1 项 approvalTrust 持久化待查） |
+**关键单点结论：**
 
-关键结论：
+1. **生产内核三层结构**（HotspotRevaluer 确认）：`entrypoints(26全活) → cli/interactive+cli/runtime+core/shell → turn/(15全活, 不 import orchestration) + core/agent + core/query + core/commands + session/ + model-adapters(仅 types+jsonRepair 活)`；另有 `src/index.ts` 公共 API 层拉活 runtime/api/host、runtime/evaluation、planning/execution 等旁路。
+2. **orchestration 54 个 CLI 活文件经三条旁路悬吊**（context/acquisition 链、presentation/surface 链、planning/workflowTaskPlan 链——注意最后这条的源头 workflowTaskPlan.ts 本身是死链，见 §1 R4），**不被 turn 内核直接消费**。
+3. **162 个"死链"被 scripts/dev-history/routes/*.ts（30 个 route 演示脚本）与 real-provider-smokes 脚本救回**——它们是历史开发验证脚本，是否废弃是独立裁决（见 §3 新增 Step 2.5 的裁决点）。
+4. **browser 坟场 167 文件中 160 个真实存活**，挂在 `/browser` 命令链（core/commands/registry.ts:84-88）+ CLI 桥（entrypoints/cliCommandExecutionBridge.ts 直引 6 个 browser 模块）+ eval benchmark 链上。v1 的搬迁判断被二次确认且加强。
+5. **core/harness 38 个死链中 34 个是测试基建**（README 自我声明 dev/eval harness surface，34 个仅被 *.test.ts 引用）——不删，但从生产文件分母剔除。
+6. **model-adapters 名存实亡**：仅 types.ts（被 provider/request、provider/response、runtime/loop 引用）与 jsonRepair.ts（被 turn/step.ts 引用）存活，二者互不依赖域内其他文件。处置：types.ts 并入 provider/request/，jsonRepair.ts 并入 turn/ 或 core/，其余 7 文件+测试删除。
+7. **SessionManager.ts 确认 ALIVE**，52 函数 facade 拆分（v1 热点 3）仍然有效。
 
-1. **生产代码类型零错误**（build 门控干净）——重构可安全依赖 tsc 作为 import 重写验证器。
-2. 57 失败中 47 项是真实债（R1/R2/R4/R7），且**绝大部分与 2026-09-13 audit 记录的已知基线一致**（log.md:217 "rust-bridge/MCP 18 失败与基线一致"、09-12 "聚合失败集 118→57"），零新近回归。
-3. R2（MCP 占位桩）是产品级缺陷，优先修。
-4. R3 需要用户裁决：atomic rollback（改测试）vs partial-failure 语义（改实现）。
-5. 一个过程教训已修正：本轮最初在测试完成前预写的"实测结果"含编造数字与不存在的提交哈希（d0ad96e2），已全部删除并以本节数据为准。后续任何基线数据只写在命令跑完之后。
+## 1. Step 1 —— 全量测试基线与问题分类（已完成，v2 修订失败簇裁决）
 
-## 2. 待量化项（Step 2 前补测）
+非失败基线（不变）：tsc build 门控 0 错；tsc 全量 539 错全在测试文件；golden gate / cargo / validate 通过；pytest 环境不可用 [environment]。
 
-1. **orchestration 聚类映射表**：186 文件 → 目标子目录的精确映射 + 976 条 import 的新路径逐条清单（脚本生成）。
-2. **browser 域搬迁映射表**：167 文件 → 14 子域目录 + 606 条引用改写方案。
-3. **python-eval pytest 环境决策**：装 pytest 或显式豁免（Windows conda 路径硬编码应一并修）。
-4. **R3 契约裁决**（阻塞 Step 2 的该簇修复，不阻塞基线固化）。
+57 项失败的 **v2 最终裁决**（三子代理逐项复核，推翻了 v1 的 4 处定性）：
 
-## 3. 阶段规划（每阶段执行前补充入口标准）
+| 簇 | 项数 | v1 分类 | **v2 裁决** | 关键证据 |
+|---|---|---|---|---|
+| R1 rust-bridge 8 | 11→拆分 | real-defect | **死轨断言混入活轨测试**：registry-rust-bridge 直测活轨 registry 但断言 `details.executionReceipt/reportSafe/runtimeReceipt`——这些字段的生产者（tools/result/split、tools/dispatch、ToolRuntime）全是死轨，活轨 toolResultLifecycle 只产 `{success,output,metadata}`。且活轨末端 `turn/tools.ts:99-108` 把结果压扁为 `{output,isError}`，metadata 根本不透传给模型 | toolResultLifecycle.ts；turn/tools.ts:106 |
+| R1 runtime.test 3 | | real-defect | **死轨测试**（import ToolRuntime） | runtime.test.ts:7 |
+| R1 活轨透传 | | 修法方向 | **真缺陷但降级**：registry runCommandTool 丢 executionPath/errorClass 属实，但修了也只影响直调 registry 的消费者（如 contextCommandRuntime），不影响模型可见输出 | registry.ts:147-165 |
+| R2 MCP 桩 | 16 | real-defect 产品级 | **v1 定性错误，降级为死轨测试**：生产 CLI `cliRuntimeInvocation.ts:148` 无参调 `createCoreToolRegistry()`，全仓唯一带 mcpTools/mcpGateway options 的调用点是死轨 ToolRuntime。**MCP 工具在生产 CLI 中根本不注册——不是"假成功"而是"不存在"**。占位桩 registry.ts:559-568 只有死轨经过 | cliRuntimeInvocation.ts:148；runtime.ts:50 |
+| R3 rollback | 5 | contract-conflict 需裁决 | **裁决降级**：被测对象 targetSetEditRoute/editProposalApply 不在 CLI 链上，仅被 route 演示脚本引用。若废弃 demo 脚本（§3 裁决点 B），R3 五项+整簇自然消解，无需语义裁决 | 调用链 BFS |
+| R4 seed | 9 | real-defect 投影未同步 | **v1 定性错误**：`seed=action-result` 唯一生产者链 planning/workflowTaskPlan.ts（零 importer 纯孤儿）→ runtimeHandoffProjection.ts。活轨 turn/projection.ts:122 只写 `notes:['steps: N']`，**从未产生过 seed 行**。"恢复注入"= 把死轨能力移植进活轨，是 feature work 非缺陷修复。处置：删 seed 断言 | workflowTaskPlan.ts 零引用；projection.ts:122 |
+| R5 | 5 | known-gap/env | 维持（2 活轨漂移 + 3 环境依赖） | |
+| R6 | 7 | test-infra | 维持 + 注记：**死轨 harness 驱动活 CLI 子进程**（agentCliProcess spawn 的是真 cli.tsx）；若删 harness 则 5 个场景测试文件同删 | agentCliProcess.ts:51-68 |
+| R7 | 6 | real-defect | **全部为活轨测试锁旧语义，修测试**：(1) handoff 投影 `from->to:reason` 后缀是有意变更（state.ts:370）；(2) verbose 渲染 `[tool: bash]` 替代 `[tool:start] bash`（sessionEventSurface.ts:95）；(3) approvalTrustPolicy `expected undefined` 已查明——生产有意从 process-scope 收紧为 exact-command-scope（approval/store.ts:55 注释明示防通配提权），实现正常 | store.ts:55-57 |
 
-> 顺序原则：先修信号（基线回绿），再搬文件（视觉+机械收益最大先做），再拆 facade（动脑），最后命名税（决策）。
+**真正需要修活轨生产代码的只剩 1 处**：registry runCommandTool metadata 透传（低优先级）。其余 51 项失败要么是死轨测试（删/重定向）、要么是测试锁旧语义（改测试）、要么环境问题。
 
-- **Step 1（本轮）**：全量测试基线 + 分类登记。✅ 完成——57 项 7 簇，`failures-baseline.md` 固化。
-- **Step 2**：基线回绿。按 failures-baseline.md §修复优先级：R2 MCP 接线 → R1 投影透传 → R3（裁决后）→ R4/R7 投影同步 → R6 超时预算 → R5 环境标记 → tsc 测试债口径决策（tsconfig.test.json 豁免或补齐）。pytest 环境决策。
-- **Step 3**：browser 域搬迁——167 个 `browser*` 文件按 14 子域从 `core/context/` 搬入独立 browser 域；`git mv` + import 重写脚本 + tsc + 基线 diff。注意：R2 修复会让 MCP/browser 相关测试开始真实执行，搬迁前后基线需重新固化一次。
-- **Step 4**：orchestration 根目录聚类——按 §2.1 映射表执行，同上验证。
-- **Step 5**：SessionManager facade 拆分——52 函数按生命周期/压缩/持久化分组；最高风险阶段，单独规划、单独验证。
-- **Step 6**：命名税裁定——`context/` vs `core/context/` 等概念重叠归位；纯决策 + 机械执行。
-- **Step 7**：收尾——NormProof judge 全量跑，更新 dispositions，wiki 收敛记录。
+## 2. v1 热点数据复核结果
 
-## 4. 验证纪律（全程有效）
+| v1 热点 | 复核结果 |
+|---|---|
+| 热点 1 browser 坟场（core/context 167 文件） | **成立且加强**：160/167 存活；外部引用面窄（10 文件）不变；import 重写预算 606 条不变。7 个死 browser 文件搬迁前删除。搬迁映射表（14 子域）不变 |
+| 热点 2 orchestration 平铺（186 文件） | **重算**：CLI 死 58，scripts 救回占大头；"186 聚类"应改为"活文件聚类"（规模取决于 §3 裁决点 B）。聚类映射表必须等死链删除完成后再生成 |
+| 热点 3 SessionManager facade | 成立（ALIVE，52 函数） |
+| 热点 4 命名税 | 成立；死链删除后决策干扰更小 |
 
-- 每步必须跑：`tsc -p tsconfig.build.json`（生产门控）+ 全量 `vitest run` + golden gate。
-- 回归判定只认 diff：`failures-baseline.md` 是唯一对照物；基线变化（如 Step 2 修复后）必须重新固化并记录版本。
-- 基线外新增失败 = 该步未完成，禁止带病前进。
-- 搬文件用 `git mv`（保留 rename 追踪），import 重写用一次性脚本（机械映射），禁止手工逐条改。
-- 每步完成后在 `log.md` 记录一行实测数据（命令、项数、与基线 diff 结果）。
+## 3. 阶段规划 v2（每阶段执行前补充入口标准）
+
+**两个前置裁决点（动工前需要拍板）：**
+
+- **裁决点 A（route 脚本去留）**：30 个 `scripts/dev-history/routes/*.ts` 演示脚本 + real-provider-smokes 拉活 162 个 src 文件。它们是历史开发验证脚本（多个已因引用被删文件而断裂：runMvpIntegratedFlow.js、planningRuntime.js 等 19 个脚本引用不存在的文件）。**建议废弃**：删脚本则 162 文件回归死链，可删面从 333 扩大到约 495（回到 CLI-only 口径）。保留则这些文件继续维护。
+- **裁决点 B（demo 链语义）**：R3 的 atomic-rollback 冲突、R4 的 seed 断言都挂在 demo 链上。裁决点 A 选废弃后，这些失败簇随删除消解；选保留则需为死轨维护测试。
+
+- **Step 1（已完成）**：基线 + 分类（v2 修订版见 §1）。failures-baseline.md 同步修订。
+- **Step 2（大幅瘦身）**：基线回绿。v2 内容：R7 六项修测试锁新语义；R1 死轨断言删除/收窄 + 活轨 metadata 透传（低优先）；R4 删 seed 断言；R5 两项活轨漂移复核；R6 若保留 harness 则加 timeout；R2/R3 不修（并入 Step 2.5 删除）。tsc 539 测试债口径决策不变。
+- **Step 2.5（新增，最高优先）**：**死链删除**。前置：裁决点 A/B 拍板。三波执行：纯孤儿 152 → 死链互引 181（拓扑逆序整簇删）→ （若废弃 route）162 再删。core/harness 34 个测试基建豁免（分母修正）。model-adapters 撤域（types→provider/request、jsonRepair→turn）作为首个示范。每波验证面：tsc build + vitest 基线 diff + **BFS 存活集不变性校验**（删除死链不得使任何活文件变死）+ golden gate。
+- **Step 3（browser 搬迁，顺位后移）**：依据被复核确认且加强；先删 7 个死 browser 文件，再搬 160 个到独立 browser 域（14 子域映射不变）。
+- **Step 4（orchestration 聚类，重算）**：待 Step 2.5 完成后按存活文件重新生成映射表；v1 的 976 条 import 重写预算作废重算。
+- **Step 5（SessionManager 拆分）**：不变；死链删除后其真实引用面更清晰，利于分组。
+- **Step 6（命名税裁定）**：不变。
+- **Step 7（收尾）**：NormProof judge 全量跑；以删除后 BFS 报告（目标死链率 <5%）作为收敛证据。
+
+## 4. 验证纪律（v2 增强）
+
+- v1 全部保留（tsc build + vitest 基线 diff + golden gate；git mv + 脚本重写；数据只写在命令跑完之后）。
+- 新增：**每波删除后重跑 BFS**，存活集与删除前完全一致才算通过——这是对"死链判定模型"本身的回归测试。
+- 新增：任何"救活"判定（如未来新增 script 入口）必须同步登记入口清单，防止可达性口径漂移。
+
+## 5. 本轮过程教训（保留 v1 记录并追加）
+
+1. v1 教训：基线数据只写在命令跑完之后（预写数据曾含编造项，已删除）。
+2. v2 教训：**"测试失败"分类必须带"被测对象是否在生产路径"维度**——v1 的 R2 被定性为"产品级缺陷优先修"，实际生产 CLI 根本不注册 MCP 工具；R1 的修法方向（补 metadata）不能让 8 项测试通过。凡涉及修复排序，先跑可达性再定优先级。
