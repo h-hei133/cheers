@@ -78,7 +78,8 @@ confidence: high
 
 - **Step 1（已完成）**：基线 + 分类（v2 修订版见 §1）。failures-baseline.md 同步修订。
 - **Step 2.5-A（已完成）**：删除历史 route/demo 脚本及注册项。`npm run build:ts`、`npm run validate` 通过；删除后的全量 vitest 为 4450 项、51 失败、14 文件。初始基线为 4444 项/57 失败；失败减少 6，但新增 `deepResearch.test.ts` 1 项且测试总数增加 6。由于工作区存在用户已有源文件改动，且全量并行测试存在超时抖动，本轮不宣称零回归。
-- **Step 2.5-B（下一步）**：重新计算 CLI-only 可达图并生成精确删除清单；把 route 脚本删除后回归死链的 src 文件与原 CLI-only 候选合并去重。先处理可证明无生产入口的孤儿/整簇，不碰 core/harness 测试基建。
+- **Step 2.5-B（已完成）**：重新从 `packages/ts-shell/src/entrypoints/*` 做 CLI-only BFS，纳入静态 `from` 与动态 `import()`，排除测试文件。结果：1366 个生产源文件，871 个 CLI 可达，495 个 CLI 不可达；其中 450 个生产删除候选、45 个测试基建豁免。精确清单写入 `cli-only-delete-candidates.md`，完整可达清单写入 `reachability-2026-09-15.json`。本步只生成清单，未删除任何 `src` 文件。
+- **Step 2.5-C（下一步）**：先删除 450 个生产删除候选中的第一小簇（纯孤儿/无生产引用），暂不碰 core/harness 与 test-utils 测试基建；删除前后重跑 BFS，要求 CLI 可达集合不变。
 - **Step 2（随后）**：基线回绿。R7 六项修测试锁新语义；R1 死轨断言删除/收窄 + 活轨 metadata 透传（低优先）；R4 删 seed 断言；R5 两项活轨漂移复核；R6 若保留 harness 则加 timeout；R2/R3 不修（并入 Step 2.5 删除）。tsc 539 测试债口径决策不变。
 - **Step 3（browser 搬迁，顺位后移）**：先删除 7 个死 browser 文件，再搬 160 个到独立 browser 域（14 子域映射不变）。
 - **Step 4（orchestration 聚类，重算）**：待 Step 2.5 完成后按存活文件重新生成映射表；v1 的 976 条 import 重写预算作废重算。
