@@ -98,3 +98,7 @@ confidence: high
 
 1. v1 教训：基线数据只写在命令跑完之后（预写数据曾含编造项，已删除）。
 2. v2 教训：**"测试失败"分类必须带"被测对象是否在生产路径"维度**——v1 的 R2 被定性为"产品级缺陷优先修"，实际生产 CLI 根本不注册 MCP 工具；R1 的修法方向（补 metadata）不能让 8 项测试通过。凡涉及修复排序，先跑可达性再定优先级。
+
+## 6. Step 2.5-C-2 复核记录（2026-09-15）
+
+原拟删除 `model-adapters` 失活适配器子域，但执行前复核发现该结论不可靠：`client.ts` 依赖 `registry.ts`/`retryPolicy.ts`，`registry.ts` 依赖 OpenAI/Anthropic adapters；这些关系说明此前“仅 types/jsonRepair 活跃”的 BFS 结果不能直接作为删除依据。误删候选已恢复，未产生源码变化。`npm run build:ts` 与 `npm run validate` 通过。该子域暂不重构；以后 provider/auth/execution 边界必须同时满足真实入口、脚本入口、显式依赖和 runtime 装配四重证据。
