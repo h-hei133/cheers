@@ -31,7 +31,12 @@ export function createCliSessionRuntime(input: {
   readonly providerRuntimeBridge: CliProviderRuntimeBridge;
   readonly getReadline: () => ReadlineInterface | null;
   readonly isStdinTty?: () => boolean;
-  readonly promptInteractiveApproval?: (
+  /**
+   * Read at prompt time, not at construction: the interactive surface installs
+   * its handler after this runtime is created, so a plain value here would
+   * freeze at undefined and the approval overlay would never appear.
+   */
+  readonly getPromptInteractiveApproval?: () => (
     prompt: EscalationPrompt,
   ) => Promise<InteractiveApprovalResult>;
 }): ShellSessionRuntime {
@@ -103,7 +108,7 @@ export function createCliSessionRuntime(input: {
         sessionManager: input.sessionManager,
         getSessionId: () => input.runtimeContext.session.id,
         getPermissionScope: () => sessionRuntime.getPermissionScope(),
-        promptInteractiveApproval: input.promptInteractiveApproval,
+        promptInteractiveApproval: input.getPromptInteractiveApproval?.(),
       });
       const existingSession = input.sessionManager.getSession(
         input.runtimeContext.session.id,

@@ -148,8 +148,10 @@ export async function runCliProcess(
     // Reported as present only once the interactive surface has actually
     // installed a handler. Handing over a fallback closure here would make the
     // approval bridge treat every run as interactive and skip the
-    // non-interactive policy path entirely.
-    promptInteractiveApproval: interactiveApprovalPrompt,
+    // non-interactive policy path entirely. The getter is read at prompt time
+    // because the interactive surface installs its handler after this runtime
+    // is built.
+    getPromptInteractiveApproval: () => interactiveApprovalPrompt,
   });
 
   const handledPrintMode = await runCliPrintModeRouter({
