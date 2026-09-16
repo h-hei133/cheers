@@ -239,3 +239,54 @@ test-utils/approvalToolProvenanceFixtures.ts
 ```
 verification/verificationCommandPlan.ts
 ```
+
+---
+
+## 执行记录（2026-09-16）
+
+**执行结论：删除 82 个文件（不是计划的 83），并回退 1 个误删。**
+
+### 与计划的偏差及原因
+
+计划要删 83 个，实际删 82 个。差异是 1 个文件被**误判为零引用**：
+
+```
+session/__tests__/longSessionDurabilityProcess.ts
+```
+
+它是 `longSessionDurability.test.ts:229` 用**字符串路径 + spawnSync** 启动的进程入口：
+
+```ts
+const fixturePath = path.join(process.cwd(), "src", "session", "__tests__", "longSessionDurabilityProcess.ts");
+spawnSync(process.execPath, [tsxCli, fixturePath, mode, scenario, ...]);
+```
+
+**静态 import 图看不见这种依赖**，因此它被误标为零引用。这是本次方法论的已知盲区，删除后立即由 `longSessionDurability.test.ts`（2 项 `ERR_MODULE_NOT_FOUND`）暴露，已用 `git checkout` 恢复。
+
+**补救验证**：对剩余 82 个文件做了同类风险排查——
+- 扫描 `process.argv` / `import.meta.url` / shebang / `main()` / `readFileSync` 入口特征 → **0 命中**
+- 全仓扫精确字符串路径引用（排除 dist、node_modules、rust target）→ 仅 1 命中，经核验是 `runtime/evaluation/task/model.ts` 的**内存虚拟工作区夹具**（`fixture()` 构造假文件树，不读磁盘），非真实依赖
+
+### 最终验证
+
+| 项 | 删除前 | 删除后 | 判定 |
+|---|---:|---:|---|
+| `production` | 1045 | **963** | −82 ✓ |
+| `cliReachable` | 871 | **871** | 未下降 ✓ |
+| `cliOpaque` | 174 | **92** | −82 ✓ |
+| `noReference` | 92 | **10** | 剩 9 + 恢复的 1 ✓ |
+| `testOnly` | 77 | 77 | 不变 ✓ |
+| `publicApiOnly` | 5 | 5 | 不变 ✓ |
+
+- `npm run build:ts`：通过，0 错误
+- 全量 `vitest run`：**3173 / 3173 通过，0 失败**
+- `deepResearch` / `cli-baseline` 曾出现并行负载失败，单跑复核通过，且 `deepResearch` 在删除前的基线中已被记录为抖动项，与本次删除无关
+
+### 方法论修正（写入后续流程）
+
+**字符串路径启动的进程入口无法被 import 图发现。** 判定"零引用"时必须额外检查：
+1. 测试/Script 中的 `path.join(...)` + `spawn` / `execFile` 目标
+2. 配置中的字符串引用（vitest config、tsconfig、package scripts）
+3. 含 `process.argv` / shebang / `main()` 的文件
+
+本仓库中这类入口命名惯用 `*Process.ts`（如 `session/__tests__/longSessionDurabilityProcess.ts`），可作为特征词加强排查。
