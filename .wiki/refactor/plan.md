@@ -119,3 +119,37 @@ confidence: high
 **方向修正：删除单位从"文件/目录"改为"连通分量整簇"。** 主簇只能整簇评估、整簇删除，不允许部分摘除。删除前的必要条件：CLI 泄漏 0、公共 API 泄漏 0、scripts 泄漏 0、簇外非测试引用仅限豁免区、`npm run build:ts` 与 `verify:host-surface` 通过、BFS 存活集不变。
 
 **待裁决（阻塞下一步）**：主簇 310 文件保留/冻结/删除，三选一（见 boundary-analysis-2026-09-15.md §5）。未裁决前不执行删除。
+
+## 8. Step 2.5-C-3 执行记录：主簇删除（2026-09-16）
+
+用户裁决：选 1（整簇删除）。执行范围与结果：
+
+**已删除 573 个文件：**
+
+| 项 | 数量 |
+|---|---:|
+| 主簇生产文件 | 310 |
+| 主簇对应测试文件 | 254 |
+| 断链测试基建（core/harness 的 browserTxn*/pw* 5 个 + 2 个测试） | 7 |
+| test-utils/workspaceWriteResumeProducer.ts | 1 |
+| 附带断链测试（browserTxnGate/browserToolServerBackend） | 2 |
+
+**安全校验（删除前）：** CLI 可达文件误入删除集 = 0；删除后复核"CLI 可达但文件已删" = 0。
+
+**残留清理：** `tsc -p tsconfig.build.json` 暴露的 11 处断链全部来自豁免区测试基建与 test-utils，已一并清理；`productPath: "runMvpIntegratedFlow"` 悬空字符串因所在文件已随主簇删除而未残留。
+
+**验证结果：**
+
+| 检查 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | 0 错误 |
+| `npm run build:ts` | 通过 |
+| `npm run validate` | 通过 |
+| `dist/cli.js --version` | `0.1.0 (ts-shell MVP)` |
+| golden gate | 通过 |
+| `tsc --noEmit`（含测试） | 251 错误，全在测试文件（原 539） |
+| 全量 vitest | 3179 项 / 30 失败 / 6 文件（原 4450 / 51 / 14） |
+
+新基线固化于 `baseline-after-main-cluster-deletion.md`。随删除消失的失败 21 项；剩余 30 项中，**唯一需要修生产代码的是 registry metadata 透传（8 项）**，其余为测试锁旧语义或环境依赖。
+
+**净效果：** 生产源文件 1361 → 1043；CLI 不可达从 490 降至 190 左右（待重算确认）。
