@@ -2452,8 +2452,8 @@ describe("shell recovery helpers", () => {
         { from: "coder", to: "reviewer", reason: "ready-for-review", turn: 2 },
       ]);
       expect(Array.from(reconstructedState?.visitedTransitions ?? [])).toEqual([
-        "planner->coder",
-        "coder->reviewer",
+        "planner->coder:plan-ready",
+        "coder->reviewer:ready-for-review",
       ]);
       expect(reconstructedState?.transcript).toEqual([
         plannerOutput,
@@ -2644,8 +2644,8 @@ describe("shell recovery helpers", () => {
         { from: "coder", to: "reviewer", reason: "ready-for-review", turn: 2 },
       ]);
       expect(Array.from(reconstructedState?.visitedTransitions ?? [])).toEqual([
-        "planner->coder",
-        "coder->reviewer",
+        "planner->coder:plan-ready",
+        "coder->reviewer:ready-for-review",
       ]);
       expect(reconstructedState?.transcript).toEqual([
         plannerOutput,

@@ -25,19 +25,22 @@ export function detectCommand(normalizedPrompt: string): string {
     return trimmed;
   }
 
+  // Every branch below must return a member of RUN_COMMAND_ALLOWLIST: the mapping
+  // runs before allowlist evaluation, so returning anything else turns a matched
+  // intent into a blocked command instead of an executable one.
   if (normalizedPrompt.includes("version")) {
     return "node --version";
   }
 
   if (normalizedPrompt.includes("test")) {
-    return "npm test";
+    return "npm test -- --help";
   }
 
   if (normalizedPrompt.includes("build")) {
-    return "npm run build";
+    return "npm run build -- --help";
   }
 
-  return trimmed || "node --version";
+  return "node --version";
 }
 
 export function detectUnsupportedCommandIntent(

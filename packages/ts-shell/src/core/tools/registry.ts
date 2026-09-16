@@ -142,8 +142,17 @@ async function runCommandTool(
     finalOutput += `\n\n[Showing last ${truncated.shownLines} of ${truncated.originalLines} lines (${Math.round(truncated.shownBytes / 1024)}KB of ${Math.round(truncated.originalBytes / 1024)}KB). Full raw output saved: ${artifact.uri}]\n[To read full or earlier sections: read(path="${artifact.uri}:1-500")]`
   }
 
+  // Where the command actually ran (ts-local, rust-daemon) and how the result was
+  // classified are decided by the execution service; dropping them here would make
+  // the tool result unable to say which executor answered.
+  const executionProvenance = {
+    executionPath: result.executionPath,
+    errorClass: result.errorClass,
+  }
+
   if (isOk) {
     return approvedResult(finalOutput, {
+      ...executionProvenance,
       status: result.status,
       exitCode: result.exitCode,
       stdout: result.stdout,
@@ -152,6 +161,7 @@ async function runCommandTool(
   }
 
   return deniedResult(finalOutput, {
+    ...executionProvenance,
     status: result.status,
     exitCode: result.exitCode,
     stdout: result.stdout,

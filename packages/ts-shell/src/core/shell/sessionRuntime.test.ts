@@ -1192,7 +1192,11 @@ describe("shell session runtime (W5)", () => {
           },
         });
 
-        await runtime.executePrompt(sessionId, "continue uncertain writer state");
+        // The continuation summary is rendered by the terminal surface's print
+        // branch; the interactive branch gates it behind verbose view mode.
+        await runtime.executePrompt(sessionId, "continue uncertain writer state", {
+          outputMode: "print",
+        });
 
         expect(capturedContinuity?.lastWriterStarted).toBe(true);
         expect(capturedContinuity?.lastWriteEffect).toBe(writeEffect);
@@ -2011,13 +2015,10 @@ describe("shell session runtime (W5)", () => {
 
     expect(renderedChunks).toEqual(["hello "]);
     expect(
-      renderedLines.some((line) => line.includes("[tool:start] bash")),
+      renderedLines.some((line) => line.includes("[tool: bash]")),
     ).toBe(true);
     expect(
       renderedLines.some((line) => line.includes("[query:retry] role=coder")),
-    ).toBe(true);
-    expect(
-      renderedLines.some((line) => line.includes("[tool:start] bash")),
     ).toBe(true);
     expect(
       renderedLines.some((line) => line.includes("Execution trace summary")),
