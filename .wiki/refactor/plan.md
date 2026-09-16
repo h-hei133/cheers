@@ -102,3 +102,20 @@ confidence: high
 ## 6. Step 2.5-C-2 复核记录（2026-09-15）
 
 原拟删除 `model-adapters` 失活适配器子域，但执行前复核发现该结论不可靠：`client.ts` 依赖 `registry.ts`/`retryPolicy.ts`，`registry.ts` 依赖 OpenAI/Anthropic adapters；这些关系说明此前“仅 types/jsonRepair 活跃”的 BFS 结果不能直接作为删除依据。误删候选已恢复，未产生源码变化。`npm run build:ts` 与 `npm run validate` 通过。该子域暂不重构；以后 provider/auth/execution 边界必须同时满足真实入口、脚本入口、显式依赖和 runtime 装配四重证据。
+
+## 7. 边界分析方法与方向修正（2026-09-15，信息收集轮）
+
+新增工具 `scripts/analyze-boundaries.py`：以四重证据（CLI 入口、scripts 入口、包公共 API 闭包、测试引用）为每个生产文件打标签。
+
+测量事实（详见 `boundary-analysis-2026-09-15.md`）：
+
+- 生产源文件 1361：CLI 可达 871，CLI 不可达 490。
+- 490 分解：仅测试引用 339、零引用 146、仅公共 API 5、仅脚本 0。
+- 测试基建 45 个（core/harness、test-utils）豁免。
+- 公共 API 闭包 246 文件，由 `verify:host-surface` 实测消费，属受门控契约面，永久保护。
+- 445 个候选构成 **1 个主簇 310 文件 + 105 个小簇**；主簇与 CLI 活跃集 import 泄漏为 0；簇外非测试引用者 6 个，全部为豁免的测试基建；主簇配套 254 个测试文件。
+- `model-adapters` 的 7 个文件全部位于主簇内部；上一轮误判源于把"CLI 不可达"等同于"可删"，忽略簇内依赖。`types.ts`（308 处引用）与 `jsonRepair.ts` CLI 可达。
+
+**方向修正：删除单位从"文件/目录"改为"连通分量整簇"。** 主簇只能整簇评估、整簇删除，不允许部分摘除。删除前的必要条件：CLI 泄漏 0、公共 API 泄漏 0、scripts 泄漏 0、簇外非测试引用仅限豁免区、`npm run build:ts` 与 `verify:host-surface` 通过、BFS 存活集不变。
+
+**待裁决（阻塞下一步）**：主簇 310 文件保留/冻结/删除，三选一（见 boundary-analysis-2026-09-15.md §5）。未裁决前不执行删除。
