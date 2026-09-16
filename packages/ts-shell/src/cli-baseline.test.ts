@@ -3316,6 +3316,9 @@ describe("CLI streaming baseline (T3)", () => {
       args: ["--project", projectRoot, "--print", "Run node --version"],
       envOverrides: {
         PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        // The approval boundary is only reachable if the model actually asks for
+        // a tool; a prose-only synthetic run never reaches it.
+        PRIVATE_AGENTS_SYNTHETIC_TOOLS: "1",
       },
       timeoutMs: 30000,
     });

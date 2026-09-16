@@ -149,6 +149,55 @@ decision-trace: seed=action-result seedAction=edit-file seedTarget=src/app.ts
 
 **注意**：`turn/synthetic.ts` 的文档注释明确"a model that answers without a provider"，即纯回显是**有意设计**，不是缺陷。所以这是"设计变更导致测试前提消失"，属于重构遗留的验证缺口。
 
+### 2026-09-16 执行（裁决 A）与根因更新
+
+按裁决 A 实现：`createSyntheticStep({ toolIntent })` + `PRIVATE_AGENTS_SYNTHETIC_TOOLS=1` 环境开关（`entrypoints/cliRuntimeInvocation.ts`）。synthetic 现可对匹配的提示发出一次工具调用，完成后转为回显收尾。默认仍为纯回显，30+ 依赖该语义的测试不受影响。
+
+**修复过程中发现并修复一个更严重的接线缺陷**（超出 CB-003 原范围）：
+
+`cli/bootstrap/cliProcessRunner.ts:148` 原来把 `promptInteractiveApproval` 传成一个**恒定存在**的闭包：
+```ts
+promptInteractiveApproval: (prompt) =>
+  interactiveApprovalPrompt ? interactiveApprovalPrompt(prompt) : Promise.resolve("deny"),
+```
+而审批桥用 `isNonInteractive = rl === null && !promptInteractiveApproval` 判定通道（`entrypoints/cliApprovalModule.ts:185`）。闭包恒存在 ⇒ `isNonInteractive` 恒为 `false` ⇒ **非交互审批分支永远不可达**，print/管道模式下的审批边界渲染（`Decision source`、`Non-interactive approval policy`、`approval-audit:*`）从不输出。
+
+修法：只有交互表面真正安装处理器后才报告存在（`promptInteractiveApproval: interactiveApprovalPrompt`）。修复后该测试的审批输出全部恢复。
+
+**剩余差异（升级为独立项 CB-004）**：见下。
+
+---
+
+## CB-004 审批拒绝后回合仍报成功（终态真实性缺口）
+
+- **状态**：`待裁决`
+- **性质**：**真实性缺陷**（非纯能力缺失）——工具被审批拒绝，回合却报 `Outcome: success`
+- **登记测试**：`cli-baseline.test.ts` → `print approval boundary defaults deny without prompt`（最后 4 项断言）
+
+### 事实
+
+1. 审批链路已修复（见 CB-003），工具确实被拒：transcript 中 `tool.result.success: false`，`failureReason: "Blocked: User denied permission for tool 'bash' (execute) on 'node --version'."`
+2. 但回合终态仍为 `Outcome: success` / `Detail: completed`；实测输出**不含** `denied`、`Blocked`、`stopped`、`approval-denied` 任何字样。
+3. 根因：`turn/projection.ts:95-119` 的 `concludeRun` 只区分两种终态——
+   - `last.stopReason === "error"` → `failed`
+   - 其余 → `completed` + `terminalClassification: "success"`
+   没有「工具被拒」这一分支；工具结果不参与终态判定。
+4. 测试期望：`Outcome: stopped`、`BlockerKind: approval-denied`、且不得出现 `Outcome: success`。
+
+### 为什么值得单独处理
+
+这违反仓库的 [`agent-rules/evidence-and-truthfulness.md`](../../AGENTS.md) 原则：一个被拒绝执行的回合对外宣称成功，会让用户与后续轮次都误判「事情做完了」。这与 CB-001（缺失一个增强能力）不同——**这里是错误的成功声明**。
+
+### 决策选项
+
+| 选项 | 含义 |
+|---|---|
+| 修终态分类 | `concludeRun` 在「存在被拒工具且无成功动作」时返回 stopped/denied，并让终端表面渲染 `BlockerKind` |
+| 收窄测试 | 只保留已恢复的审批渲染断言，删掉终态断言并注明已知缺口 |
+| 暂缓登记 | 保持失败，等更大范围的终态语义设计（可能与其他终态缺口一并处理） |
+
+**建议**：选项 1。它是真实性问题，不是可选增强；修复面也明确（一个函数 + 一个渲染分支）。若选择它，需确认 stopped 的 `blockerKind` 从哪来（工具结果是唯一现场）。
+
 ---
 
 ## 登记流程（供后续复用）

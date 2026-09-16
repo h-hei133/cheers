@@ -145,10 +145,11 @@ export async function runCliProcess(
     providerRuntimeBridge,
     getReadline: () => readline,
     isStdinTty: () => Boolean(input.stdin.isTTY),
-    promptInteractiveApproval: (prompt) =>
-      interactiveApprovalPrompt
-        ? interactiveApprovalPrompt(prompt)
-        : Promise.resolve("deny"),
+    // Reported as present only once the interactive surface has actually
+    // installed a handler. Handing over a fallback closure here would make the
+    // approval bridge treat every run as interactive and skip the
+    // non-interactive policy path entirely.
+    promptInteractiveApproval: interactiveApprovalPrompt,
   });
 
   const handledPrintMode = await runCliPrintModeRouter({

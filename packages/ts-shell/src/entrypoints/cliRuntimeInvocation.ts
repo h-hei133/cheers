@@ -63,6 +63,26 @@ const defaultDependencies: CliRuntimeInvocationDependencies = {
   createReadinessTerminalEvent: createProviderReadinessCliTerminalEvent,
 };
 
+/**
+ * Commands a synthetic run may be asked to carry out, mapped from the phrase a
+ * prompt uses to the shell command it means. Only consulted when
+ * `PRIVATE_AGENTS_SYNTHETIC_TOOLS` is set, so an ordinary synthetic run keeps
+ * answering in prose.
+ */
+const SYNTHETIC_TOOL_INTENTS = [
+  { phrase: "node version", tool: "bash", command: "node --version" },
+  { phrase: "node --version", tool: "bash", command: "node --version" },
+] as const;
+
+function syntheticToolIntent() {
+  if (process.env.PRIVATE_AGENTS_SYNTHETIC_TOOLS !== "1") return undefined;
+  return SYNTHETIC_TOOL_INTENTS.map((intent) => ({
+    phrase: intent.phrase,
+    name: intent.tool,
+    args: () => ({ command: intent.command }),
+  }));
+}
+
 export function buildCliRuntimeInvocation(input: CliRuntimeInvocationInput): CliRuntimeInvocationRequest {
   const providerMode: ProviderMode = input.providerModeEnv === "synthetic" ? "synthetic" : "real";
   const { providerModeEnv: _providerModeEnv, ...request } = input;
@@ -156,7 +176,7 @@ function startTurn(
     interactiveAsk: request.interactiveAsk,
     history: request.historyMessages ?? [],
     onMessage: request.onTurnMessage ?? (() => {}),
-    step: request.providerMode === "synthetic" ? createSyntheticStep() : (dependencies.createStep ?? createProviderStep)(request, tools),
+    step: request.providerMode === "synthetic" ? createSyntheticStep({ toolIntent: syntheticToolIntent() }) : (dependencies.createStep ?? createProviderStep)(request, tools),
     tools,
     hooks,
     maxSteps: request.maxTurns,
