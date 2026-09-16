@@ -185,3 +185,35 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 1. **Provider 适配能力**：Anthropic、Codex account-auth、Google account-auth refresh/normalization。当前配置/凭据面保留，但 real provider adapter 对非 openai 明确返回 unsupported。
 2. **完整终态真实性闭包**：`capabilityClassification.ts` + `transitions.ts` + `classificationProjection.ts` + `queryTerminalTruth.ts`。
 3. 工具 provenance/lifecycle 细节是否被新工具循环完整覆盖。
+
+## 十一、统一执行路线（收束）
+
+### 阶段 1：停止删除（已完成）
+
+不再依据 `cli:false` 单独删除任何代码。后续删除必须先完成功能审查、等价实现核验、动态入口检查和消费者存活检查。
+
+### 阶段 2：断链修复（已完成两项）
+
+已修复：工作区写授权、编辑快照写入。
+
+仍需单独闭包和验证：provider adapters（非 openai 配置面与执行能力）、完整终态真实性/verification consumers。两者不能按"整簇恢复"处理。
+
+### 阶段 3：未接线能力裁决（待所有者决定）
+
+按能力而非文件决策：任务相关验证阶梯、跨文件 repair、AST 图谱、LSP 自修复、Swarm 分发、会话树、Playwright 报告/后端、continuation proof-gap、provider proposal。
+
+每项先登记能力边界、输入输出、现有替代和接线成本；不得把"实现完整"直接等同于"必须恢复"。
+
+### 阶段 4：明确废弃/迁移残留（可维持删除）
+
+纯 re-export shim、活轨已内联归并的模块、消费者与生产者同批消失且活轨明确拒绝的 apply_patch 路线，可保持删除；但需保留本审查证据，不得重新用"未引用"作为唯一理由。
+
+## 十二、当前唯一可信总账
+
+- 三次删除生产文件：403。
+- 已确认纯 shim/迁移残留或废弃路线：保留删除，证据见 §§3、8、10。
+- 已恢复并接线：2 个文件。
+- 已确认高价值候选：见 §§4、9、10，尚未全部恢复。
+- G1/G3 的逐文件审查仍有部分不确定项；本文件的分组结论不应被误读为 403 行逐文件完成。
+
+当前工作树保持在 `normproof-observation`，未切换分支；用户已有 `.serena/project.yml` 改动未触碰。
