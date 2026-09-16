@@ -62,3 +62,64 @@
 3. **冻结**：移出 `src/`（如 `src/legacy/` 或独立包）并排除出构建，保留代码与测试但不计入门控。
 
 未裁决前不执行删除。
+
+## 6. CLI 现有能力调查（2026-09-15 追加）
+
+问题：CLI 是否已存在"多文件编辑/补丁/验证"，还是主簇是待接入的新能力？
+
+**答案：CLI 已有替代实现，主簇是 Phase 4 裁剪后的遗留物，不是待接入能力。**
+
+### 6.1 CLI 的编辑能力面
+
+工具仅 5 个（`core/tools/registry.ts`）：`read` / `write` / `edit` / `glob` / `bash`。
+
+- `write`：整文件覆盖（单目标）
+- `edit`：`content` 全量替换 或 `oldText/newText` 搜索替换 + `replaceAll`（单目标）
+- `registry.ts` 中 `apply_patch` 出现次数为 0 —— **CLI 无补丁语义、无多文件原子写**
+- `createUnifiedDiff` 仅用于生成 diff 文本展示给模型（`transcript/diff.ts`），不解析 diff 输入
+
+修复循环由 `/loop` 命令承担（`core/commands/loopCommandRuntime.ts`）：先本地跑 gate 命令，失败则把输出注入提示词，让模型用 `bash`/`edit` 工具自行迭代。该文件只 import `node:child_process` 与本地类型，**不 import 主簇任何模块**。
+
+回滚由 `/undo` 承担（`core/commands/undoCommandRuntime.ts`）：找到最近一次编辑，输出可回退该次编辑的审计命令；作者明确拒绝了 `git checkout -- . && git clean -fd` 的整树回退。
+
+因此 CLI 的"编辑 → 验证 → 修复 → 回滚"是**模型驱动的工具循环 + git/审计命令**，不是代码驱动的补丁事务。
+
+### 6.2 主簇提供的是另一套语义
+
+主簇 310 文件中约 57 个构成补丁事务引擎：
+
+| 能力 | 文件数 | CLI 是否有 |
+|---|---:|---|
+| diff/patch 解析（unified diff → 操作集） | 7 | 无 |
+| 多文件应用（create/update/delete/move） | 12 | 无（仅单文件） |
+| 原子性契约（noPartialApply / mixedFile） | 5 | 无 |
+| 补丁验证（verifyParsedPatch） | 1 | 无 |
+| 快照与回滚授权（recoveryAuthorityStore / editSnapshot） | 7 | 无（CLI 用 git + 审计命令） |
+| 受控写入通道（patchResult/*Route） | 12 | 无 |
+| 目标集编辑（targetSetEdit / fencedEdit） | 14 | 无 |
+| 验证修复环（verificationRepair* / editRepair*） | 8 | 替代实现：`/loop` |
+| 提案审查应用（editProposal* / hunkSet / exactHunk） | 8 | 无 |
+
+即主簇独有的是**确定性、代码驱动的多文件补丁事务**（解析 → 校验 → 原子写 → 快照 → 回滚 → 再验证）。
+
+### 6.3 为什么不在 CLI 路径上
+
+`a7418fcb`（2026-09-12，Phase 4）提交信息：
+
+> Deleted the legacy ReAct loop, the contract query loop and engine, **the integrated-flow coordinator and its stage modules**, … and the **apply-patch / planning-mutation CLI flags**
+
+主簇的入口链正是被这次删除切断：`runMvpIntegratedFlow.ts` 已不存在（文件缺失，`docs/PROJECT_MAP.md` 仍引用它），`agentLoop`/`engine/loop` 已删除。
+
+残留证据：`planning/runtime/projection.ts:35` 今天仍声明 `productPath: "runMvpIntegratedFlow"` —— 指向已删除模块的悬空字符串，属裁剪未清扫项。
+
+`docs/PROJECT_MAP.md` 冻结于 2026-05-22（route201），其描述的 Plan→Proposal→Apply→Verify→Repair 主链与"Main Modules"清单已与当前代码不符。
+
+### 6.4 接入状态结论
+
+主簇**不是"正待接入"**：它的接入点（集成流协调器、CLI 开关）已在 Phase 4 被主动删除，替代方案（模型驱动工具循环 + `/loop` + `/undo`）已在生产运行。因此：
+
+- 选项 2（保留并接入）= 推翻 Phase 4 的架构决策，把已剪除的集成流接回；
+- 选项 1（整簇删除）= 删除已被替代且入口已删除的旧架构；
+- 选项 3（冻结）= 仅当用户认为"确定性补丁事务引擎"仍是未来方向时才有价值。
+
+裁决点：**补丁事务引擎（diff 解析 / 原子多文件写 / 快照回滚）是否为未来目标能力？** 是 → 冻结；否 → 删除。
