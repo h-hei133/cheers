@@ -92,9 +92,11 @@ export type RunOutcome =
 /**
  * The terminal event for a run, from what the conversation holds.
  *
- * A failed last step is a failed run. A run that ended without an answer is
- * reported honestly rather than summarized: the last tool's output if tools
- * ran, otherwise the step's own account of the silence.
+ * A failed last step is a failed run. A run whose tools were all refused by the
+ * approval gate is stopped, not completed: nothing was carried out, so claiming
+ * success would misreport what happened. A run that ended without an answer is
+ * reported honestly rather than summarized: the last tool's output if tools ran,
+ * otherwise the step's own account of the silence.
  */
 export function concludeRun(messages: readonly AgentMessage[], prompt: string, sessionId: string, steps: number): RunOutcome {
   const last = [...messages].reverse().find((message) => message.role === "assistant");
@@ -108,6 +110,26 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
   }
   const explained = !last?.content;
   const finalOutput = last?.content || explainSilence(messages, last?.errorMessage);
+  const refused = refusedToolCall(messages);
+  if (refused) {
+    return {
+      kind: "completed",
+      finalOutput,
+      explained,
+      completed: {
+        type: "query.completed",
+        result: {
+          status: "stopped_error",
+          terminalClassification: "stopped",
+          terminalReason: "stopped_error",
+          stopReason: refused,
+          transcript: [],
+          sharedContext: { sessionId, initialPrompt: prompt, notes: [`steps: ${steps}`], handoffs: [] },
+          finalOutput,
+        },
+      },
+    };
+  }
   return {
     kind: "completed",
     finalOutput,
@@ -124,6 +146,36 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
       },
     },
   };
+}
+
+/**
+ * The refusal that stopped this run, if the approval gate refused a call.
+ *
+ * A refusal only ends the run when no tool ran after it — a run that was refused
+ * once and then did the work successfully is a success with a story, not a stop.
+ */
+function refusedToolCall(messages: readonly AgentMessage[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "tool") continue;
+    const content = message.content ?? "";
+    if (isApprovalRefusal(content)) return content;
+    // The newest tool result is not a refusal, so whatever happened earlier was
+    // recovered from; the run is not stopped by it.
+    return undefined;
+  }
+  return undefined;
+}
+
+/** Whether a tool result reports that the approval gate refused the call. */
+function isApprovalRefusal(content: string): boolean {
+  const normalized = content.toLowerCase();
+  return (
+    normalized.includes("user denied permission") ||
+    normalized.includes("user denied with reason") ||
+    normalized.includes("[user denied permission]") ||
+    (normalized.includes("requires permission") && normalized.includes("no interactive handler"))
+  );
 }
 
 function explainSilence(messages: readonly AgentMessage[], stepExplanation: string | undefined): string {

@@ -242,7 +242,11 @@ export function classifyActionableKind(
     normalized.includes("approval denied") ||
     normalized.includes("user rejected") ||
     normalized.includes("rejected permission") ||
-    normalized.includes("permission rejected")
+    normalized.includes("permission rejected") ||
+    // The tool gate reports a refusal as "User denied permission for tool …";
+    // the wording differs from the approval-audit phrasing matched above.
+    normalized.includes("user denied permission") ||
+    normalized.includes("user denied with reason")
   ) {
     return "approval-denied";
   }

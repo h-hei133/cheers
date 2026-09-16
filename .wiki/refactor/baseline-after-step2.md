@@ -83,3 +83,45 @@ Step 1 起点为 57 失败 → Step 2 后 15 → 裁决执行后 **1**（稳定�
 ### 剩余待裁决
 
 - **CB-003** synthetic provider 不驱动工具调用：建议选「专用 synthetic 工具调用模式」（不影响现有 30+ 依赖纯回显语义的测试）。或删除该测试。
+
+---
+
+## CB-004 修复（2026-09-16 晚）
+
+维护者裁决选 1（修终态分类）。已实现：
+
+| 变更 | 位置 | 内容 |
+|---|---|---|
+| 被拒终态判定 | `turn/projection.ts:92-179` | `concludeRun` 检测最新工具结果是否为审批拒绝；是则产出 `status: stopped_error` + `terminalClassification: stopped` + `stopReason`（拒绝原文），不再报 `success`。仅当**最新**工具结果是被拒时才停止——被拒后成功完成的工作仍是成功。 |
+| 拒绝措辞识别 | `core/query/actionableBlockerModule.ts:241-252` | 分类器原查 `approval denied`，而工具门禁产出 `User denied permission for tool …`，语序不符导致匹配失败。补上该措辞与 `user denied with reason`。 |
+
+实测输出（synthetic 工具模式）：
+
+```
+Approval
+- Decision source: default-deny
+Non-interactive approval policy: deny (default deny)
+approval-audit:channel=non-interactive
+approval-audit:decision=deny
+Approval decision: deny
+[User Denied Permission]: The user explicitly rejected this tool call. …
+Result
+- Outcome: stopped
+- Detail: [User Denied Permission]: …
+- BlockerKind: approval-denied
+- Reason: …
+- DoNext: Re-run and approve escalation for verify command execution.
+```
+
+### 最终基线
+
+| | 数值 |
+|---|---:|
+| 测试总数 | 3173 |
+| **稳定失败** | **0** |
+| 并行负载抖动 | 若干（单跑通过；`browserControlledNetworkScenarioExamples`、`deepResearch`、`surface/benchmark`） |
+| `tsc -p tsconfig.build.json` | 0 错误 |
+| `npm run build:ts` | 通过 |
+| 受影响模块回归（turn/ + core/query/ + core/shell/） | 280 项全通过 |
+
+**失败数演进**：57（Step 1）→ 15（Step 2）→ 1（裁决执行）→ **0**（CB-004 修复）。
