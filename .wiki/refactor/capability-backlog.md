@@ -14,7 +14,7 @@
 
 ## CB-001 会话续跑的决策追踪（decision trace / action-result seed）
 
-- **状态**：`待裁决`（维护者已表示"有价值，先记录"）
+- **状态**：`已裁决：删除断言`（维护者判定接受覆盖下降；能力本身保留在 backlog 供未来实现）
 - **发现于**：`cli-baseline.test.ts` 10 项失败（2026-09-16 定因）
 - **登记的测试**：
   - `prefers completed current session for /continue follow-up over recovery fallback`
@@ -89,7 +89,7 @@ decision-trace: seed=action-result seedAction=edit-file seedTarget=src/app.ts
 
 ## CB-002 非 TTY real-provider 端到端链（CLI smoke）
 
-- **状态**：`待裁决`
+- **状态**：`已裁决：删除`（维护者判定 real-provider 测试价值不大）
 - **性质**：**测试不可运行**（非功能缺失）——与 CB-001 不同，这里不是"能力未实现"，而是"测试在当前环境下无法通过"
 - **登记的测试**（`cli-baseline.test.ts` 4 项）：
   - `proves default CLI real-provider chain in non-tty mode stops twice with explicit approval guidance and durable stopped state`
@@ -118,6 +118,36 @@ decision-trace: seed=action-result seedAction=edit-file seedTarget=src/app.ts
 | 删除测试 | 若该链路已不被支持 |
 
 **建议**：先做一次定点调查（限时），区分"产品挂起"与"测试过期"再决定。这 4 项**不阻塞 Step 2 的其余部分**。
+
+---
+
+## CB-003 synthetic provider 不驱动工具调用（非交互审批边界无法验证）
+
+- **状态**：`待裁决`
+- **性质**：**能力回退**（测试引入时通过，Phase 4 turn 切换后失效）
+- **登记测试**：`cli-baseline.test.ts` → `print approval boundary defaults deny without prompt`
+
+### 事实
+
+1. **测试引入时通过**：在引入提交 `a302d77e`（2026-05-02 "Add print approval boundary smoke"）的树上单跑通过。
+2. **Phase 4 后失败**：在 `a7418fcb`（2026-09-12）的树上同样失败，与当前一致。
+3. **根因**：`turn/synthetic.ts:11-21` 的 synthetic step 恒定返回 `toolCalls: []`——**从不发出工具调用**。因此：
+   - 提示 "Run node --version" 只得到 `Synthetic reply: Run node --version`
+   - 工具审批从未被请求，非交互审批边界（`Decision source: default-deny`、`Non-interactive approval policy: deny (default deny)`、`approval-audit:channel=non-interactive`）无处触发
+4. **消费者仍在**：`entrypoints/approvalPromptBridge.ts:91,118`（CLI 可达）仍在产出这些字符串；缺失的是触发链路，不是输出逻辑。
+5. 实测输出：`Synthetic reply: Run node --version / Result / - Outcome: success / - Detail: completed`（`exit 0`）。
+
+### 决策选项
+
+| 选项 | 含义 |
+|---|---|
+| 让 synthetic 按提示中的命令意图发出工具调用 | 恢复该测试前提；但需定义"哪些提示应触发哪个工具"的合成规则，可能污染其他 30+ 依赖"纯回显"语义的 synthetic 测试 |
+| 单独提供一个 synthetic 工具调用模式（如环境开关） | 更聚焦：只让需要工具链的测试启用，不影响纯回显契约 |
+| 删除该测试 | 承认非交互审批边界不再有端到端覆盖 |
+
+**建议**：先不动，登记待裁决。若要做，选第二项（专用模式），因为选项一会改变现有 30+ 测试依赖的 synthetic 语义。
+
+**注意**：`turn/synthetic.ts` 的文档注释明确"a model that answers without a provider"，即纯回显是**有意设计**，不是缺陷。所以这是"设计变更导致测试前提消失"，属于重构遗留的验证缺口。
 
 ---
 
