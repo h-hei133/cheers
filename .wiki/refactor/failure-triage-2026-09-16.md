@@ -97,9 +97,13 @@
 
 **根因（与 B 类同源）：** 这些期望的 `seed=action-result` 由 `buildActionResultSeedDecisionTrace` 产出，其唯一调用链（`planning/workflowTaskPlan.ts` → `orchestration/runtimeHandoffProjection.ts`）已在主簇删除中消失；活轨 `turn/projection.ts:122` 只写 `notes: ['steps: ${steps}']`。
 
-**结论：** 这批断言**验证的是已删除链的能力**。但它们是端到端测试，覆盖"stopped 会话续跑的可操作性"。**处置需产品判断**：
-- 若认定该能力随主簇一起废弃 → 删断言（但要接受 `/continue` 的可操作性验证覆盖损失）
-- 若认定该能力仍应存在 → 是 feature work（在活轨重建 seed 投影），不属于重构
+**结论：** 这批断言**验证的是活轨从未实现的能力**（旧链曾是生产者，Phase 4 turn 切换后未迁移；主簇删除只是让测试从"验证旧链"变成"验证失败"）。
+
+**已登记到 [capability-backlog.md](capability-backlog.md) CB-001（状态：待裁决）。** 关键事实补充：
+- 消费方仍在（`core/shell/recovery.ts:538` CLI 可达、`sessionTerminalState.ts:613`）
+- 生产者缺失：`turn/projection.ts:122` 只写 `steps: N`，且活轨 `query.completed` **无 `codingResult` 字段**，`lastActionResultSeed` 在 turn 内核无产出
+- 维护者已表示该能力有价值，先记录、暂不实现（重构优先）
+- **当前处置**：本项不阻塞 Step 2，测试断言待裁决后处理（删除 / 收窄 / 独立立项）
 
 ### F3. print 模式审批（1 项）[需调查]
 
