@@ -1,5 +1,9 @@
 import { promises as fs } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js'
+import { buildEditSnapshotStoreConfig } from '../../orchestration/editSnapshot.js'
+import { captureRecoveryAuthorityRecord } from '../../orchestration/patchRecovery/recoveryAuthorityStore.js'
 import {
   checkRustDaemonAvailability,
   executeLocally,
@@ -34,8 +38,35 @@ export function createDefaultExecutionService(): ExecutionService {
       return fs.readFile(request.absolutePath, 'utf8')
     },
     async writeTextFile(request) {
+      const relativePath = path.relative(request.workspaceRoot, request.absolutePath)
+      // A target outside the workspace root cannot be expressed as a relative
+      // path, so the authority refuses it rather than writing through.
+      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        throw new Error(
+          `Refuse to write outside the selected workspace: ${request.reportSafeTarget}`,
+        )
+      }
+      const authority = createWorkspaceWriteAuthority(request.workspaceRoot)
       await fs.mkdir(path.dirname(request.absolutePath), { recursive: true })
-      await fs.writeFile(request.absolutePath, request.content, 'utf8')
+      // Record what the file held before the write, so /undo and /restore have
+      // something to take back. Captured under the same authority the write
+      // uses: a snapshot of a target the write would refuse is worse than none,
+      // because it reads as recoverable.
+      const before = existsSync(request.absolutePath)
+        ? authority.readVerifiedFile(relativePath)
+        : undefined
+      await captureSnapshotBeforeWrite({
+        workspaceRoot: request.workspaceRoot,
+        relativePath,
+        before,
+      })
+      if (existsSync(request.absolutePath)) {
+        // Existing targets are opened with O_NOFOLLOW and re-verified through the
+        // opened descriptor, so a symlink swapped in after the check still loses.
+        authority.writeFile(relativePath, request.content)
+        return
+      }
+      authority.createFileExclusive(relativePath, request.content)
     },
     listFilesRecursive(request) {
       return listFilesRecursive(request.absoluteRoot)
@@ -43,6 +74,38 @@ export function createDefaultExecutionService(): ExecutionService {
     runCommand(request) {
       return runCommand(request)
     },
+  }
+}
+
+/**
+ * Record a pre-write snapshot, best effort.
+ *
+ * A snapshot exists so a write can be taken back. Failing to record one must not
+ * block the write: the write itself is already gated by the workspace authority
+ * and the approval path. A missing snapshot degrades /undo for that one change,
+ * which /undo already reports as "nothing to undo".
+ */
+async function captureSnapshotBeforeWrite(input: {
+  workspaceRoot: string
+  relativePath: string
+  before: string | undefined
+}): Promise<void> {
+  try {
+    await captureRecoveryAuthorityRecord({
+      ...buildEditSnapshotStoreConfig({
+        workspaceRoot: input.workspaceRoot,
+        targetPath: input.relativePath,
+      }),
+      recordId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+      workspaceRelativePath: input.relativePath,
+      operationKind: input.before === undefined ? 'create' : 'update',
+      beforeState: input.before === undefined ? 'absent' : 'exists',
+      ...(input.before !== undefined ? { beforeContent: input.before } : {}),
+      expectedCurrentState: input.before === undefined ? 'absent' : 'exists',
+      ...(input.before !== undefined ? { expectedCurrentContent: input.before } : {}),
+    })
+  } catch {
+    // Snapshot storage is a recovery aid, never a precondition for writing.
   }
 }
 
