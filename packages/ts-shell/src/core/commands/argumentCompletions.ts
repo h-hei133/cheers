@@ -26,19 +26,20 @@ function prefixFilter(
  * so these lists come from the handler's own accepted set.
  */
 const SUBCOMMAND_VALUES = {
+  model: ["use", "list", "status", "help"],
   thinking: ["low", "medium", "high", "off"],
-  fast: ["on", "off", "toggle"],
+  fast: ["on", "off", "toggle", "enable", "disable"],
   log: ["tail", "path", "export", "clear"],
   todo: ["add", "start", "done", "clear"],
   goal: ["pause", "resume", "complete", "clear"],
   workflow: ["list", "run", "status"],
-  marketplace: ["list", "add", "remove"],
-  plugin: ["list", "install", "search", "uninstall", "enable", "disable"],
+  marketplace: ["list", "add", "remove", "rm", "delete"],
+  plugin: ["list", "install", "search", "uninstall", "enable", "disable", "add", "find", "rm", "remove"],
   memory: ["inspect", "add", "recall", "use", "invalidate", "save", "status", "review"],
   connect: ["status", "list", "presets", "login", "set", "use", "logout", "help"],
   compact: ["preview", "render", "json"],
   warmup: ["status", "rebuild"],
-  resume: ["list", "current", "switch", "help"],
+  resume: ["list", "current", "switch", "help", "panel", "ls", "active", "use"],
   mcp: ["status", "tools", "doctor", "refresh"],
   permissions: ["list", "explain", "revoke", "reset"],
   workspace: ["status", "attach", "recent"],
@@ -75,16 +76,18 @@ export function shellArgumentCompletions(
 export function modelArgumentCompletions(
   prefix: string,
 ): readonly CommandArgumentCompletion[] | null {
-  const providers = loadCatalog();
-  const pairs = providers.flatMap((provider) =>
+  const space = prefix.indexOf(" ");
+  if (space < 0) return subcommandCompletions("model", prefix);
+  const target = prefix.slice(space + 1).trim().toLowerCase();
+  const pairs = loadCatalog().flatMap((provider) =>
     provider.models.map((model) => `${provider.id}/${model.id}`),
   );
   if (pairs.length === 0) return null;
-  const lowered = prefix.toLowerCase();
-  return pairs
-    .filter((pair) => pair.toLowerCase().includes(lowered))
+  const matches = pairs
+    .filter((pair) => pair.toLowerCase().includes(target))
     .slice(0, 50)
     .map((pair) => ({ value: pair, label: pair }));
+  return matches.length > 0 ? matches : null;
 }
 
 /** `/loop [attempts] <gate>` — only the leading count is enumerable. */

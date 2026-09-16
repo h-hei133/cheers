@@ -333,3 +333,14 @@ confidence: high
 - **E3**：本记录暂不新增 E3 功能结论；状态与风格统一仍按阶段计划推进。
 
 后续所有完成声明必须区分“候选 detail 已实现”和“命令后 inline hint 已实现”，也必须区分“内部 steer 语义已接通”和“用户已理解该语义”。
+
+#### E2 复核修补（d80a8eca → 本次）
+
+双车道独立审查（code lane / arch lane）：合并方向正确、双过滤修复经验证正确，但有两处用户可见回归与一处同源漂移。
+
+已修补：
+- **参数补全走错语法形**（HIGH，argumentCompletions.ts）——`/model` 补全挂在裸形参数上，而处理器只认 `use <target>`（`modelCommandRuntime.ts:77`）：`/model use ` 无候选、`/model gpt` 却为命令拒绝的形态弹菜单。现按首空格分词，`use` 后补目录对，未分词时补子命令（`use/list/status/help`）。
+- **/statusline 提示丢失**（MEDIUM，slashCommandRegistry.ts）——投影时漏掉 `argumentHint`；已恢复 `use <preset|item...>`，并补测试锁定。
+- **子命令表缺别名**（MEDIUM，argumentCompletions.ts）——与各 handler 实际接受集不一致（`resume` 缺 panel/ls/active/use、`fast` 缺 enable/disable、`marketplace` 缺 rm/delete、`plugin` 缺 add/find/rm/remove）；已补齐并对齐。
+
+跟踪（不进本次）：`SUBCOMMAND_VALUES` 仍是手抄表，正确解是各 handler 导出自身接受集；`registerSlashCommand` 扩展路径未在注册处校验 picker 归属；拣选表与展示条目仍是两处字面量。

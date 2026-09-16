@@ -56,7 +56,8 @@ function builtinCommands(): readonly SlashCommandSpec[] {
  * Commands the interactive surface handles directly (picker overlay) without a
  * dispatch-registry handler. They live here so the completion menu and the
  * guide can show them, but the router never sees them — `opensPicker` intercepts
- * the bare form before routing.
+ * the bare form before routing. The picker table (`picker/registry.ts`) owns
+ * the behavior; this entry carries only what the menu and guide display.
  */
 const PICKER_ONLY: readonly SlashCommandSpec[] = [
   {
@@ -64,6 +65,7 @@ const PICKER_ONLY: readonly SlashCommandSpec[] = [
     aliases: ["status"],
     group: "workspace",
     summary: "choose which facts the status band keeps in view",
+    argumentHint: "use <preset|item...>",
   },
 ];
 

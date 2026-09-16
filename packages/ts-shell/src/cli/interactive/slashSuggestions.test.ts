@@ -43,10 +43,15 @@ describe("command completions", () => {
     expect(slashSuggestions("/help ")).toBeNull();
   });
 
-  it("offers model pairs from the catalogue", () => {
-    const matches = slashSuggestions("/model anthropic/");
+  it("offers model pairs after the use subcommand", () => {
+    const matches = slashSuggestions("/model use anthropic/");
     expect(matches).not.toBeNull();
     expect(matches?.some((match) => match.value.startsWith("anthropic/"))).toBe(true);
+  });
+
+  it("offers the model subcommands before a target is typed", () => {
+    const matches = slashSuggestions("/model u");
+    expect(matches?.some((match) => match.value === "use")).toBe(true);
   });
 
   it("offers nothing when nothing matches", () => {
@@ -88,6 +93,7 @@ describe("command completions", () => {
   it("shows the picker-only statusline command", () => {
     const matches = slashSuggestions("/statusline");
     expect(matches?.some((match) => match.value === "/statusline")).toBe(true);
+    expect(matches?.find((match) => match.value === "/statusline")?.detail).toContain("<preset|item...>");
   });
 
   it("completes subcommands for commands with an enumerable set", () => {
