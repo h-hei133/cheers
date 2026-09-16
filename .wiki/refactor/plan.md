@@ -80,13 +80,16 @@ confidence: high
 - **Step 2.5-A（已完成）**：删除历史 route/demo 脚本及注册项。`npm run build:ts`、`npm run validate` 通过；删除后的全量 vitest 为 4450 项、51 失败、14 文件。初始基线为 4444 项/57 失败；失败减少 6，但新增 `deepResearch.test.ts` 1 项且测试总数增加 6。由于工作区存在用户已有源文件改动，且全量并行测试存在超时抖动，本轮不宣称零回归。
 - **Step 2.5-B（已完成）**：重新从 `packages/ts-shell/src/entrypoints/*` 做 CLI-only BFS，纳入静态 `from` 与动态 `import()`，排除测试文件。结果：1366 个生产源文件，871 个 CLI 可达，495 个 CLI 不可达；其中 450 个生产删除候选、45 个测试基建豁免。精确清单写入 `cli-only-delete-candidates.md`，完整可达清单写入 `reachability-2026-09-15.json`。本步只生成清单，未删除任何 `src` 文件。
 - **Step 2.5-C-1（已完成）**：删除首个最小孤儿簇——`src/product/{edit,evidence,providerProposal,repair,verification}/*Facade.ts` 五个仅有单行 re-export、无源码/测试/公共入口引用的 facade。删除前后 CLI 可达集合保持 871 个文件不变；生产源文件从 1366 降至 1361，CLI-only 死链从 495 降至 490。`npm run build:ts`、`npm run validate`、`src/repair/iteration/projection.test.ts`（6/6）通过。没有删除 core/harness 或 test-utils。
-- **Step 2.5-C-2（下一步）**：选择下一小簇前重新核对删除候选与测试/脚本引用；继续一次只删一个完整孤儿簇，删除前后重跑 BFS + build + 对应聚焦测试。
-- **Step 2（随后）**：基线回绿。R7 六项修测试锁新语义；R1 死轨断言删除/收窄 + 活轨 metadata 透传（低优先）；R4 删 seed 断言；R5 两项活轨漂移复核；R6 若保留 harness 则加 timeout；R2/R3 不修（并入 Step 2.5 删除）。tsc 539 测试债口径决策不变。
-- **Step 3（browser 搬迁，顺位后移）**：先删除 7 个死 browser 文件，再搬 160 个到独立 browser 域（14 子域映射不变）。
-- **Step 4（orchestration 聚类，重算）**：待 Step 2.5 完成后按存活文件重新生成映射表；v1 的 976 条 import 重写预算作废重算。
-- **Step 5（SessionManager 拆分）**：不变；死链删除后其真实引用面更清晰，利于分组。
+- **Step 2.5-C-2（已中止）**：`model-adapters` 整域删除被复核阻止——其 7 文件位于 310 文件主簇内部，单独摘除破坏簇内依赖。误删已恢复，未产生源码变化。
+- **Step 2.5-C-3（已完成）**：主簇整簇删除 573 文件（310 生产 + 254 测试 + 9 断链测试基建）。生产源文件 1361 → 1045，CLI 可达保持 871 不变（零误删），全量测试 4450/51 失败 → 3179/30 失败。详见 `baseline-after-main-cluster-deletion.md`。
+- **现状重算（已完成）**：CLI 不可达从 490 降至 174（零引用 92 + 仅测试 77 + 仅公共 API 5），不再存在大型连体簇（最大分量 9）。浏览器域搬迁面重算见 `recompute-2026-09-16.md`。**顺序偏差已记录**：Step 3 原定"先删 7 个死 browser 文件"，实际由主簇删除连带删除 12 个，删除有证据支撑但时机早于 Step 2。
+- **Step 2（当前应做）**：基线回绿。剩余 30 项失败分四类——`registry-rust-bridge` 8 项（修活轨 metadata 透传）；`sessionRuntime` 3 + `recovery` 2 + `approvalTrustPolicy` 1（测试锁旧语义，改测试）；`capabilityBoundaryProjection` 1（修实现或改断言）；`cli-baseline` 15（4 环境依赖 + 10 seed 断言 + 1 print 模式）。
+- **Step 2.6（可选，纯机械）**：删除 92 个零引用文件中的孤立簇（57 个完全孤立 + 小分量），逐个验证。
+- **Step 3（browser 搬迁，按重算执行）**：`core/context/` 平铺 128 文件（可达 122）+ `browser/` 子目录 43 文件（可达 41）；先处理 8 个不可达文件，再按 14 子域映射搬迁。
+- **Step 4（orchestration 聚类）**：待 Step 2.6/Step 3 后按存活文件重算映射表。
+- **Step 5（SessionManager 拆分）**：不变。
 - **Step 6（命名税裁定）**：不变。
-- **Step 7（收尾）**：NormProof judge 全量跑；以删除后 BFS 报告（目标死链率 <5%）作为收敛证据。
+- **Step 7（收尾）**：NormProof judge 全量跑；以删除后 BFS 报告作为收敛证据。
 
 ## 4. 验证纪律（v2 增强）
 
