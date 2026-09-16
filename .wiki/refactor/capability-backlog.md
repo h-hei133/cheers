@@ -87,6 +87,40 @@ decision-trace: seed=action-result seedAction=edit-file seedTarget=src/app.ts
 
 ---
 
+## CB-002 非 TTY real-provider 端到端链（CLI smoke）
+
+- **状态**：`待裁决`
+- **性质**：**测试不可运行**（非功能缺失）——与 CB-001 不同，这里不是"能力未实现"，而是"测试在当前环境下无法通过"
+- **登记的测试**（`cli-baseline.test.ts` 4 项）：
+  - `proves default CLI real-provider chain in non-tty mode stops twice with explicit approval guidance and durable stopped state`
+  - `keeps CLI real-provider path alive across one transient chat fetch failure`
+  - `proves default real CLI continuity: deny first approval, then resume same session with explicit non-tty allow`
+  - `proves default real CLI continuity: interrupt mid-query, then /resume to completed in same session`
+
+### 事实
+
+1. 测试用**本地 mock HTTP server**（`createOpenAiHttpServer`，`cli-baseline.test.ts:415`）提供 OpenAI 兼容端点，**不需要真实凭据**。
+2. 失败形态：`Timed out waiting for two non-tty real-provider turns`（单跑 41s；探针复现 `--print` 模式挂起 120s 无输出）。
+3. **是既有失败，非本次改动引入**：在 Phase 4 提交 `a7418fcb` 的树上同样失败；该提交信息自述 "CLI smoke failure set unchanged from before the change"（承认这批为既有失败）。
+4. 4 项单独复现全部失败。
+
+### 待查清的两点
+
+- mock server 就绪但 CLI 挂起：是 `--print` 模式在 real provider 链上的真实缺陷，还是测试对 spawn/时序的假设已过期（如 provider 配置路径或握手协议变更）？
+- 该链路是否仍被产品支持（`PRIVATE_AGENTS_PROVIDER_MODE=real` + 非 TTY）？
+
+### 决策选项
+
+| 选项 | 含义 |
+|---|---|
+| 查清并修复 | 先定位挂起根因；若是产品缺陷 → 修实现；若是测试过期 → 改测试 |
+| 加环境守卫跳过 | `it.skip` 或条件跳过，注明"non-tty real chain 未验证" |
+| 删除测试 | 若该链路已不被支持 |
+
+**建议**：先做一次定点调查（限时），区分"产品挂起"与"测试过期"再决定。这 4 项**不阻塞 Step 2 的其余部分**。
+
+---
+
 ## 登记流程（供后续复用）
 
 1. 发现测试期望 ≠ 生产实现时，先判定：**是回退（实现改坏了）还是缺失（从未实现）**。
