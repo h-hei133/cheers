@@ -72,3 +72,40 @@
 2. 对"已有替代"的结论做**核验**（对比规模、能力、边界语义），不采信推理；
 3. 检查"消费者存活但生产者被删"的断链形态——这是最危险的信号；
 4. 字符串路径启动的 `*Process.ts` 进程入口无法被 import 图发现（Step 2.6 已因此误删 1 个）。
+
+---
+
+## 6. 补丁验证层复核结论（2026-09-16，未恢复）
+
+G2 判定"补丁验证层整体消失"为能力损失。**复核后判定：不是损失，是有意的架构决策。**
+
+### 证据
+
+1. **该层从未接入 CLI 工具面**。删除前（`7a59ab23^`）的 `core/tools/` 目录清单与当前一致，**同样没有 apply_patch 工具**。活轨始终是 5 个工具：`read / write / edit / glob / bash`。
+
+2. **CLI 明确拒绝补丁语法，并引导模型改用单文件替换**。活轨中存在多处相同提示（`core/query/actionableBlockerModule.ts:280,356`、`session/actionableFailureContinuity.ts:153,220`、`result/projection/shell/assembly.ts:356,389`）：
+
+   > "Rerun with one explicit target file plus exact replace-from and replace-to text; do not pass unified diff or apply_patch syntax."
+
+   注意 `apply_patch` 在这些代码里是**被拒绝的输入形态**，不是被调用的能力。
+
+3. **这些提示在删除前就存在**（`git show 7a59ab23^:...actionableBlockerModule.ts | grep -c apply_patch` = 2），与删除无关。
+
+4. **能力形态不匹配**：`buildPerFilePatchPlan` 服务的是多文件 add/delete/move/update 补丁计划（含重复目标检测、2..32 有界写入策略）；活轨 `edit` 是单文件字符串替换。二者不是同一件事。
+
+### 处置
+
+尝试恢复的 3 个文件（`edit/patch/plan/perFile.ts` 1346 行、`orchestration/patchParsing/parser.ts` 340 行、`orchestration/patchVerification/verify.ts` 469 行）**已回退**。理由：
+
+- 零依赖可直接编译，但**无任何消费者**（`cli:false, noReference:true`）——恢复文件 ≠ 恢复能力；
+- 接线需**新增 apply_patch 工具**，这会改变产品工具面（模型可见工具、审批策略、提示词），属功能新增而非重构。
+
+**结论**：这 2145 行是"被有意废弃路线的完整实现"，与 D 集（消费者存活、生产者被删）性质不同。若将来要支持补丁编辑，它是现成的高质量实现——建议登记到 `capability-backlog.md` 而非直接接入。
+
+### 与 D 集的判据区分（重要）
+
+| 形态 | 判据 | 处置 |
+|---|---|---|
+| **断链** | 消费者存活且 CLI 可达，生产者被删 | **必须恢复并接线**（D 集：写授权、快照） |
+| **废弃路线** | 消费者与生产者同批消失；活轨明确拒绝该输入形态 | 登记 backlog，不接 |
+| **未接线新能力** | 实现完整、无等价物、无消费者 | 交所有者裁决 |
