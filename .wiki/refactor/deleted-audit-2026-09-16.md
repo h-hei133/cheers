@@ -135,3 +135,53 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 - G3 的 provider 适配器需要单独保留审慎结论：活轨 `turn/step.ts` 对 OpenAI-compatible 请求有自身实现；`providerReadiness.ts:97` 明确表示非 openai provider 尚未由当前 real adapter 支持。不能把所有已删 adapter 不加区分地判为断链，需区分 OpenAI 的部分替代与 Google/ClaudeCode/Antigravity 等配置已存在但执行适配缺失的能力。
 
 因此统一决策顺序固定为：**先断链 → 再未接线价值 → 再废弃路线 → 最后纯死码**。任何后续恢复必须以"消费者存活"或"维护者明确裁决"为前提，不按目录批量恢复。
+
+## 九、G1 orchestration 分组结论（154 文件）
+
+> G1 子代理完成了关键域读审，但因外部额度中止未生成逐文件 JSON。以下按**能力簇**而不是文件逐行裁决；完整路径清单见 `/tmp/G1_orchestration.txt` 的审计原始清单。恢复时仍需对目标簇重新计算依赖闭包。
+
+| 能力簇 | 代表文件 | 判定 | 证据/理由 |
+|---|---|---|---|
+| apply_patch 解析/验证/应用 | `patchParsing/*`, `patchVerification/*`, `patchApplication/*`, `patchContract/*`, `patchMutationLane.ts` | 废弃路线 | CLI 删除前后均无 apply_patch 工具；活轨明确拒绝该语法 |
+| patch route/result 表面 | `patchResult/*` | 大部已替代 | 活轨 `edit/multifile/model.ts`（1710 行）+ `edit/result/perFilePatchResultProjection.ts` 为更新实现；smoke/gate 文件属历史门禁 |
+| edit snapshot | `editSnapshot.ts` | 断链 | 已恢复并接线；修复 `/undo` 永远无快照 |
+| fenced/target-set edit | `fencedEdit*.ts`, `targetSetEdit*.ts`, `editProposal*.ts`, `proposalHunkSet*.ts`, `exactHunkApply.ts` | 未接线有价值/部分被替代 | 活轨 multi-target 模型存在，但缺历史 route runners；恢复应按明确产品需求，不整簇恢复 |
+| task lifecycle 路由 | `taskLifecycle{Activation,Handoff,Router}.ts` | 未接线有价值 | 底层 `taskLifecycleResult/taskIntent/taskLifecycle/taskReadPlan/taskStage/taskExecutionPlan` 均存活；route/activation wiring 被删 |
+| task-relevant verification | `taskRelevantVerificationRoute.ts`, `verificationModule.ts`, `verificationRepair*.ts`, `verificationResultProjection.ts` | 未接线有价值 | 活轨保留 verification plan/model，但缺 run/classify/retry/relevance 执行半边 |
+| provider proposal/anchoring | `provider*.ts`, `anchored*.ts`, `contextAwareProvider*.ts` | 混合：部分未接线、部分历史 smoke | 活轨有 `provider/` 新链与 `providerEditProposal/providerOutputValidator/fencedEditPlanner`；旧 exact-patch/smoke 路线不可整批恢复 |
+| planning runtime / realTaskLoop | `planningRuntimeProduct*.ts`, `realTaskLoop*.ts` | 废弃路线 | 硬编码或依赖 `runMvpIntegratedFlow` / Phase 4 路由；入口已移除 |
+| read/inspect/context intent | `readInspect*.ts`, `readContinuationTarget.ts`, `workflowIntentProjection.ts`, `workspaceTargetProjection.ts` | 部分被替代 | 活轨 `context/acquisition/*` 与 `planning/runtime/engine.ts` 已承担大部分；个别双语 intent/target 逻辑可作为 backlog |
+| browser orchestration | `browserModule.ts` | 废弃旧入口 | 活轨 browser runtime/skill/receipt 链已接入 CLI |
+| tool lifecycle/runtime wrappers | `toolRuntimeModule.ts`, `toolLifecycleEvents.ts` | 已替代 | 活轨 `turn/tools.ts`, `tools/dispatch/*`, `core/tools/*` |
+| recovery/edit repair | `editRecovery*.ts`, `editRepair*.ts`, `editRollback.ts` | 未接线有价值 | 与已恢复 snapshot/authority 同域；是否恢复需按 live recovery model 缺口逐项核验 |
+
+### G1 高价值候选（进入裁决队列）
+
+1. `taskLifecycleActivation.ts`, `taskLifecycleHandoff.ts`, `taskLifecycleRouter.ts`
+2. `taskRelevantVerificationRoute.ts`, `verificationModule.ts`, `verificationRepairBridge.ts`, `verificationRepairFlow.ts`, `verificationRepairIterationFlow.ts`, `verificationRepairLoop.ts`, `verificationRepairPlanner.ts`, `verificationRepairResult.ts`, `verificationResultProjection.ts`
+3. `fencedEditActivation.ts`, `fencedEditOutcome.ts`, `fencedEditResult.ts`, `fencedEditRoute.ts`
+4. `targetSetEditJournal.ts`, `targetSetEditPlan.ts`, `targetSetEditPolicy.ts`, `targetSetEditRecovery.ts`, `targetSetEditRecoveryWorkflow.ts`, `targetSetEditResult.ts`, `targetSetEditRoute.ts`, `targetSetEditTransaction.ts`, `targetSetEditVerification.ts`
+5. `editRecoveryApply.ts`, `editRecoveryOutcome.ts`, `editRecoveryPlan.ts`, `editRecoveryResult.ts`, `editRepairPlanner.ts`, `editRepairResult.ts`, `editRollback.ts`
+
+以上不是断链的自动恢复清单，而是**未接线能力裁决清单**。
+
+## 十、G3 core / adapters 分组结论（46 文件）
+
+| 能力簇 | 文件 | 判定 | 证据 |
+|---|---|---|---|
+| 旧 browser transaction | `core/context/browser{Obs,Repair,Score,Tool,Trace,Txn,TxnEvidence,TxnReport,TxnTypes}.ts`, `pwAdapter.ts`, `browser/browserIntentPlanning.ts`, `core/harness/browserTxn*`, `pw*` | 废弃/已替代 | 活轨 browser runtime/skill/receipt/commandRunner 链；旧 txn 路线整体入口消失 |
+| context read planning | `context/{contextPlanningIntent,readContinuationPlanning,readIntentPlanning,readTargetPlanning,workflowReadPlanBranch}.ts` | 大部被替代，少量 intent 价值 | 活轨 `context/acquisition/*`, `planning/runtime/engine.ts`; 双语 read-window/fragment 规划可作为 backlog |
+| query terminal truth dependencies | `core/query/mapping/{capabilityClassification,mapper}.ts`, `runtime/{trajectory,transitions}.ts`, `terminal/classificationProjection.ts` | **高价值恢复候选** | `result/terminal/queryTerminalTruth.ts` 的依赖；可恢复完整终态真实性，但不是单文件恢复 |
+| runtime receipt | `core/runtime/{runtimeReceipt,runtimeReceiptProjection}.ts` | 大部已替代 | 活轨 `runtime/execution/{receipt,error,service}.ts` |
+| tool runtime/provenance | `core/tools/{approvalFlow,approvalProvenance,prefilter,runtime,toolExecutionProvenance,toolLifecycleProjection,toolResultProjection}.ts` | 大部已替代 | 活轨 `turn/tools.ts`, `tools/dispatch/*`, `core/tools/toolResultLifecycle.ts`; provenance 细节可单独比较 |
+| model client / retry | `model-adapters/{client,registry,retryPolicy}.ts` | 未接线有价值/部分替代 | 活轨 `turn/step.ts` 自建 OpenAI-compatible 请求，但缺旧 client health/fallback/retry 抽象 |
+| OpenAI/Codex/Google adapter | `providers/openai/{OpenAIModelAdapter,normalize,wireTypes}.ts` | **部分被替代，部分能力缺失** | 活轨 step 覆盖基础 OpenAI-compatible streaming；旧 adapter 含 Codex account endpoint、token refresh、Google account refresh、请求/错误 normalization，不能整体判死 |
+| Anthropic adapter | `providers/anthropic/AnthropicModelAdapter.ts` | **未接线有价值/执行能力缺失** | 配置面仍有 provider 类型；`providerReadiness.ts` 明确非 openai 当前不受 real adapter 支持 |
+| provider index/prompt | `provider/index.ts`, `provider/request/prompt.ts` | index 为 shim；prompt 需裁决 | 新 `provider/request/*` 存活；旧 context-aware prompt 是否被 turn/prompt 覆盖需逐符号比较 |
+| tool dispatcher | `tools/dispatch/dispatcher.ts`, `tools/index.ts` | 已替代/shim | 活轨 `tools/dispatch/executor.ts` 与核心 registry |
+
+### G3 优先裁决
+
+1. **Provider 适配能力**：Anthropic、Codex account-auth、Google account-auth refresh/normalization。当前配置/凭据面保留，但 real provider adapter 对非 openai 明确返回 unsupported。
+2. **完整终态真实性闭包**：`capabilityClassification.ts` + `transitions.ts` + `classificationProjection.ts` + `queryTerminalTruth.ts`。
+3. 工具 provenance/lifecycle 细节是否被新工具循环完整覆盖。
