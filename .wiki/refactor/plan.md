@@ -126,20 +126,32 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 
 ## 3. 后续工作
 
-### 3.1 Step 2.7 剩余项（8 项待处理破坏）
+### 3.1 Step 2.7 处理结果（12 项破坏 — 全部处置完毕）
 
-| # | 类型 | 内容 | 建议 |
+| # | 类型 | 内容 | 处置 |
 |---|---|---|---|
-| 3 | 契约型 | `provenance.toolExecutions` / `approvalDecisions`：5 个 CLI 可达读取者、**零写入者**；二级断链（兜底 evidence 写入者亦删） | 恢复生产者并接线 |
-| 4 | 契约型 | `disabledTools` / `hiddenToolPrefixes` 用户可配置，唯一执行者 `prefilter.ts` 已删 → 设置被静默忽略 | 恢复 `prefilter` 或移除字段 |
-| 5 | 能力级 | OpenAI account-auth 可存储并显示 connected，但活轨只发 `Bearer ${apiKey}` → 对话必然失败 | 恢复 adapter 或移除该登录路径 |
-| 6 | 契约型 | `planning/handoff/mutation.ts` 的 `executionLane` 指向已删路由 | 待裁决 |
-| 7 | 契约型 | 证据标签正则仍识别已删生产者 | 待裁决 |
-| 8 | 契约型 | `pwStatus.ts:16` 输出 `Eval mode: available-via-pwEval`（生产者已删） | 修正文案 |
-| 9 | 契约型 | `capabilityBoundaryProjection.ts:14-20` focused-test 白名单含 2 个不存在路径 | 待修 |
-| 10 | 脚本 | 5 个 `verify:real-user-capabilities:*` `MODULE_NOT_FOUND` | 修或删脚本 |
+| 1 | 契约型 | 写授权 `O_NOFOLLOW` 缺失 | ✅ 已恢复接线 |
+| 2 | 契约型 | `/undo` 快照写入缺失 | ✅ 已恢复接线 |
+| 3 | 契约型 | `provenance` 5 读 0 写（二级断链） | 📋 登记 **CB-005**（架构级，不单独修） |
+| 4 | 契约型 | `disabledTools` 设置被静默忽略 | ✅ **已修复 + PTY 实机验证** |
+| 5 | 能力级 | OpenAI account-auth 可登录但必然失败 | 📋 登记 **CB-006**（维护者裁决：登记不改） |
+| 6 | 契约型 | `executionLane` 指向不存在的路由 | 📋 记录（附十七），生产零消费 |
+| 7 | 契约型 | 25 条证据标签死条件 | 📋 记录（附十八），同 #3 根因 |
+| 8 | 契约型 | `pwStatus.ts` 宣传已删的 Eval mode | ✅ 已移除该行 |
+| 9 | 契约型 | focused-test 白名单 6 条全失效 | ✅ 已彻底移除该语义 |
+| 10 | 脚本 | 5 个 verify 脚本 `MODULE_NOT_FOUND` | ✅ 已删脚本 + 注册 |
+| 11 | 验证型 | `verify:edit-capability-closeout` 假阳性 | ✅ 已删（只打印不校验） |
+| 12 | 验证型 | `verify:browser-txn-gate` 服务对象 14/14 全缺 | ✅ 已删 |
 
-**已解决**：#1 写授权、#2 快照写入（恢复接线）、#11 closeout 假阳性、#12 browser-txn-gate（删除）。
+**#4 的实机证据**（§2.4 强制）：以 `{"disabledTools":["bash"]}` 启动真实 TUI，
+触发 bash 后实际输出 `Tool bash not found`；修复前该设置被忽略、bash 正常执行。
+
+**#3 / #6 / #7 同源**：三者都是 **CB-005（turn 与编排层不连通）**在
+不同数据层的表现——读取侧存活、写入侧随主簇删除。
+**不单独修复**，待该架构问题立项时一并解决。
+
+**#5 的裁决**：维护者 2026-09-17 选"登记不改"。恢复 codex 调用路径属
+新增 provider 能力，且同属 CB-005。
 
 ### 3.2 Step 3 browser 域搬迁（判据待重算）
 
