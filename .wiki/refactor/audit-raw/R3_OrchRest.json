@@ -1,0 +1,291 @@
+{
+  "summary": "G1c 71 个 orchestration 文件逐文件判定完成。核心事实：活轨 `packages/ts-shell/src/` 对这 71 个模块**零 import、零符号引用**（按 `<basename>.js` 路径与导出符号名双向穷举 grep，均 No matches），因此**编译级断链 = 0**。分布的三种真实形态：(1) 15 个旧路线模块（anchored/smoke 链、contextAwareProvider、realTaskLoop、browser 自动检测）——消费者与生产者同批消失，活轨以 `provider/request|response|registry`、`providerEditProposal/providerOutputValidator/providerAnchoredProposal/fencedEditPlanner`、`runtime/evaluation/task/*` 重建；(2) 36 个「未接线有价值」——实现完整、活轨无等价物、无消费者，最集中的是 taskLifecycle 编排层（Router/Activation/Handoff）与 continuation 续接层、planningRuntimeProduct 链、realProvider dry-run 链；(3) 20 个纯死码——66B re-export shim、纯委托 wrapper、或被活轨内联/取代（toolRuntimeModule/flowDispatch/verificationModule/verificationResultProjection 等）。另发现 3 处**活轨消费者仍在、生产者已删**的标签级残留（非编译断链，但能力永久失效），已单列。",
+  "files": [
+    {
+      "path": "orchestration/agentPlanResult.ts",
+      "description": "未接线有价值/交裁决 — AgentPlan 终态+\"Agent plan: …\" 输出投影；活轨无等价物（planQuality/parity 层不产出该输出），消费者 taskLifecycleActivation/readInspectModule 同批删除"
+    },
+    {
+      "path": "orchestration/anchoredProposalActivation.ts",
+      "description": "废弃路线/不恢复 — anchored dry-run 激活门；唯一消费者 anchoredProposalRuntime 同批删除，活轨仅存 providerAnchoredProposal 清单"
+    },
+    {
+      "path": "orchestration/anchoredProposalEval.ts",
+      "description": "废弃路线/不恢复 — anchored 提案五维评分（promptAudit/output/anchor/review/handoff）"
+    },
+    {
+      "path": "orchestration/anchoredProposalRuntime.ts",
+      "description": "废弃路线/不恢复 — anchored runtime 编排+确定性假 provider"
+    },
+    {
+      "path": "orchestration/anchoredProposalScorecard.ts",
+      "description": "废弃路线/不恢复 — anchored 记分卡；活轨 harnessScorecard.ts 仍声明同名可选字段但无生产者"
+    },
+    {
+      "path": "orchestration/anchoredProviderSmoke.ts",
+      "description": "废弃路线/不恢复 — anchored provider smoke 运行器（fake-corpus/real-provider-smoke）"
+    },
+    {
+      "path": "orchestration/anchoredProviderSmokeGate.ts",
+      "description": "废弃路线/不恢复 — smoke 门（opt-in/availability）；活轨 harnessFailureTaxonomy.ts 仍匹配其 `anchored-provider-smoke-gate:*` 标签"
+    },
+    {
+      "path": "orchestration/browserModule.ts",
+      "description": "废弃路线/不恢复 — prompt→browser plan→执行；活轨改为显式 `/browser` 命令轨（core/commands/browserCommandRuntime.ts、core/context/browserCommandRunner.ts）；遗留 WorkflowTaskPlan.browserPlan 字段与 detectBrowserAgentPlan 已无生产者/调用者"
+    },
+    {
+      "path": "orchestration/codingResultProvenance.ts",
+      "description": "纯死码/删除合理 — provenance collector；活轨 tools/dispatch/executor.ts + runtime/execution/receipt.ts + runtime/loop/contract.ts 承接回执"
+    },
+    {
+      "path": "orchestration/contextAwareProviderProposal.ts",
+      "description": "废弃路线/不恢复 — context packet→provider edit proposal 规划循环；活轨 provider/request/* + providerEditProposal.ts + fencedEditPlanner.ts 重建"
+    },
+    {
+      "path": "orchestration/contextAwareProviderResult.ts",
+      "description": "废弃路线/不恢复 — 提案结果→CodingResultSummary 投影；生产者同批消失"
+    },
+    {
+      "path": "orchestration/continuationIntent.ts",
+      "description": "未接线有价值/交裁决 — prompt→续接意图分类（explicit-continue/weak-follow-up/temporal-successor）；活轨 session/continuation/* 是否含等价分类器未确认"
+    },
+    {
+      "path": "orchestration/continuationLineage.ts",
+      "description": "未接线有价值/交裁决 — replay-safe 续接 lineage、slot 解析、lineage 激活决策；活轨无同名等价实现"
+    },
+    {
+      "path": "orchestration/continuationModule.ts",
+      "description": "纯死码/删除合理 — 8 个纯委托 wrapper 的 workflow 门面；底层 continuation* 与消费者 planning/workflowTaskPlan.ts 同批删除"
+    },
+    {
+      "path": "orchestration/continuationPlanning.ts",
+      "description": "未接线有价值/交裁决 — 续接目标推导、reflective state 响应构造（25.4KB）、repair/verify 续接对象；活轨 workflowTaskPlanner.ts 声明 ReflectiveStateQueryKind 但无生产者"
+    },
+    {
+      "path": "orchestration/continuationProjection.ts",
+      "description": "未接线有价值/交裁决 — lineage 激活/replay-safe 摘要投影，含不安全文本护栏；活轨无等价物"
+    },
+    {
+      "path": "orchestration/continuationRebase.ts",
+      "description": "纯死码/删除合理 — 续接目标重定位；活轨 session/continuation/projectRootRebaseProjection.ts + sessionProjectRootRebind.ts + core/paths/legacyRootRebase.ts 取代"
+    },
+    {
+      "path": "orchestration/controlledMultifileProofChain.ts",
+      "description": "未接线有价值/交裁决 — 三场景（success/partial-apply-failure/mixed-verification）多文件证明链，使用存活 edit/authority/workspace.ts；活轨无等价场景证明链"
+    },
+    {
+      "path": "orchestration/fileConstraintAssertions.ts",
+      "description": "未接线有价值/交裁决 — 从 prompt 抽取\"保持不变\"约束（extractLowRiskUnchangedVerifications）；活轨无等价物，且活轨渲染层仍期望 `verify-unchanged:` 标签"
+    },
+    {
+      "path": "orchestration/flowDispatch.ts",
+      "description": "纯死码/删除合理 — 工具生命周期分发/回执投影/重入摘要；活轨 tools/dispatch/executor.ts + runtime/execution/receipt.ts + runtime/loop/reentry.ts 取代"
+    },
+    {
+      "path": "orchestration/flowEvidenceProjection.ts",
+      "description": "纯死码/删除合理 — browser/verification 证据构造；活轨 browser 显式命令轨 + verificationFacade/evidence 层取代"
+    },
+    {
+      "path": "orchestration/flowResultProjection.ts",
+      "description": "纯死码/删除合理 — browser 结果→RuntimeOutcomeProjection；活轨 orchestration/runtimeOutcomeProjection.ts（存活）为基底，browser 专用投影随 browser 自动路径废弃"
+    },
+    {
+      "path": "orchestration/liveProviderAdapterApproval.ts",
+      "description": "未接线有价值/交裁决 — live provider 适配器 opt-in 审批门；消费者 liveProviderSmokeCalibration/planningRuntimeProductExecution 同批删除，活轨 providerReadinessCliSurface 仅渲染前置门"
+    },
+    {
+      "path": "orchestration/liveProviderSmokeCalibration.ts",
+      "description": "未接线有价值/交裁决 — live smoke 校准运行器；活轨 orchestration/liveProviderSmokeFallback.ts（存活）为其残件而无消费者"
+    },
+    {
+      "path": "orchestration/liveProviderSmokeEvidence.ts",
+      "description": "未接线有价值/交裁决 — live smoke 证据归一化；活轨 session/sessionResultParity.ts 仍匹配 `live-provider-smoke-result:` 标签"
+    },
+    {
+      "path": "orchestration/liveProviderSmokeFixture.ts",
+      "description": "未接线有价值/交裁决 — live smoke 夹具与期望 anchored 提案"
+    },
+    {
+      "path": "orchestration/liveProviderSmokeResult.ts",
+      "description": "未接线有价值/交裁决 — live smoke 结果投影；活轨 harnessFailureTaxonomy.ts 仍匹配 `live-provider-smoke-result:provider-error-class:*`"
+    },
+    {
+      "path": "orchestration/lowRiskVerificationPlanning.ts",
+      "description": "未接线有价值/交裁决 — 低风险文件内容/一致性断言规划；消费者 verification/command/lowRisk.ts 同批删除，活轨 sessionRuntime 仍渲染\"explicit low-risk verification\" 提示"
+    },
+    {
+      "path": "orchestration/openAICompatibleAnchoredSmokeAdapter.ts",
+      "description": "纯死码/删除合理 — OpenAI 兼容 smoke 适配器；活轨 provider/response/adapter.ts 为等价实现"
+    },
+    {
+      "path": "orchestration/planningExactProposal.ts",
+      "description": "未接线有价值/交裁决 — 由 planning handoff 生产 exact proposal；活轨 planning/handoff/mutation.ts 只产出 safe-summary-only 且明示 exactProposalReadiness=missing"
+    },
+    {
+      "path": "orchestration/planningRuntimeProductExecution.ts",
+      "description": "未接线有价值/交裁决 — planning→exact proposal→proof-carrying apply 的产品化执行头单；活轨 planning/handoff/mutation.ts 只到 review 为止"
+    },
+    {
+      "path": "orchestration/planningRuntimeProductRepair.ts",
+      "description": "未接线有价值/交裁决 — 产品链的修复续接（依赖已删 verificationRepairLoop）"
+    },
+    {
+      "path": "orchestration/planningRuntimeProductRoute.ts",
+      "description": "未接线有价值/交裁决 — 阻塞型模糊任务→planning runtime 产品路由选择"
+    },
+    {
+      "path": "orchestration/planningRuntimeProductVerification.ts",
+      "description": "未接线有价值/交裁决 — 产品链的验证命令执行/回执投影"
+    },
+    {
+      "path": "orchestration/planningRuntimeSurface.ts",
+      "description": "纯死码/删除合理 — PlanningRuntimeResult 表面投影；活轨 context/acquisition/summary.ts + presentation/surface/model.ts 承接"
+    },
+    {
+      "path": "orchestration/providerDryRunResult.ts",
+      "description": "纯死码/删除合理 — dry-run 结果→CodingResultSummary；被删 runtime 的尾部投影，活轨 runtime/loop + provider/request 构建结果"
+    },
+    {
+      "path": "orchestration/providerExactPatchContract.ts",
+      "description": "纯死码/删除合理 — exact patch 系统提示与输出解析；活轨 fencedEditPlanner.ts + providerOutputValidator.ts 取代"
+    },
+    {
+      "path": "orchestration/providerModule.ts",
+      "description": "纯死码/删除合理 — 392B 单函数委托（projectProviderDiagnosticHandoff→projectProviderOutcome）"
+    },
+    {
+      "path": "orchestration/providerOutcomeProjection.ts",
+      "description": "未接线有价值/交裁决 — 从 continuity 投影 provider 诊断 handoff；活轨无等价物，消费者 planning/workflowTaskPlan.ts 同批删除"
+    },
+    {
+      "path": "orchestration/providerPromptAudit.ts",
+      "description": "未接线有价值/交裁决 — provider prompt 预算审计；活轨 harnessTrace/harnessScorecard + providerEditProposal.promptAuditId 仍消费该字段但无生产者"
+    },
+    {
+      "path": "orchestration/providerSmokeResult.ts",
+      "description": "未接线有价值/交裁决 — smoke 结果汇总；活轨 sessionResultParity/continuationEvidenceParity 仍匹配 `provider-smoke-result:` 标签"
+    },
+    {
+      "path": "orchestration/providerSmokeTestFixtures.ts",
+      "description": "纯死码/删除合理 — 已删 smoke 链的测试夹具构造器"
+    },
+    {
+      "path": "orchestration/readContinuationTarget.ts",
+      "description": "纯死码/删除合理 — 续接读目标恢复；活轨 session/continuation/* + context/readWindowContinuation.ts 取代"
+    },
+    {
+      "path": "orchestration/readInspectIntent.ts",
+      "description": "未接线有价值/交裁决 — 读/仓库巡检意图细分分类；活轨仅 context/acquisition/engine.ts::inferTaskKind 的粗粒度替代"
+    },
+    {
+      "path": "orchestration/readInspectModule.ts",
+      "description": "未接线有价值/交裁决 — 读/巡检聚合 barrel：读停投影+续接目标恢复+路径纯读判定+repo 诊断；活轨 workspaceFileContract.ts 仅覆盖停因码"
+    },
+    {
+      "path": "orchestration/realProviderProposalDryRun.ts",
+      "description": "未接线有价值/交裁决 — 19.3KB 真实 provider 提案 dry-run 运行器；活轨无 dry-run 等价物，sessionResultParity 仍匹配 `real-provider-proposal-dry-run` 标签"
+    },
+    {
+      "path": "orchestration/realProviderProposalGate.ts",
+      "description": "未接线有价值/交裁决 — dry-run opt-in 门；活轨 provider/request/invocation.ts 门控语义不同（无 dry-run opt-in）"
+    },
+    {
+      "path": "orchestration/realTaskLoopFixture.ts",
+      "description": "废弃路线/不恢复 — 真实任务循环临时工作区夹具；活轨 runtime/evaluation/task/liveRun.ts 为重建形态 [INFERENCE]"
+    },
+    {
+      "path": "orchestration/realTaskLoopPlan.ts",
+      "description": "废弃路线/不恢复 — 真实任务循环计划构建 [INFERENCE：活轨 runtime/evaluation/task/* 取代]"
+    },
+    {
+      "path": "orchestration/realTaskLoopRepairChain.ts",
+      "description": "废弃路线/不恢复 — 真实任务循环的修复链，依赖已删 verificationRepairPlanner/Loop"
+    },
+    {
+      "path": "orchestration/realTaskLoopResult.ts",
+      "description": "废弃路线/不恢复 — 17.5KB 结果分类；活轨 sessionResultParity 仍匹配 `real-task-loop-result` 标签但仅供测试手填"
+    },
+    {
+      "path": "orchestration/realTaskLoopRuntime.ts",
+      "description": "废弃路线/不恢复 — 16.8KB 真实任务循环运行器（default-skip/fake/real-opt-in）"
+    },
+    {
+      "path": "orchestration/realTaskLoopScorecard.ts",
+      "description": "废弃路线/不恢复 — 真实任务循环记分卡"
+    },
+    {
+      "path": "orchestration/repoExplainEvidence.ts",
+      "description": "未接线有价值/交裁决 — glob 输出解析、repo 诊断证据角色选择；活轨 context/discovery 只做候选排序不做证据角色"
+    },
+    {
+      "path": "orchestration/targetResolution.ts",
+      "description": "未接线有价值/交裁决 — prompt 目标抽取/主目标选择/歧义阻塞；活轨 workspaceFileContract.ts 仅有停因码无抽取器"
+    },
+    {
+      "path": "orchestration/taskLifecycleActivation.ts",
+      "description": "未接线有价值/交裁决 — 16.9KB 生命周期激活+输出格式化（路由→contextBundle→全套 substrate）；活轨 context/acquisition/graph.ts 内联了 bundle 构建但无路由门与格式化"
+    },
+    {
+      "path": "orchestration/taskLifecycleHandoff.ts",
+      "description": "未接线有价值/交裁决 — provider 提案就绪判决 + 验证命令计划 + 修复上下文组装；活轨 planning/runtime/engine.ts 内联了验证命令计划但无 provider 就绪分类器"
+    },
+    {
+      "path": "orchestration/taskLifecycleRouter.ts",
+      "description": "未接线有价值/交裁决 — 按 prompt cue + workflowPlan 路由生命周期表面；活轨无等价路由，底层 taskIntent/workflowTaskPlanner 均存活"
+    },
+    {
+      "path": "orchestration/taskRelevantVerificationRoute.ts",
+      "description": "纯死码/删除合理 — 66B `export * from \"../verification/taskRelevantVerificationRoute.js\"` 纯 re-export shim"
+    },
+    {
+      "path": "orchestration/toolLifecycleEvents.ts",
+      "description": "纯死码/删除合理 — 工具生命周期事件追加；活轨 core/query/runtime/events.ts + tools/dispatch/projector.ts 承接"
+    },
+    {
+      "path": "orchestration/toolRuntimeModule.ts",
+      "description": "纯死码/删除合理 — dispatchRuntimeTool 薄包装；活轨 tools/dispatch/executor.ts::dispatchToolBatch + runtime/loop/contract.ts 取代"
+    },
+    {
+      "path": "orchestration/verificationModule.ts",
+      "description": "纯死码/删除合理 — workflow 作用域验证薄包装；活轨 verification/command/plan.ts + verification/selection/model.ts + verificationFacade.ts 取代"
+    },
+    {
+      "path": "orchestration/verificationRepairBridge.ts",
+      "description": "纯死码/删除合理 — 命令结果→修复循环桥接；活轨 repair/handoff/boundary.ts + readiness.ts 以观察量重构"
+    },
+    {
+      "path": "orchestration/verificationRepairFlow.ts",
+      "description": "未接线有价值/交裁决 — 内容验证驱动的端到端修复流（使用存活 edit/authority/workspace.ts）；活轨 runtime/loop/contract.ts + edit/recovery/model.ts 是否覆盖 content-verification 输入形态：未确认"
+    },
+    {
+      "path": "orchestration/verificationRepairIterationFlow.ts",
+      "description": "未接线有价值/交裁决 — 19KB 端到端修复迭代流（含 verified-success-with-repair 判决）；活轨 repair/iteration/projection.ts 只有投影无运行器"
+    },
+    {
+      "path": "orchestration/verificationRepairLoop.ts",
+      "description": "未接线有价值/交裁决 — 可运行修复循环头（context+plan+result 组装）"
+    },
+    {
+      "path": "orchestration/verificationRepairPlanner.ts",
+      "description": "未接线有价值/交裁决 — 18.9KB 由修复上下文规划修复提案（含假 provider、hunk-set handoff）；消费者 editPatchModule barrel/planningRuntimeProductRepair/realTaskLoopRepairChain 全部同批删除"
+    },
+    {
+      "path": "orchestration/verificationRepairResult.ts",
+      "description": "纯死码/删除合理 — 修复状态结果投影；活轨 repair/iteration/projection.ts + repair/handoff/readiness.ts 拥有同一表面"
+    },
+    {
+      "path": "orchestration/verificationResultProjection.ts",
+      "description": "纯死码/删除合理 — 验证结果/跳过/未请求投影；活轨 verification/result/boundary.ts + verificationFacade.ts 取代"
+    },
+    {
+      "path": "orchestration/workflowIntentProjection.ts",
+      "description": "未接线有价值/交裁决 — prompt+continuity→workflow 意图投影（reflective state 提问检测）；活轨 workflowTaskPlanner.ts 声明 ReflectiveStateQueryKind 但无生产者"
+    },
+    {
+      "path": "orchestration/workspaceTargetProjection.ts",
+      "description": "未接线有价值/交裁决 — 7.7KB 目标安全/停因摘要投影族；消费者 continuationRebase/editExpectationContract/readInspectModule/mutationExecution/futureEditPlanner 全部同批删除"
+    }
+  ],
+  "architecture": "本批次是同一层的“旧能力带”：orchestration 顶层平铺模块（taskLifecycle 编排、verification 修复链、provider dry-run/anchored smoke 链、continuation 续接、read/巡检、planningRuntimeProduct、browser 自动路径）。按依赖方向分三层：底层 substrate 存活（taskIntent/taskLifecycle/taskExecutionPlan/taskContext*/taskReadPlan/taskStage、providerAnchoredProposal/providerOutputValidator/providerEditProposal/fencedEditPlanner/providerAnchor*、repair/handoff+repair/iteration、verification/selection+command/plan+verificationFacade、context/acquisition/graph、planning/handoff/mutation、edit/authority/workspace、editSnapshot），而本批是建在其上的 **wiring/route/result 层**。活轨把这层整体重建：bundle 构建被内联进 context/acquisition/graph.ts（buildContextGraphPlanningBundle），规划交接被 planning/runtime/engine.ts 承担，修复交接改为 repair/handoff/* 观察量模型，provider 路径换成 provider/request|response|registry，工具分发换成 tools/dispatch + runtime/loop。因此活轨对这 71 个模块零引用——不是编译断裂，而是整层被替代，形成了成片的“自洽但已死”子系统。",
+  "report": "## G1c 逐文件判定表（71 行）\n\n判定方法：对每个模块做三重 grep —— (a) 活轨 `packages/ts-shell/src/` 是否 import 其模块路径（`<basename>.js`）；(b) 活轨是否引用其导出符号名；(c) `/tmp/audit-pre` 中其消费者是否存活。(a)(b) 对 71 个模块**全部 No matches**（唯一命中 `buildContextGraphPlanningBundle` 属活轨 `context/acquisition/graph.ts` 自身，非被删模块）。故无编译级断链。\n\n| 路径 | 功能(1句) | 消费者(或\"无\") | 活轨等价实现(或\"无\") | 形态 | 建议 |\n|---|---|---|---|---|---|\n| orchestration/agentPlanResult.ts | AgentPlan 终态 + \"Agent plan: …\" 输出投影 | 无（taskLifecycleActivation/readInspectModule 同批删） | 无 | 未接线有价值 | 交裁决 |\n| orchestration/anchoredProposalActivation.ts | anchored dry-run 激活门 | 无 | 无（仅 providerAnchoredProposal 清单存活） | 废弃路线 | 不恢复 |\n| orchestration/anchoredProposalEval.ts | anchored 提案五维评分 | 无 | 无 | 废弃路线 | 不恢复 |\n| orchestration/anchoredProposalRuntime.ts | anchored runtime 编排 + 确定性假 provider | 无 | 无 | 废弃路线 | 不恢复 |\n| orchestration/anchoredProposalScorecard.ts | anchored 记分卡 | 无 | 无（harnessScorecard.ts 只留字段） | 废弃路线 | 不恢复 |\n| orchestration/anchoredProviderSmoke.ts | anchored provider smoke 运行器 | 无 | 无（liveProviderSmokeFallback.ts 仅结果分类） | 废弃路线 | 不恢复 |\n| orchestration/anchoredProviderSmokeGate.ts | smoke opt-in/availability 门 | 无 | 无 | 废弃路线 | 不恢复 |\n| orchestration/browserModule.ts | prompt→browser plan→执行 | 无 | core/commands/browserCommandRuntime.ts 显式 /browser 轨 | 废弃路线 | 不恢复 |\n| orchestration/codingResultProvenance.ts | provenance collector | 无 | tools/dispatch/executor.ts + runtime/execution/receipt.ts | 纯死码 | 删除合理 |\n| orchestration/contextAwareProviderProposal.ts | context→provider edit proposal 规划 | 无 | provider/request/* + providerEditProposal.ts | 废弃路线 | 不恢复 |\n| orchestration/contextAwareProviderResult.ts | 提案结果→CodingResultSummary | 无 | 同上 | 废弃路线 | 不恢复 |\n| orchestration/continuationIntent.ts | prompt→续接意图分类 | 无 | 未确认（session/continuation/* 无同名分类器） | 未接线有价值 | 交裁决 |\n| orchestration/continuationLineage.ts | replay-safe lineage/slot/激活决策 | 无 | 无 | 未接线有价值 | 交裁决 |\n| orchestration/continuationModule.ts | 8 个纯委托 wrapper 门面 | 无 | 无（底层同批删） | 纯死码 | 删除合理 |\n| orchestration/continuationPlanning.ts | 续接目标推导 + reflective 响应（25.4KB） | 无 | 无（workflowTaskPlanner 只留类型） | 未接线有价值 | 交裁决 |\n| orchestration/continuationProjection.ts | lineage 激活/replay-safe 摘要投影 | 无 | 无 | 未接线有价值 | 交裁决 |\n| orchestration/continuationRebase.ts | 续接目标重定位 | 无 | session/continuation/projectRootRebaseProjection.ts + sessionProjectRootRebind.ts | 纯死码 | 删除合理 |\n| orchestration/controlledMultifileProofChain.ts | 三场景多文件证明链 | 无 | 无（用存活 edit/authority/workspace.ts） | 未接线有价值 | 交裁决 |\n| orchestration/fileConstraintAssertions.ts | prompt→\"保持不变\"约束抽取 | 无 | 无（活轨渲染层仍期望 verify-unchanged: 标签） | 未接线有价值 | 交裁决 |\n| orchestration/flowDispatch.ts | 工具生命周期分发/回执/重入 | 无 | tools/dispatch/executor.ts + runtime/execution/receipt.ts + runtime/loop/reentry.ts | 纯死码 | 删除合理 |\n| orchestration/flowEvidenceProjection.ts | browser/verification 证据构造 | 无 | browser 显式命令轨 + verificationFacade/evidence | 纯死码 | 删除合理 |\n| orchestration/flowResultProjection.ts | browser 结果→RuntimeOutcomeProjection | 无 | runtimeOutcomeProjection.ts（存活）为基底 | 纯死码 | 删除合理 |\n| orchestration/liveProviderAdapterApproval.ts | live provider opt-in 审批门 | 无 | providerReadinessCliSurface.ts（仅渲染前置门） | 未接线有价值 | 交裁决 |\n| orchestration/liveProviderSmokeCalibration.ts | live smoke 校准运行器 | 无 | 无（liveProviderSmokeFallback.ts 为残件） | 未接线有价值 | 交裁决 |\n| orchestration/liveProviderSmokeEvidence.ts | live smoke 证据归一化 | 无 | 无（sessionResultParity 仍匹配其标签） | 未接线有价值 | 交裁决 |\n| orchestration/liveProviderSmokeFixture.ts | live smoke 夹具 + 期望 anchored 提案 | 无 | 无 | 未接线有价值 | 交裁决 |\n| orchestration/liveProviderSmokeResult.ts | live smoke 结果投影 | 无 | 无（harnessFailureTaxonomy 仍匹配其标签） | 未接线有价值 | 交裁决 |\n| orchestration/lowRiskVerificationPlanning.ts | 低风险内容/一致性断言规划 | 无 | 无（sessionRuntime 仍渲染 low-risk verification 提示） | 未接线有价值 | 交裁决 |\n| orchestration/openAICompatibleAnchoredSmokeAdapter.ts | OpenAI 兼容 smoke 适配器 | 无 | provider/response/adapter.ts | 纯死码 | 删除合理 |\n| orchestration/planningExactProposal.ts | handoff→exact proposal | 无 | planning/handoff/mutation.ts（仅 safe-summary-only） | 未接线有价值 | 交裁决 |\n| orchestration/planningRuntimeProductExecution.ts | planning→exact proposal→proof apply 执行头 | 无 | 无（planning/handoff/mutation.ts 止于 review） | 未接线有价值 | 交裁决 |\n| orchestration/planningRuntimeProductRepair.ts | 产品链修复续接 | 无 | 无（依赖已删 verificationRepairLoop） | 未接线有价值 | 交裁决 |\n| orchestration/planningRuntimeProductRoute.ts | 阻塞型模糊任务→产品路由 | 无 | 无 | 未接线有价值 | 交裁决 |\n| orchestration/planningRuntimeProductVerification.ts | 产品链验证命令执行 | 无 | 无 | 未接线有价值 | 交裁决 |\n| orchestration/planningRuntimeSurface.ts | PlanningRuntimeResult 表面投影 | 无 | context/acquisition/summary.ts + presentation/surface/model.ts | 纯死码 | 删除合理 |\n| orchestration/providerDryRunResult.ts | dry-run 结果→CodingResultSummary | 无 | runtime/loop + provider/request 构建结果 | 纯死码 | 删除合理 |\n| orchestration/providerExactPatchContract.ts | exact patch 系统提示与输出解析 | 无 | fencedEditPlanner.ts + providerOutputValidator.ts | 纯死码 | 删除合理 |\n| orchestration/providerModule.ts | 392B 单函数委托 | 无 | 无 | 纯死码 | 删除合理 |\n| orchestration/providerOutcomeProjection.ts | continuity→provider 诊断 handoff | 无 | 无 | 未接线有价值 | 交裁决 |\n| orchestration/providerPromptAudit.ts | provider prompt 预算审计 | 无 | 无（harnessTrace/Scorecard/providerEditProposal 仍消费该字段） | 未接线有价值 | 交裁决 |\n| orchestration/providerSmokeResult.ts | smoke 结果汇总 | 无 | 无（parity 层仍匹配其标签） | 未接线有价值 | 交裁决 |\n| orchestration/providerSmokeTestFixtures.ts | 已删 smoke 链测试夹具 | 无 | 无 | 纯死码 | 删除合理 |\n| orchestration/readContinuationTarget.ts | 续接读目标恢复 | 无 | session/continuation/* + context/readWindowContinuation.ts | 纯死码 | 删除合理 |\n| orchestration/readInspectIntent.ts | 读/巡检意图细分分类 | 无 | 仅 context/acquisition/engine.ts::inferTaskKind 粗粒度 | 未接线有价值 | 交裁决 |\n| orchestration/readInspectModule.ts | 读/巡检聚合 barrel + 3 停投影 + 3 启发式 | 无 | workspaceFileContract.ts 仅覆盖停因码 | 未接线有价值 | 交裁决 |\n| orchestration/realProviderProposalDryRun.ts | 19.3KB 真实 provider 提案 dry-run | 无 | 无（parity 层仍匹配其标签） | 未接线有价值 | 交裁决 |\n| orchestration/realProviderProposalGate.ts | dry-run opt-in 门 | 无 | provider/request/invocation.ts（语义不同） | 未接线有价值 | 交裁决 |\n| orchestration/realTaskLoopFixture.ts | 真实任务循环夹具 | 无 | runtime/evaluation/task/liveRun.ts [INFERENCE] | 废弃路线 | 不恢复 |\n| orchestration/realTaskLoopPlan.ts | 真实任务循环计划 | 无 | runtime/evaluation/task/* [INFERENCE] | 废弃路线 | 不恢复 |\n| orchestration/realTaskLoopRepairChain.ts | 真实任务循环修复链 | 无 | 依赖已删 verificationRepair* | 废弃路线 | 不恢复 |\n| orchestration/realTaskLoopResult.ts | 17.5KB 结果分类 | 无 | 无（parity 层标签仅供测试手填） | 废弃路线 | 不恢复 |\n| orchestration/realTaskLoopRuntime.ts | 16.8KB 循环运行器 | 无 | 无 | 废弃路线 | 不恢复 |\n| orchestration/realTaskLoopScorecard.ts | 循环记分卡 | 无 | 无 | 废弃路线 | 不恢复 |\n| orchestration/repoExplainEvidence.ts | glob 解析 + 诊断证据角色 | 无 | context/discovery 只做候选排序 | 未接线有价值 | 交裁决 |\n| orchestration/targetResolution.ts | prompt 目标抽取/主目标/歧义阻塞 | 无 | workspaceFileContract.ts 仅有停因码 | 未接线有价值 | 交裁决 |\n| orchestration/taskLifecycleActivation.ts | 16.9KB 生命周期激活 + 输出格式化 | 无 | context/acquisition/graph.ts 内联 bundle 构建（无路由门/格式化） | 未接线有价值 | 交裁决 |\n| orchestration/taskLifecycleHandoff.ts | provider 就绪判决 + 验证计划 + 修复上下文 | 无 | planning/runtime/engine.ts 内联验证计划（无 provider 就绪分类器） | 未接线有价值 | 交裁决 |\n| orchestration/taskLifecycleRouter.ts | prompt cue→生命周期表面路由 | 无 | 无 | 未接线有价值 | 交裁决 |\n| orchestration/taskRelevantVerificationRoute.ts | 66B `export *` re-export shim | 无 | verification/selection/model.ts + command/plan.ts + verificationFacade.ts | 纯死码 | 删除合理 |\n| orchestration/toolLifecycleEvents.ts | 工具生命周期事件追加 | 无 | core/query/runtime/events.ts + tools/dispatch/projector.ts | 纯死码 | 删除合理 |\n| orchestration/toolRuntimeModule.ts | dispatchRuntimeTool 薄包装 | 无 | tools/dispatch/executor.ts + runtime/loop/contract.ts | 纯死码 | 删除合理 |\n| orchestration/verificationModule.ts | workflow 作用域验证薄包装 | 无 | verification/command/plan.ts + selection/model.ts + verificationFacade.ts | 纯死码 | 删除合理 |\n| orchestration/verificationRepairBridge.ts | 命令结果→修复循环桥接 | 无 | repair/handoff/boundary.ts + readiness.ts | 纯死码 | 删除合理 |\n| orchestration/verificationRepairFlow.ts | 内容验证驱动端到端修复流 | 无 | 无（活轨是否覆盖 content-verification 输入形态：未确认） | 未接线有价值 | 交裁决 |\n| orchestration/verificationRepairIterationFlow.ts | 19KB 端到端修复迭代流 | 无 | repair/iteration/projection.ts 只有投影无运行器 | 未接线有价值 | 交裁决 |\n| orchestration/verificationRepairLoop.ts | 可运行修复循环头 | 无 | 无 | 未接线有价值 | 交裁决 |\n| orchestration/verificationRepairPlanner.ts | 18.9KB 由修复上下文规划提案 | 无 | 无（消费者全部同批删除） | 未接线有价值 | 交裁决 |\n| orchestration/verificationRepairResult.ts | 修复状态结果投影 | 无 | repair/iteration/projection.ts + repair/handoff/readiness.ts | 纯死码 | 删除合理 |\n| orchestration/verificationResultProjection.ts | 验证结果/跳过/未请求投影 | 无 | verification/result/boundary.ts + verificationFacade.ts | 纯死码 | 删除合理 |\n| orchestration/workflowIntentProjection.ts | prompt+continuity→workflow 意图投影 | 无 | 无（workflowTaskPlanner 只留 ReflectiveStateQueryKind 类型） | 未接线有价值 | 交裁决 |\n| orchestration/workspaceTargetProjection.ts | 7.7KB 目标安全/停因摘要投影族 | 无 | 无（5 个消费者同批删除） | 未接线有价值 | 交裁决 |\n\n计数：断链 0；未接线有价值 36；废弃路线 15；纯死码 20。\n\n---\n\n## 1. 断链清单\n\n**G1c 内编译级断链：0 条。** 证据：`grep` 活轨 `packages/ts-shell/src/` 对 71 个模块的 `<basename>.js` import 路径、以及 5 批导出符号名（`activateTaskLifecycle|buildTaskLifecycleHandoff|routeTaskLifecycleRuntime|dispatchRuntimeTool|buildAgentPlanResult|runTaskRelevantVerificationRoute|planVerificationRepairLoop|projectProviderDiagnosticHandoff|auditProviderPrompt|summarizeCodingResultProvenance|detectWorkflowBrowserPlan` 等约 130 个符号）均为 **No matches found**。唯一命中 `buildContextGraphPlanningBundle` 属活轨 `context/acquisition/graph.ts:204` 自身定义，非被删模块。\n\n**但发现 3 处“活轨消费者仍在、生产者已删”的标签级残留**（不构成编译断链，但对应能力已永久失效，建议 Main 裁决）：\n\n1. **provider smoke / anchored / dry-run / realTaskLoop 证据标签**：活轨 `session/sessionResultParity.ts:93,165` 与 `session/continuationEvidenceParity.ts:19-67` 的正则/前缀表仍显式识别 `anchored-proposal-eval|anchored-proposal-scorecard|anchored-proposal-runtime:|anchored-provider-smoke|anchored-provider-smoke-gate:|provider-smoke-result:|live-provider-smoke-result:|proposal-quality-report:|real-provider-proposal-dry-run|real-task-loop-*|context-aware-provider`。生产者分别是本批的 `anchoredProposalEval/Scorecard/Runtime`、`anchoredProviderSmoke/Gate`、`providerSmokeResult`、`liveProviderSmokeResult`、`realProviderProposalDryRun`、`realTaskLoop*`、`contextAwareProvider*`（全部被删）。→ 这些分支永远不会命中。\n2. **`orchestration/harnessFailureTaxonomy.ts`（活轨）**：`545-550` 行匹配 `anchored-provider-smoke-gate:skip-reason:*` 与 `live-provider-smoke-result:provider-error-class:{auth,network,malformed-response}`，生产者 `anchoredProviderSmokeGate.ts`、`liveProviderSmokeResult.ts` 已被删。\n3. **`core/shell/sessionRuntime.test.ts:1348-1350,1411-1412,1733`（活轨）**：期望 `verify-unchanged:README.md|LOCKED.md` 证据与 “- Confirmed unchanged: …”、 “explicit low-risk verification” 渲染，生产者 `fileConstraintAssertions.ts`、`lowRiskVerificationPlanning.ts` 已被删。\n\n附带（非本批、但同批删除导致）：活轨 `orchestration/capabilityBoundaryProjection.ts:14-16` 的 focused-test 白名单包含 `src/verification/verificationCommandPlan.test.ts` 与 `src/verification/taskRelevantVerificationRoute.test.ts`（含 `-t route227e-intentional-missing-test`）。`glob` 确认这两个测试文件在活轨**与 `/tmp/audit-pre` 中都不存在** → 属删除前既有的白名单空指向，非本次新断链，但白名单现在 100% 指向不存在的路径。\n\n**关于 Main 的三个重点核实项**：\n- **taskLifecycleRouter/Activation/Handoff**：判定为 **未接线有价值，不是断链**。活轨不对它们做任何 import，`taskIntent/taskLifecycle/taskExecutionPlan/taskContext*/taskReadPlan/taskStage` 全部存活但活轨改用 `context/acquisition/graph.ts:246-380` 直接内联同一套 substrate 构建（无路由门、无 Activation 输出格式化、无 provider 就绪分类器）。故无编译/运行断裂，是“编排层缺位”。\n- **taskRelevantVerificationRoute.ts**：本批文件是 **66B 纯 re-export shim**（`/tmp/audit-pre/orchestration/taskRelevantVerificationRoute.ts:1`），实质实现 `verification/taskRelevantVerificationRoute.ts` 属他组。活轨**有等价物**：`verification/selection/model.ts` + `verification/command/plan.ts` + `verification/verificationFacade.ts`（均存活且 CLI 可达）。→ 纯死码，删除合理。\n- **verificationRepair\\***：**部分有活轨等价、部分没有**。已取代：`verificationRepairBridge.ts`（→ `repair/handoff/boundary.ts`+`readiness.ts`）、`verificationRepairResult.ts`（→ `repair/iteration/projection.ts`）、`verificationModule.ts`/`verificationResultProjection.ts`（→ `verification/command/plan.ts`+`verification/result/boundary.ts`+`verificationFacade.ts`）。**无等价物**：`verificationRepairPlanner.ts`(18.9KB)、`verificationRepairLoop.ts`、`verificationRepairFlow.ts`、`verificationRepairIterationFlow.ts`(19KB) —— 活轨 `repair/*` 只有观察量与投影，没有“由修复上下文规划提案并跑完整迭代”的可执行头。\n\n---\n\n## 2. 高价值清单（形态=未接线有价值，按价值排序）\n\n| 排名 | 文件 | 规模 | 为何活轨不能替代 |\n|---|---|---|---|\n| 1 | `verificationRepairPlanner.ts` | 18.9KB | 唯一能由 `VerificationRepairContext`（存活）规划出修复提案与 hunk-set handoff 的实现；活轨 `repair/flow/hypothesis.ts`/`strategy.ts` 只做假设分类，不做提案规划 |\n| 2 | `verificationRepairIterationFlow.ts` | 19.0KB | 端到端修复迭代运行器，产出 `verified-success-with-repair` 类判决；活轨 `repair/iteration/projection.ts` 仅有投影（其注释自述为 compatibility facade），无执行体 |\n| 3 | `realProviderProposalDryRun.ts` | 19.3KB | 唯一的 provider 提案 dry-run 运行器（gate→prompt audit→output validation→anchoring→handoff）；活轨 `provider/request/*` 走真实调用，无 dry-run 形态；且活轨 parity/taxonomy 仍期望其证据标签 |\n| 4 | `taskLifecycleActivation.ts` | 16.9KB | 唯一把 lifecycle substrate 汇成 `TaskLifecycleActivation` 并格式化为用户输出的实现；活轨 `context/acquisition/graph.ts` 只内联 bundle 构建，无 route 门与 `formatTaskLifecycleActivationOutput` |\n| 5 | `planningRuntimeProductExecution.ts` | 13.7KB | 唯一把 planning handoff 推进到 proof-carrying apply 的产品化入口；活轨 `planning/handoff/mutation.ts` 明确停在 `exactProposalReadiness: \"missing\"` / review-required |\n| 6 | `verificationRepairFlow.ts` | 13.6KB | 内容验证驱动的端到端修复流，已接线存活 `edit/authority/workspace.ts`；活轨无对应可执行入口（是否被 `runtime/loop/contract.ts` 覆盖：未确认） |\n| 7 | `taskLifecycleHandoff.ts` | 9.0KB | 唯一的 provider 提案就绪五态分类器（missing-analysis/low-confidence/execution-plan/analysis-quality/ready）；活轨无此判决 |\n| 8 | `planningExactProposal.ts` | 8.6KB | 由 handoff 生产 exact proposal 的唯一实现；活轨 `planning/handoff/mutation.ts` 只产 safe-summary-only 生成提案，exact 生产仅剩 provider 路径（`providerAnchoredProposal.ts`） |\n| 9 | `taskLifecycleRouter.ts` | 7.7KB | 唯一按 prompt cue 路由 lifecycle 表面（read/analyze/plan/proposal/verification/repair/stopped）的实现；活轨无等价路由 |\n| 10 | `workspaceTargetProjection.ts` | 7.7KB | 目标安全/停因摘要投影族；5 个消费者同批消失，活轨 `workspaceFileContract.ts` 只有停因码无摘要族 |\n| 11 | `continuationPlanning.ts` | 25.4KB | 续接目标推导 + reflective state 响应构造；活轨 `workflowTaskPlanner.ts:9` 声明 `ReflectiveStateQueryKind` 却无任何生产者 |\n| 12 | `liveProviderSmokeCalibration.ts` + `liveProviderSmokeEvidence/Result` | 13.3+4.5+9.6KB | live smoke 链的唯一生产者；活轨 `liveProviderSmokeFallback.ts` 是链条残件（只做结果分类、无消费者），且 parity/taxonomy 仍期望其标签 |\n| 13 | `providerPromptAudit.ts` | 5.4KB | 唯一 prompt 预算审计生产者；活轨 `harnessTrace.ts`/`harnessScorecard.ts`/`providerEditProposal.ts` 均仍声明/消费 `promptAudit*` 字段 |\n| 14 | `planningRuntimeProduct{Route,Verification,Repair}.ts` | 5.4+6.4+3.2KB | 产品链的路由/验证/修复三件套，无活轨等价物 |\n| 15 | `fileConstraintAssertions.ts` + `lowRiskVerificationPlanning.ts` | 2.5+9.5KB | prompt 级\"保持不变\"/低风险断言抽取；活轨渲染层（`core/shell/sessionRuntime.test.ts`）仍期望该输出格式 |\n| 16 | `continuationLineage.ts` + `continuationProjection.ts` + `continuationIntent.ts` | 8.3+2.5+3.2KB | replay-safe lineage/slot/激活决策与投影；活轨 `session/continuation/*` 是否有等价分类器：未确认 |\n| 17 | `targetResolution.ts` | 7.0KB | prompt→目标抽取/主目标/歧义阻塞；活轨无抽取器（`context/discovery` 只对已给目标做排序） |\n| 18 | `readInspectModule.ts` + `readInspectIntent.ts` + `repoExplainEvidence.ts` | 6.2+1.4+2.7KB | 读/巡检意图细分与 repo 诊断证据角色选择；活轨仅 `context/acquisition/engine.ts::inferTaskKind` 粗粒度替代 |\n| 19 | `governedMultifileProofChain.ts`（controlledMultifileProofChain.ts） | 18.1KB | 三场景多文件证明链，使用存活写授权；活轨无等价场景证明 |\n| 20 | `providerOutcomeProjection.ts` + `agentPlanResult.ts` + `workflowIntentProjection.ts` | 3.1+5.0+5.3KB | 诊断 handoff 投影 / AgentPlan 输出投影 / workflow 意图投影，三者活轨均无生产者 |\n\n**给 Main 的处理建议**：本批 36 个「未接线有价值」中，真正值得恢复的是第 1–8 名（它们构成\"provider 提案 → 修复 → 验证\"的完整能力，且活轨只保留了底层积木与被架空的投影）；第 9–20 名属\"薄能力层\"，恢复成本低但需先决定是否重开对应特性（lifecycle 路由、continuation 续接、live smoke、low-risk 验证）。15 个「废弃路线」与 20 个「纯死码」可维持删除。另建议单独清理活轨中已失效的 3 处标签级消费者与 `WorkflowTaskPlan.browserPlan` / `ReflectiveStateQueryKind` 两个无生产者的字段，以及 `capabilityBoundaryProjection.ts` 中指向不存在测试的白名单项。"
+}

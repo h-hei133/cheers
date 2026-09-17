@@ -138,6 +138,10 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 
 ## 九、G1 orchestration 分组结论（154 文件）
 
+> **本节已被逐文件审查取代（2026-09-17）。** 原判为"仅有分组结论"，实为提取错误。
+> 完整逐文件表见 `audit-raw/R1_PatchRoute.json`（G1a 26）、`R2_EditChain.json`（G1b 57）、
+> `R3_OrchRest.json`（G1c 71）。下列分组结论保留作快速索引。
+
 > G1 子代理完成了关键域读审，但因外部额度中止未生成逐文件 JSON。以下按**能力簇**而不是文件逐行裁决；完整路径清单见 `/tmp/G1_orchestration.txt` 的审计原始清单。恢复时仍需对目标簇重新计算依赖闭包。
 
 | 能力簇 | 代表文件 | 判定 | 证据/理由 |
@@ -166,6 +170,9 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 以上不是断链的自动恢复清单，而是**未接线能力裁决清单**。
 
 ## 十、G3 core / adapters 分组结论（46 文件）
+
+> **本节已被逐文件审查取代（2026-09-17）。** 完整表见 `audit-raw/R4_Browser.json`（G3a 16）、
+> `R5_CoreAdapters.json`（G3b 30）。下列分组结论保留作快速索引。
 
 | 能力簇 | 文件 | 判定 | 证据 |
 |---|---|---|---|
@@ -294,41 +301,68 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 
 ## 十二、当前唯一可信总账
 
-### 已确认的真实破坏（全部已定位，部分已修）
+### 审查覆盖率：100%
+
+| 组 | 文件 | 交付 |
+|---|---:|---|
+| G2 edit/repair/proposal | 68 | ✅ 逐文件表 |
+| G4 verification/planning/result/evidence/session | 48 | ✅ 逐文件表 |
+| Step 2.6 | 82 | ✅ 逐文件表 |
+| facade | 5 | ✅ 逐文件表 |
+| **G1a** apply_patch 路线 | 26 | ✅ 逐文件表 |
+| **G1b** 编辑链 | 57 | ✅ 逐文件表 |
+| **G1c** orchestration 其余 | 71 | ✅ 逐文件表 |
+| **G3a** browser | 16 | ✅ 逐文件表 |
+| **G3b** core/adapters | 30 | ✅ 逐文件表 |
+| **合计** | **403** | **100%** |
+
+原始结果存档：`.wiki/refactor/audit-raw/*.json`（5 份，含 summary / files / report）。
+
+> **勘误**：本文件与转接包曾记载"G1/G3 仅分组结论、覆盖率 50%"。
+> 该结论错误——5 个子代理**均已通过 `yield` 提交完整 payload**，
+> 是提取脚本只读取了 assistant 文本块、遗漏 `toolResult.details.data` 所致。
+> 实际覆盖率 100%。与 `editSnapshot.ts` 行数错误同属一类：**未核验即下结论**。
+
+### 已确认的真实破坏（全部已定位）
 
 | # | 类型 | 内容 | 状态 |
 |---|---|---|---|
-| 1 | 契约型 | 写路径丢失 `O_NOFOLLOW` / 描述符复验（`workspace.ts`） | 已恢复接线 |
-| 2 | 契约型 | `/undo` 快照无人写入（`editSnapshot.ts`） | 已恢复接线 |
-| 3 | 契约型 | `provenance.toolExecutions` 有 4 个读取者、零写入者 | **待修** |
-| 4 | 契约型 | 浏览器连续性标记前缀无生产者 | **待修** |
-| 5 | 半孤儿 | `browserAgent.ts` 在可达集内但无调用者 | **待裁决** |
-| 6 | 脚本 | 5 个 `verify:real-user-capabilities:*` 脚本 `MODULE_NOT_FOUND` | **待修** |
-| 7 | 脚本 | `verify:edit-capability-closeout` 假阳性（98 项中 75 项已不存在仍报 pass） | **待修** |
+| 1 | 契约型 | 写路径丢失 `O_NOFOLLOW` / 描述符复验（`workspace.ts`） | ✅ 已恢复接线 |
+| 2 | 契约型 | `/undo` 快照无人写入（`editSnapshot.ts`） | ✅ 已恢复接线 |
+| 3 | 契约型 | `provenance.toolExecutions` / `approvalDecisions`：5 个 CLI 可达读取者、**零写入者**；二级断链：兜底 evidence 写入者 `edit/authority/projection/approval.ts` 也已删 | ⚠️ 待修 |
+| 4 | 契约型 | `disabledTools` / `hiddenToolPrefixes` 用户可配置，**零执行者**（唯一执行者 `prefilter.ts` 已删）→ 用户设置被静默忽略 | ⚠️ 待修 |
+| 5 | 能力级 | OpenAI account-auth：`/connect login openai --account` 可存储并显示 connected，但活轨 `step.ts` 只发 `Bearer ${apiKey}`（account-auth 下为 `undefined`）→ 对话必然失败；codex 端点知识仅在已删的 `normalize.ts` | ⚠️ 待修 |
+| 6 | 契约型 | `planning/handoff/mutation.ts` 产出 `executionLane: existing-exact-fenced-route / existing-target-set-route`，指向已删的 `fencedEditRoute` / `targetSetEditRoute` | ⚠️ 待裁决 |
+| 7 | 契约型 | 活轨证据标签正则仍识别已删生产者（`anchored-*` / `provider-smoke-*` / `real-task-loop-*` / `context-aware-provider`）于 `session/sessionResultParity.ts`、`continuationEvidenceParity.ts`、`harnessFailureTaxonomy.ts` | ⚠️ 待裁决 |
+| 8 | 契约型 | `pwStatus.ts:16` 输出 `Eval mode: available-via-pwEval`，`pwEval.ts` 已删 → 界面说谎 | ⚠️ 待修 |
+| 9 | 契约型 | `capabilityBoundaryProjection.ts:14-20` focused-test 白名单含 2 个不存在的测试路径（删除前即存在，非本次新增） | ⚠️ 待修 |
+| 10 | 脚本 | 5 个 `verify:real-user-capabilities:*` `MODULE_NOT_FOUND`，退出码 1（诚实报错） | ⚠️ 待修 |
+| 11 | 脚本 | **`verify:edit-capability-closeout` 假阳性**：98 项中 75 项已不存在，仍打印全部 marker + `[pass]` + `exit 0` | ⚠️ **必须修** |
+| 12 | 脚本 | `verify:browser-txn-gate` 退出码 1，14/14 测试目标全缺（诚实报错） | ⚠️ 待裁决 |
 
 ### 已确认无问题
 
-- **引用型断链为零**：403 个已删文件的 1563 个导出符号中，无一被活轨当符号引用（附一）。
-- 纯 re-export shim / 活轨已内联归并的模块：可维持删除。
-- `apply_patch` 解析/验证/应用路线：废弃路线，不恢复（§3）。
+- **引用型（编译级）断链为零**：403 个已删文件的导出符号无一被活轨当符号引用（附一、G1a/G1b/G1c/G3a/G3b 五组独立穷举一致）。
+- 纯 re-export shim / 活轨已内联归并：可维持删除。
+- `apply_patch` 解析/验证/应用路线：废弃路线，不恢复（G1a 确认 26 文件零断链，且活轨明文否决该输入形态）。
+- `sessionContinuationProjection.ts:57-60` 的 browser 前缀：**非断链**（是压缩保序白名单，非功能消费者）。
 
-### 仍未完成
+### 高价值未接线候选（需裁决）
 
-- **G1 orchestration 154 / G3 core·adapters 46 的逐文件表**：子代理两次均因额度中止在"正在写表"阶段，
-  仅有分组结论（§9、§10）。**不得据此下"无遗漏断链"的结论。**
+| 序 | 能力 | 代表文件 | 规模 |
+|---|---|---|---|
+| 1 | 终态真实性判据（verification/taskSatisfaction/failedFiles → stopped） | `core/query/mapping/capabilityClassification.ts`、`terminal/classificationProjection.ts`、`result/terminal/queryTerminalTruth.ts` | 8 分支 |
+| 2 | 任务相关验证阶梯 | `verification/taskRelevantVerificationRoute.ts` | 721 行 |
+| 3 | target-set 子集批回滚 | `editRecoveryPlan/Apply/Result/Outcome`、`editRollback`、`targetSetEditRecovery` | 850+ 行 |
+| 4 | provider 原始输出解析 | `orchestration/patchContract/parser.ts`（输出类型 `ProviderEditRawProposal` **活轨在用**，但无人解析原始文本） | 672 行 |
+| 5 | 重试/退避/降级 | `model-adapters/retryPolicy.ts`、`client.ts`（活轨 fallback 明确 `executesFallback: false`） | 301 行 |
+| 6 | taskLifecycle 编排层 | `taskLifecycle{Activation,Handoff,Router}.ts`（底层全活，仅编排被删） | — |
+| 7 | AST 代码图谱 | `context/graph/{callGraph,symbolTable,ast/scopeTree,ast/graphRag}.ts` | — |
+| 8 | LSP 自修复循环 | `edit/repair/lspRepairLoop.ts`、`edit/patch/gauntlet/astGauntlet.ts` | — |
+| 9 | 跨文件 repair | `repair/flow/{stage,crossFilePlanning}.ts`、`repair/proposal/*` | — |
+| 10 | Swarm 分发 | `orchestration/swarm/{dispatcher,convergence,types}.ts` | — |
 
-### 审查覆盖率
-
-| 项 | 数量 |
-|---|---:|
-| 已删生产文件 | 403 |
-| 有逐文件结论 | 203（G2 68 + G4 48 + Step2.6 82 + facade 5） |
-| 仅分组结论 | 200（G1 154 + G3 46） |
-| **覆盖率** | **50%** |
-
-**但据此已确认 7 项真实破坏**，说明覆盖率虽只一半，风险已大量暴露；
-剩余 200 个文件的逐文件核验仍需完成。
-
+（完整逐文件表见 `audit-raw/*.json` 的 `files` 与 `report` 字段，共 403 条。）
 ## 附：符号级断链穷尽扫描（2026-09-17）
 
 ### 方法（可复现）

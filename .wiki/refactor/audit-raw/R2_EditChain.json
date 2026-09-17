@@ -1,0 +1,235 @@
+{
+  "summary": "G1b（编辑链 57 文件）逐文件价值审查完成。结论：**不是被 `edit/multifile/model.ts` 替代，而是路线不同**——活轨 multifile 是「全量内容 + 目标集」写入器，被删链是「精确 old/new 锚点 + apply_patch 文本」写入器，输入模型与底座都不同。但被删链的**执行底座**恰好是活轨在设计上明确否决的输入形态（3 处活轨文案拒 unified diff / apply_patch 语法），故整条执行脊椎判废弃路线。真实断链仍只有 `editSnapshot.ts`（已恢复）。另发现 3 处**契约型悬空**：活轨 `planning/runtime/engine.ts` 产出 `executionLane: existing-exact-fenced-route / existing-target-set-route`，指向已删的 `fencedEditRoute` / `targetSetEditRoute`；活轨 CLI 可达的 `capabilityBoundaryProjection.ts` 白名单登记 2 个已删测试路径；CLI 可达的 `editCapabilityReadiness.ts` 把已删的 fenced 路由登记为 `default-ready-candidate`。统计：断链 1 / 未接线有价值 19 / 废弃路线 35 / 纯死码 2。",
+  "files": [
+    {
+      "path": "orchestration/editSnapshot.ts",
+      "description": "断链（已恢复）。快照存储配置+回执投影；唯一活轨消费者 runtime/execution/service.ts:5,95 写前捕获"
+    },
+    {
+      "path": "orchestration/editExpectationContract.ts",
+      "description": "未接线有价值——编辑期望分类+policy receipt 桥接；活轨 toolPolicyResult/actionableBlockerModule 仅部分等价"
+    },
+    {
+      "path": "orchestration/editPatchManifest.ts",
+      "description": "未接线有价值——变更前置条件清单 manifest，无写入器，活轨无等价物"
+    },
+    {
+      "path": "orchestration/editPatchModule.ts",
+      "description": "纯死码——纯聚合/再导出外观，所再导出的模块全部同批被删"
+    },
+    {
+      "path": "orchestration/editPatchPreconditions.ts",
+      "description": "未接线有价值——8 项前置条件矩阵（target/content/authority/stale-read/verification/snapshot/confirmation）"
+    },
+    {
+      "path": "orchestration/editPatchPreview.ts",
+      "description": "未接线有价值——无写预览证据（缺失信息/歧义/授权/陈旧读），活轨无等价物"
+    },
+    {
+      "path": "orchestration/futureEditContract.ts",
+      "description": "未接线有价值——未来编辑模式契约与 supportStatus 门禁"
+    },
+    {
+      "path": "orchestration/futureEditPlanner.ts",
+      "description": "未接线有价值——未来编辑扩张规划（缺失前置条件/确认/回滚要求）"
+    },
+    {
+      "path": "orchestration/editProposalSelection.ts",
+      "description": "未接线有价值——提案审查→选择→显式确认门禁（maxFiles 上限、非精确 hunk 拒写）"
+    },
+    {
+      "path": "orchestration/editProposalApply.ts",
+      "description": "废弃路线——把已确认选择派发到 fenced/targetSet/hunkSet 三条已删路由"
+    },
+    {
+      "path": "orchestration/editProposalReviewResult.ts",
+      "description": "废弃路线——提案应用结果投影，绑定已删 EditProposalApplyResult"
+    },
+    {
+      "path": "orchestration/editRecoveryPlan.ts",
+      "description": "未接线有价值——单文件/目标集子集批回滚规划，活轨 /restore 仅记录级"
+    },
+    {
+      "path": "orchestration/editRecoveryApply.ts",
+      "description": "未接线有价值——批回滚执行（基于存活的 patchRecovery 原语）"
+    },
+    {
+      "path": "orchestration/editRecoveryOutcome.ts",
+      "description": "未接线有价值——回滚终态分类（含 blocker→state 映射）"
+    },
+    {
+      "path": "orchestration/editRecoveryResult.ts",
+      "description": "未接线有价值——快照/回滚就绪度结果投影"
+    },
+    {
+      "path": "orchestration/editRollback.ts",
+      "description": "未接线有价值——单文件回滚原语（restorePreview→restorePrimitive），底座存活"
+    },
+    {
+      "path": "orchestration/editRepairPlanner.ts",
+      "description": "废弃路线——修复提案规划并交接至已废的 hunk-set 路由"
+    },
+    {
+      "path": "orchestration/editRepairResult.ts",
+      "description": "废弃路线——修复结果投影，绑定已删 EditRepairPlan/hunkSet 交接"
+    },
+    {
+      "path": "orchestration/providerEditPlanner.ts",
+      "description": "未接线有价值——context→provider→no-write 提案编排；存活原语 providerEditContext/Proposal 在活轨仅测试可达"
+    },
+    {
+      "path": "orchestration/providerEditConfirmation.ts",
+      "description": "未接线有价值——provider 提案确认→精确车道交接门禁"
+    },
+    {
+      "path": "orchestration/providerEditResult.ts",
+      "description": "未接线有价值——provider 提案结果投影"
+    },
+    {
+      "path": "orchestration/contextAwareProviderEdit.ts",
+      "description": "未接线有价值——context packet/graph/plan/sufficiency→provider 输入状态机（ready/missing-context/over-budget）"
+    },
+    {
+      "path": "orchestration/proposalQualityCorpus.ts",
+      "description": "未接线有价值——11 例提案质量语料（exact/partial/fuzzy/broad/unsafe 等），唯一"
+    },
+    {
+      "path": "orchestration/proposalQualityReport.ts",
+      "description": "未接线有价值——提案质量报告投影（no-write/anchor/handoff 就绪）"
+    },
+    {
+      "path": "orchestration/fencedEditRoute.ts",
+      "description": "废弃路线——精确 fenced 替换路由，生成 apply_patch 文本喂 runWorkspaceWriteRoute"
+    },
+    {
+      "path": "orchestration/fencedEditActivation.ts",
+      "description": "废弃路线——fenced 替换提示激活门禁，其 blocker 分类与活轨否决形态重合"
+    },
+    {
+      "path": "orchestration/fencedEditOutcome.ts",
+      "description": "废弃路线——fenced 执行结果分类，绑定已删路由"
+    },
+    {
+      "path": "orchestration/fencedEditResult.ts",
+      "description": "废弃路线——fenced 路由编排结果投影"
+    },
+    {
+      "path": "orchestration/exactHunkApply.ts",
+      "description": "废弃路线——buildMultiHunkApplyPatch 生成 apply_patch 文本并写入"
+    },
+    {
+      "path": "orchestration/proposalHunkSet.ts",
+      "description": "废弃路线——提案 hunk 集 manifest，喂 hunk-set 路由"
+    },
+    {
+      "path": "orchestration/proposalHunkSetPlan.ts",
+      "description": "废弃路线——hunk 集前置校验规划（冲突/mapping/上限）"
+    },
+    {
+      "path": "orchestration/proposalHunkSetRoute.ts",
+      "description": "废弃路线——hunk 集路由，复用已删 journal/transaction/verification/recovery 层"
+    },
+    {
+      "path": "orchestration/proposalHunkSetResult.ts",
+      "description": "废弃路线——hunk 集路由结果投影"
+    },
+    {
+      "path": "orchestration/targetSetEditPlan.ts",
+      "description": "废弃路线——目标集编辑规划，底座为 planExactFencedReplacement"
+    },
+    {
+      "path": "orchestration/targetSetEditRoute.ts",
+      "description": "废弃路线——目标集路由；含 323-338 行『True Atomicity Rollback』契约冲突（已知 R3）"
+    },
+    {
+      "path": "orchestration/targetSetEditResult.ts",
+      "description": "废弃路线——目标集路由结果投影"
+    },
+    {
+      "path": "orchestration/targetSetEditPolicy.ts",
+      "description": "废弃路线——目标集前置策略（首写前全目标 preflight）"
+    },
+    {
+      "path": "orchestration/targetSetEditJournal.ts",
+      "description": "废弃路线——目标集事务日志步骤投影"
+    },
+    {
+      "path": "orchestration/targetSetEditTransaction.ts",
+      "description": "废弃路线——目标集事务 id/状态聚合"
+    },
+    {
+      "path": "orchestration/targetSetEditVerification.ts",
+      "description": "废弃路线——目标集逐文件验证聚合"
+    },
+    {
+      "path": "orchestration/targetSetEditRecoveryWorkflow.ts",
+      "description": "废弃路线——目标集回滚资格工作流，输入类型 TargetSetEditRoute（已删）"
+    },
+    {
+      "path": "orchestration/targetSetEditRecovery.ts",
+      "description": "未接线有价值——目标集子集批回滚规划（buildEditRecoveryPlan 桥接，生产者在活轨）"
+    },
+    {
+      "path": "orchestration/discoveryEditManifest.ts",
+      "description": "废弃路线——发现编辑候选 manifest（有界候选/maxCandidate 守卫）"
+    },
+    {
+      "path": "orchestration/discoveryEditConfirmation.ts",
+      "description": "废弃路线——发现编辑确认状态机（单/目标集/歧义/无效）"
+    },
+    {
+      "path": "orchestration/discoveryEditPlanner.ts",
+      "description": "废弃路线——发现编辑规划，显式拒绝 fuzzy/generated/broad"
+    },
+    {
+      "path": "orchestration/discoveryEditRuntime.ts",
+      "description": "废弃路线——从提示抽取候选并读工作区，喂发现规划"
+    },
+    {
+      "path": "orchestration/discoveryEditResult.ts",
+      "description": "废弃路线——发现编辑 manifest 结果投影"
+    },
+    {
+      "path": "orchestration/generatedEditPlanner.ts",
+      "description": "废弃路线——生成内容提案规划，交接至已删精确车道"
+    },
+    {
+      "path": "orchestration/generatedEditConfirmation.ts",
+      "description": "废弃路线——生成提案确认并派发 fenced/targetSet 路由"
+    },
+    {
+      "path": "orchestration/generatedEditResult.ts",
+      "description": "废弃路线——生成提案结果投影"
+    },
+    {
+      "path": "orchestration/mutationRoutingProjection.ts",
+      "description": "废弃路线——raw apply_patch 路由分派到 workspace*Route（依赖已删 patchResult/*）"
+    },
+    {
+      "path": "orchestration/controlledEditOperationRoute.ts",
+      "description": "废弃路线——受控编辑操作路由，包装 mutationRoutingProjection"
+    },
+    {
+      "path": "orchestration/mutationExecution.ts",
+      "description": "废弃路线——逐文件 apply_patch 变更执行分支"
+    },
+    {
+      "path": "orchestration/mutationResultAggregation.ts",
+      "description": "纯死码——纯合并助手，活轨 multifile 自带聚合"
+    },
+    {
+      "path": "orchestration/planningMutationProofHandoff.ts",
+      "description": "废弃路线——规划→变更证明交接，调用已删 editProposalApply/Selection"
+    },
+    {
+      "path": "orchestration/planningMutationProofRoute.ts",
+      "description": "废弃路线——规划变更证明路由，依赖已删 handoff/verification"
+    },
+    {
+      "path": "orchestration/planningMutationProofVerification.ts",
+      "description": "废弃路线——规划变更证明验证，依赖已删 handoff 与 realTaskLoopResult"
+    }
+  ],
+  "architecture": "被删的 57 文件构成一条完整但从未接入 CLI 的『精确锚点编辑』子系统，呈清晰的二分结构：**(a) primitive/manifest 半边存活**——`orchestration/fencedEditPlanner.ts`、`providerEditContext.ts`、`providerEditProposal.ts`、`providerOutputValidator.ts`、`providerProposalAnchors.ts`、`providerAnchor{Candidate,Matcher,Quality,Conflict}.ts`、`providerAnchoredProposal.ts`、`editProposalReview.ts`、`generatedEditProposal.ts`、`editRepairContext.ts`、`editRepairProposal.ts`、`edit/patch/plan/hunkSet.ts`、`edit/patch/apply/conflict.ts`、`patchRecovery/*` 全部仍在工作树；**(b) route/executor/result 半边被删**——本次审查的 fenced/targetSet/hunkSet/discovery/generated/provider/proposal 的 route+apply+result 层。因此活轨出现『原语在、驱动器不在』的孤儿态：`fencedEditPlanner` 的 3 个导出（parseExactFencedReplacementMapping / planExactFencedReplacement / buildStoppedFencedReplacementPlan）在活轨唯一引用者是它自己的测试文件；`providerAnchor*`/`providerAnchoredProposal` 在活轨唯一生产引用者是 `planning/quality/model.ts` 的类型 import 与 `harnessTrace.ts` 的字段。活轨真正的多目标写入器是 `edit/multifile/model.ts`（1710 行，经 `runtime/api/host/runtime.ts:22` 接 `runControlledMultiTargetMutation`），它接收 `targets[].proposedContent`（全量内容）+ `authority.status` + `executionService.writeTextFile`，自行完成冲突检测、陈旧读、快照规划、并行分组、回滚、验证聚合与修复资格；被删链接收 `oldText/newText` 精确锚点并生成 apply_patch 文本喂 `runWorkspaceWriteRoute`。二者**能力不同、底座不同，不是替代关系**。真正的否决依据是活轨三处明文拒止 apply_patch 输入形态：`core/query/actionableBlockerModule.ts:279-280,356`、`result/projection/shell/assembly.ts:355-357,389`、`session/actionableFailureContinuity.ts:151-153,220`（『do not pass unified diff or apply_patch syntax』）——这条与 G2 补丁验证层被裁定『废弃路线』的结论同源。",
+  "report": "# G1b 编辑链 57 文件逐文件价值审查\n\n## 判定规则（先声明口径，避免误读）\n\n1. **被删链没有被 `edit/multifile/model.ts` 替代**。两者输入模型不同：multifile 接 `targets[].proposedContent`（全量内容替换，1710 行，`runtime/api/host/runtime.ts:22` 接入），被删链接 `oldText/newText`（精确锚点）并生成 `*** Begin Patch` 文本喂 `runWorkspaceWriteRoute`。\n2. 判「废弃路线」的依据不是「被替代」，而是**活轨明文否决该输入形态**。活轨 3 文件 6 处：`core/query/actionableBlockerModule.ts:279-280,356`、`result/projection/shell/assembly.ts:355-357,389`、`session/actionableFailureContinuity.ts:151-153,220`。\n3. 判「未接线有价值」的判据：实现完整、**非 apply_patch 特有**、活轨无等价物、无消费者。\n4. **符号级与路径级断链穷尽扫描为零**：对 57 个 basename + `.js` 的活轨 import 扫描「No matches found」；对 `runTargetSetEditRoute` / `buildProposalHunkSetManifest` / `runExactHunkApplyRoute` / `applyEditProposalSelection` / `classifyEditExpectationContract` / `planFutureEditExpansion` / `buildEditPatchModuleState` / `executeFileMutationBranch` / `PROPOSAL_QUALITY_CORPUS` 等符号扫描同样「No matches found」。\n\n---\n\n## 逐文件判定表（57/57）\n\n| 路径 | 功能(1句) | 消费者(或\"无\") | 活轨等价实现(或\"无\") | 形态 | 建议 |\n|---|---|---|---|---|---|\n| `orchestration/editSnapshot.ts` | 快照存储配置 + 回执投影，写前捕获原内容供 /undo | `runtime/execution/service.ts:5,95`（活） | 无（唯一写入者） | 断链 | 恢复并接线（**已恢复**） |\n| `orchestration/contextAwareProviderEdit.ts` | context packet/graph/plan/sufficiency 聚合为 provider 编辑输入状态机（ready/missing-context/over-budget/plan-needs-more-context） | 无 | 无（`provider/request/*` 只建请求包，不做 context→proposal 输入聚合） | 未接线有价值 | 交裁决 |\n| `orchestration/controlledEditOperationRoute.ts` | 包装 mutationRoutingProjection，把 raw apply_patch 分类成 7 种操作并投影 | 无 | `edit/multifile/model.ts`（不同路由，非等价） | 废弃路线 | 不恢复 |\n| `orchestration/discoveryEditConfirmation.ts` | 发现编辑确认状态机（单目标/目标集/歧义/无效） | `discoveryEditPlanner.ts`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/discoveryEditManifest.ts` | 有界发现候选 manifest + maxCandidate 守卫 | `discoveryEditPlanner/Runtime/Result`（同批删） | 无（活轨无发现编辑入口） | 废弃路线 | 不恢复 |\n| `orchestration/discoveryEditPlanner.ts` | 发现编辑规划，显式拒绝 fuzzy/generated/broad | `discoveryEditResult.ts` + `editProposalApply`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/discoveryEditResult.ts` | 发现编辑 manifest 的 OrchestrationResult 投影 | 无 | 无 | 废弃路线 | 不恢复 |\n| `orchestration/discoveryEditRuntime.ts` | 从提示抽取确认目标并读工作区候选（最多 6 文件） | `editProposalApply` 间接（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/editExpectationContract.ts` | 编辑期望分类（8 种 reasonCode）+ policy receipt 桥接 | `futureEditContract.ts`（同批删） | 部分：`core/tools/toolPolicyResult.ts:buildPolicyBlockedResult` + `core/query/actionableBlockerModule.ts`（覆盖 blocked 投影，无 reasonCode 全集） | 未接线有价值 | 交裁决 |\n| `orchestration/editPatchManifest.ts` | 变更前置条件清单 manifest（stale-read/authority/verification/snapshot/confirmation） | `editPatchModule/Preconditions/Preview`（同批删） | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/editPatchModule.ts` | 纯聚合外观：聚合 expectation+contract+manifest+preconditions+preview+result 并再导出 30+ 模块 | 无 | 无（其 30+ 再导出目标全部同批被删；活轨无 barrel） | 纯死码 | 删除合理 |\n| `orchestration/editPatchPreconditions.ts` | 8 项前置条件矩阵 + overall/missing/blocked/delegated 聚合 | `editPatchModule/Preview`（同批删） | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/editPatchPreview.ts` | 无写预览证据（计划变更/缺失信息/歧义/授权/陈旧读/验证/回滚） | `editPatchModule`（同批删） | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/editProposalApply.ts` | 已确认选择派发 fenced/targetSet/hunkSet 三条路由 | `planningMutationProofHandoff`、`editProposalReviewResult`、`editRepairResult`（同批删） | 无（fixture 已修回退） | 废弃路线 | 不恢复 |\n| `orchestration/editProposalReviewResult.ts` | 提案应用结果 → OrchestrationResult 投影 | 无 | 无 | 废弃路线 | 不恢复 |\n| `orchestration/editProposalSelection.ts` | 提案 hunk 选择 + 显式确认门禁（maxFiles=3、非精确 hunk 拒写、超限拒） | `editProposalApply`、`editRepairPlanner`、`planningMutationProofHandoff`（同批删） | 无（`editProposalReview.ts` 存活但无 selection 消费方） | 未接线有价值 | 交裁决 |\n| `orchestration/editRecoveryApply.ts` | 批回滚执行（rollback-success/stopped/partial-failure/failed） | `editRecoveryResult.ts`、`editProposalApply`（同批删） | 部分：`core/commands/restoreCommandRuntime.ts` 只做记录级单文件 | 未接线有价值 | 交裁决 |\n| `orchestration/editRecoveryOutcome.ts` | 回滚终态分类 + blocker→state 映射 + restore blocker 映射 | `editRecoveryApply`、`fencedEditRoute`（同批删） | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/editRecoveryPlan.ts` | 单文件/target-set-subset 批回滚规划（413 行） | `editRecoveryApply`、`editRecoveryResult`、`targetSetEditRecovery`（同批删） | `patchRecovery/restorePreview.ts`（存活，但无子集批规划） | 未接线有价值 | 交裁决 |\n| `orchestration/editRecoveryResult.ts` | 快照状态 + 回滚就绪度结果投影（345 行） | `fencedEditRoute`、`editRecoveryApply`（同批删） | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/editRepairPlanner.ts` | 修复提案规划 + hunk-set 交接 | `editRepairResult.ts`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/editRepairResult.ts` | 修复结果 → OrchestrationResult 投影（431 行） | 无 | 无 | 废弃路线 | 不恢复 |\n| `orchestration/editRollback.ts` | 单文件回滚原语（previewRecoveryAuthorityRestore → restoreRecoveryAuthorityRecord） | `editRecoveryApply`（同批删） | `patchRecovery/restorePrimitive.ts`（存活，被 /restore 用） | 未接线有价值 | 交裁决 |\n| `orchestration/exactHunkApply.ts` | `buildMultiHunkApplyPatch` 生成 apply_patch 文本并单文件写入 | `proposalHunkSetRoute`（同批删） | 无（活轨 editor 不产 apply_patch） | 废弃路线 | 不恢复 |\n| `orchestration/fencedEditActivation.ts` | 提示→fenced 替换激活门禁（拒 fuzzy/discovery/broad/generated/rollback） | `editPatchModule`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/fencedEditOutcome.ts` | fenced 执行结果分类（12 kind → actionableBlockerKind） | `fencedEditRoute/Result`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/fencedEditResult.ts` | fenced 路由 → OrchestrationResult 投影（340 行） | 无 | 无 | 废弃路线 | 不恢复 |\n| `orchestration/fencedEditRoute.ts` | 精确 fenced 替换路由：规划→apply_patch 文本→runWorkspaceWriteRoute | `editPatchModule`、`editProposalApply`、`generatedEditConfirmation`、`targetSetEditRoute`、`proposalHunkSetRoute`（**全部同批删**） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/futureEditContract.ts` | 未来编辑模式契约 + supportStatus/route 门禁（410 行） | `futureEditPlanner.ts`、`editPatchManifest.ts`（同批删） | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/futureEditPlanner.ts` | 未来编辑扩张规划（缺失前置条件/确认要求/验证/回滚要求） | 无 | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/generatedEditConfirmation.ts` | 生成提案确认并派发 fenced/targetSet 路由 | `generatedEditResult.ts`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/generatedEditPlanner.ts` | 生成内容提案规划（348 行，含 9 种 unsupported 分支） | `generatedEditConfirmation/Result`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/generatedEditResult.ts` | 生成提案 → OrchestrationResult 投影（384 行） | 无 | 无 | 废弃路线 | 不恢复 |\n| `orchestration/mutationExecution.ts` | 逐文件 apply_patch 变更执行分支（executeFileMutationBranch） | `mutationResultAggregation`（同批删） | 部分：`edit/multifile/model.ts:applyTarget`（writeTextFile，非 apply_patch） | 废弃路线 | 不恢复 |\n| `orchestration/mutationResultAggregation.ts` | 变更结果合并（reconcileFileMutationSummary，59 行） | `mutationExecution`（同批删） | `edit/multifile/model.ts` 自带 settlement/queue 聚合 | 纯死码 | 删除合理 |\n| `orchestration/mutationRoutingProjection.ts` | raw apply_patch 路由投影，分派 workspace{Write,Create,Delete,Move,MultiFile,MixedFile}Route | `controlledEditOperationRoute`（同批删） | 无（6 个被分派的 Route 亦同批删） | 废弃路线 | 不恢复 |\n| `orchestration/planningMutationProofHandoff.ts` | 规划→变更证明交接（408 行），调用 editProposalApply/Selection | `planningMutationProofRoute`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/planningMutationProofRoute.ts` | 规划变更证明路由（331 行），依赖 handoff+verification | 无 | 无 | 废弃路线 | 不恢复 |\n| `orchestration/planningMutationProofVerification.ts` | 规划变更证明验证（457 行），依赖 handoff + realTaskLoopResult | `planningMutationProofRoute`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/proposalHunkSet.ts` | 提案 hunk 集 manifest（hunkId→targetPath 绑定） | `editProposalApply`、`proposalHunkSetRoute`（同批删） | `edit/patch/plan/hunkSet.ts`（**存活**，但为纯数据模型非 manifest） | 废弃路线 | 不恢复 |\n| `orchestration/proposalHunkSetPlan.ts` | hunk 集前置校验（14 种 blocker：冲突/重复/超限/no-op） | `proposalHunkSetRoute`（同批删） | 部分：`edit/patch/apply/conflict.ts:detectExactHunkConflicts`（存活） | 废弃路线 | 不恢复 |\n| `orchestration/proposalHunkSetResult.ts` | hunk 集路由 → OrchestrationResult 投影（245 行） | 无 | 无 | 废弃路线 | 不恢复 |\n| `orchestration/proposalHunkSetRoute.ts` | hunk 集路由（617 行），复用 journal/transaction/verification/recovery 四层 | `editProposalApply`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/proposalQualityCorpus.ts` | 11 例提案质量语料（exact-single/multi-hunk/partial/unanchored/fuzzy/broad/malformed/unsafe/stale/ambiguous/conflicting） | `proposalQualityReport.ts`（同批删） | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/proposalQualityReport.ts` | 提案质量报告投影（171 行，no-write/anchor/handoff/scorecard 就绪） | 无 | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/providerEditConfirmation.ts` | provider 提案确认→精确单目标/目标集车道交接门禁 | `providerEditResult.ts`（同批删） | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/providerEditPlanner.ts` | context→provider→no-write 提案编排（276 行，8 种 status） | `providerEditConfirmation`、`editRepairPlanner`（同批删） | 无（存活原语 `providerEditContext.ts`/`providerEditProposal.ts` 在活轨无生产消费者） | 未接线有价值 | 交裁决 |\n| `orchestration/providerEditResult.ts` | provider 提案 → OrchestrationResult 投影（208 行） | 无 | 无 | 未接线有价值 | 交裁决 |\n| `orchestration/targetSetEditJournal.ts` | 目标集事务日志步骤投影（13 种 step） | `targetSetEditRoute`、`proposalHunkSetRoute`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/targetSetEditPlan.ts` | 目标集编辑规划（315 行，15 种 blocker） | `targetSetEditRoute`（同批删） | `edit/multifile/model.ts`（不同路由：全量内容 vs 精确锚点） | 废弃路线 | 不恢复 |\n| `orchestration/targetSetEditPolicy.ts` | 目标集前置策略（首写前全目标 preflight，writeAtomicityClaim:false） | `targetSetEditRoute`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/targetSetEditRecovery.ts` | 目标集子集批回滚规划（桥接 buildEditRecoveryPlan，基于存活的 recoveryAuthorityStore） | `editRecoveryApply` 链（同批删） | 无（`/restore` 无子集批模式） | 未接线有价值 | 交裁决 |\n| `orchestration/targetSetEditRecoveryWorkflow.ts` | 目标集回滚资格工作流（eligible/ineligible + 显式确认，automaticRollback:false） | `targetSetEditRoute`、`proposalHunkSetRoute`（同批删） | 无 | 废弃路线 | 不恢复 |\n| `orchestration/targetSetEditResult.ts` | 目标集路由 → OrchestrationResult 投影（276 行） | 无 | 无 | 废弃路线 | 不恢复 |\n| `orchestration/targetSetEditRoute.ts` | 目标集路由（446 行）：复用 fenced 车道逐文件写 + 323-338 行『True Atomicity Rollback』 | `editProposalApply`、`generatedEditConfirmation`、`planningMutationProofHandoff`（同批删）；`capabilityBoundaryProjection.ts:19` 仅字符串提及 | `edit/multifile/model.ts`（不同路由，有等价 rollback观察） | 废弃路线 | 不恢复 |\n| `orchestration/targetSetEditTransaction.ts` | 目标集事务 id/状态聚合（9 种 outcome） | `targetSetEditRoute`、`proposalHunkSetRoute`（同批删） | `edit/multifile/model.ts`（settlement/队列状态） | 废弃路线 | 不恢复 |\n| `orchestration/targetSetEditVerification.ts` | 目标集逐文件验证聚合（passed/failed/skipped → overall） | `targetSetEditRoute`、`proposalHunkSetRoute`、`targetSetEditTransaction`（同批删） | `edit/multifile/model.ts`（`MultiTargetVerificationStatus` 逐目标观察） | 废弃路线 | 不恢复 |\n\n---\n\n## 1. 断链清单\n\n### 1.1 真断链（形态=断链，1 项）\n\n| 文件 | 断在哪 | 证据 | 状态 |\n|---|---|---|---|\n| `orchestration/editSnapshot.ts` | `/undo`、`/restore` 读 `.sisyphus/edit-snapshots`，但生产写者被删 → 目录恒空 | 恢复后 `runtime/execution/service.ts:5` `import { buildEditSnapshotStoreConfig }`；`:95` 在 `writeTextFile` 内 `captureRecoveryAuthorityRecord({...buildEditSnapshotStoreConfig(...)})`；`core/commands/restoreCommandRuntime.ts:19` `defaultLedgerRoot` 同路径 | **已恢复并接线** |\n\n### 1.2 契约型悬空（活轨文件引用已删产物；不在 57 清单内，但属同批删除造成的活轨悬空，须裁决）\n\n这三项**不是符号级断链**（`tsc` 不会报错），而是**活轨把已删路由当成既有能力来命名/登记**。\n\n| # | 悬空点 | 活轨位置 | 指向的已删文件 | 严重度 |\n|---|---|---|---|---|\n| A | `PlanningMutationHandoffExecutionLane = \"existing-exact-fenced-route\" \\| \"existing-target-set-route\"` | `planning/handoff/mutation.ts:22-25`（生产 `:252`、`:304`、`:530-532`）；被 `planning/runtime/engine.ts:222` 调用 | `orchestration/fencedEditRoute.ts`、`orchestration/targetSetEditRoute.ts` | 中：`backendConsumption: \"not-run\"`、`apply: not-run` 硬编码，无分派逻辑，故不是运行时崩溃；但车道名是对已不存在执行器的**具名承诺**，且被 CLI 侧 `presentation/surface/model.ts` → `core/acquisition/summary.ts` 消费 |\n| B | `PACKED` 白名单登记 2 个已删测试路径 | `orchestration/capabilityBoundaryProjection.ts:19` `\"npm test -w packages/ts-shell -- src/orchestration/targetSetEditRoute.test.ts src/orchestration/targetSetEditVerification.test.ts\"`；经 `isAllowlistedRunCommand` 被 `verification/command/plan.ts:8,178` 与 `orchestration/testImpactPlan.ts:1,106` 消费 | `targetSetEditRoute.test.ts`、`targetSetEditVerification.test.ts` | 中：`isAllowlistedRunCommand` 对该命令返回 `true`，但测试文件已不存在 → 白名单放行一个必然失败的命令 |\n| C | `editCapabilityReadiness` 把已删 fenced 路由登记为 `default-ready-candidate` | `orchestration/patchResult/editCapabilityReadiness.ts`（`exact-fenced-replacement` 行证据含 \"fenced edit route tests\"）；CLI 可达：`core/context/startup/startupWarmContextBuilder.ts:1-2,39,170`、`core/context/compact/command/compactCommandRunner.ts:1-2,42-43`、`core/context/routeContinuityHandoff.ts:1-2` | `orchestration/fencedEditRoute.ts`（及 `exactHunkApply.ts` 等） | 中高：CLI 启动预热与 compact 交接**向用户声明该能力默认可用**，与实际缺失矛盾 |\n\n**附带发现的内部矛盾**：`editCapabilityReadiness.ts` 把 `atomic-rollback` 标为 `blocked-by-design`，证据写「no transaction rollback executor exists」；但已删的 `targetSetEditRoute.ts:323-338` **确实有** \"True Atomicity Rollback\" 块。这正是 `.wiki/refactor/failures-baseline.md:29-37` 记录的 R3 契约冲突（测试期望 partial-failure 保留现场，生产做全量回滚并 `changedFiles.length = 0`）。二者是同一个未裁决点的两面。\n\n---\n\n## 2. 高价值清单（形态=未接线有价值，按价值排序，19 项）\n\n| 序 | 文件 | 为何活轨不能替代 | 接线成本 |\n|---|---|---|---|\n| 1 | `editRecoveryPlan.ts` + `editRecoveryApply.ts` + `editRecoveryResult.ts` + `editRecoveryOutcome.ts` + `editRollback.ts` + `targetSetEditRecovery.ts` | 活轨 `/restore`（`core/commands/restoreCommandRuntime.ts` → `patchRecovery/restoreCommandRunner.ts`）只做**记录级单文件**恢复；这套提供 **target-set-subset 子集批回滚规划**（413+345+93 行）与 11 种终态分类。底座 `patchRecovery/restorePreview.ts`、`restorePrimitive.ts`、`recoveryAuthorityStore.ts` **全部存活**，且 `editSnapshot.ts` 已恢复 —— 生产者-消费者闭环可在活轨内闭合 | 低：仅依赖存活原语 + 已恢复的 editSnapshot |\n| 2 | `editProposalSelection.ts` | 提案**审查→hunk 选择→显式确认**门禁：maxFiles=3 上限、非精确 hunk 拒写、超限拒、多重确认分支。活轨 `editProposalReview.ts` **存活**但只产审查文本，无任何选择/确认消费方；`planning/handoff/mutation.ts:246` 只 build review 就停在 `review-required` | 中：需决定是否引入「提案审查」产品流程 |\n| 3 | `providerEditPlanner.ts` + `providerEditConfirmation.ts` + `providerEditResult.ts` | provider 输出的 **no-write 提案编排**（276+164+208 行）：8 种 status、provider 可用性→提案→确认→精确车道交接。其**存活原语** `providerEditContext.ts`、`providerEditProposal.ts`、`providerOutputValidator.ts`、`providerProposalAnchors.ts`、`providerAnchorCandidate/Matcher/Quality/Conflict.ts`、`providerAnchoredProposal.ts`、`providerAnchoringResult.ts` 在活轨**只有测试消费者**（`providerAnchorMatcher.ts:1` 被 `providerAnchorConflict.ts` 用，但后者无人用；`planning/quality/model.ts:23` 仅类型 import）→ 存活原语整体处于孤儿态 | 中：需接 provider 运行时车道 |\n| 4 | `editPatchPreconditions.ts` + `editPatchPreview.ts` + `editPatchManifest.ts` | **前置条件矩阵 + 无写证据预览**：8 项 precondition（explicit-target/content/candidate-confirmation/authority/stale-read/verification/rollback-snapshot/user-confirmation）逐项判定 satisfied/missing/required/delegated，并投影为 preview 证据。活轨 `toolPolicyResult.ts`/`actionableBlockerModule.ts` 只产 blocked 单点投影，**无 precondition 矩阵、无 preview** | 低：纯投影层，无副作用 |\n| 5 | `editExpectationContract.ts` | 8 种 `EditExpectationReasonCode` 全集（含 concrete-write / write-content-missing / write-target-missing / bounded-edit / unsupported-refactor / unsupported-batch-edit / unsupported-discovery-edit / ambiguous-mutation）+ 中文提示正则。活轨 blocker taxonomy 只覆盖其中一部分 | 低 |\n| 6 | `futureEditContract.ts` + `futureEditPlanner.ts` | 10 种 `FutureEditMode` × 4 种 supportStatus 的**路线契约**（410+119 行），含 10 项 `FutureEditPrecondition` 与 `route-148a..148d` 命名。这是唯一把「当前支持 / 未来仅规划 / 不支持」形式化的层 | 低：纯分类层 |\n| 7 | `contextAwareProviderEdit.ts` | **context 就绪度 → provider 输入状态机**：把 contextPacket/contextGraph/codeGraphImpact/agentPlan/taskLifecycle/analysisBrief/sufficiency/qualityGate/executionPlan 聚合成 5 态（ready / missing-context / missing-analysis-brief / context-over-budget / plan-needs-more-context），含脱敏与预算省略理由。活轨 `provider/request/*` 只建请求包与边界 | 中：需接 context 引擎输出 |\n| 8 | `proposalQualityCorpus.ts` + `proposalQualityReport.ts` | 11 例**提案质量语料**（exact-single-target / exact-multi-hunk / partial-anchor / unanchored-generated / fuzzy-output / broad-refactor / malformed-output / unsafe-output / stale-context / ambiguous-target / conflicting-hunks），含 expected output validation / anchor quality / review readiness / handoff readiness 期望值 —— 是唯一可量化评测「提案质量」的资产 | 低：纯数据 + 投影 |\n\n其余 11 项（`editRecoveryApply/Outcome/Plan/Result/Rollback`、`targetSetEditRecovery` 已计入第 1 序；`editProposalSelection`、`providerEditPlanner/Confirmation/Result`、`editPatchPreconditions/Preview/Manifest`、`editExpectationContract`、`futureEditContract/Planner`、`contextAwareProviderEdit`、`proposalQualityCorpus/Report` 已计入）见上表 —— 合计 19 项。\n\n---\n\n## 3. 关于「是否被 `edit/multifile/model.ts` 替代」的明确回答\n\n**没有替代。是两条不同路线。**\n\n| 维度 | `edit/multifile/model.ts`（活） | 被删 fenced/targetSet/hunkSet 链 |\n|---|---|---|\n| 输入 | `targets[].proposedContent`（全量内容），`oldText/newText` 不参与 | `FencedEditMapping{oldText,newText}`（精确锚点） |\n| 写底座 | `executionService.writeTextFile`（`runtime/execution/service.ts`，经 `createWorkspaceWriteAuthority`） | `runWorkspaceWriteRoute` + `*** Begin Patch` 文本（**已删**） |\n| 授权 | 调用方传 `authority.status: granted` | `validateWriteTarget` 逐目标校验 + `explicitWorkspaceWriteOptIn` |\n| 并行 | `parallel.enabled` + 冲突图 + 依赖排序分组 | 顺序写 + 显式 target 顺序 |\n| 回滚 | `observeRollback` 恢复 `expectedContent`（**有等价能力**） | 323-338 行无条件全量回滚（契约冲突） |\n| 验证 | `MultiTargetVerificationStatus` 逐目标观察 | `aggregateTargetSetEditVerification` 逐文件聚合 |\n\n结论：multifile **覆盖了多目标写入的冲突/陈旧读/快照/回滚/验证骨架**（故 `targetSetEditTransaction/Verification` 等属能力已被等价覆盖），但**不覆盖**精确锚点替换、hunk-set 冲突消解、提案审查-选择-应用链、子集批回滚规划。后者被否决的真正理由是**输入底座（apply_patch 文本）被活轨设计否决**，而不是被 multifile 替代 —— 与 G2 补丁验证层的裁定同源。\n\n## 4. 统计与建议汇总\n\n| 形态 | 数量 | 建议 |\n|---|---|---|\n| 断链 | 1 | 恢复并接线（`editSnapshot.ts`，已完成） |\n| 未接线有价值 | 19 | 交裁决（建议优先序 1-8） |\n| 废弃路线 | 35 | 不恢复 |\n| 纯死码 | 2 | 删除合理（`editPatchModule.ts` 纯 barrel、`mutationResultAggregation.ts` 纯合并助手） |\n| **合计** | **57** | |\n\n**立即可做、不需裁决的两件事**：\n1. 清理 `capabilityBoundaryProjection.ts:19` 白名单中 2 个已删测试路径（当前 `isAllowlistedRunCommand` 放行必然失败的命令）。\n2. 复核 `editCapabilityReadiness.ts` 的 `exact-fenced-replacement: default-ready-candidate` 行 —— 该路由已删，CLI 可达的启动预热/compact 交接仍向用户声明其可用。\n"
+}

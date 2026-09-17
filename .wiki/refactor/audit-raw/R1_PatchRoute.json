@@ -1,0 +1,111 @@
+{
+  "summary": "G1a（apply_patch 路线 26 文件）逐文件判定完成。严格口径下断链数 = 0：packages/ts-shell/src/ 下无任何 CLI 可达文件 import 这 26 个文件中的任一个（符号级与路径级双向扫描均为空），每个生产者的消费者都在同三次删除提交内同批消失，且活轨 3 处 6 条提示明确拒绝该输入形态（unified diff / apply_patch syntax）。但发现两个此前未记录的次生缺陷（不在 26 文件内）：① scripts/verify/index.mjs 与 scripts/verify-edit-capability-closeout.mjs 仍以 pathToFileURL 引用其中 6 个已删模块，且两者都登记在 package.json（verify:real-user-capabilities*、verify:edit-capability-closeout），属脚本级悬空引用，CLI 可达性判据完全看不到；② 活轨 CLI 可达的 orchestration/patchResult/editCapabilityReadiness.ts 的 11 条 default-ready-candidate 中有 10 条登记的能力其实现（含本批 26 文件）与所引证据测试路径均已删除，属能力登记超范围声明。",
+  "files": [
+    {
+      "path": "orchestration/patchApplication/multiFileUpdateApply.ts",
+      "description": "对已验证的 2-32 个 update 写意图做顺序写入 + 逐文件写后读回校验"
+    },
+    {
+      "path": "orchestration/patchApplication/noPartialApply.ts",
+      "description": "把 PatchVerificationResult 折叠成“全验后写”原子性契约与 PatchWriteIntent 列表"
+    },
+    {
+      "path": "orchestration/patchApplication/singleFileCreateApply.ts",
+      "description": "单文件 Add File 排他创建 + 写后读回校验"
+    },
+    {
+      "path": "orchestration/patchApplication/singleFileDeleteApply.ts",
+      "description": "单文件 Delete 应用 + 写后校验"
+    },
+    {
+      "path": "orchestration/patchApplication/singleFileMoveApply.ts",
+      "description": "单文件 Move 排他搬运 + 写后校验"
+    },
+    {
+      "path": "orchestration/patchApplication/singleFileUpdateApply.ts",
+      "description": "单文件 Update 写入（契约→writer 唯一通路）"
+    },
+    {
+      "path": "orchestration/patchContract/parser.ts",
+      "description": "从原始 provider 文本抽出 JSON / 统一 diff 并解析成 ProviderEditRawProposal（672 行，含诊断与目标解析）"
+    },
+    {
+      "path": "orchestration/patchContract/types.ts",
+      "description": "上述解析的状态/分类/诊断/包装类型定义"
+    },
+    {
+      "path": "orchestration/patchMutationLane.ts",
+      "description": "单文件 replace-from/to 应用，显式拒绝 diff/apply_patch 形态与多目标路径；产出 patch-from-not-found/patch-ambiguous 等失败码"
+    },
+    {
+      "path": "orchestration/patchParsing/parser.ts",
+      "description": "解析 “*** Begin Patch” 标记格式为 ParsedPatch（add/update/delete/move + hunk）"
+    },
+    {
+      "path": "orchestration/patchParsing/boundedBroadPatchNormalizer.ts",
+      "description": "把有界 git 统一 diff / apply-patch 标记归一为 PatchFileOperation，带拒绝 taxonomy"
+    },
+    {
+      "path": "orchestration/patchParsing/broadPatchUnsupportedReason.ts",
+      "description": "17 类“不支持的宽补丁形态”原因 + shortReason/doNext/evidenceTag"
+    },
+    {
+      "path": "orchestration/patchParsing/fencedPatchExtractor.ts",
+      "description": "从模型输出中抽取 ```diff/```patch 围栏块"
+    },
+    {
+      "path": "orchestration/patchResult/mixedFileWriteRoute.ts",
+      "description": "有界 2-32 混合操作 apply_patch 工作区写入路由"
+    },
+    {
+      "path": "orchestration/patchResult/multiFileWriteRoute.ts",
+      "description": "有界 2-32 纯 update apply_patch 工作区写入路由"
+    },
+    {
+      "path": "orchestration/patchResult/productionRoute.ts",
+      "description": "单文件 apply_patch“生产路由”（路由门 + 写通道），保持默认拒绝不变"
+    },
+    {
+      "path": "orchestration/patchResult/realProviderWriteSmoke.ts",
+      "description": "隔离写通道真 provider 冒烟契约（显式 opt-in + 隔离 fixture）"
+    },
+    {
+      "path": "orchestration/patchResult/runtimeNoWriteSmoke.ts",
+      "description": "运行时不写路由冒烟契约"
+    },
+    {
+      "path": "orchestration/patchResult/singleFileApplyPatchPermissionUxRealRouteSeam.ts",
+      "description": "权限 UX 与真实路由接缝投影（纯 no-write，295 行）"
+    },
+    {
+      "path": "orchestration/patchResult/singleFileApplyPatchRealProviderDryRunGate.ts",
+      "description": "真 provider 非变异 dry-run 门契约"
+    },
+    {
+      "path": "orchestration/patchResult/singleFileApplyPatchRealProviderPermissionUxGate.ts",
+      "description": "真 provider 权限 UX no-write 门契约"
+    },
+    {
+      "path": "orchestration/patchResult/workspaceCreateRoute.ts",
+      "description": "单文件 Add File 工作区写入路由"
+    },
+    {
+      "path": "orchestration/patchResult/workspaceDeleteRoute.ts",
+      "description": "单文件 Delete 工作区写入路由"
+    },
+    {
+      "path": "orchestration/patchResult/workspaceMoveRoute.ts",
+      "description": "单文件 Move 工作区写入路由"
+    },
+    {
+      "path": "orchestration/patchResult/workspaceWriteRoute.ts",
+      "description": "单文件 Update 工作区写入路由（曾经是 apply_patch 唯一活轨写入路由）"
+    },
+    {
+      "path": "orchestration/patchVerification/verify.ts",
+      "description": "校验 ParsedPatch 每个操作（路径边界/存在性/hunk 上下文/唯一匹配）并产出应用计划"
+    }
+  ],
+  "architecture": "本批是“apply_patch 文本路线”的完整闭环，自下而上四层：① patchParsing（标记格式解析、宽补丁归一、围栏抽取、拒绝原因分类）+ patchContract（provider 原始文本 → ProviderEditRawProposal）+ patchMutationLane（单文件 replace 兜底）；② patchVerification/verify（ParsedPatch → 校验过的应用计划）；③ patchApplication（把计划拆成原子性契约并逐操作写入，含 create/delete/move/update/多文件）；④ patchResult（5 条单文件/多文件/混合 workspace 写入路由 + 4 个真 provider 门/冒烟契约 + 生产路由）。上游接线层是 orchestration/mutationRoutingProjection.ts（按 patch 形状分派到各路由）与 edit/applyPatchRuntimeBridge.ts，旁支被 edit/result/workspace/projection/*、edit/write/status/*、result/projection/write/* 消费。这四层与全部上游接线层在同三次删除提交内整体消失，因此批内无“生产者被删而消费者存活”的断链。活轨取代形态是两条不同的路径：CLI 工具面只有 edit/read/write/glob/bash（core/tools/registry.ts:389 'edit' → core/tools/editEngine.ts replaceInContent，9 策略弹性替换）经 runtime/execution/service.ts 写盘；多目标写入由 runtime/api/host/runtime.ts → edit/multifile/model.ts runControlledMultiTargetMutation 承担，输入是结构化 target 而非补丁文本。两条取代路径都明确不接受 apply_patch/unified diff 文本。",
+  "report": "## 逐文件判定表（26/26）\n\n| 路径 | 功能(1句) | 消费者(或“无”) | 活轨等价实现(或“无”) | 形态 | 建议 |\n|---|---|---|---|---|---|\n| orchestration/patchApplication/multiFileUpdateApply.ts | 对已验证 2-32 个 update 写意图顺序写入 + 逐文件写后读回校验 | 无（唯一消费者 multiFileWriteRoute.ts 同批删） | 无（edit/multifile/model.ts 走结构化 target） | 废弃路线 | 不恢复 |\n| orchestration/patchApplication/noPartialApply.ts | 把 PatchVerificationResult 折叠成“全验后写”原子性契约 + PatchWriteIntent 列表 | 无（workspaceWriteRoute/mixedFileWriteRoute 等同批删） | 无（edit/multifile/model.ts 自带 stale-read + authority 门） | 废弃路线 | 不恢复 |\n| orchestration/patchApplication/singleFileCreateApply.ts | 单文件 Add File 排他创建 + 写后读回 | 无（workspaceCreateRoute.ts 同批删） | 部分（edit/multifile/model.ts create 分类 + service.createFileExclusive） | 废弃路线 | 不恢复 |\n| orchestration/patchApplication/singleFileDeleteApply.ts | 单文件 Delete 应用 + 写后校验 | 无（workspaceDeleteRoute.ts 同批删） | 部分（同上；authority.deleteFile 存活但零调用者） | 废弃路线 | 不恢复 |\n| orchestration/patchApplication/singleFileMoveApply.ts | 单文件 Move 排他搬运 + 写后校验 | 无（workspaceMoveRoute.ts 同批删） | 部分（同上；authority.moveFileExclusive 存活但零调用者） | 废弃路线 | 不恢复 |\n| orchestration/patchApplication/singleFileUpdateApply.ts | 单文件 Update 写入（契约→writer 唯一通路） | 无（workspaceWriteRoute.ts 同批删） | 是（core/tools/editEngine.ts:69 replaceInContent + registry.ts:389 'edit' 工具） | 废弃路线 | 不恢复 |\n| orchestration/patchContract/parser.ts | 从原始 provider 文本抽 JSON/统一 diff 并解析成 ProviderEditRawProposal | 无（providerExactPatchContract.ts、openAICompatibleAnchoredSmokeAdapter.ts、planning/runtime/proposal.ts 同批删） | 无（providerOutputValidator/providerEditProposal 只收已结构化对象，无 raw 文本解析） | 未接线有价值 | 交裁决 |\n| orchestration/patchContract/types.ts | 上述解析的状态/分类/诊断/包装类型 | 无（仅被 parser.ts 引用，同批删） | 无 | 未接线有价值 | 交裁决 |\n| orchestration/patchMutationLane.ts | 单文件 replace-from/to 应用，显式拒绝 diff/apply_patch 与多目标路径 | 无（唯一消费者 edit/planning/instructionPlanner.ts 已删） | 是（editEngine.replaceInContent；失败码由活轨 3 处文本判定复现） | 废弃路线 | 不恢复 |\n| orchestration/patchParsing/parser.ts | 解析 “*** Begin Patch” 标记格式为 ParsedPatch | 无（全部消费者同批删） | 无 | 废弃路线 | 不恢复 |\n| orchestration/patchParsing/boundedBroadPatchNormalizer.ts | 有界 git 统一 diff / apply-patch 标记归一为 PatchFileOperation，带拒绝 taxonomy | 无（edit/patch/plan/candidate.ts、multiFile.ts 同批删） | 无 | 废弃路线 | 不恢复 |\n| orchestration/patchParsing/broadPatchUnsupportedReason.ts | 17 类“不支持宽补丁形态”原因 + doNext/evidenceTag | 无（仅 boundedBroadPatchNormalizer.ts 同批删） | 部分（活轨只有粗粒度 patch-generation-failed） | 废弃路线 | 不恢复 |\n| orchestration/patchParsing/fencedPatchExtractor.ts | 从模型输出抽取 ```diff/```patch 围栏块 | 无（仅 boundedBroadPatchNormalizer.ts 同批删） | 无（fencedEditPlanner 处理 old/new 内容块，非补丁文本） | 废弃路线 | 不恢复 |\n| orchestration/patchResult/mixedFileWriteRoute.ts | 有界 2-32 混合操作 apply_patch 工作区写入路由 | 无（mutationRoutingProjection.ts 同批删） | 部分（edit/multifile/model.ts 多目标写入，输入为结构化 target） | 废弃路线 | 不恢复 |\n| orchestration/patchResult/multiFileWriteRoute.ts | 有界 2-32 纯 update apply_patch 写入路由 | 无（mutationRoutingProjection.ts 同批删） | 部分（同上） | 废弃路线 | 不恢复 |\n| orchestration/patchResult/productionRoute.ts | 单文件 apply_patch 生产路由（路由门 + 写通道），默认拒绝不变 | 仅 scripts/verify/index.mjs:6635（开发者验证脚本，非 CLI 可达） | 无 | 废弃路线 | 不恢复 |\n| orchestration/patchResult/realProviderWriteSmoke.ts | 隔离写通道真 provider 冒烟契约 | 仅 scripts/verify/index.mjs:6329 | 无 | 废弃路线 | 不恢复 |\n| orchestration/patchResult/runtimeNoWriteSmoke.ts | 运行时不写路由冒烟契约 | 仅 scripts/verify/index.mjs:6233 | 无 | 废弃路线 | 不恢复 |\n| orchestration/patchResult/singleFileApplyPatchPermissionUxRealRouteSeam.ts | 权限 UX 与真实路由接缝投影（纯 no-write） | 仅 scripts/verify/index.mjs:6103；edit/write/status/noWrite.ts（同批删） | 无 | 废弃路线 | 不恢复 |\n| orchestration/patchResult/singleFileApplyPatchRealProviderDryRunGate.ts | 真 provider 非变异 dry-run 门契约 | 仅 scripts/verify/index.mjs:6021 | 无 | 废弃路线 | 不恢复 |\n| orchestration/patchResult/singleFileApplyPatchRealProviderPermissionUxGate.ts | 真 provider 权限 UX no-write 门契约 | 仅 scripts/verify/index.mjs:6104 | 无 | 废弃路线 | 不恢复 |\n| orchestration/patchResult/workspaceCreateRoute.ts | 单文件 Add File 工作区写入路由 | 无（mutationRoutingProjection.ts 同批删） | 部分（edit/multifile/model.ts create + service.createFileExclusive） | 废弃路线 | 不恢复 |\n| orchestration/patchResult/workspaceDeleteRoute.ts | 单文件 Delete 工作区写入路由 | 无（同上） | 部分（同上） | 废弃路线 | 不恢复 |\n| orchestration/patchResult/workspaceMoveRoute.ts | 单文件 Move 工作区写入路由 | 无（同上） | 部分（同上） | 废弃路线 | 不恢复 |\n| orchestration/patchResult/workspaceWriteRoute.ts | 单文件 Update 工作区写入路由（曾是 apply_patch 唯一活轨写入路由） | 无（mutationRoutingProjection/fencedEditRoute/exactHunkApply/test-utils 全删；已恢复的 editSnapshot.ts 刻意只声明结构化 facts，不 import 其类型） | 是（editEngine + service.writeTextFile） | 废弃路线 | 不恢复 |\n| orchestration/patchVerification/verify.ts | 校验 ParsedPatch 每操作（路径边界/存在性/hunk 上下文/唯一匹配）并产出应用计划 | 无（全部消费者同批删） | 无 | 废弃路线 | 不恢复 |\n\n---\n\n## 1. 断链清单\n\n### 严格口径（消费者存活且 CLI 可达）：**0 项**\n\n对本批 26 文件做了两轮穷尽扫描，均零命中：\n\n- **符号级**：对全部导出符号（`parseApplyPatchText`、`verifyParsedPatch`、`runWorkspaceWriteRoute`、`runWorkspaceMoveRoute`、`runWorkspaceDeleteRoute`、`runWorkspaceCreateRoute`、`runMixedFileWriteRoute`、`runMultiFileWriteRoute`、`runProductionRoute`、`buildRealProviderWriteSmokeContract`、`buildRuntimeNoWriteSmokeContract`、`buildSingleFileApplyPatchPermissionUxRealRouteSeam`、`buildSingleFileApplyPatchRealProviderDryRunGateContract`、`buildSingleFileApplyPatchRealProviderPermissionUxGateContract`、`applySingleFileReplacePatch`、`formatPatchFailureReason`、`applyMultiFileUpdateIntents`、`buildNoPartialPatchApplicationContract`、`applySingleFile{Create,Delete,Move,Update}Intent`、`normalizeBoundedBroadPatchText`、`broadPatchUnsupportedReasonInfo`、`broadPatchUnsupportedEvidence`、`extractFencedPatchText`、`extractJsonObject`、`parseSimpleUnifiedDiff`、`looksLikeDiff`、`resolveProposalTargets` 等）在 `packages/ts-shell/src/` 全量 grep，**零命中**。\n- **路径级**：`from \"[^\\\"]*patch(Parsing|Result|Contract|Verification|Application)/[^\\\"]*\"` 全量 grep `packages/ts-shell/src/`，**零命中**；连 `orchestration/patchParsing/types.ts`（本批唯一存活的 patchParsing 文件）也只有 `edit/patch/plan/types.ts:3`、`edit/patch/status/mixedOperation.ts:4`、`edit/patch/plan/perFile…` 三处**类型**引用，不涉及本批生产者。\n\n判据支撑：本批全部上游接线层（`mutationRoutingProjection.ts`、`edit/applyPatchRuntimeBridge.ts`、`edit/result/workspace/projection/*` 6 个、`edit/write/status/*` 8 个、`result/projection/write/{production,noWrite}.ts`、`edit/patch/plan/{perFile,candidate,multiFile}.ts`、`orchestration/{fencedEditRoute,exactHunkApply}.ts`、`test-utils/workspaceWriteResumeProducer.ts`）**全部与生产者同批删除**，故无“生产者被删而消费者存活”的形态。活轨同时显式拒绝该输入形态（`core/query/actionableBlockerModule.ts:356`、`session/actionableFailureContinuity.ts:220`、`result/projection/shell/assembly.ts:389`：*Rerun with one explicit target file plus exact replace-from and replace-to text; do not pass unified diff or apply_patch syntax.*）。\n\n### 半断链：开发者验证脚本的悬空引用（口径外，但需处理）\n\nCLI 可达性判据看不见这一类。`scripts/` 下两个脚本以 `pathToFileURL` 按**绝对路径** import 已删模块，且两者都登记在 `package.json`：\n\n| 悬空引用位置 | 指向的本批已删模块 |\n|---|---|\n| `scripts/verify/index.mjs:6021` | `patchResult/singleFileApplyPatchRealProviderDryRunGate.ts` |\n| `scripts/verify/index.mjs:6103` | `patchResult/singleFileApplyPatchPermissionUxRealRouteSeam.ts` |\n| `scripts/verify/index.mjs:6104` | `patchResult/singleFileApplyPatchRealProviderPermissionUxGate.ts` |\n| `scripts/verify/index.mjs:6233` | `patchResult/runtimeNoWriteSmoke.ts` |\n| `scripts/verify/index.mjs:6329` | `patchResult/realProviderWriteSmoke.ts` |\n| `scripts/verify/index.mjs:6635` | `patchResult/productionRoute.ts` |\n| `scripts/verify-edit-capability-closeout.mjs:10-13` | `patchParsing/{parser,fencedPatchExtractor,boundedBroadPatchNormalizer,broadPatchUnsupportedReason}.test.ts`（测试文件同批删除） |\n\n同批被这些脚本引用、同样已删的还有 `patchResult/{singleFileApplyPatchOptInDryRunRoute,writeDecisionGate,isolatedWriteLane,guardedWriteGate,productionRouteProjection,guardedRouteSmoke,noWriteRuntimeRoute,singleFileApplyPatchDryRun,workspaceAuthority}.ts`（不在本 26 清单内）。即**整个 apply_patch 真 provider 验证族被整体切除，而脚本外壳仍在**。这些脚本的完整调用链是 `package.json` → `scripts/verify-real-user-capabilities.mjs` → `scripts/verify/index.mjs` → 上述 flag 分支（`--real-apply-patch-dry-run-smoke`、`--real-apply-patch-permission-ux-smoke`、`--real-apply-patch-runtime-no-write-smoke`、`--real-apply-patch-write-fixture-smoke`、`--real-apply-patch-guarded-write-smoke`、`--real-apply-patch-guarded-route-smoke`、`--real-apply-patch-workspace-write-smoke`，均在 `index.mjs:2705-2727` 的 help 中宣告）。\n\n### 能力登记超范围声明（口径外，高优先）\n\n`orchestration/patchResult/editCapabilityReadiness.ts` **CLI 可达**（`core/commands/registry.ts:76` `/compact`、`:89` `/warmup`；`core/context/startup/startupWarmContextBuilder.ts:1-2,39-45`；`core/context/compact/delivery/compactHandoffRenderer.ts:23-31`；`core/context/model/contextStateProjection.ts:236`）。它登记的 23 条能力中，**11 条 `default-ready-candidate` 里有 10 条的实现在本批被删**：\n\n| 登记 id（`editCapabilityReadiness.ts` 行号） | 对应本批已删实现 |\n|---|---|\n| `single-update-create-delete-move`（:41） | `singleFile{Update,Create,Delete,Move}Apply.ts` |\n| `bounded-update-only-2-32`（:46） | `multiFileWriteRoute.ts` + `multiFileUpdateApply.ts` |\n| `bounded-mixed-2-32`（:50） | `mixedFileWriteRoute.ts` |\n| `bounded-delete-only-2-32`（:54） | `workspaceDeleteRoute.ts` + `singleFileDeleteApply.ts` |\n| `bounded-move-only-2-32`（:58） | `workspaceMoveRoute.ts` + `singleFileMoveApply.ts` |\n| `bounded-marker-apply-patch-candidates`（:62） | `patchParsing/parser.ts` |\n| `bounded-broad-patch-safe-subset`（:67） | `boundedBroadPatchNormalizer.ts` |\n| `fenced-bounded-broad-patch-safe-subset`（:72） | `fencedPatchExtractor.ts` |\n| `rename-with-content-decomposition`（:82） | `boundedBroadPatchNormalizer.ts` |\n| `unsupported-broad-shape-taxonomy`（:87） | `broadPatchUnsupportedReason.ts` |\n\n（唯一例外 `exact-fenced-replacement`（:77）其主体 `fencedEditPlanner.ts` 存活，但登记证据第 3 条 `workspace write route stale-read and post-write verification tests` 指向已删的 `workspaceWriteRoute.ts`。）这些 row 的 `evidence` 数组仍逐字引用已删测试（`marker parser tests`、`bounded broad patch normalizer tests`、`fenced patch extractor tests`、`broad unsupported reason tests`、`Route 71/72 compatibility gauntlet` 等），`scripts/verify-edit-capability-closeout.mjs` 也仍把对应测试路径列为 gate 目标。该文件本身不 import 被删模块（纯数据表），故**不构成运行时断链**，但对外宣称的“default-ready 候选能力”与仓库现状不符。\n\n### 附带隐患：陈旧 dist 仍可加载已删模块\n\n`packages/ts-shell/package.json` 的 `main`/`bin` 指向 `dist/packages/ts-shell/src/**`；该目录下仍保留 `patchApplication/`、`patchVerification/`、`patchResult/`（含本批 12 个路由）与 `providerExactPatchContract.js` 的编译产物（`dist/packages/ts-shell/src/orchestration/patchResult/*`、`dist/orchestration/patchResult/*`）。未重建即分发，已删代码路径仍可被 require。属构建产物卫生问题，非本批判定项。\n\n---\n\n## 2. 高价值清单（形态 = 未接线有价值）\n\n### #1 `orchestration/patchContract/parser.ts`（672 行）\n\n**为何活轨不能替代**：活轨 provider 编辑链（`orchestration/providerEditProposal.ts` 的 `normalizeProviderEditProposal`、`providerOutputValidator.ts` 的 `validateProviderOutput`、`providerProposalAnchors.ts`、`providerAnchorMatcher.ts`、`providerAnchoredProposal.ts`）**全部存活**，且其输入类型 `ProviderEditRawProposal`（`providerEditProposal.ts:67`，`operationKind: \"exact-fenced-replacement\"` + `targets[{path,oldText,newText}]`）**正是 `patchContract/parser.ts` 的输出类型**。但活轨**没有任何模块把原始 provider 文本解析成该结构**：`extractJsonObject` / `extractJsonObjectWithWrapper` / `parseSimpleUnifiedDiff` / `parseDiffTargetCandidates` / `extractUnifiedDiffHunks` / `resolveProposalTargets` / `parseExistingRawProposal` / `concreteReviewOnlyMissingFact` 在 `packages/ts-shell/src/` 全量 grep **零命中**；`grep rawProposal` 只命中测试文件。即活轨 provider 链有“消费端”无“生产端”，而此文件的 JSON 半边正是缺失的生产端。\n\n**重要限定**：该文件的统一 diff 半边（`parseSimpleUnifiedDiff`、`looksLikeDiff`、`extractUnifiedDiffHunks`、`parseDiffTargetCandidates`）对应活轨显式拒绝的输入形态，**不应恢复**；只有 JSON/`review-only` 提案解析半边具备价值。建议按此边界裁决，而非整文件恢复。\n\n### #2 `orchestration/patchContract/types.ts`\n\n`ProviderExactPatchParseStatus` / `Classification` / `Diagnostics` / `ParseResult` / `WrapperKind` / `OutputShape` 六个类型是 #1 的类型镜像，无独立能力、无仓库等价物、无消费者。与 #1 同裁：随 #1 一起恢复或一起不恢复，不单独保留。\n\n### 边界项（形态判为“废弃路线”，但知识资产可复用，供裁决参考）\n\n- `patchParsing/broadPatchUnsupportedReason.ts`：17 类拒绝原因 + `shortReason`/`doNext`/`evidenceTag`/`safeNoWrite` 的完整 taxonomy。活轨只有粗粒度 `patch-generation-failed`（`core/query/actionableBlockerModule.ts:355-356`），对“为什么这个宽补丁被拒”无细分。其载体路线已废（输入形态被活轨拒绝），故判 废弃路线/不恢复；若后续要改善拒绝 UX，这是唯一现成的 taxonomy 来源。\n- `patchParsing/fencedPatchExtractor.ts`：围栏块抽取逻辑，仓库无等价物（`fencedEditPlanner.ts` 处理的是 old/new 内容围栏，非补丁围栏）。同样因输入形态被拒绝而判 废弃路线。\n- `patchApplication/*` 与 `patchResult/*Route`（共 17 文件）：实现完整（如 `workspaceWriteRoute.ts` 687 行、`mixedFileWriteRoute.ts` 1591 行、`multiFileWriteRoute.ts` 33KB），但共同点是**入口形态是 apply_patch 文本**、且写入能力已被 `edit/multifile/model.ts` + `core/tools/editEngine.ts` 以更窄但活着的路径取代。按“活轨明确拒绝该输入形态”判 废弃路线，不建议整簇恢复；若将来产品决定重开 apply_patch 工具面，这是唯一现成的受控写入栈（含 authority 边界、final stale-read、no-partial 原子性、快照 receipt、真 provider 门），届时应作为整体评估而非零散恢复。\n\n---\n\n## 3. 方法与证据边界\n\n- 全部判定基于只读工具：`grep` / `glob` / `read`，未修改任何文件、未运行 build/lint/测试。\n- 被删文件内容读自 `/tmp/audit-pre/<相对路径>`；活轨等价物核对一律对 `packages/ts-shell/src/` 全量 grep，不靠文件名推断（已按提示核对 `session/approvalAuditProjection.ts` ≠ `session/approval/auditProjection.ts` 类平铺/子目录重名风险，本批未出现同名误配）。\n- “CLI 可达”判定依据：`core/commands/registry.ts` 的 44 条斜杠命令、`core/tools/registry.ts` 的 5 个工具（`read`/`write`/`edit`/`glob`/`bash`，`tools/types.ts:48-59` 的 `MvpToolName` 白名单不含任何 patch 工具）、`entrypoints/cliArgs.ts` 与 `cli/options/cliOptions.ts`（无 apply_patch/workspace-write 相关 flag）、`runtime/api/host/contract.ts` 的 8 个 `HostCommandAction`（无 patch 动作）。\n- 高价值判定的置信度：#1 依据是“输入类型逐字段一致 + 活轨零命中解析器”，属直接证据；统一 diff 半边的取舍属设计判断，标为建议而非结论。\n- 未确认项：无。26 个文件全部读到内容并给出结论。"
+}
