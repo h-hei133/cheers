@@ -5,14 +5,14 @@ sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-0
 created: 2026-09-15
 updated: 2026-09-17
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v3. v2 的删除路线在执行 Step 2.6 时被证伪：可达性判据不足以授权删除，前三轮删除（403 个生产文件）造成 12 项真实破坏。新增 Step 2.5.5 处理该错误，Step 2.6 的剩余范围在裁决前冻结。"
+summary: "Module boundary refactor plan v3。删除路线在执行 Step 2.6 时被证伪：可达性判据不足以授权删除，前三轮删除（403 个生产文件）造成 12 项真实破坏。Step 2.7 负责修正该错误，并阻塞 Step 3 及其后所有步骤。"
 confidence: high
 ---
 
 # Architecture Refactor Plan (v3)
 
 > 本目录（`.wiki/refactor/`）是整个模块边界重构计划的唯一记录位置。
-> v3 (2026-09-17) 新增 Step 2.5.5 与阶段顺序修正：原删除路线被证伪，详见 §9。
+> v3 (2026-09-17) 新增 Step 2.7（修正前序删除造成的破坏）与阶段顺序重排：原删除路线被证伪，详见 §9。
 > v2 (2026-09-15 晚) 基于"生产可达性 BFS + 三子代理语义复核"全面修正 v1。
 > v1 的热点数据（browser 坟场、orchestration 平铺、SessionManager facade、命名税）经复核全部成立，但 v1 缺失了最大的事实：**全仓 24% 的生产文件不在任何运行时可达路径上**。
 
@@ -97,7 +97,14 @@ confidence: high
 
 ---
 
-### Step 2.5.5 —— 修正前序删除造成的破坏（**当前应做，阻塞后续所有步骤**）
+- **Step 2.6（已完成删除部分，剩余范围冻结）**：原定"删除 92 个零引用文件中的孤立簇"。
+  实际执行删除 82 个（1 个误删 `session/__tests__/longSessionDurabilityProcess.ts` 已回退；
+  它由测试以字符串路径 spawn 启动，import 图不可见）。删除前后 `cliReachable` 保持 871 → 873 不变，
+  `production` 1045 → 963，`noReference` 92 → 10。
+  **但该步的判据已被 Step 2.7 证明不足**：删除集中已有高价值能力（如
+  `edit/patch/plan/{validator,operation}.ts`、`context/graph/*`）。
+  剩余 92 个不可达文件在 Step 2.7 完成前不动。详见 `step-2.6-plan.md`。
+### Step 2.7 —— 修正前序删除造成的破坏（**阻塞 Step 3 及其后所有步骤**）
 
 > **为什么需要这一步。** Step 2.6 原本被定义为"可选、纯机械"的删死码步骤。
 > 执行到一半（已删 82 个文件）时，对不可达文件做功能价值审查，发现**前提本身是错的**：
@@ -117,8 +124,8 @@ confidence: high
    - OpenAI account-auth——`/connect login openai --account` 可存储并显示 connected，
      但活轨 `step.ts` 只发 `Bearer ${apiKey}`（account-auth 下为 `undefined`），对话必然失败。
 2. **补齐审查**：403 个已删文件的逐文件价值判定已完成（100% 覆盖，
-   原始表存 `.wiki/refactor/audit-raw/*.json`）；**尚未对本步之前删除的
-   `7a59ab23` 测试文件（257 个）做同等审查**——它们是被删能力的证据，需一并核验。
+   原始表存 `.wiki/refactor/audit-raw/*.json`）；**尚未对 `7a59ab23` 同时删除的 257 个测试文件做同等审查**——
+   它们是被删能力的证据，需一并核验。
 3. **裁决未接线能力**：10 项高价值候选（终态真实性判据、任务相关验证阶梯、
    target-set 子集批回滚、provider 原始输出解析、重试/退避/降级、taskLifecycle 编排层、
    AST 代码图谱、LSP 自修复循环、跨文件 repair、Swarm 分发）。逐项登记输入输出、
@@ -128,9 +135,9 @@ confidence: high
    （`path.join` + `spawn`/`import()`、`*Process.ts`）→ 公共面检查 → `scripts/` 引用检查。
    断链须区分**三类**：引用型（`tsc` 可发现）、契约型（活轨读、无人写）、
    半孤儿（在可达集内但无调用者）。
-5. **冻结 Step 2.6 的剩余范围**：原计划"92 个零引用孤立簇"的结论已过时
+5. **冻结剩余删除范围**：原计划"92 个零引用孤立簇"（Step 2.6 余量）的结论已过时
    （实测 174 不可达 = 83 纯死簇 + 5 仅公共 API + 77 仅测试 + 9 孤儿；
-   且已删 82 个中有 1 个误删已回退）。**在 Step 2.5.5 完成前，不再删除任何文件。**
+   且已删 82 个中有 1 个误删已回退）。**在 Step 2.7 完成前，不再删除任何文件。**
 
 **入口标准：** 上述 12 项破坏完成分类（修复/裁决/维持）且 3 项高优先级已处理。
 
@@ -142,17 +149,8 @@ confidence: high
 
 **不做什么：** 不按目录批量恢复历史体系。恢复以"活轨消费者存活"或维护者明确裁决为前提。
 
----
-
-- **Step 2.6（已完成删除部分，剩余范围冻结）**：原定"删除 92 个零引用文件中的孤立簇"。
-  实际执行删除 82 个（1 个误删 `session/__tests__/longSessionDurabilityProcess.ts` 已回退；
-  它由测试以字符串路径 spawn 启动，import 图不可见）。删除前后 `cliReachable` 保持 871 → 873 不变，
-  `production` 1045 → 963，`noReference` 92 → 10。
-  **但该步的判据已被 Step 2.5.5 证明不足**：删除集中已有高价值能力（如
-  `edit/patch/plan/{validator,operation}.ts`、`context/graph/*`）。
-  剩余 92 个不可达文件在 Step 2.5.5 完成前不动。详见 `step-2.6-plan.md`。
 - **Step 3（browser 搬迁，按重算执行）**：`core/context/` 平铺 128 文件（可达 122）+ `browser/` 子目录 43 文件（可达 41）；先处理 8 个不可达文件，再按 14 子域映射搬迁。
-- **Step 4（orchestration 聚类）**：待 Step 2.6/Step 3 后按存活文件重算映射表。
+- **Step 4（orchestration 聚类）**：待 Step 2.7 / Step 3 完成后，按存活文件重算映射表。
 - **Step 5（SessionManager 拆分）**：不变。
 - **Step 6（命名税裁定）**：不变。
 - **Step 7（收尾）**：NormProof judge 全量跑；以删除后 BFS 报告作为收敛证据。
@@ -162,7 +160,7 @@ confidence: high
 - v1 全部保留（tsc build + vitest 基线 diff + golden gate；git mv + 脚本重写；数据只写在命令跑完之后）。
 - 新增：**每波删除后重跑 BFS**，存活集与删除前完全一致才算通过——这是对"死链判定模型"本身的回归测试。
 - 新增：任何"救活"判定（如未来新增 script 入口）必须同步登记入口清单，防止可达性口径漂移。
-- **v3 新增（Step 2.5.5 固化）：任何删除前必须完成六项检查**——功能读审、
+- **v3 新增（Step 2.7 固化）：任何删除前必须完成六项检查**——功能读审、
   等价实现核验（不采信推理）、消费者存活检查、动态入口检查（`path.join` +
   `spawn`/`import()`、`*Process.ts`）、公共面检查（`index.ts` 为 package `main`）、
   `scripts/` 引用检查。
@@ -301,7 +299,7 @@ v2 全篇建立在一个命题上：
 
 **尚未审查**：`7a59ab23` 同时删除的 257 个测试文件。它们是被删能力的证据
 （例如 `editCapabilityReadiness.ts` 的 11 行 `default-ready-candidate` 中有 10 行
-引用的实现已在本批删除，其测试也被删）。需在 Step 2.5.5 内一并核验。
+引用的实现已在本批删除，其测试也被删）。需在 Step 2.7 内一并核验。
 
 ### 9.6 方法论修正（已固化）
 
