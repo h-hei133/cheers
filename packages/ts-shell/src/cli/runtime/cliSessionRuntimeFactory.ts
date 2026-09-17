@@ -121,6 +121,8 @@ export function createCliSessionRuntime(input: {
           : allTurns;
 
       return streamCliRuntimePrompt({
+        // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
+        runtimeConfig: input.runtimeContext.runtimeConfig,
         prompt,
         sessionId,
         workspaceRoot: input.runtimeContext.cwd,

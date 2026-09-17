@@ -9,6 +9,8 @@ import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
 import { createCoreToolRegistry } from "../core/tools/registry.js";
+import { filterVisibleToolNames } from "../core/tools/prefilter.js";
+import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt } from "../turn/prompt.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
@@ -32,7 +34,8 @@ export interface CliRuntimeInvocationInput {
   readonly historyMessages?: readonly SessionMessage[];
   readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly compaction?: CompactionSetup;
-  readonly providerModeEnv?: string;
+  readonly providerModeEnv?: string;  /** Tool visibility: disabledTools / hiddenToolPrefixes are applied from here. */
+  readonly runtimeConfig?: RuntimeConfig;
 }
 
 export interface CliRuntimeInvocationRequest extends Omit<CliRuntimeInvocationInput, "providerModeEnv"> {
@@ -165,7 +168,12 @@ function startTurn(
 ): CliRuntimeInvocationResult {
   const hooks = dependencies.hooks ?? defaultHookDispatcher;
   setupBuiltinVerificationHooks(hooks);
-  const tools = dependencies.tools?.() ?? createCoreToolRegistry();
+  const registry = dependencies.tools?.() ?? createCoreToolRegistry();
+  // Honour disabledTools / hiddenToolPrefixes from user config. Without this the
+  // fields are accepted and then ignored, so a tool the user disabled still runs.
+  const tools = request.runtimeConfig
+    ? restrictToolPool(registry, request.runtimeConfig)
+    : registry;
   const run = runTurn({
     sessionId: request.sessionId,
     prompt: request.prompt,
@@ -199,4 +207,15 @@ function createProviderStep(request: CliRuntimeInvocationRequest, tools: Readonl
     systemPrompt: buildSystemPrompt(request.agentMode),
     tools: toolSchemas(tools),
   });
+}
+
+function restrictToolPool(
+  registry: ReadonlyMap<string, ToolDefinition>,
+  runtimeConfig: RuntimeConfig,
+): ReadonlyMap<string, ToolDefinition> {
+  const visible = new Set(
+    filterVisibleToolNames([...registry.keys()], runtimeConfig),
+  );
+  if (visible.size === registry.size) return registry;
+  return new Map([...registry].filter(([name]) => visible.has(name)));
 }

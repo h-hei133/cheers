@@ -6,6 +6,7 @@ import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import { runCliRuntimeInvocation, type CliRuntimeInvocationResult } from "../../entrypoints/cliRuntimeInvocation.js";
 import type { CompactionSetup } from "../../turn/session.js";
 import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
+import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 
 export function streamCliRuntimePrompt(input: {
   readonly prompt: string;
@@ -22,6 +23,8 @@ export function streamCliRuntimePrompt(input: {
   readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly compaction?: CompactionSetup;
   readonly providerRuntimeBridge: CliProviderRuntimeBridge;
+  /** Tool visibility: disabledTools / hiddenToolPrefixes come from here. */
+  readonly runtimeConfig?: RuntimeConfig;
 }): CliRuntimeInvocationResult {
   return runCliRuntimeInvocation({
     sessionId: input.sessionId,
@@ -38,5 +41,6 @@ export function streamCliRuntimePrompt(input: {
     onTurnMessage: input.onTurnMessage,
     compaction: input.compaction,
     providerModeEnv: input.providerRuntimeBridge.providerModeEnv(),
+    ...(input.runtimeConfig ? { runtimeConfig: input.runtimeConfig } : {}),
   });
 }

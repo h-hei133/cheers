@@ -1052,6 +1052,109 @@ pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'mutationRoutingPro
 （`anchored-*` / `provider-smoke-*` / `real-task-loop-*` / `context-aware-provider`）。
 分支永不匹配。**属死条件，不影响功能。**
 
+## 附十四：#3 `provenance` 断链的完整证据链（2026-09-17）
+
+### 两级都断
+
+**第一级：`provenance` 恒 undefined**
+
+| 角色 | 位置 | 状态 |
+|---|---|---|
+| 读取 | `sessionTerminalState.ts:1077`、`session/continuation/sessionToolContinuity.ts:8`、`stoppedSessionContinuity.ts:234`、`presentation/surface/model.ts:1962` | 全部 CLI 可达 |
+| 写入 | `orchestration/runtimeOutcomeProjection.ts:42` 构造 `codingResult` 时**不传 `provenance`** | CLI 可达但无该字段 |
+| 写入 | `core/query/runtime/actionAuthority.ts:246` 构造 `continuation.evidence: []` | **空数组** |
+| 写入 | `turn/*.ts` | **完全不产生 `codingResult`** |
+
+**第二级：兜底 evidence 也断**
+
+`sessionTerminalState.ts:1066-1070` 的兜底分支读
+`current-permission-request-tool:` / `current-permission-request-process:`。
+其唯一生产者 `edit/authority/projection/approval.ts:604`
+（`appendCurrentRequestScopeEvidence`）**已随主簇删除**。
+活轨只有**解码器**（`session/permissionRequestMemoryCodec.ts`）与**前缀白名单**
+（`sessionContinuationProjection.ts:47-54`），**无生产者**。
+
+### 影响面（确认在 CLI 终态路径上）
+
+```
+renderSessionTerminalSurface          ← CLI 终态渲染入口
+  → renderCodingResultContract
+    → buildCodingResultNextAction     ← sessionTerminalState.ts:903
+      → isApprovedToolExecutionFailure ← :1051
+        → hasApprovedBashExecutionFailureProvenance ← :1073
+          → codingResult.provenance?.toolExecutions   ← 恒 undefined
+          → 兜底 evidence 前缀                         ← 恒空
+```
+
+**后果**：`isApprovedToolExecutionFailure` 退化为只看 `failedFiles` 的 `"(command)"` 路径。
+即"用户批准过的 bash 执行失败"这一情形**不再被识别为可续跑**，
+`- Next action:` 行不会给出针对性指引。
+
+### 修复的可行性（已核实）
+
+活轨在审批点**确实持有数据**：`turn/tools.ts:123` 的
+`approvals = new Map<string, { operation: string; decision: string }>()`
+存有 toolName、operation、decision。
+
+**但缺通道**：`afterToolCall` 的返回类型只允许 `{ output }`（`turn/tools.ts:175`），
+无法携带结构化 provenance。修复需要**新增一条从 turn 到 `codingResult` 的数据通道**。
+
+**因此 #3 不是"恢复一个被删文件"，而是"在两个子系统之间架一条新通道"**——
+与 §3.4 记录的"turn 内核与编排层不连通"是同一问题。
+
+### 处置建议
+
+| 选项 | 含义 | 成本 |
+|---|---|---|
+| **A. 移除死读取点** | 删 `hasApprovedBashExecutionFailureProvenance` 与 4 处读取，让 `isApprovedToolExecutionFailure` 只走 `failedFiles` 路径 | 低。但会失去"已批准但失败"的识别能力 |
+| **B. 架通道** | 在 turn 侧累积审批 provenance，随 `codingResult` 传给 `sessionTerminalState` | 高。属新功能，触及 turn 与编排层边界 |
+| **C. 登记不改** | 记录为已知缺陷，待"turn 与编排层不连通"作为独立立项时一并处理 | 零 |
+
+**建议 C**——它与 §3.4 的架构问题是同一个根因，单独修一处会在架通道时返工。
+
+## 附十五：#4 `disabledTools` 已修复接线（2026-09-17）
+
+### 问题
+
+`config/runtimeConfig.ts:63-66` 定义 `disabledTools` / `hiddenToolPrefixes` / `enableMcpTools`，
+从用户配置（`$HOME/.private-agents/config.json`）合并，有测试断言其存在。
+但**唯一执行者 `core/tools/prefilter.ts` 已随主簇删除**，活轨无人读取这三个字段。
+
+**后果**：用户在配置里禁用某工具，**设置被静默忽略**——工具照常可用。
+
+### 修复
+
+| 层 | 改动 |
+|---|---|
+| 1 | 恢复 `core/tools/prefilter.ts`（38 行，仅依赖 `RuntimeConfig` 类型，可原样使用） |
+| 2 | `cliRuntimeInvocationBridge` 新增 `runtimeConfig?` 入参并透传 |
+| 3 | `CliRuntimeInvocationInput` 新增 `runtimeConfig?`；`buildCliRuntimeInvocation` 经 `...request` 自动透传 |
+| 4 | `startTurn` 用 `filterVisibleToolNames` 过滤工具池（新增 `restrictToolPool` helper） |
+| 5 | `cliSessionRuntimeFactory` 传入 `input.runtimeContext.runtimeConfig` |
+
+### 验证
+
+**单元**（4/4）：`filterVisibleToolNames` 对 disabledTools / hiddenToolPrefixes /
+enableMcpTools=false / 无配置四种情形的行为正确。
+
+**透传**：`runCliRuntimeInvocation` 接受并携带 `runtimeConfig`（非静默丢弃）。
+
+**PTY 实机（§2.4 强制）**：以 `{"disabledTools":["bash"]}` 配置启动真实 TUI，
+输入触发 bash 的提示后实际输出：
+
+```
+╭ ✗ bash ──────────────────────────────────────────────╮
+│ Tool bash not found                                  │
+╰──────────────────────────────────────────────────────╯
+```
+
+**修复前该字段被忽略，bash 会正常执行；修复后工具确实被移除。**
+
+### 可达性
+
+`cliReachable` 873 → **874**（`prefilter.ts` 进入活轨），`production` 958 → 959，
+`cliOpaque` 保持 85。**全量 3172 项零失败。**
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）
