@@ -598,6 +598,134 @@ export type RestoreCommandRecordSelection =
 
 危险度最高：它不报错、不改行为、只让**所有后续验证失去可信度**。
 
+## 附七：候选 4（provider 原始解析）核实——附四判断再次修正
+
+附四把候选 4 定为"**最干净的恢复项**"：理由是活轨 `providerEditProposal.ts` /
+`providerOutputValidator.ts` / `providerProposalAnchors.ts` 存活且在用
+`ProviderEditRawProposal` 类型，只缺解析生产者。
+
+**核实后该结论不成立。**
+
+### 证据
+
+**① `normalizeProviderEditProposal`（唯一消费 `ProviderEditRawProposal` 的函数）零调用者**
+
+```
+grep -rn "normalizeProviderEditProposal" packages/ts-shell/src --include='*.ts' | grep -v test
+→ 只有定义行（providerEditProposal.ts:93）
+```
+
+**② 这三个文件"CLI 可达"只是被 import 链拉进来，实际无调用**
+
+它们是互相 import 的孤岛：`providerEditProposal` ← `providerProposalAnchors` ←
+`providerAnchorQuality` ← `providerAnchoredProposal`，链条顶层接到
+`planning/handoff/mutation.ts`、`planning/quality/model.ts`。
+
+**③ 该链的终点是 `context/acquisition`，而 turn 不调用 acquisition**
+
+```
+planning/quality/model.ts  ← orchestration/harnessScorecard.ts
+                           ← verification/command/plan.ts ← core/query/runtime/taskState.ts
+                                                         ← session/continuation/*（compactSummary 等）
+                           ← context/acquisition/graph.ts ← context/memory/model.ts
+planning/runtime/engine.ts ← context/acquisition/summary.ts
+```
+
+```
+grep -rn "providerAnchoredProposal|providerOutputValidator|normalizeProviderEditProposal|editProposalReview" \
+     packages/ts-shell/src/turn/*.ts packages/ts-shell/src/core/agent/*.ts
+→ 空
+```
+
+**与候选 1（终态真实性）完全同一形态**：能力与消费者都挂在 `context/acquisition` /
+`planning` 侧，**turn 内核（模型驱动工具循环）不消费它们**。
+
+### 修正后的处置
+
+| # | 候选 | 附四 | 附五 | **附七（最终）** |
+|---|---|---|---|---|
+| 4 | provider 原始解析 | 恢复（最干净） | 维持 | **不恢复**：消费链不到 turn；`normalizeProviderEditProposal` 零调用者 |
+
+### 剩余待恢复项
+
+经三轮核实，10 项候选中**只剩 1 项**仍需判定：
+
+| # | 候选 | 状态 |
+|---|---|---|
+| 5 | 重试退避降级（`retryPolicy.ts`） | 待核实（活轨 `provider/request/fallback.ts` 明示 `executesFallback: false`，需确认 turn 是否在失败时受益） |
+
+### 方法论（第 4 次同类）
+
+**"CLI 可达"与"被调用"是两个不同事实**，本项目已出现 3 例半孤儿：
+`browserAgent.ts`、`providerEditProposal.ts`、`providerOutputValidator.ts`。
+可达性 BFS 由 import 边驱动，`import type` 也算边，所以纯类型引用会把一个
+**运行时无调用者**的文件标为"可达"。
+
+**因此判断"是否可恢复/接线"的必要步骤是**：
+1. 目标函数的**调用者**是否存在于活轨（不是"文件是否被 import"）；
+2. 调用者是否在**目标链路**上（对 turn 相关能力，须追到 `turn/` 或 `entrypoints/`）；
+3. 该链是否真被触发（非仅 `import type`）。
+
+## 附八：10 项候选的最终判定（2026-09-17，三轮核实收敛）
+
+### 最终结论
+
+**10 项候选中，无一项可按原计划恢复。** 全部落在四类之一：
+
+| 类别 | 数量 | 项 | 判据 |
+|---|---:|---|---|
+| **活轨已有能力** | 2 | 终态真实性、target-set 批回滚 | 同形状能力存在（`verdictFacade` 的三态裁决；`/restore` 的 `recordSelection.recordIds` 子集选择） |
+| **消费链不到 turn** | 3 | provider 原始解析、任务相关验证阶梯、taskLifecycle 编排 | 能力与消费者都挂在 `context/acquisition` / `planning` 侧，turn 内核不消费 |
+| **输入契约在活轨不存在** | 4 | AST 代码图谱、跨文件 repair、Swarm 分发、LSP 自修复 | `SymbolTable` / `CallGraph` / `RepairContinuityEvidence` / `SubAgentTask` / `LspClient` 活轨均 0 处 |
+| **需新功能** | 1 | 重试退避降级 | 见下 |
+
+### 重试退避降级的判定依据
+
+`model-adapters/retryPolicy.ts`（114 行）的接口与依赖**完全适配活轨**：
+
+- 唯一依赖 `NormalizedProviderError` **存活**（`model-adapters/types.ts:136`），已被 `provider/request/attempt.ts` 使用；
+- 接口干净：`RetryPolicy` / `RetryState` / `shouldRetry` / `calculateBackoffMs` / `abortableSleep`。
+
+**但它接不到 turn 的实际请求路径**：
+
+| 事实 | 位置 |
+|---|---|
+| 活轨 turn 的全部失败路径直接返回错误，无重试 | `turn/step.ts:136-147`（网络错误、非 2xx、上下文溢出均 `return errorStep(...)`） |
+| turn 不使用 `NormalizedProviderError` | `grep NormalizedProviderError packages/ts-shell/src/turn/*.ts` = 空 |
+| 活轨的 retry 基础设施**明确只做资格判定** | `provider/request/attempt.ts:178` 自述 `"retry-eligibility-is-not-retry-execution"` |
+| 该基础设施在 `runtime/loop/*` 侧，**不在 turn 链上** | `grep runtime/loop packages/ts-shell/src/turn/*.ts` = 空 |
+
+即：活轨**有两套 provider 请求路径**——
+`turn/step.ts`（模型驱动工具循环实际使用）与 `runtime/loop/*`（公共 API 层）。
+重试能力挂在后者，**前者无重试**。
+
+**故这是"在 turn 路径上补重试"的新功能**，被删的 `retryPolicy.ts` 可作为实现参考
+（其接口与活轨类型兼容，是现成素材），但不是"恢复一个被删文件"。
+
+### 三轮核实的收敛过程
+
+| 轮次 | 结论 | 修正原因 |
+|---|---|---|
+| 附四 | 接线 3 / 恢复 2 / backlog 5 | 按语义相似度判断 |
+| 附五 | 接线 2 / 恢复 2 / backlog 5 / 新功能 1 | 核实接线点后发现 `verdictFacade` 4/5 导出零调用者 |
+| 附七 | 恢复 1 | 核实调用链后发现 provider 链不到 turn |
+| **附八（最终）** | **恢复 0** | 核实重试能力挂在 `runtime/loop` 而非 turn |
+
+**每轮都是同一个错误的不同表现**：用间接证据（符号名、语义相似、文件可达）
+替代直接证据（调用链、数据通路、目标链路）。
+
+### 对本项目的实际含义
+
+1. **删除造成的真实损失比初判小**：10 项候选中，**没有一项是"活轨缺失、只待恢复"**。
+2. **真实的问题是"两套路径不连通"**：turn 内核（模型驱动工具循环）与
+   `context/acquisition` + `planning` + `runtime/loop` 侧（产品编排层）各有一套
+   provider 请求、终态判定、验证编排，彼此不消费对方。
+3. **该问题不是清理造成的**：删除只是让"两套并存"变得可见。恢复被删文件会让
+   **第三套**加入，加剧问题。
+
+**因此 Step 2.7 的"恢复"目标应转为**：
+登记这些能力到 backlog，并把"turn 与编排层不连通"作为**架构问题**单独立项。
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）
