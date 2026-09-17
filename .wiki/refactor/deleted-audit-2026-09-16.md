@@ -217,3 +217,50 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 - G1/G3 的逐文件审查仍有部分不确定项；本文件的分组结论不应被误读为 403 行逐文件完成。
 
 当前工作树保持在 `normproof-observation`，未切换分支；用户已有 `.serena/project.yml` 改动未触碰。
+
+---
+
+## 附：符号级断链穷尽扫描（2026-09-17）
+
+### 方法（可复现）
+
+1. 从 git 恢复 403 个已删生产文件的删除前内容到 `/tmp/audit-pre/`。
+2. 提取其导出符号：403 文件共 1563 个符号。
+3. 扣除活轨（全部 `packages/ts-shell/src/**`）已声明的同名符号（4477 个），得到**活轨不存在的独有符号 1442 个**。
+4. 用单一交替正则扫全部 962 个活轨 CLI 可达文件 + `scripts/` + `contracts/`，找独有符号的出现。
+5. 二次过滤：若提及该符号的活轨文件**自己也声明了同名符号**（内联重实现），判定误报。
+
+### 结果
+
+| 阶段 | 命中文件数 |
+|---|---:|
+| 初筛（符号出现） | 45 |
+| 扣除 barrel 聚合文件（`readInspectModule.ts` / `editPatchModule.ts` 等，其"导出"实为存活文件的重导出） | 32 |
+| 扣除活轨内联重实现 / 字段名 / 字符串 / 注释 | **0** |
+
+**最终结论：403 个已删生产文件中，没有任何一处的导出符号被活轨代码当作符号引用。符号级断链为零。**
+
+### 四例误报的真相（留作判据样本）
+
+| 候选 | 实际 |
+|---|---|
+| `invalid`（`patchContract/parser.ts` → `artifacts/workflow/correction.ts:96`） | 字符串字面量 `"invalid"` |
+| `verificationStatus` / `verdictStatus`（→ `core/query/runtime/taskState.ts:340`、`edit/multifile/model.ts:317`） | 对象字段名，非导入 |
+| `ToolRuntime`（→ `core/tools/registry.ts:34`） | 注释文本 |
+| `buildPrompt`（→ `sandbox/escalationWorkflow.ts:69,87`） | 本地 `private buildPrompt` 方法 |
+
+### 与已发现的 2 个断链不矛盾
+
+`edit/authority/workspace.ts` 与 `orchestration/editSnapshot.ts` 的断链**不是符号级**，而是**行为契约级**：
+
+- `workspace.ts`：活轨 `writeTextFile` 从**未导入**它，而是自行用裸 `fs.writeFile` 实现写入。无符号引用，但**安全语义缺失**（无 `O_NOFOLLOW`、无描述符复验）。
+- `editSnapshot.ts`：活轨 `/undo` 读取 `.sisyphus/edit-snapshots` 目录契约，但**无人写入**。无符号引用，但**数据来源缺失**。
+
+**这是本次审查最重要的方法论结论**：符号级扫描（import 图、re-export 图、导出符号引用）只能发现"引用型断链"，**发现不了"契约型断链"**——后者表现为"活轨自己实现了一半，另一半的生产者被删"。
+
+判定契约型断链必须靠：读活轨实现，问"它期待的数据/保证由谁提供"，再看提供者是否还在。
+
+### 本次由此新增的判据（写入转接包）
+
+- `tsc -p tsconfig.build.json` 零 "Cannot find module" ⇒ 不存在未解析 import ⇒ 符号级断链必为零。
+- 因此**任何删除都不会造成编译错误**，删除的危险性只在行为/数据契约层。这既解释了为什么之前三轮删除 Build 全绿却仍破坏了功能，也说明编译通过不能作为删除安全的证据。
