@@ -247,6 +247,48 @@ promptInteractiveApproval: (prompt) =>
 
 ---
 
+## CB-006 OpenAI account-auth 可登录但无法使用
+
+- **状态**：`已裁决 — 登记不改`（2026-09-17）
+- **来源**：`deleted-audit-2026-09-16.md` 附十六
+
+### 事实
+
+`/connect login openai --account` 的 OAuth 链路**完整可走通**，登录成功后
+会话显示 connected。但**每一次对话必然失败**：
+
+| 环节 | 位置 | 行为 |
+|---|---|---|
+| 凭据解析 | `providerCredentials.ts:185-197` | account-auth 产出**不含 `apiKey`** |
+| readiness | `providerReadiness.ts:138-141` | `return { ok: true }`（注释：*"Let the model adapter do the real call"*） |
+| 执行 | `turn/step.ts:131` | `Authorization: Bearer ${request.provider.apiKey}` |
+| 填充 | `cliRuntimeInvocation.ts:201` | `?? ""` → 空字符串 |
+
+发出 `Authorization: Bearer `（空），请求必然被拒。
+
+### 缺失的知识（仅在已删 adapter 中）
+
+| 知识 | 已删位置 |
+|---|---|
+| Codex 端点 `https://chatgpt.com/backend-api/codex/responses`（+ fallback） | `OpenAIModelAdapter.ts:26,352` |
+| `instructions` 字段要求 | `normalize.ts:187-189` |
+| `toCodexResponsesRequestBody`（拒 `max_output_tokens`、需 `store:false`） | `normalize.ts` |
+| token refresh（access/refresh 交换 + 持久化） | `OpenAIModelAdapter.ts:381-472` |
+
+活轨仅保留 `originator: "codex_cli_rs"`（`auth/oauth/providers.ts:44`）。
+
+### 维护者裁决（2026-09-17）
+
+**登记不改。** 恢复 codex 调用路径属新增 provider 能力，且同属 CB-005 的
+"两套 provider 路径不连通"——统一该架构时应一并解决。
+
+### 已知代价
+
+account-auth 登录入口**仍然可用**，用户可完成登录并看到 connected，
+但随后的对话会失败。**这是已知的、已记录的行为**，非新发现缺陷。
+
+---
+
 ## 登记流程（供后续复用）
 
 1. 发现测试期望 ≠ 生产实现时，先判定：**是回退（实现改坏了）还是缺失（从未实现）**。

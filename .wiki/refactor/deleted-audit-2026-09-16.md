@@ -1196,6 +1196,156 @@ authorize/token URL 齐全，`core/auth/providerAuthRuntime.ts:76-79` 持久化�
 
 **建议 B 或 C**：B 消除"能登录但不能用"的误导；C 若认为该能力即将实现。
 
+## 附十七：#6 `executionLane` 悬空命名（2026-09-17）
+
+### 声明
+
+`planning/handoff/mutation.ts:22-25` 声明：
+
+```ts
+export type PlanningMutationHandoffExecutionLane =
+  | "existing-exact-fenced-route"
+  | "existing-target-set-route"
+  | "none";
+```
+
+`selectExecutionLane`（:522-533）在 `reviewReady` 时按 target 数量产出前两者。
+
+### 两个命名指向的路径都不存在
+
+| 命名 | 声称 | 实际 |
+|---|---|---|
+| `existing-exact-fenced-route` | 存在"exact fenced"编辑路由 | `fencedEditPlanner.ts` **存在**，但其**全部生产引用都是 `import type`**——只有测试做值导入。该文件**无任何可执行入口** |
+| `existing-target-set-route` | 存在"target set"编辑路由 | 活轨**无**任何匹配（grep `targetSetRoute` / `target-set-route` 仅得本文件自身） |
+
+补充：`orchestration` 侧同族模块（`providerAnchorMatcher` / `providerAnchoredProposal` /
+`editRepairProposal`）值导入数**均为 0**；唯一值导入的是 `providerAnchorCandidate`。
+活轨真实的编辑路径是 `runtime/execution/service.ts:40` 的 `writeTextFile`（逐文件）。
+
+### 生产侧消费为零
+
+`executionLane` 的读取者**只有测试**：
+
+- `planning/handoff/mutation.test.ts:45,181,225,265`
+- `planning/runtime/engine.test.ts:74,426`
+
+生产侧仅两处**写入**（type 字段 :116、evidence 字符串 :270）。
+且 `planning/runtime/engine.ts` 的唯一生产消费者是
+`context/acquisition/summary.ts` 的 **type-only import**——**不到 turn / CLI 交互面**。
+
+### 上下文
+
+该 projection 整体是**规划产物**，evidence 大量自述 `not-run`：
+`backend-consumption:not-run`、`permission:not-requested`、
+`mutation-authority:not-granted`、`provider-call:not-run`、`apply:not-run`、
+`command-dispatch:not-run`、`no-write-status:no-write-authority-granted`。
+
+**不崩溃、无运行时影响**：字段是只写不读的类型成员。
+
+### 修复选项
+
+| 选项 | 含义 | 成本 |
+|---|---|---|
+| **A. 收窄类型** | 删除两个不存在的 lane 名，仅保留 `"none"` | 中：需改 `selectExecutionLane` + 4 处测试断言 |
+| **B. 重命名为真实状态** | 改为描述真实能力（如 `"planning-only-no-route"`） | 中：同上 |
+| **C. 不改** | 记录即可 | 零 |
+
+**问题实质**：这是**命名在承诺一个不存在的实现**，与 #8（`pwStatus` 文案说谎）
+同类——都是"表面声称的能力无对应实现"。区别在于 `executionLane` 生产侧零消费，
+用户不可见。
+
+## 附十八：#7 证据标签死条件的完整核实（2026-09-17）
+
+### 更正前序描述
+
+前序记录称"证据标签正则仍识别**已删生产者**（`sessionResultParity.ts`、
+`continuationEvidenceParity.ts`、`harnessFailureTaxonomy.ts`）"。
+**核实后事实不同**：前两者**是活轨模块**（CLI 可达，非生产者），
+`harnessFailureTaxonomy.ts` 亦存活。死条件在**它们的匹配规则内部**——
+规则匹配的标签，其**生产者**已删。
+
+### 死条件清单（25 条，生产者全删、零替代）
+
+**`session/continuationEvidenceParity.ts`**：37 条规则中 **12 条死**：
+
+  - `discovery`
+  - `context-aware-provider`
+  - `real-provider-dry-run`
+  - `real-task-loop`
+  - `anchored-proposal-runtime`
+  - `live-provider-smoke`
+  - `verification-command`
+  - `verification-repair-prompt`
+  - `proposal-apply`
+  - `proposal-hunk-set`
+  - `target-set`
+  - `edit-recovery`
+
+**`session/sessionResultParity.ts`**：`isParityEvidenceMarker` 47 个前缀中 **13 条死**：
+
+  - `live-smoke-evidence`
+  - `live-provider-smoke-result`
+  - `proposal-quality-report`
+  - `provider-smoke-result`
+  - `context-aware-provider`
+  - `real-provider-proposal-dry-run`
+  - `real-task-loop-result`
+  - `real-task-loop-scorecard`
+  - `real-task-loop-session`
+  - `real-task-loop-plan`
+  - `real-task-loop-readback`
+  - `proposal-hunk-set`
+  - `target-set-edit`
+
+### 生产者删除位置（已核实）
+
+| 死标签 | 已删生产者 |
+|---|---|
+| `discovery` | `orchestration/discoveryEditManifest.ts` |
+| `context-aware-provider` | `orchestration/contextAwareProviderResult.ts` |
+| `real-provider-dry-run` | `orchestration/providerDryRunResult.ts` |
+| `real-task-loop` | `orchestration/realTaskLoopResult.ts` |
+| `anchored-proposal-runtime` | `orchestration/anchoredProposalEval.ts` |
+| `live-provider-smoke` | `orchestration/liveProviderSmokeEvidence.ts` |
+| `verification-command` | `verification/command/result.ts` |
+| `verification-repair-prompt` | `orchestration/verificationRepairResult.ts` |
+| `proposal-apply` | `orchestration/editProposalApply.ts` |
+| `proposal-hunk-set` | `orchestration/proposalHunkSetRoute.ts` |
+| `target-set` | `orchestration/targetSetEditResult.ts` |
+| `edit-recovery` | `orchestration/editRecoveryResult.ts` |
+
+**活轨替代**：`grep taskLoopId\|claimLedger` → **0**。无替代实现。
+
+### 运行时影响
+
+**不崩溃、无用户可见影响**：
+
+- 输入 `codingResult.continuation.evidence` 在活轨**恒为空数组**
+  （`core/query/runtime/actionAuthority.ts:246` 构造 `evidence: []`，
+  与 #3 同源）。
+- 实测：`formatContinuationEvidenceParityDetails({ continuation: { evidence: [] } })`
+  → `[]`；`undefined` → `[]`。
+- 规则**本身仍是活的**——若标签出现仍会匹配（已实测验证）。
+
+即：**消费端规则完好，输入端永不产生**。与 #3 同一个根因（CB-005）。
+
+### 与 #3 / CB-005 的关系
+
+这 25 条死条件是 **#3 的直接推论**：证据链的写入侧（生产者）随主簇删除，
+而读取侧（匹配规则）保留。它们**不是独立缺陷**，
+而是 **CB-005"两套路径不连通"在证据层的表现**。
+
+### 处置选项
+
+| 选项 | 含义 | 成本 |
+|---|---|---|
+| **A. 清除 25 条死规则** | 从两个模块移除永不匹配的规则与 marker 前缀 | 中：需同步清理测试样本字符串 |
+| **B. 保留** | 规则无害，未来若恢复 provider 分析能力即可复用 | 零 |
+| **C. 登记入 CB-005** | 作为该架构债的子项记录 | 低 |
+
+**若选 B，需注意**：保留的规则会让读者误认为这些能力存在。
+建议在文件顶部加注释说明这些标签是**历史兼容保留**。
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）
