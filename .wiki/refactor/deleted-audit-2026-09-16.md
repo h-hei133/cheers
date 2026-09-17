@@ -791,6 +791,132 @@ grep -rn "providerAnchoredProposal|providerOutputValidator|normalizeProviderEdit
 3. **架构问题单独立项**：turn 内核与编排层（`context/acquisition` + `planning` +
    `runtime/loop`）不连通，各有 provider 请求 / 终态判定 / 验证编排。
 
+## 附十：维护者裁决与方向重定（2026-09-17）
+
+### 裁决 1：放弃"有部分价值但未接入 CLI"的文件
+
+**决定**：不可达文件中"有部分价值但未接入"的部分**放弃**（不恢复、不接线）。
+但**仍须审查其是否为已有实现的一部分**。
+
+**据此对 92 个不可达文件的分类**（`cli:false`）：
+
+| 类别 | 数量 | 处置 |
+|---|---:|---|
+| **重导出 shim**（目标全部存活） | **7** | **可删**：属"已有实现的一部分"，是平铺→子目录迁移残留 |
+| **仅公共 API** | 5 | **不可删**：`index.ts` 是 package `main`（`verify-host-surface` 实测消费） |
+| **仅测试引用** | 77 | 测试基建/场景夹具。**放弃其能力价值**；若删需连带处理测试 |
+| **零引用** | 10 | 同上 |
+
+**7 个 shim 清单**（重导目标已逐一核实存活）：
+
+```
+core/harness/browserEvalBenchmarkModel.ts    → eval/browser/benchmarkModel.ts
+core/harness/browserEvalBenchmarkReport.ts   → eval/browser/benchmarkReport.ts
+session/sessionApprovalMemoryModule.ts       → session/approval/sessionApprovalMemory.ts
+session/sessionRecoverySelection.ts          → session/recovery/{sessionRecoverySelection,projectContextSummary}.ts
+session/sessionRegistry.ts                   → session/store/currentSessionRegistry.ts
+session/sessionStore.ts                      → session/store/{sessionFileLayout,sessionStore}.ts
+session/sessionSummaryProjection.ts          → session/{recovery/recoveryTrustBoundary,presentation/sessionReentrySurface}.ts
+```
+
+**审查方法**（可复现）：解析每个文件的语句，若全部为 `export ... from`，则判定为重导出；
+再按 `.js`→`.ts` 映射解析目标，核实存活。**92 个中纯 shim 共 8 个，其中 `index.ts` 属公共 API 面不计入可删。**
+
+> **注意**：`core/harness/browserEvalBenchmark*` 两个 shim 的 `eval/browser/README.md` 已明确声明
+> 它们是"compatibility shims for historical harness tests and route provenance"——
+> 仓库自己登记过，删除属预期行为。
+
+### 裁决 2：turn 与编排层不连通 → 记录，不处理
+
+**决定**：该问题是维护者此前重新编排 `turn` 时留下的，**暂且记录**。
+
+**记录内容**：活轨存在两套并行的 provider 路径，互不共享：
+
+| 路径 | 使用者 | 能力 |
+|---|---|---|
+| `turn/step.ts` | 模型驱动工具循环（实际对话） | 无重试、无终态裁决；验证仅作 `[Verification feedback]` 文本注入 |
+| `runtime/loop/*` + `provider/request/*` | 编排层 / 公共 API | 有 retry 资格判定（自述 `retry-eligibility-is-not-retry-execution`）、`NormalizedProviderError` |
+
+同理，终态判定（`turn/projection.ts:concludeRun` 2 分支）与裁决投影
+（`evidence/verdictFacade.ts`）也分属两侧，不汇合。
+
+**不在本轮处理**，因为它是既有架构状态，不是清理造成的破坏。
+
+### 裁决 3：重新分析方向
+
+**新的方向基线**（取代 `plan.md` §3 的旧阶段规划）：
+
+1. **删除不再以"可达性"授权，改以"是否已有实现的一部分"授权。**
+   即：只有当被删文件的职责**已被活轨某处承担**（同名声明、重导目标存活、
+   调用链覆盖）时，删除才是安全的。
+2. **"有部分价值但未接入"一律放弃**，不再评估其价值、不再恢复、不再登记 backlog。
+   这消除了此前反复出现的"价值 vs 多余 vs 适配"判定循环。
+3. **仍须保护的三类**：公共 API 面（`index.ts` 等 5 个）、
+   消费者存活的生产者（契约型断链）、动态入口（字符串路径 / `*Process.ts`）。
+4. **Step 2.7 的收尾范围收窄为**：删除 7 个 shim + 处置两个过期 gate（附六）。
+
+## 附十一：7 个迁移残留 shim 已删（2026-09-17，裁决 1 执行）
+
+### 判定与验证链
+
+按裁决 1（"仍须审查是否为已有实现的一部分"），对 92 个不可达文件逐个判定：
+
+| 类别 | 数量 | 依据 |
+|---|---:|---|
+| **重导出 shim**（目标全部存活） | **8** | 语句全为 `export ... from`，且 `.js`→`.ts` 映射后目标均存在 |
+| 其中 `index.ts` | 1 | package `main`，公共 API 面 → **不删** |
+| 仅公共 API | 4 | `runtime/{distribution,evaluation/task}/*` → 不删 |
+| 仅测试引用 | 72 | 测试基建/场景夹具 → 本轮不动 |
+| 零引用 | 8 | 同上 |
+
+**删除的 7 个 shim 及其真实实现**（重导目标逐一核实存活）：
+
+| shim | 真实实现 |
+|---|---|
+| `core/harness/browserEvalBenchmarkModel.ts` | `eval/browser/benchmarkModel.ts` |
+| `core/harness/browserEvalBenchmarkReport.ts` | `eval/browser/benchmarkReport.ts` |
+| `session/sessionApprovalMemoryModule.ts` | `session/approval/sessionApprovalMemory.ts` |
+| `session/sessionRecoverySelection.ts` | `session/recovery/{sessionRecoverySelection,projectContextSummary}.ts` |
+| `session/sessionRegistry.ts` | `session/store/currentSessionRegistry.ts` |
+| `session/sessionStore.ts` | `session/store/{sessionFileLayout,sessionStore}.ts` |
+| `session/sessionSummaryProjection.ts` | `session/{recovery/recoveryTrustBoundary,presentation/sessionReentrySurface}.ts` |
+
+### 删除前的消费者处理
+
+7 个 shim **只被测试文件引用**（生产代码零引用）。测试已改指真实实现：
+
+- 6 处单目标改指（`browserEvalBenchmark*` ×6、`sessionApprovalMemoryModule`、`sessionRegistry`）
+- 3 处需**拆分 import**（一个 shim 从多个目标转出）：
+  - `sessionRecoverySelection.test.ts` → `projectContextSummary` / `sessionRecoverySelection` 两组
+  - `sessionProjection.test.ts` → `recoveryTrustBoundary` / `sessionReentrySurface` 两组
+  - `sessionManagerBoundary.test.ts` → `sessionFileLayout` 一组
+
+**逐符号验证**：改指前确认每个导入符号在其新目标中确实导出（无遗漏、无错指）。
+
+### 验证结果
+
+| 检查 | 删除前 | 删除后 |
+|---|---:|---:|
+| `production` | 965 | **958**（−7） |
+| `cliReachable` | 873 | **873**（不变，零误删） |
+| `cliOpaque` | 92 | **85** |
+| `tsc -p tsconfig.build.json` | 0 错 | **0 错** |
+| 受影响测试（`src/session` + `src/core/harness`） | — | **537 通过 / 1 skipped** |
+| 全量 vitest | — | 3173 项 / 2 失败 |
+
+**2 项失败为已知负载超时**（`cli-baseline`、`deepResearch`）：宽超时（30s）下
+分别 40/40、5/5 全通过，与本次删除无依赖关系。
+
+### 方法论记录
+
+判定"是否为已有实现的一部分"的可复现方法：
+
+1. 解析文件语句，若**全部**为 `export ... from` → 重导出 shim；
+2. 按 `.js`→`.ts` / `.tsx` / `/index.ts` 映射解析目标，核实**全部存活**；
+3. 核实 shim 的转出符号被目标**完整覆盖**（防止 shim 做了重命名或聚合）；
+4. 核实消费者（本例为测试）可改指真实实现——**逐符号**确认新目标导出该符号；
+5. 删除前重算 `cliReachable`，**不得下降**。
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）

@@ -8,9 +8,9 @@ import { createBrowserExecutionRequest } from "../context/browserExecutionContra
 import { compareBrowserToolServerBackend } from "../context/browserToolServerBackendComparison.js";
 import { renderBrowserPlaywrightAdapterSurface } from "../context/browserPlaywrightAdapterSurface.js";
 import { decideBrowserRuntimeDirection } from "../context/browser/runtime/core/directionDecision.js";
-import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
+import type { BrowserEvalBenchmarkTask } from "../../eval/browser/benchmarkModel.js";
 import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
-import { createBrowserEvalBenchmarkReport } from "./browserEvalBenchmarkReport.js";
+import { createBrowserEvalBenchmarkReport } from "../../eval/browser/benchmarkReport.js";
 import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserPlaywrightAdapterSpikeFixture } from "./browserPlaywrightAdapterSpikeFixtures.js";
 

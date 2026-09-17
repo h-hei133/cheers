@@ -28,9 +28,11 @@ import { projectSessionTree } from "./sessionTreeProjection.js";
 import { projectCompactRetentionPlanInput } from "./sessionCompactProjection.js";
 import {
   projectRecoveryTrustBoundaryBlock,
+} from "./recovery/recoveryTrustBoundary.js";
+import {
   projectSessionReentrySummary,
   scoreSessionReentrySummary,
-} from "./sessionSummaryProjection.js";
+} from "./presentation/sessionReentrySurface.js";
 
 describe("session substrate projections", () => {
   it("encodes transcript events without changing their stored JSON shape", () => {

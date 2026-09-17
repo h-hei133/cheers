@@ -18,9 +18,9 @@ import {
 import {
   createBrowserEvalBenchmarkReport,
   renderBrowserEvalBenchmarkReport,
-} from "./browserEvalBenchmarkReport.js";
+} from "../../eval/browser/benchmarkReport.js";
 import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
-import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
+import type { BrowserEvalBenchmarkTask } from "../../eval/browser/benchmarkModel.js";
 
 describe("browser runtime capability scenario examples", () => {
   it("reports runtime status unavailable when no explicit manifest is supplied", async () => {

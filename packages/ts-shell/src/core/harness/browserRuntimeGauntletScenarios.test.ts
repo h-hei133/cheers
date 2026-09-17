@@ -7,12 +7,12 @@ import { applyBrowserSelectorRepair } from "../context/browserSelectorRepairAppl
 import { createBrowserRuntimeGauntletManifest } from "../context/browser/runtime/core/gauntletManifest.js";
 import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserRuntimeAdapterFixture } from "./browserRuntimeAdapterFixtures.js";
-import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
+import type { BrowserEvalBenchmarkTask } from "../../eval/browser/benchmarkModel.js";
 import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
 import {
   createBrowserEvalBenchmarkReport,
   renderBrowserEvalBenchmarkReport,
-} from "./browserEvalBenchmarkReport.js";
+} from "../../eval/browser/benchmarkReport.js";
 
 describe("browser runtime adapter gauntlet scenarios", () => {
   it("runs expanded browser eval gauntlet with controlled adapter evidence", async () => {

@@ -10,19 +10,19 @@ import {
   findLastQueryCompletionEvent,
 } from "./sessionContinuityModule.js";
 import { decodeTranscriptLine, encodeTranscriptEvent } from "./sessionEventCodec.js";
-import { projectApprovalMemoryPersistence } from "./sessionApprovalMemoryModule.js";
+import { projectApprovalMemoryPersistence } from "./approval/sessionApprovalMemory.js";
 import {
   projectCurrentSessionRegistryResolution,
   projectCurrentSessionSelectionStore,
   readSessionRegistryStore,
   removeCurrentSessionSelectionFromStore,
   writeSessionRegistryStore,
-} from "./sessionRegistry.js";
+} from "./store/currentSessionRegistry.js";
 import {
   createSessionStoreLayout,
   projectSessionFileLayout,
   validateSessionId,
-} from "./sessionStore.js";
+} from "./store/sessionFileLayout.js";
 
 describe("SessionManager module boundary facades", () => {
   it("projects session store layout and id validation without changing filenames", () => {
