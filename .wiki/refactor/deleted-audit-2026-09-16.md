@@ -401,7 +401,8 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 | **登记 backlog**（不适配/需新设计） | 5 | 2、6、7、9、10 |
 
 **这轮核验的价值**：原计划的 10 项"恢复"中，实际只有 2 项该恢复；
-3 项是接线问题（成本远低），5 项不适配当前架构（恢复会得到无输入或第三套实现的代码）。
+5 项不适配当前架构（恢复会得到无输入或第三套实现的代码）；
+另 3 项经附五进一步核实后为"活轨已有能力"或"需新功能"，**均不该按原计划恢复**。
 
 ### 方法论补充（写入审查口径）
 
@@ -413,6 +414,133 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 3. **同名陷阱**——活轨 `result/terminal/truth.ts`（`selectContinuityTerminalSource`，17 行）
    与被删 `result/terminal/queryTerminalTruth.ts`（`deriveTruthfulTerminal`，149 行）**完全不同**。
    本文档此前"活轨只有 2 分支"的判断，就漏查了这个同名文件。
+
+## 附五：接线可行性核实（2026-09-17）——附四的处置建议需再修正
+
+附四判定候选 1（终态真实性）为"活轨已有等价能力，应接线"。**进一步核实接线点后，
+该结论需要修正**：活轨的裁决能力本身也不在回合链上。
+
+### 核实过程与证据
+
+**第 1 步：`verdictFacade` 的哪个导出真的有调用者**
+
+| 导出 | 非测试调用者 |
+|---|---:|
+| `projectRuntimeTerminalVerdict` | **0** |
+| `buildProductEvidenceRow` | **0** |
+| `toReportSafeProjection` | **0** |
+| `assertNoProductVerdictSuccessUpgrade` | **0** |
+| `projectProductVerdictFromClaims` | 3（`repair/iteration/projection.ts:189`、`result/projection/repair/verdict.ts:43`、`verification/verificationFacade.ts:111`） |
+
+即：附四所称的"等价能力"中，**只有 `projectProductVerdictFromClaims` 真正被使用**，
+其余 4 个是零调用者的定义。
+
+**第 2 步：`codingResult` 的生产者链到不了 turn**
+
+活轨确有 `CodingResultSummary` 生产者：
+
+```
+runtimeOutcomeProjection.ts  projectRuntimeCodingOutcome / projectRuntimeMutationOutcome
+        ↑
+contextPacketResult.ts:73    ← context/acquisition/graph.ts
+taskLifecycleResult.ts:81    ← context/acquisition/graph.ts
+        ↑
+context/memory/model.ts
+        ↑
+session/continuation/readiness.ts、session/replay/state.ts、planning/runtime/engine.ts
+```
+
+**但这条链与 turn 无关**：
+- `grep acquisition packages/ts-shell/src/turn/*.ts` = **空**（turn 不调用 acquisition）
+- `grep acquisition entrypoints/cliRuntimeInvocation.ts` = **空**
+
+**第 3 步：turn 侧的验证结果形态**
+
+活轨 turn 期间确实跑验证——`cliRuntimeInvocation.ts:167` 注册 3 个内置 hook
+（`postMutationLspGuard`、`affectedUnitTestRunner`、`evidenceReceiptCollector`）。
+但其产出**不是终态数据**，而是**注入下一轮的工具输出文本**：
+
+```
+turn/tools.ts:161  afterToolCall → hooks.dispatch({ eventName: "PostToolUse", ... })
+turn/tools.ts:175  if (decision.feedback) output = `${output}
+
+[Verification feedback]
+${decision.feedback}`
+```
+
+即验证失败以 `[Verification feedback]` 文本进入**模型上下文**（驱动自我修复），
+而**不进入** `OrchestrationResult`。`TurnProjection` 也只记录 `openCalls` 与 `steps`
+（`turn/projection.ts:17-80`），不累积验证状态。
+
+### 修正后的结论
+
+| 附四原判 | **修正后** |
+|---|---|
+| 候选 1 终态真实性 = **接线**（`verdictFacade` → `concludeRun`） | ❌ 接线路径不存在。`concludeRun` 的输入（messages/prompt/sessionId/steps）与 `verdictFacade` 的输入（claims/provenance/redaction/cleanup）**之间没有可桥接的中间数据**；活轨 turn 侧不累积任何验证状态 |
+| 候选 3 批回滚 = **接线 + 小幅补全** | ⏸ 待核实（`restorePrimitive` 的输入契约需同样核实） |
+| 候选 8 LSP 自修复 = **接线** | ⚠️ 部分成立：`postMutationLspGuard` 已存在且工作，但它是"注入反馈给模型"，不是"自动修复循环"。**两者是不同机制**，不是接线关系 |
+
+**候选 1 的真实性质**：既不是"多余"，也不是"可接线"，而是
+**活轨在架构上缺少"把验证结果反映到回合终态"这一环节**。
+
+- 若要做，属于**新功能**：需要在 `TurnProjection` 中累积验证状态，
+  并把该状态传给 `concludeRun`（改签名 + 改调用点 + 定义状态来源）。
+- 被删的 `queryTerminalTruth.ts` 可作为**算法参考**（8 个降级分支的判据），
+  但它读 `CodingResultSummary`，该类型在 turn 链上无生产者，**不能直接恢复使用**。
+
+### 附五续：候选 3（批回滚）核实结果——活轨已有该能力
+
+被删 `orchestration/targetSetEditRecovery.ts` 的核心导出：
+
+```ts
+export async function buildTargetSetPartialRecoveryPlan(input: {
+  readonly route: TargetSetEditRoute;
+  readonly confirmedSnapshotIds?: readonly string[];
+  ...
+}): Promise<EditRecoveryPlan>
+```
+
+其实现是：按 `confirmedSnapshotIds` 过滤出已写入的目标 → 调 `buildEditRecoveryPlan({ mode: "target-set-subset", ... })`。
+
+**活轨 `/restore` 已提供同一能力**：
+
+```ts
+// orchestration/patchRecovery/restoreCommandContract.ts:9-11
+export type RestoreCommandRecordSelection =
+  | { readonly kind: "all" }
+  | { readonly kind: "records"; readonly recordIds: readonly string[] };
+```
+
+即活轨支持 `recordSelection: { kind: "records", recordIds: [...] }` —— **任意记录子集回滚**，
+正是 `confirmedSnapshotIds` 的语义。且活轨链路完整可达：
+
+```
+/restore  →  restoreCommandRuntime.ts  →  restoreCommandRunner.ts
+           →  runExplicitRestoreBridge  →  restorePreview / restorePrimitive
+```
+
+**故候选 3 的处置修正为：活轨已有等价能力，不需要接线也不需要恢复。**
+被删代码的附加价值仅是 `EditRecoveryPlan` 的 11 种终态分类与 `staleTargetState`
+（`staleTargetState` 活轨 0 处、`post-rollback-verification` 活轨 0 处），属**细节增强**，非缺失能力。
+
+### 对附四处置表的再次修正
+
+| # | 候选 | 附四处置 | **附五修正** |
+|---|---|---|---|
+| 1 | 终态真实性 | 接线 | **新功能**（turn 侧无验证状态累积）；登记 backlog |
+| 3 | target-set 批回滚 | 接线 + 补全 | **已有能力**（`/restore` 的 `recordSelection.recordIds` 即子集回滚）；不恢复 |
+| 8 | LSP 自修复 | 接线 | **不接线**：现有 hook 机制（注入反馈给模型）与自修复循环（自动重试回滚）是不同设计 |
+| 4 | provider 解析 | 恢复 | 维持（输入类型有消费者，证据明确） |
+| 5 | 重试退避 | 恢复 | 维持 |
+
+### 方法论教训（第 3 次同类）
+
+附四的方法论是"按数据形状搜索活轨，判断是否已有等价能力"。
+**但"活轨有这个函数"不等于"该函数在需要的链路上"**。
+
+判断"是否可接线"必须再走一步：**从目标调用点反向追踪，
+确认存在一条数据可流通的路径**。仅凭"两侧都有同名概念"就判"可接线"，
+与之前"仅凭可达性就判可删除"是同一类错误——**用间接证据替代直接证据**。
 
 ## 十一、统一执行路线（收束）
 
