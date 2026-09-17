@@ -254,3 +254,12 @@
 - **#5**（account-auth）：附十六。**readiness 说"可以"、执行必然失败**——readiness `providerReadiness.ts:138-141` 返回 `{ok:true}`（"Let the model adapter do the real call"），而 `turn/step.ts:131` 只发 `Bearer ${apiKey}`，account-auth 凭据不含 apiKey → 空。活轨缺失的知识（Codex 端点/`instructions`/`token refresh`）仅在已删 adapter 中。**维护者裁决：选 C 登记不改** → 登记 **CB-006**。
 - 文档：`plan.md` §3.1 重写为"12 项全部处置完毕"；`capability-backlog.md` 新增 CB-005（架构级，收录 #3 + 3 项同源破坏）、CB-006。提交 `04605528`、`964c57e0`。
 - 验证：tsc 0 错；可达性 production 959 / cliReachable 874 / cliOpaque 85；全量 3172 项零失败（#4 修复后）。#6/#7/#5 为纯文档记录，零代码改动。
+
+## [2026-09-17] step3 | browser 域搬迁映射表重算完成（保留搬迁，非删除）。
+- **核心发现**：`core/context/` **不是 browser 域，是四个域混居**（351 文件）：browser 平铺156 + browser/嵌套67 + pw*/stealthPreload 5 = **browser 域 228**；另 memory 41、sidebar 34、compact 29、startup 9、model 6；另有 4 个错置文件（`routeContinuityHandoff` 属编排域、`contextAnalysis`/`contextGovernance` 属上下文域）。
+- **耦合分析**：`browser-flat` ↔ `browser-nested` **双向 195 边**（111+84）→ 同一域被拆两层，搬迁应**合并**。其余域间边数 ≤6（sidebar→memory 6、startup→memory 5、sidebar→compact 4 等），可独立处置。
+- **外部引用面**：448 边 / 124 文件。生产值导入 **134 边 / 40 文件**，测试值导入 221 边/53 文件。引用者主要来自 `core/harness`（256 边，但该域 33 文件中**仅 3 个 CLI 可达**，其余全是 scenario fixture）与 `core/commands`（83）。CLI 入口 `cliCommandExecutionBridge.ts` 占 9 边。
+- **约束发现**：`core/harness/README.md` 明确规定 "split or move a **subfamily** only after focused tests and old import paths are preserved. **Do not bulk-move this directory as one artifact family.**" → 搬迁须分批、保测试；harness 域本身**不搬迁**（它是 dev/eval 表面，非产品运行时边界）。
+- **目标结构**：`src/browser/`（228，合并 receipt/runtime/skill）、`src/memory/`（41）、`src/presentation/sidebar/`（34）、`src/context/{compact,startup,model}/`（44）。
+- **执行顺序（风险递增）**：3a model/+错置文件（1 边）→ 3b startup（5）→ 3c compact（30）→ 3d sidebar（17）→ 3e memory（31）→ **3f browser（361 边，最末且分批）**。3f 须 **PTY 实机验证**（触及 CLI 桥 + `/browser` 命令链）。
+- 产物：`.wiki/refactor/step-3-migration-map.md`（完整映射表 + 风险分级）。plan.md §3.2 已重写。

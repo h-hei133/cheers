@@ -153,18 +153,43 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 **#5 的裁决**：维护者 2026-09-17 选"登记不改"。恢复 codex 调用路径属
 新增 provider 能力，且同属 CB-005。
 
-### 3.2 Step 3 browser 域搬迁（判据待重算）
+### 3.2 Step 3 browser 域搬迁（映射表已重算 — 2026-09-17）
 
-**背景（v1 热点，复核成立）**：`core/context/` 曾被称"browser 坟场"——167 个文件中
-**160 个真实存活**，挂在三条链上：`/browser` 命令链（`core/commands/registry.ts:84-88`）、
-CLI 桥（`entrypoints/cliCommandExecutionBridge.ts` 直引 6 个 browser 模块）、
-eval benchmark 链。外部引用面窄（10 文件），import 重写预算约 606 条。
+**完整映射表**：`.wiki/refactor/step-3-migration-map.md`
 
-**搬迁面（2026-09-16 重算）**：
-`core/context/` 平铺 128 文件（可达 122）+ `browser/` 子目录 43 文件（可达 41）。
+**核心发现**：`core/context/` **不是 browser 域，而是四个域混居**（351 文件）：
 
-> **注意**：原判据"先删 8 个不可达 browser 文件"**已失效**（依据的是被推翻的可达性判据）。
-> 须按 §2.1 重新审查。搬迁映射表（14 子域）仍需重算。
+| 组 | 文件 | 职责 |
+|---|---:|---|
+| `browser*` 平铺 + `browser/` 嵌套 + `pw*`/`stealthPreload` | **228** | browser 域 |
+| `memory/` | 41 | 项目记忆 |
+| `sidebar/` | 34 | 侧栏投影 |
+| `compact/` | 29 | 上下文压缩 |
+| `startup/` `model/` | 15 | 上下文 |
+| `routeContinuityHandoff` / `contextAnalysis` | 4 | 编排域 / 上下文域（错置） |
+
+**耦合**：`browser-flat` ↔ `browser-nested` **双向 195 边** → 是**同一域被拆两层**，
+搬迁应**合并**。其余小域间边数 ≤6，可独立处置。
+
+**外部引用面**：448 边 / 124 文件（生产值导入 134 边/40 文件）。
+主要来自 `core/harness`（256，其中仅 3 文件 CLI 可达）与 `core/commands`（83）。
+
+**约束**：`core/harness/README.md` 明确"**Do not bulk-move this directory as one
+artifact family**"——须分批、保测试。该域**不搬迁**。
+
+**目标结构**：
+
+```
+src/browser/（228，合并 receipt/runtime/skill 子目录）
+src/memory/（41）
+src/presentation/sidebar/（34）
+src/context/compact|startup|model/（44）
+```
+
+**执行顺序（风险递增）**：3a `model/`+错置文件 → 3b `startup/` → 3c `compact/`
+→ 3d `sidebar/` → 3e `memory/` → **3f browser（361 边，最末且分批）**。
+
+**3f 须 PTY 实机验证**（触及 CLI 桥 + `/browser` 命令链）。
 
 ### 3.3 Step 4-7
 
