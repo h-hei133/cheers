@@ -200,6 +200,53 @@ promptInteractiveApproval: (prompt) =>
 
 ---
 
+## CB-005 turn 内核与编排层不连通（架构级）
+
+- **状态**：`待裁决`（**记录优先，不单独修复**）
+- **性质**：架构问题，非单点缺陷。**多个已确认破坏同源于此。**
+- **来源**：`deleted-audit-2026-09-16.md` 附十四（#3）、附八（10 项候选判定）、
+  `plan.md` §3.4
+
+### 问题
+
+活轨存在**两套并行的 provider 路径**，互不共享数据：
+
+| 路径 | 使用者 | 能力 | 数据形态 |
+|---|---|---|---|
+| `turn/step.ts` | 模型驱动工具循环（**实际对话**） | 无重试、无终态裁决；验证仅作 `[Verification feedback]` 文本注入模型上下文 | 不产生 `codingResult` |
+| `runtime/loop/*` + `provider/request/*` | 编排层 / 公共 API | 有 retry 资格判定（自述 `retry-eligibility-is-not-retry-execution`）、`NormalizedProviderError` | 产生 `codingResult` 但不经 turn |
+
+终态判定同理：`turn/projection.ts:concludeRun`（2 分支）与
+`evidence/verdictFacade.ts`（三态裁决）分属两侧，**不汇合**。
+
+### 由此产生的已确认破坏
+
+| 破坏 | 表现 | 证据 |
+|---|---|---|
+| **#3** `provenance` 5 读 0 写 | `sessionTerminalState` 等 5 处 CLI 可达读取者恒得 `undefined`；兜底 evidence 生产者已删 | 附十四 |
+| 终态真实性不完整 | `concludeRun` **完全不看** `verification.status` / `taskSatisfaction.verdict` / `failedFiles`，**"编辑成功但验证失败"会报 success** | 附八 |
+| 10 项候选全部不恢复 | provider 解析、验证阶梯、taskLifecycle 编排等的消费链终点在 `context/acquisition`，**不到 turn** | 附八 |
+
+### 为什么不能单独修 #3
+
+活轨在审批点**确实持有数据**（`turn/tools.ts:123` 的
+`approvals = new Map<string, { operation, decision }>()`），
+但 `afterToolCall` 的返回类型**只允许 `{ output }`**（`turn/tools.ts:175`），
+无结构化通道传给 `codingResult`。
+
+即：不是"恢复一个被删文件"，而是**在两个子系统之间架一条新通道**。
+单独修一处会在架构立项时返工。
+
+### 处置建议
+
+**记录，不单独修复。** 待"turn 与编排层连通性"作为独立架构立项时，
+一并解决：终态数据来源、验证结果传递、审批 provenance 通道、retry 归属。
+
+**这是本项目最大的结构性技术债**：它使得"活轨有的能力"与"编排层有的能力"
+长期各半，且每次删除都会在其中一侧造成不可见的缺失。
+
+---
+
 ## 登记流程（供后续复用）
 
 1. 发现测试期望 ≠ 生产实现时，先判定：**是回退（实现改坏了）还是缺失（从未实现）**。

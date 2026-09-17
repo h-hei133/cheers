@@ -1155,6 +1155,47 @@ enableMcpTools=false / 无配置四种情形的行为正确。
 `cliReachable` 873 → **874**（`prefilter.ts` 进入活轨），`production` 958 → 959，
 `cliOpaque` 保持 85。**全量 3172 项零失败。**
 
+## 附十六：#5 OpenAI account-auth 断链的完整证据链（2026-09-17）
+
+### 问题：readiness 说"可以"，执行必然失败
+
+| 环节 | 位置 | 行为 |
+|---|---|---|
+| 凭据解析 | `providerCredentials.ts:185-197` | account-auth 产出 `credential.{provider, authMode:"account-auth", accountAuth, baseUrl, model, source, envVarName}` —— **不含 `apiKey`** |
+| readiness | `providerReadiness.ts:138-141` | `if (provider === "openai" && accountAccess) return { ok: true }`，注释：*"OpenAI account-auth follows the codex backend auth path, not /v1/models. Let runtime adapter do the real call."* |
+| 执行 | `turn/step.ts:131` | `Authorization: Bearer ${request.provider.apiKey}` |
+| apiKey 填充 | `cliRuntimeInvocation.ts:201` | `apiKey: resolution.credential?.apiKey ?? ""` → account-auth 下为 **空字符串** |
+
+**结果**：发出 `Authorization: Bearer `（空），请求必然被拒。
+登录本身是可走通的——OAuth 链路完整（`auth/oauth/providers.ts:25-26` 的
+authorize/token URL 齐全，`core/auth/providerAuthRuntime.ts:76-79` 持久化正常）。
+
+### 活轨缺失的知识（仅在已删 adapter 中）
+
+| 知识 | 已删位置 | 活轨状态 |
+|---|---|---|
+| Codex 端点 `https://chatgpt.com/backend-api/codex/responses`（+ fallback） | `OpenAIModelAdapter.ts:26,352` | **无** |
+| Codex backend 要求 `instructions` 字段 | `normalize.ts:187-189` | **无** |
+| `toCodexResponsesRequestBody`（拒绝 `max_output_tokens`、需 `store:false`） | `normalize.ts` | **无** |
+| token refresh（access/refresh 交换 + 持久化） | `OpenAIModelAdapter.ts:381-472` | **无** |
+
+活轨只保留 OAuth 授权来源标记（`auth/oauth/providers.ts:44` 的 `originator: "codex_cli_rs"`）。
+
+### 修复选项
+
+| 选项 | 含义 | 成本 |
+|---|---|---|
+| **A. 恢复 codex 调用路径** | 在 `turn/step.ts` 或新 adapter 中实现 codex 端点 + `instructions` + token refresh | 高：属新增 provider 能力 |
+| **B. 拒绝 account-auth 登录** | 让 `/connect login openai --account` 明确报"当前构建不支持"，与 `providerReadiness` 的 `unsupported-provider` 语义一致 | 低：改 readiness + 登录入口提示 |
+| **C. 登记不改** | 记录为已知缺陷 | 零 |
+
+### 与 CB-005 的关系
+
+选项 A 需要在 turn 侧新增 provider 调用路径——**同属 CB-005 的"两套路径不连通"**。
+若未来统一 provider 路径，此项应一并解决。
+
+**建议 B 或 C**：B 消除"能登录但不能用"的误导；C 若认为该能力即将实现。
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）
