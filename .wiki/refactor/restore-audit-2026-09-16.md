@@ -36,7 +36,7 @@
 | 动作 | 文件 | 说明 |
 |---|---|---|
 | 恢复 | `edit/authority/workspace.ts`（552 行） | 零内部依赖，原样可用 |
-| 恢复 | `orchestration/editSnapshot.ts`（185 行） | 依赖 1 个已删类型，改为结构化最小契约 `EditSnapshotWorkspaceRouteFacts`（只取 `targetPath` / `recoveryAuthorityCapture`），避免拖入 27 文件闭包 |
+| 恢复 | `orchestration/editSnapshot.ts`（删除前 185 行，恢复并改造后 196 行） | 依赖 1 个已删类型，改为结构化最小契约 `EditSnapshotWorkspaceRouteFacts`（只取 `targetPath` / `recoveryAuthorityCapture`），避免拖入 27 文件闭包 |
 | 接线 | `runtime/execution/service.ts` `writeTextFile` | 写前经 `createWorkspaceWriteAuthority`；工作区外拒绝；已存在文件走 `writeFile`（O_NOFOLLOW + 描述符复验），新文件走 `createFileExclusive`；写前 `captureSnapshotBeforeWrite` 记录原内容 |
 
 所有 CLI 写路径都经 `ExecutionService.writeTextFile`，因此这是覆盖全部写操作的单一接线点。
