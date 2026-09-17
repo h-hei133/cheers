@@ -187,7 +187,7 @@ Current machine-checkable closeout evidence:
 
 - `packages/ts-shell/src/orchestration/patchResult/editCapabilityReadiness.ts`
 - `packages/ts-shell/src/orchestration/patchResult/editCapabilityCloseoutManifest.ts`
-- `npm run verify:edit-capability-closeout`
+- ~~`npm run verify:edit-capability-closeout`~~ (removed 2026-09-17)
 - `docs/design/edit-capability-closeout-seal.md`
 
 The closeout verifier is focused deterministic edit-surface evidence. It does

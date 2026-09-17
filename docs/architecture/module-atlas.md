@@ -393,7 +393,6 @@ Current files:
 - `packages/ts-shell/src/core/harness/browserEvalBenchmark*.ts`
 - `scripts/verify-release-deterministic.mjs`
 - `scripts/verify-release-core.mjs`
-- `scripts/verify-edit-capability-closeout.mjs`
 
 Current strengths:
 
@@ -774,7 +773,7 @@ Current files:
 - `packages/ts-shell/src/core/context/browser*.ts`
 - `packages/ts-shell/src/core/context/pw*.ts`
 - `packages/ts-shell/src/core/harness/browser*.ts`
-- `scripts/verify-browser-txn-gate.mjs`
+- ~~`scripts/verify-browser-txn-gate.mjs`~~ (removed 2026-09-17)
 - `docs/agent-routes/route100-130*.md`
 
 Current strengths:
@@ -954,7 +953,7 @@ Representative current files and families:
 | `packages/ts-shell/src/model-adapters/providers/openai/OpenAIModelAdapter.ts` | Provider / Model Engineering | Agent Loop | provider adapter | single-module | keep provider details here |
 | `scripts/verify-release-deterministic.mjs` | Eval / Benchmark Engineering | Harness, Provider, Release | deterministic release meta gate | good marker contract | keep output assertions |
 | `scripts/verify-mcp-local-execution.mjs` | Harness Engineering | Tool, MCP | local MCP execution verifier | local-only claim | avoid external overclaim |
-| `scripts/verify-browser-txn-gate.mjs` | Eval / Benchmark Engineering | Browser, Harness | browser transaction gate | good boundary | keep |
+| ~~`scripts/verify-browser-txn-gate.mjs`~~ | Eval / Benchmark Engineering | Browser, Harness | removed 2026-09-17; guarded a deleted chain | — | — |
 
 ## Cross-Cutting Contracts
 

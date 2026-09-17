@@ -917,6 +917,76 @@ session/sessionSummaryProjection.ts          → session/{recovery/recoveryTrust
 4. 核实消费者（本例为测试）可改指真实实现——**逐符号**确认新目标导出该符号；
 5. 删除前重算 `cliReachable`，**不得下降**。
 
+## 附十二：两个过期 gate 已删除（2026-09-17，Step 2.7 收尾）
+
+### 检查结果（先查清再决定）
+
+删除前核实了三个机器清单与全部文档引用的消费情况：
+
+| 检查项 | 结果 |
+|---|---|
+| `docs/project-map/current-state.json` 消费方 | **零**（无脚本、无测试读取） |
+| `docs/foundation/foundation-consistency-matrix.json` 消费方 | **零**（仅被 `ACTIVE_CONTEXT.md`、`DOC_STATUS.md` 提及） |
+| `docs/implementation-context/capability-flow-manifest.json` 消费方 | **零** |
+| `npm run validate` / `doctor` 是否读 `docs/` | **不读** |
+| closeout 的 23 个存活测试 | **全部已在全量套件中运行（23/23）** |
+
+### closeout gate 的失效性质（比初判更严重）
+
+| 维度 | 事实 |
+|---|---|
+| 是否校验 claim | ❌ **220 条 `console.log`，0 条比对**——76 个 `report field` 与 136 个 `marker` 全是裸打印 |
+| 增量覆盖 | ❌ **零**——23 个测试全在全量套件中 |
+| 输出消费 | ❌ **零**——`verify:evidence:edit-capability-closeout` 是孤立别名 |
+| claim 有效性 | ❌ 多数对应实现已删 |
+
+对比健康的 `scripts/verify-cli-entry.mjs`，它有实际比对：
+
+```js
+const missing = markers.filter((marker) => !output.includes(marker))
+if (missing.length > 0) { printStep(label, 'product-regression', `missing=${missing.join(' | ')}`) }
+```
+
+closeout gate 没有这一段。**它是"打印声明 + 跑已被覆盖的测试"的空壳。**
+
+### 删除内容
+
+| 项 | 内容 |
+|---|---|
+| 脚本 | `scripts/verify-edit-capability-closeout.mjs` |
+| | `scripts/verify-browser-txn-gate.mjs`（服务对象 14/14 全不存在） |
+| package 注册 | 4 条（两 gate 各 2 条） |
+
+### 文档同步
+
+| 类别 | 处置 | 数量 |
+|---|---|---|
+| **当前状态文档**（须修正） | `control-plane-atlas.md`、`module-atlas.md`、`project-map/{capability-state,module-boundary-map,live-evidence-ledger,verification-gate-map}.md`、`PROJECT_MAP.md`、`scripts-inventory.md` | 8 |
+| **机器清单**（须修正） | `current-state.json`、`foundation-consistency-matrix.json`、`capability-flow-manifest.json` | 3 |
+| **历史叙述文档**（加划除标注，不改写） | `runmvp-package-closeout.md`、`edit-expectation-contract.md`、`runtime-receipt-contract.md`、`continuation-lineage-cleanup.md`、`session-substrate-seams.md`、`archive/PROJECT_STATE.md`、`product-naming-origin-audit.md`、`design/{edit-capability-roadmap,edit-closeout-readiness-and-fenced-broad-diff,edit-capability-closeout-seal}.md`、`foundation-risk-register.md` | 11 |
+| **历史路由记录**（按仓库规则不改写） | `docs/agent-routes/*` | 96 |
+| **状态登记** | `DOC_STATUS.md` 新增 5 条（archived/historical） | 5 |
+
+**仓库规则依据**：`docs/archive/README.md` 明确"Prefer status entries in `docs/DOC_STATUS.md` over moving files"、
+"Do not delete useful history"；`docs/agent-routes/ROUTE_DISCIPLINE.md` 要求历史路由文档保持原样。
+
+### 验证
+
+| 检查 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | 0 错误 |
+| `npm run build:ts` | 通过 |
+| `npm run validate` | ✅ PASS |
+| 三个机器清单 JSON | 合法（`json.load` 通过） |
+| 全量 vitest | 3173 项 / 1 失败（`deepResearch` 负载超时，宽超时 5/5 通过） |
+
+### 遗留
+
+- `docs/design/*` 的 3 个历史叙述文档保留了"当时加了该 gate"的原文，仅加划除标注——
+  它们记录历史事实，改写会破坏可追溯性。
+- 若未来需要 edit capability 的 closeout 证据，应重建**真校验**的 gate
+  （比对 claim 与实际输出，像 `verify-cli-entry.mjs` 那样），而非恢复本次删除的空壳。
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）

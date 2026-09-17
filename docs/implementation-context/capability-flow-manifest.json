@@ -616,8 +616,7 @@
         "fenced edit runtime activation tests",
         "CLI runtime invocation tests",
         "mutation-lane rejection regression",
-        "verify:edit-capability-closeout",
-        "verify:result-contract",
+                "verify:result-contract",
         "runMvp if routing changes"
       ],
       "forbiddenShortcuts": [
@@ -1181,8 +1180,7 @@
         "fenced edit runtime activation tests",
         "CLI runtime invocation tests",
         "mutation-lane rejection regression",
-        "verify:edit-capability-closeout",
-        "verify:result-contract"
+                "verify:result-contract"
       ]
     },
     "addBrowserAction": {

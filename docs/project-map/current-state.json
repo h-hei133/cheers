@@ -240,7 +240,6 @@
       "responsibility": "Run gates, classify evidence, write reports, and preserve safety markers.",
       "mainFiles": [
         "scripts/verify-context-planning.mjs",
-        "scripts/verify-edit-capability-closeout.mjs",
         "scripts/verify-release-deterministic.mjs",
         "scripts/verify/index.mjs",
         "scripts/verify/cases.mjs"
@@ -441,14 +440,6 @@
       "callsProvider": false,
       "canMutateWorkspace": false,
       "falseCompleteRisk": "Can be misread as execution readiness."
-    },
-    {
-      "name": "verify:edit-capability-closeout",
-      "command": "rtk npm run verify:edit-capability-closeout",
-      "evidenceType": "focused-unit-tests",
-      "callsProvider": false,
-      "canMutateWorkspace": "isolated fixtures only",
-      "falseCompleteRisk": "Can be misread as broad edit readiness."
     },
     {
       "name": "verify:result-contract",

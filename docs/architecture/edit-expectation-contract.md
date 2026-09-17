@@ -89,7 +89,7 @@ providers, run tools, or change permission semantics.
   `73 passed` across continuation lineage/planning, verification planner,
   read/inspect intent, command/capability boundary, flow dispatch/projection,
   result mapper, dispatcher, and edit expectation tests.
-- `rtk npm run verify:edit-capability-closeout`: passed.
+- ~~`rtk npm run verify:edit-capability-closeout`~~ (removed 2026-09-17): passed.
 - `rtk npm run verify:result-contract`: passed.
 - `rtk npm run build -w packages/ts-shell`: passed.
 - `rtk git diff --check`: passed.

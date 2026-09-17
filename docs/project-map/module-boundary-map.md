@@ -173,7 +173,7 @@ Modules are responsibility boundaries, not directories.
 ## Harness / Eval
 
 - Responsibility: verification scripts, gate markers, safety checks, report writing, residue handling.
-- Main files: `scripts/verify-context-planning.mjs`, `scripts/verify-edit-capability-closeout.mjs`, `scripts/verify-result-contract.mjs`, `scripts/verify-release-deterministic.mjs`, `scripts/verify/index.mjs`, `scripts/verify/*`, `scripts/real-user-capabilities/*`.
+- Main files: `scripts/verify-context-planning.mjs`, `scripts/verify-result-contract.mjs`, `scripts/verify-release-deterministic.mjs`, `scripts/verify/index.mjs`, `scripts/verify/*`, `scripts/real-user-capabilities/*`.
 - Facade/public functions: script entrypoints and verifier modules `verifierCliModule.mjs`, `verifierCaseModule.mjs`, `verifierSafetyModule.mjs`, `verifierReportModule.mjs`.
 - Upstream modules: package scripts, focused tests, isolated test roots.
 - Downstream modules: readiness claims, release/dogfood evidence.

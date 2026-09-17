@@ -68,7 +68,7 @@ No Route227/228 historical report paths moved.
 Compatibility preserved:
 
 - Old harness import paths remain unchanged.
-- `verify:browser-txn-gate` remains the focused browser transaction harness
+- ~~`verify:browser-txn-gate`~~ (removed 2026-09-17) was the focused browser transaction harness
   gate.
 - Route history docs remain at `docs/agent-routes/route*.md`.
 - Historical route reports remain at `docs/implementation-context/route*-report.json`.

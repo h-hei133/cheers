@@ -63,7 +63,7 @@ Ending baselines:
 - Focused browser harness tests: `38 passed`
 - Focused final package-stability tests: `12 passed`
 - Full `packages/ts-shell` sweep: `2051 passed / 1 skipped`
-- `verify:edit-capability-closeout`: pass (`58 passed`)
+- ~~`verify:edit-capability-closeout`~~ (removed 2026-09-17): passed (`58 passed`)
 - `verify:result-contract`: pass
 - `build -w packages/ts-shell`: pass
 - `git diff --check`: pass

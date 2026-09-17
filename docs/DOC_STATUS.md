@@ -145,6 +145,11 @@ It does not claim every historical note is perfectly classified.
 
 | Path or group | Status | When to read | Superseded by | Owner |
 |---|---|---|---|---|
+| `docs/design/browser-eval-gate.md` | archived | Understanding the removed Route 129/130 browser transaction gate. | `eval/browser/*` | Documentation |
+| `docs/design/edit-capability-closeout-seal.md` | historical | Route 72 closeout history; its gate was removed 2026-09-17. |  | Documentation |
+| `docs/design/edit-capability-roadmap.md` | historical | Edit capability roadmap history; references a removed gate. |  | Documentation |
+| `docs/design/edit-closeout-readiness-and-fenced-broad-diff.md` | historical | Route 72 closeout history; references a removed gate. |  | Documentation |
+| `docs/architecture/control-plane-baseline.md` | historical | Baseline history; lists a removed gate. | `docs/architecture/control-plane-atlas.md` | Control Plane |
 | `docs/agent-routes/route*.md` | historical | Active route, direct predecessor route, or regression archaeology only. | Current route plan and current code | Route family |
 | `docs/agent-routes/COMMON_BOUNDARIES.md` | module-reference | Route prompt needs shared boundary language. |  | Route Discipline |
 | `docs/agent-routes/REFERENCE_SCAN_POLICY.md` | module-reference | Route performs targeted reference-repo comparison. |  | Route Discipline |

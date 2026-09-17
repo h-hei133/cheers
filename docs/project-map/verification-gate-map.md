@@ -22,17 +22,6 @@
 - Evidence type: `focused-unit-tests`.
 - Known false-complete risk: context and plan readiness can be mistaken for execution readiness.
 
-## `scripts/verify-edit-capability-closeout.mjs`
-
-- What it proves: focused edit/apply/proposal/snapshot/recovery/repair contracts and markers.
-- What it does not prove: arbitrary project mutation, broad/fuzzy apply_patch, default real-provider mutation, external release readiness.
-- Calls provider: no real provider; fake/stub provider surfaces only.
-- Can mutate workspace: isolated/focused tests may mutate fixtures.
-- Verifies apply: yes for focused bounded routes.
-- Verifies verification: yes for route-specific readback/verification projections.
-- Evidence type: `focused-unit-tests` / `fake-provider`.
-- Known false-complete risk: "covered" report fields are not broad product readiness.
-
 ## `rtk npm run verify:result-contract`
 
 - What it proves: result mapper terminal contract tests and synthetic CLI print/replay result markers for selected scenarios.

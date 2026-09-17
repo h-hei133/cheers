@@ -619,7 +619,7 @@ None open after Route 165.
   fenced replacement lane, projects rollback readiness through result/session
   summaries, and keeps rollback explicit-only.
 - Evidence: fenced edit route/result tests, snapshot/recovery/rollback tests,
-  session continuity tests, and `verify-edit-capability-closeout.mjs` markers.
+  session continuity tests, and ~~`verify-edit-capability-closeout.mjs`~~ (removed 2026-09-17) markers.
 - Recommended next action: keep fuzzy/discovery/generated/multi-file edit
   stopped until target-set confirmation and atomicity routes exist.
 - Should become a route: no, resolved by Route 170 for the single-file exact
@@ -638,7 +638,7 @@ None open after Route 165.
   as failed/error outcomes, and extends the edit closeout verifier coverage.
 - Evidence: `fencedEditOutcome.ts`, `fencedEditRoute.ts`,
   `fencedEditResult.ts`, `resultMapper.ts`, `stoppedSessionContinuity.ts`,
-  `verify-edit-capability-closeout.mjs`, fenced edit focused tests.
+  ~~`verify-edit-capability-closeout.mjs`~~ (removed 2026-09-17), fenced edit focused tests.
 - Recommended next action: no broader edit expansion; keep fuzzy/discovery/
   generated/multi-file/rollback edits stopped until a dedicated route opens one.
 - Should become a route: no, resolved by Route 169.

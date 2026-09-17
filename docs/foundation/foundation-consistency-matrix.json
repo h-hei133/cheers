@@ -360,8 +360,7 @@
       ],
       "validationEvidence": [
         "packages/ts-shell/src/orchestration/patchResult/workspaceWriteResult.test.ts",
-        "packages/ts-shell/src/orchestration/patchResult/workspaceWriteRoute.test.ts",
-        "rtk npm run verify:edit-capability-closeout"
+        "packages/ts-shell/src/orchestration/patchResult/workspaceWriteRoute.test.ts"
       ],
       "status": "consistent",
       "ownerModuleForFollowUp": "Workspace / File Context"

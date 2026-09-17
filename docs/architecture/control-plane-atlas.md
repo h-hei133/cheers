@@ -461,7 +461,6 @@ Current owners:
 - `scripts/verify/verifierReportModule.mjs`
 - `scripts/verify-real-user-capabilities.mjs`
 - `scripts/verify-result-contract.mjs`
-- `scripts/verify-edit-capability-closeout.mjs`
 - `packages/ts-shell/src/core/harness/*`
 
 Lifecycle coverage:
