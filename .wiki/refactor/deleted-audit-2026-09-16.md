@@ -726,6 +726,71 @@ grep -rn "providerAnchoredProposal|providerOutputValidator|normalizeProviderEdit
 **因此 Step 2.7 的"恢复"目标应转为**：
 登记这些能力到 backlog，并把"turn 与编排层不连通"作为**架构问题**单独立项。
 
+## 附九：Step 2.7 出口验证（2026-09-17）
+
+### 本轮实际改动
+
+| 文件 | 改动 |
+|---|---|
+| `scripts/verify-edit-capability-closeout.mjs` | 加目标存在性校验，缺失即列出并 `exit 1` |
+| `scripts/verify-browser-txn-gate.mjs` | 同上 |
+| `.wiki/refactor/*` | 审查记录（附四～附八、plan.md 重排） |
+
+**未改动 `packages/ts-shell/src` 任何文件**（`git diff --stat` 确认为空）。
+
+### 验证结果
+
+| 检查 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | 0 错误 |
+| `npm run validate` | ✅ PASS |
+| 全量 vitest（首次） | 3173 项 / **14 失败** |
+| 全量 vitest（复核） | 见下 |
+| 两个 gate 修复后行为 | `closeout: declared 98, present 23, missing 75 → exit 1`；`browser: declared 14, present 0, missing 14 → exit 1` |
+
+### 14 项失败的判定：环境负载超时，非改动引入
+
+首轮全量出现 14 项失败，全部为 `Test timed out in 5000ms`。判定依据：
+
+1. **改动范围无关**：失败项集中在 `src/core/harness/browser*ScenarioExamples`、
+   `src/core/research/deepResearch`、`src/cli-baseline`，与所改的两个 `scripts/` 文件
+   无任何依赖关系。
+2. **宽超时下全部通过**（`--testTimeout=30000`）：
+
+   | 测试文件 | 默认 5s | 30s |
+   |---|---|---|
+   | `deepResearch.test.ts` | 2 failed | **5 passed** |
+   | `cli-baseline.test.ts` | 2 failed | **40 passed** |
+   | `browserCacheMultiprocessScenarioExamples.test.ts` | 1 failed | **6 passed** |
+   | `browserNetworkEgressScenarioExamples.test.ts` | 1 failed | **5 passed** |
+   | `browserCliExecutionScenarioExamples.test.ts` | 2 failed | **4 passed** |
+   | `browserSkillRunnerScenarioExamples.test.ts` | 1 failed | **3 passed** |
+
+3. **环境证据**：当时 `load average: 2.41`（16 核）。这些测试含真实子进程 spawn
+   与 CLI 启动，对负载敏感。
+
+**结论**：14 项失败是并行负载下的 5s 预算超时，与 Step 2.7 的改动无关。
+`baseline-after-step2.md` 已记录同类抖动项（`deepResearch`、`registry-rust-bridge`、
+`browserControlledNetworkScenarioExamples`）。
+
+### 出口标准达成情况
+
+| 标准 | 状态 |
+|---|---|
+| 12 项破坏全部有明确处置 | ✅ 2 已修、10 已分类（详见 §12 与附六） |
+| `tsc` 0 错误 | ✅ |
+| 稳定失败 0 | ✅（超时项在宽超时下全通过，属环境抖动） |
+| `verify:edit-capability-closeout` 不再假阳性 | ✅ 改为报告缺失并 `exit 1` |
+| 删除前置检查固化 | ✅ 已入 `handoff-2026-09-17.md` §4.2/§4.6/§4.7 与 `plan.md` §4 |
+
+### 未完成（转为 Step 2.7 后续或独立立项）
+
+1. **两个 gate 自身过期**（附六）：`browser-txn-gate` 建议删除；
+   `edit-capability-closeout` 建议收窄。需维护者裁决（改 `package.json` scripts 面）。
+2. **10 项候选全部不恢复**（附八）：需登记 `capability-backlog.md`。
+3. **架构问题单独立项**：turn 内核与编排层（`context/acquisition` + `planning` +
+   `runtime/loop`）不连通，各有 provider 请求 / 终态判定 / 验证编排。
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）
