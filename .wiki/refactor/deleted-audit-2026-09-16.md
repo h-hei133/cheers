@@ -277,6 +277,143 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 
 **"在 CLI 可达集内"不等于"被调用"**。可达性只说明它被 import 链拉进来了（例如仅被 `import type` 引用），不说明逻辑上还有人调用它。
 
+## 附四：10 项候选的「是否多余 / 是否适配」核验（2026-09-17）
+
+### 为什么需要这一轮
+
+此前 §12 的"高价值候选"表只回答"实现是否完整、活轨有无语义相似物"。
+**它没有回答三个更关键的问题**，因此可能把"多余"或"不适配"的能力列为待恢复：
+
+| 问题 | 含义 | 若为否 |
+|---|---|---|
+| **Q1 输入是否有生产者** | 该能力读的数据，活轨今天还产生吗 | 恢复得到一段**没有输入**的代码 → 不适配 |
+| **Q2 输出是否有消费者** | 有活轨代码引用它的导出吗 | 无消费者 ≠ 无用，但需说明接线点 |
+| **Q3 活轨是否已有同形状能力** | 是否只是**未接线**而非缺失 | 则应**接线**而非**恢复**（避免第三套实现） |
+
+### Q2 结果：全部为零
+
+10 项候选的核心导出符号（共 60 余个）在活轨 `packages/ts-shell/src` 中**零符号引用**。
+仅 3 个命中为普通词误报（`invalid`、`stringField`、`sleep`，分别是字符串/字段名/同名测试辅助）。
+
+### Q1 结果：输入契约分化
+
+| 候选 | 关键输入类型 | 活轨状态 | 结论 |
+|---|---|---|---|
+| 1 终态真实性 | `CodingResultSummary` | **活轨 46 处**（`orchestration/types.ts` 等） | ✅ 输入存在 |
+| | `VerificationCommandPlan` | 活轨 2 处 | ✅ |
+| | `QueryTerminal` | **活轨无** | ⚠️ 需改接 `turn` 侧类型 |
+| 2 任务相关验证阶梯 | `PerFileVerificationCoverage`、`TaskRelevantVerificationAuthority`、`ChangedFile` | **活轨全无** | ❌ **不适配**：需重建整套输入契约 |
+| 3 target-set 批回滚 | `RecoveryAuthorityStoredRecord` | 活轨 3 处 | ✅ |
+| | `RouteScopedEditJournal` | 活轨 11 处 | ✅ |
+| | `WorkspaceWriteFailureState` | **活轨无** | ⚠️ 需降级为字符串错误 |
+| 4 provider 原始解析 | `ProviderEditRawProposal` | 活轨 3 处（消费者**在用**） | ✅ **输入有消费者，只缺生产者** |
+| | `ModelRequest` | 活轨 3 处 | ✅ |
+| 5 重试退避 | `ModelProviderConfig` | 活轨 1 处 | ✅ |
+| | `RetryPolicy` | **活轨无** | 需新建 |
+| 6 taskLifecycle 编排 | `TaskLifecycleResult` | **活轨无** | ⚠️ |
+| | `TaskIntent`/`TaskReadPlan`/`TaskStage`/`TaskExecutionPlan` | 活轨 2–8 处 | ✅ 底层全活 |
+| 7 AST 代码图谱 | `SymbolTable`/`CallGraph`/`ParsedSourceFile` | **活轨全无** | ❌ 需新建 |
+| 8 LSP 自修复 | `LspClient`/`FileMutationQueue` | **活轨无**（`fileMutationQueue` 实现存在但无该接口名） | ⚠️ 部分存在 |
+| 9 跨文件 repair | `CodingResultSummary` | 活轨 46 处 | ✅ |
+| | `RepairContinuityEvidence` | **活轨无** | ❌ |
+| 10 Swarm 分发 | `SubAgentTask`/`SubAgentResult` | **活轨全无** | ❌ |
+
+### Q3 结果：三项为"活轨已有但未接线"
+
+按语义/数据形状搜索（非符号名）后的决定性发现：
+
+**候选 1（终态真实性）—— 判定为"已有等价，但未汇合"**
+
+活轨确实存在等价能力：
+
+- `evidence/verdictFacade.ts`：产出 `ProductVerdict`，含 `status: COMPLETE|PARTIAL|BLOCKED|NOT_PROVEN`、
+  `terminalClassification: "stopped"`、`notProvenReasons` / `partialReasons` / `blockedReasons`，
+  并有**防升级断言**（"attempted to upgrade a non-live-success legacy result to COMPLETE"）。
+  其消费者 `repair/iteration/projection.ts`、`result/projection/repair/verdict.ts`、
+  `verification/verificationFacade.ts` 均 CLI 可达。
+
+但它**不在回合终态的路上**：
+
+| 路径 | 位置 | 是否写回合终态 |
+|---|---|---|
+| A 内核终态 | `turn/projection.ts:concludeRun` | ✅ **唯一写入者**（`query.completed`） |
+| B 裁决投影 | `evidence/verdictFacade.ts` → `repair/iteration/projection.ts` → `repair/handoff/*` | ❌ 止于 repair/handoff 与公共 API 层 |
+
+决定性证据：`concludeRun(messages, prompt, sessionId, steps)` —— **签名里没有 `codingResult` / `verification`**，
+结构上无法考虑验证结果；而 `turn/*.ts` 全文 **零次**出现 `codingResult`
+（`grep codingResult packages/ts-shell/src/turn/*.ts` = 空），即活轨 turn **从不产生** `CodingResultSummary`。
+
+→ **处置：接线，而非恢复。** 恢复被删的 `queryTerminalTruth.ts`（149 行 + 3 依赖）会得到**第三套**终态判定。
+
+**候选 3（target-set 批回滚）—— 判定为"部分已有"**
+
+活轨已有：`restorePrimitive` / `restorePreview` / `restoreCommandRunner` / `recoveryAuthorityStore`
+（全活）+ `editSnapshot.ts` 已恢复。
+活轨**无**：`target-set-subset` 子集批回滚概念（语义搜索 `子集回滚` = 0 命中）。
+
+→ **处置：接线 + 小幅补全**，而非整簇恢复 850+ 行。
+
+**候选 4（provider 原始解析）—— 判定为"真断裂，消费者存活"**
+
+活轨 `orchestration/providerEditProposal.ts` / `providerOutputValidator.ts` / `providerProposalAnchors.ts`
+**均存活且在用 `ProviderEditRawProposal` 类型**，但活轨**零**解析函数：
+`extractJsonObject` / `parseProviderExactPatch` / `looksLikeDiff` / `extractUnifiedDiffHunks` 全部 0 命中。
+
+→ **处置：这是最干净的恢复项**——输入类型有消费者、只缺生产者，接线点明确。
+
+**候选 7（AST 代码图谱）—— 判定为"不适配"**
+
+活轨 `context/graph/ast/parser.ts` 提供 `parseSourceSymbols` / `ASTParsedSymbol`（token 级），
+但**无** `SymbolTable` / `CallGraph` / 图构建与排序（语义搜索 = 0）。
+被删代码依赖 `ParsedSourceFile` 这一类型，活轨不存在。
+
+→ **处置：不在当前架构下恢复**。若需要，属**新功能**（需先定输入契约），登记 backlog。
+
+**候选 10（Swarm 分发）—— 判定为"不适配当前项目"**
+
+活轨无 `SubAgentTask` / `SubAgentResult`；`swarm` 仅 1 处命中（无关的 sidebar 质量检查）。
+活轨已有的多 agent 能力是 `core/tools/taskTool.ts`（子任务工具）与 `core/research/deepResearcher.ts`
+（研究型并行），形状不同。
+
+→ **处置：登记 backlog，不恢复**。
+
+### 修正后的处置表（取代 §12 的"高价值候选"）
+
+| # | 候选 | 原建议 | **核验后处置** | 依据 |
+|---|---|---|---|---|
+| 1 | 终态真实性 | 恢复（4 文件） | **接线**（`verdictFacade` → `concludeRun`） | Q3：已有等价能力，未汇合 |
+| 2 | 任务相关验证阶梯 | 恢复 | **登记 backlog** | Q1：`PerFileVerificationCoverage` 等输入契约活轨全无 |
+| 3 | target-set 批回滚 | 恢复 | **接线 + 小幅补全** | Q3：底座全活，仅缺子集概念 |
+| 4 | provider 原始解析 | 恢复 | **恢复**（唯一干净项） | Q1+Q2：输入类型有消费者，只缺生产者 |
+| 5 | 重试退避降级 | 恢复 | **恢复**（`retryPolicy`） | Q1：`ModelProviderConfig` 活轨存在；活轨 fallback 明示 `executesFallback: false` |
+| 6 | taskLifecycle 编排 | 裁决 | **登记 backlog** | Q1：底层全活但 `TaskLifecycleResult` 缺；需先定产品语义 |
+| 7 | AST 代码图谱 | 恢复 | **登记 backlog（属新功能）** | Q1+Q3：输入契约与图构建全无 |
+| 8 | LSP 自修复 | 恢复 | **接线**（`postMutationLspGuard` 已存在） | Q3：活轨已有 LSP 守卫，缺自修复循环编排 |
+| 9 | 跨文件 repair | 恢复 | **登记 backlog** | Q1：`RepairContinuityEvidence` 活轨无 |
+| 10 | Swarm 分发 | 恢复 | **登记 backlog** | Q1+Q3：契约与能力全无，形状不同 |
+
+### 汇总
+
+| 处置 | 数量 | 项 |
+|---|---:|---|
+| **接线**（活轨已有等价能力） | 3 | 1 终态真实性、3 批回滚、8 LSP 自修复 |
+| **恢复**（真缺失且适配） | 2 | 4 provider 解析、5 重试退避 |
+| **登记 backlog**（不适配/需新设计） | 5 | 2、6、7、9、10 |
+
+**这轮核验的价值**：原计划的 10 项"恢复"中，实际只有 2 项该恢复；
+3 项是接线问题（成本远低），5 项不适配当前架构（恢复会得到无输入或第三套实现的代码）。
+
+### 方法论补充（写入审查口径）
+
+判定"未接线有价值"时，必须额外回答：
+
+1. **输入契约在活轨是否存在**——否则是"不适配"，不是"未接线"。
+2. **活轨是否已有同形状能力**（按数据形状/状态枚举搜索，不按符号名）——
+   否则会把"接线问题"误判成"缺失"。
+3. **同名陷阱**——活轨 `result/terminal/truth.ts`（`selectContinuityTerminalSource`，17 行）
+   与被删 `result/terminal/queryTerminalTruth.ts`（`deriveTruthfulTerminal`，149 行）**完全不同**。
+   本文档此前"活轨只有 2 分支"的判断，就漏查了这个同名文件。
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）
@@ -347,7 +484,11 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 - `apply_patch` 解析/验证/应用路线：废弃路线，不恢复（G1a 确认 26 文件零断链，且活轨明文否决该输入形态）。
 - `sessionContinuationProjection.ts:57-60` 的 browser 前缀：**非断链**（是压缩保序白名单，非功能消费者）。
 
-### 高价值未接线候选（需裁决）
+### 高价值未接线候选（**已核验，处置见附四**）
+
+> **附四已完成"是否多余 / 是否适配"核验，下表仅为原始候选清单。**
+> 核验后实际只有 **2 项该恢复**，**3 项应接线**（活轨已有等价能力），
+> **5 项不适配当前架构**（输入契约在活轨不存在）。请以附四为准。
 
 | 序 | 能力 | 代表文件 | 规模 |
 |---|---|---|---|
