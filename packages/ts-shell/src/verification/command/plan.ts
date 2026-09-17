@@ -4,7 +4,6 @@ import type { AgentPlan } from "../../orchestration/agentPlan.js";
 import type { CodingResultSummary } from "../../orchestration/types.js";
 import {
   blockedCommandReason,
-  isAllowlistedFocusedTsShellTestCommand,
   isAllowlistedRunCommand,
 } from "../../orchestration/capabilityBoundaryProjection.js";
 import { redactProviderEditText } from "../../orchestration/providerEditContext.js";
@@ -33,7 +32,6 @@ export type VerificationCommandKind =
   | "npm-test-help"
   | "npm-build-help"
   | "npm-build-ts-shell"
-  | "npm-test-focused"
   | "task-quality-verifier"
   | "unsupported";
 
@@ -392,9 +390,6 @@ function classifyPermissionRequirement(
 }
 
 function classifyCommandKind(command: string | undefined): VerificationCommandKind {
-  if (command && isAllowlistedFocusedTsShellTestCommand(command)) {
-    return "npm-test-focused";
-  }
   switch (command) {
     case "node --version":
       return "node-version";

@@ -987,6 +987,71 @@ closeout gate 没有这一段。**它是"打印声明 + 跑已被覆盖的测试
 - 若未来需要 edit capability 的 closeout 证据，应重建**真校验**的 gate
   （比对 claim 与实际输出，像 `verify-cli-entry.mjs` 那样），而非恢复本次删除的空壳。
 
+## 附十三：8 项待处理破坏的逐项核实（2026-09-17）
+
+处置前逐项核实事实，**发现两处与初始判定不同**。
+
+### #8 `pwStatus.ts` 文案说谎 —— 确认，待修
+
+`core/context/pwStatus.ts:16` 输出 `- Eval mode: available-via-pwEval`，
+但 `pwEval.ts` 已删（活轨 0 文件）。**界面在声称一个不存在的模式可用。**
+处置：修正文案（删该行或改为 `unavailable`）。
+
+### #9 focused-test 白名单 —— **比报告的更严重，但影响更小**
+
+| 初始判定 | 核实结果 |
+|---|---|
+| "含 2 个不存在路径" | ❌ **6 条全部失效**（`FOCUSED_TS_SHELL_TEST_COMMAND_ALLOWLIST` 的 6 条路径**全部不存在**） |
+| 影响 | ⚠️ 但影响有限：该白名单与 `RUN_COMMAND_ALLOWLIST`（4 条，全部有效）**零交集**；实测 `isAllowlistedRunCommand('node --version')` = `true`、`('npm run build -- --help')` = `true`，**主白名单正常工作** |
+| 失效后果 | 仅 `classifyCommandKind` 永不返回 `npm-test-focused`。而这些命令本就不存在，无实际损失 |
+
+**处置**：移除失效的 6 条 focused 白名单及其唯一消费者 `isAllowlistedFocusedTsShellTestCommand`
+（`verification/command/plan.ts:395` 调用点）。属清理死引用，非修复功能。
+
+### #10 5 个 verify 脚本 —— 确认，属 apply_patch 废弃路线
+
+5 个脚本（`three-file-guarded-write` / `single-file-move-evidence` /
+`single-file-delete-evidence` / `mixed-operation-evidence` /
+`three-file-planning-no-write`）实测退出码全部为 1，共同根因：
+
+```
+pathToFileURL(path.join(tsShellRoot, 'src', 'orchestration', 'mutationRoutingProjection.ts'))
+→ 该模块已删，无活轨等价实现
+```
+
+**但**：脚本调用 `projectApplyPatchRuntimeMutationRoute({ rawPatchText, ... })`，
+属 **apply_patch 废弃路线**（§4.5 已判定无需恢复：CLI 从未注册 `apply_patch` 工具，
+活轨明文拒绝该输入形态）。
+
+**处置**：删除 5 个脚本 + 5 条 package 注册。依据 §2.1 新判据——
+被删模块的职责**未被活轨承担**，但**该路线本身已被有意废弃**，
+故不是"缺失能力"，而是"随路线一起废弃的验证脚本"。
+
+### #3 `provenance.toolExecutions` —— 确认，待修（最严重）
+
+见附三。5 个 CLI 可达读取者、零写入者，且兜底 evidence 写入者亦删（二级断链）。
+
+### #4 `disabledTools` / `hiddenToolPrefixes` —— 确认，待修
+
+见附三。用户可配置字段零执行者。
+
+### #5 OpenAI account-auth —— 确认，待修
+
+见附三。可登录显示 connected 但对话必然失败。
+
+### #6 `executionLane` 悬空 —— 确认，待裁决
+
+`planning/handoff/mutation.ts:22-25` 产出 `existing-exact-fenced-route` /
+`existing-target-set-route`，指向已删的 `fencedEditRoute` / `targetSetEditRoute`。
+**属命名承诺而非运行时依赖**（`backendConsumption: "not-run"` 硬编码），不导致崩溃。
+
+### #7 证据标签正则 —— 确认，待裁决
+
+`session/sessionResultParity.ts`、`session/continuationEvidenceParity.ts`、
+`orchestration/harnessFailureTaxonomy.ts` 的正则仍识别已删生产者
+（`anchored-*` / `provider-smoke-*` / `real-task-loop-*` / `context-aware-provider`）。
+分支永不匹配。**属死条件，不影响功能。**
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）

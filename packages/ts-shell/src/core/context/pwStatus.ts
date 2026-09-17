@@ -13,7 +13,6 @@ export function renderPwRuntimeStatus(status: PwRuntimeStatus): string {
     `- Browser launched during status: ${status.browserLaunched ? "yes" : "no"}`,
     "- Default runtime: disabled",
     "- Tool-server backend: optional-not-default",
-    "- Eval mode: available-via-pwEval",
     "- Provider/model call: none",
     `- Reason: ${sanitizeBrowserText(status.reason, 220)}`,
     `- Skip reason: ${status.skipReason ? sanitizeBrowserText(status.skipReason, 120) : "none"}`,

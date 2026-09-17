@@ -10,14 +10,6 @@ const RUN_COMMAND_ALLOWLIST = [
   ROUTE219_TASK_QUALITY_BENCHMARK_COMMAND,
 ] as const;
 
-const FOCUSED_TS_SHELL_TEST_COMMAND_ALLOWLIST = [
-  "npm test -w packages/ts-shell -- src/verification/verificationCommandPlan.test.ts",
-  "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts",
-  "npm test -w packages/ts-shell -- src/verification/taskRelevantVerificationRoute.test.ts -t route227e-intentional-missing-test",
-  "npm test -w packages/ts-shell -- src/orchestration/planningRuntimeProductExecution.test.ts",
-  "npm test -w packages/ts-shell -- src/orchestration/verificationRepairBridge.test.ts src/orchestration/verificationRepairContext.test.ts",
-  "npm test -w packages/ts-shell -- src/orchestration/targetSetEditRoute.test.ts src/orchestration/targetSetEditVerification.test.ts",
-] as const;
 
 export function detectCommand(normalizedPrompt: string): string {
   const trimmed = normalizedPrompt.trim();
@@ -74,24 +66,16 @@ export function detectUnsupportedCommandIntent(
 }
 
 export function isAllowlistedRunCommand(command: string): boolean {
-  if (isAllowlistedFocusedTsShellTestCommand(command)) {
-    return true;
-  }
   return RUN_COMMAND_ALLOWLIST.includes(
     command as (typeof RUN_COMMAND_ALLOWLIST)[number],
   );
 }
 
-export function isAllowlistedFocusedTsShellTestCommand(command: string): boolean {
-  return FOCUSED_TS_SHELL_TEST_COMMAND_ALLOWLIST.includes(
-    command as (typeof FOCUSED_TS_SHELL_TEST_COMMAND_ALLOWLIST)[number],
-  );
-}
 
 export function blockedCommandReason(command: string): string {
   return [
     `Run-command intent is not allowed in the controlled allowlist: ${command}`,
-    `Allowed commands: ${RUN_COMMAND_ALLOWLIST.join(", ")}, npm test -w packages/ts-shell -- src/verification/<test>.test.ts`,
+    `Allowed commands: ${RUN_COMMAND_ALLOWLIST.join(", ")}`,
     "Please rephrase your request to one of the allowed command intents.",
   ].join(" ");
 }
