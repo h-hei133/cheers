@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
 import { listEditCapabilityReadiness } from "../../../../orchestration/patchResult/editCapabilityReadiness.js";
 import { renderCompactHandoffMarkdown } from "./compactHandoffRenderer.js";
-import { buildRouteContinuityHandoffPacket } from "../../routeContinuityHandoff.js";
+import { buildRouteContinuityHandoffPacket } from "../continuity/routeContinuityHandoff.js";
 
 describe("compact handoff renderer", () => {
   it("renders compact-safe markdown sections without raw sensitive content", () => {

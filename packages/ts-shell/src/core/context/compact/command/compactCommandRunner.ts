@@ -13,7 +13,7 @@ import {
   evaluateProjectMemoryCandidateQuality,
   type ProjectMemoryCandidateQualityResult,
 } from "../../memory/projectMemoryCandidateQuality.js";
-import { buildRouteContinuityHandoffPacket } from "../../routeContinuityHandoff.js";
+import { buildRouteContinuityHandoffPacket } from "../continuity/routeContinuityHandoff.js";
 
 export interface CompactCommandRunResult {
   readonly request: CompactCommandRequest;

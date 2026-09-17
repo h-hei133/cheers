@@ -1,19 +1,19 @@
-import type { EditCapabilityCloseoutManifest } from "../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
-import type { EditCapabilityReadiness } from "../../orchestration/patchResult/editCapabilityReadiness.js";
-import type { RecoverySurfaceSummary } from "../../orchestration/patchRecovery/recoverySurfaceProjection.js";
+import type { EditCapabilityCloseoutManifest } from "../../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
+import type { EditCapabilityReadiness } from "../../../../orchestration/patchResult/editCapabilityReadiness.js";
+import type { RecoverySurfaceSummary } from "../../../../orchestration/patchRecovery/recoverySurfaceProjection.js";
 import {
   factIds,
   factValue,
   type CompactContinuityPacket,
   type CompactContinuityPacketSource,
-} from "./compact/continuity/compactContinuityPacket.js";
-import { CONTEXT_CONTINUITY_MANIFEST } from "./model/contextContinuityManifest.js";
+} from "../continuity/compactContinuityPacket.js";
+import { CONTEXT_CONTINUITY_MANIFEST } from "../../model/contextContinuityManifest.js";
 import {
   projectContextState,
   type ContextStateProjection,
   type ContextStateProjectionInput,
-} from "./model/contextStateProjection.js";
-import { applyCompactRedactionPolicy } from "./compact/policy/compactRedactionPolicy.js";
+} from "../../model/contextStateProjection.js";
+import { applyCompactRedactionPolicy } from "../policy/compactRedactionPolicy.js";
 
 export interface RouteContinuityHandoffInput {
   readonly generatedAt: string;

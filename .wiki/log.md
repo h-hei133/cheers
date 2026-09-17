@@ -263,3 +263,11 @@
 - **目标结构**：`src/browser/`（228，合并 receipt/runtime/skill）、`src/memory/`（41）、`src/presentation/sidebar/`（34）、`src/context/{compact,startup,model}/`（44）。
 - **执行顺序（风险递增）**：3a model/+错置文件（1 边）→ 3b startup（5）→ 3c compact（30）→ 3d sidebar（17）→ 3e memory（31）→ **3f browser（361 边，最末且分批）**。3f 须 **PTY 实机验证**（触及 CLI 桥 + `/browser` 命令链）。
 - 产物：`.wiki/refactor/step-3-migration-map.md`（完整映射表 + 风险分级）。plan.md §3.2 已重写。
+
+## [2026-09-17] step3a | 错置文件归位（搬迁第一步）。零风险批次，完成。
+- **`routeContinuityHandoff.{ts,test.ts}`** → `core/context/compact/continuity/`。核实后修正映射表原判：它**不是编排域**，而是被 `compact/command/compactCommandRunner.ts` 与 `compact/delivery/compactHandoffRenderer.test.ts` 消费的 **compact 域桥接层**（连接 compact 与 orchestration 的 patchResult）。
+- **`contextAnalysis.ts` + `contextGovernance.test.ts`** → `core/context/compact/governance/`（新建）。核实为**自闭环对**（生产仅被自身测试引用），职责是上下文治理（token 估算 / 健康审计），属 compact 域。
+- **`model/` 留在原位**：核实后发现映射表原判有误——`model/` **不是零引用独立域**，而是被 `compact/`（2 处）、`memory/`（2 处）、`routeContinuityHandoff`（1 处）**共享的上下文核心类型层**（`ContextLayerId` / `ContextProjectionFact` / `ContextContinuityManifest`）。留在 `core/context/model/` 是正确归属。
+- import 修正：搬迁文件的相对深度（`routeContinuityHandoff` 2→4 层、`contextAnalysis` 1→3 层）+ 2 个外部消费者（`../../` → `../continuity/`）+ 1 个测试文件。
+- **结果**：`core/context/` 平铺层只剩 browser 域的 5 个文件（`pw*` ×3 + `stealthPreload` ×2）。
+- 验证：tsc 0 错；该域 19 文件/45 测试全绿；**全量 3172 项 1 失败**（`deepResearch` 已知抖动项，宽超时 5/5 通过）；可达性 production 959 / cliReachable 874 / cliOpaque 85 **不变**（搬迁不改变可达性，符合预期）。
