@@ -5,13 +5,14 @@ sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-0
 created: 2026-09-15
 updated: 2026-09-17
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v3。删除路线在执行 Step 2.6 时被证伪：可达性判据不足以授权删除，前三轮删除（403 个生产文件）造成 12 项真实破坏。Step 2.7 负责修正该错误，并阻塞 Step 3 及其后所有步骤。"
+summary: "Module boundary refactor plan v4。删除授权依据已从\"可达性\"改为\"是否已有实现的一部分\"（§10）。v3 记录：删除路线在执行 Step 2.6 时被证伪，前三轮删除造成 12 项真实破坏；Step 2.7 修正该错误。当前生产 958 / CLI 可达 873 / 不可达 85。"
 confidence: high
 ---
 
-# Architecture Refactor Plan (v3)
+# Architecture Refactor Plan (v4)
 
 > 本目录（`.wiki/refactor/`）是整个模块边界重构计划的唯一记录位置。
+> v4 (2026-09-17) 方向重定：删除授权依据改为"是否已有实现的一部分"，见 §10。
 > v3 (2026-09-17) 新增 Step 2.7（修正前序删除造成的破坏）与阶段顺序重排：原删除路线被证伪，详见 §9。
 > v2 (2026-09-15 晚) 基于"生产可达性 BFS + 三子代理语义复核"全面修正 v1。
 > v1 的热点数据（browser 坟场、orchestration 平铺、SessionManager facade、命名税）经复核全部成立，但 v1 缺失了最大的事实：**全仓 24% 的生产文件不在任何运行时可达路径上**。
@@ -344,3 +345,57 @@ v2 全篇建立在一个命题上：
 **注**：第 1 项与已修的 CB-004 同源——CB-004 只补了 8 个分支中的 1 个
 （审批拒绝）；活轨 `concludeRun` 至今**完全不看** `verification.status` /
 `taskSatisfaction.verdict` / `failedFiles`，即"编辑成功但验证失败"会以 `success` 报出。
+
+
+## 10. 方向重定（2026-09-17，维护者裁决后）
+
+### 10.1 三条裁决
+
+**裁决 1：放弃"有部分价值但未接入 CLI"的文件。**
+
+不再评估其价值、不再恢复、不再登记 backlog。**但须审查其是否为已有实现的一部分**——
+即只有职责**已被活轨某处承担**（重导目标存活、同名声明存在、调用链覆盖）时，
+删除才被授权。
+
+**裁决 2：`turn` 与编排层不连通 → 记录，不处理。**
+
+该问题是维护者此前重新编排 `turn` 时留下的既有架构状态，**不是清理造成的破坏**。
+记录于 `deleted-audit-2026-09-16.md` 附十，不在本计划内处理。
+
+**裁决 3：删除的授权依据从"可达性"改为"是否已有实现的一部分"。**
+
+### 10.2 新的删除判据
+
+| 旧判据（已废弃） | **新判据** |
+|---|---|
+| `cli:false` ⇒ 可删 | 职责**已被活轨承担** ⇒ 可删 |
+| 可达性 BFS | ① 重导目标存活（shim）② 同名声明存在于活轨（内联归并）③ 调用链覆盖（功能已实现）④ 公共 API 面除外 ⑤ 消费者存活的生产者除外 |
+
+**仍须保护的三类**（不得因 `cli:false` 而删）：
+
+1. **公共 API 面**：`packages/ts-shell/src/index.ts`（package `main`，`verify-host-surface` 实测消费）
+   及 `runtime/{distribution,evaluation/task}/*`。
+2. **契约型断链的生产者**：活轨有 CLI 可达消费者在读取其数据/标记者（如 `provenance.toolExecutions`）。
+3. **动态入口**：`path.join` + `spawn`/`import()` 的字符串路径、`*Process.ts`。
+
+### 10.3 当前状态（2026-09-17）
+
+| 指标 | 值 |
+|---|---:|
+| 生产文件 | 958 |
+| CLI 可达 | 873 |
+| CLI 不可达 | 85（仅测试 72 + 仅公共 API 5 + 零引用 8） |
+| 全量测试 | 3173 项，稳定失败 0（2 项负载超时，宽超时通过） |
+
+### 10.4 剩余可做项
+
+| 项 | 内容 | 需裁决 |
+|---|---|---|
+| 1 | 85 个不可达文件（72 仅测试 + 8 零引用） | 其能力价值已按裁决 1 放弃；**删除需连带处理测试**，且需按 10.2 新判据审查 |
+| 2 | 两个过期 gate（附六） | `browser-txn-gate` 建议删（服务对象全不存在）；`closeout` 建议收窄。涉及 `package.json` scripts 面 |
+| 3 | Step 3 browser 域搬迁 | 原计划待执行；其判据同样受 10.2 影响，需重算 |
+| 4 | Step 4 orchestration 聚类 | 待重算 |
+| 5 | Step 5/6 SessionManager 拆分、命名税 | 不变 |
+
+**注意**：Step 3 的原判据（"8 个不可达 browser 文件先删"）**已失效**，
+须按 10.2 重新审查。
