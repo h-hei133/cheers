@@ -542,6 +542,62 @@ export type RestoreCommandRecordSelection =
 确认存在一条数据可流通的路径**。仅凭"两侧都有同名概念"就判"可接线"，
 与之前"仅凭可达性就判可删除"是同一类错误——**用间接证据替代直接证据**。
 
+## 附六：验证脚本假阳性已修（2026-09-17，Step 2.7 首项）
+
+### 失效机制
+
+两个 gate 脚本把测试路径列表原样传给 `npm run test -w packages/ts-shell -- <paths>`。
+**vitest 对不存在的路径不报错**，只跑存在的那些并返回 0。于是脚本继续打印全部
+`report field` / `marker` 行并输出 `[pass]`、`process.exit(0)`。
+
+| 脚本 | 声明目标 | 实际存在 | 修复前行为 |
+|---|---:|---:|---|
+| `verify:edit-capability-closeout` | 98 | 23 | 打印全部 claim + `[pass]`，`exit 0` |
+| `verify:browser-txn-gate` | 14 | **0** | 打印 `[pass]`，`exit 0` |
+
+### 修复
+
+在两个脚本中于 `run(...)` 之前加入目标存在性校验：缺失即列出全部缺失路径并以 `exit 1` 失败。
+导入 `existsSync`，与仓库既有模式（`scripts/verify-cli-entry.mjs` 的 `missing=` 报告）一致。
+
+修复后实测：
+
+```
+[product-regression] edit-capability-closeout - declared 98, present 23, missing 75
+[product-regression] browser-txn-gate - declared 14, present 0, missing 14
+退出码 = 1（两者）
+```
+
+### 影响面
+
+两个 gate **不在主门禁**（`npm run validate`、`npm test`）内，属独立调用，
+因此修复不会拖红主流程。`npm run validate` 仍通过。
+
+### 遗留：两个 gate 本身已过期，需裁决
+
+修好"不再说谎"之后，暴露出更根本的问题——**它们的声明已经与现实脱节**：
+
+| 脚本 | 问题 | 建议 |
+|---|---|---|
+| `verify:browser-txn-gate` | 声称的整条链（`browserTxn` / `browserTrace` / `browserScore` / `browserTxnEval` / `pwAdapter`）在活轨**全部不存在**（各 0 文件）。它是为已删除的旧事务式浏览器路线服务的门禁。活轨现役评测链是 `eval/browser/*`（`benchmarkModel` / `benchmarkReport` / `benchmarkRunner`）。 | **删除该 gate** 及 `package.json:74,76` 两条注册；同步修正 `docs/design/browser-eval-gate.md`、`docs/architecture/module-atlas.md:957` 的 `keep` 标注 |
+| `verify:edit-capability-closeout` | 声明 98 项，仅 23 项存在（覆盖 provider 链、anchor 链、restore 链，仍有价值）。其 `report field` 行声称的能力中有多项对应实现已删（如 `targetSetEditRoute` / `fencedEditRoute` / `editRecoveryPlan` 均 0 文件）。 | **收窄到 23 项实存目标**，并删除对应已失效的 `report field` 行；或整体废弃 |
+
+**处置建议**：`browser-txn-gate` 直接删除（服务对象已不存在，无替代价值）；
+`edit-capability-closeout` 收窄保留（仍覆盖活轨的 provider/anchor/restore 链）。
+
+两者均需维护者裁决，因为它们改变 `package.json` 的 scripts 注册面
+（`agent-rules` 规定 package scripts 变更需明确任务范围）。
+
+### 方法论意义
+
+这是"清理造成破坏"的**第四类**（前三类：引用型 / 契约型 / 半孤儿断链）：
+
+| 类别 | 表现 | 检测 |
+|---|---|---|
+| **验证型失效** | 验证脚本声称覆盖 N 项，实际只跑 M 项（M<N）仍报通过 | 校验声明目标是否都存在；**不可信任只输出 `[pass]` 而不报告覆盖数的门禁** |
+
+危险度最高：它不报错、不改行为、只让**所有后续验证失去可信度**。
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -187,6 +188,22 @@ console.log('report field target_set_recovery_workflow_handoff=covered')
 console.log('report field explicit_edit_recovery_apply=covered')
 console.log('report field result_contract_compatible=covered')
 console.log(`repo=${repoRoot}`)
+
+const missingTargets = testTargets.filter(
+  (target) => !existsSync(path.join(repoRoot, 'packages', 'ts-shell', target)),
+)
+if (missingTargets.length > 0) {
+  // vitest ignores paths that do not exist, so passing a stale list would run a
+  // subset and still exit 0. The gate must say what it did not cover instead of
+  // reporting a pass it did not earn.
+  console.log(
+    `[product-regression] edit-capability-closeout - declared ${testTargets.length}, present ${testTargets.length - missingTargets.length}, missing ${missingTargets.length}`,
+  )
+  for (const target of missingTargets) {
+    console.log(`  missing target: ${target}`)
+  }
+  process.exit(1)
+}
 
 const code = await run('npm', [
   'run',
