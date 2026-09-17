@@ -186,6 +186,90 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 2. **完整终态真实性闭包**：`capabilityClassification.ts` + `transitions.ts` + `classificationProjection.ts` + `queryTerminalTruth.ts`。
 3. 工具 provenance/lifecycle 细节是否被新工具循环完整覆盖。
 
+## 附二：验证脚本断链（2026-09-17，清理造成的第二类真实破坏）
+
+主簇删除同时打断了 `scripts/` 下的验证脚本。这类断链 **import 图与 `tsc` 都看不见**，
+因为脚本用 `path.join(...)` 拼路径后动态 `import()` 或传给 `tsx`。
+
+### A. 直接断链（5 个脚本，正确报错）
+
+| npm script | 退出码 | 失败原因 |
+|---|---:|---|
+| `verify:real-user-capabilities:three-file-guarded-write` | 1 | `MODULE_NOT_FOUND` |
+| `verify:real-user-capabilities:single-file-move-evidence` | 1 | `MODULE_NOT_FOUND` |
+| `verify:real-user-capabilities:single-file-delete-evidence` | 1 | `MODULE_NOT_FOUND` |
+| `verify:real-user-capabilities:mixed-operation-evidence` | 1 | `MODULE_NOT_FOUND` |
+| `verify:real-user-capabilities:three-file-planning-no-write` | 1 | `MODULE_NOT_FOUND` |
+
+共同根因：这 5 个脚本都引用已删的 `orchestration/mutationRoutingProjection.ts`
+（导出 `projectApplyPatchRuntimeMutationRoute`）。
+
+另有 `scripts/verify/index.mjs` 通过 `pathToFileURL` 引用 7 个已删模块，影响
+`verify:real-user-capabilities*` 系列。
+
+### B. 已失效但仍报通过（最危险，1 个脚本）
+
+`scripts/verify-edit-capability-closeout.mjs`（`npm run verify:edit-capability-closeout`）：
+
+- 脚本列出 **98 个测试路径**，其中 **75 个已不存在**。
+- 它把这些路径原样传给 `npm run test -- <paths>`；vitest 对不存在的文件**不报错**，
+  只跑存在的 23 个，返回 0。
+- 于是脚本打印全部 marker 并输出 `[pass] edit-capability-closeout`，`process.exit(0)`。
+
+**实测退出码 0，但覆盖已从 98 项缩到 23 项。** 这是"验证脚本静默说谎"——
+它声称能力就绪，实际大部分证据已消失。比 A 类危险得多，因为没有任何信号提示。
+
+### C. 结论
+
+- 删除前只检查了 `src/` 的 CLI 可达性，**没有检查 `scripts/` 的引用**。
+- 验证脚本是"能力就绪"的证据来源；脚本失效会让后续判断失真。
+- 处置见转接包 §6。
+
+## 附三：契约级断链（2026-09-17，子代理审查 + 自查确认）
+
+符号级扫描为零（附一），但**契约级**断链存在。这类断链的形态是：
+活轨**读取**某个数据/标记，但**没有任何活轨代码写入它**。`tsc` 不报错，
+因为类型仍在（可选字段），只是永远为空。
+
+### 断链 1（最严重）：`CodingResultSummary.provenance.toolExecutions`
+
+| | |
+|---|---|
+| **读取者**（全部 CLI 可达） | `core/shell/sessionTerminalState.ts:1077`（`hasApprovedBashExecutionFailureProvenance`）、`session/continuation/sessionToolContinuity.ts:8`、`session/continuation/stoppedSessionContinuity.ts:234`、`presentation/surface/model.ts:1962` |
+| **写入者** | **无** |
+| **被删的生产者** | `core/tools/approvalProvenance.ts`、`core/tools/toolExecutionProvenance.ts`（经已删的 `orchestration/codingResultProvenance.ts` 聚合） |
+| **后果** | 字段恒为 `undefined`。`sessionTerminalState.ts` 里那条"审批过的 bash 执行失败"分支永不触发；工具执行来源（approval/provenance）在终端与 surface 上永不显示。 |
+
+### 断链 2：浏览器连续性标记前缀
+
+| | |
+|---|---|
+| **读取者**（CLI 可达） | `session/sessionContinuationProjection.ts:57-60` 声明关键前缀 `browser-agent-transaction-trace:` / `browser-agent-transaction:` / `browser-agent-observation:` / `browser-observation:` |
+| **写入者** | 无。`core/context/browserAgent.ts:178-180` 自己也只**过滤**这些前缀，不产出。 |
+| **被删的生产者** | `core/context/browserTrace.ts`、`browserTxnEvidence.ts`、`browserObs.ts` |
+| **后果** | 连续性投影期待这些标记以判断浏览器事务续跑，但活轨浏览器链产出的是 `browser-command-runner:*` / `browser-runtime-receipt:*`。前缀列表已成为永不匹配的死条件。 |
+
+### 断链 3（半孤儿）：`browserAgent.ts` 的消费端被删
+
+| | |
+|---|---|
+| `core/context/browserAgent.ts` | CLI 可达（`detectBrowserAgentPlan`） |
+| 调用者 | 无。原调用者 `orchestration/browserModule.ts` 已删 |
+| 唯一引用 | `orchestration/workflowTaskPlanner.ts` 只 `import type { BrowserAgentPlan }`，且无任何活轨代码赋值 `browserPlan:` |
+| 后果 | 该文件仍在 CLI 可达集内，但**调用图上是死的**。可达性 BFS 掩盖了这一点。 |
+
+### 方法论升级
+
+之前只定义了"引用型"与"契约型"两类。本次新增第 3 类：
+
+| 类别 | 表现 | 检测 |
+|---|---|---|
+| 引用型 | import 不存在的模块 | `tsc` / import 图 |
+| 契约型 | 活轨读、无人写（数据/标记/字段） | 对每个被读的字段，反查写入点 |
+| **半孤儿** | 文件在可达集内，但无调用者 | 对每个导出函数，反查调用点（可达性 BFS 不覆盖） |
+
+**"在 CLI 可达集内"不等于"被调用"**。可达性只说明它被 import 链拉进来了（例如仅被 `import type` 引用），不说明逻辑上还有人调用它。
+
 ## 十一、统一执行路线（收束）
 
 ### 阶段 1：停止删除（已完成）
@@ -210,15 +294,40 @@ API 额度在生成完整逐文件表前耗尽，但已确认一个高优先级�
 
 ## 十二、当前唯一可信总账
 
-- 三次删除生产文件：403。
-- 已确认纯 shim/迁移残留或废弃路线：保留删除，证据见 §§3、8、10。
-- 已恢复并接线：2 个文件。
-- 已确认高价值候选：见 §§4、9、10，尚未全部恢复。
-- G1/G3 的逐文件审查仍有部分不确定项；本文件的分组结论不应被误读为 403 行逐文件完成。
+### 已确认的真实破坏（全部已定位，部分已修）
 
-当前工作树保持在 `normproof-observation`，未切换分支；用户已有 `.serena/project.yml` 改动未触碰。
+| # | 类型 | 内容 | 状态 |
+|---|---|---|---|
+| 1 | 契约型 | 写路径丢失 `O_NOFOLLOW` / 描述符复验（`workspace.ts`） | 已恢复接线 |
+| 2 | 契约型 | `/undo` 快照无人写入（`editSnapshot.ts`） | 已恢复接线 |
+| 3 | 契约型 | `provenance.toolExecutions` 有 4 个读取者、零写入者 | **待修** |
+| 4 | 契约型 | 浏览器连续性标记前缀无生产者 | **待修** |
+| 5 | 半孤儿 | `browserAgent.ts` 在可达集内但无调用者 | **待裁决** |
+| 6 | 脚本 | 5 个 `verify:real-user-capabilities:*` 脚本 `MODULE_NOT_FOUND` | **待修** |
+| 7 | 脚本 | `verify:edit-capability-closeout` 假阳性（98 项中 75 项已不存在仍报 pass） | **待修** |
 
----
+### 已确认无问题
+
+- **引用型断链为零**：403 个已删文件的 1563 个导出符号中，无一被活轨当符号引用（附一）。
+- 纯 re-export shim / 活轨已内联归并的模块：可维持删除。
+- `apply_patch` 解析/验证/应用路线：废弃路线，不恢复（§3）。
+
+### 仍未完成
+
+- **G1 orchestration 154 / G3 core·adapters 46 的逐文件表**：子代理两次均因额度中止在"正在写表"阶段，
+  仅有分组结论（§9、§10）。**不得据此下"无遗漏断链"的结论。**
+
+### 审查覆盖率
+
+| 项 | 数量 |
+|---|---:|
+| 已删生产文件 | 403 |
+| 有逐文件结论 | 203（G2 68 + G4 48 + Step2.6 82 + facade 5） |
+| 仅分组结论 | 200（G1 154 + G3 46） |
+| **覆盖率** | **50%** |
+
+**但据此已确认 7 项真实破坏**，说明覆盖率虽只一半，风险已大量暴露；
+剩余 200 个文件的逐文件核验仍需完成。
 
 ## 附：符号级断链穷尽扫描（2026-09-17）
 
