@@ -3,8 +3,8 @@ import type { CompactLiveCheckpoint } from "../compact/checkpoint/compactLiveChe
 import type { ProjectMemoryInjectionState } from "../memory/projectMemoryInjectionState.js";
 import type { ProjectMemoryRecord, ProjectMemoryStoreHealth } from "../memory/projectMemoryStoreContract.js";
 import type { ProjectMemoryReviewState } from "../memory/projectMemoryReviewState.js";
-import type { StartupWarmContextCache } from "../startup/startupWarmContextCache.js";
-import type { StartupWarmContextCacheHealth } from "../startup/startupWarmContextHealth.js";
+import type { StartupWarmContextCache } from "../../../context/startup/startupWarmContextCache.js";
+import type { StartupWarmContextCacheHealth } from "../../../context/startup/startupWarmContextHealth.js";
 import { projectSidebarActivity } from "./sidebarActivityProjection.js";
 import type { SidebarEvent } from "./sidebarEventModel.js";
 import {

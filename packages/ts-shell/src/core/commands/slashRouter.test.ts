@@ -11,7 +11,7 @@ import { createProjectMemoryInjectionStateStore } from "../context/memory/projec
 import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
 import { createProjectMemoryReviewStateStore } from "../context/memory/projectMemoryReviewState.js";
 import { createSidebarLiveEventStore } from "../context/sidebar/sidebarLiveEventStore.js";
-import { createStartupWarmContextCacheStore } from "../context/startup/startupWarmContextHealth.js";
+import { createStartupWarmContextCacheStore } from "../../context/startup/startupWarmContextHealth.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
 

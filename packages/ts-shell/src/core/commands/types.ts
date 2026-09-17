@@ -3,7 +3,7 @@ import type { CompactInjectionStateStore } from '../context/compact/injection/co
 import type { ProjectMemoryReviewStateStore } from '../context/memory/projectMemoryReviewState.js'
 import type { ProjectMemoryInjectionStateStore } from '../context/memory/projectMemoryInjectionState.js'
 import type { ProjectMemoryStore } from '../context/memory/projectMemoryStoreContract.js'
-import type { StartupWarmContextCacheStore } from '../context/startup/startupWarmContextHealth.js'
+import type { StartupWarmContextCacheStore } from '../../context/startup/startupWarmContextHealth.js'
 import type { BrowserExecutor } from '../context/browserExecutor.js'
 import type { BrowserExecutionConfirmationRecord } from '../context/browserExecutionConfirmation.js'
 import type { BrowserNetworkAllowlist } from '../context/browserNetworkAllowlist.js'

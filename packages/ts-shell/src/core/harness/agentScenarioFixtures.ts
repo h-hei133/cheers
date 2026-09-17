@@ -12,7 +12,7 @@ import type { BrowserExecutor } from "../context/browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "../context/browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";
 import type { BrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
-import { createStartupWarmContextCacheStore } from "../context/startup/startupWarmContextHealth.js";
+import { createStartupWarmContextCacheStore } from "../../context/startup/startupWarmContextHealth.js";
 import type { CommandContext } from "../commands/types.js";
 import {
   deterministicScenarioTimestamp,

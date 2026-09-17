@@ -271,3 +271,10 @@
 - import 修正：搬迁文件的相对深度（`routeContinuityHandoff` 2→4 层、`contextAnalysis` 1→3 层）+ 2 个外部消费者（`../../` → `../continuity/`）+ 1 个测试文件。
 - **结果**：`core/context/` 平铺层只剩 browser 域的 5 个文件（`pw*` ×3 + `stealthPreload` ×2）。
 - 验证：tsc 0 错；该域 19 文件/45 测试全绿；**全量 3172 项 1 失败**（`deepResearch` 已知抖动项，宽超时 5/5 通过）；可达性 production 959 / cliReachable 874 / cliOpaque 85 **不变**（搬迁不改变可达性，符合预期）。
+
+## [2026-09-17] step3b | `startup/` 域搬迁至 `context/startup/`。完成。
+- **搬迁**：`core/context/startup/` 全部 9 文件（`startupWarm*` 一族）→ `context/startup/`，原目录删除。
+- **路径修正**：域内 3 文件（`../memory/` → `../../core/context/memory/`；`../../../orchestration/` → `../../orchestration/`）+ 外部 5 处（`core/commands/{types,slashRouter.test,warmupCommandRuntime}.ts`、`core/harness/agentScenarioFixtures.ts`、`core/context/sidebar/sidebarStateProjection.ts`）。
+- **映射表补漏**：`sidebar/sidebarStateProjection.ts` 引用 startup 的 2 条边**未被原统计捕获**（因统计按 basename 匹配，该处用 `../startup/` 相对路径且 sidebar 属域内）。已修正。
+- **验证**：tsc 0 错；相关域 30 文件/177 测试全绿；**全量 3172 项零失败**（首跑 5 个 harness browser 场景测试超时失败，重跑全绿——确认为 `testTimeout` 默认 5000ms 与这些测试单独需 8-10 秒的**并发抖动**，非回归：5 项中 4 项完全不引用 startup 域）；可达性 production 959 / cliReachable 874 / cliOpaque 85 不变。
+- **已知配置缺口**（记录）：`packages/ts-shell/vitest.config.ts` **未设 `testTimeout`**，用默认 5000ms，而 browser 场景测试（含 Playwright）单独需 8-10 秒 → 全量并发下间歇超时。属既有问题，非本次引入。

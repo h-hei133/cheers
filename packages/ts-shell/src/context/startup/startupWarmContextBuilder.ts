@@ -1,7 +1,7 @@
-import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
-import { listEditCapabilityReadiness } from "../../../orchestration/patchResult/editCapabilityReadiness.js";
-import type { ProjectMemoryRecord, ProjectMemoryStore } from "../memory/projectMemoryStoreContract.js";
-import { buildProjectMemoryWakeupPreview } from "../memory/projectMemoryWakeup.js";
+import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
+import { listEditCapabilityReadiness } from "../../orchestration/patchResult/editCapabilityReadiness.js";
+import type { ProjectMemoryRecord, ProjectMemoryStore } from "../../core/context/memory/projectMemoryStoreContract.js";
+import { buildProjectMemoryWakeupPreview } from "../../core/context/memory/projectMemoryWakeup.js";
 import {
   buildStartupWarmContextCache,
   computeStartupWarmSourceSignature,
