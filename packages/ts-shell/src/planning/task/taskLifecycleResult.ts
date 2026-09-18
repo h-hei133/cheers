@@ -2,7 +2,7 @@ import type { AnalysisBrief } from "./analysisBrief.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
 import type { TaskReadPlan } from "./taskReadPlan.js";
-import { projectRuntimeCodingOutcome, type RuntimeOutcomeProjection } from "./runtimeOutcomeProjection.js";
+import { projectRuntimeCodingOutcome, type RuntimeOutcomeProjection } from "../../orchestration/runtimeOutcomeProjection.js";
 
 export type TaskLifecycleTerminalOutcome =
   | "task-lifecycle-created"

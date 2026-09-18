@@ -7,7 +7,7 @@ import { buildTaskContextNeeds } from "./taskContextNeed.js";
 import { evaluateTaskContextSufficiency } from "./taskContextSufficiency.js";
 import { buildTaskIntent } from "./taskIntent.js";
 import { buildTaskReadPlan } from "./taskReadPlan.js";
-import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
 
 describe("analysis brief calibration", () => {
   it("downgrades under-evidenced analysis and preserves hidden reasoning boundary", () => {

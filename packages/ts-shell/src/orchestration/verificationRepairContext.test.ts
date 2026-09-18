@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "./agentPlan.js";
+import { buildAgentPlan } from "../planning/task/agentPlan.js";
 import {
   buildVerificationRepairContext,
   buildVerificationRepairContextFromCodingResult,

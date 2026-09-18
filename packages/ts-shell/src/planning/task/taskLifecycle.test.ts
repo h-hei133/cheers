@@ -9,7 +9,7 @@ import { buildTaskLifecycleResult } from "./taskLifecycleResult.js";
 import { buildTaskLifecycleTrace } from "./taskLifecycleTrace.js";
 import { buildTaskReadPlan } from "./taskReadPlan.js";
 import { buildTaskStage } from "./taskStage.js";
-import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
 
 describe("task lifecycle loop", () => {
   it("models read analyze plan evidence without granting mutation authority", () => {

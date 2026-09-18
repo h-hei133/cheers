@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 
 import type { AgentPlanRequestedActionKind } from "./agentPlan.js";
-import { redactProviderEditText } from "./providerEditContext.js";
-import type { CodingTaskKind } from "./types.js";
-import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
+import { redactProviderEditText } from "../../orchestration/providerEditContext.js";
+import type { CodingTaskKind } from "../../orchestration/types.js";
+import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
 
 export type TaskIntentKind =
   | "read-explain"

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { AgentPlan } from "./agentPlan.js";
+import type { AgentPlan } from "../planning/task/agentPlan.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
 import {
   buildEditRepairContext,
@@ -7,11 +7,11 @@ import {
   type EditRepairContext,
 } from "./editRepairContext.js";
 import { redactProviderEditText } from "./providerEditContext.js";
-import type { AnalysisBrief } from "./analysisBrief.js";
-import type { AnalysisQualityGateResult } from "./analysisQualityGate.js";
-import type { TaskContextSufficiency } from "./taskContextSufficiency.js";
-import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
-import type { TaskLifecycle } from "./taskLifecycle.js";
+import type { AnalysisBrief } from "../planning/task/analysisBrief.js";
+import type { AnalysisQualityGateResult } from "../planning/task/analysisQualityGate.js";
+import type { TaskContextSufficiency } from "../planning/task/taskContextSufficiency.js";
+import type { TaskExecutionPlan } from "../planning/task/taskExecutionPlan.js";
+import type { TaskLifecycle } from "../planning/task/taskLifecycle.js";
 import type {
   CodingResultSummary,
   CodingVerificationSummary,

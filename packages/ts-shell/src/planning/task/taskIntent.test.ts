@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildTaskIntent } from "./taskIntent.js";
-import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
 
 describe("buildTaskIntent", () => {
   it("keeps edit planning separate from verification-output analysis when verifyAfterEdit is requested", () => {

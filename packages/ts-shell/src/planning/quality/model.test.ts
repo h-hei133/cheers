@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "../../orchestration/agentPlan.js";
+import { buildAgentPlan } from "../task/agentPlan.js";
 import { buildContextGraph } from "../../orchestration/contextGraph.js";
 import { scoreContextGraph } from "../../orchestration/contextGraphScore.js";
 import { buildPlanQuality, attachPlanQualityToAgentPlan, attachProviderAnchoringToPlanQuality } from "./model.js";

@@ -1,13 +1,13 @@
 import {
   buildContextPlanningSummary,
   type ContextPlanningSummary,
-} from "./contextPlan.js";
-import type { TargetedContextPacket } from "./contextPacket.js";
-import type { ContextGraph } from "./contextGraph.js";
-import type { ContextGraphScore } from "./contextGraphScore.js";
-import type { TestImpactPlan } from "./testImpactPlan.js";
-import type { CodeGraphTrace } from "../context/acquisition/code/trace.js";
-import type { CodeGraphImpact } from "../context/acquisition/code/impact.js";
+} from "../../orchestration/contextPlan.js";
+import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import type { ContextGraph } from "../../orchestration/contextGraph.js";
+import type { ContextGraphScore } from "../../orchestration/contextGraphScore.js";
+import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { CodeGraphTrace } from "../../context/acquisition/code/trace.js";
+import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import type { AnalysisBrief } from "./analysisBrief.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";

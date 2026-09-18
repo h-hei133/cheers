@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { projectContextPacketToAgentPlanContext } from "./agentPlanContext.js";
 import { projectWorkflowTaskPlanToAgentPlan } from "./agentPlanProjection.js";
-import type { TargetedContextPacket } from "./contextPacket.js";
-import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
+import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
 
 describe("projectWorkflowTaskPlanToAgentPlan", () => {
   it("classifies broad edit with context packet as needs-more-context", () => {

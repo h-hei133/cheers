@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import type { AgentPlan } from "../../orchestration/agentPlan.js";
+import type { AgentPlan } from "../../planning/task/agentPlan.js";
 import type { CodingResultSummary } from "../../orchestration/types.js";
 import {
   blockedCommandReason,
@@ -10,10 +10,10 @@ import { redactProviderEditText } from "../../orchestration/providerEditContext.
 import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
 import type { PlanQuality } from "../../planning/quality/model.js";
 import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
-import type { TaskExecutionPlan } from "../../orchestration/taskExecutionPlan.js";
-import type { TaskLifecycle } from "../../orchestration/taskLifecycle.js";
-import type { AnalysisQualityGateResult } from "../../orchestration/analysisQualityGate.js";
-import type { TaskContextSufficiency } from "../../orchestration/taskContextSufficiency.js";
+import type { TaskExecutionPlan } from "../../planning/task/taskExecutionPlan.js";
+import type { TaskLifecycle } from "../../planning/task/taskLifecycle.js";
+import type { AnalysisQualityGateResult } from "../../planning/task/analysisQualityGate.js";
+import type { TaskContextSufficiency } from "../../planning/task/taskContextSufficiency.js";
 import { evaluatePlanQualityGate } from "../../planning/quality/gate.js";
 import { isTaskQualityBenchmarkCommand } from "../taskQualityBenchmarkCommand.js";
 

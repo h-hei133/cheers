@@ -1,12 +1,12 @@
 import crypto from "node:crypto";
 
-import type { CodeGraphImpact } from "../context/acquisition/code/impact.js";
-import type { CodeGraphStalenessCheck } from "../context/acquisition/code/staleness.js";
-import type { ContextGraphScore } from "./contextGraphScore.js";
-import type { TargetedContextPacket } from "./contextPacket.js";
+import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
+import type { CodeGraphStalenessCheck } from "../../context/acquisition/code/staleness.js";
+import type { ContextGraphScore } from "../../orchestration/contextGraphScore.js";
+import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
 import type { TaskContextAcquisition } from "./taskContextAcquisition.js";
 import type { TaskContextNeedSet } from "./taskContextNeed.js";
-import type { TestImpactPlan } from "./testImpactPlan.js";
+import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
 
 export type TaskContextSufficiencyState =
   | "sufficient"

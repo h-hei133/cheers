@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "../../orchestration/agentPlan.js";
+import { buildAgentPlan } from "../../planning/task/agentPlan.js";
 import { buildCodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import { normalizeCodeGraphFacts } from "../../context/acquisition/code/facts.js";
 import { buildCodeGraphTrace } from "../../context/acquisition/code/trace.js";

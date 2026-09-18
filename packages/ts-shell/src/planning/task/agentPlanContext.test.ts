@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { projectContextPacketToAgentPlanContext } from "./agentPlanContext.js";
-import type { ContextGraph } from "./contextGraph.js";
-import type { ContextGraphScore } from "./contextGraphScore.js";
-import type { TargetedContextPacket } from "./contextPacket.js";
-import type { TestImpactPlan } from "./testImpactPlan.js";
+import type { ContextGraph } from "../../orchestration/contextGraph.js";
+import type { ContextGraphScore } from "../../orchestration/contextGraphScore.js";
+import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
 
 describe("projectContextPacketToAgentPlanContext", () => {
   it("projects context packet facts into replay-safe agent planning input", () => {
