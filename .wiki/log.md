@@ -832,3 +832,34 @@
 - **另更正我自己的两处过度声称**：① 曾判 `AGENTS.md:34` 指向不存在路径——**误判**，
   `packages/ts-shell/src/` 确实存在，该句是**含糊**非断链；② 曾报 `DOC_STATUS.md` 11 处断链——
   **误判**，那是通配符，具体路径 111/111 全部有效。
+
+## [2026-09-18] drift-step1 | 3.9 第一步完成：按文档自述重分类 + 门禁接入。
+- **先做 3.9 的判定依据**：3.8 有 **6 项待裁决的设计决策**，而 3.9 的止损动作
+  **不依赖任何裁决**；两者耦合极低（3.8 候选路径在 RULES 作用域 **0 引用**，docs 侧仅 7 文件）。
+- **执行中发现我上轮的门禁口径错了两次，而修正口径本身就是全部工作**：
+  | 口径 | 结果 |
+  |---|---|
+  | 上轮：按**目录**（`docs/architecture`+`project-map`） | 44 文件 / 155 死引用 |
+  | 本轮修正①：按 `DOC_STATUS` 的 **active** | 61 文件 / **224** 死引用 |
+  | 本轮修正②：再按**文档自述**重分类 | **26 文件 / 0 死引用** |
+  `docs/architecture/` 32 份里**只有 3 份 active**（2 historical、1 superseded、**27 未登记**）
+  ——**目录是错的单位**，上轮计数把 superseded/historical 文档当成了"描述当前"。
+- **关键证据（文档自述，非推断）**：61 份 active 里 **39 份**正文自己写着
+  `Status: PL003 roadmap. Date: 2026-05-29`、`PS001 audit and planning`、
+  `This audit closes Phase 2 Goal 3` —— 是**带日期的审计/路线图/结项记录**，
+  而 `DOC_STATUS` 自己定义 `historical` = "route closeout, migration, **audit**,
+  or decision history"。**它们是标注错误，不是内容过期。**
+- **已执行**：① 按自述重分类 **39 条**（`active`→`historical`）；
+  `control-plane-atlas.md` → **`superseded`**（`DOC_STATUS` 早已把 `module-atlas` 标为被它取代，
+  而它是两者中较弱的）；② **补登缺失的真源**——`DOC_STATUS` 此前**只列 `.wiki/_index.md`，
+  完全没有 `.wiki/refactor/plan.md`**，而已登记 `plan.md` + 两份本轮探索文档 + 漂移门禁本身；
+  ③ 门禁两处修正；④ **接入 `verify-release-core`（带 `--strict`）** + 注册
+  `verify:docs-drift`/`verify:docs-drift:strict`。
+- **门禁两处修正（均由负向测试暴露）**：
+  ① `active` 条目指向不存在的文件**现在失败**（此前只打印不阻断 exit 0）——
+     一个自称"当前真源"却指向空处的条目，正是本门禁要抓的漂移；
+  ② 跳过**占位符模式**（`<path>`），此前被我自己的描述性正文误报（1 处假阳性）。
+- **效果**：RULES 2 → **0**；DOCS 224 → **0**（`--strict` 通过）。
+  **双向验证**：干净态 **exit 0**；`active` 条目指向缺失文件 → **exit 1** 并指名该条目。
+- **未改动**：`docs/` 其余约 700 份历史文档**保持原样**——按定义即历史，"过期"是正确状态。
+  **未删除任何文档。零生产代码改动。**

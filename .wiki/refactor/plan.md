@@ -661,7 +661,50 @@ grep -rn "join(__dirname|join(process.cwd()|repoRoot" src --include=*.test.ts | 
 ① 只认文件不认**目录**（漏掉 `orchestration/patchResult/`，首版在规则层误报"0 问题"）；
 ② 不跳过**通配符**（把 `docs/design/*.md` 当字面路径，11 处假阳性）。
 
-#### 3.9.5 待裁决
+#### 3.9.5 第一步执行结果（2026-09-18，已完成）
+
+**先做 3.9 的理由（判定依据）**：3.8 有 **6 项待裁决的设计决策**（`renderer/` 去向、
+`test-utils/` 归属、`eval/` 归并、`theme(s)/` 合并、`exclude` 收紧、`core/` 语义），
+而 3.9 的止损动作**不依赖任何裁决**；且两者耦合度极低——3.8 的候选路径在 RULES 作用域内
+**0 引用**，在 docs 侧仅 7 个文件。
+
+**执行中发现：我上轮的门禁口径错了两次，而修正口径本身就是全部工作。**
+
+| 轮次 | 口径 | 结果 |
+|---|---|---|
+| 上轮 | 按**目录**（`docs/architecture` + `docs/project-map`） | 44 文件 / 155 死引用 |
+| 本轮第一次修正 | 按 `DOC_STATUS` 的 **active** 标注 | 61 文件 / **224** 死引用 |
+| 本轮第二次修正 | 同上 + **按文档自述重分类** | **26 文件 / 0 死引用** |
+
+`docs/architecture/` 的 32 份里**只有 3 份是 active**（2 historical、1 superseded、
+**27 未登记**）——**目录是错的单位**。
+
+**关键证据（文档自述，非我的推断）**：61 份 active 里 **39 份**的正文自己写着
+`Status: PL003 roadmap. Date: 2026-05-29`、`PS001 audit and planning`、
+`This audit closes Phase 2 Goal 3` —— 它们是**带日期的审计/路线图/结项记录**，
+而 `DOC_STATUS` 自己的定义里 `historical` 就是 "route closeout, migration, **audit**,
+or decision history"。**它们是标注错误，不是内容过期。**
+
+**已执行**：
+1. **按自述重分类 39 条**（`active` → `historical`）；`control-plane-atlas.md` → **`superseded`**
+   （`DOC_STATUS` 早已把 `module-atlas` 标为被它取代，而它是两者中较弱的那个）。
+2. **补登缺失的真源**：`DOC_STATUS` 此前**只列 `.wiki/_index.md`，完全没有 `.wiki/refactor/plan.md`**
+   ——而那才是重构与当前结构状态的真源。已登记 `plan.md`、
+  两份本轮探索文档、以及漂移门禁本身。
+3. **门禁两处修正（均由负向测试暴露）**：
+   - `active` 条目指向不存在的文件**现在失败**（此前只打印不阻断）——
+     一个自称"当前真源"却指向空处的条目，正是本门禁要抓的漂移；
+   - 跳过占位符模式（`<path>`），此前被我自己的描述性正文误报。
+4. **接入 `verify-release-core`（带 `--strict`）** + 注册 `verify:docs-drift` /
+   `verify:docs-drift:strict`——搬迁文件的人**必须同步更新指向它的文字**。
+
+**效果**：RULES 2 → **0**；DOCS 224 → **0**（`--strict` 通过）。
+**双向验证**：干净态 exit 0；`active` 条目指向缺失文件 → exit 1 并指名该条目。
+
+**未改动**：`docs/` 其余约 700 份历史文档**保持原样**——它们按定义就是历史，
+"过期"是正确状态。**未删除任何文档。**
+
+#### 3.9.6 待裁决
 
 | 项 | 性质 |
 |---|---|
