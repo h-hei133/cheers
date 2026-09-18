@@ -7,36 +7,13 @@
  * - state.json      -> mutable runtime state snapshot
  */
 
-import { createComponentLogger } from "../observability/structuredLogger.js";
-import type { QueryEvent } from "../core/query/runtime/events.js";
-import type {
-  QueryRuntimeRecoveryBoundary,
-  QueryRuntimeStateSeed,
-} from "../core/query/runtime/state.js";
-import {
-  type DurableLifecycleIndex,
-} from "../core/tools/toolResultLifecycle.js";
-import type { ContinuationReason } from "../result/types.js";
-import type {
-  CurrentSessionSelectionResolution,
-} from "./store/currentSelection.js";
-import {
-  SESSION_APPROVAL_AUDIT_HISTORY_LIMIT,
-  recordSessionApprovalAuditDecision,
-} from "./approval/sessionApprovalMemory.js";
-import { applySessionCompactRetention } from "./sessionCompactModule.js";
+import type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
+import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "./approval/sessionApprovalMemory.js";
 import { type TranscriptEvent } from "./sessionEventCodec.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
 import type { Session } from "./schema/sessionRecord.js";
-import type {
-  SessionStateSnapshot,
-  SessionStateSnapshotOverrides,
-  TerminalPersistence,
-} from "./schema/sessionStateSnapshot.js";
-import {
-  buildSessionStateSnapshot,
-} from "./schema/sessionStateSnapshot.js";
-import type { RuntimeSeedOptions } from "./replay/builder.js";
+import type { SessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
+import { buildSessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
 import {
   projectSortedSessionReentrySummaries,
   selectRecoveryTrustBoundaryBlock,
@@ -44,47 +21,27 @@ import {
 } from "./recovery/sessionRecoverySelection.js";
 import { projectRecentProjectContexts } from "./recovery/projectContextSummary.js";
 import type { ProjectContextSummary } from "./recovery/projectContextSummary.js";
-import {
-  buildSessionResumeContext,
-  buildSessionResumeSnapshot,
-} from "./continuation/sessionPromptContinuity.js";
-import {
-  validateSessionId,
-} from "./store/sessionFileLayout.js";
+import { validateSessionId } from "./store/sessionFileLayout.js";
 import {
   createSession,
   createSessionWithId,
 } from "./store/sessionCreation.js";
 import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
-import { projectSessionReentrySummary, type SessionReentrySummary } from "./presentation/sessionReentrySurface.js";
 import {
-  sessionHasConversation,
-  sessionHasReentrySurface,
+  projectSessionReentrySummary,
+  type SessionReentrySummary,
 } from "./presentation/sessionReentrySurface.js";
 import type { RecoveryTrustBoundaryBlock } from "./recovery/recoveryTrustBoundary.js";
-import type {
-  SessionResumeEligibility,
-} from "./recovery/sessionResumeEligibility.js";
+import type { SessionResumeEligibility } from "./recovery/sessionResumeEligibility.js";
 import type {
   ApprovalAuditMemoryState,
   SessionContinuitySnapshot,
 } from "./sessionContinuityTypes.js";
-import {
-  type WorkspaceRootMode,
-} from "./store/projectBindingPolicy.js";
+import { type WorkspaceRootMode } from "./store/projectBindingPolicy.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
-import { SessionLifecycleWrites } from "./lifecycle/sessionLifecycleWrites.js";
-import { buildSessionContinuitySnapshot } from "./continuation/sessionContinuitySnapshot.js";
-import { normalizeLegacyPermissionStateForSession } from "./continuation/legacyPermissionRebase.js";
-import { extractSeedInfluenceFromQueryResult } from "./continuation/sessionSeedInfluence.js";
+import { SessionReadSurface } from "./sessionReadSurface.js";
 import { rebindSessionProjectRootContinuity } from "./continuation/sessionProjectRootRebind.js";
-import { appendSessionTurn } from "./transcript/sessionTranscript.js";
 import {
-  appendSessionQueryEvent,
-  applySessionQueryEventToState,
-} from "./transcript/sessionQueryEventPersistence.js";
-import {
-  buildRecoverySnapshotForSession,
   evaluateRecoveryTrustBoundaryForSession,
   projectRecoveryTrustBoundaryBlockForSession,
 } from "./recovery/sessionRecoveryRuntime.js";
@@ -96,11 +53,6 @@ import {
   type SessionResumeResult,
 } from "./recovery/sessionResume.js";
 import type { ReplayPlan } from "./replay/sessionReplayFacade.js";
-import {
-  buildReplayPlanForSession,
-  buildRuntimeStateSeedForSession,
-} from "./replay/sessionReplayRuntime.js";
-import { handleGetTranscriptEvents } from "./agent/persistence.js";
 export type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
 export type {
   ApprovalAuditMemoryState,
@@ -130,33 +82,28 @@ export type ResumeResult = SessionResumeResult;
 
 export interface ResumeOptions extends SessionResumeOptions {}
 
-const sessionLogger = createComponentLogger("SessionManager");
-
-export class SessionManager extends SessionLifecycleWrites {
+export class SessionManager extends SessionReadSurface {
   private static readonly AUTO_COMPACT_TURN_THRESHOLD = 12;
   private static readonly APPROVAL_AUDIT_HISTORY_LIMIT =
     SESSION_APPROVAL_AUDIT_HISTORY_LIMIT;
-  private readonly store: SessionStoreAccess;
 
   constructor() {
-    const store = new SessionStoreAccess();
     super({
-      store,
+      store: new SessionStoreAccess(),
       approvalAuditHistoryLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
       readTranscriptEvents: (sessionId) => this.getTranscriptEvents(sessionId),
       readRecoverySnapshot: (sessionId) => this.getRecoverySnapshot(sessionId),
       buildStateSnapshot: (session, current) =>
         buildSessionStateSnapshot(session, current),
     });
-    this.store = store;
   }
 
   private createSessionCreationCallbacks() {
     return {
       sessionExists: (sessionId: string) => this.sessionExists(sessionId),
       validateSessionId,
-      createSessionId: () => this.store.createSessionId(),
-      writeSession: (session: Session) => this.store.writeSession(session),
+      createSessionId: () => this.host.store.createSessionId(),
+      writeSession: (session: Session) => this.host.store.writeSession(session),
       setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
         this.setCurrentSessionForProject(projectRoot, sessionId),
       now: () => new Date().toISOString(),
@@ -166,11 +113,11 @@ export class SessionManager extends SessionLifecycleWrites {
   private createSessionResumeCallbacks() {
     return {
       sessionDirExists: (sessionId: string) =>
-        this.store.sessionExists(sessionId),
-      sessionDir: (sessionId: string) => this.store.sessionDir(sessionId),
-      loadSession: (sessionId: string) => this.store.load(sessionId),
+        this.host.store.sessionExists(sessionId),
+      sessionDir: (sessionId: string) => this.host.store.sessionDir(sessionId),
+      loadSession: (sessionId: string) => this.host.store.load(sessionId),
       writeSessionMetadata: (session: Session) =>
-        this.store.writeSessionMetadata(session),
+        this.host.store.writeSessionMetadata(session),
       setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
         this.setCurrentSessionForProject(projectRoot, sessionId),
       evaluateRecoveryTrustBoundary: (session: Session) =>
@@ -178,30 +125,6 @@ export class SessionManager extends SessionLifecycleWrites {
       cwd: () => process.cwd(),
       now: () => new Date().toISOString(),
     };
-  }
-
-  getSessionFilePath(sessionId: string): string {
-    return this.store.metadataPath(sessionId);
-  }
-
-  getSessionDirPath(sessionId: string): string {
-    return this.store.sessionDir(sessionId);
-  }
-
-  /**
-   * Hide a session from re-entry until it holds something to return to.
-   *
-   * A launch has to create a session so the run has an identity, but a session
-   * nobody said anything in is not a place to go back to. Listing it would put a
-   * row in `/resume` for every time the CLI was opened, and offering its id on the
-   * way out would hand back a session that restores nothing. So an untouched
-   * session exists for the run and is invisible to everything that offers a choice.
-   *
-   * A run interrupted with a prompt still pending, or one that ended in a
-   * terminal state, is unfinished or diagnosable work and stays offered.
-   */
-  private listRealSessions(): Session[] {
-    return this.listSessions().filter((session) => sessionHasReentrySurface(session));
   }
 
   /**
@@ -223,39 +146,8 @@ export class SessionManager extends SessionLifecycleWrites {
     if (dropped <= 0) return 0;
     session.turns = session.turns.slice(0, keep);
     session.updatedAt = new Date().toISOString();
-    this.store.writeSessionMetadata(session);
+    this.host.store.writeSessionMetadata(session);
     return dropped;
-  }
-  /** The stored record, or undefined when it is gone or unreadable. */
-  getSession(sessionId: string): Session | undefined {
-    try {
-      return this.store.load(sessionId);
-    } catch (error) {
-      sessionLogger.warn("Failed to load session", { sessionId, error: error instanceof Error ? error.message : String(error) });
-      return undefined;
-    }
-  }
-
-  sessionExists(sessionId: string): boolean {
-    return this.store.sessionExists(sessionId);
-  }
-
-  getCurrentSessionForProject(projectRoot: string): Session | null {
-    return this.store.getCurrentSessionForProject(projectRoot);
-  }
-
-  resolveCurrentSessionForProject(
-    projectRoot: string,
-  ): CurrentSessionSelectionResolution {
-    return this.store.resolveCurrentSessionForProject(projectRoot);
-  }
-
-  setCurrentSessionForProject(projectRoot: string, sessionId: string): void {
-    this.store.setCurrentSessionForProject(projectRoot, sessionId);
-  }
-
-  clearCurrentSessionForProject(projectRoot: string): void {
-    this.store.clearCurrentSessionForProject(projectRoot);
   }
 
   createNewWithId(
@@ -314,57 +206,12 @@ export class SessionManager extends SessionLifecycleWrites {
   }
 
   renameSession(sessionId: string, title: string): Session {
-    const session = this.store.load(sessionId);
+    const session = this.host.store.load(sessionId);
     const normalized = title.trim();
     session.title = normalized.length > 0 ? normalized : undefined;
     session.updatedAt = new Date().toISOString();
-    this.store.writeSessionMetadata(session);
+    this.host.store.writeSessionMetadata(session);
     return session;
-  }
-
-  deleteSession(sessionId: string): void {
-    this.store.deleteSession(sessionId);
-  }
-
-  getTranscriptEvents(sessionId: string): TranscriptEvent[] {
-    return handleGetTranscriptEvents(this.store, sessionId);
-  }
-  getRecoverySnapshot(sessionId: string): RecoverySnapshot {
-    return buildRecoverySnapshotForSession({
-      sessionId,
-      session: this.store.load(sessionId),
-      state: this.store.readStateSnapshotRequired(this.store.statePath(sessionId)),
-      transcriptEvents: this.getTranscriptEvents(sessionId),
-    });
-  }
-
-  getReplayPlan(sessionId: string): ReplayPlan {
-    return buildReplayPlanForSession(this.getRecoverySnapshot(sessionId));
-  }
-
-  buildRuntimeStateSeed(
-    sessionId: string,
-    options: RuntimeSeedOptions = {},
-  ): QueryRuntimeStateSeed {
-    return buildRuntimeStateSeedForSession({
-      sessionId,
-      snapshot: this.getRecoverySnapshot(sessionId),
-      options,
-    });
-  }
-
-  listSessions(): Session[] {
-    return this.store.listSessions();
-  }
-
-  /**
-   * Sessions worth returning to, newest first.
-   *
-   * A session nobody said anything in is not one of them — offering it would put a
-   * row in the chooser for every time the CLI was opened.
-   */
-  listRecentSessions(limit: number = 5): Session[] {
-    return this.listRealSessions().slice(0, limit);
   }
 
   listRecentProjectContexts(limit: number = 8): ProjectContextSummary[] {
@@ -415,7 +262,7 @@ export class SessionManager extends SessionLifecycleWrites {
       limit: 20,
     });
     const withContent = summaries.find((summary) => summary.hasConversation === true);
-    return withContent ? this.store.load(withContent.id) : null;
+    return withContent ? this.host.store.load(withContent.id) : null;
   }
 
   getSuggestedRecoverySession(input?: {
@@ -428,25 +275,25 @@ export class SessionManager extends SessionLifecycleWrites {
       projectPreferredSummaries: (preferredProjectRoot) =>
         this.listReentrySummaries({ preferredProjectRoot }),
     });
-    return sessionId ? this.store.load(sessionId) : null;
+    return sessionId ? this.host.store.load(sessionId) : null;
   }
 
   rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string): Session {
-    const session = this.store.load(sessionId);
-    const statePath = this.store.statePath(session.id);
+    const session = this.host.store.load(sessionId);
+    const statePath = this.host.store.statePath(session.id);
     const rebound = rebindSessionProjectRootContinuity({
       session,
       nextProjectRoot,
       updatedAt: new Date().toISOString(),
       writeSessionMetadata: (nextSession) =>
-        this.store.writeSessionMetadata(nextSession),
+        this.host.store.writeSessionMetadata(nextSession),
       withStateLock: (targetSessionId, update) =>
-        this.store.withSessionStateLock(targetSessionId, update),
-      readStateSnapshot: () => this.store.readStateSnapshotSafely(statePath),
+        this.host.store.withSessionStateLock(targetSessionId, update),
+      readStateSnapshot: () => this.host.store.readStateSnapshotSafely(statePath),
       buildStateSnapshot: (nextSession, current) =>
         this.buildSessionStateSnapshot(nextSession, current),
       writeStateSnapshot: (snapshot) =>
-        this.store.writeJsonFileAtomic(statePath, snapshot),
+        this.host.store.writeJsonFileAtomic(statePath, snapshot),
     });
     this.setCurrentSessionForProject(rebound.projectRoot, rebound.id);
     return rebound;
@@ -462,14 +309,14 @@ export class SessionManager extends SessionLifecycleWrites {
       readonly gitRoot?: string | null;
     },
   ): Session {
-    const session = this.store.load(sessionId);
+    const session = this.host.store.load(sessionId);
     applySessionWorkspaceBinding({
       session,
       binding,
       updatedAt: new Date().toISOString(),
     });
-    this.store.writeSessionMetadata(session);
-    this.store.writeSessionState(session);
+    this.host.store.writeSessionMetadata(session);
+    this.host.store.writeSessionState(session);
     this.setCurrentSessionForProject(session.projectRoot, session.id);
     return session;
   }
@@ -485,7 +332,7 @@ export class SessionManager extends SessionLifecycleWrites {
   }
 
   describeSessionReentry(sessionId: string): SessionReentrySummary {
-    const session = this.store.load(sessionId);
+    const session = this.host.store.load(sessionId);
     const trustBoundary = this.evaluateRecoveryTrustBoundary(session);
     const recoverySnapshot = this.getRecoverySnapshot(sessionId);
     const continuitySnapshot = this.buildContinuitySnapshot(sessionId);
@@ -499,57 +346,10 @@ export class SessionManager extends SessionLifecycleWrites {
   }
 
   getSessionResumeEligibility(sessionId: string): SessionResumeEligibility {
-    const session = this.store.load(sessionId);
+    const session = this.host.store.load(sessionId);
     return this.evaluateRecoveryTrustBoundary(session);
   }
 
-  buildContinuitySnapshot(sessionId: string): SessionContinuitySnapshot {
-    const session = this.store.load(sessionId);
-    const statePath = this.store.statePath(sessionId);
-    const stateSnapshot = this.normalizeLegacyPermissionStateForSession(
-      session,
-      this.store.readStateSnapshotSafely(statePath),
-    );
-    return buildSessionContinuitySnapshot({
-      session,
-      stateSnapshot,
-      recoverySnapshot: this.getRecoverySnapshot(sessionId),
-      transcriptEvents: this.getTranscriptEvents(sessionId),
-      approvalHistoryLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
-    });
-  }
-
-  private normalizeLegacyPermissionStateForSession(
-    session: Session,
-    snapshot: SessionStateSnapshot | undefined,
-  ): SessionStateSnapshot | undefined {
-    const statePath = this.store.statePath(session.id);
-    return normalizeLegacyPermissionStateForSession({
-      session,
-      snapshot,
-      withStateLock: (targetSessionId, update) =>
-        this.store.withSessionStateLock(targetSessionId, update),
-      readLatestSnapshot: () => this.store.readStateSnapshotSafely(statePath),
-      writeSnapshot: (nextSnapshot) =>
-        this.store.writeJsonFileAtomic(statePath, nextSnapshot),
-    });
-  }
-
-  buildPromptContinuityContext(
-    sessionId: string,
-    currentPrompt: string,
-  ): string | undefined {
-    const snapshot = this.buildContinuitySnapshot(sessionId);
-    return buildSessionResumeContext({ currentPrompt, snapshot });
-  }
-
-  buildPromptContinuitySnapshot(
-    sessionId: string,
-    currentPrompt: string,
-  ): SessionContinuitySnapshot | undefined {
-    const snapshot = this.buildContinuitySnapshot(sessionId);
-    return buildSessionResumeSnapshot({ currentPrompt, snapshot });
-  }
   private evaluateRecoveryTrustBoundary(
     session: Session,
   ): SessionResumeEligibility {
@@ -568,7 +368,7 @@ export class SessionManager extends SessionLifecycleWrites {
   ): RecoveryTrustBoundaryBlock {
     return projectRecoveryTrustBoundaryBlockForSession({
       sessionId: session.id,
-      sessionDir: this.store.sessionDir(session.id),
+      sessionDir: this.host.store.sessionDir(session.id),
       reason,
       detail,
     });

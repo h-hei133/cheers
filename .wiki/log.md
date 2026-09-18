@@ -520,3 +520,42 @@
 - **剩余工作量**：当前 38，需再减 18。实测各组跨组依赖：**`store-binding`(11) 与 `read-projection`(8)
   跨组依赖均为 0** → 抽出后 ≈ **19，达标**，且**不需要 host 接口**（比本批更简单）。
   建议下一步先抽 `store-binding`（38 → 27），再抽 `read-projection`（→ 19）。
+
+## [2026-09-18] step5-b | SessionManager 拆分完成（38 → 18），全仓首次进入模块上限内。
+- **第三批**：20 个成员迁入新模块 `src/session/sessionReadSurface.ts`——
+  STORE 组（`getSessionFilePath`/`getSessionDirPath`/`listRealSessions`/`getSession`/`sessionExists`/
+  `getCurrentSessionForProject`/`resolveCurrentSessionForProject`/`setCurrentSessionForProject`/
+  `clearCurrentSessionForProject`/`listSessions`/`listRecentSessions`）+
+  READ 组（`deleteSession`/`getTranscriptEvents`/`getRecoverySnapshot`/`getReplayPlan`/
+  `buildRuntimeStateSeed`/`buildContinuitySnapshot`/`normalizeLegacyPermissionStateForSession`/
+  `buildPromptContinuityContext`/`buildPromptContinuitySnapshot`）。
+- **最终结构**（继承链深度 2，非"1 组/base"的深度 3）：`SessionManager`(18) →
+  `SessionReadSurface`(20) → `SessionLifecycleWrites`(17)。**判据 38 → 18。**
+- **执行前实测推翻三处既有前提**（记录于 recon §12）：
+  1. **判据漏计 2 个方法**——`createNew`/`createNewWithId` 因参数里 `process.cwd()` 的右括号
+     使判据正则 `\([^)]*\)` 提前收束。判据报 38 时**真实成员是 41**。判据漏计只降不升，
+     故"判据达标"≠"真实达标"；本文件历史计数（59/55/38）均低于真实值。
+  2. §11.3 的 `read-projection` 跨组依赖为 0 只在把 `normalizeLegacyPermissionStateForSession`
+     一并划入该组时成立（实测 41 成员调用边：`READ -> REST = 1`）。
+  3. **§11.4 的"两个独立基类、各继承一层"在 TS 下不成立**——这 20 个方法就是 SessionManager
+     的公共 API（外部调用点实测 **88 生产 / 178 测试**），改组合即改公共面与调用点，
+     而保留委托包装不降数。故改为单模块承载两组。
+- **代价（如实记录）**：`sessionReadSurface.ts` 判据 **20 恰好卡上限**（真实 21）。
+  若判据修好上述漏计，该模块成为新的越界项（SessionManager 本身不受影响）。
+- **共享 store 的接法**：`SessionLifecycleWrites` 的 `host` 由 `private` 提升为 `protected`，
+  读取层直接 `this.host.store`；**不新增 host 回调**——READ 对 REST 的 1 条边通过把该 helper
+  一并迁移消除，而非新增接口。
+- **逐字等价已证**：与 `10350ede` 对比，20 个迁移方法体**唯一差异**是 `this.store.` →
+  `this.host.store.`（含 `handleGetTranscriptEvents(this.store, …)` 一处）；
+  `SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT` → `this.host.approvalAuditHistoryLimit`；
+  `listRealSessions` 由 `private` 放宽为 `protected`。SessionManager 中仅 `constructor` 实质变更
+  （`store` 不再提升为字段，直接传入 `super`）。41 个原成员**零丢失**，三模块无重复。
+- **验证**：`tsc -p tsconfig.build.json` 0 错；**SCC 1481 文件 0 环**（§2.4.1 前置/后置检查）；
+  全量 `tsc --noEmit` **387 = 基线 387**（逐类 diff 仅联合类型成员排序差异，**零新增**）；
+  全量测试 **3170/3172**（2 项失败为既有负载抖动：`cli-baseline.test.ts` 子进程、
+  `presentation/tui/surface/benchmark.test.ts` CPU 计时，**隔离复跑均通过**）；
+  `session/` + `core/shell/` 聚焦 **509/509**；
+  **PTY 实机**（§2.4 强制）——真实回合 `working → thinking → ok` 跑通，
+  `/resume` 从 19 条增至 **20 条**且新会话 `sess_716` 在首位（`completed · 2 turns`），
+  读取路径（`listReentrySummaries` → recovery snapshot）与写入路径（`saveCompleted`）双向可用；
+  可达性 **960/875 → 961/876/85**。

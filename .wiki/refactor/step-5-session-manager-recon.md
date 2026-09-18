@@ -360,3 +360,110 @@ PTY 证据链：`/resume` 列出 15 条真实历史会话（读 `listReentrySumm
 
 **风险最低的下一步**：先抽 `store-binding`（11 名字、零依赖），
 SessionManager 38 → 27；再抽 `read-projection`（8 名字、零依赖）→ **19，达标**。
+
+---
+
+## 12. 第三批执行前修正（2026-09-18，动手前实测）
+
+§11.3/§11.4 的三处前提在执行前被实测推翻，记录于动手之前。
+
+### 12.1 判据对本文件漏计 2 个方法
+
+用 §9.1 解出的判据实现（`maskSource` + `declaredFunctionNames`）复测：
+**判据报 38，真实成员 41**。漏计的是 `createNew` / `createNewWithId`：
+
+```ts
+  createNew(
+    projectRoot: string = process.cwd(),   // 参数里的括号
+```
+
+判据第三条正则 `\([^)]*\)\s*(?::[^{;]+)?\{` 的 `[^)]*` 在 `process.cwd(` 的 `)` 处提前收束，
+整条匹配失败。探针确认两者均 `missed`。
+
+**含义**：本文件的历史计数（59/55/38）都**低于**真实成员数。判据漏计只降不升
+（其注释亦明言 "a miss lowers a count rather than raising one"），
+故**不能把"判据达标"直接等同于"真实达标"**。
+
+### 12.2 分组归属的一处实测差异
+
+用成员间 `this.X(` 反查实测 41 个真实成员的调用边：
+
+```
+REST -> STORE = 6       READ -> REST = 1       其余方向 = 0
+REST -> READ  = 5
+```
+
+- **§11.3 的 READ = 7 与"零跨组依赖"不相容**：`buildContinuitySnapshot → normalizeLegacyPermissionStateForSession`
+  是一条回指边。只有当该 helper **一并划入 READ** 时 READ 才是 8 且出边为 0——
+  即 §11.3 的这两行数字来自两种不同的分组口径。
+- **STORE 对 REST 出边为 0** 成立。
+- `buildSessionStateSnapshot` 实际被 3 处引用（`constructor`、`rebindSessionProjectRoot`、
+  `recovery/sessionRecoveryRuntime.ts`），非 §11.3 所述"随宿主组走"即可忽略。
+
+### 12.3 §11.4 的"组合另一层"在 TS 下不成立
+
+`store-binding` 与 `read-projection` 的方法**就是 SessionManager 的公共 API**
+（外部调用点实测 **88 生产 / 178 测试**）。把它换成组合成员会同时改变公共面和全部调用点；
+而保留委托包装**不降数**（§9.2 已证）。TS 单继承 ⇒ 抽 n 组只能是**深度 n 的链**，
+不存在"两个独立基类各继承一层"。
+
+### 12.4 实际采用的方案（维护者裁决）
+
+**一个模块承载 STORE+READ 两组（18 名 + `constructor` = 判据 20），继承链固定为深度 2**：
+
+```
+SessionManager → SessionReadSurface → SessionLifecycleWrites
+```
+
+- 不是"1 组/base"：那会得到深度 3。
+- 不是"2 bases"：TS 不允许。
+- 代价：新模块 `sessionReadSurface.ts` 判据 **20，恰好卡在上限**（真实成员 21）。
+  若判据修好 `createNew` 漏计，21 > 20——**该模块会变成新的越界项**（不影响 SessionManager 本身）。
+
+**共享 store 的接法**：`host` 由 `SessionLifecycleWrites` 的 `private` 提升为
+`protected`，`SessionReadSurface` 直接 `this.host.store`。**不新增 host 回调**——
+READ 组对 REST 的 1 条边通过**把该 helper 一并迁移**消除，而非新增接口。
+
+## 13. 第三批执行记录：（b）已完成（2026-09-18）
+
+### 13.1 迁移内容
+
+20 个成员迁入新模块 `src/session/sessionReadSurface.ts`：
+
+| 组 | 成员 |
+|---|---|
+| STORE（9） | `getSessionFilePath` `getSessionDirPath` `listRealSessions` `getSession` `sessionExists` `getCurrentSessionForProject` `resolveCurrentSessionForProject` `setCurrentSessionForProject` `clearCurrentSessionForProject` |
+| STORE 列表（2） | `listSessions` `listRecentSessions` |
+| READ（9） | `deleteSession` `getTranscriptEvents` `getRecoverySnapshot` `getReplayPlan` `buildRuntimeStateSeed` `buildContinuitySnapshot` `normalizeLegacyPermissionStateForSession` `buildPromptContinuityContext` `buildPromptContinuitySnapshot` |
+
+**逐字等价已证**：与 `10350ede` 的 SessionManager 对比，20 个方法体**唯一差异**是
+`this.store.` → `this.host.store.`（含 `handleGetTranscriptEvents(this.store, …)` 一处），
+`SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT` → `this.host.approvalAuditHistoryLimit`，
+以及 `listRealSessions` 由 `private` 放宽为 `protected`（子类仍需调用）。
+
+SessionManager 的 `constructor` 是唯一实质改动：`store` 不再提升为字段，
+直接以 `store: new SessionStoreAccess()` 传入 `super`。基类链各层构造函数原样透传 host。
+
+### 13.2 计数结果（判据实测）
+
+| 模块 | 判据 | 真实成员 |
+|---|---:|---:|
+| `session/SessionManager.ts` | **18** | 18 |
+| `session/sessionReadSurface.ts` | **20** | 21 |
+| `session/lifecycle/sessionLifecycleWrites.ts` | 17 | 17 |
+
+**SessionManager 38 → 18（真实 41 → 18），首次进入上限内。**
+
+### 13.3 验证
+
+| 项 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | 0 错误 |
+| **SCC（1481 文件）** | **0 环**（搬迁前后一致，符合 §2.4.1） |
+| 全量 `tsc --noEmit`（含测试） | **387 = 基线 387**，逐类 diff 仅联合类型成员**排序**差异，**零新增错误** |
+| 全量测试 | **3172 项，3170 通过 / 2 失败** |
+| 2 项失败定性 | 均为负载抖动：`cli-baseline.test.ts`（子进程）、`presentation/tui/surface/benchmark.test.ts`（CPU 计时）；**隔离复跑均通过** |
+| `src/session/` + `src/core/shell/` 聚焦 | **509 / 509 通过** |
+| **PTY 实机**（§2.4 强制） | 真实回合跑通（`working → thinking → ok`）；`/resume` 从 19 条增至 **20 条**，新会话 `sess_716` 在首位（`completed · 2 turns`） |
+| 可达性 | **961 / 876 / 85**（较 960/875 改善 1） |
+| 成员守恒 | 41 个原成员**零丢失**；三模块合计无重复（`constructor` 各一） |

@@ -72,7 +72,7 @@ export interface SessionLifecycleWriteHost {
 }
 
 export abstract class SessionLifecycleWrites {
-  protected constructor(private readonly host: SessionLifecycleWriteHost) {}
+  protected constructor(protected readonly host: SessionLifecycleWriteHost) {}
 
   private createSessionLifecycleCallbacks() {
     return {
