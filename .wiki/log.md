@@ -624,3 +624,37 @@
 - **残余（如实记录）**：去前缀后**仍有 125/170（74%）文件 >20 字符**（p50 32→25、p90 39→32）。
   规则第二条「避免长复合名编码功能路径」**步后仍被违反**；本步已实测证明唯一解法是子域切分，
   而切分被族内/跨族比 **0.32** 否证。**这是 Step 6 范围内无法闭合的残余，已记入 plan §3.3。**
+
+## [2026-09-18] step7-exec | NormProof judge 全量跑完成（0 blocking）。Step 3–7 全部收尾。
+- **运行方式**：从 `.normproof/normproof-0.1.0.tgz` 解出 CLI，执行 `normproof judge`
+  （profile `software-structure-v0`，read_only / shadow 模式）。`.normproof/out/` 被 `.gitignore`
+  忽略，故本次只提交 `.normproof/dispositions.md` 的追加记录。
+- **裁决**：Verdict `partial`；**Open blocking obligations 0**；**Blocking proof gaps 0**；
+  `would block: no` / `did block: no`；非阻塞 proof gaps **12**。
+- **三项义务最终状态**：`source_graph_is_acyclic` **satisfied**（独立 SCC 核验 1481 文件 0 环）；
+  `source_graph_has_no_unresolved_specifiers` **satisfied**（唯一 blocking 项，每次改动后 build 0 错）；
+  `declared_functions_within_module_ceiling` failed（advisory，12 模块）。
+- **Step 5 成果被 judge 证实**：`SessionManager.ts` **已从越界名单消失**，
+  越界模块 **13 → 12**。判据 59 → 38 → 18。
+- **剩余 12 个越界模块**（11 生产 + 1 测试，实测计数）：`presentation/surface/model.ts`(51)、
+  `runtime/evaluation/task/model.ts`(52)、`edit/multifile/model.ts`(39)、`core/query/runtime/harness.ts`(32)、
+  `presentation/tui/editor.ts`(28)、`cli-baseline.test.ts`(27，测试)、`core/shell/sessionTerminalState.ts`(27)、
+  `planning/runtime/engine.ts`(27)、`runtime/evaluation/model.ts`(27)、`runtime/evaluation/task/liveRun.ts`(26)、
+  `core/query/runtime/policy.ts`(23)、`session/store/sessionStoreAccess.ts`(22)。**11 个生产模块合计 419 个声明名。**
+  与 SessionManager 的关键差别：后者是**薄 facade**（22/62 纯委托、类内仅 397 条语句）可保留；
+  前者是**真单体**，按 `agent-rules:147` 不可保留。
+- **判据自身缺陷再次确认**：`declaredFunctionNames` 第三条正则的 `[^)]*` 在参数内右括号处提前收束，
+  **漏计多行签名含 `()` 的方法**。实测 `SessionManager.ts` 判据报 38 时真实成员 **41**
+  （漏 `createNew`/`createNewWithId`，参数含 `process.cwd()`）。judge 注释自述
+  「a miss lowers a count rather than raising one」→ **判据计数是下界，上文 12 个数字同样是下界。**
+- **dispositions 追加（append-only，未删任何行；55 → 64 行）**：
+  ① `SessionManager.ts` 记 **fix**（3 批拆分兑现了历次 deferral 的理由）；
+  ② **+8 名被证实已达标**：`artifacts/workflow/model.ts`(2)、`context/discovery/scan.ts`(1)、
+  `context/readWindowContinuation.ts`(3)、`core/commands/connectCommandRuntime.ts`(9)、
+  `core/paths/legacyRootRebase.ts`(15)、`core/shell/approvalTrustPolicy.ts`(14)、`daemon/client.ts`(4)、
+  `tools/toolBatchDispatch.ts`(1) —— 实测均 ≤20，历史 deferral 由后续拆分/搬迁自然达成；
+  ③ **18 条 disposition 路径已不存在**（orchestration 解散、Step 3 搬迁、Step 2.5 删除所致），
+  作为历史保留不改写。
+- **Step 6 零指标影响的预测已被验证**：改名前后的越界模块数均为 **12**，三项义务状态不变。
+- **计划状态**：Step 3–7 **全部完成**。plan.md 升级至 **v5.3**，新增 §3.6 记录本轮 judge 结果，
+  §1 现状表增加 judge 行，§7 文档索引补入 `step-6-naming-exploration.md`。

@@ -5,7 +5,7 @@ sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-0
 created: 2026-09-15
 updated: 2026-09-18
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v5。当前生产 961 / CLI 可达 876 / 不可达 85，全量测试 3172 项。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。"
+summary: "Module boundary refactor plan v5。当前生产 961 / CLI 可达 876 / 不可达 85，全量测试 3172 项。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）、Step 6 命名税（173 文件）、Step 7 judge 全量跑（0 blocking）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。"
 confidence: high
 ---
 
@@ -17,7 +17,7 @@ confidence: high
 
 **版本沿革**：v1 初版 → v2 引入生产可达性 BFS → v3 发现删除路线错误、新增 Step 2.7 →
 v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 重组结构** →
-**v5.1 同步 Step 3 完成后的现状** → **v5.2 同步 Step 4/5 完成后的现状（2026-09-18）**。
+**v5.1 同步 Step 3 完成后的现状** → **v5.2 同步 Step 4/5 完成后的现状** → **v5.3 Step 3–7 全部完成（2026-09-18）**。
 
 ---
 
@@ -31,6 +31,7 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | 全量测试 | **3172 项** |
 | 稳定失败 | **0**（`testTimeout` 已修为 30s，原 5 项负载超时消除） |
 | `tsc -p tsconfig.build.json` | 0 错误 |
+| NormProof judge | verdict `partial`；**blocking 义务 0 项未满足**（唯一 blocking 义务 satisfied） |
 
 **注**：可达性自 Step 3 起全程未变（搬迁不改可达性，符合预期）；Step 5 第 2、3 批各 +1
 （959 → 961），原因是被新模块纳入的代码进入了 CLI 可达集。最终 **961 / 876 / 85**。
@@ -53,6 +54,8 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | **Step 3 域搬迁（3a-3f）** | **✅ 全部完成**（2026-09-18）。6 个域归位，`core/context` 四域混居问题解决；详见 §3.2 |
 | **Step 4 orchestration 解散** | **✅ 全部完成**（2026-09-18，9 批）。123 文件分流至 7 个 sanctioned 域，`src/orchestration/` 已删除；详见 §3.3 与 §6.10 |
 | **Step 5 SessionManager 拆分** | **✅ 全部完成**（2026-09-18，3 批）。判据 **38 → 18**，继承链深度 2；详见 §3.5 |
+| **Step 6 命名税** | **✅ 全部完成**（2026-09-18，路径 B）。改名 **173** 个；`playwright` 经实测裁定保留；详见 §3.3 |
+| **Step 7 judge 全量跑** | **✅ 全部完成**（2026-09-18）。**0 blocking**，唯一 blocking 义务 satisfied；越界模块 13 → **12**；详见 §3.6 |
 
 ### Step 2.7 执行结果
 
@@ -238,7 +241,7 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 | Step 4 | orchestration 聚类 | ✅ **已完成**（2026-09-18，9 批）——`src/orchestration/` 已解散，123 文件全部分流 |
 | Step 5 | SessionManager 拆分（51 方法 facade，ALIVE） | ✅ **已完成**（2026-09-18，3 批）：判据 **38 → 18**，全仓首次进入上限内；详见 §3.5 |
 | Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | ✅ **已完成**（2026-09-18，路径 B）：改名 **173** 个；`playwright` 经实测裁定**保留**（真实依赖）；边集守恒 4960→4960；详见 §3.3 |
-| Step 7 | 收尾：NormProof judge 全量跑 | 以搬迁后 BFS 报告作为收敛证据 |
+| Step 7 | 收尾：NormProof judge 全量跑 | ✅ **已完成**（2026-09-18）：**0 blocking**；无环与 specifier 两项 **satisfied**；`SessionManager` 已退出越界名单；详见 §3.6 |
 
 **Step 4 决策研究结论**（2026-09-18，`step-4-decision-research.md`，零代码改动）：
 
@@ -368,6 +371,83 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 - **残余（如实记录）**：去前缀后**仍有 125/170（74%）文件 >20 字符**（p50 32→25）。
   规则第二条（避免长复合名编码功能路径）**步后仍被违反**，且本步已实测证明唯一解法是子域切分，
   而切分被内聚度 **0.32** 否证。**这是 Step 6 范围内无法闭合的残余。**
+
+### 3.6 Step 7 — NormProof judge 全量跑 ✅ 已完成（2026-09-18）
+
+**运行**：`node .normproof/normproof-0.1.0.tgz 解出的 CLI judge`（`normproof judge`，
+`software-structure-v0` profile，read_only / shadow 模式）。`.normproof/out/` 被 `.gitignore` 忽略，
+故本次只提交 `.normproof/dispositions.md` 的追加记录。
+
+**裁决**：
+
+| 项 | 值 |
+|---|---|
+| Verdict | `partial` |
+| **Open blocking obligations** | **0** |
+| **Blocking proof gaps** | **0** |
+| Would block / Did block | no / no |
+| Proof gaps（非阻塞） | 12 |
+
+**三项义务的最终状态**：
+
+| 义务 | 严重度 | 状态 | 本次收敛证据 |
+|---|---|---|---|
+| `source_graph_is_acyclic` | advisory | **satisfied** | 独立 SCC 核验 1481 文件 **0 环**（Step 3/4/5/6 每次搬迁/改名前后均为 0） |
+| `source_graph_has_no_unresolved_specifiers` | **blocking** | **satisfied** | 每次改动后 `tsc -p tsconfig.build.json` 0 错 |
+| `declared_functions_within_module_ceiling` | advisory | failed（12 模块） | **59 → 38 → 18**（SessionManager），已退出名单 |
+
+**Step 5 的成果被 judge 证实**：`SessionManager.ts` **已从越界名单消失**。
+此前 13 个越界模块，现为 12 个。
+
+**剩余 12 个越界模块**（11 生产 + 1 测试，实测计数）：
+
+| 模块 | 判据 |
+|---|---:|
+| `presentation/surface/model.ts` | 51 |
+| `runtime/evaluation/task/model.ts` | 52 |
+| `edit/multifile/model.ts` | 39 |
+| `core/query/runtime/harness.ts` | 32 |
+| `presentation/tui/editor.ts` | 28 |
+| `cli-baseline.test.ts` | 27（**测试文件**） |
+| `core/shell/sessionTerminalState.ts` | 27 |
+| `planning/runtime/engine.ts` | 27 |
+| `runtime/evaluation/model.ts` | 27 |
+| `runtime/evaluation/task/liveRun.ts` | 26 |
+| `core/query/runtime/policy.ts` | 23 |
+| `session/store/sessionStoreAccess.ts` | 22 |
+
+**11 个生产模块合计 419 个声明名**。它们与 `SessionManager` 的关键差别：
+`SessionManager` 是**薄 facade**（22/62 纯委托、类内仅 397 条语句），
+而 `presentation/surface/model.ts`(51)、`runtime/evaluation/task/model.ts`(52)
+是**真单体**——按 `agent-rules` 第 147 行，facade 可保留，单体不可。
+
+**判据自身的已知缺陷（本轮再次确认）**：`declaredFunctionNames` 的第三条正则
+`^[ \t]*(修饰符)*name\([^)]*\)\s*(?::[^{;]+)?\{` 的 `[^)]*` 会在参数内的右括号处提前收束，
+**漏计多行签名中含 `()` 的方法**。实测 `SessionManager.ts` 判据报 38 时真实成员 **41**
+（漏 `createNew`/`createNewWithId`，参数里 `process.cwd()`）。
+judge 注释自述「a miss lowers a count rather than raising one」——
+**故判据计数是下界，真实成员数只会更多**。上文 12 个的数字同样是下界。
+
+**dispositions 追加（协议要求 append-only，未删任何行）**：
+
+- **Step 5 成果 +8 名被证实达标**：`artifacts/workflow/model.ts`(2)、`context/discovery/scan.ts`(1)、
+  `context/readWindowContinuation.ts`(3)、`core/commands/connectCommandRuntime.ts`(9)、
+  `core/paths/legacyRootRebase.ts`(15)、`core/shell/approvalTrustPolicy.ts`(14)、
+  `daemon/client.ts`(4)、`tools/toolBatchDispatch.ts`(1) —— **全部 ≤20，实测判定**。
+  历史 deferral 是当时真实的，现已由后续拆分与搬迁自然达成；按协议**追加**修正行而非删除原文。
+- **`SessionManager.ts` 记 `fix`**：3 批拆分（删 4 个零调用成员 → 抽 `sessionLifecycleWrites.ts`
+  → 抽 `sessionReadSurface.ts`），判据 **59 → 18**。历次 deferral 的理由
+  （"splitting a 700-line facade with 26 dependents is its own task"）已被本条**兑现**。
+- **18 条 disposition 路径已不存在**（`orchestration/` 解散、Step 3 搬迁、Step 2.5 删除所致），
+  作为历史记录保留，不改写。
+- 当前 dispositions 共 **64** 行（原 55 + 本轮 9）。
+
+**Step 6 不影响任何指标（预测已被验证）**：改名前后的越界模块数均为 **12**，
+判据三项状态不变——与 `step-6-naming-exploration.md` §6 的结论一致。
+
+**结论**：Step 3–7 全部完成。**唯一的 blocking 义务 satisfied**，
+advisory 的函数名上限从 13 模块降至 12 模块（`SessionManager` 退出），
+残余 11 个生产单体与 1 个测试文件均有据登记，属独立立项而非本计划尾部。
 
 ### 3.4 独立立项（记录，不在本计划处理）
 
@@ -705,6 +785,7 @@ runtime 装配四重证据。
 | `step-4-orchestration-map.md` | **Step 4 orchestration 聚类重算（含 5 项未决问题）** |
 | `step-4-decision-research.md` | **Step 4 的 5 项决策研究：实测结论 + 方案建议 + pi 参考** |
 | `step-5-session-manager-recon.md` | **Step 5 SessionManager 拆分探索（含 3 个方案与 3 项未决问题）** |
+| `step-6-naming-exploration.md` | **Step 6 命名税探索：170 文件实测、族切分否证（0.32）、`playwright` 裁定依据、执行记录 ± 残余** |
 | `deleted-audit-2026-09-16.md` | **主文档**：403 个已删文件审查总账 + 附一至附十二 |
 | `restore-audit-2026-09-16.md` | 事故认定、三路审查、D 集恢复、补丁层复核 |
 | `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-006） |
