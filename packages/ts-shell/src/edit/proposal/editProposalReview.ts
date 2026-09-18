@@ -1,5 +1,5 @@
 import type { GeneratedEditProposalManifest } from "./generatedEditProposal.js";
-import type { ProviderEditProposalManifest } from "./providerEditProposal.js";
+import type { ProviderEditProposalManifest } from "../../provider/proposal/providerEditProposal.js";
 import type { EditRepairProposalManifest } from "./editRepairProposal.js";
 
 export type EditProposalSource = "generated" | "provider" | "repair";

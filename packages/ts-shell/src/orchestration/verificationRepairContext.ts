@@ -5,8 +5,8 @@ import {
   buildEditRepairContext,
   buildEditRepairContextFromCodingResult,
   type EditRepairContext,
-} from "./editRepairContext.js";
-import { redactProviderEditText } from "./providerEditContext.js";
+} from "../edit/proposal/editRepairContext.js";
+import { redactProviderEditText } from "../provider/proposal/providerEditContext.js";
 import type { AnalysisBrief } from "../planning/task/analysisBrief.js";
 import type { AnalysisQualityGateResult } from "../planning/task/analysisQualityGate.js";
 import type { TaskContextSufficiency } from "../planning/task/taskContextSufficiency.js";

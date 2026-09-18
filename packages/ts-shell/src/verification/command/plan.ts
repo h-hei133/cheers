@@ -6,7 +6,7 @@ import {
   blockedCommandReason,
   isAllowlistedRunCommand,
 } from "../../orchestration/capabilityBoundaryProjection.js";
-import { redactProviderEditText } from "../../orchestration/providerEditContext.js";
+import { redactProviderEditText } from "../../provider/proposal/providerEditContext.js";
 import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
 import type { PlanQuality } from "../../planning/quality/model.js";
 import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";

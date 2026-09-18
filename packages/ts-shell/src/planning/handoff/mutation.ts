@@ -1,11 +1,11 @@
 import {
   buildGeneratedEditProposalManifest,
   type GeneratedEditProposalManifest,
-} from "../../orchestration/generatedEditProposal.js";
+} from "../../edit/proposal/generatedEditProposal.js";
 import {
   buildGeneratedEditProposalReview,
   type EditProposalReview,
-} from "../../orchestration/editProposalReview.js";
+} from "../../edit/proposal/editProposalReview.js";
 
 export type PlanningMutationHandoffReadiness = "review-ready" | "blocked";
 

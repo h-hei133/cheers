@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildGeneratedEditProposalManifest } from "./generatedEditProposal.js";
-import { buildProviderEditProposalManifest } from "./providerEditProposal.js";
+import { buildProviderEditProposalManifest } from "../../provider/proposal/providerEditProposal.js";
 import {
   buildGeneratedEditProposalReview,
   buildProviderEditProposalReview,

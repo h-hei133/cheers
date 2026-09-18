@@ -1,4 +1,4 @@
-import { safeTargetLabel } from "./workspaceFileContract.js";
+import { safeTargetLabel } from "../../orchestration/workspaceFileContract.js";
 import {
   buildProviderAnchorCandidate,
   type ProviderAnchorCandidate,

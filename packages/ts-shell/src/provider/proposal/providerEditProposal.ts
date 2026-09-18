@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { safeTargetLabel } from "./workspaceFileContract.js";
+import { safeTargetLabel } from "../../orchestration/workspaceFileContract.js";
 import { redactProviderEditText } from "./providerEditContext.js";
 
 export type ProviderEditOperationKind =

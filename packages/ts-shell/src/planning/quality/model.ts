@@ -20,8 +20,8 @@ import type { TaskLifecycle } from "../task/taskLifecycle.js";
 import type { AnalysisBriefCalibration } from "../task/analysisBriefCalibration.js";
 import type { AnalysisQualityGateResult } from "../task/analysisQualityGate.js";
 import type { TaskContextSufficiency } from "../task/taskContextSufficiency.js";
-import type { ProviderAnchoredProposalManifest } from "../../orchestration/providerAnchoredProposal.js";
-import type { ProviderAnchoringResult } from "../../orchestration/providerAnchoringResult.js";
+import type { ProviderAnchoredProposalManifest } from "../../provider/proposal/providerAnchoredProposal.js";
+import type { ProviderAnchoringResult } from "../../provider/proposal/providerAnchoringResult.js";
 
 export type PlanQualityLevel =
   | "ready"

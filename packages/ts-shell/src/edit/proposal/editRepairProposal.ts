@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
 import type { FencedEditMapping } from "./fencedEditPlanner.js";
-import { redactProviderEditText } from "./providerEditContext.js";
+import { redactProviderEditText } from "../../provider/proposal/providerEditContext.js";
 import type { EditRepairContext } from "./editRepairContext.js";
-import { safeTargetLabel } from "./workspaceFileContract.js";
+import { safeTargetLabel } from "../../orchestration/workspaceFileContract.js";
 
 export type EditRepairHandoffReadiness =
   | "review-only"

@@ -1,7 +1,7 @@
-import { hashContent } from "../edit/recovery/recoveryAuthorityStore.js";
+import { hashContent } from "../../edit/recovery/recoveryAuthorityStore.js";
 import { redactProviderEditText } from "./providerEditContext.js";
 import type { ProviderEditOperationKind } from "./providerEditProposal.js";
-import type { FencedEditMapping } from "./fencedEditPlanner.js";
+import type { FencedEditMapping } from "../../edit/proposal/fencedEditPlanner.js";
 import type { ProviderOutputValidationStatus } from "./providerOutputValidator.js";
 
 export type ProviderAnchorOldStatus = "exact" | "partial" | "missing";

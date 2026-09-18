@@ -1,6 +1,6 @@
-import { hashContent } from "../edit/recovery/recoveryAuthorityStore.js";
-import type { FencedEditMapping } from "./fencedEditPlanner.js";
-import type { EditProposalReview } from "./editProposalReview.js";
+import { hashContent } from "../../edit/recovery/recoveryAuthorityStore.js";
+import type { FencedEditMapping } from "../../edit/proposal/fencedEditPlanner.js";
+import type { EditProposalReview } from "../../edit/proposal/editProposalReview.js";
 import type { ProviderAnchorConflictResult } from "./providerAnchorConflict.js";
 import type { ProviderAnchorMatchResult } from "./providerAnchorMatcher.js";
 import type { ProviderProposalAnchorExtraction } from "./providerProposalAnchors.js";
