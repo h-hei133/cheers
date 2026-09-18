@@ -448,3 +448,46 @@
   `/restore`（经搬迁后的恢复权威，诚实报告 "No edit snapshots recorded" 而非崩溃）、
   `/compact preview`（渲染 `closeout-candidate` 能力清单，该清单已迁至 `edit/result/`）。
 - **`context/graph/` 的既有内容**：该目录原已有 `ast/parser.ts`（AST 符号抽取，仅被 `core/tools/lsp.ts` 使用），与本次迁入的上下文图模型**语义无关**。已在提交信息中如实标注共处；若后续不适，`ast/parser.ts` 可移入 `context/graph/ast/`。
+
+## [2026-09-18] step5-recon | SessionManager 拆分探索（零代码改动，未拆）。
+- **产出**：`.wiki/refactor/step-5-session-manager-recon.md`（183 行）。plan.md §3.3 与索引已同步。
+- **现状实测**：`SessionManager.ts` **816 行 / 51 方法 / 55 个消费者文件 / 38 个实际调用方**；
+  被调用的方法 46/51；可达性 `cli:true, publicApi:false`；**生产实例化点仅 1 处**
+  （`cli/bootstrap/cliBootstrapContext.ts:83`）；25 个文件以类型引用它。
+- **关键发现：这是薄 facade，不是单体**。方法体规模分布：**纯委托（≤2 语句）22 个**、
+  薄（3–5）10 个、实质（>5）30 个；**类内总语句仅 397**（816 行中约一半是文档注释与 import）。
+  该文件已 import 并委托给 `session/` 下 **20+ 个既有模块**
+  （`store/`、`recovery/`、`transcript/`、`replay/`、`continuation/`、`presentation/`、`agent/`…）。
+  **即职责早已抽出，"52 个函数"是聚合面而非待分解的单体。**
+- **消费者内聚度**：按 5 组职责（creation-resume / store-binding / lifecycle-writes /
+  read-projection / reentry-recovery）测量 38 个调用方：**53% 只用一组**，
+  但**组合种类达 16 种**，最高频组合分别只有 7/5/4 个文件。
+  **接缝存在但分散**——既无 Step 4 那种"三组消费者集合完全相同"的合并依据，
+  也无 `types.ts` 那种"拆分必然产生 19% 跨界"的否决依据。
+- **判据性质（重要）**：`.normproof/norm-packs/software-structure-v0/profile.json` 中
+  `declared_functions_within_module_ceiling` 的 `severity` 是 **`advisory`**，
+  `ceiling: 20`；`.normproof/out/report.md` 明文
+  "Every blocking obligation is satisfied; open advisory obligations do not block"。
+  即 **当前不阻塞任何东西**。但 `AGENTS.md` 把它写成硬规则（"Responsibility ceiling…"）。
+  report 列出 13 个超限模块，SessionManager 的 proof gap 数字为 51（与 dispositions 的 52 一致）。
+- **裁决依据（关键条款）**：`agent-rules/file-placement-and-naming.md:147` **明文**：
+  "A compatibility shim is different from a rightful domain manager. For example,
+  **`SessionManager` may retain real session lifecycle coordination, public API compatibility,
+  dependency assembly, transaction ordering, and cross-session coordination** when those duties
+  are part of its public contract." —— **该条款直接点名本文件**。
+- **历史 4 条 disposition**：2026-08-28 defer（coordinator 职责）→ fix（已拆 agent/compaction/persistence）
+  → 2026-09-02 **defer**，理由 "Pre-existing facade violation… **splitting a 700-line facade with
+  26 dependents is its own task rather than a side effect of fixing resume**"。
+  **Step 5 正是那条被推迟的独立任务。** 文件自 08-28 起 763 → 816 行（+53），在缓慢增长。
+- **三个候选方案**：
+  **A** 按 5 组拆为协作类（`SessionManager` 降为组合面，约 15 方法）——消费者 import 路径不变，
+  但**不减少总函数数**，且需重构跨组共享的 `this.store` 与 3 个 callback 工厂，风险集中；
+  **B（建议）** 只抽 `lifecycle-writes`（14 方法，8 个 save*/mark* 状态写入，4 个调用方只用该组），
+  最小可验证一步，风险低，可用现有 3 个边界测试验证；
+  **C** 登记 defer 不拆——判据是 advisory 且 53% 单一职责说明 facade 形态正被正确使用，
+  但 `AGENTS.md` 是硬规则且文件仍在增长。
+- **3 项未决问题待裁决**：①判据适用范围是"每模块"还是"每类"（决定拆到什么程度）；
+  ②`SessionManager` 是否保留为公共面（建议保留，依据是上面那条明文条款）；
+  ③是否更新 `.normproof/dispositions.md`（拆则改 fix，不拆则记新 defer 理由）。
+- **验证**：探索阶段零代码改动 → 不跑构建/测试。所有数字脚本实测（正则解析 + `analyze-boundaries.py`
+  + normproof 产物）。

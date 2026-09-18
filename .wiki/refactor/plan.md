@@ -233,7 +233,7 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 | 步骤 | 内容 | 前置 |
 |---|---|---|
 | Step 4 | orchestration 聚类 | ✅ **已完成**（2026-09-18，9 批）——`src/orchestration/` 已解散，123 文件全部分流 |
-| Step 5 | SessionManager 拆分（52 函数 facade，确认 ALIVE） | 不变 |
+| Step 5 | SessionManager 拆分（51 方法 facade，ALIVE） | **探索已完成**（`step-5-session-manager-recon.md`）→ **待裁决 3 项** |
 | Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | Step 4 已完成，`orchestration` 域更名**随之自然消解** |
 | Step 7 | 收尾：NormProof judge 全量跑 | 以搬迁后 BFS 报告作为收敛证据 |
 
@@ -283,6 +283,27 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
   的 29 边是否随 cluster 拆分一并重构（**它自身仅 1 个调用者，却是 27 条边的汇合点**）；
   ④ 是否保留 `orchestration/` 目录及其更名；⑤ `agentPlan`/`analysis`/`taskLifecycle`
   三组是否合并。
+
+**Step 5 探索结论**（2026-09-18，零代码改动）：
+
+- `SessionManager.ts` **816 行 / 51 方法 / 55 消费者**，生产实例化点**仅 1 处**。
+- **关键发现：这是薄 facade，不是单体**——22/62 方法是纯委托，类内总语句仅 **397**
+  （约一半行数是文档注释），且已委托给 `session/` 下 **20+ 个既有模块**。
+  **职责早已抽出，"52 个函数"是聚合面。**
+- 消费者内聚度：**53% 的调用方只用 5 组职责中的一组**，但组合种类达 **16 种**——
+  接缝存在但分散，既无 Step 4 那种"消费者集合完全相同"的合并依据，
+  也无 `types.ts` 那种"拆分必然跨界"的否决依据。
+- **判据是 `advisory` 而非 `blocking`**（report.md 明文
+  "open advisory obligations do not block"），但 `AGENTS.md` 将其写成硬规则。
+- `agent-rules/file-placement-and-naming.md:147` **明文允许** SessionManager 保留
+  真实生命周期协调、公共 API 兼容、依赖装配、事务顺序、跨会话协调——
+  **该条款直接适用于本文件**，是裁决的关键依据。
+- 历史 4 条 disposition（2 次 defer，理由含"splitting a 700-line facade with 26
+  dependents is its own task"）——**Step 5 正是那条被推迟的任务**。
+- 建议：**方案 B 起步**（先抽 `lifecycle-writes` 14 方法），逐组推进；
+  不建议一次抽 5 组（方案 A），因需重构跨组共享的 `this.store` 与 callback 工厂，
+  风险集中且不符合分批纪律。**3 项未决问题待裁决**（判据适用范围、是否保留公共面、
+  是否更新 dispositions）。
 
 **Step 6 范围**：Step 4 已完成，`orchestration` 域已解散（原拟的"域更名"随之消解）。
 剩余范围为 3f 遗留项——
@@ -589,6 +610,7 @@ runtime 装配四重证据。
 | `step-3-migration-map.md` | **Step 3 映射表 + §6.1 逐阶段执行记录（3a-3f）** |
 | `step-4-orchestration-map.md` | **Step 4 orchestration 聚类重算（含 5 项未决问题）** |
 | `step-4-decision-research.md` | **Step 4 的 5 项决策研究：实测结论 + 方案建议 + pi 参考** |
+| `step-5-session-manager-recon.md` | **Step 5 SessionManager 拆分探索（含 3 个方案与 3 项未决问题）** |
 | `deleted-audit-2026-09-16.md` | **主文档**：403 个已删文件审查总账 + 附一至附十二 |
 | `restore-audit-2026-09-16.md` | 事故认定、三路审查、D 集恢复、补丁层复核 |
 | `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-006） |
