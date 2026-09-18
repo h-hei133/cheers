@@ -110,7 +110,9 @@ Owner Domains 列表内。
 
 ### 3.1 `renderer/` 的具体错置（最明确的一例）
 
-- `src/renderer/StreamingRenderer.ts`：**34 个外部消费者、0 条出边**——纯叶子输出通道。
+- `src/renderer/StreamingRenderer.ts`：**41 个外部消费者、0 条出边**——纯叶子输出通道。
+  （**2026-09-18 勘误**：原文记 34，实测 **41**（cli 15 / core 14 / entrypoints 11 / session 1）。
+  复现：`grep -rln "renderer/StreamingRenderer" packages/ts-shell/src --include=*.ts | wc -l`。）
 - 规则示例路径明确写着 `packages/ts-shell/src/presentation/terminal/renderer.ts`
   ——**该文件已存在**，但它是**纯格式化器**（`TerminalMessageRenderer`，
   输入 `ProductSurfaceViewModel` 输出 `string[]`，无副作用），
@@ -259,7 +261,7 @@ JSON 留在 `theme/` 下），或把数据目录明确命名为 `presentation/th
 |---|---|---|---|
 | **高** | 收紧 `tsconfig.build.json` 的 `exclude` | 发布产物含 7 个测试模块 | 无 |
 | **高** | 修 `agent-rules/architecture-boundaries.md` 的过期路径 | 规则指向不存在的目录 | 无 |
-| **中** | `renderer/` → `presentation/terminal/`（或 `surface/`） | 位置不正确（34 消费者、0 出边、规则示例冲突） | 独立决策 |
+| **中** | `renderer/` → `presentation/terminal/`（或 `surface/`） | 位置不正确（**41** 消费者、0 出边、规则示例冲突） | 独立决策 |
 | **中** | 消除 `test-utils/`（规则明文禁止 `utils`） | 违规则 + 泄漏源 | 与 `exclude` 一并 |
 | **中** | `session/__tests__/` 归并到并排约定 | 全仓唯一孤例 | 含 §4.1 动态入口改造 |
 | **低** | `eval/` 归并（语义已被 `evidence/harness/` 取代） | 目录语义重复 | 独立决策 |
@@ -270,3 +272,12 @@ JSON 留在 `theme/` 下），或把数据目录明确命名为 `presentation/th
 `core/shell`(55)、`core/tools`(27) 合计 216 条外部入边——`core/` 是**事实上的横切基础层**。
 规则提到"Keep business logic out of core"，但未定义 `core/` 的准入标准。
 **这需要维护者先裁定 `core/` 的语义**，之后才谈得上拆分；**本轮不提出拆分方案**。
+
+> **2026-09-18 勘误（阶段 B 探索实测）**：原文的 `1515 文件` **无来源且自相矛盾**——
+> 同一文档 §1 自述 `src/` 仅 **1481** 文件（961 生产 + 520 测试），而 `core/` 是 `src/` 的子集。
+> 实测 `core/` = **326** 文件（`.ts` 324，含 `.test.ts` 107），子目录 22 个；
+> 外部入边 **209**（实测，原文 216 接近）。已验证 `1515` **既非文件数也非行数**（core 实为 59232 行），
+> 且与其并列的四个分词数字（66/68/55/27）之和仅 **216**。
+> 规则中"Keep business logic out of core"一句**亦不存在**（`grep agent-rules/` 零命中）。
+> `plan.md:1222` 的 `247 文件`由 `1515` 派生，同属无来源。
+> **结论不变**（`core/` 确为横切层，不搬迁），但**数字已修正为实测值**。

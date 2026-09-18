@@ -1093,3 +1093,70 @@
   发现它顺带改写了 workspace glob 展开、删除 `python-eval` 条目等无关内容 → **回滚后手工改**）。
 - **测量**：`npm run build` 0 错误；`verify:host-surface` 通过；
   `verify:docs-drift:strict` 通过；`src/entrypoints` + `src/core/hooks` **17 文件 87 项全绿**。
+
+## [2026-09-18] phase-b-explore | 阶段 B 四项探索完成：**三项 plan 前提含无来源数字或误引**。
+**记录**：`.wiki/refactor/phase-b-exploration-2026-09-18.md`（本仓 `verify:docs-drift` 的 RULES/DOCS 双作用域均已复核通过）。
+**方式**：4 个子代理并行 + 我方独立复核关键数字。**未改任何代码**。
+
+### B1 `core/`（R6）—— 定性成立，**两处数字无来源**
+- **实测 `core/` = 326 文件**（22 子目录），**209 外部入边 / 225 出边 / 9 个域依赖**——
+  横切基础层的定性**成立**。
+- **但 `1515`（§3.8）与 `247`（§8.2 B1 行）均无来源**：同一文档 §1 自述 `src/` **仅 1481 文件**，
+  而 `core/` 是子集；已验证 `1515` **非文件数也非行数**（core 实为 59232 行），
+  且与其并列的 66/68/55/27 之和仅 **216**。`247` 由 `1515` 派生。
+- plan 引用的规则句 **"Keep business logic out of core" 在 `agent-rules/` 中不存在**（零命中）。
+- **`core/extensions/`（2 文件）= 可证死**：全仓唯一导入者是它自己的测试；
+  `scripts/`、`index.ts`、`package.json` 零命中；历史两次测量均判死。
+  **决定性语境**：CLI 可达的 `core/commands/pluginCommandRuntime.ts:12` 明文
+  *"this build does not execute extensions"*——产品**主动声明不实现**该能力。
+- **建议**：写准入规则（四款可检：方向/受众/存续 + 子域需一行职责）+ 删 `core/extensions/`，**不搬迁**。
+  已提出完整规则文本草案，全部条款映射到我方实测。
+
+### B2 `docs/`（R7）—— **前提被本仓自身政策否定**
+- `docs/archive/README.md` 明文：*"**Prefer status entries in `docs/DOC_STATUS.md` over moving files.**"*；
+  `route166-docs-active-context.md:129`：*"**Prefer classification over mass file moves.**"*
+  **R7 的"分类归档 ~700 份"与该政策直接冲突**——这是**治理裁决点**，非技术发现。
+- **真正的缺口是"未分类"**：`docs/` **810 文件**（`.md` 770），`DOC_STATUS.md` 130 行仅覆盖
+  去重路径 116（docs/ 下 108）→ **677/770 = 88% 无状态行**。
+- plan 的"**~700**"是 **git 最后提交日期分桶**（2026-05-12..06-08），**不是路径清单**——
+  仓内无任何 artifact 枚举这批文件，**故当前无法用规则表达归档边界**。
+- **门禁耦合已查清**：DOCS 作用域**不是目录列表**，而是 `DOC_STATUS.md` 中状态恰为 `active` 的行
+  （docs/ 下 **11 行**）。→ 归档未列出/非 active 文件门禁**完全无感**；归档 active 文件则
+  `status-map-path-missing` + **exit 1**（且已接入 `verify-release-core`）。
+- "零测试依赖"**已证实**（全仓仅 2 个脚本提 `docs/`，均不读本仓 docs 树）。
+- **既有先例两处都已执行过**：`docs/archive/`（8 文件）+ `docs/dev-history/routes/`（5 文件 + 指针桩）。
+- **建议**：**先填满 `DOC_STATUS.md`（分类），再只做 banner，不搬文件**。搬移买不到任何门禁收益。
+
+### B3 `renderer/`（R5）—— 消费者数记错，**倾向方案 A**
+- **实测消费者 41**（plan 记 34）：cli 15 / core 14 / entrypoints 11 / session 1；
+  出边 **0**（纯叶子）；`StreamingRenderer.ts` **60 行**。
+- **plan 的"职责不同"判断成立**：`StreamingRenderer` 是**有副作用的 stdout 通道**，
+  `presentation/terminal/renderer.ts`（149 行）是**纯格式化器**。
+- **A/B/C 重写成本相同**（单文件域 → **42 处** specifier）；**A 与 B 仅叶名不同**。
+- **建议 A = `presentation/terminal/streaming.ts`**：该子域已 sanctioned、`streaming.ts` 已是
+  推荐角色名、当前仅 1 文件故零碰撞；`renderer/` 仅为 boundary 域 → **搬迁是向规则收敛**。
+
+### B4 12 处越界模块（R4）—— **"都是真单体"不成立；规则引用是误引**
+- 用 judge 自己的三条正则复算 + 逐文件枚举：**2 个是薄 facade**
+  （`sessionStoreAccess` 委托率 **1.00**、192 行；`liveRun.ts` 仅 **15** 真名），
+  其余委托率 **≤0.03**（我方独立复算 0.00–0.14，一致）。
+  对照：`SessionManager` 委托率约 **0.35**——那才是 facade。
+- **judge 计数并非总是下界**（推翻 plan 前提）：`multifile/model.ts` 39→**29**（高估 26%）、
+  `liveRun.ts` 26→**15**（高估 42%）。成因：正则 2 命中 `const x = someCall(`、
+  正则 3 命中函数体内的对象字面量成员。**故拆分范围不得按 plan 表定，须重测。**
+- **plan 的规则引用是误引**：写的"第 147 行"实为 `Prefer this:` 代码块里的**文件名**；
+  facade 依据在 **151–170 行**且 **170 行点名 `SessionManager`**——**只对这一个具名例子授权**，
+  **不是**通行豁免。
+- **judge 严重度 = `advisory`**；judge 自己输出 *"open advisory obligations do not block"*，
+  `Would block: no`。**当前无任何门禁因此 12 项停止。**
+- **建议**：先定**四款可计算判据**（`delegationRatio ≥ 0.90 ∧ branchingFunctionCount = 0 ∧
+  ownStateWriteCount = 0 ∧ linesPerDeclaredName ≤ 15`），再只拆 3 个真单体。
+  阈值有**实测分离度**支撑：只有 1 个模块满足委托率 ≥0.90（=1.00）且无分支，其余全在 0.00–0.03
+  → **facade 簇与其余之间存在全量程断层，阈值非拟合**。
+  **危险分组**：`multifile/model.ts`（写路径有序序列）、`harness.ts`（被编解码的契约状态机）。
+
+### 交叉模式（本轮最重要的结论）
+四项里**三项**的 plan 前提含**无来源数字或误引**（B1 的 `1515`/`247`、B2 的 `~700`、
+B3 的 `34`、B4 的"都是真单体"与行号误引），
+与阶段 A 复核发现的 `*Like` 镜像漂移、`check:*` 误判**同属一类：结论先行、数字未复核**。
+**阶段 B 动代码前应先修正这些前提**；本次已就地勘误 `plan.md` 与 `architecture-exploration-*.md`。

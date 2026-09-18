@@ -620,7 +620,7 @@ Step 3–7 完成后重新审视"还有哪些位置不正确、哪些需要重�
 |---|---|---|---|
 | 1 | `tsconfig.build.json` 的 `exclude` 仅 `**/*.test.ts`，**7 个非 `.test` 的测试支撑文件被打进 `dist/`** | 中（死重，非运行时风险） | **待批准**（见下） |
 | 2 | `agent-rules/architecture-boundaries.md` 的 Common Areas **仍指向 `orchestration/patchResult/`、`orchestration/patchApplication/`**，两条路径 Step 4 已消失 | 中（规则指向不存在目录） | **待批准** |
-| 3 | `src/renderer/` 不在 sanctioned 域列表；`StreamingRenderer.ts` **34 外部消费者 / 0 出边**；规则示例路径 `presentation/terminal/renderer.ts` 已存在但职责不同 | 中 | 独立决策 |
+| 3 | `src/renderer/` 不在 sanctioned 域列表；`StreamingRenderer.ts` **41 外部消费者 / 0 出边**（原文记 34，已勘误）；规则示例路径 `presentation/terminal/renderer.ts` 已存在但职责不同（**该判断成立**：前者有副作用 stdout 通道，后者纯格式化器） | 中 | 独立决策 |
 | 4 | `src/test-utils/` 含 **`utils`**（规则明文禁止）；`session/__tests__/` 是全仓**唯一**孤例 | 中 | 与 #1 一并 |
 | 5 | `presentation/theme/` 与 `presentation/themes/` **仅差一个 `s`**，必须一起读 | 低 | 独立命名决策 |
 | 6 | `eval/` 语义已被 `evidence/harness/` 取代 | 低 | 独立决策 |
@@ -696,6 +696,8 @@ grep -rn "join(__dirname|join(process.cwd()|repoRoot" src --include=*.test.ts | 
   `artifacts browser cli config core daemon entrypoints eval memory model-adapters
   observability renderer sandbox test-utils workflow`
   ——含体量最大的 `browser`(1787)、`core`(1515)、`session`(977)。
+  （**勘误**：这三个数字**均无来源**——实测文件数为 `browser` 228 / `core` 326 / `session` 155。
+  详见 `phase-b-exploration-2026-09-18.md` 的 B1 节。）
   **规则说"用既有 owner domain"，但既有域一半不在名单里，据此无法判断归属。**
 
 #### 3.9.4 根因与治根因
@@ -1186,7 +1188,7 @@ development-workflow、compatibility-and-history、reference-repositories）。
 | **R2** | 收紧 `tsconfig.build.json` 的 `exclude`（+ 处置 `test-utils/`） | §3.8-1 | **是**（build 行为） | **零** | 高 |
 | **R3** | `AGENTS.md`：execution 措辞 + 补 15 个实际在用的顶层域 | §3.9.3 | **是**（措辞） | **零** | 中 |
 | **R4** | 修 12 处越界模块（11 生产 + 1 测试，419 个声明名） | §3.6 | 否 | 中 | 中 |
-| **R5** | `renderer/` → `presentation/terminal/output.ts` | §3.8-3 | **是**（去向 A/B/C） | 中（34 边） | 中 |
+| **R5** | `renderer/` → `presentation/terminal/output.ts` | §3.8-3 | **是**（去向 A/B/C） | 中（**41** 边，已勘误） | 中 |
 | **R6** | `core/` 准入写入规则 + `core/extensions/` 走删除检查 | §3.8 | **是**（是否接受"不搬迁"） | 低 | 中 |
 | **R7** | `docs/` 分类归档（route 时代约 700 份） | §3.9.6 | **是**（分界） | 低（零测试依赖，已实测） | 中 |
 | **R8** | 测试是否分离到 `test/`（`pi` 形态） | §3.8/§3.10.4 | **是**（风格决策） | 中（~1799 边） | 低—中 |
@@ -1219,10 +1221,10 @@ R6/R7 只需一个方向答复）。
 
 | 序 | 事项 | 需要的答复 |
 |---|---|---|
-| B1 | R6 `core/` 准入 + `core/extensions/` 处置 | 是否接受"定义准入、不做 247 文件搬迁" |
-| B2 | R7 `docs/` 分类归档 | route 时代文档的分界线（建议：按 `DOC_STATUS` 重分类后的 `historical` 集合，移入 `docs/archive/`） |
-| B3 | R5 `renderer/` 去向 | A（`terminal/streaming.ts`）/ B（`terminal/output.ts`）/ C（新子域） |
-| B4 | R4 12 处越界模块（**真单体**，非薄 facade） | 是否需要先定义"什么算真单体"的判据 |
+| B1 | R6 `core/` 准入 + `core/extensions/` 处置 | 是否接受"定义准入、不做搬迁"。**勘误**：`247` 无来源（由 §3.8 的 `1515` 派生，而 `1515` 实测为 **326** 文件）；B1 建议 = 写准入规则 + 删除 `core/extensions/`（2 文件，**零消费者**，且产品明示不执行扩展） |
+| B2 | R7 `docs/` 分类归档 | **前提被本仓政策否定**：`docs/archive/README.md` 明文"Prefer status entries in DOC_STATUS.md over moving files"；且实测 **677/770（88%）文档根本没有状态行** → 真正的缺口是**未分类**而非未归档。需裁决：是否 override 该政策 |
+| B3 | R5 `renderer/` 去向 | A（`terminal/streaming.ts`）/ B（`terminal/output.ts`）/ C（新子域）。**探索结论倾向 A**：`presentation/terminal/` 是 sanctioned 子域且 `streaming.ts` 已是推荐角色名，当前仅 1 个文件故**零碰撞**；A/B/C 重写成本相同（**42 处**）。需确认叶名 |
+| B4 | R4 12 处越界模块 | **"都是真单体"不成立**：实测 2 个是薄 facade（`sessionStoreAccess` 委托率 **1.00**、`liveRun.ts` 仅 15 真名），其余委托率 **≤0.03**。plan 的规则引用是**误引**（facade 依据在 151–170 行且**点名** `SessionManager`，非 147 行）。B4 建议：**先定四款可计算判据**，再只拆 3 个真单体 |
 
 **阶段 C — 需独立立项**
 
