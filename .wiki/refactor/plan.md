@@ -3,9 +3,9 @@ title: "Architecture Refactor Plan"
 category: article
 sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-09-15, failures-baseline, reachability-audit-2026-09-15, subagent-reviews-2026-09-15]
 created: 2026-09-15
-updated: 2026-09-17
+updated: 2026-09-18
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v5。当前生产 958 / CLI 可达 873 / 不可达 85，稳定失败 0。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。§4 记录该判据被证伪的经过与 12 项真实破坏。"
+summary: "Module boundary refactor plan v5。当前生产 959 / CLI 可达 874 / 不可达 85，全量测试 3172 项零失败。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁全部完成（3a-3f），core/context 四域混居问题解决。§4 记录删除判据被证伪的经过与 12 项真实破坏。"
 confidence: high
 ---
 
@@ -16,20 +16,24 @@ confidence: high
 > §4 起为约束来源与历史记录，需要追溯时再读。
 
 **版本沿革**：v1 初版 → v2 引入生产可达性 BFS → v3 发现删除路线错误、新增 Step 2.7 →
-v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 重组结构**。
+v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 重组结构** →
+**v5.1 同步 Step 3 完成后的现状（2026-09-18）**。
 
 ---
 
-## 1. 当前状态（2026-09-17）
+## 1. 当前状态（2026-09-18）
 
 | 指标 | 值 |
 |---|---:|
-| 生产文件 | 958 |
-| CLI 可达 | 873 |
+| 生产文件 | 959 |
+| CLI 可达 | 874 |
 | CLI 不可达 | 85（仅测试 72 + 仅公共 API 5 + 零引用 8） |
-| 全量测试 | 3173 项 |
-| 稳定失败 | **0**（偶发 2 项负载超时，宽超时通过） |
+| 全量测试 | **3172 项** |
+| 稳定失败 | **0**（`testTimeout` 已修为 30s，原 5 项负载超时消除） |
 | `tsc -p tsconfig.build.json` | 0 错误 |
+
+**注**：可达性三项自 Step 3 起全程未变（搬迁不改可达性，符合预期）。
+全量 tsc（含测试）251 错——全部为测试文件的既有类型错误，与本计划无关。
 
 ### 已完成阶段
 
@@ -44,12 +48,13 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | Step 2 基线回绿 | 30 → 0 失败；同期修 CB-004 终态真实性、TUI 审批面板 |
 | Step 2.6 零引用簇删除 | 删 82 文件（1 个误删已回退）；剩余范围冻结 |
 | Step 2.7 修正前序删除 | 见下 |
+| **Step 3 域搬迁（3a-3f）** | **✅ 全部完成**（2026-09-18）。6 个域归位，`core/context` 四域混居问题解决；详见 §3.2 |
 
 ### Step 2.7 执行结果
 
 | 目标 | 状态 |
 |---|---|
-| 修复 12 项破坏 | 4 项已解决（2 修复 + 2 删除），8 项待处理（§3.1） |
+| 修复 12 项破坏 | ✅ **全部处置完毕**（5 修复 + 5 删除/移除 + 2 登记 backlog）——见 §3.1 |
 | 核验 403 个已删文件 | ✅ 100%（原始表 `audit-raw/*.json`） |
 | 裁决 10 项未接线能力 | ✅ **全部不恢复**（§4.6） |
 | 固化删除前置检查 | ✅ 入 §2.2 与 `handoff-2026-09-17.md` |
@@ -115,6 +120,25 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
   触发面：会话持久化、审批链、TUI 渲染、启动链、删除被 CLI 依赖的模块。
 - **验证脚本必须能报告"覆盖缺失"**：把测试路径传给 vitest 时，
   vitest 对缺失路径不报错，会导致"覆盖缩水但报通过"。
+- **`testTimeout` = 30s**（2026-09-18 起）：browser/CLI 场景测试 spawn 真实子进程，
+  单项耗时 8–16s（实测最慢 16.23s，74 项 >3s），5s 默认值必然并发抖动。
+  改配置而非改测试；真挂起仍会失败。
+
+### 2.4.1 搬迁纪律（Step 3 固化，后续搬迁适用）
+
+1. **搬迁前跑 import 图 SCC 检查**。环不会让 `tsc` 报错（类型解析仍成功），
+   只有 NormProof judge 或运行时才暴露，故必须独立核验。
+   基线：**全仓 0 环**（含测试文件）。做法：搬迁前跑一次，按目标路径重建图再跑一次。
+2. **只重算 escaping 边**。整域/整树搬迁时域内相对路径解析结果不变，
+   逐条改写域内边会产生大量无意义 diff。判据：`resolve(old_file, spec)` 是否仍落在域内。
+3. **边数必须按 import 图实测，不采信映射表估算**。Step 3 六次搬迁估算全部偏低
+   （30→37、17→18、31→46、361→1537）。
+4. **目标路径先核实是否已有同名概念**。`src/context/memory/` 的既存 `ContextMemory`
+   与 `ProjectMemory` 是同词异义；按目录名机械归并会造成概念混淆。
+5. **搬迁不夹带重命名**。命名决策属独立步骤（Step 6），混入会让同一 diff
+   同时论证"位置变更"与"命名决策"。
+6. **改写产物必须校验后缀**。specifier 用 `.js`（指向 `.ts` 源）。
+   曾因把解析出的 `.ts` 路径直接当 specifier 用，产生 440 条 `TS5097`。
 
 ### 2.5 不得因 `cli:false` 而删的三类
 
@@ -153,62 +177,75 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 **#5 的裁决**：维护者 2026-09-17 选"登记不改"。恢复 codex 调用路径属
 新增 provider 能力，且同属 CB-005。
 
-### 3.2 Step 3 browser 域搬迁（映射表已重算 — 2026-09-17）
+### 3.2 Step 3 域搬迁（3a-3f）— ✅ 全部完成（2026-09-18）
 
-**完整映射表**：`.wiki/refactor/step-3-migration-map.md`
+**完整映射表与逐阶段执行记录**：`.wiki/refactor/step-3-migration-map.md`（§6.1）
 
-**核心发现**：`core/context/` **不是 browser 域，而是四个域混居**（351 文件）：
+**起因**：`core/context/` 不是 browser 域，而是**四域混居**（351 文件）。
+目录名没表达内容，这正是"browser 坟场"观感的来源。
 
-| 组 | 文件 | 职责 |
+**结果结构**：
+
+| 目标 | 文件 | 来源 |
 |---|---:|---|
-| `browser*` 平铺 + `browser/` 嵌套 + `pw*`/`stealthPreload` | **228** | browser 域 |
-| `memory/` | 41 | 项目记忆 |
-| `sidebar/` | 34 | 侧栏投影 |
-| `compact/` | 29 | 上下文压缩 |
-| `startup/` `model/` | 15 | 上下文 |
-| `routeContinuityHandoff` / `contextAnalysis` | 4 | 编排域 / 上下文域（错置） |
+| `src/browser/` | 228 | 平铺 `browser*`/`pw*`/`stealthPreload` 161 + `browser/{receipt,runtime,skill}` 67 |
+| `src/memory/` | 41 | `core/context/memory/` |
+| `src/presentation/sidebar/` | 34 | `core/context/sidebar/` |
+| `src/context/compact/` | 33 | `core/context/compact/` |
+| `src/context/startup/` | 9 | `core/context/startup/` |
+| `core/context/model/` | 6 | **留原位**（共享上下文类型层，3a 判定归属正确） |
 
-**耦合**：`browser-flat` ↔ `browser-nested` **双向 195 边** → 是**同一域被拆两层**，
-搬迁应**合并**。其余小域间边数 ≤6，可独立处置。
+**`core/context/` 现仅剩 `model/` 6 文件**——四域混居问题解决。
 
-**外部引用面**：448 边 / 124 文件（生产值导入 134 边/40 文件）。
-主要来自 `core/harness`（256，其中仅 3 文件 CLI 可达）与 `core/commands`（83）。
+**执行顺序（按依赖方向）**：
 
-**约束**：`core/harness/README.md` 明确"**Do not bulk-move this directory as one
-artifact family**"——须分批、保测试。该域**不搬迁**。
+| 阶段 | 内容 | 提交 | 实测边数（估/实） |
+|---|---|---|---|
+| 3a | `model/` 判定 + 错置文件归位 | `e53ba6b4` | 1 / 1 |
+| 3b | `startup/` → `context/startup/` | `54021279` | 5 / 5 |
+| 3c | `compact/` → `context/compact/` | `59fde020` | 30 / **37** |
+| 3d | `sidebar/` → `presentation/sidebar/` | `35ca1751` | 17 / **18** |
+| 3e | `memory/` → `src/memory/` | `dc38b155` | 31 / **46** |
+| 3f | browser 域 → `src/browser/`（4 批） | `d527993a` `60b24107` `28e6e433` `3f4fd752` | 361 / **1,537** |
 
-**目标结构**：
+**3f 分 4 批，顺序由依赖方向决定**（非文件数）：
+`receipt`(14) → `runtime`(32) → `skill`(21) → 平铺(161)。
+理由：`runtime` 引用 `skill/*`、`skill` 引用 `runtime/*`、平铺层被三者共同引用——
+**先搬被依赖者**，后续批次的 escaping 边始终指向已存在的路径。
+平铺批次**必须整批**（内部 567 边），拆开会让同一批边被重写两遍。
 
-```
-src/browser/（228，合并 receipt/runtime/skill 子目录）
-src/memory/（41）
-src/presentation/sidebar/（34）
-src/context/compact|startup|model/（44）
-```
+**约束遵守**：`core/harness/README.md` 的"Do not bulk-move this directory as one
+artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 
-**执行顺序（风险递增）**：3a `model/`+错置文件 → 3b `startup/` → 3c `compact/`
-→ 3d `sidebar/` → 3e `memory/` → **3f browser（361 边，最末且分批）**。
+**3f 未执行的事项（留给 Step 6）**：草案曾提议"平铺实现命名去掉冗余 `browser` 前缀"。
+**未做**——命名决策属独立步骤，混入搬迁会让同一 diff 同时论证两件事。
 
-**Step 3 全部完成（2026-09-18）**。进度：3a ✅（`e53ba6b4`）、3b ✅（`54021279`）、
-3c ✅（`59fde020`）、3d ✅（`35ca1751`）、3e ✅（`dc38b155`）、
-3f ✅（`d527993a` / `60b24107` / `28e6e433` / `3f4fd752`，分 4 批）。
+**关键前置检查（§2.4.1）**：六次搬迁**全部** 搬迁前 0 环 → 搬迁后 0 环。
 
-映射表估算普遍偏低（实测：3c 37 vs 30、3d 18 vs 17、3e 46 vs 31、
-3f 1,537 vs 361）；每次搬迁均按 import 图实测重算，未采信估算。
-3f 的**命名税未执行**——留给独立 Step 6。
-`core/context/` 现仅剩 `model/` 6 文件（共享上下文类型层）。
-详见 `step-3-migration-map.md` §6.1。
-
-**3f 须 PTY 实机验证**（触及 CLI 桥 + `/browser` 命令链）。
+**验证**（每阶段均执行）：build 0 错；相关域测试全绿；最终**全量 3172 项零失败**；
+可达性 959/874/85 全程不变；`validate` + `verify:host-surface` PASS；
+**PTY 实机**逐阶段验证（`/compact preview`、`/sidebar panel`、`/memory save`、
+`/browser status` + `/browser replay`）。
 
 ### 3.3 Step 4-7
 
 | 步骤 | 内容 | 前置 |
 |---|---|---|
-| Step 4 | orchestration 聚类 | 待 Step 2.7 / Step 3 后按存活文件重算映射表 |
+| Step 4 | orchestration 聚类 | **前置已满足**（Step 3 完成）→ 按存活文件重算映射表 |
 | Step 5 | SessionManager 拆分（52 函数 facade，确认 ALIVE） | 不变 |
-| Step 6 | 命名税裁定 | 不变 |
-| Step 7 | 收尾：NormProof judge 全量跑 | 以删除后 BFS 报告作为收敛证据 |
+| Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | **新增范围**：见下 |
+| Step 7 | 收尾：NormProof judge 全量跑 | 以搬迁后 BFS 报告作为收敛证据 |
+
+**Step 4 入口条件**：`core/context/` 已不再是搬迁对象（仅剩 `model/` 6 文件）。
+orchestration 域需按**存活文件**重算映射表——Step 2.5-C-3 删除了大量编排文件，
+原映射表已失效。参照 Step 3 的方法：先跑 import 图 SCC + 边数实测，再定批次。
+
+**Step 6 范围扩大**：原仅指历史遗留的命名税。现**新增 3f 遗留项**——
+`src/browser/` 下 161 个平铺文件仍带冗余 `browser` 前缀
+（如 `browserCommandRunner.ts` 在 `src/browser/` 内）。
+按 `agent-rules/file-placement-and-naming.md`「让文件夹承载域上下文，文件只命名局部角色」，
+这些应改为 `commandRunner.ts` 等。**属独立决策，须单独评估**：
+影响面为全仓引用边，且需与 Step 4 的 orchestration 命名一并裁定。
 
 ### 3.4 独立立项（记录，不在本计划处理）
 
@@ -243,7 +280,7 @@ v2 全篇建立在一个命题上：
 
 ### 4.2 12 项真实破坏
 
-完整清单见 §3.1 表（4 项已解决、8 项待处理）。已解决的四项：
+完整清单与逐项处置见 §3.1 表（**12 项全部处置完毕**）。其中四项是本判据最典型的反例：
 
 | # | 内容 | 处置 |
 |---|---|---|
@@ -251,6 +288,10 @@ v2 全篇建立在一个命题上：
 | 2 | **`/undo` / `/restore` 读取的快照目录无人写入**——恒报 `Nothing to undo` | 恢复 `orchestration/editSnapshot.ts` 并接线写前快照捕获 |
 | 11 | `verify:edit-capability-closeout` 假阳性（98 项中 75 项不存在仍 `exit 0`） | 删除该 gate |
 | 12 | `verify:browser-txn-gate` 14/14 目标全缺 | 删除该 gate |
+
+其余 8 项：`#3` `provenance` 5 读 0 写、`#5` account-auth、`#6` `executionLane`、
+`#7` 25 条死标签 → **登记/记录**（同源 CB-005）；`#4` `disabledTools`、
+`#8` `pwStatus` 宣传、`#9` 白名单失效、`#10` 5 个 verify 脚本 → **已修复/已删除**。
 
 破坏 #1、#2 是**契约型断链**的典型：活轨没有 import 被删模块，
 而是**自己实现了一半**（写路径裸实现 / 读目录但无人写）。
@@ -316,10 +357,23 @@ v2 全篇建立在一个命题上：
 9. **读子代理结果必须取 `yield` 的 payload**，不能只看对话文本（曾因此误报覆盖率 50%，
    实际 100%）。
 10. **基线数据只写在命令跑完之后**（v1 曾预写含编造项）。
+11. **估算不是测量**。Step 3 六次搬迁的边数估算**全部偏低**（最严重的 361→1,537，差 4.3 倍）。
+    根因：估算只数"跨域边"，漏掉域内 escaping 边与分批后新增的边。
+    **边数必须按 import 图实测**，估算只能用于排序批次。
+12. **`tsc` 不报的错，必须另设检查**。①依赖环：类型解析成功，只有 judge/运行时才暴露
+    → 独立跑 SCC。②测试文件的悬挂 `import type`：类型被擦除，测试照绿
+    → 只有全量 `tsc`（含测试）可见（3b 曾漏掉一处，3c 才发现）。
+13. **搬迁的改动面必须可证明是"仅 import"**。做法：逐文件与 HEAD 对比，
+    断言所有差异行都落在 import 语句范围内。Step 3 各批均以此验证（如 3f 平铺批
+    140 个变更文件、非 import 改动 0）。
+14. **返工优于打补丁**。3f 平铺批首次改写误产出 `.ts` specifier（440 条 `TS5097`），
+    处理方式是 `git reset --hard` 回上一提交重做，而非在错误产物上逐条修补。
 
 > **共性**：以上 1、5、6、7 是同一个错误的不同表现——**用间接证据替代直接证据**
 > （可达性代调用链、语义相似代数据通路、文件可达代被调用、测试绿灯代实机）。
 > 本项目共出现 5 次。
+> **11、12、13 是同一错误在搬迁场景的复现**：估算代实测、编译通过代结构正确、
+> 目视代断言。
 
 ---
 
@@ -423,6 +477,23 @@ runtime 装配四重证据。
 | 附十一 | 7 个迁移残留 shim 删除 |
 | 附十二 | 2 个过期 gate 删除 |
 
+### 6.8 Step 3 域搬迁（2026-09-18）
+
+**详细执行记录**：`step-3-migration-map.md` §6.1（含逐阶段边数、批次依据、验证证据）。
+**逐阶段提交**：`e53ba6b4` → `54021279` → `59fde020` → `35ca1751` → `dc38b155`
+→ `d527993a` / `60b24107` / `28e6e433` / `3f4fd752`。
+
+同期附带修复：
+
+- **`vitest.config.ts` 缺 `testTimeout`**（`acdc0f1b`）：默认 5s，而 browser/CLI 场景测试
+  单项需 8–16s（实测最慢 16.23s，74 项 >3s）→ 全量并发下 5 项间歇超时。
+  量测后设为 30s，**改配置不改测试**。
+- **3b 遗漏的悬挂 `import type`**：`sidebarStateProjection.test.ts` 仍指向已搬走的
+  `../startup/*`。测试照绿（类型被擦除），只有全量 `tsc` 可见；3c 期间修复。
+
+**遗留未做**：`src/browser/` 下 161 个平铺文件的冗余 `browser` 前缀未去掉
+（属 Step 6 命名税，见 §3.3）。
+
 ---
 
 ## 7. 文档索引
@@ -431,9 +502,10 @@ runtime 装配四重证据。
 
 | 文件 | 内容 |
 |---|---|
+| `step-3-migration-map.md` | **Step 3 映射表 + §6.1 逐阶段执行记录（3a-3f）** |
 | `deleted-audit-2026-09-16.md` | **主文档**：403 个已删文件审查总账 + 附一至附十二 |
 | `restore-audit-2026-09-16.md` | 事故认定、三路审查、D 集恢复、补丁层复核 |
-| `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-004） |
+| `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-006） |
 | `handoff-2026-09-17.md` | 任务转接包（方向、记录位置、执行要求） |
 | `audit-raw/*.json` | 403 个已删文件的逐文件判定原始表 |
 | `step-2.6-plan.md` | Step 2.6 方案与执行记录 |
