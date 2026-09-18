@@ -35,7 +35,7 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | 稳定失败 | **0**（`testTimeout` 已修为 30s，原 5 项负载超时消除） |
 | `tsc -p tsconfig.build.json` | 0 错误 |
 | NormProof judge | verdict `partial`；**blocking 义务 0 项未满足**（唯一 blocking 义务 satisfied） |
-| `strict` | ❌ **未开启**（`tsconfig` 链无 `strict`）；开启后生产错误 **0 → 136**，测试 251 → 265 |
+| `strict` | ❌ **未开启**；S1 已完成（`projection.ts` 73 错清零），生产 strict 错误 **136 → 63**，测试 265 |
 | 文档/规则漂移门禁 | ✅ `verify:docs-drift`（RULES 0 死引用、DOCS `--strict` 通过），已接入 `verify-release-core` |
 
 **注**：可达性自 Step 3 起全程未变（搬迁不改可达性，符合预期）；Step 5 第 2、3 批各 +1
@@ -1206,7 +1206,7 @@ R6/R7 只需一个方向答复）。
 
 | 序 | 事项 | 理由 |
 |---|---|---|
-| A1 | **R1 `strict` S1** —— `runtime/events/projection.ts`（73 错，占生产 54%） | 修复形状已定位（循环体开头一次窄化消除约 35 个）；**单文件、可独立验证** |
+| A1 | **R1 `strict` S1** —— `runtime/events/projection.ts` | ✅ **已完成**（`ffcf63bf`）：73 错全部清零，生产 strict 错误 **136 → 63**；零 `!` 或 `as` |
 | A2 | R1 S2 —— 三个 boundary/lifecycle 文件（26 错） | 同形 |
 | A3 | R1 S3 —— 其余 ~13 文件（37 错） | 生产代码清零后，**改 `tsconfig.build.json` 只对生产开 `strict`** |
 | A4 | **R2 + R3** | 两者都是"只改配置/文字"，零代码风险；**R2 顺手解决 7 个测试模块进 `dist/` 的泄漏** |

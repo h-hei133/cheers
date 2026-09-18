@@ -931,3 +931,17 @@
 - **§1 现状表新增两行**：`strict` 未开启（生产 0 → 136 错）、文档/规则漂移门禁已接入。
 - **阅读顺序更新**：**§1 现状 → §2 规则 → §8 路线**；§3 为已完成工作记录，§4 起为历史。
 - 版本号 **v5 → v6**；跑 `verify:docs-drift --strict` 通过（RULES 0 / DOCS 0）。
+
+## [2026-09-18] strict-s1 | S1 完成：`runtime/events/projection.ts` 73 处 strict 错误清零。
+- **定位**：该文件单文件占全仓生产代码 `--strict` 错误的 **54%（73/136）**。
+- **修复方式**：
+  1. 补全 `cycle.responseReentry` 与 `cycle.cycleBoundary` 的 `if (...)` 守卫（与同循环内已有的 `assistantAccumulation` / `toolExtraction` 守卫模式对齐）；
+  2. `phase.stream` 等可选对象属性访问改为可选链（`phase.stream?.status`）；
+  3. `append` 函数的必选形参 `notProvenClaims: readonly string[]` 在调用处补充 `?? []`。
+- **质量与纪律**：**零 `!`、零 `as` 逃逸断言**。全部依靠 TS 控制流类型窄化与回退默认值。
+- **测量结果**：
+  - 全包 `--strict` 错误：**401 → 328（-73）**；
+  - 生产代码 `--strict` 错误：**136 → 63（-73，降幅 54%）**；
+  - 非 strict 构建 `tsconfig.build.json`：**0 错误**；
+  - 非 strict 全量类型检查：**251 错误**（与基线一致，零新增）；
+  - `src/runtime/events/` 单元测试：**87 / 87 全通**。
