@@ -7,7 +7,7 @@ import { classifyRepairHypothesis } from "../../../repair/flow/hypothesis.js";
 import type {
   AgentExecutionOutput,
   CodingResultSummary,
-} from "../../../orchestration/types.js";
+} from "../../../result/types.js";
 import {
   chooseToolStrategy,
   type ToolActionKind,

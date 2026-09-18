@@ -6,7 +6,7 @@ import { buildTaskContextNeeds } from "./taskContextNeed.js";
 import { buildTaskContextResult } from "./taskContextResult.js";
 import { evaluateTaskContextSufficiency } from "./taskContextSufficiency.js";
 import { buildTaskIntent } from "./taskIntent.js";
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
 
 describe("task context result", () => {
   it("surfaces missing facts and suggested reads without raw content or write authority", () => {

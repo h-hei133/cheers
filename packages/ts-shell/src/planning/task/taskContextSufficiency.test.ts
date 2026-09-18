@@ -4,7 +4,7 @@ import { buildTaskContextAcquisition } from "./taskContextAcquisition.js";
 import { buildTaskContextNeeds } from "./taskContextNeed.js";
 import { evaluateTaskContextSufficiency } from "./taskContextSufficiency.js";
 import { buildTaskIntent } from "./taskIntent.js";
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
 
 describe("task context sufficiency", () => {
   it("blocks provider and verification readiness when required evidence is missing", () => {

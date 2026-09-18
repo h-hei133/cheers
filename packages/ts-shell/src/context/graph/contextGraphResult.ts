@@ -1,6 +1,6 @@
 import type { ContextGraph } from "./contextGraph.js";
 import type { ContextGraphScore } from "./contextGraphScore.js";
-import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { TestImpactPlan } from "../../planning/task/testImpactPlan.js";
 
 export type ContextGraphTerminalOutcome =
   | "context-graph-created"

@@ -3,7 +3,7 @@ import {
   hashContent,
   type RecoveryAuthorityCaptureBatchResult,
   type RecoveryAuthorityStoreConfig,
-} from "../edit/recovery/recoveryAuthorityStore.js";
+} from "./recoveryAuthorityStore.js";
 
 /**
  * What a snapshot receipt needs from whatever wrote to the workspace.

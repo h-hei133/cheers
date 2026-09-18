@@ -1,7 +1,7 @@
 import type {
   CodingResultSummary,
   CodingWriteEffect,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import {
   deriveActionableFailureContinuity,
   type ActionableFailureContinuity,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { CodingResultSummary } from "../../result/types.js";
 import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import {
   PRODUCT_TRUTH_MATRIX,

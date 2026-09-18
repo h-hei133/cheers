@@ -2,9 +2,9 @@ import crypto from "node:crypto";
 import type {
   CodingResultSummary,
   CodingVerificationSummary,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import { redactProviderEditText } from "../../provider/proposal/providerEditContext.js";
-import { safeTargetLabel } from "../../orchestration/workspaceFileContract.js";
+import { safeTargetLabel } from "../../policy/workspaceFileContract.js";
 
 export type EditRepairContextStatus =
   | "repair-context-created"

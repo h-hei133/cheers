@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import type { CodingTaskKind } from "../../orchestration/types.js";
+import type { CodingTaskKind } from "../../result/types.js";
 
 export type AgentPlanOwnerCapability =
   | "agent-loop"

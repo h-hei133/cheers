@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { AgentRunner } from "../../orchestration/types.js";
+import type { AgentRunner } from "../../result/types.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { createQueryRuntimeStateFromSeed } from "../query/runtime/state.js";
 import { resolveSessionReference, resumeShellSession } from "./recovery.js";

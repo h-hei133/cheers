@@ -1,4 +1,4 @@
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "../../planning/task/workflowTaskPlanner.js";
 import { projectContextPacketToAgentPlanContext } from "../../planning/task/agentPlanContext.js";
 import {
   projectWorkflowTaskPlanToAgentPlan,
@@ -15,7 +15,7 @@ import {
   buildTargetedContextPacket,
   type TargetedContextPacket,
 } from "../graph/contextPacket.js";
-import { buildTestImpactPlan, type TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import { buildTestImpactPlan, type TestImpactPlan } from "../../planning/task/testImpactPlan.js";
 import type { ContextGraph } from "../graph/contextGraph.js";
 import {
   attachPlanQualityToAgentPlan,

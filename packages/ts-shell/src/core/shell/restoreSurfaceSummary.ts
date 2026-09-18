@@ -1,4 +1,4 @@
-import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { CodingResultSummary } from "../../result/types.js";
 
 export function formatExplicitRestoreSummaryLines(
   codingResult: CodingResultSummary | undefined,

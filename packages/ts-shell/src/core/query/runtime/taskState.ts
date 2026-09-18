@@ -1,4 +1,4 @@
-import type { CodingResultSummary } from "../../../orchestration/types.js";
+import type { CodingResultSummary } from "../../../result/types.js";
 import { projectRepairContinuationStrategy } from "../../../repair/iteration/projection.js";
 import type { ToolActionKind } from "../../../tools/policy/strategy.js";
 import { projectTaskStateVerificationPlan } from "../../../verification/command/plan.js";

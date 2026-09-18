@@ -5,7 +5,7 @@ import { normalizeCodeGraphFacts } from "./facts.js";
 import { buildCodeGraphTrace } from "./trace.js";
 import { buildContextGraph } from "../../graph/contextGraph.js";
 import { scoreContextGraph } from "../../graph/contextGraphScore.js";
-import { buildTestImpactPlan } from "../../../orchestration/testImpactPlan.js";
+import { buildTestImpactPlan } from "../../../planning/task/testImpactPlan.js";
 
 describe("buildCodeGraphImpact", () => {
   it("summarizes tests docs call-sites verification and plan-quality contribution", () => {

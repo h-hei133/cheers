@@ -1,4 +1,4 @@
-import type { ContinuityStateLike } from "../orchestration/runtimeHandoffProjection.js";
+import type { ContinuityStateLike } from "../result/projection/runtimeHandoffProjection.js";
 import {
   extractContinuationReadLineCount,
   extractReadStartLine,

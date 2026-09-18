@@ -7,7 +7,7 @@ import {
   buildTaskProofInput,
   type TaskProofInput,
 } from "../../../evidence/task/proof.js";
-import type { AgentExecutionOutput, CodingResultSummary } from "../../../orchestration/types.js";
+import type { AgentExecutionOutput, CodingResultSummary } from "../../../result/types.js";
 import {
   projectTaskVerdict,
   type TaskVerdict,

@@ -2,7 +2,7 @@ import type {
   ContextPlanningBlockStatus,
   ContextPlanningBlockSummary,
 } from "../../context/acquisition/summary.js";
-import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../../orchestration/types.js";
+import type { CodingResultSummary, OrchestrationStatus, TerminalReason } from "../../result/types.js";
 import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import type { ModelBoundaryPhaseProjection } from "../../runtime/loop/modelBoundary.js";
 import type { RuntimeProjectionEvent } from "../../runtime/events/projection.js";

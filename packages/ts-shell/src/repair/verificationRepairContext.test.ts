@@ -5,7 +5,7 @@ import {
   buildVerificationRepairContextFromCodingResult,
 } from "./verificationRepairContext.js";
 import type { TargetedContextPacket } from "../context/graph/contextPacket.js";
-import type { CodingResultSummary } from "./types.js";
+import type { CodingResultSummary } from "../result/types.js";
 
 describe("verificationRepairContext", () => {
   it("creates safe repair-loop context from failed verification with receipt, context packet, and Agent Plan ids", () => {

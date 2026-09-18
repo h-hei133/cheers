@@ -1,4 +1,4 @@
-import type { AgentRole } from '../../../orchestration/types.js'
+import type { AgentRole } from '../../../result/types.js'
 import type { RuntimeSourceFact } from '../../../context/acquisition/code/source.js'
 import type { RepairHypothesisState } from '../../../repair/flow/hypothesis.js'
 import type { ToolActionKind } from '../../../tools/policy/strategy.js'

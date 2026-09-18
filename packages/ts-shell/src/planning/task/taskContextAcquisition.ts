@@ -4,7 +4,7 @@ import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import type { ContextGraph } from "../../context/graph/contextGraph.js";
 import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
 import type { TaskContextNeed, TaskContextNeedSet } from "./taskContextNeed.js";
-import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { TestImpactPlan } from "./testImpactPlan.js";
 
 export type TaskContextAcquisitionStage =
   | "context-packet"

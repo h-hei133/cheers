@@ -7,7 +7,7 @@ import {
   attributeGitChangeSet,
   snapshotGitChangeSet,
 } from "./gitChangeSetAttribution.js";
-import type { CodingChangeSetSummary } from "./types.js";
+import type { CodingChangeSetSummary } from "../result/types.js";
 
 describe("git change set attribution", () => {
   let tempDir: string | undefined;

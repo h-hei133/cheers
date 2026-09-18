@@ -1,4 +1,4 @@
-import type { TerminalClassification } from "../../orchestration/types.js";
+import type { TerminalClassification } from "../../result/types.js";
 
 export type SessionLifecycleStatus =
   | "active"

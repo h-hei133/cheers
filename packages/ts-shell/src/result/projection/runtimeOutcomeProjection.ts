@@ -4,13 +4,13 @@ import {
   buildShellCodingResult,
   deriveActionableBlockerContract,
   type ShellResultAssemblyInput,
-} from "../result/projection/shell/assembly.js";
+} from "./shell/assembly.js";
 import type {
   CodingPatchRecord,
   CodingResultSummary,
   CodingTaskKind,
   CodingVerificationSummary,
-} from "./types.js";
+} from "../types.js";
 
 export interface RuntimeOutcomeProjection {
   readonly codingResult: CodingResultSummary;

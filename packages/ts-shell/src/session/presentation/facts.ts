@@ -2,7 +2,7 @@ import type {
   CodingResultSummary,
   OrchestrationStatus,
   TerminalReason,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 
 export interface SessionPresentationFactsInput {
   readonly status: OrchestrationStatus;

@@ -24,7 +24,7 @@ import type {
   AgentExecutionOutput,
   AgentRole,
   ContinuationReason,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import type { RecoverySnapshot } from "../recovery/types.js";
 import type { ReplayPlan } from "./types.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";

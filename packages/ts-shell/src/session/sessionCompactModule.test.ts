@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { QueryEvent } from "../core/query/runtime/events.js";
-import type { CodingResultSummary } from "../orchestration/types.js";
+import type { CodingResultSummary } from "../result/types.js";
 import { applySessionCompactRetention } from "./sessionCompactModule.js";
 
 describe("session compact module parity", () => {

@@ -1,13 +1,13 @@
 import crypto from "node:crypto";
 
 import type { AgentPlan } from "../../planning/task/agentPlan.js";
-import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { CodingResultSummary } from "../../result/types.js";
 import {
   blockedCommandReason,
   isAllowlistedRunCommand,
-} from "../../orchestration/capabilityBoundaryProjection.js";
+} from "../../policy/capabilityBoundaryProjection.js";
 import { redactProviderEditText } from "../../provider/proposal/providerEditContext.js";
-import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { TestImpactPlan } from "../../planning/task/testImpactPlan.js";
 import type { PlanQuality } from "../../planning/quality/model.js";
 import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import type { TaskExecutionPlan } from "../../planning/task/taskExecutionPlan.js";

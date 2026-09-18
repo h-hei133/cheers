@@ -1,4 +1,4 @@
-import type { AgentExecutionOutput, AgentRole, CodingResultSummary } from '../../../orchestration/types.js'
+import type { AgentExecutionOutput, AgentRole, CodingResultSummary } from '../../../result/types.js'
 import { projectArtifactLifecycle } from '../../../artifacts/workflow/model.js'
 import { contextResultSourceFacts, normalizeRuntimeSourceFacts, sourceFactsForTargets, type RuntimeSourceFact } from '../../../context/acquisition/code/source.js'
 import { classifyRepairHypothesis, rejectRepairHypothesis, type RepairHypothesisState } from '../../../repair/flow/hypothesis.js'

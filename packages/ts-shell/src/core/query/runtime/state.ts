@@ -3,7 +3,7 @@ import type {
   AgentRole,
   ContinuationReason,
   SharedContext,
-} from '../../../orchestration/types.js'
+} from '../../../result/types.js'
 import {
   createEmptyLifecycleIndex,
   type DurableLifecycleIndex,

@@ -5,13 +5,13 @@ import type { ContextGraph } from "../../context/graph/contextGraph.js";
 import type { ContextGraphScore } from "../../context/graph/contextGraphScore.js";
 import { buildContextGraphReadinessFacts, type ContextGraphReadinessFacts } from "../../context/graph/contextGraphReadiness.js";
 import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
-import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { TestImpactPlan } from "../task/testImpactPlan.js";
 
 export interface VerificationCommandPlanLike {
   readonly verificationPlanId?: string;
   readonly state?: string;
 }
-import type { VerificationRepairContext } from "../../orchestration/verificationRepairContext.js";
+import type { VerificationRepairContext } from "../../repair/verificationRepairContext.js";
 import type { CodeGraphTrace } from "../../context/acquisition/code/trace.js";
 import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import type { AnalysisBrief } from "../task/analysisBrief.js";

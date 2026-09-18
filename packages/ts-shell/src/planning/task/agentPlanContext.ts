@@ -5,7 +5,7 @@ import {
 import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
 import type { ContextGraph } from "../../context/graph/contextGraph.js";
 import type { ContextGraphScore } from "../../context/graph/contextGraphScore.js";
-import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { TestImpactPlan } from "./testImpactPlan.js";
 import type { CodeGraphTrace } from "../../context/acquisition/code/trace.js";
 import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import type { AnalysisBrief } from "./analysisBrief.js";

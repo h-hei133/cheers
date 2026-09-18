@@ -6,7 +6,7 @@ import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type {
   CodingResultSummary,
   OrchestrationResult,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import { SessionManager, type Session } from "../SessionManager.js";
 

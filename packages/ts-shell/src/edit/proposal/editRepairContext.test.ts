@@ -3,7 +3,7 @@ import {
   buildEditRepairContext,
   buildEditRepairContextFromCodingResult,
 } from "./editRepairContext.js";
-import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { CodingResultSummary } from "../../result/types.js";
 
 describe("editRepairContext", () => {
   it("creates redacted safe context from failed verification facts", () => {

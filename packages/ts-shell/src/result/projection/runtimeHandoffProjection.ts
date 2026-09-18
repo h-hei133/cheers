@@ -3,7 +3,7 @@ import type {
   CodingTaskKind,
   TerminalClassification,
   TerminalReason,
-} from "./types.js";
+} from "../types.js";
 
 export type GroundedDeliverableMode = "read" | "summary" | "explain";
 

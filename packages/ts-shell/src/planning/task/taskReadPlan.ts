@@ -4,7 +4,7 @@ import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import type { ContextGraph } from "../../context/graph/contextGraph.js";
 import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
 import type { TaskIntent } from "./taskIntent.js";
-import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { TestImpactPlan } from "./testImpactPlan.js";
 
 export interface TaskReadPlan {
   readonly readPlanId: string;

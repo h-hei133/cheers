@@ -1,7 +1,7 @@
 import type {
   AgentExecutionOutput,
   CodingResultSummary,
-} from '../../../orchestration/types.js'
+} from '../../../result/types.js'
 import type { ToolActionKind } from '../../../tools/policy/strategy.js'
 import type { QueryRuntimeExecutionResult } from './batch.js'
 

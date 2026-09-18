@@ -9,7 +9,7 @@ import { buildLoopContextRebuildInput } from "../../context/rebuildInput.js";
 import { projectSessionContextRebuild } from "../../context/sessionContextRebuildProjection.js";
 import { buildContextPlanningBlockSummary } from "../../context/acquisition/summary.js";
 import { runPlanningRuntime } from "../../planning/runtime/engine.js";
-import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { CodingResultSummary } from "../../result/types.js";
 import {
   projectProviderRegistry,
   unknownProviderCompatibilityFlags,

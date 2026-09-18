@@ -4,7 +4,7 @@ import { projectContextPacketToAgentPlanContext } from "./agentPlanContext.js";
 import type { ContextGraph } from "../../context/graph/contextGraph.js";
 import type { ContextGraphScore } from "../../context/graph/contextGraphScore.js";
 import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
-import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { TestImpactPlan } from "./testImpactPlan.js";
 
 describe("projectContextPacketToAgentPlanContext", () => {
   it("projects context packet facts into replay-safe agent planning input", () => {

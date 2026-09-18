@@ -15,7 +15,7 @@ import type { TaskLifecycle } from "../planning/task/taskLifecycle.js";
 import type {
   CodingResultSummary,
   CodingVerificationSummary,
-} from "./types.js";
+} from "../result/types.js";
 
 export type VerificationRepairContextStatus =
   | "repair-loop-context-created"

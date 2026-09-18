@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
-import type { OrchestrationResult } from "../../orchestration/types.js";
+import type { OrchestrationResult } from "../../result/types.js";
 import { SessionManager, type Session } from "../SessionManager.js";
 
 export type LongSessionContinuityScenario =

@@ -7,7 +7,7 @@ import type {
   ContinuationReason,
   TerminalClassification,
   TerminalReason,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";

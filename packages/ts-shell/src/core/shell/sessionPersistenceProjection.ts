@@ -1,4 +1,4 @@
-import type { ContinuationReason, TerminalReason } from "../../orchestration/types.js";
+import type { ContinuationReason, TerminalReason } from "../../result/types.js";
 import type { SessionTerminalState } from "./sessionTerminalState.js";
 
 export function projectCompletedSessionSave(

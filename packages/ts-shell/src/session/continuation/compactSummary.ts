@@ -1,4 +1,4 @@
-import type { CodingWriteEffect } from "../../orchestration/types.js";
+import type { CodingWriteEffect } from "../../result/types.js";
 import type { QueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
 import type { QueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
 import { encodeSessionHarnessState } from "../harness/state.js";

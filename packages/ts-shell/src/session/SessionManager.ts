@@ -16,7 +16,7 @@ import type {
 import {
   type DurableLifecycleIndex,
 } from "../core/tools/toolResultLifecycle.js";
-import type { ContinuationReason } from "../orchestration/types.js";
+import type { ContinuationReason } from "../result/types.js";
 import type {
   CurrentSessionSelectionResolution,
 } from "./store/currentSelection.js";

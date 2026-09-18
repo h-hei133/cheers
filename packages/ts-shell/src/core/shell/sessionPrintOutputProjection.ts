@@ -1,7 +1,7 @@
 import type {
   CodingResultSummary,
   OrchestrationStatus,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 
 export function selectPrintTerminalOutput(input: {
   readonly finalOutput: string;

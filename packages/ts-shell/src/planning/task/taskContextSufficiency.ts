@@ -6,7 +6,7 @@ import type { ContextGraphScore } from "../../context/graph/contextGraphScore.js
 import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
 import type { TaskContextAcquisition } from "./taskContextAcquisition.js";
 import type { TaskContextNeedSet } from "./taskContextNeed.js";
-import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import type { TestImpactPlan } from "./testImpactPlan.js";
 
 export type TaskContextSufficiencyState =
   | "sufficient"

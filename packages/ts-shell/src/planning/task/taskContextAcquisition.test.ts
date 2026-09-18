@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildTaskContextAcquisition } from "./taskContextAcquisition.js";
 import { buildTaskContextNeeds } from "./taskContextNeed.js";
 import { buildTaskIntent } from "./taskIntent.js";
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
 
 describe("task context acquisition", () => {
   it("plans bounded staged acquisitions from context needs", () => {

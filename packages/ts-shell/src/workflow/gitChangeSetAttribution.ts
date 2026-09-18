@@ -1,6 +1,6 @@
-import type { WorkflowGitDiagnostics } from "../workflow/gitContext.js";
-import { getWorkflowGitDiagnostics } from "../workflow/gitContext.js";
-import type { CodingChangeSetSummary } from "./types.js";
+import type { WorkflowGitDiagnostics } from "./gitContext.js";
+import { getWorkflowGitDiagnostics } from "./gitContext.js";
+import type { CodingChangeSetSummary } from "../result/types.js";
 
 export function snapshotGitChangeSet(
   workspaceRoot: string,

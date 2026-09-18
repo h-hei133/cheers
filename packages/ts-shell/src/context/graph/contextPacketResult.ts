@@ -3,7 +3,7 @@ import {
   type ContextPlanningSummary,
 } from "./contextPlan.js";
 import type { TargetedContextPacket } from "./contextPacket.js";
-import { projectRuntimeCodingOutcome, type RuntimeOutcomeProjection } from "../../orchestration/runtimeOutcomeProjection.js";
+import { projectRuntimeCodingOutcome, type RuntimeOutcomeProjection } from "../../result/projection/runtimeOutcomeProjection.js";
 
 export type ContextPacketTerminalOutcome =
   | "context-packet-created"

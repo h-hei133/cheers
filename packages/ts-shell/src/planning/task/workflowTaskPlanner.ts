@@ -1,10 +1,10 @@
-import type { CodingTaskKind } from "./types.js";
-import type { BrowserAgentPlan } from "../browser/browserAgent.js";
-import type { GroundedDeliverableMode } from "./runtimeHandoffProjection.js";
+import type { CodingTaskKind } from "../../result/types.js";
+import type { BrowserAgentPlan } from "../../browser/browserAgent.js";
+import type { GroundedDeliverableMode } from "../../result/projection/runtimeHandoffProjection.js";
 import type {
   WorkflowActionGraph,
   WorkflowDependentTarget,
-} from "../planning/action/graph.js";
+} from "../action/graph.js";
 
 export type ReflectiveStateQueryKind =
   | "stop-reason"

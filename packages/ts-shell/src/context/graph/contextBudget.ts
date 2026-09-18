@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { safeTargetLabel } from "../../orchestration/workspaceFileContract.js";
+import { safeTargetLabel } from "../../policy/workspaceFileContract.js";
 
 export type ContextBudgetDecision =
   | "included"

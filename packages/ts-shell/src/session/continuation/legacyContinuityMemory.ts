@@ -1,4 +1,4 @@
-import type { CodingWriteEffect } from "../../orchestration/types.js";
+import type { CodingWriteEffect } from "../../result/types.js";
 import {
   extractSeedInfluenceFromStrings,
   extractSummaryBoolean,

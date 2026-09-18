@@ -4,7 +4,7 @@ import { buildContextGraph } from "../../context/graph/contextGraph.js";
 import { scoreContextGraph } from "../../context/graph/contextGraphScore.js";
 import { buildPlanQuality, attachPlanQualityToAgentPlan, attachProviderAnchoringToPlanQuality } from "./model.js";
 import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
-import { buildTestImpactPlan } from "../../orchestration/testImpactPlan.js";
+import { buildTestImpactPlan } from "../task/testImpactPlan.js";
 import { normalizeCodeGraphFacts } from "../../context/acquisition/code/facts.js";
 import { buildCodeGraphTrace } from "../../context/acquisition/code/trace.js";
 import { buildCodeGraphImpact } from "../../context/acquisition/code/impact.js";

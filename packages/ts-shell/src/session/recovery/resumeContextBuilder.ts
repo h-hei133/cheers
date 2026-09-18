@@ -2,7 +2,7 @@ import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type {
   CodingActionResultSeed,
   CodingResultSummary,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import { formatPromptContinuityContext } from "../continuityFormatter.js";
 import { formatContinuationEvidenceParityDetails } from "../continuationEvidenceParity.js";
 import type {

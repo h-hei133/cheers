@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type {
   CodingResultSummary,
   OrchestrationResult,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import { SessionManager, type Session } from "../../session/SessionManager.js";
 import {
   runResumeLikeShellAction,

@@ -1,5 +1,5 @@
 import type { QueryEvent } from "../core/query/runtime/events.js";
-import type { CodingResultSummary, CodingWriteEffect } from "../orchestration/types.js";
+import type { CodingResultSummary, CodingWriteEffect } from "../result/types.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
 import type {
   SeedInfluenceDiagnostic,

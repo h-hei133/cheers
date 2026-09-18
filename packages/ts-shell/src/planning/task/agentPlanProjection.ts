@@ -5,7 +5,7 @@ import type {
 } from "./agentPlan.js";
 import { buildAgentPlan } from "./agentPlan.js";
 import type { AgentPlanContextProjection } from "./agentPlanContext.js";
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
 
 export interface AgentPlanProjectionInput {
   readonly workflowPlan: WorkflowTaskPlan;

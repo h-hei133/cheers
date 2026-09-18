@@ -3,7 +3,7 @@ import type {
   AgentRole,
   CodingResultSummary,
   CodingTaskKind,
-} from "../../../orchestration/types.js";
+} from "../../../result/types.js";
 import type { ToolActionKind } from "../../../tools/policy/strategy.js";
 import type { QueryRuntimeActionDecision } from "./decision.js";
 

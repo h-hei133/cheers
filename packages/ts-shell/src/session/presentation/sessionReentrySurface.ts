@@ -1,7 +1,7 @@
 import type {
   TerminalClassification,
   TerminalReason,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 import type { RecoveryTrustBoundaryBlock } from "../recovery/recoveryTrustBoundary.js";
 import type { SessionResumeEligibility } from "../recovery/sessionResumeEligibility.js";

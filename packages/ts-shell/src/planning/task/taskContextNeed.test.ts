@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildTaskContextNeeds } from "./taskContextNeed.js";
 import { buildTaskIntent } from "./taskIntent.js";
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
 
 describe("task context needs", () => {
   it("derives bug investigation source, tests, and call-site context without mutation authority", () => {

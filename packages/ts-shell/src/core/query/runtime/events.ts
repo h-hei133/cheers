@@ -1,4 +1,4 @@
-import type { AgentExecutionOutput, AgentRole, OrchestrationResult } from '../../../orchestration/types.js'
+import type { AgentExecutionOutput, AgentRole, OrchestrationResult } from '../../../result/types.js'
 import type { QueryRuntimeActionDecision } from './decision.js'
 import type { QueryRuntimeExecutionResult } from './batch.js'
 import type {
