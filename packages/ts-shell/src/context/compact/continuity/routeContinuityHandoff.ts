@@ -1,6 +1,6 @@
 import type { EditCapabilityCloseoutManifest } from "../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
 import type { EditCapabilityReadiness } from "../../../orchestration/patchResult/editCapabilityReadiness.js";
-import type { RecoverySurfaceSummary } from "../../../orchestration/patchRecovery/recoverySurfaceProjection.js";
+import type { RecoverySurfaceSummary } from "../../../edit/recovery/recoverySurfaceProjection.js";
 import {
   factIds,
   factValue,

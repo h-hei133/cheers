@@ -1,4 +1,4 @@
-import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
+import { hashContent } from "../edit/recovery/recoveryAuthorityStore.js";
 import { redactProviderEditText } from "./providerEditContext.js";
 import type { ProviderEditOperationKind } from "./providerEditProposal.js";
 import type { FencedEditMapping } from "./fencedEditPlanner.js";

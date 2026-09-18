@@ -1,11 +1,11 @@
 import {
   runRestoreCommand,
-} from "../../orchestration/patchRecovery/restoreCommandRunner.js";
+} from "../../edit/recovery/restoreCommandRunner.js";
 import type {
   RestoreCommandRecordSelection,
   RestoreCommandRequest,
   RestoreCommandResult,
-} from "../../orchestration/patchRecovery/restoreCommandContract.js";
+} from "../../edit/recovery/restoreCommandContract.js";
 import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 

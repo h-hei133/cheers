@@ -1,4 +1,4 @@
-import type { RecoverySurfaceSummary } from './patchRecovery/recoverySurfaceProjection.js'
+import type { RecoverySurfaceSummary } from '../edit/recovery/recoverySurfaceProjection.js'
 import type { PerFilePatchResultProjection } from '../edit/result/perFilePatchResultProjection.js'
 
 export type AgentRole = 'planner' | 'coder' | 'reviewer'

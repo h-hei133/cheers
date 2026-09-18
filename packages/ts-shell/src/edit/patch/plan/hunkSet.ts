@@ -1,4 +1,4 @@
-import { hashContent } from "../../../orchestration/patchRecovery/recoveryAuthorityStore.js";
+import { hashContent } from "../../recovery/recoveryAuthorityStore.js";
 import type { FencedEditMapping } from "../../../orchestration/fencedEditPlanner.js";
 
 export interface ExactHunkRange {

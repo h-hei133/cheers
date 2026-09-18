@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js'
 import { buildEditSnapshotStoreConfig } from '../../orchestration/editSnapshot.js'
-import { captureRecoveryAuthorityRecord } from '../../orchestration/patchRecovery/recoveryAuthorityStore.js'
+import { captureRecoveryAuthorityRecord } from '../../edit/recovery/recoveryAuthorityStore.js'
 import {
   checkRustDaemonAvailability,
   executeLocally,

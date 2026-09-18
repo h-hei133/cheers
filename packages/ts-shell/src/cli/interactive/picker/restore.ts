@@ -2,7 +2,7 @@ import {
   listRecoveryAuthorityNamespaces,
   listRecoveryAuthorityRecords,
   type RecoveryAuthorityRecordIndexEntry,
-} from "../../../orchestration/patchRecovery/recoveryAuthorityIndex.js";
+} from "../../../edit/recovery/recoveryAuthorityIndex.js";
 import { defaultLedgerRoot } from "../../../core/commands/restoreCommandRuntime.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";

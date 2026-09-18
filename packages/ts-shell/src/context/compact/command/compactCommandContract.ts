@@ -1,4 +1,4 @@
-import type { RecoverySurfaceSummary } from "../../../orchestration/patchRecovery/recoverySurfaceProjection.js";
+import type { RecoverySurfaceSummary } from "../../../edit/recovery/recoverySurfaceProjection.js";
 import type { ContextStateProjectionInput } from "../../../core/context/model/contextStateProjection.js";
 
 export type CompactCommandMode = "preview" | "render" | "json";

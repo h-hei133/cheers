@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
-import { projectRecoverySurfaceSummary } from "../../../orchestration/patchRecovery/recoverySurfaceProjection.js";
-import type { RecoveryAuthorityCaptureBatchResult } from "../../../orchestration/patchRecovery/recoveryAuthorityStore.js";
+import { projectRecoverySurfaceSummary } from "../../../edit/recovery/recoverySurfaceProjection.js";
+import type { RecoveryAuthorityCaptureBatchResult } from "../../../edit/recovery/recoveryAuthorityStore.js";
 import {
   projectContextState,
   type ContextProjectionFact,

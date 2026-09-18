@@ -1,4 +1,4 @@
-import { hashContent } from "./patchRecovery/recoveryAuthorityStore.js";
+import { hashContent } from "../edit/recovery/recoveryAuthorityStore.js";
 import type { FencedEditMapping } from "./fencedEditPlanner.js";
 import type { EditProposalReview } from "./editProposalReview.js";
 import type { ProviderAnchorConflictResult } from "./providerAnchorConflict.js";
