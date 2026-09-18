@@ -467,7 +467,40 @@ advisory 的函数名上限从 13 模块降至 12 模块（`SessionManager` 退�
 |---|---|---|
 | Step 5 三批 | `268b2f83` `10350ede` `09153136` | **2 处低危发现**（见下），其余全清 |
 | Step 6 改名 | `b28ab2fd` | **clean，零发现** |
-| Step 4 九批 | 7 个 batch commit | 进行中 |
+| Step 4 九批 | 7 个 batch commit | **5 clean + 2 处 P1（同一根因，已修复）**——见下 |
+
+**Step 4 分片的发现（P1，高）——门禁静默失去覆盖**：
+
+`e2317e18`（harness 三文件→`evidence/harness/`）与 `1aaf7d4f`（8 个 provider 测试→`provider/proposal/`）
+共孤立了 `scripts/verify-anchored-provider-smoke.mjs` 里 **11 条** `focusedTests` 路径，
+**而该门禁仍打印 `[pass]` 并 `exit 0`**。
+
+**根因（比"漏改路径"更深）**：该门禁把 **23 条路径一次性**传给 vitest
+（`npm run test -- ...focusedTests`）。**vitest 在多个 filter 中只要有一个匹配即 `exit 0`**，
+故失效路径被静默吞掉。实测：修复前门禁只跑了 **2 个文件 / 13 个测试**，
+却报告 `[pass] anchored-provider-smoke - deterministic fake corpus and safe-skip coverage passed`。
+**这正是 §2.4 明文警示的"覆盖缩水但报通过"。**
+
+**全仓门禁审计（本次实测 25 个 `verify-*.mjs`）**：
+
+| 项 | 结果 |
+|---|---|
+| 有失效测试路径的门禁 | **9 个** |
+| 其中**批量调用**（因此会静默） | **1 个** = `verify-anchored-provider-smoke.mjs` |
+| 其余 8 个（逐个文件跑） | **能**正确报告 `[product-regression] ... exit=1`，`exit 3` |
+| 失效路径总数 | 21（本计划引入 **11**；另 **10** 条源于更早的 `7a59ab23` 删除，那些测试已不存在） |
+
+**处置**：
+
+1. **11 条路径改指新位置**；
+2. **10 条已删路径移除并在脚本内注明来源**（`7a59ab23` 删除了 dormant patch-transaction 簇）；
+3. **在门禁内加入缺失路径检测**（`existsSync` → `[config-failure] ... missing-test` → `exit 3`）。
+   这是对根因的修复，而非仅补路径——今后该门禁再不会把缺失路径吞成 pass。
+   **负向测试已做**：注入一条不存在的路径 → `exit 3` + 正确的 `[config-failure]` 行；移除后 `exit 0`。
+4. **效果**：门禁从 **2 文件 / 13 测试** 恢复为 **13 文件 / 39 测试**。
+
+该脚本**未被 `package.json` 或任何 release 链引用**（孤立脚本），故未纳入 `verify-release-core`
+的既有失败；但脚本自身现在会正确自检。
 | Step 3 五批 + 配置 | 5 个 move + `acdc0f1b` | **4 clean + 1 处历史缺陷（已自修复）**，配置项 clean |
 
 **Step 3 分片的发现（P2，已自修复，HEAD 不受影响）**：
