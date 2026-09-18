@@ -231,14 +231,29 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 
 | 步骤 | 内容 | 前置 |
 |---|---|---|
-| Step 4 | orchestration 聚类 | **前置已满足**（Step 3 完成）→ 按存活文件重算映射表 |
+| Step 4 | orchestration 聚类 | **映射表已重算**（`step-4-orchestration-map.md`）→ **待维护者裁决 5 项未决问题** |
 | Step 5 | SessionManager 拆分（52 函数 facade，确认 ALIVE） | 不变 |
 | Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | **新增范围**：见下 |
 | Step 7 | 收尾：NormProof judge 全量跑 | 以搬迁后 BFS 报告作为收敛证据 |
 
-**Step 4 入口条件**：`core/context/` 已不再是搬迁对象（仅剩 `model/` 6 文件）。
-orchestration 域需按**存活文件**重算映射表——Step 2.5-C-3 删除了大量编排文件，
-原映射表已失效。参照 Step 3 的方法：先跑 import 图 SCC + 边数实测，再定批次。
+**Step 4 重算结果**（2026-09-18，零代码改动）：
+
+- **`orchestration/` 的真实性质不是编排执行域，而是「被广泛消费的模型/投影层」。**
+  判据：入向 182 边 : 出向 18 边（**10:1**）；55 文件主分量中 12 个是无内部入边的
+  sources（`*Result`/`*Projection`/`*Trace`）；`types.ts` 被 **7 个顶层域**引用。
+- **与 `turn/`、`runtime/loop/` 零 import 边**——执行侧根本不在 `orchestration/`。
+  该事实独立佐证 **CB-005**。
+- **前缀族不构成子域边界**：内聚度最高的 `contextGraph*` / `providerAnchor*` 仅 **0.42**，
+  族间边 112 > 族内边 32。语义聚类内聚度 0.47。**按前缀切分会产生大量跨目录边。**
+- **三个子目录不属 orchestration**（消费者全在 edit/restore/compact 侧）：
+  `patchRecovery/`（8 生产）、`patchResult/`（2）、`patchParsing/`（1）。
+- 原 composition root `runMvpIntegratedFlow.ts` 已删；`module-atlas.md` 相关描述过期。
+- **5 项未决问题待裁决**（`step-4-orchestration-map.md` §6.3）：
+  ① `types.ts`（318 行 / 44 导出 / 7 域消费）归属；② harness 3 文件（1,203 行，
+  生产可达但 README 声明该目录非产品边界）去向；③ `context/acquisition/graph.ts`
+  的 29 边是否随 cluster 拆分一并重构（**它自身仅 1 个调用者，却是 27 条边的汇合点**）；
+  ④ 是否保留 `orchestration/` 目录及其更名；⑤ `agentPlan`/`analysis`/`taskLifecycle`
+  三组是否合并。
 
 **Step 6 范围扩大**：原仅指历史遗留的命名税。现**新增 3f 遗留项**——
 `src/browser/` 下 161 个平铺文件仍带冗余 `browser` 前缀
@@ -494,6 +509,21 @@ runtime 装配四重证据。
 **遗留未做**：`src/browser/` 下 161 个平铺文件的冗余 `browser` 前缀未去掉
 （属 Step 6 命名税，见 §3.3）。
 
+### 6.9 Step 4 orchestration 聚类重算（2026-09-18）
+
+**产出**：`step-4-orchestration-map.md`（零代码改动，纯判定）。
+
+`orchestration/` 从删除前的 412 文件降至 123（Step 2.5-C-3 删除 289）。
+重算发现其真实性质是**被广泛消费的模型/投影层**，而非编排执行域——
+入向 182 : 出向 18（10:1），`types.ts` 被 7 个顶层域引用，
+且与 `turn/`、`runtime/loop/` **零 import 边**（独立佐证 CB-005）。
+
+**前缀族被否证**：内聚度最高 0.42，族间边 112 > 族内边 32 → 不能按前缀切分。
+
+**三个子目录判定不属 orchestration**：`patchRecovery/`、`patchResult/`、`patchParsing/`。
+
+**5 项未决问题**已登记 §3.3，待维护者裁决后执行。
+
 ---
 
 ## 7. 文档索引
@@ -503,6 +533,7 @@ runtime 装配四重证据。
 | 文件 | 内容 |
 |---|---|
 | `step-3-migration-map.md` | **Step 3 映射表 + §6.1 逐阶段执行记录（3a-3f）** |
+| `step-4-orchestration-map.md` | **Step 4 orchestration 聚类重算（含 5 项未决问题）** |
 | `deleted-audit-2026-09-16.md` | **主文档**：403 个已删文件审查总账 + 附一至附十二 |
 | `restore-audit-2026-09-16.md` | 事故认定、三路审查、D 集恢复、补丁层复核 |
 | `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-006） |

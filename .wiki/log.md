@@ -330,3 +330,38 @@
 - **验证**（每批均跑）：`tsc -p tsconfig.build.json` **0 错**（全量 tsc 全程 251，与搬迁前一致）；批次相关测试全绿（批1 55 / 批2 80 / 批3 85）；**最终全量 3172 项零失败**（browser 域 58 文件/191 测试全绿）；可达性 production 959 / cliReachable 874 / cliOpaque 85 **不变**；`validate` + `verify:host-surface` PASS；**PTY 实机**——`/browser status`（渲染 Browser capability status + runtime dependency + backend candidates）与 `/browser replay`（渲染 Browser replay + **Browser receipt cache**，一条链路同时覆盖批次 1 与批次 4 的搬迁产物）。
 - **改动纯度**：批次 4 的 140 个变更文件中 **非 import 改动 = 0**。
 - **Step 3 收尾状态**：`core/context/` 只剩 `model/` 6 文件（`ContextLayerId`/`ContextContinuityManifest` 等共享类型层，3a 已判定其正确归属在此）。四域混居问题解决。
+
+## [2026-09-18] step4 | orchestration 聚类映射表重算（判定，零代码改动）。
+- **产出**：`.wiki/refactor/step-4-orchestration-map.md`（192 行）。plan.md §3.3 与 §6.9 已同步。
+- **规模**：`orchestration/` 123 文件（生产 68 + 测试 55）；删除前对照 `7a59ab23^` = 412 → **删 289**。
+  平铺 101（生产 57）+ `patchRecovery/` 16 + `patchResult/` 4 + `patchParsing/` 2。CLI 可达 **66/123**。
+- **核心判定**：`orchestration/` **不是编排执行域，而是「被广泛消费的模型/投影层」**。五条判据：
+  ①**入向 182 : 出向 18（10:1）**——消费者远多于生产者；
+  ②55 文件主分量中 **12 个是无 cluster 内入边的 sources**（`*Result`/`*Projection`/`*Trace` 一族）；
+  ③`types.ts`（318 行/44 导出）被 **7 个顶层域**引用，`contextGraph`/`agentPlan`/`taskLifecycle` 等各被 3 域引用；
+  ④主分量出向仅 18 边且 7 边指向 `context/acquisition/code`——自身几乎没有对外行为；
+  ⑤**与 `turn/`、`runtime/loop/` 零 import 边**（双向核验为空）——执行侧根本不在该目录。
+  **该零边事实从 import 图角度独立佐证 CB-005**，与 `deleted-audit` 附十一致。
+- **前缀族被否证（重要）**：按文件名前缀分组测内聚度，**无一族超过 0.42**
+  （`contextGraph*` 6 文件 0.42、`providerAnchor*` 6 文件 0.42、`taskContext*` 0.26、
+  `taskLifecycle*` 0.13、`agentPlan*` 0.18…）；**族间边 112 > 族内边 32**。
+  → **前缀族不构成合法子域边界**，按前缀切分会产生大量跨目录边。语义聚类内聚度 0.47（仍 <0.5）。
+- **连通分量**：生产 55 主分量 + `editSnapshot.ts` 孤立 + `liveProviderSmokeFallback.ts` 孤立（共 3 个）。
+- **可达性通路的关键发现**：`context/acquisition/graph.ts`（840 行、33 个 import）单文件引入 **27 个**
+  orchestration 模块，**但其自身只有 1 个调用者**（`context/memory/model.ts`）——
+  一个近乎叶子的文件承担了 27 条边的汇合点，这解释了为何 **14 个模块"仅经由 acquisition 可达"**
+  （屏蔽 acquisition 后失去：`agentPlan{Context,Projection}`、`contextGraph{Budget,Discovery,Result}`、
+  `contextPacketResult`、`contextPlan`、`harness{FailureTaxonomy,Scorecard,Trace}`、
+  `runtimeOutcomeProjection`、`taskContextResult`、`taskLifecycle{Result,Trace}`）。
+  原 composition root `runMvpIntegratedFlow.ts` **已删**，`module-atlas.md` 相关描述**已过期**。
+- **三个子目录判定不属 orchestration**（消费者全在 edit/restore/compact 侧，无一在 orchestration 内）：
+  `patchRecovery/`（8 生产，全可达，职责是 `/restore` 恢复权威存储+恢复面+恢复原语）→ 候选 `edit/recovery/`；
+  `patchResult/`（`editCapability{CloseoutManifest,Readiness}`）→ 候选 `edit/result/`；
+  `patchParsing/`（`PatchOperationKind`/`PatchHunk`）→ 候选 `edit/patch/`。
+- **5 项未决问题待裁决**（§6.3）：①`types.ts` 归属（7 域消费，全仓最广契约之一）；
+  ②harness 3 文件（1,203 行，生产可达但 `core/harness/README.md` 声明该目录非产品边界）去向；
+  ③`graph.ts` 的 29 边是否随 cluster 拆分一并重构；④是否保留/更名 `orchestration/`；
+  ⑤`agentPlan`/`analysis`/`taskLifecycle` 三组是否合并（互引密集：task-lifecycle↔analysis 5 边、↔context-graph 8 边）。
+- **验证**：本步为判定，**零代码改动** → 按 `plan.md §2.4` 与 `agent-rules/testing-and-validation.md`
+  不跑构建/测试。所有数字均以脚本实测（import 图解析 + `analyze-boundaries.py`）取得，
+  未采信估算——遵循 §2.4.1 第 3 条。
