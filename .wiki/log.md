@@ -559,3 +559,35 @@
   `/resume` 从 19 条增至 **20 条**且新会话 `sess_716` 在首位（`completed · 2 turns`），
   读取路径（`listReentrySummaries` → recovery snapshot）与写入路径（`saveCompleted`）双向可用；
   可达性 **960/875 → 961/876/85**。
+
+## [2026-09-18] step6-recon | 命名税裁定探索（零代码改动，未改名）。
+- **范围修正：170 个文件，不是 plan 记的 161。** plan 只算了 `src/browser/` 平铺层；
+  `receipt/` 全部 **14** 个文件同样是 `browserReceiptCache*`（子域已存在却未去前缀）。
+  `runtime/`(32) 与 `skill/`(21) **已合规**。无前缀 5 个：`pwEvidence`/`pwRuntime`/`pwStatus`/`stealthPreload{,.test}`。
+- **关键发现：只去前缀不满足规则。** `agent-rules/file-placement-and-naming.md` 要求
+  「加有意义的子域，而不是加长文件名」。实测去前缀后 **125/170（74%）仍 >20 字符**
+  （p50 32→25、p90 39→32），**仅 1/170** 成为规则推荐的角色名（`browserPlan.ts`→`plan.ts`）。
+  任务①只完成一部分，任务②（外部项目名）完全未动。
+- **子域切分被实测否证**：平铺层 567 条内部边，族内 **190** : 跨族 **588** = **0.32**，
+  与 Step 4 否证 `orchestration/` 前缀切分的 **0.42** 同档。17 族中最高 `Self` 仅 0.53、
+  `Read` 0.45、`Execution` 0.21、`Command` 0.07、`Sandbox` 0.00。
+  对照既有已接受子域：`context/compact` 0.76、`planning/task` 0.73、`browser/receipt` 0.67、
+  `browser/skill` 0.48、`browser/runtime` 0.35、`session/continuation` 0.28、`presentation/surface` 0.02。
+  0.32 落在已接受区间内，但远低于 Step 4 实际采用的聚类（0.73/0.76）；
+  若据 0.32 切 17 个子目录会造出 **588 条跨目录边**——即 Step 4 否证前缀切分时的同一条论证。**不推荐。**
+- **6 处文件名碰撞全部异主**：`sessionManager`(↔`session/SessionManager.ts`)、`agent`(↔`core/agent/agent.ts`)、
+  `executor`(↔`tools/dispatch/`、`browser/runtime/core/`、`browser/runtime/external/`、`browser/skill/execution/` 四处)、
+  `plan`(×3)、`toolPolicy`(↔`core/query/toolPolicy.ts`)、`sandboxPolicy`(↔`sandbox/sandboxPolicy.ts`)。
+  规则明文允许跨域同名。最尖锐的是 `browserSessionManager.ts`↔`session/SessionManager.ts`——**仅大小写之差**。
+- **plan 未记的第二类违规：外部项目名。** `playwright` **15** 处、`pw` 未展开缩写 **3** 处
+  （`pwRuntime`/`pwEvidence`/`pwStatus`，而这些文件就在 `browser/` 内）；全仓 `src/` 合计 18。
+  `AGENTS.md` 与规则均禁止外部项目名进入文件名。
+- **判据与 Step 6 零关联**：`software-structure-v0` 仅有 3 项义务（无环、specifier 可解析、函数名上限），
+  **无任何命名/前缀/放置条款**；用 `maskSource` 解析确认判据按 mask 后源码计数，文件名只作 ID 标签。
+  **Step 6 不改善任何指标，不影响 Step 7 judge 报告**——纯规则合规改动。
+- **影响面**：871 条 import 边（252 文件；201 条来自 `src/browser/` 外 49 文件，其中 173 来自 `core/harness`）。
+  **170 个旧 basename 仓库内全部唯一 → 按 basename 键改写无歧义。**
+  已核验为零：`vi.mock`/`import()` 指向面、vitest alias、`scripts/`与包配置路径引用、
+  `.ts` 文件名断言、动态入口（`spawn`/`pathToFileURL`）。`receipt/` 另需改 `browserReceipt*`→`cache*` 映射。
+- **三候选**：A 只去前缀；B 去前缀 + 缩写/外部名裁定（增量约 18 文件，两者都达成）；
+  C 登记 defer（判据零命名义务 + 无干净切分点）。**待维护者裁决。**

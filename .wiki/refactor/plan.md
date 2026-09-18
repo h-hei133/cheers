@@ -237,7 +237,7 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 |---|---|---|
 | Step 4 | orchestration 聚类 | ✅ **已完成**（2026-09-18，9 批）——`src/orchestration/` 已解散，123 文件全部分流 |
 | Step 5 | SessionManager 拆分（51 方法 facade，ALIVE） | ✅ **已完成**（2026-09-18，3 批）：判据 **38 → 18**，全仓首次进入上限内；详见 §3.5 |
-| Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | Step 4 已完成，`orchestration` 域更名**随之自然消解** |
+| Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | **探索已完成**（2026-09-18）：实测 **170** 文件（非 161）、871 条边、6 处异主碰撞、族切分被否证（内聚 0.32）、判据零命名义务；**待裁决 A/B/C**——见 §3.3 与 `step-6-naming-exploration.md` |
 | Step 7 | 收尾：NormProof judge 全量跑 | 以搬迁后 BFS 报告作为收敛证据 |
 
 **Step 4 决策研究结论**（2026-09-18，`step-4-decision-research.md`，零代码改动）：
@@ -308,13 +308,41 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
   风险集中且不符合分批纪律。**3 项未决问题待裁决**（判据适用范围、是否保留公共面、
   是否更新 dispositions）。
 
-**Step 6 范围**：Step 4 已完成，`orchestration` 域已解散（原拟的"域更名"随之消解）。
+**Step 6 范围**：Step 4 已完成，`orchestration/` 域已解散（原拟的"域更名"随之消解）。
 剩余范围为 3f 遗留项——
 `src/browser/` 下 161 个平铺文件仍带冗余 `browser` 前缀
 （如 `browserCommandRunner.ts` 在 `src/browser/` 内）。
 按 `agent-rules/file-placement-and-naming.md`「让文件夹承载域上下文，文件只命名局部角色」，
 这些应改为 `commandRunner.ts` 等。**属独立决策，须单独评估**：
 影响面为全仓引用边，且需与 Step 4 的 orchestration 命名一并裁定。
+
+**Step 6 探索结论**（2026-09-18，`step-6-naming-exploration.md`，零代码改动）：
+
+- **范围修正：170 个文件，不是 161**。plan 只算了平铺层；`receipt/` 全部 **14** 个文件
+  同样是 `browserReceiptCache*`（该子域已存在却未去前缀）。`runtime/`(32) 与 `skill/`(21)
+  **已合规**。
+- **只去前缀不满足规则**：规则要求「加子域文件夹，而不是加长文件名」。
+  实测去除前缀后 **125/170（74%）仍 >20 字符**，仅 **1/170** 成为规则推荐的角色名
+  （`browserPlan.ts` → `plan.ts`）。任务①只完成一部分，任务②（外部项目名）完全未动。
+- **子域切分被实测否证**：平铺层 567 条内部边中，族内 **190** : 跨族 **588** = **0.32**，
+  与 Step 4 否证 `orchestration/` 前缀切分的 0.42 同档。17 个族里最高的 `Self` 仅 0.53。
+  对照既有已接受子域：`context/compact` 0.76、`planning/task` 0.73、`browser/receipt` 0.67、
+  `browser/runtime` 0.35、`session/continuation` 0.28。
+- **6 处文件名碰撞全是异主**（`sessionManager`↔`SessionManager`、`agent`、`executor`×4、
+  `plan`×3、`toolPolicy`、`sandboxPolicy`），规则明文允许跨域同名。
+  其中 `src/browser/sessionManager.ts` ↔ `src/session/SessionManager.ts` **仅大小写之差**，
+  技术合规但必须逐条披露。
+- **plan 未记的第二类违规**：外部项目名——`playwright` **15** 处、`pw` 缩写 **3** 处
+  （`pwRuntime`/`pwEvidence`/`pwStatus`，这些文件就在 `browser/` 内）。
+- **判据与 Step 6 零关联**：`software-structure-v0` 只有 3 项义务（无环、specifier 可解析、
+  函数名上限），**无任何命名/前缀/放置条款**。若 Step 6 是**纯规则合规**改动，
+  不改善任何指标、不影响 Step 7 judge 报告。
+- **影响面**：871 条 import 边（252 文件，其中 201 条来自 `src/browser/` 外的 49 个文件）；
+  **170 个旧 basename 仓库内全部唯一 → 按 basename 改写无歧义**。
+  已核验为零：`vi.mock`/`import()` 指向面、vitest alias、脚本/配置路径引用、`.ts` 文件名断言、
+  动态入口。
+- **三个候选**：A 只去前缀（任务①部分达成）；B 去前缀 + 缩写/外部名裁定（两者都达成，增量约 18 文件）；
+  C 登记 defer（判据零命名义务，且 0.32 无干净切分点）。**不建议族切分。**
 
 ### 3.4 独立立项（记录，不在本计划处理）
 
