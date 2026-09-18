@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { parseBrowserPreviewActionArgs } from "../../browserActionContract.js";
-import { createBrowserExecutionRequest } from "../../browserExecutionContract.js";
-import { createBrowserLocalFixture } from "../../browserLocalFixture.js";
+import { parseBrowserPreviewActionArgs } from "../../actionContract.js";
+import { createBrowserExecutionRequest } from "../../executionContract.js";
+import { createBrowserLocalFixture } from "../../localFixture.js";
 import { createBrowserSkillRunnerMetadata } from "../runner/metadata.js";
 import { createBrowserSkillRunnerBinding } from "../runner/binding.js";
 import { prepareBrowserSkillExecutionBridge } from "./bridge.js";

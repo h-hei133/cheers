@@ -237,7 +237,7 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 |---|---|---|
 | Step 4 | orchestration 聚类 | ✅ **已完成**（2026-09-18，9 批）——`src/orchestration/` 已解散，123 文件全部分流 |
 | Step 5 | SessionManager 拆分（51 方法 facade，ALIVE） | ✅ **已完成**（2026-09-18，3 批）：判据 **38 → 18**，全仓首次进入上限内；详见 §3.5 |
-| Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | **探索已完成**（2026-09-18）：实测 **170** 文件（非 161）、871 条边、6 处异主碰撞、族切分被否证（内聚 0.32）、判据零命名义务；**待裁决 A/B/C**——见 §3.3 与 `step-6-naming-exploration.md` |
+| Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | ✅ **已完成**（2026-09-18，路径 B）：改名 **173** 个；`playwright` 经实测裁定**保留**（真实依赖）；边集守恒 4960→4960；详见 §3.3 |
 | Step 7 | 收尾：NormProof judge 全量跑 | 以搬迁后 BFS 报告作为收敛证据 |
 
 **Step 4 决策研究结论**（2026-09-18，`step-4-decision-research.md`，零代码改动）：
@@ -343,6 +343,31 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
   动态入口。
 - **三个候选**：A 只去前缀（任务①部分达成）；B 去前缀 + 缩写/外部名裁定（两者都达成，增量约 18 文件）；
   C 登记 defer（判据零命名义务，且 0.32 无干净切分点）。**不建议族切分。**
+
+**Step 6 执行结果**（2026-09-18，路径 B，**已完成**）：
+
+- **改名 173 个**：`src/browser/` 平铺去 `browser` 前缀 156 + `receipt/` 去 `browserReceiptCache` 前缀 14
+  （→ `cacheStore.ts` 等）+ `pw` 缩写 3。
+- **`playwright` 裁定保留（实测推翻 plan 的读法）**：`package.json:23` 声明
+  `"playwright-core": "^1.60.0"` 且 `pwRuntime.ts` 用 `createRequire` 加载它——
+  **它是被驱动的真实技术，不是参考项目名**；仓库既有先例 `openaiAccountAuth.ts`/`googleAccountAuth.ts`
+  同属集成目标名。`AGENTS.md` 禁止的是「作为参考/来源标签的外部项目名」。15 个 `playwright*` 文件名**保持**。
+- **`pw` 缩写不内联**：`pwRuntime.ts` **350 行**、`pwEvidence.ts` **251 行**，不是薄包装；
+  改为与其余 15 个一致的 `playwrightRuntime/playwrightEvidence/playwrightStatus`。
+  （`pwRuntime`→`runtime.ts` 会与同目录 `runtime/` 子目录并列，该歧义因此回避。）
+- **机制**：`maskSource` 锚定——仅 mask 后处于 `from`/`import`/`vi.mock`/`require` 位置的
+  字符串字面量参与改写；171 个旧 basename 在 `src/` 内全部唯一，故按 basename 键改写无歧义。
+- **首次尝试失败并回滚**：编辑按升序应用导致偏移量漂移（`Unterminated string literal`）。
+  `git reset --hard` 后重做，加入「写入前断言切片等于原 specifier」+「按位置降序应用」两条自检，
+  重做后 **930 次改写、0 断言失败**。（Step 4 教训 15 的同源形态，已记入 §5。）
+- **验证**：build 0 错；**SCC 1481 文件 0 环**；**边集守恒 4960 → 4960**（按改名映射归一化后
+  零丢失零新增）；**diff 性质审计 937 增/937 删，全部为 import 行，零非 import 变更**；
+  全量 **3171/3172**（唯一失败为既有抖动，隔离复跑通过）；
+  **PTY 实机**回合跑通 + **`/browser` 输出 37 行完整能力报告**；残留 `browser*`/`pw*` 均为 **0**；
+  可达性 **961/876/85** 不变。
+- **残余（如实记录）**：去前缀后**仍有 125/170（74%）文件 >20 字符**（p50 32→25）。
+  规则第二条（避免长复合名编码功能路径）**步后仍被违反**，且本步已实测证明唯一解法是子域切分，
+  而切分被内聚度 **0.32** 否证。**这是 Step 6 范围内无法闭合的残余。**
 
 ### 3.4 独立立项（记录，不在本计划处理）
 

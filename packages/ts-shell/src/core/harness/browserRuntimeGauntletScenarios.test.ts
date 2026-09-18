@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createBrowserActionContract } from "../../browser/browserActionContract.js";
-import { createBrowserExecutionRequest } from "../../browser/browserExecutionContract.js";
-import { runBrowserActionLoopExecutor } from "../../browser/browserActionLoopExecutor.js";
+import { createBrowserActionContract } from "../../browser/actionContract.js";
+import { createBrowserExecutionRequest } from "../../browser/executionContract.js";
+import { runBrowserActionLoopExecutor } from "../../browser/actionLoopExecutor.js";
 import { BrowserRuntimeAdapterExecutor } from "../../browser/runtime/core/adapterExecutor.js";
-import { applyBrowserSelectorRepair } from "../../browser/browserSelectorRepairApplyExecutor.js";
+import { applyBrowserSelectorRepair } from "../../browser/selectorRepairApplyExecutor.js";
 import { createBrowserRuntimeGauntletManifest } from "../../browser/runtime/core/gauntletManifest.js";
 import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserRuntimeAdapterFixture } from "./browserRuntimeAdapterFixtures.js";

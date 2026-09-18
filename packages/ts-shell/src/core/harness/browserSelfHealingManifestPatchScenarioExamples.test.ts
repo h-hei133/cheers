@@ -3,14 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createBrowserExternalRunnerManifest, serializeBrowserExternalRunnerManifest, validateBrowserExternalRunnerManifest } from "../../browser/runtime/external/manifest.js";
-import { createBrowserLocalFixtureManifest, serializeBrowserLocalFixtureManifest, validateBrowserLocalFixtureManifest } from "../../browser/browserLocalFixtureManifest.js";
-import { parseBrowserCommandArgs } from "../../browser/browserCommandContract.js";
-import { runBrowserCommandAsync } from "../../browser/browserCommandRunner.js";
+import { createBrowserLocalFixtureManifest, serializeBrowserLocalFixtureManifest, validateBrowserLocalFixtureManifest } from "../../browser/localFixtureManifest.js";
+import { parseBrowserCommandArgs } from "../../browser/commandContract.js";
+import { runBrowserCommandAsync } from "../../browser/commandRunner.js";
 import { createBrowserReplayScenarioFixture, type BrowserReplayScenarioFixture } from "./browserReplayScenarioFixtures.js";
-import { safeReceipt } from "../../browser/browserActionCacheEntry.test.js";
-import { runBrowserReplayCommand } from "../../browser/browserReplayCommandRunner.js";
-import { createBrowserNetworkAllowlist } from "../../browser/browserNetworkAllowlist.js";
-import { createBrowserSandboxAuthority } from "../../browser/browserSandboxAuthority.js";
+import { safeReceipt } from "../../browser/actionCacheEntry.test.js";
+import { runBrowserReplayCommand } from "../../browser/replayCommandRunner.js";
+import { createBrowserNetworkAllowlist } from "../../browser/networkAllowlist.js";
+import { createBrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
 import {
   captureCliOutput,
   deterministicCliScenarioTimestamp,

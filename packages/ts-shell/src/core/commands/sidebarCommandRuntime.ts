@@ -1,5 +1,5 @@
 import { getLatestCompactCheckpoint } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
-import { browserCapabilitySidebarToolItem } from "../../browser/browserCapabilitySurface.js";
+import { browserCapabilitySidebarToolItem } from "../../browser/capabilitySurface.js";
 import { parseSidebarLivePanelCommandArgs } from "../../presentation/sidebar/sidebarLivePanelCommandContract.js";
 import { runSidebarLivePanelCommand } from "../../presentation/sidebar/sidebarLivePanelCommandRunner.js";
 import { parseSidebarPanelCommandArgs } from "../../presentation/sidebar/sidebarPanelCommandContract.js";

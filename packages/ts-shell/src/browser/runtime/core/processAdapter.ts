@@ -1,12 +1,12 @@
 import { spawn } from "node:child_process";
-import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../capabilityModel.js";
 import {
   createBrowserRuntimeProtocolRequest,
   parseBrowserRuntimeProtocolResponseJson,
   type BrowserRuntimeProtocolRequest,
   type BrowserRuntimeProtocolValidation,
 } from "./protocol.js";
-import type { BrowserExecutionRequest } from "../../browserExecutionContract.js";
+import type { BrowserExecutionRequest } from "../../executionContract.js";
 import type { BrowserExternalRuntimeManifest } from "../external/runtimeManifest.js";
 
 export interface BrowserRuntimeProcessAdapterResult {

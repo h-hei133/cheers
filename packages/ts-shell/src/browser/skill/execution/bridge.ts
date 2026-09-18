@@ -1,11 +1,11 @@
-import type { BrowserExecutionRequest } from "../../browserExecutionContract.js";
+import type { BrowserExecutionRequest } from "../../executionContract.js";
 import {
   createBrowserSkillExecutionRequest,
   browserSkillExecutionActionForRequest,
   browserSkillExecutionModeForBinding,
   type BrowserSkillExecutionRequest,
 } from "./protocol.js";
-import type { BrowserLocalFixture } from "../../browserLocalFixture.js";
+import type { BrowserLocalFixture } from "../../localFixture.js";
 import {
   classifyBrowserSkillRunnerReadiness,
   type BrowserSkillRunnerReadiness,

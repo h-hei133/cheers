@@ -1,4 +1,4 @@
-import { runBrowserActionLoopExecutor } from "../../browser/browserActionLoopExecutor.js";
+import { runBrowserActionLoopExecutor } from "../../browser/actionLoopExecutor.js";
 import type { BrowserRuntimeExecutor } from "../../browser/runtime/core/executor.js";
 import type { BrowserRuntimeManifestLoadResult } from "../../browser/runtime/core/manifest.js";
 import type {

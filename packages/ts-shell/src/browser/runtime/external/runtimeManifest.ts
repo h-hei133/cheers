@@ -6,7 +6,7 @@ import {
   type BrowserRuntimeManifestLoadResult,
   type BrowserRuntimeSnapshotCapability,
 } from "../core/manifest.js";
-import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../capabilityModel.js";
 
 export type BrowserExternalRuntimeManifestVersion = "browser-external-runtime-manifest/v1";
 export type BrowserExternalRuntimeMode = "external-process" | "skill-managed" | "simulated";

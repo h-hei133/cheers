@@ -1,4 +1,4 @@
-import type { BrowserLocalFixtureManifestExecutorMode } from "../../browserLocalFixtureManifest.js";
+import type { BrowserLocalFixtureManifestExecutorMode } from "../../localFixtureManifest.js";
 
 export type BrowserExternalRunnerSource =
   | "cli-harness-manifest"

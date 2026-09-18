@@ -1,4 +1,4 @@
-import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../capabilityModel.js";
 import { normalizeOriginLike, type BrowserRuntimeManifest } from "./manifest.js";
 
 export interface BrowserRuntimeSession {

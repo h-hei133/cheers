@@ -1,6 +1,6 @@
-import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
-import type { BrowserToolServerBackendComparison } from "../../browserToolServerBackendComparison.js";
-import type { BrowserPlaywrightRuntimeAvailability } from "../../browserPlaywrightRuntimeAvailability.js";
+import { sanitizeBrowserText } from "../../capabilityModel.js";
+import type { BrowserToolServerBackendComparison } from "../../toolServerBackendComparison.js";
+import type { BrowserPlaywrightRuntimeAvailability } from "../../playwrightRuntimeAvailability.js";
 
 export interface BrowserRuntimeDirectionDecision {
   readonly recommendedCoreRuntime: "direct-playwright" | "dependency-decision-required" | "none";

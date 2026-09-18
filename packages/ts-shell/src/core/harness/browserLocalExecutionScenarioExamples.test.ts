@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createBrowserSandboxAuthority } from "../../browser/browserSandboxAuthority.js";
-import { BrowserPlaywrightCliLocalFixtureExecutor } from "../../browser/browserPlaywrightCliExecutor.js";
+import { createBrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
+import { BrowserPlaywrightCliLocalFixtureExecutor } from "../../browser/playwrightCliExecutor.js";
 import { createAgentScenarioFixtureContext } from "./agentScenarioFixtures.js";
 import { runAgentScenario } from "./agentScenarioRunner.js";
 import type { AgentScenario } from "./agentScenarioModel.js";

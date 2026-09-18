@@ -1,13 +1,13 @@
-import type { BrowserAccessibilityNodeInput } from "../../browser/browserAccessibilitySnapshot.js";
+import type { BrowserAccessibilityNodeInput } from "../../browser/accessibilitySnapshot.js";
 import type {
   BrowserDirectPlaywrightClient,
   BrowserDirectPlaywrightClientInput,
-} from "../../browser/browserDirectPlaywrightAdapter.js";
-import type { BrowserPlaywrightPageEvidence } from "../../browser/browserPlaywrightEvidenceMapper.js";
+} from "../../browser/directPlaywrightAdapter.js";
+import type { BrowserPlaywrightPageEvidence } from "../../browser/playwrightEvidenceMapper.js";
 import {
   auditBrowserPlaywrightRuntimeAvailability,
   type BrowserPlaywrightRuntimeAvailability,
-} from "../../browser/browserPlaywrightRuntimeAvailability.js";
+} from "../../browser/playwrightRuntimeAvailability.js";
 import {
   createBrowserRuntimeManifest,
   validateBrowserRuntimeManifest,

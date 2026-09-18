@@ -591,3 +591,36 @@
   `.ts` 文件名断言、动态入口（`spawn`/`pathToFileURL`）。`receipt/` 另需改 `browserReceipt*`→`cache*` 映射。
 - **三候选**：A 只去前缀；B 去前缀 + 缩写/外部名裁定（增量约 18 文件，两者都达成）；
   C 登记 defer（判据零命名义务 + 无干净切分点）。**待维护者裁决。**
+
+## [2026-09-18] step6-exec | 命名税执行完毕（路径 B，改名 173 个）。Step 6 完成。
+- **裁决**：维护者初选 C（登记 defer），随后更正为 **B**（去前缀 + 缩写/外部名裁定）。
+- **改名 173 个**：`src/browser/` 平铺去 `browser` 前缀 **156** +
+  `src/browser/receipt/` 去 `browserReceiptCache` 前缀 **14**（→ `cacheStore.ts`/`lock.ts`/`manifest.ts` 等）
+  + `pw` 缩写 **3**。未动：`stealthPreload{,.test}.ts`（无前缀）、15 个 `playwright*`（已合规）。
+- **`playwright` 裁定保留——实测推翻 plan 的读法**：
+  `packages/ts-shell/package.json:23` 声明 `"playwright-core": "^1.60.0"`，
+  `pwRuntime.ts` 第 2 行用 `createRequire` 加载该包 → **它是被驱动的真实技术，不是参考项目名**。
+  仓库既有先例：`src/core/auth/openaiAccountAuth.ts`、`googleAccountAuth.ts` 同属集成目标名。
+  `AGENTS.md` 禁止的是「外部项目名作为参考/来源标签」。**故 15 个 `playwright*` 文件名保持不动。**
+- **`pw` 缩写处置：改名而非内联**。实测 `pwRuntime.ts` **350 行**、`pwEvidence.ts` **251 行**、
+  `pwStatus.ts` 21 行——**不是薄包装**，内联会造 600 行合并并打乱边界（§2.2 检查 2）。
+  改为与其余 15 个一致的 `playwrightRuntime` / `playwrightEvidence` / `playwrightStatus`。
+  附带收益：`pwRuntime`→`runtime.ts` 会与同目录 `runtime/` 子目录并列（同名既是文件又是文件夹），
+  `playwrightRuntime.ts` 回避了该歧义。
+- **机制：`maskSource` 语法锚定**。仅 mask 后处于 `from` / `import` / `vi.mock` / `require`
+  位置的字符串字面量参与改写，字符串内容不会假冒 import（Step 4 教训 15 的成因）。
+  **171 个旧 basename 在 `src/` 内全部唯一 → 按 basename 键改写无歧义。**
+- **首次尝试失败并回滚（教训 16）**：改写器把**多个编辑按升序**应用，前面的编辑移动了后面编辑的
+  偏移量，产出 `Unterminated string literal` 并损坏 71 个文件。`git reset --hard` 回退到 `704320ba`
+  后重做，加入两条自检：① 写入前断言 `text[a:b] === spec`；② 编辑按位置**降序**应用。
+  重做后 **930 次改写、0 断言失败**。**教训：批量改写必须先证切片身份，再按降序落笔。**
+- **验证**：`tsc -p tsconfig.build.json` **0 错**；**SCC 1481 文件 0 环**（改名前基线亦 0）；
+  **边集守恒 4960 → 4960**（按改名映射归一化后**零丢失零新增**）；
+  **diff 性质审计 937 增 / 937 删，逐行判定全部为 import/export 行，零非 import 变更**；
+  全量测试 **3171/3172**（唯一失败 `cli-baseline.test.ts` 为既有抖动，**隔离复跑通过**）；
+  **PTY 实机**——回合 `working → renamed` 跑通，且 **`/browser` 输出 37 行完整能力报告**
+  （capability / runtime dependency / backend candidates / safety），改写后的模块在实际调用链上可用；
+  残留 `browser*` 前缀 **0**、`pw*` **0**；可达性 **961/876/85** 不变。
+- **残余（如实记录）**：去前缀后**仍有 125/170（74%）文件 >20 字符**（p50 32→25、p90 39→32）。
+  规则第二条「避免长复合名编码功能路径」**步后仍被违反**；本步已实测证明唯一解法是子域切分，
+  而切分被族内/跨族比 **0.32** 否证。**这是 Step 6 范围内无法闭合的残余，已记入 plan §3.3。**

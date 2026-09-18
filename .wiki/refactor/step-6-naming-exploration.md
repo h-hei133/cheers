@@ -183,3 +183,78 @@ the folder gives the meaning」——6 处碰撞**全部合规**。
 **若执行 A/B，纪律照 §2.4.1**：先跑 SCC（基线 0 环）→ 按 import 图实测边数 →
 不夹带位置变更 → 校验 `.js` 后缀 → build + 全量测试 + PTY 实机。
 额外一条（Step 4 教训 15）：**重写器必须匹配语法而非文本**，且文件列表在改名**之前**冻结。
+
+---
+
+## 10. 执行记录：路径 B 已完成（2026-09-18）
+
+**裁决**：维护者选 **B**（去前缀 + 缩写/外部名裁定）。
+
+### 10.1 裁定 `playwright` 保留（依据实测）
+
+plan 把「外部项目名」列为待清项。执行前实测**推翻了这一读法**：
+
+| 证据 | 值 |
+|---|---|
+| `packages/ts-shell/package.json:23` | `"playwright-core": "^1.60.0"` —— **声明的真实依赖** |
+| `pwRuntime.ts` 第 2 行 | `import { createRequire } from "node:module"` —— 运行时用它加载该包 |
+| 仓库既有先例 | `src/core/auth/openaiAccountAuth.ts`、`googleAccountAuth.ts` —— **集成目标名**同样进入文件名 |
+
+`AGENTS.md` 禁止的是「外部项目名**作为参考/来源标签**」（参考仓 Claude Code、opencode…）。
+`playwright-core` 是**被驱动的技术**，与 `openaiAccountAuth` 同类。**故保留 15 个 `playwright*` 文件名。**
+
+### 10.2 `pw` 缩写：3 → `playwright`（不内联）
+
+`pwRuntime.ts` 350 行、`pwEvidence.ts` 251 行、`pwStatus.ts` 21 行——**不是薄包装**，
+内联会制造 600 行的合并且打乱模块边界（§2.2 检查 2：不采信推理，实测规模差）。
+
+**处置**：改成 `playwrightRuntime.ts` / `playwrightEvidence.ts` / `playwrightStatus.ts`，
+与其余 15 个 `playwright*` 一致。
+
+**一个不如实的观察已更正**：`pwRuntime` → `runtime.ts` 会与**同目录的 `runtime/` 子目录**并列
+（`runtime.ts` + `runtime/core/…`），文件名 `runtime` 同时表示文件和文件夹。
+`playwrightRuntime.ts` 回避了该歧义，且消解了 `pw` 缩写。
+
+### 10.3 改名清单（173 个）
+
+| 组 | 数 | 例 |
+|---|---:|---|
+| `src/browser/` 平铺去 `browser` 前缀 | 156 | `browserCommandRunner.ts` → `commandRunner.ts` |
+| `src/browser/receipt/` 去 `browserReceiptCache` 前缀 | 14 | `browserReceiptCacheStore.ts` → `store.ts` |
+| `pw` 缩写 → `playwright` | 3 | `pwRuntime.ts` → `playwrightRuntime.ts` |
+
+`receipt/` 的目标是 `cacheStore.ts` 而非 `store.ts`——子目录已表达 `receipt/`，
+`Cache` 是该子域内的实质词。
+
+未动：`stealthPreload.ts`、`stealthPreload.test.ts`（无前缀）、15 个 `playwright*`（已合规）。
+
+### 10.4 机制：语法锚定的 basename 改写
+
+用判据同源的 `maskSource` 解析：**仅在 mask 后处于 `from` / `import` / `vi.mock` / `require`
+位置的字符串字面量**参与改写，因此字符串内容不会假冒 import（Step 4 教训 15 的成因）。
+**171 个旧 basename 在 `src/` 内全部唯一 → 按 basename 键改写无歧义。**
+
+**第一次尝试失败并已回滚**：改写器把**多个编辑按升序**应用，前面的编辑移动了后面编辑的偏移量，
+产出 `Unterminated string literal`。`git reset --hard` 回退后重做，加入两条自检：
+① 写入前断言 `text[a:b] === spec`；② 编辑按位置**降序**应用。重做后
+**930 次改写、0 次断言失败**。
+
+### 10.5 验证
+
+| 项 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | **0 错误** |
+| **SCC（1481 文件）** | **0 环**（与改名前基线一致，§2.4.1 强制） |
+| **边集守恒** | 改名前 4960 条 → 改名后 **4960 条**，按改名映射归一化后**零丢失零新增** |
+| diff 性质审计 | **937 增 / 937 删**，逐行判定**全部**为 import/export 行，**零非 import 变更** |
+| 全量测试 | **3171 / 3172**（唯一失败为既有抖动 `cli-baseline.test.ts`，隔离复跑**通过**） |
+| **PTY 实机** | 回合 `working → renamed` 跑通；**`/browser` 输出 37 行完整能力报告**（capability / runtime / backend candidates / safety） |
+| 残留 | `src/browser/` 内 `browser*` 前缀 **0**、`pw*` **0** |
+| 可达性 | **961 / 876 / 85**（不变） |
+
+### 10.6 如实记录的代价
+
+**去前缀后仍有 125/170（74%）文件 >20 字符**（p50 32→25）。路径 B **未**解决这一项——
+它只解决了「前缀冗余」与「缩写不一致」两条。**规则第二条（避免长复合名编码功能路径）
+在本步之后仍被违反**，且本步已实测证明：唯一解法是子域切分，而切分被内聚度 0.32 否证。
+**这是本次探索确认的、Step 6 范围内无法闭合的残余。**

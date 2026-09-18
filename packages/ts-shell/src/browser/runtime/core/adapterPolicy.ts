@@ -1,5 +1,5 @@
-import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
-import type { BrowserExecutionRequest } from "../../browserExecutionContract.js";
+import { sanitizeBrowserText } from "../../capabilityModel.js";
+import type { BrowserExecutionRequest } from "../../executionContract.js";
 import type { BrowserExternalRuntimeManifestLoadResult } from "../external/runtimeManifest.js";
 import { browserRuntimeActionAllowed, browserRuntimeOriginAllowed } from "./manifest.js";
 

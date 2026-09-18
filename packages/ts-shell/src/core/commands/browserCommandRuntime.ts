@@ -1,5 +1,5 @@
-import { parseBrowserCommandArgs } from "../../browser/browserCommandContract.js";
-import { runBrowserCommandAsync } from "../../browser/browserCommandRunner.js";
+import { parseBrowserCommandArgs } from "../../browser/commandContract.js";
+import { runBrowserCommandAsync } from "../../browser/commandRunner.js";
 import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../harness/browserPublicReadOnlyWebSmokeConfig.js";
 import { renderBrowserPublicReadOnlyWebSmokeReport } from "../harness/browserPublicReadOnlyWebSmokeReport.js";
 import { runBrowserPublicReadOnlyWebSmoke } from "../harness/browserPublicReadOnlyWebSmokeRunner.js";

@@ -3,12 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import {
   BROWSER_CLI_LOCAL_FIXTURE_MANIFEST_ENV,
-} from "../../browser/browserCliExecutorInjection.js";
+} from "../../browser/cliExecutorInjection.js";
 import {
   createBrowserLocalFixtureManifest,
   serializeBrowserLocalFixtureManifest,
   type BrowserLocalFixtureManifest,
-} from "../../browser/browserLocalFixtureManifest.js";
+} from "../../browser/localFixtureManifest.js";
 
 export interface BrowserCliLocalFixtureManifestFixture {
   readonly root: string;

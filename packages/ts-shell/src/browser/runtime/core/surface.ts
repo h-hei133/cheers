@@ -1,5 +1,5 @@
-import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
-import type { BrowserRuntimeActionLoopResult } from "../../browserActionLoopExecutor.js";
+import { sanitizeBrowserText } from "../../capabilityModel.js";
+import type { BrowserRuntimeActionLoopResult } from "../../actionLoopExecutor.js";
 import type { BrowserRuntimeReceipt } from "./receipt.js";
 
 export function renderBrowserRuntimeSurface(result: BrowserRuntimeActionLoopResult): string {

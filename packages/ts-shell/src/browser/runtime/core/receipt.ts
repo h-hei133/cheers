@@ -1,11 +1,11 @@
-import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
-import type { BrowserExecutionRequest } from "../../browserExecutionContract.js";
-import type { BrowserActionTarget } from "../../browserActionTarget.js";
-import type { BrowserActionLoopPolicyDecision } from "../../browserActionLoopPolicy.js";
-import type { BrowserObservation } from "../../browserObservationModel.js";
+import { sanitizeBrowserText } from "../../capabilityModel.js";
+import type { BrowserExecutionRequest } from "../../executionContract.js";
+import type { BrowserActionTarget } from "../../actionTarget.js";
+import type { BrowserActionLoopPolicyDecision } from "../../actionLoopPolicy.js";
+import type { BrowserObservation } from "../../observationModel.js";
 import type { BrowserRuntimeManifest } from "./manifest.js";
 import type { BrowserRuntimeExecutorResult } from "./executor.js";
-import type { BrowserSelectorRepairSeed } from "../../browserSelectorRepairSeed.js";
+import type { BrowserSelectorRepairSeed } from "../../selectorRepairSeed.js";
 
 export interface BrowserRuntimeReceipt {
   readonly receiptId: string;

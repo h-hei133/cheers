@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseBrowserPreviewActionArgs } from "../../browserActionContract.js";
-import { createBrowserExecutionRequest } from "../../browserExecutionContract.js";
-import { createBrowserExecutionResult } from "../../browserExecutionResult.js";
-import { decideBrowserExecutionPolicy } from "../../browserExecutionPolicy.js";
+import { parseBrowserPreviewActionArgs } from "../../actionContract.js";
+import { createBrowserExecutionRequest } from "../../executionContract.js";
+import { createBrowserExecutionResult } from "../../executionResult.js";
+import { decideBrowserExecutionPolicy } from "../../executionPolicy.js";
 import { renderBrowserSkillExecutionSurface } from "./surface.js";
 
 describe("browser skill execution surface", () => {

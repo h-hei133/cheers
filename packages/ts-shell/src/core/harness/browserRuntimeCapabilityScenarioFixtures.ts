@@ -1,5 +1,5 @@
-import { createBrowserActionContract } from "../../browser/browserActionContract.js";
-import { createBrowserExecutionRequest, type BrowserExecutionRequest } from "../../browser/browserExecutionContract.js";
+import { createBrowserActionContract } from "../../browser/actionContract.js";
+import { createBrowserExecutionRequest, type BrowserExecutionRequest } from "../../browser/executionContract.js";
 import {
   createBrowserRuntimeManifest,
   validateBrowserRuntimeManifest,

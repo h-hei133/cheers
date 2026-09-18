@@ -4,7 +4,7 @@ import {
   validateBrowserExternalRunnerRequest,
   validateBrowserExternalRunnerResponse,
 } from "./protocol.js";
-import { parseBrowserCommandArgs } from "../../browserCommandContract.js";
+import { parseBrowserCommandArgs } from "../../commandContract.js";
 
 describe("browser external runner protocol", () => {
   it("validates safe requests and responses", () => {

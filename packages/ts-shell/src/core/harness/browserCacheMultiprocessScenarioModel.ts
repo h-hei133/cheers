@@ -1,5 +1,5 @@
 import type { AgentCliProcessResult, AgentCliProcessSpec } from "./agentCliScenarioModel.js";
-import type { BrowserReceiptCacheIntegrityStatus } from "../../browser/receipt/browserReceiptCacheIntegrity.js";
+import type { BrowserReceiptCacheIntegrityStatus } from "../../browser/receipt/integrity.js";
 
 export type BrowserCacheProcessRole =
   | "writer"

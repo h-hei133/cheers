@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { defaultBrowserSessionManager } from "../../browser/browserSessionManager.js";
+import { defaultBrowserSessionManager } from "../../browser/sessionManager.js";
 import { createUnifiedBrowserToolDefinition } from "./browserToolUnified.js";
 
 describe("Unified Browser Tool & Session Manager", () => {

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { createBrowserActionContract } from "../../browser/browserActionContract.js";
-import { createBrowserExecutionRequest } from "../../browser/browserExecutionContract.js";
-import { parseBrowserCommandArgs } from "../../browser/browserCommandContract.js";
-import { runBrowserCommandAsync } from "../../browser/browserCommandRunner.js";
-import { runBrowserActionLoopExecutor } from "../../browser/browserActionLoopExecutor.js";
+import { createBrowserActionContract } from "../../browser/actionContract.js";
+import { createBrowserExecutionRequest } from "../../browser/executionContract.js";
+import { parseBrowserCommandArgs } from "../../browser/commandContract.js";
+import { runBrowserCommandAsync } from "../../browser/commandRunner.js";
+import { runBrowserActionLoopExecutor } from "../../browser/actionLoopExecutor.js";
 import { BrowserRuntimeAdapterExecutor } from "../../browser/runtime/core/adapterExecutor.js";
 import { validateBrowserSkillRuntimeBinding, type BrowserSkillRuntimeBinding } from "../../browser/skill/runtime/binding.js";
 import { validateBrowserRuntimeManifest } from "../../browser/runtime/core/manifest.js";
-import { applyBrowserSelectorRepair } from "../../browser/browserSelectorRepairApplyExecutor.js";
+import { applyBrowserSelectorRepair } from "../../browser/selectorRepairApplyExecutor.js";
 import {
   createBrowserRuntimeAdapterFixture,
 } from "./browserRuntimeAdapterFixtures.js";

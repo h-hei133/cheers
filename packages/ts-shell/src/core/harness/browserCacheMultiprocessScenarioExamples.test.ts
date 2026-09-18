@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { safeReceipt } from "../../browser/browserActionCacheEntry.test.js";
+import { safeReceipt } from "../../browser/actionCacheEntry.test.js";
 import {
   createBrowserPersistentReceiptCacheRecord,
-} from "../../browser/browserPersistentReceiptCache.js";
+} from "../../browser/persistentReceiptCache.js";
 import { createBrowserCacheMultiprocessFixture, type BrowserCacheMultiprocessFixture } from "./browserCacheMultiprocessFixtures.js";
 import {
   assertBrowserCacheStressSafe,

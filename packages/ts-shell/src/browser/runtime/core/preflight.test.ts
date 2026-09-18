@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { parseBrowserCommandArgs } from "../../browserCommandContract.js";
-import { runBrowserCommandAsync } from "../../browserCommandRunner.js";
-import { FakeBrowserExecutor } from "../../browserExecutor.js";
-import { buildBrowserExecutionEvidencePolicy } from "../../browserExecutionEvidencePolicy.js";
-import { decideBrowserExecutionConfirmation } from "../../browserExecutionConfirmation.js";
+import { parseBrowserCommandArgs } from "../../commandContract.js";
+import { runBrowserCommandAsync } from "../../commandRunner.js";
+import { FakeBrowserExecutor } from "../../executor.js";
+import { buildBrowserExecutionEvidencePolicy } from "../../executionEvidencePolicy.js";
+import { decideBrowserExecutionConfirmation } from "../../executionConfirmation.js";
 import {
   createBrowserNetworkAllowlist,
   decideBrowserNetworkAllowlist,
   normalizeBrowserAllowedOrigin,
-} from "../../browserNetworkAllowlist.js";
-import { decideBrowserExecutionPolicy } from "../../browserExecutionPolicy.js";
+} from "../../networkAllowlist.js";
+import { decideBrowserExecutionPolicy } from "../../executionPolicy.js";
 import { runBrowserRuntimePreflight } from "./preflight.js";
 import {
   createBrowserSandboxAuthority,
   decideBrowserSandboxAuthority,
-} from "../../browserSandboxAuthority.js";
+} from "../../sandboxAuthority.js";
 
 describe("browser runtime preflight", () => {
   it("blocks real execution when sandbox authority is disabled", () => {

@@ -1,16 +1,16 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../../browser/receipt/browserReceiptCacheManifest.js";
+import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../../browser/receipt/manifest.js";
 import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
 } from "../../browser/runtime/external/manifest.js";
-import { BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV } from "../../browser/browserCliExecutorInjection.js";
+import { BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV } from "../../browser/cliExecutorInjection.js";
 import {
   browserReceiptCacheLockPath,
   type BrowserReceiptCacheLockOperation,
-} from "../../browser/receipt/browserReceiptCacheLock.js";
+} from "../../browser/receipt/lock.js";
 import {
   buildProjectCliProcessSpec,
   type BuildProjectCliProcessSpecInput,

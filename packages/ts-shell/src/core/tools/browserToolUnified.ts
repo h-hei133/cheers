@@ -1,6 +1,6 @@
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
-import { defaultBrowserSessionManager } from "../../browser/browserSessionManager.js";
+import { defaultBrowserSessionManager } from "../../browser/sessionManager.js";
 
 /**
  * Unified Browser Tool

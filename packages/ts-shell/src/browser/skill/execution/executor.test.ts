@@ -2,15 +2,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseBrowserPreviewActionArgs } from "../../browserActionContract.js";
-import { createBrowserExecutionRequest } from "../../browserExecutionContract.js";
-import { createBrowserLocalExecutionAuthority } from "../../browserLocalExecutionAuthority.js";
-import { createBrowserLocalFixture } from "../../browserLocalFixture.js";
+import { parseBrowserPreviewActionArgs } from "../../actionContract.js";
+import { createBrowserExecutionRequest } from "../../executionContract.js";
+import { createBrowserLocalExecutionAuthority } from "../../localExecutionAuthority.js";
+import { createBrowserLocalFixture } from "../../localFixture.js";
 import { createBrowserSkillRunnerMetadata } from "../runner/metadata.js";
 import { createBrowserSkillRunnerBinding } from "../runner/binding.js";
 import { BrowserSkillExecutionExecutor } from "./executor.js";
-import { createBrowserExecutionResult } from "../../browserExecutionResult.js";
-import { decideBrowserExecutionPolicy } from "../../browserExecutionPolicy.js";
+import { createBrowserExecutionResult } from "../../executionResult.js";
+import { decideBrowserExecutionPolicy } from "../../executionPolicy.js";
 
 describe("browser skill execution executor", () => {
   const roots: string[] = [];
