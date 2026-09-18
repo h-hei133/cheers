@@ -14,7 +14,7 @@ import type { BrowserLocalFixture } from "../../../browserLocalFixture.js";
 import { sanitizeBrowserEvidenceText } from "../../../browserLocalFixture.js";
 import {
   browserExternalRunnerHasForbiddenContent,
-} from "../../runtime/external/protocol.js";
+} from "../../../../../browser/runtime/external/protocol.js";
 import {
   prepareBrowserSkillExecutionBridge,
 } from "./bridge.js";

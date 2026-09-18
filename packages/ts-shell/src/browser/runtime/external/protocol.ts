@@ -1,6 +1,6 @@
-import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
-import type { BrowserExecutionRequest } from "../../../browserExecutionContract.js";
-import { sanitizeBrowserEvidenceText } from "../../../browserLocalFixture.js";
+import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
+import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
+import { sanitizeBrowserEvidenceText } from "../../../core/context/browserLocalFixture.js";
 export interface BrowserExternalRunnerCommand {
   readonly command: string;
   readonly args: readonly string[];

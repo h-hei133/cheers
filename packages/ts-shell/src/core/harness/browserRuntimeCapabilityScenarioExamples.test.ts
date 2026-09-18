@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
 import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
 import { runBrowserActionLoopExecutor } from "../context/browserActionLoopExecutor.js";
-import { renderBrowserRuntimeSurface } from "../context/browser/runtime/core/surface.js";
+import { renderBrowserRuntimeSurface } from "../../browser/runtime/core/surface.js";
 import { renderBrowserPublicReadOnlyWebSurface } from "../context/browserPublicReadOnlyWebSurface.js";
 import { createBrowserPublicReadOnlyWebScenarioFixture } from "./browserPublicReadOnlyWebScenarioFixtures.js";
 import { createBrowserPublicReadOnlyWebManifest } from "../context/browserPublicReadOnlyWebManifest.js";

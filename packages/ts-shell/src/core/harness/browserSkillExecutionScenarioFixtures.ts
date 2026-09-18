@@ -8,7 +8,7 @@ import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
   type BrowserExternalRunnerManifest,
-} from "../context/browser/runtime/external/manifest.js";
+} from "../../browser/runtime/external/manifest.js";
 import { createBrowserSkillRunnerBinding } from "../context/browser/skill/runner/binding.js";
 import { createBrowserSkillRunnerMetadata } from "../context/browser/skill/runner/metadata.js";
 

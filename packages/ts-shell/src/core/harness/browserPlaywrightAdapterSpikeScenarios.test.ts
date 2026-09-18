@@ -7,7 +7,7 @@ import { BrowserDirectPlaywrightAdapter } from "../context/browserDirectPlaywrig
 import { createBrowserExecutionRequest } from "../context/browserExecutionContract.js";
 import { compareBrowserToolServerBackend } from "../context/browserToolServerBackendComparison.js";
 import { renderBrowserPlaywrightAdapterSurface } from "../context/browserPlaywrightAdapterSurface.js";
-import { decideBrowserRuntimeDirection } from "../context/browser/runtime/core/directionDecision.js";
+import { decideBrowserRuntimeDirection } from "../../browser/runtime/core/directionDecision.js";
 import type { BrowserEvalBenchmarkTask } from "../../eval/browser/benchmarkModel.js";
 import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
 import { createBrowserEvalBenchmarkReport } from "../../eval/browser/benchmarkReport.js";

@@ -1,11 +1,11 @@
-import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
 import {
   createBrowserLocalFixture,
   sanitizeBrowserEvidenceText,
   type BrowserLocalFixture,
   type BrowserLocalFixtureAction,
   type BrowserLocalFixtureKind,
-} from "../../../browserLocalFixture.js";
+} from "../../../core/context/browserLocalFixture.js";
 import {
   browserExternalRunnerHasForbiddenContent,
   type BrowserExternalRunnerAction,
@@ -15,11 +15,11 @@ import {
 import {
   validateBrowserSkillRunnerMetadata,
   type BrowserSkillRunnerMetadata,
-} from "../../skill/runner/metadata.js";
+} from "../../../core/context/browser/skill/runner/metadata.js";
 import {
   validateBrowserSkillRunnerBinding,
   type BrowserSkillRunnerBinding,
-} from "../../skill/runner/binding.js";
+} from "../../../core/context/browser/skill/runner/binding.js";
 
 export const BROWSER_EXTERNAL_RUNNER_MANIFEST_VERSION =
   "browser-external-runner-manifest/v1" as const;

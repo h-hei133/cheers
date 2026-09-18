@@ -1,8 +1,8 @@
 import type { BrowserAccessibilityNodeInput } from "./browserAccessibilitySnapshot.js";
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
-import type { BrowserRuntimeExecutorResult } from "./browser/runtime/core/executor.js";
-import type { BrowserRuntimeManifest } from "./browser/runtime/core/manifest.js";
+import type { BrowserRuntimeExecutorResult } from "../../browser/runtime/core/executor.js";
+import type { BrowserRuntimeManifest } from "../../browser/runtime/core/manifest.js";
 
 export type PwEvidenceStatus = "ok" | "blocked" | "unavailable" | "timed-out" | "failed";
 export type PwCleanupStatus = "closed" | "close-failed" | "not-started";

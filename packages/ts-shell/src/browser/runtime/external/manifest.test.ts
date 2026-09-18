@@ -3,8 +3,8 @@ import {
   createBrowserExternalRunnerManifest,
   validateBrowserExternalRunnerManifest,
 } from "./manifest.js";
-import { createBrowserSkillRunnerMetadata } from "../../skill/runner/metadata.js";
-import { createBrowserSkillRunnerBinding } from "../../skill/runner/binding.js";
+import { createBrowserSkillRunnerMetadata } from "../../../core/context/browser/skill/runner/metadata.js";
+import { createBrowserSkillRunnerBinding } from "../../../core/context/browser/skill/runner/binding.js";
 
 describe("browser external runner manifest", () => {
   it("validates safe test-local runner manifests", () => {

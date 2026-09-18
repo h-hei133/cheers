@@ -1,4 +1,4 @@
-import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
 
 export type BrowserRuntimeManifestVersion = "browser-runtime-manifest/v1";
 export type BrowserRuntimeManifestSource = "cli-harness" | "explicit-local-config" | "test-only";

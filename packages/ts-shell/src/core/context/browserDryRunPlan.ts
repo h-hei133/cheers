@@ -1,6 +1,6 @@
 import type { BrowserActionContract } from "./browserActionContract.js";
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
-import type { BrowserRuntimeRecommendation } from "./browser/runtime/core/decision.js";
+import type { BrowserRuntimeRecommendation } from "../../browser/runtime/core/decision.js";
 import type { BrowserSandboxPolicyResult } from "./browserSandboxPolicy.js";
 
 export interface BrowserDryRunStep {

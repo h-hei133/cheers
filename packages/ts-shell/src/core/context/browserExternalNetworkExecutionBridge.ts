@@ -8,7 +8,7 @@ import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 import {
   runBrowserRuntimePreflight,
   type BrowserRuntimePreflight,
-} from "./browser/runtime/core/preflight.js";
+} from "../../browser/runtime/core/preflight.js";
 import {
   createBrowserExternalNetworkIntent,
   type BrowserExternalNetworkExecutionMode,

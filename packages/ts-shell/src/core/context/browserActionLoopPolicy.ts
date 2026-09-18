@@ -1,11 +1,11 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
-import type { BrowserRuntimeManifest } from "./browser/runtime/core/manifest.js";
+import type { BrowserRuntimeManifest } from "../../browser/runtime/core/manifest.js";
 import {
   browserRuntimeActionAllowed,
   browserRuntimeOriginAllowed,
-} from "./browser/runtime/core/manifest.js";
-import type { BrowserRuntimeSession } from "./browser/runtime/core/session.js";
+} from "../../browser/runtime/core/manifest.js";
+import type { BrowserRuntimeSession } from "../../browser/runtime/core/session.js";
 import type { BrowserActionTarget } from "./browserActionTarget.js";
 
 export type BrowserActionLoopPolicyStatus =

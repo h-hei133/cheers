@@ -4,14 +4,14 @@ import {
 import {
   decideBrowserExternalRunnerPolicy,
   type BrowserExternalRunnerDecision,
-} from "./browser/runtime/external/policy.js";
-import { BrowserExternalRunnerExecutor } from "./browser/runtime/external/executor.js";
+} from "../../browser/runtime/external/policy.js";
+import { BrowserExternalRunnerExecutor } from "../../browser/runtime/external/executor.js";
 import {
   createBrowserNetworkAllowlist,
 } from "./browserNetworkAllowlist.js";
 import {
   browserRuntimeDependencySummary,
-} from "./browser/runtime/core/availabilitySurface.js";
+} from "../../browser/runtime/core/availabilitySurface.js";
 import {
   classifyBrowserSkillRunnerReadiness,
   type BrowserSkillRunnerReadiness,
@@ -21,7 +21,7 @@ import type { BrowserSkillRunnerBinding } from "./browser/skill/runner/binding.j
 import { BrowserSkillExecutionExecutor } from "./browser/skill/execution/executor.js";
 import {
   decideBrowserRuntimeDependencyPolicy,
-} from "./browser/runtime/core/dependencyPolicy.js";
+} from "../../browser/runtime/core/dependencyPolicy.js";
 import {
   BrowserPlaywrightCliLocalFixtureExecutor,
 } from "./browserPlaywrightCliExecutor.js";

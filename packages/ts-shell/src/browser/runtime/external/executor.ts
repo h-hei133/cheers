@@ -3,14 +3,14 @@ import {
   type BrowserExecutor,
   type BrowserExecutorContext,
   type BrowserExecutorResult,
-} from "../../../browserExecutor.js";
-import type { BrowserExecutionRequest } from "../../../browserExecutionContract.js";
+} from "../../../core/context/browserExecutor.js";
+import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
 import {
   createBrowserLocalExecutionAuthority,
   decideBrowserLocalExecutionAuthority,
   type BrowserLocalExecutionAuthority,
-} from "../../../browserLocalExecutionAuthority.js";
-import type { BrowserLocalFixture } from "../../../browserLocalFixture.js";
+} from "../../../core/context/browserLocalExecutionAuthority.js";
+import type { BrowserLocalFixture } from "../../../core/context/browserLocalFixture.js";
 import {
   createBrowserExternalRunnerRequest,
   type BrowserExternalRunnerMode,
@@ -18,7 +18,7 @@ import {
 import {
   decideBrowserSkillManagedRunnerPolicy,
   type BrowserSkillManagedRunnerMetadata,
-} from "../../../browserSkillManagedRunnerPolicy.js";
+} from "../../../core/context/browserSkillManagedRunnerPolicy.js";
 import {
   runBrowserExternalRunnerProcess,
   type BrowserExternalRunnerProcessResult,

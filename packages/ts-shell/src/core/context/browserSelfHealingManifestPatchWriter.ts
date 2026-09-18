@@ -5,7 +5,7 @@ import {
   serializeBrowserExternalRunnerManifest,
   validateBrowserExternalRunnerManifest,
   type BrowserExternalRunnerManifest,
-} from "./browser/runtime/external/manifest.js";
+} from "../../browser/runtime/external/manifest.js";
 import {
   BROWSER_LOCAL_FIXTURE_MANIFEST_VERSION,
   serializeBrowserLocalFixtureManifest,

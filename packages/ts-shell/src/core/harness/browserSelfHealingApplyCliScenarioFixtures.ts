@@ -9,7 +9,7 @@ import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
   validateBrowserExternalRunnerManifest,
-} from "../context/browser/runtime/external/manifest.js";
+} from "../../browser/runtime/external/manifest.js";
 import {
   createBrowserLocalFixtureManifest,
   serializeBrowserLocalFixtureManifest,

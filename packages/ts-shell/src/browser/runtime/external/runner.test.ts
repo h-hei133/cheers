@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { parseBrowserCommandArgs } from "../../../browserCommandContract.js";
+import { parseBrowserCommandArgs } from "../../../core/context/browserCommandContract.js";
 import { runBrowserExternalRunnerProcess } from "./runner.js";
 import { createBrowserExternalRunnerRequest } from "./protocol.js";
-import { createBrowserExternalRunnerScenarioFixture } from "../../../../harness/browserExternalRunnerScenarioFixtures.js";
+import { createBrowserExternalRunnerScenarioFixture } from "../../../core/harness/browserExternalRunnerScenarioFixtures.js";
 
 describe("browser external runner process", () => {
   const cleanupFns: (() => void)[] = [];

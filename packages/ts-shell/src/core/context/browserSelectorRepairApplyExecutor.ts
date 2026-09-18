@@ -1,7 +1,7 @@
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 import { createBrowserActionContract } from "./browserActionContract.js";
 import { createBrowserExecutionRequest } from "./browserExecutionContract.js";
-import type { BrowserRuntimeManifest } from "./browser/runtime/core/manifest.js";
+import type { BrowserRuntimeManifest } from "../../browser/runtime/core/manifest.js";
 import type { BrowserSelectorRepairSeed } from "./browserSelectorRepairSeed.js";
 import {
   decideBrowserSelectorRepairApply,

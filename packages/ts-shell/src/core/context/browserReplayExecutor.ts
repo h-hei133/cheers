@@ -10,7 +10,7 @@ import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfi
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
 import type { BrowserReplayPlan } from "./browserReplayPlanner.js";
-import { runBrowserRuntimePreflight } from "./browser/runtime/core/preflight.js";
+import { runBrowserRuntimePreflight } from "../../browser/runtime/core/preflight.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 import type { BrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
 import type { BrowserSkillRunnerReadiness } from "./browser/skill/runner/readiness.js";

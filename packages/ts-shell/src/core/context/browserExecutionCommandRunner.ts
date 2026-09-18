@@ -11,16 +11,16 @@ import {
 } from "./browserCliExecutionBridge.js";
 import {
   renderBrowserRuntimeAvailabilitySurface,
-} from "./browser/runtime/core/availabilitySurface.js";
+} from "../../browser/runtime/core/availabilitySurface.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import { createBrowserExecutionResult } from "./browserExecutionResult.js";
 import { renderBrowserExecutionSurface } from "./browserExecutionSurface.js";
 import { renderBrowserExecutionReceiptSurface } from "./browserExecutionReceiptSurface.js";
-import { renderBrowserExternalRunnerSurface } from "./browser/runtime/external/surface.js";
+import { renderBrowserExternalRunnerSurface } from "../../browser/runtime/external/surface.js";
 import { renderBrowserExecutionLifecycleSurface } from "./browserExecutionLifecycleSurface.js";
 import { decideBrowserExecutionPolicy } from "./browserExecutionPolicy.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
-import { runBrowserRuntimePreflight } from "./browser/runtime/core/preflight.js";
+import { runBrowserRuntimePreflight } from "../../browser/runtime/core/preflight.js";
 import { renderBrowserSandboxSurface } from "./browserSandboxSurface.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 import { renderBrowserSkillRunnerSurface } from "./browser/skill/runner/surface.js";

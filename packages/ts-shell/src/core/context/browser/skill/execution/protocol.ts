@@ -2,7 +2,7 @@ import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
 import type { BrowserExecutionRequest } from "../../../browserExecutionContract.js";
 import type { BrowserSkillRunnerBindingMode } from "../runner/binding.js";
 import type { BrowserSkillRunnerMetadata } from "../runner/metadata.js";
-import { browserExternalRunnerHasForbiddenContent } from "../../runtime/external/protocol.js";
+import { browserExternalRunnerHasForbiddenContent } from "../../../../../browser/runtime/external/protocol.js";
 import { sanitizeBrowserEvidenceText } from "../../../browserLocalFixture.js";
 
 export type BrowserSkillExecutionAction = "observe" | "extract" | "navigate-local";

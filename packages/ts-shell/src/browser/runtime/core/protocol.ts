@@ -1,6 +1,6 @@
-import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
-import type { BrowserExecutionRequest } from "../../../browserExecutionContract.js";
-import type { BrowserAccessibilityNodeInput } from "../../../browserAccessibilitySnapshot.js";
+import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
+import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
+import type { BrowserAccessibilityNodeInput } from "../../../core/context/browserAccessibilitySnapshot.js";
 
 export type BrowserRuntimeProtocolVersion = "browser-runtime-protocol/v1";
 export type BrowserRuntimeProtocolAction =

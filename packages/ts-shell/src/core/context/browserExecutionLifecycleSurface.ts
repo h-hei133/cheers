@@ -1,5 +1,5 @@
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
-import type { BrowserRuntimePreflight } from "./browser/runtime/core/preflight.js";
+import type { BrowserRuntimePreflight } from "../../browser/runtime/core/preflight.js";
 import type { BrowserExecutionResult } from "./browserExecutionResult.js";
 
 export function renderBrowserExecutionLifecycleSurface(input: {

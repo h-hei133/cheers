@@ -1,6 +1,6 @@
 import { createBrowserAccessibilitySnapshot, type BrowserAccessibilitySnapshot } from "./browserAccessibilitySnapshot.js";
 import { createBrowserDomSnapshot, type BrowserDomSnapshot } from "./browserDomSnapshot.js";
-import type { BrowserRuntimeProtocolResponse } from "./browser/runtime/core/protocol.js";
+import type { BrowserRuntimeProtocolResponse } from "../../browser/runtime/core/protocol.js";
 
 export type BrowserSnapshotValidationStatus = "valid" | "invalid" | "unsafe-output";
 

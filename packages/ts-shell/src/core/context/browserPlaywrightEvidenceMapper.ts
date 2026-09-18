@@ -1,8 +1,8 @@
 import type { BrowserAccessibilityNodeInput } from "./browserAccessibilitySnapshot.js";
 import { sanitizeBrowserText } from "./browserCapabilityModel.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
-import type { BrowserRuntimeExecutorResult } from "./browser/runtime/core/executor.js";
-import type { BrowserRuntimeManifest } from "./browser/runtime/core/manifest.js";
+import type { BrowserRuntimeExecutorResult } from "../../browser/runtime/core/executor.js";
+import type { BrowserRuntimeManifest } from "../../browser/runtime/core/manifest.js";
 
 export interface BrowserPlaywrightPageEvidence {
   readonly status: "ok" | "blocked" | "unavailable" | "timed-out" | "invalid" | "error";

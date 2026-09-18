@@ -6,7 +6,7 @@ import { browserCapabilitySidebarToolItem, renderBrowserCapabilitySurface } from
 import { parseBrowserCommandArgs } from "./browserCommandContract.js";
 import { runBrowserCommand } from "./browserCommandRunner.js";
 import { runBrowserDryRunHarness } from "./browserDryRunHarness.js";
-import { decideBrowserRuntime } from "./browser/runtime/core/decision.js";
+import { decideBrowserRuntime } from "../../browser/runtime/core/decision.js";
 import { classifyBrowserSandboxPolicy } from "./browserSandboxPolicy.js";
 
 describe("browser capability command runner", () => {

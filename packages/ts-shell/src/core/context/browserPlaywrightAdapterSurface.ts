@@ -4,7 +4,7 @@ import {
   renderBrowserPlaywrightRuntimeAvailability,
   type BrowserPlaywrightRuntimeAvailability,
 } from "./browserPlaywrightRuntimeAvailability.js";
-import type { BrowserRuntimeDirectionDecision } from "./browser/runtime/core/directionDecision.js";
+import type { BrowserRuntimeDirectionDecision } from "../../browser/runtime/core/directionDecision.js";
 
 export function renderBrowserPlaywrightAdapterSurface(input: {
   readonly availability: BrowserPlaywrightRuntimeAvailability;

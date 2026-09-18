@@ -1,4 +1,4 @@
-import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
 import type { BrowserRuntimeManifestLoadResult } from "./manifest.js";
 
 export type BrowserRuntimeAvailabilityStatus =

@@ -1,4 +1,4 @@
-import type { BrowserExternalRunnerAction } from "../../runtime/external/protocol.js";
+import type { BrowserExternalRunnerAction } from "../../../../../browser/runtime/external/protocol.js";
 
 export type BrowserSkillRunnerActionKind =
   | "observe"

@@ -23,19 +23,19 @@ import type { BrowserPublicReadOnlyHttpClient } from "./browserPublicReadOnlyWeb
 import {
   decideBrowserRuntimeAvailability,
   renderBrowserRuntimeStatusSurface,
-} from "./browser/runtime/core/availability.js";
-import type { BrowserRuntimeExecutor } from "./browser/runtime/core/executor.js";
+} from "../../browser/runtime/core/availability.js";
+import type { BrowserRuntimeExecutor } from "../../browser/runtime/core/executor.js";
 import {
   validateBrowserRuntimeManifest,
   type BrowserRuntimeManifestLoadResult,
-} from "./browser/runtime/core/manifest.js";
-import { renderBrowserRuntimeSurface } from "./browser/runtime/core/surface.js";
-import type { BrowserExternalRuntimeManifestLoadResult } from "./browser/runtime/external/runtimeManifest.js";
-import { BrowserRuntimeAdapterExecutor } from "./browser/runtime/core/adapterExecutor.js";
+} from "../../browser/runtime/core/manifest.js";
+import { renderBrowserRuntimeSurface } from "../../browser/runtime/core/surface.js";
+import type { BrowserExternalRuntimeManifestLoadResult } from "../../browser/runtime/external/runtimeManifest.js";
+import { BrowserRuntimeAdapterExecutor } from "../../browser/runtime/core/adapterExecutor.js";
 import type { BrowserSkillRuntimeBinding } from "./browser/skill/runtime/binding.js";
 import type { BrowserPlaywrightRuntimeAvailability } from "./browserPlaywrightRuntimeAvailability.js";
 import type { BrowserToolServerBackendComparison } from "./browserToolServerBackendComparison.js";
-import type { BrowserRuntimeDirectionDecision } from "./browser/runtime/core/directionDecision.js";
+import type { BrowserRuntimeDirectionDecision } from "../../browser/runtime/core/directionDecision.js";
 import { renderBrowserPlaywrightAdapterSurface } from "./browserPlaywrightAdapterSurface.js";
 import { renderPwRuntimeStatus } from "./pwStatus.js";
 import { getPwRuntimeStatus, type PwRuntimeStatus } from "./pwRuntime.js";

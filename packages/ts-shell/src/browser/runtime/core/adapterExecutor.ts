@@ -2,7 +2,7 @@ import type {
   BrowserRuntimeExecutor,
   BrowserRuntimeExecutorResult,
 } from "./executor.js";
-import type { BrowserExecutionRequest } from "../../../browserExecutionContract.js";
+import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
 import type { BrowserRuntimeManifest } from "./manifest.js";
 import {
   type BrowserExternalRuntimeManifestLoadResult,
@@ -16,8 +16,8 @@ import {
 import {
   validateBrowserSkillRuntimeBinding,
   type BrowserSkillRuntimeBinding,
-} from "../../skill/runtime/binding.js";
-import { validateBrowserRuntimeSnapshots } from "../../../browserSnapshotValidation.js";
+} from "../../../core/context/browser/skill/runtime/binding.js";
+import { validateBrowserRuntimeSnapshots } from "../../../core/context/browserSnapshotValidation.js";
 
 export class BrowserRuntimeAdapterExecutor implements BrowserRuntimeExecutor {
   readonly kind: BrowserRuntimeManifest["runtimeMode"];

@@ -8,7 +8,7 @@ import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
   type BrowserExternalRunnerManifest,
-} from "../context/browser/runtime/external/manifest.js";
+} from "../../browser/runtime/external/manifest.js";
 
 export interface BrowserExternalRunnerScenarioFixture {
   readonly root: string;

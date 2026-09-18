@@ -8,21 +8,21 @@ import { createBrowserDomSnapshot } from "./browserDomSnapshot.js";
 import type { BrowserExecutionRequest } from "./browserExecutionContract.js";
 import { createBrowserObservation } from "./browserObservationModel.js";
 import { createBrowserObservationProvenance } from "./browserObservationProvenance.js";
-import { createBrowserRuntimeReceipt, type BrowserRuntimeReceipt } from "./browser/runtime/core/receipt.js";
-import { createBrowserRuntimeSession } from "./browser/runtime/core/session.js";
+import { createBrowserRuntimeReceipt, type BrowserRuntimeReceipt } from "../../browser/runtime/core/receipt.js";
+import { createBrowserRuntimeSession } from "../../browser/runtime/core/session.js";
 import {
   decideBrowserRuntimeAvailability,
   type BrowserRuntimeAvailability,
-} from "./browser/runtime/core/availability.js";
+} from "../../browser/runtime/core/availability.js";
 import {
   validateBrowserRuntimeManifest,
   type BrowserRuntimeManifest,
   type BrowserRuntimeManifestLoadResult,
-} from "./browser/runtime/core/manifest.js";
+} from "../../browser/runtime/core/manifest.js";
 import type {
   BrowserRuntimeExecutor,
   BrowserRuntimeExecutorResult,
-} from "./browser/runtime/core/executor.js";
+} from "../../browser/runtime/core/executor.js";
 import { createBrowserSelectorRepairSeed } from "./browserSelectorRepairSeed.js";
 import type { BrowserObservation } from "./browserObservationModel.js";
 import type { BrowserActionTarget } from "./browserActionTarget.js";
