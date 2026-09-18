@@ -109,11 +109,35 @@ core/query/resultMapper.ts                        ← 已迁移
 3. **删除会否毁掉引用来源？** `.wiki/` 与本计划大量引用 `docs/` 下的审计文档
    （例如 §4 的约束来源）。**删文档需先确认引用它的当前文档如何处理。**
 
-### 2.5 待核：是否存在文档状态登记
+### 2.5 `docs/DOC_STATUS.md` 实测（存在，但覆盖不足）
 
-`docs/DOC_STATUS.md` 曾被本计划引用为"标注 `control-plane-atlas.md` 为 active"的依据。
-**需核实该文件是否存在、是否覆盖 770 份文档、标注是否可信**——
-若它存在但只覆盖少数文件，则它本身就是漂移的一部分。
+| 项 | 值 |
+|---|---|
+| 是否存在 | **存在**（25.5 KB，167 行） |
+| 表项数 | **126** |
+| 覆盖 770 份文档的比例 | **101 / 770（13%）** |
+| **具体路径引用的断链数** | **0 / 111（全部有效）** |
+| 状态分布 | `active` 61 · `historical` 22 · `archived` 3 · `superseded` 2 |
+
+**两点判读**：
+
+1. **它自身的具体路径引用全部有效**（111/111）——比 `docs/architecture/` 好得多。
+   （此前我的粗测报出 11 处"GONE"，实为通配符模式 `route*.md` 被误当字面路径，**已更正**。）
+2. **它只覆盖 13%**，且**自述**："This map prioritizes documents that future route
+   prompts are likely to mention. It does not claim every historical note is perfectly
+   classified." ——**即：它不是全量登记，不能当作"未登记=可删"的依据。**
+3. **它把 61 份标为 `active`，但其中含 `docs/architecture/*.md`，
+   而那些文件实测有 155 处死引用**（见 §5）。**"active"标注与事实不符**——
+   这是漂移的又一体现，且这次发生在"用来追踪漂移的那个文件"里。
+
+### 2.6 我自己在本轮的两处过度声称（已更正）
+
+1. 我曾判定 `AGENTS.md:34` 指向不存在的路径。**实为误判**：
+   `packages/ts-shell/src/` 是**存在的目录**，该句只是**含糊**（把整个 `src/` 当作执行面），
+   不是断链。**已改为"含糊"而非"断链"。**
+2. 我曾报 `DOC_STATUS.md` 有 11 处断链。**实为误判**：
+   那是通配符模式。**具体路径 111/111 全部有效。**
+   我的检测器最初**不跳过含 `*` 的模式**，已修。
 
 ---
 
@@ -175,15 +199,50 @@ eval  memory  model-adapters  observability  renderer  sandbox  test-utils  work
 
 ## 4. 初步建议（供裁决，本轮未执行）
 
-### 4.1 立即可做，零决策成本
+### 4.1 已执行（本轮，零决策成本）
 
-| # | 动作 | 依据 |
+| # | 动作 | 结果 |
 |---|---|---|
-| A | 修 `AGENTS.md:34` 的 execution 路径陈述 | 实测 `src/execution/` 不存在 |
-| B | 把实际在用的 15 个顶层域补进 Owner Domains 列表（或明确"名单非穷举"） | §3.3 实测 |
-| C | 修 `agent-rules/architecture-boundaries.md` 的两条 `orchestration/*` 条目 | 路径已消失 |
+| A | 修 `agent-rules/architecture-boundaries.md` 的两条 `orchestration/*` 死引用 | **已删**（两行） |
+| B | 修同文件 "legacy orchestration paths" 措辞 | 改为 "a legacy or compatibility path" |
+| C | **新建 `scripts/verify-docs-and-rules-drift.mjs`** | 见 §4.2 |
 
-### 4.2 需要裁决的方向性选择
+`AGENTS.md` 的 execution 一句**未改**——实测它是**含糊而非断链**（见 §2.6），
+改动属措辞决策，留给维护者。
+
+### 4.2 漂移检测门禁（治根因）
+
+`scripts/verify-docs-and-rules-drift.mjs`——**两个作用域，因义务不同**：
+
+| 作用域 | 文件 | 首个运行结果 | 门禁行为 |
+|---|---|---|---|
+| **RULES** | `AGENTS.md` + `agent-rules/**` + `.wiki/_index.md`（11 文件） | 16 引用 / **0 死引用**（修完上述两行后） | **失败**（`[product-regression]`，exit 1） |
+| **DOCS** | `docs/DOC_STATUS.md` + `docs/architecture/**` + `docs/project-map/**`（44 文件） | 508 引用 / **155 死引用** | **报告不失败**（`[advisory]`），`--strict` 才失败 |
+
+**设计理由**：规则必须准确——它们约束每个新起的代理，死路径会**误导工作**。
+当前态文档的漂移**已既存 155 处**；一个一上线就失败的门禁**会被关掉**，
+故先让它**可见**并给出计数，供后续驱降；`--strict` 留给负责驱降的人。
+
+**已排除**：`docs/` 其余部分（`archive/`、`agent-routes/`、`dev-history/` 等）
+按构造即豁免——5 月的 route 结项文档**本就应当**描述 5 月的树。
+
+**双向验证**：
+
+| 测试 | 结果 |
+|---|---|
+| 修完规则两行后运行 | `[pass] rules-drift`，**exit 0** |
+| 注入一条不存在的规则路径 | `[product-regression] rule-reference-dangling - …/does/not/exist.ts`，**exit 1** |
+| 移除注入后 | **exit 0** |
+| DOCS 计数 | 无论规则是否通过，**155 始终打印**（不可隐藏） |
+
+**两处我自己的检测器缺陷（已修，正是本门禁要防的那类错误）**：
+
+1. **只认文件、不认目录** —— 正则要求扩展名，于是 `orchestration/patchResult/`
+   这类**目录引用被漏掉**，首版在规则层报"0 问题"而实际问题就在那里。
+   **已加尾斜杠分支**——目录恰恰是重构最常删除的东西。
+2. **不跳过通配符** —— 把 `docs/design/*.md` 当字面路径，产生 11 处假阳性。**已修。**
+
+### 4.3 需要裁决的方向性选择
 
 **① `docs/` 如何处置**（三类不同处置，必须分开，不能整树删）：
 
@@ -195,7 +254,7 @@ eval  memory  model-adapters  observability  renderer  sandbox  test-utils  work
 
 **② 是否引入"文档-代码一致性"检测**（治根因的唯一手段）：
 
-候选形式——一个 `scripts/verify-doc-references.mjs`：
+**已实现为 `scripts/verify-docs-and-rules-drift.mjs`**（见 §4.2）。形态如下：
 
 - 扫描 `docs/**/*.md`、`agent-rules/*.md`、`AGENTS.md`；
 - 对其中形如 `packages/…/*.ts(x)` 与 `src/...` 的路径引用，检查文件是否存在；

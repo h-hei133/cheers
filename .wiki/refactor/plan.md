@@ -584,6 +584,92 @@ Step 3–7 完成后重新审视"还有哪些位置不正确、哪些需要重�
 **未改动的两项及原因**：`tsconfig.build.json`（build behavior）与 `agent-rules/*`
 属 `AGENTS.md` 明列"require explicit task scope"的范围；本轮**只报告，不擅自修改**。
 
+### 3.9 文档与规则漂移探索（2026-09-18）
+
+**完整记录**：`.wiki/refactor/drift-exploration-2026-09-18.md`
+
+#### 3.9.1 推翻一个前提：测试**并未**阻碍删除 `docs/`
+
+用户提出的约束是"test 涉及这些文档，导致删除受阻"。**实测不成立。**
+
+**全部 12 个提及 `docs` 的测试文件逐一核对**：全部是①**提示文本里的目标文件名**
+（`"docs/uncertain-edit.md"`）、②**断言命令生成的文本**、③**临时目录里自建的 `docs/` 结构**
+（`mkdtemp` 出来的 workspace）。决定性证据：
+
+```
+grep -rn "join(__dirname|join(process.cwd()|repoRoot" src --include=*.test.ts | grep -i docs
+→ 空
+```
+
+**零测试从磁盘读取仓库 `docs/` 树。** 非测试消费者同样：`scripts/real-provider-readonly-fixture.mjs`
+的 `'docs/flow.md'` 是**在 fixtureDir 里写入**该文件。
+**结论：删除 `docs/` 无需改动任何测试**；唯一真实成本是**知识丢失**。
+
+#### 3.9.2 `docs/` 过期程度（实测）
+
+| 指标 | 值 |
+|---|---:|
+| `docs/` 总文件 / `.md` | 810 / **770** |
+| **含死 `src/` 引用的文档** | **325 / 770（42%）** |
+| **死引用总数** | **2417** |
+| 最后修改在 2026-05~06 | **约 700 / 770（91%）** |
+
+`orchestration/` 占死引用绝大多数（Step 4 已解散该域）。
+**42% 是可机械检测的下界**——未被引用的架构描述与结论同样可能失真，那些**无法机械检测**。
+
+**`docs/DOC_STATUS.md` 实测**：存在（25.5 KB / 126 表项），**具体路径引用 111/111 全部有效**，
+但**只覆盖 101/770（13%）**，且自述不完整。**它把 61 份标为 `active`，
+其中 `docs/architecture/*.md` 实测有 155 处死引用——"active"标注与事实不符。**
+
+**不能整树删**：树内混有四类——route 时代历史（约 700，含 2417 死引用）、
+当前架构（22 份有更新）、设计规格、以及 **Step 2.7 要求保留的审计底账**
+（`deleted-audit-*`、`restore-audit-*`）；**后两类不可删且无分界标记**。
+
+#### 3.9.3 `AGENTS.md` 漂移（实测）
+
+- **链接全部有效**：11/11（9 个 `agent-rules/*.md` + `.wiki/_index.md` + `.normproof/dispositions.md`）。
+- **正文 3 处与实际不符**（其中 1 处经复核**降级为"含糊"而非断链**：
+  `packages/ts-shell/src/` 确实存在，只是把整个 `src/` 当作执行面等于没说）。
+- **15 个顶层域不在其引用的 Owner Domains 名单内**：
+  `artifacts browser cli config core daemon entrypoints eval memory model-adapters
+  observability renderer sandbox test-utils workflow`
+  ——含体量最大的 `browser`(1787)、`core`(1515)、`session`(977)。
+  **规则说"用既有 owner domain"，但既有域一半不在名单里，据此无法判断归属。**
+
+#### 3.9.4 根因与治根因
+
+**根因：本仓验证全部针对代码（tsc / vitest / SCC / judge），零针对"文档与规则是否仍与代码一致"。**
+无检测 ⇒ 每次重构必然扩大漂移且**不可见**。
+
+**已执行**：新建 **`scripts/verify-docs-and-rules-drift.mjs`**——两个作用域：
+
+| 作用域 | 文件 | 首跑结果 | 门禁行为 |
+|---|---|---|---|
+| **RULES** | `AGENTS.md` + `agent-rules/**` + `.wiki/_index.md`（11） | 16 引用 / **0 死引用** | **exit 1**（修完下述两行后为 0） |
+| **DOCS** | `DOC_STATUS.md` + `docs/architecture/**` + `docs/project-map/**`（44） | 508 引用 / **155 死引用** | **`[advisory]` 报告不失败**；`--strict` 才失败 |
+
+**已修**：`agent-rules/architecture-boundaries.md` 的两条 `orchestration/*` 死目录引用
++ "legacy orchestration paths" 措辞。**该文件此前指向 Step 4 已删除的目录，
+而 `AGENTS.md` 要求代理启动时遵守它。**
+
+**双向验证**：规则层 exit 0；注入死路径 → exit 1；DOCS 计数始终打印（不可隐藏）。
+
+**设计理由**：规则**必须准确**（约束每个新起代理，死路径会误导工作）；
+当前态文档**已既存 155 处**，一上线就失败的门禁**会被关掉**，故先让其**可见**并给出计数。
+
+**两处检测器自身缺陷（已修，恰是本门禁要防的那类错误）**：
+① 只认文件不认**目录**（漏掉 `orchestration/patchResult/`，首版在规则层误报"0 问题"）；
+② 不跳过**通配符**（把 `docs/design/*.md` 当字面路径，11 处假阳性）。
+
+#### 3.9.5 待裁决
+
+| 项 | 性质 |
+|---|---|
+| `docs/` 分类归档（route 时代约 700 份 → `archive/` + `historical` 横幅） | 需裁决；**不可整树删** |
+| 把 DOCS 作用域以 `--strict` 纳入门禁 | 需先把 155 降至 0 |
+| `AGENTS.md`：execution 措辞 + 补 15 个实际在用的顶层域 | 需裁决 |
+| 收紧 `tsconfig.build.json` 的 `exclude`（同 §3.8 发现 1） | 需裁决 |
+
 ### 3.4 独立立项（记录，不在本计划处理）
 
 **`turn` 内核与编排层不连通。** 活轨存在两套并行的 provider 路径：
@@ -922,6 +1008,7 @@ runtime 装配四重证据。
 | `step-5-session-manager-recon.md` | **Step 5 SessionManager 拆分探索（含 3 个方案与 3 项未决问题）** |
 | `step-6-naming-exploration.md` | **Step 6 命名税探索：170 文件实测、族切分否证（0.32）、`playwright` 裁定依据、执行记录 ± 残余** |
 | `architecture-exploration-2026-09-18.md` | **Step 3–7 后的架构位置再探索：5 项发现、test 分层结论（不分离）、`core/` 待裁定** |
+| `drift-exploration-2026-09-18.md` | **docs/ 与 AGENTS.md 漂移探索：测试不阻碍删除（实测）、770 份中 91% 陈旧、漂移检测门禁** |
 | `deleted-audit-2026-09-16.md` | **主文档**：403 个已删文件审查总账 + 附一至附十二 |
 | `restore-audit-2026-09-16.md` | 事故认定、三路审查、D 集恢复、补丁层复核 |
 | `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-006） |

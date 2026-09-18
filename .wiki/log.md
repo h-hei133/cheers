@@ -794,3 +794,41 @@
   属 `AGENTS.md` 明列「require explicit task scope」范围，本轮**只报告不擅改**。
 - **`core/` 未提出拆分方案**：22 子目录 / 1515 文件 / 216 条外部入边，是事实上的横切基础层；
   规则未定义其准入标准，**需维护者先裁定语义**。
+
+## [2026-09-18] drift-recon | docs/ 与 AGENTS.md 漂移探索 + 新增漂移检测门禁。
+- **推翻一个前提（重要）**：用户认为"test 涉及 docs 导致无法删除"。**实测不成立**——
+  全部 **12 个**提及 `docs` 的测试文件都是①提示文本里的目标文件名、②断言命令生成的文本、
+  ③**临时目录里自建的 `docs/` 结构**（`mkdtemp` workspace）。
+  决定性证据：`grep -rn "join(__dirname|join(process.cwd()|repoRoot" src --include=*.test.ts | grep -i docs` **为空**。
+  **零测试从磁盘读取仓库 `docs/` 树**；`scripts/real-provider-readonly-fixture.mjs` 的
+  `'docs/flow.md'` 也是在 fixtureDir 里**写入**。**删除 `docs/` 无需改任何测试**，唯一成本是知识丢失。
+- **`docs/` 过期实测**：810 文件 / **770 `.md`**；**325/770（42%）** 含死 `src/` 引用，
+  **共 2417 处**（`orchestration/` 占多数）；**约 700/770（91%）** 自 2026-05~06 未再修改。
+  42% 是**可机械检测的下界**——未被引用的架构描述同样可能失真，**无法机械检测**。
+- **`docs/DOC_STATUS.md` 实测**：存在（126 表项），**具体路径 111/111 全部有效**，
+  但**只覆盖 101/770（13%）**且自述不完整；**把 61 份标为 `active`，
+  而其中 `docs/architecture/*.md` 实测有 155 处死引用——标注与事实不符。**
+- **不能整树删**：树内混有四类（route 时代历史约 700、当前架构 22、设计规格、
+  **Step 2.7 要求保留的审计底账**），**后两类不可删且无分界标记**。
+- **`AGENTS.md` 漂移实测**：链接 **11/11 全部有效**；**正文 3 处与实际不符**；
+  **15 个顶层域不在其引用的 Owner Domains 名单内**（含 `browser`(1787)、`core`(1515)、`session`(977)）
+  ——规则说"用既有 owner domain"，但既有域一半不在名单里，**据此无法判断归属**。
+- **根因**：本仓验证**全部针对代码**（tsc / vitest / SCC / judge），
+  **零针对"文档与规则是否仍与代码一致"**。无检测 ⇒ 每次重构必然扩大漂移且**不可见**。
+- **已执行（治根因）**：新建 **`scripts/verify-docs-and-rules-drift.mjs`**，两个作用域：
+  **RULES**（`AGENTS.md`+`agent-rules/**`+`.wiki/_index.md`，11 文件）**exit 1**；
+  **DOCS**（`DOC_STATUS.md`+`docs/architecture/**`+`docs/project-map/**`，44 文件）
+  以 **`[advisory]` 报告不失败**，`--strict` 才失败。
+  设计理由：规则**必须准确**（约束每个新起代理）；当前态文档**已既存 155 处死引用**，
+  一上线就失败的门禁**会被关掉**，故先让其**可见**并给出计数。
+- **已修**：`agent-rules/architecture-boundaries.md` 的两条 **`orchestration/patchResult/`、
+  `orchestration/patchApplication/` 死目录引用**（Step 4 已删除该目录，而 AGENTS.md 要求
+  代理启动时遵守此文件）+ "legacy orchestration paths" 措辞。
+- **双向验证**：规则层 **exit 0**；注入死规则路径 → **exit 1** 并指名该行；DOCS 的 **155** 始终打印。
+- **两处我自己的检测器缺陷（已修，恰是本门禁要防的那类错误）**：
+  ① **只认文件不认目录**——正则要求扩展名，漏掉 `orchestration/patchResult/` 这类**目录引用**，
+     首版在规则层**误报"0 问题"**而问题就在那里；**已加尾斜杠分支**（目录恰恰是重构最常删除的）。
+  ② **不跳过通配符**——把 `docs/design/*.md` 当字面路径，产生 **11 处假阳性**；**已修**。
+- **另更正我自己的两处过度声称**：① 曾判 `AGENTS.md:34` 指向不存在路径——**误判**，
+  `packages/ts-shell/src/` 确实存在，该句是**含糊**非断链；② 曾报 `DOC_STATUS.md` 11 处断链——
+  **误判**，那是通配符，具体路径 111/111 全部有效。
