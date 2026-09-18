@@ -81,7 +81,6 @@ import {
   appendCompactionEvent,
   appendSessionTurn,
   appendTranscriptEvent,
-  projectTranscriptMessages,
   readTranscriptEvents,
 } from "./transcript/sessionTranscript.js";
 import {
@@ -101,15 +100,10 @@ import {
   type SessionResumeOptions,
   type SessionResumeResult,
 } from "./recovery/sessionResume.js";
-import {
-  type ReplayPlan,
-  type TranscriptRepairContext,
-} from "./replay/sessionReplayFacade.js";
+import type { ReplayPlan } from "./replay/sessionReplayFacade.js";
 import {
   buildReplayPlanForSession,
   buildRuntimeStateSeedForSession,
-  normalizeReplayTranscript,
-  repairReplayTranscript,
 } from "./replay/sessionReplayRuntime.js";
 import {
   handleAddTurn,
@@ -128,7 +122,6 @@ import {
   handleApplyQueryEventToState,
   handleGetTranscriptEvents,
 } from "./agent/persistence.js";
-import { applyAutoCompactRetention } from "./agent/compaction.js";
 export type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
 export type {
   ApprovalAuditMemoryState,
@@ -149,10 +142,7 @@ export type {
 export type {
   SessionReentrySummary,
 } from "./presentation/sessionReentrySurface.js";
-export type {
-  ReplayPlan,
-  TranscriptRepairContext,
-} from "./replay/sessionReplayFacade.js";
+export type { ReplayPlan } from "./replay/sessionReplayFacade.js";
 
 export type { WorkspaceRootMode } from "./store/projectBindingPolicy.js";
 export type { Session } from "./schema/sessionRecord.js";
@@ -518,10 +508,6 @@ export class SessionManager {
     });
   }
 
-  loadSessionMessages(sessionId: string): SessionMessage[] {
-    const events = this.getTranscriptEvents(sessionId);
-    return projectTranscriptMessages(events);
-  }
   getRecoverySnapshot(sessionId: string): RecoverySnapshot {
     return buildRecoverySnapshotForSession({
       sessionId,
@@ -529,17 +515,6 @@ export class SessionManager {
       state: this.store.readStateSnapshotRequired(this.store.statePath(sessionId)),
       transcriptEvents: this.getTranscriptEvents(sessionId),
     });
-  }
-
-  normalizeTranscriptEvents(events: TranscriptEvent[]): TranscriptEvent[] {
-    return normalizeReplayTranscript(events);
-  }
-
-  repairTranscriptEvents(
-    events: TranscriptEvent[],
-    context: TranscriptRepairContext,
-  ): TranscriptEvent[] {
-    return repairReplayTranscript(events, context);
   }
 
   getReplayPlan(sessionId: string): ReplayPlan {
@@ -787,13 +762,6 @@ export class SessionManager {
 
   private applyQueryEventToState(sessionId: string, event: QueryEvent): void {
     handleApplyQueryEventToState(this.store, sessionId, event);
-  }
-
-  private applyAutoCompactRetention(
-    workingMemory: unknown,
-    event: QueryEvent,
-  ): unknown {
-    return applyAutoCompactRetention(workingMemory, event);
   }
 
   private buildSessionStateSnapshot(

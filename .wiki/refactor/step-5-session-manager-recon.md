@@ -181,3 +181,78 @@ session/manager/
 - 若执行拆分：按 §2.4.1 —— 先跑 SCC（基线全仓 0 环）、按 import 图实测边数、
   只重算 escaping 边、PTY 实机验证（`session/` 是 §2.4 强制触发面）、
   证明改动仅 import/委托。
+
+---
+
+## 9. 执行前侦察的修正（2026-09-18，第二轮）
+
+在动手前对方案 B 做了机制核实，**发现 §6 方案 B 的机制前提有误**，须先修正再执行。
+
+### 9.1 判据计数机制的权威校准
+
+从 `.normproof/normproof-0.1.0.tgz` 解出真实实现
+（`package/dist/adapters/sidecar-file/module-graph.js` → `declaredFunctionNames`），
+逐字复刻后在 5 个标定文件上与 judge **完全一致**：
+
+| 文件 | judge | 复刻 |
+|---|---:|---:|
+| `session/SessionManager.ts` | 59 | **59** |
+| `session/store/sessionStoreAccess.ts` | 22 | **22** |
+| `edit/multifile/model.ts` | 39 | **39** |
+| `presentation/surface/model.ts` | 51 | **51** |
+| `runtime/evaluation/task/model.ts` | 52 | **52** |
+
+计数规则（三类文本形态，按**名字去重**）：
+1. `function name(` 声明
+2. `const/let/var name = (function|(` 绑定
+3. **方法位**：`^[ \t]*(修饰符)*name(...)  {` —— **类方法计入**
+   （`constructor` 与 `NOT_A_FUNCTION_NAME` 列表除外）
+4. **属性声明不计入**（已用探针验证）
+
+### 9.2 由此推翻的两个前提
+
+**前提 A 被推翻**：§6 方案 B 说"抽出 lifecycle-writes 可降低计数"。
+实测：**当前 59，抽出该组 15 个名字后剩 44 —— 仍远超 20**。
+
+**前提 B 被推翻**：§6 设想"SessionManager 保留组合面并委托"。
+但判据数的是**模块内声明名**，**新增委托方法仍会被计数**——
+组合面不降数，反而增加。已用探针确认：把协作者作为**属性**暴露则不计数，
+但 SessionManager 现有方法必须**真正移出文件**才降数。
+
+### 9.3 机制候选（须裁决）
+
+| 机制 | 是否降数 | 仓库先例 | 改动面 |
+|---|---|---|---|
+| **组合 + 改调用点** | ✅ 方法移出即降数 | ✅ 已有（`this.deps.*` 导航） | **290 处调用点**（生产 44 / 测试 246），10 种接收者表达式 |
+| **继承（基类持有 LW）** | ✅ | ❌ **无先例**（仓库 14 处 `extends` **全是 `extends Error`**） | 调用点不变 |
+| **仅加委托包装** | ❌ **不降数** | — | — |
+
+### 9.4 另发现的零风险收益（与拆分无关）
+
+3 个方法**全仓零调用**（已 grep 验证，含 `scripts/`、`index.ts`、prototype、`.call`）：
+
+| 方法 | 其底层实现 |
+|---|---|
+| `loadSessionMessages` | `projectTranscriptMessages` 已被 `sessionStore.ts`、`exportCommandRuntime.ts` 使用 |
+| `normalizeTranscriptEvents` | `normalizeReplayTranscript` → 实际用的是 `normalizeReplayTranscriptEvents` |
+| `repairTranscriptEvents` | `repairReplayTranscript` 仅此一处引用 |
+
+另有 1 个 private 死方法：`applyAutoCompactRetention`（`this.applyAutoCompactRetention` 零引用；
+底层 `applyAutoCompactRetention` 已被 `agent/persistence.ts` 使用）。
+
+**删除这 4 个名字：59 → 55。** 不改变任何行为（零调用），
+但**单独不足以达标**，且属"删除"而非"拆分"——须与 Step 2.7 的删除纪律一致（先查生产者/消费者）。
+
+### 9.5 结论
+
+**方案 B 需重新裁决**，因为：
+1. 它达不到"降到 20"的目标（44 > 20），除非继续抽更多组；
+2. 它的实现机制（组合 + 改 290 处调用点）与"最小风险一步"的初衷不符；
+3. 若目标是**真正达标**，需把 5 组全部抽出（59 − 50 − 11 ≈ 0 个名字），
+   即 SessionManager 退化为纯组合面——**这是方案 A，改动面 290 处调用点 + 55 个消费者**。
+
+**须维护者裁决**：
+- (a) 是否接受"分步降数但不达标"（如先删 4 个死名 + 抽 lifecycle-writes → 44）；
+- (b) 是否允许引入继承机制（无先例，但零调用点改动）；
+- (c) 是否改为"登记 defer"——依据仍是 `agent-rules` 第 147 行的明文条款
+  （SessionManager 可保留真实生命周期协调职责）。
