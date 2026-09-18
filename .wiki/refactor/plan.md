@@ -189,13 +189,15 @@ src/context/compact|startup|model/（44）
 **执行顺序（风险递增）**：3a `model/`+错置文件 → 3b `startup/` → 3c `compact/`
 → 3d `sidebar/` → 3e `memory/` → **3f browser（361 边，最末且分批）**。
 
-**进度**：3a ✅（`e53ba6b4`）、3b ✅（`54021279`）、**3c ✅**、**3d ✅**、**3e ✅**（2026-09-18）。
-3c 实测外部边 **37**（原估 30），域内 escaping 边 21 条；3d 实测外部边 **18**
-（原估 17），域内 escaping 边 15 条；3e 实测外部边 **46**（原估 31），域内 escaping
-边 5 条，目标改为顶层 `src/memory/`（`src/context/memory/` 是既存的另一概念
-`ContextMemory`，不可并入）；3c 顺带修复 3b 遗漏的
-`sidebarStateProjection.test.ts` 悬挂 `import type`。3d 起新增**搬迁前 SCC 检查**
-（禁止引入依赖环，基线全仓 0 环）。详见 `step-3-migration-map.md` §6.1。
+**Step 3 全部完成（2026-09-18）**。进度：3a ✅（`e53ba6b4`）、3b ✅（`54021279`）、
+3c ✅（`59fde020`）、3d ✅（`35ca1751`）、3e ✅（`dc38b155`）、
+3f ✅（`d527993a` / `60b24107` / `28e6e433` / `3f4fd752`，分 4 批）。
+
+映射表估算普遍偏低（实测：3c 37 vs 30、3d 18 vs 17、3e 46 vs 31、
+3f 1,537 vs 361）；每次搬迁均按 import 图实测重算，未采信估算。
+3f 的**命名税未执行**——留给独立 Step 6。
+`core/context/` 现仅剩 `model/` 6 文件（共享上下文类型层）。
+详见 `step-3-migration-map.md` §6.1。
 
 **3f 须 PTY 实机验证**（触及 CLI 桥 + `/browser` 命令链）。
 

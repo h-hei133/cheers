@@ -310,3 +310,23 @@
 - **搬迁前 SCC 检查**（§7 强制）：搬迁前 **0 环**、按新路径重建图后 **0 环**。
 - **验证**：① build **0 错**，全量 tsc 251（与搬迁前一致）；② 相关域 75 文件/**438 测试全绿**；③ **全量 3172 项零失败**；④ 可达性 959/874/85 **不变**；⑤ `validate` + `verify:host-surface` PASS；⑥ **PTY 实机**——真实 TUI 执行 `/memory`（渲染完整 Project memory review 面板）与 `/memory save <text>`（走 `projectMemorySaveCommandRunner` → `projectMemoryLocalStore` → `memoryValidation`/`memoryPersistence`，正确返回 `blocked / Explicit local memory store root is required` 而非静默写入）。该 blocker 字符串正来自搬迁后的 `projectMemoryLocalStore.ts:99`，证明存储链解析正确。
 - **方法论**：目标路径**必须先核实是否已有同名概念**。`src/context/memory/` 的既存 `ContextMemory` 与 `ProjectMemory` 是两套不同语义，若按目录名机械归并会造成概念混淆。
+
+## [2026-09-18] step3f | browser 域搬迁至 `src/browser/`（分 4 批）。完成。Step 3 收尾。
+- **范围**：228 文件（161 平铺 + `browser/{receipt,runtime,skill}` 67）→ 新建顶层 `src/browser/`，`git mv` 保留历史。
+- **分批依据**（依赖方向，非文件数）：**批次 1 `receipt/`（14）→ 批次 2 `runtime/`（32）→ 批次 3 `skill/`（21）→ 批次 4 平铺（161）**。顺序理由：`runtime` 引用 `skill/runner`+`skill/runtime`，`skill` 引用 `runtime/*`，平铺层被三者共同引用——先搬被依赖者，后续批次的 escaping 边始终指向已存在的路径。
+- **命名未改**：映射表 §5 草案写"平铺实现，命名去掉冗余 browser 前缀"，**本步未执行**。理由：`plan.md §3.3` 将**命名税**列为独立 Step 6；把重命名混进搬迁会让同一个 diff 同时论证两件事（位置变更 + 命名决策）。与 3c/3d/3e 的处理一致。
+- **边数与改写**：
+
+| 批次 | 文件 | 改写 specifier | 涉及文件 |
+|---|---:|---:|---:|
+| 1 receipt | 14 | 46 | 29 |
+| 2 runtime | 32 | 156 | 80 |
+| 3 skill | 21 | 74 | 32 |
+| 4 平铺 | 161 | **1,261** | **257** |
+
+  平铺批次内部耦合 **567 边**（故必须整批搬，拆开要重写两遍）；escaping 87 边（→`runtime/core` 43、`skill/runner` 17、`receipt` 13）；外部 313 边来自 98 个文件（`core/commands`、`core/harness`、`eval/browser`、`entrypoints` 桥）。
+- **过程中的一次返工（如实记录）**：平铺批次首次改写把 specifier 写成了 `.ts` 后缀（我的解析函数返回 `.ts` 路径后直接当 specifier 用），tsc 报 440 条 `TS5097`。**已 `git reset --hard` 回到批次 3 后重做**，而非在错误基础上打补丁。
+- **SCC 前置检查**（§7 强制，每批执行）：四批全部 **搬迁前 0 环 → 搬迁后 0 环**。
+- **验证**（每批均跑）：`tsc -p tsconfig.build.json` **0 错**（全量 tsc 全程 251，与搬迁前一致）；批次相关测试全绿（批1 55 / 批2 80 / 批3 85）；**最终全量 3172 项零失败**（browser 域 58 文件/191 测试全绿）；可达性 production 959 / cliReachable 874 / cliOpaque 85 **不变**；`validate` + `verify:host-surface` PASS；**PTY 实机**——`/browser status`（渲染 Browser capability status + runtime dependency + backend candidates）与 `/browser replay`（渲染 Browser replay + **Browser receipt cache**，一条链路同时覆盖批次 1 与批次 4 的搬迁产物）。
+- **改动纯度**：批次 4 的 140 个变更文件中 **非 import 改动 = 0**。
+- **Step 3 收尾状态**：`core/context/` 只剩 `model/` 6 文件（`ContextLayerId`/`ContextContinuityManifest` 等共享类型层，3a 已判定其正确归属在此）。四域混居问题解决。

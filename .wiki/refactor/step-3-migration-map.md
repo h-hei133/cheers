@@ -107,7 +107,7 @@ packages/ts-shell/src/context/model/    ← 上下文模型（6 文件）
 | 3c | `compact/` → `context/compact/` | 37（实测） | 低 |
 | 3d | `sidebar/` → `presentation/sidebar/` | 18（实测外部）+15（域内 escaping） | 中（触及 `core/commands`） |
 | 3e | `memory/` → `src/memory/` | 46（实测外部）+5（域内 escaping） | 中 |
-| 3f | **browser 域 → `browser/`** | 361 | **高**（触及 CLI 桥 + harness 256 边） |
+| 3f | **browser 域 → `browser/`** | 361（原估）/ 实测分批 1,537 | **高**（触及 CLI 桥 + harness 256 边） |
 
 **3f 必须最后做，且分批**：先 receipt → runtime → skill → 平铺，
 每批后跑相关测试。
@@ -175,6 +175,36 @@ packages/ts-shell/src/context/model/    ← 上下文模型（6 文件）
   `projectMemorySaveCommandRunner` → `projectMemoryLocalStore` →
   `memoryValidation`/`memoryPersistence`，返回 `blocked / Explicit local memory
   store root is required`（该字符串来自搬迁后的 `projectMemoryLocalStore.ts:99`）。
+
+### 3f `browser/` → `src/browser/`（2026-09-18，分 4 批，完成）
+
+- **搬迁**：228 文件（161 平铺 + `browser/{receipt,runtime,skill}` 67）→ 顶层 `src/browser/`。
+- **批次划分与顺序（按依赖方向，非文件数）**：
+
+| 批次 | 内容 | 文件 | 改写 specifier | 涉及文件 |
+|---|---|---:|---:|---:|
+| 1 | `receipt/` | 14 | 46 | 29 |
+| 2 | `runtime/` | 32 | 156 | 80 |
+| 3 | `skill/` | 21 | 74 | 32 |
+| 4 | 平铺 `browser*` / `pw*` / `stealthPreload` | 161 | **1,261** | **257** |
+
+  顺序理由：`runtime` 引用 `skill/runner` + `skill/runtime`；`skill` 引用 `runtime/*`；
+  平铺层被三者共同引用。**先搬被依赖者**，使后续批次的 escaping 边始终指向已存在的路径。
+- **平铺批次必须整批**：内部耦合 **567 边**，拆开会导致同一批边被重写两遍。
+  escaping 87 边（→`runtime/core` 43、`skill/runner` 17、`receipt` 13）；
+  外部 313 边来自 98 文件（`core/commands`、`core/harness`、`eval/browser`、`entrypoints` 桥）。
+- **命名未改（重要）**：§5 草案写"平铺实现，命名去掉冗余 browser 前缀"，
+  **本步未执行**——`plan.md §3.3` 将**命名税**列为独立 Step 6；
+  重命名混入搬迁会让同一 diff 同时论证"位置变更"与"命名决策"。
+- **返工记录**：平铺批次首次改写误产出 `.ts` specifier（解析函数返回 `.ts` 路径后
+  直接当 specifier 用），tsc 报 440 条 `TS5097`。已 `git reset --hard` 回批次 3 后重做。
+- **SCC 前置检查**：四批**全部** 搬迁前 0 环 → 搬迁后 0 环。
+- **验证**：build 0 错（全量 tsc 全程 251 不变）；批次测试 55/80/85 全绿；
+  **全量 3172 项零失败**（browser 域 58 文件/191 测试）；可达性 959/874/85 不变；
+  `validate` + `verify:host-surface` PASS；**PTY 实机** `/browser status` +
+  `/browser replay`（后者一条链路同时覆盖批次 1 与批次 4 的产物）。
+- **改动纯度**：批次 4 的 140 个变更文件**非 import 改动 = 0**。
+- **Step 3 收尾**：`core/context/` 仅剩 `model/` 6 文件（3a 已判定其正确归属）。
 
 ## 7. 验证纪律（§2.4）
 
