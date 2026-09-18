@@ -1,8 +1,8 @@
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import { createBrowserCliExecutionBridge } from "../core/context/browserCliExecutionBridge.js";
 import { loadBrowserCliExecutorInjectionFromEnv } from "../core/context/browserCliExecutorInjection.js";
-import { loadBrowserReceiptCacheManifestFromEnv } from "../core/context/browser/receipt/browserReceiptCacheManifest.js";
-import { createBrowserReceiptCacheStore } from "../core/context/browser/receipt/browserReceiptCacheStore.js";
+import { loadBrowserReceiptCacheManifestFromEnv } from "../browser/receipt/browserReceiptCacheManifest.js";
+import { createBrowserReceiptCacheStore } from "../browser/receipt/browserReceiptCacheStore.js";
 import {
   createBrowserExternalNetworkRunnerHarnessContext,
   loadBrowserExternalNetworkRunnerManifestFromEnv,

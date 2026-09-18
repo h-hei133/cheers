@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { safeReceipt } from "../../browserActionCacheEntry.test.js";
-import { createBrowserPersistentReceiptCacheRecord, createBrowserPersistentReceiptCacheTombstone } from "../../browserPersistentReceiptCache.js";
+import { safeReceipt } from "../../core/context/browserActionCacheEntry.test.js";
+import { createBrowserPersistentReceiptCacheRecord, createBrowserPersistentReceiptCacheTombstone } from "../../core/context/browserPersistentReceiptCache.js";
 import { createBrowserReceiptCacheManifest } from "./browserReceiptCacheManifest.js";
 import { scanBrowserReceiptCacheIntegrity } from "./browserReceiptCacheIntegrity.js";
 

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../context/browser/receipt/browserReceiptCacheManifest.js";
+import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../../browser/receipt/browserReceiptCacheManifest.js";
 import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
@@ -10,7 +10,7 @@ import { BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV } from "../context/browserCliE
 import {
   browserReceiptCacheLockPath,
   type BrowserReceiptCacheLockOperation,
-} from "../context/browser/receipt/browserReceiptCacheLock.js";
+} from "../../browser/receipt/browserReceiptCacheLock.js";
 import {
   buildProjectCliProcessSpec,
   type BuildProjectCliProcessSpecInput,

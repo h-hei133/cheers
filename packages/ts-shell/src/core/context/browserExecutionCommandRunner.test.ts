@@ -12,8 +12,8 @@ import { BrowserPlaywrightCliLocalFixtureExecutor } from "./browserPlaywrightCli
 import { createBrowserPlaywrightAvailability } from "./browserPlaywrightAvailability.js";
 import { BrowserPlaywrightLocalExecutor } from "./browserPlaywrightLocalExecutor.js";
 import { createBrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
-import { createBrowserReceiptCacheManifest } from "./browser/receipt/browserReceiptCacheManifest.js";
-import { createBrowserReceiptCacheStore } from "./browser/receipt/browserReceiptCacheStore.js";
+import { createBrowserReceiptCacheManifest } from "../../browser/receipt/browserReceiptCacheManifest.js";
+import { createBrowserReceiptCacheStore } from "../../browser/receipt/browserReceiptCacheStore.js";
 
 describe("browser execution command runner", () => {
   it("blocks /browser execute without an injected executor", async () => {

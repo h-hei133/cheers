@@ -1,4 +1,4 @@
-import type { BrowserReceiptCacheStore } from "./browser/receipt/browserReceiptCacheStore.js";
+import type { BrowserReceiptCacheStore } from "../../browser/receipt/browserReceiptCacheStore.js";
 import type { BrowserSelfHealingApplyPlan } from "./browserSelfHealingApplyPlan.js";
 import { writeBrowserSelfHealingManifestPatch, type BrowserSelfHealingManifestPatchWriteResult } from "./browserSelfHealingManifestPatchWriter.js";
 import type { BrowserSelfHealingManifestPatchKind } from "./browserSelfHealingManifestPatch.js";

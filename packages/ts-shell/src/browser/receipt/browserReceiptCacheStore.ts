@@ -11,14 +11,14 @@ import {
   createBrowserPersistentReceiptCacheRecord,
   createBrowserPersistentReceiptCacheTombstone,
   type BrowserPersistentReceiptCacheRecord,
-} from "../../browserPersistentReceiptCache.js";
+} from "../../core/context/browserPersistentReceiptCache.js";
 import {
   browserReceiptCacheFilePath,
   readBrowserReceiptCacheRecordsForRecovery,
   serializeBrowserReceiptCacheRecords,
   writeBrowserReceiptCacheFileAtomic,
 } from "./browserReceiptCacheRecovery.js";
-import type { BrowserExecutionReceipt } from "../../browserExecutionReceipt.js";
+import type { BrowserExecutionReceipt } from "../../core/context/browserExecutionReceipt.js";
 import type { BrowserReceiptCacheManifest } from "./browserReceiptCacheManifest.js";
 
 export interface BrowserReceiptCacheStore {

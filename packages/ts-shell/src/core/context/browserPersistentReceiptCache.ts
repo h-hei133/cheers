@@ -4,7 +4,7 @@ import {
   type BrowserActionCacheEntry,
 } from "./browserActionCacheEntry.js";
 import type { BrowserExecutionReceipt } from "./browserExecutionReceipt.js";
-import type { BrowserReceiptCacheSource } from "./browser/receipt/browserReceiptCacheManifest.js";
+import type { BrowserReceiptCacheSource } from "../../browser/receipt/browserReceiptCacheManifest.js";
 
 export type BrowserPersistentReceiptCacheRecordVersion = "browser-persistent-receipt-cache/v1";
 export type BrowserPersistentReceiptCacheRecordStatus = "active" | "invalidated" | "deleted";

@@ -9,7 +9,7 @@ import {
   type BrowserReplayPolicyDecision,
 } from "./browserReplayPolicy.js";
 import type { BrowserPersistentReceiptCacheRecordStatus } from "./browserPersistentReceiptCache.js";
-import type { BrowserReceiptCacheIntegrityStatus } from "./browser/receipt/browserReceiptCacheIntegrity.js";
+import type { BrowserReceiptCacheIntegrityStatus } from "../../browser/receipt/browserReceiptCacheIntegrity.js";
 
 export interface BrowserReplayPlan {
   readonly replayPlanId: string;

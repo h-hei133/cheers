@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createBrowserActionCache } from "./browserActionCache.js";
 import { createBrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
-import { createBrowserReceiptCacheManifest } from "./browser/receipt/browserReceiptCacheManifest.js";
-import { createBrowserReceiptCacheStore } from "./browser/receipt/browserReceiptCacheStore.js";
+import { createBrowserReceiptCacheManifest } from "../../browser/receipt/browserReceiptCacheManifest.js";
+import { createBrowserReceiptCacheStore } from "../../browser/receipt/browserReceiptCacheStore.js";
 import { createBrowserSandboxAuthority } from "./browserSandboxAuthority.js";
 import { FakeBrowserExecutor } from "./browserExecutor.js";
 import { runBrowserReplayCommand } from "./browserReplayCommandRunner.js";
