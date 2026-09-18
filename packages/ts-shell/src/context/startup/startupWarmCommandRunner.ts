@@ -1,4 +1,4 @@
-import type { ProjectMemoryStore } from "../../core/context/memory/projectMemoryStoreContract.js";
+import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract.js";
 import { buildStartupWarmContext } from "./startupWarmContextBuilder.js";
 import type { StartupWarmCommandRequest } from "./startupWarmCommandContract.js";
 import { renderStartupWarmContextSurface } from "./startupWarmContextSurface.js";

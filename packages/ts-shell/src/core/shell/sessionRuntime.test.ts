@@ -11,8 +11,8 @@ import {
   createCompactLiveCheckpointStore,
   updateLatestCompactCheckpoint,
 } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
-import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
-import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
+import { createProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
+import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
 import { runAgentLoopContract } from "../../runtime/loop/contract.js";
 import { projectProductLoopAdapter } from "../../runtime/loop/adapter.js";
 import { projectLoopTrajectory } from "../../runtime/loop/trajectory.js";

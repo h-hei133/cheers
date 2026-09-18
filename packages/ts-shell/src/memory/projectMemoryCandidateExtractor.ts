@@ -1,9 +1,9 @@
-import type { CompactContinuityPacket } from "../../../context/compact/continuity/compactContinuityPacket.js";
+import type { CompactContinuityPacket } from "../context/compact/continuity/compactContinuityPacket.js";
 import type {
   ContextProjectionFact,
   ContextStateProjection,
   ContextStateProjectionInput,
-} from "../model/contextStateProjection.js";
+} from "../core/context/model/contextStateProjection.js";
 import {
   createProjectMemoryCandidate,
   dedupeProjectMemoryCandidates,

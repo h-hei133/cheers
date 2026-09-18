@@ -5,8 +5,8 @@ import type {
 } from "../../session/SessionManager.js";
 import type { CompactLiveCheckpointStore } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import type { CompactInjectionStateStore } from "../../context/compact/injection/compactInjectionState.js";
-import type { ProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
-import type { ProjectMemoryStore } from "../context/memory/projectMemoryStoreContract.js";
+import type { ProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
+import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract.js";
 import type { QueryEvent } from "../query/runtime/events.js";
 import type { QueryRuntimeStateSeed } from "../query/runtime/state.js";
 import {

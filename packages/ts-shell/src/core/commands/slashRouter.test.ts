@@ -7,9 +7,9 @@ import {
   getLatestCompactCheckpoint,
 } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import { createCompactInjectionStateStore } from "../../context/compact/injection/compactInjectionState.js";
-import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
-import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
-import { createProjectMemoryReviewStateStore } from "../context/memory/projectMemoryReviewState.js";
+import { createProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
+import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
+import { createProjectMemoryReviewStateStore } from "../../memory/projectMemoryReviewState.js";
 import { createSidebarLiveEventStore } from "../../presentation/sidebar/sidebarLiveEventStore.js";
 import { createStartupWarmContextCacheStore } from "../../context/startup/startupWarmContextHealth.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";

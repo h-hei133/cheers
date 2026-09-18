@@ -11,9 +11,9 @@ import { planCompactFutureTurnInjection } from "../../context/compact/injection/
 import {
   DEFAULT_PROJECT_MEMORY_INJECTION_STATE_STORE,
   type ProjectMemoryInjectionStateStore,
-} from "../context/memory/projectMemoryInjectionState.js";
-import { planProjectMemoryFutureTurnInjection } from "../context/memory/projectMemoryFutureTurnInjection.js";
-import type { ProjectMemoryStore } from "../context/memory/projectMemoryStoreContract.js";
+} from "../../memory/projectMemoryInjectionState.js";
+import { planProjectMemoryFutureTurnInjection } from "../../memory/projectMemoryFutureTurnInjection.js";
+import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract.js";
 
 export interface SessionFutureTurnProjectionDependencies {
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;

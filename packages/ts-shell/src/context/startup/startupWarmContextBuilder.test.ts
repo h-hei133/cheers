@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createProjectMemoryLocalStore } from "../../core/context/memory/projectMemoryLocalStore.js";
-import type { ProjectMemoryRecord } from "../../core/context/memory/projectMemoryStoreContract.js";
+import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
+import type { ProjectMemoryRecord } from "../../memory/projectMemoryStoreContract.js";
 import { buildStartupWarmContext } from "./startupWarmContextBuilder.js";
 import { startupWarmCacheHasForbiddenContent } from "./startupWarmContextCache.js";
 

@@ -106,7 +106,7 @@ packages/ts-shell/src/context/model/    ← 上下文模型（6 文件）
 | 3b | `startup/` → `context/startup/` | 5 | 低 |
 | 3c | `compact/` → `context/compact/` | 37（实测） | 低 |
 | 3d | `sidebar/` → `presentation/sidebar/` | 18（实测外部）+15（域内 escaping） | 中（触及 `core/commands`） |
-| 3e | `memory/` → `memory/` | 31 | 中 |
+| 3e | `memory/` → `src/memory/` | 46（实测外部）+5（域内 escaping） | 中 |
 | 3f | **browser 域 → `browser/`** | 361 | **高**（触及 CLI 桥 + harness 256 边） |
 
 **3f 必须最后做，且分批**：先 receipt → runtime → skill → 平铺，
@@ -156,6 +156,25 @@ packages/ts-shell/src/context/model/    ← 上下文模型（6 文件）
   可达性 959/874/85 不变；`validate` + `verify:host-surface` 通过；
   **PTY 实机** `/sidebar panel` 渲染完整面板（含 Compact / Memory / Warmup 三节，
   正是本次改写的跨域边链路）。
+
+### 3e `memory/` → `src/memory/`（2026-09-18，完成）
+
+- **搬迁**：`core/context/memory/` 全部 41 文件 → **顶层 `src/memory/`**，`git mv` 保留历史。
+- **目标路径核实（关键）**：`src/context/memory/` **已存在但是另一个概念** ——
+  `ContextMemory`（工作区上下文复用 / 陈旧失效，41 个 `ContextMemory*` 类型，
+  依赖 `context/acquisition/graph` + `context/discovery/scan`），
+  与项目记忆（`ProjectMemory*`）**语义无关**。故不并入 `context/memory/`，
+  改设顶层 `src/memory/`。映射表原表述 `memory/ → memory/` 含糊。
+- **边数修正**：原估 31 边。实测**外部边 46 条 / 15 文件**（生产 36/11，测试 10/4）
+  + **域内 escaping 边 5 条 / 3 文件**，合计 **51 条改写 / 18 文件**。
+- **最大外部引用者**：`core/commands/memoryCommandRuntime.ts`（12 条）。
+- **搬迁前 SCC 检查**：搬迁前 0 环 → 搬迁后 0 环。
+- **验证**：build 0 错；相关域 75 文件/438 测试全绿；全量 **3172 项零失败**；
+  可达性 959/874/85 不变；`validate` + `verify:host-surface` PASS；
+  **PTY 实机** `/memory` 渲染完整 review 面板，`/memory save` 走
+  `projectMemorySaveCommandRunner` → `projectMemoryLocalStore` →
+  `memoryValidation`/`memoryPersistence`，返回 `blocked / Explicit local memory
+  store root is required`（该字符串来自搬迁后的 `projectMemoryLocalStore.ts:99`）。
 
 ## 7. 验证纪律（§2.4）
 

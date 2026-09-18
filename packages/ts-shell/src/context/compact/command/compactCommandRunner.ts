@@ -7,12 +7,12 @@ import {
   type CompactCommandRequest,
   type CompactCommandRequestInput,
 } from "./compactCommandContract.js";
-import { extractProjectMemoryCandidates } from "../../../core/context/memory/projectMemoryCandidateExtractor.js";
-import type { ProjectMemoryCandidate } from "../../../core/context/memory/projectMemoryCandidate.js";
+import { extractProjectMemoryCandidates } from "../../../memory/projectMemoryCandidateExtractor.js";
+import type { ProjectMemoryCandidate } from "../../../memory/projectMemoryCandidate.js";
 import {
   evaluateProjectMemoryCandidateQuality,
   type ProjectMemoryCandidateQualityResult,
-} from "../../../core/context/memory/projectMemoryCandidateQuality.js";
+} from "../../../memory/projectMemoryCandidateQuality.js";
 import { buildRouteContinuityHandoffPacket } from "../continuity/routeContinuityHandoff.js";
 
 export interface CompactCommandRunResult {

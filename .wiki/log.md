@@ -301,3 +301,12 @@
 - **搬迁前做的关键检查（映射表未做）**：`core/context/browserCapabilityModel.ts`（生产）`import { sanitizeSidebarText } from "./sidebar/sidebarStateModel.js"` —— 这是 **`core/ → presentation/` 的反向依赖**。核验方式：①对全仓 import 图跑 Tarjan SCC，**搬迁前 0 个环**；②按搬迁后路径重建图再跑，**仍 0 个环**（因 sidebar 生产侧不反向引用 browserCapabilityModel，仅 `sidebarCommandEventAdapter` 经 `core/commands/types` 间接触达）。③核实该形态**已有先例**：`core -> presentation` 现存 4 条边（`hotkeyCommandRuntime`、`cliSessionProductSurface`），非本步引入的新架构形态。
 - **验证**：① `tsc -p tsconfig.build.json` **0 错**，全量 tsc 251（与搬迁前一致）；② 相关域 30 文件/190 测试全绿；③ **全量 3172 项零失败**；④ 可达性 production 959 / cliReachable 874 / cliOpaque 85 **不变**；⑤ `npm run validate` PASS、`verify:host-surface` passed；⑥ **PTY 实机**——真实 TUI 执行 `/sidebar panel`，渲染完整面板（Visible agent state / Task / Edit / **Compact** / **Memory** / **Warmup** / Tools / Validation / Boundary），其中 Compact/Memory/Warmup 三节正是本次改写的跨域边所在链路，证明搬迁后投影链完好。
 - **方法论**：搬迁前对 import 图跑 SCC 是**零成本、高价值**的前置检查——本步若存在环，`tsc` 不会报（类型解析成功），只有 NormProof judge 或运行时才暴露。已作为后续 3e/3f 的固定前置。
+
+## [2026-09-18] step3e | `memory/` 域搬迁至 `src/memory/`。完成。
+- **搬迁**：`core/context/memory/` 全部 **41 文件** → `src/memory/`（新建顶层域），`git mv` 保留历史。
+- **目标路径核实**：`src/context/memory/` **已存在但是另一个概念**——`ContextMemory`（工作区上下文复用/陈旧失效，41 个 `ContextMemory*` 类型），与项目记忆（`ProjectMemory*`）无关。故不能并入，改设**顶层 `src/memory/`**。映射表原判 `memory/ → memory/` 表述含糊，实际为 `core/context/memory/ → src/memory/`。
+- **边数修正**：原估 31 边。实测**外部边 46 条 / 15 文件**（生产 36/11，测试 10/4）+ **域内 escaping 边 5 条 / 3 文件**，合计 **51 条改写 / 18 文件**。
+- **外部引用者**：`core/commands/memoryCommandRuntime.ts`（12 条，最大）、`presentation/sidebar/sidebarStateProjection{,.test}`、`core/shell/session{Runtime,FutureTurnProjection}`、`core/harness/agentScenario{Fixtures,Runner}`、`context/compact/{command,delivery}`、`context/startup/*`、`core/commands/types`。
+- **搬迁前 SCC 检查**（§7 强制）：搬迁前 **0 环**、按新路径重建图后 **0 环**。
+- **验证**：① build **0 错**，全量 tsc 251（与搬迁前一致）；② 相关域 75 文件/**438 测试全绿**；③ **全量 3172 项零失败**；④ 可达性 959/874/85 **不变**；⑤ `validate` + `verify:host-surface` PASS；⑥ **PTY 实机**——真实 TUI 执行 `/memory`（渲染完整 Project memory review 面板）与 `/memory save <text>`（走 `projectMemorySaveCommandRunner` → `projectMemoryLocalStore` → `memoryValidation`/`memoryPersistence`，正确返回 `blocked / Explicit local memory store root is required` 而非静默写入）。该 blocker 字符串正来自搬迁后的 `projectMemoryLocalStore.ts:99`，证明存储链解析正确。
+- **方法论**：目标路径**必须先核实是否已有同名概念**。`src/context/memory/` 的既存 `ContextMemory` 与 `ProjectMemory` 是两套不同语义，若按目录名机械归并会造成概念混淆。

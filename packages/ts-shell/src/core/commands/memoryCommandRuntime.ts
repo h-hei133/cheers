@@ -2,35 +2,35 @@ import {
   getLatestCompactCheckpoint,
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
 } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
-import { extractProjectMemoryCandidates } from "../context/memory/projectMemoryCandidateExtractor.js";
+import { extractProjectMemoryCandidates } from "../../memory/projectMemoryCandidateExtractor.js";
 import {
   parseProjectMemoryReviewCommandArgs,
   ProjectMemoryReviewCommandContractError,
-} from "../context/memory/projectMemoryReviewCommandContract.js";
-import { runProjectMemoryReviewCommand } from "../context/memory/projectMemoryReviewCommandRunner.js";
+} from "../../memory/projectMemoryReviewCommandContract.js";
+import { runProjectMemoryReviewCommand } from "../../memory/projectMemoryReviewCommandRunner.js";
 import {
   parseProjectMemoryRecallCommandArgs,
   ProjectMemoryRecallCommandContractError,
-} from "../context/memory/projectMemoryRecallCommandContract.js";
-import { runProjectMemoryRecallCommand } from "../context/memory/projectMemoryRecallCommandRunner.js";
+} from "../../memory/projectMemoryRecallCommandContract.js";
+import { runProjectMemoryRecallCommand } from "../../memory/projectMemoryRecallCommandRunner.js";
 import {
   parseProjectMemoryDeleteCommandArgs,
   ProjectMemoryDeleteCommandContractError,
-} from "../context/memory/projectMemoryDeleteCommandContract.js";
-import { runProjectMemoryDeleteCommand } from "../context/memory/projectMemoryDeleteCommandRunner.js";
+} from "../../memory/projectMemoryDeleteCommandContract.js";
+import { runProjectMemoryDeleteCommand } from "../../memory/projectMemoryDeleteCommandRunner.js";
 import {
   parseProjectMemoryUseCommandArgs,
   ProjectMemoryUseCommandContractError,
-} from "../context/memory/projectMemoryUseCommandContract.js";
-import { runProjectMemoryUseCommand } from "../context/memory/projectMemoryUseCommandRunner.js";
+} from "../../memory/projectMemoryUseCommandContract.js";
+import { runProjectMemoryUseCommand } from "../../memory/projectMemoryUseCommandRunner.js";
 import {
   parseProjectMemorySaveCommandArgs,
   ProjectMemorySaveCommandContractError,
-} from "../context/memory/projectMemorySaveCommandContract.js";
-import { runProjectMemorySaveCommand } from "../context/memory/projectMemorySaveCommandRunner.js";
+} from "../../memory/projectMemorySaveCommandContract.js";
+import { runProjectMemorySaveCommand } from "../../memory/projectMemorySaveCommandRunner.js";
 import {
   DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE,
-} from "../context/memory/projectMemoryReviewState.js";
+} from "../../memory/projectMemoryReviewState.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import {
