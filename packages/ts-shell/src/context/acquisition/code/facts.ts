@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
-import type { ContextGraph, ContextGraphEdgeKind, ContextGraphNode } from "../../../orchestration/contextGraph.js";
-import type { TargetedContextPacket } from "../../../orchestration/contextPacket.js";
+import type { ContextGraph, ContextGraphEdgeKind, ContextGraphNode } from "../../graph/contextGraph.js";
+import type { TargetedContextPacket } from "../../graph/contextPacket.js";
 import type { TestImpactPlan } from "../../../orchestration/testImpactPlan.js";
 
 export type CodeGraphFactKind =

@@ -1,10 +1,10 @@
 import crypto from "node:crypto";
 
 import type { AgentPlan } from "../task/agentPlan.js";
-import type { ContextGraph } from "../../orchestration/contextGraph.js";
-import type { ContextGraphScore } from "../../orchestration/contextGraphScore.js";
-import { buildContextGraphReadinessFacts, type ContextGraphReadinessFacts } from "../../orchestration/contextGraphReadiness.js";
-import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import type { ContextGraph } from "../../context/graph/contextGraph.js";
+import type { ContextGraphScore } from "../../context/graph/contextGraphScore.js";
+import { buildContextGraphReadinessFacts, type ContextGraphReadinessFacts } from "../../context/graph/contextGraphReadiness.js";
+import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
 import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
 
 export interface VerificationCommandPlanLike {

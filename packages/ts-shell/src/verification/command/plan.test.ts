@@ -3,7 +3,7 @@ import { buildAgentPlan } from "../../planning/task/agentPlan.js";
 import { buildCodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import { normalizeCodeGraphFacts } from "../../context/acquisition/code/facts.js";
 import { buildCodeGraphTrace } from "../../context/acquisition/code/trace.js";
-import { buildContextGraph } from "../../orchestration/contextGraph.js";
+import { buildContextGraph } from "../../context/graph/contextGraph.js";
 import { buildPlanQuality } from "../../planning/quality/model.js";
 import {
   buildVerificationCommandPlan,

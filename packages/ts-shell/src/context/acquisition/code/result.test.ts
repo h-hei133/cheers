@@ -4,7 +4,7 @@ import { buildCodeGraphImpact } from "./impact.js";
 import { normalizeCodeGraphFacts } from "./facts.js";
 import { buildCodeGraphResult } from "./result.js";
 import { buildCodeGraphTrace } from "./trace.js";
-import { buildContextGraph } from "../../../orchestration/contextGraph.js";
+import { buildContextGraph } from "../../graph/contextGraph.js";
 
 describe("buildCodeGraphResult", () => {
   it("renders replay-safe result surface evidence for impact queries", () => {

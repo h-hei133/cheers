@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import type { AgentPlan } from "../planning/task/agentPlan.js";
-import type { TargetedContextPacket } from "./contextPacket.js";
+import type { TargetedContextPacket } from "../context/graph/contextPacket.js";
 import {
   buildEditRepairContext,
   buildEditRepairContextFromCodingResult,

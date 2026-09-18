@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { checkCodeGraphStaleness } from "./staleness.js";
-import { buildContextGraph } from "../../../orchestration/contextGraph.js";
+import { buildContextGraph } from "../../graph/contextGraph.js";
 
 let workspaceRoot: string;
 

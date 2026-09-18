@@ -2,8 +2,8 @@ import crypto from "node:crypto";
 
 import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import type { CodeGraphStalenessCheck } from "../../context/acquisition/code/staleness.js";
-import type { ContextGraphScore } from "../../orchestration/contextGraphScore.js";
-import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import type { ContextGraphScore } from "../../context/graph/contextGraphScore.js";
+import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
 import type { TaskContextAcquisition } from "./taskContextAcquisition.js";
 import type { TaskContextNeedSet } from "./taskContextNeed.js";
 import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";

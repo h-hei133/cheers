@@ -1,6 +1,6 @@
 import { isAllowlistedRunCommand } from "./capabilityBoundaryProjection.js";
-import type { ContextGraph } from "./contextGraph.js";
-import type { ContextGraphScore } from "./contextGraphScore.js";
+import type { ContextGraph } from "../context/graph/contextGraph.js";
+import type { ContextGraphScore } from "../context/graph/contextGraphScore.js";
 
 export interface TestImpactVerificationCandidate {
   readonly command: string;

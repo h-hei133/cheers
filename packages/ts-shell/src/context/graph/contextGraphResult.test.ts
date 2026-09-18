@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ContextGraph } from "./contextGraph.js";
 import type { ContextGraphScore } from "./contextGraphScore.js";
 import { buildContextGraphResult } from "./contextGraphResult.js";
-import type { TestImpactPlan } from "./testImpactPlan.js";
+import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
 
 describe("buildContextGraphResult", () => {
   it("projects graph and test-impact facts without raw content", () => {

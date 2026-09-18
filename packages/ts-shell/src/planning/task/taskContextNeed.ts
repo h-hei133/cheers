@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
 
 import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
-import type { ContextGraph } from "../../orchestration/contextGraph.js";
-import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import type { ContextGraph } from "../../context/graph/contextGraph.js";
+import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
 import type { TaskIntent, TaskIntentKind } from "./taskIntent.js";
 import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
 

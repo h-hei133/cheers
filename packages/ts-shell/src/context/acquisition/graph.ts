@@ -4,19 +4,19 @@ import {
   projectWorkflowTaskPlanToAgentPlan,
 } from "../../planning/task/agentPlanProjection.js";
 import type { AgentPlan } from "../../planning/task/agentPlan.js";
-import { buildContextGraphResult, type ContextGraphResultProjection } from "../../orchestration/contextGraphResult.js";
-import { discoverContextGraph } from "../../orchestration/contextGraphDiscovery.js";
-import { scoreContextGraph, type ContextGraphScore } from "../../orchestration/contextGraphScore.js";
+import { buildContextGraphResult, type ContextGraphResultProjection } from "../graph/contextGraphResult.js";
+import { discoverContextGraph } from "../graph/contextGraphDiscovery.js";
+import { scoreContextGraph, type ContextGraphScore } from "../graph/contextGraphScore.js";
 import {
   buildContextPacketResult,
   type ContextPacketResultProjection,
-} from "../../orchestration/contextPacketResult.js";
+} from "../graph/contextPacketResult.js";
 import {
   buildTargetedContextPacket,
   type TargetedContextPacket,
-} from "../../orchestration/contextPacket.js";
+} from "../graph/contextPacket.js";
 import { buildTestImpactPlan, type TestImpactPlan } from "../../orchestration/testImpactPlan.js";
-import type { ContextGraph } from "../../orchestration/contextGraph.js";
+import type { ContextGraph } from "../graph/contextGraph.js";
 import {
   attachPlanQualityToAgentPlan,
   buildPlanQuality,

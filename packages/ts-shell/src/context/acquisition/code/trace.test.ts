@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { normalizeCodeGraphFacts } from "./facts.js";
 import { buildCodeGraphTrace } from "./trace.js";
-import { buildContextGraph } from "../../../orchestration/contextGraph.js";
+import { buildContextGraph } from "../../graph/contextGraph.js";
 
 describe("buildCodeGraphTrace", () => {
   it("creates deterministic trace counts with no mutation authority", () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildContextGraph } from "./contextGraph.js";
 import { buildContextGraphReadinessFacts } from "./contextGraphReadiness.js";
 import { scoreContextGraph } from "./contextGraphScore.js";
-import { buildTestImpactPlan } from "./testImpactPlan.js";
+import { buildTestImpactPlan } from "../../orchestration/testImpactPlan.js";
 
 describe("contextGraphReadiness", () => {
   it("projects graph and test-impact facts without raw content", () => {

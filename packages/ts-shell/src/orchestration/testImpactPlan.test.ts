@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { ContextGraph } from "./contextGraph.js";
-import type { ContextGraphScore } from "./contextGraphScore.js";
+import type { ContextGraph } from "../context/graph/contextGraph.js";
+import type { ContextGraphScore } from "../context/graph/contextGraphScore.js";
 import { buildTestImpactPlan } from "./testImpactPlan.js";
 
 describe("buildTestImpactPlan", () => {

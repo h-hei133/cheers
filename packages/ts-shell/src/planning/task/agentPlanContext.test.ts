@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { projectContextPacketToAgentPlanContext } from "./agentPlanContext.js";
-import type { ContextGraph } from "../../orchestration/contextGraph.js";
-import type { ContextGraphScore } from "../../orchestration/contextGraphScore.js";
-import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import type { ContextGraph } from "../../context/graph/contextGraph.js";
+import type { ContextGraphScore } from "../../context/graph/contextGraphScore.js";
+import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
 import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
 
 describe("projectContextPacketToAgentPlanContext", () => {

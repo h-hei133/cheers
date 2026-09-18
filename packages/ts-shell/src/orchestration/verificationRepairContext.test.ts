@@ -4,7 +4,7 @@ import {
   buildVerificationRepairContext,
   buildVerificationRepairContextFromCodingResult,
 } from "./verificationRepairContext.js";
-import type { TargetedContextPacket } from "./contextPacket.js";
+import type { TargetedContextPacket } from "../context/graph/contextPacket.js";
 import type { CodingResultSummary } from "./types.js";
 
 describe("verificationRepairContext", () => {

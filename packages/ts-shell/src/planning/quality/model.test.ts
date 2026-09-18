@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentPlan } from "../task/agentPlan.js";
-import { buildContextGraph } from "../../orchestration/contextGraph.js";
-import { scoreContextGraph } from "../../orchestration/contextGraphScore.js";
+import { buildContextGraph } from "../../context/graph/contextGraph.js";
+import { scoreContextGraph } from "../../context/graph/contextGraphScore.js";
 import { buildPlanQuality, attachPlanQualityToAgentPlan, attachProviderAnchoringToPlanQuality } from "./model.js";
-import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
+import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
 import { buildTestImpactPlan } from "../../orchestration/testImpactPlan.js";
 import { normalizeCodeGraphFacts } from "../../context/acquisition/code/facts.js";
 import { buildCodeGraphTrace } from "../../context/acquisition/code/trace.js";

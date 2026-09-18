@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { buildCodeGraphImpact } from "./impact.js";
 import { normalizeCodeGraphFacts } from "./facts.js";
 import { buildCodeGraphTrace } from "./trace.js";
-import { buildContextGraph } from "../../../orchestration/contextGraph.js";
-import { scoreContextGraph } from "../../../orchestration/contextGraphScore.js";
+import { buildContextGraph } from "../../graph/contextGraph.js";
+import { scoreContextGraph } from "../../graph/contextGraphScore.js";
 import { buildTestImpactPlan } from "../../../orchestration/testImpactPlan.js";
 
 describe("buildCodeGraphImpact", () => {
