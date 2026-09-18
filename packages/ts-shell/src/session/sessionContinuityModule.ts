@@ -371,11 +371,12 @@ export function findLastCodingCompletionEvent(
     if (event.event.type !== "query.completed") {
       continue;
     }
-    if (event.event.result.codingResult) {
+    const codingResult = event.event.result.codingResult;
+    if (codingResult) {
       const typedEvent = event as Extract<TranscriptEvent, { type: "query-event" }> & {
         event: Extract<QueryEvent, { type: "query.completed" }>;
       };
-      if (typedEvent.event.result.codingResult.taskKind !== "chat") {
+      if (codingResult.taskKind !== "chat") {
         return typedEvent;
       }
       if (!fallback) {

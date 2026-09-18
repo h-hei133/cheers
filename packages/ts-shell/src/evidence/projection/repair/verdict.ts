@@ -60,7 +60,7 @@ export function buildRepairVerdictProofInput(input: {
     originalFailureStatus: verification.originalFailureStatus,
     originalReceiptIds: [...verification.originalRuntimeReceiptIds],
     repairProposalId: verification.sourceRepairProposalId,
-    repairAuthorityState: verification.repairAuthorityState,
+    repairAuthorityState: verification.repairAuthorityState ?? "unknown",
     repairApplyState: verification.repairApplyState,
     repairTouchedTargetSummaries: [...verification.touchedTargetSummaries],
     repairApplyReceiptIds: [...verification.repairApplyReceiptIds],

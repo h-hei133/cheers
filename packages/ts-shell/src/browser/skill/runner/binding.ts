@@ -157,9 +157,10 @@ export function validateBrowserSkillRunnerBinding(
     ? {
         command: sanitizeBrowserText(value.runnerCommand.command, 240),
         args: value.runnerCommand.args.map((arg) => sanitizeBrowserText(arg, 240)),
-        cwd: stringValue(value.runnerCommand.cwd)
-          ? sanitizeBrowserText(value.runnerCommand.cwd, 240)
-          : undefined,
+        cwd: (() => {
+          const cwd = stringValue(value.runnerCommand.cwd);
+          return cwd ? sanitizeBrowserText(cwd, 240) : undefined;
+        })(),
       }
     : undefined;
   if ((value.mode === "test-local-process" || value.mode === "external-local-process") && !runnerCommand) {

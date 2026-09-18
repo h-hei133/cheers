@@ -69,7 +69,7 @@ export function projectHostJsonResponse(input: {
   const lastEventOrder = events.at(-1)?.order;
   const exit = classifyHostExit(response);
 
-  return Object.freeze({
+  return Object.freeze<HostJsonResponse>({
     schemaVersion: "host-json-response.v1",
     commandId,
     action: response.action,

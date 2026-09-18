@@ -1011,3 +1011,40 @@
   改为**只在镜像块内**做替换后恢复。教训：批量文本替换必须限定作用域。
 - **残余**：生产 strict 剩 **37 处**，散在 ~13 个模块（最大单文件 6 处），
   无单点大头 → 属 A3 范围。
+
+## [2026-09-18] strict-s3 | S3 完成：37 处生产 strict 错误清零，**生产已正式开启 strict**。
+- **形态与 S1/S2 完全不同**：37 处散在 **24 个文件**（最大单文件 6 处），无单点大头，
+  故**逐文件定因**而非套用模板。按错误码：TS2322 ×17、TS2345 ×10、TS18048 ×6、
+  TS7022/7023/TS2722/TS2366 各 1。
+- **四类根因**（均未使用 `!` 或 `as`）：
+  1. **判别联合被兜底成员破坏收窄**（`core/query/runtime/observation.ts` 6 错）：
+     `RuntimeObservationEvent` 末尾的 `{ type: string; 全字段可选 }` 使 `event.type === 'tool.result'`
+     无法收窄出 `toolName`/`taskId`。真实生产者（`actionAuthority.ts:95` 的 `output.events`）
+     只产生 `tool.result` / `tool.started` 两形态 → **删除兜底成员**，6 错全清。
+     （与 S2 fix③ 同源；这是本仓第二次遇到该反模式。）
+  2. **可选性谎报**（`evidence/projection/repair/verdict.ts`、`planning/runtime/engine.ts`、
+     `session/replay/host/facts.ts`、`session/agent/persistence.ts`、`core/mcp/client.ts` 等）：
+     消费侧读的字段在生产侧是可选的，投影里却当必填写。
+  3. **自引用导致的推断失败**（`cli/runtime/cliSessionRuntimeFactory.ts` TS7022/7023）：
+     `sessionRuntime` 在自己的初始化器内被引用（`runPrompt → sessionRuntime.getViewMode()`），
+     推断无法收敛 → 给 const 与 `runPrompt` 标注显式类型（`ShellSessionRuntime` / `PromptRun`）。
+  4. **契约可选性不一致**（`core/shell/signalHandlers.ts`、`cli/interactive/interactiveLoop.ts`、
+     `cli/bootstrap/cliProcessRunner.ts`）：`handleShellSigint` 声明需要 `readline` 与
+     `exit(code: number)`，但它只是转发给 `handleShellClose`（后者接受 `readline?:` 与可选 code）。
+     收窄为真实需要后 3 错消除。
+- **启用**：`tsconfig.build.json` 加 `"strict": true`（`tsconfig.json` 保持不动，
+  故测试文件的 258 个既有错误不受影响、不被放大）。
+- **测量**：
+  - 生产 strict 错误：**37 → 0**（全仓 **136 → 0**）；
+  - `npm run build`（真实产物构建，带 strict）：**0 错误**；
+  - 全包 strict：**401 → 258**（余下全部在测试文件，属 S4 范围）；
+  - 非 strict 全量：**244 = 244**（零新增）；
+  - SCC：**1480 文件 0 环**；
+  - 聚焦测试：harness **35 文件 221 项全绿**；广泛聚焦 **346 文件 2467 项通过**；
+  - **零 `!`、零 `as`**（对 diff 实测）。
+- **执行中的一次真实回归（已修复并记教训）**：首轮把 `cliExecutionBridge.ts` 的复合守卫
+  `(status!=='valid' || !fixture || (!manifest && !externalRunnerManifest))` 拆成两个独立守卫，
+  使 `externalRunnerManifest` 存在但 `manifest` 缺失的路径被新守卫提前拦截 →
+  **41 项 harness 测试失败**（`future-skill-required` 不再输出）。
+  修复方式：恢复复合守卫的语义，另用**早返回**在外部 runner 分支之后收敛 `manifest`。
+  **教训：拆复合守卫必须逐分支验证可达性——`tsc` 绿灯不代表路径语义不变。**

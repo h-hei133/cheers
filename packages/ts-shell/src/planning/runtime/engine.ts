@@ -411,7 +411,10 @@ function buildPlanningRuntimePlanQualityFacts(input: {
     planId,
     taskKind: input.context.workflowPlan.taskKind,
     planningMode,
-    contextSufficiencyInput: bundle?.taskContextSufficiency.state ?? input.context.memory.contextSufficiencyState,
+    contextSufficiencyInput:
+      bundle?.taskContextSufficiency.state ??
+      input.context.memory.contextSufficiencyState ??
+      "unknown",
     contextSourceIds: unique([
       input.context.engineId,
       input.context.repo.snapshot.snapshotId,

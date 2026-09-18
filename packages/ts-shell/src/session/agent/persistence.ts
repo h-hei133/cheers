@@ -73,5 +73,5 @@ export function handleBuildSessionStateSnapshot(
   current?: SessionStateSnapshot | null,
   overrides?: SessionStateSnapshotOverrides,
 ): SessionStateSnapshot {
-  return buildSessionStateSnapshot(session, current, overrides);
+  return buildSessionStateSnapshot(session, current ?? undefined, overrides);
 }

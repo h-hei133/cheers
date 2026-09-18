@@ -55,13 +55,13 @@ export function decideBrowserPublicReadOnlyWebPolicy(input: {
   const method = normalizeMethod(input.method);
   const manifest = input.manifestLoad?.status === "valid" ? input.manifestLoad.manifest : undefined;
   if (input.manifestLoad?.status !== "valid" || !manifest) {
-    return decision("blocked-no-manifest", safeTargetUrl, targetOrigin, method, input.request, "Public read-only web execution requires an explicit manifest.", undefined, ["missing-public-readonly-manifest"], [], "Provide a route-scoped public read-only manifest.");
+    return decision("blocked-no-manifest", safeTargetUrl, targetOrigin, method ?? "GET", input.request, "Public read-only web execution requires an explicit manifest.", undefined, ["missing-public-readonly-manifest"], [], "Provide a route-scoped public read-only manifest.");
   }
   if (!manifest.allowedPublicOrigins.length) {
-    return decision("blocked-no-allowlist", safeTargetUrl, targetOrigin, method, input.request, "Public read-only web execution requires explicit allowed origins.", undefined, ["missing-public-allowlist"], [], "Add exact https origins to the manifest.");
+    return decision("blocked-no-allowlist", safeTargetUrl, targetOrigin, method ?? "GET", input.request, "Public read-only web execution requires explicit allowed origins.", undefined, ["missing-public-allowlist"], [], "Add exact https origins to the manifest.");
   }
   if (!input.clientAvailable) {
-    return decision("blocked-client-unavailable", safeTargetUrl, targetOrigin, method, input.request, "No public read-only HTTP client is available.", undefined, ["missing-public-readonly-client"], [], "Use an injected deterministic client for tests or the built-in client for explicit opt-in runs.");
+    return decision("blocked-client-unavailable", safeTargetUrl, targetOrigin, method ?? "GET", input.request, "No public read-only HTTP client is available.", undefined, ["missing-public-readonly-client"], [], "Use an injected deterministic client for tests or the built-in client for explicit opt-in runs.");
   }
   if (!method || !manifest.allowedMethods.includes(method)) {
     return decision("blocked-method", safeTargetUrl, targetOrigin, method ?? "GET", input.request, "Public read-only web execution only allows GET and HEAD.", undefined, ["method-blocked"], [], "Use GET or HEAD.");

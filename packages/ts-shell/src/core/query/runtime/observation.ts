@@ -19,14 +19,6 @@ export type RuntimeObservationEvent =
       readonly toolName: string
       readonly taskId?: string
     }
-  | {
-      readonly type: string
-      readonly toolName?: string
-      readonly taskId?: string
-      readonly success?: boolean
-      readonly failureReason?: string
-      readonly coveredFiles?: readonly string[]
-    }
 export interface QueryRuntimeFailureObservation {
   readonly action: ToolActionKind
   readonly signature: string
@@ -358,7 +350,7 @@ function observeLastAction(
   if (seed.verification?.status === 'failed') {
     state.toolFailures.push({
       action,
-      signature: seed.target ?? seed.actionKind,
+      signature: seed.target ?? seed.actionKind ?? action,
       reason: seed.reason ?? 'action failed',
     })
   } else if (seed.reason && failureReason(seed.reason)) {

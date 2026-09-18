@@ -228,7 +228,9 @@ function deterministicOrder(events: readonly SidebarEvent[]): SidebarEvent[] {
   });
 }
 
-function severityForOutcome(outcome: SidebarEventBridgeInput["commandResults"] extends ReadonlyArray<infer T> ? T extends { readonly outcome: infer O } ? O : never : never): SidebarEvent["severity"] {
+function severityForOutcome(
+  outcome: NonNullable<SidebarEventBridgeInput["commandResults"]>[number]["outcome"],
+): SidebarEvent["severity"] {
   if (outcome === "success") {
     return "success";
   }

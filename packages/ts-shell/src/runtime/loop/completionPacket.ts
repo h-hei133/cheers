@@ -231,7 +231,7 @@ export function buildProductCompletionPacket(input: {
         }
       : {}),
     ...postRepairVerificationFacts(input),
-    ...(input.repairVerdictProofInput
+    ...(input.repairVerdictProofInput?.verdictCandidateId
       ? {
           evidenceFacts: {
             proofInputId: input.repairVerdictProofInput.proofInputId,

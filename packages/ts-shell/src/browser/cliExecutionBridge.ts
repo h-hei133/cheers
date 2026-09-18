@@ -74,10 +74,11 @@ export function createBrowserCliExecutionBridge(
     readonly playwrightLocalRunner?: BrowserPlaywrightLocalRunner;
   } = {},
 ): BrowserCliExecutionBridgeContext {
+  const manifest = injection.manifest;
   if (
     injection.status !== "valid" ||
     !injection.fixture ||
-    (!injection.manifest && !injection.externalRunnerManifest)
+    (!manifest && !injection.externalRunnerManifest)
   ) {
     const missingRunner = decideBrowserExternalRunnerPolicy();
     return {
@@ -227,10 +228,26 @@ export function createBrowserCliExecutionBridge(
       },
     };
   }
-  const executionMode = injection.manifest.executorMode;
+  if (!manifest) {
+    const missingRunner = decideBrowserExternalRunnerPolicy();
+    return {
+      browserCliExecutionBridgeSummary: {
+        executorSource: injection.source,
+        manifestStatus: injection.manifestStatus,
+        executionMode: "disabled",
+        dependencyDecision: browserRuntimeDependencySummary(),
+        externalRunnerStatus: missingRunner.status,
+        reason: injection.reason,
+        evidence: injection.evidence,
+        warnings: injection.warnings,
+        redactions: injection.redactions,
+      },
+    };
+  }
+  const executionMode = manifest.executorMode;
   const externalRunnerDecision = decideBrowserExternalRunnerPolicy({
     source: "cli-harness-manifest",
-    runnerId: `${injection.manifest.source}:${executionMode}`,
+    runnerId: `${manifest.source}:${executionMode}`,
     executorMode: executionMode,
     fixtureScope: "local-fixture-only",
     sandboxAuthority: "local-fixture",
@@ -281,7 +298,7 @@ export function createBrowserCliExecutionBridge(
         "browser-cli-execution-bridge:no-external-network",
       ],
     }),
-    browserExecutionConfirmations: injection.manifest.confirmations,
+    browserExecutionConfirmations: manifest.confirmations,
     browserCliExecutionBridgeSummary: {
       executorSource: injection.source,
       manifestStatus: "valid",

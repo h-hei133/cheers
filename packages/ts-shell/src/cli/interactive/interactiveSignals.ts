@@ -21,7 +21,7 @@ export function installInteractiveSignalHandlers(input: {
       sessionRuntime: input.sessionRuntime,
       renderer: input.renderer,
       runtimeContext: input.runtimeContext,
-      readline: input.readline,
+      readline: input.readline ?? undefined,
       exit: input.exit,
     });
   });
@@ -39,7 +39,7 @@ export function installInteractiveCloseHandler(input: {
       sessionRuntime: input.sessionRuntime,
       renderer: input.renderer,
       runtimeContext: input.runtimeContext,
-      readline: input.readline,
+      readline: input.readline ?? undefined,
       exit: input.exit,
     });
   });

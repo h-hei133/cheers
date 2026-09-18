@@ -520,11 +520,11 @@ export class InteractiveMode {
       projectRoot: this.options.runtimeContext.projectRoot,
       statusItems: this.statusItems,
       resumeSession: (sessionId) => this.runCommandLine(`/resume ${sessionId}`),
-      deleteSession: (sessionId) => {
+      deleteSession: async (sessionId) => {
         this.options.sessionManager.deleteSession(sessionId);
         return undefined;
       },
-      renameSession: (sessionId, title) => {
+      renameSession: async (sessionId, title) => {
         this.options.sessionManager.renameSession(sessionId, title);
         return undefined;
       },

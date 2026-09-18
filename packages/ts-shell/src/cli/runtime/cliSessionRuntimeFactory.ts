@@ -3,7 +3,10 @@ import process from "node:process";
 
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
-import { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
+import {
+  ShellSessionRuntime,
+  type PromptRun,
+} from "../../core/shell/sessionRuntime.js";
 import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { CliOptions } from "../options/cliOptions.js";
@@ -37,11 +40,12 @@ export function createCliSessionRuntime(input: {
    * freeze at undefined and the approval overlay would never appear.
    */
   readonly getPromptInteractiveApproval?: () => (
-    prompt: EscalationPrompt,
-  ) => Promise<InteractiveApprovalResult>;
+    | ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>)
+    | undefined
+  );
 }): ShellSessionRuntime {
   const isStdinTty = input.isStdinTty ?? (() => Boolean(process.stdin.isTTY));
-  const sessionRuntime = new ShellSessionRuntime({
+  const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     sessionManager: input.sessionManager,
     renderer: input.renderer,
     compactHistory: (sessionId, signal, instructions) => {
@@ -63,7 +67,7 @@ export function createCliSessionRuntime(input: {
         instructions,
       });
     },
-    runPrompt: (prompt, signal) => {
+    runPrompt: (prompt, signal): PromptRun => {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;

@@ -7,7 +7,7 @@ export function handleShellSigint(input: {
   sessionRuntime: ShellSessionRuntime;
   renderer: StreamingRenderer;
   runtimeContext: ShellRuntimeContext;
-  readline: Pick<Interface, "close" | "prompt">;
+  readline?: Pick<Interface, "close">;
   exit: (code: number) => never;
 }): void {
   if (input.sessionRuntime.getCurrentRunController()) {
@@ -30,7 +30,11 @@ export function handleShellClose(input: {
   renderer: StreamingRenderer;
   runtimeContext: ShellRuntimeContext;
   readline?: Pick<Interface, "close">;
-  exit: (code: number) => never;
+  /**
+   * Optional: surfaces that call this without an exit hook (and tests) must not be
+   * forced to terminate the process. Absent means "close the session, keep running".
+   */
+  exit?: (code: number) => never;
   /** Used only to ask whether the session survived being closed. */
   sessionManager?: { sessionExists(sessionId: string): boolean };
 }): void {
@@ -46,5 +50,5 @@ export function handleShellClose(input: {
   const kept = input.sessionManager?.sessionExists(sessionId) ?? true;
   if (kept) input.renderer.renderLine(`\n  --resume ${sessionId}\n`);
   else input.renderer.renderLine("");
-  input.exit(0);
+  input.exit?.(0);
 }

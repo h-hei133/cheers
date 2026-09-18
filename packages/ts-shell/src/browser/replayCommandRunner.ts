@@ -121,7 +121,7 @@ export async function runBrowserReplayCommand(input: {
     ? input.receiptCacheStore?.list().records.find((record) => record.receiptId === input.request.receiptId)
     : persistentRecord;
   const cacheHealth = inspectBrowserReceiptCacheHealth(input.receiptCacheStore);
-  const entry = memoryEntry ?? persistentRecord?.cacheEntry;
+  const entry = (memoryEntry || undefined) ?? persistentRecord?.cacheEntry;
   const sourceReceipt = entry
     ? input.actionCache?.getReceipt(entry.sourceReceiptId) ?? persistentRecord?.receipt
     : undefined;

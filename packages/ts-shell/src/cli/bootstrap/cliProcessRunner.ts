@@ -2,6 +2,7 @@ import type { Interface as ReadlineInterface } from "node:readline";
 import type { ReadStream } from "node:tty";
 
 import { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
+import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import {
   createComponentLogger,
   createTraceContext,
@@ -132,7 +133,7 @@ export async function runCliProcess(
 
   let readline: ReadlineInterface | null = null;
   let interactiveApprovalPrompt:
-    | ((prompt: EscalationPrompt) => Promise<"deny" | "allow-once" | "allow-always">)
+    | ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>)
     | undefined;
 
   const sessionRuntime = createCliSessionRuntime({
@@ -193,6 +194,6 @@ export async function runCliProcess(
     setActiveNonInteractiveApprovalMode: (mode) => {
       approvalModeState.set(mode);
     },
-    exit: input.exit,
+    exit: (code?: number) => input.exit(code ?? 0),
   });
 }

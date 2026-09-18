@@ -121,12 +121,13 @@ function resolveProviderAuthContract(
   if (!match) {
     return undefined;
   }
-  if (provider !== "openai" || !testOpenAILoginOverride) {
+  const override = testOpenAILoginOverride;
+  if (provider !== "openai" || !override) {
     return match;
   }
   return {
     ...match,
-    loginAccountAuth: (options) => testOpenAILoginOverride(options),
+    loginAccountAuth: (options) => override(options),
   };
 }
 

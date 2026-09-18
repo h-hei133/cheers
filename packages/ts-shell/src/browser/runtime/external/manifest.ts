@@ -209,9 +209,10 @@ export function validateBrowserExternalRunnerManifest(
     ? {
         command: sanitizeBrowserText(value.runnerCommand.command, 240),
         args: value.runnerCommand.args.map((arg) => sanitizeBrowserText(arg, 240)),
-        cwd: stringValue(value.runnerCommand.cwd)
-          ? sanitizeBrowserText(value.runnerCommand.cwd, 240)
-          : undefined,
+        cwd: (() => {
+          const cwd = stringValue(value.runnerCommand.cwd);
+          return cwd ? sanitizeBrowserText(cwd, 240) : undefined;
+        })(),
       }
     : undefined;
   if (runnerCommand && !runnerCommandIsSafe(value.runnerMode, runnerCommand)) {

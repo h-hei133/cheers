@@ -398,7 +398,7 @@ export function summarizeReplaySafeLoopState(input: {
       status:
         input.contextRebuildProjection.redaction.status === "redacted" ||
           input.continuationReadiness.redaction.status === "redacted" ||
-          input.rebuildInput?.redaction.status === "redacted"
+          input.rebuildInput?.redaction?.status === "redacted"
           ? "redacted"
           : "report-safe",
       excluded: REDACTION_EXCLUSIONS,

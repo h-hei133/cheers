@@ -77,7 +77,7 @@ export class CoreMcpClient {
         serverName: this.name,
         toolName: tool.name,
         qualifiedName: qualifyMcpToolName(this.name, tool.name),
-        description: tool.description,
+        description: tool.description ?? "",
         inputSchema: tool.inputSchema,
       }))
     }

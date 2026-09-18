@@ -21,7 +21,7 @@ export function projectHostReplayFacts(input: {
   return freeze({
     factsId: `${input.record.session.id}:host-replay-facts`,
     sessionId: input.record.session.id,
-    activeLeafId: input.record.thread.activeLeafId,
+    activeLeafId: input.record.thread.activeLeafId ?? input.record.session.id,
     retainedFactIds: replay
       ? [
           replay.summaryId,
@@ -33,7 +33,7 @@ export function projectHostReplayFacts(input: {
           ...replay.verificationHandoffIds,
           ...replay.repairHandoffIds,
         ]
-      : [input.record.thread.activeLeafId],
+      : [input.record.thread.activeLeafId ?? input.record.session.id],
     ...(replay?.providerRequestFacts
       ? { providerRequestFacts: replay.providerRequestFacts }
       : {}),
