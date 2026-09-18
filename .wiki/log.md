@@ -689,3 +689,36 @@
 - **计数差异属定义口径而非缺陷**：复核者边数 4959 vs 本计划 4960、可达性 875/86 vs 876/85，
   但其在**改动前后测得差值均为 0**，守恒结论成立。
 - **待回**：Step 4 九批与 Step 3 五批两个分片仍在运行。
+
+## [2026-09-18] review-exec-2 | Step 3 分片复核完成：4 clean + 1 处历史缺陷，配置项 clean。
+- **`e53ba6b4` / `59fde020` / `35ca1751` / `dc38b155` / `acdc0f1b`：全部 clean。**
+  复核者以独立工具（Tarjan + Kahn 双算法、仅从 git blob 构建图）在 **12 个 revision** 上
+  复核 SCC，**全部 0 环、1291/1479 拓扑全通**；各搬迁均为纯搬迁（文件体在 specifier 之外零改动、
+  零新增零丢失零重复目标）。
+- **`dc38b155` 的特定风险已排除**：既存的**同名异义**目录 `src/context/memory/`（`ContextMemory`）
+  **未被覆盖或合并**——该提交对 `src/context/memory/` 零文件改动，`model.ts`/`model.test.ts`
+  的 blob 在提交前后**字节一致**；两个概念分居 `src/context/memory`（`ContextMemory*`）与
+  `src/memory`（`ProjectMemory*`），无命名冲突。
+- **`35ca1751` 的跨层边已量化并定性**：`core/context/browserCapabilityModel.ts:1` → `presentation/sidebar/`
+  这条 `core → presentation` 边**在提交前即已存在**（只是解析目标换了域）；
+  `core → presentation` 在提交前就有 **4 条**，提交后 **22 条**（+18 全为 sidebar）。
+  **复核者检索 `AGENTS.md` 与全部 `agent-rules/` 未找到任何禁止该方向的明文规则**，
+  故判定为"方向对称性观察"而非违规——**未按违规上报，也未自造规则**。
+- **`acdc0f1b`（testTimeout）复核最细，结论 clean**：diff 仅 `vitest.config.ts` 的 4 行新增
+  （`testTimeout: 30000` + 注释），零测试文件、零断言改动；仓库只有这一处测试配置面、无 CI 覆盖；
+  **不会掩盖真挂起**——无任何断言断言"超时发生"，且 `agentCliScenarioAssertions.ts:96-98` 对
+  `process.timedOut` 返回失败，harness 内部超时（10s/8s/1.5s 等）均远低于 30s 且触发在断言中途；
+  复核者**未能找到任何 pass/fail 依赖机器速度的测试**。
+- **`54021279`（3b）发现历史缺陷 P2（已自修复，HEAD 不受影响）**：漏改
+  `sidebarStateProjection.test.ts:7-8` 两个 specifier（目标已移至 `src/context/startup/`）。
+  **两道门禁都看不见**：build config `exclude` 测试文件（报 0 错）；vitest 因 **type-only** import
+  被擦除而全绿。Test-inclusive `tsc` 由 251 → **253**（正是这两条 TS2307），
+  由 `59fde020` 顺带修复，缺口跨 `54021279` 与 `acdc0f1b` 两个提交。
+  **HEAD 实测：test-inclusive tsc = 251 错、`TS2307` = 0，无残留。**
+  另记 P3：该提交信息称"Caught by the compiler"，而它援引的 build config **不可能**
+  看见 `.test.ts` 内的悬空 specifier——记录与工具能力不符。
+- **方法学盲区（复核者指出，本计划随后重蹈）**：grep/python 式"悬空 specifier"扫描会
+  **匹配测试夹具里的字符串内容**。复核者测得"19 处未解析"中 **17 处是引号内的源码字符串**、
+  2 处是合法 JSON import（`with { type: "json" }`，文件均存在），**真实缺陷 0**。
+  本计划在复核后自制扫描脚本，**报出 17 处假阳性**，用判据同源的 `maskSource`
+  重做后为 **0 悬空 / 5096 条 specifier**。**与 §5 教训 15 同源，已记入 plan §3.7。**

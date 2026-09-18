@@ -211,7 +211,7 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | 阶段 | 内容 | 提交 | 实测边数（估/实） |
 |---|---|---|---|
 | 3a | `model/` 判定 + 错置文件归位 | `e53ba6b4` | 1 / 1 |
-| 3b | `startup/` → `context/startup/` | `54021279` | 5 / 5 |
+| 3b | `startup/` → `context/startup/` | `54021279` | 5 / 5（**漏改 2 处 test specifier**，§3.7） |
 | 3c | `compact/` → `context/compact/` | `59fde020` | 30 / **37** |
 | 3d | `sidebar/` → `presentation/sidebar/` | `35ca1751` | 17 / **18** |
 | 3e | `memory/` → `src/memory/` | `dc38b155` | 31 / **46** |
@@ -230,6 +230,10 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 **未做**——命名决策属独立步骤，混入搬迁会让同一 diff 同时论证两件事。
 
 **关键前置检查（§2.4.1）**：六次搬迁**全部** 搬迁前 0 环 → 搬迁后 0 环。
+
+**3b 的漏改（复核发现，2026-09-18，已由 3c 自修复）**：`sidebarStateProjection.test.ts:7-8`
+两个 specifier 未随 `54021279` 更新，且**两道门禁都看不见**——build config `exclude` 掉测试文件，
+vitest 因 type-only import 被擦除而全绿。已知的早期示例，详见 §3.7。
 
 **验证**（每阶段均执行）：build 0 错；相关域测试全绿；最终**全量 3172 项零失败**；
 可达性 959/874/85 全程不变；`validate` + `verify:host-surface` PASS；
@@ -464,7 +468,25 @@ advisory 的函数名上限从 13 模块降至 12 模块（`SessionManager` 退�
 | Step 5 三批 | `268b2f83` `10350ede` `09153136` | **2 处低危发现**（见下），其余全清 |
 | Step 6 改名 | `b28ab2fd` | **clean，零发现** |
 | Step 4 九批 | 7 个 batch commit | 进行中 |
-| Step 3 五批 + 配置 | 5 个 move + `acdc0f1b` | 进行中 |
+| Step 3 五批 + 配置 | 5 个 move + `acdc0f1b` | **4 clean + 1 处历史缺陷（已自修复）**，配置项 clean |
+
+**Step 3 分片的发现（P2，已自修复，HEAD 不受影响）**：
+
+`54021279`（3b，startup 搬迁）漏改了 `sidebarStateProjection.test.ts:7-8` 的两个 specifier
+——目标已移到 `src/context/startup/`，测试仍指向 `../startup/`。
+**两道门禁都看不见**：`tsconfig.build.json` 的 `exclude` 含 `**/*.test.ts`（build 报 0 错）；
+vitest 因二者是 **type-only** import（类型导入被擦除）而**全部通过**。
+Test-inclusive `tsc -p tsconfig.json` 从 251 → **253**，正是这两条 `TS2307`。
+它由 `59fde020`（3c）顺带修复，缺口跨 `54021279` 与 `acdc0f1b` 两个提交存在。
+**HEAD 实测：test-inclusive tsc = 251 错、`TS2307` = 0** → 无残留。
+
+**复核者同时证实了本计划的一个方法学盲区**：python/grep 式的"悬空 specifier"扫描会
+**匹配到测试夹具里的字符串内容**。复核者测得"19 处未解析"里，
+**17 处是引号内的源码字符串**（如 `"import { dep } from './dep.js';"` 作为被写入的文件内容）、
+2 处是合法的 JSON import（`with { type: "json" }`，文件均存在），**真实缺陷为 0**。
+本计划在复核后**重蹈了同一错误**（自制扫描脚本报 17 处假阳性），
+用判据同源的 `maskSource` 重做后为 **0 悬空 / 5096 条 specifier**。
+**这与 §5 教训 15 同源，属同一盲区在验证工具中的再次出现，已记录。**
 
 **复核发现并已修复（3 项，全部由复核者先于本计划发现）**：
 
