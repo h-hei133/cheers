@@ -45,7 +45,7 @@ import {
   buildRuntimeStateSeedForSession,
 } from "./replay/sessionReplayRuntime.js";
 
-const sessionLogger = createComponentLogger("SessionReadSurface");
+const sessionLogger = createComponentLogger("SessionManager");
 
 export abstract class SessionReadSurface extends SessionLifecycleWrites {
   protected constructor(host: SessionLifecycleWriteHost) {

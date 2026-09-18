@@ -551,7 +551,7 @@
   `listRealSessions` 由 `private` 放宽为 `protected`。SessionManager 中仅 `constructor` 实质变更
   （`store` 不再提升为字段，直接传入 `super`）。41 个原成员**零丢失**，三模块无重复。
 - **验证**：`tsc -p tsconfig.build.json` 0 错；**SCC 1481 文件 0 环**（§2.4.1 前置/后置检查）；
-  全量 `tsc --noEmit` **387 = 基线 387**（逐类 diff 仅联合类型成员排序差异，**零新增**）；
+  全量 `tsc --noEmit` **251 = 基线 251**（错误数；`tsc` 输出 387 行含诊断续行，口径见 plan §1；逐类 diff 仅联合类型成员排序差异，**零新增**）；
   全量测试 **3170/3172**（2 项失败为既有负载抖动：`cli-baseline.test.ts` 子进程、
   `presentation/tui/surface/benchmark.test.ts` CPU 计时，**隔离复跑均通过**）；
   `session/` + `core/shell/` 聚焦 **509/509**；
@@ -658,3 +658,34 @@
 - **Step 6 零指标影响的预测已被验证**：改名前后的越界模块数均为 **12**，三项义务状态不变。
 - **计划状态**：Step 3–7 **全部完成**。plan.md 升级至 **v5.3**，新增 §3.6 记录本轮 judge 结果，
   §1 现状表增加 judge 行，§7 文档索引补入 `step-6-naming-exploration.md`。
+
+## [2026-09-18] review-exec | 独立复核（子代理，并发上限 2）发现并修复 3 项问题。
+- **范围确定**：按**实际改动文件类型**分类，近 40 个 commit 中 **24 个真正改过代码**
+  （16 个纯 Markdown）。**`docs`/`chore` 前缀不可靠**——`5ada9623` 标为 `chore` 却删了 5 个脚本与
+  package 注册，故不按前缀而按 `git show --name-only --diff-filter=d` 的产物分类。
+- **分片**：Step 5 三批（`268b2f83`/`10350ede`/`09153136`）、Step 6 改名（`b28ab2fd`）、
+  Step 4 九批、Step 3 五批 + 配置（`acdc0f1b`）。
+- **Step 6 分片结论：clean，零发现。** 复核者逐条核验 173 个改名为纯改名（228 → 228 文件、
+  0 新增 0 丢弃、55 个未触及路径两侧字节一致）；**937 个改动字符串字面量全部可解释**；
+  **逐字面量确认"非 specifier 位置的字符串零改动"**——直接覆盖 Step 4 曾经的
+  "字符串内假冒 import"失败模式；937 个 specifier **全部解析正确**，零错目标零残留；
+  构建 0 错（另在 `git archive` 干净解包上复验）；SCC 两版均 0 环、边集守恒。
+- **Step 5 分片发现 3 项（全部由复核者先于本计划发现），已修复**：
+  1. **中 · `tsc` 计数口径错误**：plan/log/recon 三处把"**输出行数 387**"记作"**错误数 387**"。
+     实测输出 **387 行**、其中 `error TS` **251** 行（差额为诊断换行续行）。
+     **251 才是错误数**，且 `plan.md` 原文本就是正确的 251，是 Step 5 期间被本计划改坏。
+     三处已修正并加口径说明。复核者"无法复现 387"的质疑**成立**。
+  2. **低 · 两个孤儿导出**：`268b2f83` 删掉 `normalizeTranscriptEvents`/`repairTranscriptEvents` 后，
+     底层 `normalizeReplayTranscript`/`repairReplayTranscript`（两个薄包装）**失去唯一调用者**；
+     且该提交信息称这三个实现"已被真实消费者直接 import"，**对其中两个为假**（全仓零调用点）。
+     **已删除并重跑 `src/session/` 316/316 通过**。
+  3. **低 · 日志组件名被静默改变**：`09153136` 把 `sessionReadSurface.ts` 的 logger
+     由 `"SessionManager"` 改为 `"SessionReadSurface"`，与同批 `10350ede` 刻意保留原名不一致，
+     也与提交信息"Nothing else changes"矛盾；该字符串经 `/log tail` 的 `[component]` 徽标**用户可见**。
+     **已恢复为 `"SessionManager"`。**
+- **复核者独立确认**：`09153136` 41 个方法 **20 留 + 21 移 = 41 零丢失**；20 个迁移方法体在
+  允许改写之外**逐字节等价**；继承链无环、`super()` 先于任何 `this`；**分离构建的编译前后
+  公共面冒烟（38 条断言）输出一致**。
+- **计数差异属定义口径而非缺陷**：复核者边数 4959 vs 本计划 4960、可达性 875/86 vs 876/85，
+  但其在**改动前后测得差值均为 0**，守恒结论成立。
+- **待回**：Step 4 九批与 Step 3 五批两个分片仍在运行。

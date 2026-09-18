@@ -460,7 +460,7 @@ SessionManager 的 `constructor` 是唯一实质改动：`store` 不再提升为
 |---|---|
 | `tsc -p tsconfig.build.json` | 0 错误 |
 | **SCC（1481 文件）** | **0 环**（搬迁前后一致，符合 §2.4.1） |
-| 全量 `tsc --noEmit`（含测试） | **387 = 基线 387**，逐类 diff 仅联合类型成员**排序**差异，**零新增错误** |
+| 全量 `tsc --noEmit`（含测试） | **251 = 基线 251**（错误数；输出 387 行含诊断续行），逐类 diff 仅联合类型成员**排序**差异，**零新增错误** |
 | 全量测试 | **3172 项，3170 通过 / 2 失败** |
 | 2 项失败定性 | 均为负载抖动：`cli-baseline.test.ts`（子进程）、`presentation/tui/surface/benchmark.test.ts`（CPU 计时）；**隔离复跑均通过** |
 | `src/session/` + `src/core/shell/` 聚焦 | **509 / 509 通过** |
