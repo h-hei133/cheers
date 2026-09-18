@@ -73,16 +73,12 @@ import {
   type WorkspaceRootMode,
 } from "./store/projectBindingPolicy.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
+import { SessionLifecycleWrites } from "./lifecycle/sessionLifecycleWrites.js";
 import { buildSessionContinuitySnapshot } from "./continuation/sessionContinuitySnapshot.js";
 import { normalizeLegacyPermissionStateForSession } from "./continuation/legacyPermissionRebase.js";
 import { extractSeedInfluenceFromQueryResult } from "./continuation/sessionSeedInfluence.js";
 import { rebindSessionProjectRootContinuity } from "./continuation/sessionProjectRootRebind.js";
-import {
-  appendCompactionEvent,
-  appendSessionTurn,
-  appendTranscriptEvent,
-  readTranscriptEvents,
-} from "./transcript/sessionTranscript.js";
+import { appendSessionTurn } from "./transcript/sessionTranscript.js";
 import {
   appendSessionQueryEvent,
   applySessionQueryEventToState,
@@ -91,7 +87,6 @@ import {
   buildRecoverySnapshotForSession,
   evaluateRecoveryTrustBoundaryForSession,
   projectRecoveryTrustBoundaryBlockForSession,
-  reconcilePendingLifecycleForSession,
 } from "./recovery/sessionRecoveryRuntime.js";
 import type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
 import {
@@ -105,23 +100,7 @@ import {
   buildReplayPlanForSession,
   buildRuntimeStateSeedForSession,
 } from "./replay/sessionReplayRuntime.js";
-import {
-  handleAddTurn,
-  handleMarkRecoveryReentry,
-  handleMarkRunStarted,
-  handleMarkTurnActive,
-  handlePersistUserPromptBarrier,
-  handleSaveCompleted,
-  handleSaveError,
-  handleSaveInterrupted,
-  handleSaveTerminated,
-} from "./agent/lifecycle.js";
-import {
-  handleAppendQueryEvent,
-  handleAppendTranscriptEvent,
-  handleApplyQueryEventToState,
-  handleGetTranscriptEvents,
-} from "./agent/persistence.js";
+import { handleGetTranscriptEvents } from "./agent/persistence.js";
 export type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
 export type {
   ApprovalAuditMemoryState,
@@ -153,14 +132,23 @@ export interface ResumeOptions extends SessionResumeOptions {}
 
 const sessionLogger = createComponentLogger("SessionManager");
 
-export class SessionManager {
+export class SessionManager extends SessionLifecycleWrites {
   private static readonly AUTO_COMPACT_TURN_THRESHOLD = 12;
   private static readonly APPROVAL_AUDIT_HISTORY_LIMIT =
     SESSION_APPROVAL_AUDIT_HISTORY_LIMIT;
   private readonly store: SessionStoreAccess;
 
   constructor() {
-    this.store = new SessionStoreAccess();
+    const store = new SessionStoreAccess();
+    super({
+      store,
+      approvalAuditHistoryLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
+      readTranscriptEvents: (sessionId) => this.getTranscriptEvents(sessionId),
+      readRecoverySnapshot: (sessionId) => this.getRecoverySnapshot(sessionId),
+      buildStateSnapshot: (session, current) =>
+        buildSessionStateSnapshot(session, current),
+    });
+    this.store = store;
   }
 
   private createSessionCreationCallbacks() {
@@ -188,21 +176,6 @@ export class SessionManager {
       evaluateRecoveryTrustBoundary: (session: Session) =>
         this.evaluateRecoveryTrustBoundary(session),
       cwd: () => process.cwd(),
-      now: () => new Date().toISOString(),
-    };
-  }
-
-  private createSessionLifecycleCallbacks() {
-    return {
-      loadSession: (sessionId: string) => this.store.load(sessionId),
-      appendTranscriptEvent: (sessionId: string, event: TranscriptEvent) =>
-        this.appendTranscriptEvent(sessionId, event),
-      writeSessionMetadata: (session: Session) =>
-        this.store.writeSessionMetadata(session),
-      writeSessionState: (
-        session: Session,
-        overrides?: SessionStateSnapshotOverrides,
-      ) => this.store.writeSessionState(session, overrides),
       now: () => new Date().toISOString(),
     };
   }
@@ -340,78 +313,6 @@ export class SessionManager {
     );
   }
 
-  addTurn(sessionId: string, message: SessionMessage): void {
-    handleAddTurn(this.createSessionLifecycleCallbacks(), sessionId, message);
-  }
-
-  recordApprovalAuditDecision(
-    sessionId: string,
-    decision: Omit<ApprovalAuditMemoryState, "recordedAt"> & {
-      readonly recordedAt?: string;
-    },
-  ): void {
-    const session = this.store.load(sessionId);
-    const statePath = this.store.statePath(session.id);
-    recordSessionApprovalAuditDecision({
-      session,
-      decision,
-      recordedAt: decision.recordedAt ?? new Date().toISOString(),
-      historyLimit: SessionManager.APPROVAL_AUDIT_HISTORY_LIMIT,
-      withStateLock: (targetSessionId, update) =>
-        this.store.withSessionStateLock(targetSessionId, update),
-      readCurrentSnapshot: () => this.store.readStateSnapshotSafely(statePath),
-      buildSnapshot: (current) => this.buildSessionStateSnapshot(session, current),
-      writeSnapshot: (snapshot) => this.store.writeJsonFileAtomic(statePath, snapshot),
-    });
-  }
-
-  markRunStarted(sessionId: string, prompt: string): void {
-    handleMarkRunStarted(this.createSessionLifecycleCallbacks(), sessionId, prompt);
-  }
-
-  persistUserPromptBarrier(sessionId: string, prompt: string): void {
-    handlePersistUserPromptBarrier(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      prompt,
-    );
-  }
-
-  markTurnActive(sessionId: string): void {
-    handleMarkTurnActive(this.createSessionLifecycleCallbacks(), sessionId);
-  }
-
-  markRecoveryReentry(
-    sessionId: string,
-    boundary: QueryRuntimeRecoveryBoundary,
-  ): void {
-    handleMarkRecoveryReentry(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      boundary,
-    );
-  }
-
-  saveInterrupted(
-    sessionId: string,
-    interruptedKind: "prompt" | "turn" = "prompt",
-  ): void {
-    handleSaveInterrupted(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      interruptedKind,
-    );
-  }
-
-  saveCompleted(sessionId: string, terminal?: TerminalPersistence): void {
-    handleSaveCompleted(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      terminal,
-    );
-  }
-
-
   renameSession(sessionId: string, title: string): Session {
     const session = this.store.load(sessionId);
     const normalized = title.trim();
@@ -425,89 +326,9 @@ export class SessionManager {
     this.store.deleteSession(sessionId);
   }
 
-  saveError(
-    sessionId: string,
-    error: string,
-    terminal?: TerminalPersistence,
-  ): void {
-    handleSaveError(
-      this.createSessionLifecycleCallbacks(),
-      sessionId,
-      error,
-      terminal,
-    );
-  }
-
-  /**
-   * Close a session out.
-   *
-   * A session that never held a conversation is deleted rather than terminated: a
-   * run that only listed commands has nothing to come back to, and leaving those
-   * behind fills the re-entry list with empty rows and hands the user a resume id
-   * that restores nothing.
-   */
-  saveTerminated(sessionId: string): void {
-    handleSaveTerminated(this.createSessionLifecycleCallbacks(), sessionId);
-    if (this.discardIfEmpty(sessionId)) return;
-  }
-
-  /**
-   * Delete `sessionId` when nothing was ever said in it. Returns whether it went.
-   */
-  discardIfEmpty(sessionId: string): boolean {
-    let session: Session;
-    try {
-      session = this.store.load(sessionId);
-    } catch (error) {
-      sessionLogger.warn("Failed to load session for discard check", { sessionId, error: error instanceof Error ? error.message : String(error) });
-      return false;
-    }
-    if (sessionHasConversation(session)) return false;
-    const projectRoot = session.projectRoot;
-    this.store.deleteSession(sessionId);
-    // The pointer must not outlive the record it points at.
-    const current = projectRoot ? this.store.getCurrentSessionForProject(projectRoot) : null;
-    if (current?.id === sessionId) this.store.clearCurrentSessionForProject(projectRoot);
-    return true;
-  }
-
-
-  reconcilePendingLifecycle(sessionId: string): DurableLifecycleIndex {
-    const snapshot = this.getRecoverySnapshot(sessionId);
-    return reconcilePendingLifecycleForSession({
-      snapshot,
-      transcriptEvents: this.getTranscriptEvents(sessionId),
-      applyQueryEventToState: (event) =>
-        this.applyQueryEventToState(sessionId, event),
-      appendQueryEvent: (event) => this.appendQueryEvent(sessionId, event),
-      readPendingLifecycle: () =>
-        this.getRecoverySnapshot(sessionId).pendingLifecycle,
-    });
-  }
-
-  appendQueryEvent(sessionId: string, event: QueryEvent): void {
-    handleAppendQueryEvent(this.store, sessionId, event);
-  }
-
   getTranscriptEvents(sessionId: string): TranscriptEvent[] {
     return handleGetTranscriptEvents(this.store, sessionId);
   }
-  appendCompactionEntry(
-    sessionId: string,
-    input: {
-      readonly summary: string;
-      readonly firstKeptEntryId?: string;
-      readonly keptMessages?: number;
-      readonly tokensBefore?: number;
-    },
-  ): void {
-    const transcriptPath = this.store.transcriptPath(sessionId);
-    appendCompactionEvent(transcriptPath, {
-      ...input,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
   getRecoverySnapshot(sessionId: string): RecoverySnapshot {
     return buildRecoverySnapshotForSession({
       sessionId,
@@ -751,17 +572,6 @@ export class SessionManager {
       reason,
       detail,
     });
-  }
-
-  private appendTranscriptEvent(
-    sessionId: string,
-    event: TranscriptEvent,
-  ): void {
-    handleAppendTranscriptEvent(this.store, sessionId, event);
-  }
-
-  private applyQueryEventToState(sessionId: string, event: QueryEvent): void {
-    handleApplyQueryEventToState(this.store, sessionId, event);
   }
 
   private buildSessionStateSnapshot(
