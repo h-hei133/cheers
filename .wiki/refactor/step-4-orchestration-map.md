@@ -105,10 +105,13 @@ escaping 目标分散：`context/acquisition/code` 7、`patchRecovery` 4、`work
   `runtimeOutcomeProjection`、`taskContextResult`、`taskLifecycleResult`、`taskLifecycleTrace`。
 - **`context/acquisition/graph.ts`（840 行）单文件引入 27 个 orchestration 模块**——
   它是整个 cluster 的主要消费者与可达性来源。
-- **但 `graph.ts` 自身只有 1 个调用者**（`context/memory/model.ts`）。即：
+- **但 `graph.ts` 自身只有 2 个调用者**（`context/acquisition/engine.ts` 3 处、
+  `context/memory/model.ts`）。即：
   **一个近乎叶子的 840 行文件，承担了 27 条 orchestration 边的汇合点**——
   这解释了为何 14 个模块"仅经由 acquisition 可达"。若该文件或其调用链变动，
   这 14 个模块的可达性会整体改变。
+  （**勘误**：本节初版写"只有 1 个调用者"，实测为 2 个；见
+  `step-4-decision-research.md` §3.1。）
 - 原 composition root `runMvpIntegratedFlow.ts` **已在 Step 2.5-C-3 删除**（`7a59ab23`），
   `module-atlas.md` 中"orchestration 是 agent loop 组合根"的描述**已过期**。
 - 直接入口（CLI 可达文件直接 import orchestration）共 29 个目录，最大三个：
@@ -184,6 +187,9 @@ escaping 目标分散：`context/acquisition/code` 7、`patchRecovery` 4、`work
 | `patchParsing/`（1 prod） | 1 | `edit/patch/` | 补丁解析类型 |
 
 ### 6.3 未决问题（须维护者裁决，本步不擅自决定）
+
+> **研究已完成**：5 项的实测结论与方案建议见 `step-4-decision-research.md`。
+> 含 2 处对本文的勘误（`graph.ts` 调用者数、Q5 消费者集合）。
 
 1. **`types.ts`（318 行、44 导出、7 域消费）的归属**。它是全仓最广被引用的契约文件之一，
    含 `CodingResultSummary` / `OrchestrationResult` / `AgentRole` 等。

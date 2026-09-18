@@ -365,3 +365,54 @@
 - **验证**：本步为判定，**零代码改动** → 按 `plan.md §2.4` 与 `agent-rules/testing-and-validation.md`
   不跑构建/测试。所有数字均以脚本实测（import 图解析 + `analyze-boundaries.py`）取得，
   未采信估算——遵循 §2.4.1 第 3 条。
+
+## [2026-09-18] step4-research | 5 项未决问题的决策研究（含 pi 参考）。零代码改动。
+- **产出**：`.wiki/refactor/step-4-decision-research.md`（329 行）。plan.md §3.3 与文档索引已同步。
+- **pi 参考的边界（首要发现）**：`grep -rl "ContextGraph\|TaskLifecycle\|AnalysisBrief" ~/projects/pi/packages/*/src` → **零命中**。
+  pi 的 5 个包（agent 180 / coding-agent 646 / ai 340 / tui 87 / chord 34）**不存在**上下文图、
+  任务生命周期、分析简报、provider 锚定提案——本仓这些概念是独有的。
+  **故 5 项决策不能靠"pi 怎么做"回答**，只采用其 4 条可迁移原则：
+  P1 契约置于所属包根部（`agent/src/types.ts` 446 行；跨运行时线协议另立 `protocol/` 包）；
+  P2 **harness 是产品运行时**（`agent/src/harness/runtime/{drive,lane,reducer,restore}`），
+  而**记分卡/失败分类在独立 `packages/evals/`**；
+  P3 `agent/docs/runtime-simplification.md` 明文禁止通用抽象层
+  （`Do not introduce a generic Procedure interface, runner, scheduler, graph, callback plan, or dependency facade`）；
+  P4 域目录承载上下文。
+- **Q1 `types.ts`（318 行/44 导出/73 消费者）→ 不拆，迁 `session/result/`**。
+  **决定性实测**：按语义切成 result-family(23) vs agent-execution(13) 后，
+  73 个消费者中 **14 个需要两半**（44 只需 result、15 只需 agent）→ **19% 跨界，接缝不干净**，
+  拆分会造 14 个双向 import。另：44 导出中实际被 import 的只有 **20 个**；
+  零运行时导出（纯 type/interface）。最大消费者是 `session`(25) 与 `core`(14)，均非编排。
+- **Q2 harness 3 文件（1,203 行）→ 迁 `evidence/harness/`，不进 `core/harness/`**。
+  实测：生产消费者**只有 2 个**（`context/acquisition/graph.ts`、`orchestration/taskLifecycleTrace.ts`），
+  且都当作**证据字段**消费（`graph.ts:74 readonly harnessTrace: HarnessTrace`）。
+  `core/harness/` 共 68 文件：35 测试 + **33 非测试全是 scenario/fixture/report**，CLI 可达仅 3
+  （`browserPublicReadOnlyWebSmoke{Config,Report,Runner}`）。README 明文
+  "not a product runtime ownership boundary" → 放进去会造产品与夹具混居。
+  pi 的 P2 直接支持：评估/记分不属运行时 harness。
+- **Q3 `graph.ts` 的 29 边 → 本步只机械重写，不重构**。实测：840 行、33 import、
+  **function-like 15 个（上限 20，未超）**、**调用者 2 个**
+  （`context/acquisition/engine.ts` 3 处 + `context/memory/model.ts`）。
+  **勘误**：映射表 §3 初版写"只有 1 个调用者"，实测为 2 个，已修正并交叉引用。
+  判断：它是**合法组合根**（真正的错置组合根 `runMvpIntegratedFlow.ts` 已删）；
+  风险不对称——它是 14 个模块的唯一可达路径，先搬迁后重构。
+- **Q4 `orchestration/` 目录 → 不保留该名**。两条硬证据：
+  ①`orchestration` **不在** `agent-rules/file-placement-and-naming.md` 的 sanctioned owner domains
+  （列表为 runtime/turn/context/planning/provider/tools/session/evidence/result/presentation/policy/edit/verification/repair）；
+  ②**active 的 `docs/architecture/control-plane-atlas.md` 引用的 13 个 orchestration 文件全部已删**
+  （`runMvpIntegratedFlow`、`workflowIntentProjection`、`approvalAuthorityProjection`、`mutationRoutingProjection`、
+  `mutationExecution`、`patchMutationLane`、`providerOutcomeProjection`、`readInspectModule`、`verificationModule`、
+  `continuationModule`、`browserModule`、`toolRuntimeModule`、`resultSurfaceModule`）——
+  该文档标注 active 且被当作实现上下文读取，**需顺带修正**。
+- **Q5 三组合并 → 合并为一个子域（17 文件平铺，不造抽象层）**。
+  **决定性实测**：`agentPlan`(3)、`analysis`(3)、`taskLifecycle`(11) 三组的**生产消费者集合完全相同**
+  ——同为 `context/acquisition/graph.ts`、`orchestration/verificationRepairContext.ts`、
+  `planning/quality/model.ts`、`verification/command/plan.ts` 这 4 个文件。
+  内部 17 文件 **43 条边、零环（DFS 验证）、单一 DAG**；sources 4 个、sinks 2 个。
+  分开只会让同一批消费者写 3 组 import。**但按 pi 的 P3 禁止造通用抽象层**——
+  合并形态是"承载关注点的目录"而非统一 `TaskPlanner` 接口/调度器。
+- **建议执行顺序**（风险递增）：`patchRecovery`(8)→`edit/recovery` → `patchResult`(2)→`edit/result`
+  + `patchParsing`(1)→`edit/patch` → harness(3)→`evidence/harness` → 17 文件→`planning/task`
+  → provider-proposal(10)→`provider/proposal` → edit-proposal(5)→`edit/proposal`
+  → context-graph(11)→`context/graph` → misc(9) 逐个判定 → 修正 control-plane-atlas + 删除空 `orchestration/`。
+- **验证**：判定性工作，零代码改动 → 不跑构建/测试（`plan.md §2.4`）。所有数字脚本实测。

@@ -231,10 +231,31 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 
 | 步骤 | 内容 | 前置 |
 |---|---|---|
-| Step 4 | orchestration 聚类 | **映射表已重算**（`step-4-orchestration-map.md`）→ **待维护者裁决 5 项未决问题** |
+| Step 4 | orchestration 聚类 | **映射表 + 5 项决策研究已完成** → **待维护者批准执行顺序** |
 | Step 5 | SessionManager 拆分（52 函数 facade，确认 ALIVE） | 不变 |
-| Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | **新增范围**：见下 |
+| Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀 + **`orchestration` 域更名**） | 见下 |
 | Step 7 | 收尾：NormProof judge 全量跑 | 以搬迁后 BFS 报告作为收敛证据 |
+
+**Step 4 决策研究结论**（2026-09-18，`step-4-decision-research.md`，零代码改动）：
+
+| Q | 议题 | 结论 |
+|---|---|---|
+| 1 | `types.ts`（44 导出 / 73 消费者）归属 | **不拆**，迁 `session/result/`。实测：拆分会造 **14 个双向 import**（19% 消费者需两半）——接缝不干净 |
+| 2 | harness 3 文件（1,203 行） | 迁 **`evidence/harness/`**，**不进** `core/harness/`（README 明文非产品边界，其 33 个非测试文件全是 fixture；pi 亦把记分卡放在独立 evals 包） |
+| 3 | `graph.ts` 的 29 边 | **本步只机械重写，不重构**。未超模块上限（15≤20），是合法组合根；风险不对称（它是 14 个模块的唯一可达路径） |
+| 4 | `orchestration/` 目录存废 | **不保留该名**——不在 `agent-rules` 的 sanctioned 域列表内，且 **active 的 `control-plane-atlas.md` 引用的 13 个文件全部已删**（需顺带修正） |
+| 5 | agentPlan/analysis/taskLifecycle 合并 | **合并为一个子域**（17 文件平铺，**不造抽象层**）。决定性证据：三组的**生产消费者集合完全相同**（同为 4 个文件）；内部 43 边零环 DAG |
+
+**建议执行顺序**（风险递增，每步独立可验证）：
+`patchRecovery`→`edit/recovery` → `patchResult`→`edit/result` + `patchParsing`→`edit/patch`
+→ harness→`evidence/harness` → 17 文件→`planning/task` → provider-proposal→`provider/proposal`
+→ edit-proposal→`edit/proposal` → context-graph→`context/graph` → misc 逐个判定
+→ 修正 `control-plane-atlas` 失效引用 + 删除空 `orchestration/`。
+
+**pi 参考的边界（重要）**：`grep -rl "ContextGraph|TaskLifecycle|AnalysisBrief"` 在 pi 的
+5 个包中**零命中**——本仓这些概念是独有的，故 5 项决策**不能靠"pi 怎么做"回答**，
+只用其 4 条可迁移原则（契约置于所属包根部、harness 属运行时而记分卡属 evals、
+禁止通用抽象层、域目录承载上下文）。
 
 **Step 4 重算结果**（2026-09-18，零代码改动）：
 
@@ -534,6 +555,7 @@ runtime 装配四重证据。
 |---|---|
 | `step-3-migration-map.md` | **Step 3 映射表 + §6.1 逐阶段执行记录（3a-3f）** |
 | `step-4-orchestration-map.md` | **Step 4 orchestration 聚类重算（含 5 项未决问题）** |
+| `step-4-decision-research.md` | **Step 4 的 5 项决策研究：实测结论 + 方案建议 + pi 参考** |
 | `deleted-audit-2026-09-16.md` | **主文档**：403 个已删文件审查总账 + 附一至附十二 |
 | `restore-audit-2026-09-16.md` | 事故认定、三路审查、D 集恢复、补丁层复核 |
 | `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-006） |
