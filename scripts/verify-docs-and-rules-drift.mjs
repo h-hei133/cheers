@@ -30,7 +30,12 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const strict = process.argv.includes('--strict')
 
 const RULES = ['AGENTS.md', 'agent-rules', '.wiki/_index.md']
-const DOCS = ['docs/DOC_STATUS.md', 'docs/architecture', 'docs/project-map']
+// The documents whose own status entry claims they describe the current tree.
+// Written as a predicate rather than a directory list: docs/architecture holds
+// three active documents beside two historical ones, a superseded one and
+// twenty-seven the map does not list at all, so a directory is the wrong unit.
+const DOC_STATUS = 'docs/DOC_STATUS.md'
+const ACTIVE_STATUS = 'active'
 
 // File and directory references into this repository. A trailing slash marks a
 // directory, which counts: directories are exactly what a refactor deletes.
@@ -61,8 +66,9 @@ function scan(files) {
     const text = readFileSync(file, 'utf8')
     for (const match of text.matchAll(CANDIDATE)) {
       const referenced = match[1]
-      // A glob names a family, not a file, so it cannot be resolved.
-      if (referenced.includes('*')) continue
+      // A glob names a family, not a file, so it cannot be resolved. So does a
+      // placeholder like <path>, which prose uses to describe a pattern.
+      if (referenced.includes('*') || referenced.includes('<')) continue
       references += 1
       // TypeScript is routinely written as .js in prose, and a directory index
       // is written either way. Accept the shapes that resolve.
@@ -79,8 +85,43 @@ function scan(files) {
   return { references, dangling }
 }
 
+// Read the status map and keep the paths it marks active. The map is the
+// project's own statement of which documents still describe the tree, so it
+// decides the scope rather than a hand-kept directory list.
+function activeDocuments() {
+  const statusPath = resolve(repoRoot, DOC_STATUS)
+  if (!existsSync(statusPath)) {
+    console.log(`[config-failure] drift-check-status-map-missing - ${DOC_STATUS}`)
+    process.exit(3)
+  }
+  const paths = []
+  const absent = []
+  for (const line of readFileSync(statusPath, 'utf8').split('\n')) {
+    const row = /^\|\s*`([^`]+)`\s*\|\s*([a-z-]+)\s*\|/.exec(line)
+    if (row === null || row[2] !== ACTIVE_STATUS) continue
+    const target = row[1]
+    // The map names repository files; skip anything outside the repository.
+    if (target.startsWith('..') || target.startsWith('/')) continue
+    if (!existsSync(resolve(repoRoot, target))) {
+      absent.push(target)
+      continue
+    }
+    paths.push(target)
+  }
+  // An entry claiming a document is the current source of truth, when that
+  // document is gone, is exactly the drift this gate exists to catch. Report
+  // all of them, then stop: the scope itself is wrong, so the scan below would
+  // be measuring the wrong set.
+  if (absent.length > 0) {
+    for (const target of absent) console.log(`[product-regression] status-map-path-missing - ${target}`)
+    console.log(`[product-regression] status-map-drift - ${absent.length} active entr(ies) name files that do not exist`)
+    process.exit(1)
+  }
+  return paths
+}
+
 const rulesFiles = RULES.flatMap((target) => collect(target))
-const docsFiles = DOCS.flatMap((target) => collect(target))
+const docsFiles = activeDocuments().flatMap((target) => collect(target))
 const rules = scan(rulesFiles)
 const docs = scan(docsFiles)
 
