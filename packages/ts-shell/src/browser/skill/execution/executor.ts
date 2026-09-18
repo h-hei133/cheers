@@ -3,18 +3,18 @@ import type {
   BrowserExecutor,
   BrowserExecutorContext,
   BrowserExecutorResult,
-} from "../../../browserExecutor.js";
-import { blockedBrowserExecutorResult } from "../../../browserExecutor.js";
-import type { BrowserExecutionRequest } from "../../../browserExecutionContract.js";
+} from "../../../core/context/browserExecutor.js";
+import { blockedBrowserExecutorResult } from "../../../core/context/browserExecutor.js";
+import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
 import {
   decideBrowserLocalExecutionAuthority,
   type BrowserLocalExecutionAuthority,
-} from "../../../browserLocalExecutionAuthority.js";
-import type { BrowserLocalFixture } from "../../../browserLocalFixture.js";
-import { sanitizeBrowserEvidenceText } from "../../../browserLocalFixture.js";
+} from "../../../core/context/browserLocalExecutionAuthority.js";
+import type { BrowserLocalFixture } from "../../../core/context/browserLocalFixture.js";
+import { sanitizeBrowserEvidenceText } from "../../../core/context/browserLocalFixture.js";
 import {
   browserExternalRunnerHasForbiddenContent,
-} from "../../../../../browser/runtime/external/protocol.js";
+} from "../../runtime/external/protocol.js";
 import {
   prepareBrowserSkillExecutionBridge,
 } from "./bridge.js";

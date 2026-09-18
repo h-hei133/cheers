@@ -32,7 +32,7 @@ import {
 import { renderBrowserRuntimeSurface } from "../../browser/runtime/core/surface.js";
 import type { BrowserExternalRuntimeManifestLoadResult } from "../../browser/runtime/external/runtimeManifest.js";
 import { BrowserRuntimeAdapterExecutor } from "../../browser/runtime/core/adapterExecutor.js";
-import type { BrowserSkillRuntimeBinding } from "./browser/skill/runtime/binding.js";
+import type { BrowserSkillRuntimeBinding } from "../../browser/skill/runtime/binding.js";
 import type { BrowserPlaywrightRuntimeAvailability } from "./browserPlaywrightRuntimeAvailability.js";
 import type { BrowserToolServerBackendComparison } from "./browserToolServerBackendComparison.js";
 import type { BrowserRuntimeDirectionDecision } from "../../browser/runtime/core/directionDecision.js";
@@ -43,7 +43,7 @@ import type { BrowserExecutor } from "./browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "./browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
-import { renderBrowserSkillRunnerSurface } from "./browser/skill/runner/surface.js";
+import { renderBrowserSkillRunnerSurface } from "../../browser/skill/runner/surface.js";
 import { runBrowserReplayCommand } from "./browserReplayCommandRunner.js";
 import { runBrowserSelfHealingCommand } from "./browserSelfHealingCommandRunner.js";
 

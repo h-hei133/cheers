@@ -13,8 +13,8 @@ import {
   createBrowserLocalFixtureManifest,
   serializeBrowserLocalFixtureManifest,
 } from "./browserLocalFixtureManifest.js";
-import { createBrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
-import { createBrowserSkillRunnerBinding } from "./browser/skill/runner/binding.js";
+import { createBrowserSkillRunnerMetadata } from "../../browser/skill/runner/metadata.js";
+import { createBrowserSkillRunnerBinding } from "../../browser/skill/runner/binding.js";
 
 describe("browser CLI execution bridge", () => {
   it("keeps execution disabled when injection is absent", () => {

@@ -5,7 +5,7 @@ import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
 import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
 import { runBrowserActionLoopExecutor } from "../context/browserActionLoopExecutor.js";
 import { BrowserRuntimeAdapterExecutor } from "../../browser/runtime/core/adapterExecutor.js";
-import { validateBrowserSkillRuntimeBinding, type BrowserSkillRuntimeBinding } from "../context/browser/skill/runtime/binding.js";
+import { validateBrowserSkillRuntimeBinding, type BrowserSkillRuntimeBinding } from "../../browser/skill/runtime/binding.js";
 import { validateBrowserRuntimeManifest } from "../../browser/runtime/core/manifest.js";
 import { applyBrowserSelectorRepair } from "../context/browserSelectorRepairApplyExecutor.js";
 import {

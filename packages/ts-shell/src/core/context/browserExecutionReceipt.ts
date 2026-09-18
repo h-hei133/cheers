@@ -11,8 +11,8 @@ import {
   type BrowserExecutionReceiptStatus,
   type BrowserReplayReadiness,
 } from "./browserReplayReadiness.js";
-import type { BrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
-import type { BrowserSkillRunnerReadiness } from "./browser/skill/runner/readiness.js";
+import type { BrowserSkillRunnerMetadata } from "../../browser/skill/runner/metadata.js";
+import type { BrowserSkillRunnerReadiness } from "../../browser/skill/runner/readiness.js";
 
 export type { BrowserExecutionReceiptStatus } from "./browserReplayReadiness.js";
 export type BrowserExecutionReceiptId = string;

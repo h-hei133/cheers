@@ -9,8 +9,8 @@ import {
   serializeBrowserExternalRunnerManifest,
   type BrowserExternalRunnerManifest,
 } from "../../browser/runtime/external/manifest.js";
-import { createBrowserSkillRunnerBinding } from "../context/browser/skill/runner/binding.js";
-import { createBrowserSkillRunnerMetadata } from "../context/browser/skill/runner/metadata.js";
+import { createBrowserSkillRunnerBinding } from "../../browser/skill/runner/binding.js";
+import { createBrowserSkillRunnerMetadata } from "../../browser/skill/runner/metadata.js";
 
 export type BrowserSkillExecutionFixtureKind =
   | "success"

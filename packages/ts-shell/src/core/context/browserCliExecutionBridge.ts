@@ -15,10 +15,10 @@ import {
 import {
   classifyBrowserSkillRunnerReadiness,
   type BrowserSkillRunnerReadiness,
-} from "./browser/skill/runner/readiness.js";
-import type { BrowserSkillRunnerMetadata } from "./browser/skill/runner/metadata.js";
-import type { BrowserSkillRunnerBinding } from "./browser/skill/runner/binding.js";
-import { BrowserSkillExecutionExecutor } from "./browser/skill/execution/executor.js";
+} from "../../browser/skill/runner/readiness.js";
+import type { BrowserSkillRunnerMetadata } from "../../browser/skill/runner/metadata.js";
+import type { BrowserSkillRunnerBinding } from "../../browser/skill/runner/binding.js";
+import { BrowserSkillExecutionExecutor } from "../../browser/skill/execution/executor.js";
 import {
   decideBrowserRuntimeDependencyPolicy,
 } from "../../browser/runtime/core/dependencyPolicy.js";

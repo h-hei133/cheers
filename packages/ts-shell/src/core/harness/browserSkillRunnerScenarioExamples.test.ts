@@ -11,7 +11,7 @@ import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
 } from "../../browser/runtime/external/manifest.js";
-import { createBrowserSkillRunnerMetadata } from "../context/browser/skill/runner/metadata.js";
+import { createBrowserSkillRunnerMetadata } from "../../browser/skill/runner/metadata.js";
 
 describe("browser skill runner CLI scenario examples", () => {
   const tempRoots: string[] = [];

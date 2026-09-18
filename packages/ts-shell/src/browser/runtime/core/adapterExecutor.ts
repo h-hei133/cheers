@@ -16,7 +16,7 @@ import {
 import {
   validateBrowserSkillRuntimeBinding,
   type BrowserSkillRuntimeBinding,
-} from "../../../core/context/browser/skill/runtime/binding.js";
+} from "../../skill/runtime/binding.js";
 import { validateBrowserRuntimeSnapshots } from "../../../core/context/browserSnapshotValidation.js";
 
 export class BrowserRuntimeAdapterExecutor implements BrowserRuntimeExecutor {

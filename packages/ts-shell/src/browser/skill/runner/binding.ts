@@ -1,9 +1,9 @@
-import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
 import type {
   BrowserExternalRunnerAction,
   BrowserExternalRunnerCommand,
-} from "../../../../../browser/runtime/external/protocol.js";
-import { browserExternalRunnerHasForbiddenContent } from "../../../../../browser/runtime/external/protocol.js";
+} from "../../runtime/external/protocol.js";
+import { browserExternalRunnerHasForbiddenContent } from "../../runtime/external/protocol.js";
 import type { BrowserSkillRunnerMetadata } from "./metadata.js";
 
 export const BROWSER_SKILL_RUNNER_BINDING_VERSION =

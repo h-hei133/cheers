@@ -15,11 +15,11 @@ import {
 import {
   validateBrowserSkillRunnerMetadata,
   type BrowserSkillRunnerMetadata,
-} from "../../../core/context/browser/skill/runner/metadata.js";
+} from "../../skill/runner/metadata.js";
 import {
   validateBrowserSkillRunnerBinding,
   type BrowserSkillRunnerBinding,
-} from "../../../core/context/browser/skill/runner/binding.js";
+} from "../../skill/runner/binding.js";
 
 export const BROWSER_EXTERNAL_RUNNER_MANIFEST_VERSION =
   "browser-external-runner-manifest/v1" as const;

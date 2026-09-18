@@ -23,11 +23,11 @@ import type { BrowserNetworkAllowlist } from "./browserNetworkAllowlist.js";
 import { runBrowserRuntimePreflight } from "../../browser/runtime/core/preflight.js";
 import { renderBrowserSandboxSurface } from "./browserSandboxSurface.js";
 import type { BrowserSandboxAuthority } from "./browserSandboxAuthority.js";
-import { renderBrowserSkillRunnerSurface } from "./browser/skill/runner/surface.js";
+import { renderBrowserSkillRunnerSurface } from "../../browser/skill/runner/surface.js";
 import {
   hasBrowserSkillExecutionEvidence,
   renderBrowserSkillExecutionSurface,
-} from "./browser/skill/execution/surface.js";
+} from "../../browser/skill/execution/surface.js";
 import type { BrowserActionCache } from "./browserActionCache.js";
 import type { BrowserReceiptCacheStore } from "../../browser/receipt/browserReceiptCacheStore.js";
 import {

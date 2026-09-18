@@ -1,7 +1,7 @@
-import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
-import type { BrowserRuntimeProtocolResponse } from "../../../../../browser/runtime/core/protocol.js";
-import type { BrowserExecutionRequest } from "../../../browserExecutionContract.js";
-import type { BrowserExternalRuntimeManifest } from "../../../../../browser/runtime/external/runtimeManifest.js";
+import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
+import type { BrowserRuntimeProtocolResponse } from "../../runtime/core/protocol.js";
+import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
+import type { BrowserExternalRuntimeManifest } from "../../runtime/external/runtimeManifest.js";
 
 export interface BrowserSkillRuntimeBinding {
   readonly bindingId: string;

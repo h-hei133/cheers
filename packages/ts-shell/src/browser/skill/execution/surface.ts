@@ -1,5 +1,5 @@
-import { sanitizeBrowserText } from "../../../browserCapabilityModel.js";
-import type { BrowserExecutionResult } from "../../../browserExecutionResult.js";
+import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
+import type { BrowserExecutionResult } from "../../../core/context/browserExecutionResult.js";
 
 export function renderBrowserSkillExecutionSurface(
   result: BrowserExecutionResult,

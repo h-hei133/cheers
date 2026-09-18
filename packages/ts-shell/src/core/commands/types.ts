@@ -16,7 +16,7 @@ import type { BrowserPublicReadOnlyHttpClient } from '../context/browserPublicRe
 import type { BrowserRuntimeManifestLoadResult } from '../../browser/runtime/core/manifest.js'
 import type { BrowserRuntimeExecutor } from '../../browser/runtime/core/executor.js'
 import type { BrowserExternalRuntimeManifestLoadResult } from '../../browser/runtime/external/runtimeManifest.js'
-import type { BrowserSkillRuntimeBinding } from '../context/browser/skill/runtime/binding.js'
+import type { BrowserSkillRuntimeBinding } from '../../browser/skill/runtime/binding.js'
 import type { BrowserActionCache } from '../context/browserActionCache.js'
 import type { BrowserReceiptCacheStore } from '../../browser/receipt/browserReceiptCacheStore.js'
 import type { BrowserPublicReadOnlyWebSmokeConfig } from '../harness/browserPublicReadOnlyWebSmokeConfig.js'
