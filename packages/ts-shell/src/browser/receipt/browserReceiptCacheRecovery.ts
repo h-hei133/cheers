@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { browserActionCacheEntryHasForbiddenContent } from "../../core/context/browserActionCacheEntry.js";
+import { browserActionCacheEntryHasForbiddenContent } from "../browserActionCacheEntry.js";
 import {
   parseBrowserPersistentReceiptCacheRecord,
   type BrowserPersistentReceiptCacheRecord,
-} from "../../core/context/browserPersistentReceiptCache.js";
+} from "../browserPersistentReceiptCache.js";
 import type { BrowserReceiptCacheManifest } from "./browserReceiptCacheManifest.js";
 
 export interface BrowserReceiptCacheRecoveryResult {

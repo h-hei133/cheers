@@ -1,23 +1,23 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { createBrowserActionContract } from "../context/browserActionContract.js";
-import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
-import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
-import { createBrowserExecutionRequest, type BrowserExecutionRequest } from "../context/browserExecutionContract.js";
-import { createBrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";
-import { createBrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
-import { createBrowserReadOnlyExtraction } from "../context/browserReadOnlyExtractionModel.js";
-import { normalizeBrowserReadOnlyContent } from "../context/browserReadOnlyContentNormalizer.js";
-import { classifyBrowserReadOnlyContentType } from "../context/browserReadOnlyContentType.js";
+import { createBrowserActionContract } from "../../browser/browserActionContract.js";
+import { parseBrowserCommandArgs } from "../../browser/browserCommandContract.js";
+import { runBrowserCommandAsync } from "../../browser/browserCommandRunner.js";
+import { createBrowserExecutionRequest, type BrowserExecutionRequest } from "../../browser/browserExecutionContract.js";
+import { createBrowserNetworkAllowlist } from "../../browser/browserNetworkAllowlist.js";
+import { createBrowserSandboxAuthority } from "../../browser/browserSandboxAuthority.js";
+import { createBrowserReadOnlyExtraction } from "../../browser/browserReadOnlyExtractionModel.js";
+import { normalizeBrowserReadOnlyContent } from "../../browser/browserReadOnlyContentNormalizer.js";
+import { classifyBrowserReadOnlyContentType } from "../../browser/browserReadOnlyContentType.js";
 import {
   createBrowserPublicReadOnlyWebManifest,
   type BrowserPublicReadOnlyWebManifestLoadResult,
-} from "../context/browserPublicReadOnlyWebManifest.js";
-import { decideBrowserPublicReadOnlyWebPolicy } from "../context/browserPublicReadOnlyWebPolicy.js";
-import { runBrowserPublicReadOnlyWebExecutor } from "../context/browserPublicReadOnlyWebExecutor.js";
-import { createBrowserPublicReadOnlyWebReceipt } from "../context/browserPublicReadOnlyWebReceipt.js";
-import { renderBrowserPublicReadOnlyWebSurface } from "../context/browserPublicReadOnlyWebSurface.js";
-import { runBrowserExternalNetworkExecutionBridgeWithControlledNetwork } from "../context/browserExternalNetworkExecutionBridge.js";
-import { createBrowserControlledNetworkRunnerManifest } from "../context/browserControlledNetworkRunnerManifest.js";
+} from "../../browser/browserPublicReadOnlyWebManifest.js";
+import { decideBrowserPublicReadOnlyWebPolicy } from "../../browser/browserPublicReadOnlyWebPolicy.js";
+import { runBrowserPublicReadOnlyWebExecutor } from "../../browser/browserPublicReadOnlyWebExecutor.js";
+import { createBrowserPublicReadOnlyWebReceipt } from "../../browser/browserPublicReadOnlyWebReceipt.js";
+import { renderBrowserPublicReadOnlyWebSurface } from "../../browser/browserPublicReadOnlyWebSurface.js";
+import { runBrowserExternalNetworkExecutionBridgeWithControlledNetwork } from "../../browser/browserExternalNetworkExecutionBridge.js";
+import { createBrowserControlledNetworkRunnerManifest } from "../../browser/browserControlledNetworkRunnerManifest.js";
 import { createBrowserPublicReadOnlyWebScenarioFixture } from "./browserPublicReadOnlyWebScenarioFixtures.js";
 import { createBrowserControlledNetworkServer } from "./browserControlledNetworkServer.js";
 

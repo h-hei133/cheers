@@ -1,6 +1,6 @@
-import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
 import type { BrowserRuntimeProtocolResponse } from "../../runtime/core/protocol.js";
-import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
+import type { BrowserExecutionRequest } from "../../browserExecutionContract.js";
 import type { BrowserExternalRuntimeManifest } from "../../runtime/external/runtimeManifest.js";
 
 export interface BrowserSkillRuntimeBinding {

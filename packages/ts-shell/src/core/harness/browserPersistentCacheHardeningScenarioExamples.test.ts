@@ -1,13 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
-import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
-import { safeReceipt } from "../context/browserActionCacheEntry.test.js";
+import { parseBrowserCommandArgs } from "../../browser/browserCommandContract.js";
+import { runBrowserCommandAsync } from "../../browser/browserCommandRunner.js";
+import { safeReceipt } from "../../browser/browserActionCacheEntry.test.js";
 import {
   createBrowserPersistentReceiptCacheRecord,
   createBrowserPersistentReceiptCacheTombstone,
-} from "../context/browserPersistentReceiptCache.js";
+} from "../../browser/browserPersistentReceiptCache.js";
 import { acquireBrowserReceiptCacheLock } from "../../browser/receipt/browserReceiptCacheLock.js";
 import {
   createBrowserPersistentReplayScenarioFixture,

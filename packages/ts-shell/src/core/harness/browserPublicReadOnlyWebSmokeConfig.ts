@@ -1,6 +1,6 @@
-import { sanitizeBrowserText } from "../context/browserCapabilityModel.js";
-import { parseBrowserNetworkTarget } from "../context/browserNetworkAllowlist.js";
-import type { BrowserPublicReadOnlyWebMethod } from "../context/browserPublicReadOnlyWebManifest.js";
+import { sanitizeBrowserText } from "../../browser/browserCapabilityModel.js";
+import { parseBrowserNetworkTarget } from "../../browser/browserNetworkAllowlist.js";
+import type { BrowserPublicReadOnlyWebMethod } from "../../browser/browserPublicReadOnlyWebManifest.js";
 
 export const PUBLIC_WEB_SMOKE_ENABLE_ENV = "PRIVATE_AGENTS_ENABLE_PUBLIC_WEB_SMOKE";
 export const PUBLIC_WEB_SMOKE_URL_ENV = "PRIVATE_AGENTS_PUBLIC_WEB_SMOKE_URL";

@@ -1,11 +1,11 @@
-import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
 import {
   createBrowserLocalFixture,
   sanitizeBrowserEvidenceText,
   type BrowserLocalFixture,
   type BrowserLocalFixtureAction,
   type BrowserLocalFixtureKind,
-} from "../../../core/context/browserLocalFixture.js";
+} from "../../browserLocalFixture.js";
 import {
   browserExternalRunnerHasForbiddenContent,
   type BrowserExternalRunnerAction,

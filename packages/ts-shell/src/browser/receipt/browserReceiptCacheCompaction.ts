@@ -1,4 +1,4 @@
-import type { BrowserPersistentReceiptCacheRecord } from "../../core/context/browserPersistentReceiptCache.js";
+import type { BrowserPersistentReceiptCacheRecord } from "../browserPersistentReceiptCache.js";
 import type { BrowserReceiptCacheManifest } from "./browserReceiptCacheManifest.js";
 import { applyBrowserReceiptCacheRetention } from "./browserReceiptCacheRetention.js";
 import {

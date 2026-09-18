@@ -7,11 +7,11 @@ import {
   createBrowserPublicReadOnlyWebManifest,
   serializeBrowserPublicReadOnlyWebManifest,
   type BrowserPublicReadOnlyWebManifest,
-} from "../context/browserPublicReadOnlyWebManifest.js";
+} from "../../browser/browserPublicReadOnlyWebManifest.js";
 import type {
   BrowserPublicReadOnlyHttpClient,
   BrowserPublicReadOnlyHttpResponse,
-} from "../context/browserPublicReadOnlyWebExecutor.js";
+} from "../../browser/browserPublicReadOnlyWebExecutor.js";
 
 export interface BrowserPublicReadOnlyWebScenarioFixture {
   readonly origin: string;

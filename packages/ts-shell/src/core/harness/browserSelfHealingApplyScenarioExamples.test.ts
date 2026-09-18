@@ -4,13 +4,13 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createBrowserReceiptCacheManifest } from "../../browser/receipt/browserReceiptCacheManifest.js";
 import { createBrowserReceiptCacheStore } from "../../browser/receipt/browserReceiptCacheStore.js";
-import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
-import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
-import { createBrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";
-import { createBrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
-import { runBrowserReplayCommand } from "../context/browserReplayCommandRunner.js";
+import { runBrowserCommandAsync } from "../../browser/browserCommandRunner.js";
+import { parseBrowserCommandArgs } from "../../browser/browserCommandContract.js";
+import { createBrowserNetworkAllowlist } from "../../browser/browserNetworkAllowlist.js";
+import { createBrowserSandboxAuthority } from "../../browser/browserSandboxAuthority.js";
+import { runBrowserReplayCommand } from "../../browser/browserReplayCommandRunner.js";
 import { createBrowserReplayScenarioFixture, type BrowserReplayScenarioFixture } from "./browserReplayScenarioFixtures.js";
-import { safeReceipt } from "../context/browserActionCacheEntry.test.js";
+import { safeReceipt } from "../../browser/browserActionCacheEntry.test.js";
 import {
   captureCliOutput,
   deterministicCliScenarioTimestamp,

@@ -1,5 +1,5 @@
-import type { BrowserActionContract } from "../../../core/context/browserActionContract.js";
-import { sanitizeBrowserText, type BrowserBackendKind } from "../../../core/context/browserCapabilityModel.js";
+import type { BrowserActionContract } from "../../browserActionContract.js";
+import { sanitizeBrowserText, type BrowserBackendKind } from "../../browserCapabilityModel.js";
 
 export type BrowserRuntimeCandidate =
   | "playwright-cli-skills"

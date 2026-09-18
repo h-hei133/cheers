@@ -6,7 +6,7 @@ import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
 } from "../../browser/runtime/external/manifest.js";
-import { BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV } from "../context/browserCliExecutorInjection.js";
+import { BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV } from "../../browser/browserCliExecutorInjection.js";
 import {
   browserReceiptCacheLockPath,
   type BrowserReceiptCacheLockOperation,

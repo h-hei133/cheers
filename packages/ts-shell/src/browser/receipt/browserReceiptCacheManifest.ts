@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
-import { browserActionCacheEntryHasForbiddenContent } from "../../core/context/browserActionCacheEntry.js";
+import { browserActionCacheEntryHasForbiddenContent } from "../browserActionCacheEntry.js";
 
 export const BROWSER_RECEIPT_CACHE_MANIFEST_ENV =
   "PRIVATE_AGENTS_BROWSER_RECEIPT_CACHE_MANIFEST";

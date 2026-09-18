@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { compareBrowserToolServerBackend } from "../context/browserToolServerBackendComparison.js";
-import { renderBrowserPlaywrightAdapterSurface } from "../context/browserPlaywrightAdapterSurface.js";
+import { compareBrowserToolServerBackend } from "../../browser/browserToolServerBackendComparison.js";
+import { renderBrowserPlaywrightAdapterSurface } from "../../browser/browserPlaywrightAdapterSurface.js";
 import { decideBrowserRuntimeDirection } from "../../browser/runtime/core/directionDecision.js";
-import { auditBrowserPlaywrightRuntimeAvailability } from "../context/browserPlaywrightRuntimeAvailability.js";
+import { auditBrowserPlaywrightRuntimeAvailability } from "../../browser/browserPlaywrightRuntimeAvailability.js";
 
 describe("browser runtime direction decision scenarios", () => {
   it("Direct Playwright available and controllable recommends core runtime", async () => {

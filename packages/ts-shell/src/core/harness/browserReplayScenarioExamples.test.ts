@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
-import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
+import { parseBrowserCommandArgs } from "../../browser/browserCommandContract.js";
+import { runBrowserCommandAsync } from "../../browser/browserCommandRunner.js";
 import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
 import type { AgentCliScenarioResult } from "./agentCliScenarioModel.js";
 import {

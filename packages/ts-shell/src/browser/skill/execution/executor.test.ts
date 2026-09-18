@@ -2,15 +2,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseBrowserPreviewActionArgs } from "../../../core/context/browserActionContract.js";
-import { createBrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
-import { createBrowserLocalExecutionAuthority } from "../../../core/context/browserLocalExecutionAuthority.js";
-import { createBrowserLocalFixture } from "../../../core/context/browserLocalFixture.js";
+import { parseBrowserPreviewActionArgs } from "../../browserActionContract.js";
+import { createBrowserExecutionRequest } from "../../browserExecutionContract.js";
+import { createBrowserLocalExecutionAuthority } from "../../browserLocalExecutionAuthority.js";
+import { createBrowserLocalFixture } from "../../browserLocalFixture.js";
 import { createBrowserSkillRunnerMetadata } from "../runner/metadata.js";
 import { createBrowserSkillRunnerBinding } from "../runner/binding.js";
 import { BrowserSkillExecutionExecutor } from "./executor.js";
-import { createBrowserExecutionResult } from "../../../core/context/browserExecutionResult.js";
-import { decideBrowserExecutionPolicy } from "../../../core/context/browserExecutionPolicy.js";
+import { createBrowserExecutionResult } from "../../browserExecutionResult.js";
+import { decideBrowserExecutionPolicy } from "../../browserExecutionPolicy.js";
 
 describe("browser skill execution executor", () => {
   const roots: string[] = [];

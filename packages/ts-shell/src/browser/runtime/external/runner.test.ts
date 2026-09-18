@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { parseBrowserCommandArgs } from "../../../core/context/browserCommandContract.js";
+import { parseBrowserCommandArgs } from "../../browserCommandContract.js";
 import { runBrowserExternalRunnerProcess } from "./runner.js";
 import { createBrowserExternalRunnerRequest } from "./protocol.js";
 import { createBrowserExternalRunnerScenarioFixture } from "../../../core/harness/browserExternalRunnerScenarioFixtures.js";

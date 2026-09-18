@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV,
-} from "../context/browserCliExecutorInjection.js";
+} from "../../browser/browserCliExecutorInjection.js";
 import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,

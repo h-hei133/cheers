@@ -1,20 +1,20 @@
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
-import { createBrowserCliExecutionBridge } from "../core/context/browserCliExecutionBridge.js";
-import { loadBrowserCliExecutorInjectionFromEnv } from "../core/context/browserCliExecutorInjection.js";
+import { createBrowserCliExecutionBridge } from "../browser/browserCliExecutionBridge.js";
+import { loadBrowserCliExecutorInjectionFromEnv } from "../browser/browserCliExecutorInjection.js";
 import { loadBrowserReceiptCacheManifestFromEnv } from "../browser/receipt/browserReceiptCacheManifest.js";
 import { createBrowserReceiptCacheStore } from "../browser/receipt/browserReceiptCacheStore.js";
 import {
   createBrowserExternalNetworkRunnerHarnessContext,
   loadBrowserExternalNetworkRunnerManifestFromEnv,
-} from "../core/context/browserExternalNetworkRunnerManifest.js";
+} from "../browser/browserExternalNetworkRunnerManifest.js";
 import {
   createBrowserControlledNetworkHarnessContext,
   loadBrowserControlledNetworkRunnerManifestFromEnv,
-} from "../core/context/browserControlledNetworkRunnerManifest.js";
+} from "../browser/browserControlledNetworkRunnerManifest.js";
 import {
   createBrowserPublicReadOnlyWebHarnessContext,
   loadBrowserPublicReadOnlyWebManifestFromEnv,
-} from "../core/context/browserPublicReadOnlyWebManifest.js";
+} from "../browser/browserPublicReadOnlyWebManifest.js";
 import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../core/harness/browserPublicReadOnlyWebSmokeConfig.js";
 import type { CompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
 import type { CompactLiveCheckpointStore } from "../context/compact/checkpoint/compactLiveCheckpoint.js";

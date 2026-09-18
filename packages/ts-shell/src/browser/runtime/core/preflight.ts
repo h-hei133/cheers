@@ -1,24 +1,24 @@
-import type { BrowserExecutorKind } from "../../../core/context/browserExecutor.js";
-import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
+import type { BrowserExecutorKind } from "../../browserExecutor.js";
+import type { BrowserExecutionRequest } from "../../browserExecutionContract.js";
 import {
   decideBrowserExecutionConfirmation,
   type BrowserExecutionConfirmationRecord,
-} from "../../../core/context/browserExecutionConfirmation.js";
-import { buildBrowserExecutionEvidencePolicy } from "../../../core/context/browserExecutionEvidencePolicy.js";
-import type { BrowserExecutionPolicyDecision } from "../../../core/context/browserExecutionPolicy.js";
+} from "../../browserExecutionConfirmation.js";
+import { buildBrowserExecutionEvidencePolicy } from "../../browserExecutionEvidencePolicy.js";
+import type { BrowserExecutionPolicyDecision } from "../../browserExecutionPolicy.js";
 import {
   createBrowserNetworkAllowlist,
   decideBrowserNetworkAllowlist,
   type BrowserNetworkAllowlist,
   type BrowserNetworkDecision,
-} from "../../../core/context/browserNetworkAllowlist.js";
+} from "../../browserNetworkAllowlist.js";
 import {
   createBrowserSandboxAuthority,
   decideBrowserSandboxAuthority,
   type BrowserSandboxAuthority,
   type BrowserSandboxAuthorityDecision,
-} from "../../../core/context/browserSandboxAuthority.js";
-import { createBrowserPlaywrightCliPlan } from "../../../core/context/browserPlaywrightCliAdapter.js";
+} from "../../browserSandboxAuthority.js";
+import { createBrowserPlaywrightCliPlan } from "../../browserPlaywrightCliAdapter.js";
 
 export type BrowserRuntimePreflightStatus =
   | "pass"

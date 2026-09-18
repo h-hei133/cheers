@@ -7,7 +7,7 @@ import {
   type BrowserExternalRunnerStatus,
 } from "./protocol.js";
 import type { BrowserExternalRunnerManifest } from "./manifest.js";
-import { sanitizeBrowserEvidenceText } from "../../../core/context/browserLocalFixture.js";
+import { sanitizeBrowserEvidenceText } from "../../browserLocalFixture.js";
 
 export interface BrowserExternalRunnerProcessResult {
   readonly status: BrowserExternalRunnerStatus;

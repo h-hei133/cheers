@@ -1,4 +1,4 @@
-import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
 import type { BrowserSkillRunnerMetadata } from "./metadata.js";
 import type { BrowserSkillRunnerReadiness } from "./readiness.js";
 

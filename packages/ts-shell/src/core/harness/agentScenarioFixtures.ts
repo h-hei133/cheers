@@ -8,10 +8,10 @@ import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalSt
 import { createProjectMemoryReviewStateStore } from "../../memory/projectMemoryReviewState.js";
 import type { ProjectMemoryRecord } from "../../memory/projectMemoryStoreContract.js";
 import { createSidebarLiveEventStore } from "../../presentation/sidebar/sidebarLiveEventStore.js";
-import type { BrowserExecutor } from "../context/browserExecutor.js";
-import type { BrowserExecutionConfirmationRecord } from "../context/browserExecutionConfirmation.js";
-import type { BrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";
-import type { BrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
+import type { BrowserExecutor } from "../../browser/browserExecutor.js";
+import type { BrowserExecutionConfirmationRecord } from "../../browser/browserExecutionConfirmation.js";
+import type { BrowserNetworkAllowlist } from "../../browser/browserNetworkAllowlist.js";
+import type { BrowserSandboxAuthority } from "../../browser/browserSandboxAuthority.js";
 import { createStartupWarmContextCacheStore } from "../../context/startup/startupWarmContextHealth.js";
 import type { CommandContext } from "../commands/types.js";
 import {

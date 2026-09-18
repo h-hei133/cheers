@@ -6,7 +6,7 @@ import { agentCliAssertionFailures } from "./agentCliScenarioAssertions.js";
 import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
 import { runAgentCliScenario } from "./agentCliScenarioRunner.js";
 import type { AgentCliScenario } from "./agentCliScenarioModel.js";
-import { BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV } from "../context/browserCliExecutorInjection.js";
+import { BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV } from "../../browser/browserCliExecutorInjection.js";
 import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,

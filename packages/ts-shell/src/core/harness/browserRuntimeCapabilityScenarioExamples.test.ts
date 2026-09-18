@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
-import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
-import { runBrowserActionLoopExecutor } from "../context/browserActionLoopExecutor.js";
+import { parseBrowserCommandArgs } from "../../browser/browserCommandContract.js";
+import { runBrowserCommandAsync } from "../../browser/browserCommandRunner.js";
+import { runBrowserActionLoopExecutor } from "../../browser/browserActionLoopExecutor.js";
 import { renderBrowserRuntimeSurface } from "../../browser/runtime/core/surface.js";
-import { renderBrowserPublicReadOnlyWebSurface } from "../context/browserPublicReadOnlyWebSurface.js";
+import { renderBrowserPublicReadOnlyWebSurface } from "../../browser/browserPublicReadOnlyWebSurface.js";
 import { createBrowserPublicReadOnlyWebScenarioFixture } from "./browserPublicReadOnlyWebScenarioFixtures.js";
-import { createBrowserPublicReadOnlyWebManifest } from "../context/browserPublicReadOnlyWebManifest.js";
-import { decideBrowserPublicReadOnlyWebPolicy } from "../context/browserPublicReadOnlyWebPolicy.js";
-import { runBrowserPublicReadOnlyWebExecutor } from "../context/browserPublicReadOnlyWebExecutor.js";
-import { createBrowserPublicReadOnlyWebReceipt } from "../context/browserPublicReadOnlyWebReceipt.js";
+import { createBrowserPublicReadOnlyWebManifest } from "../../browser/browserPublicReadOnlyWebManifest.js";
+import { decideBrowserPublicReadOnlyWebPolicy } from "../../browser/browserPublicReadOnlyWebPolicy.js";
+import { runBrowserPublicReadOnlyWebExecutor } from "../../browser/browserPublicReadOnlyWebExecutor.js";
+import { createBrowserPublicReadOnlyWebReceipt } from "../../browser/browserPublicReadOnlyWebReceipt.js";
 import { adaptCommandResultToSidebarEvent } from "../../presentation/sidebar/sidebarCommandEventAdapter.js";
 import {
   browserRuntimeRequest,

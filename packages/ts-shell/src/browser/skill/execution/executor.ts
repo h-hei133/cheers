@@ -3,15 +3,15 @@ import type {
   BrowserExecutor,
   BrowserExecutorContext,
   BrowserExecutorResult,
-} from "../../../core/context/browserExecutor.js";
-import { blockedBrowserExecutorResult } from "../../../core/context/browserExecutor.js";
-import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
+} from "../../browserExecutor.js";
+import { blockedBrowserExecutorResult } from "../../browserExecutor.js";
+import type { BrowserExecutionRequest } from "../../browserExecutionContract.js";
 import {
   decideBrowserLocalExecutionAuthority,
   type BrowserLocalExecutionAuthority,
-} from "../../../core/context/browserLocalExecutionAuthority.js";
-import type { BrowserLocalFixture } from "../../../core/context/browserLocalFixture.js";
-import { sanitizeBrowserEvidenceText } from "../../../core/context/browserLocalFixture.js";
+} from "../../browserLocalExecutionAuthority.js";
+import type { BrowserLocalFixture } from "../../browserLocalFixture.js";
+import { sanitizeBrowserEvidenceText } from "../../browserLocalFixture.js";
 import {
   browserExternalRunnerHasForbiddenContent,
 } from "../../runtime/external/protocol.js";

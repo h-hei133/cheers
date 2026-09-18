@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderBrowserExternalRunnerSurface } from "./surface.js";
-import type { BrowserExecutionResult } from "../../../core/context/browserExecutionResult.js";
+import type { BrowserExecutionResult } from "../../browserExecutionResult.js";
 
 describe("browser external runner surface", () => {
   it("renders concise external runner status without raw content", () => {

@@ -1,6 +1,6 @@
-import { sanitizeBrowserText } from "../../../core/context/browserCapabilityModel.js";
-import type { BrowserAccessibilityNodeInput } from "../../../core/context/browserAccessibilitySnapshot.js";
-import type { BrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
+import { sanitizeBrowserText } from "../../browserCapabilityModel.js";
+import type { BrowserAccessibilityNodeInput } from "../../browserAccessibilitySnapshot.js";
+import type { BrowserExecutionRequest } from "../../browserExecutionContract.js";
 import { normalizeOriginLike, type BrowserRuntimeManifest } from "./manifest.js";
 
 export interface BrowserRuntimePageState {

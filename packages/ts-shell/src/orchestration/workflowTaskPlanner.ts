@@ -1,5 +1,5 @@
 import type { CodingTaskKind } from "./types.js";
-import type { BrowserAgentPlan } from "../core/context/browserAgent.js";
+import type { BrowserAgentPlan } from "../browser/browserAgent.js";
 import type { GroundedDeliverableMode } from "./runtimeHandoffProjection.js";
 import type {
   WorkflowActionGraph,

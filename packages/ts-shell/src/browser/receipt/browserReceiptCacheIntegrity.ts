@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import {
   type BrowserPersistentReceiptCacheRecord,
-} from "../../core/context/browserPersistentReceiptCache.js";
+} from "../browserPersistentReceiptCache.js";
 import type { BrowserReceiptCacheManifest } from "./browserReceiptCacheManifest.js";
 import {
   browserReceiptCacheFilePath,

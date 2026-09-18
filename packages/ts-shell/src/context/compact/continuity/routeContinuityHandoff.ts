@@ -6,7 +6,7 @@ import {
   factValue,
   type CompactContinuityPacket,
   type CompactContinuityPacketSource,
-} from "../continuity/compactContinuityPacket.js";
+} from "./compactContinuityPacket.js";
 import { CONTEXT_CONTINUITY_MANIFEST } from "../../../core/context/model/contextContinuityManifest.js";
 import {
   projectContextState,

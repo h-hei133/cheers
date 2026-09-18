@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseBrowserPreviewActionArgs } from "../../../core/context/browserActionContract.js";
-import { createBrowserExecutionRequest } from "../../../core/context/browserExecutionContract.js";
+import { parseBrowserPreviewActionArgs } from "../../browserActionContract.js";
+import { createBrowserExecutionRequest } from "../../browserExecutionContract.js";
 import { createBrowserSkillRunnerMetadata } from "../runner/metadata.js";
 import {
   createBrowserSkillExecutionRequest,
