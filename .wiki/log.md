@@ -491,3 +491,32 @@
   ③是否更新 `.normproof/dispositions.md`（拆则改 fix，不拆则记新 defer 理由）。
 - **验证**：探索阶段零代码改动 → 不跑构建/测试。所有数字脚本实测（正则解析 + `analyze-boundaries.py`
   + normproof 产物）。
+
+## [2026-09-18] step5-a | SessionManager 拆分第一批+第二批完成（59 → 38）。PTY 实机验证通过。
+- **第一批 `268b2f83`**：删除 4 个**全仓零调用**成员（`loadSessionMessages`、`normalizeTranscriptEvents`、
+  `repairTranscriptEvents` 三个 public + `applyAutoCompactRetention` 一个 private 包装）。
+  删除前完成六项检查：全仓各仅 1 次出现（自身声明）；底层实现均已被其他模块直接使用；
+  不在公共面（`index.ts` 不导出 SessionManager）；无字符串路径/`pathToFileURL` 入口；`scripts/` 无引用。
+  连带清理 4 处失效 import + 1 处失效 `export type`。**计数 59 → 55。**
+- **第二批 `10350ede`**：14 个状态写入方法（`markRunStarted`/`persistUserPromptBarrier`/`markTurnActive`/
+  `markRecoveryReentry`/`saveInterrupted`/`saveCompleted`/`saveError`/`saveTerminated`/`discardIfEmpty`/`addTurn`/
+  `recordApprovalAuditDecision`/`reconcilePendingLifecycle`/`appendQueryEvent`/`appendCompactionEntry`）
+  + 2 个其专属 helper（`createSessionLifecycleCallbacks`、`appendTranscriptEvent`）移入
+  `session/lifecycle/sessionLifecycleWrites.ts`。
+- **机制选择：继承**（`SessionManager extends SessionLifecycleWrites`）。理由：**同样的降数效果、零调用点改动**。
+  组合方案需改 **290 处调用点**（生产 44 / 测试 246）+ 55 个消费者文件，不带来额外收益。
+  仓库先例：14 处 `extends` **全是 `Error` 子类**，`protected` 成员**零先例**（5 处 "protected" 命中全是英文文案）——
+  本批建立先例。
+- **基类不反向依赖**：所需 3 项（transcript events、recovery snapshot、state-snapshot overrides）
+  经 `SessionLifecycleWriteHost` 接口构造注入，基类不 import SessionManager（无环）。
+- **计数 55 → 38**；新模块声明 **17**（≤20）。**两个文件均已达标。**
+- **验证**：构建 clean；**全量 3172/3172 零失败**；聚焦 897/897（124 文件）；
+  **PTY 实机**——`/resume` 列出 15 条真实历史会话 → 发真实 prompt → 回合执行 → 新会话 `sess_342`
+  落盘 → `/resume` 显示 **16 条**且新条目在首位（标题/时间/outcome 齐全）。
+  **写入路径与读取路径双向验证通过**；可达性 **959/874 → 960/875**（改善）。
+- **(b) 分析已完成**（`step-5-session-manager-recon.md` §11）：收益 = 零调用点改动 + 公共面不变 +
+  依赖方向显式化；风险 = 引入仓库第二套类约定（中）、继承链深度（中，**建议限制 1–2 层**）、
+  `as` 断言与测试替身（低，已核实不受影响）。
+- **剩余工作量**：当前 38，需再减 18。实测各组跨组依赖：**`store-binding`(11) 与 `read-projection`(8)
+  跨组依赖均为 0** → 抽出后 ≈ **19，达标**，且**不需要 host 接口**（比本批更简单）。
+  建议下一步先抽 `store-binding`（38 → 27），再抽 `read-projection`（→ 19）。

@@ -233,7 +233,7 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 | 步骤 | 内容 | 前置 |
 |---|---|---|
 | Step 4 | orchestration 聚类 | ✅ **已完成**（2026-09-18，9 批）——`src/orchestration/` 已解散，123 文件全部分流 |
-| Step 5 | SessionManager 拆分（51 方法 facade，ALIVE） | **探索已完成**（`step-5-session-manager-recon.md`）→ **待裁决 3 项** |
+| Step 5 | SessionManager 拆分（51 方法 facade，ALIVE） | **进行中**：59→55→**38**（两批已提交 `268b2f83`、`10350ede`）；(b) 分析已完成 |
 | Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | Step 4 已完成，`orchestration` 域更名**随之自然消解** |
 | Step 7 | 收尾：NormProof judge 全量跑 | 以搬迁后 BFS 报告作为收敛证据 |
 

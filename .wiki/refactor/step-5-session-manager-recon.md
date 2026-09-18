@@ -256,3 +256,107 @@ session/manager/
 - (b) 是否允许引入继承机制（无先例，但零调用点改动）；
 - (c) 是否改为"登记 defer"——依据仍是 `agent-rules` 第 147 行的明文条款
   （SessionManager 可保留真实生命周期协调职责）。
+
+---
+
+## 10. 执行记录：(a) 已完成（2026-09-18）
+
+### 10.1 第一批：删除 4 个零调用成员（`268b2f83`）
+
+删除前完成六项检查（功能读审、等价实现核验、消费者存活、动态入口、公共面、scripts 引用）：
+
+| 名字 | 性质 | 检查结果 |
+|---|---|---|
+| `loadSessionMessages` | public | 全仓**仅 1 次出现**（自身声明）；底层 `projectTranscriptMessages` 已被 `sessionStore.ts`、`exportCommandRuntime.ts` 使用 |
+| `normalizeTranscriptEvents` | public | 同上；实际在用的是 `normalizeReplayTranscriptEvents`（不同函数） |
+| `repairTranscriptEvents` | public | 同上；`repairReplayTranscript` 仅此一处引用 |
+| `applyAutoCompactRetention` | private | `this.applyAutoCompactRetention` 零引用；底层已被 `agent/persistence.ts` 使用 |
+
+- 不在公共面（`index.ts` 不导出 `SessionManager`）；无字符串路径/`pathToFileURL` 入口；`scripts/` 无引用。
+- 连带清理 4 处失效 import + 1 处失效 `export type`。
+- **计数：59 → 55。**
+
+### 10.2 第二批：抽出 lifecycle-writes（`10350ede`）
+
+14 个状态写入方法 + 2 个其专属 helper（`createSessionLifecycleCallbacks`、`appendTranscriptEvent`）
+移入 `session/lifecycle/sessionLifecycleWrites.ts`。
+
+**机制选择：继承**（`SessionManager extends SessionLifecycleWrites`）。
+
+| 机制 | 降数 | 调用点改动 | 仓库先例 |
+|---|---|---|---|
+| **继承（采用）** | ✅ | **0** | 无（本次建立） |
+| 组合 + 改调用点 | ✅ | **290 处** | `this.deps.*` 导航已有 |
+
+选继承的理由：**同样的降数效果，零调用点改动**。290 处调用点（生产 44 / 测试 246）的改动
+不带来额外收益，却把 55 个消费者文件全部卷入。
+
+**基类不反向依赖**：它需要的 3 项（transcript events、recovery snapshot、state-snapshot overrides）
+经 `SessionLifecycleWriteHost` 接口在构造时注入，而非通过 `this` 反向取用。
+
+**计数：55 → 38**；新模块声明 **17**（≤20）。**两个文件均已达标。**
+
+### 10.3 验证
+
+| 项 | 结果 |
+|---|---|
+| 构建 | clean |
+| 全量测试 | **3172 / 3172，零失败** |
+| 聚焦测试 | 897 / 897（124 文件） |
+| **PTY 实机** | 真实回合跑通；新会话 `sess_342` 出现在 `/resume` 列表（标题/时间/outcome 齐全） |
+| 可达性 | **959/874 → 960/875**（改善） |
+
+PTY 证据链：`/resume` 列出 15 条真实历史会话（读 `listReentrySummaries` + recovery snapshot）
+→ 发一条真实 prompt → 回合执行 → 新会话落盘 → `/resume` 显示 **16 条**，新条目在首位。
+**写入路径与读取路径双向验证通过。**
+
+---
+
+## 11. (b) 继承机制的风险与收益分析
+
+### 11.1 收益
+
+| 收益 | 证据 |
+|---|---|
+| **零调用点改动** | 290 处调用点、55 个消费者文件、25 处类型引用全部不变 |
+| **公共面完全不变** | `SessionManager` 的方法签名逐个保持；无 `instanceof`、无序列化、无 own-property 枚举依赖（均已 grep 验证为空） |
+| **降数效果与组合等价** | 59 → 38，与新模块 17，两个文件同时达标 |
+| **依赖方向显式化** | 基类经 host 接口声明所需，不反向 `this` 取用——比原先的隐式自引用更清晰 |
+| **已在本批验证** | 3172 测试 + PTY 实机均通过，机制已被证明可行 |
+
+### 11.2 风险
+
+| 风险 | 严重度 | 证据 / 缓解 |
+|---|---|---|
+| **引入仓库没有的第二套类约定** | **中** | 仓库 14 处 `extends` **全是 `Error` 子类**；`protected` 成员**零先例**（已核实：5 处 "protected" 命中全是英文文案）。本批已建立先例，后续沿用即一致 |
+| **继承链深度** | **中** | 当前深度 1。若 4 组全抽出成链则深度 5——**建议不建链**：改为「基类 + 组合」混合，或每组独立基类由 SessionManager 多重继承（TS 不支持）→ 故应**限制为 1–2 层** |
+| **`as SessionManager & {...}` 断言** | **低** | `sessionRuntime.ts:201/212` 的断言针对 `buildContinuitySnapshot`（read-projection，仍在 SessionManager），继承不影响 |
+| **`{} as unknown as SessionManager` 测试替身** | **低** | `interactiveMode.test.ts:36`、`firstFrame.test.ts:48` 传空对象且**不调用** LW 方法；断言绕过类型检查，继承不破坏 |
+| **基类与子类的隐式耦合** | **低** | 已用 host 接口切断反向依赖；基类不 import SessionManager（无环） |
+| **调试时方法不在自身原型上** | **低** | 继承方法在原型链上可正常调用与断点；无 own-property 枚举依赖 |
+
+### 11.3 剩余工作量（若要真正降到 ≤20）
+
+当前 38，需再减 **18** 个名字。剩余各组及其**跨组依赖数**（决定 host 接口大小）：
+
+| 组 | 方法数 | 跨组依赖 | 抽出的代价 |
+|---|---:|---:|---|
+| `store-binding` | 11 | **0** | **最干净**——零 host 需求 |
+| `read-projection` | 8 | **0** | **同样干净** |
+| `creation-resume` | 6 | 1（`setCurrentSessionForProject`） | 小 |
+| `reentry-recovery` | 8 | 4 | 较大 |
+| private helpers | 7 | — | 随宿主组走 |
+
+**结论**：`store-binding`（11）+ `read-projection`（8）= **19 个名字**，且**两者跨组依赖均为 0**。
+抽出后 SessionManager ≈ **19 个名字，达标**。
+
+### 11.4 建议
+
+**(b) 机制可行且已被本批验证，但应限制继承深度。**
+
+推荐路径：把 `store-binding` 与 `read-projection` 各抽为一个**独立基类**，SessionManager
+直接继承其中一层、组合另一层（避免深度 5 的链）。两者跨组依赖为 0，
+意味着**不需要 host 接口**——比本批的 lifecycle-writes 更简单。
+
+**风险最低的下一步**：先抽 `store-binding`（11 名字、零依赖），
+SessionManager 38 → 27；再抽 `read-projection`（8 名字、零依赖）→ **19，达标**。
