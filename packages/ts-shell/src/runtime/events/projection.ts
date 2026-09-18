@@ -1084,7 +1084,7 @@ export function projectRuntimeEvents(input: {
         redactionStatus: adapter.redactionState,
         terminalSuccessClaim: false,
       },
-      adapter.notProvenClaims,
+      adapter.notProvenClaims ?? [],
     );
     if (adapter.attemptDecision === "blocked" || adapter.outcome.status === "blocked") {
       append(
@@ -1096,7 +1096,7 @@ export function projectRuntimeEvents(input: {
           failureClass: adapter.outcome.failureClass,
           terminalSuccessClaim: false,
         },
-        adapter.notProvenClaims,
+        adapter.notProvenClaims ?? [],
       );
     }
     if (adapter.attemptDecision === "execute_via_provider_fetch") {
@@ -1108,7 +1108,7 @@ export function projectRuntimeEvents(input: {
           invocationMode: adapter.invocationMode,
           terminalSuccessClaim: false,
         },
-        adapter.notProvenClaims,
+        adapter.notProvenClaims ?? [],
       );
     }
     if (adapter.outcome.status === "completed") {
@@ -1239,38 +1239,40 @@ export function projectRuntimeEvents(input: {
   }
 
   for (const cycle of input.responseReentryCycles ?? []) {
-    append(
-      "response-reentry-observed",
-      {
-        cycleId: cycle.cycleId,
-        reentryId: cycle.responseReentry.reentryId,
-        sourceAttemptId: cycle.responseReentry.sourceAttemptId,
-        sourceResponseHandoffId: cycle.responseReentry.sourceResponseHandoffId,
-        responseClassification: cycle.responseReentry.responseClassification,
-        assistantContentAvailability: cycle.responseReentry.assistantContentAvailability,
-        toolCallExtractionReadiness: cycle.responseReentry.toolExtractionReadiness,
-        reentryStatus: cycle.responseReentry.reentryStatus,
-        redactionStatus: cycle.responseReentry.redactionState,
-        rawOutputExcluded: cycle.responseReentry.rawOutputExcluded,
-        terminalSuccessClaim: false,
-      },
-      cycle.responseReentry.notProvenClaims,
-    );
-    if (
-      cycle.responseReentry.reentryStatus === "processed" ||
-      cycle.responseReentry.reentryStatus === "ready_for_boundary_processing"
-    ) {
+    if (cycle.responseReentry) {
       append(
-        "model-boundary-processing-observed",
+        "response-reentry-observed",
         {
           cycleId: cycle.cycleId,
-          responseReentryId: cycle.responseReentry.reentryId,
-          modelResponseBoundaryId: cycle.responseBoundary.responseId,
-          responseStatus: cycle.responseBoundary.status,
+          reentryId: cycle.responseReentry.reentryId,
+          sourceAttemptId: cycle.responseReentry.sourceAttemptId,
+          sourceResponseHandoffId: cycle.responseReentry.sourceResponseHandoffId,
+          responseClassification: cycle.responseReentry.responseClassification,
+          assistantContentAvailability: cycle.responseReentry.assistantContentAvailability,
+          toolCallExtractionReadiness: cycle.responseReentry.toolExtractionReadiness,
+          reentryStatus: cycle.responseReentry.reentryStatus,
+          redactionStatus: cycle.responseReentry.redactionState,
+          rawOutputExcluded: cycle.responseReentry.rawOutputExcluded,
           terminalSuccessClaim: false,
         },
-        cycle.notProvenClaims,
+        cycle.responseReentry.notProvenClaims ?? [],
       );
+      if (
+        cycle.responseReentry.reentryStatus === "processed" ||
+        cycle.responseReentry.reentryStatus === "ready_for_boundary_processing"
+      ) {
+        append(
+          "model-boundary-processing-observed",
+          {
+            cycleId: cycle.cycleId,
+            responseReentryId: cycle.responseReentry.reentryId,
+            modelResponseBoundaryId: cycle.responseBoundary?.responseId,
+            responseStatus: cycle.responseBoundary?.status,
+            terminalSuccessClaim: false,
+          },
+          cycle.notProvenClaims ?? [],
+        );
+      }
     }
     if (cycle.assistantAccumulation) {
       append(
@@ -1285,7 +1287,7 @@ export function projectRuntimeEvents(input: {
           completionStatus: cycle.assistantAccumulation.completionStatus,
           terminalSuccessClaim: false,
         },
-        cycle.assistantAccumulation.notProvenClaims,
+        cycle.assistantAccumulation.notProvenClaims ?? [],
       );
     }
     if (cycle.toolExtraction) {
@@ -1303,7 +1305,7 @@ export function projectRuntimeEvents(input: {
           handoffReadiness: cycle.toolExtraction.handoffReadiness,
           terminalSuccessClaim: false,
         },
-        cycle.toolExtraction.notProvenClaims,
+        cycle.toolExtraction.notProvenClaims ?? [],
       );
       if (cycle.toolExtraction.noToolStatus === "observed") {
         append(
@@ -1313,53 +1315,55 @@ export function projectRuntimeEvents(input: {
             noToolStatus: cycle.toolExtraction.noToolStatus,
             terminalSuccessClaim: false,
           },
-          cycle.toolExtraction.notProvenClaims,
+          cycle.toolExtraction.notProvenClaims ?? [],
         );
       }
     }
-    append(
-      "loop-cycle-boundary-observed",
-      {
-        cycleId: cycle.cycleBoundary.cycleId,
-        sourceInvocationAttemptId: cycle.cycleBoundary.sourceInvocationAttemptId,
-        responseReentryId: cycle.cycleBoundary.responseReentryId,
-        assistantAccumulationId: cycle.cycleBoundary.assistantAccumulationId,
-        toolExtractionId: cycle.cycleBoundary.toolExtractionId,
-        nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
-        cycleStatus: cycle.cycleBoundary.cycleStatus,
-        stopReason: cycle.cycleBoundary.stopReason,
-        continuationRequirement: cycle.cycleBoundary.continuationRequirement,
-        terminalSuccessClaim: false,
-      },
-      cycle.cycleBoundary.notProvenClaims,
-    );
-    if (
-      cycle.cycleBoundary.cycleStatus === "blocked_response" ||
-      cycle.cycleBoundary.cycleStatus === "failed_response" ||
-      cycle.cycleBoundary.cycleStatus === "cancelled_response"
-    ) {
+    if (cycle.cycleBoundary) {
       append(
-        "loop-cycle-blocked",
+        "loop-cycle-boundary-observed",
         {
           cycleId: cycle.cycleBoundary.cycleId,
+          sourceInvocationAttemptId: cycle.cycleBoundary.sourceInvocationAttemptId,
+          responseReentryId: cycle.cycleBoundary.responseReentryId,
+          assistantAccumulationId: cycle.cycleBoundary.assistantAccumulationId,
+          toolExtractionId: cycle.cycleBoundary.toolExtractionId,
+          nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
           cycleStatus: cycle.cycleBoundary.cycleStatus,
           stopReason: cycle.cycleBoundary.stopReason,
+          continuationRequirement: cycle.cycleBoundary.continuationRequirement,
           terminalSuccessClaim: false,
         },
-        cycle.cycleBoundary.notProvenClaims,
+        cycle.cycleBoundary.notProvenClaims ?? [],
       );
-    }
-    if (cycle.cycleBoundary.cycleStatus === "partial_response") {
-      append(
-        "loop-cycle-partial",
-        {
-          cycleId: cycle.cycleBoundary.cycleId,
-          cycleStatus: cycle.cycleBoundary.cycleStatus,
-          nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
-          terminalSuccessClaim: false,
-        },
-        cycle.cycleBoundary.notProvenClaims,
-      );
+      if (
+        cycle.cycleBoundary.cycleStatus === "blocked_response" ||
+        cycle.cycleBoundary.cycleStatus === "failed_response" ||
+        cycle.cycleBoundary.cycleStatus === "cancelled_response"
+      ) {
+        append(
+          "loop-cycle-blocked",
+          {
+            cycleId: cycle.cycleBoundary.cycleId,
+            cycleStatus: cycle.cycleBoundary.cycleStatus,
+            stopReason: cycle.cycleBoundary.stopReason,
+            terminalSuccessClaim: false,
+          },
+          cycle.cycleBoundary.notProvenClaims ?? [],
+        );
+      }
+      if (cycle.cycleBoundary.cycleStatus === "partial_response") {
+        append(
+          "loop-cycle-partial",
+          {
+            cycleId: cycle.cycleBoundary.cycleId,
+            cycleStatus: cycle.cycleBoundary.cycleStatus,
+            nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
+            terminalSuccessClaim: false,
+          },
+          cycle.cycleBoundary.notProvenClaims ?? [],
+        );
+      }
     }
   }
 
@@ -1382,7 +1386,7 @@ export function projectRuntimeEvents(input: {
           streamProjected: adapter.streamProjected,
           terminalSuccessClaim: false,
         },
-        adapter.notProvenClaims,
+        adapter.notProvenClaims ?? [],
       );
       continue;
     }
@@ -1401,7 +1405,7 @@ export function projectRuntimeEvents(input: {
         fallbackStatus: adapter.fallbackStatus,
         terminalSuccessClaim: false,
       },
-      adapter.notProvenClaims,
+      adapter.notProvenClaims ?? [],
     );
     append(
       "provider-stream-projected",
@@ -1418,10 +1422,10 @@ export function projectRuntimeEvents(input: {
         fallbackEligibility: adapter.fallbackEligibility,
         fallbackStatus: adapter.fallbackStatus,
         recoveryFacts: adapter.recoveryFacts,
-        redactionStatus: adapter.redaction.status,
+        redactionStatus: adapter.redaction?.status,
         terminalSuccessClaim: false,
       },
-      adapter.notProvenClaims,
+      adapter.notProvenClaims ?? [],
     );
   }
 
@@ -1437,7 +1441,7 @@ export function projectRuntimeEvents(input: {
           eventCount: stream.eventCount,
           terminalSuccessClaim: false,
         },
-        stream.notProvenClaims,
+        stream.notProvenClaims ?? [],
       );
     }
     if (stream.contentDeltaCount > 0 || stream.toolCallDeltaCount > 0) {
@@ -1451,7 +1455,7 @@ export function projectRuntimeEvents(input: {
           contentSummary: stream.contentSummary,
           terminalSuccessClaim: false,
         },
-        stream.notProvenClaims,
+        stream.notProvenClaims ?? [],
       );
     }
     if (stream.status === "cancelled") {
@@ -1465,7 +1469,7 @@ export function projectRuntimeEvents(input: {
           retryStatus: stream.cancellation?.retryStatus,
           terminalSuccessClaim: false,
         },
-        stream.notProvenClaims,
+        stream.notProvenClaims ?? [],
       );
     }
     if (stream.failure) {
@@ -1479,7 +1483,7 @@ export function projectRuntimeEvents(input: {
           fallbackExecuted: stream.failure.fallbackExecuted,
           terminalSuccessClaim: false,
         },
-        stream.notProvenClaims,
+        stream.notProvenClaims ?? [],
       );
     }
     append(
@@ -1493,24 +1497,24 @@ export function projectRuntimeEvents(input: {
         toolCallCount: stream.completedToolCalls.length,
         terminalSuccessClaim: false,
       },
-      stream.notProvenClaims,
+      stream.notProvenClaims ?? [],
     );
   }
 
   for (const phase of input.modelBoundaryPhases ?? []) {
     append(
-      phase.stream.status === "completed" ? "model-boundary-completed" : "model-boundary-partial",
+      phase.stream?.status === "completed" ? "model-boundary-completed" : "model-boundary-partial",
       {
         phaseId: phase.phaseId,
-        requestId: phase.requestBoundary.requestId,
-        responseId: phase.responseBoundary.responseId,
-        streamStatus: phase.stream.status,
-        assistantAccumulationStatus: phase.assistantResponse.accumulationStatus,
-        toolCallExtractionStatus: phase.toolCallBatch.extractionStatus,
+        requestId: phase.requestBoundary?.requestId,
+        responseId: phase.responseBoundary?.responseId,
+        streamStatus: phase.stream?.status,
+        assistantAccumulationStatus: phase.assistantResponse?.accumulationStatus,
+        toolCallExtractionStatus: phase.toolCallBatch?.extractionStatus,
         toolBatchHandoffPrepared: phase.toolBatchHandoffPrepared,
         terminalSuccessClaim: phase.terminalSuccessClaim,
       },
-      phase.notProvenClaims,
+      phase.notProvenClaims ?? [],
     );
   }
 
@@ -1543,12 +1547,12 @@ export function projectRuntimeEvents(input: {
         chunkCount: response.chunkCount,
         textDeltaCount: response.textDeltaCount,
         contentSummary: response.contentSummary,
-        toolCallCandidateCount: response.toolCallCandidates.length,
+        toolCallCandidateCount: response.toolCallCandidates?.length,
         accumulationStatus: response.accumulationStatus,
-        redactionStatus: response.redaction.status,
+        redactionStatus: response.redaction?.status,
         terminalSuccessClaim: false,
       },
-      response.notProvenClaims,
+      response.notProvenClaims ?? [],
     );
   }
 
@@ -1570,7 +1574,7 @@ export function projectRuntimeEvents(input: {
         redactionStatus: batch.redaction.status,
         terminalSuccessClaim: false,
       },
-      batch.notProvenClaims,
+      batch.notProvenClaims ?? [],
     );
     append(
       "tool-dispatch-not-run",
@@ -1581,7 +1585,7 @@ export function projectRuntimeEvents(input: {
         toolCallCount: batch.calls.length,
         terminalSuccessClaim: false,
       },
-      batch.notProvenClaims,
+      batch.notProvenClaims ?? [],
     );
   }
 
@@ -1890,7 +1894,7 @@ export function projectRuntimeEvents(input: {
           redactionStatus: message.redactionStatus,
           terminalSuccessClaim: false,
         },
-        message.notProvenClaims,
+        message.notProvenClaims ?? [],
       );
     }
     append(
@@ -1903,7 +1907,7 @@ export function projectRuntimeEvents(input: {
         blockedCount: batch.blockedCount,
         terminalSuccessClaim: batch.terminalSuccessClaim,
       },
-      batch.notProvenClaims,
+      batch.notProvenClaims ?? [],
     );
   }
 
@@ -1930,7 +1934,7 @@ export function projectRuntimeEvents(input: {
         redactionStatus: bundle.redactionStatus,
         terminalSuccessClaim: bundle.terminalSuccessClaim,
       },
-      bundle.notProvenClaims,
+      bundle.notProvenClaims ?? [],
     );
     append(
       "tool-result-next-action-observed",
@@ -1942,7 +1946,7 @@ export function projectRuntimeEvents(input: {
         blockedFactCount: bundle.blockingFacts.length,
         terminalSuccessClaim: bundle.terminalSuccessClaim,
       },
-      bundle.notProvenClaims,
+      bundle.notProvenClaims ?? [],
     );
     if (bundle.mixedOutcomeStatus === "mixed_success_and_non_success") {
       append(
@@ -1952,7 +1956,7 @@ export function projectRuntimeEvents(input: {
           blockingFacts: bundle.blockingFacts,
           terminalSuccessClaim: bundle.terminalSuccessClaim,
         },
-        bundle.notProvenClaims,
+        bundle.notProvenClaims ?? [],
       );
     }
   }
@@ -2128,12 +2132,12 @@ export function projectRuntimeEvents(input: {
         policyId: policy.policyId,
         bundleId: policy.bundleId,
         deliveryStatus: policy.deliveryStatus,
-        entryCount: policy.entries.length,
+        entryCount: policy.entries?.length,
         providerCalled: policy.providerCalled,
         nextTurnExecuted: policy.nextTurnExecuted,
         terminalSuccessClaim: policy.terminalSuccessClaim,
       },
-      policy.notProvenClaims,
+      policy.notProvenClaims ?? [],
     );
     if (policy.deliveryStatus === "waiting") {
       append(
@@ -2143,7 +2147,7 @@ export function projectRuntimeEvents(input: {
           bundleId: policy.bundleId,
           terminalSuccessClaim: policy.terminalSuccessClaim,
         },
-        policy.notProvenClaims,
+        policy.notProvenClaims ?? [],
       );
     }
     if (policy.deliveryStatus === "unsupported") {
@@ -2154,7 +2158,7 @@ export function projectRuntimeEvents(input: {
           bundleId: policy.bundleId,
           terminalSuccessClaim: policy.terminalSuccessClaim,
         },
-        policy.notProvenClaims,
+        policy.notProvenClaims ?? [],
       );
     }
     if (policy.deliveryStatus === "abandoned") {
@@ -2165,7 +2169,7 @@ export function projectRuntimeEvents(input: {
           bundleId: policy.bundleId,
           terminalSuccessClaim: policy.terminalSuccessClaim,
         },
-        policy.notProvenClaims,
+        policy.notProvenClaims ?? [],
       );
     }
   }
@@ -2192,7 +2196,7 @@ export function projectRuntimeEvents(input: {
         deliveryStatus: bundle.deliveryStatus,
         terminalSuccessClaim: bundle.terminalSuccessClaim,
       },
-      bundle.notProvenClaims,
+      bundle.notProvenClaims ?? [],
     );
     if (bundle.readinessStatus.startsWith("blocked") || bundle.readinessStatus === "unsupported") {
       append(
@@ -2204,7 +2208,7 @@ export function projectRuntimeEvents(input: {
           requiredUserAction: bundle.requiredUserAction,
           terminalSuccessClaim: bundle.terminalSuccessClaim,
         },
-        bundle.notProvenClaims,
+        bundle.notProvenClaims ?? [],
       );
     }
   }
@@ -2894,7 +2898,7 @@ export function projectRuntimeEvents(input: {
         missingProofItems: finalizationInput.missingProofItems,
         terminalSuccessClaim: finalizationInput.terminalSuccessClaim,
       },
-      finalizationInput.notProvenClaims,
+      finalizationInput.notProvenClaims ?? [],
     );
   }
 
@@ -2916,7 +2920,7 @@ export function projectRuntimeEvents(input: {
         missingProofItems: decision.missingProofItems,
         terminalSuccessClaim: decision.terminalSuccessClaim,
       },
-      decision.notProvenClaims,
+      decision.notProvenClaims ?? [],
     );
   }
 
@@ -2940,7 +2944,7 @@ export function projectRuntimeEvents(input: {
         missingProofItems: closeoutInput.missingProofItems,
         terminalSuccessClaim: closeoutInput.terminalSuccessClaim,
       },
-      closeoutInput.notProvenClaims,
+      closeoutInput.notProvenClaims ?? [],
     );
   }
 
@@ -2965,7 +2969,7 @@ export function projectRuntimeEvents(input: {
         missingProofItems: closeout.missingProofItems,
         terminalSuccessClaim: closeout.terminalSuccessClaim,
       },
-      closeout.notProvenClaims,
+      closeout.notProvenClaims ?? [],
     );
   }
 
@@ -2997,7 +3001,7 @@ export function projectRuntimeEvents(input: {
         sessionCarryForwardFacts: packet.sessionCarryForwardFacts,
         terminalSuccessClaim: packet.terminalSuccessClaim,
       },
-      packet.notProvenClaims,
+      packet.notProvenClaims ?? [],
     );
   }
 
@@ -3561,7 +3565,7 @@ export function projectRuntimeEvents(input: {
         nextTurnExecuted: adapter.continuationBoundary.nextTurnExecuted,
         terminalSuccessClaim: false,
       },
-      adapter.notProvenClaims,
+      adapter.notProvenClaims ?? [],
     );
   }
 
