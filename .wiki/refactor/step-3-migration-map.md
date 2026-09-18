@@ -104,13 +104,38 @@ packages/ts-shell/src/context/model/    ← 上下文模型（6 文件）
 |---|---|---:|---|
 | 3a | `model/`（零外部引用）+ `flat-other` 归位 | 1 | 极低 |
 | 3b | `startup/` → `context/startup/` | 5 | 低 |
-| 3c | `compact/` → `context/compact/` | 30 | 低 |
+| 3c | `compact/` → `context/compact/` | 37（实测） | 低 |
 | 3d | `sidebar/` → `presentation/sidebar/` | 17 | 中（触及 `core/commands`） |
 | 3e | `memory/` → `memory/` | 31 | 中 |
 | 3f | **browser 域 → `browser/`** | 361 | **高**（触及 CLI 桥 + harness 256 边） |
 
 **3f 必须最后做，且分批**：先 receipt → runtime → skill → 平铺，
 每批后跑相关测试。
+
+## 6.1 执行记录
+
+### 3c `compact/` → `context/compact/`（2026-09-18，完成）
+
+- **搬迁**：`core/context/compact/` 全部 33 文件（7 子目录：`checkpoint` `command`
+  `continuity` `delivery` `governance` `injection` `policy`）→ `context/compact/`，
+  用 `git mv` 保留历史。
+- **映射表修正**：原判"30 边"偏低。实测**外部引用边 37 条 / 17 文件**
+  （生产值导入 25 边/11 文件，测试 12 边/6 文件），**全部需要改写**——
+  目录深度从 4 层变 3 层，每条外部边都要加一层 `../`。
+- **域内边不改写**：整树同深度搬迁，域内相对路径（`./x.js`、`../sub/x.js`）解析结果不变。
+  仅 **escaping 边**（离开 compact 域的 import）需重算，共 **21 条 / 9 文件**：
+  指向 `orchestration/patch{Result,Recovery}/*`、`core/context/model/*`、
+  `core/context/memory/*`、`core/query/microCompact`。
+- **副作用**：顺带修复 Step 3b 遗漏的一处悬挂 `import type`——
+  `core/context/sidebar/sidebarStateProjection.test.ts:7-8` 仍指向已搬走的
+  `../startup/*`（测试因类型被擦除而通过，故未被 3b 发现，只有 `tsc` 全量可见）。
+  已改为 `../../../context/startup/*`。全量 tsc 错误 253 → 251。
+- **验证**：`tsc -p tsconfig.build.json` 0 错；相关域 73 文件/432 测试全绿；
+  全量 3172 项（见 log.md 本次条目）；可达性 production 959 / cliReachable 874 /
+  cliOpaque 85 **不变**；**PTY 实机**：真实 TUI 执行 `/compact` 与
+  `/compact preview`，两次均渲染完整 Compact v2 面板（`closeout-candidate`、
+  10 个 memory candidate、preview-only / persistence none），证明搬迁后的
+  `compactCommandRuntime` → `compactCommandRunner` → `compactSessionSurface` 链完好。
 
 ## 7. 验证纪律（§2.4）
 

@@ -1,4 +1,4 @@
-import type { ChatMessageLike } from "../../../query/microCompact.js";
+import type { ChatMessageLike } from "../../../core/query/microCompact.js";
 
 export interface TokenCategoryBreakdown {
   readonly systemPromptTokens: number;

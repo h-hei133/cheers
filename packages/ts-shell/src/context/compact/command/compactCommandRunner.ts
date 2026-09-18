@@ -1,5 +1,5 @@
-import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
-import { listEditCapabilityReadiness } from "../../../../orchestration/patchResult/editCapabilityReadiness.js";
+import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
+import { listEditCapabilityReadiness } from "../../../orchestration/patchResult/editCapabilityReadiness.js";
 import { renderCompactHandoffMarkdown } from "../delivery/compactHandoffRenderer.js";
 import type { CompactContinuityPacketSource } from "../continuity/compactContinuityPacket.js";
 import {
@@ -7,12 +7,12 @@ import {
   type CompactCommandRequest,
   type CompactCommandRequestInput,
 } from "./compactCommandContract.js";
-import { extractProjectMemoryCandidates } from "../../memory/projectMemoryCandidateExtractor.js";
-import type { ProjectMemoryCandidate } from "../../memory/projectMemoryCandidate.js";
+import { extractProjectMemoryCandidates } from "../../../core/context/memory/projectMemoryCandidateExtractor.js";
+import type { ProjectMemoryCandidate } from "../../../core/context/memory/projectMemoryCandidate.js";
 import {
   evaluateProjectMemoryCandidateQuality,
   type ProjectMemoryCandidateQualityResult,
-} from "../../memory/projectMemoryCandidateQuality.js";
+} from "../../../core/context/memory/projectMemoryCandidateQuality.js";
 import { buildRouteContinuityHandoffPacket } from "../continuity/routeContinuityHandoff.js";
 
 export interface CompactCommandRunResult {

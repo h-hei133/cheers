@@ -278,3 +278,18 @@
 - **映射表补漏**：`sidebar/sidebarStateProjection.ts` 引用 startup 的 2 条边**未被原统计捕获**（因统计按 basename 匹配，该处用 `../startup/` 相对路径且 sidebar 属域内）。已修正。
 - **验证**：tsc 0 错；相关域 30 文件/177 测试全绿；**全量 3172 项零失败**（首跑 5 个 harness browser 场景测试超时失败，重跑全绿——确认为 `testTimeout` 默认 5000ms 与这些测试单独需 8-10 秒的**并发抖动**，非回归：5 项中 4 项完全不引用 startup 域）；可达性 production 959 / cliReachable 874 / cliOpaque 85 不变。
 - **已知配置缺口**（记录）：`packages/ts-shell/vitest.config.ts` **未设 `testTimeout`**，用默认 5000ms，而 browser 场景测试（含 Playwright）单独需 8-10 秒 → 全量并发下间歇超时。属既有问题，非本次引入。
+
+## [2026-09-18] fix | vitest `testTimeout` 缺口修复（Step 3b 遗留记录项）。
+- **问题**：`packages/ts-shell/vitest.config.ts` 未设 `testTimeout`，沿用默认 5000ms；而 browser/CLI 场景测试（spawn 真实子进程 + Playwright）单独耗时 8–16s → 全量并发下间歇超时。
+- **量化依据**（不是估算）：对 HEAD 跑 `vitest run --reporter=json` 取每项实测时长——**5 项失败全部是 `Test timed out in 5000ms`**，且全在 `core/harness/browser*ScenarioExamples`；同时 **74 项测试单独耗时 >3s，最大 16.23s**。5s 阈值低于实际工作负载一个数量级。
+- **修复**：`testTimeout: 30000`（约 2× 最慢项，仍能让真挂起失败）。附注释说明依据。
+- **验证**：修复后全量 **3172/3172 零失败**（修复前同机同版本 5 失败）。非靠放宽断言——未改任何测试。
+
+## [2026-09-18] step3c | `compact/` 域搬迁至 `context/compact/`。完成。
+- **搬迁**：`core/context/compact/` 全部 **33 文件**（7 子目录 checkpoint/command/continuity/delivery/governance/injection/policy）→ `context/compact/`，`git mv` 保留历史。
+- **映射表修正**：原估"30 边"**偏低**。实测**外部引用边 37 条 / 17 文件**（生产值导入 25 边/11 文件；测试 12 边/6 文件）——**37 条全部需要改写**，因为目录深度 4 层 → 3 层，每条外部相对路径都要加一层 `../`。
+- **域内边不改写**：整树同深度搬迁，域内相对路径（`./x.js`、`../sub/x.js`）解析结果不变——这是"整域搬迁"与"单文件搬迁"的关键差别。仅 **escaping 边**（离开 compact 域的 import）需重算：**21 条 / 9 文件**，指向 `orchestration/patch{Result,Recovery}/*`、`core/context/model/*`、`core/context/memory/*`、`core/query/microCompact`。
+- **顺带修复 Step 3b 遗漏**：`core/context/sidebar/sidebarStateProjection.test.ts:7-8` 仍 `import type` 已搬走的 `../startup/*`。**测试通过但 tsc 报错**——类型导入被擦除，运行时无影响，故 3b 的测试验证发现不了，只有全量 `tsc -p tsconfig.json` 可见。已改为 `../../../context/startup/*`。全量 tsc 错误 253 → **251**（另 2 项 pre-existing 未动）。
+- **可达性**：production 959 / cliReachable 874 / cliOpaque 85 **不变**（搬迁不改可达性，符合预期）。
+- **验证**：① `tsc -p tsconfig.build.json` **0 错**；② 相关域 73 文件/**432 测试全绿**；③ 全量 **3172 项零失败**；④ **PTY 实机**（触及 `entrypoints/` + `core/shell/`，§2.4 强制）——真实 TUI 执行 `/compact`（返回 "The conversation is too short to compact."）与 `/compact preview`（渲染完整 Compact v2 面板：`closeout-candidate`、10 memory candidates、preview-only / persistence none），证明 `compactCommandRuntime` → `compactCommandRunner` → `compactSessionSurface` 链完好。
+- **方法论**：本步验证了"整域搬迁"的正确改法是**只重算 escaping 边**，域内边保持字节不变——避免了 85 条无意义 diff。

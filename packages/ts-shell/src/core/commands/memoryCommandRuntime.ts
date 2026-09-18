@@ -1,7 +1,7 @@
 import {
   getLatestCompactCheckpoint,
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
-} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
+} from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import { extractProjectMemoryCandidates } from "../context/memory/projectMemoryCandidateExtractor.js";
 import {
   parseProjectMemoryReviewCommandArgs,

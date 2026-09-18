@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
-import { listEditCapabilityReadiness } from "../../../../orchestration/patchResult/editCapabilityReadiness.js";
+import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
+import { listEditCapabilityReadiness } from "../../../orchestration/patchResult/editCapabilityReadiness.js";
 import { renderCompactHandoffMarkdown } from "./compactHandoffRenderer.js";
 import { buildRouteContinuityHandoffPacket } from "../continuity/routeContinuityHandoff.js";
 

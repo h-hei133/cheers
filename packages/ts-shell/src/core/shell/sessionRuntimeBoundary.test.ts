@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { runCompactCommand } from "../context/compact/command/compactCommandRunner.js";
-import { createCompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
+import { runCompactCommand } from "../../context/compact/command/compactCommandRunner.js";
+import { createCompactInjectionStateStore } from "../../context/compact/injection/compactInjectionState.js";
 import {
   createCompactLiveCheckpointStore,
   updateLatestCompactCheckpoint,
-} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
+} from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import {
   createRuntimeEventDigest,
   renderExecutionSummaryBlock,

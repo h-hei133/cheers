@@ -16,8 +16,8 @@ import {
   loadBrowserPublicReadOnlyWebManifestFromEnv,
 } from "../core/context/browserPublicReadOnlyWebManifest.js";
 import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../core/harness/browserPublicReadOnlyWebSmokeConfig.js";
-import type { CompactInjectionStateStore } from "../core/context/compact/injection/compactInjectionState.js";
-import type { CompactLiveCheckpointStore } from "../core/context/compact/checkpoint/compactLiveCheckpoint.js";
+import type { CompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
+import type { CompactLiveCheckpointStore } from "../context/compact/checkpoint/compactLiveCheckpoint.js";
 import type { StreamingRenderer } from "../renderer/StreamingRenderer.js";
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;

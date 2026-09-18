@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { auditContextHealth, estimateTextTokens } from "./contextAnalysis.js";
-import { microcompactMessages } from "../../../query/microCompact.js";
+import { microcompactMessages } from "../../../core/query/microCompact.js";
 
 describe("Context Governance Subsystem", () => {
   describe("Token estimation & health audit", () => {

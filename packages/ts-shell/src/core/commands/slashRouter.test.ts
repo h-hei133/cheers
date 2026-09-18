@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createCompactLiveCheckpointStore,
   getLatestCompactCheckpoint,
-} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
-import { createCompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
+} from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
+import { createCompactInjectionStateStore } from "../../context/compact/injection/compactInjectionState.js";
 import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
 import { createProjectMemoryReviewStateStore } from "../context/memory/projectMemoryReviewState.js";
