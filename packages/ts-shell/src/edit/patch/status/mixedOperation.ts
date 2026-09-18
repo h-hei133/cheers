@@ -1,7 +1,7 @@
 import type {
   PatchFileOperation,
   PatchOperationKind,
-} from "../../../orchestration/patchParsing/types.js";
+} from "../types.js";
 import { isBoundedWriteOperationCount } from "../../authority/writePolicy.js";
 
 export type MixedOperationKind = "update" | "create" | "delete" | "move";

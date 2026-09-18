@@ -1,6 +1,6 @@
 import type {
   PatchFailure,
-} from "../../../orchestration/patchParsing/types.js";
+} from "../types.js";
 import type {
   MixedOperationReadinessProjection,
 } from "../status/mixedOperation.js";

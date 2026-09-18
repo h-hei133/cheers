@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
+import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../edit/result/editCapabilityCloseoutManifest.js";
 import { projectRecoverySurfaceSummary } from "../../../edit/recovery/recoverySurfaceProjection.js";
 import type { RecoveryAuthorityCaptureBatchResult } from "../../../edit/recovery/recoveryAuthorityStore.js";
 import {

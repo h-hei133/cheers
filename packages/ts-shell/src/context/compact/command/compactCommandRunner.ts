@@ -1,5 +1,5 @@
-import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../orchestration/patchResult/editCapabilityCloseoutManifest.js";
-import { listEditCapabilityReadiness } from "../../../orchestration/patchResult/editCapabilityReadiness.js";
+import { EDIT_CAPABILITY_CLOSEOUT_MANIFEST } from "../../../edit/result/editCapabilityCloseoutManifest.js";
+import { listEditCapabilityReadiness } from "../../../edit/result/editCapabilityReadiness.js";
 import { renderCompactHandoffMarkdown } from "../delivery/compactHandoffRenderer.js";
 import type { CompactContinuityPacketSource } from "../continuity/compactContinuityPacket.js";
 import {
