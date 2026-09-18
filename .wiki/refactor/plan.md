@@ -5,7 +5,7 @@ sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-0
 created: 2026-09-15
 updated: 2026-09-18
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v5。当前生产 959 / CLI 可达 874 / 不可达 85，全量测试 3172 项零失败。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁全部完成（3a-3f），core/context 四域混居问题解决。§4 记录删除判据被证伪的经过与 12 项真实破坏。"
+summary: "Module boundary refactor plan v5。当前生产 959 / CLI 可达 874 / 不可达 85，全量测试 3172 项零失败。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）与 Step 4 orchestration 解散（9 批）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。"
 confidence: high
 ---
 
@@ -49,6 +49,7 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | Step 2.6 零引用簇删除 | 删 82 文件（1 个误删已回退）；剩余范围冻结 |
 | Step 2.7 修正前序删除 | 见下 |
 | **Step 3 域搬迁（3a-3f）** | **✅ 全部完成**（2026-09-18）。6 个域归位，`core/context` 四域混居问题解决；详见 §3.2 |
+| **Step 4 orchestration 解散** | **✅ 全部完成**（2026-09-18，9 批）。123 文件分流至 7 个 sanctioned 域，`src/orchestration/` 已删除；详见 §3.3 与 §6.10 |
 
 ### Step 2.7 执行结果
 
@@ -231,9 +232,9 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 
 | 步骤 | 内容 | 前置 |
 |---|---|---|
-| Step 4 | orchestration 聚类 | **映射表 + 5 项决策研究已完成** → **待维护者批准执行顺序** |
+| Step 4 | orchestration 聚类 | ✅ **已完成**（2026-09-18，9 批）——`src/orchestration/` 已解散，123 文件全部分流 |
 | Step 5 | SessionManager 拆分（52 函数 facade，确认 ALIVE） | 不变 |
-| Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀 + **`orchestration` 域更名**） | 见下 |
+| Step 6 | 命名税裁定（含 3f 遗留的 `browser` 前缀） | Step 4 已完成，`orchestration` 域更名**随之自然消解** |
 | Step 7 | 收尾：NormProof judge 全量跑 | 以搬迁后 BFS 报告作为收敛证据 |
 
 **Step 4 决策研究结论**（2026-09-18，`step-4-decision-research.md`，零代码改动）：
@@ -246,7 +247,14 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 | 4 | `orchestration/` 目录存废 | **不保留该名**——不在 `agent-rules` 的 sanctioned 域列表内，且 **active 的 `control-plane-atlas.md` 引用的 13 个文件全部已删**（需顺带修正） |
 | 5 | agentPlan/analysis/taskLifecycle 合并 | **合并为一个子域**（17 文件平铺，**不造抽象层**）。决定性证据：三组的**生产消费者集合完全相同**（同为 4 个文件）；内部 43 边零环 DAG |
 
-**建议执行顺序**（风险递增，每步独立可验证）：
+**执行结果**（2026-09-18）：**9 批全部完成**，`src/orchestration/` 已删除。
+生产 959 / CLI 可达 874 / cliOpaque 85 全程不变；全量 3172 项零失败。
+逐批提交：`1ec0a429` → `a8142e66` → `e2317e18` → `47a4dd3e` → `1aaf7d4f`
+→ `c2fd8824` → `76d8c081` → `b7b3f13f`。详见 `log.md` 的 step4-exec 条目。
+
+**实际执行顺序**（与建议一致，5-6 合并）：
+
+
 `patchRecovery`→`edit/recovery` → `patchResult`→`edit/result` + `patchParsing`→`edit/patch`
 → harness→`evidence/harness` → 17 文件→`planning/task` → provider-proposal→`provider/proposal`
 → edit-proposal→`edit/proposal` → context-graph→`context/graph` → misc 逐个判定
@@ -276,7 +284,8 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
   ④ 是否保留 `orchestration/` 目录及其更名；⑤ `agentPlan`/`analysis`/`taskLifecycle`
   三组是否合并。
 
-**Step 6 范围扩大**：原仅指历史遗留的命名税。现**新增 3f 遗留项**——
+**Step 6 范围**：Step 4 已完成，`orchestration` 域已解散（原拟的"域更名"随之消解）。
+剩余范围为 3f 遗留项——
 `src/browser/` 下 161 个平铺文件仍带冗余 `browser` 前缀
 （如 `browserCommandRunner.ts` 在 `src/browser/` 内）。
 按 `agent-rules/file-placement-and-naming.md`「让文件夹承载域上下文，文件只命名局部角色」，
@@ -404,6 +413,14 @@ v2 全篇建立在一个命题上：
     140 个变更文件、非 import 改动 0）。
 14. **返工优于打补丁**。3f 平铺批首次改写误产出 `.ts` specifier（440 条 `TS5097`），
     处理方式是 `git reset --hard` 回上一提交重做，而非在错误产物上逐条修补。
+15. **改写器只应匹配语法，不应匹配文本**。Step 4 批次 7 暴露：用
+    `(?:from|import) ... ["']([^"']+)["']` 正则改写 import 时，会命中**字符串字面量内部**
+    的 import 语法。`contextPacket.test.ts` 的 fixture 恰好构造了含
+    `import { dep } from './dep.js';` 的测试文件内容，该字符串被改写，
+    导致 packet 不再报告 direct-import candidate——**只有测试失败才暴露**。
+    正确做法：先按 AST 或按"行首 import 语句"判定，再改写。
+    另：该批次的 file list 在搬迁**之后**计算，漏掉了已不在原路径的 `.test.ts`。
+    **教训：改写清单必须在搬迁前固化。**
 
 > **共性**：以上 1、5、6、7 是同一个错误的不同表现——**用间接证据替代直接证据**
 > （可达性代调用链、语义相似代数据通路、文件可达代被调用、测试绿灯代实机）。
@@ -529,6 +546,22 @@ runtime 装配四重证据。
 
 **遗留未做**：`src/browser/` 下 161 个平铺文件的冗余 `browser` 前缀未去掉
 （属 Step 6 命名税，见 §3.3）。
+
+### 6.10 Step 4 执行（2026-09-18，9 批，完成）
+
+`src/orchestration/` 已解散，123 文件全部分流至 7 个 sanctioned 域。
+逐批提交与明细见 `log.md` 的 step4-exec 条目；映射表与决策研究见
+`step-4-orchestration-map.md`、`step-4-decision-research.md`。
+
+**两处返工**（已记入 §5 教训 15）：
+① 批次 5-6 用搬迁后的 file list 做改写，漏掉 2 个 `.test.ts` → 从 HEAD 重建；
+② 批次 7 发现改写器**匹配字符串字面量内的 import 语法**，损坏了
+`contextPacket.test.ts` 的 fixture（测试失败暴露）→ 已还原，并审计前 5 批
+全部提交，确认零非 import 改动。
+
+**附带发现**：`docs/architecture/control-plane-atlas.md` 标注 active，
+但 78 个路径引用中 **35 个已删**（45% 失效），多数早于 Step 4。
+已加实测 staleness 表，未擅自重写未核实引用。
 
 ### 6.9 Step 4 orchestration 聚类重算（2026-09-18）
 

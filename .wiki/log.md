@@ -416,3 +416,35 @@
   → provider-proposal(10)→`provider/proposal` → edit-proposal(5)→`edit/proposal`
   → context-graph(11)→`context/graph` → misc(9) 逐个判定 → 修正 control-plane-atlas + 删除空 `orchestration/`。
 - **验证**：判定性工作，零代码改动 → 不跑构建/测试（`plan.md §2.4`）。所有数字脚本实测。
+
+## [2026-09-18] step4-exec | orchestration 域解散执行完毕（9 批）。Step 4 完成。
+- **结果**：`src/orchestration/` **已删除**（123 文件全部分流）。生产 959 / CLI 可达 874 / cliOpaque 85 **全程不变**；全量 **3172 项零失败**。
+- **9 批明细**（每批均：SCC 前置检查 0 环 → 0 环、build 0 错、相关域测试全绿、改动纯度验证）：
+
+| 批 | 内容 | 文件 | 提交 |
+|---|---|---:|---|
+| 1 | `patchRecovery/`(16) → `edit/recovery/` | 16 | `1ec0a429` |
+| 2 | `patchResult/`(4) → `edit/result/`、`patchParsing/`(2) → `edit/patch/` | 6 | `a8142e66` |
+| 3 | harness 三件套(6) → `evidence/harness/` | 6 | `e2317e18` |
+| 4 | 17 文件 → `planning/task/` | 28 | `47a4dd3e` |
+| 5-6 | provider-proposal(20) → `provider/proposal/`、edit-proposal(10) → `edit/proposal/` | 30 | `1aaf7d4f` |
+| 7 | context-graph(18) → `context/graph/` | 18 | `c2fd8824` |
+| 8 | misc 11 生产文件分流至 7 个域 | 19 | `76d8c081` |
+| 9 | 删空目录 + 修正 `control-plane-atlas` | — | `b7b3f13f` |
+
+- **批次 5-6 合并执行的理由**：两组合计 **互引 4↔4**（`providerAnchor*` → `fencedEditPlanner`/`editProposalReview`；`editProposalReview`/`editRepair*` → `providerEdit*`）。单独搬迁任一都会造成另一组的 import 中途断裂，故作为一次原子变更。
+- **两处返工（如实记录）**：
+  ①**批次 5-6**：首次改写用了"搬迁后"计算的 file list，导致 2 个 `.test.ts` 未被访问、仍指向已离开的同级模块。**从 HEAD 内容重建**（非就地打补丁），unresolved 回到 17 基线。
+  ②**批次 7 发现改写器真实 bug**：正则 `(?:from|import) ... ["']([^"']+)["']` **匹配到字符串字面量内部的 import 语法**。`contextPacket.test.ts` 的 fixture 构造一个含 `import { dep } from './dep.js';` 的测试文件内容，该**字符串**被改写，导致 packet 不再报告 direct-import candidate（测试失败暴露）。已还原 fixture，并对**前 5 批全部提交逐文件逐行审计**（与各自 `^` 父提交对比、按 import 语句范围判定）→ **零非 import 改动**。
+- **批次 8 的归属决策**（每文件按实际消费者，非按族）：
+  `types.ts`(73 消费者/10 域) → `result/`（拆分会产生 14 个双向 import，且实测对 4 个候选归宿中新增跨域边最少）；
+  `capabilityBoundaryProjection`+`workspaceFileContract` → `policy/`；
+  `editSnapshot` → `edit/recovery/`；`runtimeHandoff/OutcomeProjection` → `result/projection/`；
+  `testImpactPlan`+`workflowTaskPlanner` → `planning/task/`；`verificationRepairContext` → `repair/`；
+  `gitChangeSetAttribution` → `workflow/`；`liveProviderSmokeFallback` → `provider/`（后两者为 test-only 孤儿，属计划已裁决保留的 opaque 集）。
+- **`control-plane-atlas.md` 的发现**：该文档在 `DOC_STATUS.md` 中标注 **active**，但实测 **78 个具体路径引用中 35 个已删除**（45% 失效），且大部分失效早于 Step 4（涉及 `core/query`、`core/tools`、`core/context`、`session`）。**未擅自重写 35 处未逐个核实的引用**，改为加入实测 staleness 表 + 指向 orchestration 各模块新位置的说明；剩余重写列为独立任务。
+- **PTY 实机验证**（§2.4 强制，触及 `core/commands`/`runtime/execution`/`session`）：真实 TUI 执行
+  `/browser status`（capability + runtime dependency + backend candidates）、
+  `/restore`（经搬迁后的恢复权威，诚实报告 "No edit snapshots recorded" 而非崩溃）、
+  `/compact preview`（渲染 `closeout-candidate` 能力清单，该清单已迁至 `edit/result/`）。
+- **`context/graph/` 的既有内容**：该目录原已有 `ast/parser.ts`（AST 符号抽取，仅被 `core/tools/lsp.ts` 使用），与本次迁入的上下文图模型**语义无关**。已在提交信息中如实标注共处；若后续不适，`ast/parser.ts` 可移入 `context/graph/ast/`。
