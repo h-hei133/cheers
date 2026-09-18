@@ -28,9 +28,11 @@ packages/ts-shell/src/session/continuation/readiness.ts
 
 ## Owner Domains
 
-Use existing owner domains where possible. Common owners include:
+Use existing owner domains where possible. All top-level domains under
+`packages/ts-shell/src/` are owners:
 
 ```text
+core/
 runtime/
 turn/
 context/
@@ -45,6 +47,27 @@ policy/
 edit/
 verification/
 repair/
+```
+
+These are owners too, but they are cross-cutting or boundary-shaped rather than
+feature domains, so prefer putting new behavior in a feature domain when one
+fits:
+
+```text
+browser/          integrated browser/Playwright execution surface
+cli/              interactive CLI surface and its reusable contracts
+daemon/           Rust daemon client, protocol, and parity boundary
+entrypoints/      executables and compatibility re-exports only
+memory/           project and context memory
+sandbox/          sandbox preflight and authority
+config/           configuration loading and validation
+observability/    structured logging and tracing
+artifacts/        produced-artifact inventory and access
+eval/             offline evaluation surfaces
+workflow/         repository-level workflow helpers
+model-adapters/   model provider adapter boundary
+renderer/         streaming renderer used by the CLI surfaces
+test-utils/       test-only support; never imported by production code
 ```
 
 When a domain becomes broad, add meaningful subdomains instead of lengthening file names:

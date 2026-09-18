@@ -1202,15 +1202,15 @@ R6/R7 只需一个方向答复）。
 
 ### 8.2 建议的路线（三阶段）
 
-**阶段 A — 零裁决、零风险（可立即开始）**
+**阶段 A — 零裁决、零风险（可立即开始）—— ✅ 全部完成（A1–A5）**
 
 | 序 | 事项 | 理由 |
 |---|---|---|
 | A1 | **R1 `strict` S1** —— `runtime/events/projection.ts` | ✅ **已完成**（`ffcf63bf` + 复核修正）：73 错全部清零，生产 strict 错误 **136 → 63**；零 `!` 或 `as`。**复核发现原提交归因错误**：根因是 16 个 `*Like` 镜像接口比真实生产者类型更窄，不是"循环体缺守卫"。已回退防御式改动，改为对齐 15 个镜像到真实类型并删除死接口（保留 1 个真实断环镜像）。**A2/A3 适用同一教训：先对齐类型，再考虑防御** |
 | A2 | R1 S2 —— 三个 boundary/lifecycle 文件（26 错） | ✅ **已完成**：26 个生产错全部清零（生产 strict **63 → 37**）。**三个文件形态各不相同**，逐个定因而非套用 A1 模板：① `provider/request/boundary.ts`：3 个镜像无环风险 → 对齐真实类型并删除（8 错）；② `verification/result/boundary.ts`：`RepairApplyObservationLike` **是真断环**（`repair/handoff/boundary.ts` 可达它），不能导入真实类型 → 只修正 13 个字段的可选性使其忠于生产者（10 错）；③ `core/tools/toolResultLifecycle.ts`：`LifecycleEventLike` 的**兜底成员**（`type: string` + 全字段可选）破坏 `switch` 收窄 → 对齐真实生产者 `QueryEvent` 并删除兜底成员（8 错） |
 | A3 | R1 S3 —— 其余 ~13 文件（37 错） | ✅ **已完成**：37 处生产 strict 错误全部清零（散在 **24 个文件**，最大单文件 6 处——与 S1/S2 的"单文件集中"形态完全不同，故逐文件定因）。`tsconfig.build.json` 已加 `"strict": true`，`npm run build` **0 错误**。详见 log 的 `strict-s3` 条目 |
-| A4 | **R2 + R3** | 两者都是"只改配置/文字"，零代码风险；**R2 顺手解决 7 个测试模块进 `dist/` 的泄漏** |
-| A5 | R12 | 借鉴 `pi` 的 `check:ts-imports` / `check:entry-graphs` 检查项 |
+| A4 | **R2 + R3** | ✅ **R2 已完成**：`tsconfig.build.json` 的 `exclude` 增加 `src/test-utils/**` 与 `src/**/__tests__/**`，`dist` **961 → 954**，差集**恰为那 7 个测试支撑文件**（逐一验证非测试 importer 为零）；`longSessionDurabilityProcess.ts` 由 `tsx` 从 `src/` 启动故排除安全。✅ **R3 已完成**：`file-placement-and-naming.md` 的 Owner Domains 补全为 **26/26 顶层域**（实测 15 个原不在名单）；`AGENTS.md` execution 措辞点名真实所有者并补 `packages/rust-core/` 事实。**均经 `verify:docs-drift:strict` 验证** |
+| A5 | R12 | ✅ **已完成，结论与预设不同**：`check:ts-imports` **反向**（它禁止 `.js` 后缀，而本仓规则**要求** `.js`，实测 4918 处）→ 不可借鉴；`check:entry-graphs` **不适用**（它按已发布包的 `exports` map 设预算，而本仓无 `exports`，根因即 3.10.2 ①）；`check:runtime-deps` **适用且当场查出真实缺陷**——`typescript` 被**生产代码**（`postMutationLspGuard.ts`，CLI 静态可达）导入却只在 `devDependencies`，`--omit=dev` 安装会使 CLI 启动失败 → 已移入 `dependencies`，`package-lock.json` 仅一行移动 |
 
 **为什么 `strict` 排在最前**：它是三轮探索中**唯一不依赖我们任何自定规则、且被外部项目实践支持**的项；
 错误高度集中（单文件 54%）；`build` 与 `test` 配置可分离（**不必等 265 个测试错误**）。

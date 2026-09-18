@@ -21,11 +21,11 @@
   },
   "dependencies": {
     "playwright-core": "^1.60.0",
+    "typescript": "^5.2.0",
     "undici": "^7.18.2"
   },
   "devDependencies": {
     "tsx": "^4.0.0",
-    "typescript": "^5.2.0",
     "vitest": "^0.34.0"
   }
 }

@@ -1048,3 +1048,48 @@
   **41 项 harness 测试失败**（`future-skill-required` 不再输出）。
   修复方式：恢复复合守卫的语义，另用**早返回**在外部 runner 分支之后收敛 `manifest`。
   **教训：拆复合守卫必须逐分支验证可达性——`tsc` 绿灯不代表路径语义不变。**
+
+## [2026-09-18] A4+A5 | R2 `exclude` 收紧、R3 规则修正、R12 `check:*` 评估（阶段 A 收尾）。
+### R2 —— 测试支撑文件不再进 `dist/`（实测，非推算）
+- 收紧前实测：`dist` **961** 个 `.js`，其中 **7 个非 `.test` 的测试支撑文件**被打包：
+  `test-utils/{cleanup,cliHarness,ptyCapabilityDetector,stoppedRecoveryFixture,terminalDouble}`
+  与 `session/__tests__/{longSessionContinuityFixtures,longSessionDurabilityProcess}`（3.8 #1 记录精确）。
+- **逐一验证 7 个文件的生产可达性**：非测试 importer **全部为零**；
+  `test-utils/` 仅被 8 个 `.test.ts` 引用。
+  `longSessionDurabilityProcess.ts` 是动态入口，但**由 `tsx` 从 `src/` 启动**（`longSessionDurability.test.ts:229`），
+  不经 `dist/`，故排除安全。
+- 处置：`tsconfig.build.json` 的 `exclude` 增加 `src/test-utils/**` 与 `src/**/__tests__/**`。
+  **未**新增 `fixtures` 模式——实测 `core/mcp/fixtures/mockMcpServer.mjs` 本就不编译，
+  `src/**/*.md` 同理，加模式属无收益的猜测。
+- 结果：`dist` **961 → 954**，差集**恰为这 7 个文件**（逐条比对，非计数）；`npm run build` 0 错误；
+  `verify:host-surface` 通过。
+### R3 —— `AGENTS.md` 与规则的漂移（实测驱动）
+- 实测 15 个顶层域不在规则名单内（`core`(326) `browser`(228) `cli`(86) `entrypoints` `memory`
+  `observability` `sandbox` `test-utils` `model-adapters` `daemon` `config` `artifacts`
+  `workflow` `eval` `renderer`）。**规则说"用既有 owner domain"，而既有域一半不在名单里。**
+- 处置：`file-placement-and-naming.md` 的 Owner Domains 改为**完备列表**——
+  第一节列 15 个 feature 域，第二节列 14 个 cross-cutting/boundary 域并注明
+  "优先放进 feature 域"。实测**全部 26 个顶层域已覆盖**（另 3 个是 `src/` 下的文件非目录）。
+- `AGENTS.md` execution 措辞：原文"currently implemented in TypeScript (`src/`)"把整个 `src/` 当执行面。
+  改为点名真实所有者（`core/tools/`、`tools/`、`sandbox/`、`browser/*Executor.ts`），
+  并**补充 Rust 事实**：`packages/rust-core/` 是真实 workspace 成员，经 `src/daemon/` 到达，
+  但**不是默认执行面**。文中每条路径均已实测存在。
+- `verify:docs-drift:strict` 通过；`AGENTS.md` 17 条链接全部有效。
+### R12 —— `pi` 的 `check:*` 评估（结论与 plan 预设不同）
+- **`check:ts-imports` 对本仓是反向的，不可借鉴**：该脚本**禁止**相对 `.js` 后缀的 import，
+  而本仓 `AGENTS.md` 第 48 行**要求**本地 TS import 以 `.js` 结尾（实测 **4918 处**）。
+  照搬会与既有绑定规则直接冲突。
+- **`check:entry-graphs` 不适用**：它按**已发布 npm 包的 `exports` map** 逐入口设文件数预算。
+  实测本仓 `packages/ts-shell` **没有 `exports` map**（`jq .exports` 为 `null`），
+  根因是 3.10.2 ① ——我们没有外部消费者，包布局不受发布约束。
+- **`check:runtime-deps` 适用，且当场发现一个真实缺陷**：
+  `typescript` 被**生产代码**导入（`core/hooks/builtin/postMutationLspGuard.ts`、
+  `context/graph/ast/parser.ts`），却只声明在 `devDependencies`。
+  可达性已实测：`cli.tsx → cliRuntimeInvocation.ts → core/hooks/builtin/index.ts →
+  postMutationLspGuard.ts`（**静态 eager import**，发射的 JS 顶层即 `import ts from "typescript"`）。
+  → 生产安装（`--omit=dev`）会让 CLI 在启动时因缺 `typescript` 失败。
+  处置：`typescript` 移入 `packages/ts-shell` 的 `dependencies`，
+  `package-lock.json` **只做一行移动**（首次用 `npm install --package-lock-only` 重生成，
+  发现它顺带改写了 workspace glob 展开、删除 `python-eval` 条目等无关内容 → **回滚后手工改**）。
+- **测量**：`npm run build` 0 错误；`verify:host-surface` 通过；
+  `verify:docs-drift:strict` 通过；`src/entrypoints` + `src/core/hooks` **17 文件 87 项全绿**。
