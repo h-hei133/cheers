@@ -28,105 +28,23 @@ import type { PackageInventoryProjection } from "../resources/inventory.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
 import type { ReplaySafeLoopStateSummary } from "../../session/replay/state.js";
-export interface AssistantResponseStateLike {
-  readonly responseId: string;
-  readonly turnId?: string;
-  readonly chunkCount?: number;
-  readonly textDeltaCount?: number;
-  readonly contentSummary?: string;
-  readonly toolCallCandidates?: readonly unknown[];
-  readonly accumulationStatus?: string;
-  readonly redaction?: { readonly status: string };
-  readonly notProvenClaims?: readonly string[];
-}
-
-export interface NextTurnDeliveryPolicyProjectionLike {
-  readonly policyId: string;
-  readonly bundleId: string;
-  readonly entries?: readonly unknown[];
-  readonly deliveryStatus?: string;
-  readonly providerCalled?: boolean;
-  readonly nextTurnExecuted?: boolean;
-  readonly nextTurnEligible?: boolean;
-  readonly reason?: string;
-  readonly steeringDeliveredCount?: number;
-  readonly steeringPendingCount?: number;
-  readonly steeringBlockedCount?: number;
-  readonly followUpDeliveredCount?: number;
-  readonly followUpPendingCount?: number;
-  readonly followUpBlockedCount?: number;
-  readonly terminalSuccessClaim?: false;
-  readonly redaction?: { readonly status: string };
-  readonly notProvenClaims?: readonly string[];
-}
-
-export interface FollowUpQueueProjectionLike {
-  readonly queueId: string;
-  readonly items: readonly {
-    readonly followUpId: string;
-    readonly source: string;
-    readonly targetTurnId?: string;
-    readonly safeSummary: string;
-    readonly deliveryStatus: string;
-    readonly redactionStatus: string;
-    readonly notProvenClaims: readonly string[];
-  }[];
-}
-
-export interface NextTurnBundleProjectionLike {
-  readonly bundleId: string;
-  readonly turnId: string;
-  readonly sourceToolOutcomeBundleId?: string;
-  readonly sourceToolResultMessageIds?: readonly string[];
-  readonly safeToolResultMessages?: readonly {
-    readonly messageId: string;
-    readonly toolCallId: string;
-    readonly toolName: string;
-    readonly safeContentSummary: string;
-    readonly terminalSuccessClaim: false;
-  }[];
-  readonly steeringMessageIds?: readonly string[];
-  readonly followUpMessageIds?: readonly string[];
-  readonly deliveryFacts?: readonly {
-    readonly deliveryId: string;
-    readonly sourceNextTurnBundleId: string;
-    readonly deliveryKind: "steering" | "follow-up";
-    readonly queued: boolean;
-    readonly delivered: boolean;
-    readonly blocked: boolean;
-    readonly reason: string;
-    readonly safeUserFacingSummary: string;
-    readonly notProvenClaims: readonly string[];
-    readonly terminalSuccessClaim: false;
-  }[];
-  readonly assistantResponseSummary?: string;
-  readonly includedToolResultMessageIds?: readonly string[];
-  readonly excludedToolResultMessageIds?: readonly string[];
-  readonly readinessStatus: string;
-  readonly blockingFacts?: readonly string[];
-  readonly requiredUserAction?: unknown;
-  readonly contextRebuildProjectionId?: string;
-  readonly sessionActivePathId?: string;
-  readonly providerMetadataIds?: readonly string[];
-  readonly deliveryPolicyId?: string;
-  readonly deliveryStatus?: string;
-  readonly notProvenClaims?: readonly string[];
-  readonly terminalSuccessClaim?: false;
-  readonly redaction?: { readonly status: string };
-}
-
-export interface SteeringQueueProjectionLike {
-  readonly queueId: string;
-  readonly items: readonly {
-    readonly steeringId: string;
-    readonly source: string;
-    readonly priority: string;
-    readonly safeSummary: string;
-    readonly deliveryStatus: string;
-    readonly redactionStatus: string;
-    readonly notProvenClaims: readonly string[];
-  }[];
-}
+import type { ModelResponseReentryCycleProjection } from "../loop/reentry.js";
+import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
+import type { ProviderStreamAdapterProjection } from "../loop/providerStreamAdapter.js";
+import type { AssistantResponseState } from "../../turn/assistantResponse.js";
+import type { NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
+import type { SteeringQueueProjection } from "../../turn/steeringQueue.js";
+import type { FollowUpQueueProjection } from "../../turn/followUpQueue.js";
+import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
+import type { ToolResultMessageBatch } from "../../turn/toolResultMessage.js";
+import type {
+  LoopFinalizationInput,
+  LoopFinalizationDecision,
+  ProductLoopCloseoutInput,
+  ProductLoopCloseoutProjection,
+} from "../loop/finalization.js";
+import type { ProductCompletionPacket } from "../loop/completionPacket.js";
+import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import type { NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import type { ToolBatchHandoffProjection } from "../../tools/toolHandoff.js";
 import type {
@@ -134,46 +52,11 @@ import type {
   ToolResultDetail,
 } from "../../tools/toolBatchDispatch.js";
 import type { ToolOutcomeBundleProjection } from "../../tools/toolOutcomeBundle.js";
-export interface ToolResultMessageBatchLike {
-  readonly batchId: string;
-  readonly sourceToolOutcomeBundleId?: string;
-  readonly turnId?: string;
-  readonly extractionStatus?: string;
-  readonly dispatchPlanId?: string;
-  readonly preparedCount?: number;
-  readonly blockedCount?: number;
-  readonly messageCount?: number;
-  readonly terminalSuccessClaim?: false;
-  readonly messages: readonly {
-    readonly messageId: string;
-    readonly toolCallId?: string;
-    readonly toolName?: string;
-    readonly role?: string;
-    readonly deliveryStatus?: string;
-    readonly redactionStatus?: string;
-    readonly contentRedacted?: boolean;
-    readonly safeContentSummary?: string;
-    readonly notProvenClaims?: readonly string[];
-  }[];
-  readonly notProvenClaims?: readonly string[];
-  readonly redaction?: { readonly status: string };
-}
 import type { ToolExecutionResult } from "../../tools/types.js";
 import type {
   ToolAfterObservationAnnotation,
   ToolBeforePolicyDecision,
 } from "../../tools/policy/interception.js";
-export interface RuntimeTurnSnapshotLike {
-  readonly id: string;
-  readonly sessionId: string;
-  readonly turn: number;
-  readonly phase: string;
-  readonly provider: {
-    readonly mode: string;
-    readonly optIn: boolean;
-  };
-  readonly executionBoundaryMode: string;
-}
 import type { RuntimeExecutionReceiptProjection } from "../execution/receipt.js";
 import type {
   PostRepairVerificationRequirementObservation,
@@ -183,105 +66,6 @@ import type {
   VerificationResultObservation,
 } from "../../verification/result/boundary.js";
 import type { RepairVerdictTerminalProjection } from "../../result/projection/repair/verdict.js";
-export interface LoopFinalizationInputLike {
-  readonly inputId: string;
-  readonly resultProjectionId?: string;
-  readonly resultTerminalStatus?: string;
-  readonly resultTerminalClassification?: string;
-  readonly proofComplete: boolean;
-  readonly originalFailurePreserved?: boolean;
-  readonly repairApplyPreserved?: boolean;
-  readonly postRepairVerificationPreserved?: boolean;
-  readonly originalVerificationFailureId?: string;
-  readonly originalFailureClass?: string;
-  readonly repairApplyState?: string;
-  readonly postRepairVerificationState?: string;
-  readonly missingProofItems?: readonly string[];
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims?: readonly string[];
-}
-
-export interface LoopFinalizationDecisionLike {
-  readonly decisionId: string;
-  readonly sourceInputId: string;
-  readonly decision: string;
-  readonly reason: string;
-  readonly nextAction: string;
-  readonly pendingUserAuthority?: boolean;
-  readonly pendingVerification?: boolean;
-  readonly pendingRepair?: boolean;
-  readonly sessionCarryForwardFacts?: readonly string[];
-  readonly originalVerificationFailureId?: string;
-  readonly originalFailureClass?: string;
-  readonly missingProofItems?: readonly string[];
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims?: readonly string[];
-}
-
-export interface ProductLoopCloseoutInputLike {
-  readonly inputId: string;
-  readonly loopDecisionId?: string;
-  readonly resultProjectionId?: string;
-  readonly resultTerminalStatus?: string;
-  readonly resultTerminalClassification?: string;
-  readonly loopControlDecision?: string;
-  readonly nextAction?: string;
-  readonly pendingUserAction?: boolean;
-  readonly pendingVerification?: boolean;
-  readonly pendingRepair?: boolean;
-  readonly preservedOriginalFailure?: unknown;
-  readonly preservedRepairFacts?: unknown;
-  readonly verificationSummary?: unknown;
-  readonly missingProofItems?: readonly string[];
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims?: readonly string[];
-}
-
-export interface ProductLoopCloseoutProjectionLike {
-  readonly closeoutId: string;
-  readonly sourceInputId: string;
-  readonly status: string;
-  readonly resultOwnedTerminalStatus?: string;
-  readonly resultOwnedTerminalClassification?: string;
-  readonly loopOwnedControlDecision?: string;
-  readonly complete: boolean;
-  readonly nextAction?: string;
-  readonly pendingHandoff?: unknown;
-  readonly sessionCarryForwardFacts?: readonly string[];
-  readonly originalFailureSummary?: string;
-  readonly repairChainSummary?: string;
-  readonly verificationSummary?: string;
-  readonly missingProofItems?: readonly string[];
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims?: readonly string[];
-}
-
-export interface ProductCompletionPacketLike {
-  readonly packetId: string;
-  readonly resultProjectionId?: string;
-  readonly resultOwnedTerminalStatus?: string;
-  readonly resultOwnedTerminalClassification?: string;
-  readonly loopDecisionId?: string;
-  readonly loopDecision?: string;
-  readonly closeoutId?: string;
-  readonly closeoutState?: string;
-  readonly status: string;
-  readonly complete: boolean;
-  readonly originalFailure?: unknown;
-  readonly repairRequiredFacts?: unknown;
-  readonly proposalFacts?: unknown;
-  readonly authorityFacts?: unknown;
-  readonly applyRequestFacts?: unknown;
-  readonly applyObservationFacts?: unknown;
-  readonly postRepairVerificationFacts?: unknown;
-  readonly evidenceFacts?: unknown;
-  readonly missingProofItems?: readonly string[];
-  readonly nextAction?: string;
-  readonly sessionCarryForwardFacts?: readonly string[];
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims?: readonly string[];
-}
-
 export interface ProductLoopAdapterProjectionLike {
   readonly adapterId: string;
   readonly observationMode: string;
@@ -305,93 +89,6 @@ export interface ProductLoopAdapterProjectionLike {
     readonly nextTurnExecuted: boolean;
   };
   readonly notProvenClaims: readonly string[];
-}
-
-export interface ModelBoundaryPhaseProjectionLike {
-  readonly phaseId: string;
-  readonly requestBoundary?: { readonly requestId: string };
-  readonly responseBoundary?: { readonly responseId: string };
-  readonly stream?: { readonly status: string };
-  readonly assistantResponse?: { readonly accumulationStatus: string };
-  readonly toolCallBatch?: { readonly extractionStatus: string };
-  readonly toolBatchHandoffPrepared?: boolean;
-  readonly terminalSuccessClaim?: false;
-  readonly notProvenClaims?: readonly string[];
-}
-
-export interface ProviderStreamAdapterProjectionLike {
-  readonly adapterId: string;
-  readonly requestId?: string;
-  readonly responseId?: string;
-  readonly explicitOptIn?: boolean;
-  readonly readinessStatus?: string;
-  readonly failureClass?: string;
-  readonly liveClassification?: string;
-  readonly retryEligibility?: string;
-  readonly fallbackEligibility?: string;
-  readonly fallbackStatus?: string;
-  readonly recoveryFacts?: string;
-  readonly streamProjected?: boolean;
-  readonly fetchAttempted?: boolean;
-  readonly assistantAccumulationStatus?: string;
-  readonly toolCallExtractionStatus?: string;
-  readonly redaction?: { readonly status: string };
-  readonly notProvenClaims?: readonly string[];
-}
-
-export interface ModelResponseReentryCycleProjectionLike {
-  readonly cycleId: string;
-  readonly responseReentry?: {
-    readonly reentryId: string;
-    readonly sourceAttemptId?: string;
-    readonly sourceResponseHandoffId?: string;
-    readonly responseClassification?: string;
-    readonly assistantContentAvailability?: string;
-    readonly toolExtractionReadiness?: string;
-    readonly reentryStatus?: string;
-    readonly redactionState?: string;
-    readonly rawOutputExcluded?: boolean;
-    readonly notProvenClaims?: readonly string[];
-  };
-  readonly responseBoundary?: {
-    readonly responseId: string;
-    readonly status: string;
-  };
-  readonly assistantAccumulation?: {
-    readonly accumulationId: string;
-    readonly sourceReentryId: string;
-    readonly contentAvailability: string;
-    readonly contentSummarySafeLabel: string;
-    readonly contentRedactionState: string;
-    readonly hiddenChannelExcluded: boolean;
-    readonly completionStatus?: string;
-    readonly notProvenClaims?: readonly string[];
-  };
-  readonly toolExtraction?: {
-    readonly extractionId?: string;
-    readonly sourceAssistantAccumulationId?: string;
-    readonly extractedCallIds?: readonly string[];
-    readonly malformedCallIds?: readonly string[];
-    readonly unsupportedCallIds?: readonly string[];
-    readonly unknownToolIds?: readonly string[];
-    readonly noToolStatus?: string;
-    readonly extractionConfidence?: string;
-    readonly handoffReadiness?: string;
-    readonly notProvenClaims?: readonly string[];
-  };
-  readonly cycleBoundary?: {
-    readonly cycleId?: string;
-    readonly sourceInvocationAttemptId?: string;
-    readonly responseReentryId?: string;
-    readonly assistantAccumulationId?: string;
-    readonly toolExtractionId?: string;
-    readonly nextHandoffKind?: string;
-    readonly cycleStatus?: string;
-    readonly stopReason?: string;
-    readonly continuationRequirement?: string;
-    readonly notProvenClaims?: readonly string[];
-  };
-  readonly notProvenClaims?: readonly string[];
 }
 
 export type RuntimeProjectionEventType =
@@ -622,19 +319,19 @@ export interface RuntimeResultFactsProjection {
 }
 
 export function projectRuntimeEvents(input: {
-  readonly turnSnapshot?: RuntimeTurnSnapshotLike;
+  readonly turnSnapshot?: RuntimeTurnSnapshot;
   readonly executionReceipts?: readonly RuntimeExecutionReceiptProjection[];
   readonly toolResults?: readonly ToolExecutionResult[];
   readonly toolPolicyDecisions?: readonly ToolBeforePolicyDecision[];
   readonly toolResultAnnotations?: readonly ToolAfterObservationAnnotation[];
   readonly toolDispatchPlans?: readonly ToolBatchDispatchPlan[];
   readonly toolResultDetails?: readonly ToolResultDetail[];
-  readonly toolResultMessages?: readonly ToolResultMessageBatchLike[];
+  readonly toolResultMessages?: readonly ToolResultMessageBatch[];
   readonly toolOutcomeBundles?: readonly ToolOutcomeBundleProjection[];
-  readonly nextTurnBundles?: readonly NextTurnBundleProjectionLike[];
-  readonly steeringQueues?: readonly SteeringQueueProjectionLike[];
-  readonly followUpQueues?: readonly FollowUpQueueProjectionLike[];
-  readonly nextTurnDeliveryPolicies?: readonly NextTurnDeliveryPolicyProjectionLike[];
+  readonly nextTurnBundles?: readonly NextTurnBundleProjection[];
+  readonly steeringQueues?: readonly SteeringQueueProjection[];
+  readonly followUpQueues?: readonly FollowUpQueueProjection[];
+  readonly nextTurnDeliveryPolicies?: readonly NextTurnDeliveryPolicyProjection[];
   readonly verificationIntents?: readonly VerificationLoopIntent[];
   readonly verificationResults?: readonly VerificationResultObservation[];
   readonly postRepairVerificationRequirements?: readonly PostRepairVerificationRequirementObservation[];
@@ -642,11 +339,11 @@ export function projectRuntimeEvents(input: {
   readonly postRepairVerificationResults?: readonly PostRepairVerificationResultObservation[];
   readonly repairVerdictProofInputs?: readonly RepairVerdictProofInput[];
   readonly repairVerdictTerminalProjections?: readonly RepairVerdictTerminalProjection[];
-  readonly loopFinalizationInputs?: readonly LoopFinalizationInputLike[];
-  readonly loopFinalizationDecisions?: readonly LoopFinalizationDecisionLike[];
-  readonly productLoopCloseoutInputs?: readonly ProductLoopCloseoutInputLike[];
-  readonly productLoopCloseouts?: readonly ProductLoopCloseoutProjectionLike[];
-  readonly productCompletionPackets?: readonly ProductCompletionPacketLike[];
+  readonly loopFinalizationInputs?: readonly LoopFinalizationInput[];
+  readonly loopFinalizationDecisions?: readonly LoopFinalizationDecision[];
+  readonly productLoopCloseoutInputs?: readonly ProductLoopCloseoutInput[];
+  readonly productLoopCloseouts?: readonly ProductLoopCloseoutProjection[];
+  readonly productCompletionPackets?: readonly ProductCompletionPacket[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
@@ -659,12 +356,12 @@ export function projectRuntimeEvents(input: {
   readonly modelInvocationGates?: readonly ModelInvocationGateFacts[];
   readonly modelInvocationAttempts?: readonly ModelInvocationAttemptEnvelope[];
   readonly controlledModelInvocations?: readonly ControlledModelInvocationAdapterProjection[];
-  readonly responseReentryCycles?: readonly ModelResponseReentryCycleProjectionLike[];
+  readonly responseReentryCycles?: readonly ModelResponseReentryCycleProjection[];
   readonly providerResponseStreams?: readonly ProviderResponseStreamProjection[];
-  readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjectionLike[];
-  readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjectionLike[];
+  readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjection[];
+  readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjection[];
   readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
-  readonly assistantResponses?: readonly AssistantResponseStateLike[];
+  readonly assistantResponses?: readonly AssistantResponseState[];
   readonly toolCallBatches?: readonly NormalizedToolCallBatch[];
   readonly toolBatchHandoffs?: readonly ToolBatchHandoffProjection[];
   readonly savePoint?: RuntimeEvidenceSavePoint;
@@ -1084,7 +781,7 @@ export function projectRuntimeEvents(input: {
         redactionStatus: adapter.redactionState,
         terminalSuccessClaim: false,
       },
-      adapter.notProvenClaims ?? [],
+      adapter.notProvenClaims,
     );
     if (adapter.attemptDecision === "blocked" || adapter.outcome.status === "blocked") {
       append(
@@ -1096,7 +793,7 @@ export function projectRuntimeEvents(input: {
           failureClass: adapter.outcome.failureClass,
           terminalSuccessClaim: false,
         },
-        adapter.notProvenClaims ?? [],
+        adapter.notProvenClaims,
       );
     }
     if (adapter.attemptDecision === "execute_via_provider_fetch") {
@@ -1108,7 +805,7 @@ export function projectRuntimeEvents(input: {
           invocationMode: adapter.invocationMode,
           terminalSuccessClaim: false,
         },
-        adapter.notProvenClaims ?? [],
+        adapter.notProvenClaims,
       );
     }
     if (adapter.outcome.status === "completed") {
@@ -1239,40 +936,38 @@ export function projectRuntimeEvents(input: {
   }
 
   for (const cycle of input.responseReentryCycles ?? []) {
-    if (cycle.responseReentry) {
+    append(
+      "response-reentry-observed",
+      {
+        cycleId: cycle.cycleId,
+        reentryId: cycle.responseReentry.reentryId,
+        sourceAttemptId: cycle.responseReentry.sourceAttemptId,
+        sourceResponseHandoffId: cycle.responseReentry.sourceResponseHandoffId,
+        responseClassification: cycle.responseReentry.responseClassification,
+        assistantContentAvailability: cycle.responseReentry.assistantContentAvailability,
+        toolCallExtractionReadiness: cycle.responseReentry.toolExtractionReadiness,
+        reentryStatus: cycle.responseReentry.reentryStatus,
+        redactionStatus: cycle.responseReentry.redactionState,
+        rawOutputExcluded: cycle.responseReentry.rawOutputExcluded,
+        terminalSuccessClaim: false,
+      },
+      cycle.responseReentry.notProvenClaims,
+    );
+    if (
+      cycle.responseReentry.reentryStatus === "processed" ||
+      cycle.responseReentry.reentryStatus === "ready_for_boundary_processing"
+    ) {
       append(
-        "response-reentry-observed",
+        "model-boundary-processing-observed",
         {
           cycleId: cycle.cycleId,
-          reentryId: cycle.responseReentry.reentryId,
-          sourceAttemptId: cycle.responseReentry.sourceAttemptId,
-          sourceResponseHandoffId: cycle.responseReentry.sourceResponseHandoffId,
-          responseClassification: cycle.responseReentry.responseClassification,
-          assistantContentAvailability: cycle.responseReentry.assistantContentAvailability,
-          toolCallExtractionReadiness: cycle.responseReentry.toolExtractionReadiness,
-          reentryStatus: cycle.responseReentry.reentryStatus,
-          redactionStatus: cycle.responseReentry.redactionState,
-          rawOutputExcluded: cycle.responseReentry.rawOutputExcluded,
+          responseReentryId: cycle.responseReentry.reentryId,
+          modelResponseBoundaryId: cycle.responseBoundary.responseId,
+          responseStatus: cycle.responseBoundary.status,
           terminalSuccessClaim: false,
         },
-        cycle.responseReentry.notProvenClaims ?? [],
+        cycle.notProvenClaims,
       );
-      if (
-        cycle.responseReentry.reentryStatus === "processed" ||
-        cycle.responseReentry.reentryStatus === "ready_for_boundary_processing"
-      ) {
-        append(
-          "model-boundary-processing-observed",
-          {
-            cycleId: cycle.cycleId,
-            responseReentryId: cycle.responseReentry.reentryId,
-            modelResponseBoundaryId: cycle.responseBoundary?.responseId,
-            responseStatus: cycle.responseBoundary?.status,
-            terminalSuccessClaim: false,
-          },
-          cycle.notProvenClaims ?? [],
-        );
-      }
     }
     if (cycle.assistantAccumulation) {
       append(
@@ -1287,7 +982,7 @@ export function projectRuntimeEvents(input: {
           completionStatus: cycle.assistantAccumulation.completionStatus,
           terminalSuccessClaim: false,
         },
-        cycle.assistantAccumulation.notProvenClaims ?? [],
+        cycle.assistantAccumulation.notProvenClaims,
       );
     }
     if (cycle.toolExtraction) {
@@ -1305,7 +1000,7 @@ export function projectRuntimeEvents(input: {
           handoffReadiness: cycle.toolExtraction.handoffReadiness,
           terminalSuccessClaim: false,
         },
-        cycle.toolExtraction.notProvenClaims ?? [],
+        cycle.toolExtraction.notProvenClaims,
       );
       if (cycle.toolExtraction.noToolStatus === "observed") {
         append(
@@ -1315,55 +1010,53 @@ export function projectRuntimeEvents(input: {
             noToolStatus: cycle.toolExtraction.noToolStatus,
             terminalSuccessClaim: false,
           },
-          cycle.toolExtraction.notProvenClaims ?? [],
+          cycle.toolExtraction.notProvenClaims,
         );
       }
     }
-    if (cycle.cycleBoundary) {
+    append(
+      "loop-cycle-boundary-observed",
+      {
+        cycleId: cycle.cycleBoundary.cycleId,
+        sourceInvocationAttemptId: cycle.cycleBoundary.sourceInvocationAttemptId,
+        responseReentryId: cycle.cycleBoundary.responseReentryId,
+        assistantAccumulationId: cycle.cycleBoundary.assistantAccumulationId,
+        toolExtractionId: cycle.cycleBoundary.toolExtractionId,
+        nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
+        cycleStatus: cycle.cycleBoundary.cycleStatus,
+        stopReason: cycle.cycleBoundary.stopReason,
+        continuationRequirement: cycle.cycleBoundary.continuationRequirement,
+        terminalSuccessClaim: false,
+      },
+      cycle.cycleBoundary.notProvenClaims,
+    );
+    if (
+      cycle.cycleBoundary.cycleStatus === "blocked_response" ||
+      cycle.cycleBoundary.cycleStatus === "failed_response" ||
+      cycle.cycleBoundary.cycleStatus === "cancelled_response"
+    ) {
       append(
-        "loop-cycle-boundary-observed",
+        "loop-cycle-blocked",
         {
           cycleId: cycle.cycleBoundary.cycleId,
-          sourceInvocationAttemptId: cycle.cycleBoundary.sourceInvocationAttemptId,
-          responseReentryId: cycle.cycleBoundary.responseReentryId,
-          assistantAccumulationId: cycle.cycleBoundary.assistantAccumulationId,
-          toolExtractionId: cycle.cycleBoundary.toolExtractionId,
-          nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
           cycleStatus: cycle.cycleBoundary.cycleStatus,
           stopReason: cycle.cycleBoundary.stopReason,
-          continuationRequirement: cycle.cycleBoundary.continuationRequirement,
           terminalSuccessClaim: false,
         },
-        cycle.cycleBoundary.notProvenClaims ?? [],
+        cycle.cycleBoundary.notProvenClaims,
       );
-      if (
-        cycle.cycleBoundary.cycleStatus === "blocked_response" ||
-        cycle.cycleBoundary.cycleStatus === "failed_response" ||
-        cycle.cycleBoundary.cycleStatus === "cancelled_response"
-      ) {
-        append(
-          "loop-cycle-blocked",
-          {
-            cycleId: cycle.cycleBoundary.cycleId,
-            cycleStatus: cycle.cycleBoundary.cycleStatus,
-            stopReason: cycle.cycleBoundary.stopReason,
-            terminalSuccessClaim: false,
-          },
-          cycle.cycleBoundary.notProvenClaims ?? [],
-        );
-      }
-      if (cycle.cycleBoundary.cycleStatus === "partial_response") {
-        append(
-          "loop-cycle-partial",
-          {
-            cycleId: cycle.cycleBoundary.cycleId,
-            cycleStatus: cycle.cycleBoundary.cycleStatus,
-            nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
-            terminalSuccessClaim: false,
-          },
-          cycle.cycleBoundary.notProvenClaims ?? [],
-        );
-      }
+    }
+    if (cycle.cycleBoundary.cycleStatus === "partial_response") {
+      append(
+        "loop-cycle-partial",
+        {
+          cycleId: cycle.cycleBoundary.cycleId,
+          cycleStatus: cycle.cycleBoundary.cycleStatus,
+          nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
+          terminalSuccessClaim: false,
+        },
+        cycle.cycleBoundary.notProvenClaims,
+      );
     }
   }
 
@@ -1386,7 +1079,7 @@ export function projectRuntimeEvents(input: {
           streamProjected: adapter.streamProjected,
           terminalSuccessClaim: false,
         },
-        adapter.notProvenClaims ?? [],
+        adapter.notProvenClaims,
       );
       continue;
     }
@@ -1405,7 +1098,7 @@ export function projectRuntimeEvents(input: {
         fallbackStatus: adapter.fallbackStatus,
         terminalSuccessClaim: false,
       },
-      adapter.notProvenClaims ?? [],
+      adapter.notProvenClaims,
     );
     append(
       "provider-stream-projected",
@@ -1422,10 +1115,10 @@ export function projectRuntimeEvents(input: {
         fallbackEligibility: adapter.fallbackEligibility,
         fallbackStatus: adapter.fallbackStatus,
         recoveryFacts: adapter.recoveryFacts,
-        redactionStatus: adapter.redaction?.status,
+        redactionStatus: adapter.redaction.status,
         terminalSuccessClaim: false,
       },
-      adapter.notProvenClaims ?? [],
+      adapter.notProvenClaims,
     );
   }
 
@@ -1441,7 +1134,7 @@ export function projectRuntimeEvents(input: {
           eventCount: stream.eventCount,
           terminalSuccessClaim: false,
         },
-        stream.notProvenClaims ?? [],
+        stream.notProvenClaims,
       );
     }
     if (stream.contentDeltaCount > 0 || stream.toolCallDeltaCount > 0) {
@@ -1455,7 +1148,7 @@ export function projectRuntimeEvents(input: {
           contentSummary: stream.contentSummary,
           terminalSuccessClaim: false,
         },
-        stream.notProvenClaims ?? [],
+        stream.notProvenClaims,
       );
     }
     if (stream.status === "cancelled") {
@@ -1469,7 +1162,7 @@ export function projectRuntimeEvents(input: {
           retryStatus: stream.cancellation?.retryStatus,
           terminalSuccessClaim: false,
         },
-        stream.notProvenClaims ?? [],
+        stream.notProvenClaims,
       );
     }
     if (stream.failure) {
@@ -1483,7 +1176,7 @@ export function projectRuntimeEvents(input: {
           fallbackExecuted: stream.failure.fallbackExecuted,
           terminalSuccessClaim: false,
         },
-        stream.notProvenClaims ?? [],
+        stream.notProvenClaims,
       );
     }
     append(
@@ -1497,24 +1190,24 @@ export function projectRuntimeEvents(input: {
         toolCallCount: stream.completedToolCalls.length,
         terminalSuccessClaim: false,
       },
-      stream.notProvenClaims ?? [],
+      stream.notProvenClaims,
     );
   }
 
   for (const phase of input.modelBoundaryPhases ?? []) {
     append(
-      phase.stream?.status === "completed" ? "model-boundary-completed" : "model-boundary-partial",
+      phase.stream.status === "completed" ? "model-boundary-completed" : "model-boundary-partial",
       {
         phaseId: phase.phaseId,
-        requestId: phase.requestBoundary?.requestId,
-        responseId: phase.responseBoundary?.responseId,
-        streamStatus: phase.stream?.status,
-        assistantAccumulationStatus: phase.assistantResponse?.accumulationStatus,
-        toolCallExtractionStatus: phase.toolCallBatch?.extractionStatus,
+        requestId: phase.requestBoundary.requestId,
+        responseId: phase.responseBoundary.responseId,
+        streamStatus: phase.stream.status,
+        assistantAccumulationStatus: phase.assistantResponse.accumulationStatus,
+        toolCallExtractionStatus: phase.toolCallBatch.extractionStatus,
         toolBatchHandoffPrepared: phase.toolBatchHandoffPrepared,
         terminalSuccessClaim: phase.terminalSuccessClaim,
       },
-      phase.notProvenClaims ?? [],
+      phase.notProvenClaims,
     );
   }
 
@@ -1547,12 +1240,12 @@ export function projectRuntimeEvents(input: {
         chunkCount: response.chunkCount,
         textDeltaCount: response.textDeltaCount,
         contentSummary: response.contentSummary,
-        toolCallCandidateCount: response.toolCallCandidates?.length,
+        toolCallCandidateCount: response.toolCallCandidates.length,
         accumulationStatus: response.accumulationStatus,
-        redactionStatus: response.redaction?.status,
+        redactionStatus: response.redaction.status,
         terminalSuccessClaim: false,
       },
-      response.notProvenClaims ?? [],
+      response.notProvenClaims,
     );
   }
 
@@ -1574,7 +1267,7 @@ export function projectRuntimeEvents(input: {
         redactionStatus: batch.redaction.status,
         terminalSuccessClaim: false,
       },
-      batch.notProvenClaims ?? [],
+      batch.notProvenClaims,
     );
     append(
       "tool-dispatch-not-run",
@@ -1585,7 +1278,7 @@ export function projectRuntimeEvents(input: {
         toolCallCount: batch.calls.length,
         terminalSuccessClaim: false,
       },
-      batch.notProvenClaims ?? [],
+      batch.notProvenClaims,
     );
   }
 
@@ -1894,7 +1587,7 @@ export function projectRuntimeEvents(input: {
           redactionStatus: message.redactionStatus,
           terminalSuccessClaim: false,
         },
-        message.notProvenClaims ?? [],
+        message.notProvenClaims,
       );
     }
     append(
@@ -1907,7 +1600,7 @@ export function projectRuntimeEvents(input: {
         blockedCount: batch.blockedCount,
         terminalSuccessClaim: batch.terminalSuccessClaim,
       },
-      batch.notProvenClaims ?? [],
+      batch.notProvenClaims,
     );
   }
 
@@ -1934,7 +1627,7 @@ export function projectRuntimeEvents(input: {
         redactionStatus: bundle.redactionStatus,
         terminalSuccessClaim: bundle.terminalSuccessClaim,
       },
-      bundle.notProvenClaims ?? [],
+      bundle.notProvenClaims,
     );
     append(
       "tool-result-next-action-observed",
@@ -1946,7 +1639,7 @@ export function projectRuntimeEvents(input: {
         blockedFactCount: bundle.blockingFacts.length,
         terminalSuccessClaim: bundle.terminalSuccessClaim,
       },
-      bundle.notProvenClaims ?? [],
+      bundle.notProvenClaims,
     );
     if (bundle.mixedOutcomeStatus === "mixed_success_and_non_success") {
       append(
@@ -1956,7 +1649,7 @@ export function projectRuntimeEvents(input: {
           blockingFacts: bundle.blockingFacts,
           terminalSuccessClaim: bundle.terminalSuccessClaim,
         },
-        bundle.notProvenClaims ?? [],
+        bundle.notProvenClaims,
       );
     }
   }
@@ -2132,12 +1825,12 @@ export function projectRuntimeEvents(input: {
         policyId: policy.policyId,
         bundleId: policy.bundleId,
         deliveryStatus: policy.deliveryStatus,
-        entryCount: policy.entries?.length,
+        entryCount: policy.entries.length,
         providerCalled: policy.providerCalled,
         nextTurnExecuted: policy.nextTurnExecuted,
         terminalSuccessClaim: policy.terminalSuccessClaim,
       },
-      policy.notProvenClaims ?? [],
+      policy.notProvenClaims,
     );
     if (policy.deliveryStatus === "waiting") {
       append(
@@ -2147,7 +1840,7 @@ export function projectRuntimeEvents(input: {
           bundleId: policy.bundleId,
           terminalSuccessClaim: policy.terminalSuccessClaim,
         },
-        policy.notProvenClaims ?? [],
+        policy.notProvenClaims,
       );
     }
     if (policy.deliveryStatus === "unsupported") {
@@ -2158,7 +1851,7 @@ export function projectRuntimeEvents(input: {
           bundleId: policy.bundleId,
           terminalSuccessClaim: policy.terminalSuccessClaim,
         },
-        policy.notProvenClaims ?? [],
+        policy.notProvenClaims,
       );
     }
     if (policy.deliveryStatus === "abandoned") {
@@ -2169,7 +1862,7 @@ export function projectRuntimeEvents(input: {
           bundleId: policy.bundleId,
           terminalSuccessClaim: policy.terminalSuccessClaim,
         },
-        policy.notProvenClaims ?? [],
+        policy.notProvenClaims,
       );
     }
   }
@@ -2196,7 +1889,7 @@ export function projectRuntimeEvents(input: {
         deliveryStatus: bundle.deliveryStatus,
         terminalSuccessClaim: bundle.terminalSuccessClaim,
       },
-      bundle.notProvenClaims ?? [],
+      bundle.notProvenClaims,
     );
     if (bundle.readinessStatus.startsWith("blocked") || bundle.readinessStatus === "unsupported") {
       append(
@@ -2208,7 +1901,7 @@ export function projectRuntimeEvents(input: {
           requiredUserAction: bundle.requiredUserAction,
           terminalSuccessClaim: bundle.terminalSuccessClaim,
         },
-        bundle.notProvenClaims ?? [],
+        bundle.notProvenClaims,
       );
     }
   }
@@ -2898,7 +2591,7 @@ export function projectRuntimeEvents(input: {
         missingProofItems: finalizationInput.missingProofItems,
         terminalSuccessClaim: finalizationInput.terminalSuccessClaim,
       },
-      finalizationInput.notProvenClaims ?? [],
+      finalizationInput.notProvenClaims,
     );
   }
 
@@ -2920,7 +2613,7 @@ export function projectRuntimeEvents(input: {
         missingProofItems: decision.missingProofItems,
         terminalSuccessClaim: decision.terminalSuccessClaim,
       },
-      decision.notProvenClaims ?? [],
+      decision.notProvenClaims,
     );
   }
 
@@ -2944,7 +2637,7 @@ export function projectRuntimeEvents(input: {
         missingProofItems: closeoutInput.missingProofItems,
         terminalSuccessClaim: closeoutInput.terminalSuccessClaim,
       },
-      closeoutInput.notProvenClaims ?? [],
+      closeoutInput.notProvenClaims,
     );
   }
 
@@ -2969,7 +2662,7 @@ export function projectRuntimeEvents(input: {
         missingProofItems: closeout.missingProofItems,
         terminalSuccessClaim: closeout.terminalSuccessClaim,
       },
-      closeout.notProvenClaims ?? [],
+      closeout.notProvenClaims,
     );
   }
 
@@ -3001,7 +2694,7 @@ export function projectRuntimeEvents(input: {
         sessionCarryForwardFacts: packet.sessionCarryForwardFacts,
         terminalSuccessClaim: packet.terminalSuccessClaim,
       },
-      packet.notProvenClaims ?? [],
+      packet.notProvenClaims,
     );
   }
 
@@ -3565,7 +3258,7 @@ export function projectRuntimeEvents(input: {
         nextTurnExecuted: adapter.continuationBoundary.nextTurnExecuted,
         terminalSuccessClaim: false,
       },
-      adapter.notProvenClaims ?? [],
+      adapter.notProvenClaims,
     );
   }
 
