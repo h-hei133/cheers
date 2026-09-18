@@ -549,6 +549,41 @@ Test-inclusive `tsc -p tsconfig.json` 从 251 → **253**，正是这两条 `TS2
 - 计数差异属**定义口径**而非缺陷：复核者边数 4959 vs 本计划 4960、可达性 875/86 vs 876/85——
   复核者以其自身方法测得的**改动前后差值均为 0**，即守恒结论成立。
 
+### 3.8 架构位置再探索（2026-09-18，零代码改动）
+
+**完整记录**：`.wiki/refactor/architecture-exploration-2026-09-18.md`
+
+Step 3–7 完成后重新审视"还有哪些位置不正确、哪些需要重构、test 是否该与 src 分层"。
+**所有数字由 `maskSource` 语法锚定的 import 图实测。**
+
+| # | 发现 | 严重度 | 处置 |
+|---|---|---|---|
+| 1 | `tsconfig.build.json` 的 `exclude` 仅 `**/*.test.ts`，**7 个非 `.test` 的测试支撑文件被打进 `dist/`** | 中（死重，非运行时风险） | **待批准**（见下） |
+| 2 | `agent-rules/architecture-boundaries.md` 的 Common Areas **仍指向 `orchestration/patchResult/`、`orchestration/patchApplication/`**，两条路径 Step 4 已消失 | 中（规则指向不存在目录） | **待批准** |
+| 3 | `src/renderer/` 不在 sanctioned 域列表；`StreamingRenderer.ts` **34 外部消费者 / 0 出边**；规则示例路径 `presentation/terminal/renderer.ts` 已存在但职责不同 | 中 | 独立决策 |
+| 4 | `src/test-utils/` 含 **`utils`**（规则明文禁止）；`session/__tests__/` 是全仓**唯一**孤例 | 中 | 与 #1 一并 |
+| 5 | `presentation/theme/` 与 `presentation/themes/` **仅差一个 `s`**，必须一起读 | 低 | 独立命名决策 |
+| 6 | `eval/` 语义已被 `evidence/harness/` 取代 | 低 | 独立决策 |
+
+**关于 test 是否与 src 分层——结论：不分离。** 三条理由：
+
+1. **硬障碍**：`session/longSessionDurability.test.ts:220-245` 用 `path.join(process.cwd(), "src","session","__tests__","longSessionDurabilityProcess.ts")` **运行时拼路径**并 `spawnSync`。
+   这是 §2.2 检查 4 的**动态入口**——`tsc` 与 import 图**都看不见**。
+   分离会**静默切断**它。**必须先改造该入口，才谈得上分离。**
+2. **分离解决不了 #1 的根因**：#1 不是"同层"造成的，而是 `exclude` **只有一条模式**。
+   真正修法是收紧构建边界（加 `**/test-utils/**`、`**/__tests__/**`、`test/**`），与目录布局正交。
+3. **规则明文支持并排**且给出并排示例；当前形态合规。分离是**风格变更**，非缺陷修复。
+   代价：520 文件 + ~1799 条边重算 + 每次新增测试维护镜像路径；55%（995/1799）测试当前目标就在同目录。
+
+**结构性基线（本轮实测）**：`src/` 1481 文件（生产 961 + 测试 520）；5094 条已解析边；
+**`prod → test = 0`**（测试是纯叶子）；`test → prod = 1799`；58% 测试依赖同域生产模块。
+
+**`core/` 的处理**：22 子目录 / 1515 文件，216 条外部入边——是事实上的横切基础层。
+规则未定义 `core/` 的准入标准，**需维护者先裁定其语义**，本轮不提出拆分方案。
+
+**未改动的两项及原因**：`tsconfig.build.json`（build behavior）与 `agent-rules/*`
+属 `AGENTS.md` 明列"require explicit task scope"的范围；本轮**只报告，不擅自修改**。
+
 ### 3.4 独立立项（记录，不在本计划处理）
 
 **`turn` 内核与编排层不连通。** 活轨存在两套并行的 provider 路径：
@@ -886,6 +921,7 @@ runtime 装配四重证据。
 | `step-4-decision-research.md` | **Step 4 的 5 项决策研究：实测结论 + 方案建议 + pi 参考** |
 | `step-5-session-manager-recon.md` | **Step 5 SessionManager 拆分探索（含 3 个方案与 3 项未决问题）** |
 | `step-6-naming-exploration.md` | **Step 6 命名税探索：170 文件实测、族切分否证（0.32）、`playwright` 裁定依据、执行记录 ± 残余** |
+| `architecture-exploration-2026-09-18.md` | **Step 3–7 后的架构位置再探索：5 项发现、test 分层结论（不分离）、`core/` 待裁定** |
 | `deleted-audit-2026-09-16.md` | **主文档**：403 个已删文件审查总账 + 附一至附十二 |
 | `restore-audit-2026-09-16.md` | 事故认定、三路审查、D 集恢复、补丁层复核 |
 | `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-006） |

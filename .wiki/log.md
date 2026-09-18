@@ -748,3 +748,49 @@
   ④ 效果：门禁由 **2 文件 / 13 测试** 恢复为 **13 文件 / 39 测试**。
 - 该脚本**未被 `package.json` 或 release 链引用**（孤立脚本）。
 - **四个分片全部完成**：17 clean + 4 处发现（1 中 3 低），其中门禁项按高影响处理并已修根因。
+
+## [2026-09-18] arch-recon | 架构位置再探索（零代码改动）。5 项发现 + test 分层结论。
+- **结构基线（`maskSource` 语法锚定实测）**：`src/` 1481 文件（生产 **961** + 测试 **520**）、
+  **5094 条已解析边**、**`prod → test = 0`**（测试是导入图纯叶子）、`test → prod = 1799`、
+  58%（995/1799）测试的生产目标就在同目录。顶层目录 **28** 个。
+- **发现 1（中）· 发布产物含测试模块**：`tsconfig.build.json` 的 `exclude` 只有
+  `["dist","node_modules","**/*.test.ts"]`，故**任何不以 `.test.ts` 结尾的测试支撑文件都被编译进 `dist/`**。
+  实测 **7 个**：`test-utils/{cleanup,cliHarness,ptyCapabilityDetector,stoppedRecoveryFixture,terminalDouble}.ts`
+  + `session/__tests__/{longSessionContinuityFixtures,longSessionDurabilityProcess}.ts`。
+  **实测降级**：这 7 个的消费者**全部是 `.test.ts`**（`test-utils/` 的非测试消费者 = 0），
+  且 `package.json` 的 `files` 含 `src`（源码本就发布）—— 故实际影响 = **发布产物多 7 个死模块**，
+  非功能/安全缺陷。**根因是 `exclude` 只有一条模式，与目录布局正交。**
+- **发现 2（中）· 规则文件指向不存在的目录**：`agent-rules/architecture-boundaries.md` 的
+  Common Areas 仍列 `orchestration/patchResult/`、`orchestration/patchApplication/`，
+  **两条路径 Step 4 已全部消失**（实测目录不存在）。`AGENTS.md` 要求代理启动时遵守这些文件，
+  而它们现在指向不存在的路径。Owner Domains 列表也与实际 28 个顶层域不符（缺 `config/` 等）。
+- **发现 3（中）· `renderer/` 错置**：不在 sanctioned 域列表；
+  `StreamingRenderer.ts` **34 个外部消费者 / 0 条出边**（纯叶子），消费者为
+  `cli`(12) `core/shell`(12) `entrypoints`(9) `session`(1)——全是终端会话面。
+  规则示例路径写的是 `presentation/terminal/renderer.ts`，**该文件已存在**，
+  但它是**纯格式化器**（`TerminalMessageRenderer`，无副作用），
+  与 `StreamingRenderer`（**默认写 stdout 的带副作用输出通道**）**职责不同、不可合并**。
+  建议迁 `presentation/terminal/`（与既有 `renderer.ts` 并列，靠文件名区分），**属独立决策**。
+- **发现 4（中）· `test-utils/` 违反规则明文**：规则禁止 `helper/helpers/utils/misc/common/support`
+  这类便利目录，`test-utils/` 命中 `utils`；且 `session/__tests__/` 是全仓**唯一**孤例
+  （其余 520 个测试全部与源文件并排）。
+- **发现 5（低）· `presentation/theme/` 与 `presentation/themes/` 仅差一个 `s`**，
+  前者是逻辑（`theme.ts`/`commandHighlight.ts`）、后者是数据（`dark.json`/`light.json`/`index.ts`），
+  且 `theme/theme.ts` import `../themes/index.js`——必须一起读才懂。
+- **test 是否与 src 分层——结论：不分离**，三条理由：
+  1. **硬障碍**：`session/longSessionDurability.test.ts:220-245` 用
+     `path.join(process.cwd(),"src","session","__tests__","longSessionDurabilityProcess.ts")`
+     **运行时拼路径**并 `spawnSync` —— §2.2 检查 4 的**动态入口**，`tsc` 与 import 图都看不见。
+     分离会**静默切断**它，**必须先改造该入口**。
+  2. **分离解决不了发现 1 的根因**（根因是 `exclude` 只有一条模式），
+     真正修法是收紧构建边界：加 `**/test-utils/**`、`**/__tests__/**`、`test/**`。
+  3. **规则明文允许并排**并给出并排示例，当前形态合规；分离是**风格变更**非缺陷修复。
+     代价：520 文件 + ~1799 条边重算 + 每次新增测试维护镜像路径。
+- **一个被否证的自制判据（已记入文档）**：曾用"消费者全部是测试文件"筛测试专用模块，
+  得到 **60 个**结果——**无效**，因为 `index.ts`、`entrypoints/*`、`runtime/api/sessionApi.ts`
+  等**合法生产入口**本就不被其他生产文件静态 import。**"无生产静态消费者" ≠ "测试专用"。**
+  文档只采信"位于 `test-utils/` 或 `__tests__/`（名称即声明用途）"。
+- **未改动两项及原因**：`tsconfig.build.json`（build behavior）与 `agent-rules/*`
+  属 `AGENTS.md` 明列「require explicit task scope」范围，本轮**只报告不擅改**。
+- **`core/` 未提出拆分方案**：22 子目录 / 1515 文件 / 216 条外部入边，是事实上的横切基础层；
+  规则未定义其准入标准，**需维护者先裁定语义**。
