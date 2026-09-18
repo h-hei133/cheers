@@ -1,5 +1,5 @@
 import type { HarnessTrace } from "./harnessTrace.js";
-import type { PlanQuality } from "../planning/quality/model.js";
+import type { PlanQuality } from "../../planning/quality/model.js";
 
 export type HarnessScorecardStatus = "pass" | "warn" | "fail" | "skip";
 

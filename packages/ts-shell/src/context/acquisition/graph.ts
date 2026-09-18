@@ -22,8 +22,8 @@ import {
   buildPlanQuality,
   type PlanQuality,
 } from "../../planning/quality/model.js";
-import { buildHarnessTrace, type HarnessTrace } from "../../orchestration/harnessTrace.js";
-import { buildHarnessScorecard, type HarnessScorecard } from "../../orchestration/harnessScorecard.js";
+import { buildHarnessTrace, type HarnessTrace } from "../../evidence/harness/harnessTrace.js";
+import { buildHarnessScorecard, type HarnessScorecard } from "../../evidence/harness/harnessScorecard.js";
 import { normalizeCodeGraphFacts, type CodeGraphFacts } from "./code/facts.js";
 import { buildCodeGraphTrace, type CodeGraphTrace } from "./code/trace.js";
 import { checkCodeGraphStaleness, type CodeGraphStalenessCheck } from "./code/staleness.js";

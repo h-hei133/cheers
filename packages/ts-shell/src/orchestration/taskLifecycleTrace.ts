@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 import type { AnalysisBrief } from "./analysisBrief.js";
-import type { HarnessTrace } from "./harnessTrace.js";
+import type { HarnessTrace } from "../evidence/harness/harnessTrace.js";
 import type { TaskExecutionPlan } from "./taskExecutionPlan.js";
 import type { TaskLifecycle } from "./taskLifecycle.js";
 import type { TaskReadPlan } from "./taskReadPlan.js";
