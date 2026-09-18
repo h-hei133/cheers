@@ -713,6 +713,88 @@ or decision history"。**它们是标注错误，不是内容过期。**
 | `AGENTS.md`：execution 措辞 + 补 15 个实际在用的顶层域 | 需裁决 |
 | 收紧 `tsconfig.build.json` 的 `exclude`（同 §3.8 发现 1） | 需裁决 |
 
+### 3.10 `pi` 参考仓可行性分析 + `strict` 评估（2026-09-18）
+
+**完整记录**：`reference-pi-feasibility-2026-09-18.md`、`strict-mode-assessment-2026-09-18.md`
+
+#### 3.10.1 提议与结论
+
+提议："`pi` 架构明显更干净，为什么不直接学它、把我们的重构成那种形式？"
+
+**结论：不推荐照搬。** 但发现 **3 项局部实践可吸收**，其中 `strict` 是本轮**最高价值发现**。
+
+**方法学更正（重要）**：第一轮用**本仓自定规则**（0 环、≤20 名上限）评判 `pi`，
+被判为**循环论证**——那两条是 NormProof 的规定，非业内共识，且 NormProof 是**进行中**项目。
+**重做后的分析只使用不依赖我们规则的角度。**
+
+#### 3.10.2 三个不依赖我们规则的角度
+
+| 角度 | 我们 | `pi` | 判读 |
+|---|---|---|---|
+| **① 包的性质** | 4 包（1 真包） | **11 包，10 个 `private:false` 全部发布 npm**，统一 0.85.1 | `pi` 的包布局由**发布约束**决定（`pi-tui` 要被外部消费就不能依赖 `coding-agent`）。我们无外部消费者，搬过来只有发布开销 |
+| **② `strict`** | ❌ **未设置** | ✅ `"strict": true` | **唯一 `pi` 明确更好且与规则无关的项** |
+| **③ 变更局部性** | p50=4 文件/commit、fan-in p50=10 | p50=4、fan-in p50=6 | **同量级**，差距不足以支撑重写 |
+
+**`pi` 的结构本身更松（已核实非 barrel 假阳性）**：环 **10**（最大 **32 文件**）、
+超上限模块 **75**、最大模块 **204 函数 / 6,649 行**；`core/` **无任何定义文档**，
+而其 10 个环中 **3 个横跨 `core/`**。
+
+**规模对照**：代码量相当（177k vs 163k 行），但 commit 数 **1,599 vs 6,421**，
+`docs/` **1,134 vs 113** —— 它是 13 个月高频小步，我们是 5 个月 route 式大步。
+**我们的 770 份 docs 与 30 个顶层目录是开发方式的产物，不是架构缺陷；
+照搬布局不会改变开发方式。**
+
+#### 3.10.3 三项可吸收的局部实践
+
+| 项 | 价值 | 依赖我们的规则？ |
+|---|---|---|
+| **`tsconfig` 开 `strict`** | ⭐ 最高 | **否** |
+| `test/` 与 `src/` 分层，`test/` 自带 `fixtures/` 与共享基建 | 中 | 否 |
+| `check:*` 门禁的检查项（`check:ts-imports`/`check:entry-graphs`/`check:runtime-deps`） | 中——与既有 25 个 `verify-*.mjs` 同构 | 否 |
+
+#### 3.10.4 已据此修正的既有结论
+
+`architecture-exploration-2026-09-18.md` §4 的"**不应分离测试**"：
+**第一条理由（动态路径构成硬障碍、须先改造再搬迁）已撤回**。
+`pi` 的 `test/` 同时容纳夹具与共享基建，故 `longSessionDurabilityProcess.ts`
+只是**随测试一起搬**，那条 `path.join` 在同一次搬迁里改一处即可。
+**组织形态亦修正**：应用 `pi` 的**按主题组织**（免维护镜像路径），而非"镜像 `src/`"。
+
+#### 3.10.5 `strict` 评估（本轮最高价值项）
+
+**现状**：tsconfig 链**完全未设 `strict`** → `strictNullChecks`、`noImplicitAny` 等全部默认关闭。
+
+| 配置 | 错误数 | 生产代码 | 测试 |
+|---|---:|---:|---:|
+| 现状 | 251 | **0** | 251 |
+| `--strict` | 401 | **136** | 265 |
+
+**136 个生产错误高度集中**：
+
+| 文件 | 错误数 |
+|---|---:|
+| **`runtime/events/projection.ts`** | **73（54%）** |
+| `verification/result/boundary.ts` | 10 |
+| `provider/request/boundary.ts` | 8 |
+| `core/tools/toolResultLifecycle.ts` | 8 |
+| 其余 ~17 文件 | 各 1–6 |
+
+**且 `projection.ts` 的 73 个是重复模式**：TS18048 的标识符只有
+`cycle.cycleBoundary`(22) 与 `cycle.responseReentry`(13) 两个为主——
+可选字段在循环内无守卫访问。**循环体开头加一次窄化即可消除约 35 个**。
+
+**分批**：S1（`projection.ts`，73）→ S2（三个 boundary/lifecycle 文件，26）→
+S3（其余 ~13 文件，37）→ S4（265 个测试，独立）→ S5（写入配置）。
+**关键可分批点：`tsconfig.build.json` 已 `exclude` 测试文件，可先只对生产代码开 `strict`，
+不必等 S4。**
+
+**纪律**：每批错误数须严格下降且不新增错误码；**禁止用 `!` / `as` 消错**，
+只做窄化（守卫、解构 + `continue`、可选链）；窄化导致跳过的分支须在提交信息里解释为何正确。
+
+**未验证项（如实标注）**：`pi` 的 `node_modules` 不存在，
+`npx tsc -p tsconfig.json` 报 `TS2688: Cannot find type definition file for 'node'`，
+故 **"`pi` 在 strict 下干净"是推断，未经验证**。
+
 ### 3.4 独立立项（记录，不在本计划处理）
 
 **`turn` 内核与编排层不连通。** 活轨存在两套并行的 provider 路径：
@@ -1052,6 +1134,8 @@ runtime 装配四重证据。
 | `step-6-naming-exploration.md` | **Step 6 命名税探索：170 文件实测、族切分否证（0.32）、`playwright` 裁定依据、执行记录 ± 残余** |
 | `architecture-exploration-2026-09-18.md` | **Step 3–7 后的架构位置再探索：5 项发现、test 分层结论（不分离）、`core/` 待裁定** |
 | `drift-exploration-2026-09-18.md` | **docs/ 与 AGENTS.md 漂移探索：测试不阻碍删除（实测）、770 份中 91% 陈旧、漂移检测门禁** |
+| `reference-pi-feasibility-2026-09-18.md` | **`pi` 参考仓可行性分析：不可照搬的四个理由 + 三项可吸收实践** |
+| `strict-mode-assessment-2026-09-18.md` | **`strict` 开启评估：136 个生产错误的分批路径（单文件占 54%）** |
 | `deleted-audit-2026-09-16.md` | **主文档**：403 个已删文件审查总账 + 附一至附十二 |
 | `restore-audit-2026-09-16.md` | 事故认定、三路审查、D 集恢复、补丁层复核 |
 | `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-006） |
