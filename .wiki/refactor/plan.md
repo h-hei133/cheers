@@ -35,7 +35,7 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | 稳定失败 | **0**（`testTimeout` 已修为 30s，原 5 项负载超时消除） |
 | `tsc -p tsconfig.build.json` | 0 错误 |
 | NormProof judge | verdict `partial`；**blocking 义务 0 项未满足**（唯一 blocking 义务 satisfied） |
-| `strict` | ❌ **未开启**；S1 已完成（`projection.ts` 73 错清零），生产 strict 错误 **136 → 63**，测试 265。**复核修正**：S1 的 `ffcf63bf` 已回退，改为对齐 15 个 `*Like` 镜像接口到真实生产者类型 + 删除这 15 个死接口（保留 1 个真实断环镜像）。生产 strict 仍 **63**，全包 strict **328 → 321**，非 strict 全量 **251 → 244** |
+| `strict` | ❌ **未开启**；**S1+S2 已完成**。生产 strict 错误 **136 → 37**；全包 strict **401 → 295**；非 strict 全量 **251 → 244**；测试 strict 265 未动。S1 原提交 `ffcf63bf` 经复核**回退重做**（根因是 `*Like` 镜像类型漂移，非缺守卫）。**A3 剩余 37 处**（散在 ~13 个模块，无单点大头） |
 | 文档/规则漂移门禁 | ✅ `verify:docs-drift`（RULES 0 死引用、DOCS `--strict` 通过），已接入 `verify-release-core` |
 
 **注**：可达性自 Step 3 起全程未变（搬迁不改可达性，符合预期）；Step 5 第 2、3 批各 +1
@@ -1207,7 +1207,7 @@ R6/R7 只需一个方向答复）。
 | 序 | 事项 | 理由 |
 |---|---|---|
 | A1 | **R1 `strict` S1** —— `runtime/events/projection.ts` | ✅ **已完成**（`ffcf63bf` + 复核修正）：73 错全部清零，生产 strict 错误 **136 → 63**；零 `!` 或 `as`。**复核发现原提交归因错误**：根因是 16 个 `*Like` 镜像接口比真实生产者类型更窄，不是"循环体缺守卫"。已回退防御式改动，改为对齐 15 个镜像到真实类型并删除死接口（保留 1 个真实断环镜像）。**A2/A3 适用同一教训：先对齐类型，再考虑防御** |
-| A2 | R1 S2 —— 三个 boundary/lifecycle 文件（26 错） | 同形 |
+| A2 | R1 S2 —— 三个 boundary/lifecycle 文件（26 错） | ✅ **已完成**：26 个生产错全部清零（生产 strict **63 → 37**）。**三个文件形态各不相同**，逐个定因而非套用 A1 模板：① `provider/request/boundary.ts`：3 个镜像无环风险 → 对齐真实类型并删除（8 错）；② `verification/result/boundary.ts`：`RepairApplyObservationLike` **是真断环**（`repair/handoff/boundary.ts` 可达它），不能导入真实类型 → 只修正 13 个字段的可选性使其忠于生产者（10 错）；③ `core/tools/toolResultLifecycle.ts`：`LifecycleEventLike` 的**兜底成员**（`type: string` + 全字段可选）破坏 `switch` 收窄 → 对齐真实生产者 `QueryEvent` 并删除兜底成员（8 错） |
 | A3 | R1 S3 —— 其余 ~13 文件（37 错） | 生产代码清零后，**改 `tsconfig.build.json` 只对生产开 `strict`** |
 | A4 | **R2 + R3** | 两者都是"只改配置/文字"，零代码风险；**R2 顺手解决 7 个测试模块进 `dist/` 的泄漏** |
 | A5 | R12 | 借鉴 `pi` 的 `check:ts-imports` / `check:entry-graphs` 检查项 |

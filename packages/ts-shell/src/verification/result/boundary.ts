@@ -46,23 +46,23 @@ export type RepairApplyObservationStatus =
   | "not_proven";
 
 export interface RepairApplyObservationLike {
-  readonly repairApplyId?: string;
-  readonly proposalId?: string;
-  readonly sourceFailureId?: string;
-  readonly sourceVerificationId?: string;
-  readonly targetSummary?: string;
+  readonly repairApplyId: string;
+  readonly proposalId: string;
+  readonly sourceFailureId: string;
+  readonly sourceVerificationId: string;
+  readonly targetSummary: string;
   readonly repairApplyStatus: RepairApplyObservationStatus;
   readonly repairAuthorityStatus?: "required" | "granted" | "denied" | "not_required" | "unknown";
-  readonly applyReceiptIds?: readonly string[];
-  readonly touchedTargetSummaries?: readonly string[];
-  readonly originalFailureClass?: string;
-  readonly originalFailureSummary?: string;
+  readonly applyReceiptIds: readonly string[];
+  readonly touchedTargetSummaries: readonly string[];
+  readonly originalFailureClass: string;
+  readonly originalFailureSummary: string;
   readonly originalRuntimeReceiptIds?: readonly string[];
-  readonly runtimeReceiptIds?: readonly string[];
-  readonly taskRelevanceStatus?: VerificationIntentRelevanceStatus;
-  readonly coverageStatus?: VerificationCoverageObservationStatus;
+  readonly runtimeReceiptIds: readonly string[];
+  readonly taskRelevanceStatus: VerificationIntentRelevanceStatus;
+  readonly coverageStatus: VerificationCoverageObservationStatus;
   readonly originalFailurePreserved?: true;
-  readonly notProvenClaims?: readonly string[];
+  readonly notProvenClaims: readonly string[];
   readonly redactionStatus?: "report-safe" | "redacted";
 }
 

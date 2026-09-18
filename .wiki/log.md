@@ -970,3 +970,44 @@
 - **方法论教训**：`?? []` 与 `?.` 会让"类型已漂移"表现为"运行期可能缺值"。
   **先问镜像类型是否忠于生产者，再考虑加防御**——否则错误数下降但债务未清。
   S1 的 40 处新增 `?? []` 中，经 TS 编译器 API 实测有 **14 处**其左值声明类型为必填（死分支）。
+
+## [2026-09-18] strict-s2 | S2 完成：三个 boundary/lifecycle 文件 26 处 strict 错误清零。
+- **目标**：`verification/result/boundary.ts`(10) + `provider/request/boundary.ts`(8)
+  + `core/tools/toolResultLifecycle.ts`(8)。**三个文件形态各不相同**，未套用 S1 模板。
+- **① `provider/request/boundary.ts`（8 错）——可对齐**：
+  3 个镜像 `ContextPlanningBlockSummaryLike` / `NextTurnDeliveryFactLike` / `NextTurnBundleLike`
+  全仓零外部引用，且真实生产者模块（`context/acquisition/summary.ts`、`turn/nextTurnBundle.ts`）
+  **均不可达本文件**（无环）→ 删除镜像、导入真实类型。
+  镜像实际窄得多：`acquisition`/`planning`/`handoff` 被声明为可选子对象，
+  真实 `ContextPlanningBlockSummary` 是必填且有 11 个字段；
+  `readinessStatus` 末尾还带 `| string` 兜底，真实 `NextTurnReadinessStatus` 是 9 成员判别联合
+  （正是该兜底导致 `requestReadiness` 的 `switch` 报 TS2366）。
+- **② `verification/result/boundary.ts`（10 错）——不能对齐，只能修正可选性**：
+  `RepairApplyObservationLike` 是**真断环手段**——`repair/handoff/boundary.ts:1`
+  导入本文件的 `VerificationResultObservation`，故本文件不可反向导入 `RepairApplyObservation`。
+  **但可选性仍必须忠于生产者**：13 个字段（`repairApplyId`/`proposalId`/`sourceFailureId`/
+  `sourceVerificationId`/`targetSummary`/`applyReceiptIds`/`touchedTargetSummaries`/
+  `originalFailureClass`/`originalFailureSummary`/`runtimeReceiptIds`/`taskRelevanceStatus`/
+  `coverageStatus`/`notProvenClaims`）在真实类型上全是必填，镜像却写成可选。
+  改为必填后 10 错全清。**这是"镜像可以存在，但不得谎报可选性"的判例。**
+- **③ `core/tools/toolResultLifecycle.ts`（8 错）——兜底成员破坏收窄**：
+  `LifecycleEventLike` 联合的最后有一个 `{ readonly type: string; 全字段可选 }` 兜底成员，
+  使 `switch (event.type)` 的四个分支**无法把 `taskId` 收窄为非 undefined** → 8 处 TS2538。
+  真实生产者是 `QueryEvent`（`session/recovery/sessionLifecycleReadModel.ts:17`
+  与 `session/transcript/sessionQueryEventPersistence.ts:61` 传入的都是它），
+  其 `approval.requested` / `approval.resolved` / `tool.started` / `tool.result` 四成员
+  `taskId`/`toolName` **均为必填**。该模块**不可达** `core/query/runtime/events.ts`（实测无环）
+  → 删除该联合，直接对齐 `QueryEvent`，8 错全清。
+- **测量**：
+  - 生产 strict：**63 → 37**（26 错清零，A2 目标达成）；
+  - 全包 strict：**321 → 295**；
+  - 非 strict 全量：**244 = 244**（零新增，仅 2 处行号位移）；
+  - `tsc -p tsconfig.build.json`：**0 错误**；
+  - SCC：**1480 文件 0 环**；
+  - 聚焦测试（verification/repair/provider/core/tools/edit/runtime/session 等）：**113 文件 778 项全绿**。
+- **过程失误（已自纠）**：首次收紧 `verification/result/boundary.ts` 时用
+  `str.replace(a,b)` 未限定范围，把 `projectVerifyIntent` 等三个**函数入参**的
+  `coverageStatus?` 一并改成必填，导致错误数反升（304 → 328，新增 25 处调用方错误）。
+  改为**只在镜像块内**做替换后恢复。教训：批量文本替换必须限定作用域。
+- **残余**：生产 strict 剩 **37 处**，散在 ~13 个模块（最大单文件 6 处），
+  无单点大头 → 属 A3 范围。
