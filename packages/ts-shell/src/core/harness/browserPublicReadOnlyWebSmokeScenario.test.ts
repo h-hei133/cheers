@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { adaptCommandResultToSidebarEvent } from "../context/sidebar/sidebarCommandEventAdapter.js";
+import { adaptCommandResultToSidebarEvent } from "../../presentation/sidebar/sidebarCommandEventAdapter.js";
 import { runBrowserLocalCommand } from "../commands/browserCommandRuntime.js";
 import {
   PUBLIC_WEB_SMOKE_BYTE_BUDGET_ENV,

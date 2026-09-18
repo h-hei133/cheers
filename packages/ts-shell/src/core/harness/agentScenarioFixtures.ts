@@ -7,7 +7,7 @@ import { createProjectMemoryInjectionStateStore } from "../context/memory/projec
 import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
 import { createProjectMemoryReviewStateStore } from "../context/memory/projectMemoryReviewState.js";
 import type { ProjectMemoryRecord } from "../context/memory/projectMemoryStoreContract.js";
-import { createSidebarLiveEventStore } from "../context/sidebar/sidebarLiveEventStore.js";
+import { createSidebarLiveEventStore } from "../../presentation/sidebar/sidebarLiveEventStore.js";
 import type { BrowserExecutor } from "../context/browserExecutor.js";
 import type { BrowserExecutionConfirmationRecord } from "../context/browserExecutionConfirmation.js";
 import type { BrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";

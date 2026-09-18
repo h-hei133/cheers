@@ -10,7 +10,7 @@ import { createCompactInjectionStateStore } from "../../context/compact/injectio
 import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
 import { createProjectMemoryReviewStateStore } from "../context/memory/projectMemoryReviewState.js";
-import { createSidebarLiveEventStore } from "../context/sidebar/sidebarLiveEventStore.js";
+import { createSidebarLiveEventStore } from "../../presentation/sidebar/sidebarLiveEventStore.js";
 import { createStartupWarmContextCacheStore } from "../../context/startup/startupWarmContextHealth.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";

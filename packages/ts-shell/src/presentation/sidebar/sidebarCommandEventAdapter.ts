@@ -1,4 +1,4 @@
-import type { LocalCommandResult } from "../../commands/types.js";
+import type { LocalCommandResult } from "../../core/commands/types.js";
 import type {
   SidebarEventKind,
   SidebarEventSeverity,

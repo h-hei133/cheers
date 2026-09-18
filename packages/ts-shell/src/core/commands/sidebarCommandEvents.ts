@@ -1,15 +1,15 @@
 import {
   adaptCommandResultToSidebarEvent,
   emitSidebarCommandResult,
-} from "../context/sidebar/sidebarCommandEventAdapter.js";
+} from "../../presentation/sidebar/sidebarCommandEventAdapter.js";
 import {
   createSidebarEventSink,
   type SidebarEventSink,
-} from "../context/sidebar/sidebarEventSink.js";
+} from "../../presentation/sidebar/sidebarEventSink.js";
 import {
   DEFAULT_SIDEBAR_LIVE_EVENT_STORE,
   type SidebarLiveEventStore,
-} from "../context/sidebar/sidebarLiveEventStore.js";
+} from "../../presentation/sidebar/sidebarLiveEventStore.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 export function sidebarSessionScopeId(context: CommandContext): string {

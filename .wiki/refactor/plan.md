@@ -189,10 +189,11 @@ src/context/compact|startup|model/（44）
 **执行顺序（风险递增）**：3a `model/`+错置文件 → 3b `startup/` → 3c `compact/`
 → 3d `sidebar/` → 3e `memory/` → **3f browser（361 边，最末且分批）**。
 
-**进度**：3a ✅（`e53ba6b4`）、3b ✅（`54021279`）、**3c ✅（2026-09-18）**。
-3c 实测外部边 **37**（原估 30），域内 escaping 边 21 条；顺带修复 3b 遗漏的
-`sidebarStateProjection.test.ts` 悬挂 `import type`。详见
-`step-3-migration-map.md` §6.1。
+**进度**：3a ✅（`e53ba6b4`）、3b ✅（`54021279`）、**3c ✅**、**3d ✅**（2026-09-18）。
+3c 实测外部边 **37**（原估 30），域内 escaping 边 21 条；3d 实测外部边 **18**
+（原估 17），域内 escaping 边 15 条；3c 顺带修复 3b 遗漏的
+`sidebarStateProjection.test.ts` 悬挂 `import type`。3d 起新增**搬迁前 SCC 检查**
+（禁止引入依赖环，基线全仓 0 环）。详见 `step-3-migration-map.md` §6.1。
 
 **3f 须 PTY 实机验证**（触及 CLI 桥 + `/browser` 命令链）。
 

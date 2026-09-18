@@ -293,3 +293,11 @@
 - **可达性**：production 959 / cliReachable 874 / cliOpaque 85 **不变**（搬迁不改可达性，符合预期）。
 - **验证**：① `tsc -p tsconfig.build.json` **0 错**；② 相关域 73 文件/**432 测试全绿**；③ 全量 **3172 项零失败**；④ **PTY 实机**（触及 `entrypoints/` + `core/shell/`，§2.4 强制）——真实 TUI 执行 `/compact`（返回 "The conversation is too short to compact."）与 `/compact preview`（渲染完整 Compact v2 面板：`closeout-candidate`、10 memory candidates、preview-only / persistence none），证明 `compactCommandRuntime` → `compactCommandRunner` → `compactSessionSurface` 链完好。
 - **方法论**：本步验证了"整域搬迁"的正确改法是**只重算 escaping 边**，域内边保持字节不变——避免了 85 条无意义 diff。
+
+## [2026-09-18] step3d | `sidebar/` 域搬迁至 `presentation/sidebar/`。完成。
+- **搬迁**：`core/context/sidebar/` 全部 **34 文件** → `presentation/sidebar/`，`git mv` 保留历史。
+- **归属判据**（非按目录名）：22 个生产文件职责是渲染/面板/布局/投影（`sidebarPanelRenderer`、`sidebarLivePanelRenderer`、`sidebarPanelLayout`、`sidebarStateProjection`…），符合 `presentation/` 定义；`presentation/{surface,terminal,theme,tui}` 已是同级渲染域。
+- **映射表修正**：原估"17 边"，实测 **外部边 18 条 / 10 文件**（生产 14 / 测试 4），**全部改写**；域内 escaping 边 **15 条 / 3 文件**（`sidebarCommandEventAdapter`→`core/commands/types`、`sidebarStateProjection{,.test}`→`context/compact`+`context/startup`+`core/context/memory`）。合计 **33 条改写 / 13 文件**。
+- **搬迁前做的关键检查（映射表未做）**：`core/context/browserCapabilityModel.ts`（生产）`import { sanitizeSidebarText } from "./sidebar/sidebarStateModel.js"` —— 这是 **`core/ → presentation/` 的反向依赖**。核验方式：①对全仓 import 图跑 Tarjan SCC，**搬迁前 0 个环**；②按搬迁后路径重建图再跑，**仍 0 个环**（因 sidebar 生产侧不反向引用 browserCapabilityModel，仅 `sidebarCommandEventAdapter` 经 `core/commands/types` 间接触达）。③核实该形态**已有先例**：`core -> presentation` 现存 4 条边（`hotkeyCommandRuntime`、`cliSessionProductSurface`），非本步引入的新架构形态。
+- **验证**：① `tsc -p tsconfig.build.json` **0 错**，全量 tsc 251（与搬迁前一致）；② 相关域 30 文件/190 测试全绿；③ **全量 3172 项零失败**；④ 可达性 production 959 / cliReachable 874 / cliOpaque 85 **不变**；⑤ `npm run validate` PASS、`verify:host-surface` passed；⑥ **PTY 实机**——真实 TUI 执行 `/sidebar panel`，渲染完整面板（Visible agent state / Task / Edit / **Compact** / **Memory** / **Warmup** / Tools / Validation / Boundary），其中 Compact/Memory/Warmup 三节正是本次改写的跨域边所在链路，证明搬迁后投影链完好。
+- **方法论**：搬迁前对 import 图跑 SCC 是**零成本、高价值**的前置检查——本步若存在环，`tsc` 不会报（类型解析成功），只有 NormProof judge 或运行时才暴露。已作为后续 3e/3f 的固定前置。

@@ -20,8 +20,8 @@ import type { BrowserSkillRuntimeBinding } from '../context/browser/skill/runtim
 import type { BrowserActionCache } from '../context/browserActionCache.js'
 import type { BrowserReceiptCacheStore } from '../context/browser/receipt/browserReceiptCacheStore.js'
 import type { BrowserPublicReadOnlyWebSmokeConfig } from '../harness/browserPublicReadOnlyWebSmokeConfig.js'
-import type { SidebarEventSink } from '../context/sidebar/sidebarEventSink.js'
-import type { SidebarLiveEventStore } from '../context/sidebar/sidebarLiveEventStore.js'
+import type { SidebarEventSink } from '../../presentation/sidebar/sidebarEventSink.js'
+import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLiveEventStore.js'
 
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 

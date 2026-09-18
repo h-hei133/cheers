@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { CompactInjectionState } from "../../../context/compact/injection/compactInjectionState.js";
-import type { CompactLiveCheckpoint } from "../../../context/compact/checkpoint/compactLiveCheckpoint.js";
-import type { ProjectMemoryInjectionState } from "../memory/projectMemoryInjectionState.js";
-import type { ProjectMemoryRecord, ProjectMemoryStoreHealth } from "../memory/projectMemoryStoreContract.js";
-import type { ProjectMemoryReviewState } from "../memory/projectMemoryReviewState.js";
-import type { StartupWarmContextCache } from "../../../context/startup/startupWarmContextCache.js";
-import type { StartupWarmContextCacheHealth } from "../../../context/startup/startupWarmContextHealth.js";
+import type { CompactInjectionState } from "../../context/compact/injection/compactInjectionState.js";
+import type { CompactLiveCheckpoint } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
+import type { ProjectMemoryInjectionState } from "../../core/context/memory/projectMemoryInjectionState.js";
+import type { ProjectMemoryRecord, ProjectMemoryStoreHealth } from "../../core/context/memory/projectMemoryStoreContract.js";
+import type { ProjectMemoryReviewState } from "../../core/context/memory/projectMemoryReviewState.js";
+import type { StartupWarmContextCache } from "../../context/startup/startupWarmContextCache.js";
+import type { StartupWarmContextCacheHealth } from "../../context/startup/startupWarmContextHealth.js";
 import { projectSidebarState } from "./sidebarStateProjection.js";
 
 describe("sidebar state projection", () => {

@@ -105,7 +105,7 @@ packages/ts-shell/src/context/model/    ← 上下文模型（6 文件）
 | 3a | `model/`（零外部引用）+ `flat-other` 归位 | 1 | 极低 |
 | 3b | `startup/` → `context/startup/` | 5 | 低 |
 | 3c | `compact/` → `context/compact/` | 37（实测） | 低 |
-| 3d | `sidebar/` → `presentation/sidebar/` | 17 | 中（触及 `core/commands`） |
+| 3d | `sidebar/` → `presentation/sidebar/` | 18（实测外部）+15（域内 escaping） | 中（触及 `core/commands`） |
 | 3e | `memory/` → `memory/` | 31 | 中 |
 | 3f | **browser 域 → `browser/`** | 361 | **高**（触及 CLI 桥 + harness 256 边） |
 
@@ -137,9 +137,33 @@ packages/ts-shell/src/context/model/    ← 上下文模型（6 文件）
   10 个 memory candidate、preview-only / persistence none），证明搬迁后的
   `compactCommandRuntime` → `compactCommandRunner` → `compactSessionSurface` 链完好。
 
+### 3d `sidebar/` → `presentation/sidebar/`（2026-09-18，完成）
+
+- **搬迁**：`core/context/sidebar/` 全部 34 文件 → `presentation/sidebar/`，`git mv` 保留历史。
+- **归属判据**：22 个生产文件职责为渲染/面板/布局/投影
+  （`sidebarPanelRenderer`、`sidebarLivePanelRenderer`、`sidebarPanelLayout`、
+  `sidebarStateProjection`…），与 `presentation/{surface,terminal,theme,tui}` 同级。
+- **映射表修正**：原估 17 边。实测**外部边 18 条 / 10 文件**（生产 14 / 测试 4），
+  **域内 escaping 边 15 条 / 3 文件**，合计 **33 条改写 / 13 文件**。
+- **搬迁前新增前置检查（本步首次执行，映射表未含）**：对 import 图跑 **Tarjan SCC**。
+  起因是发现 `core/context/browserCapabilityModel.ts` 生产代码
+  `import { sanitizeSidebarText } from "./sidebar/sidebarStateModel.js"` ——
+  属 **`core/ → presentation/` 反向依赖**。核验：搬迁前 **0 环**、按新路径重建图后
+  **仍 0 环**；且该形态**已有 4 条先例**（`hotkeyCommandRuntime`、
+  `cliSessionProductSurface`），非本步引入。
+  **该检查必须做**：环不会让 `tsc` 报错，只有 NormProof judge 或运行时才暴露。
+- **验证**：build 0 错；相关域 30 文件/190 测试全绿；全量 **3172 项零失败**；
+  可达性 959/874/85 不变；`validate` + `verify:host-surface` 通过；
+  **PTY 实机** `/sidebar panel` 渲染完整面板（含 Compact / Memory / Warmup 三节，
+  正是本次改写的跨域边链路）。
+
 ## 7. 验证纪律（§2.4）
 
 - 每阶段：`tsc -p tsconfig.build.json` + 该域相关测试 + 全量测试。
+- **每阶段搬迁前跑 import 图 SCC 检查**（3d 起强制执行）：搬迁不得引入新的依赖环。
+  环不会让 `tsc` 报错（类型解析仍成功），只有 NormProof judge 或运行时才暴露，
+  故必须独立核验。核验方式：搬迁前跑一次（基线环数），按目标路径重建图后再跑一次。
+  当前基线：**全仓 0 个环**（含测试文件）。
 - **触及 `entrypoints/` 或 `cli/` 的批次**（3f 的 CLI 桥部分）→
   **PTY 实机验证**（启动真实 TUI，执行 `/browser` 命令链）。
 - `core/harness` 的 256 条引用改动后，需跑 `core/harness` 相关测试确认
