@@ -1277,12 +1277,21 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 **这与 `agent-rules/file-placement-and-naming.md` 对 `entrypoints/` 的定位冲突**
 （该文件要求 `entrypoints/` 是**入口/兼容层**，不应容纳可复用契约，也不应被下游反向依赖）。
 
-> **主代理核验**：`cli/approval/` 下确有 2 处 import `entrypoints/`：
-> `cliApprovalAuditBridge.ts:3` → `entrypoints/approvalPromptBridge.js`；
-> `cliApprovalEscalationBridge.ts:6` → `entrypoints/cliApprovalModule.js`。
+> **主代理实测（更正回报的"19 处"）**：
+> `cli/` → `entrypoints/` 共 **28 条 import 边**，其中 **value 23 条、type 5 条**。
+> 分布（已完成清单，可复核）：
+> - `cli/interactive/` **9 条**（`interactiveCommandRouter` 6 条、`interactivePromptRunner` 3 条、
+>   `slashSuggestions`、`promptChrome`）
+> - `cli/bootstrap/` **5 条**（`cliBootstrapContext` ×2、`cliProcessRunner` ×2、`cliStartupSurface` ×2）
+> - `cli/print/` **3 条**（`printModeRouter` ×2、`stdinPromptCapture`、`replayModeRunner`）
+> - `cli/approval/` **2 条**（`cliApprovalAuditBridge:3` → `approvalPromptBridge.js`；
+>   `cliApprovalEscalationBridge:6` → `cliApprovalModule.js`）
+> - `cli/runtime/`、`cli/interactive/interactiveLoop`、`interactiveMode`、`lineLoop` 各 1 条
+>
 > **反向也存在**：`entrypoints/cliApprovalModule.ts:7,14,37` ↑ `cli/approval/*`，
 > `entrypoints/cliRuntimeInvocation.ts:6` ↑ `cli/approval/permissionScope.js`。
-> **即边界双向穿越是实测的**；19 这个总数未逐一复核，但**方向性论断成立**。
+> **即边界双向穿越是实测的，且规模比回报所称的 19 条更大（28 条）。**
+> `cli/interactive/` 是最大来源域（9 条），而非回报举例的 `cli/approval/`。
 
 ### 15.2 重复实现（均已核验）
 
@@ -1459,7 +1468,7 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 ### 15.9 回报中**未经主代理复核**的项（诚实标注）
 
 下列条目来自回报，主代理**未逐条核对**，记录时保留原样但标记为未核验：
-- 「`cli/` 有 19 处 import 回 `entrypoints/`」的**总数**（方向性已核验，见 §15.1）
+- ~~「`cli/` 有 19 处 import 回 `entrypoints/`」的总数~~ —— **已复核并更正为 28 条**（value 23 + type 5），见 §15.1
 - 「`setActiveNonInteractiveApprovalMode` 在 11 个接口中重复、9 处透传」的完整清单（E-重复-8 之外的 1.8）
 - 「`presentation/tui/text` 与 `sidebarPanelRenderer` 两套布局栈」（1.10）；
   **其中的 CJK 截断风险回报自标"置信度：中"，且未做运行时验证**
