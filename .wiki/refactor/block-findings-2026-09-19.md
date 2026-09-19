@@ -1626,11 +1626,25 @@ pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本
 
 ### 17.1 结构性判断
 
-**[B-结构-1] 三个目录之间**无文件级双向依赖** —— 已核验**
-- `session/` 对 `core/shell/` 的 import：**0 条**（依赖是单向 `core/shell → session`）
-- 与 §4 的 Tarjan 文件级 0 环结论一致
-- **回报的洞察**：`session/` 是本区块**边界最健康**的域 —— 单向被依赖、
-  只依赖 `core/` 三个子域、无内部成环（除 `lifecycle/ ⇄ agent/`，由纯转发层造成）
+**[B-结构-1] `session/` 与 `core/shell/` 之间无双向依赖 —— 已核验（逐边实测）**
+- 主代理实测 `session/` 的**全部 value 出边**（排除 `import type`）：
+
+| 目标 | 边数 |
+|---|---:|
+| `session/`（域内） | 132 |
+| `core/query` | 8 |
+| `core/tools` | 6 |
+| `observability` | 2 |
+| `core/paths` | 1 |
+| `result` | 1 |
+| **`core/shell`** | **0** |
+
+- **`session/` → `core/shell/` = 0 条**，而反向存在（见 B-结构-2 的 `core/shell/sessionTerminalState.ts`）
+  → **依赖是单向的**，与 §4 的 Tarjan 文件级 0 环结论一致
+- **回报的洞察已证实**：`session/` 是本区块**边界最健康**的域 —— 除域内互引外，
+  只依赖 `core/` 子域（query/tools/paths）+ `observability` + `result`，**不依赖任何 feature 域**
+- **其被依赖方**（value 边）：`entrypoints` 3、`core` 3、`turn` 2、`cli` 2、`test-utils` 2
+  → 六个域依赖它，支持其作为 owner domain 的地位
 
 ### 17.2 重复实现（均已核验）
 
