@@ -215,6 +215,15 @@ current tree the classification has a clean gap - facade-shaped modules sit at a
 delegation ratio at or above 0.90 with zero branching, and every real monolith
 sits at 0.35 or below - so any cutoff inside that gap classifies identically.
 
+The tool has one known measurement gap, recorded rather than papered over: a
+declaration whose return type is an object type is parsed as starting mid-annotation,
+so it can be reported branch-free when it is not. One declaration in the tree is
+affected today. The error direction is always "too generous" - a module may be
+excused as a facade when it owns a little behaviour - so treat a `thin-facade`
+verdict as a prompt to look, not as proof. Three fixes were attempted and reverted
+because each regressed more verdicts than it corrected; the limitation is documented
+in the script.
+
 A fourth clause, lines per declared name, was considered and is deliberately not
 part of the verdict. Length is reported for context but does not decide, because
 it does not separate the two shapes: over-ceiling modules range from 8.8 to 144.7

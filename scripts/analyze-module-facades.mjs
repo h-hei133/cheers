@@ -32,6 +32,27 @@
 // ones; length cannot, so it stays out of the verdict and remains printed as
 // context.
 //
+// KNOWN LIMITATION, measured and deliberately left in place.
+//
+// A declaration whose return type is itself an object type is mis-measured:
+//
+//   function claimEvidenceForDefinition(d: D): readonly { claim: string }[] {
+//
+// DECLARATION_HEAD stops at the `{` of `readonly {` because its annotation pattern
+// excludes braces, so this body starts mid-annotation. The declaration then reports
+// branching 0 even though it owns rubric classification, and
+// runtime/evaluation/task/cases/index.ts is consequently reported as a thin facade
+// when it does own behaviour.
+//
+// Three attempts to fix it were reverted, each because it regressed more than it
+// corrected: widening the annotation pattern made the head swallow the *next*
+// declaration (sessionStoreAccess fell from 22 names to 12 as a method body was
+// absorbed), and moving the correction into body extraction dropped every module's
+// delegation ratio to ~0.45 by mis-positioning bodies generally. The narrow fix is
+// not obvious and a wrong detector is worse than a limited one, so the limitation is
+// recorded instead of patched. Affected today: exactly one declaration in the tree.
+// Its practical effect is that one facade verdict is too generous, never too strict.
+//
 // The thresholds are not fitted to an outcome. Measured against this tree the
 // classification is unanimous: one module sits at delegationRatio 1.00 with zero
 // branching, and every other over-ceiling module sits at <= 0.03. Any cut inside
