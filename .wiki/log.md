@@ -1280,3 +1280,28 @@ SCC **1500 文件 / 0 环**；`verify:docs-drift:strict` 通过；
 
 `edit/` 树中仍有 11 处断言，位于 `proposal/`、`recovery/restoreCommandContract.ts`、
 `patch/types.test.ts` 等**本次未重写**的模块——不在 Phase B 范围内，记录待后续。
+
+## [2026-09-18] correction | 撤回 B4 收尾时对 `.normproof/dispositions.md` 的"两处为假"断言——**断言本身是错的**。
+
+在 B4 收尾审计中，我依据"磁盘上不存在"判定 2026-08-28 的两条 disposition 记录为假，
+并据此改写。**这个判定是错的**，两条原始记录都是**准确的**。证据：
+
+| 声称的分解 | 实际历史 |
+|---|---|
+| `edit/multifile/` → `types/conflict/graph/model` | `d7f95363`（2026-08-28）**确实新增** `conflict.ts`(79行)、`graph.ts`(116行)、`types.ts`(265行) |
+| `presentation/surface/` → `sections/types/events/status/layout/components` | `e5504822`（2026-08-28）**确实新增** `surface/sections/{events,layout,status,types}.ts` 与 `presentation/components/{box,statusBadge}.ts` |
+
+两组文件都在 `42d63bd7`（2026-09-16，"delete dormant zero-reference clusters (Step 2.6)"）
+中作为零引用孤立簇被**有意删除**，代码被重新吸收回各自的 `model.ts`。
+
+### 我的方法错误
+我用**当前工作区**的存在性去证伪一条**历史**记录，没有查 `git log --diff-filter=A/-D`。
+"现在不存在" ≠ "从未存在"。这与 §5 已登记的同一类错误（用错误解析器得出可达性结论）
+形态相同：**没有先验证测量工具就采信测量结果**。
+
+### 撤销内容
+- `.normproof/dispositions.md`：我改写的那行已再次校正，明确标注
+  "the 2026-08-28 record was accurate; this reviewer's correction of it was not"，
+  并把 decision 从 defer 改为 fix（文件已真实拆分）。
+- `cce4d247` 的 commit message 含此错误断言，**commit message 不可改**，
+  故以此条目为准——**以本条覆盖 cce4d247 中的相关表述**。
