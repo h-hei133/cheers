@@ -1338,7 +1338,7 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 
 ### 15.3 死代码（均已核验）
 
-**[E-死-1] `presentation/sidebar/` 的**质量检查链**只被测试引用 —— 已核验**
+**[E-死-1] `presentation/sidebar/` 的「质量检查链」只被测试引用 —— 已核验**
 - `sidebarEventBridge.ts:70` `bridgeSidebarEvents`：消费者仅 3 个测试
   （`sidebarStateSurface.test.ts:2`、`sidebarStateQuality.test.ts:2`、`sidebarEventBridge.test.ts:3`）
 - `sidebarPanelQuality.ts:27` `checkSidebarPanelQuality`：仅 `sidebarPanelLayout.test.ts:4`
@@ -1435,6 +1435,10 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 | 5 | 裁决 sidebar Quality 三模块 + EventBridge（约 440 行）的去向 | E-死-1 | 中（测试基建 vs 删除，**不可兼得**）|
 | 6 | 删 `shellActionRuntime.ts` 三个死导出 + 连带 `cliDisplayProjection.ts` 四个格式化器 | E-死-2 | 中（消费者仍在，需一并清理）|
 | 7 | 修 `cliArgs.ts:68` 与 `:124` 的**重复保留字** `/memory` | 15.2 | **低** |
+
+> **主代理实测保留字表**：`entrypoints/cliArgs.ts` 的 `RESERVED_SHELL_SLASH_COMMANDS`
+> 含 **99 个条目、98 个唯一值** —— 唯一重复项确为 `/memory`（`:68` 与 `:124`）。
+> `Set` 去重使其行为无害，但印证该表是**手工堆叠**的（回报判断正确）。
 | 8 | 命令元数据收敛为单真值源（registry 派生 `SUBCOMMAND_VALUES`） | E-重复-8 | 中 |
 | 9 | 按 `group` 字段把 registry 的 54 命令拆到 `core/commands/definitions/` | 15.7-1 | 中（约 10-15 新文件）|
 
