@@ -56,7 +56,7 @@ runtime/events/stream.ts       prod=0  external-test=1  internal-test=1
 |---|---:|
 | 文件行数 | 3,006 |
 | 导出数 | **5**（仅 1 个导出函数 `projectRuntimeEvents`） |
-| `projectRuntimeEvents` 函数体 | **约 2,626 行**（311 → 2937） |
+| `projectRuntimeEvents` 函数体 | **2,627 行**（311 → 2937，含首尾） |
 | 内部函数 | 4（`sanitizeRecord` / `sanitizeValue` / `sanitizeText` / `deepFreeze`） |
 
 **为什么门禁没抓到**：`analyze:module-facades` 的判据是**声明名数 > 20**，
@@ -266,7 +266,7 @@ runtime/events/stream.ts       prod=0  external-test=1  internal-test=1
 | `tools` | 14 | 3,089 |
 | `session` | 15 | 2,413 |
 
-### 最大连通簇：61 文件 / 15,320 行（`context` + `planning` + `evidence`）
+### 最大连通簇：主代理复测 **58 文件 / 14,564 行**（原记 61/15,320；`context` + `planning` + `evidence`）
 
 按无向连通聚类，不可达区共 **136 个簇**。最大簇跨三个域：
 
