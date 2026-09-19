@@ -1617,3 +1617,213 @@ pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本
   可能因"读 config"与"写 config"语境不同而合理独立（同 §12.6 对 `toRelativeTime` 的保留）。
 - 区块 H/I/J 的**命名与位置**、**模块划分**、**耦合度**三类问题**尚未系统探索**，
   不在本节范围；如需，应另派子代理。
+
+---
+
+## 17. 区块 B 回报（`session/ core/session/ core/shell/`，127 文件 / 19,429 行）——逐条核验后记录
+
+**核验状态**：已核验项由主代理亲手复核。**最重要的一条经核验后需加限定**（§17.4）。
+
+### 17.1 结构性判断
+
+**[B-结构-1] 三个目录之间**无文件级双向依赖** —— 已核验**
+- `session/` 对 `core/shell/` 的 import：**0 条**（依赖是单向 `core/shell → session`）
+- 与 §4 的 Tarjan 文件级 0 环结论一致
+- **回报的洞察**：`session/` 是本区块**边界最健康**的域 —— 单向被依赖、
+  只依赖 `core/` 三个子域、无内部成环（除 `lifecycle/ ⇄ agent/`，由纯转发层造成）
+
+### 17.2 重复实现（均已核验）
+
+**[B-重复-1] `compactText` 五份逐字节相同 —— 已核验（哈希一致）**
+- `session/continuityFormatter.ts:376`、`session/recovery/resumeContextBuilder.ts:596`、
+  `session/continuationEvidenceParity.ts:146`、`session/continuation/stoppedSessionContinuity.ts:271`、
+  `session/sessionContinuityModule.ts:425`（后者名为 `compactContinuityText`，**已导出**）
+- 主代理实测：**五份函数体 sha256 前 12 位同为 `410e4adce50e`**
+- 影响：截断语义（`\s+` 折叠 + `max` 处 `...`）在 5 处各自演化；分叉只在
+  **跨层文本对比**（prompt continuity ↔ failure handoff ↔ evidence parity）时才可见
+- 建议：删 4 份私有副本，统一 import 已导出的那一份
+
+**[B-重复-2] `decodeCompactTaskState` 与 `extractTaskStateFromMemory` 是同一函数两份 —— 已核验**
+- `session/recovery/sessionRecoverySnapshot.ts:92-101` ↔
+  `session/continuation/sessionContinuitySnapshot.ts:293-302`
+- 主代理逐行比对：**三层 null/Array 守卫 + `decodeQueryRuntimeTaskState` 调用完全同形**，
+  差异仅在变量命名（`root.continuity` vs 直接取 `continuity`）
+- 两者都解码 `workingMemory.continuity.taskState`；写入侧只写一个（`continuation/compactSummary.ts`）
+  → 任一侧放宽/收紧守卫，另一侧**静默漏读**
+
+**[B-重复-3] `deepFreeze`/`freeze` 六份，其中一份缺短路 —— 已核验**
+- `session/sessionTreeProjection.ts:499`、`session/continuation/readiness.ts:249`、
+  `session/replay/state.ts:460`、`session/replay/host/facts.ts:64`、
+  `session/schema/sessionThread.ts:187`、`session/store/host/state.ts:233`
+- **关键差异（回报指出，与 §12.3 的两组语义吻合）**：`sessionTreeProjection.ts:499`
+  **缺 `!Object.isFrozen` 提前返回**，其余五份有 → 已在冻结对象上重复遍历整棵子树
+
+**[B-重复-4] approval 域的**三套** `- key: value` summary 行解析器 —— 已核验**
+- `session/approval/memoryCodec.ts:180 projectApprovalSummaryFallback`（**读**，`unknown → ApprovalMemoryRecord|undefined`）
+- `session/approval/auditProjection.ts:81 projectApprovalSummaryFallback`（**写**，`{currentSummaryEntries, approvalAudit} → string[]`）
+- `session/permissionRequestMemoryCodec.ts:474 parseSummaryFields`（读，带 prefix）
+- **主代理已核实**（§11.5 重-跨-2）：前两者**同目录同名、签名不同**，
+  调用点靠 **import 路径**区分 → **新调用者按名字选函数会拿到行为完全不同的那个**
+- 这是本区块**最容易出错**的一处
+
+**[B-重复-5] 同名 approval 评分函数两套，且语义不同**
+- `core/shell/approval/evaluator.ts:28 buildScope` ↔ `store.ts:44 buildScope`
+- `evaluator.ts:32 buildCacheKey` ↔ `store.ts:40 buildCacheKey`
+- `evaluator.ts:40 selectGrantBySelector` ↔ `store.ts:105 selectGrantBySelector`
+- **主代理早前已裁决**（§11.5）：三对均为**同名碰撞**（签名不同）；
+  且 `evaluator` 版**全套零消费者**（§11.1 A-重复-2 已记录 `evaluatePermission` 零生产消费者）
+- **回报的新角度**：这是**已死的第二套协议**与活的那套**同名共存于同一目录**
+
+**[B-重复-6] `normalizePathForCompare` 三份（`core/shell/` 内）+ `normalizeOptionalString` 三份**
+- 前者：`core/shell/bootstrap.ts:58`、`runtimeContext.ts:295`、`startupSurfaceRenderer.ts:178`
+  —— 与 §15.2 E-重复-3 的 7 份是**同一组**（主代理把 `core/shell/` 的 3 份与
+  `entrypoints/` 的 4 份合并计为 7）→ **两节互相印证**
+- 后者：`sessionContinuityModule.ts:436`（导出）、`session/permissionRequestMemoryCodec.ts:551`、
+  `session/approval/memoryCodec.ts:288`
+
+**[B-重复-7] 证据标记解析重复（置信度中，回报自标）**
+- `session/sessionContinuityModule.ts:39` 解析 `read-delivered-lines:(\d+)`，
+  `core/shell/sessionTerminalEvidence.ts:263` 再解析同一 pattern
+- `session/continuation/stoppedSessionContinuity.ts:257` 解析 `write-effect:(...)`，
+  `session/sessionContinuityModule.ts:461 normalizeWriteEffect` 又解析同一枚举
+- 回报自标"行为分叉是推断"（前者大小写敏感、后者 `/i`）→ **保留为未验证**
+
+### 17.3 死代码（均已核验）
+
+**[B-死-1] `session/store/host/` + `session/replay/host/` 两整块孤岛 —— 已核验**
+- `session/store/host/state.ts`（241 行，8 导出）、`session/replay/host/facts.ts`（72 行）
+- 主代理实测：两目录之外对它们的引用 **0 条**（唯一内部边是 `facts.ts:1` 的 `import type`）；
+  **两目录内无任何测试文件**（已 `ls` 确认，各只有 1 个 `.ts`）
+- 无动态入口
+- 影响：这是「host」命名引入的**第二套会话模型**（`HostSessionRecord` 自带
+  `thread` + `lifecycle`）。其 `store/host/state.ts:106` 的
+  `${id}:turn:${n}:${role}` 与 `schema/sessionThread.ts:183` 的 `${id}:turn-${n}`
+  是**两种 entry 命名** → 同一会话在两条路径上得到不同 entry id
+- 与 CB-005 的 host lane 同源
+
+**[B-死-2] `session/sessionDagEngine.ts`（273 行）零生产消费者 —— 已核验**
+- 消费者仅 `sessionDagEngine.test.ts:5`
+- **回报的关键发现（主代理已核实）**：这是一个**与 pi 会话基质同构的完整实现**
+  （`SessionHeader{version:3}`、`SessionDagEntry` 含 `message|compaction|branch_summary`、
+  `firstKeptEntryId` 锚点裁剪、单文件 append-only JSONL），**但零生产路径**
+- 而 `.wiki/log.md` 把它记为**已交付能力** → **文档与实际不符**
+
+**[B-死-3] `session/store/threadState.ts` 五个导出零生产消费者 —— 已核验**
+- 主代理实测：`grep store/threadState`（排除自身）在**生产代码中零命中**
+- 影响：它是 `schema/sessionThread.ts` 的**唯一持久化入口**。它死了 →
+  thread 分支/压缩只能经 `sessionStateSnapshot.ts:111-114` 的整体重写落地，
+  而 `buildLinearSessionThreadSnapshot` **恒返回 `branches: [], compactions: []`**（已核验 `:98-99`）
+
+**[B-死-4] `session/recovery/sessionReconciler.ts` 零消费者 —— 已核验**
+- 仅 `sessionReconciler.test.ts:2` 引用
+- 影响：「进程中断后为悬空 tool_call 补 synthetic 结果」这一保护**不在运行路径上**
+- 回报自标「导致 400 需一次崩溃复现才能坐实，未运行」→ **保留为未验证**
+
+**[B-死-5] `session/presentation/facts.ts` 零消费者 —— 已核验**
+- 含硬编码 `/home/wang/.private-agents-real` 脱敏（与 `sessionTreeProjection.ts` 的同一字符串重复）
+- 与**活的** `sessionResultParity.ts`、`actionableFailureContinuity.ts` 构成三套
+  「从 CodingResultSummary 判定失败 kind」实现
+
+**[B-死-6] 六层纯转发文件**
+- `sessionPromptContinuity.ts`、`replay/sessionReplayFacade.ts`、`replay/sessionReplayRuntime.ts`、
+  `replay/sessionRuntimeSeed.ts`、`continuation/sessionRootRebase.ts`、`sessionMetadataProjection.ts`
+- **回报自曝的一处矛盾（值得记录）**：`sessionReplayFacade.ts` 存在的理由是隔离 `builder.ts` 内部名，
+  但 `sessionReadSurface.ts:34` 仍**直接** `import type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js"`，**绕开了 facade**
+
+### 17.4 ⚠️ 回报最重要的一条：branching 误标 —— **已核验，但需加限定**
+
+**回报称**：`sessionTreeProjection.ts:156-158` 因 `stateSnapshot.thread` 存在就把
+`branchSupport` 判为 `storage-backed`、`treeSupport` 判为 `branching`，
+而 `branches` 数组恒空——**"当前的正确性缺陷"**。
+
+**主代理核验（逐行确认回报的事实部分成立）**：
+- `session/sessionTreeProjection.ts:156-157`（实测原文）：
+  ```ts
+  const branchSupport = input.stateSnapshot?.thread ? "storage-backed" : "not-proven";
+  const treeSupport = input.stateSnapshot?.thread ? "branching" : "linear-path";
+  ```
+  —— **确实只看 `thread` 是否存在，从不检查 `branches.length`**
+- `session/schema/sessionThread.ts:69-101` 的 `buildLinearSessionThreadSnapshot`
+  确实**恒返回 `branches: []`、`compactions: []`**（已核验 `:98-99`）
+- **该写入路径是活的**：`session/store/sessionStateStore.ts:50` → `buildSessionStateSnapshot`
+  （`:111-114` 的 `thread: current?.thread ?? buildLinearSessionThreadSnapshot(session)`）
+  → `writeJsonFileAtomic`；`sessionStateStore` 被 `sessionStore.ts:12`、`sessionStoreAccess.ts:40` 消费
+
+**⚠️ 但必须加的限定 —— 该缺陷当前不可观察**：
+- 主代理把相关文件逐一对照 `/tmp/unreachable.json`：
+  | 文件 | 状态 |
+  |---|---|
+  | `session/sessionTreeProjection.ts` | **UNREACHABLE** |
+  | `session/continuation/readiness.ts`（`branchGapStatus` 消费者） | **UNREACHABLE** |
+  | `session/replay/state.ts`（照抄 `branchSupport`） | **UNREACHABLE** |
+  | `context/sessionContextRebuildProjection.ts`（取 `branchSupport`） | **UNREACHABLE** |
+  | `context/rebuildInput.ts` | **UNREACHABLE** |
+  | `session/store/sessionStateStore.ts`（写盘） | reachable |
+- 即 **`projectSessionTree` 的生产消费者是 `session/store/host/state.ts:192`（已死）**，
+  其余全是 `import type` 或测试。**误标发生在一条不可达的投影链上。**
+
+**结论修正**：这是一处**真实的逻辑缺陷（判据不完整），但当前不可观察** ——
+属「一旦接线即成缺陷」，与 §10.4 耦合-3（`withFileMutationQueue` 绕过）同类。
+**回报称其为"当前的正确性缺陷"是过度声称**；应表述为
+**"潜在缺陷：判据只看字段存在性、不看数组内容；当前该链不可达故不可见"**。
+- **修复成本仍是一行**：`sessionTreeProjection.ts:156-157` 加 `&& thread.branches.length > 0`
+- 置信度：**高**（两侧代码与可达性均已实测）
+
+**[B-结构-2] `core/shell/` 有 7 个文件不属于 shell —— 主代理部分核验**
+- 回报列出：`providerReadiness.ts`(361)、`providerCredentials.ts`(341)、`providerFailureRedaction.ts`、
+  `compaction.ts`、`approvalTrustPolicy.ts`、`approval/store.ts`、`approval/evaluator.ts`
+- 主代理已核实其中 `providerReadiness.ts`、`providerCredentials.ts`、`compaction.ts` 的
+  存在与体量（§11.1 A-重复-1、§15.6）
+- **这与 §3「core 依赖 feature 域」的结论同源**：`core/shell/` 同时承载显示层、编排层、
+  运行时，以及 provider/approval/compaction 的越界实现
+
+### 17.5 pi 对照（区块 B 相关，均给 pi 侧 `file:line`）
+
+**pi 的会话基质与压缩是同一条链**（`packages/coding-agent/src/core/session-manager.ts` +
+`core/compaction/compaction.ts`），而本仓铺成 3 文件 + 5 层投影。四处具体差距：
+
+| # | pi 机制 | pi 证据 | 本仓差距 | 成本 |
+|---|---|---|---|---|
+| 1 | 单文件 JSONL + **版本 header + 全量迁移函数** | `session-manager.ts:37` `CURRENT_SESSION_VERSION=3`；`:240` `migrateV1ToV2`；`:269` `migrateV2ToV3`；`:290` `migrateToCurrentVersion`；`:303` `migrateSessionEntries` | 三文件布局（`sessionFileLayout.ts:45-51`）；**`SessionMetadata` 与 `SessionStateSnapshot` 均无 `version` 字段**，`session/` 下 `grep migrate` **零命中** | 高（数据模型收敛）|
+| 2 | 恢复 = **读文件重建上下文**（`buildSessionContext`） | `:343 buildSessionPath` → `:429 buildContextEntries`（按 `firstKeptEntryId` 裁剪）→ `:472` | 五层手写投影；`describeSessionReentry` 对**每个** session 重复建 recovery snapshot **3 次** + 读 transcript **2 次** | 中（回报称"本区块成本最低的高收益项"）|
+| 3 | 压缩是**文件格式的一部分**（`CompactionEntry` 带 `firstKeptEntryId` 锚点） | `compaction.ts:147` `DEFAULT_COMPACTION_SETTINGS`（`reserveTokens`/`keepRecentTokens` **按 token**）；`session-manager.ts:76` `CompactionEntry`；`:449-463 buildContextEntries` | 两套压缩（已知）；**锚点混用**：`firstRetainedEntryId`(entry id) 与 `keptMessages`(计数) **同时存在**，写入侧只用计数，`firstKeptEntryId` 唯一调用者**从不传** | 高（需改 id 生成策略，见下）|
+| 4 | 分支接上了生产 | `:1388 branch`、`:1409 branchWithSummary`、`:1441 createBranchedSession` | **两套都没接**（§17.3 B-死-2/B-死-3）；且活的落盘把 `thread` **误标为 branching** | 低（若只修投影判定＝一行）/ 高（若接 DAG）|
+
+**pi 侧的一条关键差异（对第 3、4 条共同成立）**：pi 的 entry id 用 `generateId(byId)`（`:225`）
+**随机生成并查重**；本仓用 `sessionTurnEntryId(sessionId, order)` 按**位置派生**
+（`sessionThread.ts:183`，基于 `entries.filter(kind==="turn-message").length + 1`）。
+**位置派生的 id 在 rewind（`SessionManager.ts:141-151` 直接 `sessions.turns = slice(0, keep)`）后
+会与已落盘的压缩锚点冲突** —— 故「改用 entry 锚点」必须连 id 生成策略一起改。
+
+**[B-结构-3] pi 的 core/feature 边界是**打包边界**，本仓只有目录约定 —— 回报的核心洞察**
+- pi：`packages/agent` 与 `packages/coding-agent` 是独立 package，依赖方向由 `package.json` 强制
+- 本仓：仅 `agent-rules` 三条准入规则，**无 CI 强制**
+- **回报提出的低成本替代（值得记录）**：给已存在的
+  `scripts/check-entry-graphs.mjs` 加两条断言 ——
+  (1) `src/core/**` 不得 import feature 域（`config`/`observability`/`artifacts`/`model-adapters` 白名单）；
+  (2) `src/session/**` 不得 import `src/core/shell/**`
+- 但 **§15.7 已实测**：本仓**没有** `check-entry-graphs.mjs`（那是 pi 的脚本）；
+  本仓只有 `verify:import-cycles` 与 `analyze:module-facades`。
+  **回报把 pi 的脚本当成"已存在"是错的** —— 正确表述是"**新建**一个等价脚本"
+
+### 17.6 回报纠错（主代理实测）
+
+| 项 | 回报称 | 实测 |
+|---|---|---|
+| branching 误标的性质 | "**当前的**正确性缺陷" | **潜在缺陷**：判据确实不完整，但 `sessionTreeProjection.ts` 及其全部消费者**不可达** → 当前不可观察（详见 §17.4）|
+| `scripts/check-entry-graphs.mjs` | "已存在，1 天前修改" | **不存在**（属 pi）；本仓只有 `verify:import-cycles` / `analyze:module-facades` |
+| `session/` 文件数 | 126（回报正文） | **§14 实测 `session/` + `core/session/` + `core/shell/` 共 127 生产文件**（差 1，未深究口径）|
+| `core/shell/` 文件数 | 25 | 未逐一复核 |
+
+### 17.7 处置建议（按性价比）
+
+| 序 | 动作 | 依据 | 风险 |
+|---|---|---|---|
+| 1 | 修 `sessionTreeProjection.ts:156-157` 的判据（加 `branches.length > 0`） | §17.4 | **低**（一行；且当前不可观察，纯防御）|
+| 2 | 删 `session/store/host/` + `session/replay/host/`（313 行，零消费者零测试） | B-死-1 | 低 |
+| 3 | 删 `session/sessionDagEngine.ts` + 修正 `.wiki/log.md` 的"已交付"表述 | B-死-2 | 中（需确认无路线计划）|
+| 4 | 收口 5 份 `compactText` → 1 份 | B-重复-1 | **低**（哈希已证明同体）|
+| 5 | 收口 `decodeCompactTaskState` / `extractTaskStateFromMemory` | B-重复-2 | 低 |
+| 6 | 重命名 `approval/auditProjection.ts:81` 与 `memoryCodec.ts:180` 的同名导出 | B-重复-4 | **低**（纯改名，消除最易错点）|
+| 7 | 删 `session/presentation/facts.ts` + `sessionReconciler.ts` + `threadState.ts` | B-死-3/4/5 | 中 |
+| 8 | 裁决 `sessionDagEngine` vs `threadState` 二选一 | B-死-2/3 | 高（产品/数据模型裁决）|
