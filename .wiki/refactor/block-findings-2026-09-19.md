@@ -516,8 +516,11 @@ verification/result/projection/mutation.ts          (1)
   `session/store/sessionStoreAccess.ts`
 - **`repair/handoff/boundary.ts` 不在此列**，在该 obligation 的全部输出中 grep 命中 0 次
 - **口径差异已实测**：judge 报 `edit/multifile/model.ts` 为 **39**，而该文件
-  `^(export )?(async )?function` 只有 **13** 个 → judge 计的是**函数式名（含箭头/方法）的更大集合**，
-  非"具名函数声明"。因此 21 个**具名声明**在 judge 口径下只会更多，**该文件被漏报是确定的**
+  `function` 声明 **13** 个、`type/interface` **1** 个，合计 **14** → **judge 的计数对象
+  既不是函数声明、也不是"函数+类型"**。本仓**无箭头函数赋名**（已全仓实测为 0，见 §18.3），
+  故"含箭头"的早期推断**已证伪**。**judge 口径未还原**；但 21 个具名函数声明
+  （`repair/handoff/boundary.ts`）在该 obligation 的全部输出中 grep 命中 0 次，
+  **该文件被漏报是确定的**（观测事实，不依赖口径推断）
 - **附带发现（新）：该 ledger/verdict 已过期。** 时间戳 `2026-09-18 16:35`，
   早于 CB-005 与 C2 的删除；其名单中的 `presentation/surface/model.ts`、
   `runtime/evaluation/model.ts`、`runtime/evaluation/task/liveRun.ts` **三个文件已不存在**。
@@ -1911,6 +1914,31 @@ pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本
 - `context/memory/model.ts`（27）与 `provider/registry/provider.ts`（34）**都不在** judge 的 12 项名单中
 - 而 judge 对 `edit/multifile/model.ts` 报 **39**，该文件按**函数声明**只有 13 个
 
-**即两个工具的计数口径不同**（judge 计"函数式名"的更大集合，本节的 grep 计"声明名含类型"）。
-**两者都不应单独作为拆分依据** —— 与 §10.3 模块-2 的结论一致：
-判据本身需要先对齐口径。本文件只记录事实，不裁决。
+**主代理逐文件拆分计数（决定性的口径证据）**：
+
+| 文件 | function | constarrow | type/interface | 合计 |
+|---|---:|---:|---:|---:|
+| `context/memory/model.ts` | 18 | 0 | 9 | **27** |
+| `context/acquisition/graph.ts` | 13 | 0 | 10 | 23 |
+| `core/context/model/contextStateProjection.ts` | 17 | 0 | 5 | 22 |
+| `context/graph/contextDiscovery.ts` | 18 | 0 | 4 | 22 |
+| `memory/projectMemoryCandidateExtractor.ts` | 17 | 0 | 4 | 21 |
+| `provider/registry/provider.ts` | 18 | 0 | 15 | 33 |
+| `provider/request/attempt.ts` | 18 | 0 | 10 | 28 |
+| `provider/request/invocation.ts` | 11 | 0 | 11 | 22 |
+| `edit/multifile/model.ts` | **13** | 0 | 1 | 14 |
+| `repair/handoff/boundary.ts` | **21** | 0 | 17 | 38 |
+| `verification/result/boundary.ts` | 18 | 0 | 16 | 34 |
+
+**关键结论（口径已定）**：
+- **不是"函数式名的更大集合"** —— 本仓**没有**箭头函数赋名（`constarrow` 全为 0）。
+  主代理此前在 §10.3 模块-2 中推断 judge 计的是"含箭头/方法的更大集合"，**该推断不成立**。
+- judge 对 `edit/multifile/model.ts` 报 **39**，而该文件 function+type **合计仅 14**
+  → **judge 的计数对象既不是 function 声明、也不是 function+type**。
+  其口径**未能还原**（可能含对象字面量内的方法、回调、嵌套声明等）。
+- **`agent-rules` 的"20 declared names"上限若按本节口径（function 声明）计**：
+  超限文件为 `repair/handoff/boundary.ts`(21) 一个 —— 这与 §10.3 模块-2 的
+  "21 名却不在 judge 名单"**结论一致**，且现在有了**完整的计数依据**。
+
+**即：§10.3 模块-2 关于"judge 漏报"的结论成立，但"judge 计的是更大集合"这一解释应删除**，
+改为：**judge 的计数口径未还原，且它对本文件漏报**。本文件只记录事实，不裁决。
