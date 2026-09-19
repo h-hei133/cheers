@@ -34,6 +34,16 @@ runtime/events/stream.ts       prod=0  test=2
 
 **置信度**：高（消费者计数可复核）。**处置需裁决**：删，还是保留为测试基建。
 
+> **2026-09-19 主代理复测更正**：原文"`projection.ts` prod=0 **test=4** / `stream.ts` prod=0 **test=2**"。
+> 主代理实测（`grep -rln 'runtime/events/{projection,stream}\.js'`）：
+> - **仅 2 个外部测试文件**引用该域：`provider/registry/provider.test.ts:4`、
+>   `tools/toolHandoff.test.ts:5-6`（后者同时引 `stream.ts` 与 `projection.ts`）
+> - 另有 2 个**同目录**的测试（`runtime/events/projection.test.ts`、`runtime/events/stream.test.ts`）
+>   —— 它们是域**内部**测试，不构成"外部消费者"
+> - 合并计 4 个测试文件（2 外部 + 2 内部），故原文的 "4" 可解释为**含域内测试**，
+>   但表中把 4 放在 `projection.ts` 名下、2 放在 `stream.ts` 名下，与实测不符
+> - **生产 value 消费者 0 条 —— 这一点原文正确，且是本节的实质结论**
+
 ---
 
 ## 2. `runtime/events/projection.ts` 是 2,626 行的单个函数
