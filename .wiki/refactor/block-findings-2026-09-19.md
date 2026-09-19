@@ -295,7 +295,10 @@ value 边反向闭包（排除 `import type`）：
 - 影响：同一 hostile 输入经不同路径洗成不同字符串。`edit/sanitize.ts:4-30` 的文件头注释
   **自认**这是 "correctness risk rather than a style one"，但该修复只覆盖 edit 内部两个 lane。
 
-**[重复-4] `freeze`/`deepFreeze` 在区块内重定义 **16 次**，且有两套语义**
+**[重复-4] `freeze`/`deepFreeze` 在区块内重定义 16 次（+`edit/sanitize.ts` 规范版 = 17 处），且有两套语义**
+- **主代理复核数字**：区块 G 范围内 `function freeze<T>` / `function deepFreeze<T>` 共 **17 处**
+  （16 处为局部重定义 + `edit/sanitize.ts:68` 那份可由全仓导入的规范版）；
+  **全仓**同签名（`function freeze<T>` / `function deepFreeze<T>`，排除测试）共 **54 处**
 - 16 处：`repair/handoff/boundary.ts:728`、`repair/handoff/readiness.ts:237`、`repair/loop/model.ts:293`、
   `verification/result/boundary.ts:799`、`verification/execution/model.ts:167`、`verification/selection/model.ts:280`、
   `evidence/host/proof.ts:48`、`evidence/projection/mutation/proof.ts:98`、`evidence/projection/repair/verdict.ts:131`、
@@ -306,13 +309,21 @@ value 边反向闭包（排除 `import type`）：
   （`evidence/task/proof.ts:261`、`result/task/verdict.ts:50`）。即嵌套数组在后者**并未冻结**，
   同一"裁决产物不可变"的契约被两套实现兑现。
 
-**[重复-5] 同一组 8 个"缺失证明"谓词被推导三遍**
-- 第一遍 `evidence/projection/repair/verdict.ts:89-105`（`missingProofItemsFor`）
-- 第二遍 `result/projection/repair/verdict.ts:97-175`（`claimsFor`）—— 从**扁平字段重判**同一组，
-  而不是读刚收到的 `input.proofInput.missingProofItems`
-- 第三遍 `repair/handoff/readiness.ts:181-201`
-- 影响：三处独立判据，漏改一处即在不同层给出**互相矛盾**的 missing 列表；
-  而 `readiness.ts:120-131` 又把三份 `notProvenClaims` 拼接，矛盾被稀释而非暴露。
+**[重复-5] 同一组"缺失证明"谓词被推导三遍，且三处**基数不同**（主代理实测）**
+- 第一遍 `evidence/projection/repair/verdict.ts:89-105`（`missingProofItemsFor`）——
+  **10 个 `missing.push`**：original-failure / repair-proposal / repair-authority / repair-apply /
+  post-repair-verification / post-repair-relevance / post-repair-coverage / original-receipt /
+  repair-apply-receipt / post-repair-receipt
+- 第二遍 `result/projection/repair/verdict.ts:97-175`（`claimsFor`）——
+  **8 个 `group:`**，从**扁平字段重判**同一组，而不是读刚收到的 `input.proofInput.missingProofItems`
+- 第三遍 `repair/handoff/readiness.ts:181-201`（`repairReadinessMissingProof`）——
+  **8 条自有谓词**（failed-verification / repair-required / repair-proposal / explicit-authority /
+  repair-apply-attempt / post-repair-verification / complete-evidence-proof / result-owned-verdict）
+  **外加**拼接上游两份 `input.repairVerdictProofInput.missingProofItems` 与
+  `input.repairVerdictTerminalProjection.missingProofItems`
+- 影响：三处**基数与命名都不同**（10 / 8 / 8+2 上游）。第三遍既自算 8 条又把上游两份数组拼进来，
+  同一缺口可同时以自有名与上游名出现，靠 `unique(missing)` 掩盖重名。
+  漏改一处即在不同层给出**互相矛盾**的 missing 列表。
 
 **[重复-6] proofStatus → terminal status 的 1:1 重命名层**
 - `evidence/projection/repair/verdict.ts:108-123` `proofStatusFor` →
@@ -394,14 +405,15 @@ pi 把"改动是否可信"编码进**执行协议的形状**，而非另一套�
 | pi 机制 | pi 证据 | 本仓差距 |
 |---|---|---|
 | **终态是协议里的一条记录** | `harness/session/types.ts:105` `TerminalStatus`；`:108-116` `OperationResultRecord`（8 字段） | 本区块有 **16 个**各自声明 `terminalSuccessClaim: false` 的投影类型，无一为"唯一终态" |
-| **"外部结果未知"是一等字段** | `harness/runtime/drive/tools.ts:44-45` `INTERRUPTION_MARKER`；`:150-184` aborted/truncated outcome | `verification/result/projection/mutation.ts:129-146` 用 **5 处 `reasonText.includes(...)` 子串嗅探**从散文里猜状态 |
+| **"外部结果未知"是一等字段** | `harness/runtime/drive/tools.ts:44-45` `INTERRUPTION_MARKER`；`:150-184` aborted/truncated outcome | `verification/result/projection/mutation.ts:125-149` 用 **8 处 `reasonText.includes(...)` 子串嗅探**从散文里猜状态（实测 `grep -c` = 8） |
 | **失败是可穷尽匹配的类型** | `harness/result.ts:1-16` `Result<T,E>`；`:53-88` 13 个具名错误类；`:107-115` `matchError` | 本区块**无任何 tagged error**；失败以字符串进 `notProvenClaims: readonly string[]`，靠 `includes()` 判定（`repair/loop/model.ts:126-152` 6 条字符串比较） |
 | **工具执行是带重校验的四段管线** | `harness/execution/tools.ts:78` prepare → `:101` beforeDecision（**重校验**）→ `:125` execute → `:161` finalize | 本区块是 edit 与 recovery **各自一份**；无 after-tool 补丁段，无 aborted 合成结果 |
 
 **最便宜的两条**（不依赖上游裁决）：
 1. 重复-4：16 处 `freeze` 收口到 `edit/sanitize.ts:68` 的递归版，顺带修两处浅冻结
-2. pi-2：删 `verification/result/projection/mutation.ts:129-146` 的 5 处 `reasonText.includes`，
-   改消费已有的 `writeEffect` / `writerStarted` / `routeBlocker` 字段
+2. pi-2：删 `verification/result/projection/mutation.ts:125-149` 的 **8 处 `reasonText.includes`**
+   （主代理复核：`grep -c` = 8，非回报所称 5），改消费已有的
+   `writeEffect` / `writerStarted` / `routeBlocker` 字段
 
 ---
 
