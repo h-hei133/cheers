@@ -1395,11 +1395,18 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 
 ### 15.4 命名与位置
 
-**[E-命名-1] `entrypoints/` 装 35 个契约文件，违背其"兼容层"定位**
-- 例：`cliWorkspaceModule.ts:95` 导出 `normalizePathForCompare`、`:149` 导出 `resolveWorkspaceRootMode`
-  —— 这些是 core 与 cli **共享的路径/根模式原语**，却放在 `entrypoints/` 下
-- `cliModuleBoundary.test.ts:84` 甚至在**测试** `cliWorkspaceModule` 的这个导出
-  → 即该越界已被写进测试，成了事实契约
+**[E-命名-1] `entrypoints/` 装可复用契约，违背其"兼容层"定位 —— 已核验（数量已更正）**
+- **主代理实测**：`entrypoints/` 生产文件 **26 个**（`.ts`+`.tsx`，不含测试；含测试为 42）。
+  回报称"35 个契约文件"，**未复现**（35 既非生产数 26，也非含测试数 42；可能含其它口径）。
+- 其中 **14 个**导出 `run*`/`build*`/`create*`/`render*`/`parse*`/`resolve*`/`switch*` 形态的
+  **可复用契约函数**（而非入口薄壳），即"契约层"的判定**方向成立，但规模是 14/26 而非 35**。
+- 6 个 `*Module.ts`：`cliApprovalModule`、`cliMcpModule`、`cliPermissionModule`、
+  `cliRuntimeModule`、`cliSessionModule`、`cliWorkspaceModule`
+- 具体例（回报举证准确）：
+  - `cliWorkspaceModule.ts:95` 导出 `normalizePathForCompare`、`:149` 导出 `resolveWorkspaceRootMode`
+    —— core 与 cli **共享的路径/根模式原语**
+  - `cliModuleBoundary.test.ts:84` 甚至在**测试** `cliWorkspaceModule` 的这个导出
+    → **该越界已被写进测试，成了事实契约**
 
 **[E-命名-2] `presentation/sidebar/` 的 20 个长复合文件名**
 - 回报称违反 `file-placement-and-naming.md` 的命名规则，且无脚本检查
