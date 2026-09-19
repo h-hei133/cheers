@@ -1994,3 +1994,188 @@ pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本
   却含 6 个 function 声明 ≤18 的文件（§18.3 表）；
 - **结论加固**：这不是"漏了一个边角案例"，而是 **judge 的唯一正确命中被漏掉**，
   同时它报出的多数项目**按规则口径并不超限**。
+
+---
+
+## 19. 区块 C / F 回报（`context/ memory/ provider/ config/ sandbox/` 等）——逐条核验后记录
+
+**核验状态**：已核验项由主代理亲手复核。
+
+### 19.1 重复实现（均已核验）
+
+**[C-1] `context/compact/injection/` 与 `memory/projectMemory*` 是同一台注入机器的两套实现，**逐层成对** —— 已核验（最高价值）**
+- **七层一一对应**：状态机、状态迁移（`markInjected`/`markConsumed`/`markInvalid`）、空状态、
+  默认单例、merge 策略、adapter、formatter、quality、budget、planner
+  - memory 侧：`memory/projectMemoryInjectionState.ts:79,139,153,183,196` 等
+  - compact 侧：`context/compact/injection/compactInjectionState.ts:67,120,139,165,205` 等
+- **接口签名逐字相同**：两侧 state store 都是
+  `{get, markPending, markInjected, markConsumed, markInvalid, clear}`，
+  返回体都带 `persistence:"none"` / `providerCall:"none"` 与同构 `evidence` 数组
+- **planner 的 5 步管道完全同形**：候选 → merge → format → quality（fail 则 skip）→ budget →
+  `containsUnsafeContent` 复检 → `markInjected` → `markConsumed`
+- **主代理逐字节复核（哈希一致）**：
+  | 助手 | memory 侧 | compact 侧 | 哈希 |
+  |---|---|---|---|
+  | `dedupeLines` | `memory/projectMemoryInjectedContextBudget.ts:89` | `context/compact/injection/compactInjectedContextBudget.ts:93` | **`c201d15b8fe2`（两侧相同）** |
+  | `check()` | `memory/projectMemoryInjectionQuality.ts:124` | `context/compact/continuity/compactContinuityQuality.ts:141` | **`b54872af6634`（两侧相同）** |
+- **已出现语义漂移**（回报举证，未独立复核）：
+  `compactInjectionMergePolicy.ts` 额外过滤递归 compact 文本（`isRecursiveCompactFact`），memory 侧无；
+  `projectMemoryInjectionQuality.ts` 用 `leakCandidateLines` 排除「含 redacted 字样的行」，
+  compact 侧是裸正则无此豁免 → **同一输入两侧给出不同 qualityStatus**
+- 影响：任何安全规则调整需在 5~10 个文件同步
+
+**[C-2] `containsUnsafeContent` / 秘密判定三件套在区块 C 内有 8 份**
+- `memory/memoryValidation.ts:41,48,59`（`containsRawContent`/`containsSecret`/`containsHiddenReasoning`）
+- `memory/projectMemoryFutureTurnAdapter.ts:161`、`memory/projectMemoryFutureTurnInjection.ts:200`、
+  `memory/projectMemoryInjectionQuality.ts:137,141,145`、`memory/projectMemoryCandidateQuality.ts:135,139,146`、
+  `context/compact/injection/compactFutureTurnInjection.ts:187`、
+  `context/compact/injection/compactInjectionMergePolicy.ts:103`、
+  `context/compact/continuity/compactContinuityQuality.ts:154,158`
+- **正则集合已分叉**：`projectMemoryInjectionQuality.ts` 带 `ghp_`/`github_pat_`，
+  `compactContinuityQuality.ts:159` **只有 `sk-`** → 同一段文本在 compact 路径通过、在 memory 路径被拒
+
+**[C-3] `extractSymbolHints` / `readTextPrefix` / `readDir` 在 `context/discovery` 与 `context/graph` 各一份**
+- `context/discovery/scanner.ts:26,30,43,51,60` ↔ `context/graph/contextDiscovery.ts:418,426,332`
+- **截断上限不同**：`scanner.ts:67` `slice(0,10)` vs `contextDiscovery.ts:343` `slice(0,12)`
+  → 同一文件在两条管道得到**不同 hint 集合**
+
+**[C-4] `tokenize` 三份且分词规则不同**
+- `context/discovery/scorer.ts:43`（驼峰拆分 + 停用词 + 长度≥3）
+- `context/acquisition/engine.ts:442`（`split(/[^a-z0-9]+/)`，**无驼峰、无停用词**）
+- `core/memory/memoryStore.ts:167`（第三份，Unicode 感知）
+- 影响：同一任务跨阶段 token 空间不一致
+
+**[F-1] `REDACTION_EXCLUSIONS` 在区块 F 内 7 份 —— 已核验（主代理实测全仓 19 份）**
+- 区块 F 内：`provider/registry/provider.ts:201`、`provider/request/attempt.ts:139`、
+  `provider/request/boundary.ts:135`、`provider/request/fallback.ts:52`、
+  `provider/request/invocation.ts:105`、`provider/response/boundary.ts:45`、`provider/response/stream.ts:84`
+- **主代理全仓实测：`REDACTION_EXCLUSIONS = [` 共 19 个文件**（另含 `turn/` 2、`session/` 2、
+  `tools/` 1、`context/` 2、`runtime/` 4、`policy/` 1）→ **不限于区块 F，是全仓性问题**
+- **回报举证（未独立复核）**：4 个只读别名导出
+  （`CONTROLLED_INVOCATION_REDACTION_EXCLUSIONS` 等）**全无消费者**
+
+**[F-2] 工具调用候选投影在 `request/attempt.ts:634-647` 与 `response/stream.ts:226-247` 各一份**
+- 两者用同一 fallback 文案 `malformed-tool-call-${index}` 与同一三字段取值
+
+**[F-4] `model-adapters/` 与 `provider/` 职责重叠 —— 已核验方向**
+- `model-adapters/types.ts:7-13` 的 `ProviderId` 与 `config/runtimeConfig.ts:5-11` 的 `RuntimeProvider`
+  **成员完全相同**（重复声明）；`provider/registry/provider.ts:112` 的 `providerKind` 是**第三套**
+- `ModelProviderAdapter.streamResponse` 契约**全仓无实现**（回报称含 `dist/` 亦无）
+
+### 19.2 命名与位置
+
+**[C-5] `core/context/model/` 的 3 个文件，消费者全是 feature 域**
+- `contextStateProjection.ts` 的两个消费者：`context/compact/continuity/routeContinuityHandoff.ts:12`、
+  `memory/projectMemoryCandidateExtractor.ts:3` → 违反 core 准入第 1、2 条
+- 且 `:23` 把 `route: "74"` 写进**返回类型**
+
+**[C-6] `core/memory/` 与 `memory/` 是两套同名不同义的内存系统，共用同一个 `/memory` 命令入口**
+- core 侧：`core/memory/memoryStore.ts:14` `MemoryStore`（全局单例 `:179-190`）、
+  实体 `MemoryFact`、`status: active|invalidated|superseded`
+- memory 侧：`memory/projectMemoryLocalStore.ts:29`（JSONL）、实体 `ProjectMemoryRecord`、tombstone 失效
+- **两套检索器**：`core/memory/memoryStore.ts:57` `query()` vs `memory/projectMemoryRetrieval.ts:66`
+- **同一命令分派两套**：`core/commands/memoryCommandRuntime.ts:63,72,80` 走 core store，
+  `:148-` 走 project store → `/memory recall <x>` 与 `/memory use <x>` **打到两个不同的库**
+- 注意 `core/memory/types.ts`(65) **已判不可达**（§14.5）→ core 这套本身已半废弃
+
+**[C-7] 路线/阶段词汇进入产品类型与 evidence key —— 已核验方向**
+- `core/context/model/contextContinuityManifest.ts:21` `readonly route: "74"`、
+  `:24` `editCloseoutSource: "Route 73 editCapabilityCloseoutManifest"`、
+  `:50,55,80,150,158,166,174,182` 全部 evidence 用 `route74:*`
+- `context/startup/startupWarmCommandRunner.ts:44` evidence `route87:warmup-command`
+- **直接违反 `file-placement-and-naming.md:122`**（禁止路线式产品命名）；
+  且 `contextContinuityManifest.test.ts:11` **已对 `route: "74"` 断言** → 改起来成本随时间上升
+
+**[C-8] `context/readWindowContinuation.ts` 与 `context/discovery/scan.ts` 既是 owner 又是 barrel**
+- `readWindowContinuation.ts:16-17` 的 `export *` + 自身定义 `resolveReadWindowDirectiveForWorkflow:225`
+- **后果**：`edit/sanitize.ts:2`、`edit/multifile/model.ts:35`、`edit/recovery/model.ts:2` 都从
+  该 barrel 取 `computeFragmentFingerprint`（真正 owner 是 `context/readWindow/fingerprint.ts:3`）
+  → **edit 域越过子目录边界导入 context 的内部实现**
+
+**[F-5] `provider/request/packet.ts` 是 planning 形状的产物，且是 provider/ 唯一"活着"的模块 —— 已核验方向**
+- `:1-2` import `context/selection/model` 与 `planning/execution/model`（**都是 type**）
+- `:27` `buildTaskRequestPacket` 只做 blockers 汇总 + `outputContractFor(taskKind)`
+- 与 HTTP/provider 无关 → 位置错位，且让 provider 成为 context/planning 的下游
+
+### 19.3 模块划分与死代码（均已核验）
+
+**[F-7] `provider/` 的 registry 与 request/response 元数据层无生产 value 消费者**
+- `projectProviderRegistry`（`provider/registry/provider.ts:291`）的调用点**全是测试**
+- `core/shell/providerReadiness.ts:7` 只 `import type { ProviderRegistryProjection }`
+- `classifyProviderFailure`（`:239`）的 value 消费者只有 `attempt.ts:719,727,732` 与
+  `response/stream.ts:155` —— **而这两个文件本身不可达**（§14.2）
+- 与 §14.2 互补：§14.2 报的是 attempt/boundary/stream，**本条补上 registry 投影（745 行）**
+
+**[F-8] `sandbox/` 一活三死，且导出**第二个同名 `PermissionScope`**
+- 活：`sandbox/osSandbox.ts:53,91,184`，被 `core/tools/registry.ts:28,109,135` 使用
+- 死（仅 type-only 引用）：`sandboxPolicy.ts:34`、`escalationWorkflow.ts:44`、
+  `auditTrail.ts:27`、`sandboxEnforcer.ts:21`
+- **两个同名导出、语义正交**：`cli/approval/permissionScope.ts:17`
+  `PermissionScope = "ask"|"accept-edits"|"allow-all"` vs
+  `sandbox/sandboxPolicy.ts:13` `PermissionScope = 'filesystem'|'network'|'process'|'system'`
+
+**[F-9] `config/` 两套并行配置体系，其中一套无生产调用者 —— 已核验**
+- 体系 A：`config/runtimeConfig.ts:129` `getRuntimeConfig`（~25 消费者）
+- 体系 B：`config/settingsLoader.ts:116` `loadCascadingSettings`
+- **主代理实测**：`loadCascadingSettings` 在**生产代码中零命中**（grep 只命中自身与测试）；
+  唯一生产消费者 `cli/interactive/tuiSettings.ts:3` 只取 `getSettingsPaths` + `readSettingsFileSafely`
+  → `mergeAgentSettings`/`mergeModelSettings`/`mergeSkillsSettings`/`mergePermissionSettings`/`mergeTuiSettings`
+  全部只被自身测试驱动
+- **默认值分歧**：`config/types.ts:60-61` 默认 `provider:"openai-compatible"` /
+  `model:"deepseek-ai/DeepSeek-V3"` vs `config/runtimeConfig.ts:109` 默认 `provider:"openai"`
+
+### 19.4 耦合度
+
+**[C-10] `core/` 有 12 个生产模块 value-import feature 域 —— 已核验（与 §3 同源）**
+- 回报列出 12 个文件；主代理的 §3 实测给出 `core/shell/` 10 条 + `core/commands/` 为主体的
+  127 条违规 value 边 → **两处口径不同但结论一致**
+- 回报的具体举证（未逐一复核）：`core/commands/memoryCommandRuntime.ts:4-41`（14 条）、
+  `core/commands/compactCommandRuntime.ts:4-15`（5 条）、
+  `core/shell/sessionFutureTurnProjection.ts:1-16`（6 条）、
+  `core/query/runtime/policy.ts:2-6`（一次拉进 context/planning/provider/repair/tools 五域）
+
+**[C-11] `context/acquisition/graph.ts` 单文件 value-import `planning/task/` 17 个模块**
+- 具体模块名已由回报列出（`workflowTaskPlanner`、`agentPlanContext`、`taskIntent`、`taskLifecycle` 等）
+- **这解释了 §4「context ↔ planning 36+27 边」的成因**：不是零星交叉，而是**单点全拉**
+- **新环（回报称第二个值环）**：`context/compact → memory` 与
+  `memory → context/compact + core/context` —— 载体正是 C-1 的镜像实现
+
+### 19.5 pi 对照（区块 C/F 相关，均给 pi 侧 `file:line`）
+
+| # | 维度 | pi | 本仓 | 差距性质 |
+|---|---|---|---|---|
+| 1 | **重试** | `packages/ai/src/utils/retry.ts:101,113,176,237`（策略 + 指数退避 + 60s 上限 + 可中断 sleep + 40+ 条可重试措辞）；`utils/provider-retry.ts:38`（HTTP 层读 `retry-after`） | **主代理实测：`provider/` 内 `maxRetries|retryAfter|backoff` 零命中**。唯一"重试"是 `turn/step.ts:117-125` 的 `reasoning_effort` 拒绝后 `continue` 一次 | **能力缺失** |
+| 2 | **`query.retrying`** | — | 契约齐备（`core/query/runtime/events.ts:35`；消费者 `cli/interactive/turnSink.ts:224`、`core/shell/sessionEventSurface.ts:44,117`）但**生产者零**（主代理实测 `type: "query.retrying"` 排除测试后 0 命中）| **断链**（与 §11.2 A-死-4 的 `runtime.*` 同源）|
+| 3 | **流式** | `packages/ai/src/utils/event-stream.ts:26` 泛型 `EventStream<T,R>`，9 个 `api/*.ts` 各自使用 —— **provider 模块本身是生产者** | `provider/response/stream.ts:97` 只吃 `readonly events[]` 做状态归类，**不读网络**；真流在 `turn/completion.ts:135` `readCompletionStream`（397 行手写 SSE 状态机） | **职责错位**：`provider/` 名为 provider 却不碰 HTTP |
+| 4 | **溢出判定** | `utils/overflow.ts:135` `isContextOverflow`，**25+ 条 provider 模式** + 三类检测（错误文本 / 静默超限 / length+0） | `turn/step.ts:62` `OVERFLOW_MARKERS` **仅 4 条 substring**；静默超限与 length+0 **完全未处理** | **能力缺失** |
+| 5 | **传输/代理** | `utils/node-http-proxy.ts:141`，经 SDK `fetch` 选项注入 | `provider/request/fetch.ts:36` `createProviderFetchFromEnv` 存在，但唯一生产调用者是
+`core/shell/providerReadiness.ts:149`（就绪探测）；**主模型路径 `turn/step.ts:99` 用全局 fetch** | **owner 被绕过** |
+| 6 | **JSON 修复** | `utils/json-parse.ts:32` `repairJson`（依赖 `partial-json`）| `model-adapters/jsonRepair.ts:41` 与 pi **逐字符相同**，但 partial 解析改为手写（`:102-155`）| **已分叉**（回报称本仓修了 pi 没修的流式截断，**未回灌**）|
+
+**回报指出的本仓**领先**项**：`provider/registry/provider.ts:239` `classifyProviderFailure`
+有 **20 个语义类**的结构化分类，pi 无对应物（pi 靠 `isRetryableAssistantError` 正则）。
+**但其 value 消费者只有不可达文件** → 能力存在而未被使用。
+
+### 19.6 处置建议（按性价比）
+
+| 序 | 动作 | 依据 | 风险 |
+|---|---|---|---|
+| 1 | 合并 C-1 镜像簇的三对逐字节相同助手（`dedupeLines`/`capListItems`/`check`） | C-1 | **低**（哈希已证同体）|
+| 2 | 秘密判定三件套收敛到 `memory/memoryValidation.ts`（已有的正确 owner） | C-2 | 低（**但需先对齐两侧正则差异**，否则改变行为）|
+| 3 | `REDACTION_EXCLUSIONS` 收敛为单一常量（全仓 19 份） | F-1 | 中（需确认各域的排除项是否本应不同）|
+| 4 | 修 `route: "74"` / `route74:*` 等路线式命名 | C-7 | 中（**已被测试断言，需同步改测试**）|
+| 5 | 删 `sandbox/` 的 `sandboxPolicy`/`escalationWorkflow`/`sandboxEnforcer`/`auditTrail` | F-8 | 中（需迁移 `EscalationPrompt` 类型到 `cli/approval/types.ts`）|
+| 6 | 删 `settingsLoader` 的 merge 系列（零生产调用者） | F-9 | 中（**需先裁决两套配置体系哪套是方向**）|
+| 7 | 删 `provider/registry/provider.ts` 的 700 行投影 + 4 个无消费者别名 | F-7 | 中（需确认 `ProviderRegistryProjection` 类型仍被 type-only 使用）|
+| 8 | 删 `context/readWindowContinuation.ts` 与 `context/discovery/scan.ts` 的 `export *` | C-8 | 低 |
+| 9 | 把 `provider/request/packet.ts` 迁到 `planning/handoff/` | F-5 | 低（纯搬迁）|
+| 10 | 裁决 `core/memory/` 与 `memory/` 二选一 | C-6 | 高（产品裁决）|
+
+### 19.7 回报中**未独立复核**的项（诚实标注）
+
+- C-1 的"两侧语义漂移"两个具体点（`isRecursiveCompactFact`、`leakCandidateLines`）—— 回报举证但未逐行核对
+- F-1 的"4 个只读别名导出全无消费者"
+- F-4 的"`ModelProviderAdapter.streamResponse` 含 `dist/` 亦无实现"
+- F-9 的具体默认值行号
+- P-4 的"`repairJson` 与 pi 逐字符相同"—— 回报称已比对，主代理未复查
+- P-5 的"pi 25+ 条模式"与 P-6/P-7 的效率比较（**属判断，非事实**）
