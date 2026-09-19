@@ -1,4 +1,4 @@
-import type { EvaluationCaseDefinition } from "../model.js";
+import type { EvaluationCaseDefinition } from "../types.js";
 
 /**
  * The built-in evaluation case catalogue.

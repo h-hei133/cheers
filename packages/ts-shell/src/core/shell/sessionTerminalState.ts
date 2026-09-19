@@ -15,6 +15,7 @@ import { projectCliSessionProductSurface } from "./cliSessionProductSurface.js";
 import { renderExecutionSummaryBlock } from "./sessionEventSurface.js";
 import { selectPrintTerminalOutput } from "./sessionPrintOutputProjection.js";
 import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
+export { parseRunCommandAllowlistBlockContext } from "./sessionTerminalEvidence.js";
 import {
   buildCodingFailureSummary,
   buildCodingResultNextAction,
@@ -212,25 +213,6 @@ function renderTerminalNextSteps(
   renderer.renderLine("");
 }
 
-export function parseRunCommandAllowlistBlockContext(
-  terminalDetail: string,
-): { allowedCommands: string } | null {
-  if (
-    !terminalDetail.includes(
-      "Run-command intent is not allowed in the controlled allowlist",
-    )
-  ) {
-    return null;
-  }
-
-  const allowedMatch = terminalDetail.match(
-    /Allowed commands:\s*(.+?)(?:\s+Please rephrase|$)/,
-  );
-
-  return {
-    allowedCommands: allowedMatch?.[1]?.trim() ?? "node --version",
-  };
-}
 
 function renderTerminalResultBlock(
   renderer: StreamingRenderer,

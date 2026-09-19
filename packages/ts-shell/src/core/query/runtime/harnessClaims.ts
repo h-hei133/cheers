@@ -9,7 +9,7 @@ import type {
   QueryRuntimePendingRepair,
   QueryRuntimePendingVerification,
   QueryRuntimeTrajectoryPhase,
-} from "./harness.js";
+} from "./harnessState.js";
 import type { ToolActionKind } from "../../../tools/policy/strategy.js";
 import type { CodingResultSummary } from "../../../result/types.js";
 

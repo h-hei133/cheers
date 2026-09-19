@@ -5,7 +5,8 @@ import type {
 import type {
   TaskLiveGate,
   TaskLiveGateOutcome,
-} from "./model.js";
+} from "./types.js";
+
 import { isWriteCapableEntry } from "./quality.js";
 
 /**

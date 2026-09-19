@@ -19,7 +19,8 @@ import type {
   TaskLiveReadiness,
   TaskOutcome,
   TaskVerificationStatus,
-} from "./model.js";
+} from "./types.js";
+
 
 /**
  * Live execution projection and host evaluation summary.

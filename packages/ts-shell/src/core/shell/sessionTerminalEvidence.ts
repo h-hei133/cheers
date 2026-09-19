@@ -5,7 +5,6 @@ import type {
 } from "../../result/types.js";
 import type { QueryEvent } from "../query/runtime/events.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
-import { parseRunCommandAllowlistBlockContext } from "./sessionTerminalState.js";
 
 /**
  * Terminal evidence formatting.
@@ -546,4 +545,24 @@ function hasApprovedBashExecutionFailureProvenance(
         ),
     ) ?? false
   );
+}
+
+export function parseRunCommandAllowlistBlockContext(
+  terminalDetail: string,
+): { allowedCommands: string } | null {
+  if (
+    !terminalDetail.includes(
+      "Run-command intent is not allowed in the controlled allowlist",
+    )
+  ) {
+    return null;
+  }
+
+  const allowedMatch = terminalDetail.match(
+    /Allowed commands:\s*(.+?)(?:\s+Please rephrase|$)/,
+  );
+
+  return {
+    allowedCommands: allowedMatch?.[1]?.trim() ?? "node --version",
+  };
 }

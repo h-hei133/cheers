@@ -6,7 +6,7 @@ import type {
   QueryRuntimePendingWrite,
   QueryRuntimeTrajectoryEntry,
   QueryRuntimeTrajectoryPhase,
-} from "./harness.js";
+} from "./harnessState.js";
 
 /**
  * Pending-state mutations on the harness.

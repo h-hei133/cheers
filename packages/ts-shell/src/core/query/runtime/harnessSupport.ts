@@ -12,7 +12,7 @@ import type {
   QueryRuntimeSavePoint,
   QueryRuntimeTrajectoryEntry,
   QueryRuntimeTurnSnapshot,
-} from "./harness.js";
+} from "./harnessState.js";
 
 /**
  * Harness text and immutability helpers.

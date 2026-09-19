@@ -5,9 +5,12 @@ import {
   listTaskCases,
   runTaskAssessment,
   runTaskCase,
-  type TaskLiveGateObservation,
-  type TaskOutcome,
 } from "./model.js";
+import type {
+  TaskLiveGateObservation,
+  TaskOutcome,
+} from "./types.js";
+
 
 describe("task capability assessment", () => {
   it("defines required task cases with rubrics, fixtures, verification, outputs, and redaction expectations", () => {

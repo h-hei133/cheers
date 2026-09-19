@@ -19,12 +19,18 @@
 //       && branchingFunctionCount === 0    no function branches of its own
 //       && ownStateWriteCount === 0        no this.<field> = outside the ctor
 //
-// A lines-per-declared-name ceiling was considered and rejected: measured, it
-// separates nothing. Every over-ceiling module exceeds 15 lines per name, so the
-// clause never changes a verdict, while it wrongly rejects genuine facades -
-// modules at delegationRatio 1.00 with zero branching reach 80 lines per name
-// when their bodies are literal tables rather than logic. Length is not
-// complexity, and a criterion that cannot tell the two apart is not a criterion.
+// A lines-per-declared-name ceiling was considered and rejected. The first
+// justification recorded here was wrong and is corrected: it claimed every
+// over-ceiling module exceeds 15 lines per name, but sessionStoreAccess sits at
+// 8.8, so a clause at 15 would have kept that one monolith flagged while its
+// actual reason is its branching validator, not its length. The real reason to
+// drop length is that it does not measure the thing the other three clauses
+// measure: among over-ceiling modules the values run from 8.8 to 144.7 with no
+// gap, and across the tree 502 modules sit above 40 lines per name for reasons
+// that are mostly literal tables and long doc comments. Delegation, branching,
+// and own-state writes each separate facade-shaped modules from behaviour-owning
+// ones; length cannot, so it stays out of the verdict and remains printed as
+// context.
 //
 // The thresholds are not fitted to an outcome. Measured against this tree the
 // classification is unanimous: one module sits at delegationRatio 1.00 with zero

@@ -14,7 +14,8 @@ import type {
   MultiTargetSettlementStatus,
   MultiTargetSnapshotObservation,
   MultiTargetStaleReadObservation,
-} from "./model.js";
+} from "./types.js";
+
 import type { VerificationResultObservation } from "../../verification/result/boundary.js";
 import { deepFreeze, sanitizeId, sanitizeText, unique } from "../sanitize.js";
 

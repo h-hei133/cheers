@@ -11,7 +11,8 @@ import type {
   TaskLiveReadinessBlocker,
   TaskLiveReadinessStatus,
   TaskLiveSafetyClass,
-} from "./model.js";
+} from "./types.js";
+
 
 /**
  * Live readiness classification.

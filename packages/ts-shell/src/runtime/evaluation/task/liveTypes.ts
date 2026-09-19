@@ -3,7 +3,8 @@ import type {
   TaskLiveGate,
   TaskLivePolicy,
   TaskLiveSafetyClass,
-} from "./model.js";
+} from "./types.js";
+
 
 export type BuiltinTaskLiveEntryId =
   | "single-file-edit"

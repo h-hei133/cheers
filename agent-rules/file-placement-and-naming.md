@@ -209,11 +209,18 @@ A module is a thin facade only when all four hold:
 
 Otherwise the module is a real monolith and the ceiling applies: split it.
 
-Run `npm run analyze:module-facades` to compute all four and classify every
-over-ceiling module. The thresholds are not arbitrary: on the current tree the
-classification has a clean gap - facade-shaped modules sit at a delegation ratio
-at or above 0.90 with zero branching, and every real monolith sits at 0.35 or
-below - so any cutoff inside that gap classifies identically.
+Run `npm run analyze:module-facades` to compute all three clauses and classify
+every over-ceiling module. The delegation threshold is not arbitrary: on the
+current tree the classification has a clean gap - facade-shaped modules sit at a
+delegation ratio at or above 0.90 with zero branching, and every real monolith
+sits at 0.35 or below - so any cutoff inside that gap classifies identically.
+
+A fourth clause, lines per declared name, was considered and is deliberately not
+part of the verdict. Length is reported for context but does not decide, because
+it does not separate the two shapes: over-ceiling modules range from 8.8 to 144.7
+lines per name with no gap in between, and most of the tree's long modules are
+long because of literal tables and doc comments rather than logic. A module is a
+monolith because of what its declarations do, not how tall the file is.
 
 Splitting is still a design act, not a mechanical one. A module whose functions
 form a safety-ordered write path, or whose state shape is an encoded contract

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { computeFragmentFingerprint } from "../context/readWindowContinuation.js";
 
 /**
  * Shared text, identity, and immutable-value helpers for edit lanes.
@@ -10,9 +11,18 @@ import path from "node:path";
  * correctness risk rather than a style one - the copies drift, and the same
  * hostile input is then scrubbed differently depending on which path it takes.
  *
- * `absoluteTargetPath` is deliberately absent: the two callers address a target
- * differently (a workspace root plus a relative path, versus an input record) and
- * unifying the signatures would be a behaviour change dressed as a cleanup.
+ * Scope of what actually moved, stated precisely because the first draft of this
+ * comment overstated it:
+ *
+ * - `fingerprint`, `sanitizeText`, `sanitizeId`, `sanitizeTargetSummary` and
+ *   `deepFreeze` are shared; the later four were byte-identical in both callers and
+ *   `fingerprint` was identical too (both were `computeFragmentFingerprint(...)
+ *   .slice(0, 16)`).
+ * - `absoluteTargetPath` is exported here for the multifile lane. The recovery lane
+ *   keeps its own because its signature takes an input record rather than a
+ *   (workspaceRoot, relativePath) pair; the bodies both resolve the same way.
+ * - `unique` is also still duplicated: this one is generic over `T extends string`,
+ *   the recovery copy takes plain strings. Equivalent bodies, different signatures.
  */
 
 export function absoluteTargetPath(workspaceRoot: string, relativePath: string): string {
@@ -20,11 +30,7 @@ export function absoluteTargetPath(workspaceRoot: string, relativePath: string):
 }
 
 export function fingerprint(content: string): string {
-  let hash = 0;
-  for (let index = 0; index < content.length; index += 1) {
-    hash = (hash * 31 + content.charCodeAt(index)) | 0;
-  }
-  return `fp-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  return computeFragmentFingerprint(content).slice(0, 16);
 }
 
 export function sanitizeText(value: string, maxLength: number): string {

@@ -6,7 +6,7 @@ import type {
   TaskVerificationExpectation,
   TaskVerificationStatus,
   TaskWorkspaceFixture,
-} from "../model.js";
+} from "../types.js";
 
 /**
  * The built-in task case catalogue.

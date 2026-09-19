@@ -17,7 +17,8 @@ import type {
   MultiTargetQueueState,
   MultiTargetSnapshotObservation,
   MultiTargetStaleReadObservation,
-} from "./model.js";
+} from "./types.js";
+
 import { absoluteTargetPath, deepFreeze, fingerprint, sanitizeId, sanitizeTargetSummary, sanitizeText, unique } from "../sanitize.js";
 
 /**
