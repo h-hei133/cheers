@@ -260,27 +260,46 @@ verification/result/projection/mutation.ts          (1)
 
 ---
 
-## 7. `core/query/runtime/` 有 7 个孤儿文件（1,257 行）
+## 7. `core/query/runtime/` 的孤儿文件（主代理复测：**10 个 / 1,961 行**）
 
-value 边反向闭包（排除 `import type`）：
+> **2026-09-19 主代理复测更正**：原文记"7 个孤儿 / 1,257 行"，但**未列出全部 7 个**
+> （表内只列 6 个）。主代理按"外部（`core/query/runtime/` 之外）value 边消费者"重测，
+> 结果是 **10 个孤儿 / 1,961 行**。下表为逐文件实测，可复核。
 
-| 文件 | 行数 | 生产消费者 | 测试引用 | 动态入口 |
-|---|---:|---:|---:|---:|
-| `actionAuthority.ts` | 312 | **0** | **0** | 0 |
-| `proof.ts` | 323 | **0** | **0** | 0 |
-| `policy.ts` | 272 | **0** | 1 | 0 |
-| `harnessState.ts` | 177 | **0** | **0** | 0 |
-| `batch.ts` | 143 | **0** | **0** | 0 |
-| `decision.ts` | 30 | **0** | **0** | 0 |
+**判定方法**：解析 934 个生产文件的 import 语句 → 解析目标路径 → 统计来自
+`core/query/runtime/` **之外**的消费者，**区分 value 与 `import type`**；
+目录内部互引不计。
 
-**合计约 1,257 行**，全部通过 §2.2 检查 4（无动态入口）。
+| 文件 | 行数 | 外部 value 消费者 | 外部 type 消费者 | 判定 |
+|---|---:|---:|---:|---|
+| `actionAuthority.ts` | 312 | 0 | 0 | **孤儿** |
+| `proof.ts` | 323 | 0 | 0 | **孤儿** |
+| `policy.ts` | 272 | 0 | 0 | **孤儿** |
+| `facts.ts` | 298 | 0 | 0 | **孤儿** |
+| `harnessClaims.ts` | 177 | 0 | 0 | **孤儿** |
+| `harnessPendingState.ts` | 154 | 0 | 0 | **孤儿** |
+| `harnessState.ts` | 177 | 0 | 0 | **孤儿** |
+| `harnessSupport.ts` | 75 | 0 | 0 | **孤儿** |
+| `batch.ts` | 143 | 0 | 0 | **孤儿** |
+| `decision.ts` | 30 | 0 | 0 | **孤儿** |
+| **合计** | **1,961** | | | |
+| `events.ts` | — | 0 | **27** | **type-only**（见下） |
+| `state.ts` | — | 2 | 12 | 活 |
+| `taskState.ts` | — | 4 | 6 | 活 |
+| `observation.ts` | — | 1 | 0 | 活（唯一消费者 `session/replay/builder.ts:2`） |
+| `harness.ts` | 967 | 1 | 5 | 形式上"活"，但唯一 value 消费者是 `session/harness/state.ts:12`，而后者只在"快照已有 harness"时才被调用（见 §11.2 A-死-2 的链条） |
 
-**注意 `events.ts` 的反例**：它被 **31 个文件**引用，但**全是 `import type`**——
-`grep` 会显示"31 个消费者"，而 value 边为 **0**。
-`QueryEvent` 是纯类型，被 `turn/`、`session/`、`entrypoints/` 广泛使用。
+**与原文的差异**：原文列出了 `actionAuthority` / `proof` / `policy` / `harnessState` /
+`batch` / `decision` **6 个**，并称共 7 个；复测**多出 4 个**：
+`facts.ts`、`harnessClaims.ts`、`harnessPendingState.ts`、`harnessSupport.ts`。
+（`harnessSupport.ts` 的文件名还违反 `file-placement-and-naming.md:114` 对 `support` 的禁令，见 §11.3 A-命名-1。）
+
+**`events.ts` 的反例（原文正确，复测确认）**：外部**type** 消费者 **27 个**
+（原文记 31，同一量级）、**value 消费者 0 个**。
+`QueryEvent` 是纯类型，被 `turn/`、`session/`、`entrypoints/`、`core/shell/`、`cli/` 广泛使用。
 **这正说明"消费者计数"必须区分 value 与 type 边**，否则会误判。
 
-**置信度**：高。
+**置信度**：高（逐文件可复核）。
 
 ---
 
