@@ -24,16 +24,18 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 
 ---
 
-## 1. 当前状态（2026-09-18）
+## 1. 当前状态（2026-09-18，阶段 B 收尾后）
 
 | 指标 | 值 |
 |---|---:|
 | 生产文件 | 961 |
 | CLI 可达 | 876 |
 | CLI 不可达 | 85（仅测试 72 + 仅公共 API 5 + 零引用 8） |
-| 全量测试 | **3172 项** |
+| 全量测试 | **3174 项**（520 文件 / 3173 通过 / 1 跳过 / 0 失败） |
 | 稳定失败 | **0**（`testTimeout` 已修为 30s，原 5 项负载超时消除） |
 | `tsc -p tsconfig.build.json` | 0 错误 |
+| **import 环（新增门禁）** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1505 文件） |
+| **越界模块** | **12 → 3**，余 3 个均有 disposition；`npm run analyze:module-facades` |
 | NormProof judge | verdict `partial`；**blocking 义务 0 项未满足**（唯一 blocking 义务 satisfied） |
 | `strict` | ✅ **已对生产开启**（`tsconfig.build.json` `strict: true`）。生产 strict 错误 **136 → 0**（S1 73 + S2 26 + S3 37）；全包 strict **401 → 258**（余下全在测试文件）；非 strict 全量 **251 → 244**；`npm run build` **0 错误**；零 `!` / 零 `as`。S1 原提交 `ffcf63bf` 经复核**回退重做**（根因是 `*Like` 镜像类型漂移，非缺守卫） |
 | 文档/规则漂移门禁 | ✅ `verify:docs-drift`（RULES 0 死引用、DOCS `--strict` 通过），已接入 `verify-release-core` |
@@ -63,6 +65,9 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | **Step 5 SessionManager 拆分** | **✅ 全部完成**（2026-09-18，3 批）。判据 **38 → 18**，继承链深度 2；详见 §3.5 |
 | **Step 6 命名税** | **✅ 全部完成**（2026-09-18，路径 B）。改名 **173** 个；`playwright` 经实测裁定保留；详见 §3.3 |
 | **Step 7 judge 全量跑** | **✅ 全部完成**（2026-09-18）。**0 blocking**，唯一 blocking 义务 satisfied；越界模块 13 → **12**；详见 §3.6 |
+| **阶段 A（strict 等 4 项）** | **✅ 全部完成**（2026-09-18）。见 §3.10；本仓生产 `strict` 已开启 |
+| **阶段 B（B1-B4）** | **✅ 全部完成**（2026-09-18）。B1 `core/` 准入规则 + 删 `core/extensions/`；B2 文档全分类；B3 `renderer/` → `presentation/terminal/streaming.ts`；**B4 越界模块 12 → 3**；详见 §3.11 |
+| **阶段 A/B 对抗复核** | **✅ 已完成**（2026-09-18，2 个子代理）。找出 4 个真实缺陷并全部修正；详见 §3.12 |
 
 ### Step 2.7 执行结果
 
@@ -1217,14 +1222,14 @@ R6/R7 只需一个方向答复）。
 **为什么 `strict` 排在最前**：它是三轮探索中**唯一不依赖我们任何自定规则、且被外部项目实践支持**的项；
 错误高度集中（单文件 54%）；`build` 与 `test` 配置可分离（**不必等 265 个测试错误**）。
 
-**阶段 B — 需一次方向答复**
+**阶段 B — ✅ 全部完成（2026-09-18，经维持人裁决执行）**
 
-| 序 | 事项 | 需要的答复 |
-|---|---|---|
-| B1 | R6 `core/` 准入 + `core/extensions/` 处置 | 是否接受"定义准入、不做搬迁"。**勘误**：`247` 无来源（由 §3.8 的 `1515` 派生，而 `1515` 实测为 **326** 文件）；B1 建议 = 写准入规则 + 删除 `core/extensions/`（2 文件，**零消费者**，且产品明示不执行扩展） |
-| B2 | R7 `docs/` 分类归档 | **前提被本仓政策否定**：`docs/archive/README.md` 明文"Prefer status entries in DOC_STATUS.md over moving files"；且实测 **677/770（88%）文档根本没有状态行** → 真正的缺口是**未分类**而非未归档。需裁决：是否 override 该政策 |
-| B3 | R5 `renderer/` 去向 | A（`terminal/streaming.ts`）/ B（`terminal/output.ts`）/ C（新子域）。**探索结论倾向 A**：`presentation/terminal/` 是 sanctioned 子域且 `streaming.ts` 已是推荐角色名，当前仅 1 个文件故**零碰撞**；A/B/C 重写成本相同（**42 处**）。需确认叶名 |
-| B4 | R4 12 处越界模块 | **"都是真单体"不成立**：实测 2 个是薄 facade（`sessionStoreAccess` 委托率 **1.00**、`liveRun.ts` 仅 15 真名），其余委托率 **≤0.03**。plan 的规则引用是**误引**（facade 依据在 151–170 行且**点名** `SessionManager`，非 147 行）。B4 建议：**先定四款可计算判据**，再只拆 3 个真单体 |
+| 序 | 事项 | 执行结果 | 提交 |
+|---|---|---|---|
+| **B1** | `core/` 准入 + 删 `core/extensions/` | 写入三款准入规则（方向/受众/生存）；删 `core/extensions/`（2 文件，通过全部 6 项删除检查，**零消费者**） | `b463d87d` |
+| **B2** | `docs/` 分类归档 | **0/775 文档未分类**（原 677 篇无状态行）；新建 5 个着陆页；`product_architecture_reset_routes` 挂 `historical` banner。零文件搬迁 | `2b262fe7` |
+| **B3** | `renderer/` 归位 | `src/renderer/StreamingRenderer.ts` → `src/presentation/terminal/streaming.ts`；42 处引用重写；顺带修复 A2 引入的真实环 | `d9459cac` |
+| **B4** | 12 处越界模块拆分 | 落地判据（`analyze:module-facades`）；拆分 9 个模块；**越界模块 12 → 3**（余 3 个均有 disposition）；去重 `edit/sanitize.ts` | `78cfade9` ~ `78a864d6` |
 
 **B4 已完成（2026-09-18）。** 越界模块 **12 → 3**，且剩余 3 个均已登记 disposition。
 
@@ -1276,6 +1281,47 @@ body 为字面量表时可达 **80 行/名**。**长度不是复杂度**，无�
    `liveProjection` 的两半（readiness / projection）实测**双向零调用**才敢切。
 5. **`coversTargets` 这类跨半函数说明 seam 需要调整**，而非新增 import 制造环。
    `multifile` 里 3 个 helper 从 `settlement.ts` 移回 `observation.ts` 正是为了避免环。
+
+#### B4.4 对抗式复核发现的真实缺陷与修复（2026-09-18，2 个子代理）
+
+阶段 B 完成后，派两个子代理对 Phase A 和 Phase B 分别做独立对抗复核。
+**复核找出 4 个真实缺陷，已全部修复**：
+
+1. **`fingerprint` 算法静默替换（Release Blocker，`36e36718` 引入，`89b23472` 修复）**：
+   `edit/sanitize.ts` 去重时把两个原版的 `computeFragmentFingerprint(c).slice(0, 16)`（SHA-256 前缀）
+   错误替换为 32 位 `hash * 31` 滚动哈希（`fp-95a3a00a`），导致所有下游指纹变动，
+   且因**无测试断言其输出值**而全绿通过。
+   **修复**：恢复 SHA-256 实现，并新增 `src/edit/sanitize.test.ts` 钉死已知输入的精确输出
+   （`e3f30fe5`，证实能精确捕获该回归）。
+
+2. **自写 SCC 检测器存在严重盲区：声称 0 环，实际 18 环（`89b23472` 修复）**：
+   原检测器将文件路径收集为相对路径、import specifier 解析为绝对路径，
+   导致 identity map **永远不匹配**，所有边静默丢失，图表面上无环。
+   复核者手工找出 `c8b03d12` 引入的真实运行时 2-环（`sessionTerminalEvidence ⇄ sessionTerminalState`）。
+   **修复**：
+   - 将 `sessionTerminalState.ts` 内 19 行纯解析器移至唯一调用方 `sessionTerminalEvidence.ts`，消除运行时环；
+   - 将子模块从父模块反向导入类型的 3 组 type-only 环下沉为独立 `types.ts` 叶子模块
+     （`harnessState.ts`、`edit/multifile/types.ts`、evaluation 两个 `types.ts`）；
+   - **新增正式门禁 `npm run verify:import-cycles`（`scripts/check-import-cycles.mjs`）**，
+     带自身路径一致性断言，并在合成 2-环上验证其阻断能力。
+   - **最终实测：runtime cycles = 0，type-only cycles = 0**（1505 文件）。
+
+3. **`linesPerName` 条款删除理由失实（`bdb0c570` 修复）**：
+   原记录声称"所有越界模块都超过 15 行/名"，实测 `sessionStoreAccess.ts` 为 **8.8 行/名**（反例存在）。
+   **修复**：在规则文本和脚本注释中将理由修正为诚实版本——长度不具备区分两类形态的能力
+   （全树 502 模块超过 40 行/名多因字面量表与注释，而委托率/分支/自有状态能有效切分）。
+
+4. **`package-lock.json` 中 `typescript` 残留 `"dev": true`（`bdb0c570` 修复）**：
+   手动提升依赖时漏改的元数据，已清理。
+
+5. **`edit/multifile/model.ts` 既有 17 处非空断言（`!`）彻底清零（`9c6b9fc5`、`45e50380`）**：
+   搬迁代码中继承的 `!` 断言全数改为 `never`-returning 守卫 helper（如 `missingClassification`），
+   **零 `!`、零 `as`**，不变量在类型系统中显式表达。
+
+6. **真实 CLI 渲染验证（补齐 PTY 缺口）**：
+   驱动真实 CLI（`--print --replay-file` 经真实 provider；`--host-command` 经 session 核心），
+   并与 `c8b03d12~1`（拆分前）的 worktree 渲染结果逐行对比，
+   **结构化输出（`Result / Outcome: success / Detail: completed`）逐字节一致**。
 
 **阶段 C — 需独立立项**
 
