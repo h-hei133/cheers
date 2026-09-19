@@ -1618,7 +1618,7 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | # | 事项 | 依据 | 依赖 |
 |---|---|---|---|
 | **T1** | 收口 `sanitizeText` 6 份 → 1 份 | `block-findings` §12.2 | ✅ **已完成**（`3550134f`）：新建 `core/security/redaction.ts`，6 处定义 + 10 处调用点全部改指单点；§9.9 记录了验证矩阵 |
-| **T2** | 收口 `freeze`/`deepFreeze`：**实测 56 份**（`plan.md` 原记 27 为更严口径）→ 需先裁决语义 | §12.3、§9.15 | ⏸ **已分析，待裁决**：见 §9.15 |
+| **T2** | 收口 `freeze`/`deepFreeze` | §12.3、§9.15 | ✅ **已完成**（`8c5f47c7`）：45 处合并为 `core/values/freeze.ts`；12 处不可达浅冻结**按裁决保留**，见 §9.16 |
 | **T3** | 删 `reasonText.includes` 8 处，改结构化字段 | §10.5 pi-2 | ⚠️ **前提被实测推翻，未执行** —— 见 §9.10 |
 | **T4** | 修 `browser/` 的 byte/char 混用 | §13.7 对照-3 | ✅ **已完成**（`6a793de9`）：4 处真消费点改字节计数，见 §9.13 |
 | **T5** | 切断 `browser` → `presentation` 反向依赖 | §13.6 耦合-2 | ✅ **已完成**（`161e15fd`）：**实际只改 4 处 import**（非 97），见 §9.14 |
@@ -1986,3 +1986,77 @@ CI（`.github/workflows/ci.yml:30`）用 `npm run test:ts`，`scripts/test-all-s
 - 若要执行，是否额外做一次**真实调用点前后输出 diff** 作为证明？
   （`session/sessionTreeProjection.ts:499` 等从 B 改 A 的站点，已实测同输入同输出，
   但可用真实数据再验一次）
+
+### 9.16 T2 执行记录（2026-09-19，已完成）
+
+| 项 | 内容 |
+|---|---|
+| **目标** | 56 份 `freeze`/`deepFreeze` 收敛 |
+| **提交** | `8c5f47c7` |
+| **新 owner** | `core/values/freeze.ts` → `freezeDeep`（A 类语义：带"已冻结就跳过"）|
+| **实际改动** | **48 文件**，净变化 **+238 / −632 行**（净减 394 行）|
+
+**执行范围（与 §9.15 的分析一致）**：
+
+| 类别 | 处理 | 数量 |
+|---|---|---:|
+| A 递归+跳过 | 并入 `freezeDeep` | 30 |
+| B 递归+不跳过 | 并入 `freezeDeep` | 13 |
+| C 浅冻结（`verification/execution/model.ts`）| 并入 —— 唯一可达的浅冻结，3 个冻结点只吃 `string[]`/标量 | 1 |
+| C 浅冻结（`context/rebuildInput.ts`）| 并入 —— 实为转发别名（`return freeze(value)`），删除后调用直连 | 1 |
+| **小计（转换）** | | **45** |
+| C 浅冻结（其余 10 个载体不可达）| **按裁决保留原位** | 12 |
+
+**⚠️ 执行中差点造成的破坏（已回退并修正）**
+
+第一次批处理脚本有 bug：我把「函数体 `{` 的位置」误当作「函数声明起点」，
+结果**删掉了函数体、把签名留在原地**，45 个文件全部产生孤立声明。
+
+- **发现方式**：脚本自检输出显示每个文件都残留 `deepFreeze` 计数 = 1
+- **处理**：`git checkout -- packages/ts-shell/src/` **全面回退**，修正 span 起点（`m.start()`）后重做
+- **加固**：重做时改为**先单文件验证 span 内容**（打印待删区间的首尾），确认无误再批量；
+  且分类不再依赖易漂移的哈希，改用**函数体特征**（是否含 `Object.values`、是否含 `Object.isFrozen`）
+
+**执行前的关键风险核验（决定了 C 类不并入不可达载体）**
+
+实测证明深冻结会**冻住调用方对象**：
+
+```
+SHALLOW: 调用方 workspaceFiles[1] frozen = false
+DEEP   : 调用方 workspaceFiles[1] frozen = true     ← 波及调用方
+```
+
+原因：`context/selection/model.ts` 冻结的对象里放的是
+`input.workspaceFiles.filter(...)` —— **数组是新的，元素仍是调用方的对象**。
+该文件**不可达**，故合并只有行为变更、没有收益 → **按裁决保留**。
+
+**跨模块引用一并处理**：`edit/sanitize.ts` 原本**导出** `deepFreeze`，
+被 4 个同域模块 import（`edit/multifile/{model,observation,settlement}.ts`、`edit/recovery/model.ts`）。
+删除该导出后**断链风险真实存在**，已把这 4 处改为直接从 `core/values/freeze.js` 导入。
+
+**验证矩阵**：
+
+| 检查 | 结果 |
+|---|---|
+| **行为等价性** | ✅ 探针取 git 上的**原实现**（覆盖 A 与 B 两种形态，5 个代表站点）逐一对拍：冻结后的**图结构与返回的身份**完全一致（探针跑完即删）|
+| **真实输出前后对比** | ✅ 受影响 12 域：**HEAD 与改动后均为 427 文件 / 851 项 / 0 失败** |
+| `npm run build`（strict）| ✅ 0 错误 |
+| `verify:import-cycles` | ✅ 0 环 |
+| `verify:docs-drift:strict` | ✅ rules_refs 58 → 59（新增登记被解析），0 dangling |
+| **全量（官方入口）** | ✅ **493 文件 / 2748 项 / 0 失败** |
+| 保留的 10 个 C 类载体 | ✅ 逐一确认本地实现仍在位 |
+
+**规则补登**：`core/values/` 已按 core 准入要求写入
+`agent-rules/architecture-boundaries.md` 的 Common Areas。
+
+**core/ 准入三条件**：
+
+| 条件 | 判定 |
+|---|---|
+| 1. Direction | ✅ `freeze.ts` **零 import** |
+| 2. Audience | ✅ **12 个 feature 域**消费（48 个 import 点）|
+| 3. Survival | ✅ 真实共享实现 |
+
+**遗留**：§9.15 提到的"`tools/toolHandoff.ts:216`（浅冻结 + 返回 `T` 无 readonly + 输入含嵌套）"
+**未单独修正** —— 它属 10 个保留载体之一（不可达），按同一裁决一并保留。
+若将来该文件被接线，应优先把它并入 `freezeDeep`。
