@@ -1598,3 +1598,76 @@ turn facade、契约 query loop 与 engine。此后 `turn/projection.ts` 成为*
 ### 子代理
 
 本轮**未派**：本任务是连续测量、无可并行独立切片；上一轮两个子代理均因基础设施故障（503 WAF）失败。
+
+## [2026-09-19] phase-c-c1-pi-divergence | 对照 pi 后**收回上一条建议**：`codingResult` 是 pi 对齐**之前**的旧架构，且职能已有活轨替身。
+
+产出 `.wiki/refactor/turn-vs-pi-divergence.md`。参考项目 pi 只读（`~/projects/pi`）。零代码改动。
+
+### 差异一（最关键）：`afterToolCall` 的结构化出站通道被削掉了
+
+| | 定义 | 字段 |
+|---|---|---|
+| **pi** | `AfterToolCallResult`（`packages/agent/src/types.ts:84-95`） | `content` / **`details?: unknown`** / `isError` / `usage` / `terminate` |
+| **本仓** | `AfterToolCallUpdate`（`core/agent/tools.ts:50-54`） | 只有 `output` / `isError` / `terminate` |
+
+pi 的 `details` **确实被消费**（`harness/hooks.ts:300/315/321`），工具结果消息也带 `details`
+（`harness/messages.ts:111/119`）。**本仓移植时把这条通道削掉了**——这解释了
+`turn/tools.ts:123` 的审批数据为何无处可去。
+
+### 差异二：结构化数据挂消息上 vs 独立汇总对象
+
+pi 用 `CustomMessage.details?: T`（`harness/messages.ts:30-37`），**不立汇总对象**；
+本仓多出一整层 `CodingResultSummary`（`result/types.ts:262-282`，28 字段）+ 投影链。
+
+### 差异三：终态形态
+
+pi `OperationResultRecord` = `{operationId, kind, status, error, tipId, startedAt, endedAt}`
+（`harness/session/types.ts:108-117`）——**无验证汇总**。
+pi 全仓 `grep "codingResult"` = **0**；`changedFiles`/`verification`/`taskSatisfaction` 同样 = 0。
+
+### 决定性事实：`codingResult` 的年龄
+
+| 事实 | 证据 |
+|---|---|
+| `codingResult` 最早出现 | **2026-04-21**（`4b00f24f`） |
+| turn 对齐 pi | **2026-09-12**（`a7418fcb`） |
+| 差 | **5 个月** |
+
+**`codingResult` 不是 pi 迁移的产物，是迁移前的旧架构遗留。** 迁移删掉了它的**生产者**
+（`orchestration/`），没删它本身。
+
+### 生产实测
+
+| 检查 | 结果 |
+|---|---|
+| 84 个真实会话含 `query.completed` | 23 |
+| 其中 `result` 含 `codingResult` | **0** |
+| 真实 completed 事件的 `result` | 只有 `status`/`terminalClassification`/`terminalReason`/`transcript`/`sharedContext`/`finalOutput` |
+
+（3 个 grep 命中"codingResult"的文件，逐条核对**均为聊天文本**，非事件数据。）
+面板三重失效：生产者不产出 → `sessionTerminalState.ts:67` 恒 `undefined` → `:300` 提前 return。
+测试为何没发现：`sessionRuntime.test.ts:581/682/997/1296/1459` **手工注入** `codingResult`。
+
+### 决定性发现：死字段的职能**已有活轨替身**
+
+| 死字段 | 活轨替身 | 状态 |
+|---|---|---|
+| `provenance.approvalDecisions`（0 写入者） | 审批审计记忆（`session/approval/auditProjection.ts:15-18`） | **有活写入者**：`cli/approval/cliApprovalAuditBridge.ts:34` |
+| `lastActionResultSeed`（写入者仅在测试） | `workingMemory` 提取器（`sessionContinuitySnapshot.ts:82`） | 活轨 fallback 已存在 |
+
+`sessionContinuitySnapshot.ts:81-83` 的写法是证据：每处 `codingResult` 读取都跟 `?? extract...FromMemory`，
+而 `lastCodingResult` 恒 `undefined`，**实际生效的一直是 `??` 右边**。
+
+### 收回上一条建议
+
+`cb-005-recommendation.md` 建议"接回 `codingResult` 产生"——**收回**。
+pi 的答案是不立汇总对象；而 O3'（整体移除）的证据更硬：
+面板不可见 + 0 生产产出 + pi 无此概念 + 职能有替身。
+
+### 修正后的选项
+
+| 选项 | 动作 |
+|---|---|
+| **O1'** | 删 `runtime/loop` + `runtime/api/host`，不动 `codingResult`（但不解决面板不可见） |
+| **O2'** | 照 pi 补 `AfterToolCallResult.details` 通道（需先定产出形态） |
+| **O3'** | 判定 `codingResult` 一族为旧架构遗留，整体移除（42 个引用点） |

@@ -1159,6 +1159,7 @@ runtime 装配四重证据。
 | `cb-005-initiation.md` | **CB-005 立项探索（阶段 C1）**：`runtime/loop` 生产零值导入、provider 硬编码合成；CB-005 是裁决问题而非施工问题 |
 | `cb-005-o1-vs-o3.md` | **O1/O3 代价对照（实测）**：删旧路径 vs 只补缺口；含三个待裁决的公共面问题 |
 | `cb-005-recommendation.md` | **CB-005 建议 + 三处自我更正**：成因是"产出无人接管"而非"两路径不连通"；建议先接回 `codingResult` 产生，O1 后置 |
+| `turn-vs-pi-divergence.md` | **turn 实现与参考项目 pi 的差异对照**：3 处结构性差异；`codingResult` 早于 pi 对齐 5 个月且职能已有活轨替身 |
 | `handoff-2026-09-17.md` | 任务转接包（方向、记录位置、执行要求） |
 | `audit-raw/*.json` | 403 个已删文件的逐文件判定原始表 |
 | `step-2.6-plan.md` | Step 2.6 方案与执行记录 |
