@@ -1248,3 +1248,202 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 本仓的 `core/harness/*Fixtures.ts` 与生产文件**同级混放**，
 这正是本节 26 个孤立文件里要人工剔除 11 个测试基建的原因。
 （注：R8 已裁决**测试保持并排、不分离**，故这条**不建议照做**，仅记录差异。）
+
+---
+
+## 15. 区块 E 回报（`cli/ entrypoints/ presentation/ core/commands/`，202 文件 / 26,841 行）——逐条核验后记录
+
+**核验状态**：已核验项由主代理亲手复核。**发现一处重大回报错误**（§15.6）。
+
+### 15.1 结构性判断：`entrypoints/` 与 `cli/` 的边界已实质反向
+
+回报称：`entrypoints/` 装的是**可复用 CLI 契约**，`cli/` 装的是**执行器**，
+导致 `cli/` 有 **19 处** import 回 `entrypoints/`。
+
+**这与 `agent-rules/file-placement-and-naming.md` 对 `entrypoints/` 的定位冲突**
+（该文件要求 `entrypoints/` 是**入口/兼容层**，不应容纳可复用契约，也不应被下游反向依赖）。
+
+> **主代理核验**：`cli/approval/` 下确有 2 处 import `entrypoints/`：
+> `cliApprovalAuditBridge.ts:3` → `entrypoints/approvalPromptBridge.js`；
+> `cliApprovalEscalationBridge.ts:6` → `entrypoints/cliApprovalModule.js`。
+> **反向也存在**：`entrypoints/cliApprovalModule.ts:7,14,37` ↑ `cli/approval/*`，
+> `entrypoints/cliRuntimeInvocation.ts:6` ↑ `cli/approval/permissionScope.js`。
+> **即边界双向穿越是实测的**；19 这个总数未逐一复核，但**方向性论断成立**。
+
+### 15.2 重复实现（均已核验）
+
+**[E-重复-1] `renderProjectedLines` 三份逐字节相同 —— 已核验（与 §11.5 重-跨-1 为同一条）**
+- 正式定义 `cli/output/projectedLineRenderer.ts:5-11`（全文 9 行，含 `ProjectedLineRenderer` 接口）
+- 副本 A `entrypoints/cliPermissionModule.ts:123-128`（**私有**，调用点 `:77`）
+- 副本 B `entrypoints/cliSessionModule.ts:166-172`（**导出**，调用点 `:118`、`:327`）
+- 唯一真实消费者 `cli/interactive/interactiveCommandRouter.ts:34`
+- **影响（回报的洞察）**：`cli/output/` 目录**只有这 1 个文件**，
+  它存在的唯一理由（消除这个 for 循环重复）**没有达成** → `cli/output/` 作为 owner 域不成立
+
+**[E-重复-2] `parseArgsWithFlags` 两份逐字节相同 —— 已核验（哈希一致）**
+- `core/commands/connect/preset.ts:110-136`（**导出**）
+- `core/commands/modelCommandRuntime.ts:484-506`（**私有**）
+- 主代理实测：两份函数体 **sha256 前 12 位均为 `7dfaf91c3a88`**
+- `modelCommandRuntime.ts:269` 调用的是自己的私有副本，而非已有的导出 → **已存在可用导出却仍复制**
+- 影响：`--key value` / `--key` 布尔语义须同时改两份，否则 `/model list --refresh` 与
+  `/connect set --label x` 行为分叉
+
+**[E-重复-3] `normalizePathForCompare` 共 7 份 —— 已核验**
+- `core/shell/bootstrap.ts:58`、`core/shell/runtimeContext.ts:295`、
+  `core/shell/startupSurfaceRenderer.ts:178`、`entrypoints/cliArgs.ts:419`（多一个 `cwd` 参数）、
+  `entrypoints/cliPermissionModule.ts:154`、`entrypoints/cliSessionModule.ts:355`、
+  `entrypoints/cliWorkspaceModule.ts:95`（**导出**）
+- 主代理实测共 **7 处**（与回报一致）
+- 后 6 份函数体均为 `return path.resolve(value).toLowerCase();`
+- 影响：路径规范化规则（是否 resolve/lowercase/处理 symlink）散 7 处
+
+**[E-重复-4] `toRelativeTime` 共 4 份 —— 已核验**
+- `core/shell/sessionStateSurface.ts:290`、`entrypoints/cliPermissionModule.ts:132`、
+  `entrypoints/cliWorkspaceSurface.ts:91`、`entrypoints/sessionsPanel.ts:209`
+- 前三份逐字相同（变量名都是 `updatedAt`），第四份是同一算法换名（`timestamp`）
+- 影响：会话列表 / 项目上下文列表 / 权限授权列表三处「多久以前」文案各由私有实现决定
+
+**[E-重复-5] `resolveWorkspaceRootMode` 三份**
+- `entrypoints/cliWorkspaceModule.ts:149`（导出）、`entrypoints/cliSessionModule.ts:359`（私有）、
+  `core/shell/bootstrap.ts:87-89`（私有）
+- 逻辑均为 `gitContext.insideGit && gitContext.root ? "git-root" : "direct"`
+
+**[E-重复-6] `connect/preset.ts` 与 `modelCommandRuntime.ts` 成对复制 3 组**
+- `normalizeOptional`(`preset.ts:146`) ↔ `normalizeText`(`modelCommandRuntime.ts:557`，换名)
+- `normalizeBaseUrl`(`preset.ts:151`) ↔ `normalizeBaseUrl`(`modelCommandRuntime.ts:562`)
+- `normalizeConnections`(`preset.ts:159`) ↔ `normalizeConnections`(`modelCommandRuntime.ts:538`)
+- 影响：`/model` 与 `/connect` 对「合法 provider connection」有两套判定
+
+**[E-重复-7] `isOpenAICompatibleStyleProvider` 三份**
+- `core/commands/connect/preset.ts:97-104`（导出）、`core/commands/modelCommandRuntime.ts:586-592`（私有）、
+  `core/commands/localCommandRuntime.ts:156-160`（私有）
+- 三处同值集合 `openai-compatible | google | antigravity | claudecode`
+
+**[E-重复-8] 命令元数据有 3 个真值源 —— 已核验方向**
+- `core/commands/registry.ts:59-610`：54 个 `CommandDefinition`，各带 `argumentHint: "[a|b|c]"` 字符串
+- `core/commands/argumentCompletions.ts:35-57`：`SUBCOMMAND_VALUES` 表**逐条镜像**上述字符串
+  （如 `:44 permissions: [...]` ↔ `registry.ts:273 argumentHint: "[list|explain|revoke|reset]"`）
+- `core/commands/types.ts:87-107`：`ShellActionResult` 再列一遍 action 子动作
+- **回报引用的一条证据很有价值**：`argumentCompletions.ts:19-24` 的注释**自认**这层风险
+  （"Completing a value the handler would reject is worse than completing nothing"），
+  但它是**手动**同步的第三份，不是从 handler 推导的
+
+**[E-重复-9] 「blocked 结果」文案协议 7 处手写拼装**
+- `core/commands/slashRouter.ts:70-90`、`compactCommandRuntime.ts:115`、`memoryCommandRuntime.ts:277`、
+  `warmupCommandRuntime.ts:53`、`presentation/sidebar/sidebarPanelCommandContract.ts:58`、
+  `sidebarLivePanelCommandContract.ts:46`、`entrypoints/mcpControlCliSurface.ts:24-28`
+- 五元组 `Result` / `- Outcome: blocked` / `- BlockerKind:` / `- Reason:` / `- DoNext:`
+- **回报的关键证据**：`slashRouter.test.ts:983-1003`、`mcpControlCliSurface.test.ts:129-134`
+  **已对字面文案断言** → 说明该协议已被下游依赖，改动需同步测试
+
+### 15.3 死代码（均已核验）
+
+**[E-死-1] `presentation/sidebar/` 的**质量检查链**只被测试引用 —— 已核验**
+- `sidebarEventBridge.ts:70` `bridgeSidebarEvents`：消费者仅 3 个测试
+  （`sidebarStateSurface.test.ts:2`、`sidebarStateQuality.test.ts:2`、`sidebarEventBridge.test.ts:3`）
+- `sidebarPanelQuality.ts:27` `checkSidebarPanelQuality`：仅 `sidebarPanelLayout.test.ts:4`
+  + `sidebarLivePanelQuality.ts:1`
+- `sidebarLivePanelQuality.ts:26`：仅 `sidebarLivePanelRuntime.test.ts:4`
+- `sidebarStateQuality.ts:36`：仅 `sidebarStateQuality.test.ts:5`
+- **合计约 440 行**（Quality 三模块约 200 + EventBridge 244）
+- 生产入口 `/sidebar`（`sidebarCommandRuntime.ts:15`）**从不调用**任何 Quality 或 EventBridge
+- **回报的关键判定**：这些模块**不是在验证生产代码质量，而是生产代码的平行副本** ——
+  它们对同一批 checks（hasHeader / noSecretLeak / outputWidthRespected…）各自实现一遍，
+  `sidebarPanelQuality.ts` 与 `sidebarLivePanelQuality.ts` 的 checks 表有 **8 个字段重名同义**。
+  **其绿灯不能证明生产渲染正确，因为检查的是自己构造的 snapshot。**
+- **处置建议（回报给得准）**：若刻意保留为校验基建 → 移入 `test-utils/`
+  （`file-placement-and-naming.md` 明确 `test-utils/` 仅测试使用）；
+  否则删除。**当前状态是"披着生产路径的测试代码"**。
+
+**[E-死-2] `core/commands/shellActionRuntime.ts` 三个导出构成「消费者在、生产者没了」的死链**
+- 已无生产者的三个导出：`:10` `runSessionsShellAction`（产出 `list-sessions`）、
+  `:175` `runViewShellAction`（`show-view`/`set-view`）、
+  `:206` `runAgentModeShellAction`（`show-agent-mode`/`set-agent-mode`）
+- `registry.ts:49-55` 只导入 **7 个**，上述三个不在其中，全仓 grep 亦零引用
+- **但消费者仍在**：`cli/interactive/interactiveCommandRouter.ts:203,213,220,230`
+  仍在 `isShellAction(..., "show-view")` 等判定
+- **连带孤立**：`entrypoints/cliDisplayProjection.ts:16,26,33,42` 四个格式化器**只**被
+  `interactiveCommandRouter.ts:206-235` 调用 → 只服务于这条死链；
+  `core/commands/types.ts:91-95` 的四个 union 成员；`entrypoints/cliArgs.ts:53-59` 的保留字
+- **反证（回报给得好）**：`/plan`、`/build` 的替代机制**确实存在** ——
+  `interactiveMode.ts:585-588` `cycleAgentMode()` 经 Shift+Tab 触发，且
+  `interactiveCommandRouter.test.ts:76-82` 明写「Mode switching moved to Shift+Tab,
+  so /mode no longer exists to route」→ **确认是遗留，不是待接线能力**
+
+### 15.4 命名与位置
+
+**[E-命名-1] `entrypoints/` 装 35 个契约文件，违背其"兼容层"定位**
+- 例：`cliWorkspaceModule.ts:95` 导出 `normalizePathForCompare`、`:149` 导出 `resolveWorkspaceRootMode`
+  —— 这些是 core 与 cli **共享的路径/根模式原语**，却放在 `entrypoints/` 下
+- `cliModuleBoundary.test.ts:84` 甚至在**测试** `cliWorkspaceModule` 的这个导出
+  → 即该越界已被写进测试，成了事实契约
+
+**[E-命名-2] `presentation/sidebar/` 的 20 个长复合文件名**
+- 回报称违反 `file-placement-and-naming.md` 的命名规则，且无脚本检查
+
+### 15.5 模块划分与耦合
+
+**[E-模块-1] 8 个 >400 行枢纽文件**
+- 最大 `entrypoints/cliApprovalModule.ts` **736 行**（`createCliEscalationPromptHandler` 单函数约 **545 行**）
+- `cli/interactive/interactiveMode.ts` 618 行（`InteractiveMode` 单类 ~25 字段 ~20 方法）
+- `core/commands/registry.ts` 618 行（54 命令定义，**每个条目重复
+  `kind`/`availability:'available'`/`enabled:true`/`bridgeSafe` 四个常量字段 ≈ 200 行样板**）
+
+**[E-耦合-1] `registry.ts` 的 argumentHint 与 `SUBCOMMAND_VALUES` 双真值源**
+见 E-重复-8。
+
+### 15.6 回报纠错（主代理实测）
+
+**⚠️ BlockE2 称发现 2 个 import 环，实测两个都不成立。**
+
+| 声称的环 | 实测 |
+|---|---|
+| `entrypoints/cliApprovalModule.ts` ↔ `cli/approval/cliApprovalEscalationBridge.ts` | **不成立**。`cliApprovalEscalationBridge.ts:6` → `cliApprovalModule.js`（value，存在）；但反向 `cliApprovalModule.ts` 对 `cli/approval/` 的 value 边**只有 `permissionScope.ts`**，而 `permissionScope.ts` **不引用** `cliApprovalEscalationBridge` 或 `cliApprovalModule`（已 grep 确认）。**单向，非环。** |
+| `cli/approval/cliApprovalAuditBridge.ts` ↔ `entrypoints/approvalPromptBridge.ts` | **不成立**。`cliApprovalAuditBridge.ts:1-4` 全是 `import type`（type 边不计）；`approvalPromptBridge.ts` grep `cliApprovalAuditBridge` **零命中**。**无环。** |
+
+**与门禁一致**：`npm run verify:import-cycles` 实测 **runtime 0 / type-only 0**（1,435 文件）。
+主代理另用 Tarjan 在**文件级**独立复算（value 与 value+type 两种口径）：
+**SCC > 1 = 0**。故回报的"2 个环"是**把单向 value 依赖 + 反向 type 依赖误读为环**。
+
+**其余需修正的计数**：
+
+| 项 | 回报称 | 实测 |
+|---|---|---|
+| `cliSessionModule.ts` | 363 行 | 363（一致）|
+| `cliPermissionModule.ts` | 156 行 | 156（一致）；回报自注"任务给定的 400 行量级与实测不符"，**该自我更正正确** |
+| `presentation/tui/editor.ts` | 463 行 | 463（一致，已知 monolith）|
+| `core/commands/` 跨域文件数 | 23 | 未逐一复核；§3 的 127 条 value 边结论不变 |
+
+### 15.7 pi 对照（区块 E 相关，均给 pi 侧 `file:line`）
+
+| # | pi 机制 | pi 证据 | 本仓差距 | 建议 |
+|---|---|---|---|---|
+| 1 | 命令注册表是**服务**（`register`/`replace`/`list`/`subscribe`，支持返回 dispose 与热替换） | `coding-agent/src/experimental/services/slash-commands.ts:22-28,30`；实现 `slash-commands-provider.ts:24-75` | 无——每次 `createCommandRegistry` **重建整个 Map**（`registry.ts:59`）；54 个命令全部**内联在 618 行数组字面**中 | **只取"命令定义分文件"**，不引入 pi 的 facet 容器（本仓无等价设施）。按已有 `group` 字段拆到 `core/commands/definitions/` |
+| 2 | 参数解析是**单趟 for 循环 + 位置游标**，天然支持重复 flag、`--` 终止符，**未知 flag 记入 `diagnostics`** | `coding-agent/src/cli/args.ts:67-123`；消费 `main.ts:602` | `entrypoints/cliArgs.ts:142-258`（**431 行**）用 **6 处 `indexOf`** 逐 flag 扫描；未知 flag **静默忽略**（`:376-400`） | 取"单趟遍历 + 未知 flag 诊断"；保留字表改为从 registry 派生（同时解决 E-重复-8） |
+| 3 | **入口依赖预算门禁**：`check-entry-graphs.mjs` 对每个 entry 强制 `maxFiles` + `forbid` 路径前缀；只算 value import | `scripts/check-entry-graphs.mjs:1-10,28-42` | 本仓有 `verify:import-cycles` 与 `analyze:module-facades`，**无入口依赖预算** | 加等价脚本，规则设为**渐进式**：先禁 `entrypoints/` **新增**对 `cli/` 实现的 value import，列出当前豁免。**否则会立即失败**（现存 6 条） |
+| 4 | 内建命令 23 个，completion 从单一表投影 | `coding-agent/src/core/slash-commands.ts:19-43`；投影 `interactive-mode.ts:641-645` | 本仓**已更好**：`slashCommandRegistry.ts:39-49` 的注释说明"display registry is a projection of the dispatch registry"，并配双向断言测试 | **不需要学**。回报明确判定本仓此点优于 pi，**该自我判断正确** |
+| 5 | `AGENTS.md` 含"**No inline imports**"等可执行风格约束 | `~/projects/pi/AGENTS.md:20-40` | 本仓 `agent-rules/` 更工程化（有 thin-facade 4 条可测判据 + 脚本） | 记录差异即可 |
+
+### 15.8 处置建议（按性价比）
+
+| 序 | 动作 | 依据 | 风险 |
+|---|---|---|---|
+| 1 | 删 2 处 `renderProjectedLines` 副本，改导入 `cli/output/projectedLineRenderer.js` | E-重复-1 | **低** |
+| 2 | 删 `modelCommandRuntime.ts:484` 的 `parseArgsWithFlags` 私有副本 | E-重复-2 | **低** |
+| 3 | 删 `modelCommandRuntime.ts:538/557/562/586` 与 `localCommandRuntime.ts:156` 的重复 norm/判定 | E-重复-6,7 | 低 |
+| 4 | 收口 7 份 `normalizePathForCompare` + 4 份 `toRelativeTime`（需先定 owner） | E-重复-3,4 | 中 |
+| 5 | 裁决 sidebar Quality 三模块 + EventBridge（约 440 行）的去向 | E-死-1 | 中（测试基建 vs 删除，**不可兼得**）|
+| 6 | 删 `shellActionRuntime.ts` 三个死导出 + 连带 `cliDisplayProjection.ts` 四个格式化器 | E-死-2 | 中（消费者仍在，需一并清理）|
+| 7 | 修 `cliArgs.ts:68` 与 `:124` 的**重复保留字** `/memory` | 15.2 | **低** |
+| 8 | 命令元数据收敛为单真值源（registry 派生 `SUBCOMMAND_VALUES`） | E-重复-8 | 中 |
+| 9 | 按 `group` 字段把 registry 的 54 命令拆到 `core/commands/definitions/` | 15.7-1 | 中（约 10-15 新文件）|
+
+### 15.9 回报中**未经主代理复核**的项（诚实标注）
+
+下列条目来自回报，主代理**未逐条核对**，记录时保留原样但标记为未核验：
+- 「`cli/` 有 19 处 import 回 `entrypoints/`」的**总数**（方向性已核验，见 §15.1）
+- 「`setActiveNonInteractiveApprovalMode` 在 11 个接口中重复、9 处透传」的完整清单（E-重复-8 之外的 1.8）
+- 「`presentation/tui/text` 与 `sidebarPanelRenderer` 两套布局栈」（1.10）；
+  **其中的 CJK 截断风险回报自标"置信度：中"，且未做运行时验证**
+- 「`core/commands/` 有 23 个生产文件含跨域 import」（§3 的 127 条 value 边结论独立成立）
+- 「`presentation/surface/` 为空目录但仍在规则示例中」（E-命名相关，未复核）
