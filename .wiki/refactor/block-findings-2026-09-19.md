@@ -55,7 +55,7 @@ runtime/events/stream.ts       prod=0  test=2
 
 ---
 
-## 3. `core/` 依赖 feature 域，违反自身准入规则（190+ 边）
+## 3. `core/` 依赖 feature 域，违反自身准入规则（复测：144 条 value 边，其中 127 违规）
 
 `agent-rules/file-placement-and-naming.md:78-82` 明文规定：
 
@@ -210,7 +210,7 @@ runtime/events/stream.ts       prod=0  test=2
 
 ---
 
-## 6. 全仓可达性普查：**276 个生产文件 / 60,006 行从任何入口不可达**
+## 6. 全仓可达性普查：**285 个生产文件 / 60,058 行从任何入口不可达**（原记 276/60,006，见节末复测）
 
 **判定方法**（可复核）：value 边正向闭包，根 = `entrypoints/*`（42 个文件）+ `index.ts`
 + 引用 `src/` 的 `scripts/*`（6 个）。**只算 value 边**——`import type` emit 时被擦除，
@@ -353,16 +353,24 @@ verification/result/projection/mutation.ts          (1)
    （`test-utils/longSessionDurabilityProcess.ts` 经 `spawnSync` 启动，静态分析误报）。
 3. **门禁判据有盲区**——`analyze:module-facades` 按"声明名数 > 20"判定越界，
    对"单个巨型函数"完全盲（`projection.ts` 只有 5 个声明名、3,006 行）。
-4. **域级双向 ≠ 有环**——`planning`/`context` 双向 63 条边，但 Tarjan 复算
-   **0 个强连通分量**。域级观察与文件级判据是两回事，不可互相代替。
-## 9. 子代理回报（进行中）
+4. **域级双向 ≠ 有环**——`planning`→`context` 36 条 + `context`→`planning` 27 条（含 type），
+   但主代理用 Tarjan 在**文件级**复算（value 与 value+type 两种口径）：**0 个强连通分量**。域级观察与文件级判据是两回事，不可互相代替。
+## 9. 子代理回报（索引）
 
-| 区块 | 负责 |
-|---|---|
-| A 执行内核 | `BlockA2`（scout） |
-| G 编辑验证结果 | `BlockG2`（scout） |
+**已回报并已核验**：
 
-上一轮 `BlockA`/`BlockD` 因**额度耗尽**失败，无产出；已改名重派。
+| 区块 | 子代理 | 结果位置 |
+|---|---|---|
+| G 编辑-验证-结果链 | `BlockG2`（scout） | **§10** |
+| A 执行内核 | `BlockA2`（scout） | **§11** |
+| D 浏览器 | `BlockD2`（scout） | **§13** |
+
+**仍在运行**：E 交互面（`BlockE2`）、B 会话与 shell（`BlockB2`）。
+**尚未派发**：C 上下文与记忆、F provider 与环境、H 工具与 harness、I 规划与工作流、J 小域支撑。
+
+每份子代理回报都经主代理**逐条核验**；核验中发现的计数错误在对应节末单列（§11.6、§13.9），
+另有 5 处主代理自行复测的更正：§3（边数口径）、§5（大文件 14→20）、
+§6（可达性 276→285）、§7（孤儿 7→10）、§12 的 freeze/`reasonText.includes` 计数。
 
 ---
 
