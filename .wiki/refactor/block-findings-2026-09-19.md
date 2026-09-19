@@ -8,17 +8,21 @@
 
 ## 1. `runtime/events/` 整域只有测试消费者（3,182 行）
 
-| 文件 | 行数 | 生产消费者 | 测试消费者 |
-|---|---:|---:|---:|
-| `runtime/events/projection.ts` | **3,006** | **0** | 4 |
-| `runtime/events/stream.ts` | 176 | **0** | 2 |
+| 文件 | 行数 | 生产消费者 | 外部测试消费者 | 域内测试 |
+|---|---:|---:|---:|---:|
+| `runtime/events/projection.ts` | **3,006** | **0** | 2 | 1 |
+| `runtime/events/stream.ts` | 176 | **0** | 1 | 1 |
 
-**证据**（value 边反向闭包，排除 `import type`）：
+**证据**（value 边反向闭包，排除 `import type`；外部消费者已逐行核实）：
 
 ```
-runtime/events/projection.ts   prod=0  test=4
-runtime/events/stream.ts       prod=0  test=2
+runtime/events/projection.ts   prod=0  external-test=2  internal-test=1
+runtime/events/stream.ts       prod=0  external-test=1  internal-test=1
 ```
+
+- **外部**测试消费者：`provider/registry/provider.test.ts:4`（引 `projection`）、
+  `tools/toolHandoff.test.ts:5-6`（同时引 `stream` 与 `projection`）
+- **域内**测试：`runtime/events/projection.test.ts`、`runtime/events/stream.test.ts`
 
 消费者全是测试文件：`provider/registry/provider.test.ts`、`tools/toolHandoff.test.ts`、
 `runtime/events/{projection,stream}.test.ts`。
@@ -26,10 +30,10 @@ runtime/events/stream.ts       prod=0  test=2
 **动态入口检查**（`plan.md` §2.2 #4）：`grep path.join|import(|spawn|execFile|process.argv`
 = **0**。不在公共面（`index.ts` 未导出）。
 
-**影响**：这是 CB-005 同形态的孤立簇——但**更隐蔽**，因为它有 4 个测试引用，
+**影响**：这是 CB-005 同形态的孤立簇——但**更隐蔽**，因为它有测试引用（外部 2 + 域内 2），
 静态可达性分析会把它算作"测试可达"而非"零引用"。
 
-**注意**：判定前必须确认那 4 个测试的**被测对象**是否也是死的
+**注意**：判定前必须确认这些测试的**被测对象**是否也是死的
 （CB-005 的教训：不是"测试指向死代码"，而是"被测对象本身也死"）。
 
 **置信度**：高（消费者计数可复核）。**处置需裁决**：删，还是保留为测试基建。
