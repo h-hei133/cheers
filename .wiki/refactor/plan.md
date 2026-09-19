@@ -1619,7 +1619,7 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 |---|---|---|---|
 | **T1** | 收口 `sanitizeText` 6 份 → 1 份 | `block-findings` §12.2 | ✅ **已完成**（`3550134f`）：新建 `core/security/redaction.ts`，6 处定义 + 10 处调用点全部改指单点；§9.9 记录了验证矩阵 |
 | **T2** | 收口 `freeze`/`deepFreeze` 27 份 → 1 份（需先裁决保留哪套语义） | §12.3 | 语义裁决 |
-| **T3** | 删 `reasonText.includes` 8 处，改结构化字段 | §10.5 pi-2 | 无 |
+| **T3** | 删 `reasonText.includes` 8 处，改结构化字段 | §10.5 pi-2 | ⚠️ **前提被实测推翻，未执行** —— 见 §9.10 |
 | **T4** | 修 `browser/` 的 byte/char 混用 | §13.7 对照-3 | 无（不改签名） |
 | **T5** | 切断 `browser` → `presentation` 反向依赖（97 处 import 改写） | §13.6 耦合-2 | 无（机械） |
 | **T6** | 修 `cliSessionRuntimeFactory.ts:70` 的 runtimeSeed 丢弃 | §11.2 A-死-3 | 产品裁决（是否保留种子语义） |
@@ -1703,3 +1703,39 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 `turn/toolResultMessage.ts:188` 与 `turn/assistantResponse.ts:150` 等**签名不同**
 （2 参数 / 1 参数带 `redacted` 返回值），以及 provider/repair/context/verification 侧的
 **21 行 3 参数变体**（哈希 `1b77d3b4320e`，3 份）。这些是**不同族**，不是"同一函数的第 7 份"。
+
+### 9.10 T3 前提推翻记录（2026-09-19，**未执行**）
+
+**原计划**（`block-findings` §10.5 pi-2）：把
+`verification/result/projection/mutation.ts:125-149` 的 8 处 `reasonText.includes` 改成
+消费已有的结构化字段（`writeEffect` / `writerStarted` / `routeBlocker`），
+并称之为"最低成本的一条"。
+
+**实测结果：该改动无法按原计划执行，三条独立理由。**
+
+| # | 事实 | 证据 |
+|---|---|---|
+| 1 | **目标文件在现代码中不可达** | value 边闭包（根 = `entrypoints/**` + `index.ts`）判定 `verification/result/projection/mutation.ts`、其唯一消费者 `result/projection/shell/assembly.ts`、以及 `runtimeOutcomeProjection.ts` / `contextPacketResult.ts` / `taskLifecycleResult.ts` **全部 UNREACHABLE**，属 `block-findings` §6 的不可达簇 |
+| 2 | **生产调用点不传任何结构化判别字段** | 唯一生产调用 `result/projection/shell/assembly.ts:46-56` 只传 7 个字段（`changedFiles` / `failedFiles` / `verification` / `evidence` / 4 个 cross-file 字段）。`routeBlocker` 的**生产者是 0**（全仓仅 `edit/patch/status/mixedOperation.ts:24` 另有一个同名但无关的联合类型）|
+| 3 | **8 处嗅探里 5 处无任何生产者** | 逐条全仓 grep（排除 `mutation.ts` 自身）：`"stale-read-blocker"` **0**、`"final-stale-read-blocked"` **0**、`"expected to remain unchanged"` **0**、`"protected file changed"` **0**、`"unchanged file assertion"` **0**。即这 5 个分支**只有 `mutation.test.ts` 自己构造的 reason 字符串能触发** |
+
+**结论**：这**不是**"改判定逻辑"的问题，而是
+**"文件不可达 + 无生产者 + 行为仅由测试自喂"** 三重问题。
+
+按原计划改写，会发生两件错事：
+- 把测试驱动出来的分支当成真实需求去"结构化"——**在死代码上增加新的类型面**；
+- 反过来删掉那 5 个无生产者分支，则 `mutation.test.ts` 的 4 个用例会失败，
+  而那 4 个用例断言的是**没有任何生产路径能触发的行为**。
+
+**这修正了 §10.5 的一处判断**：pi-2 当时被评为"最低成本、可直接落地"，
+是因为**只读了 `mutation.ts` 内部，没有检查它的可达性与生产调用面**。
+教训与 §8.3 第 3 条同类：**判定"最低成本"之前，必须先确认目标在生产上活着。**
+
+**建议的替代处置**（需裁决，见 T16）
+- **T16a**：随 `block-findings` §6 的不可达簇一并裁决——若该簇整体删除，`mutation.ts`
+  连同其测试一起消失，T3 自动消亡；
+- **T16b**：若不删，则先给它一个真实生产者（把 `routeBlocker` / `writeEffect` /
+  `writerStarted` 从 edit lane 真实接进 `assembly.ts`），**再接结构化判定**——
+  但这属于"接线"，不是本轮"删嗅探"能覆盖的范围。
+
+**本轮不做**：不修改 `mutation.ts`，不删除任何嗅探分支，不动其测试。
