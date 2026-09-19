@@ -18,11 +18,11 @@ These are durable project-level rules. They define how future code should be pla
 A healthy product path should read as domain ownership first, local role second:
 
 ```text
-packages/ts-shell/src/runtime/loop/contract.ts
 packages/ts-shell/src/runtime/events/projection.ts
-packages/ts-shell/src/presentation/terminal/renderer.ts
-packages/ts-shell/src/planning/handoff/edit.ts
-packages/ts-shell/src/provider/registry/model.ts
+packages/ts-shell/src/runtime/events/projection.ts
+packages/ts-shell/src/presentation/terminal/streaming.ts
+packages/ts-shell/src/planning/handoff/mutation.ts
+packages/ts-shell/src/provider/registry/provider.ts
 packages/ts-shell/src/session/continuation/readiness.ts
 ```
 
@@ -66,7 +66,6 @@ artifacts/        produced-artifact inventory and access
 eval/             offline evaluation surfaces
 workflow/         repository-level workflow helpers
 model-adapters/   model provider adapter boundary
-renderer/         streaming renderer used by the CLI surfaces
 test-utils/       test-only support; never imported by production code
 ```
 
@@ -96,11 +95,11 @@ form `core/query/` and `core/shell/` already use.
 When a domain becomes broad, add meaningful subdomains instead of lengthening file names:
 
 ```text
-runtime/loop/
+runtime/execution/
 runtime/events/
 runtime/execution/
 runtime/resources/
-planning/context/
+planning/task/
 planning/handoff/
 provider/registry/
 provider/request/
@@ -154,10 +153,10 @@ Prefer this:
 ```text
 runtime/events/projection.ts
 runtime/events/stream.ts
-runtime/loop/trajectory.ts
-runtime/resources/descriptor.ts
-presentation/surface/model.ts
-presentation/terminal/renderer.ts
+runtime/execution/receipt.ts
+runtime/resources/projection.ts
+presentation/terminal/streaming.ts
+provider/registry/provider.ts
 ```
 
 Over this:
@@ -299,8 +298,8 @@ Examples:
 runtime/events/projection.ts
 runtime/events/projection.test.ts
 
-presentation/terminal/renderer.ts
-presentation/terminal/renderer.test.ts
+presentation/terminal/streaming.ts
+presentation/terminal/streaming.test.ts
 ```
 
 ## New File Checklist

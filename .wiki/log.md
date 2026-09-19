@@ -1949,3 +1949,66 @@ plan.md 全部行内 `file:line` 引用逐条校验：**活文件引用全部在
 
 `c2-execution.md`（新增 §4 删除记录）、`plan.md` §8.2.2、
 `docs/sprint/component-adoption-log.md`（补记 contract 与 evaluation 的删除及理由）。
+
+## [2026-09-19] docs | plan.md 漂移审计：**更正与删除**（不只添加）+ 修正 `agent-rules` 的 10 处死路径。
+
+### 回答提问：§3.8 与 §3.9 都完成了吗？
+
+**都完成了。** 两者是**探索记录**（2026-09-18），其产出分别融入阶段 A/B/C：
+
+| 节 | 产出 | 去向 |
+|---|---|---|
+| §3.8 | 6 项架构发现 | #1→A4(R2)、#2→A、#3→B3、#4→A4+C2、#5→C2 关闭、#6→C2 保留 |
+| §3.9.6 | 4 项漂移待裁决 | 归档→B2、DOCS strict→已完成、AGENTS.md→A4(R3)、exclude→A4(R2) |
+
+**但两节的正文仍写着"待批准/待裁决"，是过时状态**——本轮已更正。
+
+### 发现并修正的漂移（更正，非添加）
+
+**1. `agent-rules/file-placement-and-naming.md` 有 10 处死路径**（**绑定规则**，最高严重度）：
+
+| 位置 | 死路径 | 更正为 |
+|---|---|---|
+| L21 | `runtime/loop/contract.ts` | `runtime/events/projection.ts` |
+| L23/L160/L302 | `presentation/terminal/renderer.ts` | `presentation/terminal/streaming.ts` |
+| L24 | `planning/handoff/edit.ts` | `planning/handoff/mutation.ts` |
+| L25 | `provider/registry/model.ts` | `provider/registry/provider.ts` |
+| L99 | `runtime/loop/` | `runtime/execution/` |
+| L103 | `planning/context/` | `planning/task/` |
+| L157 | `runtime/loop/trajectory.ts` | `runtime/events/stream.ts` |
+| L159 | `presentation/surface/model.ts` | `presentation/terminal/streaming.ts` |
+| L303 | `presentation/terminal/renderer.test.ts` | `presentation/terminal/streaming.test.ts` |
+
+另删域清单里的 `renderer/`（B3 已迁走）。**校验后规则清单 28/28 与实际目录完全一致。**
+
+**2. `verify-docs-and-rules-drift.mjs` 的盲区**：它只匹配**行内反引号**路径，
+**不匹配代码块内的路径行**——上述 10 处因此长期逃检。已记录，未改脚本（属门禁行为，需授权）。
+
+**3. plan.md 自身的漂移**（更正）：
+
+| 位置 | 原状 | 更正 |
+|---|---|---|
+| §3.8 表 | 6 项写"待批准/独立决策" | 改为**最终状态**（全部已处置） |
+| §3.8 表 #4 | "`test-utils/` 含 `utils`，规则明文禁止" | **该断言是错的**——规则 L70 明文 sanction `test-utils/` |
+| §3.8 表 #6 | "`eval/` 已被 `evidence/harness/` 取代" | **未获证实**，已标删除线 |
+| §3.8 基线 | 1481/961/520 文件 | 补 2026-09-19 值：**1434（生产 941 + 测试 493）** |
+| §3.8 `core/` | "规则未定义准入标准" | 已写入（B1） |
+| §3.8 末注 | "只报告不擅自修改" | 已授权并修改 |
+| §3.9.6 | 4 项"待裁决" | 改为**已全部完成** |
+| §3.9/§3.8 标题 | 无提示 | 加"本节是探索历史记录"横幅 |
+| §8.1 表 | R1–R12 状态列为规划期视图 | **重写为最终状态**（12 项已执行、1 关闭、1 保留） |
+| §8.2 阶段 C | "C2 未启动" | 改为**已完成** + 新增 §8.2.3 |
+| §8.2.2 | 旧盘点表与新结果重复 | 压缩为指向 §8.2.3 |
+| §2.3 | 4 个实例均已处置（1 文件不存在、1 门禁已删） | 加"当前状态"列 |
+| §2.4 检查 5 | `verify:host-surface` | 标注已删 |
+| §3.2/§3.3 | 验证声明含已删门禁；"5 项/3 项待裁决" | 标注为当时记录 |
+| §6.3 | "由 `verify:host-surface` 实测消费" | 标注已删 + 口径变更说明 |
+| §1 表 | 960/2750/494 文件 | **942/2748/493**（实测） |
+| §7 索引 | 缺 `phase-b-exploration-2026-09-18.md` | 已补 |
+| front-matter | 960/2750 | **941/2748** + 阶段 A/B/C 全部完成 |
+
+### 验证
+
+`verify:docs-drift:strict` **pass**（DOCS 0 dangling）；`verify:import-cycles`
+`runtime_cycles=0 type_only_cycles=0`；plan.md 内**已无任何指向不存在文件的路径**；
+`agent-rules` 域清单与实际目录**完全一致**；全量测试 **493 文件 / 2747 通过 / 0 失败**。

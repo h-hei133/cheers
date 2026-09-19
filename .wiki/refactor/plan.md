@@ -5,7 +5,7 @@ sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-0
 created: 2026-09-15
 updated: 2026-09-19
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v6。当前生产 960 / CLI 可达 770 / 不可达 190，全量测试 2750 项（2026-09-19 CB-005 死代码清理后；CLI 可达下滑系口径修正而非回归，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）、Step 6 命名税（173 文件）、Step 7 judge 全量跑（0 blocking）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。§8 是路线章：三轮探索汇总的 14 项待办与三阶段排期（阶段 A 零裁决：strict / exclude 收紧 / AGENTS.md）。阶段 C1（R13/R14 CB-005）已于 2026-09-19 完成：删 69 文件 / −23,631 行。"
+summary: "Module boundary refactor plan v6。当前生产 941 / CLI 可达 770 / 全量测试 2748 项（2026-09-19 CB-005 + C2 两轮删除后；CLI 可达下滑系口径修正而非回归，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）、Step 6 命名税（173 文件）、Step 7 judge 全量跑（0 blocking）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。§8 是路线章：三轮探索汇总的 14 项待办与三阶段排期（阶段 A 零裁决：strict / exclude 收紧 / AGENTS.md）。**阶段 A/B/C 全部完成，14 项待办（R1–R14）全部收敛**：C1 删 69 文件 / −23,631 行（CB-005）；C2 完成 R8–R11 裁决与执行、删除 runtime/evaluation。"
 confidence: high
 ---
 
@@ -24,17 +24,17 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 
 ---
 
-## 1. 当前状态（2026-09-19，阶段 C1 / CB-005 死代码清理后）
+## 1. 当前状态（2026-09-19，阶段 A/B/C 全部完成）
 
 | 指标 | 值 |
 |---|---:|
-| 生产文件 | 960 |
+| 生产文件 | 942 |
 | CLI 可达 | 770 |
-| CLI 不可达 | 190（公共 API 105 + 仅测试 72 + 零引用 13） |
-| 全量测试 | **2750 项**（494 文件 / 2749 通过 / 1 跳过 / 0 失败） |
-| 稳定失败 | **0**（唯一失败为 PTY spawn 并发抖动，隔离复跑 40/40 通过） |
+| CLI 不可达 | 172（仅测试 135 + 零引用 36 + 仅公共 API 1） |
+| 全量测试 | **2748 项**（493 文件 / 2747 通过 / 1 跳过 / 0 失败） |
+| 稳定失败 | **0** |
 | `tsc -p tsconfig.build.json` | 0 错误 |
-| **import 环（新增门禁）** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1453 文件） |
+| **import 环（新增门禁）** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1435 文件） |
 | **越界模块** | **3**，均有 disposition；`npm run analyze:module-facades` |
 | NormProof judge | verdict `partial`；**blocking 义务 0 项未满足** |
 | `strict` | ✅ **已对生产开启**（`tsconfig.build.json` `strict: true`）；`npm run build` **0 错误**；零 `!` / 零 `as` |
@@ -101,9 +101,15 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | 删除过期 gate | ✅ 2 个（closeout 假阳性、browser-txn-gate） |
 | PTY 实机验证 | ✅ 会话树正常（`session-root → user → user → assistant`） |
 
-### 85 个不可达文件的处置（已裁决：不动）
+### 85 个不可达文件的处置（2026-09-15 裁决：不动）
 
-审查结论：85 个中 **83 个是"独有实现"**（非冗余），**生产零引用**，75 个仅被测试引用。
+> **2026-09-19 更新**：该数字是**当时**的。经 Step 3–7 搬迁、CB-005 与 C2 三轮删除后，
+> 当前 `analyze-boundaries.py` 输出为 `cliOpaque=172`（其中 `publicApiOnly=1`、
+> `testOnly=135`、`noReference=36`）。**裁决结论（不动）不变**；
+> 注意 `noReference` 从 13 升至 36，且**该指标会把动态入口误报为"零引用"**
+> （实例：`longSessionDurabilityProcess.ts` 经 `spawnSync` 启动，见 §2.2 检查 4）。
+
+审查结论（当时）：85 个中 **83 个是"独有实现"**（非冗余），**生产零引用**，75 个仅被测试引用。
 其中 3 个受保护（2 个公共 API + 1 个字符串路径进程入口）。
 
 **维护者裁决：不删。** 理由：能力价值已按裁决 1 放弃，但物理删除无收益
@@ -140,12 +146,15 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 
 ### 2.3 断链的三类形态
 
-| 类别 | 表现 | 检测 | 实例 |
+| 类别 | 表现 | 检测 | 实例（2026-09-15 审计时；**当前状态**） |
 |---|---|---|---|
 | 引用型 | import 不存在的模块 | `tsc` / import 图 | 403 文件全扫，**零** |
-| **契约型** | 活轨读某字段/标记，无人写 | 对被读字段反查写入点 | `provenance.toolExecutions`、`/undo` 快照 |
-| **半孤儿** | 在可达集内但无调用者 | 对导出函数反查调用点 | `core/context/browserAgent.ts` |
-| **验证型** | 门禁声称覆盖 N 项、实跑 M 项（M<N）仍报通过 | 校验声明目标是否都存在 | `verify:edit-capability-closeout` |
+| **契约型** | 活轨读某字段/标记，无人写 | 对被读字段反查写入点 | `provenance.toolExecutions`、`/undo` 快照 → **已随 CB-005 清除**（读取者所在模块本身不可达） |
+| **半孤儿** | 在可达集内但无调用者 | 对导出函数反查调用点 | `core/context/browserAgent.ts` → **该文件已不存在**（Step 3 域搬迁后路径变更） |
+| **验证型** | 门禁声称覆盖 N 项、实跑 M 项（M<N）仍报通过 | 校验声明目标是否都存在 | `verify:edit-capability-closeout` → **该门禁已删** |
+
+> 四个类别是**判据**，长期有效；上表"实例"是**审计当时的样本**，多数已被后续工作处置。
+> 需要新样本时按"检测"列的方法现测，不要沿用旧路径。
 
 **"在 CLI 可达集内" ≠ "被调用"**：可达性由 import 边驱动，`import type` 也算边。
 
@@ -271,7 +280,8 @@ artifact family"——`core/harness` 本身**不搬迁**，仅更新其引用。
 vitest 因 type-only import 被擦除而全绿。已知的早期示例，详见 §3.7。
 
 **验证**（每阶段均执行）：build 0 错；相关域测试全绿；最终**全量 3172 项零失败**；
-可达性 959/874/85 全程不变；`validate` + `verify:host-surface` PASS；
+可达性 959/874/85 全程不变；`validate` + `verify:host-surface` PASS
+（**该门禁已于 2026-09-19 随 CB-005 删除**，属当时记录）；
 **PTY 实机**逐阶段验证（`/compact preview`、`/sidebar panel`、`/memory save`、
 `/browser status` + `/browser replay`）。
 
@@ -324,7 +334,7 @@ vitest 因 type-only import 被擦除而全绿。已知的早期示例，详见 
 - **三个子目录不属 orchestration**（消费者全在 edit/restore/compact 侧）：
   `patchRecovery/`（8 生产）、`patchResult/`（2）、`patchParsing/`（1）。
 - 原 composition root `runMvpIntegratedFlow.ts` 已删；`module-atlas.md` 相关描述过期。
-- **5 项未决问题待裁决**（`step-4-orchestration-map.md` §6.3）：
+- **5 项未决问题（当时待裁决，现已随 Step 4 完成而消解）**（`step-4-orchestration-map.md` §6.3）：
   ① `types.ts`（318 行 / 44 导出 / 7 域消费）归属；② harness 3 文件（1,203 行，
   生产可达但 README 声明该目录非产品边界）去向；③ `context/acquisition/graph.ts`
   的 29 边是否随 cluster 拆分一并重构（**它自身仅 1 个调用者，却是 27 条边的汇合点**）；
@@ -349,8 +359,8 @@ vitest 因 type-only import 被擦除而全绿。已知的早期示例，详见 
   dependents is its own task"）——**Step 5 正是那条被推迟的任务**。
 - 建议：**方案 B 起步**（先抽 `lifecycle-writes` 14 方法），逐组推进；
   不建议一次抽 5 组（方案 A），因需重构跨组共享的 `this.store` 与 callback 工厂，
-  风险集中且不符合分批纪律。**3 项未决问题待裁决**（判据适用范围、是否保留公共面、
-  是否更新 dispositions）。
+  风险集中且不符合分批纪律。**3 项未决问题（当时待裁决）**（判据适用范围、是否保留公共面、
+  是否更新 dispositions）——**Step 5 已完成（§3.5），判据 38 → 18**。
 
 **Step 6 范围**：Step 4 已完成，`orchestration/` 域已解散（原拟的"域更名"随之消解）。
 剩余范围为 3f 遗留项——
@@ -641,19 +651,22 @@ Test-inclusive `tsc -p tsconfig.json` 从 251 → **253**，正是这两条 `TS2
 
 ### 3.8 架构位置再探索（2026-09-18，零代码改动）
 
+> **本节是探索过程的历史记录。** 6 项发现的最终处置见下方表格（2026-09-19 已更新为最终状态），
+> 全部收敛于阶段 A/B/C。文中"待批准/独立决策"字样是**当时**的措辞。
+
 **完整记录**：`.wiki/refactor/architecture-exploration-2026-09-18.md`
 
 Step 3–7 完成后重新审视"还有哪些位置不正确、哪些需要重构、test 是否该与 src 分层"。
 **所有数字由 `maskSource` 语法锚定的 import 图实测。**
 
-| # | 发现 | 严重度 | 处置 |
+| # | 发现 | 严重度 | 处置（**2026-09-19 更新为最终状态**） |
 |---|---|---|---|
-| 1 | `tsconfig.build.json` 的 `exclude` 仅 `**/*.test.ts`，**7 个非 `.test` 的测试支撑文件被打进 `dist/`** | 中（死重，非运行时风险） | **待批准**（见下） |
-| 2 | `agent-rules/architecture-boundaries.md` 的 Common Areas **仍指向 `orchestration/patchResult/`、`orchestration/patchApplication/`**，两条路径 Step 4 已消失 | 中（规则指向不存在目录） | **待批准** |
-| 3 | `src/renderer/` 不在 sanctioned 域列表；`StreamingRenderer.ts` **41 外部消费者 / 0 出边**（原文记 34，已勘误）；规则示例路径 `presentation/terminal/renderer.ts` 已存在但职责不同（**该判断成立**：前者有副作用 stdout 通道，后者纯格式化器） | 中 | 独立决策 |
-| 4 | `src/test-utils/` 含 **`utils`**（规则明文禁止）；`session/__tests__/` 是全仓**唯一**孤例 | 中 | 与 #1 一并 |
-| 5 | `presentation/theme/` 与 `presentation/themes/` **仅差一个 `s`**，必须一起读 | 低 | 独立命名决策 |
-| 6 | `eval/` 语义已被 `evidence/harness/` 取代 | 低 | 独立决策 |
+| 1 | `tsconfig.build.json` 的 `exclude` 仅 `**/*.test.ts`，**7 个非 `.test` 的测试支撑文件被打进 `dist/`** | 中（死重，非运行时风险） | ✅ **已完成**（阶段 A4 / R2）：`exclude` 已加 `src/test-utils/**` 与 `src/**/__tests__/**` |
+| 2 | `agent-rules/architecture-boundaries.md` 的 Common Areas **仍指向 `orchestration/patchResult/`、`orchestration/patchApplication/`** | 中（规则指向不存在目录） | ✅ **已完成**（阶段 A）：两条死引用已修，`grep orchestration/` = 0 |
+| 3 | `src/renderer/` 不在 sanctioned 域列表；`StreamingRenderer.ts` **41 外部消费者 / 0 出边**；规则示例路径 `presentation/terminal/renderer.ts` | 中 | ✅ **已完成**（阶段 B3）：`renderer/StreamingRenderer.ts` → `presentation/terminal/streaming.ts`，42 处引用重写 |
+| 4 | ~~`src/test-utils/` 含 `utils`（规则明文禁止）~~ **【该断言是错的】**；`session/__tests__/` 是全仓**唯一**孤例 | 低 | ✅ **已完成**（A4 + C2）：`test-utils/` **被规则第 70 行明文 sanction**（"test-only support; never imported by production code"），禁止的是**新建** `utils/` 目录，不涉及此域；`session/__tests__/` 已归并（C2） |
+| 5 | `presentation/theme/` 与 `presentation/themes/` **仅差一个 `s`** | 低 | ❌ **已关闭**（C2）：实测是**数据/引擎分层**，非重复，见 `c2-inventory.md` §1 |
+| 6 | ~~`eval/` 语义已被 `evidence/harness/` 取代~~ **【该断言未获证实】** | 低 | **保留**（C2）：`eval/browser/` 被 3 个测试真实调用（29 项），非死代码 |
 
 **关于 test 是否与 src 分层——原结论"不分离"已被修正（2026-09-18，详见 §3.10.4）**：
 
@@ -663,20 +676,38 @@ Step 3–7 完成后重新审视"还有哪些位置不正确、哪些需要重�
    **不存在先后依赖**。
 2. **"分离"与 §2.2 的泄漏是正交的两件事**（此条仍成立且是决策关键）：泄漏根因是
    `exclude` **只有一条模式**，与目录布局无关。
-3. **规则明文支持并排**且给出并排示例；当前形态**合规**。**分离是风格变更，非缺陷修复**——
-   **属维护者决策**。若做，应采用 `pi` 的**按主题组织**（免维护镜像路径）
-   而非"镜像 `src/` 路径"。
+3. **规则明文支持并排**且给出并排示例；当前形态**合规**。**分离是风格变更，非缺陷修复**。
 
-**结构性基线（本轮实测）**：`src/` 1481 文件（生产 961 + 测试 520）；5094 条已解析边；
-**`prod → test = 0`**（测试是纯叶子）；`test → prod = 1799`；58% 测试依赖同域生产模块。
+> **裁决（2026-09-19，维护者）：R8 保持并排，不分离。**
+> 理由：这是风格决策而非缺陷修复；与 `pi` 的差异不影响正确性；
+> 搬迁 494 个测试文件与约 1799 条边的收益未获证明。
+> **R9 已作为该决策的收尾执行**（`session/__tests__/` 归并，C2）——
+> 当前约定**已无例外**。
+
+**结构性基线（2026-09-18 实测，下方为当时值）**：`src/` 1481 文件（生产 961 + 测试 520）；
+5094 条已解析边；**`prod → test = 0`**（测试是纯叶子）；`test → prod = 1799`；58% 测试依赖同域生产模块。
+
+> **2026-09-19 更新**：经 CB-005 与 C2 两轮删除，现为
+> `src/` **1434 文件（生产 941 + 测试 493）**。`prod → test = 0` 这一结构性结论不变。
 
 **`core/` 的处理**：22 子目录 / 1515 文件，216 条外部入边——是事实上的横切基础层。
-规则未定义 `core/` 的准入标准，**需维护者先裁定其语义**，本轮不提出拆分方案。
 
-**未改动的两项及原因**：`tsconfig.build.json`（build behavior）与 `agent-rules/*`
-属 `AGENTS.md` 明列"require explicit task scope"的范围；本轮**只报告，不擅自修改**。
+> **2026-09-19 更新**：`core/` 准入标准**已写入**（阶段 B1，`b463d87d`）——
+> `file-placement-and-naming.md` 的 "`core/` admission" 一节给出三款准入条件
+> （方向：feature domain 可依赖 `core/`，反向不可；受众；生存）。
+> 本轮不提出拆分方案这一结论不变。
+
+**未改动的两项及原因（当时）**：`tsconfig.build.json`（build behavior）与 `agent-rules/*`
+属 `AGENTS.md` 明列"require explicit task scope"的范围；该轮**只报告，不擅自修改**。
+
+> **2026-09-19 更新**：两者均已获授权并修改——`tsconfig.build.json` 见 #1（A4）；
+> `agent-rules/file-placement-and-naming.md` 见 §3.9.5 与 2026-09-19 的示例路径更正。
 
 ### 3.9 文档与规则漂移探索（2026-09-18）
+
+> **本节是探索过程的历史记录**（含当时的测量数字与门禁口径的三次修正）。
+> **其中的"待裁决"字样已过时**——四项的最终状态见 §3.9.6 与 §8.1。
+> 本节数字（155 / 224 / 44 / 61 / 26）描述的是**当时**的口径演进，保留以存档。
 
 **完整记录**：`.wiki/refactor/drift-exploration-2026-09-18.md`
 
@@ -798,14 +829,19 @@ or decision history"。**它们是标注错误，不是内容过期。**
 **未改动**：`docs/` 其余约 700 份历史文档**保持原样**——它们按定义就是历史，
 "过期"是正确状态。**未删除任何文档。**
 
-#### 3.9.6 待裁决
+#### 3.9.6 待裁决 —— ✅ 四项已全部完成（2026-09-19 更新为最终状态）
 
-| 项 | 性质 |
+| 项 | 最终状态 |
 |---|---|
-| `docs/` 分类归档（route 时代约 700 份 → `archive/` + `historical` 横幅） | 需裁决；**不可整树删** |
-| 把 DOCS 作用域以 `--strict` 纳入门禁 | 需先把 155 降至 0 |
-| `AGENTS.md`：execution 措辞 + 补 15 个实际在用的顶层域 | 需裁决 |
-| 收紧 `tsconfig.build.json` 的 `exclude`（同 §3.8 发现 1） | 需裁决 |
+| `docs/` 分类归档（route 时代约 700 份） | ✅ **已完成**（阶段 B2，`2b262fe7`）：**0/775 文档未分类**（原 677 篇无状态行）；新建 5 个着陆页；`product_architecture_reset_routes` 挂 `historical` banner。**零文件搬迁** |
+| 把 DOCS 作用域以 `--strict` 纳入门禁 | ✅ **已完成**：DOCS 224 → **0**，`verify:docs-drift:strict` 已接入 `verify-release-core` |
+| `AGENTS.md`：execution 措辞 + 补顶层域 | ✅ **已完成**（阶段 A4 / R3）：`file-placement-and-naming.md` 的 Owner Domains 补全为 **26/26 顶层域**；`AGENTS.md` execution 措辞点名真实所有者并补 `packages/rust-core/` 事实 |
+| 收紧 `tsconfig.build.json` 的 `exclude`（同 §3.8 发现 1） | ✅ **已完成**（阶段 A4 / R2）：已加 `src/test-utils/**` 与 `src/**/__tests__/**` |
+
+**结论：§3.8 与 §3.9 的全部产出均已收敛**——6 项架构发现（§3.8）+ 4 项漂移待裁决（§3.9.6）
++ 治根因门禁（§3.9.4）全部落地，分别经由阶段 A、B、C 执行。
+§3.8/§3.9 作为**探索记录**保留，但**其中的"待裁决/待批准"字样均已过时**，
+以本节与 §8.1 的进度行为准。
 
 ### 3.10 `pi` 参考仓可行性分析 + `strict` 评估（2026-09-18）
 
@@ -853,6 +889,11 @@ or decision history"。**它们是标注错误，不是内容过期。**
 `pi` 的 `test/` 同时容纳夹具与共享基建，故 `longSessionDurabilityProcess.ts`
 只是**随测试一起搬**，那条 `path.join` 在同一次搬迁里改一处即可。
 **组织形态亦修正**：应用 `pi` 的**按主题组织**（免维护镜像路径），而非"镜像 `src/`"。
+
+> **最终裁决（2026-09-19，维护者）：R8 保持并排，不做分离。**
+> 上述分析说明"分离在技术上可行"，但**可行性不等于必要性**——
+> 它是风格决策、非缺陷修复，与 `pi` 的差异不影响正确性。
+> 作为该决策的收尾，`session/__tests__/` 已归并（R9），**当前约定无例外**。
 
 #### 3.10.5 `strict` 评估（本轮最高价值项）
 
@@ -1047,7 +1088,13 @@ runtime 装配四重证据。
 
 测量事实（当时）：生产源文件 1361：CLI 可达 871，不可达 490
 （仅测试 339 + 零引用 146 + 仅公共 API 5）。测试基建 45 个豁免。
-公共 API 闭包 246 文件，由 `verify:host-surface` 实测消费。
+公共 API 闭包 246 文件，当时由 `verify:host-surface` 实测消费
+（**该门禁已于 2026-09-19 随 CB-005 删除**）。
+
+> **2026-09-19 更新**：`analyze-boundaries.py` 已于 `b5f80df4` 重写，
+> 标签口径改为 `cli` / `script` / `publicApi` / `testRef` 四类，
+> 输出 `cliOpaque` / `publicApiOnly` / `testOnly` / `noReference`。
+> 上表数字与当前输出**不可直接比较**。
 
 **当时的方向修正**：删除单位从"文件/目录"改为"连通分量整簇"。
 
@@ -1188,6 +1235,7 @@ runtime 装配四重证据。
 | `cb-005-execution.md` | **CB-005 执行记录（已完成）**：删 69 文件 / −23,631 行；验证矩阵与 TUI 实机结果；含 `cliReachable` 口径被死代码污染的说明 |
 | `c2-inventory.md` | **C2 启动前盘点**：R10 前提被证伪（应关闭）；R9/R11 可执行；发现 2 个真孤儿簇 |
 | `c2-execution.md` | **C2 执行记录**：三项已执行（删 host 遗留 / R9 归并 / 关闭 R10）；R11 与 evaluation 孤儿的深入分析与建议 |
+| `phase-b-exploration-2026-09-18.md` | **阶段 B 探索记录（B1–B4）**：推翻 plan 的两处数字/前提；所有数字实测 |
 | `handoff-2026-09-17.md` | 任务转接包（方向、记录位置、执行要求） |
 | `audit-raw/*.json` | 403 个已删文件的逐文件判定原始表 |
 | `step-2.6-plan.md` | Step 2.6 方案与执行记录 |
@@ -1220,28 +1268,29 @@ development-workflow、compatibility-and-history、reference-repositories）。
 
 三轮探索（§3.8 架构位置、§3.9 文档漂移、§3.10 pi/strict）的全部待办，合并去重后：
 
-| # | 事项 | 来源 | 依赖裁决？ | 风险 | 收益 |
-|---|---|---|---|---|---|
-| **R1** | **开启 `strict`**（S1→S3 生产代码，S4 测试独立） | §3.10.5 | **否** | 低（分批、禁令明确） | ⭐ **最高** |
-| **R2** | 收紧 `tsconfig.build.json` 的 `exclude`（+ 处置 `test-utils/`） | §3.8-1 | **是**（build 行为） | **零** | 高 |
-| **R3** | `AGENTS.md`：execution 措辞 + 补 15 个实际在用的顶层域 | §3.9.3 | **是**（措辞） | **零** | 中 |
-| **R4** | 修 12 处越界模块（11 生产 + 1 测试，419 个声明名） | §3.6 | 否 | 中 | 中 |
-| **R5** | `renderer/` → `presentation/terminal/output.ts` | §3.8-3 | **是**（去向 A/B/C） | 中（**41** 边，已勘误） | 中 |
-| **R6** | `core/` 准入写入规则 + `core/extensions/` 走删除检查 | §3.8 | **是**（是否接受"不搬迁"） | 低 | 中 |
-| **R7** | `docs/` 分类归档（route 时代约 700 份） | §3.9.6 | **是**（分界） | 低（零测试依赖，已实测） | 中 |
-| **R8** | 测试是否分离到 `test/`（`pi` 形态） | §3.8/§3.10.4 | **是**（风格决策） | 中（~1799 边） | 低—中 |
-| **R9** | `session/__tests__/` 归并（全仓唯一孤例） | §3.8-4 | 随 R8 | 低 | 低 |
-| **R10** | ~~`presentation/theme/` 与 `themes/` 合并~~ | §3.8-5 | — | — | **❌ 已关闭（2026-09-19）**：前提被证伪，二者是数据/引擎分层，见 `c2-inventory.md` §1 |
-| **R11** | `eval/` 归并（语义已被 `evidence/harness/` 取代） | §3.8-6 | **是** | 低 | 低 |
-| **R12** | `check:*` 借鉴 `pi` 的检查项 | §3.10.3 | 否 | 低 | 低 |
-| **R13** | ~~`turn` 内核与编排层不连通（**CB-005**，架构级）~~ | §3.4 | — | — | **✅ 已完成（2026-09-19）**，见 §8.2.1 |
-| **R14** | ~~`provenance` 5 读 0 写等 CB-005 的数据层表现~~ | §3.1 | — | — | **✅ 随 R13 一并清除**（其读取者本身已死，随整簇删除） |
+> **2026-09-19 更新：14 项全部收敛。** 下表已改为最终状态；
+> 原表按"是否依赖裁决 / 风险 / 收益"排序，那是**规划期**的视图，已不适用。
 
-**14 项里，7 项不依赖任何裁决**（R1、R4、R12 全部，R2/R3 只需"授权 build/规则范围"这一个答复，
-R6/R7 只需一个方向答复）。
+| # | 事项 | 来源 | 最终状态 |
+|---|---|---|---|
+| **R1** | 开启 `strict`（S1→S3 生产代码） | §3.10.5 | ✅ **已完成**（阶段 A1–A3）：生产 strict 错误 **136 → 0**；`npm run build` 0 错误；零 `!` / 零 `as` |
+| **R2** | 收紧 `tsconfig.build.json` 的 `exclude` | §3.8-1 | ✅ **已完成**（A4）：加 `src/test-utils/**` + `src/**/__tests__/**`；`dist` 961 → 954 |
+| **R3** | `AGENTS.md` execution 措辞 + 补顶层域 | §3.9.3 | ✅ **已完成**（A4）：Owner Domains 补全为 **26/26**；execution 措辞点名真实所有者 |
+| **R4** | 修 12 处越界模块 | §3.6 | ✅ **已完成**（阶段 B4）：**12 → 3**，余 3 个均有 disposition |
+| **R5** | `renderer/` 归位 | §3.8-3 | ✅ **已完成**（B3）：→ `presentation/terminal/streaming.ts`，42 处引用重写 |
+| **R6** | `core/` 准入 + `core/extensions/` 删除检查 | §3.8 | ✅ **已完成**（B1，`b463d87d`）：三款准入条件已写入规则；`core/extensions/` 已删 |
+| **R7** | `docs/` 分类归档 | §3.9.6 | ✅ **已完成**（B2，`2b262fe7`）：**0/775 未分类**；零文件搬迁 |
+| **R8** | 测试是否分离到 `test/` | §3.8/§3.10.4 | ✅ **已裁决：保持并排，不分离**（2026-09-19，维护者） |
+| **R9** | `session/__tests__/` 归并 | §3.8-4 | ✅ **已完成**（C2）：2 文件迁至 `test-utils/`，全仓 `__tests__` 目录数 **1 → 0** |
+| **R10** | `presentation/theme/` 与 `themes/` 合并 | §3.8-5 | ❌ **已关闭**（C2）：前提被证伪——二者是数据/引擎分层，见 `c2-inventory.md` §1 |
+| **R11** | `eval/` 归并 | §3.8-6 | ✅ **已裁决：保留原位**（C2）：`eval/browser/` 被 3 个测试真实调用（29 项）；原判"已被 `evidence/harness/` 取代"**未获证实** |
+| **R12** | `check:*` 借鉴 `pi` 的检查项 | §3.10.3 | ✅ **已完成**（A5）：3 项中 1 项反向、1 项不适用、1 项**当场查出真实缺陷**（`typescript` 误置 devDependencies） |
+| **R13** | `turn` 内核与编排层不连通（CB-005） | §3.4 | ✅ **已完成**（2026-09-19，C1）：删 69 文件 / −23,631 行，见 §8.2.1 |
+| **R14** | `provenance` 5 读 0 写等数据层表现 | §3.1 | ✅ **随 R13 一并清除**（读取者本身已死，随整簇删除） |
 
-**进度**：R1/R2/R3/R5/R6/R7 已随阶段 A/B 完成；**R13/R14 已于 2026-09-19 完成**（§8.2.1）；
-余 R4（部分完成，12 → 3）、R8–R12 未启动。
+**结果**：**12 项已执行，1 项已裁决不做（R10），1 项已裁决保留（R11）**。
+**无遗留待办**；R13/R14 之外的 12 项分别经由阶段 A（R1/R2/R3/R12）、
+B（R4/R5/R6/R7）、C（R8/R9/R10/R11）完成。
 
 ### 8.2 建议的路线（三阶段）
 
@@ -1364,7 +1413,7 @@ body 为字面量表时可达 **80 行/名**。**长度不是复杂度**，无�
 | 序 | 事项 | 状态 |
 |---|---|---|
 | C1 | **R13 CB-005**（`turn` 内核与编排层不连通） | **✅ 已完成（2026-09-19）**，见 §8.2.1 |
-| C2 | R8/R9/R10/R11（风格与命名） | 未启动；无回归压力，可随时穿插 |
+| C2 | R8/R9/R10/R11（风格与命名） | **✅ 已完成（2026-09-19）**，见 §8.2.3 |
 
 #### 8.2.1 C1 / CB-005 执行结果（2026-09-19）
 
@@ -1407,51 +1456,39 @@ body 为字面量表时可达 **80 行/名**。**长度不是复杂度**，无�
 | **真实 TUI**（§2.4 强制） | `--print` → `Outcome: success` exit 0；交互回合完整通过；`/sessions current` 含 `- ID:` |
 
 **测试数 3174 → 2750**：减少的 424 项**全部是被删模块自身的测试**；活模块测试一项未删。
+（C2 后为 **2748**，见 §8.2.3。）
 
 **同时修正的既有认知**：`cliReachable` 指标被死代码污染——见 §1 的口径变化说明。
 
 **完整记录**：`cb-005-execution.md`；立项与代价对照见 `cb-005-initiation.md`、
 `cb-005-o1-vs-o3.md`、`cb-005-recommendation.md`、`turn-vs-pi-divergence.md`。
 
-#### 8.2.2 C2 待办（已盘点，见 `c2-inventory.md`）
+#### 8.2.2 C2 盘点（2026-09-19，已完成——结论见 §8.2.3）
 
-盘点结果（2026-09-19）：
+盘点产出 `c2-inventory.md`：R10 前提被证伪（应关闭）、R9/R11 可执行、
+新发现 2 个真孤儿簇（`runtime/events/host/envelope.ts` 与 `runtime/evaluation/task/` 5 文件）。
+**该盘点的结论已全部执行**，最终结果见 §8.2.3。
 
-| 项 | 原判 | 盘点后 |
+#### 8.2.3 C2 执行结果（2026-09-19）
+
+盘点（`c2-inventory.md`）→ 执行（`c2-execution.md`）。**R10 的前提被证伪，R11 被裁定保留。**
+
+| 项 | 裁决 | 执行 |
 |---|---|---|
-| R8 测试分离到 `test/` | 中（~1799 边） | 风格决策，非缺陷；建议标记"保持并置" |
-| R9 `session/__tests__/` 归并 | 低 | **确认存在**（2 文件，全仓唯一 `__tests__`），可执行 |
-| R10 `theme/`+`themes/` 合并 | 低 | **❌ 前提被证伪**：二者是数据/引擎分层，**应关闭** |
-| R11 `eval/` 归并 | 低 | 确认只被测试引用（114 行），**需裁决** |
-| **新增** `runtime/events/host/envelope.ts` | — | **CB-005 遗留孤儿**（106 行，0 引用），**可直接删** |
-| **新增** `runtime/evaluation/task/` 5 文件 | — | **孤儿簇**（2,447 行，0 生产引用），**需裁决** |
+| R8 测试分离 | **保持并排，不分离** | 无需改动 |
+| R9 `session/__tests__/` 归并 | 执行 | 2 文件迁至 `test-utils/`；**全仓 `__tests__` 目录 1 → 0**；同步更新 3 个 import + 1 处 `spawnSync` 路径字符串 |
+| R10 `theme/`+`themes/` 合并 | **关闭**（前提不成立） | 无需改动 |
+| R11 `eval/` 归并 | **保留原位** | 无需改动 |
 
-**无需裁决、可立即执行**：删 `runtime/events/host/envelope.ts`、R9 归并、关闭 R10。
-**以上三项已于 2026-09-19 执行完毕**，见 `c2-execution.md`。
+**顺带完成**（`c2-inventory.md` 新发现的两处孤儿）：
 
-**执行结果**：`host/envelope.ts` 已删；`session/__tests__/` 已消除（2 文件迁至 `test-utils/`，
-同步更新 3 个 import + 1 处 `spawnSync` 路径字符串）；R10 已关闭。
-`tsc` 0 错误 / 全量 **494 文件 2750 通过 0 失败** / 四门禁全过 / 真实 TUI 实机通过。
+| 对象 | 处置 |
+|---|---|
+| `runtime/events/host/envelope.ts`（106 行） | **已删**——CB-005 删 host lane 时的遗留物 |
+| `runtime/evaluation/`（15 文件 / 5,881 行）+ `runtime/api/host/contract.ts`（332 行） | **已删**——维护者裁决；无法被调用（缺 host dispatch 生产者）、从未接线、公共面断链 |
 
-**剩余两项的深入分析（`c2-execution.md` §2）**：
-
-1. **R11 `eval/browser/`（114 行）→ 建议保留**。实测被 3 个测试真实调用（29 项），
-   且不是重复实现；原判"已被 `evidence/harness/` 取代"**未获证实**。
-   建议仅把它加入 `tsconfig.build.json` 的 `exclude`（测试专用代码不应进发布产物）。
-2. **`runtime/evaluation/task/` 5 文件（2,447 行）→ 建议随 `runtime/evaluation` 整体裁决**。
-   **关键发现**：它们不仅无引用，而且**无法被调用**——`runTaskLiveReport` 需要
-   `dispatch => Promise<HostCommandResponse>`，而唯一生产者 `createHostRuntime`
-   已随 CB-005 删除。**同样的问题也存在于 `index.ts` 公共面导出的
-   `runEvaluationCase` / `runTaskAssessment`**：CB-005 删了生产者、留了消费者。
-
-   **这是 CB-005 遗留的公共面断链**（当时记为"三个待裁决的公共面问题"之一）。
-
-   **裁决（2026-09-19）：删除。** `runtime/evaluation/`（15 文件 / 5,881 行）
-   + `runtime/api/host/contract.ts`（332 行，唯一消费者是 evaluation）
-   + `index.ts` 3 条导出，合计 **16 文件 / 约 6,213 行**已移除。
-   依据：无法被调用（缺 host dispatch 生产者）、从未接入任何 gate/脚本/测试。
-   **保留** `eval/browser/`（114 行）——它是另一件事（browser 场景基准，
-   被 3 个测试真实调用），不动。详见 `c2-execution.md` §4。
+**验证**：`tsc` 0 错误 / 全量 **493 文件 2747 通过 0 失败** / 四门禁全过 /
+`thin facades 2 → 0` / 真实 TUI 实机通过。
 
 ### 8.3 本轮规划的三个判断依据
 
