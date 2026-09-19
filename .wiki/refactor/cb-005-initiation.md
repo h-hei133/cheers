@@ -164,25 +164,30 @@ grep -n "verification\|taskSatisfaction\|failedFiles" turn/projection.ts
 
 ## 5. 立项建议
 
-CB-005 的真实形态是**裁决问题**，不是施工问题：
+CB-005 的真实形态是**裁决问题**，不是施工问题。
+
+> **命名说明**：本节三个处置方案原写作 A/B/C，与 `plan.md` 的**阶段 A/B/C** 撞名，
+> 极易误读为"回到阶段 A"。已改为 **O1/O2/O3**（option）。两者无关：
+> 阶段 A/B 是已完成的 strict / 文档 / `core/` 准入等工作；阶段 C 是"需独立立项"的路线章。
+> 本节 O1~O3 是**阶段 C1（CB-005）内部的三个可选做法**。
 
 | 方案 | 内容 | 代价 | 风险 |
 |---|---|---|---|
-| **A. 删旧路径** | 删除 `runtime/loop/*`（6579 行）+ `runtime/api/host/*` 的 loop 相关面 + `truthMatrix.test.ts`（791 行）；保留 `turn/` 为唯一执行路径；`codingResult` 一族消费方随之处置 | 大（需逐一判定 ~40 个 `CodingResultSummary` 消费者） | 中：会删掉"公共 API"的一部分（`index.ts` 导出 `createHostRuntime`） |
-| **B. 连通两路径** | 在 `turn/tools.ts` 的 `afterToolCall` 打开结构化出站通道，让 `turn` 产出 `codingResult` | 大（等于给 `turn` 补一整套投影层） | **高**：等于把已封死的 harness 复活成第二条真路径 |
-| **C. 只补缺口，不裁决路径** | 仅修 §4 的死条件（`provenance` 写入、`lastActionResultSeed` 生产、`getSessionReceipts` 消费） | 中 | 低 |
+| **O1. 删旧路径** | 删除 `runtime/loop/*`（6579 行）+ `runtime/api/host/*` 的 loop 相关面 + `truthMatrix.test.ts`（791 行）；保留 `turn/` 为唯一执行路径；`codingResult` 一族消费方随之处置 | 大（需逐一判定 ~40 个 `CodingResultSummary` 消费者） | 中：会删掉"公共 API"的一部分（`index.ts` 导出 `createHostRuntime`） |
+| **O2. 连通两路径** | 在 `turn/tools.ts` 的 `afterToolCall` 打开结构化出站通道，让 `turn` 产出 `codingResult` | 大（等于给 `turn` 补一整套投影层） | **高**：等于把已封死的 harness 复活成第二条真路径 |
+| **O3. 只补缺口，不裁决路径** | 仅修 §4 的死条件（`provenance` 写入、`lastActionResultSeed` 生产、`getSessionReceipts` 消费） | 中 | 低 |
 
-**建议：先裁决 A 还是 C，不要选 B。**
+**建议：先裁决 O1 还是 O3，不要选 O2。**
 
 理由：
-1. **B 与实测事实冲突**。旧路径的 provider 是硬编码合成、类型上无 `real`——
+1. **O2 与实测事实冲突**。旧路径的 provider 是硬编码合成、类型上无 `real`——
    "连通"它等于**新建**一条真实 provider 路径，而不是"接上已有的"。
    这与 plan §8.3 的判断（"CB-005 是唯一真正的架构重构项"）方向相反：
    它其实是**一条已经废弃的路径还留着**。
-2. **A 与 C 不冲突**，且 A 会自然消灭 C 的大部分对象：
+2. **O1 与 O3 不冲突**，且 O1 会自然消灭 O3 的大部分对象：
    若 `runtime/loop` 被删，`codingResult` 的唯一生产者 `actionAuthority.ts` 也随之暴露
    （它同样零生产值调用者），届时 §4 的 4 条死条件大多**自动消失**而非需要实现。
-3. 因此**最小且诚实**的第一步是：**先测 A 的删除闭包有多大**（不改代码），
+3. 因此**最小且诚实**的第一步是：**先测 O1 的删除闭包有多大**（不改代码），
    据此再决定"删"还是"补"。
 
 ### 5.1 建议的下一步（待裁决）
@@ -190,14 +195,14 @@ CB-005 的真实形态是**裁决问题**，不是施工问题：
 | 序 | 动作 | 产出 | 是否改代码 |
 |---|---|---|---|
 | 1 | 测 `runtime/loop` + `runtime/api/host` + `core/query/runtime` 的**删除闭包** | 受影响文件清单、公共 API 面变化、测试损失数 | 否 |
-| 2 | 据此写 A / C 的**代价对照** | 一页对照表 | 否 |
-| 3 | 维护者裁决 | A 或 C | — |
-| 4 | 按裁决执行（若 A：按 §2.2 六项删除检查 + 整簇删除） | — | 是 |
+| 2 | 据此写 O1 / O3 的**代价对照** | 一页对照表 | 否 |
+| 3 | 维护者裁决 | O1 或 O3 | — |
+| 4 | 按裁决执行（若 O1：按 §2.2 六项删除检查 + 整簇删除） | — | 是 |
 
 **第 1 步的已知边界**（本次已测）：
 - `runtime/api/host/runtime.ts` 是 `index.ts`（package `main`）的导出面，且被 `verify:host-surface` 门禁实测消费
 - `verify:host-surface` 只用合成 provider，故它验证的是 **harness 契约**，不是真实对话
-- 若删 A，该门禁需要一并裁决（保留则等于保留一个只跑合成的 API 面）
+- 若删 O1，该门禁需要一并裁决（保留则等于保留一个只跑合成的 API 面）
 
 ---
 
