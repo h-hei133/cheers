@@ -1406,6 +1406,30 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 
 ### 15.5 模块划分与耦合
 
+**[E-重复-10] `setActiveNonInteractiveApprovalMode` 在 11 个接口中重复声明、多处手写透传 —— 已核验**
+- 主代理实测全仓 **43 处**出现（排除测试），分布在 **11 个文件**：
+  | 文件 | 声明 | 透传 |
+  |---|---:|---:|
+  | `entrypoints/cliRuntimeModule.ts` | 4（`:53,195,315,467`） | 6（`:102,274,298,391,434,502`）|
+  | `cli/print/printModeRouter.ts` | 1（`:27`） | 2 |
+  | `cli/interactive/interactivePromptRunner.ts` | 2（`:24,69`） | 2 |
+  | `cli/interactive/interactiveCommandRouter.ts` | 1（`:55`） | 2 |
+  | `cli/print/replayModeRunner.ts`、`cli/interactive/interactiveLoop.ts`、`lineLoop.ts` | 各 1 | 各 1 |
+  | `cli/bootstrap/cliProcessRunner.ts` | 0 | 2（实现处 `:155,181`）|
+- **回报的关键证据已核实**：`cli/interactive/interactiveMode.ts:72` 是**唯一可选**声明
+  （`?:`），而 `:429-430` 用 `?? (() => {})` **兜底吞掉**：
+  ```ts
+  setActiveNonInteractiveApprovalMode:
+    this.options.setActiveNonInteractiveApprovalMode ?? (() => {}),
+  ```
+- 影响：新增一个上下文需要改 11 个接口 + 多处透传，**漏改任一处不会报错**
+  （被 `?? (() => {})` 静默吞掉）→ 审批模式可能在整个 print 路径上失效而无任何信号
+- 建议：定义统一的 `CliTurnContext`（或 `ApprovalModeSink`）类型，各接口引用它；
+  **删除 `interactiveMode.ts:429-430` 的 `?? (() => {})` 兜底**，让漏传变成编译错误
+- 置信度：**高**（43 处逐条实测）
+
+**[E-模块-1] 8 个 >400 行枢纽文件**
+
 **[E-模块-1] 8 个 >400 行枢纽文件**
 - 最大 `entrypoints/cliApprovalModule.ts` **736 行**（`createCliEscalationPromptHandler` 单函数约 **545 行**）
 - `cli/interactive/interactiveMode.ts` 618 行（`InteractiveMode` 单类 ~25 字段 ~20 方法）
@@ -1469,7 +1493,7 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 
 下列条目来自回报，主代理**未逐条核对**，记录时保留原样但标记为未核验：
 - ~~「`cli/` 有 19 处 import 回 `entrypoints/`」的总数~~ —— **已复核并更正为 28 条**（value 23 + type 5），见 §15.1
-- 「`setActiveNonInteractiveApprovalMode` 在 11 个接口中重复、9 处透传」的完整清单（E-重复-8 之外的 1.8）
+- ~~「`setActiveNonInteractiveApprovalMode` 在 11 个接口中重复」~~ —— **已复核为 43 处 / 11 文件**，见 §15.5 E-重复-10
 - 「`presentation/tui/text` 与 `sidebarPanelRenderer` 两套布局栈」（1.10）；
   **其中的 CJK 截断风险回报自标"置信度：中"，且未做运行时验证**
 - 「`core/commands/` 有 23 个生产文件含跨域 import」（§3 的 127 条 value 边结论独立成立）
