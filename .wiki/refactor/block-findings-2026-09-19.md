@@ -1858,3 +1858,59 @@ pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本
 | 6 | 重命名 `approval/auditProjection.ts:81` 与 `memoryCodec.ts:180` 的同名导出 | B-重复-4 | **低**（纯改名，消除最易错点）|
 | 7 | 删 `session/presentation/facts.ts` + `sessionReconciler.ts` + `threadState.ts` | B-死-3/4/5 | 中 |
 | 8 | 裁决 `sessionDagEngine` vs `threadState` 二选一 | B-死-2/3 | 高（产品/数据模型裁决）|
+
+---
+
+## 18. 区块 C / F 的模块划分与耦合（主代理机械扫描，2026-09-19）
+
+> C/F 的完整子代理回报仍在运行；本节先给出**主代理可复核的机械结果**
+> （死代码见 §14.5、§14.2；重复实现见 §12、§16）。
+
+### 18.1 区块 C（`context/ memory/ core/context/ core/memory/`，102 文件 / 20,396 行）
+
+**>600 行文件（4 个）**：
+
+| 行数 | 文件 |
+|---:|---|
+| 853 | `context/memory/model.ts` |
+| 840 | `context/acquisition/graph.ts` |
+| 827 | `context/readDeliveryProjection.ts` |
+| 680 | `context/acquisition/engine.ts` |
+
+**声明名 >20 的模块（5 个）**：
+
+| 声明名 | 文件 |
+|---:|---|
+| 27 | `context/memory/model.ts` |
+| 23 | `context/acquisition/graph.ts` |
+| 22 | `core/context/model/contextStateProjection.ts` |
+| 22 | `context/graph/contextDiscovery.ts` |
+| 21 | `memory/projectMemoryCandidateExtractor.ts` |
+
+**耦合（value 出边，排除域内）**：`planning` 18、`policy` 5、`edit` 4、`evidence` 2、`result` 1
+
+**观察**：`context → planning` 的 18 条 value 边与 §4 的
+「`context` → `planning` 27 条（其中 value 18）」**完全吻合**（主代理两处独立测量一致）。
+
+### 18.2 区块 F（`provider/ model-adapters/ config/ daemon/ sandbox/`，40 文件 / 9,276 行）
+
+**>600 行文件（3 个）**：`provider/request/attempt.ts`(857)、
+`provider/request/boundary.ts`(800)、`provider/registry/provider.ts`(745)
+—— **三者全部同时出现在 §5 的 20 个 >600 行名单与 §14.2 的不可达名单中**。
+
+**声明名 >20 的模块（3 个）**：`provider/registry/provider.ts`(34)、
+`provider/request/attempt.ts`(29)、`provider/request/invocation.ts`(23)
+
+**耦合（value 出边，排除域内）**：`edit` 4、`policy` 3 —— **极少**。
+即 `provider/` **几乎不依赖其它 feature 域**，边界干净（与 `session/` 同类）。
+
+### 18.3 一处需注意的判据不一致
+
+主代理用 `grep -cE "^(export )?(async )?function |^export (const|type|interface|class|enum) "`
+得到的 >20 名单，与 judge 的 `declared_functions_within_module_ceiling` 名单**不重叠**：
+- `context/memory/model.ts`（27）与 `provider/registry/provider.ts`（34）**都不在** judge 的 12 项名单中
+- 而 judge 对 `edit/multifile/model.ts` 报 **39**，该文件按**函数声明**只有 13 个
+
+**即两个工具的计数口径不同**（judge 计"函数式名"的更大集合，本节的 grep 计"声明名含类型"）。
+**两者都不应单独作为拆分依据** —— 与 §10.3 模块-2 的结论一致：
+判据本身需要先对齐口径。本文件只记录事实，不裁决。
