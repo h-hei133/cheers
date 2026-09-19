@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import {
   type StaticResourceDescriptor,
   validateStaticResourceDescriptor,
@@ -72,7 +73,7 @@ export function projectStaticResourceRegistry(input: {
     summaries.push(toSummary(validation.descriptor));
   }
 
-  return deepFreeze({
+  return freezeDeep({
     registryMode: "explicit-static",
     dynamicDiscovery: "disabled",
     packageLoading: "disabled",
@@ -143,14 +144,4 @@ function toSummary(descriptor: StaticResourceDescriptor): StaticResourceSummary 
       : {}),
     notProvenClaims: descriptor.notProvenClaims,
   };
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

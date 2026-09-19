@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { RepairVerdictProofInput } from "../projection/repair/verdict.js";
 import type { MultiTargetMutationProofInput } from "../projection/mutation/proof.js";
 
@@ -16,7 +17,7 @@ export function projectHostEvidenceProof(input: {
 }): HostEvidenceProof {
   const proofInput = input.proofInput;
   const missingProof = proofInput?.missingProofItems ?? input.missingProof ?? ["evidence-result-verdict"];
-  return freeze({
+  return freezeDeep({
     proofId: proofInput?.proofInputId ?? "host-evidence:not-proven",
     status: statusFor(proofInput?.proofStatus, missingProof),
     missingProof,
@@ -43,14 +44,4 @@ function statusFor(
 
 function unique(values: readonly string[]): readonly string[] {
   return Array.from(new Set(values)).sort();
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

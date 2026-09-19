@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { Session } from "./sessionRecord.js";
 
 export type SessionThreadEntryKind = "session-root" | "turn-message";
@@ -91,7 +92,7 @@ export function buildLinearSessionThreadSnapshot(
     });
   });
 
-  return deepFreeze({
+  return freezeDeep({
     schemaVersion: 1,
     entries,
     activeLeafId: entries.at(-1)?.id ?? rootId,
@@ -121,7 +122,7 @@ export function appendSessionThreadChild(input: {
     order: base.entries.length,
     timestamp: input.timestamp,
   };
-  return deepFreeze({
+  return freezeDeep({
     ...base,
     entries: [...base.entries, entry],
     activeLeafId: entryId,
@@ -146,7 +147,7 @@ export function createSessionBranch(input: {
     createdAt: input.createdAt,
     ...(input.switchReason ? { switchReason: input.switchReason } : {}),
   };
-  return deepFreeze({
+  return freezeDeep({
     ...input.snapshot,
     branches: [...input.snapshot.branches, branch],
     activeBranchId: branchId,
@@ -159,7 +160,7 @@ export function switchSessionActiveLeaf(input: {
   readonly leafEntryId: string;
   readonly branchId?: string;
 }): SessionThreadSnapshot {
-  return deepFreeze({
+  return freezeDeep({
     ...input.snapshot,
     activeLeafId: input.leafEntryId,
     ...(input.branchId ? { activeBranchId: input.branchId } : {}),
@@ -170,7 +171,7 @@ export function addSessionCompactionRecord(input: {
   readonly snapshot: SessionThreadSnapshot;
   readonly record: SessionCompactionRecord;
 }): SessionThreadSnapshot {
-  return deepFreeze({
+  return freezeDeep({
     ...input.snapshot,
     compactions: [...input.snapshot.compactions, input.record],
   });
@@ -182,14 +183,4 @@ export function sessionRootEntryId(sessionId: string): string {
 
 export function sessionTurnEntryId(sessionId: string, order: number): string {
   return `${sessionId}:turn-${order}`;
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { ArtifactCorrection } from "../../artifacts/workflow/model.js";
 import type { RepairAction } from "../../repair/loop/model.js";
 import type { ToolStrategy } from "../../tools/policy/strategy.js";
@@ -123,7 +124,7 @@ export function classifyVerificationTargetCoverage(
   const coveredTargets = uniquePaths(input.pendingTargets
     .filter((target) => target.length > 0 && target.every((path) => covered.includes(path)))
     .flat());
-  return freeze({
+  return freezeDeep({
     coveredTargets,
     wrongTargetIgnored: input.pendingTargets.some((target) =>
       target.length > 0 && !target.every((path) => covered.includes(path))
@@ -143,7 +144,7 @@ export function verifyChangedFileCoverage(
   const unverified = new Set(uniquePaths(input.unverifiedFiles ?? []));
   const coveredFiles = changedFiles.filter((path) => verified.has(path) && !unverified.has(path));
   const missingFiles = changedFiles.filter((path) => !verified.has(path) || unverified.has(path));
-  return freeze({
+  return freezeDeep({
     complete: input.verificationState === "passed" && missingFiles.length === 0,
     coveredFiles,
     missingFiles,
@@ -155,7 +156,7 @@ function result(
   blockers: readonly string[],
 ): VerificationExecution {
   const passed = state === "passed";
-  return freeze({
+  return freezeDeep({
     state,
     evidenceInputEligible: passed,
     resultInputEligible: passed,
@@ -163,11 +164,6 @@ function result(
     terminalSuccessClaim: false,
   });
 }
-
-function freeze<T>(value: T): Readonly<T> {
-  return Object.freeze(value);
-}
-
 function uniquePaths(values: readonly string[]): readonly string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

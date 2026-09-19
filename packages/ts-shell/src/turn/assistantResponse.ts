@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import type { ModelResponseBoundary } from "../provider/response/boundary.js";
 
 export type AssistantAccumulationStatus = "empty" | "accumulated" | "redacted";
@@ -78,7 +79,7 @@ export function accumulateAssistantResponse(
       ? "accumulated"
       : "empty";
 
-  return deepFreeze({
+  return freezeDeep({
     responseId: input.responseBoundary.responseId,
     ...(input.turnId || input.responseBoundary.turnId
       ? { turnId: input.turnId ?? input.responseBoundary.turnId }
@@ -169,14 +170,4 @@ function sanitizeText(value: string): { readonly value: string; readonly redacte
     sanitized = next;
   }
   return { value: sanitized, redacted };
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

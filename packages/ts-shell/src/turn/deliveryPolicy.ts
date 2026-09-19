@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import { redactReportText } from "../core/security/redaction.js";
 import type { FollowUpQueueProjection } from "./followUpQueue.js";
 import type { SteeringQueueProjection } from "./steeringQueue.js";
@@ -54,7 +55,7 @@ export function evaluateNextTurnDeliveryPolicy(input: {
     itemId: string,
     deliveryStatus: NextTurnDeliveryStatus,
   ) => {
-    entries.push(freeze({
+    entries.push(freezeDeep({
       source,
       itemId: sanitizeId(itemId),
       order: entries.length + 1,
@@ -82,10 +83,10 @@ export function evaluateNextTurnDeliveryPolicy(input: {
     append("model-response", id, "prepared");
   }
 
-  return freeze({
+  return freezeDeep({
     policyId: sanitizeId(`${input.bundleId}:delivery-policy`),
     bundleId: sanitizeId(input.bundleId),
-    entries: freeze(entries),
+    entries: freezeDeep(entries),
     deliveryStatus: input.deliveryStatus ?? (entries.length > 0 ? "waiting" : "prepared"),
     providerCalled: false,
     nextTurnExecuted: false,
@@ -119,7 +120,7 @@ function mapQueueStatus(
 }
 
 function unique(values: readonly string[]): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => redactReportText(value, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => redactReportText(value, 120)))).sort());
 }
 
 function sanitizeId(value: string): string {
@@ -127,14 +128,4 @@ function sanitizeId(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9._:-]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
 import type { ContextPlanningBlockSummary } from "../../context/acquisition/summary.js";
 import type {
@@ -175,7 +176,7 @@ export function createModelRequestBoundary(
     redactions,
   );
 
-  return deepFreeze({
+  return freezeDeep({
     requestId: sanitizeText(input.requestId || "model-request-unavailable", redactions),
     ...(input.turnId ? { turnId: sanitizeText(input.turnId, redactions) } : {}),
     ...(input.loopId ? { loopId: sanitizeText(input.loopId, redactions) } : {}),
@@ -327,7 +328,7 @@ export function prepareNextTurnModelRequest(input: {
     excludedMessageIds,
   });
 
-  return deepFreeze({
+  return freezeDeep({
     requestPreparationId: sanitizeText(
       `next-turn-request:${input.nextTurnBundle.bundleId}`,
       redactions,
@@ -473,7 +474,7 @@ function createProviderMetadata(input: {
     ]),
   ].map((value) => sanitizeText(value, input.redactions)));
 
-  return deepFreeze({
+  return freezeDeep({
     providerSafeLabel: sanitizeText(
       input.provider?.safeLabel ?? input.boundary.providerSafeLabel,
       input.redactions,
@@ -787,14 +788,4 @@ function sanitizeText(input: string, redactions: Set<string>): string {
 
 function unique(input: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(input)]);
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { ProviderFailureClass } from "../registry/provider.js";
 import type { ModelInvocationFallbackEligibility } from "./invocation.js";
 
@@ -75,7 +76,7 @@ export function decideProviderFallback(
     status === "fallback_failed" ||
     status === "fallback_completed";
 
-  return deepFreeze({
+  return freezeDeep({
     decisionId: sanitizeText(input.decisionId ?? "provider-fallback-decision", redactions),
     ...(input.sourceAttemptId
       ? { sourceAttemptId: sanitizeText(input.sourceAttemptId, redactions) }
@@ -192,15 +193,4 @@ function sanitizeText(input: string, redactions: Set<string>): string {
 function unique(input: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(input)]);
 }
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
-}
-
 export const PROVIDER_FALLBACK_REDACTION_EXCLUSIONS = REDACTION_EXCLUSIONS;

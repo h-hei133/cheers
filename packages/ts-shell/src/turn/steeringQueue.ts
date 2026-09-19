@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import { redactReportText } from "../core/security/redaction.js";
 
 export interface SteeringQueuedMessageLike {
@@ -60,7 +61,7 @@ export function projectSteeringQueue(input: {
         abandoned,
         blocked,
       });
-      return freeze({
+      return freezeDeep({
         steeringId: sanitizeId(`steering:${message.id}`),
         source: "user",
         safeSummary,
@@ -80,9 +81,9 @@ export function projectSteeringQueue(input: {
       });
     });
 
-  return freeze({
+  return freezeDeep({
     queueId: sanitizeId(`${input.turnId}:steering-queue`),
-    items: freeze(items),
+    items: freezeDeep(items),
     queuedCount: items.filter((item) => item.deliveryStatus === "queued").length,
     deliveredCount: items.filter((item) => item.deliveryStatus === "delivered").length,
     blockedCount: items.filter((item) =>
@@ -124,7 +125,7 @@ function statusFor(input: {
 }
 
 function unique(values: readonly string[]): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => redactReportText(value, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => redactReportText(value, 120)))).sort());
 }
 
 function sanitizeId(value: string): string {
@@ -132,14 +133,4 @@ function sanitizeId(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9._:-]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

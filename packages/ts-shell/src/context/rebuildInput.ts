@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import type { RuntimeEvidenceSavePoint } from "../evidence/savepoint/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../repair/handoff/boundary.js";
 import type { SessionTreeProjection } from "../session/sessionTreeProjection.js";
@@ -96,7 +97,7 @@ export function buildLoopContextRebuildInput(input: {
     ...input.sessionProjection.compaction.records.flatMap((record) => record.unsupportedFactIds),
   ];
 
-  return deepFreeze({
+  return freezeDeep({
     rebuildInputId: sanitizeId(`context-rebuild-input:${activePathProjectionId}`, redactions),
     sourceSessionId: sanitizeText(input.sessionProjection.sessionIdentity, redactions, 160),
     activePathProjectionId: sanitizeText(activePathProjectionId, redactions, 180),
@@ -104,16 +105,16 @@ export function buildLoopContextRebuildInput(input: {
       ? { nextTurnBundleId: sanitizeText(input.nextTurnBundle.bundleId, redactions, 180) }
       : {}),
     ...(input.savePoint ? { savePointId: sanitizeText(input.savePoint.id, redactions, 180) } : {}),
-    toolResultMessageIds: freeze(
+    toolResultMessageIds: freezeDeep(
       (input.toolResultMessages?.messages.map((message) => message.messageId) ?? [])
         .map((id) => sanitizeText(id, redactions, 180)),
     ),
-    verificationHandoffIds: freeze(verificationHandoffIds.map((id) => sanitizeText(id, redactions, 180))),
-    repairHandoffIds: freeze(repairHandoffIds.map((id) => sanitizeText(id, redactions, 180))),
-    providerMetadataIds: freeze((input.providerMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
-    resourceMetadataIds: freeze((input.resourceMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
-    packageMetadataIds: freeze((input.packageMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
-    includedFactsSummary: freeze([
+    verificationHandoffIds: freezeDeep(verificationHandoffIds.map((id) => sanitizeText(id, redactions, 180))),
+    repairHandoffIds: freezeDeep(repairHandoffIds.map((id) => sanitizeText(id, redactions, 180))),
+    providerMetadataIds: freezeDeep((input.providerMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
+    resourceMetadataIds: freezeDeep((input.resourceMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
+    packageMetadataIds: freezeDeep((input.packageMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
+    includedFactsSummary: freezeDeep([
       `activePath=${input.sessionProjection.activePathProjection.pathLength}`,
       `activeLeaf=${input.sessionProjection.activePathProjection.activeLeafResolution}`,
       `branch=${input.sessionProjection.branchSupport}`,
@@ -124,14 +125,14 @@ export function buildLoopContextRebuildInput(input: {
       `verificationHandoffs=${verificationHandoffIds.length}`,
       `repairHandoffs=${repairHandoffIds.length}`,
     ].map((item) => sanitizeText(item, redactions, 160))),
-    excludedFactsSummary: freeze([
+    excludedFactsSummary: freezeDeep([
       "raw-transcript-content",
       "raw-provider-output",
       "unsafe-file-contents",
       "unredacted-command-output",
       "raw-edit-content",
     ]),
-    missingFacts: freeze(Array.from(new Set(missingFacts.map((fact) => sanitizeText(fact, redactions, 160))))),
+    missingFacts: freezeDeep(Array.from(new Set(missingFacts.map((fact) => sanitizeText(fact, redactions, 160))))),
     redaction: {
       status:
         redactions.size > 0 ||
@@ -157,7 +158,7 @@ export function buildLoopContextRebuildInput(input: {
 }
 
 function unique(values: readonly string[], redactions: Set<string>): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
 }
 
 function sanitizeId(value: string, redactions: Set<string>): string {
@@ -189,18 +190,4 @@ function sanitizeText(value: string, redactions: Set<string>, maxLength: number)
     redactions.add("truncated");
   }
   return sanitized;
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
-}
-
-function deepFreeze<T>(value: T): T {
-  return freeze(value);
 }

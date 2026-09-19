@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import type { ToolBatchDispatchPlan, ToolResultDetail } from "../tools/toolBatchDispatch.js";
 
 export type ToolResultMessageDeliveryStatus =
@@ -60,7 +61,7 @@ export function prepareToolResultMessages(input: {
       ...call.notProvenClaims,
       ...(detail?.notProvenClaims ?? []),
     ]);
-    return freeze({
+    return freezeDeep({
       messageId: sanitizeId(`tool-result-message:${call.toolCallId}`),
       role: "tool",
       toolCallId: call.toolCallId,
@@ -79,10 +80,10 @@ export function prepareToolResultMessages(input: {
     });
   });
 
-  return freeze({
+  return freezeDeep({
     batchId: sanitizeId(`tool-result-message-batch:${input.dispatchPlan.batchId}`),
     dispatchPlanId: input.dispatchPlan.planId,
-    messages: freeze(messages),
+    messages: freezeDeep(messages),
     preparedCount: messages.filter((message) => message.deliveryStatus === "prepared").length,
     blockedCount: messages.filter((message) =>
       message.deliveryStatus === "blocked" ||
@@ -175,7 +176,7 @@ function messageCategory(
 }
 
 function unique(values: readonly string[]): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => sanitizeText(value, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => sanitizeText(value, 120)))).sort());
 }
 
 function sanitizeId(value: string): string {
@@ -203,14 +204,4 @@ function sanitizeText(value: string, maxLength: number): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, maxLength);
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

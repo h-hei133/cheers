@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type {
   RuntimeProjectionEvent,
   RuntimeProjectionEventType,
@@ -42,7 +43,7 @@ export function projectJsonRuntimeEventStream(input: {
     });
   const streamId = sanitizeText(input.streamId ?? "runtime-event-stream").value;
 
-  return deepFreeze(
+  return freezeDeep(
     orderedEvents.map(({ event }, index): JsonRuntimeEventStreamEntry => {
       const facts = sanitizeJsonValue(event.facts);
       const notProvenClaims = Array.from(
@@ -163,14 +164,4 @@ function sanitizeText(input: string): {
   value = value.replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]");
   value = value.replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]");
   return { value, redacted: value !== before };
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type {
   MultiTargetAuthorityObservation,
   MultiTargetClassification,
@@ -18,7 +19,7 @@ import type {
 
 import type { VerificationResultObservation } from "../../verification/result/boundary.js";
 import { redactReportText } from "../../core/security/redaction.js";
-import { deepFreeze, sanitizeId, unique } from "../sanitize.js";
+import { sanitizeId, unique } from "../sanitize.js";
 
 
 /**
@@ -39,7 +40,7 @@ export function settlementObservation(input: {
   readonly contentFingerprint?: string;
   readonly notProvenClaims: readonly string[];
 }): MultiTargetSettlementObservation {
-  return deepFreeze({
+  return freezeDeep({
     settlementId: `${input.laneId}:settlement:${sanitizeId(input.target.targetId)}:${input.order}`,
     groupId: input.groupId,
     targetId: sanitizeId(input.target.targetId),
@@ -74,7 +75,7 @@ export function observeRepairEligibility(input: {
     : input.repairTargetIds.length > 0
       ? "eligible"
       : "not_eligible";
-  return deepFreeze({
+  return freezeDeep({
     eligibilityId: `${input.laneId}:repair-eligibility`,
     status,
     targetIds: input.repairTargetIds.map(sanitizeId),

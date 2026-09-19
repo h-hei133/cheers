@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../../core/values/freeze.js";
 import type { MultiTargetMutationProofInput } from "../../../evidence/projection/mutation/proof.js";
 
 export type MultiTargetMutationTerminalStatus =
@@ -23,7 +24,7 @@ export function projectMultiTargetMutationVerdict(input: {
   readonly notProvenClaims?: readonly string[];
 }): MultiTargetMutationTerminalProjection {
   const status = input.proofInput.proofStatus;
-  return deepFreeze({
+  return freezeDeep({
     projectionId: `${input.proofInput.proofInputId}:terminal`,
     proofInputId: input.proofInput.proofInputId,
     status,
@@ -52,14 +53,4 @@ export function projectMultiTargetMutationVerdict(input: {
 
 function unique(values: readonly string[]): readonly string[] {
   return Object.freeze(Array.from(new Set(values)).sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

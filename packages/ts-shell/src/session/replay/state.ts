@@ -42,6 +42,7 @@ export interface ControlledModelInvocationAdapterStateLike {
     readonly responseHandoffId?: string;
   };
 }
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { MultiTargetMutationProjection } from "../../edit/multifile/model.js";
 import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/model.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
@@ -227,7 +228,7 @@ export function summarizeReplaySafeLoopState(input: {
   const controlledInvocations = input.controlledModelInvocations ?? [];
   const latestInvocation = controlledInvocations.at(-1);
   const replaySafePlanningStates = input.replaySafePlanningStates ?? [];
-  return deepFreeze({
+  return freezeDeep({
     summaryId: `replay-safe-loop-state:${input.sessionProjection.sessionIdentity}:${input.sessionProjection.activeLeafId}`,
     sourceSessionId: input.sessionProjection.sessionIdentity,
     activePathId: `${input.sessionProjection.sessionIdentity}:active-path:${input.sessionProjection.activeLeafId}`,
@@ -430,7 +431,7 @@ function productCompletionCarryForwardFacts(
   }
 
   return {
-    productCompletionCarryForwardFacts: deepFreeze({
+    productCompletionCarryForwardFacts: freezeDeep({
       ...(status ? { status } : {}),
       ...(resultOwnedTerminalStatus ? { resultOwnedTerminalStatus } : {}),
       ...(loopDecision ? { loopDecision } : {}),
@@ -455,14 +456,4 @@ function splitFactList(value: string | undefined): readonly string[] {
     return [];
   }
   return Object.freeze(value.split(",").filter((item) => item.length > 0));
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

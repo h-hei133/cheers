@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { ModelRequest, NormalizedProviderError } from "../../model-adapters/types.js";
 import {
   classifyProviderFailure,
@@ -206,7 +207,7 @@ export async function runControlledModelInvocationAdapter(
       failureClass,
       notProvenClaims,
     });
-    return deepFreeze({
+    return freezeDeep({
       ...base,
       attemptDecision: status === "not_attempted" ? "not_attempted" : "blocked",
       blockedReason: sanitizeText(blockedReason, redactions),
@@ -291,7 +292,7 @@ export async function runControlledModelInvocationAdapter(
       notProvenClaims,
     });
 
-    return deepFreeze({
+    return freezeDeep({
       ...base,
       attemptDecision: "execute_via_provider_fetch",
       attemptId,
@@ -339,7 +340,7 @@ export async function runControlledModelInvocationAdapter(
       notProvenClaims,
     });
 
-    return deepFreeze({
+    return freezeDeep({
       ...base,
       attemptDecision: "execute_via_provider_fetch",
       attemptId,
@@ -604,7 +605,7 @@ function createResponseHandoff(input: {
   );
 
   return {
-    responseHandoff: deepFreeze({
+    responseHandoff: freezeDeep({
       responseHandoffId,
       sourceAttemptId: sanitizeText(input.attemptId, input.redactions),
       responseClassification: input.classification,
@@ -639,7 +640,7 @@ function sanitizeToolCallCandidate(
   const id = sanitizeText(event.toolCallId ?? `malformed-tool-call-${index}`, redactions);
   const name = sanitizeText(event.toolName ?? "unknown", redactions);
   const args = sanitizeUnknown(event.toolArguments, redactions);
-  return deepFreeze({
+  return freezeDeep({
     id,
     name,
     ...(args !== undefined ? { arguments: args } : {}),
@@ -657,7 +658,7 @@ function createOutcome(input: {
   readonly fallbackStatus?: ProviderFallbackDecision["status"];
   readonly notProvenClaims: readonly string[];
 }): ControlledModelInvocationOutcomeFacts {
-  return deepFreeze({
+  return freezeDeep({
     ...(input.attemptId ? { attemptId: input.attemptId } : {}),
     sourceGateId: input.gate.gateId,
     providerSafeLabel: input.gate.providerSafeLabel,
@@ -832,7 +833,7 @@ function sanitizeUnknown(input: unknown, redactions: Set<string>): unknown {
     for (const [key, value] of Object.entries(input)) {
       output[sanitizeText(key, redactions)] = sanitizeUnknown(value, redactions);
     }
-    return deepFreeze(output);
+    return freezeDeep(output);
   }
   if (typeof input === "number") {
     return Number.isFinite(input) ? input : null;
@@ -843,15 +844,4 @@ function sanitizeUnknown(input: unknown, redactions: Set<string>): unknown {
 function unique(input: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(input)]);
 }
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
-}
-
 export const CONTROLLED_INVOCATION_REDACTION_EXCLUSIONS = REDACTION_EXCLUSIONS;

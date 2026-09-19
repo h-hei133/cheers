@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { RuntimePhase } from "../../runtime/runtimePhase.js";
 import type { RuntimeExecutionReceiptProjection } from "../../runtime/execution/receipt.js";
 import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
@@ -137,7 +138,7 @@ export function createEvidenceOnlySavePoint(
   const toolOutcomeInput = input.toolOutcomeInput
     ? sanitizeToolOutcomeInput(input.toolOutcomeInput, redactions)
     : undefined;
-  return deepFreeze({
+  return freezeDeep({
     id: `${input.turnSnapshot.id}:save-point`,
     phase: input.phase,
     turnSnapshotId: input.turnSnapshot.id,
@@ -235,7 +236,7 @@ export function prepareToolOutcomeSavePointInput(input: {
 }): RuntimeToolOutcomeSavePointInput {
   const redactions = new Set<string>();
   const sourceBundleId = sanitizeEvidenceId(input.sourceBundleId, redactions);
-  return deepFreeze({
+  return freezeDeep({
     inputId: `${sourceBundleId}:save-point-input`,
     sourceBundleId,
     receiptIds: Object.freeze(
@@ -273,7 +274,7 @@ function sanitizeToolOutcomeInput(
   input: RuntimeToolOutcomeSavePointInput,
   redactions: Set<string>,
 ): RuntimeToolOutcomeSavePointInput {
-  return deepFreeze({
+  return freezeDeep({
     inputId: sanitizeEvidenceId(input.inputId, redactions),
     sourceBundleId: sanitizeEvidenceId(input.sourceBundleId, redactions),
     receiptIds: Object.freeze(input.receiptIds.map((id) => sanitizeEvidenceId(id, redactions))),
@@ -338,14 +339,4 @@ function sanitizeEvidenceId(value: string, redactions: Set<string>): string {
     sanitized = `${sanitized.slice(0, 180)}...`;
   }
   return sanitized.length > 0 ? sanitized : "evidence:empty-redacted";
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const nested of Object.values(value)) {
-      deepFreeze(nested);
-    }
-  }
-  return value;
 }

@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { ProductVerificationReceipt } from "../verificationFacade.js";
 
 export type VerificationIntentDispatchStatus =
@@ -261,7 +262,7 @@ export function projectVerificationIntent(input: {
     input.receipt?.selectedCommand;
   const selectedNotRun = dispatchStatus === "selected_not_run" ||
     (dispatchStatus === "not_run" && Boolean(commandSummary));
-  return freeze({
+  return freezeDeep({
     intentId: sanitizeId(`verification-intent:${input.sourceTurnId}`, redactions),
     sourceTurnId: sanitizeText(input.sourceTurnId, redactions, 160),
     targetSummary: sanitizeText(input.targetSummary, redactions, 180),
@@ -313,7 +314,7 @@ export function observeVerificationResult(input: {
   const runtimeReceiptIds = input.runtimeReceiptIds ?? input.receipt?.runtimeReceiptIds ?? [];
   const repairEligible = input.repairEligible ?? input.receipt?.repairEligible ?? false;
   const selectedNotRun = status === "selected_not_run" || input.intent.selectedNotRun;
-  return freeze({
+  return freezeDeep({
     verificationId: sanitizeId(`${input.intent.intentId}:result`, redactions),
     intentId: sanitizeText(input.intent.intentId, redactions, 180),
     ...(input.executionReceiptId
@@ -383,7 +384,7 @@ export function projectVerificationObservationFromReceipt(input: {
     runtimeReceiptIds: input.runtimeReceiptIds ?? input.receipt.runtimeReceiptIds,
     notProvenClaims: input.notProvenClaims,
   });
-  return freeze({ intent, result });
+  return freezeDeep({ intent, result });
 }
 
 export function requirePostRepairVerification(input: {
@@ -399,7 +400,7 @@ export function requirePostRepairVerification(input: {
     requirementStatusFromRepairApply(input.repairApply);
   const verificationBlocker = input.verificationBlocker ??
     blockerFromRequirement(requirementStatus, input.repairApply);
-  return freeze({
+  return freezeDeep({
     requirementId: sanitizeId(`${input.repairApply.repairApplyId}:post-verification`, redactions),
     sourceRepairApplyId: sanitizeText(input.repairApply.repairApplyId, redactions, 180),
     sourceRepairProposalId: sanitizeText(input.repairApply.proposalId, redactions, 180),
@@ -458,7 +459,7 @@ export function requestPostRepairVerification(input: {
   const redactions = new Set<string>();
   const dispatchStatus = input.dispatchStatus ??
     (input.selectedCommandSummary ? "selected_not_run" : "not_run");
-  return freeze({
+  return freezeDeep({
     requestId: sanitizeId(`${input.requirement.requirementId}:request`, redactions),
     requirementId: sanitizeText(input.requirement.requirementId, redactions, 180),
     sourceRepairApplyId: sanitizeText(input.requirement.sourceRepairApplyId, redactions, 180),
@@ -554,7 +555,7 @@ export function observePostRepairVerificationResult(input: {
         terminalSuccessClaim: false as const,
       }
     : undefined;
-  return freeze({
+  return freezeDeep({
     resultId,
     ...(input.request
       ? { requestId: sanitizeText(input.request.requestId, redactions, 180) }
@@ -762,7 +763,7 @@ function summaryFromStatus(input: {
 }
 
 function unique(values: readonly string[], redactions: Set<string>): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
 }
 
 function sanitizeId(value: string, redactions: Set<string>): string {
@@ -794,14 +795,4 @@ function sanitizeText(value: string, redactions: Set<string>, maxLength: number)
     redactions.add("truncated");
   }
   return sanitized;
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

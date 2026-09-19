@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type {
   ExecutionAuthorityMode,
   ExecutionPolicyMetadata,
@@ -90,7 +91,7 @@ export function createToolInterceptionIntent(input: {
     ? false
     : sanitizeValue(input.input).redacted;
 
-  return deepFreeze({
+  return freezeDeep({
     interceptionId: stableId("tool-interception", [
       toolId,
       caller,
@@ -142,7 +143,7 @@ export function createToolBeforePolicyDecision(input: {
     ),
   );
 
-  return deepFreeze({
+  return freezeDeep({
     decisionId: stableId("tool-policy-decision", [
       input.intent.interceptionId,
       status,
@@ -224,7 +225,7 @@ export function createToolAfterObservationAnnotation(input: {
     : undefined;
   const reportSafeSummary = sanitizeWithTracking(input.reportSafeSummary, redactions, 180);
 
-  return deepFreeze({
+  return freezeDeep({
     annotationId: stableId("tool-result-annotation", [
       input.decision?.decisionId ?? input.toolId,
       input.resultStatus,
@@ -407,14 +408,4 @@ function stableId(prefix: string, parts: readonly string[]): string {
 
 function unique<T extends string>(values: readonly T[]): readonly T[] {
   return Object.freeze(Array.from(new Set(values)).sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

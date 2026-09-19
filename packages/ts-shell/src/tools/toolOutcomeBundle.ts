@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import { redactReportText } from "../core/security/redaction.js";
 import type { RuntimeExecutionReceiptProjection } from "../runtime/execution/receipt.js";
 import type { ToolResultMessageBatch } from "../turn/toolResultMessage.js";
@@ -114,22 +115,22 @@ export function createToolOutcomeBundle(input: {
     resultMessageCount: resultMessages.length,
   });
 
-  const resultMessageIds = freeze(unique(resultMessages.map((message) => message.messageId)));
-  const blockedReasons = freeze(blockingFacts(details));
+  const resultMessageIds = freezeDeep(unique(resultMessages.map((message) => message.messageId)));
+  const blockedReasons = freezeDeep(blockingFacts(details));
   const outcomeStatus = mixedStatus({
     callCount: plan.calls.length,
     executedSuccessCount,
     nonSuccessCount,
   });
 
-  return freeze({
+  return freezeDeep({
     bundleId: sanitizeId(`tool-outcome-bundle:${input.dispatchResult.resultBatchId}`),
     sourceBatchId: sanitizeId(input.dispatchResult.resultBatchId),
     ...(input.sourceModelBoundaryId ?? plan.responseId
       ? { sourceModelBoundaryId: redactReportText(input.sourceModelBoundaryId ?? plan.responseId, 160) }
       : {}),
     resultMessageIds,
-    receiptIds: freeze(unique(input.dispatchResult.executionReceipts.map(receiptId))),
+    receiptIds: freezeDeep(unique(input.dispatchResult.executionReceipts.map(receiptId))),
     executedCount,
     failedCount,
     blockedCount,
@@ -142,15 +143,15 @@ export function createToolOutcomeBundle(input: {
     nextAction: nextAction.action,
     nextActionReason: nextAction.reason,
     redactionStatus: redactionStatus(plan, details, input.dispatchResult.executionReceipts),
-    detailStatuses: freeze(details.map((detail) =>
-      freeze({
+    detailStatuses: freezeDeep(details.map((detail) =>
+      freezeDeep({
         toolCallId: redactReportText(detail.toolCallId, 160),
         toolName: redactReportText(detail.toolName, 120),
         resultStatus: detail.resultStatus,
         terminalSuccessClaim: false as const,
       })
     )),
-    carryForwardFacts: freeze({
+    carryForwardFacts: freezeDeep({
       status: outcomeStatus,
       nextAction: nextAction.action,
       resultMessageIds,
@@ -259,7 +260,7 @@ function blockingFacts(details: readonly ToolResultDetail[]): readonly string[] 
 }
 
 function unique(values: readonly string[]): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => redactReportText(value, 160)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => redactReportText(value, 160)))).sort());
 }
 
 function sanitizeId(value: string): string {
@@ -267,14 +268,4 @@ function sanitizeId(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9._:-]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

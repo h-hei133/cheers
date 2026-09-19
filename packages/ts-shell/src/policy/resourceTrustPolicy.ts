@@ -1,3 +1,5 @@
+import { freezeDeep } from "../core/values/freeze.js";
+
 export type ResourceScope =
   | "built_in"
   | "workspace"
@@ -55,7 +57,7 @@ export function projectResourceTrustPolicy(input: {
   const sourceLabel = sanitizeWithTracking(input.sourceLabel, redactions, 140);
   const trustProof = input.trustProof ?? inferTrustProof(input.trustLevel);
 
-  return deepFreeze({
+  return freezeDeep({
     sourceKind: input.sourceKind,
     sourceLabel,
     scope: input.scope,
@@ -158,14 +160,4 @@ function sanitizeText(input: string): {
 
 function unique(values: readonly string[]): readonly string[] {
   return Object.freeze(Array.from(new Set(values)).sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

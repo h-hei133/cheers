@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import {
   projectResourceTrustPolicy,
   type ResourceScope,
@@ -133,7 +134,7 @@ export function validatePackageManifest(
   }
   return {
     ok: true,
-    manifest: deepFreeze(sanitized.manifest),
+    manifest: freezeDeep(sanitized.manifest),
   };
 }
 
@@ -162,7 +163,7 @@ export function projectPackageResourceInventory(input: {
     packages.push(validation.manifest);
   }
 
-  return deepFreeze({
+  return freezeDeep({
     inventoryMode: "explicit-static",
     packageInstallation: "disabled",
     packageLoading: "disabled",
@@ -567,14 +568,4 @@ function stableId(prefix: string, parts: readonly string[]): string {
 
 function unique(values: readonly string[]): readonly string[] {
   return Object.freeze(Array.from(new Set(values)).sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

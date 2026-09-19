@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { RuntimeEvidenceSavePoint } from "../../evidence/savepoint/model.js";
 import type { MultiTargetMutationProjection } from "../../edit/multifile/model.js";
 import type { ControlledMutationRecoveryProjection } from "../../edit/recovery/model.js";
@@ -367,7 +368,7 @@ export function projectRuntimeEvents(input: {
     const sequence = events.length + 1;
     const sanitized = sanitizeRecord(facts);
     events.push(
-      deepFreeze({
+      freezeDeep({
         id: `runtime-event-${sequence}`,
         sequence,
         type,
@@ -2920,7 +2921,7 @@ export function projectRuntimeEvents(input: {
     );
   }
 
-  return deepFreeze(events);
+  return freezeDeep(events);
 }
 
 const REDACTION_EXCLUSIONS = [
@@ -2993,14 +2994,4 @@ function sanitizeText(input: string): { readonly value: string; readonly redacte
   value = value.replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]");
   value = value.replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]");
   return { value, redacted: value !== before };
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

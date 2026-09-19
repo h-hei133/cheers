@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import path from "node:path";
 import type {
   MultiTargetOperationKind,
@@ -51,7 +52,6 @@ import {
 import { redactReportText } from "../../core/security/redaction.js";
 import {
   absoluteTargetPath,
-  deepFreeze,
   fingerprint,
   sanitizeId,
   sanitizeTargetSummary,
@@ -420,7 +420,7 @@ export async function runControlledMultiTargetMutation(
     notProvenClaims,
   });
   const resultVerdict = projectMultiTargetMutationVerdict({ proofInput, notProvenClaims });
-  return deepFreeze({
+  return freezeDeep({
     laneId,
     turnId: redactReportText(input.turnId, 180),
     plan,
@@ -476,7 +476,7 @@ function createPlan(input: {
   readonly input: MultiTargetMutationInput;
   readonly notProvenClaims: readonly string[];
 }): MultiTargetMutationPlan {
-  return deepFreeze({
+  return freezeDeep({
     planId: `${input.laneId}:plan`,
     targetCount: input.input.targets.length,
     operationKinds: unique(input.input.targets.map((target) => target.operation)),
@@ -518,7 +518,7 @@ function classifyTarget(input: {
       : status === "authority_required"
         ? "target authority missing"
         : "target classified";
-  return deepFreeze({
+  return freezeDeep({
     targetId: sanitizeId(input.target.targetId),
     targetSummary: sanitizeTargetSummary(
       input.target.reportSafeTargetSummary ?? input.target.relativePath,
@@ -608,7 +608,7 @@ function detectConflicts(input: {
       }
     }
   }
-  return deepFreeze(conflicts);
+  return freezeDeep(conflicts);
 }
 
 
@@ -775,7 +775,7 @@ async function observeRollback(input: {
   readonly notProvenClaims: readonly string[];
 }): Promise<MultiTargetRollbackObservation> {
   if (!input.required) {
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "not_required",
       targetIds: input.appliedTargets.map((target) => sanitizeId(target.targetId)),
@@ -813,7 +813,7 @@ async function observeRollback(input: {
       failedTargetIds.push(sanitizeId(target.targetId));
     }
   }
-  return deepFreeze({
+  return freezeDeep({
     rollbackId: `${input.laneId}:rollback`,
     status: failedTargetIds.length > 0 ? "failed" : "succeeded",
     targetIds: input.appliedTargets.map((target) => sanitizeId(target.targetId)),

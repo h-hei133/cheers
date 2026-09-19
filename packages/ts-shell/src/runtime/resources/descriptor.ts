@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type {
   ExtensionHookEffect,
   ExtensionLifecycleEventKind,
@@ -88,7 +89,7 @@ export function validateStaticResourceDescriptor(
 
   return {
     ok: true,
-    descriptor: deepFreeze(sanitized.descriptor),
+    descriptor: freezeDeep(sanitized.descriptor),
     redaction: sanitized.redaction,
   };
 }
@@ -218,14 +219,4 @@ function sanitizeText(input: string): { readonly value: string; readonly redacte
 
 function uniqueSorted(input: readonly string[]): readonly string[] {
   return [...new Set(input)].sort();
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

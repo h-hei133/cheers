@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import type { Session } from "./schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
 import type {
@@ -345,7 +346,7 @@ export function projectSessionTree(input: {
     },
   );
 
-  return deepFreeze({
+  return freezeDeep({
     sessionIdentity: input.session.id,
     treeSupport,
     branchSupport,
@@ -495,17 +496,6 @@ function projectContinuationState(
   }
   return "unknown";
 }
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
-}
-
 function sanitizeIdentifier(input: string, fallback: string): string {
   const sanitized = input
     .replace(/\/home\/wang\/\.private-agents-real[^\s"']*/g, "[redacted-real-provider-home]")

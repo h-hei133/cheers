@@ -1,3 +1,5 @@
+import { freezeDeep } from "../../core/values/freeze.js";
+
 export type ExtensionLifecycleEventKind =
   | "session-started"
   | "session-continuation-observed"
@@ -115,7 +117,7 @@ export function extensionLifecycleEventContract(
   kind: ExtensionLifecycleEventKind,
   ownerDomain: string,
 ): ExtensionLifecycleEventContract {
-  return deepFreeze({
+  return freezeDeep({
     kind,
     ownerDomain,
     reportSafe: true,
@@ -148,7 +150,7 @@ export function validateExtensionHookDescriptor(
   }
   return {
     ok: true,
-    descriptor: deepFreeze(sanitized.descriptor),
+    descriptor: freezeDeep(sanitized.descriptor),
     redaction: sanitized.redaction,
   };
 }
@@ -178,7 +180,7 @@ export function applyExtensionHookPolicy(
   ]);
 
   if (rejectionReason) {
-    return deepFreeze({
+    return freezeDeep({
       hookId: sanitized.descriptor.hookId,
       extensionId: sanitized.descriptor.extensionId,
       eventKind: sanitized.descriptor.eventKind,
@@ -194,7 +196,7 @@ export function applyExtensionHookPolicy(
     });
   }
 
-  return deepFreeze({
+  return freezeDeep({
     hookId: sanitized.descriptor.hookId,
     extensionId: sanitized.descriptor.extensionId,
     eventKind: sanitized.descriptor.eventKind,
@@ -370,17 +372,6 @@ function extensionNotProvenClaims(extra: readonly string[] = []): readonly strin
 function uniqueSorted(input: readonly string[]): readonly string[] {
   return [...new Set(input)].sort();
 }
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
-}
-
 const VALID_EVENT_KINDS = new Set<ExtensionLifecycleEventKind>([
   "session-started",
   "session-continuation-observed",

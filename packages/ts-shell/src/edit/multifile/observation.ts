@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type {
   MultiTargetParallelEligibilityStatus,
   MultiTargetAuthorityObservation,
@@ -20,7 +21,7 @@ import type {
 } from "./types.js";
 
 import { redactReportText } from "../../core/security/redaction.js";
-import { absoluteTargetPath, deepFreeze, fingerprint, sanitizeId, sanitizeTargetSummary, unique } from "../sanitize.js";
+import { absoluteTargetPath, fingerprint, sanitizeId, sanitizeTargetSummary, unique } from "../sanitize.js";
 
 /**
  * Multi-target lane observation.
@@ -37,7 +38,7 @@ export function conflict(input: {
   readonly reason: string;
   readonly notProvenClaims: readonly string[];
 }): MultiTargetConflict {
-  return deepFreeze({
+  return freezeDeep({
     conflictId: `${input.laneId}:conflict:${input.kind}:${input.targetIds.map(sanitizeId).join("+")}`,
     kind: input.kind,
     targetIds: input.targetIds.map(sanitizeId),
@@ -78,7 +79,7 @@ export function observeAuthority(input: {
         targetStatuses.some((item) => item.status !== "granted")
       ? "partial"
       : input.input.authority.status;
-  return deepFreeze({
+  return freezeDeep({
     authorityId: `${input.laneId}:authority`,
     status,
     targetStatuses,
@@ -106,7 +107,7 @@ export async function observeStaleRead(input: {
     input.targetConflicts.length > 0 ||
     input.targetAuthority?.status !== "granted"
   ) {
-    return deepFreeze({
+    return freezeDeep({
       staleReadId: `${input.laneId}:stale-read:${sanitizeId(input.target.targetId)}`,
       targetId: sanitizeId(input.target.targetId),
       status: "blocked",
@@ -132,7 +133,7 @@ export async function observeStaleRead(input: {
     });
     const currentFingerprint = fingerprint(current);
     if (input.target.operation === "create") {
-      return deepFreeze({
+      return freezeDeep({
         staleReadId: `${input.laneId}:stale-read:${sanitizeId(input.target.targetId)}`,
         targetId: sanitizeId(input.target.targetId),
         status: "target_exists",
@@ -142,7 +143,7 @@ export async function observeStaleRead(input: {
         notProvenClaims: unique(["create-target-exists-is-not-success", ...input.notProvenClaims]),
       });
     }
-    return deepFreeze({
+    return freezeDeep({
       staleReadId: `${input.laneId}:stale-read:${sanitizeId(input.target.targetId)}`,
       targetId: sanitizeId(input.target.targetId),
       status: current === input.target.expectedContent ? "passed" : "stale",
@@ -154,7 +155,7 @@ export async function observeStaleRead(input: {
     });
   } catch {
     const status = input.target.operation === "create" ? "passed" : "target_missing";
-    return deepFreeze({
+    return freezeDeep({
       staleReadId: `${input.laneId}:stale-read:${sanitizeId(input.target.targetId)}`,
       targetId: sanitizeId(input.target.targetId),
       status,
@@ -179,7 +180,7 @@ export function observeSnapshot(input: {
     input.target.reportSafeTargetSummary ?? input.target.relativePath,
   );
   if (input.staleRead.status !== "passed" || input.targetConflicts.length > 0) {
-    return deepFreeze({
+    return freezeDeep({
       snapshotId: `${input.laneId}:snapshot:${sanitizeId(input.target.targetId)}`,
       targetId: sanitizeId(input.target.targetId),
       status: "not_planned",
@@ -191,7 +192,7 @@ export function observeSnapshot(input: {
     });
   }
   if (input.target.snapshot?.available === false) {
-    return deepFreeze({
+    return freezeDeep({
       snapshotId: `${input.laneId}:snapshot:${sanitizeId(input.target.targetId)}`,
       targetId: sanitizeId(input.target.targetId),
       status: "unavailable",
@@ -202,7 +203,7 @@ export function observeSnapshot(input: {
       notProvenClaims: unique(["snapshot-unavailable-is-not-success", ...input.notProvenClaims]),
     });
   }
-  return deepFreeze({
+  return freezeDeep({
     snapshotId: `${input.laneId}:snapshot:${sanitizeId(input.target.targetId)}`,
     targetId: sanitizeId(input.target.targetId),
     status: "planned",
@@ -273,7 +274,7 @@ export function queueObservation(input: {
   readonly contentFingerprint?: string;
   readonly notProvenClaims: readonly string[];
 }): MultiTargetQueueObservation {
-  return deepFreeze({
+  return freezeDeep({
     queueId: `${input.laneId}:queue:${sanitizeId(input.target.targetId)}:${input.order}`,
     targetId: sanitizeId(input.target.targetId),
     state: input.state,
@@ -292,7 +293,7 @@ export function buildGraph(input: {
   readonly conflicts: readonly MultiTargetConflict[];
   readonly notProvenClaims: readonly string[];
 }): readonly MultiTargetGraphNode[] {
-  return deepFreeze(input.input.targets.map((target, index) => {
+  return freezeDeep(input.input.targets.map((target, index) => {
     const targetId = sanitizeId(target.targetId);
     const targetConflicts = input.conflicts.filter((item) => item.targetIds.includes(targetId));
     const classification = input.classifications[index] ?? missingClassification(targetId);
@@ -328,7 +329,7 @@ export function buildParallelEligibility(input: {
   readonly queue: readonly MultiTargetQueueObservation[];
   readonly notProvenClaims: readonly string[];
 }): readonly MultiTargetParallelEligibility[] {
-  return deepFreeze(input.input.targets.map((target, index) => {
+  return freezeDeep(input.input.targets.map((target, index) => {
     const targetId = sanitizeId(target.targetId);
     const classification = input.classifications[index] ?? missingClassification(targetId);
     const targetAuthority = input.authority.targetStatuses[index];
@@ -384,7 +385,7 @@ export function createExecutionGroups(input: {
         notProvenClaims: input.notProvenClaims,
       }));
     }
-    return deepFreeze(groups);
+    return freezeDeep(groups);
   }
 
   let pendingParallel: string[] = [];
@@ -440,7 +441,7 @@ export function createExecutionGroups(input: {
       notProvenClaims: input.notProvenClaims,
     }));
   }
-  return deepFreeze(groups);
+  return freezeDeep(groups);
 }
 function executionGroup(input: {
   readonly laneId: string;
@@ -452,7 +453,7 @@ function executionGroup(input: {
   readonly blockedReason?: string;
   readonly notProvenClaims: readonly string[];
 }): MultiTargetExecutionGroup {
-  return deepFreeze({
+  return freezeDeep({
     groupId: `${input.laneId}:group:${input.order}`,
     mode: input.mode,
     status: input.status,

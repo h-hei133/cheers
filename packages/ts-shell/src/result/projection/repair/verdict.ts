@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../../core/values/freeze.js";
 import {
   projectProductVerdictFromClaims,
   type ProductVerdict,
@@ -52,7 +53,7 @@ export function projectRepairVerdictTerminal(input: {
     successReason: "Evidence and result owners verified completion with repair.",
   });
 
-  return deepFreeze({
+  return freezeDeep({
     projectionId: `${input.proofInput.proofInputId}:result-projection`,
     sourceProofInputId: input.proofInput.proofInputId,
     status,
@@ -172,15 +173,5 @@ function claimsFor(proofInput: RepairVerdictProofInput) {
 }
 
 function unique(values: readonly string[]): readonly string[] {
-  return deepFreeze(Array.from(new Set(values)).sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
+  return freezeDeep(Array.from(new Set(values)).sort());
 }

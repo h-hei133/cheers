@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { StaticResourceDescriptor } from "../../runtime/resources/descriptor.js";
 
 export type ProviderCapabilityState = "supported" | "unsupported" | "unknown";
@@ -215,7 +216,7 @@ const REDACTION_EXCLUSIONS = [
 export function unknownProviderCompatibilityFlags(
   claims: readonly string[] = [],
 ): ProviderCompatibilityFlags {
-  return deepFreeze({
+  return freezeDeep({
     developerRole: "unknown",
     systemRole: "unknown",
     toolCalls: "unknown",
@@ -311,7 +312,7 @@ export function projectProviderRegistry(
     ...models.map(modelToStaticResource),
   ];
 
-  return deepFreeze({
+  return freezeDeep({
     registryMode: "explicit-metadata",
     dynamicProviderLoading: "disabled",
     externalPackageLoading: "disabled",
@@ -347,7 +348,7 @@ function sanitizeProviderDescriptor(
   const fallbackPolicy = input.fallbackPolicy
     ? sanitizeFallbackPolicy(input.fallbackPolicy, redactions)
     : undefined;
-  return deepFreeze({
+  return freezeDeep({
     providerId: sanitizeText(input.providerId, redactions),
     safeLabel: sanitizeText(input.safeLabel, redactions),
     providerKind: input.providerKind,
@@ -376,7 +377,7 @@ function sanitizeModelDescriptor(
   input: Omit<ModelDescriptor, "redaction" | "notProvenClaims">,
   redactions: Set<string>,
 ): ModelDescriptor {
-  return deepFreeze({
+  return freezeDeep({
     modelId: sanitizeText(input.modelId, redactions),
     safeLabel: sanitizeText(input.safeLabel, redactions),
     providerId: sanitizeText(input.providerId, redactions),
@@ -403,7 +404,7 @@ function sanitizeFallbackPolicy(
   input: ProviderFallbackPolicyMetadata,
   redactions: Set<string>,
 ): ProviderFallbackPolicyMetadata {
-  return deepFreeze({
+  return freezeDeep({
     ...(input.fallbackProviderId
       ? { fallbackProviderId: sanitizeText(input.fallbackProviderId, redactions) }
       : {}),
@@ -430,7 +431,7 @@ function sanitizeAuthProjection(
   input: Omit<ProviderRequestAuthProjection, "redaction" | "notProvenClaims">,
   redactions: Set<string>,
 ): ProviderRequestAuthProjection {
-  return deepFreeze({
+  return freezeDeep({
     providerId: sanitizeText(input.providerId, redactions),
     authSourceKind: input.authSourceKind,
     authMode: input.authMode,
@@ -495,7 +496,7 @@ function compatibilityEntry(input: {
     flags.structuredJsonOutput,
     flags.strictMessageRoles,
   ].includes("unknown");
-  return deepFreeze({
+  return freezeDeep({
     providerId: input.provider.providerId,
     ...(input.model ? { modelId: input.model.modelId } : {}),
     providerSafeLabel: input.provider.safeLabel,
@@ -583,7 +584,7 @@ function readinessEntry(input: {
     "opt-in-required",
   ].map((value) => sanitizeText(value, input.redactions));
 
-  return deepFreeze({
+  return freezeDeep({
     providerId: input.provider.providerId,
     ...(input.model ? { modelId: input.model.modelId } : {}),
     configState,
@@ -610,7 +611,7 @@ function sanitizeCompatibility(
   input: ProviderCompatibilityFlags,
   redactions: Set<string>,
 ): ProviderCompatibilityFlags {
-  return deepFreeze({
+  return freezeDeep({
     developerRole: input.developerRole,
     systemRole: input.systemRole,
     toolCalls: input.toolCalls,
@@ -732,14 +733,4 @@ function sanitizeText(input: string, redactions: Set<string>): string {
 
 function uniqueSorted(input: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(input)].sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

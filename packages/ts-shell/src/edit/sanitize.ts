@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import path from "node:path";
 import { computeFragmentFingerprint } from "../context/readWindowContinuation.js";
 import { redactReportText } from "../core/security/redaction.js";
@@ -50,14 +51,4 @@ export function sanitizeId(value: string): string {
 
 export function unique<T extends string>(values: readonly T[]): readonly T[] {
   return Object.freeze(Array.from(new Set(values)).sort());
-}
-
-export function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

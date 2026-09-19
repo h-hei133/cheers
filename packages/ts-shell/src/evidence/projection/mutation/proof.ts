@@ -1,3 +1,5 @@
+import { freezeDeep } from "../../../core/values/freeze.js";
+
 export type MultiTargetMutationProofStatus =
   | "complete"
   | "blocked"
@@ -59,7 +61,7 @@ export function buildMultiTargetMutationProofInput(input: {
         : input.appliedCount > 0 || input.revertedCount > 0
           ? "partial"
           : "not_proven";
-  return deepFreeze({
+  return freezeDeep({
     proofInputId: `${sanitizeId(input.laneId)}:proof-input`,
     laneId: sanitizeId(input.laneId),
     proofStatus,
@@ -93,14 +95,4 @@ function sanitizeId(value: string): string {
 
 function unique(values: readonly string[]): readonly string[] {
   return Object.freeze(Array.from(new Set(values)).sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

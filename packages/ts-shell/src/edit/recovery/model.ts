@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import path from "node:path";
 import { computeFragmentFingerprint } from "../../context/readWindowContinuation.js";
 import {
@@ -36,7 +37,6 @@ import {
 } from "../../verification/result/boundary.js";
 import { redactReportText } from "../../core/security/redaction.js";
 import {
-  deepFreeze,
   fingerprint,
   sanitizeId,
   sanitizeTargetSummary,
@@ -305,7 +305,7 @@ export async function runControlledMutationRecovery(
     rollback,
     repairVerdictTerminalProjection,
   });
-  return deepFreeze({
+  return freezeDeep({
     laneId,
     turnId: redactReportText(input.turnId, 180),
     ...(input.toolCallId ? { toolCallId: redactReportText(input.toolCallId, 120) } : {}),
@@ -349,7 +349,7 @@ function observeMutationAuthority(input: {
       input.input.authority.status === "granted"
     ? "blocked"
     : input.input.authority.status;
-  return deepFreeze({
+  return freezeDeep({
     authorityId: `${input.laneId}:authority`,
     status,
     source: input.input.authority.source,
@@ -372,7 +372,7 @@ async function observeMutationStaleRead(input: {
 }): Promise<MutationStaleReadObservation> {
   const expectedFingerprint = fingerprint(input.input.target.expectedContent);
   if (input.authority.status !== "granted") {
-    return deepFreeze({
+    return freezeDeep({
       staleReadId: `${input.laneId}:stale-read`,
       status: "not_run",
       targetSummary: input.targetSummary,
@@ -399,7 +399,7 @@ async function observeMutationStaleRead(input: {
       reportSafeTarget: input.targetSummary,
     });
     const currentFingerprint = fingerprint(current);
-    return deepFreeze({
+    return freezeDeep({
       staleReadId: `${input.laneId}:stale-read`,
       status: current === input.input.target.expectedContent ? "passed" : "stale",
       targetSummary: input.targetSummary,
@@ -412,7 +412,7 @@ async function observeMutationStaleRead(input: {
       ]),
     });
   } catch {
-    return deepFreeze({
+    return freezeDeep({
       staleReadId: `${input.laneId}:stale-read`,
       status: "target_missing",
       targetSummary: input.targetSummary,
@@ -434,7 +434,7 @@ function observeMutationSnapshot(input: {
   readonly notProvenClaims: readonly string[];
 }): MutationSnapshotObservation {
   if (input.staleRead.status !== "passed") {
-    return deepFreeze({
+    return freezeDeep({
       snapshotId: `${input.laneId}:snapshot`,
       status: "not_planned",
       restorePlanAvailable: false,
@@ -448,7 +448,7 @@ function observeMutationSnapshot(input: {
     });
   }
   if (!input.input.snapshot.available) {
-    return deepFreeze({
+    return freezeDeep({
       snapshotId: `${input.laneId}:snapshot`,
       status: "unavailable",
       restorePlanAvailable: false,
@@ -461,7 +461,7 @@ function observeMutationSnapshot(input: {
       ]),
     });
   }
-  return deepFreeze({
+  return freezeDeep({
     snapshotId: `${input.laneId}:snapshot`,
     status: "planned",
     restorePlanAvailable: true,
@@ -487,7 +487,7 @@ async function observeMutationApply(input: {
 }): Promise<MutationApplyObservation> {
   const blocker = applyBlocker(input.authority, input.staleRead, input.snapshot);
   if (blocker) {
-    return deepFreeze({
+    return freezeDeep({
       applyId: `${input.laneId}:apply`,
       status: "blocked",
       attempted: false,
@@ -515,7 +515,7 @@ async function observeMutationApply(input: {
       reason: "controlled mutation apply",
       reportSafeTarget: input.targetSummary,
     });
-    return deepFreeze({
+    return freezeDeep({
       applyId: `${input.laneId}:apply`,
       status: "applied",
       attempted: true,
@@ -529,7 +529,7 @@ async function observeMutationApply(input: {
       ]),
     });
   } catch (error) {
-    return deepFreeze({
+    return freezeDeep({
       applyId: `${input.laneId}:apply`,
       status: "failed",
       attempted: true,
@@ -556,7 +556,7 @@ async function observeMutationRollback(input: {
   const required = input.recoveryDecision === "rollback_required" ||
     Boolean(input.input.recovery?.rollbackAfterVerificationFailure);
   if (!required) {
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "not_attempted",
       targetSummary: input.targetSummary,
@@ -567,7 +567,7 @@ async function observeMutationRollback(input: {
     });
   }
   if (!input.snapshot.restorePlanAvailable) {
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "failed",
       targetSummary: input.targetSummary,
@@ -592,7 +592,7 @@ async function observeMutationRollback(input: {
       reason: "controlled mutation restore",
       reportSafeTarget: input.targetSummary,
     });
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "succeeded",
       targetSummary: input.targetSummary,
@@ -607,7 +607,7 @@ async function observeMutationRollback(input: {
       ]),
     });
   } catch {
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "failed",
       targetSummary: input.targetSummary,

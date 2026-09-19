@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import { redactReportText } from "../core/security/redaction.js";
 import type { AssistantResponseState } from "./assistantResponse.js";
 import type { NextTurnDeliveryPolicyProjection, NextTurnDeliveryStatus } from "./deliveryPolicy.js";
@@ -110,7 +111,7 @@ export function prepareNextTurnBundle(input: {
   ) ?? [];
   const safeToolResultMessages = (input.toolResultMessages?.messages ?? [])
     .filter((message) => message.redactionStatus === "report-safe")
-    .map((message) => freeze({
+    .map((message) => freezeDeep({
       messageId: sanitize(message.messageId),
       toolCallId: sanitize(message.toolCallId),
       toolName: sanitize(message.toolName, 120),
@@ -148,29 +149,29 @@ export function prepareNextTurnBundle(input: {
   ]);
   const requiredUserAction = requiredAction(readinessStatus);
 
-  return freeze({
+  return freezeDeep({
     bundleId,
     turnId: sanitize(input.turnId),
     ...(input.toolOutcomeBundle
       ? { sourceToolOutcomeBundleId: sanitize(input.toolOutcomeBundle.bundleId) }
       : {}),
-    sourceToolResultMessageIds: freeze(Array.from(new Set(sourceToolResultMessageIds))),
-    safeToolResultMessages: freeze(safeToolResultMessages),
-    includedToolResultMessageIds: freeze(Array.from(new Set(includedToolResultMessageIds))),
-    excludedToolResultMessageIds: freeze(Array.from(new Set(excludedToolResultMessageIds))),
-    messageExclusionReasons: freeze(messageExclusionReasons),
+    sourceToolResultMessageIds: freezeDeep(Array.from(new Set(sourceToolResultMessageIds))),
+    safeToolResultMessages: freezeDeep(safeToolResultMessages),
+    includedToolResultMessageIds: freezeDeep(Array.from(new Set(includedToolResultMessageIds))),
+    excludedToolResultMessageIds: freezeDeep(Array.from(new Set(excludedToolResultMessageIds))),
+    messageExclusionReasons: freezeDeep(messageExclusionReasons),
     readinessStatus,
-    blockingFacts: freeze(blockingFacts),
+    blockingFacts: freezeDeep(blockingFacts),
     ...(requiredUserAction ? { requiredUserAction } : {}),
-    deliveryFacts: freeze(deliveryFacts),
+    deliveryFacts: freezeDeep(deliveryFacts),
     ...(input.assistantResponse?.contentSummary
       ? { assistantResponseSummary: sanitize(input.assistantResponse.contentSummary) }
       : {}),
     ...(followUpSummary ? { userFollowUpSummary: sanitize(followUpSummary) } : {}),
-    steeringMessageIds: freeze(input.steeringQueue?.items.map((item) =>
+    steeringMessageIds: freezeDeep(input.steeringQueue?.items.map((item) =>
       sanitize(item.steeringId)
     ) ?? []),
-    followUpMessageIds: freeze(input.followUpQueue?.items.map((item) =>
+    followUpMessageIds: freezeDeep(input.followUpQueue?.items.map((item) =>
       sanitize(item.followUpId)
     ) ?? []),
     ...(input.contextRebuildProjectionId
@@ -179,7 +180,7 @@ export function prepareNextTurnBundle(input: {
     ...(input.sessionActivePathId
       ? { sessionActivePathId: sanitize(input.sessionActivePathId) }
       : {}),
-    providerMetadataIds: freeze((input.providerMetadataIds ?? []).map((id) => sanitize(id))),
+    providerMetadataIds: freezeDeep((input.providerMetadataIds ?? []).map((id) => sanitize(id))),
     ...(input.savePointId ? { savePointId: sanitize(input.savePointId) } : {}),
     ...(input.deliveryPolicy ? { deliveryPolicyId: sanitize(input.deliveryPolicy.policyId) } : {}),
     deliveryStatus,
@@ -280,8 +281,8 @@ function createDeliveryFacts(input: {
   readonly steeringQueue?: SteeringQueueProjection;
   readonly followUpQueue?: FollowUpQueueProjection;
 }): readonly NextTurnDeliveryFact[] {
-  return freeze([
-    ...(input.steeringQueue?.items.map((item) => freeze({
+  return freezeDeep([
+    ...(input.steeringQueue?.items.map((item) => freezeDeep({
       deliveryId: sanitizeId(`${input.bundleId}:steering:${item.steeringId}`),
       sourceNextTurnBundleId: input.bundleId,
       deliveryKind: "steering" as const,
@@ -300,7 +301,7 @@ function createDeliveryFacts(input: {
       ]),
       terminalSuccessClaim: false as const,
     })) ?? []),
-    ...(input.followUpQueue?.items.map((item) => freeze({
+    ...(input.followUpQueue?.items.map((item) => freezeDeep({
       deliveryId: sanitizeId(`${input.bundleId}:follow-up:${item.followUpId}`),
       sourceNextTurnBundleId: input.bundleId,
       deliveryKind: "follow-up" as const,
@@ -323,7 +324,7 @@ function createDeliveryFacts(input: {
 }
 
 function unique(values: readonly string[]): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => redactReportText(value, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => redactReportText(value, 120)))).sort());
 }
 
 function sanitizeId(value: string): string {
@@ -331,14 +332,4 @@ function sanitizeId(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9._:-]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }
