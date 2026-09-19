@@ -1,14 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { ResumeLikePromptTurnInput } from "../../core/shell/continueShellActionRuntime.js";
-import { runResumeLikeShellAction } from "../../core/shell/continueShellActionRuntime.js";
-import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
+import type { ResumeLikePromptTurnInput } from "../core/shell/continueShellActionRuntime.js";
+import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
+import type { ShellRuntimeContext } from "../core/shell/runtimeContext.js";
 import type {
   CodingResultSummary,
   OrchestrationResult,
-} from "../../result/types.js";
-import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
-import { SessionManager, type Session } from "../SessionManager.js";
+} from "../result/types.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
+import { SessionManager, type Session } from "../session/SessionManager.js";
 
 type Scenario = "success" | "partial";
 

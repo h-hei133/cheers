@@ -224,8 +224,7 @@ function runFixture(
   const fixturePath = path.join(
     process.cwd(),
     "src",
-    "session",
-    "__tests__",
+    "test-utils",
     "longSessionDurabilityProcess.ts",
   );
   const result = spawnSync(

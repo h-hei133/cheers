@@ -1846,3 +1846,57 @@ plan.md 全部行内 `file:line` 引用逐条校验：**活文件引用全部在
 | 4 | `runtime/evaluation/task/` 5 文件 | **是** |
 | 5 | R8 标记保持并置 | **是** |
 | 6 | R10 关闭 | 否 |
+
+## [2026-09-19] phase-c-c2-execute | C2 三项已执行；剩余两项分析出**CB-005 遗留的公共面断链**。
+
+产出 `.wiki/refactor/c2-execution.md`。`tsc` 0 错误 / 全量 **494 文件 2750 通过 0 失败** /
+四门禁全过 / **真实 TUI 实机通过**。
+
+### 已执行三项
+
+1. **删 `runtime/events/host/envelope.ts`（106 行）**——CB-005 遗漏的 host lane 遗留物。
+   六项检查通过：`HostEventEnvelope` 消费者 0、无动态入口、不在公共面、无脚本引用。
+   连空目录 `runtime/events/host/` 一并移除。
+2. **R9：`session/__tests__/` 归并到 `test-utils/`**——全仓唯一 `__tests__` 目录**已消除**。
+   同步更新 **3 个 import + 1 处动态路径字符串**（`longSessionDurability.test.ts:224-229`
+   的 `spawnSync` 路径）+ 2 个文件内部相对深度。97 项相关测试全通过（含动态入口测试）。
+3. **关闭 R10**（前提被证伪，见 `c2-inventory.md` §1）。
+
+### 剩余两项分析
+
+**R11 `eval/browser/`（114 行）→ 建议保留**。实测被 3 个测试真实调用（29 项），
+`runBrowserEvalBenchmark` + `createBrowserEvalBenchmarkReport` 均在用；不是重复实现。
+原判"语义已被 `evidence/harness/` 取代"**本次未获证实**。
+建议仅加入 `tsconfig.build.json` 的 `exclude`（测试专用代码不应进发布产物）。
+
+**`runtime/evaluation/task/` 5 文件（2,447 行）→ 建议随 `runtime/evaluation` 整体裁决。**
+
+**关键发现（比"零引用"更强）**：这 5 个文件不仅无引用，而且**无法被调用**——
+`liveRun.ts:391` 的 `runTaskLiveReport` 要求
+`dispatch: (command: unknown) => Promise<HostCommandResponse>`，
+而唯一生产者 `runtime/api/host/runtime.ts`（`createHostRuntime`）已随 CB-005 删除。
+实测非测试代码中 `grep createHostRuntime` = **0**。
+
+**更大的问题**：`index.ts` **公共面**导出的 `runEvaluationCase` / `runEvaluationSuite` /
+`runTaskAssessment` / `runTaskCase` **有完全相同的依赖**（都要 host `dispatch`）。
+**CB-005 前** `index.ts` 同时导出 `createHostRuntime`（生产者）与这些消费函数；
+**CB-005 删了生产者、留了消费者** → 公共面上留下一组**无法使用**的 API。
+
+**这是 CB-005 遗留的公共面断链**（当时记为"三个待裁决的公共面问题"之一），非本轮引入。
+
+**裁决应回答**：**评测/基准能力是否留在产品里？**
+- 若要 → 需恢复一个 host dispatch 生产者（部分撤销 CB-005）
+- 若不要 → 连同 `index.ts` 的 evaluation 导出一并删除
+
+### 执行前后对照
+
+| 维度 | 前 | 后 |
+|---|---|---|
+| `__tests__` 目录数 | 1（全仓唯一孤例） | **0** |
+| CB-005 遗留孤儿 | 1（106 行） | **0** |
+| R10 | 未决（前提错误） | **已关闭** |
+| 全量测试 | 2750 通过 | **2750 通过**（不变） |
+| 测试文件数 | 494 | **494**（不变） |
+
+**代价**：3 个测试 import 路径变长一层；`test-utils/` 现承载 2 个可被 spawn 的进程入口
+（但已被 `tsconfig.build.json` 排除，不进产物）。

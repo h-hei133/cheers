@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { handleSigint } from "./entrypoints/handleSigint.js";
-import { createLongSessionContinuityFixture } from "./session/__tests__/longSessionContinuityFixtures.js";
+import { createLongSessionContinuityFixture } from "./test-utils/longSessionContinuityFixtures.js";
 import { SessionManager } from "./session/SessionManager.js";
 import {
   createGitRepoFixture,

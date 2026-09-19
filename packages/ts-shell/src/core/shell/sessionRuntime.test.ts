@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createLongSessionContinuityFixture } from "../../session/__tests__/longSessionContinuityFixtures.js";
+import { createLongSessionContinuityFixture } from "../../test-utils/longSessionContinuityFixtures.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { seedWriterStartedStoppedRecoveryContextSession } from "../../test-utils/stoppedRecoveryFixture.js";
 import { runCompactCommand } from "../../context/compact/command/compactCommandRunner.js";

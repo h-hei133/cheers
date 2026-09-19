@@ -1187,6 +1187,7 @@ runtime 装配四重证据。
 | `turn-vs-pi-divergence.md` | **turn 实现与参考项目 pi 的差异对照**：3 处结构性差异；`codingResult` 早于 pi 对齐 5 个月且职能已有活轨替身 |
 | `cb-005-execution.md` | **CB-005 执行记录（已完成）**：删 69 文件 / −23,631 行；验证矩阵与 TUI 实机结果；含 `cliReachable` 口径被死代码污染的说明 |
 | `c2-inventory.md` | **C2 启动前盘点**：R10 前提被证伪（应关闭）；R9/R11 可执行；发现 2 个真孤儿簇 |
+| `c2-execution.md` | **C2 执行记录**：三项已执行（删 host 遗留 / R9 归并 / 关闭 R10）；R11 与 evaluation 孤儿的深入分析与建议 |
 | `handoff-2026-09-17.md` | 任务转接包（方向、记录位置、执行要求） |
 | `audit-raw/*.json` | 403 个已删文件的逐文件判定原始表 |
 | `step-2.6-plan.md` | Step 2.6 方案与执行记录 |
@@ -1230,7 +1231,7 @@ development-workflow、compatibility-and-history、reference-repositories）。
 | **R7** | `docs/` 分类归档（route 时代约 700 份） | §3.9.6 | **是**（分界） | 低（零测试依赖，已实测） | 中 |
 | **R8** | 测试是否分离到 `test/`（`pi` 形态） | §3.8/§3.10.4 | **是**（风格决策） | 中（~1799 边） | 低—中 |
 | **R9** | `session/__tests__/` 归并（全仓唯一孤例） | §3.8-4 | 随 R8 | 低 | 低 |
-| **R10** | `presentation/theme/` 与 `themes/` 合并 | §3.8-5 | **是**（命名） | 低 | 低 |
+| **R10** | ~~`presentation/theme/` 与 `themes/` 合并~~ | §3.8-5 | — | — | **❌ 已关闭（2026-09-19）**：前提被证伪，二者是数据/引擎分层，见 `c2-inventory.md` §1 |
 | **R11** | `eval/` 归并（语义已被 `evidence/harness/` 取代） | §3.8-6 | **是** | 低 | 低 |
 | **R12** | `check:*` 借鉴 `pi` 的检查项 | §3.10.3 | 否 | 低 | 低 |
 | **R13** | ~~`turn` 内核与编排层不连通（**CB-005**，架构级）~~ | §3.4 | — | — | **✅ 已完成（2026-09-19）**，见 §8.2.1 |
@@ -1426,6 +1427,26 @@ body 为字面量表时可达 **80 行/名**。**长度不是复杂度**，无�
 | **新增** `runtime/evaluation/task/` 5 文件 | — | **孤儿簇**（2,447 行，0 生产引用），**需裁决** |
 
 **无需裁决、可立即执行**：删 `runtime/events/host/envelope.ts`、R9 归并、关闭 R10。
+**以上三项已于 2026-09-19 执行完毕**，见 `c2-execution.md`。
+
+**执行结果**：`host/envelope.ts` 已删；`session/__tests__/` 已消除（2 文件迁至 `test-utils/`，
+同步更新 3 个 import + 1 处 `spawnSync` 路径字符串）；R10 已关闭。
+`tsc` 0 错误 / 全量 **494 文件 2750 通过 0 失败** / 四门禁全过 / 真实 TUI 实机通过。
+
+**剩余两项的深入分析（`c2-execution.md` §2）**：
+
+1. **R11 `eval/browser/`（114 行）→ 建议保留**。实测被 3 个测试真实调用（29 项），
+   且不是重复实现；原判"已被 `evidence/harness/` 取代"**未获证实**。
+   建议仅把它加入 `tsconfig.build.json` 的 `exclude`（测试专用代码不应进发布产物）。
+2. **`runtime/evaluation/task/` 5 文件（2,447 行）→ 建议随 `runtime/evaluation` 整体裁决**。
+   **关键发现**：它们不仅无引用，而且**无法被调用**——`runTaskLiveReport` 需要
+   `dispatch => Promise<HostCommandResponse>`，而唯一生产者 `createHostRuntime`
+   已随 CB-005 删除。**同样的问题也存在于 `index.ts` 公共面导出的
+   `runEvaluationCase` / `runTaskAssessment`**：CB-005 删了生产者、留了消费者。
+
+   **这是 CB-005 遗留的公共面断链**（当时记为"三个待裁决的公共面问题"之一）。
+   裁决应回答：**评测/基准能力是否留在产品里？**
+   若要 → 需恢复 host dispatch 生产者；若不要 → 连同 `index.ts` 的 evaluation 导出删除。
 
 ### 8.3 本轮规划的三个判断依据
 
