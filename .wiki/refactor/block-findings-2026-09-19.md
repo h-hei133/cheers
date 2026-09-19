@@ -1074,3 +1074,177 @@ pi 的结构性原因已在主报告记录：它用**真实 npm workspace 包**�
 | `capabilityModel` 消费者数 | 88 | **97**（`browser/` 内）/ 101（全域） |
 | `*Executor` 文件数 | 10 | `browser/` 内 **13** |
 | `*Adapter` 文件数 | 3 | 3（正确） |
+
+---
+
+## 14. 区块 C / F / H / I / J / B / E 的死代码普查（主代理机械扫描，2026-09-19）
+
+> **口径**：这 7 个区块的子代理回报尚未全部返回。本节先给出**主代理自己可复核的机械结果**：
+> 对每个区块，用 value 边正向闭包（根 = `entrypoints/**` + `index.ts`，含 `.tsx`）
+> 判定不可达生产文件，再逐文件统计外部 value 消费者与测试引用数。
+> **标注 `DYNAMIC` 的文件经动态入口复核**（`spawn`/`execFile`/`import(`/shebang/`process.argv`）。
+> **本节只报事实，不做裁决。**
+
+### 14.0 汇总
+
+| 区块 | 孤立文件 | 行数 |
+|---|---:|---:|
+| H 工具 harness | 26 | 7,176 |
+| F provider 与环境 | 17 | 4,280 |
+| J 小域支撑 | 15 | 2,927 |
+| B 会话与 shell | 17 | 2,071 |
+| C 上下文与记忆 | 7 | 1,851 |
+| I 规划与工作流 | 14 | 1,705 |
+| E 交互面 | 12 | 1,044 |
+| **合计** | **108** | **21,054** |
+
+**注**：108 < §6 的 285，差额是这些域中**不可达但未被判为孤立**的文件
+（它们位于不可达簇内部、有簇内消费者），以及 A/D/G 三区块已单列的部分。
+
+### 14.1 H 工具执行与 harness（26 文件 / 7,176 行，最大）
+
+| 行数 | 文件 | 备注 |
+|---:|---|---|
+| 3,006 | `runtime/events/projection.ts` | 已知（§1、§2）；`tests=4` |
+| 580 | `runtime/resources/inventory.ts` | **唯一消费者是 `import type`**（`runtime/events/projection.ts:27`）|
+| 401 | `tools/toolCallBatch.ts` | **唯一消费者是 `import type`**（`runtime/events/projection.ts:38`）|
+| 366 | `core/harness/agentScenarioRunner.ts` | `tests=4` |
+| 296 | `tools/toolOutcomeBundle.ts` | `tests=2`；**含 6 份 `sanitizeText` 之一**（§12.2）|
+| 222 | `tools/toolHandoff.ts` | `tests=1` |
+| 206 | `core/harness/agentCliScenarioRunner.ts` | `tests=15` `hint` |
+| 176 | `runtime/events/stream.ts` | 已知（§1）|
+| 156 | `runtime/resources/projection.ts` | **`DYNAMIC`** |
+| 128 | `core/tools/messagingTools.ts` | `tests=1` |
+| 其余 15 个 | 23–210 | 多为 `core/harness/*Fixtures.ts`（**测试基建，不可删**）|
+
+**结构性观察**：H 区块的 26 个孤立文件里，**约 11 个是 `core/harness/*Fixtures.ts` / `*Scenario*`**
+（场景测试基建，按方法论**不算死代码**）。真正可疑的是
+`runtime/resources/inventory.ts`、`tools/toolCallBatch.ts`（**只有 type 消费者**）
+与 `runtime/events/*`（§1 已裁决）。
+
+### 14.2 F provider 与环境（17 文件 / 4,280 行）
+
+| 行数 | 文件 | 备注 |
+|---:|---|---|
+| 857 | `provider/request/attempt.ts` | `tests=2`；**全仓 >600 行文件之一**（§5）|
+| 800 | `provider/request/boundary.ts` | `tests=5`；**三个 `boundary.ts` 之一**（§10.3）|
+| 386 | `provider/proposal/providerEditProposal.ts` | 见下 |
+| 301 | `provider/response/stream.ts` | `tests=1` |
+| 253–178 | `provider/proposal/provider{AnchoredProposal,AnchorMatcher,AnchorConflict,AnchoringResult,AnchorQuality,ProposalAnchors}.ts` | 见下 |
+| 164 | `provider/proposal/providerOutputValidator.ts` | `tests=6` |
+| 155 | `model-adapters/types.ts` | 纯类型 |
+| 107 | `provider/liveProviderSmokeFallback.ts` | `tests=1` |
+| 89 | `provider/response/synthetic.ts` | `tests=1` |
+| 72/58 | `model-adapters/{multimodal,strictSchema}.ts` | |
+| 17 | `sandbox/index.ts` | **`DYNAMIC`** |
+
+**`provider/proposal/` 整簇 2,899 行**。其外部消费者只有两类：
+- `redactProviderEditText` 从 `providerEditContext.js` 被 4 个**不可达**文件 value 导入
+  （`repair/verificationRepairContext.ts:9`、`edit/proposal/editRepairContext.ts:6`、
+  `edit/proposal/editRepairProposal.ts:3`、`planning/task/taskIntent.ts:4`、
+  `verification/command/plan.ts:9`）
+- 其余全是 `import type`（`edit/proposal/editProposalReview.ts:2`、`planning/quality/model.ts:23-24`）
+- **结论：该簇的 value 消费者全部落在不可达区**，是「死簇养死簇」的形态
+
+### 14.3 J 小域与支撑（15 文件 / 2,927 行）
+
+| 行数 | 文件 | 备注 |
+|---:|---|---|
+| 685 | `test-utils/stoppedRecoveryFixture.ts` | **测试基建，不可删** |
+| 610 | `test-utils/longSessionDurabilityProcess.ts` | **`DYNAMIC`（`spawnSync` 启动）** —— §8 方法论提醒第 2 条的实例 |
+| 368 | `test-utils/cliHarness.ts` | 测试基建 |
+| 337 | `test-utils/longSessionContinuityFixtures.ts` | 测试基建 |
+| 167 | `core/messaging/sessionSocketHost.ts` | `tests=1` |
+| 163 | `core/security/projectTrust.ts` | `tests=1` |
+| 139 | `core/hooks/types.ts` | 纯类型 |
+| 129 | `test-utils/ptyCapabilityDetector.ts` | 测试基建 |
+| 104 | `test-utils/terminalDouble.ts` | 测试基建 |
+| 57 | `core/mcp/types.ts` | 纯类型 |
+| 48/43/20 | `eval/browser/benchmark{Report,Runner,Model}.ts` | `tests=3` —— **R11 已裁决"保留原位"** |
+| 42 | `core/messaging/types.ts` | 纯类型 |
+| 15 | `test-utils/cleanup.ts` | 测试基建 |
+
+**观察**：J 区块 15 个孤立文件中 **6 个在 `test-utils/`**（按方法论**不是死代码**），
+4 个是纯 `types.ts`，3 个是 R11 已裁决保留的 `eval/browser/`。
+**真正待裁决的只有 2 个**：`core/messaging/sessionSocketHost.ts`、`core/security/projectTrust.ts`。
+
+### 14.4 B 会话与 shell（17 文件 / 2,071 行）
+
+| 行数 | 文件 | 备注 |
+|---:|---|---|
+| 468 | `session/replay/state.ts` | `tests=1` —— **replay 子树的孤立部分**（`builder.ts` 本身是活的）|
+| 273 | `session/sessionDagEngine.ts` | `tests=1` `hint` |
+| 257 | `session/continuation/readiness.ts` | `tests=3` |
+| 241 | `session/store/host/state.ts` | **`host` 子目录**（CB-005 删 host lane 的遗留命名）|
+| 166 | `session/presentation/facts.ts` | `tests=1`（`presentation/` 子目录名见 `plan.md` B3 的 `renderer/` 先例）|
+| 142 | `session/sessionContinuityTypes.ts` | 纯类型 |
+| 112 | `session/store/threadState.ts` | `tests=1` |
+| 110 | `core/shell/platform/processTree.ts` | `tests=1` `hint` |
+| 72 | `session/replay/host/facts.ts` | 同 `host` 命名问题 |
+| 47 | `session/recovery/sessionReconciler.ts` | `tests=1` |
+| 47 | `core/shell/approval/types.ts` | 纯类型 |
+| 其余 6 个 | 17–29 | 纯 `types.ts` |
+
+**观察**：B 区块 17 个孤立文件中 **7 个是纯 `types.ts`**（17–155 行）。
+真正有体量的可疑项是 `session/replay/state.ts`(468)、`sessionDagEngine.ts`(273)、
+`session/continuation/readiness.ts`(257)、`session/store/host/state.ts`(241)。
+注意 `session/store/host/` 与 `session/replay/host/` 两个 **`host`** 子目录名，
+与 CB-005 删除的 host lane 同源。
+
+### 14.5 C 上下文与记忆（7 文件 / 1,851 行）
+
+| 行数 | 文件 | 备注 |
+|---:|---|---|
+| 827 | `context/readDeliveryProjection.ts` | `tests=1`；**全仓 >600 行文件之一**（§5）|
+| 292 | `context/acquisition/summary.ts` | `tests=1` |
+| 206 | `context/rebuildInput.ts` | `tests=3`；**含 3 份 `sanitizeText` 之一**（§12.4）|
+| 194 | `context/sessionContextRebuildProjection.ts` | `tests=7` |
+| 152 | `context/compact/governance/contextAnalysis.ts` | `tests=1` |
+| 115 | `core/context/model/contextLayerModel.ts` | `tests=1` |
+| 65 | `core/memory/types.ts` | 纯类型 |
+
+### 14.6 I 规划与工作流（14 文件 / 1,705 行）
+
+| 行数 | 文件 | 备注 |
+|---:|---|---|
+| 433 | `planning/action/graph.ts` | `tests=1` |
+| 240 | `planning/runtime/engine.ts` | `tests=2` **`DYNAMIC`** —— 即 judge 越界名单中的 `planning/runtime/engine.ts`（§10.3 模块-2）|
+| 208 | `core/workflow/teamStore.ts` | `tests=1` `hint` |
+| 164 | `planning/task/workflowTaskPlanner.ts` | `tests=1`；**是 `browser/agent.ts` 的唯一 type 消费者**（§13.3 D-死-1）|
+| 153 | `planning/runtime/types.ts` | 纯类型 |
+| 其余 9 个 | 21–79 | `core/workflow/*`(5) + `core/research/types.ts` + `core/subagents/types.ts` + `workflow/gitChangeSetAttribution.ts` |
+
+**交叉验证**：`planning/runtime/engine.ts` 同时出现在
+(a) 本节不可达名单、(b) judge 的 `declared_functions_within_module_ceiling` 名单（§10.3 模块-2）。
+**一个不可达文件同时被判越界** —— 两个判据在同一处叠加。
+
+### 14.7 E 交互面（12 文件 / 1,044 行）
+
+| 行数 | 文件 | 备注 |
+|---:|---|---|
+| 275 | `core/commands/authCommandRuntime.ts` | `tests=1`；**含 `normalizeBaseUrl` 4 份之一**（§12.4）|
+| 244 | `presentation/sidebar/sidebarEventBridge.ts` | `tests=3` |
+| 142 | `core/commands/types.ts` | 纯类型；**是 `runBrowserCommandAsync` 32 字段的第二份声明**（§13.7 对照-4）|
+| 110 | `presentation/sidebar/sidebarStateQuality.ts` | `tests=1` |
+| 99 | `presentation/sidebar/sidebarLivePanelQuality.ts` | `tests=1` |
+| 64 | `cli/interactive/interactiveCancellation.ts` | `tests=1` |
+| 38 | `cli/options/cliOptions.ts` | 纯类型 |
+| 27 | `entrypoints/handleSigint.ts` | `tests=1` |
+| 24 | `entrypoints/cli.tsx` | **`DYNAMIC`** `hint` —— **这是 `package.json` 的 `bin` 入口**，本次扫描把它判为不可达属于**已知误报**（见下） |
+| 13/4/4 | `cli/approval/approvalModeContract.ts`、`entrypoints/cli{Stdin,Print}ModeRunner.ts` | |
+
+> **⚠️ 本节已知的一处误报**：`entrypoints/cli.tsx` 被列为不可达，但它是
+> `packages/ts-shell/package.json` 中 `bin.agents = ./dist/packages/ts-shell/src/entrypoints/cli.js`
+> 的入口。误报原因：本次闭包的根集合是 `entrypoints/**` 的**文件名**，
+> 而 `cli.tsx` 的 `.tsx` 扩展名在 `.js`→`.ts` 的改写规则下**未能自匹配**。
+> 该文件已标 `DYNAMIC` `hint`，**不计入待裁决范围**。
+> 这再次印证 §8 方法论提醒：**入口识别必须显式处理 `.tsx`**。
+
+### 14.8 与 pi 的对照
+
+pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27 处）。
+本节补充一条结构性差异：**pi 的测试基建集中在 `packages/*/test/`**
+（按主题组织，**不镜像 src**），故「测试基建」与「生产代码」在**目录层面**就分开了；
+本仓的 `core/harness/*Fixtures.ts` 与生产文件**同级混放**，
+这正是本节 26 个孤立文件里要人工剔除 11 个测试基建的原因。
+（注：R8 已裁决**测试保持并排、不分离**，故这条**不建议照做**，仅记录差异。）
