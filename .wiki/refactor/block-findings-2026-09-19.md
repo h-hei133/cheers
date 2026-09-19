@@ -1451,3 +1451,88 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
   **其中的 CJK 截断风险回报自标"置信度：中"，且未做运行时验证**
 - 「`core/commands/` 有 23 个生产文件含跨域 import」（§3 的 127 条 value 边结论独立成立）
 - 「`presentation/surface/` 为空目录但仍在规则示例中」（E-命名相关，未复核）
+
+---
+
+## 16. 区块 H / I / J 的重复实现（主代理机械扫描，2026-09-19）
+
+> 这三个区块的完整子代理回报尚未派出；本节给出**主代理跨区块哈希扫描**中落在
+> 这三个区块内的结果（方法同 §12：`function` 声明式、逐字节比对、跨文件、≥3 行）。
+> **死代码部分已见 §14。** 本节只补重复实现。
+
+### 16.1 区块 H 工具执行与 harness（`core/tools/ tools/ runtime/ core/harness/`）
+
+**块内自成组的重复（全部在 `core/harness/` 内有 `*Assertions.ts`）**：
+
+| 组 | 份数 | 行 | 位置 |
+|---|---:|---:|---|
+| `requiredText` | 3 | 4 | `core/harness/agentCliScenarioAssertions.ts`、`core/harness/agentScenarioAssertions.ts`、`core/harness/browserExecutionReceiptAssertions.ts` |
+| `hasRawContentOrSecrets` | 2 | 8 | 同上首尾两者 |
+| `requiredSection` | 2 | 4 | 同上首两者 |
+
+**已核验**：三份 `requiredText` 函数体 **sha256 前 12 位同为 `8daeee558965`**。
+
+**跨区块组（H 有一份，其余在别处）**：
+
+| 组 | 份数 | 位置（H 内 → 外） |
+|---|---:|---|
+| `deepFreeze` | 13 | **H 内 6 份**（`runtime/events/projection.ts:2998`、`runtime/events/stream.ts:168`、`runtime/extensions/lifecycle.ts:374`、`runtime/resources/descriptor.ts`、`runtime/resources/inventory.ts`、`runtime/resources/projection.ts`、`tools/policy/interception.ts`、`tools/toolCallBatch.ts`）→ 外 `context/`、`policy/`、`provider/`、`session/` |
+| `freeze` | 13 | H 内 `tools/toolOutcomeBundle.ts` → 外 `context/rebuildInput.ts:194`、`evidence/host/proof.ts:48` 等 |
+| `sanitizeText` | 6 | H 内 `tools/toolOutcomeBundle.ts:271` → 外 `edit/sanitize.ts:36`、`turn/*`（**§12.2 的 6 份之一**）|
+| `sanitizeId` | 4 | H 内 `tools/toolHandoff.ts:195`、`tools/toolOutcomeBundle.ts:264` → 外 `turn/deliveryPolicy.ts:124`、`turn/nextTurnBundle.ts:328` |
+| `sanitizeWithTracking` | 3 | H 内 `runtime/resources/inventory.ts:518`、`tools/policy/interception.ts:370` → 外 `policy/resourceTrustPolicy.ts:120` |
+| `isPrivateNetworkHost` | 3 | H 内 `core/harness/browserPublicReadOnlyWebSmokeConfig.ts:151` → 外 `browser/publicReadOnlyWebManifest.ts:375`、`browser/publicReadOnlyWebPolicy.ts:168` |
+
+**新发现的具体项**：
+- `stableId(prefix, parts)` 在 `runtime/resources/inventory.ts:557` 与
+  `tools/policy/interception.ts:397` 各一份，**签名逐字节相同**
+- **`runtime/resources/` 子树有 4 份 `deepFreeze`**（`descriptor.ts`、`inventory.ts`、
+  `projection.ts` + `runtime/events/*` 2 份）→ 同一子域内 6 份，是该区块最密集处
+- `runtime/resources/inventory.ts` 与 `runtime/resources/projection.ts` 均**已判不可达**（§14.1），
+  故其重复副本属"死代码内的重复"——**收口的优先级应排在活文件之后**
+
+### 16.2 区块 I 规划与工作流（`planning/ core/workflow/ workflow/ core/research/ core/models/ core/subagents/`）
+
+**块内重复极少（仅 1 组）**：
+- `tail` / `trim`（3 行，2 份）：`core/workflow/runner.ts` → 外 `core/commands/loopCommandRuntime.ts`
+
+**同名不同体的函数（非重复，但需注意）**：
+- `planning/handoff/mutation.ts:613` `isReadOnlyTask(taskKind: string)`
+- `planning/runtime/support.ts:143` `isReadOnlyPlanningTask(taskKind: ContextEngineResult[...])`
+- 两者**输入类型不同**（`string` vs 具体 union），**属同名碰撞而非重复**；
+  但 `isReadOnlyPlanningTask` 的入参是 `ContextEngineResult["workflowPlan"]["taskKind"]`，
+  即它依赖 `context/` 的类型 —— 这是 §4「planning ↔ context 双向」的又一处具体表现
+
+**观察**：区块 I 的重复密度**显著低于 H 与 G**（1 组 vs 9 组 vs 56 组中的多数）。
+这与 §14.6 的死代码分布一致：I 的问题主要是**不可达**（14 文件 / 1,705 行），而非重复。
+
+### 16.3 区块 J 小域与支撑
+
+**块内重复：0 组。** `eval/`、`observability/`、`core/{auth,hooks,mcp,messaging,paths,security,skills,state}/`
+在本次扫描中**无逐字节重复的函数体**。
+
+**但跨区块组有 3 处（J 内一份 + 外部）**：
+
+| 组 | 份数 | 位置 |
+|---|---:|---|
+| `normalizeBaseUrl` | 4 | J 内 `core/auth/providerAuthRuntime.ts:250` → 外 `config/runtimeConfig.ts:432`、`core/commands/authCommandRuntime.ts:268`、`core/shell/providerCredentials.ts:253` |
+| `normalizeConnections` | 2 | J 内 `core/auth/providerAuthRuntime.ts:225` → 外 `core/commands/modelCommandRuntime.ts:538` |
+| `normalizeOptional`（J 内为 `normalizeOptionalString` 一族） | 3 | 见 §12.4 |
+
+**即 `core/auth/providerAuthRuntime.ts` 是 `normalizeBaseUrl`/`normalizeConnections` 的源头之一**，
+而 `core/commands/*` 与 `core/shell/*` 各抄一份 —— 这三处正是 `AGENTS.md` 所说
+"core 不得依赖 feature 域"之外的**另一类问题**：**core 内部横向重复**。
+
+### 16.4 与 pi 的对照
+
+pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本规范化）**共 2 处定义**
+（§12.5 实测）。本节三个区块的 9 组 / 40+ 副本与本仓整体一致：
+**问题不在某个区块，而在全仓没有"工具函数放在哪"的单一归属**。
+
+### 16.5 口径与边界
+
+- 本节覆盖的是**逐字节相同**的 `function` 声明；**箭头函数未纳入**，故是下界。
+- **未裁决任何一条**。特别地：`normalizeBaseUrl` / `normalizeConnections` 的四处
+  可能因"读 config"与"写 config"语境不同而合理独立（同 §12.6 对 `toRelativeTime` 的保留）。
+- 区块 H/I/J 的**命名与位置**、**模块划分**、**耦合度**三类问题**尚未系统探索**，
+  不在本节范围；如需，应另派子代理。
