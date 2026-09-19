@@ -158,10 +158,18 @@ runtime/events/stream.ts       prod=0  test=2
 
 ## 4. `planning` ↔ `context` 双向依赖（36 + 27 边）
 
-| 方向 | 边数 |
-|---|---:|
-| `planning` → `context` | 36 |
-| `context` → `planning` | 27 |
+| 方向 | 边数（含 `import type`） | 其中 **value** | 其中 type |
+|---|---:|---:|---:|
+| `planning` → `context` | **36** | **3** | 33 |
+| `context` → `planning` | **27** | **18** | 9 |
+
+> **2026-09-19 主代理复测**：36 与 27 两个数字**可复现**，但它们是**含 `import type` 的总数**
+> （36 = 3 value + 33 type；27 = 18 value + 9 type）。原表未标注这一点，
+> 而**本文件通篇的其它边数一律是 value-only**（见 §3、§7 的口径声明的"排除 `import type`"），
+> 故这里必须显式区分——否则会与 §3 的口径冲突。
+>
+> **实质结论不变**：`planning → context` 的 36 条里只有 **3 条是可执行依赖**，
+> 其余 33 条是类型引用；即两个域之间的**运行期耦合比表面数字小得多**。
 
 **具体证据**：
 - `context/acquisition/graph.ts:2,5,18,24,32-37` → 20 条到 `planning/` 的 value 导入
