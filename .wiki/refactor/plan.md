@@ -1631,7 +1631,10 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | **T12** | 删 `browser/toolPolicy.ts`+`agent.ts`+`plan.ts` 死链（589 行） | §13.3 D-死-1 | 低 |
 | **T13** | 修 `cliArgs.ts` 保留字表重复项 `/memory` | §15.8 | 无（低） |
 | **T14** | 收口 `normalizeBaseUrl`(4)/`normalizePathForCompare`(7)/`toRelativeTime`(4)/`stableId`(2) | §12.4、§16 | 中（需先定 owner） |
-| **T15** | 处理 2 个脚本式 `*.test.mjs`：或加 `vitest.config.ts` 的 `exclude`，或补 npm script，或改名去掉 `.test` | §9.9「测试跑法」 | **低**（三者皆可，需选一） |
+| **T15** | 处理 2 个脚本式 `*.test.mjs` | §9.9「测试跑法」 | ✅ **已完成**（`b7b7880b`）：改名去掉 `.test`，见 §9.11 |
+| **T16a** | 裁决 `block-findings` §6 的不可达簇（含 `mutation.ts`）是否删除 | §9.10 | **需裁决**（T3 的替代处置）|
+| **T16b** | 若不删，先给 `mutation.ts` 接真实生产者，再接结构化判定 | §9.10 | **需裁决**（属"接线"，非"删嗅探"）|
+| **T17** | 处理"从仓库根跑 vitest"的 11 文件 / 16 项失败：9 个缺根配置致 5s 超时 + 2 个测试自身 cwd 依赖 | §9.12 | **需裁决**（加根配置 vs 修测试 cwd vs 仅文档化）|
 
 ### 9.9 T1 执行记录（2026-09-19，已完成）
 
@@ -1677,7 +1680,7 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 |---|---|---|
 | `longSessionDurability.test.ts`（2 项） | 测试内 `repoRoot = path.resolve(process.cwd(), "../..")`，**假定 cwd = `packages/ts-shell`**。从仓库根跑时算出 `repoRoot = /home/wang` → `tsxCli = /home/wang/node_modules/tsx/dist/cli.mjs`（不存在）→ 子进程退出码 1 | 从错误 cwd 跑报 `Cannot find module '/home/wang/node_modules/tsx/dist/cli.mjs'`；从正确 cwd 跑 **2/2 通过** |
 | `core/mcp/gateway.test.ts`（1 项） | 同类：spawn 的 fixture 路径以 cwd 为基准，从仓库根跑时解析成 `/home/wang/projects/coding-agents/src/core/mcp/fixtures/mockMcpServer.mjs`（**缺 `packages/ts-shell/` 前缀**）| 从正确 cwd 跑 **9/9 通过** |
-| `scripts/verify/verifierModuleBoundary.test.mjs`<br>`scripts/real-provider-smokes/approvedProviderEnv.test.mjs` | 这两个是**脚本式自检**（`node:assert` + `console.log('[pass] ...')`，**无 `describe`/`it`**），设计为 `node <file>` 独立执行；从仓库根跑时被 vitest 默认 glob 当测试收集 → `No test suite found`。**已由 T15 修复**（改名去掉 `.test`）| 从 `packages/ts-shell` 跑时 vitest root 只含 `packages/ts-shell`，`scripts/` 不在范围内 |
+| `verifierModuleBoundary` 与 `approvedProviderEnv` 两个自检脚本（原带 `.test` 后缀，已由 T15 改名，见 §9.11） | 这两个是**脚本式自检**（`node:assert` + `console.log('[pass] ...')`，**无 `describe`/`it`**），设计为 `node <file>` 独立执行；从仓库根跑时被 vitest 默认 glob 当测试收集 → `No test suite found`。**已由 T15 修复**（改名去掉 `.test`）| 从 `packages/ts-shell` 跑时 vitest root 只含 `packages/ts-shell`，`scripts/` 不在范围内 |
 | `core/harness/browser*ScenarioExamples.test.ts`（8 个）<br>`core/tools/registry-rust-bridge.test.ts` | **`Test timed out in 5000ms`** —— 不是 cwd 路径问题，而是**根目录没有 `vitest.config.ts`**！本仓唯一的 vitest 配置是 `packages/ts-shell/vitest.config.ts`（`testTimeout: 30000`）。从仓库根跑时 vitest 找不到任何配置 → 用**默认 5000ms** → 这些 8–16s 的进程型场景测试必然超时 | CI 用 `npm run test:ts`（cwd = `packages/ts-shell`）→ 正确加载该配置 |
 
 **何时引入（git 实测）**：
@@ -1685,8 +1688,8 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | 项 | 引入时间 | 引入提交 |
 |---|---|---|
 | `longSessionDurability.test.ts` 的 `repoRoot = cwd/../..` 假设 | **2026-05-11** | `d77d5d80` "Add long-session durability gate" |
-| `scripts/verify/verifierModuleBoundary.test.mjs` | **2026-05-20** | `bdd5f289` |
-| `scripts/real-provider-smokes/approvedProviderEnv.test.mjs` | **2026-06-03** | `f84e6ab2` |
+| `verifierModuleBoundary` 自检脚本（旧名，现为 `verifierModuleBoundaryCheck.mjs`） | **2026-05-20** | `bdd5f289` |
+| `approvedProviderEnv` 自检脚本（旧名，现为 `approvedProviderEnvCheck.mjs`） | **2026-06-03** | `f84e6ab2` |
 | **根目录不存在 `vitest.config.ts`**（唯一配置在 `packages/ts-shell/`） | 自始至终 | — |
 
 **即：这不是本轮回溯中任何一步引入的，也不是本轮重构引入的** ——
@@ -1741,3 +1744,44 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
   但这属于"接线"，不是本轮"删嗅探"能覆盖的范围。
 
 **本轮不做**：不修改 `mutation.ts`，不删除任何嗅探分支，不动其测试。
+
+### 9.11 T15 执行记录（2026-09-19，已完成）
+
+| 项 | 内容 |
+|---|---|
+| **目标** | 让 2 个脚本式自检不再被 vitest 误收集 |
+| **提交** | `b7b7880b` |
+| **修法** | **改名去掉 `.test`**（用户裁决）：`verifierModuleBoundary.test.mjs` → `verifierModuleBoundaryCheck.mjs`；`approvedProviderEnv.test.mjs` → `approvedProviderEnvCheck.mjs` |
+| **依据** | `scripts/` 下另有 **80 个 `.mjs`**，**只有这 2 个**带 `.test` 后缀 —— 它们是命名异类，而非 vitest 测试 |
+| **同步引用** | 4 个文件、7 处：`foundation-consistency-audit.md`(1)、`foundation-consistency-matrix.json`(2)、`foundation-risk-register.md`(2)、`route159-verifier-module-facades.md`(2) |
+| **用的命令** | `git mv`（保留重命名历史）|
+
+**验证**：
+
+| 检查 | 结果 |
+|---|---|
+| 两脚本直接执行（预期方式 `node <file>`） | ✅ `verifierModuleBoundary=pass` / `[pass] approved-provider-env-fallback-self-test`，均 exit 0 |
+| vitest 是否仍收集 `scripts/` | ✅ `npx vitest list \| grep -c scripts/` = **0** |
+| 官方入口全量 | ✅ **493 文件 / 2748 项（2747 通过 + 1 跳过）/ 0 失败**，与 §1 基线一致 |
+| `verify:docs-drift:strict` | ✅ 0 dangling |
+
+### 9.12 ⚠️ 对 §9.9 根因诊断的更正（重要）
+
+§9.9 最初写"`vitest.config.ts` 无 `include`/`exclude`"，**该表述不准确**。实测更正：
+
+**仓库根目录根本没有 `vitest.config.ts`** —— 全仓唯一的 vitest 配置是
+`packages/ts-shell/vitest.config.ts`（`testTimeout: 30000`）。
+
+这解释了从仓库根跑时的**全部**失败现象，共 **11 文件 / 16 项**，两类：
+
+| 类 | 数量 | 现象 | 原因 |
+|---|---:|---|---|
+| **默认超时 5000ms** | 9 | `Test timed out in 5000ms` | 根目录无配置可加载 → vitest 用默认 `testTimeout: 5000`，而 `core/harness/browser*ScenarioExamples` 等进程型场景测试需 8–16s |
+| **cwd 路径错误** | 2 | `Cannot find module ...` | 测试内 `path.resolve(process.cwd(), "../..")` / fixture 路径假定 cwd = `packages/ts-shell` |
+
+**即：从仓库根跑 vitest 是"无配置 + 错误 cwd"的双重误用**，不代表代码有问题。
+CI（`.github/workflows/ci.yml:30`）用 `npm run test:ts`，`scripts/test-all-stacks.mjs:55`
+用 `--dir packages/ts-shell/src` —— **两者都不从仓库根跑**，故 CI 一直是绿的。
+
+**T15 只解决了"误收集"这一类。** 剩余 11 文件 / 16 项属**测试自身的 cwd 依赖** +
+**缺根配置**，是否需要处理见 **T17**。
