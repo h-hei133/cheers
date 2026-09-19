@@ -686,9 +686,16 @@ BlockA2 在「重复实现-4 actionable blocker」条目中称**两条链都在�
 
 ### 12.5 与 pi 的对照
 
-pi 对此类工具函数的处理是**集中在单一模块并按包边界导出**：
-`packages/agent/src/harness/` 下的工具函数（如 `harness/result.ts` 的 `Result` 一族）
-只有一份，且由 `package.json` 的 `exports` 映射强制约束谁能导入。
+**实测数字**（`~/projects/pi`，只读）：
+- pi 全仓 `function freeze` / `function deepFreeze` 定义：**2 处**
+  （`packages/agent/src/harness/pico3/system.ts:158`、`packages/coding-agent/src/core/model-config.ts:241`）
+  —— 本仓 **27 处**
+- pi 全仓 `function sanitizeText` / `function redact*` 定义：**0 处**
+  —— 本仓 `sanitizeText` 至少 **9 处**（6 + 3 两组）+ `redactSensitiveText` 4 处
+
+即 pi 在**同类职责上不存在重复定义问题**，差距是数量级（2 vs 27）。
+pi 的结构性原因已在主报告记录：它用**真实 npm workspace 包**加显式 `exports` 映射
+（`packages/agent/package.json` 9 个入口）做**硬边界**，而本仓只有约定。
 本仓无此机制——`freeze` 能在 27 处各自重定义，正是因为**没有任何东西阻止它**。
 这一步与 §12.2 的建议同向：先收口最高危的 `sanitizeText` 与 `deepFreeze`。
 
