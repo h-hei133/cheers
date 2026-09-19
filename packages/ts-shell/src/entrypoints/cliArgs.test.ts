@@ -102,7 +102,7 @@ describe("cli args parser", () => {
     expect(isContinueRequested(parsed)).toBe(true);
   });
 
-  it("preserves provider, session, replay, print, migration, and host-command flags", () => {
+  it("preserves provider, session, replay, print, and migration flags", () => {
     const parsed = expectParsed([
       "--session-id",
       "sess_route24",
@@ -114,8 +114,6 @@ describe("cli args parser", () => {
       "replay.txt",
       "-p",
       "--migrate-session-root",
-      "--host-command",
-      "{\"action\":\"get-status\",\"sessionId\":\"s1\"}",
       "ignored prompt",
     ]);
 
@@ -126,7 +124,6 @@ describe("cli args parser", () => {
       replayFile: "replay.txt",
       printMode: true,
       migrateSessionRoot: true,
-      hostCommand: "{\"action\":\"get-status\",\"sessionId\":\"s1\"}",
       promptArg: "ignored prompt",
     });
     expect(isPrintModeRequested(parsed)).toBe(true);
@@ -183,9 +180,6 @@ describe("cli args parser", () => {
     );
     expect(expectParseError(["--replay-file"]).message).toBe(
       "Missing value for --replay-file. Example: --replay-file .\\replay.txt",
-    );
-    expect(expectParseError(["--host-command"]).message).toBe(
-      "Missing value for --host-command. Provide a structured host command JSON object.",
     );
     expect(expectParseError(["--provider", "bad-provider"]).message).toBe(
       "Invalid --provider value: bad-provider. Expected openai, anthropic, openai-compatible, google, antigravity, or claudecode.",

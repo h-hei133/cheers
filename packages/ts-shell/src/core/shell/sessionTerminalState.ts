@@ -4,14 +4,11 @@ import type {
   OrchestrationStatus,
   TerminalReason,
 } from "../../result/types.js";
-import type { LoopTrajectoryProjection } from "../../runtime/loop/trajectory.js";
-import type { ProductLoopAdapterProjection } from "../../runtime/loop/adapter.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
 import { projectSessionResultParity } from "../../session/sessionResultParity.js";
 import type { QueryEvent } from "../query/runtime/events.js";
 import type { RuntimeEventDigest } from "./sessionEventSurface.js";
-import { projectCliSessionProductSurface } from "./cliSessionProductSurface.js";
 import { renderExecutionSummaryBlock } from "./sessionEventSurface.js";
 import { selectPrintTerminalOutput } from "./sessionPrintOutputProjection.js";
 import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
@@ -33,8 +30,6 @@ export interface SessionTerminalState {
   terminalClassification: "success" | "stopped" | "error";
   lastContinuationReason?: ContinuationReason;
   terminalCodingResult?: CodingResultSummary;
-  terminalLoopTrajectory?: LoopTrajectoryProjection;
-  terminalProductLoopAdapter?: ProductLoopAdapterProjection;
   terminalNotes: readonly string[];
   sawTerminalEvent: boolean;
 }
@@ -65,8 +60,6 @@ export function applyTerminalQueryEvent(
   state.terminalClassification = event.result.terminalClassification;
   state.lastContinuationReason = event.result.lastContinuationReason;
   state.terminalCodingResult = event.result.codingResult;
-  state.terminalLoopTrajectory = event.result.loopTrajectory as LoopTrajectoryProjection | undefined;
-  state.terminalProductLoopAdapter = event.result.productLoopAdapter as ProductLoopAdapterProjection | undefined;
   state.terminalNotes = event.result.sharedContext.notes;
 }
 
@@ -102,15 +95,6 @@ export function renderSessionTerminalSurface(input: {
     });
     renderCodingResultContract(input.renderer, terminalState.terminalCodingResult, {
       mode: "minimal",
-    });
-    renderProductExperienceSurface(input.renderer, {
-      status: terminalState.terminalStatus,
-      terminalClassification: terminalState.terminalClassification,
-      terminalReason: terminalState.terminalReason,
-      terminalStopReason: terminalState.terminalStopReason,
-      codingResult: terminalState.terminalCodingResult,
-      loopTrajectory: terminalState.terminalLoopTrajectory,
-      productLoopAdapter: terminalState.terminalProductLoopAdapter,
     });
     renderContinuationSeedSummary(input.renderer, {
       codingResult: terminalState.terminalCodingResult,
@@ -161,15 +145,6 @@ export function renderSessionTerminalSurface(input: {
   });
   renderCodingResultContract(input.renderer, terminalState.terminalCodingResult, {
     mode: renderMode,
-  });
-  renderProductExperienceSurface(input.renderer, {
-    status: terminalState.terminalStatus,
-    terminalClassification: terminalState.terminalClassification,
-    terminalReason: terminalState.terminalReason,
-    terminalStopReason: terminalState.terminalStopReason,
-    codingResult: terminalState.terminalCodingResult,
-    loopTrajectory: terminalState.terminalLoopTrajectory,
-    productLoopAdapter: terminalState.terminalProductLoopAdapter,
   });
   if (input.viewMode === "verbose") {
     renderContinuationSeedSummary(input.renderer, {
@@ -514,34 +489,5 @@ function renderCodingResultContract(
     renderer.renderLine(`- Evidence: ${codingResult.evidence.join(" | ")}`);
   }
   renderer.renderLine("");
-}
-
-function renderProductExperienceSurface(
-  renderer: StreamingRenderer,
-  input: {
-    status: OrchestrationStatus;
-    terminalClassification: "success" | "stopped" | "error";
-    terminalReason: TerminalReason;
-    terminalStopReason?: string;
-    codingResult?: CodingResultSummary;
-    loopTrajectory?: LoopTrajectoryProjection;
-    productLoopAdapter?: ProductLoopAdapterProjection;
-  },
-): void {
-  const surface = projectCliSessionProductSurface({
-    status: input.status,
-    terminalClassification: input.terminalClassification,
-    terminalReason: input.terminalReason,
-    stopReason: input.terminalStopReason,
-    codingResult: input.codingResult,
-    loopTrajectory: input.loopTrajectory,
-    productLoopAdapter: input.productLoopAdapter,
-  });
-  if (!surface) {
-    return;
-  }
-  for (const line of surface.lines) {
-    renderer.renderLine(line);
-  }
 }
 

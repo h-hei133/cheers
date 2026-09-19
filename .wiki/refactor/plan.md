@@ -111,8 +111,9 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 3. **消费者存活检查**——活轨是否有 CLI 可达代码在读取其数据/标记。
 4. **动态入口检查**——`path.join(...)` + `spawn`/`execFile`、`pathToFileURL` + `import()`、
    `*Process.ts`、`process.argv` / shebang / `main()`。
-5. **公共面检查**——`packages/ts-shell/src/index.ts` 是 package `main`，
-   由 `scripts/verify-host-surface.mjs` 实测消费。
+5. **公共面检查**——`packages/ts-shell/src/index.ts` 是 package `main`。
+   （原文举例 scripts/verify-host-surface.mjs 实测消费；该门禁已于 2026-09-19
+   随 CB-005 死代码清理删除，非现存文件。）
 6. **`scripts/` 引用检查**——脚本可能以字符串路径引用 `src/` 模块。
 
 **删除单元取连通分量整簇**，不按单文件摘除（`model-adapters` 先例，§6.2）。

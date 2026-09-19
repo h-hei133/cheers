@@ -1182,10 +1182,19 @@ focused validation.
 
 ## Host JSON Framing And Package Readiness
 
+> **2026-09-19 移除（CB-005 死代码清理）**：本节的 `cli/host/`、
+> `runtime/distribution/`、`runtime/api/host/{runtime,io}.ts` 及其测试
+> **已删除**，`verify:host-surface` 门禁与 `--host-command` CLI 开关一并移除。
+> 理由：该 host 执行面驱动的 provider 是硬编码合成
+> （`providerMode: "synthetic"`，类型上无 `real` 成员），生产零值导入；
+> 活路径（`turn/`）已由 `turn/synthetic.ts` 提供同等能力。
+> `runtime/api/host/contract.ts`（纯类型）**保留**，因为
+> `runtime/evaluation` 的公共 API 仍引用它。保留原文以存档。
+
 - Selected mode: structured port.
-- Owner domain: `packages/ts-shell/src/runtime/api/host/` for host JSON and
-  exit classification, `packages/ts-shell/src/cli/host/` for CLI delegation,
-  `packages/ts-shell/src/runtime/distribution/` for package readiness, and
+- Owner domain（**历史记录**）: `packages/ts-shell/src/runtime/api/host/` for host JSON and
+  exit classification, packages/ts-shell/src/cli/host/ for CLI delegation,
+  packages/ts-shell/src/runtime/distribution/ for package readiness, and
   `scripts/` for repository smoke.
 - Reason for use: the existing in-process host contract and deterministic
   evaluation runtime needed a package-facing non-interactive surface with
@@ -1230,3 +1239,6 @@ focused validation.
   script while keeping the in-process host runtime and deterministic evaluation
   contract intact; package consumers would fall back to direct owner tests until
   a corrected host surface is restored.
+  **2026-09-19 实际执行**：该 rollback 已按 CB-005 裁决落地
+  （`--host-command`、`verify:host-surface`、`cli/host/`、`runtime/distribution/`、
+  `runtime/api/host/{runtime,io}.ts` 均已移除）。

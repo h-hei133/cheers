@@ -35,7 +35,6 @@ const VALUE_FLAGS = new Set([
   "--api-key",
   "--replay-file",
   "--non-interactive-approval",
-  "--host-command",
 ]);
 
 const RESERVED_SHELL_SLASH_COMMANDS = new Set([
@@ -239,11 +238,6 @@ export function parseCliArgs(
     "nonInteractiveApproval",
     nonInteractiveApproval.value,
   );
-  const hostCommand = parseHostCommand(rawArgs);
-  if (hostCommand.ok === false) {
-    return { ok: false, error: hostCommand.error };
-  }
-  assignOption(options, "hostCommand", hostCommand.value);
   assignOption(
     options,
     "promptArg",
@@ -259,24 +253,6 @@ export function parseCliArgs(
       doctorRequested: rawArgs.includes("--doctor"),
     },
   };
-}
-
-function parseHostCommand(
-  args: readonly string[],
-):
-  | { readonly ok: true; readonly value: string | undefined }
-  | { readonly ok: false; readonly error: CliArgParseError } {
-  const idx = args.indexOf("--host-command");
-  if (idx === -1) {
-    return { ok: true, value: undefined };
-  }
-  const value = args[idx + 1];
-  if (!value) {
-    return parseError(
-      "Missing value for --host-command. Provide a structured host command JSON object.",
-    );
-  }
-  return { ok: true, value };
 }
 
 

@@ -1,16 +1,4 @@
 export {
-  createHostRuntime,
-  type HostRuntime,
-  type HostRuntimeOptions,
-} from "./runtime/api/host/runtime.js";
-export {
-  classifyHostExit,
-  parseHostJsonInput,
-  projectHostJsonError,
-  projectHostJsonResponse,
-  type HostJsonResponse,
-} from "./runtime/api/host/io.js";
-export {
   validateHostCommandEnvelope,
   type HostCommandEnvelope,
   type HostCommandResponse,
@@ -95,9 +83,3 @@ export {
   type TaskVerdict,
   type TaskVerdictStatus,
 } from "./result/task/verdict.js";
-export {
-  assessHostDistributionReadiness,
-  classifyDistributionReadiness,
-  type DistributionReadinessResult,
-  type DistributionReadinessStatus,
-} from "./runtime/distribution/model.js";

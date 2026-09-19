@@ -113,16 +113,15 @@ Owner Domains 列表内。
 - `src/renderer/StreamingRenderer.ts`：**41 个外部消费者、0 条出边**——纯叶子输出通道。
   （**2026-09-18 勘误**：原文记 34，实测 **41**（cli 15 / core 14 / entrypoints 11 / session 1）。
   复现：`grep -rln "renderer/StreamingRenderer" packages/ts-shell/src --include=*.ts | wc -l`。）
-- 规则示例路径明确写着 `packages/ts-shell/src/presentation/terminal/renderer.ts`
-  ——**该文件已存在**，但它是**纯格式化器**（`TerminalMessageRenderer`，
-  输入 `ProductSurfaceViewModel` 输出 `string[]`，无副作用），
-  而 `StreamingRenderer` 是**带副作用的流式输出通道**（默认写 stdout）。
-- **两者职责不同，不可合并**，但 `renderer/` 这个顶层名与规则示例冲突，
+- 规则示例路径曾写 packages/ts-shell/src/presentation/terminal/renderer.ts
+  ——**该文件已于 2026-09-19 删除**（CB-005 死代码清理：它是 `ProductSurfaceViewModel`
+  的纯格式化器，而活路径从不产生该输入，零生产消费者）。
+  保留结论：`StreamingRenderer` 是**带副作用的流式输出通道**（默认写 stdout），
+  与任何纯格式化器职责不同，不可合并。
   且 `StreamingRenderer` 的消费者全是 `cli/` `core/shell/` `entrypoints/`
   ——即**终端会话面**。
-- **建议**：`src/renderer/` → `src/presentation/terminal/`（与既有 `renderer.ts` 并列，
-  由文件名区分 `renderer.ts` 格式化 vs `streaming.ts` 输出通道），或
-  规则未覆盖时的次优解 `src/presentation/surface/`。**属独立决策，非机械搬迁。**
+- **建议**：`src/renderer/` → `src/presentation/terminal/`（与 `streaming.ts` 并列；
+  原 `renderer.ts` 格式化器已于 2026-09-19 随 CB-005 死代码清理删除）。
 
 ---
 

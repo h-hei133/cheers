@@ -49,7 +49,6 @@
     "verify:session-lifecycle": "node scripts/verify-session-lifecycle.mjs",
     "verify:query-orchestration": "node scripts/verify-query-orchestration.mjs",
     "verify:cli-entry": "node scripts/verify-cli-entry.mjs",
-    "verify:host-surface": "node scripts/verify-host-surface.mjs",
     "verify:docs-drift": "node scripts/verify-docs-and-rules-drift.mjs",
     "verify:docs-drift:strict": "node scripts/verify-docs-and-rules-drift.mjs --strict",
     "analyze:module-facades": "node scripts/analyze-module-facades.mjs",

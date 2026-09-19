@@ -13,95 +13,9 @@ import {
 } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import { createProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
-import { runAgentLoopContract } from "../../runtime/loop/contract.js";
-import { projectProductLoopAdapter } from "../../runtime/loop/adapter.js";
-import { projectLoopTrajectory } from "../../runtime/loop/trajectory.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
 describe("shell session runtime (W5)", () => {
-  it("passes loop trajectory observations through terminal rendering without changing terminal state", async () => {
-    const calls: string[] = [];
-    const lines: string[] = [];
-    const loop = await runAgentLoopContract({
-      sessionId: "sess_loop_surface",
-      workspaceRoot: "/workspace",
-      prompt: "observe loop",
-      providerOptIn: false,
-      modelBoundary: async () => ({
-        responseId: "response-shell-loop",
-        stopReason: "stop",
-      }),
-    });
-    const loopTrajectory = projectLoopTrajectory({
-      loopId: "shell-loop",
-      prompt: "observe loop",
-      loop,
-    });
-    const productLoopAdapter = projectProductLoopAdapter({
-      adapterId: "shell-loop-adapter",
-      loopTrajectory,
-    });
-    const runtime = new ShellSessionRuntime({
-      sessionManager: {
-        persistUserPromptBarrier(sessionId: string, prompt: string) {
-          calls.push(`barrier:${sessionId}:${prompt}`);
-        },
-        markTurnActive(sessionId: string) {
-          calls.push(`active:${sessionId}`);
-        },
-        appendQueryEvent(sessionId: string, event: { type: string }) {
-          calls.push(`event:${sessionId}:${event.type}`);
-        },
-        addTurn(sessionId: string, turn: { role: string; content: string }) {
-          calls.push(`turn:${sessionId}:${turn.role}:${turn.content}`);
-        },
-        saveCompleted(sessionId: string) {
-          calls.push(`completed:${sessionId}`);
-        },
-        saveInterrupted() {},
-        saveError() {},
-        saveTerminated() {},
-      } as never,
-      renderer: {
-        renderLine(line = "") {
-          lines.push(line);
-        },
-        renderChunk() {},
-      } as never,
-      runPrompt: async function* () {
-        yield {
-          type: "query.completed",
-          result: {
-            status: "completed",
-            terminalReason: "completed",
-            terminalClassification: "success",
-            transcript: [],
-            sharedContext: {
-              sessionId: "sess_loop_surface",
-              initialPrompt: "observe loop",
-              notes: [],
-              handoffs: [],
-            },
-            finalOutput: "done",
-            loopTrajectory,
-            productLoopAdapter,
-          },
-        };
-      },
-    });
-
-    const output = await runtime.executePrompt("sess_loop_surface", "observe loop");
-
-    expect(output).toBe("done");
-    expect(runtime.getState()).toBe("idle");
-    expect(calls).toContain("completed:sess_loop_surface");
-    expect(lines.join("\n")).toContain("terminalSuccessClaim=false");
-    expect(lines.join("\n")).toContain("Provider:");
-    expect(lines.join("\n")).toContain("providerCalled=not-proven");
-    expect(lines.join("\n")).toContain("Product loop adapter:");
-    expect(lines.join("\n")).toContain("Feature integration contract:");
-  });
-
   it("moves through a successful prompt execution lifecycle", async () => {
     const calls: string[] = [];
     const runtime = new ShellSessionRuntime({

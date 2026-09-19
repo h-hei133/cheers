@@ -15,7 +15,6 @@ export interface CliOptions {
   readonly promptArg?: string;
   readonly migrateSessionRoot?: boolean;
   readonly nonInteractiveApproval?: NonInteractiveApprovalMode;
-  readonly hostCommand?: string;
 }
 
 export interface CliArgs {

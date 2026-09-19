@@ -28,22 +28,12 @@ import type { PackageInventoryProjection } from "../resources/inventory.js";
 import type { SessionTreeProjection } from "../../session/sessionTreeProjection.js";
 import type { ContinuationReadinessProjection } from "../../session/continuation/readiness.js";
 import type { ReplaySafeLoopStateSummary } from "../../session/replay/state.js";
-import type { ModelResponseReentryCycleProjection } from "../loop/reentry.js";
-import type { ModelBoundaryPhaseProjection } from "../loop/modelBoundary.js";
-import type { ProviderStreamAdapterProjection } from "../loop/providerStreamAdapter.js";
 import type { AssistantResponseState } from "../../turn/assistantResponse.js";
 import type { NextTurnDeliveryPolicyProjection } from "../../turn/deliveryPolicy.js";
 import type { SteeringQueueProjection } from "../../turn/steeringQueue.js";
 import type { FollowUpQueueProjection } from "../../turn/followUpQueue.js";
 import type { NextTurnBundleProjection } from "../../turn/nextTurnBundle.js";
 import type { ToolResultMessageBatch } from "../../turn/toolResultMessage.js";
-import type {
-  LoopFinalizationInput,
-  LoopFinalizationDecision,
-  ProductLoopCloseoutInput,
-  ProductLoopCloseoutProjection,
-} from "../loop/finalization.js";
-import type { ProductCompletionPacket } from "../loop/completionPacket.js";
 import type { RuntimeTurnSnapshot } from "../../turn/turnSnapshot.js";
 import type { NormalizedToolCallBatch } from "../../tools/toolCallBatch.js";
 import type { ToolBatchHandoffProjection } from "../../tools/toolHandoff.js";
@@ -339,11 +329,6 @@ export function projectRuntimeEvents(input: {
   readonly postRepairVerificationResults?: readonly PostRepairVerificationResultObservation[];
   readonly repairVerdictProofInputs?: readonly RepairVerdictProofInput[];
   readonly repairVerdictTerminalProjections?: readonly RepairVerdictTerminalProjection[];
-  readonly loopFinalizationInputs?: readonly LoopFinalizationInput[];
-  readonly loopFinalizationDecisions?: readonly LoopFinalizationDecision[];
-  readonly productLoopCloseoutInputs?: readonly ProductLoopCloseoutInput[];
-  readonly productLoopCloseouts?: readonly ProductLoopCloseoutProjection[];
-  readonly productCompletionPackets?: readonly ProductCompletionPacket[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
   readonly repairProposals?: readonly RepairProposalObservation[];
   readonly repairAuthorities?: readonly RepairAuthorityObservation[];
@@ -356,10 +341,7 @@ export function projectRuntimeEvents(input: {
   readonly modelInvocationGates?: readonly ModelInvocationGateFacts[];
   readonly modelInvocationAttempts?: readonly ModelInvocationAttemptEnvelope[];
   readonly controlledModelInvocations?: readonly ControlledModelInvocationAdapterProjection[];
-  readonly responseReentryCycles?: readonly ModelResponseReentryCycleProjection[];
   readonly providerResponseStreams?: readonly ProviderResponseStreamProjection[];
-  readonly providerStreamAdapters?: readonly ProviderStreamAdapterProjection[];
-  readonly modelBoundaryPhases?: readonly ModelBoundaryPhaseProjection[];
   readonly modelResponseBoundaries?: readonly ModelResponseBoundary[];
   readonly assistantResponses?: readonly AssistantResponseState[];
   readonly toolCallBatches?: readonly NormalizedToolCallBatch[];
@@ -935,192 +917,7 @@ export function projectRuntimeEvents(input: {
     }
   }
 
-  for (const cycle of input.responseReentryCycles ?? []) {
-    append(
-      "response-reentry-observed",
-      {
-        cycleId: cycle.cycleId,
-        reentryId: cycle.responseReentry.reentryId,
-        sourceAttemptId: cycle.responseReentry.sourceAttemptId,
-        sourceResponseHandoffId: cycle.responseReentry.sourceResponseHandoffId,
-        responseClassification: cycle.responseReentry.responseClassification,
-        assistantContentAvailability: cycle.responseReentry.assistantContentAvailability,
-        toolCallExtractionReadiness: cycle.responseReentry.toolExtractionReadiness,
-        reentryStatus: cycle.responseReentry.reentryStatus,
-        redactionStatus: cycle.responseReentry.redactionState,
-        rawOutputExcluded: cycle.responseReentry.rawOutputExcluded,
-        terminalSuccessClaim: false,
-      },
-      cycle.responseReentry.notProvenClaims,
-    );
-    if (
-      cycle.responseReentry.reentryStatus === "processed" ||
-      cycle.responseReentry.reentryStatus === "ready_for_boundary_processing"
-    ) {
-      append(
-        "model-boundary-processing-observed",
-        {
-          cycleId: cycle.cycleId,
-          responseReentryId: cycle.responseReentry.reentryId,
-          modelResponseBoundaryId: cycle.responseBoundary.responseId,
-          responseStatus: cycle.responseBoundary.status,
-          terminalSuccessClaim: false,
-        },
-        cycle.notProvenClaims,
-      );
-    }
-    if (cycle.assistantAccumulation) {
-      append(
-        "assistant-accumulation-observed",
-        {
-          accumulationId: cycle.assistantAccumulation.accumulationId,
-          sourceReentryId: cycle.assistantAccumulation.sourceReentryId,
-          contentAvailability: cycle.assistantAccumulation.contentAvailability,
-          contentSummarySafeLabel: cycle.assistantAccumulation.contentSummarySafeLabel,
-          contentRedactionState: cycle.assistantAccumulation.contentRedactionState,
-          hiddenChannelExcluded: cycle.assistantAccumulation.hiddenChannelExcluded,
-          completionStatus: cycle.assistantAccumulation.completionStatus,
-          terminalSuccessClaim: false,
-        },
-        cycle.assistantAccumulation.notProvenClaims,
-      );
-    }
-    if (cycle.toolExtraction) {
-      append(
-        "tool-extraction-observed",
-        {
-          extractionId: cycle.toolExtraction.extractionId,
-          sourceAssistantAccumulationId: cycle.toolExtraction.sourceAssistantAccumulationId,
-          extractedCallIds: cycle.toolExtraction.extractedCallIds,
-          malformedCallIds: cycle.toolExtraction.malformedCallIds,
-          unsupportedCallIds: cycle.toolExtraction.unsupportedCallIds,
-          unknownToolIds: cycle.toolExtraction.unknownToolIds,
-          noToolStatus: cycle.toolExtraction.noToolStatus,
-          extractionConfidence: cycle.toolExtraction.extractionConfidence,
-          handoffReadiness: cycle.toolExtraction.handoffReadiness,
-          terminalSuccessClaim: false,
-        },
-        cycle.toolExtraction.notProvenClaims,
-      );
-      if (cycle.toolExtraction.noToolStatus === "observed") {
-        append(
-          "no-tool-response-observed",
-          {
-            extractionId: cycle.toolExtraction.extractionId,
-            noToolStatus: cycle.toolExtraction.noToolStatus,
-            terminalSuccessClaim: false,
-          },
-          cycle.toolExtraction.notProvenClaims,
-        );
-      }
-    }
-    append(
-      "loop-cycle-boundary-observed",
-      {
-        cycleId: cycle.cycleBoundary.cycleId,
-        sourceInvocationAttemptId: cycle.cycleBoundary.sourceInvocationAttemptId,
-        responseReentryId: cycle.cycleBoundary.responseReentryId,
-        assistantAccumulationId: cycle.cycleBoundary.assistantAccumulationId,
-        toolExtractionId: cycle.cycleBoundary.toolExtractionId,
-        nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
-        cycleStatus: cycle.cycleBoundary.cycleStatus,
-        stopReason: cycle.cycleBoundary.stopReason,
-        continuationRequirement: cycle.cycleBoundary.continuationRequirement,
-        terminalSuccessClaim: false,
-      },
-      cycle.cycleBoundary.notProvenClaims,
-    );
-    if (
-      cycle.cycleBoundary.cycleStatus === "blocked_response" ||
-      cycle.cycleBoundary.cycleStatus === "failed_response" ||
-      cycle.cycleBoundary.cycleStatus === "cancelled_response"
-    ) {
-      append(
-        "loop-cycle-blocked",
-        {
-          cycleId: cycle.cycleBoundary.cycleId,
-          cycleStatus: cycle.cycleBoundary.cycleStatus,
-          stopReason: cycle.cycleBoundary.stopReason,
-          terminalSuccessClaim: false,
-        },
-        cycle.cycleBoundary.notProvenClaims,
-      );
-    }
-    if (cycle.cycleBoundary.cycleStatus === "partial_response") {
-      append(
-        "loop-cycle-partial",
-        {
-          cycleId: cycle.cycleBoundary.cycleId,
-          cycleStatus: cycle.cycleBoundary.cycleStatus,
-          nextHandoffKind: cycle.cycleBoundary.nextHandoffKind,
-          terminalSuccessClaim: false,
-        },
-        cycle.cycleBoundary.notProvenClaims,
-      );
-    }
-  }
 
-  for (const adapter of input.providerStreamAdapters ?? []) {
-    if (!adapter.fetchAttempted) {
-      append(
-        "provider-fetch-blocked",
-        {
-          adapterId: adapter.adapterId,
-          requestId: adapter.requestId,
-          responseId: adapter.responseId,
-          explicitOptIn: adapter.explicitOptIn,
-          readinessStatus: adapter.readinessStatus,
-          failureClass: adapter.failureClass,
-          liveClassification: adapter.liveClassification,
-          retryEligibility: adapter.retryEligibility,
-          fallbackEligibility: adapter.fallbackEligibility,
-          fallbackStatus: adapter.fallbackStatus,
-          recoveryFacts: adapter.recoveryFacts,
-          streamProjected: adapter.streamProjected,
-          terminalSuccessClaim: false,
-        },
-        adapter.notProvenClaims,
-      );
-      continue;
-    }
-    append(
-      "provider-fetch-attempted",
-      {
-        adapterId: adapter.adapterId,
-        requestId: adapter.requestId,
-        responseId: adapter.responseId,
-        explicitOptIn: adapter.explicitOptIn,
-        readinessStatus: adapter.readinessStatus,
-        fetchAttempted: adapter.fetchAttempted,
-        liveClassification: adapter.liveClassification,
-        retryEligibility: adapter.retryEligibility,
-        fallbackEligibility: adapter.fallbackEligibility,
-        fallbackStatus: adapter.fallbackStatus,
-        terminalSuccessClaim: false,
-      },
-      adapter.notProvenClaims,
-    );
-    append(
-      "provider-stream-projected",
-      {
-        adapterId: adapter.adapterId,
-        requestId: adapter.requestId,
-        responseId: adapter.responseId,
-        streamProjected: adapter.streamProjected,
-        assistantAccumulationStatus: adapter.assistantAccumulationStatus,
-        toolCallExtractionStatus: adapter.toolCallExtractionStatus,
-        failureClass: adapter.failureClass,
-        liveClassification: adapter.liveClassification,
-        retryEligibility: adapter.retryEligibility,
-        fallbackEligibility: adapter.fallbackEligibility,
-        fallbackStatus: adapter.fallbackStatus,
-        recoveryFacts: adapter.recoveryFacts,
-        redactionStatus: adapter.redaction.status,
-        terminalSuccessClaim: false,
-      },
-      adapter.notProvenClaims,
-    );
-  }
 
   for (const stream of input.providerResponseStreams ?? []) {
     if (stream.eventCount > 0) {
@@ -1194,22 +991,6 @@ export function projectRuntimeEvents(input: {
     );
   }
 
-  for (const phase of input.modelBoundaryPhases ?? []) {
-    append(
-      phase.stream.status === "completed" ? "model-boundary-completed" : "model-boundary-partial",
-      {
-        phaseId: phase.phaseId,
-        requestId: phase.requestBoundary.requestId,
-        responseId: phase.responseBoundary.responseId,
-        streamStatus: phase.stream.status,
-        assistantAccumulationStatus: phase.assistantResponse.accumulationStatus,
-        toolCallExtractionStatus: phase.toolCallBatch.extractionStatus,
-        toolBatchHandoffPrepared: phase.toolBatchHandoffPrepared,
-        terminalSuccessClaim: phase.terminalSuccessClaim,
-      },
-      phase.notProvenClaims,
-    );
-  }
 
   for (const boundary of input.modelResponseBoundaries ?? []) {
     append(
@@ -2570,133 +2351,10 @@ export function projectRuntimeEvents(input: {
     );
   }
 
-  for (const finalizationInput of input.loopFinalizationInputs ?? []) {
-    append(
-      "loop-finalization-input-observed",
-      {
-        inputId: finalizationInput.inputId,
-        resultProjectionId: finalizationInput.resultProjectionId,
-        resultTerminalStatus: finalizationInput.resultTerminalStatus,
-        resultTerminalClassification: finalizationInput.resultTerminalClassification,
-        proofComplete: finalizationInput.proofComplete,
-        originalFailurePreserved: finalizationInput.originalFailurePreserved,
-        repairApplyPreserved: finalizationInput.repairApplyPreserved,
-        postRepairVerificationPreserved:
-          finalizationInput.postRepairVerificationPreserved,
-        originalVerificationFailureId:
-          finalizationInput.originalVerificationFailureId,
-        originalFailureClass: finalizationInput.originalFailureClass,
-        repairApplyState: finalizationInput.repairApplyState,
-        postRepairVerificationState: finalizationInput.postRepairVerificationState,
-        missingProofItems: finalizationInput.missingProofItems,
-        terminalSuccessClaim: finalizationInput.terminalSuccessClaim,
-      },
-      finalizationInput.notProvenClaims,
-    );
-  }
 
-  for (const decision of input.loopFinalizationDecisions ?? []) {
-    append(
-      "loop-finalization-decision-observed",
-      {
-        decisionId: decision.decisionId,
-        sourceInputId: decision.sourceInputId,
-        decision: decision.decision,
-        reason: decision.reason,
-        nextAction: decision.nextAction,
-        pendingUserAuthority: decision.pendingUserAuthority,
-        pendingVerification: decision.pendingVerification,
-        pendingRepair: decision.pendingRepair,
-        sessionCarryForwardFacts: decision.sessionCarryForwardFacts,
-        originalVerificationFailureId: decision.originalVerificationFailureId,
-        originalFailureClass: decision.originalFailureClass,
-        missingProofItems: decision.missingProofItems,
-        terminalSuccessClaim: decision.terminalSuccessClaim,
-      },
-      decision.notProvenClaims,
-    );
-  }
 
-  for (const closeoutInput of input.productLoopCloseoutInputs ?? []) {
-    append(
-      "product-loop-closeout-input-observed",
-      {
-        inputId: closeoutInput.inputId,
-        loopDecisionId: closeoutInput.loopDecisionId,
-        resultProjectionId: closeoutInput.resultProjectionId,
-        resultTerminalStatus: closeoutInput.resultTerminalStatus,
-        resultTerminalClassification: closeoutInput.resultTerminalClassification,
-        loopControlDecision: closeoutInput.loopControlDecision,
-        nextAction: closeoutInput.nextAction,
-        pendingUserAction: closeoutInput.pendingUserAction,
-        pendingVerification: closeoutInput.pendingVerification,
-        pendingRepair: closeoutInput.pendingRepair,
-        preservedOriginalFailure: closeoutInput.preservedOriginalFailure,
-        preservedRepairFacts: closeoutInput.preservedRepairFacts,
-        verificationSummary: closeoutInput.verificationSummary,
-        missingProofItems: closeoutInput.missingProofItems,
-        terminalSuccessClaim: closeoutInput.terminalSuccessClaim,
-      },
-      closeoutInput.notProvenClaims,
-    );
-  }
 
-  for (const closeout of input.productLoopCloseouts ?? []) {
-    append(
-      "product-loop-closeout-projected",
-      {
-        closeoutId: closeout.closeoutId,
-        sourceInputId: closeout.sourceInputId,
-        status: closeout.status,
-        resultOwnedTerminalStatus: closeout.resultOwnedTerminalStatus,
-        resultOwnedTerminalClassification:
-          closeout.resultOwnedTerminalClassification,
-        loopOwnedControlDecision: closeout.loopOwnedControlDecision,
-        complete: closeout.complete,
-        nextAction: closeout.nextAction,
-        pendingHandoff: closeout.pendingHandoff,
-        sessionCarryForwardFacts: closeout.sessionCarryForwardFacts,
-        originalFailureSummary: closeout.originalFailureSummary,
-        repairChainSummary: closeout.repairChainSummary,
-        verificationSummary: closeout.verificationSummary,
-        missingProofItems: closeout.missingProofItems,
-        terminalSuccessClaim: closeout.terminalSuccessClaim,
-      },
-      closeout.notProvenClaims,
-    );
-  }
 
-  for (const packet of input.productCompletionPackets ?? []) {
-    append(
-      "product-completion-packet-observed",
-      {
-        packetId: packet.packetId,
-        resultProjectionId: packet.resultProjectionId,
-        resultOwnedTerminalStatus: packet.resultOwnedTerminalStatus,
-        resultOwnedTerminalClassification:
-          packet.resultOwnedTerminalClassification,
-        loopDecisionId: packet.loopDecisionId,
-        loopDecision: packet.loopDecision,
-        closeoutId: packet.closeoutId,
-        closeoutState: packet.closeoutState,
-        status: packet.status,
-        complete: packet.complete,
-        originalFailure: packet.originalFailure,
-        repairRequiredFacts: packet.repairRequiredFacts,
-        proposalFacts: packet.proposalFacts,
-        authorityFacts: packet.authorityFacts,
-        applyRequestFacts: packet.applyRequestFacts,
-        applyObservationFacts: packet.applyObservationFacts,
-        postRepairVerificationFacts: packet.postRepairVerificationFacts,
-        evidenceFacts: packet.evidenceFacts,
-        missingProofItems: packet.missingProofItems,
-        nextAction: packet.nextAction,
-        sessionCarryForwardFacts: packet.sessionCarryForwardFacts,
-        terminalSuccessClaim: packet.terminalSuccessClaim,
-      },
-      packet.notProvenClaims,
-    );
-  }
 
   for (const handoff of input.repairRequiredHandoffs ?? []) {
     append(

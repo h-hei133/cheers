@@ -2,11 +2,6 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import {
-  assessHostDistributionReadiness,
-  createHostRuntime,
-  projectHostJsonResponse,
-} from "./index.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, "..", "..", "..");
@@ -40,28 +35,19 @@ describe("TypeScript shell smoke tests", () => {
     );
   });
 
-  it("imports package host surfaces and checks host distribution readiness", async () => {
+  it("exposes the package entry surface through the declared main entrypoint", async () => {
     const shellPackage = JSON.parse(readFileSync(shellPackagePath, "utf8")) as {
       main?: string;
       bin?: Record<string, string>;
     };
-    const host = createHostRuntime();
-    const response = await host.dispatch({
-      action: "start-turn",
-      inputText: "read a safe file through package import",
-      mode: "read-only",
-      providerMode: "synthetic",
-    });
-    const json = projectHostJsonResponse({ response });
-    const readiness = await assessHostDistributionReadiness({
-      packageMetadata: shellPackage,
-      cliEntrypointAvailable: Boolean(shellPackage.bin?.agents),
-    });
+    const entry = await import("./index.js");
 
     expect(shellPackage.main).toBe("./dist/packages/ts-shell/src/index.js");
-    expect(json.schemaVersion).toBe("host-json-response.v1");
-    expect(readiness.schemaVersion).toBe("host-distribution-readiness.v1");
-    expect(readiness.smoke.defaultProviderOff).toBe("passed");
-    expect(readiness.terminalSuccessClaim).toBe(false);
+    expect(typeof entry.runEvaluationCase).toBe("function");
+    expect(typeof entry.validateHostCommandEnvelope).toBe("function");
+    const accepted = entry.validateHostCommandEnvelope({ action: "get-status", sessionId: "sess_smoke" });
+    expect(accepted.accepted).toBe(true);
+    expect(accepted.terminalSuccessClaim).toBe(false);
+    expect(entry.validateHostCommandEnvelope({ action: "nope" }).accepted).toBe(false);
   });
 });

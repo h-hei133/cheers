@@ -15,9 +15,6 @@ import {
   createCliApprovalModeState,
 } from "../approval/cliApprovalModeState.js";
 import {
-  runCliHostCommand,
-} from "../host/runner.js";
-import {
   createCliProviderRuntimeBridge,
 } from "../provider/cliProviderRuntimeBridge.js";
 import {
@@ -71,16 +68,6 @@ export async function runCliProcess(
   }
 
   const options: CliOptions = parsedCliArgs.args.options;
-  if (options.hostCommand) {
-    await runCliHostCommand({
-      commandJson: options.hostCommand,
-      projectRoot: input.launchCwd,
-      writeOutput: input.writeOutput,
-      exit: input.exit,
-    });
-    return;
-  }
-
   const rootContext = createCliRootContext({
     launchCwd: input.launchCwd,
     options,

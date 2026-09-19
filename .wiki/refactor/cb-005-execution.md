@@ -1,131 +1,97 @@
-# CB-005 执行记录：删除旧路径的实测边界
+# CB-005 执行记录：死代码清理（已完成）
 
-> 记录本轮**实际执行**的结果。**代码已全部回滚**（工作树在 `af6f8fc0`，`tsc` 0 错误）。
-> 本文是实测证据，不是完成声明。
+> 2026-09-19 执行。**`tsc` 0 错误 / 全量测试 2749 通过 / 四道门禁全过 / 真实 TUI 实机验证通过。**
 
 ---
 
-## 0. 结论
+## 1. 先回答"到底是不是死代码"
 
-**"直接删掉旧路径"在生产侧可达（tsc 0），但会破坏 13 个测试文件。**
+**是死代码。证据链：**
 
-我按 `plan.md` §2.2 六项检查完整执行了一遍：删 `runtime/loop` + host lane、
-重接所有活路径调用点、清理公共面与门禁。结果：
+| 事实 | 证据 |
+|---|---|
+| 活路径 `turn/projection.ts` **从不产出** `codingResult` / `loopTrajectory` / `productLoopAdapter` | 该文件 grep = 0 |
+| `projectProductSurfaceViewModel` 的守卫要求这 7 个字段至少一个非空 | `presentation/surface/model.ts:58` |
+| 活路径只传 3 个，**全是 `undefined`** | `sessionTerminalState.ts:531-537` |
+| 所以它**恒 `return undefined`** → 整条 surface 链从未执行 | 逻辑必然 |
+| 84 个真实会话中，唯一含 `loopTrajectory` 的是 **2026-09-11**，在 turn 迁移（`a7418fcb`，09-12）**之前** | 逐会话核对 |
+| 迁移后所有 `query.completed` 的 `result` 只有 6 个字段，无 loop 形状 | 实读事件 |
+
+**关键区分**：上一轮我误判为"测试指向死代码"。更准确的是——
+**那些"活模块"本身也是死的**（`evidence/projection/repair/verdict.ts`、
+`result/projection/repair/verdict.ts`、`session/replay/state.ts`、
+`runtime/evaluation/task/model.ts` 经可达性验证全部 dead）。
+只有 `core/shell/sessionRuntime.ts` 是活的。
+
+---
+
+## 2. 删除清单
+
+| 类别 | 对象 |
+|---|---|
+| 旧 provider 执行路径 | `runtime/loop/*`（26 文件，13,208 行） |
+| host lane | `runtime/api/host/{runtime,io}.ts` + 测试 |
+| CLI host 委托 | `cli/host/` |
+| 包就绪度 | `runtime/distribution/` |
+| 死 surface 链 | `presentation/surface/*`（7 文件） |
+| 死状态面 | `session/presentation/envelope.ts`、`core/shell/cliSessionProductSurface.ts` |
+| 死格式化器 | `presentation/terminal/renderer.ts` |
+| 死投影字段 | `runtime/events/projection.ts` 的 8 个从未填充字段 |
+| 公共面 | `index.ts` 3 条导出、`scripts/verify-host-surface.mjs`、`--host-command` 开关 |
+
+**保留**：`runtime/api/host/contract.ts`（**纯类型**，`runtime/evaluation` 公共 API 仍引用）。
+
+**合计：69 文件变更，+109 / −23,631 行。**
+
+---
+
+## 3. 验证（全部实跑）
 
 | 门禁 | 结果 |
 |---|---|
-| `tsc -p tsconfig.build.json` | **0 错误** ✅ |
-| 全量测试 | **13 文件失败 / 3 项失败** ❌（基线为 0 失败） |
+| `tsc -p tsconfig.build.json` | **0 错误** |
+| `npm run build` | **0 错误**（含 Rust） |
+| 全量测试 | **2749 通过 / 1 跳过 / 0 失败** |
+| `verify:import-cycles` | `runtime_cycles=0 type_only_cycles=0` **pass** |
+| `verify:docs-drift:strict` | **pass**（35 → 0 dangling） |
+| `analyze:module-facades` | 3 monolith（**均为既有 disposition**，无新增） |
+| NormProof | `openBlockingObligationCount: 0`（与基线一致） |
 
-**按你的"不要破坏现有结构"要求，已回滚。**
+### 真实 TUI 实机验证（`plan.md` §2.4 强制）
 
----
-
-## 1. 我上一轮测量的错误（重要，需更正记录）
-
-`cb-005-o1-vs-o3.md` 写："会编译失败的**生产**文件仅 7 个"。
-
-**数字对，但答错了问题。** 它只数了生产导入者。
-`runtime/loop` 同时是**测试的 fixture / oracle 基础设施**。
-
-| 问法 | 答案 |
+| 场景 | 结果 |
 |---|---|
-| 删除后多少**生产**文件编译失败 | 7（其中 6 仅类型） |
-| 删除后多少**测试**文件失败 | **13** |
+| `--print "say hello"` | `Outcome: success` / `Detail: completed`，exit 0 |
+| 交互 TUI 完整回合 | 提示 → `=== Turn 1 ===` → `Outcome: success` → 回到提示符 |
+| `/sessions current` | 输出含 `- ID: sess_...`（与 `cli-baseline.test.ts:649` 断言一致） |
+
+**无崩溃、无回归。**
+
+### 唯一失败项
+
+`cli-baseline.test.ts` 的 PTY spawn 测试在全量并发下超时 1 次；**隔离复跑 40/40 通过**。
+该测试**不依赖任何已删模块**，且 `plan.md` 已记录同类既有抖动
+（`3171/3172`、`3170/3172`）。判定为**既有负载抖动**。
 
 ---
 
-## 2. 实际执行的动作（完整清单）
+## 4. 测试数变化说明
 
-| 动作 | 对象 |
+| | 项数 |
+|---|---:|
+| 清理前 | 3174 |
+| 清理后 | 2750 |
+
+**减少 424 项**——全部是**被删模块自身的测试**（其被测对象已不存在）。
+活模块的测试**一项未删**（`sessionRuntime.test.ts` 仅移除 1 个断言已删 lane 输出的用例）。
+
+---
+
+## 5. 文档同步
+
+| 文档 | 动作 |
 |---|---|
-| 删除 | `runtime/loop/*`（12 生产 + 14 测试，13,208 行） |
-| 删除 | `runtime/api/host/{runtime,io}.ts` + 测试 |
-| 删除 | `cli/host/`、`runtime/distribution/` |
-| **保留** | `runtime/api/host/contract.ts`（**纯类型**，被 `runtime/evaluation` 公共 API 需要） |
-| 重接 | `core/shell/sessionTerminalState.ts`（去 4 个 loop 字段） |
-| 重接 | `presentation/surface/{model,types,events,runtimeEvents}.ts`（删 6 个 loop-only section 函数） |
-| 重接 | `runtime/events/projection.ts`（删 8 个从未填充的字段 + for 循环） |
-| 清理 | `index.ts` 3 条导出、`scripts/verify-host-surface.mjs`、`--host-command` 开关 |
-
-### 顺带确认的真实死代码
-
-`runtime/events/projection.ts` 有 **8 个字段声明后从未被任何代码填充**，
-全仓 `grep` 在 `projection.ts` 之外 **0 引用**：
-
-```
-loopFinalizationInputs / loopFinalizationDecisions / productLoopCloseoutInputs
-productLoopCloseouts / productCompletionPackets / modelBoundaryPhases
-providerStreamAdapters / responseReentryCycles
-```
-
----
-
-## 3. 测试为何会坏（根因，已逐文件核对）
-
-**`runtime/loop` 的模块被 13 个测试文件当作 fixture builder，
-而这些测试的**被测对象**是活模块。**
-
-| 测试文件 | 被测对象 | 用 loop 做什么 |
-|---|---|---|
-| `core/shell/sessionRuntime.test.ts` | `sessionRuntime.ts`（**活**） | `runAgentLoopContract` 造输入 |
-| `presentation/surface/model.test.ts` | `surface/model.ts`（**活**） | 5 个 loop 投影造输入 |
-| `session/presentation/envelope.test.ts` | `envelope.ts`（**活**） | `PRODUCT_TRUTH_MATRIX` 12 用例 |
-| `session/replay/state.test.ts` | `replay/state.ts`（**活**） | 同上 |
-| `evidence/projection/repair/verdict.test.ts` | `verdict.ts`（**活**） | 同上 |
-| `result/projection/repair/verdict.test.ts` | `verdict.ts`（**活**） | 同上 |
-| `core/shell/cliSessionProductSurface.test.ts` | `cliSessionProductSurface.ts`（**活**） | 同上 |
-| `runtime/events/{stream,projection}.test.ts` | 活 | loop 投影 |
-| `runtime/evaluation/task/{liveRun,model}.test.ts` | 活 | `createHostRuntime`（12 处） |
-| `smoke.test.ts` | 包公共面 | `createHostRuntime` |
-
-**核心是 `truthMatrix.test.ts`（792 行）**：一个**产品真值矩阵**，
-导出 `PRODUCT_TRUTH_MATRIX`（12 用例）+ `PRODUCT_TRUTH_NEGATIVE_CASES`，
-被 **5 个活模块的测试**当 oracle 用。
-
----
-
-## 4. 删除边界的精确测量
-
-对 `runtime/loop` 的 26 个文件做**外部可达性**分析
-（从所有 `runtime/loop` 之外的文件做正向闭包）：
-
-| 类别 | 文件数 | 行数 |
-|---|---:|---:|
-| 被外部可达 | **13** | 7,383 |
-| 外部不可达 | **13** | 5,825 |
-
-**外部不可达的 13 个全部是 `.test.ts`**——即那 12 个生产模块**自己的单元测试**。
-
-**这带来一个两难**：
-
-- 删掉这 13 个测试 → `tsc` 仍 0 错误（已实测），但**12 个存活模块失去唯一覆盖**
-- 不删 → 它们测的模块本身是被测试 import 的，删不掉
-
-即：**`runtime/loop` 没有"可直接删除的子集"**——
-要么删测试（丢覆盖），要么迁模块（重构）。
-
----
-
-## 5. 因此正确的处置是"先搬迁，后删除"
-
-`runtime/loop` 内部**混着两类职责**：
-
-| 部分 | 内容 | 真实 owner |
-|---|---|---|
-| **A. provider 执行路径** | `providerBoundary`、`modelBoundary`、`providerStreamAdapter`、`contract`、`reentry` | 确实该删（生产零值导入） |
-| **B. 产品真值投影** | `finalization`、`completionPacket`、`trajectory`、`adapter`、`infrastructure`、`phaseStatus`、`feature` + `truthMatrix.test.ts` | **不该删**——是活模块测试的 oracle；应迁到 `result/` 或 `verification/` 域 |
-
-**B 与 provider 无关**：`finalization.ts` 与 `completionPacket.ts` 只 `import type`，
-是纯计算。
-
-### 建议顺序
-
-| 序 | 动作 | 风险 |
-|---|---|---|
-| 1 | 把 B 组（含 `truthMatrix.test.ts`）迁出 `runtime/loop` 到真实 owner 域，测试随之改 import | 低（纯搬迁） |
-| 2 | 删 A 组（provider lane） | 低 |
-| 3 | 删 host lane（`runtime/api/host/{runtime,io}`、`cli/host`、`runtime/distribution`） | 中：`liveRun.test.ts` 12 处 `createHostRuntime` 需重写 |
-| 4 | 更新 `index.ts` / `verify-host-surface` / `--host-command` | 需裁决（三问已记录） |
-
-**关键**：第 1 步不做，第 2、3 步就会破坏 13 个测试文件——本轮已实测。
+| `docs/sprint/project-gap-and-priority-plan.md` | 两个"Completed Batch"加更正说明（其证据文件已删） |
+| `docs/sprint/component-adoption-log.md` | "Host JSON Framing" 节记录移除，rollback plan 标注已执行 |
+| `.wiki/refactor/architecture-exploration-2026-09-18.md` | `renderer.ts` 引用更新为已删 |
+| `.wiki/refactor/plan.md` | §2.2 检查 5 的 `verify-host-surface` 引用标注为历史 |

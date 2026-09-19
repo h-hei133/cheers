@@ -1671,3 +1671,63 @@ pi 的答案是不立汇总对象；而 O3'（整体移除）的证据更硬：
 | **O1'** | 删 `runtime/loop` + `runtime/api/host`，不动 `codingResult`（但不解决面板不可见） |
 | **O2'** | 照 pi 补 `AfterToolCallResult.details` 通道（需先定产出形态） |
 | **O3'** | 判定 `codingResult` 一族为旧架构遗留，整体移除（42 个引用点） |
+
+
+## [2026-09-19] phase-c-c1-execute | CB-005 死代码清理**已执行完成**。
+
+`tsc` 0 错误 / 全量 **2749 通过 0 失败** / 四道门禁全过 / **真实 TUI 实机验证通过**。
+产出 `.wiki/refactor/cb-005-execution.md`。
+
+### 判定：确实是死代码
+
+活路径 `turn/projection.ts` **从不产出** `codingResult`/`loopTrajectory`/`productLoopAdapter`
+（grep = 0）；surface 入口守卫要求这 7 个字段至少一个非空（`presentation/surface/model.ts:58`），
+而活路径只传 3 个且**全是 `undefined`**（`sessionTerminalState.ts:531-537`）→
+`projectProductSurfaceViewModel` **恒 `return undefined`** → 整条 surface 链从未执行。
+
+运行时证据：84 个真实会话中唯一含 `loopTrajectory` 的是 **2026-09-11**，
+在 turn 迁移（`a7418fcb`，09-12）**之前**；迁移后 `query.completed` 的 `result`
+只有 6 个字段，无 loop 形状。
+
+**上一轮我的误判更正**：不是"测试指向死代码"，而是**那些活模块本身也是死的**
+（`evidence/projection/repair/verdict.ts`、`result/projection/repair/verdict.ts`、
+`session/replay/state.ts`、`runtime/evaluation/task/model.ts` 可达性验证全为 dead）。
+只有 `core/shell/sessionRuntime.ts` 是活的。
+
+### 删除清单（69 文件，+109 / −23,631 行）
+
+`runtime/loop/*`（26 文件 13,208 行）、`runtime/api/host/{runtime,io}.ts`、
+`cli/host/`、`runtime/distribution/`、`presentation/surface/*`（7 文件）、
+`session/presentation/envelope.ts`、`core/shell/cliSessionProductSurface.ts`、
+`presentation/terminal/renderer.ts`、`runtime/events/projection.ts` 的 8 个死字段、
+`index.ts` 3 条导出、`scripts/verify-host-surface.mjs`、`--host-command` 开关。
+
+**保留** `runtime/api/host/contract.ts`（纯类型，`runtime/evaluation` 公共 API 仍引用）。
+
+### 验证
+
+| 门禁 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | **0 错误** |
+| `npm run build` | **0 错误**（含 Rust） |
+| 全量测试 | **2749 通过 / 1 跳过 / 0 失败** |
+| `verify:import-cycles` | `runtime_cycles=0 type_only_cycles=0` pass |
+| `verify:docs-drift:strict` | pass（35 → 0 dangling） |
+| `analyze:module-facades` | 3 monolith 均为既有 disposition，无新增 |
+| NormProof | `openBlockingObligationCount: 0` |
+
+**真实 TUI 实机验证**（§2.4 强制）：`--print` 输出 `Outcome: success` exit 0；
+交互 TUI 完整回合通过；`/sessions current` 输出含 `- ID:`（与基线断言一致）。
+
+**唯一失败项**：`cli-baseline.test.ts` 的 PTY spawn 测试并发下超时 1 次，
+**隔离复跑 40/40 通过**，不依赖任何已删模块，`plan.md` 已记录同类既有抖动 → 判定既有负载抖动。
+
+### 测试数变化
+
+3174 → 2750，**减少 424 项，全部是被删模块自身的测试**。活模块测试一项未删。
+
+### 文档同步
+
+`project-gap-and-priority-plan.md`（两个 Completed Batch 加更正）、
+`component-adoption-log.md`（Host JSON 节记录移除 + rollback 已执行）、
+`architecture-exploration-2026-09-18.md`、`plan.md` §2.2 检查 5。
