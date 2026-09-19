@@ -605,3 +605,98 @@ P4 的改造不该把它一起推倒。
 BlockA2 在「重复实现-4 actionable blocker」条目中称**两条链都在跑**。实测（`/tmp/unreachable.json`）：
 `assembly.ts`、`runtimeOutcomeProjection.ts`、`context/acquisition/graph.ts` **三者均在 276 不可达集内**，
 故窄版链**不可达**。BlockG2 对该链的判定正确。本节已按实测更正。
+
+---
+
+## 12. 全仓重复实现普查（主代理机械扫描，2026-09-19）
+
+**方法**（可复核）：对 934 个生产文件，用括号配对提取所有 `function <name>(...)` 声明的函数体，
+剔除注释、压缩空白后按内容哈希分组，只保留**跨文件**且**≥3 行**的组。
+**口径限制**：只覆盖 `function` **声明式**，不覆盖箭头函数与方法简写；故这是**下界**。
+
+**结果**：**56 组逐字节相同的函数体，177 份冗余副本**（即 56 个独立实现被写成 177 份）。
+
+### 12.1 按域分布（副本数）
+
+| 域 | 副本数 |
+|---|---:|
+| `browser` | 29 |
+| `core` | 22 |
+| `session` | 20 |
+| `turn` | 18 |
+| `edit` | 10 |
+| `presentation` | 9 |
+| `provider` / `context` / `tools` / `runtime` / `memory` | 各 8 |
+| `evidence` | 5 |
+
+### 12.2 最高危：`sanitizeText` —— 安全脱敏函数被复制 6 份，逐字节相同
+
+**这是本次普查最重要的发现。**
+- 副本位置（哈希全部 `00e39a0108`）：
+  `edit/sanitize.ts:36`、`tools/toolOutcomeBundle.ts:271`、`turn/deliveryPolicy.ts:131`、
+  `turn/followUpQueue.ts:135`、`turn/nextTurnBundle.ts:335`、`turn/steeringQueue.ts:135`
+- 该函数含 **11 条正则规则**，逐条都是**凭据/隐私防线**：
+  - 真实 provider 家目录 → `[redacted-real-provider-home]`
+  - `Bearer <token>` → `[redacted]`
+  - `api_key|token|secret|cookie|authorization|password` 赋值 → `[redacted]`
+  - `sk-…` / `ghp_…` / `github_pat_…` → `[secret-redacted]`
+  - `provider.env`、`oldText/newText`、`raw provider output`、`hidden reasoning`、`<html>…</html>`
+    → `[raw-content-excluded]`
+- **影响**：这是 `AGENTS.md` 明确保护的秘密边界所依赖的代码。6 份独立副本意味着
+  **新增一条脱敏规则必须改 6 处**，漏一处即产生一条不脱敏的泄漏路径。
+  且 6 份分布在 3 个不同域（`edit` / `tools` / `turn`），无单一 review 覆盖面。
+- 建议：收口为单一导出（`AGENTS.md` 已认可该函数，可置于 `core/security/` 或 `edit/sanitize.ts`），
+  其余 5 处改为导入。
+- 置信度：**高**（哈希实测）
+
+### 12.3 次高危：`freeze` / `deepFreeze` 两组共 27 份，且**两组语义不同**
+
+- `deepFreeze` **14 份逐字节相同**（含 `!Object.isFrozen` 短路）：
+  `edit/sanitize.ts:68`、`evidence/projection/mutation/proof.ts:98`、
+  `evidence/projection/repair/verdict.ts:131`、`provider/registry/provider.ts:737`、
+  `provider/request/attempt.ts:847`、`provider/request/boundary.ts:792` 等
+- `deepFreeze` **另 13 份逐字节相同**（**无**短路，语义不同）：
+  `context/sessionContextRebuildProjection.ts:186`、`policy/resourceTrustPolicy.ts:163`、
+  `provider/response/boundary.ts:145`、`runtime/events/projection.ts:2998`、
+  `runtime/events/stream.ts:168`、`runtime/extensions/lifecycle.ts:374` 等
+- `freeze` **13 份逐字节相同**：`context/rebuildInput.ts:194`、`evidence/host/proof.ts:48`、
+  `repair/handoff/boundary.ts:728`、`result/host/verdict.ts:55`、`session/replay/host/facts.ts:64`、
+  `session/store/host/state.ts:233` 等
+- **影响**：**"不可变"这一契约在本仓有两套实现**（带/不带 `Object.isFrozen` 短路），
+  且分属两组不相互引用。任何一处修改（例如加循环引用防护）不会传播到另外 26 处。
+- 建议：收口到一份 `deepFreeze`，其余改导入；两组语义需先裁决保留哪一套。
+- 置信度：**高**（分组哈希实测；两组 body 不同已被分组本身证明）
+
+### 12.4 其余值得注意的组
+
+| 组 | 份数 | 位置 | 备注 |
+|---|---:|---|---|
+| `sanitizeId` | 4 + 3 + 3（**三组**） | `edit/sanitize.ts:57`、`turn/*`、`tools/*`、`repair/handoff/boundary.ts:697`、`verification/result/boundary.ts:768` | **同名的三套不同实现**——比单纯重复更危险 |
+| `compactText` / `compactContinuityText` | 5 | `session/continuation/stoppedSessionContinuity.ts:271` 等 | 全在 `session/` 内，同一域 5 份 |
+| `normalizeBaseUrl` | 4 | `config/runtimeConfig.ts:432`、`core/auth/providerAuthRuntime.ts:250`、`core/commands/authCommandRuntime.ts:268`、`core/shell/providerCredentials.ts:253` | URL 归一化 4 份，跨 3 个域 |
+| `toRelativeTime` | 3 | `core/shell/sessionStateSurface.ts:290`、`entrypoints/cliPermissionModule.ts:132`、`entrypoints/cliWorkspaceSurface.ts:91` | 用户可见的时间格式，3 份可漂移 |
+| `truncate` | 4 | `core/shell/recovery.ts:683`、`core/shell/sessionStateSurface.ts:312` 等 | |
+| `redactSensitiveText` | 4 | `browser/domSnapshot.ts:167`、`browser/playwrightEvidence.ts:209`、`browser/playwrightEvidenceMapper.ts:120`、`browser/readOnlyContentNormalizer.ts:98` | **脱敏的第二个家族**，全在 `browser/` |
+| `sanitizeWithTracking` | 3 | `policy/resourceTrustPolicy.ts:120`、`runtime/resources/inventory.ts:518`、`tools/policy/interception.ts:370` | |
+| `isPrivateNetworkHost` | 3 | `browser/publicReadOnlyWebManifest.ts:375`、`browser/publicReadOnlyWebPolicy.ts:168`、`core/harness/browserPublicReadOnlyWebSmokeConfig.ts:151` | **安全判定 3 份**（SSRF 防线） |
+| `clampInteger` | 3 | `presentation/sidebar/*` | 同域 3 份 |
+| `normalizeOptionalString` | 3 | `session/approval/memoryCodec.ts:288` 等 | |
+| `sanitizeText`（**第三组**） | 3 | `context/rebuildInput.ts:170`、`repair/handoff/boundary.ts:704`、`verification/result/boundary.ts:775` | 21 行版，**与 12.2 的 6 份不同的另一套** |
+| `sanitizeText`（4 组） | — | `repair/handoff/boundary.ts` / `verification/result/boundary.ts` | 即 §10.1 重复-3 |
+
+### 12.5 与 pi 的对照
+
+pi 对此类工具函数的处理是**集中在单一模块并按包边界导出**：
+`packages/agent/src/harness/` 下的工具函数（如 `harness/result.ts` 的 `Result` 一族）
+只有一份，且由 `package.json` 的 `exports` 映射强制约束谁能导入。
+本仓无此机制——`freeze` 能在 27 处各自重定义，正是因为**没有任何东西阻止它**。
+这一步与 §12.2 的建议同向：先收口最高危的 `sanitizeText` 与 `deepFreeze`。
+
+### 12.6 口径说明（诚实边界）
+
+- 本普查**只覆盖 `function` 声明式**。箭头函数（如 `const f = () => …`）
+  与方法简写未纳入，故真实重复**多于** 56 组。
+- 未判断各组"是否本应合并"：`toRelativeTime` 三份可能因显示语境不同而合理地独立；
+  但 `sanitizeText` / `deepFreeze` / `isPrivateNetworkHost` / `normalizeBaseUrl`
+  属**同一职责**，无独立理由。
+- 未评估删除/收口的风险。**本节只报事实。**
