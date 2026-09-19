@@ -1,4 +1,4 @@
-import { sanitizeSidebarText } from "../presentation/sidebar/sidebarStateModel.js";
+import { redactUnsafeReportText } from "../core/security/reportText.js";
 
 export type BrowserBackendKind =
   | "none"
@@ -137,7 +137,7 @@ export function browserActionRiskForKind(kind: BrowserActionKind): BrowserAction
 }
 
 export function sanitizeBrowserText(value: string, maxLength = 280): string {
-  return sanitizeSidebarText(value, new Set(), maxLength);
+  return redactUnsafeReportText(value, new Set(), maxLength);
 }
 
 function defaultBackendCandidates(): readonly BrowserBackendCandidate[] {

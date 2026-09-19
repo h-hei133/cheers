@@ -1,3 +1,5 @@
+import { redactUnsafeReportText } from "../../core/security/reportText.js";
+
 export const SIDEBAR_STATE_SNAPSHOT_VERSION = "sidebar-state-v1" as const;
 
 export type SidebarSection =
@@ -113,9 +115,9 @@ export function createSidebarFact(input: SidebarFact): SidebarFact {
   return {
     ...input,
     id: normalizeToken(input.id, "sidebar-fact"),
-    label: sanitizeSidebarText(input.label, redactions, 80),
-    summary: sanitizeSidebarText(input.summary, redactions),
-    evidence: unique(input.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+    label: redactUnsafeReportText(input.label, redactions, 80),
+    summary: redactUnsafeReportText(input.summary, redactions),
+    evidence: unique(input.evidence.map((item) => redactUnsafeReportText(item, redactions, 120))),
   };
 }
 
@@ -124,8 +126,8 @@ export function createSidebarNotice(input: SidebarNotice): SidebarNotice {
   return {
     ...input,
     id: normalizeToken(input.id, "sidebar-notice"),
-    message: sanitizeSidebarText(input.message, redactions),
-    evidence: unique(input.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+    message: redactUnsafeReportText(input.message, redactions),
+    evidence: unique(input.evidence.map((item) => redactUnsafeReportText(item, redactions, 120))),
   };
 }
 
@@ -134,9 +136,9 @@ export function createSidebarNextAction(input: SidebarNextAction): SidebarNextAc
   return {
     ...input,
     id: normalizeToken(input.id, "sidebar-action"),
-    label: sanitizeSidebarText(input.label, redactions, 80),
-    summary: sanitizeSidebarText(input.summary, redactions),
-    evidence: unique(input.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+    label: redactUnsafeReportText(input.label, redactions, 80),
+    summary: redactUnsafeReportText(input.summary, redactions),
+    evidence: unique(input.evidence.map((item) => redactUnsafeReportText(item, redactions, 120))),
   };
 }
 
@@ -159,7 +161,7 @@ export function createSidebarStateSnapshot(
   return {
     snapshotVersion: SIDEBAR_STATE_SNAPSHOT_VERSION,
     generatedAt: input.generatedAt,
-    title: sanitizeSidebarText(input.title ?? "Visible agent state", redactions, 120),
+    title: redactUnsafeReportText(input.title ?? "Visible agent state", redactions, 120),
     facts,
     notices,
     nextActions,
@@ -183,7 +185,7 @@ export function createSidebarStateSnapshot(
       "sidebar-state-model:no-persistence",
       "sidebar-state-model:no-provider-or-model-call",
       "sidebar-state-model:no-dynamic-discovery",
-    ].map((item) => sanitizeSidebarText(item, redactions, 120))),
+    ].map((item) => redactUnsafeReportText(item, redactions, 120))),
   };
 }
 
@@ -195,39 +197,6 @@ export function sidebarFactsForSection(
   return snapshot.facts.filter(
     (fact) => fact.section === section && fact.visibility === visibility,
   );
-}
-
-export function sanitizeSidebarText(
-  value: string,
-  redactions: Set<string> = new Set(),
-  maxLength = 280,
-): string {
-  const compact = value.replace(/\s+/g, " ").trim();
-  let sanitized = compact
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, () => {
-      redactions.add("secret-looking-token");
-      return "[REDACTED_SECRET]";
-    })
-    .replace(/\b(api key|token|authorization|provider credential|provider config|secret)\b/gi, () => {
-      redactions.add("secret-label");
-      return "[REDACTED_SECRET_LABEL]";
-    })
-    .replace(/\bRAW_[A-Z0-9_]+\b/g, () => {
-      redactions.add("raw-marker");
-      return "[REDACTED_RAW]";
-    })
-    .replace(/\b(raw content|raw (file|recovery|content|memory|event) content)\b/gi, () => {
-      redactions.add("raw-content-label");
-      return "[REDACTED_RAW_CONTENT]";
-    })
-    .replace(/\b(hidden reasoning|chain[- ]?of[- ]?thought)\b/gi, () => {
-      redactions.add("hidden-reasoning-label");
-      return "[REDACTED_REASONING]";
-    });
-  if (sanitized.length > maxLength) {
-    sanitized = `${sanitized.slice(0, maxLength - 3)}...`;
-  }
-  return sanitized;
 }
 
 export function sidebarTextHasForbiddenContent(value: string): boolean {
@@ -242,9 +211,9 @@ function sanitizeFact(fact: SidebarFact, redactions: Set<string>): SidebarFact {
   return {
     ...fact,
     id: normalizeToken(fact.id, "sidebar-fact"),
-    label: sanitizeSidebarText(fact.label, redactions, 80),
-    summary: sanitizeSidebarText(fact.summary, redactions),
-    evidence: unique(fact.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+    label: redactUnsafeReportText(fact.label, redactions, 80),
+    summary: redactUnsafeReportText(fact.summary, redactions),
+    evidence: unique(fact.evidence.map((item) => redactUnsafeReportText(item, redactions, 120))),
   };
 }
 
@@ -252,8 +221,8 @@ function sanitizeNotice(notice: SidebarNotice, redactions: Set<string>): Sidebar
   return {
     ...notice,
     id: normalizeToken(notice.id, "sidebar-notice"),
-    message: sanitizeSidebarText(notice.message, redactions),
-    evidence: unique(notice.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+    message: redactUnsafeReportText(notice.message, redactions),
+    evidence: unique(notice.evidence.map((item) => redactUnsafeReportText(item, redactions, 120))),
   };
 }
 
@@ -264,9 +233,9 @@ function sanitizeNextAction(
   return {
     ...action,
     id: normalizeToken(action.id, "sidebar-action"),
-    label: sanitizeSidebarText(action.label, redactions, 80),
-    summary: sanitizeSidebarText(action.summary, redactions),
-    evidence: unique(action.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+    label: redactUnsafeReportText(action.label, redactions, 80),
+    summary: redactUnsafeReportText(action.summary, redactions),
+    evidence: unique(action.evidence.map((item) => redactUnsafeReportText(item, redactions, 120))),
   };
 }
 
@@ -279,19 +248,19 @@ function sanitizeRecentActivity(
     events: uniqueById(activity.events.map((event) => ({
       ...event,
       id: normalizeToken(event.id, "sidebar-activity"),
-      kind: sanitizeSidebarText(event.kind, redactions, 80),
-      source: sanitizeSidebarText(event.source, redactions, 80),
-      title: sanitizeSidebarText(event.title, redactions, 100),
-      summary: sanitizeSidebarText(event.summary, redactions),
+      kind: redactUnsafeReportText(event.kind, redactions, 80),
+      source: redactUnsafeReportText(event.source, redactions, 80),
+      title: redactUnsafeReportText(event.title, redactions, 100),
+      summary: redactUnsafeReportText(event.summary, redactions),
       nextAction: event.nextAction
-        ? sanitizeSidebarText(event.nextAction, redactions)
+        ? redactUnsafeReportText(event.nextAction, redactions)
         : undefined,
-      evidence: unique(event.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+      evidence: unique(event.evidence.map((item) => redactUnsafeReportText(item, redactions, 120))),
     }))),
     latestNextAction: activity.latestNextAction
-      ? sanitizeSidebarText(activity.latestNextAction, redactions)
+      ? redactUnsafeReportText(activity.latestNextAction, redactions)
       : undefined,
-    evidence: unique(activity.evidence.map((item) => sanitizeSidebarText(item, redactions, 120))),
+    evidence: unique(activity.evidence.map((item) => redactUnsafeReportText(item, redactions, 120))),
   };
 }
 

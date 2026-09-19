@@ -1,5 +1,5 @@
+import { redactUnsafeReportText } from "../../core/security/reportText.js";
 import {
-  sanitizeSidebarText,
   type SidebarSeverity,
   type SidebarVisibility,
 } from "./sidebarStateModel.js";
@@ -56,11 +56,11 @@ export function createSidebarEvent(input: SidebarEventInput): SidebarEvent {
   if (input.rawContent) {
     redactions.add("raw-event-content-excluded");
   }
-  const title = sanitizeSidebarText(input.title, redactions, 100);
-  const summary = sanitizeSidebarText(input.summary, redactions);
-  const references = unique((input.references ?? []).map((item) => sanitizeSidebarText(item, redactions, 120)));
+  const title = redactUnsafeReportText(input.title, redactions, 100);
+  const summary = redactUnsafeReportText(input.summary, redactions);
+  const references = unique((input.references ?? []).map((item) => redactUnsafeReportText(item, redactions, 120)));
   const nextAction = input.nextAction
-    ? sanitizeSidebarText(input.nextAction, redactions)
+    ? redactUnsafeReportText(input.nextAction, redactions)
     : undefined;
   const id = input.id ?? eventId({
     kind: input.kind,
@@ -86,7 +86,7 @@ export function createSidebarEvent(input: SidebarEventInput): SidebarEvent {
       "sidebar-event-model:pure",
       "sidebar-event-model:no-persistence",
       "sidebar-event-model:no-provider-call",
-    ].map((item) => sanitizeSidebarText(item, redactions, 120))),
+    ].map((item) => redactUnsafeReportText(item, redactions, 120))),
   };
 }
 

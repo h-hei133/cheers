@@ -1,3 +1,4 @@
+import { redactUnsafeReportText } from "../../core/security/reportText.js";
 import type { CompactInjectionState } from "../../context/compact/injection/compactInjectionState.js";
 import type { CompactLiveCheckpoint } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import type { ProjectMemoryInjectionState } from "../../memory/projectMemoryInjectionState.js";
@@ -9,7 +10,6 @@ import { projectSidebarActivity } from "./sidebarActivityProjection.js";
 import type { SidebarEvent } from "./sidebarEventModel.js";
 import {
   createSidebarStateSnapshot,
-  sanitizeSidebarText,
   type SidebarFact,
   type SidebarNextAction,
   type SidebarNotice,
@@ -439,8 +439,8 @@ function fact(
     kind,
     visibility: "user-visible",
     source,
-    label: sanitizeSidebarText(label),
-    summary: sanitizeSidebarText(summary),
+    label: redactUnsafeReportText(label),
+    summary: redactUnsafeReportText(summary),
     evidence,
   };
 }
@@ -456,7 +456,7 @@ function notice(
     id,
     severity,
     source,
-    message: sanitizeSidebarText(message),
+    message: redactUnsafeReportText(message),
     evidence,
   };
 }

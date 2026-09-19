@@ -75,7 +75,7 @@ Contract changes must keep producer and consumer semantics aligned.
 - `packages/ts-shell/src/entrypoints/`: executable entrypoints and compatibility re-exports only; reusable CLI contracts belong under `packages/ts-shell/src/cli/`.
 - Current owners for new edit/result logic include `packages/ts-shell/src/edit/`, `packages/ts-shell/src/edit/result/`, `packages/ts-shell/src/edit/multifile/`, `packages/ts-shell/src/verification/`, `packages/ts-shell/src/repair/`, `packages/ts-shell/src/evidence/`, `packages/ts-shell/src/result/`, and `packages/ts-shell/src/policy/`.
 - `packages/ts-shell/src/core/query/`: generic query and result mapping; project feature-specific state into generic result shapes before handing it to query-level mappers.
-- `packages/ts-shell/src/core/security/`: path containment, project trust, and the report-safe text redactor (`redaction.ts`) shared by every domain that emits reports, receipts, or session records.
+- `packages/ts-shell/src/core/security/`: path containment, project trust, and the report-safe text redactors shared across domains - `redaction.ts` (provider paths, bearer tokens, credential assignments) and `reportText.ts` (report-unsafe markers and length caps), the latter shared by `browser/` and `presentation/`.
 - `packages/ts-shell/src/core/shell/`: shell/session display surface; keep feature-specific policy and writer semantics outside this layer when possible.
 - `packages/ts-shell/src/session/`: session lifecycle, durable session state, and resume/recovery boundaries.
 - `scripts/`: repository-level validation scripts, readiness checks, and real-provider smoke entrypoints.
