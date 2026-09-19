@@ -1,4 +1,5 @@
 import { sanitizeBrowserText } from "./capabilityModel.js";
+import { exceedsByteBudget } from "./outputBudget.js";
 
 export type BrowserEvidenceSafetyStatus = "safe" | "redacted" | "unsafe" | "blocked";
 
@@ -115,7 +116,7 @@ function unsafeEvidenceChecks(
     redactions.add("binary-or-blob-payload");
     blockers.add("binary-or-blob-payload");
   }
-  if (normalized.length > budget) {
+  if (exceedsByteBudget(normalized, budget)) {
     redactions.add("over-budget-output");
     warnings.add("raw-output-over-budget");
   }

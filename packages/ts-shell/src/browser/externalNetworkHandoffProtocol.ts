@@ -1,6 +1,7 @@
 import { sanitizeBrowserText } from "./capabilityModel.js";
 import type { BrowserExecutionRequest } from "./executionContract.js";
 import type { BrowserExternalNetworkRunnerManifestMode } from "./externalNetworkRunnerManifest.js";
+import { exceedsByteBudget } from "./outputBudget.js";
 
 export type BrowserExternalNetworkHandoffStatus =
   | "simulated"
@@ -98,7 +99,7 @@ export function validateBrowserExternalNetworkHandoffResponse(input: {
     ...response.warnings,
     ...response.redactions,
   ].filter(Boolean).join("\n");
-  if (combined.length > input.outputBudgetBytes) {
+  if (exceedsByteBudget(combined, input.outputBudgetBytes)) {
     return invalid("External-network handoff response exceeded output budget.", {
       ...response,
       status: "unsafe-output",

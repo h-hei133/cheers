@@ -202,6 +202,10 @@ function controlledHttpGet(
       response.on("end", () => {
         resolve({
           statusCode: response.statusCode ?? 0,
+          // The data handler above already caps `chunks` at outputBudgetBytes of
+          // real bytes, and a string's code-unit count never exceeds its UTF-8
+          // byte count, so this char-based call cannot truncate further. Left as
+          // a plain sanitize rather than adding a byte cap that would be inert.
           body: sanitizeBrowserText(Buffer.concat(chunks).toString("utf8"), outputBudgetBytes),
           bodyBytes: size,
           redirectLocation: response.headers.location,

@@ -1,3 +1,4 @@
+import { appendWithinByteBudget } from "../../outputBudget.js";
 import { spawn } from "node:child_process";
 import {
   browserExternalRunnerHasForbiddenContent,
@@ -73,10 +74,10 @@ export async function runBrowserExternalRunnerProcess(input: {
       });
     }, input.manifest.timeoutMs);
     child.stdout?.on("data", (chunk: Buffer) => {
-      stdout = appendBudgeted(stdout, chunk.toString("utf8"), budget);
+      stdout = appendWithinByteBudget(stdout, chunk.toString("utf8"), budget);
     });
     child.stderr?.on("data", (chunk: Buffer) => {
-      stderr = appendBudgeted(stderr, chunk.toString("utf8"), budget);
+      stderr = appendWithinByteBudget(stderr, chunk.toString("utf8"), budget);
     });
     child.on("error", () => {
       if (settled) {
@@ -179,10 +180,6 @@ function blocked(
   };
 }
 
-function appendBudgeted(current: string, next: string, budget: number): string {
-  const merged = `${current}${next}`;
-  return merged.length > budget ? merged.slice(0, budget) : merged;
-}
 
 function summarizeOutput(value: string, budget: number): string {
   if (!value.trim()) {
