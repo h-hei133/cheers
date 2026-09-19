@@ -1374,3 +1374,89 @@ SCC **1500 文件 / 0 环**；`verify:docs-drift:strict` 通过；
 
 **未修任何代码**，仅登记。三项均 `待裁决`；每项已附可脚本化的复现步骤，
 批准后可直接固化为回归测试。
+
+## [2026-09-19] phase-c-c1 | CB-005 立项探索：**前提成立，但形态与 plan 描述相反**——它是裁决问题，不是施工问题。
+
+阶段 C / C1（`plan.md` §8.2）。plan 对该项的要求原文是"**应先立项再动手**"，
+故本轮产出立项文档 `.wiki/refactor/cb-005-initiation.md`（零代码改动，全部实测）。
+
+### 结论先行
+
+CB-005 不是"两套并行 provider 路径"，而是**一条活路径 + 一条已被封死到只跑合成 provider 的旧路径**。
+因此它不再需要"连通两套"，而是需要**裁决删哪一条**。这个区别决定工作量与风险。
+
+### 决定性实测（plan 未记录）
+
+| 事实 | 证据 |
+|---|---|
+| 生产侧对 `runtime/loop/*` 的 14 处 import **全部是 `import type`** | `presentation/surface/{model,types,events,runtimeEvents}.ts`、`core/shell/sessionTerminalState.ts:7-8` |
+| 12 个 loop 文件的**值导入者全部为 0** | 逐函数反查：`adapter`/`contract`/`trajectory`/`completionPacket`/`feature`/`finalization`/`infrastructure`/`modelBoundary`/`phaseStatus`/`providerBoundary`/`providerStreamAdapter`/`reentry` |
+| 唯一生产值调用者 | `runtime/api/host/runtime.ts:351` `runAgentLoopContract` |
+| **provider 硬编码合成** | `runtime/api/host/runtime.ts:338` `createSyntheticModelBoundary(...)`；`:357` `providerMode: "synthetic"` |
+| **类型上不存在 `real`** | `runtime/api/host/contract.ts:17` `HostProviderMode = "synthetic" \| "default-off"`；`:237-239` 传 `"real"` 被 `provider-blocked` 阻断 |
+| 该封死是**门禁保护的契约** | `scripts/verify-host-surface.mjs:55` 用 synthetic；`:90` 传 `"real"` 并**断言必须被阻断**（`:96-101`） |
+
+即：**6579 行在生产中从不执行**，且该路径**结构上不能跑真实对话**。
+它是一条契约/评估 harness，不是"另一套 provider 能力"。
+
+### 真实数据佐证
+
+| 测量 | 结果 |
+|---|---|
+| 84 个真实 session `state.json` 含 `harness` / `codingResult` | **0 / 0** |
+| 162 个真实 `query.completed` 携带 `codingResult` | 5 |
+| 那 5 个的时间 | 全部 ≤ **2026-08-29**，同属一个会话（创建于 05-06）——即**全在 turn 迁移 `a7418fcb`（09-12）之前**，迁移后为零 |
+
+### CB-005 核心缺口（确认成立，实测）
+
+`turn/tools.ts:123` 在审批点**确实持有** `approvals = Map<id, {operation, decision}>`，
+`:130` 写入，但唯一出站通道 `:173` 只允许 `return { output }`——
+**审批的 operation/decision 被取到、拼成一行文本、然后丢弃**。
+
+同时 `turn/projection.ts:101` 的 `concludeRun` 完全不读 `verification` / `taskSatisfaction` /
+`failedFiles`（grep 零匹配），故"编辑成功但验证失败仍报 success"**成立**。
+
+### 对 plan 的修正
+
+| plan 原文 | 实测 |
+|---|---|
+| "两套**并行** provider 路径" | 不是并行——旧路径 provider 硬编码合成、类型无 `real` |
+| `runtime/loop` "有 retry 资格判定"（作为能力对比） | 该代码**零生产执行**，该能力**从未在真实对话中生效** |
+| 终态判定两侧不汇合 | ✅ 成立 |
+| 审批无结构化通道 | ✅ 成立 |
+
+### 四条死条件复核
+
+| # | 读侧 | 写侧 | 结论 |
+|---|---|---|---|
+| 1 `provenance.toolExecutions`/`approvalDecisions` | 7 处生产读取 | **无**（唯一 `codingResult` 生产者 `actionAuthority.ts:105` 不含 `provenance`） | ✅ 死条件 |
+| 2 `executionLane` | **无**（`.executionLane` 零生产读取点） | `mutation.ts:252` | ⚠️ **比原记录更强**：不只是"指向不存在路由"，是**无人读** |
+| 3 25 条证据标签 | 部分 | 部分 | 与 #1 同源（未逐条穷举，已如实记录） |
+| 4 `lastActionResultSeed` | 多处生产读取 | **仅测试** | ✅ 死条件 |
+
+**额外发现（plan 未登记）**：`getSessionReceipts`（`evidenceReceiptCollector.ts:16`）零生产消费者——
+该 hook 在真实路径**确实注册并执行**（`cliRuntimeInvocation.ts:10` → `builtin/index.ts:23`），
+收集的 `ToolExecutionReceipt` 写进内存环形缓冲后**无人读取**。
+这是与 #1 形态相同但方向相反（写入侧在、读取侧缺）的第 5 条死条件。
+
+### 立项建议
+
+**建议：先裁决「删旧路径(A)」还是「只补缺口(C)」，不要选「连通(B)」。**
+
+理由：B 与实测冲突——旧路径 provider 是硬编码合成，"连通"它等于**新建**一条真实 provider
+路径，而非"接上已有的"。A 与 C 不冲突，且 A 会自然消灭 C 的大部分对象（`runtime/loop` 删除后，
+`codingResult` 唯一生产者 `actionAuthority.ts` 也随之暴露——它同样零生产值调用者）。
+故最小且诚实的第一步是**先测 A 的删除闭包有多大**（不改代码），据此再决定删还是补。
+
+### 子代理基建故障（影响本轮方法，如实记录）
+
+按维护者要求并发上限 2，派出 2 个子代理，**两个均因基础设施故障失败且未产出任何结论**：
+`HostPathReach` 返回 `[workbuddy/global:deepseek-v4.1-flash] Retry budget exhausted after 10 retries: 503`
+（腾讯云 WAF 拦截页，`param=waf_ip_blocked`）；`DeadConditions` 同类故障，9 分钟后取消。
+**本文所有事实均由主代理亲自实测，无子代理输入。**
+此故障与 CB-005 无关，记录在此以区分"未完成"与"未尝试"。
+
+### 未完成（如实记录）
+
+25 条证据标签逐条穷举、`runtime/loop` 删除闭包定量、`CodingResultSummary` ~40 个消费者逐一定性——
+三项均未做，属"下一步"范畴。
