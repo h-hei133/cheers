@@ -1,34 +1,4 @@
 export {
-  validateHostCommandEnvelope,
-  type HostCommandEnvelope,
-  type HostCommandResponse,
-  type HostExitClassification,
-  type HostExitSummary,
-} from "./runtime/api/host/contract.js";
-export {
-  listEvaluationCases,
-  runEvaluationCase,
-  runEvaluationSuite,
-  type EvaluationCaseResult,
-  type EvaluationSuiteResult,
-} from "./runtime/evaluation/model.js";
-export {
-  listTaskCases,
-  runTaskAssessment,
-  runTaskCase,
-  type TaskAssessmentResult,
-  type TaskCaseDefinition,
-  type TaskCaseProofRecord,
-  type TaskCaseResult,
-  type TaskLiveGate,
-  type TaskLivePolicy,
-  type TaskLiveReadiness,
-  type TaskLiveReadinessBlocker,
-  type TaskLiveSafetyClass,
-  type TaskLiveReadinessStatus,
-  type TaskOutcome,
-} from "./runtime/evaluation/task/model.js";
-export {
   selectVerification,
   type VerificationPurpose,
   type VerificationRunState,

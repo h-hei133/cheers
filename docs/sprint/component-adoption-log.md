@@ -1188,11 +1188,15 @@ focused validation.
 > 理由：该 host 执行面驱动的 provider 是硬编码合成
 > （`providerMode: "synthetic"`，类型上无 `real` 成员），生产零值导入；
 > 活路径（`turn/`）已由 `turn/synthetic.ts` 提供同等能力。
-> `runtime/api/host/contract.ts`（纯类型）**保留**，因为
-> `runtime/evaluation` 的公共 API 仍引用它。保留原文以存档。
+> **补充（2026-09-19，C2）**：`runtime/api/host/contract.ts` 与整个
+> `runtime/evaluation`（15 文件 / 5,881 行）**随后一并删除**。
+> 理由：`contract.ts` 的唯一消费者是 `runtime/evaluation` 的公共 API，
+> 而该 evaluation 面需要 `dispatch => HostCommandResponse`，
+> 其唯一生产者 `createHostRuntime` 已随 CB-005 删除——即它**无法被调用**，
+> 且从未接入任何 gate/脚本/测试。保留原文以存档。
 
 - Selected mode: structured port.
-- Owner domain（**历史记录**）: `packages/ts-shell/src/runtime/api/host/` for host JSON and
+- Owner domain（**历史记录，目录已删**）: `runtime/api/host/` for host JSON and
   exit classification, packages/ts-shell/src/cli/host/ for CLI delegation,
   packages/ts-shell/src/runtime/distribution/ for package readiness, and
   `scripts/` for repository smoke.

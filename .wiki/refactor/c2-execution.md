@@ -95,7 +95,7 @@ CB-005 删 host lane 时的遗留物。执行前按 `plan.md` §2.2 六项检查
 **这不是本轮引入的错误**，而是 CB-005 删除时未同步裁决的结果
 （当时已记录为"三个待裁决的公共面问题"）。
 
-**建议**：连同 `runtime/evaluation` 整体处置（见下），不要单独删 `task/` 那 5 个文件。
+**建议**：连同 `runtime/evaluation` 整体处置，不要单独删 `task/` 那 5 个文件。
 
 ---
 
@@ -134,3 +134,52 @@ CB-005 删 host lane 时的遗留物。执行前按 `plan.md` §2.2 六项检查
 C 的裁决应回答：**"评测/基准能力是否要留在产品里？"**
 - 若要 → 需恢复一个 host dispatch 生产者（即部分撤销 CB-005）
 - 若不要 → 连同 `index.ts` 的 evaluation 导出一并删除
+
+
+---
+
+## 四、`runtime/evaluation` 整体删除（2026-09-19，维护者裁决）
+
+**裁决**：删除。
+
+### 删除对象
+
+| 对象 | 规模 |
+|---|---|
+| `runtime/evaluation/`（15 文件） | **5,881 行** |
+| `runtime/api/host/contract.ts` | 332 行（唯一消费者是 evaluation，随之失去存在理由） |
+| `index.ts` 3 条导出 | evaluation/model、evaluation/task/model、api/host/contract |
+
+**合计：16 文件 / 约 6,213 行。**
+
+### 删除依据
+
+1. **无法被调用**：`runEvaluationCase` / `runTaskAssessment` / `runTaskLiveReport`
+   都要求 `dispatch => Promise<HostCommandResponse>`，
+   而唯一生产者 `createHostRuntime` 已随 CB-005 删除（非测试代码中 grep = 0）。
+2. **从未接线**：`grep` 确认它**从未**接入 `verify-release-core`、
+   无 task-bench 脚本、**零测试文件**跑它。
+3. **公共面断链**：`index.ts` 曾同时导出生产者与消费者；CB-005 删了前者、留了后者。
+
+### 保留下来的
+
+- **`eval/browser/`（114 行）不动**——它是**另一件事**：browser 场景基准，
+  被 3 个测试真实调用（29 项），被测对象（`browser/*`）是活的。
+- 37 个用例的场景描述（17 个运行时用例 + 20 个任务用例）**已随删除移除**；
+  其设计意图记录在 `docs/sprint/component-adoption-log.md`
+  （"measure real task completion, not only trusted runtime fact projection"）。
+
+### 验证
+
+| 门禁 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | **0 错误** |
+| 全量测试 | **493 文件 2747 通过 / 1 跳过 / 0 失败** |
+| `verify:docs-drift:strict` | pass（0 dangling） |
+| `verify:import-cycles` | `runtime_cycles=0 type_only_cycles=0` |
+| `analyze:module-facades` | 3 monolith（均为既有 disposition）；**thin facades 2 → 0** |
+| `npm run build` | **0 错误** |
+| **真实 TUI** | 交互回合通过（提示 → `Synthetic reply: ...`） |
+
+**测试数变化**：2750 → **2748**（−2）。减少的 2 项来自 `smoke.test.ts`
+（原 3 项中 2 项断言已删的 host 契约，重写为 3 项断言现存入口面后净减 2）。

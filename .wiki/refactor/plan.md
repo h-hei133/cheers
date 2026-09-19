@@ -1445,8 +1445,13 @@ body 为字面量表时可达 **80 行/名**。**长度不是复杂度**，无�
    `runEvaluationCase` / `runTaskAssessment`**：CB-005 删了生产者、留了消费者。
 
    **这是 CB-005 遗留的公共面断链**（当时记为"三个待裁决的公共面问题"之一）。
-   裁决应回答：**评测/基准能力是否留在产品里？**
-   若要 → 需恢复 host dispatch 生产者；若不要 → 连同 `index.ts` 的 evaluation 导出删除。
+
+   **裁决（2026-09-19）：删除。** `runtime/evaluation/`（15 文件 / 5,881 行）
+   + `runtime/api/host/contract.ts`（332 行，唯一消费者是 evaluation）
+   + `index.ts` 3 条导出，合计 **16 文件 / 约 6,213 行**已移除。
+   依据：无法被调用（缺 host dispatch 生产者）、从未接入任何 gate/脚本/测试。
+   **保留** `eval/browser/`（114 行）——它是另一件事（browser 场景基准，
+   被 3 个测试真实调用），不动。详见 `c2-execution.md` §4。
 
 ### 8.3 本轮规划的三个判断依据
 

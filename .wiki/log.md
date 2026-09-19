@@ -1900,3 +1900,52 @@ plan.md 全部行内 `file:line` 引用逐条校验：**活文件引用全部在
 
 **代价**：3 个测试 import 路径变长一层；`test-utils/` 现承载 2 个可被 spawn 的进程入口
 （但已被 `tsconfig.build.json` 排除，不进产物）。
+
+## [2026-09-19] phase-c-c2-delete-evaluation | `runtime/evaluation` 整体删除（维护者裁决）。
+
+**16 文件 / 约 6,213 行移除**：`runtime/evaluation/`（15 文件 / 5,881 行）
++ `runtime/api/host/contract.ts`（332 行）+ `index.ts` 3 条导出。
+
+### 删除依据
+
+1. **无法被调用**：`runEvaluationCase` / `runTaskAssessment` / `runTaskLiveReport`
+   都要求 `dispatch => Promise<HostCommandResponse>`，而唯一生产者
+   `createHostRuntime` 已随 CB-005 删除（非测试代码 grep = 0）。
+2. **从未接线**：从未接入 `verify-release-core`；无 task-bench 脚本；**零测试文件**跑它。
+3. **公共面断链**：`index.ts` 曾同时导出生产者与消费者；CB-005 删了前者、留了后者。
+
+### 它本来是什么（查清后记录）
+
+- `evaluation/cases/`：**17 个运行时用例**（host 命令 + 期望值：`expectedStatus` /
+  `expectedNextAction` / `expectedEvidenceVerdict` / `expectedEventCategories`）。
+- `evaluation/task/cases/`：**20 个任务用例**（`single-file-edit`、`coordinated-edit`、
+  `failed-check-repair`、`rollback-recovery`、`csv-summary-artifact`、
+  `resume-after-compaction` 等），带 `successRubric` / `expectedVerification` / `baselineOutcome`。
+- 设计意图（`component-adoption-log.md` 原文）：**"measure real task completion,
+  not only trusted runtime fact projection"**——即"agent 到底能不能把活干成"的回归基准。
+- **但**：有数据、有判分逻辑、**没有驱动入口**，且唯一可能的入口已被删除。
+
+### 保留
+
+**`eval/browser/`（114 行）不动**——它是**另一件事**：browser 场景基准，
+被 3 个测试真实调用（29 项），被测对象（`browser/*`）是活的。
+
+### 验证
+
+| 门禁 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | **0 错误** |
+| 全量测试 | **493 文件 / 2747 通过 / 1 跳过 / 0 失败** |
+| `verify:import-cycles` | `runtime_cycles=0 type_only_cycles=0` |
+| `verify:docs-drift:strict` | pass（0 dangling） |
+| `analyze:module-facades` | 3 monolith 均既有 disposition；**thin facades 2 → 0** |
+| `npm run build` | **0 错误** |
+| **真实 TUI** | 交互回合通过 |
+
+**测试数**：2750 → **2748**（−2）。`smoke.test.ts` 原有 2 项断言已删的 host 契约，
+重写为 3 项断言现存入口面（`selectVerification` / `buildTaskProofInput` / `chooseToolStrategy`）。
+
+### 文档同步
+
+`c2-execution.md`（新增 §4 删除记录）、`plan.md` §8.2.2、
+`docs/sprint/component-adoption-log.md`（补记 contract 与 evaluation 的删除及理由）。

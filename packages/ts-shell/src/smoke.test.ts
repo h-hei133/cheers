@@ -43,11 +43,8 @@ describe("TypeScript shell smoke tests", () => {
     const entry = await import("./index.js");
 
     expect(shellPackage.main).toBe("./dist/packages/ts-shell/src/index.js");
-    expect(typeof entry.runEvaluationCase).toBe("function");
-    expect(typeof entry.validateHostCommandEnvelope).toBe("function");
-    const accepted = entry.validateHostCommandEnvelope({ action: "get-status", sessionId: "sess_smoke" });
-    expect(accepted.accepted).toBe(true);
-    expect(accepted.terminalSuccessClaim).toBe(false);
-    expect(entry.validateHostCommandEnvelope({ action: "nope" }).accepted).toBe(false);
+    expect(typeof entry.selectVerification).toBe("function");
+    expect(typeof entry.buildTaskProofInput).toBe("function");
+    expect(typeof entry.chooseToolStrategy).toBe("function");
   });
 });
