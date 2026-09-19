@@ -2051,6 +2051,18 @@ pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本
   `provider/request/invocation.ts:105`、`provider/response/boundary.ts:45`、`provider/response/stream.ts:84`
 - **主代理全仓实测：`REDACTION_EXCLUSIONS = [` 共 19 个文件**（另含 `turn/` 2、`session/` 2、
   `tools/` 1、`context/` 2、`runtime/` 4、`policy/` 1）→ **不限于区块 F，是全仓性问题**
+- **主代理逐字节复核**：`provider/request/` 的 4 份（`attempt.ts:139`、`boundary.ts:135`、
+  `fallback.ts:52`、`invocation.ts:105`）**成员逐字相同，哈希均为 `4c044a3768c7`**。
+- **而 `provider/response/boundary.ts:45` 已漂移**（主代理实测成员差异）：
+
+  | 成员 | request 侧 | response 侧 |
+  |---|---|---|
+  | `provider.env` | ✅ | ❌（改为 `provider-config`）|
+  | `hidden-reasoning` | ✅ | ❌（改为 `reasoning-private`）|
+  | `full-transcript` | ✅ | ❌（改为 `transcript-dumps`）|
+  | `unsafe-file-contents` | ✅ | ❌（改为 `unsafe-file-content`）|
+
+  → **响应侧的脱敏清单与请求侧已经不一致**，而两者共同定义「什么算 report-safe」
 - **回报举证（未独立复核）**：4 个只读别名导出
   （`CONTROLLED_INVOCATION_REDACTION_EXCLUSIONS` 等）**全无消费者**
 
