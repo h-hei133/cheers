@@ -1354,13 +1354,28 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
   （"Completing a value the handler would reject is worse than completing nothing"），
   但它是**手动**同步的第三份，不是从 handler 推导的
 
-**[E-重复-9] 「blocked 结果」文案协议 7 处手写拼装**
-- `core/commands/slashRouter.ts:70-90`、`compactCommandRuntime.ts:115`、`memoryCommandRuntime.ts:277`、
-  `warmupCommandRuntime.ts:53`、`presentation/sidebar/sidebarPanelCommandContract.ts:58`、
-  `sidebarLivePanelCommandContract.ts:46`、`entrypoints/mcpControlCliSurface.ts:24-28`
+**[E-重复-9] 「blocked 结果」文案协议**18 处**手写拼装（回报称 7 处，实为 18）—— 已核验并更正**
 - 五元组 `Result` / `- Outcome: blocked` / `- BlockerKind:` / `- Reason:` / `- DoNext:`
-- **回报的关键证据**：`slashRouter.test.ts:983-1003`、`mcpControlCliSurface.test.ts:129-134`
-  **已对字面文案断言** → 说明该协议已被下游依赖，改动需同步测试
+- **主代理实测**：`- Outcome: blocked` 字面量在生产代码中出现 **18 次**，跨 **5 个域**：
+
+| 域 | 处数 | 文件 |
+|---|---:|---|
+| `browser/` | **6** | `commandRunner.ts`（4 处：`:88,188,246,272`）、`selfHealingCommandContract.ts:58`、`executionCommandContract.ts:49`、`replayCommandContract.ts:77`、`actionContract.ts:171`、`commandContract.ts:126` |
+| `core/commands/` | 5 | `slashRouter.ts:71,86`（**2 处**）、`compactCommandRuntime.ts:116`、`warmupCommandRuntime.ts:54`、`memoryCommandRuntime.ts:278` |
+| `presentation/sidebar/` | 2 | `sidebarPanelCommandContract.ts:59`、`sidebarLivePanelCommandContract.ts:47` |
+| `entrypoints/` | 1 | `mcpControlCliSurface.ts:25` |
+| `core/shell/` | 1 | `shellActionBridge.ts:30`（**回报未提及**）|
+| **合计** | **18**（生产）+ 19（测试） | |
+
+- 另：含 `- BlockerKind:` 的生产文件 **21 个**（多于 `- Outcome:` 的 18 —— 说明
+  该协议的**前缀使用并不一致**，部分路径只写 BlockerKind 不写 Outcome）
+- **回报的关键证据（已核实）**：`slashRouter.test.ts` 有 **5 处**对字面文案断言、
+  `mcpControlCliSurface.test.ts` 2 处、`sidebarCommandEventAdapter.test.ts` 3 处
+  → **该协议已被下游与测试共同依赖**
+- **影响比回报所述更大**：`browser/` 是最大来源（6 处），而 §15.7 的 pi 对照指出
+  browser 的执行层本应把"被阻塞"表达为**结构化字段**而非文案
+- 建议：抽单一 `formatBlockedResult({blockerKind, reason, doNext, extraLines?})`，18 处改调用
+- 置信度：**高**（逐处实测）
 
 ### 15.3 死代码（均已核验）
 
