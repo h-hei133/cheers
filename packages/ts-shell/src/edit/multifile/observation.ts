@@ -19,7 +19,8 @@ import type {
   MultiTargetStaleReadObservation,
 } from "./types.js";
 
-import { absoluteTargetPath, deepFreeze, fingerprint, sanitizeId, sanitizeTargetSummary, sanitizeText, unique } from "../sanitize.js";
+import { redactReportText } from "../../core/security/redaction.js";
+import { absoluteTargetPath, deepFreeze, fingerprint, sanitizeId, sanitizeTargetSummary, unique } from "../sanitize.js";
 
 /**
  * Multi-target lane observation.
@@ -41,7 +42,7 @@ export function conflict(input: {
     kind: input.kind,
     targetIds: input.targetIds.map(sanitizeId),
     blocked: true,
-    reason: sanitizeText(input.reason, 180),
+    reason: redactReportText(input.reason, 180),
     terminalSuccessClaim: false,
     notProvenClaims: unique(["conflict-check-is-not-success", ...input.notProvenClaims]),
   });
@@ -61,7 +62,7 @@ export function observeAuthority(input: {
     return {
       targetId: sanitizeId(target.targetId),
       status: status as Exclude<MultiTargetAuthorityStatus, "partial">,
-      reason: sanitizeText(
+      reason: redactReportText(
         target.authority?.reason ?? input.input.authority.reason ??
           (status === "granted" ? "explicit multi-target authority granted" : "mutation authority unavailable"),
         180,
@@ -196,7 +197,7 @@ export function observeSnapshot(input: {
       status: "unavailable",
       restorePlanAvailable: false,
       targetSummary,
-      blocker: sanitizeText(input.target.snapshot.reason ?? "snapshot unavailable", 160),
+      blocker: redactReportText(input.target.snapshot.reason ?? "snapshot unavailable", 160),
       terminalSuccessClaim: false,
       notProvenClaims: unique(["snapshot-unavailable-is-not-success", ...input.notProvenClaims]),
     });
@@ -278,7 +279,7 @@ export function queueObservation(input: {
     state: input.state,
     targetSummary: input.targetSummary,
     order: input.order,
-    ...(input.blocker ? { blocker: sanitizeText(input.blocker, 160) } : {}),
+    ...(input.blocker ? { blocker: redactReportText(input.blocker, 160) } : {}),
     ...(input.contentFingerprint ? { contentFingerprint: input.contentFingerprint } : {}),
     terminalSuccessClaim: false,
     notProvenClaims: unique([`queue-${input.state}-is-not-success`, ...input.notProvenClaims]),
@@ -458,7 +459,7 @@ function executionGroup(input: {
     targetIds: input.targetIds.map(sanitizeId),
     order: input.order,
     maxGroupSize: input.maxGroupSize,
-    ...(input.blockedReason ? { blockedReason: sanitizeText(input.blockedReason, 160) } : {}),
+    ...(input.blockedReason ? { blockedReason: redactReportText(input.blockedReason, 160) } : {}),
     terminalSuccessClaim: false,
     notProvenClaims: unique([`group-${input.status}-is-not-success`, ...input.notProvenClaims]),
   });
@@ -508,7 +509,7 @@ export function parallelEligibilityReason(
   snapshot: MultiTargetSnapshotObservation,
   targetAuthority?: MultiTargetAuthorityObservation["targetStatuses"][number],
 ): string {
-  if (conflicts[0]) return sanitizeText(conflicts[0].kind, 160);
+  if (conflicts[0]) return redactReportText(conflicts[0].kind, 160);
   if (targetAuthority?.status !== "granted") return `authority:${targetAuthority?.status ?? "missing"}`;
   if (staleRead.status !== "passed") return `stale-read:${staleRead.status}`;
   if (snapshot.status !== "planned") return `snapshot:${snapshot.status}`;

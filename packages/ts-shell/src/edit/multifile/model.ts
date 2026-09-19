@@ -48,13 +48,13 @@ import {
   type VerificationLoopIntent,
   type VerificationResultObservation,
 } from "../../verification/result/boundary.js";
+import { redactReportText } from "../../core/security/redaction.js";
 import {
   absoluteTargetPath,
   deepFreeze,
   fingerprint,
   sanitizeId,
   sanitizeTargetSummary,
-  sanitizeText,
   unique,
 } from "../sanitize.js";
 import {
@@ -422,7 +422,7 @@ export async function runControlledMultiTargetMutation(
   const resultVerdict = projectMultiTargetMutationVerdict({ proofInput, notProvenClaims });
   return deepFreeze({
     laneId,
-    turnId: sanitizeText(input.turnId, 180),
+    turnId: redactReportText(input.turnId, 180),
     plan,
     classifications,
     conflicts,
@@ -707,7 +707,7 @@ async function applyExecutionGroups(input: {
       } else {
         groupFailed = true;
         const originalFailure = attempt.reason instanceof Error
-          ? sanitizeText(attempt.reason.name, 80)
+          ? redactReportText(attempt.reason.name, 80)
           : "unknown";
         input.queue.push(queueObservation({
           laneId: input.laneId,

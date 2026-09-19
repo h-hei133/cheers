@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeFragmentFingerprint } from "../context/readWindowContinuation.js";
-import { fingerprint, sanitizeId, sanitizeTargetSummary, sanitizeText } from "./sanitize.js";
+import { redactReportText } from "../core/security/redaction.js";
+import { fingerprint, sanitizeId, sanitizeTargetSummary } from "./sanitize.js";
 
 describe("edit lane sanitisation", () => {
   it("fingerprints content with the SHA-256 prefix the lanes emitted before unification", () => {
@@ -24,7 +25,7 @@ describe("edit lane sanitisation", () => {
       "hidden reasoning: chain of thought",
       "<html><body>noise</body></html>",
     ].join(" ");
-    const scrubbed = sanitizeText(detail, 400);
+    const scrubbed = redactReportText(detail, 400);
     expect(scrubbed).not.toContain("/home/wang/.private-agents-real/config.json");
     expect(scrubbed).not.toContain("abc123def456");
     expect(scrubbed).not.toContain("supersecretvalue");
@@ -36,7 +37,7 @@ describe("edit lane sanitisation", () => {
   });
 
   it("honours the output length limit after redaction", () => {
-    expect(sanitizeText("y".repeat(500), 40)).toHaveLength(40);
+    expect(redactReportText("y".repeat(500), 40)).toHaveLength(40);
   });
 
   it("normalises ids to a stable slug and keeps target summaries report-safe", () => {

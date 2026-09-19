@@ -17,7 +17,8 @@ import type {
 } from "./types.js";
 
 import type { VerificationResultObservation } from "../../verification/result/boundary.js";
-import { deepFreeze, sanitizeId, sanitizeText, unique } from "../sanitize.js";
+import { redactReportText } from "../../core/security/redaction.js";
+import { deepFreeze, sanitizeId, unique } from "../sanitize.js";
 
 
 /**
@@ -45,7 +46,7 @@ export function settlementObservation(input: {
     status: input.status,
     order: input.order,
     targetSummary: input.targetSummary,
-    ...(input.originalFailure ? { originalFailure: sanitizeText(input.originalFailure, 120) } : {}),
+    ...(input.originalFailure ? { originalFailure: redactReportText(input.originalFailure, 120) } : {}),
     ...(input.contentFingerprint ? { contentFingerprint: input.contentFingerprint } : {}),
     terminalSuccessClaim: false,
     notProvenClaims: unique([`settlement-${input.status}-is-not-success`, ...input.notProvenClaims]),

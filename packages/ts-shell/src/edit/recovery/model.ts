@@ -34,12 +34,12 @@ import {
   type VerificationLoopIntent,
   type VerificationResultObservation,
 } from "../../verification/result/boundary.js";
+import { redactReportText } from "../../core/security/redaction.js";
 import {
   deepFreeze,
   fingerprint,
   sanitizeId,
   sanitizeTargetSummary,
-  sanitizeText,
 } from "../sanitize.js";
 
 export type MutationAuthorityStatus =
@@ -307,8 +307,8 @@ export async function runControlledMutationRecovery(
   });
   return deepFreeze({
     laneId,
-    turnId: sanitizeText(input.turnId, 180),
-    ...(input.toolCallId ? { toolCallId: sanitizeText(input.toolCallId, 120) } : {}),
+    turnId: redactReportText(input.turnId, 180),
+    ...(input.toolCallId ? { toolCallId: redactReportText(input.toolCallId, 120) } : {}),
     targetSummary,
     ...(input.toolPolicyDecision
       ? { toolPolicyDecisionId: input.toolPolicyDecision.decisionId }
@@ -353,7 +353,7 @@ function observeMutationAuthority(input: {
     authorityId: `${input.laneId}:authority`,
     status,
     source: input.input.authority.source,
-    reason: sanitizeText(input.input.authority.reason ?? reasonForAuthority(status), 180),
+    reason: redactReportText(input.input.authority.reason ?? reasonForAuthority(status), 180),
     terminalSuccessClaim: false,
     notProvenClaims: unique([
       "authority-is-not-success",
@@ -453,7 +453,7 @@ function observeMutationSnapshot(input: {
       status: "unavailable",
       restorePlanAvailable: false,
       targetSummary: input.targetSummary,
-      blocker: sanitizeText(input.input.snapshot.reason ?? "snapshot unavailable", 160),
+      blocker: redactReportText(input.input.snapshot.reason ?? "snapshot unavailable", 160),
       terminalSuccessClaim: false,
       notProvenClaims: unique([
         "snapshot-unavailable-is-not-success",
@@ -534,7 +534,7 @@ async function observeMutationApply(input: {
       status: "failed",
       attempted: true,
       targetSummary: input.targetSummary,
-      failureClass: error instanceof Error ? sanitizeText(error.name, 80) : "unknown",
+      failureClass: error instanceof Error ? redactReportText(error.name, 80) : "unknown",
       terminalSuccessClaim: false,
       notProvenClaims: unique([
         "apply-failed-is-not-success",
