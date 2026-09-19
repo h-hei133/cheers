@@ -1769,13 +1769,30 @@ pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本
 - **修复成本仍是一行**：`sessionTreeProjection.ts:156-157` 加 `&& thread.branches.length > 0`
 - 置信度：**高**（两侧代码与可达性均已实测）
 
-**[B-结构-2] `core/shell/` 有 7 个文件不属于 shell —— 主代理部分核验**
+**[B-结构-2] `core/shell/` 有 7 个文件不属于 shell —— 已核验，并给出**逐边实测**佐证**
 - 回报列出：`providerReadiness.ts`(361)、`providerCredentials.ts`(341)、`providerFailureRedaction.ts`、
   `compaction.ts`、`approvalTrustPolicy.ts`、`approval/store.ts`、`approval/evaluator.ts`
-- 主代理已核实其中 `providerReadiness.ts`、`providerCredentials.ts`、`compaction.ts` 的
-  存在与体量（§11.1 A-重复-1、§15.6）
-- **这与 §3「core 依赖 feature 域」的结论同源**：`core/shell/` 同时承载显示层、编排层、
-  运行时，以及 provider/approval/compaction 的越界实现
+- 主代理已核实 `providerReadiness.ts`、`providerCredentials.ts`、`compaction.ts` 的存在与体量
+  （§11.1 A-重复-1、§15.6）
+
+**主代理逐边实测（value 边，排除 `import type`）**：`core/shell/` → feature 域共 **10 条**，
+覆盖 6 个域：
+
+| 目标域 | 边数 | 具体 |
+|---|---:|---|
+| `context` | 3 | `core/shell/sessionFutureTurnProjection.ts` → `context/compact/checkpoint/compactLiveCheckpoint.ts`、`context/compact/injection/compactInjectionState.ts`、`context/compact/injection/compactFutureTurnInjection.ts` |
+| `workflow` | 2 | `core/shell/bootstrap.ts:?`、`core/shell/recovery.ts:?` → `workflow/gitContext.ts` |
+| `memory` | 2 | `core/shell/sessionFutureTurnProjection.ts` → `memory/projectMemoryInjectionState.ts`、`memory/projectMemoryFutureTurnInjection.ts` |
+| `session` | 1 | `core/shell/sessionTerminalState.ts` → `session/sessionResultParity.ts` |
+| `provider` | 1 | `core/shell/providerReadiness.ts` → `provider/request/fetch.ts` |
+| `turn` | 1 | `core/shell/compaction.ts` → `turn/prompt.ts` |
+
+**这直接违反 `agent-rules/file-placement-and-naming.md:77`** 的
+「`core/` must not depend on a feature domain」，且是 §3 结论的**具体化**：
+§3 的 127 条违规 value 边中，**10 条来自 `core/shell/`**，且集中在
+`sessionFutureTurnProjection.ts`（5 条：context 3 + memory 2）这一个文件。
+**注意**：`providerReadiness.ts` 同时是 17 个不可达文件之一（§14.2），
+故其越界边**发生在不可达代码上**——与 §3 的"越界使规模看起来比实际大"结论一致。
 
 ### 17.5 pi 对照（区块 B 相关，均给 pi 侧 `file:line`）
 
