@@ -21,6 +21,18 @@
 //
 // Archived and historical material is out of scope by construction: a route
 // closeout from May is supposed to describe the tree as it was in May.
+//
+// References are read from two shapes. Inline ones sit in backticks. Block ones
+// sit on their own line inside a fence, which is how rules and architecture
+// notes draw tree shapes. The second shape was added on 2026-09-19: ten dead
+// paths in agent-rules/file-placement-and-naming.md lived in fences and the
+// gate had never seen them, because a rule that misdirects is worse than a note
+// that does - every agent starting here reads the rule.
+//
+// Block lines must be a whole path carrying a directory segment. That keeps
+// prose out, and it keeps the blocks that contrast a good name with a bad one
+// out too: those use bare filenames, which name no location and so cannot
+// resolve either way.
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -40,6 +52,48 @@ const ACTIVE_STATUS = 'active'
 // File and directory references into this repository. A trailing slash marks a
 // directory, which counts: directories are exactly what a refactor deletes.
 const CANDIDATE = /`((?:packages|apps|scripts|docs|agent-rules|contracts)\/[^`\s]+?\.(?:ts|tsx|mjs|js|json|md)|(?:packages|apps|scripts|docs|agent-rules|contracts)\/[^`\s]*?\/)`/g
+
+// The same references written on their own line inside a fenced block. Rules
+// and architecture notes show tree shapes that way, and a stale line there
+// misdirects exactly like an inline one - ten dead paths in
+// agent-rules/file-placement-and-naming.md sat in fences and went unseen.
+//
+// Two constraints keep this honest. The line must be a whole path, so prose
+// that merely contains a slash is not swept up. And it must carry a directory
+// segment, because the blocks that contrast a good name against a bad one use
+// bare filenames (`trajectoryProjection.ts`), which name no location and so
+// cannot be resolved either way.
+const BLOCK_PATH = /^[a-z][a-z0-9-]*(?:\/[A-Za-z0-9_.-]+)+\/?$/
+
+function blockPaths(text) {
+  const found = []
+  let fenced = false
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed.startsWith('```')) {
+      fenced = !fenced
+      continue
+    }
+    if (!fenced) continue
+    if (BLOCK_PATH.test(trimmed)) found.push(trimmed)
+  }
+  return found
+}
+
+// A reference resolves if it names something that exists, in any of the shapes
+// prose legitimately uses: TypeScript written as .js, and a directory written
+// with or without its index. Paths without a repository root prefix are read
+// from the product source tree, which is how the rules write them.
+function resolves(referenced) {
+  const shapes = [
+    referenced,
+    referenced.replace(/\.js$/, '.ts'),
+    referenced.replace(/\.js$/, '.tsx'),
+    referenced.replace(/^(.*)\/$/, '$1/index.md'),
+  ]
+  const bases = ['', 'packages/ts-shell/src']
+  return shapes.some((shape) => bases.some((base) => existsSync(resolve(repoRoot, base, shape))))
+}
 
 function collect(target, files = []) {
   const absolute = resolve(repoRoot, target)
@@ -64,22 +118,17 @@ function scan(files) {
   const dangling = []
   for (const file of files) {
     const text = readFileSync(file, 'utf8')
-    for (const match of text.matchAll(CANDIDATE)) {
-      const referenced = match[1]
+    const referenced = [
+      ...[...text.matchAll(CANDIDATE)].map((match) => match[1]),
+      ...blockPaths(text),
+    ]
+    for (const reference of referenced) {
       // A glob names a family, not a file, so it cannot be resolved. So does a
       // placeholder like <path>, which prose uses to describe a pattern.
-      if (referenced.includes('*') || referenced.includes('<')) continue
+      if (reference.includes('*') || reference.includes('<')) continue
       references += 1
-      // TypeScript is routinely written as .js in prose, and a directory index
-      // is written either way. Accept the shapes that resolve.
-      const candidates = [
-        referenced,
-        referenced.replace(/\.js$/, '.ts'),
-        referenced.replace(/\.js$/, '.tsx'),
-        referenced.replace(/^(.*)\/$/, '$1/index.md'),
-      ]
-      if (candidates.some((candidate) => existsSync(resolve(repoRoot, candidate)))) continue
-      dangling.push(`${relative(repoRoot, file)} -> ${referenced}`)
+      if (resolves(reference)) continue
+      dangling.push(`${relative(repoRoot, file)} -> ${reference}`)
     }
   }
   return { references, dangling }

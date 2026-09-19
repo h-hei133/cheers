@@ -2012,3 +2012,59 @@ plan.md 全部行内 `file:line` 引用逐条校验：**活文件引用全部在
 `verify:docs-drift:strict` **pass**（DOCS 0 dangling）；`verify:import-cycles`
 `runtime_cycles=0 type_only_cycles=0`；plan.md 内**已无任何指向不存在文件的路径**；
 `agent-rules` 域清单与实际目录**完全一致**；全量测试 **493 文件 / 2747 通过 / 0 失败**。
+
+## [2026-09-19] gate | 修 `verify-docs-and-rules-drift` 的代码块盲区（授权后）。
+
+### 问题
+
+门禁只匹配**行内反引号**路径（`` `path/to/file.ts` ``），
+**不匹配 fence 代码块内独占一行的路径**。而 `agent-rules/*` 与架构文档
+正是用 fence 画目录树——**10 处死路径因此长期逃检**（见上一条 log）。
+
+**为什么这个盲区值得修**：规则文件约束每个新起 agent，
+规则里的死路径比笔记里的死路径危害更大。
+
+### 修法
+
+新增 `blockPaths(text)`：扫描 fence 内**独占一行**的路径。两条约束保证不过度匹配：
+
+1. **必须是完整路径**（`BLOCK_PATH = /^[a-z][a-z0-9-]*(?:\/[A-Za-z0-9_.-]+)+\/?$/`），
+   所以正文里含斜杠的句子不会被卷入；
+2. **必须带目录段**，所以"好名字 vs 坏名字"对照块里的**裸文件名**
+   （`trajectoryProjection.ts`、`productSurface.ts`）被排除——
+   它们不指明位置，本就无法解析。
+
+另抽出 `resolves()`：把原先内联的"四种合法写法"（原样 / `.js`→`.ts` / `.js`→`.tsx` /
+目录→`index.md`）扩展为**再加两个基准目录**（仓库根、`packages/ts-shell/src`），
+因为规则习惯从 `src/` 相对书写。
+
+### 效果（实测）
+
+| | 修前 | 修后 |
+|---|---:|---:|
+| RULES 引用数 | 18 | **58**（+40 来自 fence） |
+| RULES 死引用 | 0 | **0**（无假阳性，逐条验证） |
+| DOCS 引用数 | 249 | 250 |
+| DOCS 死引用 | 0 | **1**（真实发现，已修） |
+
+### 新发现的真实漂移（已修）
+
+`docs/sprint/real-repository-development-pilot.md` 把
+`harnessSpine.test.ts` 列为 **"primary behavior evidence"**，
+而该文件**已于 2026-09-12 随 turn 迁移 `a7418fcb` 删除**（非本轮引入）。
+已改为"该测试**曾**是主要证据"+ 更正说明；路径移出 fence，避免以现存文件的形式呈现。
+
+### 双向验证
+
+| 场景 | 期望 | 实测 |
+|---|---|---|
+| 干净态 `--strict` | exit 0 | **0** ✅ |
+| fence 内注入死目录（RULES） | exit 1 | **1** ✅ |
+| fence 内注入死目录（DOCS `--strict`） | exit 1 | **1** ✅ |
+
+**无假阳性验证**：`agent-rules` 全部 fence 路径逐条核对，**全部可解析**。
+
+### 其他
+
+`verify-release-core` 已以 `--strict` 接入该门禁（`scripts/verify-release-core.mjs:125`），
+修后仍通过。脚本头部注释已补充"两种引用形态"的设计说明。
