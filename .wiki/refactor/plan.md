@@ -1679,6 +1679,20 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | `core/mcp/gateway.test.ts`（1 项） | 同类：spawn 的 fixture 路径以 cwd 为基准，从仓库根跑时解析成 `/home/wang/projects/coding-agents/src/core/mcp/fixtures/mockMcpServer.mjs`（**缺 `packages/ts-shell/` 前缀**）| 从正确 cwd 跑 **9/9 通过** |
 | `scripts/verify/verifierModuleBoundary.test.mjs`<br>`scripts/real-provider-smokes/approvedProviderEnv.test.mjs` | 这两个是**脚本式自检**（`node:assert` + `console.log('[pass] ...')`，**无 `describe`/`it`**），设计为 `node <file>` 独立执行；`vitest.config.ts` **无 `include`/`exclude`**，故从仓库根跑时被默认规则当测试收集 → `No test suite found` | 从 `packages/ts-shell` 跑时 vitest root 只含 `packages/ts-shell`，`scripts/` **不在范围内**，不再被收集 |
 
+**何时引入（git 实测）**：
+
+| 项 | 引入时间 | 引入提交 |
+|---|---|---|
+| `longSessionDurability.test.ts` 的 `repoRoot = cwd/../..` 假设 | **2026-05-11** | `d77d5d80` "Add long-session durability gate" |
+| `scripts/verify/verifierModuleBoundary.test.mjs` | **2026-05-20** | `bdd5f289` |
+| `scripts/real-provider-smokes/approvedProviderEnv.test.mjs` | **2026-06-03** | `f84e6ab2` |
+| `vitest.config.ts` **从未**定义 `include`/`exclude` | 自首版 | — |
+
+**即：这不是本轮回溯中任何一步引入的，也不是本轮重构引入的** ——
+最早的 `d77d5d80`（2026-05-11）比 plan.md 的 Step 1 还早四个月。
+`0621c28e`（C2，2026-09-19）只把该测试的 fixture 路径从 `__tests__` 改到 `test-utils`，
+**未触及** `repoRoot`/`tsxCli` 两行。
+
 **结论**：
 1. **任何全量测试必须用 `npm run test:ts`**（或 `cd packages/ts-shell && npx vitest run`），**不要从仓库根跑 `npx vitest run`**；
 2. 从仓库根跑会**多收集 2 个脚本式 *.test.mjs**（它们不属于 vitest），并让 3 个依赖 cwd 的测试失败；
