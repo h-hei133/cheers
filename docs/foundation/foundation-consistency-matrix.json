@@ -594,7 +594,7 @@
         "include-real dry-run does not touch real provider"
       ],
       "validationEvidence": [
-        "scripts/verify/verifierModuleBoundary.test.mjs",
+        "scripts/verify/verifierModuleBoundaryCheck.mjs",
         "packages/ts-shell/src/core/query/crossCapabilityResultFlow.test.ts"
       ],
       "status": "consistent",
@@ -797,7 +797,7 @@
         "include-real dry-run reports skipped real cases and does not touch real provider"
       ],
       "validationEvidence": [
-        "scripts/verify/verifierModuleBoundary.test.mjs"
+        "scripts/verify/verifierModuleBoundaryCheck.mjs"
       ],
       "status": "consistent",
       "ownerModuleForFollowUp": "Harness / Eval"

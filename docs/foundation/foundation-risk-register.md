@@ -686,7 +686,7 @@ None open after Route 165.
 - Why it is not a contradiction: current verifier facades preserve flags,
   report fields, dry-run facts, and redaction; the missing piece is a shared
   taxonomy across gate families.
-- Evidence: `verifierModuleBoundary.test.mjs`, `verifier-module-extraction.md`,
+- Evidence: `verifierModuleBoundaryCheck.mjs`, `verifier-module-extraction.md`,
   `module-backlog.md`.
 - Recommended next action: run the already listed `Harness / gate taxonomy`
   route before expanding release/report claims.
@@ -745,7 +745,7 @@ None open after Route 165.
 - Affected modules: Harness / Eval, Result Surface.
 - Why accepted: reports assert markers, redaction, and gate outcomes but do not
   authorize provider, browser, edit, session, CLI, or runtime behavior.
-- Evidence: `verifierModuleBoundary.test.mjs`,
+- Evidence: `verifierModuleBoundaryCheck.mjs`,
   `capability-flow-graph.md`.
 - Recommended next action: keep report/schema work separate from runtime
   behavior changes.

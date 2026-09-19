@@ -1677,7 +1677,8 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 |---|---|---|
 | `longSessionDurability.test.ts`（2 项） | 测试内 `repoRoot = path.resolve(process.cwd(), "../..")`，**假定 cwd = `packages/ts-shell`**。从仓库根跑时算出 `repoRoot = /home/wang` → `tsxCli = /home/wang/node_modules/tsx/dist/cli.mjs`（不存在）→ 子进程退出码 1 | 从错误 cwd 跑报 `Cannot find module '/home/wang/node_modules/tsx/dist/cli.mjs'`；从正确 cwd 跑 **2/2 通过** |
 | `core/mcp/gateway.test.ts`（1 项） | 同类：spawn 的 fixture 路径以 cwd 为基准，从仓库根跑时解析成 `/home/wang/projects/coding-agents/src/core/mcp/fixtures/mockMcpServer.mjs`（**缺 `packages/ts-shell/` 前缀**）| 从正确 cwd 跑 **9/9 通过** |
-| `scripts/verify/verifierModuleBoundary.test.mjs`<br>`scripts/real-provider-smokes/approvedProviderEnv.test.mjs` | 这两个是**脚本式自检**（`node:assert` + `console.log('[pass] ...')`，**无 `describe`/`it`**），设计为 `node <file>` 独立执行；`vitest.config.ts` **无 `include`/`exclude`**，故从仓库根跑时被默认规则当测试收集 → `No test suite found` | 从 `packages/ts-shell` 跑时 vitest root 只含 `packages/ts-shell`，`scripts/` **不在范围内**，不再被收集 |
+| `scripts/verify/verifierModuleBoundary.test.mjs`<br>`scripts/real-provider-smokes/approvedProviderEnv.test.mjs` | 这两个是**脚本式自检**（`node:assert` + `console.log('[pass] ...')`，**无 `describe`/`it`**），设计为 `node <file>` 独立执行；从仓库根跑时被 vitest 默认 glob 当测试收集 → `No test suite found`。**已由 T15 修复**（改名去掉 `.test`）| 从 `packages/ts-shell` 跑时 vitest root 只含 `packages/ts-shell`，`scripts/` 不在范围内 |
+| `core/harness/browser*ScenarioExamples.test.ts`（8 个）<br>`core/tools/registry-rust-bridge.test.ts` | **`Test timed out in 5000ms`** —— 不是 cwd 路径问题，而是**根目录没有 `vitest.config.ts`**！本仓唯一的 vitest 配置是 `packages/ts-shell/vitest.config.ts`（`testTimeout: 30000`）。从仓库根跑时 vitest 找不到任何配置 → 用**默认 5000ms** → 这些 8–16s 的进程型场景测试必然超时 | CI 用 `npm run test:ts`（cwd = `packages/ts-shell`）→ 正确加载该配置 |
 
 **何时引入（git 实测）**：
 
@@ -1686,7 +1687,7 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | `longSessionDurability.test.ts` 的 `repoRoot = cwd/../..` 假设 | **2026-05-11** | `d77d5d80` "Add long-session durability gate" |
 | `scripts/verify/verifierModuleBoundary.test.mjs` | **2026-05-20** | `bdd5f289` |
 | `scripts/real-provider-smokes/approvedProviderEnv.test.mjs` | **2026-06-03** | `f84e6ab2` |
-| `vitest.config.ts` **从未**定义 `include`/`exclude` | 自首版 | — |
+| **根目录不存在 `vitest.config.ts`**（唯一配置在 `packages/ts-shell/`） | 自始至终 | — |
 
 **即：这不是本轮回溯中任何一步引入的，也不是本轮重构引入的** ——
 最早的 `d77d5d80`（2026-05-11）比 plan.md 的 Step 1 还早四个月。
@@ -1695,7 +1696,8 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 
 **结论**：
 1. **任何全量测试必须用 `npm run test:ts`**（或 `cd packages/ts-shell && npx vitest run`），**不要从仓库根跑 `npx vitest run`**；
-2. 从仓库根跑会**多收集 2 个脚本式 *.test.mjs**（它们不属于 vitest），并让 3 个依赖 cwd 的测试失败；
+2. 从仓库根跑会**多收集 2 个脚本式 `*.test.mjs`**（T15 已修复），并让 **11 个文件 / 16 项**失败：
+   2 个是 cwd 路径错误（`Cannot find module`），9 个是**默认 5000ms 超时**（因根目录无配置可加载）；
 3. 这两个脚本文件**无任何 npm script 引用**，仅在 `docs/foundation/foundation-consistency-matrix.json` 登记为 `validationEvidence`。其"只能被 vitest 收集、而收集后又必然失败"的状态是一个**真实的仓库缺陷**（未被 plan.md 记录），建议另立一项处理（见 T15）。
 4. 另：**并发跑两个全量套件会导致大面积 flake**（本轮实测 17 文件失败），全量测试需串行。
 

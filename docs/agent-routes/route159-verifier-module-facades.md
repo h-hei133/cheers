@@ -158,7 +158,7 @@ Likely new or consolidated facade files:
 - `scripts/verify/verifierReportModule.mjs`
 - `scripts/verify/verifierSafetyModule.mjs`
 - `scripts/verify/verifierResidueModule.mjs`
-- `scripts/verify/verifierModuleBoundary.test.mjs`
+- `scripts/verify/verifierModuleBoundaryCheck.mjs`
 - `docs/architecture/verifier-module-extraction.md`
 
 Choose names based on actual ownership. Prefer cohesive facades over many tiny files.
@@ -371,7 +371,7 @@ Update `scripts/verify/index.mjs` / `orchestration.mjs`:
 
 ### 9. Tests and stale assumptions
 
-Add `verifierModuleBoundary.test.mjs` if repository patterns allow.
+Add `verifierModuleBoundaryCheck.mjs` if repository patterns allow.
 
 Required coverage:
 
