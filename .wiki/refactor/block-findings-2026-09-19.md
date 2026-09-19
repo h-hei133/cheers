@@ -577,6 +577,19 @@ P4 的改造不该把它一起推倒。
   2 参数）；`session/sessionContinuationProjection.ts:80` 判 `RecoverySnapshot` 三条件（1 参数）
   —— **同名的不同问题**
 - `deriveActionableBlockerContract`：见 A-重复-3，是**真重复**但一份已死（非"两张都活"）
+- `projectApprovalSummaryFallback`：`session/approval/auditProjection.ts:81` 接
+  `{ currentSummaryEntries, approvalAudit }` 返回 `readonly string[]`（**投影**，用 `Map` 按 key 归并）；
+  `session/approval/memoryCodec.ts:180` 接 `value: unknown` 返回 `ApprovalMemoryRecord | undefined`（**解码**）
+  —— **同名的不同问题**，非重复
+- `uniqueStrings`：`core/query/runtime/facts.ts:296` 返回 `Object.freeze([...new Set(...)])`（冻结 + `compact`）；
+  `core/query/runtime/harnessSupport.ts:24` 返回裸数组（`trim`）—— **行为不同**（一个冻结一个不冻结），
+  但两者都在 `core/query/runtime/` 内，且后者所在目录已被判死。属"同一目录内的近似重复"，随目录一并处置
+- `buildCacheKey` / `buildScope` / `selectGrantBySelector`（`core/shell/approval/store.ts` vs `evaluator.ts`）
+  与 `estimateTokens`（`session/context.ts:7` vs `core/shell/compaction.ts:50`）：**早前已裁决为非同名的不同问题**，不重复报
+
+**[重-跨-3] 主代理复核纠正了 BlockG2 的两个计数**
+- `freeze`/`deepFreeze`：区块内 **17** 处（非 16），全仓 **54** 处
+- `verification/result/projection/mutation.ts` 的 `reasonText.includes`：**8** 处（非 5）
 
 ### 11.6 回报纠错
 
