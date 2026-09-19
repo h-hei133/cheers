@@ -1226,6 +1226,57 @@ R6/R7 只需一个方向答复）。
 | B3 | R5 `renderer/` 去向 | A（`terminal/streaming.ts`）/ B（`terminal/output.ts`）/ C（新子域）。**探索结论倾向 A**：`presentation/terminal/` 是 sanctioned 子域且 `streaming.ts` 已是推荐角色名，当前仅 1 个文件故**零碰撞**；A/B/C 重写成本相同（**42 处**）。需确认叶名 |
 | B4 | R4 12 处越界模块 | **"都是真单体"不成立**：实测 2 个是薄 facade（`sessionStoreAccess` 委托率 **1.00**、`liveRun.ts` 仅 15 真名），其余委托率 **≤0.03**。plan 的规则引用是**误引**（facade 依据在 151–170 行且**点名** `SessionManager`，非 147 行）。B4 建议：**先定四款可计算判据**，再只拆 3 个真单体 |
 
+**B4 已完成（2026-09-18）。** 越界模块 **12 → 3**，且剩余 3 个均已登记 disposition。
+
+#### B4.1 可计算判据（已落地并成为绑定规则）
+
+`npm run analyze:module-facades`（`scripts/analyze-module-facades.mjs`）＋
+`agent-rules/file-placement-and-naming.md` 的 "Facade Or Monolith" 一节。判据三款：
+
+```text
+thinFacade(module) :=
+      delegationRatio >= 0.90          声明以聚合为主，非自有逻辑
+   && branchingFunctionCount === 0     自身无分支
+   && ownStateWriteCount === 0         构造函数外无 this.<field> = 赋值
+```
+
+**原计划的第四款 `linesPerDeclaredName <= 15` 已实测删除**：它在**全量程上无区分力**
+（越界模块无一例外超过 15），却**误杀真 facade**——委托率 1.00、零分支的模块在
+body 为字面量表时可达 **80 行/名**。**长度不是复杂度**，无法区分二者的条款不构成判据。
+删除依据已写入脚本注释与规则文本。
+
+#### B4.2 实测结果
+
+| 模块 | before | after | 处置 |
+|---|---|---|---|
+| `runtime/evaluation/task/model.ts` | 52 名 / 2298 行 | 8 名 / 510 行 | 拆为 `cases/`（facade 0.96）＋ `liveReadiness.ts` ＋ `liveProjection.ts` |
+| `presentation/surface/model.ts` | 51 / 2255 | 2 / 229 | 拆为 `types.ts` ＋ `shared.ts` ＋ `events.ts` ＋ `runtimeEvents.ts` ＋ `sections.ts` |
+| `edit/multifile/model.ts` | 39 / 1711 | 10 / 424 | 拆为 `observation.ts` ＋ `settlement.ts`；**先**去重 6 个跨模块重复 helper 至 `edit/sanitize.ts` |
+| `core/query/runtime/harness.ts` | 32 / 1415 | 8 / 305 | 拆为 `harnessClaims.ts` ＋ `harnessPendingState.ts` ＋ `harnessSupport.ts` |
+| `planning/runtime/engine.ts` | 27 / 965 | 1 / 199 | 拆为 `types.ts` ＋ `facts.ts` ＋ `support.ts` |
+| `core/shell/sessionTerminalState.ts` | 27 / 1090 | 9 / 557 | 拆出 `sessionTerminalEvidence.ts` |
+| `runtime/evaluation/task/liveRun.ts` | 26 / 1736 | 14 / 1386 | 拆出 `observation.ts`＋3 个 receipt 类型 |
+| `runtime/evaluation/model.ts` | 27 / 642 | 7 / 243 | 拆出 `cases/index.ts`（facade 0.95） |
+| `core/query/runtime/policy.ts` | 23 / 535 | 5 / 255 | 拆出 `facts.ts` |
+| **`presentation/tui/editor.ts`** | 28 / 464 | 28 / 464 | **defer**：单个 `Editor` 类、165 处 `this.` 共享可变状态；**2026-09-03 已有裁决**"kill 状态属于持有 caret 的 editor" |
+| **`session/store/sessionStoreAccess.ts`** | 22 / 193 | 22 / 193 | **defer**：委托率 **0.91**、唯一分支是 `sessionExists` 的空 id 校验（属真实行为） |
+| **`cli-baseline.test.ts`** | 27 / 3907 | 27 / 3907 | **defer**：测试套件非产品代码；judge 命中它是因为 evidence-manifest 的 glob 未排除测试 |
+
+#### B4.3 方法论教训（写入 log）
+
+1. **拆分的判据是"两半都必须过线"，不是"抽出多大一块"**。`task/model.ts` 首次只抽
+   目录数据，结果越界模块 **12→13**（抽出的 `cases/` 自身 27 名）——问题只是搬了家。
+   后续每次都验证**所有**产出模块的判据值。
+2. **判据条款必须证明有区分力**。`linesPerName` 是这次唯一的判据错误：它删除了一个
+   真实信号（facade 长度）与一个噪声（数据表长度）无法区分的条款。
+3. **提取脚本的 end-of-span 判定必须先确认 `{` 已开启**。`multifile` 第二次尝试
+   静默删掉了两处多行签名的首行，把下一个函数的函数头一起吞掉——语法错误而非判据错误。
+   修正后重跑，未打补丁。
+4. **"两半相互独立"要靠实测，不能靠直觉**。`harness` 的三个子层是先测调用图再切的；
+   `liveProjection` 的两半（readiness / projection）实测**双向零调用**才敢切。
+5. **`coversTargets` 这类跨半函数说明 seam 需要调整**，而非新增 import 制造环。
+   `multifile` 里 3 个 helper 从 `settlement.ts` 移回 `observation.ts` 正是为了避免环。
+
 **阶段 C — 需独立立项**
 
 | 序 | 事项 | 说明 |

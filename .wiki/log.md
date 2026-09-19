@@ -1217,3 +1217,46 @@ B3 的 `34`、B4 的"都是真单体"与行号误引），
   另：**构造函数从名称计数与委托率中排除**（它做初始化，不属聚合面），
   这正是让 `sessionStoreAccess` 从 0.87 回到真实值 0.91 的关键。
 - **未使用任何 `!` 或 `as`**：判据全靠结构分析得出。
+
+## [2026-09-18] phase-b-b4-split | B4 完成：越界模块 12 → 3（余 3 个均有 disposition）。
+
+### 一、判据先行
+`npm run analyze:module-facades` + 规则章节 "Facade Or Monolith"。
+三款判据：`delegationRatio >= 0.90 ∧ branching = 0 ∧ ownStateWrites = 0`。
+**第四款 `linesPerDeclaredName <= 15` 被实测删除**——全量程无区分力却误杀真 facade。
+
+### 二、拆分结果（全部实测，非估计）
+
+| 模块 | before | after |
+|---|---|---|
+| `runtime/evaluation/task/model.ts` | 52 / 2298 | 8 / 510（+3 模块，其中 `cases/` 是 façade 0.96） |
+| `presentation/surface/model.ts` | 51 / 2255 | 2 / 229（+5 模块） |
+| `edit/multifile/model.ts` | 39 / 1711 | 10 / 424（+2 模块；**先去重 6 个重复 helper**） |
+| `core/query/runtime/harness.ts` | 32 / 1415 | 8 / 305（+3 模块） |
+| `planning/runtime/engine.ts` | 27 / 965 | 1 / 199（+3 模块） |
+| `core/shell/sessionTerminalState.ts` | 27 / 1090 | 9 / 557（+1） |
+| `runtime/evaluation/task/liveRun.ts` | 26 / 1736 | 14 / 1386（+1） |
+| `runtime/evaluation/model.ts` | 27 / 642 | 7 / 243（+1，façade 0.95） |
+| `core/query/runtime/policy.ts` | 23 / 535 | 5 / 255（+1） |
+
+**defer 3 个（均有 disposition 记录）**：
+- `presentation/tui/editor.ts`（28）：单个 `Editor` 类 + **165 处 `this.`** 共享 caret/kill/undo/历史状态。
+  **2026-09-03 已有裁决**，本次为重申。判据读方法数，但**内聚的有状态类不是聚合面**。
+- `session/store/sessionStoreAccess.ts`（22）：委托率 **0.91**，唯一分支是 `sessionExists`
+  的空 id 校验——真实行为，拆走等于把检查与使用分离。
+- `cli-baseline.test.ts`（27）：测试套件。judge 命中它源于 evidence-manifest 的
+  `packages/**/*.ts` glob 未排除测试；那是 manifest 收窄决策，不是代码改动。
+
+### 三、方法教训
+1. **判据是"两半都过线"**：`task/model.ts` 首次只抽目录 → 越界 12→13。
+2. **条款必须有区分力**：`linesPerName` 无法区分"真 facade 长"与"数据表长"。
+3. **span 扫描必须先确认 `{` 已开启**：否则多行签名会吞掉下一个函数头（语法错误）。
+   修正后**重跑**，不打补丁。
+4. **独立性必须实测**：`liveProjection` 两半双向零调用才敢切。
+5. **跨半函数指向 seam 错了**，不是加 import：`multifile` 3 个 helper 移回
+   `observation.ts` 以避免环。
+
+### 四、门禁（全部实测）
+production strict **0**；非 strict **244**（基线持平）；`tsconfig.build.json` **0**；
+SCC **1500 文件 / 0 环**；`verify:docs-drift:strict` 通过；
+**零 `!`、零真实 `as` 断言**（`as const` 与 import 别名不计）。
