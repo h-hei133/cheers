@@ -766,3 +766,227 @@ pi 的结构性原因已在主报告记录：它用**真实 npm workspace 包**�
   但 `sanitizeText` / `deepFreeze` / `isPrivateNetworkHost` / `normalizeBaseUrl`
   属**同一职责**，无独立理由。
 - 未评估删除/收口的风险。**本节只报事实。**
+
+---
+
+## 13. 区块 D 回报（`browser/`，170 生产文件 / 24,146 行）——逐条核验后记录
+
+**核验状态**：下列「已核验」项由主代理亲手复核；两处计数已按实测更正（见 13.9）。
+
+### 13.1 结构判断：`browser/` 不是单一子系统
+
+`browser/` 实际是 **4 个不相交层面叠在一个目录里**：
+
+| 层 | 内容 | 活路径 |
+|---|---|---|
+| **1. 可执行 Playwright 栈** | `sessionManager.ts`（真实 launch + stealth）、`playwrightRuntime.ts`、`core/tools/browserToolUnified.ts` | 经 `core/tools/registry.ts:560` 注册 |
+| **2. 受控执行端口** | `executor.ts`（`BrowserExecutor` 为 seam）+ 4 个实现 | `cli` 命令 → `core/commands/browserCommandRuntime.ts` → `browser/commandRunner.ts` → `executionCommandRunner` |
+| **3. 第二套并行端口** | `runtime/core/executor.ts`（`BrowserRuntimeExecutor`）+ 4 个实现 | 各自独立 |
+| **4. 策略/收据/自愈噪声层** | 契约、策略、surface、receipt、selfHealing、replay | 约 130 文件 |
+
+**端到端唯一活路径**：`CLI 命令 → browser/commandRunner.ts:runBrowserCommandAsync → executionCommandRunner → BrowserExecutor`。
+其余入口（sessionManager 的 browser 工具、`runtime/` 协议栈、selfHealing 链）**各自独立、互不汇流**。
+
+**核心缺陷不在文件大小**（`browser/` 无 >600 行文件，最大 `receipt/store.ts` 447 行），
+而在**抽象层级数**：同一件事存在 **2 套端口、3 份 spawn 实现、4 份动作映射、4 份出口授权镜像**。
+每份有独立状态词表与证据前缀 → 语义分歧**不报错，只静默产出不同结果**。
+
+### 13.2 重复实现（均已核验）
+
+**[D-重复-1] 同一台「spawn 子进程→限流→解析 JSON→脱敏」机器写了 3 份 —— 已核验（最高价值）**
+- `browser/runtime/external/runner.ts:25-152` 与 `browser/skill/execution/executor.ts:148-275`：
+  结构同构（`new Promise` → `spawn` → `setTimeout + kill("SIGKILL")` → stdout 预算截断 →
+  `child.on("error"/"close")` → `parseRunnerStdout` → 校验 → 组装结果）
+- **三个私有 helper 逐字节相同（哈希实测）**：
+  - `parseRunnerStdout`：`runner.ts:154-162` = `executor.ts:329-337`（sha256 前 12 位 `a253086aea5b`，主代理复核）
+  - `appendBudgeted`：`runner.ts:182-185` = `executor.ts:357-360`
+  - `summarizeOutput`：`runner.ts:187-195` = `executor.ts:362-370`
+- **第三份** `browser/runtime/core/processAdapter.ts:22-91` 是简化版且**行为不一致**：
+  不传 `cwd`、无 env 白名单、结果**无 `redactions` 字段**、stdout/stderr 各用独立预算
+  （`runner.ts` 两者共用同一 budget）
+- 影响：三处独立演进；`processAdapter` 缺 `redactions` 意味着走 `runtime` 协议栈时
+  **脱敏记录凭空消失，且不产生类型错误**
+
+**[D-重复-2] `runtime/external/executor.ts` 与 `skill/execution/executor.ts` 是同一模板两份拷贝**
+- `runtime/external/executor.ts:28-188` vs `skill/execution/executor.ts:42-275`
+- 结构同构：authority 判定 → 门控 → 组 request → 跑进程 → 失败走 `processBlockedResult` →
+  成功返回带 **20 条 evidence** 的结果；证据标签表**逐条对应**
+- 唯一实质差异是 request 构造器与响应校验器
+- 影响：差异本已被设计成数据上的 `BrowserExecutorKind`（`executor.ts:1-9` 里
+  `external-runner` 与 `skill-runner` 并列），代码上却写成两个类 → 新增第三种 runner 必须抄第三份
+
+**[D-重复-3] 「actionKind → safe action」映射写 4 份 —— 已核验**
+- `browser/localExecutionAuthority.ts:131`、`browser/runtime/external/executor.ts:193`、
+  `browser/runtime/external/protocol.ts:83`、`browser/skill/execution/protocol.ts:104`
+- 四者都是 `navigate → "navigate-local"` / `extract → "extract"` / 其余 `"observe"`
+- **主代理复核补充**：`"navigate-local"` 字面量在全域出现 **20+ 处**（另有
+  `skill/runner/capability.ts:6,36,37,91,94,133`、`localFixture.ts:11,44`、
+  `runtime/external/manifest.ts:85,125,291` 等），不止 4 份**映射函数**
+- 影响：任一处漏改（例如新增 `wait` 动作）→ 该路径**静默降级为 `observe`** 而不报错
+
+**[D-重复-4] `evidenceValue` 与 redaction 过滤管线各写 4 份 —— 已核验（低危）**
+- `evidenceValue`：`browser/evidenceBundle.ts:125-127`、`browser/executionReceipt.ts:198-200`、
+  `browser/runtime/external/surface.ts:31-33`、`browser/skill/execution/surface.ts:47-49`
+- redaction 过滤：`evidenceBundle.ts:92-94`、`executionLifecycleSurface.ts:39-41`、
+  `runtime/external/surface.ts:14-16`、`skill/execution/surface.ts:40-42`
+
+**[D-重复-5] playwright 可用性被回答两次，两个答案在同一命令里并列打印**
+- `browser/playwrightRuntime.ts:85-142`（`getPwRuntimeStatus`，返回 `PwRuntimeStatus`）
+- `browser/playwrightRuntimeAvailability.ts:47+`（`auditBrowserPlaywrightRuntimeAvailability`）
+- 两者都活：`browser/commandRunner.ts:41` 调前者，`:39` 经 `playwrightAdapterSurface.ts:4-6` 渲染后者
+- 影响：同一状态面板两行来自两套独立探测，**状态词表也不同**
+  （`ready|package-missing|binary-missing|disabled|failed` vs
+  `available|package-missing|binary-missing|unavailable|blocked-by-policy`）→ **用户看到自相矛盾的两行**
+
+### 13.3 死代码（均已核验，`import type` 不计）
+
+**[D-死-1] `toolPolicy.ts` + `agent.ts` + `plan.ts` 构成一条完全封闭的死链（589 行）—— 已核验**
+- `browser/toolPolicy.ts`（188 行）：`decideBrowserToolPolicy` / `browserActionKindForTool` /
+  `isBrowserToolName` 全仓零引用；`browser/agent.ts:6` 只是 `import type { BrowserToolName }`
+- `browser/agent.ts`（183 行）：`detectBrowserAgentPlan` 零 value 消费者；
+  `planning/task/workflowTaskPlanner.ts:125` 是 `import type { BrowserAgentPlan }`，
+  且该 `browserPlan?` 字段全仓**无任何赋值点** —— 类型连被构造的机会都没有
+- **主代理复核新增**：`browser/plan.ts`（218 行）的唯一消费者是 `browser/agent.ts:5`
+  （line 5 `} from "./plan.js"`）→ **随 agent.ts 一起死**
+- 合计 **589 行**（188+183+218），三者内 `grep path.join|spawn|execFile|import(|process.argv` = 0，非动态入口
+- 影响：**这不是三个独立死文件而是一条死链** —— 只删 `agent.ts` 会留下更隐蔽的 `plan.ts`
+
+**[D-死-2] `browser/playwrightEvidence.ts`（251 行）的 value 面全死 —— 已核验**
+- `mapPwEvidence`(44-117) / `classifyPwFailure`(119-150) / `toRuntimeStatus`(153-163) /
+  `redactPwText`(209-239) **全仓零 value 消费者**（主代理 grep 确认）
+- 全文件唯一外部边是 `playwrightRuntime.ts:4` 的 `import type { PwFailureCode }`
+- 影响：这是**第二份** Playwright 证据映射实现（活路径用的是 `playwrightEvidenceMapper.ts`），
+  两份字段处理不同（`playwrightEvidence.ts:63` 写 `browserLaunched: input.evidence.browserLaunched`，
+  `playwrightEvidenceMapper.ts:63` 硬编码 `browserLaunched: false`）
+
+**[D-死-3] `skill/runner/manifest.ts`（196 行）是测试自足孤岛 —— 已核验**
+- 全仓 grep `BrowserSkillRunnerManifest` 只命中自身与 `manifest.test.ts`
+- 该测试**被测对象就是死文件本身**（即 block-findings §1 描述的 CB-005 形态）
+- 活路径用的是「外部 runner manifest 内嵌 skill 字段」（`runtime/external/manifest.ts:46-63`
+  的 `skillRunnerMetadata`/`skillRunnerBinding`），而非这份独立 skill manifest
+
+**[D-死-4] `directPlaywrightAdapter` / `selectorRepairApplyExecutor` 链：终端消费者是测试基建 —— 已核验**
+- `playwrightEvidenceMapper.ts` → 唯一 value 消费者 `directPlaywrightAdapter.ts:9`
+- → `BrowserDirectPlaywrightAdapter` 唯一引用点：`core/harness/browserPlaywrightAdapterSpikeFixtures.ts:4-5`
+  （**测试基建**）与 `browserPlaywrightAdapterSpikeScenarios.test.ts:6`
+- `selectorRepairApplyExecutor.ts:20` 只被 2 个测试引用
+- **精确化**：与早前「`playwrightEvidenceMapper` / `selectorRepairApplyPolicy` 不是死代码」的判定
+  **不矛盾但需精确化** —— 它们确有 value 消费者，然而整条链**没有任何生产入口**：
+  `browser/commandRunner.ts:39` 引了 `renderBrowserPlaywrightAdapterSurface` 却**从未
+  `new BrowserDirectPlaywrightAdapter`**
+- 影响：**「测试基建不是死代码」这条规则在这里正好掩盖了一条生产不可达链**
+
+### 13.4 命名与位置
+
+**[D-命名-1] 「Surface」后缀被 20 个文件复用，但无共享契约**
+- `skill/runner/surface.ts:5`（静态说明「Execution: not enabled」）与
+  `runtime/core/surface.ts:5`（渲染 `BrowserRuntimeActionLoopResult`）**同名同后缀、层级完全不同**
+- 20 个中真正被活路径消费的只有 6 个
+- 影响：在 170 文件平铺目录里，名字是唯一导航手段；「Surface」已退化为「返回 string 的渲染函数」的同义词
+
+**[D-命名-2] 同名字根家族职责分化**
+- `*Executor`（`browser/` 内 13 个）：只有前 5 个同族（浏览器动作执行）；
+  后 8 个是各自子系统的「应用某决策」函数，与 executor 端口无关
+- `*Adapter`（3 个）：`directPlaywrightAdapter.ts`（实现端口）、
+  `playwrightCliAdapter.ts:13-31`（**零副作用的策略文字块**）、`runtime/core/processAdapter.ts`（真跑进程）
+  —— 三者不共享接口
+- `*Bridge`（3 个）：`cliExecutionBridge.ts`(363)、`skill/execution/bridge.ts`、`externalNetworkExecutionBridge.ts`(397)
+  —— 输入输出毫无共性
+
+**[D-命名-3] 顶层平铺中承担子域职责的文件未收进已存在的子目录**
+- `browser/` 已有 `runtime/ receipt/ skill/` 三子目录，但
+  `externalNetwork*`(13)、`controlledNetwork*`(6)、`publicReadOnlyWeb*`(5)、`readOnly*`(5)、
+  `selfHealing*`(16)、`replay*`(17) 共 **62 文件（36%）全部平铺**
+- **注意**：回报建议「新建 `browser/network/`、`browser/recovery/`」——
+  这是按 owner 域自身的自然内聚簇收拢，**不是按区块搬迁**，方向可接受；
+  但仍属搬迁，需裁决（见 13.8）
+
+### 13.5 模块划分（均已核验）
+
+**[D-模块-1] 无 >600 行文件；但 6 个文件声明名 >20**
+- 声明名超限：`externalNetworkRunnerManifest.ts`(410 行/**27 名**)、
+  `publicReadOnlyWebManifest.ts`(394/**24**)、`runtime/external/protocol.ts`(323/**23**)、
+  `skill/execution/protocol.ts`(350/**21**)、`runtime/core/manifest.ts`(229/**22**)（另有 1 个）
+- **最大文件 447 行不是问题**：全仓 14 个 >600 行文件中 `browser/` 占 **0 个**（与 §5 名单互不重叠）
+- 真正问题：`externalNetworkRunnerManifest.ts` 一个文件容纳 **4 个职责**
+  （类型 18-46 / 序列化校验 109-210 / **env 加载 212-259** / 4 个 parse 助手 + 4 个守卫 + sanitizer）
+
+**[D-模块-2] 5 个 `loadXxxManifestFromEnv` 是同一段代码的 5 份拷贝 —— 已核验**
+- `cliExecutorInjection.ts:36`、`externalNetworkRunnerManifest.ts:212`、
+  `receipt/manifest.ts:128`、`controlledNetworkRunnerManifest.ts:169`、`publicReadOnlyWebManifest.ts:199`
+- 结构一致：读 env → 缺则 `{status:"missing"}` → `readFile ?? fs.readFileSync` → `JSON.parse` → `validate`
+- **主代理复核补充**：`cliExecutorInjection.ts` **同一文件里有两份**（`:36` 与 `:101+`，
+  `const readFile = input.readFile ?? ((path) => fs.readFileSync(path, "utf8"))` 在 63 与 102 行各一次）
+- 消费者：只有 `loadBrowserPublicReadOnlyWebManifestFromEnv` 有生产消费者
+  （`entrypoints/cliCommandExecutionBridge.ts:16`），其余四者 grep 到的引用点均为测试
+
+**[D-模块-3] `serialize` 六份函数体完全相同**
+- `runtime/external/manifest.ts:137-141`、`externalNetworkRunnerManifest.ts:135-139`、
+  `controlledNetworkRunnerManifest.ts:91-95`、`localFixtureManifest.ts:113-117`、
+  `publicReadOnlyWebManifest.ts:116-120`、`skill/runner/manifest.ts:77-81`
+- 六份都是 `` return `${JSON.stringify(manifest, null, 2)}\n`; ``
+
+### 13.6 耦合度
+
+**[D-耦合-1] 「`core/harness` → `browser` 58 条边」复核：约 2 条是生产边，其余是测试基建 —— 已核验**
+- `core/harness/` 下 value-import `browser/` 的非测试文件共 15 个，
+  **14 个**文件名是 `*Fixtures.ts` / `*Runner.ts` / `*Scenario*.ts`（场景测试基建）
+- **唯一有生产消费者的是 smoke 三件套**：`core/harness/browserPublicReadOnlyWebSmoke{Config,Report,Runner}.ts`
+  被 `core/commands/browserCommandRuntime.ts:3-5` import
+- **结论修正**：58 条边数字对，但**结论应为「browser/ 侧无越界」** ——
+  是测试基建在按需组装场景。真正的问题在 `core/commands/browserCommandRuntime.ts:1-5`
+  （把 CLI 命令执行与 harness smoke 缝在一起），那是 `core/` 越界，**不是 `browser/` 的问题**
+
+**[D-耦合-2] `browser/` 反向依赖 `presentation/` —— 已核验，真实越界**
+- `browser/capabilityModel.ts:1`：
+  `import { sanitizeSidebarText } from "../presentation/sidebar/sidebarStateModel.js";`
+- `capabilityModel.ts:139-141` 的 `sanitizeBrowserText` 只是把 `sanitizeSidebarText(value, new Set(), maxLength)` 包一层
+- **主代理实测影响面：`browser/` 内 97 个文件 import `capabilityModel.js`（全域 101 处）**（回报称 88）
+- 影响：(a) **执行层依赖 UI 层**，方向反了 —— sidebar 渲染策略一变，浏览器执行层全部文本脱敏行为跟着变，
+  且**不产生编译错误**；(b) 97 文件经单点间接依赖 `presentation/`，
+  `browser/` 无法在不牵动 `presentation/` 的前提下被复用或测试
+- **这是 `browser/` 内最重要的结构性缺陷**
+
+**[D-耦合-3] `runtime/core/adapterExecutor.ts` 与 `skill/runtime/binding.ts` 双向依赖（无环）**
+- `runtime/core/adapterExecutor.ts:19` → `skill/runtime/binding.js`
+- `skill/runtime/binding.ts:3,4` → `runtime/core/protocol.js` + `runtime/external/runtimeManifest.js`
+- 说明「runtime 是基础设施、skill 是上层」的划分**并未成立**，它们是同一层的两个切面
+
+### 13.7 pi 对照（`browser/` 相关）
+
+**前提更正（已核验）**：pi **完全没有浏览器执行子系统**。
+`grep -ri playwright|browser packages/agent/src packages/coding-agent/src` 只命中
+`@vitest/browser-playwright` 依赖与 `navigateTree`（会话树导航）。
+**不能照搬任何浏览器结构。**
+
+值得效仿的是 pi 在**「受控外部副作用」**上的架构：
+
+| # | pi 机制 | pi 证据 | 本仓差距 | 代价 |
+|---|---|---|---|---|
+| 1 | 一次副作用拆成显式四阶段 | `harness/execution/tools.ts:57-88` Prepared → `:90-110` beforeDecision → `:112-142` execute（唯一跨副作用函数）→ `:144-166` finalize | 本仓散成 **8 个独立 `*Policy.ts`**（`executionPolicy`/`sandboxPolicy`/`networkAllowlist`/`executionConfirmation`/`executionEvidencePolicy`/`sandboxAuthority`/`runtime/core/preflight`/`skillManagedRunnerPolicy`），由 `runtime/core/preflight.ts:22-90` 一次串 6 个判定，**无阶段类型** | 中高（要给 `BrowserExecutor.execute` 加 signal） |
+| 2 | 独立的作用域闸门类型 | `harness/execution/effect-gate.ts:9-13` `Gate` / `:15-19` `GateControl` / `:27-59` `createGate()` 状态机 | **无任何组件持有「本次执行是否已作废」的状态**。`browser/executionCommandRunner.ts:69` 拿到 executor 后直接 `await`，**全程无可取消点**；三份 runner 各自 `let settled = false` 手工防重，且 `runner.ts:57-76` 的超时回调**未检查 `settled` 就先置 true 再 kill**，与 `processAdapter.ts:46-48` 的正确写法不一致 | 中高 |
+| 3 | 进程输出预算唯一实现 | `harness/utils/truncate.ts:1-16`（`DEFAULT_MAX_LINES=2000`/`DEFAULT_MAX_BYTES=50KB`） | **5 处且语义不同**：`runner.ts:182` `appendBudgeted`、`processAdapter.ts:119` `bound`、`executor.ts:357` 又一份、`playwrightEvidenceMapper.ts:37` 二次夹取、`publicReadOnlyWebExecutor.ts` 用 `responseByteBudget`。**且 byte/char 混用**：字段叫 `outputBudgetBytes`（`runner.ts:56`、`executor.ts:179`）实现全是 `String.length` → **中文/emoji 页面预算可被突破 4 倍** | 低（修 byte/char 不需改签名） |
+| 4 | 工具上下文是一个字段 | `harness/tools/tool-context.ts:1-5` 全文只 `{ env: ExecutionEnv }` | `browser/commandRunner.ts:125-159` 的 `runBrowserCommandAsync` 接受 **32 个可选字段**，`core/commands/types.ts:12-20` **再声明一遍**。`core/harness/` 下 15 个 `browser*Fixtures.ts` 是注入面过宽的症状 [INFERENCE] | 高（改动面大，可分步） |
+
+**反面对照**：pi 的 `Result<TValue,TError>` 与本仓的 `{ok:true,...}|{ok:false,...}` 判别联合
+是同一模式的两种拼写；本仓版本额外携带 `evidence/warnings/redactions`，**信息量更大，无需对齐**。
+
+### 13.8 处置建议（按性价比，均标风险）
+
+| 序 | 动作 | 依据 | 风险 |
+|---|---|---|---|
+| 1 | 修 byte/char 混用（字段名与实现不符） | 13.7-3 | **低**（不改签名） |
+| 2 | `withFileMutationQueue` 同类：3 份 spawn 抽成 1 份参数化 | D-重复-1 | 中 |
+| 3 | 六份 `serialize` 合并为一 | D-模块-3 | **低** |
+| 4 | `sanitizeBrowserText` 下沉，切断 `browser → presentation` 反向依赖 | D-耦合-2 | 中（97 处 import 改写，机械） |
+| 5 | 删死链 `toolPolicy` + `agent` + `plan`（589 行） | D-死-1 | 低（需先确认无路线计划） |
+| 6 | 裁决 Direct Playwright 路线是否接线 | D-死-4 | 高（产品裁决） |
+| 7 | 顶层 62 文件按内聚簇收进子目录 | D-命名-3 | 中（搬迁，需裁决） |
+
+### 13.9 回报纠错（主代理实测）
+
+| 项 | 回报称 | 实测 |
+|---|---|---|
+| `capabilityModel` 消费者数 | 88 | **97**（`browser/` 内）/ 101（全域） |
+| `*Executor` 文件数 | 10 | `browser/` 内 **13** |
+| `*Adapter` 文件数 | 3 | 3（正确） |
