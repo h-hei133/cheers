@@ -1526,3 +1526,75 @@ CB-005 不是"两套并行 provider 路径"，而是**一条活路径 + 一条�
 
 本轮**未派子代理**：上一轮两个子代理均因基础设施故障（503 WAF）失败，
 且本任务是连续测量、无可并行的独立切片。全部事实由主代理实测。
+
+## [2026-09-19] phase-c-c1-recommend | CB-005 建议：**成因不是"两路径不连通"，是"产出无人接管"。并更正我自己前两份文档的三处论断。**
+
+产出 `.wiki/refactor/cb-005-recommendation.md`。零代码改动。
+
+### 三处自我更正（先列，因为它们决定建议走向）
+
+**更正一：CB-005 成因表指错了产生方。** `capability-backlog.md` 原写
+`runtime/loop/*` + `provider/request/*`"产生 `codingResult` 但不经 turn"。实测**两侧都不产生**：
+
+| 检查 | 结果 |
+|---|---|
+| `grep -rn "codingResult\|CodingResult" runtime/loop/` | **0** |
+| `grep -rn "codingResult\|CodingResult" provider/` | **0** |
+| `git log -S"codingResult" -- runtime/loop` | **空**（历史上也从未有过） |
+
+真实产生链在**第三个地方**：`core/query/runtime/actionAuthority.ts:105` →
+`result/projection/shell/assembly.ts:138`（`buildShellCodingResult`）→
+`result/projection/runtimeOutcomeProjection.ts:42` → `planning/task/taskLifecycleResult.ts` /
+`context/graph/contextPacketResult.ts` → `context/acquisition/graph.ts` →
+`planning/runtime/engine.ts`（**零 value 导入者**，链条终点）。
+
+**更正二：O1 不解决 CB-005——我把因果写反了。** `cb-005-initiation.md` 第 187 行原写
+"O1 会自然消灭 O3 的大部分对象……死条件大多自动消失"。实测：
+删除 `runtime/loop/` + `runtime/api/` + `runtime/evaluation/` 后，
+逐一检查的 **16 个死条件读取者全部仍可达（16/16）**。它们由
+`entrypoints/cliRuntimeModule.ts` → `session/SessionManager.ts` 直接可达，与 loop lane 无依赖。
+
+**更正三（方法论）：`import type` 让死代码看起来是活的。** 同一文件两种判据结果相反：
+
+| 文件 | CLI 可达（含 type 边） | CLI 可达（仅 value 边） |
+|---|---|---|
+| `context/acquisition/graph.ts` | ✅ | **❌** |
+| `result/projection/shell/assembly.ts` | ✅ | **❌** |
+| `core/query/runtime/actionAuthority.ts` | ✅ | **❌** |
+| `planning/runtime/engine.ts` | ✅ | **❌** |
+
+全仓 51 个生产文件**零 value 导入者**，其中 48 个仅靠 type 边"挂着"。
+
+### 成因重述
+
+孤立发生在 **turn 迁移 `a7418fcb`**（2026-09-12）：它删除了 `orchestration/`、
+turn facade、契约 query loop 与 engine。此后 `turn/projection.ts` 成为**唯一**生产
+`query.completed` 的发出者（`:120`/`:138`），而它发出的 `result` **不含 `codingResult`**
+（`:110-145` 逐字确认）。运行时证据一致：84 个 `state.json` 中 **0** 个含 `codingResult`。
+
+**即：不是"两条路径没连通"，而是"一条路径死了，它的产出没人接管"。**
+
+### 建议
+
+**最小真修复 = 在 `turn/` 内接回 `codingResult` 产生（O2 的缩小版），不是 O1。**
+
+理由：投影层**已经存在**——`buildShellCodingResult`（420 行）接受显式输入，
+不依赖被删的编排层，只是**没人调用**；`turn/` 已握有大部分输入；
+缺口是单点：`AfterToolCallUpdate`（`core/agent/tools.ts:50-54`）只有
+`{output, isError, terminate}`，无结构化出站字段。
+
+执行顺序：① 加结构化字段 → ② `turn/` 累积 observation，`concludeRun` 时调用**已存在的** builder
+→ ③ 带上 `query.completed.result` → ④ **然后**再裁决 O1（此时它是纯卫生工作）。
+
+**不推荐完整 O2**：旧路径 provider 硬编码合成（`runtime/api/host/runtime.ts:338`、`:357`），
+类型无 `real` 成员（`contract.ts:17`），`verify:host-surface.mjs:96-101` 断言 `"real"` 必须被阻断；
+且 `turn/synthetic.ts` 已在活轨提供同等能力。
+
+### 三个公共面问题
+
+`index.ts` host 导出、`verify:host-surface`、`--host-command` 去留——**在建议路径下都不阻塞**，
+因为第 ①-③ 步不触碰 host lane，只在第 ④ 步（O1）时才需答案。
+
+### 子代理
+
+本轮**未派**：本任务是连续测量、无可并行独立切片；上一轮两个子代理均因基础设施故障（503 WAF）失败。

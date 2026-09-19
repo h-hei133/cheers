@@ -218,7 +218,18 @@ promptInteractiveApproval: (prompt) =>
 | 路径 | 使用者 | 能力 | 数据形态 |
 |---|---|---|---|
 | `turn/step.ts` | 模型驱动工具循环（**实际对话**） | 无重试、无终态裁决；验证仅作 `[Verification feedback]` 文本注入模型上下文 | 不产生 `codingResult` |
-| `runtime/loop/*` + `provider/request/*` | 编排层 / 公共 API | 有 retry 资格判定（自述 `retry-eligibility-is-not-retry-execution`）、`NormalizedProviderError` | 产生 `codingResult` 但不经 turn |
+| `runtime/loop/*` + `provider/request/*` | 编排层 / 公共 API | 有 retry 资格判定（自述 `retry-eligibility-is-not-retry-execution`）、`NormalizedProviderError` | ~~产生 `codingResult` 但不经 turn~~ **【2026-09-19 更正：两侧都不产生】** |
+
+> **更正（2026-09-19）**：上表右栏原写编排层"产生 `codingResult`"，**实测为假**。
+> `grep -rn "codingResult\|CodingResult" runtime/loop/` = **0**；`provider/` = **0**；
+> `git log -S"codingResult" -- runtime/loop` = **空**（历史上也从未有过）。
+> `codingResult` 的真实产生链在**第三个地方**：
+> `core/query/runtime/actionAuthority.ts:105` → `result/projection/shell/assembly.ts:138`
+> （`buildShellCodingResult`）→ `result/projection/runtimeOutcomeProjection.ts:42`
+> → `planning/task/taskLifecycleResult.ts` / `context/graph/contextPacketResult.ts`
+> → `context/acquisition/graph.ts` → `planning/runtime/engine.ts`（**零 value 导入者**）。
+> 即：**不是"两条路径不连通"，而是"一条路径被删除后，它产生的数据无人接管"**——
+> 孤立发生在 turn 迁移 `a7418fcb` 时。详见 `cb-005-recommendation.md`。
 
 终态判定同理：`turn/projection.ts:concludeRun`（2 分支）与
 `evidence/verdictFacade.ts`（三态裁决）分属两侧，**不汇合**。
