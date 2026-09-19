@@ -1305,3 +1305,72 @@ SCC **1500 文件 / 0 环**；`verify:docs-drift:strict` 通过；
   并把 decision 从 defer 改为 fix（文件已真实拆分）。
 - `cce4d247` 的 commit message 含此错误断言，**commit message 不可改**，
   故以此条目为准——**以本条覆盖 cce4d247 中的相关表述**。
+
+## [2026-09-19] defects | 登记三项既有缺陷（PD-001 ~ PD-003），并确认**非本轮重构引入**。
+
+维护者在真机测试中报告三个问题，并明确问"是不是我们这几轮导致的"。
+**逐项复现后确认：都不是。** 三项的引入提交均早于 Step 3–7 与 Phase A/B。
+新建 `.wiki/refactor/preexisting-defects.md`（与 `capability-backlog.md` 并列：
+那份记"能力缺失"，这份记"能力在、行为错"）。
+
+### 归因证据（方法：先复现 → 再 `git log -S` 定位 → 最后判是否本轮引入）
+
+对本轮范围（`42d63bd7..HEAD`）逐文件 `git diff --numstat` 实测，**相关文件只改了 import 路径**：
+
+| 文件 | 改动 | 性质 |
+|---|---|---|
+| `cliApprovalModule.ts` / `approvalPromptRenderer.ts` / `turnSink.ts` / `recovery.ts` / `sessionReentrySurface.ts` | 各 1+/1− | `StreamingRenderer` 路径 |
+| `cli/interactive/interactiveMode.ts` | 3+/3− | 同上（逐行核对） |
+| `session/SessionManager.ts` | 44+/466− | Step 5 读面抽取（`09153136`） |
+| `cli/approval/permissionScope.ts` / `picker/registry.ts` | **unchanged** | — |
+
+`SessionManager` 的 466 行删除是读面抽取。**逐字对比 `getReentryCandidate` 前后版本**：
+唯一差异 `this.store.load` → `this.host.store.load`，**逻辑一字未改**。
+
+### PD-001 审批面自相矛盾 + scope 代答写入 allow-once 缓存后不收窄
+
+- 引入：`41b83b5b`（05-01）、`1cda3255`（09-02）、`98d680a2`（09-02）
+- 两个渲染面同时在画：`turnSink.ts:216,219` 把审批状态追加进**工具卡片**，
+  而 `toolCards.ts:38-43` 的 `note()` 只追加、从不清理 → `awaiting approval` 永久留在转写区；
+  同时 `approvalPromptRenderer.ts:60-61` **无条件**打印 `- Mode: user confirmation required`，
+  即使答案是 `session-scope` 给的。
+- **更严重的第二半**：`cliApprovalModule.ts:206` 在 scope 代答时仍 `rememberAllowOnce(...)`，
+  而缓存是进程级 `Set`（`approvalTrustPolicy.ts:40`，`cliProcessRunner.ts:60` 每进程一个），
+  `sessionRuntime.ts:144-146` 的 `setPermissionScope` **只赋值、不清缓存**。
+  实测：allow-all 放行一次 → 切回 `ask` → 同一命令**不再询问用户**（`picker was consulted: 0 time(s)`）。
+  这违反 `permissionScope.ts:12-14` 自己写的契约
+  *"A scope never grants anything permanently"*。
+
+### PD-002 运行中输入 `/resume` 被排队，结束后绕过选择器
+
+- 引入：`c0ae9ba0`（09-01）、`a7418fcb`（09-12）
+- `interactiveMode.ts:374` 的闸门带 `!this.busy`；`:386` 把斜杠命令推进队列；
+  `:464-465` 回合结束**直接 `run(next)`**，不再过闸门。
+- 于是走非选择器路径，依次打印三个独立渲染器：
+  `Resume candidates:`（`recovery.ts:163`）、`Resumed session`（`recovery.ts:270`）、
+  `Session command map`（`slashCommandRegistry.ts:118`）。**用户看到的"一个页面"是三者顺序输出。**
+- 真实 PTY 复现：回合运行期间无反应，结束后三段式输出，与用户报告一致。
+
+### PD-003 跨项目会话被选为恢复目标，状态栏显示别的目录
+
+- 引入：`4e23f58e`（05-28）、`98d680a2`（09-02）
+- `sessionReentrySurface.ts:130-135` 的根偏好只加 **+90**，而时间项是
+  `Math.floor(updatedAt/1000)` ≈ **1.79e9**（`:147`）。实测磁盘上那一对：
+  `/tmp/repproj` 1789791236 vs `coding-agents` 1789790895 —— **差 341 点，7 分钟就压过根偏好**。
+- 该候选经 `cliBootstrapContext.ts:88-91` → `startupSurfaceRenderer.ts:150`（恢复提示）
+  → `interactiveLoop.ts:35,60,76`（`fallbackSessionId`）→ `recovery.ts:260-267`
+  （`applyShellSubstrateTransition` 改 `projectRoot`）→ `sessionFacts.ts:57`（状态栏）接管显示。
+- `/resume` 选择器**完全不按项目过滤**（`sessionReadSurface.ts:122`），跨根会话默认高亮。
+- **补充事实**：`/tmp/repproj` 是维护者自己的调试残留（`/tmp/render_final.txt` 记录了
+  `--print --replay-file` 调用；`git log --all -S"repproj"` **零命中**）。
+  **该目录存在合理，被选为恢复目标才是缺陷。**
+
+### 三项互不相关
+
+与 CB-005 形态不同：CB-005 是"多个破坏同源于一个架构缺口"；
+本份三项各有独立引入路径，**不是同一根因**。
+
+### 未做
+
+**未修任何代码**，仅登记。三项均 `待裁决`；每项已附可脚本化的复现步骤，
+批准后可直接固化为回归测试。
