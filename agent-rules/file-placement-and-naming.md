@@ -97,7 +97,6 @@ When a domain becomes broad, add meaningful subdomains instead of lengthening fi
 ```text
 runtime/execution/
 runtime/events/
-runtime/execution/
 runtime/resources/
 planning/task/
 planning/handoff/
@@ -107,7 +106,7 @@ tools/policy/
 tools/result/
 session/replay/
 session/continuation/
-presentation/surface/
+presentation/sidebar/
 presentation/terminal/
 ```
 
