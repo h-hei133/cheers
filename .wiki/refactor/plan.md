@@ -1620,7 +1620,7 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | **T1** | 收口 `sanitizeText` 6 份 → 1 份 | `block-findings` §12.2 | ✅ **已完成**（`3550134f`）：新建 `core/security/redaction.ts`，6 处定义 + 10 处调用点全部改指单点；§9.9 记录了验证矩阵 |
 | **T2** | 收口 `freeze`/`deepFreeze` 27 份 → 1 份（需先裁决保留哪套语义） | §12.3 | 语义裁决 |
 | **T3** | 删 `reasonText.includes` 8 处，改结构化字段 | §10.5 pi-2 | ⚠️ **前提被实测推翻，未执行** —— 见 §9.10 |
-| **T4** | 修 `browser/` 的 byte/char 混用 | §13.7 对照-3 | 无（不改签名） |
+| **T4** | 修 `browser/` 的 byte/char 混用 | §13.7 对照-3 | ✅ **已完成**（`6a793de9`）：4 处真消费点改字节计数，见 §9.13 |
 | **T5** | 切断 `browser` → `presentation` 反向依赖（97 处 import 改写） | §13.6 耦合-2 | 无（机械） |
 | **T6** | 修 `cliSessionRuntimeFactory.ts:70` 的 runtimeSeed 丢弃 | §11.2 A-死-3 | 产品裁决（是否保留种子语义） |
 | **T7** | 裁决 285 个不可达文件的处置 | §6 | **需裁决** |
@@ -1785,3 +1785,61 @@ CI（`.github/workflows/ci.yml:30`）用 `npm run test:ts`，`scripts/test-all-s
 
 **T15 只解决了"误收集"这一类。** 剩余 11 文件 / 16 项属**测试自身的 cwd 依赖** +
 **缺根配置**，是否需要处理见 **T17**。
+
+### 9.13 T4 执行记录（2026-09-19，已完成）
+
+| 项 | 内容 |
+|---|---|
+| **目标** | `browser/` 输出预算字段名（`outputBudgetBytes`）与实现（`String.length`）不符 |
+| **提交** | `6a793de9` |
+| **新模块** | `browser/outputBudget.ts`：`exceedsByteBudget(value, maxBytes)` + `appendWithinByteBudget(current, next, maxBytes)` |
+| **裁决** | 用户选**改实现为真字节计数**（保留 JSON 键名，避免破坏外部契约）|
+
+**关键约束（决定了修法）**：`outputBudgetBytes` **是磁盘/env JSON 的键**
+（`externalNetworkRunnerManifest.ts:239` 的 `JSON.parse`，生产者
+`entrypoints/cliCommandExecutionBridge.ts:63`）。**改名会破坏用户已写好的 manifest**，
+故只改实现、不改字段名。
+
+**与 T3 的关键差异 —— T4 的目标是活的**（逐个实测 value 边可达性）：
+
+| 文件 | 可达性 |
+|---|---|
+| `browser/runtime/external/runner.ts` | ✅ REACHABLE |
+| `browser/skill/execution/executor.ts` | ✅ REACHABLE |
+| `browser/externalNetworkHandoffProtocol.ts` | ✅ REACHABLE |
+| `browser/evidenceSafety.ts` | ✅ REACHABLE |
+| `browser/controlledNetworkExecutor.ts` | ✅ REACHABLE |
+
+**改动清单（4 处真消费 + 1 处判定为 inert）**：
+
+| # | 位置 | 改前 | 改后 |
+|---|---|---|---|
+| 1 | `runtime/external/runner.ts:77,80`（`appendBudgeted` → 删除） | `merged.length > budget` | `appendWithinByteBudget(…)` |
+| 2 | `skill/execution/executor.ts:200,203`（同上，两份**逐字节相同**，哈希 `569ee9ef3468`） | 同 | 同 |
+| 3 | `externalNetworkHandoffProtocol.ts:102` | `combined.length > input.outputBudgetBytes` | `exceedsByteBudget(combined, …)` |
+| 4 | `evidenceSafety.ts:119` | `normalized.length > budget` | `exceedsByteBudget(normalized, budget)` |
+
+**第 5 处经核验后**不改**（判为 inert）**：`controlledNetworkExecutor.ts:205` 把
+`outputBudgetBytes` 传给 `sanitizeBrowserText`（字符截断）。但其上游 `:196` 的 chunk 循环
+用 `Buffer.length`（**真字节**）已封顶，而 `code units ≤ bytes` 恒成立 →
+该字符截断**永远不会触发**。按"不写无重量代码"原则，**不引入 inert 的字节包装**，
+改为加注释说明原因。**我一度改了这一处，核验后主动回退。**
+
+**验证矩阵**：
+
+| 检查 | 结果 |
+|---|---|
+| **反证明（决定性）** | 100 个「中」= 300 字节，预算 120：**旧判定接受（超支 2.5 倍）**，新判定拒绝 |
+| 探针（临时，跑完即删） | ✅ 5/5：CJK 被拒、emoji 截断不劈字符（无 U+FFFD）、ASCII 不受影响、与 `Buffer.byteLength` 在混合输入上一致 |
+| `npm run build`（strict） | ✅ 0 错误 |
+| `verify:import-cycles` | ✅ 0 环 |
+| `browser/` + `core/harness/` 套件 | ✅ 93 文件 / 413 项全过 |
+| 全量（官方入口） | 1 文件失败（`cli-baseline.test.ts`）——**在 HEAD（改动 stash）上同样失败** → **既存 flake**，与 T4 无关 |
+
+**顺带发现**：`appendBudgeted` 的两份（`runner.ts` 与 `skill/execution/executor.ts`）
+**逐字节相同**，正是 §13.2 D-重复-1 记录的"3 份 spawn 机器"中的 2 份。本轮收口了这 2 份
+（第 3 份 `processAdapter.ts` 用 `outputBudgetChars`，命名与实现本就一致，未动）。
+
+**新增可复核事实**：本仓**另有**一批**已正确**用 `Buffer.byteLength` 的地方
+（`core/tools/truncation.ts`、`publicReadOnlyWebExecutor.ts`、`observability/rotatingFileSink.ts` 等），
+说明缺陷**只存在于 `outputBudgetBytes` 这一支**，不是全仓性认知缺失。
