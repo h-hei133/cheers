@@ -15,6 +15,15 @@ import {
   type VerificationLoopIntent,
   type VerificationResultObservation,
 } from "../../verification/result/boundary.js";
+import {
+  absoluteTargetPath,
+  deepFreeze,
+  fingerprint,
+  sanitizeId,
+  sanitizeTargetSummary,
+  sanitizeText,
+  unique,
+} from "../sanitize.js";
 
 export type MultiTargetOperationKind =
   | "read_only"
@@ -1642,10 +1651,6 @@ function countState(
   return queue.filter((item) => item.state === state).length;
 }
 
-function absoluteTargetPath(workspaceRoot: string, relativePath: string): string {
-  return path.resolve(workspaceRoot, relativePath);
-}
-
 function pathEscapes(workspaceRoot: string, relativePath: string): boolean {
   const root = path.resolve(workspaceRoot);
   const target = path.resolve(root, relativePath);
@@ -1663,48 +1668,3 @@ function rangesOverlap(
   return left.startLine <= right.endLine && right.startLine <= left.endLine;
 }
 
-function fingerprint(content: string): string {
-  return computeFragmentFingerprint(content).slice(0, 16);
-}
-
-function sanitizeTargetSummary(value: string): string {
-  return sanitizeText(value, 160).replace(/\b(oldText|newText)\b/gi, "raw-content");
-}
-
-function sanitizeId(value: string): string {
-  return sanitizeText(value, 160)
-    .toLowerCase()
-    .replace(/[^a-z0-9._:-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function sanitizeText(value: string, maxLength: number): string {
-  return value
-    .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
-    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
-    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[secret-redacted]")
-    .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]")
-    .replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]")
-    .replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]")
-    .replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]")
-    .replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]")
-    .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maxLength);
-}
-
-function unique<T extends string>(values: readonly T[]): readonly T[] {
-  return Object.freeze(Array.from(new Set(values)).sort()) as readonly T[];
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
-}
