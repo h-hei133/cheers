@@ -164,6 +164,34 @@ It does not claim every historical note is perfectly classified.
 | `docs/audits/*.md` | historical | Closeout audit history or regression checks. | Current code plus foundation docs | Audit history |
 | `docs/manual-checks/*.md` | historical | Manual dogfood or live TTY checklist recovery. | Current validation policy and route-specific gates | Manual validation |
 | `docs/archive/**` | archived | Retained history and superseded pointers only. | Active docs listed above | Documentation |
+| `docs/build-infrastructure/README.md` | historical | Landing page and status banner for build-infrastructure history. |  | Build infrastructure history |
+| `docs/product-architecture-reset/README.md` | historical | Landing page and status banner for the architecture reset history. |  | Architecture history |
+| `docs/sprint/README.md` | historical | Landing page explaining the active/ historical split within `docs/sprint/`. |  | Sprint Knowledge Base |
+| `docs/dev-history/README.md` | historical | Landing page for route closeout and migration history. |  | Route history |
+| `docs/superpowers/README.md` | historical | Landing page for the superseded planning archive. |  | Route history |
+| `docs/dev-history/**` | historical | Route closeout and migration history; the route documents moved here keep pointer stubs at their old paths. | Current code and active route docs | Route history |
+| `docs/superpowers/**` | historical | Plan archive for superseded planning cycles. | Current plan and active route docs | Route history |
+| `docs/specs/*.md` | module-reference | Touching the ring-buffer or sliding-window buffer design. | Current code | Module reference |
+| `docs/product_architecture_reset_routes/**` | historical | Route pack for the completed product architecture reset program; not current architecture authority. | `docs/architecture/**` and current code | Architecture history |
+| `docs/build-infrastructure/*-planning-summary.md` | historical | Bi-planning closeout history. | Current code and `docs/architecture/**` | Build infrastructure history |
+| `docs/build-infrastructure/*-audit-summary.md` | historical | Bi-audit closeout history. | Current code and `docs/architecture/**` | Build infrastructure history |
+| `docs/build-infrastructure/browser-*.md` | historical | Browser integration route history. | `packages/ts-shell/src/browser/` and current code | Build infrastructure history |
+| `docs/build-infrastructure/**` | historical | Build-infrastructure delivery and audit history (BI/MTB batch closeouts). | Current code and `docs/architecture/**` | Build infrastructure history |
+| `docs/sprint/**` | historical | Sprint capability history. Active sprint documents are listed explicitly under Sprint Knowledge Base above, and a concrete row wins over this group row. | Current plan, current code, and the active rows above | Sprint Knowledge Base |
+| `docs/product-architecture-reset/**` | historical | Product architecture reset program history. `executionBoundary/README.md` and `harness-eval-artifact-index.md` are active and listed individually above. | Current code | Architecture history |
+| `docs/product_architecture_reset_routes/**` | historical | Route pack for the completed product architecture reset program; not current architecture authority. | `docs/architecture/**` and current code | Architecture history |
+| `docs/implementation-context/**` | implementation-context | AI wiring context before rewiring a capability path; the manifest is machine-readable. | Current code | Implementation Context |
+| `docs/project-map/**` | module-reference | Reading the read-only project map freeze; describes current target state only and recommends no routes. | Current code | Project Map |
+| `docs/architecture/**` | module-reference | Touching the named subsystem. The active subset is listed under Active Architecture above; a concrete row wins over this group row. | Current code | Architecture |
+| `docs/dev-history/**` | historical | Route closeout and migration history; moved route documents keep pointer stubs at their old paths. | Current code and active route docs | Route history |
+| `docs/superpowers/**` | historical | Plan archive for superseded planning cycles. | Current plan and active route docs | Route history |
+| `docs/specs/*.md` | module-reference | Touching the ring-buffer or sliding-window buffer design. | Current code | Module reference |
+| `docs/PROJECT_MAP.md` | module-reference | Human entrypoint and high-level current-state summary. | Current code | Project Map |
+
+**Grouping rule.** Rows above use globs deliberately: this map classifies *groups*
+so a whole tree inherits one status instead of requiring a row per file. A concrete
+path row always wins over a glob row for the same file. When a route creates a
+long-lived document, classify it here before closeout.
 
 ## Update Rule
 
