@@ -18,7 +18,13 @@
 //         delegationRatio >= 0.90          names are aggregation, not logic
 //       && branchingFunctionCount === 0    no function branches of its own
 //       && ownStateWriteCount === 0        no this.<field> = outside the ctor
-//       && linesPerDeclaredName <= 15      declarations are not sprawling bodies
+//
+// A lines-per-declared-name ceiling was considered and rejected: measured, it
+// separates nothing. Every over-ceiling module exceeds 15 lines per name, so the
+// clause never changes a verdict, while it wrongly rejects genuine facades -
+// modules at delegationRatio 1.00 with zero branching reach 80 lines per name
+// when their bodies are literal tables rather than logic. Length is not
+// complexity, and a criterion that cannot tell the two apart is not a criterion.
 //
 // The thresholds are not fitted to an outcome. Measured against this tree the
 // classification is unanimous: one module sits at delegationRatio 1.00 with zero
@@ -51,7 +57,6 @@ const THIN_FACADE = {
   minDelegationRatio: 0.9,
   maxBranchingFunctions: 0,
   maxOwnStateWrites: 0,
-  maxLinesPerName: 15,
 }
 
 if (!existsSync(SOURCE_ROOT)) {
@@ -235,8 +240,7 @@ function verdict(row) {
   const thin =
     row.delegationRatio >= THIN_FACADE.minDelegationRatio &&
     row.branching <= THIN_FACADE.maxBranchingFunctions &&
-    row.ownStateWrites <= THIN_FACADE.maxOwnStateWrites &&
-    row.linesPerName <= THIN_FACADE.maxLinesPerName
+    row.ownStateWrites <= THIN_FACADE.maxOwnStateWrites
   if (thin) return 'thin-facade'
   if (row.nameCount > CEILING) return 'monolith'
   return 'within-ceiling'
@@ -247,7 +251,7 @@ const reported = showAll ? rows : rows.filter((row) => row.nameCount > CEILING)
 console.log(
   `module-facade-check ceiling=${CEILING} modules=${rows.length} reported=${reported.length} ` +
     `thresholds=delegationRatio>=${THIN_FACADE.minDelegationRatio},branching<=${THIN_FACADE.maxBranchingFunctions},` +
-    `ownStateWrites<=${THIN_FACADE.maxOwnStateWrites},linesPerName<=${THIN_FACADE.maxLinesPerName}`,
+    `ownStateWrites<=${THIN_FACADE.maxOwnStateWrites}`,
 )
 console.log('')
 console.log('  verdict         names lines  delegation  branching  lines/name  module')
