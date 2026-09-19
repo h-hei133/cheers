@@ -1157,6 +1157,7 @@ runtime 装配四重证据。
 | `capability-backlog.md` | 未实现能力登记（CB-001 ~ CB-006） |
 | `preexisting-defects.md` | **既有缺陷登记（PD-001 ~ PD-003）**：活轨真实存在但非本轮重构引入的缺陷 |
 | `cb-005-initiation.md` | **CB-005 立项探索（阶段 C1）**：`runtime/loop` 生产零值导入、provider 硬编码合成；CB-005 是裁决问题而非施工问题 |
+| `cb-005-o1-vs-o3.md` | **O1/O3 代价对照（实测）**：删旧路径 vs 只补缺口；含三个待裁决的公共面问题 |
 | `handoff-2026-09-17.md` | 任务转接包（方向、记录位置、执行要求） |
 | `audit-raw/*.json` | 403 个已删文件的逐文件判定原始表 |
 | `step-2.6-plan.md` | Step 2.6 方案与执行记录 |
