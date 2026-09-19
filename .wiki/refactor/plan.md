@@ -5,7 +5,7 @@ sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-0
 created: 2026-09-15
 updated: 2026-09-19
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v6。当前生产 941 / CLI 可达 770 / 全量测试 2748 项（2026-09-19 CB-005 + C2 两轮删除后；CLI 可达下滑系口径修正而非回归，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）、Step 6 命名税（173 文件）、Step 7 judge 全量跑（0 blocking）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。§8 是路线章：三轮探索汇总的 14 项待办与三阶段排期（阶段 A 零裁决：strict / exclude 收紧 / AGENTS.md）。**阶段 A/B/C 全部完成，14 项待办（R1–R14）全部收敛**：C1 删 69 文件 / −23,631 行（CB-005）；C2 完成 R8–R11 裁决与执行、删除 runtime/evaluation。"
+summary: "Module boundary refactor plan v6。当前生产 941 / CLI 可达 770 / 全量测试 2748 项（2026-09-19 CB-005 + C2 两轮删除后；CLI 可达下滑系口径修正而非回归，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）、Step 6 命名税（173 文件）、Step 7 judge 全量跑（0 blocking）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。§8 是路线章：三轮探索汇总的 14 项待办与三阶段排期（阶段 A 零裁决：strict / exclude 收紧 / AGENTS.md）。**阶段 A/B/C 全部完成，14 项待办（R1–R14）全部收敛**：C1 删 69 文件 / −23,631 行（CB-005）；C2 完成 R8–R11 裁决与执行、删除 runtime/evaluation。**§9 是 2026-09-19 的区块式架构探索（零代码改动）**：10 区块分工、五类问题、子代理并发 2；产出全局普查（56 组/177 份重复实现、285 不可达文件/60,058 行、20 个 >600 行文件、core 越界 127 条 value 边）与区块 A/D/G 回报；⚠️ 区块只是探索坐标，**不是目标架构**。"
 confidence: high
 ---
 
@@ -13,7 +13,7 @@ confidence: high
 
 > `.wiki/refactor/` 是整个模块边界重构计划的唯一记录位置。
 > **本文件已重组：现状与规则在前，历史在后，路线在最后。**
-> 阅读顺序：**§1 现状 → §2 规则 → §8 路线（接下来做什么）**；
+> 阅读顺序：**§1 现状 → §2 规则 → §8 路线 → §9 区块探索（最新一轮）**；
 > §3 是已完成工作的逐轮记录，§4 起为约束来源与历史，需要追溯时再读。
 
 **版本沿革**：v1 初版 → v2 引入生产可达性 BFS → v3 发现删除路线错误、新增 Step 2.7 →
@@ -1236,6 +1236,8 @@ runtime 装配四重证据。
 | `c2-inventory.md` | **C2 启动前盘点**：R10 前提被证伪（应关闭）；R9/R11 可执行；发现 2 个真孤儿簇 |
 | `c2-execution.md` | **C2 执行记录**：三项已执行（删 host 遗留 / R9 归并 / 关闭 R10）；R11 与 evaluation 孤儿的深入分析与建议 |
 | `phase-b-exploration-2026-09-18.md` | **阶段 B 探索记录（B1–B4）**：推翻 plan 的两处数字/前提；所有数字实测 |
+| `block-exploration-2026-09-19.md` | **区块探索坐标（10 区块）**：⚠️ 区块**只是探索坐标，不是目标架构**；含"每个区块查什么"的统一清单与强制报告格式 |
+| `block-findings-2026-09-19.md` | **区块探索发现（13 节）**：全局普查（可达性/重复实现/耦合/大文件）+ 区块 A/D/G 回报与逐条核验；含 5 处主代理自行复测的计数更正 |
 | `handoff-2026-09-17.md` | 任务转接包（方向、记录位置、执行要求） |
 | `audit-raw/*.json` | 403 个已删文件的逐文件判定原始表 |
 | `step-2.6-plan.md` | Step 2.6 方案与执行记录 |
@@ -1510,3 +1512,101 @@ body 为字面量表时可达 **80 行/名**。**长度不是复杂度**，无�
 - 任何删除：§2.2 六项检查。
 - **文档/规则改动**：新增的 `verify:docs-drift`（§3.9.4）已接入 `verify-release-core --strict`，
   搬迁文件者**必须同步更新指向它的文字**——这条现在由门禁强制。
+
+---
+
+## 9. 区块式架构探索（2026-09-19）
+
+> **方向声明（重要）**：本章的"区块"是**为了分工而设的观察坐标，不是项目应有的结构**。
+> 真实 owner domain 是 `packages/ts-shell/src/` 下 **28 个顶层目录**，
+> 由 `agent-rules/file-placement-and-naming.md` 规定。
+> **不得**按区块搬迁、重组或重命名任何代码。见 `block-exploration-2026-09-19.md` 顶部警示框。
+
+### 9.1 为什么做这一轮
+
+阶段 A/B/C 完成后（R1–R14 全部收敛，§8.1），需要一次**不以删除为目标**的全面体检：
+此前所有轮次都在回答"哪些可以删"，从未系统回答过
+"**重复实现在哪里、死代码还剩多少、命名与划分有没有不合理**"。
+本轮**零代码改动**，只产出事实。
+
+### 9.2 方法
+
+- 把 `src/` 按**耦合亲和 + 体量均衡**划成 10 个区块（纯分工，无架构含义）。
+- 对每个区块回答五类问题：重复实现 / 死代码 / 命名与位置 / 模块划分 / 耦合度。
+- 每条发现强制格式：`[类别] 结论 / 证据 file:line / 影响 / 最小改动建议 / 置信度`。
+  **禁止**"耦合度高""可以优化""建议重构"这类无证据结论。
+- 子代理并发上限 **2**；每份回报**必须经主代理逐条核验**后才能写入。
+
+### 9.3 全局普查结果（不依赖区块，可独立复核）
+
+| 指标 | 实测值 | 备注 |
+|---|---:|---|
+| **重复实现** | **56 组 / 177 份冗余副本** | 仅覆盖 `function` 声明式，故为**下界** |
+| **不可达生产文件** | **285 文件 / 60,058 行** | 原记 276/60,006，依据不可复现，见 `block-findings` §6 末 |
+| **大文件（>600 行）** | **20 个** | 原记 14，已更正；除 `projection.ts` 外均在 602–967 |
+| `core/` → feature 域 | **144 条 value 边（127 违规）** | 原记 190+/240，口径未记录，已按可复核口径重述 |
+| 文件级强连通分量 | **0** | Tarjan 复算，value 与 value+type 两种口径均为 0 |
+| `core/query/runtime/` 孤儿 | **10 个 / 1,961 行** | 原记 7/1,257，已更正 |
+
+**最重的单条发现**：`sanitizeText` —— 一个含 **11 条正则**的**秘密脱敏**函数
+（真实 provider 家目录、Bearer token、`sk-`/`ghp_`/`github_pat_`、raw content 排除），
+被**逐字节复制 6 份**，散布在 `edit/`、`tools/`、`turn/` 三个域。
+新增一条脱敏规则要改 6 处，漏一处即产生不被任何单一 review 覆盖的泄漏路径。
+（对照：pi 全仓 0 处 `sanitizeText`/`redact*` 定义。详见 `block-findings` §12.2。）
+
+### 9.4 `pi` 对照（本轮新增的可吸收点）
+
+pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系统 —— 这两处本仓无对应物可照搬。
+可吸收的是它**底层机制**的四处（详见 `block-findings` §10.5、§11.4、§13.7）：
+
+| # | pi 机制 | 本仓差距 | 落地成本 |
+|---|---|---|---|
+| 1 | 终态是协议里**一条记录**（`harness/session/types.ts:105,108-116`） | 本区块有 **16 个**各自声明 `terminalSuccessClaim: false` 的投影类型，无一为唯一终态 | 高 |
+| 2 | "外部结果未知"是**一等字段**（`drive/tools.ts:44-45` `INTERRUPTION_MARKER`） | `verification/result/projection/mutation.ts:125-149` 用 **8 处 `reasonText.includes`** 从散文里猜状态 | **低** |
+| 3 | 失败是**可穷尽匹配的类型**（`harness/result.ts:1-16,53-88`） | 无任何 tagged error，失败是字符串数组 | 高 |
+| 4 | 进程输出预算**唯一实现**（`harness/utils/truncate.ts:1-16`）+ `utf8ByteLength` | 5 处且语义不同；**byte/char 混用**（字段名 `outputBudgetBytes`，实现是 `String.length`） | **低** |
+
+### 9.5 本轮**没有**解决的问题（诚实边界）
+
+本轮是**探索**，不是施工。下列结论**需要裁决**，探索不代为决定：
+
+1. **285 个不可达文件（60,058 行）**：删除、接管，还是保持？——与 §1 中
+   "85 个不可达文件：不删"的既有裁决是**同类问题**，但规模大得多。
+2. **56 组重复实现**：只有 `sanitizeText`、`deepFreeze`、`isPrivateNetworkHost`
+   等**同职责**的可明确收口；`toRelativeTime` 之类可能因显示语境不同而合理独立。
+   本轮**未逐一裁决**。
+3. **`core/query/runtime/` 的 10 个孤儿**：其存活部分（`CONTINUATION_SAFETY_POLICY` 一族、
+   `taskState`/`observation` 投影）**是活的**，需先分离再处置。
+4. **`browser/` 的 62 文件顶层平铺**与 `runtime/`↔`skill/` 边界：属搬迁，需裁决。
+
+### 9.6 本轮已确认的问题（不需裁决，属缺陷）
+
+| 问题 | 证据 | 性质 |
+|---|---|---|
+| `repair/handoff/boundary.ts` 声明 **21 个具名函数**（>20 上限）但**不在 judge 越界名单** | `block-findings` §10.3 模块-2 | **门禁漏报** |
+| `.normproof/out/{ledger,verdict}.json` **已过期**（2026-09-18 16:35），名单中含 3 个已删除文件 | 同上 | **产物陈旧** |
+| `cli/runtime/cliSessionRuntimeFactory.ts:70` 只声明 2 参而 `sessionRuntime.ts:270` 传 4 参 → **runtimeSeed 在 CLI 边界蒸发** | `block-findings` §11.2 A-死-3 | **断链** |
+| `AgentState` 的 `systemPrompt`/`streamingMessage`/`pendingToolCalls`/`isStreaming` **零生产读者** | `block-findings` §11.2 A-死-5 | **死状态** |
+| `browser/capabilityModel.ts:1` 反向依赖 `presentation/sidebar`，且 **97 个 browser 文件**经它间接依赖 UI 层 | `block-findings` §13.6 D-耦合-2 | **方向反了** |
+| `renderProjectedLines` **三份逐字节相同**（1 导出 + 2 私有副本） | `block-findings` §11.5 重-跨-1 | **真重复** |
+
+### 9.7 与既有纪律的关系
+
+- 本轮**零代码改动**，故不触及 §2 的删除授权与六项检查。
+- 本节所有数字均为**实测**；凡与原记录不符处，均已在 `block-findings` 对应节末
+  写明**原值、实测值、偏差来源**，并保留了原记录（不静默覆盖）。
+- 若后续按本节建议施工，仍适用：任何删除走 §2.2 六项检查；
+  任何搬迁走 §2.4.1（SCC 前置、实测边数、不夹带重命名、校验 `.js` 后缀）。
+
+### 9.8 待办（供下一轮）
+
+| # | 事项 | 依据 | 依赖 |
+|---|---|---|---|
+| **T1** | 收口 `sanitizeText` 6 份 → 1 份 | `block-findings` §12.2 | 无（可立即做） |
+| **T2** | 收口 `freeze`/`deepFreeze` 27 份 → 1 份（需先裁决保留哪套语义） | §12.3 | 语义裁决 |
+| **T3** | 删 `reasonText.includes` 8 处，改结构化字段 | §10.5 pi-2 | 无 |
+| **T4** | 修 `browser/` 的 byte/char 混用 | §13.7 对照-3 | 无（不改签名） |
+| **T5** | 切断 `browser` → `presentation` 反向依赖（97 处 import 改写） | §13.6 耦合-2 | 无（机械） |
+| **T6** | 修 `cliSessionRuntimeFactory.ts:70` 的 runtimeSeed 丢弃 | §11.2 A-死-3 | 产品裁决（是否保留种子语义） |
+| **T7** | 裁决 285 个不可达文件的处置 | §6 | **需裁决** |
+| **T8** | 重跑 judge 并刷新 `.normproof/out/` | §10.3 模块-2 | 无（需找/写脚本） |
