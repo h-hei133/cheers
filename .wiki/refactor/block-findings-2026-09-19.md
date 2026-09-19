@@ -1965,3 +1965,17 @@ pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本
 
 **保留下来的硬事实（不依赖口径）**：`repair/handoff/boundary.ts` 有 21 个具名函数
 （超 20 上限），而**它在该 obligation 的全部输出中 grep 命中 0 次**。
+
+**主代理全仓复算（决定性）**：对 934 个生产文件逐一运行
+`grep -cE "^(export )?(async )?function "`，**全仓只有 1 个文件 >20**：
+
+```
+21  repair/handoff/boundary.ts
+```
+
+**即**：
+- 按 `agent-rules` 的 function-like 口径，**全仓唯一超限的文件就是 `repair/handoff/boundary.ts`**；
+- 而 judge 的 `declared_functions_within_module_ceiling` 名单（12 项）**不含它**，
+  却含 6 个 function 声明 ≤18 的文件（§18.3 表）；
+- **结论加固**：这不是"漏了一个边角案例"，而是 **judge 的唯一正确命中被漏掉**，
+  同时它报出的多数项目**按规则口径并不超限**。
