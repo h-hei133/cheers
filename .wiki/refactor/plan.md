@@ -1597,6 +1597,8 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | `AgentState` 的 `systemPrompt`/`streamingMessage`/`pendingToolCalls`/`isStreaming` **零生产读者** | `block-findings` §11.2 A-死-5 | **死状态** |
 | `browser/capabilityModel.ts:1` 反向依赖 `presentation/sidebar`，且 **97 个 browser 文件**经它间接依赖 UI 层 | `block-findings` §13.6 D-耦合-2 | **方向反了** |
 | `renderProjectedLines` **三份逐字节相同**（1 导出 + 2 私有副本） | `block-findings` §11.5 重-跨-1 | **真重复** |
+| `agent-rules/file-placement-and-naming.md` 的子域示例块含**重复项**（`runtime/execution/` ×2）与**已删目录**（`presentation/surface/`） | 本节（2026-09-19 实测） | **规则漂移，已修**（`283fe006`）|
+| 漂移门禁**无法发现**上一条：它按 `existsSync` 解析目录引用，而空目录仍存在 | 同上 | **门禁盲区** |
 
 ### 9.7 与既有纪律的关系
 
