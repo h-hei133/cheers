@@ -70,6 +70,29 @@ renderer/         streaming renderer used by the CLI surfaces
 test-utils/       test-only support; never imported by production code
 ```
 
+### `core/` admission
+
+`core/` holds runtime substrate: shell and session surface, the agent loop kernel,
+tool registry and execution primitives, approval and policy evaluation, hooks,
+path and security jails, and configuration-neutral contracts. A feature domain may
+depend on `core/`; `core/` must not depend on a feature domain.
+
+A module belongs in `core/` only when all three hold:
+
+1. **Direction.** Its imports resolve only within `core/` or to sanctioned
+   leaf/cross-cutting domains (`config/`, `observability/`, `artifacts/`,
+   `model-adapters/`). A module that imports a feature domain belongs in that
+   domain, not in `core/`.
+2. **Audience.** At least two feature domains consume it, or a declared
+   entrypoint reaches it. A module with a single consumer belongs with that
+   consumer.
+3. **Survival.** It is not a compatibility shim, not a scenario fixture, and not
+   an implementation of a capability the product states it does not provide.
+
+Adding `core/<subdomain>/` also requires a one-line responsibility entry in
+[architecture boundaries](architecture-boundaries.md) Common Areas, in the same
+form `core/query/` and `core/shell/` already use.
+
 When a domain becomes broad, add meaningful subdomains instead of lengthening file names:
 
 ```text
