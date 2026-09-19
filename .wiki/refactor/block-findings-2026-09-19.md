@@ -1404,6 +1404,34 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 **[E-命名-2] `presentation/sidebar/` 的 20 个长复合文件名**
 - 回报称违反 `file-placement-and-naming.md` 的命名规则，且无脚本检查
 
+**[E-重复-11] 两套文本布局栈并存，sidebar 侧按 **code unit** 而非**显示宽度**截断 —— 已核验（回报自标"置信度中"，主代理核实为**确定的实现差异**）**
+
+- **`presentation/tui/text/layout.ts`（宽度感知）**：导出 `truncateToWidth`(`:16`)、
+  `truncateToWidthWithMode`(`:24`)、`widthPad`(`:41`)、`padToWidth`(`:46`)、`wrapToWidth`(`:61`)、
+  `truncateToVisualLines`(`:92`)，内部用 `visibleWidth` / `sliceWithWidth`
+- **`presentation/sidebar/sidebarPanelRenderer.ts`（自建、按 code unit）**：
+  `wrapOrTruncate`(`:88`)、`truncate`(`:171`)、`clampInteger`(`:182`)、`boxLine`(`:159`)
+- **实测两份 `truncate` 的实现差异（决定性）**：
+  ```ts
+  // sidebarPanelRenderer.ts:171  —— 按 code unit
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxWidth) return compact;          // String.length
+  return `${compact.slice(0, maxWidth - 3)}...`;          // slice 按 code unit
+
+  // tui/text/layout.ts:16  —— 按显示宽度
+  if (visibleWidth(line) <= cells) return line;
+  return sliceWithWidth(line, 0, cells - 1).text + ELLIPSIS;
+  ```
+- **可观察后果**：CJK 字符（`visibleWidth` = 2，`.length` = 1）与 emoji 在 sidebar 面板中
+  **会被放行到超出预算的宽度**，而 TUI 其余部分正确按列截断。
+- **校验器也用了错误的度量**：`sidebarPanelQuality.ts:38`
+  `outputWidthRespected: lines.every((line) => line.length <= maxWidth)`
+  —— 即**质量检查本身按 `.length` 判定**，故它对 CJK 溢出**会给出 pass**。
+  （这与 E-死-1 的发现叠加：该校验器既只被测试调用，又用错度量。）
+- 建议：sidebar 改用 `tui/text/layout.js` 的 `wrapToWidth`/`truncateToWidth`；
+  `sidebarPanelQuality` 的宽度检查改用 `visibleWidth`
+- 置信度：**高**（两份实现已逐行比对；CJK 溢出的具体行数未做运行时验证，但机制确定）
+
 ### 15.5 模块划分与耦合
 
 **[E-重复-10] `setActiveNonInteractiveApprovalMode` 在 11 个接口中重复声明、多处手写透传 —— 已核验**
@@ -1494,8 +1522,7 @@ pi 在同一问题上的做法已在 §12.5 记录（`freeze` 2 处 vs 本仓 27
 下列条目来自回报，主代理**未逐条核对**，记录时保留原样但标记为未核验：
 - ~~「`cli/` 有 19 处 import 回 `entrypoints/`」的总数~~ —— **已复核并更正为 28 条**（value 23 + type 5），见 §15.1
 - ~~「`setActiveNonInteractiveApprovalMode` 在 11 个接口中重复」~~ —— **已复核为 43 处 / 11 文件**，见 §15.5 E-重复-10
-- 「`presentation/tui/text` 与 `sidebarPanelRenderer` 两套布局栈」（1.10）；
-  **其中的 CJK 截断风险回报自标"置信度：中"，且未做运行时验证**
+- ~~「`presentation/tui/text` 与 `sidebarPanelRenderer` 两套布局栈」~~ —— **已核实并升为高置信度**，见 §15.4 E-重复-11
 - 「`core/commands/` 有 23 个生产文件含跨域 import」（§3 的 127 条 value 边结论独立成立）
 - 「`presentation/surface/` 为空目录但仍在规则示例中」（E-命名相关，未复核）
 
