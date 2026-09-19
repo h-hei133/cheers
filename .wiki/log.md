@@ -1731,3 +1731,57 @@ pi 的答案是不立汇总对象；而 O3'（整体移除）的证据更硬：
 `project-gap-and-priority-plan.md`（两个 Completed Batch 加更正）、
 `component-adoption-log.md`（Host JSON 节记录移除 + rollback 已执行）、
 `architecture-exploration-2026-09-18.md`、`plan.md` §2.2 检查 5。
+
+## [2026-09-19] docs | plan.md 同步 CB-005 完成态 + **记录一个被死代码污染过的指标**。
+
+`plan.md` 更新：§1 现状表、§1 口径说明、§3.1 三项处置、§8.1 进度、§8.2 阶段 C、
+§8.3 判断依据 3、§7 文档索引、front-matter。`capability-backlog.md` CB-005 状态
+`待裁决` → **`已解决`**。
+
+### 重要发现：`cliReachable` 被死代码污染
+
+更新 §1 时发现 CLI 可达从 **876 → 770**（−106）。逐文件 diff 后确认
+**不是回归，而是口径修正**：
+
+在 `HEAD~1` 的 worktree 上对比（含/不含已删 host lane）：
+
+| | 可达文件数 |
+|---|---:|
+| 含 host lane | 912 |
+| 不含 host lane | 787 |
+| **仅经 host lane 可达** | **125** |
+
+例：`context/acquisition/engine.ts` 在基线上的**唯一**路径是
+
+```
+entrypoints/cli.tsx → cli/bootstrap/cliProcessRunner.ts → cli/host/runner.ts
+→ runtime/api/host/runtime.ts → presentation/surface/model.ts
+→ context/acquisition/summary.ts → engine.ts
+```
+
+——一条**生产从未执行**的路径（host provider 硬编码合成）。
+
+**即：旧口径的"CLI 可达"把死代码的 import 边算成了真实可达。**
+那 125 个文件删除后**并未失效**：经 `index.ts`（公共 API，105 个）或测试引用（72 个）
+仍然可达。**结论：`cliReachable` 不能跨此变更直接比较；若继续用它做删除判据，
+需先排除"仅经已删 lane 可达"的路径。**
+
+### plan.md 主要更新
+
+- §1：新现状（生产 960 / CLI 可达 770 / 不可达 190 / 测试 2750 项），
+  附口径变化警示框；注明 `analyze-boundaries.py` 于 `b5f80df4` 重写、分类口径已变。
+- §3.1：#3 `provenance`、#6 `executionLane`、#7 证据标签死条件 → **已清除**；
+  补记"读取侧存活是假象"（读取者所在模块本身不可达）。
+- §8.1：R13/R14 标记完成，补进度行（R1/R2/R3/R5/R6/R7 已随阶段 A/B 完成；
+  R13/R14 完成；余 R4 部分完成、R8–R12 未启动）。
+- §8.2：阶段 C 表更新；新增 **§8.2.1**（执行结果全表：删除清单、验证矩阵、
+  TUI 实机、测试数变化）与 **§8.2.2**（C2 待办，提示部分命名税已随 C1 消失）。
+- §8.3：判断依据 3 更新为已完成，并记录**教训**——"立项表述本身也可能带错方向，
+  实测应优先于既有描述"。
+- §7：补 `cb-005-execution.md` 索引。
+
+### 引用校验
+
+plan.md 全部行内 `file:line` 引用逐条校验：**活文件引用全部在行数范围内**；
+指向已删文件的引用均标注"已删"并给出可复核的 commit（`6925b242~1`）。
+`verify:docs-drift:strict` **pass**（DOCS 0 dangling）。

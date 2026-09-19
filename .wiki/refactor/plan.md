@@ -3,9 +3,9 @@ title: "Architecture Refactor Plan"
 category: article
 sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-09-15, failures-baseline, reachability-audit-2026-09-15, subagent-reviews-2026-09-15]
 created: 2026-09-15
-updated: 2026-09-18
+updated: 2026-09-19
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v6。当前生产 961 / CLI 可达 876 / 不可达 85，全量测试 3172 项。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）、Step 6 命名税（173 文件）、Step 7 judge 全量跑（0 blocking）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。§8 是路线章：三轮探索汇总的 14 项待办与三阶段排期（阶段 A 零裁决：strict / exclude 收紧 / AGENTS.md）。"
+summary: "Module boundary refactor plan v6。当前生产 960 / CLI 可达 770 / 不可达 190，全量测试 2750 项（2026-09-19 CB-005 死代码清理后；CLI 可达下滑系口径修正而非回归，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）、Step 6 命名税（173 文件）、Step 7 judge 全量跑（0 blocking）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。§8 是路线章：三轮探索汇总的 14 项待办与三阶段排期（阶段 A 零裁决：strict / exclude 收紧 / AGENTS.md）。阶段 C1（R13/R14 CB-005）已于 2026-09-19 完成：删 69 文件 / −23,631 行。"
 confidence: high
 ---
 
@@ -24,28 +24,47 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 
 ---
 
-## 1. 当前状态（2026-09-18，阶段 B 收尾后）
+## 1. 当前状态（2026-09-19，阶段 C1 / CB-005 死代码清理后）
 
 | 指标 | 值 |
 |---|---:|
-| 生产文件 | 961 |
-| CLI 可达 | 876 |
-| CLI 不可达 | 85（仅测试 72 + 仅公共 API 5 + 零引用 8） |
-| 全量测试 | **3174 项**（520 文件 / 3173 通过 / 1 跳过 / 0 失败） |
-| 稳定失败 | **0**（`testTimeout` 已修为 30s，原 5 项负载超时消除） |
+| 生产文件 | 960 |
+| CLI 可达 | 770 |
+| CLI 不可达 | 190（公共 API 105 + 仅测试 72 + 零引用 13） |
+| 全量测试 | **2750 项**（494 文件 / 2749 通过 / 1 跳过 / 0 失败） |
+| 稳定失败 | **0**（唯一失败为 PTY spawn 并发抖动，隔离复跑 40/40 通过） |
 | `tsc -p tsconfig.build.json` | 0 错误 |
-| **import 环（新增门禁）** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1505 文件） |
-| **越界模块** | **12 → 3**，余 3 个均有 disposition；`npm run analyze:module-facades` |
-| NormProof judge | verdict `partial`；**blocking 义务 0 项未满足**（唯一 blocking 义务 satisfied） |
-| `strict` | ✅ **已对生产开启**（`tsconfig.build.json` `strict: true`）。生产 strict 错误 **136 → 0**（S1 73 + S2 26 + S3 37）；全包 strict **401 → 258**（余下全在测试文件）；非 strict 全量 **251 → 244**；`npm run build` **0 错误**；零 `!` / 零 `as`。S1 原提交 `ffcf63bf` 经复核**回退重做**（根因是 `*Like` 镜像类型漂移，非缺守卫） |
-| 文档/规则漂移门禁 | ✅ `verify:docs-drift`（RULES 0 死引用、DOCS `--strict` 通过），已接入 `verify-release-core` |
+| **import 环（新增门禁）** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1453 文件） |
+| **越界模块** | **3**，均有 disposition；`npm run analyze:module-facades` |
+| NormProof judge | verdict `partial`；**blocking 义务 0 项未满足** |
+| `strict` | ✅ **已对生产开启**（`tsconfig.build.json` `strict: true`）；`npm run build` **0 错误**；零 `!` / 零 `as` |
+| 文档/规则漂移门禁 | ✅ `verify:docs-drift:strict`（RULES 0 死引用、DOCS **0 dangling**），已接入 `verify-release-core` |
 
-**注**：可达性自 Step 3 起全程未变（搬迁不改可达性，符合预期）；Step 5 第 2、3 批各 +1
-（959 → 961），原因是被新模块纳入的代码进入了 CLI 可达集。最终 **961 / 876 / 85**。
-全量 tsc（含测试）**251 错**——全部为测试文件的既有类型错误，与本计划无关
-（Step 5 执行前后逐类 diff 为零新增，仅联合类型成员排序差异）。
-**计数口径**：`tsc` 对单个错误可输出多行（诊断的续行），故"输出行数"（该轮为 387）
-不等于"错误数"（251）。**以 `grep -c "error TS"` 为准**；此前 § 中曾误将 387 行记作 387 错，已修正。
+> **⚠️ 可达性口径变化（2026-09-19，重要）**
+>
+> 上表 **CLI 可达 876 → 770** 的下滑**不是回归**，而是**口径修正**：
+> 删掉的 host lane 曾是 **125 个文件通往 CLI 的唯一路径**。
+>
+> 实测（在 `HEAD~1` 的 worktree 上对比）：
+> - 含 host lane：912 个文件可达
+> - 不含 host lane：787 个文件可达
+> - **仅经 host lane 可达：125 个文件**
+>
+> 例：`context/acquisition/engine.ts` 在基线上的唯一路径是
+> `entrypoints/cli.tsx → cli/bootstrap/cliProcessRunner.ts → cli/host/runner.ts
+> → runtime/api/host/runtime.ts → presentation/surface/model.ts
+> → context/acquisition/summary.ts → engine.ts`
+> ——**一条生产从未执行的路径**（host provider 硬编码合成）。
+>
+> 即：旧口径的"CLI 可达"把**死代码的 import 边**算成了真实可达。
+> 那 125 个文件在删除后**并未失效**——它们经 `index.ts`（公共 API，105 个）
+> 或测试引用（72 个）仍然可达，只是不再被"CLI 可达"这一类计数。
+> **结论：`cliReachable` 这个指标本身被死代码污染过，不能跨此变更直接比较。**
+> 后续若要继续用它做删除判据，需先排除"仅经已删 lane 可达"的路径。
+
+**注**：`analyze-boundaries.py` 于 `b5f80df4` 重写，分类口径已与本文 §1 历史记录不同
+（新增 `publicApiOnly` / `cliOpaque`，不再输出旧的 `仅公共 API` / `零引用` 分项）。
+上表按**当前脚本**输出填写。
 
 ### 已完成阶段
 
@@ -68,6 +87,7 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | **阶段 A（strict 等 4 项）** | **✅ 全部完成**（2026-09-18）。见 §3.10；本仓生产 `strict` 已开启 |
 | **阶段 B（B1-B4）** | **✅ 全部完成**（2026-09-18）。B1 `core/` 准入规则 + 删 `core/extensions/`；B2 文档全分类；B3 `renderer/` → `presentation/terminal/streaming.ts`；**B4 越界模块 12 → 3**；详见 §3.11 |
 | **阶段 A/B 对抗复核** | **✅ 已完成**（2026-09-18，2 个子代理）。找出 4 个真实缺陷并全部修正；详见 §3.12 |
+| **阶段 C1 / CB-005 死代码清理** | **✅ 已完成**（2026-09-19）。删 **69 文件 / −23,631 行**：`runtime/loop`、host lane、死 surface 链。`tsc` 0 错误、全量 **2749 通过 0 失败**、四门禁全过、**真实 TUI 实机验证通过**；详见 §8.4 与 `cb-005-execution.md` |
 
 ### Step 2.7 执行结果
 
@@ -176,11 +196,11 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 |---|---|---|---|
 | 1 | 契约型 | 写授权 `O_NOFOLLOW` 缺失 | ✅ 已恢复接线 |
 | 2 | 契约型 | `/undo` 快照写入缺失 | ✅ 已恢复接线 |
-| 3 | 契约型 | `provenance` 5 读 0 写（二级断链） | 📋 登记 **CB-005**（架构级，不单独修） |
+| 3 | 契约型 | `provenance` 5 读 0 写（二级断链） | ✅ **已清除**（2026-09-19，CB-005：读取者本身已死，随整簇删除） |
 | 4 | 契约型 | `disabledTools` 设置被静默忽略 | ✅ **已修复 + PTY 实机验证** |
 | 5 | 能力级 | OpenAI account-auth 可登录但必然失败 | 📋 登记 **CB-006**（维护者裁决：登记不改） |
-| 6 | 契约型 | `executionLane` 指向不存在的路由 | 📋 记录（附十七），生产零消费 |
-| 7 | 契约型 | 25 条证据标签死条件 | 📋 记录（附十八），同 #3 根因 |
+| 6 | 契约型 | `executionLane` 指向不存在的路由 | ✅ **已清除**（2026-09-19，CB-005 整簇删除） |
+| 7 | 契约型 | 25 条证据标签死条件 | ✅ **已清除**（2026-09-19，CB-005 整簇删除） |
 | 8 | 契约型 | `pwStatus.ts` 宣传已删的 Eval mode | ✅ 已移除该行 |
 | 9 | 契约型 | focused-test 白名单 6 条全失效 | ✅ 已彻底移除该语义 |
 | 10 | 脚本 | 5 个 verify 脚本 `MODULE_NOT_FOUND` | ✅ 已删脚本 + 注册 |
@@ -190,9 +210,13 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 **#4 的实机证据**（§2.4 强制）：以 `{"disabledTools":["bash"]}` 启动真实 TUI，
 触发 bash 后实际输出 `Tool bash not found`；修复前该设置被忽略、bash 正常执行。
 
-**#3 / #6 / #7 同源**：三者都是 **CB-005（turn 与编排层不连通）**在
+**#3 / #6 / #7 同源**：三者都是 **CB-005**在
 不同数据层的表现——读取侧存活、写入侧随主簇删除。
-**不单独修复**，待该架构问题立项时一并解决。
+
+> **2026-09-19 更新**：三者**已全部清除**。实测发现它们的"读取侧存活"是假象——
+> 那些读取者所在的模块本身在活路径上不可达（`presentation/surface`、
+> `session/presentation`、`evidence/projection/repair/verdict` 等），
+> 已随 CB-005 整簇删除。详见 §8.2.1 与 `cb-005-execution.md`。
 
 **#5 的裁决**：维护者 2026-09-17 选"登记不改"。恢复 codex 调用路径属
 新增 provider 能力，且同属 CB-005。
@@ -1161,6 +1185,7 @@ runtime 装配四重证据。
 | `cb-005-o1-vs-o3.md` | **O1/O3 代价对照（实测）**：删旧路径 vs 只补缺口；含三个待裁决的公共面问题 |
 | `cb-005-recommendation.md` | **CB-005 建议 + 三处自我更正**：成因是"产出无人接管"而非"两路径不连通"；建议先接回 `codingResult` 产生，O1 后置 |
 | `turn-vs-pi-divergence.md` | **turn 实现与参考项目 pi 的差异对照**：3 处结构性差异；`codingResult` 早于 pi 对齐 5 个月且职能已有活轨替身 |
+| `cb-005-execution.md` | **CB-005 执行记录（已完成）**：删 69 文件 / −23,631 行；验证矩阵与 TUI 实机结果；含 `cliReachable` 口径被死代码污染的说明 |
 | `handoff-2026-09-17.md` | 任务转接包（方向、记录位置、执行要求） |
 | `audit-raw/*.json` | 403 个已删文件的逐文件判定原始表 |
 | `step-2.6-plan.md` | Step 2.6 方案与执行记录 |
@@ -1207,11 +1232,14 @@ development-workflow、compatibility-and-history、reference-repositories）。
 | **R10** | `presentation/theme/` 与 `themes/` 合并 | §3.8-5 | **是**（命名） | 低 | 低 |
 | **R11** | `eval/` 归并（语义已被 `evidence/harness/` 取代） | §3.8-6 | **是** | 低 | 低 |
 | **R12** | `check:*` 借鉴 `pi` 的检查项 | §3.10.3 | 否 | 低 | 低 |
-| **R13** | `turn` 内核与编排层不连通（**CB-005**，架构级） | §3.4 | **是**（独立立项） | **高** | 高 |
-| **R14** | `provenance` 5 读 0 写等 CB-005 的数据层表现 | §3.1 | 随 R13 | 高 | — |
+| **R13** | ~~`turn` 内核与编排层不连通（**CB-005**，架构级）~~ | §3.4 | — | — | **✅ 已完成（2026-09-19）**，见 §8.2.1 |
+| **R14** | ~~`provenance` 5 读 0 写等 CB-005 的数据层表现~~ | §3.1 | — | — | **✅ 随 R13 一并清除**（其读取者本身已死，随整簇删除） |
 
 **14 项里，7 项不依赖任何裁决**（R1、R4、R12 全部，R2/R3 只需"授权 build/规则范围"这一个答复，
 R6/R7 只需一个方向答复）。
+
+**进度**：R1/R2/R3/R5/R6/R7 已随阶段 A/B 完成；**R13/R14 已于 2026-09-19 完成**（§8.2.1）；
+余 R4（部分完成，12 → 3）、R8–R12 未启动。
 
 ### 8.2 建议的路线（三阶段）
 
@@ -1331,10 +1359,62 @@ body 为字面量表时可达 **80 行/名**。**长度不是复杂度**，无�
 
 **阶段 C — 需独立立项**
 
-| 序 | 事项 | 说明 |
+| 序 | 事项 | 状态 |
 |---|---|---|
-| C1 | **R13 CB-005**（`turn` 内核与编排层不连通） | **架构级**，涉及两套并行 provider 路径与终态判定分裂。**已因这一项登记了 4 条死条件**（§3.1 #3/#6/#7）。**应先立项再动手。** |
-| C2 | R8/R9/R10/R11（风格与命名） | 无回归压力，可随时穿插 |
+| C1 | **R13 CB-005**（`turn` 内核与编排层不连通） | **✅ 已完成（2026-09-19）**，见 §8.2.1 |
+| C2 | R8/R9/R10/R11（风格与命名） | 未启动；无回归压力，可随时穿插 |
+
+#### 8.2.1 C1 / CB-005 执行结果（2026-09-19）
+
+**裁决依据**：CB-005 的表述（"两套并行 provider 路径不连通"）经实测**不准确**。
+真实情况是**一条路径已死、其产出无人接管**，且**消费方本身也已死**：
+
+| 事实 | 证据 |
+|---|---|
+| 活路径 `turn/projection.ts` **从不产出** `codingResult`/`loopTrajectory`/`productLoopAdapter` | 该文件 grep = 0 |
+| surface 入口守卫要求这 7 个字段至少一个非空 | `presentation/surface/model.ts:58`（**该文件已删**，见 `6925b242~1`） |
+| 活路径只传 3 个，**全是 `undefined`** | `sessionTerminalState.ts:531-537`（**该调用点已随删除移除**，见 `6925b242~1`；现文件 493 行） |
+| ⇒ `projectProductSurfaceViewModel` **恒 `return undefined`** | 逻辑必然；`6925b242` 前的源码可复核 |
+| 84 个真实会话中唯一含 `loopTrajectory` 的是 **2026-09-11**（迁移 `a7418fcb` 在 09-12 **之后**无） | 逐会话核对 |
+
+**执行**：删 **69 文件 / +109 / −23,631 行**。
+
+| 类别 | 对象 |
+|---|---|
+| 旧 provider 执行路径 | `runtime/loop/*`（26 文件，13,208 行） |
+| host lane | `runtime/api/host/{runtime,io}.ts` + 测试 |
+| CLI host 委托 / 包就绪度 | `cli/host/`、`runtime/distribution/` |
+| 死 surface 链 | `presentation/surface/*`（7 文件） |
+| 死状态面 / 死格式化器 | `session/presentation/envelope.ts`、`core/shell/cliSessionProductSurface.ts`、`presentation/terminal/renderer.ts` |
+| 死投影字段 | `runtime/events/projection.ts` 的 **8 个从未填充字段** |
+| 公共面 | `index.ts` 3 条导出、scripts/verify-host-surface.mjs（已删）、`--host-command` 开关 |
+
+**保留**：`runtime/api/host/contract.ts`（**纯类型**，`runtime/evaluation` 公共 API 仍引用）。
+
+**验证**（全部实跑）：
+
+| 门禁 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | **0 错误** |
+| `npm run build` | **0 错误**（含 Rust） |
+| 全量测试 | **2749 通过 / 1 跳过 / 0 失败** |
+| `verify:import-cycles` | `runtime_cycles=0 type_only_cycles=0` |
+| `verify:docs-drift:strict` | pass（dangling 35 → 0） |
+| `analyze:module-facades` | 3 monolith 均为既有 disposition，**无新增** |
+| NormProof | `openBlockingObligationCount: 0` |
+| **真实 TUI**（§2.4 强制） | `--print` → `Outcome: success` exit 0；交互回合完整通过；`/sessions current` 含 `- ID:` |
+
+**测试数 3174 → 2750**：减少的 424 项**全部是被删模块自身的测试**；活模块测试一项未删。
+
+**同时修正的既有认知**：`cliReachable` 指标被死代码污染——见 §1 的口径变化说明。
+
+**完整记录**：`cb-005-execution.md`；立项与代价对照见 `cb-005-initiation.md`、
+`cb-005-o1-vs-o3.md`、`cb-005-recommendation.md`、`turn-vs-pi-divergence.md`。
+
+#### 8.2.2 C2 待办（未启动）
+
+R8/R9/R10/R11（风格与命名）无回归压力。注意：其中若干项（如 `runtime/loop` 相关的命名税）
+**已随 C1 一并消失**，启动前需重新盘点。
 
 ### 8.3 本轮规划的三个判断依据
 
@@ -1342,8 +1422,10 @@ body 为字面量表时可达 **80 行/名**。**长度不是复杂度**，无�
    `exclude` 收紧（根治发布泄漏）都属此类，且都不需搬迁代码。
 2. **暂不启动大搬迁**：R4（419 个声明名）、R8（~1799 条边）、R5（34 边）都需要裁决，
    且我们已经完成 Step 3–7 的大规模搬迁——**先巩固，再动**。
-3. **CB-005 是唯一真正的"架构需要重构"项**：它解释了 §3.1 里 4 条登记项的共同根因，
-   而它**未被任何一轮探索解决**，只是被反复记录。**它是本计划外最大的架构债务。**
+3. ~~**CB-005 是唯一真正的"架构需要重构"项**~~ —— **已于 2026-09-19 完成**（§8.2.1）。
+   回顾：它确实解释了 §3.1 里 4 条登记项的共同根因，但**根因与立项时的表述不同**：
+   不是"两条路径需要连通"，而是"一条路径已死、消费方也已死"。
+   **教训**：立项表述本身也可能带错方向；实测（可达性 + 真实会话数据）应优先于既有描述。
 
 ### 8.4 与既有纪律的关系
 

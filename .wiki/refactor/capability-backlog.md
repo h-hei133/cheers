@@ -206,10 +206,32 @@ promptInteractiveApproval: (prompt) =>
 
 ## CB-005 turn 内核与编排层不连通（架构级）
 
-- **状态**：`待裁决`（**记录优先，不单独修复**）
+- **状态**：**`已解决`（2026-09-19）** —— 见 `cb-005-execution.md` 与 `plan.md` §8.2.1。
+  原状态为 `待裁决`（记录优先，不单独修复）。
 - **性质**：架构问题，非单点缺陷。**多个已确认破坏同源于此。**
 - **来源**：`deleted-audit-2026-09-16.md` 附十四（#3）、附八（10 项候选判定）、
   `plan.md` §3.4
+
+> **解决方式与对原表述的更正（2026-09-19）**
+>
+> 本条原表述"活轨存在**两套并行 provider 路径**"经实测**不准确**。真实情况是：
+> **一条路径已死，且其消费方本身也已死**。
+>
+> 判定依据：活路径 `turn/projection.ts` **从不产出** `codingResult` /
+> `loopTrajectory` / `productLoopAdapter`（grep = 0）；而 surface 入口守卫要求这 7 个
+> 字段至少一个非空（`presentation/surface/model.ts:58`），活路径只传 3 个且**全为
+> `undefined`**（`sessionTerminalState.ts:531-537`），故
+> `projectProductSurfaceViewModel` **恒 `return undefined`**——整条 surface 链从未执行。
+> 运行时证据一致：84 个真实会话中唯一含 `loopTrajectory` 的是 **2026-09-11**，
+> 在 turn 迁移 `a7418fcb`（09-12）**之前**；迁移后 `query.completed` 的 `result`
+> 只有 6 个字段，无 loop 形状。
+>
+> **处置**：删除整簇（69 文件 / −23,631 行），而非"连通两条路径"。
+> 理由：`runtime/loop` 的生产导入全是 `import type`，provider 硬编码合成
+> （`providerMode: "synthetic"`，类型上无 `real` 成员），且活路径已由
+> `turn/synthetic.ts` 提供同等合成能力。
+>
+> **保留**：`runtime/api/host/contract.ts`（纯类型，`runtime/evaluation` 公共 API 仍引用）。
 
 ### 问题
 
