@@ -1631,6 +1631,7 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | **T12** | 删 `browser/toolPolicy.ts`+`agent.ts`+`plan.ts` 死链（589 行） | §13.3 D-死-1 | 低 |
 | **T13** | 修 `cliArgs.ts` 保留字表重复项 `/memory` | §15.8 | 无（低） |
 | **T14** | 收口 `normalizeBaseUrl`(4)/`normalizePathForCompare`(7)/`toRelativeTime`(4)/`stableId`(2) | §12.4、§16 | 中（需先定 owner） |
+| **T15** | 处理 2 个脚本式 `*.test.mjs`：或加 `vitest.config.ts` 的 `exclude`，或补 npm script，或改名去掉 `.test` | §9.9「测试跑法」 | **低**（三者皆可，需选一） |
 
 ### 9.9 T1 执行记录（2026-09-19，已完成）
 
@@ -1665,7 +1666,24 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | 受影响测试（edit/ + turn/ + tools/） | ✅ 40 文件 / 175 项全过 |
 | `verify:import-cycles` | ✅ runtime 0 / type-only 0（1,436 文件）|
 | `verify:docs-drift:strict` | ✅ rules_refs 57 → 58（新增引用解析成功），0 dangling |
-| 全量测试 | 4 文件失败，但**在 HEAD（改动 stash）上同样失败** → **既存问题，非本轮引入** |
+| 全量测试 | ✅ **493 文件 / 2748 项全过，0 失败**（隔离运行，与 §1 基线一致）。此前观察到的失败**全部源于从错误 cwd 跑 vitest**，非代码问题 —— 根因见下方"测试跑法" |
+
+**⚠️ 测试跑法（本轮踩到的坑，重要）**
+
+本轮我先用 `npx vitest run` 从**仓库根**跑，得到 4 文件失败；
+改用**官方入口** `npm run test:ts`（等价于 cwd = `packages/ts-shell`）后，**0 失败**。两个失败各有独立根因：
+
+| 失败 | 根因 | 证据 |
+|---|---|---|
+| `longSessionDurability.test.ts`（2 项） | 测试内 `repoRoot = path.resolve(process.cwd(), "../..")`，**假定 cwd = `packages/ts-shell`**。从仓库根跑时算出 `repoRoot = /home/wang` → `tsxCli = /home/wang/node_modules/tsx/dist/cli.mjs`（不存在）→ 子进程退出码 1 | 从错误 cwd 跑报 `Cannot find module '/home/wang/node_modules/tsx/dist/cli.mjs'`；从正确 cwd 跑 **2/2 通过** |
+| `core/mcp/gateway.test.ts`（1 项） | 同类：spawn 的 fixture 路径以 cwd 为基准，从仓库根跑时解析成 `/home/wang/projects/coding-agents/src/core/mcp/fixtures/mockMcpServer.mjs`（**缺 `packages/ts-shell/` 前缀**）| 从正确 cwd 跑 **9/9 通过** |
+| `scripts/verify/verifierModuleBoundary.test.mjs`<br>`scripts/real-provider-smokes/approvedProviderEnv.test.mjs` | 这两个是**脚本式自检**（`node:assert` + `console.log('[pass] ...')`，**无 `describe`/`it`**），设计为 `node <file>` 独立执行；`vitest.config.ts` **无 `include`/`exclude`**，故从仓库根跑时被默认规则当测试收集 → `No test suite found` | 从 `packages/ts-shell` 跑时 vitest root 只含 `packages/ts-shell`，`scripts/` **不在范围内**，不再被收集 |
+
+**结论**：
+1. **任何全量测试必须用 `npm run test:ts`**（或 `cd packages/ts-shell && npx vitest run`），**不要从仓库根跑 `npx vitest run`**；
+2. 从仓库根跑会**多收集 2 个脚本式 *.test.mjs**（它们不属于 vitest），并让 3 个依赖 cwd 的测试失败；
+3. 这两个脚本文件**无任何 npm script 引用**，仅在 `docs/foundation/foundation-consistency-matrix.json` 登记为 `validationEvidence`。其"只能被 vitest 收集、而收集后又必然失败"的状态是一个**真实的仓库缺陷**（未被 plan.md 记录），建议另立一项处理（见 T15）。
+4. 另：**并发跑两个全量套件会导致大面积 flake**（本轮实测 17 文件失败），全量测试需串行。
 
 **未纳入 T1 的相邻重复**（属 `block-findings` §12.4，需独立裁决）：
 `turn/toolResultMessage.ts:188` 与 `turn/assistantResponse.ts:150` 等**签名不同**
