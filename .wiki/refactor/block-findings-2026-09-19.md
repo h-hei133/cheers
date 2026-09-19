@@ -362,15 +362,24 @@ value 边反向闭包（排除 `import type`）：
 - **`boundary` 一名四义**；规则要求 "short, responsibility-based file names"，
   而 `boundary` 编码的是**相对位置**（谁挨着谁），不是职责。
 
-**[模块-2] `repair/handoff/boundary.ts` 有 21 个函数名（>20 上限），但不在 judge 报告中 —— 已核验**
-- 实测：`grep -cE "^export (async )?function |^function "` = **21**
-- `.normproof/out/verdict.json` 的 `declared_functions_within_module_ceiling` 列出 12 个模块，
-  5 个具名（`cli-baseline.test.ts`、`core/query/runtime/harness.ts`、`core/query/runtime/policy.ts`、
-  `core/shell/sessionTerminalState.ts`、`edit/multifile/model.ts`）+「and 7 more」，
-  **grep 该文件在该 obligation 的全部输出中命中 0 次**
-- 即 judge 判据对**裸函数声明**存在漏报（但 `analyze:module-facades` 另报 `harness.ts` 32 名，
-  说明两个工具的计数口径不同）
-- **置信度**：中（观测到"未出现在报告中"，但未直接运行 judge 复现其计数）
+**[模块-2] `repair/handoff/boundary.ts` 声明 21 个具名函数，但不在 judge 的越界名单中 —— 已核验**
+- 实测：`grep -cE "^(export )?(async )?function "` = **21**（`agent-rules` 上限 20）
+- judge 的完整名单（从 `.normproof/out/ledger.json` 提取，`verdict.json` 只显示前 5 + "and 7 more"）
+  恰好 **12 个模块**：
+  `cli-baseline.test.ts`、`core/query/runtime/harness.ts`、`core/query/runtime/policy.ts`、
+  `core/shell/sessionTerminalState.ts`、`edit/multifile/model.ts`、`planning/runtime/engine.ts`、
+  `presentation/surface/model.ts`、`presentation/tui/editor.ts`、`runtime/evaluation/model.ts`、
+  `runtime/evaluation/task/liveRun.ts`、`runtime/evaluation/task/model.ts`、
+  `session/store/sessionStoreAccess.ts`
+- **`repair/handoff/boundary.ts` 不在此列**，在该 obligation 的全部输出中 grep 命中 0 次
+- **口径差异已实测**：judge 报 `edit/multifile/model.ts` 为 **39**，而该文件
+  `^(export )?(async )?function` 只有 **13** 个 → judge 计的是**函数式名（含箭头/方法）的更大集合**，
+  非"具名函数声明"。因此 21 个**具名声明**在 judge 口径下只会更多，**该文件被漏报是确定的**
+- **附带发现（新）：该 ledger/verdict 已过期。** 时间戳 `2026-09-18 16:35`，
+  早于 CB-005 与 C2 的删除；其名单中的 `presentation/surface/model.ts`、
+  `runtime/evaluation/model.ts`、`runtime/evaluation/task/liveRun.ts` **三个文件已不存在**。
+  仓内无 `analyze:*` 脚本可重跑 judge（`package.json` 中无 normproof 条目）。
+- **置信度**：中高（名单与计数均已实测；"漏报"成立，但未直接运行 judge 复现其计数逻辑）
 
 **[命名-1] `result/` 域同时承载四种互不相关的"结果"**
 - `result/types.ts`（活，20+ 消费者）、`result/projection/*`（半死）、
