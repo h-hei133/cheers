@@ -2068,3 +2068,44 @@ plan.md 全部行内 `file:line` 引用逐条校验：**活文件引用全部在
 
 `verify-release-core` 已以 `--strict` 接入该门禁（`scripts/verify-release-core.mjs:125`），
 修后仍通过。脚本头部注释已补充"两种引用形态"的设计说明。
+
+## [2026-09-19] docs | SP071 文档状态 `active` → `historical`（授权后）。
+
+### 依据
+
+`DOC_STATUS.md` 的定义：`historical` = "route closeout, migration, **audit**,
+or decision history"。SP071 文档三条全中：
+
+| 特征 | 内容 |
+|---|---|
+| 标题 | `# SP071 Real Repository Development Pilot`——**路线名** |
+| 结构 | `## Decision` / `## Validation Ledger`——**结项记录** |
+| 证据 | 其声明的 primary evidence（`harnessSpine.test.ts`）**已删** |
+
+### 决定性对照：同类文档的标注
+
+| 文档 | 日期 | 标注 |
+|---|---|---|
+| SP068 `provider-shaped-end-to-end-gauntlet` | 2026-06-08 | **historical** |
+| SP070 `live-like-transcript-acceptance-decision` | 2026-06-08 | **historical** |
+| SP071 `real-repository-development-pilot` | 2026-09-19* | active → **historical** |
+
+*SP071 的 git 日期是今天，因为上一轮我改了它；内容属 2026-06 那批。
+
+**同日期、同结构、同性质的 SP070 已是 `historical`，SP071 却是 `active`——标注不一致。**
+
+### 影响（已实测）
+
+| | 改前 | 改后 |
+|---|---:|---:|
+| DOCS 作用域文件数 | 26 | **25** |
+| DOCS 引用数 | 250 | 248 |
+| DOCS 死引用 | 0 | 0 |
+
+**该文档退出"当前态"门禁作用域**——这是**正确**的：门禁的作用域是
+"自称描述当前树的文档"（`DOC_STATUS` 的定义），而历史结项记录不该被它检查。
+
+### 顺带发现（未改，供裁决）
+
+SP072 / SP073 两份仍是 `active`，与 SP068/SP070/SP071 同类（路线结项记录）。
+**本轮只改授权范围内的 SP071**；若要一并归为 `historical`，需另行裁决。
