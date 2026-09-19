@@ -104,6 +104,46 @@ runtime/events/stream.ts       prod=0  test=2
 **注意**：这**不是**说要把 `core/commands/` 整体搬走——那需要先裁决它属于哪个域。
 本文件只报告"与规则不符"，不提议去向。
 
+> **⚠️ 2026-09-19 主代理复核：本节的边数表未能复现，已改用可复核的口径重测。**
+>
+> 主代理用 **5 种计数口径**分别重测（脚本：括号/正则遍历 934 个生产文件的 import 语句），
+> 结果**没有一种**能复现上表的 62/27/25/23/17/16/15/14：
+>
+> | 口径 | browser | context | presentation | memory | tools | session | config | result |
+> |---|---:|---:|---:|---:|---:|---:|---:|---:|
+> | 上表（原始，方法未记录） | 62 | 27 | 25 | 23 | 17 | 16 | 15 | 14 |
+> | import 语句数，含 type | 78 | 32 | 28 | 26 | 23 | 17 | 18 | 19 |
+> | import 语句数，仅 value | 49 | 24 | 12 | 18 | 1 | 3 | 8 | 1 |
+> | 唯一 (文件, 目标域) 对 | 24 | 16 | 20 | 6 | 23 | 11 | 17 | 18 |
+> | 唯一被导入目标文件数 | 40 | 13 | 13 | 16 | 2 | 6 | 1 | 2 |
+> | 导入符号名数（含 type） | 117 | 46 | 31 | 32 | 26 | 34 | 45 | 41 |
+>
+> **结论：原表的数字无法复现，不应继续引用。** 下表的**结论方向不变**
+> （`core/` 依赖 feature 域且违反规则），但**量级需按新口径重述**。
+>
+> **新口径（可复核，本节采用）**：`core/**` 的 **value** import 语句数，按目标顶层域聚合。
+> 脚本逻辑：`os.walk` 取 934 个生产文件 → 正则匹配 import 语句 → 解析相对路径 →
+> 按 `.js`→`.ts` 改写后取顶层目录 → 排除 `core` 自身 → 排除 `import type`。
+>
+> | 目标域 | value 边数 | 判定 |
+> |---|---:|---|
+> | `browser` | **49** | 违反 |
+> | `context` | **24** | 违反 |
+> | `memory` | **18** | 违反 |
+> | `presentation` | **12** | 违反 |
+> | `config` | 8 | **sanctioned** |
+> | `observability` | 5 | **sanctioned** |
+> | `artifacts` | 4 | **sanctioned** |
+> | `repair` | 4 | 违反 |
+> | `session` / `workflow` / `verification` | 各 3 | 违反 |
+> | `turn` / `provider` / `edit` / `planning` / `tools` / `evidence` / `result` / `runtime` / `sandbox` | 各 1–2 | 违反 |
+> | **合计** | **144**（其中 **127 违反**，17 sanctioned） | |
+>
+> **`core/commands/` 仍是违规集中区**（该结论不变，且可用 `grep` 独立验证：
+> `memoryCommandRuntime.ts` 有 6 处 `../../memory/*` 的 value import、
+> 1 处 `../memory/types.js` 的 `import type`）——即原表"17 个文件"的**归类方向正确**，
+> 仅**每条边的计数口径未记录、且无法还原**。
+
 ---
 
 ## 4. `planning` ↔ `context` 双向依赖（36 + 27 边）
