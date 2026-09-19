@@ -402,3 +402,172 @@ pi 把"改动是否可信"编码进**执行协议的形状**，而非另一套�
 1. 重复-4：16 处 `freeze` 收口到 `edit/sanitize.ts:68` 的递归版，顺带修两处浅冻结
 2. pi-2：删 `verification/result/projection/mutation.ts:129-146` 的 5 处 `reasonText.includes`，
    改消费已有的 `writeEffect` / `writerStarted` / `routeBlocker` 字段
+
+---
+
+## 11. 区块 A 回报（`turn/ core/agent/ core/query/`）——逐条核验后记录
+
+**核验状态**：下列论断均由主代理亲手复核。**发现一处回报错误**（见 11.6）。
+
+### 11.1 重复实现（均已核验）
+
+**[A-重复-1] 会话压缩两套并行实现，切点算法不同 —— 已核验**
+- `session/compaction.ts:5` `KEEP_RECENT_MESSAGES = 4` 与 `core/shell/compaction.ts:45` **同名常量各定义一份**；
+  `session/context.ts:3` `CHARS_PER_TOKEN = 3.5` 与 `core/shell/compaction.ts:48` **同值常量再定义**（后者未 export）
+- `session/compaction.ts:37` `findCompactionCut` **含** `hasDanglingCalls` 校验（`:45`、`:61`）
+- `core/shell/compaction.ts:61` `compactionCut` **无**该校验
+- 影响：同一会话历史经 turn 自动压缩与 `/compact` 得到**不同的保留边界**；
+  `/compact` 的切点可能落在悬空工具调用上，把「回答」留在上下文而丢掉它的「提问」
+
+**[A-重复-2] 只读工具/plan 名单三份，其中一份已是死判定 —— 已核验**
+- `core/query/toolPolicy.ts:13` `READ_ONLY_TOOLS`（未 export）
+- `core/shell/approval/evaluator.ts:7` `READONLY_TOOLS`（**集合不同**：含 search/list/view/status，不含 ask）
+- `turn/tools.ts:45` `PLAN_MODE_TOOLS`（含 ask）
+- **活判定**：`turn/tools.ts:179`（`agentMode !== "plan" || PLAN_MODE_TOOLS[toolName]`）
+- **死判定**：`core/shell/approval/evaluator.ts:132` `evaluatePermission` —— 全仓 value 消费者 **0**（仅 `evaluator.test.ts`）
+- `isReadOnlyBashCommand`（`evaluator.ts:66`）**是活的**，被 `turn/tools.ts:6,180` 与 `core/query/toolPolicy.ts:4,56` 使用
+- 影响：`ask` 在 turn 侧允许、在 evaluator 侧落到「Plan mode is active」拒绝分支——**同一调用两个判定得出相反结论**
+
+**[A-重复-3] actionable blocker 两套同名实现 —— 已核验，并纠正回报**
+- 活：`core/query/actionableBlockerModule.ts:35` `deriveActionableBlockerContract`（21 种 kind）
+  + `:146` `classifyActionableKind` + `:321` `actionableBlockerNextAction`
+- 死：`result/projection/shell/assembly.ts:269` `deriveActionableBlockerContract`（6 种 kind）
+  + `:336` `classifyActionableBlockerKind` + `:380` `actionableBlockerNextAction`
+- **裁决**（实测 `unreachable.json`）：
+  - 活链：`session/sessionResultParity.ts:1-5` → `core/shell/sessionTerminalState.ts:9` → `sessionRuntime.ts:28`
+    —— 全链**可达**
+  - 死链：`assembly.ts` → `runtimeOutcomeProjection.ts:5` → `context/acquisition/graph.ts:13,42`
+    —— `assembly.ts` / `runtimeOutcomeProjection.ts` / `acquisition/graph.ts` **三者均在 276 不可达集内**
+- 影响：窄版（6 种）的 `command-not-allowlisted` 等文案与宽版**逐字相同**，但 kind 子集不同；
+  `actionable-blocker-kind:` 证据标记由两处各自 append，消费端按前缀解析 → 两条链写出的子集不同
+
+**[A-重复-4] 转向/续跑输入三层各存一份**
+- `turn/session.ts:83-84` 本地 `steering`/`followUps` 数组 · `:132-134` 监听 `message_start` **用内容字符串回删**
+- `core/agent/agent.ts:30-31` `PendingQueue<AgentMessage>`
+- `entrypoints/cliRuntimeInvocation.ts:118-119` `bufferedSteers`/`bufferedFollowUps`
+- 影响：队列里出现两条同文本输入时 `indexOf` 只删一条
+
+### 11.2 死代码（均已核验）
+
+**[A-死-1] `core/query/runtime/` 的 QueryRuntimeState 消费链生产不可达 —— 已核验**
+- `state.ts:169` `createQueryRuntimeState` / `:191` `createQueryRuntimeStateFromSeed`
+- 全仓调用点**仅测试**：`builder.test.ts:129,175,261,345,403,435,465`、`recovery.test.ts:2380,2570`
+- 连带零生产调用：`policy.ts:37` `decideQueryRuntimeAction`、`proof.ts:41`、
+  `actionAuthority.ts:16,62,82`、`batch.ts:69,96,117`
+- **保留项**：`state.ts` 的 `CONTINUATION_SAFETY_POLICY` / `resolveContinuationSafety` /
+  `buildContinuationPolicyEvidence` **是活的**，迁移目标 `session/replay/`
+
+**[A-死-2] `core/query/runtime/harness.ts`（967 行）写入链零生产者 —— 已核验**
+- 零引用（连测试都无）：`harness.ts:91` `captureHarnessTurnSnapshot`、`:142` `recordHarnessSnapshot`、
+  `:620` `settleHarnessOutput`、`:950` `restoreHarnessSavePoint`
+- 仅测试引用：`:183` `settleHarnessBatch`、`:868` `harnessObservationPatch`
+- **证据链**（已核验）：`session/sessionCompactModule.ts:76-77` 的 `applySessionCompactRetention`
+  **只传 taskState，从不传 harness** → `sessionCompactProjection.ts:54` 的
+  `input.harness ? { harness } : {}` 分支**永无值** → `RecoverySnapshot.harness` 恒 undefined
+  → `session/replay/builder.ts:460-468` `selectRuntimeHarnessState` 恒返回 undefined
+
+**[A-死-3] CLI 边界丢弃 runtimeSeed —— 已核验（重要）**
+- 生产者 `core/shell/recovery.ts:324-328` `buildRuntimeStateSeed`
+- 携带 `core/shell/continueShellActionRuntime.ts:19,160` → `entrypoints/cliRuntimeModule.ts:397`
+  → `core/shell/sessionRuntime.ts:148-153`
+- **使用** `sessionRuntime.ts:270`：`this.deps.runPrompt(promptForModel, signal, options?.runtimeSeed, continuityState)`
+- **丢弃点** `cli/runtime/cliSessionRuntimeFactory.ts:70`：`runPrompt: (prompt, signal): PromptRun =>`
+  —— **第三、四参数未声明**
+- 影响：种子里的 `observations` / `taskState` / `harness` 在 CLI 边界**全部蒸发**；
+  只有 `recoveryBoundary` 与 `truthBoundary.continuationSafety` 两个标量到达
+  （`core/shell/recovery.ts:412-413`），以及 `derivedState.transcript`（`:431-438`）
+- **即 11.2 的 A-死-1/2 在生产上更强：种子字段连 CLI 都到不了**
+
+**[A-死-4] QueryEvent 的 `runtime.*` 8 个变体 + 4 个旧变体无生产者 —— 已核验**
+- 定义 `core/query/runtime/events.ts:16-35`
+- 实测：全仓 `"runtime.` 字面量（排除定义文件与测试）**0 命中**
+- 但消费端**活着**：`core/shell/sessionEventSurface.ts:39-46,86-88,117-121`、
+  `cli/interactive/turnSink.ts:224-231`、**`session/replay/builder.ts:223`**（`turn.started` 配对）
+- 影响：`builder.ts:316-320` 的 `computedBoundary` 生产上**恒为 `fresh-entry`**
+  → `state.ts:96-120` 的 `mid-turn-safe` / `completed-turn-only` 两策略**在生产不可达**
+
+**[A-死-5] `core/agent/state.ts` 四个字段生产无人读 —— 已核验**
+- `streamingMessage`：写 `agent.ts:149,191,221,236,239,260`；**生产读点 0**
+- `pendingToolCalls`：写 `agent.ts:150,222,243-251`；**生产读点 0**
+- `isStreaming`：写 `agent.ts:148,190,220`；**生产读点 0**
+- `systemPrompt`：`createAgentState` 写入（`state.ts:26`）；**全仓读点仅 `state.test.ts:7,20`**，
+  且 `AgentCore` 构造时**未传 `initialState`**
+- 影响：这是**订阅式 UI 契约的残留**。本仓 UI 走 QueryEvent 流，内核每步维护一份没人看的镜像
+
+### 11.3 模块划分与命名
+
+**[A-模块-1] `core/query/` 对 core/ 三条准入逐条不通过**
+依据 `agent-rules/file-placement-and-naming.md:79-90`：
+1. **Direction 不通过** —— import 了 result / context / repair / tools / artifacts / evidence / verification / planning / provider
+   （具体：`runtime/harnessState.ts:1-4`、`runtime/policy.ts:1-6`、`runtime/harness.ts:2,7`、`runtime/proof.ts:1-15`、`runtime/taskState.ts:1,4`）
+2. **Audience 不通过** —— 生产消费者只有 `session/` 一个域
+3. **Survival 不通过** —— `harness.ts` 整文件不可达
+- 结论：rules 的判定是该模块属于 feature 域 `session/`
+
+**[A-命名-1] `core/query/runtime/harnessSupport.ts` 的文件名被 rules 明令禁止 —— 已核验**
+- `agent-rules/file-placement-and-naming.md:114` 明禁 `helper`/`utils`/`misc`/`common`/`support`
+- 该文件实际是纯工具层（`safeText` / `uniqueStrings` / `freezeHarness` / `appendTrajectory`）
+
+**[A-耦合-1] `core/query/runtime/policy.ts` 横跨九个域 —— 已核验**
+- `policy.ts:1-15` 依次 import artifacts / context×2 / planning / provider / repair / result / tools
+- 但它**本身不可达**（A-死-1）→ 代表的不是真实依赖需要，而是设计意图与规则的冲突
+
+**[A-耦合-2] step 层每步同步读项目状态文件 —— 已核验**
+- `turn/step.ts:102` `getThinkingEffort(workspaceRoot)`、`:113` `samplingTemperature(...)`
+- → `core/state/projectState.ts:81` `fs.readFileSync` + **`:69` `crypto.sha256`**
+- 影响：模型退避重试路径（`step.ts:98` 的 `for (;;)`）每一步都重做哈希+同步磁盘读
+
+**[A-耦合-3] `overflowRecovered` 是纯内存标志 —— 已核验**
+- `turn/session.ts:139` `let overflowRecovered = false`；`:174-175` 读写
+- 对照 pi：`drive/checkpoint.ts:74` 持久化该标志，`:drive/response.ts:192-243` 写进 `resumeAfter.continuation`
+- 影响：进程重启后同一失败的 assistant 消息会**再次**触发一次 compaction 重试（花一次 provider 调用）
+
+**[A-耦合-4] 内钩子幂等靠实例上的隐式标记 —— 已核验**
+- `core/hooks/builtin/index.ts:19-24`：`dispatcher as unknown as Record<string, boolean>` +
+  `__builtinHooksRegistered` 标记
+- `core/hooks/hookDispatcher.ts:38-49`：`registerCommandHook` 只做 `push`，**无幂等语义**
+- 对照 pi `harness/hooks.ts:28-41`：`on(name, handler, { id })` 返回 disposer，可按 id 寻址
+
+**[A-模块-2] microcompact 在 step 层静默裁剪 —— 已核验**
+- `turn/step.ts:107`：`microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 })`
+- **不产生任何事件、不进 transcript**
+- 影响：模型看到的上下文与持久化 transcript 不一致，而用户判断「该不该 /compact」的依据来自 transcript
+
+### 11.4 pi 对照（区块 A 相关，均给 pi 侧 file:line）
+
+| # | pi 机制 | pi 证据 | 本仓差距 | 代价 |
+|---|---|---|---|---|
+| P1 | 待续步骤可同时替换 context/messages/model/thinkingLevel | `packages/agent/src/types.ts:143-152`；消费 `agent-loop.ts:165-200` | `core/agent/loop.ts:24-26` 的 `NextStepUpdate` **只有 `messages?`**，无法在压缩边界切换模型/思考级别 | **低** |
+| P2 | 溢出恢复标志持久化 | `drive/checkpoint.ts:74`、`drive/response.ts:192-243` | `turn/session.ts:139` 纯内存 `let` | 高（可降为中：落进 `sessionStateSnapshot.ts:41-53`） |
+| P3 | 副作用准入与取消收口到单一 gate | `execution/effect-gate.ts:13-22,31`；`harness/hooks.ts:44,58` | 取消检查分散在 `core/agent/tools.ts:158,181-183,335`、`loop.ts:176`、`turn/session.ts:149-160` | 中高 |
+| P4 | 恢复 = 读持久状态，而非从事件流推断 | `runtime/types.ts:85-122,143-146`、`runtime/drive.ts:31,56-91`、`runtime/restore.ts:92,131` | **最大结构差异**：本仓无操作状态机，恢复靠事后推断 | **很高——不建议现在做** |
+| P5 | 钩子可替换工具参数并重新校验 | `harness/hooks.ts:156-182`、`execution/tools.ts:101` | `core/agent/tools.ts:36-40` 的 `BeforeToolCallDecision` **无 args** | **低** |
+| P6 | 钩子注册返回 disposer 且按 id 寻址 | `harness/hooks.ts:28-41` | 见 A-耦合-4 | **低** |
+| P7 | 内核产物是 EventStream，终止判据显式 | `agent-loop.ts:152-157,37-67` | `turn/stream.ts:22-25` 单槽 waiter，`this.waiting` 会被覆盖；终止靠 `close()` | 低到中（当前风险低） |
+
+**值得保留、不效仿**：`turn/projection.ts:101-190` 的 `concludeRun` 把「工具全被拒就不算成功」
+显式建模（`:166-178` `isApprovalRefusal`），pi 的对应位置无同等语义。这是区块 A 质量较高的设计，
+P4 的改造不该把它一起推倒。
+
+### 11.5 主代理自己的重复实现裁决（跨区块）
+
+**[重-跨-1] `renderProjectedLines` 三份，**函数体逐字节相同****
+- `cli/output/projectedLineRenderer.ts:5`（export，唯一有正经归属的一份）
+- `entrypoints/cliSessionModule.ts:166`（export 的私有副本）
+- `entrypoints/cliPermissionModule.ts:123`（**未 export** 的私有副本）
+- 实测三份 body 完全一致：`for (const line of lines) { renderer.renderLine(line); }`
+- 消费者：`interactiveCommandRouter.ts:34` 正确导入公共那份；
+  `cliSessionModule.ts:118,327` 与 `cliPermissionModule.ts:77` 走各自副本
+- **这是真重复**，不是同名碰撞
+
+**[重-跨-2] 其余同名函数对——裁决为**非重复**（同名碰撞）**
+- `hasContinuationEvidence`：`core/query/runtime/state.ts:75` 做 `evidence.has(token)`（集合查询，
+  2 参数）；`session/sessionContinuationProjection.ts:80` 判 `RecoverySnapshot` 三条件（1 参数）
+  —— **同名的不同问题**
+- `deriveActionableBlockerContract`：见 A-重复-3，是**真重复**但一份已死（非"两张都活"）
+
+### 11.6 回报纠错
+
+BlockA2 在「重复实现-4 actionable blocker」条目中称**两条链都在跑**。实测（`/tmp/unreachable.json`）：
+`assembly.ts`、`runtimeOutcomeProjection.ts`、`context/acquisition/graph.ts` **三者均在 276 不可达集内**，
+故窄版链**不可达**。BlockG2 对该链的判定正确。本节已按实测更正。
