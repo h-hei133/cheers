@@ -1621,7 +1621,8 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | **T2** | 收口 `freeze`/`deepFreeze` 27 份 → 1 份（需先裁决保留哪套语义） | §12.3 | 语义裁决 |
 | **T3** | 删 `reasonText.includes` 8 处，改结构化字段 | §10.5 pi-2 | ⚠️ **前提被实测推翻，未执行** —— 见 §9.10 |
 | **T4** | 修 `browser/` 的 byte/char 混用 | §13.7 对照-3 | ✅ **已完成**（`6a793de9`）：4 处真消费点改字节计数，见 §9.13 |
-| **T5** | 切断 `browser` → `presentation` 反向依赖（97 处 import 改写） | §13.6 耦合-2 | 无（机械） |
+| **T5** | 切断 `browser` → `presentation` 反向依赖 | §13.6 耦合-2 | ✅ **已完成**（`161e15fd`）：**实际只改 4 处 import**（非 97），见 §9.14 |
+| **T18** | 同类反向依赖：`session/` 有 **5 处**跨域指向顶层 `presentation/` | §9.14 附带发现 | **需裁决** |
 | **T6** | 修 `cliSessionRuntimeFactory.ts:70` 的 runtimeSeed 丢弃 | §11.2 A-死-3 | 产品裁决（是否保留种子语义） |
 | **T7** | 裁决 285 个不可达文件的处置 | §6 | **需裁决** |
 | **T8** | 重跑 judge 并刷新 `.normproof/out/` | §10.3 模块-2 | 无（需找/写脚本） |
@@ -1843,3 +1844,81 @@ CI（`.github/workflows/ci.yml:30`）用 `npm run test:ts`，`scripts/test-all-s
 **新增可复核事实**：本仓**另有**一批**已正确**用 `Buffer.byteLength` 的地方
 （`core/tools/truncation.ts`、`publicReadOnlyWebExecutor.ts`、`observability/rotatingFileSink.ts` 等），
 说明缺陷**只存在于 `outputBudgetBytes` 这一支**，不是全仓性认知缺失。
+
+### 9.14 T5 执行记录（2026-09-19，已完成）
+
+| 项 | 内容 |
+|---|---|
+| **目标** | 切断 `browser/` → `presentation/` 反向依赖 |
+| **提交** | `161e15fd` |
+| **新 owner** | `packages/ts-shell/src/core/security/reportText.ts` → `redactUnsafeReportText(value, redactions?, maxLength?)` |
+| **删除的实现** | `presentation/sidebar/sidebarStateModel.ts` 内的 `sanitizeSidebarText`（原 32 行）|
+| **裁决** | 用户选**中立位置 `core/`** |
+
+**⚠️ 对 §13.6 成本估计的更正（重要）**
+
+§13.6 写"**97 处 import 改写**"。**实测只改了 4 处 import**：
+
+| 文件 | 改动 |
+|---|---|
+| `browser/capabilityModel.ts:1,140` | 改从 `core/security/reportText.js` 导入，函数体改调 `redactUnsafeReportText` |
+| `presentation/sidebar/sidebarStateModel.ts` | 删本地实现 + 27 处调用改名 + 加 core import |
+| `presentation/sidebar/sidebarEventModel.ts` | 6 处调用改名 + 改 import 源 |
+| `presentation/sidebar/sidebarStateProjection.ts` | 4 处调用改名 + 改 import 源 |
+
+**原因**：那 91 个 `import { sanitizeBrowserText } from "./capabilityModel.js"` 的文件
+**import 的是 `capabilityModel.js` 本身**，而 `capabilityModel.ts` 仍导出 `sanitizeBrowserText`。
+只要换掉该文件**内部**的实现来源，91 处**一行都不用动**。
+§13.6 把"89 处使用 `sanitizeBrowserText`"误算成了"89 处需要改"。
+
+**测绘结果（可复核）**：
+
+| 分类 | 数量 |
+|---|---:|
+| 只 import `sanitizeBrowserText` | 91 |
+| 混合 import（还取 `BrowserActionKind` 等）| 4 |
+| 不 import `sanitizeBrowserText`（只用能力模型）| 6 |
+
+**顺手核实的语义区分（避免误判为重复）**：
+
+| 函数 | 位置 | 类别数 | 关系 |
+|---|---|---:|---|
+| `redactUnsafeReportText`（原 `sanitizeSidebarText`）| 现 `core/security/reportText.ts` | **6** | 本次搬迁对象 |
+| `sanitizeBrowserEvidenceText` | `browser/localFixture.ts:58` | 3 + 追踪 | **另一个函数**，包装 + 收集 redactions |
+| `sanitizeBrowserText` | `browser/capabilityModel.ts:139` | — | 仅包装前者（保留导出）|
+| `redactReportText` | `core/security/redaction.ts`（T1）| 11 条正则 | **不同 surface**，处理 provider 家目录/Bearer/凭据赋值 |
+
+**三者哈希均不同**（`2a08f08fe670` / `4ad7be1bceea`），确认**不是**互相重复。
+
+**core/ 准入三条件（逐条实测）**：
+
+| 条件 | 判定 |
+|---|---|
+| 1. Direction | ✅ `reportText.ts` **零 import** |
+| 2. Audience | ✅ **两个** feature 域消费（`browser/`、`presentation/`）|
+| 3. Survival | ✅ 真实共享实现，非 shim / fixture |
+
+**验证矩阵**：
+
+| 检查 | 结果 |
+|---|---|
+| **行为等价性** | ✅ 与 **HEAD 原实现**在 14 输入 × 9 长度上限 = **126 组合**上文本逐字节一致，**且脱敏标签集合也一致**（探针读 `git show HEAD:` 原文比对，跑完即删）|
+| **反向依赖消失** | ✅ `grep presentation/ browser/` = **0** |
+| `npm run build`（strict） | ✅ 0 错误 |
+| `verify:import-cycles` | ✅ 0 环 |
+| `browser/` + `presentation/` 套件 | ✅ 97 文件 / 589 项全过 |
+| 全量（官方入口）| ✅ **493 文件 / 2748 项 / 0 失败** |
+
+**顺带补登**：`core/security/` 的 Common Areas 登记更新为涵盖两个模块
+（`redaction.ts` 与 `reportText.ts`），说明二者 guard 不同 surface。
+
+**附带发现（记为 T18）**：全仓扫描"其它域是否也有指向顶层 `presentation/` 的反向依赖"，
+发现 **`session/` 有 5 处真实跨域边**：
+`session/recovery/projectContextSummary.ts:1`、`session/recovery/sessionRecoverySelection.ts:1-2`、
+`session/store/sessionListStore.ts:6`、`session/lifecycle/sessionLifecycleWrites.ts:48`。
+
+**注意区分**：`session/SessionManager.ts:33,75` 与 `session/sessionReadSurface.ts:21`
+用的是 `./presentation/…` —— 那是 `session/presentation/` **域内子目录**，**不构成反向依赖**。
+（`session/presentation/` 确实存在，含 `sessionReentrySurface.ts`、`sessionWarningSurface.ts`。）
+其余跨域边：`cli/` 53 处、`core/` 25 处、`entrypoints/` 9 处 —— 这些都在 §3 已记录的
+`core/` 越界范围内，非本轮新增。
