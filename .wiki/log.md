@@ -1785,3 +1785,64 @@ entrypoints/cli.tsx → cli/bootstrap/cliProcessRunner.ts → cli/host/runner.ts
 plan.md 全部行内 `file:line` 引用逐条校验：**活文件引用全部在行数范围内**；
 指向已删文件的引用均标注"已删"并给出可复核的 commit（`6925b242~1`）。
 `verify:docs-drift:strict` **pass**（DOCS 0 dangling）。
+
+## [2026-09-19] phase-c-c2-inventory | C2 启动前盘点：**R10 前提被证伪，另发现 2 个真孤儿簇**。
+
+`plan.md` §8.2.2 要求"C2 启动前需重新盘点"。产出 `.wiki/refactor/c2-inventory.md`。零代码改动。
+
+### R10 前提被证伪 —— 应关闭
+
+原写"`presentation/theme/` 与 `themes/` 合并"。实测**是分层，不是重复**：
+
+| 目录 | 内容 | 职责 |
+|---|---|---|
+| `presentation/themes/` | `dark.json`、`light.json`、`index.ts`（25 行） | **数据 + loader** |
+| `presentation/theme/` | `theme.ts`（176 行）、`commandHighlight.ts`（98 行） | **语义 token 引擎 + ANSI 降采样** |
+
+依赖单向：`theme/theme.ts:10` → `themes/index.js`。合并会把"数据"与"处理数据的逻辑"
+塞进同一目录，违反 `AGENTS.md` 的 owner-domain 规则。**R10 应关闭。**
+
+### R9 确认存在（可执行）
+
+`session/__tests__/` 是**全仓唯一**的 `__tests__` 目录，2 个文件：
+- `longSessionContinuityFixtures.ts` — 被 3 个测试引用
+- `longSessionDurabilityProcess.ts` — **动态入口**（`longSessionDurability.test.ts:229`
+  用 `spawnSync` + 路径字符串启动）
+
+**注意**：后者被 `analyze-boundaries.py` 报为"零引用"是**误报**——分析器不解析字符串路径。
+这正是 `plan.md` §2.2 检查 #4（动态入口）的案例。搬迁须同步更新 3 个 import + 1 处字符串。
+
+### R11 `eval/` 确认只被测试引用
+
+`eval/browser/` 3 个生产文件（114 行）+ README：CLI ❌ / 公共 API ❌ / 脚本 ❌ / 测试 ✅（3 个）。
+但其**被测对象是活的**（`browser/actionContract.ts` 13 生产引用者等），
+故 `eval/` 是**测试专用评测 harness**，非死代码。原判"语义已被 `evidence/harness/` 取代"
+**本次未获证实**。需裁决归位或保留。
+
+### 新增发现：2 个真孤儿簇
+
+**1. `runtime/events/host/envelope.ts`（106 行）** — 生产/类型/测试引用者**全为 0**。
+判定：**CB-005 删除 host lane 时的遗留物**（内容为 `HostEventEnvelope` /
+`schemaVersion: "host-event.v1"`）。可直接删。
+
+**2. `runtime/evaluation/task/` 5 文件（2,447 行）** — `liveRun.ts` 1,399 /
+`observation.ts` 389 / `catalog.ts` 350 / `quality.ts` 249 / `liveTypes.ts` 65，
+**生产引用者全为 0**。成因：唯一引用它们的 `liveRun.test.ts` 已随 CB-005 删除
+（该测试依赖 `createHostRuntime`）。`task/model.ts`（在公共面）**不** import 它们。
+需裁决：删，还是把能力并入 `task/model.ts`。
+
+### R8 重新审视
+
+494 个测试文件**全部与源文件同目录**（`.test.ts` 并置）。这是风格决策、非缺陷；
+与 `pi` 的差异不影响正确性。建议降级为"已裁决：保持并置"。
+
+### 建议执行顺序
+
+| 序 | 动作 | 依赖裁决 |
+|---|---|---|
+| 1 | 删 `runtime/events/host/envelope.ts` | 否 |
+| 2 | R9 归并 | 否 |
+| 3 | R11 `eval/` 归位 | **是** |
+| 4 | `runtime/evaluation/task/` 5 文件 | **是** |
+| 5 | R8 标记保持并置 | **是** |
+| 6 | R10 关闭 | 否 |
