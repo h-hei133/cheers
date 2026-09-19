@@ -172,7 +172,11 @@ runtime/events/stream.ts       prod=0  test=2
 
 ---
 
-## 5. 大文件分布（>600 行，共 14 个）
+## 5. 大文件分布（>600 行，**实测 20 个**）
+
+> **2026-09-19 主代理复测更正**：原文记"共 14 个"且表内列 14 行，但复测
+> `find . -name '*.ts' -not -name '*.test.ts' | xargs wc -l` 得 **20 个**。
+> 下表为**完整**名单（按行数降序）。
 
 | 文件 | 行数 |
 |---|---:|
@@ -190,10 +194,19 @@ runtime/events/stream.ts       prod=0  test=2
 | `repair/handoff/boundary.ts` | 736 |
 | `entrypoints/cliApprovalModule.ts` | 736 |
 | `core/shell/recovery.ts` | 711 |
+| `context/acquisition/engine.ts` | 680 |
+| `planning/handoff/mutation.ts` | 637 |
+| `core/commands/registry.ts` | 618 |
+| `cli/interactive/interactiveMode.ts` | 618 |
+| `planning/quality/model.ts` | 609 |
+| `session/recovery/resumeContextBuilder.ts` | 602 |
 
-**观察**：除 `projection.ts` 外，其余均在 700–970 区间，且**多数已有拆分记录**
-（B4 阶段拆过 `edit/multifile/model.ts`、`core/query/runtime/harness.ts` 等）。
-`projection.ts` 是唯一超出量级的异常值。
+**观察**：除 `projection.ts`（3,006）外，其余 19 个都在 **602–967** 区间，
+**没有第二个异常值** —— `projection.ts` 与次大者相差 **3.1 倍**，是唯一的量级异常。
+该文件同时是 §2 所述"单个 2,626 行函数"的载体，两个异常重叠在同一文件。
+
+**与区块回报的交叉验证**：`browser/` 在此名单中占 **0 个**（最大 `receipt/store.ts` 447 行），
+与 §13.5 一致。
 
 ---
 
