@@ -192,6 +192,34 @@ packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts
 
 A compatibility shim is different from a rightful domain manager. For example, `SessionManager` may retain real session lifecycle coordination, public API compatibility, dependency assembly, transaction ordering, and cross-session coordination when those duties are part of its public contract.
 
+### Facade Or Monolith
+
+A module may keep more than the responsibility ceiling of function-like names only
+when it is a **thin facade**: an aggregation surface whose names delegate rather
+than own behaviour. Claiming that standing requires measurement, not assertion.
+
+A module is a thin facade only when all four hold:
+
+1. **Delegation ratio >= 0.90.** At least 90% of its declarations are a single
+   call, optionally returning or reading one property of that result.
+2. **No branching.** No declaration contains `if`, `for`, `while`, `switch`,
+   `try`, a ternary, or `catch`.
+3. **No own state.** No `this.<field> =` assignment outside the constructor.
+4. **Bounded bodies.** Fewer than 15 physical lines per declared name.
+
+Otherwise the module is a real monolith and the ceiling applies: split it.
+
+Run `npm run analyze:module-facades` to compute all four and classify every
+over-ceiling module. The thresholds are not arbitrary: on the current tree the
+classification has a clean gap - facade-shaped modules sit at a delegation ratio
+at or above 0.90 with zero branching, and every real monolith sits at 0.35 or
+below - so any cutoff inside that gap classifies identically.
+
+Splitting is still a design act, not a mechanical one. A module whose functions
+form a safety-ordered write path, or whose state shape is an encoded contract
+consumed elsewhere, must be split along its existing seams and never by name
+count alone.
+
 ## Session Domain Guidance
 
 Session code should keep public lifecycle coordination separate from focused implementation details.

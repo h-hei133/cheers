@@ -1196,3 +1196,24 @@ B3 的 `34`、B4 的"都是真单体"与行号误引），
 - 聚焦测试：**53 文件 482 项全绿**
 - `verify:docs-drift:strict` 通过；`verify:host-surface` 通过；`npm run build` 通过
 - `src/renderer/` 残留引用 **0**；零 `!`、零 `as`
+
+## [2026-09-18] phase-b-b4-criterion | B4 第一步：四款可计算判据已落地（规则 + 脚本）。
+- **新增 `scripts/analyze-module-facades.mjs`**（`npm run analyze:module-facades`）：
+  按 plan B4 建议的四款判据判定"薄 facade"vs"真单体"：
+  `delegationRatio ≥ 0.90 ∧ branchingFunctionCount = 0 ∧ ownStateWriteCount = 0 ∧ linesPerDeclaredName ≤ 15`。
+- **判据已写入 `agent-rules/file-placement-and-naming.md`**（新增 "Facade Or Monolith" 一节），
+  故不再只是探索结论，而是绑定规则。
+- **实测分离度（决定阈值非拟合）**：当前树上 `session/store/sessionStoreAccess.ts` 委托率 **0.91**、
+  零分支（唯一分支是 `sessionExists` 的输入校验，属真实逻辑）；其余真单体全在 **0.35 及以下**。
+  **facade 簇与单体簇之间存在全量程断层**，区间内任取阈值分类结果相同。
+- **脚本准确复现 judge 的 12 个越界模块**（而非 13/14），说明计数口径对齐。
+- **实现过程中的三次口径修正（都属"检测器自身缺陷"）**：
+  1. body 提取用 `indexOf('{')` 配对时，**类体被当成函数体**，导致方法体内的方法被误归属 →
+     加入**大括号深度检查**（只有 depth ≤ 1 的 head 才算声明）；
+  2. 方法 head 正则**命中方法体内的调用表达式**（如 `ensureSessionStoreLayout(...)`）→
+     加入控制关键字过滤 + 深度判定；
+  3. 委托判定漏掉两类真实委托——**多行实参**与**调用后读一个属性**
+     （`return this.fileLayout(id).sessionDir`）→ 修正 tail 模式。
+  另：**构造函数从名称计数与委托率中排除**（它做初始化，不属聚合面），
+  这正是让 `sessionStoreAccess` 从 0.87 回到真实值 0.91 的关键。
+- **未使用任何 `!` 或 `as`**：判据全靠结构分析得出。
