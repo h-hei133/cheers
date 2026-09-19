@@ -1617,7 +1617,7 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 
 | # | 事项 | 依据 | 依赖 |
 |---|---|---|---|
-| **T1** | 收口 `sanitizeText` 6 份 → 1 份 | `block-findings` §12.2 | 无（可立即做） |
+| **T1** | 收口 `sanitizeText` 6 份 → 1 份 | `block-findings` §12.2 | ✅ **已完成**（`3550134f`）：新建 `core/security/redaction.ts`，6 处定义 + 10 处调用点全部改指单点；§9.9 记录了验证矩阵 |
 | **T2** | 收口 `freeze`/`deepFreeze` 27 份 → 1 份（需先裁决保留哪套语义） | §12.3 | 语义裁决 |
 | **T3** | 删 `reasonText.includes` 8 处，改结构化字段 | §10.5 pi-2 | 无 |
 | **T4** | 修 `browser/` 的 byte/char 混用 | §13.7 对照-3 | 无（不改签名） |
@@ -1631,3 +1631,43 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | **T12** | 删 `browser/toolPolicy.ts`+`agent.ts`+`plan.ts` 死链（589 行） | §13.3 D-死-1 | 低 |
 | **T13** | 修 `cliArgs.ts` 保留字表重复项 `/memory` | §15.8 | 无（低） |
 | **T14** | 收口 `normalizeBaseUrl`(4)/`normalizePathForCompare`(7)/`toRelativeTime`(4)/`stableId`(2) | §12.4、§16 | 中（需先定 owner） |
+
+### 9.9 T1 执行记录（2026-09-19，已完成）
+
+| 项 | 内容 |
+|---|---|
+| **目标** | 把逐字节重复 6 份的秘密脱敏函数收口为单一 owner |
+| **提交** | `3550134f` |
+| **新 owner** | `packages/ts-shell/src/core/security/redaction.ts` → `redactReportText(value, maxLength)` |
+| **删除的副本** | `edit/sanitize.ts`、`tools/toolOutcomeBundle.ts`、`turn/{deliveryPolicy,followUpQueue,nextTurnBundle,steeringQueue}.ts` 各 1 份（6 → 1）|
+| **调用点改写** | 10 处 import（6 定义处 + `edit/multifile/{model,settlement,observation}.ts` + `edit/recovery/model.ts`），共 23 处调用点改名 |
+| **净变化** | −87 行（64 插入 / 151 删除）|
+
+**owner 裁决依据**（`core/` 准入三条件，逐条实测）：
+
+| 条件 | 判定 |
+|---|---|
+| 1. Direction | ✅ `redaction.ts` **零 import**（实测 `grep -cE "^import"` = 0）|
+| 2. Audience | ✅ 三个 feature 域消费（`edit/`、`tools/`、`turn/`）|
+| 3. Survival | ✅ 真实共享行为，非 shim / fixture / 已放弃能力 |
+
+**目录选择**：`core/security/` 是**既存** owner 域（已有 `pathJail.ts`、`projectTrust.ts`），
+语义同类（安全边界）。**顺带补登**：该目录从未出现在 `agent-rules/architecture-boundaries.md`
+的 Common Areas 列表，而规则要求新增 `core/<subdomain>/` 必须登记 —— 已补一行。
+
+**验证矩阵**：
+
+| 检查 | 结果 |
+|---|---|
+| 行为等价性 | ✅ 与 **HEAD 上的原实现**在 14 输入 × 9 长度上限 = **126 组合**上逐字节一致（探针脚本比对 git 原文，跑完即删）|
+| `npm run build`（strict） | ✅ 0 错误 |
+| `npx tsc -p tsconfig.json`（含测试） | ✅ **190 → 190**，零新增；且无一涉及 `sanitizeText`/`redactReportText` |
+| 受影响测试（edit/ + turn/ + tools/） | ✅ 40 文件 / 175 项全过 |
+| `verify:import-cycles` | ✅ runtime 0 / type-only 0（1,436 文件）|
+| `verify:docs-drift:strict` | ✅ rules_refs 57 → 58（新增引用解析成功），0 dangling |
+| 全量测试 | 4 文件失败，但**在 HEAD（改动 stash）上同样失败** → **既存问题，非本轮引入** |
+
+**未纳入 T1 的相邻重复**（属 `block-findings` §12.4，需独立裁决）：
+`turn/toolResultMessage.ts:188` 与 `turn/assistantResponse.ts:150` 等**签名不同**
+（2 参数 / 1 参数带 `redacted` 返回值），以及 provider/repair/context/verification 侧的
+**21 行 3 参数变体**（哈希 `1b77d3b4320e`，3 份）。这些是**不同族**，不是"同一函数的第 7 份"。
