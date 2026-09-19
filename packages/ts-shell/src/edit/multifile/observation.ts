@@ -293,7 +293,10 @@ export function buildGraph(input: {
   return deepFreeze(input.input.targets.map((target, index) => {
     const targetId = sanitizeId(target.targetId);
     const targetConflicts = input.conflicts.filter((item) => item.targetIds.includes(targetId));
-    const classification = input.classifications[index]!;
+    const classification = input.classifications[index];
+    if (!classification) {
+      throw new Error(`Missing classification for target: ${targetId}`);
+    }
     const dependsOnTargetIds = (target.dependsOnTargetIds ?? []).map(sanitizeId);
     const relation: MultiTargetGraphRelationKind = targetConflicts.length > 0
       ? targetConflicts.some((item) => item.kind === "dependency_ordering")
@@ -328,10 +331,13 @@ export function buildParallelEligibility(input: {
 }): readonly MultiTargetParallelEligibility[] {
   return deepFreeze(input.input.targets.map((target, index) => {
     const targetId = sanitizeId(target.targetId);
-    const classification = input.classifications[index]!;
+    const classification = input.classifications[index];
     const targetAuthority = input.authority.targetStatuses[index];
-    const staleRead = input.staleReads[index]!;
-    const snapshot = input.snapshots[index]!;
+    const staleRead = input.staleReads[index];
+    const snapshot = input.snapshots[index];
+    if (!classification || !staleRead || !snapshot) {
+      throw new Error(`Missing lane observation for target: ${targetId}`);
+    }
     const queueEntry = latestQueueEntry(input.queue, targetId);
     const targetConflicts = input.conflicts.filter((item) => item.targetIds.includes(targetId));
     const status = parallelEligibilityStatus({

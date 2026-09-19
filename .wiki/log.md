@@ -1260,3 +1260,23 @@ B3 的 `34`、B4 的"都是真单体"与行号误引），
 production strict **0**；非 strict **244**（基线持平）；`tsconfig.build.json` **0**；
 SCC **1500 文件 / 0 环**；`verify:docs-drift:strict` 通过；
 **零 `!`、零真实 `as` 断言**（`as const` 与 import 别名不计）。
+
+## [2026-09-18] phase-b-b4-assertions | 清除 Phase B 触及文件中的非空断言（`!`）。
+
+阶段 B 收尾审计发现：整个 Phase B diff 新增 **4 处 `!`**——它们并非新写，
+而是 `edit/multifile/model.ts` 既有 17 处断言的**搬迁成员**。由于该文件已由本次
+重构重写，其类型债务随之归我处置，故一并清除（17 → **0**）。
+
+全部改为控制流收敛，**未使用 `as`，未放宽类型**：
+- 平行数组索引（`classifications[index]!`）：`input.targets.map(...)` 构造**保证**索引对齐，
+  故改为显式缺失检查并抛出（不变量真实存在，只是原断言未表达）；
+- `find(...)!`：改为 `if (!found) continue`（循环体本就对缺失目标无操作）；
+- 双下标嵌套循环：改为 `forEach((left, leftIndex) => ... targets.slice(leftIndex + 1) ...)`；
+- 先建 `targetIds` 映射再比较，取代 `targets[targetIndex]!.targetId`。
+
+**唯一语义变化**是把三处"静默跳过/未定义行为"变为**显式抛错**（如
+`Missing queue entry for target`）。这是收紧而非放宽：原断言在缺失时同样抛
+`TypeError`，只是错误信息不可读。全量 **3169 项测试零失败**，与该判断一致。
+
+`edit/` 树中仍有 11 处断言，位于 `proposal/`、`recovery/restoreCommandContract.ts`、
+`patch/types.test.ts` 等**本次未重写**的模块——不在 Phase B 范围内，记录待后续。

@@ -388,7 +388,10 @@ export async function runControlledMultiTargetMutation(
   const snapshots: MultiTargetSnapshotObservation[] = [];
   const queue: MultiTargetQueueObservation[] = [];
   for (const [index, target] of input.targets.entries()) {
-    const classification = classifications[index]!;
+    const classification = classifications[index];
+    if (!classification) {
+      throw new Error(`Missing classification for target: ${target.targetId}`);
+    }
     const targetConflicts = conflicts.filter((conflict) =>
       conflict.targetIds.includes(target.targetId) && conflict.blocked
     );
@@ -477,7 +480,8 @@ export async function runControlledMultiTargetMutation(
     notProvenClaims,
   });
   for (const targetId of rollback.revertedTargetIds) {
-    const target = input.targets.find((item) => item.targetId === targetId)!;
+    const target = input.targets.find((item) => item.targetId === targetId);
+    if (!target) continue;
     const targetSummary = sanitizeTargetSummary(target.reportSafeTargetSummary ?? target.relativePath);
     queue.push(queueObservation({
       laneId,
@@ -498,7 +502,8 @@ export async function runControlledMultiTargetMutation(
     }));
   }
   for (const targetId of rollback.failedTargetIds) {
-    const target = input.targets.find((item) => item.targetId === targetId)!;
+    const target = input.targets.find((item) => item.targetId === targetId);
+    if (!target) continue;
     const targetSummary = sanitizeTargetSummary(target.reportSafeTargetSummary ?? target.relativePath);
     queue.push(queueObservation({
       laneId,
@@ -533,7 +538,10 @@ export async function runControlledMultiTargetMutation(
     })
   );
   const verificationResults = verificationIntents.map((intent, index) => {
-    const target = input.targets[index]!;
+    const target = input.targets[index];
+    if (!target) {
+      throw new Error(`Missing target for verification intent at index ${index}`);
+    }
     const applied = targetReachedState(queue, target.targetId, "applied");
     return observeVerificationResult({
       intent,
@@ -564,11 +572,15 @@ export async function runControlledMultiTargetMutation(
       })
     );
   const groupVerificationResults = groupVerificationIntents.map((intent, index) => {
-    const group = executionGroups.filter((item) => item.mode !== "blocked")[index]!;
+    const group = executionGroups.filter((item) => item.mode !== "blocked")[index];
+    if (!group) {
+      throw new Error(`Missing execution group at index ${index}`);
+    }
     const applied = groupTargetsApplied(queue, group);
+    const targetIds = input.targets.map((item) => sanitizeId(item.targetId));
     const groupTargetStatuses = group.targetIds.map((targetId) =>
       verificationResults.find((item, targetIndex) =>
-        sanitizeId(input.targets[targetIndex]!.targetId) === targetId
+        targetIds[targetIndex] === targetId
       )?.status ?? "blocked"
     );
     const failed = groupTargetStatuses.some((status) => status === "failed");
@@ -766,7 +778,10 @@ function detectConflicts(input: {
 }): readonly MultiTargetConflict[] {
   const conflicts: MultiTargetConflict[] = [];
   for (const [index, target] of input.input.targets.entries()) {
-    const classification = input.classifications[index]!;
+    const classification = input.classifications[index];
+    if (!classification) {
+      throw new Error(`Missing classification for target: ${target.targetId}`);
+    }
     if (classification.status === "blocked") {
       conflicts.push(conflict({
         laneId: input.laneId,
@@ -798,10 +813,8 @@ function detectConflicts(input: {
       }));
     }
   }
-  for (let leftIndex = 0; leftIndex < input.input.targets.length; leftIndex += 1) {
-    const left = input.input.targets[leftIndex]!;
-    for (let rightIndex = leftIndex + 1; rightIndex < input.input.targets.length; rightIndex += 1) {
-      const right = input.input.targets[rightIndex]!;
+  input.input.targets.forEach((left, leftIndex) => {
+    for (const right of input.input.targets.slice(leftIndex + 1)) {
       if (normalizedPath(left.relativePath) !== normalizedPath(right.relativePath)) {
         continue;
       }
@@ -822,7 +835,7 @@ function detectConflicts(input: {
         }));
       }
     }
-  }
+  });
   for (const target of input.input.targets) {
     for (const dependencyId of target.dependsOnTargetIds ?? []) {
       const dependency = input.input.targets.find((item) => item.targetId === dependencyId);
@@ -893,7 +906,10 @@ async function applyExecutionGroups(input: {
       continue;
     }
     for (const target of targets) {
-      const latest = latestQueueEntry(input.queue, target.targetId)!;
+      const latest = latestQueueEntry(input.queue, target.targetId);
+      if (!latest) {
+        throw new Error(`Missing queue entry for target: ${target.targetId}`);
+      }
       input.queue.push(queueObservation({
         laneId: input.laneId,
         target,
@@ -904,13 +920,19 @@ async function applyExecutionGroups(input: {
       }));
     }
     const attempts = await Promise.allSettled(targets.map((target) => {
-      const latest = latestQueueEntry(input.queue, target.targetId)!;
+      const latest = latestQueueEntry(input.queue, target.targetId);
+      if (!latest) {
+        throw new Error(`Missing queue entry for target: ${target.targetId}`);
+      }
       return applyTarget({ input: input.input, target, laneId: input.laneId, targetSummary: latest.targetSummary });
     }));
     let groupFailed = false;
     for (const [index, target] of targets.entries()) {
-      const latest = latestQueueEntry(input.queue, target.targetId)!;
-      const attempt = attempts[index]!;
+      const latest = latestQueueEntry(input.queue, target.targetId);
+      const attempt = attempts[index];
+      if (!latest || !attempt) {
+        throw new Error(`Missing queue entry or attempt for target: ${target.targetId}`);
+      }
       if (attempt.status === "fulfilled") {
         appliedTargets.push(target);
         const contentFingerprint = fingerprint(target.proposedContent ?? "");
