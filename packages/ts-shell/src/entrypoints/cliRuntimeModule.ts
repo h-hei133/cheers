@@ -25,7 +25,7 @@ import {
 } from "../core/shell/turnBoundarySurface.js";
 import { recordCount } from "../observability/index.js";
 import type { StructuredLogger } from "../observability/structuredLogger.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import {

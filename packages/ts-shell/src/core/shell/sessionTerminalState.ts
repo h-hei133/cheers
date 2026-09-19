@@ -6,7 +6,7 @@ import type {
 } from "../../result/types.js";
 import type { LoopTrajectoryProjection } from "../../runtime/loop/trajectory.js";
 import type { ProductLoopAdapterProjection } from "../../runtime/loop/adapter.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionContinuitySnapshot } from "../../session/SessionManager.js";
 import { projectSessionResultParity } from "../../session/sessionResultParity.js";
 import type { QueryEvent } from "../query/runtime/events.js";

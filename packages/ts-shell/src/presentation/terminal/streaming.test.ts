@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { StreamingRenderer } from "./StreamingRenderer.js";
+import { StreamingRenderer } from "./streaming.js";
 
 function captureStdout(): { written: string[]; restore: () => void } {
   const written: string[] = [];

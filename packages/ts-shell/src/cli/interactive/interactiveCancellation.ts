@@ -2,7 +2,7 @@ import type { Interface as ReadlineInterface } from "node:readline";
 import * as readline from "node:readline";
 
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 
 export const DOUBLE_ESC_CANCEL_WINDOW_MS = 3000;
 

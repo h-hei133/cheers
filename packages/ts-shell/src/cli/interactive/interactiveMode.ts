@@ -18,7 +18,7 @@ import { TUI } from "../../presentation/tui/render/engine.js";
 import { processTerminal, type TerminalDevice } from "../../presentation/tui/terminal.js";
 import { textBlock } from "../../presentation/tui/transcript/blocks.js";
 import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";

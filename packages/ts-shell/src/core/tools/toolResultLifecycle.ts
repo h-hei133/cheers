@@ -1,5 +1,46 @@
-import type { QueryEvent } from '../query/runtime/events.js'
 import type { ToolExecutionResult } from '../../tools/types.js'
+
+/**
+ * The only event shapes this index reacts to.
+ *
+ * Deliberately structural rather than an import of `QueryEvent`: the query
+ * runtime's event module reaches back into this one through state, so importing
+ * it here would close a dependency cycle. A full `QueryEvent` satisfies this
+ * type, and the early return below ignores everything else.
+ */
+export type LifecycleEventLike =
+  | { readonly type: 'approval.requested'; readonly taskId: string; readonly toolName: string }
+  | {
+      readonly type: 'approval.resolved'
+      readonly taskId: string
+      readonly toolName: string
+      readonly outcome?: 'approved' | 'denied'
+      readonly compensated?: boolean
+    }
+  | { readonly type: 'tool.started'; readonly taskId: string; readonly toolName: string }
+  | {
+      readonly type: 'tool.result'
+      readonly taskId: string
+      readonly toolName: string
+      readonly success?: boolean
+      readonly compensated?: boolean
+    }
+  | { readonly type: string; readonly taskId?: string; readonly toolName?: string }
+
+/**
+ * Whether this index reacts to the event at all. Exported because the parameter
+ * type deliberately tolerates events this index ignores.
+ */
+export function isLifecycleEvent(event: {
+  readonly type: string;
+}): event is Extract<LifecycleEventLike, { readonly taskId: string }> {
+  return (
+    event.type === 'approval.requested' ||
+    event.type === 'approval.resolved' ||
+    event.type === 'tool.started' ||
+    event.type === 'tool.result'
+  )
+}
 
 export interface PendingApprovalEntry {
   readonly taskId: string
@@ -40,14 +81,9 @@ export function createEmptyLifecycleIndex(): DurableLifecycleIndex {
 
 export function applyLifecycleEventToIndex(
   index: DurableLifecycleIndex,
-  event: QueryEvent,
+  event: LifecycleEventLike,
 ): DurableLifecycleIndex {
-  if (
-    event.type !== 'approval.requested' &&
-    event.type !== 'approval.resolved' &&
-    event.type !== 'tool.started' &&
-    event.type !== 'tool.result'
-  ) {
+  if (!isLifecycleEvent(event)) {
     return index
   }
 

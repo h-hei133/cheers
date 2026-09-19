@@ -1,6 +1,6 @@
 import path from "node:path";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import {
   projectPermissionListDisplay,
 } from "./cliDisplayProjection.js";

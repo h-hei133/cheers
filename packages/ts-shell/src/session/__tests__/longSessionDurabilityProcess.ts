@@ -7,7 +7,7 @@ import type {
   CodingResultSummary,
   OrchestrationResult,
 } from "../../result/types.js";
-import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { SessionManager, type Session } from "../SessionManager.js";
 
 type Scenario = "success" | "partial";

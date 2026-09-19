@@ -1,7 +1,7 @@
 import path from "node:path";
 import { renderWorkspaceBindingLines } from "../core/shell/startupSurfaceRenderer.js";
 import type { ShellRuntimeContext } from "../core/shell/runtimeContext.js";
-import type { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { ProjectContextSummary } from "../session/SessionManager.js";
 
 export interface WorkspaceCliLineRenderer {

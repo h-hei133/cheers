@@ -7,7 +7,7 @@ import {
   ShellSessionRuntime,
   type PromptRun,
 } from "../../core/shell/sessionRuntime.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import {

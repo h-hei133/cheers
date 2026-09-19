@@ -1,6 +1,6 @@
 import { recordLastAssistantResponse } from "../../core/commands/copyCommandRuntime.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
-import type { RendererSink } from "../../renderer/StreamingRenderer.js";
+import type { RendererSink } from "../../presentation/terminal/streaming.js";
 import { splitFencedDiff, type Block } from "../../presentation/tui/transcript/blocks.js";
 import { ToolCards } from "./toolCards.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";

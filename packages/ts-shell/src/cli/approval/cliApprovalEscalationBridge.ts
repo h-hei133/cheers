@@ -6,7 +6,7 @@ import {
 } from "../../entrypoints/cliApprovalModule.js";
 import type { ApprovalModeObject } from "./approvalModeContract.js";
 import type { PermissionScope } from "./permissionScope.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import { persistApprovalAuditDecision } from "./cliApprovalAuditBridge.js";

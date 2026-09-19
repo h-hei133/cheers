@@ -1,7 +1,7 @@
 import type { Interface as ReadlineInterface } from "node:readline";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import type { ApprovalModeObject } from "../cli/approval/approvalModeContract.js";

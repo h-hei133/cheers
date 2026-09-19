@@ -1,4 +1,4 @@
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { EscalationPrompt } from "../../sandbox/index.js";
 
 export interface ApprovalAuditRecord {

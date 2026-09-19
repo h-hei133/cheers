@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { InteractiveMode, type InteractiveModeOptions } from "./interactiveMode.js";
 import { ManualScheduler, RecordingTerminal } from "../../test-utils/terminalDouble.js";
-import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";

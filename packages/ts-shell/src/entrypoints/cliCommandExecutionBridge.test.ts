@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import {
   buildCliCommandExecution,
   projectCliCommandExecution,

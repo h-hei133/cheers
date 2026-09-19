@@ -1,5 +1,5 @@
 import type { Interface } from "node:readline";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { ShellSessionRuntime } from "./sessionRuntime.js";
 import type { ShellRuntimeContext } from "./runtimeContext.js";
 

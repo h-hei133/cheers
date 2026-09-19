@@ -6,7 +6,7 @@ import {
   bootstrapShellRuntime,
 } from "../../core/shell/bootstrap.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
-import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";

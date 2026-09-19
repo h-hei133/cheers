@@ -6,7 +6,7 @@ import {
   handleShellClose,
   handleShellSigint,
 } from "../../core/shell/signalHandlers.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 
 export function installInteractiveSignalHandlers(input: {
   readonly process: NodeJS.Process;

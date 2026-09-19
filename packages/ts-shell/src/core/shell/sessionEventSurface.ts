@@ -1,4 +1,4 @@
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { QueryEvent } from "../query/runtime/events.js";
 
 export interface RuntimeEventDigest {

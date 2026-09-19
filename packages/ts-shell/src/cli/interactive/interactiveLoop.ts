@@ -3,7 +3,7 @@ import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.j
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";

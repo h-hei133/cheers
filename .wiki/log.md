@@ -1160,3 +1160,39 @@
 B3 的 `34`、B4 的"都是真单体"与行号误引），
 与阶段 A 复核发现的 `*Like` 镜像漂移、`check:*` 误判**同属一类：结论先行、数字未复核**。
 **阶段 B 动代码前应先修正这些前提**；本次已就地勘误 `plan.md` 与 `architecture-exploration-*.md`。
+
+## [2026-09-18] phase-b-b3 | B3 完成：`renderer/` → `presentation/terminal/streaming.ts`，并修复 A2 遗留的依赖环。
+### B3 搬迁（按维护者选定的方案 A）
+- **纯搬迁**：`src/renderer/StreamingRenderer.ts`（60 行，纯叶子、0 出边）→
+  `src/presentation/terminal/streaming.ts`；同名测试一并搬迁为 `streaming.test.ts`（自引用改为 `./streaming.js`）。
+- **specifier 重写 41 处**（40 外部 + 1 自测），实测两种形态：
+  `../../presentation/terminal/streaming.js`(29) 与 `../presentation/terminal/streaming.js`(11)。
+  **写入前逐条断言切片等于原 specifier**，零断言失败。
+- **规则面收敛**：`presentation/terminal/` 是 sanctioned 子域，`streaming.ts` 是规则推荐角色名；
+  `renderer/` 原仅为 boundary 域 → 搬迁是向规则靠拢而非改变规则。
+- 与既有 `presentation/terminal/renderer.ts`（149 行，纯格式化器）**职责不同**，不合并：
+  新搬入的是**有副作用的 stdout 通道**。
+
+### **发现并修复一个真实依赖环（A2 遗留，A2/A3 的验证都漏掉了）**
+- 修复后实测 **0 环**；修复前为 **1 个 4 节点环**：
+  `core/tools/toolResultLifecycle.ts → core/query/runtime/events.ts →
+  core/query/runtime/proof.ts → core/query/runtime/state.ts → core/tools/toolResultLifecycle.ts`
+- **引入点已用 git 精确定位**：`ff70f296`（A2 批次）把 `LifecycleEventLike` 对齐到
+  `QueryEvent` 时引入了 `toolResultLifecycle → events.ts` 这条边；环的其余三条边早已存在。
+  逐提交核验：`ff70f296~1` 该 import 计数为 0，`ff70f296` 及其后为 1。
+- **漏检原因**：A2/A3 的 SCC 脚本用正则 `from\s+"([^"]+)"`（**只认双引号**），
+  且未处理 `.tsx`；本次检测器采用 `from\s+["\']([^"\']+)["\']` 后才暴露该环。
+  **教训：图检测器的词法覆盖范围本身必须被验证——只看"0 环"不看检测器能看见什么，
+  等于用错误的仪器得出通过的结论。**
+- **修复方式（零 `!`、零 `as`）**：`toolResultLifecycle.ts` 不再导入 `QueryEvent`，
+  改为自带**结构化** `LifecycleEventLike`（四个生命周期成员的精确形状 + 一个
+  `{ type: string; taskId?; toolName? }` 兜底成员以容忍本函数忽略的其它事件类型），
+  并导出类型谓词 `isLifecycleEvent` 供收窄。调用方无需改动（两个调用方都传完整 `QueryEvent`，
+  结构上可赋值）。**函数语义未变**：它本就在非生命周期事件时原样返回索引。
+
+### 测量
+- `tsc -p tsconfig.build.json`：**0 错误**；生产 strict：**0**；非 strict 全量：**244 = 基线**（零新增）
+- **SCC：1478 文件 0 环**（修复前 1 环）
+- 聚焦测试：**53 文件 482 项全绿**
+- `verify:docs-drift:strict` 通过；`verify:host-surface` 通过；`npm run build` 通过
+- `src/renderer/` 残留引用 **0**；零 `!`、零 `as`

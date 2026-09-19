@@ -4,7 +4,7 @@ import type { Interface as ReadlineInterface } from "node:readline";
 import { describe, expect, it } from "vitest";
 
 import { runInteractiveLoop } from "./interactiveLoop.js";
-import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 
 describe("interactive loop", () => {
   it("uses the full-screen host and its readline stand-in on a real terminal", async () => {

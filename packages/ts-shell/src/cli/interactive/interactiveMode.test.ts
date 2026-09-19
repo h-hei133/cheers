@@ -6,7 +6,7 @@ import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
-import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { RecordingTerminal } from "../../test-utils/terminalDouble.js";
 
 function build(overrides: { observeEvents?: () => () => void } = {}): {

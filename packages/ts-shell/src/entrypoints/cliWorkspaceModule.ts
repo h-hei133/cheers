@@ -7,7 +7,7 @@ import {
   type ShellRuntimeContext,
 } from "../core/shell/runtimeContext.js";
 import { resolveRootBindingDiagnostics } from "../core/shell/runtimeContext.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { WorkspaceRootMode } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";

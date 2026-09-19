@@ -14,7 +14,7 @@ import {
   renderSessionListSurface,
   renderSwitchedSessionSurface,
 } from "../core/shell/sessionStateSurface.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type {
   Session,
   SessionReentrySummary,
