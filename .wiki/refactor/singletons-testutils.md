@@ -409,7 +409,6 @@ Tests       87 passed | 1 skipped (88)
 - **25 个是严格 test-only 集合中的产品代码，只是目前只有测试 value caller，应按产品能力裁决；**
 - **47 个是外部类型契约，删除会破坏编译契约；**
 - 另有 `longSessionDurabilityProcess.ts` 这一动态测试入口（已包含在 19 中），以及 `eval/browser/benchmarkModel.ts` 这一混合 contract/test 文件；只有 `ptyCapabilityDetector.ts` 与 `gauntletManifest.ts` 具备相对清晰的测试胶水删除理由。
-- **47 个是外部类型契约，删除会破坏编译契约；**
-- 只有 `ptyCapabilityDetector.ts` 与 `gauntletManifest.ts` 具备相对清晰的测试胶水删除理由；动态 process fixture 必须保留。
+  
 
 这说明清理面不是“42 个测试脚手架可直接删”，而是一个混合面：**真正的测试基建占 19 / 93，约五分之一；其余大部分仍需要产品职责、类型契约或动态入口判断。**

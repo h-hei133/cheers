@@ -206,19 +206,27 @@ export function decideBrowserNetworkAllowlist(input: {
 }
 
 /**
- * Whether `hostname` names a host on the private network.
+ * Whether `hostname` names a host on the private or link-local network.
  *
  * This is the SSRF guard: every caller uses it to refuse a target before any
  * request is made, so a rule that exists in one copy and not another is a
  * bypass in the copy that lacks it. It was previously duplicated verbatim in
  * `publicReadOnlyWebPolicy.ts`, `publicReadOnlyWebManifest.ts` and
- * `core/harness/browserPublicReadOnlyWebSmokeConfig.ts`; all three already
- * imported from this module, so consolidating here adds no dependency edge.
+ * `core/harness/browserPublicReadOnlyWebSmokeConfig.ts`, and a second,
+ * independently written copy lived in `networkEgressGuard.ts` as
+ * `isPrivateOrigin`; that one now delegates here.
  *
- * Note the scope: this covers the RFC 1918 ranges, loopback, `.local` and
- * `.localhost`. It is not a general DNS-rebinding defence and it does not
- * resolve names, so a public name that resolves to a private address is not
- * caught here.
+ * The link-local range matters as much as the RFC 1918 ranges: 169.254.0.0/16
+ * is where cloud providers publish instance metadata, so on AWS, Alibaba Cloud
+ * and others, `169.254.169.254` returns the instance's temporary credentials to
+ * anything that can reach it. A private-network check that omits it leaves the
+ * metadata endpoint reachable whenever an allowlist happens to name it.
+ *
+ * Scope, stated so the next reader does not over-trust it: this covers loopback,
+ * the RFC 1918 ranges, link-local, `.local` and `.localhost`. It does NOT cover
+ * IPv6 link-local (`fe80::/10`), carrier-grade NAT (`100.64.0.0/10`), `0.0.0.0`,
+ * or DNS rebinding, and it does not resolve names - a public hostname that
+ * resolves to a private address is not caught here.
  */
 export function isPrivateNetworkHost(hostname: string): boolean {
   return (
@@ -229,6 +237,7 @@ export function isPrivateNetworkHost(hostname: string): boolean {
     hostname.startsWith("127.") ||
     hostname.startsWith("10.") ||
     hostname.startsWith("192.168.") ||
+    hostname.startsWith("169.254.") ||
     /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
   );
 }

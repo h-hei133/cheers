@@ -1,6 +1,6 @@
 import { sanitizeBrowserText } from "./capabilityModel.js";
 import type { BrowserExecutionRequest } from "./executionContract.js";
-import { parseBrowserNetworkTarget } from "./networkAllowlist.js";
+import { isPrivateNetworkHost, parseBrowserNetworkTarget } from "./networkAllowlist.js";
 
 export type BrowserNetworkMode = "controlled-only" | "public-readonly" | "future-public" | "disabled";
 export type BrowserNetworkEgressDecisionStatus =
@@ -151,12 +151,18 @@ function isSensitive(actionKind: BrowserExecutionRequest["actionKind"]): boolean
   return ["auth", "payment", "destructive", "upload", "download", "screenshot"].includes(actionKind);
 }
 
+/**
+ * Whether an origin (`https://host:port`) names a private or link-local host.
+ *
+ * The shared guard takes a bare hostname, so the origin is unwrapped here. An
+ * origin that cannot be parsed is not treated as private: the surrounding
+ * checks already reject unparseable targets, and returning `true` here would
+ * turn a malformed value into a private-network blocker with a misleading
+ * reason.
+ */
 function isPrivateOrigin(origin: string): boolean {
   try {
-    const { hostname } = new URL(origin);
-    return hostname === "localhost" || hostname === "::1" || hostname.startsWith("127.") ||
-      hostname.startsWith("10.") || hostname.startsWith("192.168.") ||
-      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+    return isPrivateNetworkHost(new URL(origin).hostname);
   } catch {
     return false;
   }

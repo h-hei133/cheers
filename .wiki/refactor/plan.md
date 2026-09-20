@@ -2632,3 +2632,71 @@ events.ts:12 import type { QueryRuntimeProofProjection } from './proof.js'    �
 | test-only（严格静态）| 42 = **17 静态基建 + 25 产品自测** |
 | 语义测试基建 | **19**（18 静态 + 1 动态进程）|
 | 零 importer（value+type+test 全无）| **2** |
+
+### 9.24 SSRF 防线缺口修复 + `/auth` 删除（2026-09-20，维护者裁决后执行）
+
+#### 9.24.1 SSRF：`169.254.169.254` 两道防线都放行
+
+**发现经过**：§9.22 收口 `isPrivateNetworkHost` 时，探针顺带暴露该函数不认
+`169.254.169.254`。维护者要求验证完整攻击链是否可达，实测结果：
+
+| 地址 | 第一道防线（`publicReadOnlyWebPolicy`）| 第二道防线（`networkEgressGuard`）|
+|---|---|---|
+| `https://169.254.169.254/` | ✗ **放行** | ✗ **放行** |
+| `https://localhost/` | ✓ 拦截 | ✓ 拦截 |
+| `https://10.0.0.5/` | ✓ 拦截 | ✓ 拦截 |
+| `https://example.com/` | ✗ 放行（正常）| ✗ 放行（正常）|
+
+**放行后确实发请求**（`publicReadOnlyWebExecutor.ts:73` 调 `client({url})`）。
+
+**根因**：两份**独立实现**的私有地址列表**都漏了链路本地段 `169.254.0.0/16`**：
+
+| 位置 | 函数 | 缺 `169.254.` |
+|---|---|---|
+| `browser/networkAllowlist.ts` | `isPrivateNetworkHost` | ✅ 缺 |
+| `browser/networkEgressGuard.ts` | `isPrivateOrigin`（**第二份独立实现**）| ✅ 缺 |
+
+**为何重要**：`169.254.0.0/16` 是云厂商发布实例元数据的地址段（AWS / 阿里云 / 腾讯云等），
+`169.254.169.254` 会返回实例的临时凭据。私有网络检查漏掉它，意味着
+**只要 allowlist 恰好写进该地址，元数据端点就可达**——白名单是配置，可能由脚本/模板/用户输入生成。
+
+**实际严重性（诚实边界）**：不是"立即可被攻击"。走到发请求还需**同时**满足
+manifest 的 `allowedPublicOrigins` 显式包含该地址、`confirmationRequirement: "required"`
+的确认通过、sandbox authority 通过。即**"防线不完整"**，不是"防线不存在"。
+
+**修复**（两处）：
+1. `isPrivateNetworkHost` 增加 `hostname.startsWith("169.254.")`；
+2. `networkEgressGuard.ts` 的 `isPrivateOrigin` **删除本地列表、改为委托**
+   `isPrivateNetworkHost(new URL(origin).hostname)` —— 消除第二份独立实现，
+   使今后只需修一处。保留 origin 解析失败的 `catch`（返回 `false`，因周边检查已拒绝不可解析目标，
+   返回 `true` 会把畸形值误报为私有网络）。
+
+**修复后验证**：两道防线**均拦截** `169.254.169.254`，`localhost` / `10.0.0.5` 仍拦截，
+`example.com` **仍放行**（无过度拦截）。`src/browser` + `src/core/harness` 93 文件 / 412 项通过。
+
+**同时更正 §9.22 的一处误报**：上轮称"`LOCALHOST` 大写可绕过"——**错误**。
+实测走真实入口时 `parseBrowserNetworkTarget` 已 `.toLowerCase()`，大写到不了判断处。
+上轮的测法只调函数本身、未走真实入口。**只有 `169.254.` 这一处是真缺口。**
+
+#### 9.24.2 删除 `/auth`（维护者认定 `/connect` 已取代）
+
+**裁决**：维护者 2026-09-20 认定 `/connect` 取代 `/auth`。
+
+**六项删除前检查**（全部实测）：
+
+| 检查 | 结果 |
+|---|---|
+| 1 功能读审 | 275 行，实现 `/auth set/status/use/logout` legacy 命令 |
+| 2 等价核验 | ✅ `/connect` 已注册（`registry.ts:125`）且 `addConnectionFromLegacyAuthSet`（`connectCommandRuntime.ts:199`）**显式处理** legacy `/auth set` 参数形状 |
+| 3 消费者存活 | 生产 value/type consumer = **0**；仅 `authCommandRuntime.test.ts` 引用 |
+| 4 动态入口 | 0 命中 |
+| 5 公共面 | `index.ts` 0 命中 |
+| 6 `scripts/` | 0 命中 |
+
+**辅助证据**：`/auth` **未在 registry 注册**；`slashRouter` 测试断言 `/auth` 为 unknown。
+
+**测试处置**：`authCommandRuntime.test.ts` 随之删除——它只测该死模块。
+其另一处依赖 `getUserRuntimeConfigPath` 属**活代码**，但该函数另有 3 个测试覆盖
+（`runtimeConfig.test.ts`、`modelCommandRuntime.test.ts`、`connectCommandRuntime.test.ts`），**无覆盖损失**。
+
+**删除量**：`authCommandRuntime.ts`(275) + 测试(约 160) 行。
