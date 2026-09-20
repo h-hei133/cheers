@@ -227,6 +227,14 @@ export function decideBrowserNetworkAllowlist(input: {
  * IPv6 link-local (`fe80::/10`), carrier-grade NAT (`100.64.0.0/10`), `0.0.0.0`,
  * or DNS rebinding, and it does not resolve names - a public hostname that
  * resolves to a private address is not caught here.
+ *
+ * Note that the IPv4 metadata address is covered but the IPv6 one is not:
+ * `fd00:ec2::254` is the IPv6 equivalent of `169.254.169.254` on AWS, and it
+ * reads as public here. The IPv4 range was added because a probe found both
+ * guards letting it through; the IPv6 address was left uncovered deliberately
+ * rather than accidentally, because covering it means range-parsing IPv6 and
+ * that is a larger change than this fix. A caller that must be safe against the
+ * metadata endpoint should not treat this guard as sufficient on its own.
  */
 export function isPrivateNetworkHost(hostname: string): boolean {
   return (

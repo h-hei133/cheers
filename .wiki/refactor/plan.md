@@ -2381,7 +2381,7 @@ T15 改名零残留；CB-005 的 `runtime/loop` 生产零值导入、动态入�
 | 删除 | `shellActionRuntime.ts`：`runSessionsShellAction`(49) + `runAgentModeShellAction`(30)；`cliDisplayProjection.ts`：`formatWorkspaceInfoLines`(12) + `formatAgentMode*`(20) = **111 行** |
 | 连带修改 | `interactiveCommandRouter.ts`：删 agent-mode 两条分支与 3 个死 import；`types.ts`：删 `set-agent-mode`/`show-agent-mode` union 成员与 `agentMode?` 字段；`cliCoreSplit.test.ts`：删对应断言 |
 | **保留** | `runViewShellAction` + `formatViewMode*` + `projectPermissionListDisplay` |
-| 保留理由 | `/view` 的 4 个 action（`show-view`/`set-view`/`show-agent-mode`/`set-agent-mode`）**全仓无任何 producer**（实测：只在 router 被读，从不被写）→ 按 §2.1 无活轨接管即不可删。agent-mode 的**读侧**同样无 producer，但写侧语义已由 Shift+Tab 活轨承担，故其死分支可删 |
+| 保留理由 | `/view` 的 4 个 action（`show-view`/`set-view`/`show-agent-mode`/`set-agent-mode`）**全仓无任何可达 producer**（§9.26 更正：`shellActionRuntime.ts:130/137/145` 确实产出 `show-view`/`set-view`，但该函数 `runViewShellAction` **自身零调用者**、`registry.ts` 无 `view` 条目——即 producer 存在但不可达，原措辞"从不被写"不准确，结论不变）→ 按 §2.1 无活轨接管即不可删。agent-mode 的**读侧**同样无 producer，但写侧语义已由 Shift+Tab 活轨承担，故其死分支可删 |
 | 六项检查 | 全部通过 |
 | 验证 | `tsc` 0 错误；`cliCoreSplit.test.ts` 6/6、`src/cli/interactive` 全通过；残留引用扫描 0 |
 
@@ -2795,3 +2795,62 @@ manifest 的 `allowedPublicOrigins` 显式包含该地址、`confirmationRequire
 
 **若将来清理该目录**：**不能整目录删除**——必须先把 `redactProviderEditText` 迁出，
 否则会切断 `edit/`、`planning/`、`repair/`、`verification/` 四个域的活路径。
+
+### 9.26 本会话代码改动的独立复核（2026-09-20，子代理并发上限 2）
+
+**范围**：本会话 5 个含实质代码改动的 commit（其余 5 个为纯文档）。
+复核采用**对抗式**：要求子代理证伪作者声明，而非复述。主代理对每条头条发现**自行复现**后才采信。
+
+#### 已确认缺陷并修复（2 项）
+
+**（1）`/auth` 删除后遗留用户文档指向不存在的命令**（由 `ReviewDedupSSRF` 独立发现，主代理复现）
+
+`26a76eba` 删除了 `/auth` 运行时，但三份**面向用户**的文档仍在教用户使用它：
+
+| 文档 | 行 | 原文 |
+|---|---|---|
+| `INSTALL.md` | 24, 52-53 | "by using `/auth` inside the CLI"、`/auth set ...`、`/auth status` |
+| `USAGE_MANUAL.md` | 22, 101-105 | 整节 "### 3.10 `/auth`（兼容入口…）" |
+| `WORKSPACE.md` | 28 | "Provider onboarding and selection via `/auth`" |
+
+复现：`grep -rn "/auth" INSTALL.md USAGE_MANUAL.md WORKSPACE.md`。
+`slashRouter.test.ts` 已断言 `/auth status` 为 unknown，**照文档操作必然失败**。
+`USAGE_MANUAL.md` 该节还写着"建议逐步迁移到 `/connect`"——迁移已完成，该前提已假。
+
+**处置**：三份文档全部改为 `/connect`。`/connect` 的 `status|set|use|logout` 与旧 `/auth` 子命令**一一对应**（`connectCommandRuntime.ts:86-99`，其中 `set` 走 `addConnectionFromLegacyAuthSet`，参数形状刻意保留）。在 `USAGE_MANUAL.md` 保留一条迁移说明，供仍调用 `/auth set` 的旧脚本参考。
+
+**（2）`provider/response/stream.ts:197` 存在与 `d65c9178` 同形态的深度丢失**（由 `ReviewFreezeRedaction` 发现，主代理复现并修复）
+
+`d65c9178` 修的是 `turn/assistantResponse.ts` 把已冻结的容器交给 `freezeDeep`。复核在**另一处**发现同一形态：
+
+```ts
+completedToolCalls: Object.freeze(completedToolCalls),   // ← 冻结了容器
+```
+
+`freezeDeep` 对**已冻结的值不再下降**（`core/values/freeze.ts:28-35`），所以数组里的每个 tool call 及其 `arguments` 都没被冻结。实测：
+
+```
+array frozen      : true
+element frozen    : false   ← 应为 true
+element.arguments : false
+MUTATION SUCCEEDED -> rm -rf /     ← 可改模型请求的原始参数
+```
+
+`normalizeCompletedToolCall`（`stream.ts:224-240`）返回**新建的普通对象**，未被单独冻结，故必然触发。这与 `d65c9178` 修的是**同一类缺陷、同一类成因**，只是发生在另一个文件。
+
+**为何 `d65c9178` 的"68 处均无害"结论不成立**：该结论的前提是"已冻结的子值是新建容器"。此处容器是新建的，但**其元素不是**——`arguments` 承载模型请求的原始参数，属应冻结内容。该声明已被本次复核证伪。
+
+**处置**：改为交给 `freezeDeep` 冻结（附注释说明原因）。修复后实测 `element frozen: true`、`arguments: true`、mutation 抛 `TypeError`。新增回归测试 `stream.test.ts`，**已验证其在修复前失败、修复后通过**。
+
+**同类扫描**：全仓 `freezeDeep` 参数内的 `Object.freeze(标识符)` 共 **18 处**，逐处核查后仅上述 1 处有实质深度丢失。其余分三类：持有原始类型（`string[]`、`boolean[]`）故无深度可丢；元素已由 `.map(Object.freeze({...}))` 或 `sanitizeToolCallCandidate` 单独深冻结；元素仅含原始类型字段（如 `boundary.ts:374` 的 `safeRequestMessages`，字段为 `messageId/source/safeSummary/terminalSuccessClaim`）。
+
+#### 记录但不修复（1 项）
+
+`isPrivateNetworkHost` 不覆盖 `fd00:ec2::254`（AWS 的 **IPv6 元数据地址**，等价于 `169.254.169.254`）。原注释列了 IPv6 链路本地、CGNAT、`0.0.0.0`、DNS rebinding，**唯独漏了这一条**——而它恰是本次修复所针对的元数据端点。已补入注释，并注明"调用方不应单独依赖此防线"。**不扩大修复范围**：覆盖它需要解析 IPv6 网段，超出本次修复的授权范围。
+
+#### 复核未发现问题的部分
+
+- 五组重复实现收口（`80ad3616`）：逐组比对语义等价，**未发现缺陷**。`isRecord` 新旧实现 16 个取值一致（含 `null`/`NaN`/`Object.create(null)`/类实例）；脱敏器在短串/恰好 280/多字节边界一致。
+- SSRF 修复（`26a76eba`）：经**两个真实入口**（`publicReadOnlyWebPolicy`、`networkEgressGuard`）复现，`169.254.169.254` 拦截、`example.com` 放行。全仓独立私有网络判断仅剩 `runtime/core/manifest.ts:207`，为**白名单**（只放行回环、拦截其余），极性与 SSRF 相反，非漏洞。
+- `d65c9178` 的冻结修复与脱敏合并：冻结 before/after 探针复现（父提交 `candidate:false`、`8c5f47c7^` 为 `true`）；`redactReportText` 截断语义与三份原实现一致（`slice(0,maxLength)+"..."`，非更整洁的 `slice(0,maxLength-3)`）。
+- 门禁 `verify-docs-and-rules-drift.mjs` 新检测：strict 通过，且对 `` `test/artifact-workflow.mjs` `` 这类工作区相对路径**不误报**。

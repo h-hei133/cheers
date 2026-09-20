@@ -25,7 +25,7 @@ This workspace is no longer at the initial scaffold-only stage. The TypeScript s
 - Permission/sandbox policy enforcement (default-deny)
 - Session state persistence
 - Model provider adapter interface
-- Provider onboarding and selection via `/auth`
+- Provider onboarding and selection via `/connect`
 - Real-provider readiness gating for openai/openai-compatible configurations
 
 **Current runtime position**:

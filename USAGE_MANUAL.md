@@ -19,7 +19,7 @@ npm run setup
 npm start
 ```
 推荐进入后先执行：
-1. `/connect status` 或 `/auth status`
+1. `/connect status`
 2. `/workspace status`
 3. 输入你的任务
 
@@ -98,11 +98,14 @@ npm start -- --attach D:\your\repo
 
 支持目标：`openai`、`anthropic`、`openai-compatible`、`siliconflow`
 
-### 3.10 `/auth`（兼容入口，建议逐步迁移到 `/connect`）
-- `/auth status`
-- `/auth set <provider> <api-key> [base-url] [model]`
-- `/auth use <provider>`
-- `/auth logout [provider]`
+### 3.10 `/connect`（凭据接入）
+- `/connect status`
+- `/connect set <provider> <api-key> [base-url] [model]`
+- `/connect use <provider>`
+- `/connect logout [provider]`
+
+> `/auth` 已于 2026-09-20 移除（维护者认定 `/connect` 取代）。旧脚本若仍调用
+> `/auth set ...`，改用 `/connect set ...` —— 参数形状相同。
 
 ### 3.11 其他
 - `/doctor`：本地诊断

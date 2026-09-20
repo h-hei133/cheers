@@ -194,7 +194,12 @@ export function projectProviderResponseStream(input: {
     contentDeltaCount: contentDeltas.length,
     contentSummary,
     toolCallDeltaCount,
-    completedToolCalls: Object.freeze(completedToolCalls),
+    // Handed to `freezeDeep` unfrozen on purpose. Freezing the array here would
+    // freeze the container only: the deep walk skips a value that is already
+    // frozen, so each tool call and its `arguments` - the raw request the model
+    // asked for - would stay writable. Same shape as the regression fixed in
+    // turn/assistantResponse.ts; this one predates it and was found by review.
+    completedToolCalls,
     malformedToolCallCount,
     assistantMessageCompleted,
     streamCompleted,

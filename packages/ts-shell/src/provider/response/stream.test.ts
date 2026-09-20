@@ -53,6 +53,35 @@ describe("provider response stream projection", () => {
     );
   });
 
+  it("deep-freezes each completed tool call, not only the array holding them", () => {
+    // Guards a real depth loss: the array was passed to `freezeDeep` already
+    // frozen, so the walk stopped at the container and each tool call - and the
+    // `arguments` the model asked for - stayed writable.
+    const stream = projectProviderResponseStream({
+      streamId: "stream-depth",
+      responseId: "response-depth",
+      events: [
+        { eventId: "e1", kind: "stream_started", retry: "not_allowed" },
+        {
+          eventId: "e2",
+          kind: "tool_call_completed",
+          toolCallId: "call-depth",
+          toolName: "read",
+          toolArguments: { path: "a.ts" },
+          retry: "not_allowed",
+        },
+      ],
+    });
+    const [toolCall] = stream.completedToolCalls;
+
+    expect(Object.isFrozen(stream.completedToolCalls)).toBe(true);
+    expect(Object.isFrozen(toolCall)).toBe(true);
+    expect(Object.isFrozen(toolCall?.arguments)).toBe(true);
+    expect(() => {
+      (toolCall as { name: string }).name = "write";
+    }).toThrow(TypeError);
+  });
+
   it("keeps cancellation partial and retry facts distinct from success", () => {
     const stream = projectProviderResponseStream({
       streamId: "stream-cancel",
