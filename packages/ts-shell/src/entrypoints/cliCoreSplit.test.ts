@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import {
-  formatAgentModeStatusLines,
   formatViewModeStatusLines,
-  formatWorkspaceInfoLines,
   projectPermissionListDisplay,
 } from "./cliDisplayProjection.js";
 import { projectCliProviderProjection } from "./cliProviderProjection.js";
@@ -186,25 +184,9 @@ describe("CLI core split projections", () => {
   });
 
   it("projects display facts without changing known CLI strings", () => {
-    expect(
-      formatWorkspaceInfoLines({
-        cwd: "/workspace/subdir",
-        projectRoot: "/workspace",
-      }),
-    ).toEqual([
-      "",
-      "Current working directory: /workspace/subdir",
-      "Project root: /workspace",
-      "Use /cd <path> (or /workspace attach <path>) to switch target project.",
-      "",
-    ]);
     expect(formatViewModeStatusLines({ viewMode: "compact" })).toEqual([
       "\nCurrent view mode: user (compact)",
       "Use /view user for product-style output, or /view developer for runtime-level diagnostics.\n",
-    ]);
-    expect(formatAgentModeStatusLines({ agentMode: "plan" })).toEqual([
-      "\nCurrent agent mode: plan",
-      "Use /plan for planning-oriented reasoning, or /build for coding/build execution (default).\n",
     ]);
     expect(
       projectPermissionListDisplay({

@@ -91,14 +91,11 @@ export interface ShellActionResult {
     | 'set-view'
     | 'show-view'
     | 'manage-permissions'
-    | 'set-agent-mode'
-    | 'show-agent-mode'
     | 'exit-session'
     | 'retry-turn'
     | 'clear-session'
   readonly sessionId?: string
   readonly viewMode?: 'compact' | 'verbose'
-  readonly agentMode?: 'plan' | 'build'
   readonly sessionAction?: 'panel' | 'list' | 'switch' | 'current' | 'help'
   readonly permissionAction?: 'list' | 'explain' | 'revoke' | 'reset'
   readonly permissionSelector?: string

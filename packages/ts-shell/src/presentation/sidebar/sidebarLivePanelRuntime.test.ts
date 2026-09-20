@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseSidebarLivePanelCommandArgs } from "./sidebarLivePanelCommandContract.js";
 import { runSidebarLivePanelCommand } from "./sidebarLivePanelCommandRunner.js";
-import { checkSidebarLivePanelQuality } from "./sidebarLivePanelQuality.js";
 import { renderSidebarLivePanelFrame } from "./sidebarLivePanelRenderer.js";
 import { createSidebarLivePanelRuntime } from "./sidebarLivePanelRuntime.js";
 import { createSidebarLiveEventStore } from "./sidebarLiveEventStore.js";
@@ -61,7 +60,7 @@ describe("sidebar live panel runtime", () => {
     expect(second.evidence).toContain("sidebar-live-panel-runtime:no-indefinite-loop");
   });
 
-  it("renders frame metadata and passes live quality checks", () => {
+  it("renders frame metadata with bounded live output", () => {
     const store = createSidebarLiveEventStore({
       now: () => "2026-05-17T02:00:00.000Z",
     });
@@ -106,7 +105,6 @@ describe("sidebar live panel runtime", () => {
     });
     const frame = runtime.tick();
     const output = renderSidebarLivePanelFrame(frame);
-    const quality = checkSidebarLivePanelQuality({ frame, renderedOutput: output });
 
     expect(output).toContain("Sidebar live/watch preview");
     expect(output).toContain("[Live frame]");
@@ -116,9 +114,6 @@ describe("sidebar live panel runtime", () => {
     expect(output).toContain("Developer-only sidebar events are hidden by default.");
     expect(output).not.toContain("developer-only raw event");
     expect(output.split("\n").length).toBeLessThanOrEqual(frame.panel.budget.maxLines);
-    expect(quality.qualityStatus).toBe("pass");
-    expect(quality.checks.watchOutputBounded).toBe("pass");
-    expect(quality.checks.blockersWarningsVisible).toBe("pass");
   });
 
   it("redacts raw content, secrets, and hidden reasoning from live output", () => {
@@ -147,7 +142,6 @@ describe("sidebar live panel runtime", () => {
     });
     const frame = runtime.tick();
     const output = renderSidebarLivePanelFrame(frame);
-    const quality = checkSidebarLivePanelQuality({ frame, renderedOutput: output });
 
     expect(output).toContain("[REDACTED_RAW_CONTENT]");
     expect(output).toContain("[REDACTED_SECRET]");
@@ -155,9 +149,6 @@ describe("sidebar live panel runtime", () => {
     expect(output).not.toContain("sk-testsecret123");
     expect(output).not.toContain("RAW_SECRET_CONTENT");
     expect(output).not.toContain("hidden reasoning");
-    expect(quality.checks.noRawContentLeak).toBe("pass");
-    expect(quality.checks.noSecretLeak).toBe("pass");
-    expect(quality.checks.noHiddenReasoningLeak).toBe("pass");
   });
 
   it("parses and runs the watch command as a bounded read-only command", () => {

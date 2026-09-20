@@ -15,11 +15,8 @@ import {
   buildCliCommandExecution,
 } from "../../entrypoints/cliCommandExecutionBridge.js";
 import {
-  formatAgentModeStatusLines,
-  formatAgentModeUpdatedLines,
   formatViewModeStatusLines,
   formatViewModeUpdatedLine,
-  formatWorkspaceInfoLines,
 } from "../../entrypoints/cliDisplayProjection.js";
 import {
   type CliMcpGateway,
@@ -215,26 +212,6 @@ export async function routeInteractiveCommand(
     input.sessionRuntime.setViewMode(nextMode);
     input.renderer.renderLine(formatViewModeUpdatedLine({ viewMode: nextMode }));
     return { turnNumber: nextTurnNumber };
-  }
-
-  if (isShellAction(slashResult, "show-agent-mode")) {
-    renderProjectedLines(
-      input.renderer,
-      formatAgentModeStatusLines({
-        agentMode: input.sessionRuntime.getAgentMode(),
-      }),
-    );
-    return { turnNumber: nextTurnNumber };
-  }
-
-  if (isShellAction(slashResult, "set-agent-mode")) {
-    const nextMode = slashResult.agentMode ?? "build";
-    input.sessionRuntime.setAgentMode(nextMode);
-    renderProjectedLines(
-      input.renderer,
-      formatAgentModeUpdatedLines({ agentMode: nextMode }),
-    );
-    return { turnNumber: nextTurnNumber, refreshPromptChrome: true };
   }
 
   if (isShellAction(slashResult, "manage-permissions")) {

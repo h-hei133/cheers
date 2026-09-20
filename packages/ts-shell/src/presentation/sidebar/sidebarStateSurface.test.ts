@@ -1,13 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { bridgeSidebarEvents } from "./sidebarEventBridge.js";
+import { createSidebarEvent } from "./sidebarEventModel.js";
 import { projectSidebarState } from "./sidebarStateProjection.js";
 import { renderSidebarStateSurface } from "./sidebarStateSurface.js";
 
 describe("sidebar state surface", () => {
   it("renders a concise preview with safety boundaries and no UI claim", () => {
-    const events = bridgeSidebarEvents({
-      commandResults: [{ command: "/sidebar", outcome: "status", summary: "Rendered." }],
-    }).events;
+    const events = [
+      createSidebarEvent({
+        kind: "command",
+        severity: "info",
+        visibility: "user-visible",
+        source: "slash-command",
+        title: "/sidebar",
+        summary: "Rendered.",
+        evidence: ["sidebar:command"],
+      }),
+    ];
     const output = renderSidebarStateSurface(projectSidebarState({
       task: { routeId: "Route 88", title: "sidebar state", objective: "Preview state." },
       toolAvailability: {},

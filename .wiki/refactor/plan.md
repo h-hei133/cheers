@@ -1634,9 +1634,9 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | **T7** | 裁决不可达文件的处置 | §6 | ✅ **已裁决（2026-09-20）：不批准整批删除**，逐簇按「活轨是否已承担职责」裁决。实测 **270 文件 / 59,121 行**（285/60,058 不可复现）；见 §9.18 |
 | **T8** | 重跑 judge 并刷新 `.normproof/out/` | §10.3 模块-2 | ✅ **已完成**（2026-09-20）：`normproof judge` 重跑，`out/` 全部产物刷新；**ledger 的 4 个已删 `claimId` 归零**，见 §9.18 |
 | **T9** | 删 2 处 `renderProjectedLines` 副本 + `parseArgsWithFlags` 私有副本 | §15.8 | ✅ **已完成**（2026-09-20）：3 → 1、2 → 1，见 §9.18 |
-| **T10** | 裁决并清理 sidebar Quality 三模块 + EventBridge | §15.3 E-死-1 | ✅ **已裁决（2026-09-20）：删除**。实测 **550 行**（非约 440）；删 4 模块 + 2 自测，保留并窄改 3 个 live 行为测试；见 §9.18 |
-| **T11** | 删 `shellActionRuntime.ts` 三个死导出及连带 `cliDisplayProjection.ts` | §15.3 E-死-2 | ✅ **已裁决（2026-09-20）：部分删除**（111 行）。`/view` 无 producer 故保留；`cliDisplayProjection.ts` 不能整删；见 §9.18 |
-| **T12** | 删 `browser/toolPolicy.ts`+`agent.ts`+`plan.ts` 死链（589 行） | §13.3 D-死-1 | ✅ **已裁决（2026-09-20）：删除** 589 行 + 移除 `WorkflowTaskPlan.browserPlan` 的 type-only 残留；见 §9.18 |
+| **T10** | 裁决并清理 sidebar Quality 三模块 + EventBridge | §15.3 E-死-1 | ✅ **已执行（2026-09-20）**：实测 **550 行**（非约 440）。删 4 模块 + 2 自测，保留并窄改 3 个 live 行为测试；见 §9.19 |
+| **T11** | 删 shell action 与 display projection 的死导出 | §15.3 E-死-2 | ✅ **已执行（2026-09-20）：部分删除**（111 行）。`/view` 无 producer 故保留；`cliDisplayProjection.ts` 不能整删；见 §9.19 |
+| **T12** | 删 browser agent/plan/tool-policy 死链（589 行） | §13.3 D-死-1 | ✅ **已执行（2026-09-20）**：589 行 + 移除 `WorkflowTaskPlan.browserPlan` 的 type-only 残留；见 §9.19 |
 | **T13** | 修 `cliArgs.ts` 保留字表重复项 `/memory` | §15.8 | ✅ **已完成**（2026-09-20）：100 条字面量含 1 重复 → 99 条全唯一，见 §9.18 |
 | **T14** | 收口 `normalizeBaseUrl`/`normalizePathForCompare`/`toRelativeTime`/`stableId` | §12.4、§16 | ✅ **已裁决（2026-09-20）：选择性收口**。实测 **7/7/4/3**（非 4/7/4/2）；仅 `stableId` 两份可并入 `core/values/`；见 §9.18 |
 | **T15** | 处理 2 个脚本式 `*.test.mjs` | §9.9「测试跑法」 | ✅ **已完成**（`b7b7880b`）：改名去掉 `.test`，见 §9.11 |
@@ -2297,3 +2297,98 @@ T15 改名零残留；CB-005 的 `runtime/loop` 生产零值导入、动态入�
 - 未运行全量 vitest / `npm run build`（并发约束）；未对建议 diff 实际施工。
 - 未做动态 `import()` / `spawn` / `pathToFileURL` 的运行时 tracing；保护类判定基于静态形状 + 精确字符串探针。
 - 未验证仓库外 consumer、未入仓 plugin；`WorkflowTaskPlan.browserPlan` 与 `/view` 文档承诺是否属外部契约需维护者确认。
+
+### 9.19 §9.8 剩余项的施工执行（2026-09-20）
+
+§9.18 给出裁决后，按 **T12 → T10 → T11** 顺序施工（风险由低到高），
+并先把 T6/T7/T16a/T16b/T18 五项"决定不改"登记进 `.normproof/dispositions.md`。
+
+#### 先登记：5 条 disposition
+
+`dispositions.md` 追加 4 条（协议 append-only，未删任何行）：
+
+| obligation-id | 内容 |
+|---|---|
+| `unreachable-code-retention` | T7：270 文件 / 59,121 行不可达，**不授权整批删除**（抽样证明 context 获取、planning runtime、event 投影、session tree 投影均无活轨等价承担）|
+| `unreachable-code-retention` | T16a/T16b：`mutation.ts` 簇不可达且 5 个嗅探字符串生产者为 0；**不删、不接线**，若需语义应在活 edit/result lane 新建 producer |
+| `contract-seam-inert` | T6：`cliSessionRuntimeFactory.ts` 声明 2 参、调用方传 4 参；生产者存活但 CLI 后无 seed reader，**补形参＝接死端**。与 CB-005 方向相反 |
+| `dependency-direction` | T18：原记录"5 处跨域指向顶层 `presentation/`"**不成立**，实测顶层 0 条，全部在 `session/presentation/` 内 |
+
+#### T12 ✅ 已执行 —— 删除 browser 死链
+
+| 项 | 内容 |
+|---|---|
+| 删除 | `browser/toolPolicy.ts`(188) + `browser/agent.ts`(183) + `browser/plan.ts`(218) = **589 行** |
+| 连带修改 | `planning/task/workflowTaskPlanner.ts`：移除 `BrowserAgentPlan` type-only import 与 `browserPlan?` 字段 |
+| 六项检查 | 1 功能读审 ✅（构造 prompt-driven plan，无 side effect）｜2 等价核验 ✅（显式 `/browser` 活轨：`browserCommandRuntime` → `commandRunner` → action loop/policy）｜3 消费者 ✅（唯一外部边是 type-only，**全仓 `browserPlan` 仅 1 处出现＝声明本身，无赋值无读取**）｜4 动态入口 ✅ 0 命中｜5 公共面 ✅ 0 命中｜6 scripts ✅ 0 命中 |
+| 验证 | `tsc` 0 错误；`src/browser` 71 文件 / 210 项通过；残留引用扫描 0；环扫描 **1439 → 1436 文件，0 环** |
+
+#### T10 ✅ 已执行 —— 删除 sidebar Quality/EventBridge
+
+| 项 | 内容 |
+|---|---|
+| 删除 | `sidebarEventBridge.ts`(244) + `sidebarPanelQuality.ts`(97) + `sidebarLivePanelQuality.ts`(99) + `sidebarStateQuality.ts`(110) = **550 行**；另删 2 个自测（`sidebarEventBridge.test.ts`、`sidebarStateQuality.test.ts`）|
+| 保留并窄改 | `sidebarStateSurface.test.ts`：`bridgeSidebarEvents` fixture → 活 `createSidebarEvent`（**断言全保留**）｜`sidebarPanelLayout.test.ts`：摘除 `checkSidebarPanelQuality` import/调用/断言（**其余 4 项断言全保留**）｜`sidebarLivePanelRuntime.test.ts`：摘除 `checkSidebarLivePanelQuality` 调用与 6 条断言（**它们与已有的直接输出断言重复**）|
+| 六项检查 | 全部通过；生产 value consumer = 0（实测：仅 `sidebarLivePanelQuality.ts` 内部 import，而它自身只被测试 import）|
+| 验证 | `tsc` 0 错误；`src/presentation/sidebar` **10 文件 / 33 项通过**——live state/panel/runtime/renderer/store 行为仍被覆盖 |
+
+**关键点**：T10 的"测试基建 vs 删除不可兼得"两难**已解决**——3 个 live 行为测试保留，只把死模块从它们的 fixture/断言中摘除。
+
+#### T11 ✅ 已执行 —— 部分删除（111 行）
+
+| 项 | 内容 |
+|---|---|
+| 删除 | `shellActionRuntime.ts`：`runSessionsShellAction`(49) + `runAgentModeShellAction`(30)；`cliDisplayProjection.ts`：`formatWorkspaceInfoLines`(12) + `formatAgentMode*`(20) = **111 行** |
+| 连带修改 | `interactiveCommandRouter.ts`：删 agent-mode 两条分支与 3 个死 import；`types.ts`：删 `set-agent-mode`/`show-agent-mode` union 成员与 `agentMode?` 字段；`cliCoreSplit.test.ts`：删对应断言 |
+| **保留** | `runViewShellAction` + `formatViewMode*` + `projectPermissionListDisplay` |
+| 保留理由 | `/view` 的 4 个 action（`show-view`/`set-view`/`show-agent-mode`/`set-agent-mode`）**全仓无任何 producer**（实测：只在 router 被读，从不被写）→ 按 §2.1 无活轨接管即不可删。agent-mode 的**读侧**同样无 producer，但写侧语义已由 Shift+Tab 活轨承担，故其死分支可删 |
+| 六项检查 | 全部通过 |
+| 验证 | `tsc` 0 错误；`cliCoreSplit.test.ts` 6/6、`src/cli/interactive` 全通过；残留引用扫描 0 |
+
+#### 本轮结束时状态
+
+| 指标 | 值 | 变化 |
+|---|---:|---|
+| 生产文件 | 939 | −7（T10 4 + T12 3）|
+| CLI 可达 | 770 | — |
+| CLI 不可达 | 169 | −4 |
+| 仅测试 | 132 | −4 |
+| import 环扫描文件 | 1430 | −9（含 2 个自测）|
+| 越界模块 | 3 | — |
+| 死引用（RULES）| 0 | — |
+| 死引用（DOCS 无前缀）| 47 | — |
+
+**删除总量**：源码 **1250 行**（589 + 550 + 111）+ 2 个自测文件。
+**未删除但已裁决保留**：T7 的 270 文件 / 59,121 行、T16a 的 `mutation.ts` 簇、T11 的 `/view` 子链。
+
+**本轮未做的事（诚实边界）**：未运行真实 TUI 实机验证——本轮改动触及 `entrypoints/`、`cli/interactive/`、`core/commands/`、`presentation/sidebar/`，**按 §2.4 属 PTY 实机验证触发面**，见 §9.20。
+
+### 9.20 本轮 PTY 实机验证（2026-09-20，§2.4 强制）
+
+本轮触及 `entrypoints/`、`cli/interactive/`、`core/commands/`、`presentation/sidebar/`
+——按 §2.4 属**实机验证触发面**，故必须启动真实 TUI 走完整回合。
+
+| 场景 | 命令 | 结果 |
+|---|---|---|
+| 完整回合 | 提示 → `bash` 工具调用 → 执行 → `echo t10-verify` 输出 → 收尾 → 回到提示符 | ✅ **无崩溃、无回归** |
+| 会话落盘 | `/sessions`（上一轮已验证同路径） | ✅ 正常 |
+| **`/view` 实机行为** | 输入 `/view status` | ⚠️ **`Outcome: blocked` / `BlockerKind: command-not-allowlisted` / `Unknown slash command: /view`** |
+
+**`/view` 实机结果是对 §9.19 决策的独立证实**：T11 之所以**保留** view 子链，是因为它
+"没有 producer"。实机运行进一步证明该命令**根本不在 registry 中**——用户敲 `/view` 得到的是
+"未知命令"，而非保留的功能。
+
+**但保留仍是正确的**，原因是实测发现 view-mode 的**读侧是活的**：
+
+| 位置 | 角色 |
+|---|---|
+| `entrypoints/cliApprovalModule.ts:490,494` | **活消费**：读取 `getViewMode()`，`"verbose"` 时改变审批输出 |
+| `core/shell/sessionRuntime.ts:123,127` | `getViewMode`/`setViewMode` 实现 |
+| `cli/runtime/cliSessionRuntimeFactory.ts:104` | 桥接到 session runtime |
+
+即：view **模式**被活路径读取（影响审批显示），只有 view **命令**（`/view`）未接线。
+这与 §9.19 的判断一致：`/view` 的 4 个 action 无 producer，但 view-mode 语义仍有活消费者，
+所以既不能删 `getViewMode`/`setViewMode`，也不该在无产品裁决的情况下把 `/view` 接回。
+
+**若要让 `/view` 可用**：需在 registry 注册命令并接线 `runViewShellAction`
+（该函数已按裁决保留），这是**新增产品能力**，不是删除清理，需单独裁决。

@@ -7,56 +7,6 @@ export async function runCancelShellAction(_args: string[], _context: CommandCon
   }
 }
 
-export async function runSessionsShellAction(_args: string[], _context: CommandContext): Promise<ShellActionResult> {
-  const mode = _args[0]?.trim().toLowerCase()
-  if (!mode || mode === 'panel') {
-    return {
-      kind: 'shell-action',
-      action: 'list-sessions',
-      sessionAction: 'panel',
-    }
-  }
-
-  if (mode === 'list') {
-    return {
-      kind: 'shell-action',
-      action: 'list-sessions',
-      sessionAction: 'list',
-    }
-  }
-
-  if (mode === 'current') {
-    return {
-      kind: 'shell-action',
-      action: 'list-sessions',
-      sessionAction: 'current',
-    }
-  }
-
-  if (mode === 'switch') {
-    return {
-      kind: 'shell-action',
-      action: 'list-sessions',
-      sessionAction: 'switch',
-      sessionId: _args[1],
-    }
-  }
-
-  if (mode === 'help' || mode === '?') {
-    return {
-      kind: 'shell-action',
-      action: 'list-sessions',
-      sessionAction: 'help',
-    }
-  }
-
-  return {
-    kind: 'shell-action',
-    action: 'list-sessions',
-    sessionAction: 'help',
-  }
-}
-
 export async function runWorkspaceShellAction(_args: string[], _context: CommandContext): Promise<ShellActionResult> {
   const mode = _args[0]?.trim().toLowerCase()
   const target = _args.slice(1).join(' ').trim() || undefined
@@ -194,37 +144,6 @@ export async function runViewShellAction(args: string[], _context: CommandContex
       kind: 'shell-action',
       action: 'set-view',
       viewMode: 'verbose',
-    }
-  }
-
-  return {
-    kind: 'shell-action',
-    action: 'show-help',
-  }
-}
-
-export async function runAgentModeShellAction(args: string[], _context: CommandContext): Promise<ShellActionResult> {
-  const mode = args[0]?.trim().toLowerCase()
-  if (!mode || mode === 'status') {
-    return {
-      kind: 'shell-action',
-      action: 'show-agent-mode',
-    }
-  }
-
-  if (mode === 'plan') {
-    return {
-      kind: 'shell-action',
-      action: 'set-agent-mode',
-      agentMode: 'plan',
-    }
-  }
-
-  if (mode === 'build') {
-    return {
-      kind: 'shell-action',
-      action: 'set-agent-mode',
-      agentMode: 'build',
     }
   }
 

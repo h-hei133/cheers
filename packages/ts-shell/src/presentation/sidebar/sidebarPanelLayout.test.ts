@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createSidebarEvent } from "./sidebarEventModel.js";
 import { buildSidebarPanel } from "./sidebarPanelLayout.js";
-import { checkSidebarPanelQuality } from "./sidebarPanelQuality.js";
 import { renderSidebarPanel } from "./sidebarPanelRenderer.js";
 import { projectSidebarState } from "./sidebarStateProjection.js";
 
@@ -10,7 +9,6 @@ describe("sidebar panel layout and renderer", () => {
     const snapshot = completeSnapshot();
     const panel = buildSidebarPanel(snapshot, { density: "normal" });
     const output = renderSidebarPanel(panel);
-    const quality = checkSidebarPanelQuality({ panel, renderedOutput: output });
 
     expect(panel.sections.map((section) => section.id)).toEqual(
       expect.arrayContaining([
@@ -41,7 +39,6 @@ describe("sidebar panel layout and renderer", () => {
     expect(output).toContain("Run focused Route 91 tests.");
     expect(output).toContain("No provider/model calls");
     expect(output).not.toContain("Project memory raw text");
-    expect(quality.qualityStatus).toBe("pass");
   });
 
   it("hides empty noisy sections in compact mode while preserving blockers and next action", () => {
