@@ -113,7 +113,12 @@ describe("sidebar live panel runtime", () => {
     expect(output).toContain("Route blocker");
     expect(output).toContain("Developer-only sidebar events are hidden by default.");
     expect(output).not.toContain("developer-only raw event");
+    // Width and next-action were asserted through the deleted live quality
+    // helper. Restored here against the rendered output, which is what a
+    // consumer sees; the panel layout test only covers renderSidebarPanel.
     expect(output.split("\n").length).toBeLessThanOrEqual(frame.panel.budget.maxLines);
+    expect(output.split("\n").every((line) => line.length <= frame.panel.budget.maxWidth)).toBe(true);
+    expect(output).toContain("Keep watch output bounded.");
   });
 
   it("redacts raw content, secrets, and hidden reasoning from live output", () => {

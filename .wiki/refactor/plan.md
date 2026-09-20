@@ -2844,6 +2844,20 @@ MUTATION SUCCEEDED -> rm -rf /     ← 可改模型请求的原始参数
 
 **同类扫描**：全仓 `freezeDeep` 参数内的 `Object.freeze(标识符)` 共 **18 处**，逐处核查后仅上述 1 处有实质深度丢失。其余分三类：持有原始类型（`string[]`、`boolean[]`）故无深度可丢；元素已由 `.map(Object.freeze({...}))` 或 `sanitizeToolCallCandidate` 单独深冻结；元素仅含原始类型字段（如 `boundary.ts:374` 的 `safeRequestMessages`，字段为 `messageId/source/safeSummary/terminalSuccessClaim`）。
 
+**（3）T10 的测试收窄丢失了两条活断言**（由 `ReviewDeletionsT10T11T12` 发现，主代理复现并修复）
+
+`bfe56b20` 删除 `checkSidebarLivePanelQuality` 时，一并删掉了经由它断言的**两条活不变式**：
+
+| 丢失的断言 | 原实现位置 | 现状 |
+|---|---|---|
+| 输出宽度 ≤ `budget.maxWidth` | `sidebarLivePanelQuality.ts` 的 `watchOutputBounded` | `sidebarLivePanelRuntime.test.ts` 只留了 `maxLines` |
+| next-action 可见 | 同上 `nextActionVisible` | 测试种了 `nextAction`（L98）却从不断言它出现 |
+
+`sidebarPanelLayout.test.ts:81` 的 `maxWidth` 断言**不覆盖此处**——它测的是 `renderSidebarPanel` 且传了显式 budget，不是 `renderSidebarLivePanelFrame` 的活路径。
+
+**处置**：两条断言已按**渲染输出**（消费者实际所见）恢复，并各自注入真实回归验证其有效：`innerWidth = width + 30` 触发宽度断言失败；过滤掉 `next-action` 段触发 next-action 断言失败。
+**注意**：单纯放宽 `options.maxWidth` **不会**触发——`renderSidebarPanel` 会把宽度 clamp 到 `panel.budget.maxWidth`，真正能回归的是 inner-width 路径。
+
 #### 记录但不修复（1 项）
 
 `isPrivateNetworkHost` 不覆盖 `fd00:ec2::254`（AWS 的 **IPv6 元数据地址**，等价于 `169.254.169.254`）。原注释列了 IPv6 链路本地、CGNAT、`0.0.0.0`、DNS rebinding，**唯独漏了这一条**——而它恰是本次修复所针对的元数据端点。已补入注释，并注明"调用方不应单独依赖此防线"。**不扩大修复范围**：覆盖它需要解析 IPv6 网段，超出本次修复的授权范围。
