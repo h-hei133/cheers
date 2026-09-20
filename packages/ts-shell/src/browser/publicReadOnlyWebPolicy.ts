@@ -1,6 +1,6 @@
 import type { BrowserExecutionConfirmationRecord } from "./executionConfirmation.js";
 import type { BrowserExecutionRequest } from "./executionContract.js";
-import { parseBrowserNetworkTarget } from "./networkAllowlist.js";
+import { isPrivateNetworkHost, parseBrowserNetworkTarget } from "./networkAllowlist.js";
 import { decideBrowserNetworkEgress, type BrowserNetworkEgressDecision } from "./networkEgressGuard.js";
 import type {
   BrowserPublicReadOnlyWebManifest,
@@ -163,12 +163,6 @@ function normalizeMethod(value: string | undefined): BrowserPublicReadOnlyWebMet
 
 function isSensitive(actionKind: BrowserExecutionRequest["actionKind"]): boolean {
   return !["navigate", "observe", "extract"].includes(actionKind);
-}
-
-function isPrivateNetworkHost(hostname: string): boolean {
-  return hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local") ||
-    hostname === "::1" || hostname.startsWith("127.") || hostname.startsWith("10.") ||
-    hostname.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
 }
 
 function unique(values: readonly string[]): readonly string[] {

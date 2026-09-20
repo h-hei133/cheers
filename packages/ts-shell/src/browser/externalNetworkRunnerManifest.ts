@@ -1,3 +1,4 @@
+import { isRecord } from "../core/values/record.js";
 import { sanitizeBrowserText } from "./capabilityModel.js";
 import {
   createBrowserNetworkAllowlist,
@@ -339,10 +340,6 @@ function isSource(value: unknown): value is BrowserExternalNetworkRunnerManifest
 
 function isRunnerMode(value: unknown): value is BrowserExternalNetworkRunnerManifestMode {
   return value === "simulated-external" || value === "disabled" || value === "future-real-external";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function stringValue(value: unknown): string | undefined {

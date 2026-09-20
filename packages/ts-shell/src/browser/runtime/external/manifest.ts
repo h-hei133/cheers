@@ -1,3 +1,4 @@
+import { isRecord } from "../../../core/values/record.js";
 import { sanitizeBrowserText } from "../../capabilityModel.js";
 import {
   createBrowserLocalFixture,
@@ -369,10 +370,6 @@ function stringArray(value: unknown): readonly string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string").map((item) => sanitizeBrowserEvidenceText(item, 120).value)
     : [];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function invalid(

@@ -1,3 +1,4 @@
+import { isRecord } from "../../../core/values/record.js";
 import { sanitizeBrowserText } from "../../capabilityModel.js";
 import type { BrowserExecutionRequest } from "../../executionContract.js";
 import type { BrowserAccessibilityNodeInput } from "../../accessibilitySnapshot.js";
@@ -249,10 +250,6 @@ function toProtocolAction(value: string): BrowserRuntimeProtocolAction {
   return ["runtime-status", "navigate", "observe", "extract", "click", "type", "close"].includes(value)
     ? value as BrowserRuntimeProtocolAction
     : "close";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function toStringArray(value: unknown): readonly string[] {

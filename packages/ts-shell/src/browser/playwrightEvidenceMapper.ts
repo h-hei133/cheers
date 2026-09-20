@@ -1,3 +1,4 @@
+import { redactBrowserEvidenceText } from "./evidenceSafety.js";
 import type { BrowserAccessibilityNodeInput } from "./accessibilitySnapshot.js";
 import { sanitizeBrowserText } from "./capabilityModel.js";
 import type { BrowserExecutionRequest } from "./executionContract.js";
@@ -26,7 +27,7 @@ export function mapPlaywrightEvidenceToRuntimeResult(input: {
   readonly manifest: BrowserRuntimeManifest;
   readonly evidence: BrowserPlaywrightPageEvidence;
 }): BrowserRuntimeExecutorResult {
-  const redacted = redactSensitiveText([
+  const redacted = redactBrowserEvidenceText([
     input.evidence.title,
     input.evidence.renderedText,
     input.evidence.html,
@@ -109,39 +110,12 @@ function sanitizeAccessibilityNodes(
 ): readonly BrowserAccessibilityNodeInput[] {
   return nodes.slice(0, 40).map((node) => ({
     role: sanitizeBrowserText(node.role || "generic", 60),
-    name: node.name ? sanitizeBrowserText(redactSensitiveText(node.name).text, 140) : undefined,
+    name: node.name ? sanitizeBrowserText(redactBrowserEvidenceText(node.name).text, 140) : undefined,
     selector: node.selector ? sanitizeBrowserText(node.selector, 120) : undefined,
     disabled: node.disabled,
     hidden: node.hidden,
     value: undefined,
   }));
-}
-
-function redactSensitiveText(value: string): {
-  readonly text: string;
-  readonly warnings: readonly string[];
-  readonly redactions: readonly string[];
-} {
-  const redactions = new Set<string>();
-  const text = value
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, () => {
-      redactions.add("secret-looking-token");
-      return "[REDACTED_SECRET]";
-    })
-    .replace(/\b(api[_ -]?key|token|authorization|password|secret)\s*[:=]\s*[^\s<>"']+/gi, (match) => {
-      redactions.add("secret-looking-field");
-      const label = match.split(/[:=]/)[0] ?? "secret";
-      return `${label}=[REDACTED_SECRET]`;
-    })
-    .replace(/\b(hidden reasoning|chain[- ]?of[- ]?thought)\b/gi, () => {
-      redactions.add("hidden-reasoning-label");
-      return "[REDACTED_REASONING]";
-    });
-  return {
-    text,
-    warnings: redactions.size > 0 ? ["sensitive-content-redacted"] : [],
-    redactions: Array.from(redactions).sort(),
-  };
 }
 
 function escapeHtml(value: string): string {

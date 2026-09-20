@@ -1,3 +1,4 @@
+import { normalizeOptionalString } from "./sessionContinuityModule.js";
 import path from "node:path";
 import type {
   PermissionRequestMemoryState,
@@ -546,12 +547,4 @@ function normalizePermissionSource(
   return sourceRaw === "verification-command" || sourceRaw === "approval-request"
     ? sourceRaw
     : undefined;
-}
-
-function normalizeOptionalString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
 }

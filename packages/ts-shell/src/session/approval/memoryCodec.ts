@@ -1,3 +1,4 @@
+import { normalizeOptionalString } from "../sessionContinuityModule.js";
 import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
 
 export type ApprovalMemoryRecord = ApprovalAuditMemoryState;
@@ -283,12 +284,4 @@ function normalizeApprovalDecision(
     return normalized;
   }
   return undefined;
-}
-
-function normalizeOptionalString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
 }

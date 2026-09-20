@@ -1,3 +1,4 @@
+import { isRecord } from "../core/values/record.js";
 import fs from "node:fs";
 import { sanitizeBrowserText } from "./capabilityModel.js";
 import { createBrowserNetworkAllowlist } from "./networkAllowlist.js";
@@ -261,10 +262,6 @@ function invalid(
     warnings: ["browser-controlled-network-runner-manifest:blocked"],
     redactions,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function stringValue(value: unknown): string | undefined {

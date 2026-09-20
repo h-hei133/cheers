@@ -1,3 +1,4 @@
+import { compactContinuityText } from "../sessionContinuityModule.js";
 import type {
   CodingResultSummary,
   CodingWriteEffect,
@@ -174,7 +175,7 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
     parts.push(`command=${command}`);
   }
   if (reason) {
-    parts.push(`reason=${compactText(reason, 140)}`);
+    parts.push(`reason=${compactContinuityText(reason, 140)}`);
   }
   if (blockerKind) {
     parts.push(`blocker=${blockerKind}`);
@@ -197,7 +198,7 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
     parts.push("automatic-rollback=no");
   }
   parts.push(...formatContinuationEvidenceParityDetails(codingResult));
-  parts.push(`next=${compactText(nextFocus, 140).replace(/[.]+$/, "")}`);
+  parts.push(`next=${compactContinuityText(nextFocus, 140).replace(/[.]+$/, "")}`);
   return `${parts.join("; ")}.`;
 }
 
@@ -266,12 +267,4 @@ function extractWriteEffectFromEvidence(
     }
   }
   return undefined;
-}
-
-function compactText(input: string, max: number = 220): string {
-  const normalized = input.replace(/\s+/g, " ").trim();
-  if (normalized.length <= max) {
-    return normalized;
-  }
-  return `${normalized.slice(0, max)}...`;
 }

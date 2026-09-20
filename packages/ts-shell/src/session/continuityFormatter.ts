@@ -1,3 +1,4 @@
+import { compactContinuityText } from "./sessionContinuityModule.js";
 import type { SessionContinuitySnapshot } from "./sessionContinuityTypes.js";
 
 export function formatPromptContinuityContext(
@@ -86,16 +87,16 @@ export function formatPromptContinuityContext(
     lines.push(`- last-staged-repair-next-step: ${snapshot.lastStagedRepairNextStep}`);
   }
   if (snapshot.lastAnswerDefect) {
-    lines.push(`- last-answer-defect: ${compactText(snapshot.lastAnswerDefect, 120)}`);
+    lines.push(`- last-answer-defect: ${compactContinuityText(snapshot.lastAnswerDefect, 120)}`);
   }
   if (snapshot.lastActionHandoffSummary) {
     lines.push(
-      `- last-action-handoff-summary: ${compactText(snapshot.lastActionHandoffSummary, 180)}`,
+      `- last-action-handoff-summary: ${compactContinuityText(snapshot.lastActionHandoffSummary, 180)}`,
     );
   }
   if (snapshot.lastSeedInfluenceHandoffSummary) {
     lines.push(
-      `- last-seed-influence-handoff-summary: ${compactText(snapshot.lastSeedInfluenceHandoffSummary, 180)}`,
+      `- last-seed-influence-handoff-summary: ${compactContinuityText(snapshot.lastSeedInfluenceHandoffSummary, 180)}`,
     );
   }
   if (snapshot.lastWriterStarted !== undefined) {
@@ -116,12 +117,12 @@ export function formatPromptContinuityContext(
   }
   if (snapshot.lastFailureHandoffDiagnostic) {
     lines.push(
-      `- last-failure-handoff-diagnostic: ${compactText(snapshot.lastFailureHandoffDiagnostic, 220)}`,
+      `- last-failure-handoff-diagnostic: ${compactContinuityText(snapshot.lastFailureHandoffDiagnostic, 220)}`,
     );
   }
   if (snapshot.lastSuccessHandoffDiagnostic) {
     lines.push(
-      `- last-success-handoff-diagnostic: ${compactText(snapshot.lastSuccessHandoffDiagnostic, 220)}`,
+      `- last-success-handoff-diagnostic: ${compactContinuityText(snapshot.lastSuccessHandoffDiagnostic, 220)}`,
     );
   }
   if (snapshot.lastTerminalClassification || snapshot.lastTerminalReason) {
@@ -130,7 +131,7 @@ export function formatPromptContinuityContext(
     );
   }
   if (snapshot.lastFailure) {
-    lines.push(`- last-failure: ${compactText(snapshot.lastFailure)}`);
+    lines.push(`- last-failure: ${compactContinuityText(snapshot.lastFailure)}`);
   }
   if (snapshot.recentChangedFiles.length > 0) {
     lines.push(`- recent-changed-files: ${snapshot.recentChangedFiles.join(", ")}`);
@@ -163,7 +164,7 @@ export function formatPromptContinuityContext(
     }
     if (snapshot.lastVerificationReason) {
       lines.push(
-        `- last-verification-reason: ${compactText(snapshot.lastVerificationReason)}`,
+        `- last-verification-reason: ${compactContinuityText(snapshot.lastVerificationReason)}`,
       );
     }
     if (snapshot.lastVerificationBlockerKind) {
@@ -173,7 +174,7 @@ export function formatPromptContinuityContext(
     }
     if (snapshot.lastVerificationNextAction) {
       lines.push(
-        `- last-verification-next-action: ${compactText(snapshot.lastVerificationNextAction)}`,
+        `- last-verification-next-action: ${compactContinuityText(snapshot.lastVerificationNextAction)}`,
       );
     }
     if (snapshot.lastVerificationResumeEligible !== undefined) {
@@ -217,7 +218,7 @@ export function formatPromptContinuityContext(
     }
     if (snapshot.lastApprovalStopReason) {
       lines.push(
-        `- last-approval-stop-reason: ${compactText(snapshot.lastApprovalStopReason)}`,
+        `- last-approval-stop-reason: ${compactContinuityText(snapshot.lastApprovalStopReason)}`,
       );
     }
     if (snapshot.lastApprovalRecordedAt) {
@@ -336,7 +337,7 @@ export function formatPromptContinuityContext(
     if (snapshot.lastRepairNotes.length > 0) {
       lines.push(
         `- last-repair-notes: ${snapshot.lastRepairNotes
-          .map((note) => compactText(note, 120))
+          .map((note) => compactContinuityText(note, 120))
           .join(" | ")}`,
       );
     }
@@ -346,7 +347,7 @@ export function formatPromptContinuityContext(
     if (snapshot.lastContinuationEvidence.length > 0) {
       lines.push(
         `- last-continuation-evidence: ${snapshot.lastContinuationEvidence
-          .map((entry) => compactText(entry, 120))
+          .map((entry) => compactContinuityText(entry, 120))
           .join(" | ")}`,
       );
     }
@@ -358,7 +359,7 @@ export function formatPromptContinuityContext(
     if (snapshot.lastTaskSatisfactionReasons.length > 0) {
       lines.push(
         `- last-task-satisfaction-reasons: ${snapshot.lastTaskSatisfactionReasons
-          .map((reason) => compactText(reason, 120))
+          .map((reason) => compactContinuityText(reason, 120))
           .join(" | ")}`,
       );
     }
@@ -371,12 +372,4 @@ export function formatPromptContinuityContext(
   );
 
   return lines.join("\n");
-}
-
-function compactText(input: string, max: number = 220): string {
-  const normalized = input.replace(/\s+/g, " ").trim();
-  if (normalized.length <= max) {
-    return normalized;
-  }
-  return `${normalized.slice(0, max)}...`;
 }

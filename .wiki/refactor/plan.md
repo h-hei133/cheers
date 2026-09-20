@@ -2497,3 +2497,48 @@ adapter seam** —— 交叉边 **9 条**（6 value + 3 type-only），且**存�
 **不搬迁的理由**：654 条内部边 + 9 条跨 seam 边 + 多入口 ingress；且历史先例是
 Step 3f 实测 1,537 边 vs 估算 361（**低估 4 倍**）。按 §2.4.1 的搬迁纪律，
 此规模搬迁需先跑 SCC、按依赖方向分批、实测每条 escaping 边——**收益不明确，成本已证明会低估**。
+
+### 9.22 §9.5-2 五组重复实现的收口执行（2026-09-20）
+
+按 §9.21 的裁决，收口 5 组。**每组都先证明等价、再改调用点**，全部实测：
+
+| 组 | 前 | 后 | owner | 等价性证明 |
+|---|---:|---:|---|---|
+| `isPrivateNetworkHost`（**SSRF 防线**）| 4 | 1 | `browser/networkAllowlist.ts`（既有）| 28 个 host 输入，**0 不一致** |
+| `redactSensitiveText`（浏览器族）| 3 | 1 | `browser/evidenceSafety.ts`（既有）| 21 输入 × 2 变体 = **42 组，0 不一致** |
+| `isRecord` | 13 | 1 | `core/values/record.ts`（**新建**）| 两个变体在 16 个值上**行为相同** |
+| `compactText` | 4 | 1 | `session/sessionContinuityModule.ts`（既有导出 `compactContinuityText`）| 函数体**逐字节相同** |
+| `normalizeOptionalString` | 3 | 1 | `session/sessionContinuityModule.ts`（既有）| 函数体**逐字节相同** |
+
+**关键安全发现（未改，需裁决）**：`isPrivateNetworkHost` 的探针暴露该防线本身有两个缺口——
+`LOCALHOST`（大写）与 `169.254.169.254`（云元数据端点）**均判为非私有**。
+这两处是**行为缺口而非重复问题**，收口不改变它们（4 份本来就一致地有缺口）。
+**修它属行为变更，需独立裁决**，本轮不做。
+
+**`core/values/record.ts` 新建的依据**：`core/` 准入三条件实测通过——
+① Direction：零 import；② Audience：`browser/`(12) + `turn/`(1) 两个域；
+③ Survival：真实共享值守卫。已按规则要求在 `agent-rules/architecture-boundaries.md`
+的 Common Areas 登记。
+
+**过程中的两次自纠**：
+- 批处理脚本误删了 `core/values/record.ts` 自身的定义（它也被 `grep -rl` 命中），已立即重建；
+- `permissionRequestMemoryCodec.ts` 的 import 路径算错（`../` 应为 `./`），`tsc` 报错后修正。
+
+**验证**：
+| 检查 | 结果 |
+|---|---|
+| `tsc --noEmit -p tsconfig.build.json` | 0 错误 |
+| `src/browser` | 58 文件 / 191 项通过 |
+| `src/session` | 57 文件 / 265 项通过 |
+| `src/browser` + `src/turn` + `src/core/values` | 67 文件 / 260 项通过 |
+| 全量（官方入口）| 490/491 文件，**2741 通过 / 1 失败** |
+| import 环 | 0（1431 文件）|
+| 越界模块 | 3，无新增 |
+| drift 门禁 | strict pass |
+
+**那 1 个失败是既存 flake，非本轮引入**：`cli-baseline.test.ts:649` 的
+`sessions current` 断言 `- ID:`。三重证据：
+① 该字符串由 `core/shell/sessionStateSurface.ts:115` 产出，**不在本轮改动文件内**；
+② 隔离复跑 **40/40 通过**；
+③ `git stash` 掉本轮全部改动后该测试同样通过——即两侧行为一致，失败只出现在全量并发下。
+`plan.md` §9.14 已记录同一测试的同类抖动（"在 HEAD 上同样失败 → 既存 flake"）。

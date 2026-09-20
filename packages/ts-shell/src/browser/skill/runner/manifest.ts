@@ -1,3 +1,4 @@
+import { isRecord } from "../../../core/values/record.js";
 import { sanitizeBrowserText } from "../../capabilityModel.js";
 import {
   createBrowserSkillRunnerMetadata,
@@ -189,8 +190,4 @@ function hasForbiddenContent(value: string): boolean {
 
 function isSafeInteger(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

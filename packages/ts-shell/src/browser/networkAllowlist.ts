@@ -205,7 +205,22 @@ export function decideBrowserNetworkAllowlist(input: {
   });
 }
 
-function isPrivateNetworkHost(hostname: string): boolean {
+/**
+ * Whether `hostname` names a host on the private network.
+ *
+ * This is the SSRF guard: every caller uses it to refuse a target before any
+ * request is made, so a rule that exists in one copy and not another is a
+ * bypass in the copy that lacks it. It was previously duplicated verbatim in
+ * `publicReadOnlyWebPolicy.ts`, `publicReadOnlyWebManifest.ts` and
+ * `core/harness/browserPublicReadOnlyWebSmokeConfig.ts`; all three already
+ * imported from this module, so consolidating here adds no dependency edge.
+ *
+ * Note the scope: this covers the RFC 1918 ranges, loopback, `.local` and
+ * `.localhost`. It is not a general DNS-rebinding defence and it does not
+ * resolve names, so a public name that resolves to a private address is not
+ * caught here.
+ */
+export function isPrivateNetworkHost(hostname: string): boolean {
   return (
     hostname === "localhost" ||
     hostname.endsWith(".localhost") ||

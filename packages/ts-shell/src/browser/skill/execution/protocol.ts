@@ -1,3 +1,4 @@
+import { isRecord } from "../../../core/values/record.js";
 import { sanitizeBrowserText } from "../../capabilityModel.js";
 import type { BrowserExecutionRequest } from "../../executionContract.js";
 import type { BrowserSkillRunnerBindingMode } from "../runner/binding.js";
@@ -343,8 +344,4 @@ function stringValue(value: unknown): string | undefined {
 
 function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

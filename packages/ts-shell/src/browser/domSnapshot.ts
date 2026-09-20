@@ -1,3 +1,4 @@
+import { redactBrowserEvidenceText } from "./evidenceSafety.js";
 import { sanitizeBrowserText } from "./capabilityModel.js";
 import { normalizeOriginLike } from "./runtime/core/manifest.js";
 
@@ -49,7 +50,7 @@ export function createBrowserDomSnapshot(input: {
     warnings.add("dom-snapshot-truncated-to-budget");
   }
   const stripped = stripUnsafeMarkup(bounded.text);
-  const redacted = redactSensitiveText(decodeBasicEntities(stripped));
+  const redacted = redactBrowserEvidenceText(decodeBasicEntities(stripped));
   redacted.redactions.forEach((item) => redactions.add(item));
   redacted.warnings.forEach((item) => warnings.add(item));
   const title = input.title ?? firstMatch(stripped, /<title[^>]*>([\s\S]*?)<\/title>/i) ?? "untitled";
@@ -161,33 +162,6 @@ function element(label: string, selectorSummary: string): BrowserDomElementSumma
   return {
     label: sanitizeBrowserText(decodeBasicEntities(stripTags(label)), 160),
     selectorSummary: sanitizeBrowserText(selectorSummary, 80),
-  };
-}
-
-function redactSensitiveText(value: string): {
-  readonly text: string;
-  readonly warnings: readonly string[];
-  readonly redactions: readonly string[];
-} {
-  const redactions = new Set<string>();
-  const text = value
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, () => {
-      redactions.add("secret-looking-token");
-      return "[REDACTED_SECRET]";
-    })
-    .replace(/\b(api[_ -]?key|token|authorization|password|secret)\s*[:=]\s*[^\s<>"']+/gi, (match) => {
-      redactions.add("secret-looking-field");
-      const label = match.split(/[:=]/)[0] ?? "secret";
-      return `${label}=[REDACTED_SECRET]`;
-    })
-    .replace(/\b(hidden reasoning|chain[- ]?of[- ]?thought)\b/gi, () => {
-      redactions.add("hidden-reasoning-label");
-      return "[REDACTED_REASONING]";
-    });
-  return {
-    text,
-    warnings: redactions.size > 0 ? ["sensitive-content-redacted"] : [],
-    redactions: Array.from(redactions).sort(),
   };
 }
 

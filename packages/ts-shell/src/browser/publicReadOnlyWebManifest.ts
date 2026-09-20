@@ -1,7 +1,9 @@
+import { isRecord } from "../core/values/record.js";
 import fs from "node:fs";
 import { sanitizeBrowserText } from "./capabilityModel.js";
 import {
   createBrowserNetworkAllowlist,
+  isPrivateNetworkHost,
   normalizeBrowserAllowedOrigin,
   parseBrowserNetworkTarget,
 } from "./networkAllowlist.js";
@@ -360,22 +362,12 @@ function isSource(value: unknown): value is BrowserPublicReadOnlyWebManifestSour
   return value === "cli-harness" || value === "explicit-local-config" || value === "test-only";
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
 function isSafeInteger(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max;
-}
-
-function isPrivateNetworkHost(hostname: string): boolean {
-  return hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local") ||
-    hostname === "::1" || hostname.startsWith("127.") || hostname.startsWith("10.") ||
-    hostname.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
 }
 
 function sanitizeList(values: readonly unknown[]): readonly string[] {

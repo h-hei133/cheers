@@ -1,5 +1,5 @@
 import { sanitizeBrowserText } from "../../browser/capabilityModel.js";
-import { parseBrowserNetworkTarget } from "../../browser/networkAllowlist.js";
+import { isPrivateNetworkHost, parseBrowserNetworkTarget } from "../../browser/networkAllowlist.js";
 import type { BrowserPublicReadOnlyWebMethod } from "../../browser/publicReadOnlyWebManifest.js";
 
 export const PUBLIC_WEB_SMOKE_ENABLE_ENV = "PRIVATE_AGENTS_ENABLE_PUBLIC_WEB_SMOKE";
@@ -146,12 +146,6 @@ function parseBoundedInteger(
   }
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
-}
-
-function isPrivateNetworkHost(hostname: string): boolean {
-  return hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local") ||
-    hostname === "::1" || hostname.startsWith("127.") || hostname.startsWith("10.") ||
-    hostname.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
 }
 
 function unique(values: readonly string[]): readonly string[] {

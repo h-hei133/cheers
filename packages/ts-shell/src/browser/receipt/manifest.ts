@@ -1,3 +1,4 @@
+import { isRecord } from "../../core/values/record.js";
 import path from "node:path";
 import fs from "node:fs";
 import { browserActionCacheEntryHasForbiddenContent } from "../actionCacheEntry.js";
@@ -166,10 +167,6 @@ function invalid(
     warnings: ["browser-receipt-cache-manifest:blocked"],
     redactions,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function isSafeExplicitRoot(root: string): boolean {

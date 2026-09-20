@@ -71,6 +71,53 @@ export function browserEvidenceHasUnsafeRawContent(value: string): boolean {
   return unsafeEvidenceChecks(value, 4096).blockers.length > 0;
 }
 
+/**
+ * Redacts secret-shaped tokens, credential assignments and hidden reasoning
+ * from browser-captured text, reporting which categories fired.
+ *
+ * This was hand-copied into `domSnapshot.ts`, `readOnlyContentNormalizer.ts` and
+ * `playwrightEvidenceMapper.ts`. The first and third were byte-identical; the
+ * second added a truncation step on top. Since these run on captured page
+ * content, a rule that reaches one copy and not another is a leak in the copy
+ * that missed it, so the chain lives here and the callers delegate.
+ *
+ * `truncate` preserves the `readOnlyContentNormalizer` variant, which caps the
+ * result with `sanitizeBrowserText` at `max(280, length)` - a no-op unless the
+ * text is under 280 characters, where it normalises whitespace instead.
+ */
+export function redactBrowserEvidenceText(
+  value: string,
+  options: { readonly truncate?: boolean } = {},
+): {
+  readonly text: string;
+  readonly warnings: readonly string[];
+  readonly redactions: readonly string[];
+} {
+  const redactions = new Set<string>();
+  let text = value
+    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, () => {
+      redactions.add("secret-looking-token");
+      return "[REDACTED_SECRET]";
+    })
+    .replace(/\b(api[_ -]?key|token|authorization|password|secret)\s*[:=]\s*[^\s<>"']+/gi, (match) => {
+      redactions.add("secret-looking-field");
+      const label = match.split(/[:=]/)[0] ?? "secret";
+      return `${label}=[REDACTED_SECRET]`;
+    })
+    .replace(/\b(hidden reasoning|chain[- ]?of[- ]?thought)\b/gi, () => {
+      redactions.add("hidden-reasoning-label");
+      return "[REDACTED_REASONING]";
+    });
+  if (options.truncate) {
+    text = sanitizeBrowserText(text, Math.max(280, text.length));
+  }
+  return {
+    text,
+    warnings: redactions.size > 0 ? ["sensitive-content-redacted"] : [],
+    redactions: Array.from(redactions).sort(),
+  };
+}
+
 function unsafeEvidenceChecks(
   value: string,
   budget: number,

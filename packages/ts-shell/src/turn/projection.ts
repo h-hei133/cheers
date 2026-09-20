@@ -1,3 +1,4 @@
+import { isRecord } from "../core/values/record.js";
 import type { AgentLifecycleEvent } from "../core/agent/events.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
@@ -72,10 +73,6 @@ export class TurnProjection {
         return [];
     }
   }
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** How a finished run is reported to the shell. */

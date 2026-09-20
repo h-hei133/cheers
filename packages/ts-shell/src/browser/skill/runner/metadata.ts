@@ -1,3 +1,4 @@
+import { isRecord } from "../../../core/values/record.js";
 import { sanitizeBrowserText } from "../../capabilityModel.js";
 import {
   browserSkillRunnerAllowedActions,
@@ -224,8 +225,4 @@ function sanitizeId(value: string): string {
 
 function hasForbiddenContent(value: string): boolean {
   return /(api[_-]?key|token|secret|password|bearer\s+|BEGIN [A-Z ]+PRIVATE KEY|https?:\/\/)/i.test(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
