@@ -2561,12 +2561,12 @@ Step 3f 实测 1,537 边 vs 估算 361（**低估 4 倍**）。按 §2.4.1 的�
 | 类别 | 数量 | 含义 |
 |---|---:|---|
 | **type-contract**（有外部 type importer）| **47** | **活文件依赖其类型，删了会编译失败** |
-| test-only（仅测试 import）| 42 | 其中仅 **19** 是测试基建，**23 是"产品代码 + 自测"** |
+| test-only（仅测试 import）| 42 | **17 静态基建 + 25 产品自测**；另加 1 个动态进程 fixture，语义基建共 **19** |
 | 零 importer（value + type + test 全无）| **2** | 仅 `session/replay/host/facts.ts` 与 `test-utils/longSessionDurabilityProcess.ts` |
 
 **核心结论**：**93 个中 47 个是类型契约**——"孤立"不等于"可删"。
 这一条推翻了"93 个单文件簇是低成本清理面"的初始预期：真正可考虑删除的只有
-**2 个零 importer + 23 个自测产品模块**，且后者删了会连带删掉它们唯一的测试。
+**2 个零 importer + 25 个自测产品模块**，且后者删了会连带删掉它们唯一的测试。
 
 #### 主代理的三次自我纠错（均由子代理以直接证据反驳）
 
@@ -2605,3 +2605,30 @@ Step 3f 实测 1,537 边 vs 估算 361（**低估 4 倍**）。按 §2.4.1 的�
 - 未运行全量测试；本轮零代码改动。
 - `runtime/events/projection.ts`（2,997 行）的裁决基于静态 import 图 + 测试消费者，
   未做运行时 tracing 验证其输出确实无人消费。
+
+#### 9.23.1 主代理第四处错误的根因（单引号 import）
+
+`singletons-testutils` 报告指出了我那个扫描脚本的**真正根因**，值得单独记录：
+
+我的正则只匹配**双引号** specifier（`from\s+"([^"]+)"`），而 `core/query/runtime/`
+的文件用**单引号**：
+
+```
+batch.ts:6   import type { RuntimeActionBlock } from './actionAuthority.js'   ← 单引号
+events.ts:12 import type { QueryRuntimeProofProjection } from './proof.js'    ← 单引号
+```
+
+因此这两条 type-only 边对我的扫描**完全不可见**，我才把零 importer 数成 4（实为 2）。
+**这与多行 `import type` 是同一类缺陷的两个变体**：都是"自制正则比真实语法窄"。
+
+**四条错误的共同根因**：三次用自制静态扫描替代 `grep` + 读上下文，四次都栽在
+"正则覆盖不了真实语法"（resolver 不剥 `.js`、多行 import 块、单引号 specifier）。
+子代理每次都用直接证据反驳，四次全部成立。
+
+**修正后的权威数字**：
+| 口径 | 值 |
+|---|---:|
+| type-contract（外部 type importer）| 47 |
+| test-only（严格静态）| 42 = **17 静态基建 + 25 产品自测** |
+| 语义测试基建 | **19**（18 静态 + 1 动态进程）|
+| 零 importer（value+type+test 全无）| **2** |

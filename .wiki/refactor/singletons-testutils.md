@@ -6,8 +6,8 @@
 
 - **18 个静态测试 / 评测基建** = `test-utils/` 的 6 个普通文件 + `core/harness/` 的 8 个 singleton + `eval/browser/` 的 3 个 benchmark 文件 + `browser/runtime/core/gauntletManifest.ts` 1 个场景元数据 wrapper。
 - **再加 1 个动态测试入口**：`test-utils/longSessionDurabilityProcess.ts`。它不在静态 test-only importer 类别中，但由 `spawnSync` 通过字符串路径启动。
-- **42 个“仅测试导入”**是导入图的机械分类，不等于 42 个脚手架。按严格静态集合，42 = 17 个静态基建单例 + 25 个产品模块自测；`eval/browser/benchmarkModel.ts` 是混合 type-contract/test 文件，动态 process 则是 zero-importer，因此不属于这 42 个的严格子集。
-- 作为宽口径 headline，`42 - 19 = 23` 表示“仅测试引用集合”与完整语义基建集合之间的差额；更严格的集合拆分见本报告 §G（17 + 25），避免把不同基数混算。
+- **42 个“仅测试导入”**是导入图的机械分类，不等于 42 个脚手架。按严格静态集合，42 = 17 个静态基建单例 + **25 个产品模块自测**；`eval/browser/benchmarkModel.ts` 是混合 type-contract/test 文件，动态 process 则是 zero-importer，因此不属于这 42 个的严格子集。
+- 因而，**严格可复现的 test-only remainder 是 25 个产品模块**。如果维护者采用“把动态 process 也归入 test-only、但不把 mixed benchmarkModel 算入”的宽口径，才会得到约 **23 个**；这两个数字不能混算。本报告以后续判断统一采用严格口径：17 + 25 = 42，18 + 1 = 19。
 - 另有 **47 个单例存在外部生产 type-only importer**；它们是编译契约，不是死叶，删除会破坏类型检查。这个数字来自维护者给出的修正版口径（12 个 type-contract-only + 35 个 type-contract + test）。
 - 因此，本轮“测试基础设施是否只是死代码”的答案是：**19 / 93 是明确测试基建；其余 74 个不能因为不可达或仅有测试引用就直接称为 dead product code。**
 
@@ -405,10 +405,10 @@ Tests       87 passed | 1 skipped (88)
 
 ## 最终建议
 
-**不要把这 93 个 singleton 当成“93 个死产品文件”。** 本 slice 的真正结论是：
-
 - **19 个是测试 / 评测基建，应该保留或仅做结构迁移；**
-- **25 个是产品代码，只是目前只有测试 value caller，应按产品能力裁决；**
+- **25 个是严格 test-only 集合中的产品代码，只是目前只有测试 value caller，应按产品能力裁决；**
+- **47 个是外部类型契约，删除会破坏编译契约；**
+- 另有 `longSessionDurabilityProcess.ts` 这一动态测试入口（已包含在 19 中），以及 `eval/browser/benchmarkModel.ts` 这一混合 contract/test 文件；只有 `ptyCapabilityDetector.ts` 与 `gauntletManifest.ts` 具备相对清晰的测试胶水删除理由。
 - **47 个是外部类型契约，删除会破坏编译契约；**
 - 只有 `ptyCapabilityDetector.ts` 与 `gauntletManifest.ts` 具备相对清晰的测试胶水删除理由；动态 process fixture 必须保留。
 
