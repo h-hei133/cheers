@@ -2858,6 +2858,29 @@ MUTATION SUCCEEDED -> rm -rf /     ← 可改模型请求的原始参数
 **处置**：两条断言已按**渲染输出**（消费者实际所见）恢复，并各自注入真实回归验证其有效：`innerWidth = width + 30` 触发宽度断言失败；过滤掉 `next-action` 段触发 next-action 断言失败。
 **注意**：单纯放宽 `options.maxWidth` **不会**触发——`renderSidebarPanel` 会把宽度 clamp 到 `panel.budget.maxWidth`，真正能回归的是 inner-width 路径。
 
+#### 复核未发现问题的部分（补 `bfe56b20` 与 `4a65ddf3` 的实测）
+
+- **`bfe56b20`（T12/T10/T11 删除）**：三项删除均有**活轨接管**，非仅凭"不可达"：
+  T12 → `browserCommandRuntime` → `commandRunner`；T10 → `sidebarCommandRuntime` →
+  `projectSidebarState`/panel/live runtime + 事件适配器；T11 → sessions 走 `runResumeCommand`，
+  agent-mode 走 Shift+Tab → `InteractiveMode.cycleAgentMode`。
+  测试计数实测：父提交 114 文件/458 测试 → 目标 112 文件/452 测试，**恰为删掉的 2 文件/6 测试**。
+  两个被删的自测（`sidebarEventBridge.test.ts`、`sidebarStateQuality.test.ts`）确只覆盖被删模块。
+  `WorkflowTaskPlan.browserPlan` 全仓仅其声明处出现一次，确认从未被赋值或读取。
+  **例外**：T10 的测试收窄丢失两条活断言，见上文（3）。
+- **`4a65ddf3`（T8/T9/T13）**：三份 `renderProjectedLines` 旧实现逐字等价（现归属
+  `cli/output/projectedLineRenderer.ts`）；两份 `parseArgsWithFlags` 语义一致（仅空白/导出差异），
+  且 `--flag=value`、`--flag value`、未知 flag、空输入四种行为均一致，`./connect/preset.js`
+  的导入**未引入环**。T13 实测：父提交 100 条目/99 唯一（`/memory` 重复两次）→ 目标 99/99。
+  `.gitignore` 仅新增注释与 `.omp/`，**无任何原被跟踪路径转为被忽略**。
+  `.normproof/dispositions.md` 父→子 77 行未变，append-only 完整。
+
+**复核内部存在分歧（如实记录）**：`ReviewDeletionsT10T11T12` 判 `overall_correctness=incorrect`（两条 P2）；
+其下属 `CoverageScout` 独立复查后**反对**，认为宽度/next-action 由共享的 renderer/panel 测试覆盖，非行为断裂。
+**主代理裁决：采纳 P2**。依据是主代理自己注入真实回归的实测——`innerWidth = width + 30` 与移除
+`next-action` 段**各自触发断言失败**，证明这两条不变式此前确实无人守护；且 `sidebarPanelLayout.test.ts:81`
+走的是 `renderSidebarPanel` + 显式 budget，不覆盖 `renderSidebarLivePanelFrame` 的活路径。
+
 #### 记录但不修复（1 项）
 
 `isPrivateNetworkHost` 不覆盖 `fd00:ec2::254`（AWS 的 **IPv6 元数据地址**，等价于 `169.254.169.254`）。原注释列了 IPv6 链路本地、CGNAT、`0.0.0.0`、DNS rebinding，**唯独漏了这一条**——而它恰是本次修复所针对的元数据端点。已补入注释，并注明"调用方不应单独依赖此防线"。**不扩大修复范围**：覆盖它需要解析 IPv6 网段，超出本次修复的授权范围。
