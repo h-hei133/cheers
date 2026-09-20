@@ -2700,3 +2700,56 @@ manifest 的 `allowedPublicOrigins` 显式包含该地址、`confirmationRequire
 （`runtimeConfig.test.ts`、`modelCommandRuntime.test.ts`、`connectCommandRuntime.test.ts`），**无覆盖损失**。
 
 **删除量**：`authCommandRuntime.ts`(275) + 测试(约 160) 行。
+
+### 9.25 `provider/proposal/` 家族：一个活函数寄居在休眠目录里（2026-09-20，仅记录）
+
+**背景**：§9.23 的单文件簇研究顺带发现 `provider/proposal/` 是"混合状态"。
+本轮逐个函数实测后，结论比"混合"更精确。
+
+#### 实测：一个目录，两种完全相反的存活状态
+
+**9 个源文件 / 1,985 行**的校验-匹配-定级逻辑，**每个导出函数的外部生产调用者都是 0**：
+
+| 文件 | 行数 | 导出函数 | 外部生产引用 |
+|---|---:|---|---:|
+| `providerAnchorMatcher.ts` | 264 | `matchProviderAnchorCandidates` | **0** |
+| `providerAnchorConflict.ts` | 197 | `detectProviderAnchorConflicts` | **0** |
+| `providerAnchorQuality.ts` | 178 | `classifyProviderAnchorQuality` | **0** |
+| `providerAnchoredProposal.ts` | 290 | `buildProviderAnchoredProposal` | **0** |
+| `providerAnchoringResult.ts` | 179 | `buildProviderAnchoringResult` | **0** |
+| `providerOutputValidator.ts` | 164 | `validateProviderOutput` | **0** |
+| `providerProposalAnchors.ts` | 170 | `extractProviderProposalAnchors` | **0** |
+| `providerAnchorCandidate.ts` | 161 | （类型 + 候选构造）| **0** |
+| `providerEditProposal.ts` | 386 | `normalizeProviderEditProposal`、`buildProviderEditProposalManifest` | **0 / 0** |
+
+**唯一活的**：`providerEditContext.ts:134` 的 `redactProviderEditText`（4 行），
+**13 处外部生产引用**。
+
+#### 关键事实：13 个调用者全是活文件
+
+| 调用者 | 次数 |
+|---|---:|
+| `planning/task/taskIntent.ts` | 5 |
+| `provider/proposal/providerEditProposal.ts` | 5 |
+| `edit/proposal/editRepairContext.ts` | 2 |
+| `edit/proposal/editRepairProposal.ts` | 2 |
+| `repair/verificationRepairContext.ts` | 2 |
+| `verification/command/plan.ts` | 2 |
+
+**即：准确表述不是"该目录混合"，而是——一个通用脱敏函数被放在一个整体休眠的目录里。**
+`redactProviderEditText` 与 provider 的"提案"语义无关，只是碰巧同居；
+它被 `edit/`、`planning/`、`repair/`、`verification/` 四个域消费。
+
+#### 裁决：记录，不动
+
+| 对象 | 处置 | 理由 |
+|---|---|---|
+| 休眠的 9 文件 / 1,985 行 | **保留** | 属"独有能力、无活轨覆盖"，与 §9.5-1 的 270 文件同类；§2.1 规定可达性不授权删除 |
+| `redactProviderEditText` | **保留，另记待裁决** | 它是**脱敏家族的第 N 份**（与 `core/security/redaction.ts`、`core/security/reportText.ts` 同族但**规则不同**）。合并属**行为变更**，需独立裁决 |
+
+**遗留待裁决项**：`redactProviderEditText` 是否并入 `core/security/`。
+注意其规则与现有两份**不完全相同**（它额外处理 `sk-{12,}` 与 `Bearer`，但**不处理**
+`oldText/newText`、`<html>`、`raw provider output`），故**不能直接替换**，需先定规则并集。
+
+**若将来清理该目录**：**不能整目录删除**——必须先把 `redactProviderEditText` 迁出，
+否则会切断 `edit/`、`planning/`、`repair/`、`verification/` 四个域的活路径。
