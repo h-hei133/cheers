@@ -1629,20 +1629,20 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | **T3** | 删 `reasonText.includes` 8 处，改结构化字段 | §10.5 pi-2 | ⚠️ **前提被实测推翻，未执行** —— 见 §9.10 |
 | **T4** | 修 `browser/` 的 byte/char 混用 | §13.7 对照-3 | ✅ **已完成**（`6a793de9`）：4 处真消费点改字节计数，见 §9.13 |
 | **T5** | 切断 `browser` → `presentation` 反向依赖 | §13.6 耦合-2 | ✅ **已完成**（`161e15fd`）：**实际只改 4 处 import**（非 97），见 §9.14 |
-| **T18** | 同类反向依赖：`session/` 有 **5 处**跨域指向顶层 `presentation/` | §9.14 附带发现 | **需裁决** |
-| **T6** | 修 `cliSessionRuntimeFactory.ts:70` 的 runtimeSeed 丢弃 | §11.2 A-死-3 | 产品裁决（是否保留种子语义） |
-| **T7** | 裁决 285 个不可达文件的处置 | §6 | **需裁决** |
-| **T8** | 重跑 judge 并刷新 `.normproof/out/` | §10.3 模块-2 | 无（需找/写脚本） |
-| **T9** | 删 2 处 `renderProjectedLines` 副本 + `parseArgsWithFlags` 私有副本 | §15.8 | 无（低） |
-| **T10** | 裁决并清理 sidebar Quality 三模块 + EventBridge（约 440 行） | §15.3 E-死-1 | **需裁决**（测试基建 vs 删除，不可兼得） |
-| **T11** | 删 `shellActionRuntime.ts` 三个死导出及连带 `cliDisplayProjection.ts` | §15.3 E-死-2 | 中（消费者需一并清理） |
-| **T12** | 删 `browser/toolPolicy.ts`+`agent.ts`+`plan.ts` 死链（589 行） | §13.3 D-死-1 | 低 |
-| **T13** | 修 `cliArgs.ts` 保留字表重复项 `/memory` | §15.8 | 无（低） |
-| **T14** | 收口 `normalizeBaseUrl`(4)/`normalizePathForCompare`(7)/`toRelativeTime`(4)/`stableId`(2) | §12.4、§16 | 中（需先定 owner） |
+| **T18** | 同类反向依赖：`session/` 跨域指向顶层 `presentation/` | §9.14 附带发现 | ✅ **已裁决（2026-09-20）：登记 disposition，不改**。实测**顶层 0 条**（原记录不成立），全部解析到 `session/presentation/`；见 §9.18 |
+| **T6** | 修 `cliSessionRuntimeFactory.ts:70` 的 runtimeSeed 丢弃 | §11.2 A-死-3 | ✅ **已裁决（2026-09-20）：保留现状 + disposition**。live turn lane 无 seed reader，补形参即接死端；见 §9.18 |
+| **T7** | 裁决不可达文件的处置 | §6 | ✅ **已裁决（2026-09-20）：不批准整批删除**，逐簇按「活轨是否已承担职责」裁决。实测 **270 文件 / 59,121 行**（285/60,058 不可复现）；见 §9.18 |
+| **T8** | 重跑 judge 并刷新 `.normproof/out/` | §10.3 模块-2 | ✅ **已完成**（2026-09-20）：`normproof judge` 重跑，`out/` 全部产物刷新；**ledger 的 4 个已删 `claimId` 归零**，见 §9.18 |
+| **T9** | 删 2 处 `renderProjectedLines` 副本 + `parseArgsWithFlags` 私有副本 | §15.8 | ✅ **已完成**（2026-09-20）：3 → 1、2 → 1，见 §9.18 |
+| **T10** | 裁决并清理 sidebar Quality 三模块 + EventBridge | §15.3 E-死-1 | ✅ **已裁决（2026-09-20）：删除**。实测 **550 行**（非约 440）；删 4 模块 + 2 自测，保留并窄改 3 个 live 行为测试；见 §9.18 |
+| **T11** | 删 `shellActionRuntime.ts` 三个死导出及连带 `cliDisplayProjection.ts` | §15.3 E-死-2 | ✅ **已裁决（2026-09-20）：部分删除**（111 行）。`/view` 无 producer 故保留；`cliDisplayProjection.ts` 不能整删；见 §9.18 |
+| **T12** | 删 `browser/toolPolicy.ts`+`agent.ts`+`plan.ts` 死链（589 行） | §13.3 D-死-1 | ✅ **已裁决（2026-09-20）：删除** 589 行 + 移除 `WorkflowTaskPlan.browserPlan` 的 type-only 残留；见 §9.18 |
+| **T13** | 修 `cliArgs.ts` 保留字表重复项 `/memory` | §15.8 | ✅ **已完成**（2026-09-20）：100 条字面量含 1 重复 → 99 条全唯一，见 §9.18 |
+| **T14** | 收口 `normalizeBaseUrl`/`normalizePathForCompare`/`toRelativeTime`/`stableId` | §12.4、§16 | ✅ **已裁决（2026-09-20）：选择性收口**。实测 **7/7/4/3**（非 4/7/4/2）；仅 `stableId` 两份可并入 `core/values/`；见 §9.18 |
 | **T15** | 处理 2 个脚本式 `*.test.mjs` | §9.9「测试跑法」 | ✅ **已完成**（`b7b7880b`）：改名去掉 `.test`，见 §9.11 |
-| **T16a** | 裁决 `block-findings` §6 的不可达簇（含 `mutation.ts`）是否删除 | §9.10 | **需裁决**（T3 的替代处置）|
-| **T16b** | 若不删，先给 `mutation.ts` 接真实生产者，再接结构化判定 | §9.10 | **需裁决**（属"接线"，非"删嗅探"）|
-| **T17** | 处理"从仓库根跑 vitest"的 11 文件 / 16 项失败：9 个缺根配置致 5s 超时 + 2 个测试自身 cwd 依赖 | §9.12 | **需裁决**（加根配置 vs 修测试 cwd vs 仅文档化）|
+| **T16a** | 裁决不可达簇（含 `mutation.ts`）是否删除 | §9.10 | ✅ **已裁决（2026-09-20）：暂不删除**，标记为不可单独修复的死簇；见 §9.18 |
+| **T16b** | 给 `mutation.ts` 接真实生产者 | §9.10 | ✅ **已裁决（2026-09-20）：不接线**。5 个嗅探字符串生产者为 0（实测）；若要保留语义，在活 edit/result lane 新建 producer；见 §9.18 |
+| **T17** | 处理"从仓库根跑 vitest"的失败 | §9.12 | ✅ **已裁决（2026-09-20）：仅文档化官方入口**。实测仅 **2 文件 / 3 项**失败（非 11/16），9 个 5s 超时未复现；见 §9.18 |
 
 ### 9.9 T1 执行记录（2026-09-19，已完成）
 
@@ -2238,3 +2238,62 @@ T15 改名零残留；CB-005 的 `runtime/loop` 生产零值导入、动态入�
 `index.ts` 无悬空导出；C2 的 `runEvaluationCase` 确无可调用的 `HostCommandResponse` 生产者、
 零外部测试导入者、`index.ts` 已修复。全量 493 文件 / 2747 通过 / 0 失败；
 `tsc --noEmit -p tsconfig.build.json` 0 错误；import 环 0。
+
+### 9.18 §9.8 剩余待办的深度研究（2026-09-20，四个子代理并行）
+
+**方法**：4 个 `unsee/gpt-5.6-luna:max` 子代理并行，每个负责一个不相交切片，
+各自独立重测所有数字（不复用 wiki 数字）。**主代理已逐条复核其头条数字**（见下）。
+四份完整报告：
+
+| 报告 | 覆盖 | 行数 |
+|---|---|---:|
+| `t7-unreachable-disposition.md` | T7 / T16a / T16b | 272 |
+| `t10-t11-t12-disposition.md` | T10 / T11 / T12 | 246 |
+| `t6-t18-disposition.md` | T6 / T18 | 239 |
+| `t14-t17-disposition.md` | T14 / T17 | 460 |
+
+**主代理独立复核的头条数字**（每条都亲自重跑）：
+
+| 复核项 | 子代理结论 | 主代理复核 |
+|---|---|---|
+| value-edge 不可达集合 | 270 文件 / 59,121 行 | ✅ 复现（`python3 /tmp/closure.py`） |
+| T18 的 5 处"跨域边" | 全部解析到 `session/presentation/`，顶层 0 条 | ✅ 复现（自写扫描：8 条命中，顶层 0） |
+| `mutation.ts` 嗅探的 5 个字符串 | 生产生产者 0 | ✅ 复现（逐字符串 grep，全 0） |
+| T6 形参丢失 | 调用方传 4、工厂声明 2 | ✅ 复现（`sessionRuntime.ts:270` vs `cliSessionRuntimeFactory.ts:70`） |
+| T10 行数 | 550（非 wiki 的约 440） | ✅ 复现（`wc -l`） |
+| T12 行数 | 589 | ✅ 复现（`wc -l`） |
+| T14 组数 | 7/7/4/3（非 wiki 的 4/7/4/2） | ✅ 复现（`stableId` 实为 3 处：2 同 + 1 异） |
+
+#### 逐项裁决建议
+
+| # | 建议 | 理由（核心） | 成本 / 风险 |
+|---|---|---|---|
+| **T7** | **不批准整批删除**；按"活轨是否已承担职责"逐簇裁决 | 285/60,058 **不可复现**（实测 270/59,121）。抽样 12+ 文件显示 context 获取链、planning runtime、runtime event 投影、session tree 投影**均无活轨等价承担**，属独有实现。§2.1 规定可达性不授权删除 | 保留成本＝继续占用 59k 行；删除成本＝193 个测试文件直接 import 不可达集（129 仅死 + 64 混合），且需逐簇六项检查 |
+| **T16a** | **暂不删除**该不可达簇，标记为"不可单独修复的死簇" | `mutation.ts:68` 唯一生产调用方 `result/projection/shell/assembly.ts:46` 本身不可达；8 个嗅探分支只由自测输入触发 | 若将来授权整簇删除，T16a 随簇删除；**在此之前不做单点重构** |
+| **T16b** | **不接线**；若产品确需该语义，在活 edit/result lane 新建结构化生产者 | 5 个被嗅探字符串生产者为 0（已复核）；`writerStarted`/`writeEffect` 有活连续性生产者但**不是同一 contract**；`routeBlocker` 值域不覆盖 | 新建 producer 的 owner 建议 `edit/result/journal/model.ts`；**不要**恢复 `assembly.ts` 旧路线 |
+| **T10** | **删除** 4 个仅测试可达的模块（550 行）+ 2 个自测文件；**保留并窄改** 3 个 live 行为测试 | 生产 value consumer = 0；`/sidebar` 活轨由 `projectSidebarState` + panel/live runtime + renderer + event sink/adapter 承担 | 需改 3 个测试（把死质量模块从 fixture/断言中摘除）。风险：未来有人把 test-only 模块接回生产 |
+| **T11** | **部分删除**（111 行）：删 `runSessionsShellAction`(49) + `runAgentModeShellAction`(30) + agent/workspace 死 formatter(32)；**保留** `runViewShellAction` 与 view formatter | sessions 由 `runResumeCommand` 活轨承担（实测 `resumeCommandRuntime.ts:53` 产出 `list-sessions`）；agent-mode 由 `cycleAgentMode` + Shift+Tab 承担（实测 `keymap.ts:191`）；**`/view` 无任何 producer**（实测 4 个 action 全无写入点）→ 按 §2.1 不可删 | `cliDisplayProjection.ts` **不能整删**（`projectPermissionListDisplay` 仍 live）。风险：`USAGE_MANUAL.md` 仍宣称 `/view` 可用，需产品确认该承诺 |
+| **T12** | **删除**三文件（589 行）+ 移除 `WorkflowTaskPlan.browserPlan` 的 type-only 残留 | 显式 `/browser` 活轨（`browserCommandRuntime` → `commandRunner` → action loop/policy）承担该职责 | 需同步改 `planning/task/workflowTaskPlanner.ts:2`（`BrowserAgentPlan` 无任何赋值点）。风险：若将来恢复 prompt-driven browser planning，需作为新 lane 明确接线 |
+| **T6** | **保留现状 + 登记 disposition**，不补形参 | seed 生产者存活、`ShellSessionRuntime` 调用点仍传值，但 CLI 工厂之后的 live turn lane **无任何 seed reader**（`createQueryRuntimeStateFromSeed` 生产调用者 = 0）。补形参＝接到死端；删实参＝破坏现有契约及测试 seam | 与 CB-005 **方向相反**（CB-005 是生产者被删/读者存活；T6 是生产者存活/消费端惰性）。若产品要恢复 seed 语义，必须端到端扩展 `streamCliRuntimePrompt` → `CliRuntimeInvocationInput` → `runTurn` |
+| **T18** | **登记 disposition，五处全部不改** | fresh 扫描证明**没有一条**指向顶层 `src/presentation/`：全部解析到 `session/presentation/`（主代理复核：顶层 0 条）。原记录"5 处跨域反向依赖"**不成立**；且实为 3 value + 2 type-only | 与 T5 不同：这些对象携带 session 专属类型（`SessionReentrySummary` 等），**不满足** `core/` 的 direction/audience/survival 准入。强行修的成本高于收益（`SessionReentrySummary` 48 处命中 / 12 文件） |
+| **T14** | **选择性收口**，不四组一刀切 | 实测 7/7/4/3。仅 `stableId(prefix, parts)` 的 2 份逐字节相同 → 候选 owner `core/values/`；`normalizeBaseUrl` 需先按 provider/config 语义拆分（`providerReadiness.ts` 版本不 trim）；`normalizePathForCompare` 依赖 `node:path` **不满足** `core/` 零 import 准入 → 本轮不合；`toRelativeTime` 4 份**无用户可见输出差异** → 可谨慎收口到 `core/shell/` 显示层 | 低风险项只有 `stableId`；其余需先定语义边界 |
+| **T17** | **仅文档化官方入口**（选项 C），不加根配置、不为迁就错误 cwd 改测试 | 实测根跑只剩 **2 文件 / 3 项**失败（非 wiki 记的 11/16），全部是测试自行把 `process.cwd()` 当 package 根；**9 个 5s 超时未复现**。CI 与官方入口均为 `npm run test:ts`（cwd = `packages/ts-shell`） | 加根配置会改变官方入口行为并有重复收集风险；根跑从未是承诺入口 |
+
+#### 与既有记录的差异（本轮实测更正）
+
+| 记录 | 原值 | 实测 | 性质 |
+|---|---:|---:|---|
+| §6 不可达文件 | 285 / 60,058 | **270 / 59,121** | 不可复现，口径已变 |
+| §14 孤立文件 | 108 / 21,054 | **129 / 26,855**（排除 test-utils） | 定义/集合口径不同 |
+| §7 `core/query/runtime/` 孤儿 | 10 / 1,961 | 10 / 1,961（剔除 `events.ts` 的 type-only 消费者后） | ✅ 对齐 |
+| T10 行数 | 约 440 | **550** | 低估 110 |
+| T14 组数 | 4/7/4/2 | **7/7/4/3** | `stableId` 漏算多行签名 |
+| T18 边 | 5 处跨域指向顶层 `presentation/` | **顶层 0 条**；实为 3 value + 2 type-only，全在 `session/presentation/` | **原记录不成立** |
+| T17 根跑失败 | 11 文件 / 16 项 | **2 文件 / 3 项** | 9 个 5s 超时未复现 |
+
+#### 未验证事项（诚实边界）
+
+- 四份报告**均未**逐一完成 270 个文件的 §2.2 六项检查；T7 结论基于 12+ 跨域抽样与关键簇核验，**不构成整批删除授权**。
+- 未运行全量 vitest / `npm run build`（并发约束）；未对建议 diff 实际施工。
+- 未做动态 `import()` / `spawn` / `pathToFileURL` 的运行时 tracing；保护类判定基于静态形状 + 精确字符串探针。
+- 未验证仓库外 consumer、未入仓 plugin；`WorkflowTaskPlan.browserPlan` 与 `/view` 文档承诺是否属外部契约需维护者确认。

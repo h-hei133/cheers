@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { Interface as ReadlineInterface } from "node:readline";
+import { renderProjectedLines } from "../cli/output/projectedLineRenderer.js";
 import {
   createSessionRootMismatchDiagnostic,
   resolveRootBindingDiagnostics,
@@ -161,15 +162,6 @@ export function renderSessionSurfaceOverview(
     preferredProjectRoot: runtimeContext.projectRoot,
   });
   renderSessionCommandMap(renderer);
-}
-
-export function renderProjectedLines(
-  renderer: { renderLine(line: string): void },
-  lines: readonly string[],
-): void {
-  for (const line of lines) {
-    renderer.renderLine(line);
-  }
 }
 
 export function switchRuntimeSessionProjectContext(

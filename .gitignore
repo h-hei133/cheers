@@ -37,3 +37,6 @@ rtk/
 
 # NormProof judge output
 .normproof/out/
+
+# omp project settings (model overrides for subagents)
+.omp/

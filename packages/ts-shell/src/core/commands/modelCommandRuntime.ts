@@ -6,6 +6,7 @@ import {
   type RuntimeProvider,
 } from "../../config/runtimeConfig.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import { parseArgsWithFlags } from "./connect/preset.js";
 import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
 import { refreshCatalog } from "../models/catalogRefresh.js";
@@ -479,30 +480,6 @@ function fallbackModelsForProvider(
     return ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"];
   }
   return ["deepseek-ai/DeepSeek-V4-Flash", "Qwen/Qwen2.5-Coder-32B-Instruct"];
-}
-
-function parseArgsWithFlags(args: string[]): {
-  positionals: string[];
-  flags: Record<string, string | boolean>;
-} {
-  const positionals: string[] = [];
-  const flags: Record<string, string | boolean> = {};
-  for (let index = 0; index < args.length; index += 1) {
-    const token = args[index];
-    if (!token.startsWith("--")) {
-      positionals.push(token);
-      continue;
-    }
-    const key = token.slice(2).trim().toLowerCase();
-    const next = args[index + 1];
-    if (!next || next.startsWith("--")) {
-      flags[key] = true;
-      continue;
-    }
-    flags[key] = next;
-    index += 1;
-  }
-  return { positionals, flags };
 }
 
 function normalizeProvider(input?: string): RuntimeProvider | undefined {
