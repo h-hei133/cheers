@@ -2875,6 +2875,12 @@ MUTATION SUCCEEDED -> rm -rf /     ← 可改模型请求的原始参数
   `.gitignore` 仅新增注释与 `.omp/`，**无任何原被跟踪路径转为被忽略**。
   `.normproof/dispositions.md` 父→子 77 行未变，append-only 完整。
 
+**复核正式结论**：`ReviewDeletionsT10T11T12` 以 `overall_correctness=incorrect`、confidence 0.98 结案，
+两条 P2 分别锚定 `sidebarLivePanelRuntime.test.ts:109-116`（宽度）与 `:98-116`（next-action）。
+主代理在**该两处行区间**确认已恢复，且各自注入真实回归验证有效。同时该复核确认
+`bfe56b20` 正确保留了 T12 browser 活轨、T10 sidebar runtime/event-store 活轨、T11 session/agent-mode 活轨，
+以及 view-mode **状态**（`getViewMode` 仍被 `cliApprovalModule` 读取），仅将**未注册**的 `/view` 命令链留作休眠。
+
 **复核内部存在分歧（如实记录）**：`ReviewDeletionsT10T11T12` 判 `overall_correctness=incorrect`（两条 P2）；
 其下属 `CoverageScout` 独立复查后**反对**，认为宽度/next-action 由共享的 renderer/panel 测试覆盖，非行为断裂。
 **主代理裁决：采纳 P2**。依据是主代理自己注入真实回归的实测——`innerWidth = width + 30` 与移除
