@@ -3,9 +3,9 @@ title: "Architecture Refactor Plan"
 category: article
 sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-09-15, failures-baseline, reachability-audit-2026-09-15, subagent-reviews-2026-09-15]
 created: 2026-09-15
-updated: 2026-09-19
+updated: 2026-09-20
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v6。当前生产 941 / CLI 可达 770 / 全量测试 2748 项（2026-09-19 CB-005 + C2 两轮删除后；CLI 可达下滑系口径修正而非回归，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）、Step 6 命名税（173 文件）、Step 7 judge 全量跑（0 blocking）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。§8 是路线章：三轮探索汇总的 14 项待办与三阶段排期（阶段 A 零裁决：strict / exclude 收紧 / AGENTS.md）。**阶段 A/B/C 全部完成，14 项待办（R1–R14）全部收敛**：C1 删 69 文件 / −23,631 行（CB-005）；C2 完成 R8–R11 裁决与执行、删除 runtime/evaluation。**§9 是 2026-09-19 的区块式架构探索（零代码改动）**：10 区块分工、五类问题、子代理并发 2；产出全局普查（56 组/177 份重复实现、285 不可达文件/60,058 行、20 个 >600 行文件、core 越界 127 条 value 边）与区块 A/D/G 回报；⚠️ 区块只是探索坐标，**不是目标架构**。"
+summary: "Module boundary refactor plan v6。当前生产 946 / CLI 可达 773 / 全量测试 2748 项（2026-09-20 T 轮收口后实测；CLI 可达较阶段 C 结束时上升系 T 轮新增 4 个 owner 模块，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），不再使用可达性。Step 3 域搬迁（3a-3f）、Step 4 orchestration 解散（9 批）、Step 5 SessionManager 拆分（3 批，判据 38→18）、Step 6 命名税（173 文件）、Step 7 judge 全量跑（0 blocking）均已完成。§4 记录删除判据被证伪的经过与 12 项真实破坏。§8 是路线章：三轮探索汇总的 14 项待办与三阶段排期（阶段 A 零裁决：strict / exclude 收紧 / AGENTS.md）。**阶段 A/B/C 全部完成，14 项待办（R1–R14）全部收敛**：C1 删 69 文件 / −23,631 行（CB-005）；C2 完成 R8–R11 裁决与执行、删除 runtime/evaluation。**§9 是 2026-09-19 的区块式架构探索（零代码改动）**：10 区块分工、五类问题、子代理并发 2；产出全局普查（56 组/177 份重复实现、285 不可达文件/60,058 行、20 个 >600 行文件、core 越界 127 条 value 边）与区块 A/D/G 回报；⚠️ 区块只是探索坐标，**不是目标架构**。"
 confidence: high
 ---
 
@@ -24,21 +24,28 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 
 ---
 
-## 1. 当前状态（2026-09-19，阶段 A/B/C 全部完成）
+## 1. 当前状态（2026-09-20，阶段 A/B/C + T 轮收口后）
 
 | 指标 | 值 |
 |---|---:|
-| 生产文件 | 942 |
-| CLI 可达 | 770 |
-| CLI 不可达 | 172（仅测试 135 + 零引用 36 + 仅公共 API 1） |
+| 生产文件 | 946 |
+| CLI 可达 | 773 |
+| CLI 不可达 | 173（仅测试 136 + 零引用 36 + 仅公共 API 1） |
 | 全量测试 | **2748 项**（493 文件 / 2747 通过 / 1 跳过 / 0 失败） |
 | 稳定失败 | **0** |
 | `tsc -p tsconfig.build.json` | 0 错误 |
-| **import 环（新增门禁）** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1435 文件） |
+| **import 环（新增门禁）** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1439 文件） |
 | **越界模块** | **3**，均有 disposition；`npm run analyze:module-facades` |
 | NormProof judge | verdict `partial`；**blocking 义务 0 项未满足** |
 | `strict` | ✅ **已对生产开启**（`tsconfig.build.json` `strict: true`）；`npm run build` **0 错误**；零 `!` / 零 `as` |
 | 文档/规则漂移门禁 | ✅ `verify:docs-drift:strict`（RULES 0 死引用、DOCS **0 dangling**），已接入 `verify-release-core` |
+
+> **2026-09-20 计数更正（本轮实测）**：上表原为 942 / 770 / 172 / 1435，是 2026-09-19 阶段 C
+> 结束时的值。T 轮新增 4 个 owner 模块（`core/security/redaction.ts`、
+> `core/security/reportText.ts`、`core/values/freeze.ts`、`browser/outputBudget.ts`），
+> 各轮执行记录（§9.9/§9.13/§9.14/§9.16）都已写明，但**汇总表未同步** —— 这正是本计划
+> 反复要避免的那类漂移。现按 `analyze-boundaries.py` 与 `check-import-cycles.mjs` 实测值填入。
+
 
 > **⚠️ 可达性口径变化（2026-09-19，重要）**
 >
@@ -2060,3 +2067,174 @@ DEEP   : 调用方 workspaceFiles[1] frozen = true     ← 波及调用方
 **遗留**：§9.15 提到的"`tools/toolHandoff.ts:216`（浅冻结 + 返回 `T` 无 readonly + 输入含嵌套）"
 **未单独修正** —— 它属 10 个保留载体之一（不可达），按同一裁决一并保留。
 若将来该文件被接线，应优先把它并入 `freezeDeep`。
+
+### 9.17 2026-09-20 独立复核与处置（T 轮收口）
+
+对 T 轮（`3550134f` / `6a793de9` / `161e15fd` / `8c5f47c7` / `b7b7880b` / `96252719`）
+与两轮删除（`6925b242` / `0621c28e` / `8f5b5832`）做独立对抗复核。**发现 1 项真实回归并修复**，
+另有 6 项记录/文档缺陷。全部处置如下。
+
+#### P1 ✅ 已修复 —— T2 的 A/B 语义替换造成不可变性回退（真实回归）
+
+**性质**：`8c5f47c7` 把 13 处 B 语义（`deepFreeze` 不短路）实现并入 A 语义
+（`freezeDeep` 带 `!Object.isFrozen` 短路）。§9.15 断言"当前代码基本没触发这些差异"——
+**该断言对外层成立、对内层不成立**。
+
+**根因**：B 语义文件里，调用点把 `Object.freeze(...)` 的容器直接塞进了 `freezeDeep` 的参数，
+例如 `turn/assistantResponse.ts:91` 的 `toolCallCandidates: Object.freeze(candidates)`。
+改动前 `deepFreeze` 会下探并冻结元素；改动后遇到已冻结的数组**直接跳过**，元素保持可写。
+
+**实测（同输入、同模块、改动前后对拍）**：
+
+| | `8c5f47c7^` | HEAD（修复前） |
+|---|---|---|
+| `toolCallCandidates` 冻结 | true | true |
+| `toolCallCandidates[0]` 冻结 | **true** | **false** |
+| `candidate.arguments` 冻结 | **true** | **false** |
+| 改写 `candidate.arguments.command` | `TypeError` 阻止 | **成功** |
+
+**为何是缺陷**：`AssistantResponseState.toolCallCandidates` 声明为 `readonly unknown[]` ——
+`readonly` 只保护数组本身，**元素无任何类型保护**。改动前运行时兜住了，改动后类型与运行时都不挡。
+
+**修复**（`turn/assistantResponse.ts`）：移除 `toolCallCandidates` 与 `notProvenClaims`
+两处的内层 `Object.freeze`，交由 `freezeDeep` 统一深冻结。
+
+**验证**：`accumulateAssistantResponse` 的 `candidate.arguments.options` 现已冻结，
+改写抛 `TypeError`；新增回归测试 `assistantResponse.test.ts`「freezes the accumulated response
+and every reachable candidate」——**实测在修复前失败、修复后通过**（已用 `git stash` 双向验证）。
+
+**⚠️ 同类形态在 A 类文件里是既有形态，非本轮引入 —— 但实测未造成泄漏。**
+`freezeDeep({ ... Object.freeze(child) ... })` 在 A 类原实现里**不会**深冻结该 child
+（遇已冻结值即跳过），这是改动前就有的行为。实测 `freezeDeep` 对象字面量内共
+**68 处**预冻结子表达式，分布：
+
+| 文件 | 处数 | 性质 |
+|---|---:|---|
+| `evidence/savepoint/model.ts` | 33 | 全部为新建容器 |
+| `provider/request/boundary.ts` | 20 | 全部为新建容器 |
+| `tools/toolCallBatch.ts` | 8 | 元素已由 `normalizeToolCall` 深冻结 |
+| `provider/registry/provider.ts` | 3 | 新建容器 |
+| `provider/response/stream.ts` / `request/attempt.ts` / `request/fallback.ts` / `response/boundary.ts` | 各 1 | 新建容器或字符串数组 |
+
+**逐点核验结论（`/tmp` 探针实跑，非推断）**：
+
+- `evidence/savepoint/model.ts`：`executionReceipts[0]` 与 `observedResult` **均为新建对象**
+  （前者由 `.map((receipt) => Object.freeze({...}))` 构造，后者由 `input.resultProjection`
+  的字段展开为新字面量），**深冻结是 no-op，调用方对象未被冻结**
+  （实测 `callerReceipt` / `callerResultProjection` / `callerReceipt.redaction` 均 `false`）。
+- `tools/toolCallBatch.ts`：`calls` 的元素由 `normalizeToolCall` 各自 `freezeDeep`，
+  **元素本就深冻结**（实测仍为 `true`）。
+- `provider/*`：字符串数组或新建容器，深冻结为 no-op 或已由外层覆盖。
+
+**即：这 68 处是"冗余但无害"**——`Object.freeze` 与 `freezeDeep` 的语义重叠，删掉它
+既无收益也无风险，属可选清理，**不在本轮范围**。先前我一度写成"22 处"并指认
+`savepoint/model.ts:148` 为"唯一真实泄漏点"，**该指认被实测推翻**，已按上述实测更正。
+
+**已核验为非缺陷的 2 处**（无需处理）：
+- `tools/toolCallBatch.ts` 的 `calls: Object.freeze(calls)` —— `normalizeToolCall` 已对每个
+  call 调用 `freezeDeep`，元素本就深冻结，故不受影响（实测元素仍冻结）。
+- `provider/response/boundary.ts` 的 `notProvenClaims` 等 —— 纯字符串数组，深冻结是 no-op。
+
+#### P2 ✅ 已修复 —— T1 收口不完整：11 条安全正则链仍有 4 份
+
+§9.9 记「6 → 1」。**实测仍有 3 份与 owner 规则链完全相同**（括号配对提取函数体，
+名字归一后哈希 `5eed66aaf6ba` 三份一致）：`repair/handoff/boundary.ts:705`、
+`verification/result/boundary.ts:776`、`context/rebuildInput.ts:171`。
+
+**差异仅在链外**：签名多一个 `redactions: Set<string>`，尾部记 `unsafe-content` / `truncated`
+标签并用 `slice(0, maxLength)}...` 截断（注意：**产出 `maxLength + 3` 字符**，非保留尾缀）。
+`block-findings` §12.4 记过这组，但描述为"与 12.2 的 6 份**不同的另一套**"——**不准确**，
+规则链完全相同。
+
+**处置**：把链抽为 owner 的单一实现，链外差异参数化为
+`redactReportText(value, maxLength, { redactions?, ellipsis? })`。三个文件的私有 `sanitizeText`
+改为一行委托。
+
+**等价性验证（逐字节，含副作用集合）**：
+- 带 `ellipsis` 路径：19 输入 × 8 上限 = **152 组，0 不一致**（含 `redactions` 标签集合比对）
+- 默认路径（原 6 份语义）：11 输入 × 9 上限 = **99 组，0 不一致**
+- **自纠一处**：我最初把 `ellipsis` 实现为保留尾缀 `maxLength - 3`，探针立刻报 63 组不一致；
+  已改为与原实现一致的 `slice(0, maxLength) + "..."` 后归零。
+
+**收口结果**：承载完整 11 条规则的实现 **4 → 1**。
+
+#### P3 ✅ 已修复 —— 漂移门禁对"无前缀行内引用"失明
+
+门禁在 `96252719` 专门加了 fence 解析，但 `CANDIDATE` 正则要求行内引用带仓库根前缀，
+`resolves()` 里那条 `packages/ts-shell/src` 回退基址**永远收不到输入**。
+
+**处置**：新增 `SOURCE_PATH` 规则，**以"首段是否为 `packages/ts-shell/src` 下的真实域"为闸门**
+（域列表从磁盘读取，新增域当天即覆盖，删除域自动失效）。该闸门避免把
+"一次性工作区里的 `test/artifact-workflow.mjs`"这类非仓库路径误判为漂移。
+
+**口径对照（同一脚本、同一 active 文档集）**：
+
+| 口径 | 引用数 | 死引用 |
+|---|---:|---:|
+| 修复前 | 260 | 0 |
+| 修复后（含无前缀源码路径） | 418 | **0 dangling + 47 source-dangling** |
+
+47 条**单列为 advisory 计数、不逐条打印、不判失败**——因为删除轮次会合法引用已删路径
+（如 `plan.md` 记录"Step 2.6 误删 X，已回退"），硬失败会误报。计数本身即信号：它衡量
+"根前缀正则看不见的散文面有多大"。
+
+**双向验证**：注入根前缀死路径 → DOCS 作用域 exit 1；注入死规则引用 → RULES 作用域 exit 1；
+干净态 → exit 0。**自纠一处**：我最初在脚本自己的注释里写了根前缀示例路径，
+而该脚本被 `DOC_STATUS` 标为 active，导致门禁自报 1 条 dangling；已改写注释。
+
+#### P4 ✅ 已修复 —— plan §1 计数漂移
+
+| 指标 | 原值 | 实测 |
+|---|---:|---:|
+| 生产文件 | 942 | **946** |
+| CLI 可达 | 770 | **773** |
+| CLI 不可达 | 172 | **173**（仅测试 136 + 零引用 36 + 仅公共 API 1） |
+| 环扫描文件 | 1435 | **1439** |
+| front-matter 生产数 | 941 | **946**（与正文 942 亦不一致） |
+
+T 轮新增 4 个 owner 模块各轮执行记录都写了，但**汇总表与 front-matter 未同步**。
+
+#### P5 ✅ 已修复 —— 三处陈旧产物
+
+| 位置 | 处置 |
+|---|---|
+| `.normproof/dispositions.md` | 追加失效说明行：**20 条** disposition 指向已删路径。协议 append-only，故不删原行，改为显式登记其为惰性（最易被误读为现存 deferral 的是 4 条 `runtime/evaluation` / `presentation/surface`）|
+| `scripts/analyze-module-facades.mjs:44` | 注释改为说明该限制**现已无实际暴露文件**，并对任何声明 `readonly { ... }` 字段的模块成立 |
+| `docs/sprint/project-gap-and-priority-plan.md:44` | 现在时陈述改为过去时 + 删除说明 |
+
+#### P6 ✅ 已记录 —— `verification/execution/model.ts` 的 C→A 转换副作用
+
+§9.16 记了 `context/selection/model.ts` 的"深冻结会冻住调用方对象"，**未记此文件的同类副作用**：
+
+| | 改动前（浅冻结） | 改动后（`freezeDeep`） |
+|---|---|---|
+| `out.blockers` 冻结 | false | true |
+| **调用方传入数组冻结** | false（可 push） | **true（push 抛 TypeError）** |
+
+**当前无破坏**：该模块 CLI 可达，但两个活消费者
+（`core/query/runtime/harness.ts:7`、`core/query/runtime/proof.ts:15`）只调
+`classifyVerificationTargetCoverage` / `verifyChangedFileCoverage`；受影响的是
+`executeVerification`，仅由 `index.ts` 公共面与测试调用。属需记录的行为变更。
+
+#### P7 ✅ 已记录 —— 保留载体计数口径
+
+§9.16 记"12 处不可达浅冻结保留"。实测 `8c5f47c7^` 全仓浅冻结定义共 **12 个**，
+其中 **1 个被转换**（`verification/execution/model.ts:167`），**保留 11 个**，
+差 1 且口径未说明。
+
+保留的 11 个：`context/selection/model.ts:211`、`evidence/task/proof.ts:261`、
+`planning/execution/model.ts:187`、`provider/request/packet.ts:70`、`repair/loop/model.ts:293`、
+`result/task/verdict.ts:50`、`tools/policy/strategy.ts:369`、`tools/toolHandoff.ts:217`、
+`turn/turnSnapshot.ts:136/140`、`verification/selection/model.ts:280`。
+
+其中 **10 个返回 `Readonly<T>`**，**仅 `tools/toolHandoff.ts:217` 返回 `T`（无 readonly 保护）**——
+§9.16 的记述与此一致，且实测该文件生产侧仅 type-only 引用，**不可达结论成立**。
+
+#### 复核中被证实的声明（不逐条展开）
+
+T1 六份副本规则链逐条一致；T4 字节语义（CJK/emoji 边界、不劈字符、exact-cap 正确）与
+inert 判定（上游确以 `Buffer.length` 封顶）；T5 提取后**逐字节相同**且反向依赖归零；
+T15 改名零残留；CB-005 的 `runtime/loop` 生产零值导入、动态入口无字符串路径、
+`index.ts` 无悬空导出；C2 的 `runEvaluationCase` 确无可调用的 `HostCommandResponse` 生产者、
+零外部测试导入者、`index.ts` 已修复。全量 493 文件 / 2747 通过 / 0 失败；
+`tsc --noEmit -p tsconfig.build.json` 0 错误；import 环 0。

@@ -40,9 +40,11 @@
 //
 // DECLARATION_HEAD stops at the `{` of `readonly {` because its annotation pattern
 // excludes braces, so this body starts mid-annotation. The declaration then reports
-// branching 0 even though it owns rubric classification, and
-// runtime/evaluation/task/cases/index.ts is consequently reported as a thin facade
-// when it does own behaviour.
+// branching 0 even though it owns rubric classification, and a module shaped this
+// way is consequently reported as a thin facade when it does own behaviour. The
+// file that exposed this (runtime/evaluation/task/cases/index.ts) was deleted with
+// runtime/evaluation, so the case is now hypothetical; the limitation stands and
+// would apply to any module declaring a `readonly { ... }` field.
 //
 // Three attempts to fix it were reverted, each because it regressed more than it
 // corrected: widening the annotation pattern made the head swallow the *next*

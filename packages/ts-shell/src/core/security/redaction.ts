@@ -13,12 +13,42 @@
  * redaction rule meant editing six files in three domains, and a missed copy
  * would have produced a leak path that no single review covered.
  *
+ * A later sweep found the same chain in three more modules -
+ * `repair/handoff/boundary.ts`, `verification/result/boundary.ts` and
+ * `context/rebuildInput.ts` - where it differed only in what it did *around*
+ * the chain: those callers also want to know that a redaction fired and to
+ * truncate with an ellipsis. That variation is now a parameter here rather than
+ * a reason to keep a private copy, so the rule chain has exactly one home and a
+ * new rule reaches every caller.
+ *
  * The length limit stays a caller argument rather than a module constant:
  * callers pass 80, 120, 160, and 180 depending on the field they are scrubbing,
  * and that variation is deliberate.
  */
-export function redactReportText(value: string, maxLength: number): string {
-  return value
+
+/**
+ * Applies the shared rule chain and returns the scrubbed text.
+ *
+ * `redactions` is mutated in place with `unsafe-content` when any rule fired
+ * and with `truncated` when the length cap cut the value. Callers that only
+ * want the text pass nothing.
+ *
+ * Truncation is `slice` by default. Pass `{ ellipsis: true }` for the callers
+ * that report a shortened value to a reader and signal the cut with a trailing
+ * `...`. That form slices to `maxLength` and then appends the marker, so it
+ * yields `maxLength + 3` characters - the behaviour the three consolidated
+ * copies had, preserved exactly rather than "tidied" into a reserved tail.
+ */
+export function redactReportText(
+  value: string,
+  maxLength: number,
+  options: {
+    readonly redactions?: Set<string>;
+    readonly ellipsis?: boolean;
+  } = {},
+): string {
+  const { redactions, ellipsis = false } = options;
+  let sanitized = value
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
     .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
     .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
@@ -30,6 +60,16 @@ export function redactReportText(value: string, maxLength: number): string {
     .replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]")
     .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maxLength);
+    .trim();
+
+  if (redactions && sanitized !== value.trim()) {
+    redactions.add("unsafe-content");
+  }
+  if (sanitized.length > maxLength) {
+    sanitized = ellipsis
+      ? `${sanitized.slice(0, maxLength)}...`
+      : sanitized.slice(0, maxLength);
+    redactions?.add("truncated");
+  }
+  return sanitized;
 }

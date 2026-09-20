@@ -53,6 +53,38 @@ const ACTIVE_STATUS = 'active'
 // directory, which counts: directories are exactly what a refactor deletes.
 const CANDIDATE = /`((?:packages|apps|scripts|docs|agent-rules|contracts)\/[^`\s]+?\.(?:ts|tsx|mjs|js|json|md)|(?:packages|apps|scripts|docs|agent-rules|contracts)\/[^`\s]*?\/)`/g
 
+// The same references written without the repository root, which is how prose
+// inside `packages/ts-shell/` names things: the domain path on its own rather
+// than prefixed with the package and source directories. The gate already
+// resolves such paths through its `packages/ts-shell/src` base, but the pattern
+// above could never hand it one, so this whole family went unseen.
+//
+// Gated on the first segment being a real domain under the product source tree.
+// Without that gate the pattern matches any two-segment path in prose - a
+// `test/artifact-workflow.mjs` inside a disposable workspace, a `theme/theme.ts`
+// from another repository - and those resolve to nothing for reasons that are
+// not drift. The domain list is read from disk, so a new domain is covered the
+// day it is created and a removed one stops being a reference source.
+const SOURCE_PATH = /`([a-z][a-z0-9-]*(?:\/[A-Za-z0-9_.@-]+)+\.(?:ts|tsx|mjs|js))`/g
+
+function sourceDomains() {
+  const root = resolve(repoRoot, 'packages/ts-shell/src')
+  if (!existsSync(root)) return new Set()
+  return new Set(
+    readdirSync(root, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name),
+  )
+}
+
+function sourcePaths(text, domains) {
+  const found = []
+  for (const match of text.matchAll(SOURCE_PATH)) {
+    if (domains.has(match[1].split('/')[0])) found.push(match[1])
+  }
+  return found
+}
+
 // The same references written on their own line inside a fenced block. Rules
 // and architecture notes show tree shapes that way, and a stale line there
 // misdirects exactly like an inline one - ten dead paths in
@@ -116,6 +148,8 @@ function collect(target, files = []) {
 function scan(files) {
   let references = 0
   const dangling = []
+  const sourceDangling = []
+  const domains = sourceDomains()
   for (const file of files) {
     const text = readFileSync(file, 'utf8')
     const referenced = [
@@ -130,8 +164,19 @@ function scan(files) {
       if (resolves(reference)) continue
       dangling.push(`${relative(repoRoot, file)} -> ${reference}`)
     }
+    // Unprefixed source references are counted apart from the rest. A dead one
+    // is not necessarily drift: these documents legitimately cite paths that
+    // were deleted, to record the deletion ("Step 2.6 deleted X and it was
+    // rolled back"). The count is what matters - it is the size of the surface
+    // the root-prefixed pattern cannot see, and it should fall as documents are
+    // corrected, not rise.
+    for (const reference of sourcePaths(text, domains)) {
+      references += 1
+      if (resolves(reference)) continue
+      sourceDangling.push(`${relative(repoRoot, file)} -> ${reference}`)
+    }
   }
-  return { references, dangling }
+  return { references, dangling, sourceDangling }
 }
 
 // Read the status map and keep the paths it marks active. The map is the
@@ -174,8 +219,8 @@ const docsFiles = activeDocuments().flatMap((target) => collect(target))
 const rules = scan(rulesFiles)
 const docs = scan(docsFiles)
 
-console.log(`drift-check rules_files=${rulesFiles.length} rules_refs=${rules.references} rules_dangling=${rules.dangling.length}`)
-console.log(`drift-check docs_files=${docsFiles.length} docs_refs=${docs.references} docs_dangling=${docs.dangling.length}`)
+console.log(`drift-check rules_files=${rulesFiles.length} rules_refs=${rules.references} rules_dangling=${rules.dangling.length} rules_source_dangling=${rules.sourceDangling.length}`)
+console.log(`drift-check docs_files=${docsFiles.length} docs_refs=${docs.references} docs_dangling=${docs.dangling.length} docs_source_dangling=${docs.sourceDangling.length}`)
 
 for (const entry of rules.dangling) {
   console.log(`[product-regression] rule-reference-dangling - ${entry}`)
@@ -195,4 +240,12 @@ if (strict && docs.dangling.length > 0) {
 console.log(`[pass] rules-drift - every binding rule reference resolves`)
 if (docs.dangling.length > 0) {
   console.log(`[advisory] docs-drift - ${docs.dangling.length} reference(s) in current-state documents name paths that do not exist; run with --strict to fail`)
+}
+// Reported, never fatal, and deliberately not printed one per line: a deletion
+// round leaves hundreds of legitimate citations of removed paths, and listing
+// them would bury the findings this gate exists to surface. The count is the
+// signal - it is how much of the prose surface the root-prefixed pattern cannot
+// see, and it should trend down as documents are corrected.
+if (docs.sourceDangling.length > 0) {
+  console.log(`[advisory] docs-source-drift - ${docs.sourceDangling.length} unprefixed source reference(s) in current-state documents name paths that do not exist; these are counted, not listed, and not failed on`)
 }

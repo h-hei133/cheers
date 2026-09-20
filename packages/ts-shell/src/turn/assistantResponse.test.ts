@@ -53,4 +53,39 @@ describe("assistant response accumulation", () => {
     expect(response.redaction.status).toBe("redacted");
     expect(response.terminalSuccessClaim).toBe(false);
   });
+
+  // The candidates are the one place raw tool-call arguments reach a report
+  // structure, and `readonly unknown[]` protects the array but not its
+  // elements. A shallow freeze here would leave the arguments writable, so the
+  // immutability of the whole graph is the observable contract being defended.
+  it("freezes the accumulated response and every reachable candidate", () => {
+    const boundary = createModelResponseBoundary({
+      responseId: "response-freeze",
+      source: "fake_default_safe",
+    });
+    const response = accumulateAssistantResponse({
+      responseBoundary: boundary,
+      chunks: [{
+        toolCall: {
+          id: "call-1",
+          name: "write",
+          arguments: { path: "notes.txt", options: { mode: "append" } },
+        },
+      }],
+    });
+
+    const candidate = response.toolCallCandidates[0] as {
+      arguments: { path: string; options: { mode: string } };
+    };
+
+    expect(Object.isFrozen(response)).toBe(true);
+    expect(Object.isFrozen(response.toolCallCandidates)).toBe(true);
+    expect(Object.isFrozen(candidate)).toBe(true);
+    expect(Object.isFrozen(candidate.arguments)).toBe(true);
+    expect(Object.isFrozen(candidate.arguments.options)).toBe(true);
+    expect(() => {
+      candidate.arguments.path = "overwritten.txt";
+    }).toThrow(TypeError);
+    expect(candidate.arguments.path).toBe("notes.txt");
+  });
 });

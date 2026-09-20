@@ -88,13 +88,18 @@ export function accumulateAssistantResponse(
     textDeltaCount: safeDeltas.length,
     contentSummary: summary.value,
     safeContent,
-    toolCallCandidates: Object.freeze(candidates),
+    // Handed to `freezeDeep` unfrozen on purpose, and the same holds for the
+    // claim list below. Freezing a child here would freeze the container only:
+    // the deep walk skips a value that is already frozen, so the candidates
+    // themselves - each a tool call whose arguments carry the raw request -
+    // would stay writable, and `readonly unknown[]` does not protect elements.
+    toolCallCandidates: candidates,
     accumulationStatus: status,
     redaction: {
       status: redacted ? "redacted" : "report-safe",
       excluded: REDACTION_EXCLUSIONS,
     },
-    notProvenClaims: Object.freeze([
+    notProvenClaims: [
       ...new Set([
         "assistant-text-is-not-task-success",
         "provider-success",
@@ -104,7 +109,7 @@ export function accumulateAssistantResponse(
         ...(input.notProvenClaims ?? []),
         ...input.responseBoundary.notProvenClaims,
       ]),
-    ]),
+    ],
     terminalSuccessClaim: false,
   });
 }

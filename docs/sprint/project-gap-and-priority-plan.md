@@ -41,9 +41,11 @@ deterministic runtime case is not enough.
   Deterministic cases and explicit live entries call the same ordered task-loop
   runtime from goal and state through context, plan, request, provider turn,
   action, observation, verification, repair, proof, and verdict. Safe live gate
-  receipts are projected inside `runtime/evaluation/task` for read-only,
-  anchored, artifact dry-run, and reviewed isolated write entries. The
-  repeatable opt-in live run defines thirteen exact entries. The current
+  receipts **were** projected inside `runtime/evaluation/task` for read-only,
+  anchored, artifact dry-run, and reviewed isolated write entries; that module
+  was deleted with CB-005/C2 (2026-09-19), so this describes the arrangement at
+  the time of measurement, not the current tree. The repeatable opt-in live run
+  defines thirteen exact entries. The current
   measured SP031 explicit recovery gauntlet executed all 13 entries, completed
   11 with task proof,
   completed 3 write tasks with reviewed disposable apply plus post-apply task
