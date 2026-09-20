@@ -2381,7 +2381,7 @@ T15 改名零残留；CB-005 的 `runtime/loop` 生产零值导入、动态入�
 | 删除 | `shellActionRuntime.ts`：`runSessionsShellAction`(49) + `runAgentModeShellAction`(30)；`cliDisplayProjection.ts`：`formatWorkspaceInfoLines`(12) + `formatAgentMode*`(20) = **111 行** |
 | 连带修改 | `interactiveCommandRouter.ts`：删 agent-mode 两条分支与 3 个死 import；`types.ts`：删 `set-agent-mode`/`show-agent-mode` union 成员与 `agentMode?` 字段；`cliCoreSplit.test.ts`：删对应断言 |
 | **保留** | `runViewShellAction` + `formatViewMode*` + `projectPermissionListDisplay` |
-| 保留理由 | `/view` 的 4 个 action（`show-view`/`set-view`/`show-agent-mode`/`set-agent-mode`）**全仓无任何可达 producer**（§9.26 更正：`shellActionRuntime.ts:130/137/145` 确实产出 `show-view`/`set-view`，但该函数 `runViewShellAction` **自身零调用者**、`registry.ts` 无 `view` 条目——即 producer 存在但不可达，原措辞"从不被写"不准确，结论不变）→ 按 §2.1 无活轨接管即不可删。agent-mode 的**读侧**同样无 producer，但写侧语义已由 Shift+Tab 活轨承担，故其死分支可删 |
+| 保留理由 | `/view` 的 4 个 action（`show-view`/`set-view`/`show-agent-mode`/`set-agent-mode`）**全仓无任何可达 producer**（§9.26 更正：`shellActionRuntime.ts:130/137/145` 确实产出 `show-view`/`set-view`，但该函数 `runViewShellAction` **自身零调用者**、`registry.ts` 无 `view` 条目——即 producer 存在但不可达，原措辞"从不被写"不准确，结论不变。**且该不可达并非 `bfe56b20` 造成**：`/view` 于 **2026-09-01 `c0ae9ba0`**（"turn catalogue commands into choosers"，registry 减 56 行）即已从注册表移除，`bfe56b20` 父提交实测 registry 无 `view` 条目、`runViewShellAction` 零调用者——属**先于本次删除**的既有状态）→ 按 §2.1 无活轨接管即不可删。agent-mode 的**读侧**同样无 producer，但写侧语义已由 Shift+Tab 活轨承担，故其死分支可删 |
 | 六项检查 | 全部通过 |
 | 验证 | `tsc` 0 错误；`cliCoreSplit.test.ts` 6/6、`src/cli/interactive` 全通过；残留引用扫描 0 |
 
