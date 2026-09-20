@@ -37,6 +37,9 @@ confidence: high
 > **Phase 1 施工已完成**：见 [`phase-1-execution.md`](phase-1-execution.md)。
 > 执行中发现 **5 处与裁决不符**（含 `thinkingLevel` 双源、multimodal 实为缺陷、
 > 事件流模块非事件流），均已在执行记录中逐条更正。
+> **Phase 2 前置研究已完成**：见 [`phase-2-pre-research.md`](phase-2-pre-research.md)。
+> 该研究关闭了 `07-*` §5 标记的两个未覆盖项，并查明 `context/compact/`（初记 5,186 行，
+> 实为 4,659 + `readWindow` 527 的误并）**不是压缩器**——它自述 `providerCall: "none"`。
 > 本索引的 §3 优先项表在裁决后**不再是「待决定」**——处置已定，见裁决文件。
 
 | # | 报告 | 覆盖范围 | DEFICIENT | MISSING | OURS-ONLY | 平手 |

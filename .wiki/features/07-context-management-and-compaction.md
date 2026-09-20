@@ -225,6 +225,9 @@ grep -rnE 'eventName:[[:space:]]*"(PreCompact|PostCompact)"' packages/ts-shell/s
 1. **`chars/3.5` 相对真实 tokenizer 的误差**：未从 provider fixture 或真实 transcript 取同一段内容对比，故只给阈值层面的确定差异（§2.1）。
 2. **`rewindTo` 之外 transcript 的物理清理策略**：不能断言旧 transcript 文件字节是否同步删除；能确定的是 active session 的 turns 已截断且无 branch summary 生成（§3.1）。
 3. **`SessionDagEngine.branchWithSummary` 的全仓调用图**：已确定它不在 rewind picker 调用链中，但未穷举所有产品入口（§3.1）。
-4. **`context/compact/` 域（5,186 行）的完整职责**：本轮只读了 `checkpoint/compactLiveCheckpoint.ts` 与 `governance/contextAnalysis.ts` 的头部；该域与 `session/compaction.ts` 的关系未系统梳理。**这是本轮最大的未覆盖区域。**
+4. **`context/compact/` 域（4,659 行含测试 / 2,919 行非测试）的完整职责**：本轮只读了 `checkpoint/compactLiveCheckpoint.ts` 与 `governance/contextAnalysis.ts` 的头部；该域与 `session/compaction.ts` 的关系未系统梳理。**这是本轮最大的未覆盖区域。**
+   > **2026-09-20 更正**：本项初记「5,186 行」，该数字实为 `context/compact/`（4,659 含测试）**加上** `context/readWindow/`（527）之和——两者被误并为一个域。
+   > 且后续研究（`phase-2-pre-research.md` §1.1）已查明：`context/compact/` **不是压缩器**，而是交接包生成器（结果类型自述 `providerCall: "none"`），与 `session/compaction.ts` 不在同一问题上。该未覆盖项已收口。
 5. **`core/shell/compaction.ts` 与 `session/compaction.ts` 的语义重叠**：确认了两者是**不同的活路径**（前者服务交互式 `/compact`，后者服务自动压缩与 overflow），但未逐字段对比二者的 cut 逻辑是否一致。
+   > **2026-09-20 已收口**：见 [`phase-2-pre-research.md`](phase-2-pre-research.md) §2 的逐字段对照。结论：两者共享同一摘要器，差异在**切点 guard** 与**落盘责任**，是真实语义差异而非重复。
 6. **未运行任何构建/测试/产品**：全部为静态分析。

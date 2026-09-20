@@ -2371,3 +2371,66 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 
 `tuiSettings` 迁移后，`statusItems` 的级联优先级从「项目胜出」变为「用户胜出」（与 `getRuntimeConfig` 一致）。
 对显示偏好而言更合理，但属**静默变化**，已在执行记录 §3.2 显式记录。
+
+## [2026-09-20] research | Phase 2 前置研究：压缩层地形测绘（零代码改动）。
+
+**依据**：上一轮定下的纪律——「不先理清 `context/compact/` 与 `session/compaction.ts` 的关系，不动压缩层」。
+**产出**：`features/phase-2-pre-research.md`。
+
+### 两个未覆盖项已关闭
+
+1. **`07-*` §5 的「5,186 行」是个误并数字**——实测 = `context/compact/`（4,659 含测试）
+   **加上** `context/readWindow/`（527）。两者被当成一个域统计。
+2. **`context/compact/` 不是压缩器**——它的结果类型自述 `providerCall: "none"`、
+   `persistence: "none"`、`recoveryExecution: "none"`，实际构建的是**交接包**
+   （`buildRouteContinuityHandoffPacket`），不调用 provider、不改上下文。
+   它有 **11 个**外部生产消费者，读的是 checkpoint/injection **状态存储**，不是压缩结果。
+   → **上一轮担心的「在两个实现之间做错改动」前提不成立。**
+
+### 六个「compaction」，四个活着，职责各不相同
+
+| 文件 | 消费者 | 职责 |
+|---|---:|---|
+| `session/compaction.ts`（179 行） | 1 | 回合内压缩 + 溢出恢复 |
+| `core/shell/compaction.ts`（116 行） | 3 | 手动 `/compact` |
+| `core/query/microCompact.ts`（125 行） | 2 | 每请求工具输出剪枝 |
+| `session/agent/compaction.ts` | 1 | working-memory 按 turn 保留 |
+| `browser/receipt/compaction.ts` | 1 | 浏览器凭据缓存（无关） |
+| `context/compact/**`（2,919 非测试行） | 11 | **交接包生成器，非压缩器** |
+
+### 三项待施工的候选
+
+1. **P8 触发依据**——修复路径已钉死：provider 的**真实 usage 已被记录**
+   （`turn/step.ts:152` → `usageTelemetry.ts:57` 的 `lastPromptTokens`），
+   且**已被两处 UI 使用**（`sessionFacts.ts:67`、`contextCommandRuntime.ts:52`），
+   **却没喂给压缩触发**（`session/compaction.ts` 里该字段出现 0 次）。
+   需解决三个接缝：`createCompactionStep` 无 `sessionId`；`contextWindow` 取全局常量
+   而非模型目录的 per-model 值；`reserveTokens` 默认 8,000（对方 16,384）。
+2. **切点 split-turn**——已复现：巨型 turn（41 条）上 `findCompactionCut` 返回 `None`，
+   溢出恢复复用同一函数因而同样失败。
+3. **B 的 dangling guard**——真实但轻微（见下）。
+
+### 一处判断被自己的实测推翻
+
+我一度推断「B 缺 dangling guard 会把含未闭合 call 的 head 发给 provider，请求不合法」。
+**错**——两条路径最终都经 `toChatMessages`，它会补 `(Operation cancelled or interrupted)`。
+真实损失是**保真度**：一次工具结果本可留在 tail，却因 call 在 head 而被静默删除
+（`prompt.ts:87-88` 的 `continue`）。已构造实测序列确认 guard 拦得住
+（`hasDanglingCalls(msgs,2)=True`，A 跳过、B 采用）。
+
+### 另：A 的注释不准确
+
+`session/compaction.ts:78-84` 称「Results after the cut stay paired with their own assistant message」。
+实测反例：`[user, assistant(call_a), user, tool(result_a)]` 在 cut=2 时，
+`assistant(call_a)` 被丢弃而 `tool(result_a)` 留在 tail——**配对不成立**。
+
+### 命名问题（记录，不在功能范围）
+
+`/handoff` 是 `/compact` 的**别名**（走压缩路径），而 `/compact preview|render|json`
+走**交接包**路径。**两条命令的名字与职责是交叉的。**
+
+### 方法教训（本轮自己踩的）
+
+**第一次统计消费者时按 basename 匹配**，得出「A 与 B 有 6 个相同消费者」的错误结论——
+`from "./compaction.js"` 被按文件名匹配，两个同名文件互相污染。改为解析说明符到真实路径后修正。
+**与上一轮三次误报同源：证据搜索停在第一层。**
