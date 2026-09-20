@@ -5,7 +5,7 @@ sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-0
 created: 2026-09-15
 updated: 2026-09-20
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v7。当前生产 939 / CLI 可达 771 / 全量测试 2739 项（490 文件 / 2738 通过 / 1 跳过 / 0 失败；2026-09-20 实测，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），可达性只用于分析、不授权删除。Step 1–7 与阶段 A/B/C 全部完成；§9 的 T1–T18 待办已全部收口（18 项已完成、T3 前提被推翻），§9.5 四项开放问题与 93 个单文件孤立簇均已裁决，结论均为「保留」并登记 disposition。本轮另修两处真实缺陷：T2 引入的不可变性回归（§9.17 P1）与 SSRF 防线漏 169.254.0.0/16（§9.24）。§9.18–§9.25 为 2026-09-20 的复核、研究与施工记录。"
+summary: "Module boundary refactor plan v7。当前生产 939 / CLI 可达 771 / 全量测试 2740 项（490 文件 / 2739 通过 / 1 跳过 / 0 失败；2026-09-20 实测，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），可达性只用于分析、不授权删除。Step 1–7 与阶段 A/B/C 全部完成；§9 的 T1–T18 待办已全部收口（18 项已完成、T3 前提被推翻），§9.5 四项开放问题与 93 个单文件孤立簇均已裁决，结论均为「保留」并登记 disposition。本轮另修两处真实缺陷：T2 引入的不可变性回归（§9.17 P1）与 SSRF 防线漏 169.254.0.0/16（§9.24）。§9.18–§9.25 为 2026-09-20 的复核、研究与施工记录。"
 confidence: high
 ---
 
@@ -34,7 +34,7 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 | 生产文件 | 939 |
 | CLI 可达 | 771 |
 | CLI 不可达 | 168（仅测试 131 + 零引用 36 + 仅公共 API 1） |
-| 全量测试 | **2739 项**（490 文件 / 2738 通过 / 1 跳过 / 0 失败） |
+| 全量测试 | **2740 项**（490 文件 / 2739 通过 / 1 跳过 / 0 失败） |
 | 稳定失败 | **0** |
 | `tsc -p tsconfig.build.json` | 0 错误 |
 | **import 环** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1429 文件） |
@@ -2897,3 +2897,66 @@ MUTATION SUCCEEDED -> rm -rf /     ← 可改模型请求的原始参数
 - SSRF 修复（`26a76eba`）：经**两个真实入口**（`publicReadOnlyWebPolicy`、`networkEgressGuard`）复现，`169.254.169.254` 拦截、`example.com` 放行。全仓独立私有网络判断仅剩 `runtime/core/manifest.ts:207`，为**白名单**（只放行回环、拦截其余），极性与 SSRF 相反，非漏洞。
 - `d65c9178` 的冻结修复与脱敏合并：冻结 before/after 探针复现（父提交 `candidate:false`、`8c5f47c7^` 为 `true`）；`redactReportText` 截断语义与三份原实现一致（`slice(0,maxLength)+"..."`，非更整洁的 `slice(0,maxLength-3)`）。
 - 门禁 `verify-docs-and-rules-drift.mjs` 新检测：strict 通过，且对 `` `test/artifact-workflow.mjs` `` 这类工作区相对路径**不误报**。
+
+### 9.27 结构防护面实测（2026-09-20）：门禁存在，但大多不阻断
+
+**问题**：重构收口后，如何防止后续开发重新破坏这些结构？本章不回答"应该怎么做"，
+只记录**实测到的现状**——因为未经实测的建议不可靠。
+
+#### 实测方法
+
+向工作区**注入真实违规**，逐门禁观察退出码与报告。每次注入后立即还原，`git status` 干净。
+
+| 门禁 | 检出违规 | 退出码 | 能否阻断 |
+|---|---|---|---|
+| `npm run verify:import-cycles` | ✅ 检出真实环 | **1** | ✅ **能** |
+| `npm run verify:docs-drift:strict` | ✅ 检出悬空引用 | **1** | ✅ **能** |
+| `npm run test:ts` | ✅ | **1** | ✅ **能** |
+| `npm run analyze:module-facades` | ✅ 3→4 越界模块 | **0** | ❌ 仅告警 |
+| `normproof judge` | ✅ 检出 | **0** | ❌ **shadow 模式** |
+
+实测命令示例（注入两个模块互指的真实环）：
+
+```bash
+# core/values/freeze.ts → presentation/sidebar/sidebarStateProjection.ts，且反向
+node scripts/check-import-cycles.mjs   # exit 1，报告 1 个 runtime cycle
+npx normproof judge                     # exit 0，wouldBlock=false
+```
+
+#### 关键缺口 1：CI 不跑那两个**能阻断**的架构门禁
+
+`.github/workflows/ci.yml` 实际只跑三步：`build:ts`、`test:ts`、`normproof judge`。
+**不含** `verify:import-cycles`、`verify:docs-drift:strict`、`analyze:module-facades`、`verify:cli-entry`。
+
+后果：**一个真实的循环依赖今天可以被推入 `main` 且 CI 全绿**——因为唯一跑架构的门禁
+（`normproof judge`）处于 shadow 模式永不阻断，而真正会 exit 1 的 `verify:import-cycles` 根本没被 CI 调用。
+
+#### 关键缺口 2：NormProof 把最重要的两条义务定为 advisory
+
+`.normproof/norm-packs/software-structure-v0/profile.json` 的三条义务等级：
+
+| 义务 | severity |
+|---|---|
+| `source_graph_is_acyclic`（无循环依赖） | **advisory** |
+| `declared_functions_within_module_ceiling`（函数上限 20） | **advisory** |
+| `source_graph_has_no_unresolved_specifiers`（导入必须可解析） | blocking |
+
+即：即便把 judge 从 shadow 切到 enforcing，**环与函数超限仍不会阻断**——只有"导入无法解析"会。
+而这恰是 §9 全程最在意的两条结构约束。
+
+`.github/workflows/normproof-watch.yml` 亦自述为"observation instrument, not a release gate"，
+且 `exit 0 # Observation mode: record, never gate`。
+
+#### 关键缺口 3：§1 的计数会持续漂移，且无机器校验
+
+§1 的计数表**本轮已第二次漂移**：记录值 2739，实测 2740——原因是本轮修复新增了一个回归测试。
+文件数（939/771/168）经复核未变。
+
+根因：该表是手写同步，没有任何门禁校验"文档记载的数字 == 实跑得到的数字"。
+`verify-docs-drift` 只校验**路径引用**能否解析，不校验**计数**。
+
+#### 未发现问题
+
+`docs-drift --strict` 与 `import-cycles` 耗时分别为 **171 ms / 270 ms**，
+`module-facades` 391 ms——三者合计 **< 1 秒**，相对 `test:ts` 的 ~187 秒可忽略。
+即"把门禁接进 CI"的成本障碍接近于零。
