@@ -9,6 +9,14 @@ export interface SessionUsageTelemetry {
    * context many times over.
    */
   lastPromptTokens: number;
+  /**
+   * How many messages that request carried.
+   *
+   * The measured count only covers what was sent. Anything the conversation
+   * gained afterwards is not in the provider's number, so the two have to be
+   * added together before either can answer whether the next request fits.
+   */
+  lastPromptMessageCount: number;
   turnsCount: number;
   toolCallsCount: number;
   model: string;
@@ -36,6 +44,8 @@ export function recordSessionUsage(
     totalTokens?: number;
     toolCallsCount?: number;
     model?: string;
+    /** How many messages the request carried, so trailing ones can be counted. */
+    promptMessageCount?: number;
   },
 ): void {
   const existing = sessionTelemetries.get(sessionId) ?? {
@@ -43,6 +53,7 @@ export function recordSessionUsage(
     completionTokens: 0,
     totalTokens: 0,
     lastPromptTokens: 0,
+    lastPromptMessageCount: 0,
     turnsCount: 0,
     toolCallsCount: 0,
     model: usage.model || "default",
@@ -54,7 +65,10 @@ export function recordSessionUsage(
   const tTokens = usage.totalTokens ?? pTokens + cTokens;
 
   existing.promptTokens += pTokens;
-  if (pTokens > 0) existing.lastPromptTokens = pTokens;
+  if (pTokens > 0) {
+    existing.lastPromptTokens = pTokens;
+    existing.lastPromptMessageCount = usage.promptMessageCount ?? 0;
+  }
   existing.completionTokens += cTokens;
   existing.totalTokens += tTokens;
   existing.turnsCount += 1;
@@ -74,6 +88,7 @@ export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
       completionTokens: 0,
       totalTokens: 0,
       lastPromptTokens: 0,
+      lastPromptMessageCount: 0,
       turnsCount: 0,
       toolCallsCount: 0,
       model: "default",
@@ -89,7 +104,10 @@ export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
  */
 export function markContextUnknown(sessionId: string): void {
   const existing = sessionTelemetries.get(sessionId);
-  if (existing) existing.lastPromptTokens = 0;
+  if (existing) {
+    existing.lastPromptTokens = 0;
+    existing.lastPromptMessageCount = 0;
+  }
 }
 
 export function resetSessionUsage(sessionId: string): void {

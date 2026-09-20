@@ -154,6 +154,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
             completionTokens: completion.usage.completion_tokens,
             totalTokens: completion.usage.total_tokens,
             model: request.provider.model,
+            // The provider counted the prompt it was sent; the message count lets
+            // a later reader add whatever the conversation gained since.
+            promptMessageCount: messages.length + 1,
           });
         }
         return toStep(completion, watched);

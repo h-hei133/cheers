@@ -8,7 +8,7 @@ import {
   applyCompaction,
   createCompactionStep,
   findCompactionCut,
-  KEEP_RECENT_MESSAGES,
+  KEEP_RECENT_TOKENS,
   type CompactionPolicy,
   type CompactionReason,
   type SummarizeHistory,
@@ -216,7 +216,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     if (overflowRecovered) return false;
     overflowRecovered = true;
     const kept = messages.slice(0, -1);
-    const cut = findCompactionCut(kept, options.compaction.policy.keepRecentMessages ?? KEEP_RECENT_MESSAGES);
+    const cut = findCompactionCut(kept, options.compaction.policy.keepRecentTokens ?? KEEP_RECENT_TOKENS);
     if (cut === undefined) return false;
     const summary = await options.compaction.summarize(kept.slice(0, cut), options.signal).catch(() => undefined);
     if (!summary) return false;

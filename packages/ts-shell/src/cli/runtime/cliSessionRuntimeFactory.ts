@@ -21,7 +21,8 @@ import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { compactSessionHistory } from "../../core/shell/compaction.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
-import { markContextUnknown } from "../../observability/usageTelemetry.js";
+import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
+import { estimateTokens } from "../../session/context.js";
 import { toChatMessages } from "../../turn/prompt.js";
 import type { CompactionSetup } from "../../turn/session.js";
 export function createCliSessionRuntime(input: {
@@ -95,6 +96,14 @@ export function createCliSessionRuntime(input: {
               policy: {
                 contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64_000,
                 reserveTokens: input.runtimeContext.runtimeConfig.reserveTokens,
+                // The provider's own count, plus whatever the conversation has
+                // gained since that request. Falls back to the estimate inside
+                // planCompaction when no request has reported usage yet.
+                measureContextTokens: (messages) => {
+                  const usage = getSessionUsage(sessionId);
+                  if (usage.lastPromptTokens <= 0) return undefined;
+                  return usage.lastPromptTokens + estimateTokens(messages.slice(usage.lastPromptMessageCount));
+                },
               },
               summarize: (messages, summarizeSignal) =>
                 requestCompactionSummary({

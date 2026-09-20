@@ -3,7 +3,7 @@ import { runAgentLoop } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import type { AgentTool, AgentToolCall } from "../core/agent/tools.js";
 import {
-  KEEP_RECENT_MESSAGES,
+  KEEP_RECENT_TOKENS,
   applyCompaction,
   createCompactionStep,
   findCompactionCut,
@@ -32,7 +32,12 @@ function history(exchanges: number): AgentMessage[] {
   return messages;
 }
 
-const policy: CompactionPolicy = { contextWindow: 30, reserveTokens: 10, keepRecentMessages: 2 };
+/**
+ * A budget just under one exchange's worth of characters, so the cut lands on
+ * the newest boundary and keeps a two-message tail — the same shape the
+ * message-count fixture used to produce.
+ */
+const policy: CompactionPolicy = { contextWindow: 30, reserveTokens: 10, keepRecentTokens: 10 };
 
 describe("shouldCompact", () => {
   it("fires only past the reserved headroom", () => {
@@ -60,8 +65,12 @@ describe("findCompactionCut", () => {
   });
 
   it("keeps at least one full exchange before the cut", () => {
-    expect(findCompactionCut(history(2), 2)).toBe(2);
-    expect(findCompactionCut(history(2), 3)).toBeUndefined();
+    // A budget below one exchange leaves the newest boundary to cut at.
+    expect(findCompactionCut(history(2), 5)).toBe(2);
+    // Deciding whether to cut at all is the caller's job: a budget that covers
+    // the whole fixture still yields a boundary, and planCompaction is what
+    // refuses to act on it because the threshold was never crossed.
+    expect(planCompaction(history(2), { contextWindow: 10_000, reserveTokens: 0 })).toBeUndefined();
   });
 });
 
@@ -303,7 +312,7 @@ describe("compaction through the kernel hook", () => {
 });
 
 describe("constants", () => {
-  it("keeps a small verbatim tail", () => {
-    expect(KEEP_RECENT_MESSAGES).toBe(4);
+  it("keeps a recent tail measured in tokens", () => {
+    expect(KEEP_RECENT_TOKENS).toBe(20_000);
   });
 });

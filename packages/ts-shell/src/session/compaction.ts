@@ -1,14 +1,30 @@
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
-import { DEFAULT_RESERVE_TOKENS, estimateTokens } from "./context.js";
+import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateTokens, messageCharCount } from "./context.js";
 
-export const KEEP_RECENT_MESSAGES = 4;
+export const KEEP_RECENT_TOKENS = 20_000;
 
 export interface CompactionPolicy {
   readonly contextWindow: number;
   readonly reserveTokens?: number;
-  readonly keepRecentMessages?: number;
+  /**
+   * Tokens of recent history to keep verbatim.
+   *
+   * A budget in tokens rather than a count of messages: four short messages and
+   * four enormous ones mean completely different amounts of context, and only
+   * one of those is what "keep the recent exchange" is asking for.
+   */
+  readonly keepRecentTokens?: number;
   readonly enabled?: boolean;
+  /**
+   * What the provider reported the context costs, given the messages on hand.
+   *
+   * A callback rather than a number because it changes as the turn proceeds: the
+   * measured value covers the prompt that was sent, and every message added since
+   * has to be counted on top of it. Returns nothing when no measurement exists,
+   * in which case the caller estimates instead.
+   */
+  readonly measureContextTokens?: (messages: readonly AgentMessage[]) => number | undefined;
 }
 
 export interface CompactionPlan {
@@ -57,20 +73,48 @@ export function shouldCompact(
   return tokens > contextWindow - reserveTokens;
 }
 
+/**
+ * Index of the first message to keep, or nothing when there is too little to
+ * condense.
+ *
+ * Takes the earliest user boundary whose tail still fits the budget, so the kept
+ * messages are exactly the recent ones. Stops at the first boundary that cannot
+ * fit: every earlier one keeps even more.
+ *
+ * Two properties hold the cut together. The tail must begin on a user message —
+ * starting mid-tool-call would hand the provider a result without its call. And
+ * the head must close on its own — a call whose result lands in the kept tail is
+ * a result whose call has already been discarded.
+ *
+ * When nothing fits, the newest boundary still wins. Reaching this function
+ * means the context was already judged too large, so declining to condense
+ * would leave the request exactly as oversized as before.
+ */
 export function findCompactionCut(
   messages: readonly AgentMessage[],
-  keepRecent: number,
+  keepRecentTokens: number,
 ): number | undefined {
-  for (let index = messages.length - keepRecent; index >= 2; index -= 1) {
-    if (messages[index]?.role !== "user") {
-      continue;
+  const budgetChars = keepRecentTokens * CHARS_PER_TOKEN;
+  let accumulated = 0;
+  let fits: number | undefined;
+  let overran: number | undefined;
+  for (let index = messages.length - 1; index >= 2; index -= 1) {
+    accumulated += messageCharCount(messages[index]!);
+    if (messages[index]!.role !== "user" || hasDanglingCalls(messages, index)) continue;
+    if (accumulated > budgetChars) {
+      // This boundary keeps more than the budget allows, so it is the candidate
+      // to cut at — but only if every boundary was over. Otherwise the earlier
+      // one that fits is the better answer.
+      overran ??= index;
+      break;
     }
-    if (hasDanglingCalls(messages, index)) {
-      continue;
-    }
-    return index;
+    fits = index;
   }
-  return undefined;
+  // `fits` is the earliest boundary whose tail stays inside the budget. When
+  // even the newest boundary overruns, condensing that much is still the only
+  // way to shrink the request, so the overrunning boundary is used. When
+  // nothing overran, the budget covers everything and there is nothing to cut.
+  return fits ?? overran;
 }
 
 /**
@@ -105,16 +149,24 @@ export function planCompaction(
   policy: CompactionPolicy,
 ): CompactionPlan | undefined {
   const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const keepRecent = policy.keepRecentMessages ?? KEEP_RECENT_MESSAGES;
-  const tokensBefore = estimateTokens(messages);
+  const available = Math.max(0, policy.contextWindow - reserve);
+  // A budget at or above what the window can hold would swallow the whole
+  // conversation, so no cut would ever be found and compaction would never run
+  // — the opposite of what the budget is for. Clamp it to the space that
+  // actually exists.
+  const keepRecentTokens = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available);
+  const estimated = estimateTokens(messages);
+  // The provider's own count wins when it exists: it measured the prompt that
+  // was actually sent, while the estimate only measures the text we kept.
+  const tokensBefore = policy.measureContextTokens?.(messages) ?? estimated;
   if (!shouldCompact(tokensBefore, policy.contextWindow, reserve, policy.enabled ?? true)) {
     return undefined;
   }
-  const cut = findCompactionCut(messages, keepRecent);
+  const cut = findCompactionCut(messages, keepRecentTokens);
   if (cut === undefined) {
     return undefined;
   }
-  return { cut, keptMessages: messages.length - cut, tokensBefore };
+  return { cut, keptMessages: messages.length - cut, tokensBefore: estimated };
 }
 
 export function applyCompaction(
