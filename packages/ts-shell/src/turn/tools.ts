@@ -201,6 +201,15 @@ async function askPermission(
     return { blocked: `Blocked: Tool '${toolName}' requires permission (${evaluation.reason}), but no interactive handler is available.` };
   }
   options.emit({ type: "approval.requested", toolName, taskId: toolCallId });
+  await options.hooks.dispatch({
+    eventName: "PermissionRequest",
+    sessionId: options.sessionId,
+    workspaceRoot: options.workspaceRoot,
+    timestamp: new Date().toISOString(),
+    toolName,
+    toolCallId,
+    args,
+  });
   const response = await options.escalationPromptHandler(
     buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, evaluation.reason),
   );
@@ -211,6 +220,16 @@ async function askPermission(
       response.userComment && !response.userComment.startsWith("CLI explicit approval")
         ? response.userComment.replace(/^User denied with reason:\s*/i, "").trim()
         : "";
+    await options.hooks.dispatch({
+      eventName: "PermissionDenied",
+      sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot,
+      timestamp: new Date().toISOString(),
+      toolName,
+      toolCallId,
+      args,
+      reason: feedback || evaluation.reason,
+    });
     return {
       blocked: feedback
         ? `[User Denied Permission]: The user explicitly rejected this tool call.\nUser feedback / instructions: "${feedback}"\nYou MUST follow the user's instructions above instead of repeating the rejected action.`

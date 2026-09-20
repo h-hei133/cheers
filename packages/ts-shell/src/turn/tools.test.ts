@@ -83,7 +83,9 @@ describe("createToolHooks", () => {
     expect(await hooks.beforeToolCall!(context)).toBeUndefined();
     const after = await hooks.afterToolCall!({ ...context, result: { output: "wrote a", isError: false }, isError: false });
     expect(after?.output).toBe("[User approved write operation (allow-once)]\nwrote a");
-    expect(setup.dispatched).toEqual(["PreToolUse", "PostToolUse"]);
+    // An approval round trip is reported as a request and then as a tool call, so
+    // a hook can observe both the decision being asked for and what ran.
+    expect(setup.dispatched).toEqual(["PermissionRequest", "PreToolUse", "PostToolUse"]);
   });
 
   it("stops a model that repeats the same call three times", async () => {

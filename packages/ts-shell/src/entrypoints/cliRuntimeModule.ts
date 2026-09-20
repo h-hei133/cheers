@@ -12,6 +12,7 @@ import {
 } from "../core/shell/printPromptInput.js";
 import type { ShellRuntimeContext } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
+import { createJsonEventWriter } from "../presentation/terminal/jsonEvents.js";
 import {
   isResumeLikeShellAction,
   renderInteractiveOnlyShellActionBlocked,
@@ -190,6 +191,8 @@ export async function runNonInteractivePrompt(options: {
   sessionRuntime: ShellSessionRuntime;
   logger: StructuredLogger;
   printMode: boolean;
+  /** Write the run's events as JSON lines on stdout instead of prose. */
+  jsonEvents?: boolean;
   fallbackSessionId?: string;
   lifecycleNotices?: readonly string[];
   setActiveNonInteractiveApprovalMode: (
@@ -278,6 +281,7 @@ export async function runNonInteractivePrompt(options: {
             sessionRuntime: options.sessionRuntime,
             logger: options.logger,
             printMode: options.printMode,
+            jsonEvents: options.jsonEvents,
             turnNumber: turnInput.turnNumber,
             renderer: options.renderer,
             turnOrigin: turnInput.turnOrigin,
@@ -302,6 +306,7 @@ export async function runNonInteractivePrompt(options: {
     sessionRuntime: options.sessionRuntime,
     logger: options.logger,
     printMode: options.printMode,
+    jsonEvents: options.jsonEvents,
     renderer: options.renderer,
   });
 }
@@ -320,6 +325,8 @@ export async function executeResolvedPromptTurn(options: {
   sessionRuntime: ShellSessionRuntime;
   logger: StructuredLogger;
   printMode: boolean;
+  /** Write the run's events as JSON lines on stdout instead of prose. */
+  jsonEvents?: boolean;
   turnNumber?: number;
   renderer: StreamingRenderer;
   turnOrigin?: "normal" | "resumed" | "continued";
@@ -389,15 +396,30 @@ export async function executeResolvedPromptTurn(options: {
       sessionId: options.runtimeContext.session.id,
     });
     options.setActiveNonInteractiveApprovalMode(approvalModeObject);
-    await options.sessionRuntime.executePrompt(
-      options.runtimeContext.session.id,
-      options.effectivePrompt,
-      {
-        outputMode: options.printMode ? "print" : "interactive",
-        runtimeSeed: options.runtimeSeed,
-        continuityState: continuitySnapshot,
-      },
-    );
+    // An event consumer gets the run as events and nothing else: prose arriving
+    // on the same stream would interleave with the JSON lines and make them
+    // unparseable. Prose is routed to a sink that drops it, and the events are
+    // written to the device directly.
+    const unsubscribe = options.jsonEvents
+      ? options.sessionRuntime.observeEvents(
+          createJsonEventWriter((line) => process.stdout.write(line)),
+        )
+      : undefined;
+    if (options.jsonEvents) options.renderer.setSink({ line: () => {}, chunk: () => {} });
+    try {
+      await options.sessionRuntime.executePrompt(
+        options.runtimeContext.session.id,
+        options.effectivePrompt,
+        {
+          outputMode: options.printMode ? "print" : "interactive",
+          runtimeSeed: options.runtimeSeed,
+          continuityState: continuitySnapshot,
+        },
+      );
+    } finally {
+      unsubscribe?.();
+      if (options.jsonEvents) options.renderer.clearSink();
+    }
   } catch (error) {
     const shellState = options.sessionRuntime.getState();
     if (interactiveTurn && shellState === "interrupted") {

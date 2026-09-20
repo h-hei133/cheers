@@ -48,6 +48,17 @@ export function projectTranscriptMessages(
         },
         ...kept,
       ];
+    } else if (event.type === "branch_summary") {
+      // What the abandoned turns established, carried forward as a note. It is
+      // not a turn the user took, so it reads as context rather than as speech.
+      messages = [
+        ...messages,
+        {
+          role: "user",
+          content: `[Earlier Path]\n${event.summary}`,
+          timestamp: event.timestamp,
+        },
+      ];
     } else if (event.type === "message") {
       const msg = transcriptEventToSessionMessage(event);
       if (msg) {
@@ -75,6 +86,22 @@ export function appendCompactionEvent(
     firstKeptEntryId: input.firstKeptEntryId,
     keptMessages: input.keptMessages,
     tokensBefore: input.tokensBefore,
+    timestamp: input.timestamp,
+  });
+}
+
+export function appendBranchSummaryEvent(
+  transcriptPath: string,
+  input: {
+    readonly summary: string;
+    readonly droppedTurns: number;
+    readonly timestamp: string;
+  },
+): void {
+  appendTranscriptEvent(transcriptPath, {
+    type: "branch_summary",
+    summary: input.summary,
+    droppedTurns: input.droppedTurns,
     timestamp: input.timestamp,
   });
 }

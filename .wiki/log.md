@@ -2233,3 +2233,141 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 - §9.15 T2 标题的"待裁决"→ 指向 §9.16 执行 + §9.17 复核发现的回归
 - 两份 `active` 探索文档加**基线过期横幅**（961→938 生产文件）
 - frontmatter summary 与版本沿革更新至 **v7**
+
+## [2026-09-20] research | 功能开发前锋探索：pi 对照的七切片缺口普查（零代码改动）。
+
+**背景**：重构已收口（`plan.md` v7），下一步进入功能开发。本轮为**方向探索**，
+不是路线图——产出「我们的功能相比参考实现 `pi` 差在哪」的分类清单。
+
+**产出**：新建 `.wiki/features/`，7 份切片报告 + `_index.md`。
+
+| # | 切片 | DEF | MISS | OURS | 平手 |
+|---|---|---:|---:|---:|---:|
+| 01 | 可扩展性与定制化 | 4 | 10 | 1 | 0 |
+| 02 | 程序化集成与会话数据 | 4 | 5 | 2 | 0 |
+| 03 | Provider 与模型层 | 7 | 4 | 1 | 0 |
+| 04 | 终端交互与呈现 | 11 | 7 | 2 | 0 |
+| 05 | 工具与执行安全 | 6 | 3 | 4 | 4 |
+| 06 | 可观测性、配置与生命周期 | 4 | 6 | 5 | 1 |
+| 07 | 上下文管理与压缩 | 4 | 3 | 1 | 2 |
+| | **合计** | **40** | **38** | **16** | **7** |
+
+**分类口径**：`DEFICIENT`＝有但更弱/未接线；`MISSING`＝pi 有我们没有；
+`OURS-ONLY`＝我们有 pi 没有（**按维护者指示仅记录，不提议开发**）；`平手`＝两侧都有、形态不同。
+
+### 八项硬缺陷
+
+| # | 缺陷 | 关键证据 |
+|---|---|---|
+| P1 | `getRuntimeConfig` 丢弃全部可选字段 | `config/runtimeConfig.ts:196-213` 手写字面量只列 10 个字段；**实机验证**：用户 config 里 `contextWindow: 200000` 读回 `undefined` |
+| P2 | 两套并行配置系统，`settingsLoader` 整层无效 | `loadCascadingSettings` **零调用者**；`AgentSettings` 四个子 schema 零外部消费者 → `.agents/settings.json` 的 `permissions`/`denyRules` 形同虚设 |
+| P3 | `glob`/`grep` 全树遍历不剪枝、不读 `.gitignore` | `runtime/execution/service.ts:112-123` 无条件递归；**实测** 14,023 文件中 7,874（56%）注定被丢弃 |
+| P4 | 22 个钩子事件中 11 个从未派发 | `core/hooks/types.ts:5-27` 声明 22；生产派发点仅 4 个（`turn/tools.ts:132,162`、`turn/session.ts:143,199`） |
+| P5 | 技能与 `AGENTS.md` 都不进入模型上下文 | `turn/prompt.ts:26` 是纯字面量数组；全仓无一处读取 `AGENTS.md` 内容 |
+| P6 | `light` 主题在生产不可达 | `presentation/theme/theme.ts:168` `setTheme` **零调用者**；生产引用 `defaultTheme` 159 处全指向 dark |
+| P7 | Metrics 有 API 无 sink | `observability/metrics.ts:11` `metricSink?.()`；`setMetricSink` 零调用点 → 唯一的生产调用静默丢弃 |
+| P8 | 压缩触发用字符估算而非 provider usage | `session/context.ts:7` `CHARS_PER_TOKEN = 3.5` + `cliSessionRuntimeFactory.ts:84` `?? 64_000`；128k 窗口模型**早约 55,616 tokens** 触发 |
+
+### 复核：主代理自己写错 3 条，全部更正并保留记录
+
+| # | 原判 | 实际 | 误报原因 |
+|---|---|---|---|
+| 1 | bash 截断后丢弃原始输出 | `registry.ts:141` 已 `artifactManager.save` 落盘 | `sed -n '81,140p'` 读函数，落盘分支在 **141 行**——读窗口差一行 |
+| 2 | registry 层 edit/write 未串行化 | 串行化在 `tools/dispatch/executor.ts:90-99`，**位置更好** | 只查 import 消费者，未追调用链下一层 |
+| 3 | 消息队列是单一队列、无投递时机区分 | `core/agent/queue.ts` + `agent.ts:30-31` 完整实现两种语义并接线 | 只看 `interactiveMode` 的 `queue: string[]`，未追到 `AgentCore` |
+
+**共同模式**：**证据搜索停在第一层**。与 `plan.md` §5 记录的既有教训同源。
+
+### 子代理执行情况（并发上限 2，全程未超）
+
+- `GapProgrammatic`、`GapTools`、`GapContext` 成功并产出报告。
+- **`GapExtensibility` 与 `GapExtensibility2` 两次因上游故障失败**（`Unable to forward upstream stream`），
+  未产出任何内容 → 该切片由主代理自行完成。
+- `03`（Provider）与 `06`（可观测性）也由主代理完成（当时并发位被占用）。
+
+### 验证纪律
+
+- 每条发现附**双侧** `file:line`；缺失类结论附**精确检索命令 + 结果**。
+- **仅一次实机执行**（P1 的 config 往返探针）。其余全部静态分析。
+- **未运行** build/测试/产品 CLI；`04-*` 的视觉类结论**未经实机视觉确认**。
+- `git status` 确认 `packages/` 零改动。
+- `npm run verify:docs-drift:strict` 通过（`.wiki/features/` 不在门禁范围，无漂移引入）。
+
+## [2026-09-20] decision | Phase 0 四项裁决全部通过，功能开发授权开始（`features/phase-0-disposition.md`）。
+
+**性质**：裁决记录，**零代码改动**。四项均采纳建议，维护者已确认。
+
+| # | 决策 | 结论 |
+|---|---|---|
+| 1 | 保留哪套配置系统 | **保留 `runtimeConfig`，删 `settingsLoader` 的 `AgentSettings` 层** |
+| 2 | 7 处「声明了没接」 | **第 1、2 组接线，第 3 组删除** |
+| 3 | 11 个未派发钩子事件 | **删 4 个**（`PostToolBatch`/`UserPromptExpansion`/`TaskCreated`/`TaskCompleted`），**其余 7 个接入** |
+| 4 | `getRuntimeConfig` 漏掉的字段 | **6 个随 P1 修、3 个保留待接线、4 个删除** |
+
+**执行顺序**：决策 4 → 决策 1 → 决策 3 → 决策 2。
+先做决策 4 的理由：若先删 `settingsLoader`，`AgentSettings.permissions` 会随之消失，看起来权限问题解决了，
+但 `runtimeConfig.permissionMode` 仍在——**同一隐患换个位置**。
+
+### 裁决期间新核实的三个事实（与初稿不同，已更正）
+
+1. **`config/types.ts` 整文件可删。** `cli/interactive/tuiSettings.ts:21-26` 自定义了 `StoredTuiSettings`，
+   **从不使用 `TuiSettings`**——初稿以为要保留它。实测该文件 7 个导出全部零消费者。
+2. **`config/{settingsLoader,types,schema}.ts` 构成封闭引用团。** 唯一出口 `settingsLoader` 只有 1 个消费者
+   （`tuiSettings.ts:3`）。迁移它之后三份文件全部无引用。
+3. **`HookEventName` 实测 22 个**，删除 4 个后为 18。
+
+### 一个必须澄清的限定
+
+决策 3 的「接入 7 个事件」**只解决「类型说谎」，不等于可扩展**：
+`registerCommandHook` 零调用者、无 `hooks.json` 加载、`registerInProcessHook` 仅 3 个内置。
+即使 22 个事件全部派发，第三方仍挂不上去。建扩展宿主是 `01-*` §2.1 的独立立项。
+
+### 关键陷阱（写入裁决）
+
+- **`DEFAULT_AGENT_SETTINGS.permissions.allowRules` 看起来像权限防线，实际不生效。**
+  删除时**不得**搬进 `runtimeConfig`——那会把「看起来有权限控制」的错觉带过去。
+- **`permissionMode` 一旦接线会产生权限双源**（config 的 5 档 vs `permissionScope.ts` 的 3 档），
+  故在 P1 时直接删除。
+- **`config/runtimeConfig.test.ts:37-51` 固化了 P1 缺陷**（`toEqual({ ...恰好 10 个字段 })`）。
+  修复时**不得更新它**，须改为断言往返行为（修前失败、修后通过）。
+
+## [2026-09-20] execute | Phase 1 施工完成：四项裁决全部落地，五项执行发现更正了裁决。
+
+**依据**：`features/phase-0-disposition.md`。**完整记录**：`features/phase-1-execution.md`。
+
+### 落地内容
+
+| 决策 | 结果 |
+|---|---|
+| 4 | `getRuntimeConfig` 的 `return` 补齐 10 个字段；删 5 个死字段；P1 回归测试（修前失败、修后通过） |
+| 1 | `config/{settingsLoader,types,schema}.ts` **整团删除**；env 插值内联进 `runtimeConfig` 并补测试 |
+| 3 | 钩子联合 22 → **18**；7 个新事件各有生产派发点；`PreCompact` 可取消 |
+| 2 组1 | `setTheme` → `applyTheme`（就地换色，159 处调用点无需改）；rewind 生成分支摘要 |
+| 2 组2 | metrics 写入日志流；`read` 图片改为说明而非乱码；新增 `--json` 实时事件流 |
+
+### 五项执行发现（均更正裁决）
+
+1. **`thinkingLevel` 是第五个双源项**——与 `permissionMode` 同构（config 7 档 vs 项目状态 3 档，零消费者）→ 一并删除。
+2. **「6 个字段随 P1 修」只有 2 个真的生效**——`contextWindow`/`agentMode` 生效；`reserveTokens` 需进 `CompactionPolicy`，`temperature`/`topP`/`maxOutputTokens` 需进 `StepRequest`（`createProviderStep` 只传 5 个字段）。已全部接线。
+3. **`settingsLoader` 是封闭引用团**，不是逐函数可删——三文件 + 其测试整团删除。
+4. **multimodal 不是「接线」而是可复现缺陷**——实测 `read` 对 PNG 返回 `\uFFFD PNG\r\n…` 乱码，**看起来像内容**，比明确拒绝更糟。已修（返回 `image/png` + 大小 + bash 指引）。真图片输入需 `SessionMessage.content` 类型迁移（156 处）+ 二进制读能力，属新基础设施，另行立项。
+5. **`runtime/events/stream.ts` 不是事件流**——`projectRuntimeEvents` 吃 ~20 个批量输入、产出**一个 JSON 数组**、零生产消费者，是事后报告投影。故 `--json` 改用活事件源 `sessionRuntime.observeEvents()` 的 `QueryEvent` 实现。
+
+### 验证
+
+- `tsc` **0 错误**；全量 **490 文件 / 2741 通过 / 1 跳过 / 0 失败**；
+  `verify:import-cycles` **0 环**（1427 文件）；`verify:docs-drift:strict` pass。
+- **实机**：`--json` 44 行全部合法 JSON、order 单调、散文未泄漏、exit 0；不带 `--json` 的 `--print` 仍输出散文。
+- **实机**：`read` 图片返回说明而非乱码。
+- **反向验证 2 处通过**（rewind 摘要、图片读取：移除修复后测试分别失败）。
+
+### 一处未覆盖，如实记录
+
+**反向验证第 3 处失败**：移除 `createProviderStep` 的采样参数传参后 `step.test.ts` **仍然全绿**——
+该测试直接构造 `StepRequest`，不经过 `createProviderStep`。**中间那一跳只有类型检查与人工核对，没有测试。**
+该函数未导出；补测需另开 seam。已在执行记录 §2.3 标注。
+
+### 一处静默行为变化
+
+`tuiSettings` 迁移后，`statusItems` 的级联优先级从「项目胜出」变为「用户胜出」（与 `getRuntimeConfig` 一致）。
+对显示偏好而言更合理，但属**静默变化**，已在执行记录 §3.2 显式记录。

@@ -72,19 +72,27 @@ export interface RuntimeConfig {
   readonly temperature?: number;
   readonly topP?: number;
   readonly maxOutputTokens?: number;
-  readonly thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   readonly thinkingBudgets?: Readonly<Record<string, number>>;
   readonly contextWindow?: number;
-  readonly autoCompactPercent?: number;
   readonly reserveTokens?: number;
   readonly agentMode?: "plan" | "build";
-  readonly permissionMode?: "default" | "plan" | "auto" | "acceptEdits" | "bypassPermissions";
-  readonly subagentIsolation?: "worktree" | "none";
   readonly promptCacheTtl?: "5m" | "1h";
-  readonly subagentPromptCacheTtl?: "5m" | "1h";
   readonly theme?: "dark" | "light" | "auto";
   readonly tuiMode?: "regular" | "fullscreen" | "stream";
+  readonly tui?: TuiPreferences;
   readonly configSources: string[];
+}
+
+/**
+ * What the interactive surface remembers between sessions.
+ *
+ * These belong to the user rather than to a session, so they live in the same
+ * file as the rest of the user's configuration instead of a second one that
+ * only this module reads.
+ */
+export interface TuiPreferences {
+  /** Status band item ids, in canonical order. Absent means the defaults. */
+  readonly statusItems?: readonly string[];
 }
 
 export interface RuntimeConfigFile {
@@ -102,18 +110,14 @@ export interface RuntimeConfigFile {
   temperature?: number;
   topP?: number;
   maxOutputTokens?: number;
-  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
   thinkingBudgets?: Record<string, number>;
   contextWindow?: number;
-  autoCompactPercent?: number;
   reserveTokens?: number;
   agentMode?: "plan" | "build";
-  permissionMode?: "default" | "plan" | "auto" | "acceptEdits" | "bypassPermissions";
-  subagentIsolation?: "worktree" | "none";
   promptCacheTtl?: "5m" | "1h";
-  subagentPromptCacheTtl?: "5m" | "1h";
   theme?: "dark" | "light" | "auto";
   tuiMode?: "regular" | "fullscreen" | "stream";
+  tui?: TuiPreferences;
 }
 
 const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
@@ -129,7 +133,6 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   temperature: 0.7,
   topP: 1.0,
   maxOutputTokens: 4096,
-  thinkingLevel: "medium",
   thinkingBudgets: {
     minimal: 1024,
     low: 4096,
@@ -137,15 +140,12 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
     high: 32768,
   },
   contextWindow: 64_000,
-  autoCompactPercent: 80,
   reserveTokens: 8_000,
   agentMode: "build",
-  permissionMode: "default",
-  subagentIsolation: "worktree",
   promptCacheTtl: "5m",
-  subagentPromptCacheTtl: "5m",
   theme: "dark",
   tuiMode: "regular",
+  tui: {},
 };
 
 export function getRuntimeConfig(
@@ -164,7 +164,15 @@ export function getRuntimeConfig(
     try {
       const rawContent = fs.readFileSync(candidate, "utf8");
       const content = rawContent.startsWith("\uFEFF") ? rawContent.slice(1) : rawContent;
-      const parsed = JSON.parse(content) as RuntimeConfigFile;
+      // A config file names credentials by reference rather than by value, so a
+      // key can live in the environment instead of on disk. An unset name
+      // expands to the empty string rather than throwing: a missing secret
+      // should surface as the provider refusing the request, not as a process
+      // that cannot read its own config.
+      const interpolated = content
+        .replace(/\$\{([A-Za-z0-9_]+)\}/g, (_, name: string) => process.env[name] ?? "")
+        .replace(/\$([A-Za-z0-9_]+)/g, (_, name: string) => process.env[name] ?? "");
+      const parsed = JSON.parse(interpolated) as RuntimeConfigFile;
       merged = {
         ...merged,
         ...parsed,
@@ -209,6 +217,17 @@ export function getRuntimeConfig(
     providerCredentials: normalizeProviderCredentials(
       merged.providerCredentials,
     ),
+    temperature: merged.temperature ?? DEFAULT_CONFIG.temperature,
+    topP: merged.topP ?? DEFAULT_CONFIG.topP,
+    maxOutputTokens: merged.maxOutputTokens ?? DEFAULT_CONFIG.maxOutputTokens,
+    thinkingBudgets: merged.thinkingBudgets ?? DEFAULT_CONFIG.thinkingBudgets,
+    contextWindow: merged.contextWindow ?? DEFAULT_CONFIG.contextWindow,
+    reserveTokens: merged.reserveTokens ?? DEFAULT_CONFIG.reserveTokens,
+    agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
+    promptCacheTtl: merged.promptCacheTtl ?? DEFAULT_CONFIG.promptCacheTtl,
+    theme: merged.theme ?? DEFAULT_CONFIG.theme,
+    tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,
+    tui: merged.tui ?? DEFAULT_CONFIG.tui,
     configSources: sources,
   };
 }

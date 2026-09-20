@@ -80,6 +80,7 @@ export async function runCliPrintModeRouter(
           ...runtimeInput,
           prompt,
           printMode: true,
+          jsonEvents: input.options.jsonEvents === true,
         }),
     });
     return true;

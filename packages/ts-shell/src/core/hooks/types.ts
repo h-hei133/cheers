@@ -6,11 +6,9 @@ export type HookEventName =
   | "SessionStart"
   | "SessionEnd"
   | "UserPromptSubmit"
-  | "UserPromptExpansion"
   | "PreToolUse"
   | "PostToolUse"
   | "PostToolUseFailure"
-  | "PostToolBatch"
   | "PermissionRequest"
   | "PermissionDenied"
   | "PreModelSwitch"
@@ -21,8 +19,6 @@ export type HookEventName =
   | "SubagentStop"
   | "WorktreeCreate"
   | "WorktreeRemove"
-  | "TaskCreated"
-  | "TaskCompleted"
   | "Stop"
   | "StopFailure";
 
@@ -104,6 +100,52 @@ export interface StopPayload extends BaseHookEventPayload {
   readonly finalOutput: string;
 }
 
+export interface SessionStartPayload extends BaseHookEventPayload {
+  readonly eventName: "SessionStart";
+  readonly resumed: boolean;
+}
+
+export interface SessionEndPayload extends BaseHookEventPayload {
+  readonly eventName: "SessionEnd";
+  readonly turnsExecuted: number;
+}
+
+export interface PermissionRequestPayload extends BaseHookEventPayload {
+  readonly eventName: "PermissionRequest";
+  readonly toolName: string;
+  readonly toolCallId: string;
+  readonly args: Record<string, unknown>;
+}
+
+export interface PermissionDeniedPayload extends BaseHookEventPayload {
+  readonly eventName: "PermissionDenied";
+  readonly toolName: string;
+  readonly toolCallId: string;
+  readonly args: Record<string, unknown>;
+  readonly reason: string;
+}
+
+export interface PreCompactPayload extends BaseHookEventPayload {
+  readonly eventName: "PreCompact";
+  readonly reason: "manual" | "threshold" | "overflow";
+  readonly tokensBefore: number;
+  readonly messageCount: number;
+}
+
+export interface PostCompactPayload extends BaseHookEventPayload {
+  readonly eventName: "PostCompact";
+  readonly reason: "manual" | "threshold" | "overflow";
+  readonly summary: string;
+  readonly keptMessages: number;
+  readonly tokensBefore: number;
+}
+
+export interface StopFailurePayload extends BaseHookEventPayload {
+  readonly eventName: "StopFailure";
+  readonly turnsExecuted: number;
+  readonly error: string;
+}
+
 export type HookEventPayload =
   | UserPromptSubmitPayload
   | PreToolUsePayload
@@ -114,6 +156,13 @@ export type HookEventPayload =
   | WorktreeCreatePayload
   | WorktreeRemovePayload
   | StopPayload
+  | SessionStartPayload
+  | SessionEndPayload
+  | PermissionRequestPayload
+  | PermissionDeniedPayload
+  | PreCompactPayload
+  | PostCompactPayload
+  | StopFailurePayload
   | BaseHookEventPayload;
 
 export interface InProcessHookConfig {

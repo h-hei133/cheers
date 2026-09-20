@@ -51,10 +51,22 @@ export type ThemeColorToken =
   | "syntaxComment";
 
 export class Theme {
-  readonly name: string;
-  private readonly colors: Map<ThemeColorToken, string>;
+  name: string;
+  private colors: Map<ThemeColorToken, string>;
 
   constructor(theme: ThemeConfig) {
+    this.name = theme.name;
+    this.colors = new Map(Object.entries(theme.colors) as [ThemeColorToken, string][]);
+  }
+
+  /**
+   * Adopt another theme's colors in place.
+   *
+   * Call sites hold this one instance rather than a name to look up, so swapping
+   * the palette here is what lets a theme change reach every surface that was
+   * already rendering.
+   */
+  apply(theme: ThemeConfig): void {
     this.name = theme.name;
     this.colors = new Map(Object.entries(theme.colors) as [ThemeColorToken, string][]);
   }
@@ -154,7 +166,7 @@ export class Theme {
   }
 }
 
-let currentTheme: Theme | undefined;
+let currentThemeName = "dark";
 
 export function getTheme(name: string): Theme {
   if (name === "default") return defaultTheme;
@@ -165,12 +177,24 @@ export function getTheme(name: string): Theme {
   return new Theme(config);
 }
 
-export function setTheme(name: string): void {
-  currentTheme = getTheme(name);
+/**
+ * Apply a named theme to the palette every surface already renders with.
+ *
+ * Recoloring the shared instance rather than replacing it is what makes a theme
+ * change visible: the alternative is every call site holding a stale reference.
+ */
+export function applyTheme(name: string): void {
+  const config = loadTheme(name);
+  if (!config) {
+    throw new Error(`Theme not found: ${name}`);
+  }
+  defaultTheme.apply(config);
+  currentThemeName = config.name;
 }
 
-export function getDefaultThemeInstance(): Theme {
-  return currentTheme ?? defaultTheme;
+/** The theme currently in effect. */
+export function currentTheme(): string {
+  return currentThemeName;
 }
 
 export const defaultTheme = new Theme(getDefaultTheme());

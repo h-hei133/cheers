@@ -67,6 +67,17 @@ export function createCliSessionRuntime(input: {
         instructions,
       });
     },
+    summarizeAbandonedTurns: (messages) => {
+      const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
+      const apiKey = resolved.credential?.apiKey;
+      const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl;
+      const model = resolved.model ?? resolved.credential?.model;
+      if (!apiKey || !baseUrl || !model) return Promise.resolve(undefined);
+      return requestCompactionSummary({
+        provider: { apiKey, baseUrl, model },
+        messages: toChatMessages(messages),
+      });
+    },
     runPrompt: (prompt, signal): PromptRun => {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
@@ -81,7 +92,10 @@ export function createCliSessionRuntime(input: {
       const compaction: CompactionSetup | undefined =
         compactionProvider.apiKey && compactionProvider.baseUrl && compactionProvider.model
           ? {
-              policy: { contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64_000 },
+              policy: {
+                contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64_000,
+                reserveTokens: input.runtimeContext.runtimeConfig.reserveTokens,
+              },
               summarize: (messages, summarizeSignal) =>
                 requestCompactionSummary({
                   provider: {

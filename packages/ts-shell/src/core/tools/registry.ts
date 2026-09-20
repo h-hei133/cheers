@@ -1,5 +1,7 @@
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
+import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
 import { replaceInContent } from './editEngine.js'
 import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
 import { truncateHead, truncateTail, truncateLineWidth } from './truncation.js'
@@ -220,7 +222,7 @@ export function createCoreToolRegistry(options?: {
   const tools: ToolDefinition[] = [
     {
       name: 'read',
-      description: 'Read the contents of a file in the workspace, with optional line offset/limit pagination and safe truncation protection.',
+      description: 'Read the contents of a file in the workspace, with optional line offset/limit pagination and safe truncation protection. Image files are reported, not returned: this harness reads text, so use bash to inspect an image.',
       argsSchema: {
         type: 'object',
         properties: {
@@ -271,6 +273,22 @@ export function createCoreToolRegistry(options?: {
           const containment = verifyPathContainment(target, context.workspaceRoot)
           if (!containment.allowed) {
             throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+          }
+          // An image read as text is mojibake, and mojibake is worse than a
+          // refusal: it looks like content. Say what the file is and how to view
+          // it instead of handing the model bytes it cannot interpret.
+          if (isImageFilePath(containment.resolvedPath)) {
+            const stats = await fs.stat(containment.resolvedPath)
+            return approvedResult(
+              formatNonVisionFallback({
+                type: 'image',
+                data: '',
+                mimeType: getImageMimeType(containment.resolvedPath),
+              }) +
+                `\n${selector.cleanPath} is ${Math.round(stats.size / 1024)}KB on disk. ` +
+                `Its bytes cannot be read as text; this model receives no image content. ` +
+                `Use bash to inspect it (e.g. file, identify, exiftool) if you need facts about it.`,
+            )
           }
           rawContent = await executionService.readTextFile({
             operationKind: 'file.read',

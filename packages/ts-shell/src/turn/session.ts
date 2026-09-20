@@ -10,6 +10,7 @@ import {
   findCompactionCut,
   KEEP_RECENT_MESSAGES,
   type CompactionPolicy,
+  type CompactionReason,
   type SummarizeHistory,
 } from "../session/compaction.js";
 import { estimateTokens } from "../session/context.js";
@@ -36,6 +37,8 @@ export interface CompactionSetup {
   readonly summarize: SummarizeHistory;
   /** A checkpoint was written into the context; record it durably. */
   readonly onCompact: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void;
+  /** Why this compaction is allowed to run. Manual runs say so. */
+  readonly reason?: CompactionReason;
 }
 
 export interface TurnOptions {
@@ -117,7 +120,39 @@ export function runTurn(options: TurnOptions): TurnRun {
       ),
     shouldStopAfterStep: () => projection.stepCount >= options.maxSteps,
     prepareNextStep: options.compaction
-      ? createCompactionStep(options.compaction.policy, options.compaction.summarize, undefined, options.compaction.onCompact)
+      ? createCompactionStep(
+          options.compaction.policy,
+          options.compaction.summarize,
+          undefined,
+          options.compaction.onCompact,
+          {
+            before: async (input) => {
+              const decision = await options.hooks.dispatch({
+                eventName: "PreCompact",
+                sessionId: options.sessionId,
+                workspaceRoot: options.workspaceRoot,
+                timestamp: new Date().toISOString(),
+                reason: options.compaction?.reason ?? "threshold",
+                tokensBefore: input.tokensBefore,
+                messageCount: input.messageCount,
+              });
+              return decision.decision !== "block";
+            },
+            after: async (input) => {
+              await options.hooks.dispatch({
+                eventName: "PostCompact",
+                sessionId: options.sessionId,
+                workspaceRoot: options.workspaceRoot,
+                timestamp: new Date().toISOString(),
+                reason: options.compaction?.reason ?? "threshold",
+                summary: input.summary,
+                keptMessages: input.keptMessages,
+                tokensBefore: input.tokensBefore,
+              });
+            },
+          },
+          options.compaction.reason ?? "threshold",
+        )
       : undefined,
   });
 
@@ -139,6 +174,13 @@ export function runTurn(options: TurnOptions): TurnRun {
   let overflowRecovered = false;
   const drive = async (): Promise<void> => {
     channel.push({ type: "query.started", sessionId: options.sessionId, prompt: options.prompt });
+    await options.hooks.dispatch({
+      eventName: "SessionStart",
+      sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot,
+      timestamp: new Date().toISOString(),
+      resumed: options.history.length > 0,
+    });
     await options.hooks.dispatch({
       eventName: "UserPromptSubmit",
       sessionId: options.sessionId,
@@ -188,6 +230,14 @@ export function runTurn(options: TurnOptions): TurnRun {
   const conclude = async (): Promise<void> => {
     const outcome = concludeRun(core.state.messages, options.prompt, options.sessionId, projection.stepCount);
     if (outcome.kind === "failed") {
+      await options.hooks.dispatch({
+        eventName: "StopFailure",
+        sessionId: options.sessionId,
+        workspaceRoot: options.workspaceRoot,
+        timestamp: new Date().toISOString(),
+        turnsExecuted: projection.stepCount,
+        error: outcome.error,
+      });
       channel.push({ type: "query.failed", error: outcome.error });
       return;
     }
@@ -211,7 +261,18 @@ export function runTurn(options: TurnOptions): TurnRun {
       if (options.signal.aborted) return;
       channel.push({ type: "query.failed", error: error instanceof Error ? error.message : String(error) });
     })
-    .finally(() => channel.close());
+    .finally(async () => {
+      await options.hooks
+        .dispatch({
+          eventName: "SessionEnd",
+          sessionId: options.sessionId,
+          workspaceRoot: options.workspaceRoot,
+          timestamp: new Date().toISOString(),
+          turnsExecuted: projection.stepCount,
+        })
+        .catch(() => undefined);
+      channel.close();
+    });
 
   return {
     events: channel,

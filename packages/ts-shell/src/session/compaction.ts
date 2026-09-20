@@ -17,6 +17,29 @@ export interface CompactionPlan {
   readonly tokensBefore: number;
 }
 
+/** Why a compaction ran, so a hook can tell a scheduled one from a rescue. */
+export type CompactionReason = "manual" | "threshold" | "overflow";
+
+/**
+ * What the caller wants told about a compaction, before and after.
+ *
+ * `before` may refuse: a compaction discards the wording of everything it
+ * condenses, so a caller that can see the conversation is allowed to stop it.
+ */
+export interface CompactionLifecycle {
+  readonly before?: (input: {
+    readonly reason: CompactionReason;
+    readonly tokensBefore: number;
+    readonly messageCount: number;
+  }) => Promise<boolean> | boolean;
+  readonly after?: (input: {
+    readonly reason: CompactionReason;
+    readonly summary: string;
+    readonly keptMessages: number;
+    readonly tokensBefore: number;
+  }) => Promise<void> | void;
+}
+
 export type SummarizeHistory = (
   messages: readonly AgentMessage[],
   signal?: AbortSignal,
@@ -112,6 +135,8 @@ export function createCompactionStep(
   summarize: SummarizeHistory,
   onError?: (error: unknown) => void,
   onCompact?: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void,
+  lifecycle?: CompactionLifecycle,
+  reason: CompactionReason = "threshold",
 ): (snapshot: NextStepSnapshot, signal?: AbortSignal) => Promise<NextStepUpdate | undefined> {
   return async (snapshot, signal) => {
     if (signal?.aborted) {
@@ -119,6 +144,14 @@ export function createCompactionStep(
     }
     const plan = planCompaction(snapshot.messages, policy);
     if (!plan) {
+      return undefined;
+    }
+    const proceed = await lifecycle?.before?.({
+      reason,
+      tokensBefore: plan.tokensBefore,
+      messageCount: snapshot.messages.length,
+    });
+    if (proceed === false) {
       return undefined;
     }
     let summary: string | undefined;
@@ -135,6 +168,12 @@ export function createCompactionStep(
       return undefined;
     }
     onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
+    await lifecycle?.after?.({
+      reason,
+      summary,
+      keptMessages: plan.keptMessages,
+      tokensBefore: plan.tokensBefore,
+    });
     return { messages: applyCompaction(snapshot.messages, plan, summary) };
   };
 }

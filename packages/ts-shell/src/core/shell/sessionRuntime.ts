@@ -9,6 +9,7 @@ import type { ProjectMemoryInjectionStateStore } from "../../memory/projectMemor
 import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract.js";
 import type { QueryEvent } from "../query/runtime/events.js";
 import type { QueryRuntimeStateSeed } from "../query/runtime/state.js";
+import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import {
   createRuntimeEventDigest,
   renderSessionQueryEventSurface,
@@ -58,6 +59,13 @@ export interface SessionRuntimeDependencies {
     signal: AbortSignal,
     instructions?: string,
   ) => Promise<CompactionOutcome>;
+  /**
+   * Condense turns the user stepped back past, so what they established is not
+   * lost with them. Absent when no provider can summarize.
+   */
+  readonly summarizeAbandonedTurns?: (
+    messages: readonly SessionMessage[],
+  ) => Promise<string | undefined>;
 }
 
 export type QueryEventObserver = (event: QueryEvent) => void;
@@ -390,6 +398,18 @@ export class ShellSessionRuntime {
     } finally {
       if (this.currentRunController === controller) this.currentRunController = null;
     }
+  }
+
+  /**
+   * Condense turns the user stepped back past.
+   *
+   * Returns nothing rather than failing when no provider can summarize: the
+   * rewind itself is the user's decision and must not depend on a summary
+   * being available.
+   */
+  async summarizeAbandonedTurns(messages: readonly SessionMessage[]): Promise<string | undefined> {
+    if (!this.deps.summarizeAbandonedTurns) return undefined;
+    return this.deps.summarizeAbandonedTurns(messages);
   }
 
   terminate(sessionId: string): void {

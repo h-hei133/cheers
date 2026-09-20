@@ -36,18 +36,61 @@ describe("runtime config", () => {
 
   it("loads defaults when no config file exists", () => {
     const config = getRuntimeConfig(fakeRoot);
-    expect(config).toEqual({
-      provider: "openai",
-      daemonEnabled: true,
-      maxTurns: 15,
-      disabledTools: [],
-      hiddenToolPrefixes: [],
-      enableMcpTools: true,
-      activeProviderConnectionId: undefined,
-      providerConnections: [],
-      providerCredentials: {},
-      configSources: [],
-    });
+    // Assert the fields a caller actually reads, not the exact key set: pinning
+    // the key set is what let a missing field go unnoticed.
+    expect(config.provider).toBe("openai");
+    expect(config.daemonEnabled).toBe(true);
+    expect(config.maxTurns).toBe(15);
+    expect(config.disabledTools).toEqual([]);
+    expect(config.hiddenToolPrefixes).toEqual([]);
+    expect(config.enableMcpTools).toBe(true);
+    expect(config.activeProviderConnectionId).toBeUndefined();
+    expect(config.providerConnections).toEqual([]);
+    expect(config.providerCredentials).toEqual({});
+    expect(config.configSources).toEqual([]);
+  });
+
+  it("keeps every declared optional field that a config file sets", () => {
+    const configPath = path.join(fakeRoot, ".private-agents.json");
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        contextWindow: 200_000,
+        reserveTokens: 30_000,
+        temperature: 0.2,
+        topP: 0.9,
+        maxOutputTokens: 8192,
+        agentMode: "plan",
+      }),
+      "utf8",
+    );
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.contextWindow).toBe(200_000);
+    expect(config.reserveTokens).toBe(30_000);
+    expect(config.temperature).toBe(0.2);
+    expect(config.topP).toBe(0.9);
+    expect(config.maxOutputTokens).toBe(8192);
+    expect(config.agentMode).toBe("plan");
+  });
+
+  it("expands environment references in a config file", () => {
+    const configPath = path.join(fakeRoot, ".private-agents.json");
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        providerCredentials: {
+          openai: { apiKey: "${TEST_CONFIG_KEY}" },
+          anthropic: { apiKey: "$TEST_CONFIG_KEY" },
+        },
+      }),
+      "utf8",
+    );
+    process.env.TEST_CONFIG_KEY = "sk-from-environment";
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.providerCredentials.openai?.apiKey).toBe("sk-from-environment");
+    expect(config.providerCredentials.anthropic?.apiKey).toBe("sk-from-environment");
   });
 
   it("loads project config and env overrides", () => {

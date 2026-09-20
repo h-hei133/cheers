@@ -9,6 +9,7 @@ import {
   setGlobalTraceContext,
 } from "../../observability/index.js";
 import { parseCliArgs } from "../../entrypoints/cliArgs.js";
+import { applyTheme } from "../../presentation/theme/theme.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import { printCliDoctor } from "../../entrypoints/cliDoctor.js";
 import {
@@ -95,6 +96,13 @@ export async function runCliProcess(
     projectRoot: runtimeContext.projectRoot,
     options,
   });
+  // The configured theme has to be applied to the shared palette before any
+  // surface renders, or the first frame is drawn in the default and never
+  // redrawn.
+  const configuredTheme = runtimeContext.runtimeConfig.theme;
+  if (configuredTheme && configuredTheme !== "auto") {
+    applyTheme(configuredTheme);
+  }
   const resolvedCredential =
     providerRuntimeBridge.resolveCredentialSnapshot();
   const mcpGateway = bootstrapRuntime.mcpGateway;

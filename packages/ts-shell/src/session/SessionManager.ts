@@ -10,6 +10,7 @@
 import type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
 import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "./approval/sessionApprovalMemory.js";
 import { type TranscriptEvent } from "./sessionEventCodec.js";
+import { appendBranchSummaryEvent } from "./transcript/sessionTranscript.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
 import type { Session } from "./schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
@@ -136,17 +137,34 @@ export class SessionManager extends SessionReadSurface {
    * question are different decisions, and doing both from one gesture makes the
    * destructive one impossible to decline.
    *
+   * When a summarizer is supplied, what the dropped turns established is kept as
+   * a note at the point the user returned to. The turns are gone either way; the
+   * difference is whether the next answer knows what was already tried.
+   *
    * Returns how many turns were dropped.
    */
-  rewindTo(sessionId: string, turnIndex: number): number {
+  async rewindTo(
+    sessionId: string,
+    turnIndex: number,
+    summarize?: (dropped: readonly SessionMessage[]) => Promise<string | undefined>,
+  ): Promise<number> {
     const session = this.getSession(sessionId);
     if (!session) return 0;
     const keep = Math.max(0, Math.min(turnIndex, session.turns.length));
     const dropped = session.turns.length - keep;
     if (dropped <= 0) return 0;
+    const abandoned = session.turns.slice(keep);
+    const summary = summarize ? await summarize(abandoned).catch(() => undefined) : undefined;
     session.turns = session.turns.slice(0, keep);
     session.updatedAt = new Date().toISOString();
     this.host.store.writeSessionMetadata(session);
+    if (summary) {
+      appendBranchSummaryEvent(this.host.store.transcriptPath(sessionId), {
+        summary,
+        droppedTurns: dropped,
+        timestamp: session.updatedAt,
+      });
+    }
     return dropped;
   }
 

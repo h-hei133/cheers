@@ -206,6 +206,12 @@ function createProviderStep(request: CliRuntimeInvocationRequest, tools: Readonl
     sessionId: request.sessionId,
     systemPrompt: buildSystemPrompt(request.agentMode),
     tools: toolSchemas(tools),
+    // Sampling settings travel with the request, not with the provider: a
+    // provider that ignores them still receives a well-formed request, and a
+    // run that sets none keeps the step's own defaults.
+    temperature: request.runtimeConfig?.temperature,
+    topP: request.runtimeConfig?.topP,
+    maxOutputTokens: request.runtimeConfig?.maxOutputTokens,
   });
 }
 

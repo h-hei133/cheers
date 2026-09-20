@@ -223,6 +223,7 @@ export function parseCliArgs(
     "printMode",
     rawArgs.includes("--print") || rawArgs.includes("-p"),
   );
+  assignOption(options, "jsonEvents", rawArgs.includes("--json"));
   assignOption(
     options,
     "migrateSessionRoot",

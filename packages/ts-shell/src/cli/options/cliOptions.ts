@@ -12,6 +12,8 @@ export interface CliOptions {
   readonly projectPath?: string;
   readonly replayFile?: string;
   readonly printMode?: boolean;
+  /** Emit the run's events as JSON lines on stdout instead of prose. */
+  readonly jsonEvents?: boolean;
   readonly promptArg?: string;
   readonly migrateSessionRoot?: boolean;
   readonly nonInteractiveApproval?: NonInteractiveApprovalMode;

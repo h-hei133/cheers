@@ -118,6 +118,24 @@ describe("createStepFunction", () => {
     expect(result.stopReason).toBe("stop");
   });
 
+  it("sends the sampling settings the caller configured", async () => {
+    let body: { temperature?: number; top_p?: number; max_tokens?: number } = {};
+    const step = createStepFunction({
+      ...request,
+      temperature: 0.2,
+      topP: 0.9,
+      maxOutputTokens: 777,
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as typeof body;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+    expect(body.temperature).toBe(0.2);
+    expect(body.top_p).toBe(0.9);
+    expect(body.max_tokens).toBe(777);
+  });
+
   it("recognizes overflow markers regardless of provider casing", () => {
     expect(isContextOverflow("Maximum Context Length exceeded for model m")).toBe(true);
     expect(isContextOverflow("PROMPT_TOO_LONG: reduce input")).toBe(true);

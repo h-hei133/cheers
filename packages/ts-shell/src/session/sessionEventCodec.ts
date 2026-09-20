@@ -17,6 +17,22 @@ export interface CompactionTranscriptEntry {
   timestamp: string;
 }
 
+/**
+ * A summary of turns the user stepped back past.
+ *
+ * Going back in the conversation discards what was said after that point. The
+ * turns themselves are gone, but what they established — what was tried, what
+ * it ruled out — is usually still worth carrying forward, so it travels as a
+ * summary attached at the point the user returned to.
+ */
+export interface BranchSummaryTranscriptEntry {
+  type: "branch_summary";
+  summary: string;
+  /** How many turns were dropped at the point this summary was written. */
+  droppedTurns: number;
+  timestamp: string;
+}
+
 export type TranscriptEvent =
   | {
       type: "message";
@@ -33,7 +49,8 @@ export type TranscriptEvent =
       detail?: string;
     }
   | { type: "query-event"; event: QueryEvent; timestamp: string }
-  | CompactionTranscriptEntry;
+  | CompactionTranscriptEntry
+  | BranchSummaryTranscriptEntry;
 
 export function createMessageTranscriptEvent(
   message: SessionMessage & { timestamp: string },
@@ -92,6 +109,7 @@ function isTranscriptEvent(value: unknown): value is TranscriptEvent {
   if (record.type === "lifecycle") return typeof record.event === "string";
   if (record.type === "query-event") return record.event !== null && typeof record.event === "object";
   if (record.type === "compaction") return typeof record.summary === "string";
+  if (record.type === "branch_summary") return typeof record.summary === "string";
   return false;
 }
 

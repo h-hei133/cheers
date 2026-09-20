@@ -533,9 +533,10 @@ export class InteractiveMode {
       sessionTurns: () =>
         this.options.sessionManager.getSession(this.options.runtimeContext.session.id)?.turns ?? [],
       rewind: async (point) => {
-        const dropped = this.options.sessionManager.rewindTo(
+        const dropped = await this.options.sessionManager.rewindTo(
           this.options.runtimeContext.session.id,
           point.turnIndex,
+          (abandoned) => this.options.sessionRuntime.summarizeAbandonedTurns(abandoned),
         );
         showConversation(this.historyTarget());
         this.tui.requestRender({ force: true });
