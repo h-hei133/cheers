@@ -2434,3 +2434,41 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 **第一次统计消费者时按 basename 匹配**，得出「A 与 B 有 6 个相同消费者」的错误结论——
 `from "./compaction.js"` 被按文件名匹配，两个同名文件互相污染。改为解析说明符到真实路径后修正。
 **与上一轮三次误报同源：证据搜索停在第一层。**
+
+## [2026-09-20] execute | Phase 2 步 1：压缩触发改用 provider 真实 usage + token 预算。
+
+**裁决**：`features/phase-2-execution.md`。步 1 只换「什么时候压」，切点仍限 user；步 2 才放开到 assistant 并引入 split-turn。
+
+### 落地
+
+- **P8**：policy 新增 `measureContextTokens(messages)` **回调**（非数字——测量值只覆盖已发出的那次请求，
+  后续新增消息必须现加）；`usageTelemetry` 新增 `lastPromptMessageCount`；工厂把「provider 报的 + 尾随」相加。
+- **token 口径**：`keepRecentMessages` → `keepRecentTokens`（默认 20,000）；新增 `messageCharCount`；
+  预算夹到「窗口能装下的量」。
+
+### 施工中发现并修复的两个自身缺陷
+
+1. **回退从不触发**——初版「累加后判断，超则 break」，预算为 0 时首次遇边界即 break，回退变量从未赋值。
+   实测 `findCompactionCut(history(4), 0)` 返回 `undefined`。
+2. **回退过于激进**——修完 1 后回退变成无条件，预算充足时也返回切点，
+   会误导溢出恢复（摘要完上下文几乎没变小，白花一次 provider 调用）。改为只在**确有边界超预算**时回退。
+
+### 第 5 次「判断被自己的实测推翻」
+
+我曾判断「预算夹到可用空间」是死逻辑。穷举扫描 `available × budget` 后实测 **9 处行为差异**，
+且都正确：`available=0` 时夹紧得 `cut=10`（只留 2 条），不夹紧得 `cut=2`（留 10 条）。
+**夹紧保证「保留预算不超过窗口能容纳」——不是死逻辑。**
+
+### 测试
+
+10 处失败**全部源于口径变更**（fixture 的 `keepRecentMessages: 2` 在新口径下是「2 个 token」）。
+逐条判断后更新；其中一处断言写错了层——「该不该切」属 `planCompaction`，「哪能切」属 `findCompactionCut`。
+新增 `session/compactionUsage.test.ts`，**反向验证**：移除测量路径后该测试失败。
+
+### 验证
+
+`tsc` 0 错误；全量 **491 文件 / 2743 通过 / 0 失败**；`verify:import-cycles` 0 环（1428 文件）。
+
+### 已知边界（有意）
+
+**巨型 turn 仍压缩不了**——步 1 只换口径，切点仍限 user。这是步 2 的范围。
