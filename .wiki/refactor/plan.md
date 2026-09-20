@@ -2913,7 +2913,18 @@ MUTATION SUCCEEDED -> rm -rf /     ← 可改模型请求的原始参数
 | `npm run verify:docs-drift:strict` | ✅ 检出悬空引用 | **1** | ✅ **能** |
 | `npm run test:ts` | ✅ | **1** | ✅ **能** |
 | `npm run analyze:module-facades` | ✅ 3→4 越界模块 | **0** | ❌ 仅告警 |
-| `normproof judge` | ✅ 检出 | **0** | ❌ **shadow 模式** |
+| `normproof judge` | ✅ 检出 | **0 或 2** | ⚠️ **视义务等级**（见下） |
+
+**更正（同日实测补充）**：judge 的退出码**并非恒为 0**——它取决于命中的是 blocking 还是 advisory 义务：
+
+| 注入的违规 | judge exit | `wouldBlock` |
+|---|---|---|
+| 环（`source_graph_is_acyclic`，**advisory**） | **0** | false |
+| 函数超限（**advisory**） | **0** | false |
+| **无法解析的导入**（**blocking**） | **2** | **true** |
+
+即 judge 对唯一那条 blocking 义务**是会阻断的**，这也是 `ci.yml` 里该步骤长期绿色的原因——
+它并非"永不失败"，只是**只对一条义务失败**。
 
 实测命令示例（注入两个模块互指的真实环）：
 
@@ -2954,6 +2965,19 @@ npx normproof judge                     # exit 0，wouldBlock=false
 
 根因：该表是手写同步，没有任何门禁校验"文档记载的数字 == 实跑得到的数字"。
 `verify-docs-drift` 只校验**路径引用**能否解析，不校验**计数**。
+
+#### 关键缺口 4：`verify:import-cycles` **不检查导入是否可解析**
+
+该脚本名字暗示它覆盖 AGENTS.md 的规则 2，实则**只查环**：第 44-56 行对无法解析的说明符
+**静默返回 `null`**，环路计算直接跳过。
+
+实测：向 `core/values/freeze.ts` 注入 `import { nope } from "./does-not-exist.js"`，
+`npm run verify:import-cycles` 仍输出 `[pass] no-dependency-cycles`，**exit 0**。
+
+好在 `normproof judge` 的 blocking 义务 `source_graph_has_no_unresolved_specifiers` **确实抓住了它**
+（exit 2）。所以此缺口**当前由 CI 中的 judge 步骤兜住**，但依赖关系脆弱：
+一旦 judge 被摘除或被调成 advisory，可解析性就完全失守。
+**建议**（未实施）：给 `check-import-cycles.mjs` 增加 unresolved 报告，使两个门禁职责不重叠也不留缝。
 
 #### 未发现问题
 

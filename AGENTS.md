@@ -59,6 +59,15 @@ Detailed rules: [file placement and naming](agent-rules/file-placement-and-namin
 - Do not claim validation passed unless the command actually ran and passed.
 - Restore audit/history residue before finalizing.
 
+CI enforces these gates, and they exit non-zero on a violation:
+
+- `npm run verify:import-cycles` — dependency cycles. Note it checks cycles only; it does not report imports that fail to resolve.
+- `npm run verify:docs-drift:strict` — dangling path references in binding rules and current-state docs.
+- `npm run test:ts` — the TypeScript suite.
+- `normproof judge` — blocks on the unresolved-specifier obligation only. The cycle and function-ceiling obligations are advisory, so they report without failing the build.
+
+Run the first two locally before pushing; together they take under a second, against roughly three minutes for the suite. Measurements and the gate-by-gate audit are in `.wiki/refactor/plan.md` section 9.27.
+
 Detailed rules: [testing and validation](agent-rules/testing-and-validation.md), [development workflow](agent-rules/development-workflow.md).
 
 ## Reference Repositories
@@ -101,6 +110,17 @@ Follow these architectural rules:
 1. No dependency cycles. No module may import, directly or transitively, a module that imports it.
 2. Every module import resolves within the declared source graph.
 3. Responsibility ceiling. No single module may declare more than 20 function-like names — counting named functions, functions or arrows bound to a name, and methods. Split a module that would exceed it rather than letting one module accumulate behaviour.
+
+How these are checked, so you know what will stop you:
+
+| Rule | Gate that catches it | Blocks? |
+|---|---|---|
+| 1 — cycles | `npm run verify:import-cycles` | yes, in CI |
+| 2 — imports resolve | `normproof judge` (unresolved-specifier obligation) | yes, in CI |
+| 3 — function ceiling | `npm run analyze:module-facades` | no, advisory |
+| 1 — cycles, as a NormProof obligation | `normproof judge` | no, advisory |
+
+Rule 3 has no blocking gate, so a module over the ceiling passes CI. Treat it as a rule to hold yourself to rather than one the pipeline will hold you to.
 
 ### Architecture Watch Disposition Protocol
 
