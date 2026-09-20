@@ -58,6 +58,10 @@ NormProof 的设计目标是**图结构验证**而非**代码语义执行**，�
 ### 典型实战案例对比：
 - **`fileMutationQueue.ts` 并发锁死锁**：NormProof 判定该文件“无环、结构合规、函数少于 20 个”放行；而 Code Review 准确抓住了 `await currentQueue` 在 `try` 块外抛出异常会导致 `releaseNext` 永远不被调用的致命死锁。
 - **`edit/multifile/graph.ts` 拓扑排序缺失**：NormProof 认为依赖图结构合格；Code Review 发现了依赖目标未排序即执行导致的执行顺序错误。
+  > **2026-09-20 补注**：该文件**已不存在**——它由 `d7f95363` 引入，后经 `42d63bd7`
+  > 作为"休眠零引用簇"删除，代码被重新吸收进 `edit/multifile/model.ts`。
+  > 本条作为**当时的案例记录**保留；同类拓扑排序逻辑现位于
+  > `planning/action/graph.ts` 与 `context/acquisition/graph.ts`。
 
 ---
 

@@ -1,5 +1,13 @@
 # Task Capability Gap Plan
 
+> **⚠️ 部分证据路径已失效（2026-09-20 补注）。** 本文的 "Current Assessment" 表与
+> "Real task evaluation" 一行引用 `runtime/evaluation/task/*`、`runtime/loop/*`
+> 等路径，这些模块已随 **CB-005 与 C2（2026-09-19）删除**。
+> 本文作为**当时的差距评估记录**保留，但**其证据列不再描述当前树**；
+> 引用前请对照 `.wiki/refactor/plan.md` §1 的当前状态表。
+> 删除理由：该 evaluation 面需要 `dispatch => HostCommandResponse`，
+> 而其唯一生产者 `createHostRuntime` 已随 CB-005 删除，故**无法被调用**。
+
 This plan compares the current project with the task capability map and turns
 the next phase toward trusted task completion. It is aggressive by grouping
 capabilities that must ship together for real user-visible work.

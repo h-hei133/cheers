@@ -495,6 +495,13 @@ focused validation.
 
 ## Shared Task Loop Runtime
 
+> **⚠️ 本节描述的 `runtime/evaluation/task` 已删除（2026-09-19，C2）。**
+> 本节正文仍以现在时描述该 owner，作为**采纳决策的历史记录**保留；
+> 引用本节路径前请先读文末 L1191 附近的移除说明。删除理由：
+> 该面需要 `dispatch => HostCommandResponse`，而其唯一生产者
+> `createHostRuntime` 已随 CB-005 删除，故**无法被调用**。
+
+
 - Selected mode: structured port for the local task-loop contract and
   behavior-only alignment for mature lifecycle, save-point, and queued input
   flow.

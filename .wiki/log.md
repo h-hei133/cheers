@@ -2109,3 +2109,127 @@ or decision history"。SP071 文档三条全中：
 
 SP072 / SP073 两份仍是 `active`，与 SP068/SP070/SP071 同类（路线结项记录）。
 **本轮只改授权范围内的 SP071**；若要一并归为 `historical`，需另行裁决。
+
+## [2026-09-20] review | T 轮独立复核：发现并修复 1 处真实不可变性回归（§9.17）。
+
+对 6 个 T 轮 commit（`3550134f`/`6a793de9`/`161e15fd`/`8c5f47c7`/`b7b7880b`/`96252719`）
+与两轮删除（`6925b242`/`0621c28e`/`8f5b5832`）做对抗复核。
+
+### P1 真实回归（已修）
+
+`8c5f47c7` 把 13 处 B 语义 `deepFreeze`（不短路）并入 A 语义 `freezeDeep`（遇已冻结即跳过）。
+作者 §9.15 断言"当前代码基本没触发差异"——**对外层成立、对内层不成立**。
+
+B 类文件的调用点把 `Object.freeze(...)` 的容器直接塞进 `freezeDeep` 参数，
+例如 `turn/assistantResponse.ts:91` 的 `toolCallCandidates: Object.freeze(candidates)`：
+
+| | 改动前 | 改动后（修复前）|
+|---|---|---|
+| `toolCallCandidates[0]` 冻结 | true | **false** |
+| `candidate.arguments` 冻结 | true | **false** |
+| 改写 `arguments.command` | `TypeError` 阻止 | **成功** |
+
+`readonly unknown[]` 只保护数组本身、**元素无类型保护**，故是真实回退。
+修复：移除两处内层 `Object.freeze`，交 `freezeDeep` 统一深冻结；
+新增回归测试**实测修复前失败、修复后通过**。
+
+### 另 6 项
+
+P2 T1 收口不完整（11 条安全正则仍有 4 份）→ 已收口为 1；
+P3 漂移门禁对"无前缀行内引用"失明 → 已扩（发现 47 条此前不可见死引用）；
+P4 §1 计数漂移；P5 陈旧产物 3 处；P6/P7 补记。
+
+### 方法教训
+
+本次三轮都栽在同一模式：**用自制静态扫描替代 `grep` + 读上下文**。
+
+## [2026-09-20] research | §9.8 剩余待办深度研究（4 个子代理并行，§9.18）。
+
+T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处既有记录**：
+
+| 项 | 原记 | 实测 |
+|---|---|---|
+| 不可达文件 | 285 / 60,058 | **270 / 59,121** |
+| T10 行数 | 约 440 | **550** |
+| T14 组数 | 4/7/4/2 | **7/7/4/3** |
+| T17 根跑失败 | 11 文件 / 16 项 | **2 文件 / 3 项** |
+| T18 跨域边 | 5 处指向顶层 `presentation/` | **顶层 0 条**（全部在 `session/presentation/`）|
+
+## [2026-09-20] execute | T12/T10/T11 施工 + 5 条 disposition 登记（§9.19）。
+
+| 项 | 删除 | 关键证据 |
+|---|---:|---|
+| T12 | **589 行** | `browserPlan` 全仓仅 1 处出现＝它自己的声明，无赋值无读取 |
+| T10 | **550 行** + 2 自测 | 生产消费者 0；3 个 live 测试保留、只摘掉死模块 fixture |
+| T11 | **111 行**（部分）| `/view` 四个 action **全无 producer** → 按 §2.1 保留 |
+
+**PTY 实机验证**（§2.4 强制）：完整回合通过；`/view status` 实机返回
+"Unknown slash command" —— 独立证实 view 命令未接线，但 `getViewMode` 被
+`cliApprovalModule` 活读，故保留正确。
+
+## [2026-09-20] research | §9.5 四项开放问题深度研究（4 个子代理并行，§9.21）。
+
+**四项结论均为「保留」**，非回避——每项都跑了应跑的检查，检查未能授权变更：
+
+- 不可达簇：263 文件 / 57,977 行（三口径须分开标注），118 分量其中 **93 个单文件**
+- 重复实现：普查实为 **96 组 / 344 份**（非 56/177）
+- `core/query/runtime/` 孤儿：`policy.ts` 是最强候选，但 `harness.ts` **不覆盖**其职责
+- `browser/` 布局：**不搬迁**；`runtime/`↔`skill/` 是耦合 adapter seam（9 条交叉边 + 真实环），
+  推翻原记"两套并行端口"
+
+**主代理三处自我纠错**（均由子代理以直接证据反驳）：query/runtime "0 消费者"表漏目录内消费者、
+`closure.py` 两个 scope 标签写反、破损脚本算出 252/97 两个伪值。
+
+## [2026-09-20] execute | 5 组重复实现收口（§9.22）。
+
+| 组 | 前→后 | owner | 等价证明 |
+|---|---:|---|---|
+| `isPrivateNetworkHost`（**SSRF 防线**）| 4→1 | `browser/networkAllowlist.ts` | 28 host 输入 0 不一致 |
+| `redactSensitiveText` | 3→1 | `browser/evidenceSafety.ts` | 42 组 0 不一致 |
+| `isRecord` | 13→1 | `core/values/record.ts`（新建）| 16 值行为相同 |
+| `compactText` | 4→1 | `session/sessionContinuityModule.ts` | 逐字节相同 |
+| `normalizeOptionalString` | 3→1 | 同上 | 逐字节相同 |
+
+**共 27 份副本 → 5 份。**
+
+## [2026-09-20] research | 93 个单文件孤立簇深度研究（4 个子代理并行，§9.23）。
+
+**结论推翻任务前提**：不是低成本清理面。
+
+| 类别 | 数量 |
+|---|---:|
+| **type-contract**（活文件依赖其类型）| **47** |
+| test-only | 42（其中仅 19 是测试基建，**25 是产品自测**）|
+| 真零 importer | **2** |
+
+**主代理第四次错误**：扫描正则只匹配双引号 specifier，而 `batch.ts:6`、`events.ts:12`
+用**单引号**，故两条 type-only 边不可见，零 importer 数成 4（实为 2）。
+**四次错误同源**：自制正则覆盖不了真实语法。
+
+## [2026-09-20] fix | SSRF 缺口修复 + 删除 `/auth`（§9.24）。
+
+### SSRF：`169.254.169.254` 两道防线都放行
+
+云元数据端点（返回实例临时凭据）**不被判定为私有**，且**两份独立实现都漏**
+（`isPrivateNetworkHost` 与 `networkEgressGuard.ts` 的 `isPrivateOrigin`）。
+
+修复：owner 加 `169.254.`；`isPrivateOrigin` **删除本地列表改为委托**，消除第二份实现。
+修后两道防线均拦截，`example.com` 仍放行（无过度拦截）。
+
+**同时更正上轮一处误报**：称"`LOCALHOST` 大写可绕过"——**错误**。
+`parseBrowserNetworkTarget` 已 `.toLowerCase()`；上轮只调函数未走真实入口。
+
+### `/auth` 删除
+
+维护者认定 `/connect` 取代。六项检查全过：生产消费者 0、未注册 registry、
+不在公共面/scripts/动态入口，`addConnectionFromLegacyAuthSet` 显式覆盖 legacy 形状。
+
+## [2026-09-20] docs | 文档全面更新（本条目）。
+
+- §1 计数按实测同步（946/773/173/1439 → **939/771/168/1429**），并列出每个数字的产生命令
+- §7 索引修复：原有一段落**插在表格中间**把表劈成两半；补全 **12 份**新报告
+- §9.5「本轮没有解决的问题」→ **四项已全部收口**
+- §9.6「八项缺陷」→ **逐项重测后标注状态**（仅 `AgentState` 四字段仍开放）
+- §9.15 T2 标题的"待裁决"→ 指向 §9.16 执行 + §9.17 复核发现的回归
+- 两份 `active` 探索文档加**基线过期横幅**（961→938 生产文件）
+- frontmatter summary 与版本沿革更新至 **v7**
