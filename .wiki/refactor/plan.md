@@ -2392,3 +2392,108 @@ T15 改名零残留；CB-005 的 `runtime/loop` 生产零值导入、动态入�
 
 **若要让 `/view` 可用**：需在 registry 注册命令并接线 `runViewShellAction`
 （该函数已按裁决保留），这是**新增产品能力**，不是删除清理，需单独裁决。
+
+### 9.21 §9.5 四项未裁决问题的深度研究（2026-09-20，四个子代理并行）
+
+**方法**：4 个 `unsee/gpt-5.6-luna:max` 子代理并行，各负责 §9.5 的一项，独立重测所有数字。
+四份完整报告：
+
+| 报告 | 覆盖 | 字节 |
+|---|---|---:|
+| `unreachable-clusters-disposition.md` | §9.5-1 不可达簇 | 23,493 |
+| `duplicate-groups-disposition.md` | §9.5-2 重复实现 | 38,919 |
+| `query-runtime-orphans-disposition.md` | §9.5-3 query/runtime 孤儿 | 20,780 |
+| `browser-layout-disposition.md` | §9.5-4 browser 布局 | 17,908 |
+
+**过程中主代理纠正了 3 处自己的错误**（子代理反驳成立，已改）：
+① 我给 query/runtime 研究员的"0 消费者"表漏了目录内消费者（实际只有 3 个文件全隔离）；
+② 我把 `closure.py` 的两个 scope 标签写反了（263 是 all-non-test，256 才是排除 test-utils）；
+③ 我用一个只清首行的破损脚本算出 252/97，两个数都是伪值——真正权威是 263/118。
+
+#### §9.5-1 不可达簇 ✅ 已裁决 —— **全部保留，逐簇处置**
+
+**三口径必须分开标注**（此前多次混淆，已固化）：
+
+| 口径 | 不可达 | 弱连通分量 | 最大簇 |
+|---|---:|---:|---|
+| value-only，全部非测试 TS | **263 / 57,977 行** | **118** | **60 文件 / 14,852 行** |
+| value-only，排除 test-utils | 256 / 55,729 行 | — | — |
+| type-inclusive（环门禁用的图）| 168 / 40,097 行 | 45 | 98 / 30,115 |
+
+**关键结构事实**：118 个分量中 **93 个是单文件孤立**。这直接决定 §2.2 的适用方式——
+对单文件，分量就是文件本身，可单独裁决；对 60 文件的 C1，**不能按单文件处置**。
+
+**建议：保留全部**。理由：抽样与逐文件分类显示 top-3 域（core 62 / context 36 / edit 27）
+中绝大多数是**独有能力**或**不可达链内的 internal-only 载体**，没有证明活轨等价承担。
+唯一进入未来删除候选的是 `core/commands/authCommandRuntime.ts` 所在单文件簇
+（若正式认定 `/connect` 已替代 `/auth`），但**仍需先过六项检查**。
+
+**触发条件（何时可重访）**：产品明确退休旧 query/context/planning lane，并完成职责迁移后，
+按连通分量整簇删除，而非按文件。
+
+#### §9.5-2 重复实现 ✅ 已裁决 —— **推进 5 组，其余记录在案**
+
+**普查数字修正**：可靠下界是 **96 组 / 344 份**（TS lexical scanner），**不是 wiki 的 56/177**。
+诚实边界：仅 `function` 声明式、跨文件、函数体 ≥3 行；箭头函数/方法简写/短函数体全排除，
+真实值更高。
+
+**"同名"≠"同职责"**（wiki 曾把两者混为一谈）：
+- `sanitizeId` **24 个定义**，跨多域多行为族 —— 是**命名风险**，不是合并目标；
+- `truncate` **13 个定义**，字符/宽度/trim/ellipsis 规则不统一 —— 同上。
+
+**本轮推进的 5 组**（均已有现成 owner，无需新建）：
+
+| 组 | 份数 | owner | 理由 |
+|---|---:|---|---|
+| `isPrivateNetworkHost` | 4 | `browser/networkAllowlist.ts`（已有）| **安全边界**（SSRF 防线），最高优先 |
+| `redactSensitiveText`（浏览器族）| 3 | `browser/evidenceSafety.ts`（已有）| 脱敏家族；**不得**吞并 `policy/workspaceFileContract.ts` 的不同 redactor |
+| `isRecord` | 11 exact + 2 变体 | `core/values/`（已有）| 中性值守卫，无 import |
+| `compactText`/`compactContinuityText` | 5 | `session/sessionContinuityModule.ts`（已有）| 同域，可直接收口 |
+| `normalizeOptionalString` | 3 | `session/sessionContinuityModule.ts`（已有）| 同域 |
+
+**次选**：plain `truncate` 的 5 份 exact（32 个直接调用点），因 sidebar/result projection
+另有语义且无隔离 canonical 文件，暂不推进。
+
+**其余全部保持"已记录、未裁决"**，非 dismiss。
+
+#### §9.5-3 `core/query/runtime/` 孤儿 ✅ 已裁决 —— **全部保留，登记 disposition**
+
+**纠正主代理的"只有 3 个文件全隔离"**：按外部 value + 目录内 value 双口径，
+(a) 类实为 **7 个**（`actionAuthority`、`batch`、`decision`、`events`、`harnessState`、`policy`、`proof`），
+其中多数仍有 **type-only 入边**。**只有 `policy.ts` 真正零 value/type 入边。**
+
+| 分类 | 文件 | 裁决 |
+|---|---|---|
+| **live**（外部 value 消费者）| `harness`（`session/harness/state.ts:12`）、`observation`（`session/replay/builder.ts:2`）、`state`（`core/shell/recovery.ts:11`）、`taskState`（4 处）| 保留 |
+| **(b) 目录内 value 依赖** | `facts`（← `policy`）、`harnessClaims`、`harnessPendingState`、`harnessSupport`（← `harness`）| 保留——**承重**，非死叶 |
+| **(a) 无 value 消费者** | `actionAuthority`(312)、`batch`(143)、`decision`(30)、`events`(74)、`harnessState`(177)、`policy`(272)、`proof`(323) | **keep-and-investigate** |
+
+**为何不删**（关键反证）：`policy.ts` 是最强候选（唯一零入边），但实测 `harness.ts`
+**不覆盖**它的 action-selection 责任——harness 管 snapshot/save-point/pending queue/output
+settlement（`:183-967`），policy 管 fact→context→plan→request→strategy→repair-plan 编排
+（`:37-170`）。二者是**不同职责**。`proof.ts` 的底层 owner 虽活
+（`evidence/task/proof.ts:61`、`result/task/verdict.ts:18`），但 query-specific projection glue
+未被证明接管。
+
+**六项检查**：三个候选的 #4（动态入口）与 #6（`scripts/`）均 0 命中，#5 公共面 0 命中。
+**测试成本**：`policy.ts` 仅 1 个直接测试（`session/replay/builder.test.ts:7`），
+`actionAuthority`/`proof` 各 0 —— 删除成本低，但**授权不成立**。
+
+#### §9.5-4 `browser/` 布局 ✅ 已裁决 —— **不搬迁，登记 disposition**
+
+**形状修正**：wiki 记"62 个平铺文件"，实测 **125 个平铺**（+ `receipt/` 9、`runtime/` 23、
+`skill/` 11 = **168 生产文件 / 23,616 行**；含测试共 226）。最大文件仍是
+`receipt/store.ts` 447 行（无生产文件 >600）。
+
+**可达性**：**162/168 可达**；不可达仅 6 个（`directPlaywrightAdapter.ts`、
+`playwrightEvidenceMapper.ts`、`runtime/core/gauntletManifest.ts`、`selectorRepairApplyExecutor.ts`、
+`selectorRepairApplyPolicy.ts`、`skill/runner/manifest.ts`）。
+
+**⚠️ 推翻 wiki 的"两套并行端口"判断**：`runtime/` ↔ `skill/` **不是并行实现，而是耦合的
+adapter seam** —— 交叉边 **9 条**（6 value + 3 type-only），且**存在真实环**
+（`runtime/core/adapterExecutor.ts:19` → `skill/runtime/binding.ts` →
+`runtime/core/protocol.ts`）。这也解释了环门禁为何把 type-only 环单列。
+
+**不搬迁的理由**：654 条内部边 + 9 条跨 seam 边 + 多入口 ingress；且历史先例是
+Step 3f 实测 1,537 边 vs 估算 361（**低估 4 倍**）。按 §2.4.1 的搬迁纪律，
+此规模搬迁需先跑 SCC、按依赖方向分批、实测每条 escaping 边——**收益不明确，成本已证明会低估**。
