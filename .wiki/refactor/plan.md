@@ -2542,3 +2542,66 @@ Step 3f 实测 1,537 边 vs 估算 361（**低估 4 倍**）。按 §2.4.1 的�
 ② 隔离复跑 **40/40 通过**；
 ③ `git stash` 掉本轮全部改动后该测试同样通过——即两侧行为一致，失败只出现在全量并发下。
 `plan.md` §9.14 已记录同一测试的同类抖动（"在 HEAD 上同样失败 → 既存 flake"）。
+
+### 9.23 93 个单文件孤立簇的深度研究（2026-09-20，四个子代理并行）
+
+§9.21 发现 263 个不可达文件中 **118 个弱连通分量里有 93 个是单文件**。
+因 §2.2 的整分量规则，单文件分量**就是分量本身**，可逐个裁决——这是该集合里唯一低成本清理面。
+4 个子代理并行，报告：
+
+| 报告 | 覆盖 | 行数 |
+|---|---|---:|
+| `singletons-zero-importer.md` | 零 importer 簇 | 190 |
+| `singletons-core.md` | `core/` 簇 | 347 |
+| `singletons-noncore.md` | 非 core 簇 | 220 |
+| `singletons-testutils.md` | test-utils 与测试基建 | 800+ |
+
+#### 分类（**主代理自己的前两次测量都错了，已由子代理纠正**）
+
+| 类别 | 数量 | 含义 |
+|---|---:|---|
+| **type-contract**（有外部 type importer）| **47** | **活文件依赖其类型，删了会编译失败** |
+| test-only（仅测试 import）| 42 | 其中仅 **19** 是测试基建，**23 是"产品代码 + 自测"** |
+| 零 importer（value + type + test 全无）| **2** | 仅 `session/replay/host/facts.ts` 与 `test-utils/longSessionDurabilityProcess.ts` |
+
+**核心结论**：**93 个中 47 个是类型契约**——"孤立"不等于"可删"。
+这一条推翻了"93 个单文件簇是低成本清理面"的初始预期：真正可考虑删除的只有
+**2 个零 importer + 23 个自测产品模块**，且后者删了会连带删掉它们唯一的测试。
+
+#### 主代理的三次自我纠错（均由子代理以直接证据反驳）
+
+1. 我给研究员的"零 importer = 4"**错了**：`actionAuthority.ts` 被 `batch.ts:6`
+   **type-only 导入**，`proof.ts` 被 `events.ts:12` type-only 导入 → **实际零 importer 是 2**。
+2. 我的扫描脚本有 **resolver bug**（给 `./x.js` 直接拼 `.ts` 而非先剥 `.js`），
+   导致首轮"live-importer=9"分类全部不可靠。
+3. 我还**漏掉了多行 `import type { ... } from "./x.js"` 块**（`hookDispatcher.ts:3-11` 即为此形态），
+   这使我把 `core/hooks/types.ts` 误判为"live importer"。
+
+**方法教训**：本次三轮都栽在同一个模式——用自制的静态扫描替代直接 grep + 读上下文。
+子代理坚持用 `grep` + `git show` 验证并**拒绝接受我的更正**，才纠正了这三处。
+
+#### 逐项裁决
+
+| 簇 | 裁决 | 决定性理由 |
+|---|---|---|
+| `test-utils/longSessionDurabilityProcess.ts` | **保留（受保护）** | §2.5 动态入口：`session/longSessionDurability.test.ts:228` 用 `path.join` + `spawnSync` 启动；另有 `scripts/verify-session-durability-long.mjs` 驱动 |
+| `core/harness/*ScenarioFixtures.ts`（8 个）| **保留** | 均被 `*ScenarioExamples.test.ts` / `*GauntletScenarios.test.ts` **直接 import**（主代理已独立验证 `browserRuntimeAdapterFixtures.ts` 有 2 个命名消费者）|
+| `core/workflow/*`（6 个）| **保留** | `core/workflow/` **是活的**（`registry.ts` → `workflowCommandRuntime.ts` → definition/runner/runStore）；这 6 个是**测试专用/休眠辅助**，非死代码 |
+| `core/commands/authCommandRuntime.ts` | **唯一有条件删除候选** | 无生产 importer、无 registry 条目；`/connect` 已注册且 `addConnectionFromLegacyAuthSet` 显式覆盖 legacy `/auth set`；`slashRouter` 测试断言 `/auth` 为 unknown |
+| 其余 type-contract（47）| **保留** | 活文件依赖其类型 |
+| 其余自测产品模块（23）| **保留，登记 disposition** | 删除会连带删除其唯一测试，需产品裁决 |
+
+#### 与既有记录的差异
+
+| 项 | 原记录 | 实测 |
+|---|---|---|
+| "93 个是低成本清理面" | §9.21 的预期 | **不成立**：47/93 是类型契约，仅 2 个真零 importer |
+| `actionAuthority` / `proof` 零 importer | 主代理首测 | **各有 1 个 type-only importer**（且 importer 本身也不可达，属"弱持有"）|
+| test-only 簇的性质 | 未区分 | **42 个中仅 19 个是基建**，23 个是自测产品代码 |
+
+#### 未验证事项
+
+- 未逐文件完成 47 个 type-contract 的六项检查（结论是"保留"，无需删除检查）。
+- 未运行全量测试；本轮零代码改动。
+- `runtime/events/projection.ts`（2,997 行）的裁决基于静态 import 图 + 测试消费者，
+  未做运行时 tracing 验证其输出确实无人消费。
