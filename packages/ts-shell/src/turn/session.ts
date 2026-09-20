@@ -5,15 +5,13 @@ import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import {
-  applyCompaction,
+  condenseContext,
   createCompactionStep,
-  findCompactionCut,
-  KEEP_RECENT_TOKENS,
   type CompactionPolicy,
   type CompactionReason,
   type SummarizeHistory,
+  type SummarizeTurnPrefix,
 } from "../session/compaction.js";
-import { estimateTokens } from "../session/context.js";
 import { environmentLine } from "./prompt.js";
 import { concludeRun, TurnProjection } from "./projection.js";
 import { EventChannel } from "./stream.js";
@@ -35,6 +33,14 @@ import type { ToolDefinition } from "../tools/types.js";
 export interface CompactionSetup {
   readonly policy: CompactionPolicy;
   readonly summarize: SummarizeHistory;
+  /**
+   * Summarizes the opening of a turn the cut landed inside of.
+   *
+   * Only used when one turn is larger than the whole budget, which is the case
+   * the history summary cannot cover: its request would otherwise be dropped
+   * along with everything else.
+   */
+  readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
   /** A checkpoint was written into the context; record it durably. */
   readonly onCompact: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void;
   /** Why this compaction is allowed to run. Manual runs say so. */
@@ -120,12 +126,11 @@ export function runTurn(options: TurnOptions): TurnRun {
       ),
     shouldStopAfterStep: () => projection.stepCount >= options.maxSteps,
     prepareNextStep: options.compaction
-      ? createCompactionStep(
-          options.compaction.policy,
-          options.compaction.summarize,
-          undefined,
-          options.compaction.onCompact,
-          {
+      ? createCompactionStep(options.compaction.policy, {
+          summarize: options.compaction.summarize,
+          summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
+          onCompact: options.compaction.onCompact,
+          lifecycle: {
             before: async (input) => {
               const decision = await options.hooks.dispatch({
                 eventName: "PreCompact",
@@ -151,8 +156,8 @@ export function runTurn(options: TurnOptions): TurnRun {
               });
             },
           },
-          options.compaction.reason ?? "threshold",
-        )
+          reason: options.compaction.reason ?? "threshold",
+        })
       : undefined,
   });
 
@@ -215,14 +220,27 @@ export function runTurn(options: TurnOptions): TurnRun {
     if (!last || last.role !== "assistant" || !isOverflowFailure(last) || !options.compaction) return false;
     if (overflowRecovered) return false;
     overflowRecovered = true;
+    // The same operation the scheduled path uses, so the rescue cannot cut
+    // somewhere the scheduled path would not have. It runs without the
+    // threshold check standing in the way: the provider already refused the
+    // request, so the context is over budget by definition, not by estimate.
     const kept = messages.slice(0, -1);
-    const cut = findCompactionCut(kept, options.compaction.policy.keepRecentTokens ?? KEEP_RECENT_TOKENS);
-    if (cut === undefined) return false;
-    const summary = await options.compaction.summarize(kept.slice(0, cut), options.signal).catch(() => undefined);
-    if (!summary) return false;
-    const plan = { cut, keptMessages: kept.length - cut, tokensBefore: estimateTokens(kept) };
-    options.compaction.onCompact({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
-    core.state.messages = applyCompaction(kept, plan, summary);
+    const condensed = await condenseContext({
+      messages: kept,
+      policy: options.compaction.policy,
+      summarize: options.compaction.summarize,
+      summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
+      signal: options.signal,
+      force: true,
+    }).catch(() => undefined);
+    if (!condensed) return false;
+    const { plan } = condensed;
+    options.compaction.onCompact({
+      summary: condensed.summary,
+      keptMessages: plan.keptMessages,
+      tokensBefore: plan.tokensBefore,
+    });
+    core.state.messages = condensed.messages;
     return true;
   };
 

@@ -34,13 +34,15 @@ export interface CompactionRequest {
   readonly signal?: AbortSignal;
   /** What the user asked the summary to pay attention to, if anything. */
   readonly instructions?: string;
+  /** Which summary to ask for; defaults to the full checkpoint prompt. */
+  readonly prompt?: string;
 }
 
 /** The checkpoint message replacing `messages`, or nothing when the provider could not produce one. */
 export async function requestCompactionSummary(request: CompactionRequest): Promise<string | undefined> {
   const prompt = request.instructions?.trim()
-    ? `${EIGHT_SECTION_COMPACTION_PROMPT}\n\nThe user asked the summary to focus on: ${request.instructions.trim()}`
-    : EIGHT_SECTION_COMPACTION_PROMPT;
+    ? `${request.prompt ?? EIGHT_SECTION_COMPACTION_PROMPT}\n\nThe user asked the summary to focus on: ${request.instructions.trim()}`
+    : (request.prompt ?? EIGHT_SECTION_COMPACTION_PROMPT);
   const res = await fetch(`${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
     method: "POST",
     headers: {

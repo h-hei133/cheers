@@ -174,3 +174,136 @@ available=0 budget=100: clamped=10 raw=2
 - **`turn/session.ts:219` 的溢出恢复**已按新口径更新，但仍受同一限制。
 
 
+
+---
+
+## 3. 步 2 执行记录：压哪里
+
+### 3.1 切点规则：从「只能切 user」到「任何合法边界」
+
+| 改动 | 位置 |
+|---|---|
+| 新增 `canStartTail` / `opensTurn` / `findTurnStart` / `newestCutBelow` | `session/compaction.ts:112-165` |
+| `findCompactionCut` 改为「预算花光 → 取该点之前最新的合法边界」 | `session/compaction.ts:167-203` |
+| 返回类型从 `number` 改为 `CompactionCut { cut, turnStart, splitsTurn }` | `session/compaction.ts:40-47` |
+| 开放调用计数一次算完（替代逐候选重扫前缀） | `session/compaction.ts:79-101` |
+
+**合法边界的定义**：除 tool result 以外的任何消息。
+- 起在 tool result 上 → 会交给 provider 一个「答案」，而它的「问题」刚被丢弃
+- 起在 assistant 上 → 它自己的 tool_calls 与随后的 results 一起留在尾巴里，配对不破
+
+**与参考实现的一致性**（子代理 `RefCutRules` 核实）：
+合法切点 = `user` / `assistant`（不含 `toolResult`）；预算落在一串 tool result 里时，
+回退到「其前置 assistant 调用」而非整个头部。**已对齐。**
+
+### 3.2 巨型 turn 的复现与修复
+
+| | 修复前 | 修复后 |
+|---|---|---|
+| 巨型 turn（42 条） | `None` | `{ cut: 41, turnStart: 0, splitsTurn: true }` |
+
+**反向验证**：把 `canStartTail` 改回只允许 user，`compaction.test.ts` 与 split 测试**共 3 条失败**。
+
+### 3.3 split-turn 双摘要
+
+| 改动 | 位置 |
+|---|---|
+| 新增 `condenseContext`——两条路径共用的唯一压缩操作 | `session/compaction.ts:300-380` |
+| 新增 `SummarizeTurnPrefix` 类型 | `session/compaction.ts:293-299` |
+| 前缀提示词 `TURN_PREFIX_COMPACTION_PROMPT` | `core/query/compaction/summarizer.ts:38-64` |
+| `requestCompactionSummary` 支持自定义提示词 | `core/query/compaction/summarize.ts:38,41-43` |
+| 工厂注入前缀摘要器 | `cli/runtime/cliSessionRuntimeFactory.ts:112-125` |
+| 合并格式 | `**Turn Context (split turn):**`（与参考一致） |
+
+**为什么是两次调用而不是一次**：参考实现的**历史摘要提示词本身就含 `In Progress` / `Current Work` 段**，
+与前缀摘要要答的问题重叠；但前缀问的是「保留下来的续写段在回答什么」，
+而历史摘要面对的是「之前发生过什么」。**是互补，不是重复。**
+
+**失败语义**（已实测，非推断）：
+
+| 情形 | 行为 | 理由 |
+|---|---|---|
+| 历史摘要失败 | **放弃压缩** | 前缀摘要描述不了被丢弃的整段历史，用它替换会**无声丢失** |
+| 前缀摘要失败 | **仍压缩**，只用历史摘要 | 丢开题会损失上下文，但**拒绝压缩损失更大**——上下文已判定过大 |
+
+### 3.4 我自己的施工缺陷（本轮 3 处，全部实测发现）
+
+**缺陷 1：触发用测量值、切点用估算值 → 可能静默空转。**
+步 1 让触发读 provider 的 `lastPromptTokens`，但 `findCompactionCut` 仍按 `chars/3.5` 走。
+两者不一致时（provider 会算每条消息的开销，估算看不到；**CJK 文本在 3.5 比值下被系统性低估**），
+触发为真而切点找不到 → 压缩**什么都不做**。测试报 `expected "spy" to be called 1 times, but got 0 times`。
+**修复**：`planCompactionCut` 用**本次对话自身**的「估算/实测」比值缩放预算（`session/compaction.ts:246-260`）。
+
+**缺陷 2：回退的语义放错了层。**
+我先把「装不下就回退到最新边界」放进 `findCompactionCut`，
+但 `shouldCompact` 已经在调用方挡过一道，于是「预算充足」时也会给出切点。
+**修复**：把「该不该切」完全交给 `planCompaction`，`findCompactionCut` 只答「哪能切」。
+
+**缺陷 3：前缀摘要会把被保留的系统提示词再摘要一遍。**
+`applyCompaction` 原样保留开头的 system 消息，但切片从 0 开始 → 付费重复且信息重复。
+**修复**：``head`` 偏移（`session/compaction.ts:346-351`）。
+
+### 3.5 对原计划的一处更正：`firstKeptEntryId` **没有**施工
+
+计划里写的是「`firstKeptEntryId` 持久化」。子代理 `KeptEntryIdTrace` 核实后**推翻了这个前提**：
+
+- `firstKeptEntryId` 的**唯一语义消费者**是 `SessionDagEngine.buildSessionContext`（`sessionDagEngine.ts:230-242`）
+- 而 `SessionDagEngine` **零个生产调用方**（`grep` 实测无匹配）
+- 且它用的是**另一套 ID 空间**：DAG 用 `msg_<8位>`，而 `sessionProjection.test.ts:356` 用的是
+  `sess_compaction_contract:turn-2`（`sessionThread.ts:184-185` 的 `${sessionId}:turn-${order}`）
+- **活着的 transcript 路径不读这个字段**，它按 `keptMessages` 重新锚定（`sessionTranscript.ts:39-47`）
+
+**结论**：为它写入一个没人读的值就是**脚手架**。**本轮不施工**，并把这个字段的真实状态记在此处备查。
+
+### 3.6 顺带修掉的两个既有缺陷
+
+**缺陷 A：`/context` 报的压缩阈值是错的。** 它显示 `window * 0.8`，而实际触发是 `window - reserve`。
+
+```
+修复前显示：51,200      实际：56,000
+修复后显示：56,000      （实机验证，见 §3.7）
+```
+
+**缺陷 B：`/context` 里 `reserve = 8_000` 与 `CHARS_PER_TOKEN = 3.5` 是硬编码副本。**
+已改为从 `session/context.ts` 引入，重复常量从 3 处降为 1 处。
+
+### 3.7 B 的 dangling guard 与重复估算器
+
+| 改动 | 位置 |
+|---|---|
+| B 新增 `hasDanglingCalls` 并接入 `compactionCut` | `core/shell/compaction.ts:56-93` |
+| 删除 B 自己的 `estimateTokens`（**低估 84.94%**：只数 content，不数 tool_calls） | `core/shell/compaction.ts` → 改用 `session/context.js` |
+| 删除 B 的 `CHARS_PER_TOKEN` 副本 | 同上 |
+
+**反向验证**：移除 guard 后 `core/shell/dangling.test.ts` 失败；
+带 guard 时 `compactionCut` 对悬空调用返回 `undefined`、对配对完整返回索引。
+
+### 3.8 验证
+
+| 门禁 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json --noEmit` | **0 错误** |
+| `npm run test:ts` | **491 文件 / 2751 通过 / 1 跳过 / 0 失败**（见 §3.10） |
+| `npm run verify:import-cycles` | `runtime_cycles=0 type_only_cycles=0`（1429 文件） |
+| `npm run build:ts` + 实机 `/context` | **已实机验证**：显示 56,000 = 64,000 − 8,000 ✅ |
+| 反向验证（切点放开） | 改回只允许 user → 3 条测试失败 ✅ |
+| 反向验证（B 的 guard） | 移除 guard → 测试失败 ✅ |
+| 反向验证（测量路径） | 移除 `measureContextTokens` → `compactionUsage.test.ts` 失败 ✅ |
+
+### 3.9 一次全量失败：判定为既有抖动，非本轮回归
+
+首次全量运行报 `cli-baseline.test.ts > pipe-spawn interactive slash command smoke` 失败 1 项。
+
+**判定依据**（三重）：
+1. **隔离复跑 40/40 通过**——失败的是 PTY 子进程冒烟测试，并发下超时。
+2. **该测试以 `tsx` 直接跑源码**（`cli-baseline.test.ts:29-35`），不依赖本轮改动的构建产物。
+3. **项目历史已有两次同款记录**：`.wiki/log.md:620` 与 `:1722` 均记载
+   「唯一失败 `cli-baseline.test.ts` 为既有抖动，隔离复跑通过」。
+
+**随即重跑全量：491 文件 / 2751 通过 / 0 失败**——同一棵工作树，确证抖动。
+
+### 3.10 仍未验证的项
+
+1. **未跑真实 provider 触发一次自动压缩。** 实机验证的是 `/context` 的阈值显示与构建；
+   自动压缩需要真实 provider 报告 usage 越阈值，合成 provider 不产生 usage。
+2. **前缀摘要在真实 provider 上的输出质量**未知——只验证了「两条摘要都进入 checkpoint」的结构。

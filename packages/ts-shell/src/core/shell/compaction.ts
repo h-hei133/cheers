@@ -1,4 +1,5 @@
 import { markContextUnknown } from "../../observability/usageTelemetry.js";
+import { estimateTokens } from "../../session/context.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import { toChatMessages } from "../../turn/prompt.js";
 import {
@@ -44,23 +45,41 @@ export interface CompactionStore {
 /** Messages kept verbatim after the checkpoint, at minimum. */
 export const KEEP_RECENT_MESSAGES = 4;
 
-/** Rough tokens per character; the same ratio the loop uses for its own budget. */
-const CHARS_PER_TOKEN = 3.5;
-
-export function estimateTokens(messages: readonly { readonly content?: string | null }[]): number {
-  let chars = 0;
-  for (const message of messages) chars += message.content?.length ?? 0;
-  return Math.ceil(chars / CHARS_PER_TOKEN);
+/**
+ * Whether the compacted head leaves a tool call without its result.
+ *
+ * A tail beginning on a tool result would hand the provider an answer whose
+ * question was just discarded. The head must therefore close every call it
+ * keeps: a call made before the cut needs its result before the cut too.
+ */
+function hasDanglingCalls(turns: readonly SessionMessage[], cut: number): boolean {
+  const calls = new Set<string>();
+  const results = new Set<string>();
+  for (const turn of turns.slice(0, cut)) {
+    for (const call of turn.tool_calls ?? []) {
+      calls.add(call.id);
+    }
+    if (turn.tool_call_id) {
+      results.add(turn.tool_call_id);
+    }
+  }
+  for (const id of calls) {
+    if (!results.has(id)) return true;
+  }
+  return false;
 }
 
 /**
  * Index of the first message to keep, or nothing when there is too little to
  * condense: the newest user message that still leaves `keepRecent` messages
- * after it, provided at least one full exchange precedes it.
+ * after it, provided at least one full exchange precedes it and the head it
+ * leaves behind closes its own tool calls.
  */
 export function compactionCut(turns: readonly SessionMessage[], keepRecent = KEEP_RECENT_MESSAGES): number | undefined {
   for (let index = turns.length - keepRecent; index >= 2; index--) {
-    if (turns[index]?.role === "user") return index;
+    if (turns[index]?.role !== "user") continue;
+    if (hasDanglingCalls(turns, index)) continue;
+    return index;
   }
   return undefined;
 }
@@ -111,6 +130,6 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
     summarized: older.length,
     kept: kept.length,
     tokensBefore,
-    tokensAfter: estimateTokens([{ content: summary }, ...kept]),
+    tokensAfter: estimateTokens([{ role: "user", content: summary }, ...kept]),
   };
 }

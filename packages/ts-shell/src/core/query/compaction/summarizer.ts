@@ -35,6 +35,34 @@ Rules:
 - Output only the <compacted-summary>...</compacted-summary> block: do not call tools or execute code.
 `;
 
+/**
+ * The prompt for the opening of a turn that was too large to keep whole.
+ *
+ * It asks a different question from the checkpoint prompt: not "what has
+ * happened" but "what is the work that follows still answering". The kept tail
+ * is the rest of that turn, so the prefix is what gives the tail its purpose.
+ */
+export const TURN_PREFIX_COMPACTION_PROMPT = `The messages above are the BEGINNING of a single turn that was too large to summarize as a whole. The rest of that turn is kept verbatim and follows immediately.
+
+Summarize only this beginning, so the retained continuation can be understood:
+
+<compacted-summary>
+## Original Request
+- [what the user asked for in this turn; quote exact wording where it matters]
+
+## Early Progress
+- [decisions made and work completed before the retained continuation]
+
+## Context for Continuation
+- [what the retained continuation needs in order to make sense: file paths, identifiers, error strings, and anything already ruled out]
+</compacted-summary>
+
+Rules:
+- Write concise, factual technical prose.
+- Preserve exact file paths, shell commands, function signatures, identifier names, and error strings.
+- Output only the <compacted-summary>...</compacted-summary> block: do not call tools or execute code.
+`;
+
 export interface CheckpointSection {
   readonly title: string;
   readonly content: string;

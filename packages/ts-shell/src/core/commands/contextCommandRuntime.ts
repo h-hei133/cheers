@@ -1,5 +1,6 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
+import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
 import { toolSchemas } from "../../turn/tools.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 
@@ -20,8 +21,6 @@ import { createCoreToolRegistry } from "../tools/registry.js";
  * remainder rather than split into invented parts.
  */
 
-/** Characters per token, for text that has only been counted in characters. */
-const CHARS_PER_TOKEN = 3.5;
 const BAR_WIDTH = 32;
 
 export async function runContextCommand(
@@ -31,7 +30,7 @@ export async function runContextCommand(
   const sessionId = context.sessionId ?? "";
   const telemetry = sessionId ? getSessionUsage(sessionId) : undefined;
   const window = configuredWindow();
-  const reserve = 8_000;
+  const reserve = DEFAULT_RESERVE_TOKENS;
   const schemaTokens = toolSchemaTokens();
   const registry = createCoreToolRegistry();
 
@@ -52,7 +51,10 @@ export async function runContextCommand(
   const used = telemetry.lastPromptTokens;
   const remainder = Math.max(0, used - schemaTokens);
   const free = Math.max(0, window - used - reserve);
-  const compactAt = Math.round(window * 0.8);
+  // The threshold the loop actually applies: the reserve is headroom kept for
+  // the reply, so compaction starts when a request would spend past the window
+  // minus that reserve — not at some fixed share of the window.
+  const compactAt = Math.max(0, window - reserve);
 
   return {
     kind: "local",

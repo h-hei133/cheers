@@ -25,6 +25,11 @@ describe('measured usage drives the trigger', () => {
 
     expect(estimatedOnly).toBeUndefined()
     expect(withUsage).not.toBeUndefined()
-    expect(messages[withUsage!.cut].role).toBe('user')
+    // The provider measured 60k of a 64k window against a fixture that estimates
+    // to a handful of tokens. The budget is scaled by that ratio, so the walk
+    // runs out well before the opening user message and cuts inside the turn —
+    // which is the case a user-boundary-only cut could not handle at all.
+    expect(withUsage!.splitsTurn).toBe(true)
+    expect(messages[withUsage!.cut].role).not.toBe('tool')
   })
 })

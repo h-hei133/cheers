@@ -21,6 +21,7 @@ import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { compactSessionHistory } from "../../core/shell/compaction.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
+import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
 import { estimateTokens } from "../../session/context.js";
 import { toChatMessages } from "../../turn/prompt.js";
@@ -113,6 +114,20 @@ export function createCliSessionRuntime(input: {
                     model: compactionProvider.model!,
                   },
                   messages: toChatMessages(messages),
+                  signal: summarizeSignal,
+                }),
+              // Asked a different question from the history summary: this is the
+              // opening of a turn whose continuation is kept, so it explains the
+              // work that follows rather than recapping what came before.
+              summarizeTurnPrefix: (messages, summarizeSignal) =>
+                requestCompactionSummary({
+                  provider: {
+                    apiKey: compactionProvider.apiKey!,
+                    baseUrl: compactionProvider.baseUrl!,
+                    model: compactionProvider.model!,
+                  },
+                  messages: toChatMessages(messages),
+                  prompt: TURN_PREFIX_COMPACTION_PROMPT,
                   signal: summarizeSignal,
                 }),
               onCompact: (record) => {

@@ -111,3 +111,26 @@ describe("session compaction", () => {
     expect(target.entries).toEqual([]);
   });
 });
+
+describe("a head that would strand a tool call", () => {
+  it("refuses the cut rather than splitting a call from its result", () => {
+    const turns: SessionMessage[] = [
+      { role: "user", content: "start" },
+      { role: "assistant", content: "", tool_calls: [{ id: "call-1", type: "function", function: { name: "read", arguments: "{}" } }] },
+      { role: "user", content: "new question" },
+    ];
+    // Cutting here would keep the new question and drop the assistant message,
+    // leaving call-1 with no result on either side of the cut.
+    expect(compactionCut(turns, 1)).toBeUndefined();
+  });
+
+  it("still cuts when the head closes its own calls", () => {
+    const turns: SessionMessage[] = [
+      { role: "user", content: "start" },
+      { role: "assistant", content: "", tool_calls: [{ id: "call-1", type: "function", function: { name: "read", arguments: "{}" } }] },
+      { role: "tool", tool_call_id: "call-1", content: "file" },
+      { role: "user", content: "new question" },
+    ];
+    expect(compactionCut(turns, 1)).toBe(3);
+  });
+});

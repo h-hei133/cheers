@@ -27,8 +27,26 @@ export interface CompactionPolicy {
   readonly measureContextTokens?: (messages: readonly AgentMessage[]) => number | undefined;
 }
 
-export interface CompactionPlan {
+/**
+ * Where a cut falls, and whether it lands inside a turn.
+ *
+ * A turn opens on a user message. Condensing can leave the kept tail starting
+ * on an assistant message when a single turn is larger than the whole budget —
+ * the alternative is refusing to compact at all, which leaves the request just
+ * as oversized as before. When that happens the opening of the turn has to be
+ * summarized separately, because it is neither kept nor covered by the rest of
+ * the history, so the cut has to name it.
+ */
+export interface CompactionCut {
+  /** Index of the first message kept verbatim. */
   readonly cut: number;
+  /** Index of the user message opening the turn being split, or -1 when none. */
+  readonly turnStart: number;
+  /** Whether the cut falls inside a turn instead of on its opening message. */
+  readonly splitsTurn: boolean;
+}
+
+export interface CompactionPlan extends CompactionCut {
   readonly keptMessages: number;
   readonly tokensBefore: number;
 }
@@ -74,74 +92,166 @@ export function shouldCompact(
 }
 
 /**
- * Index of the first message to keep, or nothing when there is too little to
- * condense.
+ * Whether a message may begin the kept tail.
  *
- * Takes the earliest user boundary whose tail still fits the budget, so the kept
- * messages are exactly the recent ones. Stops at the first boundary that cannot
- * fit: every earlier one keeps even more.
+ * Any message except a tool result. A tool result answers an earlier call, so a
+ * tail opening on one would hand the provider an answer whose question was just
+ * discarded. An assistant message is allowed: its own tool results follow it and
+ * stay in the tail, which keeps the pair together.
+ */
+function canStartTail(message: AgentMessage): boolean {
+  return message.role !== "tool";
+}
+
+/** Whether the message opens a turn, which is what the tail would rather start on. */
+function opensTurn(message: AgentMessage): boolean {
+  return message.role === "user";
+}
+
+/**
+ * The user message opening the turn `index` falls in, searching back to `from`.
  *
- * Two properties hold the cut together. The tail must begin on a user message —
- * starting mid-tool-call would hand the provider a result without its call. And
- * the head must close on its own — a call whose result lands in the kept tail is
- * a result whose call has already been discarded.
+ * Cutting inside a turn leaves its opening request out of both the summary and
+ * the kept tail, so the opener has to be found and summarized on its own.
+ */
+function findTurnStart(messages: readonly AgentMessage[], index: number, from: number): number {
+  for (let cursor = index; cursor >= from; cursor -= 1) {
+    if (opensTurn(messages[cursor]!)) {
+      return cursor;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The newest legal cut at or before `from`, given how many calls are open at
+ * each position.
  *
- * When nothing fits, the newest boundary still wins. Reaching this function
- * means the context was already judged too large, so declining to condense
- * would leave the request exactly as oversized as before.
+ * Searching downwards keeps at least the budget: every earlier position keeps
+ * more, so the newest qualifying one is the closest fit without keeping less
+ * than the budget asked for.
+ */
+function newestCutBelow(
+  messages: readonly AgentMessage[],
+  openCalls: readonly number[],
+  from: number,
+): CompactionCut | undefined {
+  for (let index = from; index >= 2; index -= 1) {
+    const message = messages[index];
+    if (!message || !canStartTail(message)) continue;
+    // A call left open at the cut would lose its result with the head.
+    if (openCalls[index] !== 0) continue;
+    const splitsTurn = !opensTurn(message);
+    const turnStart = splitsTurn ? findTurnStart(messages, index, 0) : -1;
+    // Cutting inside a turn needs its opener to summarize; without one the
+    // request that the kept tail answers would be lost silently.
+    if (splitsTurn && turnStart === -1) continue;
+    return { cut: index, turnStart, splitsTurn };
+  }
+  return undefined;
+}
+
+/**
+ * Where to cut so the kept tail costs about `keepRecentTokens`.
+ *
+ * Walks back from the newest message adding up size until the budget is spent,
+ * then takes the newest legal cut at or before that point. Legal means any
+ * message but a tool result: a tail starting on a tool result would hand the
+ * provider an answer whose call was just discarded, while an assistant message
+ * keeps its own tool calls and their results together in the tail.
+ *
+ * Returns nothing only when no legal cut exists anywhere, which means there is
+ * nothing this function can do rather than that nothing should be done. Whether
+ * to compact is the caller's question, asked by `planCompaction`.
+ *
+ * The walk measures estimated tokens while the caller may have measured the
+ * request for real. The two can disagree — a provider counts per-message
+ * overhead the estimate cannot see — so when the budget is never reached the
+ * newest legal cut is used rather than giving up. Declining here would leave an
+ * already-oversized context untouched, which is the one outcome that cannot help.
  */
 export function findCompactionCut(
   messages: readonly AgentMessage[],
   keepRecentTokens: number,
-): number | undefined {
+): CompactionCut | undefined {
   const budgetChars = keepRecentTokens * CHARS_PER_TOKEN;
+  const openCalls = openCallsBefore(messages);
   let accumulated = 0;
-  let fits: number | undefined;
-  let overran: number | undefined;
   for (let index = messages.length - 1; index >= 2; index -= 1) {
     accumulated += messageCharCount(messages[index]!);
-    if (messages[index]!.role !== "user" || hasDanglingCalls(messages, index)) continue;
-    if (accumulated > budgetChars) {
-      // This boundary keeps more than the budget allows, so it is the candidate
-      // to cut at — but only if every boundary was over. Otherwise the earlier
-      // one that fits is the better answer.
-      overran ??= index;
-      break;
-    }
-    fits = index;
+    if (accumulated < budgetChars) continue;
+    // The budget is spent. Take the newest legal cut at or before here; the
+    // earliest ones would keep more than the budget allows.
+    const atBudget = newestCutBelow(messages, openCalls, index);
+    if (atBudget) return atBudget;
+    break;
   }
-  // `fits` is the earliest boundary whose tail stays inside the budget. When
-  // even the newest boundary overruns, condensing that much is still the only
-  // way to shrink the request, so the overrunning boundary is used. When
-  // nothing overran, the budget covers everything and there is nothing to cut.
-  return fits ?? overran;
+  // Either everything fits the budget, or the budget was spent inside a run of
+  // tool results. Cut as late as legality allows in both cases.
+  return newestCutBelow(messages, openCalls, messages.length - 1);
 }
 
 /**
- * Whether the compacted head leaves calls without results behind.
+ * How many tool calls are still unanswered before each position.
  *
- * Only the head is dropped, so only the head must be self-closed: every
- * tool call before `cut` needs its result before `cut` as well. Results
- * after the cut stay paired with their own assistant message in the kept
- * tail, which always starts on a user boundary.
+ * Only the head is dropped, so only the head must be self-closed: a call before
+ * the cut whose result also falls before the cut. Counting the open calls
+ * arriving at every index answers that for all candidate cuts in one pass,
+ * rather than rescanning the head once per candidate.
+ *
+ * A result for a call that was never seen is ignored, since it cannot close
+ * anything.
  */
-function hasDanglingCalls(messages: readonly AgentMessage[], cut: number): boolean {
-  const calls = new Set<string>();
-  const results = new Set<string>();
-  for (const message of messages.slice(0, cut)) {
+function openCallsBefore(messages: readonly AgentMessage[]): number[] {
+  const open = new Set<string>();
+  const counts = new Array<number>(messages.length + 1).fill(0);
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index]!;
     for (const call of message.tool_calls ?? []) {
-      calls.add(call.id);
+      open.add(call.id);
     }
     if (message.tool_call_id) {
-      results.add(message.tool_call_id);
+      open.delete(message.tool_call_id);
     }
+    counts[index + 1] = open.size;
   }
-  for (const id of calls) {
-    if (!results.has(id)) {
-      return true;
-    }
+  return counts;
+}
+
+/**
+ * The plan for condensing `messages`, without asking whether it is time to.
+ *
+ * Kept separate from the threshold check so a caller that already knows the
+ * context is too large — a provider that refused the request — can act on that
+ * instead of on an estimate. The estimate is exactly what cannot be trusted
+ * there: the refused request never reported its usage.
+ */
+export function planCompactionCut(
+  messages: readonly AgentMessage[],
+  policy: CompactionPolicy,
+): CompactionPlan | undefined {
+  const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
+  const available = Math.max(0, policy.contextWindow - reserve);
+  const estimated = estimateTokens(messages);
+  const measured = policy.measureContextTokens?.(messages);
+  // The estimate is what the walk can see per message; the provider's count is
+  // what the whole request actually costs. Dividing costs by characters is not
+  // a constant — a script with wide characters spends more tokens per character
+  // than Latin prose does — so the two disagree by a factor that varies with the
+  // conversation. Scaling the budget by the ratio found in this very
+  // conversation keeps the walk landing where the real number says it should,
+  // instead of reaching the end of the history and finding no cut at all.
+  const scale = measured !== undefined && measured > 0 && estimated > 0 ? estimated / measured : 1;
+  // A budget at or above what the window can hold would swallow the whole
+  // conversation, so no cut would ever be found and compaction would never run
+  // — the opposite of what the budget is for. Clamp it to the space that
+  // actually exists.
+  const keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available) * scale;
+  const cut = findCompactionCut(messages, keepRecent);
+  if (cut === undefined) {
+    return undefined;
   }
-  return false;
+  return { ...cut, keptMessages: messages.length - cut.cut, tokensBefore: estimated };
 }
 
 export function planCompaction(
@@ -149,24 +259,108 @@ export function planCompaction(
   policy: CompactionPolicy,
 ): CompactionPlan | undefined {
   const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const available = Math.max(0, policy.contextWindow - reserve);
-  // A budget at or above what the window can hold would swallow the whole
-  // conversation, so no cut would ever be found and compaction would never run
-  // — the opposite of what the budget is for. Clamp it to the space that
-  // actually exists.
-  const keepRecentTokens = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available);
-  const estimated = estimateTokens(messages);
+  const plan = planCompactionCut(messages, policy);
+  if (!plan) {
+    return undefined;
+  }
   // The provider's own count wins when it exists: it measured the prompt that
   // was actually sent, while the estimate only measures the text we kept.
-  const tokensBefore = policy.measureContextTokens?.(messages) ?? estimated;
+  const tokensBefore = policy.measureContextTokens?.(messages) ?? plan.tokensBefore;
   if (!shouldCompact(tokensBefore, policy.contextWindow, reserve, policy.enabled ?? true)) {
     return undefined;
   }
-  const cut = findCompactionCut(messages, keepRecentTokens);
-  if (cut === undefined) {
+  return { ...plan, tokensBefore };
+}
+
+/**
+ * What the token budget was reached in the middle of a turn, so the opening of
+ * that turn is summarized on its own.
+ *
+ * A separate summarizer because the prefix is asked a different question: not
+ * "what happened so far" but "what was being attempted here", since the kept
+ * tail is the work that followed it.
+ */
+export type SummarizeTurnPrefix = (
+  messages: readonly AgentMessage[],
+  signal?: AbortSignal,
+) => Promise<string | undefined>;
+
+/** Marks where the framing of a split turn begins inside a merged checkpoint. */
+const TURN_CONTEXT_MARKER = "**Turn Context (split turn):**";
+
+export interface CondensedContext {
+  readonly plan: CompactionPlan;
+  readonly summary: string;
+  readonly messages: AgentMessage[];
+}
+
+/**
+ * The one place a compaction actually happens: choose the cut, summarize what
+ * is dropped, and build the replacement context.
+ *
+ * Both the scheduled path (a step that notices the context grew too large) and
+ * the rescue path (a provider that refused the request) go through here, so the
+ * two cannot disagree about where the cut is or what the summary contains. They
+ * used to compute it separately, which is how the rescue path came to run
+ * without the budget clamp the scheduled path applied.
+ *
+ * Returns nothing when there is no cut to make or nothing worth summarizing.
+ */
+export async function condenseContext(input: {
+  readonly messages: readonly AgentMessage[];
+  readonly policy: CompactionPolicy;
+  readonly summarize: SummarizeHistory;
+  readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
+  readonly signal?: AbortSignal;
+  /**
+   * Whether to condense regardless of the threshold.
+   *
+   * Set by a caller that already knows the context is too large — a provider
+   * that refused the request. The threshold is measured from the last reported
+   * usage, and the refused request never reported any, so leaving the check on
+   * would have the rescue judge an oversized context by the estimate that
+   * missed its size in the first place.
+   */
+  readonly force?: boolean;
+}): Promise<CondensedContext | undefined> {
+  const plan = input.force
+    ? planCompactionCut(input.messages, input.policy)
+    : planCompaction(input.messages, input.policy);
+  if (!plan) {
     return undefined;
   }
-  return { cut, keptMessages: messages.length - cut, tokensBefore: estimated };
+  // A leading system message is carried over verbatim by applyCompaction, so
+  // summarizing it as well would pay to restate what is still there.
+  const head = input.messages[0]?.role === "system" ? 1 : 0;
+  // When the cut sits inside a turn, that turn's opening message is neither kept
+  // nor part of the older history, so the history stops where the turn begins
+  // and the opener is summarized separately.
+  const historyEnd = plan.splitsTurn ? plan.turnStart : plan.cut;
+  const history = input.messages.slice(head, historyEnd);
+  const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
+
+  let historyText: string | undefined;
+  if (history.length > 0) {
+    historyText = await input.summarize(history, input.signal);
+    if (!historyText) {
+      return undefined;
+    }
+  }
+
+  let summary = historyText;
+  if (prefix.length > 0) {
+    const prefixText = await input.summarizeTurnPrefix?.(prefix, input.signal);
+    // The request the tail is answering lives in the prefix, so losing it costs
+    // real context. Refusing to compact costs more: the request was already
+    // judged too large, and declining leaves it exactly as large as before.
+    if (prefixText) {
+      summary = historyText ? `${historyText}\n\n---\n\n${TURN_CONTEXT_MARKER}\n\n${prefixText}` : prefixText;
+    }
+  }
+  if (!summary) {
+    return undefined;
+  }
+  return { plan, summary, messages: applyCompaction(input.messages, plan, summary) };
 }
 
 export function applyCompaction(
@@ -182,50 +376,73 @@ export function applyCompaction(
   return [...head, checkpoint, ...messages.slice(plan.cut)];
 }
 
+export interface CompactionStepOptions {
+  readonly summarize: SummarizeHistory;
+  readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
+  readonly onError?: (error: unknown) => void;
+  readonly onCompact?: (input: {
+    readonly summary: string;
+    readonly keptMessages: number;
+    readonly tokensBefore: number;
+  }) => void;
+  readonly lifecycle?: CompactionLifecycle;
+  readonly reason?: CompactionReason;
+}
+
+/**
+ * The scheduled path: before the next model step, condense the context when it
+ * has outgrown its budget.
+ */
 export function createCompactionStep(
   policy: CompactionPolicy,
-  summarize: SummarizeHistory,
-  onError?: (error: unknown) => void,
-  onCompact?: (input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }) => void,
-  lifecycle?: CompactionLifecycle,
-  reason: CompactionReason = "threshold",
+  options: CompactionStepOptions,
 ): (snapshot: NextStepSnapshot, signal?: AbortSignal) => Promise<NextStepUpdate | undefined> {
+  const reason = options.reason ?? "threshold";
   return async (snapshot, signal) => {
     if (signal?.aborted) {
       return undefined;
     }
-    const plan = planCompaction(snapshot.messages, policy);
-    if (!plan) {
+    // A compaction whose size is known before the summary is requested can be
+    // refused by the caller without paying for a summary that gets thrown away.
+    const tokensBefore = planCompaction(snapshot.messages, policy)?.tokensBefore;
+    if (tokensBefore === undefined) {
       return undefined;
     }
-    const proceed = await lifecycle?.before?.({
+    const proceed = await options.lifecycle?.before?.({
       reason,
-      tokensBefore: plan.tokensBefore,
+      tokensBefore,
       messageCount: snapshot.messages.length,
     });
     if (proceed === false) {
       return undefined;
     }
-    let summary: string | undefined;
+    let condensed: CondensedContext | undefined;
     try {
-      summary = await summarize(snapshot.messages.slice(0, plan.cut), signal);
+      condensed = await condenseContext({
+        messages: snapshot.messages,
+        policy,
+        summarize: options.summarize,
+        summarizeTurnPrefix: options.summarizeTurnPrefix,
+        signal,
+      });
     } catch (error) {
       if (signal?.aborted) {
         return undefined;
       }
-      onError?.(error);
+      options.onError?.(error);
       return undefined;
     }
-    if (!summary) {
+    if (!condensed) {
       return undefined;
     }
-    onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
-    await lifecycle?.after?.({
+    const { plan, summary } = condensed;
+    options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
+    await options.lifecycle?.after?.({
       reason,
       summary,
       keptMessages: plan.keptMessages,
       tokensBefore: plan.tokensBefore,
     });
-    return { messages: applyCompaction(snapshot.messages, plan, summary) };
+    return { messages: condensed.messages };
   };
 }

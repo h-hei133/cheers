@@ -2472,3 +2472,54 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 ### 已知边界（有意）
 
 **巨型 turn 仍压缩不了**——步 1 只换口径，切点仍限 user。这是步 2 的范围。
+
+## [2026-09-20] execute | Phase 2 步 2：切点放开到任意合法边界 + split-turn 双摘要。
+
+**裁决与执行记录**：`features/phase-2-execution.md` §3。
+
+### 落地
+
+- **切点规则**：从「只能切 user」改为「除 tool result 外的任何消息」。
+  起在 tool result 上会交给 provider 一个「答案」而其「问题」已被丢弃；
+  起在 assistant 上则它自己的 tool_calls 与随后的 results 一起留在尾巴里——配对不破。
+- **巨型 turn 已修复**：42 条消息的单 turn 从 `None` 变为 `{ cut: 41, turnStart: 0, splitsTurn: true }`。
+  **反向验证**：改回只允许 user → 3 条测试失败。
+- **split-turn 双摘要**：新增 `condenseContext` 作为两条路径（自动 + 溢出恢复）**共用的唯一压缩操作**，
+  新增 `TURN_PREFIX_COMPACTION_PROMPT`，合并格式 `**Turn Context (split turn):**`。
+- **B 的 dangling guard** 已加，重复的 `estimateTokens`（**低估 84.94%**）与 `CHARS_PER_TOKEN` 副本已删。
+
+### 对本轮计划的一处更正（子代理核实后推翻前提）
+
+计划里写的「`firstKeptEntryId` 持久化」**没有施工**。核实结果：
+它的**唯一语义消费者**是 `SessionDagEngine.buildSessionContext`，而该引擎**零个生产调用方**；
+且用的是**另一套 ID 空间**（DAG 用 `msg_<8位>`，测试用的是 `${sessionId}:turn-${order}`）。
+活着的 transcript 路径不读这个字段，它按 `keptMessages` 重新锚定。
+**为它写入一个没人读的值就是脚手架，故不施工。**
+
+### 我自己的施工缺陷（3 处，全部实测发现）
+
+1. **触发用测量值、切点用估算值 → 可能静默空转。** 两者不一致时（CJK 在 3.5 比值下被系统性低估）
+   触发为真而切点找不到，压缩什么都不做。修复：用**本次对话自身**的「估算/实测」比值缩放预算。
+2. **回退语义放错层。** 「该不该切」交给 `planCompaction`，「哪能切」留给 `findCompactionCut`。
+3. **前缀摘要会重复摘要被保留的系统提示词。** 修复：`head` 偏移。
+
+### 顺带修掉的两个既有缺陷
+
+- **`/context` 报的压缩阈值是错的**：显示 `window * 0.8`，实际是 `window - reserve`。
+  **实机验证**：修复后显示 `56,000 = 64,000 − 8,000`（修复前显示 51,200）。
+- **`/context` 里 `reserve` 与 `CHARS_PER_TOKEN` 是硬编码副本**，已改为从 `session/context.ts` 引入。
+
+### 失败语义（实测，非推断）
+
+历史摘要失败 → **放弃压缩**（前缀摘要描述不了被丢弃的整段历史，替换会无声丢失）；
+前缀摘要失败 → **仍压缩**，只用历史摘要（丢开题损失上下文，但拒绝压缩损失更大）。
+
+### 验证
+
+`tsc` 0 错误；全量 **493 文件 / 2750 通过 / 0 失败**；`verify:import-cycles` 0 环（1429 文件）；
+`build:ts` 成功；`/context` **实机验证**。四项反向验证全部按预期失败/通过。
+
+### 未验证（如实记录）
+
+1. **未跑真实 provider 触发一次自动压缩**——合成 provider 不产生 usage。
+2. **前缀摘要在真实 provider 上的输出质量**未知，只验证了结构（两条摘要都进入 checkpoint）。
