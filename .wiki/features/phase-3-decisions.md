@@ -128,7 +128,40 @@ confidence: high
 
    引入网络依赖（离线不可用）、供应链面（**下载并执行未经校验的第三方二进制**），而我们的依赖面**只有 3 个**（`playwright-core`/`typescript`/`undici`，已核实）。**不该为此破例**；且 `pi` 自己的失败模式证明这条路径在离线环境下是硬失败。
 
-2. **不引入 `ignore` npm 包**（`gemini-cli` 的做法）：600 行自解析代码（`gitIgnoreParser.ts` 199 + `ignoreFileParser.ts` 123 + `ignorePatterns.ts` 278）+ 1 个新依赖，只为得到 git 已经实现的语义。
+2. **⚠️ 原记录关于 `ignore` npm 包的判断是错的，已更正。** 原文写：
+
+   > 不引入 `ignore` npm 包（`gemini-cli` 的做法）：600 行自解析代码（`gitIgnoreParser.ts` 199 + `ignoreFileParser.ts` 123 + `ignorePatterns.ts` 278）+ 1 个新依赖，只为得到 git 已经实现的语义。
+
+   **实测：`gemini-cli` 不手写匹配器，它 import 的正是 `ignore` 包。**
+
+   | 文件 | 行数 | 实际内容（已核验） |
+   |---|---|---|
+   | `gitIgnoreParser.ts` | 199 | **目录遍历 + 嵌套前缀改写**，匹配**全部委托**（`:9 import ignorePkg`、`:59 ignore().add(...)`、`:138 ig.ignores(...)`） |
+   | `ignoreFileParser.ts` | 123 | 单文件读取，同样**委托**（`:9 import`、`:85 ig.ignores()`） |
+   | `ignorePatterns.ts` | 278 | **纯常量表**（`grep -c "^export const"` → 8；无任何匹配函数）——与我方 `registry.ts`/`grep.ts` 的硬编码列表**同构** |
+
+   **即：那 600 行里匹配逻辑为 0。** 原文把它们全算作「自解析代码」，是把**加载器 + 常量表**误当成了**匹配器**。
+
+   **参考实现的真实分工**（已核验四个参考 + claudecode）：
+
+   | 项目 | 加载/前缀改写（手写） | 模式匹配 |
+   |---|---|---|
+   | `gemini-cli` | `gitIgnoreParser` + `ignoreFileParser` | **`ignore` npm** |
+   | `pi` | `prefixIgnorePattern`/`addIgnoreRules`（三份副本） | **`ignore` npm**（`skills.ts:2`） |
+   | `codex` | `WalkBuilder` 配置 | **Rust `ignore` crate** |
+   | `claudecode` | — | **`ignore` npm** 或 `git check-ignore` |
+   | `opencode` | — | **无 gitignore 支持**（67 行固定列表，非 gitignore 语义） |
+
+   **手写匹配器的先例：零个。** 最接近的是 `opencode` 的 67 行固定列表，它**没有**取反、锚定、last-match-wins、逐目录读取——不是 gitignore。
+
+   **`ignore` 包的成本（已核验 registry）**：MIT、**零运行时依赖**（无 `dependencies` 键）、113 KB unpacked、6 个文件、其中实现是 `index.js` **43 KB / 1454 行**、自带类型（`index.d.ts`）。**我方 `package-lock.json` 中不存在**（`ignore`/`minimatch`/`picomatch` 全部 0 命中）——所以这是**真正的第 4 个依赖**，不是既有传递依赖的提升。
+
+   **`minimatch`/`picomatch` 不能替代**：`ignore` 的 README 明写 *"minimatch ... does not follow the gitignore spec"*。gitignore 的 **last-match-wins 序列语义**、**目录专有 `dir/`**、**逐目录相对锚定**、**父目录被排除则子项不可再包含**，**都不是 glob 特性**。
+
+   **已核验的 `ignore` 自身偏差**（README 自述）：`ignorecase` 默认 `true`（git 在 Linux 上大小写敏感）→ 必须显式传 `ignorecase: false`；按 UTF-16 code unit 匹配而 git 按 UTF-8 字节；`***` 跟文档而非 git 二进制；**不做任何文件系统工作**（目录遍历、逐目录读取、嵌套改写仍需我方实现）；要求相对路径（`./abc` 会抛错）。
+
+   **裁决更新**：见 §1.10 裁决 8。
+
 3. **`git ls-files` 是既有调用面**：`workflow/gitContext.ts` 已用 `spawnSync('git', ...)`，不是新依赖。
 4. **第 1 层必须独立存在**，因为第 2 层在非 git 目录**直接失败**（已实测 exit 128）。**我们的回退优于 `pi` 的**：`pi` 离线时工具直接报错，我们则降级为「无 `.gitignore` 支持但能列出文件」。
 
@@ -157,7 +190,7 @@ confidence: high
 | # | 事项 | 裁决 | 理由 |
 |---|---|---|---|
 | **1** | 结果上限与截断通知 | **加**：条数上限 + 字节上限，且**通知可操作**（`"Use limit=N for more, or refine pattern"`） | 原计划只规定剪枝，未规定上限——巨型仓库的 `glob **/*` 仍会把全部结果塞给模型。pi 的 find/grep/ls 三者都有上限且通知可操作 |
-| **2** | 非 git 目录的 `.gitignore` | **补第 3 层**：向上找 `.git`；在仓库内用 `git ls-files`，不在则**进程内读取 `.gitignore`/`.ignore` 并匹配** | pi 证明可行。**不引入依赖**——手写解析（pi 的 `skills.ts:47-63` 给出参考：前缀改写 + 递归传递 matcher）。**先交付第 1+2 层，第 3 层紧随** |
+| **2** | 非 git 目录的 `.gitignore` | **补第 3 层**：向上找 `.git`；在仓库内用 `git ls-files`，不在则**进程内匹配 `.gitignore`/`.ignore`** | pi 证明可行。**依赖裁决见 §1.10 裁决 8**（已由侦察更正：引入 `ignore` 包，不自研匹配器） |
 | **3** | 结果与 workspace root 的关系 | **过滤**（不保留越界结果） | 工具的作用域就是 workspace；越界结果对模型是噪音。pi 保留并渲染 `../…`，我方明确不跟，理由已记录 |
 | **4** | 额外忽略文件名 | **支持 `.gitignore` + `.ignore`**（不含 `.fdignore`——那是 fd 专有，我方无 fd） | pi 支持三个；我方取前两个。`.fdignore` 与我方无关 |
 | **5** | 忽略文件的**嵌套前缀改写** | **必须实现** | 这是 `git ls-files` 原本替我方承担的复杂度。pi 的做法（`prefixIgnorePattern`）是参考 |
@@ -189,6 +222,120 @@ sub/inner.ts
 原 §1.8 裁决 2 称「手写解析（pi 的 `skills.ts:47-63` 给出参考）」。**但 pi 在该文件第 2 行 `import ignore from "ignore"`，`package.json:63` 依赖 `ignore@7.0.8`。** pi 只手写了**嵌套前缀改写**（`prefixIgnorePattern`），**模式匹配本身交给 npm 包**。
 
 **这意味着第 3 层的真实成本被低估**：要自研需覆盖 glob 通配、目录级斜杠、字符类、取反等边界。**追加裁决**：第 3 层仍做（裁决 2 不变），但**必须诚实记录这是一个自研解析器**，且实现前先评估是否需要为此破例引入 `ignore` 依赖——**这个取舍应显式做，而不是被「pi 也没用依赖」的错误印象掩盖**。
+
+### 1.10 开工前的补充裁决（2026-09-21，施工前侦察）
+
+#### 裁决 8（**推翻原裁决 2 的「不引入依赖」**）：第 3 层采用 `ignore` npm 包
+
+**侦察已核验**（见 §1.5 理由 2 的更正）：
+
+| 项目 | 加载/前缀改写 | 模式匹配 |
+|---|---|---|
+| `pi` | 手写（三份副本） | **`ignore@7.0.8`** |
+| `gemini-cli` | 手写（199+123 行） | **`ignore@7.0.0`** |
+| `opencode` | — | **`ignore@7.0.5`** |
+| `codex` | `WalkBuilder` 配置 | **Rust `ignore` crate** |
+
+**手写匹配器的先例：零个**（搜 `gitignoreRegex\|wildmatch\|fnmatch` 于 pi/gemini-cli 的 src → 0 命中）。
+
+**裁决：引入 `ignore` 作为第 4 个生产依赖。**
+
+**理由**：
+1. **参考实现的分布是 4 : 0**——每一个支持 gitignore 的实现都委托给匹配器库，没有一个自研。
+2. **`ignore` 的成本极低**：MIT、**零运行时依赖**（lockfile 条目数不变）、43 KB 实现（1454 行）。
+3. **自研的真实成本被原记录低估**：`ignore` 的实现含一个 **90 行的括号表达式扫描器**，逐行对照 git 的 `wildmatch.c`（POSIX 字符类、ASCII-only ctype、转义、未闭合表达式匹配空）。自研要复现这些，且**没有任何参考可抄**。
+4. **`minimatch`/`picomatch` 不能替代**（已核验）：`ignore` 的 README 明写 *"minimatch ... does not follow the gitignore spec"*。gitignore 的 **last-match-wins 序列语义**、**目录专有 `dir/`**、**逐目录相对锚定**、**父目录被排除则子项不可再包含**，**都不是 glob 特性**。
+
+**必须同时记录 `ignore` 的四处已知偏差**（README 自述，全部要处理）：
+
+| 偏差 | 后果 | 处置 |
+|---|---|---|
+| `ignorecase` 默认 `true` | git 在 Linux 上大小写敏感 | **必须显式传 `ignorecase: false`** |
+| 按 UTF-16 code unit 匹配 | git 按 UTF-8 字节 | 非 ASCII 路径上有偏差，接受（记录） |
+| **不做任何文件系统工作** | 目录遍历、逐目录读取、嵌套前缀改写**仍需我方实现** | 见裁决 9 |
+| 要求相对路径（`./abc` 抛错） | 需自己的路径归一化 | 见裁决 10 |
+
+#### 裁决 9：第 3 层的**加载器**由我方实现（这是 `ignore` 不做的部分）
+
+`ignore` 只管模式匹配，不读文件、不走目录。参考实现都自己写了加载器，**且都是同一形状**：
+
+1. 递归时**每进一个目录**，读该目录的 `.gitignore`/`.ignore`；
+2. 把每行模式**加上该目录相对于遍历根的路径前缀**；
+3. 喂给**同一个** matcher 实例（递归传递，不重建）。
+
+**我方形状**（取 pi 的 `prefixIgnorePattern` 语义 + gemini-cli 的 `**/` 细化）：
+
+| 输入模式 | 在 `a/b/` 目录下应变为 |
+|---|---|
+| `/c`（锚定） | `/a/b/c` |
+| `c/d`（含斜杠） | `/a/b/c/d` |
+| `c`（无斜杠、未锚定） | `/a/b/**/c` |
+| `!c` | `!/a/b/**/c` |
+
+**遍历期剪枝**：进目录前先问 `ig.ignores(relPath + '/')`（**目录必须带尾斜杠**——`ignore` 靠它区分目录），命中则不下降。
+
+#### 裁决 10：`git ls-files` 的**精确调用形式**（已实测三轮，原记录有两处错）
+
+**实测的三种形态**：
+
+```
+# fixture: /tmp/gt5/{root.ts, other/o.ts, sub/inner.ts}
+
+# ① 裸调用，从 sub/ 运行 → 仅 cwd 内，路径相对 cwd
+$ cd sub && git ls-files --cached --others --exclude-standard
+inner.ts
+
+# ② -C <仓库根> → 整个仓库，路径相对仓库根
+$ git -C /tmp/gt5 ls-files --cached --others --exclude-standard
+other/o.ts
+root.ts
+sub/inner.ts
+
+# ③ -C <workspaceRoot> → 仅 workspace 内，路径相对 workspaceRoot  ✅
+$ git -C /tmp/gt5/sub ls-files --cached --others --exclude-standard
+inner.ts
+```
+
+**裁决：用形态 ③——`git -C <workspaceRoot> ls-files --cached --others --exclude-standard`。**
+
+**它同时解决三件事**（本仓库实测，`workspaceRoot = packages/ts-shell`）：
+
+| 检查 | 结果 |
+|---|---|
+| 返回路径相对谁 | **相对 `workspaceRoot`**（`src/artifacts/...`，非 `packages/ts-shell/src/...`） |
+| 是否含 workspace 之外的文件 | **否**（越界条目 **0**） |
+| 总数 | 1448（= 该目录的真实文件数） |
+
+**因此不需要 `--full-name`，不需要 pathspec，也不需要剥前缀。** 原记录与审查者都以为要「先取全仓再过滤」——**实测不需要**，`-C` 已经把作用域限定好了。
+
+**原记录的两处错**：
+
+1. 原 §1.6 称「从子目录运行返回仓库相对路径且**包含 cwd 之外的文件**」——**错**。裸调用返回的是**相对 cwd 的路径**且**不含 cwd 之外的任何文件**（形态 ①）。
+2. 原 §1.9 发现 1 的追加裁决称「必须用 `git -C <workspaceRoot>`（或显式 pathspec `:/`）」——**方向对了，但理由错**。它以为 `-C` 是为了拿到「全仓路径」，实际 `-C` 的作用是**把作用域限定到 workspace**。
+
+**另有一处需记录的观察**：本仓库里 `packages/ts-shell/.sisyphus/` **存在于该目录之下**，所以裸调用返回的 `.sisyphus/...` 是**合法的 cwd 内路径**，不是越界。我最初误判为越界——**这正是「路径基准」容易看错的地方**，故此处把三种形态都写下。
+
+**非 git 目录**：`-C` 仍报 `fatal: not a git repository`（exit 128）→ 落到第 3 层。
+
+#### 裁决 11：返回值形态——**改为相对 workspace 的路径**（收敛三处字符串手术）
+
+已核验三个调用方**各自重写同一段前缀剥离**（`registry.ts:570-574`、`grep.ts:114-120`、`lsp.ts:119-124`），且都用 `file.includes('node_modules/')` 这类**子串**判定而非**路径段**判定——`my_node_modules_notes/readme.md` 会被误杀，而根级 `node_modules`（无尾斜杠）不会被杀。
+
+**参考实现的共识**（已核验）：**相对化在遍历层完成，或在唯一一个共享 helper 里完成，绝不在每个调用方**。`codex` 的 `FileMatch { path, root }`、`gemini-cli` 的 `crawler` 内相对化 + 共享 `makeRelative`、`claudecode` 的单一 `toRelativePath` 都是这个形状。
+
+**裁决**：`listFilesRecursive` 返回**相对 workspaceRoot 的 posix 路径**；调用方不再做字符串手术，也不再各自过滤。
+
+#### 裁决 12：忽略策略的位置——**请求选项**，不由调用方各自构造
+
+已核验三种形态：`codex` 的 options struct（最纯粹）、`gemini-cli` 的注入式 service（最集中）、`pi` 的逐工具内联 + 匹配器两份副本（**反面教材**——两份策略会漂移，且工具都够不到它）。
+
+**裁决**：采纳 **`codex` 的请求选项形状**——`FileListExecutionRequest` 增加一个可选选项对象，`listFilesRecursive` 读它并剪枝。理由：不引入新模块与新注入路径；我方 `runtime/execution` 没有 `gemini-cli` 那样的 `Config` 对象可供注入；且调用方传默认值即得一致行为。
+
+#### 裁决 13：`dist/` 与 `.normproof/` 属「明显非源码」类，与 `node_modules`/`.git` 不同
+
+`gemini-cli` 同时维护**两套**机制（gitignore 语义 + 一组「明显非源码」的 glob 常量），说明这两类排除**不是一回事**。我方 `node_modules`/`.git` 是第一类（几乎所有项目都有），`dist`/`.normproof` 是第二类（本项目特有）。
+
+**裁决**：第 1 层剪枝**保留**这四项（它们描述的是「此工作区里不可能有源码的目录」），但**写成一份共享常量**，不再三处各写一遍。
 
 ---
 

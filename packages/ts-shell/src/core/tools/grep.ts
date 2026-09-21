@@ -109,23 +109,7 @@ export function createGrepToolDefinition(
         reportSafeTarget: context.workspaceRoot,
       });
 
-      const rootPath = context.workspaceRoot.replace(/\\/g, "/").replace(/\/+$/, "");
-      const relativeFiles = allFiles.map((file) => {
-        const normalized = file.replace(/\\/g, "/");
-        return normalized.startsWith(rootPath + "/")
-          ? normalized.slice(rootPath.length + 1)
-          : normalized;
-      });
-
-      const targetFiles = relativeFiles.filter((file) => {
-        if (
-          file.includes("node_modules/") ||
-          file.includes(".git/") ||
-          file.includes("dist/") ||
-          file.includes(".normproof/")
-        ) {
-          return false;
-        }
+      const targetFiles = allFiles.filter((file) => {
         if (searchSubPath && !file.startsWith(searchSubPath)) {
           return false;
         }

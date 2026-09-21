@@ -1,3 +1,4 @@
+import type { FileWalkOptions } from './fileWalk.js'
 import type { NormalizedExecutionResult } from '../../daemon/client.js'
 export type ExecutionErrorClass =
   | 'success'
@@ -119,6 +120,15 @@ export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<
 
 export interface FileListExecutionRequest extends ExecutionRequestMetadata<'file.list'> {
   readonly absoluteRoot: string
+  /**
+   * How the walk decides what to include.
+   *
+   * Absent means the workspace defaults: prune the directories that hold no
+   * source, and honour the repository's ignore rules. A caller passes this only
+   * when it has a reason to differ, which keeps the three tools that share this
+   * walk from each deciding for themselves.
+   */
+  readonly walkOptions?: FileWalkOptions
 }
 
 export type ExecutionEvent =

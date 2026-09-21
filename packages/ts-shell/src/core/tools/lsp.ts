@@ -117,19 +117,11 @@ export function createLspToolDefinition(
           reportSafeTarget: context.workspaceRoot,
         });
 
-        const rootPath = context.workspaceRoot.replace(/\\/g, "/").replace(/\/+$/, "");
-        const targetFiles = allFiles
-          .map((f) => {
-            const n = f.replace(/\\/g, "/");
-            return n.startsWith(rootPath + "/") ? n.slice(rootPath.length + 1) : n;
-          })
-          .filter(
-            (f) =>
-              !f.includes("node_modules/") &&
-              !f.includes(".git/") &&
-              !f.includes("dist/") &&
-              (f.endsWith(".ts") || f.endsWith(".tsx") || f.endsWith(".js")),
-          );
+        // The walk already applied the shared prune and ignore policy; this only
+        // narrows to the extensions the symbol scan understands.
+        const targetFiles = allFiles.filter(
+          (f) => f.endsWith(".ts") || f.endsWith(".tsx") || f.endsWith(".js"),
+        );
 
         const matches: Array<{ file: string; line: number; text: string; isDef: boolean }> = [];
 

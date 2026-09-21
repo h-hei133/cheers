@@ -21,6 +21,8 @@ import {
   type RuntimeExecutionReceiptProjection,
 } from './receipt.js'
 export * from './types.js'
+import { listWorkspaceFiles } from './fileWalk.js'
+export { listWorkspaceFiles, type FileWalkOptions } from './fileWalk.js'
 import type {
   CommandExecutionRequest,
   CommandExecutionResult,
@@ -46,7 +48,7 @@ export function createDefaultExecutionService(): ExecutionService {
       return withFileLock(request.absolutePath, () => writeTextFileUnlocked(request))
     },
     listFilesRecursive(request) {
-      return listFilesRecursive(request.absoluteRoot)
+      return listWorkspaceFiles(request.absoluteRoot, request.walkOptions)
     },
     runCommand(request) {
       return runCommand(request)
@@ -122,20 +124,6 @@ async function captureSnapshotBeforeWrite(input: {
   } catch {
     // Snapshot storage is a recovery aid, never a precondition for writing.
   }
-}
-
-async function listFilesRecursive(root: string): Promise<readonly string[]> {
-  const entries = await fs.readdir(root, { withFileTypes: true })
-  const files = await Promise.all(
-    entries.map(async entry => {
-      const fullPath = path.join(root, entry.name)
-      if (entry.isDirectory()) {
-        return listFilesRecursive(fullPath)
-      }
-      return [fullPath]
-    }),
-  )
-  return files.flat()
 }
 
 async function runCommand(request: CommandExecutionRequest): Promise<CommandExecutionResult> {

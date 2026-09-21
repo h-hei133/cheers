@@ -126,7 +126,7 @@ describe('execution service boundary', () => {
       caller: 'execution-service-test',
       reason: 'verify recursive file listing boundary',
       reportSafeTarget: workspaceRoot,
-    })).resolves.toContain(target)
+    })).resolves.toContain('nested/artifact.txt')
   })
 
   it('validates the shared execution command contract fixture against boundary semantics', () => {

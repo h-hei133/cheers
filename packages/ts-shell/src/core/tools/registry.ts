@@ -565,19 +565,7 @@ export function createCoreToolRegistry(options?: {
           reason: 'List approved workspace files for glob matching.',
           reportSafeTarget: context.workspaceRoot,
         })
-        const rootPath = context.workspaceRoot.replace(/\\/g, '/').replace(/\/+$/, '')
-        const relativeFiles = files.map(file => {
-          const normalized = file.replace(/\\/g, '/')
-          return normalized.startsWith(rootPath + '/')
-            ? normalized.slice(rootPath.length + 1)
-            : normalized
-        })
-        const filtered = relativeFiles.filter(file => {
-          if (file.includes('node_modules/') || file.includes('.git/') || file.includes('dist/')) {
-            return false
-          }
-          return matchGlobPattern(file, pattern)
-        })
+        const filtered = files.filter(file => matchGlobPattern(file, pattern))
         return approvedResult(filtered.length > 0 ? filtered.join('\n') : 'No files matched the pattern.')
       },
     },

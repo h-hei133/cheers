@@ -14,7 +14,7 @@
 |---|---|---|
 | T3 | 删除 `thinkingBudgets` + `promptCacheTtl`；`tuiMode` 加注释保留 | ✅ **完成**（§1） |
 | T7 | 死字段门禁 | ✅ **完成**（§2） |
-| T1 | 三层遍历 + `.gitignore` | ⬜ 未开始 |
+| T1 | 三层遍历 + `.gitignore` | ✅ **完成**（§3） |
 | T4 | 逐模型窗口 + 逐模型压缩预算 | ⬜ 未开始 |
 | T6 | 目录列举折进 `read` | ⬜ 未开始 |
 | T2 / T2b | `AGENTS.md` 注入 + 技能（一轮） | ⬜ 未开始 |
@@ -183,7 +183,98 @@
 
 ## 3. T1 — 文件遍历剪枝与 `.gitignore`
 
-⬜ 未开始。
+**提交**：见 §3.7。
+
+### 3.1 施工前的裁决更正（两处，均由侦察推翻原记录）
+
+| # | 原记录 | 实测 | 处置 |
+|---|---|---|---|
+| 1 | 「`gemini-cli` 600 行自解析」→「不引入 `ignore` 依赖」 | `gemini-cli` **import 的正是 `ignore` 包**（`gitIgnoreParser.ts:9`）；那 600 行是**加载器 + 纯常量表**，匹配逻辑为 0 | **改为引入 `ignore`**（§1.10 裁决 8） |
+| 2 | 「从子目录运行返回仓库相对路径且**包含 cwd 之外的文件**」 | **相反**：裸调用返回**相对 cwd** 的路径且**不含 cwd 之外的文件** | 裁决 10 改写为三种形态 |
+
+**第 1 处的证据分布是 4 : 0**：`pi` / `gemini-cli` / `opencode` 全部依赖 `ignore` 包，`codex` 依赖 Rust `ignore` crate，**手写匹配器的先例为零**（搜 `gitignoreRegex\|wildmatch\|fnmatch` → 0 命中）。
+
+### 3.2 施工内容
+
+| 文件 | 变化 |
+|---|---|
+| `runtime/execution/fileWalk.ts` | **新增**（~200 行）：三层遍历 |
+| `runtime/execution/fileWalk.test.ts` | **新增**：10 项测试 |
+| `runtime/execution/service.ts` | 删掉旧的无剪枝 `listFilesRecursive`（14 行），改调 `listWorkspaceFiles` |
+| `runtime/execution/types.ts` | `FileListExecutionRequest` 增加 `walkOptions?` |
+| `core/tools/registry.ts`（glob） | **−14 行**：删前缀剥离 + 硬编码列表 |
+| `core/tools/grep.ts` | **−18 行**：同上 |
+| `core/tools/lsp.ts` | **−18 行**：同上，只保留扩展名收窄 |
+| `packages/ts-shell/package.json` | 新增依赖 `ignore@^7.0.9` |
+
+**三个调用方净减 43 行**，且**不再各自剥离前缀**。
+
+### 3.3 三层的精确形状
+
+| 层 | 机制 | 何时生效 |
+|---|---|---|
+| 1 | 遍历期剪枝 `node_modules`/`.git`/`dist`/`.normproof`（**按路径段**，非子串） | **始终** |
+| 2 | `git -C <workspaceRoot> ls-files --cached --others --exclude-standard` | 在 git 仓库内 |
+| 3 | 进程内 `ignore` 匹配 `.gitignore`/`.ignore` | 无 git 时（第 2 层 exit 128） |
+
+**层 1 不与层 2/3 重复**（实测）：一个**没有**把 `node_modules` 写进 `.gitignore` 的仓库，`git ls-files` **会**返回整个 `node_modules`。层 1 必须始终叠加。
+
+**层 3 的嵌套前缀改写**（`addIgnoreFile`）：`a/b/.gitignore` 里的 `c` → `a/b/**/c`；`/c` → `a/b/c`；`c/d` → `a/b/c/d`。目录判定用尾斜杠（`matcher.ignores(rel + '/')`），因为匹配器不做 `fs.stat`。
+
+**`ignorecase: false` 必须显式传**：`ignore` 默认大小写不敏感，而 git 在 Linux 上敏感。
+
+### 3.4 施工中发现并处理的问题
+
+**1. `npm install` 静默改写了 lockfile 的无关部分。** 它把 `workspaces: ["packages/*"]` 展开为显式列表，并删掉了 `python-eval` 条目——那是**既有的 lockfile 漂移**（`package.json` 与 lockfile 早已不一致），但**不属 T1 范围**。已还原 lockfile，只保留 `ignore` 的 10 行最小改动。
+
+**2. 两个类型错误**（tsc 暴露，非猜测）：
+- `Awaited<ReturnType<typeof fs.readdir>>` 解析到了 `Buffer` 重载 → 改用具体的 `Dirent[]`；
+- `service.ts` 需要值导入而非仅重导出。
+
+**3. 一处命名违规**（自查发现）：注释里写了 `fd` 和 `ripgrep` 两个外部工具名，违反「不得出现别人项目名字」。已改写为「a widely shared convention」。
+
+### 3.5 验证
+
+| 项 | 方式 | 结果 |
+|---|---|---|
+| 新增测试 | `fileWalk.test.ts` | **10/10 通过** |
+| 全量 | `npm run test:ts` | **495 文件 / 2810 通过 / 1 跳过 / 0 失败** |
+| 类型 | `tsc -p tsconfig.build.json --noEmit` | **0 错误** |
+| 门禁 | import-cycles / docs-drift / config-consumers / test:scripts | **全 pass** |
+
+**反向验证（三层各自独立有效）**：
+
+| 反转 | 失败测试数 |
+|---|---|
+| 移除**层 1**（剪枝） | **2 项失败**（顶层与嵌套的剪枝用例） |
+| 移除**层 3**（进程内匹配） | **3 项失败**（非 git 目录、子目录锚定、目录专有模式） |
+
+**实机验证（真实构建产物，非合成）**：
+
+| 场景 | 结果 |
+|---|---|
+| 本仓库遍历 | **2741 文件 / 18ms**（旧：**14517 文件 / 200ms**）——**11× 快、81% 更少** |
+| 不含 `.git/`、`node_modules/`、`.normproof/` | ✅ 三者皆无 |
+| 非 git 目录（第 3 层） | `['.gitignore', 'a.ts', 'keep.log']`——`x.log` 排除、`keep.log` 保留（**取反生效**）、`build/out.js` 排除 |
+| 与 git 自己的答案交叉核对 | 去掉 `node_modules` 后**逐条一致** |
+
+### 3.6 未做（如实记录）
+
+- **Windows glob 语义**：裁决 6 已明确本轮不做。
+- **结果条数上限与截断通知**：裁决 1 要求「加」，**本轮未实现**——三个调用方仍各自持有自己的上限（`grep` 的 `DEFAULT_GREP_LIMIT`、`glob` 的无上限）。**这是一个未完成的裁决**，见 §3.8。
+- **`git` 不在 PATH 时**：会走第 3 层（`spawnSync` 的 `result.error` 已处理），但**未实测**无 git 的环境。
+
+### 3.7 提交
+
+**提交**：见 git log。
+
+### 3.8 遗留：裁决 1（上限与截断通知）未完成
+
+§1.8 裁决 1 要求「条数上限 + 字节上限 + 可操作通知」，理由是「巨型仓库的 `glob **/*` 仍会把全部结果塞给模型」。
+
+**本轮未实现**，原因：三个调用方各有上限语义（`grep` 有 `DEFAULT_GREP_LIMIT`，`glob` 无上限，`lsp` 按扩展名收窄），把它们统一到遍历层需要先决定「上限属于遍历层还是工具层」。侦察证据指向**工具层**（`pi`/`claudecode` 都是逐工具计数，只有 `codex` 把上限放进遍历层，因为它的遍历本身就是搜索引擎）。
+
+**处置**：记入 T6（目录列举）一并裁决——T6 必然要处理上限与分页，届时统一三个工具的上限语义更自然，避免两轮各改一次。
 
 ---
 
