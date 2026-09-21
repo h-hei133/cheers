@@ -309,7 +309,10 @@ export function createCoreToolRegistry(options?: {
           })
         }
 
-        const lines = rawContent.split('\n')
+        // Strip leading BOM so the model never sees an invisible \uFEFF character
+        // that could pollute prompts or edits.
+        const { text: cleanContent } = splitByteOrderMark(rawContent)
+        const lines = cleanContent.split('\n')
         const totalLines = lines.length
 
         let selectedLines: string[] = []
@@ -337,13 +340,15 @@ export function createCoreToolRegistry(options?: {
         const truncated = truncateHead(resultText, { maxLines: 1500, maxBytes: 50 * 1024 })
         resultText = truncated.content
 
-        if (truncated.truncated) {
+        if (truncated.firstLineExceedsLimit) {
+          const firstLineKb = Math.round((truncated.firstLineBytes ?? 0) / 1024)
+          resultText = `[Line ${startLine} is ${firstLineKb}KB, exceeds 50KB limit. Use bash: sed -n '${startLine}p' ${selector.cleanPath} | head -c 51200]`
+        } else if (truncated.truncated) {
           const artifact = await artifactManager.save(rawContent, 'read')
           resultText += `\n\n[Showing lines ${startLine}-${startLine + truncated.shownLines - 1} of ${totalLines} (${Math.round(truncated.shownBytes / 1024)}KB). Output spilled to ${artifact.uri}]\n[Use selector to read other sections: read(path="${selector.cleanPath}:${startLine + truncated.shownLines}-${startLine + truncated.shownLines + 200}")]`
         } else if (startLine > 1 || endLine < totalLines) {
           resultText += `\n[Showing lines ${startLine}-${endLine} of ${totalLines}. Use selector :N-M or offset/limit to view other sections]`
         }
-
         return approvedResult(resultText)
       },
     },
@@ -481,10 +486,14 @@ export function createCoreToolRegistry(options?: {
           const { bom, text: content } = splitByteOrderMark(raw)
           const lineEnding = detectLineEnding(content)
           original = content
+          // If the model copied a leading BOM into oldText (or newText), strip it
+          // so matching operates on clean text, while preserving the file's BOM on write.
+          const cleanOld = splitByteOrderMark(args.oldText).text
+          const cleanNew = splitByteOrderMark(args.newText).text
           const replaceRes = replaceInContent(
             toUnixLines(content),
-            toUnixLines(args.oldText),
-            toUnixLines(args.newText),
+            toUnixLines(cleanOld),
+            toUnixLines(cleanNew),
             { replaceAll: Boolean(args.replaceAll) },
           )
           if (!replaceRes.success) {

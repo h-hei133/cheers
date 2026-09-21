@@ -517,3 +517,35 @@ Windows `taskkill /T` 与 POSIX 进程组终止，**但只有它自己的测试�
 | UTF-16 | **不支持** | 不支持 | 平手 |
 | 读取时的 BOM | 原样交给模型 | 未查 | 待比对 |
 | 超长单行 | 首行超限时提示改用 bash 读取 | 未查 | 待比对 |
+
+---
+
+## 11. 读取工具增强：BOM 剥离与超长单行防护（2026-09-20）
+
+按项目规则与参考实现（Claude Code、Pi）决策比对后，对文件读取工具进行增强补全。
+
+### 11.1 决策比对与发现
+
+1. **读取文件时的 BOM**：
+   - 参考实现中，Claude Code 采用在快速与流式读取前剥离 BOM（`raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw`），避免不可见的 `\uFEFF` 混入 prompt 或干扰模型比对。
+   - 我们的 `edit` 在前一轮已做到了拆除 BOM 并在写入时还原，但模型如果在 `edit` 的 `oldText` 中意外带上或未带上 BOM，仍存在匹配不对称风险。
+   - **改进**：
+     - `read` 工具读取内容后，通过 `splitByteOrderMark` 显式剥离首字符 BOM 后再切分行与返回，模型永远获取干净文本；
+     - `edit` 工具对模型传入的 `oldText` 与 `newText` 同样预先过滤可能复制进去的开头 BOM。
+
+2. **超长单行（如混淆压缩后的 JS / 单行大 JSON / Base64）**：
+   - 参考实现（Pi `truncate.ts` & `read.ts`）发现：当文件第一行单行体积即超过整体预算（50KB）时，传统逐行预算检查会导致返回 0 行或截断出超限内容。
+   - Pi 的决策：判定 `firstLineBytes > maxBytes`，内容丢弃为 `""`，并返回可操作的建议提示：
+     `[Line 1 is 1.2MB, exceeds 50.0KB limit. Use bash: sed -n '1p' file.js | head -c 50.0KB]`。
+   - **改进**：
+     - `truncateHead` 中增加 `firstLineExceedsLimit` 判定；
+     - `read` 工具检测到该情况后，返回明确的指示行，告知具体行数、体积，并给出精准的 `bash sed | head -c` 可行回退方案，避免模型面对不可读内容发生阻塞或死循环。
+
+### 11.2 验证
+
+| 门禁 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json --noEmit` | 0 错误 |
+| `npm run test:ts` | **494 文件 / 2789 通过 / 1 跳过 / 0 失败** |
+| `verify:import-cycles` | 0 环 |
+| `verify:docs-drift:strict` | pass |

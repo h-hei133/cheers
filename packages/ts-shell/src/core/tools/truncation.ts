@@ -20,6 +20,8 @@ export interface TruncationResult {
   readonly shownLines: number;
   readonly shownBytes: number;
   readonly direction: "head" | "tail" | "none";
+  readonly firstLineExceedsLimit?: boolean;
+  readonly firstLineBytes?: number;
 }
 
 const DEFAULT_MAX_LINES = 2000;
@@ -47,6 +49,20 @@ export function truncateHead(
       direction: "none",
     };
   }
+  const firstLineBytes = Buffer.byteLength(lines[0], "utf8");
+  if (firstLineBytes > maxBytes) {
+    return {
+      content: "",
+      truncated: true,
+      originalLines: totalLines,
+      originalBytes: totalBytes,
+      shownLines: 0,
+      shownBytes: 0,
+      direction: "head",
+      firstLineExceedsLimit: true,
+      firstLineBytes,
+    };
+  }
 
   const resultLines: string[] = [];
   let currentBytes = 0;
@@ -60,7 +76,6 @@ export function truncateHead(
     resultLines.push(line);
     currentBytes += lineBytes;
   }
-
   const truncatedContent = resultLines.join("\n");
   return {
     content: truncatedContent,
