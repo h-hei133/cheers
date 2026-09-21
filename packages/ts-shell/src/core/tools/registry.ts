@@ -4,6 +4,12 @@ import { verifyPathContainment } from '../security/pathJail.js'
 import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
 import { replaceInContent } from './editEngine.js'
 import { withFileLock } from '../../runtime/execution/fileLock.js'
+import {
+  detectLineEnding,
+  splitByteOrderMark,
+  toUnixLines,
+  withLineEnding,
+} from '../../runtime/execution/fileText.js'
 import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
 import { truncateHead, truncateTail, truncateLineWidth } from './truncation.js'
 import { ArtifactManager } from '../session/artifactManager.js'
@@ -459,7 +465,7 @@ export function createCoreToolRegistry(options?: {
         let originalUnreadable = false
         let finalContent = ''
         if (typeof args.oldText === 'string' && typeof args.newText === 'string') {
-          original = await executionService.readTextFile({
+          const raw = await executionService.readTextFile({
             operationKind: 'file.read',
             absolutePath: containment.resolvedPath,
             workspaceRoot: context.workspaceRoot,
@@ -468,13 +474,23 @@ export function createCoreToolRegistry(options?: {
             reason: 'Read original content for resilient replacement.',
             reportSafeTarget: containment.resolvedPath,
           })
-          const replaceRes = replaceInContent(original, args.oldText, args.newText, {
-            replaceAll: Boolean(args.replaceAll),
-          })
+          // The file's own shape is separated out before matching and put back
+          // before writing. A model never types the mark or the carriage returns,
+          // so leaving them in the text makes a pattern that cannot be found, and
+          // returning them untouched is the only way the file keeps its style.
+          const { bom, text: content } = splitByteOrderMark(raw)
+          const lineEnding = detectLineEnding(content)
+          original = content
+          const replaceRes = replaceInContent(
+            toUnixLines(content),
+            toUnixLines(args.oldText),
+            toUnixLines(args.newText),
+            { replaceAll: Boolean(args.replaceAll) },
+          )
           if (!replaceRes.success) {
             throw new Error(replaceRes.error ?? 'Failed to apply replacement.')
           }
-          finalContent = replaceRes.content
+          finalContent = bom + withLineEnding(replaceRes.content, lineEnding)
         } else if (typeof args.content === 'string') {
           try {
             original = await executionService.readTextFile({

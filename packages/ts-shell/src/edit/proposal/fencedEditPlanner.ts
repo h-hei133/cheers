@@ -1,3 +1,5 @@
+import { toUnixLines } from "../../runtime/execution/fileText.js";
+
 export type FencedEditMappingSource =
   | "old-new-fenced-blocks"
   | "replace-directive-to-fence";
@@ -284,8 +286,7 @@ function buildApplyPatchUpdate(input: {
 }
 
 function splitPatchLines(value: string): readonly string[] {
-  const normalized = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const lines = normalized.split("\n");
+  const lines = toUnixLines(value).split("\n");
   return lines.at(-1) === "" ? lines.slice(0, -1) : lines;
 }
 

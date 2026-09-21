@@ -16,9 +16,11 @@ class ProcessTreeManager {
   private readonly trackedPids = new Set<number>();
   private handlersInstalled = false;
 
-  constructor() {
-    this.installSignalHandlers();
-  }
+  // Handlers are installed on first use rather than on construction, because
+  // construction happens when the module is imported. Registering signal handlers
+  // then would change how the whole process responds to an interrupt from the
+  // moment it starts, for a capability it may never use.
+
 
   static getShared(): ProcessTreeManager {
     if (!ProcessTreeManager.instance) {
@@ -28,6 +30,7 @@ class ProcessTreeManager {
   }
 
   trackPid(pid: number): void {
+    this.installSignalHandlers();
     if (pid && Number.isFinite(pid) && pid > 0) {
       this.trackedPids.add(pid);
     }

@@ -1,4 +1,5 @@
 import { hashContent } from "../../recovery/recoveryAuthorityStore.js";
+import { toUnixLines } from "../../../runtime/execution/fileText.js";
 import type { FencedEditMapping } from "../../proposal/fencedEditPlanner.js";
 
 export interface ExactHunkRange {
@@ -132,8 +133,7 @@ export function sortHunksForApply<T extends { readonly range?: ExactHunkRange; r
 }
 
 export function splitExactHunkLines(value: string): readonly string[] {
-  const normalized = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const lines = normalized.split("\n");
+  const lines = toUnixLines(value).split("\n");
   return lines.at(-1) === "" ? lines.slice(0, -1) : lines;
 }
 

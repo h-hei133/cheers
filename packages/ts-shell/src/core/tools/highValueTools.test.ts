@@ -220,3 +220,63 @@ describe("concurrent edits of one file", () => {
     expect(await fs.readFile(path.join(dir, "two.txt"), "utf8")).toBe("second\n");
   });
 });
+
+/**
+ * A file's stored shape — its byte order mark and its line endings — outlives an
+ * edit of it.
+ *
+ * Neither is something a model types, so leaving either out of the read would
+ * produce a pattern that cannot be found, and leaving it out of the write would
+ * quietly convert the file to another convention. Nothing shows this in a diff,
+ * which is why it is tested rather than assumed.
+ */
+describe("editing a file keeps its stored shape", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "file-shape-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  async function editTo(content: string, oldText: string, newText: string): Promise<string> {
+    const file = path.join(dir, "target.txt");
+    await fs.writeFile(file, content, "utf8");
+    const tool = createCoreToolRegistry().get("edit");
+    if (!tool) throw new Error("edit tool missing");
+    await tool.execute({ path: "target.txt", oldText, newText }, { workspaceRoot: dir, taskId: "t" } as never);
+    return fs.readFile(file, "utf8");
+  }
+
+  it("writes every line with the file's own line ending", async () => {
+    // The replacement text carries Unix endings because that is what a model
+    // writes. Inserting them verbatim leaves the file mixing the two.
+    const after = await editTo("ALPHA\r\nBETA\r\n", "BETA", "B1\nB2");
+    expect(after).toBe("ALPHA\r\nB1\r\nB2\r\n");
+    expect(after).not.toMatch(/[^\r]\n/);
+  });
+
+  it("matches a pattern written with the file's line ending too", async () => {
+    // Both forms have to be findable, or the model has to guess what the file uses.
+    const after = await editTo("ALPHA\r\nBETA\r\nGAMMA\r\n", "BETA\r\nGAMMA", "X");
+    expect(after).toBe("ALPHA\r\nX\r\n");
+  });
+
+  it("keeps the byte order mark when the edit touches the first line", async () => {
+    const after = await editTo("\uFEFFALPHA\nBETA\n", "ALPHA", "FIRST");
+    expect(after.startsWith("\uFEFF")).toBe(true);
+    expect(after).toBe("\uFEFFFIRST\nBETA\n");
+  });
+
+  it("keeps the byte order mark when the edit is elsewhere", async () => {
+    const after = await editTo("\uFEFFALPHA\nBETA\n", "BETA", "BBB");
+    expect(after).toBe("\uFEFFALPHA\nBBB\n");
+  });
+
+  it("leaves a Unix file alone", async () => {
+    const after = await editTo("ALPHA\nBETA\n", "BETA", "B1\nB2");
+    expect(after).toBe("ALPHA\nB1\nB2\n");
+  });
+});
