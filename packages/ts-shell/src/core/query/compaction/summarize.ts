@@ -1,6 +1,7 @@
 import { extractFileFootprint, formatFileFootprintXml } from "./fileFootprint.js";
 import {
   EIGHT_SECTION_COMPACTION_PROMPT,
+  UPDATE_COMPACTION_PROMPT,
   formatCheckpointMessage,
   parseCompactedSummary,
 } from "./summarizer.js";
@@ -36,13 +37,28 @@ export interface CompactionRequest {
   readonly instructions?: string;
   /** Which summary to ask for; defaults to the full checkpoint prompt. */
   readonly prompt?: string;
+  /**
+   * The checkpoint the messages already begin with, when a previous compaction
+   * wrote one.
+   *
+   * Present means the messages are additions to that checkpoint rather than a
+   * conversation to summarize from scratch, so the summary asked for is a
+   * revision of it. Supplying it here rather than letting the caller pick a
+   * prompt keeps the choice of prompt and the shape of the request together.
+   */
+  readonly previousSummary?: string;
 }
 
 /** The checkpoint message replacing `messages`, or nothing when the provider could not produce one. */
 export async function requestCompactionSummary(request: CompactionRequest): Promise<string | undefined> {
+  const previousSummary = request.previousSummary?.trim();
+  // Revising a checkpoint and summarizing from scratch are different questions,
+  // so the default prompt follows which one is being asked. An explicit prompt
+  // still wins: the caller knows if it wants something else entirely.
+  const base = request.prompt ?? (previousSummary ? UPDATE_COMPACTION_PROMPT : EIGHT_SECTION_COMPACTION_PROMPT);
   const prompt = request.instructions?.trim()
-    ? `${request.prompt ?? EIGHT_SECTION_COMPACTION_PROMPT}\n\nThe user asked the summary to focus on: ${request.instructions.trim()}`
-    : (request.prompt ?? EIGHT_SECTION_COMPACTION_PROMPT);
+    ? `${base}\n\nThe user asked the summary to focus on: ${request.instructions.trim()}`
+    : base;
   const res = await fetch(`${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
@@ -51,7 +67,13 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
     },
     body: JSON.stringify({
       model: request.provider.model,
-      messages: [...request.messages, { role: "user", content: prompt }],
+      messages: [
+        ...(previousSummary
+          ? [{ role: "user", content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }]
+          : []),
+        ...request.messages,
+        { role: "user", content: prompt },
+      ],
     }),
     signal: request.signal,
   });

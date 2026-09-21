@@ -1,18 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getSessionUsage, recordSessionUsage } from "../../observability/usageTelemetry.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
-import { compactionCut, compactSessionHistory, type CompactionStore } from "./compaction.js";
+import type { CompactionPolicy, SummarizeRequest } from "../../session/compaction.js";
+import { compactSessionHistory, type CompactionStore } from "./compaction.js";
 
-const PROVIDER = { baseUrl: "https://provider.test/v1", apiKey: "k", model: "m" };
-
-function exchange(count: number): SessionMessage[] {
+function exchange(count: number, padding = 400): SessionMessage[] {
   const turns: SessionMessage[] = [];
   for (let i = 0; i < count; i++) {
-    turns.push({ role: "user", content: `question ${i} ${"x".repeat(200)}` });
-    turns.push({ role: "assistant", content: `answer ${i} ${"y".repeat(200)}` });
+    turns.push({ role: "user", content: `question ${i} ${"x".repeat(padding)}` });
+    turns.push({ role: "assistant", content: `answer ${i} ${"y".repeat(padding)}` });
   }
   return turns;
 }
+
+/**
+ * A window below what `exchange` costs, so the size threshold is crossed. The
+ * manual path ignores that threshold anyway — `/compact` is the user asking —
+ * but the numbers have to be real for the accounting to mean anything.
+ */
+const POLICY: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 300 };
 
 function store(turns: SessionMessage[]): CompactionStore & { entries: Array<{ summary: string; keptMessages: number }> } {
   const entries: Array<{ summary: string; keptMessages: number }> = [];
@@ -25,71 +31,105 @@ function store(turns: SessionMessage[]): CompactionStore & { entries: Array<{ su
   };
 }
 
-describe("compaction cut", () => {
-  it("lands on the newest user message that leaves the recent tail intact", () => {
-    const turns = exchange(5);
-    // Ten messages, keep four: the cut is the user message at index 6.
-    expect(compactionCut(turns, 4)).toBe(6);
-    expect(turns[6]!.role).toBe("user");
-  });
-
-  it("refuses when fewer than one exchange would be condensed", () => {
-    expect(compactionCut(exchange(2), 4)).toBeUndefined();
-    expect(compactionCut(exchange(3), 4)).toBe(2);
-  });
-
-  it("walks back past a tool group so the tail starts with a question", () => {
-    const turns: SessionMessage[] = [
-      { role: "user", content: "a" },
-      { role: "assistant", content: "b" },
-      { role: "user", content: "c" },
-      { role: "assistant", content: "", tool_calls: [{ id: "t1", type: "function", function: { name: "bash", arguments: "{}" } }] },
-      { role: "tool", content: "out", tool_call_id: "t1" },
-      { role: "assistant", content: "d" },
-    ];
-    expect(compactionCut(turns, 2)).toBe(2);
-  });
-});
-
 describe("session compaction", () => {
   it("condenses the older messages, keeps the tail, and forgets the stale context gauge", async () => {
     const turns = exchange(6);
     const target = store(turns);
     recordSessionUsage("sess_compact", { promptTokens: 9_000, completionTokens: 100 });
-    const summarizeCalls: number[] = [];
+    const requests: SummarizeRequest[] = [];
     const outcome = await compactSessionHistory({
       store: target,
       sessionId: "sess_compact",
-      provider: PROVIDER,
+      policy: POLICY,
       summarize: async (request) => {
-        summarizeCalls.push(request.messages.length);
+        requests.push(request);
         return "checkpoint summary";
       },
     });
-    expect(outcome).toEqual({ status: "compacted", summarized: 8, kept: 4, tokensBefore: expect.any(Number), tokensAfter: expect.any(Number) });
+
+    expect(outcome.status).toBe("compacted");
     if (outcome.status !== "compacted") throw new Error("unreachable");
+    // Twelve messages in; the cut keeps the newest three, so nine go. The cut
+    // lands inside the newest exchange, so eight of those nine are history and
+    // the ninth is the opening of the split turn, summarized separately.
+    expect(outcome.summarized).toBe(9);
+    expect(outcome.kept).toBe(3);
     expect(outcome.tokensAfter).toBeLessThan(outcome.tokensBefore);
-    expect(summarizeCalls).toEqual([8]);
-    expect(target.entries).toEqual([{ summary: "checkpoint summary", keptMessages: 4 }]);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.messages).toHaveLength(8);
+    expect(target.entries).toEqual([{ summary: "checkpoint summary", keptMessages: 3 }]);
     expect(getSessionUsage("sess_compact").lastPromptTokens).toBe(0);
     expect(getSessionUsage("sess_compact").totalTokens).toBe(9_100);
   });
 
+  it("passes the user's focus instructions to the summarizer", async () => {
+    const requests: SummarizeRequest[] = [];
+    await compactSessionHistory({
+      store: store(exchange(6)),
+      sessionId: "s",
+      policy: POLICY,
+      instructions: "keep the migration plan",
+      summarize: async (request) => {
+        requests.push(request);
+        return "checkpoint summary";
+      },
+    });
+    expect(requests[0]!.instructions).toBe("keep the migration plan");
+  });
+
+  it("condenses a conversation that is under the automatic threshold", async () => {
+    // `/compact` is an explicit request, so it does not wait for the context to
+    // grow past the reserve the scheduled path watches.
+    const outcome = await compactSessionHistory({
+      store: store(exchange(6)),
+      sessionId: "s",
+      policy: { contextWindow: 1_000_000, reserveTokens: 8_000, keepRecentTokens: 300 },
+      summarize: async () => "checkpoint summary",
+    });
+    expect(outcome.status).toBe("compacted");
+  });
+
   it("does nothing for a short conversation and writes no entry", async () => {
     const target = store(exchange(2));
+    const summarize = vi.fn(async () => "never called");
     const outcome = await compactSessionHistory({
       store: target,
       sessionId: "s",
-      provider: PROVIDER,
-      summarize: async () => "never called",
+      policy: POLICY,
+      summarize,
     });
+    expect(outcome).toEqual({ status: "nothing", reason: "The conversation is too short to compact." });
+    expect(target.entries).toEqual([]);
+    // Declining happens before the provider is asked, so a refusal costs nothing.
+    expect(summarize).not.toHaveBeenCalled();
+  });
+
+  it("refuses to replace messages with a summary that is not smaller", async () => {
+    const target = store(exchange(6));
+    const outcome = await compactSessionHistory({
+      store: target,
+      sessionId: "s",
+      policy: POLICY,
+      // Longer than the twelve messages it would replace, which is the shape a
+      // summary takes when the history it condenses was mostly short messages.
+      summarize: async () => "a summary long enough to outweigh the messages it would replace ".repeat(100),
+    });
+    // This is the guard that stops a context growing on every compaction. The
+    // summary is discarded and the session is left exactly as it was.
     expect(outcome.status).toBe("nothing");
+    if (outcome.status !== "nothing") throw new Error("unreachable");
+    expect(outcome.reason).toContain("would not free any context");
     expect(target.entries).toEqual([]);
   });
 
   it("reports a provider that returned no summary without touching the session", async () => {
     const target = store(exchange(6));
-    const outcome = await compactSessionHistory({ store: target, sessionId: "s", provider: PROVIDER, summarize: async () => undefined });
+    const outcome = await compactSessionHistory({
+      store: target,
+      sessionId: "s",
+      policy: POLICY,
+      summarize: async () => undefined,
+    });
     expect(outcome).toEqual({ status: "failed", reason: "The provider returned no summary." });
     expect(target.entries).toEqual([]);
   });
@@ -100,7 +140,7 @@ describe("session compaction", () => {
     const outcome = await compactSessionHistory({
       store: target,
       sessionId: "s",
-      provider: PROVIDER,
+      policy: POLICY,
       signal: controller.signal,
       summarize: async () => {
         controller.abort();
@@ -109,28 +149,5 @@ describe("session compaction", () => {
     });
     expect(outcome).toEqual({ status: "failed", reason: "Compaction was cancelled." });
     expect(target.entries).toEqual([]);
-  });
-});
-
-describe("a head that would strand a tool call", () => {
-  it("refuses the cut rather than splitting a call from its result", () => {
-    const turns: SessionMessage[] = [
-      { role: "user", content: "start" },
-      { role: "assistant", content: "", tool_calls: [{ id: "call-1", type: "function", function: { name: "read", arguments: "{}" } }] },
-      { role: "user", content: "new question" },
-    ];
-    // Cutting here would keep the new question and drop the assistant message,
-    // leaving call-1 with no result on either side of the cut.
-    expect(compactionCut(turns, 1)).toBeUndefined();
-  });
-
-  it("still cuts when the head closes its own calls", () => {
-    const turns: SessionMessage[] = [
-      { role: "user", content: "start" },
-      { role: "assistant", content: "", tool_calls: [{ id: "call-1", type: "function", function: { name: "read", arguments: "{}" } }] },
-      { role: "tool", tool_call_id: "call-1", content: "file" },
-      { role: "user", content: "new question" },
-    ];
-    expect(compactionCut(turns, 1)).toBe(3);
   });
 });

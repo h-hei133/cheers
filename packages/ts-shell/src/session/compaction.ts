@@ -74,9 +74,25 @@ export interface CompactionLifecycle {
   }) => Promise<void> | void;
 }
 
+/**
+ * What a summarizer is asked to condense, and what is already known about it.
+ *
+ * `previousSummary` is the checkpoint this history already begins with, so the
+ * messages beside it are what has been added since. Handing both over lets the
+ * summarizer revise that checkpoint instead of summarizing the conversation a
+ * second time — and a summary of a summary sheds a little of what it said on
+ * every pass.
+ */
+export interface SummarizeRequest {
+  readonly messages: readonly AgentMessage[];
+  readonly previousSummary?: string;
+  /** What the user asked the summary to pay attention to, if anything. */
+  readonly instructions?: string;
+  readonly signal?: AbortSignal;
+}
+
 export type SummarizeHistory = (
-  messages: readonly AgentMessage[],
-  signal?: AbortSignal,
+  request: SummarizeRequest,
 ) => Promise<string | undefined>;
 
 export function shouldCompact(
@@ -160,15 +176,20 @@ function newestCutBelow(
  * provider an answer whose call was just discarded, while an assistant message
  * keeps its own tool calls and their results together in the tail.
  *
- * Returns nothing only when no legal cut exists anywhere, which means there is
- * nothing this function can do rather than that nothing should be done. Whether
- * to compact is the caller's question, asked by `planCompaction`.
+ * Returns nothing in two cases, which callers must tell apart by their own
+ * question rather than here:
+ *
+ * - No legal cut exists anywhere. There is nothing this function can do.
+ * - The whole conversation fits inside the budget. There is no history beyond
+ *   the tail to condense, so a checkpoint would replace less than it costs.
+ *   Condensing anyway is what makes a context grow on every pass.
  *
  * The walk measures estimated tokens while the caller may have measured the
- * request for real. The two can disagree — a provider counts per-message
- * overhead the estimate cannot see — so when the budget is never reached the
- * newest legal cut is used rather than giving up. Declining here would leave an
- * already-oversized context untouched, which is the one outcome that cannot help.
+ * request for real, and the two disagree by a factor that varies with the
+ * conversation. When the budget is spent inside a run of tool results — the one
+ * case where the budget cannot be met without starting the tail on a result —
+ * the newest legal cut anywhere is used, which keeps less than the budget asked
+ * for rather than giving up.
  */
 export function findCompactionCut(
   messages: readonly AgentMessage[],
@@ -181,14 +202,13 @@ export function findCompactionCut(
     accumulated += messageCharCount(messages[index]!);
     if (accumulated < budgetChars) continue;
     // The budget is spent. Take the newest legal cut at or before here; the
-    // earliest ones would keep more than the budget allows.
-    const atBudget = newestCutBelow(messages, openCalls, index);
-    if (atBudget) return atBudget;
-    break;
+    // earliest ones would keep more than the budget allows. Falling back to the
+    // newest legal cut anywhere keeps less than the budget, which is the only
+    // alternative to starting the tail on a tool result.
+    return newestCutBelow(messages, openCalls, index) ?? newestCutBelow(messages, openCalls, messages.length - 1);
   }
-  // Either everything fits the budget, or the budget was spent inside a run of
-  // tool results. Cut as late as legality allows in both cases.
-  return newestCutBelow(messages, openCalls, messages.length - 1);
+  // The conversation fits the budget, so there is nothing to condense.
+  return undefined;
 }
 
 /**
@@ -292,7 +312,58 @@ export interface CondensedContext {
   readonly plan: CompactionPlan;
   readonly summary: string;
   readonly messages: AgentMessage[];
+  /** How many messages the checkpoint replaced, counting any earlier checkpoint. */
+  readonly summarized: number;
+  /** What the context is estimated to cost after the checkpoint replaces the head. */
+  readonly tokensAfter: number;
 }
+
+/** Opens the message a compaction leaves in place of the history it condensed. */
+export const CONTEXT_CHECKPOINT_MARKER = "[Context Checkpoint]";
+
+/** The message that stands in for a span of condensed history. */
+export function formatContextCheckpoint(summary: string): string {
+  return `${CONTEXT_CHECKPOINT_MARKER}\n${summary}`;
+}
+
+/**
+ * The summary a checkpoint message carries, or nothing when it is not one.
+ *
+ * A conversation that has already been compacted opens with its own checkpoint,
+ * so a later compaction has to recognize it. That text is itself a summary, and
+ * condensing a condensation loses a little of what it said every time, so the
+ * engine hands it back as the checkpoint to revise rather than as history.
+ */
+export function readContextCheckpoint(content: string): string | undefined {
+  if (!content.startsWith(CONTEXT_CHECKPOINT_MARKER)) {
+    return undefined;
+  }
+  return content.slice(CONTEXT_CHECKPOINT_MARKER.length).replace(/^\n/, "");
+}
+
+/**
+ * Why a condensation did not happen.
+ *
+ * Kept apart from a failure: nothing went wrong here, the engine looked at what
+ * it had and decided the operation would not help. A caller that can speak to
+ * the user is expected to say so rather than report an error.
+ */
+export type CompactionDecline =
+  /**
+   * There is no history beyond the kept tail: either no legal cut exists, or
+   * the conversation already fits inside the recent-tail budget. Both mean the
+   * same thing to a caller — nothing worth replacing — so they are one case
+   * rather than two that would need a second walk to tell apart.
+   */
+  | "nothing-to-condense"
+  /** The summary would cost at least what it replaces, so the context could only grow. */
+  | "would-not-shrink"
+  /** The summarizer produced nothing usable. */
+  | "unsummarized";
+
+export type CondenseOutcome =
+  | ({ readonly status: "condensed" } & CondensedContext)
+  | { readonly status: "declined"; readonly reason: CompactionDecline };
 
 /**
  * The one place a compaction actually happens: choose the cut, summarize what
@@ -304,7 +375,9 @@ export interface CondensedContext {
  * used to compute it separately, which is how the rescue path came to run
  * without the budget clamp the scheduled path applied.
  *
- * Returns nothing when there is no cut to make or nothing worth summarizing.
+ * Reports a decline, rather than nothing, whenever there was no condensation to
+ * make: a caller that can speak to the user has to tell "there was nothing worth
+ * replacing" apart from "the summarizer failed".
  */
 export async function condenseContext(input: {
   readonly messages: readonly AgentMessage[];
@@ -312,6 +385,8 @@ export async function condenseContext(input: {
   readonly summarize: SummarizeHistory;
   readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
   readonly signal?: AbortSignal;
+  /** What the user asked the summary to pay attention to, if anything. */
+  readonly instructions?: string;
   /**
    * Whether to condense regardless of the threshold.
    *
@@ -322,29 +397,45 @@ export async function condenseContext(input: {
    * missed its size in the first place.
    */
   readonly force?: boolean;
-}): Promise<CondensedContext | undefined> {
+}): Promise<CondenseOutcome> {
   const plan = input.force
     ? planCompactionCut(input.messages, input.policy)
     : planCompaction(input.messages, input.policy);
   if (!plan) {
-    return undefined;
+    return { status: "declined", reason: "nothing-to-condense" };
   }
   // A leading system message is carried over verbatim by applyCompaction, so
   // summarizing it as well would pay to restate what is still there.
   const head = input.messages[0]?.role === "system" ? 1 : 0;
+  // A conversation that was compacted before opens with the checkpoint that
+  // compaction left. That text is already a summary, so it travels back to the
+  // summarizer as the summary to revise rather than as history to condense —
+  // condensing a condensation sheds a little of it on every pass.
+  const existing = input.messages[head];
+  const previousSummary = existing ? readContextCheckpoint(existing.content) : undefined;
+  const historyStart = previousSummary === undefined ? head : head + 1;
   // When the cut sits inside a turn, that turn's opening message is neither kept
   // nor part of the older history, so the history stops where the turn begins
   // and the opener is summarized separately.
   const historyEnd = plan.splitsTurn ? plan.turnStart : plan.cut;
-  const history = input.messages.slice(head, historyEnd);
+  const history = input.messages.slice(historyStart, historyEnd);
   const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
 
   let historyText: string | undefined;
   if (history.length > 0) {
-    historyText = await input.summarize(history, input.signal);
+    historyText = await input.summarize({
+      messages: history,
+      previousSummary,
+      instructions: input.instructions,
+      signal: input.signal,
+    });
     if (!historyText) {
-      return undefined;
+      return { status: "declined", reason: "unsummarized" };
     }
+  } else if (previousSummary !== undefined) {
+    // Nothing new to condense, so the checkpoint it already carries stands as
+    // the summary of the history being replaced.
+    historyText = previousSummary;
   }
 
   let summary = historyText;
@@ -358,9 +449,24 @@ export async function condenseContext(input: {
     }
   }
   if (!summary) {
-    return undefined;
+    return { status: "declined", reason: "unsummarized" };
   }
-  return { plan, summary, messages: applyCompaction(input.messages, plan, summary) };
+  const messages = applyCompaction(input.messages, plan, summary);
+  // A compaction earns its cost by leaving the context smaller than it found
+  // it. Both sides are measured the same way — an estimate against an estimate
+  // — because the comparison is between two contexts and the provider has
+  // measured neither. A summary can be larger than what it replaces when the
+  // history it condenses was mostly short messages, which is how a context
+  // grows on every pass instead of shrinking.
+  const before = estimateTokens(input.messages);
+  const after = estimateTokens(messages);
+  if (after >= before) {
+    return { status: "declined", reason: "would-not-shrink" };
+  }
+  // The head the checkpoint replaces spans from the first message it discards
+  // to the cut, which includes any earlier checkpoint it was merged with.
+  const summarized = plan.cut - head;
+  return { status: "condensed", plan, summary, messages, summarized, tokensAfter: after };
 }
 
 export function applyCompaction(
@@ -370,7 +476,7 @@ export function applyCompaction(
 ): AgentMessage[] {
   const checkpoint: AgentMessage = {
     role: "user",
-    content: `[Context Checkpoint]\n${summary}`,
+    content: formatContextCheckpoint(summary),
   };
   const head = messages[0]?.role === "system" ? [messages[0]] : [];
   return [...head, checkpoint, ...messages.slice(plan.cut)];
@@ -416,7 +522,7 @@ export function createCompactionStep(
     if (proceed === false) {
       return undefined;
     }
-    let condensed: CondensedContext | undefined;
+    let condensed: CondenseOutcome;
     try {
       condensed = await condenseContext({
         messages: snapshot.messages,
@@ -432,7 +538,10 @@ export function createCompactionStep(
       options.onError?.(error);
       return undefined;
     }
-    if (!condensed) {
+    // A decline is not a failure: the engine found the context either too small
+    // to cut or a summary that would not pay for itself. Either way the step
+    // runs on the context it already has.
+    if (condensed.status === "declined") {
       return undefined;
     }
     const { plan, summary } = condensed;

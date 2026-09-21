@@ -140,9 +140,15 @@ describe("runTurn", () => {
   it("compacts once and retries when the provider reports an overflow", async () => {
     const summaries: string[] = [];
     let calls = 0;
+    // Long enough that condensing them is worth it: the guard declines when the
+    // summary would cost at least what it replaces, and a fixture of two-letter
+    // messages is exactly that case.
     const history: SessionMessage[] = [];
     for (let index = 0; index < 4; index += 1) {
-      history.push({ role: "user", content: `q${index}` }, { role: "assistant", content: `a${index}` });
+      history.push(
+        { role: "user", content: `q${index} ${"x".repeat(400)}` },
+        { role: "assistant", content: `a${index} ${"y".repeat(400)}` },
+      );
     }
     const setup = options({
       history,
@@ -155,7 +161,9 @@ describe("runTurn", () => {
         return { text, toolCalls: [], stopReason: "stop" };
       },
       compaction: {
-        policy: { contextWindow: 1_000_000 },
+        // An overflow is a context that outgrew its window, so the recent-tail
+        // budget is the part of that window the compaction may keep.
+        policy: { contextWindow: 1_000_000, keepRecentTokens: 300 },
         summarize: async () => "older work",
         onCompact: (record) => summaries.push(record.summary),
       },

@@ -5,15 +5,20 @@ sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
 updated: 2026-09-20
 tags: [features, gap-analysis, pi, compaction, context, branching]
-summary: "对照 pi 的上下文管理：触发阈值、切点、超大 turn、重复压缩、分支摘要、文件追踪、压缩钩子。四处 DEFICIENT（阈值用字符估算而非 provider usage、切点只认 user 且无 split-turn、重复压缩不沿用上一条 kept boundary、文件追踪不跨压缩累积）、两处 MISSING（rewind 不生成分支摘要、压缩钩子无运行时等价物）、一处 OURS-ONLY（每请求 tool-output 微压缩）。"
+summary: "对照 pi 的上下文管理：触发阈值、切点、超大 turn、重复压缩、分支摘要、文件追踪、压缩钩子。四处 DEFICIENT（阈值用字符估算而非 provider usage、切点只认 user 且无 split-turn、重复压缩不沿用上一条 kept boundary、文件追踪不跨压缩累积）、两处 MISSING（rewind 不生成分支摘要、压缩钩子无运行时等价物）、一处 OURS-ONLY（每请求 tool-output 微压缩）。**2026-09-21 更新：DEFICIENT #1/#2/#3 与 pre-research 的 guard 缺口已全部收口（见 phase-2-execution.md §4）。**"
 confidence: high
 ---
 
 # 功能对照 07：上下文管理与压缩
 
-> 本轮为**功能开发前锋探索**，零代码改动。对照本地参考仓 `pi`（`/home/wang/projects/pi`）。
+> **本轮为功能开发前锋探索，零代码改动**。对照本地参考仓 `pi`（`/home/wang/projects/pi`）。
 > 分类口径：`DEFICIENT`＝我们有但更弱／不完整／未接线；`MISSING`＝pi 有我们没有；
 > `OURS-ONLY`＝我们有 pi 没有（**仅记录，本轮不提议开发**）。
+>
+> **2026-09-21 收口**：§2.1（触发阈值）、§2.2（切点与 split-turn）、§2.3（重复压缩）
+> 三项 DEFICIENT 与 `phase-2-pre-research.md` §3 记录的 guard 缺口**已全部修复**，
+> 记录见 [`phase-2-execution.md`](phase-2-execution.md) §4。§2.4（跨压缩文件追踪）、
+> §3.1（rewind 分支摘要）、§3.2（压缩钩子）仍是开放项。
 
 ## 0. 方法与范围
 

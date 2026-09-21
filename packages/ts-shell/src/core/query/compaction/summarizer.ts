@@ -36,6 +36,52 @@ Rules:
 `;
 
 /**
+ * The prompt for revising a checkpoint that a previous compaction already wrote.
+ *
+ * Used when the conversation being condensed opens with its own checkpoint.
+ * Asking for a fresh summary of that text would summarize a summary, and each
+ * pass would shed a little of what the last one preserved. Revising keeps the
+ * established facts and folds in only what has happened since.
+ */
+export const UPDATE_COMPACTION_PROMPT = `The messages above are NEW conversation messages to fold into the existing checkpoint provided in <previous-summary> tags. Rewrite that checkpoint so it accounts for the new messages.
+
+Output EXACTLY the Markdown structure below: keep every section, in order. Use terse bullets, not verbose prose. Write "(none)" for an empty section.
+
+<compacted-summary>
+## Primary Request and Intent
+- [preserve the existing goals and requirements, and add any the new messages introduced]
+
+## Key Technical Concepts
+- [preserve the existing concepts, and add any the new messages introduced]
+
+## Files and Code
+- [preserve the existing paths and signatures, and add the ones the new messages touched]
+
+## Errors and Fixes
+- [preserve the existing entries, and add what the new messages diagnosed or resolved]
+
+## Pending Jobs
+- [remove what the new messages completed; add anything newly requested and not yet done]
+
+## Current Work
+- [what is in progress now, updated from the new messages]
+
+## Next Step
+- [the single next action, updated from the new messages]
+
+## Critical Context
+- [preserve the existing decisions, preferences, constraints, and invariants; add new ones]
+</compacted-summary>
+
+Rules:
+- Keep everything the existing checkpoint established unless the new messages supersede it.
+- Write concise, factual technical prose.
+- Preserve exact file paths, shell commands, function signatures, identifier names, and error strings.
+- Capture user feedback and corrections faithfully.
+- Output only the <compacted-summary>...</compacted-summary> block: do not call tools or execute code.
+`;
+
+/**
  * The prompt for the opening of a turn that was too large to keep whole.
  *
  * It asks a different question from the checkpoint prompt: not "what has

@@ -37,8 +37,11 @@ confidence: high
 > **Phase 1 施工已完成**：见 [`phase-1-execution.md`](phase-1-execution.md)。
 > 执行中发现 **5 处与裁决不符**（含 `thinkingLevel` 双源、multimodal 实为缺陷、
 > 事件流模块非事件流），均已在执行记录中逐条更正。
-> **Phase 2 执行状态**：**未彻底完成**（见 [`phase-2-execution.md`](phase-2-execution.md)）。
-> 核心自动压缩已实现 token 预算与 split-turn，但手动 `/compact` 未接入导致越压越大（134k->134k+），且连续压缩未继承上一条锚点，需收口统一。
+> **Phase 2 执行状态**：**已闭环完成**（见 [`phase-2-execution.md`](phase-2-execution.md) §4）。
+> 自动与手动压缩已统一到同一引擎（`session/compaction.ts`），`core/shell/compaction.ts`
+> 的私有切分与 `KEEP_RECENT_MESSAGES = 4` 已删除；新增防膨胀保护
+> （摘要不小于被替换内容时拒绝压缩）；连续压缩改为识别并修订上一条 checkpoint。
+> 对应 `07-*` 的 DEFICIENT #1/#2/#3 与 pre-research §3 的 guard 缺口全部收口。
 
 | # | 报告 | 覆盖范围 | DEFICIENT | MISSING | OURS-ONLY | 平手 |
 |---|---|---|---:|---:|---:|---:|

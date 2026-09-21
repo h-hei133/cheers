@@ -2687,3 +2687,15 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 
 1. **未在真实交互会话中制造并发编辑** —— 验证在工具层与锁层完成，未观测端到端实机场景。
 2. **未量化锁的性能开销。**
+
+## [2026-09-21] feat | Phase 2 闭环：压缩器统一（手动/自动共用引擎）+ 防膨胀保护 + checkpoint 继承
+- **统一引擎**：删除 `core/shell/compaction.ts` 的私有切分（`KEEP_RECENT_MESSAGES = 4`、`compactionCut`、`hasDanglingCalls` 全部移除），该文件改为「读存储 → 交引擎 → 记录结果」的适配器。两路（自动 step/overflow 与手动 `/compact`）共用同一 policy、摘要器、测量回调（新增 `buildCompactionWiring`）。同一会话历史不再因「谁发起的」而得到不同保留边界。
+- **防膨胀保护（本轮核心缺陷修复）**：`condenseContext` 返回前比较压缩前后体积，**不缩小就拒绝**（`estimateTokens` 对 `estimateTokens`，两边同一把尺子）。这是实测缺陷「134,715 → 134,913 tokens 越压越大」的根治。根因另有一处：`findCompactionCut` 末尾**无条件回退**到最新合法切点，导致预算充足（本无需压缩）时也给出切点 → 摘要白花一次 provider 调用且比原文更大。已改为「预算未花光即返回 `undefined`」。
+- **拒绝语义显式化**：`condenseContext` 返回类型 `CondensedContext | undefined` → `CondenseOutcome = {status:"condensed",…} | {status:"declined", reason}`。三种原被挤进 `undefined` 的情形各有名字（`nothing-to-condense` / `would-not-shrink` / `unsummarized`），调用方据此给出准确提示。`unsummarized` 仍报 `failed`（请求已发出但结果不可用，是真实故障）。
+- **跨压缩继承 checkpoint（07-* §2.3）**：不走 `firstKeptEntryId`（§3.5 已证该字段活轨无人读），改为**从上下文自身识别**——被压缩上下文若以 `[Context Checkpoint]` 开头，该文本即为待修订摘要，不作为历史再摘要一遍；摘要器侧新增 `UPDATE_COMPACTION_PROMPT` 并新增 `<previous-summary>` 传递。`SummarizeHistory` 签名由位置参数改为请求对象 `{messages, previousSummary, instructions, signal}`。
+- **手动路径不受自动阈值限制**：`/compact` 以 `force: true` 调用引擎（用户明确要求，不该因未越阈值被拒），引擎自身的「不缩小就拒绝」仍生效。
+- **实机验证（真实 CLI + PTY，pty.fork 120×40）**：正常 `/compact` → `Condensed 65 earlier messages … latest 115 stay verbatim`、`~31,418 → ~20,288 tokens`，transcript 新增 `type:"compaction"`；摘要过大（30k 字符）→ 输出 `The summary would be at least as large as the messages it replaces…` 且**零 entry**；会话太短 → `too short to compact` 且**不调用 provider**；种入「已有 compaction 条目 + 新历史」→ provider 侧实测 `hasPreviousSummary: true` 且该 checkpoint 不在待压缩消息内。
+- **测试**：`session/compaction.test.ts` 33 项（新增防膨胀 3 项 + 继承 checkpoint 2 项）、`core/shell/compaction.test.ts` 7 项（重写为适配器语义）、`turn/session.test.ts` 12 项。**反向验证**：摘要 1829 vs 原文 1406 tokens 时返回 `nothing` 且不写 entry。施工中发现**自己的测试 fixture 全部过短**（`history(4)` 总字符少于任何摘要）导致 7 项失败——这不是 guard 的错误而是 fixture 不真实，改为 400 字符/条的 `longHistory` 后通过，**恰好证明 guard 有效**。
+- **验证**：`tsc` 0 错；`verify:import-cycles` 0 环（1433 文件）；`verify:docs-drift:strict` pass；**空载全量 494 文件 / 2792 通过 / 1 跳过 / 0 失败**。带负载时曾见 12 项 30s 超时（`core/harness/browser*` + `registry-rust-bridge`）与 `cli-baseline` resume-continuity 超时，**成因是 PTY 验证脚本同时占满机器**——隔离复跑分别 230 通过/零失败与 9.9s 通过，确证为负载抖动。
+- **未验证**：真实 provider 的摘要质量与超长 prompt 行为；`UPDATE_COMPACTION_PROMPT` 的实际输出质量；连续两次**真实**压缩的累积效果（继承验证用的是种入历史而非真实第一次压缩产物）。均记入 `phase-2-execution.md` §4.5。
+- 文档：`phase-2-execution.md` 新增 §4（施工/缺陷/验证/未验证），状态改为**已闭环**；`features/_index.md` 与 `07-*` 同步收口标注。

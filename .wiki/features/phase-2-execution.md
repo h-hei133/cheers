@@ -1,8 +1,8 @@
-# Phase 2 裁决与执行记录（2026-09-20）
+# Phase 2 裁决与执行记录（2026-09-20，2026-09-21 闭环）
 
 > **依据**：[`phase-2-pre-research.md`](phase-2-pre-research.md) 的地形测绘。
-> **当前状态**：**未彻底完成（有严重体验缺陷与遗留功能，见下）**。
-> **未完成原因与缺陷**：
+> **当前状态**：**已闭环完成**。§4 记录收口这一轮的全部施工与验证。
+> **闭环前遗留的两项缺陷**（均已在 §4 处置）：
 > 1. **手动压缩与自动压缩割裂（严重负向缺陷）**：自动压缩器 A 已升级为 token 预算与 split-turn，但用户敲 `/compact` 走的压缩器 B 依然保留写死 `KEEP_RECENT_MESSAGES = 4` 的旧逻辑。长会话中若前 4 条消息很短，八段式摘要体积超过原消息，导致**上下文越压越大**（实测 `134,715 → 134,913` tokens）。必须废除压缩器 B 的私有切分，统一合并到统一压缩引擎中。
 > 2. **重复压缩沿用上一条 kept boundary（07-* §2.3）未真正闭环**：多轮连续压缩未沿用上一条 compaction 的锚点推进，导致重复计算和上下文丢失风险。
 ---
@@ -309,3 +309,157 @@ available=0 budget=100: clamped=10 raw=2
 1. **未跑真实 provider 触发一次自动压缩。** 实机验证的是 `/context` 的阈值显示与构建；
    自动压缩需要真实 provider 报告 usage 越阈值，合成 provider 不产生 usage。
 2. **前缀摘要在真实 provider 上的输出质量**未知——只验证了「两条摘要都进入 checkpoint」的结构。
+
+---
+
+## 4. 收口：统一压缩引擎（2026-09-21）
+
+### 4.1 施工内容
+
+**废弃 B 的私有切分，B 变成共享引擎的适配器**
+
+| 改动 | 位置 |
+|---|---|
+| 删除 `KEEP_RECENT_MESSAGES = 4`、`compactionCut`、`hasDanglingCalls` | `core/shell/compaction.ts`（全部移除） |
+| B 改为「读存储 → 交引擎 → 记录结果」的适配器 | `core/shell/compaction.ts` |
+| 两路共用同一 policy / 摘要器 / 测量回调 | `cli/runtime/cliSessionRuntimeFactory.ts`（新增 `buildCompactionWiring`） |
+
+`core/shell/compaction.ts` 从 135 行降到 130 行，但**没有一行是自己的切点逻辑**——
+切点、split-turn、摘要、落盘判定全部来自 `session/compaction.ts`。
+
+**防膨胀保护（本轮新增，来自实测缺陷）**
+
+引擎在 `condenseContext` 返回前比较压缩前后体积，**不缩小就拒绝**：
+
+```ts
+const before = estimateTokens(input.messages);
+const after = estimateTokens(messages);
+if (after >= before) return { status: "declined", reason: "would-not-shrink" };
+```
+
+两边都用估算（估算对估算），因为比较的是两个上下文，而 provider 对**两者都没测过**。
+用 provider 的实测值比估算值会引入第三把尺子。
+
+**拒绝语义显式化**
+
+`condenseContext` 返回类型从 `CondensedContext | undefined` 改为
+`CondenseOutcome = { status:"condensed", … } | { status:"declined", reason }`。
+理由：原来「无可切点」「预算充足」「摘要为空」三种情形挤在 `undefined` 里，
+调用方无法给出正确的用户提示。现在三种各有名字：
+
+| reason | 含义 | 手动路径的提示 |
+|---|---|---|
+| `nothing-to-condense` | 无合法切点，或历史已在预算内 | 「对话太短」 |
+| `would-not-shrink` | 摘要 ≥ 被替换内容 | 「摘要不小于被替换的消息，压缩不会释放任何上下文」 |
+| `unsummarized` | 摘要器没产出 | 报 `failed`（请求已发出但结果不可用，是真实故障） |
+
+**跨压缩继承上一条 checkpoint（`07-*` §2.3）**
+
+上一轮判定此项「未真正闭环」。本轮**换了实现路径**——不再写 `firstKeptEntryId`
+（§3.5 已证该字段在活轨无人读），而是**从上下文自身识别**：
+
+```ts
+const existing = input.messages[head];
+const previousSummary = existing ? readContextCheckpoint(existing.content) : undefined;
+const historyStart = previousSummary === undefined ? head : head + 1;
+```
+
+即：被压缩的上下文若以 checkpoint 开头，那段文本**本身就是要修订的摘要**，
+不作为「待压缩的历史」再摘要一遍。摘要器侧新增 `UPDATE_COMPACTION_PROMPT`
+（保留既有条目、只并入新进展），由 `requestCompactionSummary` 依据
+`previousSummary` 是否存在自动选用。
+
+**`SummarizeHistory` 签名改为请求对象**
+
+`(messages, signal)` → `({ messages, previousSummary, instructions, signal })`。
+理由：`previousSummary` 是新增的必需输入，再往后加参数会让位置参数失控；
+且 `instructions` 原本只在手动路径上生效，现在两条路径统一走同一签名。
+
+**`/compact` 不再受自动阈值限制**
+
+手动路径以 `force: true` 调用引擎：`/compact` 是用户明确要求，
+不该因为上下文还没越阈值就被拒。引擎自身的「不缩小就拒绝」仍然生效。
+
+### 4.2 施工中发现并修复的自身缺陷（本轮 2 处）
+
+**缺陷 1：`findCompactionCut` 的回退会在预算充足时给出切点。**
+
+原实现末尾无条件 `return newestCutBelow(messages, openCalls, messages.length - 1)`。
+当整个对话都在预算内（无需压缩）时，它仍返回一个切点 → 摘要白花一次 provider 调用、
+且**摘要比被替换内容更大**，正是「越压越大」的成因之一。
+
+**修复**：预算未花光就返回 `undefined`（「没有可压缩的历史」），
+只有「预算花光但切在 tool result 串里」才回退到最新合法切点。
+
+**反向验证**：修复前 `condenseContext` 对「对话短于预算」的输入返回 `condensed`；
+修复后返回 `declined/nothing-to-condense`（`session/compaction.test.ts`
+「declines when the conversation already fits the recent-tail budget」）。
+
+**缺陷 2：我最初的测试 fixture 全部过短，导致新 guard 把它们全部拒掉。**
+
+`history(4)`（8 条 `question 0`/`answer 0`）总字符数远小于任何摘要，
+guard 判定 `would-not-shrink` 而拒绝——**7 个测试因此失败**。
+
+这不是 guard 的错误，是 fixture 不真实。改为 `longHistory(n)`（每条 400 字符）后，
+`longHistory(4)` 实测 938 tokens，`keepRecentTokens: 300` 的切点落在 `cut=5`。
+**这恰好证明了 guard 有效**：它拒掉的正是「摘要比原文长」的输入。
+
+### 4.3 验证
+
+| 门禁 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json --noEmit` | **0 错误** |
+| `npm run verify:import-cycles` | `runtime_cycles=0 type_only_cycles=0`（1433 文件） |
+| `npm run verify:docs-drift:strict` | `rules_dangling=0`，**pass** |
+| `npm run test:ts`（空载机器，load 0.22） | **494 文件 / 2792 通过 / 1 跳过 / 0 失败** |
+| 聚焦套件（`session` + `core/shell` + `turn` + `cli/interactive` 压缩相关） | **58 通过 / 0 失败** |
+
+**关于两次带负载的运行（已定性，非回归）**：本轮曾两次在全量/分区运行中看到失败，
+**两次都是验证脚本自己占满机器造成的**：
+- 全量那次 12 项全为 `core/harness/browser*ScenarioExamples` 与 `registry-rust-bridge`
+  的 `Test timed out in 30000ms`——当时 PTY 实机验证正在同机运行。**隔离复跑
+  36 文件 / 230 通过 / 1 跳过、零失败**。
+- 受影响域那次是 `cli-baseline.test.ts > gates resume continuity` 超时。
+  **隔离复跑 9.9s 通过**（30s 预算），该测试是子进程中断/恢复门禁，**不涉及压缩**。
+
+**空载复跑全量：494 文件 / 2792 通过 / 0 失败**——同一棵工作树，确证为负载抖动。
+
+**实机验证（真实 CLI + PTY，本轮必做）**
+
+用真实 TUI（`pty.fork` + 120×40 窗口）驱动真实 CLI，合成 provider 返回 JSON 格式的
+八段式摘要，种入一个长会话（90 轮交换 ≈ 31.4k tokens）：
+
+| 场景 | 观察到的结果 |
+|---|---|
+| 正常 `/compact` | 输出 `Condensed 65 earlier messages into a checkpoint; the latest 115 stay verbatim.` + `~31,418 → ~20,288 tokens`；transcript 新增 `type:"compaction"` 条目（`keptMessages:115`、`tokensBefore:31418`） |
+| 摘要过大（30k 字符） | 输出 **`The summary would be at least as large as the messages it replaces, so compacting would not free any context.`**；**不写任何 entry**；上下文不变 |
+| 会话太短 | 输出 `The conversation is too short to compact.`；**不调用 provider** |
+| 继承上一条 checkpoint | 种入「已有 compaction 条目 + 新历史」的 transcript，摘要请求带 **`<previous-summary>`**（provider 侧实测 `hasPreviousSummary: true`），且该 checkpoint **不在**待压缩消息里 |
+
+**反向验证（guard）**：`core/shell/compaction.test.ts`
+「refuses to replace messages with a summary that is not smaller」——
+摘要 1829 tokens vs 原文 1406 tokens 时返回 `nothing` 且不写 entry。
+
+**反向验证（继承 checkpoint）**：`session/compaction.test.ts` 「repeated compaction」两条——
+① 上下文以 checkpoint 开头时，摘要器收到 `previousSummary`，且该 checkpoint
+**不出现**在待压缩消息里；② 没有新历史时**不再调用**摘要器，直接沿用既有 checkpoint 文本。
+
+### 4.4 施工过程中的一处自我更正
+
+最初把「对话短于预算」与「无合法切点」合并成一个 decline reason，写文档时发现
+两者对用户是同一句话（「太短」），但对**调用方**含义不同——前者说明预算充足，
+后者说明历史里没有可切点。合并会丢掉这个区别。
+
+**最终保留合并**，理由：要区分二者需要**第二遍扫描**才能知道预算是否花光，
+而两条路径（自动/手动）对它们的处置完全相同（都不压缩、都提示「太短」）。
+为一个无人消费的区别付一遍扫描的代价不划算。这一判断记在此处备查。
+
+### 4.5 未验证的项（诚实记录）
+
+1. **未跑真实 provider 的 `/compact`**：§4.3 的实机验证用的是**合成 provider**
+   （返回固定的八段式摘要文本）。真实模型产出的摘要质量、以及真实 provider 在
+   超长 prompt 下的行为未验证。
+2. **`UPDATE_COMPACTION_PROMPT` 在真实 provider 上的输出质量**未知——
+   只验证了「修订提示词被选用、`<previous-summary>` 被传递、checkpoint 不被重复压缩」的结构。
+3. **连续两次真实压缩的累积效果**未在真实 provider 上观察；§4.3 第 4 行的
+   「继承 checkpoint」用的是**种入的历史**而非真实第一次压缩的产物。

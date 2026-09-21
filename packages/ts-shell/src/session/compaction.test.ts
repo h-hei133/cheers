@@ -40,6 +40,31 @@ function history(exchanges: number): AgentMessage[] {
  */
 const policy: CompactionPolicy = { contextWindow: 30, reserveTokens: 10, keepRecentTokens: 10 };
 
+/**
+ * A history whose messages are long enough that condensing them is worth it.
+ *
+ * The short `history` fixture cannot be compacted at all: its messages total
+ * fewer characters than any summary of them, so the engine declines. That is
+ * the guard working, not a limitation, and it is covered on its own below.
+ */
+function longHistory(exchanges: number): AgentMessage[] {
+  const messages: AgentMessage[] = [];
+  for (let index = 0; index < exchanges; index += 1) {
+    messages.push(
+      userMessage(`question ${index} ${"x".repeat(400)}`),
+      assistantMessage(`answer ${index} ${"y".repeat(400)}`),
+    );
+  }
+  return messages;
+}
+
+/**
+ * A budget for `longHistory`: the window sits below what four long exchanges
+ * cost (938 tokens), so the threshold is crossed and the cut lands inside the
+ * newest exchange, keeping three messages and condensing five.
+ */
+const longPolicy: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRecentTokens: 300 };
+
 describe("shouldCompact", () => {
   it("fires only past the reserved headroom", () => {
     expect(shouldCompact(90, 100, 10)).toBe(false);
@@ -136,21 +161,21 @@ describe("findCompactionCut", () => {
 
   it("notifies the transcript record when compaction applies", async () => {
     const seen: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore: number }[] = [];
-    const step = createCompactionStep(policy, {
+    const step = createCompactionStep(longPolicy, {
       summarize: async () => "older work",
       onCompact: (input) => {
         seen.push(input);
       },
     });
-    const messages = history(4);
+    const messages = longHistory(4);
     const update = await step(
-      { message: messages[messages.length - 1], toolResults: [], messages },
+      { message: messages[messages.length - 1]!, toolResults: [], messages },
       undefined,
     );
     expect(update).not.toBeUndefined();
     expect(seen).toHaveLength(1);
-    expect(seen[0].summary).toBe("older work");
-    expect(seen[0].keptMessages).toBeGreaterThan(0);
+    expect(seen[0]!.summary).toBe("older work");
+    expect(seen[0]!.keptMessages).toBeGreaterThan(0);
   });
 
 describe("planCompaction", () => {
@@ -199,38 +224,39 @@ describe("createCompactionStep", () => {
 
   it("compacts over-threshold contexts before the next step", async () => {
     const summarize = vi.fn(async () => "older work summary");
-    const step = createCompactionStep(policy, { summarize });
-    const messages = history(4);
+    const step = createCompactionStep(longPolicy, { summarize });
+    const messages = longHistory(4);
 
     const update = await step(
-      { message: messages[messages.length - 1], toolResults: [], messages },
+      { message: messages[messages.length - 1]!, toolResults: [], messages },
       undefined,
     );
 
     expect(summarize).toHaveBeenCalledTimes(1);
-    expect(update?.messages).toHaveLength(1 + messages.length - 4);
-    expect(update?.messages?.[0].content).toContain("older work summary");
+    // The checkpoint replaces the head and the newest three messages stay.
+    expect(update?.messages).toHaveLength(1 + 3);
+    expect(update?.messages?.[0]!.content).toContain("older work summary");
   });
 
   it("falls back to the full context when summarization fails", async () => {
-    const step = createCompactionStep(policy, { summarize: async () => undefined });
-    const messages = history(4);
+    const step = createCompactionStep(longPolicy, { summarize: async () => undefined });
+    const messages = longHistory(4);
 
     await expect(
-      step({ message: messages[messages.length - 1], toolResults: [], messages }, undefined),
+      step({ message: messages[messages.length - 1]!, toolResults: [], messages }, undefined),
     ).resolves.toBeUndefined();
   });
 
   it("falls back to the full context when the summarizer throws", async () => {
-    const step = createCompactionStep(policy, {
+    const step = createCompactionStep(longPolicy, {
       summarize: async () => {
         throw new Error("provider down");
       },
     });
-    const messages = history(4);
+    const messages = longHistory(4);
 
     await expect(
-      step({ message: messages[messages.length - 1], toolResults: [], messages }, undefined),
+      step({ message: messages[messages.length - 1]!, toolResults: [], messages }, undefined),
     ).resolves.toBeUndefined();
   });
 });
@@ -274,7 +300,7 @@ describe("compaction pairing and policy guards", () => {
 
   it("reports summarizer failures through onError", async () => {
     const errors: unknown[] = [];
-    const step = createCompactionStep(policy, {
+    const step = createCompactionStep(longPolicy, {
       summarize: async () => {
         throw new Error("provider down");
       },
@@ -282,9 +308,9 @@ describe("compaction pairing and policy guards", () => {
         errors.push(error);
       },
     });
-    const messages = history(4);
+    const messages = longHistory(4);
     await step(
-      { message: messages[messages.length - 1], toolResults: [], messages },
+      { message: messages[messages.length - 1]!, toolResults: [], messages },
       undefined,
     );
     expect(errors).toHaveLength(1);
@@ -294,15 +320,15 @@ describe("compaction pairing and policy guards", () => {
     const errors: unknown[] = [];
     const controller = new AbortController();
     controller.abort();
-    const step = createCompactionStep(policy, {
+    const step = createCompactionStep(longPolicy, {
       summarize: async () => "never",
       onError: (error) => {
         errors.push(error);
       },
     });
-    const messages = history(4);
+    const messages = longHistory(4);
     const summary = step(
-      { message: messages[messages.length - 1], toolResults: [], messages },
+      { message: messages[messages.length - 1]!, toolResults: [], messages },
       controller.signal,
     );
     await expect(summary).resolves.toBeUndefined();
@@ -321,8 +347,8 @@ describe("compaction through the kernel hook", () => {
       },
     ];
     const seed: AgentMessage[] = [
-      userMessage("background ".repeat(40)),
-      ...history(3),
+      userMessage("background ".repeat(400)),
+      ...longHistory(3),
     ];
     const summarize = vi.fn(async () => "background summary");
 
@@ -338,7 +364,7 @@ describe("compaction through the kernel hook", () => {
           }
           return { text: "done", toolCalls: [], stopReason: "stop" };
         },
-        prepareNextStep: createCompactionStep(policy, { summarize }),
+        prepareNextStep: createCompactionStep(longPolicy, { summarize }),
       },
       () => {},
       undefined,
@@ -346,8 +372,8 @@ describe("compaction through the kernel hook", () => {
 
     expect(summarize).toHaveBeenCalledTimes(1);
     expect(seen).toHaveLength(2);
-    expect(seen[1].length).toBeLessThan(seen[0].length);
-    expect(seen[1][0].content).toContain("background summary");
+    expect(seen[1]!.length).toBeLessThan(seen[0]!.length);
+    expect(seen[1]![0]!.content).toContain("background summary");
   });
 });
 
@@ -384,7 +410,6 @@ describe("a single turn larger than the budget", () => {
     assistantMessage("earlier answer"),
     ...giantTurn(),
   ];
-
   it("summarizes the turn opening separately from the older history", async () => {
     const summarize = vi.fn(async () => "history summary");
     const summarizeTurnPrefix = vi.fn(async () => "turn opener summary");
@@ -396,15 +421,16 @@ describe("a single turn larger than the budget", () => {
       summarizeTurnPrefix,
     });
 
-    expect(condensed).not.toBeUndefined();
-    expect(condensed!.plan.splitsTurn).toBe(true);
+    expect(condensed.status).toBe("condensed");
+    if (condensed.status !== "condensed") throw new Error("unreachable");
+    expect(condensed.plan.splitsTurn).toBe(true);
     // The kept tail is the end of the turn, so its opening request is not in it
     // and is reachable only through the second summary.
     expect(summarizeTurnPrefix).toHaveBeenCalledTimes(1);
-    expect(summarizeTurnPrefix.mock.calls[0][0][0].content).toBe("rework the parser");
+    expect(summarizeTurnPrefix.mock.calls[0]![0][0]!.content).toBe("rework the parser");
     // Both summaries reach the context as one checkpoint.
-    expect(condensed!.summary).toContain("history summary");
-    expect(condensed!.summary).toContain("turn opener summary");
+    expect(condensed.summary).toContain("history summary");
+    expect(condensed.summary).toContain("turn opener summary");
   });
 
   it("falls back to the history summary when the prefix cannot be summarized", async () => {
@@ -416,8 +442,9 @@ describe("a single turn larger than the budget", () => {
     });
     // Losing the opener costs context, but refusing to compact costs more: the
     // context was already judged too large, and the kept tail still continues.
-    expect(condensed).not.toBeUndefined();
-    expect(condensed!.summary).toBe("history summary");
+    expect(condensed.status).toBe("condensed");
+    if (condensed.status !== "condensed") throw new Error("unreachable");
+    expect(condensed.summary).toBe("history summary");
   });
 
   it("refuses to drop history it could not summarize", async () => {
@@ -429,6 +456,106 @@ describe("a single turn larger than the budget", () => {
     });
     // The opener alone does not describe the turns being discarded, so replacing
     // the head with it would lose them without a trace.
-    expect(condensed).toBeUndefined();
+    expect(condensed).toEqual({ status: "declined", reason: "unsummarized" });
+  });
+});
+
+describe("a compaction that would not shrink the context", () => {
+  /**
+   * A conversation of very short exchanges. A summary of it costs more than the
+   * messages it would replace, which is the shape the manual path used to
+   * produce when it kept a fixed count of messages: every pass made the context
+   * larger instead of smaller.
+   */
+  const brief = (): AgentMessage[] => history(4);
+
+  it("declines instead of replacing short messages with a longer summary", async () => {
+    const condensed = await condenseContext({
+      messages: brief(),
+      policy,
+      summarize: async () => "a summary that costs more than the conversation it replaces",
+    });
+    expect(condensed).toEqual({ status: "declined", reason: "would-not-shrink" });
+  });
+
+  it("declines when the conversation already fits the recent-tail budget", async () => {
+    // Nothing is older than the tail the budget keeps, so a checkpoint would
+    // replace nothing and still cost its own size.
+    const condensed = await condenseContext({
+      messages: brief(),
+      policy: { contextWindow: 30, reserveTokens: 10, keepRecentTokens: 10_000 },
+      summarize: async () => "summary",
+    });
+    expect(condensed).toEqual({ status: "declined", reason: "nothing-to-condense" });
+  });
+
+  it("condenses the same conversation once the messages outweigh the summary", async () => {
+    const condensed = await condenseContext({
+      messages: longHistory(4),
+      policy: longPolicy,
+      summarize: async () => "short summary",
+    });
+    // The guard is about size, not about refusing to compact: the same shape of
+    // conversation goes through as soon as condensing it actually frees space.
+    expect(condensed.status).toBe("condensed");
+  });
+});
+
+describe("repeated compaction", () => {
+  /**
+   * A checkpoint from an earlier compaction, then two long exchanges. The cut
+   * lands inside the newest exchange, so the checkpoint is what the history
+   * summary is asked to revise.
+   */
+  const afterCheckpoint = (): AgentMessage[] => [
+    userMessage("[Context Checkpoint]\nprior checkpoint text"),
+    userMessage(`q0 ${"x".repeat(600)}`),
+    assistantMessage(`a0 ${"y".repeat(600)}`),
+    userMessage(`q1 ${"x".repeat(600)}`),
+    assistantMessage(`a1 ${"y".repeat(600)}`),
+  ];
+  /** A window well under what those exchanges cost, so the threshold is crossed. */
+  const repeatPolicy: CompactionPolicy = { contextWindow: 100, reserveTokens: 0, keepRecentTokens: 300 };
+
+  it("revises the checkpoint it finds instead of summarizing it again", async () => {
+    const seen: Array<{ messages: number; previousSummary?: string }> = [];
+    const condensed = await condenseContext({
+      messages: afterCheckpoint(),
+      policy: repeatPolicy,
+      force: true,
+      summarize: async (request) => {
+        seen.push({ messages: request.messages.length, previousSummary: request.previousSummary });
+        return "revised";
+      },
+    });
+
+    expect(condensed.status).toBe("condensed");
+    // The earlier checkpoint travels as the summary to revise rather than as one
+    // more message to condense — condensing a condensation sheds a little of
+    // what it said on every pass.
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.previousSummary).toBe("prior checkpoint text");
+    expect(seen[0]!.messages).toBe(2);
+  });
+
+  it("carries a checkpoint forward when there is nothing new to condense", async () => {
+    const summarize = vi.fn(async () => "should not be called");
+    // The checkpoint and one long exchange: everything before the kept tail is
+    // the checkpoint itself, whose own text is already the summary to carry.
+    const condensed = await condenseContext({
+      messages: [
+        userMessage("[Context Checkpoint]\nprior checkpoint text"),
+        userMessage(`q1 ${"x".repeat(600)}`),
+        assistantMessage(`a1 ${"y".repeat(600)}`),
+      ],
+      policy: repeatPolicy,
+      force: true,
+      summarize,
+    });
+
+    expect(condensed.status).toBe("condensed");
+    if (condensed.status !== "condensed") throw new Error("unreachable");
+    expect(condensed.summary).toBe("prior checkpoint text");
+    expect(summarize).not.toHaveBeenCalled();
   });
 });

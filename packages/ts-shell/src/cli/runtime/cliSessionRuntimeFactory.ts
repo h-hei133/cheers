@@ -24,8 +24,66 @@ import { requestCompactionSummary } from "../../core/query/compaction/summarize.
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
 import { estimateTokens } from "../../session/context.js";
+import type { CompactionPolicy, SummarizeHistory, SummarizeTurnPrefix } from "../../session/compaction.js";
 import { toChatMessages } from "../../turn/prompt.js";
 import type { CompactionSetup } from "../../turn/session.js";
+
+/** What a compaction needs from the provider, resolved once per entry point. */
+interface CompactionWiring {
+  readonly policy: CompactionPolicy;
+  readonly summarize: SummarizeHistory;
+  readonly summarizeTurnPrefix: SummarizeTurnPrefix;
+}
+
+/**
+ * The engine wiring both compaction paths run on.
+ *
+ * The automatic step and the `/compact` command must condense the same history
+ * the same way, so they are handed the same policy, the same summarizers, and
+ * the same measured-usage callback. Building this twice is how the manual path
+ * came to keep a fixed count of messages while the automatic path worked to a
+ * token budget.
+ */
+function buildCompactionWiring(input: {
+  readonly provider: { readonly apiKey: string; readonly baseUrl: string; readonly model: string };
+  readonly runtimeContext: ShellRuntimeContext;
+  readonly sessionId: string;
+}): CompactionWiring {
+  const provider = input.provider;
+  return {
+    policy: {
+      contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64_000,
+      reserveTokens: input.runtimeContext.runtimeConfig.reserveTokens,
+      // The provider's own count, plus whatever the conversation has gained
+      // since that request. Falls back to the estimate inside planCompaction
+      // when no request has reported usage yet.
+      measureContextTokens: (messages) => {
+        const usage = getSessionUsage(input.sessionId);
+        if (usage.lastPromptTokens <= 0) return undefined;
+        return usage.lastPromptTokens + estimateTokens(messages.slice(usage.lastPromptMessageCount));
+      },
+    },
+    summarize: (request) =>
+      requestCompactionSummary({
+        provider,
+        messages: toChatMessages(request.messages),
+        previousSummary: request.previousSummary,
+        instructions: request.instructions,
+        signal: request.signal,
+      }),
+    // Asked a different question from the history summary: this is the opening
+    // of a turn whose continuation is kept, so it explains the work that
+    // follows rather than recapping what came before.
+    summarizeTurnPrefix: (messages, signal) =>
+      requestCompactionSummary({
+        provider,
+        messages: toChatMessages(messages),
+        prompt: TURN_PREFIX_COMPACTION_PROMPT,
+        signal,
+      }),
+  };
+}
+
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
@@ -47,36 +105,42 @@ export function createCliSessionRuntime(input: {
   );
 }): ShellSessionRuntime {
   const isStdinTty = input.isStdinTty ?? (() => Boolean(process.stdin.isTTY));
+  /** The provider both compaction paths summarize with, or nothing when none is configured. */
+  const compactionProvider = (): { apiKey: string; baseUrl: string; model: string } | undefined => {
+    const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
+    const apiKey = resolved.credential?.apiKey;
+    const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl;
+    const model = resolved.model ?? resolved.credential?.model;
+    return apiKey && baseUrl && model ? { apiKey, baseUrl, model } : undefined;
+  };
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     sessionManager: input.sessionManager,
     renderer: input.renderer,
     compactHistory: (sessionId, signal, instructions) => {
-      const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
-      const apiKey = resolved.credential?.apiKey;
-      const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl;
-      const model = resolved.model ?? resolved.credential?.model;
-      if (!apiKey || !baseUrl || !model) {
+      const provider = compactionProvider();
+      if (!provider) {
+        const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
         return Promise.resolve({
           status: "failed" as const,
           reason: `No credential for provider ${resolved.provider}; set ${resolved.expectedEnvVarName} or configure a connection.`,
         });
       }
+      const wiring = buildCompactionWiring({ provider, runtimeContext: input.runtimeContext, sessionId });
       return compactSessionHistory({
         store: input.sessionManager,
         sessionId,
-        provider: { apiKey, baseUrl, model },
+        policy: wiring.policy,
+        summarize: wiring.summarize,
+        summarizeTurnPrefix: wiring.summarizeTurnPrefix,
         signal,
         instructions,
       });
     },
     summarizeAbandonedTurns: (messages) => {
-      const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
-      const apiKey = resolved.credential?.apiKey;
-      const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl;
-      const model = resolved.model ?? resolved.credential?.model;
-      if (!apiKey || !baseUrl || !model) return Promise.resolve(undefined);
+      const provider = compactionProvider();
+      if (!provider) return Promise.resolve(undefined);
       return requestCompactionSummary({
-        provider: { apiKey, baseUrl, model },
+        provider,
         messages: toChatMessages(messages),
       });
     },
@@ -84,58 +148,18 @@ export function createCliSessionRuntime(input: {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
-      const compactionProvider = {
-        apiKey: resolvedCredential.credential?.apiKey,
-        baseUrl: resolvedCredential.baseUrl ?? resolvedCredential.credential?.baseUrl,
-        model: resolvedCredential.model ?? resolvedCredential.credential?.model,
-      };
+      const activeProvider = compactionProvider();
       // Automatic compaction needs a provider to write the checkpoint; without
       // one the turn runs with the history it has and overflow reports itself.
-      const compaction: CompactionSetup | undefined =
-        compactionProvider.apiKey && compactionProvider.baseUrl && compactionProvider.model
-          ? {
-              policy: {
-                contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64_000,
-                reserveTokens: input.runtimeContext.runtimeConfig.reserveTokens,
-                // The provider's own count, plus whatever the conversation has
-                // gained since that request. Falls back to the estimate inside
-                // planCompaction when no request has reported usage yet.
-                measureContextTokens: (messages) => {
-                  const usage = getSessionUsage(sessionId);
-                  if (usage.lastPromptTokens <= 0) return undefined;
-                  return usage.lastPromptTokens + estimateTokens(messages.slice(usage.lastPromptMessageCount));
-                },
-              },
-              summarize: (messages, summarizeSignal) =>
-                requestCompactionSummary({
-                  provider: {
-                    apiKey: compactionProvider.apiKey!,
-                    baseUrl: compactionProvider.baseUrl!,
-                    model: compactionProvider.model!,
-                  },
-                  messages: toChatMessages(messages),
-                  signal: summarizeSignal,
-                }),
-              // Asked a different question from the history summary: this is the
-              // opening of a turn whose continuation is kept, so it explains the
-              // work that follows rather than recapping what came before.
-              summarizeTurnPrefix: (messages, summarizeSignal) =>
-                requestCompactionSummary({
-                  provider: {
-                    apiKey: compactionProvider.apiKey!,
-                    baseUrl: compactionProvider.baseUrl!,
-                    model: compactionProvider.model!,
-                  },
-                  messages: toChatMessages(messages),
-                  prompt: TURN_PREFIX_COMPACTION_PROMPT,
-                  signal: summarizeSignal,
-                }),
-              onCompact: (record) => {
-                input.sessionManager.appendCompactionEntry(sessionId, record);
-                markContextUnknown(sessionId);
-              },
-            }
-          : undefined;
+      const compaction: CompactionSetup | undefined = activeProvider
+        ? {
+            ...buildCompactionWiring({ provider: activeProvider, runtimeContext: input.runtimeContext, sessionId }),
+            onCompact: (record) => {
+              input.sessionManager.appendCompactionEntry(sessionId, record);
+              markContextUnknown(sessionId);
+            },
+          }
+        : undefined;
       const escalationPromptHandler = createCliApprovalEscalationBridge({
         renderer: input.renderer,
         readline: input.getReadline,
