@@ -98,7 +98,7 @@
 
 ### 1.6 提交
 
-**提交**：`<见 git log>`（`fix(config): drop two config fields nothing read`）
+**提交**：`26d6e0ab`（`fix(config): drop two config fields nothing read`）
 
 ---
 
