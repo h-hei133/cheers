@@ -23,13 +23,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The two gates below exit non-zero on a violation, unlike the NormProof
-      # judge step further down, which runs in shadow mode and never fails the
-      # build. Neither needs the compiled output, so they run before the build:
-      # a dependency cycle should fail the run in seconds, not after 187s of
+      # The gates below exit non-zero on a violation, unlike the NormProof judge
+      # step further down, which runs in shadow mode and never fails the build.
+      # None needs the compiled output, so they run before the build: a
+      # dependency cycle should fail the run in seconds, not after 187s of
       # tests. See .wiki/refactor/plan.md section 9.27 for the measurements.
       - name: Check for dependency cycles
         run: npm run verify:import-cycles
+
+      - name: Check config fields have consumers
+        run: npm run check:config-consumers
+
+      # The gate's own test, so a gate that stops detecting what it was written
+      # for fails here rather than passing quietly. Covers every scripts/*.test.mjs.
+      - name: Check the gates still detect
+        run: npm run test:scripts
 
       - name: Check for docs and rules drift
         run: npm run verify:docs-drift:strict

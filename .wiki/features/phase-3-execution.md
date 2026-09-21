@@ -13,7 +13,7 @@
 | 任务 | 范围 | 状态 |
 |---|---|---|
 | T3 | 删除 `thinkingBudgets` + `promptCacheTtl`；`tuiMode` 加注释保留 | ✅ **完成**（§1） |
-| T7 | 死字段门禁 | ⬜ 未开始 |
+| T7 | 死字段门禁 | ✅ **完成**（§2） |
 | T1 | 三层遍历 + `.gitignore` | ⬜ 未开始 |
 | T4 | 逐模型窗口 + 逐模型压缩预算 | ⬜ 未开始 |
 | T6 | 目录列举折进 `read` | ⬜ 未开始 |
@@ -104,7 +104,83 @@
 
 ## 2. T7 — 死字段门禁
 
-⬜ 未开始。
+**提交**：见 §2.6。
+
+### 2.1 裁决回顾与两处更正
+
+原裁决：「扫描**用户文档**中声明的配置字段，逐个验证存在生产消费者」。
+
+**侦察推翻了它的前提**：
+
+| 检查 | 结果 |
+|---|---|
+| `USAGE_MANUAL.md`（唯一用户手册，241 行） | 只写配置文件**位置**，**零个配置键**（`grep thinkingBudgets\|promptCacheTtl\|contextWindow` → 0 命中） |
+| 其它 md 中的配置键 | 全在 `.wiki/` 内部分析文档里，不是用户面 |
+
+**即：T3 的缺陷不在「文档 vs 代码」，而在「类型声明 vs 消费者」。** 门禁改为检查**声明 → 消费者**。
+
+**第二处更正：参考实现没有这个门禁。** 已核验 pi / opencode / codex / gemini-cli **零个**做此检查。最接近的是：
+
+- **codex 的穷尽解构**（`mcp_types.rs:317-320`）：`RawMcpServerConfig` 的 `TryFrom` 穷尽解构每个字段，加字段而不更新映射即**编译失败**——由语言强制，但只证明「映射读了它」。
+- **gemini-cli 的 schema 单一来源**（`settingsSchema.ts:3027-3030`）：类型/默认值/校验器/schema/文档全部派生 + CI `--check`。**但没有「消费者」概念**——字段加进 schema 即自动文档化、校验、CI 全绿，可能完全无人读。
+
+**TypeScript 侧无对应物**：`noUnusedLocals`、eslint `no-unused-vars`、biome unused 规则**都只管局部变量/导入/参数，从不管接口成员**。
+
+**结论：本门禁在已核验的参考里是首创。** 机制取 codex 的方向（声明必须有消费方），用静态扫描实现，因为 TS 没有穷尽解构那样的强制。
+
+### 2.2 施工内容
+
+| 文件 | 作用 |
+|---|---|
+| `scripts/check-config-consumers.mjs` | 门禁本体 |
+| `scripts/check-config-consumers.test.mjs` | 门禁的 7 项测试（`node --test`） |
+| `package.json` | `check:config-consumers`（门禁）+ `test:scripts`（`node --test scripts/*.test.mjs`，**glob** 而非逐个门禁命名） |
+| `scripts/test-all-stacks.mjs` | 新增「Script Tests」栈，使 `npm test` 覆盖 `scripts/` 下的门禁测试 |
+| `.github/workflows/ci.yml` | 新增两个阻断步骤：跑门禁、跑 `test:scripts` |
+
+**命名**：用 `check-*` 而非 `verify-*`。仓库约定（与 `pi` 一致）是**结构性不变量用 `check-*`**（如 `check-import-cycles.mjs`、pi 的 `check-runtime-deps.mjs`），**行为/场景验证用 `verify-*`**。本门禁断言的是树的**结构不变量**，属前者。
+
+**测试组织**：采纳 `pi` 的方式——**一个 glob 跑全部脚本测试**（`node --test scripts/*.test.mjs`），而不是给每个门禁造专属脚本名。我最初写成 `check:config-consumers:test`（per-gate 命名），**这是错的**：它把「门禁测试」这件事拆成 N 个脚本名，每加一个门禁就要多一行 `package.json`。`pi` 的 `test:scripts` 是单行 glob，新门禁的测试**自动被收录**。
+
+**同时补入 `test-all-stacks.mjs`**：该脚本原先只跑 vitest / cargo / pytest **三个栈**，`scripts/` 下的门禁测试**不在其中**——即 `npm test` 不会跑它们。已新增「Script Tests」栈。
+
+### 2.3 门禁的判定规则
+
+1. 解析 `RuntimeConfig` 与 `TuiPreferences` 的 `readonly` 字段；
+2. 在 `packages/ts-shell/src` 中搜 `.字段名`；
+3. **声明模块自身不计**（一个只被自己文件读的字段没有消费者）；
+4. **测试文件不计**（测试断言往返不使字段有用），但会**报告**「仅被 N 个测试文件读」；
+5. 零生产读者的字段 → 报错 exit 1，除非在 `DECLARED_WITHOUT_READER` 里登记了理由。
+
+**当前唯一豁免**：`tuiMode`（理由：它描述的能力已实现，字段是将来显式覆盖的入口；与已删的两个不同，那两个描述的能力不存在）。
+
+### 2.4 施工中发现并修复的**门禁自身缺陷**（3 处，全部由测试暴露）
+
+| # | 缺陷 | 症状 | 修复 |
+|---|---|---|---|
+| 1 | `MIN_DECLARED_FIELDS = 15` 硬编码 | 每个 fixture 都被判 `parse-shrank` exit 3 | 改为从 `REQUIRED_INTERFACES.length` 派生 |
+| 2 | 先解析后检查文件存在 | 缺失文件时 `statSync` **抛异常**（exit 1）而非 `config-failure`（exit 3） | 文件存在检查前置，且用 `existsSync` 而非 `statSync` |
+| 3 | 弱守卫（只查 `fields.length === 0`） | 接口改名后**解析到 1 个字段却 pass** —— 门禁在它看不见的字段上通过 | 逐接口检查存在性 + 空体检查 |
+
+**第 3 处是这次施工最重要的发现**：一个「读取不到目标却报告通过」的门禁**比没有门禁更糟**——它给出虚假保证。这条记录与 T7 的目的一致：门禁的价值在于**能否失败**，不在于能否通过。
+
+### 2.5 验证
+
+| 项 | 方式 | 结果 |
+|---|---|---|
+| 门禁测试 | `node --test scripts/check-config-consumers.test.mjs` | **7/7 通过** |
+| 反向验证（注入死字段） | 在真实 config 里注入 `deadProbe`（声明+默认+合并三处） | 门禁**报错 exit 1**，点名 `deadProbe` |
+| 反向验证（原始缺陷） | 重新注入**真实的** `thinkingBudgets` + `promptCacheTtl` | 门禁**同时报出两者**，exit 1 |
+| 守卫验证（接口改名） | 把 `RuntimeConfig` 改名为 `Settings` | **`config-failure` exit 3**（不再静默通过） |
+| 守卫验证（文件缺失） | 指向空目录 | **`config-failure` exit 3** |
+| 实机（真实树） | `npm run check:config-consumers` | `fields=20 read=19 declared_without_reader=1 findings=0` **pass** |
+| CI 接线 | YAML 解析 + 步骤列表 | 新步骤就位 |
+
+**测试暴露的 fixture 缺陷（一并记录）**：初版 fixture 把 reader 放在 config 模块**自己**里，门禁正确地把它排除并报错——**是 fixture 错了，不是门禁错了**。这与 T7 规则 3 一致。
+
+### 2.6 提交
+
+**提交**：见 git log。
 
 ---
 
