@@ -5,7 +5,7 @@ sources: [pi-source-2026-09-21, phase-3-decisions-2026-09-21, phase-3-pre-resear
 created: 2026-09-21
 updated: 2026-09-21
 tags: [features, phase-3, execution, pi-comparison, decisions]
-summary: "按 `agent-rules/reference-repositories.md` 的「Compare Decisions Before Implementing」纪律，把 pi 对 Phase 3 七项决策的**具体决定**逐条列出，并标注我方是同意、不同意、还是**未考虑**。共 **40 处「未考虑」**（T1 七、T2 九、T2b 八、T3 三、T4 六、T5 四、T6 三）与**两处我方论证错误**，是实际产出。最重要的四条：①pi 的 `thinkingBudgets` 是活机制（档位→数值预算，Anthropic/Google/Bedrock 原生消费，注释明写与 `thinkingFormat` **无关**），我方 T3 的「双来源冲突」论证被推翻——删除仍对，但理由须换成「我方无消费位点」；②我方**已经**暴露在 pi 那条注释警告的失效模式里（同时发 `reasoning_effort` 与 `max_tokens: 4096`，推理与答案共享额度），我方是检测而非预防；③项目技能、项目设置、扩展、提示词、主题、`SYSTEM.md` 在 pi 里共用一个信任门（7 类资源），而我方 `SkillLoader` **零信任检查**——T2b 一旦接线就会激活这个提示注入面；④**实测我方 `SkillLoader.scan` 只读一层，3 个嵌套技能只发现 1 个**（pi 有专门测试，opencode 真实技能即用嵌套布局）——T2b 注入的是残缺目录。另有 **19 项**待维护者裁决的开放问题。"
+summary: "Phase 3 开工前的**对照研究**（证据层，非裁决层）：按 `agent-rules/reference-repositories.md` 的「Compare Decisions Before Implementing」纪律，把 pi 对 Phase 3 七项决策的**具体决定**逐条列出，并标注我方是同意、不同意、还是**未考虑**。共 **40 处「未考虑」**与**两处我方论证错误**。最重要的四条：①pi 的 `thinkingBudgets` 是活机制（档位→数值预算，Anthropic/Google/Bedrock 原生消费，注释明写与 `thinkingFormat` **无关**），我方 T3 的「双来源冲突」论证被推翻——删除仍对，但理由须换成「我方无消费位点」；②我方**已经**暴露在 pi 那条注释警告的失效模式里（同时发 `reasoning_effort` 与 `max_tokens: 4096`），我方是检测而非预防；③项目技能、项目设置、扩展、提示词、主题、`SYSTEM.md` 在 pi 里共用一个信任门（7 类资源），而我方 `SkillLoader` **零信任检查**；④**实测我方 `SkillLoader.scan` 只读一层，3 个嵌套技能只发现 1 个**。**本文档只提供证据；全部裁决见 `phase-3-decisions.md`（含 44 项补充裁决）。**"
 confidence: high
 ---
 
@@ -832,31 +832,29 @@ IsADirectoryError: [Errno 21] Is a directory: 'packages/ts-shell/src'
 
 ---
 
-## 8. 需要维护者裁决的开放问题
+## 8. 对照产生的裁决（已全部定案）
 
-对照产生的**新**待决项（不在 `phase-3-decisions.md` 的七项之内）：
+本节原为「需要维护者裁决的开放问题」，列出 19 项。**这 19 项已全部裁决**，并入
+`phase-3-decisions.md` 各任务的「补充裁决」小节——见该文件 §1.8 / §2.5 / §3.6 /
+§5.6 / §6.5 / §7.7，以及 §3.7 的死字段门禁。
 
-| # | 问题 | 为什么需要裁决 | 我的倾向 |
-|---|---|---|---|
-| **Q1** | 非 git 目录下是否保留 `.gitignore` 支持？ | pi 证明可行（`--no-require-git`），但我方需自实现嵌套前缀改写（成本从 0 变成 1 个依赖或 ~150 行手写解析） | **做**，但作为 T1 的第 2 步——先交付 `git ls-files` 路径，再补非 git 路径。**不因此引入依赖**，手写解析 |
-| **Q2** | 结果与 workspace root 的关系：过滤还是保留并标记？ | 我方已实测 `git ls-files` 会返回 cwd 之外的文件；pi 保留并渲染 `../…`，我方计划是过滤 | **过滤**（工具的作用域就是 workspace，越界结果对模型是噪音）。但必须写进文档并测试 |
-| **Q3** | 窗口未知时：回退 64,000 还是跳过压缩？ | pi 跳过，我方回退。两者都有真实代价 | **回退 + 警告日志**。不压缩会导致上下文无限增长至 provider 报错，比早压缩更糟 |
-| **Q4** | 是否引入逐模型压缩预算（`reserveTokens`/`keepRecentTokens`）？ | pi 有这一层，我方无。且它关联 Phase 2 已修缺陷的根因 | **引入**，与 T4 同批（都在改 `CompactionPolicy` 的构造） |
-| **Q5** | 项目级设置是否也需要信任门（与钩子共用还是分开）？ | pi 共用同一个 `projectTrusted`；我方只讨论了钩子 | **共用**（一个门，语义是「信任此项目的所有本地行为」），但必须在文档中写明作用域 |
-| **Q6** | 非法配置值（如负的 `reserveTokens`）应抛错还是忽略？ | pi 抛精确错误；我方计划未规定 | **抛错**。静默忽略让用户以为设置生效了 |
-| **Q7** | 是否引入分节系统提示结构？ | pi 的 `SystemPromptSections` 让「哪类内容属于哪一节」在代码里显式；我方是字面量数组 | **暂不引入**。T2 只需在字面量里追加一段。但若 T2 之后还要加更多注入源（技能目录、cwd、git 状态），分节的价值会上升——**记入 backlog** |
-| **Q8** | 目录列举是否显示隐藏文件？ | pi 显式「是」；我方若应用忽略层则 `.git/` 会被排除 | **显示**（与 pi 一致），忽略层只排除 gitignore 命中的项，不额外排除 dotfiles |
-| **Q9** | 逃生口是否需要危险提示？ | codex 在运行时警告；pi 的 `--approve` 无警告 | **加警告**，与 codex 一致 |
-| **Q10** | **项目级技能是否过信任门？** | pi 让项目技能与项目扩展共用一个信任位；我方 `SkillLoader` 已支持 `<workspace>/.agents/skills` 但计划里未提信任 | **必须过**。项目技能内容**直接进入系统提示**，是比执行代码更隐蔽的注入面。用户级技能无条件注入，项目级走信任门 |
-| **Q11** | **项目 `AGENTS.md` 是否过信任门？** | pi 在这一点上**自相矛盾**：`.pi/SYSTEM.md` 需要信任，`AGENTS.md` 不需要（两者都是仓库提供的、进入系统提示的文本） | **过信任门**。理由取自 pi 自己对 `SYSTEM.md` 的处理——它认可「仓库提供文本进入系统提示」这一类风险 |
-| **Q12** | 信任门的作用域：一个门还是多个？ | pi 是**一个门管 7 类资源**（`settings.json`/`extensions`/`skills`/`prompts`/`themes`/`SYSTEM.md`/`APPEND_SYSTEM.md`） | **一个门**，但提示文案必须**逐项列出**获批范围（pi 的文案做到了：「load `.pi` settings and resources, install missing project packages, and execute project extensions」） |
-| **Q13** | 上下文文件的刷新触发是什么？ | pi 有显式 `/reload`（刷新 keybindings/扩展/技能/提示词/主题/**context files**）；我方**无 `/reload`**（已核验 45 个命令中无此项），计划只说「中途修改不生效」 | **加 `/reload`**，且刷新全部资源而非只刷 `AGENTS.md`——「刷新全部」更可预测。注意我方**有 `/cd` 命令**（`registry.ts:210`），切目录后 `AGENTS.md` 是否重新发现需一并裁决 |
-| **Q14** | 是否支持 `AGENTS.override.md` 这类逐目录覆盖逃生口？ | pi 的候选集有五个文件名，`.override` 排最前，专门用于在不改动 `AGENTS.md` 的前提下覆盖它 | **采纳**——成本是一个数组项，收益是 git 工作树友好的临时覆盖 |
-| **Q15** | 同名目录（名为 `AGENTS.md` 的目录）时，是否让下一候选胜出？ | pi 用 `statSync().isFile()` 跳过，**使 `CLAUDE.md` 有机会胜出**；我方的直觉是「跳过该目录」 | **跟 pi**（继续下一候选）——目录名撞上文件名时，用户显然还写了别的候选文件，没有理由因此整目录放弃 |
-| **Q16** | **`SkillLoader.scan` 是否改为递归？** | **实测我方 3 个技能只发现 1 个**（只读一层）；pi 有 `should load nested skills recursively` 与 `should prefer a directory's root SKILL.md over nested` 两条测试，opencode 的真实技能也用嵌套布局 | **必须递归**，语义跟 pi（找到 `SKILL.md` 即停，否则继续）。**与 T2b 同批**——注入残缺目录比不注入更糟 |
-| **Q17** | 技能名/长度不合规：抛错、警告、还是忽略？ | pi 分两级：缺 `description` **硬失败**，名字/长度不合规**仅警告仍加载** | **跟 pi**——description 是模型匹配技能的唯一依据（缺了无法被发现），名字格式是可容忍瑕疵 |
-| **Q18** | 是否强制 `name` 与父目录名一致？ | pi **刻意偏离** Agent Skills 标准，理由写在文档里：「该要求对共享技能目录不合理」 | **跟 pi**（不强制），但**必须在文档中显式记录这是刻意的标准偏离**——否则将来有人「修复」它会引入不兼容 |
-| **Q19** | 是否加文档↔类型的死字段一致性检查？ | pi 的 `allowed-tools` 与我的 `thinkingBudgets`/`promptCacheTtl` 是**同类系统性缺陷**（声明了、零消费者、甚至写进用户文档） | **加一个门禁**：扫描用户文档里声明的配置字段，逐个验证存在生产消费者。三个独立实现都犯过，说明这是系统性失效模式 |
+**分流如下**（避免两处记录不一致）：
+
+| 原编号 | 主题 | 现位置 |
+|---|---|---|
+| Q1, Q2 | 非 git 目录的 gitignore、结果与 root 的关系 | `phase-3-decisions.md` §1.8 裁决 2、3 |
+| Q3, Q4, Q6 | 窗口未知的回退、逐模型压缩预算、非法配置值 | §5.6 裁决 1、2、3 |
+| Q5, Q9, Q11, Q12 | 信任门作用域、逃生口警告、`AGENTS.md` 信任、门的粒度 | §6.5 裁决 1、6，§2.5 裁决 4 |
+| Q7 | 分节系统提示结构 | §2.5 裁决 8（不引入） |
+| Q8 | 目录列举显示隐藏文件 | §7.7 + §7.6 |
+| Q10 | 项目级技能的信任门 | §3.6 裁决 2 |
+| Q13 | 刷新触发（`/reload`、`/cd`） | §2.5 裁决 5、6 |
+| Q14, Q15 | `AGENTS.override.md`、同名目录 | §2.5 裁决 1、§2.4 |
+| Q16 | `SkillLoader.scan` 递归 | §3.6 裁决 1 |
+| Q17, Q18 | 技能校验分级、`name` 与目录名 | §3.6 裁决 4、§3.5 |
+| Q19 | 死字段门禁 | §3.7 |
+
+**本节不再保留独立清单**——`phase-3-decisions.md` 是唯一裁决源。
 
 ---
 

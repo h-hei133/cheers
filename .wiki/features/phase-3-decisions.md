@@ -136,14 +136,31 @@ confidence: high
 
 | 场景 | 行为 |
 |---|---|
-| 非 git 目录 | 回退到第 1 层剪枝（**无 `.gitignore` 支持**——这是诚实的降级，不是静默错误） |
-| 子目录 cwd | `git ls-files` 默认返回**仓库相对路径**且**包含 cwd 之外的文件**（已实测）→ **必须过滤到 workspace root** |
+| 非 git 目录 | 回退到第 1 层剪枝 + **第 3 层：进程内 `.gitignore` 匹配**（见 §1.8 裁决 2） |
+| 子目录 cwd | `git ls-files` 默认返回**仓库相对路径**且**包含 cwd 之外的文件**（已实测）→ **过滤到 workspace root**（裁决 3） |
 | `git` 不在 PATH | 同「非 git 目录」路径处理 |
+| 嵌套 git repo | 外层 `git ls-files` 把内层 repo 显示为 gitlink **且不进入**（已实测）→ 与 pi 的嵌套边界行为一致，接受 |
 | 巨大仓库 | 未实测；`git ls-files` 是 C 实现，预期优于 JS 递归 |
+
+**⚠️ 原记录更正**：本表原写「非 git 目录无 `.gitignore` 支持——这是诚实的降级」。**该定性过宽**。pi 用 `--no-require-git` 证明**非 git 目录下保留 gitignore 是可行的**，且只需一个纯路径判断（向上找 `.git`），不需要 git 命令。这是**能力缺口**而非等价降级。已裁决补齐（§1.8 裁决 2）。
 
 ### 1.7 验证方式（客观可测）
 
 文件数（14,414 → 2,741）、`.gitignore` 生效、`!` 取反生效、非 git 回退、**三工具可见文件集一致**。
+
+### 1.8 补充裁决（对照 pi 后收口）
+
+对照 `phase-3-execution.md` §1 的 pi 决定后，以下三项**已裁决**：
+
+| # | 事项 | 裁决 | 理由 |
+|---|---|---|---|
+| **1** | 结果上限与截断通知 | **加**：条数上限 + 字节上限，且**通知可操作**（`"Use limit=N for more, or refine pattern"`） | 原计划只规定剪枝，未规定上限——巨型仓库的 `glob **/*` 仍会把全部结果塞给模型。pi 的 find/grep/ls 三者都有上限且通知可操作 |
+| **2** | 非 git 目录的 `.gitignore` | **补第 3 层**：向上找 `.git`；在仓库内用 `git ls-files`，不在则**进程内读取 `.gitignore`/`.ignore` 并匹配** | pi 证明可行。**不引入依赖**——手写解析（pi 的 `skills.ts:47-63` 给出参考：前缀改写 + 递归传递 matcher）。**先交付第 1+2 层，第 3 层紧随** |
+| **3** | 结果与 workspace root 的关系 | **过滤**（不保留越界结果） | 工具的作用域就是 workspace；越界结果对模型是噪音。pi 保留并渲染 `../…`，我方明确不跟，理由已记录 |
+| **4** | 额外忽略文件名 | **支持 `.gitignore` + `.ignore`**（不含 `.fdignore`——那是 fd 专有，我方无 fd） | pi 支持三个；我方取前两个。`.fdignore` 与我方无关 |
+| **5** | 忽略文件的**嵌套前缀改写** | **必须实现** | 这是 `git ls-files` 原本替我方承担的复杂度。pi 的做法（`prefixIgnorePattern`）是参考 |
+| **6** | Windows glob 语义 | **本轮不做**，记入 backlog | 我方无 Windows 目标；`find.ts:201-213` 的 `**/` 前缀与 `[/\\]` 改写是 pi 的平台适配 |
+| **7** | 部分失败的容忍 | **采纳 pi 的形态**：无匹配不是错误；上限触发不算错误；stat 失败的条目跳过但**计数报告** | `grep` exit 1 = 成功；`ls` 的静默跳过改为报告数量（见 T6） |
 
 ---
 
@@ -232,12 +249,28 @@ confidence: high
 
 ### 2.4 失败模式
 
-| 场景 | 建议行为 |
+| 场景 | 裁决 |
 |---|---|
 | 文件不可读 | 警告并跳过（**`pi` 的做法**）；**不采纳 `opencode`**（它 `Effect.catch(() => succeed(""))` 后又被 falsy 过滤 → **不可读与不存在无法区分**） |
-| 同名目录 | 跳过（`pi` 的 `statSync(...).isFile()`；`codex` 的 `metadata.is_file`） |
+| 同名目录（名为 `AGENTS.md` 的目录） | **继续下一候选**（跟 `pi` 的 `statSync().isFile()`）——用户显然还写了别的候选文件，没有理由因此整目录放弃 |
 | 超大文件 | 截断到预算 + 警告（`codex`） |
 | 非 UTF-8 | 有损解码（`codex` 的 `from_utf8_lossy`） |
+| BOM | 剥离（`pi` 的 `stripBom`）；复用我方 `read` 已有的 `splitByteOrderMark` |
+
+### 2.5 补充裁决（对照 pi 后收口）
+
+| # | 事项 | 裁决 | 理由 |
+|---|---|---|---|
+| **1** | 候选文件名集 | **五个**：`AGENTS.override.md` > `AGENTS.md` > `AGENTS.MD` > `CLAUDE.md` > `CLAUDE.MD`，每目录取首个命中 | `.override` 是**刻意的逐目录覆盖逃生口**——让「临时覆盖项目规则」不需要改动 `AGENTS.md` 本身（对 git 工作树友好）。成本是一个数组项 |
+| **2** | 全局/用户文件 | **包含，且排在最前** | `pi` 与 `codex` 都这么做。我方原计划未提，补入 |
+| **3** | 注入顺序 | **全局 → 根 → … → cwd**（由远及近） | 与 `pi` 的 `unshift` 顺序一致；顺序影响模型如何理解「更具体的规则覆盖更一般的」。原计划未显式记录 |
+| **4** | 项目 `AGENTS.md` 是否过信任门 | **过**（与 T5 同一门） | `pi` 在这一点上**自相矛盾**：`.pi/SYSTEM.md` 需要信任而 `AGENTS.md` 不需要（两者都是仓库提供的、进入系统提示的文本）。理由取自 `pi` 自己对 `SYSTEM.md` 的处理——它认可这类风险。**这是安全默认，不是跟风** |
+| **5** | 刷新触发 | **新增 `/reload`**，刷新全部资源（上下文文件 + 技能 + 扩展 + 配置），与 `pi` 一致 | 我方原计划只说「中途修改不生效」，未规定如何让它生效。且「刷新全部」比「只刷 `AGENTS.md`」更可预测 |
+| **6** | `/cd` 切换目录后 | **重新发现上下文文件** | 我方有 `/cd` 命令（`registry.ts:210`）；`pi` 的 `cwd` 在 loader 构造时固定，它没有这个问题是因为它**没有切目录命令**。我方有，必须处理 |
+| **7** | linked worktree 遮蔽 | **本轮不做**，记入 backlog | `pi` 的 `findShadowedContextFile`（`resource-loader.ts:89-111`）处理「主仓库与链接工作树的同名文件占据同一逻辑作用域、加载两次」的缺陷。我方是否支持 worktree 工作流尚未裁决；**先记入，不阻塞 T2** |
+| **8** | 分节系统提示结构 | **不引入**（维持字面量数组） | 已核验：我方 `turn/step.ts:106` 只发**一条**前导 system 消息，`pi` 的分节 diff 在其「无 mid-convo system 支持」分支上**退化为重新折叠整份提示词**——即与我方做法等价。不引入不是「简化」，而是「选 `pi` 在该分支上实际执行的做法」 |
+| **9** | 标签包裹 | **保留**（`<project_instructions path="...">`） | 即使不做 diff，标签给了模型结构化边界；且 `path` 属性让模型知道规则来源 |
+| **10** | 无 mid-convo system 消息的 provider | **不区分**——我方只有一条前导 system 消息 | `pi` 需要 `collapseSystemMessages` 是因为它支持多 provider；我方单路径无需分支 |
 
 ---
 
@@ -284,11 +317,33 @@ confidence: high
 
 ### 3.5 失败模式
 
-| 场景 | 行为 |
+| 场景 | 裁决 |
 |---|---|
-| 技能无 `description` | `pi` 直接丢弃该技能（`skills.ts:338-340`）→ 采纳（无描述无法被模型匹配） |
-| 技能名冲突 | `pi` 首个胜出 + 冲突诊断；`opencode` 后者覆盖 + 警告 → 采纳 `pi`（首胜更可预测） |
-| 技能数量 | **两个参考都无上限**（已核实）→ 同样不做上限，但目录注入天然受 T2 的 32 KiB 预算保护 |
+| 技能无 `description` | **硬失败，不加载**（`pi`）——description 是模型匹配技能的唯一依据，缺了无法被发现 |
+| 技能名/长度不合规 | **仅警告，仍加载**（`pi` 的两级划分）——名字格式是可容忍瑕疵，与「无法被匹配」不同级 |
+| 技能名冲突 | **首个胜出 + 冲突诊断**（记录 `winnerPath`/`loserPath`）；`opencode` 是后者覆盖 + 警告 → 采纳 `pi`（首胜更可预测） |
+| 符号链接指向同一文件 | **静默跳过**（`pi` 的 `realPathSet` 去重）——同一文件经符号链接出现两次不是冲突 |
+| 技能数量 | **不设上限**（两个参考都无）——目录注入天然受 T2 的 32 KiB 预算保护 |
+
+### 3.6 补充裁决（对照 pi 后收口）
+
+| # | 事项 | 裁决 | 理由 |
+|---|---|---|---|
+| **1** | **`SkillLoader.scan` 递归** | **改为递归**，语义跟 `pi`：找到 `SKILL.md` 的目录**不再向下**，否则继续 | **实测我方只读一层：3 个嵌套技能只发现 1 个**（`top/SKILL.md`、`group/nested/SKILL.md`、`nested/deep/SKILL.md` → 只发现 `top-skill`）。`pi` 有两条专门测试（`should load nested skills recursively`、`should prefer a directory's root SKILL.md over nested`），`opencode` 真实技能即用嵌套布局。**必须与 T2b 同批**——注入残缺目录比不注入更糟 |
+| **2** | 项目级技能的信任门 | **过信任门**（与 T5 同一门）；用户级技能无条件注入 | 项目技能内容**直接进入系统提示**。已核验我方 `SkillLoader` 读 `<workspace>/.agents/skills` 时 `grep -c "trust"` → **0**，且项目技能**覆盖**用户同名技能（`skillLoader.ts:36-40` 注释明写 "Project skills win"）。今天这条路是惰性的（技能只喂 `/skill` 与 UI）；**T2b 一旦接线就激活它** |
+| **3** | 逐技能退出字段 | **加 `disable-model-invocation`**，语义为「从模型视野隐藏，保留用户调用路径」 | `pi` 的语义比「禁用」精确。我方 `Skill` 类型**无隐藏标志**，需补字段。补偿路径是 `/skill:name` 强制注入正文 |
+| **4** | `name` 是否必须匹配父目录 | **不强制**，但**在文档中显式记录这是刻意的标准偏离** | `pi` 刻意偏离 Agent Skills 标准，理由：「该要求对共享技能目录不合理」。我方行为已一致（`dirName` 仅作 fallback），但**未记录是刻意的**——将来有人「修复」会引入不兼容 |
+| **5** | 根级散落 `.md` | **支持**（我方 `scan` 已支持） | 我方比 `pi` 更宽（`pi` 只在特定模式目录收根级 `.md`）；保持现有行为，不收紧 |
+| **6** | CLI 级技能路径注入 | **不做**（记入 backlog） | `pi` 有 `--skill`（additive，即使与 `--no-skills` 同用也生效）。我方无此需求，且 `SkillLoader` 的根是构造时固定的两个 |
+| **7** | 目录列举中的技能目录 | 与 T6 一致——**应用统一忽略层** | 技能目录可能含 `node_modules` 等；T6 的目录列举与 T2b 的技能发现共享同一忽略判定 |
+
+### 3.7 死字段门禁（新增，源自 T3 与 pi 的同类缺陷）
+
+**已核验**：`pi` 的 `allowed-tools` 在 `docs/skills.md:148` 被声明，但 `grep allowed-tools` 于 pi `src` → **0 命中**。这与本仓库的 `thinkingBudgets`/`promptCacheTtl` 是**完全同构**的缺陷。
+
+**三个独立实现都犯过** → 这是这类产品的**系统性失效模式**，不是孤立失误。
+
+**裁决：加一个门禁**——扫描用户文档中声明的配置字段，逐个验证存在生产消费者。反向可失败：给某字段加文档但不接线 → 门禁必须失败。
 
 ---
 
@@ -302,38 +357,48 @@ confidence: high
 | `promptCacheTtl` | `"5m" \| "1h"`，`runtimeConfig.ts:79,117,145,227` | **同上，零实际使用** |
 | `tuiMode` | `"regular" \| "fullscreen" \| "stream"`，`runtimeConfig.ts:81,119,147,229` | **同上，零实际使用** |
 
-### 4.2 关键证据：与活轨语义冲突
+### 4.2 关键证据：我方只有一条请求路径，无 token 预算的消费位点
 
-`turn/step.ts:102-114` 的活轨发的是 **OpenAI 的档位**：
+**⚠️ 本节原论证有误，已更正。** 原文称 `thinkingBudgets` 与活轨的 `reasoning_effort`「语义冲突、接线会产生两个来源」——**这个论证是错的**。pi 的实现证明二者互补：`thinkingBudgets` 把档位映射为数值预算（`minimal:1024 / low:2048 / medium:8192 / high:16384`），Anthropic/Google/Bedrock 原生消费，且注释明写 *"Independent of thinkingFormat"*——**它是 cap，不是竞争来源**。详见 `phase-3-execution.md` §4.1。
 
-```ts
-const effort = effortAccepted ? getThinkingEffort(request.workspaceRoot) : undefined;
-const payload = {
-  ...
-  ...(effort ? { reasoning_effort: effort } : {}),
-```
+**正确的理由**（已核验）：
 
-而 `thinkingBudgets` 是 **Anthropic 的数值 token 预算**概念（`Record<string, number>`）。
+| 事实 | 证据 |
+|---|---|
+| 我方只有**一条**请求路径：`POST /chat/completions` | `turn/step.ts:138`（唯一 fetch） |
+| `RuntimeProvider` 声明了 6 个值（`anthropic`/`openai`/`google`/…），但**不驱动请求形状** | `step.ts` 只有一个请求体 |
+| 我方**无**任何 token 预算字段 | 搜 `thinking_token_budget\|budget_tokens` → **0 命中** |
+| 活轨只发 `reasoning_effort` | `turn/step.ts:114` |
 
-**接线会产生两个 thinking 来源**——这正是 Phase 1 为此删掉 `permissionMode` 的同一类缺陷（`phase-0-disposition.md` §1.5：声明了但没接的，要么接上要么删掉）。
+即：`thinkingBudgets` 描述的能力（按档位设定 token 预算）在我方**没有消费位点**——不是因为它与 `reasoning_effort` 冲突，而是因为我方运行时只有 OpenAI 兼容的单一路径，没有 token 型 provider 的适配层。
 
-`promptCacheTtl` 同理：我们的 provider 层只发标准 `POST /chat/completions`，该端点**没有**请求级缓存 TTL 参数（OpenAI 的缓存是 1024+ token 前缀自动生效；Anthropic 用 `cache_control` 块标记，不是根字段）。接线只能接成空转或 400。
+**这个区别有实际后果**：原论证会导出「将来接 Anthropic 也不该有此字段」，而 pi 证明**恰恰相反**——接 token 型 provider 时数值预算是**必需**的，`reasoning_effort` 无法表达它。
+
+**`promptCacheTtl` 同理但独立**：标准 `/chat/completions` 没有请求级缓存 TTL 参数（OpenAI 的缓存是 1024+ token 前缀自动生效；Anthropic 用 `cache_control` 块标记，不是根字段）。我方无 `cache_control` 也无 `cacheRetention` 层（已核验 0 命中），接线只能接成空转或 400。
 
 ### 4.3 裁决
 
 | 字段 | 裁决 | 理由 |
 |---|---|---|
-| `thinkingBudgets` | **删除** | 与活轨语义冲突，接线制造双来源 |
-| `promptCacheTtl` | **删除** | 端点无对应参数 |
+| `thinkingBudgets` | **删除** | 无消费位点（我方只有 OpenAI 兼容单路径）。**接入 token 型 provider 时必须重新引入**，形状见 `phase-3-execution.md` §4.1 |
+| `promptCacheTtl` | **删除** | 端点无对应参数，且我方无 `cache_control` 层 |
 | `tuiMode` | **暂缓，不删** | 它是**真能力**，只是缺配置入口 |
 
 **`tuiMode` 为何与上两个不同**：表面选择是**真实存在且已在运行**的——`supportsFullScreenSurface(stdin, stdout)` 从 TTY 能力**自动判定**（`cliStartupSurface.ts:61`、`interactiveLoop.ts:50`，共 5 处消费），并在不支持时回退到 `runLineLoop`。所以 `tuiMode` 描述的是一个**已经实现的机制**，只是用户无法**强制**选择。而 `thinkingBudgets`/`promptCacheTtl` 描述的是**不存在的机制**。
 
-**但要注意**：当前判定是**纯自动**的（依据 TTY 能力），不是配置驱动。因此「接线」不是「读配置传给表面选择」这么简单——需要定义**自动判定与显式配置的优先级**（显式配置应能覆盖自动判定，但自动判定为「不支持全屏」时不应允许强制全屏）。这个设计问题使它不宜与 T3 的两个纯删除项同批处理。
+**但要注意**：当前判定是**纯自动**的（依据 TTY 能力），不是配置驱动。因此「接线」需要定义**自动判定与显式配置的优先级**（显式配置应能覆盖自动判定，但自动判定为「不支持全屏」时不应允许强制全屏）。**裁决：本轮不接线，`tuiMode` 保留并在类型注释中标注「已声明未接线」**，避免下一个人重复调查。
 
-**参考实现的印证**：`pi` 的 `settings-manager.ts:895-905` 里，thinking 相关设置是**档位/开关**，不是数值预算表——与本仓库活轨一致。
+### 4.4 一个附带的真实失效模式
 
-### 4.4 验证
+pi 引入预算上限的理由（`openai-completions.ts:974-977` 注释）：
+
+> Reasoning and the answer share max_tokens here, so an uncapped reasoning phase can consume the whole response and leave no answer and no tool call.
+
+**我方符合这个前提**：`turn/step.ts:114,116` **同时**发 `reasoning_effort` 与 `max_tokens`（默认 4096）。我方是**检测并解释**（`emptyAnswerExplanation` 按 `reasoningLength > 0` 区分空响应与推理吃满），**pi 是预防**。
+
+**裁决：本轮不改**（检测已覆盖可观测性），但记入 backlog——接入 token 型 provider 时预算上限成为必需。
+
+### 4.5 验证
 
 `tsc` 0 错 + 全量测试。删除字段会同时删除钉住它们的测试（这些测试只断言「字段存在」——属于「断言实现」而非「断言行为」，按 `AGENTS.md` 验证纪律应删）。
 
@@ -401,6 +466,19 @@ return tokens > contextWindow - reserveTokens;
 
 选一个 200k 模型，断言 `/context` 与压缩策略**都用 200k**（当前会用 64k）。
 
+### 5.6 补充裁决（对照 pi 后收口）
+
+| # | 事项 | 裁决 | 理由 |
+|---|---|---|---|
+| **1** | 窗口未知/为 0 时 | **回退 64,000 + 警告日志**（不跟 `pi` 的「跳过压缩」） | `pi` 跳过压缩（`agent-session.ts:571-573`），我方回退。**取舍**：不压缩会导致上下文无限增长直至 provider 报错，比早压缩更糟。**但必须加警告日志**——当前静默回退让用户不知道窗口是猜的 |
+| **2** | 逐模型压缩预算 | **引入** `reserveTokens`/`keepRecentTokens` 的逐模型覆盖，解析链 `override ?? ordinary ?? default`，与 T4 同批 | `pi` 有这一层（`settings-manager.ts:19-27`），我方 `CompactionPolicy` 无逐模型维度。**它关联 Phase 2 已修缺陷的根因**——`phase-2-execution.md` §5 的「预算被当作测量值」问题，根因之一是预算只有全局一个口径 |
+| **3** | 非法配置值（如负的 `reserveTokens`） | **抛带字段名的精确错误**（跟 `pi`） | 静默忽略让用户以为设置生效了。`pi` 校验非安全整数并抛错（`settings-manager.ts:858-883`） |
+| **4** | 覆盖键格式 | **单一格式**：`"provider/modelId"` | `pi` 在同一产品里有**两种**（models.json 用裸 `modelId`，settings.json 用 `"provider/modelId"`）——**这是不一致，不是设计**，不复制 |
+| **5** | 窗口解析时机 | **解析一次并缓存**（比 `pi` 更严） | `pi` 快照模型对象但**每次调用重解并重校验压缩预算**（`agent-session.ts:2311,568`）。我方 `loadCatalog()` **每次同步读盘**（`catalogStore.ts:45`），「每次重解」会变成每次读盘。校验应在加载期一次完成 |
+| **6** | 模型切换后的溢出归属 | **按当前模型衡量** | `pi` 的 `agent-session.ts:2319-2339` 保证旧模型的溢出不触发新模型的压缩。我方需显式处理（切换后重算阈值） |
+| **7** | 目录新鲜度 | **本轮不引入远程刷新**，但**加 `localGeneratedAt` 式守卫**（若将来引入） | `pi` 有完整设计（4h 窗口、etag 仅在缓存体存在时发、404/501 → 空覆盖、瞬时失败保留 etag）。特别值得注意的是 `localGeneratedAt` 守卫——**防止陈旧远程数据覆盖更新的内置快照**，这是一个我方未考虑的具体失效模式。我方 `catalogRefresh.ts` 已存在，本轮不扩展 |
+| **8** | 未信任项目的设置 | **不可见**（与 T5 同一门） | `pi` 的 `settings-manager.ts:397-399`：`if (scope === "project" && !projectTrusted) return {}` |
+
 ---
 
 ## 6. T5 — 扩展宿主的最小诚实步骤
@@ -454,7 +532,19 @@ return tokens > contextWindow - reserveTokens;
 | 配置不可读 | 警告 + 忽略该文件 |
 | 未信任 | **仍列出但不执行**（`discovery.rs:701-707`）——避免「用户以为钩子在跑」 |
 
-### 6.5 若本轮不做
+### 6.5 补充裁决（对照 pi 后收口）
+
+| # | 事项 | 裁决 | 理由 |
+|---|---|---|---|
+| **1** | 信任门作用域 | **一个门，覆盖 7 类资源**：项目设置、扩展/钩子、技能、提示词模板、主题、`SYSTEM.md`、`APPEND_SYSTEM.md`（+ 本项目 T2 的 `AGENTS.md`） | `pi` 的 `TRUST_REQUIRING_PROJECT_CONFIG_RESOURCES`（`trust-manager.ts:30-38`）就是这 7 类。**一个门**的语义是「信任此项目的所有本地行为」，比分门可预测 |
+| **2** | 提示文案 | **必须逐项列出获批范围** | `pi` 的文案做到了：「load `.pi` settings and resources, install missing project packages, and execute project extensions」。含糊的「信任此项目？」不够——用户要能看见自己批准了什么 |
+| **3** | 批准前如何展示内容 | **两遍加载**：先以「不信任」加载一遍（用于**展示待批准项**，此时项目代码**尚未执行**），询问后再以真实状态重载 | `pi` 的 `resource-loader.ts:380-387` 的具体技巧。原计划只说了「需要一个信任门」，未考虑「用户如何在批准前看到内容」 |
+| **4** | 无 UI 时（非交互模式） | **默认拒绝** | `pi` 的 `project-trust.ts:83-85`。这是关键的安全默认值——非交互模式无人能批准，必须默认不信任 |
+| **5** | 自举风险：扩展能否决定自身信任 | **明确排除**——声明式钩子**不得**注册 `project_trust` 类 handler | `pi` 允许扩展注册 `project_trust` handler **程序化覆盖**信任决策（`project-trust.ts:56-69`），形成鸡生蛋问题：能决定「是否信任项目」的代码本身来自项目。**我方不做这个能力** |
+| **6** | 逃生口 | **提供，且必须带危险提示** | `codex` 的 `--dangerously-bypass-hook-trust` 在运行时警告「Enabled hooks may run without review for this invocation.」；`pi` 的 `--approve` 无警告。**采纳 codex 的带警告形式** |
+| **7** | 失败处理 | 超时、输出上限、非 JSON 输出 → 无操作、`block` 无 reason → 无效、配置不可读 → 警告并忽略、**未信任仍列出但不执行** | 全部来自 `codex` 的实测行为。最后一条尤其重要——避免「用户以为钩子在跑」 |
+
+### 6.6 若本轮不做
 
 **明确说明**：`registerCommandHook` 与 `HooksConfiguration` 保持零调用者。**这是可接受的**——它们不是「说谎的字段」（不像 T3 那三个），而是**已就绪但未接线的能力**。但应在类型注释中标注「未接线」，避免下一个人重复调查。
 
@@ -535,36 +625,68 @@ if (type === "directory") return yield* reader.list(absolute, { offset: input.of
 
 ### 7.6 失败模式
 
-| 场景 | 行为 |
+| 场景 | 裁决 |
 |---|---|
 | 巨大目录 | 分页（1000/页）+ 截断通知 |
 | 权限不足 | 明确错误（`pi`：`Cannot read directory: ...`） |
 | 符号链接指向工作区外 | 沿用现有 containment 检查 |
 | 目录为空 | 中性消息，非错误 |
+| 条目 stat 失败 | 跳过，**但报告跳过数量**（不跟 `pi` 的静默跳过） |
+| 隐藏文件 | **显示**（跟 `pi` 的 "Includes dotfiles"）——忽略层只排除 gitignore 命中的项，不额外排除 dotfiles |
+
+### 7.7 补充裁决（对照 pi 后收口）
+
+| # | 事项 | 裁决 | 理由 |
+|---|---|---|---|
+| **1** | 输出是否含文件大小 | **不含** | `pi`/`opencode` 无，`gemini-cli` 有 `(N bytes)` → 2:1，且省一次 `stat` |
+| **2** | 条目 stat 失败 | **报告跳过数量**（`(N skipped)`） | `pi` 静默跳过（`ls.ts:125-128`）会让模型以为「目录就这些」。`gemini-cli` 的 `(N ignored)` 是可取的 |
+| **3** | 忽略规则的可见反馈 | **报告被忽略数量** | `gemini-cli` 的 `(N ignored)` 帮助模型判断是否需要换策略 |
+| **4** | 与 `read` 的分页参数共用 | **共用**现有 `offset`/`limit`（默认 500，上限 1000） | 我方 `read` 已有该机制（`registry.ts:328-338`），无需新参数 |
+| **5** | 提示词是否加「优先用目录列举」的正面指引 | **不加** | 四个参考**都没有**正面指引；`pi` 只有一条**反向**规则（仅当 `ls`/`grep`/`find` 全部缺失时才建议用 bash）。这是强信号 |
 
 ---
 
 ## 8. 汇总表
 
+**全部 7 项主决策 + 44 项补充裁决已定案，无待决项。**
+
 | 项 | 裁决 | 类型 | 成本 | 风险 | 关键依据 |
 |---|---|---|---|---|---|
-| **T3** | **删除** `thinkingBudgets` + `promptCacheTtl`；`tuiMode` 暂缓 | 删死配置 | 极低 | 极低 | 与活轨 `reasoning_effort` 语义冲突 |
-| **T1** | **两层**：遍历期剪枝 + `git ls-files`（非 git 回退） | 修缺陷（性能+正确性） | 中低 | 低 | 57.2% 白遍历；`.gitignore` 零支持；`codex` `require_git` 注释 |
-| **T4** | 配置优先 + 目录回退 + **上限钳制** | 修缺陷 | 低 | 低 | 1M 模型被按 64k 压缩（浪费 93.6%） |
-| **T2** | 分节系统提示 + 祖先遍历（**止于项目根**）+ **32 KiB 预算** + CLI/配置开关 | 修缺陷 | 低 | 中（推高固定成本） | `AGENTS.md` 对模型完全不可见 |
-| **T2b** | **目录注入 + 复用 `read`**，不加专用工具；`/skill:name` 强制注入 | 补功能 | 低 | 低 | `pi`/`opencode` 一致：只注入目录 |
-| **T5** | **声明式窄路径 + 内容哈希信任门**；不做插件代码宿主 | 补基础设施 | 中 | 中高（安全面） | `opencode` 静默执行是反面教材 |
-| **T6** | **做**：目录列举**折进 `read`**（非新增 `ls`），应用 T1 忽略层 | **修缺陷** | 低 | 低 | `read` 对目录抛 EISDIR；`opencode` 折叠形状；四个参考一致单层 |
+| **T3** | **删除** `thinkingBudgets` + `promptCacheTtl`；`tuiMode` 保留待接线 | 删死配置 | 极低 | 极低 | **无消费位点**（我方只有 OpenAI 兼容单路径）；非「语义冲突」 |
+| **T1** | **三层**：遍历期剪枝 + `git ls-files` + 非 git 时进程内 `.gitignore` | 修缺陷（性能+正确性） | 中低 | 低 | 57.2% 白遍历；`.gitignore` 零支持；`pi` 的 `--no-require-git` |
+| **T4** | 配置优先 + 目录回退 + **上限钳制** + 逐模型压缩预算 | 修缺陷 | 低 | 低 | 1M 模型被按 64k 压缩（浪费 93.6%） |
+| **T2** | 祖先遍历（**止于项目根**）+ **32 KiB 预算** + 五候选含 `.override` + `/reload` + **过信任门** | 修缺陷 | 低 | 中（推高固定成本） | `AGENTS.md` 对模型完全不可见 |
+| **T2b** | **目录注入 + 复用 `read`**；`/skill:name` 强制注入；**`scan` 改递归**；**过信任门** | 修缺陷（含实测缺陷） | 低 | 低 | **实测 3 个嵌套技能只发现 1 个** |
+| **T5** | **声明式窄路径 + 内容哈希信任门**（一门管 7 类资源）；不做插件代码宿主 | 补基础设施 | 中 | 中高（安全面） | `opencode` 静默执行是反面教材 |
+| **T6** | **做**：目录列举**折进 `read`**，应用 T1 忽略层 | **修缺陷** | 低 | 低 | `read` 对目录抛 EISDIR（实测） |
 
-**执行顺序**（沿用 `phase-3-pre-research.md` §6，**仅 T6 的性质与位置理由有修订**）：
+### 8.1 本轮实测发现的**两个真实缺陷**
+
+| 缺陷 | 实测证据 | 归属 |
+|---|---|---|
+| `read` 对目录抛原始 `EISDIR` | `IsADirectoryError: [Errno 21]` | T6 |
+| `SkillLoader.scan` 只读一层，嵌套技能静默丢失 | 3 个 fixture 只发现 1 个 | T2b |
+
+**两者都必须与各自的任务同批修，不能分两轮**——T2b 注入残缺目录比不注入更糟。
+
+### 8.2 执行顺序
 
 $$\text{T3} \to \text{T1} \to \text{T4} \to \text{T6} \to \text{T2/T2b} \to \text{T5}$$
 
-**T2 与 T2b 合并为一轮**（共用 `Skill` 数据与同一个系统提示组装点）。
+**T2 与 T2b 合并为一轮**（共用 `Skill` 数据与同一个系统提示组装点，且共用信任门）。
 
-**T6 的位置修订**：预研把它排在最后并判为「补功能」。**实测推翻了这个定性**——`read` 对目录抛 EISDIR 是一个真实缺陷，且修复形状已由 `opencode` 验证。它排在 **T1 之后**（硬依赖统一忽略层）、**T2 之前**（T2 会推高每次请求的固定成本，应在功能面稳定后再做，以便 `/context` 数字准确）。
+**T6 的位置修订**：预研判为「补功能」并排在最后。**实测推翻了这个定性**——`read` 对目录抛 EISDIR 是真实缺陷，且修复形状已由 `opencode` 验证。排在 **T1 之后**（硬依赖统一忽略层）、**T2 之前**（T2 会推高每次请求的固定成本，其收益评估需要 `/context` 数字准确；T6 不改变请求成本，先做无干扰）。
 
-**T6 为何排在 T2 之前**：T2 增加的是**每次请求的固定开销**，其收益评估需要 `/context` 的数字可信；而 T4 刚修正窗口解析。T6 不改变请求成本，先做无干扰。
+### 8.3 移出本轮（附理由）
+
+| 项 | 理由 |
+|---|---|
+| linked worktree 遮蔽 | 我方是否支持 worktree 工作流未裁决；记入 backlog |
+| Windows glob 语义 | 我方无 Windows 目标 |
+| CLI 级技能路径注入（`--skill`） | 我方无此需求 |
+| 远程目录新鲜度刷新 | `catalogRefresh.ts` 已存在，本轮不扩展；但已裁决「若引入则加 `localGeneratedAt` 守卫」 |
+| 推理预算上限（防推理吃满 `max_tokens`） | 我方已有 `emptyAnswerExplanation` 检测；接入 token 型 provider 时成为必需 |
+| 文档↔类型死字段门禁（§3.7） | 已裁决要做，但属独立小工具，不与 T1–T6 同批 |
 
 ---
 
@@ -586,7 +708,13 @@ $$\text{T3} \to \text{T1} \to \text{T4} \to \text{T6} \to \text{T2/T2b} \to \tex
 | `AGENTS.md` 零内容读取 | 全仓 6 处引用逐个读 |
 | `AGENTS.md` 体积 | **实测** 138 行 / 8,922 字符 ≈ 2,549 tokens |
 | 三个配置字段零消费者 | 全仓 `grep`，逐个确认仅剩声明/默认/合并 |
-| `thinkingBudgets` 与活轨冲突 | 读 `turn/step.ts:102-114` |
+| `thinkingBudgets` 无消费位点（**原判「与活轨冲突」已更正**） | 读 `turn/step.ts:102-114,138`（唯一请求路径）；搜 `thinking_token_budget\|budget_tokens` → **0 命中** |
+| `pi` 的 `thinkingBudgets` 是活机制 | 逐层读 `settings-manager.ts:67-72` → `simple-options.ts:57-72` → `anthropic-messages.ts:1175` / `bedrock-converse-stream.ts:564-568` / `openai-completions.ts:974-977` |
+| 我方同时发 `reasoning_effort` + `max_tokens` | 读 `turn/step.ts:114,116`（`max_tokens` 默认 4096，`runtimeConfig.ts:135`） |
+| **我方 `SkillLoader.scan` 只读一层** | 构造 3 个嵌套技能 fixture，复刻 `scan` 逻辑运行 → **只发现 1 个** |
+| 我方 `SkillLoader` 零信任检查 | `grep -c "trust\|Trust" skillLoader.ts` → **0** |
+| 我方 `read` 对目录抛 EISDIR | **实测** `IsADirectoryError: [Errno 21]` |
+| 我方无 `/reload`、有 `/cd` | 列 `registry.ts` 全部命令名 |
 | 目录 `contextWindow` 只用于显示 | 全仓 `grep .contextWindow` 逐个分类（显示 3 处 / 压缩 0 处） |
 | 压缩策略值来自 `runtimeConfig` | 读 `cliSessionRuntimeFactory.ts:55` → `session/compaction.ts:116` |
 | `loadCatalog` 同步读盘 | 读 `catalogStore.ts:45` |
