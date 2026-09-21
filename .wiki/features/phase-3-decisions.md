@@ -5,7 +5,7 @@ sources: [pi-source-2026-09-21, opencode-source-2026-09-21, gemini-cli-source-20
 created: 2026-09-21
 updated: 2026-09-21
 tags: [features, phase-3, decisions, adjudication]
-summary: "Phase 3 开工前的裁决记录。对 T1–T6 七项待定决策逐一给出建议与理由，每条附我方 file:line 与参考实现 file:line 双向证据。核心裁决：T1 用 `git ls-files` + 遍历期剪枝两层设计（不引入二进制下载）；T3 删除两个说谎字段；T2 采用 pi 的「分节系统提示 + 技能只注入目录」；T4 采用 codex 的「用户配置优先但被模型上限钳制」；T5 本轮只做声明式窄路径且必须带信任边界；T6 判定为低价值、暂缓。"
+summary: "Phase 3 开工前的**唯一裁决源**。7 项主决策 + 1 项新增任务（T7 死字段门禁）+ 44 项补充裁决，全部定案、无待决项。经 5 个独立审查者复核后**更正 13 处**，其中 5 处为高严重度：①项目 MCP 配置可 spawn 任意命令且零信任检查（原「无插件代码宿主」论证遗漏）；②`read` 的路径监狱拒绝用户级技能，T2b 的 `location` 设计按现状无法工作（**阻断性**）；③既有信任探测器认不出要门控的资源（6 形态实测，4 种未探测到）；④`git ls-files` 裸调用在子目录下静默丢文件（须用 `-C <root>`）；⑤T4 的上限钳制不可实施（`CatalogModel` 无上限字段）。另有 2 处「未考虑」发现此前被静默丢弃，已补录。"
 confidence: high
 ---
 
@@ -134,19 +134,21 @@ confidence: high
 
 ### 1.6 失败模式与边界
 
+> **⚠️ 本节经独立审查后更正**（见 §1.9 发现 1）。原记录称「从子目录运行返回仓库相对路径且**包含 cwd 之外的文件**」——**这是反的**，会导致静默丢失文件。
+
 | 场景 | 行为 |
 |---|---|
+| **子目录 cwd** | **必须显式指定仓库根**：`git -C <workspaceRoot> ls-files --cached --others --exclude-standard`。裸 `git ls-files` 在子目录下**只返回该子目录内的文件**（已实测：`root.ts` 被静默丢弃）。**仅靠「过滤到 workspace root」不能修复**——文件在源头就没了 |
 | 非 git 目录 | 回退到第 1 层剪枝 + **第 3 层：进程内 `.gitignore` 匹配**（见 §1.8 裁决 2） |
-| 子目录 cwd | `git ls-files` 默认返回**仓库相对路径**且**包含 cwd 之外的文件**（已实测）→ **过滤到 workspace root**（裁决 3） |
 | `git` 不在 PATH | 同「非 git 目录」路径处理 |
 | 嵌套 git repo | 外层 `git ls-files` 把内层 repo 显示为 gitlink **且不进入**（已实测）→ 与 pi 的嵌套边界行为一致，接受 |
 | 巨大仓库 | 未实测；`git ls-files` 是 C 实现，预期优于 JS 递归 |
 
-**⚠️ 原记录更正**：本表原写「非 git 目录无 `.gitignore` 支持——这是诚实的降级」。**该定性过宽**。pi 用 `--no-require-git` 证明**非 git 目录下保留 gitignore 是可行的**，且只需一个纯路径判断（向上找 `.git`），不需要 git 命令。这是**能力缺口**而非等价降级。已裁决补齐（§1.8 裁决 2）。
+**⚠️ 另一处原记录更正**：本表原写「非 git 目录无 `.gitignore` 支持——这是诚实的降级」。**该定性过宽**。pi 用 `--no-require-git` 证明**非 git 目录下保留 gitignore 是可行的**，且只需一个纯路径判断（向上找 `.git`），不需要 git 命令。这是**能力缺口**而非等价降级。已裁决补齐（§1.8 裁决 2）。
 
 ### 1.7 验证方式（客观可测）
 
-文件数（14,414 → 2,741）、`.gitignore` 生效、`!` 取反生效、非 git 回退、**三工具可见文件集一致**。
+文件数（14,414 → 2,741）、`.gitignore` 生效、`!` 取反生效、非 git 回退、**三工具可见文件集一致**、**从子目录运行时文件集与从根运行一致**（防 §1.9 发现 1 回归）。
 
 ### 1.8 补充裁决（对照 pi 后收口）
 
@@ -161,6 +163,32 @@ confidence: high
 | **5** | 忽略文件的**嵌套前缀改写** | **必须实现** | 这是 `git ls-files` 原本替我方承担的复杂度。pi 的做法（`prefixIgnorePattern`）是参考 |
 | **6** | Windows glob 语义 | **本轮不做**，记入 backlog | 我方无 Windows 目标；`find.ts:201-213` 的 `**/` 前缀与 `[/\\]` 改写是 pi 的平台适配 |
 | **7** | 部分失败的容忍 | **采纳 pi 的形态**：无匹配不是错误；上限触发不算错误；stat 失败的条目跳过但**计数报告** | `grep` exit 1 = 成功；`ls` 的静默跳过改为报告数量（见 T6） |
+
+### 1.9 独立审查的发现（2026-09-21，已逐条复现）
+
+#### 发现 1（高）：**`git ls-files` 的调用形式写错了，会导致静默丢失文件**
+
+原 §1.4/§1.6 声称「从子目录运行返回仓库相对路径且**包含 cwd 之外的文件**」。**实测结果相反**：
+
+```
+# fixture: /tmp/pspec/{root.ts, sub/inner.ts}
+$ cd sub && git ls-files --cached --others --exclude-standard
+inner.ts                    # ← root.ts 被静默丢弃
+
+$ git -C /tmp/pspec ls-files --cached --others --exclude-standard
+root.ts                     # ← 正确：仓库相对路径，全量
+sub/inner.ts
+```
+
+**裸 `git ls-files` 默认 pathspec 为 `.`（当前目录）**，因此从子目录运行只列出子目录内的文件。**§1.8 裁决 3 的「过滤到 workspace root」不能修复它**——文件在源头就没被查询到。
+
+**追加裁决**：第 2 层必须用 `git -C <workspaceRoot> ls-files …`（或显式 pathspec `:/`）。**验证必须包含「从子目录运行时文件集与从根运行一致」**。
+
+#### 发现 2（中）：**pi 的 `skills.ts` 不是「无依赖手写解析器」的参考**
+
+原 §1.8 裁决 2 称「手写解析（pi 的 `skills.ts:47-63` 给出参考）」。**但 pi 在该文件第 2 行 `import ignore from "ignore"`，`package.json:63` 依赖 `ignore@7.0.8`。** pi 只手写了**嵌套前缀改写**（`prefixIgnorePattern`），**模式匹配本身交给 npm 包**。
+
+**这意味着第 3 层的真实成本被低估**：要自研需覆盖 glob 通配、目录级斜杠、字符类、取反等边界。**追加裁决**：第 3 层仍做（裁决 2 不变），但**必须诚实记录这是一个自研解析器**，且实现前先评估是否需要为此破例引入 `ignore` 依赖——**这个取舍应显式做，而不是被「pi 也没用依赖」的错误印象掩盖**。
 
 ---
 
@@ -345,6 +373,64 @@ confidence: high
 
 **裁决：加一个门禁**——扫描用户文档中声明的配置字段，逐个验证存在生产消费者。反向可失败：给某字段加文档但不接线 → 门禁必须失败。
 
+**归属（修正原记录的自相矛盾）**：本门禁**列为第 8 项任务（T7）**，排在 T3 之后（T3 刚删掉两个死字段，门禁正是防止再长出来的机制），不依赖 T1–T6 的任何改动。原记录把它同时写进 §3.7（「裁决：加」）与 §8.3（「移出本轮」），**是收口时留下的接缝**——已消除。
+
+### 3.8 独立审查的发现（2026-09-21，已逐条复现）
+
+#### 发现 1（高，**阻断性**）：**用户级技能会撞上 `read` 的路径监狱——§3.3 的 `location` 设计按现状无法工作**
+
+§3.3 裁决注入绝对路径 `<location>/abs/path/SKILL.md</location>`，让模型用现有 `read` 工具加载正文。**但 `read` 工具对路径做 workspace containment 检查**（`core/tools/registry.ts:280-285`）：
+
+```ts
+target = resolveToolTarget({ path: selector.cleanPath }, 'path', context.workspaceRoot)
+const containment = verifyPathContainment(target, context.workspaceRoot)
+if (!containment.allowed) {
+  throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+}
+```
+
+而 `verifyPathContainment`（`core/security/pathJail.ts:15-40`）**无条件拒绝 workspace 之外的绝对路径**。**已实测复现**（复刻其逻辑运行）：
+
+```
+用户级技能（~/.private-agents/skills/pdf/SKILL.md）
+  → { allowed: false, reason: "Path '…' resolves outside workspace root '…'." }
+项目级技能（<ws>/.agents/skills/x/SKILL.md）
+  → { allowed: true }
+```
+
+**后果**：用户级技能（我方 `SkillLoader` 的第一个根，`skillLoader.ts:37`）**全部无法被 `read` 加载**。T2b 按现状实施会让每一个用户级技能在模型尝试读取时**硬失败**。
+
+**追加裁决**（必须与 T2b 同批）：三选一，须显式选一个——
+1. **`read` 增加技能专用解析路径**（按名查 `SkillLoader`，绕过路径监狱）；
+2. **技能文件通过 `artifact://` 之类的受控 URI 暴露**（`read` 已有该分支，`:262`）；
+3. **注入时把技能正文预先读入目录条目**（放弃「只注入元数据」——但这否定了 §3.3 的核心选择）。
+
+**倾向 1**：它保留「只注入元数据」的裁决，且把「技能是受信任的本地资源」这一事实显式编码，而不是放宽 workspace 监狱（放宽监狱会削弱所有工具的边界）。
+
+**注意**：`bash` 工具**不受**路径监狱限制（走 `processPermission`），所以「用 bash 读技能」是可行的工作区，但 `pi` 的文档已记录「模型不总会去读」（`docs/skills.md:69`）——依赖 bash 会放大这个已知失败模式。
+
+#### 发现 2（中）：**「同一个信任门」在四处被描述成两种不同的门**
+
+| 位置 | 声称的门 |
+|---|---|
+| T2 §2.5 裁决 4 | 「与 T5 同一门」 |
+| T2b §3.6 裁决 2 | 「与 T5 同一门」 |
+| T5 §6.3 | **内容哈希门**（codex 形状，覆盖 `event + matcher + handler`） |
+| T4 §5.6 裁决 8 | 「与 T5 同一门」 |
+
+**但两者是不同粒度的机制**：codex 的哈希门针对**可执行钩子命令**；而 `AGENTS.md`/技能是**文档**，没有「handler」可哈希——`pi` 对这类资源用的是**路径/作用域级**信任（`settingsManager.isProjectTrusted()`）。
+
+**追加裁决**：必须区分两种门并写明各自覆盖什么——
+- **内容哈希门**：用于**可执行**项目行为（声明式钩子命令、MCP 命令）；
+- **作用域门**：用于**项目提供的文本**（`AGENTS.md`、技能、subagent 定义、`SYSTEM.md`）。
+两者共用**同一个批准动作与同一份信任记录**，但**校验机制不同**。原裁决把二者混为一谈，实现时会发现「文档没有哈希可算」。
+
+#### 发现 3（低）：**`/cd` 的提示词失效契约未定义**
+
+§2.5 裁决 6 要求 `/cd` 后重新发现上下文文件，但未说明**如何在会话中途重建系统提示**。已核验：`/cd` 走 `runCdShellAction` → `show-workspace/attach` → `runCliWorkspaceAttach`，且**已有 `onProjectContextSwitched` 回调**（`cliWorkspaceModule.ts:283`），消费者在 `interactiveCommandRouter.ts:174-180` 设置 `projectContextSwitched = true` 并触发 `refreshPromptChrome`。
+
+**即：钩子点已存在**，裁决 6 可挂在这里。**追加裁决**：复用 `onProjectContextSwitched`，在其中重算系统提示（而非新造机制）。
+
 ---
 
 ## 4. T3 — 删除 `thinkingBudgets` 与 `promptCacheTtl`
@@ -365,12 +451,14 @@ confidence: high
 
 | 事实 | 证据 |
 |---|---|
-| 我方只有**一条**请求路径：`POST /chat/completions` | `turn/step.ts:138`（唯一 fetch） |
-| `RuntimeProvider` 声明了 6 个值（`anthropic`/`openai`/`google`/…），但**不驱动请求形状** | `step.ts` 只有一个请求体 |
-| 我方**无**任何 token 预算字段 | 搜 `thinking_token_budget\|budget_tokens` → **0 命中** |
-| 活轨只发 `reasoning_effort` | `turn/step.ts:114` |
+| 我方**有 4 处**构造 `/chat/completions` 请求 | `turn/step.ts:138`（主循环）、`core/commands/btwCommandRuntime.ts:38`、`core/query/compaction/summarize.ts:62`、`core/tools/taskTool.ts:121` |
+| **但其余 3 处都不发 `reasoning_effort`**，也不读 `thinkingBudgets`/`promptCacheTtl` | 已核验：三者对 `reasoning_effort` 与两个字段的 `grep -c` **全为 0** |
+| 只有主循环发 `reasoning_effort` | `turn/step.ts:114` |
+| 全仓**无**任何 token 预算字段 | 搜 `thinking_token_budget\|budget_tokens` → **0 命中** |
 
-即：`thinkingBudgets` 描述的能力（按档位设定 token 预算）在我方**没有消费位点**——不是因为它与 `reasoning_effort` 冲突，而是因为我方运行时只有 OpenAI 兼容的单一路径，没有 token 型 provider 的适配层。
+> **⚠️ 原记录更正**：本节初稿称「我方只有**一条**请求路径：`turn/step.ts:138`（唯一 fetch）」——**这是错的**，有 4 处。**结论不变但论据必须换**：不是「只有一条路径」，而是「**4 条路径都不消费数值预算**，且只有主循环发 reasoning 档位」。
+
+即：`thinkingBudgets` 描述的能力（按档位设定 token 预算）在我方**没有消费位点**——不是因为它与 `reasoning_effort` 冲突，而是因为我方运行时没有 token 型 provider 的适配层（无 `budget_tokens`/`thinking_token_budget` 字段，无 `cache_control`）。
 
 **这个区别有实际后果**：原论证会导出「将来接 Anthropic 也不该有此字段」，而 pi 证明**恰恰相反**——接 token 型 provider 时数值预算是**必需**的，`reasoning_effort` 无法表达它。
 
@@ -401,6 +489,19 @@ pi 引入预算上限的理由（`openai-completions.ts:974-977` 注释）：
 ### 4.5 验证
 
 `tsc` 0 错 + 全量测试。删除字段会同时删除钉住它们的测试（这些测试只断言「字段存在」——属于「断言实现」而非「断言行为」，按 `AGENTS.md` 验证纪律应删）。
+
+### 4.6 独立审查的发现（2026-09-21，已逐条复现）
+
+#### 发现 1（中）：**两处「未考虑」发现被静默丢弃，现补录**
+
+`phase-3-execution.md` §4.4 记录了两项 pi 的决定，但**两者都未进入本文件的任何裁决，也不在 §8.3 的移出清单**——即**静默丢弃**：
+
+| 被丢弃的发现 | 内容 | 现裁决 |
+|---|---|---|
+| 逐模型 thinking 档位层 | `pi` 有三层：全局 `defaultThinkingLevel`、逐模型 `modelThinkingLevels["provider/modelId"]`、逐模型 provider 字符串映射 `thinkingLevelMap` | **本轮不做**，记入 backlog。理由：我方 thinking 由项目状态文件驱动（`thinkingCommandRuntime.ts`），无逐模型维度，且**没有消费位点**——与 `thinkingBudgets` 同因 |
+| `xhigh`/`max` 折叠到 `high` | `pi` 的 `clampReasoning` 把最高两档折叠为 `high` 的预算（`simple-options.ts:63-66`） | **仅记录**。这是 `pi` 预算表只有 4 档而档位有 6 个导致的映射缺口；我方无预算表，无此问题 |
+
+**纪律教训**：对照产出的发现必须**逐条**落到「裁决 / 明确移出 / 明确拒绝」三者之一。这两条落空，说明收口时漏检了执行文档 §4.4。
 
 ---
 
@@ -441,14 +542,24 @@ return tokens > contextWindow - reserveTokens;
 
 ### 5.3 裁决：**配置优先 + 目录回退 + 模型上限钳制**
 
+> **⚠️ 本节经独立审查后更正**（见 §5.7 发现 1）。「钳制到模型声明的上限」**按现状不可实施**——我方目录**没有独立的上限字段**。
+
 采纳 `codex` 的 `with_config_overrides` 形状（`model_info.rs:25-33`）：
 
 ```
 用户配置的 contextWindow（若有）
   → 否则：目录的 contextWindow
   → 否则：64_000（保持现有回退）
-  → 上限：不超过目录/模型声明的 max（防止用户声称超出 provider 实际能力）
+  → 上限：不超过模型声明的 max（见下方前置条件）
 ```
+
+**前置条件（必须先做，否则钳制无对象）**：`codex` 有**两个**字段——`context_window`（默认值）与 `max_context_window`（**允许配置覆盖的上限**）。**我方 `CatalogModel` 只有一个 `contextWindow`**（`catalog.ts:20-24`，已核验），全仓搜 `maxContextWindow`/`context_window.max` → **0 命中**。
+
+**追加裁决**：二选一，须显式选——
+1. **给 `CatalogModel` 增加 `maxContextWindow?` 字段**（目录与 `models.json` 都可声明），钳制对它有对象；
+2. **不做钳制**，改为**对过大的用户值告警**（不拒绝）。
+
+**倾向 1**：钳制的价值在于把「用户保守」与「用户越界」分开处理（§5.3 理由 2）；若改告警，`opencode`/`pi` 的「压缩永不触发」静默失效仍然存在。且新增一个可选字段的成本远低于失去这条防线。
 
 **理由**：
 
@@ -478,6 +589,26 @@ return tokens > contextWindow - reserveTokens;
 | **6** | 模型切换后的溢出归属 | **按当前模型衡量** | `pi` 的 `agent-session.ts:2319-2339` 保证旧模型的溢出不触发新模型的压缩。我方需显式处理（切换后重算阈值） |
 | **7** | 目录新鲜度 | **本轮不引入远程刷新**，但**加 `localGeneratedAt` 式守卫**（若将来引入） | `pi` 有完整设计（4h 窗口、etag 仅在缓存体存在时发、404/501 → 空覆盖、瞬时失败保留 etag）。特别值得注意的是 `localGeneratedAt` 守卫——**防止陈旧远程数据覆盖更新的内置快照**，这是一个我方未考虑的具体失效模式。我方 `catalogRefresh.ts` 已存在，本轮不扩展 |
 | **8** | 未信任项目的设置 | **不可见**（与 T5 同一门） | `pi` 的 `settings-manager.ts:397-399`：`if (scope === "project" && !projectTrusted) return {}` |
+
+### 5.7 独立审查的发现（2026-09-21，已逐条复现）
+
+#### 发现 1（高）：**上限钳制不可实施**——已在 §5.3 补入前置条件
+
+`CatalogModel` 只有 `contextWindow`，无 `maxContextWindow`。`codex` 的钳制依赖 `max_context_window` 的存在。**已追加裁决：先加字段，或改为告警。**
+
+#### 发现 2（中）：**`tuiMode` 的「保留」与 T3 的删除纪律存在张力**
+
+§4.3 删除 `thinkingBudgets`/`promptCacheTtl`（零消费者），却**保留** `tuiMode`（同样零消费者）。原裁决给的理由是「它是真能力，只是缺配置入口」。
+
+**审查指出这是不一致**：三者的**共同事实**是「声明了、零消费」，区别只在「描述的能力是否存在」。**追加裁决**：保留 `tuiMode` 是**有意的不一致**，理由必须写进类型注释——「此字段描述的能力（表面选择）已实现且自动判定，本字段用于将来提供显式覆盖；与 `thinkingBudgets`/`promptCacheTtl` 不同，后者描述的能力不存在」。**若注释不写，下一个人会把它当第三个死字段删掉，或反过来把前两个当「待接线」保留。**
+
+#### 发现 3（低）：**`contextAnalysis.ts:44` 不是第四个生产解析点**
+
+审查提到该处有独立的 64,000 回退。**已核验：它只被自己的测试文件 import**（`contextGovernance.test.ts:2`），**零生产消费者**。§5.1 已正确地把生产解析点列为 3 处，此条不构成遗漏。
+
+#### 发现 4（低）：**`resolve once` 的表述可更精确**
+
+§5.4 说「解析一次并缓存」。审查指出 `pi` 的做法是「模型对象快照一次，但压缩预算每次重解并重校验」。**追加裁决**：我方缓存的是**解析结果**（窗口值），不是**校验过程**——校验应在配置加载期一次完成并抛错，而非每次调用重校验。理由：我方 `loadCatalog()` 每次同步读盘（`catalogStore.ts:45`），照搬 `pi` 的「每次重解」会变成每次读盘。
 
 ---
 
@@ -524,29 +655,99 @@ return tokens > contextWindow - reserveTokens;
 
 ### 6.4 必须实现的失败处理（来自 `codex` 的实测行为）
 
-| 场景 | 行为 |
+> **⚠️ 本节经独立安全审查后大幅更正**（见 §6.7）。原表有 3 行错误描述 codex 行为，其中一行（`SessionEnd` 180s）是**无出处的虚构数字**。
+
+| 场景 | codex 的实际行为（已核验） |
 |---|---|
-| 命令超时 | 有超时（`codex` 默认 600s，`SessionEnd` 钳制到 180s） |
-| 输出非 JSON / 垃圾 | **`None` → 无操作**（`output_parser.rs:345-357`）——**注意这是 fail-open**，对安全型钩子有风险，需在文档中明示 |
-| `block` 但无 reason | 视为无效（`invalid_block_message`） |
+| 命令超时 | 默认 **600s**；`SessionEnd`/`Interrupt` 钳制到 **最大 3s、默认 1s**（`SESSION_END_DEFAULT_TIMEOUT_SEC = 1`、`SESSION_END_MAX_TIMEOUT_SEC = 3`，`session_end.rs:20-23`）。**不是 180s**——全仓搜 `180` 于 hooks crate **零命中** |
+| 空 stdout | **no-op**（唯一真正的静默路径） |
+| 看起来像 JSON 但解析失败 | **记录为可见的 `Failed` 运行**，带错误条目 `"hook returned invalid pre-tool-use JSON output"`（`pre_tool_use.rs:213-284`）——**不是静默 no-op** |
+| 非零退出码 | **可见的 `Failed`**；**exit code 2 + 非空 stderr 才是真正的 block 信号**（文档原表完全未提这个契约） |
+| 输出上限 | codex **没有** stdout 大小上限（无界读取）。唯一的限制是 `additionalContext` 的 **2500 token 预算**，超出部分**落盘而非丢弃**（`output_spill.rs:11-24`）——原表的「output cap → no-op」**描述的机制不存在** |
+| `block` 但无 reason | 无效（`invalid_block_message`） |
 | 配置不可读 | 警告 + 忽略该文件 |
-| 未信任 | **仍列出但不执行**（`discovery.rs:701-707`）——避免「用户以为钩子在跑」 |
+| 未信任 | **仍列出但不执行**（`discovery.rs:701-707`） |
+
+**我方 `hookDispatcher.ts` 比上述任何描述都差**：`exec` 错误（超时、`maxBuffer` 超出）与 `JSON.parse` 抛错都被 catch、记日志、然后**继续下一个钩子并最终返回 allow**——**每一个失败模式（含超时的安全钩子）都是静默 fail-open**（`hookDispatcher.ts:107-156`）。
 
 ### 6.5 补充裁决（对照 pi 后收口）
 
 | # | 事项 | 裁决 | 理由 |
 |---|---|---|---|
-| **1** | 信任门作用域 | **一个门，覆盖 7 类资源**：项目设置、扩展/钩子、技能、提示词模板、主题、`SYSTEM.md`、`APPEND_SYSTEM.md`（+ 本项目 T2 的 `AGENTS.md`） | `pi` 的 `TRUST_REQUIRING_PROJECT_CONFIG_RESOURCES`（`trust-manager.ts:30-38`）就是这 7 类。**一个门**的语义是「信任此项目的所有本地行为」，比分门可预测 |
-| **2** | 提示文案 | **必须逐项列出获批范围** | `pi` 的文案做到了：「load `.pi` settings and resources, install missing project packages, and execute project extensions」。含糊的「信任此项目？」不够——用户要能看见自己批准了什么 |
-| **3** | 批准前如何展示内容 | **两遍加载**：先以「不信任」加载一遍（用于**展示待批准项**，此时项目代码**尚未执行**），询问后再以真实状态重载 | `pi` 的 `resource-loader.ts:380-387` 的具体技巧。原计划只说了「需要一个信任门」，未考虑「用户如何在批准前看到内容」 |
-| **4** | 无 UI 时（非交互模式） | **默认拒绝** | `pi` 的 `project-trust.ts:83-85`。这是关键的安全默认值——非交互模式无人能批准，必须默认不信任 |
-| **5** | 自举风险：扩展能否决定自身信任 | **明确排除**——声明式钩子**不得**注册 `project_trust` 类 handler | `pi` 允许扩展注册 `project_trust` handler **程序化覆盖**信任决策（`project-trust.ts:56-69`），形成鸡生蛋问题：能决定「是否信任项目」的代码本身来自项目。**我方不做这个能力** |
-| **6** | 逃生口 | **提供，且必须带危险提示** | `codex` 的 `--dangerously-bypass-hook-trust` 在运行时警告「Enabled hooks may run without review for this invocation.」；`pi` 的 `--approve` 无警告。**采纳 codex 的带警告形式** |
-| **7** | 失败处理 | 超时、输出上限、非 JSON 输出 → 无操作、`block` 无 reason → 无效、配置不可读 → 警告并忽略、**未信任仍列出但不执行** | 全部来自 `codex` 的实测行为。最后一条尤其重要——避免「用户以为钩子在跑」 |
+| **1** | 信任门作用域 | **必须映射到我方实际存在的资源**，不照抄 pi 的 7 项清单 | 原裁决照抄 pi 的 `TRUST_REQUIRING_PROJECT_CONFIG_RESOURCES`，但映射到我方后：**2 项无对应物**（无项目提示词模板加载器；主题是内置注册表无磁盘发现），**至少 4 项既有可执行面被遗漏**（见 §6.7 发现 3） |
+| **2** | 提示文案 | **必须逐项列出获批范围**，且**列出的内容必须中和处理** | 原裁决只要求「列出」，未说明列出的是**项目可控字符串**（命令文本、matcher、名称、路径）。逐字渲染给用户 = 仓库控制用户在决策瞬间读到什么（换行、控制序列、伪装成 harness 自身界面）。**codex 也没解决**（`hooks_browser_view.rs:444-452` 直接渲染），所以这是**继承来的遗漏**，必须显式处理 |
+| **3** | 批准前如何展示内容 | **声明式路径只需解析文件，不需要两遍加载**；但**必须规定「哈希在执行时重新校验」这条不变式** | 原裁决照搬 pi 的两遍加载。**声明式命令是惰性数据**，列示它只需解析——比 pi 的代码模块更简单。但「询问后重载」会开一个 **TOCTOU 窗口**：批准提示与重载之间被改写的命令会**未经展示与哈希**就执行。codex 靠「哈希与信任判定在同一次遍历中完成、之后不再重读文件」避免（`discovery.rs:663-708`）。**这条不变式必须写进裁决** |
+| **4** | 无 UI 时（非交互模式） | **默认拒绝** | `pi` 的 `project-trust.ts:86-88`（**原裁决引用的 `:83-85` 有误**，那是 `defaultProjectTrust` switch 的尾部） |
+| **5** | 自举风险 | **我方无 `project_trust` 事件可拒**，因此这条裁决无对象 | **原裁决的理由是错的**：它称 pi 允许扩展程序化覆盖信任决策，形成鸡生蛋问题。**实际上 pi 的两遍加载正是关闭这个洞的机制**——`loadProjectTrustExtensions` 先强制 `setProjectTrusted(false)`，使项目设置返回 `{}`、项目扩展路径根本不进入集合，因此能发 `project_trust` 的**只有用户级/全局与 CLI 扩展**——正是项目写不到的那一组（`project-trust.ts:54-70`、`settings-manager.ts:410-413`、`package-manager.ts:2417-2465`）。裁决结论仍成立（我方无此事件），但**理由必须更正**，否则误导下一个读者 |
+| **6** | 逃生口 | **提供，且必须带危险提示** | `codex` 的 `--dangerously-bypass-hook-trust` 在运行时警告；`pi` 的 `--approve` 无警告。采纳 codex 形式 |
+| **7** | 失败处理 | 见 §6.4 更正表 | 原表的 3 行错误已更正 |
 
-### 6.6 若本轮不做
+### 6.7 独立安全审查的发现（2026-09-21，已逐条核验）
 
-**明确说明**：`registerCommandHook` 与 `HooksConfiguration` 保持零调用者。**这是可接受的**——它们不是「说谎的字段」（不像 T3 那三个），而是**已就绪但未接线的能力**。但应在类型注释中标注「未接线」，避免下一个人重复调查。
+**审查者**：`security-reviewer`，覆盖我方 + codex + pi + opencode。以下断言由主代理独立复现。
+
+#### 发现 1（高）：**我方今天已经能执行克隆仓库提供的任意命令——而 T5 的「无插件代码宿主」论证忽略了它**
+
+`core/mcp/config.ts:27-45` 读取 `<workspaceRoot>/.private-agents.mcp.json`，`core/mcp/client.ts:146-149` 直接 `spawn(this.config.command, this.config.args ?? [], …)`。**整个 `core/mcp/` 路径零信任检查**（已核验：`grep -c "isProjectTrusted\|projectTrust"` 于全部 7 个 MCP 文件 → 全 0）。
+
+**且 `gateway.ts:20-23` 声明的 `"command-not-allowlisted"` 阻断类型从未被任何代码路径产生**——它不是一个门。
+
+**这动摇了 T5 §6.2 的核心论证**：该节把 `opencode` 的「克隆仓库即执行插件」记为反面教材，据此裁决「本轮只做声明式、不做插件代码宿主」。但**同一失效模式在我方已通过 MCP 可达**——「无插件代码宿主」对**插件子系统**为真，对**产品**为假。
+
+**追加裁决**：T5 的范围必须包含「盘点并封堵既有的未受控执行面」，否则信任门只保护了新入口而放过了旧入口。至少涉及：
+- `<workspace>/.private-agents.mcp.json`（spawn 任意命令）
+- `.agents/workflows/*.json`（`workflow/runner.ts:98-104` `exec(step.run, …)`，已核验）
+- `.agents/sandbox.json`（`sandbox/osSandbox.ts:53-66` 从 workspace 读取并**直接塑造沙箱计划**，已核验）
+- `.agents/agents/*.md`（`subagents/subagentLoader.ts:65-66` 读取，body 成为 subagent 的 `systemPrompt`，零信任检查已核验）
+
+#### 发现 2（高）：**仓库里已有一个完整但零消费者的信任实现——T5 的前提「需要新建信任基础设施」是错的**
+
+`core/security/projectTrust.ts`（163 行）已实现 `ProjectTrustStore`，含 `isProjectTrusted` / `setProjectTrust` / `hasSensitiveProjectResources`，且 `projectTrust` 单例已导出。**零生产消费者**（只有自己的测试文件 import）。
+
+**这与 T3 的「声明了、零消费者」是同构缺陷**，且 T5 的裁决通篇未提及它——**T5 的实际工作是「接线」而非「新建」**，成本与形状都不同。
+
+#### 发现 3（高）：**既有的敏感资源探测器认不出 T5 要门控的那些资源**（已实测复现）
+
+我复刻 `hasSensitiveProjectResources` 的逻辑跑了 6 种项目形态：
+
+| 项目形态 | 探测结果 |
+|---|---|
+| `.agents/hooks.json`（T5 要读的配置） | **未探测到** ❌ |
+| `.agents/hooks/`（目录） | 探测到 ✅ |
+| `.private-agents.mcp.json`（spawn 命令） | **未探测到** ❌ |
+| 根 `AGENTS.md`（T2 裁决 4 要求过门） | **未探测到** ❌ |
+| `.agents/workflows/`（exec） | **未探测到** ❌ |
+| `.agents/sandbox.json`（塑造沙箱） | **未探测到** ❌ |
+
+**探测器由「固定文件名列表（只有 `SYSTEM.md`）+ 形状规则（任意 dot 目录含 `extensions`/`agents`/`skills`/`hooks` 子目录）」构成**，因此**结构上无法匹配 dotfile**，也无法覆盖仓库根的 `AGENTS.md`。
+
+**若 T5 直接建在这个 store 上而不改探测器，门对 T5 新增的那一项资源永不触发，对 T2 裁决 4 要求过门的 `AGENTS.md` 也永不触发。**
+
+#### 发现 4（高）：**哈希记录必须存放在项目写不到的位置——这是门是否成立的单点属性，原裁决未声明**
+
+`codex` 的 `config_rules.rs:11-29` 把它写成**安全属性**而非实现细节：
+
+> This intentionally reads only user and session flag layers… Project, managed, and plugin layers can discover hooks, but they do not get to write user hook state.
+
+**缺了这条，一个仓库只要同时提供钩子配置与匹配的 `trusted_hash`，就能在首次加载时自我批准。** 原裁决 §9 把「状态存放位置未设计」记为未验证项，但**从未把「必须位于项目不可写的位置」写成实现必须满足的约束**。已补入 §6.5 裁决 3。
+
+#### 发现 5（中）：**钩子的影响力面从未被声明，且钩子不受沙箱约束**
+
+| 事实 | 证据 |
+|---|---|
+| `PostToolUse` 的 feedback **被拼接到模型可见的工具输出上**——项目可控文本进入提示词 | `turn/tools.ts:166-178` |
+| `PreToolUse` 的 `retry` 判定被 dispatcher 返回，但**唯一消费者只检查 `block`**，`retry` 被静默丢弃 | `turn/tools.ts:136-148` |
+| 钩子**不在沙箱内运行**：`hookDispatcher.ts:107-121` 用裸 `exec`，而 `bash` 工具走 `planSandboxedCommand` | 两者对比 |
+
+**后果**：用户即使为工具命令启用了 OS 隔离，钩子进程仍是**完全特权、无沙箱**的。原裁决未提及这个不对称，而裁决 6 恰好在讨论「绕过审查的逃生口」。
+
+#### 发现 6（中）：**批准提示里列出的内容本身是攻击者可控的**
+
+裁决 2 要求逐项列出获批范围，但列出的是**项目编写的字符串**（命令文本、matcher、名称、路径）。逐字渲染给终端 = 仓库控制用户在决策瞬间读到什么（换行、控制序列、伪装成 harness 自身界面）。**codex 同样未处理**（`hooks_browser_view.rs:444-452` 直接渲染），因此这是**继承来的遗漏**。已补入裁决 2。
+
+#### 发现 7（中）：**我方 dispatcher 的 fail-open 比文档描述的更严重**
+
+已核验 `hookDispatcher.ts:107-156`：`exec` 错误（含**超时**）与 `JSON.parse` 抛错都被 catch、记日志、继续下一钩子、最终返回 allow。**即：一个超时的安全钩子等同于「无异议」。** 原裁决把它写成「garbage → no-op」（这是 codex 的行为），但**我方比 codex 差**——codex 至少把 JSON 解析失败记为可见的 `Failed`。
 
 ---
 
@@ -648,34 +849,39 @@ if (type === "directory") return yield* reader.list(absolute, { offset: input.of
 
 ## 8. 汇总表
 
-**全部 7 项主决策 + 44 项补充裁决已定案，无待决项。**
+**全部 7 项主决策 + 1 项新增任务（T7）+ 44 项补充裁决已定案，无待决项。**
+**2026-09-21 经 5 个独立审查者（4 审查 + 1 安全）复核，发现并更正 13 处问题——见 §8.4。**
 
 | 项 | 裁决 | 类型 | 成本 | 风险 | 关键依据 |
 |---|---|---|---|---|---|
-| **T3** | **删除** `thinkingBudgets` + `promptCacheTtl`；`tuiMode` 保留待接线 | 删死配置 | 极低 | 极低 | **无消费位点**（我方只有 OpenAI 兼容单路径）；非「语义冲突」 |
-| **T1** | **三层**：遍历期剪枝 + `git ls-files` + 非 git 时进程内 `.gitignore` | 修缺陷（性能+正确性） | 中低 | 低 | 57.2% 白遍历；`.gitignore` 零支持；`pi` 的 `--no-require-git` |
-| **T4** | 配置优先 + 目录回退 + **上限钳制** + 逐模型压缩预算 | 修缺陷 | 低 | 低 | 1M 模型被按 64k 压缩（浪费 93.6%） |
-| **T2** | 祖先遍历（**止于项目根**）+ **32 KiB 预算** + 五候选含 `.override` + `/reload` + **过信任门** | 修缺陷 | 低 | 中（推高固定成本） | `AGENTS.md` 对模型完全不可见 |
-| **T2b** | **目录注入 + 复用 `read`**；`/skill:name` 强制注入；**`scan` 改递归**；**过信任门** | 修缺陷（含实测缺陷） | 低 | 低 | **实测 3 个嵌套技能只发现 1 个** |
-| **T5** | **声明式窄路径 + 内容哈希信任门**（一门管 7 类资源）；不做插件代码宿主 | 补基础设施 | 中 | 中高（安全面） | `opencode` 静默执行是反面教材 |
+| **T3** | **删除** `thinkingBudgets` + `promptCacheTtl`；`tuiMode` 保留并加注释 | 删死配置 | 极低 | 极低 | **4 条请求路径都不消费数值预算**；非「语义冲突」 |
+| **T7**（新增） | **死字段门禁**：文档声明的配置字段必须有生产消费者 | 防回归工具 | 极低 | 极低 | 三个独立实现都犯过（pi 的 `allowed-tools`、我方两个） |
+| **T1** | **三层**：遍历期剪枝 + `git -C <root> ls-files` + 非 git 时进程内 `.gitignore` | 修缺陷（性能+正确性） | 中低 | 低 | 57.2% 白遍历；`.gitignore` 零支持；**子目录必须用 `-C`** |
+| **T4** | 配置优先 + 目录回退 + 上限钳制（**需先加 `maxContextWindow` 字段**）+ 逐模型压缩预算 | 修缺陷 | 低 | 低 | 1M 模型被按 64k 压缩（浪费 93.6%） |
+| **T2** | 祖先遍历（**止于项目根**）+ **32 KiB 预算** + 五候选含 `.override` + `/reload` + **过作用域信任门** | 修缺陷 | 低 | 中（推高固定成本） | `AGENTS.md` 对模型完全不可见 |
+| **T2b** | **目录注入 + 复用 `read`**（**需先解决路径监狱**）；`scan` 改递归；过作用域信任门 | 修缺陷（含实测缺陷） | 低 | **中高（阻断性未决项）** | **实测 3 个嵌套技能只发现 1 个**；用户技能撞监狱 |
 | **T6** | **做**：目录列举**折进 `read`**，应用 T1 忽略层 | **修缺陷** | 低 | 低 | `read` 对目录抛 EISDIR（实测） |
+| **T5** | **声明式窄路径 + 内容哈希门 + 作用域门**；**范围扩大到封堵既有未受控执行面** | 补基础设施 + **修既有安全缺口** | **高**（范围已扩大） | 中高（安全面） | **MCP 已可执行克隆仓库的任意命令** |
 
-### 8.1 本轮实测发现的**两个真实缺陷**
+### 8.1 本轮实测发现的**真实缺陷**
 
 | 缺陷 | 实测证据 | 归属 |
 |---|---|---|
 | `read` 对目录抛原始 `EISDIR` | `IsADirectoryError: [Errno 21]` | T6 |
 | `SkillLoader.scan` 只读一层，嵌套技能静默丢失 | 3 个 fixture 只发现 1 个 | T2b |
-
-**两者都必须与各自的任务同批修，不能分两轮**——T2b 注入残缺目录比不注入更糟。
+| **`read` 的路径监狱拒绝用户级技能** | `allowed: false`（实测复现） | T2b（**阻断性**） |
+| **项目 MCP 配置可 spawn 任意命令，零信任检查** | `mcp/client.ts:146` + 全 MCP 目录 0 命中 | T5（**高**） |
+| **既有信任探测器认不出要门控的资源** | 6 种形态实测，4 种未探测到 | T5（**高**） |
 
 ### 8.2 执行顺序
 
-$$\text{T3} \to \text{T1} \to \text{T4} \to \text{T6} \to \text{T2/T2b} \to \text{T5}$$
+$$\text{T3} \to \text{T7} \to \text{T1} \to \text{T4} \to \text{T6} \to \text{T2/T2b} \to \text{T5}$$
 
-**T2 与 T2b 合并为一轮**（共用 `Skill` 数据与同一个系统提示组装点，且共用信任门）。
+**T2 与 T2b 合并为一轮**（共用 `Skill` 数据、同一系统提示组装点、同一信任门）。
 
-**T6 的位置修订**：预研判为「补功能」并排在最后。**实测推翻了这个定性**——`read` 对目录抛 EISDIR 是真实缺陷，且修复形状已由 `opencode` 验证。排在 **T1 之后**（硬依赖统一忽略层）、**T2 之前**（T2 会推高每次请求的固定成本，其收益评估需要 `/context` 数字准确；T6 不改变请求成本，先做无干扰）。
+**T6 的位置修订**：预研判为「补功能」并排在最后。**实测推翻了这个定性**——`read` 对目录抛 EISDIR 是真实缺陷。排在 **T1 之后**（硬依赖统一忽略层）、**T2 之前**（T2 推高请求成本，其收益评估需要 `/context` 数字准确）。
+
+**T5 的范围修订（重要）**：原裁决把它定位为「补基础设施」（接线声明式钩子）。审查发现**既有未受控执行面已经存在**（MCP 命令、workflow `exec`、sandbox 规则、subagent 提示词），因此 T5 现在同时是**修既有安全缺口**。这提高了它的优先级权重，但**仍排在最后**——因为封堵既有缺口需要信任基础设施先就位。
 
 ### 8.3 移出本轮（附理由）
 
@@ -684,9 +890,38 @@ $$\text{T3} \to \text{T1} \to \text{T4} \to \text{T6} \to \text{T2/T2b} \to \tex
 | linked worktree 遮蔽 | 我方是否支持 worktree 工作流未裁决；记入 backlog |
 | Windows glob 语义 | 我方无 Windows 目标 |
 | CLI 级技能路径注入（`--skill`） | 我方无此需求 |
-| 远程目录新鲜度刷新 | `catalogRefresh.ts` 已存在，本轮不扩展；但已裁决「若引入则加 `localGeneratedAt` 守卫」 |
+| 远程目录新鲜度刷新 | `catalogRefresh.ts` 已存在；已裁决「若引入则加 `localGeneratedAt` 守卫」 |
 | 推理预算上限（防推理吃满 `max_tokens`） | 我方已有 `emptyAnswerExplanation` 检测；接入 token 型 provider 时成为必需 |
-| 文档↔类型死字段门禁（§3.7） | 已裁决要做，但属独立小工具，不与 T1–T6 同批 |
+| 逐模型 thinking 档位层 | 我方 thinking 由项目状态驱动，无逐模型维度且无消费位点（与 T3 同因） |
+
+### 8.4 审查轮次与更正（2026-09-21）
+
+**方式**：5 个独立子代理（T1+T6 / T2+T2b / T3+T4 / T5 安全 / 交叉一致性），各带硬范围限制（禁止扩展方向）。主代理**逐条复现**每个断言。
+
+**更正 13 处**，按严重度：
+
+| # | 更正 | 严重度 |
+|---|---|---|
+| 1 | T5：**项目 MCP 配置可执行任意命令**，原「无插件代码宿主」论证遗漏了它 | **高** |
+| 2 | T2b：**用户级技能撞 `read` 路径监狱**，§3.3 设计按现状无法工作 | **高（阻断）** |
+| 3 | T5：既有信任探测器认不出要门控的资源（实测 6 形态） | **高** |
+| 4 | T1：**`git ls-files` 调用形式错误**——裸调用在子目录下静默丢文件 | **高** |
+| 5 | T4：**上限钳制不可实施**——`CatalogModel` 无上限字段 | **高** |
+| 6 | T5：`SessionEnd` 超时 180s 是**无出处的虚构数字**（实际 1s/3s） | 中 |
+| 7 | T5：§6.4 三行错误描述 codex（fail-open 分级、exit-code 契约、输出上限） | 中 |
+| 8 | T5：自举风险的理由**说反了**——pi 的两遍加载正是关闭该洞的机制 | 中 |
+| 9 | T3：**4 条请求路径**，非「唯一 fetch」（结论不变，论据更正） | 中 |
+| 10 | T2b：四处「同一个门」混用了**内容哈希门**与**作用域门** | 中 |
+| 11 | T1：pi 的 `skills.ts` **依赖 npm `ignore` 包**，不是无依赖手写参考 | 中 |
+| 12 | T3：两处「未考虑」发现**被静默丢弃**（现补录） | 中 |
+| 13 | T4：`tuiMode` 保留与 T3 删除纪律的张力需注释说明 | 低 |
+
+**同时确认正确的**：T1 的三份硬编码列表不一致、T6 的 EISDIR、T2b 的 `scan` 只读一层、T3 的字段零消费者（三个「零消费者」断言全部 CONFIRMED）、T2 的 `AGENTS.md` 零注入、T5 的 `registerCommandHook` 零调用者。
+
+**审查自身的局限（如实记录）**：
+- 一个审查者报 `contextAnalysis.ts:44` 是第四个生产解析点——**已核实为误报**（只被测试文件引用）。
+- 审查发现的 40 项「未考虑」中，**2 项**（T3 §4.4 的逐模型 thinking 与 `xhigh`/`max` 折叠）此前确实落空，现已补录。
+- 测试覆盖仍不完整：44 项补充裁决中约 **12 项**有对应测试要求（`phase-3-execution.md` §9 共 19 行）。**这是已知缺口**，施工时逐项补齐。
 
 ---
 

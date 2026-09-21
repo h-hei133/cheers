@@ -5,7 +5,7 @@ sources: [pi-source-2026-09-21, phase-3-decisions-2026-09-21, phase-3-pre-resear
 created: 2026-09-21
 updated: 2026-09-21
 tags: [features, phase-3, execution, pi-comparison, decisions]
-summary: "Phase 3 开工前的**对照研究**（证据层，非裁决层）：按 `agent-rules/reference-repositories.md` 的「Compare Decisions Before Implementing」纪律，把 pi 对 Phase 3 七项决策的**具体决定**逐条列出，并标注我方是同意、不同意、还是**未考虑**。共 **40 处「未考虑」**与**两处我方论证错误**。最重要的四条：①pi 的 `thinkingBudgets` 是活机制（档位→数值预算，Anthropic/Google/Bedrock 原生消费，注释明写与 `thinkingFormat` **无关**），我方 T3 的「双来源冲突」论证被推翻——删除仍对，但理由须换成「我方无消费位点」；②我方**已经**暴露在 pi 那条注释警告的失效模式里（同时发 `reasoning_effort` 与 `max_tokens: 4096`），我方是检测而非预防；③项目技能、项目设置、扩展、提示词、主题、`SYSTEM.md` 在 pi 里共用一个信任门（7 类资源），而我方 `SkillLoader` **零信任检查**；④**实测我方 `SkillLoader.scan` 只读一层，3 个嵌套技能只发现 1 个**。**本文档只提供证据；全部裁决见 `phase-3-decisions.md`（含 44 项补充裁决）。**"
+summary: "Phase 3 开工前的**对照研究**（证据层，非裁决层）：按 `agent-rules/reference-repositories.md` 的「Compare Decisions Before Implementing」纪律，把 pi 对 Phase 3 七项决策的**具体决定**逐条列出，并标注我方是同意、不同意、还是**未考虑**。共 **40 处「未考虑」**与**两处我方论证错误**。最重要的四条：①pi 的 `thinkingBudgets` 是活机制（档位→数值预算，Anthropic/Google/Bedrock 原生消费，注释明写与 `thinkingFormat` **无关**），我方 T3 的「双来源冲突」论证被推翻——删除仍对，但理由须换成「我方无消费位点」；②我方**已经**暴露在 pi 那条注释警告的失效模式里（同时发 `reasoning_effort` 与 `max_tokens: 4096`），我方是检测而非预防；③项目技能、项目设置、扩展、提示词、主题、`SYSTEM.md` 在 pi 里共用一个信任门（7 类资源），而我方 `SkillLoader` **零信任检查**；④**实测我方 `SkillLoader.scan` 只读一层，3 个嵌套技能只发现 1 个**。**本文档只提供证据；全部裁决见 `phase-3-decisions.md`（含 44 项补充裁决与 5 个审查者的 13 处更正）。**"
 confidence: high
 ---
 
