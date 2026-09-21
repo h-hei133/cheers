@@ -20,6 +20,8 @@ import {
   type ExecutionService,
 } from '../../runtime/execution/service.js'
 import { type CoreMcpGateway } from '../mcp/gateway.js'
+import { formatDirectoryListing } from './directoryListing.js'
+import { createGlobToolDefinition } from './glob.js'
 import { createGrepToolDefinition } from './grep.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
@@ -71,20 +73,6 @@ function inferFailureKind(result: {
     default:
       return undefined
   }
-}
-function matchGlobPattern(filePath: string, pattern: string): boolean {
-  if (!pattern || pattern === '*' || pattern === '**' || pattern === '**/*') {
-    return true
-  }
-  const cleanPattern = pattern.trim().replace(/^\.\//, '')
-  const regexStr = cleanPattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*\*\//g, '(.+/)?')
-    .replace(/\*\*/g, '.*')
-    .replace(/\*/g, '[^/]*')
-    .replace(/\?/g, '[^/]')
-  const regex = new RegExp(`^${regexStr}$`, 'i')
-  return regex.test(filePath) || regex.test(filePath.replace(/^[/]+/, ''))
 }
 
 async function runCommandTool(
@@ -230,21 +218,21 @@ export function createCoreToolRegistry(options?: {
   const tools: ToolDefinition[] = [
     {
       name: 'read',
-      description: 'Read the contents of a file in the workspace, with optional line offset/limit pagination and safe truncation protection. Image files are reported, not returned: this harness reads text, so use bash to inspect an image.',
+      description: 'Read a file in the workspace, with optional line offset/limit pagination and safe truncation protection. Reading a directory path lists its direct contents instead, one level deep. Image files are reported, not returned: this harness reads text, so use bash to inspect an image.',
       argsSchema: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'The relative path of the file to read (e.g. package.json, src/index.ts).',
+            description: 'The relative path of the file or directory to read (e.g. package.json, src/index.ts, src).',
           },
           offset: {
             type: 'number',
-            description: 'The 1-based starting line number to read from (default: 1).',
+            description: 'The 1-based starting line number, or entry number when reading a directory (default: 1).',
           },
           limit: {
             type: 'number',
-            description: 'The maximum number of lines to read (default: 500, max: 1000).',
+            description: 'The maximum number of lines, or entries when reading a directory (default: 500, max: 1000).',
           },
         },
         required: ['path'],
@@ -281,6 +269,22 @@ export function createCoreToolRegistry(options?: {
           const containment = verifyPathContainment(target, context.workspaceRoot)
           if (!containment.allowed) {
             throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+          }
+          // A directory is a legitimate thing to read. Handing the model a raw
+          // EISDIR instead of the names it asked for makes "what is in here"
+          // unanswerable without shelling out, so the listing is answered here,
+          // through the same ignore policy every other tool walks with.
+          const stats = await fs.stat(containment.resolvedPath).catch(() => undefined)
+          if (stats?.isDirectory()) {
+            return approvedResult(
+              await formatDirectoryListing({
+                absolutePath: containment.resolvedPath,
+                workspaceRoot: context.workspaceRoot,
+                displayPath: selector.cleanPath,
+                offset: typeof args.offset === 'number' ? args.offset : undefined,
+                limit: typeof args.limit === 'number' ? args.limit : undefined,
+              }),
+            )
           }
           // An image read as text is mojibake, and mojibake is worse than a
           // refusal: it looks like content. Say what the file is and how to view
@@ -539,36 +543,7 @@ export function createCoreToolRegistry(options?: {
         })
       },
     },
-    {
-      name: 'glob',
-      description: 'List files in the workspace matching a path pattern or suffix (e.g. **/*.ts, package.json).',
-      argsSchema: {
-        type: 'object',
-        properties: {
-          pattern: {
-            type: 'string',
-            description: 'The file pattern or suffix to match (e.g. *.json, src/**/*.ts).',
-          },
-        },
-        required: ['pattern'],
-      },
-      permissions: { check: () => [] },
-      async execute(args, context) {
-        const rawPattern = typeof args.pattern === 'string' ? args.pattern.trim() : ''
-        const pattern = rawPattern.replace(/^[./\\]+/, '') || '*'
-        const files = await executionService.listFilesRecursive({
-          operationKind: 'file.list',
-          absoluteRoot: context.workspaceRoot,
-          workspaceRoot: context.workspaceRoot,
-          authority: TOOL_APPROVED_READ_AUTHORITY,
-          caller: 'core-tool:glob',
-          reason: 'List approved workspace files for glob matching.',
-          reportSafeTarget: context.workspaceRoot,
-        })
-        const filtered = files.filter(file => matchGlobPattern(file, pattern))
-        return approvedResult(filtered.length > 0 ? filtered.join('\n') : 'No files matched the pattern.')
-      },
-    },
+    createGlobToolDefinition(executionService),
     createGrepToolDefinition(executionService),
     {
       name: 'bash',

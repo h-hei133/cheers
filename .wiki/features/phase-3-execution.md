@@ -16,7 +16,7 @@
 | T7 | 死字段门禁 | ✅ **完成**（§2） |
 | T1 | 三层遍历 + `.gitignore` | ✅ **完成**（§3） |
 | T4 | 逐模型窗口 + 逐模型压缩预算 | ✅ **完成**（§4） |
-| T6 | 目录列举折进 `read` | ⬜ 未开始 |
+| T6 | 目录列举折进 `read` | ✅ **完成**（§5） |
 | T2 / T2b | `AGENTS.md` 注入 + 技能（一轮） | ⬜ 未开始 |
 | T5 | 声明式钩子 + 信任门 + 封堵既有执行面 | ⬜ 未开始 |
 
@@ -354,7 +354,95 @@
 
 ## 5. T6 — 目录列举
 
-⬜ 未开始。
+### 5.1 施工内容
+
+| 文件 | 变化 |
+|---|---|
+| `runtime/execution/fileWalk.ts` | 新增 `listDirectoryEntries` + `matcherForDirectory` + `listIgnoredViaGit` |
+| `core/tools/directoryListing.ts` | **新增**：列表渲染（分页、排序、截断与省略通知） |
+| `core/tools/globMatch.ts` | **新增**：统一 glob 匹配器（替换两份手写副本） |
+| `core/tools/glob.ts` | **新增**：glob 工具独立成模块 + 结果上限 |
+| `core/tools/registry.ts` | `read` 增加目录分支；删除内联 glob 与重复匹配器；描述更新 |
+| `core/tools/grep.ts` | 收敛到共享匹配器（删除本地副本） |
+
+### 5.2 施工中发现并修复的**两个额外缺陷**（不在原裁决范围内）
+
+**缺陷 1（重要）：glob 的两份手写匹配器都无法匹配 `**/*` 的根级文件。**
+
+`registry.ts` 与 `grep.ts` **各有一份完全相同的手写 glob→regex 改写**。两者都有同一个错误：
+
+```
+.replace(/\*\*\//g, '(.+/)?')   // 生成 (.+/)? —— 这个 ? 是「可选」
+.replace(/\?/g, '[^/]')          // 但这一步把这个 ? 变成了 [^/]
+```
+
+结果是 `(.+/)?` 变成 `(.+/)[^/]`——**可选组变成必需**。实测：
+
+| 模式 | 文件 | 修复前 | 应为 |
+|---|---|---|---|
+| `**/*.ts` | `a.ts` | ❌ false | true |
+| `**/*.ts` | `src/a.ts` | ✅ true | true |
+| `src/**/*.ts` | `src/a.ts` | ❌ false | true |
+
+**即：工具描述里宣传的两种模式，对最常见的位置都是失效的。**
+
+**处置**：引入 `picomatch`（**零依赖、124KB**，`gemini-cli` 同选），删除两份手写副本，两个工具收敛到 `globMatch.ts` 一份实现。
+
+**为什么选 `picomatch` 而非 `minimatch`**：两者语义都正确（已实测），但 `minimatch` 带 2 层依赖、680KB；`picomatch` 零依赖、124KB。参考实现里两者各有采用（`minimatch` 2 家、`picomatch` 1 家），**体积与依赖树是决定因素**。
+
+**保留了大小写不敏感**（原实现编译时带 `i` 标志）：改为 `nocase: true`，避免「修复后 `Package.json` 突然搜不到」。
+
+**缺陷 2：glob 无任何结果上限。**
+
+实测本仓 `**/*` 匹配 **2744 条 / 155KB**，全部 `join` 后交给模型。这正是裁决 §1.8 #1「**加**：条数上限 + 字节上限 + 可操作通知」要求的事项——T1 时判为「延迟到 T6」，本轮落实。
+
+**处置**：默认 500、上限 1000，截断时通知「Showing N of M matches (limit L). Narrow the pattern, or pass limit=K to see more」。
+
+### 5.3 形状（按裁决 §7.4）
+
+| 维度 | 实现 |
+|---|---|
+| 触发 | `read` 的路径 `stat` 为目录时 |
+| 层级 | **单层**（四个参考一致） |
+| 分页 | 复用 `offset`/`limit`（默认 500，上限 1000） |
+| 排序 | 目录优先，然后字母序（**按码点比较，不用 locale**，避免随环境漂移） |
+| 目录标记 | `/` 后缀 |
+| 忽略 | **T1 的统一忽略层**（`git check-ignore --stdin` 批量问 git，非仓库时进程内匹配） |
+| 空目录 | `Directory X is empty.`，**非错误** |
+| 全部被忽略 | **不报 empty**，报「holds no entries that this tool may show (N omitted)」 |
+| 省略计数 | `[N entries omitted by the ignore rules]`（裁决 §7.7 #2/#3） |
+| 符号链接 | 指向目录的链接按目录标记（`stat` 跟随）；断链按文件 |
+| 大小信息 | **不做**（裁决 §7.7 #1） |
+
+**一个实现细节值得记录**：`read` 的目录分支**在 `stat` 之后、读文件之前**——这样目录永远不会进入 `readTextFile`，也就永远不会产生 EISDIR。
+
+### 5.4 验证
+
+| 项 | 方式 | 结果 |
+|---|---|---|
+| 目录列举 | `readImprovements.test.ts` 新增 7 项 | **通过** |
+| glob 上限 | `globCap.test.ts` 新增 4 项 | **通过** |
+| glob 匹配 | 同上新增 5 项 | **通过** |
+| 全量 | `npm run test:ts` | **497 文件 / 2843 通过 / 1 跳过 / 0 失败** |
+| 类型 | `tsc` | **0 错误** |
+| 门禁 | import-cycles / docs-drift / config-consumers / test:scripts / module-facades | **全 pass**（环 0，无新增超限模块） |
+
+**反向验证**：把 `globMatch.ts` 换回原来的手写改写 → **5 项测试失败**（含 2 项钉住根级匹配缺陷）。
+
+**实机验证（真实构建产物）**：
+
+```
+read src  →  Directory src/ (3 entries):  sub/  a.ts  b.ts
+read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.json  package.json
+```
+
+修复前：`read src` → `IsADirectoryError: [Errno 21] Is a directory`。
+
+### 5.5 未做（如实记录）
+
+- **`grep` 的字节上限**：`grep` 已有 `truncateHead(50KB)` + 溢出落盘，未改动。
+- **`lsp` 的上限**：未动（裁决未要求）。
+- **Windows glob 语义**：仍为 backlog（裁决 §1.8 #6）。
 
 ---
 

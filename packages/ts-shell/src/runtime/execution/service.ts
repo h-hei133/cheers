@@ -22,7 +22,12 @@ import {
 } from './receipt.js'
 export * from './types.js'
 import { listWorkspaceFiles } from './fileWalk.js'
-export { listWorkspaceFiles, type FileWalkOptions } from './fileWalk.js'
+export {
+  listWorkspaceFiles,
+  listDirectoryEntries,
+  type FileWalkOptions,
+  type DirectoryEntry,
+} from './fileWalk.js'
 import type {
   CommandExecutionRequest,
   CommandExecutionResult,

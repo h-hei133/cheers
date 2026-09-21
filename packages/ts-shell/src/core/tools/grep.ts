@@ -5,6 +5,7 @@ import type { ToolDefinition } from "../../tools/types.js";
 import type { ExecutionAuthority, ExecutionService } from "../../runtime/execution/service.js";
 import { truncateLineWidth, truncateHead } from "./truncation.js";
 import { ArtifactManager } from "../session/artifactManager.js";
+import { matchesGlob } from "./globMatch.js";
 const DEFAULT_GREP_LIMIT = 100;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB limit per file
 
@@ -14,28 +15,6 @@ export const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
   reason: "ToolRuntime approved the filesystem read before ExecutionService was called.",
 };
 
-function matchPathPattern(filePath: string, pattern: string): boolean {
-  if (!pattern || pattern === "*" || pattern === "**" || pattern === "**/*") {
-    return true;
-  }
-  const cleanPattern = pattern.trim().replace(/^\.\//, "");
-  const baseName = path.basename(filePath);
-
-  // If pattern has no directory separators, match either against the full path or the basename
-  const regexStr = cleanPattern
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*\//g, "(.+/)?")
-    .replace(/\*\*/g, ".*")
-    .replace(/\*/g, "[^/]*")
-    .replace(/\?/g, "[^/]");
-  const regex = new RegExp(`^${regexStr}$`, "i");
-
-  return (
-    regex.test(filePath) ||
-    regex.test(filePath.replace(/^[/]+/, "")) ||
-    regex.test(baseName)
-  );
-}
 
 export function createGrepToolDefinition(
   executionService: ExecutionService,
@@ -113,7 +92,7 @@ export function createGrepToolDefinition(
         if (searchSubPath && !file.startsWith(searchSubPath)) {
           return false;
         }
-        if (globFilter && !matchPathPattern(file, globFilter)) {
+        if (globFilter && !matchesGlob(file, globFilter)) {
           return false;
         }
         return true;

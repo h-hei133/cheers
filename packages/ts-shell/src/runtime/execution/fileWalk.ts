@@ -213,3 +213,182 @@ export async function listWorkspaceFiles(
 
   return listViaWalk(resolved, pruned, respectIgnore)
 }
+
+/** One direct entry of a directory, as a listing should present it. */
+export interface DirectoryEntry {
+  /** The entry's own name, without any directory prefix. */
+  readonly name: string
+  readonly isDirectory: boolean
+}
+
+/** A directory's direct entries, with what was withheld from them. */
+export interface DirectoryListing {
+  readonly entries: readonly DirectoryEntry[]
+  /**
+   * How many entries the ignore rules or the pruned names withheld.
+   *
+   * Reported rather than dropped silently. A listing that shows three of thirty
+   * entries without saying so reads as a complete answer, and a model that
+   * believes it has seen everything will conclude a file does not exist when it
+   * merely was not shown.
+   */
+  readonly omittedCount: number
+}
+
+/**
+ * The names `directory` holds that the ignore rules exclude.
+ *
+ * Asked of git in one batch rather than one call per entry. git resolves the
+ * ancestor and nested ignore files, `.git/info/exclude` and the configured
+ * global excludes with the precedence it defines, and it reports a tracked path
+ * as not ignored even when a pattern matches it — the same judgement
+ * `listWorkspaceFiles` relies on, which is the point of asking it here too.
+ *
+ * Returns null when there is no repository to ask, which is the caller's signal
+ * to fall back to matching in-process. Exit 1 means "nothing was ignored" and is
+ * an answer, not a failure; only 128 (not a repository) means git cannot help.
+ */
+function listIgnoredViaGit(
+  directory: string,
+  names: readonly string[],
+): ReadonlySet<string> | null {
+  if (names.length === 0) return new Set()
+  const result = spawnSync('git', ['-C', directory, 'check-ignore', '--stdin'], {
+    input: `${names.join('\n')}\n`,
+    encoding: 'utf8',
+    shell: false,
+  })
+  if (result.error || result.status === 128) return null
+  if (result.status !== 0 && result.status !== 1) return null
+  return new Set(
+    (result.stdout || '')
+      .split('\n')
+      .filter((line) => line !== '')
+      .map((line) => line.split(path.sep).join('/')),
+  )
+}
+
+/**
+ * An ignore matcher carrying every rule that reaches `target`.
+ *
+ * Built by replaying the ancestor chain from `root` down, because a rule in an
+ * ancestor applies to `target` and there is no cheaper way to know it: the
+ * matcher is stateful and the prefixes differ at each level. Each directory's
+ * ignore files are folded in with that directory's prefix relative to `root`,
+ * exactly as the walk does when it descends.
+ */
+function matcherForDirectory(root: string, target: string): Ignore {
+  const matcher = ignore({ ignorecase: false })
+  const relative = path.relative(root, target)
+  const segments =
+    relative === '' || relative.startsWith('..') ? [] : relative.split(path.sep)
+
+  let current = root
+  let prefix = ''
+  for (const segment of segments) {
+    for (const name of IGNORE_FILES) {
+      addIgnoreFile(matcher, path.join(current, name), prefix)
+    }
+    current = path.join(current, segment)
+    prefix = `${prefix}${segment}/`
+  }
+  for (const name of IGNORE_FILES) {
+    addIgnoreFile(matcher, path.join(current, name), prefix)
+  }
+  return matcher
+}
+
+/**
+ * The direct entries of one directory, as a tool should see them.
+ *
+ * One level only. Recursing is what the glob tool answers, and a directory
+ * listing that descended would be a second, worse glob.
+ *
+ * The ignore policy is the same one the file walk applies, which is the point:
+ * a listing and a glob of the same tree must agree about what exists. A listing
+ * with no ignore support at all would be a fourth opinion about the same
+ * question, and would show a model the directories it is not meant to search.
+ *
+ * Pruned names are withheld rather than shown empty, because a listing that
+ * offered `node_modules/` and then answered nothing when asked about it would be
+ * telling the model the directory is empty when it is merely excluded.
+ */
+export async function listDirectoryEntries(
+  root: string,
+  directory: string,
+  options?: FileWalkOptions,
+): Promise<DirectoryListing> {
+  const pruned = options?.pruneDirectories ?? PRUNED_DIRECTORIES
+  const respectIgnore = options?.respectIgnore ?? true
+  const resolvedRoot = path.resolve(root)
+  const resolvedDirectory = path.resolve(directory)
+
+  const dirents = await fs.readdir(resolvedDirectory, { withFileTypes: true })
+  const candidates = dirents.filter((entry) => !pruned.includes(entry.name))
+  let omittedCount = dirents.length - candidates.length
+
+  // Names are what git is asked about; paths are what the matcher needs.
+  const ignored = respectIgnore
+    ? listIgnoredViaGit(
+        resolvedDirectory,
+        candidates.map((entry) => entry.name),
+      )
+    : new Set<string>()
+  const matcher =
+    respectIgnore && ignored === null
+      ? matcherForDirectory(resolvedRoot, resolvedDirectory)
+      : null
+  const relative = path.relative(resolvedRoot, resolvedDirectory)
+  const prefix = relative === '' ? '' : `${relative.split(path.sep).join('/')}/`
+
+  const entries: DirectoryEntry[] = []
+  for (const entry of candidates) {
+    const isDirectory = await resolveIsDirectory(resolvedDirectory, entry)
+    let excluded = false
+    if (ignored !== null) {
+      excluded = ignored.has(entry.name)
+    } else if (matcher !== null) {
+      // The trailing separator is how the matcher is told this is a directory,
+      // so a `dir/` pattern matches.
+      const path_ = `${prefix}${entry.name}`
+      excluded = matcher.ignores(isDirectory ? `${path_}/` : path_)
+    }
+    if (excluded) {
+      omittedCount++
+      continue
+    }
+    entries.push({ name: entry.name, isDirectory })
+  }
+
+  // Directories first, then by name. Sorted by comparison rather than locale
+  // collation so the order does not shift with the environment.
+  entries.sort((a, b) => {
+    if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1
+    if (a.name < b.name) return -1
+    if (a.name > b.name) return 1
+    return 0
+  })
+  return { entries, omittedCount }
+}
+
+/**
+ * Whether an entry is a directory, following a symlink when it is one.
+ *
+ * A symlink to a directory reports as a symlink, not a directory, so reading it
+ * as a file would fail on a path the listing just offered. Statting the link
+ * resolves that; a broken link reports as a file, which is what the eventual
+ * read will say too.
+ */
+async function resolveIsDirectory(
+  parent: string,
+  entry: Dirent,
+): Promise<boolean> {
+  if (entry.isDirectory()) return true
+  if (!entry.isSymbolicLink()) return false
+  try {
+    const stats = await fs.stat(path.join(parent, entry.name))
+    return stats.isDirectory()
+  } catch {
+    return false
+  }
+}
