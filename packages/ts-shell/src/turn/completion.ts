@@ -163,6 +163,20 @@ async function nextWithGrace(
   }
 }
 
+/**
+ * Whether to narrate the shape of each stream frame on stderr.
+ *
+ * For diagnosing a host whose stream never finishes: the question is always
+ * whether the terminal reason arrived, whether the sentinel did, and whether the
+ * socket closed — and none of that is visible from the screen. Content is never
+ * printed, only the frame's structure.
+ */
+const TRACE_STREAMS = process.env.PRIVATE_AGENTS_STREAM_TRACE === "1";
+
+function traceStream(message: string): void {
+  if (TRACE_STREAMS) console.error(`[stream] ${message}`);
+}
+
 export async function* readCompletionStream(
   body: ReadableStream<Uint8Array>,
 ): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
@@ -188,8 +202,14 @@ export async function* readCompletionStream(
       // way, so the wait is bounded rather than indefinite — a host holding the
       // connection open must not hold the turn open with it.
       const chunk = settled ? await nextWithGrace(iterator, FINISH_GRACE_MS) : await iterator.next();
-      if (chunk === GRACE_EXPIRED) break;
-      if (chunk.done) break;
+      if (chunk === GRACE_EXPIRED) {
+        traceStream("stopped: grace window expired");
+        break;
+      }
+      if (chunk.done) {
+        traceStream("stopped: socket closed by host");
+        break;
+      }
       buffer += decoder.decode(chunk.value, { stream: true });
       for (;;) {
         const split = nextEvent(buffer);
@@ -198,6 +218,7 @@ export async function* readCompletionStream(
         const step = absorb(split.event, state);
         yield* step.fragments;
         if (step.ended) {
+          traceStream("stopped: [DONE] sentinel");
           ended = true;
           break;
         }
@@ -221,6 +242,11 @@ export async function* readCompletionStream(
   const tail = flushHeld(state);
   if (tail) yield { kind: "text", text: tail };
 
+  if (TRACE_STREAMS) {
+    traceStream(
+      `turn ended finish_reason=${state.finishReason ?? "-"} content_chars=${state.content.length} calls=${state.calls.length} usage=${state.usage ? "yes" : "no"}`,
+    );
+  }
   return assemble(state);
 }
 
@@ -250,6 +276,12 @@ function absorb(
   if (parsed.usage) state.usage = parsed.usage;
   const choice = parsed.choices?.[0];
   if (choice?.finish_reason) state.finishReason = choice.finish_reason;
+  if (TRACE_STREAMS) {
+    const keys = choice?.delta ? Object.keys(choice.delta).filter((k) => k !== "content") : [];
+    traceStream(
+      `frame finish_reason=${choice?.finish_reason ?? "-"} delta_keys=${keys.join("|") || "-"} usage=${parsed.usage ? "yes" : "no"}`,
+    );
+  }
   const delta = choice?.delta;
   // A terminal finish reason ends the answer even though more events may follow.
   // The `[DONE]` sentinel is the documented end of the stream but not a reliable
