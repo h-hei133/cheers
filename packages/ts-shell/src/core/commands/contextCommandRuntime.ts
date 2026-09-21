@@ -1,4 +1,5 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
 import { toolSchemas } from "../../turn/tools.js";
@@ -29,8 +30,13 @@ export async function runContextCommand(
 ): Promise<LocalCommandResult> {
   const sessionId = context.sessionId ?? "";
   const telemetry = sessionId ? getSessionUsage(sessionId) : undefined;
-  const window = configuredWindow();
-  const reserve = DEFAULT_RESERVE_TOKENS;
+  // The window and reserve the compaction engine actually works to. Read from
+  // the same configuration the engine reads, rather than from an environment
+  // variable nothing sets and a constant that happens to match today: a report
+  // about a threshold is only useful if it names the threshold in force.
+  const runtimeConfig = getRuntimeConfig(context.cwd);
+  const window = runtimeConfig.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+  const reserve = runtimeConfig.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
   const schemaTokens = toolSchemaTokens();
   const registry = createCoreToolRegistry();
 
@@ -78,10 +84,8 @@ export async function runContextCommand(
   };
 }
 
-/** The window this process is configured for. */
-function configuredWindow(): number {
-  return Number.parseInt(process.env.AUTO_COMPACT_WINDOW ?? "", 10) || 64_000;
-}
+/** The window to assume when no configuration names one. */
+const DEFAULT_CONTEXT_WINDOW = 64_000;
 
 /** Tokens the tool definitions occupy, from the bytes actually sent. */
 function toolSchemaTokens(): number {

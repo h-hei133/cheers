@@ -463,3 +463,183 @@ guard 判定 `would-not-shrink` 而拒绝——**7 个测试因此失败**。
    只验证了「修订提示词被选用、`<previous-summary>` 被传递、checkpoint 不被重复压缩」的结构。
 3. **连续两次真实压缩的累积效果**未在真实 provider 上观察；§4.3 第 4 行的
    「继承 checkpoint」用的是**种入的历史**而非真实第一次压缩的产物。
+
+---
+
+## 5. 更正：收口后暴露的第二个缺陷（2026-09-21）
+
+### 5.1 现象
+
+用户在真实会话中执行 `/compact`，得到：
+
+```
+Condensed 3 earlier messages into a checkpoint; the latest 13 stay verbatim.
+Estimated context: ~18,439 → ~18,106 tokens.
+```
+
+**16 条消息的会话，压缩掉 3 条，只释放 333 tokens（1.8%）。** 用户质疑「你确定已经统一？」
+——质疑是对的：§4 的统一本身成立，但统一后的引擎**在错误的输入上做了决定**。
+
+### 5.2 根因：把「预算」当成了「测量值」
+
+§4 施工时，`planCompactionCut` 里保留了上一轮的一段逻辑：
+
+```ts
+const measured = policy.measureContextTokens?.(messages);
+const scale = estimated / measured;              // ← 缺陷
+const keepRecent = Math.min(keepRecentTokens, available) * scale;
+```
+
+**`measured` 是 provider 报的「整个请求」的 token 数，包含系统提示词与工具 schema；
+而 `estimated` 只统计消息正文。** 两者相除得到的不是「单位换算比率」，而是
+「正文占整个请求的比例」——一个恒小于 1、且随工具数量变化的值。
+
+代数后果（`E`=estimated，`M`=measured，`K`=keepRecentTokens，`C`=正文总字符数）：
+
+$$\text{budgetChars} = K \cdot \frac{E}{M} \cdot 3.5 = K \cdot \frac{C/3.5}{M} \cdot 3.5 = \frac{K \cdot C}{M}$$
+
+预算被花光（即产生切点）的条件是 $\text{budgetChars} \le C$，代入化简：
+
+$$\frac{K \cdot C}{M} \le C \iff M \ge K$$
+
+**即：只要 provider 报的请求大小 ≥ 20,000，就必然产生一个切点——与对话有多长完全无关。**
+
+这就解释了两个症状：
+- 16 条消息、正文仅 18.4k tokens 的会话被切了 3 条（因为工具 schema 把 `measured` 推过了 20k）；
+- 用户看到的 `18,439 → 18,106` 是用 `estimateTokens` 算的，而**决定用的是 `measured`**——
+  展示的数字与决策的数字不是同一个，用户无法从提示里看出发生了什么。
+
+**量化复现**（实测，非推断）：16 条消息、`estimated = 18,439`，
+切点落在 index 3 当且仅当 $24{,}615 \le measured \le 26{,}665$。
+工具丰富的 CLI 会话常态就在这个区间。
+
+### 5.3 对照参考实现
+
+`pi` 的 `findCutPoint`（`compaction.ts:437-451`）**只累加逐条消息的估算值**：
+
+```ts
+const messageTokens = sessionEntryToContextMessages(entry).reduce(
+  (sum, message) => sum + estimateTokens(message), 0);
+accumulatedTokens += messageTokens;
+if (accumulatedTokens >= keepRecentTokens) { cutIndex = ...; break; }
+```
+
+全仓检索 `scale`／`estimated / measured` **无匹配**——**没有这个机制**。
+且 `prepareCompaction`（`:820-822`）在无可摘要内容时返回 `undefined`，
+手动路径据此抛 `"Nothing to compact (session too small)"`。
+即：**同一场景下参考实现会拒绝，我们却切了 3 条。**
+
+### 5.4 修复
+
+**删除 `scale`。** 预算由 `keepRecentTokens` 与窗口夹紧得出，是**策略**，不是测量值：
+
+```ts
+const keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available);
+```
+
+**把两个数字分派到各自的问题上**——这是本次修复的核心认识：
+
+| 问题 | 用哪个数字 | 为什么 |
+|---|---|---|
+| 上下文是否已超出窗口（阈值） | **`measured`**（provider 报的整请求） | 只有 provider 能看见系统提示词与工具 schema 的开销 |
+| 该在哪里切（切点） | **`estimated`**（逐条消息累加） | 切点是对**对话**做的操作，与请求的固定开销无关 |
+
+**顺带修正 §4.4 的一处判断。** 上一轮我把「对话短于预算」与「无合法切点」合并为一个
+decline reason，理由是「要区分需第二遍扫描，而两者对用户是同一句话」。
+**这个判断是错的**：16 条消息的会话被报成「太短」正是这个合并的后果——
+它既不短、也不该拒绝，只是尚未超出压缩保留的尾部。
+现已拆为四个 reason，各有准确措辞：
+
+| reason | 含义 |
+|---|---|
+| `fits-budget` | 没有比「压缩会保留的尾部」更旧的内容（本轮真实场景） |
+| `below-threshold` | 上下文尚未超出窗口（仅自动路径会报，`/compact` 跳过阈值） |
+| `no-legal-cut` | 有内容可换，但每个切点都会拆散工具调用与其结果 |
+| `would-not-shrink` | 摘要不小于被替换内容 |
+
+### 5.5 验证
+
+**回归测试**（`session/compactionUsage.test.ts` 重写为 7 项）：
+- 「the provider's measurement never moves the cut」——遍历
+  `measured ∈ {1k, 20k, 25k, 40k, 60k}`，断言**切点逐一同一个**；
+- 「declines rather than cutting three messages out of a conversation inside its budget」——
+  **直接复刻上报场景**，断言返回 `undefined`；
+- 「declines when the request is large only because of overhead」——
+  断言 provider 报 60k 但对话本身很小 → 不压缩。
+
+**反向验证**：删除 `scale` 前，上述遍历会得到
+`measured=25k → cut=3`、`measured=60k → cut=10`（切点随测量值漂移）；
+删除后全部收敛到同一 `cut`。
+
+**实机验证（真实 CLI + PTY）**：
+| 场景 | 修复前 | 修复后 |
+|---|---|---|
+| 16 条消息、正文 18.4k tokens | `Condensed 3 earlier messages`（释放 333 tokens） | `There is nothing older than the recent history that compaction keeps, so there is nothing to condense yet` |
+| 90 轮交换、正文 31.4k tokens | — | 正常压缩：`keptMessages:115`、`tokensBefore:31418` |
+
+**门禁**：`tsc` 0 错；`verify:import-cycles` 0 环；`verify:docs-drift:strict` pass；
+**全量 `npm run test:ts`：494 文件 / 2799 通过 / 1 跳过 / 0 失败**（空载，load 0.05）。
+`/context` 修复后另跑全量 **3 次**：2 次 494 文件 / 2798 通过 / 1 失败，1 次 **494/494 全通过**。
+唯一失败项恒为 `cli-baseline.test.ts > routes sessions current without provider turn`。
+
+**判定为既有负载抖动，非本次改动引入**，依据五条（逐条实测）：
+1. **代码路径不重叠**：该测试用 `/sessions current`（`registry.ts:164` `kind:"prompt"`），
+   **从不调用 `runContextCommand`**；我改的是 `/context`。
+2. **未新增配置读取**：`registry.ts:1` 在改动前就已 `import { getRuntimeConfig }`，
+   我的改动没有把任何新的 I/O 引入启动路径。
+3. **隔离复跑 6/6 通过**（每次约 2s，预算 20s）。
+4. **带修复的全量运行出现过 494/494 全通过**——同一份代码既有通过也有失败，即非确定性。
+5. **对照实验**：在 load 5.59 下**移除**该修复跑全量 → 494/494 全通过；
+   在 load 2.57 下**保留**修复 → 该 1 项失败。两次样本与「load 越高越容易失败」不一致，
+   说明**失败由时序而非负载单调决定**；结合第 1、2 条（路径不重叠），
+   该对照不足以证明因果，也不足以推翻第 1、2 条的直接证据。
+   项目历史已两次记载同一项抖动（`.wiki/log.md:620`、`:1722`）。
+
+**诚实记录**：本条无法用单次实验证否，故同时保留「路径不重叠」的静态证据与
+「3 次全量中 1 次全通过」的动态证据，不作更强断言。
+
+### 5.6 同类缺陷排查（`/context` 也在报错的数字）
+
+§5.5 修完后，派子代理按**同一错误类别**全仓排查：
+「比率的分子与分母是否度量同一件事」「比较的两侧是否同一量程」。
+
+**找到第二处**（`core/commands/contextCommandRuntime.ts`）：`/context` 报告的窗口与阈值
+**不来自压缩引擎所用的配置**：
+
+| 项 | 引擎用的 | `/context` 报告的（修复前） |
+|---|---|---|
+| 窗口 | `runtimeConfig.contextWindow` | `process.env.AUTO_COMPACT_WINDOW` ?? 64,000 |
+| reserve | `runtimeConfig.reserveTokens` | 硬编码 `DEFAULT_RESERVE_TOKENS` |
+
+两处后果：
+1. **`AUTO_COMPACT_WINDOW` 是一个无人设置的幻影环境变量**——全仓检索仅此一处读取，
+   无任何生产者（已核实：`.wiki/features/03-provider-and-model-layer.md:79` 早已记录
+   「同一数字在三处各写一遍」）。因此 `/context` **永远显示 64,000**，
+   即使用户配置了别的窗口。
+2. 用户会看到**一个阈值、另一个行为**：报告说「超过 64,000 才压缩」，
+   而引擎按配置的窗口压缩。
+
+**修复**：与同目录的 `localCommandRuntime.ts` 一致，改读 `getRuntimeConfig(context.cwd)`。
+**实机验证**：配置 `contextWindow: 200000` 后 `/context` 显示 `Window: 200,000 tokens`
+（修复前恒为 64,000）。
+
+**该轮排查的其余结论**（子代理 `RatioAudit`，已核验）：
+- **无其他「异量比率」**：检查 9 处比率/缩放，全部是同一量程（字符→token 换算、
+  百分比、Jaccard、进度）。`microCompact` 只用字符数与轮次，无 token 数学。
+- **provider usage 与本地估算的组合仅一处**（`cliSessionRuntimeFactory.ts:60-64`），
+  且**判定为正确**：`lastPromptTokens`（上次整请求实测）**加上**新增消息的估算，
+  再与整请求阈值比较——加法两侧同量程，且该值**不再用于缩放切点预算**。
+
+### 5.7 教训
+
+**§4 的验证覆盖不到这个缺陷，因为验证的是「结构」而不是「数值」。**
+§4 断言了「两路共用同一引擎」「拒绝时不写 entry」「继承 checkpoint」——
+全部成立，且至今成立。但它从未断言**「该不该切」的判据是否正确**：
+测试 fixture 用的都是远超预算的长对话，于是「切点总是存在」被当成了前提。
+
+**这是 §4.4 同一种错误的第二次出现**：为省一遍扫描而合并两个语义不同的情形。
+第一次的代价是一句不准确的提示，第二次的代价是**把预算换成了比例尺**。
+
+**纪律**：凡引入一个「比率」或「缩放系数」，必须能回答
+「这个比率的分子与分母是否在度量同一件事」。本次的分子（消息正文）
+与分母（整个请求）**不是**同一件事，相除得到的量没有意义。

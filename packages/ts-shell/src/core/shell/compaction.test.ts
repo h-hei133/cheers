@@ -98,7 +98,9 @@ describe("session compaction", () => {
       policy: POLICY,
       summarize,
     });
-    expect(outcome).toEqual({ status: "nothing", reason: "The conversation is too short to compact." });
+    expect(outcome.status).toBe("nothing");
+    if (outcome.status !== "nothing") throw new Error("unreachable");
+    expect(outcome.reason).toContain("nothing older than the recent history");
     expect(target.entries).toEqual([]);
     // Declining happens before the provider is asked, so a refusal costs nothing.
     expect(summarize).not.toHaveBeenCalled();

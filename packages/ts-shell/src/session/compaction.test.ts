@@ -486,7 +486,29 @@ describe("a compaction that would not shrink the context", () => {
       policy: { contextWindow: 30, reserveTokens: 10, keepRecentTokens: 10_000 },
       summarize: async () => "summary",
     });
-    expect(condensed).toEqual({ status: "declined", reason: "nothing-to-condense" });
+    expect(condensed).toEqual({ status: "declined", reason: "fits-budget" });
+  });
+
+  it("tells a conversation with no legal cut apart from one that fits its budget", async () => {
+    // Every candidate boundary sits inside an open tool call, so there is
+    // history to replace but nowhere safe to cut it — a different refusal from
+    // "nothing is older than the kept tail".
+    const dangling: AgentMessage[] = [
+      userMessage("start"),
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [{ id: "call-1", type: "function", function: { name: "read", arguments: "{}" } }],
+      },
+      userMessage(`tail prompt ${"z".repeat(200)}`),
+    ];
+    const condensed = await condenseContext({
+      messages: dangling,
+      policy: { contextWindow: 1_000, reserveTokens: 0, keepRecentTokens: 1 },
+      force: true,
+      summarize: async () => "summary",
+    });
+    expect(condensed).toEqual({ status: "declined", reason: "no-legal-cut" });
   });
 
   it("condenses the same conversation once the messages outweigh the summary", async () => {

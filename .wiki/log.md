@@ -2699,3 +2699,24 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 - **验证**：`tsc` 0 错；`verify:import-cycles` 0 环（1433 文件）；`verify:docs-drift:strict` pass；**空载全量 494 文件 / 2792 通过 / 1 跳过 / 0 失败**。带负载时曾见 12 项 30s 超时（`core/harness/browser*` + `registry-rust-bridge`）与 `cli-baseline` resume-continuity 超时，**成因是 PTY 验证脚本同时占满机器**——隔离复跑分别 230 通过/零失败与 9.9s 通过，确证为负载抖动。
 - **未验证**：真实 provider 的摘要质量与超长 prompt 行为；`UPDATE_COMPACTION_PROMPT` 的实际输出质量；连续两次**真实**压缩的累积效果（继承验证用的是种入历史而非真实第一次压缩产物）。均记入 `phase-2-execution.md` §4.5。
 - 文档：`phase-2-execution.md` 新增 §4（施工/缺陷/验证/未验证），状态改为**已闭环**；`features/_index.md` 与 `07-*` 同步收口标注。
+
+## [2026-09-21] fix | 压缩层第二缺陷：预算被当作测量值（`scale` 缩放）导致小会话被切 3 条
+- **现象**：用户实机 `/compact` 报 `Condensed 3 earlier messages ... ~18,439 → ~18,106 tokens`——16 条消息的会话只释放 333 tokens（1.8%）。用户质疑「是否真的统一」——质疑成立：§4 的统一本身没错，但引擎在**错误的输入**上做了决定。
+- **根因（代数可证）**：`planCompactionCut` 里 `scale = estimated / measured` 把**消息正文估算**除以**provider 报的整个请求 token**（含系统提示词与工具 schema）。两者不是同一件事，相除得到的不是换算率而是「正文占请求的比例」。代入化简：产生切点的条件 `budgetChars ≤ C` 等价于 **`measured ≥ keepRecentTokens`**——**与对话多长完全无关**。实测：16 条消息、`estimated=18,439`，切点落在 index 3 当且仅当 `24,615 ≤ measured ≤ 26,665`，而工具丰富的 CLI 会话常态就在此区间。
+- **对照参考实现**：`pi` 的 `findCutPoint` 只累加**逐条消息**的估算值，全仓检索 `scale`／`estimated / measured` **无匹配**（无此机制）；`prepareCompaction` 在无可摘要内容时返回 `undefined`，手动路径据此拒绝。**同场景参考实现会拒绝，我们却切了 3 条。**
+- **修复**：删除 `scale`。预算由 `keepRecentTokens` 与窗口夹紧得出——它是**策略**而非测量值。两个数字各归其位：**阈值用 `measured`**（只有 provider 能看见系统提示词与工具 schema 开销），**切点用 `estimated`**（切点是对对话的操作，与请求固定开销无关）。
+- **顺带修正 §4.4 的错误判断**：上一轮为省一遍扫描，把「对话短于预算」与「无合法切点」合并为一个 decline reason。**该判断错误**——16 条消息被报成「太短」正是后果。现拆为四个：`fits-budget`（本轮真实场景）/ `below-threshold` / `no-legal-cut` / `would-not-shrink`，各有准确措辞。
+- **验证**：`session/compactionUsage.test.ts` 重写为 7 项，含「the provider's measurement never moves the cut」（遍历 `measured ∈ {1k,20k,25k,40k,60k}` 断言切点逐一同一个）与「declines rather than cutting three messages out of a conversation inside its budget」（直接复刻上报场景）。**反向验证**：删除 `scale` 前遍历得到 `25k→cut=3`、`60k→cut=10`（切点随测量值漂移），删除后全部收敛。**实机 PTY**：16 条消息 → `There is nothing older than the recent history that compaction keeps...`（零 entry）；90 轮交换 → 正常压缩（`keptMessages:115`、`tokensBefore:31418`）。门禁：`tsc` 0 错、0 环、docs-drift pass、**全量 494 文件 / 2799 通过 / 0 失败**。
+- **教训**：§4 的验证覆盖不到此缺陷，因为验证的是**结构**（两路共用引擎、拒绝时不写 entry、继承 checkpoint——全部成立且至今成立），从未断言**「该不该切」的判据是否正确**；fixture 全用远超预算的长对话，「切点总是存在」被当成前提。**这是 §4.4 同一种错误的第二次出现**：为省一遍扫描而合并两个语义不同的情形。纪律：凡引入比率或缩放系数，必须能回答「分子与分母是否在度量同一件事」。
+
+## [2026-09-21] fix | 同类缺陷排查：`/context` 报的窗口与阈值不来自引擎所用配置
+- **排查方法**：按 §5 缺陷的**错误类别**（「比率的分子分母是否度量同一件事」「比较两侧是否同一量程」）派子代理全仓扫描。
+- **找到第二处**：`core/commands/contextCommandRuntime.ts` 的窗口取自 `process.env.AUTO_COMPACT_WINDOW ?? 64_000`，reserve 取自硬编码常量——**而压缩引擎取的是 `runtimeConfig.contextWindow` / `runtimeConfig.reserveTokens`**。两个后果：①`AUTO_COMPACT_WINDOW` 是**无人设置的幻影环境变量**（全仓仅此一处读取、零生产者），所以 `/context` 恒显示 64,000；②用户看到「报告说一个阈值、引擎按另一个行为」。
+- **修复**：与同目录 `localCommandRuntime.ts` 一致改读 `getRuntimeConfig(context.cwd)`。**实机验证**：配置 `contextWindow:200000` → `/context` 显示 `Window: 200,000 tokens`（修复前恒为 64,000）。
+- **其余排查结论（已核验）**：9 处比率/缩放全部同量程（字符→token、百分比、Jaccard、进度条）；`microCompact` 只用字符数与轮次，无 token 数学；**provider usage 与本地估算的组合全仓仅一处**（`cliSessionRuntimeFactory.ts:60-64`）且判定正确——`lastPromptTokens + estimateTokens(新增消息)` 是加法、两侧同量程，且该值只用于整请求阈值、**不再缩放切点预算**。
+- **验证**：`tsc` 0 错、0 环；受影响域 172 通过；全量 494 文件 / 2798 通过（唯一失败为 `cli-baseline` `/sessions current` PTY 抖动，隔离复跑 1.8s 通过，不涉及 `/context`）。
+
+## [2026-09-21] verify | `/context` 修复后的全量验证与一次未决抖动
+- **`/context` 修复后全量跑 3 次**：2 次 494 文件 / 2798 通过 / 1 失败，1 次 **494/494 全通过**。唯一失败恒为 `cli-baseline.test.ts > routes sessions current without provider turn`。
+- **判定为既有抖动，五条依据**：①该测试走 `/sessions current`（`registry.ts:164` `kind:"prompt"`），**从不调用 `runContextCommand`**；②`registry.ts:1` 改动前就已 import `getRuntimeConfig`，本次未新增启动期 I/O；③隔离复跑 **6/6 通过**（每次约 2s / 预算 20s）；④**带修复的全量出现过 494/494 全通过**——同一代码既通过又失败即非确定性；⑤项目历史已两次记载同一项抖动（`.wiki/log.md:620`、`:1722`）。
+- **对照实验的局限（诚实记录）**：load 5.59 下移除修复 → 494/494 通过；load 2.57 下保留修复 → 1 项失败。两次样本与「load 单调影响」不符，故该对照既不足以证因果、也不足以推翻①②的直接证据。不作更强断言。

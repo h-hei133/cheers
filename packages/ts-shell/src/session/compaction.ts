@@ -17,12 +17,21 @@ export interface CompactionPolicy {
   readonly keepRecentTokens?: number;
   readonly enabled?: boolean;
   /**
-   * What the provider reported the context costs, given the messages on hand.
+   * What the provider reported the whole request costs, given the messages on
+   * hand.
    *
    * A callback rather than a number because it changes as the turn proceeds: the
    * measured value covers the prompt that was sent, and every message added since
    * has to be counted on top of it. Returns nothing when no measurement exists,
    * in which case the caller estimates instead.
+   *
+   * Used for the threshold — "has the context outgrown its window" — and never
+   * for the cut. The two questions need different numbers: the threshold is
+   * about the request as a whole, which only the provider can size, while the
+   * cut is about the conversation, which the walk measures per message. Feeding
+   * the provider's count into the cut scaled the budget by the fixed overhead of
+   * the system prompt and tool schemas, so a conversation comfortably inside the
+   * budget still produced a cut, and the cut shrank as that overhead grew.
    */
   readonly measureContextTokens?: (messages: readonly AgentMessage[]) => number | undefined;
 }
@@ -168,6 +177,20 @@ function newestCutBelow(
 }
 
 /**
+ * The outcome of searching for a cut: where it is, or why there is none.
+ *
+ * The two reasons are kept apart because they mean different things to whoever
+ * reads them. A conversation that fits the budget is not too small — it is
+ * growing, and has simply not yet outgrown what compaction would have kept
+ * anyway. A conversation with no legal cut is a different situation entirely:
+ * there is history to replace, but every boundary would strand a tool call from
+ * its result.
+ */
+type CutSearch =
+  | { readonly cut: CompactionCut }
+  | { readonly reason: "fits-budget" | "no-legal-cut" };
+
+/**
  * Where to cut so the kept tail costs about `keepRecentTokens`.
  *
  * Walks back from the newest message adding up size until the budget is spent,
@@ -176,39 +199,64 @@ function newestCutBelow(
  * provider an answer whose call was just discarded, while an assistant message
  * keeps its own tool calls and their results together in the tail.
  *
- * Returns nothing in two cases, which callers must tell apart by their own
- * question rather than here:
+ * Reports "fits-budget" when the whole conversation is smaller than the budget,
+ * so there is no history beyond the tail to condense and a checkpoint would
+ * replace less than it costs. Condensing anyway is what makes a context grow on
+ * every pass.
  *
- * - No legal cut exists anywhere. There is nothing this function can do.
- * - The whole conversation fits inside the budget. There is no history beyond
- *   the tail to condense, so a checkpoint would replace less than it costs.
- *   Condensing anyway is what makes a context grow on every pass.
- *
- * The walk measures estimated tokens while the caller may have measured the
- * request for real, and the two disagree by a factor that varies with the
- * conversation. When the budget is spent inside a run of tool results — the one
- * case where the budget cannot be met without starting the tail on a result —
- * the newest legal cut anywhere is used, which keeps less than the budget asked
- * for rather than giving up.
+ * When the budget is spent inside a run of tool results — the one case where it
+ * cannot be met without starting the tail on a result — the newest legal cut
+ * anywhere is used, which keeps less than the budget asked for rather than
+ * giving up.
  */
-export function findCompactionCut(
-  messages: readonly AgentMessage[],
-  keepRecentTokens: number,
-): CompactionCut | undefined {
+function locateCut(messages: readonly AgentMessage[], keepRecentTokens: number): CutSearch {
   const budgetChars = keepRecentTokens * CHARS_PER_TOKEN;
   const openCalls = openCallsBefore(messages);
   let accumulated = 0;
   for (let index = messages.length - 1; index >= 2; index -= 1) {
     accumulated += messageCharCount(messages[index]!);
     if (accumulated < budgetChars) continue;
-    // The budget is spent. Take the newest legal cut at or before here; the
-    // earliest ones would keep more than the budget allows. Falling back to the
-    // newest legal cut anywhere keeps less than the budget, which is the only
-    // alternative to starting the tail on a tool result.
-    return newestCutBelow(messages, openCalls, index) ?? newestCutBelow(messages, openCalls, messages.length - 1);
+    // The budget is spent, so there is history to replace; only legality can
+    // fail from here. The earliest qualifying cut would keep more than the
+    // budget allows.
+    const cut =
+      newestCutBelow(messages, openCalls, index) ?? newestCutBelow(messages, openCalls, messages.length - 1);
+    return cut ? { cut } : { reason: "no-legal-cut" };
   }
-  // The conversation fits the budget, so there is nothing to condense.
-  return undefined;
+  return { reason: "fits-budget" };
+}
+
+/**
+ * Where to cut, or nothing when there is no cut to make.
+ *
+ * A thin view over `locateCut` for callers that only need the position; a
+ * caller that has to explain the refusal should ask `explainNoCut` instead.
+ */
+export function findCompactionCut(
+  messages: readonly AgentMessage[],
+  keepRecentTokens: number,
+): CompactionCut | undefined {
+  const found = locateCut(messages, keepRecentTokens);
+  return "cut" in found ? found.cut : undefined;
+}
+
+/**
+ * Why no cut could be made, for a caller that has to tell the user.
+ *
+ * Only meaningful once a cut has been found absent: it re-runs the search to
+ * read its reason, which is why it is not part of the planning result. Callers
+ * that decline are already refusing, so the second walk costs nothing that
+ * matters.
+ */
+export function explainNoCut(
+  messages: readonly AgentMessage[],
+  policy: CompactionPolicy,
+): "fits-budget" | "no-legal-cut" {
+  const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
+  const available = Math.max(0, policy.contextWindow - reserve);
+  const keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available);
+  const found = locateCut(messages, keepRecent);
+  return "cut" in found ? "no-legal-cut" : found.reason;
 }
 
 /**
@@ -253,20 +301,11 @@ export function planCompactionCut(
   const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
   const available = Math.max(0, policy.contextWindow - reserve);
   const estimated = estimateTokens(messages);
-  const measured = policy.measureContextTokens?.(messages);
-  // The estimate is what the walk can see per message; the provider's count is
-  // what the whole request actually costs. Dividing costs by characters is not
-  // a constant — a script with wide characters spends more tokens per character
-  // than Latin prose does — so the two disagree by a factor that varies with the
-  // conversation. Scaling the budget by the ratio found in this very
-  // conversation keeps the walk landing where the real number says it should,
-  // instead of reaching the end of the history and finding no cut at all.
-  const scale = measured !== undefined && measured > 0 && estimated > 0 ? estimated / measured : 1;
   // A budget at or above what the window can hold would swallow the whole
   // conversation, so no cut would ever be found and compaction would never run
   // — the opposite of what the budget is for. Clamp it to the space that
   // actually exists.
-  const keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available) * scale;
+  const keepRecent = Math.min(policy.keepRecentTokens ?? KEEP_RECENT_TOKENS, available);
   const cut = findCompactionCut(messages, keepRecent);
   if (cut === undefined) {
     return undefined;
@@ -290,6 +329,23 @@ export function planCompaction(
     return undefined;
   }
   return { ...plan, tokensBefore };
+}
+
+/**
+ * Whether the threshold is what stopped a plan, for a caller that has to say so.
+ *
+ * `planCompaction` declines for two different reasons — no cut to make, or a
+ * context still inside its window — and only the first is about the
+ * conversation's shape. Asking this after a decline keeps the distinction out
+ * of the plan itself, which callers that do not speak to a user never need.
+ */
+function isBelowThreshold(
+  messages: readonly AgentMessage[],
+  policy: CompactionPolicy,
+): boolean {
+  const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
+  const tokensBefore = policy.measureContextTokens?.(messages) ?? estimateTokens(messages);
+  return !shouldCompact(tokensBefore, policy.contextWindow, reserve, policy.enabled ?? true);
 }
 
 /**
@@ -350,12 +406,25 @@ export function readContextCheckpoint(content: string): string | undefined {
  */
 export type CompactionDecline =
   /**
-   * There is no history beyond the kept tail: either no legal cut exists, or
-   * the conversation already fits inside the recent-tail budget. Both mean the
-   * same thing to a caller — nothing worth replacing — so they are one case
-   * rather than two that would need a second walk to tell apart.
+   * The conversation already fits inside the recent-tail budget, so there is
+   * nothing older than the kept tail to replace. This is the common case: a
+   * conversation that is growing but has not yet outgrown what compaction would
+   * have kept anyway.
    */
-  | "nothing-to-condense"
+  | "fits-budget"
+  /**
+   * The context has not yet outgrown its window, so there is nothing to do
+   * until it does. Reported only by a caller that asked for the threshold to be
+   * applied; an explicit `/compact` bypasses it.
+   */
+  | "below-threshold"
+  /**
+   * There is history to replace, but nowhere legal to cut it: every candidate
+   * boundary would strand a tool call from its result. Rare, and worth telling
+   * apart from "fits budget" because the remedy differs — the conversation is
+   * not too small, its calls are simply all still open.
+   */
+  | "no-legal-cut"
   /** The summary would cost at least what it replaces, so the context could only grow. */
   | "would-not-shrink"
   /** The summarizer produced nothing usable. */
@@ -402,7 +471,13 @@ export async function condenseContext(input: {
     ? planCompactionCut(input.messages, input.policy)
     : planCompaction(input.messages, input.policy);
   if (!plan) {
-    return { status: "declined", reason: "nothing-to-condense" };
+    // Which refusal this is matters to whoever reads it. An explicit `/compact`
+    // skips the threshold, so its refusal is always about the conversation's
+    // shape; a scheduled step can also be refusing because nothing is due yet.
+    if (!input.force && isBelowThreshold(input.messages, input.policy)) {
+      return { status: "declined", reason: "below-threshold" };
+    }
+    return { status: "declined", reason: explainNoCut(input.messages, input.policy) };
   }
   // A leading system message is carried over verbatim by applyCompaction, so
   // summarizing it as well would pay to restate what is still there.

@@ -58,16 +58,31 @@ export interface CompactionInput {
 /**
  * What to tell the user when the engine declined to condense.
  *
- * Most declines are decisions, not faults: the engine found either too little
- * to cut or a summary that would cost at least what it replaces. The second is
- * the one worth naming — a context that grows on every compaction is worse than
- * one that was left alone. A summarizer that returned nothing is the exception:
- * the request went out and came back unusable, so it is reported as a failure.
+ * Most declines are decisions, not faults, and the wording has to say which
+ * decision: a conversation that has not yet outgrown what compaction would keep
+ * anyway is a different situation from one whose tool calls are all still open.
+ * A summarizer that returned nothing is the exception — the request went out and
+ * came back unusable, so that one is reported as a failure.
  */
 function declineOutcome(reason: CompactionDecline): CompactionOutcome {
   switch (reason) {
-    case "nothing-to-condense":
-      return { status: "nothing", reason: "The conversation is too short to compact." };
+    case "fits-budget":
+      return {
+        status: "nothing",
+        reason:
+          "There is nothing older than the recent history that compaction keeps, so there is nothing to condense yet.",
+      };
+    case "below-threshold":
+      return {
+        status: "nothing",
+        reason: "The context has not outgrown its window yet, so there is nothing to compact.",
+      };
+    case "no-legal-cut":
+      return {
+        status: "nothing",
+        reason:
+          "Every point this conversation could be split at would separate a tool call from its result, so there is nowhere safe to cut.",
+      };
     case "would-not-shrink":
       return {
         status: "nothing",
