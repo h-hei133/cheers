@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+
 /**
  * Reading a chat completion as it arrives.
  *
@@ -164,17 +166,27 @@ async function nextWithGrace(
 }
 
 /**
- * Whether to narrate the shape of each stream frame on stderr.
+ * Whether to narrate the shape of each stream frame.
  *
  * For diagnosing a host whose stream never finishes: the question is always
  * whether the terminal reason arrived, whether the sentinel did, and whether the
- * socket closed — and none of that is visible from the screen. Content is never
- * printed, only the frame's structure.
+ * socket closed — none of which is visible from the screen.
+ *
+ * Written to a file rather than the terminal. The interactive surface owns the
+ * terminal and repaints it; anything else writing there lands between two frames
+ * of a repaint, which scrolls the whole view and repeats lines. Content is never
+ * written, only the frame's structure.
  */
 const TRACE_STREAMS = process.env.PRIVATE_AGENTS_STREAM_TRACE === "1";
+const TRACE_PATH = process.env.PRIVATE_AGENTS_STREAM_TRACE_PATH ?? "stream-trace.log";
 
 function traceStream(message: string): void {
-  if (TRACE_STREAMS) console.error(`[stream] ${message}`);
+  if (!TRACE_STREAMS) return;
+  try {
+    fs.appendFileSync(TRACE_PATH, `[stream] ${message}\n`, "utf8");
+  } catch {
+    // A diagnostic must never be the reason a turn fails.
+  }
 }
 
 export async function* readCompletionStream(
