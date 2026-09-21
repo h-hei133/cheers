@@ -2597,11 +2597,18 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 
 ### 根因（三处，均已核对源码）
 
-**① 整批结果才发事件（主因）。**
-`core/agent/tools.ts:358-366`：`Promise.all(...)` 之后才在循环里 `emitToolResultMessage`。
-所以并行批里**没有任何工具完成事件**到达 UI，直到全部工具跑完 —— 然后一次性涌出。
-**`runSequential` 反而是正确的**（`tools.ts:322-323` 每个工具完成即发）：
-两条路径行为不一致，串行路径写对了，并行路径没有。
+**① 卡片收尾信号被投影层丢弃（主因）。**
+我在本节初稿里把这一条写成「整批结果才发事件」，**那是错的**，已更正：
+`emitExecutionEnd` 位于**每个工具的闭包内**（`core/agent/tools.ts:348`、`:360`），
+**确实**在单个工具完成时立即发出。分批的只有结果消息，而那是 OpenAI 协议要求
+（同一 assistant 消息的 tool results 必须顺序对应且完整；pi 同样如此，
+`agent-loop.ts:592-613`）。
+
+真正的问题在下一层：`turn/projection.ts:50-54` 对 `tool_execution_end` 返回 `[]`，
+而 `tool.result` 只在 `message_end`（`:55-70`）产生 —— 那个要等 `Promise.all`。
+**信号路径是满的，投影层是漏的。** 卡片因此只能等结果消息才关闭。
+
+详见 `.wiki/features/interaction-issues.md` §0（含我把错误结论更正的过程）。
 
 **② `tool_execution_end` 被投影层丢弃。**
 `turn/projection.ts:50-54` 返回 `[]`；`tool.result` 只在 `message_end`（`:55-70`）产生。
