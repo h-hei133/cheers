@@ -132,6 +132,37 @@ export function isEventStream(response: { readonly headers: Headers; readonly bo
  * Consume an SSE completion, yielding each text fragment as it arrives and
  * returning the assembled message.
  */
+/** How long to keep reading for a late usage event once the answer is complete. */
+const FINISH_GRACE_MS = 2_000;
+
+const GRACE_EXPIRED = Symbol("finish-grace-expired");
+
+/**
+ * The next chunk, or a marker when nothing arrives within the grace window.
+ *
+ * The abandoned `next()` is left to settle on its own; its rejection is caught
+ * so a stream that fails after the answer is complete cannot surface as an
+ * unhandled error.
+ */
+async function nextWithGrace(
+  iterator: AsyncIterator<Uint8Array>,
+  graceMs: number,
+): Promise<IteratorResult<Uint8Array> | typeof GRACE_EXPIRED> {
+  const pending = iterator.next();
+  pending.catch(() => undefined);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      pending,
+      new Promise<typeof GRACE_EXPIRED>((resolve) => {
+        timer = setTimeout(() => resolve(GRACE_EXPIRED), graceMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function* readCompletionStream(
   body: ReadableStream<Uint8Array>,
 ): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
@@ -146,23 +177,39 @@ export async function* readCompletionStream(
     usage: undefined,
   };
   const decoder = new TextDecoder();
+  const iterator = (body as unknown as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
   let buffer = "";
   let ended = false;
+  let settled = false;
 
-  for await (const chunk of body as unknown as AsyncIterable<Uint8Array>) {
-    buffer += decoder.decode(chunk, { stream: true });
+  try {
     for (;;) {
-      const split = nextEvent(buffer);
-      if (!split) break;
-      buffer = split.rest;
-      const step = absorb(split.event, state);
-      yield* step.fragments;
-      if (step.ended) {
-        ended = true;
-        break;
+      // Once the answer is complete, an event carrying usage may still be on its
+      // way, so the wait is bounded rather than indefinite — a host holding the
+      // connection open must not hold the turn open with it.
+      const chunk = settled ? await nextWithGrace(iterator, FINISH_GRACE_MS) : await iterator.next();
+      if (chunk === GRACE_EXPIRED) break;
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      for (;;) {
+        const split = nextEvent(buffer);
+        if (!split) break;
+        buffer = split.rest;
+        const step = absorb(split.event, state);
+        yield* step.fragments;
+        if (step.ended) {
+          ended = true;
+          break;
+        }
+        if (step.settled) settled = true;
       }
+      if (ended) break;
     }
-    if (ended) break;
+  } finally {
+    // Released on every exit, including the grace expiry: `for await` does this
+    // itself, and doing the read by hand means doing it here. A body left open
+    // holds its connection, and a held connection outlives the turn.
+    void Promise.resolve(iterator.return?.(undefined)).catch(() => undefined);
   }
 
   // A host that closes without a blank line after its last event leaves it in the
@@ -194,17 +241,24 @@ function nextEvent(buffer: string): { readonly event: string; readonly rest: str
 function absorb(
   event: string,
   state: StreamState,
-): { readonly fragments: readonly StreamFragment[]; readonly ended: boolean } {
+): { readonly fragments: readonly StreamFragment[]; readonly ended: boolean; readonly settled: boolean } {
   const payload = eventData(event);
-  if (payload === undefined) return { fragments: [], ended: false };
-  if (payload === "[DONE]") return { fragments: [], ended: true };
+  if (payload === undefined) return { fragments: [], ended: false, settled: false };
+  if (payload === "[DONE]") return { fragments: [], ended: true, settled: false };
   const parsed = parseChunk(payload);
-  if (!parsed) return { fragments: [], ended: false };
+  if (!parsed) return { fragments: [], ended: false, settled: false };
   if (parsed.usage) state.usage = parsed.usage;
   const choice = parsed.choices?.[0];
   if (choice?.finish_reason) state.finishReason = choice.finish_reason;
   const delta = choice?.delta;
-  if (!delta) return { fragments: [], ended: false };
+  // A terminal finish reason ends the answer even though more events may follow.
+  // The `[DONE]` sentinel is the documented end of the stream but not a reliable
+  // one: a host behind a keep-alive proxy can hold the connection open after its
+  // last event, and waiting for a close that never comes leaves the turn running
+  // with nothing left to read. Continuing would only collect the usage event,
+  // which is already reported before the reason on the hosts that send it late.
+  const finished = isTerminalFinishReason(choice?.finish_reason);
+  if (!delta) return { fragments: [], ended: false, settled: finished };
 
   const batch = delta.tool_calls ?? [];
   for (let offset = 0; offset < batch.length; offset++) {
@@ -226,7 +280,25 @@ function absorb(
     state.reasoning += thinking;
     fragments.push({ kind: "reasoning", text: thinking });
   }
-  return { fragments, ended: false };
+  // The content is complete, but a host that reports usage in its own event
+  // sends that event after this one, so the caller may still read a little more.
+  return { fragments, ended: false, settled: finished };
+}
+
+/**
+ * Whether a finish reason means the answer is complete.
+ *
+ * The reasons a provider sends when it has stopped generating. Anything else —
+ * absent, or a value this does not know — leaves the stream open in case more
+ * content follows it.
+ */
+function isTerminalFinishReason(reason: string | null | undefined): boolean {
+  return (
+    reason === "stop" ||
+    reason === "tool_calls" ||
+    reason === "length" ||
+    reason === "content_filter"
+  );
 }
 
 /**

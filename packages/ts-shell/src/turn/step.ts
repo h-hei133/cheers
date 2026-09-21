@@ -126,12 +126,20 @@ export function createStepFunction(request: StepRequest): StepFunction {
         },
       };
       let response: Response;
+      // Reading ends as soon as the answer is complete, which can be before the
+      // host closes the stream — a keep-alive proxy holds the connection open
+      // afterwards. The socket is released here rather than left to the host, so
+      // a connection nobody is reading cannot outlive the turn.
+      const releaseStream = new AbortController();
+      const requestSignal = signal
+        ? AbortSignal.any([signal, releaseStream.signal])
+        : releaseStream.signal;
       try {
         response = await fetchImpl(`${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${request.provider.apiKey}` },
           body: JSON.stringify(payload),
-          signal,
+          signal: requestSignal,
         });
       } catch (error) {
         if (signal?.aborted) return abortedStep("");
@@ -163,6 +171,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       } catch (error) {
         if (signal?.aborted) return abortedStep(shown);
         return errorStep(`Network error: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        releaseStream.abort();
       }
     }
   };

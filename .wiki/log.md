@@ -2523,3 +2523,66 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 
 1. **未跑真实 provider 触发一次自动压缩**——合成 provider 不产生 usage。
 2. **前缀摘要在真实 provider 上的输出质量**未知，只验证了结构（两条摘要都进入 checkpoint）。
+
+## [2026-09-20] fix | CLI 挂死复现并修复：流没有 `[DONE]` 时永不结束。
+
+**用户报告**：交互式 CLI 一直转圈 working 无法回复；Esc 中止后仍执行一段时间。
+
+### 复现（未触碰真实 provider 配置）
+
+写了一个本地 OpenAI 兼容的 SSE 服务作为替身。判定矩阵：
+
+| provider 行为 | 修复前 | 修复后 |
+|---|---|---|
+| `finish_reason` + `[DONE]`，socket 保持打开 | 正常退出 | 正常退出 |
+| `finish_reason`，**无 `[DONE]`**，socket 保持打开 | **挂死（exit 124）** | **exit 0，2s** |
+| 无 `[DONE]`，socket 关闭 | 正常退出 | 正常退出 |
+| 工具调用轮次 | 正常退出 | 正常退出 |
+
+**决定因素是 `[DONE]` 哨兵。** 缺它时挂死无限期。
+
+### 根因（两层）
+
+1. **`readCompletionStream` 只认 `[DONE]` 或 socket 关闭，不认 `finish_reason`。**
+   `turn/completion.ts` 记录 `state.finishReason` 但从不据此结束，仍等下一次读取；
+   keep-alive 代理不关连接 → 永久等待。**信号已经到达并用上了，终止条件却只认哨兵。**
+2. **请求没有超时。** `provider/request/fetch.ts` 定义了 `bodyTimeout`（默认 120s），
+   但 `createProviderFetchFromEnv` **只被 `core/shell/providerReadiness.ts:149` 使用**——
+   聊天请求在 `turn/step.ts` 直接 `fetchImpl(...)`，拿不到这些超时。所以连"最终会失败"都没有。
+
+### 修复
+
+- `turn/completion.ts`：终止性 `finish_reason` 视为答案结束；其后留 **2s 宽限窗口**收 usage
+  （`stream_options.include_usage` 时 usage 在 `finish_reason` **之后**单独一帧到达，
+  立即结束会丢掉 P8 依赖的测量值）。
+- `turn/step.ts`：读取结束后 `AbortController.abort()` 释放连接——
+  body 不释放会持有 socket，进程也不退出。
+
+### 这不是本轮回归（已证明）
+
+用 `git worktree` 在 `0afe8294`（2026-09-18，Phase 1 之前）另建构建，
+对同一替身 provider 得到**同样的 exit 124**。**是既有缺陷**，`turn/completion.ts` 自
+`a7418fcb`（2026-09-12，Phase 4 kernel 化）以来未改动。
+
+### 施工中我自己的两次误判（均被实测推翻）
+
+1. **以为 `bodyTimeout=120s` 是那个"一段时间"。** 实测 `PRIVATE_AGENTS_PROVIDER_BODY_TIMEOUT_MS=8000`
+   后仍挂死 60s → 该配置对聊天请求根本没生效。
+2. **以为 `iterator.return()` 能释放 body。** 实测无效：`return()` 要排在那次
+   永不 resolve 的 `read()` 之后。改用 `AbortController` 才真正释放。
+
+另：有两次全量 `npm run test:ts` 报失败（`cli-baseline` 冒烟；一次还带上 TUI benchmark）。
+两次都发生在我为复现而起的替身服务仍在运行时；**清理这些进程后即为
+491 文件 / 2754 通过 / 0 失败**，且两个测试**单独复跑均通过**（47/47）。
+**相关性明确、因果未证明**——它们都对负载敏感。`cli-baseline.test.ts` 另有项目已知的并发抖动记录（见本文件 :620、:1722）。
+
+### 验证
+
+- **实机**：四种 provider 行为全部 ≤2s 退出；`/context` 显示 provider 真实 usage（777 tokens）→ 宽限窗口确实收到了晚到的 usage。
+- **反向验证**：注入 `vite.config` 强制 vitest 1s 超时后，去掉宽限窗口 → 测试**挂死失败**；带窗口 → 29 项通过。
+- 全量 **491 文件 / 2754 通过 / 0 失败**（较修复前 +3，为本轮新增测试）。
+
+### 仍未验证
+
+真实 provider 的流结束行为未直接观测（未启用真实凭据门）。修复基于协议与实测替身；
+真实 provider 若同样不带 `[DONE]`，修复同样生效，这一点符合判定矩阵而非推断。

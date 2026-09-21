@@ -298,3 +298,67 @@ describe("chat-template markers that leak into visible text", () => {
     expect(result.message.content).toBe(markup);
   });
 });
+
+describe("a stream that ends without its sentinel", () => {
+  /** A body that yields the given events and then stays open, never closing. */
+  function openStream(...events: string[]): ReadableStream<Uint8Array> {
+    const encoder = new TextEncoder();
+    return new ReadableStream({
+      start(controller) {
+        for (const event of events) controller.enqueue(encoder.encode(event));
+        // Deliberately not closed: a keep-alive host holds the connection.
+      },
+    });
+  }
+
+  it("finishes on the terminal reason instead of waiting for [DONE]", async () => {
+    const started = Date.now();
+    const { deltas, result } = await collect(
+      openStream(
+        chunk({ content: "Answer" }),
+        chunk({}, { finish_reason: "stop" }),
+      ),
+    );
+
+    // Before this was handled the reader waited for a close that never came, and
+    // the turn ran forever.
+    expect(deltas).toEqual(["Answer"]);
+    expect(result.message.content).toBe("Answer");
+    expect(result.finishReason).toBe("stop");
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it("still collects usage reported after the terminal reason", async () => {
+    const encoder = new TextEncoder();
+    let sent = 0;
+    const usageChunk = () =>
+      `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 42, completion_tokens: 7, total_tokens: 49 } })}\n\n`;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(chunk({ content: "Hi" })));
+        controller.enqueue(encoder.encode(chunk({}, { finish_reason: "stop" })));
+        setTimeout(() => {
+          sent += 1;
+          controller.enqueue(encoder.encode(usageChunk()));
+        }, 50);
+      },
+    });
+
+    const { result } = await collect(body);
+    // The grace window exists for exactly this: usage arrives after the reason.
+    expect(sent).toBe(1);
+    expect(result.usage?.prompt_tokens).toBe(42);
+  });
+
+  it("finishes a tool-call turn the same way", async () => {
+    const { result } = await collect(
+      openStream(
+        chunk({ tool_calls: [{ index: 0, id: "call_1", function: { name: "bash", arguments: "{}" } }] }),
+        chunk({}, { finish_reason: "tool_calls" }),
+      ),
+    );
+
+    expect(result.finishReason).toBe("tool_calls");
+    expect(result.message.tool_calls?.[0]?.function.name).toBe("bash");
+  });
+});
