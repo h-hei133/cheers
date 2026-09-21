@@ -5,7 +5,7 @@ sources: [pi-source-2026-09-21, phase-3-decisions-2026-09-21, phase-3-pre-resear
 created: 2026-09-21
 updated: 2026-09-21
 tags: [features, phase-3, execution, pi-comparison, decisions]
-summary: "按 `agent-rules/reference-repositories.md` 的「Compare Decisions Before Implementing」纪律，把 pi 对 Phase 3 七项决策的**具体决定**逐条列出，并标注我方是同意、不同意、还是**未考虑**。三处「未考虑」与两处「我方论证错误」是本轮的实际产出：①pi 的 `thinkingBudgets` 是活机制而非死配置，我方 T3 的「双来源」论证被推翻；②pi 在非 git 目录下用 `--no-require-git` **保留** gitignore，我方「回退即失去 gitignore」是能力缺口而非等价降级；③pi 的 find 有 git 探测而 grep 没有，这种同产品内不对称我方从未考虑。"
+summary: "按 `agent-rules/reference-repositories.md` 的「Compare Decisions Before Implementing」纪律，把 pi 对 Phase 3 七项决策的**具体决定**逐条列出，并标注我方是同意、不同意、还是**未考虑**。共 **35 处「未考虑」**（T1 七处、T2 九处、T2b 三处、T3 三处、T4 六处、T5 四处、T6 三处）与**两处我方论证错误**，是实际产出。最重要的三条：①pi 的 `thinkingBudgets` 是活机制（档位→数值预算，Anthropic/Google/Bedrock 原生消费，且注释明写与 `thinkingFormat` **无关**），我方 T3 的「双来源冲突」论证被推翻——删除仍对，但理由须换成「我方无消费位点」；②我方**已经**暴露在 pi 那条注释警告的失效模式里（同时发 `reasoning_effort` 与 `max_tokens: 4096`，推理与答案共享额度），我方是检测而非预防；③项目技能、项目设置、扩展、提示词、主题、`SYSTEM.md` 在 pi 里共用一个信任门（7 类资源），而我方 `SkillLoader` **零信任检查**——T2b 一旦接线就会激活这个提示注入面。另有 **15 项**待维护者裁决的开放问题。"
 confidence: high
 ---
 
@@ -249,6 +249,40 @@ pi 的 `SystemPromptSections` 把提示词拆成 `preamble`/`tools`/`rules`/`doc
 **这是一处真实的不一致**：同一产品里，「项目指令文件」的继承范围比「项目技能」更大。`resource-loader.ts` 的注释解释了自己的选择（worktree 遮蔽处理），但**没有解释为什么与技能不同**。
 
 **对我方的意义**：我方 `phase-3-decisions.md` §2.2.1 选择「止于项目根标记（`.git`）」——**这与 pi 的技能一致，与 pi 的 AGENTS.md 不一致**。这个发现的价值是：**我方选择的边界在 pi 里有先例（技能侧），且 pi 的 AGENTS.md 侧是无意的更宽边界**。我方的决定因此更站得住，但应把「为什么与 pi 的 AGENTS.md 不同」写进文档（理由：`~/AGENTS.md` 不该注入每个项目）。
+
+**发现 6：pi 的分节 diff 是为「支持会话中途 system 消息的 provider」服务的——我方不在这条分支上，这反过来验证了我方的选择。**
+
+pi 的分节机制（`diffSystemPromptSections` → 会话中途的 system 消息 patch）**只对支持 mid-conversation system 消息的 provider 有意义**。对不支持的 provider，pi 用 `collapseSystemMessages` 把整份提示词**重新折叠到首条消息**（`transcript.ts:108-112`）：
+
+```ts
+export function collapseSystemMessages(context: TranscriptContext): TranscriptContext {
+    const head = getCurrentSystemMessage(context.messages);
+    const messages = context.messages.filter((message) => message.role !== "system");
+    return { messages: head ? [head, ...messages] : messages } as TranscriptContext;
+}
+```
+
+**我方已核验属于后一种**：`turn/step.ts:106` 只发**一条**前导 system 消息（`{ role: "system", content: request.systemPrompt }`），无中途 system 消息。
+
+**即：我方 `buildSystemPrompt` 每次 run 重建一个字符串的做法，与 pi 在「无 mid-convo system 支持」分支上的行为等价。** 我方不采纳分节 diff（§2.3 B）**不只是「不需要」，而是「pi 的机制在我方对应的分支上退化为同样的事」**。这使 §2.3 B 的裁决从「我们选了更简单的做法」升级为「我们选了 pi 在该分支上实际执行的做法」。
+
+**发现 7：`AGENTS.override.md` 是刻意的逐目录覆盖逃生口。**
+
+pi 的候选集是**五个**文件名（`resource-loader.ts:72`）：`AGENTS.override.md` > `AGENTS.md` > `AGENTS.MD` > `CLAUDE.md` > `CLAUDE.MD`。其中 `AGENTS.override.md` 是**专为「覆盖」设计的**——它排在最前，使一个目录能用它替换掉同目录的 `AGENTS.md`。
+
+**我方计划只考虑了 `AGENTS.md`/`CLAUDE.md` 的优先级，未考虑 `.override` 这个逃生口。** 价值：它让「临时覆盖项目规则」不需要改动 `AGENTS.md` 本身（对 git 工作树友好）。**建议采纳**——成本是一个数组项。
+
+**发现 8：刷新触发是显式的 `/reload` 命令，且它同时刷新所有资源。**
+
+pi 的 `/reload` 描述（`slash-commands.ts:42`）：
+
+> Reload keybindings, extensions, skills, prompts, themes, and context files
+
+**我方计划只说「会话中途修改不生效」，未规定如何让它生效。** pi 的答案是「一个显式命令刷新全部」。**建议采纳同一形状**——我方已有 `/` 命令体系，加一个 `/reload` 即可；且「刷新全部」比「只刷 `AGENTS.md`」更可预测。
+
+**发现 9：BOM 剥离与「目录名为 AGENTS.md」的处理。**
+
+pi 在读取时 `stripBom`（`resource-loader.ts:81`），且用 `statSync().isFile()` 跳过同名目录，**使下一个候选（如 `CLAUDE.md`）有机会胜出**（`resource-loader.ts:77-79`）。我方 `read` 工具已有 BOM 剥离（`splitByteOrderMark`），**但上下文文件加载是另一条路径**——需确认它是否复用同一处理。**同名目录使下一候选胜出**这个行为我方未考虑（我方的直觉是「跳过该目录」）。
 
 ---
 
@@ -596,11 +630,42 @@ async loadProjectTrustExtensions(): Promise<LoadExtensionsResult> {
 
 **这是一个鸡生蛋问题**：能决定「是否信任项目」的代码，本身来自项目。**我方未考虑这个自举风险。** pi 的缓解是：该 handler 来自**已加载的扩展**（包括全局扩展），且首个决定胜出。**我方若做声明式路径，应明确排除这类「决定自身信任」的能力。**
 
-**发现 3：项目设置与项目扩展共享同一信任位。**
+**发现 3：项目设置与项目扩展共享同一信任位——且覆盖 **7 类资源**。**
 
-`settings-manager.ts:397-399` 的项目作用域加载与 `resource-loader.ts:380-399` 的扩展加载**读同一个 `projectTrusted` 标志**。即：**批准一次 = 项目设置 + 项目扩展 + 包安装三者同时生效**。
+已核验（`trust-manager.ts:30-38,185-207`）：
 
-**我方 `phase-3-decisions.md` §6 只讨论了「钩子配置的信任边界」**，未考虑「项目设置是否也需要信任门」。**这是一个作用域划分缺口**——若我方将来支持项目级配置，必须决定它与钩子信任是同一个门还是两个门。
+```ts
+const TRUST_REQUIRING_PROJECT_CONFIG_RESOURCES = [
+    "settings.json", "extensions", "skills", "prompts", "themes", "SYSTEM.md", "APPEND_SYSTEM.md",
+] as const;
+```
+
+`hasTrustRequiringProjectResources(cwd)` 的判定是：**项目 `.pi/` 下存在上述任一资源**，**或**任意祖先目录存在 `.agents/skills`（排除用户主目录的那个）。
+
+即：**批准一次 = 项目设置 + 扩展 + 技能 + 提示词模板 + 主题 + 两个 system 提示文件，同时生效**。
+
+**我方 `phase-3-decisions.md` §6 只讨论了「钩子配置的信任边界」**，未考虑：
+- 项目设置是否也需要信任门；
+- **项目技能、提示词模板、主题**是否也需要；
+- 信任门的作用域边界（pi 是「一个门管所有项目资源」）。
+
+**注意 `SYSTEM.md` / `APPEND_SYSTEM.md` 在列表里**——这两个是**直接追加到系统提示**的文件。这与我方 T2（`AGENTS.md` 注入）是同一类资源，**pi 把它放在信任门内**。若我方 T2 要注入项目 `AGENTS.md`，按同一逻辑它**也应过信任门**——这是一个我方计划未覆盖的推论（见 Q11）。
+
+**但已核验一处不一致**：`loadProjectContextFiles`（`AGENTS.md`/`CLAUDE.md`）**没有任何信任检查**（`resource-loader.ts:119-155` 全文无 `isProjectTrusted`），而 `discoverSystemPromptFile` / `discoverAppendSystemPromptFile` **有**：
+
+```ts
+private discoverSystemPromptFile(): string | undefined {
+    const projectPath = join(this.cwd, CONFIG_DIR_NAME, "SYSTEM.md");
+    if (this.settingsManager.isProjectTrusted() && existsSync(projectPath)) {   // ← 信任门
+        return projectPath;
+    }
+    ...
+}
+```
+
+**即：在 pi 里，项目 `.pi/SYSTEM.md` 需要信任，但项目 `AGENTS.md` 不需要。** 两者都是「注入系统提示的仓库提供文本」，处理方式却不同。
+
+**这是一个真实的不一致，而非设计**——`AGENTS.md` 走的是独立函数（`loadProjectContextFiles`），从未接入信任门。**对我方的意义**：我方 T2 必须**自己决定** `AGENTS.md` 是否过信任门，不能以「pi 怎么做」为依据（pi 在这个点上自相矛盾）。**我的倾向：项目 `AGENTS.md` 应过信任门**——它与 `.pi/SYSTEM.md` 是同类资源（仓库提供的、进入系统提示的文本），pi 把后者放进门内说明它认可这类风险。
 
 **发现 4：逃生口的命名与语义。**
 
@@ -687,6 +752,11 @@ IsADirectoryError: [Errno 21] Is a directory: 'packages/ts-shell/src'
 | **Q8** | 目录列举是否显示隐藏文件？ | pi 显式「是」；我方若应用忽略层则 `.git/` 会被排除 | **显示**（与 pi 一致），忽略层只排除 gitignore 命中的项，不额外排除 dotfiles |
 | **Q9** | 逃生口是否需要危险提示？ | codex 在运行时警告；pi 的 `--approve` 无警告 | **加警告**，与 codex 一致 |
 | **Q10** | **项目级技能是否过信任门？** | pi 让项目技能与项目扩展共用一个信任位；我方 `SkillLoader` 已支持 `<workspace>/.agents/skills` 但计划里未提信任 | **必须过**。项目技能内容**直接进入系统提示**，是比执行代码更隐蔽的注入面。用户级技能无条件注入，项目级走信任门 |
+| **Q11** | **项目 `AGENTS.md` 是否过信任门？** | pi 在这一点上**自相矛盾**：`.pi/SYSTEM.md` 需要信任，`AGENTS.md` 不需要（两者都是仓库提供的、进入系统提示的文本） | **过信任门**。理由取自 pi 自己对 `SYSTEM.md` 的处理——它认可「仓库提供文本进入系统提示」这一类风险 |
+| **Q12** | 信任门的作用域：一个门还是多个？ | pi 是**一个门管 7 类资源**（`settings.json`/`extensions`/`skills`/`prompts`/`themes`/`SYSTEM.md`/`APPEND_SYSTEM.md`） | **一个门**，但提示文案必须**逐项列出**获批范围（pi 的文案做到了：「load `.pi` settings and resources, install missing project packages, and execute project extensions」） |
+| **Q13** | 上下文文件的刷新触发是什么？ | pi 有显式 `/reload`（刷新 keybindings/扩展/技能/提示词/主题/**context files**）；我方**无 `/reload`**（已核验 45 个命令中无此项），计划只说「中途修改不生效」 | **加 `/reload`**，且刷新全部资源而非只刷 `AGENTS.md`——「刷新全部」更可预测。注意我方**有 `/cd` 命令**（`registry.ts:210`），切目录后 `AGENTS.md` 是否重新发现需一并裁决 |
+| **Q14** | 是否支持 `AGENTS.override.md` 这类逐目录覆盖逃生口？ | pi 的候选集有五个文件名，`.override` 排最前，专门用于在不改动 `AGENTS.md` 的前提下覆盖它 | **采纳**——成本是一个数组项，收益是 git 工作树友好的临时覆盖 |
+| **Q15** | 同名目录（名为 `AGENTS.md` 的目录）时，是否让下一候选胜出？ | pi 用 `statSync().isFile()` 跳过，**使 `CLAUDE.md` 有机会胜出**；我方的直觉是「跳过该目录」 | **跟 pi**（继续下一候选）——目录名撞上文件名时，用户显然还写了别的候选文件，没有理由因此整目录放弃 |
 
 ---
 
@@ -708,6 +778,8 @@ IsADirectoryError: [Errno 21] Is a directory: 'packages/ts-shell/src'
 | T4 逐模型压缩预算 | 两个模型配不同 `keepRecentTokens`，断言各自生效 |
 | T5 未信任不执行 | 项目钩子配置存在但未信任 → 断言**零执行**；反转信任门即失败 |
 | T5 内容哈希变更触发复审 | 改动命令文本 → 断言信任状态回到未信任 |
+| T5 未信任时项目资源不可见 | 未信任 → 断言项目 `.agents/skills`、项目设置、项目钩子**全部不生效**；用户级资源**仍生效** |
+| T2 项目 `AGENTS.md` 的信任边界 | 未信任项目的 `AGENTS.md` → 断言**不注入**；用户级/全局 `AGENTS.md` 仍注入 |
 | T6 目录列举 | `read(目录)` 返回条目列表而非 EISDIR；断言目录 `/` 后缀、单层、忽略规则生效 |
 
 ---
@@ -733,6 +805,17 @@ IsADirectoryError: [Errno 21] Is a directory: 'packages/ts-shell/src'
 | pi `ls` 无忽略规则、含 dotfiles | 读 `ls.ts:62,102` |
 | pi `ls` stat 失败静默跳过 | 读 `ls.ts:125-128` |
 | 我方 `read` 对目录抛 EISDIR | **实测** `IsADirectoryError: [Errno 21]` |
+| pi 的信任门覆盖 7 类资源 | 读 `trust-manager.ts:30-38,185-207` |
+| pi 的 `.pi/SYSTEM.md` 过信任门而 `AGENTS.md` 不过 | 读 `resource-loader.ts:1024-1026`（有信任检查）vs `:119-155`（无） |
+| pi 的项目技能过信任门 | 读 `package-manager.ts:2398-2401,2425-2435` |
+| pi 的两条祖先遍历边界不同 | `resource-loader.ts:150`（文件系统根）vs `package-manager.ts:462-479`（git 根），且 `findGitRepoRoot` 存在但前者不用 |
+| pi 的 `collapseSystemMessages` 分支 | 读 `transcript.ts:108-112`；我方 `step.ts:106` 只发一条前导 system 消息 → 等价 |
+| pi 的 `/reload` 刷新范围 | 读 `slash-commands.ts:42` |
+| 我方无 `/reload` 命令 | 列 `registry.ts` 45 个命令名，无此项 |
+| 我方有 `/cd` 命令 | 读 `registry.ts:210` |
+| 我方 `SkillLoader` 零信任检查 | `grep -c "trust\|Trust" skillLoader.ts` → **0** |
+| 我方 `emptyAnswerExplanation` 覆盖推理吃满额度 | 读 `turn/step.ts:288-299` |
+| 我方同时发 `reasoning_effort` + `max_tokens` | 读 `turn/step.ts:114,116`（`max_tokens` 默认 4096，`runtimeConfig.ts:135`） |
 | 我方只有一条请求路径 | 读 `turn/step.ts:138`（唯一 `/chat/completions`） |
 | 我方无 budget/cache 字段 | 搜 `thinking_token_budget\|budget_tokens\|cache_control` → **0 命中** |
 | 我方 `loadCatalog` 同步读盘 | 读 `catalogStore.ts:45` |
