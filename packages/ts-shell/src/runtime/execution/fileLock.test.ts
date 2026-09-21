@@ -99,15 +99,20 @@ describe("serializing mutations of one file", () => {
     });
     await entered.wait;
 
-    let throughLinkStarted = false;
+    // The link is the stronger check of the two: it must not merely start late, it
+    // must not be able to *finish* while the target is held. An earlier version of
+    // this test only watched for the start, which a call still registering itself
+    // also satisfies — so it passed against a lock that did not cover links at all.
+    let throughLinkFinished = false;
     const two = withFileLock(link, async () => {
-      throughLinkStarted = true;
+      throughLinkFinished = true;
       order.push("link:in");
     });
-    await settle();
+    for (let spins = 0; spins < 50; spins += 1) {
+      await settle();
+    }
+    expect(throughLinkFinished).toBe(false);
 
-    // A lock that missed the link would protect nothing in a workspace using them.
-    expect(throughLinkStarted).toBe(false);
     first.open();
     await Promise.all([one, two]);
     expect(order).toEqual(["real:in", "real:out", "link:in"]);

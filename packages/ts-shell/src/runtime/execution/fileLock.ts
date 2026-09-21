@@ -51,18 +51,28 @@ let registration = Promise.resolve();
 /**
  * The path two mentions of the same file share.
  *
- * The directory is canonicalised rather than the file, because a file that does
- * not exist yet cannot be resolved — and edits that create files are ordinary.
- * Resolving the directory gives a file the same key before and after it comes
- * into existence, which resolving the file itself would not.
+ * Symlinks are why this resolves rather than compares strings: a workspace can
+ * reach one file by more than one name, and a lock that treated those as different
+ * files would let the very writes it exists to serialize happen at once.
  */
 async function lockKey(absolutePath: string): Promise<string> {
   const resolved = path.resolve(absolutePath);
+  // The file itself first: that is what makes two names for one file — a link and
+  // its target — resolve to a single key. Resolving only the directory would give
+  // them different keys, and a mutation through the link would then run alongside
+  // one through the target, which is the interleaving this module exists to stop.
   try {
-    return path.join(await realpath(path.dirname(resolved)), path.basename(resolved));
+    return await realpath(resolved);
   } catch {
-    // A directory that cannot be resolved is about to fail the write anyway.
-    return resolved;
+    // Usually because the file does not exist yet, which is ordinary: an edit that
+    // creates a file takes this path. Resolving the directory still gives the file
+    // the same key before and after it appears, because the name is unchanged.
+    try {
+      return path.join(await realpath(path.dirname(resolved)), path.basename(resolved));
+    } catch {
+      // A directory that cannot be resolved is about to fail the write anyway.
+      return resolved;
+    }
   }
 }
 
