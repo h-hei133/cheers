@@ -1,6 +1,6 @@
-import { execFile, spawn } from 'node:child_process'
-import { promisify } from 'node:util'
+import { spawn } from 'node:child_process'
 import { getRuntimeConfig } from '../config/runtimeConfig.js'
+import { killProcessTree, trackChildPid, untrackChildPid } from '../core/shell/platform/processTree.js'
 import type {
   DaemonAvailability,
   DaemonExecutionResult,
@@ -18,8 +18,6 @@ import {
   isDaemonProcessAlive,
   resetResidentDaemonStateForTest,
 } from './resident.js'
-
-const execFileAsync = promisify(execFile)
 
 export * from './types.js'
 export * from './protocol.js'
@@ -58,21 +56,17 @@ export async function executeLocally(options: {
   cwd: string
   timeoutMs?: number
   onOutput?: (chunk: string) => void
+  abortSignal?: AbortSignal
 }): Promise<NormalizedExecutionResult> {
-  const isWindows = process.platform === 'win32'
-  // Spawned rather than execFile'd when the caller wants to watch: execFile only
-  // hands back the finished buffers, so a caller with a callback needs the streams
-  // as they fill. Both paths collect the same stdout and stderr.
-  const forward = options.onOutput
-  const childPromise = forward
-    ? collectStreamed({ ...options, onOutput: forward })
-    : execFileAsync(options.command, options.args, {
-        cwd: options.cwd,
-        windowsHide: true,
-        maxBuffer: 1024 * 1024,
-        timeout: options.timeoutMs,
-        shell: isWindows,
-      })
+  // One path for every command. There used to be two — execFile when nobody
+  // watched, a spawn when somebody did — and they diverged: the watched one
+  // learned to report output early and to kill a whole process group, and the
+  // unwatched one kept neither. Two implementations of one job drift, so there is
+  // now only this one, and a caller with no callback passes nothing.
+  const childPromise = collectStreamed({
+    ...options,
+    onOutput: options.onOutput ?? (() => {}),
+  })
 
   try {
     const { stdout, stderr } = await childPromise
@@ -88,8 +82,20 @@ export async function executeLocally(options: {
       stderr?: string
       code?: number | string | null
       killed?: boolean
+      cancelled?: boolean
       signal?: string | null
       message?: string
+    }
+
+    // A stop is reported as the stop it was. Guessing from `killed` alone told a
+    // user who cancelled a command that it had timed out.
+    if (execError.cancelled) {
+      return {
+        status: 'cancelled',
+        exitCode: typeof execError.code === 'number' ? execError.code : null,
+        stdout: execError.stdout ?? '',
+        stderr: execError.stderr || execError.message || 'Command cancelled',
+      }
     }
 
     if (execError.killed || execError.signal === 'SIGTERM') {
@@ -139,19 +145,44 @@ function collectStreamed(options: {
   cwd: string
   timeoutMs?: number
   onOutput: (chunk: string) => void
+  abortSignal?: AbortSignal
 }): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
       windowsHide: true,
+      // Its own process group, so the whole tree can be signalled. Killing only
+      // the direct child leaves its descendants running, and while they hold the
+      // stdout and stderr pipes the close event never arrives — which is how a
+      // timed-out command leaves the turn waiting on a result forever.
+      detached: process.platform !== 'win32',
     })
     let stdout = ''
     let stderr = ''
     let timedOut = false
+    let cancelled = false
+    const finish = (): void => {
+      if (child.pid) untrackChildPid(child.pid)
+      options.abortSignal?.removeEventListener('abort', onAbort)
+    }
+    const stop = (): void => {
+      // The group, not just the child: a shell's children outlive it otherwise.
+      if (child.pid) killProcessTree(child.pid)
+      else child.kill('SIGKILL')
+    }
+    const onAbort = (): void => {
+      cancelled = true
+      stop()
+    }
+    if (child.pid) trackChildPid(child.pid)
+    if (options.abortSignal) {
+      if (options.abortSignal.aborted) onAbort()
+      else options.abortSignal.addEventListener('abort', onAbort, { once: true })
+    }
     const timer = options.timeoutMs
       ? setTimeout(() => {
           timedOut = true
-          child.kill('SIGTERM')
+          stop()
         }, options.timeoutMs)
       : undefined
     child.stdout?.on('data', (chunk: Buffer) => {
@@ -166,10 +197,28 @@ function collectStreamed(options: {
     })
     child.on('error', (error) => {
       clearTimeout(timer)
+      finish()
       reject(error)
     })
     child.on('close', (code, signal) => {
       clearTimeout(timer)
+      finish()
+      if (cancelled) {
+        // Marked rather than inferred from the exit code: a killed process
+        // reports whichever signal arrived, and the caller needs to tell "the
+        // user stopped this" apart from "it ran too long" and "it failed".
+        reject(
+          Object.assign(new Error('Command cancelled'), {
+            stdout,
+            stderr: stderr || 'Command cancelled',
+            code,
+            killed: true,
+            cancelled: true,
+            signal,
+          }),
+        )
+        return
+      }
       if (code === 0) {
         resolve({ stdout, stderr })
         return

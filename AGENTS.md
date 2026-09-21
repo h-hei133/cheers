@@ -90,6 +90,8 @@ Read-only references:
 
 Use references only after inspecting the target implementation first, and only for task-relevant semantic comparison. Do not broad-scan references without a direct blocker. Do not mechanically copy implementation code or architecture wholesale.
 
+Use references only after inspecting the target implementation first, and only for task-relevant semantic comparison. Do not broad-scan references without a direct blocker. Do not mechanically copy implementation code or architecture wholesale. When a reference has already solved the same class of problem, compare its specific decisions against your plan before writing code, and keep a test that fails when a compared decision is reversed.
+
 Detailed rules: [reference repositories](agent-rules/reference-repositories.md).
 
 ## Detailed Rules

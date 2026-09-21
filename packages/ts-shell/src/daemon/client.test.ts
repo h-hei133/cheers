@@ -433,3 +433,38 @@ describe("forwarding command output as it is produced", () => {
   expect(result.stderr).toContain('boom')
 })
 })
+
+describe("stopping a command that outlives its own child", () => {
+  /** A command whose shell is not its only process: the loop is a descendant. */
+  const withDescendant = ['/bin/bash', '-c', 'sleep 30 & wait'];
+
+  it("returns when a descendant holds the pipes past the timeout", async () => {
+    const result = await executeLocally({
+      command: withDescendant[0],
+      args: withDescendant.slice(1),
+      cwd: process.cwd(),
+      timeoutMs: 300,
+      onOutput: () => {},
+    });
+    // The shell is killed but its `sleep` inherits the pipes. Waiting for the
+    // pipes to close meant waiting for that descendant, so nothing returned at
+    // all and the turn hung on a tool that would never report.
+    expect(result.status).toBe("timeout");
+  }, 15000);
+
+  it("reports a cancellation as cancelled rather than as a timeout", async () => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 200);
+    const result = await executeLocally({
+      command: withDescendant[0],
+      args: withDescendant.slice(1),
+      cwd: process.cwd(),
+      timeoutMs: 60_000,
+      onOutput: () => {},
+      abortSignal: controller.signal,
+    });
+    // The caller stopped it. Saying "timeout" blamed the clock for a decision
+    // the user made.
+    expect(result.status).toBe("cancelled");
+  }, 15000);
+});
