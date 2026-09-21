@@ -116,10 +116,21 @@ confidence: high
 
 ### 1.5 理由
 
-1. **不复制 `pi` 的二进制下载**：`utils/tools-manager.ts` 309 行，从 GitHub Releases 拉二进制。引入网络依赖（离线不可用）、供应链面（执行第三方二进制），而我们的依赖面**只有 3 个**（`playwright-core`/`typescript`/`undici`，已核实）。不该为此破例。
-2. **不引入 `ignore` npm 包**（`gemini-cli` 的做法）：600 行自解析代码 + 1 个新依赖，只为得到 git 已经实现的语义。
+1. **不复制 `pi` 的二进制下载**。已核实其代价：
+
+   | 维度 | 实测 |
+   |---|---|
+   | 代码量 | `utils/tools-manager.ts` **400 行** |
+   | 来源 | `https://github.com/${repo}/releases/latest` → `.../releases/download/...`（`tools-manager.ts:112,278`） |
+   | **完整性校验** | **零**（`grep checksum\|sha256\|signature\|createHash\|gpg` → **0 命中**）——只依赖 TLS |
+   | 离线行为 | `ensureTool` 返回 `null` → `find.ts:179-181` **硬失败**：`reject(new Error("fd is not available and could not be downloaded"))` |
+   | **回退遍历** | **不存在**——离线即该工具完全不可用 |
+
+   引入网络依赖（离线不可用）、供应链面（**下载并执行未经校验的第三方二进制**），而我们的依赖面**只有 3 个**（`playwright-core`/`typescript`/`undici`，已核实）。**不该为此破例**；且 `pi` 自己的失败模式证明这条路径在离线环境下是硬失败。
+
+2. **不引入 `ignore` npm 包**（`gemini-cli` 的做法）：600 行自解析代码（`gitIgnoreParser.ts` 199 + `ignoreFileParser.ts` 123 + `ignorePatterns.ts` 278）+ 1 个新依赖，只为得到 git 已经实现的语义。
 3. **`git ls-files` 是既有调用面**：`workflow/gitContext.ts` 已用 `spawnSync('git', ...)`，不是新依赖。
-4. **第 1 层必须独立存在**，因为第 2 层在非 git 目录**直接失败**（已实测 exit 128）。
+4. **第 1 层必须独立存在**，因为第 2 层在非 git 目录**直接失败**（已实测 exit 128）。**我们的回退优于 `pi` 的**：`pi` 离线时工具直接报错，我们则降级为「无 `.gitignore` 支持但能列出文件」。
 
 ### 1.6 失败模式与边界
 
@@ -567,6 +578,8 @@ $$\text{T3} \to \text{T1} \to \text{T4} \to \text{T6} \to \text{T2/T2b} \to \tex
 | 三份硬编码列表不一致 | 逐个 `sed` 读 `registry.ts:570-585`、`grep.ts:118-135`、`lsp.ts:122-135` |
 | `git ls-files` 语义 | **5 项 fixture 实测**：嵌套 `.gitignore`、`!` 取反、`dir/`、`core.excludesFile`、未跟踪新文件 |
 | 非 git 目录失败 | **实测** `fatal: not a git repository`，exit 128 |
+| `pi` 二进制下载无完整性校验 | `grep checksum\|sha256\|signature\|createHash\|gpg` 于 `tools-manager.ts` → **0 命中** |
+| `pi` 离线无回退遍历 | 读 `find.ts:179-181`（`reject("fd is not available and could not be downloaded")`） |
 | `git ls-files` 性能 | **实测** 2,741 文件 / 0.033s |
 | 子目录 cwd 语义 | **实测**：返回仓库相对路径且含 cwd 外文件 → 需过滤 |
 | `buildSystemPrompt` 是字面量 | 读 `turn/prompt.ts:26-40` |
