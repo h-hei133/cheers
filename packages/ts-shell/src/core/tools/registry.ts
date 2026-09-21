@@ -3,6 +3,7 @@ import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
 import { replaceInContent } from './editEngine.js'
+import { withFileLock } from '../../runtime/execution/fileLock.js'
 import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
 import { truncateHead, truncateTail, truncateLineWidth } from './truncation.js'
 import { ArtifactManager } from '../session/artifactManager.js'
@@ -363,45 +364,49 @@ export function createCoreToolRegistry(options?: {
         },
       },
       async execute(args, context) {
-        const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        const containment = verifyPathContainment(target, context.workspaceRoot)
-        if (!containment.allowed) {
-          throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
-        }
-        const content = typeof args.content === 'string' ? args.content : ''
-        const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
-        let original = ''
-        let originalUnreadable = false
-        try {
-          original = await executionService.readTextFile({
-            operationKind: 'file.read',
+        // The read decides the write, so both sit under one lock: taking it
+        // only for the write would let two edits read the same original.
+        return withFileLock(resolveToolTarget(args, 'path', context.workspaceRoot), async () => {
+          const target = resolveToolTarget(args, 'path', context.workspaceRoot)
+          const containment = verifyPathContainment(target, context.workspaceRoot)
+          if (!containment.allowed) {
+            throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+          }
+          const content = typeof args.content === 'string' ? args.content : ''
+          const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
+          let original = ''
+          let originalUnreadable = false
+          try {
+            original = await executionService.readTextFile({
+              operationKind: 'file.read',
+              absolutePath: containment.resolvedPath,
+              workspaceRoot: context.workspaceRoot,
+              authority: TOOL_APPROVED_READ_AUTHORITY,
+              caller: 'core-tool:write',
+              reason: 'Read original content for diff.',
+              reportSafeTarget: containment.resolvedPath,
+            })
+          } catch {
+            originalUnreadable = true
+          }
+          await executionService.writeTextFile({
+            operationKind: 'file.write',
             absolutePath: containment.resolvedPath,
+            content,
             workspaceRoot: context.workspaceRoot,
-            authority: TOOL_APPROVED_READ_AUTHORITY,
+            authority: TOOL_APPROVED_WRITE_AUTHORITY,
             caller: 'core-tool:write',
-            reason: 'Read original content for diff.',
+            reason: 'Write an approved workspace file target.',
             reportSafeTarget: containment.resolvedPath,
           })
-        } catch {
-          originalUnreadable = true
-        }
-        await executionService.writeTextFile({
-          operationKind: 'file.write',
-          absolutePath: containment.resolvedPath,
-          content,
-          workspaceRoot: context.workspaceRoot,
-          authority: TOOL_APPROVED_WRITE_AUTHORITY,
-          caller: 'core-tool:write',
-          reason: 'Write an approved workspace file target.',
-          reportSafeTarget: containment.resolvedPath,
-        })
-        const diff = original && original !== content ? createUnifiedDiff(relPath, original, content) : ''
-        const output = diff
-          ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\``
-          : originalUnreadable
-            ? `Wrote ${relPath} (original unreadable, no diff)`
-            : `Wrote ${relPath}`
-        return approvedResult(output)
+          const diff = original && original !== content ? createUnifiedDiff(relPath, original, content) : ''
+          const output = diff
+            ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\``
+            : originalUnreadable
+              ? `Wrote ${relPath} (original unreadable, no diff)`
+              : `Wrote ${relPath}`
+          return approvedResult(output)
+          })
       },
     },
     {
@@ -439,6 +444,10 @@ export function createCoreToolRegistry(options?: {
         },
       },
       async execute(args, context) {
+        // Read-modify-write under one lock. The read is what decides the write,
+        // so locking only the write would still let two edits read the same
+        // original and lose the first one's change without an error.
+        return withFileLock(resolveToolTarget(args, 'path', context.workspaceRoot), async () => {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
         const containment = verifyPathContainment(target, context.workspaceRoot)
         if (!containment.allowed) {
@@ -502,6 +511,7 @@ export function createCoreToolRegistry(options?: {
             ? `Updated ${relPath} (original unreadable, no diff)`
             : `Updated ${relPath}`
         return approvedResult(output)
+        })
       },
     },
     {

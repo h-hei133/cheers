@@ -2630,3 +2630,60 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 
 本轮只做诊断（用户当前意图是搞清楚问题所在，非立刻修）。修法见下面「建议」段，
 属需要单独批准的改动。
+
+## [2026-09-20] fix | 并发编辑同一文件会静默丢修改：加按文件互斥锁。
+
+### 先纠正上一轮的判断
+
+我上一轮把 P2 写成「缺证据，得先测」。**实测是会真丢数据 —— 正确性 bug，不是性能问题。**
+
+```
+初始:  "ALPHA\nBETA\n"   两个 edit 并发改不同行   结果: "AAA\nBETA\n"   ← 第二次修改消失
+```
+
+两次调用**都返回 success**，没有任何报错。根因：`edit`/`write` 是**读 → 改 → 写**，
+两个并发都读到同一份原文，第二个基于已被替换的旧内容写入。
+
+### 本轮最重要的实测结论：只给「写」加锁没用
+
+先只包 `writeTextFile`，结果仍是 `"ALPHA\nBBB\n"` —— **两个读都发生在写之前**，损害已成定局。
+锁必须覆盖整个「读→改→写」。
+
+第二次实测：给工具层加锁后**死锁**（`Test timed out in 20000ms`）——
+工具持有锁，其内部的 `writeTextFile` 又请求同一把锁。
+**这正是我在该模块注释里写下的警告，被我自己踩中。**
+
+### 落地
+
+- `runtime/execution/fileLock.ts`：`withFileLock`，按**规范化路径**串行，不同文件互不等待。
+  - **可重入（按调用链）**：用 `AsyncLocalStorage` 区分「同一条链」与「另一个调用者」。
+  - **锁键解析目录而非文件**：尚不存在的文件无法 `realpath`，而创建文件是常规操作。
+- `core/tools/registry.ts`：`edit`、`write` 的**整个读改写**包在锁内。
+- `runtime/execution/service.ts`：`writeTextFile` 兜底。
+
+**放在 `runtime/execution/` 的理由**：该层拥有 `writeTextFile`（唯一写入咽喉），
+且只依赖 node 内置模块，可被 `core/tools` 引用而不引入循环。已过 `verify:import-cycles`。
+
+**未收窄 `SEQUENTIAL_TOOLS`**：锁已让安全成为结构性的；收窄串行是独立提速项，应另行测量。
+
+### 一处共享配置升级
+
+`tsconfig.json` 的 `lib`：`ES2022` → `ES2024`。`Promise.withResolvers`
+（Node 18.6+，本机 Node 24 实测存在）在 ES2022 lib 下类型不通过。
+**这是既有的潜伏问题**：`cliRuntimeInvocation.test.ts:171` 早已使用它，
+只因测试被 `tsconfig.build.json` 排除而未暴露。**实测 ES2024 下零新增错误。**
+`lib` 只影响类型检查，**不可能改变运行时行为**。
+
+### 验证
+
+**492 文件 / 2774 通过 / 0 失败**；`tsc` 0 错误；0 import 环；docs-drift pass。
+
+**反向验证**：把 `withFileLock` 改为直通 → **4 项失败**，含丢更新回归
+（`expected 'ALPHA\nBBB\n' to include 'AAA'`）。锁与其回归测试都具备判别力。
+
+**测试用门控 promise 决定顺序，不用 `setTimeout` 等真实时间。**
+
+### 未验证
+
+1. **未在真实交互会话中制造并发编辑** —— 验证在工具层与锁层完成，未观测端到端实机场景。
+2. **未量化锁的性能开销。**

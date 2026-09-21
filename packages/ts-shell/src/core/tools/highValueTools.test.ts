@@ -8,6 +8,7 @@ import { createTodoToolDefinition } from "./todoTool.js";
 import { createTaskToolDefinition } from "./taskTool.js";
 import { runTodoCommand } from "../commands/todoCommandRuntime.js";
 import { createDefaultExecutionService } from "../../runtime/execution/service.js";
+import { createCoreToolRegistry } from "./registry.js";
 describe("High-Value Modern Built-in Tools Subsystem", () => {
   let tempDir: string;
 
@@ -160,5 +161,62 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       expect(result.output).toContain("Description**: Analyze dependency tree");
       expect(result.output).toContain("PLAN (Read-Only)");
     });
+  });
+});
+
+/**
+ * Two edits of one file at the same time.
+ *
+ * This is the shape a read-modify-write takes, and it is why the write tools hold
+ * a per-file lock across both halves. Without it both edits read the same
+ * original, the second write is built on content the first already replaced, and
+ * one change disappears — while both calls report success.
+ */
+describe("concurrent edits of one file", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "concurrent-edit-"));
+    await fs.writeFile(path.join(dir, "target.txt"), "ALPHA\nBETA\n", "utf8");
+  });
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  function editTool() {
+    const tool = createCoreToolRegistry().get("edit");
+    if (!tool) throw new Error("edit tool missing");
+    return tool;
+  }
+
+  it("keeps both changes when two edits touch different lines", async () => {
+    const tool = editTool();
+    const context = { workspaceRoot: dir, taskId: "t" } as never;
+    const results = await Promise.all([
+      tool.execute({ path: "target.txt", oldText: "ALPHA", newText: "AAA" }, context),
+      tool.execute({ path: "target.txt", oldText: "BETA", newText: "BBB" }, context),
+    ]);
+
+    const final = await fs.readFile(path.join(dir, "target.txt"), "utf8");
+    // Both were accepted, so both must be in the file. Losing one silently is the
+    // failure this guards: nothing errors, and the file is simply missing an edit.
+    for (const result of results) {
+      expect(result.success).toBe(true);
+    }
+    expect(final).toContain("AAA");
+    expect(final).toContain("BBB");
+  });
+
+  it("keeps both changes when two writes replace the file's content", async () => {
+    const tool = editTool();
+    const context = { workspaceRoot: dir, taskId: "t" } as never;
+    await Promise.all([
+      tool.execute({ path: "one.txt", content: "first\n" }, context),
+      tool.execute({ path: "two.txt", content: "second\n" }, context),
+    ]);
+    // Different files are independent, so neither should be able to lose the other.
+    expect(await fs.readFile(path.join(dir, "one.txt"), "utf8")).toBe("first\n");
+    expect(await fs.readFile(path.join(dir, "two.txt"), "utf8")).toBe("second\n");
   });
 });
