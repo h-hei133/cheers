@@ -183,7 +183,7 @@
 
 ## 3. T1 — 文件遍历剪枝与 `.gitignore`
 
-**提交**：见 §3.7。
+**提交**：`12818fe6`（`perf(execution): one walk policy, three layers, no per-caller filtering`）。
 
 ### 3.1 施工前的裁决更正（两处，均由侦察推翻原记录）
 
@@ -266,7 +266,7 @@
 
 ### 3.7 提交
 
-**提交**：见 git log。
+**提交**：`12818fe6`。
 
 ### 3.8 遗留：裁决 1（上限与截断通知）未完成
 
