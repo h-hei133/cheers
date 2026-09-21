@@ -24,11 +24,18 @@ import { requestCompactionSummary } from "../../core/query/compaction/summarize.
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
 import { estimateTokens } from "../../session/context.js";
-import type { CompactionPolicy, SummarizeHistory, SummarizeTurnPrefix } from "../../session/compaction.js";
+import { KEEP_RECENT_TOKENS, type CompactionPolicy, type SummarizeHistory, type SummarizeTurnPrefix } from "../../session/compaction.js";
+import { DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
+import { loadCatalog } from "../../core/models/catalogStore.js";
+import type { CatalogProvider } from "../../core/models/catalog.js";
+import { resolveContextWindow, resolveTokenBudget } from "../../core/models/window.js";
+import { createComponentLogger } from "../../observability/structuredLogger.js";
 import { toChatMessages } from "../../turn/prompt.js";
 import type { CompactionSetup } from "../../turn/session.js";
 
 /** What a compaction needs from the provider, resolved once per entry point. */
+const windowLogger = createComponentLogger('model-window')
+
 interface CompactionWiring {
   readonly policy: CompactionPolicy;
   readonly summarize: SummarizeHistory;
@@ -45,15 +52,61 @@ interface CompactionWiring {
  * token budget.
  */
 function buildCompactionWiring(input: {
-  readonly provider: { readonly apiKey: string; readonly baseUrl: string; readonly model: string };
+  readonly provider: {
+    readonly apiKey: string;
+    readonly baseUrl: string;
+    readonly model: string;
+    readonly providerId: string;
+  };
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionId: string;
+  /**
+   * The catalogue, read once by the caller.
+   *
+   * Passed in rather than loaded here because this runs once per turn and
+   * `loadCatalog` reads two files synchronously every call. The catalogue only
+   * changes when the user edits it or a refresh writes it, neither of which
+   * happens mid-turn.
+   */
+  readonly catalog: readonly CatalogProvider[];
 }): CompactionWiring {
   const provider = input.provider;
+  const runtimeConfig = input.runtimeContext.runtimeConfig;
+  // Resolved per model rather than read from one global number: the catalog
+  // knows each model's window, and using a single value compacted a million-token
+  // model at sixty-four thousand.
+  const resolvedWindow = resolveContextWindow({
+    catalog: input.catalog,
+    provider: provider.providerId,
+    model: provider.model,
+    configured: runtimeConfig.contextWindow,
+  });
+  if (resolvedWindow.warning !== undefined) {
+    windowLogger.warn(resolvedWindow.warning);
+  }
   return {
     policy: {
-      contextWindow: input.runtimeContext.runtimeConfig.contextWindow ?? 64_000,
-      reserveTokens: input.runtimeContext.runtimeConfig.reserveTokens,
+      contextWindow: resolvedWindow.window,
+      // Per-model budgets where the user set them, the global value otherwise.
+      // A single global budget cannot suit every model: the same "keep the last
+      // twenty thousand tokens" is most of a small model's window and a
+      // rounding error in a large one.
+      reserveTokens: resolveTokenBudget(
+        runtimeConfig.modelTokenBudgets,
+        provider.providerId,
+        provider.model,
+        "reserveTokens",
+        runtimeConfig.reserveTokens,
+        DEFAULT_RESERVE_TOKENS,
+      ),
+      keepRecentTokens: resolveTokenBudget(
+        runtimeConfig.modelTokenBudgets,
+        provider.providerId,
+        provider.model,
+        "keepRecentTokens",
+        undefined,
+        KEEP_RECENT_TOKENS,
+      ),
       // The provider's own count, plus whatever the conversation has gained
       // since that request. Falls back to the estimate inside planCompaction
       // when no request has reported usage yet.
@@ -105,13 +158,26 @@ export function createCliSessionRuntime(input: {
   );
 }): ShellSessionRuntime {
   const isStdinTty = input.isStdinTty ?? (() => Boolean(process.stdin.isTTY));
+  /**
+   * The catalogue for this session, read once.
+   *
+   * Every turn resolves the model's window from it, and `loadCatalog` reads two
+   * files synchronously on each call, so reading it per turn would put two file
+   * reads on the path that decides whether to compact.
+   */
+  const catalog = loadCatalog()
+
   /** The provider both compaction paths summarize with, or nothing when none is configured. */
-  const compactionProvider = (): { apiKey: string; baseUrl: string; model: string } | undefined => {
+  const compactionProvider = ():
+    | { apiKey: string; baseUrl: string; model: string; providerId: string }
+    | undefined => {
     const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
     const apiKey = resolved.credential?.apiKey;
     const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl;
     const model = resolved.model ?? resolved.credential?.model;
-    return apiKey && baseUrl && model ? { apiKey, baseUrl, model } : undefined;
+    return apiKey && baseUrl && model
+      ? { apiKey, baseUrl, model, providerId: resolved.provider }
+      : undefined;
   };
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     sessionManager: input.sessionManager,
@@ -125,7 +191,7 @@ export function createCliSessionRuntime(input: {
           reason: `No credential for provider ${resolved.provider}; set ${resolved.expectedEnvVarName} or configure a connection.`,
         });
       }
-      const wiring = buildCompactionWiring({ provider, runtimeContext: input.runtimeContext, sessionId });
+      const wiring = buildCompactionWiring({ provider, runtimeContext: input.runtimeContext, sessionId, catalog });
       return compactSessionHistory({
         store: input.sessionManager,
         sessionId,
@@ -153,7 +219,7 @@ export function createCliSessionRuntime(input: {
       // one the turn runs with the history it has and overflow reports itself.
       const compaction: CompactionSetup | undefined = activeProvider
         ? {
-            ...buildCompactionWiring({ provider: activeProvider, runtimeContext: input.runtimeContext, sessionId }),
+            ...buildCompactionWiring({ provider: activeProvider, runtimeContext: input.runtimeContext, sessionId, catalog }),
             onCompact: (record) => {
               input.sessionManager.appendCompactionEntry(sessionId, record);
               markContextUnknown(sessionId);

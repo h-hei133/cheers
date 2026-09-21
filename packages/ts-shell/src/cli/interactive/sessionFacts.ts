@@ -1,3 +1,5 @@
+import { loadCatalog } from "../../core/models/catalogStore.js";
+import { resolveContextWindow } from "../../core/models/window.js";
 import path from "node:path";
 import os from "node:os";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -65,7 +67,17 @@ export function readStatusFacts(
     // Absent until a real request has been accounted for: a zeroed gauge is a
     // fabricated fact, not a neutral one.
     ...(usage.lastPromptTokens > 0
-      ? { contextUsed: usage.lastPromptTokens, contextWindow: context.runtimeConfig.contextWindow ?? 64_000 }
+      ? {
+          contextUsed: usage.lastPromptTokens,
+          // The gauge's denominator has to be the same window compaction uses,
+          // or the percentage it shows describes a limit nothing enforces.
+          contextWindow: resolveContextWindow({
+            catalog: loadCatalog(),
+            provider: context.runtimeConfig.provider,
+            model: activeModelName(context),
+            configured: context.runtimeConfig.contextWindow,
+          }).window,
+        }
       : {}),
     ...(usage.totalTokens > 0 ? { sessionTokens: usage.totalTokens } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),

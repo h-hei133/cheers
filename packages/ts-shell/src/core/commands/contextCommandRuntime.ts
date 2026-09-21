@@ -1,5 +1,8 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { loadCatalog } from "../models/catalogStore.js";
+import { resolveContextWindow } from "../models/window.js";
+import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { getSessionUsage } from "../../observability/usageTelemetry.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
 import { toolSchemas } from "../../turn/tools.js";
@@ -35,7 +38,16 @@ export async function runContextCommand(
   // variable nothing sets and a constant that happens to match today: a report
   // about a threshold is only useful if it names the threshold in force.
   const runtimeConfig = getRuntimeConfig(context.cwd);
-  const window = runtimeConfig.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+  // The same resolution the compaction engine performs, so the number reported
+  // here is the number in force. Asking the credential resolver for the active
+  // model is what makes this per-model rather than one global value.
+  const active = resolveProviderCredential({ runtimeConfig });
+  const window = resolveContextWindow({
+    catalog: loadCatalog(),
+    provider: active.provider,
+    model: active.model,
+    configured: runtimeConfig.contextWindow,
+  }).window;
   const reserve = runtimeConfig.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
   const schemaTokens = toolSchemaTokens();
   const registry = createCoreToolRegistry();
@@ -83,9 +95,6 @@ export async function runContextCommand(
     ].join("\n").replace(/\n+$/, ""),
   };
 }
-
-/** The window to assume when no configuration names one. */
-const DEFAULT_CONTEXT_WINDOW = 64_000;
 
 /** Tokens the tool definitions occupy, from the bytes actually sent. */
 function toolSchemaTokens(): number {

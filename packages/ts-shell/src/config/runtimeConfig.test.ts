@@ -74,6 +74,15 @@ describe("runtime config", () => {
     expect(config.agentMode).toBe("plan");
   });
 
+  it("leaves the context window absent when the user did not set one", () => {
+    // The window is resolved per model from the catalog. A default filled in
+    // here would be indistinguishable from a deliberate override, so the
+    // catalog would never be consulted and every model would compact at the
+    // same number.
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.contextWindow).toBeUndefined();
+  });
+
   it("does not carry a config key whose value nothing reads", () => {
     // A key that survives onto the resolved config is a promise the runtime
     // does not keep: the user sets it, and nothing happens. A config file that

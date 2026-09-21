@@ -2,6 +2,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+/**
+ * Token budgets for one model.
+ *
+ * Declared here rather than beside the resolver because it is part of the
+ * configuration file's shape: the resolver reads it, the config owns it.
+ */
+export interface ModelTokenBudget {
+  readonly reserveTokens?: number;
+  readonly keepRecentTokens?: number;
+}
+
 export type RuntimeProvider =
   | "openai"
   | "anthropic"
@@ -72,8 +83,26 @@ export interface RuntimeConfig {
   readonly temperature?: number;
   readonly topP?: number;
   readonly maxOutputTokens?: number;
+  /**
+   * The context window to use, overriding whatever the model's catalog entry
+   * says.
+   *
+   * Absent means "ask the catalog", which is the normal case. Present means the
+   * user knows something the catalog does not — a proxy, a self-hosted model, or
+   * a window the catalog has not caught up with.
+   */
   readonly contextWindow?: number;
   readonly reserveTokens?: number;
+  /**
+   * Token budgets for specific models, keyed `"provider/modelId"`.
+   *
+   * One global budget cannot fit every model: keeping the last twenty thousand
+   * tokens verbatim is most of a small model's window and a rounding error in a
+   * large one. Keyed by provider as well as model because two providers can
+   * serve the same model id, and a budget tuned for one must not silently apply
+   * to the other.
+   */
+  readonly modelTokenBudgets?: Readonly<Record<string, ModelTokenBudget>>;
   readonly agentMode?: "plan" | "build";
   readonly theme?: "dark" | "light" | "auto";
   /**
@@ -120,6 +149,7 @@ export interface RuntimeConfigFile {
   maxOutputTokens?: number;
   contextWindow?: number;
   reserveTokens?: number;
+  modelTokenBudgets?: Record<string, ModelTokenBudget>;
   agentMode?: "plan" | "build";
   theme?: "dark" | "light" | "auto";
   tuiMode?: "regular" | "fullscreen" | "stream";
@@ -139,8 +169,8 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   temperature: 0.7,
   topP: 1.0,
   maxOutputTokens: 4096,
-  contextWindow: 64_000,
   reserveTokens: 8_000,
+  modelTokenBudgets: {},
   agentMode: "build",
   theme: "dark",
   tuiMode: "regular",
@@ -219,8 +249,13 @@ export function getRuntimeConfig(
     temperature: merged.temperature ?? DEFAULT_CONFIG.temperature,
     topP: merged.topP ?? DEFAULT_CONFIG.topP,
     maxOutputTokens: merged.maxOutputTokens ?? DEFAULT_CONFIG.maxOutputTokens,
-    contextWindow: merged.contextWindow ?? DEFAULT_CONFIG.contextWindow,
+    // Left undefined when the user did not set it: the window is resolved per
+    // model from the catalog, and a default filled in here would be
+    // indistinguishable from a deliberate override, so the catalog would never
+    // be consulted.
+    ...(merged.contextWindow !== undefined ? { contextWindow: merged.contextWindow } : {}),
     reserveTokens: merged.reserveTokens ?? DEFAULT_CONFIG.reserveTokens,
+    modelTokenBudgets: merged.modelTokenBudgets ?? DEFAULT_CONFIG.modelTokenBudgets,
     agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
     theme: merged.theme ?? DEFAULT_CONFIG.theme,
     tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,
