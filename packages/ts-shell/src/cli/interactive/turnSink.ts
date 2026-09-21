@@ -218,6 +218,11 @@ export class TurnSink implements RendererSink {
       case "approval.resolved":
         this.tools.note(event.taskId, `approval ${event.outcome}`);
         return;
+      case "tool.settled":
+        // The call stopped; its card stops looking busy now. Output follows on
+        // tool.result, which is when the card is finally closed.
+        this.tools.settle(event.taskId, event.success);
+        return;
       case "tool.result":
         this.closeTool(event.taskId, event.success, event.failureReason, event.output);
         return;
@@ -252,17 +257,32 @@ export class TurnSink implements RendererSink {
 
   private openAssistant(): Block {
     this.prose = undefined;
+    // The answer has started, so whatever the model was working through is done
+    // being shown as live and the activity row goes back to the turn's own label.
+    // Streamed text arrives through this path and never through `openProse`, so
+    // skipping this here left the row reading "thinking" for the whole answer.
+    this.settleThinking();
     this.assistant = this.transcript.append({ kind: "assistant", text: "", finalized: false });
     return this.assistant;
   }
 
+  /**
+   * Retire the live working block, if there is one.
+   *
+   * Both paths that begin the answer call this: prose written for a command, and
+   * text streamed from the model. They used to disagree, and only one of them put
+   * the label back.
+   */
+  private settleThinking(): void {
+    if (!this.thinking) return;
+    this.thinking.finalized = true;
+    this.thinking = undefined;
+    this.label = "working";
+  }
+
   private finalizeAssistant(): void {
     // Whatever the model was working through is settled once it starts answering.
-    if (this.thinking) {
-      this.thinking.finalized = true;
-      this.thinking = undefined;
-      this.label = "working";
-    }
+    this.settleThinking();
     if (!this.assistant) return;
     this.assistant.finalized = true;
     // `/copy` with no argument copies the last answer; without this it had

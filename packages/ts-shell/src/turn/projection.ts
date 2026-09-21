@@ -47,7 +47,17 @@ export class TurnProjection {
       case "tool_execution_end": {
         const open = this.openCalls.get(event.toolCallId);
         if (open) open.isError = event.isError;
-        return [];
+        // The call stopped running, so its card should stop looking busy here
+        // rather than waiting for the batch to be assembled. The record stays
+        // open because the output still has to arrive on `tool.result`.
+        return [
+          {
+            type: "tool.settled",
+            toolName: event.toolName,
+            taskId: event.toolCallId,
+            success: !event.isError,
+          },
+        ];
       }
       case "message_end": {
         const message = event.message;

@@ -231,3 +231,56 @@ describe("runTurn", () => {
     expect(run.pending()).toEqual({ steering: [], followUps: [] });
   });
 });
+
+describe("tool events reach the shell before the batch is assembled", () => {
+  it("reports a call settled as soon as that call stops running", async () => {
+    let releaseSecond: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+    const setup = options({
+      tools: new Map([
+        [
+          "read",
+          {
+            ...echoTool("read", "file contents"),
+            execute: async () => {
+              await gate;
+              return { success: true, output: "file contents" };
+            },
+          },
+        ],
+      ]),
+      step: scripted([
+        {
+          text: "",
+          toolCalls: [
+            { id: "call_1", name: "read", args: { path: "a.txt" } },
+            { id: "call_2", name: "read", args: { path: "b.txt" } },
+          ],
+          stopReason: "stop",
+        },
+        { text: "Read both.", toolCalls: [], stopReason: "stop" },
+      ]),
+    });
+    const run = runTurn(setup);
+    const seen: QueryEvent[] = [];
+    const drained = (async () => {
+      for await (const event of run.events) seen.push(event);
+    })();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // Both calls started, neither has finished: nothing has settled yet.
+    expect(seen.filter((event) => event.type === "tool.started")).toHaveLength(2);
+    expect(seen.filter((event) => event.type === "tool.settled")).toHaveLength(0);
+    releaseSecond?.();
+    await drained;
+
+    const settled = seen.filter((event) => event.type === "tool.settled");
+    expect(settled).toHaveLength(2);
+    // Status arrives for each call, which is what lets a card stop looking busy
+    // without waiting for the whole batch. Output still arrives on tool.result.
+    expect(settled.map((event) => (event as { taskId: string }).taskId).sort()).toEqual(["call_1", "call_2"]);
+    expect(seen.filter((event) => event.type === "tool.result")).toHaveLength(2);
+  });
+});

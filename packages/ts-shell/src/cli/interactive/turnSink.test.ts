@@ -339,3 +339,62 @@ describe("what a tool card says it is doing", () => {
     expect(rows()).toContain("awaiting approval");
   });
 });
+
+describe("the activity row across a reasoning answer", () => {
+  it("stops reading thinking once the answer starts streaming", () => {
+    const { sink } = build();
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "reasoning.delta", role: "coder", delta: "working it out" } as QueryEvent);
+    expect(sink.activity()?.label).toBe("thinking");
+
+    // The answer arrives as deltas, which never travel through the prose path.
+    // This used to leave the row reading "thinking" for the whole answer.
+    sink.handleEvent({ type: "message.delta", role: "coder", delta: "Here it is" } as QueryEvent);
+    expect(sink.activity()?.label).toBe("working");
+  });
+
+  it("settles the worked-through block so it stops rendering as live", () => {
+    const { sink, transcript } = build();
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "reasoning.delta", role: "coder", delta: "working it out" } as QueryEvent);
+    sink.handleEvent({ type: "message.delta", role: "coder", delta: "Here it is" } as QueryEvent);
+
+    const thinking = transcript.recent(10).find((block) => block.kind === "thinking");
+    expect(thinking?.finalized).toBe(true);
+  });
+});
+
+describe("a tool card when its call settles", () => {
+  it("stops looking busy before its output arrives", () => {
+    const { sink, transcript } = build();
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "c1", args: {} } as QueryEvent);
+    const card = transcript.last();
+    expect(card?.kind).toBe("tool");
+    expect(card?.status).toBe("running");
+
+    // The call is over; the batch's result messages are not assembled yet.
+    sink.handleEvent({ type: "tool.settled", toolName: "bash", taskId: "c1", success: true } as QueryEvent);
+    expect(card?.status).toBe("ok");
+  });
+
+  it("keeps the card open until the output arrives", () => {
+    const { sink, transcript } = build();
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "c1", args: {} } as QueryEvent);
+    sink.handleEvent({ type: "tool.settled", toolName: "bash", taskId: "c1", success: true } as QueryEvent);
+    const card = transcript.last();
+    // Settling must not finalize: the output still has to land on the card.
+    expect(card?.finalized).toBe(false);
+
+    sink.handleEvent({
+      type: "tool.result",
+      toolName: "bash",
+      taskId: "c1",
+      success: true,
+      output: "printed this",
+    } as QueryEvent);
+    expect(card?.finalized).toBe(true);
+    expect(card?.text).toContain("printed this");
+  });
+});

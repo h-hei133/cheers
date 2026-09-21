@@ -43,6 +43,20 @@ export class ToolCards {
   }
 
   /**
+   * Mark a card as no longer running, without closing it.
+   *
+   * The call has stopped, but what it printed arrives separately on its result
+   * message. Closing here would lose the output; leaving the status running would
+   * keep a finished call looking busy for as long as the rest of its batch takes.
+   */
+  settle(taskId: string, success: boolean): void {
+    const block = this.cards.get(taskId);
+    if (!block) return;
+    block.status = success ? "ok" : "failed";
+    this.onChange();
+  }
+
+  /**
    * Close a card with its outcome and what the tool printed.
    *
    * The output is kept on the card and folded away rather than dropped: a card

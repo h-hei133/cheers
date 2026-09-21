@@ -43,6 +43,20 @@ export type QueryEvent =
   }
   | { readonly type: 'approval.requested'; readonly toolName: string; readonly taskId: string }
   | { readonly type: 'approval.resolved'; readonly toolName: string; readonly taskId: string; readonly outcome: 'approved' | 'denied'; readonly compensated?: boolean }
+  /**
+   * The call is over. Sent when the tool itself finishes, which for a batch of
+   * parallel calls is well before the batch's result messages are assembled.
+   *
+   * Status separate from content: this says the call stopped running, while
+   * `tool.result` carries what it printed. A card can stop looking busy on this
+   * and still receive its output a moment later.
+   */
+  | {
+    readonly type: 'tool.settled';
+    readonly toolName: string;
+    readonly taskId: string;
+    readonly success: boolean;
+  }
   | {
     readonly type: 'tool.result';
     readonly toolName: string;
