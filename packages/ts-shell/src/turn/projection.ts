@@ -44,6 +44,18 @@ export class TurnProjection {
             ...(isRecord(event.args) ? { args: event.args } : {}),
           },
         ];
+      case "tool_execution_update": {
+        const chunk = typeof event.partialResult === "string" ? event.partialResult : "";
+        if (!chunk) return [];
+        return [
+          {
+            type: "tool.output",
+            toolName: event.toolName,
+            taskId: event.toolCallId,
+            chunk,
+          },
+        ];
+      }
       case "tool_execution_end": {
         const open = this.openCalls.get(event.toolCallId);
         if (open) open.isError = event.isError;

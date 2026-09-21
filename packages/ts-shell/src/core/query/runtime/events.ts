@@ -51,6 +51,18 @@ export type QueryEvent =
    * `tool.result` carries what it printed. A card can stop looking busy on this
    * and still receive its output a moment later.
    */
+  /**
+   * Output a running tool has produced so far.
+   *
+   * Not the final result: this is progress, and it arrives repeatedly. A card can
+   * show it while the call runs; `tool.result` still carries the whole output.
+   */
+  | {
+    readonly type: 'tool.output';
+    readonly toolName: string;
+    readonly taskId: string;
+    readonly chunk: string;
+  }
   | {
     readonly type: 'tool.settled';
     readonly toolName: string;

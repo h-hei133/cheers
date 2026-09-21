@@ -284,3 +284,38 @@ describe("tool events reach the shell before the batch is assembled", () => {
     expect(seen.filter((event) => event.type === "tool.result")).toHaveLength(2);
   });
 });
+
+describe("progress from a tool reaches the shell", () => {
+  it("carries output a tool reports while it runs", async () => {
+    const setup = options({
+      tools: new Map([
+        [
+          "bash",
+          {
+            ...echoTool("bash", "final output"),
+            execute: async (_args, context) => {
+              // What a command tool does: report as it produces, then return.
+              context.onOutput?.("part one\n");
+              context.onOutput?.("part two\n");
+              return { success: true, output: "final output" };
+            },
+          },
+        ],
+      ]),
+      step: scripted([
+        { text: "", toolCalls: [{ id: "call_1", name: "bash", args: { command: "x" } }], stopReason: "stop" },
+        { text: "Done.", toolCalls: [], stopReason: "stop" },
+      ]),
+    });
+    const events = await drain(runTurn(setup).events);
+
+    // The adapter, the tool context, and the projection all have to line up for
+    // this to appear; any one of them dropping the callback loses it silently.
+    const output = events.filter((event) => event.type === "tool.output");
+    expect(output.length).toBeGreaterThan(0);
+    expect(output.map((event) => (event as { chunk: string }).chunk).join("")).toContain("part one");
+    // The progress is not the result: the whole output still arrives separately.
+    const result = events.find((event) => event.type === "tool.result") as { output?: string } | undefined;
+    expect(result?.output).toContain("final output");
+  });
+});

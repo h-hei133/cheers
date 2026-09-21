@@ -16,6 +16,14 @@ import type { TurnActivity } from "../../presentation/tui/transcript/live.js";
  * that decides which channel owns which content — so nothing is shown twice.
  */
 
+/**
+ * How often a running tool's output repaints.
+ *
+ * Fast enough to look live, slow enough that a command emitting thousands of
+ * chunks a second cannot spend the frame budget on redraws.
+ */
+const OUTPUT_FLUSH_MS = 100;
+
 export class TurnSink implements RendererSink {
   private readonly transcript: Transcript;
   private readonly onChange: () => void;
@@ -30,6 +38,8 @@ export class TurnSink implements RendererSink {
   private thinkingStartedAt = 0;
   private prose: Block | undefined;
   private readonly tools: ToolCards;
+  private outputBuffer = new Map<string, string>();
+  private outputFlushAt = 0;
   private proseKind: "command" | "error" = "command";
   private proseTitle = "";
   private failed = false;
@@ -218,6 +228,9 @@ export class TurnSink implements RendererSink {
       case "approval.resolved":
         this.tools.note(event.taskId, `approval ${event.outcome}`);
         return;
+      case "tool.output":
+        this.bufferToolOutput(event.taskId, event.chunk);
+        return;
       case "tool.settled":
         // The call stopped; its card stops looking busy now. Output follows on
         // tool.result, which is when the card is finally closed.
@@ -298,9 +311,38 @@ export class TurnSink implements RendererSink {
     failureReason?: string,
     output?: string,
   ): void {
+    // Whatever has not been flushed belongs before the result, which carries the
+    // whole output anyway; flushing first keeps the card's order honest.
+    this.flushToolOutput();
     this.tools.finish(taskId, success, failureReason, output);
     this.label = "working";
     this.onChange();
+  }
+
+  /**
+   * Collect a running tool's output, repainting at a fixed cadence.
+   *
+   * A command can emit thousands of small chunks a second. Repainting for each
+   * one spends the frame budget on redraws nobody can read, and the screen ends
+   * up further behind than the output. Everything is kept; only the repaint is
+   * rate-limited, so nothing is lost by waiting.
+   */
+  private bufferToolOutput(taskId: string, chunk: string): void {
+    this.outputBuffer.set(taskId, (this.outputBuffer.get(taskId) ?? "") + chunk);
+    const now = this.now();
+    if (now < this.outputFlushAt) return;
+    this.outputFlushAt = now + OUTPUT_FLUSH_MS;
+    this.flushToolOutput();
+  }
+
+  /** Move buffered output onto its cards, now. */
+  private flushToolOutput(): void {
+    if (this.outputBuffer.size === 0) return;
+    const pending = [...this.outputBuffer.entries()];
+    this.outputBuffer.clear();
+    for (const [taskId, chunk] of pending) {
+      this.tools.append(taskId, chunk);
+    }
   }
 
   /** Open a tool card, closing out any prose the turn had been writing. */

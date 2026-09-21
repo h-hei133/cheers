@@ -103,6 +103,8 @@ export interface CommandExecutionRequest {
   readonly reportSafeCommand: string
   readonly timeoutMs?: number
   readonly abortSignal?: AbortSignal
+  /** Forwarded output, for a command whose progress the caller wants to show. */
+  readonly onOutput?: (chunk: string) => void
   readonly policy?: ExecutionPolicyMetadata
 }
 

@@ -169,6 +169,7 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
     args: [...request.args],
     cwd: request.cwd,
     timeoutMs: request.timeoutMs,
+    ...(request.onOutput ? { onOutput: request.onOutput } : {}),
   })
 
   return withCommandExecutionProjection(request, 'ts-local', localResult)

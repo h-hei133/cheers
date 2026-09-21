@@ -9,6 +9,9 @@ import type { Transcript } from "../../presentation/tui/transcript/container.js"
  * running twice at once and a result must land on the call that produced it — a
  * result for a call that was never opened is dropped rather than guessed at.
  */
+/** How many lines of live output a running card keeps on screen. */
+const LIVE_OUTPUT_LINES = 40;
+
 export class ToolCards {
   private readonly cards = new Map<string, Block>();
 
@@ -39,6 +42,30 @@ export class ToolCards {
     const block = this.cards.get(taskId);
     if (!block) return;
     block.text = block.text ? `${block.text}\n${note}` : note;
+    this.onChange();
+  }
+
+  /**
+   * Append output a running call has produced, and repaint.
+   *
+   * Kept in the card's body while the call is still open, so a long command shows
+   * something as it goes rather than only once it is over. The final result
+   * replaces nothing: `finish` appends what it has, and the body is already
+   * carrying the same text.
+   */
+  append(taskId: string, chunk: string): void {
+    const block = this.cards.get(taskId);
+    if (!block) return;
+    const text = chunk.replace(/\s+$/, "");
+    if (!text) return;
+    block.text = block.text ? `${block.text}\n${text}` : text;
+    // A card the user opened to watch should keep showing the latest output, not
+    // grow past the view. The body is clipped here rather than at finish, because
+    // while running there is no "full output" to point at yet.
+    const lines = block.text.split("\n");
+    if (lines.length > LIVE_OUTPUT_LINES) {
+      block.text = lines.slice(-LIVE_OUTPUT_LINES).join("\n");
+    }
     this.onChange();
   }
 

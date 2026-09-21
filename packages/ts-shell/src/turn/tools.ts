@@ -73,7 +73,8 @@ export function adaptTools(
   return [...tools.values()].map((tool) => ({
     name: tool.name,
     prepareArguments: (args) => prepareArguments(tool.name, args),
-    execute: (toolCallId, args, signal) => executeTool(tool, toolCallId, args, signal, options),
+    execute: (toolCallId, args, signal, onUpdate) =>
+      executeTool(tool, toolCallId, args, signal, options, onUpdate),
   }));
 }
 
@@ -95,6 +96,7 @@ async function executeTool(
   args: Record<string, unknown>,
   signal: AbortSignal | undefined,
   options: ToolGateOptions,
+  onUpdate?: (partialResult: unknown) => void,
 ): Promise<AgentToolResult> {
   try {
     const result = await tool.execute(args, {
@@ -103,6 +105,9 @@ async function executeTool(
       abortSignal: signal,
       interactiveAsk: options.interactiveAsk,
       sessionId: options.sessionId,
+      // A tool that reports progress passes it on; one that does not is
+      // unaffected, since the callback only fires if the tool calls it.
+      ...(onUpdate ? { onOutput: (chunk: string) => onUpdate(chunk) } : {}),
     });
     return { output: result.output || result.content || "Success", isError: !result.success };
   } catch (error) {

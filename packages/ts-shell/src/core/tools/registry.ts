@@ -125,6 +125,7 @@ async function runCommandTool(
     reportSafeCommand: command,
     timeoutMs: 60_000,
     abortSignal: context.abortSignal,
+    ...(context.onOutput ? { onOutput: context.onOutput } : {}),
   })
   const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
   const isOk = result.status === 'completed' && result.exitCode === 0

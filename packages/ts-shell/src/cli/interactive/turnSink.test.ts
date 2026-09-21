@@ -398,3 +398,65 @@ describe("a tool card when its call settles", () => {
     expect(card?.text).toContain("printed this");
   });
 });
+
+describe("live output from a running tool", () => {
+  it("shows output as it arrives rather than only at the end", () => {
+    const transcript = new Transcript();
+    let clock = 0;
+    const sink = new TurnSink(transcript, () => {}, () => (clock += 200));
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "c1", args: {} } as QueryEvent);
+    sink.handleEvent({ type: "tool.output", toolName: "bash", taskId: "c1", chunk: "line one" } as QueryEvent);
+
+    const card = transcript.last();
+    expect(card?.status).toBe("running");
+    expect(card?.text).toContain("line one");
+  });
+
+  it("keeps every chunk even when repaints are rate-limited", () => {
+    const transcript = new Transcript();
+    let clock = 0;
+    let repaints = 0;
+    // A clock that does not advance: every chunk after the first is buffered.
+    const sink = new TurnSink(transcript, () => { repaints += 1; }, () => clock);
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "c1", args: {} } as QueryEvent);
+    const afterStart = repaints;
+    for (let index = 0; index < 20; index += 1) {
+      sink.handleEvent({ type: "tool.output", toolName: "bash", taskId: "c1", chunk: `c${index}` } as QueryEvent);
+    }
+    // Repaints were held back — that is the point of the buffer.
+    expect(repaints - afterStart).toBeLessThan(20);
+
+    // The result closes the card, which flushes what was still buffered.
+    sink.handleEvent({
+      type: "tool.result",
+      toolName: "bash",
+      taskId: "c1",
+      success: true,
+      output: "c19",
+    } as QueryEvent);
+    const card = transcript.last();
+    // c0 repaints immediately and c19 arrives on the result, so neither would
+    // notice a lost buffer. c10 exists only in it: if the flush is gone, it is gone.
+    expect(card?.text).toContain("c0");
+    expect(card?.text).toContain("c10");
+    expect(card?.text).toContain("c19");
+    expect(card?.finalized).toBe(true);
+  });
+
+  it("bounds the live body so a chatty command cannot push the view over", () => {
+    const transcript = new Transcript();
+    let clock = 0;
+    const sink = new TurnSink(transcript, () => {}, () => (clock += 200));
+    sink.begin("turn", "turn");
+    sink.handleEvent({ type: "tool.started", toolName: "bash", taskId: "c1", args: {} } as QueryEvent);
+    for (let index = 0; index < 200; index += 1) {
+      sink.handleEvent({ type: "tool.output", toolName: "bash", taskId: "c1", chunk: `line ${index}` } as QueryEvent);
+    }
+    const body = transcript.last()?.text ?? "";
+    expect(body.split("\n").length).toBeLessThanOrEqual(40);
+    // The newest output is what is kept.
+    expect(body).toContain("line 199");
+  });
+});

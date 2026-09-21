@@ -2,7 +2,8 @@
 
 > **依据**：对 `/home/wang/projects/pi` 的两轮只读勘察（工具事件粒度、bash 流式、忙碌指示器），
 > 以及我们自己的源码核对与实测。
-> **性质**：建议，未施工。每条含理由、证据、成本与风险。
+> **性质**：P0（卡片收尾）、标签修复、P1（命令输出流式）**已施工**（见 §6）；
+P2（按文件互斥）与其余建议**未施工**。
 
 ---
 
@@ -179,3 +180,61 @@ pi **把「忙碌指示器」与「思考内容」彻底分开**：
 3. **P1 的节流取值（100ms）是从 pi 读来的，未在我们的 TUI 上实测**。
 4. **P2 未评估**：我们没有 pi 那样的按文件互斥，但也没有证据表明 `write`/`edit`
    并发写同一文件会造成实际问题。**建议先测，再决定是否值得做。**
+
+---
+
+## 6. 施工记录（2026-09-20）
+
+### 6.1 已落地
+
+| 项 | 改动 | 位置 |
+|---|---|---|
+| **P0 卡片收尾** | 新增 `tool.settled` 事件；投影层不再丢弃 `tool_execution_end`；卡片 `settle()` 只标状态不关闭 | `core/query/runtime/events.ts`、`turn/projection.ts:50-66`、`cli/interactive/toolCards.ts`、`cli/interactive/turnSink.ts` |
+| **标签不对称** | 抽出 `settleThinking()`，`openAssistant()` 与 `finalizeAssistant()` 共用 | `cli/interactive/turnSink.ts` |
+| **P1 命令输出流式** | `ToolExecutionContext.onOutput` → `CommandExecutionRequest.onOutput` → `executeLocally` 用 `spawn` 边跑边转 → `tool_execution_update` → `tool.output` 事件 → 卡片 `append()` | `tools/types.ts`、`runtime/execution/{types,service}.ts`、`daemon/client.ts`、`turn/tools.ts`、`turn/projection.ts`、`core/tools/registry.ts` |
+| **节流** | 输出缓冲 **100ms** 才重绘；**所有 chunk 都保留**，只限重绘频率。活动卡片最多保留 **40 行** | `cli/interactive/turnSink.ts`、`cli/interactive/toolCards.ts` |
+
+**状态与内容分离**（P0 的关键取舍）：`tool.settled` 只表示「调用停了」，
+`tool.result` 仍表示「输出是什么」。两者不可合并——`tool.result` 被**会话恢复**用来
+核对未闭合调用（`session/recovery/sessionLifecycleReadModel.ts:27`），
+改它的含义会破坏恢复。这一点是我在施工中核对消费者后才发现并调整的。
+
+**为什么节流放在显示层而非工具层**：命令不应该知道重绘节奏。
+工具只管把输出报出来，由界面决定多快画一次。
+
+### 6.2 验证
+
+| 门禁 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json --noEmit` | 0 错误 |
+| `npm run test:ts` | **491 文件 / 2765 通过 / 1 跳过 / 0 失败** |
+| `verify:import-cycles` | 0 环 |
+| 实机（真实 SSE + 工具调用） | 命令执行、输出回传正常 |
+
+**四项反向验证**（证明测试真的在测修复）：
+
+| 移除什么 | 结果 |
+|---|---|
+| 投影层的 `tool_execution_end` 产出 | `turn/session.test.ts` 失败 |
+| 标签的 `settleThinking()` | `turnSink.test.ts` 2 项失败 |
+| 适配器的 `onOutput` 传递 | `turn/session.test.ts` 失败 |
+| 关卡片前的 flush | `turnSink.test.ts` 失败（`'c0\nc19'` 缺 `c10`） |
+
+**其中一项反向验证暴露了我自己的测试缺陷**：我最初把 sink 测试写成直接投喂
+`tool.settled`，于是把投影层改回「丢弃」时测试**仍然全绿**——测试没覆盖到真正的漏点。
+补了 `turn/session.test.ts` 的整链测试后才具备判别力。
+
+### 6.3 仍未施工
+
+| 项 | 理由 |
+|---|---|
+| **P2 按文件互斥**替代整批串行 | 需先确认并发写同一文件是否真有问题；`bash`/`task`/`browser` 语义复杂，不能照搬 |
+| 方案 B：标签不再表示「在思考」 | 有行为取舍，需用户确认 |
+| Rust daemon 路径的流式 | 非默认执行面；`executeLocally` 已支持，daemon 未接 |
+
+### 6.4 未验证（如实说明）
+
+1. **P1 的端到端实机效果未在真实交互界面逐步观察**——我验证到「命令执行 + 输出经事件流回传」，
+   但**没有逐帧确认卡片在终端上随命令逐步增长**。上面 §2.3 P1 的理由仍然成立，
+   但「屏幕上的观感」这一条我无法仅凭事件流断言。
+2. **100ms 节流值未在真实负载下实测**——取自参考实现，未在我们的 TUI 上量过。
