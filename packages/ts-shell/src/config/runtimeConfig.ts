@@ -72,12 +72,20 @@ export interface RuntimeConfig {
   readonly temperature?: number;
   readonly topP?: number;
   readonly maxOutputTokens?: number;
-  readonly thinkingBudgets?: Readonly<Record<string, number>>;
   readonly contextWindow?: number;
   readonly reserveTokens?: number;
   readonly agentMode?: "plan" | "build";
-  readonly promptCacheTtl?: "5m" | "1h";
   readonly theme?: "dark" | "light" | "auto";
+  /**
+   * Explicit override of the interactive surface.
+   *
+   * Unlike the fields this config used to carry for thinking budgets and prompt
+   * cache lifetime, the capability behind this one exists: the surface is chosen
+   * from terminal capability in `supportsFullScreenSurface`, and this field is
+   * where a caller will be able to force that choice. It stays declared, and
+   * unwired, so the next reader does not have to re-derive which of the three
+   * was the real one.
+   */
   readonly tuiMode?: "regular" | "fullscreen" | "stream";
   readonly tui?: TuiPreferences;
   readonly configSources: string[];
@@ -110,11 +118,9 @@ export interface RuntimeConfigFile {
   temperature?: number;
   topP?: number;
   maxOutputTokens?: number;
-  thinkingBudgets?: Record<string, number>;
   contextWindow?: number;
   reserveTokens?: number;
   agentMode?: "plan" | "build";
-  promptCacheTtl?: "5m" | "1h";
   theme?: "dark" | "light" | "auto";
   tuiMode?: "regular" | "fullscreen" | "stream";
   tui?: TuiPreferences;
@@ -133,16 +139,9 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   temperature: 0.7,
   topP: 1.0,
   maxOutputTokens: 4096,
-  thinkingBudgets: {
-    minimal: 1024,
-    low: 4096,
-    medium: 10240,
-    high: 32768,
-  },
   contextWindow: 64_000,
   reserveTokens: 8_000,
   agentMode: "build",
-  promptCacheTtl: "5m",
   theme: "dark",
   tuiMode: "regular",
   tui: {},
@@ -220,11 +219,9 @@ export function getRuntimeConfig(
     temperature: merged.temperature ?? DEFAULT_CONFIG.temperature,
     topP: merged.topP ?? DEFAULT_CONFIG.topP,
     maxOutputTokens: merged.maxOutputTokens ?? DEFAULT_CONFIG.maxOutputTokens,
-    thinkingBudgets: merged.thinkingBudgets ?? DEFAULT_CONFIG.thinkingBudgets,
     contextWindow: merged.contextWindow ?? DEFAULT_CONFIG.contextWindow,
     reserveTokens: merged.reserveTokens ?? DEFAULT_CONFIG.reserveTokens,
     agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
-    promptCacheTtl: merged.promptCacheTtl ?? DEFAULT_CONFIG.promptCacheTtl,
     theme: merged.theme ?? DEFAULT_CONFIG.theme,
     tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,
     tui: merged.tui ?? DEFAULT_CONFIG.tui,

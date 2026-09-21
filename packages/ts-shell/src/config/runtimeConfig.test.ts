@@ -74,6 +74,28 @@ describe("runtime config", () => {
     expect(config.agentMode).toBe("plan");
   });
 
+  it("does not carry a config key whose value nothing reads", () => {
+    // A key that survives onto the resolved config is a promise the runtime
+    // does not keep: the user sets it, and nothing happens. A config file that
+    // still carries a removed key must load without error and must not put the
+    // key back on the result.
+    const configPath = path.join(fakeRoot, ".private-agents.json");
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        contextWindow: 200_000,
+        thinkingBudgets: { high: 8192 },
+        promptCacheTtl: "1h",
+      }),
+      "utf8",
+    );
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.contextWindow).toBe(200_000);
+    expect(Object.keys(config)).not.toContain("thinkingBudgets");
+    expect(Object.keys(config)).not.toContain("promptCacheTtl");
+  });
+
   it("expands environment references in a config file", () => {
     const configPath = path.join(fakeRoot, ".private-agents.json");
     fs.writeFileSync(

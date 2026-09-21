@@ -152,7 +152,7 @@ confidence: high
 
 ### 1.8 补充裁决（对照 pi 后收口）
 
-对照 `phase-3-execution.md` §1 的 pi 决定后，以下三项**已裁决**：
+对照 `phase-3-comparison.md` §1 的 pi 决定后，以下三项**已裁决**：
 
 | # | 事项 | 裁决 | 理由 |
 |---|---|---|---|
@@ -485,7 +485,7 @@ if (!containment.allowed) {
 
 ### 4.2 关键证据：我方只有一条请求路径，无 token 预算的消费位点
 
-**⚠️ 本节原论证有误，已更正。** 原文称 `thinkingBudgets` 与活轨的 `reasoning_effort`「语义冲突、接线会产生两个来源」——**这个论证是错的**。pi 的实现证明二者互补：`thinkingBudgets` 把档位映射为数值预算（`minimal:1024 / low:2048 / medium:8192 / high:16384`），Anthropic/Google/Bedrock 原生消费，且注释明写 *"Independent of thinkingFormat"*——**它是 cap，不是竞争来源**。详见 `phase-3-execution.md` §4.1。
+**⚠️ 本节原论证有误，已更正。** 原文称 `thinkingBudgets` 与活轨的 `reasoning_effort`「语义冲突、接线会产生两个来源」——**这个论证是错的**。pi 的实现证明二者互补：`thinkingBudgets` 把档位映射为数值预算（`minimal:1024 / low:2048 / medium:8192 / high:16384`），Anthropic/Google/Bedrock 原生消费，且注释明写 *"Independent of thinkingFormat"*——**它是 cap，不是竞争来源**。详见 `phase-3-comparison.md` §4.1。
 
 **正确的理由**（已核验）：
 
@@ -508,7 +508,7 @@ if (!containment.allowed) {
 
 | 字段 | 裁决 | 理由 |
 |---|---|---|
-| `thinkingBudgets` | **删除** | 无消费位点（我方只有 OpenAI 兼容单路径）。**接入 token 型 provider 时必须重新引入**，形状见 `phase-3-execution.md` §4.1 |
+| `thinkingBudgets` | **删除** | 无消费位点（我方只有 OpenAI 兼容单路径）。**接入 token 型 provider 时必须重新引入**，形状见 `phase-3-comparison.md` §4.1 |
 | `promptCacheTtl` | **删除** | 端点无对应参数，且我方无 `cache_control` 层 |
 | `tuiMode` | **暂缓，不删** | 它是**真能力**，只是缺配置入口 |
 
@@ -528,13 +528,28 @@ pi 引入预算上限的理由（`openai-completions.ts:974-977` 注释）：
 
 ### 4.5 验证
 
-`tsc` 0 错 + 全量测试。删除字段会同时删除钉住它们的测试（这些测试只断言「字段存在」——属于「断言实现」而非「断言行为」，按 `AGENTS.md` 验证纪律应删）。
+`tsc` 0 错 + 全量测试。
+
+> **⚠️ 原记录更正（执行时实测）**：本节原写「删除字段会同时删除钉住它们的测试（这些测试只断言『字段存在』）」。**实测：没有任何测试钉住这两个字段**——全仓 `grep thinkingBudgets|promptCacheTtl` 于 `*.test.ts` → **0 命中**。即原判断不成立，删除时无需改测试。
+
+**实际执行的验证**（T3 已施工）：
+
+| 项 | 方式 | 结果 |
+|---|---|---|
+| 回归测试 | 新增 `runtimeConfig.test.ts` 的「does not carry a config key whose value nothing reads」——旧配置**仍含**两个已删字段时，断言解析结果的键集**不含**它们 | **反向验证通过**：只重新引入 `promptCacheTtl` → 该测试失败（`expected [...] to not include 'promptCacheTtl'`）；移除 → 通过 |
+| 类型 | `tsc -p packages/ts-shell/tsconfig.build.json --noEmit` | **0 错误** |
+| 全量 | `npm run test:ts` | **494 文件 / 2800 通过 / 1 跳过 / 0 失败** |
+| 实机（真实构建产物） | 用含两个已删字段的 `.private-agents.json` 调 `getRuntimeConfig` | 存活字段正确（`200000`/`30000`/`0.2`/`plan`/`fullscreen`）；**两个已删字段均不在结果键集中**；**旧配置不报错**（向后兼容） |
+| 实机（真实 CLI） | `node dist/cli.js` 于该目录 | 正常启动，无错误 |
+| 实机（`/context`） | `printf '/context\n' \| node dist/cli.js` | `Window: 200,000 tokens` —— 从配置读到，未被删除影响 |
+
+**一个必须记录的边界**：**配置文件中残留已删键不会报错，也不会有提示**。`getRuntimeConfig` 的解析路径**没有未知键校验**（全仓搜 `unknown`/`unrecognized`/`schema` 于 `runtimeConfig.ts` → 0 命中），多余的键被静默忽略。这是**有意的向后兼容**（旧配置继续可用），但也意味着**用户无法知道某个键已被删除**。这与 T7（死字段门禁）方向一致——T7 防的是「文档声明了但代码没接」，此处是「代码删了但用户的配置还留着」；**两者都不报错**。记录备查，不在 T3 解决。
 
 ### 4.6 独立审查的发现（2026-09-21，已逐条复现）
 
 #### 发现 1（中）：**两处「未考虑」发现被静默丢弃，现补录**
 
-`phase-3-execution.md` §4.4 记录了两项 pi 的决定，但**两者都未进入本文件的任何裁决，也不在 §8.3 的移出清单**——即**静默丢弃**：
+`phase-3-comparison.md` §4.4 记录了两项 pi 的决定，但**两者都未进入本文件的任何裁决，也不在 §8.3 的移出清单**——即**静默丢弃**：
 
 | 被丢弃的发现 | 内容 | 现裁决 |
 |---|---|---|
@@ -978,7 +993,7 @@ $$\text{T3} \to \text{T7} \to \text{T1} \to \text{T4} \to \text{T6} \to \text{T2
 **审查自身的局限（如实记录）**：
 - 一个审查者报 `contextAnalysis.ts:44` 是第四个生产解析点——**已核实为误报**（只被测试文件引用）。
 - 审查发现的 40 项「未考虑」中，**2 项**（T3 §4.4 的逐模型 thinking 与 `xhigh`/`max` 折叠）此前确实落空，现已补录。
-- 测试覆盖仍不完整：44 项补充裁决中约 **12 项**有对应测试要求（`phase-3-execution.md` §9 共 19 行）。**这是已知缺口**，施工时逐项补齐。
+- 测试覆盖仍不完整：44 项补充裁决中约 **12 项**有对应测试要求（`phase-3-comparison.md` §9 共 19 行）。**这是已知缺口**，施工时逐项补齐。
 
 ---
 
