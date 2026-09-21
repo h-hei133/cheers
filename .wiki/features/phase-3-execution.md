@@ -15,7 +15,7 @@
 | T3 | 删除 `thinkingBudgets` + `promptCacheTtl`；`tuiMode` 加注释保留 | ✅ **完成**（§1） |
 | T7 | 死字段门禁 | ✅ **完成**（§2） |
 | T1 | 三层遍历 + `.gitignore` | ✅ **完成**（§3） |
-| T4 | 逐模型窗口 + 逐模型压缩预算 | ⬜ 未开始 |
+| T4 | 逐模型窗口 + 逐模型压缩预算 | ✅ **完成**（§4） |
 | T6 | 目录列举折进 `read` | ⬜ 未开始 |
 | T2 / T2b | `AGENTS.md` 注入 + 技能（一轮） | ⬜ 未开始 |
 | T5 | 声明式钩子 + 信任门 + 封堵既有执行面 | ⬜ 未开始 |
@@ -280,7 +280,75 @@
 
 ## 4. T4 — 逐模型上下文窗口
 
-⬜ 未开始。
+**提交**：`26567504`。
+
+### 4.1 施工内容
+
+| 文件 | 变化 |
+|---|---|
+| `core/models/window.ts` | **新增**：逐模型窗口 + 逐模型预算解析 |
+| `core/models/window.test.ts` | **新增**：16 项测试 |
+| `config/runtimeConfig.ts` | 新增 `modelTokenBudgets` 字段；**`contextWindow` 不再填默认值**；`ModelTokenBudget` 类型移入此处 |
+| `cli/runtime/cliSessionRuntimeFactory.ts` | policy 改为逐模型解析；catalog 每会话读一次 |
+| `cli/interactive/sessionFacts.ts` | 状态栏分母改为同一解析 |
+| `core/commands/contextCommandRuntime.ts` | `/context` 改为同一解析；删除已成死代码的本地常量 |
+
+### 4.2 施工中发现并修复的**两个自身缺陷**
+
+**缺陷 1（重要）：`getRuntimeConfig` 总是填默认窗口，使逐模型解析永远不生效。**
+
+原实现 `contextWindow: merged.contextWindow ?? DEFAULT_CONFIG.contextWindow`——**用户未配置时也返回 64000**。于是「用户设了 64k」与「没人设过」是同一个值，解析链的第一层（用户配置优先）**永远命中**，目录**永远不会被查**。
+
+**这个缺陷是实机验证发现的**：`/context` 仍报 64,000，而代码看起来「已经接线」。查下去才发现 source 是 `config` 而非 `catalog`。
+
+**修复**：配置层**不再发明**默认值，字段改为「用户没设就不存在」。已加测试钉住。
+
+**教训**：「把默认值填在配置层」会让下游的「是否显式配置」判断**永远为真**——这类缺陷在类型上完全合法，只有跑起来才看得见。
+
+**缺陷 2：类型放错模块，制造了一个 type-only 环。**
+
+`ModelTokenBudget` 最初定义在 `window.ts`，而 `window.ts` import `catalog.ts`、`catalog.ts` import `runtimeConfig.ts`——形成 `runtimeConfig → window → catalog → runtimeConfig`。
+
+**被仓库既有的 `verify:import-cycles` 抓到**（`type_only_cycles=0 → 1`）。该门禁的提示原文：*"they become runtime cycles the moment one is converted to a value import"*。
+
+**修复**：类型移入 `config/runtimeConfig.ts`（它本来就是配置形状），`window.ts` 改为 re-export。
+
+### 4.3 一处需要记录的**跨命名空间**问题
+
+凭证解析器返回的是 **`RuntimeProvider`（协议名）**：`openai-compatible`、`anthropic`。目录用的是 **vendor id**：`siliconflow`、`deepseek`。
+
+**实测本环境**：活动模型是 `openai-compatible/deepseek-ai/DeepSeek-V4-Flash`，而该模型在目录里挂在 **`siliconflow`** 下（`runtime: openai-compatible`）。**只按 provider 精确匹配会漏掉**。
+
+**已核验无歧义**：目录里**没有任何模型 id 出现在两个 provider 下**（实测：0 个）。因此**按模型 id 回退匹配是安全的**，已实现并加测试。
+
+**未做**：未把 `RuntimeProvider` 与 vendor id 统一——那是更大的重构，且回退匹配已经消除症状。
+
+### 4.4 验证
+
+| 项 | 方式 | 结果 |
+|---|---|---|
+| 新增测试 | `window.test.ts` | **16/16 通过** |
+| 配置测试 | 新增「未配置时窗口应为 undefined」 | **13/13 通过** |
+| 全量 | `npm run test:ts` | **496 文件 / 2827 通过 / 1 跳过 / 0 失败** |
+| 类型 | `tsc` | **0 错误** |
+| 门禁 | import-cycles / docs-drift / config-consumers / test:scripts | **全 pass**（环回到 0） |
+
+**反向验证**：移除目录查找 → **3 项测试失败**（含钉住原始缺陷的那条）。
+
+**实机验证（真实构建产物 + 真实配置）**：
+
+| 检查 | 修复前 | 修复后 |
+|---|---|---|
+| `/context` 报告的窗口 | 64,000（**恒为此值**） | **128,000**（来自目录） |
+| 解析来源 | `config`（被默认值污染） | `catalog` |
+
+**逐模型预算实测**：该模型的覆盖 40000、其他模型走全局 8000、无覆盖走默认 20000。
+
+### 4.5 未做（如实记录）
+
+- **未统一 `RuntimeProvider` 与目录 vendor id 的命名空间**：回退匹配已消除症状，但两者仍是两套名字（见 §4.3）。
+- **模型切换后的溢出归属**（裁决 §5.6 #6）：未专门实现。已核验 `runPrompt` 每轮重算 wiring（`compactionProvider()`），因此切换后阈值会重算；但「旧模型的溢出不触发新模型压缩」这一具体守卫**未实现**。
+- **目录新鲜度**（裁决 §5.6 #7）：本轮不引入，符合裁决。
 
 ---
 
