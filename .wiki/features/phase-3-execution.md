@@ -5,7 +5,7 @@ sources: [pi-source-2026-09-21, phase-3-decisions-2026-09-21, phase-3-pre-resear
 created: 2026-09-21
 updated: 2026-09-21
 tags: [features, phase-3, execution, pi-comparison, decisions]
-summary: "按 `agent-rules/reference-repositories.md` 的「Compare Decisions Before Implementing」纪律，把 pi 对 Phase 3 七项决策的**具体决定**逐条列出，并标注我方是同意、不同意、还是**未考虑**。共 **35 处「未考虑」**（T1 七处、T2 九处、T2b 三处、T3 三处、T4 六处、T5 四处、T6 三处）与**两处我方论证错误**，是实际产出。最重要的三条：①pi 的 `thinkingBudgets` 是活机制（档位→数值预算，Anthropic/Google/Bedrock 原生消费，且注释明写与 `thinkingFormat` **无关**），我方 T3 的「双来源冲突」论证被推翻——删除仍对，但理由须换成「我方无消费位点」；②我方**已经**暴露在 pi 那条注释警告的失效模式里（同时发 `reasoning_effort` 与 `max_tokens: 4096`，推理与答案共享额度），我方是检测而非预防；③项目技能、项目设置、扩展、提示词、主题、`SYSTEM.md` 在 pi 里共用一个信任门（7 类资源），而我方 `SkillLoader` **零信任检查**——T2b 一旦接线就会激活这个提示注入面。另有 **15 项**待维护者裁决的开放问题。"
+summary: "按 `agent-rules/reference-repositories.md` 的「Compare Decisions Before Implementing」纪律，把 pi 对 Phase 3 七项决策的**具体决定**逐条列出，并标注我方是同意、不同意、还是**未考虑**。共 **40 处「未考虑」**（T1 七、T2 九、T2b 八、T3 三、T4 六、T5 四、T6 三）与**两处我方论证错误**，是实际产出。最重要的四条：①pi 的 `thinkingBudgets` 是活机制（档位→数值预算，Anthropic/Google/Bedrock 原生消费，注释明写与 `thinkingFormat` **无关**），我方 T3 的「双来源冲突」论证被推翻——删除仍对，但理由须换成「我方无消费位点」；②我方**已经**暴露在 pi 那条注释警告的失效模式里（同时发 `reasoning_effort` 与 `max_tokens: 4096`，推理与答案共享额度），我方是检测而非预防；③项目技能、项目设置、扩展、提示词、主题、`SYSTEM.md` 在 pi 里共用一个信任门（7 类资源），而我方 `SkillLoader` **零信任检查**——T2b 一旦接线就会激活这个提示注入面；④**实测我方 `SkillLoader.scan` 只读一层，3 个嵌套技能只发现 1 个**（pi 有专门测试，opencode 真实技能即用嵌套布局）——T2b 注入的是残缺目录。另有 **19 项**待维护者裁决的开放问题。"
 confidence: high
 ---
 
@@ -374,6 +374,102 @@ this.roots = [
 - **项目级技能**（`<workspace>/.agents/skills`）：**必须过与 T5 相同的信任门**。
 
 这与 §6.4 发现 3 是同一结论，但**攻击面更直接**（提示注入 vs 代码执行）。应把 Q5 的裁决范围扩大到技能。
+
+**发现 4：pi 的 `allowed-tools` 是**文档化了但从未读取**的字段——与我方 T3 的死字段**同类缺陷**。**
+
+已核验：`docs/skills.md:148` 声明
+
+| `allowed-tools` | No | Space-delimited list of pre-approved tools (experimental). |
+
+而 `grep allowed-tools\|allowedTools` 于 `packages/coding-agent/src` → **0 命中**（同一搜索确认 `license`/`compatibility`/`metadata` 也从未被读取；只有 `name`/`description`/`disable-model-invocation` 进入行为）。
+
+**这是与我方 T3 完全同构的缺陷**：一个「声明了能力、零消费者」的字段，且**被写进用户文档**。pi 比我们更严重——我方至少没把它写进文档。
+
+**价值**：这是**第三个独立实现**出现同一类缺陷（我方 `thinkingBudgets`/`promptCacheTtl`、pi 的 `allowed-tools`）。说明「声明了但没接线」是这类产品的**系统性失效模式**，不是我方的孤立失误。**支持 T3 的删除裁决，也提示我方应在文档与类型之间做一致性检查**（见 Q16）。
+
+**发现 5：pi 的校验分两级——「缺 description」硬失败，「名字/长度不合规」仅警告。**
+
+已核验（`skills.ts:318-341`）：
+
+```ts
+const nameErrors = validateName(name);
+for (const error of nameErrors) { diagnostics.push({ type: "warning", message: error, path: filePath }); }
+
+// Still load the skill even with warnings, unless description is missing or empty.
+if (!hasDescription) { return { skill: null, diagnostics }; }
+```
+
+即：**名字超 64 字符、字符集不合规、description 超 1024 → 仅警告，技能仍加载**；**只有缺/空 description 才不加载**。
+
+**我方 `phase-3-decisions.md` §3.5 只规定了「无 description 则丢弃」**，未规定名字/长度不合规如何处理。**pi 的两级划分是合理的**：description 是模型**匹配技能的唯一依据**（缺了就无法被发现），而名字格式问题是**可容忍的瑕疵**。
+
+**发现 6：pi **刻意不要求** `name` 与父目录名一致——并给出了理由。**
+
+`docs/skills.md:145` 原文：
+
+> `name` | Yes | Max 64 chars. Lowercase a-z, 0-9, hyphens. **Unlike the standard, Pi does not require this to match the parent directory because that standard requirement is suboptimal for shared skill directories.**
+
+即 Agent Skills 标准要求 `name` 匹配目录名，**pi 明确偏离**，理由是「共享技能目录下该要求不合理」。
+
+**我方未考虑**：`SkillLoader` 的 `readSkill(filePath, dirName, source)` 把 `dirName` 作为 fallback（`skillLoader.ts:68,90`），但**未校验 `name` 是否与目录一致**。**我方的默认行为与 pi 一致（不强制）**，但**未记录这是一个刻意的标准偏离**。应显式记录——否则将来有人「修复」它就会引入不兼容。
+
+**发现 7：技能根目录**不再继续递归**，且根级散落 `.md` 的加载规则因模式而异。**
+
+已核验（`package-manager.ts:378-399`）：找到 `SKILL.md` 后 **`return entries`**——该目录即为技能根，**不再向下递归**。
+
+且根级散落 `.md` 的规则是：
+
+```ts
+const shouldIncludeMarkdownFile = isFile && entry.name.endsWith(".md") && !ig.ignores(relPath)
+    && ((mode === "pi" && dir === root) || (mode === "agents" && dir !== root));
+```
+
+即：**`~/.pi/agent/skills` 与 `.pi/skills`（pi 模式）在根级收 `.md`；`.agents/skills`（agents 模式）根级不收，但子目录收**。
+
+**我方 `SkillLoader` 的 `scan` 行为不同**——**且已实测是一个真实缺陷**。
+
+我方 `scan`（`skillLoader.ts:53-74`）**只读一层**：它遍历根目录的条目，对目录取 `<dir>/SKILL.md`，对 `.md` 文件直接取。**没有任何递归调用**（`grep -c "scan("` → 2，即定义 + `load()` 里的一次调用，**无自递归**）。
+
+**实测**（构造 fixture：`top/SKILL.md`、`group/nested/SKILL.md`、`nested/deep/SKILL.md`，复刻我方 `scan` 逻辑运行）：
+
+```
+discovered: [ 'top-skill' ]
+on disk    : [ 'top-skill', 'nested-skill', 'deep-skill' ]
+```
+
+**3 个技能只发现 1 个。** 任何把技能放进子目录的用户都会**静默丢失**技能。
+
+**这不是我的推测——pi 有两条专门测试这个行为的用例**（`packages/coding-agent/test/skills.test.ts:97-116`）：
+
+```ts
+it("should load nested skills recursively", () => {
+    const { skills, diagnostics } = loadSkillsFromDir({ dir: join(fixturesDir, "nested"), source: "test" });
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe("child-skill");
+    expect(diagnostics).toHaveLength(0);
+});
+
+it("should prefer a directory's root SKILL.md over nested SKILL.md files", () => {
+    const { skills } = loadSkillsFromDir({ dir: join(fixturesDir, "root-skill-preferred"), source: "test" });
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe("root-skill-preferred");
+    expect(skills[0].description).toBe("Root skill should win.");
+});
+```
+
+且 pi 的 fixture 目录里就有 `nested/child-skill/SKILL.md` 与 `root-skill-preferred/nested-child/SKILL.md`。**opencode 的真实技能也采用同样布局**（`opencode/.opencode/skills/effect/SKILL.md`、`rtl-aware-development/SKILL.md`）。
+
+**即：`<root>/<name>/SKILL.md` 与 `<root>/<group>/<name>/SKILL.md` 两种布局在参考实现里都被支持且被测试。**
+
+**这是本轮发现的第二个真实缺陷**（第一个是 T6 的 EISDIR）。它与 T2b 直接相关：**T2b 要注入技能目录，但目录本身是残缺的**——注入一个漏掉 2/3 技能的目录，比不注入更糟（模型以为看到了全部）。
+
+**必须与 T2b 同批修**：`scan` 需要递归，且语义与 pi 一致——**找到 `SKILL.md` 的目录不再向下递归**（`return entries`），否则继续。两条测试应对应移植。
+
+**发现 8：`--skill` CLI 参数**即使与 `--no-skills` 同时给出也生效**（additive）。**
+
+pi 的发现顺序（`package-manager.ts:917-968`）：已安装包 → settings 的 `skills` 数组（项目优先于用户）→ 自动发现 → CLI `--skill`。
+
+**我方未考虑 CLI 级的技能路径注入**，也未考虑「显式指定的技能应覆盖禁用开关」这个语义。
 
 ---
 
@@ -757,6 +853,10 @@ IsADirectoryError: [Errno 21] Is a directory: 'packages/ts-shell/src'
 | **Q13** | 上下文文件的刷新触发是什么？ | pi 有显式 `/reload`（刷新 keybindings/扩展/技能/提示词/主题/**context files**）；我方**无 `/reload`**（已核验 45 个命令中无此项），计划只说「中途修改不生效」 | **加 `/reload`**，且刷新全部资源而非只刷 `AGENTS.md`——「刷新全部」更可预测。注意我方**有 `/cd` 命令**（`registry.ts:210`），切目录后 `AGENTS.md` 是否重新发现需一并裁决 |
 | **Q14** | 是否支持 `AGENTS.override.md` 这类逐目录覆盖逃生口？ | pi 的候选集有五个文件名，`.override` 排最前，专门用于在不改动 `AGENTS.md` 的前提下覆盖它 | **采纳**——成本是一个数组项，收益是 git 工作树友好的临时覆盖 |
 | **Q15** | 同名目录（名为 `AGENTS.md` 的目录）时，是否让下一候选胜出？ | pi 用 `statSync().isFile()` 跳过，**使 `CLAUDE.md` 有机会胜出**；我方的直觉是「跳过该目录」 | **跟 pi**（继续下一候选）——目录名撞上文件名时，用户显然还写了别的候选文件，没有理由因此整目录放弃 |
+| **Q16** | **`SkillLoader.scan` 是否改为递归？** | **实测我方 3 个技能只发现 1 个**（只读一层）；pi 有 `should load nested skills recursively` 与 `should prefer a directory's root SKILL.md over nested` 两条测试，opencode 的真实技能也用嵌套布局 | **必须递归**，语义跟 pi（找到 `SKILL.md` 即停，否则继续）。**与 T2b 同批**——注入残缺目录比不注入更糟 |
+| **Q17** | 技能名/长度不合规：抛错、警告、还是忽略？ | pi 分两级：缺 `description` **硬失败**，名字/长度不合规**仅警告仍加载** | **跟 pi**——description 是模型匹配技能的唯一依据（缺了无法被发现），名字格式是可容忍瑕疵 |
+| **Q18** | 是否强制 `name` 与父目录名一致？ | pi **刻意偏离** Agent Skills 标准，理由写在文档里：「该要求对共享技能目录不合理」 | **跟 pi**（不强制），但**必须在文档中显式记录这是刻意的标准偏离**——否则将来有人「修复」它会引入不兼容 |
+| **Q19** | 是否加文档↔类型的死字段一致性检查？ | pi 的 `allowed-tools` 与我的 `thinkingBudgets`/`promptCacheTtl` 是**同类系统性缺陷**（声明了、零消费者、甚至写进用户文档） | **加一个门禁**：扫描用户文档里声明的配置字段，逐个验证存在生产消费者。三个独立实现都犯过，说明这是系统性失效模式 |
 
 ---
 
@@ -781,6 +881,10 @@ IsADirectoryError: [Errno 21] Is a directory: 'packages/ts-shell/src'
 | T5 未信任时项目资源不可见 | 未信任 → 断言项目 `.agents/skills`、项目设置、项目钩子**全部不生效**；用户级资源**仍生效** |
 | T2 项目 `AGENTS.md` 的信任边界 | 未信任项目的 `AGENTS.md` → 断言**不注入**；用户级/全局 `AGENTS.md` 仍注入 |
 | T6 目录列举 | `read(目录)` 返回条目列表而非 EISDIR；断言目录 `/` 后缀、单层、忽略规则生效 |
+| T2b 嵌套技能被发现 | fixture `nested/child-skill/SKILL.md` → 断言被发现（**当前实测会失败**：3 个只发现 1 个） |
+| T2b 技能根不再递归 | fixture `root-skill-preferred/nested-child/SKILL.md` → 断言只返回根技能 |
+| T2b 缺 description 硬失败、名字不合规仅警告 | 两组 fixture，断言前者不加载、后者加载 |
+| Q19 死字段门禁 | 断言文档声明的每个配置字段都存在生产消费者（反向：给某字段加文档但不接线 → 门禁失败） |
 
 ---
 
@@ -814,6 +918,13 @@ IsADirectoryError: [Errno 21] Is a directory: 'packages/ts-shell/src'
 | 我方无 `/reload` 命令 | 列 `registry.ts` 45 个命令名，无此项 |
 | 我方有 `/cd` 命令 | 读 `registry.ts:210` |
 | 我方 `SkillLoader` 零信任检查 | `grep -c "trust\|Trust" skillLoader.ts` → **0** |
+| **我方 `scan` 只读一层（实测）** | 构造 3 个嵌套技能 fixture，复刻 `scan` 逻辑运行 → **只发现 1 个** |
+| 我方 `scan` 无自递归 | `grep -c "scan(" skillLoader.ts` → 2（定义 + `load()` 一次调用） |
+| pi 的嵌套技能有测试 | 读 `test/skills.test.ts:97-116`（两条用例）与 fixture 目录 |
+| pi 的 `allowed-tools` 从未被读取 | `grep allowed-tools\|allowedTools` 于 pi `src` → **0 命中**（文档在 `docs/skills.md:148`） |
+| pi 的技能校验分两级 | 读 `skills.ts:318-341`（名字错误仅警告；缺 description 才 `return null`） |
+| pi 的技能根不再递归 | 读 `package-manager.ts:378-399`（找到 `SKILL.md` 后 `return entries`） |
+| pi 的 `enableSkillCommands` 默认 true | 读 `settings-manager.ts:1182` |
 | 我方 `emptyAnswerExplanation` 覆盖推理吃满额度 | 读 `turn/step.ts:288-299` |
 | 我方同时发 `reasoning_effort` + `max_tokens` | 读 `turn/step.ts:114,116`（`max_tokens` 默认 4096，`runtimeConfig.ts:135`） |
 | 我方只有一条请求路径 | 读 `turn/step.ts:138`（唯一 `/chat/completions`） |
