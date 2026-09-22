@@ -1,7 +1,8 @@
 import { createComponentLogger } from "../../observability/structuredLogger.js";
 import { HOOK_TRUST_BYPASS_NOTICE } from "./types.js";
 import type { HookTrustStore } from "./trust.js";
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
+import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import type {
   HookEventPayload,
   HookDecision,
@@ -15,6 +16,15 @@ import type {
 } from "./types.js";
 
 const logger = createComponentLogger("HookDispatcher");
+
+/**
+ * The shell a hook command is written for.
+ *
+ * A hook's `command` is a shell command line, so it needs a shell to interpret
+ * it. Named once because the sandbox plan and the unconfined path must agree on
+ * which shell that is.
+ */
+const SHELL_BIN = "/bin/sh";
 
 /**
  * A command hook that did not finish normally.
@@ -207,10 +217,31 @@ export class HookDispatcher {
         const timeoutMs = hook.timeoutMs ?? hookTimeoutMs(relevantEvent);
         const jsonPayload = JSON.stringify(payload);
 
+        // Run under the same isolation the bash tool uses. A hook is a shell
+        // command, and leaving it unconfined while confining the commands the user
+        // runs through a tool would mean the sandbox protects the paths they can
+        // see and not the one a repository supplies.
+        //
+        // Launched as a program with an argument list rather than a command line,
+        // so the sandbox wrapper's arguments are never re-parsed by a shell. A
+        // hook command containing `$(...)` would otherwise be substituted by the
+        // wrapper's own shell before it ever reached the sandbox.
+        const sandbox = planSandboxedCommand({
+          shell: SHELL_BIN,
+          shellArgs: ["-c", hook.command],
+          workspaceRoot: payload.workspaceRoot,
+        });
+        if (sandbox.state === "unavailable" && sandbox.notice) {
+          logger.warn(sandbox.notice, { event: relevantEvent, command: hook.command });
+        }
+        const program = sandbox.command ?? SHELL_BIN;
+        const programArgs = sandbox.args ?? ["-c", hook.command];
+
         try {
           const stdout = await new Promise<string>((resolve, reject) => {
-            const child = exec(
-              hook.command,
+            const child = execFile(
+              program,
+              [...programArgs],
               {
                 cwd: payload.workspaceRoot,
                 timeout: timeoutMs,
