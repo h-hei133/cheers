@@ -23,6 +23,16 @@ export interface Skill {
   readonly body: string;
   readonly filePath: string;
   readonly source: SkillSource;
+  /**
+   * Whether the model may see this skill.
+   *
+   * A skill hidden this way is still discoverable and still loadable by name on
+   * request; it is only absent from the list the model reads. That distinction is
+   * the point: "do not put this in front of the model" is a different wish from
+   * "this skill does not exist", and only the first has a reason to keep the
+   * skill reachable.
+   */
+  readonly disableModelInvocation: boolean;
 }
 
 const MANIFEST = "SKILL.md";
@@ -45,28 +55,55 @@ export class SkillLoader {
   load(): ReadonlyMap<string, Skill> {
     const skills = new Map<string, Skill>();
     for (const root of this.roots) {
-      for (const skill of this.scan(root.dir, root.source)) skills.set(skill.name, skill);
+      for (const skill of this.scan(root.dir, root.source, true)) skills.set(skill.name, skill);
     }
     return skills;
   }
 
-  private scan(dir: string, source: SkillSource): Skill[] {
+  /**
+   * Every skill at or below `dir`.
+   *
+   * Recursive, with one rule that decides the shape: a directory holding a
+   * `SKILL.md` is a skill and is not descended into, because everything under it
+   * belongs to that skill — its scripts, its references, its own nested files. A
+   * directory without one is just a grouping directory, and is searched.
+   *
+   * Reading only one level loses every skill grouped into a subdirectory, which
+   * is the layout a real skill collection uses. Missing skills are worse than
+   * found ones are good: the model cannot use a skill it was never told about,
+   * and it has no way to notice the omission.
+   */
+  private scan(dir: string, source: SkillSource, isRoot: boolean): Skill[] {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
       return [];
     }
+
+    // A directory holding a manifest is itself the skill, at any depth: its
+    // subdirectories are that skill's own files, not more skills.
+    const manifestPath = path.join(dir, MANIFEST);
+    if (fs.existsSync(manifestPath)) {
+      const skill = readSkill(manifestPath, path.basename(dir), source);
+      return skill ? [skill] : [];
+    }
+
     const found: Skill[] = [];
     for (const entry of entries) {
-      const filePath = entry.isDirectory()
-        ? path.join(dir, entry.name, MANIFEST)
-        : entry.name.endsWith(".md")
-          ? path.join(dir, entry.name)
-          : undefined;
-      if (!filePath) continue;
-      const skill = readSkill(filePath, entry.isDirectory() ? entry.name : undefined, source);
-      if (skill) found.push(skill);
+      // Dot-directories hold tooling state rather than skills, and a dependency
+      // directory holds other people's skills. Neither is this project's.
+      if (entry.isDirectory()) {
+        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+        found.push(...this.scan(path.join(dir, entry.name), source, false));
+        continue;
+      }
+      // Loose files are only skills at the root. Deeper down, a bare `.md` is
+      // more likely to be part of the skill above it than a skill of its own.
+      if (isRoot && entry.name.endsWith(".md")) {
+        const skill = readSkill(path.join(dir, entry.name), undefined, source);
+        if (skill) found.push(skill);
+      }
     }
     return found.sort((left, right) => left.name.localeCompare(right.name));
   }
@@ -94,6 +131,7 @@ function readSkill(
     body: (match ? content.slice(match[0].length) : content).trim(),
     filePath,
     source,
+    disableModelInvocation: fields.get("disable-model-invocation")?.trim() === "true",
   };
 }
 
@@ -114,4 +152,50 @@ function parseFields(block: string): Map<string, string> {
     if (key) fields.set(key, value);
   }
   return fields;
+}
+
+/**
+ * The skill list as the model reads it, or the empty string when there are none.
+ *
+ * Only names and descriptions appear. The body is fetched by the skill tool when
+ * a description matches the task, because injecting every body would grow the
+ * prompt with the whole collection while the task needs one of it.
+ *
+ * A skill marked `disable-model-invocation` is left out here and remains loadable
+ * by name, which is the whole point of the flag.
+ */
+export function renderSkillList(skills: ReadonlyMap<string, Skill>): string {
+  const visible = [...skills.values()]
+    .filter((skill) => !skill.disableModelInvocation && skill.description !== "")
+    .sort((left, right) => left.name.localeCompare(right.name));
+  if (visible.length === 0) return "";
+
+  const lines = [
+    "The following skills provide instructions for specific tasks. When a task matches a description, load it with the skill tool before starting.",
+    "",
+    "<available_skills>",
+  ];
+  for (const skill of visible) {
+    lines.push("  <skill>");
+    lines.push(`    <name>${escapeXml(skill.name)}</name>`);
+    lines.push(`    <description>${escapeXml(skill.description)}</description>`);
+    // A source annotation, not an instruction to read it: the file may live
+    // outside the workspace, so the file reader would refuse it. It is here so the
+    // model can tell where a rule comes from, which is what makes two skills with
+    // similar descriptions distinguishable.
+    lines.push(`    <location>${escapeXml(skill.filePath)}</location>`);
+    lines.push("  </skill>");
+  }
+  lines.push("</available_skills>");
+  return lines.join("\n");
+}
+
+/** XML-escape a value so a description cannot close the tag that carries it. */
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }

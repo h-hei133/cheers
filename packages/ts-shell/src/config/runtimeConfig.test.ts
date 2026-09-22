@@ -74,6 +74,13 @@ describe("runtime config", () => {
     expect(config.agentMode).toBe("plan");
   });
 
+  it("defaults the instruction budget to a bounded number of bytes", () => {
+    // A default of zero would disable project instructions for everyone, and an
+    // unbounded default would let one repository's file fill the prompt.
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.instructionBudgetBytes).toBe(32 * 1024);
+  });
+
   it("leaves the context window absent when the user did not set one", () => {
     // The window is resolved per model from the catalog. A default filled in
     // here would be indistinguishable from a deliberate override, so the

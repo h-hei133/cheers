@@ -22,6 +22,7 @@ import {
 import { type CoreMcpGateway } from '../mcp/gateway.js'
 import { formatDirectoryListing } from './directoryListing.js'
 import { createGlobToolDefinition } from './glob.js'
+import { createSkillToolDefinition, type SkillCatalog } from './skill.js'
 import { createGrepToolDefinition } from './grep.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
@@ -213,6 +214,14 @@ export function createCoreToolRegistry(options?: {
   mcpGateway?: CoreMcpGateway
   browserRuntimeStatus?: PwRuntimeStatus
   executionService?: ExecutionService
+  /**
+   * Skills the skill tool may load.
+   *
+   * Absent means no skill tool is registered at all: a tool that could only ever
+   * answer "no such skill" is worse than no tool, because the model would keep
+   * trying it.
+   */
+  skills?: SkillCatalog
 }): ReadonlyMap<string, ToolDefinition> {
   const executionService = options?.executionService ?? createDefaultExecutionService()
   const tools: ToolDefinition[] = [
@@ -576,6 +585,10 @@ export function createCoreToolRegistry(options?: {
     createTaskToolDefinition(),
     createUnifiedBrowserToolDefinition(),
   ]
+
+  if (options?.skills && options.skills.size > 0) {
+    tools.push(createSkillToolDefinition(options.skills))
+  }
 
   for (const tool of options?.mcpTools ?? []) {
     tools.push({

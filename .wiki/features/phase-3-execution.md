@@ -17,7 +17,7 @@
 | T1 | 三层遍历 + `.gitignore` | ✅ **完成**（§3） |
 | T4 | 逐模型窗口 + 逐模型压缩预算 | ✅ **完成**（§4） |
 | T6 | 目录列举折进 `read` | ✅ **完成**（§5） |
-| T2 / T2b | `AGENTS.md` 注入 + 技能（一轮） | ⬜ 未开始 |
+| T2 / T2b | `AGENTS.md` 注入 + 技能（一轮） | ✅ **完成**（§6） |
 | T5 | 声明式钩子 + 信任门 + 封堵既有执行面 | ⬜ 未开始 |
 
 ---
@@ -450,7 +450,108 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 
 ## 6. T2 / T2b — 上下文注入与技能
 
-⬜ 未开始。
+### 6.1 施工内容
+
+| 文件 | 变化 |
+|---|---|
+| `context/instructions/projectInstructions.ts` | **新增**：指令文件发现 + 预算 + 渲染 |
+| `core/tools/skill.ts` | **新增**：按名加载技能正文的工具 |
+| `core/skills/skillLoader.ts` | `scan` **改递归**；新增 `disableModelInvocation`；新增 `renderSkillList` |
+| `core/security/projectTrust.ts` | 新增 `isProjectUntrusted` |
+| `turn/prompt.ts` | `buildSystemPrompt` 接受指令与技能目录 |
+| `entrypoints/cliRuntimeInvocation.ts` | 每轮发现技能与指令，过信任门，注入系统提示 |
+| `core/tools/registry.ts` | 接受 `skills`，注册 `skill` 工具 |
+| `config/runtimeConfig.ts` | 新增 `instructionBudgetBytes`（0 = 关闭） |
+
+### 6.2 施工中发现的**三个关键问题**
+
+**发现 1（重要）：信任门按「未信任」实现会让 T2/T2b 完全失效。**
+
+裁决 §2.5 #4 与 §3.6 #2 都要求「过信任门」。但实测我方 `ProjectTrustStore`：
+
+- `setProjectTrust` 的**生产调用方为零**（全仓仅测试文件）
+- `isProjectTrusted()` 对**没有记录的**项目返回 `false`
+
+即：**没有任何路径能让一个项目变成「已信任」**。若按 `!isProjectTrusted()` 门控，注入将**永远不发生**——功能上线即死，且是静默的（调用方只是「没找到东西可加载」）。
+
+**核对参考后更正**：`codex` 的门是 `is_untrusted()`（`agents_md.rs:61`），语义是**只在显式标记为不可信时跳过**；无记录的项目照常加载。已按此实现，新增 `isProjectUntrusted`，并加 4 项测试钉住「无记录 ≠ 不可信」。
+
+**发现 2：`/reload` 不需要实现——每轮已自动重新发现。**
+
+裁决 §2.2.2 记载「会话中途修改 `AGENTS.md` **不会**生效（与 `pi` 同）」，§2.5 #5 因此要求新增 `/reload`。
+
+**实测推翻了前半个断言**：`startTurn` 是**每个用户提示调用一次**，系统提示每次重建。实机验证（同一会话两个提示之间改写 `AGENTS.md`）：
+
+```
+提示 1 → "Rule ALPHA is in force"
+（改写 AGENTS.md 为 BETA）
+提示 2 → "Rule BETA is now in force ... The rule has changed since the last check"
+```
+
+**故未新增 `/reload`**：刷新已经是自动的，加一个什么都不刷新的命令是纯装饰。**比 `pi` 更好，且是免费得到的。** `/cd` 亦同——切目录后下一轮即重新发现，无需专门处理。
+
+**发现 3：技能发现的递归边界。**
+
+`pi` 的规则是「目录含 `SKILL.md` 则其为技能根，**不再下探**；否则继续递归」。我方按此实现，并**修正了自己一度写反的条件**：根级散落 `.md` 仍支持（裁决 §3.6 #5），但**只在根级**——更深处的裸 `.md` 更可能是上层技能的组成部分。
+
+### 6.3 形状
+
+**指令注入**（`<project_instructions path="...">`，来源标注）：
+
+| 维度 | 实现 |
+|---|---|
+| 候选 | `AGENTS.override.md` > `AGENTS.md` > `AGENTS.MD` > `CLAUDE.md` > `CLAUDE.MD`，每目录取首个 |
+| 顺序 | 用户级 → 项目根 → … → cwd（由远及近） |
+| 边界 | 上溯止于**项目根标记**（`.git`）；无标记则**只取 cwd** |
+| 预算 | 32 KiB **跨文件累减**；截断按**字节**切（非字符） |
+| 关闭 | `instructionBudgetBytes: 0` |
+| 失败 | 不可读跳过；候选是目录则**继续下一候选**；剥 BOM |
+
+**技能**（`<available_skills>` + `skill` 工具）：
+
+| 维度 | 实现 |
+|---|---|
+| 目录字段 | `name` / `description` / `location`（**来源标注，非 `read` 参数**） |
+| 正文加载 | `skill` 工具按名取，正文来自**发现期已读入内存** |
+| 路径监狱 | **不经过**——工具不接触模型给的路径 |
+| 隐藏 | `disable-model-invocation: true` → 从模型视野移除，`/skill` 仍可见 |
+| 递归 | 含 `SKILL.md` 的目录即技能根，不下探；跳过点目录与 `node_modules` |
+| 作用域 | 项目级技能过信任门；**用户级无条件** |
+
+### 6.4 验证
+
+| 项 | 方式 | 结果 |
+|---|---|---|
+| 指令发现 | `projectInstructions.test.ts` 11 项 | **通过** |
+| 技能递归 | `skillLoader.test.ts` 新增 3 项 | **通过** |
+| 技能工具 | `skill.test.ts` 9 项 | **通过** |
+| 提示组装 | `prompt.test.ts` 新增 4 项 | **通过** |
+| 信任门 | `projectTrust.test.ts` 新增 4 项 | **通过** |
+| 配置默认 | `runtimeConfig.test.ts` 新增 1 项 | **通过** |
+| 全量 | `npm run test:ts` | **499 文件 / 2875 通过 / 1 跳过 / 0 失败** |
+| 门禁 | 环 / docs-drift / config-consumers / test:scripts / module-facades | **全 pass** |
+
+**反向验证**：把 `scan` 换回单层 → **1 项测试失败**（钉住嵌套技能丢失）。
+
+**实机验证（真实构建产物 + 真实 CLI）**：
+
+| 检查 | 结果 |
+|---|---|
+| 注入内容 | `<project_instructions path="/tmp/t2verify/AGENTS.md">` |
+| 嵌套技能发现 | `['nested-skill', 'pdf']`（修复前只发现 1 个） |
+| 模型读到规则 | 提问后回答 "You MUST always write tests before code" |
+| `skill` 工具端到端 | 调用后模型复述出技能正文的 `pdftotext` 流程 |
+| 中途改写 `AGENTS.md` | 同一会话内**立即生效**（见 §6.2 发现 2） |
+| 关闭开关 | `instructionBudgetBytes: 0` → 加载 0 个文件，渲染为空 |
+
+### 6.5 未做（如实记录）
+
+- **`/reload` 命令**：已论证不需要（§6.2 发现 2）。
+- **CLI 标志 `--no-context-files`**：裁决 §2.2.4 要求「CLI 标志 + 配置项」两者。**配置项已实现**（`instructionBudgetBytes`）；CLI 标志未加——它需要在 `cliOptions` → `cliArgs` → invocation 三处穿线，而配置项已覆盖同一用途。**这是一个未完成的裁决项，如实记录。**
+- **「截断时告警」**：`InstructionLoadResult.truncated` 已返回，但**当前无消费者**（未记入日志或提示）。裁决 §2.2.3 要求「截断 + 警告」。**未完成。**
+- **嵌套目录懒加载**（裁决 §2.3）：明确移出本轮。
+- **linked worktree 遮蔽**：backlog。
+- **CLI 级技能路径注入**：backlog。
 
 ---
 

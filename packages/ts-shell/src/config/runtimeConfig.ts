@@ -103,6 +103,14 @@ export interface RuntimeConfig {
    * to the other.
    */
   readonly modelTokenBudgets?: Readonly<Record<string, ModelTokenBudget>>;
+  /**
+   * How many bytes of project instruction files may enter the system prompt.
+   *
+   * Zero disables loading them entirely, which is the opt-out: a run that wants
+   * to see how the model behaves without a repository's rules should not have to
+   * delete the file.
+   */
+  readonly instructionBudgetBytes?: number;
   readonly agentMode?: "plan" | "build";
   readonly theme?: "dark" | "light" | "auto";
   /**
@@ -150,6 +158,7 @@ export interface RuntimeConfigFile {
   contextWindow?: number;
   reserveTokens?: number;
   modelTokenBudgets?: Record<string, ModelTokenBudget>;
+  instructionBudgetBytes?: number;
   agentMode?: "plan" | "build";
   theme?: "dark" | "light" | "auto";
   tuiMode?: "regular" | "fullscreen" | "stream";
@@ -171,6 +180,7 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   maxOutputTokens: 4096,
   reserveTokens: 8_000,
   modelTokenBudgets: {},
+  instructionBudgetBytes: 32 * 1024,
   agentMode: "build",
   theme: "dark",
   tuiMode: "regular",
@@ -256,6 +266,7 @@ export function getRuntimeConfig(
     ...(merged.contextWindow !== undefined ? { contextWindow: merged.contextWindow } : {}),
     reserveTokens: merged.reserveTokens ?? DEFAULT_CONFIG.reserveTokens,
     modelTokenBudgets: merged.modelTokenBudgets ?? DEFAULT_CONFIG.modelTokenBudgets,
+    instructionBudgetBytes: merged.instructionBudgetBytes ?? DEFAULT_CONFIG.instructionBudgetBytes,
     agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
     theme: merged.theme ?? DEFAULT_CONFIG.theme,
     tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,

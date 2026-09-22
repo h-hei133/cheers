@@ -64,6 +64,32 @@ export class ProjectTrustStore {
     return false;
   }
 
+  /**
+   * Whether the project was explicitly marked untrusted.
+   *
+   * Deliberately not the inverse of `isProjectTrusted`. A project with no record
+   * is one nobody has ruled on, and treating that as untrusted would switch off
+   * every resource that consults this — silently, because the caller would simply
+   * find nothing to load. Only an explicit refusal should suppress anything, and
+   * that is the rule the gate is meant to express.
+   */
+  isProjectUntrusted(workspaceRoot: string): boolean {
+    const normalized = path.resolve(workspaceRoot);
+    if (this.readStore().projects[normalized]?.trustLevel === "untrusted") {
+      return true;
+    }
+    // A parent marked untrusted covers everything beneath it, mirroring how a
+    // parent marked trusted does.
+    for (const [savedPath, record] of Object.entries(this.readStore().projects)) {
+      if (record.trustLevel !== "untrusted") continue;
+      const rel = path.relative(savedPath, normalized);
+      if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   setProjectTrust(workspaceRoot: string, level: ProjectTrustLevel): void {
     const normalized = path.resolve(workspaceRoot);
     if (level === "session-only") {

@@ -12,7 +12,10 @@ import { createCoreToolRegistry } from "../core/tools/registry.js";
 import { filterVisibleToolNames } from "../core/tools/prefilter.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
-import { buildSystemPrompt } from "../turn/prompt.js";
+import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
+import { renderSkillList, SkillLoader, type Skill } from "../core/skills/skillLoader.js";
+import { loadInstructionFiles, renderInstructionFiles } from "../context/instructions/projectInstructions.js";
+import { projectTrust } from "../core/security/projectTrust.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
 import { createSyntheticStep } from "../turn/synthetic.js";
@@ -162,18 +165,71 @@ function deferUntilReady(
   };
 }
 
+/**
+ * The skills this run may offer the model.
+ *
+ * Discovered once per run rather than per turn: discovery reads the filesystem,
+ * and the system prompt is built once, so a per-turn scan would repeat work whose
+ * result is not consulted again.
+ *
+ * A project explicitly marked untrusted contributes no project skills. Its skills
+ * are text that would enter the system prompt, and a project nobody has vouched
+ * for does not get to write there. User-level skills are the user's own and load
+ * regardless.
+ */
+function discoverSkills(request: CliRuntimeInvocationRequest): ReadonlyMap<string, Skill> {
+  const loader = new SkillLoader(request.workspaceRoot);
+  const found = loader.load();
+  if (!projectTrust.isProjectUntrusted(request.workspaceRoot)) return found;
+
+  return new Map([...found].filter(([, skill]) => skill.source === "user"));
+}
+
+/**
+ * The project context that reaches the system prompt.
+ *
+ * Both parts are read here, once, at the point where the run's workspace and
+ * configuration are already known. They are assembled into one value so the step
+ * factory takes a single argument rather than reaching back into the filesystem
+ * for material the caller has already gathered.
+ *
+ * Project instructions are withheld from an explicitly untrusted project for the
+ * same reason as its skills: they are repository-controlled text going into the
+ * system prompt.
+ */
+function buildPromptContext(
+  request: CliRuntimeInvocationRequest,
+  skills: ReadonlyMap<string, Skill>,
+): SystemPromptContext {
+  const untrusted = projectTrust.isProjectUntrusted(request.workspaceRoot);
+  const instructions = untrusted
+    ? { files: [], truncated: false }
+    : loadInstructionFiles({
+        cwd: request.workspaceRoot,
+        // Absent means the loader's own default; zero is the opt-out.
+        maxBytes: request.runtimeConfig?.instructionBudgetBytes,
+      });
+
+  return {
+    instructions: renderInstructionFiles(instructions.files),
+    skills: renderSkillList(skills),
+  };
+}
+
 function startTurn(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
 ): CliRuntimeInvocationResult {
   const hooks = dependencies.hooks ?? defaultHookDispatcher;
   setupBuiltinVerificationHooks(hooks);
-  const registry = dependencies.tools?.() ?? createCoreToolRegistry();
+  const skills = discoverSkills(request);
+  const registry = dependencies.tools?.() ?? createCoreToolRegistry({ skills });
   // Honour disabledTools / hiddenToolPrefixes from user config. Without this the
-  // fields are accepted and then ignored, so a tool the user disabled still runs.
+  // fields are accepted then ignored, so a tool the user disabled still runs.
   const tools = request.runtimeConfig
     ? restrictToolPool(registry, request.runtimeConfig)
     : registry;
+  const promptContext = buildPromptContext(request, skills);
   const run = runTurn({
     sessionId: request.sessionId,
     prompt: request.prompt,
@@ -184,7 +240,7 @@ function startTurn(
     interactiveAsk: request.interactiveAsk,
     history: request.historyMessages ?? [],
     onMessage: request.onTurnMessage ?? (() => {}),
-    step: request.providerMode === "synthetic" ? createSyntheticStep({ toolIntent: syntheticToolIntent() }) : (dependencies.createStep ?? createProviderStep)(request, tools),
+    step: request.providerMode === "synthetic" ? createSyntheticStep({ toolIntent: syntheticToolIntent() }) : (dependencies.createStep ?? createProviderStep)(request, tools, promptContext),
     tools,
     hooks,
     maxSteps: request.maxTurns,
@@ -194,7 +250,11 @@ function startTurn(
   return { events: run.events, input: run };
 }
 
-function createProviderStep(request: CliRuntimeInvocationRequest, tools: ReadonlyMap<string, ToolDefinition>): StepFunction {
+function createProviderStep(
+  request: CliRuntimeInvocationRequest,
+  tools: ReadonlyMap<string, ToolDefinition>,
+  promptContext: SystemPromptContext,
+): StepFunction {
   const resolution = request.providerCredentialResolution;
   return createStepFunction({
     provider: {
@@ -204,7 +264,7 @@ function createProviderStep(request: CliRuntimeInvocationRequest, tools: Readonl
     },
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
-    systemPrompt: buildSystemPrompt(request.agentMode),
+    systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
     tools: toolSchemas(tools),
     // Sampling settings travel with the request, not with the provider: a
     // provider that ignores them still receives a well-formed request, and a

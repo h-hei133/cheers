@@ -25,6 +25,44 @@ describe("skill discovery", () => {
     );
   }
 
+  it("finds skills grouped into subdirectories, not only at the top level", () => {
+    // The layout a real skill collection uses. Reading one level deep loses
+    // every grouped skill, and the model cannot miss what it was never told.
+    writeSkill("top-skill", "top-skill", "top body");
+    writeSkill("group/nested-skill", "nested-skill", "nested body");
+    writeSkill("group/deeper/deep-skill", "deep-skill", "deep body");
+
+    expect([...new SkillLoader(workspace).load().keys()].sort()).toEqual([
+      "deep-skill",
+      "nested-skill",
+      "top-skill",
+    ]);
+  });
+
+  it("treats a directory holding a skill manifest as that skill, not a container", () => {
+    // The manifest's own subdirectories belong to the skill above it.
+    writeSkill("outer", "outer-skill", "outer body");
+    const nested = path.join(workspace, ".agents", "skills", "outer", "inner");
+    fs.mkdirSync(nested, { recursive: true });
+    fs.writeFileSync(
+      path.join(nested, "SKILL.md"),
+      "---\nname: inner-skill\ndescription: nested inside another skill\n---\n\ninner body\n",
+      "utf8",
+    );
+
+    const loaded = new SkillLoader(workspace).load();
+    expect(loaded.has("outer-skill")).toBe(true);
+    expect(loaded.has("inner-skill")).toBe(false);
+  });
+
+  it("skips dependency and dot directories", () => {
+    writeSkill("real-skill", "real-skill", "body");
+    writeSkill("node_modules/dep-skill", "dep-skill", "someone else's");
+    writeSkill(".hidden/hidden-skill", "hidden-skill", "tooling state");
+
+    expect([...new SkillLoader(workspace).load().keys()]).toEqual(["real-skill"]);
+  });
+
   it("finds nothing when no skills are written down", () => {
     expect([...new SkillLoader(workspace).load().keys()]).toEqual([]);
   });

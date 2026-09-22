@@ -23,8 +23,28 @@ export interface ChatMessage {
   readonly tool_call_id?: string;
 }
 
-export function buildSystemPrompt(agentMode: "plan" | "build" | undefined): string {
-  return [
+export interface SystemPromptContext {
+  /**
+   * Project instruction files, already rendered and wrapped.
+   *
+   * Passed in rather than read here because reading is a filesystem concern and
+   * this function is pure: it takes what applies and assembles it.
+   */
+  readonly instructions?: string
+  /**
+   * The skill list the model reads, already rendered.
+   *
+   * Only skills the model may see are included; hiding one is a discovery-time
+   * decision, not something this assembler re-decides.
+   */
+  readonly skills?: string
+}
+
+export function buildSystemPrompt(
+  agentMode: "plan" | "build" | undefined,
+  context?: SystemPromptContext,
+): string {
+  const sections = [
     "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, lsp, bash, web_fetch, web_search, browser, ask, todo, task).",
     agentMode === "plan"
       ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, run safe read-only commands (like git status, git diff) via bash, and explore websites via browser and web tools, but cannot modify files. Produce a structured execution plan based on real file contents."
@@ -35,7 +55,15 @@ export function buildSystemPrompt(agentMode: "plan" | "build" | undefined): stri
     "3. For web searching: use `web_search` to retrieve online technical references.",
     "4. For workspace files: use `glob` (to find paths), `grep` (to search contents), `read` (to inspect files), `edit`/`write` (to update code), and `bash` (to run commands/tests/git).",
     "5. User Permission & Denial Feedback: When a tool execution is denied by the user, immediately respect the decision. If the user provided feedback or alternative instructions (e.g. changing filenames, using different arguments, or avoiding certain actions), you MUST strictly follow their feedback and not retry the rejected action.",
-  ].join("\n");
+  ]
+
+  // Instructions come after the rules that describe how to work and before the
+  // skill list, so a project's own conventions read as the most specific thing
+  // said about this repository.
+  if (context?.instructions) sections.push(context.instructions)
+  if (context?.skills) sections.push(context.skills)
+
+  return sections.join("\n")
 }
 
 /**
