@@ -39,6 +39,14 @@ export interface SystemPromptContext {
    */
   readonly skills?: string
   /**
+   * Standing instructions the project asked to have appended, already rendered.
+   *
+   * Separate from `instructions` because they are a different kind of statement:
+   * the rule files say how this repository works, and these say what the harness
+   * should also do. Kept as their own section so a reader can tell which is which.
+   */
+  readonly appendedInstructions?: string
+  /**
    * The tools this run actually offers, in the order they should be named.
    *
    * Passed in rather than listed here because a hand-written list drifts: it
@@ -70,6 +78,7 @@ export function buildSystemPrompt(
   // skill list, so a project's own conventions read as the most specific thing
   // said about this repository.
   if (context?.instructions) sections.push(context.instructions)
+  if (context?.appendedInstructions) sections.push(context.appendedInstructions)
   if (context?.skills) sections.push(context.skills)
 
   return sections.join("\n")

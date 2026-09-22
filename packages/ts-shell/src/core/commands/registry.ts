@@ -16,6 +16,7 @@ import { runExitCommand } from "./exitCommandRuntime.js";
 import { runClearCommand } from "./clearCommandRuntime.js";
 import { runReviewCommand } from "./reviewCommandRuntime.js";
 import { runReloadCommand } from "./reloadCommandRuntime.js";
+import { runThemeCommand } from "./themeCommandRuntime.js";
 import { runTrustCommand } from "./trustCommandRuntime.js";
 import { runInitCommand } from "./initCommandRuntime.js";
 import { runCostCommand } from "./costCommandRuntime.js";
@@ -308,6 +309,17 @@ export function createCommandRegistry(
       summary: "re-read the configuration this session started with",
       group: "context",
       execute: (args, context) => runReloadCommand(args, context),
+    },
+    {
+      name: "theme",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      summary: "list the available themes, or switch to one",
+      argumentHint: "[name]",
+      group: "workspace",
+      execute: (args, context) => runThemeCommand(args, context),
     },
     {
       name: "trust",

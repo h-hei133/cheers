@@ -25,6 +25,54 @@ describe("skill discovery", () => {
     );
   }
 
+  it("finds a skill kept at the repository root when the session starts below it", () => {
+    // A repository that ships a skill at its root, with the session opened in a
+    // subdirectory. Reading only the working directory loses it silently: the
+    // file is there, correctly formed, and the model is never told about it.
+    fs.mkdirSync(path.join(workspace, ".git"), { recursive: true });
+    writeSkill("root-skill", "root-skill", "root body");
+    const nested = path.join(workspace, "packages", "app");
+    fs.mkdirSync(nested, { recursive: true });
+
+    expect([...new SkillLoader(nested).load().keys()]).toEqual(["root-skill"]);
+  });
+
+  it("lets a skill beside the working directory win over one at the root", () => {
+    // The nearer skill was written for this part of the tree, so it is the more
+    // specific statement and takes precedence.
+    fs.mkdirSync(path.join(workspace, ".git"), { recursive: true });
+    const nested = path.join(workspace, "packages", "app");
+    fs.mkdirSync(nested, { recursive: true });
+    writeSkill("shared", "shared", "root body");
+    const nearer = path.join(nested, ".agents", "skills", "shared");
+    fs.mkdirSync(nearer, { recursive: true });
+    fs.writeFileSync(
+      path.join(nearer, "SKILL.md"),
+      `---\nname: shared\ndescription: the nearer one\n---\n\nnearer body\n`,
+      "utf8",
+    );
+
+    const loaded = new SkillLoader(nested).load();
+    expect(loaded.get("shared")?.description).toBe("the nearer one");
+  });
+
+  it("does not read a parent directory that is not part of a project", () => {
+    // Without a root marker the chain above the working directory belongs to no
+    // project, and reading it would attribute someone else's skills to this one.
+    const outer = path.join(workspace, "not-a-project");
+    const inner = path.join(outer, "inner");
+    fs.mkdirSync(inner, { recursive: true });
+    const outside = path.join(outer, ".agents", "skills", "outside-skill");
+    fs.mkdirSync(outside, { recursive: true });
+    fs.writeFileSync(
+      path.join(outside, "SKILL.md"),
+      `---\nname: outside-skill\ndescription: above an unmarked directory\n---\n\nbody\n`,
+      "utf8",
+    );
+
+    expect([...new SkillLoader(inner).load().keys()]).toEqual([]);
+  });
+
   it("finds skills grouped into subdirectories, not only at the top level", () => {
     // The layout a real skill collection uses. Reading one level deep loses
     // every grouped skill, and the model cannot miss what it was never told.

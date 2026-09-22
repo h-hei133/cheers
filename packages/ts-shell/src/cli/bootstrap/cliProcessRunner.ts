@@ -99,9 +99,11 @@ export async function runCliProcess(
   // The configured theme has to be applied to the shared palette before any
   // surface renders, or the first frame is drawn in the default and never
   // redrawn.
+  // The workspace root is passed so a theme the project ships is found, not only
+  // the user's and the built-in ones.
   const configuredTheme = runtimeContext.runtimeConfig.theme;
   if (configuredTheme && configuredTheme !== "auto") {
-    applyTheme(configuredTheme);
+    applyTheme(configuredTheme, runtimeContext.projectRoot ?? runtimeContext.cwd);
   }
   const resolvedCredential =
     providerRuntimeBridge.resolveCredentialSnapshot();

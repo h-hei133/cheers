@@ -49,7 +49,7 @@ export async function runReloadCommand(
   // Applying the theme is what makes the line above true. Reporting a change the
   // screen does not show is worse than not reporting it: it teaches the reader
   // to distrust the command's output.
-  const themeApplied = applyConfiguredTheme(outcome.after.theme);
+  const themeApplied = applyConfiguredTheme(outcome.after.theme, context.cwd);
   return {
     kind: "local",
     output: [
@@ -74,10 +74,10 @@ export async function runReloadCommand(
  * at startup. A name that no longer loads is reported as not applied rather than
  * throwing, because a bad theme must not cost the settings that did reload.
  */
-function applyConfiguredTheme(theme: string | undefined): string | undefined {
+function applyConfiguredTheme(theme: string | undefined, workspaceRoot?: string): string | undefined {
   if (!theme || theme === "auto") return undefined;
   try {
-    applyTheme(theme);
+    applyTheme(theme, workspaceRoot);
     return currentTheme();
   } catch (error) {
     logger.warn(

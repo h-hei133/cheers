@@ -24,6 +24,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { splitByteOrderMark } from "../../runtime/execution/fileText.js";
+import { projectDirectories } from "../../core/project/directories.js";
 import { escapeAttribute, neutraliseTagBoundaries } from "../../core/text/safety.js";
 import { userDataSearchDirsFor } from "../../core/paths/userHome.js";
 
@@ -46,8 +47,22 @@ const CANDIDATES = [
 /** How much instruction text may enter the prompt, across every file. */
 export const DEFAULT_INSTRUCTION_BUDGET_BYTES = 32 * 1024;
 
-/** The marker that ends the upward walk: a directory holding this is the root. */
-const PROJECT_ROOT_MARKER = ".git";
+/**
+ * A file whose contents are appended to the prompt rather than treated as rules.
+ *
+ * Separate from the candidates above because it is read in addition to them, not
+ * instead of them: a project may keep its rules in `AGENTS.md` and its extra
+ * standing instructions in `APPEND_SYSTEM.md`, and both apply.
+ *
+ * There is deliberately no `SYSTEM.md`. That name means "replace the system
+ * prompt", and the prompt carries the harness's own execution rules — a file able
+ * to remove those is a different kind of trust decision than a file that adds to
+ * them, and inventing a half-considered version of it here would be worse than
+ * leaving the name unclaimed.
+ */
+const APPEND_CANDIDATES = ["APPEND_SYSTEM.md", "APPEND_SYSTEM.MD"] as const;
+
+
 
 /** One instruction file that will be injected, in the order it is injected. */
 export interface InstructionFile {
@@ -108,28 +123,10 @@ export function loadInstructionFiles(options: InstructionLoadOptions): Instructi
  * repository that never declared them.
  */
 function loadAncestorFiles(cwd: string): InstructionFile[] {
-  const chain: string[] = [];
-  let current = cwd;
-  let reachedRoot = false;
-
-  while (true) {
-    chain.push(current);
-    if (fs.existsSync(path.join(current, PROJECT_ROOT_MARKER))) {
-      reachedRoot = true;
-      break;
-    }
-    const parent = path.dirname(current);
-    if (parent === current) break;
-    current = parent;
-  }
-
-  // Without a marker the chain above `cwd` is not part of any project.
-  const scoped = reachedRoot ? chain : [cwd];
-
   const files: InstructionFile[] = [];
-  // `chain` runs nearest-first; reversing gives the outermost-first order the
-  // prompt wants.
-  for (const directory of scoped.reverse()) {
+  // The same chain skills are found along, so a repository cannot have its rules
+  // honored from a directory while its skills are ignored from that directory.
+  for (const directory of projectDirectories(cwd)) {
     const file = loadOneFrom(directory);
     if (file) files.push(file);
   }
@@ -144,8 +141,11 @@ function loadAncestorFiles(cwd: string): InstructionFile[] {
  * written one of the other candidates. An unreadable file is skipped for the
  * same reason — one bad file should not cost the reader every other one.
  */
-function loadOneFrom(directory: string): InstructionFile | undefined {
-  for (const candidate of CANDIDATES) {
+function loadOneFrom(
+  directory: string,
+  candidates: readonly string[] = CANDIDATES,
+): InstructionFile | undefined {
+  for (const candidate of candidates) {
     const filePath = path.join(directory, candidate);
     let stats: fs.Stats;
     try {
@@ -215,6 +215,44 @@ function cutToBytes(content: string, maxBytes: number): string {
     end += character.length;
   }
   return content.slice(0, end);
+}
+
+/**
+ * The `APPEND_SYSTEM.md` files that apply to `cwd`, outermost first.
+ *
+ * Read in addition to the rule files rather than instead of them, and kept in a
+ * separate list so the caller can label them differently: these are standing
+ * instructions the harness did not write, and a reader should be able to tell
+ * them apart from the rules the repository declares as its own.
+ */
+export function loadAppendedInstructionFiles(options: InstructionLoadOptions): InstructionLoadResult {
+  const maxBytes = options.maxBytes ?? DEFAULT_INSTRUCTION_BUDGET_BYTES;
+  if (maxBytes <= 0) {
+    return { files: [], truncated: false };
+  }
+
+  const files: InstructionFile[] = [];
+  for (const directory of projectDirectories(path.resolve(options.cwd))) {
+    const file = loadOneFrom(directory, APPEND_CANDIDATES);
+    if (file) files.push(file);
+  }
+  return spendBudget(files, maxBytes);
+}
+
+/**
+ * Appended instructions as prompt text, or the empty string when there are none.
+ *
+ * Wrapped in their own tag so the model can tell an appended instruction from a
+ * repository rule; the two arrive together but do not mean the same thing.
+ */
+export function renderAppendedInstructions(files: readonly InstructionFile[]): string {
+  if (files.length === 0) return "";
+  return files
+    .map(
+      (file) =>
+        `<appended_instructions path="${escapeAttribute(file.filePath)}">\n${neutraliseTagBoundaries(file.content)}\n</appended_instructions>`,
+    )
+    .join("\n\n");
 }
 
 /**

@@ -17,6 +17,8 @@ import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
 import { renderSkillList, SkillLoader, type Skill } from "../core/skills/skillLoader.js";
 import {
   DEFAULT_INSTRUCTION_BUDGET_BYTES,
+  loadAppendedInstructionFiles,
+  renderAppendedInstructions,
   loadInstructionFiles,
   renderInstructionFiles,
 } from "../context/instructions/projectInstructions.js";
@@ -248,8 +250,24 @@ function buildPromptContext(
     );
   }
 
+  // Appended instructions are withheld from an untrusted project for the same
+  // reason as the rule files: they are repository-controlled text entering the
+  // system prompt.
+  const appended = untrusted
+    ? { files: [], truncated: false }
+    : loadAppendedInstructionFiles({
+        cwd: request.workspaceRoot,
+        maxBytes: request.runtimeConfig?.instructionBudgetBytes,
+      });
+  if (appended.truncated) {
+    createComponentLogger("project-instructions").warn(
+      `Appended instruction files exceeded the ${request.runtimeConfig?.instructionBudgetBytes ?? DEFAULT_INSTRUCTION_BUDGET_BYTES}-byte budget and were truncated.`,
+    );
+  }
+
   return {
     instructions: renderInstructionFiles(instructions.files),
+    appendedInstructions: renderAppendedInstructions(appended.files),
     skills: renderSkillList(skills),
     toolNames,
   };

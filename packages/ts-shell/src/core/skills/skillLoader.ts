@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { resolveAllUserDataFiles, userDataDir } from "../paths/userHome.js";
+import { projectDirectories } from "../project/directories.js";
 
 /**
  * Skill discovery.
@@ -72,13 +73,25 @@ export class SkillLoader {
     // location — they are additional, not superseded. When none exists yet, the
     // current path stands in as the place new skills would be written.
     const userSkillDirs = resolveAllUserDataFiles("skills");
+    // Every project directory from the working one up to the root, so a skill
+    // kept at the repository root is found when the session starts in a
+    // subdirectory. Reading only the working directory made those skills
+    // invisible, with nothing said about it.
+    //
+    // Nearest first, because within one source the first file found wins: a skill
+    // written for a subdirectory is the more specific statement and should take
+    // precedence over one written for the whole repository.
+    const projectSkillDirs = [...projectDirectories(workspaceRoot)].reverse().map((dir) => ({
+      dir: path.join(dir, ".agents", "skills"),
+      source: "project" as const,
+    }));
     this.roots = [
       ...(userSkillDirs.length > 0 ? userSkillDirs : [path.join(userDataDir(), "skills")]).map(
         (dir) => ({ dir, source: "user" as const }),
       ),
       // Project skills win: a repository that ships its own way of doing something
       // should override the user's general habit for that repository.
-      { dir: path.join(path.resolve(workspaceRoot), ".agents", "skills"), source: "project" },
+      ...projectSkillDirs,
     ];
   }
 
