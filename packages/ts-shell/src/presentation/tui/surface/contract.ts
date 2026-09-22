@@ -114,6 +114,8 @@ export interface ViewActions {
   syncSuggestions(mayOpen: boolean): void;
   /** Copy active mouse selection to clipboard and clear highlight. Returns true if copied. */
   copySelection?(): boolean;
+  /** Collapse or expand the reasoning blocks, or the tool output. */
+  toggleCollapsed(only: "thinking" | "tool"): void;
 }
 
 /**
@@ -148,6 +150,15 @@ export interface InteractiveView extends TerminalFrameProvider {
   contentRows(): readonly string[];
   /** The block under screen row `row`, for a click that lands on the transcript. */
   blockAtScreenRow(row: number): Block | undefined;
+  /**
+   * Collapse or expand the collapsible blocks on screen, and report whether any
+   * changed.
+   *
+   * `only` narrows it to one block kind, which is what the two keys are for:
+   * reasoning and tool output are read at different times, so one key that
+   * toggled both would make each press undo the other's state.
+   */
+  toggleCollapsed(only?: "thinking" | "tool"): boolean;
   /** Screen row bounds and visual rows of the composer, for mouse drag selection. */
   composerGeometry?(): ComposerGeometry | undefined;
 }

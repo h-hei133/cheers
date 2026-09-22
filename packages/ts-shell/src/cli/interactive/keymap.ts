@@ -179,9 +179,27 @@ export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
     case "ctrl+y":
       editor.yank();
       break;
+    case "alt+y":
+      // Cycling back through the kill ring, so the cut before the last one is
+      // reachable. Without it a yank only ever reaches the newest entry.
+      editor.yankPop();
+      break;
     case "ctrl+z":
       editor.undo();
       break;
+    case "ctrl+shift+z":
+      // The way back from an undo. Bound alongside it because an undo that
+      // cannot be taken back is a key that is dangerous to press.
+      editor.redo();
+      break;
+    case "ctrl+o":
+      actions.toggleCollapsed("tool");
+      actions.redraw();
+      return;
+    case "ctrl+t":
+      actions.toggleCollapsed("thinking");
+      actions.redraw();
+      return;
     case "tab":
       actions.syncSuggestions(true);
       actions.redraw();

@@ -2,6 +2,9 @@ import { graphemeBoundaries, sliceWithWidth, visibleWidth } from "./text/measure
 import { wrapToWidth } from "./text/layout.js";
 import { nextCluster, previousCluster, wordEnd, wordStart } from "./text/motion.js";
 import { CURSOR_MARKER } from "./render/paint.js";
+import { KillRing } from "./editor/killRing.js";
+import { EditHistory } from "./editor/editHistory.js";
+import { YankPlacement } from "./editor/yank.js";
 
 /**
  * Multi-line prompt editor.
@@ -51,10 +54,28 @@ export class Editor {
   private lines: string[] = [""];
   private row = 0;
   private column = 0;
-  private readonly killRing: string[] = [];
+  private readonly killRing = new KillRing(MAX_KILL_RING);
+  private readonly yanks = new YankPlacement({
+    read: () => ({ lines: this.lines, row: this.row, column: this.column }),
+    adopt: (next) => {
+      this.lines = [...next.lines];
+      this.row = next.row;
+      this.column = next.column;
+    },
+  });
   /** Where the last cut finished, so the next one can continue the same entry. */
   private lastKill: { row: number; column: number; target: KillTarget } | undefined;
-  private readonly undoStack: EditorSnapshot[] = [];
+  private readonly edits = new EditHistory<EditorSnapshot>(
+    (state) => ({ lines: [...state.lines], row: state.row, column: state.column }),
+    MAX_UNDO_DEPTH,
+  );
+  /**
+   * Where the last yank landed, so consecutive yanks can walk the ring.
+   *
+   * Without it a yank only ever reaches the most recent cut, and the earlier ones
+   * are unreachable however many times the key is pressed.
+   */
+  private yankAnchor: { readonly row: number; readonly column: number; readonly length: number } | undefined;
   private readonly history: string[] = [];
   private historyIndex = -1;
   private draft = "";
@@ -216,7 +237,7 @@ export class Editor {
   kill(target: KillTarget): void {
     const line = this.lines[this.row]!;
     const backward = target !== "line-end";
-    const continuing = backward && this.resumesKill(target);
+    const continuing = backward && this.killRing.continues(target, this.caret());
     let start = this.column;
     let end = this.column;
     if (target === "line-end") end = line.length;
@@ -232,7 +253,7 @@ export class Editor {
       this.lines.splice(this.row, 1);
       this.row -= 1;
       this.column = previous.length;
-      this.markKill(target);
+      this.killRing.endedAt(target, this.caret());
       return;
     }
     this.adoptAsDraft();
@@ -240,21 +261,43 @@ export class Editor {
     this.pushKill(line.slice(start, end), continuing);
     this.lines[this.row] = line.slice(0, start) + line.slice(end);
     this.column = start;
-    this.markKill(target);
+    this.killRing.endedAt(target, this.caret());
   }
 
   yank(): void {
-    const top = this.killRing[this.killRing.length - 1];
-    if (top !== undefined) this.insert(top);
+    this.yanks.take(this.killRing);
+  }
+
+  /**
+   * Replace the last yank with the previous entry in the kill ring.
+   *
+   * The yank is replaced rather than appended: pressing the key again is asking
+   * for a different cut, not for the same text a second time. Without this, the
+   * earlier cuts are unreachable however many times the key is pressed.
+   */
+  yankPop(): boolean {
+    return this.yanks.cycle(this.killRing);
   }
 
   undo(): boolean {
-    const previous = this.undoStack.pop();
-    if (!previous) return false;
-    this.lines = [...previous.lines];
-    this.row = previous.row;
-    this.column = previous.column;
+    const previous = this.edits.back(this.caretState());
+    if (previous === undefined) return false;
+    this.restore(previous);
     return true;
+  }
+
+  /** Take back the last undo. */
+  redo(): boolean {
+    const next = this.edits.forward(this.caretState());
+    if (next === undefined) return false;
+    this.restore(next);
+    return true;
+  }
+
+  private restore(snapshot: EditorSnapshot): void {
+    this.lines = [...snapshot.lines];
+    this.row = snapshot.row;
+    this.column = snapshot.column;
   }
 
   /** Move the caret; returns false when the motion had nowhere to go. */
@@ -430,34 +473,22 @@ export class Editor {
 
 
   private pushKill(text: string, continuing = false): void {
-    const top = this.killRing.length - 1;
     // A continued backward kill grows the entry in front of what it already held,
     // because each press cuts the text that came before the last.
-    if (continuing && top >= 0) {
-      this.killRing[top] = text + this.killRing[top]!;
-      return;
-    }
-    this.killRing.push(text);
-    if (this.killRing.length > MAX_KILL_RING) this.killRing.shift();
+    this.killRing.push(text, { continuing, prepend: true });
   }
 
-  /** Whether the caret is still exactly where the last kill of this kind left it. */
-  private resumesKill(target: KillTarget): boolean {
-    const last = this.lastKill;
-    return (
-      last !== undefined &&
-      last.target === target &&
-      last.row === this.row &&
-      last.column === this.column
-    );
+  /** The caret position, for a caller that only needs where it is. */
+  private caret(): { readonly row: number; readonly column: number } {
+    return { row: this.row, column: this.column };
   }
 
-  private markKill(target: KillTarget): void {
-    this.lastKill = { row: this.row, column: this.column, target };
+  /** The lines and the caret, which is what a snapshot and the span helpers both take. */
+  private caretState(): EditorSnapshot {
+    return { lines: this.lines, row: this.row, column: this.column };
   }
 
   private saveUndo(): void {
-    if (this.undoStack.length >= MAX_UNDO_DEPTH) this.undoStack.shift();
-    this.undoStack.push({ lines: [...this.lines], row: this.row, column: this.column });
+    this.edits.record({ lines: this.lines, row: this.row, column: this.column });
   }
 }

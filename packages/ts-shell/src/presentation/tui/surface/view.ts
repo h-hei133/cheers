@@ -119,6 +119,20 @@ export class InteractiveSurface implements InteractiveView {
     return this.pane.blockAtScreenRow(row);
   }
 
+  toggleCollapsed(only?: "thinking" | "tool"): boolean {
+    const collapsible = this.transcript
+      .all()
+      .filter((block) => block.collapsed !== undefined)
+      .filter((block) => only === undefined || block.kind === only);
+    if (collapsible.length === 0) return false;
+    // One decision for the whole set, taken from the first: pressing the key
+    // again must undo what it just did, which it cannot if some blocks were
+    // already in the target state and flip the other way.
+    const collapsed = !collapsible[0]!.collapsed;
+    for (const block of collapsible) this.transcript.setCollapsed(block, collapsed);
+    return true;
+  }
+
   composerGeometry(): ComposerGeometry | undefined {
     return this.lastComposerGeometry;
   }

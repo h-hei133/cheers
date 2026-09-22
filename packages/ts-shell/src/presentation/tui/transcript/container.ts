@@ -36,6 +36,17 @@ export class Transcript {
     return block;
   }
 
+  /**
+   * Every block, oldest first.
+   *
+   * Exposed for the operations that act on the set rather than one block —
+   * collapsing everything, or finalizing the transcript — so those do not have
+   * to walk it by index.
+   */
+  all(): readonly Block[] {
+    return this.blocks;
+  }
+
   /** The most recently appended block, for streaming updates. */
   last(): Block | undefined {
     return this.blocks[this.blocks.length - 1];

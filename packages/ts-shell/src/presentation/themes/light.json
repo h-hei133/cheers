@@ -2,6 +2,7 @@
   "name": "light",
   "description": "Light theme",
   "colors": {
+    "text": "#111827",
     "userMessageText": "#111827",
     "assistantText": "#1f2937",
     "thinkingText": "#6b7280",
@@ -13,6 +14,13 @@
     "filename": "#2563eb",
     "command": "#d97706",
     "commandArg": "#374151",
+    "commandFlag": "#2563eb",
+    "commandString": "#a16207",
+    "commandNumber": "#b45309",
+    "commandPipe": "#2563eb",
+    "mdHeading": "#1d4ed8",
+    "mdCode": "#6d28d9",
+    "mdLink": "#2563eb",
     "success": "#16a34a",
     "error": "#dc2626",
     "warning": "#d97706",
@@ -20,10 +28,18 @@
     "dim": "#6b7280",
     "accent": "#d97706",
     "border": "#d1d5db",
+    "borderAccent": "#9ca3af",
+    "borderMuted": "#e5e7eb",
     "selectedBg": "#f3f4f6",
     "userMessageBg": "#f9fafb",
     "toolPendingBg": "#f3f4f6",
     "toolSuccessBg": "#dcfce7",
-    "toolErrorBg": "#fee2e2"
+    "toolErrorBg": "#fee2e2",
+    "syntaxKeyword": "#2563eb",
+    "syntaxFunction": "#6d28d9",
+    "syntaxVariable": "#1f2937",
+    "syntaxString": "#a16207",
+    "syntaxNumber": "#b45309",
+    "syntaxComment": "#6b7280"
   }
 }

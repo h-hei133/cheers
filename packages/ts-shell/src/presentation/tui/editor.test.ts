@@ -180,6 +180,83 @@ describe("kill ring and undo", () => {
     expect(editor.undo()).toBe(true);
     expect(editor.getText()).toBe("");
   });
+
+  it("takes back an undo", () => {
+    // An undo that cannot be undone is a key that is dangerous to press: the way
+    // back from a mistake becomes a mistake with no way back.
+    const editor = new Editor();
+    editor.insert("abc");
+    editor.undo();
+
+    expect(editor.redo()).toBe(true);
+    expect(editor.getText()).toBe("abc");
+  });
+
+  it("reports that there is nothing to redo", () => {
+    const editor = new Editor();
+    expect(editor.redo()).toBe(false);
+  });
+
+  it("drops the redo branch once the text moves on", () => {
+    // A new edit is a new branch, so redoing into the old one would jump
+    // somewhere the text never was.
+    const editor = new Editor();
+    editor.insert("abc");
+    editor.undo();
+    editor.insert("xyz");
+
+    expect(editor.redo()).toBe(false);
+    expect(editor.getText()).toBe("xyz");
+  });
+
+  it("walks back through the kill ring on repeated yank-pop", () => {
+    // Without this a yank only ever reaches the most recent cut, and the ones
+    // before it are unreachable however many times the key is pressed.
+    // Each cut starts from a fresh caret position, which is what makes them
+    // separate ring entries rather than one continued entry.
+    const editor = new Editor();
+    editor.insert("first");
+    editor.move("line-start");
+    editor.kill("line-end");
+    editor.insert("second");
+    editor.move("line-start");
+    editor.kill("line-end");
+
+    editor.insert(" ");
+    editor.yank();
+    expect(editor.getText()).toBe(" second");
+
+    // The earlier cut replaces the yank rather than being appended to it.
+    editor.yankPop();
+    expect(editor.getText()).toBe(" first");
+  });
+
+  it("starts the walk over once it reaches the oldest cut", () => {
+    const editor = new Editor();
+    editor.insert("first");
+    editor.move("line-start");
+    editor.kill("line-end");
+    editor.insert("second");
+    editor.move("line-start");
+    editor.kill("line-end");
+
+    editor.insert(" ");
+    editor.yank();
+    editor.yankPop();
+    // Two entries, so the next pop returns to the newest rather than stopping.
+    editor.yankPop();
+    expect(editor.getText()).toBe(" second");
+  });
+
+  it("reports that there is nothing to yank-pop to", () => {
+    const editor = new Editor();
+    editor.insert("alpha");
+    editor.kill("word-left");
+    editor.yank();
+
+    // One entry in the ring: there is no earlier cut to walk to.
+    expect(editor.yankPop()).toBe(false);
+  });
 });
 
 describe("cutting back through a multi-line draft", () => {

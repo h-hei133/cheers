@@ -305,3 +305,57 @@ describe("selection", () => {
     expect(view.contentToScreenSpan({ from: { row: 0, column: 0 }, to: { row: 2, column: 10 } })).toBeUndefined();
   });
 });
+
+describe("collapsing from the keyboard", () => {
+  function withBlocks(): { view: InteractiveSurface; live: Facts } {
+    const made = surface();
+    made.view.transcript.append({ kind: "thinking", text: "reasoning", finalized: true, collapsed: true });
+    made.view.transcript.append({ kind: "tool", text: "output", finalized: true, collapsed: true });
+    made.view.transcript.append({ kind: "assistant", text: "answer", finalized: true });
+    return made;
+  }
+
+  it("expands the reasoning blocks without touching the tool output", () => {
+    // The two are read at different times, so one key that toggled both would
+    // make each press undo the other's state.
+    const { view } = withBlocks();
+
+    expect(view.toggleCollapsed("thinking")).toBe(true);
+
+    const kinds = view.transcript.all().map((block) => [block.kind, block.collapsed]);
+    expect(kinds).toEqual([
+      ["thinking", false],
+      ["tool", true],
+      ["assistant", undefined],
+    ]);
+  });
+
+  it("takes the second press back to where the first one started", () => {
+    const { view } = withBlocks();
+    view.toggleCollapsed("tool");
+    view.toggleCollapsed("tool");
+
+    expect(view.transcript.all().find((block) => block.kind === "tool")?.collapsed).toBe(true);
+  });
+
+  it("reports that there was nothing to toggle", () => {
+    // So the key does not claim to have done something when the transcript holds
+    // nothing collapsible.
+    const { view } = surface();
+    expect(view.toggleCollapsed("tool")).toBe(false);
+  });
+
+  it("leaves a block alone when it is already in the target state", () => {
+    // One decision for the whole set, taken from the first: a mixed set must not
+    // end up split the other way after two presses.
+    const { view } = surface();
+    view.transcript.append({ kind: "tool", text: "a", finalized: true, collapsed: true });
+    view.transcript.append({ kind: "tool", text: "b", finalized: true, collapsed: false });
+
+    view.toggleCollapsed("tool");
+    expect(view.transcript.all().map((block) => block.collapsed)).toEqual([false, false]);
+
+    view.toggleCollapsed("tool");
+    expect(view.transcript.all().map((block) => block.collapsed)).toEqual([true, true]);
+  });
+});

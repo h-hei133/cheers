@@ -320,6 +320,7 @@ export class InteractiveMode {
         },
         syncSuggestions: (mayOpen) => this.syncSuggestions(mayOpen),
         copySelection: () => this.pointer.copySelection(),
+        toggleCollapsed: (only) => this.view.toggleCollapsed(only),
       },
     });
   }
