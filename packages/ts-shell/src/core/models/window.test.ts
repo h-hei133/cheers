@@ -149,6 +149,68 @@ describe('context window resolution', () => {
     expect(resolved.source).toBe('catalog')
   })
 
+  it('refuses to guess when a model id is claimed by more than one provider', () => {
+    // The fallback exists because the runtime names a protocol and the catalog
+    // names a vendor, so requiring both to match would miss models served over a
+    // compatible endpoint. But that fallback must not pick one of several: the
+    // answer is a context window, and taking the wrong provider's number silently
+    // compacts at the wrong threshold.
+    const ambiguous: readonly CatalogProvider[] = [
+      {
+        id: 'vendor-a',
+        label: 'A',
+        runtime: 'openai-compatible',
+        auth: 'api-key',
+        envVar: 'A_KEY',
+        models: [{ id: 'shared-model', contextWindow: 100_000 }],
+      },
+      {
+        id: 'vendor-b',
+        label: 'B',
+        runtime: 'openai-compatible',
+        auth: 'api-key',
+        envVar: 'B_KEY',
+        models: [{ id: 'shared-model', contextWindow: 200_000 }],
+      },
+    ]
+
+    const resolved = resolveContextWindow({
+      catalog: ambiguous,
+      provider: 'openai-compatible',
+      model: 'shared-model',
+    })
+
+    // Neither number is used: the catalog cannot say which one applies, so the
+    // conservative default applies and the ambiguity is named.
+    expect(resolved.source).toBe('default')
+    expect(resolved.warning).toContain('shared-model')
+    expect(resolved.warning).toContain('vendor-a')
+    expect(resolved.warning).toContain('vendor-b')
+  })
+
+  it('uses the vendor when the runtime names a protocol and only one declares the model', () => {
+    // The case the fallback is for: unambiguous, so it resolves.
+    const oneVendor: readonly CatalogProvider[] = [
+      {
+        id: 'siliconflow',
+        label: 'SiliconFlow',
+        runtime: 'openai-compatible',
+        auth: 'api-key',
+        envVar: 'SILICONFLOW_API_KEY',
+        models: [{ id: 'vendor-only-model', contextWindow: 128_000 }],
+      },
+    ]
+
+    const resolved = resolveContextWindow({
+      catalog: oneVendor,
+      provider: 'openai-compatible',
+      model: 'vendor-only-model',
+    })
+
+    expect(resolved.window).toBe(128_000)
+    expect(resolved.source).toBe('catalog')
+  })
+
   it('still prefers the named provider when both it and another declare the model', () => {
     const twoProviders: readonly CatalogProvider[] = [
       {

@@ -58,33 +58,46 @@ export interface WindowResolutionInput {
 }
 
 /**
- * The catalog's window for a provider and model, if both are known.
+ * What the catalog says about a model, and who said it.
  *
- * Matched exactly, then by model id alone when the provider does not match.
+ * Matched on the provider first, then by model id alone when the provider does
+ * not match.
  *
  * The fallback exists because the two sides name providers differently: the
- * runtime reports a protocol (`openai-compatible`, `anthropic`) while the
- * catalog keys by vendor (`siliconflow`, `deepseek`). A model served over an
- * OpenAI-compatible endpoint is filed under its vendor, so requiring the
- * protocol to match would miss it and silently fall back to the default window.
+ * runtime reports a protocol (`openai-compatible`, `anthropic`) while the catalog
+ * keys by vendor (`siliconflow`, `deepseek`). A model served over an
+ * OpenAI-compatible endpoint is filed under its vendor, so requiring the protocol
+ * to match would miss it and silently fall back to the default window.
  *
- * Falling back by model id is safe because the catalog has no model id under two
- * providers at all, so there is nothing to be ambiguous between.
+ * The fallback only answers when exactly one provider claims the id. Where several
+ * do, it reports them instead of choosing: the number decides when compaction
+ * runs, and picking one of two silently would compact at the wrong threshold with
+ * nothing to show for it. Which providers claim a model id is a property of the
+ * catalog as it happens to stand, not a promise about every catalog a user will
+ * assemble — a third-party endpoint or a later addition can introduce a second
+ * claim to an id that is unique today.
  */
 function catalogWindow(
   catalog: readonly CatalogProvider[],
   provider: string,
   model: string | undefined,
-): number | undefined {
-  if (model === undefined) return undefined
+): { window?: number; claimedBy?: string[] } {
+  if (model === undefined) return {}
+
   const entry = catalog.find((candidate) => candidate.id === provider)
   const direct = entry?.models.find((candidate) => candidate.id === model)?.contextWindow
-  if (direct !== undefined) return direct
+  if (direct !== undefined) return { window: direct }
+
+  // Collected in one pass so the window and its owner come from the same lookup,
+  // rather than finding the owner and then looking up what it said a second time.
+  const claims: { provider: string; window: number | undefined }[] = []
   for (const candidate of catalog) {
-    const found = candidate.models.find((entry) => entry.id === model)?.contextWindow
-    if (found !== undefined) return found
+    const found = candidate.models.find((entry) => entry.id === model)
+    if (found !== undefined) claims.push({ provider: candidate.id, window: found.contextWindow })
   }
-  return undefined
+  if (claims.length === 1) return { window: claims[0]?.window }
+  if (claims.length > 1) return { claimedBy: claims.map((claim) => claim.provider).sort() }
+  return {}
 }
 
 /**
@@ -96,7 +109,7 @@ function catalogWindow(
  */
 export function resolveContextWindow(input: WindowResolutionInput): ResolvedContextWindow {
   if (input.configured !== undefined && input.configured > 0) {
-    const fromCatalog = catalogWindow(input.catalog, input.provider, input.model)
+    const fromCatalog = catalogWindow(input.catalog, input.provider, input.model).window
     if (fromCatalog !== undefined && input.configured > fromCatalog) {
       // Not refused: a provider may serve more than this catalog knows about.
       // Worth saying out loud, because if it does not, the failure arrives as a
@@ -113,18 +126,24 @@ export function resolveContextWindow(input: WindowResolutionInput): ResolvedCont
     return { window: input.configured, source: 'config' }
   }
 
-  const fromCatalog = catalogWindow(input.catalog, input.provider, input.model)
+  const { window: fromCatalog, claimedBy } = catalogWindow(input.catalog, input.provider, input.model)
   if (fromCatalog !== undefined && fromCatalog > 0) {
     return { window: fromCatalog, source: 'catalog' }
   }
 
   const named = input.model === undefined ? input.provider : `${input.provider}/${input.model}`
+  const ambiguous =
+    claimedBy === undefined
+      ? undefined
+      : `More than one provider lists ${input.model}: ${claimedBy.join(', ')}. ` +
+        `Set contextWindow in your configuration to say which applies.`
   return {
     window: DEFAULT_CONTEXT_WINDOW,
     source: 'default',
     warning:
+      ambiguous ??
       `No context window is known for ${named}; assuming ${DEFAULT_CONTEXT_WINDOW}. ` +
-      'Set contextWindow in your configuration if the model has more room than that.',
+        'Set contextWindow in your configuration if the model has more room than that.',
   }
 }
 
