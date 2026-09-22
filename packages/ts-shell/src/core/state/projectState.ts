@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { userDataDirFor } from "../paths/userHome.js";
 
 /**
  * Durable per-project state for choices that outlive a turn.
@@ -67,7 +68,7 @@ export function projectStateDir(from: string): string {
   const root = projectRootOf(from);
   const home = process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
   const digest = crypto.createHash("sha256").update(root).digest("hex").slice(0, 8);
-  return path.join(home, ".private-agents", "projects", `${path.basename(root)}-${digest}`);
+  return path.join(userDataDirFor(home), "projects", `${path.basename(root)}-${digest}`);
 }
 
 /** Where this project's standing choices are recorded. */

@@ -45,9 +45,9 @@ describe("os sandbox rules", () => {
     const originalHome = process.env.HOME;
     process.env.HOME = home;
     try {
-      fs.mkdirSync(path.join(home, ".private-agents"), { recursive: true });
+      fs.mkdirSync(path.join(home, ".cheer"), { recursive: true });
       fs.writeFileSync(
-        path.join(home, ".private-agents", "sandbox.json"),
+        path.join(home, ".cheer", "sandbox.json"),
         JSON.stringify({ enabled: true }),
         "utf8",
       );
@@ -67,9 +67,9 @@ describe("os sandbox rules", () => {
     const originalHome = process.env.HOME;
     process.env.HOME = home;
     try {
-      fs.mkdirSync(path.join(home, ".private-agents"), { recursive: true });
+      fs.mkdirSync(path.join(home, ".cheer"), { recursive: true });
       fs.writeFileSync(
-        path.join(home, ".private-agents", "sandbox.json"),
+        path.join(home, ".cheer", "sandbox.json"),
         JSON.stringify({ enabled: true, filesystem: { allowWrite: ["/tmp/ok"] } }),
         "utf8",
       );
@@ -92,9 +92,9 @@ describe("os sandbox rules", () => {
     const originalHome = process.env.HOME;
     process.env.HOME = home;
     try {
-      fs.mkdirSync(path.join(home, ".private-agents"), { recursive: true });
+      fs.mkdirSync(path.join(home, ".cheer"), { recursive: true });
       fs.writeFileSync(
-        path.join(home, ".private-agents", "sandbox.json"),
+        path.join(home, ".cheer", "sandbox.json"),
         JSON.stringify({ enabled: true }),
         "utf8",
       );

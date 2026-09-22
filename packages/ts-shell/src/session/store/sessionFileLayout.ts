@@ -1,6 +1,7 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
+import { userDataDirFor } from "../../core/paths/userHome.js";
 import * as path from "node:path";
 
 export interface SessionStoreLayout {
@@ -19,10 +20,9 @@ export interface SessionFileLayout {
 export function createSessionStoreLayout(homeDir?: string): SessionStoreLayout {
   const root = homeDir ?? process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
   return {
-    sessionsDir: path.join(root, ".private-agents", "sessions"),
+    sessionsDir: path.join(userDataDirFor(root), "sessions"),
     currentSessionStorePath: path.join(
-      root,
-      ".private-agents",
+      userDataDirFor(root),
       "current-session.json",
     ),
   };

@@ -25,6 +25,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { splitByteOrderMark } from "../../runtime/execution/fileText.js";
 import { escapeAttribute, neutraliseTagBoundaries } from "../../core/text/safety.js";
+import { userDataDirFor } from "../../core/paths/userHome.js";
+import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
 /**
  * Candidate file names, most specific first.
@@ -85,7 +87,7 @@ export function loadInstructionFiles(options: InstructionLoadOptions): Instructi
   const ordered: InstructionFile[] = [];
 
   const homeDir = options.homeDir ?? process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
-  const userFile = loadOneFrom(path.join(homeDir, ".private-agents"));
+  const userFile = loadOneFrom(userDataDirFor(homeDir));
   if (userFile) ordered.push(userFile);
 
   ordered.push(...loadAncestorFiles(path.resolve(options.cwd)));

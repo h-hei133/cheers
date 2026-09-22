@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { SubagentMemoryScope } from "./types.js";
+import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
 export interface AgentMemoryContext {
   readonly memoryDir: string;
@@ -24,7 +25,7 @@ export class AgentMemoryManager {
     const cleanName = agentName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-");
 
     if (scope === "user") {
-      return path.join(os.homedir(), ".private-agents", "agent-memory", cleanName);
+      return path.join(userDataDir(), "agent-memory", cleanName);
     }
     if (scope === "local") {
       return path.join(this.workspaceRoot, ".agents", "memory-local", cleanName);

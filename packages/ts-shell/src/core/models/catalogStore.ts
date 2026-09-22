@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { userDataDir } from "../paths/userHome.js";
 import {
   BUILTIN_PROVIDERS,
   mergeProviders,
@@ -28,7 +29,7 @@ interface StoredCatalog {
 
 function agentDir(): string {
   const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
-  return path.join(home, ".private-agents");
+  return userDataDir();
 }
 
 /** Path of the file a user edits to add providers and models. */

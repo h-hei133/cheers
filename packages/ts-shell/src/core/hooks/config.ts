@@ -17,6 +17,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { HookEventName } from "./types.js";
+import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
 /**
  * The events a configuration may name.
@@ -83,7 +84,7 @@ export function loadHookDeclarations(
   const problems: string[] = [];
 
   for (const configPath of [
-    path.join(homeDir, ".private-agents", "hooks.json"),
+    resolveUserDataFile("hooks.json", homeDir),
     path.join(workspaceRoot, ".agents", "hooks.json"),
   ]) {
     const result = readOne(configPath);

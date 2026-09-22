@@ -22,6 +22,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
 /** The parts of a hook that decide what it does. */
 export interface HookIdentity {
@@ -57,7 +58,7 @@ export class HookTrustStore {
   constructor(customPath?: string) {
     this.storePath =
       customPath ??
-      path.join(os.homedir(), ".coding-agents", "hook-trust.json");
+      resolveUserDataFile("hook-trust.json");
   }
 
   isTrusted(fingerprint: string): boolean {

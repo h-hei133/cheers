@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { McpServerConfig, ScopedMcpServerConfig } from './types.js'
+import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
 interface McpConfigFile {
   readonly mcpServers?: Record<string, McpServerConfig>
@@ -27,7 +28,7 @@ export function isMcpConfigLoadError(error: unknown): error is McpConfigLoadErro
 export function getMcpConfigPaths(workspaceRoot: string): string[] {
   const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir()
   return [
-    path.join(homeDir, '.private-agents', 'mcp.json'),
+    resolveUserDataFile('mcp.json'),
     path.join(workspaceRoot, '.private-agents.mcp.json'),
   ]
 }

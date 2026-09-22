@@ -257,8 +257,11 @@ describe("runtime config", () => {
   });
 
   it("returns stable candidate paths", () => {
+    // The user-level candidate is where the file is *read* from, which is the
+    // current directory when nothing older holds one — so the promise is that it
+    // resolves under the current name, not that it is a particular string.
     const candidates = getCandidateConfigPaths(fakeRoot);
-    expect(candidates[0]).toContain(".private-agents");
+    expect(candidates[0]).toContain(".cheer");
     expect(candidates[1]).toBe(path.join(fakeRoot, ".private-agents.json"));
   });
 

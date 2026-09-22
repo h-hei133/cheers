@@ -175,7 +175,7 @@ describe("CLI streaming baseline (T3)", () => {
     fakeHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), "private-agents-cli-home-"),
     );
-    sessionsDir = path.join(fakeHomeDir, ".private-agents", "sessions");
+    sessionsDir = path.join(fakeHomeDir, ".cheer", "sessions");
     fs.mkdirSync(sessionsDir, { recursive: true });
   });
 
@@ -355,7 +355,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     const currentStorePath = path.join(
       fakeHomeDir,
-      ".private-agents",
+      ".cheer",
       "current-session.json",
     );
     fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
@@ -384,7 +384,7 @@ describe("CLI streaming baseline (T3)", () => {
   }): void {
     const currentStorePath = path.join(
       fakeHomeDir,
-      ".private-agents",
+      ".cheer",
       "current-session.json",
     );
     fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
@@ -561,7 +561,7 @@ describe("CLI streaming baseline (T3)", () => {
   }): void {
     const configPath = path.join(
       input.fakeHome,
-      ".private-agents",
+      ".cheer",
       "config.json",
     );
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
@@ -600,7 +600,7 @@ describe("CLI streaming baseline (T3)", () => {
         cli.kill();
         try {
           expect(output.length).toBeGreaterThan(0);
-          expect(output).toContain("Private Coding Agents Shell");
+          expect(output).toContain("Cheer Shell");
           expect(output).toContain("Session: sess_");
           expect(output).toContain(
             "Ctrl+C cancels the current run. Ctrl+D exits.",
@@ -624,7 +624,7 @@ describe("CLI streaming baseline (T3)", () => {
       },
     });
 
-    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Cheer Shell");
     expect(result.output).toContain("Session: sess_");
     expect(result.sessionId).toMatch(/^sess_/);
     expect(result.output).toContain(
@@ -644,7 +644,7 @@ describe("CLI streaming baseline (T3)", () => {
       },
     });
 
-    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Cheer Shell");
     expect(result.output).toContain("Current session");
     expect(result.output).toContain("- ID:");
     expect(result.sessionId).toMatch(/^sess_/);
@@ -662,7 +662,7 @@ describe("CLI streaming baseline (T3)", () => {
     });
 
     expect(result.code).toBe(0);
-    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Cheer Shell");
     expect(result.output).toContain("Session: sess_");
     expect(result.output).toContain(
       "Ctrl+C cancels the current run. Ctrl+D exits.",
@@ -1096,7 +1096,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     const currentSessionStore = JSON.parse(
       fs.readFileSync(
-        path.join(fakeHomeDir, ".private-agents", "current-session.json"),
+        path.join(fakeHomeDir, ".cheer", "current-session.json"),
         "utf8",
       ),
     ) as { byProjectRoot?: Record<string, { sessionId?: string }> };
@@ -1111,7 +1111,7 @@ describe("CLI streaming baseline (T3)", () => {
     fs.mkdirSync(projectRoot, { recursive: true });
     const currentStorePath = path.join(
       fakeHomeDir,
-      ".private-agents",
+      ".cheer",
       "current-session.json",
     );
     fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
@@ -1631,7 +1631,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     const currentSessionStorePath = path.join(
       fakeHomeDir,
-      ".private-agents",
+      ".cheer",
       "current-session.json",
     );
     const currentSessionStore = JSON.parse(
@@ -2268,7 +2268,7 @@ describe("CLI streaming baseline (T3)", () => {
           clearTimeout(timeout);
           cli.kill();
           try {
-            expect(output).toContain("Private Coding Agents Shell");
+            expect(output).toContain("Cheer Shell");
             expect(output).toContain("Session: sess_");
             expect(output).toContain("Next actions:");
             expect(output).toContain(
@@ -2680,7 +2680,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     const currentStore = JSON.parse(
       fs.readFileSync(
-        path.join(fakeHomeDir, ".private-agents", "current-session.json"),
+        path.join(fakeHomeDir, ".cheer", "current-session.json"),
         "utf8",
       ),
     ) as {
@@ -3291,7 +3291,7 @@ describe("CLI streaming baseline (T3)", () => {
       timeoutMs: 30000,
     });
 
-    expect(result.output).toContain("Private Coding Agents Shell");
+    expect(result.output).toContain("Cheer Shell");
     expect(result.output).toContain("Continuation");
     expect(result.output).toContain("Failure handoff: status=blocked");
     expect(result.output).toContain("target=docs/failed-edit.md");
@@ -3557,7 +3557,7 @@ describe("CLI streaming baseline (T3)", () => {
         if (sessionId && persistedCompletionCount >= 2) {
           clearTimeout(timeout);
           finish(() => {
-            expect(output).toContain("Private Coding Agents Shell");
+            expect(output).toContain("Cheer Shell");
             expect(output).toContain("Next actions:");
             expect(output).toContain(
               "- /resume             inspect sessions or continue work.",

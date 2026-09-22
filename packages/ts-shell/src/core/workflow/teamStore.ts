@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
 export interface TeamMember {
   readonly agentId: string;
@@ -39,7 +40,7 @@ export interface TeamTask {
 
 /**
  * TeamConfigManager & MailboxMesh
- * Manages team membership (~/.private-agents/teams/{team}/config.json) and point-to-point inboxes.
+ * Manages team membership (~/.cheer/teams/{team}/config.json) and point-to-point inboxes.
  */
 export class TeamConfigManager {
   private readonly teamId: string;
@@ -47,7 +48,7 @@ export class TeamConfigManager {
 
   constructor(sessionId: string) {
     this.teamId = `session-${sessionId.slice(0, 8)}`;
-    this.baseDir = path.join(os.homedir(), ".private-agents", "teams", this.teamId);
+    this.baseDir = path.join(userDataDir(), "teams", this.teamId);
   }
 
   getTeamId(): string {
@@ -122,7 +123,7 @@ export class TaskStore {
 
   constructor(teamId: string) {
     this.teamId = teamId;
-    this.tasksDir = path.join(os.homedir(), ".private-agents", "tasks", this.teamId);
+    this.tasksDir = path.join(userDataDir(), "tasks", this.teamId);
     try {
       if (!fs.existsSync(this.tasksDir)) {
         fs.mkdirSync(this.tasksDir, { recursive: true });

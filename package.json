@@ -1,11 +1,10 @@
 {
-  "name": "private-coding-agents",
+  "name": "cheer",
   "version": "0.1.0",
   "description": "Maintainable three-layer workspace: TypeScript shell, Rust core, Python eval",
   "private": true,
   "type": "module",
   "bin": {
-    "private-agents": "./dist/cli.js",
     "cheer": "./dist/cli.js"
   },
   "workspaces": [

@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { StructuredLogEntry } from "./types.js";
+import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
 
 export interface RotatingFileSinkOptions {
   readonly logDir?: string;
@@ -28,7 +29,7 @@ export class RotatingFileSink {
 
   constructor(options: RotatingFileSinkOptions = {}) {
     const configuredDir = process.env.CODING_AGENTS_LOG_DIR?.trim();
-    const defaultDir = path.join(os.homedir(), ".coding-agents", "logs");
+    const defaultDir = path.join(userDataDir(), "logs");
     this.logDir = options.logDir ?? (configuredDir || defaultDir);
     this.maxFileSizeBytes = (options.maxFileSizeMb ?? 5) * 1024 * 1024;
     this.maxHistoryDays = options.maxHistoryDays ?? 7;

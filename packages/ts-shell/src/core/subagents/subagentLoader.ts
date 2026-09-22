@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { SubagentDefinition, SubagentIsolationMode, SubagentMemoryScope, SubagentPermissionMode } from "./types.js";
+import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
 const BUILTIN_SUBAGENTS: SubagentDefinition[] = [
   {
@@ -47,7 +48,7 @@ export class SubagentLoader {
 
   constructor(workspaceRoot: string = process.cwd()) {
     this.workspaceRoot = path.resolve(workspaceRoot);
-    this.userAgentsDir = path.join(os.homedir(), ".private-agents", "agents");
+    this.userAgentsDir = path.join(userDataDir(), "agents");
   }
 
   /**
@@ -71,7 +72,7 @@ export class SubagentLoader {
       registry.set(agent.name.toLowerCase(), agent);
     }
 
-    // 2. User-level agents (~/.private-agents/agents/*.md). The user's own files,
+    // 2. User-level agents (~/.cheer/agents/*.md). The user's own files,
     // so they load regardless.
     this.scanDirectory(this.userAgentsDir, "user", registry);
 

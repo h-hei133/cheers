@@ -1054,7 +1054,7 @@ describe("shell session runtime (W5)", () => {
       process.env.HOME = fakeHome;
 
       try {
-        const sessionsDir = path.join(fakeHome, ".private-agents", "sessions");
+        const sessionsDir = path.join(fakeHome, ".cheer", "sessions");
         const {
           projectRoot,
           sessionId,

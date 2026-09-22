@@ -1,12 +1,9 @@
 {
-  "name": "@private-agents/ts-shell",
+  "name": "@cheer/ts-shell",
   "version": "0.1.0",
   "description": "TypeScript CLI shell and orchestration layer",
   "type": "module",
   "main": "./dist/packages/ts-shell/src/index.js",
-  "bin": {
-    "agents": "./dist/packages/ts-shell/src/entrypoints/cli.js"
-  },
   "files": [
     "dist",
     "src"

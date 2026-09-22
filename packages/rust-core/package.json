@@ -1,5 +1,5 @@
 {
-  "name": "@private-agents/rust-core",
+  "name": "@cheer/rust-core",
   "version": "0.1.0",
   "description": "Rust execution core daemon and high-performance operations",
   "scripts": {

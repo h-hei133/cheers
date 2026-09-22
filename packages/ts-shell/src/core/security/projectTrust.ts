@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
 export type ProjectTrustLevel = "trusted" | "untrusted" | "session-only";
 
@@ -28,7 +29,7 @@ export class ProjectTrustStore {
   constructor(customPath?: string) {
     this.storePath =
       customPath ??
-      path.join(os.homedir(), ".coding-agents", "trust.json");
+      resolveUserDataFile("trust.json");
     this.ensureStoreExists();
   }
 

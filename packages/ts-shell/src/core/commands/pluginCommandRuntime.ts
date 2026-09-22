@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
 /**
  * Extension registry.
@@ -31,7 +32,7 @@ export interface InstalledPlugin {
 function getPluginStoragePath(): string {
   const customPath = process.env.CODING_AGENTS_PLUGINS_FILE?.trim();
   if (customPath) return customPath;
-  return path.join(os.homedir(), ".coding-agents", "plugins.json");
+  return resolveUserDataFile("plugins.json");
 }
 
 /** Nothing is registered until the user registers it. */

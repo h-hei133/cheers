@@ -95,7 +95,7 @@ describe("instruction file discovery", () => {
     const root = await makeTree({
       ".git/HEAD": "ref: refs/heads/main\n",
       "AGENTS.md": "project rules",
-      "home/.private-agents/AGENTS.md": "user rules",
+      "home/.cheer/AGENTS.md": "user rules",
     });
 
     const loaded = loadInstructionFiles({

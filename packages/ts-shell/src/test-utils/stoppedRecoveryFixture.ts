@@ -53,7 +53,7 @@ export function seedStoppedRecoveryContextSession(input: {
 
   const currentStorePath = path.join(
     input.fakeHomeDir,
-    ".private-agents",
+    ".cheer",
     "current-session.json",
   );
   fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
@@ -245,7 +245,7 @@ export function seedWriterStartedStoppedRecoveryContextSession(input: {
 
   const currentStorePath = path.join(
     input.fakeHomeDir,
-    ".private-agents",
+    ".cheer",
     "current-session.json",
   );
   fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
@@ -476,7 +476,7 @@ export function seedNonWriteStoppedRecoveryContextSession(input: {
 
   const currentStorePath = path.join(
     input.fakeHomeDir,
-    ".private-agents",
+    ".cheer",
     "current-session.json",
   );
   fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });

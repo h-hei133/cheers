@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
 
 /**
  * Token budgets for one model.
@@ -317,13 +318,13 @@ export function getCandidateConfigPaths(
   rootDir: string = process.cwd(),
 ): string[] {
   return [
-    path.join(getRuntimeConfigHomeDir(), ".private-agents", "config.json"),
+    resolveUserDataFile("config.json"),
     path.join(rootDir, ".private-agents.json"),
   ];
 }
 
 export function getUserRuntimeConfigPath(): string {
-  return path.join(getRuntimeConfigHomeDir(), ".private-agents", "config.json");
+  return resolveUserDataFile("config.json");
 }
 
 export function readUserRuntimeConfigFile(): RuntimeConfigFile {

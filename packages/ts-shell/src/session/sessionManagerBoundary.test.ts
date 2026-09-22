@@ -34,10 +34,10 @@ describe("SessionManager module boundary facades", () => {
     });
 
     expect(layout.sessionsDir).toBe(
-      path.join(home, ".private-agents", "sessions"),
+      path.join(home, ".cheer", "sessions"),
     );
     expect(layout.currentSessionStorePath).toBe(
-      path.join(home, ".private-agents", "current-session.json"),
+      path.join(home, ".cheer", "current-session.json"),
     );
     expect(files).toEqual({
       sessionDir: path.join(layout.sessionsDir, "sess_boundary"),

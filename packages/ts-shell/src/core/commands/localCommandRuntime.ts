@@ -7,7 +7,7 @@ export async function runDoctorCommand(context: CommandContext): Promise<LocalCo
   const gitContext = getWorkflowGitContext(context.cwd)
 
   const lines = [
-    'Private Coding Agents CLI Doctor',
+    'Cheer CLI Doctor',
     `Execution path: ${runtimeConfig.daemonEnabled ? 'rust-daemon' : 'ts-local'}`,
     `Provider: ${runtimeConfig.provider}`,
     `Max turns: ${runtimeConfig.maxTurns}`,

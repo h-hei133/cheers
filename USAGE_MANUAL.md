@@ -1,4 +1,4 @@
-# Private Coding Agents 使用手册
+# Cheer 使用手册
 
 适用目录：`D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents`
 
@@ -184,7 +184,7 @@ npm start -- --attach D:\your\repo
 
 ## 8. 子包常用命令
 
-### 8.1 `@private-agents/ts-shell`
+### 8.1 `@cheer/ts-shell`
 - `npm run build -w packages/ts-shell`
 - `npm run dev -w packages/ts-shell`
 - `npm run start -w packages/ts-shell`
@@ -192,14 +192,14 @@ npm start -- --attach D:\your\repo
 - `npm run test:gate:golden-main-path -w packages/ts-shell`
 - `npm run test:watch -w packages/ts-shell`
 
-### 8.2 `@private-agents/rust-core`
+### 8.2 `@cheer/rust-core`
 - `npm run build -w packages/rust-core`
 - `npm run test -w packages/rust-core`
 - `npm run test:watch -w packages/rust-core`
 - `npm run check -w packages/rust-core`
 - `npm run lint -w packages/rust-core`
 
-### 8.3 `@private-agents/python-eval`
+### 8.3 `@cheer/python-eval`
 - `npm run build -w packages/python-eval`
 - `npm run test -w packages/python-eval`
 - `npm run test:watch -w packages/python-eval`
@@ -209,7 +209,7 @@ npm start -- --attach D:\your\repo
 ## 9. 配置与优先级
 
 ### 9.1 配置文件位置
-- 用户级：`%USERPROFILE%\.private-agents\config.json`
+- 用户级：`%USERPROFILE%\.cheer\config.json`
 - 项目级：`<projectRoot>\.private-agents.json`
 
 ### 9.2 Provider/凭证优先级（简化）

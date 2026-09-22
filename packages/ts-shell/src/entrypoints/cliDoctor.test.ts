@@ -28,7 +28,7 @@ describe("printCliDoctor", () => {
 
     expect(lines).toEqual(
       expect.arrayContaining([
-        "Private Coding Agents CLI Doctor",
+        "Cheer CLI Doctor",
         `Launch directory: /tmp/launch`,
         `Target workspace: ${workspaceRoot}`,
         "Tip: run `npm run doctor` from the repo root for full environment diagnostics.",

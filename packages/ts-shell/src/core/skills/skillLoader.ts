@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { resolveAllUserDataFiles, userDataDir } from "../paths/userHome.js";
 
 /**
  * Skill discovery.
@@ -66,9 +67,15 @@ export class SkillLoader {
   private readonly roots: readonly { readonly dir: string; readonly source: SkillSource }[];
 
   constructor(workspaceRoot: string = process.cwd()) {
-    const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
+    // Every user skills directory that exists, newest first. A listing that read
+    // only the current one would hide skills the user already wrote in an older
+    // location — they are additional, not superseded. When none exists yet, the
+    // current path stands in as the place new skills would be written.
+    const userSkillDirs = resolveAllUserDataFiles("skills");
     this.roots = [
-      { dir: path.join(home, ".private-agents", "skills"), source: "user" },
+      ...(userSkillDirs.length > 0 ? userSkillDirs : [path.join(userDataDir(), "skills")]).map(
+        (dir) => ({ dir, source: "user" as const }),
+      ),
       // Project skills win: a repository that ships its own way of doing something
       // should override the user's general habit for that repository.
       { dir: path.join(path.resolve(workspaceRoot), ".agents", "skills"), source: "project" },

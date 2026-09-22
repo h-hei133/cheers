@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { EscalationPrompt } from "../../../sandbox/index.js";
+import { resolveUserDataFile, userDataDir } from "../../../core/paths/userHome.js"
 
 export interface PersistedApprovalGrant {
   readonly projectRoot: string;
@@ -23,7 +24,7 @@ export interface ApprovalTrustGrantView extends PersistedApprovalGrant {
 
 export function defaultPolicyFilePath(): string {
   const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir();
-  return path.join(homeDir, ".private-agents", "approval-policy.json");
+  return resolveUserDataFile("approval-policy.json");
 }
 
 export function normalizeProjectRoot(projectRoot: string): string {

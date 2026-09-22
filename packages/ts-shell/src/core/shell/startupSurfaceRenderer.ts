@@ -108,7 +108,7 @@ export function renderStartupSurface(
     path.basename(input.runtimeContext.projectRoot) ||
     input.runtimeContext.projectRoot;
 
-  renderer.renderLine("\nPrivate Coding Agents Shell");
+  renderer.renderLine("\nCheer Shell");
   renderer.renderLine(`- Project: ${projectLabel}`);
   renderer.renderLine(`- Project root: ${input.runtimeContext.projectRoot}`);
   renderWorkspaceBindingLines(renderer, {

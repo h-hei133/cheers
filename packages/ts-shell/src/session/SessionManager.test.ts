@@ -359,7 +359,7 @@ describe("SessionManager", () => {
     manager.markRunStarted(healthy.id, "healthy prompt");
     manager.saveInterrupted(healthy.id);
 
-    const sessionsRoot = path.join(fakeHome, ".private-agents", "sessions");
+    const sessionsRoot = path.join(fakeHome, ".cheer", "sessions");
     const brokenA = path.join(sessionsRoot, "sess_broken_a");
     const brokenB = path.join(sessionsRoot, "sess_broken_b");
     fs.mkdirSync(brokenA, { recursive: true });
@@ -409,7 +409,7 @@ describe("SessionManager", () => {
     const session = manager.createNew(projectRoot);
     const statePath = path.join(
       fakeHome,
-      ".private-agents",
+      ".cheer",
       "sessions",
       session.id,
       "state.json",
@@ -517,7 +517,7 @@ describe("SessionManager", () => {
     const session = manager.createNew(projectRoot);
     const statePath = path.join(
       fakeHome,
-      ".private-agents",
+      ".cheer",
       "sessions",
       session.id,
       "state.json",
@@ -591,7 +591,7 @@ describe("SessionManager", () => {
     const session = manager.createNew(projectRoot);
     const statePath = path.join(
       fakeHome,
-      ".private-agents",
+      ".cheer",
       "sessions",
       session.id,
       "state.json",
@@ -710,7 +710,7 @@ describe("SessionManager", () => {
     const session = manager.createNew(projectRoot);
     const statePath = path.join(
       fakeHome,
-      ".private-agents",
+      ".cheer",
       "sessions",
       session.id,
       "state.json",
@@ -810,7 +810,7 @@ describe("SessionManager", () => {
     const session = manager.createNew(projectRoot);
     const statePath = path.join(
       fakeHome,
-      ".private-agents",
+      ".cheer",
       "sessions",
       session.id,
       "state.json",

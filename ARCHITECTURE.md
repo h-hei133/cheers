@@ -295,8 +295,8 @@ Every session has a directory:
 ### Recovery
 
 On CLI startup:
-1. List recent sessions: `agents resume`
-2. Or create new: `agents new`
+1. List recent sessions: `cheer resume`
+2. Or create new: `cheer new`
 3. Load session state
 4. Repair replayable transcript state if interruption left orphaned terminal events
 5. Read durable recovery facts from `state.json`

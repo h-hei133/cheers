@@ -1,5 +1,5 @@
 {
-  "name": "@private-agents/python-eval",
+  "name": "@cheer/python-eval",
   "version": "0.1.0",
   "description": "Python evaluation layer for offline research and analysis",
   "scripts": {
