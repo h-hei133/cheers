@@ -48,7 +48,7 @@ describe("assistant response accumulation", () => {
     const serialized = JSON.stringify(response);
 
     expect(serialized).not.toMatch(
-      /hidden reasoning|token=secret|private-agents-real|provider\.env/i,
+      /hidden reasoning|token=secret|cheers-real|provider\.env/i,
     );
     expect(response.redaction.status).toBe("redacted");
     expect(response.terminalSuccessClaim).toBe(false);

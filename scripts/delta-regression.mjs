@@ -49,14 +49,14 @@ function parseSuiteArg(argv) {
 }
 
 function resolveHomeDir() {
-  const forced = process.env.PRIVATE_AGENTS_TEST_HOME
-  if (forced && fs.existsSync(path.join(forced, '.private-agents', 'config.json'))) return forced
+  const forced = process.env.CHEERS_TEST_HOME
+  if (forced && fs.existsSync(path.join(forced, '.cheers', 'config.json'))) return forced
   const candidates = ['D:/Test/home-daily', 'D:/Test/home-fulltest2', 'D:/Test/home-fulltest', 'D:/Test/home-sf']
   for (const home of candidates) {
-    if (fs.existsSync(path.join(home, '.private-agents', 'config.json'))) return home
+    if (fs.existsSync(path.join(home, '.cheers', 'config.json'))) return home
   }
   const fallback = 'D:/Test/home-delta'
-  fs.mkdirSync(path.join(fallback, '.private-agents'), { recursive: true })
+  fs.mkdirSync(path.join(fallback, '.cheers'), { recursive: true })
   return fallback
 }
 
@@ -74,7 +74,7 @@ function ensureEnvironmentBoundary() {
   if (normalized.cwd !== normalized.mainRepoRoot) violations.push('cwd-not-main-repo')
   if (normalized.repoRoot !== normalized.mainRepoRoot) violations.push('script-reporoot-not-main-repo')
   if (normalized.projectRoot !== normalized.testRoot) violations.push('project-root-not-d-test')
-  if (normalized.cwd.startsWith(`${normalized.testRoot}/`) && normalized.cwd.includes('private-coding-agents')) {
+  if (normalized.cwd.startsWith(`${normalized.testRoot}/`) && normalized.cwd.includes('cheers')) {
     violations.push('executing-from-d-test-repo-copy')
   }
   return { ...normalized, violations, passed: violations.length === 0 }
@@ -128,7 +128,7 @@ async function runCli(args, options = {}) {
       ...process.env,
       HOME: homeDir,
       USERPROFILE: homeDir,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      CHEERS_PROVIDER_MODE: 'real',
     },
     ...options,
   })
@@ -172,7 +172,7 @@ function extractSessionIds(output) {
 }
 
 function readLastQueryCompleted(sessionId) {
-  const txPath = path.join(homeDir, '.private-agents', 'sessions', sessionId, 'transcript.jsonl')
+  const txPath = path.join(homeDir, '.cheers', 'sessions', sessionId, 'transcript.jsonl')
   if (!fs.existsSync(txPath)) return null
   let last = null
   for (const rawLine of fs.readFileSync(txPath, 'utf8').split(/\r?\n/)) {
@@ -191,13 +191,13 @@ function readLastQueryCompleted(sessionId) {
 }
 
 function readSessionState(sessionId) {
-  const statePath = path.join(homeDir, '.private-agents', 'sessions', sessionId, 'state.json')
+  const statePath = path.join(homeDir, '.cheers', 'sessions', sessionId, 'state.json')
   if (!fs.existsSync(statePath)) return null
   return JSON.parse(fs.readFileSync(statePath, 'utf8'))
 }
 
 function listProjectSessions() {
-  const sessionsRoot = path.join(homeDir, '.private-agents', 'sessions')
+  const sessionsRoot = path.join(homeDir, '.cheers', 'sessions')
   if (!fs.existsSync(sessionsRoot)) return new Map()
   const map = new Map()
   for (const entry of fs.readdirSync(sessionsRoot, { withFileTypes: true })) {
@@ -364,7 +364,7 @@ function buildMismatchDebtSummary(mismatches) {
 }
 
 function scanSessions(currentRunSessionSet) {
-  const sessionsRoot = path.join(homeDir, '.private-agents', 'sessions')
+  const sessionsRoot = path.join(homeDir, '.cheers', 'sessions')
   if (!fs.existsSync(sessionsRoot)) {
     return {
       runId,
@@ -555,14 +555,14 @@ async function runN3FaultSuite(currentRunSessionIds, faultReport) {
   const failureReasons = []
 
   const missingHome = path.join(testRoot, `home-delta-missing-${runId}`)
-  fs.mkdirSync(path.join(missingHome, '.private-agents'), { recursive: true })
+  fs.mkdirSync(path.join(missingHome, '.cheers'), { recursive: true })
   const missingCredRun = await runProcess(process.execPath, [tsxCliPath, cliEntryPath, '--project', projectRoot, '--provider', 'openai-compatible', '--print', 'reply exactly: probe'], {
     cwd: tsShellCwd,
     env: {
       ...process.env,
       HOME: missingHome,
       USERPROFILE: missingHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      CHEERS_PROVIDER_MODE: 'real',
     },
     timeoutMs: 120000,
   })

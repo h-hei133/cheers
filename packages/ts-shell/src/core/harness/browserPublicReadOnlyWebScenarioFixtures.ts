@@ -29,7 +29,7 @@ export function createBrowserPublicReadOnlyWebScenarioFixture(input: {
   readonly responseByteBudget?: number;
   readonly contentTypeAllowlist?: readonly string[];
 } = {}): BrowserPublicReadOnlyWebScenarioFixture {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-public-readonly-web-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-public-readonly-web-"));
   const origin = input.origin ?? "https://example.test";
   const manifest = createBrowserPublicReadOnlyWebManifest({
     source: "test-only",

@@ -46,7 +46,7 @@ describe('execution service boundary', () => {
 
   it('routes command execution through the TS-local boundary when the daemon is disabled', async () => {
     process.env.DAEMON_ENABLED = '0'
-    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'private-agents-execution-service-'))
+    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-execution-service-'))
     const service = createDefaultExecutionService()
 
     const result = await service.runCommand({
@@ -94,7 +94,7 @@ describe('execution service boundary', () => {
   })
 
   it('centralizes basic text file side effects for tool callers', async () => {
-    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'private-agents-execution-service-'))
+    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-execution-service-'))
     const service = createDefaultExecutionService()
     const target = path.join(workspaceRoot, 'nested', 'artifact.txt')
 

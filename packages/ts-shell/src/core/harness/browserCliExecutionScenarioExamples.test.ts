@@ -28,7 +28,7 @@ describe("browser CLI execution scenario examples", () => {
   }
 
   function projectRoot(): string {
-    const projectPath = tempRoot("private-agents-cli-route100-project-");
+    const projectPath = tempRoot("cheers-cli-route100-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 100 fixture\n", "utf8");
     return projectPath;
   }
@@ -57,7 +57,7 @@ describe("browser CLI execution scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-cli-route100-home-"),
+      homeDir: tempRoot("cheers-cli-route100-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -109,7 +109,7 @@ describe("browser CLI execution scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-cli-route100-home-"),
+      homeDir: tempRoot("cheers-cli-route100-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -159,7 +159,7 @@ describe("browser CLI execution scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-cli-route100-home-"),
+      homeDir: tempRoot("cheers-cli-route100-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -196,7 +196,7 @@ describe("browser CLI execution scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-cli-route100-home-"),
+      homeDir: tempRoot("cheers-cli-route100-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);

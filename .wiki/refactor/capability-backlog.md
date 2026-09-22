@@ -111,7 +111,7 @@ decision-trace: seed=action-result seedAction=edit-file seedTarget=src/app.ts
 ### 待查清的两点
 
 - mock server 就绪但 CLI 挂起：是 `--print` 模式在 real provider 链上的真实缺陷，还是测试对 spawn/时序的假设已过期（如 provider 配置路径或握手协议变更）？
-- 该链路是否仍被产品支持（`PRIVATE_AGENTS_PROVIDER_MODE=real` + 非 TTY）？
+- 该链路是否仍被产品支持（`CHEERS_PROVIDER_MODE=real` + 非 TTY）？
 
 ### 决策选项
 
@@ -155,7 +155,7 @@ decision-trace: seed=action-result seedAction=edit-file seedTarget=src/app.ts
 
 ### 2026-09-16 执行（裁决 A）与根因更新
 
-按裁决 A 实现：`createSyntheticStep({ toolIntent })` + `PRIVATE_AGENTS_SYNTHETIC_TOOLS=1` 环境开关（`entrypoints/cliRuntimeInvocation.ts`）。synthetic 现可对匹配的提示发出一次工具调用，完成后转为回显收尾。默认仍为纯回显，30+ 依赖该语义的测试不受影响。
+按裁决 A 实现：`createSyntheticStep({ toolIntent })` + `CHEERS_SYNTHETIC_TOOLS=1` 环境开关（`entrypoints/cliRuntimeInvocation.ts`）。synthetic 现可对匹配的提示发出一次工具调用，完成后转为回显收尾。默认仍为纯回显，30+ 依赖该语义的测试不受影响。
 
 **修复过程中发现并修复一个更严重的接线缺陷**（超出 CB-003 原范围）：
 

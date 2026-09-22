@@ -46,7 +46,7 @@ describe("model response boundary", () => {
     const serialized = JSON.stringify(boundary);
 
     expect(serialized).not.toMatch(
-      /sk-1234567890|token=secret|oldText=before|newText=after|hidden reasoning|private-agents-real/i,
+      /sk-1234567890|token=secret|oldText=before|newText=after|hidden reasoning|cheers-real/i,
     );
     expect(serialized).toMatch(/redacted|raw-content-excluded/);
     expect(boundary.terminalSuccessClaim).toBe(false);

@@ -17,7 +17,7 @@ describe("printCliDoctor", () => {
 
   it("renders CLI doctor diagnostics without changing runtime truthfulness", async () => {
     workspaceRoot = await fs.mkdtemp(
-      path.join(os.tmpdir(), "private-agents-cli-doctor-"),
+      path.join(os.tmpdir(), "cheers-cli-doctor-"),
     );
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((line = "") => {
@@ -28,7 +28,7 @@ describe("printCliDoctor", () => {
 
     expect(lines).toEqual(
       expect.arrayContaining([
-        "Cheer CLI Doctor",
+        "Cheers CLI Doctor",
         `Launch directory: /tmp/launch`,
         `Target workspace: ${workspaceRoot}`,
         "Tip: run `npm run doctor` from the repo root for full environment diagnostics.",

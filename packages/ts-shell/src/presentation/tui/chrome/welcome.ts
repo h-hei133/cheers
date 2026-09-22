@@ -22,7 +22,7 @@ export function renderWelcome(state: WelcomeState, width: number): string[] {
     ? `${state.directory} ${defaultTheme.fg("border", "·")} ${defaultTheme.fg("success", state.branch)}`
     : state.directory;
   const rows = [
-    `${defaultTheme.bold(defaultTheme.fg("accent", "Coding Agent"))}  ${defaultTheme.dim(state.model)}`,
+    `${defaultTheme.bold(defaultTheme.fg("accent", "Cheers"))}  ${defaultTheme.dim(state.model)}`,
     `${defaultTheme.dim(truncateToWidthWithMode(location, Math.max(8, width), "middle"))}`,
   ];
   if (state.resumeHint) rows.push(defaultTheme.dim(state.resumeHint));

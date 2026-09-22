@@ -173,9 +173,9 @@ describe("CLI streaming baseline (T3)", () => {
     // to a different provider and the failure surfaces as fabricated output).
     delete process.env.OPENAI_API_KEY;
     fakeHomeDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cli-home-"),
+      path.join(os.tmpdir(), "cheers-cli-home-"),
     );
-    sessionsDir = path.join(fakeHomeDir, ".cheer", "sessions");
+    sessionsDir = path.join(fakeHomeDir, ".cheers", "sessions");
     fs.mkdirSync(sessionsDir, { recursive: true });
   });
 
@@ -355,7 +355,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     const currentStorePath = path.join(
       fakeHomeDir,
-      ".cheer",
+      ".cheers",
       "current-session.json",
     );
     fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
@@ -384,7 +384,7 @@ describe("CLI streaming baseline (T3)", () => {
   }): void {
     const currentStorePath = path.join(
       fakeHomeDir,
-      ".cheer",
+      ".cheers",
       "current-session.json",
     );
     fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
@@ -561,7 +561,7 @@ describe("CLI streaming baseline (T3)", () => {
   }): void {
     const configPath = path.join(
       input.fakeHome,
-      ".cheer",
+      ".cheers",
       "config.json",
     );
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
@@ -600,7 +600,7 @@ describe("CLI streaming baseline (T3)", () => {
         cli.kill();
         try {
           expect(output.length).toBeGreaterThan(0);
-          expect(output).toContain("Cheer Shell");
+          expect(output).toContain("Cheers Shell");
           expect(output).toContain("Session: sess_");
           expect(output).toContain(
             "Ctrl+C cancels the current run. Ctrl+D exits.",
@@ -620,11 +620,11 @@ describe("CLI streaming baseline (T3)", () => {
       spawnCli,
       fakeHome: fakeHomeDir,
       envOverrides: {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        CHEERS_PROVIDER_MODE: "synthetic",
       },
     });
 
-    expect(result.output).toContain("Cheer Shell");
+    expect(result.output).toContain("Cheers Shell");
     expect(result.output).toContain("Session: sess_");
     expect(result.sessionId).toMatch(/^sess_/);
     expect(result.output).toContain(
@@ -640,11 +640,11 @@ describe("CLI streaming baseline (T3)", () => {
       line: "/sessions current",
       waitFor: "Current session",
       envOverrides: {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        CHEERS_PROVIDER_MODE: "synthetic",
       },
     });
 
-    expect(result.output).toContain("Cheer Shell");
+    expect(result.output).toContain("Cheers Shell");
     expect(result.output).toContain("Current session");
     expect(result.output).toContain("- ID:");
     expect(result.sessionId).toMatch(/^sess_/);
@@ -657,12 +657,12 @@ describe("CLI streaming baseline (T3)", () => {
       spawnCli,
       fakeHome: fakeHomeDir,
       envOverrides: {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        CHEERS_PROVIDER_MODE: "synthetic",
       },
     });
 
     expect(result.code).toBe(0);
-    expect(result.output).toContain("Cheer Shell");
+    expect(result.output).toContain("Cheers Shell");
     expect(result.output).toContain("Session: sess_");
     expect(result.output).toContain(
       "Ctrl+C cancels the current run. Ctrl+D exits.",
@@ -692,8 +692,8 @@ describe("CLI streaming baseline (T3)", () => {
     const projectRoot = path.join(fakeHomeDir, "entry-parity-sessions-current");
     fs.mkdirSync(projectRoot, { recursive: true });
     const env = {
-      PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
-      PRIVATE_AGENTS_REAL_HOME: "",
+      CHEERS_PROVIDER_MODE: "synthetic",
+      CHEERS_REAL_HOME: "",
     };
 
     const stdinResult = await runCliStdinToClose({
@@ -743,9 +743,9 @@ describe("CLI streaming baseline (T3)", () => {
     fs.mkdirSync(projectRoot, { recursive: true });
     const prompt = "Run a real provider task without API key";
     const env = {
-      PRIVATE_AGENTS_PROVIDER_MODE: "real",
-      PRIVATE_AGENTS_HOME_OVERRIDE: "",
-      PRIVATE_AGENTS_REAL_HOME: "",
+      CHEERS_PROVIDER_MODE: "real",
+      CHEERS_HOME_OVERRIDE: "",
+      CHEERS_REAL_HOME: "",
       OPENAI_API_KEY: "",
     };
 
@@ -794,8 +794,8 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("CLI entry parity keeps stopped /continue failure handoff aligned across stdin, print, and pipe-spawn interactive entries", async () => {
     const env = {
-      PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
-      PRIVATE_AGENTS_REAL_HOME: "",
+      CHEERS_PROVIDER_MODE: "synthetic",
+      CHEERS_REAL_HOME: "",
     };
     const createFixture = (label: string) =>
       seedStoppedRecoveryContextSession({
@@ -879,11 +879,11 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("CLI entry parity keeps MCP unavailable control-plane surface aligned across stdin, print, and pipe-spawn interactive entries", async () => {
     const projectRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cli-entry-parity-mcp-"),
+      path.join(os.tmpdir(), "cheers-cli-entry-parity-mcp-"),
     );
     try {
       fs.writeFileSync(
-        path.join(projectRoot, ".private-agents.mcp.json"),
+        path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
             connectedSdk: {
@@ -910,8 +910,8 @@ describe("CLI streaming baseline (T3)", () => {
         "utf8",
       );
       const env = {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
-        PRIVATE_AGENTS_REAL_HOME: "",
+        CHEERS_PROVIDER_MODE: "synthetic",
+        CHEERS_REAL_HOME: "",
       };
 
       const stdinResult = await runCliStdinToClose({
@@ -1080,7 +1080,7 @@ describe("CLI streaming baseline (T3)", () => {
       fakeHome: fakeHomeDir,
       args: ["--project", projectRoot, "--print", "/sessions current"],
       envOverrides: {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        CHEERS_PROVIDER_MODE: "synthetic",
       },
     });
     const output = normalizeCliOutput(result.output);
@@ -1096,7 +1096,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     const currentSessionStore = JSON.parse(
       fs.readFileSync(
-        path.join(fakeHomeDir, ".cheer", "current-session.json"),
+        path.join(fakeHomeDir, ".cheers", "current-session.json"),
         "utf8",
       ),
     ) as { byProjectRoot?: Record<string, { sessionId?: string }> };
@@ -1111,7 +1111,7 @@ describe("CLI streaming baseline (T3)", () => {
     fs.mkdirSync(projectRoot, { recursive: true });
     const currentStorePath = path.join(
       fakeHomeDir,
-      ".cheer",
+      ".cheers",
       "current-session.json",
     );
     fs.mkdirSync(path.dirname(currentStorePath), { recursive: true });
@@ -1122,7 +1122,7 @@ describe("CLI streaming baseline (T3)", () => {
       fakeHome: fakeHomeDir,
       args: ["--project", projectRoot, "--print", "/sessions current"],
       envOverrides: {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        CHEERS_PROVIDER_MODE: "synthetic",
       },
     });
     const output = normalizeCliOutput(result.output);
@@ -1139,11 +1139,11 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("shows MCP status reasons and do-next for unavailable capabilities", async () => {
     const projectRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cli-mcp-status-"),
+      path.join(os.tmpdir(), "cheers-cli-mcp-status-"),
     );
     try {
       fs.writeFileSync(
-        path.join(projectRoot, ".private-agents.mcp.json"),
+        path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
             connectedSdk: {
@@ -1187,7 +1187,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp status"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const output = normalizeCliOutput(result.output);
@@ -1217,11 +1217,11 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("shows MCP tools unavailable-server guidance without hiding connected tools", async () => {
     const projectRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cli-mcp-tools-"),
+      path.join(os.tmpdir(), "cheers-cli-mcp-tools-"),
     );
     try {
       fs.writeFileSync(
-        path.join(projectRoot, ".private-agents.mcp.json"),
+        path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
             connectedSdk: {
@@ -1265,7 +1265,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp tools connectedSdk"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const connectedOutput = normalizeCliOutput(connectedResult.output);
@@ -1279,7 +1279,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp tools needsAuth"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const authOutput = normalizeCliOutput(authResult.output);
@@ -1297,7 +1297,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp tools brokenStdio"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const failedOutput = normalizeCliOutput(failedResult.output);
@@ -1315,7 +1315,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp tools disabledSdk"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const disabledOutput = normalizeCliOutput(disabledResult.output);
@@ -1330,11 +1330,11 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("shows MCP refresh unavailable-server guidance without masking connected refresh", async () => {
     const projectRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cli-mcp-refresh-"),
+      path.join(os.tmpdir(), "cheers-cli-mcp-refresh-"),
     );
     try {
       fs.writeFileSync(
-        path.join(projectRoot, ".private-agents.mcp.json"),
+        path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
             connectedSdk: {
@@ -1370,7 +1370,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp refresh connectedSdk"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const connectedOutput = normalizeCliOutput(connectedResult.output);
@@ -1384,7 +1384,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp refresh needsAuth"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const authOutput = normalizeCliOutput(authResult.output);
@@ -1402,7 +1402,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp refresh brokenStdio"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const failedOutput = normalizeCliOutput(failedResult.output);
@@ -1420,7 +1420,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp refresh disabledSdk"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const disabledOutput = normalizeCliOutput(disabledResult.output);
@@ -1435,7 +1435,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp refresh missingServer"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const unknownOutput = normalizeCliOutput(unknownResult.output);
@@ -1451,11 +1451,11 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("shows MCP doctor diagnostics with shared unavailable-server guidance", async () => {
     const projectRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cli-mcp-doctor-"),
+      path.join(os.tmpdir(), "cheers-cli-mcp-doctor-"),
     );
     try {
       fs.writeFileSync(
-        path.join(projectRoot, ".private-agents.mcp.json"),
+        path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
             connectedSdk: {
@@ -1491,7 +1491,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp doctor"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const output = normalizeCliOutput(result.output);
@@ -1520,7 +1520,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp doctor connectedSdk"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const connectedOutput = normalizeCliOutput(connectedResult.output);
@@ -1536,7 +1536,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args: ["--project", projectRoot, "--print", "/mcp doctor missingServer"],
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
       const unknownOutput = normalizeCliOutput(unknownResult.output);
@@ -1553,10 +1553,10 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("shows MCP malformed config blockers across user-visible MCP commands", async () => {
     const projectRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cli-mcp-malformed-"),
+      path.join(os.tmpdir(), "cheers-cli-mcp-malformed-"),
     );
     try {
-      const configPath = path.join(projectRoot, ".private-agents.mcp.json");
+      const configPath = path.join(projectRoot, ".cheers.mcp.json");
       fs.writeFileSync(configPath, "{broken", "utf8");
 
       for (const command of [
@@ -1570,7 +1570,7 @@ describe("CLI streaming baseline (T3)", () => {
           fakeHome: fakeHomeDir,
           args: ["--project", projectRoot, "--print", command],
           envOverrides: {
-            PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+            CHEERS_PROVIDER_MODE: "synthetic",
           },
         });
         const output = normalizeCliOutput(result.output);
@@ -1578,7 +1578,7 @@ describe("CLI streaming baseline (T3)", () => {
         expect(output).toContain("- Outcome: blocked");
         expect(output).toContain("- BlockerKind: environment-not-ready");
         expect(output).toContain("MCP config is invalid at");
-        expect(output).toContain(".private-agents.mcp.json");
+        expect(output).toContain(".cheers.mcp.json");
         expect(output).toContain("Fix or remove");
         expect(output).toContain("then run /mcp refresh all.");
       }
@@ -1599,7 +1599,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHome: fakeHomeDir,
         args,
         envOverrides: {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       });
 
@@ -1631,7 +1631,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     const currentSessionStorePath = path.join(
       fakeHomeDir,
-      ".cheer",
+      ".cheers",
       "current-session.json",
     );
     const currentSessionStore = JSON.parse(
@@ -1675,7 +1675,7 @@ describe("CLI streaming baseline (T3)", () => {
   it("gates real-provider missing key at CLI entry before query loop starts", async () => {
     await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir, [], {
-        PRIVATE_AGENTS_PROVIDER_MODE: "real",
+        CHEERS_PROVIDER_MODE: "real",
         OPENAI_API_KEY: "",
       });
       let output = "";
@@ -1818,11 +1818,11 @@ describe("CLI streaming baseline (T3)", () => {
     try {
       await new Promise<void>((resolve, reject) => {
         const cli = spawnCli(fakeHomeDir, [], {
-          PRIVATE_AGENTS_PROVIDER_MODE: "real",
-          PRIVATE_AGENTS_HOME_OVERRIDE: "",
-          PRIVATE_AGENTS_REAL_HOME: "",
-          PRIVATE_AGENTS_PROVIDER_PROXY: "off",
-          PRIVATE_AGENTS_PROVIDER_NO_PROXY: "127.0.0.1,localhost",
+          CHEERS_PROVIDER_MODE: "real",
+          CHEERS_HOME_OVERRIDE: "",
+          CHEERS_REAL_HOME: "",
+          CHEERS_PROVIDER_PROXY: "off",
+          CHEERS_PROVIDER_NO_PROXY: "127.0.0.1,localhost",
           HTTPS_PROXY: "",
           https_proxy: "",
           HTTP_PROXY: "",
@@ -1951,9 +1951,9 @@ describe("CLI streaming baseline (T3)", () => {
     try {
       await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir, [], {
-        PRIVATE_AGENTS_PROVIDER_MODE: "real",
+        CHEERS_PROVIDER_MODE: "real",
         OPENAI_API_KEY: "test-real-cli-key",
-        PRIVATE_AGENTS_REAL_HOME: "",
+        CHEERS_REAL_HOME: "",
       });
 
       let output = "";
@@ -2268,7 +2268,7 @@ describe("CLI streaming baseline (T3)", () => {
           clearTimeout(timeout);
           cli.kill();
           try {
-            expect(output).toContain("Cheer Shell");
+            expect(output).toContain("Cheers Shell");
             expect(output).toContain("Session: sess_");
             expect(output).toContain("Next actions:");
             expect(output).toContain(
@@ -2319,7 +2319,7 @@ describe("CLI streaming baseline (T3)", () => {
           ...process.env,
           USERPROFILE: fakeHomeDir,
           HOME: fakeHomeDir,
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
         encoding: "utf8",
         timeout: 20000,
@@ -2370,7 +2370,7 @@ describe("CLI streaming baseline (T3)", () => {
           ...process.env,
           USERPROFILE: fakeHomeDir,
           HOME: fakeHomeDir,
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
         encoding: "utf8",
         timeout: 20000,
@@ -2406,7 +2406,7 @@ describe("CLI streaming baseline (T3)", () => {
           ...process.env,
           USERPROFILE: fakeHomeDir,
           HOME: fakeHomeDir,
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
         encoding: "utf8",
         timeout: 30000,
@@ -2601,7 +2601,7 @@ describe("CLI streaming baseline (T3)", () => {
           ...process.env,
           USERPROFILE: fakeHomeDir,
           HOME: fakeHomeDir,
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
         encoding: "utf8",
         timeout: 30000,
@@ -2680,7 +2680,7 @@ describe("CLI streaming baseline (T3)", () => {
 
     const currentStore = JSON.parse(
       fs.readFileSync(
-        path.join(fakeHomeDir, ".cheer", "current-session.json"),
+        path.join(fakeHomeDir, ".cheers", "current-session.json"),
         "utf8",
       ),
     ) as {
@@ -2754,7 +2754,7 @@ describe("CLI streaming baseline (T3)", () => {
             ...process.env,
             USERPROFILE: fakeHomeDir,
             HOME: fakeHomeDir,
-            PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+            CHEERS_PROVIDER_MODE: "synthetic",
           },
           encoding: "utf8",
           timeout: 45000,
@@ -2950,7 +2950,7 @@ describe("CLI streaming baseline (T3)", () => {
           ...process.env,
           USERPROFILE: fakeHomeDir,
           HOME: fakeHomeDir,
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
         encoding: "utf8",
         timeout: 30000,
@@ -3043,7 +3043,7 @@ describe("CLI streaming baseline (T3)", () => {
             ...process.env,
             USERPROFILE: fakeHomeDir,
             HOME: fakeHomeDir,
-            PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+            CHEERS_PROVIDER_MODE: "synthetic",
           },
           encoding: "utf8",
           timeout: 30000,
@@ -3127,7 +3127,7 @@ describe("CLI streaming baseline (T3)", () => {
               ...process.env,
               USERPROFILE: fakeHomeDir,
               HOME: fakeHomeDir,
-              PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+              CHEERS_PROVIDER_MODE: "synthetic",
             },
             encoding: "utf8",
             timeout: 30000,
@@ -3217,7 +3217,7 @@ describe("CLI streaming baseline (T3)", () => {
               ...process.env,
               USERPROFILE: fakeHomeDir,
               HOME: fakeHomeDir,
-              PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+              CHEERS_PROVIDER_MODE: "synthetic",
             },
             encoding: "utf8",
             timeout: 30000,
@@ -3286,12 +3286,12 @@ describe("CLI streaming baseline (T3)", () => {
       line: `/continue ${followUpPrompt}`,
       waitFor: "Failure handoff: status=blocked",
       envOverrides: {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        CHEERS_PROVIDER_MODE: "synthetic",
       },
       timeoutMs: 30000,
     });
 
-    expect(result.output).toContain("Cheer Shell");
+    expect(result.output).toContain("Cheers Shell");
     expect(result.output).toContain("Continuation");
     expect(result.output).toContain("Failure handoff: status=blocked");
     expect(result.output).toContain("target=docs/failed-edit.md");
@@ -3315,10 +3315,10 @@ describe("CLI streaming baseline (T3)", () => {
       fakeHome: fakeHomeDir,
       args: ["--project", projectRoot, "--print", "Run node --version"],
       envOverrides: {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+        CHEERS_PROVIDER_MODE: "synthetic",
         // The approval boundary is only reachable if the model actually asks for
         // a tool; a prose-only synthetic run never reaches it.
-        PRIVATE_AGENTS_SYNTHETIC_TOOLS: "1",
+        CHEERS_SYNTHETIC_TOOLS: "1",
       },
       timeoutMs: 30000,
     });
@@ -3372,7 +3372,7 @@ describe("CLI streaming baseline (T3)", () => {
           ...process.env,
           USERPROFILE: fakeHomeDir,
           HOME: fakeHomeDir,
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
         encoding: "utf8",
         timeout: 20000,
@@ -3409,7 +3409,7 @@ describe("CLI streaming baseline (T3)", () => {
           ...process.env,
           USERPROFILE: fakeHomeDir,
           HOME: fakeHomeDir,
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
         encoding: "utf8",
         timeout: 20000,
@@ -3438,7 +3438,7 @@ describe("CLI streaming baseline (T3)", () => {
           ...process.env,
           USERPROFILE: fakeHomeDir,
           HOME: fakeHomeDir,
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
         encoding: "utf8",
         timeout: 20000,
@@ -3469,7 +3469,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHomeDir,
         ["--non-interactive-approval", "allow-once"],
         {
-          PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
+          CHEERS_PROVIDER_MODE: "synthetic",
         },
       );
       let output = "";
@@ -3557,7 +3557,7 @@ describe("CLI streaming baseline (T3)", () => {
         if (sessionId && persistedCompletionCount >= 2) {
           clearTimeout(timeout);
           finish(() => {
-            expect(output).toContain("Cheer Shell");
+            expect(output).toContain("Cheers Shell");
             expect(output).toContain("Next actions:");
             expect(output).toContain(
               "- /resume             inspect sessions or continue work.",
@@ -3656,7 +3656,7 @@ describe("CLI streaming baseline (T3)", () => {
     try {
       await new Promise<void>((resolve, reject) => {
       const cli = spawnCli(fakeHomeDir, [], {
-        PRIVATE_AGENTS_PROVIDER_MODE: "real",
+        CHEERS_PROVIDER_MODE: "real",
         OPENAI_API_KEY: "test-resume-continuity-key",
       });
       let settled = false;
@@ -3768,7 +3768,7 @@ describe("CLI streaming baseline (T3)", () => {
         fakeHomeDir,
         ["--session-id", interruptedSessionId],
         {
-          PRIVATE_AGENTS_PROVIDER_MODE: "real",
+          CHEERS_PROVIDER_MODE: "real",
           OPENAI_API_KEY: "test-resume-continuity-key",
         },
       );

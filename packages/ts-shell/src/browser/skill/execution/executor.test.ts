@@ -82,7 +82,7 @@ describe("browser skill execution executor", () => {
   }
 
   function writeRunner(kind: "success" | "malformed" | "timeout" | "unsafe-output"): string {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-skill-exec-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-skill-exec-test-"));
     roots.push(root);
     const runnerPath = path.join(root, "skill-runner.cjs");
     fs.writeFileSync(runnerPath, runnerScript(kind), "utf8");

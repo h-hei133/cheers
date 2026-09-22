@@ -78,8 +78,8 @@ async function runFocusedTest(name, file, pattern, timeoutMs = 180000) {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
-      PRIVATE_AGENTS_REAL_HOME: '',
+      CHEERS_PROVIDER_MODE: 'synthetic',
+      CHEERS_REAL_HOME: '',
     },
     timeoutMs,
   })
@@ -102,7 +102,7 @@ async function main() {
   console.log('externalMcpServerUsed=false')
   console.log('userMcpConfigUsed=false')
   console.log('localStdioFixture=src/core/mcp/fixtures/mockMcpServer.mjs')
-  console.log(`releaseCoreWired=${process.env.PRIVATE_AGENTS_RELEASE_CORE_WIRED === '1' ? 'true' : 'false'}`)
+  console.log(`releaseCoreWired=${process.env.CHEERS_RELEASE_CORE_WIRED === '1' ? 'true' : 'false'}`)
   console.log('userVisibleSurface=focused-shell-runtime')
   console.log('cliEntryExecutionProof=not-covered')
   console.log('homeCreated=false')

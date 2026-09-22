@@ -20,10 +20,10 @@ describe("connect command runtime", () => {
 
   beforeEach(() => {
     fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-connect-home-"),
+      path.join(os.tmpdir(), "cheers-connect-home-"),
     );
     workspaceRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-connect-root-"),
+      path.join(os.tmpdir(), "cheers-connect-root-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;

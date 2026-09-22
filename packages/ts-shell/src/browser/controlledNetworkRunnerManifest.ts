@@ -8,7 +8,7 @@ import type { BrowserExternalNetworkActionKind } from "./externalNetworkRunnerMa
 import { validateBrowserControlledNetworkOrigin } from "./controlledNetworkOrigin.js";
 
 export const BROWSER_CLI_CONTROLLED_NETWORK_RUNNER_MANIFEST_ENV =
-  "PRIVATE_AGENTS_BROWSER_CONTROLLED_NETWORK_RUNNER_MANIFEST";
+  "CHEERS_BROWSER_CONTROLLED_NETWORK_RUNNER_MANIFEST";
 export const BROWSER_CONTROLLED_NETWORK_RUNNER_MANIFEST_VERSION =
   "browser-controlled-network-runner-manifest/v1" as const;
 

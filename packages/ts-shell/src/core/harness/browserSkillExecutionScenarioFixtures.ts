@@ -33,7 +33,7 @@ export function createBrowserSkillExecutionScenarioFixture(input: {
   readonly kind?: BrowserSkillExecutionFixtureKind;
 } = {}): BrowserSkillExecutionScenarioFixture {
   const kind = input.kind ?? "success";
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-browser-skill-runner-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-browser-skill-runner-"));
   const runnerPath = kind === "missing-binding" || kind === "unsafe-capability"
     ? undefined
     : path.join(root, "skill-runner.cjs");

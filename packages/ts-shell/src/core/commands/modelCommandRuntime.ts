@@ -429,7 +429,7 @@ async function fetchModelsFromModelsDev(
     : MODELS_DEV_API_URL;
   try {
     const response = await fetch(url, {
-      headers: { "User-Agent": "cheer/ts-shell" },
+      headers: { "User-Agent": "cheers/ts-shell" },
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {

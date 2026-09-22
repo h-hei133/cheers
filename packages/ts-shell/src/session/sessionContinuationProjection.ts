@@ -1,7 +1,7 @@
 import type { RecoverySnapshot } from "./recovery/sessionRecoverySnapshot.js";
 
 const unsafeContinuationEvidencePattern =
-  /(raw-dom|raw DOM|<html|<\/|authorization|api[_-]?key|token|secret|cookie|private-agents-real|BEGIN [A-Z ]*PRIVATE KEY|raw-file|file-dump)/i;
+  /(raw-dom|raw DOM|<html|<\/|authorization|api[_-]?key|token|secret|cookie|cheers-real|BEGIN [A-Z ]*PRIVATE KEY|raw-file|file-dump)/i;
 
 export function isReplaySafeContinuationEvidence(entry: string): boolean {
   return (

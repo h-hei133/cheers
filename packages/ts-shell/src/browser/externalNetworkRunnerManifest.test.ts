@@ -22,7 +22,7 @@ describe("browser external-network runner manifest", () => {
     }
 
     const loaded = loadBrowserExternalNetworkRunnerManifestFromEnv({
-      env: { PRIVATE_AGENTS_BROWSER_EXTERNAL_NETWORK_RUNNER_MANIFEST: "/tmp/manifest.json" },
+      env: { CHEERS_BROWSER_EXTERNAL_NETWORK_RUNNER_MANIFEST: "/tmp/manifest.json" },
       readFile: () => serializeBrowserExternalNetworkRunnerManifest(manifest),
     });
     expect(loaded.status).toBe("valid");

@@ -41,7 +41,7 @@ describe("browser execution receipt assertions", () => {
 function processResult(output: string): AgentCliProcessResult {
   return {
     spec: {
-      command: "private-agents",
+      command: "cheers",
       args: [],
       cwd: "/tmp/project",
       timeoutMs: 1000,

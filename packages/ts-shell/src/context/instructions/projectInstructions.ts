@@ -25,8 +25,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { splitByteOrderMark } from "../../runtime/execution/fileText.js";
 import { escapeAttribute, neutraliseTagBoundaries } from "../../core/text/safety.js";
-import { userDataDirFor } from "../../core/paths/userHome.js";
-import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
+import { userDataSearchDirsFor } from "../../core/paths/userHome.js";
 
 /**
  * Candidate file names, most specific first.
@@ -87,7 +86,12 @@ export function loadInstructionFiles(options: InstructionLoadOptions): Instructi
   const ordered: InstructionFile[] = [];
 
   const homeDir = options.homeDir ?? process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
-  const userFile = loadOneFrom(userDataDirFor(homeDir));
+  // Every directory the user file may live in, current first. Reading only the
+  // current one would drop the rules someone already wrote under an earlier name,
+  // which is the same loss as deleting them.
+  const userFile = userDataSearchDirsFor(homeDir)
+    .map((directory) => loadOneFrom(directory))
+    .find((file) => file !== undefined);
   if (userFile) ordered.push(userFile);
 
   ordered.push(...loadAncestorFiles(path.resolve(options.cwd)));

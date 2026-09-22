@@ -33,7 +33,7 @@ export class SessionSocketHost {
 
   private computeSocketPath(): string {
     if (process.platform === "win32") {
-      return `\\\\.\\pipe\\coding-agents-${this.sessionId}`;
+      return `\\\\.\\pipe\\cheers-${this.sessionId}`;
     }
     const uid = typeof process.getuid === "function" ? process.getuid() : 1000;
     const baseDir = path.join(os.tmpdir(), `ts-socks-${uid}`);

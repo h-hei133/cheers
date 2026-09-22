@@ -8,15 +8,15 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 const realProviderEnvKeys = [
-  'PRIVATE_AGENTS_REAL_HOME',
-  'PRIVATE_AGENTS_REAL_PROVIDER_SMOKE',
-  'PRIVATE_AGENTS_PROVIDER_ENV',
-  'PRIVATE_AGENTS_REAL_PROVIDER_ENV',
-  'PRIVATE_AGENTS_REAL_PROVIDER',
-  'PRIVATE_AGENTS_PROVIDER',
-  'PRIVATE_AGENTS_REAL_API_KEY',
-  'PRIVATE_AGENTS_REAL_BASE_URL',
-  'PRIVATE_AGENTS_REAL_MODEL',
+  'CHEERS_REAL_HOME',
+  'CHEERS_REAL_PROVIDER_SMOKE',
+  'CHEERS_PROVIDER_ENV',
+  'CHEERS_REAL_PROVIDER_ENV',
+  'CHEERS_REAL_PROVIDER',
+  'CHEERS_PROVIDER',
+  'CHEERS_REAL_API_KEY',
+  'CHEERS_REAL_BASE_URL',
+  'CHEERS_REAL_MODEL',
 ]
 
 function deterministicEnv() {
@@ -27,7 +27,7 @@ function deterministicEnv() {
   for (const key of realProviderEnvKeys) {
     delete env[key]
   }
-  env.PRIVATE_AGENTS_RELEASE_DETERMINISTIC = '1'
+  env.CHEERS_RELEASE_DETERMINISTIC = '1'
   return env
 }
 

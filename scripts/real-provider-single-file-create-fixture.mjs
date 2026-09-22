@@ -137,9 +137,9 @@ function initializeFixtureGitRepo(fixtureDir, files) {
     'git',
     [
       '-c',
-      'user.name=Private Agents Fixture',
+      'user.name=Cheers Fixture',
       '-c',
-      'user.email=private-agents-fixture@example.invalid',
+      'user.email=cheers-fixture@example.invalid',
       'commit',
       '--quiet',
       '-m',

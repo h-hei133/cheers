@@ -358,7 +358,7 @@ const projectAgentsSkillDirs = projectTrusted
 
 ```ts
 this.roots = [
-  { dir: path.join(home, ".private-agents", "skills"), source: "user" },
+  { dir: path.join(home, ".cheers", "skills"), source: "user" },
   // Project skills win: a repository that ships its own way of doing something
   // should override the user's general habit for that repository.
   { dir: path.join(path.resolve(workspaceRoot), ".agents", "skills"), source: "project" },
@@ -370,7 +370,7 @@ this.roots = [
 **这不是 T2b 引入的新缺陷，而是 T2b 会让一个既有的无防护读取路径变得有实际后果。** 因此 T2b 的施工**必须**同时解决信任判定——不能分两轮。
 
 **修正建议**：T2b 必须明确——
-- **用户级技能**（`~/.private-agents/skills`）：无条件注入；
+- **用户级技能**（`~/.cheers/skills`）：无条件注入；
 - **项目级技能**（`<workspace>/.agents/skills`）：**必须过与 T5 相同的信任门**。
 
 这与 §6.4 发现 3 是同一结论，但**攻击面更直接**（提示注入 vs 代码执行）。应把 Q5 的裁决范围扩大到技能。

@@ -17,17 +17,17 @@ Never manually read, print, copy, summarize, clean, or modify files under this p
 Real provider configuration may be consumed only through explicit opt-in gates that set:
 
 ```text
-PRIVATE_AGENTS_REAL_HOME=/home/wang/.private-agents-real
+CHEERS_REAL_HOME=/home/wang/.private-agents-real
 ```
 
-`PRIVATE_AGENTS_REAL_HOME` is a credential/config source, not a runtime home.
+`CHEERS_REAL_HOME` is a credential/config source, not a runtime home.
 
 Real-provider gates must use isolated runtime and test directories such as:
 
 ```text
-PRIVATE_AGENTS_TEST_ROOT=/tmp/private-agents-test/<gate-name>
-HOME=/tmp/private-agents-test/<gate-name>-home
-USERPROFILE=/tmp/private-agents-test/<gate-name>-home
+CHEERS_TEST_ROOT=/tmp/cheers-test/<gate-name>
+HOME=/tmp/cheers-test/<gate-name>-home
+USERPROFILE=/tmp/cheers-test/<gate-name>-home
 ```
 
 Provider defaults must remain off.

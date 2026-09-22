@@ -59,7 +59,7 @@ function withFakeHome<T>(prefix: string, run: () => Promise<T>): Promise<T> {
 
 describe("runResumeLikeShellAction", () => {
   it("executes returned auto-resume payload with runtime seed and continuity state", async () =>
-    withFakeHome("private-agents-resume-action-", async () => {
+    withFakeHome("cheers-resume-action-", async () => {
       const manager = new SessionManager();
       const session = manager.createNew();
       manager.persistUserPromptBarrier(session.id, "resume action prompt");
@@ -100,7 +100,7 @@ describe("runResumeLikeShellAction", () => {
     }));
 
   it("continues completed sessions with a follow-up prompt and continuity snapshot", async () =>
-    withFakeHome("private-agents-completed-continue-action-", async () => {
+    withFakeHome("cheers-completed-continue-action-", async () => {
       const manager = new SessionManager();
       const session = manager.createNew();
       manager.persistUserPromptBarrier(session.id, "completed prompt");
@@ -144,7 +144,7 @@ describe("runResumeLikeShellAction", () => {
     }));
 
   it("renders stopped guidance before a stopped-session follow-up prompt", async () =>
-    withFakeHome("private-agents-stopped-continue-action-", async () => {
+    withFakeHome("cheers-stopped-continue-action-", async () => {
       const manager = new SessionManager();
       const session = manager.createNew();
       manager.addTurn(session.id, {
@@ -210,7 +210,7 @@ describe("runResumeLikeShellAction", () => {
     }));
 
   it("renders partial mutation recovery details before a stopped-session follow-up prompt", async () =>
-    withFakeHome("private-agents-partial-mutation-followup-", async () => {
+    withFakeHome("cheers-partial-mutation-followup-", async () => {
       const manager = new SessionManager();
       const session = manager.createNew();
       const stopReason =

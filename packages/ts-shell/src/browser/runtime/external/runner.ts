@@ -47,7 +47,7 @@ export async function runBrowserExternalRunnerProcess(input: {
         env: {
           PATH: process.env.PATH ?? "",
           NODE_NO_WARNINGS: "1",
-          PRIVATE_AGENTS_BROWSER_EXTERNAL_RUNNER: "test-local",
+          CHEERS_BROWSER_EXTERNAL_RUNNER: "test-local",
         },
       },
     );

@@ -20,6 +20,41 @@ export interface SessionRegistryReadResult {
 export function readSessionRegistryStore(
   storePath: string,
 ): SessionRegistryReadResult {
+  return readSessionRegistryStoreAt(storePath);
+}
+
+/**
+ * The registry store, merged from every path that holds one, current first.
+ *
+ * A project's selection recorded before the directory was renamed still names a
+ * real session, so an older store is read rather than ignored. A project present
+ * in more than one is decided by the newest one: the paths are searched in order
+ * and the first entry for a project root wins, which is the same rule the user
+ * data directory itself uses. Writes are unaffected and go to one path.
+ */
+export function readMergedSessionRegistryStore(
+  storePaths: readonly string[],
+): SessionRegistryReadResult {
+  const merged = createEmptyCurrentSessionSelectionStore();
+  let readError: string | null = null;
+
+  for (const storePath of storePaths) {
+    const result = readSessionRegistryStoreAt(storePath);
+    if (result.readError && !readError) {
+      readError = result.readError;
+    }
+    for (const [projectRoot, selection] of Object.entries(result.store.byProjectRoot)) {
+      if (merged.byProjectRoot[projectRoot]) {
+        continue;
+      }
+      merged.byProjectRoot[projectRoot] = selection;
+    }
+  }
+
+  return { store: merged, readError };
+}
+
+function readSessionRegistryStoreAt(storePath: string): SessionRegistryReadResult {
   if (!fs.existsSync(storePath)) {
     return {
       store: createEmptyCurrentSessionSelectionStore(),
@@ -107,12 +142,14 @@ export function projectCurrentSessionRegistryResolution(input: {
 
 export function resolveCurrentSessionForProject(input: {
   readonly storePath: string;
+  /** Every store that may already exist, current first. Defaults to `storePath`. */
+  readonly storeSearchPaths?: readonly string[];
   readonly projectRoot: string;
   readonly sessionExists: (sessionId: string) => boolean;
   readonly loadSession: (sessionId: string) => Session;
 }): CurrentSessionSelectionResolution {
   const normalizedProjectRoot = normalizeProjectRootKey(input.projectRoot);
-  const registry = readSessionRegistryStore(input.storePath);
+  const registry = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
   const selection = registry.store.byProjectRoot[normalizedProjectRoot];
   if (!selection?.sessionId?.trim()) {
     return projectCurrentSessionRegistryResolution({
@@ -177,6 +214,8 @@ export function resolveCurrentSessionForProject(input: {
 
 export function setCurrentSessionSelection(input: {
   readonly storePath: string;
+  /** Every store that may already exist, current first. Defaults to `storePath`. */
+  readonly storeSearchPaths?: readonly string[];
   readonly projectRoot: string;
   readonly sessionId: string;
   readonly updatedAt: string;
@@ -187,7 +226,7 @@ export function setCurrentSessionSelection(input: {
     return;
   }
 
-  const current = readSessionRegistryStore(input.storePath).store;
+  const current = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]).store;
   writeSessionRegistryStore({
     storePath: input.storePath,
     store: projectCurrentSessionSelectionStore({
@@ -201,12 +240,13 @@ export function setCurrentSessionSelection(input: {
 
 export function clearCurrentSessionSelection(input: {
   readonly storePath: string;
+  readonly storeSearchPaths?: readonly string[];
   readonly normalizedProjectRoot: string;
 }): void {
   if (!input.normalizedProjectRoot) {
     return;
   }
-  const current = readSessionRegistryStore(input.storePath).store;
+  const current = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]).store;
   const next = removeCurrentSessionSelectionFromStore({
     current,
     normalizedProjectRoot: input.normalizedProjectRoot,
@@ -221,10 +261,13 @@ export function clearCurrentSessionSelection(input: {
 
 export function clearCurrentSessionSelectionForProject(input: {
   readonly storePath: string;
+  /** Every store that may already exist, current first. Defaults to `storePath`. */
+  readonly storeSearchPaths?: readonly string[];
   readonly projectRoot: string;
 }): void {
   clearCurrentSessionSelection({
     storePath: input.storePath,
+    storeSearchPaths: input.storeSearchPaths,
     normalizedProjectRoot: normalizeProjectRootKey(input.projectRoot),
   });
 }

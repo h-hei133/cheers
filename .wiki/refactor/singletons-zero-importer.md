@@ -17,7 +17,7 @@
 
 ## 实测证据
 
-工作树：`/home/wang/projects/cheer`。目标文件行数命令：
+工作树：`/home/wang/projects/cheers`。目标文件行数命令：
 
 ```bash
 wc -l packages/ts-shell/src/core/query/runtime/actionAuthority.ts \

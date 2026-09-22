@@ -12,8 +12,8 @@ function run(command, args) {
       cwd: repoRoot,
       env: {
         ...process.env,
-        PRIVATE_AGENTS_REAL_HOME: '',
-        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '',
+        CHEERS_REAL_HOME: '',
+        CHEERS_REAL_PROVIDER_SMOKE: '',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,

@@ -15,10 +15,10 @@ describe("model command runtime", () => {
 
   beforeEach(async () => {
     fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-model-home-"),
+      path.join(os.tmpdir(), "cheers-model-home-"),
     );
     workspaceRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-model-root-"),
+      path.join(os.tmpdir(), "cheers-model-root-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;

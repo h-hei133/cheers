@@ -22,7 +22,7 @@ describe("browser real CLI scenario examples", () => {
   }
 
   it("covers default blocked browser execute observe through the real CLI", async () => {
-    const projectPath = tempRoot("private-agents-cli-route99-project-");
+    const projectPath = tempRoot("cheers-cli-route99-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 99 fixture\n", "utf8");
     const scenario: AgentCliScenario = {
       id: "cli-browser-observe-blocked",
@@ -50,7 +50,7 @@ describe("browser real CLI scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath,
-      homeDir: tempRoot("private-agents-cli-route99-home-"),
+      homeDir: tempRoot("cheers-cli-route99-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);

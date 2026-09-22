@@ -7,7 +7,7 @@ confidence: high
 sources:
   - raw/notes/2026-08-28-deep-research-architectural-debts-and-evolution.md
   - raw/notes/2026-08-28-reference-projects-matrix.md
-summary: Systematic comparison between coding-agents and world-class coding agents (Pi, Claude Code, OpenCode, GitNexus), identifying debts, dead code, and concrete reuse blueprints.
+summary: Systematic comparison between cheers and world-class coding agents (Pi, Claude Code, OpenCode, GitNexus), identifying debts, dead code, and concrete reuse blueprints.
 tags:
   - architecture
   - state-of-the-art
@@ -22,7 +22,7 @@ tags:
 
 ## Overview
 
-As autonomous coding agents evolve rapidly in 2026, leading projects have converged on specific architectural paradigms. This article synthesizes a deep research audit of `coding-agents` against top-tier systems: **Pi** (`earendil-works/pi`), **Claude Code** (`source-claudecode`), **OpenCode** (`anomalyco/opencode`), **GitNexus** (`abhigyanpatwari/GitNexus`), and **mini-swe-agent**.
+As autonomous coding agents evolve rapidly in 2026, leading projects have converged on specific architectural paradigms. This article synthesizes a deep research audit of `cheers` against top-tier systems: **Pi** (`earendil-works/pi`), **Claude Code** (`source-claudecode`), **OpenCode** (`anomalyco/opencode`), **GitNexus** (`abhigyanpatwari/GitNexus`), and **mini-swe-agent**.
 
 ```mermaid
 graph TD

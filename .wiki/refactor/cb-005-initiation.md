@@ -18,7 +18,7 @@
 |---|---|
 | 生产代码 `import` 语句逐条甄别 `import type` vs 值导入 | 区分"类型可达"与"实际执行" |
 | `scripts/analyze-boundaries.py`（仓库自带） | 权威可达性口径 |
-| 真实会话数据（`~/.private-agents/sessions/`，84 个） | 判定某字段是否真的被写入 |
+| 真实会话数据（`~/.cheers/sessions/`，84 个） | 判定某字段是否真的被写入 |
 | `git log -S` | 定位引入提交 |
 | 逐函数反查生产调用点 | 区分"导出"与"被调用" |
 

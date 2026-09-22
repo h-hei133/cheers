@@ -33,7 +33,7 @@ const SENSITIVE_ENV_PATTERNS = [
   /token/i,
   /secret/i,
   /credential/i,
-  /^PRIVATE_AGENTS_REAL_HOME$/i,
+  /^CHEERS_REAL_HOME$/i,
 ];
 
 export interface BuildProjectCliProcessSpecInput {
@@ -52,7 +52,7 @@ export function buildProjectCliProcessSpec(
 ): AgentCliProcessSpec {
   const homeDir =
     input.homeDir ??
-    fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-cli-scenario-home-"));
+    fs.mkdtempSync(path.join(os.tmpdir(), "cheers-cli-scenario-home-"));
   fs.mkdirSync(homeDir, { recursive: true });
   const cliPath = input.cliPath ?? defaultCliPath;
   return {
@@ -73,8 +73,8 @@ export function buildProjectCliProcessSpec(
       ...sanitizedProcessEnv(),
       USERPROFILE: homeDir,
       HOME: homeDir,
-      PRIVATE_AGENTS_PROVIDER_MODE: "disabled",
-      PRIVATE_AGENTS_REAL_HOME: undefined,
+      CHEERS_PROVIDER_MODE: "disabled",
+      CHEERS_REAL_HOME: undefined,
       NO_PROXY: "*",
       ...sanitizeEnvRecord(input.env),
     },

@@ -12,7 +12,7 @@ import {
 import { setStructuredLogSink, type StructuredLogEntry } from './structuredLogger.js'
 
 describe('observability integration', () => {
-  const workspaceRoot = path.join(os.tmpdir(), 'private-agents-observability')
+  const workspaceRoot = path.join(os.tmpdir(), 'cheers-observability')
   let captured: StructuredLogEntry[] = []
 
   beforeEach(async () => {

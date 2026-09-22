@@ -239,9 +239,9 @@ registry.ts
 
 `TeamConfigManager` 和 `TaskStore` 在 `teamStore.ts:44-208` 实现：
 
-- `~/.private-agents/teams/{team}/config.json` membership；
+- `~/.cheers/teams/{team}/config.json` membership；
 - per-agent mailbox JSON；
-- `~/.private-agents/tasks/{team}` task files；
+- `~/.cheers/tasks/{team}` task files；
 - `openSync(..., "wx")` lockfile claiming 与 dependency completion check。
 
 当前仓内只有 `messagingAndTeams.test.ts:7` 值导入它。`core/tools/messagingTools.ts` 的 live-looking messaging surface 使用 `AgentRegistryScanner` 和 `SessionSocketClient`，没有直接接入 `TeamConfigManager`/`TaskStore`。由于未找到另一条活轨等价实现，**保留并登记 dormant/test-only**，不按可达性直接删除。

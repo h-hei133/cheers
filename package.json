@@ -1,11 +1,11 @@
 {
-  "name": "cheer",
+  "name": "cheers",
   "version": "0.1.0",
   "description": "Maintainable three-layer workspace: TypeScript shell, Rust core, Python eval",
   "private": true,
   "type": "module",
   "bin": {
-    "cheer": "./dist/cli.js"
+    "cheers": "./dist/cli.js"
   },
   "workspaces": [
     "packages/ts-shell",

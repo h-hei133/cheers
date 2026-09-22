@@ -264,7 +264,7 @@ describe("provider readiness boundary", () => {
       apiKey: "test-key",
       fetchImpl: async () => {
         throw new Error(
-          "request failed for D:/Test/home-sf/.private-agents/config.json Authorization: Bearer sk-live-secret api_key=sk-query-secret https://example.test/v1/models?api_key=sk-url-secret",
+          "request failed for D:/Test/home-sf/.cheers/config.json Authorization: Bearer sk-live-secret api_key=sk-query-secret https://example.test/v1/models?api_key=sk-url-secret",
         );
       },
     });
@@ -278,7 +278,7 @@ describe("provider readiness boundary", () => {
       expect(result.failure.stopReason).toContain("Bearer [REDACTED]");
       expect(result.failure.stopReason).toContain("api_key=[REDACTED]");
       expect(result.failure.stopReason).toContain("api_key=[REDACTED]");
-      expect(result.failure.stopReason).not.toContain("home-sf/.private-agents");
+      expect(result.failure.stopReason).not.toContain("home-sf/.cheers");
       expect(result.failure.stopReason).not.toContain("sk-live-secret");
       expect(result.failure.stopReason).not.toContain("sk-query-secret");
       expect(result.failure.stopReason).not.toContain("sk-url-secret");
@@ -295,7 +295,7 @@ describe("provider readiness boundary", () => {
         "refresh_token=refresh-secret",
         "accessToken: acct-token",
         "x-api-key='sk-header-secret'",
-        "C:\\Test\\home-sf\\.private-agents\\config.json",
+        "C:\\Test\\home-sf\\.cheers\\config.json",
         "https://example.test/v1?token=token-secret&signature=sig-secret",
       ].join("\n"),
     );
@@ -311,6 +311,6 @@ describe("provider readiness boundary", () => {
     expect(redacted).not.toContain("refresh-secret");
     expect(redacted).not.toContain("acct-token");
     expect(redacted).not.toContain("sk-header-secret");
-    expect(redacted).not.toContain("home-sf\\.private-agents");
+    expect(redacted).not.toContain("home-sf\\.cheers");
   });
 });

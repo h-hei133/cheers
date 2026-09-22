@@ -3,10 +3,10 @@ import path from 'node:path'
 
 export const approvedRealProviderHome = '/home/wang/.private-agents-real'
 export const defaultProviderEnvPath = path.join(approvedRealProviderHome, 'provider.env')
-export const fakeReadyHome = '/tmp/private-agents-fake-ready'
+export const fakeReadyHome = '/tmp/cheers-fake-ready'
 
 export function buildEffectiveProviderEnv(processEnv) {
-  if (processEnv.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() !== '1') {
+  if (processEnv.CHEERS_REAL_PROVIDER_SMOKE?.trim() !== '1') {
     return {
       env: processEnv,
       configSource: 'not-loaded-no-real-provider-opt-in',
@@ -14,12 +14,12 @@ export function buildEffectiveProviderEnv(processEnv) {
   }
 
   const providerEnvPath =
-    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
-    processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim() ||
+    processEnv.CHEERS_PROVIDER_ENV?.trim() ||
+    processEnv.CHEERS_REAL_PROVIDER_ENV?.trim() ||
     defaultProviderEnvPath
   const explicitProviderEnvPath = Boolean(
-    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
-      processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim(),
+    processEnv.CHEERS_PROVIDER_ENV?.trim() ||
+      processEnv.CHEERS_REAL_PROVIDER_ENV?.trim(),
   )
   const loaded = parseApprovedProviderEnvFile(providerEnvPath)
   if (!loaded.ok) {
@@ -94,28 +94,28 @@ export function parseApprovedProviderEnvFile(filePath) {
 export function canonicalProviderEnv(env) {
   const provider = chooseProvider(env) ?? 'unknown'
   const apiKey = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_API_KEY',
+    'CHEERS_REAL_API_KEY',
     ...providerSpecificApiKeyNames(provider),
   ])
   const baseUrl = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_BASE_URL',
-    'PRIVATE_AGENTS_PROVIDER_BASE_URL',
-    'PRIVATE_AGENTS_BASE_URL',
+    'CHEERS_REAL_BASE_URL',
+    'CHEERS_PROVIDER_BASE_URL',
+    'CHEERS_BASE_URL',
     ...providerSpecificBaseUrlNames(provider),
   ])
   const model = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_MODEL',
-    'PRIVATE_AGENTS_PROVIDER_MODEL',
-    'PRIVATE_AGENTS_MODEL',
+    'CHEERS_REAL_MODEL',
+    'CHEERS_PROVIDER_MODEL',
+    'CHEERS_MODEL',
     ...providerSpecificModelNames(provider),
   ])
   return {
     providerSafeLabel: provider === 'openai-compatible' ? 'openai-compatible' : provider,
     env: {
-      PRIVATE_AGENTS_REAL_PROVIDER: provider,
-      ...(apiKey ? { PRIVATE_AGENTS_REAL_API_KEY: apiKey } : {}),
-      ...(baseUrl ? { PRIVATE_AGENTS_REAL_BASE_URL: baseUrl } : {}),
-      ...(model ? { PRIVATE_AGENTS_REAL_MODEL: model } : {}),
+      CHEERS_REAL_PROVIDER: provider,
+      ...(apiKey ? { CHEERS_REAL_API_KEY: apiKey } : {}),
+      ...(baseUrl ? { CHEERS_REAL_BASE_URL: baseUrl } : {}),
+      ...(model ? { CHEERS_REAL_MODEL: model } : {}),
     },
     fallback: canonicalFallbackProviderEnv(env, provider),
   }
@@ -127,7 +127,7 @@ export function sanitizedProviderEnv(source) {
     if (typeof value === 'string') env[key] = value
   }
   for (const key of [
-    'PRIVATE_AGENTS_REAL_API_KEY',
+    'CHEERS_REAL_API_KEY',
     'OPENAI_API_KEY',
     'OPENAI_COMPATIBLE_API_KEY',
     'GOOGLE_API_KEY',
@@ -142,13 +142,13 @@ export function sanitizedProviderEnv(source) {
     'ACCESS_TOKEN',
     'REFRESH_TOKEN',
     'ID_TOKEN',
-    'PRIVATE_AGENTS_REAL_FALLBACK_API_KEY',
-    'PRIVATE_AGENTS_PROVIDER_FALLBACK_API_KEY',
-    'PRIVATE_AGENTS_FALLBACK_API_KEY',
+    'CHEERS_REAL_FALLBACK_API_KEY',
+    'CHEERS_PROVIDER_FALLBACK_API_KEY',
+    'CHEERS_FALLBACK_API_KEY',
     'OPENAI_COMPATIBLE_FALLBACK_API_KEY',
     'SILICONFLOW_FALLBACK_API_KEY',
-    'PRIVATE_AGENTS_PROVIDER_ENV',
-    'PRIVATE_AGENTS_REAL_PROVIDER_ENV',
+    'CHEERS_PROVIDER_ENV',
+    'CHEERS_REAL_PROVIDER_ENV',
   ]) {
     delete env[key]
   }
@@ -157,29 +157,29 @@ export function sanitizedProviderEnv(source) {
 
 export function canonicalFallbackProviderEnv(env, primaryProvider = 'unknown') {
   const fallbackProvider = normalizeProvider(getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_FALLBACK_PROVIDER',
-    'PRIVATE_AGENTS_FALLBACK_PROVIDER',
+    'CHEERS_REAL_FALLBACK_PROVIDER',
+    'CHEERS_FALLBACK_PROVIDER',
     'SILICONFLOW_FALLBACK_PROVIDER',
   ]) ?? '')
   const provider = fallbackProvider ?? normalizeProvider(primaryProvider) ?? 'unknown'
   const apiKey = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_FALLBACK_API_KEY',
-    'PRIVATE_AGENTS_PROVIDER_FALLBACK_API_KEY',
-    'PRIVATE_AGENTS_FALLBACK_API_KEY',
+    'CHEERS_REAL_FALLBACK_API_KEY',
+    'CHEERS_PROVIDER_FALLBACK_API_KEY',
+    'CHEERS_FALLBACK_API_KEY',
     'OPENAI_COMPATIBLE_FALLBACK_API_KEY',
     'SILICONFLOW_FALLBACK_API_KEY',
   ])
   const baseUrl = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL',
-    'PRIVATE_AGENTS_PROVIDER_FALLBACK_BASE_URL',
-    'PRIVATE_AGENTS_FALLBACK_BASE_URL',
+    'CHEERS_REAL_FALLBACK_BASE_URL',
+    'CHEERS_PROVIDER_FALLBACK_BASE_URL',
+    'CHEERS_FALLBACK_BASE_URL',
     'OPENAI_COMPATIBLE_FALLBACK_BASE_URL',
     'SILICONFLOW_FALLBACK_BASE_URL',
   ])
   const model = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_FALLBACK_MODEL',
-    'PRIVATE_AGENTS_PROVIDER_FALLBACK_MODEL',
-    'PRIVATE_AGENTS_FALLBACK_MODEL',
+    'CHEERS_REAL_FALLBACK_MODEL',
+    'CHEERS_PROVIDER_FALLBACK_MODEL',
+    'CHEERS_FALLBACK_MODEL',
     'OPENAI_COMPATIBLE_FALLBACK_MODEL',
     'SILICONFLOW_FALLBACK_MODEL',
   ])
@@ -188,26 +188,26 @@ export function canonicalFallbackProviderEnv(env, primaryProvider = 'unknown') {
   return {
     providerSafeLabel: provider === 'openai-compatible' ? 'openai-compatible-fallback' : `${provider}-fallback`,
     env: {
-      PRIVATE_AGENTS_REAL_FALLBACK_CONFIGURED: '1',
-      PRIVATE_AGENTS_REAL_FALLBACK_PROVIDER: provider,
-      ...(apiKey ? { PRIVATE_AGENTS_REAL_FALLBACK_API_KEY: apiKey } : {}),
-      ...(baseUrl ? { PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL: baseUrl } : {}),
-      ...(model ? { PRIVATE_AGENTS_REAL_FALLBACK_MODEL: model } : {}),
+      CHEERS_REAL_FALLBACK_CONFIGURED: '1',
+      CHEERS_REAL_FALLBACK_PROVIDER: provider,
+      ...(apiKey ? { CHEERS_REAL_FALLBACK_API_KEY: apiKey } : {}),
+      ...(baseUrl ? { CHEERS_REAL_FALLBACK_BASE_URL: baseUrl } : {}),
+      ...(model ? { CHEERS_REAL_FALLBACK_MODEL: model } : {}),
     },
   }
 }
 
 function chooseProvider(env) {
   const explicit = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_PROVIDER',
-    'PRIVATE_AGENTS_PROVIDER',
+    'CHEERS_REAL_PROVIDER',
+    'CHEERS_PROVIDER',
     'provider',
     'PROVIDER',
   ])
   if (explicit) return normalizeProvider(explicit)
   if (getTrimmed(env, ['OPENAI_COMPATIBLE_API_KEY'])) return 'openai-compatible'
   if (
-    getTrimmed(env, ['PRIVATE_AGENTS_REAL_API_KEY', 'OPENAI_API_KEY']) &&
+    getTrimmed(env, ['CHEERS_REAL_API_KEY', 'OPENAI_API_KEY']) &&
     hasCompatibleBaseUrlHint(env)
   ) {
     return 'openai-compatible'
@@ -242,9 +242,9 @@ function normalizeProvider(value) {
 function hasCompatibleBaseUrlHint(env) {
   return Boolean(
     getTrimmed(env, [
-      'PRIVATE_AGENTS_REAL_BASE_URL',
-      'PRIVATE_AGENTS_PROVIDER_BASE_URL',
-      'PRIVATE_AGENTS_BASE_URL',
+      'CHEERS_REAL_BASE_URL',
+      'CHEERS_PROVIDER_BASE_URL',
+      'CHEERS_BASE_URL',
       'OPENAI_COMPATIBLE_BASE_URL',
       'OPENAI_API_BASE',
       'OPENAI_API_BASE_URL',

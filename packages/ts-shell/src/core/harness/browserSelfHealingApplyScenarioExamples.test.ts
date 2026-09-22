@@ -214,7 +214,7 @@ describe("browser self-healing apply scenario examples", () => {
         status: "passed",
         process: {
           spec: {
-            command: "private-agents",
+            command: "cheers",
             args: ["/browser", "repair"],
             cwd: "/tmp",
             timeoutMs: 1000,

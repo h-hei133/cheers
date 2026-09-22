@@ -39,7 +39,7 @@ No implementation code was copied from reference repositories.
 
 ## Route 100 Baseline
 
-Route 100 added `PRIVATE_AGENTS_BROWSER_LOCAL_FIXTURE_MANIFEST`, a temp JSON
+Route 100 added `CHEERS_BROWSER_LOCAL_FIXTURE_MANIFEST`, a temp JSON
 manifest written by the real CLI scenario harness. The child CLI reads only the
 manifest path, validates one safe local fixture, and constructs a non-default
 local-fixture executor. No manifest means disabled; invalid manifest means a

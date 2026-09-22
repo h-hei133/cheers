@@ -17,19 +17,19 @@ describe("runtime config", () => {
   let fakeRoot: string;
 
   beforeEach(() => {
-    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-home-"));
-    fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-root-"));
+    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-home-"));
+    fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-root-"));
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
     delete process.env.DAEMON_ENABLED;
-    delete process.env.PRIVATE_AGENTS_MAX_TURNS;
+    delete process.env.CHEERS_MAX_TURNS;
   });
 
   afterEach(() => {
     process.env.USERPROFILE = originalHome;
     process.env.HOME = originalUnixHome;
     delete process.env.DAEMON_ENABLED;
-    delete process.env.PRIVATE_AGENTS_MAX_TURNS;
+    delete process.env.CHEERS_MAX_TURNS;
     fs.rmSync(fakeHome, { recursive: true, force: true });
     fs.rmSync(fakeRoot, { recursive: true, force: true });
   });
@@ -51,7 +51,7 @@ describe("runtime config", () => {
   });
 
   it("keeps every declared optional field that a config file sets", () => {
-    const configPath = path.join(fakeRoot, ".private-agents.json");
+    const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(
       configPath,
       JSON.stringify({
@@ -94,7 +94,7 @@ describe("runtime config", () => {
     // which is the whole thing the gate exists to prevent.
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bypass-config-"));
     fs.writeFileSync(
-      path.join(dir, ".private-agents.json"),
+      path.join(dir, ".cheers.json"),
       JSON.stringify({ allowUntrustedHooks: true }),
       "utf8",
     );
@@ -123,7 +123,7 @@ describe("runtime config", () => {
     // does not keep: the user sets it, and nothing happens. A config file that
     // still carries a removed key must load without error and must not put the
     // key back on the result.
-    const configPath = path.join(fakeRoot, ".private-agents.json");
+    const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(
       configPath,
       JSON.stringify({
@@ -141,7 +141,7 @@ describe("runtime config", () => {
   });
 
   it("expands environment references in a config file", () => {
-    const configPath = path.join(fakeRoot, ".private-agents.json");
+    const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(
       configPath,
       JSON.stringify({
@@ -160,7 +160,7 @@ describe("runtime config", () => {
   });
 
   it("loads project config and env overrides", () => {
-    const configPath = path.join(fakeRoot, ".private-agents.json");
+    const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(
       configPath,
       JSON.stringify({
@@ -192,7 +192,7 @@ describe("runtime config", () => {
       "utf8",
     );
     process.env.DAEMON_ENABLED = "1";
-    process.env.PRIVATE_AGENTS_MAX_TURNS = "12";
+    process.env.CHEERS_MAX_TURNS = "12";
 
     const config = getRuntimeConfig(fakeRoot);
     expect(config.provider).toBe("openai");
@@ -221,7 +221,7 @@ describe("runtime config", () => {
 
   it("lets user runtime config override project defaults", () => {
     fs.writeFileSync(
-      path.join(fakeRoot, ".private-agents.json"),
+      path.join(fakeRoot, ".cheers.json"),
       JSON.stringify({
         provider: "openai",
         providerCredentials: {
@@ -251,7 +251,7 @@ describe("runtime config", () => {
       "project-openai-key",
     );
     expect(config.configSources).toEqual([
-      path.join(fakeRoot, ".private-agents.json"),
+      path.join(fakeRoot, ".cheers.json"),
       getUserRuntimeConfigPath(),
     ]);
   });
@@ -261,8 +261,8 @@ describe("runtime config", () => {
     // current directory when nothing older holds one — so the promise is that it
     // resolves under the current name, not that it is a particular string.
     const candidates = getCandidateConfigPaths(fakeRoot);
-    expect(candidates[0]).toContain(".cheer");
-    expect(candidates[1]).toBe(path.join(fakeRoot, ".private-agents.json"));
+    expect(candidates[0]).toContain(".cheers");
+    expect(candidates[1]).toBe(path.join(fakeRoot, ".cheers.json"));
   });
 
   it("uses the same user config path for connection writes and runtime reads", () => {
@@ -317,7 +317,7 @@ describe("runtime config", () => {
   });
 
   it("tolerates UTF-8 BOM in config file", () => {
-    const configPath = path.join(fakeRoot, ".private-agents.json");
+    const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(
       configPath,
       "\uFEFF" + JSON.stringify({ maxTurns: 10 }),
@@ -340,10 +340,10 @@ describe("runtime config", () => {
   });
 
   it("includes config path in parse error for invalid JSON", () => {
-    const configPath = path.join(fakeRoot, ".private-agents.json");
+    const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(configPath, "{ invalid_json }", "utf8");
     expect(() => getRuntimeConfig(fakeRoot)).toThrowError(
-      new RegExp(`Failed to read runtime config at .*\\.private-agents\\.json:.*`)
+      new RegExp(`Failed to read runtime config at .*\\.cheers\\.json:.*`)
     );
   });
 });

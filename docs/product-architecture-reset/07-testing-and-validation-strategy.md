@@ -79,8 +79,8 @@ These should eventually consume product evidence/verdict APIs.
 Live provider tests are required only when a route touches provider-facing
 behavior, smoke scripts, or claims about live provider behavior. They must:
 
-- Set explicit `PRIVATE_AGENTS_REAL_HOME`.
-- Use isolated `PRIVATE_AGENTS_TEST_ROOT`, `HOME`, and `USERPROFILE`.
+- Set explicit `CHEERS_REAL_HOME`.
+- Use isolated `CHEERS_TEST_ROOT`, `HOME`, and `USERPROFILE`.
 - Avoid manual reads of real provider files.
 - Preserve redaction and clean repository status.
 - Classify provider-network separately from product-route failure.

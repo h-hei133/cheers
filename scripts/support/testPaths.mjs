@@ -5,7 +5,7 @@ import path from 'node:path'
 const WINDOWS_SYNTHETIC_HOME = 'D:/Test/pca-home-synth'
 const LINUX_SYNTHETIC_HOME = '/tmp/pca-home-synth'
 const WINDOWS_TEST_ROOT = 'D:/Test'
-const LINUX_TEST_ROOT = '/tmp/private-agents-test'
+const LINUX_TEST_ROOT = '/tmp/cheers-test'
 const WINDOWS_REAL_PROVIDER_HOME = 'D:/Test/home-sf'
 
 export function isWindowsPlatform() {
@@ -13,22 +13,22 @@ export function isWindowsPlatform() {
 }
 
 export function getSyntheticHome() {
-  return cleanEnvPath(process.env.PRIVATE_AGENTS_SYNTHETIC_HOME) ??
+  return cleanEnvPath(process.env.CHEERS_SYNTHETIC_HOME) ??
     (isWindowsPlatform() ? WINDOWS_SYNTHETIC_HOME : LINUX_SYNTHETIC_HOME)
 }
 
 export function getTestRoot() {
-  return cleanEnvPath(process.env.PRIVATE_AGENTS_TEST_ROOT) ??
+  return cleanEnvPath(process.env.CHEERS_TEST_ROOT) ??
     (isWindowsPlatform() ? WINDOWS_TEST_ROOT : LINUX_TEST_ROOT)
 }
 
 export function getCliEntryGateRoot() {
-  return cleanEnvPath(process.env.PRIVATE_AGENTS_CLI_ENTRY_GATE_ROOT) ??
+  return cleanEnvPath(process.env.CHEERS_CLI_ENTRY_GATE_ROOT) ??
     path.join(getTestRoot(), 'cli-entry-gate')
 }
 
 export function getRealProviderHome(options = {}) {
-  const configured = cleanEnvPath(process.env.PRIVATE_AGENTS_REAL_HOME)
+  const configured = cleanEnvPath(process.env.CHEERS_REAL_HOME)
   if (configured) return configured
   if (options.allowDefault === true && isWindowsPlatform()) return WINDOWS_REAL_PROVIDER_HOME
   return undefined

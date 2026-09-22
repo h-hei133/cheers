@@ -1,5 +1,5 @@
 {
-  "$schema": "https://coding-agents.dev/schemas/settings.v1.json",
+  "$schema": "https://cheers.dev/schemas/settings.v1.json",
   "version": 1,
   "model": {
     "provider": "openai-compatible",

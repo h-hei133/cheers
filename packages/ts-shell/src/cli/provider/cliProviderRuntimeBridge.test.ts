@@ -8,8 +8,8 @@ describe("CLI provider runtime bridge", () => {
       projectRoot: process.cwd(),
       options: {},
       env: {
-        PRIVATE_AGENTS_PROVIDER_MODE: "synthetic",
-        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: "true",
+        CHEERS_PROVIDER_MODE: "synthetic",
+        CHEERS_REAL_PROVIDER_SMOKE: "true",
       },
     });
 
@@ -22,7 +22,7 @@ describe("CLI provider runtime bridge", () => {
       projectRoot: process.cwd(),
       options: {},
       env: {
-        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: " 1 ",
+        CHEERS_REAL_PROVIDER_SMOKE: " 1 ",
       },
     });
 

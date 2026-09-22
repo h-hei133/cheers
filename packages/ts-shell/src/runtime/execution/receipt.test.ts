@@ -33,7 +33,7 @@ describe("runtime execution receipt projection", () => {
     expect(receipt.errorClass).toBe("command_failed");
     expect(receipt.notProvenClaims).toContain("terminal-task-success");
     expect(receipt.redaction.status).toBe("redacted");
-    expect(serialized).not.toMatch(/secret-value|raw-before|hidden reasoning|sk-1234567890|Bearer abc|private-agents-real/);
+    expect(serialized).not.toMatch(/secret-value|raw-before|hidden reasoning|sk-1234567890|Bearer abc|cheers-real/);
     expect(serialized).toContain("[secret-redacted]");
   });
 

@@ -30,7 +30,7 @@ function boundaryCheck() {
   const test = normalizePath(testRoot)
   const violations = []
   if (cwd !== repo) violations.push('cwd-not-main-repo')
-  if (cwd.startsWith(`${test}/`) && cwd.includes('private-coding-agents')) violations.push('executing-from-d-test-repo-copy')
+  if (cwd.startsWith(`${test}/`) && cwd.includes('cheers')) violations.push('executing-from-d-test-repo-copy')
   return { cwd, repo, test, violations, passed: violations.length === 0 }
 }
 

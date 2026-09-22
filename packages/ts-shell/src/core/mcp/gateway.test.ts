@@ -18,10 +18,10 @@ describe("core MCP gateway (W3)", () => {
 
   beforeEach(() => {
     fakeHomeDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-mcp-home-"),
+      path.join(os.tmpdir(), "cheers-mcp-home-"),
     );
     workspaceRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-mcp-workspace-"),
+      path.join(os.tmpdir(), "cheers-mcp-workspace-"),
     );
     process.env.USERPROFILE = fakeHomeDir;
     process.env.HOME = fakeHomeDir;
@@ -35,11 +35,11 @@ describe("core MCP gateway (W3)", () => {
   });
 
   it("loads user and project MCP configs into scoped configs", () => {
-    fs.mkdirSync(path.join(fakeHomeDir, ".private-agents"), {
+    fs.mkdirSync(path.join(fakeHomeDir, ".cheers"), {
       recursive: true,
     });
     fs.writeFileSync(
-      path.join(fakeHomeDir, ".private-agents", "mcp.json"),
+      path.join(fakeHomeDir, ".cheers", "mcp.json"),
       JSON.stringify({
         mcpServers: {
           userServer: {
@@ -51,7 +51,7 @@ describe("core MCP gateway (W3)", () => {
       "utf8",
     );
     fs.writeFileSync(
-      path.join(workspaceRoot, ".private-agents.mcp.json"),
+      path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({
         mcpServers: {
           projectServer: {
@@ -72,7 +72,7 @@ describe("core MCP gateway (W3)", () => {
   });
 
   it("fails closed with a recoverable blocker when MCP config is malformed", async () => {
-    const configPath = path.join(workspaceRoot, ".private-agents.mcp.json");
+    const configPath = path.join(workspaceRoot, ".cheers.mcp.json");
     fs.writeFileSync(configPath, "{broken", "utf8");
 
     expect(() => loadMcpConfigs(workspaceRoot, true)).toThrow(McpConfigLoadError);
@@ -105,7 +105,7 @@ describe("core MCP gateway (W3)", () => {
 
   it("aggregates tools/resources/prompts through the gateway snapshot", async () => {
     fs.writeFileSync(
-      path.join(workspaceRoot, ".private-agents.mcp.json"),
+      path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({
         mcpServers: {
           localSdk: {
@@ -149,7 +149,7 @@ describe("core MCP gateway (W3)", () => {
     );
 
     fs.writeFileSync(
-      path.join(workspaceRoot, ".private-agents.mcp.json"),
+      path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({
         mcpServers: {
           stdioEcho: {
@@ -180,7 +180,7 @@ describe("core MCP gateway (W3)", () => {
 
   it("drops stale cached clients when a server disappears on the next snapshot", async () => {
     fs.writeFileSync(
-      path.join(workspaceRoot, ".private-agents.mcp.json"),
+      path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({
         mcpServers: {
           localSdk: {
@@ -203,7 +203,7 @@ describe("core MCP gateway (W3)", () => {
     await gateway.snapshot();
 
     fs.writeFileSync(
-      path.join(workspaceRoot, ".private-agents.mcp.json"),
+      path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({ mcpServers: {} }),
       "utf8",
     );
@@ -217,7 +217,7 @@ describe("core MCP gateway (W3)", () => {
 
   it("invalidates cached clients when reconnect reveals auth is now required", async () => {
     fs.writeFileSync(
-      path.join(workspaceRoot, ".private-agents.mcp.json"),
+      path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({
         mcpServers: {
           localSdk: {
@@ -240,7 +240,7 @@ describe("core MCP gateway (W3)", () => {
     await gateway.snapshot();
 
     fs.writeFileSync(
-      path.join(workspaceRoot, ".private-agents.mcp.json"),
+      path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({
         mcpServers: {
           localSdk: {
@@ -280,7 +280,7 @@ describe("core MCP gateway (W3)", () => {
 
   it("refresh supports target/all and rejects unknown server targets", async () => {
     fs.writeFileSync(
-      path.join(workspaceRoot, ".private-agents.mcp.json"),
+      path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({
         mcpServers: {
           localSdk: {

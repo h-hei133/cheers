@@ -153,7 +153,7 @@ describe("extension lifecycle and hook boundary", () => {
     expect(executed).toBe(false);
     expect(outcome.redaction.status).toBe("redacted");
     expect(serialized).not.toMatch(
-      /private-agents-real|Bearer abc|sk-1234567890|before|after|hidden reasoning|unredacted command output|full transcript/i,
+      /cheers-real|Bearer abc|sk-1234567890|before|after|hidden reasoning|unredacted command output|full transcript/i,
     );
     expect(serialized).toContain("[raw-content-excluded]");
   });

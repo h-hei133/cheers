@@ -135,7 +135,7 @@ pi 对齐工作删掉了它的**生产者**（`orchestration/`），但没删掉
 
 ### 5.2 真实会话数据
 
-84 个真实会话（`~/.private-agents/sessions`）：
+84 个真实会话（`~/.cheers/sessions`）：
 
 | 检查 | 结果 |
 |---|---|

@@ -34,7 +34,7 @@ export async function runAgentCliScenario(
   const now = input.now ?? (() => deterministicCliScenarioTimestamp());
   const homeDir =
     input.homeDir ??
-    fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-cli-scenario-home-"));
+    fs.mkdtempSync(path.join(os.tmpdir(), "cheers-cli-scenario-home-"));
   const startedAt = now();
   const steps: AgentCliScenarioStepResult[] = [];
   const assertions: AgentCliAssertionResult[] = [];

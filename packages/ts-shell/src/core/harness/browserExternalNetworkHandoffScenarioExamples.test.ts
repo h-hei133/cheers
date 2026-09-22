@@ -197,7 +197,7 @@ describe("browser external-network handoff scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route117-home-"),
+      homeDir: tempRoot("cheers-route117-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -259,7 +259,7 @@ describe("browser external-network handoff scenario examples", () => {
   }
 
   function projectRoot(): string {
-    const projectPath = tempRoot("private-agents-route117-project-");
+    const projectPath = tempRoot("cheers-route117-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 117 fixture\n", "utf8");
     return projectPath;
   }

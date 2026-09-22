@@ -74,7 +74,7 @@ describe("tool batch handoff", () => {
       "unsupported_tool",
       "unknown_tool",
     ]);
-    expect(JSON.stringify(prepared)).not.toMatch(/token=secret|private-agents-real|provider\.env/i);
+    expect(JSON.stringify(prepared)).not.toMatch(/token=secret|cheers-real|provider\.env/i);
   });
 
   it("projects policy and authority states without executing tools", () => {

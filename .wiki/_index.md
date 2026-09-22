@@ -1,4 +1,4 @@
-# Coding Agents Wiki
+# Cheers Wiki
 
 > Compiled knowledge base for the three-layer autonomous coding agent architecture, proof grounding, and reference models.
 

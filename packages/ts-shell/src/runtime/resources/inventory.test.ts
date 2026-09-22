@@ -201,7 +201,7 @@ describe("package resource inventory governance", () => {
     expect(executed).toBe(false);
     expect(inventory.redaction.status).toBe("redacted");
     expect(serialized).not.toMatch(
-      /private-agents-real|provider\.env|Bearer abc|raw provider output|raw-before|raw-after|secret-value|hidden reasoning|npm install|postinstall/i,
+      /cheers-real|provider\.env|Bearer abc|raw provider output|raw-before|raw-after|secret-value|hidden reasoning|npm install|postinstall/i,
     );
     expect(serialized).not.toContain('"success":true');
   });

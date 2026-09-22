@@ -108,7 +108,7 @@ export class ProjectTrustStore {
       "SYSTEM.md",
       "AGENTS.md",
       "AGENTS.override.md",
-      ".private-agents.mcp.json",
+      ".cheers.mcp.json",
       path.join(".agents", "hooks.json"),
       path.join(".agents", "sandbox.json"),
     ];

@@ -1,5 +1,5 @@
 {
-  "name": "@private-agents/contracts",
+  "name": "@cheers/contracts",
   "version": "0.1.0",
   "description": "Cross-runtime protocol contracts (TS/Rust/Python)",
   "type": "module",

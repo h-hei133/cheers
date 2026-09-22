@@ -1,7 +1,6 @@
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
-import { userDataDir } from "../paths/userHome.js";
+import { resolveUserDataFile } from "../paths/userHome.js";
 import {
   BUILTIN_PROVIDERS,
   mergeProviders,
@@ -27,19 +26,20 @@ interface StoredCatalog {
   readonly providers?: Record<string, Partial<CatalogProvider>>;
 }
 
-function agentDir(): string {
-  const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
-  return userDataDir();
-}
-
-/** Path of the file a user edits to add providers and models. */
+/**
+ * Path of the file a user edits to add providers and models.
+ *
+ * Resolved rather than assumed to be in the current directory: the file may
+ * already exist under a name this directory had earlier, and a path built from the
+ * current name alone would show the user a file that is not the one being read.
+ */
 export function userCatalogPath(): string {
-  return path.join(agentDir(), USER_FILE);
+  return resolveUserDataFile(USER_FILE);
 }
 
 /** Path of the cache an explicit refresh writes. */
 export function catalogCachePath(): string {
-  return path.join(agentDir(), CACHE_FILE);
+  return resolveUserDataFile(CACHE_FILE);
 }
 
 /** The full catalogue: snapshot, then any refreshed copy, then the user's file. */

@@ -24,7 +24,7 @@ export function createBrowserCliLocalFixtureManifestFixture(input: {
   readonly unsafeManifest?: unknown;
 } = {}): BrowserCliLocalFixtureManifestFixture {
   const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), input.prefix ?? "private-agents-browser-cli-fixture-"),
+    path.join(os.tmpdir(), input.prefix ?? "cheers-browser-cli-fixture-"),
   );
   const manifestPath = path.join(root, "browser-local-fixture-manifest.json");
   const manifest = createBrowserLocalFixtureManifest({

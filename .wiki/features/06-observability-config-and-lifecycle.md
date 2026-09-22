@@ -5,7 +5,7 @@ sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
 updated: 2026-09-20
 tags: [features, gap-analysis, pi, observability, config, lifecycle, diagnostics]
-summary: "[部分已过时，见文首横幅] 对照 pi 的可观测性与配置面。发现最重的一项：我们有两套并行配置系统（runtimeConfig 与 settingsLoader），而 settingsLoader 的整个 AgentSettings schema（model/skills/permissions/tui）零生产消费者——.agents/settings.json 与 ~/.private-agents/settings.json 里的配置从不生效。另有 metrics 无 sink、崩溃日志缺失、无 bug report、无更新检查等差距。覆盖清单 4 项 DEFICIENT、6 项 MISSING、5 项 OURS-ONLY、1 项平手。"
+summary: "[部分已过时，见文首横幅] 对照 pi 的可观测性与配置面。发现最重的一项：我们有两套并行配置系统（runtimeConfig 与 settingsLoader），而 settingsLoader 的整个 AgentSettings schema（model/skills/permissions/tui）零生产消费者——.agents/settings.json 与 ~/.cheers/settings.json 里的配置从不生效。另有 metrics 无 sink、崩溃日志缺失、无 bug report、无更新检查等差距。覆盖清单 4 项 DEFICIENT、6 项 MISSING、5 项 OURS-ONLY、1 项平手。"
 confidence: high
 ---
 
@@ -29,8 +29,8 @@ confidence: high
 
 ```bash
 # 两套配置系统各自的路径
-sed -n '216,224p' packages/ts-shell/src/config/runtimeConfig.ts   # ~/.private-agents/config.json + .private-agents.json
-sed -n '18,24p'   packages/ts-shell/src/config/settingsLoader.ts  # ~/.private-agents/settings.json + .agents/settings.json
+sed -n '216,224p' packages/ts-shell/src/config/runtimeConfig.ts   # ~/.cheers/config.json + .cheers.json
+sed -n '18,24p'   packages/ts-shell/src/config/settingsLoader.ts  # ~/.cheers/settings.json + .agents/settings.json
 
 # settingsLoader 是否有人用
 grep -rn "loadCascadingSettings" packages/ts-shell/src --include='*.ts' | grep -v test
@@ -77,8 +77,8 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 
 | | `config/runtimeConfig.ts` | `config/settingsLoader.ts` |
 |---|---|---|
-| 用户文件 | `~/.private-agents/config.json`（`:221`） | `~/.private-agents/settings.json`（`:19`） |
-| 项目文件 | `<root>/.private-agents.json`（`:222`） | `<root>/.agents/settings.json`、`<root>/coding-agents.json`（`:20-23`） |
+| 用户文件 | `~/.cheers/config.json`（`:221`） | `~/.cheers/settings.json`（`:19`） |
+| 项目文件 | `<root>/.cheers.json`（`:222`） | `<root>/.agents/settings.json`、`<root>/cheers.json`（`:20-23`） |
 | schema | `RuntimeConfigFile`（`:90-116`） | `AgentSettings`（`types.ts:47-55`） |
 | 生效状态 | **生效**（10 个字段） | **零消费者** |
 
@@ -242,7 +242,7 @@ grep -rni "latest-version\|checkUpdate\|updateCheck" packages/ts-shell/src --inc
 
 ## 5. 未能验证的项
 
-1. **`~/.private-agents/settings.json` 是否曾生效过**：只确认了当前零消费者，未追溯 git 历史确认它是否在某个已删除的路径下工作过。
+1. **`~/.cheers/settings.json` 是否曾生效过**：只确认了当前零消费者，未追溯 git 历史确认它是否在某个已删除的路径下工作过。
 2. **`tuiSettings.ts` 的写入是否与 `settingsLoader` 的 schema 兼容**：它用 `getSettingsPaths` 取路径但自己定义 `StoredTuiSettings`（`cli/interactive/tuiSettings.ts:21-26`），未验证两者写入同一文件时是否互相破坏。
 3. **pi 的 Radius 上传服务端行为**：只读了 `radius.ts` 与 `bug-report.ts` 的客户端代码，未验证服务端。
 4. **我们的 metrics 是否有外部消费者**：只做了源码内 grep；可能存在仓库外的仪表盘读取某种导出。

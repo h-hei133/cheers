@@ -285,18 +285,18 @@ Schema version: `MAJOR.MINOR.PATCH`
 
 Every session has a directory:
 ```
-~/.cache/coding-agents/sessions/{session-id}/
+~/.cheers/sessions/{session-id}/
 ├── metadata.json          # session config, timestamps, agent list
 ├── transcript.jsonl       # all turns (message, response, decision)
 ├── state.json             # current agent, turn count, context
-└── temp/                  # temporary files (auto-cleaned)
+└── state.lock             # lock held while the session state is written
 ```
 
 ### Recovery
 
 On CLI startup:
-1. List recent sessions: `cheer resume`
-2. Or create new: `cheer new`
+1. List recent sessions: `cheers resume`
+2. Or create new: `cheers new`
 3. Load session state
 4. Repair replayable transcript state if interruption left orphaned terminal events
 5. Read durable recovery facts from `state.json`

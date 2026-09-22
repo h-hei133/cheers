@@ -35,7 +35,7 @@ describe("browser execution receipt CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route104-home-"),
+      homeDir: tempRoot("cheers-route104-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -60,7 +60,7 @@ describe("browser execution receipt CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route104-home-"),
+      homeDir: tempRoot("cheers-route104-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -83,7 +83,7 @@ describe("browser execution receipt CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route104-home-"),
+      homeDir: tempRoot("cheers-route104-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -125,7 +125,7 @@ describe("browser execution receipt CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route104-home-"),
+      homeDir: tempRoot("cheers-route104-home-"),
     });
   }
 
@@ -159,7 +159,7 @@ describe("browser execution receipt CLI scenario examples", () => {
   }
 
   function projectRoot(): string {
-    const projectPath = tempRoot("private-agents-route104-project-");
+    const projectPath = tempRoot("cheers-route104-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 104 fixture\n", "utf8");
     return projectPath;
   }

@@ -10,7 +10,7 @@ import {
   parseCliArgs,
 } from "./cliArgs.js";
 
-const cwd = path.resolve("/tmp/private-agents-cli-args");
+const cwd = path.resolve("/tmp/cheers-cli-args");
 
 function expectParsed(args: readonly string[]) {
   const result = parseCliArgs(args, { cwd });

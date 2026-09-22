@@ -212,7 +212,7 @@ async function main() {
   console.log(`testRoot=${testRoot}`)
 
   if (!realHome) {
-    console.log('[CONFIG] real provider home is not configured; set PRIVATE_AGENTS_REAL_HOME to opt in')
+    console.log('[CONFIG] real provider home is not configured; set CHEERS_REAL_HOME to opt in')
     process.exit(3)
   }
   if (!fs.existsSync(realHome)) {
@@ -250,11 +250,11 @@ async function main() {
     env: {
       HOME: runtimeHome,
       USERPROFILE: runtimeHome,
-      PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
-      PRIVATE_AGENTS_REAL_HOME: realHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
-      PRIVATE_AGENTS_PROVIDER_TRANSPORT_DIAGNOSTICS: '1',
-      PRIVATE_AGENTS_PROVIDER_NO_PROXY: process.env.PRIVATE_AGENTS_PROVIDER_NO_PROXY ?? '*',
+      CHEERS_HOME_OVERRIDE: realHome,
+      CHEERS_REAL_HOME: realHome,
+      CHEERS_PROVIDER_MODE: 'real',
+      CHEERS_PROVIDER_TRANSPORT_DIAGNOSTICS: '1',
+      CHEERS_PROVIDER_NO_PROXY: process.env.CHEERS_PROVIDER_NO_PROXY ?? '*',
     },
     timeoutMs: 240000,
   })

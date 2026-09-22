@@ -11,7 +11,7 @@ import type { BrowserExecutionActionKind } from "./executionContract.js";
 import fs from "node:fs";
 
 export const BROWSER_CLI_EXTERNAL_NETWORK_RUNNER_MANIFEST_ENV =
-  "PRIVATE_AGENTS_BROWSER_EXTERNAL_NETWORK_RUNNER_MANIFEST";
+  "CHEERS_BROWSER_EXTERNAL_NETWORK_RUNNER_MANIFEST";
 
 export const BROWSER_EXTERNAL_NETWORK_RUNNER_MANIFEST_VERSION =
   "browser-external-network-runner-manifest/v1" as const;

@@ -68,7 +68,7 @@ export async function runLogCommand(
 
   if (subCommand === "export") {
     const targetPath =
-      args[1] || path.join(context.cwd, `coding-agent-debug-${Date.now()}.jsonl`);
+      args[1] || path.join(context.cwd, `cheers-debug-${Date.now()}.jsonl`);
     try {
       if (!fs.existsSync(currentPath)) {
         return {

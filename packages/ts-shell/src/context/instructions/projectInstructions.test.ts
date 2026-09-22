@@ -95,7 +95,25 @@ describe("instruction file discovery", () => {
     const root = await makeTree({
       ".git/HEAD": "ref: refs/heads/main\n",
       "AGENTS.md": "project rules",
-      "home/.cheer/AGENTS.md": "user rules",
+      "home/.cheers/AGENTS.md": "user rules",
+    });
+
+    const loaded = loadInstructionFiles({
+      cwd: root,
+      homeDir: path.join(root, "home"),
+    });
+
+    expect(loaded.files.map((file) => file.content)).toEqual(["user rules", "project rules"]);
+  });
+
+  it("finds the user file in a directory an earlier name left behind", async () => {
+    // The user file was written under a name this tool no longer uses. It is
+    // still the user's file, and reading only the current directory would drop
+    // rules they already wrote — the same loss as deleting them.
+    const root = await makeTree({
+      ".git/HEAD": "ref: refs/heads/main\n",
+      "AGENTS.md": "project rules",
+      "home/.private-agents/AGENTS.md": "user rules",
     });
 
     const loaded = loadInstructionFiles({

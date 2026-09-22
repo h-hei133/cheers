@@ -22,7 +22,7 @@ describe("compact command runner", () => {
         nextAction: "Run focused compact command tests.",
       },
       projectInfo: {
-        projectRoot: "/home/wang/projects/cheer",
+        projectRoot: "/home/wang/projects/cheers",
         safeToPersistProjectRoot: true,
         branch: "main",
         baseCommit: "abc123",

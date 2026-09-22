@@ -1,12 +1,12 @@
 import { Agent, ProxyAgent, fetch as undiciFetch } from "undici";
 
 export interface ProviderFetchEnvironment {
-  readonly PRIVATE_AGENTS_PROVIDER_PROXY?: string;
-  readonly PRIVATE_AGENTS_PROVIDER_NO_PROXY?: string;
-  readonly PRIVATE_AGENTS_PROVIDER_TRANSPORT_DIAGNOSTICS?: string;
-  readonly PRIVATE_AGENTS_PROVIDER_CONNECT_TIMEOUT_MS?: string;
-  readonly PRIVATE_AGENTS_PROVIDER_HEADERS_TIMEOUT_MS?: string;
-  readonly PRIVATE_AGENTS_PROVIDER_BODY_TIMEOUT_MS?: string;
+  readonly CHEERS_PROVIDER_PROXY?: string;
+  readonly CHEERS_PROVIDER_NO_PROXY?: string;
+  readonly CHEERS_PROVIDER_TRANSPORT_DIAGNOSTICS?: string;
+  readonly CHEERS_PROVIDER_CONNECT_TIMEOUT_MS?: string;
+  readonly CHEERS_PROVIDER_HEADERS_TIMEOUT_MS?: string;
+  readonly CHEERS_PROVIDER_BODY_TIMEOUT_MS?: string;
   readonly HTTPS_PROXY?: string;
   readonly https_proxy?: string;
   readonly HTTP_PROXY?: string;
@@ -72,19 +72,19 @@ export function resolveProviderTransportConfig(
   return {
     proxyUrl: resolveProxyUrl(env),
     noProxy: parseNoProxy(
-      env.PRIVATE_AGENTS_PROVIDER_NO_PROXY ?? env.NO_PROXY ?? env.no_proxy,
+      env.CHEERS_PROVIDER_NO_PROXY ?? env.NO_PROXY ?? env.no_proxy,
     ),
-    diagnosticsEnabled: isTruthy(env.PRIVATE_AGENTS_PROVIDER_TRANSPORT_DIAGNOSTICS),
+    diagnosticsEnabled: isTruthy(env.CHEERS_PROVIDER_TRANSPORT_DIAGNOSTICS),
     connectTimeoutMs: parsePositiveInteger(
-      env.PRIVATE_AGENTS_PROVIDER_CONNECT_TIMEOUT_MS,
+      env.CHEERS_PROVIDER_CONNECT_TIMEOUT_MS,
       DEFAULT_CONNECT_TIMEOUT_MS,
     ),
     headersTimeoutMs: parsePositiveInteger(
-      env.PRIVATE_AGENTS_PROVIDER_HEADERS_TIMEOUT_MS,
+      env.CHEERS_PROVIDER_HEADERS_TIMEOUT_MS,
       DEFAULT_HEADERS_TIMEOUT_MS,
     ),
     bodyTimeoutMs: parsePositiveInteger(
-      env.PRIVATE_AGENTS_PROVIDER_BODY_TIMEOUT_MS,
+      env.CHEERS_PROVIDER_BODY_TIMEOUT_MS,
       DEFAULT_BODY_TIMEOUT_MS,
     ),
   };
@@ -111,7 +111,7 @@ export function resolveTransportDecision(
 }
 
 function resolveProxyUrl(env: ProviderFetchEnvironment): string | undefined {
-  const explicit = normalizeText(env.PRIVATE_AGENTS_PROVIDER_PROXY);
+  const explicit = normalizeText(env.CHEERS_PROVIDER_PROXY);
   if (!explicit) {
     return undefined;
   }

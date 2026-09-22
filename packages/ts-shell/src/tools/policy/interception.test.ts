@@ -77,7 +77,7 @@ describe("tool interception contract", () => {
     expect(shouldPreventToolExecution(decision)).toBe(true);
     expect(decision.terminalSuccessClaim).toBe(false);
     expect(JSON.stringify(decision)).not.toMatch(
-      /raw-before|raw-after|private-agents-real|provider\.env/i,
+      /raw-before|raw-after|cheers-real|provider\.env/i,
     );
   });
 
@@ -136,7 +136,7 @@ describe("tool interception contract", () => {
       expect.arrayContaining(["terminal-success", "verification-success"]),
     );
     expect(JSON.stringify(annotation)).not.toMatch(
-      /hidden reasoning|sk-1234567890|private-agents-real|provider\.env/i,
+      /hidden reasoning|sk-1234567890|cheers-real|provider\.env/i,
     );
   });
 

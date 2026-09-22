@@ -186,7 +186,7 @@ function controlledHttpGet(
   return new Promise((resolve, reject) => {
     const request = http.get(url, {
       timeout: timeoutMs,
-      headers: { "user-agent": "private-agents-controlled-network-harness" },
+      headers: { "user-agent": "cheers-controlled-network-harness" },
     }, (response) => {
       const chunks: Buffer[] = [];
       let size = 0;

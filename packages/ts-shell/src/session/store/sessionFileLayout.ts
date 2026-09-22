@@ -1,12 +1,23 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
-import { userDataDirFor } from "../../core/paths/userHome.js";
+import { resolveAllUserDataFiles, userDataDirFor } from "../../core/paths/userHome.js";
 import * as path from "node:path";
 
 export interface SessionStoreLayout {
   readonly sessionsDir: string;
+  /**
+   * Every directory a session may already live in, current first.
+   *
+   * Sessions are a directory per id, so they are not resolved one file at a time
+   * the way a config is: a session written under an older name is still that
+   * session, and a listing or a resume that read only the current directory would
+   * lose it. New sessions are still created in {@link sessionsDir}.
+   */
+  readonly sessionsSearchDirs: readonly string[];
   readonly currentSessionStorePath: string;
+  /** Every pointer store that may already exist, current first. */
+  readonly currentSessionStoreSearchPaths: readonly string[];
 }
 
 export interface SessionFileLayout {
@@ -19,12 +30,26 @@ export interface SessionFileLayout {
 
 export function createSessionStoreLayout(homeDir?: string): SessionStoreLayout {
   const root = homeDir ?? process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
+  const sessionsDir = path.join(userDataDirFor(root), "sessions");
+  const currentSessionStorePath = path.join(
+    userDataDirFor(root),
+    "current-session.json",
+  );
   return {
-    sessionsDir: path.join(userDataDirFor(root), "sessions"),
-    currentSessionStorePath: path.join(
-      userDataDirFor(root),
-      "current-session.json",
-    ),
+    sessionsDir,
+    // `resolveAllUserDataFiles` returns only the directories that exist, so the
+    // current one is added when nothing is there yet: a fresh install still has
+    // one place to read from and one place to write to, and they are the same.
+    sessionsSearchDirs: [
+      ...new Set([sessionsDir, ...resolveAllUserDataFiles("sessions", root)]),
+    ],
+    currentSessionStorePath,
+    currentSessionStoreSearchPaths: [
+      ...new Set([
+        currentSessionStorePath,
+        ...resolveAllUserDataFiles("current-session.json", root),
+      ]),
+    ],
   };
 }
 
@@ -63,4 +88,29 @@ export function projectSessionFileLayout(input: {
     statePath: path.join(sessionDir, "state.json"),
     stateLockPath: path.join(sessionDir, "state.lock"),
   };
+}
+
+/**
+ * Where a session of this id actually is, current directory first.
+ *
+ * A session written before the state directory was renamed is still that session,
+ * so every caller that reads or writes one by id has to look in each directory the
+ * layout searched rather than assume the current one. Reading only
+ * {@link SessionStoreLayout.sessionsDir} finds nothing for a session an earlier
+ * name left behind — the file is there, the lookup just never asks about it.
+ *
+ * Falls back to the current directory, which is where a session that does not
+ * exist yet would be created.
+ */
+export function locateExistingSessionLayout(
+  layout: SessionStoreLayout,
+  sessionId: string,
+): SessionFileLayout {
+  for (const sessionsDir of layout.sessionsSearchDirs) {
+    const candidate = projectSessionFileLayout({ sessionsDir, sessionId });
+    if (fs.existsSync(candidate.sessionDir)) {
+      return candidate;
+    }
+  }
+  return projectSessionFileLayout({ sessionsDir: layout.sessionsDir, sessionId });
 }

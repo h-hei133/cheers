@@ -1,11 +1,20 @@
 const REAL_HOME_CONFIG_PATTERN =
-  /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.private-agents[\\/]+config\.json/gi;
+  /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.cheers[\\/]+config\.json/gi;
 
-const WINDOWS_PRIVATE_AGENTS_CONFIG_PATTERN =
-  /[A-Za-z]:[\\/]+[^\s"'`<>]+[\\/]+\.private-agents[\\/]+config\.json/gi;
+// Every directory a user config may be read from, not just the current one:
+// an older directory is still consulted when the current one has no file, so a
+// path under one of those names can reach a failure message just as easily.
+const USER_DATA_DIRS = "(?:cheers|cheer|private-agents|coding-agents)";
 
-const POSIX_PRIVATE_AGENTS_CONFIG_PATTERN =
-  /\/[^\s"'`<>]+\/\.private-agents\/config\.json/gi;
+const WINDOWS_CHEERS_CONFIG_PATTERN = new RegExp(
+  `[A-Za-z]:[\\\\/]+[^\\s"'\\\`<>]+[\\\\/]+\\.${USER_DATA_DIRS}[\\\\/]+config\\.json`,
+  "gi",
+);
+
+const POSIX_CHEERS_CONFIG_PATTERN = new RegExp(
+  `/[^\\s"'\\\`<>]+/\\.${USER_DATA_DIRS}/config\\.json`,
+  "gi",
+);
 
 const BEARER_TOKEN_PATTERN = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const AUTHORIZATION_BEARER_PATTERN =
@@ -34,6 +43,6 @@ export function redactProviderFailureDetail(input: string): string {
     .replace(OPENAI_STYLE_KEY_PATTERN, "[REDACTED_API_KEY]")
     .replace(SECRET_QUERY_PARAM_PATTERN, "$1[REDACTED]")
     .replace(REAL_HOME_CONFIG_PATTERN, "[REAL_PROVIDER_CONFIG_PATH]")
-    .replace(WINDOWS_PRIVATE_AGENTS_CONFIG_PATTERN, "[PRIVATE_AGENTS_CONFIG_PATH]")
-    .replace(POSIX_PRIVATE_AGENTS_CONFIG_PATTERN, "[PRIVATE_AGENTS_CONFIG_PATH]");
+    .replace(WINDOWS_CHEERS_CONFIG_PATTERN, "[CHEERS_CONFIG_PATH]")
+    .replace(POSIX_CHEERS_CONFIG_PATTERN, "[CHEERS_CONFIG_PATH]");
 }

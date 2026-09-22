@@ -92,7 +92,7 @@ numPassedTests = 2746
 当前实测失败面是 **2 个文件 / 3 个失败项**：
 
 1. `packages/ts-shell/src/session/longSessionDurability.test.ts`：2 项失败。测试在 `runFixture()` 中使用 `path.resolve(process.cwd(), "../..")` 计算 repoRoot；从仓库根启动时得到 `/home/wang`，于是寻找 `/home/wang/node_modules/tsx/dist/cli.mjs`，该路径不存在。相同测试在 package cwd 下才会把 `../..` 解析到仓库根。
-2. `packages/ts-shell/src/core/mcp/gateway.test.ts`：1 项失败。测试使用 `path.resolve(process.cwd(), "src/core/mcp/fixtures/mockMcpServer.mjs")`；从仓库根启动时得到 `/home/wang/projects/cheer/src/core/mcp/fixtures/mockMcpServer.mjs`，而实际 fixture 在 `packages/ts-shell/src/core/mcp/fixtures/mockMcpServer.mjs`。
+2. `packages/ts-shell/src/core/mcp/gateway.test.ts`：1 项失败。测试使用 `path.resolve(process.cwd(), "src/core/mcp/fixtures/mockMcpServer.mjs")`；从仓库根启动时得到 `/home/wang/projects/cheers/src/core/mcp/fixtures/mockMcpServer.mjs`，而实际 fixture 在 `packages/ts-shell/src/core/mcp/fixtures/mockMcpServer.mjs`。
 
 验证上述路径假设的命令：
 

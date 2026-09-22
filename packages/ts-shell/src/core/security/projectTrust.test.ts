@@ -119,7 +119,7 @@ describe("sensitive resource detection", () => {
   // has to see all of them, because it is what decides whether a user is asked.
   const sensitive = [
     ".agents/hooks.json",
-    ".private-agents.mcp.json",
+    ".cheers.mcp.json",
     "AGENTS.md",
     ".agents/sandbox.json",
     ".agents/skills/anything/SKILL.md",

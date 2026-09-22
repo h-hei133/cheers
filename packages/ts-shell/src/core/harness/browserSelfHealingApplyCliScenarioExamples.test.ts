@@ -154,7 +154,7 @@ describe("browser self-healing apply real CLI scenario examples", () => {
         repairStep("invalid-manifest", fixture.proposalIds.runnerBinding, invalidManifest, {
           assertions: [{ id: "invalid", kind: "stdout-contains", text: "Manifest could not be read or parsed." }],
         }),
-        repairStep("global", fixture.proposalIds.runnerBinding, "/etc/private-agents-browser.json", {
+        repairStep("global", fixture.proposalIds.runnerBinding, "/etc/cheers-browser.json", {
           assertions: [{ id: "global", kind: "stdout-contains", text: "global-manifest-scope" }],
         }),
         {
@@ -165,7 +165,7 @@ describe("browser self-healing apply real CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route115-home-"),
+      homeDir: tempRoot("cheers-route115-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -245,7 +245,7 @@ describe("browser self-healing apply real CLI scenario examples", () => {
         ...followUpSteps,
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route115-home-"),
+      homeDir: tempRoot("cheers-route115-home-"),
     });
   }
 
@@ -294,7 +294,7 @@ describe("browser self-healing apply real CLI scenario examples", () => {
   }
 
   function projectRoot(): string {
-    const projectPath = tempRoot("private-agents-route115-project-");
+    const projectPath = tempRoot("cheers-route115-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 115 fixture\n", "utf8");
     return projectPath;
   }

@@ -18,7 +18,7 @@ This is not a one-file slice and not a narrow projection task. The expected outc
 
 Target repository:
 
-/home/wang/projects/cheer
+/home/wang/projects/cheers
 
 Mature local implementation:
 

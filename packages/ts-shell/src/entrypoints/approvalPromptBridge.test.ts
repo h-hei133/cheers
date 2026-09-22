@@ -56,7 +56,7 @@ describe("approval prompt bridge", () => {
       prompt: createPrompt(),
       includeRisk: true,
       decisionSource: "default-deny",
-      lines: ["- Trust boundary project: coding-agents"],
+      lines: ["- Trust boundary project: cheers"],
     });
 
     expect(renderer.lines).toEqual([
@@ -67,7 +67,7 @@ describe("approval prompt bridge", () => {
       "- Target: npm test",
       "- Risk: high",
       "- Decision source: default-deny",
-      "- Trust boundary project: coding-agents",
+      "- Trust boundary project: cheers",
     ]);
   });
 
@@ -190,9 +190,9 @@ describe("approval prompt bridge", () => {
     expect(
       formatTrustPolicyUpdatedLine({
         scopeLabel: "shell:execute:npm-test",
-        projectRoot: "/tmp/coding-agents",
+        projectRoot: "/tmp/cheers",
       }),
-    ).toBe("Trust policy updated: shell:execute:npm-test @ coding-agents");
+    ).toBe("Trust policy updated: shell:execute:npm-test @ cheers");
     expect(formatApprovalConflictResolutionLine()).toBe(
       "Resolve approval conflict explicitly with --non-interactive-approval deny|allow-once|allow-always.",
     );
@@ -220,7 +220,7 @@ describe("approval prompt bridge", () => {
       decisionSource: "default-deny",
       persistent: false,
       cacheEffect: "none",
-      projectRoot: "/tmp/coding-agents",
+      projectRoot: "/tmp/cheers",
       cacheKey: "cache-key",
       scopeLabel: "shell:execute:npm-test",
       inputKey: "n",
@@ -234,7 +234,7 @@ describe("approval prompt bridge", () => {
       "approval-audit:decision-source=default-deny",
       "approval-audit:persistent=false",
       "approval-audit:cache-effect=none",
-      "approval-audit:project-root=/tmp/coding-agents",
+      "approval-audit:project-root=/tmp/cheers",
       "approval-audit:cache-key=cache-key",
       "approval-audit:scope=shell:execute:npm-test",
       "approval-audit:input-key=n",

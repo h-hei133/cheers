@@ -6,8 +6,8 @@ import { AuditTrail } from './auditTrail.js'
 import { SandboxEnforcer } from './sandboxEnforcer.js'
 import { SandboxPolicy } from './sandboxPolicy.js'
 
-const workspaceRoot = path.join(os.tmpdir(), 'private-agents-workspace')
-const auditLogPath = path.join(os.tmpdir(), 'private-agents-audit.jsonl')
+const workspaceRoot = path.join(os.tmpdir(), 'cheers-workspace')
+const auditLogPath = path.join(os.tmpdir(), 'cheers-audit.jsonl')
 
 async function waitForFileContent(filePath: string, expected: readonly string[]): Promise<string> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -20,7 +20,7 @@ async function waitForFileContent(filePath: string, expected: readonly string[])
 
 describe('sandbox policy and escalation workflow', () => {
   afterEach(() => {
-    delete process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH
+    delete process.env.CHEERS_AUDIT_LOG_PATH
     fs.rmSync(auditLogPath, { force: true })
   })
 
@@ -143,11 +143,11 @@ describe('sandbox policy and escalation workflow', () => {
   })
 
   it('uses explicit audit config before environment override', () => {
-    const envAuditPath = path.join(os.tmpdir(), 'private-agents-env-audit.jsonl')
-    const explicitAuditPath = path.join(os.tmpdir(), 'private-agents-explicit-audit.jsonl')
+    const envAuditPath = path.join(os.tmpdir(), 'cheers-env-audit.jsonl')
+    const explicitAuditPath = path.join(os.tmpdir(), 'cheers-explicit-audit.jsonl')
     fs.rmSync(envAuditPath, { force: true })
     fs.rmSync(explicitAuditPath, { force: true })
-    process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH = envAuditPath
+    process.env.CHEERS_AUDIT_LOG_PATH = envAuditPath
 
     const audit = new AuditTrail({ logFilePath: explicitAuditPath })
     try {
@@ -161,10 +161,10 @@ describe('sandbox policy and escalation workflow', () => {
     }
   })
 
-  it('uses PRIVATE_AGENTS_AUDIT_LOG_PATH when no explicit audit config is provided', () => {
-    const envAuditPath = path.join(os.tmpdir(), 'private-agents-env-audit.jsonl')
+  it('uses CHEERS_AUDIT_LOG_PATH when no explicit audit config is provided', () => {
+    const envAuditPath = path.join(os.tmpdir(), 'cheers-env-audit.jsonl')
     fs.rmSync(envAuditPath, { force: true })
-    process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH = envAuditPath
+    process.env.CHEERS_AUDIT_LOG_PATH = envAuditPath
 
     const audit = new AuditTrail()
     try {

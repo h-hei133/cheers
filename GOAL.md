@@ -1,4 +1,4 @@
-# GOAL.md - Coding Agents 核心演进目标与当前交付状态
+# GOAL.md - Cheers 核心演进目标与当前交付状态
 
 > **状态**：SOTA 工业级全栈智能体演进交付完成 (38 套件 / 245 项单测全绿，SOTA 弹性/持久化/通信全量落地)  
 > **分支**：`normproof-observation`  

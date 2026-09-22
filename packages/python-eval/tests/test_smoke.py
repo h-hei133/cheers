@@ -27,4 +27,4 @@ class TestPythonEvalSmoke:
         assert not validate_schema_version("1.0.0.0")
 
     def test_python_smoke_initialization(self) -> None:
-        assert os.environ.get("PRIVATE_AGENTS_FAIL_PYTHON_SMOKE") != "1"
+        assert os.environ.get("CHEERS_FAIL_PYTHON_SMOKE") != "1"

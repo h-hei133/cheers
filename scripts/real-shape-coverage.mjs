@@ -25,7 +25,7 @@ function parseArgs(argv) {
 }
 
 async function runCli(project, prompt) {
-  const home = process.env.PRIVATE_AGENTS_REAL_HOME || defaultRealHome;
+  const home = process.env.CHEERS_REAL_HOME || defaultRealHome;
   const args = [
     path.join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs"),
     "src/entrypoints/cli.tsx",

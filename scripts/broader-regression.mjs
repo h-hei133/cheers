@@ -50,7 +50,7 @@ function ensureEnvironmentBoundary() {
   const projectRootIsTestRoot = normalized.projectRoot === normalized.testRoot
   const executionFromTestRepoCopy =
     normalized.cwd.startsWith(`${normalized.testRoot}/`) &&
-    normalized.cwd.includes('private-coding-agents')
+    normalized.cwd.includes('cheers')
 
   const violations = []
   if (!cwdIsMainRepo) violations.push('cwd-not-main-repo')
@@ -79,16 +79,16 @@ function parseTierArg(argv) {
 }
 
 function resolveHomeDir() {
-  const forced = process.env.PRIVATE_AGENTS_TEST_HOME
-  if (forced && fs.existsSync(path.join(forced, '.private-agents', 'config.json'))) return forced
+  const forced = process.env.CHEERS_TEST_HOME
+  if (forced && fs.existsSync(path.join(forced, '.cheers', 'config.json'))) return forced
 
   const candidates = ['D:/Test/home-daily', 'D:/Test/home-fulltest2', 'D:/Test/home-fulltest', 'D:/Test/home-sf']
   for (const home of candidates) {
-    if (fs.existsSync(path.join(home, '.private-agents', 'config.json'))) return home
+    if (fs.existsSync(path.join(home, '.cheers', 'config.json'))) return home
   }
 
   const fallback = 'D:/Test/home-daily'
-  fs.mkdirSync(path.join(fallback, '.private-agents'), { recursive: true })
+  fs.mkdirSync(path.join(fallback, '.cheers'), { recursive: true })
   return fallback
 }
 
@@ -142,7 +142,7 @@ async function runCli(args, options = {}) {
       ...process.env,
       HOME: homeDir,
       USERPROFILE: homeDir,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      CHEERS_PROVIDER_MODE: 'real',
     },
     ...options,
   })
@@ -196,7 +196,7 @@ function hasProviderDrift(output) {
 }
 
 function readActiveConnectionId() {
-  const configPath = path.join(homeDir, '.private-agents', 'config.json')
+  const configPath = path.join(homeDir, '.cheers', 'config.json')
   if (!fs.existsSync(configPath)) return null
   try {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
@@ -256,7 +256,7 @@ async function runNonTtyCheck() {
         ...process.env,
         HOME: homeDir,
         USERPROFILE: homeDir,
-        PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+        CHEERS_PROVIDER_MODE: 'real',
       },
       stdio: ['pipe', 'pipe', 'pipe'],
     })
@@ -283,7 +283,7 @@ async function runNonTtyCheck() {
 }
 
 function scanSessions(currentRunSessionSet) {
-  const sessionsRoot = path.join(homeDir, '.private-agents', 'sessions')
+  const sessionsRoot = path.join(homeDir, '.cheers', 'sessions')
   if (!fs.existsSync(sessionsRoot)) {
     return {
       runId,
@@ -557,7 +557,7 @@ async function runP0Checks(currentRunSessionIds) {
   let dState = null
   let dStateOk = false
   if (dSessionId) {
-    const sessionDir = path.join(homeDir, '.private-agents', 'sessions', dSessionId)
+    const sessionDir = path.join(homeDir, '.cheers', 'sessions', dSessionId)
     const statePath = path.join(sessionDir, 'state.json')
     const txPath = path.join(sessionDir, 'transcript.jsonl')
     let tx = ''

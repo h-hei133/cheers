@@ -66,7 +66,7 @@ Inside the CLI, you can then submit a real task prompt directly at the `>` promp
 If you want to force the real-provider path during a session, set:
 
 ```powershell
-$env:PRIVATE_AGENTS_PROVIDER_MODE='real'
+$env:CHEERS_PROVIDER_MODE='real'
 npm start
 ```
 

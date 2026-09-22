@@ -56,11 +56,11 @@ read-only receipt is produced.
 
 ## Env / Config
 
-- `PRIVATE_AGENTS_ENABLE_PUBLIC_WEB_SMOKE=1`
-- `PRIVATE_AGENTS_PUBLIC_WEB_SMOKE_URL=<https-url>`
-- `PRIVATE_AGENTS_PUBLIC_WEB_SMOKE_METHOD=HEAD|GET` defaults to `HEAD`
-- `PRIVATE_AGENTS_PUBLIC_WEB_SMOKE_TIMEOUT_MS=<bounded-ms>`
-- `PRIVATE_AGENTS_PUBLIC_WEB_SMOKE_BYTE_BUDGET=<bounded-bytes>`
+- `CHEERS_ENABLE_PUBLIC_WEB_SMOKE=1`
+- `CHEERS_PUBLIC_WEB_SMOKE_URL=<https-url>`
+- `CHEERS_PUBLIC_WEB_SMOKE_METHOD=HEAD|GET` defaults to `HEAD`
+- `CHEERS_PUBLIC_WEB_SMOKE_TIMEOUT_MS=<bounded-ms>`
+- `CHEERS_PUBLIC_WEB_SMOKE_BYTE_BUDGET=<bounded-bytes>`
 
 The config parser never performs network calls. It rejects missing URLs when
 enabled, non-HTTPS URLs, credential URLs, private/local network URLs, and

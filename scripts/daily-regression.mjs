@@ -31,8 +31,8 @@ fs.mkdirSync(resultsDir, { recursive: true })
 fs.writeFileSync(path.join(testRoot, 'tmp-evidence-read.txt'), canonicalEvidence, 'utf8')
 
 function resolveHomeDir() {
-  const forced = process.env.PRIVATE_AGENTS_TEST_HOME
-  if (forced && fs.existsSync(path.join(forced, '.private-agents', 'config.json'))) {
+  const forced = process.env.CHEERS_TEST_HOME
+  if (forced && fs.existsSync(path.join(forced, '.cheers', 'config.json'))) {
     return forced
   }
 
@@ -44,13 +44,13 @@ function resolveHomeDir() {
   ]
 
   for (const home of candidates) {
-    if (fs.existsSync(path.join(home, '.private-agents', 'config.json'))) {
+    if (fs.existsSync(path.join(home, '.cheers', 'config.json'))) {
       return home
     }
   }
 
   const target = 'D:/Test/home-daily'
-  fs.mkdirSync(path.join(target, '.private-agents'), { recursive: true })
+  fs.mkdirSync(path.join(target, '.cheers'), { recursive: true })
   return target
 }
 
@@ -103,7 +103,7 @@ async function runCli(args, options = {}) {
       ...process.env,
       HOME: homeDir,
       USERPROFILE: homeDir,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real'
+      CHEERS_PROVIDER_MODE: 'real'
     },
     ...options
   })
@@ -155,7 +155,7 @@ function hasProviderDrift(output) {
 }
 
 function readActiveConnectionId() {
-  const configPath = path.join(homeDir, '.private-agents', 'config.json')
+  const configPath = path.join(homeDir, '.cheers', 'config.json')
   if (!fs.existsSync(configPath)) {
     return null
   }
@@ -225,7 +225,7 @@ async function runNonTtyCheck() {
         ...process.env,
         HOME: homeDir,
         USERPROFILE: homeDir,
-        PRIVATE_AGENTS_PROVIDER_MODE: 'real'
+        CHEERS_PROVIDER_MODE: 'real'
       },
       stdio: ['pipe', 'pipe', 'pipe']
     })
@@ -252,7 +252,7 @@ async function runNonTtyCheck() {
 }
 
 function scanSessions(currentRunSessionSet) {
-  const sessionsRoot = path.join(homeDir, '.private-agents', 'sessions')
+  const sessionsRoot = path.join(homeDir, '.cheers', 'sessions')
   if (!fs.existsSync(sessionsRoot)) {
     return {
       runId,
@@ -467,7 +467,7 @@ async function main() {
   let dStateOk = false
 
   if (sessionId) {
-    const sessionDir = path.join(homeDir, '.private-agents', 'sessions', sessionId)
+    const sessionDir = path.join(homeDir, '.cheers', 'sessions', sessionId)
     const statePath = path.join(sessionDir, 'state.json')
     const txPath = path.join(sessionDir, 'transcript.jsonl')
     let tx = ''

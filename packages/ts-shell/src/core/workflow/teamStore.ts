@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
+import { resolveUserDataFile } from "../../core/paths/userHome.js"
 
 export interface TeamMember {
   readonly agentId: string;
@@ -40,7 +40,7 @@ export interface TeamTask {
 
 /**
  * TeamConfigManager & MailboxMesh
- * Manages team membership (~/.cheer/teams/{team}/config.json) and point-to-point inboxes.
+ * Manages team membership (~/.cheers/teams/{team}/config.json) and point-to-point inboxes.
  */
 export class TeamConfigManager {
   private readonly teamId: string;
@@ -48,7 +48,10 @@ export class TeamConfigManager {
 
   constructor(sessionId: string) {
     this.teamId = `session-${sessionId.slice(0, 8)}`;
-    this.baseDir = path.join(userDataDir(), "teams", this.teamId);
+    // A team started before the directory was renamed is still this team, so an
+    // existing directory wins over the current one; otherwise the current one is
+    // where it is created.
+    this.baseDir = resolveUserDataFile(path.join("teams", this.teamId));
   }
 
   getTeamId(): string {
@@ -123,7 +126,8 @@ export class TaskStore {
 
   constructor(teamId: string) {
     this.teamId = teamId;
-    this.tasksDir = path.join(userDataDir(), "tasks", this.teamId);
+    // Same rule as teams: keep reading a queue that already exists elsewhere.
+    this.tasksDir = resolveUserDataFile(path.join("tasks", this.teamId));
     try {
       if (!fs.existsSync(this.tasksDir)) {
         fs.mkdirSync(this.tasksDir, { recursive: true });

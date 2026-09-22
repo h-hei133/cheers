@@ -752,4 +752,4 @@ Residue cleanup performed:
 - Restored generated audit appends in `.sisyphus/audit/permissions.jsonl`.
 - Restored generated audit appends in `packages/ts-shell/.sisyphus/audit/permissions.jsonl`.
 - Removed generated `undefined/`.
-- Removed generated `/tmp/private-agents-test/test-results/real-user-capabilities-report.json`.
+- Removed generated `/tmp/cheers-test/test-results/real-user-capabilities-report.json`.

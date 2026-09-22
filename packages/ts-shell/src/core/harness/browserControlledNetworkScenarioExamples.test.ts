@@ -183,7 +183,7 @@ describe("browser controlled-network scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route118-home-"),
+      homeDir: tempRoot("cheers-route118-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -270,7 +270,7 @@ describe("browser controlled-network scenario examples", () => {
   }
 
   function projectRoot(): string {
-    const projectPath = tempRoot("private-agents-route118-project-");
+    const projectPath = tempRoot("cheers-route118-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 118 fixture\n", "utf8");
     return projectPath;
   }

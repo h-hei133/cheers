@@ -232,7 +232,7 @@ async function publicReadOnlyFetch(input: {
       signal: controller.signal,
       headers: {
         "accept": "text/html,text/plain,application/json",
-        "user-agent": "private-agents-public-readonly-web",
+        "user-agent": "cheers-public-readonly-web",
       },
     });
     const body = input.method === "HEAD" ? "" : await response.text();

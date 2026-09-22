@@ -10,13 +10,13 @@ export interface MarketplaceSource {
 let marketplaceSources: MarketplaceSource[] = [
   {
     name: "official",
-    url: "https://github.com/private-coding-agents/marketplace",
+    url: "https://github.com/cheers/marketplace",
     description: "Official verified plugins directory",
     isDefault: true,
   },
   {
     name: "community",
-    url: "https://github.com/private-coding-agents/community-plugins",
+    url: "https://github.com/cheers/community-plugins",
     description: "Community curated agent capabilities and tools",
     isDefault: false,
   },
@@ -30,13 +30,13 @@ export function resetMarketplaceSources(): void {
   marketplaceSources = [
     {
       name: "official",
-      url: "https://github.com/private-coding-agents/marketplace",
+      url: "https://github.com/cheers/marketplace",
       description: "Official verified plugins directory",
       isDefault: true,
     },
     {
       name: "community",
-      url: "https://github.com/private-coding-agents/community-plugins",
+      url: "https://github.com/cheers/community-plugins",
       description: "Community curated agent capabilities and tools",
       isDefault: false,
     },

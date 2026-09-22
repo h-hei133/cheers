@@ -12,9 +12,9 @@ import type { BrowserExecutionConfirmationRecord } from "./executionConfirmation
 import type { BrowserExecutionActionKind } from "./executionContract.js";
 
 export const BROWSER_CLI_PUBLIC_READONLY_WEB_MANIFEST_ENV =
-  "PRIVATE_AGENTS_BROWSER_PUBLIC_READONLY_WEB_MANIFEST";
+  "CHEERS_BROWSER_PUBLIC_READONLY_WEB_MANIFEST";
 export const BROWSER_CLI_PUBLIC_READONLY_WEB_CONFIRM_ENV =
-  "PRIVATE_AGENTS_BROWSER_PUBLIC_READONLY_WEB_CONFIRM";
+  "CHEERS_BROWSER_PUBLIC_READONLY_WEB_CONFIRM";
 export const BROWSER_PUBLIC_READONLY_WEB_MANIFEST_VERSION =
   "browser-public-readonly-web-manifest/v1" as const;
 

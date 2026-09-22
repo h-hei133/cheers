@@ -12,7 +12,7 @@ bypass.
 
 Serena was available and used on both required repositories:
 
-- Current project: `/home/wang/projects/cheer`
+- Current project: `/home/wang/projects/cheers`
 - Pi reference repo: `/home/wang/projects/pi`
 
 Current project areas inspected:

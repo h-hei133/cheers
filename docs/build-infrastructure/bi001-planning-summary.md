@@ -8,7 +8,7 @@ This route created planning documents only. No product code was changed.
 
 Serena was used on both required repositories:
 
-- Current project: `/home/wang/projects/cheer`
+- Current project: `/home/wang/projects/cheers`
 - Pi reference repo: `/home/wang/projects/pi`
 
 Current project inspected areas:

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { userDataDirFor } from "../paths/userHome.js";
+import { resolveUserDataFile } from "../paths/userHome.js";
 
 /**
  * Durable per-project state for choices that outlive a turn.
@@ -68,7 +68,13 @@ export function projectStateDir(from: string): string {
   const root = projectRootOf(from);
   const home = process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
   const digest = crypto.createHash("sha256").update(root).digest("hex").slice(0, 8);
-  return path.join(userDataDirFor(home), "projects", `${path.basename(root)}-${digest}`);
+  // The directory is keyed by project path, so the name is stable across the
+  // rename and a project recorded under an older directory is found there rather
+  // than read as "nothing recorded".
+  return resolveUserDataFile(
+    path.join("projects", `${path.basename(root)}-${digest}`),
+    home,
+  );
 }
 
 /** Where this project's standing choices are recorded. */

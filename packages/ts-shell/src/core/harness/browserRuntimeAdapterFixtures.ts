@@ -18,7 +18,7 @@ export interface BrowserRuntimeAdapterFixture {
 }
 
 export function createBrowserRuntimeAdapterFixture(): BrowserRuntimeAdapterFixture {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-browser-runtime-adapter-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-browser-runtime-adapter-"));
   const runnerPath = path.join(root, "runner.mjs");
   fs.writeFileSync(runnerPath, runnerSource(), "utf8");
   const origin = "controlled-runtime://route124";

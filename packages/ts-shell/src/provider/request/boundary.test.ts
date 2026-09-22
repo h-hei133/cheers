@@ -81,7 +81,7 @@ describe("model request boundary", () => {
 
     expect(boundary.readinessStatus).toBe("blocked_missing_required_facts");
     expect(boundary.redaction.status).toBe("redacted");
-    expect(serialized).not.toMatch(/sk-1234567890|Bearer secret|token=secret|oldText=before|newText=after|private-agents-real|hidden reasoning/i);
+    expect(serialized).not.toMatch(/sk-1234567890|Bearer secret|token=secret|oldText=before|newText=after|cheers-real|hidden reasoning/i);
     expect(boundary.terminalSuccessClaim).toBe(false);
   });
 

@@ -179,7 +179,7 @@ describe("context state projection", () => {
     const projection = projectContextState({
       routeInfo: { routeId: "74", title: "context engineering", status: "active" },
       projectInfo: {
-        projectRoot: "/home/wang/projects/cheer",
+        projectRoot: "/home/wang/projects/cheers",
         safeToPersistProjectRoot: true,
         projectFacts: ["TypeScript control plane"],
       },

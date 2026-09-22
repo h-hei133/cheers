@@ -94,7 +94,7 @@ npx tsx /tmp/probe.mts
 | `agentMode` | `cli/interactive/sessionFacts.ts:59` 有 `?? "build"` 兜底 | 兜底掩盖 |
 | `permissionMode` | **零消费者** | 权限实际由 `cli/approval/permissionScope.ts` 的 `ask`/`accept-edits`/`allow-all` 三档驱动 |
 
-**影响**：这是一个**系统性配置失效**——用户在 `~/.private-agents/config.json` 或 `.private-agents.json` 里写的绝大多数设置都不生效，且没有任何提示。最直接的可见后果是**自动压缩在 64k 而非模型真实窗口触发**。
+**影响**：这是一个**系统性配置失效**——用户在 `~/.cheers/config.json` 或 `.cheers.json` 里写的绝大多数设置都不生效，且没有任何提示。最直接的可见后果是**自动压缩在 64k 而非模型真实窗口触发**。
 
 **注意**：`config/runtimeConfig.test.ts` 有 9 个测试且全部通过——因为 `:37-51` 的断言写的是 `expect(config).toEqual({ ... 那 10 个字段 })`（`:38` 起），**测试固化了缺陷本身**。
 
@@ -151,7 +151,7 @@ npx tsx /tmp/probe.mts
 
 ### 2.6 HTTP 超时只能靠环境变量（置信度：高）
 
-**证据（我们）**：`provider/request/fetch.ts:7-9` 读 `PRIVATE_AGENTS_PROVIDER_CONNECT_TIMEOUT_MS` / `..._HEADERS_TIMEOUT_MS` / `..._BODY_TIMEOUT_MS`；`:32-34` 默认 `30_000` / `120_000` / `120_000`。无配置文件入口。
+**证据（我们）**：`provider/request/fetch.ts:7-9` 读 `CHEERS_PROVIDER_CONNECT_TIMEOUT_MS` / `..._HEADERS_TIMEOUT_MS` / `..._BODY_TIMEOUT_MS`；`:32-34` 默认 `30_000` / `120_000` / `120_000`。无配置文件入口。
 
 **证据（pi）**：`src/core/http-dispatcher.ts:6` `DEFAULT_HTTP_IDLE_TIMEOUT_MS = 300_000`，`:8-14` `HTTP_IDLE_TIMEOUT_CHOICES` 提供 30s/1m/2m/5m/disabled 五档，并有 `parseHttpIdleTimeoutMs` 解析 `"disabled"` 与数字；`docs/settings.md` 暴露为 `httpIdleTimeoutMs`（设 0 关闭）。
 
@@ -250,4 +250,4 @@ grep -rn "websocket" packages/ts-shell/src --include='*.ts' | grep -v test   # �
 2. **`thinkingBudgets` 在 pi 侧的实际生效路径**：`docs/settings.md` 声明 Anthropic/Google/Bedrock 原生使用，但未验证 `compat.thinkingTokenBudgetField` 的具体落点。
 3. **cache warming 的收益量级**：pi 的 `IDLE_CONTINUATION_PROBABILITY = 0.15` 自称「measured from our own usage」，我们无法复核其测量方法，故只引用其机制不引用其收益数字。
 4. **`config/runtimeConfig.test.ts` 的 `:38` 断言**是否**有意**固化为「恰好这 10 个字段」——未追溯提交历史确认作者意图，只确认其当前效果是掩盖缺陷。
-5. **环境变量路径是否被实际使用**：`PRIVATE_AGENTS_PROVIDER_*_TIMEOUT_MS` 与 `AUTO_COMPACT_WINDOW` 是否有用户实际依赖，未调查。
+5. **环境变量路径是否被实际使用**：`CHEERS_PROVIDER_*_TIMEOUT_MS` 与 `AUTO_COMPACT_WINDOW` 是否有用户实际依赖，未调查。

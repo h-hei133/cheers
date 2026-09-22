@@ -36,7 +36,7 @@ describe("browser external runner CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route103-home-"),
+      homeDir: tempRoot("cheers-route103-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -72,7 +72,7 @@ describe("browser external runner CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route103-home-"),
+      homeDir: tempRoot("cheers-route103-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -97,7 +97,7 @@ describe("browser external runner CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route103-home-"),
+      homeDir: tempRoot("cheers-route103-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -148,7 +148,7 @@ describe("browser external runner CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route103-home-"),
+      homeDir: tempRoot("cheers-route103-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -174,7 +174,7 @@ describe("browser external runner CLI scenario examples", () => {
           },
         ]),
         projectPath: projectRoot(),
-        homeDir: tempRoot("private-agents-route103-home-"),
+        homeDir: tempRoot("cheers-route103-home-"),
       });
       expect(agentCliAssertionFailures(result)).toEqual([]);
     }
@@ -197,7 +197,7 @@ describe("browser external runner CLI scenario examples", () => {
   }
 
   function projectRoot(): string {
-    const projectPath = tempRoot("private-agents-route103-project-");
+    const projectPath = tempRoot("cheers-route103-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 103 fixture\n", "utf8");
     return projectPath;
   }

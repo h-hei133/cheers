@@ -7,7 +7,7 @@ function skill(name: string, overrides: Partial<Skill> = {}): Skill {
     name,
     description: `what ${name} is for`,
     body: `instructions for ${name}`,
-    filePath: `/home/someone/.private-agents/skills/${name}/SKILL.md`,
+    filePath: `/home/someone/.cheers/skills/${name}/SKILL.md`,
     source: "user",
     disableModelInvocation: false,
     ...overrides,
@@ -135,6 +135,6 @@ describe("skill body wrapping", () => {
     const result = await tool.execute({ name: "pdf" }, {} as never);
 
     expect(result.output).toContain("instructions for pdf");
-    expect(result.output).toContain("/home/someone/.private-agents/skills/pdf/SKILL.md");
+    expect(result.output).toContain("/home/someone/.cheers/skills/pdf/SKILL.md");
   });
 });

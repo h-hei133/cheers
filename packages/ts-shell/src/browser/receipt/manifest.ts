@@ -4,9 +4,9 @@ import fs from "node:fs";
 import { browserActionCacheEntryHasForbiddenContent } from "../actionCacheEntry.js";
 
 export const BROWSER_RECEIPT_CACHE_MANIFEST_ENV =
-  "PRIVATE_AGENTS_BROWSER_RECEIPT_CACHE_MANIFEST";
+  "CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST";
 export const BROWSER_RECEIPT_CACHE_ROOT_ENV =
-  "PRIVATE_AGENTS_BROWSER_RECEIPT_CACHE_ROOT";
+  "CHEERS_BROWSER_RECEIPT_CACHE_ROOT";
 
 export type BrowserReceiptCacheManifestVersion = "browser-receipt-cache-manifest/v1";
 export type BrowserReceiptCacheSource = "cli-harness" | "explicit-local" | "test-only";

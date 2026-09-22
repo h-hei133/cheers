@@ -42,7 +42,7 @@ function candidateCommands(candidates, args = ['--version']) {
 }
 
 export function detectPython() {
-  const configured = process.env.PRIVATE_AGENTS_PYTHON
+  const configured = process.env.CHEERS_PYTHON
   const knownConda = 'D:\\conda-envs\\coding_agents\\python.exe'
   const candidates = configured
     ? [configured, knownConda, 'python', 'py']
@@ -77,8 +77,8 @@ export function detectVitestModule(rootDir) {
 
 export function getExecutionPathLabel(rootDir = process.cwd()) {
   const candidates = [
-    path.join(os.homedir(), '.private-agents', 'config.json'),
-    path.join(rootDir, '.private-agents.json'),
+    path.join(os.homedir(), '.cheers', 'config.json'),
+    path.join(rootDir, '.cheers.json'),
   ]
 
   let daemonEnabledFromConfig

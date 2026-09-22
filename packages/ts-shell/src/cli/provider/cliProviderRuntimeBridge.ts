@@ -26,8 +26,8 @@ export function createCliProviderRuntimeBridge(input: {
         cliProvider: input.options.provider,
         cliApiKey: input.options.apiKey,
       }),
-    providerModeEnv: () => env.PRIVATE_AGENTS_PROVIDER_MODE,
+    providerModeEnv: () => env.CHEERS_PROVIDER_MODE,
     realProviderSmokeOptIn: () =>
-      env.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() === "1",
+      env.CHEERS_REAL_PROVIDER_SMOKE?.trim() === "1",
   };
 }

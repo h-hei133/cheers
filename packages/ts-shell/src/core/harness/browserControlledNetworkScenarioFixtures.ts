@@ -27,7 +27,7 @@ export async function createBrowserControlledNetworkScenarioFixture(input: {
   readonly unsafeManifest?: unknown;
 } = {}): Promise<BrowserControlledNetworkScenarioFixture> {
   const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), input.prefix ?? "private-agents-browser-controlled-network-"),
+    path.join(os.tmpdir(), input.prefix ?? "cheers-browser-controlled-network-"),
   );
   const server = await createBrowserControlledNetworkServer();
   const manifest = createBrowserControlledNetworkRunnerManifest({

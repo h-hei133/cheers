@@ -123,7 +123,7 @@ describe("verification loop boundary", () => {
     const serialized = JSON.stringify({ intent, result });
 
     expect(serialized).not.toMatch(
-      /raw provider output|hidden reasoning|token=secret|oldText=before|newText=after|Bearer abc|private-agents-real|sk-1234567890/i,
+      /raw provider output|hidden reasoning|token=secret|oldText=before|newText=after|Bearer abc|cheers-real|sk-1234567890/i,
     );
     expect(intent.redactionStatus).toBe("redacted");
     expect(result.redactionStatus).toBe("redacted");

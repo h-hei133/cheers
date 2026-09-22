@@ -64,8 +64,8 @@ for (const [key, value] of Object.entries(process.env)) {
 }
 env.HOME = syntheticHome
 env.USERPROFILE = syntheticHome
-env.PRIVATE_AGENTS_PROVIDER_MODE = 'synthetic'
-env.PRIVATE_AGENTS_REAL_HOME = ''
+env.CHEERS_PROVIDER_MODE = 'synthetic'
+env.CHEERS_REAL_HOME = ''
 
 const result = await run(
   process.execPath,

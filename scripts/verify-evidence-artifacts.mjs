@@ -19,7 +19,7 @@ const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
 const syntheticHome = getSyntheticHome()
 const realProviderHome = getRealProviderHome({ allowDefault: true })
 const targetProject = path.join(getTestRoot(), 'evidence-artifacts-gate')
-const sessionsRoot = path.join(syntheticHome, '.private-agents', 'sessions')
+const sessionsRoot = path.join(syntheticHome, '.cheers', 'sessions')
 const runId = `${Date.now()}`
 const successRelativePath = `scripts/evidence_success_${runId}.py`
 const successTargetPath = path.join(targetProject, successRelativePath)
@@ -187,7 +187,7 @@ async function runSuccessEvidenceCheck() {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs: 240000,
   })
@@ -262,7 +262,7 @@ async function runDeniedEvidenceCheck() {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs: 240000,
   })

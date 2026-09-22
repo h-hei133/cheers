@@ -30,7 +30,7 @@ export interface InstalledPlugin {
 }
 
 function getPluginStoragePath(): string {
-  const customPath = process.env.CODING_AGENTS_PLUGINS_FILE?.trim();
+  const customPath = process.env.CHEERS_PLUGINS_FILE?.trim();
   if (customPath) return customPath;
   return resolveUserDataFile("plugins.json");
 }

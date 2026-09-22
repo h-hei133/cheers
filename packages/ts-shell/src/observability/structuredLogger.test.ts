@@ -106,4 +106,28 @@ describe("Observability & RotatingFileSink Test Suite", () => {
     const createdFiles = fs.readdirSync(tempLogDir).filter((f) => f.startsWith("rotate-test"));
     expect(createdFiles.length).toBeGreaterThan(1);
   });
+
+  it("prunes logs written under a prefix an earlier name left behind", () => {
+    // Retention is a bound on disk use, so it has to see every file this tool
+    // wrote. A file from before the rename that the pattern does not match is
+    // never pruned, and it is the oldest one — exactly what the bound is for.
+    const stale = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const stamp = `${stale.getFullYear()}-${String(stale.getMonth() + 1).padStart(2, "0")}-${String(stale.getDate()).padStart(2, "0")}`;
+    const legacyFile = path.join(tempLogDir, `coding-agent.${stamp}.999999.log`);
+    fs.writeFileSync(legacyFile, "old entry\n", "utf8");
+
+    const sink = new RotatingFileSink({ logDir: tempLogDir, pid: 12345 });
+    sink.write({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      traceId: "t",
+      spanId: "s",
+      component: "Prune",
+      message: "trigger pruning",
+      fields: {},
+    });
+    sink.flushAndClose();
+
+    expect(fs.existsSync(legacyFile)).toBe(false);
+  });
 });

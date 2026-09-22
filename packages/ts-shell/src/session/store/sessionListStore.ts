@@ -15,6 +15,14 @@ export function listSessionRecords(input: {
   readonly loadSession: (sessionId: string) => Session;
   readonly warningState: SessionListWarningState;
   readonly warn: (message: string) => void;
+  /**
+   * Ids to leave out of this listing.
+   *
+   * When sessions are read from more than one directory, an id found in an
+   * earlier one must not be loaded again from a later one. Skipping rather than
+   * loading and discarding keeps a duplicate from being reported as unreadable.
+   */
+  readonly skipSessionIds?: ReadonlySet<string>;
 }): Session[] {
   try {
     const entries = fs.readdirSync(input.sessionsDir, { withFileTypes: true });
@@ -23,6 +31,9 @@ export function listSessionRecords(input: {
 
     for (const entry of entries) {
       if (!entry.isDirectory()) {
+        continue;
+      }
+      if (input.skipSessionIds?.has(entry.name)) {
         continue;
       }
 

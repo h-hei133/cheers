@@ -86,7 +86,7 @@ function parseArgs(argv) {
 }
 
 function sessionsRoot(home) {
-  return path.join(home, '.private-agents', 'sessions')
+  return path.join(home, '.cheers', 'sessions')
 }
 
 function findSession(options) {

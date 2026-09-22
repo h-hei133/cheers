@@ -225,7 +225,7 @@ if (next !== undefined) void this.run(next);   // 直接进 run
 
 ### 现象
 
-在 `/home/wang/projects/cheer` 下 `npm start`，状态栏显示
+在 `/home/wang/projects/cheers` 下 `npm start`，状态栏显示
 `/tmp/repproj` —— 一个与本次启动无关的目录。
 
 ### 根因
@@ -252,7 +252,7 @@ score += Math.floor(updatedAt / 1000);                                  // 时�
 
 ```
 /tmp/repproj  (7 分钟更新)  score = 1789791236
-coding-agents (优先根)      score = 1789790895
+cheers (优先根)      score = 1789790895
 差 = 341 点；+90 的根奖励仅占该差距的 26%
 ```
 

@@ -68,7 +68,7 @@ async function runFocusedTest(name, file, pattern, timeoutMs = 180000) {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs,
   })

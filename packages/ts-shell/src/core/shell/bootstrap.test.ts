@@ -14,7 +14,7 @@ describe('shell bootstrap', () => {
   let fakeHome = ''
 
   beforeEach(() => {
-    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-bootstrap-'))
+    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-bootstrap-'))
     process.env.USERPROFILE = fakeHome
   })
 
@@ -269,7 +269,7 @@ describe('shell bootstrap', () => {
   it('explains damaged current session pointer stores without restoring stale state', () => {
     const sessionManager = new SessionManager()
     const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-current-damaged-'))
-    const currentStorePath = path.join(fakeHome, '.cheer', 'current-session.json')
+    const currentStorePath = path.join(fakeHome, '.cheers', 'current-session.json')
     fs.mkdirSync(path.dirname(currentStorePath), { recursive: true })
     fs.writeFileSync(currentStorePath, '{broken', 'utf8')
 

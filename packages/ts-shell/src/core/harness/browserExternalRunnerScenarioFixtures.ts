@@ -29,7 +29,7 @@ export function createBrowserExternalRunnerScenarioFixture(input: {
   readonly kind?: BrowserExternalRunnerFixtureKind;
   readonly unsafeManifest?: unknown;
 } = {}): BrowserExternalRunnerScenarioFixture {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-browser-external-runner-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-browser-external-runner-"));
   const runnerPath = path.join(root, "runner.cjs");
   const manifestPath = path.join(root, "browser-external-runner-manifest.json");
   fs.writeFileSync(runnerPath, runnerScript(input.kind ?? "success"), "utf8");

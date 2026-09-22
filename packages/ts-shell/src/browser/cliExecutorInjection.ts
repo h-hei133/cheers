@@ -10,9 +10,9 @@ import {
 import type { BrowserLocalFixture } from "./localFixture.js";
 
 export const BROWSER_CLI_LOCAL_FIXTURE_MANIFEST_ENV =
-  "PRIVATE_AGENTS_BROWSER_LOCAL_FIXTURE_MANIFEST";
+  "CHEERS_BROWSER_LOCAL_FIXTURE_MANIFEST";
 export const BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV =
-  "PRIVATE_AGENTS_BROWSER_EXTERNAL_RUNNER_MANIFEST";
+  "CHEERS_BROWSER_EXTERNAL_RUNNER_MANIFEST";
 
 export type BrowserCliExecutorInjectionStatus =
   | "disabled"

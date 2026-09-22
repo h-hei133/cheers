@@ -21,8 +21,8 @@ describe("provider fetch transport", () => {
     const calls: Array<{ url: string; dispatcherName: string }> = [];
     const providerFetch = createProviderFetchFromEnv({
       env: {
-        PRIVATE_AGENTS_PROVIDER_PROXY: "http://127.0.0.1:7897",
-        PRIVATE_AGENTS_PROVIDER_NO_PROXY: "api.siliconflow.cn",
+        CHEERS_PROVIDER_PROXY: "http://127.0.0.1:7897",
+        CHEERS_PROVIDER_NO_PROXY: "api.siliconflow.cn",
       },
       fetchImpl: (async (input, init) => {
         calls.push({
@@ -61,7 +61,7 @@ describe("provider fetch transport", () => {
 
     expect(
       resolveProviderTransportConfig({
-        PRIVATE_AGENTS_PROVIDER_PROXY: "env",
+        CHEERS_PROVIDER_PROXY: "env",
         HTTPS_PROXY: "http://127.0.0.1:7897",
       }).proxyUrl,
     ).toBe("http://127.0.0.1:7897");
@@ -69,9 +69,9 @@ describe("provider fetch transport", () => {
 
   it("reports no-proxy star as direct even when a proxy is configured", () => {
     const config = resolveProviderTransportConfig({
-      PRIVATE_AGENTS_PROVIDER_PROXY: "http://127.0.0.1:7897",
-      PRIVATE_AGENTS_PROVIDER_NO_PROXY: "*",
-      PRIVATE_AGENTS_PROVIDER_TRANSPORT_DIAGNOSTICS: "1",
+      CHEERS_PROVIDER_PROXY: "http://127.0.0.1:7897",
+      CHEERS_PROVIDER_NO_PROXY: "*",
+      CHEERS_PROVIDER_TRANSPORT_DIAGNOSTICS: "1",
     });
 
     expect(config.diagnosticsEnabled).toBe(true);

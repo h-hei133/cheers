@@ -28,7 +28,7 @@ describe("browser Playwright local real CLI scenario examples", () => {
   }
 
   function projectRoot(): string {
-    const projectPath = tempRoot("private-agents-cli-route101-project-");
+    const projectPath = tempRoot("cheers-cli-route101-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 101 fixture\n", "utf8");
     return projectPath;
   }
@@ -57,7 +57,7 @@ describe("browser Playwright local real CLI scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-cli-route101-home-"),
+      homeDir: tempRoot("cheers-cli-route101-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -88,7 +88,7 @@ describe("browser Playwright local real CLI scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-cli-route102-home-"),
+      homeDir: tempRoot("cheers-cli-route102-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -127,7 +127,7 @@ describe("browser Playwright local real CLI scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-cli-route101-home-"),
+      homeDir: tempRoot("cheers-cli-route101-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -163,7 +163,7 @@ describe("browser Playwright local real CLI scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-cli-route101-home-"),
+      homeDir: tempRoot("cheers-cli-route101-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -198,7 +198,7 @@ describe("browser Playwright local real CLI scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-cli-route101-home-"),
+      homeDir: tempRoot("cheers-cli-route101-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);

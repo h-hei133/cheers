@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
-import { userDataDirFor } from "../core/paths/userHome.js";
+import { resolveUserDataFile } from "../core/paths/userHome.js";
 
 /**
  * OS-level isolation for shell commands.
@@ -77,7 +77,7 @@ const ALWAYS_HIDDEN = [".ssh", ".aws", ".gnupg", ".private-agents-real"];
  */
 export function readSandboxRules(workspaceRoot: string): SandboxRules {
   const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
-  const userRules = readRulesFile(path.join(userDataDirFor(home), CONFIG_NAME));
+  const userRules = readRulesFile(resolveUserDataFile(CONFIG_NAME, home));
   const projectRules = readRulesFile(path.join(workspaceRoot, ".agents", CONFIG_NAME));
   return tighten(userRules, projectRules);
 }

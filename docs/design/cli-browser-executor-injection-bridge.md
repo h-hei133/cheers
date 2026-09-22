@@ -41,7 +41,7 @@ blocked.
 
 The safest bridge is an explicit temporary manifest plus env pointer:
 
-- env var: `PRIVATE_AGENTS_BROWSER_LOCAL_FIXTURE_MANIFEST`
+- env var: `CHEERS_BROWSER_LOCAL_FIXTURE_MANIFEST`
 - value: path to a harness-created temp JSON manifest
 - default: absent, which returns a disabled/noop injection state
 - invalid or missing file: blocked with a safe manifest status and no raw
@@ -72,7 +72,7 @@ summaries.
 `browserCliScenarioFixtures.ts` creates the temp manifest and returns the
 single env var needed by `agentCliProcess.ts`. The existing CLI process wrapper
 continues to isolate `HOME`/`USERPROFILE`, disable provider mode, clear
-`PRIVATE_AGENTS_REAL_HOME`, and set `NO_PROXY=*`.
+`CHEERS_REAL_HOME`, and set `NO_PROXY=*`.
 
 The child process reads the env pointer through
 `browserCliExecutorInjection.ts`. No provider, model, MCP, Playwright, network,
@@ -155,7 +155,7 @@ path.
 ## Route 103 External Runner Manifest Note
 
 Route 103 adds a second explicit env pointer for external runner manifests:
-`PRIVATE_AGENTS_BROWSER_EXTERNAL_RUNNER_MANIFEST`. When present, the CLI bridge
+`CHEERS_BROWSER_EXTERNAL_RUNNER_MANIFEST`. When present, the CLI bridge
 validates the manifest, creates an external runner executor, and keeps the
 same local-fixture sandbox and no-network allowlist. Missing or invalid
 manifests remain disabled/blocked, and local-fixture plus `playwright-local`

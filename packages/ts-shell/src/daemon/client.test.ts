@@ -5,7 +5,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { executeLocally, isRustDaemonEnabled } from './client.js'
 function getExecutionPathLabel(rootDir: string): string {
-  const configFile = path.join(rootDir, '.private-agents.json')
+  const configFile = path.join(rootDir, '.cheers.json')
   let daemonEnabledFromConfig: boolean | undefined
   if (fs.existsSync(configFile)) {
     try {
@@ -96,8 +96,8 @@ describe('rust daemon feature flag', () => {
   let fakeRoot = ''
 
   beforeEach(() => {
-    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-daemon-home-'))
-    fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'private-agents-daemon-root-'))
+    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-daemon-home-'))
+    fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-daemon-root-'))
     process.env.USERPROFILE = fakeHome
     process.env.HOME = fakeHome
     delete process.env.DAEMON_ENABLED
@@ -128,7 +128,7 @@ describe('rust daemon feature flag', () => {
 
   it('reports ts-local when project config disables daemon mode', () => {
     fs.writeFileSync(
-      path.join(fakeRoot, '.private-agents.json'),
+      path.join(fakeRoot, '.cheers.json'),
       JSON.stringify({ daemonEnabled: false }),
       'utf8',
     )

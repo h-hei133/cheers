@@ -235,7 +235,7 @@ describe("shell recovery helpers", () => {
           reason: "terminal-evidence-indeterminate",
           detail: "terminal evidence is indeterminate",
           recoveryHint:
-            "Session sess_blocked is not recoverable. Start a fresh session or manually repair D:/home/.private-agents/sessions/sess_blocked.",
+            "Session sess_blocked is not recoverable. Start a fresh session or manually repair D:/home/.cheers/sessions/sess_blocked.",
         }),
       } as never,
       runtimeContext: {} as never,
@@ -680,7 +680,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-no-dup-resume-barrier-"),
+      path.join(os.tmpdir(), "cheers-no-dup-resume-barrier-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -748,7 +748,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-recovery-lifecycle-"),
+      path.join(os.tmpdir(), "cheers-recovery-lifecycle-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -824,7 +824,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-recovery-repair-summary-"),
+      path.join(os.tmpdir(), "cheers-recovery-repair-summary-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -1016,7 +1016,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-repeated-resume-"),
+      path.join(os.tmpdir(), "cheers-repeated-resume-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -1167,7 +1167,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-mixed-boundary-"),
+      path.join(os.tmpdir(), "cheers-mixed-boundary-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -1271,7 +1271,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cross-interrupt-runtime-"),
+      path.join(os.tmpdir(), "cheers-cross-interrupt-runtime-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -1409,7 +1409,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-approval-drift-recovery-"),
+      path.join(os.tmpdir(), "cheers-approval-drift-recovery-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -1532,7 +1532,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-approval-prompt-recovery-"),
+      path.join(os.tmpdir(), "cheers-approval-prompt-recovery-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -1643,7 +1643,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-recovery-bundle-audit-"),
+      path.join(os.tmpdir(), "cheers-recovery-bundle-audit-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -1891,7 +1891,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-recovery-error-audit-"),
+      path.join(os.tmpdir(), "cheers-recovery-error-audit-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -2081,7 +2081,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-repeated-resume-bundle-"),
+      path.join(os.tmpdir(), "cheers-repeated-resume-bundle-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -2315,7 +2315,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-handoff-recovery-"),
+      path.join(os.tmpdir(), "cheers-handoff-recovery-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -2497,7 +2497,7 @@ describe("shell recovery helpers", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-midturn-handoff-recovery-"),
+      path.join(os.tmpdir(), "cheers-midturn-handoff-recovery-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;

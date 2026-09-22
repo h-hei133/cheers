@@ -137,7 +137,7 @@ function ensureFixtureData() {
 }
 
 function removeSeededSessionDir() {
-  const sessionsRoot = path.join(syntheticHome, '.private-agents', 'sessions')
+  const sessionsRoot = path.join(syntheticHome, '.cheers', 'sessions')
   const sessionDir = path.join(sessionsRoot, seededSessionId)
   const resolvedSessionDir = path.resolve(sessionDir)
   const resolvedSyntheticHome = path.resolve(syntheticHome)
@@ -149,7 +149,7 @@ function removeSeededSessionDir() {
 
 function seedSessionForMigration() {
   removeSeededSessionDir()
-  const sessionDir = path.join(syntheticHome, '.private-agents', 'sessions', seededSessionId)
+  const sessionDir = path.join(syntheticHome, '.cheers', 'sessions', seededSessionId)
   fs.mkdirSync(sessionDir, { recursive: true })
   const now = new Date().toISOString()
   fs.writeFileSync(
@@ -198,7 +198,7 @@ async function runCli(args, options = {}) {
   const env = {
     HOME: syntheticHome,
     USERPROFILE: syntheticHome,
-    PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+    CHEERS_PROVIDER_MODE: 'synthetic',
     ...(options.env ?? {}),
   }
   return run(process.execPath, [tsxCliPath, cliEntryPath, ...args], {
@@ -248,7 +248,7 @@ async function runPackagedCli(args, options = {}) {
   const env = {
     HOME: syntheticHome,
     USERPROFILE: syntheticHome,
-    PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+    CHEERS_PROVIDER_MODE: 'synthetic',
     ...(options.env ?? {}),
   }
   return run(process.execPath, [packagedCliEntryPath, ...args], {
@@ -613,7 +613,7 @@ async function runSessionMigrationBoundary() {
   )
   if (!ok) return false
 
-  const sessionDir = path.join(syntheticHome, '.private-agents', 'sessions', seededSessionId)
+  const sessionDir = path.join(syntheticHome, '.cheers', 'sessions', seededSessionId)
   const metadata = readJson(path.join(sessionDir, 'metadata.json'))
   const state = readJson(path.join(sessionDir, 'state.json'))
   const expectedRoot = path.resolve(migratedProjectRoot)

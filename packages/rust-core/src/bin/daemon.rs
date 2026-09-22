@@ -1,8 +1,8 @@
-use private_agents_core::{
+use cheers_core::{
     execute_command, CancellationToken, CommandExecutionRequest, CommandExecutionResult,
     CommandExecutionStatus,
 };
-use private_agents_core::executor::FailureKind;
+use cheers_core::executor::FailureKind;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
 use std::collections::HashMap;

@@ -30,7 +30,7 @@ const compatibleProviders = new Set([
 const realHomePathPattern =
   /(?:\/[^\s"'`<>]*\.private-agents-real|[A-Za-z]:[\\/]+Test[\\/]+home-sf)(?:[\\/][^\s"'`<>]*)?/gi
 const providerConfigPathPattern =
-  /(?:\/[^\s"'`<>]*|[A-Za-z]:[\\/][^\s"'`<>]*)?[\\/]\.private-agents[\\/]config\.json/gi
+  /(?:\/[^\s"'`<>]*|[A-Za-z]:[\\/][^\s"'`<>]*)?[\\/]\.(?:cheers|cheer|private-agents|coding-agents)[\\/]config\.json/gi
 const bearerTokenPattern = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
 const authorizationBearerPattern =
   /\b(authorization\s*[:=]\s*)(["']?)Bearer\s+[A-Za-z0-9._~+/=-]+/gi
@@ -43,17 +43,17 @@ const secretQueryParamPattern =
 function usage() {
   console.log('Usage: npm run verify:provider-readiness:real')
   console.log('')
-  console.log('Default behavior: skip unless PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1 is set.')
+  console.log('Default behavior: skip unless CHEERS_REAL_PROVIDER_SMOKE=1 is set.')
   console.log('Required opt-in env:')
-  console.log('  PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1')
-  console.log('  PRIVATE_AGENTS_TEST_ROOT=<isolated test root>')
+  console.log('  CHEERS_REAL_PROVIDER_SMOKE=1')
+  console.log('  CHEERS_TEST_ROOT=<isolated test root>')
   console.log('Provider env may be supplied explicitly or by silently loading provider.env.')
-  console.log('  PRIVATE_AGENTS_REAL_PROVIDER=openai|openai-compatible|google|antigravity|claudecode')
-  console.log('  PRIVATE_AGENTS_PROVIDER=<same providers>  accepted alias')
-  console.log('  PRIVATE_AGENTS_REAL_API_KEY=<provider api key>')
+  console.log('  CHEERS_REAL_PROVIDER=openai|openai-compatible|google|antigravity|claudecode')
+  console.log('  CHEERS_PROVIDER=<same providers>  accepted alias')
+  console.log('  CHEERS_REAL_API_KEY=<provider api key>')
   console.log('  OPENAI_API_KEY / OPENAI_COMPATIBLE_API_KEY / GOOGLE_API_KEY / ANTIGRAVITY_API_KEY / CLAUDECODE_API_KEY')
-  console.log('  PRIVATE_AGENTS_REAL_BASE_URL=<base url>   required for OpenAI-compatible style providers')
-  console.log('  PRIVATE_AGENTS_REAL_MODEL=<model>         required for OpenAI-compatible style providers')
+  console.log('  CHEERS_REAL_BASE_URL=<base url>   required for OpenAI-compatible style providers')
+  console.log('  CHEERS_REAL_MODEL=<model>         required for OpenAI-compatible style providers')
   console.log('')
   console.log('This smoke never reads real user provider config directories.')
 }
@@ -186,9 +186,9 @@ function normalizeProvider(value) {
 function hasCompatibleBaseUrlHint(env) {
   return Boolean(
     getTrimmed(env, [
-      'PRIVATE_AGENTS_REAL_BASE_URL',
-      'PRIVATE_AGENTS_PROVIDER_BASE_URL',
-      'PRIVATE_AGENTS_BASE_URL',
+      'CHEERS_REAL_BASE_URL',
+      'CHEERS_PROVIDER_BASE_URL',
+      'CHEERS_BASE_URL',
       'OPENAI_COMPATIBLE_BASE_URL',
       'OPENAI_API_BASE',
       'OPENAI_API_BASE_URL',
@@ -201,8 +201,8 @@ function hasCompatibleBaseUrlHint(env) {
 
 function chooseProvider(env) {
   const explicit = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_PROVIDER',
-    'PRIVATE_AGENTS_PROVIDER',
+    'CHEERS_REAL_PROVIDER',
+    'CHEERS_PROVIDER',
   ])
   if (explicit) return normalizeProvider(explicit)
   if (
@@ -272,7 +272,7 @@ function providerSpecificModelNames(provider) {
 }
 
 function buildEffectiveEnv(processEnv) {
-  if (processEnv.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() !== '1') {
+  if (processEnv.CHEERS_REAL_PROVIDER_SMOKE?.trim() !== '1') {
     return {
       env: processEnv,
       configSource: 'not-loaded-no-opt-in',
@@ -280,12 +280,12 @@ function buildEffectiveEnv(processEnv) {
   }
 
   const providerEnvPath =
-    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
-    processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim() ||
+    processEnv.CHEERS_PROVIDER_ENV?.trim() ||
+    processEnv.CHEERS_REAL_PROVIDER_ENV?.trim() ||
     defaultProviderEnvPath
   const explicitProviderEnvPath = Boolean(
-    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
-      processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim(),
+    processEnv.CHEERS_PROVIDER_ENV?.trim() ||
+      processEnv.CHEERS_REAL_PROVIDER_ENV?.trim(),
   )
   const loaded = parseProviderEnvFile(providerEnvPath)
   if (!loaded.ok) {
@@ -316,49 +316,49 @@ function buildEffectiveEnv(processEnv) {
 }
 
 function validateEnv(env) {
-  const optIn = env.PRIVATE_AGENTS_REAL_PROVIDER_SMOKE?.trim() === '1'
+  const optIn = env.CHEERS_REAL_PROVIDER_SMOKE?.trim() === '1'
   if (!optIn) {
-    return { ok: false, skip: true, status: 'skip', code: 0, reason: 'set PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1 to run the real provider smoke' }
+    return { ok: false, skip: true, status: 'skip', code: 0, reason: 'set CHEERS_REAL_PROVIDER_SMOKE=1 to run the real provider smoke' }
   }
 
-  const testRoot = env.PRIVATE_AGENTS_TEST_ROOT?.trim()
+  const testRoot = env.CHEERS_TEST_ROOT?.trim()
   if (!testRoot) {
-    return { ok: false, status: 'missing-config', code: 3, reason: 'PRIVATE_AGENTS_TEST_ROOT is required and must point at an isolated temp directory' }
+    return { ok: false, status: 'missing-config', code: 3, reason: 'CHEERS_TEST_ROOT is required and must point at an isolated temp directory' }
   }
 
   const provider = chooseProvider(env)
   if (!provider) {
-    return { ok: false, status: 'missing-config', code: 3, reason: 'PRIVATE_AGENTS_REAL_PROVIDER or PRIVATE_AGENTS_PROVIDER is required' }
+    return { ok: false, status: 'missing-config', code: 3, reason: 'CHEERS_REAL_PROVIDER or CHEERS_PROVIDER is required' }
   }
   if (!allowedProviders.has(provider)) {
     return { ok: false, status: 'unsupported', code: 3, reason: `unsupported provider ${provider}` }
   }
 
   const apiKey = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_API_KEY',
+    'CHEERS_REAL_API_KEY',
     ...providerSpecificApiKeyNames(provider),
   ])
   if (!apiKey) {
-    return { ok: false, status: 'missing-key', code: 3, reason: `PRIVATE_AGENTS_REAL_API_KEY or ${getProviderEnvVar(provider)} is required` }
+    return { ok: false, status: 'missing-key', code: 3, reason: `CHEERS_REAL_API_KEY or ${getProviderEnvVar(provider)} is required` }
   }
 
   const baseUrl = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_BASE_URL',
-    'PRIVATE_AGENTS_PROVIDER_BASE_URL',
-    'PRIVATE_AGENTS_BASE_URL',
+    'CHEERS_REAL_BASE_URL',
+    'CHEERS_PROVIDER_BASE_URL',
+    'CHEERS_BASE_URL',
     ...providerSpecificBaseUrlNames(provider),
   ])
   const model = getTrimmed(env, [
-    'PRIVATE_AGENTS_REAL_MODEL',
-    'PRIVATE_AGENTS_PROVIDER_MODEL',
-    'PRIVATE_AGENTS_MODEL',
+    'CHEERS_REAL_MODEL',
+    'CHEERS_PROVIDER_MODEL',
+    'CHEERS_MODEL',
     ...providerSpecificModelNames(provider),
   ])
   if (compatibleProviders.has(provider) && !baseUrl) {
-    return { ok: false, status: 'missing-config', code: 3, reason: `${provider} requires PRIVATE_AGENTS_REAL_BASE_URL` }
+    return { ok: false, status: 'missing-config', code: 3, reason: `${provider} requires CHEERS_REAL_BASE_URL` }
   }
   if (compatibleProviders.has(provider) && !model) {
-    return { ok: false, status: 'missing-config', code: 3, reason: `${provider} requires PRIVATE_AGENTS_REAL_MODEL` }
+    return { ok: false, status: 'missing-config', code: 3, reason: `${provider} requires CHEERS_REAL_MODEL` }
   }
 
   return { ok: true, provider, apiKey, baseUrl, model, testRoot: path.resolve(testRoot) }
@@ -367,7 +367,7 @@ function validateEnv(env) {
 function writeRuntimeConfig(input) {
   const runtimeHome = path.join(input.testRoot, 'real-provider-readiness-smoke', 'runtime-home')
   const workspace = path.join(input.testRoot, 'real-provider-readiness-smoke', 'workspace')
-  const configDir = path.join(runtimeHome, '.private-agents')
+  const configDir = path.join(runtimeHome, '.cheers')
   const configPath = path.join(configDir, 'config.json')
   fs.mkdirSync(configDir, { recursive: true })
   fs.mkdirSync(workspace, { recursive: true })
@@ -458,7 +458,7 @@ async function runSmoke(config) {
   console.log(`runtimeHome=${runtimeHome}`)
   console.log('HOME isolated=yes')
   console.log('USERPROFILE isolated=yes')
-  console.log('PRIVATE_AGENTS_REAL_HOME=unset')
+  console.log('CHEERS_REAL_HOME=unset')
 
   const result = await run(process.execPath, [
     tsxCliPath,
@@ -476,9 +476,9 @@ async function runSmoke(config) {
     env: {
       HOME: runtimeHome,
       USERPROFILE: runtimeHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
-      PRIVATE_AGENTS_REAL_HOME: '',
-      PRIVATE_AGENTS_AUDIT_LOG: path.join(config.testRoot, 'real-provider-readiness-smoke', 'audit', 'permissions.jsonl'),
+      CHEERS_PROVIDER_MODE: 'real',
+      CHEERS_REAL_HOME: '',
+      CHEERS_AUDIT_LOG: path.join(config.testRoot, 'real-provider-readiness-smoke', 'audit', 'permissions.jsonl'),
       [getProviderEnvVar(config.provider)]: config.apiKey,
     },
     timeoutMs: 300000,
@@ -532,7 +532,7 @@ function runClassificationSelfTest() {
   }
 
   const redacted = summarizeOutput(
-    '/home/wang/.private-agents-real/.private-agents/config.json Authorization: Bearer sk-live-secret refresh_token=refresh-secret https://example.test/v1?api_key=sk-url-secret',
+    '/home/wang/.private-agents-real/.cheers/config.json Authorization: Bearer sk-live-secret refresh_token=refresh-secret https://example.test/v1?api_key=sk-url-secret',
   )
   const redactionPassed =
     redacted.includes('[REAL_PROVIDER_HOME]') &&
@@ -561,12 +561,12 @@ function runClassificationSelfTest() {
     {
       name: 'explicit-openai-compatible-alias',
       env: {
-        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '1',
-        PRIVATE_AGENTS_TEST_ROOT: '/tmp/private-agents-test/provider-readiness-self-test',
-        PRIVATE_AGENTS_REAL_PROVIDER: 'siliconflow',
-        PRIVATE_AGENTS_REAL_API_KEY: 'test-key',
-        PRIVATE_AGENTS_REAL_BASE_URL: 'https://example.test/v1',
-        PRIVATE_AGENTS_REAL_MODEL: 'test-model',
+        CHEERS_REAL_PROVIDER_SMOKE: '1',
+        CHEERS_TEST_ROOT: '/tmp/cheers-test/provider-readiness-self-test',
+        CHEERS_REAL_PROVIDER: 'siliconflow',
+        CHEERS_REAL_API_KEY: 'test-key',
+        CHEERS_REAL_BASE_URL: 'https://example.test/v1',
+        CHEERS_REAL_MODEL: 'test-model',
       },
       assert(result) {
         return result.ok === true && result.provider === 'openai-compatible'
@@ -575,8 +575,8 @@ function runClassificationSelfTest() {
     {
       name: 'openai-key-with-compatible-base-url',
       env: {
-        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '1',
-        PRIVATE_AGENTS_TEST_ROOT: '/tmp/private-agents-test/provider-readiness-self-test',
+        CHEERS_REAL_PROVIDER_SMOKE: '1',
+        CHEERS_TEST_ROOT: '/tmp/cheers-test/provider-readiness-self-test',
         OPENAI_API_KEY: 'test-key',
         BASE_URL: 'https://example.test/v1',
         MODEL: 'test-model',
@@ -588,9 +588,9 @@ function runClassificationSelfTest() {
     {
       name: 'opt-in-missing-key',
       env: {
-        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '1',
-        PRIVATE_AGENTS_TEST_ROOT: '/tmp/private-agents-test/provider-readiness-self-test',
-        PRIVATE_AGENTS_REAL_PROVIDER: 'openai',
+        CHEERS_REAL_PROVIDER_SMOKE: '1',
+        CHEERS_TEST_ROOT: '/tmp/cheers-test/provider-readiness-self-test',
+        CHEERS_REAL_PROVIDER: 'openai',
       },
       assert(result) {
         return result.status === 'missing-key' && result.code === 3

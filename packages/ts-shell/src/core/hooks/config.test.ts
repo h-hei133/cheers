@@ -74,12 +74,12 @@ describe("hook configuration loading", () => {
 
   it("reads the user-level file as well as the project one", () => {
     // The two scopes live in different places: a project keeps its tool
-    // definitions under `.agents`, the user's own under `.private-agents`, which
+    // definitions under `.agents`, the user's own under `.cheers`, which
     // is the same split the sandbox rules already use.
     const home = path.join(tempDir, "home");
-    fs.mkdirSync(path.join(home, ".private-agents"), { recursive: true });
+    fs.mkdirSync(path.join(home, ".cheers"), { recursive: true });
     fs.writeFileSync(
-      path.join(home, ".private-agents", "hooks.json"),
+      path.join(home, ".cheers", "hooks.json"),
       JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "user.sh" }] }] } }),
       "utf8",
     );

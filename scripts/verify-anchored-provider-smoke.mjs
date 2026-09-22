@@ -56,8 +56,8 @@ console.log('marker provider-smoke-session-continue')
 console.log('marker provider-smoke-no-apply')
 console.log('marker provider-smoke-raw-output-excluded')
 
-if (process.env.PRIVATE_AGENTS_ANCHORED_PROVIDER_SMOKE !== '1') {
-  console.log('[skip] anchored-real-provider-smoke-opt-in - set PRIVATE_AGENTS_ANCHORED_PROVIDER_SMOKE=1 to request the optional real-provider smoke')
+if (process.env.CHEERS_ANCHORED_PROVIDER_SMOKE !== '1') {
+  console.log('[skip] anchored-real-provider-smoke-opt-in - set CHEERS_ANCHORED_PROVIDER_SMOKE=1 to request the optional real-provider smoke')
 } else {
   console.log('[skip] anchored-real-provider-smoke-provider - no approved real-provider adapter is supplied by this verifier; module gate coverage proves safe provider-unavailable skip')
 }
@@ -69,9 +69,9 @@ const result = spawnSync(
     stdio: 'inherit',
     env: {
       ...process.env,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
-      PRIVATE_AGENTS_REAL_HOME: '',
-      PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '',
+      CHEERS_PROVIDER_MODE: 'synthetic',
+      CHEERS_REAL_HOME: '',
+      CHEERS_REAL_PROVIDER_SMOKE: '',
     },
   },
 )

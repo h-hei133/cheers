@@ -2,11 +2,11 @@ import { sanitizeBrowserText } from "../../browser/capabilityModel.js";
 import { isPrivateNetworkHost, parseBrowserNetworkTarget } from "../../browser/networkAllowlist.js";
 import type { BrowserPublicReadOnlyWebMethod } from "../../browser/publicReadOnlyWebManifest.js";
 
-export const PUBLIC_WEB_SMOKE_ENABLE_ENV = "PRIVATE_AGENTS_ENABLE_PUBLIC_WEB_SMOKE";
-export const PUBLIC_WEB_SMOKE_URL_ENV = "PRIVATE_AGENTS_PUBLIC_WEB_SMOKE_URL";
-export const PUBLIC_WEB_SMOKE_METHOD_ENV = "PRIVATE_AGENTS_PUBLIC_WEB_SMOKE_METHOD";
-export const PUBLIC_WEB_SMOKE_TIMEOUT_ENV = "PRIVATE_AGENTS_PUBLIC_WEB_SMOKE_TIMEOUT_MS";
-export const PUBLIC_WEB_SMOKE_BYTE_BUDGET_ENV = "PRIVATE_AGENTS_PUBLIC_WEB_SMOKE_BYTE_BUDGET";
+export const PUBLIC_WEB_SMOKE_ENABLE_ENV = "CHEERS_ENABLE_PUBLIC_WEB_SMOKE";
+export const PUBLIC_WEB_SMOKE_URL_ENV = "CHEERS_PUBLIC_WEB_SMOKE_URL";
+export const PUBLIC_WEB_SMOKE_METHOD_ENV = "CHEERS_PUBLIC_WEB_SMOKE_METHOD";
+export const PUBLIC_WEB_SMOKE_TIMEOUT_ENV = "CHEERS_PUBLIC_WEB_SMOKE_TIMEOUT_MS";
+export const PUBLIC_WEB_SMOKE_BYTE_BUDGET_ENV = "CHEERS_PUBLIC_WEB_SMOKE_BYTE_BUDGET";
 
 export type BrowserPublicReadOnlyWebSmokeConfigStatus = "disabled" | "ready" | "blocked";
 

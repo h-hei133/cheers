@@ -82,7 +82,7 @@ describe("loop context rebuild input", () => {
     const serialized = JSON.stringify(rebuildInput);
 
     expect(serialized).not.toMatch(
-      /private-agents-real|token=secret|oldText=before|newText=after/i,
+      /cheers-real|token=secret|oldText=before|newText=after/i,
     );
     expect(rebuildInput.redaction.status).toBe("redacted");
   });

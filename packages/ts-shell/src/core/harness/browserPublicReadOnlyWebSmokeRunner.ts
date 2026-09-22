@@ -52,7 +52,7 @@ export async function runBrowserPublicReadOnlyWebSmoke(input: {
       reason: input.config.reason,
       warnings: input.config.warnings,
       evidence: input.config.evidence,
-      nextAction: "Set PRIVATE_AGENTS_ENABLE_PUBLIC_WEB_SMOKE=1 with an explicit HTTPS URL to run the smoke.",
+      nextAction: "Set CHEERS_ENABLE_PUBLIC_WEB_SMOKE=1 with an explicit HTTPS URL to run the smoke.",
     });
   }
   if (input.config.status === "blocked" || !input.config.url || !input.config.origin) {

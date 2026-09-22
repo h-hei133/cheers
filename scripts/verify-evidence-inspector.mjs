@@ -16,7 +16,7 @@ const realProviderHome = 'D:/Test/home-sf'
 const successProject = 'D:/Test/evidence-inspector-success'
 const deniedProject = 'D:/Test/evidence-inspector-denied'
 const partialFixtureRoot = `D:/Test/evidence-inspector-partial-fixtures/${Date.now()}`
-const sessionsRoot = path.join(syntheticHome, '.private-agents', 'sessions')
+const sessionsRoot = path.join(syntheticHome, '.cheers', 'sessions')
 const runId = `${Date.now()}`
 const successRelativePath = `scripts/inspector_success_${runId}.py`
 
@@ -137,7 +137,7 @@ async function runCli(projectRoot, prompt, approval) {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs: 240000,
   })
@@ -155,7 +155,7 @@ async function inspectProject(projectRoot) {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs: 120000,
   })
@@ -170,7 +170,7 @@ async function runInspectorHelp() {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs: 120000,
   })
@@ -196,7 +196,7 @@ async function inspectSessionDir(sessionDir) {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs: 120000,
   })

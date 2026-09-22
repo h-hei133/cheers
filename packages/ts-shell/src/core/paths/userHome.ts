@@ -1,11 +1,12 @@
 /**
  * Where this tool keeps the state that belongs to the person using it.
  *
- * The name changed once already, and the two old directories are still on disk
- * with real content in them: `~/.private-agents` holds settings, skills and
- * sessions, `~/.coding-agents` holds logs, plugins and trust decisions. Losing
- * them would mean re-authoring skills and re-approving hooks, so reads consult
- * the old locations rather than pretending they are not there.
+ * The name has changed twice, and the earlier directories are still on disk with
+ * real content in them: `~/.cheer` holds sessions, teams and tasks,
+ * `~/.private-agents` holds settings, skills and sessions, and `~/.coding-agents`
+ * holds logs, plugins and trust decisions. Losing them would mean re-authoring
+ * skills and re-approving hooks, so reads consult the old locations rather than
+ * pretending they are not there.
  *
  * Reads therefore try the current directory first and each earlier one after it,
  * while writes always land in the current one. That ordering is what makes the
@@ -23,7 +24,7 @@ import os from "node:os";
 import path from "node:path";
 
 /** The directory in use now. */
-const CURRENT_DIRECTORY_NAME = ".cheer";
+const CURRENT_DIRECTORY_NAME = ".cheers";
 
 /**
  * Where the same state used to live, most recent first.
@@ -31,7 +32,7 @@ const CURRENT_DIRECTORY_NAME = ".cheer";
  * Nothing writes here any more. They are read so that an existing installation
  * keeps working, and dropped when a future release no longer expects them.
  */
-const LEGACY_DIRECTORY_NAMES = [".private-agents", ".coding-agents"] as const;
+const LEGACY_DIRECTORY_NAMES = [".cheer", ".private-agents", ".coding-agents"] as const;
 
 /** The home directory to resolve against, honouring the environment override. */
 export function userHomeDir(): string {
@@ -104,7 +105,10 @@ export function resolveUserDataFile(relativePath: string, root?: string): string
  * Every existing path for `relativePath`, current first.
  *
  * For the callers that merge rather than choose — reading a whole directory of
- * skills, say, where an older file is not superseded but additional.
+ * skills, say, where an older file is not superseded but additional. Works for a
+ * directory as well as a file: state that is a tree rather than one file
+ * (sessions, teams, tasks) is found the same way, and a caller that read only the
+ * current name would lose what an older installation already has.
  */
 export function resolveAllUserDataFiles(relativePath: string, root?: string): readonly string[] {
   const dirs = root === undefined ? userDataSearchDirs() : userDataSearchDirsFor(root);

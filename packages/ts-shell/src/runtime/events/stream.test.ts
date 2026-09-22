@@ -347,7 +347,7 @@ describe("JSON runtime event stream projection", () => {
     expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
     expect(stream[0]?.notProvenClaims).toContain("terminal-success");
     expect(serialized).not.toMatch(
-      /token=secret|oldText=before|newText=after|private-agents-real/i,
+      /token=secret|oldText=before|newText=after|cheers-real/i,
     );
   });
 
@@ -416,7 +416,7 @@ describe("JSON runtime event stream projection", () => {
     expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
     expect(stream[0]?.notProvenClaims).toContain("terminal-success");
     expect(serialized).not.toMatch(
-      /private-agents-real|raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+      /cheers-real|raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
     );
   });
 
@@ -452,7 +452,7 @@ describe("JSON runtime event stream projection", () => {
     expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
     expect(stream[0]?.notProvenClaims).toContain("terminal-success");
     expect(serialized).not.toMatch(
-      /private-agents-real|raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+      /cheers-real|raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
     );
   });
 
@@ -615,7 +615,7 @@ describe("JSON runtime event stream projection", () => {
     expect(stream[0]?.truthfulness.terminalSuccessClaim).toBe(false);
     expect(stream[0]?.notProvenClaims).toContain("terminal-success");
     expect(serialized).not.toMatch(
-      /private-agents-real|raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
+      /cheers-real|raw provider output|hidden reasoning|token=secret|oldText=before|newText=after/i,
     );
   });
 
@@ -646,7 +646,7 @@ describe("JSON runtime event stream projection", () => {
     const serialized = serializeJsonRuntimeEventStream(stream);
 
     expect(serialized).not.toMatch(
-      /private-agents-real|sk-1234567890|hidden reasoning|token=secret|oldText=before|newText=after|unsafe file contents|not json/i,
+      /cheers-real|sk-1234567890|hidden reasoning|token=secret|oldText=before|newText=after|unsafe file contents|not json/i,
     );
     expect(stream[0]?.facts).not.toHaveProperty("dropped");
     expect(stream[0]?.facts).not.toHaveProperty("fn");

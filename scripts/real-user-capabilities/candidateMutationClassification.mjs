@@ -47,7 +47,7 @@ export function route02FailureClassForCandidate(fields) {
     combined.includes('config') ||
     combined.includes('not clean') ||
     combined.includes('status could not be checked') ||
-    combined.includes('set private_agents_real_home')
+    combined.includes('set cheers_real_home')
   ) {
     return 'config'
   }

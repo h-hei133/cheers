@@ -9,7 +9,7 @@ This file is the startup index for agents working in this repository. Keep it co
 Writable target repository:
 
 ```text
-/home/wang/projects/cheer
+/home/wang/projects/cheers
 ```
 
 Only this repository may be modified. Reference repositories are read-only and are used only for targeted semantic comparison.

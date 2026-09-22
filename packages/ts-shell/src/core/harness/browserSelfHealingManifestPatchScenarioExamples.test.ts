@@ -195,7 +195,7 @@ describe("browser self-healing manifest patch scenario examples", () => {
         status: "passed",
         process: {
           spec: {
-            command: "private-agents",
+            command: "cheers",
             args: ["/browser", "repair"],
             cwd: "/tmp",
             timeoutMs: 1000,

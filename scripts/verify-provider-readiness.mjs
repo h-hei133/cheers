@@ -18,16 +18,16 @@ const classificationSelfTest = process.argv.includes('--classification-self-test
 const preflightOnly = process.argv.includes('--preflight-only')
 const baselineSmoke = process.argv.includes('--baseline-smoke')
 const expectedBaselineBaseUrl =
-  process.env.PRIVATE_AGENTS_EXPECT_PROVIDER_BASE_URL?.trim() ||
+  process.env.CHEERS_EXPECT_PROVIDER_BASE_URL?.trim() ||
   'https://api.siliconflow.cn/v1'
 const expectedBaselineModel =
-  process.env.PRIVATE_AGENTS_EXPECT_MODEL?.trim() ||
+  process.env.CHEERS_EXPECT_MODEL?.trim() ||
   'deepseek-ai/DeepSeek-V4-Flash'
 const providerProxy =
-  process.env.PRIVATE_AGENTS_PROVIDER_PROXY?.trim() ||
+  process.env.CHEERS_PROVIDER_PROXY?.trim() ||
   undefined
 const providerNoProxy =
-  process.env.PRIVATE_AGENTS_PROVIDER_NO_PROXY?.trim() ||
+  process.env.CHEERS_PROVIDER_NO_PROXY?.trim() ||
   process.env.NO_PROXY?.trim() ||
   process.env.no_proxy?.trim() ||
   undefined
@@ -37,7 +37,7 @@ const networkFailurePattern =
 const configFailurePattern =
   /(provider-readiness:(missing-key|missing-config|auth|unsupported-provider)|missing.*config|failed to parse.*config|config\.json|api key|apikey|not connected|connect first|credentials|authentication was rejected|401|403)/i
 const realHomeConfigPattern =
-  /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.private-agents[\\/]+config\.json/gi
+  /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.(?:cheers|cheer|private-agents|coding-agents)[\\/]+config\.json/gi
 const bearerTokenPattern = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
 const authorizationBearerPattern =
   /\b(authorization\s*[:=]\s*)(["']?)Bearer\s+[A-Za-z0-9._~+/=-]+/gi
@@ -123,15 +123,15 @@ function renderPresence(value) {
 
 function resolveProviderTransport() {
   const connectTimeoutMs = parsePositiveInteger(
-    process.env.PRIVATE_AGENTS_PROVIDER_CONNECT_TIMEOUT_MS,
+    process.env.CHEERS_PROVIDER_CONNECT_TIMEOUT_MS,
     30000,
   )
   const headersTimeoutMs = parsePositiveInteger(
-    process.env.PRIVATE_AGENTS_PROVIDER_HEADERS_TIMEOUT_MS,
+    process.env.CHEERS_PROVIDER_HEADERS_TIMEOUT_MS,
     120000,
   )
   const bodyTimeoutMs = parsePositiveInteger(
-    process.env.PRIVATE_AGENTS_PROVIDER_BODY_TIMEOUT_MS,
+    process.env.CHEERS_PROVIDER_BODY_TIMEOUT_MS,
     120000,
   )
   const explicitProxy = providerProxy?.toLowerCase() === 'env'
@@ -203,10 +203,10 @@ function loadConfig() {
     return {
       ok: false,
       status: 'config-failure',
-      reason: 'real provider home is not configured; set PRIVATE_AGENTS_REAL_HOME on Linux/WSL to opt in',
+      reason: 'real provider home is not configured; set CHEERS_REAL_HOME on Linux/WSL to opt in',
     }
   }
-  const configPath = path.join(realHome, '.private-agents', 'config.json')
+  const configPath = path.join(realHome, '.cheers', 'config.json')
   if (!fs.existsSync(realHome)) {
     return { ok: false, status: 'config-failure', reason: `${realHome} missing` }
   }
@@ -380,7 +380,7 @@ function runClassificationSelfTest() {
     {
       name: 'redacted-config',
       result: {
-        output: 'Failed to parse D:/Test/home-sf/.private-agents/config.json: access_token=acct-secret',
+        output: 'Failed to parse D:/Test/home-sf/.cheers/config.json: access_token=acct-secret',
         timedOut: false,
       },
       expectedStatus: 'config-failure',
@@ -414,7 +414,7 @@ function runClassificationSelfTest() {
   }
 
   const redactionSample = summarizeOutput(
-    'D:/Test/home-sf/.private-agents/config.json Authorization: Bearer sk-live-secret refresh_token=refresh-secret https://example.test/v1?api_key=sk-url-secret',
+    'D:/Test/home-sf/.cheers/config.json Authorization: Bearer sk-live-secret refresh_token=refresh-secret https://example.test/v1?api_key=sk-url-secret',
   )
   const redactionPassed =
     redactionSample.includes('[REAL_PROVIDER_CONFIG_PATH]') &&
@@ -424,7 +424,7 @@ function runClassificationSelfTest() {
     !redactionSample.includes('sk-live-secret') &&
     !redactionSample.includes('refresh-secret') &&
     !redactionSample.includes('sk-url-secret') &&
-    !redactionSample.includes('.private-agents/config.json')
+    !redactionSample.includes('.cheers/config.json')
   printStep(
     'provider-readiness-redaction-self-test',
     redactionPassed ? 'pass' : 'product-regression',
@@ -452,7 +452,7 @@ async function runRealProviderSmoke() {
     env: {
       HOME: realHome,
       USERPROFILE: realHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      CHEERS_PROVIDER_MODE: 'real',
     },
     timeoutMs: 300000,
   })

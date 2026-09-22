@@ -692,7 +692,7 @@ as an import-policing rule.
   verifier, fake/live report parity, and live smoke failure taxonomy over the
   Route 196 smoke surface.
 - Route 198 hardens that path so explicit
-  `PRIVATE_AGENTS_LIVE_ANCHORED_PROVIDER_SMOKE=1` is preserved by the verifier
+  `CHEERS_LIVE_ANCHORED_PROVIDER_SMOKE=1` is preserved by the verifier
   and unavailable provider readiness safe-skips without provider calls.
 - Live smoke calibration now normalizes lifecycle, analysis, Plan Quality,
   context packet/graph, code graph, execution-plan, and redaction evidence from
@@ -714,9 +714,9 @@ as an import-policing rule.
   confirmation, existing exact apply lane, snapshot/recovery evidence, safe
   readback verification, result/session evidence, and scorecard markers.
 - Default verifier mode safe-skips provider and apply. Live provider calls
-  require `PRIVATE_AGENTS_REAL_PROVIDER_SMOKE=1` plus
-  `PRIVATE_AGENTS_LIVE_TASK_LOOP_SMOKE=1`, and controlled fixture apply also
-  requires `PRIVATE_AGENTS_CONFIRM_TASK_LOOP_APPLY=1`.
+  require `CHEERS_REAL_PROVIDER_SMOKE=1` plus
+  `CHEERS_LIVE_TASK_LOOP_SMOKE=1`, and controlled fixture apply also
+  requires `CHEERS_CONFIRM_TASK_LOOP_APPLY=1`.
 - Apply reuses existing proposal hunk-set / fenced edit routes and remains
   limited to the controlled temp fixture. Provider output never grants mutation
   authority, and apply never calls the provider.

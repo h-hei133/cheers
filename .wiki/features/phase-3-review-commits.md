@@ -41,7 +41,7 @@ created: 2026-09-22
 allowUntrustedHooks: overrides?.allowUntrustedHooks ?? merged.allowUntrustedHooks ?? ...
 ```
 
-`RuntimeConfigFile` 声明了该字段，于是仓库可自带 `.private-agents.json` 写上 `allowUntrustedHooks: true`，**把自己的钩子豁免掉**——与 `ca1e97ac` 提交信息声称的「config file cannot grant it」**相反**。
+`RuntimeConfigFile` 声明了该字段，于是仓库可自带 `.cheers.json` 写上 `allowUntrustedHooks: true`，**把自己的钩子豁免掉**——与 `ca1e97ac` 提交信息声称的「config file cannot grant it」**相反**。
 
 **参考**：`codex` 明确规定豁免状态只能来自 CLI 标志或用户层配置，绝不允许项目层。
 

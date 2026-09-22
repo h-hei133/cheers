@@ -86,7 +86,7 @@
 
 **实机验证（真实构建产物，非合成）**：
 
-用一份**同时含两个已删字段**的 `.private-agents.json` 调 `getRuntimeConfig`：
+用一份**同时含两个已删字段**的 `.cheers.json` 调 `getRuntimeConfig`：
 
 | 检查 | 结果 |
 |---|---|
@@ -435,7 +435,7 @@
 
 ```
 read src  →  Directory src/ (3 entries):  sub/  a.ts  b.ts
-read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.json  package.json
+read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .cheers.json  package.json
 ```
 
 修复前：`read src` → `IsADirectoryError: [Errno 21] Is a directory`。
@@ -622,7 +622,7 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 
 **缺陷 3（中）：`hasSensitiveProjectResources` 认不出它要门控的资源。**
 
-实测 6 种形态全部漏报（`.agents/hooks.json`、`.private-agents.mcp.json`、根 `AGENTS.md`、`.agents/sandbox.json`、`.agents/workflows/`）。原因是探测器只有「固定文件名列表（仅 `SYSTEM.md`）+ 任意点目录含特定子目录」——**结构上无法匹配 dotfile，也覆盖不到仓库根**。已补齐并加 8 项测试。
+实测 6 种形态全部漏报（`.agents/hooks.json`、`.cheers.mcp.json`、根 `AGENTS.md`、`.agents/sandbox.json`、`.agents/workflows/`）。原因是探测器只有「固定文件名列表（仅 `SYSTEM.md`）+ 任意点目录含特定子目录」——**结构上无法匹配 dotfile，也覆盖不到仓库根**。已补齐并加 8 项测试。
 
 ### 7.3 形状
 
@@ -640,7 +640,7 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 | 维度 | 实现 |
 |---|---|
 | 指纹覆盖 | 事件 + matcher + 命令（`sha256`，按固定顺序序列化，不受键序影响） |
-| 记录位置 | `~/.coding-agents/hook-trust.json`——**项目不可写**，否则仓库可自带审批 |
+| 记录位置 | `~/.cheers/hook-trust.json`——**项目不可写**，否则仓库可自带审批 |
 | 改动命令 | 指纹变化 → 重新询问 |
 | 无指纹的钩子 | 本进程自注册（内置），不需授权 |
 | 失败处理 | `PreToolUse` 钩子失败 → **阻断**；非法 JSON → 记录并抛错 |

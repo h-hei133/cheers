@@ -34,7 +34,7 @@ function boundaryCheck() {
   const cwdIsMainRepo = normalized.cwd === normalized.mainRepoRoot
   const executionFromTestRepoCopy =
     normalized.cwd.startsWith(`${normalized.testRoot}/`) &&
-    normalized.cwd.includes('private-coding-agents')
+    normalized.cwd.includes('cheers')
   const violations = []
   if (!cwdIsMainRepo) violations.push('cwd-not-main-repo')
   if (executionFromTestRepoCopy) violations.push('executing-from-d-test-repo-copy')

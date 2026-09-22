@@ -1,5 +1,5 @@
 {
-  "name": "@cheer/rust-core",
+  "name": "@cheers/rust-core",
   "version": "0.1.0",
   "description": "Rust execution core daemon and high-performance operations",
   "scripts": {

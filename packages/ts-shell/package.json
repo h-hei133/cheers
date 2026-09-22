@@ -1,5 +1,5 @@
 {
-  "name": "@cheer/ts-shell",
+  "name": "@cheers/ts-shell",
   "version": "0.1.0",
   "description": "TypeScript CLI shell and orchestration layer",
   "type": "module",

@@ -2196,7 +2196,7 @@ Residue notes:
   - `packages/ts-shell/.sisyphus/audit/permissions.jsonl`
 - Validation created `undefined/.rustup/settings.toml`.
 - Real-user-capabilities verifiers wrote
-  `/tmp/private-agents-test/test-results/real-user-capabilities-report.json`.
+  `/tmp/cheers-test/test-results/real-user-capabilities-report.json`.
 - Cleanup performed:
   - restored both tracked audit files with `rtk git restore`
   - removed `undefined/`

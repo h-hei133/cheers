@@ -3,7 +3,7 @@ import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import {
   createSessionStoreLayout,
-  projectSessionFileLayout,
+  locateExistingSessionLayout,
 } from "../../session/store/sessionFileLayout.js";
 import {
   projectTranscriptMessages,
@@ -73,10 +73,7 @@ export async function runExportCommand(
 /** The conversation this session recorded, in order. */
 function readConversation(sessionId: string): readonly SessionMessage[] {
   try {
-    const layout = projectSessionFileLayout({
-      sessionsDir: createSessionStoreLayout().sessionsDir,
-      sessionId,
-    });
+    const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
     return projectTranscriptMessages(readTranscriptEvents(layout.transcriptPath));
   } catch {
     return [];

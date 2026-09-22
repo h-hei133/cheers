@@ -304,7 +304,7 @@ describe("controlled model invocation adapter", () => {
 
     expect(adapter.redactionState).toBe("redacted");
     expect(JSON.stringify(adapter)).not.toMatch(
-      /private-agents-real|provider\.env=\/tmp|Bearer secret|token=secret|raw provider output|hidden reasoning|oldText=before|newText=after/i,
+      /cheers-real|provider\.env=\/tmp|Bearer secret|token=secret|raw provider output|hidden reasoning|oldText=before|newText=after/i,
     );
   });
 });

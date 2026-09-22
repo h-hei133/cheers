@@ -164,6 +164,6 @@ describe("provider response stream projection", () => {
     const serialized = JSON.stringify(stream);
 
     expect(stream.redaction.status).toBe("redacted");
-    expect(serialized).not.toMatch(/sk-1234567890|token=secret|oldText=before|newText=after|private-agents-real|hidden reasoning|Bearer secret/i);
+    expect(serialized).not.toMatch(/sk-1234567890|token=secret|oldText=before|newText=after|cheers-real|hidden reasoning|Bearer secret/i);
   });
 });

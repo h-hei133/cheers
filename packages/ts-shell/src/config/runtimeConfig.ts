@@ -264,7 +264,7 @@ export function getRuntimeConfig(
       ? (merged.daemonEnabled ?? DEFAULT_CONFIG.daemonEnabled)
       : daemonFromEnv === "1";
 
-  const maxTurnsFromEnv = process.env.PRIVATE_AGENTS_MAX_TURNS;
+  const maxTurnsFromEnv = process.env.CHEERS_MAX_TURNS;
   const maxTurns = maxTurnsFromEnv
     ? Number(maxTurnsFromEnv)
     : (merged.maxTurns ?? DEFAULT_CONFIG.maxTurns);
@@ -319,7 +319,7 @@ export function getCandidateConfigPaths(
 ): string[] {
   return [
     resolveUserDataFile("config.json"),
-    path.join(rootDir, ".private-agents.json"),
+    path.join(rootDir, ".cheers.json"),
   ];
 }
 
@@ -545,7 +545,7 @@ function normalizeConnectionId(value?: string): string | undefined {
 }
 
 function getRuntimeConfigHomeDir(): string {
-  const explicit = process.env.PRIVATE_AGENTS_HOME_OVERRIDE?.trim();
+  const explicit = process.env.CHEERS_HOME_OVERRIDE?.trim();
   if (explicit) {
     return explicit;
   }

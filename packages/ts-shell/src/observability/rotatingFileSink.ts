@@ -1,8 +1,7 @@
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import type { StructuredLogEntry } from "./types.js";
-import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
+import { userDataDir } from "../core/paths/userHome.js"
 
 export interface RotatingFileSinkOptions {
   readonly logDir?: string;
@@ -11,6 +10,15 @@ export interface RotatingFileSinkOptions {
   readonly filePrefix?: string;
   readonly pid?: number;
 }
+
+/**
+ * Log file prefixes this tool has used before.
+ *
+ * The name changed, and the files written under the old one are still in the log
+ * directory. Pruning has to recognise them, or the retention window silently stops
+ * covering the oldest files — the ones it exists for.
+ */
+const LEGACY_FILE_PREFIXES = ["coding-agent"] as const;
 
 /**
  * High-performance, non-blocking rotating file sink for structured logs.
@@ -28,12 +36,12 @@ export class RotatingFileSink {
   private initialized: boolean = false;
 
   constructor(options: RotatingFileSinkOptions = {}) {
-    const configuredDir = process.env.CODING_AGENTS_LOG_DIR?.trim();
+    const configuredDir = process.env.CHEERS_LOG_DIR?.trim();
     const defaultDir = path.join(userDataDir(), "logs");
     this.logDir = options.logDir ?? (configuredDir || defaultDir);
     this.maxFileSizeBytes = (options.maxFileSizeMb ?? 5) * 1024 * 1024;
     this.maxHistoryDays = options.maxHistoryDays ?? 7;
-    this.filePrefix = options.filePrefix ?? "coding-agent";
+    this.filePrefix = options.filePrefix ?? "cheers";
     this.pid = options.pid ?? process.pid;
   }
 
@@ -133,7 +141,14 @@ export class RotatingFileSink {
   private pruneStaleLogs(): void {
     try {
       const files = fs.readdirSync(this.logDir);
-      const pattern = new RegExp(`^${this.filePrefix}\\.(\\d{4}-\\d{2}-\\d{2})\\.(\\d+)\\.log(?:\\.\\d+)?$`);
+      // Every prefix a log file may carry, current first. A file written under an
+      // earlier name is still this tool's log, and pruning only the current prefix
+      // would leave those on disk forever — the retention bound would stop
+      // applying to exactly the files that are already oldest.
+      const prefixes = [this.filePrefix, ...LEGACY_FILE_PREFIXES];
+      const pattern = new RegExp(
+        `^(?:${prefixes.join("|")})\\.(\\d{4}-\\d{2}-\\d{2})\\.(\\d+)\\.log(?:\\.\\d+)?$`,
+      );
       const now = Date.now();
       const maxAgeMs = this.maxHistoryDays * 24 * 60 * 60 * 1000;
 

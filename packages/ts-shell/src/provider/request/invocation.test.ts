@@ -49,7 +49,7 @@ describe("model invocation gate", () => {
     expect(gate.blockedReasons).toContain("auth-readiness:expired");
     expect(attempt.failureClass).toBe("provider_auth");
     expect(JSON.stringify({ gate, attempt })).not.toMatch(
-      /private-agents-real|provider\.env=\/tmp|Bearer secret|token=secret|raw provider output|hidden reasoning/i,
+      /cheers-real|provider\.env=\/tmp|Bearer secret|token=secret|raw provider output|hidden reasoning/i,
     );
   });
 

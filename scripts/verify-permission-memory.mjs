@@ -135,7 +135,7 @@ function writeText(filePath, content) {
 }
 
 function ensureSyntheticPermissionMemoryFixture() {
-  const sessionsRoot = path.join(syntheticHome, '.private-agents', 'sessions')
+  const sessionsRoot = path.join(syntheticHome, '.cheers', 'sessions')
   const sessionDir = path.join(sessionsRoot, syntheticSessionId)
   assertPathInside(sessionsRoot, sessionDir)
 
@@ -265,7 +265,7 @@ function ensureSyntheticPermissionMemoryFixture() {
     ].map((entry) => JSON.stringify(entry)).join('\n') + '\n',
   )
 
-  const currentSessionPath = path.join(syntheticHome, '.private-agents', 'current-session.json')
+  const currentSessionPath = path.join(syntheticHome, '.cheers', 'current-session.json')
   let currentSessionStore = { schemaVersion: 1, byProjectRoot: {} }
   if (fs.existsSync(currentSessionPath)) {
     try {
@@ -325,7 +325,7 @@ async function runSyntheticExplanationGate() {
   const env = {
     HOME: syntheticHome,
     USERPROFILE: syntheticHome,
-    PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+    CHEERS_PROVIDER_MODE: 'synthetic',
   }
   const args = [
     '--project',
@@ -413,14 +413,14 @@ async function runRealGate() {
   console.log(`real HOME=${realHome ?? 'not-configured'}`)
   console.log('homeCreated=false')
 
-  const configPath = realHome ? path.join(realHome, '.private-agents', 'config.json') : 'not-configured'
+  const configPath = realHome ? path.join(realHome, '.cheers', 'config.json') : 'not-configured'
   if (!realHome || !fs.existsSync(realHome) || !fs.existsSync(configPath)) {
     printStep('real-provider-config', 'config failure', `${configPath} missing`)
     return { ok: false, classification: 'config failure' }
   }
   printStep('real-provider-config', 'pass')
 
-  const statePath = path.join(realHome, '.private-agents', 'sessions', realSessionId, 'state.json')
+  const statePath = path.join(realHome, '.cheers', 'sessions', realSessionId, 'state.json')
   if (!fs.existsSync(statePath)) {
     printStep('real-provider-compact-evidence', 'product regression', `${statePath} missing`)
     return { ok: false, classification: 'product regression' }

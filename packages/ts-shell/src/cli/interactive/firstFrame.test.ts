@@ -73,7 +73,7 @@ describe("first painted frame", () => {
     mode.start();
     scheduler.flush();
     const output = terminal.drain();
-    expect(output).toContain("Coding Agent");
+    expect(output).toContain("Cheers");
     expect(output).toContain("opus-5");
     expect(output).toContain("main");
     expect(output).toContain("╰─");
@@ -146,7 +146,7 @@ describe("first painted frame", () => {
     const document = written.slice(left);
     // The intro is a transcript block, so it is the first thing left behind; the
     // prompt and band are chrome and stay on the screen that was given back.
-    expect(document).toContain("Coding Agent");
+    expect(document).toContain("Cheers");
     expect(document).not.toContain("hello there");
     expect(document).not.toContain("╰─");
   });

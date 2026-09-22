@@ -140,7 +140,7 @@ async function searchWithExa(
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
-      "User-Agent": "coding-agents/1.0.0",
+      "User-Agent": "cheers/1.0.0",
     },
     body: JSON.stringify({
       query,
@@ -181,7 +181,7 @@ async function searchWithTavily(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "User-Agent": "coding-agents/1.0.0",
+      "User-Agent": "cheers/1.0.0",
     },
     body: JSON.stringify({
       api_key: apiKey,

@@ -36,7 +36,7 @@ function listSkills(skills: readonly Skill[]): string {
       "",
       "A skill is a folder with a `SKILL.md` in it — frontmatter naming and describing it, then the instructions:",
       "",
-      "- `~/.cheer/skills/<name>/SKILL.md` — yours, everywhere",
+      "- `~/.cheers/skills/<name>/SKILL.md` — yours, everywhere",
       "- `.agents/skills/<name>/SKILL.md` — this project's, and it wins",
     ].join("\n");
   }

@@ -74,7 +74,7 @@ function describeTrust(root: string): string {
     "",
   ];
 
-  const mcpConfig = path.join(root, ".private-agents.mcp.json");
+  const mcpConfig = path.join(root, ".cheers.mcp.json");
   lines.push(
     projectTrust.hasSensitiveProjectResources(root)
       ? "This project declares resources that would run on your machine."

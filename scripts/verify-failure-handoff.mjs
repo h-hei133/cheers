@@ -106,8 +106,8 @@ async function verifyProductRegressionHandoff() {
     'mode=hard',
     'target project=D:/Test/evidence-artifacts-gate',
     'session-id=sess_failure_handoff_123',
-    'transcript-path=D:\\Test\\pca-home-synth\\.private-agents\\sessions\\sess_failure_handoff_123\\transcript.jsonl',
-    'state-path=D:\\Test\\pca-home-synth\\.private-agents\\sessions\\sess_failure_handoff_123\\state.json',
+    'transcript-path=D:\\Test\\pca-home-synth\\.cheers\\sessions\\sess_failure_handoff_123\\transcript.jsonl',
+    'state-path=D:\\Test\\pca-home-synth\\.cheers\\sessions\\sess_failure_handoff_123\\state.json',
     '[product-regression] denied-path-audit-evidence - stdout approval marker did not map to transcript/state evidence',
     'missing=approval-event=bash:denied',
   ].join('\n'))
@@ -130,7 +130,7 @@ async function verifyProductRegressionHandoff() {
     'failure-class=product-regression',
     'key-marker=[product-regression] denied-path-audit-evidence',
     'session-id=sess_failure_handoff_123',
-    'transcript-path=D:\\Test\\pca-home-synth\\.private-agents\\sessions\\sess_failure_handoff_123\\transcript.jsonl',
+    'transcript-path=D:\\Test\\pca-home-synth\\.cheers\\sessions\\sess_failure_handoff_123\\transcript.jsonl',
     'evidence-inspector-command=npm run evidence:inspect -- --home D:/Test/pca-home-synth --session-id sess_failure_handoff_123',
     'evidence-inspector-command=npm run evidence:inspect -- --home D:/Test/pca-home-synth --project "D:/Test/evidence-artifacts-gate"',
     'next-action=Run the evidence inspector command above',
@@ -170,7 +170,7 @@ async function verifyConfigFailureHandoff() {
   const log = writeFixture('config-failure', [
     'gate name=doctor-environment',
     'mode=env',
-    '[config-failure] real-provider-config - D:\\Test\\home-sf\\.private-agents\\config.json missing',
+    '[config-failure] real-provider-config - D:\\Test\\home-sf\\.cheers\\config.json missing',
     'credential missing',
   ].join('\n'))
   const result = await runHandoff({

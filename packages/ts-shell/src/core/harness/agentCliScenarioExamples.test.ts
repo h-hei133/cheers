@@ -18,7 +18,7 @@ describe("Agent CLI scenario harness", () => {
 
   function tempProject(): string {
     const root = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cli-scenario-project-"),
+      path.join(os.tmpdir(), "cheers-cli-scenario-project-"),
     );
     fs.writeFileSync(
       path.join(root, "README.md"),
@@ -31,7 +31,7 @@ describe("Agent CLI scenario harness", () => {
 
   function tempHome(): string {
     const root = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-cli-scenario-home-"),
+      path.join(os.tmpdir(), "cheers-cli-scenario-home-"),
     );
     tempRoots.push(root);
     return root;

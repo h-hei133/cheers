@@ -187,7 +187,7 @@ const providerAuthFailurePattern =
 const providerModelFailurePattern =
   /(provider-readiness:model|model.*(?:not found|not available|unsupported|does not exist|is invalid)|unsupported model|invalid model|quota|rate limit|429|insufficient quota|context length|maximum context)/i
 const realHomeConfigPattern =
-  /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.private-agents[\\/]+config\.json/gi
+  /[A-Za-z]:[\\/]+Test[\\/]+home-sf[\\/]+\.(?:cheers|cheer|private-agents|coding-agents)[\\/]+config\.json/gi
 const bearerTokenPattern = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi
 const authorizationBearerPattern =
   /\b(authorization\s*[:=]\s*)(["']?)Bearer\s+[A-Za-z0-9._~+/=-]+/gi
@@ -198,7 +198,7 @@ const maskedOpenAiStyleKeyPattern = /\bsk-[A-Za-z0-9][A-Za-z0-9*._-]{8,}\b/g
 const secretQueryParamPattern =
   /([?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|token|key|signature|sig)=)[^&\s"'`<>]+/gi
 const posixPrivateAgentsConfigPattern =
-  /\/[^\s"'`<>]+\/\.private-agents\/config\.json/gi
+  /\/[^\s"'`<>]+\/\.(?:cheers|cheer|private-agents|coding-agents)\/config\.json/gi
 const posixPrivateAgentsRealHomePattern =
   /\/[^\s"'`<>]*\.private-agents-real(?:\/[^\s"'`<>]*)?/gi
 
@@ -214,7 +214,7 @@ function prepareRealMutationEnvContract() {
     }
   }
 
-  const explicitRealHome = process.env.PRIVATE_AGENTS_REAL_HOME?.trim()
+  const explicitRealHome = process.env.CHEERS_REAL_HOME?.trim()
   const loaded = loadApprovedProviderEnv(process.env)
   if (!loaded.ok) {
     return {
@@ -228,14 +228,14 @@ function prepareRealMutationEnvContract() {
   }
 
   for (const [key, value] of Object.entries(loaded.env)) {
-    if (key === 'PRIVATE_AGENTS_REAL_HOME') continue
+    if (key === 'CHEERS_REAL_HOME') continue
     if (process.env[key] === undefined && typeof value === 'string') {
       process.env[key] = value
     }
   }
 
-  if (!process.env.PRIVATE_AGENTS_TEST_ROOT?.trim()) {
-    process.env.PRIVATE_AGENTS_TEST_ROOT = path.join(getTestRoot(), 'candidate-mutation-real')
+  if (!process.env.CHEERS_TEST_ROOT?.trim()) {
+    process.env.CHEERS_TEST_ROOT = path.join(getTestRoot(), 'candidate-mutation-real')
   }
 
   const resolved = resolveProviderEnvConfig(process.env, {
@@ -254,9 +254,9 @@ function prepareRealMutationEnvContract() {
   }
 
   const generatedRealHome = writeEnvBackedRealProviderConfig(resolved)
-  process.env.PRIVATE_AGENTS_REAL_HOME = generatedRealHome
+  process.env.CHEERS_REAL_HOME = generatedRealHome
   process.env[resolved.apiKeyEnvVar] = resolved.apiKey
-  process.env.PRIVATE_AGENTS_REAL_PROVIDER = resolved.provider
+  process.env.CHEERS_REAL_PROVIDER = resolved.provider
   const configSource = `${loaded.configSource}${resolved.configSourceSuffix ?? ''}`
   return {
     enabled: true,
@@ -292,12 +292,12 @@ function shouldPrepareRealMutationEnv() {
 
 function loadApprovedProviderEnv(processEnv) {
   const providerEnvPath =
-    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
-    processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim() ||
+    processEnv.CHEERS_PROVIDER_ENV?.trim() ||
+    processEnv.CHEERS_REAL_PROVIDER_ENV?.trim() ||
     defaultProviderEnvPath
   const explicitProviderEnvPath = Boolean(
-    processEnv.PRIVATE_AGENTS_PROVIDER_ENV?.trim() ||
-      processEnv.PRIVATE_AGENTS_REAL_PROVIDER_ENV?.trim(),
+    processEnv.CHEERS_PROVIDER_ENV?.trim() ||
+      processEnv.CHEERS_REAL_PROVIDER_ENV?.trim(),
   )
   const resolved = path.resolve(providerEnvPath)
   if (resolved !== defaultProviderEnvPath) {
@@ -500,14 +500,14 @@ function fieldAliases(field) {
 function resolveProviderEnvConfig(env, { providerEnvLoaded = false, providerEnv = {} } = {}) {
   const approvedEnv = providerEnv && typeof providerEnv === 'object' ? providerEnv : {}
   let provider = normalizeRealProvider(getFirstEnvValue(env, [
-    'PRIVATE_AGENTS_REAL_PROVIDER',
-    'PRIVATE_AGENTS_PROVIDER',
+    'CHEERS_REAL_PROVIDER',
+    'CHEERS_PROVIDER',
     'provider',
     'PROVIDER',
   ])) ??
     normalizeRealProvider(getFirstEnvValue(approvedEnv, [
-      'PRIVATE_AGENTS_REAL_PROVIDER',
-      'PRIVATE_AGENTS_PROVIDER',
+      'CHEERS_REAL_PROVIDER',
+      'CHEERS_PROVIDER',
       'provider',
       'PROVIDER',
     ])) ??
@@ -517,7 +517,7 @@ function resolveProviderEnvConfig(env, { providerEnvLoaded = false, providerEnv 
     providerEnvLoaded &&
     Boolean(getFirstEnvValue(approvedEnv, [
       'OPENAI_COMPATIBLE_API_KEY',
-      'PRIVATE_AGENTS_REAL_API_KEY',
+      'CHEERS_REAL_API_KEY',
       'OPENAI_API_KEY',
       ...providerCredentialFieldNames('openai-compatible', 'apiKey'),
     ]))
@@ -530,7 +530,7 @@ function resolveProviderEnvConfig(env, { providerEnvLoaded = false, providerEnv 
       status: 'config-failure',
       reason: providerEnvLoaded
         ? 'approved provider.env was loaded but did not expose a supported provider selector; refusing ambient OPENAI_API_KEY fallback'
-        : 'PRIVATE_AGENTS_REAL_PROVIDER or PRIVATE_AGENTS_PROVIDER is required for candidate mutation real suite',
+        : 'CHEERS_REAL_PROVIDER or CHEERS_PROVIDER is required for candidate mutation real suite',
     }
   }
 
@@ -546,10 +546,10 @@ function resolveProviderEnvConfig(env, { providerEnvLoaded = false, providerEnv 
   const apiKeyEnvVar = providerApiKeyEnvVar(provider)
   const apiKey = getFirstEnvValue(env, [
     apiKeyEnvVar,
-    'PRIVATE_AGENTS_REAL_API_KEY',
+    'CHEERS_REAL_API_KEY',
   ]) ?? getFirstEnvValue(approvedEnv, [
     apiKeyEnvVar,
-    'PRIVATE_AGENTS_REAL_API_KEY',
+    'CHEERS_REAL_API_KEY',
     ...providerApiKeyAliases(provider),
   ]) ?? getFirstEnvValue(env, [
     ...filterAmbientOpenAiFallbackAliases(providerApiKeyAliases(provider), { providerEnvLoaded }),
@@ -558,30 +558,30 @@ function resolveProviderEnvConfig(env, { providerEnvLoaded = false, providerEnv 
     return {
       ok: false,
       status: 'config-failure',
-      reason: `${apiKeyEnvVar} or PRIVATE_AGENTS_REAL_API_KEY is required for candidate mutation real suite`,
+      reason: `${apiKeyEnvVar} or CHEERS_REAL_API_KEY is required for candidate mutation real suite`,
     }
   }
 
   const baseUrl = getFirstEnvValue(env, [
-    'PRIVATE_AGENTS_REAL_BASE_URL',
-    'PRIVATE_AGENTS_PROVIDER_BASE_URL',
-    'PRIVATE_AGENTS_BASE_URL',
+    'CHEERS_REAL_BASE_URL',
+    'CHEERS_PROVIDER_BASE_URL',
+    'CHEERS_BASE_URL',
   ]) ?? getFirstEnvValue(approvedEnv, [
-    'PRIVATE_AGENTS_REAL_BASE_URL',
-    'PRIVATE_AGENTS_PROVIDER_BASE_URL',
-    'PRIVATE_AGENTS_BASE_URL',
+    'CHEERS_REAL_BASE_URL',
+    'CHEERS_PROVIDER_BASE_URL',
+    'CHEERS_BASE_URL',
     ...providerBaseUrlAliases(provider),
   ]) ?? getFirstEnvValue(env, [
     ...filterAmbientOpenAiFallbackAliases(providerBaseUrlAliases(provider), { providerEnvLoaded }),
   ]) ?? (approvedProviderEnvOpenAiCompatibleDefault ? 'https://api.siliconflow.cn/v1' : undefined)
   const model = getFirstEnvValue(env, [
-    'PRIVATE_AGENTS_REAL_MODEL',
-    'PRIVATE_AGENTS_PROVIDER_MODEL',
-    'PRIVATE_AGENTS_MODEL',
+    'CHEERS_REAL_MODEL',
+    'CHEERS_PROVIDER_MODEL',
+    'CHEERS_MODEL',
   ]) ?? getFirstEnvValue(approvedEnv, [
-    'PRIVATE_AGENTS_REAL_MODEL',
-    'PRIVATE_AGENTS_PROVIDER_MODEL',
-    'PRIVATE_AGENTS_MODEL',
+    'CHEERS_REAL_MODEL',
+    'CHEERS_PROVIDER_MODEL',
+    'CHEERS_MODEL',
     ...providerModelAliases(provider),
   ]) ?? getFirstEnvValue(env, [
     ...filterAmbientOpenAiFallbackAliases(providerModelAliases(provider), { providerEnvLoaded }),
@@ -590,14 +590,14 @@ function resolveProviderEnvConfig(env, { providerEnvLoaded = false, providerEnv 
     return {
       ok: false,
       status: 'config-failure',
-      reason: `${provider} requires PRIVATE_AGENTS_REAL_BASE_URL or provider-specific base URL env`,
+      reason: `${provider} requires CHEERS_REAL_BASE_URL or provider-specific base URL env`,
     }
   }
   if (providerRequiresEndpointConfig(provider) && !model) {
     return {
       ok: false,
       status: 'config-failure',
-      reason: `${provider} requires PRIVATE_AGENTS_REAL_MODEL or provider-specific model env`,
+      reason: `${provider} requires CHEERS_REAL_MODEL or provider-specific model env`,
     }
   }
 
@@ -637,11 +637,11 @@ function inferProviderFromEnv(env, { allowOpenAiFallback = true } = {}) {
   if (hasProviderCredentialConfig(env, 'claudecode')) return 'claudecode'
   if (getFirstEnvValue(env, ['CLAUDECODE_API_KEY'])) return 'claudecode'
   if (
-    getFirstEnvValue(env, ['PRIVATE_AGENTS_REAL_API_KEY']) &&
+    getFirstEnvValue(env, ['CHEERS_REAL_API_KEY']) &&
     (getFirstEnvValue(env, [
-      'PRIVATE_AGENTS_REAL_BASE_URL',
-      'PRIVATE_AGENTS_PROVIDER_BASE_URL',
-      'PRIVATE_AGENTS_BASE_URL',
+      'CHEERS_REAL_BASE_URL',
+      'CHEERS_PROVIDER_BASE_URL',
+      'CHEERS_BASE_URL',
       'OPENAI_COMPATIBLE_BASE_URL',
       'OPENAI_BASE_URL',
       'OPENAI_API_BASE',
@@ -650,9 +650,9 @@ function inferProviderFromEnv(env, { allowOpenAiFallback = true } = {}) {
       'BASE_URL',
     ]) ||
       getFirstEnvValue(env, [
-        'PRIVATE_AGENTS_REAL_MODEL',
-        'PRIVATE_AGENTS_PROVIDER_MODEL',
-        'PRIVATE_AGENTS_MODEL',
+        'CHEERS_REAL_MODEL',
+        'CHEERS_PROVIDER_MODEL',
+        'CHEERS_MODEL',
         'OPENAI_COMPATIBLE_MODEL',
         'OPENAI_MODEL',
         'MODEL',
@@ -664,9 +664,9 @@ function inferProviderFromEnv(env, { allowOpenAiFallback = true } = {}) {
     getFirstEnvValue(env, ['OPENAI_API_KEY']) &&
     getFirstEnvValue(env, [
       'OPENAI_COMPATIBLE_BASE_URL',
-      'PRIVATE_AGENTS_REAL_BASE_URL',
-      'PRIVATE_AGENTS_PROVIDER_BASE_URL',
-      'PRIVATE_AGENTS_BASE_URL',
+      'CHEERS_REAL_BASE_URL',
+      'CHEERS_PROVIDER_BASE_URL',
+      'CHEERS_BASE_URL',
       'OPENAI_API_BASE',
       'OPENAI_API_BASE_URL',
       'OPENAI_BASE_URL',
@@ -692,7 +692,7 @@ function hasProviderCredentialConfig(env, provider) {
 
 function writeEnvBackedRealProviderConfig(input) {
   const configHome = path.join(getTestRoot(), 'candidate-mutation-real-provider-home')
-  const configDir = path.join(configHome, '.private-agents')
+  const configDir = path.join(configHome, '.cheers')
   fs.rmSync(configHome, { recursive: true, force: true })
   fs.mkdirSync(configDir, { recursive: true })
   fs.writeFileSync(
@@ -826,7 +826,7 @@ function providerCredentialFieldNames(provider, field) {
     ...aliases.map((alias) => `provider_credentials.${alias}.${field}`),
     ...aliases.map((alias) => `PROVIDER_CREDENTIALS.${alias}.${field}`),
     ...aliases.map((alias) => `PROVIDER_CREDENTIALS_${alias.toUpperCase().replace(/-/g, '_')}_${envField}`),
-    ...aliases.map((alias) => `PRIVATE_AGENTS_PROVIDER_CREDENTIALS_${alias.toUpperCase().replace(/-/g, '_')}_${envField}`),
+    ...aliases.map((alias) => `CHEERS_PROVIDER_CREDENTIALS_${alias.toUpperCase().replace(/-/g, '_')}_${envField}`),
   ]
 }
 
@@ -984,7 +984,7 @@ async function runProviderReadinessPreflight() {
         ? {
             HOME: readinessRuntimeHome,
             USERPROFILE: readinessRuntimeHome,
-            PRIVATE_AGENTS_REAL_HOME: realHome,
+            CHEERS_REAL_HOME: realHome,
           }
         : {}),
     },
@@ -1084,7 +1084,7 @@ function redactProviderOutput(input) {
     .replace(openAiStyleKeyPattern, '[REDACTED_API_KEY]')
     .replace(maskedOpenAiStyleKeyPattern, '[REDACTED_API_KEY]')
     .replace(secretQueryParamPattern, '$1[REDACTED]')
-    .replace(posixPrivateAgentsConfigPattern, '[PRIVATE_AGENTS_CONFIG_PATH]')
+    .replace(posixPrivateAgentsConfigPattern, '[CHEERS_CONFIG_PATH]')
     .replace(posixPrivateAgentsRealHomePattern, '[REAL_PROVIDER_HOME]')
     .replace(realHomeConfigPattern, '[REAL_PROVIDER_CONFIG_PATH]')
 }
@@ -1094,7 +1094,7 @@ function providerEnv(provider) {
     return {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     }
   }
   return {
@@ -1142,7 +1142,7 @@ async function readCurrentSessionId(scenario) {
 
 function readSessionTranscript(scenario, sessionId) {
   const home = scenario.provider === 'real' ? realHome : syntheticHome
-  const transcriptPath = path.join(home, '.private-agents', 'sessions', sessionId, 'transcript.jsonl')
+  const transcriptPath = path.join(home, '.cheers', 'sessions', sessionId, 'transcript.jsonl')
   try {
     return fs.readFileSync(transcriptPath, 'utf8')
   } catch {
@@ -1671,7 +1671,7 @@ async function runMutationContinuityCompactScenario(scenario) {
   ], {
     cwd: repoRoot,
     env: {
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs: 120000,
   })
@@ -1751,7 +1751,7 @@ async function runMutationRecoveryFollowupScenario(scenario) {
   ], {
     cwd: repoRoot,
     env: {
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs: 120000,
   })
@@ -2203,7 +2203,7 @@ async function runMultiFileUpdatePlanningDryRun({ fixtureDir, patchPath }) {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     timeoutMs: 120000,
   })
@@ -2290,7 +2290,7 @@ function runTurnBoundaryDryRun() {
       provider: 'real',
       failureReason: 'turn 1 exited 1',
       output:
-        'Failed to parse D:/Test/home-sf/.private-agents/config.json: refresh_token=refresh-secret',
+        'Failed to parse D:/Test/home-sf/.cheers/config.json: refresh_token=refresh-secret',
       expectedCategory: 'provider-readiness',
       expectedStatusDetail: 'config-failure',
       expectedExitCode: 3,
@@ -2330,7 +2330,7 @@ function runTurnBoundaryDryRun() {
     const redacted =
       !result.outputTail.includes('sk-live-secret') &&
       !result.outputTail.includes('refresh-secret') &&
-      !result.outputTail.includes('.private-agents/config.json')
+      !result.outputTail.includes('.cheers/config.json')
     const passed =
       result.failureCategory === item.expectedCategory &&
       failureStatus.statusDetail === item.expectedStatusDetail &&
@@ -2380,7 +2380,7 @@ function runTerminalResultSurfaceDryRun() {
         outputTail: 'provider-readiness:network fetch failed Authorization: Bearer sk-live-secret',
       },
       expected: ['Outcome: provider-failure', 'Category: provider-readiness', 'Status: provider-network-inconclusive', 'NextAction: Retry when the provider endpoint is reachable'],
-      forbidden: ['sk-live-secret', '.private-agents/config.json'],
+      forbidden: ['sk-live-secret', '.cheers/config.json'],
     },
     {
       name: 'provider-auth-terminal-result',
@@ -2459,7 +2459,7 @@ function runFailureFollowupContextDryRun() {
         'reason=provider-readiness:network',
         'DoNext=Retry when the provider endpoint is reachable',
       ],
-      forbidden: ['sk-live-secret', '.private-agents/config.json'],
+      forbidden: ['sk-live-secret', '.cheers/config.json'],
     },
     {
       name: 'provider-auth-followup-context',
@@ -2607,8 +2607,8 @@ function runToolExecutionPlanningDryRun() {
         providerStatus: 'ready',
         tool: 'write-file',
         targetPath: realHome
-          ? path.join(realHome, '.private-agents', 'config.json')
-          : 'D:/Test/home-sf/.private-agents/config.json',
+          ? path.join(realHome, '.cheers', 'config.json')
+          : 'D:/Test/home-sf/.cheers/config.json',
         writes: true,
       },
       expectedDecision: 'blocked-real-home',
@@ -2634,7 +2634,7 @@ function runToolExecutionPlanningDryRun() {
     const passed =
       audit.decision === item.expectedDecision &&
       audit.execute === item.expectedExecute &&
-      !line.includes('.private-agents/config.json')
+      !line.includes('.cheers/config.json')
     console.log(`[${passed ? 'PASS' : 'FAIL'}] ${item.name} - ${line}`)
     ok = ok && passed
   }
@@ -2810,7 +2810,7 @@ function runRealReadonlyCodingPreflightSelfTest() {
       status.status === item.expected.status &&
       status.exitCode === item.expected.exitCode &&
       status.failureReason.indexOf('sk-') === -1 &&
-      status.failureReason.indexOf('.private-agents/config.json') === -1
+      status.failureReason.indexOf('.cheers/config.json') === -1
     console.log(`[${passed ? 'PASS' : 'FAIL'}] preflight-${item.name} status=${status.status} exit=${status.exitCode}`)
     ok = ok && passed
   }
@@ -2835,7 +2835,7 @@ function runRealReadonlyCodingFailureAttributionSelfTest() {
         output: [
           'Provider readiness failed (provider-readiness:network): Unable to reach the OpenAI-compatible endpoint.',
           'Authorization: Bearer sk-live-secret-123456789',
-          'D:/Test/home-sf/.private-agents/config.json',
+          'D:/Test/home-sf/.cheers/config.json',
         ].join('\n'),
       },
       expected: {
@@ -3324,7 +3324,7 @@ function inspectCodingFlowRuntimeHome(runtimeHome) {
   }
 
   assertSafeCodingFlowRuntimeHome(runtimeHome)
-  const privateAgentsDir = path.join(runtimeHome, '.private-agents')
+  const privateAgentsDir = path.join(runtimeHome, '.cheers')
   return {
     existsAfterTurn: fs.existsSync(runtimeHome),
     privateAgentsDirCreated: fs.existsSync(privateAgentsDir),
@@ -3651,7 +3651,7 @@ function runRealCodingFlowFailureAttributionSelfTest() {
         output: [
           'Provider readiness failed (provider-readiness:network): Unable to reach the OpenAI-compatible endpoint.',
           'Authorization: Bearer sk-live-secret-123456789',
-          'D:/Test/home-sf/.private-agents/config.json',
+          'D:/Test/home-sf/.cheers/config.json',
         ].join('\n'),
       },
       expected: {
@@ -3908,7 +3908,7 @@ function runRealCodingFlowFollowupContextSelfTest() {
         failureReason: [
           'provider-readiness:network: endpoint unreachable',
           'Authorization: Bearer sk-live-secret-123456789',
-          'D:/Test/home-sf/.private-agents/config.json',
+          'D:/Test/home-sf/.cheers/config.json',
         ].join('\n'),
         changedFiles: [],
         verification: 'blocked',
@@ -3935,7 +3935,7 @@ function runRealCodingFlowFollowupContextSelfTest() {
         changedFiles: [],
         verification: 'blocked',
       },
-      followupPrompt: 'retry without printing D:/Test/home-sf/.private-agents/config.json',
+      followupPrompt: 'retry without printing D:/Test/home-sf/.cheers/config.json',
       expected: [
         'previousOutcome=provider-failure',
         'blocker=auth/config failure',
@@ -3994,8 +3994,8 @@ function runRealCodingFlowFollowupContextSelfTest() {
           'api_key=sk-url-secret-123456789',
           'refresh_token=refresh-secret',
           'access_token=access-secret',
-          'D:/Test/home-sf/.private-agents/config.json',
-          '/home/wang/.private-agents-real/.private-agents/config.json',
+          'D:/Test/home-sf/.cheers/config.json',
+          '/home/wang/.private-agents-real/.cheers/config.json',
         ].join('\n'),
         changedFiles: [],
         failedFiles: ['note.txt'],
@@ -4007,7 +4007,7 @@ function runRealCodingFlowFollowupContextSelfTest() {
         'retry with exact replacement for note.txt',
         'Authorization: Bearer sk-live-secret-123456789',
         'api_key=sk-url-secret-123456789',
-        '/home/wang/.private-agents-real/.private-agents/config.json',
+        '/home/wang/.private-agents-real/.cheers/config.json',
       ].join(' '),
       expected: [
         'previousOutcome=stopped',
@@ -4048,7 +4048,7 @@ function runRealCodingFlowFollowupContextSelfTest() {
   for (const item of cases) {
     const context = buildCodingFlowFailureFollowupContext(item.result, item.followupPrompt, fixture)
     const hasExpected = item.expected.every((marker) => context.contextLine.includes(marker))
-    const avoidsConfigPath = !/\.private-agents(?:-real)?[\\/]+(?:\.private-agents[\\/]+)?config\.json/i.test(context.contextLine)
+    const avoidsConfigPath = !/\.cheers(?:-real)?[\\/]+(?:\.cheers[\\/]+)?config\.json/i.test(context.contextLine)
     const avoidsKey = !/\bsk-[A-Za-z0-9][A-Za-z0-9._-]{8,}\b/i.test(context.contextLine)
     const avoidsAuthHeader = !/Authorization\s*:/i.test(context.contextLine)
     const avoidsToken = !/\b(?:refresh_token|access_token|api_key)\b/i.test(context.contextLine)
@@ -4268,8 +4268,8 @@ function buildDirectProviderExplanationEvalScript() {
     import { resolveProviderCredential } from ${JSON.stringify(providerCredentialsUrl)};
 
     ;(async () => {
-      const prompt = process.env.PRIVATE_AGENTS_FOLLOWUP_PROMPT ?? '';
-      const workspaceRoot = process.env.PRIVATE_AGENTS_FOLLOWUP_WORKSPACE ?? process.cwd();
+      const prompt = process.env.CHEERS_FOLLOWUP_PROMPT ?? '';
+      const workspaceRoot = process.env.CHEERS_FOLLOWUP_WORKSPACE ?? process.cwd();
       const runtimeConfig = getRuntimeConfig(workspaceRoot);
       const resolved = resolveProviderCredential({ runtimeConfig });
       const credential = resolved.credential;
@@ -4351,11 +4351,11 @@ async function runDirectProviderExplanationTurn({ prompt, runtimeHome, realHome,
     env: {
       HOME: runtimeHome,
       USERPROFILE: runtimeHome,
-      PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
-      PRIVATE_AGENTS_REAL_HOME: realHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
-      PRIVATE_AGENTS_FOLLOWUP_PROMPT: prompt,
-      PRIVATE_AGENTS_FOLLOWUP_WORKSPACE: fixtureDir,
+      CHEERS_HOME_OVERRIDE: realHome,
+      CHEERS_REAL_HOME: realHome,
+      CHEERS_PROVIDER_MODE: 'real',
+      CHEERS_FOLLOWUP_PROMPT: prompt,
+      CHEERS_FOLLOWUP_WORKSPACE: fixtureDir,
     },
     timeoutMs: 420000,
   })
@@ -4397,7 +4397,7 @@ function runRealCodingFlowFollowupSmokeDryRun() {
     prompt,
     'Authorization: Bearer sk-live-secret-123456789',
     'api_key=sk-url-secret-123456789',
-    '/home/wang/.private-agents-real/.private-agents/config.json',
+    '/home/wang/.private-agents-real/.cheers/config.json',
   ].join('\n'))
   const passing = assertCodingFlowFollowupSmokeResponse({
     output: [
@@ -4483,7 +4483,7 @@ function runRealCodingFlowFollowupSmokeDryRun() {
     editRouting.routing.ambiguousTargetDetected &&
     redaction.ok &&
     !serialized.includes('.private-agents-real') &&
-    !serialized.includes('.private-agents/config.json') &&
+    !serialized.includes('.cheers/config.json') &&
     !serialized.includes('sk-live-secret') &&
     !serialized.includes('sk-url-secret')
 
@@ -4527,7 +4527,7 @@ async function runRealCodingFlowFollowupSmoke() {
       modelTurn: false,
       writableFixture: false,
       failureCategory: 'provider-readiness',
-      failureReason: 'real provider home is not configured; set PRIVATE_AGENTS_REAL_HOME to opt in',
+      failureReason: 'real provider home is not configured; set CHEERS_REAL_HOME to opt in',
     }
     writeReport(report)
     console.log('[CONFIG] real-coding-flow-followup-smoke status=config-failure')
@@ -4743,11 +4743,11 @@ function runRealCodingFlowDiagnosticsSelfTest() {
   const auditLogPath = createIsolatedCodingFlowAuditLogPath()
   const fixture = createCodingFlowFixture()
   try {
-    fs.mkdirSync(path.join(runtimeHome, '.private-agents', 'sessions', 'diagnostic-session'), {
+    fs.mkdirSync(path.join(runtimeHome, '.cheers', 'sessions', 'diagnostic-session'), {
       recursive: true,
     })
     fs.writeFileSync(
-      path.join(runtimeHome, '.private-agents', 'sessions', 'diagnostic-session', 'transcript.jsonl'),
+      path.join(runtimeHome, '.cheers', 'sessions', 'diagnostic-session', 'transcript.jsonl'),
       '{}\n',
       'utf8',
     )
@@ -4776,7 +4776,7 @@ function runRealCodingFlowDiagnosticsSelfTest() {
         'Execution summary',
         '- Actions: read (1 run)',
         'Authorization: Bearer sk-live-secret-123456789',
-        '/home/wang/.private-agents-real/.private-agents/config.json',
+        '/home/wang/.private-agents-real/.cheers/config.json',
       ].join('\n'),
       stderr: 'api_key=sk-url-secret-123456789',
       output: [
@@ -4790,7 +4790,7 @@ function runRealCodingFlowDiagnosticsSelfTest() {
         'Execution summary',
         '- Actions: read (1 run)',
         'Authorization: Bearer sk-live-secret-123456789',
-        '/home/wang/.private-agents-real/.private-agents/config.json',
+        '/home/wang/.private-agents-real/.cheers/config.json',
         'api_key=sk-url-secret-123456789',
       ].join('\n'),
     }
@@ -4896,7 +4896,7 @@ function runRealCodingFlowDiagnosticsSelfTest() {
       diagnostics.classification.failureCategory === 'changedFiles wrong' &&
       diagnostics.classification.statusDetail === 'changed-files-wrong' &&
       !serialized.includes('.private-agents-real') &&
-      !serialized.includes('.private-agents/config.json') &&
+      !serialized.includes('.cheers/config.json') &&
       !serialized.includes('sk-live-secret') &&
       !serialized.includes('sk-url-secret')
 
@@ -4970,7 +4970,7 @@ function runRealCodingFlowAuditIsolationSelfTest() {
       residueDetected.auditResidueCleaned === true &&
       !serialized.includes(auditLogPath) &&
       !serialized.includes('.private-agents-real') &&
-      !serialized.includes('.private-agents/config.json')
+      !serialized.includes('.cheers/config.json')
 
     console.log(`auditLogKind=${afterCreate.auditLogKind}`)
     console.log(`auditLogCreated=${afterCreate.auditLogCreated}`)
@@ -5029,7 +5029,7 @@ function buildReadonlyProviderAttempts() {
   const approvedHomeSelected = realHome === approvedRealProviderHome
   const effective = buildEffectiveProviderEnv(
     approvedHomeSelected
-      ? { ...process.env, PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: '1' }
+      ? { ...process.env, CHEERS_REAL_PROVIDER_SMOKE: '1' }
       : process.env,
   )
   if (effective.providerEnvError) {
@@ -5056,16 +5056,16 @@ function buildReadonlyProviderAttempts() {
 
 function fallbackProviderEnvAsPrimary(fallbackEnv) {
   return {
-    PRIVATE_AGENTS_REAL_PROVIDER:
-      fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_PROVIDER ?? fallbackEnv.PRIVATE_AGENTS_REAL_PROVIDER,
-    ...(fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_API_KEY
-      ? { PRIVATE_AGENTS_REAL_API_KEY: fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_API_KEY }
+    CHEERS_REAL_PROVIDER:
+      fallbackEnv.CHEERS_REAL_FALLBACK_PROVIDER ?? fallbackEnv.CHEERS_REAL_PROVIDER,
+    ...(fallbackEnv.CHEERS_REAL_FALLBACK_API_KEY
+      ? { CHEERS_REAL_API_KEY: fallbackEnv.CHEERS_REAL_FALLBACK_API_KEY }
       : {}),
-    ...(fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL
-      ? { PRIVATE_AGENTS_REAL_BASE_URL: fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_BASE_URL }
+    ...(fallbackEnv.CHEERS_REAL_FALLBACK_BASE_URL
+      ? { CHEERS_REAL_BASE_URL: fallbackEnv.CHEERS_REAL_FALLBACK_BASE_URL }
       : {}),
-    ...(fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_MODEL
-      ? { PRIVATE_AGENTS_REAL_MODEL: fallbackEnv.PRIVATE_AGENTS_REAL_FALLBACK_MODEL }
+    ...(fallbackEnv.CHEERS_REAL_FALLBACK_MODEL
+      ? { CHEERS_REAL_MODEL: fallbackEnv.CHEERS_REAL_FALLBACK_MODEL }
       : {}),
   }
 }
@@ -5097,7 +5097,7 @@ async function runReadonlyModelTurnAttempt({ fixture, providerEnv }) {
     env: {
       HOME: realHome,
       USERPROFILE: realHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
+      CHEERS_PROVIDER_MODE: 'real',
       ...providerEnv,
     },
     timeoutMs: 420000,
@@ -5313,7 +5313,7 @@ function runRealReadonlyCodingDryRun() {
         'Authorization: Bearer sk-live-secret-123456789',
         'api_key=sk-url-secret-123456789',
         'refresh_token=refresh-secret',
-        'D:/Test/home-sf/.private-agents/config.json',
+        'D:/Test/home-sf/.cheers/config.json',
       ].join('\n'),
     )
     const report = {
@@ -5385,7 +5385,7 @@ async function runRealCodingFlowSmoke() {
       statusDetail: 'config-failure',
       exitCode: 3,
       failureCategory: 'auth/config failure',
-      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME on Linux/WSL before running coding flow smoke',
+      failureReason: 'config-failure: set CHEERS_REAL_HOME on Linux/WSL before running coding flow smoke',
     }
     writeReport({
       generatedAt: new Date().toISOString(),
@@ -5496,10 +5496,10 @@ async function runRealCodingFlowSmoke() {
       env: {
         HOME: runtimeHome,
         USERPROFILE: runtimeHome,
-        PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
-        PRIVATE_AGENTS_REAL_HOME: realHome,
-        PRIVATE_AGENTS_PROVIDER_MODE: 'real',
-        PRIVATE_AGENTS_AUDIT_LOG_PATH: auditLogPath,
+        CHEERS_HOME_OVERRIDE: realHome,
+        CHEERS_REAL_HOME: realHome,
+        CHEERS_PROVIDER_MODE: 'real',
+        CHEERS_AUDIT_LOG_PATH: auditLogPath,
       },
       timeoutMs: 420000,
     })
@@ -5730,9 +5730,9 @@ function runRealCodingFlowDryRun() {
         'api_key=sk-url-secret-123456789',
         'refresh_token=refresh-secret',
         'access_token=access-secret',
-        'D:/Test/home-sf/.private-agents/config.json',
-        '/home/example/.private-agents-real/.private-agents/config.json',
-        '/home/wang/.private-agents-real/.private-agents/sessions/session-1/transcript.jsonl',
+        'D:/Test/home-sf/.cheers/config.json',
+        '/home/example/.private-agents-real/.cheers/config.json',
+        '/home/wang/.private-agents-real/.cheers/sessions/session-1/transcript.jsonl',
       ].join('\n'),
     )
     const contract = buildCodingFlowDryRunContract(fixture)
@@ -5846,8 +5846,8 @@ function buildApplyPatchDryRunProviderEvalScript() {
     import { resolveProviderCredential } from ${JSON.stringify(providerCredentialsUrl)};
 
     ;(async () => {
-      const prompt = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PROMPT ?? '';
-      const workspaceRoot = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? process.cwd();
+      const prompt = process.env.CHEERS_APPLY_PATCH_DRY_RUN_PROMPT ?? '';
+      const workspaceRoot = process.env.CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? process.cwd();
       const runtimeConfig = getRuntimeConfig(workspaceRoot);
       const resolved = resolveProviderCredential({ runtimeConfig });
       const credential = resolved.credential;
@@ -5865,7 +5865,7 @@ function buildApplyPatchDryRunProviderEvalScript() {
         clientProtocol: credential.provider === 'openai-compatible' ? 'openai-compatible' : credential.provider,
         baseUrlHost: baseUrlHost(baseUrl),
         model,
-        configSource: process.env.PRIVATE_AGENTS_REAL_CONFIG_SOURCE ?? 'runtime-config',
+        configSource: process.env.CHEERS_REAL_CONFIG_SOURCE ?? 'runtime-config',
         credentialSource: credential.source,
       };
       console.log(${JSON.stringify(applyPatchProviderDiagnosticsMarker)} + JSON.stringify(diagnostics));
@@ -5944,13 +5944,13 @@ async function runApplyPatchDryRunProviderTurn({ prompt, runtimeHome, realHome, 
     env: {
       HOME: runtimeHome,
       USERPROFILE: runtimeHome,
-      PRIVATE_AGENTS_HOME_OVERRIDE: realHome,
-      PRIVATE_AGENTS_REAL_HOME: realHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'real',
-      PRIVATE_AGENTS_AUDIT_LOG_PATH: auditLogPath,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PROMPT: prompt,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
-      PRIVATE_AGENTS_REAL_CONFIG_SOURCE: realMutationEnvContract.configSource,
+      CHEERS_HOME_OVERRIDE: realHome,
+      CHEERS_REAL_HOME: realHome,
+      CHEERS_PROVIDER_MODE: 'real',
+      CHEERS_AUDIT_LOG_PATH: auditLogPath,
+      CHEERS_APPLY_PATCH_DRY_RUN_PROMPT: prompt,
+      CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      CHEERS_REAL_CONFIG_SOURCE: realMutationEnvContract.configSource,
     },
     timeoutMs: 420000,
   })
@@ -6025,9 +6025,9 @@ function buildApplyPatchDryRunRouteEvalScript() {
     import { buildSingleFileApplyPatchOptInDryRunRoute } from ${JSON.stringify(routeUrl)};
     import { buildSingleFileApplyPatchRealProviderDryRunGateContract } from ${JSON.stringify(gateUrl)};
 
-    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
-    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
-    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const workspaceRoot = path.resolve(process.env.CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.CHEERS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.CHEERS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
     const routeResult = buildSingleFileApplyPatchOptInDryRunRoute({
       workspaceRoot,
       rawPatchText,
@@ -6064,9 +6064,9 @@ async function runApplyPatchDryRunRoute({ fixtureDir, patchText, redaction }) {
   ], {
     cwd: tsShellRoot,
     env: {
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+      CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      CHEERS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      CHEERS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
         ok: redaction.ok,
         leaks: redaction.leaks,
       }),
@@ -6109,9 +6109,9 @@ function buildApplyPatchPermissionUxRouteEvalScript() {
     import { buildSingleFileApplyPatchPermissionUxRealRouteSeam } from ${JSON.stringify(seamUrl)};
     import { buildSingleFileApplyPatchRealProviderPermissionUxGateContract } from ${JSON.stringify(gateUrl)};
 
-    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
-    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
-    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const workspaceRoot = path.resolve(process.env.CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.CHEERS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.CHEERS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
     const readFixtureFile = (absolutePath) => {
       const resolved = path.resolve(absolutePath);
       if (!(resolved === workspaceRoot || resolved.startsWith(workspaceRoot + path.sep))) {
@@ -6194,9 +6194,9 @@ async function runApplyPatchPermissionUxRoute({ fixtureDir, patchText, redaction
   ], {
     cwd: tsShellRoot,
     env: {
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+      CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      CHEERS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      CHEERS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
         ok: redaction.ok,
         leaks: redaction.leaks,
       }),
@@ -6237,11 +6237,11 @@ function buildApplyPatchRuntimeNoWriteRouteEvalScript() {
     import { buildNoWriteRuntimeRoute } from ${JSON.stringify(routeUrl)};
     import { buildRuntimeNoWriteSmokeContract } from ${JSON.stringify(smokeUrl)};
 
-    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
-    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
-    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
-    const fixtureUnchanged = process.env.PRIVATE_AGENTS_APPLY_PATCH_RUNTIME_FIXTURE_UNCHANGED === 'true';
-    const repositoryClean = process.env.PRIVATE_AGENTS_APPLY_PATCH_RUNTIME_REPOSITORY_CLEAN === 'true';
+    const workspaceRoot = path.resolve(process.env.CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.CHEERS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.CHEERS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const fixtureUnchanged = process.env.CHEERS_APPLY_PATCH_RUNTIME_FIXTURE_UNCHANGED === 'true';
+    const repositoryClean = process.env.CHEERS_APPLY_PATCH_RUNTIME_REPOSITORY_CLEAN === 'true';
     const readFixtureFile = (absolutePath) => {
       const resolved = path.resolve(absolutePath);
       if (!(resolved === workspaceRoot || resolved.startsWith(workspaceRoot + path.sep))) {
@@ -6286,14 +6286,14 @@ async function runApplyPatchRuntimeNoWriteRoute({
   ], {
     cwd: tsShellRoot,
     env: {
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+      CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      CHEERS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      CHEERS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
         ok: redaction.ok,
         leaks: redaction.leaks,
       }),
-      PRIVATE_AGENTS_APPLY_PATCH_RUNTIME_FIXTURE_UNCHANGED: String(fixtureUnchanged),
-      PRIVATE_AGENTS_APPLY_PATCH_RUNTIME_REPOSITORY_CLEAN: String(repositoryClean),
+      CHEERS_APPLY_PATCH_RUNTIME_FIXTURE_UNCHANGED: String(fixtureUnchanged),
+      CHEERS_APPLY_PATCH_RUNTIME_REPOSITORY_CLEAN: String(repositoryClean),
     },
     timeoutMs: 120000,
   })
@@ -6335,11 +6335,11 @@ function buildApplyPatchWriteFixtureEvalScript() {
     import { runIsolatedWriteLane } from ${JSON.stringify(laneUrl)};
     import { buildRealProviderWriteSmokeContract } from ${JSON.stringify(smokeUrl)};
 
-    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
-    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
-    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
-    const beforeChangedFiles = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_WRITE_FIXTURE_CHANGED ?? '[]');
-    const protectedFilesUnchanged = process.env.PRIVATE_AGENTS_APPLY_PATCH_WRITE_FIXTURE_PROTECTED_UNCHANGED === 'true';
+    const workspaceRoot = path.resolve(process.env.CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.CHEERS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.CHEERS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const beforeChangedFiles = JSON.parse(process.env.CHEERS_APPLY_PATCH_WRITE_FIXTURE_CHANGED ?? '[]');
+    const protectedFilesUnchanged = process.env.CHEERS_APPLY_PATCH_WRITE_FIXTURE_PROTECTED_UNCHANGED === 'true';
     const expectedChangedFiles = ['src/app.ts'];
     const readFixtureFile = (absolutePath) => {
       const resolved = path.resolve(absolutePath);
@@ -6425,14 +6425,14 @@ async function runApplyPatchWriteFixtureRoute({
   ], {
     cwd: tsShellRoot,
     env: {
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+      CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      CHEERS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      CHEERS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
         ok: redaction.ok,
         leaks: redaction.leaks,
       }),
-      PRIVATE_AGENTS_APPLY_PATCH_WRITE_FIXTURE_CHANGED: JSON.stringify(fixtureChangedFiles),
-      PRIVATE_AGENTS_APPLY_PATCH_WRITE_FIXTURE_PROTECTED_UNCHANGED: String(protectedFilesUnchanged),
+      CHEERS_APPLY_PATCH_WRITE_FIXTURE_CHANGED: JSON.stringify(fixtureChangedFiles),
+      CHEERS_APPLY_PATCH_WRITE_FIXTURE_PROTECTED_UNCHANGED: String(protectedFilesUnchanged),
     },
     timeoutMs: 120000,
   })
@@ -6484,12 +6484,12 @@ function buildApplyPatchGuardedWriteEvalScript() {
     import { runProductionWriteLane } from ${JSON.stringify(laneUrl)};
     import { buildGuardedWriteSmokeContract } from ${JSON.stringify(smokeUrl)};
 
-    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
-    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
-    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
-    const workspaceChangedFiles = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_GUARDED_WRITE_CHANGED ?? '[]');
-    const protectedFilesUnchanged = process.env.PRIVATE_AGENTS_APPLY_PATCH_GUARDED_WRITE_PROTECTED_UNCHANGED === 'true';
-    const repositoryClean = process.env.PRIVATE_AGENTS_APPLY_PATCH_GUARDED_WRITE_REPOSITORY_CLEAN === 'true';
+    const workspaceRoot = path.resolve(process.env.CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.CHEERS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.CHEERS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const workspaceChangedFiles = JSON.parse(process.env.CHEERS_APPLY_PATCH_GUARDED_WRITE_CHANGED ?? '[]');
+    const protectedFilesUnchanged = process.env.CHEERS_APPLY_PATCH_GUARDED_WRITE_PROTECTED_UNCHANGED === 'true';
+    const repositoryClean = process.env.CHEERS_APPLY_PATCH_GUARDED_WRITE_REPOSITORY_CLEAN === 'true';
     const expectedChangedFiles = ['src/app.ts'];
     const readWorkspaceFile = (absolutePath) => {
       const resolved = path.resolve(absolutePath);
@@ -6583,15 +6583,15 @@ async function runApplyPatchGuardedWriteRoute({
   ], {
     cwd: tsShellRoot,
     env: {
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+      CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      CHEERS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      CHEERS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
         ok: redaction.ok,
         leaks: redaction.leaks,
       }),
-      PRIVATE_AGENTS_APPLY_PATCH_GUARDED_WRITE_CHANGED: JSON.stringify(workspaceChangedFiles),
-      PRIVATE_AGENTS_APPLY_PATCH_GUARDED_WRITE_PROTECTED_UNCHANGED: String(protectedFilesUnchanged),
-      PRIVATE_AGENTS_APPLY_PATCH_GUARDED_WRITE_REPOSITORY_CLEAN: String(repositoryClean),
+      CHEERS_APPLY_PATCH_GUARDED_WRITE_CHANGED: JSON.stringify(workspaceChangedFiles),
+      CHEERS_APPLY_PATCH_GUARDED_WRITE_PROTECTED_UNCHANGED: String(protectedFilesUnchanged),
+      CHEERS_APPLY_PATCH_GUARDED_WRITE_REPOSITORY_CLEAN: String(repositoryClean),
     },
     timeoutMs: 120000,
   })
@@ -6645,12 +6645,12 @@ function buildApplyPatchGuardedRouteEvalScript() {
     import { buildProductionRouteRuntimeProjection } from ${JSON.stringify(routeProjectionUrl)};
     import { buildGuardedRouteSmokeContract } from ${JSON.stringify(smokeUrl)};
 
-    const workspaceRoot = path.resolve(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
-    const rawPatchText = process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
-    const redaction = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
-    const workspaceChangedFiles = JSON.parse(process.env.PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_CHANGED ?? '[]');
-    const protectedFilesUnchanged = process.env.PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_PROTECTED_UNCHANGED === 'true';
-    const repositoryClean = process.env.PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_REPOSITORY_CLEAN === 'true';
+    const workspaceRoot = path.resolve(process.env.CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE ?? '');
+    const rawPatchText = process.env.CHEERS_APPLY_PATCH_DRY_RUN_PATCH ?? '';
+    const redaction = JSON.parse(process.env.CHEERS_APPLY_PATCH_DRY_RUN_REDACTION ?? '{"ok":false,"leaks":["missing-redaction-input"]}');
+    const workspaceChangedFiles = JSON.parse(process.env.CHEERS_APPLY_PATCH_GUARDED_ROUTE_CHANGED ?? '[]');
+    const protectedFilesUnchanged = process.env.CHEERS_APPLY_PATCH_GUARDED_ROUTE_PROTECTED_UNCHANGED === 'true';
+    const repositoryClean = process.env.CHEERS_APPLY_PATCH_GUARDED_ROUTE_REPOSITORY_CLEAN === 'true';
     const expectedChangedFiles = ['src/app.ts'];
     const readWorkspaceFile = (absolutePath) => {
       const resolved = path.resolve(absolutePath);
@@ -6751,15 +6751,15 @@ async function runApplyPatchGuardedRouteRoute({
   ], {
     cwd: tsShellRoot,
     env: {
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
-      PRIVATE_AGENTS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
+      CHEERS_APPLY_PATCH_DRY_RUN_WORKSPACE: fixtureDir,
+      CHEERS_APPLY_PATCH_DRY_RUN_PATCH: patchText,
+      CHEERS_APPLY_PATCH_DRY_RUN_REDACTION: JSON.stringify({
         ok: redaction.ok,
         leaks: redaction.leaks,
       }),
-      PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_CHANGED: JSON.stringify(workspaceChangedFiles),
-      PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_PROTECTED_UNCHANGED: String(protectedFilesUnchanged),
-      PRIVATE_AGENTS_APPLY_PATCH_GUARDED_ROUTE_REPOSITORY_CLEAN: String(repositoryClean),
+      CHEERS_APPLY_PATCH_GUARDED_ROUTE_CHANGED: JSON.stringify(workspaceChangedFiles),
+      CHEERS_APPLY_PATCH_GUARDED_ROUTE_PROTECTED_UNCHANGED: String(protectedFilesUnchanged),
+      CHEERS_APPLY_PATCH_GUARDED_ROUTE_REPOSITORY_CLEAN: String(repositoryClean),
     },
     timeoutMs: 120000,
   })
@@ -7351,7 +7351,7 @@ function runRealApplyPatchDryRunSmokeDryRun() {
       fixture.prompt,
       'Authorization: Bearer sk-live-secret-123456789',
       'api_key=sk-url-secret-123456789',
-      '/home/wang/.private-agents-real/.private-agents/config.json',
+      '/home/wang/.private-agents-real/.cheers/config.json',
     ].join('\n'))
     const passed =
       comparison.ok &&
@@ -7385,7 +7385,7 @@ async function runRealApplyPatchDryRunSmoke() {
       statusDetail: 'config-failure',
       exitCode: 3,
       failureCategory: 'auth/config failure',
-      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch dry-run smoke',
+      failureReason: 'config-failure: set CHEERS_REAL_HOME before running apply_patch dry-run smoke',
     }
     writeReport({
       generatedAt: new Date().toISOString(),
@@ -7679,13 +7679,13 @@ async function runRealApplyPatchPermissionUxSmoke() {
       modelTurn: false,
       noWriteMode: true,
       failureCategory: 'auth/config failure',
-      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch permission UX smoke',
+      failureReason: 'config-failure: set CHEERS_REAL_HOME before running apply_patch permission UX smoke',
       changedFiles: [],
       writeIntents: [],
       noWriterInvoked: true,
     })
     console.log('[CONFIG] real-apply-patch-permission-ux-smoke status=config-failure')
-    console.log('config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch permission UX smoke')
+    console.log('config-failure: set CHEERS_REAL_HOME before running apply_patch permission UX smoke')
     process.exit(3)
   }
 
@@ -7956,13 +7956,13 @@ async function runRealApplyPatchRuntimeNoWriteSmoke() {
       modelTurn: false,
       noWriteMode: true,
       failureCategory: 'auth/config failure',
-      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch runtime no-write smoke',
+      failureReason: 'config-failure: set CHEERS_REAL_HOME before running apply_patch runtime no-write smoke',
       changedFiles: [],
       writeIntents: [],
       noWriterInvoked: true,
     })
     console.log('[CONFIG] real-apply-patch-runtime-no-write-smoke status=config-failure')
-    console.log('config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch runtime no-write smoke')
+    console.log('config-failure: set CHEERS_REAL_HOME before running apply_patch runtime no-write smoke')
     process.exit(3)
   }
 
@@ -8244,13 +8244,13 @@ async function runRealApplyPatchWriteFixtureSmoke() {
       modelTurn: false,
       noProductionWrite: true,
       failureCategory: 'auth/config failure',
-      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch write fixture smoke',
+      failureReason: 'config-failure: set CHEERS_REAL_HOME before running apply_patch write fixture smoke',
       changedFiles: [],
       writeIntents: [],
       productionWriterInvoked: false,
     })
     console.log('[CONFIG] real-apply-patch-write-fixture-smoke status=config-failure')
-    console.log('config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch write fixture smoke')
+    console.log('config-failure: set CHEERS_REAL_HOME before running apply_patch write fixture smoke')
     process.exit(3)
   }
 
@@ -8555,13 +8555,13 @@ async function runRealApplyPatchGuardedWriteSmoke() {
       modelTurn: false,
       noProductionWrite: true,
       failureCategory: 'auth/config failure',
-      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch guarded write smoke',
+      failureReason: 'config-failure: set CHEERS_REAL_HOME before running apply_patch guarded write smoke',
       changedFiles: [],
       writeIntents: [],
       productionWriterInvoked: false,
     })
     console.log('[CONFIG] real-apply-patch-guarded-write-smoke status=config-failure')
-    console.log('config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch guarded write smoke')
+    console.log('config-failure: set CHEERS_REAL_HOME before running apply_patch guarded write smoke')
     process.exit(3)
   }
 
@@ -8875,13 +8875,13 @@ async function runRealApplyPatchGuardedRouteSmoke() {
       modelTurn: false,
       noProductionWrite: true,
       failureCategory: 'auth/config failure',
-      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch guarded route smoke',
+      failureReason: 'config-failure: set CHEERS_REAL_HOME before running apply_patch guarded route smoke',
       changedFiles: [],
       writeIntents: [],
       productionWriterInvoked: false,
     })
     console.log('[CONFIG] real-apply-patch-guarded-route-smoke status=config-failure')
-    console.log('config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch guarded route smoke')
+    console.log('config-failure: set CHEERS_REAL_HOME before running apply_patch guarded route smoke')
     process.exit(3)
   }
 
@@ -9209,7 +9209,7 @@ async function runRealApplyPatchWorkspaceWriteSmoke() {
       realProviderExecution: false,
       modelTurn: false,
       failureCategory: 'auth/config failure',
-      failureReason: 'config-failure: set PRIVATE_AGENTS_REAL_HOME before running apply_patch workspace write smoke',
+      failureReason: 'config-failure: set CHEERS_REAL_HOME before running apply_patch workspace write smoke',
       changedFiles: [],
       writeIntents: [],
       workspaceWriterInvoked: false,
@@ -10414,7 +10414,7 @@ async function runRealSelectedWorkspaceTwoFileUpdate() {
   if (!realHome) {
     const failure = buildRealTwoFileUpdateFailure({
       category: 'provider/preflight',
-      reason: 'provider/preflight: set PRIVATE_AGENTS_REAL_HOME before running real selected-workspace two-file update smoke',
+      reason: 'provider/preflight: set CHEERS_REAL_HOME before running real selected-workspace two-file update smoke',
       status: 'CONFIG',
       exitCode: 3,
     })
@@ -10792,7 +10792,7 @@ async function runRealSelectedWorkspaceSingleFileCreate() {
   if (!realHome) {
     const failure = buildRealSingleFileCreateFailure({
       category: 'provider/preflight',
-      reason: 'provider/preflight: set PRIVATE_AGENTS_REAL_HOME before running real selected-workspace single-file create smoke',
+      reason: 'provider/preflight: set CHEERS_REAL_HOME before running real selected-workspace single-file create smoke',
       status: 'CONFIG',
       exitCode: 3,
     })
@@ -11145,7 +11145,7 @@ async function runRealSelectedWorkspaceSingleFileUpdate() {
   if (!realHome) {
     const failure = buildRealSingleFileUpdateFailure({
       category: 'provider/preflight',
-      reason: 'provider/preflight: set PRIVATE_AGENTS_REAL_HOME before running real selected-workspace single-file update smoke',
+      reason: 'provider/preflight: set CHEERS_REAL_HOME before running real selected-workspace single-file update smoke',
       status: 'CONFIG',
       exitCode: 3,
     })
@@ -11508,8 +11508,8 @@ async function runApplyPatchWorkspaceWriteCli({
     env: {
       HOME: runtimeHome,
       USERPROFILE: runtimeHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
-      PRIVATE_AGENTS_APPROVAL_AUDIT_LOG: auditLogPath,
+      CHEERS_PROVIDER_MODE: 'synthetic',
+      CHEERS_APPROVAL_AUDIT_LOG: auditLogPath,
     },
     timeoutMs: 120000,
   })
@@ -11856,7 +11856,7 @@ async function main() {
     if (selectedRequiresRealProvider) {
       if (!realHome) {
         throw Object.assign(
-          new Error('real provider home is not configured; set PRIVATE_AGENTS_REAL_HOME on Linux/WSL to opt in'),
+          new Error('real provider home is not configured; set CHEERS_REAL_HOME on Linux/WSL to opt in'),
           { configFailure: true },
         )
       }

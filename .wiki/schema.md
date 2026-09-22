@@ -1,12 +1,12 @@
 ---
-title: "Coding Agents Topic Guide"
+title: "Cheers Topic Guide"
 schema_state: advisory
 created: 2026-08-28
 updated: 2026-08-28
-summary: "Human-owned topic guide for coding-agents vocabulary, domain boundaries, and reference mappings."
+summary: "Human-owned topic guide for cheers vocabulary, domain boundaries, and reference mappings."
 ---
 
-# Coding Agents Topic Guide
+# Cheers Topic Guide
 
 > This is an advisory topic guide for local vocabulary, domain boundaries, and conceptual relationships.
 

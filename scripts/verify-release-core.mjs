@@ -83,7 +83,7 @@ if (mcpRoutingCode !== 0) {
 const mcpLocalExecutionCode = await runNodeScript(
   'verify-mcp-local-execution.mjs',
   [],
-  { PRIVATE_AGENTS_RELEASE_CORE_WIRED: '1' },
+  { CHEERS_RELEASE_CORE_WIRED: '1' },
 )
 if (mcpLocalExecutionCode !== 0) {
   const status = mcpLocalExecutionCode === 3 ? 'config-failure' : 'product-regression'

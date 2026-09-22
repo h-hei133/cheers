@@ -3,10 +3,10 @@
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
-const WINDOWS_PRIVATE_AGENTS_CONFIG_PATTERN =
-  /[A-Za-z]:[\\/]+[^\s"'`<>]+[\\/]+\.private-agents[\\/]+config\.json/gi
-const POSIX_PRIVATE_AGENTS_CONFIG_PATTERN =
-  /\/[^\s"'`<>]+\/\.private-agents\/config\.json/gi
+const WINDOWS_CHEERS_CONFIG_PATTERN =
+  /[A-Za-z]:[\\/]+[^\s"'`<>]+[\\/]+\.(?:cheers|cheer|private-agents|coding-agents)[\\/]+config\.json/gi
+const POSIX_CHEERS_CONFIG_PATTERN =
+  /\/[^\s"'`<>]+\/\.(?:cheers|cheer|private-agents|coding-agents)\/config\.json/gi
 const REAL_HOME_PATTERN = /[A-Za-z]:[\\/]+Test[\\/]+home-sf(?:[\\/][^\s"'`<>]*)?/gi
 const POSIX_REAL_HOME_PATTERN =
   /\/[^\s"'`<>]*\.private-agents-real(?:\/[^\s"'`<>]*)?/gi
@@ -23,7 +23,7 @@ const SECRET_QUERY_PARAM_PATTERN =
 const FORBIDDEN_PROVIDER_DETAIL_PATTERNS = [
   { label: 'real-provider-home', pattern: /D:[\\/]+Test[\\/]+home-sf/i },
   { label: 'posix-real-provider-home', pattern: /\/[^\s"'`<>]*\.private-agents-real/i },
-  { label: 'private-agents-config-path', pattern: /\.private-agents[\\/]+config\.json/i },
+  { label: 'user-config-path', pattern: /\.(?:cheers|cheer|private-agents|coding-agents)[\\/]+config\.json/i },
   { label: 'bearer-token', pattern: /Bearer\s+(?!\[REDACTED\])[A-Za-z0-9._~+/=-]+/i },
   { label: 'api-key-value', pattern: /\b(api[_-]?key|x-api-key)\s*[:=]\s*(?!["']?\[REDACTED\])["']?[^\s"'`,;]+/i },
   { label: 'access-token-value', pattern: /\baccess[_-]?token\s*[:=]\s*(?!["']?\[REDACTED\])["']?[^\s"'`,;]+/i },
@@ -48,8 +48,8 @@ export function redactCodingProviderOutput(input) {
     .replace(OPENAI_STYLE_KEY_PATTERN, '[REDACTED_API_KEY]')
     .replace(MASKED_OPENAI_STYLE_KEY_PATTERN, '[REDACTED_API_KEY]')
     .replace(SECRET_QUERY_PARAM_PATTERN, '$1[REDACTED]')
-    .replace(WINDOWS_PRIVATE_AGENTS_CONFIG_PATTERN, '[PRIVATE_AGENTS_CONFIG_PATH]')
-    .replace(POSIX_PRIVATE_AGENTS_CONFIG_PATTERN, '[PRIVATE_AGENTS_CONFIG_PATH]')
+    .replace(WINDOWS_CHEERS_CONFIG_PATTERN, '[CHEERS_CONFIG_PATH]')
+    .replace(POSIX_CHEERS_CONFIG_PATTERN, '[CHEERS_CONFIG_PATH]')
     .replace(REAL_HOME_PATTERN, '[REAL_PROVIDER_HOME]')
     .replace(POSIX_REAL_HOME_PATTERN, '[REAL_PROVIDER_HOME]')
 }
@@ -83,9 +83,9 @@ function runSelfTest() {
     'refresh_token=refresh-secret',
     'access_token=access-secret',
     'https://example.test/v1?api_key=sk-url-secret&signature=sig-secret',
-    'D:/Test/home-sf/.private-agents/config.json',
-    '/home/example/.private-agents-real/.private-agents/config.json',
-    '/home/wang/.private-agents-real/.private-agents/sessions/session-1/transcript.jsonl',
+    'D:/Test/home-sf/.cheers/config.json',
+    '/home/example/.private-agents-real/.cheers/config.json',
+    '/home/wang/.private-agents-real/.cheers/sessions/session-1/transcript.jsonl',
   ].join('\n')
 
   const result = redactAndAssertCodingProviderOutput(sample)
@@ -94,7 +94,7 @@ function runSelfTest() {
       result.redacted.includes('Authorization: [REDACTED]')) &&
     result.redacted.includes('api_key=[REDACTED]') &&
     result.redacted.includes('refresh_token=[REDACTED]') &&
-    result.redacted.includes('[PRIVATE_AGENTS_CONFIG_PATH]') &&
+    result.redacted.includes('[CHEERS_CONFIG_PATH]') &&
     result.redacted.includes('[REAL_PROVIDER_HOME]') &&
     !result.redacted.includes('.private-agents-real')
   const passed = result.ok && hasMarkers

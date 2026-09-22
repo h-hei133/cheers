@@ -177,8 +177,8 @@ async function nextWithGrace(
  * of a repaint, which scrolls the whole view and repeats lines. Content is never
  * written, only the frame's structure.
  */
-const TRACE_STREAMS = process.env.PRIVATE_AGENTS_STREAM_TRACE === "1";
-const TRACE_PATH = process.env.PRIVATE_AGENTS_STREAM_TRACE_PATH ?? "stream-trace.log";
+const TRACE_STREAMS = process.env.CHEERS_STREAM_TRACE === "1";
+const TRACE_PATH = process.env.CHEERS_STREAM_TRACE_PATH ?? "stream-trace.log";
 
 function traceStream(message: string): void {
   if (!TRACE_STREAMS) return;

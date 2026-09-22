@@ -11,7 +11,7 @@ describe("long-session compact/reload continuation durability", () => {
   const originalUserProfile = process.env.USERPROFILE;
 
   beforeEach(() => {
-    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "private-agents-long-session-durability-"));
+    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-long-session-durability-"));
     process.env.HOME = fakeHome;
     process.env.USERPROFILE = fakeHome;
   });
@@ -236,8 +236,8 @@ function runFixture(
         ...process.env,
         HOME: fakeHome,
         USERPROFILE: fakeHome,
-        PRIVATE_AGENTS_REAL_HOME: "",
-        PRIVATE_AGENTS_REAL_PROVIDER_SMOKE: "",
+        CHEERS_REAL_HOME: "",
+        CHEERS_REAL_PROVIDER_SMOKE: "",
       },
       encoding: "utf8",
     },

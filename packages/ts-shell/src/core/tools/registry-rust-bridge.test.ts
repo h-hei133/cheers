@@ -8,7 +8,7 @@ describe('tool registry rust bridge', () => {
   let workspaceRoot = ''
 
   beforeEach(async () => {
-    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'private-agents-rust-bridge-'))
+    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-rust-bridge-'))
   })
 
   afterEach(async () => {

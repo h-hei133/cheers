@@ -90,7 +90,7 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 
 | 维度 | 我们 | pi（`src/core/skills.ts`） |
 |---|---|---|
-| 根目录 | 2 个：`~/.private-agents/skills`（`:37`）、`<ws>/.agents/skills`（`:40`） | 6 类：`~/.pi/agent/skills`、`~/.agents/skills`、`.pi/skills`、祖先目录 `.agents/skills`、包、settings、CLI（`docs/skills.md:24-35`） |
+| 根目录 | 2 个：`~/.cheers/skills`（`:37`）、`<ws>/.agents/skills`（`:40`） | 6 类：`~/.pi/agent/skills`、`~/.agents/skills`、`.pi/skills`、祖先目录 `.agents/skills`、包、settings、CLI（`docs/skills.md:24-35`） |
 | 祖先目录搜索 | **无**（只查 cwd 正下方） | 有，向上到 git 根（`docs/skills.md:31`） |
 | manifest 名 | `SKILL.md`（`:28`） | `SKILL.md`（同） |
 | frontmatter 解析 | 本地正则 `FRONTMATTER`（`:29`），`parseFields` 手写 | `parseFrontmatter`（`skills.ts:4`） |
@@ -110,11 +110,11 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 
 > 「Registering one records an address and a manifest; **this build does not execute extensions**, and the output says so rather than implying a capability arrived.」
 
-`InstalledPlugin`（`:18-29`）字段含 `resolved`（`:28`，注释「False until the spec has been resolved on disk」）、`source: "path"|"package"`；存储位置 `~/.coding-agents/plugins.json`（`:34`）；默认空注册表（`:38`）。
+`InstalledPlugin`（`:18-29`）字段含 `resolved`（`:28`，注释「False until the spec has been resolved on disk」）、`source: "path"|"package"`；存储位置 `~/.cheers/plugins.json`（`:34`）；默认空注册表（`:38`）。
 
 **证据（pi）**：`src/core/package-manager.ts:112` `PackageManager` 接口，配合 `ResolvedResource`/`ResolvedPaths`/`PackageUpdate`（`:74,80,98`）；`src/core/pi-manifest.ts:4` `PiManifest`、`:17` `readPiManifest`；`docs/packages.md` 描述 npm/git 源与 `pi install/remove/update/list/config`。
 
-**影响**：`/plugin` 与 `/marketplace` 是**登记簿**而非安装器。`core/commands/marketplaceCommandRuntime.ts:10-22` 的两个源 URL（`github.com/private-coding-agents/marketplace`、`.../community-plugins`）是硬编码字面量，全文件无任何网络拉取代码。用户以为装了能力，实际什么都没变。
+**影响**：`/plugin` 与 `/marketplace` 是**登记簿**而非安装器。`core/commands/marketplaceCommandRuntime.ts:10-22` 的两个源 URL（`github.com/cheers/marketplace`、`.../community-plugins`）是硬编码字面量，全文件无任何网络拉取代码。用户以为装了能力，实际什么都没变。
 
 **最小改动建议**：二选一——要么把 `/plugin` 的输出与帮助文案改成明确「仅登记、不加载」（注释已诚实，但命令输出与帮助未对齐），要么实现真实加载路径（大工程，建议单独立项）。
 
@@ -126,7 +126,7 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 
 **影响**：`config/runtimeConfig.ts` 声明了 `theme?: "dark"|"light"|"auto"`，但 `getRuntimeConfig` 不返回该字段（见 `02-*` 报告），且 `loadTheme` 只认这两个名字——用户无法自带主题。
 
-**最小改动建议**：把 `presentation/themes/index.ts` 的静态 registry 改为「静态兜底 + 目录扫描」，扫描 `~/.private-agents/themes/*.json` 与 `<ws>/.agents/themes/*.json`。
+**最小改动建议**：把 `presentation/themes/index.ts` 的静态 registry 改为「静态兜底 + 目录扫描」，扫描 `~/.cheers/themes/*.json` 与 `<ws>/.agents/themes/*.json`。
 
 ## 3. MISSING 详述
 
@@ -164,7 +164,7 @@ grep -rn "prompt-template\|promptTemplate\|\.agents/prompts" packages/ts-shell/s
 
 **影响**：用户无法定义可复用的参数化提示词。当前唯一的「模板」是硬编码在 `core/commands/registry.ts` 里的 45 个内建命令。
 
-**最小落地路径**：新增 `core/skills/promptTemplateLoader.ts`，扫描 `~/.private-agents/prompts/*.md` 与 `<ws>/.agents/prompts/*.md`，在 `core/commands/registry.ts` 构建时动态注册为命令（`CommandDefinition` 已支持 `summary`/`argumentHint` 形状，见 `entrypoints/slashCommandRegistry.ts:17-27`）。
+**最小落地路径**：新增 `core/skills/promptTemplateLoader.ts`，扫描 `~/.cheers/prompts/*.md` 与 `<ws>/.agents/prompts/*.md`，在 `core/commands/registry.ts` 构建时动态注册为命令（`CommandDefinition` 已支持 `summary`/`argumentHint` 形状，见 `entrypoints/slashCommandRegistry.ts:17-27`）。
 
 ### 3.3 ~~上下文文件（AGENTS.md）不被加载~~ ✅ 已修复（原文保留为历史记录）
 
@@ -202,4 +202,4 @@ grep -rn "AGENTS.md" packages/ts-shell/src --include='*.ts' | grep -v test
 1. **pi 的扩展实际运行效果**：pi 的 `node_modules` 不存在，未能实跑 `pi -e ./ext.ts` 验证其扩展宿主行为。上述 pi 侧结论全部来自**其文档与源码**，未做实机对照。
 2. **`runtime/resources/` 是否曾被接线**：其 `projection.ts` 只有测试导入者（`provider/registry/provider.test.ts:5`）。未追溯 git 历史确认它是否曾有过生产消费者。
 3. **`docs/` 中是否有技能/插件的既有设计文档**：仅做了关键词级 grep，未逐份阅读 770 份 `docs/`，可能遗漏既有设计意图记录。
-4. **`core/commands/marketplaceCommandRuntime.ts` 的源 URL 是否可达**：未做网络请求，未验证 `github.com/private-coding-agents/marketplace` 是否存在。
+4. **`core/commands/marketplaceCommandRuntime.ts` 的源 URL 是否可达**：未做网络请求，未验证 `github.com/cheers/marketplace` 是否存在。

@@ -15,9 +15,8 @@ import {
   createSessionId,
   createSessionStoreLayout,
   ensureSessionStoreLayout,
-  projectSessionFileLayout,
+  locateExistingSessionLayout,
   validateSessionId,
-  type SessionFileLayout,
   type SessionStoreLayout,
 } from "./sessionFileLayout.js";
 import { writeJsonFileAtomic } from "./sessionFileStore.js";
@@ -63,40 +62,33 @@ export class SessionStoreAccess {
     return validateSessionId(sessionId);
   }
 
-  fileLayout(sessionId: string): SessionFileLayout {
-    return projectSessionFileLayout({
-      sessionsDir: this.storeLayout.sessionsDir,
-      sessionId,
-    });
-  }
-
   sessionDir(sessionId: string): string {
-    return this.fileLayout(sessionId).sessionDir;
+    return locateExistingSessionLayout(this.storeLayout, sessionId).sessionDir;
   }
 
   metadataPath(sessionId: string): string {
-    return this.fileLayout(sessionId).metadataPath;
+    return locateExistingSessionLayout(this.storeLayout, sessionId).metadataPath;
   }
 
   transcriptPath(sessionId: string): string {
-    return this.fileLayout(sessionId).transcriptPath;
+    return locateExistingSessionLayout(this.storeLayout, sessionId).transcriptPath;
   }
 
   statePath(sessionId: string): string {
-    return this.fileLayout(sessionId).statePath;
+    return locateExistingSessionLayout(this.storeLayout, sessionId).statePath;
   }
 
   sessionExists(sessionId: string): boolean {
     if (!sessionId?.trim()) {
       return false;
     }
-    return sessionExistsAtLayout(this.fileLayout(sessionId.trim()));
+    return sessionExistsAtLayout(locateExistingSessionLayout(this.storeLayout, sessionId.trim()));
   }
 
   load(sessionId: string): Session {
     return loadSessionRecord({
       sessionId,
-      layout: this.fileLayout(sessionId),
+      layout: locateExistingSessionLayout(this.storeLayout, sessionId),
       cwd: process.cwd(),
     });
   }
@@ -104,14 +96,14 @@ export class SessionStoreAccess {
   writeSession(session: Session): void {
     writeSessionRecord({
       session,
-      layout: this.fileLayout(session.id),
+      layout: locateExistingSessionLayout(this.storeLayout, session.id),
     });
   }
 
   writeSessionMetadata(session: Session): void {
     writeSessionMetadataRecord({
       session,
-      layout: this.fileLayout(session.id),
+      layout: locateExistingSessionLayout(this.storeLayout, session.id),
     });
   }
 
@@ -121,7 +113,7 @@ export class SessionStoreAccess {
   ): void {
     writeSessionState({
       session,
-      layout: this.fileLayout(session.id),
+      layout: locateExistingSessionLayout(this.storeLayout, session.id),
       overrides,
     });
   }
@@ -129,17 +121,31 @@ export class SessionStoreAccess {
   deleteSession(sessionId: string): void {
     deleteSessionRecord({
       sessionId,
-      layout: this.fileLayout(sessionId),
+      layout: locateExistingSessionLayout(this.storeLayout, sessionId),
     });
   }
 
   listSessions(): Session[] {
-    return listSessionRecords({
-      sessionsDir: this.storeLayout.sessionsDir,
-      loadSession: (sessionId) => this.load(sessionId),
-      warningState: this.listWarningState,
-      warn: (message) => console.warn(message),
-    });
+    // Every directory that may hold sessions, so a listing does not hide the ones
+    // written before the directory was renamed. Ids are unique, so an id present
+    // in more than one directory is one session, read from the first that has it.
+    const seen = new Set<string>();
+    const sessions: Session[] = [];
+    for (const sessionsDir of this.storeLayout.sessionsSearchDirs) {
+      for (const session of listSessionRecords({
+        sessionsDir,
+        loadSession: (sessionId) => this.load(sessionId),
+        warningState: this.listWarningState,
+        warn: (message) => console.warn(message),
+        skipSessionIds: seen,
+      })) {
+        seen.add(session.id);
+        sessions.push(session);
+      }
+    }
+    return sessions.sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
   }
 
   getCurrentSessionForProject(projectRoot: string): Session | null {
@@ -152,6 +158,7 @@ export class SessionStoreAccess {
   ): CurrentSessionSelectionResolution {
     return resolveCurrentSessionForProject({
       storePath: this.storeLayout.currentSessionStorePath,
+      storeSearchPaths: this.storeLayout.currentSessionStoreSearchPaths,
       projectRoot,
       sessionExists: (sessionId) => this.sessionExists(sessionId),
       loadSession: (sessionId) => this.load(sessionId),
@@ -161,6 +168,7 @@ export class SessionStoreAccess {
   setCurrentSessionForProject(projectRoot: string, sessionId: string): void {
     setCurrentSessionSelection({
       storePath: this.storeLayout.currentSessionStorePath,
+      storeSearchPaths: this.storeLayout.currentSessionStoreSearchPaths,
       projectRoot,
       sessionId,
       updatedAt: new Date().toISOString(),
@@ -170,6 +178,7 @@ export class SessionStoreAccess {
   clearCurrentSessionForProject(projectRoot: string): void {
     clearCurrentSessionSelectionForProject({
       storePath: this.storeLayout.currentSessionStorePath,
+      storeSearchPaths: this.storeLayout.currentSessionStoreSearchPaths,
       projectRoot,
     });
   }
@@ -183,7 +192,7 @@ export class SessionStoreAccess {
   }
 
   withSessionStateLock<T>(sessionId: string, action: () => T): T {
-    return withSessionStateLock(this.fileLayout(sessionId), action);
+    return withSessionStateLock(locateExistingSessionLayout(this.storeLayout, sessionId), action);
   }
 
   writeJsonFileAtomic(filePath: string, payload: unknown): void {

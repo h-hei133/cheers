@@ -148,7 +148,7 @@ describe("SOTA Cross-Session Messaging & Agent Teams Test Suite", () => {
 
       // Complete t1
       claimed1!.status = "completed";
-      const t1Path = path.join(os.homedir(), ".cheer", "tasks", teamId, "t1.json");
+      const t1Path = path.join(os.homedir(), ".cheers", "tasks", teamId, "t1.json");
       fs.writeFileSync(t1Path, JSON.stringify(claimed1, null, 2), "utf8");
 
       // Now t2 is unblocked and can be claimed

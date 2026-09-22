@@ -22,7 +22,7 @@ export function createBrowserExternalNetworkHandoffManifestFixture(input: {
   readonly unsafeManifest?: unknown;
 } = {}): BrowserExternalNetworkHandoffManifestFixture {
   const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), input.prefix ?? "private-agents-browser-external-network-handoff-"),
+    path.join(os.tmpdir(), input.prefix ?? "cheers-browser-external-network-handoff-"),
   );
   const manifestPath = path.join(root, "browser-external-network-runner-manifest.json");
   const manifest = input.manifest ?? createBrowserExternalNetworkRunnerManifest();

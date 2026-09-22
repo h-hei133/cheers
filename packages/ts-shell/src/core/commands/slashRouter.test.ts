@@ -23,12 +23,12 @@ describe("slash router (W4)", () => {
 
   beforeEach(() => {
     fakeHomeDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-slash-router-home-"),
+      path.join(os.tmpdir(), "cheers-slash-router-home-"),
     );
     process.env.USERPROFILE = fakeHomeDir;
     process.env.HOME = fakeHomeDir;
     workspaceRoot = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-command-registry-"),
+      path.join(os.tmpdir(), "cheers-command-registry-"),
     );
   });
 
@@ -1115,7 +1115,7 @@ describe("slash router (W4)", () => {
 
   it("hides /mcp when MCP command exposure is disabled", async () => {
     fs.writeFileSync(
-      path.join(workspaceRoot, ".private-agents.json"),
+      path.join(workspaceRoot, ".cheers.json"),
       JSON.stringify({ enableMcpTools: false }),
       "utf8",
     );

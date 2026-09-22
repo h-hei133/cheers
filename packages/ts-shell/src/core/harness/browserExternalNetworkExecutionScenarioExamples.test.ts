@@ -146,7 +146,7 @@ describe("browser external-network execution bridge scenario examples", () => {
     const result = await runAgentCliScenario({
       scenario,
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route116-home-"),
+      homeDir: tempRoot("cheers-route116-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -188,7 +188,7 @@ describe("browser external-network execution bridge scenario examples", () => {
   }
 
   function projectRoot(): string {
-    const projectPath = tempRoot("private-agents-route116-project-");
+    const projectPath = tempRoot("cheers-route116-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 116 fixture\n", "utf8");
     return projectPath;
   }

@@ -410,7 +410,7 @@ describe("runtime event projection", () => {
     const serialized = JSON.stringify(events);
 
     expect(serialized).not.toMatch(
-      /hidden reasoning|sk-1234567890|raw-before|raw-after|secret-value|private-agents-real|full file contents/i,
+      /hidden reasoning|sk-1234567890|raw-before|raw-after|secret-value|cheers-real|full file contents/i,
     );
     expect(serialized).toContain("[redacted-real-provider-home]");
     expect(serialized).toContain("[secret-redacted]");
@@ -673,7 +673,7 @@ describe("runtime event projection", () => {
         toolOutcomeBlockedReasons: ["call-read:executed_failed"],
         terminalSuccessClaim: false,
       });
-    expect(serialized).not.toMatch(/private-agents-real|secret branch summary/i);
+    expect(serialized).not.toMatch(/cheers-real|secret branch summary/i);
   });
 
   it("projects static resource metadata without discovery, execution, or success claims", () => {
@@ -799,7 +799,7 @@ describe("runtime event projection", () => {
     expect(
       events.every((event) => event.facts.terminalSuccessClaim !== true),
     ).toBe(true);
-    expect(serialized).not.toMatch(/private-agents-real|provider\.env|Bearer abc/i);
+    expect(serialized).not.toMatch(/cheers-real|provider\.env|Bearer abc/i);
     expect(serialized).not.toContain('"success":true');
     expect(events[0]?.notProvenClaims).toEqual(
       expect.arrayContaining([
@@ -948,7 +948,7 @@ describe("runtime event projection", () => {
       events.every((event) => event.facts.terminalSuccessClaim !== true),
     ).toBe(true);
     expect(serialized).not.toMatch(
-      /hidden reasoning|sk-1234567890|private-agents-real|provider\.env/i,
+      /hidden reasoning|sk-1234567890|cheers-real|provider\.env/i,
     );
     expect(serialized).not.toContain('"success":true');
     expect(

@@ -1,6 +1,6 @@
-# Cheer 使用手册
+# Cheers 使用手册
 
-适用目录：`D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents`
+适用目录：`/home/wang/projects/cheers`
 
 ## 1. 先说结论：用户态与开发态是否已区分
 已区分，方式是“同一 CLI 下的视图与职责分层”：
@@ -152,7 +152,7 @@ npm start -- --attach D:\your\repo
 
 ## 7. npm 命令总览（根目录）
 
-来源：`D:\LenovoSoftstore\pyproject\source-claudecode\private-coding-agents\package.json`
+来源：`/home/wang/projects/cheers/package.json`
 
 ### 7.1 初始化与诊断
 - `npm run bootstrap`
@@ -184,7 +184,7 @@ npm start -- --attach D:\your\repo
 
 ## 8. 子包常用命令
 
-### 8.1 `@cheer/ts-shell`
+### 8.1 `@cheers/ts-shell`
 - `npm run build -w packages/ts-shell`
 - `npm run dev -w packages/ts-shell`
 - `npm run start -w packages/ts-shell`
@@ -192,14 +192,14 @@ npm start -- --attach D:\your\repo
 - `npm run test:gate:golden-main-path -w packages/ts-shell`
 - `npm run test:watch -w packages/ts-shell`
 
-### 8.2 `@cheer/rust-core`
+### 8.2 `@cheers/rust-core`
 - `npm run build -w packages/rust-core`
 - `npm run test -w packages/rust-core`
 - `npm run test:watch -w packages/rust-core`
 - `npm run check -w packages/rust-core`
 - `npm run lint -w packages/rust-core`
 
-### 8.3 `@cheer/python-eval`
+### 8.3 `@cheers/python-eval`
 - `npm run build -w packages/python-eval`
 - `npm run test -w packages/python-eval`
 - `npm run test:watch -w packages/python-eval`
@@ -209,8 +209,8 @@ npm start -- --attach D:\your\repo
 ## 9. 配置与优先级
 
 ### 9.1 配置文件位置
-- 用户级：`%USERPROFILE%\.cheer\config.json`
-- 项目级：`<projectRoot>\.private-agents.json`
+- 用户级：`%USERPROFILE%\.cheers\config.json`
+- 项目级：`<projectRoot>\.cheers.json`
 
 ### 9.2 Provider/凭证优先级（简化）
 - provider：CLI 参数 > runtime 配置

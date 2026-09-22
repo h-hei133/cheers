@@ -37,6 +37,31 @@ describe("os sandbox rules", () => {
     expect(readSandboxRules(workspace).enabled).toBe(true);
   });
 
+  it("reads the user file from a directory an earlier name left behind", () => {
+    // Isolation the user switched on under an older name still has to hold: a
+    // rule that silently stops applying is worse than one never written.
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-home-"));
+    const originalHome = process.env.HOME;
+    const originalProfile = process.env.USERPROFILE;
+    process.env.HOME = home;
+    delete process.env.USERPROFILE;
+    try {
+      fs.mkdirSync(path.join(home, ".private-agents"), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, ".private-agents", "sandbox.json"),
+        JSON.stringify({ enabled: true }),
+        "utf8",
+      );
+
+      expect(readSandboxRules(workspace).enabled).toBe(true);
+    } finally {
+      process.env.HOME = originalHome;
+      if (originalProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalProfile;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it("does not let a project turn off isolation the user enabled", () => {
     // Only the user decides whether their commands are isolated. A project's file
     // tightens that decision or leaves it alone; it must not be able to lift it,
@@ -45,9 +70,9 @@ describe("os sandbox rules", () => {
     const originalHome = process.env.HOME;
     process.env.HOME = home;
     try {
-      fs.mkdirSync(path.join(home, ".cheer"), { recursive: true });
+      fs.mkdirSync(path.join(home, ".cheers"), { recursive: true });
       fs.writeFileSync(
-        path.join(home, ".cheer", "sandbox.json"),
+        path.join(home, ".cheers", "sandbox.json"),
         JSON.stringify({ enabled: true }),
         "utf8",
       );
@@ -67,9 +92,9 @@ describe("os sandbox rules", () => {
     const originalHome = process.env.HOME;
     process.env.HOME = home;
     try {
-      fs.mkdirSync(path.join(home, ".cheer"), { recursive: true });
+      fs.mkdirSync(path.join(home, ".cheers"), { recursive: true });
       fs.writeFileSync(
-        path.join(home, ".cheer", "sandbox.json"),
+        path.join(home, ".cheers", "sandbox.json"),
         JSON.stringify({ enabled: true, filesystem: { allowWrite: ["/tmp/ok"] } }),
         "utf8",
       );
@@ -92,9 +117,9 @@ describe("os sandbox rules", () => {
     const originalHome = process.env.HOME;
     process.env.HOME = home;
     try {
-      fs.mkdirSync(path.join(home, ".cheer"), { recursive: true });
+      fs.mkdirSync(path.join(home, ".cheers"), { recursive: true });
       fs.writeFileSync(
-        path.join(home, ".cheer", "sandbox.json"),
+        path.join(home, ".cheers", "sandbox.json"),
         JSON.stringify({ enabled: true }),
         "utf8",
       );

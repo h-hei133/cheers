@@ -255,8 +255,8 @@ describe("browser public read-only web scenario examples", () => {
 
   it("real CLI blocked shape requires confirmation and does not make public network default", async () => {
     const fixture = fixtureFor({ confirmed: false });
-    const projectPath = tempRoot("private-agents-route120-project-");
-    const homeDir = tempRoot("private-agents-route120-home-");
+    const projectPath = tempRoot("cheers-route120-project-");
+    const homeDir = tempRoot("cheers-route120-home-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 120 fixture\n", "utf8");
     const scenario: AgentCliScenario = {
       id: "route120-cli-public-readonly-confirmation-required",

@@ -132,8 +132,8 @@ describe("browser public read-only web smoke scenario", () => {
   });
 
   it("real CLI smoke disabled scenario reports skipped without public network", async () => {
-    const projectPath = tempRoot("private-agents-route121-project-");
-    const homeDir = tempRoot("private-agents-route121-home-");
+    const projectPath = tempRoot("cheers-route121-project-");
+    const homeDir = tempRoot("cheers-route121-home-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 121 fixture\n", "utf8");
     const scenario: AgentCliScenario = {
       id: "route121-cli-public-smoke-disabled",

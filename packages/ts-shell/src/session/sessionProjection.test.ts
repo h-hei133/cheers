@@ -391,7 +391,7 @@ describe("session substrate projections", () => {
       terminalSuccessClaim: false,
     });
     expect(serialized).not.toMatch(
-      /hidden reasoning|token=secret|raw-before|raw-after|private-agents-real|branch summary exists/i,
+      /hidden reasoning|token=secret|raw-before|raw-after|cheers-real|branch summary exists/i,
     );
     expect(serialized).not.toContain('"success":true');
     expect(projection.compaction.records[0]?.notProvenClaims).toContain(
@@ -476,7 +476,7 @@ describe("session substrate projections", () => {
     expect(
       projectRecoveryTrustBoundaryBlock({
         sessionId: "sess_blocked",
-        sessionDir: "/home/test/.private-agents/sessions/sess_blocked",
+        sessionDir: "/home/test/.cheers/sessions/sess_blocked",
         reason: "continuation-evidence-missing",
         detail: "error state has no continuation evidence",
       }),
@@ -485,7 +485,7 @@ describe("session substrate projections", () => {
       reason: "continuation-evidence-missing",
       detail: "error state has no continuation evidence",
       recoveryHint:
-        "Session sess_blocked is not recoverable. Start a fresh session or manually repair /home/test/.private-agents/sessions/sess_blocked.",
+        "Session sess_blocked is not recoverable. Start a fresh session or manually repair /home/test/.cheers/sessions/sess_blocked.",
     });
   });
 });

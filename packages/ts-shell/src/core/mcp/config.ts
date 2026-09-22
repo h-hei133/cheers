@@ -29,7 +29,7 @@ export function getMcpConfigPaths(workspaceRoot: string): string[] {
   const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir()
   return [
     resolveUserDataFile('mcp.json'),
-    path.join(workspaceRoot, '.private-agents.mcp.json'),
+    path.join(workspaceRoot, '.cheers.mcp.json'),
   ]
 }
 
@@ -37,7 +37,7 @@ export function getMcpConfigPaths(workspaceRoot: string): string[] {
  * The MCP servers configured for this workspace.
  *
  * A project-scoped config names a command and this process spawns it, so a
- * repository that ships `.private-agents.mcp.json` decides what runs on the
+ * repository that ships `.cheers.mcp.json` decides what runs on the
  * machine of whoever opens it. That file is therefore read only when the caller
  * says the project may be trusted; the user's own file is always read, since they
  * wrote it.
@@ -56,11 +56,11 @@ export function loadMcpConfigs(
     if (!fs.existsSync(configPath)) {
       continue
     }
-    if (configPath.endsWith('.private-agents.mcp.json') && !allowProjectScope) {
+    if (configPath.endsWith('.cheers.mcp.json') && !allowProjectScope) {
       continue
     }
 
-    const scope = configPath.endsWith('.private-agents.mcp.json') ? 'project' : 'user'
+    const scope = configPath.endsWith('.cheers.mcp.json') ? 'project' : 'user'
     const raw = readMcpConfigFile(configPath)
     for (const [name, config] of Object.entries(raw.mcpServers ?? {})) {
       merged[name] = {

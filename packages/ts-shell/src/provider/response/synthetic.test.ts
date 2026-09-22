@@ -87,6 +87,6 @@ describe("synthetic provider response", () => {
         fallbackEligible: false,
       }),
     ]);
-    expect(JSON.stringify(events)).not.toMatch(/private-agents-real|provider\.env/i);
+    expect(JSON.stringify(events)).not.toMatch(/cheers-real|provider\.env/i);
   });
 });

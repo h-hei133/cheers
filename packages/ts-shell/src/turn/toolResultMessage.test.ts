@@ -46,7 +46,7 @@ describe("tool result messages", () => {
     expect(messages.terminalSuccessClaim).toBe(false);
     expect(messages.notProvenClaims).toContain("next-turn-success");
     expect(serialized).not.toMatch(
-      /token=secret|oldText=before|newText=after|private-agents-real|provider\.env/i,
+      /token=secret|oldText=before|newText=after|cheers-real|provider\.env/i,
     );
   });
 });

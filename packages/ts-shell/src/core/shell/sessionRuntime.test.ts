@@ -872,7 +872,7 @@ describe("shell session runtime (W5)", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-edit-patch-continuity-"),
+      path.join(os.tmpdir(), "cheers-edit-patch-continuity-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -1048,13 +1048,13 @@ describe("shell session runtime (W5)", () => {
       const originalUserProfile = process.env.USERPROFILE;
       const originalHome = process.env.HOME;
       const fakeHome = fs.mkdtempSync(
-        path.join(os.tmpdir(), "private-agents-writer-started-continuity-"),
+        path.join(os.tmpdir(), "cheers-writer-started-continuity-"),
       );
       process.env.USERPROFILE = fakeHome;
       process.env.HOME = fakeHome;
 
       try {
-        const sessionsDir = path.join(fakeHome, ".cheer", "sessions");
+        const sessionsDir = path.join(fakeHome, ".cheers", "sessions");
         const {
           projectRoot,
           sessionId,
@@ -2036,7 +2036,7 @@ describe("shell session runtime (W5)", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-compact-resume-"),
+      path.join(os.tmpdir(), "cheers-compact-resume-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -3347,7 +3347,7 @@ describe("shell session runtime (W5)", () => {
   it("records interrupted prompt vs interrupted turn differently", async () => {
     const originalUserProfile = process.env.USERPROFILE;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-interrupt-kind-"),
+      path.join(os.tmpdir(), "cheers-interrupt-kind-"),
     );
     process.env.USERPROFILE = fakeHome;
 
@@ -3412,7 +3412,7 @@ describe("shell session runtime (W5)", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-terminal-state-"),
+      path.join(os.tmpdir(), "cheers-terminal-state-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
@@ -3473,7 +3473,7 @@ describe("shell session runtime (W5)", () => {
     const originalUserProfile = process.env.USERPROFILE;
     const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "private-agents-query-failed-state-"),
+      path.join(os.tmpdir(), "cheers-query-failed-state-"),
     );
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;

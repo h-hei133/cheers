@@ -8,7 +8,7 @@ Last updated: 2026-08-28
 
 | File | Summary | Tags | Updated |
 |------|---------|------|---------|
-| [local-reference-repositories.md](local-reference-repositories.md) | Comparative architecture reference matrix mapping local projects in ~/projects/ to candidate subsystems in coding-agents. | references, pi, opencode, gitnexus, stagehand, mem0, graphiti, inspect_ai, mini-swe-agent | 2026-08-28 |
+| [local-reference-repositories.md](local-reference-repositories.md) | Comparative architecture reference matrix mapping local projects in ~/projects/ to candidate subsystems in cheers. | references, pi, opencode, gitnexus, stagehand, mem0, graphiti, inspect_ai, mini-swe-agent | 2026-08-28 |
 
 ## Recent Changes
 

@@ -48,7 +48,7 @@ for (const check of checks) {
     encoding: 'utf8',
     env: {
       ...process.env,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
     maxBuffer: 1024 * 1024 * 10,
   })

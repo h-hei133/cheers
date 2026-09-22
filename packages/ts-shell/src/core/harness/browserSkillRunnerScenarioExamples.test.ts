@@ -44,7 +44,7 @@ describe("browser skill runner CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route105-home-"),
+      homeDir: tempRoot("cheers-route105-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -80,7 +80,7 @@ describe("browser skill runner CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route105-home-"),
+      homeDir: tempRoot("cheers-route105-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -113,7 +113,7 @@ describe("browser skill runner CLI scenario examples", () => {
         },
       ]),
       projectPath: projectRoot(),
-      homeDir: tempRoot("private-agents-route105-home-"),
+      homeDir: tempRoot("cheers-route105-home-"),
     });
 
     expect(agentCliAssertionFailures(result)).toEqual([]);
@@ -135,7 +135,7 @@ describe("browser skill runner CLI scenario examples", () => {
   }
 
   function writeManifestEnv(manifest: ReturnType<typeof createBrowserExternalRunnerManifest>): Record<string, string> {
-    const root = tempRoot("private-agents-route105-manifest-");
+    const root = tempRoot("cheers-route105-manifest-");
     const manifestPath = path.join(root, "browser-skill-runner.json");
     fs.writeFileSync(manifestPath, serializeBrowserExternalRunnerManifest(manifest), "utf8");
     return { [BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV]: manifestPath };
@@ -158,7 +158,7 @@ describe("browser skill runner CLI scenario examples", () => {
   }
 
   function projectRoot(): string {
-    const projectPath = tempRoot("private-agents-route105-project-");
+    const projectPath = tempRoot("cheers-route105-project-");
     fs.writeFileSync(path.join(projectPath, "README.md"), "Route 105 fixture\n", "utf8");
     return projectPath;
   }

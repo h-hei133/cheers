@@ -68,7 +68,7 @@ describe("static resource projection", () => {
     expect(projection.providerDefaultEnablement).toBe("disabled");
     expect(projection.redaction.status).toBe("redacted");
     expect(serialized).not.toMatch(
-      /private-agents-real|Bearer abc|sk-1234567890|raw-before|raw-after|raw provider output/i,
+      /cheers-real|Bearer abc|sk-1234567890|raw-before|raw-after|raw provider output/i,
     );
   });
 

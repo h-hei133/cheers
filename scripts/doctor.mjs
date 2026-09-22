@@ -36,7 +36,7 @@ const checks = [
   { label: 'Rustup', result: rustup, required: false },
 ]
 
-console.log('🩺 Private Coding Agents Doctor\n')
+console.log('🩺 Cheers Doctor\n')
 console.log(`Workspace: ${rootDir}`)
 console.log(`Execution path: ${getExecutionPathLabel()}`)
 console.log('')

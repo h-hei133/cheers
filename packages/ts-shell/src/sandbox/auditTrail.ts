@@ -30,7 +30,7 @@ export class AuditTrail {
   private entryCount: number = 0;
 
   constructor(config?: Partial<AuditLogConfig>) {
-    const configuredLogPath = process.env.PRIVATE_AGENTS_AUDIT_LOG_PATH?.trim();
+    const configuredLogPath = process.env.CHEERS_AUDIT_LOG_PATH?.trim();
     const defaultLogPath = path.join(
       process.cwd(),
       '.sisyphus',

@@ -33,8 +33,8 @@ secrets, credentials, or hidden reasoning.
 Persistent cache is available only when an explicit cache root or manifest is
 provided. No env/config means no persistent cache. The CLI bridge accepts:
 
-- `PRIVATE_AGENTS_BROWSER_RECEIPT_CACHE_ROOT`
-- `PRIVATE_AGENTS_BROWSER_RECEIPT_CACHE_MANIFEST`
+- `CHEERS_BROWSER_RECEIPT_CACHE_ROOT`
+- `CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST`
 
 The manifest must name a non-global explicit root, allowed operations, scope,
 max record budget, safe-summary-only redaction, and cleanup policy.

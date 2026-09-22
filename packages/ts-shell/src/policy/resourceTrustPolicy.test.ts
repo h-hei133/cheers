@@ -44,7 +44,7 @@ describe("resource trust policy projection", () => {
 
     expect(projection.redaction.status).toBe("redacted");
     expect(serialized).not.toMatch(
-      /private-agents-real|provider\.env|Bearer abc|raw provider output/i,
+      /cheers-real|provider\.env|Bearer abc|raw provider output/i,
     );
     expect(serialized).not.toContain('"success":true');
   });

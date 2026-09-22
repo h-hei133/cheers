@@ -84,7 +84,7 @@ describe("tool call batch extraction", () => {
     expect(batch.redaction.status).toBe("redacted");
     expect(batch.calls[0]?.argumentSummary).toContain("redacted=true");
     expect(serialized).not.toMatch(
-      /private-agents-real|provider\.env|oldText=before|newText=after|token=secret/i,
+      /cheers-real|provider\.env|oldText=before|newText=after|token=secret/i,
     );
     expect(batch.calls[0]?.terminalSuccessClaim).toBe(false);
   });

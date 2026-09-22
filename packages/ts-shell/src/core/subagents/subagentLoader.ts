@@ -1,8 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
 import type { SubagentDefinition, SubagentIsolationMode, SubagentMemoryScope, SubagentPermissionMode } from "./types.js";
-import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
+import { resolveUserDataFile } from "../../core/paths/userHome.js"
 
 const BUILTIN_SUBAGENTS: SubagentDefinition[] = [
   {
@@ -48,7 +47,9 @@ export class SubagentLoader {
 
   constructor(workspaceRoot: string = process.cwd()) {
     this.workspaceRoot = path.resolve(workspaceRoot);
-    this.userAgentsDir = path.join(userDataDir(), "agents");
+    // The user's own agent definitions, from the directory in use or an older one:
+    // a definition they already wrote keeps working after the rename.
+    this.userAgentsDir = resolveUserDataFile("agents");
   }
 
   /**
@@ -72,7 +73,7 @@ export class SubagentLoader {
       registry.set(agent.name.toLowerCase(), agent);
     }
 
-    // 2. User-level agents (~/.cheer/agents/*.md). The user's own files,
+    // 2. User-level agents (~/.cheers/agents/*.md). The user's own files,
     // so they load regardless.
     this.scanDirectory(this.userAgentsDir, "user", registry);
 

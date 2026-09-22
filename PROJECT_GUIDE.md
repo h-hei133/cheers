@@ -1,4 +1,4 @@
-# Coding Agents 项目全景指南 (Project Overview & Architecture Guide)
+# Cheers 项目全景指南 (Project Overview & Architecture Guide)
 
 > **版本**：v0.5.0 (SOTA 全栈工业级智能体架构 - 跨会话通信、大输出溢出、9 阶弹性源码编辑、持久化会话与网络弹性)  
 > **当前 Git 分支**：`normproof-observation`  
@@ -20,7 +20,7 @@
 
 ## 一、 项目定位与核心架构
 
-`coding-agents` 是一个企业级多层自主编码智能体（Autonomous Coding Agent）开发框架，旨在为开发者提供具备**编译器级真实 AST 前检、原生四层记忆（QuadMemory）、智能体软件工程工作流（Agentic SDLC）、跨平台终端自适应、原生多模型协议分流（OpenAI / Anthropic Messages API）、14 重反检测浏览器与细粒度权限控制**的新一代终端编码助手。
+`cheers` 是一个企业级多层自主编码智能体（Autonomous Coding Agent）开发框架，旨在为开发者提供具备**编译器级真实 AST 前检、原生四层记忆（QuadMemory）、智能体软件工程工作流（Agentic SDLC）、跨平台终端自适应、原生多模型协议分流（OpenAI / Anthropic Messages API）、14 重反检测浏览器与细粒度权限控制**的新一代终端编码助手。
 
 ### 三层运行时模型 (Three-Layer Runtime)
 
@@ -56,11 +56,11 @@ graph TD
 
 ```mermaid
 timeline
-  title coding-agents 7 大阶段彻底去伪存真全景
+  title cheers 7 大阶段彻底去伪存真全景
   Phase A (数据与状态) : /cost completions.usage 真实 Token 计费 : /context 动态计算窗口余量 : /fast 联动温度 : /undo Git 物理撤销
   Phase B (推理与研究) : CreativeSynthesizer 异步 LLM 架构综合推导 : /brainstorm ADR 规范生成 : DeepResearcher 语义分句清洗
   Phase C (编排与原子性) : targetSetEditRoute 引入 preWrite 暂存与 100% 自动回滚 : realTaskLoop 显式归因合成回退
-  Phase D (多智能体与插件) : /plugin 实现 ~/.coding-agents/plugins.json 磁盘持久化 : workflowCoordinator Planner 动态任务拆解
+  Phase D (多智能体与插件) : /plugin 实现 ~/.cheers/plugins.json 磁盘持久化 : workflowCoordinator Planner 动态任务拆解
   Phase E (编译器 AST 守护) : astGauntlet TypeScript 编译器真实 AST 语法诊断 : selection 智能项目测试选择 : parser/callGraph AST 符号与调用图
   Phase F (工具与安全加固) : approvalStore 全命令签名哈希 (消除 bash 越权) : 剔除只读白名单中危险写工具 : lsp hover AST 符号签名
   Phase G (多模型协议适配) : AnthropicModelAdapter 原生 /v1/messages 协议与 tool_use 解析 : capabilityBoundary 动态命令解析
@@ -136,7 +136,7 @@ packages/ts-shell/src/
 │   │   ├── contextCommandRuntime.ts # /context 动态 Token 窗口分配
 │   │   ├── undoCommandRuntime.ts    # /undo Git 真实脏检查与 --hard 物理回滚
 │   │   ├── fastCommandRuntime.ts    # /fast 联动采样与快速模型
-│   │   ├── pluginCommandRuntime.ts  # /plugin 磁盘持久化 (~/.coding-agents/plugins.json)
+│   │   ├── pluginCommandRuntime.ts  # /plugin 磁盘持久化 (~/.cheers/plugins.json)
 │   │   └── brainstormCommandRuntime.ts # /brainstorm 异步大模型 ADR 推导
 │   ├── agent/                    # 通用执行内核（步进循环、双待办队列、工具批次、终态屏障）
 │   │   ├── loop.ts / agent.ts / queue.ts / tools.ts / state.ts / events.ts

@@ -468,7 +468,7 @@ inner.ts
 
 ### 3.3 裁决：**目录注入 + 按名加载正文（不依赖 `read` 的绝对路径）**
 
-> **⚠️ 本节经审查后更正**（见 §3.8 发现 1）。原裁决采纳 `pi` 的做法——注入 `<location>` 绝对路径、复用现有 `read` 工具。**该做法在我方不可行**：`read` 强制 workspace containment，用户级技能（`~/.private-agents/skills/…`）**全部被拒**（已实测）。
+> **⚠️ 本节经审查后更正**（见 §3.8 发现 1）。原裁决采纳 `pi` 的做法——注入 `<location>` 绝对路径、复用现有 `read` 工具。**该做法在我方不可行**：`read` 强制 workspace containment，用户级技能（`~/.cheers/skills/…`）**全部被拒**（已实测）。
 
 **注入形状（元数据，不变）**：
 
@@ -565,7 +565,7 @@ inner.ts
 
 | 检查 | 结果 |
 |---|---|
-| `USAGE_MANUAL.md`（241 行，唯一的用户手册） | 只写了配置文件**位置**（`%USERPROFILE%\.private-agents\config.json`、`<projectRoot>\.private-agents.json`），**一个配置键都没列**（`grep thinkingBudgets\|promptCacheTtl\|contextWindow` → 0 命中） |
+| `USAGE_MANUAL.md`（241 行，唯一的用户手册） | 只写了配置文件**位置**（`%USERPROFILE%\.cheers\config.json`、`<projectRoot>\.cheers.json`），**一个配置键都没列**（`grep thinkingBudgets\|promptCacheTtl\|contextWindow` → 0 命中） |
 | 其它 md | 提及配置键的全是 `.wiki/` 下的**内部分析文档**，不是用户面文档 |
 
 **即：T3 那两个字段的缺陷不在「文档与代码不一致」，而在「类型声明与消费者不一致」。** 门禁必须检查**声明 → 消费者**，不是**文档 → 代码**。
@@ -600,7 +600,7 @@ if (!containment.allowed) {
 而 `verifyPathContainment`（`core/security/pathJail.ts:15-40`）**无条件拒绝 workspace 之外的绝对路径**。**已实测复现**（复刻其逻辑运行）：
 
 ```
-用户级技能（~/.private-agents/skills/pdf/SKILL.md）
+用户级技能（~/.cheers/skills/pdf/SKILL.md）
   → { allowed: false, reason: "Path '…' resolves outside workspace root '…'." }
 项目级技能（<ws>/.agents/skills/x/SKILL.md）
   → { allowed: true }
@@ -745,7 +745,7 @@ pi 引入预算上限的理由（`openai-completions.ts:974-977` 注释）：
 | 回归测试 | 新增 `runtimeConfig.test.ts` 的「does not carry a config key whose value nothing reads」——旧配置**仍含**两个已删字段时，断言解析结果的键集**不含**它们 | **反向验证通过**：只重新引入 `promptCacheTtl` → 该测试失败（`expected [...] to not include 'promptCacheTtl'`）；移除 → 通过 |
 | 类型 | `tsc -p packages/ts-shell/tsconfig.build.json --noEmit` | **0 错误** |
 | 全量 | `npm run test:ts` | **494 文件 / 2800 通过 / 1 跳过 / 0 失败** |
-| 实机（真实构建产物） | 用含两个已删字段的 `.private-agents.json` 调 `getRuntimeConfig` | 存活字段正确（`200000`/`30000`/`0.2`/`plan`/`fullscreen`）；**两个已删字段均不在结果键集中**；**旧配置不报错**（向后兼容） |
+| 实机（真实构建产物） | 用含两个已删字段的 `.cheers.json` 调 `getRuntimeConfig` | 存活字段正确（`200000`/`30000`/`0.2`/`plan`/`fullscreen`）；**两个已删字段均不在结果键集中**；**旧配置不报错**（向后兼容） |
 | 实机（真实 CLI） | `node dist/cli.js` 于该目录 | 正常启动，无错误 |
 | 实机（`/context`） | `printf '/context\n' \| node dist/cli.js` | `Window: 200,000 tokens` —— 从配置读到，未被删除影响 |
 
@@ -986,14 +986,14 @@ return tokens > contextWindow - reserveTokens;
 
 #### 发现 1（高）：**我方今天已经能执行克隆仓库提供的任意命令——而 T5 的「无插件代码宿主」论证忽略了它**
 
-`core/mcp/config.ts:27-45` 读取 `<workspaceRoot>/.private-agents.mcp.json`，`core/mcp/client.ts:146-149` 直接 `spawn(this.config.command, this.config.args ?? [], …)`。**整个 `core/mcp/` 路径零信任检查**（已核验：`grep -c "isProjectTrusted\|projectTrust"` 于全部 7 个 MCP 文件 → 全 0）。
+`core/mcp/config.ts:27-45` 读取 `<workspaceRoot>/.cheers.mcp.json`，`core/mcp/client.ts:146-149` 直接 `spawn(this.config.command, this.config.args ?? [], …)`。**整个 `core/mcp/` 路径零信任检查**（已核验：`grep -c "isProjectTrusted\|projectTrust"` 于全部 7 个 MCP 文件 → 全 0）。
 
 **且 `gateway.ts:20-23` 声明的 `"command-not-allowlisted"` 阻断类型从未被任何代码路径产生**——它不是一个门。
 
 **这动摇了 T5 §6.2 的核心论证**：该节把 `opencode` 的「克隆仓库即执行插件」记为反面教材，据此裁决「本轮只做声明式、不做插件代码宿主」。但**同一失效模式在我方已通过 MCP 可达**——「无插件代码宿主」对**插件子系统**为真，对**产品**为假。
 
 **追加裁决**：T5 的范围必须包含「盘点并封堵既有的未受控执行面」，否则信任门只保护了新入口而放过了旧入口。至少涉及：
-- `<workspace>/.private-agents.mcp.json`（spawn 任意命令）
+- `<workspace>/.cheers.mcp.json`（spawn 任意命令）
 - `.agents/workflows/*.json`（`workflow/runner.ts:98-104` `exec(step.run, …)`，已核验）
 - `.agents/sandbox.json`（`sandbox/osSandbox.ts:53-66` 从 workspace 读取并**直接塑造沙箱计划**，已核验）
 - `.agents/agents/*.md`（`subagents/subagentLoader.ts:65-66` 读取，body 成为 subagent 的 `systemPrompt`，零信任检查已核验）
@@ -1012,7 +1012,7 @@ return tokens > contextWindow - reserveTokens;
 |---|---|
 | `.agents/hooks.json`（T5 要读的配置） | **未探测到** ❌ |
 | `.agents/hooks/`（目录） | 探测到 ✅ |
-| `.private-agents.mcp.json`（spawn 命令） | **未探测到** ❌ |
+| `.cheers.mcp.json`（spawn 命令） | **未探测到** ❌ |
 | 根 `AGENTS.md`（T2 裁决 4 要求过门） | **未探测到** ❌ |
 | `.agents/workflows/`（exec） | **未探测到** ❌ |
 | `.agents/sandbox.json`（塑造沙箱） | **未探测到** ❌ |

@@ -5,13 +5,13 @@ sources: [raw/notes/2026-08-28-architecture-and-sprint-overview.md]
 created: 2026-08-28
 updated: 2026-08-28
 tags: [architecture, control-plane, ts-shell, rust-core, python-eval]
-summary: "The architectural foundation of coding-agents separating TypeScript control plane, Rust native executor, and Python offline eval."
+summary: "The architectural foundation of cheers separating TypeScript control plane, Rust native executor, and Python offline eval."
 confidence: high
 ---
 
 # Three-Layer Agent Architecture
 
-The `coding-agents` system is structured into three distinct runtime layers to maximize flexibility, safety, and performance.
+The `cheers` system is structured into three distinct runtime layers to maximize flexibility, safety, and performance.
 
 ```mermaid
 graph TD

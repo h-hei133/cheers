@@ -192,7 +192,7 @@ function checkRealProviderConfig() {
     printStep('real-provider-credential', 'pass', 'not-checked')
     return true
   }
-  const configPath = path.join(realHome, '.private-agents', 'config.json')
+  const configPath = path.join(realHome, '.cheers', 'config.json')
   if (!fs.existsSync(configPath)) {
     printStep('real-provider-config', 'config-failure', `${configPath} missing`)
     return false
@@ -204,11 +204,11 @@ function checkRealProviderConfig() {
 }
 
 async function checkSyntheticModeEnv() {
-  const result = await run(process.execPath, ['-e', 'console.log(`${process.env.PRIVATE_AGENTS_PROVIDER_MODE}|${process.env.HOME}|${process.env.USERPROFILE}`)'], {
+  const result = await run(process.execPath, ['-e', 'console.log(`${process.env.CHEERS_PROVIDER_MODE}|${process.env.HOME}|${process.env.USERPROFILE}`)'], {
     env: {
       HOME: syntheticHome,
       USERPROFILE: syntheticHome,
-      PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+      CHEERS_PROVIDER_MODE: 'synthetic',
     },
   })
   const expected = `synthetic|${syntheticHome}|${syntheticHome}`

@@ -117,7 +117,7 @@ async function runSyntheticPrintReplayGate() {
   const env = {
     HOME: syntheticHome,
     USERPROFILE: syntheticHome,
-    PRIVATE_AGENTS_PROVIDER_MODE: 'synthetic',
+    CHEERS_PROVIDER_MODE: 'synthetic',
   }
   const commonArgs = [
     '--project',

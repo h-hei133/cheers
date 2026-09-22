@@ -6,7 +6,7 @@ import { getWorkflowGitContext } from "../workflow/gitContext.js";
 export function printCliDoctor(targetCwd: string, launchCwd: string): void {
   const runtimeConfig = getRuntimeConfig(targetCwd);
   const gitContext = getWorkflowGitContext(targetCwd);
-  console.log("Cheer CLI Doctor");
+  console.log("Cheers CLI Doctor");
   console.log(`Node: ${process.version}`);
   console.log(
     `Execution path: ${isRustDaemonEnabled() ? "rust-daemon" : "ts-local"}`,

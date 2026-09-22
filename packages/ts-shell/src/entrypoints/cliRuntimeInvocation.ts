@@ -79,7 +79,7 @@ const defaultDependencies: CliRuntimeInvocationDependencies = {
 /**
  * Commands a synthetic run may be asked to carry out, mapped from the phrase a
  * prompt uses to the shell command it means. Only consulted when
- * `PRIVATE_AGENTS_SYNTHETIC_TOOLS` is set, so an ordinary synthetic run keeps
+ * `CHEERS_SYNTHETIC_TOOLS` is set, so an ordinary synthetic run keeps
  * answering in prose.
  */
 const SYNTHETIC_TOOL_INTENTS = [
@@ -88,7 +88,7 @@ const SYNTHETIC_TOOL_INTENTS = [
 ] as const;
 
 function syntheticToolIntent() {
-  if (process.env.PRIVATE_AGENTS_SYNTHETIC_TOOLS !== "1") return undefined;
+  if (process.env.CHEERS_SYNTHETIC_TOOLS !== "1") return undefined;
   return SYNTHETIC_TOOL_INTENTS.map((intent) => ({
     phrase: intent.phrase,
     name: intent.tool,

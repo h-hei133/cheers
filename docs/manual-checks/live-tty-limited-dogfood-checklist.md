@@ -26,11 +26,11 @@ Required before manual TTY work:
 | Repo state | `rtk git status --short --branch` | Branch is expected and no unrelated dirty files. | Pass if clean enough to attribute residue. | Branch, dirty entries, reason if dirty. | None. |
 | Deterministic baseline | Run the deterministic gates in the gate table below. | Gates pass without real-provider execution. | Pass if every required deterministic gate passes. | Command, exit status, notable output markers. | Clean generated residue. |
 | Private config boundary | Do not read, print, copy, grep, parse, modify, or summarize private provider config. | No private config or secret-bearing value appears. | Fail on any secret/config exposure. | `secretExposure=yes/no`. | Stop and report if exposed. |
-| Workspace isolation | Use a disposable project under `/tmp/private-agents-test/live-tty-limited-dogfood`. | Manual edits stay inside that project. | Pass if no repo files are changed by the live session. | Workspace path and files changed. | Remove disposable workspace if safe. |
+| Workspace isolation | Use a disposable project under `/tmp/cheers-test/live-tty-limited-dogfood`. | Manual edits stay inside that project. | Pass if no repo files are changed by the live session. | Workspace path and files changed. | Remove disposable workspace if safe. |
 
 ## Deterministic Gate Table
 
-Run these from `/home/wang/projects/cheer` with `rtk`.
+Run these from `/home/wang/projects/cheers` with `rtk`.
 
 | Gate | Command | Expected marker |
 | --- | --- | --- |
@@ -59,14 +59,14 @@ requires `process.stdin.isTTY` and `process.stdout.isTTY`.
 Suggested disposable workspace:
 
 ```sh
-mkdir -p /tmp/private-agents-test/live-tty-limited-dogfood/project/src
-printf 'export const value = "before";\n' > /tmp/private-agents-test/live-tty-limited-dogfood/project/src/app.ts
+mkdir -p /tmp/cheers-test/live-tty-limited-dogfood/project/src
+printf 'export const value = "before";\n' > /tmp/cheers-test/live-tty-limited-dogfood/project/src/app.ts
 ```
 
 Suggested live launch, run by a human in a real terminal:
 
 ```sh
-rtk npm run start:live:interactive -- --project /tmp/private-agents-test/live-tty-limited-dogfood/project
+rtk npm run start:live:interactive -- --project /tmp/cheers-test/live-tty-limited-dogfood/project
 ```
 
 If live TTY cannot be run safely or meaningfully in the current environment,
@@ -171,7 +171,7 @@ Before final reporting, check for and clean safe generated residue:
 - `packages/ts-shell/.sisyphus/**/permissions.jsonl`
 - `undefined/`
 - temporary audit output
-- temporary CLI workspaces under `/tmp/private-agents-test/live-tty-limited-dogfood`
+- temporary CLI workspaces under `/tmp/cheers-test/live-tty-limited-dogfood`
 - temporary TTY logs
 - temporary MCP logs
 - generated `history.db` files in route-created test homes

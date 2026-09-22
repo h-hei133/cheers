@@ -5,12 +5,12 @@ It is not a default gate and is not run by default checkpoints. The minimal isol
 
 ## Boundary
 
-- The smoke creates a temporary fixture workspace under `PRIVATE_AGENTS_TEST_ROOT` or the platform test root.
+- The smoke creates a temporary fixture workspace under `CHEERS_TEST_ROOT` or the platform test root.
 - The real target repository is never used as the mutation workspace.
 - The fixture contains `note.txt`, `README.md`, and `LOCKED.md`.
 - The only allowed mutation is changing `note.txt` from `status: draft` to `status: ready`.
 - `README.md` and `LOCKED.md` are protected.
-- Real-provider config is sourced only through explicit `PRIVATE_AGENTS_REAL_HOME` on Linux/WSL or the Windows default home.
+- Real-provider config is sourced only through explicit `CHEERS_REAL_HOME` on Linux/WSL or the Windows default home.
 - CLI runtime/session `HOME` and `USERPROFILE` must use an isolated runtime home under the configured test root, never the real-provider home.
 - Permission audit logs must be explicitly routed to an isolated audit log path under the configured test root for this smoke. The smoke reports only safe audit isolation labels/booleans, not the audit path.
 - Provider config content, keys, headers, and tokens are never printed.
@@ -33,7 +33,7 @@ It is not a default gate and is not run by default checkpoints. The minimal isol
     - routing summary: non-interactive CLI command kind, safe cwd/project kind labels, prompt byte count, prompt intent hint, whether `Repo-aware summary` intercepted the turn, whether the session runtime was entered, and whether result/tool markers were present.
     - process summary: exit code, timeout flag, output byte count, redacted stdout/stderr/combined tails, and output marker booleans.
     - fixture summary: observed/expected changed files, protected changed files, and `note.txt` status as only `draft`, `ready`, `other`, or `missing`.
-    - runtime summary: isolated runtime home kind, whether `.private-agents`/session artifacts were created under that isolated home, and `realProviderHomeUsedForRuntime=false`.
+    - runtime summary: isolated runtime home kind, whether `.cheers`/session artifacts were created under that isolated home, and `realProviderHomeUsedForRuntime=false`.
     - audit isolation summary: `auditLogKind`, `repoAuditResidueDetected`, `auditResidueCleaned`, and `auditLogCreated`.
     - mutation summary: `taskKind`, `actionSequence`, `targetFile`, `mutationInstructionPresent`, `replaceFromPresent`, `replaceToPresent`, `replaceFieldSource`, `diagnosticSource`, `patchFailureCode`, `failedFileReason`, and a redacted model text tail. Successful structured edit results must not be reported as missing replacement fields merely because no literal replace fields were emitted; the diagnostics must distinguish structured success from redacted output fallback.
     - classification summary: `failureStage`, `failureCategory`, `statusDetail`, and `nextAction`.
@@ -88,9 +88,9 @@ auto-recovery semantics.
 
 ## Audit Isolation Guard
 
-The smoke must set `PRIVATE_AGENTS_AUDIT_LOG_PATH` for the child CLI process to
+The smoke must set `CHEERS_AUDIT_LOG_PATH` for the child CLI process to
 an isolated path under the configured test root. `AuditTrail` path precedence is:
-explicit constructor config, then `PRIVATE_AGENTS_AUDIT_LOG_PATH`, then the
+explicit constructor config, then `CHEERS_AUDIT_LOG_PATH`, then the
 legacy `process.cwd()/.sisyphus/audit/permissions.jsonl` default. The override
 does not change permission semantics and must fail through the existing audit
 write behavior if the path is invalid or unwritable; it must not silently fall

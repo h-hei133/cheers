@@ -1,5 +1,5 @@
 ---
-title: "Coding Agents Knowledge Base"
+title: "Cheers Knowledge Base"
 description: "Project knowledge base for the three-layer autonomous coding agent framework: TypeScript control plane, Rust native executor candidate, and Python eval harness."
 created: 2026-08-28
 freshness_threshold: 70
@@ -9,7 +9,7 @@ freshness_threshold: 70
 
 ## Scope
 
-This wiki covers the architecture, core execution paths, proof and evidence contracts, benchmark integration, and reference implementations for the `coding-agents` project.
+This wiki covers the architecture, core execution paths, proof and evidence contracts, benchmark integration, and reference implementations for the `cheers` project.
 
 - **TypeScript Control Plane**: CLI, QueryEngine, TaskLoop, Session & Replay, Patch & Repair, Verification & Proof.
 - **Native Executor**: Rust core daemon, OS/sandbox isolation, process lifecycle.

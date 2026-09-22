@@ -170,7 +170,7 @@ export async function runBrowserSkillExecutionProcess(input: {
         env: {
           PATH: process.env.PATH ?? "",
           NODE_NO_WARNINGS: "1",
-          PRIVATE_AGENTS_BROWSER_SKILL_RUNNER: input.binding.mode,
+          CHEERS_BROWSER_SKILL_RUNNER: input.binding.mode,
         },
       },
     );
