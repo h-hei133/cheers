@@ -227,6 +227,11 @@ export function parseCliArgs(
   assignOption(options, "noContextFiles", rawArgs.includes("--no-context-files"));
   assignOption(
     options,
+    "dangerouslyBypassHookTrust",
+    rawArgs.includes("--dangerously-bypass-hook-trust"),
+  );
+  assignOption(
+    options,
     "migrateSessionRoot",
     rawArgs.includes("--migrate-session-root"),
   );

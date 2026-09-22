@@ -81,6 +81,18 @@ describe("runtime config", () => {
     expect(config.instructionBudgetBytes).toBe(32 * 1024);
   });
 
+  it("does not allow unreviewed hooks unless a flag says so", () => {
+    // The default has to be the safe one: a config file must not be able to grant
+    // this, or a repository could ship the exemption along with the hooks.
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.allowUntrustedHooks).toBe(false);
+  });
+
+  it("lets a command-line override turn on unreviewed hooks", () => {
+    const config = getRuntimeConfig(fakeRoot, { allowUntrustedHooks: true });
+    expect(config.allowUntrustedHooks).toBe(true);
+  });
+
   it("leaves the context window absent when the user did not set one", () => {
     // The window is resolved per model from the catalog. A default filled in
     // here would be indistinguishable from a deliberate override, so the

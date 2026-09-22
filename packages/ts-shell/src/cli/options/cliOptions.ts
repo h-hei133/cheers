@@ -24,6 +24,13 @@ export interface CliOptions {
    * one-off: "is it this repository's rules that are steering the model?"
    */
   readonly noContextFiles?: boolean;
+  /**
+   * Run a project's declared hook commands without approving each one.
+   *
+   * The name says what it does because the thing it does is dangerous: it lets a
+   * repository execute commands on this machine with no review at all.
+   */
+  readonly dangerouslyBypassHookTrust?: boolean;
 }
 
 export interface CliArgs {

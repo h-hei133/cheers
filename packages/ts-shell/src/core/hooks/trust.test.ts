@@ -136,3 +136,72 @@ describe("a hook that cannot run", () => {
     expect(decision.decision).toBe("allow");
   });
 });
+
+describe("a hook's exit code", () => {
+  /** A dispatcher with one declared PreToolUse hook running `command`. */
+  function dispatcherRunning(command: string): HookDispatcher {
+    const dispatcher = new HookDispatcher();
+    dispatcher.registerCommandHook({ event: "PreToolUse", matcher: "bash", command });
+    return dispatcher;
+  }
+
+  const fire = (dispatcher: HookDispatcher) =>
+    dispatcher.dispatch({
+      eventName: "PreToolUse",
+      workspaceRoot: process.cwd(),
+      toolName: "bash",
+      toolArgs: {},
+    } as never);
+
+  it("treats exit 2 with stderr as a refusal carrying the hook's reason", async () => {
+    // The documented way for a hook to say no: it has an explanation, and the
+    // explanation is what the caller should be told. Checked on an event with no
+    // failure fallback of its own, so the reason can only have come from here —
+    // on PreToolUse the generic "could not run" branch would mask the difference.
+    const dispatcher = new HookDispatcher();
+    dispatcher.registerCommandHook({
+      event: "SessionStart",
+      command: "printf 'refusing to start' >&2; exit 2",
+    });
+
+    const decision = await dispatcher.dispatch({
+      eventName: "SessionStart",
+      workspaceRoot: process.cwd(),
+    } as never);
+
+    expect(decision.decision).toBe("block");
+    expect(decision.reason).toBe("refusing to start");
+  });
+
+  it("treats a non-zero exit without stderr as a failure, not a refusal", async () => {
+    const decision = await fire(dispatcherRunning("exit 1"));
+
+    expect(decision.decision).toBe("block");
+    expect(decision.reason).not.toContain("not on this branch");
+  });
+
+  it("still accepts the JSON decision form", async () => {
+    const decision = await fire(
+      dispatcherRunning(`printf '{"decision":"allow"}'`),
+    );
+
+    expect(decision.decision).toBe("allow");
+  });
+});
+
+describe("a hook that does not read its input", () => {
+  it("does not take the process down when the pipe closes early", async () => {
+    // A command such as `exit 0` never reads stdin, so the write raises EPIPE.
+    // That is the hook declining the payload, not a failure, and an unhandled
+    // error event here would crash the run.
+    const dispatcher = new HookDispatcher();
+    dispatcher.registerCommandHook({ event: "SessionStart", command: "exit 0" });
+
+    const decision = await dispatcher.dispatch({
+      eventName: "SessionStart",
+      workspaceRoot: process.cwd(),
+    } as never);
+
+    expect(decision.decision).toBe("allow");
+  });
+});

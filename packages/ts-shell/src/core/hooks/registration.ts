@@ -37,6 +37,13 @@ export interface HookRegistrationOptions {
   readonly trustStore?: HookTrustStore
   /** How to ask the user about a command. Absent means nothing may run. */
   readonly requestApproval?: HookApprovalRequest
+  /**
+   * Run declared commands without approval.
+   *
+   * Set only from an explicit command-line flag. The dispatcher announces each
+   * command it runs this way, so the exemption is visible rather than implied.
+   */
+  readonly bypassed?: boolean
 }
 
 /**
@@ -63,6 +70,7 @@ export function registerDeclaredHooks(
   dispatcher.setCommandHookTrust({
     store,
     requestApproval: options?.requestApproval,
+    bypassed: options?.bypassed === true,
   });
 
   for (const hook of hooks) {

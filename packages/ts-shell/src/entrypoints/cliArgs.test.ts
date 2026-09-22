@@ -208,3 +208,18 @@ describe("--no-context-files", () => {
     expect(parsed.options.promptArg).toBe("explain this repo");
   });
 });
+
+describe("--dangerously-bypass-hook-trust", () => {
+  it("is off unless asked for", () => {
+    expect(expectParsed([]).options.dangerouslyBypassHookTrust).toBe(false);
+  });
+
+  it("is set when the flag is given", () => {
+    expect(expectParsed(["--dangerously-bypass-hook-trust"]).options.dangerouslyBypassHookTrust).toBe(true);
+  });
+
+  it("does not consume the prompt that follows it", () => {
+    const parsed = expectParsed(["--dangerously-bypass-hook-trust", "run the tests"]);
+    expect(parsed.options.promptArg).toBe("run the tests");
+  });
+});

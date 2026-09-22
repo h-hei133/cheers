@@ -64,6 +64,7 @@ export function createCliRootContext(
     // Zero is the loader's opt-out, so the flag needs no separate path through
     // the prompt builder.
     instructionBudgetBytes: input.options.noContextFiles ? 0 : undefined,
+    allowUntrustedHooks: input.options.dangerouslyBypassHookTrust === true ? true : undefined,
   });
   return {
     runtimeBaseDir,

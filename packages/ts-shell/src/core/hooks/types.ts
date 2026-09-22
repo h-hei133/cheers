@@ -205,6 +205,16 @@ export interface HooksConfiguration {
  * other: the registration step supplies one, the dispatcher calls it, and neither
  * has to know about the other to describe it.
  */
+/**
+ * A hook approval that was granted without asking.
+ *
+ * Recorded so the exemption is visible in the tool output rather than silent: the
+ * point of an escape hatch is that it is deliberate and can be seen being used,
+ * and one that runs quietly is indistinguishable from the gate being broken.
+ */
+export const HOOK_TRUST_BYPASS_NOTICE =
+  "HOOK TRUST BYPASSED: declared hook commands are running without approval because this run was started with --dangerously-bypass-hook-trust. Only do this in a repository you already trust.";
+
 export type HookApprovalRequest = (request: {
   readonly command: string;
   readonly event: string;

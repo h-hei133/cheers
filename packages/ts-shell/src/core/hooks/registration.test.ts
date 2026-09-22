@@ -164,6 +164,36 @@ describe("registering declared hooks", () => {
     expect(ran()).toEqual([]);
   });
 
+  it("runs declared hooks without asking when the bypass is set", async () => {
+    // The escape hatch for a repository someone is auditing by hand. It exists so
+    // they do not approve commands one at a time, and it runs only when a flag
+    // says so.
+    const dispatcher = new HookDispatcher();
+    registerDeclaredHooks(dispatcher, declareHook(markerCommand("bypassed")), {
+      bypassed: true,
+      trustStore: new HookTrustStore(trustPath),
+      homeDir: homeDir(),
+    });
+
+    await fire(dispatcher);
+
+    expect(ran()).toEqual(["bypassed"]);
+  });
+
+  it("does not bypass merely because no approval path was given", async () => {
+    // The two states must not be confused: one is a deliberate exemption, the
+    // other is a run that cannot ask and therefore must refuse.
+    const dispatcher = new HookDispatcher();
+    registerDeclaredHooks(dispatcher, declareHook(markerCommand("unattended")), {
+      trustStore: new HookTrustStore(trustPath),
+      homeDir: homeDir(),
+    });
+
+    await fire(dispatcher);
+
+    expect(ran()).toEqual([]);
+  });
+
   it("runs a hook this process registered itself without asking", async () => {
     // A built-in hook is this process's own code, not something a repository
     // wrote, so there is nobody to ask and nothing to refuse.

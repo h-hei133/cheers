@@ -1,10 +1,12 @@
 import { createComponentLogger } from "../../observability/structuredLogger.js";
+import { HOOK_TRUST_BYPASS_NOTICE } from "./types.js";
 import type { HookTrustStore } from "./trust.js";
 import { exec } from "node:child_process";
 import type {
   HookEventPayload,
   HookDecision,
   HookApprovalRequest,
+  HookEventName,
   InProcessHookConfig,
   CommandHookConfig,
   HooksConfiguration,
@@ -14,10 +16,44 @@ import type {
 
 const logger = createComponentLogger("HookDispatcher");
 
+/**
+ * A command hook that did not finish normally.
+ *
+ * Carried as one value rather than an `any`-shaped node error so the exit code
+ * and stderr survive to where the block contract is applied — a non-zero exit is
+ * a failure, but exit 2 with something on stderr is an instruction to refuse.
+ */
+class CommandHookFailure extends Error {
+  constructor(
+    message: string,
+    readonly exitCode: number | undefined,
+    readonly stderr: string,
+    readonly timedOut: boolean,
+  ) {
+    super(message);
+    this.name = "CommandHookFailure";
+  }
+}
+
+/**
+ * How long a hook on `event` may run.
+ *
+ * Events that fire while the session is winding down get a short budget: a hook
+ * that cannot finish quickly there delays the exit itself, and the work it was
+ * going to do is already moot.
+ */
+function hookTimeoutMs(event: HookEventName): number {
+  return event === "SessionEnd" || event === "Stop" || event === "StopFailure"
+    ? 3_000
+    : 15_000;
+}
+
 export class HookDispatcher {
   private commandHooks: CommandHookConfig[] = [];
   private inProcessHooks: InProcessHookConfig[] = [];
-  private trust: { store: HookTrustStore; requestApproval?: HookApprovalRequest } | undefined;
+  private trust:
+    | { store: HookTrustStore; requestApproval?: HookApprovalRequest; bypassed?: boolean }
+    | undefined;
 
   /**
    * How declared hooks are checked before they run.
@@ -27,7 +63,11 @@ export class HookDispatcher {
    * dispatcher refuses declared hooks and says so, which is the safe reading of
    * "nobody has been asked".
    */
-  setCommandHookTrust(trust: { store: HookTrustStore; requestApproval?: HookApprovalRequest }): void {
+  setCommandHookTrust(trust: {
+    store: HookTrustStore;
+    requestApproval?: HookApprovalRequest;
+    bypassed?: boolean;
+  }): void {
     this.trust = trust;
   }
 
@@ -39,6 +79,13 @@ export class HookDispatcher {
    */
   private async declaredHookIsAllowed(hook: CommandHookConfig): Promise<boolean> {
     if (hook.fingerprint === undefined) return true;
+    if (this.trust?.bypassed === true) {
+      // Said every time rather than once, because the state that matters is
+      // "this command is running unreviewed right now", not "the flag was set
+      // at some point".
+      logger.warn(HOOK_TRUST_BYPASS_NOTICE, { command: hook.command });
+      return true;
+    }
     if (this.trust === undefined) {
       // Nothing can be asked, so nothing may run. A non-interactive run must not
       // execute a repository's commands merely because nobody was there to say no.
@@ -153,9 +200,11 @@ export class HookDispatcher {
 
     // 2. Execute Command Hooks (Shell scripts with JSON stdin/stdout)
     for (const hook of this.commandHooks) {
+      // What the hook last wrote to stderr, which the block contract reads.
+      let lastStderr = "";
       if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
         if (!(await this.declaredHookIsAllowed(hook))) continue;
-        const timeoutMs = hook.timeoutMs ?? 15_000;
+        const timeoutMs = hook.timeoutMs ?? hookTimeoutMs(relevantEvent);
         const jsonPayload = JSON.stringify(payload);
 
         try {
@@ -169,19 +218,31 @@ export class HookDispatcher {
               },
               (error, stdoutBuf, stderrBuf) => {
                 if (error) {
-                  const errObj = error as any;
-                  errObj.stderr = stderrBuf;
-                  errObj.stdout = stdoutBuf;
-                  reject(errObj);
+                  reject(
+                    new CommandHookFailure(
+                      error instanceof Error ? error.message : String(error),
+                      typeof (error as { code?: unknown }).code === "number"
+                        ? (error as { code: number }).code
+                        : undefined,
+                      stderrBuf,
+                      error instanceof Error && (error as { killed?: boolean }).killed === true,
+                    ),
+                  );
                 } else {
+                  if (stderrBuf) lastStderr = stderrBuf;
                   resolve(stdoutBuf);
                 }
               },
             );
 
             if (child.stdin) {
-              child.stdin.write(jsonPayload);
-              child.stdin.end();
+              // A hook that exits without reading its input closes the pipe, and
+              // writing to it then raises EPIPE. That is a hook declining the
+              // payload, not a failure — an unhandled error event here would take
+              // the whole process down over a hook that simply had nothing to
+              // read. The callback above still decides the outcome.
+              child.stdin.on("error", () => {});
+              child.stdin.end(jsonPayload);
             }
           });
 
@@ -212,13 +273,24 @@ export class HookDispatcher {
           // exactly what it existed to stop. A failure on a `PreToolUse` hook is
           // now a refusal rather than a shrug; on the observing events it stays a
           // logged failure, since there is nothing to refuse.
+          const failure = err instanceof CommandHookFailure ? err : undefined;
           const detail = err instanceof Error ? err.message : String(err);
           logger.error(`Command hook failed for event ${relevantEvent}`, {
             event: relevantEvent,
             command: hook.command,
             timeoutMs,
+            exitCode: failure?.exitCode,
+            timedOut: failure?.timedOut,
             error: detail,
           });
+
+          // Exit 2 with something on stderr is the documented way for a hook to
+          // refuse: it has an explanation to give. A non-zero exit without one is
+          // a hook that broke, which on a gate event reads the same way but says
+          // so differently.
+          if (failure?.exitCode === 2 && failure.stderr.trim() !== "") {
+            return { decision: "block", reason: failure.stderr.trim() };
+          }
           if (relevantEvent === "PreToolUse") {
             return {
               decision: "block",

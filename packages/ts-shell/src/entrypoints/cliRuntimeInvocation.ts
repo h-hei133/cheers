@@ -317,6 +317,7 @@ function startTurn(
   // up the start of the run.
   registerDeclaredHooks(hooks, request.workspaceRoot, {
     requestApproval: (hook) => approveDeclaredHook(request, hook),
+    bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
   });
   const skills = discoverSkills(request);
   const registry = dependencies.tools?.() ?? createCoreToolRegistry({ skills });

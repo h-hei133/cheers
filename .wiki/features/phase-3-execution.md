@@ -675,14 +675,36 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 
 **未标记不可信时**（默认路径）：MCP 服务器 `["evil"]`、子代理可见、指令文件 1 个、沙箱规则按项目文件生效——**确认没有过度拦截**。
 
-### 7.5 未做（如实记录）
+### 7.5 后续补齐：裁决 §6.4 / §6.5 的四项与审查发现 5 的两项
 
-- **逃生口 `--dangerously-bypass-hook-trust`**（裁决 §6.5 #6）：**未实现**。需求是「提供且必须带危险提示」，采纳 `codex` 形式。当前没有绕过开关——要放行只能通过 `/trust on` 或审批提示。
-- **`SessionEnd` 超时钳制**（裁决 §6.4）：未实现分级超时（当前统一 15s）。
-- **退出码 2 + stderr 作为 block 信号**（裁决 §6.4）：未实现；当前只认 JSON 输出里的 `decision`。
-- **`PreToolUse` 的 `retry` 被静默丢弃**（审查发现 5）：**仍未修**——唯一消费者只检查 `block`。
-- **钩子不在沙箱内运行**（审查发现 5）：**仍未修**——钩子用裸 `exec`，而 `bash` 工具走 `planSandboxedCommand`。这是一个已知的不对称。
-- **`POSToolUse` feedback 拼进模型可见输出**（审查发现 5）：未做中和处理。
+首版提交后补齐：
+
+| 项 | 来源 | 实现 | 反向验证 |
+|---|---|---|---|
+| 退出码 2 + stderr 作为 block 信号 | 裁决 §6.4 | `CommandHookFailure` 携带 exitCode/stderr；exit 2 且有 stderr → `block` 且**理由用钩子自己的话** | 移除该分支 → 1 项失败 |
+| 事件分级超时 | 裁决 §6.4 | `SessionEnd`/`Stop`/`StopFailure` **3s**，其余 **15s** | — |
+| `--dangerously-bypass-hook-trust` 逃生口 | 裁决 §6.5 #6 | CLI 标志 → `RuntimeConfigOverrides` → 调度器；**每次执行都打警告**（`HOOK_TRUST_BYPASS_NOTICE`） | 与「无审批路径」分开测试 |
+| `retry` 决策 | 审查发现 5 | 不再静默丢弃：转为带理由的 block | 移除该分支 → 1 项失败 |
+| PostToolUse feedback 中和 | 审查发现 5 | `neutraliseHookText()` 转义控制字符、折叠空白 | 移除中和 → 1 项失败 |
+
+**新增测试**：绕过 4 项、退出码 3 项、retry/中和 2 项、EPIPE 1 项。
+
+### 7.6 施工中发现并修复的**第四个缺陷**：不读 stdin 的钩子会让进程崩溃
+
+实机验证绕过开关时，一个 `exit 0` 的钩子触发了**未捕获的 `EPIPE`**，直接终止进程：
+
+```
+Error: write EPIPE
+    at HookDispatcher.dispatch (.../hookDispatcher.js:177)
+```
+
+原因是 `child.stdin.write(jsonPayload)` 在钩子已退出、管道已关闭时抛错，而该事件无人监听——**一个「什么都不做」的钩子足以让整个会话崩溃**。已改为监听 `stdin` 的 `error` 事件并 `end(payload)` 一次写入，并加测试钉住。
+
+### 7.7 未做（如实记录）
+
+- **钩子不在沙箱内运行**（审查发现 5）：**仍未修**——钩子用裸 `exec`，而 `bash` 工具走 `planSandboxedCommand`。用户即使为工具命令启用了 OS 隔离，钩子进程仍是完全特权。**这是已知的、记录在案的不对称。**
+- **审批提示的完整中和**：`/trust` 与钩子审批提示已中和命令文本；但**其余升级提示路径**未逐一审计。
+- **`SessionEnd` 超时的可配置化**：当前是固定表，不可由用户调整。
 
 ---
 

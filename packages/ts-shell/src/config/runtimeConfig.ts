@@ -111,6 +111,15 @@ export interface RuntimeConfig {
    * delete the file.
    */
   readonly instructionBudgetBytes?: number;
+  /**
+   * Whether declared hook commands may run without approval for this run.
+   *
+   * Only a command-line flag sets this. It exists because a repository someone is
+   * already auditing by hand should not need its hooks approving one at a time,
+   * and it announces itself when it takes effect so it cannot be mistaken for the
+   * gate working.
+   */
+  readonly allowUntrustedHooks?: boolean;
   readonly agentMode?: "plan" | "build";
   readonly theme?: "dark" | "light" | "auto";
   /**
@@ -159,6 +168,7 @@ export interface RuntimeConfigFile {
   reserveTokens?: number;
   modelTokenBudgets?: Record<string, ModelTokenBudget>;
   instructionBudgetBytes?: number;
+  allowUntrustedHooks?: boolean;
   agentMode?: "plan" | "build";
   theme?: "dark" | "light" | "auto";
   tuiMode?: "regular" | "fullscreen" | "stream";
@@ -181,6 +191,7 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   reserveTokens: 8_000,
   modelTokenBudgets: {},
   instructionBudgetBytes: 32 * 1024,
+  allowUntrustedHooks: false,
   agentMode: "build",
   theme: "dark",
   tuiMode: "regular",
@@ -195,6 +206,8 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
  */
 export interface RuntimeConfigOverrides {
   readonly instructionBudgetBytes?: number
+  /** Run declared hook commands without asking. Off unless a flag says otherwise. */
+  readonly allowUntrustedHooks?: boolean
 }
 
 export function getRuntimeConfig(
@@ -281,6 +294,10 @@ export function getRuntimeConfig(
       overrides?.instructionBudgetBytes ??
       merged.instructionBudgetBytes ??
       DEFAULT_CONFIG.instructionBudgetBytes,
+    allowUntrustedHooks:
+      overrides?.allowUntrustedHooks ??
+      merged.allowUntrustedHooks ??
+      DEFAULT_CONFIG.allowUntrustedHooks,
     agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
     theme: merged.theme ?? DEFAULT_CONFIG.theme,
     tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,

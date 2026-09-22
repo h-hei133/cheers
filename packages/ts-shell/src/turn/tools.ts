@@ -9,6 +9,22 @@ import type { AskQuestion } from "../core/tools/ask.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { ToolDefinition } from "../tools/types.js";
 
+/**
+ * Make hook-supplied text safe to put in front of the model.
+ *
+ * Collapses whitespace that could forge extra lines, and spells out control
+ * characters. The source may be a project's configuration file, so this text is
+ * not necessarily something the user wrote.
+ */
+function neutraliseHookText(value: string): string {
+  let output = "";
+  for (const character of value) {
+    const code = character.codePointAt(0) ?? 0;
+    output += code < 0x20 || code === 0x7f ? `\\x${code.toString(16).padStart(2, "0")}` : character;
+  }
+  return output.replace(/[ \t]{2,}/g, " ");
+}
+
 /** A tool definition in the shape a chat completion request takes. */
 export interface ToolSchema {
   readonly type: "function";
@@ -146,6 +162,17 @@ export function createToolHooks(options: ToolGateOptions): ToolHooks {
         approvals.delete(call.id);
         return { block: true, reason: `Blocked by Hook: ${decision.reason || "Action rejected by security/verification hook policy."}` };
       }
+      if (decision.decision === "retry") {
+        // Asked to try again rather than refused. Treated as a block carrying the
+        // hook's reason, which is what a retry has to say to be actionable — the
+        // previous behaviour dropped the decision entirely, so a hook asking for
+        // another attempt was indistinguishable from one that had nothing to say.
+        approvals.delete(call.id);
+        return {
+          block: true,
+          reason: `Hook asked for a different attempt: ${decision.reason || "Retry with different arguments."}`,
+        };
+      }
       const repeat = doomLoop.recordAndCheck(call.name, args);
       if (repeat.isDoomLoop) {
         approvals.delete(call.id);
@@ -174,7 +201,12 @@ export function createToolHooks(options: ToolGateOptions): ToolHooks {
         output,
         success: !isError,
       });
-      if (decision.feedback) output = `${output}\n\n[Verification feedback]\n${decision.feedback}`;
+      if (decision.feedback) {
+        // Hook feedback reaches the model, and a hook's text can come from a
+        // project-supplied configuration. Neutralised so a newline or a control
+        // character cannot forge extra lines or repaint the transcript.
+        output = `${output}\n\n[Verification feedback]\n${neutraliseHookText(decision.feedback)}`;
+      }
       return output === result.output ? undefined : { output };
     },
   };
