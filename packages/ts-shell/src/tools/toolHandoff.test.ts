@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { createEvidenceOnlySavePoint } from "../evidence/savepoint/model.js";
 import { createModelResponseBoundary } from "../provider/response/boundary.js";
-import { projectJsonRuntimeEventStream } from "../runtime/events/stream.js";
-import { projectRuntimeEvents } from "../runtime/events/projection.js";
 import { createRuntimeTurnSnapshot } from "../turn/turnSnapshot.js";
 import { accumulateAssistantResponse } from "../turn/assistantResponse.js";
 import { prepareNextTurnBundle } from "../turn/nextTurnBundle.js";
@@ -123,7 +121,7 @@ describe("tool batch handoff", () => {
     );
   });
 
-  it("projects runtime events, JSON stream, save point, and next-turn inputs as observation-only", () => {
+  it("carries a save point and next-turn inputs as observation-only", () => {
     const prepared = prepare([
       { id: "call-read", name: "read", arguments: { path: "a.ts" } },
     ]);
@@ -160,28 +158,9 @@ describe("tool batch handoff", () => {
       savePointInputId: savePoint.id,
       nextTurnInputId: nextTurn.bundleId,
     });
-    const events = projectRuntimeEvents({
-      toolBatchHandoffs: [handoff],
-      toolDispatchPlans: [prepared.dispatchPlan],
-      toolResultDetails: prepared.resultDetails,
-      toolResultMessages: [messages],
-      savePoint,
-      nextTurnBundles: [nextTurn],
-    });
-    const stream = projectJsonRuntimeEventStream({ events, streamId: "stream-handoff" });
 
-    expect(events.map((event) => event.type)).toEqual(
-      expect.arrayContaining([
-        "tool-batch-handoff-observed",
-        "tool-batch-planned",
-        "tool-call-not-dispatched",
-        "non-executed-result-message-prepared",
-        "tool-batch-observation-completed",
-        "next-turn-bundle-prepared",
-      ]),
-    );
-    expect(stream.every((entry) => entry.truthfulness.observationOnly)).toBe(true);
-    expect(stream.every((entry) => entry.truthfulness.terminalSuccessClaim === false)).toBe(true);
+    expect(handoff.savePointInputId).toBe(savePoint.id);
+    expect(handoff.nextTurnInputId).toBe(nextTurn.bundleId);
     expect(savePoint.nextTurnBundleId).toBe("bundle-tool");
     expect(nextTurn.sourceToolResultMessageIds).toEqual(["tool-result-message:call-read"]);
   });

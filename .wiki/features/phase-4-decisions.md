@@ -78,6 +78,17 @@ grep -rn "events/stream.js"     → tools/toolHandoff.test.ts:5
 
 ### 1.2 为什么这不是「接线」而是「删除」
 
+> **⚠️ 本节依据已在施工前更正（2026-09-22）。** 原判「Phase 1 已判定它不该被接线，只是没有删除」**不成立**。
+> Phase 1 §6.3 只说了「`--json` 用了另一个模块」，**从未说该删除**。
+> 真正的删除依据是 `.wiki/refactor/singletons-noncore.md:9` 的**既有处置**：
+>
+> > `runtime/events/projection.ts`（2,997 行）：**保留**，但标记为"未接线的独有实现"，不列入本轮删除。…
+> > **若维护者决定放弃整个 runtime-event product surface，未来应成簇裁决 `projection.ts` + `stream.ts` + tests**；
+> > 现在不能以"无 live consumer"自动授权删除，因为 §2.1 要求先证明职责由活轨承担。
+>
+> 即：**删除是被允许的，但前置条件是维护者明确放弃该产品面**。维护者已于 2026-09-22 作出该决定。
+> 施工按 `.wiki/refactor/plan.md` §2.2 的**删除前六项检查**执行，结果见 §1.2.1。
+
 `projection.ts` 的 35 条 import 里**只有 1 条是值导入**（`:1` 的 `freezeDeep`），**其余 34 条全是 `import type`**
 （逐行核验），即它几乎只在类型层被引用。
 而它的上游依赖**都是活的**（实测：`core/values/freeze` 48 个非测试 importer、`evidence/savepoint/model` 48 个、
@@ -92,7 +103,30 @@ grep -rn "events/stream.js"     → tools/toolHandoff.test.ts:5
 
 **另一条独立证据**：`--json` **已经用别的模块实现了**（`presentation/terminal/jsonEvents.ts`），
 `phase-1-execution.md` §6.3 记录了这一点，并明确写「该模块是批量报告投影，非事件流」。
-**Phase 1 已经判定它不该被接线，只是没有删除。**
+
+### 1.2.1 删除前六项检查（`plan.md` §2.2 强制）
+
+| # | 检查 | 结果 |
+|---|---|---|
+| 1 | **功能读审** | 产出 `RuntimeProjectionEvent`（5 个导出：1 个函数 + 4 个类型）；无副作用、无 I/O |
+| 2 | **等价实现核验** | 活轨是 `turn/projection.ts`（206 行）→ `core/query/runtime/events.ts`（100 行）→ `presentation/terminal/jsonEvents.ts`（52 行）；被删的是 2,997 行，**不是替代关系而是另一套未接线的投影**。`pi` 对照（子代理 `VerifyRef` 逐字核验）：pi **没有**投影层，事件由 agent loop 直接 emit（`agent-loop.ts:116-120`），`--json` 只做一次 `toJsonEvent()` 字段裁剪（`modes/json-event.ts`） |
+| 3 | **消费者存活** | **生产 importer 为 0**（精确检索 `events/projection.js` / `events/stream.js`）；3 处全部是测试 |
+| 4 | **动态入口** | 无 `path.join`+spawn、无 `pathToFileURL`+`import()`、无 `*Process.ts`、无 `process.argv`；全仓唯一的非字面量 `import()` 在 `browser/playwrightRuntimeAvailability.ts`，与此无关 |
+| 5 | **公共面** | `packages/ts-shell/src/index.ts` **未导出**该域 |
+| 6 | **`scripts/` 引用** | `scripts/` 无任何引用 |
+
+**删除单元取连通分量整簇**（`plan.md` §2.2）：`projection.ts` + `stream.ts` + 两个测试，共 **5,124 行**。
+
+### 1.2.2 与参考实现的对照（子代理 `VerifyRef`，逐字）
+
+| 本仓概念 | `pi` 是否有 | 证据 |
+|---|---|---|
+| 独立的事件投影层 | **无** | 事件由 `agent-session.ts:830-834` 的 `_emit` 与 `agent-loop.ts:116-120` 直接发出；`--json` 只经 `toJsonEvent()` 裁剪字段 |
+| 工具交接 / 下一回合包 / 批派发 作为独立模块 | **无** | 工具派发内联在 `agent-loop.ts:267-272,516-520` |
+| 上下文图谱 / 预算 / 发现 子系统 | **无** | 「context discovery」= 向上遍历找 `AGENTS.md`（`resource-loader.ts:71-75`）；「context budget」= 一次阈值比较（`compaction.ts:246-248`） |
+| 独立的会话 DAG 引擎 | **无** | 树逻辑在 `session-manager.ts:1522-1542` 的 `getTree()` 内 |
+
+即：**被删的是一个本仓独有、且参考实现从未采用的抽象层**。
 
 ### 1.3 裁决
 

@@ -38,6 +38,15 @@ export interface SystemPromptContext {
    * decision, not something this assembler re-decides.
    */
   readonly skills?: string
+  /**
+   * The tools this run actually offers, in the order they should be named.
+   *
+   * Passed in rather than listed here because a hand-written list drifts: it
+   * named thirteen tools while the registry offered fourteen, so the model was
+   * told about a tool set it did not have. The registry is the only place that
+   * knows, and `restrictToolPool` may have narrowed it further for this run.
+   */
+  readonly toolNames?: readonly string[]
 }
 
 export function buildSystemPrompt(
@@ -45,7 +54,7 @@ export function buildSystemPrompt(
   context?: SystemPromptContext,
 ): string {
   const sections = [
-    "You are an expert autonomous coding agent equipped with real tools (read, write, edit, glob, grep, lsp, bash, web_fetch, web_search, browser, ask, todo, task).",
+    `You are an expert autonomous coding agent equipped with real tools (${context?.toolNames?.join(", ") ?? "none available"}).`,
     agentMode === "plan"
       ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, run safe read-only commands (like git status, git diff) via bash, and explore websites via browser and web tools, but cannot modify files. Produce a structured execution plan based on real file contents."
       : "BUILD MODE ACTIVE: You have full access to inspect, search, execute, browse, and edit files to accomplish the user's task.",

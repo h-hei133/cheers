@@ -18,8 +18,8 @@ These are durable project-level rules. They define how future code should be pla
 A healthy product path should read as domain ownership first, local role second:
 
 ```text
-packages/ts-shell/src/runtime/events/projection.ts
-packages/ts-shell/src/runtime/events/projection.ts
+packages/ts-shell/src/runtime/execution/fileWalk.ts
+packages/ts-shell/src/runtime/execution/receipt.ts
 packages/ts-shell/src/presentation/terminal/streaming.ts
 packages/ts-shell/src/planning/handoff/mutation.ts
 packages/ts-shell/src/provider/registry/provider.ts
@@ -96,8 +96,8 @@ When a domain becomes broad, add meaningful subdomains instead of lengthening fi
 
 ```text
 runtime/execution/
-runtime/events/
 runtime/resources/
+runtime/extensions/
 planning/task/
 planning/handoff/
 provider/registry/
@@ -150,9 +150,9 @@ readiness.ts
 Prefer this:
 
 ```text
-runtime/events/projection.ts
-runtime/events/stream.ts
 runtime/execution/receipt.ts
+runtime/execution/fileWalk.ts
+runtime/execution/fileLock.ts
 runtime/resources/projection.ts
 presentation/terminal/streaming.ts
 provider/registry/provider.ts
@@ -294,8 +294,8 @@ When a module is split into subdomains, tests should target the new owner path r
 Examples:
 
 ```text
-runtime/events/projection.ts
-runtime/events/projection.test.ts
+runtime/execution/fileWalk.ts
+runtime/execution/fileWalk.test.ts
 
 presentation/terminal/streaming.ts
 presentation/terminal/streaming.test.ts

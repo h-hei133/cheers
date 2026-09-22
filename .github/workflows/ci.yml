@@ -34,6 +34,9 @@ jobs:
       - name: Check config fields have consumers
         run: npm run check:config-consumers
 
+      - name: Check declared hooks dispatch and tools are registered
+        run: npm run check:declarations
+
       # The gate's own test, so a gate that stops detecting what it was written
       # for fails here rather than passing quietly. Covers every scripts/*.test.mjs.
       - name: Check the gates still detect

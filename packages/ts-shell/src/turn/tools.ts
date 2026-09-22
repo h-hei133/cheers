@@ -175,17 +175,32 @@ export function createToolHooks(options: ToolGateOptions): ToolHooks {
       if (approval && !isError) {
         output = `[User approved ${approval.operation} operation (${approval.decision})]\n${output}`;
       }
-      const decision = await options.hooks.dispatch({
-        eventName: "PostToolUse",
-        sessionId: options.sessionId,
-        workspaceRoot: options.workspaceRoot,
-        timestamp: new Date().toISOString(),
-        toolName: call.name,
-        toolCallId: call.id,
-        args,
-        output,
-        success: !isError,
-      });
+      // A call that failed is announced as a failure. Sending it on
+      // `PostToolUse` alone would make the event name mean "a call finished",
+      // and a hook watching for breakage would have to re-derive the outcome
+      // from a field rather than being told.
+      const decision = isError
+        ? await options.hooks.dispatch({
+            eventName: "PostToolUseFailure",
+            sessionId: options.sessionId,
+            workspaceRoot: options.workspaceRoot,
+            timestamp: new Date().toISOString(),
+            toolName: call.name,
+            toolCallId: call.id,
+            args,
+            error: output,
+          })
+        : await options.hooks.dispatch({
+            eventName: "PostToolUse",
+            sessionId: options.sessionId,
+            workspaceRoot: options.workspaceRoot,
+            timestamp: new Date().toISOString(),
+            toolName: call.name,
+            toolCallId: call.id,
+            args,
+            output,
+            success: true,
+          });
       if (decision.feedback) {
         // Hook feedback reaches the model, and a hook's text can come from a
         // project-supplied configuration. Neutralised so a newline or a control

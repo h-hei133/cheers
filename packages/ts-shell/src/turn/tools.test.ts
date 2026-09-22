@@ -166,6 +166,37 @@ describe("createToolHooks", () => {
     expect(after?.output).toContain("\\x0a");
   });
 
+  it("routes a failed call to PostToolUseFailure and a successful one to PostToolUse", async () => {
+    // The two events carry different payloads, so a hook watching for breakage
+    // should not have to re-derive the outcome from a boolean on the success
+    // event. A call that failed must arrive as a failure.
+    const setup = gate({ permissionScope: "allow-all" });
+    const hooks = createToolHooks(setup);
+
+    await hooks.beforeToolCall!(call("read", { path: "a" }));
+    await hooks.afterToolCall!({
+      ...call("read", { path: "a" }),
+      result: { output: "no such file", isError: true },
+      isError: true,
+    });
+
+    expect(setup.dispatched).toEqual(["PreToolUse", "PostToolUseFailure"]);
+  });
+
+  it("keeps a successful call on PostToolUse", async () => {
+    const setup = gate({ permissionScope: "allow-all" });
+    const hooks = createToolHooks(setup);
+
+    await hooks.beforeToolCall!(call("read", { path: "a" }));
+    await hooks.afterToolCall!({
+      ...call("read", { path: "a" }),
+      result: { output: "ok", isError: false },
+      isError: false,
+    });
+
+    expect(setup.dispatched).toEqual(["PreToolUse", "PostToolUse"]);
+  });
+
   it("appends PostToolUse feedback to the result", async () => {
     const setup = gate({ permissionScope: "allow-all" });
     setup.hooks = {

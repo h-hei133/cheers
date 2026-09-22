@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { projectProviderReadinessMetadata } from "../../core/shell/providerReadiness.js";
-import { projectRuntimeEvents } from "../../runtime/events/projection.js";
 import { projectStaticResourceRegistry } from "../../runtime/resources/projection.js";
 import {
   classifyProviderFailure,
@@ -206,7 +205,7 @@ describe("provider registry metadata", () => {
     expect(auth?.notProvenClaims).toContain("auth-secret-available");
   });
 
-  it("integrates provider and model metadata through resource and runtime events", () => {
+  it("projects provider descriptors as disabled resources", () => {
     const registry = projectProviderRegistry({
       providers: [
         {
@@ -241,19 +240,10 @@ describe("provider registry metadata", () => {
     const resources = projectStaticResourceRegistry({
       descriptors: registry.resourceDescriptors,
     });
-    const events = projectRuntimeEvents({ resourceProjection: resources });
 
     expect(resources.resources).toHaveLength(2);
     expect(resources.resources.every((resource) => resource.enabledByDefault === false)).toBe(true);
     expect(resources.providerDefaultEnablement).toBe("disabled");
-    expect(events[0]?.type).toBe("resource-projection-observed");
-    expect(events[0]?.facts).toMatchObject({
-      providerResourceCount: 2,
-      terminalSuccessClaim: false,
-    });
-    expect(events[0]?.notProvenClaims).toEqual(
-      expect.arrayContaining(["provider-success", "terminal-success"]),
-    );
   });
 
   it("exposes a provider readiness metadata seam without changing readiness execution", () => {

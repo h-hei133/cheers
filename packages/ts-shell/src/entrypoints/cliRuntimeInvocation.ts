@@ -225,6 +225,7 @@ function discoverSkills(request: CliRuntimeInvocationRequest): ReadonlyMap<strin
 function buildPromptContext(
   request: CliRuntimeInvocationRequest,
   skills: ReadonlyMap<string, Skill>,
+  toolNames: readonly string[],
 ): SystemPromptContext {
   const untrusted = projectTrust.isProjectUntrusted(request.workspaceRoot);
   const instructions = untrusted
@@ -247,6 +248,7 @@ function buildPromptContext(
   return {
     instructions: renderInstructionFiles(instructions.files),
     skills: renderSkillList(skills),
+    toolNames,
   };
 }
 
@@ -318,7 +320,7 @@ function startTurn(
   const tools = request.runtimeConfig
     ? restrictToolPool(registry, request.runtimeConfig)
     : registry;
-  const promptContext = buildPromptContext(request, skills);
+  const promptContext = buildPromptContext(request, skills, [...tools.keys()]);
   const run = runTurn({
     sessionId: request.sessionId,
     prompt: request.prompt,

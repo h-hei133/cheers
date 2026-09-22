@@ -105,6 +105,19 @@ export function createTaskToolDefinition(
         } catch {
           // Fallback to shared workspace
         }
+        // Announced outside the allocation guard: a hook that throws is a hook
+        // problem, not a reason to silently drop the worktree we just made.
+        if (allocatedWorktree) {
+          await defaultHookDispatcher.dispatch({
+            eventName: "WorktreeCreate",
+            sessionId: context.taskId || subtaskId,
+            workspaceRoot: context.workspaceRoot,
+            timestamp: new Date().toISOString(),
+            subtaskId,
+            worktreePath: allocatedWorktree.worktreePath,
+            branch: allocatedWorktree.branch,
+          });
+        }
       }
 
       let subagentResponse = "";
@@ -153,6 +166,16 @@ export function createTaskToolDefinition(
       } finally {
         if (allocatedWorktree) {
           await worktreeManager.releaseWorktree(subtaskId, { squashMerge: true });
+          // Paired with the create above, and dispatched after the release so the
+          // path in the payload is one that no longer exists.
+          await defaultHookDispatcher.dispatch({
+            eventName: "WorktreeRemove",
+            sessionId: context.taskId || subtaskId,
+            workspaceRoot: context.workspaceRoot,
+            timestamp: new Date().toISOString(),
+            subtaskId,
+            worktreePath: allocatedWorktree.worktreePath,
+          });
         }
 
         // 4. Dispatch SubagentStop lifecycle hook

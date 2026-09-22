@@ -62,11 +62,14 @@ Detailed rules: [file placement and naming](agent-rules/file-placement-and-namin
 CI enforces these gates, and they exit non-zero on a violation:
 
 - `npm run verify:import-cycles` — dependency cycles. Note it checks cycles only; it does not report imports that fail to resolve.
+- `npm run check:config-consumers` — config fields declared with no production reader.
+- `npm run check:declarations` — hook events declared with no dispatch site, and tool factories the registry never calls.
 - `npm run verify:docs-drift:strict` — dangling path references in binding rules and current-state docs.
 - `npm run test:ts` — the TypeScript suite.
+- `npm run test:scripts` — the gates' own tests, so a gate that stops detecting fails here rather than passing quietly.
 - `normproof judge` — blocks on the unresolved-specifier obligation only. The cycle and function-ceiling obligations are advisory, so they report without failing the build.
 
-Run the first two locally before pushing; together they take under a second, against roughly three minutes for the suite. Measurements and the gate-by-gate audit are in `.wiki/refactor/plan.md` section 9.27.
+Run the `check:*` and `verify:*` gates locally before pushing; together they take under a second, against roughly three minutes for the suite. Measurements and the gate-by-gate audit are in `.wiki/refactor/plan.md` section 9.27.
 
 Detailed rules: [testing and validation](agent-rules/testing-and-validation.md), [development workflow](agent-rules/development-workflow.md).
 

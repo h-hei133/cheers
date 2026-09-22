@@ -518,7 +518,6 @@ that shared path.
   `packages/ts-shell/src/provider/request/fallback.test.ts`,
   `packages/ts-shell/src/provider/response/adapter.test.ts`,
   packages/ts-shell/src/runtime/api/host/runtime.test.ts,
-  `packages/ts-shell/src/runtime/events/projection.test.ts`,
   packages/ts-shell/src/session/replay/state.test.ts,
   packages/ts-shell/src/session/presentation/envelope.test.ts,
   packages/ts-shell/src/presentation/surface/model.test.ts, and the focused
@@ -551,7 +550,6 @@ that shared path.
 - Evidence: `packages/ts-shell/src/tools/toolBatchDispatch.test.ts`,
   packages/ts-shell/src/runtime/loop/providerBoundary.test.ts,
   packages/ts-shell/src/runtime/api/host/runtime.test.ts,
-  `packages/ts-shell/src/runtime/events/projection.test.ts`,
   packages/ts-shell/src/session/replay/state.test.ts,
   packages/ts-shell/src/session/presentation/envelope.test.ts,
   packages/ts-shell/src/presentation/surface/model.test.ts,
