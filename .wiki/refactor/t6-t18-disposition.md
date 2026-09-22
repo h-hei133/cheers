@@ -12,7 +12,7 @@
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-root=Path('/home/wang/projects/coding-agents')
+root=Path('/home/wang/projects/cheer')
 for rel, ranges in {
 'packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts':[(68,72)],
 'packages/ts-shell/src/core/shell/sessionRuntime.ts':[(42,50),(244,270)],
@@ -71,7 +71,7 @@ JS
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-root=Path('/home/wang/projects/coding-agents')
+root=Path('/home/wang/projects/cheer')
 src=root/'packages/ts-shell/src'
 needle='createQueryRuntimeStateFromSeed('
 rows=[]
@@ -196,7 +196,7 @@ packages/ts-shell/src/session/store/sessionListStore.ts:6 [value] ../presentatio
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-root=Path('/home/wang/projects/coding-agents')
+root=Path('/home/wang/projects/cheer')
 src=root/'packages/ts-shell/src'
 symbols=['SessionReentrySummary','scoreSessionReentrySummary','sessionHasConversation','formatUnreadableSessionDirectoryWarning','formatListSessionsFailureWarning','projectSessionReentrySummary','sessionHasReentrySurface']
 for sym in symbols:

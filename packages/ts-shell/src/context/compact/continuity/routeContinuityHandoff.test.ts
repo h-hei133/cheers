@@ -18,7 +18,7 @@ describe("route continuity handoff", () => {
         forbiddenScope: ["provider/MCP", "memory system", "startup cache"],
       },
       project: {
-        projectRoot: "/home/wang/projects/coding-agents",
+        projectRoot: "/home/wang/projects/cheer",
         safeToPersistProjectRoot: true,
         branch: "main",
         baseCommit: "abc123",

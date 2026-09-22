@@ -7,7 +7,7 @@ schema migration, or ExecutionService bypass.
 
 ## Inputs And Inspection Status
 
-- Current project: `/home/wang/projects/coding-agents`
+- Current project: `/home/wang/projects/cheer`
 - Pi reference project: `/home/wang/projects/pi`
 - Serena status: available and used on both repositories
 - Pi official docs status: internet access was available and checked

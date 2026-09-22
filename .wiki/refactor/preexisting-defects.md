@@ -225,7 +225,7 @@ if (next !== undefined) void this.run(next);   // 直接进 run
 
 ### 现象
 
-在 `/home/wang/projects/coding-agents` 下 `npm start`，状态栏显示
+在 `/home/wang/projects/cheer` 下 `npm start`，状态栏显示
 `/tmp/repproj` —— 一个与本次启动无关的目录。
 
 ### 根因

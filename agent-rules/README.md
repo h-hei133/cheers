@@ -1,6 +1,6 @@
 # Agent Rules
 
-This directory contains durable project-level rules for agents working in `/home/wang/projects/coding-agents`.
+This directory contains durable project-level rules for agents working in `/home/wang/projects/cheer`.
 
 Root `AGENTS.md` is intentionally short. Use it as the startup index, then open only the detailed rule files that match the current task.
 

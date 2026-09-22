@@ -1733,7 +1733,7 @@ pi **没有**"改动→验证→裁决"投影链，也**没有**浏览器子系�
 | 失败 | 根因 | 证据 |
 |---|---|---|
 | `longSessionDurability.test.ts`（2 项） | 测试内 `repoRoot = path.resolve(process.cwd(), "../..")`，**假定 cwd = `packages/ts-shell`**。从仓库根跑时算出 `repoRoot = /home/wang` → `tsxCli = /home/wang/node_modules/tsx/dist/cli.mjs`（不存在）→ 子进程退出码 1 | 从错误 cwd 跑报 `Cannot find module '/home/wang/node_modules/tsx/dist/cli.mjs'`；从正确 cwd 跑 **2/2 通过** |
-| `core/mcp/gateway.test.ts`（1 项） | 同类：spawn 的 fixture 路径以 cwd 为基准，从仓库根跑时解析成 `/home/wang/projects/coding-agents/src/core/mcp/fixtures/mockMcpServer.mjs`（**缺 `packages/ts-shell/` 前缀**）| 从正确 cwd 跑 **9/9 通过** |
+| `core/mcp/gateway.test.ts`（1 项） | 同类：spawn 的 fixture 路径以 cwd 为基准，从仓库根跑时解析成 `/home/wang/projects/cheer/src/core/mcp/fixtures/mockMcpServer.mjs`（**缺 `packages/ts-shell/` 前缀**）| 从正确 cwd 跑 **9/9 通过** |
 | `verifierModuleBoundary` 与 `approvedProviderEnv` 两个自检脚本（原带 `.test` 后缀，已由 T15 改名，见 §9.11） | 这两个是**脚本式自检**（`node:assert` + `console.log('[pass] ...')`，**无 `describe`/`it`**），设计为 `node <file>` 独立执行；从仓库根跑时被 vitest 默认 glob 当测试收集 → `No test suite found`。**已由 T15 修复**（改名去掉 `.test`）| 从 `packages/ts-shell` 跑时 vitest root 只含 `packages/ts-shell`，`scripts/` 不在范围内 |
 | `core/harness/browser*ScenarioExamples.test.ts`（8 个）<br>`core/tools/registry-rust-bridge.test.ts` | **`Test timed out in 5000ms`** —— 不是 cwd 路径问题，而是**根目录没有 `vitest.config.ts`**！本仓唯一的 vitest 配置是 `packages/ts-shell/vitest.config.ts`（`testTimeout: 30000`）。从仓库根跑时 vitest 找不到任何配置 → 用**默认 5000ms** → 这些 8–16s 的进程型场景测试必然超时 | CI 用 `npm run test:ts`（cwd = `packages/ts-shell`）→ 正确加载该配置 |
 

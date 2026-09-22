@@ -30,7 +30,7 @@ Required before manual TTY work:
 
 ## Deterministic Gate Table
 
-Run these from `/home/wang/projects/coding-agents` with `rtk`.
+Run these from `/home/wang/projects/cheer` with `rtk`.
 
 | Gate | Command | Expected marker |
 | --- | --- | --- |

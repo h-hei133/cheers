@@ -5,7 +5,7 @@ Reference repositories are read-only. Use them only for targeted semantic compar
 ## Writable Target
 
 ```text
-/home/wang/projects/coding-agents
+/home/wang/projects/cheer
 ```
 
 Only the target repository may be modified.

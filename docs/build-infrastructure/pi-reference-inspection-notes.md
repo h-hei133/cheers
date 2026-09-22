@@ -7,7 +7,7 @@ product code.
 
 - Uploaded Pi architecture summary: `docs/build-infrastructure/pi_structure.md`
 - Local Pi reference repository: `/home/wang/projects/pi`
-- Current project repository: `/home/wang/projects/coding-agents`
+- Current project repository: `/home/wang/projects/cheer`
 - Serena semantic inspection for both repositories
 - Current route plan: `docs/build-infrastructure/route/route-bi001-pi-inspired-architecture-planning.md`
 - Current project constraints from `AGENTS.md`, `docs/ACTIVE_CONTEXT.md`,
@@ -21,7 +21,7 @@ repo shape.
 
 Current project activated with Serena:
 
-- `/home/wang/projects/coding-agents`
+- `/home/wang/projects/cheer`
 
 Pi reference project activated with Serena:
 

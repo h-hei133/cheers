@@ -18,7 +18,7 @@ This is not a one-file slice and not a narrow projection task. The expected outc
 
 Target repository:
 
-/home/wang/projects/coding-agents
+/home/wang/projects/cheer
 
 Mature local implementation:
 
