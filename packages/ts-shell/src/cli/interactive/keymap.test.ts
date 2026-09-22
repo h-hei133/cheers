@@ -4,6 +4,7 @@ import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { parseKeyEvent } from "../../presentation/tui/input/keys.js";
 import { KEY_BINDINGS } from "../../presentation/tui/chrome/keys.js";
 import { dispatchedKeyIds } from "./keymap.js";
+import { Keybindings } from "./keybindings.js";
 
 function build(busy = false): {
   press: (data: string) => void;
@@ -55,6 +56,7 @@ function build(busy = false): {
         busy,
         now: () => clock.now,
         gesture,
+        keybindings: new Keybindings(),
       }),
   };
 }

@@ -53,6 +53,14 @@ export interface InteractiveCommandRouterInput {
   readonly setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
+  /**
+   * Re-read the user's keybindings.
+   *
+   * Read at startup like the rest of the configuration, so `/reload` has to
+   * re-read them too — otherwise editing the file mid-session does nothing and
+   * says nothing, which is exactly the silence `/reload` exists to remove.
+   */
+  readonly refreshKeybindings?: () => void;
 }
 
 export interface InteractiveCommandRouterResult {
@@ -101,6 +109,7 @@ export async function routeInteractiveCommand(
       const before = input.runtimeContext.runtimeConfig;
       const after = getRuntimeConfig(input.runtimeContext.cwd);
       input.runtimeContext.runtimeConfig = after;
+      input.refreshKeybindings?.();
       return { before, after };
     },
   });

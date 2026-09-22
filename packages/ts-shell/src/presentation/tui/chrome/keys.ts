@@ -39,7 +39,9 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["ctrl+u"], does: "cut back to the start of the line, then the line above", group: "editing" },
   { keys: ["ctrl+k"], does: "delete to the end of the line", group: "editing" },
   { keys: ["ctrl+y"], does: "put back what was last deleted", group: "editing" },
+  { keys: ["alt+y"], does: "cycle back through earlier deletions", group: "editing" },
   { keys: ["ctrl+z"], does: "undo the last edit", group: "editing" },
+  { keys: ["ctrl+shift+z"], does: "redo the last undone edit", group: "editing", negotiated: true },
 
   {
     keys: ["paste twice"],
@@ -60,6 +62,9 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["escape"], does: "interrupt a run, or dismiss a chooser", group: "sending" },
 
   { keys: ["shift+tab"], does: "switch between planning and building", group: "session" },
+  { keys: ["ctrl+t"], does: "collapse or expand the model's reasoning", group: "session" },
+  { keys: ["ctrl+o"], does: "collapse or expand tool output", group: "session" },
+  { keys: ["ctrl+g"], does: "edit the draft in your own editor", group: "session" },
   { keys: ["alt+p"], does: "cycle how much a turn may do without asking", group: "session" },
   { keys: ["f5"], does: "retry the last turn that failed", group: "session" },
   { keys: ["ctrl+l"], does: "clear the conversation from the screen", group: "session" },

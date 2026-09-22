@@ -16,6 +16,15 @@ export interface Suggestion {
   readonly value: string;
   readonly label: string;
   readonly detail?: string;
+  /**
+   * Where in the draft the accepted value starts, counted from the beginning.
+   *
+   * A candidate replaces what is being written, not the whole draft: accepting a
+   * file reference three words into a sentence must not delete the sentence.
+   * Absent means the candidate is the whole draft, which is what a command name
+   * typed on its own is.
+   */
+  readonly from?: number;
 }
 
 const MAX_VISIBLE = 8;

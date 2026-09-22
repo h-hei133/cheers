@@ -26,6 +26,7 @@ import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
 import { approvalPicker, type InteractiveApprovalResult } from "./picker/approval.js";
 import { routeKey } from "./keymap.js";
+import { InputPreferences } from "./inputPreferences.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
 import { showConversation, startFreshSession, type HistoryTarget } from "./history.js";
@@ -35,6 +36,7 @@ import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
 import { couldBeCommand, slashSuggestions } from "./slashSuggestions.js";
+import { couldBeFileReference, fileSuggestions } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
 
@@ -88,6 +90,22 @@ export class InteractiveMode {
   private readonly questions: QuestionBridge;
   private readonly readline: ReadlineInterface;
   private readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number } = {};
+  /**
+   * The bindings in force.
+   *
+   * Held rather than rebuilt per keystroke: routing asks this on every key, so it
+   * is derived once at startup and again when /reload says the file changed.
+   */
+  private readonly preferences = new InputPreferences({
+    report: (message) => {
+      this.state.transcript.append(textBlock("notice", message));
+      this.tui.requestRender();
+    },
+    suspendTerminal: (run) => this.tui.suspend(run),
+    workspaceRoot: () => this.options.runtimeContext.projectRoot,
+    adoptDraft: (text) => this.state.editor.setDraftText(text),
+    redraw: () => this.tui.requestRender(),
+  });
   private readonly overlay: OverlayHost;
   private readonly pager = new Pager();
   private readonly pointer: Pointer;
@@ -244,6 +262,7 @@ export class InteractiveMode {
     });
     this.tui.onInput((data) => this.stdin.feed(data));
     this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
+    this.preferences.reload();
     // `regular` keeps the conversation in the terminal's own scrollback, so a
     // session that ends leaves something to scroll back through. `fullscreen` is
     // the private screen, and `stream` is reserved without a defined meaning.
@@ -293,6 +312,7 @@ export class InteractiveMode {
       busy: this.busy,
       now: () => Date.now(),
       gesture: this.gesture,
+      keybindings: this.preferences.keybindings,
       actions: {
         submit: (text, disposition) => this.onSubmit(text, disposition),
         interrupt: () => void this.interrupt(),
@@ -321,6 +341,7 @@ export class InteractiveMode {
         syncSuggestions: (mayOpen) => this.syncSuggestions(mayOpen),
         copySelection: () => this.pointer.copySelection(),
         toggleCollapsed: (only) => this.view.toggleCollapsed(only),
+        openExternalEditor: () => this.preferences.openExternalEditor(this.state.editor.getText()),
       },
     });
   }
@@ -358,12 +379,17 @@ export class InteractiveMode {
    */
   private syncSuggestions(mayOpen: boolean): void {
     const draft = this.state.editor.getText();
-    const matches = slashSuggestions(draft);
+    // Files first: an `@` reference is unambiguous, while a leading slash could
+    // still become either a command or a path.
+    const matches =
+      fileSuggestions(draft, this.options.runtimeContext.projectRoot) ??
+      slashSuggestions(draft);
     if (!matches) {
       this.view.setSuggesting(false);
       return;
     }
-    if (!mayOpen && !this.view.suggestionsOpen && !couldBeCommand(draft)) return;
+    const couldStillBecomeSomething = couldBeCommand(draft) || couldBeFileReference(draft);
+    if (!mayOpen && !this.view.suggestionsOpen && !couldStillBecomeSomething) return;
     this.state.suggestions.setItems(matches);
     this.view.setSuggesting(true);
   }
@@ -434,6 +460,7 @@ export class InteractiveMode {
         modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
         setActiveNonInteractiveApprovalMode:
           this.options.setActiveNonInteractiveApprovalMode ?? (() => {}),
+        refreshKeybindings: () => this.preferences.reload(),
       });
       this.turnNumber = result.turnNumber;
       if (result.exitRequested) exiting = true;

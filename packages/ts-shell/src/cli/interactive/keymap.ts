@@ -1,47 +1,47 @@
 import type { CursorMove, KillTarget } from "../../presentation/tui/editor.js";
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { InteractiveView, ViewActions } from "../../presentation/tui/surface/contract.js";
+import { KEY_ACTIONS, type Keybindings } from "./keybindings.js";
 
 /**
  * Key routing for the interactive view.
  *
- * One table maps keys to editor motions and one to kill commands, so adding a
- * binding is a data change rather than another branch. The ordering of the
- * branches encodes the interception hierarchy: an open completion list consumes
- * navigation keys first, Escape then unwinds one level of state per press, and
- * only what nothing claimed reaches the editor as text.
+ * One table maps every action to a handler and another maps every key to an
+ * action, so a binding is a data change and a rebinding is a config change. The
+ * ordering of the interception points encodes the hierarchy: an open completion
+ * list consumes navigation keys first, Escape then unwinds one level of state per
+ * press, and only what nothing claimed reaches the editor as text.
+ *
+ * A key no action claims is not an error — it falls through to the editor, which
+ * inserts it if it is printable. That is what keeps an unbound key from being a
+ * dead key.
  */
 
-const MOTIONS: Record<string, CursorMove> = {
-  left: "left",
-  right: "right",
-  "ctrl+home": "doc-start",
-  "ctrl+end": "doc-end",
-  "ctrl+b": "left",
-  "ctrl+f": "right",
-  "alt+left": "word-left",
-  "alt+right": "word-right",
-  "ctrl+left": "word-left",
-  "ctrl+right": "word-right",
-  "alt+b": "word-left",
-  "alt+f": "word-right",
-  home: "line-start",
-  end: "line-end",
-  "ctrl+a": "line-start",
-  "ctrl+e": "line-end",
+/** Motions, expressed as the editor motion each action performs. */
+const MOTION_ACTIONS: Record<string, CursorMove> = {
+  "tui.editor.cursorLeft": "left",
+  "tui.editor.cursorRight": "right",
+  "tui.editor.cursorWordLeft": "word-left",
+  "tui.editor.cursorWordRight": "word-right",
+  "tui.editor.cursorLineStart": "line-start",
+  "tui.editor.cursorLineEnd": "line-end",
 };
 
-const KILLS: Record<string, KillTarget> = {
-  "ctrl+k": "line-end",
-  "ctrl+u": "line-start",
-  "ctrl+w": "word-left",
-  "alt+backspace": "word-left",
+/** Cuts, expressed as the editor kill each action performs. */
+const KILL_ACTIONS: Record<string, KillTarget> = {
+  "tui.editor.deleteToLineEnd": "line-end",
+  "tui.editor.deleteToLineStart": "line-start",
+  "tui.editor.deleteWordBackward": "word-left",
 };
-
-const NEWLINE_KEYS = new Set(["shift+enter", "alt+enter", "ctrl+j"]);
 
 /** Rows moved per keystroke for shift+arrow fast scrolling. */
 const FAST_SCROLL_ROWS = 5;
+
+/** Window in which a second Escape on an empty prompt offers to go back. */
+const DOUBLE_ESCAPE_MS = 600;
+
+/** Window in which a second Ctrl+C on an empty draft exits. */
+const DOUBLE_INTERRUPT_MS = 600;
 
 /** The host actions a key can reach; the seam names them once for every surface. */
 export type KeymapActions = ViewActions;
@@ -59,6 +59,186 @@ export interface KeymapContext {
    * time zero, which would otherwise let the very first Ctrl+C exit.
    */
   readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number };
+  /** The bindings in force, resolved from the catalogue and the user's file. */
+  readonly keybindings: Keybindings;
+}
+
+/**
+ * Every key id this keymap can dispatch on, for the test that keeps the guide and
+ * the bindings from drifting apart.
+ *
+ * Derived from the catalogue rather than listed, so a new action cannot be added
+ * without the guide check seeing it.
+ */
+export function dispatchedKeyIds(): readonly string[] {
+  const keys: string[] = [];
+  for (const definition of Object.values(KEY_ACTIONS)) keys.push(...definition.defaultKeys);
+  return keys;
+}
+
+/** Apply one keystroke to the view. */
+export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
+  const { view, actions } = context;
+
+  if (view.suggestionsOpen && consumeSuggestionKey(event, context)) return;
+
+  const action = context.keybindings.actionFor(event.keyId);
+  if (action === undefined) {
+    // Nothing claims this key, so it is text as far as the surface is concerned.
+    applyTextKey(event, context);
+    return;
+  }
+
+  const handled = runAction(action, event, context);
+  if (handled === "text") applyTextKey(event, context);
+  else if (handled === "resync") resync(event, context);
+}
+
+/**
+ * What an action did, which decides whether the caller does anything after.
+ *
+ * `redrawn` means the action rendered for itself and nothing more should happen;
+ * `resync` means the draft may have changed, so completions are re-evaluated.
+ */
+type ActionOutcome = "redrawn" | "resync" | "text" | "nothing";
+
+function runAction(action: string, event: ParsedKeyEvent, context: KeymapContext): ActionOutcome {
+  const { view, actions } = context;
+  const editor = view.editor;
+
+  const motion = MOTION_ACTIONS[action];
+  if (motion) {
+    editor.move(motion);
+    return "resync";
+  }
+  const kill = KILL_ACTIONS[action];
+  if (kill) {
+    editor.kill(kill);
+    return "resync";
+  }
+
+  switch (action) {
+    case "tui.editor.cursorUp":
+      recallOrMove(context, -1);
+      return "redrawn";
+    case "tui.editor.cursorDown":
+      recallOrMove(context, 1);
+      return "redrawn";
+    case "tui.editor.pageUp":
+      actions.scrollPage(-1);
+      return "redrawn";
+    case "tui.editor.pageDown":
+      actions.scrollPage(1);
+      return "redrawn";
+    case "app.scroll.fastUp":
+      actions.scroll(-FAST_SCROLL_ROWS);
+      return "redrawn";
+    case "app.scroll.fastDown":
+      actions.scroll(FAST_SCROLL_ROWS);
+      return "redrawn";
+    case "tui.editor.deleteCharBackward":
+      editor.backspace();
+      return "resync";
+    case "tui.editor.deleteCharForward":
+      editor.deleteForward();
+      return "resync";
+    case "tui.editor.yank":
+      editor.yank();
+      return "resync";
+    case "tui.editor.yankPop":
+      // Cycling back through the kill ring, so the cut before the last one is
+      // reachable. Without it a yank only ever reaches the newest entry.
+      editor.yankPop();
+      return "resync";
+    case "tui.editor.undo":
+      editor.undo();
+      return "resync";
+    case "tui.editor.redo":
+      // The way back from an undo. Bound alongside it because an undo that
+      // cannot be taken back is a key that is dangerous to press.
+      editor.redo();
+      return "resync";
+    case "tui.input.newLine":
+      editor.newline();
+      return "resync";
+    case "tui.input.submit":
+      submitDraft(context, context.busy ? "steer" : undefined);
+      return "redrawn";
+    case "tui.input.tab":
+      actions.syncSuggestions(true);
+      actions.redraw();
+      return "redrawn";
+    case "tui.altScreen.top":
+      return handleEdge(context, "start");
+    case "tui.altScreen.bottom":
+      return handleEdge(context, "end");
+    case "app.interrupt":
+      handleEscapeKey(context);
+      return "redrawn";
+    case "app.clear":
+      handleCancelKey(context);
+      return "redrawn";
+    case "app.exit":
+      if (editor.getText().length === 0) actions.exit();
+      return "redrawn";
+    case "app.clearScreen":
+      actions.clearScreen();
+      return "redrawn";
+    case "app.message.followUp":
+      // Only while a run is active: with nothing running there is no queue to
+      // join, and the key does nothing rather than sending the draft by surprise.
+      if (context.busy) {
+        submitDraft(context, "followUp");
+        return "redrawn";
+      }
+      return "nothing";
+    case "app.thinking.cycle":
+      // Tab is completion, so mode cycling takes the shifted form.
+      actions.cycleAgentMode();
+      actions.redraw();
+      return "redrawn";
+    case "app.thinking.toggle":
+      actions.toggleCollapsed("thinking");
+      actions.redraw();
+      return "redrawn";
+    case "app.tools.expand":
+      actions.toggleCollapsed("tool");
+      actions.redraw();
+      return "redrawn";
+    case "app.permission.cycle":
+      actions.cyclePermissionScope();
+      actions.redraw();
+      return "redrawn";
+    case "app.retry":
+      // A function key by default rather than a modified chord: every terminal
+      // delivers F5 verbatim, while modified Enter and friends get folded.
+      actions.retry();
+      return "redrawn";
+    case "app.editor.external":
+      actions.openExternalEditor?.();
+      return "redrawn";
+    default:
+      // An action with no handler here is one this surface does not implement.
+      // Reported as unhandled so the key still reaches the editor as text rather
+      // than being swallowed by a binding nothing answers.
+      return "text";
+  }
+}
+
+/**
+ * The two edge actions are shared: inside a non-empty draft they move the caret,
+ * and on an empty prompt the same key pages the conversation to that edge. The
+ * dual meaning is what makes one key serve both without a second binding.
+ */
+function handleEdge(context: KeymapContext, edge: "start" | "end"): ActionOutcome {
+  const { view, actions } = context;
+  if (view.editor.getText().length > 0) {
+    view.editor.move(edge === "start" ? "doc-start" : "doc-end");
+    return "resync";
+  }
+  if (edge === "end") actions.scrollToEnd();
+  else actions.scroll(1_000_000);
+  return "redrawn";
 }
 
 /**
@@ -99,170 +279,36 @@ function handleEscapeKey(context: KeymapContext): void {
   actions.redraw();
 }
 
-/** Window in which a second Escape on an empty prompt offers to go back. */
-const DOUBLE_ESCAPE_MS = 600;
-
-/** Window in which a second Ctrl+C on an empty draft exits. */
-const DOUBLE_INTERRUPT_MS = 600;
-
 /**
- * Every key id this keymap dispatches on, for the test that keeps the guide and
- * the bindings from drifting apart.
+ * Ctrl+C discards a draft first so an accidental press never ends the session;
+ * on an empty prompt a second press within the double-press window exits.
  */
-export function dispatchedKeyIds(): readonly string[] {
-  return [
-    ...Object.keys(MOTIONS),
-    ...Object.keys(KILLS),
-    ...NEWLINE_KEYS,
-    "escape",
-    "ctrl+c",
-    "ctrl+d",
-    "ctrl+l",
-    "enter",
-    "backspace",
-    "delete",
-    "ctrl+y",
-    "ctrl+z",
-    "tab",
-    "shift+tab",
-    "alt+p",
-    "ctrl+q",
-    "pageup",
-    "pagedown",
-    "shift+up",
-    "shift+down",
-    "up",
-    "down",
-  ];
-}
-
-/** Apply one keystroke to the view. */
-export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
-  const { view, actions } = context;
-  const editor = view.editor;
-
-  if (view.suggestionsOpen && consumeSuggestionKey(event, context)) return;
-
-  switch (event.keyId) {
-    case "escape":
-      handleEscapeKey(context);
-      return;
-    case "ctrl+c":
-      handleCancelKey(context);
-      return;
-    case "ctrl+d":
-      if (editor.getText().length === 0) actions.exit();
-      return;
-    case "ctrl+l":
-      actions.clearScreen();
-      return;
-    case "enter":
-      submitDraft(context, context.busy ? "steer" : undefined);
-      return;
-    case "alt+enter":
-      // Idle newline fallback; busy follow-up is on ctrl+q for stability.
-      if (!applyTableKey(event, context)) return;
-      break;
-    case "ctrl+q":
-      if (context.busy) {
-        submitDraft(context, "followUp");
-        return;
-      }
-      if (!applyTableKey(event, context)) return;
-      break;
-    case "backspace":
-      editor.backspace();
-      break;
-    case "delete":
-      editor.deleteForward();
-      break;
-    case "ctrl+y":
-      editor.yank();
-      break;
-    case "alt+y":
-      // Cycling back through the kill ring, so the cut before the last one is
-      // reachable. Without it a yank only ever reaches the newest entry.
-      editor.yankPop();
-      break;
-    case "ctrl+z":
-      editor.undo();
-      break;
-    case "ctrl+shift+z":
-      // The way back from an undo. Bound alongside it because an undo that
-      // cannot be taken back is a key that is dangerous to press.
-      editor.redo();
-      break;
-    case "ctrl+o":
-      actions.toggleCollapsed("tool");
-      actions.redraw();
-      return;
-    case "ctrl+t":
-      actions.toggleCollapsed("thinking");
-      actions.redraw();
-      return;
-    case "tab":
-      actions.syncSuggestions(true);
-      actions.redraw();
-      return;
-    case "shift+tab":
-      // Tab is completion, so mode cycling takes the shifted form.
-      actions.cycleAgentMode();
-      actions.redraw();
-      return;
-    case "alt+p":
-      actions.cyclePermissionScope();
-      actions.redraw();
-      return;
-    case "pageup":
-      actions.scrollPage(-1);
-      return;
-    case "pagedown":
-      actions.scrollPage(1);
-      return;
-    case "shift+up":
-      actions.scroll(-FAST_SCROLL_ROWS);
-      return;
-    case "shift+down":
-      actions.scroll(FAST_SCROLL_ROWS);
-      return;
-    case "ctrl+end":
-      // With a non-empty draft the caret jumps inside the draft; on an empty
-      // prompt the same chord pages back to the live edge of the conversation.
-      if (view.editor.getText().length > 0) {
-        view.editor.move("doc-end");
-        actions.syncSuggestions(opensSuggestions(event));
-        actions.redraw();
-        return;
-      }
-      actions.scrollToEnd();
-      return;
-    case "ctrl+home":
-      // Mirror of ctrl+end: jump inside a non-empty draft, else scroll the
-      // conversation to its oldest rows.
-      if (view.editor.getText().length > 0) {
-        view.editor.move("doc-start");
-        actions.syncSuggestions(opensSuggestions(event));
-        actions.redraw();
-        return;
-      }
-      actions.scroll(1_000_000);
-      return;
-    case "f5":
-      // A function key rather than a modified chord: every terminal delivers F5
-      // verbatim, while modified Enter and friends get folded or swallowed.
-      actions.retry();
-      return;
-    case "up":
-      recallOrMove(context, -1);
-      return;
-    case "down":
-      recallOrMove(context, 1);
-      return;
-    default:
-      if (!applyTableKey(event, context)) return;
+function handleCancelKey(context: KeymapContext): void {
+  const { view, actions, now } = context;
+  if (actions.copySelection?.()) {
+    actions.redraw();
+    return;
   }
-  actions.syncSuggestions(opensSuggestions(event));
+  if (context.busy) {
+    actions.interrupt();
+    actions.redraw();
+    return;
+  }
+  if (view.editor.getText().length > 0) {
+    view.editor.clear();
+    view.setSuggesting(false);
+    actions.redraw();
+    return;
+  }
+  const at = now();
+  const previous = context.gesture.lastCancelAt;
+  if (previous !== undefined && at - previous < DOUBLE_INTERRUPT_MS) {
+    actions.exit();
+    return;
+  }
+  context.gesture.lastCancelAt = at;
   actions.redraw();
+  actions.redrawAfter(DOUBLE_INTERRUPT_MS);
 }
 
 /**
@@ -297,82 +343,53 @@ function opensSuggestions(event: ParsedKeyEvent): boolean {
   return Boolean(event.text) && !event.ctrl && !event.alt && !event.meta;
 }
 
-/** Motions, kills, newlines, and printable text. Returns false when unhandled. */
-function applyTableKey(event: ParsedKeyEvent, context: KeymapContext): boolean {
-  const editor = context.view.editor;
-  const motion = MOTIONS[event.keyId];
-  if (motion) {
-    editor.move(motion);
-    return true;
+/** Re-evaluate completions after a key that may have changed the draft. */
+function resync(event: ParsedKeyEvent, context: KeymapContext): void {
+  context.actions.syncSuggestions(opensSuggestions(event));
+  context.actions.redraw();
+}
+
+/** Printable text, which is what an unclaimed key is. */
+function applyTextKey(event: ParsedKeyEvent, context: KeymapContext): void {
+  if (!opensSuggestions(event)) {
+    context.actions.redraw();
+    return;
   }
-  const kill = KILLS[event.keyId];
-  if (kill) {
-    editor.kill(kill);
-    return true;
-  }
-  if (NEWLINE_KEYS.has(event.keyId)) {
-    editor.newline();
-    return true;
-  }
-  if (opensSuggestions(event)) {
-    editor.insert(event.text);
-    return true;
-  }
-  return false;
+  context.view.editor.insert(event.text);
+  resync(event, context);
 }
 
 /** Navigation and acceptance while the completion list is open. */
 function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): boolean {
-  const { view, actions } = context;
-  if (event.keyId === "up" || event.keyId === "down") {
-    view.suggestions.step(event.keyId === "up" ? -1 : 1);
+  const { view, actions, keybindings } = context;
+  const action = keybindings.actionFor(event.keyId);
+  if (action === "tui.editor.cursorUp" || action === "tui.editor.cursorDown") {
+    view.suggestions.step(action === "tui.editor.cursorUp" ? -1 : 1);
     actions.redraw();
     return true;
   }
   // Tab always completes. Enter completes only when a candidate was actively
   // selected; otherwise it submits, so typing a whole command still sends on the
   // first press.
-  if (event.keyId === "tab" || (event.keyId === "enter" && view.suggestions.chosen)) {
+  const accepts = action === "tui.input.tab" ||
+    (action === "tui.input.submit" && view.suggestions.chosen);
+  if (accepts) {
     const chosen = view.suggestions.current();
     if (!chosen) return false;
-    view.editor.setText(`${chosen.value} `);
+    // A candidate that names where it starts replaces just that part of the
+    // draft; one that does not is the whole draft, which is what a command name
+    // typed on its own is.
+    if (chosen.from !== undefined) {
+      const draft = view.editor.getText();
+      view.editor.setDraftText(`${draft.slice(0, chosen.from)}${chosen.value} `);
+    } else {
+      view.editor.setText(`${chosen.value} `);
+    }
     view.setSuggesting(false);
     actions.redraw();
     return true;
   }
   return false;
-}
-
-/**
- * Ctrl+C discards a draft first so an accidental press never ends the session;
- * on an empty prompt a second press within the double-press window exits.
- */
-function handleCancelKey(context: KeymapContext): void {
-  const { view, actions, now } = context;
-  if (actions.copySelection?.()) {
-    actions.redraw();
-    return;
-  }
-  if (context.busy) {
-    actions.interrupt();
-    actions.redraw();
-    return;
-  }
-  if (view.editor.getText().length > 0) {
-    view.editor.clear();
-    view.setSuggesting(false);
-    actions.redraw();
-    return;
-  }
-  const at = now();
-  const previous = context.gesture.lastCancelAt;
-  if (previous !== undefined && at - previous < DOUBLE_INTERRUPT_MS) {
-    actions.exit();
-    return;
-  }
-  context.gesture.lastCancelAt = at;
-  actions.redraw();
-  actions.redrawAfter(DOUBLE_INTERRUPT_MS);
 }
 
 function submitDraft(context: KeymapContext, disposition?: "steer" | "followUp"): void {

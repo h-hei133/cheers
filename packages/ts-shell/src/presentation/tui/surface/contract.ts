@@ -116,6 +116,13 @@ export interface ViewActions {
   copySelection?(): boolean;
   /** Collapse or expand the reasoning blocks, or the tool output. */
   toggleCollapsed(only: "thinking" | "tool"): void;
+  /**
+   * Hand the draft to an editor outside the terminal.
+   *
+   * Optional because only a surface that owns the terminal can release it, and a
+   * caller that cannot must leave the key unclaimed rather than pretend.
+   */
+  openExternalEditor?(): void;
 }
 
 /**

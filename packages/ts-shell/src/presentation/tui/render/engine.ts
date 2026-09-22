@@ -1,5 +1,5 @@
 import { DISABLE_MOUSE, ENABLE_MOUSE } from "../input/mouse.js";
-import type { TerminalDevice } from "../terminal.js";
+import type { TerminalDevice, TerminalStartOptions } from "../terminal.js";
 import { processTerminal } from "../terminal.js";
 import {
   defaultRenderScheduler,
@@ -17,6 +17,7 @@ import {
   diffPaint,
   ENTER_ALT_SCREEN,
   fullPaint,
+  EXIT_ALT_SCREEN,
   leaveScreen,
   padToHeight,
   paintBegin,
@@ -67,6 +68,14 @@ export class TUI {
    * the terminal, and only one of the two painters is ever used.
    */
   private mainScreen?: MainScreenPainter;
+  /**
+   * Whether the surface took the alternate screen.
+   *
+   * Remembered rather than re-derived from `mainScreen`, which is cleared while a
+   * child process holds the terminal: on restore the mode has to be the one the
+   * session started with, not whatever the field happens to hold.
+   */
+  private alternateScreen = false;
   private readonly inputListeners = new Set<(data: string) => void>();
   private disconnectHandler?: () => void;
 
@@ -111,26 +120,87 @@ export class TUI {
   start(options?: TuiStartOptions): void {
     this.started = true;
     this.stopped = false;
+    this.beginTerminal({ deferInput: options?.deferInput === true });
+    this.alternateScreen = options?.useAlternateScreen !== false;
+    this.enterScreen();
+    this.setMouseTracking(true);
+    this.requestRender({ force: true });
+  }
+
+  /**
+   * Take the screen the session paints on.
+   *
+   * The alternate screen is a private screen with no scrollback: leaving it
+   * restores the user's terminal exactly, and takes the conversation with it. The
+   * terminal's own screen keeps the transcript instead, so a session that ends
+   * leaves something to scroll back through.
+   */
+  private enterScreen(): void {
+    if (this.alternateScreen) {
+      this.terminal.write(ENTER_ALT_SCREEN);
+      return;
+    }
+    this.mainScreen = new MainScreenPainter(this.terminal);
+    this.mainScreen.start();
+  }
+
+  /** Give back whatever {@link enterScreen} took. */
+  private leaveScreen(): void {
+    if (this.mainScreen) {
+      this.mainScreen.stop();
+      this.mainScreen = undefined;
+      return;
+    }
+    if (this.alternateScreen) this.terminal.write(EXIT_ALT_SCREEN);
+  }
+
+  /** Take stdin and paint the screen the session runs on. */
+  private beginTerminal(options: TerminalStartOptions): void {
     this.terminal.start(
       (data) => {
         for (const listener of this.inputListeners) listener(data);
       },
       () => this.onResize(),
       this.handleDisconnect,
-      { deferInput: options?.deferInput === true },
+      options,
     );
-    // The alternate screen is a private screen with no scrollback: leaving it
-    // restores the user's terminal exactly, and takes the conversation with it.
-    // The terminal's own screen keeps the transcript instead, so a session that
-    // ends leaves something to scroll back through.
-    if (options?.useAlternateScreen === false) {
-      this.mainScreen = new MainScreenPainter(this.terminal);
-      this.mainScreen.start();
-    } else {
-      this.terminal.write(ENTER_ALT_SCREEN);
+  }
+
+  /**
+   * Give the terminal to `run`, then take it back.
+   *
+   * A child process that inherits this terminal would otherwise start inside raw
+   * mode on a screen the surface owns: no echo, no line editing, and output that
+   * the next frame overwrites. So every mode this driver set is restored, the
+   * screen is given back, and the terminal is handed over in a state an ordinary
+   * program can drive.
+   *
+   * Taking it back is in a `finally` because the failure that matters is not the
+   * child failing — it is the child failing and leaving the session with no
+   * terminal, which is indistinguishable from a hang.
+   */
+  suspend<T>(run: () => T): T {
+    if (!this.started || this.stopped) return run();
+
+    this.scheduler.clearTimeout(this.frameTimer);
+    this.setMouseTracking(false);
+    this.leaveScreen();
+    // The driver restores every mode it may have set, unbuffered, and that
+    // battery includes releasing raw mode — which is the whole point here.
+    this.terminal.stop();
+
+    try {
+      return run();
+    } finally {
+      this.beginTerminal({});
+      this.enterScreen();
+      this.setMouseTracking(true);
+      // The child wrote to the screen, so the next frame is a full paint rather
+      // than a diff against rows that are no longer there.
+      this.painted = false;
+      this.window = [];
+      this.requestRender({ force: true });
     }
-    this.setMouseTracking(true);
-    this.requestRender({ force: true });
   }
 
   stop(options?: TuiStopOptions): void {

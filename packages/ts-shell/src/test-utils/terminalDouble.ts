@@ -48,6 +48,9 @@ export class RecordingTerminal implements TerminalDevice {
     onDisconnect: () => void,
     _options?: TerminalStartOptions,
   ): void {
+    // Starting clears the stopped flag, as the real device does: a terminal that
+    // was released for a child process and taken back is running again.
+    this.stopped = false;
     this.input = onInput;
     this.resize = onResize;
     this.disconnect = onDisconnect;

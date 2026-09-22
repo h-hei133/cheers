@@ -359,3 +359,91 @@ describe("lifecycle stress", () => {
     expect(terminal.drain()).toBe("");
   });
 });
+
+describe("handing the terminal to a child process", () => {
+  it("gives the terminal back before the child runs", () => {
+    // The child is an editor, and an editor cannot start inside raw mode on a
+    // screen this surface owns: no echo, no line editing, and output the next
+    // frame overwrites.
+    const { tui, terminal, scheduler } = boot();
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+
+    let stoppedDuringChild = false;
+    tui.suspend(() => {
+      stoppedDuringChild = terminal.stopped;
+    });
+
+    expect(stoppedDuringChild).toBe(true);
+    expect(terminal.drain()).toContain("\x1b[?1049l");
+  });
+
+  it("takes the terminal back afterwards", () => {
+    const { tui, terminal, scheduler } = boot();
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+
+    tui.suspend(() => {});
+    scheduler.flush();
+
+    // Stopped for the child, then started again for the session.
+    expect(terminal.stopped).toBe(false);
+    expect(terminal.drain()).toContain("\x1b[?1049h");
+  });
+
+  it("takes the terminal back when the child throws", () => {
+    // The failure that matters is not the child failing — it is the child failing
+    // and leaving the session with no terminal, which reads as a hang.
+    const { tui, terminal, scheduler } = boot();
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+
+    expect(() => tui.suspend(() => {
+      throw new Error("child died");
+    })).toThrow("child died");
+
+    scheduler.flush();
+    expect(terminal.stopped).toBe(false);
+    expect(terminal.drain()).toContain("\x1b[?1049h");
+  });
+
+  it("leaves a screen it never took alone", () => {
+    // `tuiMode: "regular"` keeps the conversation in the terminal's own
+    // scrollback, so there is no screen to hand over.
+    const { tui, terminal, scheduler } = boot();
+    tui.start({ useAlternateScreen: false });
+    scheduler.flush();
+    terminal.drain();
+
+    tui.suspend(() => {});
+    scheduler.flush();
+
+    expect(terminal.drain()).not.toContain("\x1b[?1049");
+  });
+
+  it("repaints fully afterwards rather than diffing against rows the child erased", () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    tui.start();
+    provider.rows = ["before"];
+    tui.renderNow();
+    scheduler.flush();
+    terminal.drain();
+
+    tui.suspend(() => {});
+    provider.rows = ["after"];
+    scheduler.flush();
+    tui.renderNow();
+
+    // A diff would leave the old row in place; a full paint clears first.
+    expect(terminal.drain()).toContain("\x1b[J");
+  });
+
+  it("runs the child even when the session is not started", () => {
+    // Nothing to hand over, so the call is a plain passthrough.
+    const { tui } = boot();
+    expect(tui.suspend(() => "ran")).toBe("ran");
+  });
+});
