@@ -15,6 +15,7 @@ import { runWarmupLocalCommand } from "./warmupCommandRuntime.js";
 import { runExitCommand } from "./exitCommandRuntime.js";
 import { runClearCommand } from "./clearCommandRuntime.js";
 import { runReviewCommand } from "./reviewCommandRuntime.js";
+import { runReloadCommand } from "./reloadCommandRuntime.js";
 import { runTrustCommand } from "./trustCommandRuntime.js";
 import { runInitCommand } from "./initCommandRuntime.js";
 import { runCostCommand } from "./costCommandRuntime.js";
@@ -297,6 +298,16 @@ export function createCommandRegistry(
       group: "workflow",
       argumentHint: "[focus]",
       execute: (args, context) => runReviewCommand(args, context),
+    },
+    {
+      name: "reload",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      summary: "re-read the configuration this session started with",
+      group: "context",
+      execute: (args, context) => runReloadCommand(args, context),
     },
     {
       name: "trust",

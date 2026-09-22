@@ -8,6 +8,8 @@
 
 import { approvedResult } from './toolResultLifecycle.js'
 import { matchesGlob } from './globMatch.js'
+import { truncateHead } from './truncation.js'
+import { ArtifactManager } from '../session/artifactManager.js'
 import type { ToolDefinition } from '../../tools/types.js'
 import type { ExecutionAuthority, ExecutionService } from '../../runtime/execution/service.js'
 
@@ -75,15 +77,35 @@ export function createGlobToolDefinition(
       const limit = Math.min(requested, MAX_MATCH_LIMIT)
       const page = filtered.slice(0, limit)
 
-      if (filtered.length <= limit) {
-        return approvedResult(page.join('\n'))
+      // The count cap does not bound the response on its own: what arrives is
+      // paths, and their length is not ours to choose. A thousand entries in a
+      // monorepo with hashed directories is hundreds of kilobytes and tens of
+      // thousands of tokens, which is why a byte budget is applied to the joined
+      // result as well. The count cap still earns its place — it is what stops
+      // the walk from formatting entries that will certainly be discarded.
+      const raw = page.join('\n')
+      const truncated = truncateHead(raw, { maxLines: Number.MAX_SAFE_INTEGER })
+      const notices: string[] = []
+
+      if (truncated.truncated) {
+        // Spilled rather than dropped, so nothing matched is unreachable — the
+        // model can read the rest instead of re-running a narrower search.
+        const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
+        const artifact = await artifactManager.save(raw, 'glob')
+        notices.push(
+          `${Math.round(truncated.shownBytes / 1024)}KB limit reached, showing ${truncated.shownLines} of ${filtered.length} matches. Full list written to ${artifact.uri}`,
+        )
       }
-      // The count and the ceiling are both named, because the model has to be
-      // able to tell "these are all of them" from "these are the first of many"
-      // to decide whether to narrow the pattern or page through.
+      if (filtered.length > limit) {
+        // The total is named as well as the page, because scale is what tells the
+        // model whether to narrow the pattern or ask for more of it.
+        notices.push(
+          `Showing ${page.length} of ${filtered.length} matches (limit ${limit}). Use limit=${Math.min(limit * 2, MAX_MATCH_LIMIT)} for more, or narrow the pattern`,
+        )
+      }
+
       return approvedResult(
-        `${page.join('\n')}\n\n[Showing ${page.length} of ${filtered.length} matches (limit ${limit}). ` +
-          `Narrow the pattern, or pass limit=${Math.min(filtered.length, MAX_MATCH_LIMIT)} to see more]`,
+        notices.length === 0 ? truncated.content : `${truncated.content}\n\n[${notices.join('. ')}]`,
       )
     },
   }

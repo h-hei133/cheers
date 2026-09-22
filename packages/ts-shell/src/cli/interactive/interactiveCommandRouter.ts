@@ -1,5 +1,6 @@
 import type { Interface as ReadlineInterface } from "node:readline";
 
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
@@ -93,6 +94,15 @@ export async function routeInteractiveCommand(
     interactive: true,
     sessionId: input.runtimeContext.session.id,
     modifierKeysReported: input.modifierKeysReported,
+    // The settings live on the context this session carries, so replacing them in
+    // place is what makes `/reload` take effect for the rest of the session rather
+    // than only for the turn that ran it.
+    refreshRuntimeConfig: () => {
+      const before = input.runtimeContext.runtimeConfig;
+      const after = getRuntimeConfig(input.runtimeContext.cwd);
+      input.runtimeContext.runtimeConfig = after;
+      return { before, after };
+    },
   });
   if (resolved.kind === "handled") {
     return { turnNumber: nextTurnNumber };

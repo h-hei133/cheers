@@ -16,6 +16,13 @@ import * as path from "node:path";
 
 export type SkillSource = "user" | "project";
 
+/** Something wrong with a skill that did not prevent it loading, or did. */
+export interface SkillDiagnostic {
+  readonly name: string
+  readonly filePath: string
+  readonly message: string
+}
+
 /** Two skill files that claimed the same name, and which one was kept. */
 export interface SkillCollision {
   readonly name: string
@@ -43,6 +50,16 @@ export interface Skill {
 }
 
 const MANIFEST = "SKILL.md";
+
+/**
+ * Per the Agent Skills spec: a length bound and a character set.
+ *
+ * Checked because a name is not only a label — it is what a caller writes to load
+ * the skill, and it is interpolated into the prompt. Characters outside this set
+ * make the name awkward to quote and can break the tags it appears in.
+ */
+const MAX_NAME_LENGTH = 64;
+const VALID_NAME = /^[a-z0-9-]+$/;
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 export class SkillLoader {
@@ -75,11 +92,17 @@ export class SkillLoader {
    * deliberate — a repository that ships its own way of doing something should
    * override the user's general habit for that repository.
    */
-  loadDetailed(): { skills: ReadonlyMap<string, Skill>; collisions: readonly SkillCollision[] } {
+  loadDetailed(): {
+    skills: ReadonlyMap<string, Skill>
+    collisions: readonly SkillCollision[]
+    diagnostics: readonly SkillDiagnostic[]
+  } {
     const skills = new Map<string, Skill>();
     const collisions: SkillCollision[] = [];
+    const diagnostics: SkillDiagnostic[] = [];
     for (const root of this.roots) {
       for (const skill of this.scan(root.dir, root.source, true)) {
+        diagnostics.push(...inspectSkill(skill));
         const existing = skills.get(skill.name);
         if (existing && existing.source === skill.source) {
           collisions.push({
@@ -99,7 +122,7 @@ export class SkillLoader {
         skills.set(skill.name, skill);
       }
     }
-    return { skills, collisions };
+    return { skills, collisions, diagnostics };
   }
 
   /**
@@ -240,4 +263,32 @@ function escapeXml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+/**
+ * What is wrong with a skill, without deciding whether to keep it.
+ *
+ * The two findings are deliberately not the same severity. A missing description
+ * means the model can never match the skill, so it is invisible in every sense —
+ * the author needs to be told. A malformed name or an over-long description is a
+ * blemish: the skill still loads and still works when asked for by name, so it is
+ * reported and kept rather than refused. Discarding working instructions over
+ * cosmetics would be the worse trade.
+ */
+function inspectSkill(skill: Skill): SkillDiagnostic[] {
+  const diagnostics: SkillDiagnostic[] = [];
+  const note = (message: string): void => {
+    diagnostics.push({ name: skill.name, filePath: skill.filePath, message });
+  };
+
+  if (skill.description.trim() === "") {
+    note("has no description, so the model cannot match it; it will not appear in the skill list");
+  }
+  if (skill.name.length > MAX_NAME_LENGTH) {
+    note(`name exceeds ${MAX_NAME_LENGTH} characters (${skill.name.length})`);
+  } else if (!VALID_NAME.test(skill.name)) {
+    note("name contains characters outside lowercase a-z, 0-9 and hyphens");
+  }
+
+  return diagnostics;
 }

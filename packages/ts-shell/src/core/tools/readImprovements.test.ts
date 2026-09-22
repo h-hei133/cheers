@@ -171,6 +171,28 @@ describe("read tool improvements", () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
 
+  it("bounds a directory listing by bytes, not only by entry count", async () => {
+    // Entry names are as long as the filesystem says. The entry cap bounds how
+    // many there are, not how large the response is.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "read-dir-bytes-"));
+    const filler = "z".repeat(180);
+    for (let i = 0; i < 300; i++) {
+      await fs.writeFile(path.join(dir, `${filler}-${String(i).padStart(4, "0")}.ts`), "x", "utf8");
+    }
+
+    const readTool = createCoreToolRegistry().get("read")!;
+    const res = await readTool.execute(
+      { path: "." },
+      { workspaceRoot: dir, taskId: "t" } as never,
+    );
+
+    const bytes = Buffer.byteLength(res.output ?? "", "utf8");
+    expect(bytes).toBeLessThanOrEqual(60 * 1024);
+    expect(res.output).toMatch(/limit reached/i);
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
   it("handles oversized single line by dropping it and providing actionable bash fallback", () => {
     const hugeLine = "A".repeat(60 * 1024);
     const result = truncateHead(hugeLine + "\nshort line", { maxBytes: 50 * 1024 });

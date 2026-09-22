@@ -30,7 +30,15 @@ export interface ShellRuntimeContext {
   targetPathBase: string
   gitRoot: string | null
   rootBindingDiagnostics: readonly RootBindingDiagnostic[]
-  readonly runtimeConfig: RuntimeConfig
+  /**
+   * The settings in force for this session.
+   *
+   * Mutable because it is read once at startup and a long session outlives the
+   * file it came from: editing `config.json` mid-session would otherwise change
+   * nothing until restart, with no indication why. `/reload` re-reads it in place.
+   * Everything else this context holds is fixed for the session.
+   */
+  runtimeConfig: RuntimeConfig
   gitContext: WorkflowGitContext
   session: Session
   activeSession: ActiveSessionIdentity

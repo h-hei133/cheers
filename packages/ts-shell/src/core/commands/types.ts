@@ -20,6 +20,7 @@ import type { BrowserSkillRuntimeBinding } from '../../browser/skill/runtime/bin
 import type { BrowserActionCache } from '../../browser/actionCache.js'
 import type { BrowserReceiptCacheStore } from '../../browser/receipt/store.js'
 import type { BrowserPublicReadOnlyWebSmokeConfig } from '../harness/browserPublicReadOnlyWebSmokeConfig.js'
+import type { RuntimeConfig } from "../../config/runtimeConfig.js"
 import type { SidebarEventSink } from '../../presentation/sidebar/sidebarEventSink.js'
 import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLiveEventStore.js'
 
@@ -55,6 +56,15 @@ export interface CommandContext {
   readonly browserReceiptCacheStore?: BrowserReceiptCacheStore
   readonly sidebarEventSink?: SidebarEventSink
   readonly sidebarLiveEventStore?: SidebarLiveEventStore
+  /**
+   * Re-read the configuration this session started with, returning what changed.
+   *
+   * Injected rather than reaching for the runtime context directly: a command is
+   * handed the narrow view it needs, and only the surface that owns the session
+   * knows how to replace the settings in place. Absent means the caller has no
+   * session to refresh, and `/reload` says so instead of pretending.
+   */
+  readonly refreshRuntimeConfig?: () => { readonly before: RuntimeConfig; readonly after: RuntimeConfig }
 }
 
 export interface LocalCommandResult {

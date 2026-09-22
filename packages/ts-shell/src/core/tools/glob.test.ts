@@ -120,3 +120,52 @@ describe("glob result cap", () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
 });
+
+describe("glob byte cap", () => {
+  /**
+   * A tree whose direct children have very long names.
+   *
+   * A count cap alone does not bound the response: path length is what turns
+   * "a thousand entries" into hundreds of kilobytes. These names are long enough
+   * that the default page exceeds the byte budget.
+   */
+  async function makeLongNameTree(count: number): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "glob-bytes-"));
+    const filler = "z".repeat(180);
+    for (let i = 0; i < count; i++) {
+      await fs.writeFile(path.join(dir, `${filler}-${String(i).padStart(4, "0")}.ts`), "x", "utf8");
+    }
+    return dir;
+  }
+
+  it("bounds the bytes it returns, not only the number of entries", async () => {
+    const dir = await makeLongNameTree(500);
+    const globTool = createCoreToolRegistry().get("glob")!;
+
+    const res = await globTool.execute(
+      { pattern: "**/*.ts" },
+      { workspaceRoot: dir, taskId: "t" } as never,
+    );
+
+    const bytes = Buffer.byteLength(res.output ?? "", "utf8");
+    expect(bytes).toBeLessThanOrEqual(60 * 1024);
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("says the output was cut short, not just that entries were withheld", async () => {
+    const dir = await makeLongNameTree(500);
+    const globTool = createCoreToolRegistry().get("glob")!;
+
+    const res = await globTool.execute(
+      { pattern: "**/*.ts" },
+      { workspaceRoot: dir, taskId: "t" } as never,
+    );
+
+    // A caller has to be able to tell "these are all of them" from "the rest did
+    // not fit", which is a different fact from the entry count running out.
+    expect(res.output).toMatch(/limit reached|KB/i);
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+});

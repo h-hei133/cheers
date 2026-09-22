@@ -1,4 +1,5 @@
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
+import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import { createBrowserCliExecutionBridge } from "../browser/cliExecutionBridge.js";
 import { loadBrowserCliExecutorInjectionFromEnv } from "../browser/cliExecutorInjection.js";
 import { loadBrowserReceiptCacheManifestFromEnv } from "../browser/receipt/manifest.js";
@@ -42,6 +43,8 @@ export interface BuildCliCommandExecutionInput {
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** True when the terminal agreed to report modified keys. */
   readonly modifierKeysReported?: boolean;
+  /** How `/reload` re-reads the session's configuration. Absent off-session. */
+  readonly refreshRuntimeConfig?: () => { readonly before: RuntimeConfig; readonly after: RuntimeConfig };
 }
 
 export interface CliCommandExecutionBridge {
@@ -82,6 +85,7 @@ export async function buildCliCommandExecution(
     cwd: input.cwd,
     sessionId: input.sessionId,
     modifierKeysReported: input.modifierKeysReported,
+    refreshRuntimeConfig: input.refreshRuntimeConfig,
     compactCheckpointStore: input.compactCheckpointStore,
     compactInjectionStateStore: input.compactInjectionStateStore,
     browserReceiptCacheStore,

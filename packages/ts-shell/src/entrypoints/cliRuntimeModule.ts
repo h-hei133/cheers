@@ -42,6 +42,7 @@ import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
 import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "./cliSessionModule.js";
 import { runCliWorkspaceCommand } from "./cliWorkspaceModule.js";
 import { renderUserHelp, renderSessionCommandMap } from "./slashCommandRegistry.js";
+import { getRuntimeConfig } from "../config/runtimeConfig.js";
 
 export async function runNonTtyPromptStream(options: {
   sessionManager: SessionManager;
@@ -211,6 +212,15 @@ export async function runNonInteractivePrompt(options: {
     printMode: options.printMode,
     interactive: false,
     sessionId: options.runtimeContext.session.id,
+    // Offered on the non-interactive path too: a scripted run has the same
+    // session and the same one-shot configuration read, so `/reload` must mean
+    // the same thing there rather than reporting that it cannot help.
+    refreshRuntimeConfig: () => {
+      const before = options.runtimeContext.runtimeConfig;
+      const after = getRuntimeConfig(options.runtimeContext.cwd);
+      options.runtimeContext.runtimeConfig = after;
+      return { before, after };
+    },
   });
   if (resolved.kind === "handled") {
     return;

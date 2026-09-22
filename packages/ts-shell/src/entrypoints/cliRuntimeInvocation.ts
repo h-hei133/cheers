@@ -185,7 +185,14 @@ function deferUntilReady(
  */
 function discoverSkills(request: CliRuntimeInvocationRequest): ReadonlyMap<string, Skill> {
   const loader = new SkillLoader(request.workspaceRoot);
-  const { skills: found, collisions } = loader.loadDetailed();
+  const { skills: found, collisions, diagnostics } = loader.loadDetailed();
+
+  // Reported because a malformed skill is otherwise invisible: a missing
+  // description keeps it out of the model's list entirely, and a bad name is
+  // something the author can only discover by noticing it never appears.
+  for (const diagnostic of diagnostics) {
+    createComponentLogger("skills").warn(`${diagnostic.filePath} ${diagnostic.message}.`);
+  }
 
   if (collisions.length > 0) {
     // Surfaced because the losing file is otherwise invisible: the winner

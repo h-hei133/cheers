@@ -12,6 +12,8 @@
 
 import path from 'node:path'
 import { listDirectoryEntries } from '../../runtime/execution/service.js'
+import { truncateHead } from './truncation.js'
+import { ArtifactManager } from '../session/artifactManager.js'
 
 /**
  * Entries per page when the caller does not ask for a count.
@@ -91,9 +93,22 @@ export async function formatDirectoryListing(
 
   const lines = page.map((entry) => `${entry.name}${entry.isDirectory ? '/' : ''}`)
   const header = `Directory ${shownPath} (${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}):`
-  let body = `${header}\n${lines.join('\n')}`
+  // Entry names are as long as the filesystem says, and the entry cap bounds
+  // their number rather than their size — a directory of long names clears the
+  // cap and still arrives over budget. The byte budget is what actually bounds
+  // the response.
+  const truncated = truncateHead(lines.join('\n'), { maxLines: Number.MAX_SAFE_INTEGER })
+  let body = `${header}\n${truncated.content}`
 
-  if (endIndex < entries.length) {
+  if (truncated.truncated) {
+    // Spilled rather than dropped: the rest is reachable by reading the file
+    // instead of re-listing a narrower path.
+    const artifact = await ArtifactManager.getShared(request.workspaceRoot).save(
+      lines.join('\n'),
+      'read',
+    )
+    body += `\n[${Math.round(truncated.shownBytes / 1024)}KB limit reached, showing ${truncated.shownLines} of ${lines.length} entries. Full listing written to ${artifact.uri}]`
+  } else if (endIndex < entries.length) {
     body += continuationNotice(shownPath, page.length, entries.length, endIndex + 1)
   }
   if (listing.omittedCount > 0) {
