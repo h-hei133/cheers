@@ -50,7 +50,20 @@ export class SubagentLoader {
     this.userAgentsDir = path.join(os.homedir(), ".private-agents", "agents");
   }
 
-  loadAllSubagents(): ReadonlyMap<string, SubagentDefinition> {
+  /**
+   * Every subagent available here.
+   *
+   * A project's definition files become a subagent's system prompt verbatim, so
+   * they are read only when the caller says the project may supply them. That is
+   * the same rule the project's instruction files and skills follow, and for the
+   * same reason: text a repository wrote does not get to direct the model just
+   * because it was written to a file the harness reads.
+   *
+   * The decision arrives as an argument rather than being read from a global, so
+   * each call site shows which rule it is applying and a test can exercise either
+   * side without arranging the machine's trust store.
+   */
+  loadAllSubagents(allowProjectAgents = true): ReadonlyMap<string, SubagentDefinition> {
     const registry = new Map<string, SubagentDefinition>();
 
     // 1. Built-in defaults (lowest priority)
@@ -58,18 +71,21 @@ export class SubagentLoader {
       registry.set(agent.name.toLowerCase(), agent);
     }
 
-    // 2. User-level agents (~/.private-agents/agents/*.md)
+    // 2. User-level agents (~/.private-agents/agents/*.md). The user's own files,
+    // so they load regardless.
     this.scanDirectory(this.userAgentsDir, "user", registry);
 
     // 3. Project-level agents (.agents/agents/*.md and .agents/*.md) (highest priority)
-    this.scanDirectory(path.join(this.workspaceRoot, ".agents", "agents"), "project", registry);
-    this.scanDirectory(path.join(this.workspaceRoot, ".agents"), "project", registry);
+    if (allowProjectAgents) {
+      this.scanDirectory(path.join(this.workspaceRoot, ".agents", "agents"), "project", registry);
+      this.scanDirectory(path.join(this.workspaceRoot, ".agents"), "project", registry);
+    }
 
     return registry;
   }
 
-  getSubagent(name: string): SubagentDefinition | undefined {
-    const registry = this.loadAllSubagents();
+  getSubagent(name: string, allowProjectAgents = true): SubagentDefinition | undefined {
+    const registry = this.loadAllSubagents(allowProjectAgents);
     return registry.get(name.trim().toLowerCase());
   }
 

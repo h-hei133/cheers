@@ -242,6 +242,27 @@ describe("Workflow & Agentic SDLC Subsystem Test Suite", () => {
       nodeFs.rmSync(home, { recursive: true, force: true });
     });
 
+    it("refuses to run a workflow when the project is marked untrusted", async () => {
+      // A workflow is a list of commands this process runs. Asking for one by name
+      // says nothing about what is inside it, so an untrusted project does not get
+      // to supply them.
+      define("danger", [{ id: "boom", run: "touch " + nodePath.join(project, "ran.txt") }]);
+
+      const result = await runWorkflowCommand(["run", "danger"], { cwd: project }, false);
+
+      expect(result.output).toContain("untrusted");
+      expect(nodeFs.existsSync(nodePath.join(project, "ran.txt"))).toBe(false);
+    });
+
+    it("still runs a workflow for a project nobody has ruled on", async () => {
+      define("fine", [{ id: "ok", run: "exit 0" }]);
+
+      const result = await runWorkflowCommand(["run", "fine"], { cwd: project });
+
+      expect(result.output).not.toContain("untrusted");
+      expect(result.output).toContain("ok");
+    });
+
     it("says nothing has run rather than showing progress it never observed", async () => {
       const status = await runWorkflowCommand(["status"], { cwd: project });
 

@@ -180,9 +180,34 @@ export interface CommandHookConfig {
   readonly matcher?: string;
   readonly command: string;
   readonly timeoutMs?: number;
+  /**
+   * Identity of what this hook will do, when it came from a configuration file.
+   *
+   * Present means "this command is asking for permission": the dispatcher checks
+   * it against what the user has approved before running anything, and asks when
+   * there is no answer yet. Absent means the hook was registered by this process
+   * rather than read from a file, and runs as before.
+   */
+  readonly fingerprint?: string;
+  /** Where it was declared, so the approval prompt can name the source. */
+  readonly sourcePath?: string;
 }
 
 export interface HooksConfiguration {
   readonly commandHooks?: readonly CommandHookConfig[];
   readonly inProcessHooks?: readonly InProcessHookConfig[];
 }
+
+/**
+ * How the dispatcher asks whether one declared command may run.
+ *
+ * Declared here rather than beside either user so the two do not import each
+ * other: the registration step supplies one, the dispatcher calls it, and neither
+ * has to know about the other to describe it.
+ */
+export type HookApprovalRequest = (request: {
+  readonly command: string;
+  readonly event: string;
+  readonly matcher?: string;
+  readonly sourcePath: string;
+}) => Promise<boolean>;

@@ -49,21 +49,133 @@ const CONFIG_NAME = "sandbox.json";
 /** Paths never exposed, regardless of configuration. */
 const ALWAYS_HIDDEN = [".ssh", ".aws", ".gnupg", ".private-agents-real"];
 
-/** The rules in force for `workspaceRoot`: the project's file, else the user's. */
+/**
+ * The rules in force for `workspaceRoot`.
+ *
+ * A project's file may not relax what the user's file decided. The two are
+ * combined rather than one chosen over the other, because a project that could
+ * replace the user's rules could lift their isolation outright: a workspace file
+ * saying `enabled: false`, or naming `/` as writable, would undo a decision its
+ * author never made. The attack is cloning a repository, not mistyping a setting.
+ *
+ * Each field resolves in the direction that keeps authority with the user:
+ *
+ *   - Isolation can be requested by either file but switched off by neither, so
+ *     a project may ask for confinement and may not remove it.
+ *   - The path allowlists (`allowRead`, `allowWrite`) and the domain allowlist are
+ *     permission grants, and a grant is the user's to make. When the user set one
+ *     the project's is ignored; when they did not, the project's applies. Honouring
+ *     a project's narrower list instead would mean reasoning about which paths
+ *     contain which, and the failure mode of getting that wrong is silently
+ *     widening the grant — the one outcome this must not have.
+ *   - `denyRead` is a restriction, so it accumulates: a path either file refuses
+ *     stays refused.
+ *
+ * A field the user never set is the project's to define, since there is no user
+ * decision for it to contradict.
+ */
 export function readSandboxRules(workspaceRoot: string): SandboxRules {
   const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
-  const candidates = [
-    path.join(workspaceRoot, ".agents", CONFIG_NAME),
-    path.join(home, ".private-agents", CONFIG_NAME),
-  ];
-  for (const candidate of candidates) {
-    try {
-      return JSON.parse(fs.readFileSync(candidate, "utf8")) as SandboxRules;
-    } catch {
-      continue;
-    }
+  const userRules = readRulesFile(path.join(home, ".private-agents", CONFIG_NAME));
+  const projectRules = readRulesFile(path.join(workspaceRoot, ".agents", CONFIG_NAME));
+  return tighten(userRules, projectRules);
+}
+
+/** The rules in one file, or none when it is absent or unreadable. */
+function readRulesFile(configPath: string): SandboxRules | undefined {
+  try {
+    return JSON.parse(fs.readFileSync(configPath, "utf8")) as SandboxRules;
+  } catch {
+    // Absent, unreadable and malformed all mean the same thing here: this file
+    // contributes no rules. A malformed file must not cost the other one.
+    return undefined;
   }
-  return {};
+}
+
+/**
+ * Apply `project` to `user` without letting the project widen anything.
+ *
+ * Absent sections are passed through, so a project file that says nothing about
+ * the network leaves the user's network rules exactly as they were.
+ */
+function tighten(user: SandboxRules | undefined, project: SandboxRules | undefined): SandboxRules {
+  if (!user) return project ?? {};
+  if (!project) return user;
+
+  // Built as a mutable shape because the fields are readonly on the published
+  // type; the value is assembled once and never changed afterwards.
+  const result: {
+    enabled?: boolean
+    network?: SandboxRules["network"]
+    filesystem?: SandboxRules["filesystem"]
+  } = {};
+
+  // Isolation is the user's to switch off. A project can ask for it, which is the
+  // tightening direction.
+  const enabled = user.enabled === true || project.enabled === true;
+  if (enabled) result.enabled = true;
+
+  // A permission grant belongs to whoever asked for the confinement. When the
+  // user turned isolation on, the grants are theirs even where they listed no
+  // paths: not listing any means "the built-in default" (the workspace and a temp
+  // directory), and a project naming `/` here would be replacing that default with
+  // the whole filesystem — widening the decision rather than respecting it.
+  const grantsComeFromProject = user.enabled !== true;
+
+  const allowedDomains = grantsComeFromProject
+    ? project.network?.allowedDomains ?? user.network?.allowedDomains
+    : user.network?.allowedDomains;
+  if (allowedDomains !== undefined) result.network = { allowedDomains };
+
+  const filesystem = tightenFilesystem(user.filesystem, project.filesystem, grantsComeFromProject);
+  if (filesystem) result.filesystem = filesystem;
+
+  return result;
+}
+
+/** Path rules, in the direction that keeps authority with the user. */
+function tightenFilesystem(
+  user: SandboxRules["filesystem"],
+  project: SandboxRules["filesystem"],
+  grantsComeFromProject: boolean,
+): SandboxRules["filesystem"] {
+  // No user section: nothing to contradict, unless the user asked for isolation
+  // and simply listed no paths — then their silence is the default, not a
+  // delegation. Only the restriction carries over in that case.
+  if (!user) {
+    if (grantsComeFromProject) return project;
+    return project?.denyRead === undefined ? undefined : { denyRead: project.denyRead };
+  }
+  if (!project) return user;
+
+  const result: {
+    allowRead?: readonly string[];
+    allowWrite?: readonly string[];
+    denyRead?: readonly string[];
+  } = {};
+
+  // Allowlists are grants, so they follow the same rule as the domain list: the
+  // user's where the user asked for confinement, the project's otherwise.
+  const allowRead = grantsComeFromProject
+    ? project.allowRead ?? user.allowRead
+    : user.allowRead;
+  if (allowRead !== undefined) result.allowRead = allowRead;
+  const allowWrite = grantsComeFromProject
+    ? project.allowWrite ?? user.allowWrite
+    : user.allowWrite;
+  if (allowWrite !== undefined) result.allowWrite = allowWrite;
+
+  // A denylist is a restriction and only accumulates: a path either file refuses
+  // stays refused. A project cannot un-refuse what the user refused.
+  const denyRead =
+    user.denyRead === undefined
+      ? project.denyRead
+      : project.denyRead === undefined
+        ? user.denyRead
+        : [...new Set([...user.denyRead, ...project.denyRead])];
+  if (denyRead !== undefined) result.denyRead = denyRead;
+
+  return result;
 }
 
 /** Whether this platform has a sandbox launcher installed. */

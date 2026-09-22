@@ -15,6 +15,7 @@ import { runWarmupLocalCommand } from "./warmupCommandRuntime.js";
 import { runExitCommand } from "./exitCommandRuntime.js";
 import { runClearCommand } from "./clearCommandRuntime.js";
 import { runReviewCommand } from "./reviewCommandRuntime.js";
+import { runTrustCommand } from "./trustCommandRuntime.js";
 import { runInitCommand } from "./initCommandRuntime.js";
 import { runCostCommand } from "./costCommandRuntime.js";
 import { runUndoCommand } from "./undoCommandRuntime.js";
@@ -296,6 +297,17 @@ export function createCommandRegistry(
       group: "workflow",
       argumentHint: "[focus]",
       execute: (args, context) => runReviewCommand(args, context),
+    },
+    {
+      name: "trust",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      summary: "show or set what this project is allowed to contribute",
+      group: "context",
+      argumentHint: "[status|on|off|session]",
+      execute: (args, context) => runTrustCommand(args, context),
     },
     {
       name: "init",

@@ -4,6 +4,7 @@ import { GitWorktreeManager } from "../workflow/gitWorktreeManager.js";
 import { SubagentLoader } from "../subagents/subagentLoader.js";
 import { AgentMemoryManager } from "../subagents/agentMemoryManager.js";
 import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
+import { projectTrust } from "../security/projectTrust.js";
 
 const defaultWorktreeManager = new GitWorktreeManager();
 
@@ -61,7 +62,10 @@ export function createTaskToolDefinition(
 
       const requestedType = (typeof args.subagent_type === "string" ? args.subagent_type.trim() : "") || "general-purpose";
       const loader = new SubagentLoader(context.workspaceRoot);
-      const subagentDef = loader.getSubagent(requestedType);
+      const subagentDef = loader.getSubagent(
+        requestedType,
+        !projectTrust.isProjectUntrusted(context.workspaceRoot),
+      );
 
       const randomSuffix = Math.random().toString(36).slice(2, 8).padEnd(6, "0");
       const subtaskId = `task_${randomSuffix}`;

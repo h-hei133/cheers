@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { definitionExample, listWorkflowNames, readWorkflow, workflowsDir } from "../workflow/definition.js";
+import { projectTrust } from "../security/projectTrust.js";
 import { runWorkflow, type StepOutcome, type WorkflowRun } from "../workflow/runner.js";
 import { readLastRun, writeRun } from "../workflow/runStore.js";
 
@@ -22,8 +23,11 @@ import { readLastRun, writeRun } from "../workflow/runStore.js";
 export async function runWorkflowCommand(
   args: string[],
   context: CommandContext,
+  /** Whether this project may supply commands. Defaults to reading the trust store. */
+  projectAllowed?: boolean,
 ): Promise<LocalCommandResult> {
   const root = context.cwd;
+  const allowed = projectAllowed ?? !projectTrust.isProjectUntrusted(root);
   const subCommand = args[0]?.toLowerCase();
 
   if (subCommand === "list" || subCommand === "templates") {
@@ -33,7 +37,7 @@ export async function runWorkflowCommand(
   if (subCommand === "run" || subCommand === "start") {
     const name = args[1];
     if (!name) return { kind: "local", output: "Which workflow? `/workflow list` shows what this project has." };
-    return { kind: "local", output: await execute(root, name) };
+    return { kind: "local", output: await execute(root, name, allowed) };
   }
 
   if (!subCommand || subCommand === "status") {
@@ -54,9 +58,20 @@ export async function runWorkflowCommand(
 }
 
 /** Load, run, and record one workflow. */
-async function execute(root: string, name: string): Promise<string> {
+async function execute(root: string, name: string, projectAllowed: boolean): Promise<string> {
   const loaded = readWorkflow(root, name);
   if ("error" in loaded) return [loaded.error, "", definitionExample()].join("\n");
+
+  // A workflow is a list of commands this process will run. Asking for one by
+  // name is a deliberate act, but the name says nothing about the commands inside
+  // it — so a project explicitly marked untrusted does not get to supply them.
+  if (!projectAllowed) {
+    return [
+      `Refusing to run \`${name}\`: this project is marked untrusted and its workflows contain commands.`,
+      "",
+      `Inspect it with \`/workflow status\`, then allow the project with \`/trust on\` if the commands are acceptable.`,
+    ].join("\n");
+  }
 
   const outcome = await runWorkflow(loaded.workflow, root);
   if ("error" in outcome) return outcome.error;

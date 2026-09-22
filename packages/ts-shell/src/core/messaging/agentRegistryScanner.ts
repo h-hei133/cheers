@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import type { AgentDescriptor } from "./types.js";
 import { SubagentLoader } from "../subagents/subagentLoader.js";
+import { projectTrust } from "../security/projectTrust.js";
 
 /**
  * AgentRegistryScanner
@@ -46,7 +47,9 @@ export class AgentRegistryScanner {
 
     // 2. Discover Custom & Built-in Subagents via SubagentLoader
     const subagentLoader = new SubagentLoader(this.workspaceRoot);
-    const subagents = subagentLoader.loadAllSubagents();
+    const subagents = subagentLoader.loadAllSubagents(
+      !projectTrust.isProjectUntrusted(this.workspaceRoot),
+    );
 
     for (const [key, sub] of subagents.entries()) {
       agents.push({

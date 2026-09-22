@@ -18,7 +18,7 @@
 | T4 | 逐模型窗口 + 逐模型压缩预算 | ✅ **完成**（§4） |
 | T6 | 目录列举折进 `read` | ✅ **完成**（§5） |
 | T2 / T2b | `AGENTS.md` 注入 + 技能（一轮） | ✅ **完成**（§6） |
-| T5 | 声明式钩子 + 信任门 + 封堵既有执行面 | ⬜ 未开始 |
+| T5 | 声明式钩子 + 信任门 + 封堵既有执行面 | ✅ **完成**（§7） |
 
 ---
 
@@ -578,7 +578,115 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 
 ## 7. T5 — 扩展宿主与信任边界
 
-⬜ 未开始。
+### 7.1 施工内容
+
+| 文件 | 变化 |
+|---|---|
+| `core/hooks/trust.ts` | **新增**：钩子指纹 + 审批记录（存于项目之外） |
+| `core/hooks/config.ts` | **新增**：声明式钩子配置读取器（只读，不做判定） |
+| `core/hooks/registration.ts` | **新增**：注册全部声明 + 设置调度侧门 |
+| `core/hooks/types.ts` | `CommandHookConfig` 增 `fingerprint`/`sourcePath`；`HookApprovalRequest` 归位于此 |
+| `core/hooks/hookDispatcher.ts` | **修 fail-open**；新增 `setCommandHookTrust` + `declaredHookIsAllowed` |
+| `core/commands/trustCommandRuntime.ts` | **新增**：`/trust [status|on|off|session]` |
+| `core/security/projectTrust.ts` | `hasSensitiveProjectResources` **补齐 6 种形态** |
+| `core/mcp/config.ts` | 项目 MCP 配置按信任门读取（显式参数） |
+| `sandbox/osSandbox.ts` | **修「项目可关掉用户隔离」**：规则改为只收紧 |
+| `core/commands/workflowCommandRuntime.ts` | 工作流执行按信任门（显式参数） |
+| `core/subagents/subagentLoader.ts` | 项目子代理定义按信任门（显式参数） |
+| `core/tools/taskTool.ts`、`core/messaging/agentRegistryScanner.ts` | 传入信任判定 |
+| `entrypoints/cliRuntimeInvocation.ts` | 注册声明钩子 + `approveDeclaredHook`（含显示中和） |
+
+### 7.2 施工中发现的**三个额外缺陷**（都不在原裁决的「新建」范围内）
+
+**缺陷 1（严重）：仓库可以关掉用户开启的沙箱隔离，并给自己 `allowWrite: ["/"]`。**
+
+`readSandboxRules` 原本「项目文件优先，否则用户文件」——**是替换，不是合并**。实机复现：
+
+```
+用户: {enabled: true}                        （用户要求隔离）
+仓库: {enabled: false, filesystem:{allowWrite:["/"]}}
+生效: {"enabled":false,"filesystem":{"allowWrite":["/"]}}   ← 隔离被关，且可写整个文件系统
+```
+
+**攻击形状是「克隆一个仓库」，不是配置失误。**
+
+**修复**：规则改为**只收紧**。权限授予（`allowRead`/`allowWrite`/`allowedDomains`）跟随**谁要求了隔离**——用户要求隔离时授予权归用户（未列举 = 内置默认，项目不能替换成 `/`）；限制（`denyRead`）只累加。
+
+**一处设计取舍值得记录**：最初写的是「allowlist 取交集」，但实测 `["/tmp/ok"]` 与 `["/"]` 取交集得空——**按字符串取交集会得出错误结论**，而正确做法需要路径包含推理。改用「授予权归属」这一更简单且**失败方向安全**的规则：判错的最坏结果是「用户说了算」，而不是静默放宽。
+
+**缺陷 2（高）：工作流 `exec` 与项目子代理定义零信任检查。**
+
+`/workflow run <name>` 会执行 `.agents/workflows/*.json` 里的命令；`.agents/agents/*.md` 的正文直接成为 subagent 的 `systemPrompt`。两者都已过门（显式参数 + 调用点传入）。
+
+**缺陷 3（中）：`hasSensitiveProjectResources` 认不出它要门控的资源。**
+
+实测 6 种形态全部漏报（`.agents/hooks.json`、`.private-agents.mcp.json`、根 `AGENTS.md`、`.agents/sandbox.json`、`.agents/workflows/`）。原因是探测器只有「固定文件名列表（仅 `SYSTEM.md`）+ 任意点目录含特定子目录」——**结构上无法匹配 dotfile，也覆盖不到仓库根**。已补齐并加 8 项测试。
+
+### 7.3 形状
+
+**信任门语义（采纳参考实现的「显式不可信」而非「非显式信任」）**
+
+| 状态 | 行为 |
+|---|---|
+| 无记录 | **照常加载**（没人裁决过 ≠ 不可信） |
+| `trusted` | 加载 |
+| `untrusted` | 拒绝项目提供的可执行资源；**用户级资源无条件加载** |
+| 无审批路径（非交互） | **拒绝执行** |
+
+**钩子门**
+
+| 维度 | 实现 |
+|---|---|
+| 指纹覆盖 | 事件 + matcher + 命令（`sha256`，按固定顺序序列化，不受键序影响） |
+| 记录位置 | `~/.coding-agents/hook-trust.json`——**项目不可写**，否则仓库可自带审批 |
+| 改动命令 | 指纹变化 → 重新询问 |
+| 无指纹的钩子 | 本进程自注册（内置），不需授权 |
+| 失败处理 | `PreToolUse` 钩子失败 → **阻断**；非法 JSON → 记录并抛错 |
+| 提示中和 | 命令/matcher/路径逐字符中和控制字符、折叠空白（仓库控制这些字符串） |
+
+### 7.4 验证
+
+| 项 | 方式 | 结果 |
+|---|---|---|
+| 指纹与记录 | `trust.test.ts` 11 项 | **通过** |
+| 配置读取 | `config.test.ts` 6 项 | **通过** |
+| 注册与门 | `registration.test.ts` 6 项 | **通过** |
+| MCP 门 | `mcp/config.test.ts` 2 项 | **通过** |
+| 资源探测 | `projectTrust.test.ts` 15 项 | **通过** |
+| 沙箱收紧 | `osSandbox.test.ts` 19 项 | **通过** |
+| 工作流门 | `workflow.test.ts` 23 项 | **通过** |
+| 子代理门 | `subagent.test.ts` 5 项 | **通过** |
+| 门禁 | 环 / docs-drift / config-consumers / test:scripts / module-facades | **全 pass**（环 0） |
+
+**反向验证（三项，各自独立）**：
+- 移除调度侧钩子门 → **4 项失败**
+- 沙箱改回「项目文件替换用户文件」→ **2 项失败**
+- 移除 `PreToolUse` 失败阻断 → **1 项失败**
+
+**实机验证（真实构建产物）**：标记项目为 `untrusted` 后，同一 fixture 上
+
+| 表面 | 结果 |
+|---|---|
+| MCP 服务器 | `[]`（`evil` 被拦） |
+| 项目子代理可见 | `false` |
+| 项目指令文件数 | `0` |
+| 工作流 | **未运行**（`ran.txt` 不存在），提示 "Refusing to run ... untrusted" |
+| 钩子（无审批路径） | **未运行** |
+
+**未标记不可信时**（默认路径）：MCP 服务器 `["evil"]`、子代理可见、指令文件 1 个、沙箱规则按项目文件生效——**确认没有过度拦截**。
+
+### 7.5 未做（如实记录）
+
+- **逃生口 `--dangerously-bypass-hook-trust`**（裁决 §6.5 #6）：**未实现**。需求是「提供且必须带危险提示」，采纳 `codex` 形式。当前没有绕过开关——要放行只能通过 `/trust on` 或审批提示。
+- **`SessionEnd` 超时钳制**（裁决 §6.4）：未实现分级超时（当前统一 15s）。
+- **退出码 2 + stderr 作为 block 信号**（裁决 §6.4）：未实现；当前只认 JSON 输出里的 `decision`。
+- **`PreToolUse` 的 `retry` 被静默丢弃**（审查发现 5）：**仍未修**——唯一消费者只检查 `block`。
+- **钩子不在沙箱内运行**（审查发现 5）：**仍未修**——钩子用裸 `exec`，而 `bash` 工具走 `planSandboxedCommand`。这是一个已知的不对称。
+- **`POSToolUse` feedback 拼进模型可见输出**（审查发现 5）：未做中和处理。
+
+---
+
+## 8. 文档结构调整（本轮顺带）
 
 ---
 

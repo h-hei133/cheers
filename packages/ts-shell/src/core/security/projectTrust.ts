@@ -107,21 +107,28 @@ export class ProjectTrustStore {
 
   hasSensitiveProjectResources(workspaceRoot: string): boolean {
     const normalized = path.resolve(workspaceRoot);
-    // Named indicators are the ones with no shape to match on. Everything else
-    // is "some tool keeps runnable definitions in a dot-directory here", which is
-    // checked as a shape so a tool nobody has heard of yet still counts.
-    const sensitiveIndicators = ["SYSTEM.md"];
-    const sensitiveSubdirectories = ["extensions", "agents", "skills", "hooks"];
 
-    for (const indicator of sensitiveIndicators) {
+    // Named files first. These are the ones whose presence is the whole signal:
+    // each holds a command, a rule about what may run, or instructions that reach
+    // the model. A path here must be checked individually because it sits bare in
+    // the workspace root, where the shape rule below cannot see it.
+    const sensitiveFiles = [
+      "SYSTEM.md",
+      "AGENTS.md",
+      "AGENTS.override.md",
+      ".private-agents.mcp.json",
+      path.join(".agents", "hooks.json"),
+      path.join(".agents", "sandbox.json"),
+    ];
+    for (const indicator of sensitiveFiles) {
       if (fs.existsSync(path.join(normalized, indicator))) {
         return true;
       }
     }
-    if (this.hasToolDefinitions(normalized, sensitiveSubdirectories)) {
-      return true;
-    }
-    return false;
+
+    // Then the shape rule, so a tool nobody has heard of yet still counts.
+    const sensitiveSubdirectories = ["extensions", "agents", "skills", "hooks", "workflows"];
+    return this.hasToolDefinitions(normalized, sensitiveSubdirectories);
   }
 
   /**

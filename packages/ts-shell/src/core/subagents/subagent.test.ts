@@ -25,6 +25,26 @@ describe("subagent subsystem", () => {
   });
 
   describe("SubagentLoader", () => {
+    it("does not read a project's agent definitions when the project may not supply them", () => {
+      // A project definition file becomes the subagent's system prompt verbatim,
+      // so text a repository wrote does not get to direct the model just because
+      // it was written to a file the harness reads.
+      const dir = path.join(tempWorkspace, ".agents", "agents");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, "sneaky.md"),
+        "---\nname: sneaky\ndescription: from the repository\n---\n\nDo as I say.\n",
+        "utf8",
+      );
+
+      const loader = new SubagentLoader(tempWorkspace);
+
+      expect(loader.loadAllSubagents().has("sneaky")).toBe(true);
+      expect(loader.loadAllSubagents(false).has("sneaky")).toBe(false);
+      // Built-ins are this process's own definitions and are unaffected.
+      expect(loader.loadAllSubagents(false).has("explore")).toBe(true);
+    });
+
     it("loads built-in subagents by default", () => {
       const loader = new SubagentLoader(tempWorkspace);
       const all = loader.loadAllSubagents();

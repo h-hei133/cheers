@@ -96,3 +96,46 @@ describe("explicit untrusted marking", () => {
     expect(store.isProjectUntrusted(project)).toBe(false);
   });
 });
+
+describe("sensitive resource detection", () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "trust-sensitive-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  /** Write a file, creating its parent directories. */
+  function touch(relative: string): void {
+    const target = path.join(root, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, "x", "utf8");
+  }
+
+  // Each of these causes something to run or reaches the prompt. The detector
+  // has to see all of them, because it is what decides whether a user is asked.
+  const sensitive = [
+    ".agents/hooks.json",
+    ".private-agents.mcp.json",
+    "AGENTS.md",
+    ".agents/sandbox.json",
+    ".agents/skills/anything/SKILL.md",
+    ".agents/workflows/build.json",
+    "SYSTEM.md",
+  ];
+
+  for (const relative of sensitive) {
+    it(`detects ${relative}`, () => {
+      touch(relative);
+
+      expect(new ProjectTrustStore(path.join(root, "trust.json")).hasSensitiveProjectResources(root)).toBe(true);
+    });
+  }
+
+  it("reports nothing for a project that declares nothing", () => {
+    expect(new ProjectTrustStore(path.join(root, "trust.json")).hasSensitiveProjectResources(root)).toBe(false);
+  });
+});

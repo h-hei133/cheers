@@ -8,6 +8,7 @@ import type { AskQuestion } from "../core/tools/ask.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
+import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/registration.js";
 import { createCoreToolRegistry } from "../core/tools/registry.js";
 import { filterVisibleToolNames } from "../core/tools/prefilter.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
@@ -241,12 +242,82 @@ function buildPromptContext(
   };
 }
 
+/**
+ * Ask the user whether one declared command may run.
+ *
+ * The command text is written by whoever wrote the repository, and it is shown at
+ * the exact moment a person is deciding whether to trust them. Rendered verbatim
+ * it could contain newlines that forge extra prompt lines, or control sequences
+ * that repaint what is on screen, so it is neutralised first: the user has to be
+ * able to trust what they are reading as much as what they are approving.
+ *
+ * A run with no way to ask refuses, which is what keeps a repository's commands
+ * from executing unattended simply because nobody was present to object.
+ */
+async function approveDeclaredHook(
+  request: CliRuntimeInvocationRequest,
+  hook: { readonly command: string; readonly event: string; readonly matcher?: string; readonly sourcePath: string },
+): Promise<boolean> {
+  if (!request.escalationPromptHandler) return false;
+
+  const response = await request.escalationPromptHandler({
+    id: `hook-approval-${Date.now()}`,
+    title: "Run a command this project asks for?",
+    message: [
+      `${neutraliseForDisplay(hook.sourcePath)} declares a command to run on the ${neutraliseForDisplay(hook.event)} event.`,
+      hook.matcher ? `Applies to: ${neutraliseForDisplay(hook.matcher)}` : "Applies to all tools.",
+      "",
+      "Command:",
+      `  ${neutraliseForDisplay(hook.command)}`,
+      "",
+      "Approval is remembered for this exact command; changing it asks again.",
+    ].join("\n"),
+    context: {
+      toolName: "hook",
+      operation: hook.event,
+      target: hook.command,
+    },
+    options: [
+      { value: "allow-once", label: "Allow once", description: "Run it for this session." },
+      { value: "allow-always", label: "Allow and remember", description: "Run it until the command changes." },
+      { value: "deny", label: "Deny", description: "Do not run it." },
+    ],
+    defaultOption: "deny",
+    recommendedAction: "Review the command before allowing it.",
+    severity: "high",
+  });
+
+  return response.decision === "allow" || response.decision === "allow-once" || response.decision === "allow-always";
+}
+
+/**
+ * Make a project-controlled string safe to print.
+ *
+ * Collapses the whitespace that could forge extra lines, and spells out control
+ * characters, which could move the cursor or repaint the prompt the user is
+ * reading. Both are things a repository can put in a command, matcher or path.
+ */
+function neutraliseForDisplay(value: string): string {
+  let output = "";
+  for (const character of value) {
+    const code = character.codePointAt(0) ?? 0;
+    output += code < 0x20 || code === 0x7f ? `\\x${code.toString(16).padStart(2, "0")}` : character;
+  }
+  return output.replace(/\s+/g, " ").trim();
+}
+
 function startTurn(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
 ): CliRuntimeInvocationResult {
   const hooks = dependencies.hooks ?? defaultHookDispatcher;
   setupBuiltinVerificationHooks(hooks);
+  // Declared hooks are registered here so the user can be asked about them; the
+  // approval itself is awaited at dispatch, where a pending answer does not hold
+  // up the start of the run.
+  registerDeclaredHooks(hooks, request.workspaceRoot, {
+    requestApproval: (hook) => approveDeclaredHook(request, hook),
+  });
   const skills = discoverSkills(request);
   const registry = dependencies.tools?.() ?? createCoreToolRegistry({ skills });
   // Honour disabledTools / hiddenToolPrefixes from user config. Without this the

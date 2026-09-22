@@ -37,6 +37,84 @@ describe("os sandbox rules", () => {
     expect(readSandboxRules(workspace).enabled).toBe(true);
   });
 
+  it("does not let a project turn off isolation the user enabled", () => {
+    // Only the user decides whether their commands are isolated. A project's file
+    // tightens that decision or leaves it alone; it must not be able to lift it,
+    // or cloning a repository would be enough to run its code unconfined.
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-home-"));
+    const originalHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      fs.mkdirSync(path.join(home, ".private-agents"), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, ".private-agents", "sandbox.json"),
+        JSON.stringify({ enabled: true }),
+        "utf8",
+      );
+      writeRules({ enabled: false });
+
+      expect(readSandboxRules(workspace).enabled).toBe(true);
+    } finally {
+      process.env.HOME = originalHome;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("does not let a project widen the paths the user allowed", () => {
+    // `allowWrite` is the list of places a command may modify. A project able to
+    // append to it could grant itself the whole filesystem.
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-home-"));
+    const originalHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      fs.mkdirSync(path.join(home, ".private-agents"), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, ".private-agents", "sandbox.json"),
+        JSON.stringify({ enabled: true, filesystem: { allowWrite: ["/tmp/ok"] } }),
+        "utf8",
+      );
+      writeRules({ enabled: true, filesystem: { allowWrite: ["/"] } });
+
+      const rules = readSandboxRules(workspace);
+
+      expect(rules.filesystem?.allowWrite).toEqual(["/tmp/ok"]);
+    } finally {
+      process.env.HOME = originalHome;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("does not let a project name writable paths when the user asked for isolation", () => {
+    // The user turning isolation on without listing paths means the built-in
+    // default, not "let the project decide". A project naming `/` here would be
+    // replacing a confined workspace with the whole filesystem.
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-home-"));
+    const originalHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      fs.mkdirSync(path.join(home, ".private-agents"), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, ".private-agents", "sandbox.json"),
+        JSON.stringify({ enabled: true }),
+        "utf8",
+      );
+      writeRules({ enabled: true, filesystem: { allowWrite: ["/"] } });
+
+      expect(readSandboxRules(workspace).filesystem?.allowWrite).toBeUndefined();
+    } finally {
+      process.env.HOME = originalHome;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("still takes a project file's additions when the user set no rule of their own", () => {
+    // With nothing from the user there is nothing to relax, so the project's own
+    // restrictions apply as written.
+    writeRules({ enabled: true, filesystem: { denyRead: ["/etc"] } });
+
+    expect(readSandboxRules(workspace).filesystem?.denyRead).toEqual(["/etc"]);
+  });
+
   it("treats a malformed file as no rules rather than failing", () => {
     fs.mkdirSync(path.join(workspace, ".agents"), { recursive: true });
     fs.writeFileSync(path.join(workspace, ".agents", "sandbox.json"), "{ not json", "utf8");
