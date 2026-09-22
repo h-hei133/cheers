@@ -578,6 +578,8 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 
 ## 7. T5 — 扩展宿主与信任边界
 
+**提交**：`6532463d`（主体）、`ca1e97ac`（补齐裁决 §6.4/§6.5 与审查发现 5）、`6d7585a7`（钩子纳入沙箱）。
+
 ### 7.1 施工内容
 
 | 文件 | 变化 |
@@ -648,12 +650,12 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 
 | 项 | 方式 | 结果 |
 |---|---|---|
-| 指纹与记录 | `trust.test.ts` 11 项 | **通过** |
+| 指纹与记录 | `trust.test.ts` 15 项 | **通过** |
 | 配置读取 | `config.test.ts` 6 项 | **通过** |
-| 注册与门 | `registration.test.ts` 6 项 | **通过** |
+| 注册与门 | `registration.test.ts` 8 项 | **通过** |
 | MCP 门 | `mcp/config.test.ts` 2 项 | **通过** |
 | 资源探测 | `projectTrust.test.ts` 15 项 | **通过** |
-| 沙箱收紧 | `osSandbox.test.ts` 19 项 | **通过** |
+| 沙箱收紧 | `osSandbox.test.ts` 11 项（整个 `src/sandbox/` 目录 19 项） | **通过** |
 | 工作流门 | `workflow.test.ts` 23 项 | **通过** |
 | 子代理门 | `subagent.test.ts` 5 项 | **通过** |
 | 门禁 | 环 / docs-drift / config-consumers / test:scripts / module-facades | **全 pass**（环 0） |
@@ -675,7 +677,7 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 
 **未标记不可信时**（默认路径）：MCP 服务器 `["evil"]`、子代理可见、指令文件 1 个、沙箱规则按项目文件生效——**确认没有过度拦截**。
 
-### 7.5 后续补齐：裁决 §6.4 / §6.5 的四项与审查发现 5 的两项
+### 7.5 后续补齐：裁决 §6.4 / §6.5 的四项与审查发现 5 的三项
 
 首版提交后补齐：
 
@@ -686,8 +688,11 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 | `--dangerously-bypass-hook-trust` 逃生口 | 裁决 §6.5 #6 | CLI 标志 → `RuntimeConfigOverrides` → 调度器；**每次执行都打警告**（`HOOK_TRUST_BYPASS_NOTICE`） | 与「无审批路径」分开测试 |
 | `retry` 决策 | 审查发现 5 | 不再静默丢弃：转为带理由的 block | 移除该分支 → 1 项失败 |
 | PostToolUse feedback 中和 | 审查发现 5 | `neutraliseHookText()` 转义控制字符、折叠空白 | 移除中和 → 1 项失败 |
+| **钩子纳入沙箱** | 审查发现 5 | 与 `bash` 工具走**同一个沙箱计划**；用 `execFile(program, argv)` 而非 `exec(commandLine)`——包装器参数**绝不再被 shell 重新解析**，否则 `$(...)` 会在到达沙箱前就被替换 | — |
 
 **新增测试**：绕过 4 项、退出码 3 项、retry/中和 2 项、EPIPE 1 项。
+
+**关于沙箱这一项**：补齐前的不对称是「用户为工具命令启用 OS 隔离，钩子进程仍是完全特权」——**隔离保护的是用户看得见的路径，放过了仓库提供的路径**。现在两者走同一计划。
 
 ### 7.6 施工中发现并修复的**第四个缺陷**：不读 stdin 的钩子会让进程崩溃
 
@@ -698,7 +703,9 @@ Error: write EPIPE
     at HookDispatcher.dispatch (.../hookDispatcher.js:177)
 ```
 
-原因是 `child.stdin.write(jsonPayload)` 在钩子已退出、管道已关闭时抛错，而该事件无人监听——**一个「什么都不做」的钩子足以让整个会话崩溃**。已改为监听 `stdin` 的 `error` 事件并 `end(payload)` 一次写入，并加测试钉住。
+原因是向 `child.stdin` 写入时钩子已退出、管道已关闭，而该 `error` 事件无人监听——**一个「什么都不做」的钩子足以让整个会话崩溃**。
+
+已改为：监听 `stdin` 的 `error` 事件，并用 `end(payload)` 一次写入而非 `write` + `end` 两次调用。加测试钉住（`exit 0` 的钩子不再让进程崩溃）。
 
 ### 7.7 全量测试的一个已知不稳定项（**与 Phase 3 无关**）
 
@@ -720,13 +727,8 @@ Error: write EPIPE
 
 ### 7.8 未做（如实记录）
 
-**已补齐（审查发现 5 的不对称）**：钩子现在与 `bash` 工具走**同一个沙箱计划**。实现上用 `execFile(program, argv)` 而非 `exec(commandLine)`——**包装器的参数绝不再被 shell 重新解析**，否则 `$(...)` 会在到达沙箱之前就被替换。T5 因此不再有「工具被隔离、钩子不受隔离」的不对称。
 - **审批提示的完整中和**：`/trust` 与钩子审批提示已中和命令文本；但**其余升级提示路径**未逐一审计。
 - **`SessionEnd` 超时的可配置化**：当前是固定表，不可由用户调整。
-
----
-
-## 8. 文档结构调整（本轮顺带）
 
 ---
 
