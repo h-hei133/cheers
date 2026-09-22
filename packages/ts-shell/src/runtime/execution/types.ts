@@ -104,6 +104,14 @@ export interface CommandExecutionRequest {
   readonly reportSafeCommand: string
   readonly timeoutMs?: number
   readonly abortSignal?: AbortSignal
+  /**
+   * The environment the command runs with.
+   *
+   * Carried rather than read from `process.env` at the spawn site because the
+   * values describe the session, not the process: the tool layer knows which
+   * model is answering, and the spawn site does not.
+   */
+  readonly env?: Readonly<Record<string, string>>
   /** Forwarded output, for a command whose progress the caller wants to show. */
   readonly onOutput?: (chunk: string) => void
   readonly policy?: ExecutionPolicyMetadata

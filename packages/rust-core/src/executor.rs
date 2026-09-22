@@ -35,6 +35,13 @@ pub struct CommandExecutionRequest {
     pub cwd: Option<String>,
     pub workspace_root: Option<String>,
     pub timeout_ms: Option<u64>,
+    /// The environment the command runs with.
+    ///
+    /// Absent means inherit the daemon's own, which is what a request that names
+    /// nothing wants. Present replaces it entirely: the caller already resolved
+    /// the session's values and removed the ones it does not want inherited.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub env: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,6 +136,11 @@ pub async fn execute_command(
 
     if let Some(cwd) = &request.cwd {
         command.current_dir(cwd);
+    }
+
+    if let Some(env) = &request.env {
+        command.env_clear();
+        command.envs(env);
     }
 
     command.stdout(std::process::Stdio::piped());
@@ -366,6 +378,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(1_000),
+                env: None,
             }
         } else {
             CommandExecutionRequest {
@@ -374,6 +387,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(1_000),
+                env: None,
             }
         };
 
@@ -395,6 +409,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(50),
+                env: None,
             }
         } else {
             CommandExecutionRequest {
@@ -403,6 +418,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(50),
+                env: None,
             }
         };
 
@@ -423,6 +439,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(2_000),
+                env: None,
             }
         } else {
             CommandExecutionRequest {
@@ -431,6 +448,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(2_000),
+                env: None,
             }
         };
 
@@ -453,6 +471,7 @@ mod tests {
             cwd: Some("D:/repo/workspace".to_string()),
             workspace_root: Some("D:/repo".to_string()),
             timeout_ms: Some(100),
+            env: None,
         });
 
         assert_eq!(evaluation.status, SandboxStatus::Allowed);
@@ -466,6 +485,7 @@ mod tests {
             cwd: Some("D:/repo/workspace".to_string()),
             workspace_root: Some("D:/repo".to_string()),
             timeout_ms: Some(100),
+            env: None,
         });
 
         assert_eq!(evaluation.status, SandboxStatus::EscalationRequired);

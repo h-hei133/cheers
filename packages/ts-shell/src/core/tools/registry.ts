@@ -38,6 +38,7 @@ import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
 import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
+import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
@@ -80,12 +81,19 @@ async function runCommandTool(
   executionService: ExecutionService,
   command: string,
   context: ToolExecutionContext,
+  requestedTimeoutSeconds?: unknown,
 ) {
   if (!command || !command.trim()) {
     return deniedResult('Error: No command provided to execute.', {
       status: 'failed',
       exitCode: 1,
     })
+  }
+  // Refused rather than clamped: a value past the ceiling would otherwise be
+  // silently replaced by something the caller did not ask for.
+  const timeout = resolveCommandTimeout(requestedTimeoutSeconds)
+  if (!timeout.ok) {
+    return deniedResult(`Error: ${timeout.reason}`, { status: 'failed', exitCode: 1 })
   }
   const env = ShellManager.getActiveEnvironment();
   const isWindows = process.platform === 'win32';
@@ -119,8 +127,9 @@ async function runCommandTool(
     caller: 'core-tool:bash',
     reason: 'Run an approved workspace command.',
     reportSafeCommand: command,
-    timeoutMs: 60_000,
+    timeoutMs: timeout.timeoutMs,
     abortSignal: context.abortSignal,
+    ...(context.commandEnv ? { env: context.commandEnv } : {}),
     ...(context.onOutput ? { onOutput: context.onOutput } : {}),
   })
   const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
@@ -564,6 +573,10 @@ export function createCoreToolRegistry(options?: {
             type: 'string',
             description: 'The shell command line to execute.',
           },
+          timeout: {
+            type: 'number',
+            description: `Optional timeout in seconds. Defaults to ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds; the maximum is ${MAX_COMMAND_TIMEOUT_MS / 1000}. Raise it for a build, an install, or a full test run that needs longer.`,
+          },
         },
         required: ['command'],
       },
@@ -574,7 +587,7 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, context) {
         const command = typeof args.command === 'string' ? args.command : ''
-        return runCommandTool(executionService, command, context)
+        return runCommandTool(executionService, command, context, args.timeout)
       },
     },
     createWebFetchToolDefinition(),

@@ -261,6 +261,118 @@ describe('tool registry rust bridge', () => {
     })
   })
 
+  it('passes the default timeout when the model names none', async () => {
+    process.env.DAEMON_ENABLED = '1'
+    const executeViaRustDaemonMock = vi.fn().mockResolvedValue({
+      status: 'completed',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    })
+    vi.resetModules()
+    vi.doMock('../../daemon/client.js', () => ({
+      executeViaRustDaemon: executeViaRustDaemonMock,
+      isRustDaemonEnabled: () => true,
+      checkRustDaemonAvailability: () => ({ available: true }),
+    }))
+
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const bashTool = createCoreToolRegistry().get('bash')
+    if (!bashTool) throw new Error('bash tool missing from registry')
+
+    await bashTool.execute({ command: 'echo ok' }, { taskId: 'task_default_timeout', workspaceRoot })
+
+    const sent = executeViaRustDaemonMock.mock.calls[0]?.[0] as { timeoutMs?: number } | undefined
+    expect(sent?.timeoutMs).toBe(60_000)
+  })
+
+  it('passes a timeout the model asked for, in milliseconds', async () => {
+    // A build or an install needs longer than the default, and before this the
+    // model had no way to say so.
+    process.env.DAEMON_ENABLED = '1'
+    const executeViaRustDaemonMock = vi.fn().mockResolvedValue({
+      status: 'completed',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    })
+    vi.resetModules()
+    vi.doMock('../../daemon/client.js', () => ({
+      executeViaRustDaemon: executeViaRustDaemonMock,
+      isRustDaemonEnabled: () => true,
+      checkRustDaemonAvailability: () => ({ available: true }),
+    }))
+
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const bashTool = createCoreToolRegistry().get('bash')
+    if (!bashTool) throw new Error('bash tool missing from registry')
+
+    await bashTool.execute(
+      { command: 'echo ok', timeout: 300 },
+      { taskId: 'task_custom_timeout', workspaceRoot },
+    )
+
+    const sent = executeViaRustDaemonMock.mock.calls[0]?.[0] as { timeoutMs?: number } | undefined
+    expect(sent?.timeoutMs).toBe(300_000)
+  })
+
+  it('refuses an out-of-range timeout rather than running with a different one', async () => {
+    process.env.DAEMON_ENABLED = '1'
+    const executeViaRustDaemonMock = vi.fn()
+    vi.resetModules()
+    vi.doMock('../../daemon/client.js', () => ({
+      executeViaRustDaemon: executeViaRustDaemonMock,
+      isRustDaemonEnabled: () => true,
+      checkRustDaemonAvailability: () => ({ available: true }),
+    }))
+
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const bashTool = createCoreToolRegistry().get('bash')
+    if (!bashTool) throw new Error('bash tool missing from registry')
+
+    const result = await bashTool.execute(
+      { command: 'echo ok', timeout: 99_999_999 },
+      { taskId: 'task_bad_timeout', workspaceRoot },
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('maximum is')
+    // The command must not run at all: silently substituting the ceiling would
+    // run something other than what was asked for.
+    expect(executeViaRustDaemonMock).not.toHaveBeenCalled()
+  })
+
+  it('hands the command the environment the caller resolved', async () => {
+    process.env.DAEMON_ENABLED = '1'
+    const executeViaRustDaemonMock = vi.fn().mockResolvedValue({
+      status: 'completed',
+      exitCode: 0,
+      stdout: 'ok',
+      stderr: '',
+    })
+    vi.resetModules()
+    vi.doMock('../../daemon/client.js', () => ({
+      executeViaRustDaemon: executeViaRustDaemonMock,
+      isRustDaemonEnabled: () => true,
+      checkRustDaemonAvailability: () => ({ available: true }),
+    }))
+
+    const { createCoreToolRegistry } = await import('./registry.js')
+    const bashTool = createCoreToolRegistry().get('bash')
+    if (!bashTool) throw new Error('bash tool missing from registry')
+
+    const commandEnv = { CHEERS_SESSION_ID: 'sess_env', CHEERS_MODEL: 'm-1', PATH: '/usr/bin' }
+    await bashTool.execute(
+      { command: 'echo "$CHEERS_MODEL"' },
+      { taskId: 'task_env', workspaceRoot, commandEnv },
+    )
+
+    const sent = executeViaRustDaemonMock.mock.calls[0]?.[0] as
+      | { env?: Record<string, string> }
+      | undefined
+    expect(sent?.env).toEqual(commandEnv)
+  })
+
   it('keeps command failure details report-safe without leaking raw output', async () => {
     process.env.DAEMON_ENABLED = '1'
     vi.resetModules()

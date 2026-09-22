@@ -221,6 +221,26 @@ npm start -- --attach D:\your\repo
 - `anthropic` -> `ANTHROPIC_API_KEY`
 - `openai-compatible` -> `OPENAI_COMPATIBLE_API_KEY`
 
+### 9.3 命令能读到的会话变量
+
+`bash` 工具执行的命令会收到当前会话的信息，可直接读取：
+
+| 变量 | 含义 |
+|---|---|
+| `CHEERS_SESSION_ID` | 当前会话 ID |
+| `CHEERS_SESSION_FILE` | 当前会话的 `transcript.jsonl` 绝对路径 |
+| `CHEERS_PROVIDER` | 当前 provider |
+| `CHEERS_MODEL` | 当前模型 |
+| `CHEERS_REASONING_LEVEL` | 当前推理档位（`low` / `medium` / `high`） |
+
+值在**每条命令启动时**解析，所以切换模型或档位对下一条命令立即生效。想知道自己在哪个模型上运行时，直接读变量而不是猜：
+
+```bash
+printf '%s/%s\n' "$CHEERS_PROVIDER" "$CHEERS_MODEL"
+```
+
+命令默认有 **60 秒**超时。需要更久的构建或安装可以显式指定，上限为 2147483.647 秒；超出上限会被拒绝（而不是被悄悄改成别的值）。
+
 ## 10. 常见问题
 
 ### 10.1 为什么有时还会弹 approval？

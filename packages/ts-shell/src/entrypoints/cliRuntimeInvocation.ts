@@ -26,6 +26,9 @@ import { projectTrust } from "../core/security/projectTrust.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
 import { createSyntheticStep } from "../turn/synthetic.js";
+import { commandEnvironment } from "../runtime/execution/commandEnvironment.js";
+import { createSessionStoreLayout, locateExistingSessionLayout } from "../session/store/sessionFileLayout.js";
+import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
 import { toolSchemas } from "../turn/tools.js";
 
 type ProviderMode = "synthetic" | "real";
@@ -322,6 +325,7 @@ function startTurn(
     : registry;
   const promptContext = buildPromptContext(request, skills, [...tools.keys()]);
   const run = runTurn({
+    commandEnv: commandEnvironmentFor(request),
     sessionId: request.sessionId,
     prompt: request.prompt,
     workspaceRoot: request.workspaceRoot,
@@ -339,6 +343,48 @@ function startTurn(
     signal: request.signal,
   });
   return { events: run.events, input: run };
+}
+
+/**
+ * What a command the model runs should know about the session it runs in.
+ *
+ * Resolved here, once per turn, because this is where the workspace, the session
+ * id and the resolved provider are all in hand. Each value is read fresh rather
+ * than cached for the session: switching model or reasoning level mid-session
+ * has to reach the next command, not the one after a restart.
+ *
+ * A value that cannot be resolved is left out rather than sent empty. A command
+ * cannot tell an empty session id from a missing one, and would report the
+ * former as fact.
+ */
+function commandEnvironmentFor(request: CliRuntimeInvocationRequest): Record<string, string> {
+  const facts: Record<string, string> = {};
+  const sessionId = request.sessionId?.trim();
+  if (sessionId) facts.sessionId = sessionId;
+
+  if (sessionId) {
+    try {
+      const layout = createSessionStoreLayout();
+      const file = locateExistingSessionLayout(layout, sessionId);
+      if (file.transcriptPath) facts.sessionFile = file.transcriptPath;
+    } catch {
+      // A session file that cannot be located is not a reason to withhold the
+      // rest of the facts.
+    }
+  }
+
+  const resolution = request.providerCredentialResolution;
+  if (resolution.provider) facts.provider = resolution.provider;
+  if (resolution.model) facts.model = resolution.model;
+
+  try {
+    const effort = getThinkingEffort(request.workspaceRoot);
+    if (effort) facts.reasoningLevel = effort;
+  } catch {
+    // No recorded level means the provider decides; nothing to report.
+  }
+
+  return commandEnvironment(process.env, facts) as Record<string, string>;
 }
 
 function createProviderStep(

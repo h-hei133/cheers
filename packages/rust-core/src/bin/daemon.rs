@@ -433,6 +433,9 @@ async fn run_one_shot_exec(args: &[String]) {
         cwd,
         workspace_root,
         timeout_ms,
+        // The one-shot CLI path inherits the caller's environment, the same way
+        // a shell started by hand would.
+        env: None,
     };
 
     let result = execute_command(request, CancellationToken::new()).await;
@@ -464,6 +467,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(5_000),
+            env: None,
             }
         } else {
             CommandExecutionRequest {
@@ -472,6 +476,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(5_000),
+            env: None,
             }
         }
     }
@@ -484,6 +489,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(1_000),
+            env: None,
             }
         } else {
             CommandExecutionRequest {
@@ -492,6 +498,7 @@ mod tests {
                 cwd: None,
                 workspace_root: None,
                 timeout_ms: Some(1_000),
+            env: None,
             }
         }
     }

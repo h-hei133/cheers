@@ -154,6 +154,7 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
         workspaceRoot: request.workspaceRoot,
         timeoutMs: request.timeoutMs,
         abortSignal: request.abortSignal,
+        ...(request.env ? { env: request.env } : {}),
       })
       return withCommandExecutionProjection(request, 'rust-daemon', {
         ...daemonResult,
@@ -177,6 +178,7 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
     args: [...request.args],
     cwd: request.cwd,
     timeoutMs: request.timeoutMs,
+    ...(request.env ? { env: request.env } : {}),
     ...(request.onOutput ? { onOutput: request.onOutput } : {}),
   })
 

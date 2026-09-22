@@ -178,6 +178,7 @@ export async function executeViaResidentDaemon(options: {
   workspaceRoot: string
   timeoutMs?: number
   abortSignal?: AbortSignal
+  env?: Readonly<Record<string, string>>
 }): Promise<DaemonExecutionResult> {
   const state = await ensureResidentDaemon(options.workspaceRoot)
   const health = await requestDaemonResponse(state, { type: 'health' }, 5_000, 'daemon readiness')
@@ -192,6 +193,10 @@ export async function executeViaResidentDaemon(options: {
       cwd: options.cwd,
       workspaceRoot: options.workspaceRoot,
       timeoutMs: options.timeoutMs ?? 30_000,
+      // Omitted rather than sent empty: the daemon treats an absent map as
+      // "inherit mine", and an empty one would run the command with no
+      // environment at all.
+      ...(options.env ? { env: options.env } : {}),
     },
   }, 5_000, 'execution start request')
 

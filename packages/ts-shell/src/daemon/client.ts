@@ -30,6 +30,7 @@ export async function executeViaRustDaemon(options: {
   workspaceRoot: string
   timeoutMs?: number
   abortSignal?: AbortSignal
+  env?: Readonly<Record<string, string>>
 }): Promise<DaemonExecutionResult> {
   return executeQueuedDaemonTask(async (): Promise<DaemonExecutionResult> => {
     try {
@@ -57,6 +58,7 @@ export async function executeLocally(options: {
   timeoutMs?: number
   onOutput?: (chunk: string) => void
   abortSignal?: AbortSignal
+  env?: Readonly<Record<string, string>>
 }): Promise<NormalizedExecutionResult> {
   // One path for every command. There used to be two — execFile when nobody
   // watched, a spawn when somebody did — and they diverged: the watched one
@@ -146,11 +148,15 @@ function collectStreamed(options: {
   timeoutMs?: number
   onOutput: (chunk: string) => void
   abortSignal?: AbortSignal
+  env?: Readonly<Record<string, string>>
 }): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
       windowsHide: true,
+      // Only when the caller named one: passing `env: undefined` is the same as
+      // inheriting, but stating that explicitly reads as if it were chosen.
+      ...(options.env ? { env: options.env as NodeJS.ProcessEnv } : {}),
       // Its own process group, so the whole tree can be signalled. Killing only
       // the direct child leaves its descendants running, and while they hold the
       // stdout and stderr pipes the close event never arrives — which is how a

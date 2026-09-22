@@ -11,6 +11,13 @@ export interface ToolExecutionContext {
   readonly correlationId?: string
   readonly abortSignal?: AbortSignal
   /**
+   * What a command this tool runs should know about the session it runs in.
+   *
+   * Supplied by the turn rather than read here, because the values name the
+   * model that is answering and only the layer that resolved it knows.
+   */
+  readonly commandEnv?: Readonly<Record<string, string>>
+  /**
    * Called with output as a command produces it.
    *
    * A long command that reports nothing until it exits is indistinguishable from

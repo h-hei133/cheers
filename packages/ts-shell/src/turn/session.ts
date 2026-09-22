@@ -66,6 +66,8 @@ export interface TurnOptions {
   readonly maxSteps: number;
   readonly compaction?: CompactionSetup;
   readonly signal: AbortSignal;
+  /** What a command the model runs should know about this session. */
+  readonly commandEnv?: Readonly<Record<string, string>>;
 }
 
 /** Input the user can hand a running turn. */
@@ -100,6 +102,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     escalationPromptHandler: options.escalationPromptHandler,
     interactiveAsk: options.interactiveAsk,
     emit: (event) => channel.push(event),
+    ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
   };
   const opening: AgentMessage = {
     role: "user",

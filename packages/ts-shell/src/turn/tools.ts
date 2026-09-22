@@ -40,6 +40,14 @@ export interface ToolGateOptions {
   readonly interactiveAsk?: (questions: AskQuestion[]) => Promise<Record<string, string>>;
   /** Approval events, so a card can say it is waiting and how it was answered. */
   readonly emit: (event: QueryEvent) => void;
+  /**
+   * What a command the model runs should know about the session it runs in.
+   *
+   * Resolved once by whoever assembled the turn and handed down, because the
+   * tool layer is where a command is built and the values are about the model
+   * answering, not about this process.
+   */
+  readonly commandEnv?: Readonly<Record<string, string>>;
 }
 
 /** Tools a planning session may call: the ones that only look. */
@@ -106,6 +114,7 @@ async function executeTool(
       abortSignal: signal,
       interactiveAsk: options.interactiveAsk,
       sessionId: options.sessionId,
+      ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
       // A tool that reports progress passes it on; one that does not is
       // unaffected, since the callback only fires if the tool calls it.
       ...(onUpdate ? { onOutput: (chunk: string) => onUpdate(chunk) } : {}),
