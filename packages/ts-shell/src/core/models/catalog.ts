@@ -21,6 +21,22 @@ export interface CatalogModel {
   readonly id: string;
   /** Context window in tokens, when the provider publishes one. */
   readonly contextWindow?: number;
+  /**
+   * What this model charges, when the publisher states it.
+   *
+   * Optional because most entries in the snapshot do not carry prices, and a
+   * guess would be worse than an admission: a cost report that silently
+   * substitutes a made-up rate reads like a measurement.
+   */
+  readonly cost?: ModelCostRates;
+}
+
+/** Prices per million tokens, as the model publishes them. */
+export interface ModelCostRates {
+  readonly promptPerMTok: number;
+  readonly completionPerMTok: number;
+  readonly cacheReadPerMTok?: number;
+  readonly cacheWritePerMTok?: number;
 }
 
 export interface CatalogProvider {

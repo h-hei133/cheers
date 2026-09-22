@@ -18,7 +18,29 @@ export interface ViewportSize {
 
 export interface TerminalFramePlan {
   /** Exactly the rows to paint, top row first. Longer than the screen is clipped. */
-  readonly rows: readonly string[];
+  readonly rows: readonly string[]
+  /**
+   * The bottom block that stays put when the surface is not the whole screen.
+   *
+   * On the alternate screen the surface owns every row, so a frame is just rows.
+   * On the main screen the transcript is appended to the terminal's own
+   * scrollback and only this block is redrawn in place — so the two have to be
+   * separable, and the provider is the only thing that knows where the split is.
+   *
+   * Absent means the frame has no fixed region and every row is content.
+   */
+  readonly chromeRows?: readonly string[]
+  /**
+   * Every row of the surface's content, not only the ones that fit on screen.
+   *
+   * On the alternate screen the viewport *is* the content: rows that do not fit
+   * are scrolled to, not lost. A surface appending to the terminal's scrollback
+   * has no viewport, so it needs the whole document — the window onto it would
+   * silently drop everything that scrolled past.
+   *
+   * Absent means `rows` is already the whole document.
+   */
+  readonly documentRows?: readonly string[]
 }
 
 export interface TerminalFrameProvider {
@@ -29,6 +51,17 @@ export interface TerminalFrameProvider {
 export interface TuiStartOptions {
   /** Paint without taking over stdin, so cooked-mode echo stays usable. */
   readonly deferInput?: boolean;
+  /**
+   * Whether the surface may take the alternate screen.
+   *
+   * `false` keeps the conversation in the terminal's own scrollback: the
+   * transcript is appended once and never rewritten, and only the fixed block at
+   * the bottom is redrawn. That is what leaves something to scroll back through
+   * after the session ends, at the cost of not being able to reflow history.
+   *
+   * Defaults to `true`, which is the full-screen behavior every surface has had.
+   */
+  readonly useAlternateScreen?: boolean;
 }
 
 export interface TuiStopOptions {

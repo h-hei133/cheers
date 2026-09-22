@@ -24,7 +24,25 @@ import * as fs from "node:fs";
 export interface StreamedToolCall {
   readonly id: string;
   readonly type: "function";
-  readonly function: { name: string; arguments: string };
+  readonly function: { readonly name: string; readonly arguments: string };
+}
+
+/**
+ * What a provider reports about the request it just answered.
+ *
+ * Providers disagree on how to report cache traffic. OpenAI-compatible hosts
+ * nest it under `prompt_tokens_details.cached_tokens`; Anthropic-shaped ones
+ * report `cache_read_input_tokens` and `cache_creation_input_tokens` at the top
+ * level. Both are accepted here and flattened by `usageFromProvider`, so the
+ * rest of the runtime reads one shape.
+ */
+export interface ProviderUsage {
+  readonly prompt_tokens?: number;
+  readonly completion_tokens?: number;
+  readonly total_tokens?: number;
+  readonly prompt_tokens_details?: { readonly cached_tokens?: number };
+  readonly cache_read_input_tokens?: number;
+  readonly cache_creation_input_tokens?: number;
 }
 
 export interface StreamedCompletion {
@@ -37,11 +55,7 @@ export interface StreamedCompletion {
   /** Everything the model said while working it out, when it reported any. */
   readonly reasoning: string;
   readonly finishReason?: string;
-  readonly usage?: {
-    readonly prompt_tokens?: number;
-    readonly completion_tokens?: number;
-    readonly total_tokens?: number;
-  };
+  readonly usage?: ProviderUsage;
 }
 
 /** What kind of text a fragment is: the answer, or the working out. */

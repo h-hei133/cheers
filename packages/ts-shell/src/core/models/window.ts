@@ -23,7 +23,7 @@
  * limit silently overruling them.
  */
 
-import type { CatalogProvider } from './catalog.js'
+import type { CatalogProvider, ModelCostRates } from './catalog.js'
 import type { ModelTokenBudget } from '../../config/runtimeConfig.js'
 
 /**
@@ -98,6 +98,31 @@ function catalogWindow(
   if (claims.length === 1) return { window: claims[0]?.window }
   if (claims.length > 1) return { claimedBy: claims.map((claim) => claim.provider).sort() }
   return {}
+}
+
+/**
+ * What the catalog charges for one model, if it says.
+ *
+ * Resolved by the same rule as the window — the provider first, then the model id
+ * alone when exactly one provider claims it — so the price and the window come
+ * from the same entry rather than from two different guesses about which model is
+ * running.
+ */
+export function resolveModelCost(
+  catalog: readonly CatalogProvider[],
+  provider: string,
+  model: string | undefined,
+): ModelCostRates | undefined {
+  if (model === undefined) return undefined
+  const direct = catalog
+    .find((candidate) => candidate.id === provider)
+    ?.models.find((candidate) => candidate.id === model)?.cost
+  if (direct !== undefined) return direct
+
+  const claims = catalog
+    .map((candidate) => candidate.models.find((entry) => entry.id === model)?.cost)
+    .filter((cost): cost is ModelCostRates => cost !== undefined)
+  return claims.length === 1 ? claims[0] : undefined
 }
 
 /**

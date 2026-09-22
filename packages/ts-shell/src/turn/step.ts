@@ -6,7 +6,7 @@ import { recordSessionUsage } from "../observability/usageTelemetry.js";
 import { samplingTemperature } from "../core/commands/fastCommandRuntime.js";
 import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
 import { microcompactMessages } from "../core/query/microCompact.js";
-import { isEventStream, readCompletionStream, type StreamedToolCall } from "./completion.js";
+import { isEventStream, readCompletionStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
 import { toChatMessages } from "./prompt.js";
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
 
@@ -80,7 +80,7 @@ interface CompletionShape {
     readonly message?: { readonly content?: string | null; readonly tool_calls?: readonly StreamedToolCall[] };
     readonly finish_reason?: string | null;
   }[];
-  readonly usage?: { readonly prompt_tokens?: number; readonly completion_tokens?: number; readonly total_tokens?: number };
+  readonly usage?: ProviderUsage;
   readonly reasoning?: string;
   /** Text already delivered as deltas; it must not be delivered a second time. */
   readonly streamed?: string;
@@ -156,11 +156,15 @@ export function createStepFunction(request: StepRequest): StepFunction {
       }
       try {
         const completion = await readCompletion(response, watched);
-        if (completion.usage) {
+        const usage = completion.usage;
+        if (usage) {
+          const cache = cacheTokensFromUsage(usage);
           recordSessionUsage(request.sessionId, {
-            promptTokens: completion.usage.prompt_tokens,
-            completionTokens: completion.usage.completion_tokens,
-            totalTokens: completion.usage.total_tokens,
+            promptTokens: usage.prompt_tokens,
+            completionTokens: usage.completion_tokens,
+            totalTokens: usage.total_tokens,
+            cacheReadTokens: cache.cacheReadTokens,
+            cacheWriteTokens: cache.cacheWriteTokens,
             model: request.provider.model,
             // The provider counted the prompt it was sent; the message count lets
             // a later reader add whatever the conversation gained since.
@@ -272,6 +276,27 @@ function liftInlineCalls(
 
 function abortedStep(shown: string): AssistantStep {
   return { text: shown, toolCalls: [], stopReason: "aborted", errorMessage: "Operation aborted" };
+}
+
+/**
+ * Cache traffic, however the provider chose to report it.
+ *
+ * OpenAI-compatible hosts nest it under `prompt_tokens_details.cached_tokens`;
+ * Anthropic-shaped ones report `cache_read_input_tokens` and
+ * `cache_creation_input_tokens` at the top level. Both mean the same thing, and
+ * the difference is the provider's, not the session's — so it is flattened once
+ * here rather than at every reader.
+ */
+function cacheTokensFromUsage(usage: ProviderUsage): {
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+} {
+  const read = usage.prompt_tokens_details?.cached_tokens ?? usage.cache_read_input_tokens ?? 0;
+  const write = usage.cache_creation_input_tokens ?? 0;
+  return {
+    cacheReadTokens: Number.isFinite(read) ? read : 0,
+    cacheWriteTokens: Number.isFinite(write) ? write : 0,
+  };
 }
 
 function errorStep(message: string): AssistantStep {

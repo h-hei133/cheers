@@ -26,6 +26,47 @@ function boot(): {
   return { tui, terminal, scheduler, provider };
 }
 
+describe("keeping the terminal's own screen", () => {
+  it("does not take the alternate screen when asked not to", () => {
+    // What `tuiMode: "regular"` selects: no screen is taken, so none has to be
+    // given back and the conversation stays in the scrollback.
+    const { tui, terminal, scheduler } = boot();
+    tui.start({ useAlternateScreen: false });
+    scheduler.flush();
+
+    expect(terminal.drain()).not.toContain("\x1b[?1049h");
+  });
+
+  it("still asks for the mouse on the terminal's own screen", () => {
+    const { tui, terminal, scheduler } = boot();
+    tui.start({ useAlternateScreen: false });
+    scheduler.flush();
+
+    expect(terminal.drain()).toContain("\x1b[?1002h");
+  });
+
+  it("keeps content out of the alternate screen's full repaint", () => {
+    // On this screen the frame is appended, never repainted from the top, so the
+    // rows that scrolled past stay where the terminal put them.
+    const { tui, terminal, scheduler, provider } = boot();
+    tui.start({ useAlternateScreen: false });
+    provider.rows = ["content", "chrome"];
+    tui.renderNow();
+    terminal.drain();
+    tui.renderNow();
+
+    expect(terminal.drain()).not.toContain("\x1b[2J");
+  });
+
+  it("takes the alternate screen by default", () => {
+    const { tui, terminal, scheduler } = boot();
+    tui.start();
+    scheduler.flush();
+
+    expect(terminal.drain()).toContain("\x1b[?1049h");
+  });
+});
+
 describe("taking the screen", () => {
   it("enters a screen of its own and asks for the mouse", () => {
     const { tui, terminal, scheduler } = boot();

@@ -140,12 +140,13 @@ export interface RuntimeConfig {
   /**
    * Explicit override of the interactive surface.
    *
-   * Unlike the fields this config used to carry for thinking budgets and prompt
-   * cache lifetime, the capability behind this one exists: the surface is chosen
-   * from terminal capability in `supportsFullScreenSurface`, and this field is
-   * where a caller will be able to force that choice. It stays declared, and
-   * unwired, so the next reader does not have to re-derive which of the three
-   * was the real one.
+   * `regular` keeps the conversation in the terminal's own scrollback and only
+   * redraws the fixed block at the bottom, so a session that ends leaves
+   * something to scroll back through. `fullscreen` is the private screen, which
+   * restores the terminal exactly on exit and takes the transcript with it.
+   * Anything else, including `stream`, is treated as `fullscreen`: `stream` is
+   * reserved and has no defined meaning yet, so it does not get a behavior
+   * invented for it.
    */
   readonly tuiMode?: "regular" | "fullscreen" | "stream";
   readonly tui?: TuiPreferences;

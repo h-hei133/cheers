@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { runReloadCommand } from "./reloadCommandRuntime.js";
 import { getRuntimeConfig, type RuntimeConfig } from "../../config/runtimeConfig.js";
+import { applyTheme, defaultTheme } from "../../presentation/theme/theme.js";
 
 /** A context whose settings are replaced in place, as the session does. */
 function contextWith(initial: RuntimeConfig, next?: RuntimeConfig) {
@@ -78,5 +79,46 @@ describe("/reload", () => {
     const result = await runReloadCommand([], { cwd: "/tmp" } as never);
 
     expect(result.output).toContain("Restart");
+  });
+
+  it("applies the theme it just read, rather than only reporting it", async () => {
+    // Reporting `theme: "dark" → "light"` while the screen stays dark teaches the
+    // reader to distrust the command. The report and the screen have to agree.
+    const first = getRuntimeConfig("/tmp/nonexistent-a");
+    const second = { ...first, theme: "light" as const };
+    const { context } = contextWith(first, second);
+
+    const result = await runReloadCommand([], context);
+
+    expect(result.output).toContain("theme");
+    expect(result.output).toContain("Applied theme `light`");
+    // The shared palette every surface renders with is the observable effect.
+    expect(defaultTheme.name).toBe("light");
+    // Restored because the palette is a module-level singleton: leaving it light
+    // would hand every later test in this worker a different starting state.
+    applyTheme("dark");
+  });
+
+  it("leaves the palette alone when the theme is auto", async () => {
+    // `auto` defers to the terminal rather than naming a theme to apply.
+    const first = getRuntimeConfig("/tmp/nonexistent-a");
+    const second = { ...first, theme: "auto" as const };
+    const { context } = contextWith(first, second);
+
+    const result = await runReloadCommand([], context);
+
+    expect(result.output).not.toContain("Applied theme");
+  });
+
+  it("keeps the reload working when the named theme no longer loads", async () => {
+    // A broken theme must not cost the settings that did reload.
+    const first = getRuntimeConfig("/tmp/nonexistent-a");
+    const second = { ...first, theme: "no-such-theme" as never };
+    const { context } = contextWith(first, second);
+
+    const result = await runReloadCommand([], context);
+
+    expect(result.output).toContain("Re-read configuration");
+    expect(result.output).not.toContain("Applied theme");
   });
 });

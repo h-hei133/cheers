@@ -10,6 +10,7 @@ import {
   type TuiStopOptions,
   type ViewportSize,
 } from "./frame.js";
+import { MainScreenPainter } from "./mainScreen.js";
 import {
   cursorPaint,
   cursorTarget,
@@ -59,6 +60,13 @@ export class TUI {
   private lastFrameCostMs = 0;
   private forceNextFrame = false;
   private mouseTracking = false;
+  /**
+   * Set when the surface runs on the terminal's own screen.
+   *
+   * Constructed at start rather than in the field initializer because it needs
+   * the terminal, and only one of the two painters is ever used.
+   */
+  private mainScreen?: MainScreenPainter;
   private readonly inputListeners = new Set<(data: string) => void>();
   private disconnectHandler?: () => void;
 
@@ -111,7 +119,16 @@ export class TUI {
       this.handleDisconnect,
       { deferInput: options?.deferInput === true },
     );
-    this.terminal.write(ENTER_ALT_SCREEN);
+    // The alternate screen is a private screen with no scrollback: leaving it
+    // restores the user's terminal exactly, and takes the conversation with it.
+    // The terminal's own screen keeps the transcript instead, so a session that
+    // ends leaves something to scroll back through.
+    if (options?.useAlternateScreen === false) {
+      this.mainScreen = new MainScreenPainter(this.terminal);
+      this.mainScreen.start();
+    } else {
+      this.terminal.write(ENTER_ALT_SCREEN);
+    }
     this.setMouseTracking(true);
     this.requestRender({ force: true });
   }
@@ -130,6 +147,14 @@ export class TUI {
     // overprinted by whatever came next at the restored cursor.
     this.terminal.stop();
     const width = Math.max(1, this.terminal.getDimensions().columns);
+    if (this.mainScreen) {
+      // There is no screen to give back — this never took one. The rows the
+      // caller wanted left behind are already in the scrollback, having been
+      // appended as they were produced, so only the cursor has to be placed.
+      this.mainScreen.stop();
+      this.mainScreen = undefined;
+      return;
+    }
     const document = prepareRows(options?.document ?? [], width);
     this.terminal.write(leaveScreen(document, this.terminal.capabilities.supportsDec2026Sync));
   }
@@ -157,7 +182,17 @@ export class TUI {
     }
     const startedAt = this.scheduler.now();
     const dimensions = this.terminal.getDimensions();
-    this.paint(this.provider.renderFrame(dimensions).rows, dimensions);
+    const frame = this.provider.renderFrame(dimensions);
+    if (this.mainScreen) {
+      // The fixed block is redrawn in place; the content was appended to the
+      // scrollback when it was first composed and is left alone. The whole
+      // document is passed rather than the viewport, because there is no
+      // viewport here — rows that do not fit are history, not something to
+      // scroll to.
+      this.mainScreen.paint(frame.documentRows ?? frame.rows, frame.chromeRows ?? []);
+    } else {
+      this.paint(frame.rows, dimensions);
+    }
     this.lastFrameCostMs = this.scheduler.now() - startedAt;
   }
 

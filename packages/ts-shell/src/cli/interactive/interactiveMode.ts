@@ -244,7 +244,12 @@ export class InteractiveMode {
     });
     this.tui.onInput((data) => this.stdin.feed(data));
     this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
-    this.tui.start();
+    // `regular` keeps the conversation in the terminal's own scrollback, so a
+    // session that ends leaves something to scroll back through. `fullscreen` is
+    // the private screen, and `stream` is reserved without a defined meaning.
+    this.tui.start({
+      useAlternateScreen: this.options.runtimeContext.runtimeConfig.tuiMode !== "regular",
+    });
   }
   stop(): void {
     if (this.stopped) return;

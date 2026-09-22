@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createStepFunction, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "./step.js";
+import { getSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -141,5 +142,73 @@ describe("createStepFunction", () => {
     expect(isContextOverflow("PROMPT_TOO_LONG: reduce input")).toBe(true);
     expect(isContextOverflow("context_length_exceeded")).toBe(true);
     expect(isContextOverflow("rate limited, try again later")).toBe(false);
+  });
+
+  it("reads cache traffic from the OpenAI-compatible shape", async () => {
+    resetSessionUsage("sess_cache_openai");
+    const step = createStepFunction({
+      ...request,
+      sessionId: "sess_cache_openai",
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+          usage: {
+            prompt_tokens: 1_000,
+            completion_tokens: 10,
+            prompt_tokens_details: { cached_tokens: 768 },
+          },
+        }),
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    // Nested under `prompt_tokens_details` on this family of providers.
+    expect(getSessionUsage("sess_cache_openai").cacheReadTokens).toBe(768);
+    resetSessionUsage("sess_cache_openai");
+  });
+
+  it("reads cache traffic from the Anthropic-shaped fields", async () => {
+    resetSessionUsage("sess_cache_anthropic");
+    const step = createStepFunction({
+      ...request,
+      sessionId: "sess_cache_anthropic",
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+          usage: {
+            prompt_tokens: 1_000,
+            completion_tokens: 10,
+            cache_read_input_tokens: 512,
+            cache_creation_input_tokens: 256,
+          },
+        }),
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const usage = getSessionUsage("sess_cache_anthropic");
+    expect(usage.cacheReadTokens).toBe(512);
+    expect(usage.cacheWriteTokens).toBe(256);
+    resetSessionUsage("sess_cache_anthropic");
+  });
+
+  it("records no cache traffic when the provider reports none", async () => {
+    resetSessionUsage("sess_cache_none");
+    const step = createStepFunction({
+      ...request,
+      sessionId: "sess_cache_none",
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 1_000, completion_tokens: 10 },
+        }),
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const usage = getSessionUsage("sess_cache_none");
+    expect(usage.cacheReadTokens).toBe(0);
+    expect(usage.cacheWriteTokens).toBe(0);
+    resetSessionUsage("sess_cache_none");
   });
 });

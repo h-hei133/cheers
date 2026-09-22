@@ -42,15 +42,7 @@ const SOURCE_ROOT = 'packages/ts-shell/src'
 // the field exists and the field is where a caller will reach it. A field whose
 // capability does not exist does not belong here - it belongs deleted, which is
 // why `thinkingBudgets` and `promptCacheTtl` are gone rather than listed.
-const DECLARED_WITHOUT_READER = new Map([
-  [
-    'tuiMode',
-    'The surface is already chosen from terminal capability in ' +
-      'supportsFullScreenSurface; this field is where a caller will be able to ' +
-      'force that choice. The capability exists, unlike the thinking-budget and ' +
-      'prompt-cache fields this config used to carry.',
-  ],
-])
+const DECLARED_WITHOUT_READER = new Map([])
 
 function interfaceFields(source, name) {
   const start = source.indexOf(`export interface ${name} `)

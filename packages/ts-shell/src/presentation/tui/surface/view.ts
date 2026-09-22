@@ -57,6 +57,8 @@ export class InteractiveSurface implements InteractiveView {
     const width = Math.max(8, dimensions.columns);
     const height = Math.max(4, dimensions.rows);
     if (this.context.overlayFullScreen()) {
+      // A full-screen overlay owns every row, so there is no fixed block to
+      // redraw separately.
       return { rows: this.context.overlayRows(width, height) };
     }
     const chrome = this.renderChrome(width, height);
@@ -67,7 +69,14 @@ export class InteractiveSurface implements InteractiveView {
       rows: chrome.composerRows,
     };
     const transcriptRows = this.pane.render(width, capacity, this.context.selection());
-    return { rows: [...transcriptRows, ...chrome.rows] };
+    // The split and the full document are reported, not just performed: a
+    // surface appending to the terminal's scrollback has no window onto the
+    // transcript, so it needs every row rather than the ones that fit.
+    return {
+      rows: [...transcriptRows, ...chrome.rows],
+      chromeRows: chrome.rows,
+      documentRows: this.pane.documentRows(width),
+    };
   }
 
   get scrolledBack(): number {

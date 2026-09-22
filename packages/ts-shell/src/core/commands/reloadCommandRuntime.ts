@@ -1,4 +1,5 @@
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
+import { applyTheme, currentTheme } from "../../presentation/theme/theme.js";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
@@ -45,6 +46,10 @@ export async function runReloadCommand(
   }
 
   const changed = describeChanges(outcome.before, outcome.after);
+  // Applying the theme is what makes the line above true. Reporting a change the
+  // screen does not show is worse than not reporting it: it teaches the reader
+  // to distrust the command's output.
+  const themeApplied = applyConfiguredTheme(outcome.after.theme);
   return {
     kind: "local",
     output: [
@@ -54,10 +59,32 @@ export async function runReloadCommand(
         ? `Changed:\n${changed.map((line) => `  ${line}`).join("\n")}`
         : "No settings differ from the ones already in force.",
       "",
+      ...(themeApplied ? [`Applied theme \`${themeApplied}\` to the running surface.`] : []),
       "Project instructions, skills and hooks are re-read every turn, so they need no reload.",
       "Provider, workspace binding and tool pool changes still need a restart.",
     ].join("\n"),
   };
+}
+
+/**
+ * Recolor the running surface to the configured theme, and say which one.
+ *
+ * `auto` and an unset theme are both "leave it alone" rather than a name to
+ * apply: the first defers to the terminal, and the second was already resolved
+ * at startup. A name that no longer loads is reported as not applied rather than
+ * throwing, because a bad theme must not cost the settings that did reload.
+ */
+function applyConfiguredTheme(theme: string | undefined): string | undefined {
+  if (!theme || theme === "auto") return undefined;
+  try {
+    applyTheme(theme);
+    return currentTheme();
+  } catch (error) {
+    logger.warn(
+      `Theme '${theme}' could not be applied: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return undefined;
+  }
 }
 
 /**
