@@ -5,11 +5,15 @@ sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
 updated: 2026-09-20
 tags: [features, gap-analysis, pi, observability, config, lifecycle, diagnostics]
-summary: "对照 pi 的可观测性与配置面。发现最重的一项：我们有两套并行配置系统（runtimeConfig 与 settingsLoader），而 settingsLoader 的整个 AgentSettings schema（model/skills/permissions/tui）零生产消费者——.agents/settings.json 与 ~/.private-agents/settings.json 里的配置从不生效。另有 metrics 无 sink、崩溃日志缺失、无 bug report、无更新检查等差距。覆盖清单 4 项 DEFICIENT、6 项 MISSING、5 项 OURS-ONLY、1 项平手。"
+summary: "[部分已过时，见文首横幅] 对照 pi 的可观测性与配置面。发现最重的一项：我们有两套并行配置系统（runtimeConfig 与 settingsLoader），而 settingsLoader 的整个 AgentSettings schema（model/skills/permissions/tui）零生产消费者——.agents/settings.json 与 ~/.private-agents/settings.json 里的配置从不生效。另有 metrics 无 sink、崩溃日志缺失、无 bug report、无更新检查等差距。覆盖清单 4 项 DEFICIENT、6 项 MISSING、5 项 OURS-ONLY、1 项平手。"
 confidence: high
 ---
 
 # 功能对照 06：可观测性、配置与生命周期
+
+> **⚠️ 本文是 2026-09-20 的调研快照，其中部分结论已过时。**
+> 逐条现状（含代码证据）见 [[gap-status|功能对照 01–07 的差距完成度核验]]。
+> 已在本文件相应位置加 ✅ 标注；**未标注的行仍按原文有效**。
 
 > 本轮为**功能开发前锋探索**，零代码改动。对照本地参考仓 `pi`（`/home/wang/projects/pi`）。
 > 分类口径：`DEFICIENT`＝我们有但更弱／不完整／未接线；`MISSING`＝pi 有我们没有；
@@ -45,7 +49,7 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 单一、生效的配置系统 | `src/core/settings-manager.ts`；`docs/settings.md:1-18`（两层：global + project） | `config/runtimeConfig.ts` **与** `config/settingsLoader.ts` 并行 | **DEFICIENT** | 见 §2.1（**最高优先级**） |
+| 单一、生效的配置系统 ✅ **已解决**（`settingsLoader` 已删除，只剩 `runtimeConfig`） | `src/core/settings-manager.ts`；`docs/settings.md:1-18`（两层：global + project） | `config/runtimeConfig.ts` **与** `config/settingsLoader.ts` 并行 | **DEFICIENT** | 见 §2.1（**最高优先级**） |
 | 配置错误可见 | `src/core/settings-diagnostics.ts:4-11`（收集 + 去重）；`docs/settings.md` | `config/runtimeConfig.ts:178,240`（抛异常） | **DEFICIENT** | 见 §2.2 |
 | 崩溃日志 | `src/core/crash-log.ts`（`CrashRecord`，保留最近 5 条，7 天过期） | 无 | **MISSING** | 见 §3.1 |
 | Bug report（含脱敏与打包） | `src/core/bug-report.ts`（`redactUrl`、敏感键正则、zip、UUID） | 无 | **MISSING** | 见 §3.2 |
@@ -64,7 +68,9 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 
 ## 2. DEFICIENT 详述
 
-### 2.1 两套并行配置系统，其中一套完全无效（置信度：高）
+### 2.1 ~~两套并行配置系统，其中一套完全无效~~ ✅ 已解决（该模块已被删除）
+
+> **现状**：`settingsLoader` 与其 `AgentSettings` schema 在 **Phase 1**（提交 `d60895e3`）已**整个删除**，`packages/ts-shell/src` 下不再存在该模块，两套并行配置系统的问题随之消失。原文保留为历史记录。
 
 **现象**：仓库里有两个互不相关的配置加载器，读不同的文件、用不同的 schema、由不同代码消费。其中一个**从未被调用**。
 

@@ -5,11 +5,15 @@ sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
 updated: 2026-09-20
 tags: [features, gap-analysis, pi, tui, themes, keybindings, markdown]
-summary: "对照 pi 的终端面：编辑器、补全、主题、快捷键、消息队列、转录渲染。发现 light 主题在生产不可达（setTheme 零调用者）、主题令牌 39 vs pi 56 且缺 thinking 档位色、无 @文件引用与 Tab 路径补全、无快捷键自定义。覆盖清单 11 项 DEFICIENT、7 项 MISSING、2 项 OURS-ONLY。"
+summary: "[部分已过时，见文首横幅] 对照 pi 的终端面：编辑器、补全、主题、快捷键、消息队列、转录渲染。发现 light 主题在生产不可达（setTheme 零调用者）、主题令牌 39 vs pi 56 且缺 thinking 档位色、无 @文件引用与 Tab 路径补全、无快捷键自定义。覆盖清单 11 项 DEFICIENT、7 项 MISSING、2 项 OURS-ONLY。"
 confidence: high
 ---
 
 # 功能对照 04：终端交互与呈现
+
+> **⚠️ 本文是 2026-09-20 的调研快照，其中部分结论已过时。**
+> 逐条现状（含代码证据）见 [[gap-status|功能对照 01–07 的差距完成度核验]]。
+> 已在本文件相应位置加 ✅ 标注；**未标注的行仍按原文有效**。
 
 > 本轮为**功能开发前锋探索**，零代码改动。对照本地参考仓 `pi`（`/home/wang/projects/pi`）。
 > 分类口径：`DEFICIENT`＝我们有但更弱／不完整／未接线；`MISSING`＝pi 有我们没有；
@@ -55,7 +59,7 @@ pi-only:   bashMode, customMessageBg, customMessageLabel, customMessageText,
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 主题可达性与切换 | `docs/themes.md:17-40`；`src/modes/interactive/theme/theme-controller.ts` | `presentation/theme/theme.ts:168`；`presentation/themes/index.ts:10` | **DEFICIENT** | 见 §2.1 |
+| 主题可达性与切换 ✅ **已修复**（配置驱动生效；仍缺 `/theme` 命令与热重载） | `docs/themes.md:17-40`；`src/modes/interactive/theme/theme-controller.ts` | `presentation/theme/theme.ts:168`；`presentation/themes/index.ts:10` | **DEFICIENT** | 见 §2.1 |
 | 主题令牌完整度 | `src/modes/interactive/theme/theme-schema.json`（56 色） | `presentation/themes/dark.json`（39 色） | **DEFICIENT** | 见 §2.2 |
 | 主题磁盘发现与 CLI 覆盖 | `docs/themes.md:17-40`（5 类位置 + `--theme`） | 静态 registry（`presentation/themes/index.ts:10`） | **DEFICIENT** | 见 `01-*` §2.4 |
 | 快捷键可自定义 | `docs/keybindings.md:1-40`（`~/.pi/agent/keybindings.json`） | `cli/interactive/keymap.ts`（硬编码表） | **MISSING** | 见 §3.1 |
@@ -78,7 +82,9 @@ pi-only:   bashMode, customMessageBg, customMessageLabel, customMessageText,
 
 ## 2. DEFICIENT 详述
 
-### 2.1 `light` 主题在生产不可达（置信度：高）
+### 2.1 ~~`light` 主题在生产不可达~~ ✅ 已修复
+
+> **现状**：`setTheme` 已重构为 `applyTheme`，并在 `cli/bootstrap/cliProcessRunner.ts:104` 由 `runtimeConfig.theme` 驱动调用——配置指定 `light` 在生产已生效。仍缺：`/theme` 命令不存在，且 `/reload` 比对 `theme` 后**未重新 `applyTheme`**（热重载不生效）。
 
 **现象**：`light.json` 存在、`listThemes()` 会列出它，但没有任何代码路径能切换到它。
 

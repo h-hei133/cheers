@@ -5,11 +5,15 @@ sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
 updated: 2026-09-20
 tags: [features, gap-analysis, pi, provider, models, config, oauth]
-summary: "对照 pi 的 provider/模型层：订阅登录、模型目录、per-model 覆盖、兼容性开关、传输与缓存。发现一处硬缺陷：getRuntimeConfig 返回字面量时漏掉全部可选字段，用户配置里的 contextWindow/reserveTokens/thinkingLevel/temperature 等静默失效；另有模型目录不支持 per-model 覆盖、兼容性标志只描述不生效。覆盖清单 7 项 DEFICIENT、4 项 MISSING、1 项 OURS-ONLY。"
+summary: "[部分已过时，见文首横幅] 对照 pi 的 provider/模型层：订阅登录、模型目录、per-model 覆盖、兼容性开关、传输与缓存。发现一处硬缺陷：getRuntimeConfig 返回字面量时漏掉全部可选字段，用户配置里的 contextWindow/reserveTokens/thinkingLevel/temperature 等静默失效；另有模型目录不支持 per-model 覆盖、兼容性标志只描述不生效。覆盖清单 7 项 DEFICIENT、4 项 MISSING、1 项 OURS-ONLY。"
 confidence: high
 ---
 
 # 功能对照 03：Provider 与模型层
+
+> **⚠️ 本文是 2026-09-20 的调研快照，其中部分结论已过时。**
+> 逐条现状（含代码证据）见 [[gap-status|功能对照 01–07 的差距完成度核验]]。
+> 已在本文件相应位置加 ✅ 标注；**未标注的行仍按原文有效**。
 
 > 本轮为**功能开发前锋探索**，零代码改动。对照本地参考仓 `pi`（`/home/wang/projects/pi`）。
 > 分类口径：`DEFICIENT`＝我们有但更弱／不完整／未接线；`MISSING`＝pi 有我们没有；
@@ -42,7 +46,7 @@ npx tsx /tmp/probe.mts
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 用户配置文件字段真正生效 | `docs/settings.md:20-60`；`src/core/settings-manager.ts` | `config/runtimeConfig.ts:193-215` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
+| 用户配置文件字段真正生效 ✅ **已大幅修复**（见 §2.1 现状；仅 `tuiMode` 仍为裁决保留的未接线字段） | `docs/settings.md:20-60`；`src/core/settings-manager.ts` | `config/runtimeConfig.ts:193-215` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
 | 订阅式 OAuth 登录 | `docs/providers.md:15-63`（7 家：Codex／Claude Pro／Copilot／xAI／Meta／OpenRouter／Radius） | `core/auth/oauth/providers.ts:23,59`（2 家） | **DEFICIENT** | 见 §2.2 |
 | 模型目录（内置快照 + 用户叠加 + 刷新） | `src/core/{model-registry.ts, models-store.ts, remote-catalog-provider.ts}` | `core/models/{catalog.ts, catalogStore.ts, catalogRefresh.ts}` | **DEFICIENT** | 见 §2.3 |
 | per-model 覆盖（`modelOverrides`） | `docs/models.md:354-420` | 无 | **MISSING** | 见 §3.1 |
@@ -57,7 +61,9 @@ npx tsx /tmp/probe.mts
 
 ## 2. DEFICIENT 详述
 
-### 2.1 `getRuntimeConfig` 丢弃全部可选字段 —— 用户配置静默失效（置信度：高，已实机验证）
+### 2.1 ~~`getRuntimeConfig` 丢弃全部可选字段 —— 用户配置静默失效~~ ✅ 已修复
+
+> **现状**：Phase 3 的 T3 + T4 已修。`getRuntimeConfig` 现返回 20+ 字段且逐字段接线（`contextWindow`/`reserveTokens`/`temperature`/`topP`/`maxOutputTokens`/`modelTokenBudgets`/`theme`/`agentMode` 等）；死字段回归由 `scripts/check-config-consumers.mjs` 拦住。`thinkingLevel` 未进配置，改由 `/thinking` 存项目状态。
 
 **现象**：`RuntimeConfig` 接口声明了 20+ 字段，`RuntimeConfigFile` 也接受同样字段，但 `getRuntimeConfig` 的 `return` 是**手写字面量**，只列了 10 个字段。其余字段在类型上可选，因此**编译器不报错**，运行时一律 `undefined`。
 

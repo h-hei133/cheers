@@ -5,11 +5,15 @@ sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
 updated: 2026-09-20
 tags: [features, gap-analysis, pi, tools, sandbox, execution, safety]
-summary: "对照 pi 的工具与执行面。两处硬缺陷：glob/grep 递归遍历不剪枝且不读 .gitignore（一次查询要走 14,023 个文件，其中 6,389 个在 .git 下）；22 个声明的钩子事件里有 11 个从未派发。另有 bash 超时硬编码 60s、无 ls/find 工具、edit 仅单段等差距。全量输出落盘与同文件串行化经复核确认与 pi 平手（主代理原判为缺陷，已更正）。安全面（沙箱/审批/SSRF/路径围栏）我们显著强于 pi。覆盖清单 6 项 DEFICIENT、3 项 MISSING、4 项 OURS-ONLY、4 项平手。"
+summary: "[部分已过时，见文首横幅] 对照 pi 的工具与执行面。两处硬缺陷：glob/grep 递归遍历不剪枝且不读 .gitignore（一次查询要走 14,023 个文件，其中 6,389 个在 .git 下）；22 个声明的钩子事件里有 11 个从未派发。另有 bash 超时硬编码 60s、无 ls/find 工具、edit 仅单段等差距。全量输出落盘与同文件串行化经复核确认与 pi 平手（主代理原判为缺陷，已更正）。安全面（沙箱/审批/SSRF/路径围栏）我们显著强于 pi。覆盖清单 6 项 DEFICIENT、3 项 MISSING、4 项 OURS-ONLY、4 项平手。"
 confidence: high
 ---
 
 # 功能对照 05：工具与执行安全
+
+> **⚠️ 本文是 2026-09-20 的调研快照，其中部分结论已过时。**
+> 逐条现状（含代码证据）见 [[gap-status|功能对照 01–07 的差距完成度核验]]。
+> 已在本文件相应位置加 ✅ 标注；**未标注的行仍按原文有效**。
 
 > 本轮为**功能开发前锋探索**，零代码改动。对照本地参考仓 `pi`（`/home/wang/projects/pi`）。
 > 分类口径：`DEFICIENT`＝我们有但更弱／不完整／未接线；`MISSING`＝pi 有我们没有；
@@ -47,11 +51,11 @@ sed -n '5,27p' packages/ts-shell/src/core/hooks/types.ts                        
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 目录遍历剪枝 + `.gitignore` 遵从 | `src/core/tools/find.ts:65`（用 `fd`）、`src/core/tools/grep.ts` | `runtime/execution/service.ts:112-123`；`core/tools/registry.ts:505-524` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
+| 目录遍历剪枝 + `.gitignore` 遵从 ✅ **已实现**（Phase 3 T1，`runtime/execution/fileWalk.ts`） | `src/core/tools/find.ts:65`（用 `fd`）、`src/core/tools/grep.ts` | `runtime/execution/service.ts:112-123`；`core/tools/registry.ts:505-524` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
 | bash 超时可指定 | `src/core/tools/bash.ts:239`（`timeout` 参数） | `core/tools/registry.ts:124`（硬编码） | **DEFICIENT** | 见 §2.2 |
 | 全量输出落盘并可回读 | `src/core/tools/output-accumulator.ts:19-22`（`fullOutputPath`，OS temp 文件） | `core/tools/registry.ts:141`（`ArtifactManager.save`，`artifact://` URI） | **平手** | 两侧都保留完整输出；差异仅在回读载体（§2.3 已更正原误报） |
-| `ls` 工具 | `src/core/tools/ls.ts`（175 行，`limit` 默认 500） | 无 | **MISSING** | 见 §3.1 |
-| `find` 工具 | `src/core/tools/find.ts`（318 行，`limit` 默认 1000，尊重 `.gitignore`） | 无（`glob` 不等价） | **MISSING** | 见 §3.1 |
+| `ls` 工具 ⚠️ **部分实现**：无独立工具，但目录列举已折进 `read`（Phase 3 T6） | `src/core/tools/ls.ts`（175 行，`limit` 默认 500） | 无 | **MISSING** | 见 §3.1 |
+| `find` 工具 ⚠️ **部分实现**：无独立工具，主体由 `glob` 覆盖（不支持谓词过滤） | `src/core/tools/find.ts`（318 行，`limit` 默认 1000，尊重 `.gitignore`） | 无（`glob` 不等价） | **MISSING** | 见 §3.1 |
 | 多段编辑（`edits[]` 数组、重叠拒绝） | `src/core/tools/edit.ts:22-40` | `core/tools/registry.ts:389-489`（单段） | **DEFICIENT** | 见 §2.4 |
 | 同文件写入串行化 | `src/core/tools/file-mutation-queue.ts`（edit/write 各自包队列） | `tools/dispatch/executor.ts:90-99`（dispatch 层统一包队列） | **平手** | 两侧都有；我们的位置覆盖全部工具（§2.5 已更正原误判） |
 | 会话环境变量注入 bash | `docs/environment-variables.md:20-32`（5 个 `PI_*`） | 无 | **MISSING** | 见 §3.2 |

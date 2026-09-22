@@ -5,12 +5,15 @@ sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
 updated: 2026-09-20
 tags: [features, gap-analysis, pi, extensibility, skills, plugins]
-summary: "对照 pi 的可扩展面：扩展宿主、技能、提示词模板、包分发、主题、上下文文件。结论：我们的扩展宿主已被拆除（core/extensions、core/plugins 均不存在），技能只读不注入上下文，提示词模板与包分发缺失。覆盖清单共 10 项 MISSING、4 项 DEFICIENT、1 项 OURS-ONLY。"
+summary: "[部分已过时，见文首横幅] 对照 pi 的可扩展面：扩展宿主、技能、提示词模板、包分发、主题、上下文文件。结论：我们的扩展宿主已被拆除（core/extensions、core/plugins 均不存在），技能只读不注入上下文，提示词模板与包分发缺失。覆盖清单共 10 项 MISSING、4 项 DEFICIENT、1 项 OURS-ONLY。"
 confidence: high
 ---
 
 # 功能对照 01：可扩展性与定制化
 
+> **⚠️ 本文是 2026-09-20 的调研快照，其中部分结论已过时。**
+> 逐条现状（含代码证据）见 [[gap-status|功能对照 01–07 的差距完成度核验]]。
+> 已在本文件相应位置加 ✅ 标注；**未标注的行仍按原文有效**。
 > 本轮为**功能开发前锋探索**，零代码改动。对照本地参考仓 `pi`（`/home/wang/projects/pi`）。
 > 分类口径：`DEFICIENT`＝我们有但更弱／不完整／未接线；`MISSING`＝pi 有我们没有；
 > `OURS-ONLY`＝我们有 pi 没有（**仅记录，本轮不提议开发**）。
@@ -53,12 +56,12 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 | 扩展 API：注册快捷键／消息渲染器／Markdown 变换器／入口渲染器 | `docs/extensions.md:1632,1636,1657,1677` | **无** | **MISSING** | 同上，无任何注册入口 |
 | 自定义 UI 组件（扩展内） | `docs/tui.md:89-124` `ctx.ui.custom()` | **无** | **MISSING** | `grep -rn "ui\.custom\|ctx\.ui" packages/ts-shell/src` → 0 |
 | 技能发现（磁盘 SKILL.md） | `src/core/skills.ts:168,409` | `core/skills/skillLoader.ts` | **DEFICIENT** | 见 §2.2 |
-| 技能注入上下文（模型可见清单） | `src/core/skills.ts:355-390` `formatSkillsForPrompt()` → `<available_skills>` | **无** | **MISSING** | 见 §3.1 |
+| 技能注入上下文（模型可见清单） | `src/core/skills.ts:355-390` `formatSkillsForPrompt()` → `<available_skills>` | ✅ **已实现**（`skillLoader.renderSkillList()` + `turn/prompt.ts`） | ~~MISSING~~ | 见 §3.1 |
 | 技能作为斜杠命令 `/skill:name` | `docs/skills.md:74-91`（`enableSkillCommands`） | **无** | **MISSING** | 我们只有 `/skill <name>` 子命令形式（`core/commands/skillCommandRuntime.ts:15`），非注册命令 |
 | 提示词模板（磁盘 `.md` 参数化） | `src/core/prompt-templates.ts:194,269`；`docs/prompt-templates.md` | **无** | **MISSING** | 见 §3.2 |
 | 包分发（npm/git 安装、manifest） | `src/core/package-manager.ts:112`、`src/core/pi-manifest.ts:4,17`、`docs/packages.md` | 部分：`core/commands/pluginCommandRuntime.ts:12,18` | **DEFICIENT** | 见 §2.3 |
 | 主题发现（磁盘 JSON、CLI 覆盖） | `docs/themes.md:17-40` | 部分：`presentation/themes/index.ts:10` | **DEFICIENT** | 见 §2.4 |
-| 上下文文件（AGENTS.md）分层加载 | `docs/usage.md:102-108`、`src/core/resource-loader.ts:119` `loadProjectContextFiles` | **无** | **MISSING** | 见 §3.3 |
+| 上下文文件（AGENTS.md）分层加载 | `docs/usage.md:102-108`、`src/core/resource-loader.ts:119` `loadProjectContextFiles` | ✅ **已实现**（`context/instructions/projectInstructions.ts`） | ~~MISSING~~ | 见 §3.3 |
 | 系统提示词覆盖（`SYSTEM.md`／`APPEND_SYSTEM.md`） | `docs/usage.md:112-119` | **无** | **MISSING** | `grep -rn "SYSTEM.md" packages/ts-shell/src` → 仅 `core/security/projectTrust.ts:87` 把它当作「敏感文件」探测，不读取内容 |
 | MCP 客户端 | **pi 无**（`docs/usage.md:310` 明确声明不内置） | `core/mcp/`（client/config/connectionManager/errorTaxonomy/gateway/types） | **OURS-ONLY** | 见 §4 |
 
@@ -73,14 +76,14 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 - `core/hooks/types.ts:5-27` 定义 `HookEventName` 共 22 项（含 `PreToolUse`、`PreCompact`、`Stop` 等）；`:29` `HookDecisionKind = "allow" | "block" | "retry" | "ask" | "defer"`。
 - `core/hooks/hookDispatcher.ts:31` `registerInProcessHook`、`:38` `registerCommandHook`。
 - 全仓调用者：`core/hooks/builtin/index.ts:21-23` 注册 3 个内置钩子；其余全部是 `hooks.test.ts`。
-- `registerCommandHook` **零调用者**：`grep -rn "registerCommandHook" packages/ts-shell/src` → 仅定义处 + 注释。
-- 磁盘加载不存在：`grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'` → 仅 `hookDispatcher.ts:36` 的注释提到 `.agents/hooks.json`，无任何读取代码。
+- ~~`registerCommandHook` **零调用者**~~：✅ **已接线**（`core/hooks/registration.ts` 读 `.agents/hooks.json` 并注册）。
+- ~~磁盘加载不存在~~：✅ **已实现**（`core/hooks/config.ts` 的 `loadHookDeclarations`）。
 
 **证据（pi）**：`docs/extensions.md:109-127` 扩展从磁盘自动发现；`:1391` `pi.on(event,handler)` 返回可取消订阅；`:800` 的 `tool_call` 事件明确「Can block」，是真正的拦截点。
 
 **影响**：用户无法在不改我们源码的前提下影响任何工具调用。`HookDecisionKind` 里的 `"block"`/`"retry"`/`"ask"` 语义对第三方不可达。
 
-**最小改动建议**：让 `registerCommandHook` 有真实调用者——在启动时读 `.agents/hooks.json`（或 settings 的 `hooks` 数组）并注册。这是把已有能力接线，不是新建机制。
+**最小改动建议（已完成）**：✅ 已读 `.agents/hooks.json` 并注册，另加信任门（`core/hooks/trust.ts`）。
 
 ### 2.2 技能：发现面窄、无校验、无优先级规则（置信度：高）
 
@@ -93,7 +96,7 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 | manifest 名 | `SKILL.md`（`:28`） | `SKILL.md`（同） |
 | frontmatter 解析 | 本地正则 `FRONTMATTER`（`:29`），`parseFields` 手写 | `parseFrontmatter`（`skills.ts:4`） |
 | 校验 | 无 | 名称长度/字符集/连字符规则（`skills.ts:92-115`）+ 描述必填（`:117-127`） |
-| `disable-model-invocation` | 无 | 有（`skills.ts:70,80,341`） |
+| `disable-model-invocation` | ✅ 有（`skillLoader.ts:198`） | 有（`skills.ts:70,80,341`） |
 | 关闭机制 | frontmatter `enabled: false`（`:89`） | `--no-skills`、settings 数组（`docs/skills.md:35`） |
 | 忽略规则 | 无 | `.gitignore`/`.ignore`/`.fdignore`（`skills.ts:14`） |
 | 注入模型 | **无** | `formatSkillsForPrompt()`（`skills.ts:355`） |
@@ -128,7 +131,7 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 
 ## 3. MISSING 详述
 
-### 3.1 技能不进入模型上下文（置信度：高）
+### 3.1 ~~技能不进入模型上下文~~ ✅ 已修复（原文保留为历史记录）
 
 **pi 如何实现**：`src/core/skills.ts:355` `formatSkillsForPrompt(skills)` 产出 `<available_skills>` XML 块（`name`/`description`/`location`），追加进系统提示；`disableModelInvocation` 的技能被过滤。模型据此知道有哪些技能，再用 `read` 去取内容。
 
@@ -164,7 +167,7 @@ grep -rn "prompt-template\|promptTemplate\|\.agents/prompts" packages/ts-shell/s
 
 **最小落地路径**：新增 `core/skills/promptTemplateLoader.ts`，扫描 `~/.private-agents/prompts/*.md` 与 `<ws>/.agents/prompts/*.md`，在 `core/commands/registry.ts` 构建时动态注册为命令（`CommandDefinition` 已支持 `summary`/`argumentHint` 形状，见 `entrypoints/slashCommandRegistry.ts:17-27`）。
 
-### 3.3 上下文文件（AGENTS.md）不被加载（置信度：高）
+### 3.3 ~~上下文文件（AGENTS.md）不被加载~~ ✅ 已修复（原文保留为历史记录）
 
 **pi 如何实现**：`docs/usage.md:102-108` 从 `~/.pi/agent/AGENTS.md`、祖先目录、cwd 分层加载 `AGENTS.md`/`CLAUDE.md`，`AGENTS.override.md` 覆盖同级（`:108`）；`src/core/resource-loader.ts:119` `loadProjectContextFiles()`。
 

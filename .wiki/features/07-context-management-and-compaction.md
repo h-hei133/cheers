@@ -11,6 +11,10 @@ confidence: high
 
 # 功能对照 07：上下文管理与压缩
 
+> **⚠️ 本文是 2026-09-20 的调研快照，其中部分结论已过时。**
+> 逐条现状（含代码证据）见 [[gap-status|功能对照 01–07 的差距完成度核验]]。
+> 已在本文件相应位置加 ✅ 标注；**未标注的行仍按原文有效**。
+
 > **本轮为功能开发前锋探索，零代码改动**。对照本地参考仓 `pi`（`/home/wang/projects/pi`）。
 > 分类口径：`DEFICIENT`＝我们有但更弱／不完整／未接线；`MISSING`＝pi 有我们没有；
 > `OURS-ONLY`＝我们有 pi 没有（**仅记录，本轮不提议开发**）。
@@ -50,13 +54,13 @@ grep -rnE 'microcompact|microCompact|pruneToolContent' /home/wang/projects/pi/pa
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 触发阈值依据 provider usage | `compaction.ts:161-195,217-252` | `session/context.ts:3-21`；`cli/runtime/cliSessionRuntimeFactory.ts:81-85` | **DEFICIENT** | 见 §2.1 |
+| 触发阈值依据 provider usage ✅ **已实现**（`compaction.ts` 的 `measureContextTokens` 接 `getSessionUsage`） | `compaction.ts:161-195,217-252` | `session/context.ts:3-21`；`cli/runtime/cliSessionRuntimeFactory.ts:81-85` | **DEFICIENT** | 见 §2.1 |
 | 切点允许非 user 边界 + split turn | `compaction.ts:323-377,393-472,899-938` | `session/compaction.ts:37-78` | **DEFICIENT** | 见 §2.2 |
 | 重复压缩沿用上一条 kept boundary | `compaction.ts:762-790` | `session/compaction.ts:14-18,80-108` | **DEFICIENT** | 见 §2.3 |
 | 跨压缩累积文件追踪 | `compaction.ts:46-82,961-975`；`utils.ts:12-82` | `core/query/compaction/fileFootprint.ts:19-60` | **DEFICIENT** | 见 §2.4 |
-| 压缩前可取消/自定义的扩展钩子 | `extensions/types.ts:594-630`；`agent-session.ts:2124-2138` | `core/hooks/types.ts:5-20`（仅声明） | **MISSING** | 见 §3.2 |
+| 压缩前可取消/自定义的扩展钩子 ✅ **已实现**（`turn/session.ts:136` 的 `PreCompact` 可 block，`PostCompact` 亦派发） | `extensions/types.ts:594-630`；`agent-session.ts:2124-2138` | `core/hooks/types.ts:5-20`（仅声明） | **MISSING** | 见 §3.2 |
 | rewind／分支切换时摘要被放弃的分支 | `branch-summarization.ts:108-380`；`docs/compaction.md:150-179` | `picker/rewind.ts:14-17,50-55`；`SessionManager.ts:141-150` | **MISSING** | 见 §3.1 |
-| per-model reserveTokens／keepRecentTokens 覆盖 | `settings-manager.ts:13-32,887-912` | 无 | **MISSING** | 见 `03-*` §3.1（同源：模型目录无 per-model 覆盖） |
+| per-model reserveTokens／keepRecentTokens 覆盖 ✅ **已实现**（Phase 3 T4，`modelTokenBudgets`） | `settings-manager.ts:13-32,887-912` | 无 | **MISSING** | 见 `03-*` §3.1（同源：模型目录无 per-model 覆盖） |
 | 结构化摘要格式 | `docs/compaction.md`（Goal/Constraints/Progress…） | `core/query/compaction/summarizer.ts:1-30`（`EIGHT_SECTION_COMPACTION_PROMPT`） | **平手** | 两侧都是结构化八段式，字段名不同 |
 | 手动 `/compact [instructions]` | `docs/compaction.md`（含 custom instructions） | `cli/interactive/compact.ts`（`parseCompactCommand` 取 instructions） | **平手** | 两侧都支持带指令的手动压缩 |
 | 每次请求前的 tool-output 微压缩 | **pi 无** | `core/query/microCompact.ts:24-60`；`turn/step.ts:103-108` | **OURS-ONLY** | 见 §4 |
