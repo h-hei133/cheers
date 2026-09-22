@@ -24,6 +24,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { splitByteOrderMark } from "../../runtime/execution/fileText.js";
+import { escapeAttribute, neutraliseTagBoundaries } from "../../core/text/safety.js";
 
 /**
  * Candidate file names, most specific first.
@@ -168,6 +169,12 @@ function loadOneFrom(directory: string): InstructionFile | undefined {
  * The cut is measured in bytes, not characters, because the budget is a byte
  * budget and a multi-byte character straddling the boundary would otherwise
  * push past it.
+ *
+ * The budget counts the files' own content. The `<project_instructions>` tags
+ * and their paths add a fixed amount per file when the result is rendered, so the
+ * prompt receives slightly more than the budget rather than exactly it. Counting
+ * the framing here would mean this function had to know how the caller wraps what
+ * it returns, and the overhead does not grow with the budget.
  */
 function spendBudget(
   files: readonly InstructionFile[],
@@ -216,7 +223,22 @@ export function renderInstructionFiles(files: readonly InstructionFile[]): strin
   return files
     .map(
       (file) =>
-        `<project_instructions path="${file.filePath}">\n${file.content}\n</project_instructions>`,
+        `<project_instructions path="${escapeAttribute(file.filePath)}">\n${neutraliseTagBoundaries(file.content)}\n</project_instructions>`,
     )
     .join("\n\n");
 }
+
+/**
+ * Stop wrapped text from closing the tag that wraps it.
+ *
+ * The content comes from a file a repository controls and it is injected between
+ * tags this harness writes. Left alone, a `</project_instructions>` inside it ends
+ * the block early, letting the rest appear outside the boundary — which is what
+ * makes text look like it comes from somewhere other than the file it came from,
+ * including from the harness itself.
+ *
+ * The angle brackets are escaped rather than the tag stripped: the reader should
+ * still see that the file contained something shaped like a tag, which is itself
+ * worth knowing, and silently deleting it would hide the attempt.
+ */
+

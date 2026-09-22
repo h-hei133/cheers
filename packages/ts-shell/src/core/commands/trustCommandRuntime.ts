@@ -1,5 +1,6 @@
 import path from "node:path";
 import { projectTrust, type ProjectTrustLevel } from "../security/projectTrust.js";
+import { neutraliseForDisplay } from "../text/safety.js";
 import { loadHookDeclarations } from "../hooks/config.js";
 import { hookFingerprint } from "../hooks/trust.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
@@ -85,31 +86,14 @@ function describeTrust(root: string): string {
   if (projectHooks.length > 0) {
     lines.push("", "Commands this project asks to run:");
     for (const hook of projectHooks) {
-      lines.push(`  ${hook.event}${hook.matcher ? ` (${hook.matcher})` : ""}: ${neutralise(hook.command)}`);
+      lines.push(`  ${hook.event}${hook.matcher ? ` (${hook.matcher})` : ""}: ${neutraliseForDisplay(hook.command)}`);
       lines.push(`    fingerprint ${hookFingerprint(hook).slice(0, 12)}`);
     }
   }
   for (const problem of problems) {
-    lines.push(`  warning: ${neutralise(problem)}`);
+    lines.push(`  warning: ${neutraliseForDisplay(problem)}`);
   }
   lines.push(`  mcp config: ${mcpConfig}`);
 
   return lines.join("\n");
-}
-
-/**
- * Make a project-controlled string safe to print.
- *
- * Collapses the whitespace a repository could use to forge extra lines, and
- * replaces control characters, which could move the cursor or repaint what the
- * user is reading.
- */
-function neutralise(value: string): string {
-  let output = "";
-  for (const character of value) {
-    const code = character.codePointAt(0) ?? 0;
-    const isControl = code < 0x20 || code === 0x7f;
-    output += isControl ? `\\x${code.toString(16).padStart(2, "0")}` : character;
-  }
-  return output.replace(/\s+/g, " ").trim();
 }

@@ -16,6 +16,7 @@
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
 import type { ToolDefinition } from '../../tools/types.js'
 import type { Skill } from '../skills/skillLoader.js'
+import { escapeAttribute, neutraliseTagBoundaries } from '../text/safety.js'
 
 /** The skills a tool call may load, keyed by name. */
 export type SkillCatalog = ReadonlyMap<string, Skill>
@@ -58,8 +59,21 @@ export function createSkillToolDefinition(skills: SkillCatalog): ToolDefinition 
       // the rules come from without inviting a read of a path the workspace jail
       // would refuse.
       return approvedResult(
-        `<skill_content name="${skill.name}" source="${skill.filePath}">\n${skill.body}\n</skill_content>`,
+        `<skill_content name="${escapeAttribute(skill.name)}" source="${escapeAttribute(skill.filePath)}">\n${neutraliseTagBoundaries(skill.body)}\n</skill_content>`,
       )
     },
   }
 }
+
+/**
+ * Stop wrapped text from closing the tag that wraps it.
+ *
+ * A skill body is written by whoever wrote the skill and injected between tags
+ * this tool writes. Left alone, a `</skill_content>` inside it ends the block
+ * early and puts the rest outside the boundary, where it reads as coming from the
+ * harness rather than from the skill.
+ *
+ * The brackets are escaped rather than the tag removed, so a reader can still see
+ * that the body contained something shaped like a tag.
+ */
+

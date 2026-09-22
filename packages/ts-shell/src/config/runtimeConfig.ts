@@ -104,7 +104,12 @@ export interface RuntimeConfig {
    */
   readonly modelTokenBudgets?: Readonly<Record<string, ModelTokenBudget>>;
   /**
-   * How many bytes of project instruction files may enter the system prompt.
+   * How many bytes of project instruction file content may be read.
+   *
+   * The budget covers the files' own bytes. The tags that frame them in the
+   * prompt add a fixed amount per file on top — a couple of hundred bytes
+   * overall, not proportional to the budget — so the prompt as a whole is
+   * slightly larger than this number rather than equal to it.
    *
    * Zero disables loading them entirely, which is the opt-out: a run that wants
    * to see how the model behaves without a repository's rules should not have to
@@ -114,10 +119,11 @@ export interface RuntimeConfig {
   /**
    * Whether declared hook commands may run without approval for this run.
    *
-   * Only a command-line flag sets this. It exists because a repository someone is
-   * already auditing by hand should not need its hooks approving one at a time,
-   * and it announces itself when it takes effect so it cannot be mistaken for the
-   * gate working.
+   * Set only by a command-line flag, never by a configuration file — see the
+   * resolution below for why. It exists because a repository someone is already
+   * auditing by hand should not need its hooks approving one at a time, and it
+   * announces itself when it takes effect so it cannot be mistaken for the gate
+   * working.
    */
   readonly allowUntrustedHooks?: boolean;
   readonly agentMode?: "plan" | "build";
@@ -168,7 +174,6 @@ export interface RuntimeConfigFile {
   reserveTokens?: number;
   modelTokenBudgets?: Record<string, ModelTokenBudget>;
   instructionBudgetBytes?: number;
-  allowUntrustedHooks?: boolean;
   agentMode?: "plan" | "build";
   theme?: "dark" | "light" | "auto";
   tuiMode?: "regular" | "fullscreen" | "stream";
@@ -294,10 +299,12 @@ export function getRuntimeConfig(
       overrides?.instructionBudgetBytes ??
       merged.instructionBudgetBytes ??
       DEFAULT_CONFIG.instructionBudgetBytes,
-    allowUntrustedHooks:
-      overrides?.allowUntrustedHooks ??
-      merged.allowUntrustedHooks ??
-      DEFAULT_CONFIG.allowUntrustedHooks,
+    // Deliberately read from the overrides only. Every other field falls back to
+    // the config files, but this one is an exemption from having hooks approved,
+    // and a repository that could write it would be approving its own commands
+    // from the same file that declares them. It is granted per run by a person
+    // typing a flag, or not at all.
+    allowUntrustedHooks: overrides?.allowUntrustedHooks ?? DEFAULT_CONFIG.allowUntrustedHooks,
     agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
     theme: merged.theme ?? DEFAULT_CONFIG.theme,
     tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,

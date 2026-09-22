@@ -139,3 +139,68 @@ describe("sensitive resource detection", () => {
     expect(new ProjectTrustStore(path.join(root, "trust.json")).hasSensitiveProjectResources(root)).toBe(false);
   });
 });
+
+describe("sensitive resources behind a symlink", () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "trust-symlink-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("reports tool definitions reached through a symlinked directory", () => {
+    // A symlink to a directory is not `isDirectory()` on the Dirent, so checking
+    // only that would let a project keep its definitions behind one and go
+    // unreported at the moment the user decides whether to trust it.
+    fs.mkdirSync(path.join(root, "real", "hooks"), { recursive: true });
+    fs.mkdirSync(path.join(root, "workspace"), { recursive: true });
+    fs.symlinkSync(path.join(root, "real"), path.join(root, "workspace", ".tooling"));
+
+    const store = new ProjectTrustStore(path.join(root, "trust.json"));
+
+    expect(store.hasSensitiveProjectResources(path.join(root, "workspace"))).toBe(true);
+  });
+});
+
+describe("symlinked paths", () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "trust-symlinkpath-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("does not let a symlink hide that a project was marked untrusted", () => {
+    // The decision is about the project, not about the string used to reach it.
+    // Matching paths literally means opening an untrusted repository through a
+    // symlink — a perfectly ordinary thing to do — silently restores every
+    // resource the user refused.
+    const real = path.join(root, "realrepo");
+    fs.mkdirSync(real, { recursive: true });
+    const link = path.join(root, "link");
+    fs.symlinkSync(real, link);
+
+    const store = new ProjectTrustStore(path.join(root, "trust.json"));
+    store.setProjectTrust(real, "untrusted");
+
+    expect(store.isProjectUntrusted(link)).toBe(true);
+  });
+
+  it("keeps a trusted decision across a symlink too", () => {
+    const real = path.join(root, "realrepo");
+    fs.mkdirSync(real, { recursive: true });
+    const link = path.join(root, "link");
+    fs.symlinkSync(real, link);
+
+    const store = new ProjectTrustStore(path.join(root, "trust.json"));
+    store.setProjectTrust(link, "trusted");
+
+    expect(store.isProjectTrusted(real)).toBe(true);
+  });
+});

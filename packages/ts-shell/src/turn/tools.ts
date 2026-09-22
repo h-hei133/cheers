@@ -8,22 +8,7 @@ import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { AskQuestion } from "../core/tools/ask.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { ToolDefinition } from "../tools/types.js";
-
-/**
- * Make hook-supplied text safe to put in front of the model.
- *
- * Collapses whitespace that could forge extra lines, and spells out control
- * characters. The source may be a project's configuration file, so this text is
- * not necessarily something the user wrote.
- */
-function neutraliseHookText(value: string): string {
-  let output = "";
-  for (const character of value) {
-    const code = character.codePointAt(0) ?? 0;
-    output += code < 0x20 || code === 0x7f ? `\\x${code.toString(16).padStart(2, "0")}` : character;
-  }
-  return output.replace(/[ \t]{2,}/g, " ");
-}
+import { neutraliseForDisplay } from "../core/text/safety.js";
 
 /** A tool definition in the shape a chat completion request takes. */
 export interface ToolSchema {
@@ -205,7 +190,7 @@ export function createToolHooks(options: ToolGateOptions): ToolHooks {
         // Hook feedback reaches the model, and a hook's text can come from a
         // project-supplied configuration. Neutralised so a newline or a control
         // character cannot forge extra lines or repaint the transcript.
-        output = `${output}\n\n[Verification feedback]\n${neutraliseHookText(decision.feedback)}`;
+        output = `${output}\n\n[Verification feedback]\n${neutraliseForDisplay(decision.feedback)}`;
       }
       return output === result.output ? undefined : { output };
     },

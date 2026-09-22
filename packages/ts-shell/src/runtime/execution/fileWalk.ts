@@ -42,6 +42,29 @@ import ignore, { type Ignore } from 'ignore'
 const PRUNED_DIRECTORIES = ['node_modules', '.git', 'dist', '.normproof'] as const
 
 /**
+ * How long git may take before the walk gives up on it.
+ *
+ * These calls are synchronous, so a git that never returns takes the session with
+ * it — no prompt, no output, nothing to cancel. On a network mount or a very large
+ * repository that is not hypothetical. The budget is generous because a legitimate
+ * listing of a big repository is not fast, and stopping the wait only costs the
+ * faster path: the in-process walk answers the same question.
+ */
+const GIT_TIMEOUT_MS = 10_000
+
+/**
+ * How much git output to accept before giving up on it.
+ *
+ * Above Node's 1 MiB default on purpose. A repository with twenty thousand files
+ * lists at about 1.5 MiB, and exceeding the default does not truncate — it raises
+ * ENOBUFS, which is indistinguishable here from git being absent, so the walk
+ * silently falls back to reading the whole tree in-process. That fallback answers
+ * correctly but is far slower, and it would run on ordinary large repositories
+ * rather than rare ones.
+ */
+const GIT_MAX_BUFFER_BYTES = 64 * 1024 * 1024
+
+/**
  * Files read for ignore rules at each directory, when git is not available.
  *
  * `.ignore` is a widely shared convention, honoured alongside `.gitignore` by
@@ -75,7 +98,7 @@ function listViaGit(root: string): readonly string[] | null {
   const result = spawnSync(
     'git',
     ['-C', root, 'ls-files', '--cached', '--others', '--exclude-standard'],
-    { encoding: 'utf8', shell: false },
+    { encoding: 'utf8', shell: false, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER_BYTES },
   )
   if (result.error || result.status !== 0) {
     return null
@@ -257,6 +280,8 @@ function listIgnoredViaGit(
     input: `${names.join('\n')}\n`,
     encoding: 'utf8',
     shell: false,
+    timeout: GIT_TIMEOUT_MS,
+    maxBuffer: GIT_MAX_BUFFER_BYTES,
   })
   if (result.error || result.status === 128) return null
   if (result.status !== 0 && result.status !== 1) return null

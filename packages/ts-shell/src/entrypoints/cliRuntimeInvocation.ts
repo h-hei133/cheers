@@ -21,6 +21,7 @@ import {
   renderInstructionFiles,
 } from "../context/instructions/projectInstructions.js";
 import { createComponentLogger } from "../observability/structuredLogger.js";
+import { neutraliseForDisplay } from "../core/text/safety.js";
 import { projectTrust } from "../core/security/projectTrust.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
@@ -295,22 +296,6 @@ async function approveDeclaredHook(
   });
 
   return response.decision === "allow" || response.decision === "allow-once" || response.decision === "allow-always";
-}
-
-/**
- * Make a project-controlled string safe to print.
- *
- * Collapses the whitespace that could forge extra lines, and spells out control
- * characters, which could move the cursor or repaint the prompt the user is
- * reading. Both are things a repository can put in a command, matcher or path.
- */
-function neutraliseForDisplay(value: string): string {
-  let output = "";
-  for (const character of value) {
-    const code = character.codePointAt(0) ?? 0;
-    output += code < 0x20 || code === 0x7f ? `\\x${code.toString(16).padStart(2, "0")}` : character;
-  }
-  return output.replace(/\s+/g, " ").trim();
 }
 
 function startTurn(

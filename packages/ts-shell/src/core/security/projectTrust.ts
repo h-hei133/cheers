@@ -40,7 +40,7 @@ export class ProjectTrustStore {
   }
 
   isProjectTrusted(workspaceRoot: string): boolean {
-    const normalized = path.resolve(workspaceRoot);
+    const normalized = identifyProject(workspaceRoot);
     if (this.sessionTrusts.has(normalized)) {
       return true;
     }
@@ -52,16 +52,10 @@ export class ProjectTrustStore {
     }
 
     // Parent path inheritance check
-    for (const [savedPath, record] of Object.entries(data.projects)) {
-      if (record.trustLevel === "trusted") {
-        const rel = path.relative(savedPath, normalized);
-        if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
+    return Object.entries(data.projects).some(
+      ([savedPath, record]) =>
+        record.trustLevel === "trusted" && covers(savedPath, normalized),
+    );
   }
 
   /**
@@ -74,24 +68,21 @@ export class ProjectTrustStore {
    * that is the rule the gate is meant to express.
    */
   isProjectUntrusted(workspaceRoot: string): boolean {
-    const normalized = path.resolve(workspaceRoot);
-    if (this.readStore().projects[normalized]?.trustLevel === "untrusted") {
+    const normalized = identifyProject(workspaceRoot);
+    const data = this.readStore();
+    if (data.projects[normalized]?.trustLevel === "untrusted") {
       return true;
     }
     // A parent marked untrusted covers everything beneath it, mirroring how a
     // parent marked trusted does.
-    for (const [savedPath, record] of Object.entries(this.readStore().projects)) {
-      if (record.trustLevel !== "untrusted") continue;
-      const rel = path.relative(savedPath, normalized);
-      if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
-        return true;
-      }
-    }
-    return false;
+    return Object.entries(data.projects).some(
+      ([savedPath, record]) =>
+        record.trustLevel === "untrusted" && covers(savedPath, normalized),
+    );
   }
 
   setProjectTrust(workspaceRoot: string, level: ProjectTrustLevel): void {
-    const normalized = path.resolve(workspaceRoot);
+    const normalized = identifyProject(workspaceRoot);
     if (level === "session-only") {
       this.sessionTrusts.add(normalized);
       return;
@@ -143,7 +134,12 @@ export class ProjectTrustStore {
       return false;
     }
     for (const entry of entries) {
-      if (!entry.isDirectory() || !entry.name.startsWith(".")) continue;
+      if (!entry.name.startsWith(".")) continue;
+      // A symlink to a directory is not `isDirectory()`, so a project could hide
+      // its tool definitions behind one and go unreported. `existsSync` on the
+      // joined path resolves the link for the check below either way, so the
+      // directory test here only needs to exclude things that are plainly files.
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
       for (const subdirectory of subdirectories) {
         if (fs.existsSync(path.join(root, entry.name, subdirectory))) return true;
       }
@@ -191,6 +187,31 @@ export class ProjectTrustStore {
       }
     }
   }
+}
+
+/**
+ * The identity of a project, for matching against stored decisions.
+ *
+ * Resolved through symlinks before use. A decision is about the project, not
+ * about the string that reached it, and the two differ whenever a repository is
+ * opened through a link: comparing literal paths lets an untrusted repository be
+ * reached by a second name and quietly regain everything the user refused. Falls
+ * back to the lexical path when the target does not exist yet, so a decision can
+ * still be recorded for a directory before it is created.
+ */
+function identifyProject(workspaceRoot: string): string {
+  const resolved = path.resolve(workspaceRoot);
+  try {
+    return fs.realpathSync(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
+/** Whether a decision recorded at `savedPath` applies to `candidate`. */
+function covers(savedPath: string, candidate: string): boolean {
+  const relative = path.relative(savedPath, candidate);
+  return !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
 export const projectTrust = ProjectTrustStore.getShared();

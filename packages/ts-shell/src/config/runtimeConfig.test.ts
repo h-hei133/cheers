@@ -88,6 +88,22 @@ describe("runtime config", () => {
     expect(config.allowUntrustedHooks).toBe(false);
   });
 
+  it("lets no configuration file turn on unreviewed hooks", () => {
+    // The exemption must be given per run, by a person typing a flag. A repository
+    // that could ship it alongside its hooks would be approving its own commands,
+    // which is the whole thing the gate exists to prevent.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bypass-config-"));
+    fs.writeFileSync(
+      path.join(dir, ".private-agents.json"),
+      JSON.stringify({ allowUntrustedHooks: true }),
+      "utf8",
+    );
+
+    expect(getRuntimeConfig(dir).allowUntrustedHooks).toBe(false);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   it("lets a command-line override turn on unreviewed hooks", () => {
     const config = getRuntimeConfig(fakeRoot, { allowUntrustedHooks: true });
     expect(config.allowUntrustedHooks).toBe(true);

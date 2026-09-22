@@ -77,6 +77,13 @@ const configSource = readFileSync(configPath, 'utf8')
 // Both interfaces must be found. A rename that leaves one of them unparsed would
 // otherwise shrink the field list silently - and a gate that reads fewer fields
 // than exist passes on exactly the fields it can no longer see.
+// Only the resolved shapes. `RuntimeConfigFile` describes what a config file may
+// contain and its members are deliberately not `readonly` — it is an input shape,
+// not a resolved one — so the parser below, which collects `readonly` members,
+// cannot read it. A field there is not inert in the same way either: it reaches a
+// resolved field by being merged in `getRuntimeConfig`, and the resolved interface
+// is checked. A file field with no resolved counterpart is caught as an unused
+// property by the type checker instead.
 const REQUIRED_INTERFACES = ['RuntimeConfig', 'TuiPreferences']
 const parsed = new Map(
   REQUIRED_INTERFACES.map((name) => [name, interfaceFields(configSource, name)]),

@@ -41,7 +41,7 @@ interface ModelsDevProviderInfo {
 
 export async function runModelCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
   const [action, ...rest] = args;
   if (!action) {
@@ -76,7 +76,7 @@ export async function runModelCommand(
   }
 
   if (action === "use" || action === "set") {
-    return { kind: "local", output: await setModel(rest, _context) };
+    return { kind: "local", output: await setModel(rest, context) };
   }
   if (action === "help" || action === "--help" || action === "-h") {
     return {
@@ -101,7 +101,7 @@ export async function runModelCommand(
   if (!modelArg) {
     return { kind: "local", output: renderModelStatus() };
   }
-  return { kind: "local", output: await setModel(args, _context) };
+  return { kind: "local", output: await setModel(args, context) };
 }
 /**
  * The catalogue, with this session's connection state folded in.
@@ -394,6 +394,13 @@ async function setModel(args: string[], context?: CommandContext): Promise<strin
     },
   };
   const configPath = writeUserRuntimeConfigFile(next);
+
+  // The session carries the settings it started with, and this command has just
+  // changed one of them on disk. Without re-reading, the token budgets resolved
+  // per model would keep answering from the model that was active at startup —
+  // the new model's window comes from the provider bridge and does update, so the
+  // two would disagree in a way nothing reports.
+  context?.refreshRuntimeConfig?.();
 
   // Dispatch PostModelSwitch Hook
   await defaultHookDispatcher.dispatch({

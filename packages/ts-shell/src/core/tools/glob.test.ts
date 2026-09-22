@@ -169,3 +169,86 @@ describe("glob byte cap", () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
 });
+
+describe("patterns naming hidden files", () => {
+  /** A tree holding hidden entries alongside ordinary ones. */
+  async function makeHiddenTree(): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "glob-hidden-"));
+    await fs.writeFile(path.join(dir, ".gitignore"), "x", "utf8");
+    await fs.writeFile(path.join(dir, "plain.ts"), "x", "utf8");
+    await fs.mkdir(path.join(dir, ".github"));
+    await fs.writeFile(path.join(dir, ".github", "ci.yml"), "x", "utf8");
+    await fs.mkdir(path.join(dir, "src"));
+    await fs.writeFile(path.join(dir, "src", "a.ts"), "x", "utf8");
+    return dir;
+  }
+
+  it("finds a named hidden file instead of searching for a truncated name", async () => {
+    // `.gitignore` must match `.gitignore`. Stripping the leading dot turned the
+    // pattern into `gitignore`, which matches nothing and reports "no files".
+    const dir = await makeHiddenTree();
+    const globTool = createCoreToolRegistry().get("glob")!;
+
+    const res = await globTool.execute(
+      { pattern: ".gitignore" },
+      { workspaceRoot: dir, taskId: "t" } as never,
+    );
+
+    expect(res.output).toContain(".gitignore");
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("finds files under a hidden directory", async () => {
+    const dir = await makeHiddenTree();
+    const globTool = createCoreToolRegistry().get("glob")!;
+
+    const res = await globTool.execute(
+      { pattern: ".github/**/*.yml" },
+      { workspaceRoot: dir, taskId: "t" } as never,
+    );
+
+    expect(res.output).toContain("ci.yml");
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("still accepts a pattern written with a leading ./", async () => {
+    const dir = await makeHiddenTree();
+    const globTool = createCoreToolRegistry().get("glob")!;
+
+    const res = await globTool.execute(
+      { pattern: "./src/*.ts" },
+      { workspaceRoot: dir, taskId: "t" } as never,
+    );
+
+    expect(res.output).toContain("a.ts");
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("both caps reached at once", () => {
+  it("does not name two different shown counts in one answer", async () => {
+    // When the byte budget cuts the page, the count cap's notice would report a
+    // larger "showing N of M" for the same answer, and would advise raising the
+    // limit — advice that cannot work, since the next page meets the same budget.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "glob-both-"));
+    const filler = "z".repeat(200);
+    for (let i = 0; i < 1500; i++) {
+      await fs.writeFile(path.join(dir, `${filler}-${String(i).padStart(5, "0")}.ts`), "x", "utf8");
+    }
+
+    const res = await createCoreToolRegistry().get("glob")!.execute(
+      { pattern: "**/*.ts" },
+      { workspaceRoot: dir, taskId: "t" } as never,
+    );
+
+    const output = res.output ?? "";
+    const shownCounts = output.match(/showing \d+ of/g) ?? [];
+    expect(shownCounts).toHaveLength(1);
+    expect(output).not.toContain("for more");
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+});

@@ -55,8 +55,12 @@ export function createGlobToolDefinition(
     },
     permissions: { check: () => [] },
     async execute(args, context) {
-      const rawPattern = typeof args.pattern === 'string' ? args.pattern.trim() : ''
-      const pattern = rawPattern.replace(/^[./\\]+/, '') || '*'
+      // Only trimmed. Stripping a leading `./` looks helpful but is not: the
+      // character class that did it also ate the leading dot of a hidden file, so
+      // `.gitignore` became `gitignore` and `.github/**` became `github/**`,
+      // silently searching for a name the caller did not ask for. The matcher
+      // understands `./` on its own, so there is nothing to strip.
+      const pattern = (typeof args.pattern === 'string' ? args.pattern.trim() : '') || '*'
       const files = await executionService.listFilesRecursive({
         operationKind: 'file.list',
         absoluteRoot: context.workspaceRoot,
@@ -96,7 +100,13 @@ export function createGlobToolDefinition(
           `${Math.round(truncated.shownBytes / 1024)}KB limit reached, showing ${truncated.shownLines} of ${filtered.length} matches. Full list written to ${artifact.uri}`,
         )
       }
-      if (filtered.length > limit) {
+      if (truncated.truncated) {
+        // The byte budget is what stopped this answer, so suggesting a larger
+        // `limit` would be advice that cannot work: the next page would be cut by
+        // the same budget, and two notices naming different "showing N" counts
+        // would contradict each other.
+        notices.push(`Raising limit will not help: the byte budget is what stopped this. Narrow the pattern instead`)
+      } else if (filtered.length > limit) {
         // The total is named as well as the page, because scale is what tells the
         // model whether to narrow the pattern or ask for more of it.
         notices.push(

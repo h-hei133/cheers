@@ -137,3 +137,4 @@ test('fails loudly when the config module is absent', (t) => {
   assert.equal(result.status, 3, result.stdout)
   assert.match(result.stdout, /config-consumer-gate-source-missing/)
 })
+

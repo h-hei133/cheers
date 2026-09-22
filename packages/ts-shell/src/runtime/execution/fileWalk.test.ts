@@ -157,3 +157,32 @@ describe('workspace file walk', () => {
     await expect(listWorkspaceFiles(missing)).resolves.toEqual([])
   })
 })
+
+describe('git unavailability', () => {
+  afterEach(() => {
+    if (root) fs.rmSync(root, { recursive: true, force: true })
+    root = undefined
+  })
+
+  it('still lists files when git cannot be run', async () => {
+    // The git path is the fast one, not the only one. A missing or unusable git
+    // has to degrade to the in-process walk rather than fail the listing, or a
+    // tool would stop working on a machine that simply lacks git.
+    makeRoot()
+    write('.gitignore', 'ignored.txt\n')
+    write('kept.ts')
+    write('ignored.txt')
+
+    const originalPath = process.env.PATH
+    process.env.PATH = ''
+    try {
+      const found = await listWorkspaceFiles(root as string)
+      expect(found).toContain('kept.ts')
+      // The in-process matcher still honours the ignore file, so the answer is
+      // the same one git would have given.
+      expect(found).not.toContain('ignored.txt')
+    } finally {
+      process.env.PATH = originalPath
+    }
+  })
+})
