@@ -73,6 +73,14 @@ export interface RuntimeConfig {
   readonly provider: RuntimeProvider;
   readonly daemonEnabled: boolean;
   readonly maxTurns: number;
+  /**
+   * The only tools this run may offer, when the user named any.
+   *
+   * Absent means no allowlist. An empty array is a deliberate "offer nothing" -
+   * the two are different answers and are kept apart, because collapsing them
+   * would make one of them inexpressible.
+   */
+  readonly allowedTools?: readonly string[];
   readonly disabledTools: readonly string[];
   readonly hiddenToolPrefixes: readonly string[];
   readonly enableMcpTools: boolean;
@@ -160,6 +168,7 @@ export interface RuntimeConfigFile {
   provider?: RuntimeProvider;
   daemonEnabled?: boolean;
   maxTurns?: number;
+  allowedTools?: string[];
   disabledTools?: string[];
   hiddenToolPrefixes?: string[];
   enableMcpTools?: boolean;
@@ -212,6 +221,8 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
  */
 export interface RuntimeConfigOverrides {
   readonly instructionBudgetBytes?: number
+  /** The tools this run may offer. Naming none leaves the pool unrestricted. */
+  readonly allowedTools?: readonly string[]
   /** Run declared hook commands without asking. Off unless a flag says otherwise. */
   readonly allowUntrustedHooks?: boolean
 }
@@ -273,6 +284,12 @@ export function getRuntimeConfig(
     provider: merged.provider ?? DEFAULT_CONFIG.provider,
     daemonEnabled,
     maxTurns,
+    // Left absent when unset, rather than defaulted to an empty list: an empty
+    // allowlist means "offer nothing", and defaulting to it would disable every
+    // tool for everyone.
+    ...(overrides?.allowedTools ?? merged.allowedTools
+      ? { allowedTools: overrides?.allowedTools ?? merged.allowedTools }
+      : {}),
     disabledTools: merged.disabledTools ?? DEFAULT_CONFIG.disabledTools,
     hiddenToolPrefixes:
       merged.hiddenToolPrefixes ?? DEFAULT_CONFIG.hiddenToolPrefixes,

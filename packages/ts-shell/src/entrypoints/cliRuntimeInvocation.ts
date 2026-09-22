@@ -416,6 +416,17 @@ function restrictToolPool(
   registry: ReadonlyMap<string, ToolDefinition>,
   runtimeConfig: RuntimeConfig,
 ): ReadonlyMap<string, ToolDefinition> {
+  // A name in the allowlist that matches no tool is a typo, and a typo here is
+  // invisible: the run simply offers fewer tools than intended and the model
+  // works around it. Reported rather than rejected, because a shared config may
+  // legitimately name a tool this build does not have.
+  const unknown = (runtimeConfig.allowedTools ?? []).filter((name) => !registry.has(name));
+  if (unknown.length > 0) {
+    createComponentLogger("tools").warn(
+      `Ignoring ${unknown.length} name(s) in allowedTools that match no tool: ${unknown.join(", ")}.`,
+    );
+  }
+
   const visible = new Set(
     filterVisibleToolNames([...registry.keys()], runtimeConfig),
   );

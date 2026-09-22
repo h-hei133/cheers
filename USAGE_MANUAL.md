@@ -39,6 +39,7 @@ npm start -- --attach D:\your\repo
 - `--project <path>` / `--attach <path>`：启动即附着目标项目
 - `--provider <openai|anthropic|openai-compatible>`：仅本次进程覆盖 provider
 - `--api-key <key>`：仅本次进程覆盖 API key
+- `--tools <a,b,c>`：**只**向模型提供这些工具（只读审查常用 `--tools read,grep,glob`）。省略即不限制。值里至少要有一个名字，写 `--tools ,,` 会被当作参数错误而不是“一个工具都不给”。
 
 ## 3. 会话内控制面（Slash 命令）
 

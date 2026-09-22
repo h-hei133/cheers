@@ -35,6 +35,9 @@ const VALUE_FLAGS = new Set([
   "--api-key",
   "--replay-file",
   "--non-interactive-approval",
+  // Takes a value, so the prompt scan must step over it: without this the tool
+  // list is also read as part of the prompt.
+  "--tools",
 ]);
 
 const RESERVED_SHELL_SLASH_COMMANDS = new Set([
@@ -225,6 +228,26 @@ export function parseCliArgs(
   );
   assignOption(options, "jsonEvents", rawArgs.includes("--json"));
   assignOption(options, "noContextFiles", rawArgs.includes("--no-context-files"));
+  const toolsIdx = rawArgs.indexOf("--tools");
+  if (toolsIdx !== -1) {
+    const value = rawArgs[toolsIdx + 1];
+    if (!value || value.startsWith("--")) {
+      return parseError(
+        "Missing value for --tools. Example: --tools read,grep,glob",
+      );
+    }
+    const named = value.split(",").map((name) => name.trim()).filter((name) => name.length > 0);
+    if (named.length === 0) {
+      // `--tools ,,` is a typo, not a request for no tools at all. Accepting it
+      // would offer the model nothing and read as the agent being broken. The
+      // empty allowlist stays expressible in the config file, where writing an
+      // empty list is a deliberate act.
+      return parseError(
+        "No tool names in --tools. Example: --tools read,grep,glob",
+      );
+    }
+    assignOption(options, "allowedTools", named);
+  }
   assignOption(
     options,
     "dangerouslyBypassHookTrust",

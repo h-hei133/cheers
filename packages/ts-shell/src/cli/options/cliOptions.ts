@@ -25,6 +25,14 @@ export interface CliOptions {
    */
   readonly noContextFiles?: boolean;
   /**
+   * The only tools this run may offer, comma-separated.
+   *
+   * A flag rather than only a setting because a read-only pass is a per-run
+   * intent: "review this, change nothing". Naming what may run fails closed,
+   * where naming what may not fails open as the tool set grows.
+   */
+  readonly allowedTools?: readonly string[];
+  /**
    * Run a project's declared hook commands without approving each one.
    *
    * The name says what it does because the thing it does is dangerous: it lets a

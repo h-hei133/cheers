@@ -65,6 +65,9 @@ export function createCliRootContext(
     // the prompt builder.
     instructionBudgetBytes: input.options.noContextFiles ? 0 : undefined,
     allowUntrustedHooks: input.options.dangerouslyBypassHookTrust === true ? true : undefined,
+    // Passed through only when the flag named something: an empty array here
+    // would mean "offer no tools at all", which is not what an absent flag says.
+    allowedTools: input.options.allowedTools,
   });
   return {
     runtimeBaseDir,

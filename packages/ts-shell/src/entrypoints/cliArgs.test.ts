@@ -209,6 +209,42 @@ describe("--no-context-files", () => {
   });
 });
 
+describe("--tools", () => {
+  it("is absent unless asked for, which means no restriction", () => {
+    // Absent is not the same as empty: absent leaves the pool alone.
+    expect(expectParsed([]).options.allowedTools).toBeUndefined();
+  });
+
+  it("takes a comma-separated list", () => {
+    expect(expectParsed(["--tools", "read,grep,glob"]).options.allowedTools).toEqual([
+      "read",
+      "grep",
+      "glob",
+    ]);
+  });
+
+  it("trims whitespace around names", () => {
+    expect(expectParsed(["--tools", " read , grep "]).options.allowedTools).toEqual(["read", "grep"]);
+  });
+
+  it("does not consume the prompt that follows it", () => {
+    const parsed = expectParsed(["--tools", "read", "review this repo"]);
+    expect(parsed.options.allowedTools).toEqual(["read"]);
+    expect(parsed.options.promptArg).toBe("review this repo");
+  });
+
+  it("refuses a missing value rather than reading the next flag as one", () => {
+    expect(expectParseError(["--tools"]).message).toContain("Missing value for --tools");
+    expect(expectParseError(["--tools", "--print"]).message).toContain("Missing value for --tools");
+  });
+
+  it("refuses a list with no names in it", () => {
+    // `--tools ,,` is a typo, not a request for zero tools. Accepting it would
+    // offer the model nothing and look like the agent had broken.
+    expect(expectParseError(["--tools", ",,"]).message).toContain("No tool names in --tools");
+  });
+});
+
 describe("--dangerously-bypass-hook-trust", () => {
   it("is off unless asked for", () => {
     expect(expectParsed([]).options.dangerouslyBypassHookTrust).toBe(false);
