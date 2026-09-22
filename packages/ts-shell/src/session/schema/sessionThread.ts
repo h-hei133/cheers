@@ -205,6 +205,8 @@ export function catchUpSessionThread(
   if (missing.length === 0) return thread;
 
   const entries = [...thread.entries];
+  // New turns continue the active leaf, which is where the conversation is. The
+  // fallback covers a thread that records no active leaf at all.
   let leafId = thread.activeLeafId ?? entries.at(-1)?.id ?? sessionRootEntryId(session.id);
   missing.forEach((turn, offset) => {
     const order = recorded + offset + 1;
@@ -223,6 +225,9 @@ export function catchUpSessionThread(
   return freezeDeep({
     ...thread,
     entries,
+    // New turns continue the conversation, so the newest entry is where it is
+    // anchored. Branch selection would need its own rule here, and nothing
+    // writes a branch yet — when something does, this is the place to decide it.
     activeLeafId: leafId,
   });
 }

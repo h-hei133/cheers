@@ -3,7 +3,7 @@ title: "功能开发：pi 对照总索引"
 category: article
 sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-23
 tags: [features, gap-analysis, pi, index]
 summary: "功能开发前锋探索的总入口。对照本地参考仓 pi，把能力缺口按七个切片分类登记：共 40 项 DEFICIENT、38 项 MISSING、16 项 OURS-ONLY、7 项平手。列出 8 项硬缺陷与 12 项高价值缺口。本轮零代码改动，只产出事实与分类。"
 confidence: high
@@ -63,7 +63,14 @@ confidence: high
 > ②bash 工具的 `timeout` 与 `env` 是**每天都会踩到**的缺口（60 秒硬编码杀掉 `npm install` 与构建）；
 > ③**`light` 主题会让正文变成白底白字**（`light.json` 缺 16 个令牌含 `text`，回退是纯白——实测）；
 > ④`/cost` 的费率是写死的常量且没有 cache 维度、`/reload` **报告**主题变化却从不应用。
-> **尚未施工。**
+>
+> **Phase 4 施工已闭环**：见 [`phase-4-execution.md`](phase-4-execution.md)（8 项任务全部完工，
+> 提交 `86739806` → `02a20d21`）。
+> 八项任务各自都做了「还原实现 → 确认测试失败 → 恢复」的反向验证，清单见该文 §9.2。
+> 执行中**偏离裁决两处**（均在正文说明）：T5-2 的接线点改到 state snapshot 构建处，
+> 并因此**删除**了裁决里要接的那个函数（覆盖更全的一处胜过一个调用点）；
+> T7 的 `editor.ts` 未回到 28 名（继续拆需搬走整个 prompt history，改动面大于收益）。
+> 另**推翻三处既有文档记录**（`pi` 无 CPR、catalog `modelOverrides` 本来生效 ×2），见该文 §11。
 
 | # | 报告 | 覆盖范围 | DEFICIENT | MISSING | OURS-ONLY | 平手 |
 |---|---|---|---:|---:|---:|---:|
