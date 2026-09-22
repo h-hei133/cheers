@@ -12,18 +12,25 @@ export interface CliOptions {
   readonly projectPath?: string;
   readonly replayFile?: string;
   readonly printMode?: boolean;
+  /** Emit the run's events as JSON lines on stdout instead of prose. */
+  readonly jsonEvents?: boolean;
   readonly promptArg?: string;
   readonly migrateSessionRoot?: boolean;
   readonly nonInteractiveApproval?: NonInteractiveApprovalMode;
-  readonly applyPatchRuntimeRoute?: boolean;
-  readonly applyPatchWorkspaceWrite?: boolean;
-  readonly planningMutationConfirm?: boolean;
-  readonly planningMutationControlledWorkspace?: boolean;
-  readonly planningMutationSelectedWorkspace?: boolean;
-  readonly planningMutationLiveProviderProposal?: boolean;
-  readonly planningMutationProposalPath?: string;
-  readonly planningMutationVerifyCommand?: string;
-  readonly hostCommand?: string;
+  /**
+   * Skip project instruction files for this run.
+   *
+   * A flag as well as a setting because the reason to want it is usually a
+   * one-off: "is it this repository's rules that are steering the model?"
+   */
+  readonly noContextFiles?: boolean;
+  /**
+   * Run a project's declared hook commands without approving each one.
+   *
+   * The name says what it does because the thing it does is dangerous: it lets a
+   * repository execute commands on this machine with no review at all.
+   */
+  readonly dangerouslyBypassHookTrust?: boolean;
 }
 
 export interface CliArgs {

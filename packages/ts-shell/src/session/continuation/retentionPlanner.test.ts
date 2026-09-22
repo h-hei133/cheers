@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
-import type { OrchestrationResult } from "../../orchestration/types.js";
+import type { OrchestrationResult } from "../../result/types.js";
 import { applyCompactRetentionPlan } from "./retentionPlanner.js";
 
 describe("applyCompactRetentionPlan", () => {

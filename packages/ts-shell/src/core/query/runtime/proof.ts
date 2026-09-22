@@ -7,7 +7,7 @@ import {
   buildTaskProofInput,
   type TaskProofInput,
 } from "../../../evidence/task/proof.js";
-import type { AgentExecutionOutput, CodingResultSummary } from "../../../orchestration/types.js";
+import type { AgentExecutionOutput, CodingResultSummary } from "../../../result/types.js";
 import {
   projectTaskVerdict,
   type TaskVerdict,
@@ -274,9 +274,17 @@ function stagedActionConsistent(
   if (!seed?.actionKind) {
     return undefined;
   }
+  // A `continue` decision carries no action-type commitment — it means "do the
+  // pending work" — so any seed the turn actually produced is consistent with
+  // it. Likewise a seed that names the task's own kind did what was dispatched.
+  if (decision.nextAction === "continue" || seed.actionKind === decision.taskKind) {
+    return true;
+  }
   const observed = actionForSeed(seed.actionKind);
+  // A read/search turn only gathers context; whatever the turn produced
+  // (including a seed left over from real work) does not contradict it.
   if (decision.nextAction === "search" || decision.nextAction === "read") {
-    return observed === "search" || observed === "read";
+    return true;
   }
   return observed === decision.nextAction;
 }
@@ -292,7 +300,14 @@ function actionForSeed(action: string): QueryRuntimeActionDecision["nextAction"]
   if (normalized.includes("edit") || normalized.includes("write") || normalized.includes("apply")) {
     return "edit";
   }
-  if (normalized.includes("verify") || normalized.includes("test") || normalized.includes("check")) {
+  // Running a command is how this runtime verifies: the strategy ladder calls
+  // the same step `verify`, so a `run-command` seed must agree with it.
+  if (
+    normalized.includes("verify") ||
+    normalized.includes("test") ||
+    normalized.includes("check") ||
+    normalized.includes("command")
+  ) {
     return "verify";
   }
   if (normalized.includes("repair")) {

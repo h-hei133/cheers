@@ -1,14 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
-import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
-import { safeReceipt } from "../context/browserActionCacheEntry.test.js";
+import { parseBrowserCommandArgs } from "../../browser/commandContract.js";
+import { runBrowserCommandAsync } from "../../browser/commandRunner.js";
+import { safeReceipt } from "../../browser/actionCacheEntry.test.js";
 import {
   createBrowserPersistentReceiptCacheRecord,
   createBrowserPersistentReceiptCacheTombstone,
-} from "../context/browserPersistentReceiptCache.js";
-import { acquireBrowserReceiptCacheLock } from "../context/browser/receipt/browserReceiptCacheLock.js";
+} from "../../browser/persistentReceiptCache.js";
+import { acquireBrowserReceiptCacheLock } from "../../browser/receipt/lock.js";
 import {
   createBrowserPersistentReplayScenarioFixture,
   type BrowserPersistentReplayScenarioFixture,

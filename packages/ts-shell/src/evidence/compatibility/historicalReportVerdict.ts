@@ -3,7 +3,7 @@ import type {
   ProductEvidenceProvenance,
   ProductRedactionStatus,
   ProductVerdict,
-} from "../verdictFacade.js";
+} from "../types.js";
 
 export function projectHistoricalReportVerdict(input: {
   readonly routeId?: string;

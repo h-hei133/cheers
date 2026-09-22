@@ -1,23 +1,27 @@
 import crypto from "node:crypto";
 
-import type { AgentPlan } from "../../orchestration/agentPlan.js";
-import type { ContextGraph } from "../../orchestration/contextGraph.js";
-import type { ContextGraphScore } from "../../orchestration/contextGraphScore.js";
-import { buildContextGraphReadinessFacts, type ContextGraphReadinessFacts } from "../../orchestration/contextGraphReadiness.js";
-import type { TargetedContextPacket } from "../../orchestration/contextPacket.js";
-import type { TestImpactPlan } from "../../orchestration/testImpactPlan.js";
-import type { VerificationCommandPlan } from "../../verification/command/plan.js";
-import type { VerificationRepairContext } from "../../orchestration/verificationRepairContext.js";
+import type { AgentPlan } from "../task/agentPlan.js";
+import type { ContextGraph } from "../../context/graph/contextGraph.js";
+import type { ContextGraphScore } from "../../context/graph/contextGraphScore.js";
+import { buildContextGraphReadinessFacts, type ContextGraphReadinessFacts } from "../../context/graph/contextGraphReadiness.js";
+import type { TargetedContextPacket } from "../../context/graph/contextPacket.js";
+import type { TestImpactPlan } from "../task/testImpactPlan.js";
+
+export interface VerificationCommandPlanLike {
+  readonly verificationPlanId?: string;
+  readonly state?: string;
+}
+import type { VerificationRepairContext } from "../../repair/verificationRepairContext.js";
 import type { CodeGraphTrace } from "../../context/acquisition/code/trace.js";
 import type { CodeGraphImpact } from "../../context/acquisition/code/impact.js";
-import type { AnalysisBrief } from "../../orchestration/analysisBrief.js";
-import type { TaskExecutionPlan } from "../../orchestration/taskExecutionPlan.js";
-import type { TaskLifecycle } from "../../orchestration/taskLifecycle.js";
-import type { AnalysisBriefCalibration } from "../../orchestration/analysisBriefCalibration.js";
-import type { AnalysisQualityGateResult } from "../../orchestration/analysisQualityGate.js";
-import type { TaskContextSufficiency } from "../../orchestration/taskContextSufficiency.js";
-import type { ProviderAnchoredProposalManifest } from "../../orchestration/providerAnchoredProposal.js";
-import type { ProviderAnchoringResult } from "../../orchestration/providerAnchoringResult.js";
+import type { AnalysisBrief } from "../task/analysisBrief.js";
+import type { TaskExecutionPlan } from "../task/taskExecutionPlan.js";
+import type { TaskLifecycle } from "../task/taskLifecycle.js";
+import type { AnalysisBriefCalibration } from "../task/analysisBriefCalibration.js";
+import type { AnalysisQualityGateResult } from "../task/analysisQualityGate.js";
+import type { TaskContextSufficiency } from "../task/taskContextSufficiency.js";
+import type { ProviderAnchoredProposalManifest } from "../../provider/proposal/providerAnchoredProposal.js";
+import type { ProviderAnchoringResult } from "../../provider/proposal/providerAnchoringResult.js";
 
 export type PlanQualityLevel =
   | "ready"
@@ -188,7 +192,7 @@ export function buildPlanQuality(input: {
   readonly analysisCalibration?: AnalysisBriefCalibration;
   readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
-  readonly verificationCommandPlan?: VerificationCommandPlan;
+  readonly verificationCommandPlan?: VerificationCommandPlanLike;
   readonly repairContext?: VerificationRepairContext;
   readonly providerReadiness?: "ready" | "missing" | "blocked" | "unsupported";
 }): PlanQuality {
@@ -439,7 +443,7 @@ function buildDimensions(input: {
   readonly analysisCalibration?: AnalysisBriefCalibration;
   readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
-  readonly verificationCommandPlan?: VerificationCommandPlan;
+  readonly verificationCommandPlan?: VerificationCommandPlanLike;
   readonly repairContext?: VerificationRepairContext;
   readonly providerReadiness?: "ready" | "missing" | "blocked" | "unsupported";
   readonly graphReadiness?: ContextGraphReadinessFacts;
@@ -481,7 +485,7 @@ function classifyLevel(input: {
   readonly analysisCalibration?: AnalysisBriefCalibration;
   readonly analysisQualityGate?: AnalysisQualityGateResult;
   readonly taskExecutionPlan?: TaskExecutionPlan;
-  readonly verificationCommandPlan?: VerificationCommandPlan;
+  readonly verificationCommandPlan?: VerificationCommandPlanLike;
   readonly repairContext?: VerificationRepairContext;
   readonly score: number;
 }): PlanQualityLevel {

@@ -1,5 +1,6 @@
+import { redactReportText } from "../../core/security/redaction.js";
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { ProductVerificationReceipt } from "../verificationFacade.js";
-import type { RepairApplyObservation } from "../../repair/handoff/boundary.js";
 
 export type VerificationIntentDispatchStatus =
   | "planned"
@@ -36,6 +37,36 @@ export type VerificationResultObservationStatus =
   | "unsupported"
   | "selected_not_run"
   | "relevance_rejected";
+
+export type RepairApplyObservationStatus =
+  | "not_applied"
+  | "authority_required"
+  | "applied"
+  | "failed"
+  | "blocked"
+  | "unsupported"
+  | "not_proven";
+
+export interface RepairApplyObservationLike {
+  readonly repairApplyId: string;
+  readonly proposalId: string;
+  readonly sourceFailureId: string;
+  readonly sourceVerificationId: string;
+  readonly targetSummary: string;
+  readonly repairApplyStatus: RepairApplyObservationStatus;
+  readonly repairAuthorityStatus?: "required" | "granted" | "denied" | "not_required" | "unknown";
+  readonly applyReceiptIds: readonly string[];
+  readonly touchedTargetSummaries: readonly string[];
+  readonly originalFailureClass: string;
+  readonly originalFailureSummary: string;
+  readonly originalRuntimeReceiptIds?: readonly string[];
+  readonly runtimeReceiptIds: readonly string[];
+  readonly taskRelevanceStatus: VerificationIntentRelevanceStatus;
+  readonly coverageStatus: VerificationCoverageObservationStatus;
+  readonly originalFailurePreserved?: true;
+  readonly notProvenClaims: readonly string[];
+  readonly redactionStatus?: "report-safe" | "redacted";
+}
 
 export type VerificationCoverageObservationStatus =
   | "covered"
@@ -126,8 +157,8 @@ export interface PostRepairVerificationRequirementObservation {
   readonly sourceVerificationId: string;
   readonly originalFailureClass: string;
   readonly originalFailureStatus: "failed";
-  readonly repairApplyState: RepairApplyObservation["repairApplyStatus"];
-  readonly repairAuthorityState: RepairApplyObservation["repairAuthorityStatus"];
+  readonly repairApplyState: RepairApplyObservationStatus;
+  readonly repairAuthorityState: "required" | "granted" | "denied" | "not_required" | "unknown" | undefined;
   readonly verificationRequired: boolean;
   readonly requirementStatus: PostRepairVerificationRequirementStatus;
   readonly verificationBlocker: PostRepairVerificationBlocker;
@@ -189,8 +220,8 @@ export interface PostRepairVerificationResultObservation {
   readonly originalTaskRelevanceStatus: VerificationIntentRelevanceStatus;
   readonly originalCoverageStatus: VerificationCoverageObservationStatus;
   readonly originalRuntimeReceiptIds: readonly string[];
-  readonly repairApplyState: RepairApplyObservation["repairApplyStatus"];
-  readonly repairAuthorityState: RepairApplyObservation["repairAuthorityStatus"];
+  readonly repairApplyState: RepairApplyObservationStatus;
+  readonly repairAuthorityState: "required" | "granted" | "denied" | "not_required" | "unknown" | undefined;
   readonly repairApplyReceiptIds: readonly string[];
   readonly touchedTargetSummaries: readonly string[];
   readonly status: PostRepairVerificationResultStatus;
@@ -232,7 +263,7 @@ export function projectVerificationIntent(input: {
     input.receipt?.selectedCommand;
   const selectedNotRun = dispatchStatus === "selected_not_run" ||
     (dispatchStatus === "not_run" && Boolean(commandSummary));
-  return freeze({
+  return freezeDeep({
     intentId: sanitizeId(`verification-intent:${input.sourceTurnId}`, redactions),
     sourceTurnId: sanitizeText(input.sourceTurnId, redactions, 160),
     targetSummary: sanitizeText(input.targetSummary, redactions, 180),
@@ -284,7 +315,7 @@ export function observeVerificationResult(input: {
   const runtimeReceiptIds = input.runtimeReceiptIds ?? input.receipt?.runtimeReceiptIds ?? [];
   const repairEligible = input.repairEligible ?? input.receipt?.repairEligible ?? false;
   const selectedNotRun = status === "selected_not_run" || input.intent.selectedNotRun;
-  return freeze({
+  return freezeDeep({
     verificationId: sanitizeId(`${input.intent.intentId}:result`, redactions),
     intentId: sanitizeText(input.intent.intentId, redactions, 180),
     ...(input.executionReceiptId
@@ -354,11 +385,11 @@ export function projectVerificationObservationFromReceipt(input: {
     runtimeReceiptIds: input.runtimeReceiptIds ?? input.receipt.runtimeReceiptIds,
     notProvenClaims: input.notProvenClaims,
   });
-  return freeze({ intent, result });
+  return freezeDeep({ intent, result });
 }
 
 export function requirePostRepairVerification(input: {
-  readonly repairApply: RepairApplyObservation;
+  readonly repairApply: RepairApplyObservationLike;
   readonly requirementStatus?: PostRepairVerificationRequirementStatus;
   readonly verificationBlocker?: PostRepairVerificationBlocker;
   readonly taskRelevanceExpectation?: VerificationIntentRelevanceStatus;
@@ -370,7 +401,7 @@ export function requirePostRepairVerification(input: {
     requirementStatusFromRepairApply(input.repairApply);
   const verificationBlocker = input.verificationBlocker ??
     blockerFromRequirement(requirementStatus, input.repairApply);
-  return freeze({
+  return freezeDeep({
     requirementId: sanitizeId(`${input.repairApply.repairApplyId}:post-verification`, redactions),
     sourceRepairApplyId: sanitizeText(input.repairApply.repairApplyId, redactions, 180),
     sourceRepairProposalId: sanitizeText(input.repairApply.proposalId, redactions, 180),
@@ -429,7 +460,7 @@ export function requestPostRepairVerification(input: {
   const redactions = new Set<string>();
   const dispatchStatus = input.dispatchStatus ??
     (input.selectedCommandSummary ? "selected_not_run" : "not_run");
-  return freeze({
+  return freezeDeep({
     requestId: sanitizeId(`${input.requirement.requirementId}:request`, redactions),
     requirementId: sanitizeText(input.requirement.requirementId, redactions, 180),
     sourceRepairApplyId: sanitizeText(input.requirement.sourceRepairApplyId, redactions, 180),
@@ -525,7 +556,7 @@ export function observePostRepairVerificationResult(input: {
         terminalSuccessClaim: false as const,
       }
     : undefined;
-  return freeze({
+  return freezeDeep({
     resultId,
     ...(input.request
       ? { requestId: sanitizeText(input.request.requestId, redactions, 180) }
@@ -660,7 +691,7 @@ function resultStatusFromReceipt(
 }
 
 function requirementStatusFromRepairApply(
-  repairApply: RepairApplyObservation,
+  repairApply: RepairApplyObservationLike,
 ): PostRepairVerificationRequirementStatus {
   if (repairApply.repairApplyStatus === "applied") return "required";
   if (
@@ -676,7 +707,7 @@ function requirementStatusFromRepairApply(
 
 function blockerFromRequirement(
   status: PostRepairVerificationRequirementStatus,
-  repairApply: RepairApplyObservation,
+  repairApply: RepairApplyObservationLike,
 ): PostRepairVerificationBlocker {
   if (status === "required") return "none";
   if (repairApply.repairApplyStatus !== "applied") return "repair-not-applied";
@@ -733,7 +764,7 @@ function summaryFromStatus(input: {
 }
 
 function unique(values: readonly string[], redactions: Set<string>): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
 }
 
 function sanitizeId(value: string, redactions: Set<string>): string {
@@ -744,35 +775,5 @@ function sanitizeId(value: string, redactions: Set<string>): string {
 }
 
 function sanitizeText(value: string, redactions: Set<string>, maxLength: number): string {
-  let sanitized = value
-    .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
-    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
-    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[secret-redacted]")
-    .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]")
-    .replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]")
-    .replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]")
-    .replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]")
-    .replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]")
-    .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (sanitized !== value.trim()) {
-    redactions.add("unsafe-content");
-  }
-  if (sanitized.length > maxLength) {
-    sanitized = `${sanitized.slice(0, maxLength)}...`;
-    redactions.add("truncated");
-  }
-  return sanitized;
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
+  return redactReportText(value, maxLength, { redactions, ellipsis: true });
 }

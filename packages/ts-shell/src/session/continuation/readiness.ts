@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { LoopContextRebuildInput } from "../../context/rebuildInput.js";
 import type { SessionContextRebuildProjection } from "../../context/sessionContextRebuildProjection.js";
 import type { ContextWorkingMemory } from "../../context/memory/model.js";
@@ -143,7 +144,7 @@ export function evaluateContinuationReadiness(input: {
     optionalRefreshReads,
   });
 
-  return deepFreeze({
+  return freezeDeep({
     readinessId: `continuation-readiness:${input.sessionProjection.sessionIdentity}:${input.sessionProjection.activeLeafId}`,
     sourceSessionId: input.sessionProjection.sessionIdentity,
     status,
@@ -244,14 +245,4 @@ function continuationContextReadinessStatus(input: {
 
 function unique(values: readonly string[]): readonly string[] {
   return Array.from(new Set(values.filter((value) => value.trim().length > 0)));
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

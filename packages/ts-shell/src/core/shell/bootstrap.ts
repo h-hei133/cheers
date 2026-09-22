@@ -1,5 +1,6 @@
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
+import type { Session } from "../../session/schema/sessionRecord.js";
 import type { ResumeResult } from "../../session/SessionManager.js";
 import type { WorkspaceRootMode } from "../../session/SessionManager.js";
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
@@ -98,6 +99,12 @@ export function bootstrapShellRuntime(input: {
   requestedSessionId?: string;
   allowSessionRootMigration?: boolean;
   emitLifecycleMessages?: boolean;
+  /**
+   * Step into the stored current-session pointer instead of starting a new
+   * session. True for one-shot `--print` runs, which continue what the user was
+   * last doing; false for an interactive launch, which is a new sitting.
+   */
+  adoptCurrentSession?: boolean;
 }): ShellBootstrapResult {
   const phases: ShellBootstrapPhase[] = ["fast-path-parse", "config-load"];
   const lifecycleNotices: string[] = [];
@@ -113,10 +120,29 @@ export function bootstrapShellRuntime(input: {
 
   const session = (() => {
     if (!input.requestedSessionId) {
+      // Two kinds of run, two answers.
+      //
+      // A one-shot `--print` invocation is a continuation of whatever the user was
+      // last doing — that is what makes `/continue` and `/resume current` mean
+      // anything from a script — so it steps into the stored pointer.
+      //
+      // An interactive launch is a new sitting and gets its own session. Adopting
+      // the pointer there meant every launch landed in the same session, with one
+      // ever-growing history and no way to tell two days of work apart. The pointer
+      // is still evaluated, because "why was it ignored" is worth saying, and it is
+      // still what `/resume` and `/continue` fall back to.
       const currentSelection = input.sessionManager.resolveCurrentSessionForProject(
         requestedProjectRoot,
       );
-      if (currentSelection.ok) {
+      // A session with unfinished business is stepped back into whatever the run
+      // kind: an interruption, an error, a prompt that never ran, or a write whose
+      // outcome was never established. That is recovery, and it is what anyone
+      // expects after a crash. A session the user simply closed is left closed, and
+      // only a one-shot run steps into it.
+      const unfinished =
+        currentSelection.ok &&
+        hasUnfinishedBusiness(input.sessionManager, currentSelection.session);
+      if (currentSelection.ok && (input.adoptCurrentSession === true || unfinished)) {
         try {
           const resumed = input.sessionManager.resume(
             currentSelection.session.id,
@@ -130,10 +156,7 @@ export function bootstrapShellRuntime(input: {
             `Current session pointer ${currentSelection.session.id} could not be resumed for ${requestedProjectRoot}; starting a fresh session.`,
           );
         }
-      } else if (
-        currentSelection.ok === false &&
-        currentSelection.reason !== "none"
-      ) {
+      } else if (currentSelection.ok === false && currentSelection.reason !== "none") {
         emitLifecycleMessage(
           `Current session pointer ignored: ${currentSelection.detail} Starting a fresh session.`,
         );
@@ -283,4 +306,21 @@ export function bootstrapShellRuntime(input: {
       session,
     }),
   };
+}
+
+/**
+ * Whether a session was left mid-work rather than closed.
+ *
+ * Any of: it never reached a terminal state, a prompt is still pending, or a write
+ * was started and its outcome never established. Each is a reason the user would
+ * expect to land back in it rather than somewhere new.
+ */
+function hasUnfinishedBusiness(
+  sessionManager: SessionManager,
+  session: Session,
+): boolean {
+  if (session.status !== "terminated" && session.status !== "completed") return true;
+  if (session.pendingPrompt?.trim()) return true;
+  const summary = sessionManager.describeSessionReentry?.(session.id);
+  return summary?.durableStatus === "stopped" || summary?.runPhase === "turn-active";
 }

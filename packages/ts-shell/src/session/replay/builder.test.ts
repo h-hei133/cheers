@@ -6,7 +6,7 @@ import {
 } from "../../core/query/runtime/state.js";
 import { decideQueryRuntimeAction } from "../../core/query/runtime/policy.js";
 import { createQueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
-import type { AgentExecutionOutput } from "../../orchestration/types.js";
+import type { AgentExecutionOutput } from "../../result/types.js";
 import type { RecoverySnapshot, TranscriptEvent } from "../SessionManager.js";
 import {
   buildReplayTurnPairingState,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectMixedOperationReadiness } from "./mixedOperation.js";
-import type { PatchFileOperation } from "../../../orchestration/patchParsing/types.js";
+import type { PatchFileOperation } from "../types.js";
 
 describe("projectMixedOperationReadiness", () => {
   it("recognizes bounded exactly-four mixed route support without granting write authority", () => {

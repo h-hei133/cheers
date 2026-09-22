@@ -125,7 +125,7 @@ Need more evidence before any future default claim:
 
 ## Closeout Verifier
 
-Route 72 adds `scripts/verify-edit-capability-closeout.mjs` and package script
+Route 72 added ~~`scripts/verify-edit-capability-closeout.mjs`~~ (removed 2026-09-17) and package script
 `verify:edit-capability-closeout`. The verifier runs only focused closeout
 tests for:
 

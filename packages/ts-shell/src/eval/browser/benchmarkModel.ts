@@ -1,4 +1,4 @@
-import type { BrowserExecutionRequest } from "../../core/context/browserExecutionContract.js";
+import type { BrowserExecutionRequest } from "../../browser/executionContract.js";
 
 export type BrowserEvalBenchmarkExpectation =
   | { readonly kind: "contains"; readonly text: string }

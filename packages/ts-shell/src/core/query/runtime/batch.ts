@@ -1,8 +1,8 @@
-import type { AgentRole } from '../../../orchestration/types.js'
+import type { AgentRole } from '../../../result/types.js'
 import type { RuntimeSourceFact } from '../../../context/acquisition/code/source.js'
 import type { RepairHypothesisState } from '../../../repair/flow/hypothesis.js'
 import type { ToolActionKind } from '../../../tools/policy/strategy.js'
-import type { QueryRuntimeActionDecision } from './decision.js'
+import type { QueryRuntimeActionDecision, QueryRuntimeRepairPlan } from './decision.js'
 import type { RuntimeActionBlock } from './actionAuthority.js'
 
 export type QueryRuntimeExecutionExitStatusClass = 'success' | 'failed' | 'blocked' | 'not-run'
@@ -19,11 +19,6 @@ export interface QueryRuntimeExecutionBatchItem {
   readonly terminalSuccessClaim: false
 }
 
-export interface QueryRuntimeRepairPlan {
-  readonly hypothesis: RepairHypothesisState
-  readonly sourceFacts: readonly RuntimeSourceFact[]
-  readonly blockedRepeat: boolean
-}
 
 export interface QueryRuntimeExecutionBatch {
   readonly batchId: string

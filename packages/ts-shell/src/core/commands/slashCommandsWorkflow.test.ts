@@ -1,0 +1,166 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { runGoalCommand, getActiveSessionGoal, setActiveSessionGoal } from "./goalCommandRuntime.js";
+import { runLoopCommand } from "./loopCommandRuntime.js";
+import { runTodoCommand, getSessionTodos } from "./todoCommandRuntime.js";
+import { runFastCommand, isFastModeEnabled, setFastModeEnabled } from "./fastCommandRuntime.js";
+import { runContextCommand } from "./contextCommandRuntime.js";
+import { runBtwCommand } from "./btwCommandRuntime.js";
+import { routeSlashCommand } from "./slashRouter.js";
+
+describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
+  let tempDir: string;
+  let realHome: string | undefined;
+  let realProfile: string | undefined;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "slash-workflow-test-"));
+    // Durable per-project state lands under the home directory, so the home is
+    // moved into the temp tree for the duration: a test must not write into the
+    // state of the machine running it.
+    realHome = process.env.HOME;
+    realProfile = process.env.USERPROFILE;
+    process.env.HOME = tempDir;
+    delete process.env.USERPROFILE;
+    setActiveSessionGoal(tempDir, null);
+    setFastModeEnabled(tempDir, false);
+  });
+
+  afterEach(async () => {
+    if (realHome === undefined) delete process.env.HOME;
+    else process.env.HOME = realHome;
+    if (realProfile !== undefined) process.env.USERPROFILE = realProfile;
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  describe("/goal command", () => {
+    it("creates, pauses, resumes, and completes goal state", async () => {
+      // 1. Create goal
+      const createRes = await runGoalCommand(["Build", "authentication", "system"], { cwd: tempDir });
+      expect(createRes.output).toContain("Objective set");
+      expect(getActiveSessionGoal(tempDir)?.objective).toBe("Build authentication system");
+      expect(getActiveSessionGoal(tempDir)?.phase).toBe("active");
+
+      // 2. Pause goal
+      const pauseRes = await runGoalCommand(["pause"], { cwd: tempDir });
+      expect(pauseRes.output).toContain("Objective paused");
+      expect(getActiveSessionGoal(tempDir)?.phase).toBe("paused");
+
+      // 3. Resume goal
+      const resumeRes = await runGoalCommand(["resume"], { cwd: tempDir });
+      expect(resumeRes.output).toContain("Objective resumed");
+      expect(getActiveSessionGoal(tempDir)?.phase).toBe("active");
+
+      // 4. Complete goal
+      const completeRes = await runGoalCommand(["complete"], { cwd: tempDir });
+      expect(completeRes.output).toContain("Objective complete");
+      expect(getActiveSessionGoal(tempDir)?.phase).toBe("complete");
+
+      // 5. Clear goal
+      const clearRes = await runGoalCommand(["clear"], { cwd: tempDir });
+      expect(clearRes.output).toContain("cleared");
+      expect(getActiveSessionGoal(tempDir)).toBeNull();
+    });
+  });
+
+  describe("/loop command", () => {
+    it("spends no turn on a gate that already passes", async () => {
+      const result = await runLoopCommand(["3", "echo 'hello'"], { cwd: tempDir });
+
+      expect(result.kind).toBe("local");
+      if (result.kind === "local") {
+        expect(result.output).toContain("already passes");
+        expect(result.output).not.toMatch(/will now drive|Armed autonomous/);
+      }
+    });
+
+    it("hands a failing gate to the model with its own output as the evidence", async () => {
+      const result = await runLoopCommand(["2", "echo 'boom' 1>&2; exit 1"], { cwd: tempDir });
+
+      expect(result.kind).toBe("prompt");
+      if (result.kind === "prompt") {
+        expect(result.prompt).toContain("boom");
+        expect(result.prompt).toContain("at most 2 attempts");
+      }
+    });
+  });
+
+  describe("/todo command", () => {
+    it("adds tasks, marks them in_progress and done, and visualizes checklist", async () => {
+      await runTodoCommand(["clear"], { cwd: tempDir });
+
+      // Add tasks
+      await runTodoCommand(["add", "Write unit tests"], { cwd: tempDir });
+      await runTodoCommand(["add", "Refactor session manager"], { cwd: tempDir });
+
+      expect(getSessionTodos().length).toBe(2);
+
+      // Start task 1
+      await runTodoCommand(["start", "1"], { cwd: tempDir });
+      expect(getSessionTodos()[0].status).toBe("in_progress");
+
+      // Complete task 1
+      await runTodoCommand(["done", "1"], { cwd: tempDir });
+      expect(getSessionTodos()[0].status).toBe("done");
+
+      // Render checklist
+      const viewRes = await runTodoCommand([], { cwd: tempDir });
+      expect(viewRes.output).toContain("Session Task Checklist");
+      expect(viewRes.output).toContain("[X] **#1**: Write unit tests *(done)*");
+      expect(viewRes.output).toContain("[ ] **#2**: Refactor session manager *(pending)*");
+      expect(viewRes.output).toContain("Progress: **1/2** (50%)");
+    });
+  });
+
+  describe("/fast command", () => {
+    it("toggles fast mode on and off", async () => {
+      const onRes = await runFastCommand(["on"], { cwd: tempDir });
+      expect(onRes.output).toContain("Fast mode is on");
+      // What it changes is sampling, not which model answers.
+      expect(onRes.output).not.toMatch(/Model Routing/);
+      expect(isFastModeEnabled(tempDir)).toBe(true);
+
+      const offRes = await runFastCommand(["off"], { cwd: tempDir });
+      expect(offRes.output).toMatch(/fast mode is off/i);
+      expect(isFastModeEnabled(tempDir)).toBe(false);
+    });
+  });
+
+  describe("/context command", () => {
+    it("says nothing has been measured yet instead of inventing a footprint", async () => {
+      const result = await runContextCommand([], { cwd: tempDir, sessionId: "sess_ctx_test" });
+
+      // The old version fell back to a literal 2,500-token footprint and split it
+      // 35/1200/remainder under a heading that called the numbers measured.
+      expect(result.kind).toBe("local");
+      expect(result.output).toContain("No request has been sent in this session yet");
+      expect(result.output).toContain("64,000 tokens");
+      expect(result.output).toMatch(/Tool schemas sent with every request: ~\d/);
+    });
+  });
+
+  describe("/btw command", () => {
+    it("handles out of band side questions cleanly", async () => {
+      const result = await runBtwCommand(["what is typescript?"], { cwd: tempDir });
+      expect(result.kind).toBe("local");
+      expect(result.output).toContain("Side Question (/btw)");
+      expect(result.output).toContain("what is typescript?");
+      expect(result.output).toContain("100% excluded from your main session history");
+    });
+  });
+
+  describe("Slash Router Dispatch for Phase 5 Commands", () => {
+    it("routes all 6 workflow commands through routeSlashCommand", async () => {
+      expect((await routeSlashCommand("/goal Fix memory leaks", { cwd: tempDir }))?.kind).toBe("local");
+      expect((await routeSlashCommand("/todo add Clean up logs", { cwd: tempDir }))?.kind).toBe("local");
+      expect((await routeSlashCommand("/fast toggle", { cwd: tempDir }))?.kind).toBe("local");
+      expect((await routeSlashCommand("/context", { cwd: tempDir }))?.kind).toBe("local");
+      expect((await routeSlashCommand("/btw explain git merge", { cwd: tempDir }))?.kind).toBe("local");
+      // A passing gate answers locally; a failing one expands into a repair prompt.
+      expect((await routeSlashCommand("/loop 2 exit 0", { cwd: tempDir }))?.kind).toBe("local");
+      expect((await routeSlashCommand("/loop 2 exit 1", { cwd: tempDir }))?.kind).toBe("prompt");
+    });
+  });
+});

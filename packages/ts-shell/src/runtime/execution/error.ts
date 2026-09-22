@@ -1,29 +1,14 @@
-import type { CommandExecutionResult, ExecutionAuthorityMode } from './service.js'
-
-export type ExecutionErrorClass =
-  | 'success'
-  | 'command_failed'
-  | 'command_not_allowed'
-  | 'command_unavailable'
-  | 'timeout'
-  | 'cancelled'
-  | 'environment_error'
-  | 'filesystem_error'
-  | 'permission_denied'
-  | 'policy_blocked'
-  | 'invalid_request'
-  | 'unknown_error'
-
+import type { ExecutionAuthorityMode, ExecutionErrorClass } from './types.js'
+export type { ExecutionErrorClass } from './types.js'
 export interface ExecutionOutcomeClassification {
   readonly executionStatus: 'success' | 'failure'
   readonly errorClass: ExecutionErrorClass
   readonly reportSafeReason: string
 }
-
 export function classifyCommandExecutionOutcome(input: {
-  readonly status: CommandExecutionResult['status']
+  readonly status: 'completed' | 'failed' | 'timeout' | 'cancelled'
   readonly exitCode: number | null
-  readonly failureKind?: CommandExecutionResult['failureKind']
+  readonly failureKind?: string
   readonly authorityMode: ExecutionAuthorityMode
   readonly stderr?: string
   readonly recoveryReason?: string

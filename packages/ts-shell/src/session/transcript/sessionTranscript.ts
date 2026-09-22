@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import {
   createMessageTranscriptEvent,
-  decodeTranscriptLine,
+  decodeTranscriptLineSafe,
   encodeTranscriptEvent,
   transcriptEventToSessionMessage,
   type TranscriptEvent,
@@ -14,11 +14,13 @@ export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] 
     return [];
   }
 
-  return fs
-    .readFileSync(transcriptPath, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map(decodeTranscriptLine);
+  const events: TranscriptEvent[] = [];
+  for (const line of fs.readFileSync(transcriptPath, "utf8").split("\n")) {
+    if (!line) continue;
+    const event = decodeTranscriptLineSafe(line);
+    if (event) events.push(event);
+  }
+  return events;
 }
 
 export function appendTranscriptEvent(
@@ -31,9 +33,77 @@ export function appendTranscriptEvent(
 export function projectTranscriptMessages(
   events: readonly TranscriptEvent[],
 ): SessionMessage[] {
-  return events
-    .map((event) => transcriptEventToSessionMessage(event) ?? null)
-    .filter((event): event is SessionMessage => event !== null);
+  let messages: SessionMessage[] = [];
+
+  for (const event of events) {
+    if (event.type === "compaction") {
+      // Re-anchor context at the compaction checkpoint, keeping the most
+      // recent messages verbatim behind it.
+      const kept = event.keptMessages && event.keptMessages > 0 ? messages.slice(-event.keptMessages) : [];
+      messages = [
+        {
+          role: "user",
+          content: `[Context Checkpoint]\n${event.summary}`,
+          timestamp: event.timestamp,
+        },
+        ...kept,
+      ];
+    } else if (event.type === "branch_summary") {
+      // What the abandoned turns established, carried forward as a note. It is
+      // not a turn the user took, so it reads as context rather than as speech.
+      messages = [
+        ...messages,
+        {
+          role: "user",
+          content: `[Earlier Path]\n${event.summary}`,
+          timestamp: event.timestamp,
+        },
+      ];
+    } else if (event.type === "message") {
+      const msg = transcriptEventToSessionMessage(event);
+      if (msg) {
+        messages.push(msg);
+      }
+    }
+  }
+
+  return messages;
+}
+
+export function appendCompactionEvent(
+  transcriptPath: string,
+  input: {
+    readonly summary: string;
+    readonly firstKeptEntryId?: string;
+    readonly keptMessages?: number;
+    readonly tokensBefore?: number;
+    readonly timestamp: string;
+  },
+): void {
+  appendTranscriptEvent(transcriptPath, {
+    type: "compaction",
+    summary: input.summary,
+    firstKeptEntryId: input.firstKeptEntryId,
+    keptMessages: input.keptMessages,
+    tokensBefore: input.tokensBefore,
+    timestamp: input.timestamp,
+  });
+}
+
+export function appendBranchSummaryEvent(
+  transcriptPath: string,
+  input: {
+    readonly summary: string;
+    readonly droppedTurns: number;
+    readonly timestamp: string;
+  },
+): void {
+  appendTranscriptEvent(transcriptPath, {
+    type: "branch_summary",
+    summary: input.summary,
+    droppedTurns: input.droppedTurns,
+    timestamp: input.timestamp,
+  });
 }
 
 export function appendSessionTurn(input: {

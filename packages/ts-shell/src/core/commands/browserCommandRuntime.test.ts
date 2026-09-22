@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
-import { createSidebarLiveEventStore } from "../context/sidebar/sidebarLiveEventStore.js";
-import { FakeBrowserExecutor } from "../context/browserExecutor.js";
-import { createBrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
-import { BrowserExternalRunnerExecutor } from "../context/browser/runtime/external/executor.js";
-import { validateBrowserExternalRunnerManifest } from "../context/browser/runtime/external/manifest.js";
-import { createBrowserSkillRunnerMetadata } from "../context/browser/skill/runner/metadata.js";
-import { classifyBrowserSkillRunnerReadiness } from "../context/browser/skill/runner/readiness.js";
+import { createSidebarLiveEventStore } from "../../presentation/sidebar/sidebarLiveEventStore.js";
+import { FakeBrowserExecutor } from "../../browser/executor.js";
+import { createBrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
+import { BrowserExternalRunnerExecutor } from "../../browser/runtime/external/executor.js";
+import { validateBrowserExternalRunnerManifest } from "../../browser/runtime/external/manifest.js";
+import { createBrowserSkillRunnerMetadata } from "../../browser/skill/runner/metadata.js";
+import { classifyBrowserSkillRunnerReadiness } from "../../browser/skill/runner/readiness.js";
 import { createBrowserSkillExecutionScenarioFixture } from "../harness/browserSkillExecutionScenarioFixtures.js";
-import { createBrowserCliExecutionBridge } from "../context/browserCliExecutionBridge.js";
-import { loadBrowserCliExecutorInjectionFromEnv } from "../context/browserCliExecutorInjection.js";
+import { createBrowserCliExecutionBridge } from "../../browser/cliExecutionBridge.js";
+import { loadBrowserCliExecutorInjectionFromEnv } from "../../browser/cliExecutorInjection.js";
 import { createBrowserExternalRunnerScenarioFixture } from "../harness/browserExternalRunnerScenarioFixtures.js";
 
 describe("browser local command runtime", () => {

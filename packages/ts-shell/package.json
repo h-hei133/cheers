@@ -20,12 +20,15 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "ignore": "^7.0.9",
+    "picomatch": "^4.0.7",
     "playwright-core": "^1.60.0",
+    "typescript": "^5.2.0",
     "undici": "^7.18.2"
   },
   "devDependencies": {
+    "@types/picomatch": "^4.0.3",
     "tsx": "^4.0.0",
-    "typescript": "^5.2.0",
     "vitest": "^0.34.0"
   }
 }

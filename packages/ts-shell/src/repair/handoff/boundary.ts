@@ -1,3 +1,5 @@
+import { redactReportText } from "../../core/security/redaction.js";
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { VerificationResultObservation } from "../../verification/result/boundary.js";
 import type { ProductRepairIterationProjection } from "../iteration/projection.js";
 
@@ -208,7 +210,7 @@ export function projectRepairRequiredHandoff(input: {
 }): RepairRequiredHandoff {
   const redactions = new Set<string>();
   const repairBlocker = input.repairBlocker ?? repairBlockerFromVerification(input.verification);
-  return freeze({
+  return freezeDeep({
     handoffId: sanitizeId(`${input.verification.verificationId}:repair-required`, redactions),
     sourceVerificationId: sanitizeText(input.verification.verificationId, redactions, 180),
     failureClass: sanitizeText(input.verification.failureClass ?? "verification-failed", redactions, 120),
@@ -263,7 +265,7 @@ export function observeRepairProposal(input: {
     (input.repairIteration?.changedFiles.length
       ? `changedFiles=${input.repairIteration.changedFiles.length}`
       : "proposal target not available");
-  return freeze({
+  return freezeDeep({
     proposalId: sanitizeId(`${input.handoff.handoffId}:proposal`, redactions),
     sourceFailureId: sanitizeText(input.handoff.handoffId, redactions, 180),
     proposalSource: input.proposalSource ??
@@ -321,7 +323,7 @@ export function observeRepairAuthority(input: {
     decision: input.authorityDecision,
     source: authoritySource,
   });
-  return freeze({
+  return freezeDeep({
     authorityId: sanitizeId(`${input.proposal.proposalId}:authority`, redactions),
     proposalId: sanitizeText(input.proposal.proposalId, redactions, 180),
     sourceFailureId: sanitizeText(input.proposal.sourceFailureId, redactions, 180),
@@ -375,7 +377,7 @@ export function createRepairApplyRequest(input: {
   const redactions = new Set<string>();
   const applyBlocker = input.applyBlocker ??
     applyBlockerFromProposalAndAuthority(input.proposal, input.authority);
-  return freeze({
+  return freezeDeep({
     requestId: sanitizeId(`${input.proposal.proposalId}:apply-request`, redactions),
     proposalId: sanitizeText(input.proposal.proposalId, redactions, 180),
     sourceFailureId: sanitizeText(input.proposal.sourceFailureId, redactions, 180),
@@ -516,7 +518,7 @@ export function observeRepairApply(input: {
     input.editApplyObservation?.changedFiles ??
     input.repairIteration?.changedFiles ??
     [];
-  return freeze({
+  return freezeDeep({
     repairApplyId: sanitizeId(`${input.proposal.proposalId}:apply`, redactions),
     proposalId: sanitizeText(input.proposal.proposalId, redactions, 180),
     sourceFailureId: sanitizeText(input.proposal.sourceFailureId, redactions, 180),
@@ -691,7 +693,7 @@ function postRepairStatusFromIteration(
 }
 
 function unique(values: readonly string[], redactions: Set<string>): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
 }
 
 function sanitizeId(value: string, redactions: Set<string>): string {
@@ -702,35 +704,5 @@ function sanitizeId(value: string, redactions: Set<string>): string {
 }
 
 function sanitizeText(value: string, redactions: Set<string>, maxLength: number): string {
-  let sanitized = value
-    .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
-    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
-    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[secret-redacted]")
-    .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]")
-    .replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]")
-    .replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]")
-    .replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]")
-    .replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]")
-    .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (sanitized !== value.trim()) {
-    redactions.add("unsafe-content");
-  }
-  if (sanitized.length > maxLength) {
-    sanitized = `${sanitized.slice(0, maxLength)}...`;
-    redactions.add("truncated");
-  }
-  return sanitized;
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
+  return redactReportText(value, maxLength, { redactions, ellipsis: true });
 }

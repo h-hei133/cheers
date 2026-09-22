@@ -20,13 +20,11 @@ const providerCredentialResolution: ProviderCredentialResolution = {
   },
 };
 
-function baseInput(
-  overrides: Partial<CliRuntimeInvocationInput> = {},
-): CliRuntimeInvocationInput {
+function baseInput(overrides: Partial<CliRuntimeInvocationInput> = {}): CliRuntimeInvocationInput {
   return {
     sessionId: "sess_123",
     prompt: "write a file",
-    workspaceRoot: "/workspace",
+    workspaceRoot: process.cwd(),
     signal: new AbortController().signal,
     maxTurns: 3,
     escalationPromptHandler: async (prompt) => ({
@@ -43,38 +41,19 @@ function baseInput(
 
 async function collect(events: AsyncIterable<QueryEvent>): Promise<QueryEvent[]> {
   const collected: QueryEvent[] = [];
-  for await (const event of events) {
-    collected.push(event);
-  }
+  for await (const event of events) collected.push(event);
   return collected;
 }
 
 function event(delta: string): QueryEvent {
-  return { type: "message.delta", role: "assistant", delta };
+  return { type: "message.delta", role: "coder", delta };
 }
 
-async function* oneEvent(delta: string): AsyncIterable<QueryEvent> {
-  yield event(delta);
-}
-
-function dependencies(): {
-  deps: CliRuntimeInvocationDependencies;
-  calls: string[];
-} {
+function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string[] } {
   const calls: string[] = [];
   return {
     calls,
     deps: {
-      streamIntegratedFlow: (input) => {
-        calls.push(
-          `integrated:${input.providerMode}:${input.applyPatchRuntimeRoute ? "patch" : "default"}:${input.planningMutationExecution ? "planning-mutation" : "no-planning-mutation"}`,
-        );
-        return oneEvent("integrated");
-      },
-      streamLightweight: (input) => {
-        calls.push(`lightweight:${input.providerMode}:${input.mode}`);
-        return oneEvent("lightweight");
-      },
       checkProviderReadiness: async () => {
         calls.push("readiness");
         return { ok: true };
@@ -83,149 +62,128 @@ function dependencies(): {
         calls.push(`readiness-event:${input.stopReason}`);
         return event("readiness-event");
       },
+      createStep: () => {
+        calls.push("step");
+        return async (_messages, _signal, listener) => {
+          listener.onText?.("real answer");
+          return { text: "real answer", toolCalls: [], stopReason: "stop" };
+        };
+      },
+      tools: () => new Map(),
     },
   };
 }
 
 describe("CLI runtime invocation", () => {
   it("packages provider mode from the existing CLI environment convention", () => {
-    expect(
-      buildCliRuntimeInvocation(
-        baseInput({ providerModeEnv: "synthetic" }),
-      ).providerMode,
-    ).toBe("synthetic");
-    expect(
-      buildCliRuntimeInvocation(baseInput({ providerModeEnv: "real" }))
-        .providerMode,
-    ).toBe("real");
-    expect(
-      buildCliRuntimeInvocation(baseInput({ providerModeEnv: undefined }))
-        .providerMode,
-    ).toBe("real");
+    expect(buildCliRuntimeInvocation(baseInput({ providerModeEnv: "synthetic" })).providerMode).toBe("synthetic");
+    expect(buildCliRuntimeInvocation(baseInput({ providerModeEnv: "real" })).providerMode).toBe("real");
+    expect(buildCliRuntimeInvocation(baseInput({ providerModeEnv: undefined })).providerMode).toBe("real");
   });
 
-  it("keeps explicit apply_patch runtime route on the integrated flow path", async () => {
+  it("drives a synthetic prompt through the turn without touching the provider", async () => {
     const { deps, calls } = dependencies();
-    const events = await collect(
-      runCliRuntimeInvocation(
-        baseInput({
-          providerModeEnv: "synthetic",
-          applyPatchRuntimeRoute: {
-            explicitRuntimeOptIn: true,
-            requestedUserDecision: "approved",
-            runtimeSource: "production-adjacent",
-          },
-        }),
-        deps,
-      ).events,
-    );
-
-    expect(events).toEqual([event("integrated")]);
-    expect(calls).toEqual(["integrated:synthetic:patch:no-planning-mutation"]);
-  });
-
-  it("routes exact fenced replacement prompts through the integrated CLI path", async () => {
-    const { deps, calls } = dependencies();
-    const events = await collect(
-      runCliRuntimeInvocation(
-        baseInput({
-          providerModeEnv: "synthetic",
-          prompt: [
-            "Replace the exact fenced block in src/app.ts",
-            "```",
-            "status: draft",
-            "```",
-            "with",
-            "```",
-            "status: ready",
-            "```",
-          ].join("\n"),
-          agentMode: "build",
-        }),
-        deps,
-      ).events,
-    );
-
-    expect(events).toEqual([event("integrated")]);
-    expect(calls).toEqual(["integrated:synthetic:default:no-planning-mutation"]);
-  });
-
-  it("passes explicit planning mutation execution contract to integrated flow", async () => {
-    const { deps, calls } = dependencies();
-    const events = await collect(
-      runCliRuntimeInvocation(
-        baseInput({
-          providerModeEnv: "synthetic",
-          prompt: "Fix planner ranking",
-          planningMutationExecution: {
-            confirmation: { state: "trusted-confirmed" },
-            rawProposal: {
-              operationKind: "exact-fenced-replacement",
-              targets: [
-                {
-                  path: "src/app.ts",
-                  oldText: "old",
-                  newText: "new",
-                },
-              ],
-            },
-            controlledWorkspace: {
-              scope: "controlled-temp-workspace",
-              source: "cli-flag",
-            },
-          },
-        }),
-        deps,
-      ).events,
-    );
-
-    expect(events).toEqual([event("integrated")]);
-    expect(calls).toEqual(["integrated:synthetic:default:planning-mutation"]);
-  });
-
-  it("routes lightweight prompts through the existing lightweight provider path", async () => {
-    const { deps, calls } = dependencies();
+    const recorded: string[] = [];
     const events = await collect(
       runCliRuntimeInvocation(
         baseInput({
           providerModeEnv: "synthetic",
           prompt: "hello there",
-          agentMode: "build",
+          onTurnMessage: (message) => recorded.push(`${message.role}:${message.content}`),
         }),
         deps,
       ).events,
     );
 
-    expect(events).toEqual([event("lightweight")]);
-    expect(calls).toEqual(["lightweight:synthetic:chat"]);
+    expect(calls).toEqual([]);
+    expect(events[0]).toEqual({ type: "query.started", sessionId: "sess_123", prompt: "hello there" });
+    const deltas = events.filter((entry) => entry.type === "message.delta").map((entry) => (entry as { delta: string }).delta);
+    expect(deltas.join("")).toBe("Synthetic reply: hello there");
+    const terminal = events.at(-1);
+    expect(terminal?.type).toBe("query.completed");
+    if (terminal?.type === "query.completed") {
+      expect(terminal.result.finalOutput).toBe("Synthetic reply: hello there");
+      expect(terminal.result.terminalClassification).toBe("success");
+    }
+    expect(recorded).toEqual(["assistant:Synthetic reply: hello there"]);
   });
 
-  it("preserves real-provider readiness stop before integrated runtime", async () => {
+  it("checks real-provider readiness before the model is asked anything", async () => {
+    const { deps, calls } = dependencies();
+    const events = await collect(runCliRuntimeInvocation(baseInput({ providerModeEnv: "real" }), deps).events);
+
+    expect(calls).toEqual(["readiness", "step"]);
+    expect(events.at(-1)?.type).toBe("query.completed");
+    expect(events.some((entry) => entry.type === "message.delta" && entry.delta === "real answer")).toBe(true);
+  });
+
+  it("preserves real-provider readiness stop before the turn starts", async () => {
     const { deps, calls } = dependencies();
     const failingDeps: CliRuntimeInvocationDependencies = {
       ...deps,
       checkProviderReadiness: async () => {
         calls.push("readiness");
-        return {
-          ok: false,
-          failure: {
-            kind: "missing-key",
-            stopReason: "missing provider key",
-          },
-        };
+        return { ok: false, failure: { kind: "missing-key", stopReason: "missing provider key" } };
       },
     };
     const events = await collect(
-      runCliRuntimeInvocation(
-        baseInput({
-          providerModeEnv: "real",
-          prompt: "write a file",
-        }),
-        failingDeps,
-      ).events,
+      runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "write a file" }), failingDeps).events,
     );
 
     expect(events).toEqual([event("readiness-event")]);
     expect(calls).toEqual(["readiness", "readiness-event:missing provider key"]);
+  });
+
+  it("hands back an input handle that reaches the run once it has started", async () => {
+    const { deps } = dependencies();
+    const gate = { release: (): void => {} };
+    const slowDeps: CliRuntimeInvocationDependencies = {
+      ...deps,
+      createStep: () => async (messages, _signal, listener) => {
+        const lastUser = [...messages].reverse().find((message) => message.role === "user");
+        if (!lastUser?.content.includes("steered")) await new Promise<void>((resolve) => { gate.release = resolve; });
+        const text = `saw ${lastUser?.content ?? ""}`;
+        listener.onText?.(text);
+        return { text, toolCalls: [], stopReason: "stop" };
+      },
+    };
+    const run = runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "first" }), slowDeps);
+    const collected: QueryEvent[] = [];
+    const reading = (async () => {
+      for await (const entry of run.events) {
+        collected.push(entry);
+        if (entry.type === "query.started") {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          run.input?.followUp("steered later");
+          expect(run.input?.pending().followUps).toEqual(["steered later"]);
+          gate.release();
+        }
+      }
+    })();
+    await reading;
+    const deltas = collected.filter((entry) => entry.type === "message.delta").map((entry) => (entry as { delta: string }).delta);
+    expect(deltas.some((delta) => delta.includes("steered later"))).toBe(true);
+    expect(run.input?.pending().followUps).toEqual([]);
+  });
+
+  it("buffers input handed over before the readiness check finishes", async () => {
+    const { deps } = dependencies();
+    const { promise: readinessGate, resolve: releaseReadiness } = Promise.withResolvers<void>();
+    const gatedDeps: CliRuntimeInvocationDependencies = {
+      ...deps,
+      checkProviderReadiness: async () => {
+        await readinessGate;
+        return { ok: true };
+      },
+    };
+    const run = runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "first" }), gatedDeps);
+    run.input?.steer("early steer");
+    run.input?.followUp("early follow-up");
+    expect(run.input?.pending()).toEqual({ steering: ["early steer"], followUps: ["early follow-up"] });
+    const reading = collect(run.events);
+    releaseReadiness();
+    const events = await reading;
+    expect(events.at(-1)?.type).toBe("query.completed");
+    expect(run.input?.pending()).toEqual({ steering: [], followUps: [] });
   });
 });

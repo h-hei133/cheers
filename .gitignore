@@ -18,6 +18,7 @@ tmp-*
 packages/ts-shell/.tmp-debug-*/
 packages/ts-shell/_cli_input.txt
 status=*
+.ts-shell/
 Microsoft/
 
 .DS_Store
@@ -33,3 +34,9 @@ rtk/
 .codex/skills/.system/**
 !.codex/prompts/
 !.codex/prompts/**
+
+# NormProof judge output
+.normproof/out/
+
+# omp project settings (model overrides for subagents)
+.omp/

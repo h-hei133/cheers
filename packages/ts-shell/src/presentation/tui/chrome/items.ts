@@ -1,0 +1,168 @@
+import { defaultTheme } from "../../theme/theme.js";
+import { formatTokens } from "../transcript/live.js";
+
+/**
+ * Status item vocabulary.
+ *
+ * The band shows what the user chose, and can only offer items with a real
+ * source — every value here is read from runtime state or recorded provider
+ * usage. An item whose source is unavailable renders nothing rather than a
+ * placeholder, so an unconfigured session shows a shorter band instead of a band
+ * full of zeroes and dashes.
+ */
+
+export type StatusItemId =
+  | "model"
+  | "provider"
+  | "branch"
+  | "directory"
+  | "context"
+  | "session-tokens"
+  | "cost"
+  | "turns"
+  | "agent-mode"
+  | "permission-scope"
+  | "session"
+  | "todos"
+  | "queued"
+  | "peers"
+  | "worktree";
+
+export interface StatusFacts {
+  readonly model: string;
+  readonly provider: string;
+  readonly branch?: string;
+  readonly directory?: string;
+  readonly contextUsed?: number;
+  readonly contextWindow?: number;
+  readonly sessionTokens?: number;
+  readonly costUsd?: number;
+  readonly turns?: number;
+  readonly agentMode?: string;
+  /** How much the session may do before it has to ask. */
+  readonly permissionScope?: string;
+  readonly sessionId?: string;
+  readonly openTodos?: number;
+  /** Submissions waiting behind the running turn. */
+  readonly queued?: number;
+  /** Other live sessions reachable for cross-session messaging. */
+  readonly peers?: number;
+  /** Whether the working tree has uncommitted changes. */
+  readonly worktreeDirty?: boolean;
+}
+
+export interface StatusItem {
+  readonly id: StatusItemId;
+  readonly label: string;
+  readonly describe: string;
+}
+
+/** Every offerable item, in the order a picker should present them. */
+export const STATUS_ITEMS: readonly StatusItem[] = [
+  { id: "model", label: "model", describe: "active model name" },
+  { id: "provider", label: "provider", describe: "active provider" },
+  { id: "agent-mode", label: "mode", describe: "plan or build" },
+  { id: "permission-scope", label: "permissions", describe: "how much a turn may do without asking" },
+  { id: "branch", label: "branch", describe: "current git branch" },
+  { id: "directory", label: "directory", describe: "project root, home-relative" },
+  { id: "context", label: "context", describe: "context window used, as tokens and percent" },
+  { id: "session-tokens", label: "tokens", describe: "total tokens this session" },
+  { id: "cost", label: "cost", describe: "estimated session spend" },
+  { id: "turns", label: "turns", describe: "turns completed this session" },
+  { id: "todos", label: "todos", describe: "open todo entries" },
+  { id: "worktree", label: "worktree", describe: "whether the working tree is dirty" },
+  { id: "queued", label: "queued", describe: "submissions waiting behind the running turn" },
+  { id: "peers", label: "peers", describe: "other live sessions you can message" },
+  { id: "session", label: "session", describe: "short session id, for /resume" },
+];
+
+/** Items shown when the user has not chosen. */
+export const DEFAULT_STATUS_ITEMS: readonly StatusItemId[] = [
+  "model",
+  "agent-mode",
+  "permission-scope",
+  "branch",
+  "context",
+  "directory",
+];
+
+const CONTEXT_TIERS = [
+  { at: 90, token: "error" as const },
+  { at: 70, token: "warning" as const },
+  { at: 50, token: "accent" as const },
+];
+
+/** One item's rendered text, or undefined when its source has nothing to say. */
+export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string | undefined {
+  switch (id) {
+    case "model":
+      return defaultTheme.fg("accent", facts.model);
+    case "provider":
+      return defaultTheme.dim(facts.provider);
+    case "agent-mode":
+      // Always shown: Shift+Tab toggles this, and a toggle whose state is
+      // invisible half the time is a toggle nobody trusts.
+      if (!facts.agentMode) return undefined;
+      return facts.agentMode === "plan"
+        ? defaultTheme.fg("warning", facts.agentMode)
+        : defaultTheme.dim(facts.agentMode);
+    case "permission-scope":
+      // Widening what a turn may do without asking is the one state a user must
+      // never be unsure of, so it is coloured by how much it gives away.
+      if (!facts.permissionScope) return undefined;
+      if (facts.permissionScope === "allow-all") {
+        return defaultTheme.fg("error", facts.permissionScope);
+      }
+      return facts.permissionScope === "accept-edits"
+        ? defaultTheme.fg("warning", facts.permissionScope)
+        : defaultTheme.dim(facts.permissionScope);
+    case "branch":
+      return facts.branch ? defaultTheme.fg("success", facts.branch) : undefined;
+    case "worktree":
+      if (facts.worktreeDirty === undefined) return undefined;
+      return facts.worktreeDirty
+        ? defaultTheme.fg("warning", "uncommitted")
+        : defaultTheme.dim("clean");
+    case "queued":
+      return facts.queued ? defaultTheme.fg("accent", `${facts.queued} queued`) : undefined;
+    case "peers":
+      return facts.peers ? defaultTheme.dim(`${facts.peers} peers`) : undefined;
+    case "directory":
+      return facts.directory ? defaultTheme.dim(facts.directory) : undefined;
+    case "context":
+      return renderContext(facts);
+    case "session-tokens":
+      return facts.sessionTokens ? defaultTheme.dim(`${formatTokens(facts.sessionTokens)} tok`) : undefined;
+    case "cost":
+      return facts.costUsd && facts.costUsd > 0 ? defaultTheme.dim(`$${facts.costUsd.toFixed(4)}`) : undefined;
+    case "turns":
+      return facts.turns ? defaultTheme.dim(`${facts.turns} turn${facts.turns === 1 ? "" : "s"}`) : undefined;
+    case "todos":
+      return facts.openTodos ? defaultTheme.fg("warning", `${facts.openTodos} todo`) : undefined;
+    default:
+      return facts.sessionId ? defaultTheme.dim(shortSession(facts.sessionId)) : undefined;
+  }
+}
+
+/** Context gauge, coloured by how close the window is to full. */
+function renderContext(facts: StatusFacts): string | undefined {
+  if (facts.contextUsed === undefined || !facts.contextWindow) return undefined;
+  const percent = Math.min(100, Math.round((facts.contextUsed / facts.contextWindow) * 100));
+  const text = `${formatTokens(facts.contextUsed)}/${formatTokens(facts.contextWindow)} ${percent}%`;
+  const tier = CONTEXT_TIERS.find((entry) => percent >= entry.at);
+  return tier ? defaultTheme.fg(tier.token, text) : defaultTheme.dim(text);
+}
+
+/** The distinctive tail of a session id, which is what /resume accepts. */
+function shortSession(sessionId: string): string {
+  const parts = sessionId.split("_");
+  return parts.length > 1 ? parts[1]!.slice(0, 8) : sessionId.slice(0, 8);
+}
+
+/** Ids that name a real item, in canonical order, or the default set. */
+export function normalizeStatusItems(ids: readonly string[] | undefined): readonly StatusItemId[] {
+  if (!ids || ids.length === 0) return DEFAULT_STATUS_ITEMS;
+  const wanted = new Set(ids);
+  const chosen = STATUS_ITEMS.filter((item) => wanted.has(item.id)).map((item) => item.id);
+  return chosen.length > 0 ? chosen : DEFAULT_STATUS_ITEMS;
+}

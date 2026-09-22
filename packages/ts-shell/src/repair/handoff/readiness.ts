@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { RepairVerdictProofInput } from "../../evidence/projection/repair/verdict.js";
 import type { RepairVerdictTerminalProjection } from "../../result/projection/repair/verdict.js";
 import type {
@@ -64,7 +65,7 @@ export function projectRepairReadiness(input: {
     input.postRepairVerificationResult?.sourceVerificationId ??
     input.repairVerdictTerminalProjection?.originalVerificationFailureId;
 
-  return deepFreeze({
+  return freezeDeep({
     readinessId: `repair-readiness:${sourceVerificationId ?? "not-proven"}`,
     status,
     ...(sourceVerificationId ? { sourceVerificationId } : {}),
@@ -231,15 +232,5 @@ function repairReadinessNextAction(
 }
 
 function unique(values: readonly string[]): readonly string[] {
-  return deepFreeze(Array.from(new Set(values)).sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const nested of Object.values(value)) {
-      deepFreeze(nested);
-    }
-  }
-  return value;
+  return freezeDeep(Array.from(new Set(values)).sort());
 }

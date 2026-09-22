@@ -1,15 +1,15 @@
-import { createBrowserActionContract } from "../context/browserActionContract.js";
-import { createBrowserExecutionRequest, type BrowserExecutionRequest } from "../context/browserExecutionContract.js";
+import { createBrowserActionContract } from "../../browser/actionContract.js";
+import { createBrowserExecutionRequest, type BrowserExecutionRequest } from "../../browser/executionContract.js";
 import {
   createBrowserRuntimeManifest,
   validateBrowserRuntimeManifest,
   type BrowserRuntimeManifest,
   type BrowserRuntimeManifestLoadResult,
-} from "../context/browser/runtime/core/manifest.js";
+} from "../../browser/runtime/core/manifest.js";
 import {
   SimulatedBrowserRuntimeExecutor,
   type BrowserRuntimePageState,
-} from "../context/browser/runtime/core/executor.js";
+} from "../../browser/runtime/core/executor.js";
 
 export interface BrowserRuntimeMvpScenarioFixture {
   readonly manifest: BrowserRuntimeManifest;

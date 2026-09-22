@@ -71,8 +71,10 @@ export async function openSessionsPanel(input: {
       const projectLabel = path.basename(session.projectRoot) || session.projectRoot;
       const recoverability = session.recoverable ? "recoverable" : "blocked";
       const cue = buildResumeCue(session);
+      // The title is what a reader recognises a conversation by; the id only
+      // disambiguates when two titles collide.
       stdout.write(
-        `${marker}${active} ${title}  [${session.status}] [${recoverability}]  ${session.id}\n`,
+        `${marker}${active} ${title}  [${session.status}] [${recoverability}]  ${session.id.slice(0, 8)}\n`,
       );
       stdout.write(
         `   @${projectLabel}  updated=${toRelativeTime(session.updatedAt)}${cue ? `  ${cue}` : ""}\n`,

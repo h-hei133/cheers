@@ -1,0 +1,21 @@
+import { sanitizeBrowserText } from "./capabilityModel.js";
+import type { PwRuntimeStatus } from "./playwrightRuntime.js";
+
+export function renderPwRuntimeStatus(status: PwRuntimeStatus): string {
+  return [
+    "Direct Playwright",
+    `- Status: ${status.status}`,
+    `- Reason code: ${status.reasonCode}`,
+    `- Dependency: ${status.dependency}`,
+    `- Browser: ${status.browserName}`,
+    `- Executable source: ${status.executableSource}`,
+    `- Real browser validation: ${status.realBrowserValidationAvailable ? "available" : "unavailable"}`,
+    `- Browser launched during status: ${status.browserLaunched ? "yes" : "no"}`,
+    "- Default runtime: disabled",
+    "- Tool-server backend: optional-not-default",
+    "- Provider/model call: none",
+    `- Reason: ${sanitizeBrowserText(status.reason, 220)}`,
+    `- Skip reason: ${status.skipReason ? sanitizeBrowserText(status.skipReason, 120) : "none"}`,
+    `- Next action: ${sanitizeBrowserText(status.nextAction, 220)}`,
+  ].join("\n");
+}

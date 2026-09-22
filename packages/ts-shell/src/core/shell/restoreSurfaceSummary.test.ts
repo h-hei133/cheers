@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { CodingResultSummary } from "../../result/types.js";
 import { formatExplicitRestoreSummaryLines } from "./restoreSurfaceSummary.js";
 
 describe("restore surface summary", () => {

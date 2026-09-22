@@ -2,6 +2,16 @@ import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { normalizeLegacyPermissionWorkingMemory } from "./projectRootRebaseProjection.js";
 
+/**
+ * One-time repair of a session state snapshot that still carries permission
+ * continuity from a previous machine or project root. The first snapshot build
+ * after such a session is loaded rewrites the stored state so every later read
+ * sees normalized, current-root-scoped cache keys.
+ *
+ * Restored from the same-named module it was inlined from: snapshot building
+ * must not hand legacy roots through to approval-memory lookups, and the repair
+ * must persist, not just correct one read.
+ */
 export function normalizeLegacyPermissionStateForSession(input: {
   readonly session: Session;
   readonly snapshot: SessionStateSnapshot | undefined;

@@ -1,0 +1,62 @@
+{
+  "id": "software-structure-v0",
+  "version": "0",
+  "name": "Software structure",
+  "description": "Structural norms generated for this workspace. Every obligation names a path detected in it.",
+  "obligationTemplates": [
+    {
+      "id": "source_graph_is_acyclic",
+      "title": "No dependency cycle among source modules",
+      "severity": "advisory",
+      "requiredWhen": {
+        "kind": "always"
+      },
+      "requiredEvidence": [
+        "source_module_graph"
+      ],
+      "requiredAuthority": "A0",
+      "expression": {
+        "kind": "acyclic",
+        "evidenceId": "source_module_graph"
+      },
+      "repair": "Break the cycle by moving the shared type or helper into a module both sides may depend on."
+    },
+    {
+      "id": "source_graph_has_no_unresolved_specifiers",
+      "title": "Every module import resolves within the declared source graph",
+      "severity": "blocking",
+      "requiredWhen": {
+        "kind": "always"
+      },
+      "requiredEvidence": [
+        "source_module_graph"
+      ],
+      "requiredAuthority": "A0",
+      "expression": {
+        "kind": "none",
+        "evidenceId": "source_module_graph",
+        "matches": "unresolved: */**"
+      },
+      "repair": "Fix or remove imports that do not resolve to a collected file — path aliases, bare package specifiers written as relative paths, and escapes from the detected root all leave a hole in the graph every other rule reads."
+    },
+    {
+      "id": "declared_functions_within_module_ceiling",
+      "title": "No module declares more function-like names than the responsibility ceiling allows",
+      "severity": "advisory",
+      "requiredWhen": {
+        "kind": "always"
+      },
+      "requiredEvidence": [
+        "source_module_functions"
+      ],
+      "requiredAuthority": "A0",
+      "expression": {
+        "kind": "groupSizeUnder",
+        "evidenceId": "source_module_functions",
+        "ceiling": 20,
+        "onEmpty": "unsatisfied"
+      },
+      "repair": "Split packages modules that accumulate more than 20 declared names into narrower responsibilities."
+    }
+  ]
+}

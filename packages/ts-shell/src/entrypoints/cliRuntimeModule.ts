@@ -10,9 +10,9 @@ import {
   parseTransportPrompts,
   updateFenceState,
 } from "../core/shell/printPromptInput.js";
-import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import type { ShellRuntimeContext } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
+import { createJsonEventWriter } from "../presentation/terminal/jsonEvents.js";
 import {
   isResumeLikeShellAction,
   renderInteractiveOnlyShellActionBlocked,
@@ -26,66 +26,23 @@ import {
 } from "../core/shell/turnBoundarySurface.js";
 import { recordCount } from "../observability/index.js";
 import type { StructuredLogger } from "../observability/structuredLogger.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
-import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import {
   analyzeApprovalModeConflict,
-  applyPatchDecisionFromApprovalMode,
   materializeApprovalModeObject,
   type ApprovalModeObject,
 } from "./cliApprovalModule.js";
 import {
   buildCliCommandExecution as resolveTurnInputForExecution,
-  normalizePromptForExecution,
 } from "./cliCommandExecutionBridge.js";
 import { formatCliContextTag } from "./cliInteractiveLoopState.js";
 import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
-import {
-  runCliRuntimeInvocation,
-  type CliApplyPatchRuntimeRouteOptions,
-} from "./cliRuntimeInvocation.js";
-import type { PlanningRuntimeProductExecutionOptions } from "../orchestration/planningRuntimeProductExecution.js";
 import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "./cliSessionModule.js";
 import { runCliWorkspaceCommand } from "./cliWorkspaceModule.js";
 import { renderUserHelp, renderSessionCommandMap } from "./slashCommandRegistry.js";
-
-export async function* streamOrchestratedResponse(
-  prompt: string,
-  sessionId: string,
-  workspaceRoot: string,
-  signal: AbortSignal,
-  maxTurns: number,
-  escalationPromptHandler: (
-    prompt: EscalationPrompt,
-  ) => Promise<EscalationResponse>,
-  providerCredentialResolution: ProviderCredentialResolution,
-  agentMode: "plan" | "build",
-  runtimeSeed?: QueryRuntimeStateSeed,
-  continuityState?: SessionContinuitySnapshot,
-  applyPatchRuntimeRoute?: CliApplyPatchRuntimeRouteOptions,
-  planningMutationExecution?: PlanningRuntimeProductExecutionOptions,
-) {
-  const invocation = runCliRuntimeInvocation({
-    sessionId,
-    prompt,
-    workspaceRoot,
-    signal,
-    maxTurns,
-    escalationPromptHandler,
-    providerCredentialResolution,
-    agentMode,
-    runtimeSeed,
-    continuityState,
-    applyPatchRuntimeRoute,
-    planningMutationExecution,
-    providerModeEnv: process.env.PRIVATE_AGENTS_PROVIDER_MODE,
-  });
-  for await (const event of invocation.events) {
-    yield event;
-  }
-}
+import { getRuntimeConfig } from "../config/runtimeConfig.js";
 
 export async function runNonTtyPromptStream(options: {
   sessionManager: SessionManager;
@@ -235,6 +192,8 @@ export async function runNonInteractivePrompt(options: {
   sessionRuntime: ShellSessionRuntime;
   logger: StructuredLogger;
   printMode: boolean;
+  /** Write the run's events as JSON lines on stdout instead of prose. */
+  jsonEvents?: boolean;
   fallbackSessionId?: string;
   lifecycleNotices?: readonly string[];
   setActiveNonInteractiveApprovalMode: (
@@ -253,6 +212,15 @@ export async function runNonInteractivePrompt(options: {
     printMode: options.printMode,
     interactive: false,
     sessionId: options.runtimeContext.session.id,
+    // Offered on the non-interactive path too: a scripted run has the same
+    // session and the same one-shot configuration read, so `/reload` must mean
+    // the same thing there rather than reporting that it cannot help.
+    refreshRuntimeConfig: () => {
+      const before = options.runtimeContext.runtimeConfig;
+      const after = getRuntimeConfig(options.runtimeContext.cwd);
+      options.runtimeContext.runtimeConfig = after;
+      return { before, after };
+    },
   });
   if (resolved.kind === "handled") {
     return;
@@ -307,7 +275,6 @@ export async function runNonInteractivePrompt(options: {
         sessionManager: options.sessionManager,
         runtimeContext: options.runtimeContext,
         renderer: options.renderer,
-        normalizePromptForExecution,
         switchRuntimeSessionProjectContext,
         renderSessionCommandMap,
         executeResolvedPromptTurn: (turnInput) => {
@@ -324,6 +291,7 @@ export async function runNonInteractivePrompt(options: {
             sessionRuntime: options.sessionRuntime,
             logger: options.logger,
             printMode: options.printMode,
+            jsonEvents: options.jsonEvents,
             turnNumber: turnInput.turnNumber,
             renderer: options.renderer,
             turnOrigin: turnInput.turnOrigin,
@@ -348,6 +316,7 @@ export async function runNonInteractivePrompt(options: {
     sessionRuntime: options.sessionRuntime,
     logger: options.logger,
     printMode: options.printMode,
+    jsonEvents: options.jsonEvents,
     renderer: options.renderer,
   });
 }
@@ -366,6 +335,8 @@ export async function executeResolvedPromptTurn(options: {
   sessionRuntime: ShellSessionRuntime;
   logger: StructuredLogger;
   printMode: boolean;
+  /** Write the run's events as JSON lines on stdout instead of prose. */
+  jsonEvents?: boolean;
   turnNumber?: number;
   renderer: StreamingRenderer;
   turnOrigin?: "normal" | "resumed" | "continued";
@@ -380,12 +351,16 @@ export async function executeResolvedPromptTurn(options: {
       turn: turnLabel,
       turnOrigin,
     });
-    options.renderer.renderLine(
-      formatTurnStartBoundary({
-        turnNumber: turnLabel,
-        origin: turnOrigin,
-      }),
-    );
+    // A host that captures output draws its own turn boundaries; emitting these
+    // as prose too would put duplicate chrome inside its transcript.
+    if (!options.renderer.captured) {
+      options.renderer.renderLine(
+        formatTurnStartBoundary({
+          turnNumber: turnLabel,
+          origin: turnOrigin,
+        }),
+      );
+    }
   }
   options.logger.info(
     options.source === "interactive"
@@ -424,32 +399,51 @@ export async function executeResolvedPromptTurn(options: {
       });
       return;
     }
-    if (!options.printMode) {
+    if (!options.printMode && !options.renderer.captured) {
       options.renderer.renderLine(formatExecutionStartedLine(turnOrigin));
     }
     recordCount("cli.prompts", 1, {
       sessionId: options.runtimeContext.session.id,
     });
     options.setActiveNonInteractiveApprovalMode(approvalModeObject);
-    await options.sessionRuntime.executePrompt(
-      options.runtimeContext.session.id,
-      options.effectivePrompt,
-      {
-        outputMode: options.printMode ? "print" : "interactive",
-        runtimeSeed: options.runtimeSeed,
-        continuityState: continuitySnapshot,
-      },
-    );
+    // An event consumer gets the run as events and nothing else: prose arriving
+    // on the same stream would interleave with the JSON lines and make them
+    // unparseable. Prose is routed to a sink that drops it, and the events are
+    // written to the device directly.
+    const unsubscribe = options.jsonEvents
+      ? options.sessionRuntime.observeEvents(
+          createJsonEventWriter((line) => process.stdout.write(line)),
+        )
+      : undefined;
+    if (options.jsonEvents) options.renderer.setSink({ line: () => {}, chunk: () => {} });
+    try {
+      await options.sessionRuntime.executePrompt(
+        options.runtimeContext.session.id,
+        options.effectivePrompt,
+        {
+          outputMode: options.printMode ? "print" : "interactive",
+          runtimeSeed: options.runtimeSeed,
+          continuityState: continuitySnapshot,
+        },
+      );
+    } finally {
+      unsubscribe?.();
+      if (options.jsonEvents) options.renderer.clearSink();
+    }
   } catch (error) {
     const shellState = options.sessionRuntime.getState();
     if (interactiveTurn && shellState === "interrupted") {
       turnEndStatus = "interrupted";
-      renderTurnResultFallback(options.renderer, {
-        outcome: "interrupted",
-        detail: "Current request was cancelled before completion.",
-        doNext:
-          "Use /resume to continue the interrupted session, or enter a new prompt.",
-      });
+      // A surface that captures output announces the interruption in its own
+      // transcript; only a plain terminal needs the fallback block.
+      if (!options.renderer.captured) {
+        renderTurnResultFallback(options.renderer, {
+          outcome: "interrupted",
+          detail: "Current request was cancelled before completion.",
+          doNext:
+            "Use /resume to continue the interrupted session, or enter a new prompt.",
+        });
+      }
       return;
     }
     turnEndStatus = "error";
@@ -480,7 +474,7 @@ export async function executeResolvedPromptTurn(options: {
         turnEndStatus,
       },
     );
-    if (interactiveTurn) {
+    if (interactiveTurn && !options.renderer.captured) {
       options.renderer.renderLine(
         formatTurnEndBoundary({
           turnNumber: turnLabel,

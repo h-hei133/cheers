@@ -1,4 +1,4 @@
-import type { SchemaVersion } from '../../../../contracts/typescript/types.js'
+export type SchemaVersion = `${number}.${number}.${number}` | string
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,

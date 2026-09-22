@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type {
   RecoveryTrustBoundaryBlock,
   SessionManager,
@@ -157,10 +157,9 @@ export function renderStartupSurface(
 
   renderer.renderLine("Next actions:");
   renderer.renderLine("- Type a prompt to start work in this project.");
-  renderer.renderLine("- /sessions    inspect active + recent sessions.");
-  renderer.renderLine("- /resume      continue the best recoverable context.");
-  renderer.renderLine("- /workspace status    verify project/workdir binding.");
-  renderer.renderLine("- /help        open grouped command navigation.");
+  renderer.renderLine("- /resume             inspect sessions or continue work.");
+  renderer.renderLine("- /workspace status   verify project/workdir binding.");
+  renderer.renderLine("- /help               open grouped command navigation.");
   if (input.stdinTransportMode === "stream-live") {
     renderer.renderLine(
       "- Non-TTY stream mode active: each input line is processed as a sequential turn.",

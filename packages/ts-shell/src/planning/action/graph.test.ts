@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
+import type { WorkflowTaskPlan } from "../task/workflowTaskPlanner.js";
 import {
   buildWorkflowActionGraph,
   orderedMutationTargetsFromGraph,

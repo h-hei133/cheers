@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createBrowserExternalRuntimeManifest, validateBrowserExternalRuntimeManifest } from "../context/browser/runtime/external/runtimeManifest.js";
-import type { BrowserRuntimeProtocolResponse } from "../context/browser/runtime/core/protocol.js";
-import type { BrowserSkillRuntimeBinding } from "../context/browser/skill/runtime/binding.js";
+import { createBrowserExternalRuntimeManifest, validateBrowserExternalRuntimeManifest } from "../../browser/runtime/external/runtimeManifest.js";
+import type { BrowserRuntimeProtocolResponse } from "../../browser/runtime/core/protocol.js";
+import type { BrowserSkillRuntimeBinding } from "../../browser/skill/runtime/binding.js";
 
 export interface BrowserRuntimeAdapterFixture {
   readonly root: string;

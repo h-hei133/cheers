@@ -3,7 +3,7 @@ import type {
   AgentRole,
   CodingResultSummary,
   CodingTaskKind,
-} from "../../../orchestration/types.js";
+} from "../../../result/types.js";
 import type { ToolActionKind } from "../../../tools/policy/strategy.js";
 import type { QueryRuntimeActionDecision } from "./decision.js";
 
@@ -198,7 +198,8 @@ function blockMismatchedArtifact(
     return undefined;
   }
   const evidence = result.taskSatisfaction.observedEvidence.join(" ").toLowerCase();
-  const hasSourceEvidence = evidence.includes("source") || result.diagnosis?.evidenceFiles.length > 0;
+  const hasSourceEvidence = evidence.includes("source") ||
+    (result.diagnosis?.evidenceFiles.length ?? 0) > 0;
   const hasVerificationEvidence = evidence.includes("verification") || evidence.includes("verify") || result.verifiedFiles.length > 0;
   if (hasSourceEvidence && hasVerificationEvidence) {
     return undefined;

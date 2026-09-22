@@ -1,17 +1,5 @@
-import type { ContinuationReason, TerminalReason } from "../../orchestration/types.js";
+import type { ContinuationReason, TerminalReason } from "../../result/types.js";
 import type { SessionTerminalState } from "./sessionTerminalState.js";
-
-export function projectAssistantTurnPersistence(
-  terminalState: SessionTerminalState,
-): { role: "assistant"; content: string } | undefined {
-  if (terminalState.finalOutput.length === 0) {
-    return undefined;
-  }
-  return {
-    role: "assistant",
-    content: terminalState.finalOutput,
-  };
-}
 
 export function projectCompletedSessionSave(
   terminalState: SessionTerminalState,

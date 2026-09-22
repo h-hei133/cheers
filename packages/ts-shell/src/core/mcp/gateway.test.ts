@@ -64,7 +64,9 @@ describe("core MCP gateway (W3)", () => {
       "utf8",
     );
 
-    const configs = loadMcpConfigs(workspaceRoot);
+    // `true` because a project-scoped config is only read for a project that has
+    // not been marked untrusted; these tests are about scope merging.
+    const configs = loadMcpConfigs(workspaceRoot, true);
     expect(configs.userServer.scope).toBe("user");
     expect(configs.projectServer.scope).toBe("project");
   });
@@ -73,7 +75,7 @@ describe("core MCP gateway (W3)", () => {
     const configPath = path.join(workspaceRoot, ".private-agents.mcp.json");
     fs.writeFileSync(configPath, "{broken", "utf8");
 
-    expect(() => loadMcpConfigs(workspaceRoot)).toThrow(McpConfigLoadError);
+    expect(() => loadMcpConfigs(workspaceRoot, true)).toThrow(McpConfigLoadError);
 
     const gateway = new CoreMcpGateway(workspaceRoot);
     await expect(gateway.snapshot()).rejects.toMatchObject({

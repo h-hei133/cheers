@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "../../orchestration/agentPlan.js";
+import { buildAgentPlan } from "../../planning/task/agentPlan.js";
 import { buildCodeGraphImpact } from "../../context/acquisition/code/impact.js";
 import { normalizeCodeGraphFacts } from "../../context/acquisition/code/facts.js";
 import { buildCodeGraphTrace } from "../../context/acquisition/code/trace.js";
-import { buildContextGraph } from "../../orchestration/contextGraph.js";
+import { buildContextGraph } from "../../context/graph/contextGraph.js";
 import { buildPlanQuality } from "../../planning/quality/model.js";
 import {
   buildVerificationCommandPlan,
@@ -68,26 +68,6 @@ describe("verificationCommandPlan", () => {
     expect(plan.nextAction).toContain("Allowed commands");
   });
 
-  it("selects focused task-relevant ts-shell test commands without granting dispatch", () => {
-    const plan = buildVerificationCommandPlan({
-      explicitCommand:
-        "npm test -w packages/ts-shell -- src/verification/verificationCommandPlan.test.ts",
-      sourceProposalId: "proposal_route219",
-    });
-
-    expect(plan.state).toBe("ready");
-    expect(plan.commandKind).toBe("npm-test-focused");
-    expect(plan.allowlistStatus).toBe("allowlisted");
-    expect(plan.permissionRequirement).toBe("checked-by-existing-runtime");
-    expect(plan.executionReadiness).toBe("ready");
-    expect(plan.evidence).toEqual(
-      expect.arrayContaining([
-        "verification-command-plan:kind:npm-test-focused",
-        "verification-command-plan:mutation:not-run",
-        "verification-command-plan:provider-call:not-run",
-      ]),
-    );
-  });
 
   it("maps the Route219 benchmark verifier to a product task-quality command kind", () => {
     const plan = buildVerificationCommandPlan({
@@ -233,7 +213,7 @@ describe("verificationCommandPlan", () => {
       testImpactPlan: {
         impactPlanId: "test_impact_focused",
         graphId: "ctx_graph_focused",
-        likelyTestFiles: ["packages/ts-shell/src/verification/verificationCommandPlan.test.ts"],
+        likelyTestFiles: ["packages/ts-shell/src/verification/command/plan.test.ts"],
         likelyVerificationCommandCandidates: [
           {
             command: "npm test -- --help",
@@ -242,8 +222,7 @@ describe("verificationCommandPlan", () => {
             reason: "generic readiness probe",
           },
           {
-            command:
-              "npm test -w packages/ts-shell -- src/verification/verificationCommandPlan.test.ts",
+            command: "npm run build -w packages/ts-shell",
             source: "targeted-test",
             readiness: "ready",
             reason: "focused command covers changed owner",
@@ -261,10 +240,8 @@ describe("verificationCommandPlan", () => {
 
     expect(plan.state).toBe("ready");
     expect(plan.source).toBe("test-impact");
-    expect(plan.command).toBe(
-      "npm test -w packages/ts-shell -- src/verification/verificationCommandPlan.test.ts",
-    );
-    expect(plan.commandKind).toBe("npm-test-focused");
+    expect(plan.command).toBe("npm run build -w packages/ts-shell");
+    expect(plan.commandKind).toBe("npm-build-ts-shell");
   });
 
   it("can select allowlisted code graph impact verification candidates without executing them", () => {

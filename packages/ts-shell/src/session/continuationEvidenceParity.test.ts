@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CodingResultSummary } from "../orchestration/types.js";
+import type { CodingResultSummary } from "../result/types.js";
 import { formatContinuationEvidenceParityDetails } from "./continuationEvidenceParity.js";
 
 describe("continuation evidence parity", () => {

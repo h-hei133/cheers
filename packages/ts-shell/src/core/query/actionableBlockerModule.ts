@@ -1,4 +1,4 @@
-import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { CodingResultSummary } from "../../result/types.js";
 
 export type ActionableBlockerKind =
   | "ambiguous-target"
@@ -53,10 +53,20 @@ export function deriveActionableBlockerContract(input: {
 
   const kind =
     evidenceKind ??
-    classifyActionableKind(
-      reason,
-      input.codingResult?.verification.status === "failed",
-    );
+    (() => {
+      const verification = input.codingResult?.verification;
+      if (
+        verification?.status === "blocked" &&
+        verification?.blockerKind === "approval-denied" &&
+        Boolean(verification?.nextAction?.trim())
+      ) {
+        return "approval-denied";
+      }
+      return classifyActionableKind(
+        reason,
+        input.codingResult?.verification?.status === "failed",
+      );
+    })();
   if (!kind) {
     return undefined;
   }
@@ -218,10 +228,25 @@ export function classifyActionableKind(
     return "command-not-allowlisted";
   }
   if (
+    normalized.includes("review-only planning runtime") ||
+    normalized.includes("verification intent only") ||
+    normalized.includes("mutationauthority=not-granted") ||
+    normalized.includes("mutation authority is not granted")
+  ) {
+    // A planning stop with a structured handoff is actionable by design: the
+    // user confirms or supplies what the planner listed. Looping cannot grant
+    // the missing mutation authority.
+    return "unsupported-future-edit";
+  }
+  if (
     normalized.includes("approval denied") ||
     normalized.includes("user rejected") ||
     normalized.includes("rejected permission") ||
-    normalized.includes("permission rejected")
+    normalized.includes("permission rejected") ||
+    // The tool gate reports a refusal as "User denied permission for tool …";
+    // the wording differs from the approval-audit phrasing matched above.
+    normalized.includes("user denied permission") ||
+    normalized.includes("user denied with reason")
   ) {
     return "approval-denied";
   }

@@ -1,4 +1,12 @@
-import type { AgentLoopContractQueuedMessage } from "../runtime/loop/contract.js";
+import { freezeDeep } from "../core/values/freeze.js";
+import { redactReportText } from "../core/security/redaction.js";
+
+export interface SteeringQueuedMessageLike {
+  readonly id: string;
+  readonly text: string;
+  readonly mode?: "steering" | "follow-up" | string;
+  readonly priority?: "normal" | "high" | string;
+}
 
 export type SteeringDeliveryStatus =
   | "queued"
@@ -31,7 +39,7 @@ export interface SteeringQueueProjection {
 
 export function projectSteeringQueue(input: {
   readonly turnId: string;
-  readonly messages: readonly AgentLoopContractQueuedMessage[];
+  readonly messages: readonly SteeringQueuedMessageLike[];
   readonly deliveredMessageIds?: readonly string[];
   readonly unsupportedMessageIds?: readonly string[];
   readonly abandonedMessageIds?: readonly string[];
@@ -44,7 +52,7 @@ export function projectSteeringQueue(input: {
   const items = input.messages
     .filter((message) => message.mode === "steer")
     .map((message): SteeringQueueItem => {
-      const safeSummary = sanitizeText(message.text, 160);
+      const safeSummary = redactReportText(message.text, 160);
       const deliveryStatus = statusFor({
         id: message.id,
         text: message.text,
@@ -53,7 +61,7 @@ export function projectSteeringQueue(input: {
         abandoned,
         blocked,
       });
-      return freeze({
+      return freezeDeep({
         steeringId: sanitizeId(`steering:${message.id}`),
         source: "user",
         safeSummary,
@@ -73,9 +81,9 @@ export function projectSteeringQueue(input: {
       });
     });
 
-  return freeze({
+  return freezeDeep({
     queueId: sanitizeId(`${input.turnId}:steering-queue`),
-    items: freeze(items),
+    items: freezeDeep(items),
     queuedCount: items.filter((item) => item.deliveryStatus === "queued").length,
     deliveredCount: items.filter((item) => item.deliveryStatus === "delivered").length,
     blockedCount: items.filter((item) =>
@@ -110,46 +118,19 @@ function statusFor(input: {
   if (input.blocked.has(input.id)) {
     return "blocked";
   }
-  if (sanitizeText(input.text, 160) !== input.text.trim().slice(0, 160)) {
+  if (redactReportText(input.text, 160) !== input.text.trim().slice(0, 160)) {
     return "redacted";
   }
   return input.delivered.has(input.id) ? "delivered" : "queued";
 }
 
 function unique(values: readonly string[]): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => sanitizeText(value, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => redactReportText(value, 120)))).sort());
 }
 
 function sanitizeId(value: string): string {
-  return sanitizeText(value, 160)
+  return redactReportText(value, 160)
     .toLowerCase()
     .replace(/[^a-z0-9._:-]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function sanitizeText(value: string, maxLength: number): string {
-  return value
-    .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
-    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
-    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[secret-redacted]")
-    .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]")
-    .replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]")
-    .replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]")
-    .replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]")
-    .replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]")
-    .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maxLength);
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

@@ -4,8 +4,8 @@ import path from "node:path";
 import {
   createBrowserReceiptCacheManifest,
   BROWSER_RECEIPT_CACHE_ROOT_ENV,
-} from "../context/browser/receipt/browserReceiptCacheManifest.js";
-import { createBrowserReceiptCacheStore } from "../context/browser/receipt/browserReceiptCacheStore.js";
+} from "../../browser/receipt/manifest.js";
+import { createBrowserReceiptCacheStore } from "../../browser/receipt/store.js";
 import {
   createBrowserReplayScenarioFixture,
   type BrowserReplayScenarioFixture,

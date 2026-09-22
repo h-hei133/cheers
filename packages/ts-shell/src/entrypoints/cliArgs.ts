@@ -35,22 +35,109 @@ const VALUE_FLAGS = new Set([
   "--api-key",
   "--replay-file",
   "--non-interactive-approval",
-  "--planning-mutation-proposal",
-  "--planning-mutation-verify-command",
-  "--host-command",
 ]);
 
 const RESERVED_SHELL_SLASH_COMMANDS = new Set([
   "/continue",
+  "/c",
   "/restore",
   "/sessions",
   "/mcp",
   "/resume",
   "/workspace",
-  "/help",
+  "/where",
+  "/project",
+  "/cd",
   "/pwd",
+  "/cancel",
+  "/build",
+  "/mode-build",
+  "/plan",
+  "/mode-plan",
+  "/mode",
+  "/agent-mode",
+  "/view",
+  "/diagnose",
+  "/repo",
+  "/changes",
+  "/doctor",
+  "/workflow-status",
+  "/status",
+  "/compact",
+  "/handoff",
+  "/memory",
+  "/warmup",
+  "/browser",
+  "/sidebar",
+  "/connect",
+  "/providers",
+  "/model",
+  "/models",
+  "/permissions",
+  "/approval-policy",
+  "/help",
+  "/",
+  "/exit",
+  "/quit",
+  "/q",
+  "/clear",
+  "/reset",
+  "/cls",
+  "/review",
+  "/audit",
+  "/check",
+  "/init",
+  "/setup",
+  "/cost",
+  "/tokens",
+  "/stats",
+  "/undo",
+  "/rewind",
+  "/revert",
+  "/export",
+  "/save",
+  "/copy",
+  "/cp",
+  "/goal",
+  "/objective",
+  "/target",
+  "/loop",
+  "/ralph",
+  "/autoloop",
+  "/todo",
+  "/tasks",
+  "/checklist",
+  "/fast",
+  "/turbo",
+  "/speed",
+  "/context",
+  "/ctx",
+  "/tokens-map",
+  "/btw",
+  "/side",
+  "/ask",
+  "/marketplace",
+  "/marketplaces",
+  "/market",
+  "/plugin",
+  "/plugins",
+  "/mem",
+  "/recall",
+  "/retain",
+  "/workflow",
+  "/wf",
+  "/pipeline",
+  "/dag",
+  "/deep-research",
+  "/research",
+  "/deep",
+  "/brainstorm",
+  "/explore",
+  "/brainstorming",
+  "/shell",
+  "/sh",
+  "/platform",
 ]);
-
 export function parseCliArgs(
   rawArgs: readonly string[],
   parseOptions: ParseCliArgsOptions,
@@ -136,6 +223,13 @@ export function parseCliArgs(
     "printMode",
     rawArgs.includes("--print") || rawArgs.includes("-p"),
   );
+  assignOption(options, "jsonEvents", rawArgs.includes("--json"));
+  assignOption(options, "noContextFiles", rawArgs.includes("--no-context-files"));
+  assignOption(
+    options,
+    "dangerouslyBypassHookTrust",
+    rawArgs.includes("--dangerously-bypass-hook-trust"),
+  );
   assignOption(
     options,
     "migrateSessionRoot",
@@ -150,59 +244,6 @@ export function parseCliArgs(
     "nonInteractiveApproval",
     nonInteractiveApproval.value,
   );
-  assignOption(
-    options,
-    "applyPatchRuntimeRoute",
-    rawArgs.includes("--apply-patch-runtime-route"),
-  );
-  assignOption(
-    options,
-    "applyPatchWorkspaceWrite",
-    rawArgs.includes("--apply-patch-workspace-write"),
-  );
-  assignOption(
-    options,
-    "planningMutationConfirm",
-    rawArgs.includes("--planning-mutation-confirm"),
-  );
-  assignOption(
-    options,
-    "planningMutationControlledWorkspace",
-    rawArgs.includes("--planning-mutation-controlled-workspace"),
-  );
-  assignOption(
-    options,
-    "planningMutationSelectedWorkspace",
-    rawArgs.includes("--planning-mutation-selected-workspace"),
-  );
-  assignOption(
-    options,
-    "planningMutationLiveProviderProposal",
-    rawArgs.includes("--planning-mutation-live-provider-proposal"),
-  );
-  const planningMutationProposal = parsePlanningMutationProposalPath(rawArgs);
-  if (planningMutationProposal.ok === false) {
-    return { ok: false, error: planningMutationProposal.error };
-  }
-  assignOption(
-    options,
-    "planningMutationProposalPath",
-    planningMutationProposal.value,
-  );
-  const planningMutationVerifyCommand = parsePlanningMutationVerifyCommand(rawArgs);
-  if (planningMutationVerifyCommand.ok === false) {
-    return { ok: false, error: planningMutationVerifyCommand.error };
-  }
-  assignOption(
-    options,
-    "planningMutationVerifyCommand",
-    planningMutationVerifyCommand.value,
-  );
-  const hostCommand = parseHostCommand(rawArgs);
-  if (hostCommand.ok === false) {
-    return { ok: false, error: hostCommand.error };
-  }
-  assignOption(options, "hostCommand", hostCommand.value);
   assignOption(
     options,
     "promptArg",
@@ -220,59 +261,7 @@ export function parseCliArgs(
   };
 }
 
-function parseHostCommand(
-  args: readonly string[],
-):
-  | { readonly ok: true; readonly value: string | undefined }
-  | { readonly ok: false; readonly error: CliArgParseError } {
-  const idx = args.indexOf("--host-command");
-  if (idx === -1) {
-    return { ok: true, value: undefined };
-  }
-  const value = args[idx + 1];
-  if (!value) {
-    return parseError(
-      "Missing value for --host-command. Provide a structured host command JSON object.",
-    );
-  }
-  return { ok: true, value };
-}
 
-function parsePlanningMutationVerifyCommand(
-  args: readonly string[],
-):
-  | { readonly ok: true; readonly value: string | undefined }
-  | { readonly ok: false; readonly error: CliArgParseError } {
-  const idx = args.indexOf("--planning-mutation-verify-command");
-  if (idx === -1) {
-    return { ok: true, value: undefined };
-  }
-  const value = args[idx + 1];
-  if (!value) {
-    return parseError(
-      "Missing value for --planning-mutation-verify-command. Provide an allowlisted verification command.",
-    );
-  }
-  return { ok: true, value };
-}
-
-function parsePlanningMutationProposalPath(
-  args: readonly string[],
-):
-  | { readonly ok: true; readonly value: string | undefined }
-  | { readonly ok: false; readonly error: CliArgParseError } {
-  const idx = args.indexOf("--planning-mutation-proposal");
-  if (idx === -1) {
-    return { ok: true, value: undefined };
-  }
-  const value = args[idx + 1];
-  if (!value) {
-    return parseError(
-      "Missing value for --planning-mutation-proposal. Provide a JSON file with exact old/new proposal targets.",
-    );
-  }
-  return { ok: true, value };
-}
 
 export function isVersionRequested(args: readonly string[]): boolean {
   return (

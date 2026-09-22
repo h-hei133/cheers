@@ -1,18 +1,18 @@
-import type { BrowserAccessibilityNodeInput } from "../context/browserAccessibilitySnapshot.js";
+import type { BrowserAccessibilityNodeInput } from "../../browser/accessibilitySnapshot.js";
 import type {
   BrowserDirectPlaywrightClient,
   BrowserDirectPlaywrightClientInput,
-} from "../context/browserDirectPlaywrightAdapter.js";
-import type { BrowserPlaywrightPageEvidence } from "../context/browserPlaywrightEvidenceMapper.js";
+} from "../../browser/directPlaywrightAdapter.js";
+import type { BrowserPlaywrightPageEvidence } from "../../browser/playwrightEvidenceMapper.js";
 import {
   auditBrowserPlaywrightRuntimeAvailability,
   type BrowserPlaywrightRuntimeAvailability,
-} from "../context/browserPlaywrightRuntimeAvailability.js";
+} from "../../browser/playwrightRuntimeAvailability.js";
 import {
   createBrowserRuntimeManifest,
   validateBrowserRuntimeManifest,
   type BrowserRuntimeManifestLoadResult,
-} from "../context/browser/runtime/core/manifest.js";
+} from "../../browser/runtime/core/manifest.js";
 
 export interface BrowserPlaywrightAdapterSpikeFixture {
   readonly origin: string;

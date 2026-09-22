@@ -2,14 +2,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import {
   buildCliCommandExecution,
-  normalizePromptForExecution,
   projectCliCommandExecution,
   type CliCommandExecutionBridge,
 } from "./cliCommandExecutionBridge.js";
-import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../core/context/browser/receipt/browserReceiptCacheManifest.js";
+import type { CommandExecutionResult } from "../core/commands/types.js";
+import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../browser/receipt/manifest.js";
 
 function renderer(): Pick<StreamingRenderer, "renderLine"> & {
   readonly lines: string[];
@@ -23,34 +23,13 @@ function renderer(): Pick<StreamingRenderer, "renderLine"> & {
   };
 }
 
-function bridge(
-  result: Awaited<ReturnType<CliCommandExecutionBridge["routeSlashCommand"]>>,
-  repoAwareResponse: string | null = null,
-): CliCommandExecutionBridge {
+function bridge(result: CommandExecutionResult | null): CliCommandExecutionBridge {
   return {
     routeSlashCommand: async () => result,
-    resolveRepoAwarePromptResponse: () => repoAwareResponse,
   };
 }
 
 describe("CLI command execution bridge", () => {
-  it("renders repo-aware handled responses with print-mode formatting", async () => {
-    const output = renderer();
-    const resolved = await buildCliCommandExecution(
-      {
-        prompt: "where am I?",
-        cwd: "/workspace",
-        renderer: output as StreamingRenderer,
-        printMode: true,
-        interactive: false,
-      },
-      bridge(null, "Current working directory: /workspace"),
-    );
-
-    expect(resolved).toEqual({ kind: "handled" });
-    expect(output.lines).toEqual(["Current working directory: /workspace"]);
-  });
-
   it("renders local slash command output with interactive spacing", async () => {
     const output = renderer();
     const resolved = await buildCliCommandExecution(
@@ -87,7 +66,6 @@ describe("CLI command execution bridge", () => {
           contextSeen.push(context);
           return { kind: "local", output: "compact output" };
         },
-        resolveRepoAwarePromptResponse: () => null,
       },
     );
 
@@ -123,7 +101,6 @@ describe("CLI command execution bridge", () => {
             contextSeen.push(context);
             return { kind: "local", output: "browser output" };
           },
-          resolveRepoAwarePromptResponse: () => null,
         },
       );
 
@@ -161,7 +138,7 @@ describe("CLI command execution bridge", () => {
     expect(output.lines).toEqual([]);
   });
 
-  it("projects slash prompt expansions and normalized execution prompts", async () => {
+  it("projects slash prompt expansions without rewriting the prompt", async () => {
     const output = renderer();
     const resolved = await buildCliCommandExecution(
       {
@@ -179,22 +156,16 @@ describe("CLI command execution bridge", () => {
 
     expect(resolved).toEqual({
       kind: "execute",
-      effectivePrompt:
-        "Create a python script at ./demo.py with a minimal hello world implementation.",
+      effectivePrompt: "Create python script demo in current directory",
     });
     expect(output.lines).toEqual([
       "\nSlash command expanded into prompt:\nCreate python script demo in current directory\n",
     ]);
   });
 
-  it("keeps prompt normalization available as a pure projection", () => {
+  it("keeps prompt projection as identity", () => {
     expect(projectCliCommandExecution({ prompt: "hello" })).toEqual({
       effectivePrompt: "hello",
     });
-    expect(
-      normalizePromptForExecution("Create python script demo in current directory"),
-    ).toBe(
-      "Create a python script at ./demo.py with a minimal hello world implementation.",
-    );
   });
 });

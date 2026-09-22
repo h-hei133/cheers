@@ -495,6 +495,13 @@ focused validation.
 
 ## Shared Task Loop Runtime
 
+> **⚠️ 本节描述的 `runtime/evaluation/task` 已删除（2026-09-19，C2）。**
+> 本节正文仍以现在时描述该 owner，作为**采纳决策的历史记录**保留；
+> 引用本节路径前请先读文末 L1191 附近的移除说明。删除理由：
+> 该面需要 `dispatch => HostCommandResponse`，而其唯一生产者
+> `createHostRuntime` 已随 CB-005 删除，故**无法被调用**。
+
+
 - Selected mode: structured port for the local task-loop contract and
   behavior-only alignment for mature lifecycle, save-point, and queued input
   flow.
@@ -1182,10 +1189,23 @@ focused validation.
 
 ## Host JSON Framing And Package Readiness
 
+> **2026-09-19 移除（CB-005 死代码清理）**：本节的 `cli/host/`、
+> `runtime/distribution/`、`runtime/api/host/{runtime,io}.ts` 及其测试
+> **已删除**，`verify:host-surface` 门禁与 `--host-command` CLI 开关一并移除。
+> 理由：该 host 执行面驱动的 provider 是硬编码合成
+> （`providerMode: "synthetic"`，类型上无 `real` 成员），生产零值导入；
+> 活路径（`turn/`）已由 `turn/synthetic.ts` 提供同等能力。
+> **补充（2026-09-19，C2）**：`runtime/api/host/contract.ts` 与整个
+> `runtime/evaluation`（15 文件 / 5,881 行）**随后一并删除**。
+> 理由：`contract.ts` 的唯一消费者是 `runtime/evaluation` 的公共 API，
+> 而该 evaluation 面需要 `dispatch => HostCommandResponse`，
+> 其唯一生产者 `createHostRuntime` 已随 CB-005 删除——即它**无法被调用**，
+> 且从未接入任何 gate/脚本/测试。保留原文以存档。
+
 - Selected mode: structured port.
-- Owner domain: `packages/ts-shell/src/runtime/api/host/` for host JSON and
-  exit classification, `packages/ts-shell/src/cli/host/` for CLI delegation,
-  `packages/ts-shell/src/runtime/distribution/` for package readiness, and
+- Owner domain（**历史记录，目录已删**）: `runtime/api/host/` for host JSON and
+  exit classification, packages/ts-shell/src/cli/host/ for CLI delegation,
+  packages/ts-shell/src/runtime/distribution/ for package readiness, and
   `scripts/` for repository smoke.
 - Reason for use: the existing in-process host contract and deterministic
   evaluation runtime needed a package-facing non-interactive surface with
@@ -1230,3 +1250,6 @@ focused validation.
   script while keeping the in-process host runtime and deterministic evaluation
   contract intact; package consumers would fall back to direct owner tests until
   a corrected host surface is restored.
+  **2026-09-19 实际执行**：该 rollback 已按 CB-005 裁决落地
+  （`--host-command`、`verify:host-surface`、`cli/host/`、`runtime/distribution/`、
+  `runtime/api/host/{runtime,io}.ts` 均已移除）。

@@ -1,9 +1,9 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type {
   ExecutionAuthorityMode,
   ExecutionPolicyMetadata,
 } from "../../runtime/execution/service.js";
 import type { RuntimeExecutionReceiptProjection } from "../../runtime/execution/receipt.js";
-import type { ToolExecutionResult } from "../types.js";
 
 export type ToolInterceptionDecisionStatus =
   | "allow"
@@ -91,7 +91,7 @@ export function createToolInterceptionIntent(input: {
     ? false
     : sanitizeValue(input.input).redacted;
 
-  return deepFreeze({
+  return freezeDeep({
     interceptionId: stableId("tool-interception", [
       toolId,
       caller,
@@ -143,7 +143,7 @@ export function createToolBeforePolicyDecision(input: {
     ),
   );
 
-  return deepFreeze({
+  return freezeDeep({
     decisionId: stableId("tool-policy-decision", [
       input.intent.interceptionId,
       status,
@@ -225,7 +225,7 @@ export function createToolAfterObservationAnnotation(input: {
     : undefined;
   const reportSafeSummary = sanitizeWithTracking(input.reportSafeSummary, redactions, 180);
 
-  return deepFreeze({
+  return freezeDeep({
     annotationId: stableId("tool-result-annotation", [
       input.decision?.decisionId ?? input.toolId,
       input.resultStatus,
@@ -260,9 +260,30 @@ export function createToolAfterObservationAnnotation(input: {
   });
 }
 
+export interface BlockedToolInterceptionResult {
+  readonly success: false;
+  readonly error?: string;
+  readonly content?: string;
+  readonly metadata?: Record<string, unknown>;
+  readonly details?: {
+    readonly toolInterception?: {
+      readonly beforeDecision?: ToolBeforePolicyDecision;
+      readonly afterAnnotation?: ToolAfterObservationAnnotation;
+    };
+  };
+  readonly reportSafe?: {
+    readonly redactionStatus: "report-safe" | "redacted";
+    readonly notProvenClaims: readonly string[];
+    readonly toolInterception?: {
+      readonly beforeDecision?: ToolBeforePolicyDecision;
+      readonly afterAnnotation?: ToolAfterObservationAnnotation;
+    };
+  };
+}
+
 export function createBlockedToolInterceptionResult(
   decision: ToolBeforePolicyDecision,
-): ToolExecutionResult {
+): BlockedToolInterceptionResult {
   const annotation = createToolAfterObservationAnnotation({
     decision,
     toolId: decision.intent.toolId,
@@ -387,14 +408,4 @@ function stableId(prefix: string, parts: readonly string[]): string {
 
 function unique<T extends string>(values: readonly T[]): readonly T[] {
   return Object.freeze(Array.from(new Set(values)).sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

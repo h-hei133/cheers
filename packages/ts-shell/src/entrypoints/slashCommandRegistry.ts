@@ -1,3 +1,12 @@
+import { listVisibleCommands } from "../core/commands/registry.js";
+import type { CommandDefinition } from "../core/commands/types.js";
+
+export interface SlashCommandCompletion {
+  readonly value: string;
+  readonly label: string;
+  readonly detail?: string;
+}
+
 export interface SlashCommandLineRenderer {
   renderLine(line: string): void;
 }
@@ -7,128 +16,92 @@ export interface SlashCommandSpec {
   readonly aliases?: readonly string[];
   readonly group:
     | "session"
+    | "context"
     | "workspace"
     | "workflow"
     | "diagnostics";
   readonly summary: string;
+  readonly argumentHint?: string;
+  readonly getArgumentCompletions?: (
+    argumentPrefix: string,
+  ) => readonly SlashCommandCompletion[] | null;
 }
 
-export const SLASH_COMMANDS = [
-  {
-    name: "sessions",
-    group: "session",
-    summary: "inspect active and recent sessions",
-  },
-  {
-    name: "resume",
-    group: "session",
-    summary: "continue best recoverable context",
-  },
-  {
-    name: "continue",
-    aliases: ["c"],
-    group: "session",
-    summary: "resume context and optionally run an immediate follow-up",
-  },
-  {
-    name: "restore",
-    group: "session",
-    summary: "preview or execute guarded recovery authority restore",
-  },
-  {
-    name: "workspace",
-    aliases: ["where", "project"],
-    group: "workspace",
-    summary: "inspect or switch project/workdir binding",
-  },
-  {
-    name: "cd",
-    group: "workspace",
-    summary: "quick attach by path",
-  },
-  {
-    name: "pwd",
-    group: "workspace",
-    summary: "print current workspace status",
-  },
-  {
-    name: "cancel",
-    group: "workflow",
-    summary: "stop only the current run",
-  },
-  {
-    name: "build",
-    aliases: ["mode-build"],
-    group: "workflow",
-    summary: "switch to build mode",
-  },
-  {
-    name: "plan",
-    aliases: ["mode-plan"],
-    group: "workflow",
-    summary: "switch to plan mode",
-  },
-  {
-    name: "mode",
-    aliases: ["agent-mode"],
-    group: "workflow",
-    summary: "inspect or switch agent mode",
-  },
-  {
-    name: "view",
-    group: "workflow",
-    summary: "switch output verbosity",
-  },
-  {
-    name: "diagnose",
-    aliases: ["repo", "changes"],
-    group: "diagnostics",
-    summary: "repo-aware diagnosis and next action",
-  },
-  {
-    name: "model",
-    aliases: ["models"],
-    group: "diagnostics",
-    summary: "inspect and switch active model",
-  },
-  {
-    name: "mcp",
-    group: "diagnostics",
-    summary: "inspect and recover MCP state",
-  },
-  {
-    name: "permissions",
-    aliases: ["approval-policy"],
-    group: "diagnostics",
-    summary: "inspect trust policy state",
-  },
-  {
-    name: "connect",
-    aliases: ["providers"],
-    group: "diagnostics",
-    summary: "provider connection management",
-  },
-  {
-    name: "help",
-    aliases: ["?"],
-    group: "diagnostics",
-    summary: "show full command guide",
-  },
-] as const satisfies readonly SlashCommandSpec[];
+/**
+ * The display registry is a projection of the dispatch registry.
+ *
+ * Two hand-maintained lists drifted: the completion menu advertised commands
+ * the router had stopped accepting, and the router accepted commands the menu
+ * never showed. Projecting from the dispatch side makes that impossible — a
+ * command appears in the menu exactly when the router can run it.
+ */
+function project(command: CommandDefinition): SlashCommandSpec {
+  return {
+    name: command.name,
+    ...(command.aliases ? { aliases: command.aliases } : {}),
+    group: command.group,
+    summary: command.summary,
+    ...(command.argumentHint ? { argumentHint: command.argumentHint } : {}),
+    ...(command.getArgumentCompletions
+      ? { getArgumentCompletions: command.getArgumentCompletions }
+      : {}),
+  };
+}
 
-export type SlashCommandName = (typeof SLASH_COMMANDS)[number]["name"];
+function builtinCommands(): readonly SlashCommandSpec[] {
+  return listVisibleCommands().map(project);
+}
+
+/**
+ * Commands the interactive surface handles directly (picker overlay) without a
+ * dispatch-registry handler. They live here so the completion menu and the
+ * guide can show them, but the router never sees them — `opensPicker` intercepts
+ * the bare form before routing. The picker table (`picker/registry.ts`) owns
+ * the behavior; this entry carries only what the menu and guide display.
+ */
+const PICKER_ONLY: readonly SlashCommandSpec[] = [
+  {
+    name: "statusline",
+    aliases: ["status"],
+    group: "workspace",
+    summary: "choose which facts the status band keeps in view",
+    argumentHint: "use <preset|item...>",
+  },
+];
+
+const extensions: SlashCommandSpec[] = [...PICKER_ONLY];
+const listeners = new Set<(commands: readonly SlashCommandSpec[]) => void>();
+
+function allCommands(): readonly SlashCommandSpec[] {
+  const builtins = builtinCommands();
+  return extensions.length === 0 ? builtins : [...builtins, ...extensions];
+}
 
 export function listSlashCommands(): readonly SlashCommandSpec[] {
-  return SLASH_COMMANDS;
+  return allCommands();
+}
+
+export function registerSlashCommand(command: SlashCommandSpec): () => void {
+  if (getSlashCommand(command.name)) throw new Error(`Slash command already registered: ${command.name}`);
+  extensions.push(command);
+  for (const listener of listeners) listener(allCommands());
+  return () => {
+    const index = extensions.indexOf(command);
+    if (index < 0) return;
+    extensions.splice(index, 1);
+    for (const listener of listeners) listener(allCommands());
+  };
+}
+
+export function subscribeSlashCommands(listener: (commands: readonly SlashCommandSpec[]) => void): () => void {
+  listeners.add(listener);
+  listener(allCommands());
+  return () => listeners.delete(listener);
 }
 
 export function getSlashCommand(name: string): SlashCommandSpec | undefined {
   const normalized = name.replace(/^\//, "").trim().toLowerCase();
-  return SLASH_COMMANDS.find((command) => {
-    const aliases: readonly string[] | undefined =
-      "aliases" in command ? command.aliases : undefined;
-    return command.name === normalized || aliases?.includes(normalized);
-  });
+  return allCommands().find((command) => command.name === normalized || command.aliases?.includes(normalized));
 }
 
 export function isKnownSlashCommand(name: string): boolean {
@@ -145,14 +118,14 @@ export function renderSessionCommandMap(
     compact ? "Session command map:" : "\nSession command map",
   );
   renderer.renderLine(
-    "- /sessions            open the session surface (interactive panel in TTY; overview in print/non-TTY).",
+    "- /resume              open the session surface (interactive panel in TTY; overview in print/non-TTY).",
   );
-  renderer.renderLine("- /sessions current    inspect the active session.");
+  renderer.renderLine("- /resume current      inspect the active session.");
   renderer.renderLine(
-    "- /sessions list       inspect recent sessions for this project.",
+    "- /resume list         inspect recent sessions for this project.",
   );
   renderer.renderLine(
-    "- /sessions switch <id|prefix|title|last> switch active session and project context.",
+    "- /resume switch <id|prefix|title|last> switch active session and project context.",
   );
   renderer.renderLine(
     "- /resume [id|prefix|title|last] resume the best recoverable context.",
@@ -162,101 +135,47 @@ export function renderSessionCommandMap(
   }
 }
 
+const GROUP_TITLES: Record<SlashCommandSpec["group"], string> = {
+  session: "Session",
+  context: "Context",
+  workspace: "Workspace",
+  workflow: "Workflow",
+  diagnostics: "Diagnostics",
+};
+
+/**
+ * The command guide, generated from the registry.
+ *
+ * A hand-written guide drifts the moment a command is added or retired — it kept
+ * advertising commands the router had already stopped accepting. Generating it
+ * means the guide cannot describe a command that does not exist, and cannot omit
+ * one that does.
+ */
 export function renderUserHelp(renderer: SlashCommandLineRenderer): void {
-  renderer.renderLine("\nSlash command guide");
-  renderer.renderLine("Next actions (start here):");
-  renderer.renderLine(
-    "- /sessions               inspect active + recent sessions.",
-  );
-  renderer.renderLine(
-    "- /resume                 continue best recoverable context.",
-  );
-  renderer.renderLine(
-    "- /workspace status       confirm project/workdir binding.",
-  );
-  renderer.renderLine(
-    "- /diagnose               get actionable repo next step.",
-  );
+  const commands = allCommands();
+  const width = longestName(commands);
+  renderer.renderLine("\nSlash commands");
+  for (const group of Object.keys(GROUP_TITLES) as SlashCommandSpec["group"][]) {
+    const inGroup = commands.filter((command) => command.group === group);
+    if (inGroup.length === 0) continue;
+    renderer.renderLine(`\n${GROUP_TITLES[group]}`);
+    for (const command of inGroup) {
+      renderer.renderLine(`  /${command.name.padEnd(width)}  ${command.summary}`);
+    }
+  }
+  // The keys live in one table that the keymap dispatches on; naming a few of
+  // them again here is how a guide ends up advertising a key nothing binds.
+  renderer.renderLine("\nKeys");
+  renderer.renderLine("  shift+tab   switch between planning and building");
+  renderer.renderLine("  alt+p       cycle how much a turn may do without asking");
+  renderer.renderLine("  ctrl+j      insert a newline without sending");
+  renderer.renderLine("  /hotkey     every key, and which ones this terminal delivers");
   renderer.renderLine("");
+}
 
-  renderer.renderLine("Command groups:");
-  renderer.renderLine("1) Session & Continuation");
-  renderer.renderLine(
-    "- /sessions               session surface entrypoint (TTY: panel, non-TTY/print: overview).",
-  );
-  renderer.renderLine(
-    "- /sessions current       active session identity and resume readiness.",
-  );
-  renderer.renderLine(
-    "- /sessions list          recent sessions for current project context.",
-  );
-  renderer.renderLine(
-    "- /sessions switch <id|prefix|title|last>   switch active session + project context.",
-  );
-  renderer.renderLine(
-    "- /resume [id|prefix|title|last] resume recoverable context by reference.",
-  );
-  renderer.renderLine(
-    "- /continue [id] [text]   resume context and optionally run immediate follow-up.",
-  );
-  renderer.renderLine(
-    "- /restore preview --ledger-root <path> --authority-id <id> --all   preview guarded restore eligibility.",
-  );
-  renderer.renderLine(
-    "- /restore execute --ledger-root <path> --authority-id <id> --all --execute   explicitly restore eligible records.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("2) Workspace & Navigation");
-  renderer.renderLine(
-    "- /workspace status       show current project/workdir binding.",
-  );
-  renderer.renderLine(
-    "- /workspace attach <path> attach/switch active project target.",
-  );
-  renderer.renderLine(
-    "- /workspace recent       list recently attached project contexts.",
-  );
-  renderer.renderLine("- /cd <path>              quick attach by path.");
-  renderer.renderLine(
-    "- /pwd                    print current workspace status.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("3) Workflow & Runtime");
-  renderer.renderLine("- /cancel                 stop only the current run.");
-  renderer.renderLine("- /build                  switch to build mode.");
-  renderer.renderLine("- /plan                   switch to plan mode.");
-  renderer.renderLine(
-    "- /mode [status|plan|build] inspect or switch agent mode.",
-  );
-  renderer.renderLine("- /view user|developer    switch output verbosity.");
-  renderer.renderLine("");
-
-  renderer.renderLine("4) Diagnostics & Integrations");
-  renderer.renderLine(
-    "- /diagnose               repo-aware diagnosis and next action.",
-  );
-  renderer.renderLine(
-    "- /model status|list|use  inspect and switch active model.",
-  );
-  renderer.renderLine(
-    "- /mcp status|tools|doctor|refresh [server] inspect and recover MCP state.",
-  );
-  renderer.renderLine(
-    "- /permissions list|explain|revoke|reset inspect trust policy state.",
-  );
-  renderer.renderLine(
-    "- /connect status|login|use|logout|set ... provider connection management.",
-  );
-  renderer.renderLine("");
-
-  renderer.renderLine("Discovery tips:");
-  renderer.renderLine(
-    "- Unknown slash commands now return this guide path with quick actions.",
-  );
-  renderer.renderLine(
-    "- Use /help any time to get back to grouped command navigation.",
-  );
-  renderer.renderLine("");
+/** Longest command name, so summaries line up in one column. */
+function longestName(commands: readonly SlashCommandSpec[]): number {
+  let longest = 0;
+  for (const command of commands) longest = Math.max(longest, command.name.length);
+  return longest;
 }

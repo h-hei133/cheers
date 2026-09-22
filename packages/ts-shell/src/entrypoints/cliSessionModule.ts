@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { Interface as ReadlineInterface } from "node:readline";
+import { renderProjectedLines } from "../cli/output/projectedLineRenderer.js";
 import {
   createSessionRootMismatchDiagnostic,
   resolveRootBindingDiagnostics,
@@ -14,7 +15,7 @@ import {
   renderSessionListSurface,
   renderSwitchedSessionSurface,
 } from "../core/shell/sessionStateSurface.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type {
   Session,
   SessionReentrySummary,
@@ -75,7 +76,10 @@ export async function runCliSessionCommand(input: {
     return;
   }
 
-  if (!input.readline) {
+  // The interactive panel drives stdin keypresses itself. A host that captures
+  // renderer output owns raw stdin, so the panel would fight it for keystrokes;
+  // such hosts get the non-interactive overview instead.
+  if (!input.readline || input.renderer.captured) {
     renderSessionSurfaceOverview(
       input.renderer,
       input.sessionManager,
@@ -150,7 +154,7 @@ export function renderSessionSurfaceOverview(
   sessionManager: SessionManager,
   runtimeContext: ShellRuntimeContext,
 ): void {
-  renderer.renderLine("\n/sessions (session surface)");
+  renderer.renderLine("\n/resume (session surface)");
   renderCurrentSessionSurface(renderer, { sessionManager, runtimeContext });
   renderSessionListSurface(renderer, {
     sessionManager,
@@ -158,15 +162,6 @@ export function renderSessionSurfaceOverview(
     preferredProjectRoot: runtimeContext.projectRoot,
   });
   renderSessionCommandMap(renderer);
-}
-
-export function renderProjectedLines(
-  renderer: { renderLine(line: string): void },
-  lines: readonly string[],
-): void {
-  for (const line of lines) {
-    renderer.renderLine(line);
-  }
 }
 
 export function switchRuntimeSessionProjectContext(

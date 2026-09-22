@@ -2,7 +2,7 @@ import type {
   CodingActionResultSeed,
   CodingTaskKind,
   CodingVerificationSummary,
-} from "../../../orchestration/types.js";
+} from "../../../result/types.js";
 
 export function buildActionResultSeedFromCodingResult(
   taskKind: CodingTaskKind,

@@ -30,7 +30,15 @@ export interface ShellRuntimeContext {
   targetPathBase: string
   gitRoot: string | null
   rootBindingDiagnostics: readonly RootBindingDiagnostic[]
-  readonly runtimeConfig: RuntimeConfig
+  /**
+   * The settings in force for this session.
+   *
+   * Mutable because it is read once at startup and a long session outlives the
+   * file it came from: editing `config.json` mid-session would otherwise change
+   * nothing until restart, with no indication why. `/reload` re-reads it in place.
+   * Everything else this context holds is fixed for the session.
+   */
+  runtimeConfig: RuntimeConfig
   gitContext: WorkflowGitContext
   session: Session
   activeSession: ActiveSessionIdentity
@@ -209,7 +217,7 @@ export function createWorkspaceAttachSwitchDiagnostic(input: {
     explanation:
       `Workspace attach requested ${input.requestedWorkspaceRoot}, which resolves to ${input.resolvedProjectRoot}; the current session is bound to ${input.currentProjectRoot}.`,
     nextAction:
-      "Confirm this project switch is intended. Use /sessions current after attach to inspect the new active session, or stay in the current project and use paths relative to its Target path base.",
+      "Confirm this project switch is intended. Use /resume current after attach to inspect the new active session, or stay in the current project and use paths relative to its Target path base.",
   }
 }
 

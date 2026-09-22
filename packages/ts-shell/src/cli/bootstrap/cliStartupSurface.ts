@@ -13,6 +13,7 @@ import {
 import type {
   CliBootstrapRuntimeContext,
 } from "./cliBootstrapContext.js";
+import { supportsFullScreenSurface } from "../interactive/surfaceCapability.js";
 
 export interface CliStartupSurfaceProjection {
   readonly startupPlan: CliStartupPlan;
@@ -21,6 +22,8 @@ export interface CliStartupSurfaceProjection {
 
 export interface ProjectAndRenderCliStartupSurfaceInput {
   readonly options: CliOptions;
+  readonly stdin?: NodeJS.ReadStream;
+  readonly stdout?: NodeJS.WriteStream;
   readonly cliModePlan: CliModePlan;
   readonly stdinTransportMode: StdinTransportMode;
   readonly nonInteractivePromptCount: number;
@@ -47,12 +50,17 @@ export function projectAndRenderCliStartupSurface(
     providerModeEnv: input.providerModeEnv,
     maxTurns: input.bootstrapRuntime.runtimeContext.runtimeConfig.maxTurns,
   });
-  const showStartupSurface =
+  // The full-screen host draws its own intro inside the frame, so printing the
+  // console startup surface too would scroll unmanaged text under it. Only a
+  // real terminal gets that host: over a pipe the surface is the only intro
+  // there is, and harnesses wait on it for readiness.
+  const fullScreenHost =
     !input.options.printMode &&
     !input.options.replayFile &&
     input.nonInteractivePromptCount === 0 &&
-    input.stdinTransportMode !== "capture-batch";
-
+    supportsFullScreenSurface(input.stdin, input.stdout);
+  const showStartupSurface =
+    !fullScreenHost && input.stdinTransportMode !== "capture-batch";
   if (showStartupSurface) {
     renderStartupSurface(input.bootstrapRuntime.renderer, {
       runtimeContext: input.bootstrapRuntime.runtimeContext,

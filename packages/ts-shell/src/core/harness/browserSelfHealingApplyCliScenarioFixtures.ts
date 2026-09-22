@@ -4,17 +4,17 @@ import path from "node:path";
 import {
   BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV,
   BROWSER_CLI_LOCAL_FIXTURE_MANIFEST_ENV,
-} from "../context/browserCliExecutorInjection.js";
+} from "../../browser/cliExecutorInjection.js";
 import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
   validateBrowserExternalRunnerManifest,
-} from "../context/browser/runtime/external/manifest.js";
+} from "../../browser/runtime/external/manifest.js";
 import {
   createBrowserLocalFixtureManifest,
   serializeBrowserLocalFixtureManifest,
   validateBrowserLocalFixtureManifest,
-} from "../context/browserLocalFixtureManifest.js";
+} from "../../browser/localFixtureManifest.js";
 
 export type BrowserSelfHealingApplyCliManifestKind =
   | "external-runner"

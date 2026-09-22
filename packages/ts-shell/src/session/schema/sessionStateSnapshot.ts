@@ -6,7 +6,7 @@ import type {
   ContinuationReason,
   TerminalClassification,
   TerminalReason,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import { projectDurableStatus } from "../lifecycle/durableStatusProjection.js";
 import type { SessionHarnessState } from "../harness/state.js";
 import type { Session } from "./sessionRecord.js";

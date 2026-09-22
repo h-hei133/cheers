@@ -1,3 +1,10 @@
+> **Archived (2026-09-17).** The Route 129/130 browser transaction chain this
+> document describes (`browserTrace.ts`, `browserScore.ts`, `browserTxnEval.ts`,
+> `browserTxnGolden.ts`, `browserTxnReport.ts`) was removed with the dormant
+> main cluster, along with `verify:browser-txn-gate`. The live browser evaluation
+> path is `eval/browser/*` (`benchmarkModel`, `benchmarkReport`,
+> `benchmarkRunner`). Retained as history; not current authority.
+
 # Browser Eval Gate
 
 Route 129 made controlled same-page browser transactions executable for local

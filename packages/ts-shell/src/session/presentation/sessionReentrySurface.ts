@@ -1,7 +1,7 @@
 import type {
   TerminalClassification,
   TerminalReason,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 import type { RecoveryTrustBoundaryBlock } from "../recovery/recoveryTrustBoundary.js";
 import type { SessionResumeEligibility } from "../recovery/sessionResumeEligibility.js";
@@ -36,6 +36,14 @@ export interface SessionReentrySummary {
   readonly stagedRepairNextStep?: number;
   readonly blockedReason?: RecoveryTrustBoundaryBlock["reason"];
   readonly blockedDetail?: string;
+  /**
+   * Whether anything was ever said in this session.
+   *
+   * A run that only used slash commands leaves a session record but no
+   * conversation; those are not worth offering to return to, and are not worth
+   * keeping. This is what tells the two apart.
+   */
+  readonly hasConversation: boolean;
 }
 
 export function projectSessionReentrySummary(input: {
@@ -47,7 +55,7 @@ export function projectSessionReentrySummary(input: {
   const { session, trustBoundary, recoverySnapshot, continuitySnapshot } = input;
   return {
     id: session.id,
-    title: session.title,
+    title: session.title?.trim() || session.id,
     status: session.status,
     projectRoot: session.projectRoot,
     createdAt: session.createdAt,
@@ -81,7 +89,29 @@ export function projectSessionReentrySummary(input: {
       : {}),
     blockedReason: trustBoundary.block?.reason,
     blockedDetail: trustBoundary.block?.detail,
+    hasConversation: sessionHasConversation(session),
   };
+}
+
+/** Whether a session holds a real exchange rather than only command bookkeeping. */
+export function sessionHasConversation(session: Session): boolean {
+  return session.turns.some(
+    (turn) => (turn.role === "user" || turn.role === "assistant") && turn.content.trim().length > 0,
+  );
+}
+
+/**
+ * Whether a session is worth offering to return to.
+ *
+ * A real exchange qualifies. So does a run that was interrupted with a prompt
+ * still pending, or one that ended in a terminal state — both are unfinished or
+ * diagnosable work, which is exactly what re-entry exists for. A freshly opened
+ * session with nothing said and nothing pending is not.
+ */
+export function sessionHasReentrySurface(session: Session): boolean {
+  if (sessionHasConversation(session)) return true;
+  if (session.pendingPrompt?.trim()) return true;
+  return session.status !== "active";
 }
 
 export function scoreSessionReentrySummary(input: {

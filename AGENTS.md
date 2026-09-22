@@ -31,11 +31,11 @@ Detailed rules: [provider and secret boundary](agent-rules/provider-and-secret-b
 ## Architecture Summary
 
 - TypeScript is the primary product runtime and control plane: shell, session, orchestration, query loop, slash commands, permission UX, recovery, replay, runtime durability, result mapping, terminal/session surface, high-level capability routing, and most current execution adapters.
-- Execution is an explicit runtime boundary/interface, currently implemented mostly in TypeScript.
+- Execution is an explicit runtime boundary/interface implemented in `packages/ts-shell/src/` (see `core/tools/`, `tools/`, `sandbox/`, and the `browser/*Executor.ts` adapters). A Rust daemon path exists under `packages/rust-core/`, reached through `src/daemon/`; it is not the default execution plane.
 - Rust is a future native executor candidate for OS/process/sandbox/isolation/distribution-critical responsibilities; do not claim Rust owns current execution unless the code path proves it.
 - `contracts` carries schemas, events, lifecycle states, permission semantics, and serialization rules only when there is a real cross-runtime consumer.
-- `packages/python-eval/` is offline evaluation only, not a production runtime owner.
-
+- `packages/python-eval/` is isolated offline benchmark evaluation only, not a production workspace member.
+- Project master knowledge base, technical RFCs (RFC-001 through RFC-004), and architecture specifications live in `.wiki/` (`.wiki/_index.md`).
 Detailed rules: [architecture boundaries](agent-rules/architecture-boundaries.md).
 
 ## Ownership And Naming Summary
@@ -59,6 +59,15 @@ Detailed rules: [file placement and naming](agent-rules/file-placement-and-namin
 - Do not claim validation passed unless the command actually ran and passed.
 - Restore audit/history residue before finalizing.
 
+CI enforces these gates, and they exit non-zero on a violation:
+
+- `npm run verify:import-cycles` — dependency cycles. Note it checks cycles only; it does not report imports that fail to resolve.
+- `npm run verify:docs-drift:strict` — dangling path references in binding rules and current-state docs.
+- `npm run test:ts` — the TypeScript suite.
+- `normproof judge` — blocks on the unresolved-specifier obligation only. The cycle and function-ceiling obligations are advisory, so they report without failing the build.
+
+Run the first two locally before pushing; together they take under a second, against roughly three minutes for the suite. Measurements and the gate-by-gate audit are in `.wiki/refactor/plan.md` section 9.27.
+
 Detailed rules: [testing and validation](agent-rules/testing-and-validation.md), [development workflow](agent-rules/development-workflow.md).
 
 ## Reference Repositories
@@ -81,6 +90,8 @@ Read-only references:
 
 Use references only after inspecting the target implementation first, and only for task-relevant semantic comparison. Do not broad-scan references without a direct blocker. Do not mechanically copy implementation code or architecture wholesale.
 
+Use references only after inspecting the target implementation first, and only for task-relevant semantic comparison. Do not broad-scan references without a direct blocker. Do not mechanically copy implementation code or architecture wholesale. When a reference has already solved the same class of problem, compare its specific decisions against your plan before writing code, and keep a test that fails when a compared decision is reversed.
+
 Detailed rules: [reference repositories](agent-rules/reference-repositories.md).
 
 ## Detailed Rules
@@ -94,3 +105,34 @@ Detailed rules: [reference repositories](agent-rules/reference-repositories.md).
 - [agent-rules/testing-and-validation.md](agent-rules/testing-and-validation.md)
 - [agent-rules/development-workflow.md](agent-rules/development-workflow.md)
 - [agent-rules/compatibility-and-history.md](agent-rules/compatibility-and-history.md)
+
+## Architectural Norms (NormProof)
+
+Follow these architectural rules:
+1. No dependency cycles. No module may import, directly or transitively, a module that imports it.
+2. Every module import resolves within the declared source graph.
+3. Responsibility ceiling. No single module may declare more than 20 function-like names — counting named functions, functions or arrows bound to a name, and methods. Split a module that would exceed it rather than letting one module accumulate behaviour.
+
+How these are checked, so you know what will stop you:
+
+| Rule | Gate that catches it | Blocks? |
+|---|---|---|
+| 1 — cycles | `npm run verify:import-cycles` | yes, in CI |
+| 2 — imports resolve | `normproof judge` (unresolved-specifier obligation) | yes, in CI |
+| 3 — function ceiling | `npm run analyze:module-facades` | no, advisory |
+| 1 — cycles, as a NormProof obligation | `normproof judge` | no, advisory |
+
+Rule 3 has no blocking gate, so a module over the ceiling passes CI. Treat it as a rule to hold yourself to rather than one the pipeline will hold you to.
+
+### Architecture Watch Disposition Protocol
+
+`.normproof/dispositions.md` is where findings that you have reviewed and decided NOT to change get recorded. One line per finding:
+
+```
+- <obligation-id> | <finding> | reviewed <date> | decision: fix|defer|ignore | reason: <one line>
+```
+
+Rules:
+- Recording a disposition NEVER changes the verdict — judge keeps reporting the finding every run.
+- If a finding appears repeatedly, first try to fix it; record only when deferring is a real decision.
+- Never delete previous disposition lines; append only.

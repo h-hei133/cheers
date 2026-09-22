@@ -1,18 +1,18 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createCompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
-import { createCompactLiveCheckpointStore } from "../context/compact/checkpoint/compactLiveCheckpoint.js";
-import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
-import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
-import { createProjectMemoryReviewStateStore } from "../context/memory/projectMemoryReviewState.js";
-import type { ProjectMemoryRecord } from "../context/memory/projectMemoryStoreContract.js";
-import { createSidebarLiveEventStore } from "../context/sidebar/sidebarLiveEventStore.js";
-import type { BrowserExecutor } from "../context/browserExecutor.js";
-import type { BrowserExecutionConfirmationRecord } from "../context/browserExecutionConfirmation.js";
-import type { BrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";
-import type { BrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
-import { createStartupWarmContextCacheStore } from "../context/startup/startupWarmContextHealth.js";
+import { createCompactInjectionStateStore } from "../../context/compact/injection/compactInjectionState.js";
+import { createCompactLiveCheckpointStore } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
+import { createProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
+import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
+import { createProjectMemoryReviewStateStore } from "../../memory/projectMemoryReviewState.js";
+import type { ProjectMemoryRecord } from "../../memory/projectMemoryStoreContract.js";
+import { createSidebarLiveEventStore } from "../../presentation/sidebar/sidebarLiveEventStore.js";
+import type { BrowserExecutor } from "../../browser/executor.js";
+import type { BrowserExecutionConfirmationRecord } from "../../browser/executionConfirmation.js";
+import type { BrowserNetworkAllowlist } from "../../browser/networkAllowlist.js";
+import type { BrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
+import { createStartupWarmContextCacheStore } from "../../context/startup/startupWarmContextHealth.js";
 import type { CommandContext } from "../commands/types.js";
 import {
   deterministicScenarioTimestamp,

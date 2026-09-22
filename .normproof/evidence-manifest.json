@@ -1,0 +1,20 @@
+{
+  "version": "0.1.0",
+  "workspace": "..",
+  "entries": [
+    {
+      "id": "source_module_graph",
+      "source": {
+        "kind": "module-graph",
+        "pattern": "packages/**/*.ts"
+      }
+    },
+    {
+      "id": "source_module_functions",
+      "source": {
+        "kind": "module-functions",
+        "pattern": "packages/**/*.ts"
+      }
+    }
+  ]
+}

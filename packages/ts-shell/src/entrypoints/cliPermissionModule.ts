@@ -1,6 +1,7 @@
 import path from "node:path";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
+import { renderProjectedLines } from "../cli/output/projectedLineRenderer.js";
 import {
   projectPermissionListDisplay,
 } from "./cliDisplayProjection.js";
@@ -118,15 +119,6 @@ function renderPermissionExplain(
   );
   renderer.renderLine(`- When: ${toRelativeTime(lastHit.at)}`);
   renderer.renderLine("");
-}
-
-function renderProjectedLines(
-  renderer: { renderLine(line: string): void },
-  lines: readonly string[],
-): void {
-  for (const line of lines) {
-    renderer.renderLine(line);
-  }
 }
 
 function toRelativeTime(iso: string): string {

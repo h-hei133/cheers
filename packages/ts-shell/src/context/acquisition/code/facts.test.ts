@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { normalizeCodeGraphFacts } from "./facts.js";
-import { buildContextGraph } from "../../../orchestration/contextGraph.js";
-import { scoreContextGraph } from "../../../orchestration/contextGraphScore.js";
-import { buildTestImpactPlan } from "../../../orchestration/testImpactPlan.js";
+import { buildContextGraph } from "../../graph/contextGraph.js";
+import { scoreContextGraph } from "../../graph/contextGraphScore.js";
+import { buildTestImpactPlan } from "../../../planning/task/testImpactPlan.js";
 
 describe("normalizeCodeGraphFacts", () => {
   it("normalizes context graph nodes edges and verification candidates without raw content", () => {

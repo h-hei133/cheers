@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
-import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
-import { runBrowserActionLoopExecutor } from "../context/browserActionLoopExecutor.js";
-import { renderBrowserRuntimeSurface } from "../context/browser/runtime/core/surface.js";
-import { renderBrowserPublicReadOnlyWebSurface } from "../context/browserPublicReadOnlyWebSurface.js";
+import { parseBrowserCommandArgs } from "../../browser/commandContract.js";
+import { runBrowserCommandAsync } from "../../browser/commandRunner.js";
+import { runBrowserActionLoopExecutor } from "../../browser/actionLoopExecutor.js";
+import { renderBrowserRuntimeSurface } from "../../browser/runtime/core/surface.js";
+import { renderBrowserPublicReadOnlyWebSurface } from "../../browser/publicReadOnlyWebSurface.js";
 import { createBrowserPublicReadOnlyWebScenarioFixture } from "./browserPublicReadOnlyWebScenarioFixtures.js";
-import { createBrowserPublicReadOnlyWebManifest } from "../context/browserPublicReadOnlyWebManifest.js";
-import { decideBrowserPublicReadOnlyWebPolicy } from "../context/browserPublicReadOnlyWebPolicy.js";
-import { runBrowserPublicReadOnlyWebExecutor } from "../context/browserPublicReadOnlyWebExecutor.js";
-import { createBrowserPublicReadOnlyWebReceipt } from "../context/browserPublicReadOnlyWebReceipt.js";
-import { adaptCommandResultToSidebarEvent } from "../context/sidebar/sidebarCommandEventAdapter.js";
+import { createBrowserPublicReadOnlyWebManifest } from "../../browser/publicReadOnlyWebManifest.js";
+import { decideBrowserPublicReadOnlyWebPolicy } from "../../browser/publicReadOnlyWebPolicy.js";
+import { runBrowserPublicReadOnlyWebExecutor } from "../../browser/publicReadOnlyWebExecutor.js";
+import { createBrowserPublicReadOnlyWebReceipt } from "../../browser/publicReadOnlyWebReceipt.js";
+import { adaptCommandResultToSidebarEvent } from "../../presentation/sidebar/sidebarCommandEventAdapter.js";
 import {
   browserRuntimeRequest,
   createBrowserRuntimeMvpScenarioFixture,
@@ -18,9 +18,9 @@ import {
 import {
   createBrowserEvalBenchmarkReport,
   renderBrowserEvalBenchmarkReport,
-} from "./browserEvalBenchmarkReport.js";
+} from "../../eval/browser/benchmarkReport.js";
 import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
-import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
+import type { BrowserEvalBenchmarkTask } from "../../eval/browser/benchmarkModel.js";
 
 describe("browser runtime capability scenario examples", () => {
   it("reports runtime status unavailable when no explicit manifest is supplied", async () => {

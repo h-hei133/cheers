@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { ProviderFailureClass } from "../registry/provider.js";
 import type { NextTurnModelRequestPreparation } from "./boundary.js";
 
@@ -138,7 +139,7 @@ export function createModelInvocationGate(
     aborted: input.abortSignal?.aborted ?? false,
   });
 
-  return deepFreeze({
+  return freezeDeep({
     gateId: sanitizeText(
       input.gateId ?? `model-invocation-gate:${preparation.requestPreparationId}`,
       redactions,
@@ -193,7 +194,7 @@ export function createModelInvocationAttemptEnvelope(
         : "blocked";
   const failureClass = input.failureClass ?? failureClassForGate(input.gate);
 
-  return deepFreeze({
+  return freezeDeep({
     attemptId: sanitizeText(
       input.attemptId ?? `model-invocation-attempt:${input.gate.gateId}`,
       redactions,
@@ -387,15 +388,4 @@ function sanitizeText(input: string, redactions: Set<string>): string {
 function unique(input: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(input)]);
 }
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
-}
-
 export const MODEL_INVOCATION_REDACTION_EXCLUSIONS = REDACTION_EXCLUSIONS;

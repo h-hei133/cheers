@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import type { SessionTreeProjection } from "../session/sessionTreeProjection.js";
 
 export interface SessionContextRebuildProjection {
@@ -125,7 +126,7 @@ export function projectSessionContextRebuild(input: {
       (record) => record.redaction.status === "redacted",
     );
 
-  return deepFreeze({
+  return freezeDeep({
     rebuildSource: {
       sessionIdentity: input.sessionProjection.sessionIdentity,
       activeLeafId: input.sessionProjection.activeLeafId,
@@ -181,14 +182,4 @@ export function projectSessionContextRebuild(input: {
       "context-completeness",
     ],
   });
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

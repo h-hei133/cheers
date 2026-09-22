@@ -11,8 +11,8 @@ export function formatSessionSwitchUsage(input: {
   readonly printMode: boolean;
 }): string {
   return input.printMode
-    ? "Usage: /sessions switch <id|prefix|title|last>"
-    : "\nUsage: /sessions switch <id|prefix|title|last>\n";
+    ? "Usage: /resume switch <id|prefix|title|last>"
+    : "\nUsage: /resume switch <id|prefix|title|last>\n";
 }
 
 export function formatSessionSwitchSuccessLines(
@@ -52,7 +52,7 @@ export function formatSessionSwitchNotFoundLine(input: {
   readonly reference: string;
   readonly printMode: boolean;
 }): string {
-  const line = `Switch target '${input.reference}' was not found.\nHint: run /sessions list, then /sessions switch <id|prefix|title|last>.`;
+  const line = `Switch target '${input.reference}' was not found.\nHint: run /resume list, then /resume switch <id|prefix|title|last>.`;
   return input.printMode ? line : `\n${line}\n`;
 }
 
@@ -67,7 +67,7 @@ export function formatSessionSwitchAmbiguousLine(input: {
     lines.push(`- ${candidate.id} [${candidate.status}] ${title}`);
   }
   lines.push(
-    "Hint: use a longer session id prefix or exact session id from /sessions list.",
+    "Hint: use a longer session id prefix or exact session id from /resume list.",
   );
   return input.printMode ? lines.join("\n") : `\n${lines.join("\n")}\n`;
 }

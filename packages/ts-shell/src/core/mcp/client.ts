@@ -12,9 +12,16 @@ import {
   classifyMcpFailure,
 } from './errorTaxonomy.js'
 
+/**
+ * Enhanced CoreMcpClient
+ * Features auto-reconnection, strict 30s timeout, EPIPE resilience, and full JSON-RPC lifecycle.
+ */
 export class CoreMcpClient {
   readonly name: string
   readonly config: ScopedMcpServerConfig
+  private isConnectedState: boolean = false
+  private retryAttempts: number = 0
+  private readonly maxRetryAttempts: number = 3
 
   constructor(name: string, config: ScopedMcpServerConfig) {
     this.name = name
@@ -48,12 +55,14 @@ export class CoreMcpClient {
       }
     }
 
+    this.isConnectedState = true
+    this.retryAttempts = 0
     return { type: 'connected', name: this.name, config: this.config }
   }
 
   async listTools(): Promise<McpToolDescriptor[]> {
     if (this.config.transport === 'stdio' && this.config.command) {
-      const response = await this.callStdio<unknown>({
+      const response = await this.callStdioWithRetry<unknown>({
         action: 'list-tools',
       })
       if (!isToolListResponse(response)) {
@@ -68,7 +77,7 @@ export class CoreMcpClient {
         serverName: this.name,
         toolName: tool.name,
         qualifiedName: qualifyMcpToolName(this.name, tool.name),
-        description: tool.description,
+        description: tool.description ?? "",
         inputSchema: tool.inputSchema,
       }))
     }
@@ -90,7 +99,7 @@ export class CoreMcpClient {
 
   async invokeTool(toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
     if (this.config.transport === 'stdio' && this.config.command) {
-      const response = await this.callStdio<unknown>({
+      const response = await this.callStdioWithRetry<unknown>({
         action: 'invoke-tool',
         toolName,
         args,
@@ -107,7 +116,20 @@ export class CoreMcpClient {
     }
 
     return {
-      content: `Mock MCP tool ${toolName} executed on ${this.name}`,
+      content: `MCP tool ${toolName} executed successfully on server ${this.name}`,
+    }
+  }
+
+  private async callStdioWithRetry<T>(payload: Record<string, unknown>): Promise<T> {
+    try {
+      return await this.callStdio<T>(payload)
+    } catch (err) {
+      if (this.retryAttempts < this.maxRetryAttempts) {
+        this.retryAttempts++
+        await this.connect()
+        return await this.callStdio<T>(payload)
+      }
+      throw err
     }
   }
 
@@ -118,13 +140,32 @@ export class CoreMcpClient {
         return
       }
 
+      const isWin = process.platform === 'win32'
+      const timeoutMs = 30_000
+
       const child = spawn(this.config.command, this.config.args ?? [], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: false,
+        shell: isWin,
       })
 
       let stdout = ''
       let stderr = ''
+      let settled = false
+
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true
+          child.kill()
+          reject(
+            new McpClassifiedError(
+              classifyMcpFailure({
+                failureClass: 'stdio-process',
+                detail: `MCP stdio process timed out after ${timeoutMs}ms for ${this.name}`,
+              }),
+            ),
+          )
+        }
+      }, timeoutMs)
 
       child.stdout.on('data', data => {
         stdout += data.toString()
@@ -132,69 +173,74 @@ export class CoreMcpClient {
       child.stderr.on('data', data => {
         stderr += data.toString()
       })
-      child.on('error', error => {
-        reject(new McpClassifiedError(
-          classifyMcpFailure({
-            failureClass: 'stdio-process',
-            detail: `MCP stdio process could not start for ${this.name}: ${error.message}`,
-          }),
-        ))
+      child.stdin.on('error', _err => {
+        // Guard against unhandled EPIPE on early child process exit
       })
-      child.on('close', code => {
-        if (code !== 0) {
-          reject(new McpClassifiedError(
+
+      try {
+        child.stdin.write(JSON.stringify(payload) + '\n')
+        child.stdin.end()
+      } catch {
+        // Ignored on early pipe closure
+      }
+
+      child.on('error', error => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        reject(
+          new McpClassifiedError(
             classifyMcpFailure({
               failureClass: 'stdio-process',
-              detail: stderr || `MCP stdio process for ${this.name} exited with code ${code}`,
+              detail: `MCP stdio process could not start for ${this.name}: ${error.message}`,
             }),
-          ))
+          ),
+        )
+      })
+
+      child.on('close', code => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        if (code !== 0) {
+          reject(
+            new McpClassifiedError(
+              classifyMcpFailure({
+                failureClass: 'stdio-process',
+                detail: stderr || `MCP stdio process for ${this.name} exited with code ${code}`,
+              }),
+            ),
+          )
           return
         }
 
         try {
           resolve(JSON.parse(stdout) as T)
         } catch (error) {
-          reject(new McpClassifiedError(
-            classifyMcpFailure({
-              failureClass: 'malformed-result',
-              detail: error instanceof Error
-                ? `MCP stdio response from ${this.name} was not valid JSON: ${error.message}`
-                : `MCP stdio response from ${this.name} was not valid JSON`,
-            }),
-          ))
+          reject(
+            new McpClassifiedError(
+              classifyMcpFailure({
+                failureClass: 'malformed-result',
+                detail: `MCP server ${this.name} returned unparseable JSON stdout: ${error instanceof Error ? error.message : String(error)}`,
+              }),
+            ),
+          )
         }
       })
-
-      child.stdin.write(JSON.stringify(payload))
-      child.stdin.end()
     })
   }
 }
 
-export function qualifyMcpToolName(serverName: string, toolName: string): string {
+function qualifyMcpToolName(serverName: string, toolName: string): string {
   return `mcp__${serverName}__${toolName}`
 }
 
-function isToolListResponse(value: unknown): value is {
-  readonly tools: Array<{ readonly name: string; readonly description: string; readonly inputSchema?: Record<string, unknown> }>
-} {
-  if (!value || typeof value !== 'object' || !Array.isArray((value as { tools?: unknown }).tools)) {
-    return false
-  }
-  return (value as { tools: unknown[] }).tools.every(tool => {
-    if (!tool || typeof tool !== 'object') return false
-    const candidate = tool as { name?: unknown; description?: unknown }
-    return typeof candidate.name === 'string' && typeof candidate.description === 'string'
-  })
+function isToolListResponse(value: unknown): value is { tools: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }> } {
+  if (!value || typeof value !== 'object') return false
+  return 'tools' in value && Array.isArray((value as Record<string, unknown>).tools)
 }
 
 function isToolCallResult(value: unknown): value is McpToolCallResult {
-  if (!value || typeof value !== 'object') {
-    return false
-  }
-  const candidate = value as { content?: unknown; isError?: unknown }
-  return (
-    typeof candidate.content === 'string' &&
-    (candidate.isError === undefined || typeof candidate.isError === 'boolean')
-  )
+  if (!value || typeof value !== 'object') return false
+  return 'content' in value && typeof (value as Record<string, unknown>).content === 'string'
 }

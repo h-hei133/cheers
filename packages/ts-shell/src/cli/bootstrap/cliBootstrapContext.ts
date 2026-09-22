@@ -6,7 +6,7 @@ import {
   bootstrapShellRuntime,
 } from "../../core/shell/bootstrap.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
-import { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
@@ -60,7 +60,12 @@ export function createCliRootContext(
   );
   const gitContext = getWorkflowGitContext(runtimeBaseDir);
   const workspaceRoot = gitContext.root ?? runtimeBaseDir;
-  const runtimeConfig = getRuntimeConfig(workspaceRoot);
+  const runtimeConfig = getRuntimeConfig(workspaceRoot, {
+    // Zero is the loader's opt-out, so the flag needs no separate path through
+    // the prompt builder.
+    instructionBudgetBytes: input.options.noContextFiles ? 0 : undefined,
+    allowUntrustedHooks: input.options.dangerouslyBypassHookTrust === true ? true : undefined,
+  });
   return {
     runtimeBaseDir,
     gitContext,
@@ -82,8 +87,11 @@ export function createCliBootstrapRuntimeContext(
 ): CliBootstrapRuntimeContext {
   const sessionManager = new SessionManager();
   const renderer = new StreamingRenderer();
+  // What a bare `/resume` or `/continue` falls back to. Recovery eligibility is too
+  // narrow for that: a session that finished cleanly is exactly what someone means
+  // by "the one I was in".
   const recoveryCandidate = !input.options.sessionId
-    ? sessionManager.getSuggestedRecoverySession({
+    ? sessionManager.getReentryCandidate({
         preferredProjectRoot: input.rootContext.workspaceRoot,
       })
     : null;
@@ -109,6 +117,9 @@ export function createCliBootstrapRuntimeContext(
         requestedSessionId: input.options.sessionId,
         allowSessionRootMigration: input.options.migrateSessionRoot === true,
         emitLifecycleMessages: false,
+        // A one-shot run continues where the user left off; an interactive launch
+        // is a new sitting and starts its own session.
+        adoptCurrentSession: input.options.printMode === true,
       });
     } catch (error) {
       handleCliBootstrapError({

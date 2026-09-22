@@ -3,12 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import {
   BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV,
-} from "../context/browserCliExecutorInjection.js";
+} from "../../browser/cliExecutorInjection.js";
 import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
   type BrowserExternalRunnerManifest,
-} from "../context/browser/runtime/external/manifest.js";
+} from "../../browser/runtime/external/manifest.js";
 
 export interface BrowserExternalRunnerScenarioFixture {
   readonly root: string;

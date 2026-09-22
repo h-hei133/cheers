@@ -6,7 +6,7 @@ import {
   extractLastReadWindow,
   extractStagedRepairProgress,
 } from "../sessionContinuityModule.js";
-import type { CodingResultSummary } from "../../orchestration/types.js";
+import type { CodingResultSummary } from "../../result/types.js";
 
 export function projectSessionReadContinuity(
   lastCodingResult: CodingResultSummary | undefined,

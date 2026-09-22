@@ -6,12 +6,14 @@ Status: hard-gate validation passed; live provider was not run because it is
 optional for this route and non-live primary evidence covers the required
 product behavior.
 
-Primary behavior evidence is the new focused test:
+Primary behavior evidence was the focused test `harnessSpine.test.ts`, which
+executed repository package tasks with repair, receipt proof, restore, and an
+honest not-proven result.
 
-```text
-packages/ts-shell/src/core/query/runtime/harnessSpine.test.ts
-  executes repository package tasks with repair, receipt proof, restore, and honest not-proven result
-```
+> **2026-09-19 更正**：该测试文件**已不存在**——它随 turn 迁移 `a7418fcb`
+> （2026-09-12，双循环收敛为内核驱动 turn）删除。本文其余内容
+> （SP071 路线的裁决、任务表、验证台账）**保留为历史记录**；
+> 但"primary behavior evidence"这一项**当前无对应文件**，不要按它去复核。
 
 These are primary disposable workspace tasks. They do not reuse SP044-SP070
 primary tasks, do not depend on transcript fixtures, and do not use catalog,

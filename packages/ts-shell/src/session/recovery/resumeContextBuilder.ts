@@ -1,8 +1,9 @@
+import { compactContinuityText } from "../sessionContinuityModule.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type {
   CodingActionResultSeed,
   CodingResultSummary,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import { formatPromptContinuityContext } from "../continuityFormatter.js";
 import { formatContinuationEvidenceParityDetails } from "../continuationEvidenceParity.js";
 import type {
@@ -385,7 +386,7 @@ export function buildSuccessHandoffDiagnostic(
     parts.push(`verified=${verifiedFiles.slice(0, 4).join(",")}`);
   }
   if (reason) {
-    parts.push(`reason=${compactText(reason, 140)}`);
+    parts.push(`reason=${compactContinuityText(reason, 140)}`);
   }
   if (codingResult.recoverySurface?.explicitRestoreAvailable) {
     parts.push("snapshot=created");
@@ -591,12 +592,4 @@ function normalizePathLikeTarget(value: string): string | undefined {
     return undefined;
   }
   return trimmed;
-}
-
-function compactText(input: string, max: number = 220): string {
-  const normalized = input.replace(/\s+/g, " ").trim();
-  if (normalized.length <= max) {
-    return normalized;
-  }
-  return `${normalized.slice(0, max)}...`;
 }

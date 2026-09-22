@@ -9,7 +9,7 @@ import type {
   CodingResultSummary,
   CodingTaskKind,
   CodingVerificationSummary,
-} from "../../../orchestration/types.js";
+} from "../../types.js";
 import { buildMutationTaskDelivery } from "./verification.js";
 
 export interface ShellResultAssemblyInput {

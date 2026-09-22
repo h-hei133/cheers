@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../../core/values/freeze.js";
 import type { PostRepairVerificationResultObservation } from "../../../verification/result/boundary.js";
 
 export type RepairVerdictProofInputStatus =
@@ -51,7 +52,7 @@ export function buildRepairVerdictProofInput(input: {
 }): RepairVerdictProofInput {
   const verification = input.postRepairVerification;
   const missingProofItems = missingProofItemsFor(verification);
-  return deepFreeze({
+  return freezeDeep({
     proofInputId: `${verification.resultId}:evidence-proof`,
     verdictCandidateId: verification.verdictCandidateInput?.candidateId,
     sourcePostRepairVerificationResultId: verification.resultId,
@@ -60,7 +61,7 @@ export function buildRepairVerdictProofInput(input: {
     originalFailureStatus: verification.originalFailureStatus,
     originalReceiptIds: [...verification.originalRuntimeReceiptIds],
     repairProposalId: verification.sourceRepairProposalId,
-    repairAuthorityState: verification.repairAuthorityState,
+    repairAuthorityState: verification.repairAuthorityState ?? "unknown",
     repairApplyState: verification.repairApplyState,
     repairTouchedTargetSummaries: [...verification.touchedTargetSummaries],
     repairApplyReceiptIds: [...verification.repairApplyReceiptIds],
@@ -102,7 +103,7 @@ function missingProofItemsFor(
   if (verification.originalRuntimeReceiptIds.length === 0) missing.push("original-receipt");
   if (verification.repairApplyReceiptIds.length === 0) missing.push("repair-apply-receipt");
   if (verification.receiptIds.length === 0) missing.push("post-repair-receipt");
-  return deepFreeze(missing);
+  return freezeDeep(missing);
 }
 
 function proofStatusFor(
@@ -125,15 +126,5 @@ function proofStatusFor(
 }
 
 function unique(values: readonly string[]): readonly string[] {
-  return deepFreeze(Array.from(new Set(values)).sort());
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
+  return freezeDeep(Array.from(new Set(values)).sort());
 }

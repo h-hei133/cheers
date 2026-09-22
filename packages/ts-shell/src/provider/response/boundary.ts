@@ -1,3 +1,5 @@
+import { freezeDeep } from "../../core/values/freeze.js";
+
 export type ModelResponseSource =
   | "fake_default_safe"
   | "product_fixture"
@@ -73,7 +75,7 @@ export function createModelResponseBoundary(
     (modelSafeLabel?.redacted ?? false) ||
     summary.redacted;
 
-  return deepFreeze({
+  return freezeDeep({
     responseId: responseId.value,
     ...(turnId ? { turnId: turnId.value } : {}),
     providerMode: input.providerMode ?? "default",
@@ -140,14 +142,4 @@ function sanitizeText(value: string): { readonly value: string; readonly redacte
     sanitized = next;
   }
   return { value: sanitized, redacted };
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

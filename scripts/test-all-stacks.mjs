@@ -53,6 +53,9 @@ function main() {
   }
 
   runStack('TypeScript Tests (vitest)', nodeExe, [vitestModule, 'run', '--dir', 'packages/ts-shell/src'])
+  // The gates under scripts/ carry their own tests so a gate that stops
+  // detecting what it was written for fails here rather than silently passing.
+  runStack('Script Tests (node --test)', nodeExe, ['--test', 'scripts/*.test.mjs'])
   runStack('Rust Tests (cargo test)', cargo.command, ['test', '--manifest-path', 'packages/rust-core/Cargo.toml'])
   runStack('Python Tests (pytest)', python.command, ['scripts/run-python-tests.py'])
 

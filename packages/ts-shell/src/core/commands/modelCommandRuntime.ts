@@ -6,6 +6,11 @@ import {
   type RuntimeProvider,
 } from "../../config/runtimeConfig.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import { parseArgsWithFlags } from "./connect/preset.js";
+import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
+import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
+import { refreshCatalog } from "../models/catalogRefresh.js";
+import { renderCatalog } from "../models/catalogSurface.js";
 
 const MODELS_DEV_API_URL = "https://models.dev/api.json";
 const OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS = [
@@ -36,11 +41,34 @@ interface ModelsDevProviderInfo {
 
 export async function runModelCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
   const [action, ...rest] = args;
-  if (!action || action === "status") {
+  if (!action) {
+    return { kind: "local", output: renderCatalogView() };
+  }
+  if (action === "status") {
     return { kind: "local", output: renderModelStatus() };
+  }
+  if (action === "refresh") {
+    const result = await refreshCatalog();
+    return {
+      kind: "local",
+      output: result.ok
+        ? `Catalogue refreshed: ${result.providers} providers, ${result.models} models, cached in \`${result.cachePath}\`. Your own entries in \`${userCatalogPath()}\` still win.`
+        : `Catalogue refresh failed (${result.error}). The shipped catalogue is unchanged and still complete.`,
+    };
+  }
+  if (action === "config") {
+    const path = ensureUserCatalog();
+    return {
+      kind: "local",
+      output: [
+        `Your provider file is \`${path}\`.`,
+        "",
+        "An entry with a known provider id patches it — a different base URL, extra models, a different key variable. An unknown id adds a provider outright.",
+      ].join("\n"),
+    };
   }
 
   if (action === "list" || action === "ls") {
@@ -48,13 +76,55 @@ export async function runModelCommand(
   }
 
   if (action === "use" || action === "set") {
-    return { kind: "local", output: setModel(rest) };
+    return { kind: "local", output: await setModel(rest, context) };
+  }
+  if (action === "help" || action === "--help" || action === "-h") {
+    return {
+      kind: "local",
+      output: getModelHelpText(),
+    };
   }
 
-  return {
-    kind: "local",
-    output: getModelHelpText(),
-  };
+  if (action.startsWith("-")) {
+    return {
+      kind: "local",
+      output: [
+        `Unknown flag '${action}'.`,
+        "Usage:",
+        "- `/model` or `/model status` : Inspect active model and provider",
+        "- `/model list` : List all available models",
+        "- `/model <model-name>` : Switch model directly",
+      ].join("\n"),
+    };
+  }
+  const [modelArg] = args;
+  if (!modelArg) {
+    return { kind: "local", output: renderModelStatus() };
+  }
+  return { kind: "local", output: await setModel(args, context) };
+}
+/**
+ * The catalogue, with this session's connection state folded in.
+ *
+ * Bare `/model` answers "what can I use", which is a question about providers and
+ * models together — the old bare form answered "what am I using", which is
+ * `/model status`.
+ */
+function renderCatalogView(): string {
+  const config = readUserRuntimeConfigFile();
+  const connections = normalizeConnections(config);
+  const activeId = config.activeProviderConnectionId?.trim();
+  const active = connections.find((item) => item.id === activeId);
+  const activeProvider = active?.provider ?? config.provider;
+  return renderCatalog({
+    providers: loadCatalog(),
+    connected: new Set(connections.map((connection) => connection.provider)),
+    activeProvider,
+    activeModel:
+      normalizeText(active?.model) ??
+      normalizeText(activeProvider ? config.providerCredentials?.[activeProvider]?.model : undefined),
+    configPath: userCatalogPath(),
+  });
 }
 
 function renderModelStatus(): string {
@@ -164,6 +234,38 @@ function renderProviderReadinessLines(input: {
   ];
 }
 
+export interface ModelCatalog {
+  readonly provider: RuntimeProvider;
+  readonly models: readonly string[];
+  readonly active?: string;
+  /** True when the catalog came from a local fallback rather than the registry. */
+  readonly offline: boolean;
+}
+
+/**
+ * The model catalog as data, for callers that present a chooser rather than
+ * text. Shares the provider, auth, and fallback resolution with `/model list` so
+ * the two can never offer different models.
+ */
+export async function readModelCatalog(refresh = false): Promise<ModelCatalog> {
+  const config = readUserRuntimeConfigFile();
+  const connections = normalizeConnections(config);
+  const activeId = config.activeProviderConnectionId?.trim();
+  const activeConnection = connections.find((item) => item.id === activeId);
+  const provider = activeConnection?.provider ?? config.provider ?? "openai";
+  const authType = activeConnection?.authType;
+  const active =
+    normalizeText(activeConnection?.model) ??
+    normalizeText(config.providerCredentials?.[provider]?.model);
+
+  if (provider === "openai" && authType === "account-auth") {
+    return { provider, models: OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS, active, offline: false };
+  }
+  const fromApi = await fetchModelsFromModelsDev(provider, refresh);
+  if (fromApi.length > 0) return { provider, models: fromApi, active, offline: false };
+  return { provider, models: fallbackModelsForProvider(provider, authType), active, offline: true };
+}
+
 async function listModels(args: string[]): Promise<string> {
   const parsed = parseArgsWithFlags(args);
   const providerHint = normalizeProvider(parsed.positionals[0]);
@@ -207,22 +309,57 @@ async function listModels(args: string[]): Promise<string> {
   ].join("\n");
 }
 
-function setModel(args: string[]): string {
-  const model = normalizeText(args[0]);
-  if (!model) {
-    return "Usage: /model use <model-id>";
+async function setModel(args: string[], context?: CommandContext): Promise<string> {
+  const target = args[0]?.trim();
+  if (!target) {
+    return "Usage: /model use <provider>/<model>, or /model use <model> to keep the current provider.";
   }
-
+  // A `provider/model` target names both; a bare name keeps the active provider.
+  // Model ids can themselves contain slashes, so only a leading segment that is a
+  // known provider is read as one.
+  const separator = target.indexOf("/");
+  const prefix = separator > 0 ? target.slice(0, separator) : undefined;
+  const namedProvider = prefix && loadCatalog().some((entry) => entry.id === prefix) ? prefix : undefined;
+  const model = namedProvider ? target.slice(separator + 1) : target;
+  if (namedProvider && !model) {
+    return `\`${namedProvider}\` has no models listed. Name one: /model use ${namedProvider}/<model>.`;
+  }
   const config = readUserRuntimeConfigFile();
+  const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
+  const activeConnection = connections.find((item) => item.id === activeId);
+  const provider = activeConnection?.provider ?? config.provider ?? "openai";
+  const fromModel = config.providerCredentials?.[provider]?.model || "default";
+
+  // Dispatch PreModelSwitch Hook
+  const preDecision = await defaultHookDispatcher.dispatch({
+    eventName: "PreModelSwitch",
+    sessionId: context?.sessionId || "model-switch",
+    workspaceRoot: context?.cwd || process.cwd(),
+    timestamp: new Date().toISOString(),
+    fromModel,
+    toModel: model,
+  });
+
+  if (preDecision && preDecision.decision === "block") {
+    return `Model switch blocked by hook policy: ${preDecision.reason || "Switch not allowed."}`;
+  }
   if (!activeId) {
     return "No active connection. Run /connect login ... first.";
   }
-
-  const connections = normalizeConnections(config);
-  const activeConnection = connections.find((item) => item.id === activeId);
   if (!activeConnection) {
     return `Active connection not found: ${activeId}`;
+  }
+  // Switching model and switching provider are different acts with different
+  // consequences — the second needs a credential — so a target naming a provider
+  // that is not the active one is refused rather than half-applied.
+  if (namedProvider && namedProvider !== activeConnection.provider) {
+    return [
+      `\`${model}\` belongs to \`${namedProvider}\`, and the active connection is \`${activeConnection.provider}\`.`,
+      "",
+      `Connect that provider first: /connect login ${namedProvider} --api-key <key>`,
+      "Then switch to it with /connect use <connection-id>.",
+    ].join("\n");
   }
 
   if (
@@ -242,10 +379,10 @@ function setModel(args: string[]): string {
   const nextConnections = connections.map((item) =>
     item.id === activeId ? { ...item, model, updatedAt } : item,
   );
-  const provider = activeConnection.provider;
+  const activeProvider = activeConnection.provider;
   const next: RuntimeConfigFile = {
     ...config,
-    provider,
+    provider: activeProvider,
     activeProviderConnectionId: activeId,
     providerConnections: nextConnections,
     providerCredentials: {
@@ -257,6 +394,23 @@ function setModel(args: string[]): string {
     },
   };
   const configPath = writeUserRuntimeConfigFile(next);
+
+  // The session carries the settings it started with, and this command has just
+  // changed one of them on disk. Without re-reading, the token budgets resolved
+  // per model would keep answering from the model that was active at startup —
+  // the new model's window comes from the provider bridge and does update, so the
+  // two would disagree in a way nothing reports.
+  context?.refreshRuntimeConfig?.();
+
+  // Dispatch PostModelSwitch Hook
+  await defaultHookDispatcher.dispatch({
+    eventName: "PostModelSwitch",
+    sessionId: context?.sessionId || "model-switch",
+    workspaceRoot: context?.cwd || process.cwd(),
+    timestamp: new Date().toISOString(),
+    fromModel,
+    toModel: model,
+  });
 
   return [
     `Model switched to ${model}.`,
@@ -333,30 +487,6 @@ function fallbackModelsForProvider(
     return ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"];
   }
   return ["deepseek-ai/DeepSeek-V4-Flash", "Qwen/Qwen2.5-Coder-32B-Instruct"];
-}
-
-function parseArgsWithFlags(args: string[]): {
-  positionals: string[];
-  flags: Record<string, string | boolean>;
-} {
-  const positionals: string[] = [];
-  const flags: Record<string, string | boolean> = {};
-  for (let index = 0; index < args.length; index += 1) {
-    const token = args[index];
-    if (!token.startsWith("--")) {
-      positionals.push(token);
-      continue;
-    }
-    const key = token.slice(2).trim().toLowerCase();
-    const next = args[index + 1];
-    if (!next || next.startsWith("--")) {
-      flags[key] = true;
-      continue;
-    }
-    flags[key] = next;
-    index += 1;
-  }
-  return { positionals, flags };
 }
 
 function normalizeProvider(input?: string): RuntimeProvider | undefined {

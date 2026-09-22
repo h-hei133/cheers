@@ -21,7 +21,7 @@ npm run doctor
 
 ## Optional local config
 
-You can bootstrap credentials either by editing the user config file or by using `/auth` inside the CLI.
+You can bootstrap credentials either by editing the user config file or by using `/connect` inside the CLI.
 
 ```bash
 npm start
@@ -49,8 +49,8 @@ For `openai-compatible`, store all three fields:
 Recommended CLI onboarding flow:
 
 ```bash
-/auth set openai-compatible <api-key> https://api.siliconflow.cn/v1 deepseek-ai/DeepSeek-V3
-/auth status
+/connect set openai-compatible <api-key> https://api.siliconflow.cn/v1 deepseek-ai/DeepSeek-V3
+/connect status
 ```
 
 ## Daily-use commands

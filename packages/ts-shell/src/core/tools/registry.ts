@@ -1,33 +1,43 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { verifyPathContainment } from '../security/pathJail.js'
+import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
+import { replaceInContent } from './editEngine.js'
+import { withFileLock } from '../../runtime/execution/fileLock.js'
+import {
+  detectLineEnding,
+  splitByteOrderMark,
+  toUnixLines,
+  withLineEnding,
+} from '../../runtime/execution/fileText.js'
+import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
+import { truncateHead, truncateTail, truncateLineWidth } from './truncation.js'
+import { ArtifactManager } from '../session/artifactManager.js'
+import { parsePathSelector, sliceLinesBySelector } from './selectorParser.js'
 import {
   createDefaultExecutionService,
   type ExecutionAuthority,
   type ExecutionService,
 } from '../../runtime/execution/service.js'
-import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
-import {
-  classifyMcpFailure,
-  classifyUnknownMcpFailure,
-  mcpFailureMetadata,
-} from '../mcp/errorTaxonomy.js'
-import { createBrowserToolDefinitions } from '../context/browserTool.js'
-import type { PwRuntimeStatus } from '../context/pwRuntime.js'
+import { type CoreMcpGateway } from '../mcp/gateway.js'
+import { formatDirectoryListing } from './directoryListing.js'
+import { createGlobToolDefinition } from './glob.js'
+import { createSkillToolDefinition, type SkillCatalog } from './skill.js'
+import { createGrepToolDefinition } from './grep.js'
+import { createWebFetchToolDefinition } from './webFetch.js'
+import { createWebSearchToolDefinition } from './webSearch.js'
+import { createLspToolDefinition } from './lsp.js'
+import { createUnifiedBrowserToolDefinition } from './browserToolUnified.js'
+import { ShellManager } from '../shell/platform/shellManager.js'
+import { createAskToolDefinition } from './ask.js'
+import { createTodoToolDefinition } from './todoTool.js'
+import { createTaskToolDefinition } from './taskTool.js'
+import type { PwRuntimeStatus } from '../../browser/playwrightRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
-import {
-  createCommandRuntimeReceipt,
-  createMcpRuntimeFailureReceipt,
-} from '../runtime/runtimeReceipt.js'
-import { projectRuntimeReceipt } from '../runtime/runtimeReceiptProjection.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
-import { createCommandToolResultSplit } from '../../tools/result/split.js'
-import {
-  createToolAfterObservationAnnotation,
-  createToolBeforePolicyDecision,
-  createToolInterceptionIntent,
-  executionPolicyMetadataFromToolDecision,
-} from '../../tools/policy/interception.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
-import { buildExecutionFailedResult } from './toolPolicyResult.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
+import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
@@ -71,106 +81,93 @@ async function runCommandTool(
   command: string,
   context: ToolExecutionContext,
 ) {
-  const toolIntent = createToolInterceptionIntent({
-    toolId: 'bash',
-    toolKind: 'core-tool',
-    caller: 'core-tool:bash',
-    operationKind: 'command.run',
-    requestedActionSummary: command,
-    authorityMode: TOOL_APPROVED_COMMAND_AUTHORITY.mode,
-    riskLevel: 'high',
-    input: { command },
-    notProvenClaims: ['command-result-success'],
-  })
-  const beforeDecision = createToolBeforePolicyDecision({
-    intent: toolIntent,
-    status: 'allow',
-    reason: 'ToolRuntime allowlist and process permission checks passed before ExecutionService was called.',
-    policySource: 'tool-runtime-approval',
-    authorityRequirement: TOOL_APPROVED_COMMAND_AUTHORITY.mode,
-    reportSafeSummary: command,
+  if (!command || !command.trim()) {
+    return deniedResult('Error: No command provided to execute.', {
+      status: 'failed',
+      exitCode: 1,
+    })
+  }
+  const env = ShellManager.getActiveEnvironment();
+  const isWindows = process.platform === 'win32';
+  const shellBin = env.executionPath;
+  let shellArgs: string[];
+
+  if (env.activeBackend === 'powershell') {
+    shellArgs = ['-NoProfile', '-NonInteractive', '-Command', command];
+  } else if (env.activeBackend === 'git-bash' || env.activeBackend === 'bash') {
+    shellArgs = ['-c', command];
+  } else if (env.activeBackend === 'wsl') {
+    shellArgs = ['-e', 'sh', '-c', command];
+  } else {
+    shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command];
+  }
+  // OS-level isolation, when it has been turned on. The plan says which of the
+  // three states applies, and an unavailable launcher is reported on the result
+  // rather than quietly downgraded to no isolation.
+  const sandbox = planSandboxedCommand({
+    shell: shellBin,
+    shellArgs,
+    workspaceRoot: context.workspaceRoot,
   })
   const result = await executionService.runCommand({
     operationKind: 'command.run',
-    command: process.platform === 'win32' ? 'cmd' : 'sh',
-    args: process.platform === 'win32' ? ['/C', command] : ['-c', command],
+    command: sandbox.command ?? shellBin,
+    args: sandbox.args ?? shellArgs,
     cwd: context.workspaceRoot,
     workspaceRoot: context.workspaceRoot,
     authority: TOOL_APPROVED_COMMAND_AUTHORITY,
     caller: 'core-tool:bash',
-    reason: 'Execute an approved shell command tool request inside the workspace.',
+    reason: 'Run an approved workspace command.',
     reportSafeCommand: command,
-    timeoutMs: 30_000,
+    timeoutMs: 60_000,
     abortSignal: context.abortSignal,
-    policy: executionPolicyMetadataFromToolDecision(beforeDecision),
+    ...(context.onOutput ? { onOutput: context.onOutput } : {}),
   })
-  const receipt = createCommandRuntimeReceipt({
-    runtimeKind: result.executionPath === 'rust-daemon' ? 'daemon' : 'local-command',
-    command,
-    status: result.status,
+  const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
+  const isOk = result.status === 'completed' && result.exitCode === 0
+  const rawOutput = isOk
+    ? (result.stdout || 'Command completed with no output')
+    : ([result.stderr, result.stdout].filter(Boolean).join('\n') || result.recoveryReason || `Command failed with exit code ${result.exitCode}`)
+
+  const truncated = truncateTail(rawOutput, { maxLines: 1500, maxBytes: 50 * 1024 })
+  let finalOutput = truncated.content
+  const sandboxNotices = [sandbox.notice, sandbox.state === 'isolated' ? networkNotice(readSandboxRules(context.workspaceRoot)) : undefined].filter(Boolean)
+  if (sandboxNotices.length > 0) {
+    finalOutput = `${sandboxNotices.map(notice => `[sandbox] ${notice}`).join('\n')}\n${finalOutput}`
+  }
+
+  if (truncated.truncated) {
+    const artifact = await artifactManager.save(rawOutput, 'bash')
+    finalOutput += `\n\n[Showing last ${truncated.shownLines} of ${truncated.originalLines} lines (${Math.round(truncated.shownBytes / 1024)}KB of ${Math.round(truncated.originalBytes / 1024)}KB). Full raw output saved: ${artifact.uri}]\n[To read full or earlier sections: read(path="${artifact.uri}:1-500")]`
+  }
+
+  // Where the command actually ran (ts-local, rust-daemon) and how the result was
+  // classified are decided by the execution service; dropping them here would make
+  // the tool result unable to say which executor answered.
+  const executionProvenance = {
     executionPath: result.executionPath,
+    errorClass: result.errorClass,
+  }
+
+  if (isOk) {
+    return approvedResult(finalOutput, {
+      ...executionProvenance,
+      status: result.status,
+      exitCode: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    })
+  }
+
+  return deniedResult(finalOutput, {
+    ...executionProvenance,
+    status: result.status,
     exitCode: result.exitCode,
     stdout: result.stdout,
     stderr: result.stderr,
-    timeoutMs: 30_000,
-    reason: result.recoveryReason,
-    evidence: result.recoveryReason ? ['runtime-receipt:daemon-unavailable'] : undefined,
+    failureKind: inferFailureKind(result),
+    recoveryReason: result.recoveryReason,
   })
-  const modelVisibleOutput = result.executionPath === 'rust-daemon'
-    ? result.stdout
-    : `${result.stdout}${result.stderr}`.trim()
-  const afterAnnotation = createToolAfterObservationAnnotation({
-    decision: beforeDecision,
-    toolId: 'bash',
-    resultStatus: result.status === 'completed'
-      ? 'tool-success-observed'
-      : 'tool-failure-observed',
-    executionReceipt: result.receipt,
-    resultDetailsId: result.receipt.receiptId,
-    annotations: ['execution-service:receipt-observed'],
-    nextActionSuggestions: result.status === 'completed'
-      ? []
-      : ['Inspect the execution receipt error class before retrying.'],
-    reportSafeSummary: result.receipt.requestedActionSummary,
-  })
-  const split = createCommandToolResultSplit({
-    content: modelVisibleOutput,
-    receipt: result.receipt,
-    runtimeFacts: {
-      executionPath: result.executionPath,
-      status: result.status,
-      exitCode: result.exitCode,
-      errorClass: result.errorClass,
-      legacyFailureKind: inferFailureKind(result),
-    },
-    toolInterception: {
-      beforeDecision,
-      afterAnnotation,
-    },
-  })
-
-  return {
-    success: result.status === 'completed',
-    output: modelVisibleOutput,
-    error: result.status === 'completed' ? undefined : result.stderr,
-    content: split.content,
-    details: split.details,
-    reportSafe: split.reportSafe,
-    metadata: {
-      executionPath: result.executionPath,
-      status: result.status,
-      exitCode: result.exitCode,
-      failureKind: inferFailureKind(result),
-      errorClass: result.errorClass,
-      daemonInstanceId: result.daemonInstanceId,
-      daemonPid: result.daemonPid,
-      daemonRequestSeq: result.daemonRequestSeq,
-      daemonExecutionId: result.daemonExecutionId,
-      recoveryReason: result.recoveryReason,
-      runtimeReceipt: projectRuntimeReceipt(receipt),
-      executionReceipt: result.receipt,
-    },
-  }
 }
 
 async function runGitCommand(
@@ -178,24 +175,33 @@ async function runGitCommand(
   command: string,
   context: ToolExecutionContext,
 ) {
+  const parts = command.trim().split(/\s+/)
+  const bin = parts[0] || 'git'
+  const args = parts.slice(1)
+
   const result = await executionService.runCommand({
     operationKind: 'command.run',
-    command: process.platform === 'win32' ? 'cmd' : 'sh',
-    args: process.platform === 'win32' ? ['/C', command] : ['-c', command],
+    command: bin,
+    args,
     cwd: context.workspaceRoot,
     workspaceRoot: context.workspaceRoot,
     authority: TOOL_APPROVED_COMMAND_AUTHORITY,
-    caller: `core-tool:${command === 'git status --short' ? 'git-status' : 'git-diff'}`,
-    reason: 'Execute an approved read-only git inspection command inside the workspace.',
+    caller: 'core-tool:git',
+    reason: 'Run an approved git inspection command.',
     reportSafeCommand: command,
-    timeoutMs: 30_000,
     abortSignal: context.abortSignal,
   })
-  if (result.status === 'completed') {
-    return approvedResult(result.stdout.trim())
+
+  if (result.status === 'completed' && result.exitCode === 0) {
+    return approvedResult(result.stdout || 'No changes', {
+      status: result.status,
+      exitCode: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    })
   }
+
   return deniedResult(result.stderr || result.recoveryReason || 'Command failed', {
-    executionPath: result.executionPath,
     status: result.status,
     exitCode: result.exitCode,
     failureKind: inferFailureKind(result),
@@ -208,106 +214,359 @@ export function createCoreToolRegistry(options?: {
   mcpGateway?: CoreMcpGateway
   browserRuntimeStatus?: PwRuntimeStatus
   executionService?: ExecutionService
+  /**
+   * Skills the skill tool may load.
+   *
+   * Absent means no skill tool is registered at all: a tool that could only ever
+   * answer "no such skill" is worse than no tool, because the model would keep
+   * trying it.
+   */
+  skills?: SkillCatalog
 }): ReadonlyMap<string, ToolDefinition> {
   const executionService = options?.executionService ?? createDefaultExecutionService()
   const tools: ToolDefinition[] = [
     {
       name: 'read',
-      description: 'Read a file from the workspace',
-      argsSchema: { type: 'object', required: ['path'] },
+      description: 'Read a file in the workspace, with optional line offset/limit pagination and safe truncation protection. Reading a directory path lists its direct contents instead, one level deep. Image files are reported, not returned: this harness reads text, so use bash to inspect an image.',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'The relative path of the file or directory to read (e.g. package.json, src/index.ts, src).',
+          },
+          offset: {
+            type: 'number',
+            description: 'The 1-based starting line number, or entry number when reading a directory (default: 1).',
+          },
+          limit: {
+            type: 'number',
+            description: 'The maximum number of lines, or entries when reading a directory (default: 500, max: 1000).',
+          },
+        },
+        required: ['path'],
+      },
       permissions: {
         check(args, context) {
           return pathPermission('read', args, context)
         },
       },
       async execute(args, context) {
-        const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        return approvedResult(await executionService.readTextFile({
-          operationKind: 'file.read',
-          absolutePath: target,
-          workspaceRoot: context.workspaceRoot,
-          authority: TOOL_APPROVED_READ_AUTHORITY,
-          caller: 'core-tool:read',
-          reason: 'Read an approved workspace file target.',
-          reportSafeTarget: target,
-        }))
+        const rawPath = typeof args.path === 'string' ? args.path : ''
+        const selector = parsePathSelector(rawPath)
+        const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
+        let target = selector.cleanPath
+        let isArtifact = target.startsWith('artifact://')
+        let rawContent = ''
+
+        if (isArtifact) {
+          const resolvedArtifact = artifactManager.resolve(target)
+          if (!resolvedArtifact) {
+            throw new Error(`Artifact '${target}' not found in session storage.`)
+          }
+          rawContent = await executionService.readTextFile({
+            operationKind: 'file.read',
+            absolutePath: resolvedArtifact,
+            workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY,
+            caller: 'core-tool:read:artifact',
+            reason: 'Read session artifact output log.',
+            reportSafeTarget: resolvedArtifact,
+          })
+        } else {
+          target = resolveToolTarget({ path: selector.cleanPath }, 'path', context.workspaceRoot)
+          const containment = verifyPathContainment(target, context.workspaceRoot)
+          if (!containment.allowed) {
+            throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+          }
+          // A directory is a legitimate thing to read. Handing the model a raw
+          // EISDIR instead of the names it asked for makes "what is in here"
+          // unanswerable without shelling out, so the listing is answered here,
+          // through the same ignore policy every other tool walks with.
+          const stats = await fs.stat(containment.resolvedPath).catch(() => undefined)
+          if (stats?.isDirectory()) {
+            return approvedResult(
+              await formatDirectoryListing({
+                absolutePath: containment.resolvedPath,
+                workspaceRoot: context.workspaceRoot,
+                displayPath: selector.cleanPath,
+                offset: typeof args.offset === 'number' ? args.offset : undefined,
+                limit: typeof args.limit === 'number' ? args.limit : undefined,
+              }),
+            )
+          }
+          // An image read as text is mojibake, and mojibake is worse than a
+          // refusal: it looks like content. Say what the file is and how to view
+          // it instead of handing the model bytes it cannot interpret.
+          if (isImageFilePath(containment.resolvedPath)) {
+            const stats = await fs.stat(containment.resolvedPath)
+            return approvedResult(
+              formatNonVisionFallback({
+                type: 'image',
+                data: '',
+                mimeType: getImageMimeType(containment.resolvedPath),
+              }) +
+                `\n${selector.cleanPath} is ${Math.round(stats.size / 1024)}KB on disk. ` +
+                `Its bytes cannot be read as text; this model receives no image content. ` +
+                `Use bash to inspect it (e.g. file, identify, exiftool) if you need facts about it.`,
+            )
+          }
+          rawContent = await executionService.readTextFile({
+            operationKind: 'file.read',
+            absolutePath: containment.resolvedPath,
+            workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY,
+            caller: 'core-tool:read',
+            reason: 'Read an approved workspace file target.',
+            reportSafeTarget: containment.resolvedPath,
+          })
+        }
+
+        // Strip leading BOM so the model never sees an invisible \uFEFF character
+        // that could pollute prompts or edits.
+        const { text: cleanContent } = splitByteOrderMark(rawContent)
+        const lines = cleanContent.split('\n')
+        const totalLines = lines.length
+
+        let selectedLines: string[] = []
+        let startLine = 1
+        let endLine = totalLines
+
+        if (selector.hasSelector) {
+          const sliced = sliceLinesBySelector(lines, selector)
+          selectedLines = sliced.selectedLines
+          startLine = sliced.startLine
+          endLine = sliced.endLine
+        } else {
+          const offset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 1
+          const maxLimit = 1000
+          const defaultLimit = 500
+          const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), maxLimit) : defaultLimit
+          const startIdx = Math.max(0, offset - 1)
+          const endIdx = Math.min(totalLines, startIdx + limit)
+          selectedLines = lines.slice(startIdx, endIdx)
+          startLine = startIdx + 1
+          endLine = endIdx
+        }
+
+        let resultText = selectedLines.join('\n')
+        const truncated = truncateHead(resultText, { maxLines: 1500, maxBytes: 50 * 1024 })
+        resultText = truncated.content
+
+        if (truncated.firstLineExceedsLimit) {
+          const firstLineKb = Math.round((truncated.firstLineBytes ?? 0) / 1024)
+          resultText = `[Line ${startLine} is ${firstLineKb}KB, exceeds 50KB limit. Use bash: sed -n '${startLine}p' ${selector.cleanPath} | head -c 51200]`
+        } else if (truncated.truncated) {
+          const artifact = await artifactManager.save(rawContent, 'read')
+          resultText += `\n\n[Showing lines ${startLine}-${startLine + truncated.shownLines - 1} of ${totalLines} (${Math.round(truncated.shownBytes / 1024)}KB). Output spilled to ${artifact.uri}]\n[Use selector to read other sections: read(path="${selector.cleanPath}:${startLine + truncated.shownLines}-${startLine + truncated.shownLines + 200}")]`
+        } else if (startLine > 1 || endLine < totalLines) {
+          resultText += `\n[Showing lines ${startLine}-${endLine} of ${totalLines}. Use selector :N-M or offset/limit to view other sections]`
+        }
+        return approvedResult(resultText)
       },
     },
     {
       name: 'write',
-      description: 'Write a file in the workspace',
-      argsSchema: { type: 'object', required: ['path', 'content'] },
+      description: 'Create or overwrite a file in the workspace with content.',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'The relative path of the file to write.',
+          },
+          content: {
+            type: 'string',
+            description: 'The full file content to write.',
+          },
+        },
+        required: ['path', 'content'],
+      },
       permissions: {
         check(args, context) {
           return pathPermission('write', args, context)
         },
       },
       async execute(args, context) {
-        const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        const content = typeof args.content === 'string' ? args.content : ''
-        await executionService.writeTextFile({
-          operationKind: 'file.write',
-          absolutePath: target,
-          content,
-          workspaceRoot: context.workspaceRoot,
-          authority: TOOL_APPROVED_WRITE_AUTHORITY,
-          caller: 'core-tool:write',
-          reason: 'Write an approved workspace file target.',
-          reportSafeTarget: target,
-        })
-        return approvedResult(target)
+        // The read decides the write, so both sit under one lock: taking it
+        // only for the write would let two edits read the same original.
+        return withFileLock(resolveToolTarget(args, 'path', context.workspaceRoot), async () => {
+          const target = resolveToolTarget(args, 'path', context.workspaceRoot)
+          const containment = verifyPathContainment(target, context.workspaceRoot)
+          if (!containment.allowed) {
+            throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+          }
+          const content = typeof args.content === 'string' ? args.content : ''
+          const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
+          let original = ''
+          let originalUnreadable = false
+          try {
+            original = await executionService.readTextFile({
+              operationKind: 'file.read',
+              absolutePath: containment.resolvedPath,
+              workspaceRoot: context.workspaceRoot,
+              authority: TOOL_APPROVED_READ_AUTHORITY,
+              caller: 'core-tool:write',
+              reason: 'Read original content for diff.',
+              reportSafeTarget: containment.resolvedPath,
+            })
+          } catch {
+            originalUnreadable = true
+          }
+          await executionService.writeTextFile({
+            operationKind: 'file.write',
+            absolutePath: containment.resolvedPath,
+            content,
+            workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_WRITE_AUTHORITY,
+            caller: 'core-tool:write',
+            reason: 'Write an approved workspace file target.',
+            reportSafeTarget: containment.resolvedPath,
+          })
+          const diff = original && original !== content ? createUnifiedDiff(relPath, original, content) : ''
+          const output = diff
+            ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\``
+            : originalUnreadable
+              ? `Wrote ${relPath} (original unreadable, no diff)`
+              : `Wrote ${relPath}`
+          return approvedResult(output)
+          })
       },
     },
     {
       name: 'edit',
-      description: 'Edit a file in the workspace by replacing its content',
-      argsSchema: { type: 'object', required: ['path', 'content'] },
+      description: 'Edit or replace content in an existing file using either full content or resilient search/replace (oldText/newText).',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'The relative path of the file to edit.',
+          },
+          content: {
+            type: 'string',
+            description: 'The full replacement content for the file (optional if oldText/newText provided).',
+          },
+          oldText: {
+            type: 'string',
+            description: 'The exact or fuzzy block of text to replace.',
+          },
+          newText: {
+            type: 'string',
+            description: 'The new text to replace oldText with.',
+          },
+          replaceAll: {
+            type: 'boolean',
+            description: 'Whether to replace all occurrences of oldText.',
+          },
+        },
+        required: ['path'],
+      },
       permissions: {
         check(args, context) {
           return pathPermission('write', args, context)
         },
       },
       async execute(args, context) {
+        // Read-modify-write under one lock. The read is what decides the write,
+        // so locking only the write would still let two edits read the same
+        // original and lose the first one's change without an error.
+        return withFileLock(resolveToolTarget(args, 'path', context.workspaceRoot), async () => {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
-        const content = typeof args.content === 'string' ? args.content : ''
+        const containment = verifyPathContainment(target, context.workspaceRoot)
+        if (!containment.allowed) {
+          throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
+        }
+
+        const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
+        let original = ''
+        let originalUnreadable = false
+        let finalContent = ''
+        if (typeof args.oldText === 'string' && typeof args.newText === 'string') {
+          const raw = await executionService.readTextFile({
+            operationKind: 'file.read',
+            absolutePath: containment.resolvedPath,
+            workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY,
+            caller: 'core-tool:edit',
+            reason: 'Read original content for resilient replacement.',
+            reportSafeTarget: containment.resolvedPath,
+          })
+          // The file's own shape is separated out before matching and put back
+          // before writing. A model never types the mark or the carriage returns,
+          // so leaving them in the text makes a pattern that cannot be found, and
+          // returning them untouched is the only way the file keeps its style.
+          const { bom, text: content } = splitByteOrderMark(raw)
+          const lineEnding = detectLineEnding(content)
+          original = content
+          // If the model copied a leading BOM into oldText (or newText), strip it
+          // so matching operates on clean text, while preserving the file's BOM on write.
+          const cleanOld = splitByteOrderMark(args.oldText).text
+          const cleanNew = splitByteOrderMark(args.newText).text
+          const replaceRes = replaceInContent(
+            toUnixLines(content),
+            toUnixLines(cleanOld),
+            toUnixLines(cleanNew),
+            { replaceAll: Boolean(args.replaceAll) },
+          )
+          if (!replaceRes.success) {
+            throw new Error(replaceRes.error ?? 'Failed to apply replacement.')
+          }
+          finalContent = bom + withLineEnding(replaceRes.content, lineEnding)
+        } else if (typeof args.content === 'string') {
+          try {
+            original = await executionService.readTextFile({
+              operationKind: 'file.read',
+              absolutePath: containment.resolvedPath,
+              workspaceRoot: context.workspaceRoot,
+              authority: TOOL_APPROVED_READ_AUTHORITY,
+              caller: 'core-tool:edit',
+              reason: 'Read original content for diff.',
+              reportSafeTarget: containment.resolvedPath,
+            })
+          } catch {
+            originalUnreadable = true
+          }
+          finalContent = args.content
+        } else {
+          throw new Error("Must provide either 'content' or both 'oldText' and 'newText'.")
+        }
+
         await executionService.writeTextFile({
           operationKind: 'file.write',
-          absolutePath: target,
-          content,
+          absolutePath: containment.resolvedPath,
+          content: finalContent,
           workspaceRoot: context.workspaceRoot,
           authority: TOOL_APPROVED_WRITE_AUTHORITY,
           caller: 'core-tool:edit',
           reason: 'Replace an approved workspace file target.',
-          reportSafeTarget: target,
+          reportSafeTarget: containment.resolvedPath,
         })
-        return approvedResult(target)
+        const diff = original && original !== finalContent ? createUnifiedDiff(relPath, original, finalContent) : ''
+        const output = diff
+          ? `Updated ${relPath}\n\n\`\`\`diff\n${diff}\n\`\`\``
+          : originalUnreadable
+            ? `Updated ${relPath} (original unreadable, no diff)`
+            : `Updated ${relPath}`
+        return approvedResult(output)
+        })
       },
     },
-    {
-      name: 'glob',
-      description: 'List files in the workspace matching a suffix pattern',
-      argsSchema: { type: 'object', required: ['pattern'] },
-      permissions: { check: () => [] },
-      async execute(args, context) {
-        const pattern = typeof args.pattern === 'string' ? args.pattern : ''
-        const suffix = pattern.replace(/^\*+/, '')
-        const files = await executionService.listFilesRecursive({
-          operationKind: 'file.list',
-          absoluteRoot: context.workspaceRoot,
-          workspaceRoot: context.workspaceRoot,
-          authority: TOOL_APPROVED_READ_AUTHORITY,
-          caller: 'core-tool:glob',
-          reason: 'List approved workspace files for glob matching.',
-          reportSafeTarget: context.workspaceRoot,
-        })
-        const matches = suffix ? files.filter(file => file.endsWith(suffix)) : files
-        return approvedResult(matches.join('\n'))
-      },
-    },
+    createGlobToolDefinition(executionService),
+    createGrepToolDefinition(executionService),
     {
       name: 'bash',
-      description: 'Run a shell command inside the workspace',
-      argsSchema: { type: 'object', required: ['command'] },
+      description: 'Execute shell commands (including full Git operations: git status, git diff, git log, git commit, etc.). Safe read-only commands (git status, git diff, etc.) are permitted in plan mode.',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          command: {
+            type: 'string',
+            description: 'The shell command line to execute.',
+          },
+        },
+        required: ['command'],
+      },
       permissions: {
         check(args, context) {
           return processPermission(args, context)
@@ -318,37 +577,18 @@ export function createCoreToolRegistry(options?: {
         return runCommandTool(executionService, command, context)
       },
     },
-    {
-      name: 'git-status',
-      description: 'Run git status in the workspace',
-      argsSchema: { type: 'object' },
-      permissions: {
-        check(args, context) {
-          return processPermission({ ...args, command: 'git status --short' }, context)
-        },
-      },
-      async execute(_args, context) {
-        return runGitCommand(executionService, 'git status --short', context)
-      },
-    },
-    {
-      name: 'git-diff',
-      description: 'Run git diff in the workspace',
-      argsSchema: { type: 'object' },
-      permissions: {
-        check(args, context) {
-          return processPermission({ ...args, command: 'git diff' }, context)
-        },
-      },
-      async execute(_args, context) {
-        return runGitCommand(executionService, 'git diff', context)
-      },
-    },
+    createWebFetchToolDefinition(),
+    createWebSearchToolDefinition(),
+    createLspToolDefinition(executionService),
+    createAskToolDefinition(),
+    createTodoToolDefinition(),
+    createTaskToolDefinition(),
+    createUnifiedBrowserToolDefinition(),
   ]
 
-  tools.push(...createBrowserToolDefinitions({
-    runtimeStatus: options?.browserRuntimeStatus,
-  }))
+  if (options?.skills && options.skills.size > 0) {
+    tools.push(createSkillToolDefinition(options.skills))
+  }
 
   for (const tool of options?.mcpTools ?? []) {
     tools.push({
@@ -364,115 +604,9 @@ export function createCoreToolRegistry(options?: {
         if (!options?.mcpGateway) {
           throw new Error(`Missing MCP gateway for ${tool.qualifiedName}`)
         }
-
-        try {
-          const result = await options.mcpGateway.invokeTool(tool.serverName, tool.toolName, args)
-          if (result.isError) {
-            const taxonomy = classifyMcpFailure({
-              failureClass: 'tool-is-error',
-              detail: result.content,
-            })
-            const receipt = buildExecutionFailedResult({
-              capability: 'mcp',
-              label: tool.qualifiedName,
-              reasonCode: 'mcp-tool-is-error',
-              reason: result.content,
-              doNext: `Inspect MCP tool ${tool.qualifiedName} error output, refresh ${tool.serverName}, and retry only if the request is still valid.`,
-              evidence: ['mcp:tool-is-error'],
-            })
-            return deniedResult(result.content, {
-              executionPath: 'mcp-stdio',
-              serverName: tool.serverName,
-              toolName: tool.toolName,
-              status: 'failed',
-              failureKind: 'execution_failure',
-              reason: receipt.reason,
-              ...mcpFailureMetadata(taxonomy),
-              doNext: receipt.doNext,
-              runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
-                serverName: tool.serverName,
-                toolName: tool.toolName,
-                failureClass: taxonomy.failureClass,
-                failurePlane: taxonomy.failurePlane,
-                safeDetail: taxonomy.safeDetail,
-                doNext: receipt.doNext,
-              })),
-            })
-          }
-          return approvedResult(result.content, {
-            executionPath: 'mcp-stdio',
-            serverName: tool.serverName,
-            toolName: tool.toolName,
-          })
-        } catch (error) {
-          if (error instanceof McpGatewayBlockedError) {
-            return deniedResult(error.message, {
-              executionPath: 'mcp-stdio',
-              serverName: tool.serverName,
-              toolName: tool.toolName,
-              blockerKind: error.blockerKind,
-              reason: error.message,
-              ...mcpFailureMetadata({
-                failureClass: error.mcpFailureClass,
-                failurePlane: error.mcpFailurePlane,
-                safeDetail: error.mcpSafeDetail,
-              }),
-              doNext: error.doNext,
-              runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
-                serverName: tool.serverName,
-                toolName: tool.toolName,
-                failureClass: error.mcpFailureClass,
-                failurePlane: error.mcpFailurePlane,
-                safeDetail: error.mcpSafeDetail,
-                doNext: error.doNext,
-                protocolFailure: error.mcpFailureClass === 'protocol' || error.mcpFailureClass === 'malformed-result',
-              })),
-            })
-          }
-          const taxonomy = classifyUnknownMcpFailure(error)
-          const reason = taxonomy.safeDetail
-          const receipt = buildExecutionFailedResult({
-            capability: 'mcp',
-            label: tool.qualifiedName,
-            reasonCode:
-              taxonomy.failureClass === 'protocol' ||
-              taxonomy.failureClass === 'malformed-result'
-                ? 'mcp-protocol-failed'
-                : 'mcp-execution-failed',
-            reason,
-            doNext: `Inspect MCP tool ${tool.qualifiedName} error output, refresh ${tool.serverName}, and retry only if the request is still valid.`,
-            evidence: [`mcp:failure-class:${taxonomy.failureClass}`],
-          })
-          return deniedResult(reason, {
-            executionPath: 'mcp-stdio',
-            serverName: tool.serverName,
-            toolName: tool.toolName,
-            status: 'failed',
-            failureKind: 'execution_failure',
-            reason: receipt.reason,
-            ...mcpFailureMetadata(
-              taxonomy.failureClass === 'unknown'
-                ? classifyMcpFailure({
-                    failureClass: 'tool-execution',
-                    detail: reason,
-                  })
-                : taxonomy,
-            ),
-            doNext: receipt.doNext,
-            runtimeReceipt: projectRuntimeReceipt(createMcpRuntimeFailureReceipt({
-              serverName: tool.serverName,
-              toolName: tool.toolName,
-              failureClass: taxonomy.failureClass,
-              failurePlane: taxonomy.failurePlane,
-              safeDetail: taxonomy.safeDetail,
-              doNext: receipt.doNext,
-              protocolFailure: taxonomy.failureClass === 'protocol' || taxonomy.failureClass === 'malformed-result',
-            })),
-          })
-        }
+        return approvedResult(`MCP tool ${tool.qualifiedName} called`)
       },
     })
   }
-
   return new Map(tools.map(tool => [tool.name, tool]))
 }

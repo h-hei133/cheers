@@ -185,7 +185,7 @@ Evidence levels are restricted to Route 201 labels.
 ## Harness / Eval
 
 - Responsibility: run deterministic/focused gates, print markers, classify failure, handle redaction/residue, and report gate scope.
-- Main files/modules: `scripts/verify-context-planning.mjs`, `scripts/verify-edit-capability-closeout.mjs`, `scripts/verify-result-contract.mjs`, `scripts/verify-release-deterministic.mjs`, `scripts/verify/index.mjs`, `scripts/verify/*`, `scripts/real-user-capabilities/*`.
+- Main files/modules: `scripts/verify-context-planning.mjs`, `scripts/verify-result-contract.mjs`, `scripts/verify-release-deterministic.mjs`, `scripts/verify/index.mjs`, `scripts/verify/*`, `scripts/real-user-capabilities/*`.
 - Upstream dependencies: package scripts, isolated test roots, selected cases/tier/suite flags.
 - Downstream consumers: release/dogfood/readiness claims.
 - What works: broad focused gates, deterministic release meta gate, split real-user capability verifier modules, dry-run safety facts.

@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import { createHash } from "node:crypto";
 import path from "node:path";
 
@@ -107,7 +108,7 @@ export function createRuntimeTurnSnapshot(
       ]),
     }),
   };
-  return deepFreeze(snapshot);
+  return freezeDeep(snapshot);
 }
 
 function sanitizeSafeLabel(value: string, fallback: string): string {
@@ -139,14 +140,4 @@ function freezeArray<T>(values: readonly T[]): readonly T[] {
 
 function freezeObject<T extends object>(value: T): Readonly<T> {
   return Object.freeze(value);
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const nested of Object.values(value)) {
-      deepFreeze(nested);
-    }
-  }
-  return value;
 }

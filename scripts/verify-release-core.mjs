@@ -118,5 +118,16 @@ if (sessionDurabilityLongCode !== 0) {
   process.exit(sessionDurabilityLongCode)
 }
 
+// Every gate above checks code. This one checks whether the prose that
+// describes the code still describes it. It is strict here: the current-state
+// documents it reads are clean, and --strict keeps them that way, so a refactor
+// that moves a file must also update what points at it.
+const docsDriftCode = await runNodeScript('verify-docs-and-rules-drift.mjs', ['--strict'])
+if (docsDriftCode !== 0) {
+  const status = docsDriftCode === 3 ? 'config-failure' : 'product-regression'
+  console.log(`[${status}] release-core - docs and rules drift exited ${docsDriftCode}`)
+  process.exit(docsDriftCode)
+}
+
 console.log('[pass] release-core')
 process.exit(0)

@@ -2,15 +2,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createBrowserActionCache } from "../context/browserActionCache.js";
-import { createBrowserActionCacheEntryFromReceipt, type BrowserActionCacheEntry } from "../context/browserActionCacheEntry.js";
-import { safeReceipt } from "../context/browserActionCacheEntry.test.js";
-import { createBrowserReceiptCacheManifest } from "../context/browser/receipt/browserReceiptCacheManifest.js";
-import { createBrowserReceiptCacheStore } from "../context/browser/receipt/browserReceiptCacheStore.js";
-import { FakeBrowserExecutor, NOOP_BROWSER_EXECUTOR } from "../context/browserExecutor.js";
-import { createBrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";
-import { runBrowserReplayCommand } from "../context/browserReplayCommandRunner.js";
-import { createBrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
+import { createBrowserActionCache } from "../../browser/actionCache.js";
+import { createBrowserActionCacheEntryFromReceipt, type BrowserActionCacheEntry } from "../../browser/actionCacheEntry.js";
+import { safeReceipt } from "../../browser/actionCacheEntry.test.js";
+import { createBrowserReceiptCacheManifest } from "../../browser/receipt/manifest.js";
+import { createBrowserReceiptCacheStore } from "../../browser/receipt/store.js";
+import { FakeBrowserExecutor, NOOP_BROWSER_EXECUTOR } from "../../browser/executor.js";
+import { createBrowserNetworkAllowlist } from "../../browser/networkAllowlist.js";
+import { runBrowserReplayCommand } from "../../browser/replayCommandRunner.js";
+import { createBrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
 import { createBrowserReplayScenarioFixture, type BrowserReplayScenarioFixture } from "./browserReplayScenarioFixtures.js";
 
 describe("browser replay repair scenario examples", () => {

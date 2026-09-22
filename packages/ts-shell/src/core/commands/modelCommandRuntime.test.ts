@@ -36,7 +36,7 @@ describe("model command runtime", () => {
   });
 
   it("shows model status", async () => {
-    const result = await runModelCommand([], { cwd: workspaceRoot });
+    const result = await runModelCommand(["status"], { cwd: workspaceRoot });
     expect(result.kind).toBe("local");
     expect(result.output).toContain("Model selection status");
     expect(result.output).toContain("Provider: openai");
@@ -61,7 +61,7 @@ describe("model command runtime", () => {
       ],
     });
 
-    const result = await runModelCommand([], { cwd: workspaceRoot });
+    const result = await runModelCommand(["status"], { cwd: workspaceRoot });
 
     expect(result.output).toContain("Active connection: none");
     expect(result.output).toContain("Config status: no active connection selected");
@@ -85,7 +85,7 @@ describe("model command runtime", () => {
       ],
     });
 
-    const result = await runModelCommand([], { cwd: workspaceRoot });
+    const result = await runModelCommand(["status"], { cwd: workspaceRoot });
 
     expect(result.output).toContain("Provider: openai-compatible");
     expect(result.output).toContain("requires base URL");
@@ -108,7 +108,7 @@ describe("model command runtime", () => {
       ],
     });
 
-    const pending = await runModelCommand([], { cwd: workspaceRoot });
+    const pending = await runModelCommand(["status"], { cwd: workspaceRoot });
     expect(pending.output).toContain("connection setup is pending");
 
     writeUserRuntimeConfigFile({
@@ -126,7 +126,7 @@ describe("model command runtime", () => {
       ],
     });
 
-    const error = await runModelCommand([], { cwd: workspaceRoot });
+    const error = await runModelCommand(["status"], { cwd: workspaceRoot });
     expect(error.output).toContain("connection setup is in error state");
   });
 
@@ -149,5 +149,24 @@ describe("model command runtime", () => {
     );
     expect(active?.model).toBe("gpt-5.4");
     expect(stored.providerCredentials?.openai?.model).toBe("gpt-5.4");
+  });
+
+  it("answers a bare /model with the catalogue, grouped by provider", async () => {
+    const result = await runModelCommand([], { cwd: workspaceRoot });
+
+    expect(result.output).toContain("### Providers and models");
+    expect(result.output).toContain("**Anthropic**");
+    expect(result.output).toContain("**SiliconFlow**");
+    // Grouping is the point: the same model name can appear under two providers,
+    // so a row is only meaningful with its provider attached.
+    expect(result.output).toContain("`/model use <provider>/<model>`");
+  });
+
+  it("refuses a model that belongs to a provider that is not connected", async () => {
+    const result = await runModelCommand(["use", "openrouter/openai/gpt-5.3"], {
+      cwd: workspaceRoot,
+    });
+
+    expect(result.output).toMatch(/openrouter|No active connection/);
   });
 });

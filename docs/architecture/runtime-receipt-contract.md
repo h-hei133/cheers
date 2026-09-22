@@ -179,7 +179,7 @@ Focused route validation:
 - touched runtime/tool/browser/MCP tests
 - `runMvpIntegratedFlow.test.ts`
 - package sweep when feasible
-- `verify:edit-capability-closeout`
+- ~~`verify:edit-capability-closeout`~~ (removed 2026-09-17)
 - `verify:result-contract`
 - `rtk npm run build -w packages/ts-shell`
 - `rtk git diff --check`

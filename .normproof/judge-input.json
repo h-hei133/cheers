@@ -1,0 +1,19 @@
+{
+  "runId": "generated-structure-judge",
+  "taskText": "Judge this workspace against its declared structural norms.",
+  "taskAllowsMutation": false,
+  "evidences": {},
+  "taskManifest": {
+    "version": "0.5",
+    "taskId": "generated-structure-judge",
+    "normProfile": "software-structure-v0",
+    "mode": "read_only",
+    "goal": "Judge this workspace against its declared structural norms.",
+    "workspace": ".",
+    "allowsMutation": false,
+    "verification": {
+      "required": false,
+      "commands": []
+    }
+  }
+}

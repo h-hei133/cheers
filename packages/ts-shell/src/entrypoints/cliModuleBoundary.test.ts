@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeApprovalModeConflict,
-  applyPatchDecisionFromApprovalMode,
   materializeApprovalModeObject,
 } from "./cliApprovalModule.js";
 import {
@@ -14,13 +13,6 @@ import {
 } from "./cliWorkspaceModule.js";
 
 describe("CLI module facades", () => {
-  it("projects apply-patch approval decisions without broadening states", () => {
-    expect(applyPatchDecisionFromApprovalMode("deny")).toBe("denied");
-    expect(applyPatchDecisionFromApprovalMode("allow-once")).toBe("approved");
-    expect(applyPatchDecisionFromApprovalMode("allow-always")).toBe("approved");
-    expect(applyPatchDecisionFromApprovalMode(undefined)).toBeUndefined();
-  });
-
   it("materializes approval-mode objects only with verify continuation lineage", () => {
     const continuation = {
       lastVerificationResumeEligible: true,

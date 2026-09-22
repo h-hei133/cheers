@@ -33,25 +33,37 @@ describe("slash command registry CLI surface", () => {
 
     expect(lines).toEqual([
       "Session command map:",
-      "- /sessions            open the session surface (interactive panel in TTY; overview in print/non-TTY).",
-      "- /sessions current    inspect the active session.",
-      "- /sessions list       inspect recent sessions for this project.",
-      "- /sessions switch <id|prefix|title|last> switch active session and project context.",
+      "- /resume              open the session surface (interactive panel in TTY; overview in print/non-TTY).",
+      "- /resume current      inspect the active session.",
+      "- /resume list         inspect recent sessions for this project.",
+      "- /resume switch <id|prefix|title|last> switch active session and project context.",
       "- /resume [id|prefix|title|last] resume the best recoverable context.",
       "- /help                show full command guide.",
     ]);
   });
 
-  it("renders the grouped slash command guide without executing commands", () => {
-    const lines = capture(renderUserHelp);
+  it("generates the guide from the registry, so it cannot drift from it", () => {
+    // A hand-written guide kept advertising commands the router had stopped
+    // accepting; generating it makes that impossible.
+    const lines = capture(renderUserHelp).join("\n");
 
-    expect(lines).toContain("\nSlash command guide");
-    expect(lines).toContain("1) Session & Continuation");
-    expect(lines).toContain("2) Workspace & Navigation");
-    expect(lines).toContain("4) Diagnostics & Integrations");
-    expect(lines).toContain(
-      "- /mcp status|tools|doctor|refresh [server] inspect and recover MCP state.",
-    );
-    expect(lines.at(-1)).toBe("");
+    for (const command of listSlashCommands()) {
+      expect(lines).toContain(`/${command.name}`);
+      expect(lines).toContain(command.summary);
+    }
+  });
+
+  it("describes no command the registry does not have", () => {
+    const names = new Set(listSlashCommands().map((command) => command.name));
+    const advertised = capture(renderUserHelp)
+      .flatMap((line) => line.match(/(?<=\s|^)\/[a-z-]+/g) ?? [])
+      .map((token) => token.slice(1));
+    for (const name of advertised) expect(names.has(name)).toBe(true);
+  });
+
+  it("lists the keys that replaced retired commands", () => {
+    const lines = capture(renderUserHelp).join("\n");
+    expect(lines).toContain("shift+tab");
+    expect(lines).toContain("ctrl+j");
   });
 });

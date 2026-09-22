@@ -32,11 +32,30 @@ export function getMcpConfigPaths(workspaceRoot: string): string[] {
   ]
 }
 
-export function loadMcpConfigs(workspaceRoot: string): Record<string, ScopedMcpServerConfig> {
+/**
+ * The MCP servers configured for this workspace.
+ *
+ * A project-scoped config names a command and this process spawns it, so a
+ * repository that ships `.private-agents.mcp.json` decides what runs on the
+ * machine of whoever opens it. That file is therefore read only when the caller
+ * says the project may be trusted; the user's own file is always read, since they
+ * wrote it.
+ *
+ * The decision arrives as an argument rather than being read from a global here,
+ * so the rule is visible at each call site and a test can exercise either side of
+ * it without arranging the machine's trust store.
+ */
+export function loadMcpConfigs(
+  workspaceRoot: string,
+  allowProjectScope: boolean,
+): Record<string, ScopedMcpServerConfig> {
   const merged: Record<string, ScopedMcpServerConfig> = {}
 
   for (const configPath of getMcpConfigPaths(workspaceRoot)) {
     if (!fs.existsSync(configPath)) {
+      continue
+    }
+    if (configPath.endsWith('.private-agents.mcp.json') && !allowProjectScope) {
       continue
     }
 

@@ -6,7 +6,7 @@ import {
 import type {
   CodingResultSummary,
   TerminalClassification,
-} from "../orchestration/types.js";
+} from "../result/types.js";
 import { deriveActionableFailureContinuity } from "./actionableFailureContinuity.js";
 
 export interface SessionResultParityProjection {

@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../../core/values/freeze.js";
 import type { HostSessionRecord } from "../../store/host/state.js";
 import type { ReplaySafeLoopStateSummary } from "../state.js";
 
@@ -18,10 +19,10 @@ export function projectHostReplayFacts(input: {
   readonly replay?: ReplaySafeLoopStateSummary;
 }): HostReplayFacts {
   const replay = input.replay;
-  return freeze({
+  return freezeDeep({
     factsId: `${input.record.session.id}:host-replay-facts`,
     sessionId: input.record.session.id,
-    activeLeafId: input.record.thread.activeLeafId,
+    activeLeafId: input.record.thread.activeLeafId ?? input.record.session.id,
     retainedFactIds: replay
       ? [
           replay.summaryId,
@@ -33,7 +34,7 @@ export function projectHostReplayFacts(input: {
           ...replay.verificationHandoffIds,
           ...replay.repairHandoffIds,
         ]
-      : [input.record.thread.activeLeafId],
+      : [input.record.thread.activeLeafId ?? input.record.session.id],
     ...(replay?.providerRequestFacts
       ? { providerRequestFacts: replay.providerRequestFacts }
       : {}),
@@ -59,14 +60,4 @@ export function projectHostReplayFacts(input: {
 
 function unique(values: readonly string[]): readonly string[] {
   return Array.from(new Set(values)).sort();
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

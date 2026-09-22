@@ -1,11 +1,11 @@
-import { getLatestCompactCheckpoint } from "../context/compact/checkpoint/compactLiveCheckpoint.js";
-import { browserCapabilitySidebarToolItem } from "../context/browserCapabilitySurface.js";
-import { parseSidebarLivePanelCommandArgs } from "../context/sidebar/sidebarLivePanelCommandContract.js";
-import { runSidebarLivePanelCommand } from "../context/sidebar/sidebarLivePanelCommandRunner.js";
-import { parseSidebarPanelCommandArgs } from "../context/sidebar/sidebarPanelCommandContract.js";
-import { runSidebarPanelCommand } from "../context/sidebar/sidebarPanelCommandRunner.js";
-import { projectSidebarState } from "../context/sidebar/sidebarStateProjection.js";
-import { renderSidebarStateSurface } from "../context/sidebar/sidebarStateSurface.js";
+import { getLatestCompactCheckpoint } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
+import { browserCapabilitySidebarToolItem } from "../../browser/capabilitySurface.js";
+import { parseSidebarLivePanelCommandArgs } from "../../presentation/sidebar/sidebarLivePanelCommandContract.js";
+import { runSidebarLivePanelCommand } from "../../presentation/sidebar/sidebarLivePanelCommandRunner.js";
+import { parseSidebarPanelCommandArgs } from "../../presentation/sidebar/sidebarPanelCommandContract.js";
+import { runSidebarPanelCommand } from "../../presentation/sidebar/sidebarPanelCommandRunner.js";
+import { projectSidebarState } from "../../presentation/sidebar/sidebarStateProjection.js";
+import { renderSidebarStateSurface } from "../../presentation/sidebar/sidebarStateSurface.js";
 import {
   sidebarLiveEventStoreForContext,
   sidebarSessionScopeId,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { FakeBrowserExecutor } from "../context/browserExecutor.js";
-import { createBrowserNetworkAllowlist } from "../context/browserNetworkAllowlist.js";
-import { createBrowserSandboxAuthority } from "../context/browserSandboxAuthority.js";
+import { FakeBrowserExecutor } from "../../browser/executor.js";
+import { createBrowserNetworkAllowlist } from "../../browser/networkAllowlist.js";
+import { createBrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
 import { createAgentScenarioFixtureContext } from "./agentScenarioFixtures.js";
 import { runAgentScenario } from "./agentScenarioRunner.js";
 import type { AgentScenario } from "./agentScenarioModel.js";

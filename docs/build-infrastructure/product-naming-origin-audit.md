@@ -39,13 +39,13 @@ Date: 2026-05-29.
 - `packages/ts-shell/src/core/harness/browserRuntimeCapabilityScenarioExamples.test.ts`
 - Browser runtime/context/report tests and surfaces under `packages/ts-shell/src/core/context` and `packages/ts-shell/src/core/harness`
 - Controlled allowlist wording in focused tool/session/orchestration tests and projections
-- `scripts/verify-browser-txn-gate.mjs`
+- ~~`scripts/verify-browser-txn-gate.mjs`~~ (removed 2026-09-17)
 
 ## Left Unchanged
 
 - `runMvpIntegratedFlow.ts` and `runMvpIntegratedFlow.test.ts` retain the legacy compatibility name. Renaming it would break the existing compatibility surface and is outside this cleanup route.
 - `editCapabilityCloseoutManifest.ts` and its context consumers retain `closeout` because that manifest is an existing compatibility/status surface used by compact/session/sidebar projections.
-- Historical route verifier scripts and package commands such as `verify:route-history:*`, `verify:edit-capability-closeout`, and `verify:real-user-capabilities:mvp` remain as compatibility/history entrypoints.
+- Historical route verifier scripts and package commands such as `verify:route-history:*`, ~~`verify:edit-capability-closeout`~~, and `verify:real-user-capabilities:mvp` remain as compatibility/history entrypoints.
 - Existing `packages/ts-shell/src/core/harness` route labels and older fixture ids remain under the harness README compatibility rule: they are evidence provenance labels, not product runtime ownership.
 - Historical docs under `docs/build-infrastructure`, `docs/dev-history`, `docs/evidence/history`, `docs/product-architecture-reset`, `docs/agent-routes`, `docs/design`, and historical architecture/reference notes retain external source names when discussing learning history.
 - Local semantic uses of `reference` meaning pointer/authority/receipt reference were not treated as external-origin vocabulary.
@@ -54,7 +54,7 @@ Date: 2026-05-29.
 
 - `runMvpIntegratedFlow*`: legacy product compatibility shim and test surface.
 - `editCapabilityCloseoutManifest*`: existing edit capability status manifest used across compact/session/sidebar surfaces.
-- `verify-edit-capability-closeout.mjs`, `verify-real-provider-task-loop-mvp.mjs`, and route-history package scripts: historical/compatibility command surfaces. They are documented here rather than renamed to avoid breaking existing gates.
+- `verify-real-provider-task-loop-mvp.mjs` and route-history package scripts (and `verify-edit-capability-closeout.mjs` until its removal on 2026-09-17): historical/compatibility command surfaces. They are documented here rather than renamed to avoid breaking existing gates.
 - Older `core/harness` route labels, `Mvp`, gauntlet, and validation provenance names covered by `packages/ts-shell/src/core/harness/README.md`.
 
 ## Remaining Risks

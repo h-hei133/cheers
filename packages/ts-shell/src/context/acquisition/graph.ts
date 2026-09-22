@@ -1,48 +1,48 @@
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
-import { projectContextPacketToAgentPlanContext } from "../../orchestration/agentPlanContext.js";
+import type { WorkflowTaskPlan } from "../../planning/task/workflowTaskPlanner.js";
+import { projectContextPacketToAgentPlanContext } from "../../planning/task/agentPlanContext.js";
 import {
   projectWorkflowTaskPlanToAgentPlan,
-} from "../../orchestration/agentPlanProjection.js";
-import type { AgentPlan } from "../../orchestration/agentPlan.js";
-import { buildContextGraphResult, type ContextGraphResultProjection } from "../../orchestration/contextGraphResult.js";
-import { discoverContextGraph } from "../../orchestration/contextGraphDiscovery.js";
-import { scoreContextGraph, type ContextGraphScore } from "../../orchestration/contextGraphScore.js";
+} from "../../planning/task/agentPlanProjection.js";
+import type { AgentPlan } from "../../planning/task/agentPlan.js";
+import { buildContextGraphResult, type ContextGraphResultProjection } from "../graph/contextGraphResult.js";
+import { discoverContextGraph } from "../graph/contextGraphDiscovery.js";
+import { scoreContextGraph, type ContextGraphScore } from "../graph/contextGraphScore.js";
 import {
   buildContextPacketResult,
   type ContextPacketResultProjection,
-} from "../../orchestration/contextPacketResult.js";
+} from "../graph/contextPacketResult.js";
 import {
   buildTargetedContextPacket,
   type TargetedContextPacket,
-} from "../../orchestration/contextPacket.js";
-import { buildTestImpactPlan, type TestImpactPlan } from "../../orchestration/testImpactPlan.js";
-import type { ContextGraph } from "../../orchestration/contextGraph.js";
+} from "../graph/contextPacket.js";
+import { buildTestImpactPlan, type TestImpactPlan } from "../../planning/task/testImpactPlan.js";
+import type { ContextGraph } from "../graph/contextGraph.js";
 import {
   attachPlanQualityToAgentPlan,
   buildPlanQuality,
   type PlanQuality,
 } from "../../planning/quality/model.js";
-import { buildHarnessTrace, type HarnessTrace } from "../../orchestration/harnessTrace.js";
-import { buildHarnessScorecard, type HarnessScorecard } from "../../orchestration/harnessScorecard.js";
+import { buildHarnessTrace, type HarnessTrace } from "../../evidence/harness/harnessTrace.js";
+import { buildHarnessScorecard, type HarnessScorecard } from "../../evidence/harness/harnessScorecard.js";
 import { normalizeCodeGraphFacts, type CodeGraphFacts } from "./code/facts.js";
 import { buildCodeGraphTrace, type CodeGraphTrace } from "./code/trace.js";
 import { checkCodeGraphStaleness, type CodeGraphStalenessCheck } from "./code/staleness.js";
 import { buildCodeGraphImpact, type CodeGraphImpact } from "./code/impact.js";
 import { buildCodeGraphResult, type CodeGraphResultProjection } from "./code/result.js";
-import { buildAnalysisBrief, type AnalysisBrief } from "../../orchestration/analysisBrief.js";
-import { calibrateAnalysisBrief, type AnalysisBriefCalibration } from "../../orchestration/analysisBriefCalibration.js";
-import { evaluateAnalysisQualityGate, type AnalysisQualityGateResult } from "../../orchestration/analysisQualityGate.js";
-import { buildTaskExecutionPlan, type TaskExecutionPlan } from "../../orchestration/taskExecutionPlan.js";
-import { buildTaskContextAcquisition, type TaskContextAcquisition } from "../../orchestration/taskContextAcquisition.js";
-import { buildTaskContextNeeds, type TaskContextNeedSet } from "../../orchestration/taskContextNeed.js";
-import { buildTaskContextResult, type TaskContextResult } from "../../orchestration/taskContextResult.js";
-import { evaluateTaskContextSufficiency, type TaskContextSufficiency } from "../../orchestration/taskContextSufficiency.js";
-import { buildTaskIntent, type TaskIntent } from "../../orchestration/taskIntent.js";
-import { buildTaskLifecycle, type TaskLifecycle } from "../../orchestration/taskLifecycle.js";
-import { buildTaskLifecycleResult, type TaskLifecycleResultProjection } from "../../orchestration/taskLifecycleResult.js";
-import { buildTaskLifecycleTrace, type TaskLifecycleTrace } from "../../orchestration/taskLifecycleTrace.js";
-import { buildTaskReadPlan, type TaskReadPlan } from "../../orchestration/taskReadPlan.js";
-import { buildTaskStage } from "../../orchestration/taskStage.js";
+import { buildAnalysisBrief, type AnalysisBrief } from "../../planning/task/analysisBrief.js";
+import { calibrateAnalysisBrief, type AnalysisBriefCalibration } from "../../planning/task/analysisBriefCalibration.js";
+import { evaluateAnalysisQualityGate, type AnalysisQualityGateResult } from "../../planning/task/analysisQualityGate.js";
+import { buildTaskExecutionPlan, type TaskExecutionPlan } from "../../planning/task/taskExecutionPlan.js";
+import { buildTaskContextAcquisition, type TaskContextAcquisition } from "../../planning/task/taskContextAcquisition.js";
+import { buildTaskContextNeeds, type TaskContextNeedSet } from "../../planning/task/taskContextNeed.js";
+import { buildTaskContextResult, type TaskContextResult } from "../../planning/task/taskContextResult.js";
+import { evaluateTaskContextSufficiency, type TaskContextSufficiency } from "../../planning/task/taskContextSufficiency.js";
+import { buildTaskIntent, type TaskIntent } from "../../planning/task/taskIntent.js";
+import { buildTaskLifecycle, type TaskLifecycle } from "../../planning/task/taskLifecycle.js";
+import { buildTaskLifecycleResult, type TaskLifecycleResultProjection } from "../../planning/task/taskLifecycleResult.js";
+import { buildTaskLifecycleTrace, type TaskLifecycleTrace } from "../../planning/task/taskLifecycleTrace.js";
+import { buildTaskReadPlan, type TaskReadPlan } from "../../planning/task/taskReadPlan.js";
+import { buildTaskStage } from "../../planning/task/taskStage.js";
 
 export interface ContextGraphPlanningBundle {
   readonly packet: TargetedContextPacket;

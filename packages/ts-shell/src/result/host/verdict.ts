@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import type { HostEvidenceProof } from "../../evidence/host/proof.js";
 import type { MultiTargetMutationTerminalProjection } from "../projection/mutation/verdict.js";
 import type { RepairVerdictTerminalProjection } from "../projection/repair/verdict.js";
@@ -27,7 +28,7 @@ export function projectHostTruth(input: {
         input.result?.status === "complete") &&
       input.result.terminalClassification === "success",
   );
-  return freeze({
+  return freezeDeep({
     truthId: `${input.evidence.proofId}:host-truth`,
     evidenceStatus: input.evidence.status,
     resultStatus: input.result?.status ?? "not_proven",
@@ -50,14 +51,4 @@ export function projectHostTruth(input: {
 
 function unique(values: readonly string[]): readonly string[] {
   return Array.from(new Set(values)).sort();
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import path from "node:path";
 import { computeFragmentFingerprint } from "../../context/readWindowContinuation.js";
 import {
@@ -34,6 +35,12 @@ import {
   type VerificationLoopIntent,
   type VerificationResultObservation,
 } from "../../verification/result/boundary.js";
+import { redactReportText } from "../../core/security/redaction.js";
+import {
+  fingerprint,
+  sanitizeId,
+  sanitizeTargetSummary,
+} from "../sanitize.js";
 
 export type MutationAuthorityStatus =
   | "permission_pending"
@@ -298,10 +305,10 @@ export async function runControlledMutationRecovery(
     rollback,
     repairVerdictTerminalProjection,
   });
-  return deepFreeze({
+  return freezeDeep({
     laneId,
-    turnId: sanitizeText(input.turnId, 180),
-    ...(input.toolCallId ? { toolCallId: sanitizeText(input.toolCallId, 120) } : {}),
+    turnId: redactReportText(input.turnId, 180),
+    ...(input.toolCallId ? { toolCallId: redactReportText(input.toolCallId, 120) } : {}),
     targetSummary,
     ...(input.toolPolicyDecision
       ? { toolPolicyDecisionId: input.toolPolicyDecision.decisionId }
@@ -342,11 +349,11 @@ function observeMutationAuthority(input: {
       input.input.authority.status === "granted"
     ? "blocked"
     : input.input.authority.status;
-  return deepFreeze({
+  return freezeDeep({
     authorityId: `${input.laneId}:authority`,
     status,
     source: input.input.authority.source,
-    reason: sanitizeText(input.input.authority.reason ?? reasonForAuthority(status), 180),
+    reason: redactReportText(input.input.authority.reason ?? reasonForAuthority(status), 180),
     terminalSuccessClaim: false,
     notProvenClaims: unique([
       "authority-is-not-success",
@@ -365,7 +372,7 @@ async function observeMutationStaleRead(input: {
 }): Promise<MutationStaleReadObservation> {
   const expectedFingerprint = fingerprint(input.input.target.expectedContent);
   if (input.authority.status !== "granted") {
-    return deepFreeze({
+    return freezeDeep({
       staleReadId: `${input.laneId}:stale-read`,
       status: "not_run",
       targetSummary: input.targetSummary,
@@ -392,7 +399,7 @@ async function observeMutationStaleRead(input: {
       reportSafeTarget: input.targetSummary,
     });
     const currentFingerprint = fingerprint(current);
-    return deepFreeze({
+    return freezeDeep({
       staleReadId: `${input.laneId}:stale-read`,
       status: current === input.input.target.expectedContent ? "passed" : "stale",
       targetSummary: input.targetSummary,
@@ -405,7 +412,7 @@ async function observeMutationStaleRead(input: {
       ]),
     });
   } catch {
-    return deepFreeze({
+    return freezeDeep({
       staleReadId: `${input.laneId}:stale-read`,
       status: "target_missing",
       targetSummary: input.targetSummary,
@@ -427,7 +434,7 @@ function observeMutationSnapshot(input: {
   readonly notProvenClaims: readonly string[];
 }): MutationSnapshotObservation {
   if (input.staleRead.status !== "passed") {
-    return deepFreeze({
+    return freezeDeep({
       snapshotId: `${input.laneId}:snapshot`,
       status: "not_planned",
       restorePlanAvailable: false,
@@ -441,12 +448,12 @@ function observeMutationSnapshot(input: {
     });
   }
   if (!input.input.snapshot.available) {
-    return deepFreeze({
+    return freezeDeep({
       snapshotId: `${input.laneId}:snapshot`,
       status: "unavailable",
       restorePlanAvailable: false,
       targetSummary: input.targetSummary,
-      blocker: sanitizeText(input.input.snapshot.reason ?? "snapshot unavailable", 160),
+      blocker: redactReportText(input.input.snapshot.reason ?? "snapshot unavailable", 160),
       terminalSuccessClaim: false,
       notProvenClaims: unique([
         "snapshot-unavailable-is-not-success",
@@ -454,7 +461,7 @@ function observeMutationSnapshot(input: {
       ]),
     });
   }
-  return deepFreeze({
+  return freezeDeep({
     snapshotId: `${input.laneId}:snapshot`,
     status: "planned",
     restorePlanAvailable: true,
@@ -480,7 +487,7 @@ async function observeMutationApply(input: {
 }): Promise<MutationApplyObservation> {
   const blocker = applyBlocker(input.authority, input.staleRead, input.snapshot);
   if (blocker) {
-    return deepFreeze({
+    return freezeDeep({
       applyId: `${input.laneId}:apply`,
       status: "blocked",
       attempted: false,
@@ -508,7 +515,7 @@ async function observeMutationApply(input: {
       reason: "controlled mutation apply",
       reportSafeTarget: input.targetSummary,
     });
-    return deepFreeze({
+    return freezeDeep({
       applyId: `${input.laneId}:apply`,
       status: "applied",
       attempted: true,
@@ -522,12 +529,12 @@ async function observeMutationApply(input: {
       ]),
     });
   } catch (error) {
-    return deepFreeze({
+    return freezeDeep({
       applyId: `${input.laneId}:apply`,
       status: "failed",
       attempted: true,
       targetSummary: input.targetSummary,
-      failureClass: error instanceof Error ? sanitizeText(error.name, 80) : "unknown",
+      failureClass: error instanceof Error ? redactReportText(error.name, 80) : "unknown",
       terminalSuccessClaim: false,
       notProvenClaims: unique([
         "apply-failed-is-not-success",
@@ -549,7 +556,7 @@ async function observeMutationRollback(input: {
   const required = input.recoveryDecision === "rollback_required" ||
     Boolean(input.input.recovery?.rollbackAfterVerificationFailure);
   if (!required) {
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "not_attempted",
       targetSummary: input.targetSummary,
@@ -560,7 +567,7 @@ async function observeMutationRollback(input: {
     });
   }
   if (!input.snapshot.restorePlanAvailable) {
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "failed",
       targetSummary: input.targetSummary,
@@ -585,7 +592,7 @@ async function observeMutationRollback(input: {
       reason: "controlled mutation restore",
       reportSafeTarget: input.targetSummary,
     });
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "succeeded",
       targetSummary: input.targetSummary,
@@ -600,7 +607,7 @@ async function observeMutationRollback(input: {
       ]),
     });
   } catch {
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "failed",
       targetSummary: input.targetSummary,
@@ -831,48 +838,7 @@ function reasonForAuthority(status: MutationAuthorityStatus): string {
   return "mutation authority missing";
 }
 
-function fingerprint(content: string): string {
-  return computeFragmentFingerprint(content).slice(0, 16);
-}
-
-function sanitizeTargetSummary(value: string): string {
-  return sanitizeText(value, 160).replace(/\b(oldText|newText)\b/gi, "raw-content");
-}
-
-function sanitizeId(value: string): string {
-  return sanitizeText(value, 160)
-    .toLowerCase()
-    .replace(/[^a-z0-9._:-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function sanitizeText(value: string, maxLength: number): string {
-  return value
-    .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
-    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
-    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[secret-redacted]")
-    .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]")
-    .replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]")
-    .replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]")
-    .replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]")
-    .replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]")
-    .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maxLength);
-}
-
 function unique(values: readonly string[]): readonly string[] {
   return Object.freeze(Array.from(new Set(values)).sort());
 }
 
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
-}

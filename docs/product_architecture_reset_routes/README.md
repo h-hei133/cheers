@@ -1,5 +1,10 @@
 # Product Architecture Reset Route Pack
 
+> **Status: historical.** This pack is the route record for the completed
+> product architecture reset program. It is not current architecture authority
+> and is not part of the default read set. See `docs/DOC_STATUS.md` for the
+> status of this group.
+
 This pack contains the controlling goal and the execution route documents for the product architecture reset program.
 
 The reset program is not a feature sprint. It exists to migrate the project from a route-grown prototype toward a product-owned architecture while preserving the proof-carrying evidence model.

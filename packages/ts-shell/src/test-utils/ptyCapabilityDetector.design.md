@@ -18,7 +18,7 @@ The detector exists to protect evidence quality:
 packages/ts-shell/src/test-utils/ptyCapabilityDetector.ts
 ```
 
-The helper must remain test-only. Production modules such as `entrypoints/cli.tsx`, `session/SessionManager.ts`, and `orchestration/runMvpIntegratedFlow.ts` must not import it.
+The helper must remain test-only. Production modules such as `entrypoints/cli.tsx`, `session/SessionManager.ts`, and `turn/session.ts` must not import it.
 
 ## Proposed API
 

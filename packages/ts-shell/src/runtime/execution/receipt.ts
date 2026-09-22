@@ -7,35 +7,13 @@ import type {
   CommandExecutionRequest,
   CommandExecutionResult,
   ExecutionAuthorityMode,
-  ExecutionPolicyMetadata,
   ExecutionOperationKind,
-} from './service.js'
+  ExecutionPolicyMetadata,
+  ExecutionReceiptRedactionStatus,
+  RuntimeExecutionReceiptProjection,
+} from './types.js'
 
-export type ExecutionReceiptRedactionStatus = 'report-safe' | 'redacted'
-
-export interface RuntimeExecutionReceiptProjection {
-  readonly receiptId: string
-  readonly caller: string
-  readonly operationKind: ExecutionOperationKind
-  readonly authorityMode: ExecutionAuthorityMode
-  readonly requestedActionSummary: string
-  readonly executionStatus: 'success' | 'failure'
-  readonly errorClass: ExecutionErrorClass
-  readonly exitCode: number | null
-  readonly timedOut: boolean
-  readonly cancelled: boolean
-  readonly outputSummaryRedactionStatus: ExecutionReceiptRedactionStatus
-  readonly evidenceCorrelationId: string
-  readonly turnSnapshotId?: string
-  readonly savePointId?: string
-  readonly policy?: ExecutionPolicyMetadata
-  readonly notProvenClaims: readonly string[]
-  readonly redaction: {
-    readonly status: ExecutionReceiptRedactionStatus
-    readonly redactions: readonly string[]
-  }
-  readonly outputSummary?: string
-}
+export type { ExecutionReceiptRedactionStatus, RuntimeExecutionReceiptProjection } from './types.js'
 
 export function createCommandExecutionReceipt(input: {
   readonly request: CommandExecutionRequest

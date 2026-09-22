@@ -9,7 +9,7 @@ const distDir = path.join(repoRoot, "dist");
 const cliEntry = path.join(distDir, "cli.js");
 
 const content = `#!/usr/bin/env node
-import "../packages/ts-shell/dist/packages/ts-shell/src/entrypoints/cli.js";
+import "../packages/ts-shell/dist/entrypoints/cli.js";
 `;
 
 await mkdir(distDir, { recursive: true });

@@ -1,12 +1,23 @@
 import {
   runRestoreCommand,
-} from "../../orchestration/patchRecovery/restoreCommandRunner.js";
+} from "../../edit/recovery/restoreCommandRunner.js";
 import type {
   RestoreCommandRecordSelection,
   RestoreCommandRequest,
   RestoreCommandResult,
-} from "../../orchestration/patchRecovery/restoreCommandContract.js";
+} from "../../edit/recovery/restoreCommandContract.js";
+import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+
+/**
+ * Where edit snapshots are kept when no ledger is named.
+ *
+ * The edit pipeline writes here, so resolving to the same place is what makes
+ * `/restore` answer about this project instead of refusing for want of a flag.
+ */
+export function defaultLedgerRoot(workspaceRoot: string): string {
+  return path.join(workspaceRoot, ".sisyphus", "edit-snapshots");
+}
 
 export async function runRestoreLocalCommand(
   args: string[],
@@ -59,7 +70,7 @@ export function parseRestoreCommandArgs(
 
   return {
     mode,
-    ledgerRoot,
+    ledgerRoot: ledgerRoot ?? defaultLedgerRoot(workspaceRoot),
     workspaceRoot,
     authorityId,
     recordSelection,
@@ -70,48 +81,61 @@ export function parseRestoreCommandArgs(
   };
 }
 
+/**
+ * Restore output as Markdown.
+ *
+ * The one thing a reader must not have to infer is whether anything was written.
+ * So the state comes first, in words, and preview never borrows the vocabulary of
+ * a completed restore: a preview lists what *would* be restored and says how to
+ * ask for it, while an execute lists what was. Blocked records keep their reason
+ * attached to their path rather than being collected into an anonymous count.
+ */
 export function formatRestoreCommandResult(
   result: RestoreCommandResult,
 ): string {
+  const preview = result.mode === "preview";
   const lines = [
-    "Restore",
-    "Result",
+    `### Restore — ${preview ? "preview" : result.executed ? "executed" : "not executed"}`,
+    "",
     `- Mode: ${result.mode}`,
     `- Executed: ${result.executed ? "yes" : "no"}`,
     `- Automatic recovery: ${result.automaticRecovery ? "yes" : "no"}`,
     `- Atomic rollback: ${result.rollbackAtomicityClaim ? "yes" : "no"}`,
   ];
-  if (result.restorableFiles.length > 0) {
-    lines.push(
-      `- Restorable files: ${result.restorableFiles.map((file) => file.workspaceRelativePath).join(", ")}`,
-    );
-  }
-  if (result.restoredFiles.length > 0) {
-    lines.push(`- Restored files: ${result.restoredFiles.join(", ")}`);
-  }
-  if (result.blockedFiles.length > 0) {
-    lines.push(
-      `- Blocked files: ${result.blockedFiles.map((file) => `${file.workspaceRelativePath} (${file.blockedReason})`).join("; ")}`,
-    );
-  }
-  if (result.inspectedFiles.length > 0) {
-    lines.push(`- Inspected files: ${result.inspectedFiles.join(", ")}`);
-  }
-  if (result.missingRecords.length > 0) {
-    lines.push(`- Missing records: ${result.missingRecords.join(", ")}`);
-  }
   const blockers = result.evidence
     .filter((entry) => entry.startsWith("restore-command-contract:blocker:"))
     .map((entry) => entry.slice("restore-command-contract:blocker:".length));
   if (blockers.length > 0) {
-    lines.push(`- Blockers: ${blockers.join(", ")}`);
+    lines.push("", "**Blocked before reading the ledger**", "");
+    for (const blocker of blockers) lines.push(`- ${blocker}`);
   }
+  lines.push(...fileSection(preview ? "Would restore" : "Restorable", result.restorableFiles.map(pathOf)));
+  lines.push(...fileSection("Restored", result.restoredFiles));
   lines.push(
-    result.mode === "preview"
-      ? "- Next action: Re-run with /restore execute --execute to restore eligible records explicitly."
-      : "- Next action: Inspect restored and blocked files before retrying the original edit.",
+    ...fileSection(
+      "Blocked",
+      result.blockedFiles.map((file) => `${pathOf(file)} — ${file.blockedReason}`),
+    ),
+  );
+  lines.push(...fileSection("Inspected", result.inspectedFiles));
+  lines.push(...fileSection("Missing records", result.missingRecords));
+  lines.push(
+    "",
+    preview
+      ? "Nothing was written. Re-run the same command as `/restore execute … --execute` to restore the listed records."
+      : "Inspect the restored and blocked files before retrying the original edit.",
   );
   return lines.join("\n");
+}
+
+/** A titled list, or nothing at all when there is nothing to list. */
+function fileSection(title: string, entries: readonly string[]): string[] {
+  if (entries.length === 0) return [];
+  return ["", `**${title}**`, "", ...entries.map((entry) => `- \`${entry}\``)];
+}
+
+function pathOf(file: { readonly workspaceRelativePath: string }): string {
+  return file.workspaceRelativePath;
 }
 
 function parseOptions(args: readonly string[]): Map<string, string | true> {

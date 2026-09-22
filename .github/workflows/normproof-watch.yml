@@ -1,0 +1,58 @@
+name: NormProof Architecture Watch
+
+on:
+  push:
+    branches: [main, normproof-observation]
+  pull_request:
+  schedule:
+    # Daily sweep at 01:30 UTC — the observation instrument, not a release gate.
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  normproof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install normproof from self-contained bundle
+        run: |
+          npm install -g .normproof/normproof-*.tgz
+
+      - name: Judge with SARIF projection
+        id: judge
+        run: |
+          set +e
+          normproof judge --format sarif
+          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+          exit 0   # Observation mode: record, never gate.
+
+      - name: Upload NormProof Output Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: normproof-report
+          path: .normproof/out/
+          retention-days: 14
+
+      - name: Upload SARIF to Code Scanning (if enabled)
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: .normproof/out/sarif.json
+
+      - name: Observation summary
+        run: |
+          echo "NormProof exit was ${{ steps.judge.outputs.exitcode }}."
+          echo "This workflow is an observation instrument: it records and projects findings"
+          echo "into artifacts and Code Scanning but never fails CI during the study window."

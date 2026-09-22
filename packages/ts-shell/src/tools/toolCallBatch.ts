@@ -1,3 +1,4 @@
+import { freezeDeep } from "../core/values/freeze.js";
 import type { ModelResponseBoundary } from "../provider/response/boundary.js";
 import type { AssistantResponseState } from "../turn/assistantResponse.js";
 import { isAllowlistedTool } from "./types.js";
@@ -97,7 +98,7 @@ export function extractToolCallBatch(
         ? "partial"
         : "extracted";
 
-  return deepFreeze({
+  return freezeDeep({
     batchId: sanitizeText(input.batchId ?? `${input.responseBoundary.responseId}:tool-call-batch`).value,
     responseId: input.responseBoundary.responseId,
     ...(input.turnId || input.responseBoundary.turnId || input.assistantResponse.turnId
@@ -155,7 +156,7 @@ function normalizeToolCall(
   ];
 
   if (!idValue || !nameValue || seenIds.has(id)) {
-    return deepFreeze({
+    return freezeDeep({
       id,
       name,
       kind: nameValue ? classifyToolKind(name) : "unknown",
@@ -183,7 +184,7 @@ function normalizeToolCall(
 
   const kind = classifyToolKind(name);
   if (kind === "unsupported") {
-    return deepFreeze({
+    return freezeDeep({
       id,
       name,
       kind,
@@ -208,7 +209,7 @@ function normalizeToolCall(
     });
   }
   if (kind === "unknown") {
-    return deepFreeze({
+    return freezeDeep({
       id,
       name,
       kind,
@@ -233,7 +234,7 @@ function normalizeToolCall(
     });
   }
 
-  return deepFreeze({
+  return freezeDeep({
     id,
     name,
     kind,
@@ -260,7 +261,7 @@ function malformedCall(
   name: string,
   claims: readonly string[],
 ): NormalizedToolCall {
-  return deepFreeze({
+  return freezeDeep({
     id,
     name,
     kind: "unknown",
@@ -326,7 +327,7 @@ function projectArguments(value: unknown): {
   }).sort();
   return {
     keys: Object.freeze(keys),
-    ...(redacted ? {} : { reportSafeArguments: deepFreeze(projected) }),
+    ...(redacted ? {} : { reportSafeArguments: freezeDeep(projected) }),
     summary: `argumentKeys=${keys.join(",") || "none"}; redacted=${redacted}`,
     redacted,
   };
@@ -361,7 +362,7 @@ function projectReportSafeValue(value: unknown): {
       }
       projected[safeKey.value] = safeChild.value;
     }
-    return { value: deepFreeze(projected), redacted: false };
+    return { value: freezeDeep(projected), redacted: false };
   }
   return { redacted: true };
 }
@@ -388,14 +389,4 @@ function sanitizeText(value: string): { readonly value: string; readonly redacte
     sanitized = next;
   }
   return { value: sanitized, redacted };
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object") {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

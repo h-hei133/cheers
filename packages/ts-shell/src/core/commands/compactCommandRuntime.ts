@@ -1,18 +1,18 @@
 import {
   CompactCommandContractError,
   parseCompactCommandArgs,
-} from "../context/compact/command/compactCommandContract.js";
-import { formatCompactCheckpointStatus } from "../context/compact/checkpoint/compactCheckpointSurface.js";
+} from "../../context/compact/command/compactCommandContract.js";
+import { formatCompactCheckpointStatus } from "../../context/compact/checkpoint/compactCheckpointSurface.js";
 import {
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
   updateLatestCompactCheckpoint,
-} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
+} from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import {
   DEFAULT_COMPACT_INJECTION_STATE_STORE,
   markCompactCheckpointPendingInjection,
-} from "../context/compact/injection/compactInjectionState.js";
-import { runCompactCommand } from "../context/compact/command/compactCommandRunner.js";
-import { formatCompactSessionSurface } from "../context/compact/delivery/compactSessionSurface.js";
+} from "../../context/compact/injection/compactInjectionState.js";
+import { runCompactCommand } from "../../context/compact/command/compactCommandRunner.js";
+import { formatCompactSessionSurface } from "../../context/compact/delivery/compactSessionSurface.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
@@ -21,8 +21,13 @@ export async function runCompactLocalCommand(
   context: CommandContext,
 ): Promise<LocalCommandResult> {
   try {
+    const nonFlagArgs = args.filter((a) => !a.startsWith("--"));
+    const firstArg = nonFlagArgs[0]?.toLowerCase();
+    const instructionArgs = (firstArg === "preview" || firstArg === "render" || firstArg === "json")
+      ? nonFlagArgs.slice(1)
+      : nonFlagArgs;
+    const customInstructions = instructionArgs.join(" ").trim();
     const request = parseCompactCommandArgs(args, {
-      source: "session",
       projectInfo: {
         projectRoot: context.cwd,
         safeToPersistProjectRoot: true,
@@ -51,18 +56,25 @@ export async function runCompactLocalCommand(
         createdAt: checkpoint.createdAt,
       },
     );
+    const outputLines: string[] = [
+      formatCompactSessionSurface(result),
+      formatCompactCheckpointStatus(checkpoint, injectionState),
+    ];
+
+    if (customInstructions) {
+      outputLines.push("", `Custom instructions noted: "${customInstructions}"`);
+    }
+
     const localResult: LocalCommandResult = {
       kind: "local",
       output:
         result.request.mode === "json" && result.json
           ? result.json
-          : [
-              formatCompactSessionSurface(result),
-              formatCompactCheckpointStatus(checkpoint, injectionState),
-            ].join("\n\n"),
+          : outputLines.join("\n"),
     };
+
     emitCommandResultToSidebar(context, {
-      command: compactSourceCommand(context.rawCommandName),
+      command: "compact",
       args,
       result: localResult,
     });

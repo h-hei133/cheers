@@ -6,7 +6,7 @@ import {
   createBrowserExternalNetworkRunnerManifest,
   serializeBrowserExternalNetworkRunnerManifest,
   type BrowserExternalNetworkRunnerManifest,
-} from "../context/browserExternalNetworkRunnerManifest.js";
+} from "../../browser/externalNetworkRunnerManifest.js";
 
 export interface BrowserExternalNetworkHandoffManifestFixture {
   readonly root: string;

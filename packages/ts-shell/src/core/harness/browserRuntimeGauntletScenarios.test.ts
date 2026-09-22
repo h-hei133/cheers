@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { createBrowserActionContract } from "../context/browserActionContract.js";
-import { createBrowserExecutionRequest } from "../context/browserExecutionContract.js";
-import { runBrowserActionLoopExecutor } from "../context/browserActionLoopExecutor.js";
-import { BrowserRuntimeAdapterExecutor } from "../context/browser/runtime/core/adapterExecutor.js";
-import { applyBrowserSelectorRepair } from "../context/browserSelectorRepairApplyExecutor.js";
-import { createBrowserRuntimeGauntletManifest } from "../context/browser/runtime/core/gauntletManifest.js";
+import { createBrowserActionContract } from "../../browser/actionContract.js";
+import { createBrowserExecutionRequest } from "../../browser/executionContract.js";
+import { runBrowserActionLoopExecutor } from "../../browser/actionLoopExecutor.js";
+import { BrowserRuntimeAdapterExecutor } from "../../browser/runtime/core/adapterExecutor.js";
+import { applyBrowserSelectorRepair } from "../../browser/selectorRepairApplyExecutor.js";
+import { createBrowserRuntimeGauntletManifest } from "../../browser/runtime/core/gauntletManifest.js";
 import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserRuntimeAdapterFixture } from "./browserRuntimeAdapterFixtures.js";
-import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
+import type { BrowserEvalBenchmarkTask } from "../../eval/browser/benchmarkModel.js";
 import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
 import {
   createBrowserEvalBenchmarkReport,
   renderBrowserEvalBenchmarkReport,
-} from "./browserEvalBenchmarkReport.js";
+} from "../../eval/browser/benchmarkReport.js";
 
 describe("browser runtime adapter gauntlet scenarios", () => {
   it("runs expanded browser eval gauntlet with controlled adapter evidence", async () => {

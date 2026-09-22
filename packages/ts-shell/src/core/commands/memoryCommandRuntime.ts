@@ -1,38 +1,128 @@
 import {
   getLatestCompactCheckpoint,
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
-} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
-import { extractProjectMemoryCandidates } from "../context/memory/projectMemoryCandidateExtractor.js";
+} from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
+import { extractProjectMemoryCandidates } from "../../memory/projectMemoryCandidateExtractor.js";
 import {
   parseProjectMemoryReviewCommandArgs,
   ProjectMemoryReviewCommandContractError,
-} from "../context/memory/projectMemoryReviewCommandContract.js";
-import { runProjectMemoryReviewCommand } from "../context/memory/projectMemoryReviewCommandRunner.js";
+} from "../../memory/projectMemoryReviewCommandContract.js";
+import { runProjectMemoryReviewCommand } from "../../memory/projectMemoryReviewCommandRunner.js";
 import {
   parseProjectMemoryRecallCommandArgs,
   ProjectMemoryRecallCommandContractError,
-} from "../context/memory/projectMemoryRecallCommandContract.js";
-import { runProjectMemoryRecallCommand } from "../context/memory/projectMemoryRecallCommandRunner.js";
+} from "../../memory/projectMemoryRecallCommandContract.js";
+import { runProjectMemoryRecallCommand } from "../../memory/projectMemoryRecallCommandRunner.js";
 import {
   parseProjectMemoryDeleteCommandArgs,
   ProjectMemoryDeleteCommandContractError,
-} from "../context/memory/projectMemoryDeleteCommandContract.js";
-import { runProjectMemoryDeleteCommand } from "../context/memory/projectMemoryDeleteCommandRunner.js";
+} from "../../memory/projectMemoryDeleteCommandContract.js";
+import { runProjectMemoryDeleteCommand } from "../../memory/projectMemoryDeleteCommandRunner.js";
 import {
   parseProjectMemoryUseCommandArgs,
   ProjectMemoryUseCommandContractError,
-} from "../context/memory/projectMemoryUseCommandContract.js";
-import { runProjectMemoryUseCommand } from "../context/memory/projectMemoryUseCommandRunner.js";
+} from "../../memory/projectMemoryUseCommandContract.js";
+import { runProjectMemoryUseCommand } from "../../memory/projectMemoryUseCommandRunner.js";
 import {
   parseProjectMemorySaveCommandArgs,
   ProjectMemorySaveCommandContractError,
-} from "../context/memory/projectMemorySaveCommandContract.js";
-import { runProjectMemorySaveCommand } from "../context/memory/projectMemorySaveCommandRunner.js";
+} from "../../memory/projectMemorySaveCommandContract.js";
+import { runProjectMemorySaveCommand } from "../../memory/projectMemorySaveCommandRunner.js";
 import {
   DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE,
-} from "../context/memory/projectMemoryReviewState.js";
+} from "../../memory/projectMemoryReviewState.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+import {
+  executeMemoryInspect,
+  executeMemoryRetain,
+  executeMemoryRecall,
+} from "../memory/memoryTools.js";
+import type { MemoryCategory } from "../memory/types.js";
+
+/**
+ * /memory command
+ * Unified memory engine:
+ * 1. Coordinates ProjectMemoryReview lifecycle (review, save, recall, wake, use, invalidate, delete).
+ * 2. Emits real-time telemetry to sidebar.
+ * 3. Supports QuadMemory bank extensions (/memory stats, /memory add).
+ */
+export async function runMemoryCommand(
+  args: string[],
+  context: CommandContext,
+): Promise<LocalCommandResult> {
+  const rawCmd = (context.rawCommandName ?? "").replace(/^\//, "").toLowerCase();
+  const sub = args[0]?.toLowerCase();
+
+  // If invoked via aliases such as /recall <query> or /retain <statement>
+  if (rawCmd === "recall") {
+    const query = args.join(" ").trim();
+    if (!query) {
+      return { kind: "local", output: "Usage: `/recall <query>`\nExample: `/recall NormProof rules`" };
+    }
+    const output = await executeMemoryRecall({ query });
+    return { kind: "local", output };
+  }
+
+  if (rawCmd === "retain") {
+    const statement = args.join(" ").trim();
+    if (!statement) {
+      return { kind: "local", output: "Usage: `/retain <statement>`\nExample: `/retain Project uses Vitest`" };
+    }
+    const output = await executeMemoryRetain({
+      items: [{ statement }],
+    });
+    return { kind: "local", output };
+  }
+
+  // Explicit QuadMemory Stats/Inspect
+  if (sub === "inspect" || sub === "stats") {
+    const statsOutput = await executeMemoryInspect();
+    const localResult: LocalCommandResult = {
+      kind: "local",
+      output: statsOutput,
+    };
+    emitCommandResultToSidebar(context, {
+      command: "/memory",
+      args,
+      result: localResult,
+    });
+    return localResult;
+  }
+
+  // Explicit QuadMemory Add/Retain
+  if (sub === "add" || sub === "retain") {
+    const statement = args.slice(1).join(" ").trim();
+    if (!statement) {
+      return {
+        kind: "local",
+        output: "Usage: `/memory add <statement>`\nExample: `/memory add Project uses Vitest`",
+      };
+    }
+    let category: MemoryCategory = "convention";
+    if (statement.toLowerCase().includes("rule") || statement.toLowerCase().includes("must")) {
+      category = "constraint";
+    } else if (statement.toLowerCase().includes("arch") || statement.toLowerCase().includes("layer")) {
+      category = "architecture";
+    }
+    const output = await executeMemoryRetain({
+      items: [{ statement, category }],
+    });
+    const localResult: LocalCommandResult = {
+      kind: "local",
+      output,
+    };
+    emitCommandResultToSidebar(context, {
+      command: "/memory",
+      args,
+      result: localResult,
+    });
+    return localResult;
+  }
+
+  // Standard Lifecycle & Review Protocol
+  return runMemoryLocalCommand(args, context);
+}
 
 export async function runMemoryLocalCommand(
   args: string[],

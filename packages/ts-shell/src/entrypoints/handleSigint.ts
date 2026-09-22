@@ -1,6 +1,6 @@
 import type { Interface } from "node:readline";
 import type { SessionManager } from "../session/SessionManager.js";
-import type { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
 
 export interface SigintContext {
   currentRunController: AbortController | null;

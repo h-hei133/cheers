@@ -4,7 +4,7 @@ import type {
   CodingWriteEffect,
   TerminalClassification,
   TerminalReason,
-} from "../orchestration/types.js";
+} from "../result/types.js";
 import type { QueryRuntimeTaskState } from "../core/query/runtime/taskState.js";
 
 export type SeedInfluenceDiagnostic =

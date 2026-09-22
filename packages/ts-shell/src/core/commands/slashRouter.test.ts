@@ -5,13 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createCompactLiveCheckpointStore,
   getLatestCompactCheckpoint,
-} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
-import { createCompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
-import { createProjectMemoryInjectionStateStore } from "../context/memory/projectMemoryInjectionState.js";
-import { createProjectMemoryLocalStore } from "../context/memory/projectMemoryLocalStore.js";
-import { createProjectMemoryReviewStateStore } from "../context/memory/projectMemoryReviewState.js";
-import { createSidebarLiveEventStore } from "../context/sidebar/sidebarLiveEventStore.js";
-import { createStartupWarmContextCacheStore } from "../context/startup/startupWarmContextHealth.js";
+} from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
+import { createCompactInjectionStateStore } from "../../context/compact/injection/compactInjectionState.js";
+import { createProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
+import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
+import { createProjectMemoryReviewStateStore } from "../../memory/projectMemoryReviewState.js";
+import { createSidebarLiveEventStore } from "../../presentation/sidebar/sidebarLiveEventStore.js";
+import { createStartupWarmContextCacheStore } from "../../context/startup/startupWarmContextHealth.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
@@ -39,14 +39,6 @@ describe("slash router (W4)", () => {
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });
 
-  it("routes local doctor command", async () => {
-    const result = await routeSlashCommand("/doctor", { cwd: workspaceRoot });
-    expect(result).toBeTruthy();
-    expect(result?.kind).toBe("local");
-    if (result?.kind === "local") {
-      expect(result.output).toContain("Private Coding Agents CLI Doctor");
-    }
-  });
 
   it("routes local connect command", async () => {
     const result = await routeSlashCommand("/connect status", {
@@ -66,7 +58,9 @@ describe("slash router (W4)", () => {
     expect(result).toBeTruthy();
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
-      expect(result.output).toContain("Model selection status");
+      // Bare `/model` answers "what can I use"; `/model status` answers "what am
+      // I using".
+      expect(result.output).toContain("### Providers and models");
     }
   });
 
@@ -1007,7 +1001,7 @@ describe("slash router (W4)", () => {
       expect(result.output).toContain("- DoNext:");
       expect(result.output).toContain("Slash command required");
       expect(result.output).toContain("Quick actions:");
-      expect(result.output).toContain("/sessions");
+      expect(result.output).toContain("/resume");
     }
   });
 
@@ -1022,15 +1016,15 @@ describe("slash router (W4)", () => {
     }
   });
 
-  it("routes /cancel, /sessions, /workspace, /mcp, /help, /view, and /permissions as shell actions", async () => {
+  it("routes /cancel, /resume, /workspace, /mcp, /help, and /permissions as shell actions", async () => {
     for (const [command, action] of [
       ["/cancel", "cancel-run"],
-      ["/sessions", "list-sessions"],
+      ["/resume list", "list-sessions"],
+      ["/resume current", "list-sessions"],
+      ["/resume switch sess_abc", "list-sessions"],
+      ["/resume help", "list-sessions"],
       ["/sessions list", "list-sessions"],
       ["/sessions current", "list-sessions"],
-      ["/sessions switch sess_abc", "list-sessions"],
-      ["/sessions help", "list-sessions"],
-      ["/sessions unknown-mode", "list-sessions"],
       ["/workspace", "show-workspace"],
       ["/workspace status", "show-workspace"],
       ["/workspace recent", "show-workspace"],
@@ -1045,13 +1039,6 @@ describe("slash router (W4)", () => {
       ["/mcp reconnect", "show-mcp"],
       ["/mcp refresh localSdk", "show-mcp"],
       ["/help", "show-help"],
-      ["/view", "show-view"],
-      ["/view status", "show-view"],
-      ["/view compact", "set-view"],
-      ["/view user", "set-view"],
-      ["/view verbose", "set-view"],
-      ["/view developer", "set-view"],
-      ["/view dev", "set-view"],
       ["/permissions", "manage-permissions"],
       ["/approval-policy list", "manage-permissions"],
       ["/permissions explain", "manage-permissions"],
@@ -1063,20 +1050,17 @@ describe("slash router (W4)", () => {
       expect(result?.kind).toBe("shell-action");
       if (result?.kind === "shell-action") {
         expect(result.action).toBe(action);
-        if (command === "/sessions list") {
+        if (command === "/resume list" || command === "/sessions list") {
           expect(result.sessionAction).toBe("list");
         }
-        if (command === "/sessions current") {
+        if (command === "/resume current" || command === "/sessions current") {
           expect(result.sessionAction).toBe("current");
         }
-        if (command === "/sessions switch sess_abc") {
+        if (command === "/resume switch sess_abc") {
           expect(result.sessionAction).toBe("switch");
           expect(result.sessionId).toBe("sess_abc");
         }
-        if (command === "/sessions help") {
-          expect(result.sessionAction).toBe("help");
-        }
-        if (command === "/sessions unknown-mode") {
+        if (command === "/resume help") {
           expect(result.sessionAction).toBe("help");
         }
         if (command === "/permissions explain") {

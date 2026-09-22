@@ -16,8 +16,8 @@ import {
   type RepoIntelligenceResult,
   type RepoTargetRankingAmbiguityState,
 } from "../discovery/scan.js";
-import type { CodingTaskKind } from "../../orchestration/types.js";
-import type { WorkflowTaskPlan } from "../../orchestration/workflowTaskPlanner.js";
+import type { CodingTaskKind } from "../../result/types.js";
+import type { WorkflowTaskPlan } from "../../planning/task/workflowTaskPlanner.js";
 
 export type ContextEngineTaskKindHint = Extract<
   CodingTaskKind,

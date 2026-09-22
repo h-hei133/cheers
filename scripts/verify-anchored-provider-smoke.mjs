@@ -1,32 +1,45 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 
+// Paths retargeted after the orchestration domain was dissolved: the provider
+// anchoring tests moved to provider/proposal/, the harness tests to
+// evidence/harness/. Ten further entries were dropped because the tests
+// themselves were deleted with the dormant patch-transaction cluster
+// (7a59ab23) and no longer exist anywhere in the tree.
 const focusedTests = [
-  'src/orchestration/anchoredProviderSmokeGate.test.ts',
-  'src/orchestration/proposalQualityCorpus.test.ts',
-  'src/orchestration/proposalQualityReport.test.ts',
-  'src/orchestration/providerSmokeResult.test.ts',
-  'src/orchestration/anchoredProviderSmoke.test.ts',
-  'src/orchestration/realProviderProposalDryRun.test.ts',
-  'src/orchestration/providerPromptAudit.test.ts',
-  'src/orchestration/providerOutputValidator.test.ts',
-  'src/orchestration/providerAnchorQuality.test.ts',
-  'src/orchestration/providerAnchorCandidate.test.ts',
-  'src/orchestration/providerProposalAnchors.test.ts',
-  'src/orchestration/providerAnchorMatcher.test.ts',
-  'src/orchestration/providerAnchorConflict.test.ts',
-  'src/orchestration/providerAnchoredProposal.test.ts',
-  'src/orchestration/providerAnchoringResult.test.ts',
-  'src/orchestration/anchoredProposalRuntime.test.ts',
-  'src/orchestration/anchoredProposalEval.test.ts',
-  'src/orchestration/anchoredProposalScorecard.test.ts',
-  'src/orchestration/harnessTrace.test.ts',
-  'src/orchestration/harnessScorecard.test.ts',
-  'src/orchestration/harnessFailureTaxonomy.test.ts',
+  'src/provider/proposal/providerOutputValidator.test.ts',
+  'src/provider/proposal/providerAnchorQuality.test.ts',
+  'src/provider/proposal/providerAnchorCandidate.test.ts',
+  'src/provider/proposal/providerProposalAnchors.test.ts',
+  'src/provider/proposal/providerAnchorMatcher.test.ts',
+  'src/provider/proposal/providerAnchorConflict.test.ts',
+  'src/provider/proposal/providerAnchoredProposal.test.ts',
+  'src/provider/proposal/providerAnchoringResult.test.ts',
+  'src/evidence/harness/harnessTrace.test.ts',
+  'src/evidence/harness/harnessScorecard.test.ts',
+  'src/evidence/harness/harnessFailureTaxonomy.test.ts',
   'src/session/sessionResultParity.test.ts',
   'src/session/continuationEvidenceParity.test.ts',
 ]
+
+// A missing path must fail here rather than be absorbed by the run below. The
+// focused tests go to vitest in a single invocation, and vitest exits 0 when
+// any one of several filters matches, so a path that no longer exists would
+// otherwise be silently dropped from coverage while the gate still reports
+// pass. Checked against the package root the test run uses.
+const packageRoot = new URL('../packages/ts-shell/', import.meta.url)
+const absent = focusedTests.filter(
+  (relative) => !existsSync(new URL(relative, packageRoot)),
+)
+if (absent.length > 0) {
+  for (const relative of absent) {
+    console.log(`[config-failure] anchored-provider-smoke-missing-test - ${relative}`)
+  }
+  process.exit(3)
+}
+
 
 console.log('gate name=anchored-provider-smoke')
 console.log('mode=deterministic-default')

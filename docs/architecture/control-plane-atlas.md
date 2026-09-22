@@ -2,6 +2,31 @@
 
 Route: `docs/agent-routes/route136-control-plane-atlas.md`
 
+## Staleness Notice (measured 2026-09-18)
+
+This atlas is the active control-plane reference, but a majority of its concrete
+file references no longer resolve. Measured against the current tree:
+
+| | count |
+|---|---:|
+| Distinct `packages/ts-shell/src/...` references | 78 |
+| Still exist | 30 |
+| **Deleted** | **35** |
+| Wildcard paths | 13 |
+
+The drift is not only from the Step 4 orchestration dissolution; it also covers
+earlier deletions in `core/query`, `core/tools`, `core/context` and `session`.
+Treat the named paths below as historical unless they resolve.
+
+Step 4 specifically dissolved `orchestration/`. Its modules now live in
+`result/` (the result contract and runtime projections), `planning/task/`
+(task planning), `context/graph/` (graph model), `provider/proposal/` and
+`edit/proposal/` (proposal anchoring), `edit/recovery/` and `edit/result/`
+(recovery authority and capability manifest), `evidence/harness/` (trace and
+scorecard) and `policy/` (command allowlist, workspace authority).
+
+Rewriting the remaining stale references is its own task and is not done here.
+
 ## Scope
 
 This atlas consolidates the Route 131 module map and the Route 136 ledgers into
@@ -64,9 +89,11 @@ too many cross-layer decisions:
 - `packages/ts-shell/src/core/shell/sessionRuntime.ts`: shell/runtime event
   ordering, facade invocation, state-machine coordination, and SessionManager
   write-call ordering.
-- `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`: prompt
-  classification, capability planning, browser/edit/tool/provider dispatch,
-  policy handoff, result construction, and evidence notes.
+- `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts` (deleted): was the
+  prompt classification, capability planning, browser/edit/tool/provider
+  dispatch, policy handoff, result construction, and evidence notes. The
+  `orchestration/` directory has since been dissolved - see the note at the end
+  of this section.
 - `packages/ts-shell/src/core/query/resultMapper.ts`: terminal truthfulness and
   actionable stopped/error mapping.
 - `packages/ts-shell/src/session/SessionManager.ts`: directory persistence,
@@ -80,9 +107,9 @@ too many cross-layer decisions:
 Current owners:
 
 - `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts`
-- `packages/ts-shell/src/orchestration/workflowTaskPlanner.ts`
-- `packages/ts-shell/src/orchestration/workflowIntentProjection.ts`
-- `packages/ts-shell/src/orchestration/runtimeHandoffProjection.ts`
+- `packages/ts-shell/src/planning/task/workflowTaskPlanner.ts`
+- `packages/ts-shell/src/result/projection/runtimeHandoffProjection.ts`
+  (`workflowIntentProjection.ts` was deleted)
 - `packages/ts-shell/src/core/query/*`
 
 Mixed responsibilities:
@@ -461,7 +488,6 @@ Current owners:
 - `scripts/verify/verifierReportModule.mjs`
 - `scripts/verify-real-user-capabilities.mjs`
 - `scripts/verify-result-contract.mjs`
-- `scripts/verify-edit-capability-closeout.mjs`
 - `packages/ts-shell/src/core/harness/*`
 
 Lifecycle coverage:

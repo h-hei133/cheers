@@ -1,10 +1,17 @@
 import type { Interface as ReadlineInterface } from "node:readline";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import { applyInteractiveApprovalDecisionWiring } from "../core/shell/interactiveApprovalWiring.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import type { ApprovalModeObject } from "../cli/approval/approvalModeContract.js";
+import type { InteractiveApprovalResult } from "../cli/interactive/picker/approval.js";
+import {
+  scopeAnswer,
+  scopeLabel,
+  scopeMeaning,
+  type PermissionScope,
+} from "../cli/approval/permissionScope.js";
 import {
   createApprovalResponse,
   formatAllowOnceAppliedLine,
@@ -26,7 +33,6 @@ import {
   type ApprovalAuditRecord,
   type ApprovalDecisionSource,
 } from "./approvalPromptBridge.js";
-import type { CliApplyPatchRuntimeRouteOptions } from "./cliRuntimeInvocation.js";
 
 export type { ApprovalModeObject } from "../cli/approval/approvalModeContract.js";
 
@@ -77,9 +83,15 @@ export function createCliEscalationPromptHandler(
     | undefined,
   getApprovalModeObject?: () => ApprovalModeObject | undefined,
   persistApprovalAudit?: (record: ApprovalAuditRecord) => void,
+  getPermissionScope?: () => PermissionScope,
+  promptInteractiveApproval?: (
+    prompt: EscalationPrompt,
+  ) => Promise<InteractiveApprovalResult>,
 ): (prompt: EscalationPrompt) => Promise<EscalationResponse> {
   function emitApprovalAudit(record: ApprovalAuditRecord): void {
-    renderApprovalAuditSurface(renderer, record);
+    if (!promptInteractiveApproval) {
+      renderApprovalAuditSurface(renderer, record);
+    }
     persistApprovalAudit?.(record);
   }
 
@@ -170,7 +182,7 @@ export function createCliEscalationPromptHandler(
   return async (prompt) => {
     const projectRoot = getProjectRoot();
     const evaluation = trustPolicy.evaluate(prompt, projectRoot);
-    const isNonInteractive = rl === null;
+    const isNonInteractive = rl === null && !promptInteractiveApproval;
     const cliNonInteractiveDecision = isNonInteractive
       ? getNonInteractiveDecision?.()
       : undefined;
@@ -178,6 +190,38 @@ export function createCliEscalationPromptHandler(
     const hasAllowOnceCache = trustPolicy.hasAllowOnce(evaluation.cacheKey);
     const hasAllowAlwaysGrant = Boolean(evaluation.matchedGrant);
     const hasCachedGrant = hasAllowOnceCache || hasAllowAlwaysGrant;
+    // A session scope answers before anything is put to the user, and only in the
+    // interactive channel: the non-interactive path has its own explicit policy,
+    // and letting a display-level setting speak for it would hide which authority
+    // actually decided.
+    const scope = getPermissionScope?.() ?? "ask";
+    const scopeDecision = isNonInteractive ? undefined : scopeAnswer(scope, prompt);
+    if (scopeDecision) {
+      renderApprovalRequiredSurface(renderer, {
+        prompt,
+        includeRisk: true,
+        decisionSource: "session-scope",
+        lines: [`- Session permission scope is \`${scopeLabel(scope)}\`: ${scopeMeaning(scope)}.`],
+      });
+      trustPolicy.rememberAllowOnce(evaluation.cacheKey);
+      emitApprovalAudit({
+        channel: "interactive",
+        decision: scopeDecision,
+        decisionSource: `session-scope:${scope}`,
+        persistent: false,
+        cacheEffect: "none",
+        projectRoot,
+        cacheKey: evaluation.cacheKey,
+        scopeLabel: evaluation.scopeLabel,
+      });
+      renderer.renderLine(formatApprovalDecisionLine(scopeDecision));
+      renderer.renderLine("");
+      return createApprovalResponse({
+        promptId: prompt.id,
+        decision: scopeDecision,
+        userComment: `Allowed by the session permission scope (${scopeLabel(scope)}), not by an explicit answer.`,
+      });
+    }
 
     if (isNonInteractive) {
       const nonInteractiveDecisionPlan = resolveNonInteractiveApprovalDecision({
@@ -438,27 +482,30 @@ export function createCliEscalationPromptHandler(
       });
     }
 
-    renderApprovalRequiredSurface(renderer, { prompt, includeRisk: true });
-    for (const line of trustPolicy.explain(
-      evaluation,
-      projectRoot,
-      getViewMode(),
-    )) {
-      renderer.renderLine(`- ${line}`);
+    if (!promptInteractiveApproval) {
+      renderApprovalRequiredSurface(renderer, { prompt, includeRisk: true });
+      for (const line of trustPolicy.explain(
+        evaluation,
+        projectRoot,
+        getViewMode(),
+      )) {
+        renderer.renderLine(`- ${line}`);
+      }
+      if (getViewMode() === "verbose") {
+        renderer.renderLine(`- Recommended default: ${prompt.recommendedAction}`);
+        renderer.renderLine("");
+        renderer.renderLine(prompt.message);
+      } else {
+        renderer.renderLine(
+          "- Tip: use /view developer to see policy and full escalation details.",
+        );
+      }
+      renderer.renderLine(formatApprovalPromptDecisionMenuLine());
     }
-    if (getViewMode() === "verbose") {
-      renderer.renderLine(`- Recommended default: ${prompt.recommendedAction}`);
-      renderer.renderLine("");
-      renderer.renderLine(prompt.message);
-    } else {
-      renderer.renderLine(
-        "- Tip: use /view developer to see policy and full escalation details.",
-      );
-    }
-    renderer.renderLine(formatApprovalPromptDecisionMenuLine());
 
     let decision: "deny" | "allow-once" | "allow-always";
     let decisionInputKey: "y" | "a" | "n" | "other" | undefined;
+    let denialReason: string | undefined;
     if (isNonInteractive) {
       decision = "deny";
       decisionInputKey = "n";
@@ -468,6 +515,26 @@ export function createCliEscalationPromptHandler(
           formatApprovalObjectLine("Non-interactive", approvalModeObject),
         );
       }
+    } else if (promptInteractiveApproval) {
+      try {
+        const res = await promptInteractiveApproval(prompt);
+        if (typeof res === "object" && res !== null) {
+          decision = res.decision;
+          denialReason = res.reason;
+        } else if (typeof res === "string") {
+          decision = res;
+        } else {
+          decision = "deny";
+        }
+      } catch {
+        decision = "deny";
+      }
+      decisionInputKey =
+        decision === "allow-once"
+          ? "y"
+          : decision === "allow-always"
+            ? "a"
+            : "n";
     } else {
       const answer = await askReadline(rl, "approval> ");
       const normalized = answer.trim().toLowerCase();
@@ -487,7 +554,7 @@ export function createCliEscalationPromptHandler(
             : "deny";
     }
 
-    if (decision === "allow-once") {
+    if (!promptInteractiveApproval && decision === "allow-once") {
       renderer.renderLine(formatAllowOnceAppliedLine());
     }
     const interactiveWiring = applyInteractiveApprovalDecisionWiring({
@@ -499,12 +566,14 @@ export function createCliEscalationPromptHandler(
     });
     if (decision === "allow-always" && interactiveWiring.persistedGrant) {
       const persisted = interactiveWiring.persistedGrant;
-      renderer.renderLine(
-        formatTrustPolicyUpdatedLine({
-          scopeLabel: persisted.scopeLabel,
-          projectRoot,
-        }),
-      );
+      if (!promptInteractiveApproval) {
+        renderer.renderLine(
+          formatTrustPolicyUpdatedLine({
+            scopeLabel: persisted.scopeLabel,
+            projectRoot,
+          }),
+        );
+      }
     }
     emitApprovalAudit({
       channel: isNonInteractive ? "non-interactive" : "interactive",
@@ -521,34 +590,31 @@ export function createCliEscalationPromptHandler(
       lineage: approvalModeObject?.verifyLineage,
       ...(decisionInputKey ? { inputKey: decisionInputKey } : {}),
       ...(decision === "deny"
-        ? { stopReason: "Interactive approval denied by user input." }
+        ? {
+            stopReason: denialReason
+              ? `Interactive approval denied by user: ${denialReason}`
+              : "Interactive approval denied by user input.",
+          }
         : {}),
     });
 
-    renderer.renderLine(formatApprovalDecisionLine(decision));
-    renderer.renderLine("");
+    if (!promptInteractiveApproval) {
+      renderer.renderLine(formatApprovalDecisionLine(decision));
+      renderer.renderLine("");
+    }
     return createApprovalResponse({
       promptId: prompt.id,
       decision,
-      userComment: formatExplicitApprovalComment({
-        decision,
-        hasApprovalModeObject: Boolean(getApprovalModeObject?.()),
-      }),
+      userComment: denialReason
+        ? `User denied with reason: ${denialReason}`
+        : formatExplicitApprovalComment({
+            decision,
+            hasApprovalModeObject: Boolean(getApprovalModeObject?.()),
+          }),
     });
   };
 }
 
-export function applyPatchDecisionFromApprovalMode(
-  mode: "deny" | "allow-once" | "allow-always" | undefined,
-): CliApplyPatchRuntimeRouteOptions["requestedUserDecision"] | undefined {
-  if (mode === "deny") {
-    return "denied";
-  }
-  if (mode === "allow-once" || mode === "allow-always") {
-    return "approved";
-  }
-  return undefined;
-}
 
 export function materializeApprovalModeObject(input: {
   prompt: string;

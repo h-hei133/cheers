@@ -62,6 +62,8 @@ export function evaluateBrowserExecutionReceiptAssertion(input: {
       );
     case "browser-receipt-next-action":
       return receiptPassIf(assertion, !!summary.nextAction, "Receipt next action was missing.");
+    default:
+      return receiptPassIf(assertion, false, `Unsupported receipt assertion kind: ${assertion.kind}.`);
   }
 }
 

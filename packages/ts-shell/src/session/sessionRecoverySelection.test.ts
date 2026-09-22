@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   projectRecentProjectContexts,
+} from "./recovery/projectContextSummary.js";
+import {
   projectSortedSessionReentrySummaries,
   selectRecoveryTrustBoundaryBlock,
   selectSuggestedRecoverySessionId,
   selectSuggestedRecoverySessionIdFromSessions,
-} from "./sessionRecoverySelection.js";
+} from "./recovery/sessionRecoverySelection.js";
 import type {
   RecoveryTrustBoundaryBlock,
   Session,

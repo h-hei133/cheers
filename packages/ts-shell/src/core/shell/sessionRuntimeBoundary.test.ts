@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { runCompactCommand } from "../context/compact/command/compactCommandRunner.js";
-import { createCompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
+import { runCompactCommand } from "../../context/compact/command/compactCommandRunner.js";
+import { createCompactInjectionStateStore } from "../../context/compact/injection/compactInjectionState.js";
 import {
   createCompactLiveCheckpointStore,
   updateLatestCompactCheckpoint,
-} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
+} from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import {
   createRuntimeEventDigest,
   renderExecutionSummaryBlock,
@@ -13,7 +13,6 @@ import {
 } from "./sessionEventSurface.js";
 import { buildPromptWithFutureTurnInjections } from "./sessionFutureTurnProjection.js";
 import {
-  projectAssistantTurnPersistence,
   projectCompletedSessionSave,
   projectErrorSessionSave,
   projectRuntimeFailureSessionSave,
@@ -359,10 +358,6 @@ describe("session runtime boundary facades", () => {
     completed.terminalClassification = "success";
     completed.lastContinuationReason = "handoff";
 
-    expect(projectAssistantTurnPersistence(completed)).toEqual({
-      role: "assistant",
-      content: "done",
-    });
     expect(projectCompletedSessionSave(completed)).toEqual({
       terminalReason: "completed",
       terminalClassification: "success",

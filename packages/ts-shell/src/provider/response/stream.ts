@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import {
   classifyProviderFailure,
   type ProviderFailureClass,
@@ -183,7 +184,7 @@ export function projectProviderResponseStream(input: {
   }
 
   const contentSummary = summarizeText(contentDeltas.join(""), redactions);
-  return deepFreeze({
+  return freezeDeep({
     streamId: sanitizeText(input.streamId || "provider-stream-unavailable", redactions),
     ...(input.requestBoundary ? { requestId: input.requestBoundary.requestId } : {}),
     responseId: sanitizeText(input.responseId || "response-unavailable", redactions),
@@ -193,7 +194,12 @@ export function projectProviderResponseStream(input: {
     contentDeltaCount: contentDeltas.length,
     contentSummary,
     toolCallDeltaCount,
-    completedToolCalls: Object.freeze(completedToolCalls),
+    // Handed to `freezeDeep` unfrozen on purpose. Freezing the array here would
+    // freeze the container only: the deep walk skips a value that is already
+    // frozen, so each tool call and its `arguments` - the raw request the model
+    // asked for - would stay writable. Same shape as the regression fixed in
+    // turn/assistantResponse.ts; this one predates it and was found by review.
+    completedToolCalls,
     malformedToolCallCount,
     assistantMessageCompleted,
     streamCompleted,
@@ -288,14 +294,4 @@ function sanitizeText(input: string, redactions: Set<string>): string {
 
 function unique(input: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(input)]);
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
 }

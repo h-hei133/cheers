@@ -3,8 +3,23 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { isRustDaemonEnabled } from './client.js'
-import { getExecutionPathLabel } from '../../../../scripts/toolchain.mjs'
+import { executeLocally, isRustDaemonEnabled } from './client.js'
+function getExecutionPathLabel(rootDir: string): string {
+  const configFile = path.join(rootDir, '.private-agents.json')
+  let daemonEnabledFromConfig: boolean | undefined
+  if (fs.existsSync(configFile)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(configFile, 'utf8'))
+      if (typeof parsed.daemonEnabled === 'boolean') {
+        daemonEnabledFromConfig = parsed.daemonEnabled
+      }
+    } catch {}
+  }
+  const daemonEnabled = process.env.DAEMON_ENABLED === undefined
+    ? daemonEnabledFromConfig ?? true
+    : process.env.DAEMON_ENABLED === '1'
+  return daemonEnabled ? 'rust-daemon' : 'ts-local'
+}
 
 interface MockDaemonHarness {
   readonly spawnMock: ReturnType<typeof vi.fn>
@@ -373,3 +388,83 @@ describe('rust daemon feature flag', () => {
     expect(result.failureKind).toBe('timeout')
   }, 15000)
 })
+
+describe("forwarding command output as it is produced", () => {
+  it("forwards output while a command runs, not only at the end", async () => {
+  const chunks: string[] = []
+  const stamped: Array<{ at: number; text: string }> = []
+  const started = Date.now()
+  const result = await executeLocally({
+    command: process.execPath,
+    args: ['-e', 'let i=0;const t=setInterval(()=>{if(i++>=3){clearInterval(t);process.exit(0)}console.log("tick"+i)},60)'],
+    cwd: process.cwd(),
+    onOutput: (chunk) => {
+      chunks.push(chunk)
+      stamped.push({ at: Date.now() - started, text: chunk.trim() })
+    },
+  })
+  console.log('chunks=' + JSON.stringify(stamped))
+  expect(result.status).toBe('completed')
+  // Output arrived spread over time, not in one burst at the end.
+  expect(chunks.length).toBeGreaterThan(1)
+  expect(stamped[0].at).toBeLessThan(stamped.at(-1)!.at)
+  expect(result.stdout).toContain('tick3')
+})
+
+  it("reports the same result shape without a callback", async () => {
+  const result = await executeLocally({
+    command: process.execPath,
+    args: ['-e', 'console.log("plain")'],
+    cwd: process.cwd(),
+  })
+  expect(result.status).toBe('completed')
+  expect(result.stdout).toContain('plain')
+})
+
+  it("reports a failing command with its exit code", async () => {
+  const result = await executeLocally({
+    command: process.execPath,
+    args: ['-e', 'console.error("boom");process.exit(3)'],
+    cwd: process.cwd(),
+    onOutput: () => {},
+  })
+  expect(result.status).toBe('failed')
+  expect(result.exitCode).toBe(3)
+  expect(result.stderr).toContain('boom')
+})
+})
+
+describe("stopping a command that outlives its own child", () => {
+  /** A command whose shell is not its only process: the loop is a descendant. */
+  const withDescendant = ['/bin/bash', '-c', 'sleep 30 & wait'];
+
+  it("returns when a descendant holds the pipes past the timeout", async () => {
+    const result = await executeLocally({
+      command: withDescendant[0],
+      args: withDescendant.slice(1),
+      cwd: process.cwd(),
+      timeoutMs: 300,
+      onOutput: () => {},
+    });
+    // The shell is killed but its `sleep` inherits the pipes. Waiting for the
+    // pipes to close meant waiting for that descendant, so nothing returned at
+    // all and the turn hung on a tool that would never report.
+    expect(result.status).toBe("timeout");
+  }, 15000);
+
+  it("reports a cancellation as cancelled rather than as a timeout", async () => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 200);
+    const result = await executeLocally({
+      command: withDescendant[0],
+      args: withDescendant.slice(1),
+      cwd: process.cwd(),
+      timeoutMs: 60_000,
+      onOutput: () => {},
+      abortSignal: controller.signal,
+    });
+    // The caller stopped it. Saying "timeout" blamed the clock for a decision
+    // the user made.
+    expect(result.status).toBe("cancelled");
+  }, 15000);
+});

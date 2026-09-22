@@ -1,5 +1,10 @@
 import { promises as fs } from 'node:fs'
+import { withFileLock } from './fileLock.js'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js'
+import { buildEditSnapshotStoreConfig } from '../../edit/recovery/editSnapshot.js'
+import { captureRecoveryAuthorityRecord } from '../../edit/recovery/recoveryAuthorityStore.js'
 import {
   checkRustDaemonAvailability,
   executeLocally,
@@ -15,151 +20,25 @@ import {
   createCommandExecutionReceipt,
   type RuntimeExecutionReceiptProjection,
 } from './receipt.js'
-
-export type ExecutionPath = 'ts-local' | 'rust-daemon'
-export type ExecutionOperationKind =
-  | 'command.run'
-  | 'file.read'
-  | 'file.write'
-  | 'file.list'
-
-export type ExecutionAuthorityMode =
-  | 'none-required'
-  | 'read-only'
-  | 'preview'
-  | 'permission-pending'
-  | 'denied'
-  | 'approved-for-write'
-  | 'command-allowlisted'
-  | 'sandbox-approved'
-  | 'sandbox-rejected'
-  | 'unknown-transitional'
-
-export type ExecutionAuthoritySource =
-  | 'tool-runtime-approval'
-  | 'workspace-authority'
-  | 'daemon-sandbox'
-  | 'none'
-  | 'unknown-transitional'
-
-export interface ExecutionAuthority {
-  readonly mode: ExecutionAuthorityMode
-  readonly source: ExecutionAuthoritySource
-  readonly reason: string
-}
-
-export interface ExecutionPolicyMetadata {
-  readonly decisionId: string
-  readonly decisionStatus: string
-  readonly policySource: string
-  readonly authorityRequirement: ExecutionAuthorityMode
-  readonly redactionStatus: 'report-safe' | 'redacted'
-  readonly reportSafeSummary: string
-  readonly terminalSuccessClaim: false
-  readonly notProvenClaims: readonly string[]
-}
-
-interface ExecutionRequestMetadata<K extends ExecutionOperationKind> {
-  readonly operationKind: K
-  readonly workspaceRoot: string
-  readonly authority: ExecutionAuthority
-  readonly caller: string
-  readonly reason: string
-  readonly reportSafeTarget?: string
-  readonly policy?: ExecutionPolicyMetadata
-}
-
-export interface CommandExecutionRequest {
-  readonly operationKind: 'command.run'
-  readonly command: string
-  readonly args: readonly string[]
-  readonly cwd: string
-  readonly workspaceRoot: string
-  readonly authority: ExecutionAuthority
-  readonly caller: string
-  readonly reason: string
-  readonly reportSafeCommand: string
-  readonly timeoutMs?: number
-  readonly abortSignal?: AbortSignal
-  readonly policy?: ExecutionPolicyMetadata
-}
-
-export interface TextFileReadExecutionRequest extends ExecutionRequestMetadata<'file.read'> {
-  readonly absolutePath: string
-}
-
-export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<'file.write'> {
-  readonly absolutePath: string
-  readonly content: string
-}
-
-export interface FileListExecutionRequest extends ExecutionRequestMetadata<'file.list'> {
-  readonly absoluteRoot: string
-}
-
-export type ExecutionEvent =
-  | {
-      readonly kind: 'execution.started'
-      readonly operationKind: 'command.run'
-      readonly executionPath: ExecutionPath
-      readonly authorityMode: ExecutionAuthorityMode
-      readonly caller: string
-      readonly reportSafeCommand: string
-      readonly timeoutMs?: number
-    }
-  | {
-      readonly kind: 'execution.exited'
-      readonly operationKind: 'command.run'
-      readonly executionPath: ExecutionPath
-      readonly authorityMode: ExecutionAuthorityMode
-      readonly status: 'completed'
-      readonly exitCode: number | null
-    }
-  | {
-      readonly kind: 'execution.failed' | 'execution.timed_out' | 'execution.cancelled'
-      readonly operationKind: 'command.run'
-      readonly executionPath: ExecutionPath
-      readonly authorityMode: ExecutionAuthorityMode
-      readonly status: 'failed' | 'timeout' | 'cancelled'
-      readonly exitCode: number | null
-      readonly failureKind: 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
-      readonly recoveryReason?: string
-    }
-  | {
-      readonly kind: 'file.read.completed' | 'file.write.completed'
-      readonly operationKind: 'file.read' | 'file.write'
-      readonly authorityMode: ExecutionAuthorityMode
-      readonly caller: string
-      readonly reportSafeTarget: string
-    }
-  | {
-      readonly kind: 'file.write.denied' | 'file.write.failed'
-      readonly operationKind: 'file.write'
-      readonly authorityMode: ExecutionAuthorityMode
-      readonly caller: string
-      readonly reportSafeTarget: string
-      readonly failureKind: 'execution_failure'
-      readonly reason: string
-    }
-
-export interface CommandExecutionResult extends NormalizedExecutionResult {
-  readonly executionPath: ExecutionPath
-  readonly events: readonly ExecutionEvent[]
-  readonly errorClass: ExecutionErrorClass
-  readonly receipt: RuntimeExecutionReceiptProjection
-  readonly daemonInstanceId?: string
-  readonly daemonPid?: number
-  readonly daemonRequestSeq?: number
-  readonly daemonExecutionId?: string
-  readonly recoveryReason?: string
-}
-
-export interface ExecutionService {
-  readonly readTextFile: (request: TextFileReadExecutionRequest) => Promise<string>
-  readonly writeTextFile: (request: TextFileWriteExecutionRequest) => Promise<void>
-  readonly listFilesRecursive: (request: FileListExecutionRequest) => Promise<readonly string[]>
-  readonly runCommand: (request: CommandExecutionRequest) => Promise<CommandExecutionResult>
-}
+export * from './types.js'
+import { listWorkspaceFiles } from './fileWalk.js'
+export {
+  listWorkspaceFiles,
+  listDirectoryEntries,
+  type FileWalkOptions,
+  type DirectoryEntry,
+} from './fileWalk.js'
+import type {
+  CommandExecutionRequest,
+  CommandExecutionResult,
+  ExecutionAuthorityMode,
+  ExecutionEvent,
+  ExecutionPath,
+  ExecutionService,
+  FileListExecutionRequest,
+  TextFileReadExecutionRequest,
+  TextFileWriteExecutionRequest,
+} from './types.js'
 
 export function createDefaultExecutionService(): ExecutionService {
   return {
@@ -167,11 +46,14 @@ export function createDefaultExecutionService(): ExecutionService {
       return fs.readFile(request.absolutePath, 'utf8')
     },
     async writeTextFile(request) {
-      await fs.mkdir(path.dirname(request.absolutePath), { recursive: true })
-      await fs.writeFile(request.absolutePath, request.content, 'utf8')
+      // Held across the whole write, and taken by anyone who writes. A caller
+      // that read first then wrote through here has its read covered too, as
+      // long as it took the lock around both — the bare write is the last line
+      // of defence, not the whole guarantee.
+      return withFileLock(request.absolutePath, () => writeTextFileUnlocked(request))
     },
     listFilesRecursive(request) {
-      return listFilesRecursive(request.absoluteRoot)
+      return listWorkspaceFiles(request.absoluteRoot, request.walkOptions)
     },
     runCommand(request) {
       return runCommand(request)
@@ -179,18 +61,74 @@ export function createDefaultExecutionService(): ExecutionService {
   }
 }
 
-async function listFilesRecursive(root: string): Promise<readonly string[]> {
-  const entries = await fs.readdir(root, { withFileTypes: true })
-  const files = await Promise.all(
-    entries.map(async entry => {
-      const fullPath = path.join(root, entry.name)
-      if (entry.isDirectory()) {
-        return listFilesRecursive(fullPath)
-      }
-      return [fullPath]
-    }),
-  )
-  return files.flat()
+/**
+ * Record a pre-write snapshot, best effort.
+ *
+ * A snapshot exists so a write can be taken back. Failing to record one must not
+ * block the write: the write itself is already gated by the workspace authority
+ * and the approval path. A missing snapshot degrades /undo for that one change,
+ * which /undo already reports as "nothing to undo".
+ */
+/**
+ * The write itself, with the lock already held by the caller.
+ *
+ * Split out so the lock is taken in exactly one place and nothing can reach the
+ * filesystem without passing through it.
+ */
+async function writeTextFileUnlocked(request: TextFileWriteExecutionRequest): Promise<void> {
+  const relativePath = path.relative(request.workspaceRoot, request.absolutePath)
+  // A target outside the workspace root cannot be expressed as a relative path,
+  // so the authority refuses it rather than writing through.
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    throw new Error(
+      `Refuse to write outside the selected workspace: ${request.reportSafeTarget}`,
+    )
+  }
+  const authority = createWorkspaceWriteAuthority(request.workspaceRoot)
+  await fs.mkdir(path.dirname(request.absolutePath), { recursive: true })
+  // Record what the file held before the write, so /undo and /restore have
+  // something to take back. Captured under the same authority the write uses: a
+  // snapshot of a target the write would refuse is worse than none, because it
+  // reads as recoverable.
+  const before = existsSync(request.absolutePath)
+    ? authority.readVerifiedFile(relativePath)
+    : undefined
+  await captureSnapshotBeforeWrite({
+    workspaceRoot: request.workspaceRoot,
+    relativePath,
+    before,
+  })
+  if (existsSync(request.absolutePath)) {
+    // Existing targets are opened with O_NOFOLLOW and re-verified through the
+    // opened descriptor, so a symlink swapped in after the check still loses.
+    authority.writeFile(relativePath, request.content)
+    return
+  }
+  authority.createFileExclusive(relativePath, request.content)
+}
+
+async function captureSnapshotBeforeWrite(input: {
+  workspaceRoot: string
+  relativePath: string
+  before: string | undefined
+}): Promise<void> {
+  try {
+    await captureRecoveryAuthorityRecord({
+      ...buildEditSnapshotStoreConfig({
+        workspaceRoot: input.workspaceRoot,
+        targetPath: input.relativePath,
+      }),
+      recordId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+      workspaceRelativePath: input.relativePath,
+      operationKind: input.before === undefined ? 'create' : 'update',
+      beforeState: input.before === undefined ? 'absent' : 'exists',
+      ...(input.before !== undefined ? { beforeContent: input.before } : {}),
+      expectedCurrentState: input.before === undefined ? 'absent' : 'exists',
+      ...(input.before !== undefined ? { expectedCurrentContent: input.before } : {}),
+    })
+  } catch {
+    // Snapshot storage is a recovery aid, never a precondition for writing.
+  }
 }
 
 async function runCommand(request: CommandExecutionRequest): Promise<CommandExecutionResult> {
@@ -239,6 +177,7 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
     args: [...request.args],
     cwd: request.cwd,
     timeoutMs: request.timeoutMs,
+    ...(request.onOutput ? { onOutput: request.onOutput } : {}),
   })
 
   return withCommandExecutionProjection(request, 'ts-local', localResult)

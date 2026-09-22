@@ -1,11 +1,11 @@
-import { createBrowserActionCache } from "../context/browserActionCache.js";
+import { createBrowserActionCache } from "../../browser/actionCache.js";
 import {
   createBrowserCliExecutionBridge,
-} from "../context/browserCliExecutionBridge.js";
+} from "../../browser/cliExecutionBridge.js";
 import {
   loadBrowserCliExecutorInjectionFromEnv,
-} from "../context/browserCliExecutorInjection.js";
-import type { BrowserExecutionReceipt } from "../context/browserExecutionReceipt.js";
+} from "../../browser/cliExecutorInjection.js";
+import type { BrowserExecutionReceipt } from "../../browser/executionReceipt.js";
 import { createBrowserExternalRunnerScenarioFixture } from "./browserExternalRunnerScenarioFixtures.js";
 import { createBrowserSkillExecutionScenarioFixture } from "./browserSkillExecutionScenarioFixtures.js";
 

@@ -1,0 +1,67 @@
+import { describe, expect, it } from "vitest";
+import { renderBlock, textBlock } from "./blocks.js";
+import { visibleWidth } from "../text/measure.js";
+import { stripAnsi } from "../text/ansi.js";
+
+const WIDTH = 40;
+
+describe("prompt echo", () => {
+  it("paints the prompt as a full-width bubble", () => {
+    // A shade that stops at the last character reads as a highlight, not as a
+    // turn boundary; padding it to the frame width makes the prompt a board.
+    const rows = renderBlock(textBlock("user", "hello"), WIDTH);
+    expect(rows[0]).toContain("▌");
+    expect(rows[0]).toContain("\x1b[48;");
+    expect(visibleWidth(rows[0]!)).toBe(WIDTH);
+  });
+
+  it("wraps within the frame for wide characters too", () => {
+    for (const row of renderBlock(textBlock("user", "\u4f60\u597d\u4e16\u754c".repeat(20)), WIDTH)) {
+      expect(visibleWidth(row)).toBeLessThanOrEqual(WIDTH);
+    }
+  });
+});
+
+describe("tool invocation", () => {
+  it("marks a running tool differently from a finished one", () => {
+    const running = renderBlock({ kind: "tool", title: "read", text: "", status: "running", finalized: false }, WIDTH);
+    const done = renderBlock({ kind: "tool", title: "read", text: "", status: "ok", finalized: true }, WIDTH);
+    expect(running[0]).not.toBe(done[0]);
+    expect(done[0]).toContain("✔");
+  });
+
+  it("marks a failure and shows why", () => {
+    const rows = renderBlock(
+      { kind: "tool", title: "bash", text: "exit status 1", status: "failed", finalized: true },
+      WIDTH,
+    ).join("\n");
+    expect(rows).toContain("✗");
+    expect(rows).toContain("exit status 1");
+  });
+
+  it("renders an attached diff", () => {
+    const rows = renderBlock(
+      { kind: "tool", title: "edit", text: "", diff: "-old\n+new", status: "ok", finalized: true },
+      WIDTH,
+    ).join("\n");
+    expect(rows).toContain("old");
+    expect(rows).toContain("new");
+  });
+});
+
+describe("width discipline", () => {
+  it("never emits a row wider than the frame", () => {
+    const long = "word ".repeat(60);
+    for (const kind of ["notice", "assistant", "command", "error"] as const) {
+      for (const row of renderBlock(textBlock(kind, long, "title"), WIDTH)) {
+        expect(visibleWidth(row)).toBeLessThanOrEqual(WIDTH);
+      }
+    }
+  });
+
+  it("wraps rather than truncating, so nothing is lost", () => {
+    const rows = renderBlock(textBlock("assistant", "alpha beta gamma delta epsilon zeta"), 16).join("");
+    expect(rows).toContain("epsilon");
+    expect(rows).toContain("zeta");
+  });
+});

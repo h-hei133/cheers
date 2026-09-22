@@ -1,5 +1,6 @@
 import type { Interface as ReadlineInterface } from "node:readline";
 
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
@@ -8,18 +9,15 @@ import {
   isShellAction,
 } from "../../core/shell/shellActionBridge.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import {
   buildCliCommandExecution,
 } from "../../entrypoints/cliCommandExecutionBridge.js";
 import {
-  formatAgentModeStatusLines,
-  formatAgentModeUpdatedLines,
   formatViewModeStatusLines,
   formatViewModeUpdatedLine,
-  formatWorkspaceInfoLines,
 } from "../../entrypoints/cliDisplayProjection.js";
 import {
   type CliMcpGateway,
@@ -28,7 +26,6 @@ import {
 import { runCliPermissionCommand } from "../../entrypoints/cliPermissionModule.js";
 import { runCliSessionCommand } from "../../entrypoints/cliSessionModule.js";
 import {
-  isWorkspaceInfoPromptStrict,
   runCliWorkspaceCommand,
 } from "../../entrypoints/cliWorkspaceModule.js";
 import { renderUserHelp } from "../../entrypoints/slashCommandRegistry.js";
@@ -37,6 +34,7 @@ import {
   runInteractivePromptExecution,
   runInteractiveResumeAction,
 } from "./interactivePromptRunner.js";
+import { describeCompaction, parseCompactCommand } from "./compact.js";
 
 export interface InteractiveCommandRouterInput {
   readonly prompt: string;
@@ -50,6 +48,8 @@ export interface InteractiveCommandRouterInput {
   readonly logger: StructuredLogger;
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly turnNumber: number;
+  /** True when the terminal agreed to report modified keys. */
+  readonly modifierKeysReported?: boolean;
   readonly setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
@@ -59,6 +59,14 @@ export interface InteractiveCommandRouterResult {
   readonly turnNumber: number;
   readonly refreshPromptChrome?: boolean;
   readonly refreshMcpGateway?: boolean;
+  /** The user asked to leave; the host owns handing the terminal back. */
+  readonly exitRequested?: boolean;
+  /** The user asked to run the last turn again; only the host knows what it was. */
+  readonly retryRequested?: boolean;
+  /** Start over: a new session, an empty transcript, a screen with nothing on it. */
+  readonly clearRequested?: boolean;
+  /** A different session is now current; its conversation should be put back on screen. */
+  readonly sessionOpened?: boolean;
 }
 
 export async function routeInteractiveCommand(
@@ -66,15 +74,16 @@ export async function routeInteractiveCommand(
 ): Promise<InteractiveCommandRouterResult> {
   let nextTurnNumber = input.turnNumber;
 
-  if (isWorkspaceInfoPromptStrict(input.prompt)) {
-    renderProjectedLines(
-      input.renderer,
-      formatWorkspaceInfoLines({
-        cwd: input.runtimeContext.cwd,
-        projectRoot: input.runtimeContext.projectRoot,
-      }),
+  // Compaction changes the live context, which only the session runtime can do;
+  // the registry's handoff forms keep their artifact-writing behaviour.
+  const compaction = parseCompactCommand(input.prompt);
+  if (compaction) {
+    const outcome = await input.sessionRuntime.compactHistory(
+      input.runtimeContext.session.id,
+      compaction.instructions,
     );
-    return { turnNumber: nextTurnNumber };
+    for (const line of describeCompaction(outcome)) input.renderer.renderLine(line);
+    return { turnNumber: nextTurnNumber, refreshPromptChrome: true };
   }
 
   const resolved = await buildCliCommandExecution({
@@ -84,6 +93,16 @@ export async function routeInteractiveCommand(
     printMode: false,
     interactive: true,
     sessionId: input.runtimeContext.session.id,
+    modifierKeysReported: input.modifierKeysReported,
+    // The settings live on the context this session carries, so replacing them in
+    // place is what makes `/reload` take effect for the rest of the session rather
+    // than only for the turn that ran it.
+    refreshRuntimeConfig: () => {
+      const before = input.runtimeContext.runtimeConfig;
+      const after = getRuntimeConfig(input.runtimeContext.cwd);
+      input.runtimeContext.runtimeConfig = after;
+      return { before, after };
+    },
   });
   if (resolved.kind === "handled") {
     return { turnNumber: nextTurnNumber };
@@ -91,6 +110,7 @@ export async function routeInteractiveCommand(
   const slashResult = resolved.kind === "shell-action" ? resolved.slashResult : null;
 
   if (isResumeLikeShellAction(slashResult)) {
+    const before = input.runtimeContext.session.id;
     const resumeResult = await runInteractiveResumeAction({
       slashResult,
       fallbackSessionId: input.fallbackSessionId,
@@ -107,7 +127,22 @@ export async function routeInteractiveCommand(
       turnNumber: resumeResult.turnNumber,
       refreshPromptChrome: true,
       refreshMcpGateway: true,
+      // The runtime context is switched in place, so a changed id is the signal
+      // that a different session's conversation now belongs on screen.
+      sessionOpened: input.runtimeContext.session.id !== before,
     };
+  }
+
+  if (isShellAction(slashResult, "exit-session")) {
+    return { turnNumber: nextTurnNumber, exitRequested: true };
+  }
+
+  if (isShellAction(slashResult, "clear-session")) {
+    return { turnNumber: nextTurnNumber, clearRequested: true };
+  }
+
+  if (isShellAction(slashResult, "retry-turn")) {
+    return { turnNumber: nextTurnNumber, retryRequested: true };
   }
 
   if (isShellAction(slashResult, "cancel-run")) {
@@ -187,26 +222,6 @@ export async function routeInteractiveCommand(
     input.sessionRuntime.setViewMode(nextMode);
     input.renderer.renderLine(formatViewModeUpdatedLine({ viewMode: nextMode }));
     return { turnNumber: nextTurnNumber };
-  }
-
-  if (isShellAction(slashResult, "show-agent-mode")) {
-    renderProjectedLines(
-      input.renderer,
-      formatAgentModeStatusLines({
-        agentMode: input.sessionRuntime.getAgentMode(),
-      }),
-    );
-    return { turnNumber: nextTurnNumber };
-  }
-
-  if (isShellAction(slashResult, "set-agent-mode")) {
-    const nextMode = slashResult.agentMode ?? "build";
-    input.sessionRuntime.setAgentMode(nextMode);
-    renderProjectedLines(
-      input.renderer,
-      formatAgentModeUpdatedLines({ agentMode: nextMode }),
-    );
-    return { turnNumber: nextTurnNumber, refreshPromptChrome: true };
   }
 
   if (isShellAction(slashResult, "manage-permissions")) {

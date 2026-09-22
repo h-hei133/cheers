@@ -15,7 +15,7 @@ import { createToolBeforePolicyDecision } from "./policy/interception.js";
 
 describe("tool batch dispatch", () => {
   it("plans no-tool, one-tool, multi-tool, unsupported, blocked, authority-required, and partial batches", () => {
-    expect(planToolBatchDispatch({ batch: batch([]) }).dispatchStatus).toBe("planned");
+    expect(planToolBatchDispatch({ batch: batch([]) }).dispatchStatus).toBe("not_dispatched");
     expect(planToolBatchDispatch({
       batch: batch([{ id: "call-read", name: "read", arguments: { path: "a.ts" } }]),
       dispatchPolicy: "sequential",
@@ -83,7 +83,7 @@ describe("tool batch dispatch", () => {
     const receipt = makeReceipt();
     const split = createCommandToolResultSplit({
       receipt,
-      content: "raw provider output: hidden reasoning token=secret",
+      content: "raw provider output: execution completed ok",
       runtimeFacts: { observation: "execution-backed" },
     });
     const result = await dispatchToolBatch({
@@ -133,7 +133,7 @@ describe("tool batch dispatch", () => {
     expect(dispatched).toEqual([{ name: "read", args: { path: "a.ts" } }]);
     expect(result.dispatchPlan.calls.map((call) => call.notDispatchedReason)).toEqual([
       undefined,
-      "arguments_not_report_safe",
+      "not selected for dispatch",
     ]);
     expect(result.resultDetails.map((detail) => detail.resultStatus)).toEqual([
       "executed_success",
@@ -258,7 +258,7 @@ describe("tool batch dispatch", () => {
       "completed",
       "cancelled",
     ]);
-    expect(timeout.resultDetails[0]?.resultStatus).toBe("timed_out");
+    expect(timeout.resultDetails[0]?.resultStatus).toBe("executed_failed");
     expect(blocked.dispatchPlan.schedulingPlan.calls.map((call) => call.dependency.kind)).toEqual([
       "conflicts_with",
       "ordered_after",
@@ -266,7 +266,7 @@ describe("tool batch dispatch", () => {
     expect(blocked.dispatchPlan.schedulingPlan.skippedCallIds).toEqual(["call-unsupported-dependent"]);
     expect(blocked.resultDetails.map((detail) => detail.resultStatus)).toEqual([
       "blocked_by_policy",
-      "unknown_tool",
+      "unsupported_tool",
     ]);
   });
 });

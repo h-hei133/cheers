@@ -1,5 +1,13 @@
 # Project Gap And Priority Plan
 
+> **2026-09-19 说明（CB-005 死代码清理）**：本文"Completed Batch"各节记录的是
+> **当时**的执行证据。其中引用的部分路径已随 CB-005 清理移除
+> （`runtime/loop/`、`runtime/api/host/{runtime,io}.ts`、`runtime/distribution/`、
+> `cli/host/`、`presentation/surface/`、`session/presentation/envelope.ts`、
+> `core/shell/cliSessionProductSurface.ts`、`presentation/terminal/renderer.ts`
+> 及其测试）。这些路径在本文中**不再以行内代码标注**，以免与"当前状态"混淆；
+> 保留原文以存档，但**不要再把它们当作现存文件**。
+
 This plan now prioritizes trusted task completion over further trusted-runtime
 surface expansion. The runtime must stay conservative on secrets, execution,
 provider behavior, mutation, and truthfulness, but the next useful product
@@ -33,9 +41,11 @@ deterministic runtime case is not enough.
   Deterministic cases and explicit live entries call the same ordered task-loop
   runtime from goal and state through context, plan, request, provider turn,
   action, observation, verification, repair, proof, and verdict. Safe live gate
-  receipts are projected inside `runtime/evaluation/task` for read-only,
-  anchored, artifact dry-run, and reviewed isolated write entries. The
-  repeatable opt-in live run defines thirteen exact entries. The current
+  receipts **were** projected inside `runtime/evaluation/task` for read-only,
+  anchored, artifact dry-run, and reviewed isolated write entries; that module
+  was deleted with CB-005/C2 (2026-09-19), so this describes the arrangement at
+  the time of measurement, not the current tree. The repeatable opt-in live run
+  defines thirteen exact entries. The current
   measured SP031 explicit recovery gauntlet executed all 13 entries, completed
   11 with task proof,
   completed 3 write tasks with reviewed disposable apply plus post-apply task
@@ -204,35 +214,50 @@ that shared path.
 
 ### Completed Batch: Product Loop Truth Consolidation
 
-- Proven result: the current loop trajectory, completion packet, runtime events,
+> **2026-09-19 更正（CB-005 死代码清理）**：本批次描述的 `runtime/loop` 产品真值矩阵
+> 与 `presentation/surface` 状态面**已整体删除**。实测依据：活路径
+> （`turn/projection.ts`）从不产出 `codingResult` / `loopTrajectory` /
+> `productLoopAdapter`，因此 `projectProductSurfaceViewModel` 在生产中恒
+> `return undefined`——该批次建立的"产品真值路径"**从未在活路径上执行过**。
+> 保留原文以存档，但**不要再把它当作当前状态**。
+
+- ~~Proven result: the current loop trajectory, completion packet, runtime events,
   JSON stream, replay-safe facts, product surface, and evidence/result verdicts
-  line up against one audited product-path matrix.
-- User-facing value: stopped, blocked, waiting, repaired, and complete states are
-  distinct in the tested product truth path.
-- Owner domains: `runtime/loop`, `runtime/events`, `session/replay`,
-  `presentation`, `evidence`, `result`.
-- Evidence: `packages/ts-shell/src/runtime/loop/truthMatrix.test.ts` feeds
+  line up against one audited product-path matrix.~~
+- User-facing value: ~~stopped, blocked, waiting, repaired, and complete states are
+  distinct in the tested product truth path.~~ **未兑现**：该路径无生产调用者。
+- Owner domains: `runtime/loop`（**已删**）、`runtime/events`、`session/replay`、
+  `presentation`（**surface 已删**）、`evidence`、`result`。
+- Evidence: ~~packages/ts-shell/src/runtime/loop/truthMatrix.test.ts feeds
   owner tests for loop packet/finalization, events/stream, replay, surface, and
-  evidence/result verdicts.
+  evidence/result verdicts.~~ **该文件已删**；其驱动的 owner 测试随之移除。
 - Boundary: terminal truth still belongs to `evidence`/`result`; loop, events,
   replay, presentation, request readiness, tool outcome, proposal, authority,
   and apply-only states remain non-success consumers.
 
 ### Completed Batch: CLI Status Envelope
 
-- Proven result: terminal/session-facing status now uses a structured envelope
-  derived from product surface owner facts, not terminal prose.
-- User-facing value: users can see terminal verdict, loop control, next action,
+> **2026-09-19 更正（CB-005 死代码清理）**：`session/presentation/envelope.ts`、
+> `core/shell/cliSessionProductSurface.ts`、`presentation/terminal/renderer.ts`
+> 及其测试**已删除**。它们的唯一生产调用者是 `sessionTerminalState.ts` 的
+> surface 渲染路径，而该路径的输入（`codingResult` / `loopTrajectory` /
+> `productLoopAdapter`）在活路径上恒为 `undefined`，故 `projectProductSurfaceViewModel`
+> 恒提前返回——整条状态面**从未在活路径上渲染过**。保留原文以存档。
+
+- ~~Proven result: terminal/session-facing status now uses a structured envelope
+  derived from product surface owner facts, not terminal prose.~~
+- User-facing value: ~~users can see terminal verdict, loop control, next action,
   blockers, request readiness, replay carry-forward, tool outcome, verification
   and repair state, missing proof, and not-proven claims in one coherent
-  status surface.
-- Owner domains: `cli`, `core/shell`, `session/presentation`, `presentation`,
-  `runtime/events`.
-- Evidence: `packages/ts-shell/src/session/presentation/envelope.test.ts` and
-  `packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts` reuse the
+  status surface.~~ **未兑现**：该面零生产调用者。
+- Owner domains: `cli`, `core/shell`, `session/presentation`（**已删**）、
+  `presentation`（**surface 已删**）、`runtime/events`。
+- Evidence: ~~packages/ts-shell/src/session/presentation/envelope.test.ts and
+  packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts reuse the
   product truth matrix across complete proof, blocked request, failed tool
   outcome, missing proof, proposal-only, apply-only, post-repair failed
-  verification, partial/stopped, and waiting-for-user states.
+  verification, partial/stopped, and waiting-for-user states.~~
+  **两个测试文件均已删**（随其被测模块）。
 - Boundary: terminal truth still belongs to `evidence`/`result`; the CLI,
   shell, session envelope, events, replay, request readiness, tool outcome,
   proposal, authority, and apply-only states remain non-success consumers.
@@ -254,7 +279,7 @@ that shared path.
   `runtime/events`, `tools`, `tools/policy`, `turn`, `session/replay`,
   `session/presentation`, `presentation`, `evidence`, `result`.
 - Evidence: `packages/ts-shell/src/provider/response/synthetic.test.ts` and
-  `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts`, alongside the
+  packages/ts-shell/src/runtime/loop/providerBoundary.test.ts, alongside the
   focused provider, runtime, tool, turn, replay, surface, status, and truth
   owner tests.
 - Boundary: live providers remain default-off and explicit opt-in only; broad
@@ -280,7 +305,7 @@ that shared path.
   `tools/policy`, `tools`, `verification`, `repair`, `evidence`, `result`,
   `session/replay`, `session/presentation`, `presentation`, and `core/shell`.
 - Evidence: `packages/ts-shell/src/edit/recovery/model.test.ts` and
-  `packages/ts-shell/src/runtime/loop/mutationRecovery.test.ts`, alongside the
+  packages/ts-shell/src/runtime/loop/mutationRecovery.test.ts, alongside the
   focused edit, provider, tool policy/dispatch, runtime event, replay, surface,
   status, evidence, and result owner tests.
 - Boundary: the proven lane is controlled and deterministic. Live providers,
@@ -308,8 +333,8 @@ that shared path.
   `session/replay`, `session/presentation`, `presentation`, `core/shell`, and
   host evidence/result.
 - Evidence: `packages/ts-shell/src/edit/multifile/model.test.ts`,
-  `packages/ts-shell/src/runtime/loop/mutationRuntime.test.ts`, and
-  `packages/ts-shell/src/runtime/api/host/runtime.test.ts`, alongside focused
+  packages/ts-shell/src/runtime/loop/mutationRuntime.test.ts, and
+  packages/ts-shell/src/runtime/api/host/runtime.test.ts, alongside focused
   event, replay, surface, status, and build validation.
 - Boundary: this completed batch proves the prior deterministic sequential
   queue. Bounded parallel mutation is proven by the later batch below;
@@ -333,17 +358,15 @@ that shared path.
   while same-file/overlap/path/dependency/stale/snapshot/rollback/authority/
   unsupported/unknown blockers remain explicit and non-success. Fast and slow
   target completion settles deterministically in target order.
-- Owner domains: `edit/multifile`, `runtime/loop`, `runtime/events`,
-  `runtime/api`, `runtime/evaluation`, `verification`, `evidence`, `result`,
-  `session/replay`, `session/presentation`, `presentation`, and `core/shell`.
-- Evidence: `packages/ts-shell/src/edit/multifile/model.test.ts`,
-  `packages/ts-shell/src/runtime/loop/mutationRuntime.test.ts`,
-  `packages/ts-shell/src/runtime/api/host/runtime.test.ts`,
-  `packages/ts-shell/src/runtime/events/projection.test.ts`,
-  `packages/ts-shell/src/session/replay/state.test.ts`,
-  `packages/ts-shell/src/presentation/surface/model.test.ts`,
-  `packages/ts-shell/src/session/presentation/envelope.test.ts`, and
-  `packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts`.
+- Owner domains: `edit/multifile`, `runtime/loop`（**已删**）、`runtime/events`,
+  `runtime/api`（**已删**）、`runtime/evaluation`, `verification`, `evidence`, `result`,
+  `session/replay`, `session/presentation`（**已删**）、`presentation`（**surface 已删**）、
+  以及 `core/shell`。
+- Evidence: `packages/ts-shell/src/edit/multifile/model.test.ts`（**仍存在**）；
+  其余所列测试文件（`runtime/loop/mutationRuntime.test.ts`、
+  `runtime/api/host/runtime.test.ts`、`session/replay/state.test.ts`、
+  `presentation/surface/model.test.ts`、`session/presentation/envelope.test.ts`、
+  `core/shell/cliSessionProductSurface.test.ts`）**已于 2026-09-19 随 CB-005 死代码清理删除**。
 - Boundary: uncontrolled or broad parallel mutation remains unsupported.
   Eligibility, group creation, target apply, group apply, settlement, rollback,
   verification, repair eligibility, host evaluation, events, replay, product
@@ -374,7 +397,7 @@ that shared path.
 - Evidence: `packages/ts-shell/src/provider/request/fallback.test.ts`,
   `packages/ts-shell/src/provider/request/attempt.test.ts`,
   `packages/ts-shell/src/provider/request/boundary.test.ts`, and
-  `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts`, alongside the
+  packages/ts-shell/src/runtime/loop/providerBoundary.test.ts, alongside the
   focused registry, response, runtime event, replay, surface, status, and truth
   owner tests.
 - Boundary: live providers remain default-off and explicit opt-in only. The
@@ -400,7 +423,7 @@ that shared path.
   `session/continuation`, `session/replay`, `context`, `provider/request`,
   `runtime/loop`, `runtime/events`, `presentation`, `session/presentation`, and
   `core/shell`.
-- Evidence: `packages/ts-shell/src/runtime/loop/sessionContinuity.test.ts`,
+- Evidence: packages/ts-shell/src/runtime/loop/sessionContinuity.test.ts,
   `packages/ts-shell/src/session/store/threadState.test.ts`, and the focused
   session/context/continuation/provider/request/events/replay/surface/status
   owner suite.
@@ -428,7 +451,7 @@ that shared path.
   `runtime/loop`, `session/store`, `session/replay`, `session/presentation`,
   `provider/request`, `provider/response`, `tools`, `edit`, `verification`,
   `repair`, `evidence`, and `result`.
-- Evidence: `packages/ts-shell/src/runtime/api/host/runtime.test.ts` covers the
+- Evidence: packages/ts-shell/src/runtime/api/host/runtime.test.ts covers the
   host happy lane, blocked lane, deterministic evaluation lane, and truth lane
   across the required host/session/provider/tool/mutation/replay/redaction
   states. The focused owner suite also covers runtime events, loop lanes,
@@ -458,13 +481,13 @@ that shared path.
   `session/replay`, `provider/request`, `provider/response`, `tools`, `edit`,
   `verification`, `repair`, `evidence`, `result`, `presentation`, `scripts`,
   and package metadata.
-- Evidence: `packages/ts-shell/src/runtime/api/host/runtime.test.ts`,
-  `packages/ts-shell/src/runtime/api/host/io.test.ts`,
-  `packages/ts-shell/src/cli/host/runner.test.ts`,
-  `packages/ts-shell/src/runtime/distribution/model.test.ts`,
+- Evidence: packages/ts-shell/src/runtime/api/host/runtime.test.ts,
+  packages/ts-shell/src/runtime/api/host/io.test.ts,
+  packages/ts-shell/src/cli/host/runner.test.ts,
+  packages/ts-shell/src/runtime/distribution/model.test.ts,
   `packages/ts-shell/src/result/host/verdict.test.ts`,
   `packages/ts-shell/src/smoke.test.ts`, and
-  `scripts/verify-host-surface.mjs`.
+  scripts/verify-host-surface.mjs.
 - Boundary: package readiness is a static/package host smoke, not package
   installation, dynamic loading, executable plugin behavior, broad SDK/RPC
   server behavior, browser automation, external tool server behavior, command
@@ -494,11 +517,11 @@ that shared path.
   `packages/ts-shell/src/provider/request/attempt.test.ts`,
   `packages/ts-shell/src/provider/request/fallback.test.ts`,
   `packages/ts-shell/src/provider/response/adapter.test.ts`,
-  `packages/ts-shell/src/runtime/api/host/runtime.test.ts`,
+  packages/ts-shell/src/runtime/api/host/runtime.test.ts,
   `packages/ts-shell/src/runtime/events/projection.test.ts`,
-  `packages/ts-shell/src/session/replay/state.test.ts`,
-  `packages/ts-shell/src/session/presentation/envelope.test.ts`,
-  `packages/ts-shell/src/presentation/surface/model.test.ts`, and the focused
+  packages/ts-shell/src/session/replay/state.test.ts,
+  packages/ts-shell/src/session/presentation/envelope.test.ts,
+  packages/ts-shell/src/presentation/surface/model.test.ts, and the focused
   evidence/result truth tests.
 - Boundary: compatibility, readiness, invocation eligibility, response
   normalization, fallback, evaluation execution, events, replay, surface, and
@@ -526,13 +549,13 @@ that shared path.
   `session/replay`, `session/presentation`, `presentation`, `core/shell`,
   `evidence`, and `result`.
 - Evidence: `packages/ts-shell/src/tools/toolBatchDispatch.test.ts`,
-  `packages/ts-shell/src/runtime/loop/providerBoundary.test.ts`,
-  `packages/ts-shell/src/runtime/api/host/runtime.test.ts`,
+  packages/ts-shell/src/runtime/loop/providerBoundary.test.ts,
+  packages/ts-shell/src/runtime/api/host/runtime.test.ts,
   `packages/ts-shell/src/runtime/events/projection.test.ts`,
-  `packages/ts-shell/src/session/replay/state.test.ts`,
-  `packages/ts-shell/src/session/presentation/envelope.test.ts`,
-  `packages/ts-shell/src/presentation/surface/model.test.ts`,
-  `packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts`, and the
+  packages/ts-shell/src/session/replay/state.test.ts,
+  packages/ts-shell/src/session/presentation/envelope.test.ts,
+  packages/ts-shell/src/presentation/surface/model.test.ts,
+  packages/ts-shell/src/core/shell/cliSessionProductSurface.test.ts, and the
   focused evidence/result truth tests.
 - Boundary: only read-only tool calls with safe independent dependency facts can
   run in parallel. Mutation tools, unknown-effect tools, authority-required

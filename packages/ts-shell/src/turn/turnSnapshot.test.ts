@@ -12,7 +12,7 @@ describe("runtime turn snapshot", () => {
       workspaceRoot: "/tmp/workspace",
       providerMode: "real",
       providerOptIn: true,
-      modelLabel: "codex-test-model",
+      modelLabel: "test-model",
       agentMode: "build",
       capabilityFlags: flags,
       planningMutationExecution: "provided",
@@ -29,7 +29,7 @@ describe("runtime turn snapshot", () => {
     expect(snapshot.provider).toEqual({
       mode: "real",
       optIn: true,
-      modelLabel: "codex-test-model",
+      modelLabel: "test-model",
     });
   });
 

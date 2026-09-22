@@ -6,7 +6,7 @@ import {
   createBrowserControlledNetworkRunnerManifest,
   serializeBrowserControlledNetworkRunnerManifest,
   type BrowserControlledNetworkRunnerManifest,
-} from "../context/browserControlledNetworkRunnerManifest.js";
+} from "../../browser/controlledNetworkRunnerManifest.js";
 import {
   createBrowserControlledNetworkServer,
   type BrowserControlledNetworkServer,

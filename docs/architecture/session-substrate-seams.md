@@ -117,7 +117,7 @@ Compact/current-session:
   - `151 passed`
 - `rtk npm run test -w packages/ts-shell`
   - `343 passed`, `2059 passed / 1 skipped`
-- `rtk npm run verify:edit-capability-closeout`
+- ~~`rtk npm run verify:edit-capability-closeout`~~ (removed 2026-09-17)
   - pass, `58 passed`
 - `rtk npm run verify:result-contract`
   - pass

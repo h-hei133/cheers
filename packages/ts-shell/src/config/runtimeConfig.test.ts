@@ -36,18 +36,127 @@ describe("runtime config", () => {
 
   it("loads defaults when no config file exists", () => {
     const config = getRuntimeConfig(fakeRoot);
-    expect(config).toEqual({
-      provider: "openai",
-      daemonEnabled: true,
-      maxTurns: 6,
-      disabledTools: [],
-      hiddenToolPrefixes: [],
-      enableMcpTools: true,
-      activeProviderConnectionId: undefined,
-      providerConnections: [],
-      providerCredentials: {},
-      configSources: [],
-    });
+    // Assert the fields a caller actually reads, not the exact key set: pinning
+    // the key set is what let a missing field go unnoticed.
+    expect(config.provider).toBe("openai");
+    expect(config.daemonEnabled).toBe(true);
+    expect(config.maxTurns).toBe(15);
+    expect(config.disabledTools).toEqual([]);
+    expect(config.hiddenToolPrefixes).toEqual([]);
+    expect(config.enableMcpTools).toBe(true);
+    expect(config.activeProviderConnectionId).toBeUndefined();
+    expect(config.providerConnections).toEqual([]);
+    expect(config.providerCredentials).toEqual({});
+    expect(config.configSources).toEqual([]);
+  });
+
+  it("keeps every declared optional field that a config file sets", () => {
+    const configPath = path.join(fakeRoot, ".private-agents.json");
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        contextWindow: 200_000,
+        reserveTokens: 30_000,
+        temperature: 0.2,
+        topP: 0.9,
+        maxOutputTokens: 8192,
+        agentMode: "plan",
+      }),
+      "utf8",
+    );
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.contextWindow).toBe(200_000);
+    expect(config.reserveTokens).toBe(30_000);
+    expect(config.temperature).toBe(0.2);
+    expect(config.topP).toBe(0.9);
+    expect(config.maxOutputTokens).toBe(8192);
+    expect(config.agentMode).toBe("plan");
+  });
+
+  it("defaults the instruction budget to a bounded number of bytes", () => {
+    // A default of zero would disable project instructions for everyone, and an
+    // unbounded default would let one repository's file fill the prompt.
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.instructionBudgetBytes).toBe(32 * 1024);
+  });
+
+  it("does not allow unreviewed hooks unless a flag says so", () => {
+    // The default has to be the safe one: a config file must not be able to grant
+    // this, or a repository could ship the exemption along with the hooks.
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.allowUntrustedHooks).toBe(false);
+  });
+
+  it("lets no configuration file turn on unreviewed hooks", () => {
+    // The exemption must be given per run, by a person typing a flag. A repository
+    // that could ship it alongside its hooks would be approving its own commands,
+    // which is the whole thing the gate exists to prevent.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bypass-config-"));
+    fs.writeFileSync(
+      path.join(dir, ".private-agents.json"),
+      JSON.stringify({ allowUntrustedHooks: true }),
+      "utf8",
+    );
+
+    expect(getRuntimeConfig(dir).allowUntrustedHooks).toBe(false);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("lets a command-line override turn on unreviewed hooks", () => {
+    const config = getRuntimeConfig(fakeRoot, { allowUntrustedHooks: true });
+    expect(config.allowUntrustedHooks).toBe(true);
+  });
+
+  it("leaves the context window absent when the user did not set one", () => {
+    // The window is resolved per model from the catalog. A default filled in
+    // here would be indistinguishable from a deliberate override, so the
+    // catalog would never be consulted and every model would compact at the
+    // same number.
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.contextWindow).toBeUndefined();
+  });
+
+  it("does not carry a config key whose value nothing reads", () => {
+    // A key that survives onto the resolved config is a promise the runtime
+    // does not keep: the user sets it, and nothing happens. A config file that
+    // still carries a removed key must load without error and must not put the
+    // key back on the result.
+    const configPath = path.join(fakeRoot, ".private-agents.json");
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        contextWindow: 200_000,
+        thinkingBudgets: { high: 8192 },
+        promptCacheTtl: "1h",
+      }),
+      "utf8",
+    );
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.contextWindow).toBe(200_000);
+    expect(Object.keys(config)).not.toContain("thinkingBudgets");
+    expect(Object.keys(config)).not.toContain("promptCacheTtl");
+  });
+
+  it("expands environment references in a config file", () => {
+    const configPath = path.join(fakeRoot, ".private-agents.json");
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        providerCredentials: {
+          openai: { apiKey: "${TEST_CONFIG_KEY}" },
+          anthropic: { apiKey: "$TEST_CONFIG_KEY" },
+        },
+      }),
+      "utf8",
+    );
+    process.env.TEST_CONFIG_KEY = "sk-from-environment";
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.providerCredentials.openai?.apiKey).toBe("sk-from-environment");
+    expect(config.providerCredentials.anthropic?.apiKey).toBe("sk-from-environment");
   });
 
   it("loads project config and env overrides", () => {

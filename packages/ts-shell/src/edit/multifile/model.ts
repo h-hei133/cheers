@@ -1,4 +1,38 @@
+import { freezeDeep } from "../../core/values/freeze.js";
 import path from "node:path";
+import type {
+  MultiTargetOperationKind,
+  MultiTargetClassificationStatus,
+  MultiTargetConflictKind,
+  MultiTargetAuthorityStatus,
+  MultiTargetStaleReadStatus,
+  MultiTargetSnapshotStatus,
+  MultiTargetQueueState,
+  MultiTargetGraphRelationKind,
+  MultiTargetParallelEligibilityStatus,
+  MultiTargetGroupMode,
+  MultiTargetGroupStatus,
+  MultiTargetSettlementStatus,
+  MultiTargetVerificationStatus,
+  MultiTargetRepairEligibilityStatus,
+  MultiTargetVerdictStatus,
+  MultiTargetMutationTargetInput,
+  MultiTargetMutationInput,
+  MultiTargetMutationPlan,
+  MultiTargetClassification,
+  MultiTargetConflict,
+  MultiTargetAuthorityObservation,
+  MultiTargetStaleReadObservation,
+  MultiTargetSnapshotObservation,
+  MultiTargetQueueObservation,
+  MultiTargetGraphNode,
+  MultiTargetParallelEligibility,
+  MultiTargetExecutionGroup,
+  MultiTargetSettlementObservation,
+  MultiTargetRollbackObservation,
+  MultiTargetRepairEligibility,
+  MultiTargetMutationProjection,
+} from "./types.js";
 import { computeFragmentFingerprint } from "../../context/readWindowContinuation.js";
 import {
   buildMultiTargetMutationProofInput,
@@ -15,310 +49,71 @@ import {
   type VerificationLoopIntent,
   type VerificationResultObservation,
 } from "../../verification/result/boundary.js";
+import { redactReportText } from "../../core/security/redaction.js";
+import {
+  absoluteTargetPath,
+  fingerprint,
+  sanitizeId,
+  sanitizeTargetSummary,
+  unique,
+} from "../sanitize.js";
+import {
+  buildGraph,
+  latestQueueEntry,
+  observeStaleRead,
+  buildParallelEligibility,
+  conflict,
+  createExecutionGroups,
+  initialQueueState,
+  observeAuthority,
+  observeSnapshot,
+  queueBlocker,
+  queueObservation,
+} from "./observation.js";
+import {
+  allReadyTargetsApplied,
+  boundedGroupSize,
+  countState,
+  deterministicSettlementOrder,
+  groupTargetsApplied,
+  observeRepairEligibility,
+  settlementObservation,
+  targetReachedState,
+} from "./settlement.js";
 
-export type MultiTargetOperationKind =
-  | "read_only"
-  | "create"
-  | "update"
-  | "delete"
-  | "move"
-  | "unsupported"
-  | "unknown";
-
-export type MultiTargetClassificationStatus =
-  | MultiTargetOperationKind
-  | "authority_required"
-  | "blocked";
-
-export type MultiTargetConflictKind =
-  | "same_file_overlap"
-  | "overlapping_hunk"
-  | "stale_base"
-  | "missing_file"
-  | "path_escape"
-  | "unsupported_operation"
-  | "dependency_ordering"
-  | "snapshot_conflict"
-  | "unknown_conflict";
-
-export type MultiTargetAuthorityStatus = "granted" | "missing" | "partial" | "denied" | "blocked";
-export type MultiTargetStaleReadStatus = "not_run" | "passed" | "stale" | "target_missing" | "target_exists" | "blocked" | "failed";
-export type MultiTargetSnapshotStatus = "not_planned" | "planned" | "unavailable";
-export type MultiTargetQueueState =
-  | "planned"
-  | "ready"
-  | "skipped"
-  | "blocked"
-  | "applying"
-  | "applied"
-  | "failed"
-  | "reverted"
-  | "revert_failed"
-  | "unknown";
-export type MultiTargetGraphRelationKind =
-  | "independent"
-  | "dependency"
-  | "conflict"
-  | "blocked";
-export type MultiTargetParallelEligibilityStatus =
-  | "eligible"
-  | "forced_sequential"
-  | "blocked"
-  | "unsupported"
-  | "unknown"
-  | "authority_required"
-  | "stale"
-  | "conflict"
-  | "dependency_blocked"
-  | "snapshot_missing"
-  | "rollback_missing"
-  | "unsafe";
-export type MultiTargetGroupMode = "parallel" | "sequential" | "blocked";
-export type MultiTargetGroupStatus =
-  | "created"
-  | "ready"
-  | "applying"
-  | "settled"
-  | "failed"
-  | "skipped"
-  | "blocked";
-export type MultiTargetSettlementStatus =
-  | "applied"
-  | "failed"
-  | "skipped"
-  | "reverted"
-  | "revert_failed";
-export type MultiTargetVerificationStatus = VerificationResultObservation["status"];
-export type MultiTargetRepairEligibilityStatus = "eligible" | "not_eligible" | "not_needed" | "blocked";
-export type MultiTargetVerdictStatus = "complete" | "blocked" | "failed" | "partial" | "not_proven";
-
-export interface MultiTargetMutationTargetInput {
-  readonly targetId: string;
-  readonly relativePath: string;
-  readonly operation: MultiTargetOperationKind;
-  readonly expectedContent?: string;
-  readonly proposedContent?: string;
-  readonly repairContent?: string;
-  readonly reportSafeTargetSummary?: string;
-  readonly dependsOnTargetIds?: readonly string[];
-  readonly hunk?: {
-    readonly startLine: number;
-    readonly endLine: number;
-  };
-  readonly authority?: {
-    readonly status: Exclude<MultiTargetAuthorityStatus, "partial">;
-    readonly reason?: string;
-  };
-  readonly snapshot?: {
-    readonly available: boolean;
-    readonly reason?: string;
-  };
-  readonly verification?: {
-    readonly status: MultiTargetVerificationStatus;
-    readonly failureClass?: string;
-  };
-}
-
-export interface MultiTargetMutationInput {
-  readonly laneId: string;
-  readonly turnId: string;
-  readonly workspaceRoot: string;
-  readonly executionService: Pick<ExecutionService, "readTextFile" | "writeTextFile">;
-  readonly targets: readonly MultiTargetMutationTargetInput[];
-  readonly authority: {
-    readonly status: MultiTargetAuthorityStatus;
-    readonly reason?: string;
-  };
-  readonly parallel?: {
-    readonly enabled?: boolean;
-    readonly maxGroupSize?: number;
-  };
-  readonly verification: {
-    readonly wholeTaskStatus: MultiTargetVerificationStatus;
-    readonly failureClass?: string;
-  };
-  readonly recovery?: {
-    readonly rollbackOnPartialFailure?: boolean;
-    readonly repairTargetIds?: readonly string[];
-    readonly postRepairWholeTaskStatus?: MultiTargetVerificationStatus;
-  };
-  readonly notProvenClaims?: readonly string[];
-}
-
-export interface MultiTargetMutationPlan {
-  readonly planId: string;
-  readonly targetCount: number;
-  readonly operationKinds: readonly MultiTargetOperationKind[];
-  readonly parallelMutation: "unsupported" | "bounded";
-  readonly ordering: "sequential" | "bounded_parallel";
-  readonly maxGroupSize: number;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetClassification {
-  readonly targetId: string;
-  readonly targetSummary: string;
-  readonly operation: MultiTargetOperationKind;
-  readonly status: MultiTargetClassificationStatus;
-  readonly reason: string;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetConflict {
-  readonly conflictId: string;
-  readonly kind: MultiTargetConflictKind;
-  readonly targetIds: readonly string[];
-  readonly blocked: boolean;
-  readonly reason: string;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetAuthorityObservation {
-  readonly authorityId: string;
-  readonly status: MultiTargetAuthorityStatus;
-  readonly targetStatuses: readonly {
-    readonly targetId: string;
-    readonly status: Exclude<MultiTargetAuthorityStatus, "partial">;
-    readonly reason: string;
-  }[];
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetStaleReadObservation {
-  readonly staleReadId: string;
-  readonly targetId: string;
-  readonly status: MultiTargetStaleReadStatus;
-  readonly targetSummary: string;
-  readonly expectedFingerprint?: string;
-  readonly currentFingerprint?: string;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetSnapshotObservation {
-  readonly snapshotId: string;
-  readonly targetId: string;
-  readonly status: MultiTargetSnapshotStatus;
-  readonly restorePlanAvailable: boolean;
-  readonly targetSummary: string;
-  readonly contentFingerprint?: string;
-  readonly blocker?: string;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetQueueObservation {
-  readonly queueId: string;
-  readonly targetId: string;
-  readonly state: MultiTargetQueueState;
-  readonly targetSummary: string;
-  readonly order: number;
-  readonly blocker?: string;
-  readonly contentFingerprint?: string;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetGraphNode {
-  readonly nodeId: string;
-  readonly targetId: string;
-  readonly targetSummary: string;
-  readonly operation: MultiTargetOperationKind;
-  readonly relation: MultiTargetGraphRelationKind;
-  readonly conflictIds: readonly string[];
-  readonly dependsOnTargetIds: readonly string[];
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetParallelEligibility {
-  readonly eligibilityId: string;
-  readonly targetId: string;
-  readonly status: MultiTargetParallelEligibilityStatus;
-  readonly reason: string;
-  readonly groupable: boolean;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetExecutionGroup {
-  readonly groupId: string;
-  readonly mode: MultiTargetGroupMode;
-  readonly status: MultiTargetGroupStatus;
-  readonly targetIds: readonly string[];
-  readonly order: number;
-  readonly maxGroupSize: number;
-  readonly blockedReason?: string;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetSettlementObservation {
-  readonly settlementId: string;
-  readonly groupId: string;
-  readonly targetId: string;
-  readonly status: MultiTargetSettlementStatus;
-  readonly order: number;
-  readonly targetSummary: string;
-  readonly originalFailure?: string;
-  readonly contentFingerprint?: string;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetRollbackObservation {
-  readonly rollbackId: string;
-  readonly status: "not_required" | "required" | "succeeded" | "failed";
-  readonly targetIds: readonly string[];
-  readonly revertedTargetIds: readonly string[];
-  readonly failedTargetIds: readonly string[];
-  readonly preservesOriginalFailure: true;
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetRepairEligibility {
-  readonly eligibilityId: string;
-  readonly status: MultiTargetRepairEligibilityStatus;
-  readonly targetIds: readonly string[];
-  readonly originalFailureIds: readonly string[];
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
-
-export interface MultiTargetMutationProjection {
-  readonly laneId: string;
-  readonly turnId: string;
-  readonly plan: MultiTargetMutationPlan;
-  readonly classifications: readonly MultiTargetClassification[];
-  readonly conflicts: readonly MultiTargetConflict[];
-  readonly authority: MultiTargetAuthorityObservation;
-  readonly staleReads: readonly MultiTargetStaleReadObservation[];
-  readonly snapshots: readonly MultiTargetSnapshotObservation[];
-  readonly graph: readonly MultiTargetGraphNode[];
-  readonly parallelEligibility: readonly MultiTargetParallelEligibility[];
-  readonly executionGroups: readonly MultiTargetExecutionGroup[];
-  readonly queue: readonly MultiTargetQueueObservation[];
-  readonly settlements: readonly MultiTargetSettlementObservation[];
-  readonly rollback: MultiTargetRollbackObservation;
-  readonly verificationIntents: readonly VerificationLoopIntent[];
-  readonly verificationResults: readonly VerificationResultObservation[];
-  readonly groupVerificationIntents: readonly VerificationLoopIntent[];
-  readonly groupVerificationResults: readonly VerificationResultObservation[];
-  readonly wholeTaskVerificationIntent: VerificationLoopIntent;
-  readonly wholeTaskVerificationResult: VerificationResultObservation;
-  readonly repairEligibility: MultiTargetRepairEligibility;
-  readonly proofInput: MultiTargetMutationProofInput;
-  readonly resultVerdict: MultiTargetMutationTerminalProjection;
-  readonly verdictStatus: MultiTargetVerdictStatus;
-  readonly redactionStatus: "report-safe" | "redacted";
-  readonly terminalSuccessClaim: false;
-  readonly notProvenClaims: readonly string[];
-}
+export type {
+  MultiTargetOperationKind,
+  MultiTargetClassificationStatus,
+  MultiTargetConflictKind,
+  MultiTargetAuthorityStatus,
+  MultiTargetStaleReadStatus,
+  MultiTargetSnapshotStatus,
+  MultiTargetQueueState,
+  MultiTargetGraphRelationKind,
+  MultiTargetParallelEligibilityStatus,
+  MultiTargetGroupMode,
+  MultiTargetGroupStatus,
+  MultiTargetSettlementStatus,
+  MultiTargetVerificationStatus,
+  MultiTargetRepairEligibilityStatus,
+  MultiTargetVerdictStatus,
+  MultiTargetMutationTargetInput,
+  MultiTargetMutationInput,
+  MultiTargetMutationPlan,
+  MultiTargetClassification,
+  MultiTargetConflict,
+  MultiTargetAuthorityObservation,
+  MultiTargetStaleReadObservation,
+  MultiTargetSnapshotObservation,
+  MultiTargetQueueObservation,
+  MultiTargetGraphNode,
+  MultiTargetParallelEligibility,
+  MultiTargetExecutionGroup,
+  MultiTargetSettlementObservation,
+  MultiTargetRollbackObservation,
+  MultiTargetRepairEligibility,
+  MultiTargetMutationProjection,
+} from "./types.js";
 
 export async function runControlledMultiTargetMutation(
   input: MultiTargetMutationInput,
@@ -347,16 +142,22 @@ export async function runControlledMultiTargetMutation(
     ...(input.notProvenClaims ?? []),
   ]);
   const plan = createPlan({ laneId, input, notProvenClaims });
-  const classifications = input.targets.map((target) =>
-    classifyTarget({ laneId, workspaceRoot: input.workspaceRoot, target, notProvenClaims })
-  );
+  const classifiedTargets = input.targets.map((target) => ({
+    target,
+    classification: classifyTarget({
+      laneId,
+      workspaceRoot: input.workspaceRoot,
+      target,
+      notProvenClaims,
+    }),
+  }));
+  const classifications = classifiedTargets.map((pair) => pair.classification);
   const conflicts = detectConflicts({ laneId, input, classifications, notProvenClaims });
   const authority = observeAuthority({ laneId, input, classifications, notProvenClaims });
   const staleReads: MultiTargetStaleReadObservation[] = [];
   const snapshots: MultiTargetSnapshotObservation[] = [];
   const queue: MultiTargetQueueObservation[] = [];
-  for (const [index, target] of input.targets.entries()) {
-    const classification = classifications[index]!;
+  for (const [index, { target, classification }] of classifiedTargets.entries()) {
     const targetConflicts = conflicts.filter((conflict) =>
       conflict.targetIds.includes(target.targetId) && conflict.blocked
     );
@@ -445,7 +246,8 @@ export async function runControlledMultiTargetMutation(
     notProvenClaims,
   });
   for (const targetId of rollback.revertedTargetIds) {
-    const target = input.targets.find((item) => item.targetId === targetId)!;
+    const target = input.targets.find((item) => item.targetId === targetId);
+    if (!target) continue;
     const targetSummary = sanitizeTargetSummary(target.reportSafeTargetSummary ?? target.relativePath);
     queue.push(queueObservation({
       laneId,
@@ -466,7 +268,8 @@ export async function runControlledMultiTargetMutation(
     }));
   }
   for (const targetId of rollback.failedTargetIds) {
-    const target = input.targets.find((item) => item.targetId === targetId)!;
+    const target = input.targets.find((item) => item.targetId === targetId);
+    if (!target) continue;
     const targetSummary = sanitizeTargetSummary(target.reportSafeTargetSummary ?? target.relativePath);
     queue.push(queueObservation({
       laneId,
@@ -501,7 +304,7 @@ export async function runControlledMultiTargetMutation(
     })
   );
   const verificationResults = verificationIntents.map((intent, index) => {
-    const target = input.targets[index]!;
+    const target = input.targets[index] ?? missingTargetAt("verification intent", index);
     const applied = targetReachedState(queue, target.targetId, "applied");
     return observeVerificationResult({
       intent,
@@ -532,11 +335,13 @@ export async function runControlledMultiTargetMutation(
       })
     );
   const groupVerificationResults = groupVerificationIntents.map((intent, index) => {
-    const group = executionGroups.filter((item) => item.mode !== "blocked")[index]!;
+    const group = executionGroups.filter((item) => item.mode !== "blocked")[index]
+      ?? missingTargetAt("execution group", index);
     const applied = groupTargetsApplied(queue, group);
+    const targetIds = input.targets.map((item) => sanitizeId(item.targetId));
     const groupTargetStatuses = group.targetIds.map((targetId) =>
       verificationResults.find((item, targetIndex) =>
-        sanitizeId(input.targets[targetIndex]!.targetId) === targetId
+        targetIds[targetIndex] === targetId
       )?.status ?? "blocked"
     );
     const failed = groupTargetStatuses.some((status) => status === "failed");
@@ -615,9 +420,9 @@ export async function runControlledMultiTargetMutation(
     notProvenClaims,
   });
   const resultVerdict = projectMultiTargetMutationVerdict({ proofInput, notProvenClaims });
-  return deepFreeze({
+  return freezeDeep({
     laneId,
-    turnId: sanitizeText(input.turnId, 180),
+    turnId: redactReportText(input.turnId, 180),
     plan,
     classifications,
     conflicts,
@@ -671,7 +476,7 @@ function createPlan(input: {
   readonly input: MultiTargetMutationInput;
   readonly notProvenClaims: readonly string[];
 }): MultiTargetMutationPlan {
-  return deepFreeze({
+  return freezeDeep({
     planId: `${input.laneId}:plan`,
     targetCount: input.input.targets.length,
     operationKinds: unique(input.input.targets.map((target) => target.operation)),
@@ -713,7 +518,7 @@ function classifyTarget(input: {
       : status === "authority_required"
         ? "target authority missing"
         : "target classified";
-  return deepFreeze({
+  return freezeDeep({
     targetId: sanitizeId(input.target.targetId),
     targetSummary: sanitizeTargetSummary(
       input.target.reportSafeTargetSummary ?? input.target.relativePath,
@@ -734,7 +539,7 @@ function detectConflicts(input: {
 }): readonly MultiTargetConflict[] {
   const conflicts: MultiTargetConflict[] = [];
   for (const [index, target] of input.input.targets.entries()) {
-    const classification = input.classifications[index]!;
+    const classification = input.classifications[index] ?? missingClassification(target.targetId);
     if (classification.status === "blocked") {
       conflicts.push(conflict({
         laneId: input.laneId,
@@ -766,10 +571,8 @@ function detectConflicts(input: {
       }));
     }
   }
-  for (let leftIndex = 0; leftIndex < input.input.targets.length; leftIndex += 1) {
-    const left = input.input.targets[leftIndex]!;
-    for (let rightIndex = leftIndex + 1; rightIndex < input.input.targets.length; rightIndex += 1) {
-      const right = input.input.targets[rightIndex]!;
+  input.input.targets.forEach((left, leftIndex) => {
+    for (const right of input.input.targets.slice(leftIndex + 1)) {
       if (normalizedPath(left.relativePath) !== normalizedPath(right.relativePath)) {
         continue;
       }
@@ -790,7 +593,7 @@ function detectConflicts(input: {
         }));
       }
     }
-  }
+  });
   for (const target of input.input.targets) {
     for (const dependencyId of target.dependsOnTargetIds ?? []) {
       const dependency = input.input.targets.find((item) => item.targetId === dependencyId);
@@ -805,430 +608,18 @@ function detectConflicts(input: {
       }
     }
   }
-  return deepFreeze(conflicts);
+  return freezeDeep(conflicts);
 }
 
-function conflict(input: {
-  readonly laneId: string;
-  readonly kind: MultiTargetConflictKind;
-  readonly targetIds: readonly string[];
-  readonly reason: string;
-  readonly notProvenClaims: readonly string[];
-}): MultiTargetConflict {
-  return deepFreeze({
-    conflictId: `${input.laneId}:conflict:${input.kind}:${input.targetIds.map(sanitizeId).join("+")}`,
-    kind: input.kind,
-    targetIds: input.targetIds.map(sanitizeId),
-    blocked: true,
-    reason: sanitizeText(input.reason, 180),
-    terminalSuccessClaim: false,
-    notProvenClaims: unique(["conflict-check-is-not-success", ...input.notProvenClaims]),
-  });
-}
 
-function observeAuthority(input: {
-  readonly laneId: string;
-  readonly input: MultiTargetMutationInput;
-  readonly classifications: readonly MultiTargetClassification[];
-  readonly notProvenClaims: readonly string[];
-}): MultiTargetAuthorityObservation {
-  const targetStatuses = input.input.targets.map((target, index) => {
-    const status = input.input.authority.status === "granted"
-      ? target.authority?.status ?? "granted"
-      : input.input.authority.status === "partial"
-        ? target.authority?.status ?? "missing"
-        : input.input.authority.status;
-    return {
-      targetId: sanitizeId(target.targetId),
-      status: status as Exclude<MultiTargetAuthorityStatus, "partial">,
-      reason: sanitizeText(
-        target.authority?.reason ?? input.input.authority.reason ??
-          (status === "granted" ? "explicit multi-target authority granted" : "mutation authority unavailable"),
-        180,
-      ),
-    };
-  });
-  const blockedByClassification = input.classifications.some((item) =>
-    item.status === "authority_required" || item.status === "blocked"
-  );
-  const status = blockedByClassification
-    ? "blocked"
-    : input.input.authority.status === "partial" ||
-        targetStatuses.some((item) => item.status !== "granted")
-      ? "partial"
-      : input.input.authority.status;
-  return deepFreeze({
-    authorityId: `${input.laneId}:authority`,
-    status,
-    targetStatuses,
-    terminalSuccessClaim: false,
-    notProvenClaims: unique(["authority-is-not-success", ...input.notProvenClaims]),
-  });
-}
 
-async function observeStaleRead(input: {
-  readonly laneId: string;
-  readonly input: MultiTargetMutationInput;
-  readonly target: MultiTargetMutationTargetInput;
-  readonly classification: MultiTargetClassification;
-  readonly targetAuthority?: MultiTargetAuthorityObservation["targetStatuses"][number];
-  readonly targetConflicts: readonly MultiTargetConflict[];
-  readonly notProvenClaims: readonly string[];
-}): Promise<MultiTargetStaleReadObservation> {
-  const targetSummary = sanitizeTargetSummary(
-    input.target.reportSafeTargetSummary ?? input.target.relativePath,
-  );
-  const expectedFingerprint = input.target.expectedContent !== undefined
-    ? fingerprint(input.target.expectedContent)
-    : undefined;
-  if (
-    input.classification.status === "blocked" ||
-    input.targetConflicts.length > 0 ||
-    input.targetAuthority?.status !== "granted"
-  ) {
-    return deepFreeze({
-      staleReadId: `${input.laneId}:stale-read:${sanitizeId(input.target.targetId)}`,
-      targetId: sanitizeId(input.target.targetId),
-      status: "blocked",
-      targetSummary,
-      ...(expectedFingerprint ? { expectedFingerprint } : {}),
-      terminalSuccessClaim: false,
-      notProvenClaims: unique(["stale-read-blocked-is-not-success", ...input.notProvenClaims]),
-    });
-  }
-  try {
-    const current = await input.input.executionService.readTextFile({
-      operationKind: "file.read",
-      absolutePath: absoluteTargetPath(input.input.workspaceRoot, input.target.relativePath),
-      workspaceRoot: input.input.workspaceRoot,
-      authority: {
-        mode: "approved-for-write",
-        source: "workspace-authority",
-        reason: "final stale-read before controlled multi-target mutation",
-      },
-      caller: "edit-multifile",
-      reason: "final stale-read before controlled multi-target mutation",
-      reportSafeTarget: targetSummary,
-    });
-    const currentFingerprint = fingerprint(current);
-    if (input.target.operation === "create") {
-      return deepFreeze({
-        staleReadId: `${input.laneId}:stale-read:${sanitizeId(input.target.targetId)}`,
-        targetId: sanitizeId(input.target.targetId),
-        status: "target_exists",
-        targetSummary,
-        currentFingerprint,
-        terminalSuccessClaim: false,
-        notProvenClaims: unique(["create-target-exists-is-not-success", ...input.notProvenClaims]),
-      });
-    }
-    return deepFreeze({
-      staleReadId: `${input.laneId}:stale-read:${sanitizeId(input.target.targetId)}`,
-      targetId: sanitizeId(input.target.targetId),
-      status: current === input.target.expectedContent ? "passed" : "stale",
-      targetSummary,
-      ...(expectedFingerprint ? { expectedFingerprint } : {}),
-      currentFingerprint,
-      terminalSuccessClaim: false,
-      notProvenClaims: unique(["stale-read-passed-is-not-success", ...input.notProvenClaims]),
-    });
-  } catch {
-    const status = input.target.operation === "create" ? "passed" : "target_missing";
-    return deepFreeze({
-      staleReadId: `${input.laneId}:stale-read:${sanitizeId(input.target.targetId)}`,
-      targetId: sanitizeId(input.target.targetId),
-      status,
-      targetSummary,
-      ...(expectedFingerprint ? { expectedFingerprint } : {}),
-      terminalSuccessClaim: false,
-      notProvenClaims: unique([
-        status === "passed" ? "create-missing-target-is-not-success" : "missing-file-is-not-success",
-        ...input.notProvenClaims,
-      ]),
-    });
-  }
-}
 
-function observeSnapshot(input: {
-  readonly laneId: string;
-  readonly target: MultiTargetMutationTargetInput;
-  readonly staleRead: MultiTargetStaleReadObservation;
-  readonly targetConflicts: readonly MultiTargetConflict[];
-  readonly notProvenClaims: readonly string[];
-}): MultiTargetSnapshotObservation {
-  const targetSummary = sanitizeTargetSummary(
-    input.target.reportSafeTargetSummary ?? input.target.relativePath,
-  );
-  if (input.staleRead.status !== "passed" || input.targetConflicts.length > 0) {
-    return deepFreeze({
-      snapshotId: `${input.laneId}:snapshot:${sanitizeId(input.target.targetId)}`,
-      targetId: sanitizeId(input.target.targetId),
-      status: "not_planned",
-      restorePlanAvailable: false,
-      targetSummary,
-      blocker: input.targetConflicts[0]?.kind ?? `stale-read:${input.staleRead.status}`,
-      terminalSuccessClaim: false,
-      notProvenClaims: unique(["snapshot-not-planned-is-not-success", ...input.notProvenClaims]),
-    });
-  }
-  if (input.target.snapshot?.available === false) {
-    return deepFreeze({
-      snapshotId: `${input.laneId}:snapshot:${sanitizeId(input.target.targetId)}`,
-      targetId: sanitizeId(input.target.targetId),
-      status: "unavailable",
-      restorePlanAvailable: false,
-      targetSummary,
-      blocker: sanitizeText(input.target.snapshot.reason ?? "snapshot unavailable", 160),
-      terminalSuccessClaim: false,
-      notProvenClaims: unique(["snapshot-unavailable-is-not-success", ...input.notProvenClaims]),
-    });
-  }
-  return deepFreeze({
-    snapshotId: `${input.laneId}:snapshot:${sanitizeId(input.target.targetId)}`,
-    targetId: sanitizeId(input.target.targetId),
-    status: "planned",
-    restorePlanAvailable: true,
-    targetSummary,
-    contentFingerprint: fingerprint(input.target.expectedContent ?? ""),
-    terminalSuccessClaim: false,
-    notProvenClaims: unique(["snapshot-planned-is-not-success", ...input.notProvenClaims]),
-  });
-}
 
-function initialQueueState(input: {
-  readonly classification: MultiTargetClassification;
-  readonly targetAuthority?: MultiTargetAuthorityObservation["targetStatuses"][number];
-  readonly targetConflicts: readonly MultiTargetConflict[];
-  readonly staleRead: MultiTargetStaleReadObservation;
-  readonly snapshot: MultiTargetSnapshotObservation;
-}): MultiTargetQueueState {
-  if (input.targetConflicts.some((item) => item.kind === "dependency_ordering")) return "skipped";
-  if (
-    input.classification.status === "blocked" ||
-    input.classification.status === "authority_required" ||
-    input.targetAuthority?.status !== "granted" ||
-    input.targetConflicts.length > 0 ||
-    input.staleRead.status !== "passed" ||
-    input.snapshot.status !== "planned"
-  ) {
-    return "blocked";
-  }
-  if (
-    input.classification.operation === "delete" ||
-    input.classification.operation === "move" ||
-    input.classification.operation === "unsupported" ||
-    input.classification.operation === "unknown" ||
-    input.classification.operation === "read_only"
-  ) {
-    return "blocked";
-  }
-  return "ready";
-}
 
-function queueBlocker(input: {
-  readonly classification: MultiTargetClassification;
-  readonly targetAuthority?: MultiTargetAuthorityObservation["targetStatuses"][number];
-  readonly targetConflicts: readonly MultiTargetConflict[];
-  readonly staleRead: MultiTargetStaleReadObservation;
-  readonly snapshot: MultiTargetSnapshotObservation;
-}): string | undefined {
-  if (input.targetConflicts[0]) return input.targetConflicts[0].kind;
-  if (input.targetAuthority?.status !== "granted") return `authority:${input.targetAuthority?.status ?? "missing"}`;
-  if (input.staleRead.status !== "passed") return `stale-read:${input.staleRead.status}`;
-  if (input.snapshot.status !== "planned") return `snapshot:${input.snapshot.status}`;
-  if (input.classification.status !== input.classification.operation) return input.classification.status;
-  if (
-    input.classification.operation === "delete" || input.classification.operation === "move" ||
-    input.classification.operation === "unsupported" || input.classification.operation === "unknown" ||
-    input.classification.operation === "read_only"
-  ) {
-    return `operation:${input.classification.operation}`;
-  }
-  return undefined;
-}
 
-function queueObservation(input: {
-  readonly laneId: string;
-  readonly target: MultiTargetMutationTargetInput;
-  readonly state: MultiTargetQueueState;
-  readonly targetSummary: string;
-  readonly order: number;
-  readonly blocker?: string;
-  readonly contentFingerprint?: string;
-  readonly notProvenClaims: readonly string[];
-}): MultiTargetQueueObservation {
-  return deepFreeze({
-    queueId: `${input.laneId}:queue:${sanitizeId(input.target.targetId)}:${input.order}`,
-    targetId: sanitizeId(input.target.targetId),
-    state: input.state,
-    targetSummary: input.targetSummary,
-    order: input.order,
-    ...(input.blocker ? { blocker: sanitizeText(input.blocker, 160) } : {}),
-    ...(input.contentFingerprint ? { contentFingerprint: input.contentFingerprint } : {}),
-    terminalSuccessClaim: false,
-    notProvenClaims: unique([`queue-${input.state}-is-not-success`, ...input.notProvenClaims]),
-  });
-}
 
-function buildGraph(input: {
-  readonly laneId: string;
-  readonly input: MultiTargetMutationInput;
-  readonly classifications: readonly MultiTargetClassification[];
-  readonly conflicts: readonly MultiTargetConflict[];
-  readonly notProvenClaims: readonly string[];
-}): readonly MultiTargetGraphNode[] {
-  return deepFreeze(input.input.targets.map((target, index) => {
-    const targetId = sanitizeId(target.targetId);
-    const targetConflicts = input.conflicts.filter((item) => item.targetIds.includes(targetId));
-    const classification = input.classifications[index]!;
-    const dependsOnTargetIds = (target.dependsOnTargetIds ?? []).map(sanitizeId);
-    const relation: MultiTargetGraphRelationKind = targetConflicts.length > 0
-      ? targetConflicts.some((item) => item.kind === "dependency_ordering")
-        ? "blocked"
-        : "conflict"
-      : dependsOnTargetIds.length > 0
-        ? "dependency"
-        : "independent";
-    return {
-      nodeId: `${input.laneId}:graph:${targetId}`,
-      targetId,
-      targetSummary: sanitizeTargetSummary(target.reportSafeTargetSummary ?? target.relativePath),
-      operation: classification.operation,
-      relation,
-      conflictIds: targetConflicts.map((item) => item.conflictId),
-      dependsOnTargetIds,
-      terminalSuccessClaim: false,
-      notProvenClaims: unique(["mutation-graph-is-not-success", ...input.notProvenClaims]),
-    };
-  }));
-}
 
-function buildParallelEligibility(input: {
-  readonly laneId: string;
-  readonly input: MultiTargetMutationInput;
-  readonly classifications: readonly MultiTargetClassification[];
-  readonly conflicts: readonly MultiTargetConflict[];
-  readonly authority: MultiTargetAuthorityObservation;
-  readonly staleReads: readonly MultiTargetStaleReadObservation[];
-  readonly snapshots: readonly MultiTargetSnapshotObservation[];
-  readonly queue: readonly MultiTargetQueueObservation[];
-  readonly notProvenClaims: readonly string[];
-}): readonly MultiTargetParallelEligibility[] {
-  return deepFreeze(input.input.targets.map((target, index) => {
-    const targetId = sanitizeId(target.targetId);
-    const classification = input.classifications[index]!;
-    const targetAuthority = input.authority.targetStatuses[index];
-    const staleRead = input.staleReads[index]!;
-    const snapshot = input.snapshots[index]!;
-    const queueEntry = latestQueueEntry(input.queue, targetId);
-    const targetConflicts = input.conflicts.filter((item) => item.targetIds.includes(targetId));
-    const status = parallelEligibilityStatus({
-      target,
-      classification,
-      targetAuthority,
-      staleRead,
-      snapshot,
-      queueEntry,
-      targetConflicts,
-    });
-    const groupable = input.input.parallel?.enabled === true && status === "eligible";
-    return {
-      eligibilityId: `${input.laneId}:eligibility:${targetId}`,
-      targetId,
-      status,
-      reason: parallelEligibilityReason(status, targetConflicts, staleRead, snapshot, targetAuthority),
-      groupable,
-      terminalSuccessClaim: false,
-      notProvenClaims: unique([
-        `parallel-eligibility-${status}-is-not-success`,
-        ...input.notProvenClaims,
-      ]),
-    };
-  }));
-}
 
-function createExecutionGroups(input: {
-  readonly laneId: string;
-  readonly input: MultiTargetMutationInput;
-  readonly queue: readonly MultiTargetQueueObservation[];
-  readonly parallelEligibility: readonly MultiTargetParallelEligibility[];
-  readonly maxGroupSize: number;
-  readonly notProvenClaims: readonly string[];
-}): readonly MultiTargetExecutionGroup[] {
-  const groups: MultiTargetExecutionGroup[] = [];
-  const readyTargets = input.input.targets.filter((target) =>
-    latestQueueEntry(input.queue, target.targetId)?.state === "ready"
-  );
-  if (!input.input.parallel?.enabled) {
-    for (const target of readyTargets) {
-      groups.push(executionGroup({
-        laneId: input.laneId,
-        mode: "sequential",
-        status: "ready",
-        targetIds: [target.targetId],
-        order: groups.length,
-        maxGroupSize: 1,
-        notProvenClaims: input.notProvenClaims,
-      }));
-    }
-    return deepFreeze(groups);
-  }
-
-  let pendingParallel: string[] = [];
-  const flushParallel = (): void => {
-    if (pendingParallel.length === 0) return;
-    groups.push(executionGroup({
-      laneId: input.laneId,
-      mode: "parallel",
-      status: "ready",
-      targetIds: pendingParallel,
-      order: groups.length,
-      maxGroupSize: input.maxGroupSize,
-      notProvenClaims: input.notProvenClaims,
-    }));
-    pendingParallel = [];
-  };
-
-  for (const target of readyTargets) {
-    const eligibility = input.parallelEligibility.find((item) =>
-      item.targetId === sanitizeId(target.targetId)
-    );
-    if (eligibility?.groupable) {
-      pendingParallel.push(target.targetId);
-      if (pendingParallel.length >= input.maxGroupSize) {
-        flushParallel();
-      }
-      continue;
-    }
-    flushParallel();
-    groups.push(executionGroup({
-      laneId: input.laneId,
-      mode: "sequential",
-      status: "ready",
-      targetIds: [target.targetId],
-      order: groups.length,
-      maxGroupSize: 1,
-      notProvenClaims: input.notProvenClaims,
-    }));
-  }
-  flushParallel();
-
-  for (const blocked of input.parallelEligibility.filter((item) =>
-    item.status !== "eligible" && latestQueueEntry(input.queue, item.targetId)?.state !== "ready"
-  )) {
-    groups.push(executionGroup({
-      laneId: input.laneId,
-      mode: "blocked",
-      status: "blocked",
-      targetIds: [blocked.targetId],
-      order: groups.length,
-      maxGroupSize: input.maxGroupSize,
-      blockedReason: blocked.status,
-      notProvenClaims: input.notProvenClaims,
-    }));
-  }
-  return deepFreeze(groups);
-}
 
 async function applyExecutionGroups(input: {
   readonly laneId: string;
@@ -1273,7 +664,7 @@ async function applyExecutionGroups(input: {
       continue;
     }
     for (const target of targets) {
-      const latest = latestQueueEntry(input.queue, target.targetId)!;
+      const latest = latestQueueEntry(input.queue, target.targetId) ?? missingQueueEntry(target.targetId);
       input.queue.push(queueObservation({
         laneId: input.laneId,
         target,
@@ -1284,13 +675,13 @@ async function applyExecutionGroups(input: {
       }));
     }
     const attempts = await Promise.allSettled(targets.map((target) => {
-      const latest = latestQueueEntry(input.queue, target.targetId)!;
+      const latest = latestQueueEntry(input.queue, target.targetId) ?? missingQueueEntry(target.targetId);
       return applyTarget({ input: input.input, target, laneId: input.laneId, targetSummary: latest.targetSummary });
     }));
     let groupFailed = false;
     for (const [index, target] of targets.entries()) {
-      const latest = latestQueueEntry(input.queue, target.targetId)!;
-      const attempt = attempts[index]!;
+      const latest = latestQueueEntry(input.queue, target.targetId) ?? missingQueueEntry(target.targetId);
+      const attempt = attempts[index] ?? missingQueueEntry(target.targetId);
       if (attempt.status === "fulfilled") {
         appliedTargets.push(target);
         const contentFingerprint = fingerprint(target.proposedContent ?? "");
@@ -1316,7 +707,7 @@ async function applyExecutionGroups(input: {
       } else {
         groupFailed = true;
         const originalFailure = attempt.reason instanceof Error
-          ? sanitizeText(attempt.reason.name, 80)
+          ? redactReportText(attempt.reason.name, 80)
           : "unknown";
         input.queue.push(queueObservation({
           laneId: input.laneId,
@@ -1346,114 +737,10 @@ async function applyExecutionGroups(input: {
   return appliedTargets;
 }
 
-function executionGroup(input: {
-  readonly laneId: string;
-  readonly mode: MultiTargetGroupMode;
-  readonly status: MultiTargetGroupStatus;
-  readonly targetIds: readonly string[];
-  readonly order: number;
-  readonly maxGroupSize: number;
-  readonly blockedReason?: string;
-  readonly notProvenClaims: readonly string[];
-}): MultiTargetExecutionGroup {
-  return deepFreeze({
-    groupId: `${input.laneId}:group:${input.order}`,
-    mode: input.mode,
-    status: input.status,
-    targetIds: input.targetIds.map(sanitizeId),
-    order: input.order,
-    maxGroupSize: input.maxGroupSize,
-    ...(input.blockedReason ? { blockedReason: sanitizeText(input.blockedReason, 160) } : {}),
-    terminalSuccessClaim: false,
-    notProvenClaims: unique([`group-${input.status}-is-not-success`, ...input.notProvenClaims]),
-  });
-}
 
-function settlementObservation(input: {
-  readonly laneId: string;
-  readonly groupId: string;
-  readonly target: MultiTargetMutationTargetInput;
-  readonly status: MultiTargetSettlementStatus;
-  readonly order: number;
-  readonly targetSummary: string;
-  readonly originalFailure?: string;
-  readonly contentFingerprint?: string;
-  readonly notProvenClaims: readonly string[];
-}): MultiTargetSettlementObservation {
-  return deepFreeze({
-    settlementId: `${input.laneId}:settlement:${sanitizeId(input.target.targetId)}:${input.order}`,
-    groupId: input.groupId,
-    targetId: sanitizeId(input.target.targetId),
-    status: input.status,
-    order: input.order,
-    targetSummary: input.targetSummary,
-    ...(input.originalFailure ? { originalFailure: sanitizeText(input.originalFailure, 120) } : {}),
-    ...(input.contentFingerprint ? { contentFingerprint: input.contentFingerprint } : {}),
-    terminalSuccessClaim: false,
-    notProvenClaims: unique([`settlement-${input.status}-is-not-success`, ...input.notProvenClaims]),
-  });
-}
 
-function parallelEligibilityStatus(input: {
-  readonly target: MultiTargetMutationTargetInput;
-  readonly classification: MultiTargetClassification;
-  readonly targetAuthority?: MultiTargetAuthorityObservation["targetStatuses"][number];
-  readonly staleRead: MultiTargetStaleReadObservation;
-  readonly snapshot: MultiTargetSnapshotObservation;
-  readonly queueEntry?: MultiTargetQueueObservation;
-  readonly targetConflicts: readonly MultiTargetConflict[];
-}): MultiTargetParallelEligibilityStatus {
-  if (input.classification.status === "blocked") return "unsafe";
-  if (input.targetConflicts.some((item) => item.kind === "dependency_ordering")) return "dependency_blocked";
-  if (input.targetConflicts.some((item) => item.kind === "unsupported_operation")) {
-    return input.target.operation === "unknown" ? "unknown" : "unsupported";
-  }
-  if (input.targetConflicts.length > 0) return "conflict";
-  if (input.classification.status === "authority_required" || input.targetAuthority?.status !== "granted") {
-    return "authority_required";
-  }
-  if (input.staleRead.status === "stale" || input.staleRead.status === "target_missing" ||
-      input.staleRead.status === "target_exists") {
-    return "stale";
-  }
-  if (input.staleRead.status !== "passed") return "blocked";
-  if (input.snapshot.status === "unavailable") return "snapshot_missing";
-  if (input.snapshot.status !== "planned") return "blocked";
-  if (!input.snapshot.restorePlanAvailable) return "rollback_missing";
-  if (
-    input.target.operation === "delete" || input.target.operation === "move" ||
-    input.target.operation === "unsupported"
-  ) {
-    return "unsupported";
-  }
-  if (input.target.operation === "unknown" || input.queueEntry?.state === "unknown") return "unknown";
-  if (input.queueEntry?.state !== "ready") return "blocked";
-  if ((input.target.dependsOnTargetIds?.length ?? 0) > 0) return "forced_sequential";
-  return "eligible";
-}
 
-function parallelEligibilityReason(
-  status: MultiTargetParallelEligibilityStatus,
-  conflicts: readonly MultiTargetConflict[],
-  staleRead: MultiTargetStaleReadObservation,
-  snapshot: MultiTargetSnapshotObservation,
-  targetAuthority?: MultiTargetAuthorityObservation["targetStatuses"][number],
-): string {
-  if (conflicts[0]) return sanitizeText(conflicts[0].kind, 160);
-  if (targetAuthority?.status !== "granted") return `authority:${targetAuthority?.status ?? "missing"}`;
-  if (staleRead.status !== "passed") return `stale-read:${staleRead.status}`;
-  if (snapshot.status !== "planned") return `snapshot:${snapshot.status}`;
-  return status === "eligible"
-    ? "target independent and bounded group eligible"
-    : status === "forced_sequential"
-      ? "target dependency requires deterministic ordering"
-      : status;
-}
 
-function boundedGroupSize(value: number | undefined): number {
-  if (!Number.isFinite(value)) return 2;
-  return Math.max(1, Math.min(8, Math.floor(value ?? 2)));
-}
 
 async function applyTarget(input: {
   readonly input: MultiTargetMutationInput;
@@ -1488,7 +775,7 @@ async function observeRollback(input: {
   readonly notProvenClaims: readonly string[];
 }): Promise<MultiTargetRollbackObservation> {
   if (!input.required) {
-    return deepFreeze({
+    return freezeDeep({
       rollbackId: `${input.laneId}:rollback`,
       status: "not_required",
       targetIds: input.appliedTargets.map((target) => sanitizeId(target.targetId)),
@@ -1526,7 +813,7 @@ async function observeRollback(input: {
       failedTargetIds.push(sanitizeId(target.targetId));
     }
   }
-  return deepFreeze({
+  return freezeDeep({
     rollbackId: `${input.laneId}:rollback`,
     status: failedTargetIds.length > 0 ? "failed" : "succeeded",
     targetIds: input.appliedTargets.map((target) => sanitizeId(target.targetId)),
@@ -1544,107 +831,12 @@ async function observeRollback(input: {
   });
 }
 
-function observeRepairEligibility(input: {
-  readonly laneId: string;
-  readonly verificationResults: readonly VerificationResultObservation[];
-  readonly wholeTaskVerificationResult: VerificationResultObservation;
-  readonly repairTargetIds: readonly string[];
-  readonly notProvenClaims: readonly string[];
-}): MultiTargetRepairEligibility {
-  const originalFailureIds = [
-    ...input.verificationResults.filter((item) => item.status === "failed").map((item) => item.verificationId),
-    ...(input.wholeTaskVerificationResult.status === "failed"
-      ? [input.wholeTaskVerificationResult.verificationId]
-      : []),
-  ];
-  const status: MultiTargetRepairEligibilityStatus = originalFailureIds.length === 0
-    ? "not_needed"
-    : input.repairTargetIds.length > 0
-      ? "eligible"
-      : "not_eligible";
-  return deepFreeze({
-    eligibilityId: `${input.laneId}:repair-eligibility`,
-    status,
-    targetIds: input.repairTargetIds.map(sanitizeId),
-    originalFailureIds,
-    terminalSuccessClaim: false,
-    notProvenClaims: unique([
-      "repair-eligibility-is-not-success",
-      "original-failures-preserved",
-      ...input.notProvenClaims,
-    ]),
-  });
-}
 
-function targetReachedState(
-  queue: readonly MultiTargetQueueObservation[],
-  targetId: string,
-  state: MultiTargetQueueState,
-): boolean {
-  return queue.some((item) => item.targetId === sanitizeId(targetId) && item.state === state);
-}
 
-function latestQueueEntry(
-  queue: readonly MultiTargetQueueObservation[],
-  targetId: string,
-): MultiTargetQueueObservation | undefined {
-  const sanitizedTargetId = sanitizeId(targetId);
-  for (let index = queue.length - 1; index >= 0; index -= 1) {
-    const item = queue[index];
-    if (item?.targetId === sanitizedTargetId) {
-      return item;
-    }
-  }
-  return undefined;
-}
 
-function allReadyTargetsApplied(
-  queue: readonly MultiTargetQueueObservation[],
-  targets: readonly MultiTargetMutationTargetInput[],
-): boolean {
-  const readyTargetIds = new Set(
-    queue.filter((item) => item.state === "ready").map((item) => item.targetId),
-  );
-  if (readyTargetIds.size === 0) {
-    return false;
-  }
-  return targets.every((target) => {
-    const targetId = sanitizeId(target.targetId);
-    return !readyTargetIds.has(targetId) || targetReachedState(queue, targetId, "applied");
-  });
-}
 
-function groupTargetsApplied(
-  queue: readonly MultiTargetQueueObservation[],
-  group: MultiTargetExecutionGroup,
-): boolean {
-  return group.targetIds.length > 0 &&
-    group.targetIds.every((targetId) => targetReachedState(queue, targetId, "applied"));
-}
 
-function deterministicSettlementOrder(input: {
-  readonly input: MultiTargetMutationInput;
-  readonly settlements: readonly MultiTargetSettlementObservation[];
-}): boolean {
-  const finalTargetOrder = input.settlements
-    .filter((item) => item.status === "applied" || item.status === "failed" || item.status === "skipped")
-    .map((item) => item.targetId);
-  const expectedOrder = input.input.targets
-    .map((target) => sanitizeId(target.targetId))
-    .filter((targetId) => finalTargetOrder.includes(targetId));
-  return finalTargetOrder.every((targetId, index) => targetId === expectedOrder[index]);
-}
 
-function countState(
-  queue: readonly MultiTargetQueueObservation[],
-  state: MultiTargetQueueState,
-): number {
-  return queue.filter((item) => item.state === state).length;
-}
-
-function absoluteTargetPath(workspaceRoot: string, relativePath: string): string {
-  return path.resolve(workspaceRoot, relativePath);
-}
 
 function pathEscapes(workspaceRoot: string, relativePath: string): boolean {
   const root = path.resolve(workspaceRoot);
@@ -1663,48 +855,14 @@ function rangesOverlap(
   return left.startLine <= right.endLine && right.startLine <= left.endLine;
 }
 
-function fingerprint(content: string): string {
-  return computeFragmentFingerprint(content).slice(0, 16);
+function missingClassification(targetId: string): never {
+  throw new Error(`Missing classification for target: ${targetId}`);
 }
 
-function sanitizeTargetSummary(value: string): string {
-  return sanitizeText(value, 160).replace(/\b(oldText|newText)\b/gi, "raw-content");
+function missingQueueEntry(targetId: string): never {
+  throw new Error(`Missing queue entry for target: ${targetId}`);
 }
 
-function sanitizeId(value: string): string {
-  return sanitizeText(value, 160)
-    .toLowerCase()
-    .replace(/[^a-z0-9._:-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function sanitizeText(value: string, maxLength: number): string {
-  return value
-    .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
-    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
-    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[secret-redacted]")
-    .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]")
-    .replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]")
-    .replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]")
-    .replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]")
-    .replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]")
-    .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maxLength);
-}
-
-function unique<T extends string>(values: readonly T[]): readonly T[] {
-  return Object.freeze(Array.from(new Set(values)).sort()) as readonly T[];
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      deepFreeze(child);
-    }
-  }
-  return value;
+function missingTargetAt(what: string, index: number): never {
+  throw new Error(`Missing ${what} at index ${index}`);
 }

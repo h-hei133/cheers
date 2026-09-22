@@ -18,12 +18,12 @@ import {
   buildExplainTaskDelivery,
   buildPurposeIoExplainDelivery,
 } from "./repoExplainStage.js";
-import type { GroundedDeliverableMode } from "../orchestration/runtimeHandoffProjection.js";
+import type { GroundedDeliverableMode } from "../result/projection/runtimeHandoffProjection.js";
 import type {
   GroundedDeliverableConstraints,
   GroundedRepairInstruction,
   GroundedRepairStage,
-} from "../orchestration/workflowTaskPlanner.js";
+} from "../planning/task/workflowTaskPlanner.js";
 
 export function buildReadTaskDelivery(input: {
   prompt: string;

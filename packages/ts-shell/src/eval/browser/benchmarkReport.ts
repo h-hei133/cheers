@@ -1,4 +1,4 @@
-import { sanitizeBrowserText } from "../../core/context/browserCapabilityModel.js";
+import { sanitizeBrowserText } from "../../browser/capabilityModel.js";
 import type { BrowserEvalBenchmarkScore } from "./benchmarkModel.js";
 
 export interface BrowserEvalBenchmarkReport {

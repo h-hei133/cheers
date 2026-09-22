@@ -40,7 +40,7 @@ describe("ApprovalTrustPolicy", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("persists allow-always by project-scoped process target", () => {
+  it("persists allow-always by project-scoped command signature", () => {
     const policy = new ApprovalTrustPolicy(policyPath);
     const projectA = path.join(tempDir, "project-a");
     const projectB = path.join(tempDir, "project-b");
@@ -49,9 +49,17 @@ describe("ApprovalTrustPolicy", () => {
 
     policy.rememberAllowAlways(buildPrompt("node --version"), projectA);
 
-    const matchSameProcess = policy.evaluate(buildPrompt("node -v"), projectA);
-    expect(matchSameProcess.matchedGrant).toBeDefined();
-    expect(matchSameProcess.scopeLabel).toBe("bash/spawn/process(node)");
+    // The scope is the exact command signature: `node -v` is a different
+    // command from `node --version`, so it must not reuse that grant.
+    const matchSameCommand = policy.evaluate(
+      buildPrompt("node --version"),
+      projectA,
+    );
+    expect(matchSameCommand.matchedGrant).toBeDefined();
+    expect(matchSameCommand.scopeLabel).toBe("bash/spawn(node --version)");
+
+    const missDifferentCommand = policy.evaluate(buildPrompt("node -v"), projectA);
+    expect(missDifferentCommand.matchedGrant).toBeUndefined();
 
     const missDifferentProcess = policy.evaluate(
       buildPrompt("python --version"),
@@ -60,7 +68,10 @@ describe("ApprovalTrustPolicy", () => {
     expect(missDifferentProcess.matchedGrant).toBeUndefined();
     expect(missDifferentProcess.sameOperationCandidates.length).toBe(1);
 
-    const missDifferentProject = policy.evaluate(buildPrompt("node -v"), projectB);
+    const missDifferentProject = policy.evaluate(
+      buildPrompt("node --version"),
+      projectB,
+    );
     expect(missDifferentProject.matchedGrant).toBeUndefined();
   });
 

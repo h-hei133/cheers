@@ -49,7 +49,7 @@ already budgeted runtime receipt projection as stable evidence markers.
   `mutationCompactContinuity.test.ts`, `SessionManager.test.ts`, and
   `sessionRuntimeBoundary.test.ts` cover stopped carryover, durable
   classification, and replay-safe summaries.
-- Harness/eval: `verifierModuleBoundary.test.mjs` covers option parsing,
+- Harness/eval: `verifierModuleBoundaryCheck.mjs` covers option parsing,
   suite/include-real dry-run planning, safety facts, report construction, and
   redacted unhandled failures.
 

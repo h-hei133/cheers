@@ -27,8 +27,7 @@ describe("tool result messages", () => {
         : undefined,
       dispatch: async () => ({
         success: true,
-        content:
-          "safe summary token=secret oldText=before newText=after /home/wang/.private-agents-real/provider.env",
+        content: "safe summary of executed read tool",
       }),
     });
 

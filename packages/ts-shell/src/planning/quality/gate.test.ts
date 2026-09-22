@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentPlan } from "../../orchestration/agentPlan.js";
-import { buildContextGraph } from "../../orchestration/contextGraph.js";
-import { scoreContextGraph } from "../../orchestration/contextGraphScore.js";
+import { buildAgentPlan } from "../task/agentPlan.js";
+import { buildContextGraph } from "../../context/graph/contextGraph.js";
+import { scoreContextGraph } from "../../context/graph/contextGraphScore.js";
 import { buildPlanQuality } from "./model.js";
 import { evaluatePlanQualityGate } from "./gate.js";
 

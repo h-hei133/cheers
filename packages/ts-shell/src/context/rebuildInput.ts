@@ -1,10 +1,20 @@
+import { redactReportText } from "../core/security/redaction.js";
+import { freezeDeep } from "../core/values/freeze.js";
 import type { RuntimeEvidenceSavePoint } from "../evidence/savepoint/model.js";
 import type { RepairApplyObservation, RepairProposalObservation, RepairRequiredHandoff } from "../repair/handoff/boundary.js";
 import type { SessionTreeProjection } from "../session/sessionTreeProjection.js";
 import type { SessionContextRebuildProjection } from "./sessionContextRebuildProjection.js";
-import type { NextTurnBundleProjection } from "../turn/nextTurnBundle.js";
-import type { ToolResultMessageBatch } from "../turn/toolResultMessage.js";
 import type { VerificationLoopIntent, VerificationResultObservation } from "../verification/result/boundary.js";
+
+export interface NextTurnBundleLike {
+  readonly bundleId: string;
+  readonly redaction: { readonly status: "report-safe" | "redacted" | string };
+  readonly notProvenClaims?: readonly string[];
+}
+
+export interface ToolResultMessageBatchLike {
+  readonly messages: readonly { readonly messageId: string }[];
+}
 
 export interface LoopContextRebuildInput {
   readonly rebuildInputId: string;
@@ -45,9 +55,9 @@ const REDACTION_EXCLUSIONS = [
 export function buildLoopContextRebuildInput(input: {
   readonly sessionProjection: SessionTreeProjection;
   readonly contextRebuildProjection?: SessionContextRebuildProjection;
-  readonly nextTurnBundle?: NextTurnBundleProjection;
+  readonly nextTurnBundle?: NextTurnBundleLike;
   readonly savePoint?: RuntimeEvidenceSavePoint;
-  readonly toolResultMessages?: ToolResultMessageBatch;
+  readonly toolResultMessages?: ToolResultMessageBatchLike;
   readonly verificationIntents?: readonly VerificationLoopIntent[];
   readonly verificationResults?: readonly VerificationResultObservation[];
   readonly repairRequiredHandoffs?: readonly RepairRequiredHandoff[];
@@ -88,7 +98,7 @@ export function buildLoopContextRebuildInput(input: {
     ...input.sessionProjection.compaction.records.flatMap((record) => record.unsupportedFactIds),
   ];
 
-  return deepFreeze({
+  return freezeDeep({
     rebuildInputId: sanitizeId(`context-rebuild-input:${activePathProjectionId}`, redactions),
     sourceSessionId: sanitizeText(input.sessionProjection.sessionIdentity, redactions, 160),
     activePathProjectionId: sanitizeText(activePathProjectionId, redactions, 180),
@@ -96,16 +106,16 @@ export function buildLoopContextRebuildInput(input: {
       ? { nextTurnBundleId: sanitizeText(input.nextTurnBundle.bundleId, redactions, 180) }
       : {}),
     ...(input.savePoint ? { savePointId: sanitizeText(input.savePoint.id, redactions, 180) } : {}),
-    toolResultMessageIds: freeze(
+    toolResultMessageIds: freezeDeep(
       (input.toolResultMessages?.messages.map((message) => message.messageId) ?? [])
         .map((id) => sanitizeText(id, redactions, 180)),
     ),
-    verificationHandoffIds: freeze(verificationHandoffIds.map((id) => sanitizeText(id, redactions, 180))),
-    repairHandoffIds: freeze(repairHandoffIds.map((id) => sanitizeText(id, redactions, 180))),
-    providerMetadataIds: freeze((input.providerMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
-    resourceMetadataIds: freeze((input.resourceMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
-    packageMetadataIds: freeze((input.packageMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
-    includedFactsSummary: freeze([
+    verificationHandoffIds: freezeDeep(verificationHandoffIds.map((id) => sanitizeText(id, redactions, 180))),
+    repairHandoffIds: freezeDeep(repairHandoffIds.map((id) => sanitizeText(id, redactions, 180))),
+    providerMetadataIds: freezeDeep((input.providerMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
+    resourceMetadataIds: freezeDeep((input.resourceMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
+    packageMetadataIds: freezeDeep((input.packageMetadataIds ?? []).map((id) => sanitizeText(id, redactions, 180))),
+    includedFactsSummary: freezeDeep([
       `activePath=${input.sessionProjection.activePathProjection.pathLength}`,
       `activeLeaf=${input.sessionProjection.activePathProjection.activeLeafResolution}`,
       `branch=${input.sessionProjection.branchSupport}`,
@@ -116,14 +126,14 @@ export function buildLoopContextRebuildInput(input: {
       `verificationHandoffs=${verificationHandoffIds.length}`,
       `repairHandoffs=${repairHandoffIds.length}`,
     ].map((item) => sanitizeText(item, redactions, 160))),
-    excludedFactsSummary: freeze([
+    excludedFactsSummary: freezeDeep([
       "raw-transcript-content",
       "raw-provider-output",
       "unsafe-file-contents",
       "unredacted-command-output",
       "raw-edit-content",
     ]),
-    missingFacts: freeze(Array.from(new Set(missingFacts.map((fact) => sanitizeText(fact, redactions, 160))))),
+    missingFacts: freezeDeep(Array.from(new Set(missingFacts.map((fact) => sanitizeText(fact, redactions, 160))))),
     redaction: {
       status:
         redactions.size > 0 ||
@@ -149,7 +159,7 @@ export function buildLoopContextRebuildInput(input: {
 }
 
 function unique(values: readonly string[], redactions: Set<string>): readonly string[] {
-  return freeze(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
+  return freezeDeep(Array.from(new Set(values.map((value) => sanitizeText(value, redactions, 120)))).sort());
 }
 
 function sanitizeId(value: string, redactions: Set<string>): string {
@@ -160,39 +170,5 @@ function sanitizeId(value: string, redactions: Set<string>): string {
 }
 
 function sanitizeText(value: string, redactions: Set<string>, maxLength: number): string {
-  let sanitized = value
-    .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
-    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
-    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
-    .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[secret-redacted]")
-    .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]")
-    .replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]")
-    .replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]")
-    .replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]")
-    .replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]")
-    .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (sanitized !== value.trim()) {
-    redactions.add("unsafe-content");
-  }
-  if (sanitized.length > maxLength) {
-    sanitized = `${sanitized.slice(0, maxLength)}...`;
-    redactions.add("truncated");
-  }
-  return sanitized;
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
-}
-
-function deepFreeze<T>(value: T): T {
-  return freeze(value);
+  return redactReportText(value, maxLength, { redactions, ellipsis: true });
 }

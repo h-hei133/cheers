@@ -4,7 +4,7 @@ import type {
   CodingVerificationBlockerKind,
   CodingVerificationSummary,
   CodingWriteEffect,
-} from "../../../orchestration/types.js";
+} from "../../../result/types.js";
 
 export type MutationVerificationHandoffKind =
   | "write-verified"

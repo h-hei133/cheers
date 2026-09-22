@@ -2,20 +2,19 @@ import type { Interface as ReadlineInterface } from "node:readline";
 import type { ReadStream } from "node:tty";
 
 import { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
+import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import {
   createComponentLogger,
   createTraceContext,
   setGlobalTraceContext,
 } from "../../observability/index.js";
 import { parseCliArgs } from "../../entrypoints/cliArgs.js";
+import { applyTheme } from "../../presentation/theme/theme.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import { printCliDoctor } from "../../entrypoints/cliDoctor.js";
 import {
   createCliApprovalModeState,
 } from "../approval/cliApprovalModeState.js";
-import {
-  runCliHostCommand,
-} from "../host/runner.js";
 import {
   createCliProviderRuntimeBridge,
 } from "../provider/cliProviderRuntimeBridge.js";
@@ -33,6 +32,7 @@ import {
 import {
   runInteractiveLoop,
 } from "../interactive/interactiveLoop.js";
+import type { EscalationPrompt } from "../../sandbox/index.js";
 import {
   runCliPrintModeRouter,
 } from "../print/printModeRouter.js";
@@ -69,16 +69,6 @@ export async function runCliProcess(
   }
 
   const options: CliOptions = parsedCliArgs.args.options;
-  if (options.hostCommand) {
-    await runCliHostCommand({
-      commandJson: options.hostCommand,
-      projectRoot: input.launchCwd,
-      writeOutput: input.writeOutput,
-      exit: input.exit,
-    });
-    return;
-  }
-
   const rootContext = createCliRootContext({
     launchCwd: input.launchCwd,
     options,
@@ -106,6 +96,13 @@ export async function runCliProcess(
     projectRoot: runtimeContext.projectRoot,
     options,
   });
+  // The configured theme has to be applied to the shared palette before any
+  // surface renders, or the first frame is drawn in the default and never
+  // redrawn.
+  const configuredTheme = runtimeContext.runtimeConfig.theme;
+  if (configuredTheme && configuredTheme !== "auto") {
+    applyTheme(configuredTheme);
+  }
   const resolvedCredential =
     providerRuntimeBridge.resolveCredentialSnapshot();
   const mcpGateway = bootstrapRuntime.mcpGateway;
@@ -116,6 +113,8 @@ export async function runCliProcess(
   });
   projectAndRenderCliStartupSurface({
     options,
+    stdin: input.stdin,
+    stdout: input.process.stdout,
     cliModePlan: stdinPromptCapture.cliModePlan,
     stdinTransportMode: stdinPromptCapture.stdinTransportMode,
     nonInteractivePromptCount:
@@ -128,6 +127,9 @@ export async function runCliProcess(
   logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
 
   let readline: ReadlineInterface | null = null;
+  let interactiveApprovalPrompt:
+    | ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>)
+    | undefined;
 
   const sessionRuntime = createCliSessionRuntime({
     sessionManager,
@@ -139,6 +141,13 @@ export async function runCliProcess(
     providerRuntimeBridge,
     getReadline: () => readline,
     isStdinTty: () => Boolean(input.stdin.isTTY),
+    // Reported as present only once the interactive surface has actually
+    // installed a handler. Handing over a fallback closure here would make the
+    // approval bridge treat every run as interactive and skip the
+    // non-interactive policy path entirely. The getter is read at prompt time
+    // because the interactive surface installs its handler after this runtime
+    // is built.
+    getPromptInteractiveApproval: () => interactiveApprovalPrompt,
   });
 
   const handledPrintMode = await runCliPrintModeRouter({
@@ -161,6 +170,7 @@ export async function runCliProcess(
 
   await runInteractiveLoop({
     stdin: input.stdin,
+    stdout: input.process.stdout,
     process: input.process,
     sessionManager,
     renderer,
@@ -173,9 +183,12 @@ export async function runCliProcess(
     setReadline: (nextReadline) => {
       readline = nextReadline;
     },
+    setInteractiveApprovalPrompt: (handler) => {
+      interactiveApprovalPrompt = handler;
+    },
     setActiveNonInteractiveApprovalMode: (mode) => {
       approvalModeState.set(mode);
     },
-    exit: input.exit,
+    exit: (code?: number) => input.exit(code ?? 0),
   });
 }

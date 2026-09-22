@@ -95,7 +95,7 @@ not introduce a new persistence layer or session schema.
 - Focused continuation runMvp cluster: `18 passed / 133 skipped`
 - Route 137-141 preservation helper tests: `53 passed`
 - Full `runMvpIntegratedFlow.test.ts`: `127 passed / 24 failed`
-- `rtk npm run verify:edit-capability-closeout`: pass
+- ~~`rtk npm run verify:edit-capability-closeout`~~ (removed 2026-09-17): pass
 - `rtk npm run verify:result-contract`: pass
 - `rtk npm run build -w packages/ts-shell`: pass
 - `rtk git diff --check`: pass

@@ -43,38 +43,42 @@ function createHarness() {
 }
 
 describe("interactive command router", () => {
-  it("keeps workspace-info shortcut out of normal prompt execution", async () => {
+  it("routes /compact to the session runtime and prints the outcome", async () => {
     const harness = createHarness();
-
+    const calls: Array<[string, string | undefined]> = [];
     const result = await routeInteractiveCommand({
       ...harness.input,
-      prompt: "what is the current working directory?",
+      sessionRuntime: {
+        ...(harness.input.sessionRuntime as object),
+        compactHistory: async (sessionId: string, instructions?: string) => {
+          calls.push([sessionId, instructions]);
+          return { status: "compacted", summarized: 6, kept: 4, tokensBefore: 8_000, tokensAfter: 2_000 };
+        },
+      } as never,
+      prompt: "/compact focus on the failing test",
     });
-
-    expect(result).toEqual({ turnNumber: 0 });
-    expect(harness.lines).toContain(
-      "Current working directory: /tmp/project-alpha",
-    );
-    expect(harness.lines).toContain("Project root: /tmp/project-alpha");
+    expect(calls).toEqual([["sess_1234567890abcdef", "focus on the failing test"]]);
+    expect(harness.lines.join("\n")).toContain("Condensed 6 earlier messages");
+    expect(result.turnNumber).toBe(0);
   });
 
-  it("routes agent mode commands and requests prompt refresh", async () => {
+  it("routes /cd workspace navigation commands out of normal prompt execution", async () => {
     const harness = createHarness();
 
     const result = await routeInteractiveCommand({
       ...harness.input,
-      prompt: "/mode plan",
+      prompt: "/cd /tmp/project-alpha",
     });
 
-    expect(result).toEqual({
-      turnNumber: 0,
-      refreshPromptChrome: true,
+    expect(result.turnNumber).toBe(0);
+  });
+
+  it("treats a retired mode command as an unknown command rather than routing it", () => {
+    // Mode switching moved to Shift+Tab, so /mode no longer exists to route.
+    const harness = createHarness();
+    return routeInteractiveCommand({ ...harness.input, prompt: "/mode plan" }).then((result) => {
+      expect(result.refreshPromptChrome).toBeUndefined();
+      expect(harness.getAgentMode()).toBe("build");
     });
-    expect(harness.getAgentMode()).toBe("plan");
-    expect(harness.lines).toEqual([
-      "\nAgent mode updated to plan.",
-      "Plan mode prioritizes planning and diagnosis over direct edits/tool execution.",
-      "",
-    ]);
   });
 });

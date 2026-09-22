@@ -1,4 +1,4 @@
-import type { FencedEditMapping } from "../../../orchestration/fencedEditPlanner.js";
+import type { FencedEditMapping } from "../../proposal/fencedEditPlanner.js";
 import type { ExactHunkRange } from "../plan/hunkSet.js";
 import { sortHunksForApply, splitExactHunkLines } from "../plan/hunkSet.js";
 

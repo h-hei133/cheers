@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type {
   CodingResultSummary,
   OrchestrationResult,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import { SessionManager, type Session } from "../../session/SessionManager.js";
 import {
   runResumeLikeShellAction,
@@ -78,7 +78,6 @@ describe("runResumeLikeShellAction", () => {
         runtimeContext: createRuntimeContext(session),
         renderer: { renderLine() {} } as never,
         turnNumber: 7,
-        normalizePromptForExecution: (prompt) => prompt.trim(),
         switchRuntimeSessionProjectContext: (runtimeContext, nextSession) => {
           runtimeContext.session = nextSession;
         },
@@ -122,7 +121,6 @@ describe("runResumeLikeShellAction", () => {
         runtimeContext: createRuntimeContext(session),
         renderer: { renderLine() {} } as never,
         turnNumber: 2,
-        normalizePromptForExecution: (prompt) => `normalized:${prompt}`,
         switchRuntimeSessionProjectContext: (runtimeContext, nextSession) => {
           switched.push(nextSession.id);
           runtimeContext.session = nextSession;
@@ -137,7 +135,7 @@ describe("runResumeLikeShellAction", () => {
       expect(switched).toEqual([session.id]);
       expect(turns).toHaveLength(1);
       expect(turns[0]).toMatchObject({
-        effectivePrompt: "normalized:follow up",
+        effectivePrompt: "follow up",
         turnNumber: 3,
         turnOrigin: "continued",
       });
@@ -178,7 +176,6 @@ describe("runResumeLikeShellAction", () => {
           },
         } as never,
         turnNumber: 4,
-        normalizePromptForExecution: (prompt) => prompt.trim(),
         switchRuntimeSessionProjectContext: (runtimeContext, nextSession) => {
           runtimeContext.session = nextSession;
         },
@@ -251,7 +248,6 @@ describe("runResumeLikeShellAction", () => {
           },
         } as never,
         turnNumber: 1,
-        normalizePromptForExecution: (prompt) => prompt.trim(),
         switchRuntimeSessionProjectContext: (runtimeContext, nextSession) => {
           runtimeContext.session = nextSession;
         },

@@ -146,10 +146,11 @@ If the Rust daemon path is enabled but unavailable:
 
 ## Post-Reset Owner Modules
 
-- `packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts` is a thin
-  compatibility wrapper that delegates to the runtime coordinator.
-- `packages/ts-shell/src/runtime/workflowExecutionCoordinator.ts` owns runtime
-  workflow coordination and transaction ordering.
+- `packages/ts-shell/src/turn/session.ts` owns one user turn: it drives the
+  execution kernel under `core/agent/`, persists completed messages, keeps the
+  context inside the window, and takes steering and follow-up input.
+- `packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts` is the thin
+  entry that checks provider readiness and starts a turn.
 - `packages/ts-shell/src/planning/workflowTaskPlan.ts` owns task-plan
   construction and planning facts.
 - `packages/ts-shell/src/entrypoints/cli.tsx` is an executable shim; reusable

@@ -1,4 +1,5 @@
-import type { CodingResultSummary } from "../orchestration/types.js";
+import { compactContinuityText } from "./sessionContinuityModule.js";
+import type { CodingResultSummary } from "../result/types.js";
 
 export interface ContinuationEvidenceParityDetail {
   readonly label: string;
@@ -119,7 +120,7 @@ export function collectContinuationEvidenceParityDetails(
     if (summary) {
       details.push({
         label: item.label,
-        summary: compactText(summary, 300),
+        summary: compactContinuityText(summary, 300),
       });
     }
   }
@@ -141,12 +142,4 @@ function findContinuationEvidenceSummary(
   return evidence.find((entry) =>
     prefixes.some((prefix) => entry.startsWith(prefix)),
   );
-}
-
-function compactText(input: string, max: number): string {
-  const normalized = input.replace(/\s+/g, " ").trim();
-  if (normalized.length <= max) {
-    return normalized;
-  }
-  return `${normalized.slice(0, max)}...`;
 }

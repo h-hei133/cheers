@@ -1,3 +1,4 @@
+import { freezeDeep } from "../../../core/values/freeze.js";
 import type { Session } from "../../schema/sessionRecord.js";
 import {
   appendSessionThreadChild,
@@ -28,7 +29,7 @@ export interface HostSessionMutationResult {
 }
 
 export function createHostSessionState(): HostSessionState {
-  return freeze({
+  return freezeDeep({
     sessions: [],
     terminalSuccessClaim: false,
   });
@@ -44,7 +45,7 @@ export function selectOrCreateHostSession(input: {
     ? input.state.sessions.find((record) => record.session.id === input.sessionId)
     : undefined;
   if (found) {
-    return freeze({
+    return freezeDeep({
       state: {
         ...input.state,
         currentSessionId: found.session.id,
@@ -71,7 +72,7 @@ export function selectOrCreateHostSession(input: {
     lifecycle: "running",
     eventCount: 0,
   };
-  return freeze({
+  return freezeDeep({
     state: {
       sessions: [...input.state.sessions, record],
       currentSessionId: session.id,
@@ -171,7 +172,7 @@ export function listHostSessionHeads(
   readonly updatedAt: string;
   readonly terminalSuccessClaim: false;
 }[] {
-  return freeze(state.sessions.map((record) => {
+  return freezeDeep(state.sessions.map((record) => {
     const projection = projectHostSessionProjection(record);
     return {
       sessionId: record.session.id,
@@ -206,7 +207,7 @@ function replaceRecord(
   const sessions = state.sessions.map((candidate) =>
     candidate.session.id === record.session.id ? record : candidate
   );
-  return freeze({
+  return freezeDeep({
     state: {
       sessions,
       currentSessionId: record.session.id,
@@ -228,14 +229,4 @@ function sanitizeSummary(input: string): string {
     .replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]")
     .replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]")
     .slice(0, 240);
-}
-
-function freeze<T>(value: T): T {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) {
-      freeze(child);
-    }
-  }
-  return value;
 }

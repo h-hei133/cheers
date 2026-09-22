@@ -2,6 +2,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+/**
+ * Token budgets for one model.
+ *
+ * Declared here rather than beside the resolver because it is part of the
+ * configuration file's shape: the resolver reads it, the config owns it.
+ */
+export interface ModelTokenBudget {
+  readonly reserveTokens?: number;
+  readonly keepRecentTokens?: number;
+}
+
 export type RuntimeProvider =
   | "openai"
   | "anthropic"
@@ -69,7 +80,79 @@ export interface RuntimeConfig {
   readonly providerCredentials: Readonly<
     Partial<Record<RuntimeProvider, ProviderCredentialConfig>>
   >;
+  readonly temperature?: number;
+  readonly topP?: number;
+  readonly maxOutputTokens?: number;
+  /**
+   * The context window to use, overriding whatever the model's catalog entry
+   * says.
+   *
+   * Absent means "ask the catalog", which is the normal case. Present means the
+   * user knows something the catalog does not — a proxy, a self-hosted model, or
+   * a window the catalog has not caught up with.
+   */
+  readonly contextWindow?: number;
+  readonly reserveTokens?: number;
+  /**
+   * Token budgets for specific models, keyed `"provider/modelId"`.
+   *
+   * One global budget cannot fit every model: keeping the last twenty thousand
+   * tokens verbatim is most of a small model's window and a rounding error in a
+   * large one. Keyed by provider as well as model because two providers can
+   * serve the same model id, and a budget tuned for one must not silently apply
+   * to the other.
+   */
+  readonly modelTokenBudgets?: Readonly<Record<string, ModelTokenBudget>>;
+  /**
+   * How many bytes of project instruction file content may be read.
+   *
+   * The budget covers the files' own bytes. The tags that frame them in the
+   * prompt add a fixed amount per file on top — a couple of hundred bytes
+   * overall, not proportional to the budget — so the prompt as a whole is
+   * slightly larger than this number rather than equal to it.
+   *
+   * Zero disables loading them entirely, which is the opt-out: a run that wants
+   * to see how the model behaves without a repository's rules should not have to
+   * delete the file.
+   */
+  readonly instructionBudgetBytes?: number;
+  /**
+   * Whether declared hook commands may run without approval for this run.
+   *
+   * Set only by a command-line flag, never by a configuration file — see the
+   * resolution below for why. It exists because a repository someone is already
+   * auditing by hand should not need its hooks approving one at a time, and it
+   * announces itself when it takes effect so it cannot be mistaken for the gate
+   * working.
+   */
+  readonly allowUntrustedHooks?: boolean;
+  readonly agentMode?: "plan" | "build";
+  readonly theme?: "dark" | "light" | "auto";
+  /**
+   * Explicit override of the interactive surface.
+   *
+   * Unlike the fields this config used to carry for thinking budgets and prompt
+   * cache lifetime, the capability behind this one exists: the surface is chosen
+   * from terminal capability in `supportsFullScreenSurface`, and this field is
+   * where a caller will be able to force that choice. It stays declared, and
+   * unwired, so the next reader does not have to re-derive which of the three
+   * was the real one.
+   */
+  readonly tuiMode?: "regular" | "fullscreen" | "stream";
+  readonly tui?: TuiPreferences;
   readonly configSources: string[];
+}
+
+/**
+ * What the interactive surface remembers between sessions.
+ *
+ * These belong to the user rather than to a session, so they live in the same
+ * file as the rest of the user's configuration instead of a second one that
+ * only this module reads.
+ */
+export interface TuiPreferences {
+  /** Status band item ids, in canonical order. Absent means the defaults. */
+  readonly statusItems?: readonly string[];
 }
 
 export interface RuntimeConfigFile {
@@ -84,22 +167,57 @@ export interface RuntimeConfigFile {
   providerCredentials?: Partial<
     Record<RuntimeProvider, ProviderCredentialConfig>
   >;
+  temperature?: number;
+  topP?: number;
+  maxOutputTokens?: number;
+  contextWindow?: number;
+  reserveTokens?: number;
+  modelTokenBudgets?: Record<string, ModelTokenBudget>;
+  instructionBudgetBytes?: number;
+  agentMode?: "plan" | "build";
+  theme?: "dark" | "light" | "auto";
+  tuiMode?: "regular" | "fullscreen" | "stream";
+  tui?: TuiPreferences;
 }
 
 const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   provider: "openai",
   daemonEnabled: true,
-  maxTurns: 6,
+  maxTurns: 15,
   disabledTools: [],
   hiddenToolPrefixes: [],
   enableMcpTools: true,
   activeProviderConnectionId: undefined,
   providerConnections: [],
   providerCredentials: {},
+  temperature: 0.7,
+  topP: 1.0,
+  maxOutputTokens: 4096,
+  reserveTokens: 8_000,
+  modelTokenBudgets: {},
+  instructionBudgetBytes: 32 * 1024,
+  allowUntrustedHooks: false,
+  agentMode: "build",
+  theme: "dark",
+  tuiMode: "regular",
+  tui: {},
 };
+
+/**
+ * Overrides a command-line flag has already decided.
+ *
+ * A flag is a statement about this run, so it outranks both config files. Passed
+ * in rather than read here so the config layer stays free of argument parsing.
+ */
+export interface RuntimeConfigOverrides {
+  readonly instructionBudgetBytes?: number
+  /** Run declared hook commands without asking. Off unless a flag says otherwise. */
+  readonly allowUntrustedHooks?: boolean
+}
 
 export function getRuntimeConfig(
   rootDir: string = process.cwd(),
+  overrides?: RuntimeConfigOverrides,
 ): RuntimeConfig {
   const sources: string[] = [];
   let merged: RuntimeConfigFile = {};
@@ -114,7 +232,15 @@ export function getRuntimeConfig(
     try {
       const rawContent = fs.readFileSync(candidate, "utf8");
       const content = rawContent.startsWith("\uFEFF") ? rawContent.slice(1) : rawContent;
-      const parsed = JSON.parse(content) as RuntimeConfigFile;
+      // A config file names credentials by reference rather than by value, so a
+      // key can live in the environment instead of on disk. An unset name
+      // expands to the empty string rather than throwing: a missing secret
+      // should surface as the provider refusing the request, not as a process
+      // that cannot read its own config.
+      const interpolated = content
+        .replace(/\$\{([A-Za-z0-9_]+)\}/g, (_, name: string) => process.env[name] ?? "")
+        .replace(/\$([A-Za-z0-9_]+)/g, (_, name: string) => process.env[name] ?? "");
+      const parsed = JSON.parse(interpolated) as RuntimeConfigFile;
       merged = {
         ...merged,
         ...parsed,
@@ -159,6 +285,30 @@ export function getRuntimeConfig(
     providerCredentials: normalizeProviderCredentials(
       merged.providerCredentials,
     ),
+    temperature: merged.temperature ?? DEFAULT_CONFIG.temperature,
+    topP: merged.topP ?? DEFAULT_CONFIG.topP,
+    maxOutputTokens: merged.maxOutputTokens ?? DEFAULT_CONFIG.maxOutputTokens,
+    // Left undefined when the user did not set it: the window is resolved per
+    // model from the catalog, and a default filled in here would be
+    // indistinguishable from a deliberate override, so the catalog would never
+    // be consulted.
+    ...(merged.contextWindow !== undefined ? { contextWindow: merged.contextWindow } : {}),
+    reserveTokens: merged.reserveTokens ?? DEFAULT_CONFIG.reserveTokens,
+    modelTokenBudgets: merged.modelTokenBudgets ?? DEFAULT_CONFIG.modelTokenBudgets,
+    instructionBudgetBytes:
+      overrides?.instructionBudgetBytes ??
+      merged.instructionBudgetBytes ??
+      DEFAULT_CONFIG.instructionBudgetBytes,
+    // Deliberately read from the overrides only. Every other field falls back to
+    // the config files, but this one is an exemption from having hooks approved,
+    // and a repository that could write it would be approving its own commands
+    // from the same file that declares them. It is granted per run by a person
+    // typing a flag, or not at all.
+    allowUntrustedHooks: overrides?.allowUntrustedHooks ?? DEFAULT_CONFIG.allowUntrustedHooks,
+    agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
+    theme: merged.theme ?? DEFAULT_CONFIG.theme,
+    tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,
+    tui: merged.tui ?? DEFAULT_CONFIG.tui,
     configSources: sources,
   };
 }

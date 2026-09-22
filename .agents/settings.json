@@ -1,0 +1,35 @@
+{
+  "$schema": "https://coding-agents.dev/schemas/settings.v1.json",
+  "version": 1,
+  "model": {
+    "provider": "openai-compatible",
+    "model": "deepseek-ai/DeepSeek-V4-Flash",
+    "baseUrl": "https://api.siliconflow.cn/v1",
+    "apiKey": "${SILICONFLOW_API_KEY}",
+    "thinkingBudget": "medium",
+    "maxTurns": 30
+  },
+  "mcpServers": {},
+  "skills": {
+    "directory": ".codex/skills",
+    "enabled": ["*"],
+    "disabled": []
+  },
+  "permissions": {
+    "mode": "default",
+    "defaultBehavior": "ask",
+    "allowReadOnlyTools": true,
+    "allowRules": [
+      "read:*",
+      "glob:*",
+      "grep:*",
+      "bash:git status*",
+      "bash:git diff*"
+    ]
+  },
+  "tui": {
+    "mode": "differential",
+    "altScreen": true,
+    "showThinking": true
+  }
+}

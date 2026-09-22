@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { createBrowserActionContract } from "../context/browserActionContract.js";
-import { runBrowserActionLoopExecutor } from "../context/browserActionLoopExecutor.js";
-import { runBrowserCommandAsync } from "../context/browserCommandRunner.js";
-import { parseBrowserCommandArgs } from "../context/browserCommandContract.js";
-import { BrowserDirectPlaywrightAdapter } from "../context/browserDirectPlaywrightAdapter.js";
-import { createBrowserExecutionRequest } from "../context/browserExecutionContract.js";
-import { compareBrowserToolServerBackend } from "../context/browserToolServerBackendComparison.js";
-import { renderBrowserPlaywrightAdapterSurface } from "../context/browserPlaywrightAdapterSurface.js";
-import { decideBrowserRuntimeDirection } from "../context/browser/runtime/core/directionDecision.js";
-import type { BrowserEvalBenchmarkTask } from "./browserEvalBenchmarkModel.js";
+import { createBrowserActionContract } from "../../browser/actionContract.js";
+import { runBrowserActionLoopExecutor } from "../../browser/actionLoopExecutor.js";
+import { runBrowserCommandAsync } from "../../browser/commandRunner.js";
+import { parseBrowserCommandArgs } from "../../browser/commandContract.js";
+import { BrowserDirectPlaywrightAdapter } from "../../browser/directPlaywrightAdapter.js";
+import { createBrowserExecutionRequest } from "../../browser/executionContract.js";
+import { compareBrowserToolServerBackend } from "../../browser/toolServerBackendComparison.js";
+import { renderBrowserPlaywrightAdapterSurface } from "../../browser/playwrightAdapterSurface.js";
+import { decideBrowserRuntimeDirection } from "../../browser/runtime/core/directionDecision.js";
+import type { BrowserEvalBenchmarkTask } from "../../eval/browser/benchmarkModel.js";
 import { runBrowserEvalBenchmark } from "../../eval/browser/benchmarkRunner.js";
-import { createBrowserEvalBenchmarkReport } from "./browserEvalBenchmarkReport.js";
+import { createBrowserEvalBenchmarkReport } from "../../eval/browser/benchmarkReport.js";
 import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserPlaywrightAdapterSpikeFixture } from "./browserPlaywrightAdapterSpikeFixtures.js";
 

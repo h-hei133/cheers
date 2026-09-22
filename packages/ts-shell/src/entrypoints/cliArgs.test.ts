@@ -102,7 +102,7 @@ describe("cli args parser", () => {
     expect(isContinueRequested(parsed)).toBe(true);
   });
 
-  it("preserves provider, session, replay, print, migration, and apply-patch flags", () => {
+  it("preserves provider, session, replay, print, and migration flags", () => {
     const parsed = expectParsed([
       "--session-id",
       "sess_route24",
@@ -114,18 +114,6 @@ describe("cli args parser", () => {
       "replay.txt",
       "-p",
       "--migrate-session-root",
-      "--apply-patch-runtime-route",
-      "--apply-patch-workspace-write",
-      "--planning-mutation-confirm",
-      "--planning-mutation-controlled-workspace",
-      "--planning-mutation-selected-workspace",
-      "--planning-mutation-live-provider-proposal",
-      "--planning-mutation-proposal",
-      "proposal.json",
-      "--planning-mutation-verify-command",
-      "node --version",
-      "--host-command",
-      "{\"action\":\"get-status\",\"sessionId\":\"s1\"}",
       "ignored prompt",
     ]);
 
@@ -136,15 +124,6 @@ describe("cli args parser", () => {
       replayFile: "replay.txt",
       printMode: true,
       migrateSessionRoot: true,
-      applyPatchRuntimeRoute: true,
-      applyPatchWorkspaceWrite: true,
-      planningMutationConfirm: true,
-      planningMutationControlledWorkspace: true,
-      planningMutationSelectedWorkspace: true,
-      planningMutationLiveProviderProposal: true,
-      planningMutationProposalPath: "proposal.json",
-      planningMutationVerifyCommand: "node --version",
-      hostCommand: "{\"action\":\"get-status\",\"sessionId\":\"s1\"}",
       promptArg: "ignored prompt",
     });
     expect(isPrintModeRequested(parsed)).toBe(true);
@@ -202,15 +181,6 @@ describe("cli args parser", () => {
     expect(expectParseError(["--replay-file"]).message).toBe(
       "Missing value for --replay-file. Example: --replay-file .\\replay.txt",
     );
-    expect(expectParseError(["--planning-mutation-proposal"]).message).toBe(
-      "Missing value for --planning-mutation-proposal. Provide a JSON file with exact old/new proposal targets.",
-    );
-    expect(expectParseError(["--planning-mutation-verify-command"]).message).toBe(
-      "Missing value for --planning-mutation-verify-command. Provide an allowlisted verification command.",
-    );
-    expect(expectParseError(["--host-command"]).message).toBe(
-      "Missing value for --host-command. Provide a structured host command JSON object.",
-    );
     expect(expectParseError(["--provider", "bad-provider"]).message).toBe(
       "Invalid --provider value: bad-provider. Expected openai, anthropic, openai-compatible, google, antigravity, or claudecode.",
     );
@@ -219,5 +189,37 @@ describe("cli args parser", () => {
     ).toBe(
       "Invalid --non-interactive-approval value: maybe. Use deny, allow-once, or allow-always.",
     );
+  });
+});
+
+describe("--no-context-files", () => {
+  it("is off unless asked for", () => {
+    expect(expectParsed([]).options.noContextFiles).toBe(false);
+  });
+
+  it("is set when the flag is given", () => {
+    expect(expectParsed(["--no-context-files"]).options.noContextFiles).toBe(true);
+  });
+
+  it("does not consume the prompt that follows it", () => {
+    // The flag takes no value, so the next token is still the prompt rather than
+    // being swallowed as its argument.
+    const parsed = expectParsed(["--no-context-files", "explain this repo"]);
+    expect(parsed.options.promptArg).toBe("explain this repo");
+  });
+});
+
+describe("--dangerously-bypass-hook-trust", () => {
+  it("is off unless asked for", () => {
+    expect(expectParsed([]).options.dangerouslyBypassHookTrust).toBe(false);
+  });
+
+  it("is set when the flag is given", () => {
+    expect(expectParsed(["--dangerously-bypass-hook-trust"]).options.dangerouslyBypassHookTrust).toBe(true);
+  });
+
+  it("does not consume the prompt that follows it", () => {
+    const parsed = expectParsed(["--dangerously-bypass-hook-trust", "run the tests"]);
+    expect(parsed.options.promptArg).toBe("run the tests");
   });
 });

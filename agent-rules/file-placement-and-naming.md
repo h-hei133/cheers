@@ -18,19 +18,21 @@ These are durable project-level rules. They define how future code should be pla
 A healthy product path should read as domain ownership first, local role second:
 
 ```text
-packages/ts-shell/src/runtime/loop/contract.ts
 packages/ts-shell/src/runtime/events/projection.ts
-packages/ts-shell/src/presentation/terminal/renderer.ts
-packages/ts-shell/src/planning/handoff/edit.ts
-packages/ts-shell/src/provider/registry/model.ts
+packages/ts-shell/src/runtime/events/projection.ts
+packages/ts-shell/src/presentation/terminal/streaming.ts
+packages/ts-shell/src/planning/handoff/mutation.ts
+packages/ts-shell/src/provider/registry/provider.ts
 packages/ts-shell/src/session/continuation/readiness.ts
 ```
 
 ## Owner Domains
 
-Use existing owner domains where possible. Common owners include:
+Use existing owner domains where possible. All top-level domains under
+`packages/ts-shell/src/` are owners:
 
 ```text
+core/
 runtime/
 turn/
 context/
@@ -47,14 +49,56 @@ verification/
 repair/
 ```
 
+These are owners too, but they are cross-cutting or boundary-shaped rather than
+feature domains, so prefer putting new behavior in a feature domain when one
+fits:
+
+```text
+browser/          integrated browser/Playwright execution surface
+cli/              interactive CLI surface and its reusable contracts
+daemon/           Rust daemon client, protocol, and parity boundary
+entrypoints/      executables and compatibility re-exports only
+memory/           project and context memory
+sandbox/          sandbox preflight and authority
+config/           configuration loading and validation
+observability/    structured logging and tracing
+artifacts/        produced-artifact inventory and access
+eval/             offline evaluation surfaces
+workflow/         repository-level workflow helpers
+model-adapters/   model provider adapter boundary
+test-utils/       test-only support; never imported by production code
+```
+
+### `core/` admission
+
+`core/` holds runtime substrate: shell and session surface, the agent loop kernel,
+tool registry and execution primitives, approval and policy evaluation, hooks,
+path and security jails, and configuration-neutral contracts. A feature domain may
+depend on `core/`; `core/` must not depend on a feature domain.
+
+A module belongs in `core/` only when all three hold:
+
+1. **Direction.** Its imports resolve only within `core/` or to sanctioned
+   leaf/cross-cutting domains (`config/`, `observability/`, `artifacts/`,
+   `model-adapters/`). A module that imports a feature domain belongs in that
+   domain, not in `core/`.
+2. **Audience.** At least two feature domains consume it, or a declared
+   entrypoint reaches it. A module with a single consumer belongs with that
+   consumer.
+3. **Survival.** It is not a compatibility shim, not a scenario fixture, and not
+   an implementation of a capability the product states it does not provide.
+
+Adding `core/<subdomain>/` also requires a one-line responsibility entry in
+[architecture boundaries](architecture-boundaries.md) Common Areas, in the same
+form `core/query/` and `core/shell/` already use.
+
 When a domain becomes broad, add meaningful subdomains instead of lengthening file names:
 
 ```text
-runtime/loop/
-runtime/events/
 runtime/execution/
+runtime/events/
 runtime/resources/
-planning/context/
+planning/task/
 planning/handoff/
 provider/registry/
 provider/request/
@@ -62,7 +106,7 @@ tools/policy/
 tools/result/
 session/replay/
 session/continuation/
-presentation/surface/
+presentation/sidebar/
 presentation/terminal/
 ```
 
@@ -108,10 +152,10 @@ Prefer this:
 ```text
 runtime/events/projection.ts
 runtime/events/stream.ts
-runtime/loop/trajectory.ts
-runtime/resources/descriptor.ts
-presentation/surface/model.ts
-presentation/terminal/renderer.ts
+runtime/execution/receipt.ts
+runtime/resources/projection.ts
+presentation/terminal/streaming.ts
+provider/registry/provider.ts
 ```
 
 Over this:
@@ -141,10 +185,54 @@ Examples of compatibility or executable surfaces that must stay thin unless expl
 
 ```text
 packages/ts-shell/src/entrypoints/cli.tsx
-packages/ts-shell/src/orchestration/runMvpIntegratedFlow.ts
+packages/ts-shell/src/entrypoints/cliRuntimeInvocation.ts
 ```
 
 A compatibility shim is different from a rightful domain manager. For example, `SessionManager` may retain real session lifecycle coordination, public API compatibility, dependency assembly, transaction ordering, and cross-session coordination when those duties are part of its public contract.
+
+### Facade Or Monolith
+
+A module may keep more than the responsibility ceiling of function-like names only
+when it is a **thin facade**: an aggregation surface whose names delegate rather
+than own behaviour. Claiming that standing requires measurement, not assertion.
+
+A module is a thin facade only when all four hold:
+
+1. **Delegation ratio >= 0.90.** At least 90% of its declarations are a single
+   call, optionally returning or reading one property of that result.
+2. **No branching.** No declaration contains `if`, `for`, `while`, `switch`,
+   `try`, a ternary, or `catch`.
+3. **No own state.** No `this.<field> =` assignment outside the constructor.
+4. **Bounded bodies.** Fewer than 15 physical lines per declared name.
+
+Otherwise the module is a real monolith and the ceiling applies: split it.
+
+Run `npm run analyze:module-facades` to compute all three clauses and classify
+every over-ceiling module. The delegation threshold is not arbitrary: on the
+current tree the classification has a clean gap - facade-shaped modules sit at a
+delegation ratio at or above 0.90 with zero branching, and every real monolith
+sits at 0.35 or below - so any cutoff inside that gap classifies identically.
+
+The tool has one known measurement gap, recorded rather than papered over: a
+declaration whose return type is an object type is parsed as starting mid-annotation,
+so it can be reported branch-free when it is not. One declaration in the tree is
+affected today. The error direction is always "too generous" - a module may be
+excused as a facade when it owns a little behaviour - so treat a `thin-facade`
+verdict as a prompt to look, not as proof. Three fixes were attempted and reverted
+because each regressed more verdicts than it corrected; the limitation is documented
+in the script.
+
+A fourth clause, lines per declared name, was considered and is deliberately not
+part of the verdict. Length is reported for context but does not decide, because
+it does not separate the two shapes: over-ceiling modules range from 8.8 to 144.7
+lines per name with no gap in between, and most of the tree's long modules are
+long because of literal tables and doc comments rather than logic. A module is a
+monolith because of what its declarations do, not how tall the file is.
+
+Splitting is still a design act, not a mechanical one. A module whose functions
+form a safety-ordered write path, or whose state shape is an encoded contract
+consumed elsewhere, must be split along its existing seams and never by name
+count alone.
 
 ## Session Domain Guidance
 
@@ -209,8 +297,8 @@ Examples:
 runtime/events/projection.ts
 runtime/events/projection.test.ts
 
-presentation/terminal/renderer.ts
-presentation/terminal/renderer.test.ts
+presentation/terminal/streaming.ts
+presentation/terminal/streaming.test.ts
 ```
 
 ## New File Checklist

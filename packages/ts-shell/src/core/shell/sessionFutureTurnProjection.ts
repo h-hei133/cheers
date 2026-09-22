@@ -2,18 +2,18 @@ import {
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
   getLatestCompactCheckpoint,
   type CompactLiveCheckpointStore,
-} from "../context/compact/checkpoint/compactLiveCheckpoint.js";
+} from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import {
   DEFAULT_COMPACT_INJECTION_STATE_STORE,
   type CompactInjectionStateStore,
-} from "../context/compact/injection/compactInjectionState.js";
-import { planCompactFutureTurnInjection } from "../context/compact/injection/compactFutureTurnInjection.js";
+} from "../../context/compact/injection/compactInjectionState.js";
+import { planCompactFutureTurnInjection } from "../../context/compact/injection/compactFutureTurnInjection.js";
 import {
   DEFAULT_PROJECT_MEMORY_INJECTION_STATE_STORE,
   type ProjectMemoryInjectionStateStore,
-} from "../context/memory/projectMemoryInjectionState.js";
-import { planProjectMemoryFutureTurnInjection } from "../context/memory/projectMemoryFutureTurnInjection.js";
-import type { ProjectMemoryStore } from "../context/memory/projectMemoryStoreContract.js";
+} from "../../memory/projectMemoryInjectionState.js";
+import { planProjectMemoryFutureTurnInjection } from "../../memory/projectMemoryFutureTurnInjection.js";
+import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract.js";
 
 export interface SessionFutureTurnProjectionDependencies {
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;

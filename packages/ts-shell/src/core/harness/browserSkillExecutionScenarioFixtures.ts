@@ -3,14 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import {
   BROWSER_CLI_EXTERNAL_RUNNER_MANIFEST_ENV,
-} from "../context/browserCliExecutorInjection.js";
+} from "../../browser/cliExecutorInjection.js";
 import {
   createBrowserExternalRunnerManifest,
   serializeBrowserExternalRunnerManifest,
   type BrowserExternalRunnerManifest,
-} from "../context/browser/runtime/external/manifest.js";
-import { createBrowserSkillRunnerBinding } from "../context/browser/skill/runner/binding.js";
-import { createBrowserSkillRunnerMetadata } from "../context/browser/skill/runner/metadata.js";
+} from "../../browser/runtime/external/manifest.js";
+import { createBrowserSkillRunnerBinding } from "../../browser/skill/runner/binding.js";
+import { createBrowserSkillRunnerMetadata } from "../../browser/skill/runner/metadata.js";
 
 export type BrowserSkillExecutionFixtureKind =
   | "success"

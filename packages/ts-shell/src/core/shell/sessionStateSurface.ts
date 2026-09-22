@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type {
   SessionContinuitySnapshot,
   SessionManager,
@@ -26,7 +26,7 @@ export function renderSessionListSurface(
 
   renderer.renderLine("\nRe-entry sessions");
   renderer.renderLine(
-    "Use /sessions switch <id|prefix|title|last> to jump directly, /resume [id|prefix|title|last] to continue recoverable work, or /sessions current for active-session details.",
+    "Use /resume switch <id|prefix|title|last> to jump directly, /resume [id|prefix|title|last] to continue recoverable work, or /resume current for active-session details.",
   );
   for (const summary of summaries) {
     renderer.renderLine(
@@ -86,7 +86,7 @@ export function formatSessionListLine(input: {
   activeSessionId: string;
 }): string {
   const summary = input.summary;
-  const activeMarker = summary.id === input.activeSessionId ? "*" : " ";
+  const activeMarker = summary.id === input.activeSessionId ? " (active now)" : "";
   const recoverability =
     summary.resumeDisposition === "fully-resumable"
       ? "fully-resumable"
@@ -101,7 +101,9 @@ export function formatSessionListLine(input: {
     : summary.lastUserMessage?.trim()
       ? ` last="${truncate(summary.lastUserMessage.trim(), 56)}"`
       : "";
-  return `${activeMarker} ${summary.id}  [${summary.status}] [${recoverability}]  ${title}  @${projectLabel}  updated=${toRelativeTime(summary.updatedAt)}${stateLabels}${promptLabel}`;
+  // Every entry is a list item: a leading marker that is a bullet on one line and
+  // whitespace on the next renders as two different things.
+  return `- \`${summary.id}\`${activeMarker}  [${summary.status}] [${recoverability}]  ${title}  @${projectLabel}  updated=${toRelativeTime(summary.updatedAt)}${stateLabels}${promptLabel}`;
 }
 
 export function formatCurrentSessionLines(

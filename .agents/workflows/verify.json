@@ -1,0 +1,23 @@
+{
+  "name": "verify",
+  "description": "types first, then the shell test suite",
+  "maxConcurrency": 2,
+  "steps": [
+    {
+      "id": "types",
+      "run": "npx tsc --noEmit -p packages/ts-shell/tsconfig.build.json",
+      "timeoutSeconds": 600
+    },
+    {
+      "id": "cycles",
+      "run": "node scripts/validate-structure.mjs",
+      "timeoutSeconds": 300
+    },
+    {
+      "id": "shell-tests",
+      "run": "npm run test:ts --silent",
+      "needs": ["types"],
+      "timeoutSeconds": 1200
+    }
+  ]
+}

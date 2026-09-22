@@ -23,6 +23,24 @@ interface SessionLifecycleCallbacks {
   readonly now: () => string;
 }
 
+/**
+ * The subject line of a session, derived from its first prompt.
+ *
+ * A bare id tells a user nothing about which conversation was which; the first
+ * thing they typed does. The first line of the prompt, collapsed and bounded,
+ * becomes the title unless the user has already named the session explicitly —
+ * an explicit rename always wins over the derivation.
+ */
+export function deriveSessionTitleFromPrompt(prompt: string): string {
+  const firstLine = prompt
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  const collapsed = (firstLine ?? "").replace(/\s+/g, " ").trim();
+  if (collapsed.length === 0) return "";
+  return collapsed.length <= 60 ? collapsed : `${collapsed.slice(0, 59)}…`;
+}
+
 export function markSessionRunStarted(
   callbacks: SessionLifecycleCallbacks,
   sessionId: string,
@@ -33,6 +51,10 @@ export function markSessionRunStarted(
   delete session.lastError;
   session.pendingPrompt = prompt;
   session.updatedAt = callbacks.now();
+  if (!session.title?.trim()) {
+    const derived = deriveSessionTitleFromPrompt(prompt);
+    if (derived) session.title = derived;
+  }
   callbacks.appendTranscriptEvent(
     sessionId,
     createLifecycleTranscriptEvent({

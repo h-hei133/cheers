@@ -3,34 +3,31 @@ import {
   getGlobalTraceContext,
   type TraceContext,
 } from './traceContext.js'
+import { getGlobalRotatingFileSink } from './rotatingFileSink.js'
+import type { StructuredLogEntry } from './types.js'
 
-export interface StructuredLogEntry {
-  readonly timestamp: string
-  readonly level: 'debug' | 'info' | 'warn' | 'error'
-  readonly traceId: string
-  readonly spanId: string
-  readonly parentSpanId?: string
-  readonly component: string
-  readonly message: string
-  readonly fields: Record<string, unknown>
-}
-
+export type { StructuredLogEntry } from './types.js'
 const secretPatterns = [
-  /\bsk_[A-Za-z0-9_-]{16,}\b/g,
-  /\bpk_[A-Za-z0-9_-]{16,}\b/g,
+  /\bsk[-_][A-Za-z0-9_-]{16,}\b/g,
+  /\bpk[-_][A-Za-z0-9_-]{16,}\b/g,
   /\bBearer\s+[A-Za-z0-9._-]+\b/gi,
   /\bAKIA[0-9A-Z]{16}\b/g,
   /AIza[0-9A-Za-z\-_]{35}/g,
   /https?:\/\/([^:\s]+):([^@\s]+)@/gi,
   /eyJ[A-Za-z0-9_\-.]+\.eyJ[A-Za-z0-9_\-.]+\.[A-Za-z0-9_\-.]+/g,
-]
+];
 
 const sensitiveKeys = ['secret', 'token', 'password', 'apiKey', 'api_key', 'authorization']
 
 let globalSink: ((entry: StructuredLogEntry) => void) | null = null
+let enableFilePersistence: boolean = true
 
 export function setStructuredLogSink(sink: ((entry: StructuredLogEntry) => void) | null): void {
   globalSink = sink
+}
+
+export function setFilePersistenceEnabled(enabled: boolean): void {
+  enableFilePersistence = enabled
 }
 
 export function redactSecrets(value: string): string {
@@ -41,22 +38,32 @@ export function redactSecrets(value: string): string {
   return next
 }
 
-export function redactSecretsFromObject(value: unknown): unknown {
+export function redactSecretsFromObject(value: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
   if (typeof value === 'string') {
     return redactSecrets(value)
   }
 
-  if (Array.isArray(value)) {
-    return value.map(item => redactSecretsFromObject(item))
-  }
-
   if (typeof value === 'object' && value !== null) {
+    if (seen.has(value)) {
+      return '[CIRCULAR]'
+    }
+    seen.add(value)
+
+    if (Array.isArray(value)) {
+      return value.map(item => redactSecretsFromObject(item, seen))
+    }
+
     const redacted: Record<string, unknown> = {}
     for (const [key, item] of Object.entries(value)) {
-      if (sensitiveKeys.includes(key) || sensitiveKeys.includes(key.toLowerCase())) {
+      const lowerKey = key.toLowerCase()
+      const isSensitive =
+        sensitiveKeys.some(s => lowerKey.includes(s.toLowerCase())) ||
+        /token|secret|password|apikey|auth/i.test(key)
+
+      if (isSensitive) {
         redacted[key] = '[REDACTED]'
       } else {
-        redacted[key] = redactSecretsFromObject(item)
+        redacted[key] = redactSecretsFromObject(item, seen)
       }
     }
     return redacted
@@ -90,12 +97,17 @@ export class StructuredLogger {
     this.emit('error', message, fields)
   }
 
+  child(subComponent: string): StructuredLogger {
+    const childContext = createChildSpan(this.traceContext)
+    return new StructuredLogger(`${this.component}.${subComponent}`, childContext)
+  }
+
   private emit(
-    level: StructuredLogEntry['level'],
+    level: 'debug' | 'info' | 'warn' | 'error',
     message: string,
     fields: Record<string, unknown>,
   ): void {
-    globalSink?.({
+    const entry: StructuredLogEntry = {
       timestamp: new Date().toISOString(),
       level,
       traceId: this.traceContext.traceId,
@@ -104,7 +116,23 @@ export class StructuredLogger {
       component: this.component,
       message: redactSecrets(message),
       fields: redactSecretsFromObject(fields) as Record<string, unknown>,
-    })
+    }
+
+    if (globalSink) {
+      try {
+        globalSink(entry)
+      } catch {
+        // Sinks are side-channels
+      }
+    }
+
+    if (enableFilePersistence && !process.env.VITEST && process.env.NODE_ENV !== 'test') {
+      try {
+        getGlobalRotatingFileSink().write(entry)
+      } catch {
+        // Non-blocking
+      }
+    }
   }
 }
 

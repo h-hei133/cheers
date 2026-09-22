@@ -1,5 +1,5 @@
 import type { ShellActionResult } from "../commands/types.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type {
   ResumeResult,
   Session,
@@ -37,7 +37,6 @@ export async function runResumeLikeShellAction(options: {
   runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   turnNumber?: number;
-  normalizePromptForExecution: (prompt: string) => string;
   switchRuntimeSessionProjectContext: (
     runtimeContext: ShellRuntimeContext,
     session: Session,
@@ -99,10 +98,8 @@ export async function runResumeLikeShellAction(options: {
       }
 
       const nextTurn = (options.turnNumber ?? 0) + 1;
-      const effectiveFollowUp =
-        options.normalizePromptForExecution(continuationPrompt);
       await options.executeResolvedPromptTurn({
-        effectivePrompt: effectiveFollowUp,
+        effectivePrompt: continuationPrompt,
         continuityState: options.sessionManager.buildContinuitySnapshot(
           resumeResult.session.id,
         ),
@@ -138,6 +135,9 @@ export async function runResumeLikeShellAction(options: {
     sessionManager: options.sessionManager,
     runtimeContext: options.runtimeContext,
     renderer: options.renderer,
+    // `/continue` is the recovery door: it exists to pick up an interrupted run,
+    // so it keeps the gate that refuses a session with nothing to continue.
+    recoveryOnly: options.slashResult.action === "continue-session",
   });
   if (!resumed.resumed) {
     return { turnNumber: options.turnNumber ?? 0 };
@@ -145,10 +145,8 @@ export async function runResumeLikeShellAction(options: {
 
   if (continuationPrompt) {
     const nextTurn = (options.turnNumber ?? 0) + 1;
-    const effectiveFollowUp =
-      options.normalizePromptForExecution(continuationPrompt);
     await options.executeResolvedPromptTurn({
-      effectivePrompt: effectiveFollowUp,
+      effectivePrompt: continuationPrompt,
       turnNumber: options.source === "interactive" ? nextTurn : undefined,
       turnOrigin: "continued",
     });

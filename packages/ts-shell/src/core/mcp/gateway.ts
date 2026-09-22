@@ -5,6 +5,7 @@ import {
   loadMcpConfigs,
 } from "./config.js";
 import { CoreMcpConnectionManager } from "./connectionManager.js";
+import { projectTrust } from "../security/projectTrust.js";
 import type {
   McpClientSnapshot,
   McpConnectionState,
@@ -110,7 +111,7 @@ export class CoreMcpGateway {
   }
 
   loadConfigs(): Record<string, ScopedMcpServerConfig> {
-    return loadMcpConfigs(this.workspaceRoot);
+    return loadMcpConfigs(this.workspaceRoot, !projectTrust.isProjectUntrusted(this.workspaceRoot));
   }
 
   async snapshot(): Promise<McpClientSnapshot> {

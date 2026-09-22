@@ -55,7 +55,7 @@ Verification planning and execution are split between in-loop low-risk verificat
 - Verification / Repair: `verificationModule.ts`, `verificationCommand*.ts`, `verificationRepair*.ts`, `editRepair*.ts`
 - Result Surface: `resultMapper.ts`, `resultSurfaceModule.ts`, `sessionTerminalState.ts`, `sessionStateSurface.ts`
 - Session / Continue: `SessionManager.ts`, `stoppedSessionContinuity.ts`, `compactContinuitySummary.ts`, `continueShellActionRuntime.ts`
-- Harness / Eval: `scripts/verify-context-planning.mjs`, `scripts/verify-edit-capability-closeout.mjs`, `scripts/verify-result-contract.mjs`, `scripts/verify-release-deterministic.mjs`, `scripts/verify-real-provider-anchored-smoke.mjs`, `scripts/verify-real-provider-task-loop-mvp.mjs`, `scripts/verify/index.mjs`
+- Harness / Eval: `scripts/verify-context-planning.mjs`, `scripts/verify-result-contract.mjs`, `scripts/verify-release-deterministic.mjs`, `scripts/verify-real-provider-anchored-smoke.mjs`, `scripts/verify-real-provider-task-loop-mvp.mjs`, `scripts/verify/index.mjs`
 - Browser: `browserModule.ts`, browser runtime/policy/transaction modules under `core/context`
 - MCP: `core/mcp/*`, especially `errorTaxonomy.ts` and `gateway.ts`
 

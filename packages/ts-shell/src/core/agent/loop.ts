@@ -1,0 +1,225 @@
+import type { AgentEventSink } from "./events.js";
+import type { AgentMessage, AgentStopReason } from "./state.js";
+import {
+  executeToolBatch,
+  failTruncatedCalls,
+  type AgentTool,
+  type AgentToolCall,
+  type AgentToolExecutionMode,
+  type ToolHooks,
+} from "./tools.js";
+
+export interface AssistantStep {
+  readonly text: string;
+  readonly toolCalls: readonly AgentToolCall[];
+  readonly stopReason: AgentStopReason;
+  readonly errorMessage?: string;
+}
+export interface NextStepSnapshot {
+  readonly message: AgentMessage;
+  readonly toolResults: readonly AgentMessage[];
+  readonly messages: readonly AgentMessage[];
+}
+
+export interface NextStepUpdate {
+  readonly messages?: readonly AgentMessage[];
+}
+
+export interface AgentLoopConfig {
+  readonly tools?: readonly AgentTool[];
+  readonly toolExecution?: AgentToolExecutionMode;
+  readonly beforeToolCall?: ToolHooks["beforeToolCall"];
+  readonly afterToolCall?: ToolHooks["afterToolCall"];
+  readonly shouldStopAfterStep?: (snapshot: NextStepSnapshot) => boolean | Promise<boolean>;
+  readonly prepareNextStep?: (
+    snapshot: NextStepSnapshot,
+    signal?: AbortSignal,
+  ) => NextStepUpdate | undefined | Promise<NextStepUpdate | undefined>;
+  readonly onContextReplaced?: (messages: readonly AgentMessage[]) => void;
+  readonly getSteeringMessages?: () => Promise<AgentMessage[]>;
+  readonly getFollowUpMessages?: () => Promise<AgentMessage[]>;
+  readonly streamStep: (
+    messages: readonly AgentMessage[],
+    signal?: AbortSignal,
+  ) => Promise<AssistantStep>;
+}
+
+export async function runAgentLoop(
+  prompts: readonly AgentMessage[],
+  seed: readonly AgentMessage[],
+  config: AgentLoopConfig,
+  emit: AgentEventSink,
+  signal: AbortSignal | undefined,
+  options: { readonly skipInitialSteeringPoll?: boolean } = {},
+): Promise<AgentMessage[]> {
+  const produced: AgentMessage[] = [];
+  const context: AgentMessage[] = [...seed, ...prompts];
+
+  await emit({ type: "agent_start" });
+  await emit({ type: "turn_start" });
+  for (const prompt of prompts) {
+    await emit({ type: "message_start", message: prompt });
+    await emit({ type: "message_end", message: prompt });
+    produced.push(prompt);
+  }
+  await driveLoop(context, produced, config, emit, signal, !options.skipInitialSteeringPoll);
+  return produced;
+}
+
+export async function runAgentLoopContinue(
+  seed: readonly AgentMessage[],
+  config: AgentLoopConfig,
+  emit: AgentEventSink,
+  signal: AbortSignal | undefined,
+): Promise<AgentMessage[]> {
+  if (seed.length === 0) {
+    throw new Error("Cannot continue: no messages in context");
+  }
+  if (seed[seed.length - 1].role === "assistant") {
+    throw new Error("Cannot continue from message role: assistant");
+  }
+  const produced: AgentMessage[] = [];
+  const context: AgentMessage[] = [...seed];
+
+  await emit({ type: "agent_start" });
+  await emit({ type: "turn_start" });
+
+  await driveLoop(context, produced, config, emit, signal, false);
+  return produced;
+}
+
+async function driveLoop(
+  context: AgentMessage[],
+  produced: AgentMessage[],
+  config: AgentLoopConfig,
+  emit: AgentEventSink,
+  signal: AbortSignal | undefined,
+  seedSteering: boolean,
+): Promise<void> {
+  const hooks: ToolHooks | undefined =
+    config.beforeToolCall || config.afterToolCall
+      ? { beforeToolCall: config.beforeToolCall, afterToolCall: config.afterToolCall }
+      : undefined;
+  let pending: AgentMessage[] = seedSteering ? await pollSteering(config) : [];
+  let completedStep: NextStepSnapshot | undefined;
+
+  while (true) {
+    let hasMoreToolCalls = true;
+    while (hasMoreToolCalls || pending.length > 0) {
+      if (completedStep) {
+        const update = await config.prepareNextStep?.(completedStep, signal);
+        if (update?.messages) {
+          replaceContext(context, update.messages);
+          config.onContextReplaced?.(update.messages);
+        }
+        if (pending.length === 0) {
+          pending = await pollSteering(config);
+        }
+        await emit({ type: "turn_start" });
+      }
+
+      for (const message of pending) {
+        await emit({ type: "message_start", message });
+        await emit({ type: "message_end", message });
+        context.push(message);
+        produced.push(message);
+      }
+      pending = [];
+
+      const step = await config.streamStep(context, signal);
+      const assistant: AgentMessage = {
+        role: "assistant",
+        content: step.text,
+        ...(step.toolCalls.length > 0
+          ? {
+              tool_calls: step.toolCalls.map((call) => ({
+                id: call.id,
+                type: "function" as const,
+                function: { name: call.name, arguments: JSON.stringify(call.args ?? {}) },
+              })),
+            }
+          : {}),
+        stopReason: step.stopReason,
+        ...(step.errorMessage ? { errorMessage: step.errorMessage } : {}),
+      };
+      await emit({ type: "message_start", message: assistant });
+      await emit({ type: "message_end", message: assistant });
+      context.push(assistant);
+      produced.push(assistant);
+
+      if (step.stopReason === "error" || step.stopReason === "aborted") {
+        await emit({ type: "turn_end", message: assistant, toolResults: [] });
+        await emit({ type: "agent_end", messages: [...produced] });
+        return;
+      }
+
+      const toolResults: AgentMessage[] = [];
+      hasMoreToolCalls = false;
+      if (step.toolCalls.length > 0) {
+        if (step.stopReason === "length") {
+          const failed = await failTruncatedCalls(step.toolCalls, emit);
+          toolResults.push(...failed);
+          hasMoreToolCalls = true;
+        } else {
+          const batch = await executeToolBatch(
+            config.tools ?? [],
+            assistant,
+            step.toolCalls,
+            hooks,
+            config.toolExecution,
+            signal,
+            emit,
+          );
+          toolResults.push(...batch.messages);
+          hasMoreToolCalls = !batch.terminate;
+        }
+      }
+      for (const result of toolResults) {
+        context.push(result);
+        produced.push(result);
+      }
+      if (signal?.aborted) {
+        await emit({ type: "turn_end", message: assistant, toolResults });
+        await emit({ type: "agent_end", messages: [...produced] });
+        return;
+      }
+
+      await emit({ type: "turn_end", message: assistant, toolResults });
+      completedStep = { message: assistant, toolResults, messages: [...context] };
+      if (await config.shouldStopAfterStep?.(completedStep)) {
+        await emit({ type: "agent_end", messages: [...produced] });
+        return;
+      }
+      pending = await pollSteering(config);
+    }
+
+    const followUp = await pollFollowUp(config);
+    if (followUp.length > 0) {
+      pending = followUp;
+      continue;
+    }
+    break;
+  }
+
+  await emit({ type: "agent_end", messages: [...produced] });
+}
+
+async function pollSteering(config: AgentLoopConfig): Promise<AgentMessage[]> {
+  try {
+    return (await config.getSteeringMessages?.()) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function pollFollowUp(config: AgentLoopConfig): Promise<AgentMessage[]> {
+  try {
+    return (await config.getFollowUpMessages?.()) ?? [];
+  } catch {
+    return [];
+  }
+}
+function replaceContext(context: AgentMessage[], next: readonly AgentMessage[]): void {
+  context.length = 0;
+  context.push(...next);
+}

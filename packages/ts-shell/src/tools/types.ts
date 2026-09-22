@@ -10,6 +10,21 @@ export interface ToolExecutionContext {
   readonly sessionId?: string
   readonly correlationId?: string
   readonly abortSignal?: AbortSignal
+  /**
+   * Called with output as a command produces it.
+   *
+   * A long command that reports nothing until it exits is indistinguishable from
+   * one that has hung. Chunks arrive as they are written, not at the end.
+   */
+  readonly onOutput?: (chunk: string) => void
+  readonly interactiveAsk?: (
+    questions: Array<{
+      id: string
+      question: string
+      options?: Array<{ label: string; description?: string }>
+      recommended?: number
+    }>,
+  ) => Promise<Record<string, string>>
 }
 
 export interface ToolExecutionResult {

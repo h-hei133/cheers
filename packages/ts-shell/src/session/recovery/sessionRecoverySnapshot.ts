@@ -7,7 +7,7 @@ import type {
   ContinuationReason,
   TerminalClassification,
   TerminalReason,
-} from "../../orchestration/types.js";
+} from "../../result/types.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
@@ -21,24 +21,8 @@ import {
   prepareReplayTranscript,
 } from "../replay/builder.js";
 import { deriveLifecycleIndexFromTranscript } from "./sessionLifecycleReadModel.js";
-
-export interface RecoverySnapshot {
-  readonly pendingPrompt?: string;
-  readonly runPhase?: "idle" | "prompt-persisted" | "turn-active";
-  readonly interruptedKind?: "prompt" | "turn";
-  readonly durableStatus?: "success" | "stopped" | "error";
-  readonly terminalReason?: TerminalReason;
-  readonly terminalClassification?: TerminalClassification;
-  readonly lastContinuationReason?: ContinuationReason;
-  readonly pendingLifecycle: DurableLifecycleIndex;
-  readonly repairSummary: QueryRuntimeRepairSummary;
-  readonly harness?: QueryRuntimeHarnessState;
-  readonly taskState?: QueryRuntimeTaskState;
-  readonly lastUserMessage?: SessionMessage;
-  readonly lastAssistantMessage?: SessionMessage;
-  readonly lastLifecycleEvent?: Extract<TranscriptEvent, { type: "lifecycle" }>;
-  readonly transcriptEvents: TranscriptEvent[];
-}
+export type { RecoverySnapshot } from "./types.js";
+import type { RecoverySnapshot } from "./types.js";
 
 export function buildSessionRecoverySnapshot(input: {
   readonly sessionId: string;

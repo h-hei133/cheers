@@ -66,6 +66,35 @@ Expected workflow:
 3. Use the comparison to preserve responsibility boundaries and runtime semantics.
 4. Implement the target design inside this repository.
 
+## Compare Decisions Before Implementing
+
+When a reference has already solved the same class of problem, compare its **specific decisions**
+against your plan **before writing the code**, not after. Re-deriving a solution from first
+principles is how a known pitfall gets walked into: a sound local reason can still justify a
+choice the existing solution had already rejected for a reason you have not seen yet.
+
+Concretely, for the part of the reference that does the same job:
+
+- List the decisions it makes, one line each — key derivation, ordering, fallbacks, what it
+  deliberately refuses to do, and what it does about the cases your plan treats as edge cases.
+- For each, state whether your plan agrees, disagrees, or has not considered it. **"Not
+  considered" is the finding**: it is where the defect hides.
+- Where you disagree, name the reason. A disagreement with a stated reason is a decision; a
+  disagreement by omission is a defect waiting to be found.
+
+Then write a test that fails when the reference's decision is reversed.
+
+This is not licence to copy. The comparison is for decisions, not code: the target's ownership
+boundaries, naming, and structure still govern the implementation, per the limits below.
+
+### Evidence a comparison actually happened
+
+- The reference's decisions appear in the change's reasoning or commit message.
+- A test exists that fails when a compared decision is reverted.
+- Disagreements carry an explicit reason rather than silence.
+
+A comparison that cannot fail a test has not been checked against anything.
+
 ## Limits
 
 - Do not modify reference repositories.

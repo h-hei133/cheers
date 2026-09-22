@@ -3,13 +3,12 @@ import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { ResumeLikeShellAction } from "../../core/shell/shellActionBridge.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
-import type { StreamingRenderer } from "../../renderer/StreamingRenderer.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import {
   executeResolvedPromptTurn,
 } from "../../entrypoints/cliRuntimeModule.js";
-import { normalizePromptForExecution } from "../../entrypoints/cliCommandExecutionBridge.js";
 import { renderSessionCommandMap } from "../../entrypoints/slashCommandRegistry.js";
 import { switchRuntimeSessionProjectContext } from "../../entrypoints/cliSessionModule.js";
 
@@ -35,7 +34,6 @@ export async function runInteractiveResumeAction(input: {
     runtimeContext: input.runtimeContext,
     renderer: input.renderer,
     turnNumber: input.turnNumber,
-    normalizePromptForExecution,
     switchRuntimeSessionProjectContext,
     renderSessionCommandMap,
     executeResolvedPromptTurn: (turnInput) => {

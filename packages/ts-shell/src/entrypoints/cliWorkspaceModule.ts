@@ -7,7 +7,7 @@ import {
   type ShellRuntimeContext,
 } from "../core/shell/runtimeContext.js";
 import { resolveRootBindingDiagnostics } from "../core/shell/runtimeContext.js";
-import { StreamingRenderer } from "../renderer/StreamingRenderer.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { WorkspaceRootMode } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
@@ -43,37 +43,53 @@ export function runCliWorkspaceCommand(input: {
 }
 
 export function isWorkspaceInfoPromptStrict(prompt: string): boolean {
-  const normalized = prompt.toLowerCase();
-  const trimmed = prompt.trim();
-  const hasQuestionShape =
-    /[?？]$/.test(trimmed) ||
-    normalized.startsWith("what ") ||
-    normalized.startsWith("where ") ||
-    /\b(what|where)\b/i.test(normalized) ||
-    /(?:\u4ec0\u4e48|\u54ea\u91cc|\u5728\u54ea|\u54ea\u4e2a)/u.test(prompt);
-  if (!hasQuestionShape) {
+  const normalized = prompt.toLowerCase().trim();
+  
+  // Only match pure workspace path queries (e.g., "pwd", "where am i", "当前工作目录是什么", "what is the current directory")
+  const pureDirectoryQueries = [
+    "pwd",
+    "cwd",
+    "where am i",
+    "where am i?",
+    "what is current directory",
+    "what is current directory?",
+    "what is the current directory",
+    "what is the current directory?",
+    "what is the current workspace",
+    "what is the current workspace?",
+    "当前目录是什么",
+    "当前目录是什么？",
+    "当前工作目录是什么",
+    "当前工作目录是什么？",
+    "当前工作区是什么",
+    "当前工作区是什么？",
+    "当前目录在哪里",
+    "当前目录在哪里？",
+    "当前工作目录在哪里",
+    "当前工作目录在哪里？",
+    "当前工作区在哪里",
+    "当前工作区在哪里？",
+  ];
+  if (pureDirectoryQueries.includes(normalized)) {
+    return true;
+  }
+
+  // If prompt asks to analyze, explain, look, fix, read, etc., it must ALWAYS pass to the agent loop
+  const complexTaskVerbs =
+    /(?:\u5206\u6790|\u770b\u4e00\u4e0b|\u4ecb\u7ecd|\u89e3\u6790|\u67e5\u770b|\u641c\u7d22|\u67b6\u6784|\u4ee3\u7801|\u9879\u76ee|analyze|explain|explore|check|overview|architecture|structure|summary)/i;
+  if (complexTaskVerbs.test(prompt)) {
     return false;
   }
 
-  const workspaceTerms =
-    /\b(current|working)\s+(directory|dir|cwd)\b/i.test(normalized) ||
-    /\bwhere\s+am\s+i\b/i.test(normalized) ||
-    /\bwhat\s+is\s+the\s+current\s+workspace\b/i.test(normalized) ||
-    /(?:\u5f53\u524d|\u73b0\u5728).*(?:\u5de5\u4f5c\u76ee\u5f55|\u76ee\u5f55|\u5de5\u4f5c\u533a)/u.test(
-      prompt,
-    );
-  if (!workspaceTerms) {
-    return false;
-  }
-
-  const hasMutationIntent =
-    /\b(write|create|generate|save|edit|modify|update|fix|replace|patch)\b/i.test(
+  const isStrictShortQuery =
+    /^(?:what|where)\s+(?:is\s+)?(?:the\s+)?(?:current\s+)?(?:directory|cwd|workspace)\s*[?？]?$/i.test(
       normalized,
     ) ||
-    /(?:\u5199|\u521b\u5efa|\u751f\u6210|\u4fdd\u5b58|\u4fee\u6539|\u66f4\u65b0|\u4fee\u590d|\u66ff\u6362)/u.test(
-      prompt,
+    /^(?:\u5f53\u524d|\u73b0\u5728)(?:\u7684)?(?:\u5de5\u4f5c)?(?:\u76ee\u5f55|\u5de5\u4f5c\u533a)(?:\u662f(?:\u4ec0\u4e48|\u54ea\u91cc)|\u5728\u54ea)\s*[?？]?$/u.test(
+      prompt.trim(),
     );
-  return !hasMutationIntent;
+
+  return isStrictShortQuery;
 }
 
 export function normalizePathForCompare(value: string): string {

@@ -258,6 +258,6 @@ describe('shell runtime context', () => {
     expect(diagnostic.explanation).toContain('D:/repo-a')
     expect(diagnostic.explanation).toContain('D:/repo-b/packages/app')
     expect(diagnostic.explanation).toContain('D:/repo-b')
-    expect(diagnostic.nextAction).toContain('/sessions current')
+    expect(diagnostic.nextAction).toContain('/resume current')
   })
 })
