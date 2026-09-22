@@ -5,45 +5,30 @@ import type {
 } from "../schema/sessionThread.js";
 import {
   addSessionCompactionRecord,
-  appendSessionThreadChild,
   buildLinearSessionThreadSnapshot,
+  catchUpSessionThread,
   createSessionBranch,
   switchSessionActiveLeaf,
 } from "../schema/sessionThread.js";
 import { readStateSnapshotSafely, writeSessionState } from "./sessionStateStore.js";
 import type { SessionFileLayout } from "./sessionFileLayout.js";
 
+/**
+ * The thread as the session currently stands.
+ *
+ * Caught up on read: a thread is built once and then kept, so it does not follow
+ * the session by itself, and a reader that took the stored thread at face value
+ * would see a history that stops at whichever turn was written first.
+ */
 export function readSessionThreadSnapshot(input: {
   readonly session: Session;
   readonly layout: Pick<SessionFileLayout, "statePath">;
 }): SessionThreadSnapshot {
-  return readStateSnapshotSafely(input.layout.statePath)?.thread ??
-    buildLinearSessionThreadSnapshot(input.session);
-}
-
-export function appendDurableSessionChild(input: {
-  readonly session: Session;
-  readonly layout: Pick<SessionFileLayout, "statePath" | "stateLockPath">;
-  readonly messageRole: "user" | "assistant";
-  readonly timestamp: string;
-  readonly entryId?: string;
-  readonly parentEntryId?: string;
-}): SessionThreadSnapshot {
-  const current = readStateSnapshotSafely(input.layout.statePath)?.thread;
-  const thread = appendSessionThreadChild({
-    snapshot: current,
-    session: input.session,
-    messageRole: input.messageRole,
-    timestamp: input.timestamp,
-    ...(input.entryId ? { entryId: input.entryId } : {}),
-    ...(input.parentEntryId ? { parentEntryId: input.parentEntryId } : {}),
-  });
-  writeSessionState({
-    session: input.session,
-    layout: input.layout,
-    overrides: { thread },
-  });
-  return thread;
+  return catchUpSessionThread(
+    readStateSnapshotSafely(input.layout.statePath)?.thread ??
+      buildLinearSessionThreadSnapshot(input.session),
+    input.session,
+  );
 }
 
 export function createDurableSessionBranch(input: {

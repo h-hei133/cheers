@@ -35,7 +35,7 @@ import {
 } from "./presentation/sessionReentrySurface.js";
 
 describe("session substrate projections", () => {
-  it("encodes transcript events without changing their stored JSON shape", () => {
+  it("encodes transcript events with an entry id and no other shape change", () => {
     const message = createMessageTranscriptEvent({
       role: "user",
       content: "resume this",
@@ -43,6 +43,7 @@ describe("session substrate projections", () => {
     });
     expect(JSON.parse(encodeTranscriptEvent(message))).toEqual({
       type: "message",
+      id: expect.stringMatching(/^msg_[0-9a-f]{8}$/),
       role: "user",
       content: "resume this",
       timestamp: "2026-05-19T00:00:00.000Z",
@@ -61,6 +62,7 @@ describe("session substrate projections", () => {
       }),
     ).toEqual({
       type: "lifecycle",
+      id: expect.stringMatching(/^evt_[0-9a-f]{8}$/),
       event: "run-interrupted",
       timestamp: "2026-05-19T00:00:01.000Z",
       detail: "pending prompt",
@@ -73,6 +75,7 @@ describe("session substrate projections", () => {
       }),
     ).toEqual({
       type: "query-event",
+      id: expect.stringMatching(/^qevt_[0-9a-f]{8}$/),
       event: { type: "query.started", sessionId: "sess_1", prompt: "go" },
       timestamp: "2026-05-19T00:00:02.000Z",
     });

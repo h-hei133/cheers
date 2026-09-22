@@ -117,6 +117,71 @@ describe("sessionTranscript", () => {
   });
 });
 
+describe("entry identity", () => {
+  it("gives every appended entry its own id", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-ids-"));
+    try {
+      const transcriptPath = path.join(root, "transcript.jsonl");
+      appendTranscriptEvent(
+        transcriptPath,
+        createMessageTranscriptEvent({
+          role: "user",
+          content: "one",
+          timestamp: "2026-05-28T00:00:00.000Z",
+        }),
+      );
+      appendBranchSummaryEvent(transcriptPath, {
+        summary: "went another way",
+        droppedTurns: 1,
+        timestamp: "2026-05-28T00:00:01.000Z",
+      });
+
+      const ids = readTranscriptEvents(transcriptPath).map((event) => event.id);
+      expect(ids.every((id) => typeof id === "string" && id.length > 0)).toBe(true);
+      // Two entries that could otherwise be told apart only by position.
+      expect(new Set(ids).size).toBe(ids.length);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("names entries written before ids existed by their line, without rewriting the file", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-legacy-"));
+    try {
+      const transcriptPath = path.join(root, "transcript.jsonl");
+      const original = [
+        JSON.stringify({ type: "message", role: "user", content: "old", timestamp: "t1" }),
+        JSON.stringify({ type: "message", role: "assistant", content: "older", timestamp: "t2" }),
+      ].join("\n");
+      fs.writeFileSync(transcriptPath, original, "utf8");
+
+      expect(readTranscriptEvents(transcriptPath).map((event) => event.id)).toEqual([
+        "line-1",
+        "line-2",
+      ]);
+      // Derived, not stored: these files are append-only.
+      expect(fs.readFileSync(transcriptPath, "utf8")).toBe(original);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps an id that was already recorded", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-keep-"));
+    try {
+      const transcriptPath = path.join(root, "transcript.jsonl");
+      fs.writeFileSync(
+        transcriptPath,
+        JSON.stringify({ type: "message", id: "msg_written", role: "user", content: "hi", timestamp: "t1" }),
+        "utf8",
+      );
+      expect(readTranscriptEvents(transcriptPath)[0]?.id).toBe("msg_written");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("corrupt transcript lines", () => {
   it("skips truncated and misshapen lines instead of failing the session", async () => {
     const { readTranscriptEvents } = await import("./sessionTranscript.js");

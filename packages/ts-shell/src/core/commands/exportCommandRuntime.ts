@@ -9,6 +9,7 @@ import {
   projectTranscriptMessages,
   readTranscriptEvents,
 } from "../../session/transcript/sessionTranscript.js";
+import type { TranscriptEvent } from "../../session/sessionEventCodec.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
 /**
@@ -20,6 +21,13 @@ import type { SessionMessage } from "../../session/schema/sessionMessage.js";
  * that contained no conversation, described as an export of one. Now it reads the
  * transcript the session actually recorded, and an empty transcript is reported as
  * empty rather than written out as a successful export of nothing.
+ *
+ * The two formats read different things, deliberately. Markdown projects the
+ * transcript into messages, because that is what a person wants to read. JSONL
+ * writes the transcript's own entries, because re-serializing the projection
+ * would drop the entry identity — the compaction and branch-summary entries are
+ * exactly what the projection exists to fold away, and an export that cannot show
+ * them cannot show what happened.
  */
 
 export async function runExportCommand(
@@ -33,8 +41,9 @@ export async function runExportCommand(
   }
 
   const format = args[0]?.toLowerCase() === "jsonl" ? "jsonl" : "markdown";
-  const messages = readConversation(sessionId);
-  if (messages.length === 0) {
+  const events = readTranscript(sessionId);
+  const messages = projectTranscriptMessages(events);
+  if (events.length === 0) {
     return {
       kind: "local",
       output: [
@@ -46,7 +55,7 @@ export async function runExportCommand(
   }
 
   const target = resolveTarget(root, args[1], sessionId, format);
-  const content = format === "jsonl" ? asJsonl(messages) : asMarkdown(messages, sessionId, root);
+  const content = format === "jsonl" ? asJsonl(events) : asMarkdown(messages, sessionId, root);
   try {
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, content, "utf8");
@@ -58,6 +67,19 @@ export async function runExportCommand(
   }
 
   const shown = path.relative(root, target) || target;
+  if (format === "jsonl") {
+    return {
+      kind: "local",
+      output: [
+        `Exported ${events.length} transcript entries to \`${shown}\`.`,
+        "",
+        "- One entry per line, in the order they were recorded.",
+        "- Entries carry their own `type` and `id`, so a reader can tell messages",
+        "  apart from compaction and branch-summary entries.",
+      ].join("\n"),
+    };
+  }
+
   const counts = tally(messages);
   return {
     kind: "local",
@@ -65,16 +87,16 @@ export async function runExportCommand(
       `Exported ${messages.length} messages to \`${shown}\`.`,
       "",
       `- ${counts.user} from you, ${counts.assistant} from the model, ${counts.tool} tool results`,
-      `- Format: ${format === "jsonl" ? "JSONL, one message per line" : "Markdown"}`,
+      "- Format: Markdown",
     ].join("\n"),
   };
 }
 
-/** The conversation this session recorded, in order. */
-function readConversation(sessionId: string): readonly SessionMessage[] {
+/** The transcript entries this session recorded, in order. */
+function readTranscript(sessionId: string): readonly TranscriptEvent[] {
   try {
     const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
-    return projectTranscriptMessages(readTranscriptEvents(layout.transcriptPath));
+    return readTranscriptEvents(layout.transcriptPath);
   } catch {
     return [];
   }
@@ -114,9 +136,16 @@ function asMarkdown(messages: readonly SessionMessage[], sessionId: string, root
   return `${lines.join("\n").replace(/\n{3,}/g, "\n\n")}\n`;
 }
 
-/** One JSON object per line, which is what a downstream tool can read back. */
-function asJsonl(messages: readonly SessionMessage[]): string {
-  return `${messages.map((message) => JSON.stringify(message)).join("\n")}\n`;
+/**
+ * One transcript entry per line.
+ *
+ * These are the entries the session recorded, not a projection of them: the
+ * projection folds compaction and branch-summary entries into ordinary messages,
+ * so exporting it would lose the record of what was compacted and what was
+ * stepped back past.
+ */
+function asJsonl(events: readonly TranscriptEvent[]): string {
+  return `${events.map((event) => JSON.stringify(event)).join("\n")}\n`;
 }
 
 function heading(role: SessionMessage["role"]): string {

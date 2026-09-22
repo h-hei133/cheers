@@ -6,9 +6,9 @@ import { describe, expect, it } from "vitest";
 import type { Session } from "../schema/sessionRecord.js";
 import { createSessionStoreLayout, projectSessionFileLayout } from "./sessionFileLayout.js";
 import { loadSessionRecord, writeSessionRecord } from "./sessionStore.js";
+import { writeSessionState } from "./sessionStateStore.js";
 import {
   addDurableSessionCompaction,
-  appendDurableSessionChild,
   createDurableSessionBranch,
   readSessionThreadSnapshot,
   switchDurableSessionActiveLeaf,
@@ -37,14 +37,49 @@ describe("session thread state store", () => {
       };
       writeSessionRecord({ session, layout });
 
-      appendDurableSessionChild({
-        session,
-        layout,
-        messageRole: "assistant",
-        timestamp: "2026-06-02T00:00:02.000Z",
-        entryId: "sess_thread_store:turn-2",
-        parentEntryId: "sess_thread_store:turn-1",
+      // The thread follows the session on its own: the turn recorded above has
+      // an entry even though nothing wrote one.
+      expect(readSessionThreadSnapshot({ session, layout })).toMatchObject({
+        entries: [
+          { id: "sess_thread_store:root", kind: "session-root" },
+          { id: "sess_thread_store:turn-1", kind: "turn-message", role: "user" },
+        ],
+        activeLeafId: "sess_thread_store:turn-1",
       });
+
+      // A turn recorded later is picked up, and the entry it gets is the one a
+      // rebuild would have produced.
+      session.turns.push({
+        role: "assistant",
+        content: "second",
+        timestamp: "2026-06-02T00:00:02.000Z",
+      });
+      // The turn path writes the state as each turn lands, which is what carries
+      // the thread forward.
+      writeSessionState({ session, layout });
+      const caughtUp = readSessionThreadSnapshot({ session, layout });
+      expect(caughtUp.entries.map((entry) => entry.id)).toEqual([
+        "sess_thread_store:root",
+        "sess_thread_store:turn-1",
+        "sess_thread_store:turn-2",
+      ]);
+      expect(caughtUp.activeLeafId).toBe("sess_thread_store:turn-2");
+
+      // Reading again changes nothing.
+      expect(readSessionThreadSnapshot({ session, layout }).entries).toHaveLength(3);
+
+      // The file itself carries the turn, not just the reader: a later process
+      // that loads the state directly must see the same history.
+      expect(
+        JSON.parse(fs.readFileSync(layout.statePath, "utf8")).thread.entries.map(
+          (entry: { id: string }) => entry.id,
+        ),
+      ).toEqual([
+        "sess_thread_store:root",
+        "sess_thread_store:turn-1",
+        "sess_thread_store:turn-2",
+      ]);
+
       createDurableSessionBranch({
         session,
         layout,

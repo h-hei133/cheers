@@ -12,6 +12,7 @@ import type { SessionHarnessState } from "../harness/state.js";
 import type { Session } from "./sessionRecord.js";
 import {
   buildLinearSessionThreadSnapshot,
+  catchUpSessionThread,
   type SessionThreadSnapshot,
 } from "./sessionThread.js";
 
@@ -111,7 +112,10 @@ export function buildSessionStateSnapshot(
     thread:
       overrides && Object.prototype.hasOwnProperty.call(overrides, "thread")
         ? overrides.thread
-        : (current?.thread ?? buildLinearSessionThreadSnapshot(session)),
+        : catchUpSessionThread(
+            current?.thread ?? buildLinearSessionThreadSnapshot(session),
+            session,
+          ),
     workingMemory: current?.workingMemory,
   };
 }

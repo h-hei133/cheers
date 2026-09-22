@@ -184,3 +184,45 @@ export function sessionRootEntryId(sessionId: string): string {
 export function sessionTurnEntryId(sessionId: string, order: number): string {
   return `${sessionId}:turn-${order}`;
 }
+
+/**
+ * Extend a thread so it accounts for every turn the session has recorded.
+ *
+ * A thread is built once and then kept, so it does not follow the session on its
+ * own: turns recorded after it was written have no entry until something extends
+ * it. Entry ids come from the turn's position, so a thread caught up here is the
+ * same one a rebuild would have produced, and calling this more than once
+ * changes nothing after the first time.
+ *
+ * Returns the thread unchanged when it is already up to date.
+ */
+export function catchUpSessionThread(
+  thread: SessionThreadSnapshot,
+  session: Session,
+): SessionThreadSnapshot {
+  const recorded = thread.entries.filter((entry) => entry.kind === "turn-message").length;
+  const missing = session.turns.slice(recorded);
+  if (missing.length === 0) return thread;
+
+  const entries = [...thread.entries];
+  let leafId = thread.activeLeafId ?? entries.at(-1)?.id ?? sessionRootEntryId(session.id);
+  missing.forEach((turn, offset) => {
+    const order = recorded + offset + 1;
+    const id = sessionTurnEntryId(session.id, order);
+    entries.push({
+      id,
+      parentId: leafId,
+      kind: "turn-message",
+      role: turn.role,
+      order,
+      ...(turn.timestamp ? { timestamp: turn.timestamp } : {}),
+    });
+    leafId = id;
+  });
+
+  return freezeDeep({
+    ...thread,
+    entries,
+    activeLeafId: leafId,
+  });
+}

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage, SessionToolCall } from "./schema/sessionMessage.js";
 export type TranscriptLifecycleEventName =
@@ -9,6 +10,7 @@ export type TranscriptLifecycleEventName =
 
 export interface CompactionTranscriptEntry {
   type: "compaction";
+  id?: string;
   summary: string;
   firstKeptEntryId?: string;
   /** Messages immediately before this entry that stay in the context verbatim. */
@@ -27,6 +29,7 @@ export interface CompactionTranscriptEntry {
  */
 export interface BranchSummaryTranscriptEntry {
   type: "branch_summary";
+  id?: string;
   summary: string;
   /** How many turns were dropped at the point this summary was written. */
   droppedTurns: number;
@@ -36,6 +39,7 @@ export interface BranchSummaryTranscriptEntry {
 export type TranscriptEvent =
   | {
       type: "message";
+      id?: string;
       role: SessionMessage["role"];
       content: string;
       tool_calls?: readonly SessionToolCall[];
@@ -44,19 +48,44 @@ export type TranscriptEvent =
     }
   | {
       type: "lifecycle";
+      id?: string;
       event: TranscriptLifecycleEventName;
       timestamp: string;
       detail?: string;
     }
-  | { type: "query-event"; event: QueryEvent; timestamp: string }
+  | { type: "query-event"; id?: string; event: QueryEvent; timestamp: string }
   | CompactionTranscriptEntry
   | BranchSummaryTranscriptEntry;
+
+/**
+ * A short, unique name for one transcript entry.
+ *
+ * Sequential numbers would be simpler, but the transcript is appended to by more
+ * than one writer across a session's life and a repeat after a crash would make
+ * two entries answer to the same name. Random suffixes cost nothing here and
+ * cannot collide.
+ */
+export function createTranscriptEntryId(prefix: string): string {
+  return `${prefix}_${randomUUID().slice(0, 8)}`;
+}
+
+/**
+ * The id an entry has when it was written before ids existed.
+ *
+ * Derived from the line number rather than assigned and stored: rewriting old
+ * transcripts would break the promise that they are append-only, and a derived
+ * name is stable for as long as the file is.
+ */
+export function legacyTranscriptEntryId(lineNumber: number): string {
+  return `line-${lineNumber}`;
+}
 
 export function createMessageTranscriptEvent(
   message: SessionMessage & { timestamp: string },
 ): Extract<TranscriptEvent, { type: "message" }> {
   return {
     type: "message",
+    id: createTranscriptEntryId("msg"),
     role: message.role,
     content: message.content,
     ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
@@ -72,6 +101,7 @@ export function createLifecycleTranscriptEvent(input: {
 }): Extract<TranscriptEvent, { type: "lifecycle" }> {
   return {
     type: "lifecycle",
+    id: createTranscriptEntryId("evt"),
     event: input.event,
     timestamp: input.timestamp,
     ...(input.detail !== undefined ? { detail: input.detail } : {}),
@@ -84,6 +114,7 @@ export function createQueryTranscriptEvent(input: {
 }): Extract<TranscriptEvent, { type: "query-event" }> {
   return {
     type: "query-event",
+    id: createTranscriptEntryId("qevt"),
     event: input.event,
     timestamp: input.timestamp,
   };
@@ -113,14 +144,24 @@ function isTranscriptEvent(value: unknown): value is TranscriptEvent {
   return false;
 }
 
-export function decodeTranscriptLineSafe(line: string): TranscriptEvent | undefined {
+export function decodeTranscriptLineSafe(
+  line: string,
+  lineNumber?: number,
+): TranscriptEvent | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line);
   } catch {
     return undefined;
   }
-  return isTranscriptEvent(parsed) ? parsed : undefined;
+  if (!isTranscriptEvent(parsed)) return undefined;
+  // Lines written before entries had ids get a name derived from their position.
+  // Derived rather than stored, because rewriting an old transcript would break
+  // the promise that these files are append-only.
+  if (parsed.id === undefined && lineNumber !== undefined) {
+    return { ...parsed, id: legacyTranscriptEntryId(lineNumber) };
+  }
+  return parsed;
 }
 
 export function transcriptEventToSessionMessage(

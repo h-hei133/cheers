@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import {
   createMessageTranscriptEvent,
+  createTranscriptEntryId,
   decodeTranscriptLineSafe,
   encodeTranscriptEvent,
   transcriptEventToSessionMessage,
@@ -15,9 +16,11 @@ export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] 
   }
 
   const events: TranscriptEvent[] = [];
+  let lineNumber = 0;
   for (const line of fs.readFileSync(transcriptPath, "utf8").split("\n")) {
     if (!line) continue;
-    const event = decodeTranscriptLineSafe(line);
+    lineNumber += 1;
+    const event = decodeTranscriptLineSafe(line, lineNumber);
     if (event) events.push(event);
   }
   return events;
@@ -82,6 +85,7 @@ export function appendCompactionEvent(
 ): void {
   appendTranscriptEvent(transcriptPath, {
     type: "compaction",
+    id: createTranscriptEntryId("comp"),
     summary: input.summary,
     firstKeptEntryId: input.firstKeptEntryId,
     keptMessages: input.keptMessages,
@@ -100,6 +104,7 @@ export function appendBranchSummaryEvent(
 ): void {
   appendTranscriptEvent(transcriptPath, {
     type: "branch_summary",
+    id: createTranscriptEntryId("brsum"),
     summary: input.summary,
     droppedTurns: input.droppedTurns,
     timestamp: input.timestamp,
