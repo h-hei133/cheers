@@ -103,3 +103,53 @@ describe("skill discovery", () => {
     expect([...new SkillLoader(workspace).load().keys()]).toEqual([]);
   });
 });
+
+describe("name collisions", () => {
+  let workspace = "";
+
+  beforeEach(() => {
+    workspace = fs.mkdtempSync(path.join(os.tmpdir(), "skills-collide-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it("reports both files when two claim the same name", () => {
+    // The losing file is otherwise invisible: the winner appears and the other
+    // never does, so nobody learns that editing it has no effect.
+    const dir = path.join(workspace, ".agents", "skills");
+    for (const group of ["one", "two"]) {
+      const target = path.join(dir, group);
+      fs.mkdirSync(target, { recursive: true });
+      fs.writeFileSync(
+        path.join(target, "SKILL.md"),
+        `---\nname: shared\ndescription: from ${group}\n---\n\nbody\n`,
+        "utf8",
+      );
+    }
+
+    const { skills, collisions } = new SkillLoader(workspace).loadDetailed();
+
+    expect(skills.size).toBe(1);
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0]?.name).toBe("shared");
+    expect(collisions[0]?.winnerPath).toContain("one");
+    expect(collisions[0]?.loserPath).toContain("two");
+  });
+
+  it("reports nothing when every name is unique", () => {
+    const dir = path.join(workspace, ".agents", "skills");
+    for (const name of ["alpha", "beta"]) {
+      const target = path.join(dir, name);
+      fs.mkdirSync(target, { recursive: true });
+      fs.writeFileSync(
+        path.join(target, "SKILL.md"),
+        `---\nname: ${name}\ndescription: what ${name} is for\n---\n\nbody\n`,
+        "utf8",
+      );
+    }
+
+    expect(new SkillLoader(workspace).loadDetailed().collisions).toEqual([]);
+  });
+});

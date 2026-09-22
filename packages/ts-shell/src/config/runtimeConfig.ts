@@ -187,8 +187,19 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   tui: {},
 };
 
+/**
+ * Overrides a command-line flag has already decided.
+ *
+ * A flag is a statement about this run, so it outranks both config files. Passed
+ * in rather than read here so the config layer stays free of argument parsing.
+ */
+export interface RuntimeConfigOverrides {
+  readonly instructionBudgetBytes?: number
+}
+
 export function getRuntimeConfig(
   rootDir: string = process.cwd(),
+  overrides?: RuntimeConfigOverrides,
 ): RuntimeConfig {
   const sources: string[] = [];
   let merged: RuntimeConfigFile = {};
@@ -266,7 +277,10 @@ export function getRuntimeConfig(
     ...(merged.contextWindow !== undefined ? { contextWindow: merged.contextWindow } : {}),
     reserveTokens: merged.reserveTokens ?? DEFAULT_CONFIG.reserveTokens,
     modelTokenBudgets: merged.modelTokenBudgets ?? DEFAULT_CONFIG.modelTokenBudgets,
-    instructionBudgetBytes: merged.instructionBudgetBytes ?? DEFAULT_CONFIG.instructionBudgetBytes,
+    instructionBudgetBytes:
+      overrides?.instructionBudgetBytes ??
+      merged.instructionBudgetBytes ??
+      DEFAULT_CONFIG.instructionBudgetBytes,
     agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
     theme: merged.theme ?? DEFAULT_CONFIG.theme,
     tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,

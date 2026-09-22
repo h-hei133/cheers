@@ -17,6 +17,13 @@ export interface CliOptions {
   readonly promptArg?: string;
   readonly migrateSessionRoot?: boolean;
   readonly nonInteractiveApproval?: NonInteractiveApprovalMode;
+  /**
+   * Skip project instruction files for this run.
+   *
+   * A flag as well as a setting because the reason to want it is usually a
+   * one-off: "is it this repository's rules that are steering the model?"
+   */
+  readonly noContextFiles?: boolean;
 }
 
 export interface CliArgs {

@@ -14,7 +14,12 @@ import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
 import { renderSkillList, SkillLoader, type Skill } from "../core/skills/skillLoader.js";
-import { loadInstructionFiles, renderInstructionFiles } from "../context/instructions/projectInstructions.js";
+import {
+  DEFAULT_INSTRUCTION_BUDGET_BYTES,
+  loadInstructionFiles,
+  renderInstructionFiles,
+} from "../context/instructions/projectInstructions.js";
+import { createComponentLogger } from "../observability/structuredLogger.js";
 import { projectTrust } from "../core/security/projectTrust.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
@@ -179,7 +184,18 @@ function deferUntilReady(
  */
 function discoverSkills(request: CliRuntimeInvocationRequest): ReadonlyMap<string, Skill> {
   const loader = new SkillLoader(request.workspaceRoot);
-  const found = loader.load();
+  const { skills: found, collisions } = loader.loadDetailed();
+
+  if (collisions.length > 0) {
+    // Surfaced because the losing file is otherwise invisible: the winner
+    // appears and the other never does, so nobody learns editing it has no effect.
+    for (const collision of collisions) {
+      createComponentLogger("skills").warn(
+        `Skill name '${collision.name}' is claimed by ${collision.winnerPath} and ${collision.loserPath}; using ${collision.winnerPath}.`,
+      );
+    }
+  }
+
   if (!projectTrust.isProjectUntrusted(request.workspaceRoot)) return found;
 
   return new Map([...found].filter(([, skill]) => skill.source === "user"));
@@ -209,6 +225,15 @@ function buildPromptContext(
         // Absent means the loader's own default; zero is the opt-out.
         maxBytes: request.runtimeConfig?.instructionBudgetBytes,
       });
+
+  // Said out loud rather than swallowed: a project whose rules were cut short is
+  // one where the model is following a truncated version of them, and that is
+  // worth knowing before wondering why a rule was ignored.
+  if (instructions.truncated) {
+    createComponentLogger("project-instructions").warn(
+      `Instruction files exceeded the ${request.runtimeConfig?.instructionBudgetBytes ?? DEFAULT_INSTRUCTION_BUDGET_BYTES}-byte budget and were truncated.`,
+    );
+  }
 
   return {
     instructions: renderInstructionFiles(instructions.files),

@@ -224,6 +224,7 @@ export function parseCliArgs(
     rawArgs.includes("--print") || rawArgs.includes("-p"),
   );
   assignOption(options, "jsonEvents", rawArgs.includes("--json"));
+  assignOption(options, "noContextFiles", rawArgs.includes("--no-context-files"));
   assignOption(
     options,
     "migrateSessionRoot",

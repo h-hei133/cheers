@@ -16,6 +16,13 @@ import * as path from "node:path";
 
 export type SkillSource = "user" | "project";
 
+/** Two skill files that claimed the same name, and which one was kept. */
+export interface SkillCollision {
+  readonly name: string
+  readonly winnerPath: string
+  readonly loserPath: string
+}
+
 export interface Skill {
   readonly name: string;
   readonly description: string;
@@ -53,11 +60,46 @@ export class SkillLoader {
 
   /** Every discoverable skill, keyed by name, project overriding user. */
   load(): ReadonlyMap<string, Skill> {
+    return this.loadDetailed().skills;
+  }
+
+  /**
+   * The skills, and every name more than one file claimed.
+   *
+   * A collision is reported rather than left silent because the losing file is
+   * otherwise invisible: the winner simply appears and the other never does, so
+   * nobody learns that editing it has no effect.
+   *
+   * Within one root the first file found wins, which is what makes the result
+   * stable across runs; across roots the project overrides the user, which is
+   * deliberate — a repository that ships its own way of doing something should
+   * override the user's general habit for that repository.
+   */
+  loadDetailed(): { skills: ReadonlyMap<string, Skill>; collisions: readonly SkillCollision[] } {
     const skills = new Map<string, Skill>();
+    const collisions: SkillCollision[] = [];
     for (const root of this.roots) {
-      for (const skill of this.scan(root.dir, root.source, true)) skills.set(skill.name, skill);
+      for (const skill of this.scan(root.dir, root.source, true)) {
+        const existing = skills.get(skill.name);
+        if (existing && existing.source === skill.source) {
+          collisions.push({
+            name: skill.name,
+            winnerPath: existing.filePath,
+            loserPath: skill.filePath,
+          });
+          continue;
+        }
+        if (existing) {
+          collisions.push({
+            name: skill.name,
+            winnerPath: skill.filePath,
+            loserPath: existing.filePath,
+          });
+        }
+        skills.set(skill.name, skill);
+      }
     }
-    return skills;
+    return { skills, collisions };
   }
 
   /**

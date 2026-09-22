@@ -191,3 +191,20 @@ describe("cli args parser", () => {
     );
   });
 });
+
+describe("--no-context-files", () => {
+  it("is off unless asked for", () => {
+    expect(expectParsed([]).options.noContextFiles).toBe(false);
+  });
+
+  it("is set when the flag is given", () => {
+    expect(expectParsed(["--no-context-files"]).options.noContextFiles).toBe(true);
+  });
+
+  it("does not consume the prompt that follows it", () => {
+    // The flag takes no value, so the next token is still the prompt rather than
+    // being swallowed as its argument.
+    const parsed = expectParsed(["--no-context-files", "explain this repo"]);
+    expect(parsed.options.promptArg).toBe("explain this repo");
+  });
+});

@@ -544,14 +544,26 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .private-agents.jso
 | 中途改写 `AGENTS.md` | 同一会话内**立即生效**（见 §6.2 发现 2） |
 | 关闭开关 | `instructionBudgetBytes: 0` → 加载 0 个文件，渲染为空 |
 
-### 6.5 未做（如实记录）
+### 6.5 补充：裁决 §2.2.4 与 §2.2.3 的两项已补齐
+
+首版提交时这两项未做，已补：
+
+| 项 | 实现 | 实机验证 |
+|---|---|---|
+| CLI 标志 `--no-context-files` | `cliOptions` → `cliArgs`（无值布尔）→ `getRuntimeConfig` 的 `overrides` 参数 | 带该标志提问，模型回答「我的指令里没有 `AGENTS.md` 的内容」 |
+| 截断告警 | `truncated` 现由 `project-instructions` 组件日志记录 | 单元测试保证返回值正确 |
+
+**`getRuntimeConfig` 新增 `overrides` 参数**：命令行标志是关于**本次运行**的声明，应当高于两个配置文件。单独设参数而不是让配置层解析 argv，是为了让配置层不依赖参数解析。
+
+### 6.6 未做（如实记录）
 
 - **`/reload` 命令**：已论证不需要（§6.2 发现 2）。
-- **CLI 标志 `--no-context-files`**：裁决 §2.2.4 要求「CLI 标志 + 配置项」两者。**配置项已实现**（`instructionBudgetBytes`）；CLI 标志未加——它需要在 `cliOptions` → `cliArgs` → invocation 三处穿线，而配置项已覆盖同一用途。**这是一个未完成的裁决项，如实记录。**
-- **「截断时告警」**：`InstructionLoadResult.truncated` 已返回，但**当前无消费者**（未记入日志或提示）。裁决 §2.2.3 要求「截断 + 警告」。**未完成。**
 - **嵌套目录懒加载**（裁决 §2.3）：明确移出本轮。
-- **linked worktree 遮蔽**：backlog。
-- **CLI 级技能路径注入**：backlog。
+- **linked worktree 遮蔽**（裁决 §2.5 #7）：backlog。
+- **CLI 级技能路径注入**（裁决 §3.6 #6）：backlog。
+- **技能名冲突的 `winnerPath`/`loserPath` 诊断**（裁决 §3.5）：**未实现**。当前行为是「后写入者覆盖」（项目覆盖用户），且**不产生冲突诊断**。裁决要求「首个胜出 + 冲突诊断」。**这是一项未完成的裁决项。**
+- **技能名/长度不合规的警告**（裁决 §3.5）：**未实现**（当前不校验名称格式）。
+- **技能无 `description` 时硬失败**（裁决 §3.5）：已由 `renderSkillList` 的过滤实现（无描述则不进入模型视野），但**不产生诊断**。
 
 ---
 

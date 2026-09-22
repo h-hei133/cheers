@@ -60,7 +60,11 @@ export function createCliRootContext(
   );
   const gitContext = getWorkflowGitContext(runtimeBaseDir);
   const workspaceRoot = gitContext.root ?? runtimeBaseDir;
-  const runtimeConfig = getRuntimeConfig(workspaceRoot);
+  const runtimeConfig = getRuntimeConfig(workspaceRoot, {
+    // Zero is the loader's opt-out, so the flag needs no separate path through
+    // the prompt builder.
+    instructionBudgetBytes: input.options.noContextFiles ? 0 : undefined,
+  });
   return {
     runtimeBaseDir,
     gitContext,
