@@ -773,7 +773,7 @@ description: "Search for files by glob pattern. Returns matching file paths rela
 | 13 | `test-utils/*` | **保留** | 测试基础设施 |
 | 14 | cache 保活（warming） | **不做** | 主动发请求花钱，收益取决于继续对话的概率，需真实账单数据验证 |
 | 15 | 传输选择（SSE/WebSocket） | **不做** | 我方只有一个传输；`pi` 自己也标注为实验 |
-| 16 | 图片输入 | **不做** | 需 `SessionMessage.content` 类型迁移；**T3 的 `input` 字段是它的前置**，先做 T3 |
+| 16 | 图片输入 | **不做** | 需 `SessionMessage.content` 类型迁移。~~**T3 的 `input` 字段是它的前置**，先做 T3~~ **⚠️ 复核轮更正**：`input` 字段已因**无任何消费者**被撤销（见 §3.2），所以这条前置**不存在**。若要做图片输入，须从「消费者是谁」重新推导 |
 | 17 | 转录内搜索 | **不做** | `viewport.ts` 的屏幕行↔内容行映射需扩展，成本中高，收益低于 T1/T2 |
 | 18 | Mermaid 渲染 | **不做** | 需引入新依赖；我方依赖面只有 5 个 |
 | 19 | 树形可视化导航 | **不做** | `pi` 的组件 1435 行，收益与成本不匹配 |
