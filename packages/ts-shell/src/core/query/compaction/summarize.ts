@@ -1,4 +1,9 @@
-import { extractFileFootprint, formatFileFootprintXml } from "./fileFootprint.js";
+import {
+  extractFileFootprint,
+  formatFileFootprintXml,
+  mergeFileFootprints,
+  parseFileFootprintXml,
+} from "./fileFootprint.js";
 import {
   EIGHT_SECTION_COMPACTION_PROMPT,
   UPDATE_COMPACTION_PROMPT,
@@ -82,6 +87,14 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   const summaryContent = data.choices?.[0]?.message?.content;
   if (!summaryContent) return undefined;
   const { rawSummary } = parseCompactedSummary(summaryContent);
-  const footprintXml = formatFileFootprintXml(extractFileFootprint(request.messages));
-  return formatCheckpointMessage(rawSummary, footprintXml);
+  // The previous checkpoint's own footprint is merged in, so a file read before
+  // an earlier compaction is still named after this one. Without it the list
+  // only ever describes the messages in front of the summarizer, and the model
+  // re-reads files it has already seen — which is the cost this list exists to
+  // avoid.
+  const footprint = mergeFileFootprints(
+    parseFileFootprintXml(previousSummary),
+    extractFileFootprint(request.messages),
+  );
+  return formatCheckpointMessage(rawSummary, formatFileFootprintXml(footprint));
 }
