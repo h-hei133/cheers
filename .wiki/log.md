@@ -2768,3 +2768,12 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 - **文档**：新增 `.wiki/features/phase-4-execution.md`（含执行总览、逐项施工、偏离裁决 2 处、未做 7 项、推翻既有记录 3 处）；`features/_index.md` 的 Phase 4 状态改为已闭环；`USAGE_MANUAL.md` 新增引用文件、自定义快捷键、外部编辑器三节。
 - **模块规模如实记录**：`editor.ts` 在 T7 **之前**就已超 20 名上限（28 名）；拆出四个模块后 31 名，未回到 28（继续拆需搬走整个 prompt history，改动面大于收益）。`interactiveMode.ts` 一度因新增两个方法升到 22 名，改为把状态放进 `inputPreferences.ts` 后**回到基线**，`module-facades` 的 monolith 列表回到 5 个。
 - **未做（如实记录）**：`parentId`/分支导航（产品设计）、`firstKeptEntryId` 接线（活轨无人读）、`SYSTEM.md`、worktree 主仓库规则（继承 C-1）、124 个不可达模块、`editor.ts` 降到 28 以下、`pi` 的旧格式 keybindings 迁移（我方无历史格式）。
+
+## [2026-09-23] fix | 会话回退坏了两次：改为非破坏性分支导航（`2bd3f722`）。
+- **起因**：维护者报告「rewind 用起来好像有点问题」。5 个子代理并行探索（存储形状 / rewind 缺陷 / 死代码审计 / 参考实现交互 / 上下文重建），主代理逐条复现后施工。
+- **缺陷一（截断从未落盘）**：`rewindTo` 做 `session.turns.slice(0, keep)` 后调 `writeSessionMetadata`，但 `projectSessionMetadata`（`sessionMetadataCodec.ts:16-32`）**不写 turns**，而 `loadSessionRecord` 的 turns 来自 `projectTranscriptMessages(transcript.jsonl)`。实测 `rewindTo(id, 0)` 后内存仍是 4 条、重开会话仍是 4 条 —— **回退完全没生效**。
+- **缺陷二（设计就是破坏性的）**：即使落盘成功也是「删掉后面说的」。thread 本就是树（`parentId` + `activeLeafId`），回到某点只需换分支。两层互相掩盖：没生效，所以没人发现它本该是破坏性的。
+- **施工**：turn 记录时即命名、thread entry 沿用同名（分支能还原成消息的前提）；新增 `sessionThreadPath` 从 active leaf 回溯；`catchUpSessionThread` 沿活跃路径计数且**按名字**选缺失 turn；`loadSessionRecord` 只投影当前分支；`rewindTo` → `revertTo`（切 active leaf），picker 提供 entry id 而非下标；**删除 `sessionDagEngine.ts`**（273 行的第二套树实现，存储格式不兼容，零生产调用者）。
+- **施工中发现自己引入的两个缺陷**：①`catchUpSessionThread` 按「活跃分支计数」会把另一分支上的 turn 当缺失而**重复追加**（实测 `t2` 出现两次、`t3` 挂错父节点）→ 改为按名字判断；②按分支过滤后，thread 与 transcript **对不上**时（旧会话无 id 就会这样）返回**空会话** —— 读起来是「什么都没说」而不是「两个文件对不上」→ 改为 thread 指不出任何消息时不采信它。
+- **验证**：端到端实测「回到 Q1 换方向提问 → 两分支都在、可来回切换、7 个 entry 无重复」；无 id 的旧会话仍完整加载且可回退。**反向验证三项**（重复 entry 防护 / load 路径接线 / 不匹配防护），各自还原后对应测试失败。全量套件 519 文件 / 3119 通过，8 项失败在与开工前**完全相同的 5 个文件**；全部门禁通过。已重建 `dist/`（`cheers` 走构建产物，源码改动需 `npm run build:ts` 才对命令行生效）。
+- **仍未做**：树形可视化导航（`/tree` 式）—— 参考实现的树选择器 1435 行，其中搜索/过滤/标签/复制属锦上添花；入口沿用「空草稿连按两次 Escape」的既有手势。

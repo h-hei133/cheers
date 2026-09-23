@@ -201,7 +201,7 @@
 
 ### 7.3 `parentId` 仍未做
 
-与裁决 §5.4 一致：`parentId` 只在分支真的被写入时才有意义，而分支导航是产品设计。本轮只做了追加路径。`firstKeptEntryId` 同样未接线（§5.5）。
+与裁决 §5.4 一致：`parentId` 只在分支真的被写入时才有意义。本轮只做了追加路径；分支导航在后续会话中完成，见 §12。`firstKeptEntryId` 仍未接线（§5.5）。
 
 ### 7.4 验证
 
@@ -306,7 +306,7 @@ npx --package .normproof/normproof-*.tgz normproof judge   # 与 CI 同一条命
 
 | 项 | 依据 | 原因 |
 |---|---|---|
-| `parentId` / 分支导航 | §5.4 | 产品设计，非接线 |
+| `parentId` / 分支导航 | §5.4 | **后续已做**，见 §12 |
 | `firstKeptEntryId` 接线 | §5.5 | 该字段活轨无人读；压缩切点仍用 `keptMessages` 计数 |
 | `SYSTEM.md` | §6.2 | 与「追加」是不同的信任决定 |
 | worktree 里主仓库规则不可见 | §6.1 继承 C-1 | 既有取舍，改动属产品判断 |
@@ -327,3 +327,47 @@ npx --package .normproof/normproof-*.tgz normproof judge   # 与 CI 同一条命
 | `03-*` §3.1 | `CatalogModel` 的限制在 overrides | 限制在字段太少；`cost` 已补 |
 
 另有一处**执行中偏离裁决**（已在正文说明）：T5-2 的接线点改为 snapshot 构建处，并因此删除了裁决里要接的那个函数。T7 的 `editor.ts` 一度到 31 名，收尾时已内联回裁定的 28 名（`8127d017`）。
+
+---
+
+## 12. 后续：非破坏性分支导航（`parentId` 那项的落地）
+
+裁决 §5.4 把 `parentId` / 分支导航列为「产品设计，非接线」，本轮（Phase 4）未做。维护者在后续会话中决定做，因为**用户报告 rewind 用起来有问题**。探索由 5 个子代理并行完成（存储形状 / 现有 rewind 缺陷 / 死代码审计 / 参考实现交互 / 上下文重建路径），主代理逐条复现后施工。
+
+### 12.1 真实缺陷：rewind 坏了两次，且两者互相掩盖
+
+**第一层：截断从未落盘。** `rewindTo` 做 `session.turns = session.turns.slice(0, keep)`，然后 `writeSessionMetadata(session)`。但 `projectSessionMetadata`（`sessionMetadataCodec.ts:16-32`）**根本不写 `turns`** —— 而 `loadSessionRecord` 的 turns 来自 `projectTranscriptMessages(transcript.jsonl)`。所以：**截断写进了一个不含该字段的文件**，重开会话时被丢弃的轮次全部回来。
+
+实测（已删除的探针）：`rewindTo(id, 0)` 之后内存里仍是全部 4 条，重开会话也是 4 条。
+
+**第二层：设计上是破坏性的。** 即使落盘成功，它也是「删掉后面说的」。而 thread 本来就是树（entry 有 `parentId`、有 `activeLeafId`），回到某点只需**换一条分支**，不需要抹掉任何东西。
+
+两层互相掩盖：截断没生效，所以没人发现它本该是破坏性的；而「既然反正是删，没生效看起来只是没删干净」。
+
+### 12.2 施工内容
+
+| 改动 | 内容 |
+|---|---|
+| turn 身份 | turn 在记录时即命名，thread entry 沿用同一个名字。这是「分支能还原成消息」的前提 |
+| `sessionThreadPath` | 从 `activeLeafId` 沿 `parentId` 回溯到根 —— 当前分支 |
+| `catchUpSessionThread` | 沿活跃路径计数，并**按名字**选取缺失的 turn，避免另一分支上的 turn 被重复追加 |
+| `loadSessionRecord` | 只投影当前分支 |
+| `rewindTo` → `revertTo` | 切换 active leaf 而非截断；picker 提供 entry id 而非位置下标 |
+| 删除 `sessionDagEngine.ts` | 273 行的第二套树实现，存储格式（单文件 JSONL v3）与本产品不兼容，零生产调用者 |
+
+### 12.3 施工中发现并修复的两个自己引入的缺陷
+
+1. **重复 entry**：`catchUpSessionThread` 原本按「活跃分支计数」判断缺失，切换分支后会把另一分支上的 turn 当成缺失而**重复追加**（实测：`t2` 出现两次、`t3` 挂错父节点）。改为按名字判断。
+2. **会话被清空**（更严重，静默数据丢失）：`loadSessionRecord` 按分支过滤后，若 thread 指向的 id 与 transcript 里的**对不上**（旧会话无 id 时就会这样），会返回**空会话** —— 读起来是「这个会话什么都没说」，而不是「这两个文件对不上」。改为：thread 若指不出任何一条消息，就不采信它。
+
+### 12.4 验证
+
+- 端到端（一次性探针，跑完即删）：回到 Q1 后换方向提问 → 两条分支都在、可来回切换且各自完整（7 个 entry 无重复）；无 id 的旧会话仍完整加载且可回退。
+- 反向验证三项：重复 entry 防护、load 路径接线、thread/transcript 不匹配防护 —— 各自还原后对应测试失败。
+- 全量套件：519 文件 / 3119 通过，失败 8 项分布在**与开工前完全相同的 5 个文件**（另见 §9.3）。
+- 全部门禁通过（tsc / import-cycles / declarations / config-consumers / docs-drift / test:scripts）。
+
+### 12.5 仍未做
+
+- **树形可视化导航**（`/tree` 式）。当前入口沿用「空草稿上连按两次 Escape」的既有手势，选中的是**提问轮**并把原文放回输入框。参考实现的树选择器组件有 1435 行，其中搜索/过滤/标签/复制/时间戳属于锦上添花；本产品尚未做。
+- 分支摘要仍写在 transcript 尾部（`branch_summary` 条目），未按分支归档。
