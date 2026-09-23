@@ -237,7 +237,7 @@ export class Editor {
   kill(target: KillTarget): void {
     const line = this.lines[this.row]!;
     const backward = target !== "line-end";
-    const continuing = backward && this.killRing.continues(target, this.caret());
+    const continuing = backward && this.killRing.continues(target, { row: this.row, column: this.column });
     let start = this.column;
     let end = this.column;
     if (target === "line-end") end = line.length;
@@ -247,21 +247,21 @@ export class Editor {
       if (!backward || this.row === 0) return;
       this.adoptAsDraft();
       this.saveUndo();
-      this.pushKill("\n", continuing);
+      this.killRing.push("\n", { continuing, prepend: true });
       const previous = this.lines[this.row - 1]!;
       this.lines[this.row - 1] = previous + line;
       this.lines.splice(this.row, 1);
       this.row -= 1;
       this.column = previous.length;
-      this.killRing.endedAt(target, this.caret());
+      this.killRing.endedAt(target, { row: this.row, column: this.column });
       return;
     }
     this.adoptAsDraft();
     this.saveUndo();
-    this.pushKill(line.slice(start, end), continuing);
+    this.killRing.push(line.slice(start, end), { continuing, prepend: true });
     this.lines[this.row] = line.slice(0, start) + line.slice(end);
     this.column = start;
-    this.killRing.endedAt(target, this.caret());
+    this.killRing.endedAt(target, { row: this.row, column: this.column });
   }
 
   yank(): void {
@@ -280,7 +280,7 @@ export class Editor {
   }
 
   undo(): boolean {
-    const previous = this.edits.back(this.caretState());
+    const previous = this.edits.back({ lines: this.lines, row: this.row, column: this.column });
     if (previous === undefined) return false;
     this.restore(previous);
     return true;
@@ -288,7 +288,7 @@ export class Editor {
 
   /** Take back the last undo. */
   redo(): boolean {
-    const next = this.edits.forward(this.caretState());
+    const next = this.edits.forward({ lines: this.lines, row: this.row, column: this.column });
     if (next === undefined) return false;
     this.restore(next);
     return true;
@@ -471,22 +471,6 @@ export class Editor {
 
 
 
-
-  private pushKill(text: string, continuing = false): void {
-    // A continued backward kill grows the entry in front of what it already held,
-    // because each press cuts the text that came before the last.
-    this.killRing.push(text, { continuing, prepend: true });
-  }
-
-  /** The caret position, for a caller that only needs where it is. */
-  private caret(): { readonly row: number; readonly column: number } {
-    return { row: this.row, column: this.column };
-  }
-
-  /** The lines and the caret, which is what a snapshot and the span helpers both take. */
-  private caretState(): EditorSnapshot {
-    return { lines: this.lines, row: this.row, column: this.column };
-  }
 
   private saveUndo(): void {
     this.edits.record({ lines: this.lines, row: this.row, column: this.column });
