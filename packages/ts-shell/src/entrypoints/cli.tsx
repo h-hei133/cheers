@@ -6,7 +6,15 @@ import {
 import {
   handleCliFatalError,
 } from "../cli/errors/cliFatalErrorBoundary.js";
+import { installCrashRecorder } from "../observability/crashLog.js";
+import { time } from "../observability/startupTiming.js";
 
+// Installed before anything else runs, so a failure during startup is recorded
+// too — the moment a process is most likely to fall over is while it is still
+// assembling itself.
+installCrashRecorder({ cwd: process.cwd() });
+
+time("process start");
 runCliProcess({
   args: process.argv.slice(2),
   launchCwd: process.cwd(),

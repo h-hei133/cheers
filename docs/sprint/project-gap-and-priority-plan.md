@@ -7,6 +7,13 @@
 > `core/shell/cliSessionProductSurface.ts`、`presentation/terminal/renderer.ts`
 > 及其测试）。这些路径在本文中**不再以行内代码标注**，以免与"当前状态"混淆；
 > 保留原文以存档，但**不要再把它们当作现存文件**。
+>
+> **2026-09-23 说明（投影层清理）**：同理，本文引用的 `tools/dispatch/`、
+> `tools/scheduling/`、`tools/toolBatchDispatch`、`provider/request/*`、
+> `provider/response/*`、`turn/{nextTurnBundle,steeringQueue,followUpQueue,deliveryPolicy,`
+> `assistantResponse,toolResultMessage,turnSnapshot}` 等路径也已移除：它们的职责由
+> 内核（`core/agent/tools.ts` 的工具批执行、`turn/step.ts` 的请求构造）承担。
+> 这些行**同样是当时的存档**，不代表现存的模块。
 
 This plan now prioritizes trusted task completion over further trusted-runtime
 surface expansion. The runtime must stay conservative on secrets, execution,
@@ -278,7 +285,7 @@ that shared path.
 - Owner domains: `provider/response`, `provider/request`, `runtime/loop`,
   `runtime/events`, `tools`, `tools/policy`, `turn`, `session/replay`,
   `session/presentation`, `presentation`, `evidence`, `result`.
-- Evidence: `packages/ts-shell/src/provider/response/synthetic.test.ts` and
+- Evidence: packages/ts-shell/src/provider/response/synthetic.test.ts and
   packages/ts-shell/src/runtime/loop/providerBoundary.test.ts, alongside the
   focused provider, runtime, tool, turn, replay, surface, status, and truth
   owner tests.
@@ -394,9 +401,9 @@ that shared path.
   `runtime/loop`, `runtime/events`, `turn`, `tools`, `session/replay`,
   `session/presentation`, `presentation`, `core/shell`, `evidence`, and
   `result`.
-- Evidence: `packages/ts-shell/src/provider/request/fallback.test.ts`,
-  `packages/ts-shell/src/provider/request/attempt.test.ts`,
-  `packages/ts-shell/src/provider/request/boundary.test.ts`, and
+- Evidence: packages/ts-shell/src/provider/request/fallback.test.ts,
+  packages/ts-shell/src/provider/request/attempt.test.ts,
+  packages/ts-shell/src/provider/request/boundary.test.ts, and
   packages/ts-shell/src/runtime/loop/providerBoundary.test.ts, alongside the
   focused registry, response, runtime event, replay, surface, status, and truth
   owner tests.
@@ -512,11 +519,11 @@ that shared path.
   `runtime/loop`, `session/replay`, `session/presentation`, `presentation`,
   `core/shell`, `evidence`, and `result`.
 - Evidence: `packages/ts-shell/src/provider/registry/provider.test.ts`,
-  `packages/ts-shell/src/provider/request/boundary.test.ts`,
-  `packages/ts-shell/src/provider/request/invocation.test.ts`,
-  `packages/ts-shell/src/provider/request/attempt.test.ts`,
-  `packages/ts-shell/src/provider/request/fallback.test.ts`,
-  `packages/ts-shell/src/provider/response/adapter.test.ts`,
+  packages/ts-shell/src/provider/request/boundary.test.ts,
+  packages/ts-shell/src/provider/request/invocation.test.ts,
+  packages/ts-shell/src/provider/request/attempt.test.ts,
+  packages/ts-shell/src/provider/request/fallback.test.ts,
+  packages/ts-shell/src/provider/response/adapter.test.ts,
   packages/ts-shell/src/runtime/api/host/runtime.test.ts,
   packages/ts-shell/src/session/replay/state.test.ts,
   packages/ts-shell/src/session/presentation/envelope.test.ts,
@@ -547,7 +554,7 @@ that shared path.
   `runtime/loop`, `runtime/events`, `runtime/api`, `runtime/evaluation`,
   `session/replay`, `session/presentation`, `presentation`, `core/shell`,
   `evidence`, and `result`.
-- Evidence: `packages/ts-shell/src/tools/toolBatchDispatch.test.ts`,
+- Evidence: packages/ts-shell/src/tools/toolBatchDispatch.test.ts,
   packages/ts-shell/src/runtime/loop/providerBoundary.test.ts,
   packages/ts-shell/src/runtime/api/host/runtime.test.ts,
   packages/ts-shell/src/session/replay/state.test.ts,

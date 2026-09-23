@@ -138,19 +138,19 @@ export function retryDelayMs(
 export function waitBeforeRetry(delayMs: number, signal: AbortSignal | undefined): Promise<boolean> {
   if (signal?.aborted) return Promise.resolve(false);
   if (delayMs <= 0) return Promise.resolve(true);
-  return new Promise<boolean>((resolve) => {
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve(true);
-    }, delayMs);
-    // Not `once`: the listener has to come off when the timer wins too, or every
-    // retry leaves one behind for the life of the process.
-    const onAbort = (): void => {
-      clearTimeout(timer);
-      resolve(false);
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  const timer = setTimeout(() => {
+    signal?.removeEventListener("abort", onAbort);
+    resolve(true);
+  }, delayMs);
+  // Not `once` alone: the listener has to come off when the timer wins too, or
+  // every retry leaves one behind for the life of the process.
+  const onAbort = (): void => {
+    clearTimeout(timer);
+    resolve(false);
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+  return promise;
 }
 
 /**

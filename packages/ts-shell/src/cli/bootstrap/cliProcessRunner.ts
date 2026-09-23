@@ -12,6 +12,7 @@ import { parseCliArgs } from "../../entrypoints/cliArgs.js";
 import { applyTheme } from "../../presentation/theme/theme.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import { printCliDoctor } from "../../entrypoints/cliDoctor.js";
+import { time } from "../../observability/startupTiming.js";
 import {
   createCliApprovalModeState,
 } from "../approval/cliApprovalModeState.js";
@@ -79,6 +80,7 @@ export async function runCliProcess(
     return;
   }
 
+  time("arguments parsed");
   const bootstrapRuntime = createCliBootstrapRuntimeContext({
     launchCwd: input.launchCwd,
     options,
@@ -86,6 +88,7 @@ export async function runCliProcess(
     writeError: input.writeError,
     exit: input.exit,
   });
+  time("runtime bootstrapped");
   const {
     sessionManager,
     renderer,
@@ -113,6 +116,7 @@ export async function runCliProcess(
     options,
     stdin: input.stdin,
   });
+  time("stdin captured");
   projectAndRenderCliStartupSurface({
     options,
     stdin: input.stdin,
@@ -126,6 +130,7 @@ export async function runCliProcess(
     providerCredentialResolution: resolvedCredential,
     providerModeEnv: providerRuntimeBridge.providerModeEnv(),
   });
+  time("startup surface rendered");
   logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
 
   let readline: ReadlineInterface | null = null;

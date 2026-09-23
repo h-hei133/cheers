@@ -21,9 +21,9 @@ A healthy product path should read as domain ownership first, local role second:
 packages/ts-shell/src/runtime/execution/fileWalk.ts
 packages/ts-shell/src/runtime/execution/receipt.ts
 packages/ts-shell/src/presentation/terminal/streaming.ts
-packages/ts-shell/src/planning/handoff/mutation.ts
+packages/ts-shell/src/context/compact/command/compactCommandRunner.ts
 packages/ts-shell/src/provider/registry/provider.ts
-packages/ts-shell/src/session/continuation/readiness.ts
+packages/ts-shell/src/session/recovery/sessionRecoveryRuntime.ts
 ```
 
 ## Owner Domains

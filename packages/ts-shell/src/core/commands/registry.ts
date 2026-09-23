@@ -43,6 +43,8 @@ import { runThinkingCommand } from "./thinkingCommandRuntime.js";
 import { runToolsCommand } from "./toolsCommandRuntime.js";
 import { runShellCommand } from "./shellCommandRuntime.js";
 import { runLogCommand } from "./logCommandRuntime.js";
+import { runCrashCommand } from "./crashCommandRuntime.js";
+import { runTimingsCommand } from "./timingsCommandRuntime.js";
 import {
   runDiagnoseCommand,
 } from "./localCommandRuntime.js";
@@ -640,6 +642,28 @@ export function createCommandRegistry(
       argumentHint: "[tail|path|export|clear]",
       getArgumentCompletions: (prefix) => subcommandCompletions("log", prefix),
       execute: (args, context) => runLogCommand(args, context),
+    },
+    {
+      name: "crash",
+      aliases: ["crashes"],
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      summary: "list the recent runs that ended by falling over",
+      group: "workspace",
+      argumentHint: "[--stack]",
+      execute: (args, context) => runCrashCommand(args, context),
+    },
+    {
+      name: "timings",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      summary: "how long each phase of startup took, when CHEERS_TIMING=1 was set",
+      group: "workspace",
+      execute: (args, context) => runTimingsCommand(args, context),
     },
   ];
 
