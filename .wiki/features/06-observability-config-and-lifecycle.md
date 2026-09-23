@@ -57,7 +57,7 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 | 结构化日志 | 无独立结构化日志层 | `observability/structuredLogger.ts`（脱敏 + trace 关联 + 轮转文件） | **OURS-ONLY** | 见 §4 |
 | Trace context（traceId/spanId 传播） | 无 | `observability/traceContext.ts` | **OURS-ONLY** | 见 §4 |
 | 会话用量统计（token） | `src/core/usage-totals.ts`（`UsageTotals` 含 input/output/cacheRead/cacheWrite/cost） | ✅ **已实现**（**2026-09-23 更正**）：`observability/usageTelemetry.ts` | ~~DEFICIENT~~ **已收口** | `recordSessionUsage`/`getSessionUsage` + `/cost` 渲染（含 cache 维度与费率）。**余量见下一行**（按模型分桶）。见 §2.4（已同步更正） |
-| 按模型拆分的成本 | `src/core/usage-totals.ts:36-60`（`getUsageCostBreakdown` 按 `provider/model` 分组） | 部分：`/cost` 按实际作答模型取费率，但**记账不按模型分桶** | **⚠️ DEFICIENT（记账错误）**（**2026-09-23 更正**） | `usageTelemetry.ts:108-110` `existing.model = usage.model` **后写覆盖**——每个 session 只有一条扁平记录。**换模型后先前 token 按最新费率计价**，`/cost` 报出一个没人会被收取的金额。**这是 Phase 6 的 T3**，见 `phase-6-decisions.md` §3 |
+| 按模型拆分的成本 | `src/core/usage-totals.ts:36-60`（`getUsageCostBreakdown` 按 `provider/model` 分组） | ✅ **已收口**（**2026-09-24**，Phase 6 T3）：`usageTelemetry` 改为按模型分桶，`/cost` 分表渲染 | ~~DEFICIENT~~ **已收口** | **修复前**：`existing.model = usage.model` 后写覆盖，换模型后先前 token 按最新费率计价。**修复后**：`byModel` 分桶 + `estimateSessionCost` 按模型取费率；单模型输出保持不变。**实机**：两模型 → 两张表 + `Session total: $0.4200`。见 `phase-6-execution.md` §3 |
 | Cache 命中/浪费统计 ✅ **部分收口 2026-09-23**：usage 已带 `cacheReadTokens`/`cacheWriteTokens`（provider 实测值），`/cost` 按其计价 | `src/core/cache-stats.ts`（`CacheMiss{missedTokens,missedCost,idleMs,modelChanged}`，含空闲间隔归因） | `observability/usageTelemetry.ts` | **部分收口**（`/cost` 已报 cache 维度） | 见 `phase-4-execution.md` §4。**余量**：**无命中率、无浪费分析**——pi 算的是「本可命中却未命中」的 token 与多花的钱 |
 | 更新检查 | `docs/settings.md`（`PI_SKIP_VERSION_CHECK`、`pi.dev/api/latest-version`） | 无 | **MISSING** | 见 §3.5 |
 | 终端状态恢复（崩溃/信号） | pi 的 TUI 层各自处理 | `presentation/tui/terminal.ts:111-112,212-215`（`process.once("exit")` + `restoreSync`） | **OURS-ONLY** | 见 §4 |
@@ -160,7 +160,15 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 
 **最小改动建议**：要么接一个 sink（最简单的实现是把 `MetricEvent` 写进已有的 `RotatingFileSink`），要么按 `01-*` §3.1 的标准删除 `metrics.ts`。**不要保留「发射了但没人收」的中间态。**
 
-### 2.4 用量统计缺 cache 维度与真实费率（置信度：高）
+### 2.4 用量统计缺 cache 维度与真实费率（置信度：高）—— **2026-09-24 部分收口（按模型分桶）**
+
+> **收口说明**：Phase 6 T3 把记账改为**按模型分桶**（`SessionUsageTelemetry.byModel`），
+> 并让 `/cost` 与 TUI 状态栏都**按模型取费率**——修掉了一个「输出看起来正常但数值是错的」缺陷
+> （换模型后先前 token 按最新费率计价）。
+> **余量**：**内置目录里没有一个模型声明 `cost`**（`grep -c 'cost:' core/models/catalog.ts` → 0），
+> 所以**所有费率仍走 `USAGE_RATES` 固定回退值**，「真实费率」这一半仍未收口。
+> 输出会如实说明这一点（「estimates at a fixed fallback」）。
+> **下方原文保留为当时的证据。**
 
 **证据（我们）**：`observability/usageTelemetry.ts:1-19` `SessionUsageTelemetry` 字段为 `promptTokens`/`completionTokens`/`totalTokens`/`lastPromptTokens`/`turnsCount`/`toolCallsCount`/`model`/`lastUpdated`——**无 cache 维度**。`:19` `USAGE_RATES = { promptPerMTok: 0.14, completionPerMTok: 0.28 }` 是**写死的两个常量**，不随模型变化；`core/commands/costCommandRuntime.ts:3-10` 的注释诚实承认了这一点（「The money is not measured — the rate table is a constant that does not vary by model」）。
 

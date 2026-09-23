@@ -3,7 +3,7 @@ import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveContextWindow } from "../models/window.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
-import { getSessionUsage } from "../../observability/usageTelemetry.js";
+import { getSessionUsage, totalTokens } from "../../observability/usageTelemetry.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
 import { toolSchemas } from "../../turn/tools.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
@@ -89,8 +89,8 @@ export async function runContextCommand(
       `| **Last request total** | **${used.toLocaleString()}** | reported by the provider |`,
       "",
       `Auto-compaction runs when a request would exceed about ${compactAt.toLocaleString()} tokens. \`/compact\` runs it now.`,
-      telemetry.totalTokens > 0
-        ? `\nAcross the whole session: ${telemetry.totalTokens.toLocaleString()} tokens over ${telemetry.turnsCount} ${telemetry.turnsCount === 1 ? "turn" : "turns"}.`
+      totalTokens(telemetry) > 0
+        ? `\nAcross the whole session: ${totalTokens(telemetry).toLocaleString()} tokens over ${telemetry.turnsCount} ${telemetry.turnsCount === 1 ? "turn" : "turns"}.`
         : "",
     ].join("\n").replace(/\n+$/, ""),
   };

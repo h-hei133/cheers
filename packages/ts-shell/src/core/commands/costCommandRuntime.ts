@@ -1,5 +1,13 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import { estimateUsageCost, getSessionUsage, USAGE_RATES } from "../../observability/usageTelemetry.js";
+import {
+  estimateSessionCost,
+  estimateUsageCost,
+  getSessionUsage,
+  totalTokens,
+  usageBuckets,
+  USAGE_RATES,
+  type ModelUsageBucket,
+} from "../../observability/usageTelemetry.js";
 import type { ModelCostRates } from "../models/catalog.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveModelCost } from "../models/window.js";
@@ -16,6 +24,11 @@ import { getRuntimeConfig } from "../../config/runtimeConfig.js";
  * does not, the fallback constants are used and the output says *that*. The two
  * must not look alike: a number derived from a real price list and a number
  * derived from a guess are not the same claim.
+ *
+ * Rates are resolved per model, not once for the session. A session that switched
+ * models partway through spent tokens at two different prices, and applying the
+ * newest model's rate to all of them reports an amount nobody would be billed —
+ * which is worse than reporting nothing, because it looks like a measurement.
  */
 export async function runCostCommand(
   _args: string[],
@@ -23,8 +36,10 @@ export async function runCostCommand(
 ): Promise<LocalCommandResult> {
   const sessionId = context.sessionId ?? "";
   const telemetry = sessionId ? getSessionUsage(sessionId) : undefined;
+  const buckets = telemetry ? usageBuckets(telemetry) : [];
+  const grandTotal = telemetry ? totalTokens(telemetry) : 0;
 
-  if (!telemetry || telemetry.totalTokens <= 0) {
+  if (!telemetry || grandTotal <= 0) {
     return {
       kind: "local",
       output: [
@@ -35,46 +50,84 @@ export async function runCostCommand(
     };
   }
 
-  // Resolved the same way the engine does, so the rate applied here is the rate
-  // for the model that actually answered — not for whichever model the session
-  // happens to be pointing at now.
+  // Resolved the same way the engine does, so the rate applied to each bucket is
+  // the rate for the provider the session is pointed at now.
   const active = resolveProviderCredential({ runtimeConfig: getRuntimeConfig(context.cwd) });
-  const published = resolveModelCost(loadCatalog(), active.provider, telemetry.model);
-  const rates: ModelCostRates = published ?? USAGE_RATES;
-  const promptCost = (telemetry.promptTokens / 1_000_000) * rates.promptPerMTok;
-  const completionCost = (telemetry.completionTokens / 1_000_000) * rates.completionPerMTok;
 
-  const rows = [
-    `| In | ${telemetry.promptTokens.toLocaleString()} | $${rates.promptPerMTok}/M | $${promptCost.toFixed(4)} |`,
-    `| Out | ${telemetry.completionTokens.toLocaleString()} | $${rates.completionPerMTok}/M | $${completionCost.toFixed(4)} |`,
-  ];
-  // Only shown when the provider reported any: a row of zeroes would suggest the
-  // cache is being tracked for a model that never mentioned it.
-  if (telemetry.cacheReadTokens > 0 || telemetry.cacheWriteTokens > 0) {
-    const readRate = rates.cacheReadPerMTok;
-    const writeRate = rates.cacheWritePerMTok;
-    rows.push(
-      `| Cache read | ${telemetry.cacheReadTokens.toLocaleString()} | ${readRate === undefined ? "—" : `$${readRate}/M`} | ${readRate === undefined ? "—" : `$${((telemetry.cacheReadTokens / 1_000_000) * readRate).toFixed(4)}`} |`,
-      `| Cache write | ${telemetry.cacheWriteTokens.toLocaleString()} | ${writeRate === undefined ? "—" : `$${writeRate}/M`} | ${writeRate === undefined ? "—" : `$${((telemetry.cacheWriteTokens / 1_000_000) * writeRate).toFixed(4)}`} |`,
-    );
-  }
+  const rateFor = (model: string): ModelCostRates | undefined =>
+    resolveModelCost(loadCatalog(), active.provider, model);
+  const { cost: sessionCost, everyRatePublished } = estimateSessionCost(telemetry, rateFor);
+  const sections = buckets.map(([model, bucket]) => {
+    const published = rateFor(model);
+    const rates: ModelCostRates = published ?? USAGE_RATES;
+    return renderModelSection({
+      model,
+      bucket,
+      rates,
+      cost: estimateUsageCost(bucket, rates),
+      published: published !== undefined,
+      // With one model there is nothing to distinguish, so the heading would be
+      // noise. With several it is the whole point.
+      showHeading: buckets.length > 1,
+    });
+  });
 
   return {
     kind: "local",
     output: [
       "### Usage",
       "",
-      `- Model \`${telemetry.model}\` · ${telemetry.turnsCount} ${telemetry.turnsCount === 1 ? "turn" : "turns"}`,
-      `- ${telemetry.totalTokens.toLocaleString()} tokens reported by the provider`,
+      // Named when there is one model, counted when there are several: the name is
+      // the useful fact in the first case and the count is in the second.
+      buckets.length === 1
+        ? `- Model \`${buckets[0]![0]}\` · ${telemetry.turnsCount} ${telemetry.turnsCount === 1 ? "turn" : "turns"}`
+        : `- ${buckets.length} models · ${telemetry.turnsCount} ${telemetry.turnsCount === 1 ? "turn" : "turns"}`,
+      `- ${grandTotal.toLocaleString()} tokens reported by the provider`,
       "",
-      "| | Tokens | Rate | Estimated |",
-      "| :--- | ---: | ---: | ---: |",
-      ...rows,
-      `| **Total** | **${telemetry.totalTokens.toLocaleString()}** | | **$${estimateUsageCost(telemetry, rates).toFixed(4)}** |`,
-      "",
-      published
-        ? `The token counts are what the provider reported. The rates are the ones \`${telemetry.model}\` publishes.`
-        : "The token counts are what the provider reported. The money is an estimate at a fixed rate that does not follow the model in use — check your provider's billing for what was actually charged.",
+      ...sections,
+      ...(buckets.length > 1
+        ? [`**Session total: $${sessionCost.toFixed(4)}**`, ""]
+        : []),
+      everyRatePublished
+        ? "The token counts are what the provider reported. The rates are the ones each model publishes."
+        : "The token counts are what the provider reported. Some rates are estimates at a fixed fallback that does not follow the model in use — check your provider's billing for what was actually charged.",
     ].join("\n"),
   };
+}
+
+/** One model's table, with the total row. */
+function renderModelSection(input: {
+  readonly model: string;
+  readonly bucket: ModelUsageBucket;
+  readonly rates: ModelCostRates;
+  readonly cost: number;
+  readonly published: boolean;
+  readonly showHeading: boolean;
+}): string {
+  const { bucket, rates } = input;
+  const rows = [
+    `| In | ${bucket.promptTokens.toLocaleString()} | $${rates.promptPerMTok}/M | $${((bucket.promptTokens / 1_000_000) * rates.promptPerMTok).toFixed(4)} |`,
+    `| Out | ${bucket.completionTokens.toLocaleString()} | $${rates.completionPerMTok}/M | $${((bucket.completionTokens / 1_000_000) * rates.completionPerMTok).toFixed(4)} |`,
+  ];
+  // Only shown when the provider reported any: a row of zeroes would suggest the
+  // cache is being tracked for a model that never mentioned it.
+  if (bucket.cacheReadTokens > 0 || bucket.cacheWriteTokens > 0) {
+    const readRate = rates.cacheReadPerMTok;
+    const writeRate = rates.cacheWritePerMTok;
+    rows.push(
+      `| Cache read | ${bucket.cacheReadTokens.toLocaleString()} | ${readRate === undefined ? "—" : `$${readRate}/M`} | ${readRate === undefined ? "—" : `$${((bucket.cacheReadTokens / 1_000_000) * readRate).toFixed(4)}`} |`,
+      `| Cache write | ${bucket.cacheWriteTokens.toLocaleString()} | ${writeRate === undefined ? "—" : `$${writeRate}/M`} | ${writeRate === undefined ? "—" : `$${((bucket.cacheWriteTokens / 1_000_000) * writeRate).toFixed(4)}`} |`,
+    );
+  }
+  const heading = input.showHeading
+    ? [`**\`${input.model}\`** — ${bucket.turnsCount} ${bucket.turnsCount === 1 ? "turn" : "turns"}${input.published ? "" : " (estimated rate)"}`, ""]
+    : [];
+  return [
+    ...heading,
+    "| | Tokens | Rate | Estimated |",
+    "| :--- | ---: | ---: | ---: |",
+    ...rows,
+    `| **Total** | **${bucket.totalTokens.toLocaleString()}** | | **$${input.cost.toFixed(4)}** |`,
+    "",
+  ].join("\n");
 }

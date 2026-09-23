@@ -5,7 +5,8 @@ import os from "node:os";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { StatusFacts } from "../../presentation/tui/chrome/items.js";
 import type { WelcomeState } from "../../presentation/tui/chrome/welcome.js";
-import { estimateUsageCost, getSessionUsage } from "../../observability/usageTelemetry.js";
+import { estimateSessionCost, getSessionUsage, totalTokens } from "../../observability/usageTelemetry.js";
+import { resolveModelCost } from "../../core/models/window.js";
 import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 
 /**
@@ -51,7 +52,12 @@ export function readStatusFacts(
   live: LiveStatusFacts = {},
 ): StatusFacts {
   const usage = getSessionUsage(context.session.id);
-  const cost = estimateUsageCost(usage);
+  // Summed across the models that answered, each at its own published rate. A
+  // session that switched models spent tokens at two prices, and the status band
+  // must not show the newest model's rate applied to all of them.
+  const { cost } = estimateSessionCost(usage, (model) =>
+    resolveModelCost(loadCatalog(), context.runtimeConfig.provider, model),
+  );
   return {
     model: activeModelName(context),
     provider: context.runtimeConfig.provider,
@@ -79,7 +85,7 @@ export function readStatusFacts(
           }).window,
         }
       : {}),
-    ...(usage.totalTokens > 0 ? { sessionTokens: usage.totalTokens } : {}),
+    ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
     ...(cost > 0 ? { costUsd: cost } : {}),
   };
