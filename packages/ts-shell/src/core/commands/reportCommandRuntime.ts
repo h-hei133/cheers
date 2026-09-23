@@ -26,6 +26,14 @@ import { resolveUserDataFile } from "../paths/userHome.js";
 /** Longest value kept per field, after scrubbing. */
 const MAX_FIELD_LENGTH = 200;
 
+/**
+ * Longest stack kept, after scrubbing.
+ *
+ * Larger than a message because a stack is many lines, but still capped: a deep
+ * recursion can produce thousands of frames, and the useful ones are at the top.
+ */
+const MAX_STACK_LENGTH = 4_000;
+
 export async function runReportCommand(
   args: string[],
   context: CommandContext,
@@ -39,9 +47,15 @@ export async function runReportCommand(
     // A crash message can quote a file path, a URL, or a token in an error string.
     message: redactReportText(record.message, MAX_FIELD_LENGTH, { redactions }),
     ...(record.sessionId ? { sessionId: redactReportText(record.sessionId, MAX_FIELD_LENGTH, { redactions }) } : {}),
-    // The stack is kept: it is the most useful part of a crash and the least
-    // likely to carry user content, being file paths and function names.
-    ...(record.stack ? { stack: record.stack } : {}),
+    // The stack is scrubbed too, and it has to be: a V8 stack begins with
+    // `Error: <message>`, so whatever the message carried is repeated verbatim in
+    // it. Scrubbing only the message left the secret in the archive — found by
+    // extracting an archive a byte-level check had called clean.
+    //
+    // Line by line, because the scrubber collapses whitespace by design and a
+    // stack whose frames run together is not worth including. The frame
+    // indentation is restored so the result still reads as a stack.
+    ...(record.stack ? { stack: scrubStack(record.stack, redactions) } : {}),
   }));
 
   const report = {
@@ -108,4 +122,26 @@ export async function runReportCommand(
 export function defaultReportPath(now: Date = new Date()): string {
   const stamp = now.toISOString().replace(/[:.]/g, "-");
   return resolveUserDataFile(`report-${stamp}.zip`);
+}
+
+/**
+ * Scrub a stack without destroying its shape.
+ *
+ * The shared scrubber collapses runs of whitespace, which is right for a message
+ * and wrong for a stack: it would join every frame onto one line and leave
+ * something nobody can read. Each line is scrubbed on its own and its leading
+ * indentation restored, so the frames stay distinguishable while any credential
+ * inside them is still removed.
+ *
+ * The cap applies to the whole stack, and the tail is dropped rather than the
+ * head: the frames nearest the throw are the informative ones, and a deep
+ * recursion puts thousands of uninteresting ones after them.
+ */
+function scrubStack(stack: string, redactions: Set<string>): string {
+  const lines = stack.split("\n").map((line) => {
+    const indent = /^(\s*)/.exec(line)?.[1] ?? "";
+    return indent + redactReportText(line, MAX_FIELD_LENGTH, { redactions });
+  });
+  const joined = lines.join("\n");
+  return joined.length > MAX_STACK_LENGTH ? `${joined.slice(0, MAX_STACK_LENGTH)}\n...` : joined;
 }

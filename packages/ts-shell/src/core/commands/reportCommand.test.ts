@@ -46,9 +46,31 @@ function contextFor(cwd: string): CommandContext {
   return { cwd, sessionId: "sess_report" } as CommandContext;
 }
 
-/** Everything the archive holds, concatenated, so a scan sees every byte. */
-function archiveBytes(file: string): string {
-  return fs.readFileSync(file).toString("latin1");
+/**
+ * Everything the archive actually holds, decompressed.
+ *
+ * Scanning the raw file would be worse than useless: entries are deflated, so a
+ * secret inside one does not appear as a contiguous ASCII run in the container
+ * bytes. A byte-level check therefore passes on an archive that leaks — which is
+ * exactly what happened here, and only extracting the entries showed it.
+ *
+ * This walks the local headers and inflates each entry, so what is scanned is what
+ * a reader of the archive would see.
+ */
+function archiveContents(file: string): string {
+  const { inflateRawSync } = require("node:zlib") as typeof import("node:zlib");
+  const buffer = fs.readFileSync(file);
+  const parts: string[] = [];
+  let cursor = 0;
+  while (cursor + 30 <= buffer.length && buffer.readUInt32LE(cursor) === 0x04034b50) {
+    const compressedLength = buffer.readUInt32LE(cursor + 18);
+    const nameLength = buffer.readUInt16LE(cursor + 26);
+    const extraLength = buffer.readUInt16LE(cursor + 28);
+    const dataStart = cursor + 30 + nameLength + extraLength;
+    parts.push(inflateRawSync(buffer.subarray(dataStart, dataStart + compressedLength)).toString("utf8"));
+    cursor = dataStart + compressedLength;
+  }
+  return parts.join("\n");
 }
 
 describe("runReportCommand", () => {
@@ -67,11 +89,15 @@ describe("runReportCommand", () => {
     const dir = fakeHome();
     const target = path.join(dir, "out.zip");
     await runReportCommand([target], contextFor(dir));
-    const bytes = archiveBytes(target);
-    // Only the two entries it declares, and neither is a transcript.
-    expect(bytes).toContain("report.json");
-    expect(bytes).toContain("summary.md");
-    expect(bytes).not.toContain("transcript");
+    // The entry names live in the archive's headers; the contents are the entries
+    // themselves. Checking both is the point: a transcript could arrive under
+    // either.
+    const raw = fs.readFileSync(target).toString("latin1");
+    expect(raw).toContain("report.json");
+    expect(raw).toContain("summary.md");
+    const contents = archiveContents(target);
+    expect(contents).not.toContain("transcript");
+    expect(contents).toContain("formatVersion");
   });
 
   it("keeps a credential out of the archive", async () => {
@@ -88,9 +114,10 @@ describe("runReportCommand", () => {
     const target = path.join(dir, "out.zip");
     const result = await runReportCommand([target], contextFor(dir));
 
-    const bytes = archiveBytes(target);
-    expect(bytes).not.toContain("sk-abcdefghijklmnopqrstuvwxyz012345");
-    expect(bytes).not.toContain("ghp_abcdefghijklmnopqrst");
+    // Scanned after decompression: the raw container bytes would not show it.
+    const contents = archiveContents(target);
+    expect(contents).not.toContain("sk-abcdefghijklmnopqrstuvwxyz012345");
+    expect(contents).not.toContain("ghp_abcdefghijklmnopqrst");
     // And it says that it scrubbed something, rather than doing it silently.
     expect(result.output).toContain("Scrubbed");
   });

@@ -113,13 +113,19 @@ function readLogLines(logDir: string, currentPath: string, limit: number): strin
   const files = names
     .filter((name) => name.endsWith(".log"))
     .map((name) => path.join(logDir, name))
-    // Oldest first, so the slice below keeps the most recent lines.
+    // Oldest first, so the slice below keeps the most recent lines. The
+    // comparison falls through to the name so it is a total order: two files
+    // written in the same millisecond would otherwise compare equal and leave
+    // their relative order to the directory listing.
     .sort((left, right) => {
       const leftTime = safeMtime(left);
       const rightTime = safeMtime(right);
       if (leftTime !== rightTime) return leftTime - rightTime;
       // Same timestamp: the current process's file is the newest by definition.
-      return (left === currentPath ? 1 : 0) - (right === currentPath ? 1 : 0);
+      const leftCurrent = left === currentPath ? 1 : 0;
+      const rightCurrent = right === currentPath ? 1 : 0;
+      if (leftCurrent !== rightCurrent) return leftCurrent - rightCurrent;
+      return left.localeCompare(right);
     });
 
   const lines: string[] = [];
