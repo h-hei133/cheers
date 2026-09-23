@@ -21,6 +21,7 @@ import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { compactSessionHistory } from "../../core/shell/compaction.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
+import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
 import { estimateTokens } from "../../session/context.js";
@@ -119,6 +120,10 @@ function buildCompactionWiring(input: {
     summarize: (request) =>
       requestCompactionSummary({
         provider,
+        // The same deadlines as the main request. A summarization that hangs is
+        // as fatal to a turn as an answer that hangs, and harder to notice: the
+        // conversation looks idle rather than broken.
+        fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(runtimeConfig)),
         messages: toChatMessages(request.messages),
         previousSummary: request.previousSummary,
         instructions: request.instructions,
@@ -130,6 +135,7 @@ function buildCompactionWiring(input: {
     summarizeTurnPrefix: (messages, signal) =>
       requestCompactionSummary({
         provider,
+        fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(runtimeConfig)),
         messages: toChatMessages(messages),
         prompt: TURN_PREFIX_COMPACTION_PROMPT,
         signal,

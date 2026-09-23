@@ -18,6 +18,22 @@ export interface ProviderFetchEnvironment {
 interface ProviderFetchOptions {
   readonly env?: ProviderFetchEnvironment;
   readonly fetchImpl?: typeof fetch;
+  /**
+   * Timeouts from the resolved configuration, when the caller has them.
+   *
+   * The environment still wins over these, matching how every other setting
+   * resolves: a variable is a statement about this run, and a file is a standing
+   * preference. Passing them in rather than reading config here keeps this module
+   * independent of the config layer, which it does not otherwise import.
+   */
+  readonly timeouts?: ProviderTimeoutOverrides;
+}
+
+/** The three deadlines a request runs against, as configuration states them. */
+export interface ProviderTimeoutOverrides {
+  readonly connectTimeoutMs?: number;
+  readonly headersTimeoutMs?: number;
+  readonly bodyTimeoutMs?: number;
 }
 
 interface ProviderTransportConfig {
@@ -36,7 +52,7 @@ const DEFAULT_BODY_TIMEOUT_MS = 120_000;
 export function createProviderFetchFromEnv(
   options: ProviderFetchOptions = {},
 ): typeof fetch {
-  const config = resolveProviderTransportConfig(options.env ?? process.env);
+  const config = resolveProviderTransportConfig(options.env ?? process.env, options.timeouts);
   const baseFetch = options.fetchImpl ?? (undiciFetch as unknown as typeof fetch);
   const directDispatcher = new Agent({
     connect: { timeout: config.connectTimeoutMs },
@@ -66,8 +82,57 @@ export function createProviderFetchFromEnv(
   }) as typeof fetch;
 }
 
+/**
+ * The fetch every provider request goes through, reused across calls.
+ *
+ * Reused rather than rebuilt because the wrapper holds an undici dispatcher: a
+ * session that made a new one per prompt would accumulate connections nobody
+ * closes. Keyed on the three timeouts, so a configuration change produces a new
+ * wrapper instead of silently keeping the old deadlines.
+ *
+ * Takes the timeouts rather than the configuration, because this layer does not
+ * import the config layer — the caller that has both does the extraction.
+ */
+let cachedProviderFetch: { readonly key: string; readonly fetch: typeof fetch } | undefined;
+
+export function providerFetchFromTimeouts(
+  timeouts: ProviderTimeoutOverrides = {},
+): typeof fetch {
+  const key = `${timeouts.connectTimeoutMs ?? ""}/${timeouts.headersTimeoutMs ?? ""}/${timeouts.bodyTimeoutMs ?? ""}`;
+  if (cachedProviderFetch?.key === key) return cachedProviderFetch.fetch;
+  const fetchImpl = createProviderFetchFromEnv({ timeouts });
+  cachedProviderFetch = { key, fetch: fetchImpl };
+  return fetchImpl;
+}
+
+/**
+ * The timeouts a configuration object states, if any.
+ *
+ * Structural rather than typed against the config module, so this layer stays
+ * independent of it: any object carrying these three optional numbers works.
+ */
+export function providerTimeoutsFrom(config: {
+  readonly providerConnectTimeoutMs?: number;
+  readonly providerHeadersTimeoutMs?: number;
+  readonly providerBodyTimeoutMs?: number;
+} | undefined): ProviderTimeoutOverrides {
+  if (!config) return {};
+  return {
+    ...(config.providerConnectTimeoutMs !== undefined
+      ? { connectTimeoutMs: config.providerConnectTimeoutMs }
+      : {}),
+    ...(config.providerHeadersTimeoutMs !== undefined
+      ? { headersTimeoutMs: config.providerHeadersTimeoutMs }
+      : {}),
+    ...(config.providerBodyTimeoutMs !== undefined
+      ? { bodyTimeoutMs: config.providerBodyTimeoutMs }
+      : {}),
+  };
+}
+
 export function resolveProviderTransportConfig(
   env: ProviderFetchEnvironment = process.env,
+  timeouts: ProviderTimeoutOverrides = {},
 ): ProviderTransportConfig {
   return {
     proxyUrl: resolveProxyUrl(env),
@@ -77,17 +142,29 @@ export function resolveProviderTransportConfig(
     diagnosticsEnabled: isTruthy(env.CHEERS_PROVIDER_TRANSPORT_DIAGNOSTICS),
     connectTimeoutMs: parsePositiveInteger(
       env.CHEERS_PROVIDER_CONNECT_TIMEOUT_MS,
-      DEFAULT_CONNECT_TIMEOUT_MS,
+      positiveOr(timeouts.connectTimeoutMs, DEFAULT_CONNECT_TIMEOUT_MS),
     ),
     headersTimeoutMs: parsePositiveInteger(
       env.CHEERS_PROVIDER_HEADERS_TIMEOUT_MS,
-      DEFAULT_HEADERS_TIMEOUT_MS,
+      positiveOr(timeouts.headersTimeoutMs, DEFAULT_HEADERS_TIMEOUT_MS),
     ),
     bodyTimeoutMs: parsePositiveInteger(
       env.CHEERS_PROVIDER_BODY_TIMEOUT_MS,
-      DEFAULT_BODY_TIMEOUT_MS,
+      positiveOr(timeouts.bodyTimeoutMs, DEFAULT_BODY_TIMEOUT_MS),
     ),
   };
+}
+
+/**
+ * A configured deadline, or the built-in one when it is not usable.
+ *
+ * A zero or negative value is treated as "not stated" rather than "no deadline",
+ * which is what the environment variables already do and what a reader expects
+ * from a field named in milliseconds. Silently disabling the deadline on a `0`
+ * would turn a typo into the exact hang this exists to prevent.
+ */
+function positiveOr(value: number | undefined, fallback: number): number {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 export interface ProviderTransportDecision {

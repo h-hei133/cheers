@@ -207,6 +207,35 @@ export interface RuntimeConfig {
    */
   readonly followUpMode?: "one-at-a-time" | "all";
   /**
+   * How long a provider connection may take to establish, in milliseconds.
+   *
+   * A request that never answers leaves a turn waiting forever, and a retry
+   * cannot rescue it: retries classify a failure *after* a response arrives, and
+   * a connection that hangs never produces one. So the connection has to be
+   * given a deadline of its own.
+   *
+   * Three separate values rather than one, because the three failures are
+   * different problems: connecting to an unreachable host should give up quickly,
+   * while a model that thinks for a long time before sending headers is not
+   * broken. A single number would have to be loose enough for the slowest case,
+   * which makes it useless for the fastest.
+   */
+  readonly providerConnectTimeoutMs?: number;
+  /**
+   * How long the provider may take to send response headers, in milliseconds.
+   *
+   * Idle, not total: a stream that keeps producing bytes is not timing out, only
+   * one that stops. This is the deadline a long reasoning model runs against.
+   */
+  readonly providerHeadersTimeoutMs?: number;
+  /**
+   * How long the provider may pause while streaming the body, in milliseconds.
+   *
+   * Also idle. A model that streams a long answer is fine; one that sends nothing
+   * for this long has stopped being useful.
+   */
+  readonly providerBodyTimeoutMs?: number;
+  /**
    * Config files that could not be read, one message each.
    *
    * A malformed file used to stop the process, so a stray comma meant the
@@ -264,6 +293,9 @@ export interface RuntimeConfigFile {
   retryMaxDelayMs?: number;
   steeringMode?: "one-at-a-time" | "all";
   followUpMode?: "one-at-a-time" | "all";
+  providerConnectTimeoutMs?: number;
+  providerHeadersTimeoutMs?: number;
+  providerBodyTimeoutMs?: number;
 }
 
 const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
@@ -308,6 +340,11 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   // reader, so that is the behaviour the defaults preserve.
   steeringMode: "one-at-a-time",
   followUpMode: "one-at-a-time",
+  // The same values the provider fetch layer used before they were configurable,
+  // so a run that sets none of them behaves exactly as it did.
+  providerConnectTimeoutMs: 30_000,
+  providerHeadersTimeoutMs: 120_000,
+  providerBodyTimeoutMs: 120_000,
   // Empty is the normal case: nothing was wrong with any file.
   configDiagnostics: [],
 };
@@ -439,6 +476,9 @@ export function getRuntimeConfig(
     retryMaxDelayMs: merged.retryMaxDelayMs ?? DEFAULT_CONFIG.retryMaxDelayMs,
     steeringMode: merged.steeringMode ?? DEFAULT_CONFIG.steeringMode,
     followUpMode: merged.followUpMode ?? DEFAULT_CONFIG.followUpMode,
+    providerConnectTimeoutMs: merged.providerConnectTimeoutMs ?? DEFAULT_CONFIG.providerConnectTimeoutMs,
+    providerHeadersTimeoutMs: merged.providerHeadersTimeoutMs ?? DEFAULT_CONFIG.providerHeadersTimeoutMs,
+    providerBodyTimeoutMs: merged.providerBodyTimeoutMs ?? DEFAULT_CONFIG.providerBodyTimeoutMs,
     configDiagnostics: dedupeDiagnostics(diagnostics),
     configSources: sources,
   };

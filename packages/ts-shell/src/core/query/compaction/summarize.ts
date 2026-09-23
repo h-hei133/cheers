@@ -35,6 +35,15 @@ export interface CompactionChatMessage {
 
 export interface CompactionRequest {
   readonly provider: CompactionProvider;
+  /**
+   * The fetch to send with, when the caller has one configured.
+   *
+   * Compaction issues its own model call, so it needs the same deadlines and
+   * transport as the main request: a summarization that hangs is as fatal to a
+   * turn as an answer that hangs, and it is the harder one to notice because the
+   * conversation looks idle rather than broken.
+   */
+  readonly fetchImpl?: typeof fetch;
   /** The messages to condense, in order. */
   readonly messages: readonly CompactionChatMessage[];
   readonly signal?: AbortSignal;
@@ -64,7 +73,11 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   const prompt = request.instructions?.trim()
     ? `${base}\n\nThe user asked the summary to focus on: ${request.instructions.trim()}`
     : base;
-  const res = await fetch(`${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+  // The caller's fetch when it supplied one, so this request carries the same
+  // transport and deadlines as the main one. Falling back to the global keeps
+  // every existing caller working unchanged.
+  const fetchImpl = request.fetchImpl ?? fetch;
+  const res = await fetchImpl(`${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

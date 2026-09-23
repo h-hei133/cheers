@@ -54,7 +54,7 @@ npx tsx /tmp/probe.mts
 | Prompt cache 保活（warming） | `src/core/cache-warmer.ts`；`docs/settings.md:66-100` | 无 | **MISSING** | 见 §3.2 |
 | Cache 命中/未命中统计 | `src/core/cache-stats.ts`（`CacheMiss{missedTokens,missedCost,idleMs,modelChanged}`） | 部分：`observability/usageTelemetry.ts:34-35` | **部分收口**（**2026-09-23 更正**） | 我方**记录 provider 报的缓存绝对值**（`cacheReadTokens`/`cacheWriteTokens`），`/cost` 展示。**余量**：**无命中率、无浪费分析**——pi 算的是「本可命中却未命中」的 token 与多花的钱（含空闲间隔关联，`cache-stats.ts:9` `CACHE_TTL_MS`）。见 §3.3（已同步更正） |
 | 传输选择（SSE／WebSocket） | `docs/settings.md`（`transport`） | 无 | **MISSING** | 见 §3.4 |
-| HTTP 空闲超时可配 | `src/core/http-dispatcher.ts`（默认 300000，五档可选，`disabled` 可关） | `provider/request/fetch.ts:32-34`（30s/120s/120s，`:78-89` 读 env） | **⚠️ DEFICIENT —— 且比原文更严重**（**2026-09-23 更正**） | **不是「仅 env」而是「仅被启动预检使用」**：`createProviderFetchFromEnv` 的**唯一调用者**是 `core/shell/providerReadiness.ts:149`；活轨 `turn/step.ts:134` 用**裸 `fetch`**，`grep -rn fetchImpl entrypoints turn core/agent \| grep -v test` → **无任何生产调用方传入**。所以活轨**完全没有超时**，挂起的连接让回合无限等待。**这是 Phase 6 的 T1**，见 `phase-6-decisions.md` §1 |
+| HTTP 空闲超时可配 | `src/core/http-dispatcher.ts`（默认 300000，五档可选，`disabled` 可关） | ✅ **已收口**（**2026-09-24**，Phase 6 T1）：`provider/request/fetch.ts` 接进活轨 + 3 个配置字段 | ~~DEFICIENT~~ **已收口** | **修复前**：`createProviderFetchFromEnv` 的唯一调用者是启动预检（`core/shell/providerReadiness.ts:149`），活轨 `turn/step.ts:134` 用**裸 `fetch`**——挂起的连接让回合无限等待，**且重试救不了**（只在收到响应后分类）。**修复**：`createProviderStep` 与压缩路径都传 `fetchImpl`；三个字段默认 30s/120s/120s。**实机对照**：全局 `fetch` 4s 仍在等待，provider fetch 2.5s 抛出。见 `phase-6-execution.md` §1 |
 | Per-model thinking 级别映射 | `docs/models.md:274-317`（`thinkingLevelMap`） | `core/models/requestShape.ts` `levelNameFor`（Phase 5 新增） | ✅ **已收口**（**2026-09-23 更正**） | `CatalogModel.thinkingLevelMap` + `levelNameFor` 实现**下探再上探**的档位翻译：模型只支持 `high` 时，请求 `low` 仍得到 `high` 而非什么都不发。见 §2.7（已同步更正） |
 | Provider 兼容性/就绪度矩阵 | **pi 无**（直接执行，不做矩阵） | `provider/registry/provider.ts:56-110`、`core/shell/providerReadiness.ts` | **OURS-ONLY** | 见 §4 |
 
@@ -177,7 +177,16 @@ npx tsx /tmp/probe.mts
 
 **最小改动建议**：`CatalogModel` 增加 `compat?: Partial<ProviderCompatibilityFlags>` 与 `samplingParams?: Record<string, unknown>`；与 §2.3/§2.4 一起落地。
 
-### 2.6 HTTP 超时只能靠环境变量（置信度：高）—— ⚠️ **2026-09-23 更正：比原文更严重**
+### 2.6 ~~HTTP 超时只能靠环境变量~~ ✅ **2026-09-24 已收口（Phase 6 T1）**
+
+> **收口说明**：把 `provider/request/fetch.ts` 的实现**接进了活轨**——
+> `createProviderStep` 传 `fetchImpl`（`cliRuntimeInvocation.ts:439`），
+> 压缩路径同样传（`cliSessionRuntimeFactory.ts:125,137`）；
+> 新增三个可配字段 `providerConnectTimeoutMs`/`providerHeadersTimeoutMs`/`providerBodyTimeoutMs`
+> （默认 30s/120s/120s，环境变量 `CHEERS_PROVIDER_*_TIMEOUT_MS` **仍优先**）。
+> **实机验证**：对一个「答就绪但不应答」的 provider，请求在超时后**结束**而非无限等待；
+> 对照测试显示全局 `fetch` 4 秒仍在等待，provider fetch 在 2.5 秒抛出。
+> 见 `phase-6-execution.md` §1。**下方原文保留为当时的证据。**
 
 > **更正说明**：原文说「只能靠环境变量」，实际是**更糟的一种情况**——
 > 那份可配实现（`provider/request/fetch.ts:32-34`，30s/120s/120s，`:78-89` 读 env）

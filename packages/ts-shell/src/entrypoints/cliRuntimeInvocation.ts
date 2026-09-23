@@ -28,6 +28,7 @@ import { neutraliseForDisplay } from "../core/text/safety.js";
 import { projectTrust } from "../core/security/projectTrust.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
+import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../provider/request/fetch.js";
 import { createSyntheticStep } from "../turn/synthetic.js";
 import { commandEnvironment } from "../runtime/execution/commandEnvironment.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../session/store/sessionFileLayout.js";
@@ -417,6 +418,17 @@ function commandEnvironmentFor(request: CliRuntimeInvocationRequest): Record<str
   return commandEnvironment(process.env, facts) as Record<string, string>;
 }
 
+/**
+ * The fetch every provider request goes through.
+ *
+ * A host with no configured timeouts still gets the built-in ones, which is the
+ * point of wiring this in at all: the live path previously used the global fetch
+ * and therefore had no deadline whatsoever.
+ */
+function providerFetch(runtimeConfig: RuntimeConfig | undefined): typeof fetch {
+  return providerFetchFromTimeouts(providerTimeoutsFrom(runtimeConfig));
+}
+
 function createProviderStep(
   request: CliRuntimeInvocationRequest,
   tools: ReadonlyMap<string, ToolDefinition>,
@@ -432,6 +444,11 @@ function createProviderStep(
       // resolved without it.
       provider: resolution.provider,
     },
+    // Without this the request is sent with the global fetch, which has no
+    // deadline: a provider that accepts the connection and then never answers
+    // leaves the turn waiting forever, and the retry layer cannot rescue it
+    // because it classifies a failure only after a response arrives.
+    fetchImpl: providerFetch(request.runtimeConfig),
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
     systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
