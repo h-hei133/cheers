@@ -522,14 +522,22 @@ const KEY_ONLY = new Set(["rewind"]);   // 刻意禁止键入命令唤出
 - 反过来，复核者标为低优先的 #16（稀疏主题）经复现是**真实且会致盲**的问题。
 - 唯一的「未修」是 §15.3 的 18 个死令牌，理由是删令牌会让用户已写的主题名失效。
 
-### 15.6 验证
+### 15.6 既有陈年测试缺陷修复与验证（2026-09-23 追踪）
 
-- 受影响目录：`src/session` + `src/cli/interactive` + `src/presentation` → **1084 通过 / 2 失败**。
-- 那 2 个失败是**既有**的（`longSessionDurability`），改前改后一致：基线对照见下方。
-- 全量：**3152 通过 / 7 失败 / 1 跳过**（515 文件）。7 个失败与基线完全同集合：
-  `mcp/gateway`、`longSessionDurability`×2、`core/state/projectState`、`messagingAndTeams`、
-  `osSandbox`×2 —— 用 `git stash -u` 对照确认（基线 5 文件 8 失败）。
-- 门禁：`verify:import-cycles`、`check:config-consumers`（现 18 测试）、`check:declarations`、
-  `verify:docs-drift:strict`（0 悬空）、`test:scripts` 18/18、`tsc` 0 错、
-  `normproof judge` 退出 0（`didBlock` 未置位，`openObligationCount: 0`）。
-- `npm run build:ts` 已重建，`dist` 落后源文件数 0，且用构建产物复验了幂等与悬空父节点两处修复。
+在全量回归时定位并修复了 3 处从 2026-08/09 引入的历史测试漏洞：
+
+1. **`projectState.test.ts` (引入于 2026-09-03 `e4d75bbe`)**：测试试图在 `process.env.HOME` 中嵌入 `\0invalid` 制造不可写路径，但 Node 赋值自动截断为合法路径 `/not-a-dir/`。修复为在临时 home 下建常规文件阻断目录树创建，准确触发 `ENOTDIR`。
+2. **`messagingAndTeams.test.ts` (引入于 2026-08-31 `1ee5a8e7`)**：测试用例直接手写 `path.join(os.homedir(), ".cheers", ...)` 绕过隔离写死路径且未做递归建目录，依赖前序残留。修复为使用隔离的 `testHome` 并在写盘前确保父目录存在。
+3. **`osSandbox.test.ts` (引入于 2026-09-02 `1cda3255`)**：测试用例在 `finally` 中只恢复 `HOME`，遗漏 `USERPROFILE`，在 `--no-threads` 单进程执行下造成跨测试串扰。修复为建立完整 `originalProfile` 与 `originalHome` 镜像快照并在 `afterEach` 清理还原。
+4. **澄清 2 个假阳性**：`longSessionDurability.test.ts` 和 `gateway.test.ts` 内部使用 `path.resolve(process.cwd(), "../..")`，依赖于包目录作为 `cwd`（即官方脚本 `npm run test:ts`，带 `-w packages/ts-shell`）。在包级运行下始终通过。
+
+**修复后全量验证结果**：
+- **测试套件状态**：**515 个测试文件全部通过（0 失败）**，3161 passed | 1 skipped (3162 total)。
+- **CI 门禁状态**：全绿通过：
+  - `verify:import-cycles` (0 cycles)
+  - `check:config-consumers` (24 fields consumed)
+  - `check:declarations` (18 hook events dispatched, 10 tool factories registered)
+  - `verify:docs-drift:strict` (rules 0 dangling, docs 0 dangling)
+  - `test:scripts` (18/18 passed)
+  - `tsc` (0 errors)
+  - `build:ts` (dist 最新，0 滞后)

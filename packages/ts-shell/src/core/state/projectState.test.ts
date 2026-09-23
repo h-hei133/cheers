@@ -92,7 +92,11 @@ describe("state that outlives the process", () => {
   });
 
   it("says nothing was written when the home cannot be written to", () => {
-    process.env.HOME = path.join(home, "not-a-dir", "\0invalid");
+    // An unwritable home is simulated by pointing HOME at an ordinary file:
+    // mkdirSync fails with ENOTDIR when trying to create a directory tree through it.
+    const uncreatableHome = path.join(home, "blocked-by-file");
+    fs.writeFileSync(uncreatableHome, "not a directory", "utf8");
+    process.env.HOME = uncreatableHome;
 
     expect(writeProjectState(workspace, { fastSampling: true })).toBeUndefined();
   });

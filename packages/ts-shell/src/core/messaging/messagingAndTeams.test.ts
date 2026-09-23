@@ -9,15 +9,29 @@ import { createListAgentsToolDefinition, createSendMessageToolDefinition } from 
 
 describe("SOTA Cross-Session Messaging & Agent Teams Test Suite", () => {
   let host: SessionSocketHost;
+  let testHome: string;
+  let originalHome: string | undefined;
+  let originalProfile: string | undefined;
   const sessionId = "test_mesh_session_123";
 
   beforeEach(async () => {
+    testHome = fs.mkdtempSync(path.join(os.tmpdir(), "messaging-teams-home-"));
+    originalHome = process.env.HOME;
+    originalProfile = process.env.USERPROFILE;
+    process.env.HOME = testHome;
+    delete process.env.USERPROFILE;
+
     host = new SessionSocketHost(sessionId);
     await host.start();
   });
 
   afterEach(() => {
     host.stop();
+    if (originalHome !== undefined) process.env.HOME = originalHome;
+    else delete process.env.HOME;
+    if (originalProfile !== undefined) process.env.USERPROFILE = originalProfile;
+    else delete process.env.USERPROFILE;
+    fs.rmSync(testHome, { recursive: true, force: true });
   });
 
   describe("SessionSocketHost & Client IPC Transport", () => {
@@ -148,9 +162,9 @@ describe("SOTA Cross-Session Messaging & Agent Teams Test Suite", () => {
 
       // Complete t1
       claimed1!.status = "completed";
-      const t1Path = path.join(os.homedir(), ".cheers", "tasks", teamId, "t1.json");
+      const t1Path = path.join(testHome, ".cheers", "tasks", teamId, "t1.json");
+      fs.mkdirSync(path.dirname(t1Path), { recursive: true });
       fs.writeFileSync(t1Path, JSON.stringify(claimed1, null, 2), "utf8");
-
       // Now t2 is unblocked and can be claimed
       const claimed2 = taskStore.claimNextAvailableTask("worker-2");
       expect(claimed2?.id).toBe("t2");

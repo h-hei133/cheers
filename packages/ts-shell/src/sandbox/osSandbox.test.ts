@@ -6,12 +6,20 @@ import { networkNotice, planSandboxedCommand, readSandboxRules } from "./osSandb
 
 describe("os sandbox rules", () => {
   let workspace = "";
+  let originalHome: string | undefined;
+  let originalProfile: string | undefined;
 
   beforeEach(() => {
     workspace = fs.mkdtempSync(path.join(os.tmpdir(), "os-sandbox-"));
+    originalHome = process.env.HOME;
+    originalProfile = process.env.USERPROFILE;
   });
 
   afterEach(() => {
+    if (originalHome !== undefined) process.env.HOME = originalHome;
+    else delete process.env.HOME;
+    if (originalProfile !== undefined) process.env.USERPROFILE = originalProfile;
+    else delete process.env.USERPROFILE;
     fs.rmSync(workspace, { recursive: true, force: true });
   });
 
@@ -41,8 +49,6 @@ describe("os sandbox rules", () => {
     // Isolation the user switched on under an older name still has to hold: a
     // rule that silently stops applying is worse than one never written.
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-home-"));
-    const originalHome = process.env.HOME;
-    const originalProfile = process.env.USERPROFILE;
     process.env.HOME = home;
     delete process.env.USERPROFILE;
     try {
@@ -55,9 +61,6 @@ describe("os sandbox rules", () => {
 
       expect(readSandboxRules(workspace).enabled).toBe(true);
     } finally {
-      process.env.HOME = originalHome;
-      if (originalProfile === undefined) delete process.env.USERPROFILE;
-      else process.env.USERPROFILE = originalProfile;
       fs.rmSync(home, { recursive: true, force: true });
     }
   });
@@ -67,8 +70,8 @@ describe("os sandbox rules", () => {
     // tightens that decision or leaves it alone; it must not be able to lift it,
     // or cloning a repository would be enough to run its code unconfined.
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-home-"));
-    const originalHome = process.env.HOME;
     process.env.HOME = home;
+    delete process.env.USERPROFILE;
     try {
       fs.mkdirSync(path.join(home, ".cheers"), { recursive: true });
       fs.writeFileSync(
@@ -80,7 +83,6 @@ describe("os sandbox rules", () => {
 
       expect(readSandboxRules(workspace).enabled).toBe(true);
     } finally {
-      process.env.HOME = originalHome;
       fs.rmSync(home, { recursive: true, force: true });
     }
   });
@@ -89,8 +91,8 @@ describe("os sandbox rules", () => {
     // `allowWrite` is the list of places a command may modify. A project able to
     // append to it could grant itself the whole filesystem.
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-home-"));
-    const originalHome = process.env.HOME;
     process.env.HOME = home;
+    delete process.env.USERPROFILE;
     try {
       fs.mkdirSync(path.join(home, ".cheers"), { recursive: true });
       fs.writeFileSync(
@@ -104,7 +106,6 @@ describe("os sandbox rules", () => {
 
       expect(rules.filesystem?.allowWrite).toEqual(["/tmp/ok"]);
     } finally {
-      process.env.HOME = originalHome;
       fs.rmSync(home, { recursive: true, force: true });
     }
   });
@@ -114,8 +115,8 @@ describe("os sandbox rules", () => {
     // default, not "let the project decide". A project naming `/` here would be
     // replacing a confined workspace with the whole filesystem.
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-home-"));
-    const originalHome = process.env.HOME;
     process.env.HOME = home;
+    delete process.env.USERPROFILE;
     try {
       fs.mkdirSync(path.join(home, ".cheers"), { recursive: true });
       fs.writeFileSync(
@@ -127,7 +128,6 @@ describe("os sandbox rules", () => {
 
       expect(readSandboxRules(workspace).filesystem?.allowWrite).toBeUndefined();
     } finally {
-      process.env.HOME = originalHome;
       fs.rmSync(home, { recursive: true, force: true });
     }
   });
