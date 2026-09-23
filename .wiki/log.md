@@ -2777,3 +2777,12 @@ T6/T7/T10/T11/T12/T14/T16a/T16b/T17/T18 全部有结论。**实测更正 5 处�
 - **施工中发现自己引入的两个缺陷**：①`catchUpSessionThread` 按「活跃分支计数」会把另一分支上的 turn 当缺失而**重复追加**（实测 `t2` 出现两次、`t3` 挂错父节点）→ 改为按名字判断；②按分支过滤后，thread 与 transcript **对不上**时（旧会话无 id 就会这样）返回**空会话** —— 读起来是「什么都没说」而不是「两个文件对不上」→ 改为 thread 指不出任何消息时不采信它。
 - **验证**：端到端实测「回到 Q1 换方向提问 → 两分支都在、可来回切换、7 个 entry 无重复」；无 id 的旧会话仍完整加载且可回退。**反向验证三项**（重复 entry 防护 / load 路径接线 / 不匹配防护），各自还原后对应测试失败。全量套件 519 文件 / 3119 通过，8 项失败在与开工前**完全相同的 5 个文件**；全部门禁通过。已重建 `dist/`（`cheers` 走构建产物，源码改动需 `npm run build:ts` 才对命令行生效）。
 - **仍未做**：树形可视化导航（`/tree` 式）—— 参考实现的树选择器 1435 行，其中搜索/过滤/标签/复制属锦上添花；入口沿用「空草稿连按两次 Escape」的既有手势。
+
+## [2026-09-23] fix | 回退入口的三个可用性缺陷：`/undo` 冒名、选项语义错、回退不留痕（`5f558351`）。
+- **起因**：维护者实测 ——「双击 Esc 然后选择一个输入，没有任何变化」「/undo 完全不知道在干嘛，我的对话回到了哪里？」。5 个子代理并行探索（`content_filter` 失败 2 个，主代理补做），确认是三个独立缺陷，用户三个都撞上。
+- **缺陷一（`/undo` 冒用对话回退的名字）**：`/undo` 实际是**文件**命令（报告最近文件编辑 + 回退命令，全文无 `turns`/`thread`/`revertTo` 引用），但注册为 `aliases: ["rewind", "revert"]` 且 `summary: "rewind the last conversational turn or changes"` —— **摘要声称回退对话轮次**。用户打 `/rewind` 想回对话，拿到文件报告。参考实现 `pi` **没有** `/undo` 这个 slash 命令（`undo` 只是编辑器按键），对话导航叫 `/tree`，且 `doubleEscapeAction` 默认就是 `"tree"`（双击 Esc 与 `/tree` 同一动作）。**修正**：移除两个别名、summary 改为陈述文件行为、补全表 `/rewind`/`/revert` → `/back`。
+- **缺陷二（选项语义与计数都错）**：选中提问会**回到输入框**（本身不算损失），但 `dropped: turns.length - index` 把它算进去了 —— 实测选最新提问显示 `dropped=2` 实际只丢 1 条，**每项多报 1**。文案又是描述损失（「forgets one exchange after it」），选最新提问时读起来像「什么都没发生」—— 正是用户看到的现象。**修正**：`- 1`、文案改为陈述结果（「drops N turns after this question」）、标题 `"Go back to"` → `"Ask again from"`。
+- **缺陷三（回退不留痕迹，静默数据丢失）**：回退记录写不写取决于 LLM 摘要是否成功（`if (summary) { appendBranchSummaryEvent(...) }`）。实测不传 summarizer 时 transcript 前后字节数**完全相同**（329 → 329）—— 重开会话看到更短的对话，**没有任何东西说明退过、丢了多少**。**修正**：`summary` 改可选、新增 `toEntryId`、**每次回退都写**；校验从「summary 是字符串」改为「droppedTurns 是数字」。
+- **缺陷四（无可发现入口）**：唯一入口是「空草稿连按两次 Esc」（600ms 窗口），而 `picker/registry.ts` 里 `const KEY_ONLY = new Set(["rewind"])` **刻意禁止**键入命令唤出，`/help` 也没有。用户「不知道怎么用」是设计造成的。**修正**：新增 `/back`（注册进 `PICKER_ONLY`，与既有 `/statusline` 同机制）；picker 键 `rewind` → `back`；**删除 `KEY_ONLY`**。**命名取舍**：不用 `/tree` —— `pi` 的 `/tree` 背后是 1435 行的树形选择器，我方目前只是线性列表，叫 `/tree` 会承诺不存在的东西。
+- **验证**：**反向验证 4 项**（回退记录 / 丢弃计数 / `/undo` 别名 / 选项文案），各自还原后对应测试失败。端到端走**构建产物**：列表显示「drops one turn after this question」、回退后对话 `[Q1, A1, Q2]`、transcript 字节数增加。全量套件 515 文件 / 3128 通过 / 7 失败（失败仍为既有 4–5 个文件，隔离运行同样失败）。全部门禁通过，`monoliths=5` 未增。已重建 `dist/`。
+- **仍未做**：树形可视化导航（见 `phase-4-execution.md` §13.6）。`/back` 只是把既有线性列表暴露出来，不是树形浏览器。

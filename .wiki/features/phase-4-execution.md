@@ -371,3 +371,79 @@ npx --package .normproof/normproof-*.tgz normproof judge   # 与 CI 同一条命
 
 - **树形可视化导航**（`/tree` 式）。当前入口沿用「空草稿上连按两次 Escape」的既有手势，选中的是**提问轮**并把原文放回输入框。参考实现的树选择器组件有 1435 行，其中搜索/过滤/标签/复制/时间戳属于锦上添花；本产品尚未做。
 - 分支摘要仍写在 transcript 尾部（`branch_summary` 条目），未按分支归档。
+
+---
+
+## 13. 后续：回退入口的三个可用性缺陷
+
+§12 把回退改成了非破坏性分支切换。维护者随后实测反馈：
+
+> 「双击 Esc 然后选择一个输入，没有任何变化」「/undo 完全不知道在干嘛，我的对话回到了哪里？」
+
+5 个子代理并行探索（`content_filter` 失败 2 个，主代理补做），确认是**三个独立缺陷**，且用户三个都撞上了。
+
+### 13.1 缺陷一：`/undo` 冒用了对话回退的名字
+
+`/undo` 实际是**文件**命令 —— 报告最近一次文件编辑并给出回退它的命令，完全不碰对话（`undoCommandRuntime.ts` 里没有任何 `turns` / `thread` / `revertTo` 引用）。但它的注册项是：
+
+```ts
+aliases: ["rewind", "revert"],
+summary: "rewind the last conversational turn or changes",
+```
+
+**摘要声称会回退对话轮次。** 用户输入 `/rewind` 或 `/undo` 时，被告知的是对话回退，拿到的是文件报告 —— 这正是「完全不知道这个 undo 在干嘛」的直接原因。
+
+参考实现对照：`pi` **没有** `/undo` 这个 slash 命令（`undo` 只是编辑器按键 `tui.editor.undo`），对话导航叫 `/tree`，且 `doubleEscapeAction` 默认就是 `"tree"` —— 双击 Esc 与 `/tree` 是同一个动作。我方 `rewind`/`revert` 别名是自造的冲突。
+
+**修正**：移除两个别名；summary 改为 `"report the most recent file edit and the command to revert it"`；`cliArgs.ts` 的补全表把 `/rewind`/`/revert` 换成 `/back`。
+
+### 13.2 缺陷二：选项的语义与计数都是错的
+
+**语义**：picker 列出提问轮，选中的提问会**回到输入框**（因此它本身不算损失）。但 `describeCost` 把它算进了丢弃数：
+
+```ts
+dropped: turns.length - index,        // 把该提问自己也算进去了
+```
+
+实测：选最新提问显示 `dropped=2`，实际只丢 1 条。**每一项都多报 1。**
+
+**措辞**：原文案是「forgets one exchange after it」—— 描述损失而非结果。选最新提问时它读起来像「什么都没发生」，而这正是用户看到的现象（选中列表第一项以为要重问，结果屏幕几乎没变）。
+
+**修正**：`dropped: turns.length - index - 1`；文案改为陈述结果（`"drops the answer to this question"` / `"drops N turns after this question"`）；picker 标题从 `"Go back to"` 改为 `"Ask again from"`。
+
+### 13.3 缺陷三：回退不留任何痕迹
+
+回退事件写不写进 `transcript.jsonl`，**取决于 LLM 摘要是否成功**：
+
+```ts
+if (summary) { appendBranchSummaryEvent(...); }   // 无 provider / 调用失败 -> 什么都不写
+```
+
+实测：不传 summarizer 时，回退前后 transcript 字节数**完全相同**（329 → 329）。后果是重开会话后看到一段更短的对话，**没有任何东西说明发生过回退、丢了多少**。这是静默数据丢失。
+
+**修正**：`BranchSummaryTranscriptEntry.summary` 改为可选、新增 `toEntryId`；**每次回退都写**（`droppedTurns` + `toEntryId` + 时间戳），摘要有则附上。校验函数相应从「summary 是字符串」改为「droppedTurns 是数字」。
+
+### 13.4 缺陷四：没有可发现的入口（用户提的「入口只有两个」）
+
+对话回退当时**唯一**入口是「空草稿上连按两次 Esc」（`DOUBLE_ESCAPE_MS = 600`），而 picker 注册表里有：
+
+```ts
+const KEY_ONLY = new Set(["rewind"]);   // 刻意禁止键入命令唤出
+```
+
+即：唯一的键入手势被硬编码屏蔽，`/help` 里也没有。用户「不知道怎么用」是设计造成的。
+
+**修正**：新增 `/back` 命令（注册进 `PICKER_ONLY`，与既有的 `/statusline` 同机制）；picker 键 `rewind` → `back`；**删除 `KEY_ONLY`**（不再有需要屏蔽的 picker）。`opensPicker` 仍只拦裸命令，`/back <参数>` 不打开选择器。
+
+**命名取舍**：不用 `/tree`。`pi` 的 `/tree` 背后是树形可视化选择器（其组件 1435 行），我方目前只是线性提问列表，叫 `/tree` 会承诺一个还不存在的东西。`/back` 无冲突且符合「回到之前」的直觉。
+
+### 13.5 验证
+
+- **反向验证 4 项**：回退记录、丢弃计数、`/undo` 别名、选项文案 —— 各自还原后对应测试失败。
+- 端到端（构建产物，非源码）：列表显示「drops one turn after this question」；回退后对话为 `[Q1, A1, Q2]`；transcript 字节数增加（留下记录）。
+- 全量套件 515 文件 / 3128 通过 / 7 失败，失败仍为**既有的** 4–5 个文件（`mcp/gateway`、`messagingAndTeams`、`projectState`、`osSandbox`、`longSessionDurability`；隔离运行同样失败，确认非本轮引入）。全部门禁通过。
+- 已重建 `dist/`。
+
+### 13.6 仍未做
+
+树形可视化导航仍未做（见 §12.5）。`/back` 只是把既有线性列表暴露出来，不是树形浏览器。
