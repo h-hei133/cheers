@@ -148,35 +148,80 @@ export function loadUserKeybindings(root?: string): LoadedKeybindings {
       problems.push({ message: `\`${actionId}\` must be a key or an array of keys; it is ignored.` });
       continue;
     }
+    // A key the parser can never emit is reported rather than dropped: the entry
+    // is in the file, so the user believes the binding exists.
+    const unusable = unusableKeys(value);
+    if (unusable.length > 0) {
+      problems.push({
+        message:
+          `\`${actionId}\` names ${unusable.map((key) => `\`${key}\``).join(", ")}, ` +
+          "which this terminal cannot produce (known modifiers: ctrl, alt, shift, meta). The binding is ignored.",
+      });
+      if (keys.length === 0) continue;
+    }
     config[actionId] = keys;
   }
   return { config, problems };
 }
 
+/** Every key in an entry that the parser could never report. */
+export function unusableKeys(value: unknown): readonly string[] {
+  const entries = typeof value === "string" ? [value] : Array.isArray(value) ? value : [];
+  return entries.filter(
+    (entry): entry is string =>
+      typeof entry === "string" && entry.trim() !== "" && normalizeKey(entry) === undefined,
+  );
+}
+
 export function normalizeEntry(value: unknown): readonly string[] | undefined {
-  if (typeof value === "string") return value.trim() === "" ? [] : [normalizeKey(value)];
+  if (typeof value === "string") return value.trim() === "" ? [] : entryKeys([value]);
   if (Array.isArray(value)) {
     if (!value.every((entry) => typeof entry === "string")) return undefined;
-    return (value as string[]).filter((entry) => entry.trim() !== "").map(normalizeKey);
+    return entryKeys(value as string[]);
   }
   return undefined;
 }
 
+/** The usable keys of an entry, dropping the ones the parser cannot report. */
+function entryKeys(entries: readonly string[]): readonly string[] {
+  const keys: string[] = [];
+  for (const entry of entries) {
+    const normalized = entry.trim() === "" ? undefined : normalizeKey(entry);
+    if (normalized !== undefined) keys.push(normalized);
+  }
+  return keys;
+}
+
+/** Modifiers the key parser can put in a key id. */
+const KNOWN_MODIFIERS = ["ctrl", "alt", "shift", "meta"] as const;
+
 /**
- * A key as the parser would report it.
+ * A key as the parser would report it, or nothing when it is not a key.
  *
  * Lower-cased and with modifiers ordered, so `Ctrl+Shift+Z` in a config file and
  * `ctrl+shift+z` from the terminal are the same binding. Without this a config
  * that looks right would never match.
+ *
+ * Returning nothing for an unrecognizable key is the whole point. The parser only
+ * ever emits modifiers from {@link KNOWN_MODIFIERS}, so a segment it does not
+ * know — `cmd`, `super`, or a typo like `cotrl` — describes a key that can never
+ * arrive. Dropping the unknown segment instead would turn `cmd+z` into a binding
+ * on the bare `z`, and the user would find their letter key hijacked by a
+ * shortcut they thought they had given to a chord.
  */
-function normalizeKey(key: string): string {
+function normalizeKey(key: string): string | undefined {
   const parts = key
     .split("+")
     .map((part) => part.trim().toLowerCase())
     .filter((part) => part !== "");
-  if (parts.length === 0) return "";
+  if (parts.length === 0) return undefined;
   const name = parts.pop()!;
-  const modifiers = ["ctrl", "alt", "shift"].filter((modifier) => parts.includes(modifier));
+  // A modifier with no key after it, as `ctrl+` produces.
+  if ((KNOWN_MODIFIERS as readonly string[]).includes(name)) return undefined;
+  const modifiers = KNOWN_MODIFIERS.filter((modifier) => parts.includes(modifier));
+  // Every segment has to be a known modifier: one that is not names a key that
+  // cannot be typed, so the binding is rejected rather than silently narrowed.
+  if (parts.some((part) => !(KNOWN_MODIFIERS as readonly string[]).includes(part))) return undefined;
   return [...modifiers, name].join("+");
 }
 

@@ -81,6 +81,52 @@ describe("keybindings", () => {
     expect(bindings.actionFor("ctrl+shift+z")).toBe("tui.editor.redo");
   });
 
+  it("refuses a chord it cannot produce instead of binding the bare key", () => {
+    // `cmd+z` is not a key this parser emits. Dropping the segment it does not
+    // know would leave a binding on `z`, and typing would fire the shortcut.
+    const bindings = new Keybindings();
+    bindings.setUserConfig({ "tui.editor.undo": "cmd+z" });
+
+    expect(bindings.actionFor("z")).toBeUndefined();
+    expect(bindings.keysFor("tui.editor.undo")).toEqual([]);
+  });
+
+  it("refuses a misspelled modifier for the same reason", () => {
+    const bindings = new Keybindings();
+    bindings.setUserConfig({ "app.retry": "cotrl+x" });
+    expect(bindings.actionFor("x")).toBeUndefined();
+  });
+
+  it("refuses a modifier with no key after it", () => {
+    const bindings = new Keybindings();
+    bindings.setUserConfig({ "app.retry": "ctrl+" });
+    // `ctrl` is not a key id the parser ever reports, so this would never fire.
+    expect(bindings.actionFor("ctrl")).toBeUndefined();
+    expect(bindings.keysFor("app.retry")).toEqual([]);
+  });
+
+  it("keeps meta, which the parser does emit", () => {
+    const bindings = new Keybindings();
+    bindings.setUserConfig({ "app.exit": "meta+q" });
+    expect(bindings.actionFor("meta+q")).toBe("app.exit");
+  });
+
+  it("reports a key it cannot produce, and keeps the rest of the entry", () => {
+    writeConfig(
+      JSON.stringify({
+        "tui.editor.undo": "cmd+z",
+        "tui.editor.redo": ["ctrl+shift+z", "super+r"],
+      }),
+    );
+    const loaded = loadUserKeybindings();
+
+    expect(loaded.problems.map((problem) => problem.message).join("\n")).toContain("cmd+z");
+    expect(loaded.problems.map((problem) => problem.message).join("\n")).toContain("super+r");
+    // The usable half of the list survives, and the rejected action is dropped
+    // rather than left with one key where two were asked for.
+    expect(loaded.config).toEqual({ "tui.editor.redo": ["ctrl+shift+z"] });
+  });
+
   it("lets a user binding take a key from a default binding", () => {
     // Otherwise the config file would say one thing and the surface do another.
     const bindings = new Keybindings();
