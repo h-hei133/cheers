@@ -160,9 +160,11 @@
 
 ### 6.3 模块规模的如实记录
 
-`editor.ts` 在本次任务**之前**就已经超过 20 名的上限（28 名）。本次新增 redo/yankPop 后若不做拆分是 35 名；拆出四个模块后是 31 名。
+`editor.ts` 在本次任务**之前**就已经超过 20 名的上限（28 名，且已在 `.normproof/dispositions.md` 里裁定为 defer）。本次新增 redo/yankPop 后若不做拆分是 35 名；拆出四个模块后是 31 名。
 
-**未降到 28** 的原因：继续拆需要把 `browsing` / `draft` / `historyIndex` 三个字段一起搬走（即整个 prompt history），改动面大于收益。已记录，未做。
+**收尾时降到 28**（`8127d017`）：AGENTS.md 要求「先试修，再记录 defer」，所以把本次新增留下的三个薄包装（`caret` / `caretState` / `pushKill`，各两个调用点）内联回去。31 → 28 后，`editor.ts` 回到了它已被复审过的那个数字，**本轮不再往上推**。
+
+**仍高于上限 20**，与 `pi` 对照过：`pi` 的编辑器是 81 个方法一个文件。差异不在拆分遗漏，而在它是「一个类持有共享 caret 状态」——拆分要连同 `browsing` / `draft` / `historyIndex` 一起搬走，即整个 prompt history。已在 dispositions 里按协议记一条新行重申该裁定。
 
 ---
 
@@ -246,9 +248,14 @@ npm run check:declarations
 npm run verify:docs-drift:strict
 npm run test:scripts
 npm run analyze:module-facades
+npx --package .normproof/normproof-*.tgz normproof judge   # 与 CI 同一条命令
 ```
 
 全部通过。
+
+`normproof judge` **exits 0，`didBlock: false`，0 条阻塞义务**（唯一阻塞项 `unresolved_specifiers` 为 holds）。
+它同时报出 5 条模块上限发现（advisory，不阻塞）——其中 `editor.ts` 与 `turnSink.ts` 本轮各补了一条
+`.normproof/dispositions.md` 记录；`editor.ts` 的那条是**收尾时先修后记**（31 → 28，见 §6.3）。
 
 ### 9.2 反向验证清单
 
@@ -292,7 +299,7 @@ npm run analyze:module-facades
 | `SYSTEM.md` | §6.2 | 与「追加」是不同的信任决定 |
 | worktree 里主仓库规则不可见 | §6.1 继承 C-1 | 既有取舍，改动属产品判断 |
 | 124 个不可达模块 | §1.2 | 2026-09-15「不动」裁决 + `plan.md` §4.6 |
-| `editor.ts` 降到 28 名以下 | §6.3 | 需搬走整个 prompt history，改动面大于收益 |
+| `editor.ts` 降到 20 名以下 | §6.3 | 已回到裁定的 28；再降需搬走整个 prompt history，改动面大于收益 |
 | `pi` 的旧格式 keybindings 迁移 | §8.2 | 我方无历史格式 |
 
 ---
@@ -307,4 +314,4 @@ npm run analyze:module-facades
 | `03-*` §2.3/§3.1 | catalog `modelOverrides` 不生效 | `dedupeModels` last-write-wins，本来生效 |
 | `03-*` §3.1 | `CatalogModel` 的限制在 overrides | 限制在字段太少；`cost` 已补 |
 
-另有两处**执行中偏离裁决**（均已在正文说明）：T5-2 的接线点改为 snapshot 构建处（并因此删除一个函数），T7 的 `editor.ts` 未回到 28 名。
+另有一处**执行中偏离裁决**（已在正文说明）：T5-2 的接线点改为 snapshot 构建处，并因此删除了裁决里要接的那个函数。T7 的 `editor.ts` 一度到 31 名，收尾时已内联回裁定的 28 名（`8127d017`）。
