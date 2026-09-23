@@ -16,6 +16,12 @@ export function printCliDoctor(targetCwd: string, launchCwd: string): void {
   console.log(
     `Config sources: ${runtimeConfig.configSources.join(", ") || "none"}`,
   );
+  // The one place a skipped config file is visible without a stack trace. A
+  // setting that appears to have been ignored is the symptom; this is the
+  // explanation.
+  for (const diagnostic of runtimeConfig.configDiagnostics) {
+    console.log(`Config problem: ${diagnostic}`);
+  }
   console.log(`Launch directory: ${launchCwd}`);
   console.log(`Target workspace: ${targetCwd}`);
   if (gitContext.insideGit) {

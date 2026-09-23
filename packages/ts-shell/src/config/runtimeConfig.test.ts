@@ -150,6 +150,59 @@ describe("runtime config", () => {
     expect(config.followUpMode).toBe("all");
   });
 
+  it("starts anyway when a config file cannot be parsed", () => {
+    // A stray comma used to stop the process, which turned a typo into a
+    // product that would not run. The file is skipped and the complaint is
+    // reported instead.
+    fs.writeFileSync(path.join(fakeRoot, ".cheers.json"), "{ not json", "utf8");
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.provider).toBe("openai");
+    expect(config.configDiagnostics).toHaveLength(1);
+    expect(config.configDiagnostics[0]).toContain("Invalid config at");
+    expect(config.configDiagnostics[0]).toContain(".cheers.json");
+  });
+
+  it("does not let a broken project file inherit the user's settings", () => {
+    // Skipping the file means it contributes nothing. Falling back to the user
+    // file would attribute the user's values to a project that never declared
+    // them, and the diagnostics would be the only sign.
+    fs.mkdirSync(path.dirname(getUserRuntimeConfigPath()), { recursive: true });
+    fs.writeFileSync(
+      getUserRuntimeConfigPath(),
+      JSON.stringify({ maxTurns: 99, provider: "anthropic" }),
+      "utf8",
+    );
+    fs.writeFileSync(path.join(fakeRoot, ".cheers.json"), "{ not json", "utf8");
+
+    const config = getRuntimeConfig(fakeRoot);
+    // The user file still applies; the project file contributed nothing.
+    expect(config.maxTurns).toBe(99);
+    expect(config.configDiagnostics).toHaveLength(1);
+  });
+
+  it("reports one diagnostic per distinct problem", () => {
+    fs.writeFileSync(path.join(fakeRoot, ".cheers.json"), "{ not json", "utf8");
+    const config = getRuntimeConfig(fakeRoot);
+    // The same file read twice must not read as two problems.
+    expect(new Set(config.configDiagnostics).size).toBe(config.configDiagnostics.length);
+  });
+
+  it("says nothing when every config file reads cleanly", () => {
+    fs.writeFileSync(path.join(fakeRoot, ".cheers.json"), JSON.stringify({ maxTurns: 7 }), "utf8");
+    expect(getRuntimeConfig(fakeRoot).configDiagnostics).toEqual([]);
+  });
+
+  it("still refuses to write back a user config it could not read", () => {
+    // The read-modify-write path keeps throwing on purpose: returning an empty
+    // object there would make the next write replace everything the user had
+    // with the single field the command was setting.
+    const userConfigPath = getUserRuntimeConfigPath();
+    fs.mkdirSync(path.dirname(userConfigPath), { recursive: true });
+    fs.writeFileSync(userConfigPath, "{ not json", "utf8");
+    expect(() => readUserRuntimeConfigFile()).toThrow(/Failed to read user runtime config/);
+  });
+
   it("does not allow unreviewed hooks unless a flag says so", () => {
     // The default has to be the safe one: a config file must not be able to grant
     // this, or a repository could ship the exemption along with the hooks.
@@ -408,11 +461,14 @@ describe("runtime config", () => {
     expect(loaded.maxTurns).toBe(15);
   });
 
-  it("includes config path in parse error for invalid JSON", () => {
+  it("names the config path in the diagnostic for invalid JSON", () => {
+    // The path has to be in the message: with two candidate files, "invalid
+    // config" alone leaves the user guessing which one to fix.
     const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(configPath, "{ invalid_json }", "utf8");
-    expect(() => getRuntimeConfig(fakeRoot)).toThrowError(
-      new RegExp(`Failed to read runtime config at .*\\.cheers\\.json:.*`)
-    );
+
+    const diagnostics = getRuntimeConfig(fakeRoot).configDiagnostics;
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toContain(".cheers.json");
   });
 });

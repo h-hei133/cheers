@@ -118,6 +118,14 @@ export function bootstrapShellRuntime(input: {
   const requestedProjectRoot = input.gitContext.root ?? input.cwd;
   const requestedRootMode = resolveWorkspaceRootMode(input.gitContext);
 
+  // Said before anything else, because a config file that could not be read
+  // explains everything that follows: the settings it held are simply not in
+  // effect, and without this line the only symptom is a product that ignores
+  // what the user wrote.
+  for (const diagnostic of input.runtimeConfig.configDiagnostics) {
+    emitLifecycleMessage(`Warning: ${diagnostic}`);
+  }
+
   const session = (() => {
     if (!input.requestedSessionId) {
       // Two kinds of run, two answers.

@@ -206,6 +206,18 @@ export interface RuntimeConfig {
    * applies at a coarser boundary. Absent means `one-at-a-time`.
    */
   readonly followUpMode?: "one-at-a-time" | "all";
+  /**
+   * Config files that could not be read, one message each.
+   *
+   * A malformed file used to stop the process, so a stray comma meant the
+   * product would not start and said so only in a stack trace. The file is
+   * skipped now and its complaint is carried here instead, because a
+   * configuration error is something to tell the user about, not something to
+   * refuse to run over.
+   *
+   * Empty when every file read cleanly, which is the normal case.
+   */
+  readonly configDiagnostics: readonly string[];
   readonly configSources: string[];
 }
 
@@ -296,6 +308,8 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   // reader, so that is the behaviour the defaults preserve.
   steeringMode: "one-at-a-time",
   followUpMode: "one-at-a-time",
+  // Empty is the normal case: nothing was wrong with any file.
+  configDiagnostics: [],
 };
 
 /**
@@ -317,6 +331,7 @@ export function getRuntimeConfig(
   overrides?: RuntimeConfigOverrides,
 ): RuntimeConfig {
   const sources: string[] = [];
+  const diagnostics: string[] = [];
   let merged: RuntimeConfigFile = {};
 
   // 先读项目级配置，再读用户级配置，确保 /auth 写入的个人凭据与 provider
@@ -348,8 +363,12 @@ export function getRuntimeConfig(
       };
       sources.push(candidate);
     } catch (error) {
-      throw new Error(
-        `Failed to read runtime config at ${candidate}: ${error instanceof Error ? error.message : String(error)}`,
+      // Skipped rather than fatal, and the file contributes nothing: a bad
+      // project file must not silently inherit the user's values either, since
+      // "this file did not apply" is the honest reading. The complaint travels
+      // out on the result so the surface can say what happened.
+      diagnostics.push(
+        `Invalid config at ${candidate}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -420,6 +439,7 @@ export function getRuntimeConfig(
     retryMaxDelayMs: merged.retryMaxDelayMs ?? DEFAULT_CONFIG.retryMaxDelayMs,
     steeringMode: merged.steeringMode ?? DEFAULT_CONFIG.steeringMode,
     followUpMode: merged.followUpMode ?? DEFAULT_CONFIG.followUpMode,
+    configDiagnostics: dedupeDiagnostics(diagnostics),
     configSources: sources,
   };
 }
@@ -437,6 +457,17 @@ export function getUserRuntimeConfigPath(): string {
   return resolveUserDataFile("config.json");
 }
 
+/**
+ * The user's own config file, read to be modified and written back.
+ *
+ * This deliberately still throws, unlike `getRuntimeConfig`, and the difference
+ * is the whole reason the two are separate functions. Callers here take the
+ * result, change one field and write the file again; returning an empty object
+ * for a file that could not be parsed would make that write replace everything
+ * the user had with the one field the command was setting. Losing a config file
+ * to a typo is worse than refusing the command that would have done it, so the
+ * error stops the caller instead.
+ */
 export function readUserRuntimeConfigFile(): RuntimeConfigFile {
   const configPath = getUserRuntimeConfigPath();
   if (!fs.existsSync(configPath)) {
@@ -452,6 +483,17 @@ export function readUserRuntimeConfigFile(): RuntimeConfigFile {
       `Failed to read user runtime config at ${configPath}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+/**
+ * One line per distinct complaint.
+ *
+ * The user file is read twice on some paths — once to resolve and once by a
+ * command that then writes it back — so the same unreadable file can be
+ * reported twice. Two identical warnings read as two problems.
+ */
+function dedupeDiagnostics(messages: readonly string[]): string[] {
+  return [...new Set(messages)];
 }
 
 export function writeUserRuntimeConfigFile(config: RuntimeConfigFile): string {

@@ -15,6 +15,14 @@ export async function runDoctorCommand(context: CommandContext): Promise<LocalCo
     `Workspace: ${context.cwd}`,
   ]
 
+  // Reported here because this is where someone looks when the product is not
+  // behaving as their configuration says it should. A skipped file explains
+  // that in one line, and without it the only symptom is a setting that seems
+  // to have been ignored.
+  for (const diagnostic of runtimeConfig.configDiagnostics) {
+    lines.push(`Config problem: ${diagnostic}`)
+  }
+
   if (gitContext.insideGit) {
     lines.push(`Git branch: ${gitContext.branch ?? 'unknown'}`)
     lines.push(`Workspace clean: ${gitContext.isClean ? 'yes' : 'no'}`)
