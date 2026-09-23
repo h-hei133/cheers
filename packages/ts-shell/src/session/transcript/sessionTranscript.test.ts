@@ -34,7 +34,10 @@ describe("sessionTranscript", () => {
         }),
       );
 
-      expect(projectTranscriptMessages(readTranscriptEvents(transcriptPath))).toEqual([
+      // The id travels with the message: a branch is a set of these ids, so a
+      // projection that dropped them could not be filtered to one branch.
+      const projected = projectTranscriptMessages(readTranscriptEvents(transcriptPath));
+      expect(projected.map(({ id, ...rest }) => rest)).toEqual([
         {
           role: "user",
           content: "first",
@@ -46,6 +49,7 @@ describe("sessionTranscript", () => {
           timestamp: "2026-05-28T00:00:01.000Z",
         },
       ]);
+      expect(projected.every((message) => typeof message.id === "string")).toBe(true);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -69,7 +73,11 @@ describe("sessionTranscript", () => {
         timestamp: "2026-05-28T00:00:05.000Z",
       });
 
-      expect(projectTranscriptMessages(readTranscriptEvents(transcriptPath))).toEqual([
+      expect(
+        projectTranscriptMessages(readTranscriptEvents(transcriptPath)).map(
+          ({ id, ...rest }) => rest,
+        ),
+      ).toEqual([
         {
           role: "user",
           content: "try approach A",
@@ -106,13 +114,15 @@ describe("sessionTranscript", () => {
       writeState: () => events.push("state"),
     });
 
-    expect(session.turns).toEqual([
+    expect(session.turns.map(({ id, ...rest }) => rest)).toEqual([
       {
         role: "user",
         content: "hello",
         timestamp: "2026-05-28T00:00:02.000Z",
       },
     ]);
+    // Named on the way in, so the thread can point back at this turn.
+    expect(typeof session.turns[0]?.id).toBe("string");
     expect(events).toEqual(["append", "metadata", "state"]);
   });
 });

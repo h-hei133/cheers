@@ -7,6 +7,7 @@ import type { SessionStateSnapshotOverrides } from "../schema/sessionStateSnapsh
 import {
   createLifecycleTranscriptEvent,
   createMessageTranscriptEvent,
+  createTranscriptEntryId,
   type TranscriptEvent,
 } from "../sessionEventCodec.js";
 import { deriveSessionTitleFromPrompt } from "./sessionLifecycleStore.js";
@@ -26,6 +27,10 @@ export function persistSessionUserPromptBarrier(input: {
     role: "user",
     content: input.prompt,
     timestamp: input.timestamp,
+    // Named here so the thread entry and the transcript line agree, as in
+    // `appendSessionTurn`. Both writers have to do this or a branch would only
+    // resolve for half the turns.
+    id: createTranscriptEntryId("turn"),
   };
 
   input.session.status = "active";

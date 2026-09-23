@@ -48,11 +48,15 @@ describe("session substrate projections", () => {
       content: "resume this",
       timestamp: "2026-05-19T00:00:00.000Z",
     });
-    expect(transcriptEventToSessionMessage(message)).toEqual({
+    // The id comes along: a branch is a set of these ids, and a message that
+    // lost its own could not be assigned to one.
+    const { id, ...rest } = transcriptEventToSessionMessage(message)!;
+    expect(rest).toEqual({
       role: "user",
       content: "resume this",
       timestamp: "2026-05-19T00:00:00.000Z",
     });
+    expect(id).toBe(message.id);
 
     expect(
       createLifecycleTranscriptEvent({

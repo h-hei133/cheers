@@ -11,25 +11,27 @@ import type { Picker, PickerOutcome } from "../overlay.js";
  * first, since that is what a person remembers about where the conversation went
  * wrong.
  *
- * Choosing one drops every turn after it and puts that question back in the prompt
- * to be asked differently. Files are untouched: reconsidering the question and
- * reverting the work are separate decisions, and `/undo` is the other one.
+ * Choosing one puts that question back in the prompt to be asked differently, and
+ * moves the conversation to that point. What came after is not erased — it stays
+ * in the session, so returning to that direction later finds it intact. Files are
+ * untouched: reconsidering the question and reverting the work are separate
+ * decisions, and `/undo` is the other one.
  */
 
 const MAX_POINTS = 25;
 const SUMMARY_LENGTH = 72;
 
 export interface RewindPoint {
-  /** Number of turns kept when rewinding here — the index of this message. */
-  readonly turnIndex: number;
+  /** The entry to make active, so the choice survives the turns moving. */
+  readonly entryId: string;
   readonly prompt: string;
-  /** Turns that would be dropped. */
+  /** Turns that would be left behind. */
   readonly dropped: number;
 }
 
 export interface RewindPickerInput {
   readonly turns: readonly SessionMessage[];
-  /** Drop everything after `point`, and put its prompt back in the composer. */
+  /** Make `point` active again, and put its prompt back in the composer. */
   rewind(point: RewindPoint): Promise<string | undefined>;
 }
 
@@ -41,14 +43,14 @@ export function rewindPicker(input: RewindPickerInput): Picker {
     empty: "Nothing to go back to yet — no questions have been asked in this session.",
     async load(): Promise<readonly Option[]> {
       return points.map<Option>((point) => ({
-        id: String(point.turnIndex),
+        id: point.entryId,
         label: summarise(point.prompt),
         detail: describeCost(point.dropped),
         note: "keeps files",
       }));
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
-      const point = points.find((candidate) => String(candidate.turnIndex) === ids[0]);
+      const point = points.find((candidate) => candidate.entryId === ids[0]);
       if (!point) return undefined;
       const note = await input.rewind(point);
       return { note, draft: point.prompt };
@@ -61,8 +63,16 @@ export function rewindPoints(turns: readonly SessionMessage[]): RewindPoint[] {
   const points: RewindPoint[] = [];
   for (let index = 0; index < turns.length; index++) {
     const turn = turns[index]!;
+    // A turn always has an id once recorded, but a session written before ids
+    // existed does not. Those cannot be gone back to by name, so they are left
+    // out rather than offered as a choice that would not survive being made.
+    if (turn.id === undefined) continue;
     if (turn.role !== "user" || turn.content.trim().length === 0) continue;
-    points.push({ turnIndex: index, prompt: turn.content.trim(), dropped: turns.length - index });
+    points.push({
+      entryId: turn.id,
+      prompt: turn.content.trim(),
+      dropped: turns.length - index,
+    });
   }
   return points.reverse().slice(0, MAX_POINTS);
 }

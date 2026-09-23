@@ -82,9 +82,13 @@ export function buildLinearSessionThreadSnapshot(
 
   session.turns.forEach((turn, index) => {
     const order = index + 1;
+    // The turn's own id when it has one, matching what catch-up produces, so the
+    // two builders cannot name the same turn differently. A turn recorded before
+    // ids existed falls back to its position.
+    const id = turn.id ?? sessionTurnEntryId(session.id, order);
     entries.push({
-      id: sessionTurnEntryId(session.id, order),
-      parentId: order === 1 ? rootId : sessionTurnEntryId(session.id, order - 1),
+      id,
+      parentId: entries.at(-1)!.id,
       kind: "turn-message",
       role: turn.role,
       order,
@@ -186,37 +190,85 @@ export function sessionTurnEntryId(sessionId: string, order: number): string {
 }
 
 /**
+ * The entries from the root down to the active leaf — the branch in view.
+ *
+ * This is what makes a branch mean something. The entries are a tree, and the
+ * conversation the model sees is one path through it, chosen by `activeLeafId`.
+ * Everything else in the tree is what the user stepped away from, kept so they
+ * can come back to it.
+ *
+ * Returns an empty path when the leaf is not in the thread, which the caller can
+ * tell apart from a root-only path: a leaf that cannot be resolved is a damaged
+ * thread, not an empty conversation.
+ */
+export function sessionThreadPath(
+  thread: SessionThreadSnapshot,
+  leafId?: string,
+): { readonly path: readonly SessionThreadEntry[]; readonly resolved: boolean } {
+  const byId = new Map(thread.entries.map((entry) => [entry.id, entry]));
+  const target = leafId ?? thread.activeLeafId;
+  const leaf = target === undefined ? thread.entries.at(-1) : byId.get(target);
+  if (leaf === undefined) return { path: [], resolved: target === undefined };
+
+  const path: SessionThreadEntry[] = [];
+  const seen = new Set<string>();
+  let cursor: SessionThreadEntry | undefined = leaf;
+  while (cursor) {
+    // A cycle would otherwise hang the caller in a walk it cannot finish.
+    if (seen.has(cursor.id)) return { path: [], resolved: false };
+    seen.add(cursor.id);
+    path.unshift(cursor);
+    cursor = cursor.parentId === undefined ? undefined : byId.get(cursor.parentId);
+  }
+  return { path, resolved: true };
+}
+
+/**
  * Extend a thread so it accounts for every turn the session has recorded.
  *
  * A thread is built once and then kept, so it does not follow the session on its
  * own: turns recorded after it was written have no entry until something extends
- * it. Entry ids come from the turn's position, so a thread caught up here is the
- * same one a rebuild would have produced, and calling this more than once
- * changes nothing after the first time.
+ * it. Calling this more than once changes nothing after the first time.
  *
- * Returns the thread unchanged when it is already up to date.
+ * Counting is done along the branch in view, not across the whole tree. A thread
+ * that has been branched holds every branch's turns, so counting all of them
+ * would compare a number that includes abandoned work against the session's
+ * current turns and either skip turns that need entries or invent ones that do
+ * not exist.
  */
 export function catchUpSessionThread(
   thread: SessionThreadSnapshot,
   session: Session,
 ): SessionThreadSnapshot {
-  const recorded = thread.entries.filter((entry) => entry.kind === "turn-message").length;
-  const missing = session.turns.slice(recorded);
+  // A turn the tree already represents is not missing, whichever branch it is
+  // on. Selecting by name rather than by counting from the end is what keeps a
+  // turn that was stepped away from — and then returned to — from being added a
+  // second time under a new parent.
+  const known = new Set(thread.entries.map((entry) => entry.id));
+  const branch = sessionThreadPath(thread);
+  const missing = session.turns.filter((turn, index) => {
+    const id = turn.id ?? sessionTurnEntryId(session.id, index + 1);
+    return !known.has(id);
+  });
   if (missing.length === 0) return thread;
 
   const entries = [...thread.entries];
   // New turns continue the active leaf, which is where the conversation is. The
   // fallback covers a thread that records no active leaf at all.
-  let leafId = thread.activeLeafId ?? entries.at(-1)?.id ?? sessionRootEntryId(session.id);
-  missing.forEach((turn, offset) => {
-    const order = recorded + offset + 1;
-    const id = sessionTurnEntryId(session.id, order);
+  let leafId = branch.resolved && thread.activeLeafId !== undefined
+    ? thread.activeLeafId
+    : sessionRootEntryId(session.id);
+  missing.forEach((turn) => {
+    // Named after the turn it records, so the thread entry and the transcript
+    // line agree. A turn with no id of its own — recorded before ids existed —
+    // takes its position, which is the name the linear builder gives it too.
+    const id = turn.id ?? sessionTurnEntryId(session.id, entries.length);
     entries.push({
       id,
       parentId: leafId,
       kind: "turn-message",
       role: turn.role,
-      order,
+      order: entries.length,
       ...(turn.timestamp ? { timestamp: turn.timestamp } : {}),
     });
     leafId = id;
@@ -225,9 +277,6 @@ export function catchUpSessionThread(
   return freezeDeep({
     ...thread,
     entries,
-    // New turns continue the conversation, so the newest entry is where it is
-    // anchored. Branch selection would need its own rule here, and nothing
-    // writes a branch yet — when something does, this is the place to decide it.
     activeLeafId: leafId,
   });
 }

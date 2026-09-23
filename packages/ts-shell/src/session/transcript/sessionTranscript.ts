@@ -26,6 +26,45 @@ export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] 
   return events;
 }
 
+/**
+ * The messages on the branch the thread is looking at.
+ *
+ * The transcript holds every branch, because it is append-only and nothing that
+ * was said is erased when the user steps away from it. Which of those lines the
+ * conversation is currently made of is a question about the thread, so the thread
+ * answers it: the active path names the messages in view.
+ *
+ * Only message lines are filtered. Compaction and branch-summary lines keep
+ * applying, because they describe how to read the history rather than being part
+ * of it, and dropping them would put back the messages a checkpoint replaced.
+ *
+ * Falling back to the whole transcript when no thread has been written keeps a
+ * session recorded before any of this existed loading exactly as it did.
+ */
+export function projectBranchMessages(
+  events: readonly TranscriptEvent[],
+  activeEntryIds: readonly string[] | undefined,
+  knownEntryIds?: readonly string[],
+): SessionMessage[] {
+  if (activeEntryIds === undefined) return projectTranscriptMessages(events);
+  const onBranch = new Set(activeEntryIds);
+  const known = knownEntryIds === undefined ? onBranch : new Set(knownEntryIds);
+
+  const messages = events.filter((event) => event.type === "message");
+  // A thread that names none of these messages does not describe them — it was
+  // written against some other transcript, or against a version of this one that
+  // recorded no ids. Filtering by it would return an empty conversation, which
+  // reads as "this session said nothing" rather than "these two files disagree",
+  // so the transcript wins.
+  if (messages.length > 0 && !messages.some((event) => event.id !== undefined && known.has(event.id))) {
+    return projectTranscriptMessages(events);
+  }
+
+  return projectTranscriptMessages(
+    events.filter((event) => event.type !== "message" || (event.id !== undefined && onBranch.has(event.id))),
+  );
+}
+
 export function appendTranscriptEvent(
   transcriptPath: string,
   event: TranscriptEvent,
@@ -122,6 +161,10 @@ export function appendSessionTurn(input: {
   const nextMessage: SessionMessage & { timestamp: string } = {
     ...input.message,
     timestamp: input.timestamp,
+    // Named at the moment it is recorded, so the thread can point back at it.
+    // The transcript and the turn list then agree on which message is which,
+    // which is what lets a branch be resolved into the messages it contains.
+    id: input.message.id ?? createTranscriptEntryId("turn"),
   };
   input.session.turns.push(nextMessage);
   input.session.updatedAt = input.timestamp;

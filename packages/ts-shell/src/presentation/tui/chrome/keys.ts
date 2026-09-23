@@ -59,7 +59,11 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   },
   { keys: ["ctrl+q"], does: "queue the draft to run after the current turn", group: "sending" },
   { keys: ["tab"], does: "complete a command name", group: "sending" },
-  { keys: ["escape"], does: "interrupt a run, or dismiss a chooser", group: "sending" },
+  {
+    keys: ["escape"],
+    does: "interrupt a run, dismiss a chooser; twice on an empty prompt goes back",
+    group: "sending",
+  },
 
   { keys: ["shift+tab"], does: "switch between planning and building", group: "session" },
   { keys: ["ctrl+t"], does: "collapse or expand the model's reasoning", group: "session" },

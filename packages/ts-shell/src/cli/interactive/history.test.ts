@@ -3,8 +3,21 @@ import { restoreConversation } from "./history.js";
 import { rewindPoints } from "./picker/rewind.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
+let nextTurnId = 0;
+/**
+ * A recorded turn.
+ *
+ * Ids are part of what a recorded turn has: the loader always supplies one, so a
+ * fixture without them would not be the shape the picker actually sees.
+ */
 function turn(role: SessionMessage["role"], content: string): SessionMessage {
-  return { role, content, timestamp: "2026-09-02T00:00:00.000Z" } as SessionMessage;
+  nextTurnId += 1;
+  return {
+    id: `turn_${nextTurnId}`,
+    role,
+    content,
+    timestamp: "2026-09-02T00:00:00.000Z",
+  } as SessionMessage;
 }
 
 const CONVERSATION = [
@@ -190,9 +203,9 @@ describe("points to go back to", () => {
     expect(rewindPoints([turn("system", "prompt")])).toEqual([]);
   });
 
-  it("keeps the index that says where to cut", () => {
+  it("names the entry to make active, so the choice survives the turns moving", () => {
     const [newest] = rewindPoints(CONVERSATION);
 
-    expect(CONVERSATION[newest!.turnIndex]?.content).toBe("second question");
+    expect(CONVERSATION.find((t) => t.id === newest!.entryId)?.content).toBe("second question");
   });
 });

@@ -566,15 +566,15 @@ export class InteractiveMode {
       sessionTurns: () =>
         this.options.sessionManager.getSession(this.options.runtimeContext.session.id)?.turns ?? [],
       rewind: async (point) => {
-        const dropped = await this.options.sessionManager.rewindTo(
+        const dropped = await this.options.sessionManager.revertTo(
           this.options.runtimeContext.session.id,
-          point.turnIndex,
+          point.entryId,
           (abandoned) => this.options.sessionRuntime.summarizeAbandonedTurns(abandoned),
         );
         showConversation(this.historyTarget());
         this.tui.requestRender({ force: true });
         return dropped > 0
-          ? "Went back. Files are untouched — /undo reverts what was written."
+          ? "Went back. The rest is kept, not erased — /undo reverts what was written."
           : "Already at that point in the conversation.";
       },
       previewStatusItems: (items) => {

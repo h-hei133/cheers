@@ -17,6 +17,7 @@ import {
   ensureSessionStoreLayout,
   locateExistingSessionLayout,
   validateSessionId,
+  type SessionFileLayout,
   type SessionStoreLayout,
 } from "./sessionFileLayout.js";
 import { writeJsonFileAtomic } from "./sessionFileStore.js";
@@ -76,6 +77,16 @@ export class SessionStoreAccess {
 
   statePath(sessionId: string): string {
     return locateExistingSessionLayout(this.storeLayout, sessionId).statePath;
+  }
+
+  /**
+   * Where a session's state lives, for the callers that read and write it whole.
+   *
+   * The thread operations need the path and its lock together, and resolving them
+   * separately would let the two disagree if the layout were located twice.
+   */
+  stateLayout(sessionId: string): Pick<SessionFileLayout, "statePath" | "stateLockPath"> {
+    return locateExistingSessionLayout(this.storeLayout, sessionId);
   }
 
   sessionExists(sessionId: string): boolean {

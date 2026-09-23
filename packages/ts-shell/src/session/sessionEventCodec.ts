@@ -85,7 +85,10 @@ export function createMessageTranscriptEvent(
 ): Extract<TranscriptEvent, { type: "message" }> {
   return {
     type: "message",
-    id: createTranscriptEntryId("msg"),
+    // The message's own id when it has one, so the transcript and the turn list
+    // name the same thing. A branch is defined as a set of these ids, and the
+    // two would drift apart if each generated its own.
+    id: message.id ?? createTranscriptEntryId("msg"),
     role: message.role,
     content: message.content,
     ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
@@ -171,6 +174,7 @@ export function transcriptEventToSessionMessage(
     return undefined;
   }
   return {
+    ...(event.id ? { id: event.id } : {}),
     role: event.role,
     content: event.content,
     tool_calls: event.tool_calls,

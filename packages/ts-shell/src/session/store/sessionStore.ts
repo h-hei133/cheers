@@ -5,8 +5,8 @@ import type { Session } from "../schema/sessionRecord.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
-import { readTranscriptEvents } from "../transcript/sessionTranscript.js";
-import { projectTranscriptMessages } from "../transcript/sessionTranscript.js";
+import { projectBranchMessages, readTranscriptEvents } from "../transcript/sessionTranscript.js";
+import { sessionThreadPath } from "../schema/sessionThread.js";
 import { readJsonFileWithRetry, writeJsonFileAtomic } from "./sessionFileStore.js";
 import type { SessionFileLayout } from "./sessionFileLayout.js";
 import { readStateSnapshotRequired, writeSessionState } from "./sessionStateStore.js";
@@ -78,8 +78,16 @@ export function loadSessionRecord(input: {
       },
     );
     const state = readStateSnapshotRequired(input.layout.statePath);
-    const turns = projectTranscriptMessages(
+    // Which branch is in view is a question about the thread, so the thread
+    // answers it. Without a thread — a session recorded before any of this
+    // existed — every message in the transcript is the conversation, as before.
+    const branchPath = state.thread === undefined
+      ? undefined
+      : sessionThreadPath(state.thread).path.map((entry) => entry.id);
+    const turns = projectBranchMessages(
       readTranscriptEvents(input.layout.transcriptPath),
+      branchPath,
+      state.thread?.entries.map((entry) => entry.id),
     );
 
     return projectLoadedSession({

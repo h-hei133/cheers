@@ -11,6 +11,11 @@ import type { CurrentSessionSelectionResolution } from "./store/currentSelection
 import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "./approval/sessionApprovalMemory.js";
 import { type TranscriptEvent } from "./sessionEventCodec.js";
 import { appendBranchSummaryEvent } from "./transcript/sessionTranscript.js";
+import { sessionThreadPath } from "./schema/sessionThread.js";
+import {
+  readSessionThreadSnapshot,
+  switchDurableSessionActiveLeaf,
+} from "./store/threadState.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
 import type { Session } from "./schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
@@ -129,43 +134,54 @@ export class SessionManager extends SessionReadSurface {
   }
 
   /**
-   * Drop everything said after `turnIndex`, keeping the workspace untouched.
+   * Go back to an earlier point without erasing what came after it.
    *
-   * This is the conversational half of going back: the model stops seeing the
-   * turns that followed, so the next answer is built from the shorter history.
-   * Files are deliberately left alone — reverting the work and reconsidering the
-   * question are different decisions, and doing both from one gesture makes the
-   * destructive one impossible to decline.
+   * The turns are not dropped. The thread is a tree, and going back moves which
+   * leaf is active — the abandoned turns keep their entries and stay in the
+   * transcript, so returning to that direction later finds it intact.
    *
-   * When a summarizer is supplied, what the dropped turns established is kept as
-   * a note at the point the user returned to. The turns are gone either way; the
-   * difference is whether the next answer knows what was already tried.
+   * The previous sentence is a correction. This used to truncate
+   * `session.turns` and write the result to the session metadata, which does not
+   * record turns at all: the cut never reached disk, and the turns came back on
+   * the next load. Reworking the question looked like it had worked until the
+   * session was reopened.
    *
-   * Returns how many turns were dropped.
+   * When a summarizer is supplied, what the abandoned turns established travels
+   * as a note attached at the point the user returned to, so the next answer
+   * knows what was already tried.
+   *
+   * Returns how many turns were left behind.
    */
-  async rewindTo(
+  async revertTo(
     sessionId: string,
-    turnIndex: number,
-    summarize?: (dropped: readonly SessionMessage[]) => Promise<string | undefined>,
+    entryId: string,
+    summarize?: (abandoned: readonly SessionMessage[]) => Promise<string | undefined>,
   ): Promise<number> {
     const session = this.getSession(sessionId);
     if (!session) return 0;
-    const keep = Math.max(0, Math.min(turnIndex, session.turns.length));
-    const dropped = session.turns.length - keep;
-    if (dropped <= 0) return 0;
-    const abandoned = session.turns.slice(keep);
-    const summary = summarize ? await summarize(abandoned).catch(() => undefined) : undefined;
-    session.turns = session.turns.slice(0, keep);
-    session.updatedAt = new Date().toISOString();
-    this.host.store.writeSessionMetadata(session);
+
+    const layout = this.host.store.stateLayout(sessionId);
+    const current = readSessionThreadSnapshot({ session, layout });
+    const target = sessionThreadPath(current, entryId);
+    if (!target.resolved || target.path.length === 0) return 0;
+
+    const onBranch = new Set(target.path.map((entry) => entry.id));
+    const abandoned = session.turns.filter(
+      (turn) => turn.id === undefined || !onBranch.has(turn.id),
+    );
+    const summary = summarize && abandoned.length > 0
+      ? await summarize(abandoned).catch(() => undefined)
+      : undefined;
+
+    switchDurableSessionActiveLeaf({ session, layout, leafEntryId: entryId });
     if (summary) {
       appendBranchSummaryEvent(this.host.store.transcriptPath(sessionId), {
         summary,
-        droppedTurns: dropped,
-        timestamp: session.updatedAt,
+        droppedTurns: abandoned.length,
+        timestamp: new Date().toISOString(),
       });
     }
-    return dropped;
+    return abandoned.length;
   }
 
   createNewWithId(
