@@ -147,6 +147,11 @@ export interface RuntimeConfig {
    * Anything else, including `stream`, is treated as `fullscreen`: `stream` is
    * reserved and has no defined meaning yet, so it does not get a behavior
    * invented for it.
+   *
+   * `fullscreen` is the default because it is what the surface did before this
+   * field had a reader. A default is not a place to adopt another tool's choice:
+   * it decides what everyone who never set the field sees, and changing it
+   * silently changes the product's appearance.
    */
   readonly tuiMode?: "regular" | "fullscreen" | "stream";
   readonly tui?: TuiPreferences;
@@ -210,7 +215,12 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   allowUntrustedHooks: false,
   agentMode: "build",
   theme: "dark",
-  tuiMode: "regular",
+  // The surface took the alternate screen unconditionally before this field was
+  // wired, so that is the behaviour a default has to preserve: wiring a field
+  // must not change how the product looks for someone who never set it. The
+  // `regular` value below is the other choice, made deliberately by whoever
+  // wants the conversation in their own scrollback.
+  tuiMode: "fullscreen",
   tui: {},
 };
 

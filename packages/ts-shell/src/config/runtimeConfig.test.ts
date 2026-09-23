@@ -50,6 +50,24 @@ describe("runtime config", () => {
     expect(config.configSources).toEqual([]);
   });
 
+  it("keeps the screen the surface has always taken when tuiMode is unset", () => {
+    // Wiring this field must not change how the product looks for someone who
+    // never set it. The surface took the alternate screen unconditionally before
+    // the field had a reader, so that is what the default has to keep: a default
+    // of `regular` silently moved every existing session onto the main screen.
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.tuiMode).not.toBe("regular");
+  });
+
+  it("honours tuiMode when a config file asks for the main screen", () => {
+    fs.writeFileSync(
+      path.join(fakeRoot, ".cheers.json"),
+      JSON.stringify({ tuiMode: "regular" }),
+      "utf8",
+    );
+    expect(getRuntimeConfig(fakeRoot).tuiMode).toBe("regular");
+  });
+
   it("keeps every declared optional field that a config file sets", () => {
     const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(
