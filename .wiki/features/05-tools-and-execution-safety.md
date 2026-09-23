@@ -53,8 +53,8 @@ sed -n '5,27p' packages/ts-shell/src/core/hooks/types.ts                        
 | 目录遍历剪枝 + `.gitignore` 遵从 ✅ **已实现**（Phase 3 T1，`runtime/execution/fileWalk.ts`） | `src/core/tools/find.ts:65`（用 `fd`）、`src/core/tools/grep.ts` | `runtime/execution/service.ts:112-123`；`core/tools/registry.ts:505-524` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
 | ~~bash 超时可指定~~ ✅ **已收口 2026-09-23**：`timeout` 参数已实现（`runtime/execution/commandTimeout.ts`），默认保留 60s，上限拒绝而非钳制 | `src/core/tools/bash.ts:239`（`timeout` 参数） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §2 |.2 |
 | 全量输出落盘并可回读 | `src/core/tools/output-accumulator.ts:19-22`（`fullOutputPath`，OS temp 文件） | `core/tools/registry.ts:141`（`ArtifactManager.save`，`artifact://` URI） | **平手** | 两侧都保留完整输出；差异仅在回读载体（§2.3 已更正原误报） |
-| `ls` 工具 ⚠️ **部分实现**：无独立工具，但目录列举已折进 `read`（Phase 3 T6） | `src/core/tools/ls.ts`（175 行，`limit` 默认 500） | 无 | **MISSING** | 见 §3.1 |
-| `find` 工具 ⚠️ **部分实现**：无独立工具，主体由 `glob` 覆盖（不支持谓词过滤） | `src/core/tools/find.ts`（318 行，`limit` 默认 1000，尊重 `.gitignore`） | 无（`glob` 不等价） | **MISSING** | 见 §3.1 |
+| `ls` 工具 ✅ **2026-09-23 更正为平手**：能力已在 `read` 的目录分支（`registry.ts:239,249-253`，默认 500、max 1000，与 pi 的 `ls` 一致） | `src/core/tools/ls.ts`（175 行，`limit` 默认 500） | `read` 的目录分支 | **平手** | 见 `phase-5-execution.md` §7 |
+| `find` 工具 ✅ **2026-09-23 更正为平手**：`glob` 已只返回路径（`glob.ts:90` 的 `page.join('\n')`）、已模式匹配、已读 `.gitignore`、已剪枝。**新建 `find` 的裁决已撤销**（原前提「glob 返回文件内容」实测证伪） | `src/core/tools/find.ts`（318 行，`limit` 默认 1000，尊重 `.gitignore`） | `core/tools/glob.ts` | **平手** | 见 `phase-5-execution.md` §7.2 |
 | 多段编辑（`edits[]` 数组、重叠拒绝） | `src/core/tools/edit.ts:22-40` | `core/tools/registry.ts:389-489`（单段） | **DEFICIENT** | 见 §2.4 |
 | 同文件写入串行化 | `src/core/tools/file-mutation-queue.ts`（edit/write 各自包队列） | `tools/dispatch/executor.ts:90-99`（dispatch 层统一包队列） | **平手** | 两侧都有；我们的位置覆盖全部工具（§2.5 已更正原误判） |
 | 会话环境变量注入 bash | `docs/environment-variables.md:20-32`（5 个 `PI_*`） | 无 | **MISSING** | 见 §3.2 |
@@ -146,7 +146,12 @@ if (truncated.truncated) {
 
 **与 pi 的真实差异（保留为观察，不构成缺陷）**：pi 把完整输出写到 OS temp 文件并在结果里给出路径（`src/core/tools/output-accumulator.ts:19-22` `fullOutputPath`、`bash.ts:335`），模型可以用 `bash` 直接 `tail`/`grep` 那个文件；我们给出的是 `artifact://` URI，模型需要经 `read` 工具解析。**两者都保住了内容**，差别在回读路径的便利性，不在数据完整性。
 
-### 2.4 `edit` 只支持单段替换（置信度：高）
+### 2.4 `edit` 只支持单段替换（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：新增 `edits[]`，一次调用多处替换，每段对**原文**匹配（不是对前一段
+> 的结果），**重叠拒绝**并指名哪两段，任一段失败则一个字节都不写。
+> `editEngine.ts` 为此拆出 `locateInContent`（返回匹配跨度），九个策略与顺序不变，
+> 故单段路径行为不变。见 `phase-5-execution.md` §7.1。**下方原文保留为当时的证据。**
 
 **证据（我们）**：`core/tools/registry.ts:389-489`。schema（`:392-416`）字段为 `path`、`content`（整文件重写）、`oldText`、`newText`、`replaceAll`。`oldText`/`newText` 是**单个字符串对**（`:429-441`）；`replaceInContent` 支持模糊匹配与 `replaceAll`。
 

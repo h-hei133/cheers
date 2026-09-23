@@ -182,21 +182,25 @@ export function createStepFunction(request: StepRequest): StepFunction {
       // Send the request, retrying a transient failure. A refusal of
       // `reasoning_effort` is not transient, so it leaves this loop for the
       // outer one, which drops the field and rebuilds the payload.
+      //
+      // Each attempt owns an abort controller that releases its connection. The
+      // socket has to outlive the response object — reading the body happens
+      // after this loop — so the controller for a kept response is handed out
+      // rather than aborted here. Aborting it in a `finally` would cancel the
+      // very stream the caller is about to read.
       let attempt = 0;
       let response: Response | undefined;
+      let releaseAfterRead: AbortController | undefined;
       let refusal = "";
       let dropEffort = false;
       for (;;) {
-        // Reading ends as soon as the answer is complete, which can be before the
-        // host closes the stream — a keep-alive proxy holds the connection open
-        // afterwards. The socket is released here rather than left to the host, so
-        // a connection nobody is reading cannot outlive the turn.
         const releaseStream = new AbortController();
         const requestSignal = signal
           ? AbortSignal.any([signal, releaseStream.signal])
           : releaseStream.signal;
         let requestedDelayMs: number | undefined;
         let transient = false;
+        let releaseNow = true;
         try {
           const attemptResponse = await fetchImpl(
             `${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`,
@@ -209,6 +213,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
           );
           if (attemptResponse.ok) {
             response = attemptResponse;
+            releaseAfterRead = releaseStream;
+            releaseNow = false;
             break;
           }
           const detail = await attemptResponse.text();
@@ -236,15 +242,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
           refusal = `Network error: ${error instanceof Error ? error.message : String(error)}`;
           transient = true;
         } finally {
-          // The body is either already read or belongs to a response this
-          // attempt is discarding, so the connection is released either way.
-          releaseStream.abort();
+          // An attempt whose body is not being read releases its connection now.
+          if (releaseNow) releaseStream.abort();
         }
 
         attempt += 1;
-        if (!transient || attempt > retry.maxRetries) {
-          return errorStep(refusal);
-        }
+        if (!transient || attempt > retry.maxRetries) return errorStep(refusal);
         const waited = await waitBeforeRetry(retryDelayMs(retry, attempt, requestedDelayMs), signal);
         if (!waited) return abortedStep("");
       }
@@ -278,6 +281,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
       } catch (error) {
         if (signal?.aborted) return abortedStep(shown);
         return errorStep(`Network error: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        // Reading ends as soon as the answer is complete, which can be before
+        // the host closes the stream — a keep-alive proxy holds the connection
+        // open afterwards. Releasing it here rather than leaving it to the host
+        // means a connection nobody is reading cannot outlive the turn.
+        releaseAfterRead?.abort();
       }
     }
   };

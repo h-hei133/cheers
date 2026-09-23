@@ -112,7 +112,13 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 
 **最小改动建议**：**二选一并删掉另一套**。推荐保留 `runtimeConfig`（它已被 79 处消费），把 `AgentSettings` 里真正需要的字段（`permissions` 优先）迁进去，然后删除 `settingsLoader.ts` 的 `loadCascadingSettings`/`mergeAgentSettings`/`AgentSettings` 与 `DEFAULT_AGENT_SETTINGS`。`tuiSettings.ts` 对 `getSettingsPaths` 的使用需一并迁移。
 
-### 2.2 配置错误直接抛异常，无诊断聚合（置信度：高）
+### 2.2 配置错误直接抛异常，无诊断聚合（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：`getRuntimeConfig` 不再抛异常，改为跳过坏文件并产出诊断，
+> 经 `RuntimeConfig.configDiagnostics` 在启动横幅、`/doctor`、CLI `doctor` 三处可见。
+> **一处必须保持抛异常**：`readUserRuntimeConfigFile` 服务于读-改-写，
+> 降级会让下一次写入把用户整个配置替换成一个字段。见 `phase-5-execution.md` §3。
+> **下方原文保留为当时的证据。**
 
 **证据（我们）**：`config/runtimeConfig.ts:177-181` 与 `:239-243` 两处 `catch` 都**直接 `throw new Error(...)`**。一个 JSON 语法错误会让进程无法启动，且没有「哪个文件、哪一行、其他配置是否仍可用」的聚合视图。
 
@@ -153,7 +159,11 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 
 ## 3. MISSING 详述
 
-### 3.1 崩溃日志（置信度：高）
+### 3.1 崩溃日志（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：新增 `observability/crashLog.ts`（保留最近 5 条，
+> `prependListener` 保证先于其他监听器运行，写入包在吞异常的 try/catch 里）
+> 与 `/crash` 命令。见 `phase-5-execution.md` §6。**下方原文保留为当时的证据。**
 
 **pi 如何实现**：`src/core/crash-log.ts:4-13` `CrashRecord` 含 `timestamp`/`version`/`kind`（`"uncaught_exception" | "fatal_error"`）/`message`/`stack`/`sessionFile`/`cwd`/`notified`；`:15-16` `MAX_CRASH_RECORDS = 5`、`MAX_AGE = 7 天`；`:18-20` 存 `~/.pi/agent/crashes.json`。`docs/sessions.md` 说明：下次交互启动显示一次警告，`/bug` 会把崩溃附加到 `diagnostics.json` 并在上传后删除该文件。
 
@@ -185,7 +195,11 @@ grep -rni "bugReport\|bug-report" packages/ts-shell/src --include='*.ts' | grep 
 
 **最小落地路径**：需先定隐私边界与去向，建议单独立项；但**脱敏部分可以先行**——我们已有 `core/security/redaction.ts`（`redactReportText`）与 `observability/structuredLogger.ts:10-18` 的 7 条密钥正则，pi 的 `redactUrl` 是它们缺的一块。
 
-### 3.3 启动性能计时（置信度：高）
+### 3.3 启动性能计时（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：新增 `observability/startupTiming.ts`，`CHEERS_TIMING=1` 时记录
+> **相邻标记的差值**（而非距起点），关闭时什么都不做；新增 `/timings` 命令。
+> 见 `phase-5-execution.md` §6。**下方原文保留为当时的证据。**
 
 **pi 如何实现**：`src/core/timings.ts:6` `const ENABLED = process.env.PI_TIMING === "1"`；`:14-30` `resetTimings(namespace)`/`time(label, namespace)` 支持 `"main"`/`"extensions"` 两个命名空间；`:24-28` 记录每次调用的**间隔毫秒**。零成本关闭（未启用时全部早返回）。
 

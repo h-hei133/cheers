@@ -149,7 +149,12 @@ export function findCompactionCut(messages, keepRecent): number | undefined {
 
 **最小改动建议**：让 `CompactionPlan` 携带 `firstKeptEntryId`，在 `applyCompaction` 与持久化中落盘，下次 plan 从该 boundary 起算。
 
-### 2.4 文件追踪只在单次 request 内有效（置信度：高）
+### 2.4 文件追踪只在单次 request 内有效（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：**未按原文建议加字段**。实测发现足迹本来就已持久化在 checkpoint
+> 文本里，而下一个压缩收到的 `previousSummary` 正是那个文本——改为解析并合并，
+> 不新增字段、不需要迁移、不留第二处真相。见 `phase-5-execution.md` §4。
+> **下方原文保留为当时的证据。**
 
 **证据（我们）**——子代理发现了一处**注入位置错误**，主代理已核验：
 

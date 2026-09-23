@@ -123,7 +123,14 @@ npx tsx /tmp/probe.mts
 
 **最小改动建议**：给 `CatalogProvider` 增加 `modelOverrides?: Record<string, Partial<CatalogModel>>`，在 `mergeProviders` 里按 id 应用。
 
-### 2.4 兼容性标志是描述性的，不改变请求形状（置信度：高）
+### 2.4 兼容性标志是描述性的，不改变请求形状（置信度：高）—— ✅ **2026-09-23 已收口（部分）**
+
+> **收口说明**：新增 `core/models/requestShape.ts`，`CatalogModel` 加 `compat` 字段，
+> 让**四个有失败证据的标志**真正改变请求：system 角色名、输出上限字段名、
+> 是否发 `reasoning_effort`、是否需要合成 assistant 桥接 tool 结果。
+> 其余 7 个标志**保持描述性**——每个都需要「哪类端点会因此失败」的证据，
+> 为没有证据的能力发明开关正是这一项记录的问题本身。
+> 实现见 `phase-5-execution.md` §5。**下方原文保留为当时的证据。**
 
 **现象**：我们有一张很完整的 provider 兼容性矩阵，但没有任何一处根据它调整请求。
 
@@ -151,6 +158,11 @@ npx tsx /tmp/probe.mts
 
 ### 2.6 HTTP 超时只能靠环境变量（置信度：高）
 
+> **2026-09-23 补充**：请求失败的重试与退避已实现（两层：provider 层默认 0 次、
+> turn 层默认 3 次，`Retry-After` 优先于本地退避）。这不改变本项记录的
+> 「超时只能靠环境变量」的事实，但**一个原本必然终止回合的瞬态失败现在可以恢复**。
+> 见 `phase-5-execution.md` §2。
+
 **证据（我们）**：`provider/request/fetch.ts:7-9` 读 `CHEERS_PROVIDER_CONNECT_TIMEOUT_MS` / `..._HEADERS_TIMEOUT_MS` / `..._BODY_TIMEOUT_MS`；`:32-34` 默认 `30_000` / `120_000` / `120_000`。无配置文件入口。
 
 **证据（pi）**：`src/core/http-dispatcher.ts:6` `DEFAULT_HTTP_IDLE_TIMEOUT_MS = 300_000`，`:8-14` `HTTP_IDLE_TIMEOUT_CHOICES` 提供 30s/1m/2m/5m/disabled 五档，并有 `parseHttpIdleTimeoutMs` 解析 `"disabled"` 与数字；`docs/settings.md` 暴露为 `httpIdleTimeoutMs`（设 0 关闭）。
@@ -159,7 +171,12 @@ npx tsx /tmp/probe.mts
 
 **最小改动建议**：加入 config 字段并在 `resolveProviderTransportConfig` 读取；pi 的「五档 + disabled」是可直接借鉴的 UX 形状。
 
-### 2.7 thinking 级别：我们有 3 档，pi 有 7 档且按模型映射（置信度：高）
+### 2.7 thinking 级别：我们有 3 档，pi 有 7 档且按模型映射（置信度：高）—— ✅ **2026-09-23 部分收口**
+
+> **收口说明**：`CatalogModel` 新增 `thinkingLevelMap`，档位名按模型翻译；
+> 模型没有该档时**向下**回退（低档回答更快，高档可能长时间不出声）。
+> **档位数仍为 3**（`low`/`medium`/`high`）——扩到 7 档是产品决策，
+> 而映射是正确性修复，两者分开处理。**下方原文保留为当时的证据。**
 
 **证据（我们）**：
 

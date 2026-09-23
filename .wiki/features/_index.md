@@ -1,11 +1,11 @@
 ---
 title: "功能开发：pi 对照总索引"
 category: article
-sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
+sources: [pi-source-2026-09-20, repo-audit-2026-09-20, phase-5-pre-research-2026-09-23]
 created: 2026-09-20
 updated: 2026-09-23
 tags: [features, gap-analysis, pi, index]
-summary: "功能开发前锋探索的总入口。对照本地参考仓 pi，把能力缺口按七个切片分类登记：共 40 项 DEFICIENT、38 项 MISSING、16 项 OURS-ONLY、7 项平手。列出 8 项硬缺陷与 12 项高价值缺口。本轮零代码改动，只产出事实与分类。"
+summary: "功能开发前锋探索的总入口。对照本地参考仓 pi，把能力缺口按七个切片分类登记：共 40 项 DEFICIENT、38 项 MISSING、16 项 OURS-ONLY、7 项平手。Phase 0–5 已闭环；Phase 5 的前置研究、裁决与施工均已完成（8 项任务 + 22 项补充裁决），核心是删除 32 文件 / 8,330 行的零消费者「报告投影族」、补上缺失的重试与错误分类、并让 compat 标志真正改变请求形状。裁决经五个独立复核者证伪式复核，推翻主代理 4 项错误（含 T2 闭包方向算错，数字从 36/10,008 更正为 32/8,330）。"
 confidence: high
 ---
 
@@ -79,6 +79,44 @@ confidence: high
 > 选项把「会回到输入框的那个提问」算进了丢弃数（每项多报 1）且措辞像没事发生、
 > 回退记录依赖 LLM 摘要成功才写（否则零痕迹 = 静默数据丢失）；并新增 `/back` 命令解决
 > 「入口只有双击 Esc 且被键位注册表硬编码屏蔽」。见同文 §13。
+>
+> **Phase 5 前置研究与裁决已完成**：见 [`phase-5-pre-research.md`](phase-5-pre-research.md) 与
+> [`phase-5-decisions.md`](phase-5-decisions.md)（2026-09-23）。本轮把 Phase 4 收口后的剩余项
+> 重新盘点并按缺陷类别分组，给出 8 个候选任务（T1–T8）、22 项补充裁决与执行顺序。
+> 三项核心发现：①**一整个「报告投影族」共 32 文件 / 8,330 行零活消费者**——
+> `tools/dispatch/` 全族、`turn/` 七个投影模块、`provider/request|response` 八个包装模块
+> 加 6 个连带闭包，活轨的承担者分别是 `core/agent/tools.ts:184` 的 `executeToolBatch`、
+> `runtime/execution/fileLock.ts:85` 的 `withFileLock`、`turn/step.ts:97` 的 `createStepFunction`
+> （与 Phase 4 删掉的 `runtime/events/` 同型）；②**重试只有「资格判定」没有「执行」**——
+> `provider/request/invocation.ts:328` 会算 `retry_eligible`，而活轨 `turn/step.ts` 的
+> 三处失败路径全部直接 `return errorStep`，**一次 429 或 502 直接终止整个回合**；
+> ③**`steeringMode`/`followUpMode` 的消费链断在内核边界**——`AgentCore` 支持两种投递模式，
+> 但 `turn/session.ts:112` 构造时从不传入，配置里也没有这两个字段。
+> 另有 `CatalogModel` 只有 3 字段而 `compat` 的 11 个标志**只用来生成说明字符串**
+> （类型说谎）、配置错误抛异常导致 CLI 起不来、压缩文件足迹不跨压缩累积等项。
+> **同时更正 4 条既有记录**：`ls` 与 `powershell` 更正为「平手」、
+> 主题死令牌数从 18 更正为 14、`/export jsonl` 的原始缺陷已由 Phase 4 T5 收口。
+>
+> **Phase 5 裁决经五个独立复核者证伪式复核**：`RvRetry`（T1）、`RvProvider`（T3）、
+> `RvDecisions`（T4–T8 + §9.1）三份**零发现**；`RvSweep2` 发现 1 处数字不一致；
+> **`RvDeadCode` 判定 overall `incorrect` 并推翻主代理 4 项错误**——其中最重要的是
+> **T2 的闭包方向算错**（把有外部引用者的 10 个文件误列为闭包，同时漏了 6 个会悬空的
+> 类型导入者），数字从「36 文件 / 10,008 行」更正为 **32 文件 / 8,330 行**。
+> 若不复核就施工，`tsc` 会在删到一半时报出 6 个悬空 import。全过程见 `phase-5-decisions.md` §11。
+>
+> **Phase 5 施工已闭环**：见 [`phase-5-execution.md`](phase-5-execution.md)（7 项任务全部完工，
+> 提交 `f7edc840` → `f3eb60b8`）。净变化 **93 文件，+3,983 / −12,191**。
+> 三项执行中**偏离裁决**（均在执行记录里说明）：
+> ①**T2 的删除让一个绑定规则与一份 active 文档悬空**（`verify:docs-drift:strict` 报出），
+> 按该文自己已有的先例修复引用；
+> ②**T4 有一条路径必须保持抛异常**——`readUserRuntimeConfigFile` 服务于读-改-写，
+> 若它也降级，下一次写入会把用户整个配置替换成那一个字段；
+> ③**T6 找到一条比裁决更省的路径**——足迹本来就已持久化在 checkpoint 文本里，
+> 解析并合并即可，**不新增字段、不需要迁移**。
+> 另**撤销裁决的一半**：T8 的 `find` 工具不新建，因为其前提（`glob` 返回文件内容）
+> 经实测证伪——`glob` 只拼接路径、已匹配模式、已读 `.gitignore`，新建即重复。
+> **T3 执行中修正了自己两处默认值**：`reasoning` 未声明时的默认、以及未知模型的 level，
+> 初版都会**静默关掉 `/thinking`**（快照里没有一个条目声明过 `reasoning`），已改为保持原行为。
 
 | # | 报告 | 覆盖范围 | DEFICIENT | MISSING | OURS-ONLY | 平手 |
 |---|---|---|---:|---:|---:|---:|
