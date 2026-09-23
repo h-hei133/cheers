@@ -140,10 +140,15 @@ permissions: {
 
 ### 2.2 第 1 组 — 接线（有明确受益方等着）
 
+> **✅ 2026-09-23 本组两项均已收口**，见 [`phase-4-execution.md`](phase-4-execution.md) §12–§13。
+> 但**接法与本表原设想不同**：`sessionDagEngine.ts` 未接线而是**删除**（273 行、零生产调用者、
+> 单文件 JSONL 格式与本产品目录三件套不兼容，与 `sessionThread.ts` 构成重复实现）；
+> 分支能力由 `sessionThread.ts` + `store/threadState.ts` 承担，回退入口为 `/back`（或双击 Esc）。
+
 | 项 | 位置 | 受益方 | 动作 |
 |---|---|---|---|
 | `setTheme` | `presentation/theme/theme.ts:168` | 浅色终端用户（当前被迫用深色） | 接到 `runtimeConfig.theme` 或 `/settings` |
-| `branchWithSummary` + `threadState` | `session/sessionDagEngine.ts:184`；`session/store/threadState.ts:24-71` | rewind 分支摘要（`07-*` §3.1 的 M11） | 接到 rewind 链路 |
+| ~~`branchWithSummary` + `threadState`~~ | ~~`session/sessionDagEngine.ts:184`~~（已删除）；`session/store/threadState.ts:24-71` | rewind 分支摘要（`07-*` §3.1 的 M11） | ✅ 已接到回退链路（`SessionManager.revertTo`） |
 
 **共同点**：**已经有明确的消费者等着**——接线即可交付。
 

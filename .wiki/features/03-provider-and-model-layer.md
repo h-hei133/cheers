@@ -3,7 +3,7 @@ title: "功能对照 03：Provider 与模型层（我们 vs pi）"
 category: article
 sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-23
 tags: [features, gap-analysis, pi, provider, models, config, oauth]
 summary: "[部分已过时，见文首横幅] 对照 pi 的 provider/模型层：订阅登录、模型目录、per-model 覆盖、兼容性开关、传输与缓存。发现一处硬缺陷：getRuntimeConfig 返回字面量时漏掉全部可选字段，用户配置里的 contextWindow/reserveTokens/thinkingLevel/temperature 等静默失效；另有模型目录不支持 per-model 覆盖、兼容性标志只描述不生效。覆盖清单 7 项 DEFICIENT、4 项 MISSING、1 项 OURS-ONLY。"
 confidence: high
@@ -45,10 +45,10 @@ npx tsx /tmp/probe.mts
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 用户配置文件字段真正生效 ✅ **已大幅修复**（见 §2.1 现状；仅 `tuiMode` 仍为裁决保留的未接线字段） | `docs/settings.md:20-60`；`src/core/settings-manager.ts` | `config/runtimeConfig.ts:193-215` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
+| 用户配置文件字段真正生效 ✅ **已全部收口 2026-09-23**（含 `tuiMode`：默认 `fullscreen`，`regular` 标为实验性） | `docs/settings.md:20-60`；`src/core/settings-manager.ts` | `config/runtimeConfig.ts:193-215` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
 | 订阅式 OAuth 登录 | `docs/providers.md:15-63`（7 家：Codex／Claude Pro／Copilot／xAI／Meta／OpenRouter／Radius） | `core/auth/oauth/providers.ts:23,59`（2 家） | **DEFICIENT** | 见 §2.2 |
 | 模型目录（内置快照 + 用户叠加 + 刷新） | `src/core/{model-registry.ts, models-store.ts, remote-catalog-provider.ts}` | `core/models/{catalog.ts, catalogStore.ts, catalogRefresh.ts}` | **DEFICIENT** | 见 §2.3 |
-| per-model 覆盖（`modelOverrides`） | `docs/models.md:354-420` | 无 | **MISSING** | 见 §3.1 |
+| per-model 覆盖（`modelOverrides`） ✅ **判定更正 2026-09-23**：`dedupeModels` 本就是 last-write-wins，**一直生效**；真正的限制只是 `CatalogModel` 字段太少，`cost`（4 个费率，可选）已补 | `docs/models.md:354-420` | `core/models/catalog.ts` | ~~MISSING~~ **判定有误** | 见 `phase-4-execution.md` §4.2 |
 | 兼容性开关真正改变请求形状 | `docs/models.md:420-520`（`compat.supportsDeveloperRole` 等） | `provider/registry/provider.ts:28-41` | **DEFICIENT** | 见 §2.4 |
 | 自定义 provider（声明式 API 适配） | `docs/custom-provider.md`（786 行）；`src/core/provider-composer.ts` | `core/models/catalogStore.ts:74-90`（用户文件加 provider） | **DEFICIENT** | 见 §2.5 |
 | Prompt cache 保活（warming） | `src/core/cache-warmer.ts`；`docs/settings.md:66-100` | 无 | **MISSING** | 见 §3.2 |

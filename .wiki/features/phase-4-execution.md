@@ -447,3 +447,21 @@ const KEY_ONLY = new Set(["rewind"]);   // 刻意禁止键入命令唤出
 ### 13.6 仍未做
 
 树形可视化导航仍未做（见 §12.5）。`/back` 只是把既有线性列表暴露出来，不是树形浏览器。
+
+---
+
+## 14. 文档删除记录（2026-09-23）
+
+维护者在收尾时删除了两份仓库根目录文档，**不是本轮改动所致**，按「用户的工作即事实」记录于此：
+
+| 文件 | 原行数 | 说明 |
+|---|---:|---|
+| `USAGE_MANUAL.md` | 362 | 用户手册。本轮曾向它补记 `tuiMode` 模式表、`/back` 回退入口、`/undo` 与文件回退的区别 |
+| `problem.md` | 125 | 问题清单。§4.2 与 §11 引用了它的一条记录（`pi` 用 CPR，实测为假） |
+
+**影响与处置**：
+
+- §4.2 与 §11 中「`problem.md:6` 声称…」的引用保留 —— 它们描述的是**当时那份文件说了什么**，是历史事实，不因文件删除而失真。
+- **用户手册的内容没有搬到别处**（已确认无替代文件）。因此「`/back` / 双击 Esc 回退」「`tuiMode` 三值语义」「`/undo` 只报告文件」这些**用户可见行为**目前只在代码注释、`/help` 命令列表与本执行记录里，**不再有面向用户的手册**。
+- 若将来需要重建用户文档，`/back` 的权威描述在 `cli/interactive/picker/rewind.ts` 的文件头注释与 `slashCommandRegistry.ts` 的 `back` 条目；`tuiMode` 的在 `config/runtimeConfig.ts` 的类型注释。
+- `problem.md` 仍被 `.wiki/wiki/theses/full-fidelity-tui-engine-and-interactive-runtime-adaptation.md` 引用，该处亦为历史引用，同样保留。

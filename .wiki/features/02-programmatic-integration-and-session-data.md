@@ -3,7 +3,7 @@ title: "功能对照 02：程序化集成与会话数据（我们 vs pi）"
 category: article
 sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-23
 tags: [features, gap-analysis, pi, sdk, rpc, session-format, jsonl]
 summary: "对照 pi 的机器面对接面：JSON 事件流、stdin/stdout RPC、SDK 嵌入、session 文件格式、导出与分享。结论：我们只有进程内事件订阅与目录化 session，没有任何对外协议；public index.ts 仅 10 组纯函数导出。共 5 项 MISSING、4 项 DEFICIENT、2 项 OURS-ONLY。"
 confidence: high
@@ -107,13 +107,21 @@ grep -rn "runtime/events/stream" packages/ts-shell/src --include='*.ts'         
 
 - `session/SessionManager.ts:187` `resume()`、`:195` `tryResume()` —— 加载目录、把 status 改 active、更新 current selection。
 - `entrypoints/cliRuntimeModule.ts:457-507` `--replay-file` 解析文本 prompt 脚本后**逐条重新执行**——是 prompt script，不是 durable session replay。
-- `session/store/threadState.ts:24-47` `appendDurableSessionChild`、`:49-69` `createDurableSessionBranch`、`:71+` `switchDurableSessionActiveLeaf` 三个函数**零生产调用者**（`grep -rn "appendDurableSessionChild\|createDurableSessionBranch" packages/ts-shell/src` → 仅 `threadState.ts` 自身与 `threadState.test.ts`）。
+- ~~`session/store/threadState.ts:24-47` `appendDurableSessionChild`、`:49-69` `createDurableSessionBranch`、`:71+` `switchDurableSessionActiveLeaf` 三个函数**零生产调用者**~~
+  → **2026-09-23 已改变**：`switchDurableSessionActiveLeaf` 现有生产调用者
+  （`SessionManager.revertTo`，回退入口 `/back` 或双击 Esc）；`appendDurableSessionChild`
+  因改用「按 entry 身份 catch-up」而被**删除**；`createDurableSessionBranch` 仍零调用者。
+  见 [`phase-4-execution.md`](phase-4-execution.md) §12。
 
 **证据（pi）**：`docs/rpc.md:717-745` 规定 `get_entries` 支持 `since` entry ID，返回 entries 与 current `leafId`，并明确可跨 client restart 使用；`:747-772` `get_tree` 返回树与 leaf。
 
-**影响**：分支／游标能力**已在代码里写好但从未接线**——`sessionThread.ts` 的 `createSessionBranch` 与 `threadState.ts` 的写入函数构成完整 API，没有调用者。第三方无法「从上次看到的 entry 之后继续收取」。
+**影响**（2026-09-23 部分收口）：分支能力**已接线到回退路径**（`revertTo` 切换 active leaf，
+`loadSessionRecord` 按活跃分支投影 turns）。**仍未做的是对外暴露**：没有 RPC/`since` 游标接口，
+第三方依旧无法「从上次看到的 entry 之后继续收取」—— 那属于本文件记录的 RPC 契约缺口。
 
-**最小改动建议**：把 `appendDurableSessionChild` 接到会话写入路径（当前只写 `metadata.json`，见 `session/store/sessionStore.ts:32-42`），即可让分支能力生效。
+**最小改动建议原始文本**：把 `appendDurableSessionChild` 接到会话写入路径（当前只写 `metadata.json`，见 `session/store/sessionStore.ts:32-42`），即可让分支能力生效。
+> **2026-09-23 更正**：该建议的前提有误 —— `metadata.json` **不记录 turns**（`projectSessionMetadata`
+> 无该字段），turns 是从 `transcript.jsonl` 回放投影的。正因如此，原 `rewindTo` 的截断从未落盘。
 
 ## 3. MISSING 详述
 

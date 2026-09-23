@@ -3,7 +3,7 @@ title: "功能对照 01：可扩展性与定制化（我们 vs pi）"
 category: article
 sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-23
 tags: [features, gap-analysis, pi, extensibility, skills, plugins]
 summary: "[部分已过时，见文首横幅] 对照 pi 的可扩展面：扩展宿主、技能、提示词模板、包分发、主题、上下文文件。结论：我们的扩展宿主已被拆除（core/extensions、core/plugins 均不存在），技能只读不注入上下文，提示词模板与包分发缺失。覆盖清单共 10 项 MISSING、4 项 DEFICIENT、1 项 OURS-ONLY。"
 confidence: high
@@ -59,9 +59,9 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 | 技能作为斜杠命令 `/skill:name` | `docs/skills.md:74-91`（`enableSkillCommands`） | **无** | **MISSING** | 我们只有 `/skill <name>` 子命令形式（`core/commands/skillCommandRuntime.ts:15`），非注册命令 |
 | 提示词模板（磁盘 `.md` 参数化） | `src/core/prompt-templates.ts:194,269`；`docs/prompt-templates.md` | **无** | **MISSING** | 见 §3.2 |
 | 包分发（npm/git 安装、manifest） | `src/core/package-manager.ts:112`、`src/core/pi-manifest.ts:4,17`、`docs/packages.md` | 部分：`core/commands/pluginCommandRuntime.ts:12,18` | **DEFICIENT** | 见 §2.3 |
-| 主题发现（磁盘 JSON、CLI 覆盖） | `docs/themes.md:17-40` | 部分：`presentation/themes/index.ts:10` | **DEFICIENT** | 见 §2.4 |
+| 主题发现（磁盘 JSON、CLI 覆盖） ✅ **部分收口 2026-09-23**：已支持用户级 `~/.cheers/themes/*.json` 与项目级 `<projectRoot>/.agents/themes/*.json` + `/theme` 命令；仍**无**包/CLI 覆盖层 | `docs/themes.md:17-40` | `presentation/themes/index.ts` | **DEFICIENT**（余量：包/CLI 层，我方无包系统） | 见 `phase-4-execution.md` §5 |
 | 上下文文件（AGENTS.md）分层加载 | `docs/usage.md:102-108`、`src/core/resource-loader.ts:119` `loadProjectContextFiles` | ✅ **已实现**（`context/instructions/projectInstructions.ts`） | ~~MISSING~~ | 见 §3.3 |
-| 系统提示词覆盖（`SYSTEM.md`／`APPEND_SYSTEM.md`） | `docs/usage.md:112-119` | **无** | **MISSING** | `grep -rn "SYSTEM.md" packages/ts-shell/src` → 仅 `core/security/projectTrust.ts:87` 把它当作「敏感文件」探测，不读取内容 |
+| 提示词附加 `APPEND_SYSTEM.md` ✅ **已收口 2026-09-23**；`SYSTEM.md`（**替换**语义）**刻意不做** | `docs/usage.md:112-119` | `context/instructions/projectInstructions.ts`（`APPEND_CANDIDATES`） | **部分收口** | `SYSTEM.md` 替换会连带删掉 harness 自身的执行规则，是不同的信任决定；有测试钉住它未被认领。见 `phase-4-execution.md` §5 |
 | MCP 客户端 | **pi 无**（`docs/usage.md:310` 明确声明不内置） | `core/mcp/`（client/config/connectionManager/errorTaxonomy/gateway/types） | **OURS-ONLY** | 见 §4 |
 
 ## 2. DEFICIENT 详述

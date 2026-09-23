@@ -3,7 +3,7 @@ title: "功能对照 06：可观测性、配置与生命周期（我们 vs pi）
 category: article
 sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-23
 tags: [features, gap-analysis, pi, observability, config, lifecycle, diagnostics]
 summary: "[部分已过时，见文首横幅] 对照 pi 的可观测性与配置面。发现最重的一项：我们有两套并行配置系统（runtimeConfig 与 settingsLoader），而 settingsLoader 的整个 AgentSettings schema（model/skills/permissions/tui）零生产消费者——.agents/settings.json 与 ~/.cheers/settings.json 里的配置从不生效。另有 metrics 无 sink、崩溃日志缺失、无 bug report、无更新检查等差距。覆盖清单 4 项 DEFICIENT、6 项 MISSING、5 项 OURS-ONLY、1 项平手。"
 confidence: high
@@ -58,7 +58,7 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 | Trace context（traceId/spanId 传播） | 无 | `observability/traceContext.ts` | **OURS-ONLY** | 见 §4 |
 | 会话用量统计（token） | `src/core/usage-totals.ts`（`UsageTotals` 含 input/output/cacheRead/cacheWrite/cost） | `observability/usageTelemetry.ts` | **DEFICIENT** | 见 §2.4 |
 | 按模型拆分的成本 | `src/core/usage-totals.ts:36-60`（`getUsageCostBreakdown` 按 `provider/model` 分组） | 无（单一固定费率） | **MISSING** | 见 §3.4 |
-| Cache 命中/浪费统计 | `src/core/cache-stats.ts` | 无 | **MISSING** | 见 `03-*` §3.3 |
+| Cache 命中/浪费统计 ✅ **部分收口 2026-09-23**：usage 已带 `cacheReadTokens`/`cacheWriteTokens`（provider 实测值），`/cost` 按其计价 | `src/core/cache-stats.ts` | `observability/usageTelemetry.ts` | **部分收口**（`/cost` 已报 cache 维度） | 见 `phase-4-execution.md` §4 |
 | 更新检查 | `docs/settings.md`（`PI_SKIP_VERSION_CHECK`、`pi.dev/api/latest-version`） | 无 | **MISSING** | 见 §3.5 |
 | 终端状态恢复（崩溃/信号） | pi 的 TUI 层各自处理 | `presentation/tui/terminal.ts:111-112,212-215`（`process.once("exit")` + `restoreSync`） | **OURS-ONLY** | 见 §4 |
 | 信号处理与优雅关闭 | — | `core/shell/signalHandlers.ts`（`handleShellSigint`/`handleShellClose`） | **OURS-ONLY** | 见 §4 |

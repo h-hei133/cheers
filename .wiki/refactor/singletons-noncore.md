@@ -4,6 +4,16 @@
 >
 > 规则：可达性只用于分析，不直接授权删除；删除前按 `.wiki/refactor/plan.md` §2.1/§2.2 判断“职责是否已被活轨承担”。本报告只创建该文件；未重新实测的旧记录标为 `[UNVERIFIED]`。
 
+> **⚠️ 2026-09-23 局部已被推翻（记录，不改原文）**：本报告建议保留的批次里包含
+> `session/sessionDagEngine.ts`，**该文件已于 2026-09-23 删除**。
+> 删除依据不是「可达性」，而是 §2.1 要求的另外三条，且均已实测：
+> ①零生产调用者（含测试仅 `sessionDagEngine.test.ts`）；②其单文件 JSONL v3 格式与本产品的
+> 目录三件套（`metadata.json`/`transcript.jsonl`/`state.json`）**不兼容**；
+> ③它与 `session/sessionThread.ts` 是**同一职责的两套实现**，保留两套正是两份会漂移的答案。
+> 分支能力由 `sessionThread.ts` + `session/store/threadState.ts` 承担并已接线。
+> 见 [`../features/phase-4-execution.md`](../features/phase-4-execution.md) §12.2。
+> 本报告其余各项的结论**未受影响**。
+
 ## 结论
 
 - **`runtime/events/projection.ts`（2,997 行）：保留，但标记为“未接线的独有实现”，不列入本轮删除。** 当前没有生产 value importer，也没有 live lane 读取其输出；唯一外部生产依赖是同目录 `stream.ts` 的 type-only contract，且 `stream.ts` 自身也不在 roots 的 value-only 闭包。现有 live session surface 只是渲染别的事件形态，未证明覆盖 `RuntimeProjectionEvent` 投影责任。若维护者决定放弃整个 runtime-event product surface，未来应成簇裁决 `projection.ts` + `stream.ts` + tests；现在不能以“无 live consumer”自动授权删除，因为 §2.1 要求先证明职责由活轨承担。

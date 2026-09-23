@@ -123,7 +123,7 @@ confidence: high
 | M8 | HTML 导出 / session 分享 | `02-*` §3.3 | 高——需先定隐私边界 |
 | M9 | stdin/stdout RPC 协议 | `02-*` §3.1 | 高——需独立定义 framing |
 | M10 | 订阅式 OAuth（Claude Pro/Max、GitHub Copilot） | `03-*` §2.2 | 中——OAuth flow 已是声明式，加两条配置 |
-| M11 | rewind 时摘要被放弃的分支 | `07-*` §3.1 | 中——`sessionThread.ts` + `sessionDagEngine.ts` 已有大部分基础 |
+| M11 | ~~rewind 时摘要被放弃的分支~~ | `07-*` §3.1 | ✅ **2026-09-23 已收口**：回退改为非破坏性分支切换，每次回退必写 `branch_summary`（摘要可选）；`sessionDagEngine.ts` 已删除（重复实现），由 `sessionThread.ts` + `store/threadState.ts` 承担
 | M12 | 压缩前可取消/自定义的钩子 | `07-*` §3.2 | 低——类型与 dispatcher 都在，只缺派发点 |
 
 ## 4. 验证纪律（本轮执行情况）

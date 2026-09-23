@@ -3,7 +3,7 @@ title: "功能对照 07：上下文管理与压缩（我们 vs pi）"
 category: article
 sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-23
 tags: [features, gap-analysis, pi, compaction, context, branching]
 summary: "对照 pi 的上下文管理：触发阈值、切点、超大 turn、重复压缩、分支摘要、文件追踪、压缩钩子。四处 DEFICIENT（阈值用字符估算而非 provider usage、切点只认 user 且无 split-turn、重复压缩不沿用上一条 kept boundary、文件追踪不跨压缩累积）、两处 MISSING（rewind 不生成分支摘要、压缩钩子无运行时等价物）、一处 OURS-ONLY（每请求 tool-output 微压缩）。**2026-09-21 更新：DEFICIENT #1/#2/#3 与 pre-research 的 guard 缺口已全部收口（见 phase-2-execution.md §4）。**"
 confidence: high
@@ -21,7 +21,7 @@ confidence: high
 > **2026-09-21 收口**：§2.1（触发阈值）、§2.2（切点与 split-turn）、§2.3（重复压缩）
 > 三项 DEFICIENT 与 `phase-2-pre-research.md` §3 记录的 guard 缺口**已全部修复**，
 > 记录见 [`phase-2-execution.md`](phase-2-execution.md) §4。§2.4（跨压缩文件追踪）、
-> §3.1（rewind 分支摘要）、§3.2（压缩钩子）仍是开放项。
+> §3.1（rewind 分支摘要）、§3.2（压缩钩子）仍是开放项。**2026-09-23 更新：§3.1（rewind 分支摘要）已收口 —— 回退改为非破坏性分支切换且每次回退必写 branch_summary，见 phase-4-execution.md §12–§13。**
 
 ## 0. 方法与范围
 
@@ -174,9 +174,17 @@ export function findCompactionCut(messages, keepRecent): number | undefined {
 
 ### 3.1 rewind 不生成被放弃分支的摘要（置信度：高）
 
+> **✅ 2026-09-23 已收口。** 回退已改为非破坏性分支切换（`rewindTo` → `revertTo`，
+> `SessionManager.ts` 同 `sessionThreadPath` 一起工作），并且**每次回退都写
+> `branch_summary`**（含 `droppedTurns` 与 `toEntryId`），摘要变为可选 —— 原先
+> 「拿不到摘要就什么都不写」导致重开会话完全看不出退过、丢了多少。
+> 记录见 [`phase-4-execution.md`](phase-4-execution.md) §12–§13。
+> **与 `pi` 仍有的差别**：`pi` 在 `/tree` 导航时**询问**用户是否摘要；我方是自动尝试、
+> 失败则只留记录。下面原文保留为当时的证据。
+
 **pi 如何实现**：`branch-summarization.ts:108-145` `collectEntriesForBranchSummary` 从旧叶回溯到共同祖先并收集 entries；`:195-246` `prepareBranchEntries(entries, tokenBudget)` 按预算（**从新到旧**）准备消息并提取累计 file ops；`:293-380` `generateBranchSummary` 调模型；`docs/compaction.md:150-179` 描述 `/tree` 导航时询问用户是否摘要并把结果注入新分支。
 
-**我们缺失的证明**：
+**我们的证据（当时代码，2026-09-23 已全部改变）**：
 
 ```bash
 grep -nE 'generateBranchSummary|appendBranchSummary|branch_summary|requestCompactionSummary|compactSessionHistory' \
@@ -186,18 +194,21 @@ grep -nE 'generateBranchSummary|appendBranchSummary|branch_summary|requestCompac
 # → No matches found.
 ```
 
-实际链路（逐步核实）：
+实际链路（当时代码，逐步核实）：
 
 1. `picker/rewind.ts:14-17` 注释明确语义：「Choosing one **drops every turn after it** and puts that question back in the prompt」。
 2. `:50-55` 只调用 `input.rewind(point)`，**无 summary／provider 参数**。
 3. `interactiveMode.ts:535-539` 直接调 `sessionManager.rewindTo(...)`。
 4. `SessionManager.ts:141-150` `rewindTo` 把 `session.turns` **截断**并写 metadata，返回丢弃条数。
 
-**旁证**：`session/sessionDagEngine.ts:184-200` 有 `branchWithSummary` API——**但不在实际 rewind 调用链中**（与 `02-*` 报告的 `threadState.ts` 零消费者是同一模式：分支能力已写好但未接线）。
+**旁证（当时代码）**：`session/sessionDagEngine.ts:184-200` 有 `branchWithSummary` API——**但不在实际 rewind 调用链中**（与 `02-*` 报告的 `threadState.ts` 零消费者是同一模式：分支能力已写好但未接线）。该文件现已删除。
 
-**影响**：被放弃的 turns **不被摘要**，直接从 active session 的 turns 视图中消失。这与 pi 的 `/tree` 形成鲜明对比：pi 让你带着「刚才那条路试过什么、为什么放弃」的摘要继续，我们让你从零开始。
+**影响（当时）**：被放弃的 turns **不被摘要**，直接从 active session 的 turns 视图中消失。这与 pi 的 `/tree` 形成鲜明对比：pi 让你带着「刚才那条路试过什么、为什么放弃」的摘要继续，我们让你从零开始。
 
-**最小落地路径**：把 rewind 变成 branch navigation——保留旧叶与共同祖先，按预算收集 dropped entries，询问是否摘要，并在目标路径追加 branch-summary entry。**已有的 `sessionThread.ts` + `sessionDagEngine.ts` 提供了大部分基础。**
+**最小落地路径（当时）**：把 rewind 变成 branch navigation——保留旧叶与共同祖先，按预算收集 dropped entries，询问是否摘要，并在目标路径追加 branch-summary entry。**已有的 `sessionThread.ts` + `sessionDagEngine.ts` 提供了大部分基础。**
+
+> **上述最小落地路径已于 2026-09-23 实施**（`sessionDagEngine.ts` 未采用而是删除，
+> 因为它是与本产品存储格式不兼容的重复实现）。
 
 ### 3.2 压缩钩子没有运行时等价物（置信度：高）
 
@@ -231,8 +242,15 @@ grep -rnE 'eventName:[[:space:]]*"(PreCompact|PostCompact)"' packages/ts-shell/s
 ## 5. 未能验证的项
 
 1. **`chars/3.5` 相对真实 tokenizer 的误差**：未从 provider fixture 或真实 transcript 取同一段内容对比，故只给阈值层面的确定差异（§2.1）。
-2. **`rewindTo` 之外 transcript 的物理清理策略**：不能断言旧 transcript 文件字节是否同步删除；能确定的是 active session 的 turns 已截断且无 branch summary 生成（§3.1）。
-3. **`SessionDagEngine.branchWithSummary` 的全仓调用图**：已确定它不在 rewind picker 调用链中，但未穷举所有产品入口（§3.1）。
+2. **~~`rewindTo` 之外 transcript 的物理清理策略~~**（2026-09-23 已不成立）：`rewindTo` 已不存在，
+   回退改为非破坏性分支切换，**不再清理任何 transcript 内容**（append-only 保持不变）。
+   当时能确定的是「active session 的 turns 被截断且无 branch summary 生成」—— 前者实为
+   **截断从未落盘**的缺陷（写进了不含 `turns` 的 metadata），后者已改为必写。见
+   [`phase-4-execution.md`](phase-4-execution.md) §12–§13。
+3. **~~`SessionDagEngine.branchWithSummary` 的全仓调用图~~**（2026-09-23 已收口）：
+   `session/sessionDagEngine.ts` **已删除**（273 行，零生产调用者，且其单文件 JSONL 格式与本产品
+   的目录三件套不兼容，与 `sessionThread.ts` 构成重复实现）。分支能力现由 `sessionThread.ts`
+   + `store/threadState.ts` 承担并已接线。见 [`phase-4-execution.md`](phase-4-execution.md) §12.2。
 4. **`context/compact/` 域（4,659 行含测试 / 2,919 行非测试）的完整职责**：本轮只读了 `checkpoint/compactLiveCheckpoint.ts` 与 `governance/contextAnalysis.ts` 的头部；该域与 `session/compaction.ts` 的关系未系统梳理。**这是本轮最大的未覆盖区域。**
    > **2026-09-20 更正**：本项初记「5,186 行」，该数字实为 `context/compact/`（4,659 含测试）**加上** `context/readWindow/`（527）之和——两者被误并为一个域。
    > 且后续研究（`phase-2-pre-research.md` §1.1）已查明：`context/compact/` **不是压缩器**，而是交接包生成器（结果类型自述 `providerCall: "none"`），与 `session/compaction.ts` 不在同一问题上。该未覆盖项已收口。

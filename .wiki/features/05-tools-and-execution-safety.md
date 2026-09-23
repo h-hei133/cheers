@@ -3,7 +3,7 @@ title: "功能对照 05：工具与执行安全（我们 vs pi）"
 category: article
 sources: [pi-source-2026-09-20, repo-audit-2026-09-20]
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-23
 tags: [features, gap-analysis, pi, tools, sandbox, execution, safety]
 summary: "[部分已过时，见文首横幅] 对照 pi 的工具与执行面。两处硬缺陷：glob/grep 递归遍历不剪枝且不读 .gitignore（一次查询要走 14,023 个文件，其中 6,389 个在 .git 下）；22 个声明的钩子事件里有 11 个从未派发。另有 bash 超时硬编码 60s、无 ls/find 工具、edit 仅单段等差距。全量输出落盘与同文件串行化经复核确认与 pi 平手（主代理原判为缺陷，已更正）。安全面（沙箱/审批/SSRF/路径围栏）我们显著强于 pi。覆盖清单 6 项 DEFICIENT、3 项 MISSING、4 项 OURS-ONLY、4 项平手。"
 confidence: high
@@ -51,7 +51,7 @@ sed -n '5,27p' packages/ts-shell/src/core/hooks/types.ts                        
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
 | 目录遍历剪枝 + `.gitignore` 遵从 ✅ **已实现**（Phase 3 T1，`runtime/execution/fileWalk.ts`） | `src/core/tools/find.ts:65`（用 `fd`）、`src/core/tools/grep.ts` | `runtime/execution/service.ts:112-123`；`core/tools/registry.ts:505-524` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
-| bash 超时可指定 | `src/core/tools/bash.ts:239`（`timeout` 参数） | `core/tools/registry.ts:124`（硬编码） | **DEFICIENT** | 见 §2.2 |
+| ~~bash 超时可指定~~ ✅ **已收口 2026-09-23**：`timeout` 参数已实现（`runtime/execution/commandTimeout.ts`），默认保留 60s，上限拒绝而非钳制 | `src/core/tools/bash.ts:239`（`timeout` 参数） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §2 |.2 |
 | 全量输出落盘并可回读 | `src/core/tools/output-accumulator.ts:19-22`（`fullOutputPath`，OS temp 文件） | `core/tools/registry.ts:141`（`ArtifactManager.save`，`artifact://` URI） | **平手** | 两侧都保留完整输出；差异仅在回读载体（§2.3 已更正原误报） |
 | `ls` 工具 ⚠️ **部分实现**：无独立工具，但目录列举已折进 `read`（Phase 3 T6） | `src/core/tools/ls.ts`（175 行，`limit` 默认 500） | 无 | **MISSING** | 见 §3.1 |
 | `find` 工具 ⚠️ **部分实现**：无独立工具，主体由 `glob` 覆盖（不支持谓词过滤） | `src/core/tools/find.ts`（318 行，`limit` 默认 1000，尊重 `.gitignore`） | 无（`glob` 不等价） | **MISSING** | 见 §3.1 |
@@ -123,6 +123,7 @@ sed -n '5,27p' packages/ts-shell/src/core/hooks/types.ts                        
 **影响**：`npm install`、`npm run build`、完整测试套件、`cargo build` 都可能超过 60 秒——**这些恰好是 agent 最需要跑的验证命令**。超过即被我们掐断，且模型无从表达「这个要跑久一点」。
 
 **最小改动建议**：schema 加 `timeout` 参数，默认保留 60s，上限照 pi 的做法给一个明确的最大值。
+> ✅ **2026-09-23 已实施**（`runtime/execution/commandTimeout.ts`，上限 `2_147_483_647` ms 且**拒绝**而非钳制）。另外补了 5 个 `CHEERS_*` 会话环境变量（`commandEnvironment.ts`，先删同名继承值再写入）。见 `phase-4-execution.md` §2。
 
 ### 2.3 bash 的全量输出**已落盘** —— 原判为缺陷，经复核更正（置信度：高）
 
@@ -201,7 +202,8 @@ if (filePath && (call.name === "write" || call.name === "edit")) {
 
 **影响**：无法构造「只读审查」这类最小权限运行——必须枚举所有要禁用的工具，且**新增工具时会漏**（fail-open）。白名单是 fail-closed 的。
 
-**最小改动建议**：`runtimeConfig` 增加 `allowedTools?: string[]`，`buildVisibleToolPool` 在 `disabledTools` 之前先做白名单收窄。
+**最小改动建议**：`runtimeConfig` 增加 `allowedTools?: string[]`，`buildVisibleToolPool` 在 `disabledTools` 之前先做白名单收窄
+> ✅ **2026-09-23 已实施**（`core/tools/prefilter.ts`：白名单在最外层先收窄，MCP 判据与 `disabledTools` 其后；`undefined` = 不限制、`[]` = 全部禁用，两者可区分；`--tools` CLI 标志走 `RuntimeConfigOverrides`）。见 `phase-4-execution.md` §3。。
 
 ### 2.8 22 个钩子事件中 11 个从未派发（置信度：高）
 
@@ -219,6 +221,13 @@ if (filePath && (call.name === "write" || call.name === "edit")) {
   ```
 
   派发点总数：`turn/tools.ts:132,162`（Pre/PostToolUse）、`turn/session.ts:143,199`（UserPromptSubmit/Stop）——**整个回合只有 4 个派发点**。
+
+  > **✅ 2026-09-23 部分收口**：其中 **3 个已派发** —— `SessionStart`（`turn/session.ts:186`）、
+  > `SessionEnd`（`turn/session.ts:291`）、`PermissionDenied`（`turn/tools.ts:270`）。
+  > 其余 8 个**仍零派发**，并已有门禁守住：`scripts/check-declarations.mjs`
+  > 要求「每个声明的事件必须在生产代码里有 dispatch」，接入 CI。
+  > 该门禁**只覆盖钩子事件与工具工厂两类** —— 接口字段与模块导出的误报面太大，不纳入。
+  > 见 `phase-4-execution.md` §1。
 
 **证据（pi）**：`docs/extensions.md` 的 Events 章共 **26** 个事件（`project_trust`、`resources_discover`、`session_start`、`session_info_changed`、`session_before_switch`、`session_before_fork`、`session_before_compact`、`session_before_tree`、`session_shutdown`、`before_agent_start`、`agent_start`、`ui_prompt_start`、`turn_start`、`message_start`、`tool_execution_start`、`context`、`before_provider_headers`、`before_provider_request`、`after_provider_response`、`cache_warming_decision`、`model_select`、`thinking_level_select`、`tool_call`、`tool_result`、`user_bash`、`input`），每个都有实际派发点与文档化的返回值语义。
 
