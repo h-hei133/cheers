@@ -125,6 +125,12 @@ export function findCompactionCut(messages, keepRecent): number | undefined {
 
 ### 2.3 重复压缩不沿用上一条的 kept boundary（置信度：高）
 
+> **✅ 2026-09-21 已收口**（见文首横幅与 [`phase-2-execution.md`](phase-2-execution.md) §4）：
+> 跨压缩继承改为从上下文自身识别 `[Context Checkpoint]` 并修订，不走 `firstKeptEntryId`。
+> **2026-09-23 附注**：下方提到的 `session/sessionDagEngine.ts` **已删除**（零生产调用者、
+> 存储格式与本产品不兼容的重复实现），其 `firstKeptEntryId` 读取能力随之消失 ——
+> 该字段至今仍无生产写入者，`phase-4-execution.md` §5.5 已论证本轮不接线。
+
 **证据（我们）**：
 
 - `session/compaction.ts:14-18` `CompactionPlan` 只有 `cut`、`keptMessages`、`tokensBefore`——**没有** `firstKeptEntryId` 语义。
