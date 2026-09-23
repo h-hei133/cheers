@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
-import { replaceInContent } from './editEngine.js'
+import { replaceInContent, replaceManyInContent } from './editEngine.js'
 import { withFileLock } from '../../runtime/execution/fileLock.js'
 import {
   detectLineEnding,
@@ -55,6 +55,34 @@ const TOOL_APPROVED_COMMAND_AUTHORITY: ExecutionAuthority = {
   mode: 'command-allowlisted',
   source: 'tool-runtime-approval',
   reason: 'ToolRuntime allowlist and process permission checks passed before ExecutionService was called.',
+}
+
+/**
+ * The `edits` argument, when it was given in a usable shape.
+ *
+ * Returns nothing rather than throwing for an absent or empty list so the
+ * caller can fall through to the other two forms. A list that is present but
+ * malformed throws, because "I passed edits and it did something else" is worse
+ * than being told the shape was wrong.
+ */
+function readSegmentEdits(args: Record<string, unknown>): Array<{ oldText: string; newText: string }> | undefined {
+  if (args.edits === undefined) return undefined
+  if (!Array.isArray(args.edits)) {
+    throw new Error("'edits' must be an array of { oldText, newText } objects.")
+  }
+  if (args.edits.length === 0) {
+    throw new Error("'edits' was empty. Provide at least one replacement, or omit it.")
+  }
+  return args.edits.map((entry, index) => {
+    if (!entry || typeof entry !== 'object') {
+      throw new Error(`edits[${index}] must be an object with 'oldText' and 'newText'.`)
+    }
+    const segment = entry as Record<string, unknown>
+    if (typeof segment.oldText !== 'string' || typeof segment.newText !== 'string') {
+      throw new Error(`edits[${index}] needs both 'oldText' and 'newText' as strings.`)
+    }
+    return { oldText: segment.oldText, newText: segment.newText }
+  })
 }
 
 function inferFailureKind(result: {
@@ -444,7 +472,7 @@ export function createCoreToolRegistry(options?: {
     },
     {
       name: 'edit',
-      description: 'Edit or replace content in an existing file using either full content or resilient search/replace (oldText/newText).',
+      description: 'Edit an existing file: several targeted replacements in one call, or full replacement content.',
       argsSchema: {
         type: 'object',
         properties: {
@@ -454,11 +482,24 @@ export function createCoreToolRegistry(options?: {
           },
           content: {
             type: 'string',
-            description: 'The full replacement content for the file (optional if oldText/newText provided).',
+            description: 'The full replacement content for the file (optional if edits are provided).',
+          },
+          edits: {
+            type: 'array',
+            description:
+              'Targeted replacements, applied as one edit or none. Each is matched against the original file, not against the result of the previous one, and they must not overlap — merge nearby changes into one edit instead.',
+            items: {
+              type: 'object',
+              properties: {
+                oldText: { type: 'string', description: 'The exact or fuzzy block of text to replace.' },
+                newText: { type: 'string', description: 'The text to put in its place.' },
+              },
+              required: ['oldText', 'newText'],
+            },
           },
           oldText: {
             type: 'string',
-            description: 'The exact or fuzzy block of text to replace.',
+            description: 'The exact or fuzzy block of text to replace (single-edit form).',
           },
           newText: {
             type: 'string',
@@ -491,7 +532,38 @@ export function createCoreToolRegistry(options?: {
         let original = ''
         let originalUnreadable = false
         let finalContent = ''
-        if (typeof args.oldText === 'string' && typeof args.newText === 'string') {
+        const segmentEdits = readSegmentEdits(args)
+        if (segmentEdits) {
+          if (typeof args.content === 'string') {
+            throw new Error("Provide either 'content' or 'edits', not both.")
+          }
+          const raw = await executionService.readTextFile({
+            operationKind: 'file.read',
+            absolutePath: containment.resolvedPath,
+            workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY,
+            caller: 'core-tool:edit',
+            reason: 'Read original content for targeted replacements.',
+            reportSafeTarget: containment.resolvedPath,
+          })
+          // Same treatment as the single-edit form: the file's own shape is
+          // separated out before matching and put back before writing, because a
+          // model never types the mark or the carriage returns.
+          const { bom, text: content } = splitByteOrderMark(raw)
+          const lineEnding = detectLineEnding(content)
+          original = content
+          const replaceRes = replaceManyInContent(
+            toUnixLines(content),
+            segmentEdits.map((segment) => ({
+              oldText: toUnixLines(splitByteOrderMark(segment.oldText).text),
+              newText: toUnixLines(splitByteOrderMark(segment.newText).text),
+            })),
+          )
+          if (!replaceRes.success) {
+            throw new Error(replaceRes.error ?? 'Failed to apply replacements.')
+          }
+          finalContent = bom + withLineEnding(replaceRes.content, lineEnding)
+        } else if (typeof args.oldText === 'string' && typeof args.newText === 'string') {
           const raw = await executionService.readTextFile({
             operationKind: 'file.read',
             absolutePath: containment.resolvedPath,
@@ -538,7 +610,7 @@ export function createCoreToolRegistry(options?: {
           }
           finalContent = args.content
         } else {
-          throw new Error("Must provide either 'content' or both 'oldText' and 'newText'.")
+          throw new Error("Must provide 'content', 'edits', or both 'oldText' and 'newText'.")
         }
 
         await executionService.writeTextFile({

@@ -219,6 +219,67 @@ describe("concurrent edits of one file", () => {
     expect(await fs.readFile(path.join(dir, "one.txt"), "utf8")).toBe("first\n");
     expect(await fs.readFile(path.join(dir, "two.txt"), "utf8")).toBe("second\n");
   });
+
+  it("applies every segment of one multi-segment edit", async () => {
+    const tool = editTool();
+    const context = { workspaceRoot: dir, taskId: "t" } as never;
+
+    const result = await tool.execute(
+      {
+        path: "target.txt",
+        edits: [
+          { oldText: "ALPHA", newText: "AAA" },
+          { oldText: "BETA", newText: "BBB" },
+        ],
+      },
+      context,
+    );
+
+    expect(result.success).toBe(true);
+    expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("AAA\nBBB\n");
+  });
+
+  it("writes nothing when one segment of a multi-segment edit does not match", async () => {
+    const tool = editTool();
+    const context = { workspaceRoot: dir, taskId: "t" } as never;
+
+    await expect(
+      tool.execute(
+        {
+          path: "target.txt",
+          edits: [
+            { oldText: "ALPHA", newText: "AAA" },
+            { oldText: "NOT THERE", newText: "X" },
+          ],
+        },
+        context,
+      ),
+    ).rejects.toThrow(/edits\[1\]/);
+
+    // The first segment must not have been written: a partial edit leaves a file
+    // that matches neither the old state nor the requested one.
+    expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
+  });
+
+  it("refuses an edit that both replaces content and names segments", async () => {
+    const tool = editTool();
+    const context = { workspaceRoot: dir, taskId: "t" } as never;
+
+    await expect(
+      tool.execute(
+        { path: "target.txt", content: "wholesale", edits: [{ oldText: "ALPHA", newText: "AAA" }] },
+        context,
+      ),
+    ).rejects.toThrow(/not both/);
+    expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
+  });
+
+  it("refuses an empty edits array rather than doing nothing quietly", async () => {
+    const tool = editTool();
+    const context = { workspaceRoot: dir, taskId: "t" } as never;
+
+    await expect(tool.execute({ path: "target.txt", edits: [] }, context)).rejects.toThrow(/empty/);
+  });
 });
 
 /**
