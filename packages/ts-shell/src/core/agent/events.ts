@@ -9,6 +9,20 @@ export type AgentLifecycleEvent =
       readonly message: AgentMessage;
       readonly toolResults: readonly AgentMessage[];
     }
+  /**
+   * A failed step is about to be asked for again, after `delayMs`.
+   *
+   * Announced before the wait rather than after it so a surface can say why
+   * nothing is happening yet — a silent pause during a backoff reads as a hang.
+   */
+  | {
+      readonly type: "retry_scheduled";
+      readonly attempt: number;
+      readonly maxAttempts: number;
+      readonly delayMs: number;
+    }
+  /** The wait is over and the step is being re-requested. */
+  | { readonly type: "retry_attempt_start"; readonly attempt: number }
   | { readonly type: "message_start"; readonly message: AgentMessage }
   /**
    * Streaming progress. Produced by the `streamStep` implementation pushing

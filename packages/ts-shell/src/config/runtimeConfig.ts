@@ -160,6 +160,52 @@ export interface RuntimeConfig {
    */
   readonly tuiMode?: "regular" | "fullscreen" | "stream";
   readonly tui?: TuiPreferences;
+  /**
+   * Whether a failed model call is asked for again.
+   *
+   * A rate limit or a dropped socket is answered differently a moment later;
+   * without this the turn ends and the user sees a failure where waiting would
+   * have worked. Absent means enabled.
+   */
+  readonly retryEnabled?: boolean;
+  /**
+   * How many times the turn layer retries, after the first attempt.
+   *
+   * The turn layer is the one that retries by default, because it runs between
+   * steps and so can retry after the context has been reshaped — compaction
+   * being the case that matters. Zero disables it without disabling the
+   * mechanism.
+   */
+  readonly retryMaxRetries?: number;
+  /**
+   * How many times the provider layer retries a single request.
+   *
+   * Separate from the count above and zero by default, so one transient failure
+   * costs one retry rather than one per layer. It exists for a host whose
+   * failures are best absorbed at the request, which is where a server's own
+   * `Retry-After` can be honoured.
+   */
+  readonly providerRetryMaxRetries?: number;
+  /** First backoff before a retry, doubled per attempt. */
+  readonly retryBaseDelayMs?: number;
+  /** Ceiling on a backoff, so a long run stays interruptible. */
+  readonly retryMaxDelayMs?: number;
+  /**
+   * How many queued steering messages reach the model at once.
+   *
+   * Steering is delivered before the model's next step. `all` hands over
+   * everything waiting, `one-at-a-time` hands over the oldest and waits for the
+   * response before the next — which keeps a burst of corrections from arriving
+   * as one wall of text the model has to sort out. Absent means `one-at-a-time`.
+   */
+  readonly steeringMode?: "one-at-a-time" | "all";
+  /**
+   * How many queued follow-up messages reach the model at once.
+   *
+   * Follow-ups wait until the current work has stopped, so the same choice
+   * applies at a coarser boundary. Absent means `one-at-a-time`.
+   */
+  readonly followUpMode?: "one-at-a-time" | "all";
   readonly configSources: string[];
 }
 
@@ -199,6 +245,13 @@ export interface RuntimeConfigFile {
   theme?: "dark" | "light" | "auto";
   tuiMode?: "regular" | "fullscreen" | "stream";
   tui?: TuiPreferences;
+  retryEnabled?: boolean;
+  retryMaxRetries?: number;
+  providerRetryMaxRetries?: number;
+  retryBaseDelayMs?: number;
+  retryMaxDelayMs?: number;
+  steeringMode?: "one-at-a-time" | "all";
+  followUpMode?: "one-at-a-time" | "all";
 }
 
 const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
@@ -227,6 +280,22 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   // wants the conversation in their own scrollback.
   tuiMode: "fullscreen",
   tui: {},
+  // Retrying is on by default because the failures it absorbs are the ones a
+  // user cannot act on: a rate limit or a dropped socket is not a mistake in
+  // their request, and the turn ends for a reason that would not have repeated.
+  retryEnabled: true,
+  // The turn layer carries the retries, so the provider layer starts at none:
+  // one transient failure then costs one retry rather than one per layer. The
+  // turn layer is also the one that can retry after compaction has reshaped the
+  // context, which is the retry worth having.
+  retryMaxRetries: 3,
+  providerRetryMaxRetries: 0,
+  retryBaseDelayMs: 2_000,
+  retryMaxDelayMs: 60_000,
+  // Both queues delivered one message at a time before these fields had a
+  // reader, so that is the behaviour the defaults preserve.
+  steeringMode: "one-at-a-time",
+  followUpMode: "one-at-a-time",
 };
 
 /**
@@ -343,6 +412,14 @@ export function getRuntimeConfig(
     theme: merged.theme ?? DEFAULT_CONFIG.theme,
     tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,
     tui: merged.tui ?? DEFAULT_CONFIG.tui,
+    retryEnabled: merged.retryEnabled ?? DEFAULT_CONFIG.retryEnabled,
+    retryMaxRetries: merged.retryMaxRetries ?? DEFAULT_CONFIG.retryMaxRetries,
+    providerRetryMaxRetries:
+      merged.providerRetryMaxRetries ?? DEFAULT_CONFIG.providerRetryMaxRetries,
+    retryBaseDelayMs: merged.retryBaseDelayMs ?? DEFAULT_CONFIG.retryBaseDelayMs,
+    retryMaxDelayMs: merged.retryMaxDelayMs ?? DEFAULT_CONFIG.retryMaxDelayMs,
+    steeringMode: merged.steeringMode ?? DEFAULT_CONFIG.steeringMode,
+    followUpMode: merged.followUpMode ?? DEFAULT_CONFIG.followUpMode,
     configSources: sources,
   };
 }

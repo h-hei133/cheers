@@ -129,11 +129,14 @@ describe("runTurn", () => {
   });
 
   it("reports a failed model call as a failed run", async () => {
+    // A rejection the provider will keep giving: retrying it would spend a
+    // request to learn the same thing, so the run ends here. A transient
+    // failure is retried instead, which is what the retry tests cover.
     const setup = options({
-      step: scripted([{ text: "", toolCalls: [], stopReason: "error", errorMessage: "Provider HTTP 500: boom" }]),
+      step: scripted([{ text: "", toolCalls: [], stopReason: "error", errorMessage: "Provider HTTP 401: bad key" }]),
     });
     const events = await drain(runTurn(setup).events);
-    expect(events.at(-1)).toEqual({ type: "query.failed", error: "Provider HTTP 500: boom" });
+    expect(events.at(-1)).toEqual({ type: "query.failed", error: "Provider HTTP 401: bad key" });
     expect(setup.persisted).toEqual([]);
   });
 

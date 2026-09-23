@@ -336,3 +336,148 @@ describe("runAgentLoopContinue", () => {
     expect(eventTypes(events)[0]).toBe("agent_start");
   });
 });
+
+describe("step retry", () => {
+  it("asks for the step again after a transient failure", async () => {
+    let attempts = 0;
+    const { events, emit } = collect();
+
+    const messages = await runAgentLoop(
+      [userMessage("hi")],
+      [],
+      {
+        retry: { enabled: true, maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 },
+        streamStep: async () => {
+          attempts += 1;
+          if (attempts === 1) {
+            return { text: "", toolCalls: [], stopReason: "error", errorMessage: "Provider HTTP 503: busy" };
+          }
+          return textStep("recovered");
+        },
+      },
+      emit,
+      undefined,
+    );
+
+    expect(attempts).toBe(2);
+    expect(messages[messages.length - 1]?.content).toBe("recovered");
+    expect(eventTypes(events)).toContain("retry_scheduled");
+  });
+
+  it("announces the wait before it takes it", async () => {
+    // A silent pause during a backoff reads as a hang, so the wait is reported
+    // while it is happening rather than after.
+    const { events, emit } = collect();
+    let attempts = 0;
+
+    await runAgentLoop(
+      [userMessage("hi")],
+      [],
+      {
+        retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
+        streamStep: async () => {
+          attempts += 1;
+          return attempts === 1
+            ? { text: "", toolCalls: [], stopReason: "error", errorMessage: "Network error: fetch failed" }
+            : textStep("ok");
+        },
+      },
+      emit,
+      undefined,
+    );
+
+    const scheduled = events.findIndex((event) => event.type === "retry_scheduled");
+    const started = events.findIndex((event) => event.type === "retry_attempt_start");
+    expect(scheduled).toBeGreaterThan(-1);
+    expect(started).toBeGreaterThan(scheduled);
+  });
+
+  it("gives up when the failure will not change", async () => {
+    let attempts = 0;
+    const { events, emit } = collect();
+
+    const messages = await runAgentLoop(
+      [userMessage("hi")],
+      [],
+      {
+        retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+        streamStep: async () => {
+          attempts += 1;
+          return { text: "", toolCalls: [], stopReason: "error", errorMessage: "Provider HTTP 401: bad key" };
+        },
+      },
+      emit,
+      undefined,
+    );
+
+    expect(attempts).toBe(1);
+    expect(eventTypes(events)).not.toContain("retry_scheduled");
+    expect(messages[messages.length - 1]?.stopReason).toBe("error");
+  });
+
+  it("stops at the configured count", async () => {
+    let attempts = 0;
+    const { emit } = collect();
+
+    await runAgentLoop(
+      [userMessage("hi")],
+      [],
+      {
+        retry: { enabled: true, maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 },
+        streamStep: async () => {
+          attempts += 1;
+          return { text: "", toolCalls: [], stopReason: "error", errorMessage: "Provider HTTP 500: error" };
+        },
+      },
+      emit,
+      undefined,
+    );
+
+    // The first attempt plus two retries.
+    expect(attempts).toBe(3);
+  });
+
+  it("does not retry when the user turned retrying off", async () => {
+    let attempts = 0;
+    const { emit } = collect();
+
+    await runAgentLoop(
+      [userMessage("hi")],
+      [],
+      {
+        retry: { enabled: false, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+        streamStep: async () => {
+          attempts += 1;
+          return { text: "", toolCalls: [], stopReason: "error", errorMessage: "Provider HTTP 503: busy" };
+        },
+      },
+      emit,
+      undefined,
+    );
+
+    expect(attempts).toBe(1);
+  });
+
+  it("never retries a cancelled run", async () => {
+    let attempts = 0;
+    const controller = new AbortController();
+    const { emit } = collect();
+
+    await runAgentLoop(
+      [userMessage("hi")],
+      [],
+      {
+        retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+        streamStep: async () => {
+          attempts += 1;
+          controller.abort();
+          return { text: "", toolCalls: [], stopReason: "aborted", errorMessage: "Operation aborted" };
+        },
+      },
+      emit,
+      controller.signal,
+    );
+
+    expect(attempts).toBe(1);
+  });
+});

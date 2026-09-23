@@ -396,4 +396,62 @@ describe("AgentCore continue and reset", () => {
       core.state.messages.filter((message) => message.role === "user"),
     ).toHaveLength(2);
   });
+
+  it("takes the drain strategy from the options it was built with", async () => {
+    // The mode has to be settable at construction, not only afterwards: a caller
+    // that read it from configuration has no second chance to apply it.
+    const core = new AgentCore({
+      streamStep: async () => answer("hi"),
+      steeringMode: "all",
+      followUpMode: "all",
+    });
+    core.steer(userMessage("first"));
+    core.steer(userMessage("second"));
+
+    await core.continue();
+    await core.waitForIdle();
+
+    expect(
+      core.state.messages.filter((message) => message.role === "user"),
+    ).toHaveLength(2);
+  });
+
+  it("delivers one steering message per step by default", async () => {
+    // The mode decides how many arrive at once, not how many arrive in total:
+    // the loop keeps stepping until the queue is empty either way. What differs
+    // is the number of model calls — one per message, or one for all of them.
+    let steps = 0;
+    const core = new AgentCore({
+      streamStep: async () => {
+        steps += 1;
+        return answer("hi");
+      },
+    });
+    core.steer(userMessage("first"));
+    core.steer(userMessage("second"));
+
+    await core.continue();
+    await core.waitForIdle();
+
+    expect(steps).toBe(2);
+  });
+
+  it("delivers every steering message at once when told to", async () => {
+    let steps = 0;
+    const core = new AgentCore({
+      streamStep: async () => {
+        steps += 1;
+        return answer("hi");
+      },
+      steeringMode: "all",
+    });
+    core.steer(userMessage("first"));
+    core.steer(userMessage("second"));
+
+    await core.continue();
+    await core.waitForIdle();
+
+    // Both corrections arrive in one request, so the model answers once.
+    expect(steps).toBe(1);
+  });
 });

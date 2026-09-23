@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { createStepFunction, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "./step.js";
 import { getSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
+import { writeProjectState } from "../core/state/projectState.js";
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -210,5 +214,163 @@ describe("createStepFunction", () => {
     expect(usage.cacheReadTokens).toBe(0);
     expect(usage.cacheWriteTokens).toBe(0);
     resetSessionUsage("sess_cache_none");
+  });
+
+  it("asks again after a transient refusal and keeps the successful answer", async () => {
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            ok: false,
+            status: 503,
+            headers: new Headers(),
+            text: async () => "service unavailable",
+          } as unknown as Response;
+        }
+        return jsonResponse({ choices: [{ message: { content: "recovered" }, finish_reason: "stop" }] });
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(calls).toBe(2);
+    expect(result.stopReason).toBe("stop");
+    expect(result.text).toBe("recovered");
+  });
+
+  it("stops at the configured count instead of asking forever", async () => {
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls += 1;
+        return {
+          ok: false,
+          status: 500,
+          headers: new Headers(),
+          text: async () => "server error",
+        } as unknown as Response;
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    // The first attempt plus two retries.
+    expect(calls).toBe(3);
+    expect(result.stopReason).toBe("error");
+  });
+
+  it("does not ask again when the request itself was rejected", async () => {
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls += 1;
+        return {
+          ok: false,
+          status: 400,
+          headers: new Headers(),
+          text: async () => "bad request",
+        } as unknown as Response;
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(calls).toBe(1);
+    expect(result.errorMessage).toContain("400");
+  });
+
+  it("waits the delay the server asked for", async () => {
+    const started = Date.now();
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 1, baseDelayMs: 10_000, maxDelayMs: 10_000 },
+      fetchImpl: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            ok: false,
+            status: 429,
+            headers: new Headers({ "retry-after": "0.05" }),
+            text: async () => "rate limited",
+          } as unknown as Response;
+        }
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const elapsed = Date.now() - started;
+    // The server said 50ms; the local backoff would have been ten seconds.
+    expect(elapsed).toBeGreaterThanOrEqual(40);
+    expect(elapsed).toBeLessThan(5_000);
+  });
+
+  it("does not retry an overflow, which is answered by condensing", async () => {
+    let calls = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls += 1;
+        return {
+          ok: false,
+          status: 400,
+          headers: new Headers(),
+          text: async () => JSON.stringify({ error: { code: "context_length_exceeded" } }),
+        } as unknown as Response;
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(calls).toBe(1);
+    expect(result.errorMessage?.startsWith(CONTEXT_OVERFLOW_PREFIX)).toBe(true);
+  });
+
+  it("still drops reasoning_effort when the host refuses it", async () => {
+    // The refusal is not a transient failure, so it must not be retried with the
+    // same field; the request is rebuilt without it instead. The level has to be
+    // set for the field to be sent at all, so this runs in its own workspace.
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "step-effort-"));
+    try {
+      writeProjectState(workspace, { thinkingEffort: "high" });
+      const bodies: string[] = [];
+      const step = createStepFunction({
+        ...request,
+        workspaceRoot: workspace,
+        retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+        fetchImpl: async (_url, init) => {
+          bodies.push(String(init?.body ?? ""));
+          if (bodies.length === 1) {
+            return {
+              ok: false,
+              status: 400,
+              headers: new Headers(),
+              text: async () => "unsupported parameter: reasoning_effort",
+            } as unknown as Response;
+          }
+          return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+        },
+      });
+
+      const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0]).toContain("reasoning_effort");
+      expect(bodies[1]).not.toContain("reasoning_effort");
+      expect(result.stopReason).toBe("stop");
+    } finally {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
   });
 });

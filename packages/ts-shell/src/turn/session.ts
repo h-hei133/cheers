@@ -68,6 +68,22 @@ export interface TurnOptions {
   readonly signal: AbortSignal;
   /** What a command the model runs should know about this session. */
   readonly commandEnv?: Readonly<Record<string, string>>;
+  /**
+   * How a failed step is retried, resolved once by the caller.
+   *
+   * Absent means the turn layer's default, which is to retry. Resolved outside
+   * so the setting is read once per run rather than once per attempt.
+   */
+  readonly retry?: {
+    readonly enabled?: boolean;
+    readonly maxRetries?: number;
+    readonly baseDelayMs?: number;
+    readonly maxDelayMs?: number;
+  };
+  /** How many queued steering messages reach the model at once. */
+  readonly steeringMode?: "one-at-a-time" | "all";
+  /** How many queued follow-up messages reach the model at once. */
+  readonly followUpMode?: "one-at-a-time" | "all";
 }
 
 /** Input the user can hand a running turn. */
@@ -111,6 +127,12 @@ export function runTurn(options: TurnOptions): TurnRun {
   const hooks = createToolHooks(gate);
   const core = new AgentCore({
     initialState: { messages: options.history as readonly AgentMessage[] },
+    // Absent means the kernel's own default, which is the same value the config
+    // default carries — so a run that sets neither behaves exactly as it did
+    // before these options had a reader.
+    ...(options.steeringMode ? { steeringMode: options.steeringMode } : {}),
+    ...(options.followUpMode ? { followUpMode: options.followUpMode } : {}),
+    ...(options.retry ? { retry: options.retry } : {}),
     tools: adaptTools(options.tools, gate).map((tool) =>
       SEQUENTIAL_TOOLS.has(tool.name) ? { ...tool, executionMode: "sequential" as const } : tool,
     ),

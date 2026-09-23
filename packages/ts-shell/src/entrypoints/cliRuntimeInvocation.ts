@@ -359,6 +359,17 @@ function startTurn(
     maxSteps: request.maxTurns,
     compaction: request.compaction,
     signal: request.signal,
+    // Read once per run: a policy that changed mid-run would make the number of
+    // retries depend on when the config was reloaded rather than on what the
+    // user asked for.
+    retry: {
+      enabled: request.runtimeConfig?.retryEnabled,
+      maxRetries: request.runtimeConfig?.retryMaxRetries,
+      baseDelayMs: request.runtimeConfig?.retryBaseDelayMs,
+      maxDelayMs: request.runtimeConfig?.retryMaxDelayMs,
+    },
+    ...(request.runtimeConfig?.steeringMode ? { steeringMode: request.runtimeConfig.steeringMode } : {}),
+    ...(request.runtimeConfig?.followUpMode ? { followUpMode: request.runtimeConfig.followUpMode } : {}),
   });
   return { events: run.events, input: run };
 }
@@ -427,6 +438,12 @@ function createProviderStep(
     temperature: request.runtimeConfig?.temperature,
     topP: request.runtimeConfig?.topP,
     maxOutputTokens: request.runtimeConfig?.maxOutputTokens,
+    retry: {
+      enabled: request.runtimeConfig?.retryEnabled,
+      maxRetries: request.runtimeConfig?.providerRetryMaxRetries,
+      baseDelayMs: request.runtimeConfig?.retryBaseDelayMs,
+      maxDelayMs: request.runtimeConfig?.retryMaxDelayMs,
+    },
   });
 }
 

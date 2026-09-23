@@ -99,6 +99,57 @@ describe("runtime config", () => {
     expect(config.instructionBudgetBytes).toBe(32 * 1024);
   });
 
+  it("retries by default, with the turn layer carrying the retries", () => {
+    // Retrying is on because the failures it absorbs are ones the user cannot
+    // act on. The provider layer starts at none so one transient failure costs
+    // one retry rather than one per layer.
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.retryEnabled).toBe(true);
+    expect(config.retryMaxRetries).toBe(3);
+    expect(config.providerRetryMaxRetries).toBe(0);
+  });
+
+  it("takes the retry settings a config file sets", () => {
+    fs.writeFileSync(
+      path.join(fakeRoot, ".cheers.json"),
+      JSON.stringify({
+        retryEnabled: false,
+        retryMaxRetries: 5,
+        providerRetryMaxRetries: 2,
+        retryBaseDelayMs: 500,
+        retryMaxDelayMs: 10_000,
+      }),
+      "utf8",
+    );
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.retryEnabled).toBe(false);
+    expect(config.retryMaxRetries).toBe(5);
+    expect(config.providerRetryMaxRetries).toBe(2);
+    expect(config.retryBaseDelayMs).toBe(500);
+    expect(config.retryMaxDelayMs).toBe(10_000);
+  });
+
+  it("keeps the queue delivery the kernel already had when unset", () => {
+    // Both queues delivered one message at a time before these fields had a
+    // reader, so that is what the defaults have to preserve.
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.steeringMode).toBe("one-at-a-time");
+    expect(config.followUpMode).toBe("one-at-a-time");
+  });
+
+  it("takes the queue delivery a config file asks for", () => {
+    fs.writeFileSync(
+      path.join(fakeRoot, ".cheers.json"),
+      JSON.stringify({ steeringMode: "all", followUpMode: "all" }),
+      "utf8",
+    );
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.steeringMode).toBe("all");
+    expect(config.followUpMode).toBe("all");
+  });
+
   it("does not allow unreviewed hooks unless a flag says so", () => {
     // The default has to be the safe one: a config file must not be able to grant
     // this, or a repository could ship the exemption along with the hooks.

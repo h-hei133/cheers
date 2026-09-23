@@ -1,6 +1,13 @@
 import type { AgentEventSink } from "./events.js";
 import type { AgentMessage, AgentStopReason } from "./state.js";
 import {
+  isRetryableFailure,
+  resolveRetryPolicy,
+  retryDelayMs,
+  waitBeforeRetry,
+  type RetryPolicy,
+} from "./retry.js";
+import {
   executeToolBatch,
   failTruncatedCalls,
   type AgentTool,
@@ -38,6 +45,18 @@ export interface AgentLoopConfig {
   readonly onContextReplaced?: (messages: readonly AgentMessage[]) => void;
   readonly getSteeringMessages?: () => Promise<AgentMessage[]>;
   readonly getFollowUpMessages?: () => Promise<AgentMessage[]>;
+  /**
+   * How many times a failed step is asked for again.
+   *
+   * This sits above the step rather than inside it because the two see
+   * different things: the step sees one HTTP response, while this sees the
+   * finished step and runs between steps, so a retry here happens after
+   * `prepareNextStep` has had its chance to reshape the context.
+   *
+   * Partial because the caller states what the user asked for and this layer's
+   * own default fills the rest.
+   */
+  readonly retry?: Partial<RetryPolicy>;
   readonly streamStep: (
     messages: readonly AgentMessage[],
     signal?: AbortSignal,
@@ -64,6 +83,39 @@ export async function runAgentLoop(
   }
   await driveLoop(context, produced, config, emit, signal, !options.skipInitialSteeringPoll);
   return produced;
+}
+
+/**
+ * Ask for the next step, asking again when the failure may not repeat.
+ *
+ * The retry lives here rather than inside the step so that the second attempt
+ * goes through the same path as the first: whatever the loop does between steps
+ * — compaction, steering, a replaced context — happens before a retry too,
+ * because a failure caused by the context is answered by changing it.
+ *
+ * A cancelled run is never retried, and neither is a failure whose text names a
+ * condition that will still hold: an exhausted account stays exhausted, and
+ * retrying only spends quota to learn that again.
+ */
+async function retryStep(
+  config: AgentLoopConfig,
+  context: readonly AgentMessage[],
+  signal: AbortSignal | undefined,
+  emit: AgentEventSink,
+): Promise<AssistantStep> {
+  const policy = resolveRetryPolicy("turn", config.retry ?? {});
+  let attempt = 0;
+  for (;;) {
+    const step = await config.streamStep(context, signal);
+    if (!isRetryableFailure(step.stopReason, step.errorMessage)) return step;
+    attempt += 1;
+    if (attempt > policy.maxRetries) return step;
+
+    const delayMs = retryDelayMs(policy, attempt, undefined);
+    await emit({ type: "retry_scheduled", attempt, maxAttempts: policy.maxRetries, delayMs });
+    if (!(await waitBeforeRetry(delayMs, signal))) return step;
+    await emit({ type: "retry_attempt_start", attempt });
+  }
 }
 
 export async function runAgentLoopContinue(
@@ -126,7 +178,7 @@ async function driveLoop(
       }
       pending = [];
 
-      const step = await config.streamStep(context, signal);
+      const step = await retryStep(config, context, signal, emit);
       const assistant: AgentMessage = {
         role: "assistant",
         content: step.text,

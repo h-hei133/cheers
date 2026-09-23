@@ -9,6 +9,14 @@ import { microcompactMessages } from "../core/query/microCompact.js";
 import { isEventStream, readCompletionStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
 import { toChatMessages } from "./prompt.js";
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
+import {
+  isRetryableStatus,
+  resolveRetryPolicy,
+  retryDelayMs,
+  serverRequestedDelayMs,
+  waitBeforeRetry,
+  type RetryPolicy,
+} from "../core/agent/retry.js";
 
 /**
  * One model call.
@@ -57,6 +65,16 @@ export interface StepRequest {
   readonly topP?: number;
   readonly maxOutputTokens?: number;
   readonly fetchImpl?: typeof fetch;
+  /**
+   * How many times a request that failed for a transient reason is sent again.
+   *
+   * A partial policy rather than a resolved one: the caller states what the user
+   * asked for and the provider layer's own default fills the rest, so the
+   * default lives here beside the layer it belongs to. Absent means no retries,
+   * which is this layer's default — the turn layer above is the one that
+   * retries by default.
+   */
+  readonly retry?: Partial<RetryPolicy>;
 }
 
 const OVERFLOW_MARKERS = ["context_length_exceeded", "context_overflow", "maximum context length", "prompt_too_long"];
@@ -97,6 +115,7 @@ interface CompletionShape {
 export function createStepFunction(request: StepRequest): StepFunction {
   let effortAccepted = true;
   const fetchImpl = request.fetchImpl ?? fetch;
+  const retry = resolveRetryPolicy("provider", request.retry ?? {});
   return async (messages, signal, listener, options) => {
     for (;;) {
       const effort = effortAccepted ? getThinkingEffort(request.workspaceRoot) : undefined;
@@ -125,35 +144,84 @@ export function createStepFunction(request: StepRequest): StepFunction {
           listener.onText?.(delta);
         },
       };
-      let response: Response;
-      // Reading ends as soon as the answer is complete, which can be before the
-      // host closes the stream — a keep-alive proxy holds the connection open
-      // afterwards. The socket is released here rather than left to the host, so
-      // a connection nobody is reading cannot outlive the turn.
-      const releaseStream = new AbortController();
-      const requestSignal = signal
-        ? AbortSignal.any([signal, releaseStream.signal])
-        : releaseStream.signal;
-      try {
-        response = await fetchImpl(`${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${request.provider.apiKey}` },
-          body: JSON.stringify(payload),
-          signal: requestSignal,
-        });
-      } catch (error) {
-        if (signal?.aborted) return abortedStep("");
-        return errorStep(`Network error: ${error instanceof Error ? error.message : String(error)}`);
-      }
-      if (!response.ok) {
-        const detail = await response.text();
-        if (isContextOverflow(detail)) return errorStep(`${CONTEXT_OVERFLOW_PREFIX}${detail.slice(0, 200)}`);
-        if (effort && /reasoning_effort/i.test(detail)) {
-          effortAccepted = false;
-          continue;
+      // Send the request, retrying a transient failure. A refusal of
+      // `reasoning_effort` is not transient, so it leaves this loop for the
+      // outer one, which drops the field and rebuilds the payload.
+      let attempt = 0;
+      let response: Response | undefined;
+      let refusal = "";
+      let dropEffort = false;
+      for (;;) {
+        // Reading ends as soon as the answer is complete, which can be before the
+        // host closes the stream — a keep-alive proxy holds the connection open
+        // afterwards. The socket is released here rather than left to the host, so
+        // a connection nobody is reading cannot outlive the turn.
+        const releaseStream = new AbortController();
+        const requestSignal = signal
+          ? AbortSignal.any([signal, releaseStream.signal])
+          : releaseStream.signal;
+        let requestedDelayMs: number | undefined;
+        let transient = false;
+        try {
+          const attemptResponse = await fetchImpl(
+            `${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${request.provider.apiKey}` },
+              body: JSON.stringify(payload),
+              signal: requestSignal,
+            },
+          );
+          if (attemptResponse.ok) {
+            response = attemptResponse;
+            break;
+          }
+          const detail = await attemptResponse.text();
+          // The conversation outgrew the window. That is answered by condensing,
+          // not by asking again, so it keeps its own prefix and stops here.
+          if (isContextOverflow(detail)) {
+            return errorStep(`${CONTEXT_OVERFLOW_PREFIX}${detail.slice(0, 200)}`);
+          }
+          if (effort && /reasoning_effort/i.test(detail)) {
+            dropEffort = true;
+            break;
+          }
+          refusal = `Provider HTTP ${attemptResponse.status}: ${detail.slice(0, 200)}`;
+          transient = isRetryableStatus(attemptResponse.status);
+          if (transient) {
+            requestedDelayMs = serverRequestedDelayMs(
+              attemptResponse.headers.get("retry-after-ms"),
+              attemptResponse.headers.get("retry-after"),
+            );
+          }
+        } catch (error) {
+          if (signal?.aborted) return abortedStep("");
+          // The request never arrived, which is the failure a second attempt
+          // most often fixes.
+          refusal = `Network error: ${error instanceof Error ? error.message : String(error)}`;
+          transient = true;
+        } finally {
+          // The body is either already read or belongs to a response this
+          // attempt is discarding, so the connection is released either way.
+          releaseStream.abort();
         }
-        return errorStep(`Provider HTTP ${response.status}: ${detail.slice(0, 200)}`);
+
+        attempt += 1;
+        if (!transient || attempt > retry.maxRetries) {
+          return errorStep(refusal);
+        }
+        const waited = await waitBeforeRetry(retryDelayMs(retry, attempt, requestedDelayMs), signal);
+        if (!waited) return abortedStep("");
       }
+
+      if (dropEffort) {
+        // Rebuilding without the field is the retry: the request is otherwise
+        // identical, and asking again with it would fail again.
+        effortAccepted = false;
+        continue;
+      }
+      if (!response) return errorStep(refusal || "Provider returned no response.");
+
       try {
         const completion = await readCompletion(response, watched);
         const usage = completion.usage;
@@ -175,8 +243,6 @@ export function createStepFunction(request: StepRequest): StepFunction {
       } catch (error) {
         if (signal?.aborted) return abortedStep(shown);
         return errorStep(`Network error: ${error instanceof Error ? error.message : String(error)}`);
-      } finally {
-        releaseStream.abort();
       }
     }
   };

@@ -3,6 +3,7 @@ import { PendingQueue } from "./queue.js";
 import { createAgentState, type AgentMessage, type AgentState, type InitialAgentState } from "./state.js";
 import type { AgentEventListener } from "./events.js";
 import type { AgentTool, AgentToolExecutionMode, ToolHooks } from "./tools.js";
+import type { RetryPolicy } from "./retry.js";
 
 export interface AgentCoreOptions {
   readonly initialState?: InitialAgentState;
@@ -15,6 +16,13 @@ export interface AgentCoreOptions {
   readonly prepareNextStep?: AgentLoopConfig["prepareNextStep"];
   readonly steeringMode?: "one-at-a-time" | "all";
   readonly followUpMode?: "one-at-a-time" | "all";
+  /**
+   * How a failed step is retried, passed through to the loop unchanged.
+   *
+   * Absent leaves the loop's own default in place, so a core built without a
+   * policy behaves as it did before this option existed.
+   */
+  readonly retry?: Partial<RetryPolicy>;
 }
 
 interface ActiveRun {
@@ -161,6 +169,7 @@ export class AgentCore {
       afterToolCall: this.options.afterToolCall,
       shouldStopAfterStep: this.options.shouldStopAfterStep,
       prepareNextStep: this.options.prepareNextStep,
+      ...(this.options.retry ? { retry: this.options.retry } : {}),
       onContextReplaced: (messages) => {
         this.internalState.messages = [...messages];
       },

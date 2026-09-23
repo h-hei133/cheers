@@ -91,6 +91,24 @@ export class TurnProjection {
           },
         ];
       }
+      case "retry_scheduled":
+        // Reported through the event the shell already renders for a retry, so
+        // there is one place a retry is announced rather than two that can
+        // disagree. The wait is what the surface needs: without it a backoff
+        // looks like the run has stopped.
+        return [
+          {
+            type: "query.retrying",
+            role: "coder",
+            turn: this.steps,
+            attempt: event.attempt,
+            reason: `transient provider failure; waiting ${Math.round(event.delayMs / 1000)}s`,
+          },
+        ];
+      case "retry_attempt_start":
+        // The retry itself was already announced before the wait; repeating it
+        // here would double-count the attempt in the digest.
+        return [];
       default:
         return [];
     }
