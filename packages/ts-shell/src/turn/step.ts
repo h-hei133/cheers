@@ -7,8 +7,10 @@ import { samplingTemperature } from "../core/commands/fastCommandRuntime.js";
 import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
 import { microcompactMessages } from "../core/query/microCompact.js";
 import { isEventStream, readCompletionStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
-import { toChatMessages } from "./prompt.js";
+import { toChatMessages, type ChatMessage } from "./prompt.js";
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
+import { resolveRequestShape } from "../core/models/requestShape.js";
+import type { CatalogProvider } from "../core/models/catalog.js";
 import {
   isRetryableStatus,
   resolveRetryPolicy,
@@ -32,6 +34,14 @@ export interface ProviderTarget {
   readonly apiKey: string;
   readonly baseUrl: string;
   readonly model: string;
+  /**
+   * Which provider this is, so the catalog can be asked how it wants requests.
+   *
+   * Absent means the question cannot be answered, and the defaults an
+   * OpenAI-compatible endpoint expects are used — which is what every request
+   * looked like before the catalog could answer at all.
+   */
+  readonly provider?: string;
 }
 
 /** What a step reports while it runs, before the assembled message exists. */
@@ -65,6 +75,13 @@ export interface StepRequest {
   readonly topP?: number;
   readonly maxOutputTokens?: number;
   readonly fetchImpl?: typeof fetch;
+  /**
+   * The catalog to ask how this model wants requests shaped.
+   *
+   * Passed in rather than loaded here so a run reads it once, and so a test can
+   * state a model's shape without writing a catalog file.
+   */
+  readonly catalog?: readonly CatalogProvider[];
   /**
    * How many times a request that failed for a transient reason is sent again.
    *
@@ -119,20 +136,38 @@ export function createStepFunction(request: StepRequest): StepFunction {
   return async (messages, signal, listener, options) => {
     for (;;) {
       const effort = effortAccepted ? getThinkingEffort(request.workspaceRoot) : undefined;
+      // Resolved per attempt rather than once, because the shape depends on the
+      // level, and a refused `reasoning_effort` is answered by rebuilding the
+      // request without it.
+      const shape = resolveRequestShape(
+        request.catalog ?? [],
+        request.provider.provider ?? "",
+        request.provider.model,
+        effortAccepted ? effort : undefined,
+      );
       const payload = {
         model: request.provider.model,
         messages: [
-          { role: "system", content: request.systemPrompt },
-          ...microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
+          { role: shape.systemRole, content: request.systemPrompt },
+          ...bridgeToolResults(
+            microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
+            shape.assistantAfterToolResult,
+          ),
         ],
         tools: request.tools,
         tool_choice: options.allowTools ? "auto" : "none",
         stream: true,
         stream_options: { include_usage: true },
         temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
-        ...(effort ? { reasoning_effort: effort } : {}),
+        // The model's own name for the level, which is the level's own name when
+        // it did not declare a different one.
+        ...(shape.reasoningEffort && shape.thinkingLevelName
+          ? { reasoning_effort: shape.thinkingLevelName }
+          : {}),
         ...(request.topP != null ? { top_p: request.topP } : {}),
-        ...(request.maxOutputTokens != null ? { max_tokens: request.maxOutputTokens } : {}),
+        ...(request.maxOutputTokens != null
+          ? { [shape.maxTokensField]: request.maxOutputTokens }
+          : {}),
       };
       // What has been shown so far, so an interrupted answer keeps the part
       // the user already read instead of vanishing from the conversation.
@@ -246,6 +281,32 @@ export function createStepFunction(request: StepRequest): StepFunction {
       }
     }
   };
+}
+
+/**
+ * Bridge tool results and a following user turn, for the endpoints that need it.
+ *
+ * Some providers reject a user message that directly follows tool results. The
+ * bridge is a synthetic assistant turn rather than a reordering, because
+ * reordering would change what the conversation says — moving the user's message
+ * earlier would attribute it to a moment before the model had read the results.
+ *
+ * A no-op for every model that did not ask for it, which is all of them today.
+ */
+function bridgeToolResults(
+  messages: readonly ChatMessage[],
+  enabled: boolean,
+): readonly ChatMessage[] {
+  if (!enabled) return messages;
+  const bridged: ChatMessage[] = [];
+  for (const message of messages) {
+    const previous = bridged[bridged.length - 1];
+    if (message.role === "user" && previous?.role === "tool") {
+      bridged.push({ role: "assistant", content: "I have processed the tool results." });
+    }
+    bridged.push(message);
+  }
+  return bridged;
 }
 
 async function readCompletion(response: Response, listener: StepListener): Promise<CompletionShape> {

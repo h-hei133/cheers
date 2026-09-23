@@ -11,6 +11,7 @@ import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
 import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/registration.js";
 import { createCoreToolRegistry } from "../core/tools/registry.js";
 import { filterVisibleToolNames } from "../core/tools/prefilter.js";
+import { loadCatalog } from "../core/models/catalogStore.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
@@ -427,11 +428,18 @@ function createProviderStep(
       apiKey: resolution.credential?.apiKey ?? "",
       baseUrl: resolution.baseUrl ?? resolution.credential?.baseUrl ?? "",
       model: resolution.model ?? resolution.credential?.model ?? "",
+      // The catalog is keyed by provider id, so the request shape cannot be
+      // resolved without it.
+      provider: resolution.provider,
     },
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
     systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
     tools: toolSchemas(tools),
+    // Read once per step function rather than per request: the catalog is a
+    // snapshot, and a run that reloaded it mid-turn could change request shape
+    // between two steps of the same answer.
+    catalog: loadCatalog(),
     // Sampling settings travel with the request, not with the provider: a
     // provider that ignores them still receives a well-formed request, and a
     // run that sets none keeps the step's own defaults.

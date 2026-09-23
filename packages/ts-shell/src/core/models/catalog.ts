@@ -29,7 +29,93 @@ export interface CatalogModel {
    * substitutes a made-up rate reads like a measurement.
    */
   readonly cost?: ModelCostRates;
+  /**
+   * Whether this model accepts a reasoning setting.
+   *
+   * Absent means capable, which is what the request assumed before the catalog
+   * could answer: the level went out and a host that did not want it said so.
+   * `false` is the only value that stops the field being sent, and it is for a
+   * model that is known to reject it.
+   */
+  readonly reasoning?: boolean;
+  /**
+   * What this model calls each reasoning level.
+   *
+   * Endpoints disagree about the names — one takes `low`, another `minimal`,
+   * another a number. A level mapped to `null` is one this model does not have,
+   * and the nearest supported level is used instead. An unmapped level travels
+   * as its own name, which is right for the endpoints that do use them.
+   */
+  readonly thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
+  /**
+   * The output ceiling this model applies when the request does not set one.
+   *
+   * Separate from the run-wide `maxOutputTokens` because the ceiling is a
+   * property of the model: a value that fits one is truncated by another.
+   */
+  readonly maxTokens?: number;
+  /**
+   * What this model accepts as input.
+   *
+   * Absent means text only, which is what every request carries today. The field
+   * exists so a model that reads images can say so before anything tries to
+   * send one.
+   */
+  readonly input?: readonly ("text" | "image")[];
+  /**
+   * How this model wants the request shaped.
+   *
+   * Absent means the defaults an OpenAI-compatible endpoint expects, which is
+   * what every shipped entry is. It is here because the differences are real:
+   * an endpoint that refuses the `developer` role, or that only accepts
+   * `max_completion_tokens`, fails on a request that is otherwise correct.
+   */
+  readonly compat?: ModelRequestShape;
 }
+
+/** How one model wants a request shaped, when it differs from the default. */
+export interface ModelRequestShape {
+  /**
+   * Which role carries the system instruction.
+   *
+   * Some endpoints accept `developer` and prefer it for reasoning models;
+   * others reject anything but `system`.
+   */
+  readonly systemRole?: "system" | "developer";
+  /**
+   * The field that carries the output ceiling.
+   *
+   * OpenAI moved to `max_completion_tokens` for newer models and rejects
+   * `max_tokens` on them; compatible endpoints vary.
+   */
+  readonly maxTokensField?: "max_tokens" | "max_completion_tokens";
+  /**
+   * Whether the reasoning level is sent as `reasoning_effort`.
+   *
+   * False means the field is never sent, so a level set for the project does
+   * not become a rejected request.
+   */
+  readonly reasoningEffort?: boolean;
+  /**
+   * Whether a user message may follow tool results directly.
+   *
+   * Some endpoints require an assistant turn in between. Where they do, the
+   * request is bridged with a synthetic assistant message rather than reordered,
+   * because reordering would change what the conversation says.
+   */
+  readonly assistantAfterToolResult?: boolean;
+}
+
+/**
+ * The reasoning levels a user can choose, in order.
+ *
+ * Three, because that is what the surface offers and what the project state
+ * stores. A model may name them differently, which is what `thinkingLevelMap`
+ * is for — the level is the choice, the mapping is how it is said.
+ */
+export const THINKING_LEVELS = ["low", "medium", "high"] as const;
+
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
 /** Prices per million tokens, as the model publishes them. */
 export interface ModelCostRates {

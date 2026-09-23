@@ -337,6 +337,117 @@ describe("createStepFunction", () => {
     expect(result.errorMessage?.startsWith(CONTEXT_OVERFLOW_PREFIX)).toBe(true);
   });
 
+  it("shapes the request the way the catalog says this model wants it", async () => {
+    // The catalog could describe a model's window and price but not how to talk
+    // to it, so an endpoint that refuses `developer` or only accepts
+    // `max_completion_tokens` failed on an otherwise correct request.
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "step-shape-"));
+    try {
+      writeProjectState(workspace, { thinkingEffort: "high" });
+      let body: Record<string, unknown> = {};
+      const step = createStepFunction({
+        ...request,
+        workspaceRoot: workspace,
+        maxOutputTokens: 4096,
+        catalog: [
+          {
+            id: "vendor",
+            label: "Vendor",
+            runtime: "openai-compatible",
+            auth: "api-key",
+            models: [
+              {
+                id: "m",
+                contextWindow: 128_000,
+                thinkingLevelMap: { high: "xhigh" },
+                compat: {
+                  systemRole: "developer",
+                  maxTokensField: "max_completion_tokens",
+                  assistantAfterToolResult: true,
+                },
+              },
+            ],
+          },
+        ],
+        fetchImpl: async (_url, init) => {
+          body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+          return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+        },
+      });
+
+      await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+      const messages = body.messages as Array<{ role: string }>;
+      expect(messages[0]?.role).toBe("developer");
+      expect(body.max_completion_tokens).toBe(4096);
+      expect(body.max_tokens).toBeUndefined();
+      // The model's own name for the level, not the level's name.
+      expect(body.reasoning_effort).toBe("xhigh");
+    } finally {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it("bridges tool results when the model requires an assistant turn between them", async () => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      catalog: [
+        {
+          id: "vendor",
+          label: "Vendor",
+          runtime: "openai-compatible",
+          auth: "api-key",
+          models: [{ id: "m", contextWindow: 1_000, compat: { assistantAfterToolResult: true } }],
+        },
+      ],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step(
+      [
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [{ id: "c1", type: "function", function: { name: "read", arguments: "{}" } }],
+        },
+        { role: "tool", tool_call_id: "c1", content: "file!" },
+        { role: "user", content: "and now?" },
+      ] as never,
+      undefined,
+      {},
+      { allowTools: true },
+    );
+
+    const roles = (body.messages as Array<{ role: string }>).map((message) => message.role);
+    const toolIndex = roles.indexOf("tool");
+    expect(roles[toolIndex + 1]).toBe("assistant");
+    expect(roles[toolIndex + 2]).toBe("user");
+  });
+
+  it("keeps the request unchanged for a model the catalog does not describe", async () => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      maxOutputTokens: 2048,
+      catalog: [],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const messages = body.messages as Array<{ role: string }>;
+    expect(messages[0]?.role).toBe("system");
+    expect(body.max_tokens).toBe(2048);
+    expect(body.max_completion_tokens).toBeUndefined();
+  });
+
   it("still drops reasoning_effort when the host refuses it", async () => {
     // The refusal is not a transient failure, so it must not be retried with the
     // same field; the request is rebuilt without it instead. The level has to be
