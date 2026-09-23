@@ -90,6 +90,9 @@ export async function runCostCommand(
         : []),
       everyRatePublished
         ? "The token counts are what the provider reported. The rates are the ones each model publishes."
+        // "Some" rather than "the": with several models, one of them may publish
+        // prices while another does not, so a flat statement would be wrong for
+        // at least one table above it.
         : "The token counts are what the provider reported. Some rates are estimates at a fixed fallback that does not follow the model in use — check your provider's billing for what was actually charged.",
     ].join("\n"),
   };

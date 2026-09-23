@@ -60,7 +60,6 @@ export function createZipArchive(entries: readonly ZipEntry[], now: Date = new D
   const localParts: Buffer[] = [];
   const centralParts: Buffer[] = [];
   let offset = 0;
-  let totalBytes = 0;
 
   for (const entry of entries) {
     const nameBytes = Buffer.from(entry.name, "utf8");
@@ -104,7 +103,9 @@ export function createZipArchive(entries: readonly ZipEntry[], now: Date = new D
     centralParts.push(central, nameBytes);
 
     offset += local.length + nameBytes.length + compressed.length;
-    totalBytes += offset;
+    // Checked as the archive is built rather than at the end: the offsets written
+    // into the central directory are 32-bit, so an archive past this point cannot
+    // be described by the format at all.
     if (offset > MAX_TOTAL_BYTES) {
       throw new Error("A zip archive without zip64 holds at most 4 GiB; this one does not.");
     }

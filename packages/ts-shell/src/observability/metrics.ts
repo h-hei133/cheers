@@ -21,6 +21,14 @@ export interface MetricEvent {
  * The accumulator keeps the write count at one per turn while preserving the
  * count and the tags, which is what a reader actually wants: not "a tool ran",
  * but "this tool ran eleven times and took 4.2s in total".
+ *
+ * **The buffer is process-wide rather than per session, which holds only because
+ * one session runs at a time.** `ShellSessionRuntime` refuses a second prompt
+ * while one is running, and every recording path sits inside a turn that flushes
+ * on the way out, so nothing survives across sessions in practice. A change that
+ * ran two sessions concurrently, or a turn that outlived its caller, would need
+ * this keyed by session — otherwise the first flush would attribute the other
+ * session's counts to itself.
  */
 const logger = createComponentLogger("metric");
 

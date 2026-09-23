@@ -150,8 +150,21 @@ T1–T4 的施工**不会让它们再变**；压到最后等于让施工者**在
 也计算成本（用固定回退费率渲染进 TUI 状态栏）。**只改 `/cost` 会让同一会话出现两个金额**——
 比原来的缺陷更难发现。两处现在都经 `estimateSessionCost` 按模型取费率。
 
-**保持不变**：单模型输出**逐字不变**（兼容性要求）；`lastPromptTokens`/`lastPromptMessageCount`
-仍是会话级（上下文仪表描述的是对话，不是最后读它的模型）。
+**保持不变**：单模型的**表格与数字逐字不变**（兼容性要求）；
+`lastPromptTokens`/`lastPromptMessageCount` 仍是会话级（上下文仪表描述的是对话，不是最后读它的模型）。
+
+**⚠️ 一处被实测推翻的断言**：初稿与提交信息写「单模型输出**逐字不变**」——
+**不准确**。用 worktree 跑旧版本对比，发现**结尾那句变了**：
+
+```
+旧：The money is an estimate at a fixed rate that does not follow the model in use …
+新：Some rates are estimates at a fixed fallback that does not follow the model in use …
+```
+
+**改动本身是对的**（多模型时可能有的发布费率、有的不发布，平铺陈述会对至少一张表撒谎），
+但**「逐字不变」的说法是错的**，已更正为「表格与数字逐字不变」。
+这是「用对比验证兼容性声称」而不是「用推理声称兼容性」的一个实例——
+若只读代码推理，这条会一直留在文档里。
 
 ### 4.2 反向验证
 

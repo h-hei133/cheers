@@ -135,4 +135,42 @@ describe("createZipArchive", () => {
     // Bit 11 of the general purpose flags.
     expect(archive.readUInt16LE(6) & 0x0800).toBe(0x0800);
   });
+
+  it("points each central-directory record at its own local header", () => {
+    // The classic zip bug: accumulating the total size instead of tracking the
+    // running offset, which produces an archive where only the first entry opens.
+    // Three entries of different sizes, so a wrong offset cannot go unnoticed.
+    const archive = createZipArchive([
+      { name: "a.txt", data: "a".repeat(100) },
+      { name: "bb.txt", data: "b".repeat(5_000) },
+      { name: "ccc.txt", data: "c".repeat(20) },
+    ]);
+
+    // The end-of-central-directory record is the last 22 bytes: signature, disk
+    // numbers, entry counts, directory size, directory offset, comment length.
+    const end = archive.length - 22;
+    expect(archive.readUInt32LE(end)).toBe(0x06054b50);
+    const entryCount = archive.readUInt16LE(end + 8);
+    const centralOffset = archive.readUInt32LE(end + 16);
+    expect(entryCount).toBe(3);
+
+    // Walk the central directory and check every offset lands on a local header.
+    let cursor = centralOffset;
+    const offsets: number[] = [];
+    for (let index = 0; index < entryCount; index += 1) {
+      expect(archive.readUInt32LE(cursor)).toBe(0x02014b50);
+      const localHeaderOffset = archive.readUInt32LE(cursor + 42);
+      offsets.push(localHeaderOffset);
+      expect(archive.readUInt32LE(localHeaderOffset)).toBe(0x04034b50);
+      const nameLength = archive.readUInt16LE(cursor + 28);
+      const extraLength = archive.readUInt16LE(cursor + 30);
+      const commentLength = archive.readUInt16LE(cursor + 32);
+      cursor += 46 + nameLength + extraLength + commentLength;
+    }
+
+    // Strictly increasing: each entry starts after the previous one.
+    expect(offsets[0]).toBe(0);
+    expect(offsets[1]).toBeGreaterThan(offsets[0]!);
+    expect(offsets[2]).toBeGreaterThan(offsets[1]!);
+  });
 });
