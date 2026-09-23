@@ -327,7 +327,24 @@ python3 scripts/analyze-boundaries.py
 
 ### 9.3 全量套件
 
-见 §10。
+| 轮次 | 结果 | 说明 |
+|---|---|---|
+| 首跑（T1 未修时） | 3195 项，**2 失败** | `cli-baseline.test.ts` 的 resume 与 golden 两项，见 §2.4 |
+| 修复后（第二次） | 3198 项，**1 失败** | `presentation/tui/surface/benchmark.test.ts`，见下 |
+| 修复后（第三次） | **3197 通过 / 1 跳过 / 0 失败** | 同一套件，benchmark 这次通过 |
+
+**剩余的 1 项**：`presentation/tui/surface/benchmark.test.ts` 的
+「long-transcript budget」——它断言一次渲染在 **1000ms** 内完成，
+实测 1233ms。**单独运行通过**（242ms），是全量并发下的负载敏感项，
+与本次改动无关（它测的是 TUI 渲染性能，不触及 turn/config/tools/observability）。
+
+**这一项在本轮之前就存在**：`phase-4-execution.md` §9.3 已记录过同类项
+（性能预算 + cli-baseline 在负载下失败）。本轮**修掉了 cli-baseline 的真实回归**，
+benchmark 仍是负载敏感项——**连跑三次里它失败一次、通过两次**，
+这正是「负载敏感」与「真实失败」的区别：真实失败每次都失败。
+
+**结论：本轮引入的失败为 0。** 唯一不稳定项是一个既有的、对机器负载敏感的
+渲染性能断言（它断言 1000ms 内完成，实测 1233ms；单独跑 254ms）。
 
 ---
 
