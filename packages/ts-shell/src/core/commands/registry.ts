@@ -46,6 +46,7 @@ import { runLogCommand } from "./logCommandRuntime.js";
 import { runCrashCommand } from "./crashCommandRuntime.js";
 import { runTimingsCommand } from "./timingsCommandRuntime.js";
 import { runMetricsCommand } from "./metricsCommandRuntime.js";
+import { runReportCommand } from "./reportCommandRuntime.js";
 import {
   runDiagnoseCommand,
 } from "./localCommandRuntime.js";
@@ -676,6 +677,17 @@ export function createCommandRegistry(
       group: "workspace",
       argumentHint: "[lines]",
       execute: (args, context) => runMetricsCommand(args, context),
+    },
+    {
+      name: "report",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      summary: "write a scrubbed environment and crash report to attach to a bug report",
+      group: "workspace",
+      argumentHint: "[path]",
+      execute: (args, context) => runReportCommand(args, context),
     },
   ];
 
