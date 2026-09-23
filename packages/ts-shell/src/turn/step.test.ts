@@ -166,8 +166,10 @@ describe("createStepFunction", () => {
 
     await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
 
-    // Nested under `prompt_tokens_details` on this family of providers.
-    expect(getSessionUsage("sess_cache_openai").cacheReadTokens).toBe(768);
+    // Nested under `prompt_tokens_details` on this family of providers. Cache
+    // traffic is per model, so it is read from the bucket for the model that
+    // answered rather than from a session-level field.
+    expect(getSessionUsage("sess_cache_openai").byModel.m?.cacheReadTokens).toBe(768);
     resetSessionUsage("sess_cache_openai");
   });
 
@@ -191,8 +193,8 @@ describe("createStepFunction", () => {
     await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
 
     const usage = getSessionUsage("sess_cache_anthropic");
-    expect(usage.cacheReadTokens).toBe(512);
-    expect(usage.cacheWriteTokens).toBe(256);
+    expect(usage.byModel.m?.cacheReadTokens).toBe(512);
+    expect(usage.byModel.m?.cacheWriteTokens).toBe(256);
     resetSessionUsage("sess_cache_anthropic");
   });
 
@@ -211,8 +213,8 @@ describe("createStepFunction", () => {
     await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
 
     const usage = getSessionUsage("sess_cache_none");
-    expect(usage.cacheReadTokens).toBe(0);
-    expect(usage.cacheWriteTokens).toBe(0);
+    expect(usage.byModel.m?.cacheReadTokens).toBe(0);
+    expect(usage.byModel.m?.cacheWriteTokens).toBe(0);
     resetSessionUsage("sess_cache_none");
   });
 

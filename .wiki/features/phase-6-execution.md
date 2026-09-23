@@ -1,0 +1,287 @@
+---
+title: "Phase 6 执行记录：4 项任务与 25 行判定回写"
+category: article
+sources: [phase-6-pre-research-2026-09-23, phase-6-decisions-2026-09-23, phase-5-execution-2026-09-23]
+created: 2026-09-24
+updated: 2026-09-24
+tags: [features, phase-6, execution]
+summary: "Phase 6 施工记录。按裁决顺序执行：T5a 回写 25 行滞后判定（**先做，因为它本身就是正确性工作**）→ T1 HTTP 超时接线 → T2 metrics 采集与读取 → T3 用量按模型分桶 → T4 `/report` 与 zip 写入器 → T5b 收尾。四项代码任务全部有**反向验证**（还原实现 → 测试必须失败）与**实机验证**（构建产物 + 真实运行），无一项只靠单元测试。三处执行中偏离裁决（`summarize.ts` 一并接线、T4 提高引擎下限、`/metrics` 跨进程读日志），均在本文说明。"
+confidence: high
+---
+
+# Phase 6 执行记录
+
+> **性质**：施工记录。裁决见 [`phase-6-decisions.md`](phase-6-decisions.md)，盘点见 [`phase-6-pre-research.md`](phase-6-pre-research.md)。
+> **顺序**：**T5a → T1 → T2 → T3 → T4 → T5b**（T5 拆两段，理由见裁决 §5.2）。
+
+| 提交 | 任务 | 规模 |
+|---|---|---|
+| `a5858658` | T5a 回写 25 行滞后判定 | 7 文件 |
+| `e9476687` | T1 HTTP 超时接线 | 6 文件 + 1 新测试 |
+| `2d34215e` | T2 metrics 采集与 `/metrics` | 8 文件 + 2 新测试 |
+| `db576061` | T3 用量按模型分桶 | 6 文件 + 2 新测试 |
+| `dfcccc71` | T4 `/report` 与 zip 写入器 | 5 文件 + 1 新测试 |
+
+---
+
+## 1. T5a — 回写 25 行滞后判定
+
+**为什么先做**：裁决 §5.2 的修正结论。25 行描述的是 Phase 1–5 **早已实现**的能力，
+T1–T4 的施工**不会让它们再变**；压到最后等于让施工者**在整个施工期间继续被同一张错表误导**。
+初稿的主代理自己就是被 `03-*` 那张表误导的（把「接线任务」当成「需要新建」）。
+
+**方法**：对 01–07 每一行**回到代码核对**，标出四种状态。表格判定列改为
+`✅ 已收口（2026-09-23 更正）` 并附证据；`### 2.x` 详情节同步加「更正说明」。
+
+**一处必须记的自我更正**：`01-*` §2.2 的技能表有 **3 行已过时**——
+祖先目录搜索（`skillLoader.ts:82` 用 `projectDirectories`）、
+注入清单（`:252` `renderSkillList` 产出 `<available_skills>`）、
+`disable-model-invocation`（`:219`）**都已实现**，而表里写的是「无」。
+
+**索引汇总表改为两行**：初稿数字与重数结果并列，差额本身就是发现。
+
+| | DEFICIENT | MISSING | OURS-ONLY | 平手 |
+|---|---:|---:|---:|---:|
+| 各文初稿时 | 40 | 38 | 16 | 7 |
+| **2026-09-23 重数** | **16** | **21** | **16** | **10** |
+
+---
+
+## 2. T1 — HTTP 超时接线
+
+### 2.1 施工内容
+
+**接进活轨**（不是新建）：`provider/request/fetch.ts` 的实现本来只被启动预检使用。
+
+| 位置 | 改动 |
+|---|---|
+| `entrypoints/cliRuntimeInvocation.ts` | `createProviderStep` 传 `fetchImpl: providerFetch(request.runtimeConfig)` |
+| `cli/runtime/cliSessionRuntimeFactory.ts` | 压缩的两条路径（`summarize`/`summarizeTurnPrefix`）同样传 |
+| `provider/request/fetch.ts` | 新增 `ProviderTimeoutOverrides`、`providerFetchFromTimeouts`（**按超时三元组记忆化**）、`providerTimeoutsFrom` |
+| `config/runtimeConfig.ts` | 3 个字段 `providerConnectTimeoutMs`/`providerHeadersTimeoutMs`/`providerBodyTimeoutMs` |
+
+**默认值 30s/120s/120s**（沿用既有实现），**环境变量仍优先**——
+与 `CHEERS_MAX_TURNS` 的既有约定一致：环境变量是关于本次运行的声明，文件是长期偏好。
+
+**记忆化的理由**：wrapper 持有 undici dispatcher，逐 prompt 新建会累积无人关闭的连接；
+按三元组做键意味着**改超时会产生新 wrapper**，而不是静默保留旧期限。
+
+### 2.2 执行中偏离裁决：`summarize.ts` 一并接线
+
+裁决 §1.3 已定「一并修」，但**理由被改写**——初稿的因果是错的（挂起的请求永不返回，
+不会触发 overflow 恢复）。正确理由是**压缩请求是独立的模型调用，它自己会挂**。
+已在裁决 §1.3 与本文同时记录。
+
+### 2.3 反向验证
+
+还原 `resolveProviderTransportConfig` 忽略配置超时 → **2/11 失败**。
+
+### 2.4 实机验证
+
+| 场景 | 结果 |
+|---|---|
+| 「答就绪（`/models`）但不应答」的 provider，配置 3s 超时 | 请求**结束**，4 次尝试（1 + 3 重试）后报网络错误 |
+| **对照**：同一静默 server，全局 `fetch` vs provider fetch | 全局 `fetch` **4 秒仍在等待**；provider fetch **2.5 秒抛出**（2s 期限） |
+
+**对照实验是决定性证据**：它同时证明了「旧路径真的会无限等待」与「新路径真的会结束」。
+初稿曾试图用「去掉接线再跑 CLI」来对比，但那次的 mock server 已退出，
+结果无效——**已如实更正为这个受控对照**。
+
+---
+
+## 3. T2 — metrics 采集与读取
+
+### 3.1 施工内容
+
+**5 类采集点**，每项回答一个真实问题：
+
+| 指标 | 位置 | 回答 |
+|---|---|---|
+| `tool.calls` / `tool.duration` | `core/agent/tools.ts:253-254`（**唯一工具执行入口**，串行与批量都经此） | 哪些工具在用、哪个慢 |
+| `turn.duration` | `core/agent/loop.ts:90` | 回合耗时 |
+| `provider.retries` | `loop.ts:124` | 重试实际发生频率（Phase 5 T1 的效果度量） |
+| `compaction.runs` | `cliSessionRuntimeFactory.ts:235` | 压缩触发频率 |
+
+**按回合批量写**：`metrics.ts` 改为累加器 + `flushMetrics()`。
+**这不是优化**——sink 是 `fs.appendFileSync`（**同步**），逐调用写会在热路径上放几十次阻塞磁盘写。
+累加器保留 count/total/max，所以 40 次工具调用产出几行而不是 40 行。
+
+**`/metrics` 命令**：渲染 count 总和与 ms 平均/最大。
+
+### 3.2 执行中偏离裁决：跨进程读日志
+
+裁决未预见的一点：sink 是 `<prefix>.<date>.<pid>.log`，**只读当前进程的文件会在下次运行时看不到上次的数字**——
+而指标恰恰在会话结束后才有意义。改为读**当天目录下所有日志文件**，按 mtime 排序后取尾部。
+`/log tail` 保持进程内范围（它适合看正在跑的运行）。
+
+**这个偏离是实机发现的**：先按裁决实现，实机跑 `/metrics` 得到「No metrics recorded yet」，
+而日志里明明有 5 行指标。**测试也因此改过一版**：初版用同一进程的两个 sink，
+它们共享 PID 故写同一个文件，**反向验证时不失败**——改成两个不同 PID 才真正测到跨文件读取。
+
+### 3.3 反向验证
+
+| 还原项 | 结果 |
+|---|---|
+| 改回逐调用写（不缓冲） | **2/9 失败** |
+| 改回只读当前进程日志 | **1/6 失败**（修正 PID 后） |
+
+### 3.4 实机验证
+
+真实会话（mock provider，含一次工具调用）后 `/metrics`：
+
+```
+| `cli.prompts` | — | 2 | total 2 |
+| `tool.calls` | tool=read outcome=ok | 1 | total 1 |
+| `tool.duration` | tool=read | 1 | avg 4ms · max 4ms |
+| `turn.duration` | — | 1 | avg 48ms · max 48ms |
+```
+
+日志里 5 行 `"component":"metric"`，**tags 与计数都保留**。
+
+---
+
+## 4. T3 — 用量按模型分桶
+
+### 4.1 施工内容
+
+`SessionUsageTelemetry` 从**单条扁平记录**改为 `byModel: Record<string, ModelUsageBucket>`。
+
+**必须一并迁移的第二个消费者**（复核发现）：`cli/interactive/sessionFacts.ts:54`
+也计算成本（用固定回退费率渲染进 TUI 状态栏）。**只改 `/cost` 会让同一会话出现两个金额**——
+比原来的缺陷更难发现。两处现在都经 `estimateSessionCost` 按模型取费率。
+
+**保持不变**：单模型输出**逐字不变**（兼容性要求）；`lastPromptTokens`/`lastPromptMessageCount`
+仍是会话级（上下文仪表描述的是对话，不是最后读它的模型）。
+
+### 4.2 反向验证
+
+| 还原项 | 结果 |
+|---|---|
+| 分桶退化为单桶（扁平覆盖） | **5/13 失败**（`usageTelemetry`）+ **2/5 失败**（`/cost`） |
+
+**一处如实记录的局限**：试图用「所有模型套同一费率」来反向验证 `/cost` 时**测试不失败**——
+因为**内置目录里没有一个模型声明 `cost`**（`grep -c 'cost:' core/models/catalog.ts` → 0），
+所有费率都走固定回退值，套谁都一样。所以 `/cost` 的费率泄漏**在现有目录下不可测**；
+能测到的是分桶本身（已覆盖）。**这条限制写进了提交信息与文档。**
+
+### 4.4 全量套件抓出 4 处受影响的既有测试（已修）
+
+改形状必然影响读旧形状的测试。**全量套件（不是受影响套件）抓出 4 项**：
+
+| 测试 | 读的字段 | 修法 |
+|---|---|---|
+| `turn/step.test.ts` ×3（OpenAI 形状 / Anthropic 形状 / 无缓存） | `usage.cacheReadTokens` 等 | 改读 `usage.byModel.m?.cacheReadTokens` |
+| `core/shell/compaction.test.ts` ×1 | `usage.totalTokens` | 改用 `totalTokens(usage)` 辅助函数 |
+
+**这 4 项断言的是真实行为**（缓存字段的解析、会话总量），**不是实现细节**——
+所以修的是**读取路径**，不是把断言弱化。**已反向验证**：
+去掉 bucket 的缓存累加 → 其中 2 项失败，证明它们仍能捕获真实缺陷。
+
+**这条值得单独记**：`npm run test:ts` 是**唯一**发现这 4 项的东西。
+受影响套件（`src/observability/`、`src/core/commands/`）全绿，
+因为它们**不包含** `turn/step.test.ts` 与 `core/shell/compaction.test.ts`。
+**「改了共享数据结构就一定要跑全量」**——这是 Phase 5 复核轮
+（`cli-baseline` 抓出 T1 回归）之后的第二次同型教训。
+
+### 4.3 实机验证
+
+两模型（cheap 1,000,000 / dear 2,000,000）→ **两张独立表 + `Session total: $0.4200`**；
+单模型 → 输出与修复前一致（`Model \`solo\``）。
+
+---
+
+## 5. T4 — `/report` 与 zip 写入器
+
+### 5.1 施工内容
+
+| 文件 | 作用 |
+|---|---|
+| `observability/zipArchive.ts` | 手写 zip（**只用 `node:zlib`**，零新依赖） |
+| `core/commands/reportCommandRuntime.ts` | `/report [path]`：环境 + 崩溃记录 → 脱敏 → 打包 |
+| `package.json` | `engines` 从 `>=20.0.0` 提到 **`>=20.15.0`** |
+
+**复用而非新建脱敏**：`core/security/redaction.ts` 自己的注释记录了
+「同一套规则曾被手抄进六个模块」，而 bug report 是**唯一离开本机**的路径——
+最不能有私有副本的地方。
+
+**不含会话内容**：bug report 不是拷走用户代码的理由。
+
+**测试断言扫描归档字节**，不是结构化字段——「漏在某个没想到要脱敏的字段里」
+正是逐字段检查会漏掉的情形。
+
+### 5.2 执行中偏离裁决：提高引擎下限
+
+裁决 §6.1 第 15 项已定「提高下限」，执行时**独立核实了版本事实**：
+Node 官方发布说明确认 `zlib.crc32` 于 **v22.2.0** 加入、**回移至 v20.15.0**。
+声明是 `>=20.0.0`，CI 用 `node-version: 20`（解析为最新 20.x，**不会抓到**），
+所以**只有真实用户的旧 20.x 会撞到 `TypeError`**——恰好在用户来求助时失败。
+
+**同时更正一处既有不准确**：本仓**已经**用到 `AbortSignal.any`（需 20.3.0），
+所以 `>=20.0.0` 本就不准确。
+
+### 5.3 反向验证
+
+去掉崩溃消息的脱敏 → **1/8 失败**（字节扫描捕获）。
+
+### 5.4 实机验证
+
+| 检查 | 结果 |
+|---|---|
+| `unzip -t` | `No errors detected` |
+| 内容往返 | `report.json` / `summary.md` 逐字还原 |
+| **密钥在原始字节中** | **不存在**（`grep -q sk-live-… out.zip` → 未命中） |
+| 消息字段 | `api_key=[redacted]` |
+| 命令输出 | 报出路径、崩溃数、`Scrubbed: unsafe-content` |
+
+**zip 格式合规由系统 `unzip` 独立验证**，不是我自己的读取器自证。
+
+---
+
+## 6. 门禁与测试
+
+每个提交前跑：`tsc --noEmit`、`verify:import-cycles`、`check:config-consumers`、
+`check:declarations`、`verify:docs-drift:strict`、`test:scripts`、`analyze:module-facades`。
+
+| 门禁 | 结果 |
+|---|---|
+| `config-consumers` | **32 → 35 字段，全部有生产读取者** |
+| `verify:import-cycles` | 通过（0 环） |
+| `check:declarations` | 通过（18/18 事件有派发点） |
+| `analyze:module-facades` | 仍是原有 **5 个** monolith，**无新增** |
+| 受影响套件 | T1 52 文件/529 项、T2 31/283、T3 55/573、T4 27/210 |
+| **全量套件** | **509 文件 / 3266 通过 / 1 跳过 / 0 失败**（修复 §4.4 的 4 项之后） |
+| `analyze-boundaries.py` | 生产 **937 → 941**、CLI 可达 **808 → 812**、testOnly 100 → 99 |
+
+**边界数字的一处说明**：生产文件只**新增 3 个**（`metricsCommandRuntime.ts`、
+`reportCommandRuntime.ts`、`zipArchive.ts`），但生产计数 +4。
+差额是 **1 个文件从 testOnly 重分类为生产**（`usageTelemetry.test.ts` 自 Phase 5 就存在，
+本轮改动使其可达性标签变化）。**没有未申报的生产文件**——已用
+`git diff --name-status 3ba4abf8..HEAD -- packages/ts-shell/src | grep '^A' | grep -v '\.test\.'` 核对。
+
+---
+
+## 7. 新增文件
+
+| 文件 | 性质 |
+|---|---|
+| `provider/request/fetch.test.ts` | 超时优先级 + **真实静默 server** 的挂起测试 |
+| `observability/metrics.test.ts` | 累加、批量写、标签顺序无关 |
+| `core/commands/metricsCommand.test.ts` | 渲染 + **跨进程读日志** |
+| `observability/usageTelemetry.test.ts` | 分桶 + 按模型计价 |
+| `core/commands/costCommand.test.ts` | 分表渲染 + 不串表 |
+| `core/commands/reportCommand.test.ts` | **归档字节扫描** + zip 格式 |
+| `observability/zipArchive.ts` | zip 写入器 |
+| `core/commands/metricsCommandRuntime.ts` | `/metrics` |
+| `core/commands/reportCommandRuntime.ts` | `/report` |
+
+---
+
+## 8. 未做的事（如实记录）
+
+| 项 | 原因 |
+|---|---|
+| 真实 provider 端点的超时验证 | 用本地静默 server 代替；**真实验证需要真实端点与真实挂起**，不可控 |
+| 真实发布费率 | 内置目录零 `cost` 声明，`/cost` 仍用固定回退（输出如实说明） |
+| `/report` 上传 | 裁决 §7 定为独立立项（对外请求 + 需用户同意） |
+| 扩展宿主、RPC/SDK、HTML 导出、更新检查 | 裁决 §7 逐项裁定不做 |
+| 全量套件 | 见 §6（已跑，0 失败） |

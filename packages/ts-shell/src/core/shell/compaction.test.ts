@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getSessionUsage, recordSessionUsage } from "../../observability/usageTelemetry.js";
+import { getSessionUsage, recordSessionUsage, totalTokens } from "../../observability/usageTelemetry.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import type { CompactionPolicy, SummarizeRequest } from "../../session/compaction.js";
 import { compactSessionHistory, type CompactionStore } from "./compaction.js";
@@ -59,7 +59,8 @@ describe("session compaction", () => {
     expect(requests[0]!.messages).toHaveLength(8);
     expect(target.entries).toEqual([{ summary: "checkpoint summary", keptMessages: 3 }]);
     expect(getSessionUsage("sess_compact").lastPromptTokens).toBe(0);
-    expect(getSessionUsage("sess_compact").totalTokens).toBe(9_100);
+    // Summed across the per-model buckets: the session total is derived, not stored.
+    expect(totalTokens(getSessionUsage("sess_compact"))).toBe(9_100);
   });
 
   it("passes the user's focus instructions to the summarizer", async () => {
