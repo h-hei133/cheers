@@ -306,8 +306,21 @@ export interface CatalogModel {
 | `reasoning` | `boolean` | `/thinking` 对不支持的模型也照发 `reasoning_effort`，会被拒 |
 | `thinkingLevelMap` | `Partial<Record<ThinkingLevel, string \| null>>` | 见子决策 2 |
 | `maxTokens` | `number?` | 当前只有全局 `config.maxOutputTokens`，无法按模型给默认 |
-| `input` | `("text"\|"image")[]` | 判断模型是否支持图片；**是未来图片输入的前置** |
 | `compat` | `OpenAICompatibleFlags?` | 见子决策 3 |
+
+**执行期撤销：`input` 未加**（原裁决列了 5 个字段，实际加了 4 个）。
+
+`input: ("text"|"image")[]` 的**唯一消费者**是「发图片前先问模型收不收」。
+实测：**本产品没有任何图片输入路径**——`model-adapters/multimodal.ts` 的两个转换函数
+（`toAnthropicImageBlock`、`toOpenAIImageUrlBlock`）**零生产调用者**，
+`read` 工具在 `core/tools/registry.ts:338` 对图片**主动返回占位文本**
+（`"this model receives no image content"`），消息构造（`turn/prompt.ts:109`）
+不产出图片块。`.wiki/features/04-terminal-interaction-and-presentation.md:281`
+已把图片输入判为**「建议独立立项」**。
+
+**所以加这个字段是加一个永远读不到的字段**——正是本次复核要清除的那类东西。
+`phase-5-pre-research.md:711` 把它列为「缺口」时，把**基础设施存在**误读为
+**链路可通**；复核时按「消费者是否存在」重判，撤销。
 
 **不加的 8 个**（`name`/`api`/`provider`/`baseUrl`/`inputLimits`/`promptCache`/
 `samplingParams`/`headers`）与理由：

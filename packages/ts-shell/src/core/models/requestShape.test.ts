@@ -70,6 +70,17 @@ describe("resolveRequestShape", () => {
     expect(shape.assistantAfterToolResult).toBe(true);
   });
 
+  it("reports the model's own output ceiling", () => {
+    // The ceiling is a property of the model, so the catalog is where it lives.
+    // It is what the request falls back to when the run set no ceiling of its own.
+    const shape = resolveRequestShape(catalogWith({ maxTokens: 16_384 }), "vendor", "m", undefined);
+    expect(shape.maxOutputCeiling).toBe(16_384);
+  });
+
+  it("leaves the ceiling to the request when the model declares none", () => {
+    expect(resolveRequestShape(catalogWith({}), "vendor", "m", undefined).maxOutputCeiling).toBeUndefined();
+  });
+
   it("still sends a level for a model the snapshot does not describe", () => {
     // Defaulting this the other way would silently disable a setting that works
     // for every model not listed, which is all of them today.

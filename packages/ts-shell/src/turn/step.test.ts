@@ -388,6 +388,59 @@ describe("createStepFunction", () => {
     }
   });
 
+  it("sends the model's own ceiling when the run set none", async () => {
+    // The ceiling is a property of the model: a value that fits one is truncated
+    // by another. The run-wide setting wins when it is set; when it is not, the
+    // catalog's value is what the request falls back to.
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      maxOutputTokens: undefined,
+      catalog: [
+        {
+          id: "vendor",
+          label: "Vendor",
+          runtime: "openai-compatible",
+          auth: "api-key",
+          models: [{ id: "m", contextWindow: 128_000, maxTokens: 16_384 }],
+        },
+      ],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(body.max_tokens).toBe(16_384);
+  });
+
+  it("lets the run's ceiling win over the model's", async () => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      maxOutputTokens: 777,
+      catalog: [
+        {
+          id: "vendor",
+          label: "Vendor",
+          runtime: "openai-compatible",
+          auth: "api-key",
+          models: [{ id: "m", contextWindow: 128_000, maxTokens: 16_384 }],
+        },
+      ],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(body.max_tokens).toBe(777);
+  });
+
   it("bridges tool results when the model requires an assistant turn between them", async () => {
     let body: Record<string, unknown> = {};
     const step = createStepFunction({

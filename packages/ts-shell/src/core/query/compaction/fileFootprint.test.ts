@@ -47,6 +47,17 @@ describe("extractFileFootprint", () => {
       modifiedFiles: [],
     });
   });
+
+  it("lists files in the order they were touched", () => {
+    // Recency is what the cap keeps, so the order has to be the order things
+    // happened. Sorting here would make "the newest 200" mean "the
+    // alphabetically last 200" as soon as a list is read back and re-capped.
+    const footprint = extractFileFootprint([
+      assistantCall("read", { path: "z.ts" }),
+      assistantCall("read", { path: "a.ts" }),
+    ]);
+    expect(footprint.readFiles).toEqual(["z.ts", "a.ts"]);
+  });
 });
 
 describe("parseFileFootprintXml", () => {
@@ -109,6 +120,40 @@ describe("mergeFileFootprints", () => {
     expect(merged.readFiles).toHaveLength(200);
     expect(merged.readFiles).toContain("file-249.ts");
     expect(merged.readFiles).not.toContain("file-0.ts");
+  });
+
+  it("keeps the newest across a second compaction, not the alphabetically last", () => {
+    // The list is read back out of the checkpoint text before the next merge, so
+    // this is what a long session actually does. Sorting on the way out makes the
+    // cap drop files alphabetically, which is only the same as "oldest" until
+    // someone touches a file whose name sorts early.
+    const first = mergeFileFootprints(
+      { readFiles: ["zzz.ts"], modifiedFiles: [] },
+      { readFiles: Array.from({ length: 250 }, (_, i) => `a${String(i).padStart(3, "0")}.ts`), modifiedFiles: [] },
+    );
+    // zzz.ts was touched before every a-file, so it is the one to drop.
+    expect(first.readFiles).not.toContain("zzz.ts");
+
+    const second = mergeFileFootprints(
+      parseFileFootprintXml(formatFileFootprintXml(first)),
+      { readFiles: ["brand-new.ts"], modifiedFiles: [] },
+    );
+    // a000.ts is newer than zzz.ts, so it must survive where zzz.ts did not.
+    expect(second.readFiles).toContain("brand-new.ts");
+    expect(second.readFiles).toContain("a249.ts");
+    expect(second.readFiles).not.toContain("a000.ts");
+  });
+
+  it("moves a file touched again to the recent end", () => {
+    // A file read once long ago and read again now is recent, and a cap that
+    // keeps the newest has to treat it that way rather than by its first sighting.
+    // `early.ts` was seen before `other.ts`, then read again now, so it should
+    // end up after it — the newest entry is last, which is the end the cap keeps.
+    const merged = mergeFileFootprints(
+      { readFiles: ["early.ts", "other.ts"], modifiedFiles: [] },
+      { readFiles: ["early.ts"], modifiedFiles: [] },
+    );
+    expect(merged.readFiles).toEqual(["other.ts", "early.ts"]);
   });
 
   it("ignores blank entries", () => {

@@ -55,14 +55,6 @@ export interface CatalogModel {
    */
   readonly maxTokens?: number;
   /**
-   * What this model accepts as input.
-   *
-   * Absent means text only, which is what every request carries today. The field
-   * exists so a model that reads images can say so before anything tries to
-   * send one.
-   */
-  readonly input?: readonly ("text" | "image")[];
-  /**
    * How this model wants the request shaped.
    *
    * Absent means the defaults an OpenAI-compatible endpoint expects, which is
@@ -141,6 +133,19 @@ export interface CatalogProvider {
 
 const OPENAI_COMPATIBLE: RuntimeProvider = "openai-compatible";
 
+/**
+ * What a reasoning model on the OpenAI endpoint needs.
+ *
+ * Named once because every entry that needs it needs all of it: the ceiling
+ * field and the instruction role changed together for the models that reason
+ * before answering, and a request that carries one but not the other is still
+ * rejected.
+ */
+const REASONING_REQUEST_SHAPE: ModelRequestShape = {
+  systemRole: "developer",
+  maxTokensField: "max_completion_tokens",
+};
+
 /** Providers that ship with the shell, in the order a chooser should offer them. */
 export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
   {
@@ -161,11 +166,16 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     runtime: "openai",
     auth: "api-key",
     envVar: "OPENAI_API_KEY",
+    // The reasoning models reject `max_tokens` and the `system` role outright:
+    // the request has to carry `max_completion_tokens` and address the
+    // instruction to `developer`, or the call fails before it is answered. The
+    // run-wide output ceiling is always sent, so without this every request to
+    // one of these models was a rejected one.
     models: [
-      { id: "gpt-5.3", contextWindow: 400_000 },
-      { id: "gpt-5.3-codex", contextWindow: 400_000 },
-      { id: "gpt-5.1-mini", contextWindow: 400_000 },
-      { id: "o4-mini", contextWindow: 200_000 },
+      { id: "gpt-5.3", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE },
+      { id: "gpt-5.3-codex", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE },
+      { id: "gpt-5.1-mini", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE },
+      { id: "o4-mini", contextWindow: 200_000, compat: REASONING_REQUEST_SHAPE },
     ],
   },
   {
@@ -190,7 +200,11 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     envVar: "DEEPSEEK_API_KEY",
     models: [
       { id: "deepseek-chat", contextWindow: 128_000 },
-      { id: "deepseek-reasoner", contextWindow: 128_000 },
+      // Reasoning is a property of the model, not a dial: this endpoint does not
+      // take a `reasoning_effort`, and sending one is a rejected request rather
+      // than an ignored field. The other entry stays capable, because
+      // `deepseek-chat` does accept the level.
+      { id: "deepseek-reasoner", contextWindow: 128_000, reasoning: false },
     ],
   },
   {

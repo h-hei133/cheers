@@ -155,6 +155,17 @@ export function findCompactionCut(messages, keepRecent): number | undefined {
 > 文本里，而下一个压缩收到的 `previousSummary` 正是那个文本——改为解析并合并，
 > 不新增字段、不需要迁移、不留第二处真相。见 `phase-5-execution.md` §4。
 > **下方原文保留为当时的证据。**
+>
+> ⚠️ **复核轮修正**：合并逻辑**有一处顺序缺陷**。`extractFileFootprint` 与
+> `mergeFileFootprints` 都在输出前 `.sort()`，而「上限保留最近 200 条」
+> （`capList` 取尾部）依赖**遇到顺序**。checkpoint 文本回读后顺序即字典序，
+> 于是**从第二次压缩起，「最近 200 个」变成「字典序最后 200 个」**。
+> 实测：`zzz.ts`（最早读）存活、`a000.ts`（较新）被丢。
+> 已去掉两处 `.sort()`，并让「再次读到的文件」`delete` 后重加以真正移到最近端。
+> 详见 `phase-5-execution.md` §11.2 第 6 项。
+>
+> **原测试为何没抓到**：测试数据 `file-0.ts … file-249.ts` 的**字典序恰好等于时序**，
+> 所以 `.sort()` 不可见——这是「测试数据掩盖缺陷」的典型。
 
 **证据（我们）**——子代理发现了一处**注入位置错误**，主代理已核验：
 

@@ -131,6 +131,17 @@ npx tsx /tmp/probe.mts
 > 其余 7 个标志**保持描述性**——每个都需要「哪类端点会因此失败」的证据，
 > 为没有证据的能力发明开关正是这一项记录的问题本身。
 > 实现见 `phase-5-execution.md` §5。**下方原文保留为当时的证据。**
+>
+> ⚠️ **复核轮修正**：接线完成，但**所有内置模型都没有声明 `compat`**，
+> 所以对**开箱即用的模型完全无效**——用户最可能用的那些模型恰好一个都没配。
+> 已按证据补齐：OpenAI 推理模型（`developer` + `max_completion_tokens`）、
+> DeepSeek（不发 `reasoning_effort`）。
+> **其中 OpenAI 一项是真实故障**：`DEFAULT_CONFIG.maxOutputTokens: 4096`
+> 且**总是发送**，而 gpt-5/o 系列**拒绝 `max_tokens`**，
+> 所以修复前**每一个这类请求都会被拒**。
+> 另：`maxTokens` 当时也是**零读取者的字段**，已接线为 `maxOutputCeiling` 回退；
+> `input` 因**无任何消费者**而删除（裁决 §3.2 撤销记录）。
+> 详见 `phase-5-execution.md` §11.2 第 7 项。
 
 **现象**：我们有一张很完整的 provider 兼容性矩阵，但没有任何一处根据它调整请求。
 

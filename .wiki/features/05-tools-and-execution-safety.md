@@ -152,6 +152,13 @@ if (truncated.truncated) {
 > 的结果），**重叠拒绝**并指名哪两段，任一段失败则一个字节都不写。
 > `editEngine.ts` 为此拆出 `locateInContent`（返回匹配跨度），九个策略与顺序不变，
 > 故单段路径行为不变。见 `phase-5-execution.md` §7.1。**下方原文保留为当时的证据。**
+>
+> ⚠️ **复核轮修正**：新增 `edits[]` 时**漏了参数互斥**。`edits` 与
+> `oldText`/`newText` 同时给出时，`edits` 分支先跑并**静默丢弃**旧参数，
+> 却返回 `success: true`；`content` 与 `oldText`/`newText` 同时给出时同理
+> （`content` 被丢弃）。两种都是**调用方无法察觉的静默丢编辑**。
+> 已改为三种写法**两两互斥**、任一组合都拒绝。
+> 详见 `phase-5-execution.md` §11.2 第 4、5 项。
 
 **证据（我们）**：`core/tools/registry.ts:389-489`。schema（`:392-416`）字段为 `path`、`content`（整文件重写）、`oldText`、`newText`、`replaceAll`。`oldText`/`newText` 是**单个字符串对**（`:429-441`）；`replaceInContent` 支持模糊匹配与 `replaceAll`。
 

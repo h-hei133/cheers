@@ -165,8 +165,11 @@ export function createStepFunction(request: StepRequest): StepFunction {
           ? { reasoning_effort: shape.thinkingLevelName }
           : {}),
         ...(request.topP != null ? { top_p: request.topP } : {}),
-        ...(request.maxOutputTokens != null
-          ? { [shape.maxTokensField]: request.maxOutputTokens }
+        // The request's own ceiling wins; the model's applies when it did not set
+        // one, because the ceiling is a property of the model rather than of the
+        // run. Neither set means the field is left off and the host decides.
+        ...((request.maxOutputTokens ?? shape.maxOutputCeiling) != null
+          ? { [shape.maxTokensField]: request.maxOutputTokens ?? shape.maxOutputCeiling }
           : {}),
       };
       // What has been shown so far, so an interrupted answer keeps the part

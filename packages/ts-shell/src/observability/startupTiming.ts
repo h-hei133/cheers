@@ -11,6 +11,9 @@
  * Not "records and does not print" — does nothing at all.
  */
 
+/** When the module was loaded, which is the earliest point timing can observe. */
+const PROCESS_START = Date.now();
+
 /** Whether timing was asked for. Read once, so a call cannot disagree with itself. */
 const ENABLED = process.env.CHEERS_TIMING === "1";
 
@@ -29,10 +32,16 @@ const runs = new Map<string, TimingRun>();
  * since the previous mark, not since the start: the question being asked is
  * which phase was slow, and a running total makes the reader do that subtraction
  * themselves — which they will get wrong once the list is long enough to scroll.
+ *
+ * The first mark measures from module load rather than reporting zero. A phase
+ * that reports `0ms` because there was nothing before it hides the one interval
+ * nobody else can see — everything between the process starting and the first
+ * line of the entrypoint running — which for an ESM CLI is where most of the
+ * time actually goes.
  */
 export function time(label: string, namespace: string = "startup"): void {
   if (!ENABLED) return;
-  const run = runs.get(namespace) ?? { marks: [], lastAt: Date.now() };
+  const run = runs.get(namespace) ?? { marks: [], lastAt: PROCESS_START };
   const now = Date.now();
   run.marks.push({ label, ms: now - run.lastAt });
   run.lastAt = now;

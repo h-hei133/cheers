@@ -100,10 +100,21 @@ export function recordCrash(
  * The listener is added once and removed by the returned function, so a process
  * that installs it twice does not write the same crash twice.
  *
- * `unhandledRejection` is recorded but not fatal — the rejection is reported and
- * the process continues, which is what Node does by default and what a long
- * session wants. `uncaughtException` is recorded and rethrown, because ignoring
- * it would leave the process running in a state nobody can reason about.
+ * **Registering any `uncaughtException` listener replaces Node's default of
+ * letting the process die.** A recorder that only writes a file would therefore
+ * turn every fatal crash into a process that carries on in a state nobody can
+ * reason about — a worse outcome than the crash, and one this module would have
+ * caused. So the handler rethrows: the record is written first, and then the
+ * error is thrown on from inside the handler, which is what actually terminates
+ * the process (Node exits 7 and prints the stack as it would have without us).
+ * Verified against Node 24: without a listener the process exits 1, with a
+ * recording-only listener it survived, and with the rethrow it terminates.
+ *
+ * `unhandledRejection` is deliberately different: a rejection is recorded and the
+ * process continues. That is also not Node's default — since Node 15 an
+ * unhandled rejection is fatal — so this is a real change of behaviour rather
+ * than a no-op, and it is the one a long session wants: a stray rejection from a
+ * tool is worth knowing about but is not a reason to lose the conversation.
  */
 export function installCrashRecorder(options: {
   readonly cwd?: string;
@@ -113,11 +124,14 @@ export function installCrashRecorder(options: {
   const cwd = options.cwd ?? process.cwd();
   const sessionId = (): string | undefined => options.sessionId?.();
 
-  const onUncaught = (error: unknown): void => {
+  const onUncaught = (error: unknown): never => {
     recordCrash(
       { kind: "uncaught-exception", error, cwd, ...(sessionId() ? { sessionId: sessionId() } : {}) },
       options.filePath,
     );
+    // Rethrown rather than exited: the other listeners still get their turn, and
+    // the terminal reports the crash the way it would have without a recorder.
+    throw error;
   };
   const onRejection = (reason: unknown): void => {
     recordCrash(

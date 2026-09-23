@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import { MAX_CRASH_RECORDS, crashLogPath, installCrashRecorder, readCrashLog, recordCrash } from "./crashLog.js";
 
@@ -94,9 +95,10 @@ describe("installCrashRecorder", () => {
     try {
       // The listener is invoked directly rather than emitted: emitting an
       // uncaught exception is reported by the test runner as a real one, which
-      // would drown the assertion being made.
+      // would drown the assertion being made. It rethrows on purpose, so the
+      // throw is what says the handler ran.
       const handler = process.listeners("uncaughtException").at(0) as (error: unknown) => void;
-      handler(new Error("from the process"));
+      expect(() => handler(new Error("from the process"))).toThrow("from the process");
       expect(readCrashLog(file).some((record) => record.message === "from the process")).toBe(true);
     } finally {
       stop();
@@ -123,5 +125,47 @@ describe("installCrashRecorder", () => {
     stop();
     expect(process.listeners("uncaughtException").length).toBe(before - 1);
     expect(readCrashLog(file)).toEqual([]);
+  });
+
+  /**
+   * The three cases above call the handler directly, which cannot show whether
+   * the process still dies. Registering any `uncaughtException` listener
+   * replaces Node's default of terminating, so a recorder that only writes a
+   * file converts every fatal crash into a process that carries on — and no
+   * amount of calling the handler in-process can reveal that. These run a real
+   * child process instead, which is the only way to observe the exit.
+   */
+  describe("what the process does after a crash", () => {
+    function runFixture(mode: string, file: string): { status: number | null } {
+      const repoRoot = path.resolve(process.cwd(), "../..");
+      const tsxCli = path.join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs");
+      const fixturePath = path.join(process.cwd(), "src", "test-utils", "crashRecorderProcess.ts");
+      const result = spawnSync(process.execPath, [tsxCli, fixturePath, mode, file], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        timeout: 30_000,
+      });
+      return { status: result.status };
+    }
+
+    it("still terminates on an uncaught exception, and records it first", () => {
+      const file = tempFile();
+      const { status } = runFixture("throw", file);
+
+      // Not 99: the process did not reach the line after the failure.
+      expect(status).not.toBe(99);
+      expect(status).not.toBe(0);
+      // And the record was written before it died.
+      expect(readCrashLog(file).map((record) => record.message)).toContain("fatal from a timer");
+    });
+
+    it("keeps running after an unhandled rejection, and records it", () => {
+      const file = tempFile();
+      const { status } = runFixture("reject", file);
+
+      // 99 is the line after the failure, so the process survived by design.
+      expect(status).toBe(99);
+      expect(readCrashLog(file).map((record) => record.kind)).toContain("unhandled-rejection");
+    });
   });
 });

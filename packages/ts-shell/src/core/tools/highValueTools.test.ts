@@ -280,6 +280,52 @@ describe("concurrent edits of one file", () => {
 
     await expect(tool.execute({ path: "target.txt", edits: [] }, context)).rejects.toThrow(/empty/);
   });
+
+  it("refuses an edit that names both segments and a single replacement", async () => {
+    // The branch for `edits` ran first and the legacy pair was never read, so
+    // the call reported success for an edit that dropped half of what was asked
+    // for — an outcome the caller had no way to notice.
+    const tool = editTool();
+    const context = { workspaceRoot: dir, taskId: "t" } as never;
+
+    await expect(
+      tool.execute(
+        { path: "target.txt", edits: [{ oldText: "ALPHA", newText: "AAA" }], oldText: "BETA", newText: "BBB" },
+        context,
+      ),
+    ).rejects.toThrow(/not both/);
+    expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
+  });
+
+  it("refuses an edit that replaces content and names a single replacement", async () => {
+    // Same silent-drop shape, in the other direction: the content branch ran and
+    // the named replacement was ignored.
+    const tool = editTool();
+    const context = { workspaceRoot: dir, taskId: "t" } as never;
+
+    await expect(
+      tool.execute(
+        { path: "target.txt", content: "wholesale", oldText: "BETA", newText: "BBB" },
+        context,
+      ),
+    ).rejects.toThrow(/not both/);
+    expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
+  });
+
+  it("refuses replaceAll alongside segments rather than ignoring it", async () => {
+    // The segments path never reads `replaceAll`, so accepting it would leave the
+    // caller believing every occurrence was replaced.
+    const tool = editTool();
+    const context = { workspaceRoot: dir, taskId: "t" } as never;
+
+    await expect(
+      tool.execute(
+        { path: "target.txt", edits: [{ oldText: "ALPHA", newText: "AAA" }], replaceAll: true },
+        context,
+      ),
+    ).rejects.toThrow(/replaceAll/);
+    expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
+  });
 });
 
 /**

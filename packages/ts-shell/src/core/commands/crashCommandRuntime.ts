@@ -14,6 +14,12 @@ export async function runCrashCommand(
 ): Promise<LocalCommandResult> {
   const filePath = crashLogPath();
   const records = readCrashLog(filePath);
+  // Checked once, and by presence rather than position: `args[0] === "--stack"`
+  // reads the flag only when it comes first, so `/crash --stack` worked and
+  // `/crash --stack extra` silently printed no stacks while also suppressing the
+  // hint that says how to get them — the reader was told nothing and offered
+  // nothing.
+  const wantsStack = args.includes("--stack");
 
   if (records.length === 0) {
     return {
@@ -41,13 +47,13 @@ export async function runCrashCommand(
     lines.push(`- \`${record.timestamp}\` **${record.kind}**`);
     lines.push(`  ${record.message}`);
     if (record.sessionId) lines.push(`  session: ${record.sessionId}`);
-    if (record.stack && args[0] === "--stack") {
+    if (record.stack && wantsStack) {
       lines.push("", "  ```", ...record.stack.split("\n").map((line) => `  ${line}`), "  ```");
     }
   }
 
   lines.push("", `File: \`${filePath}\``);
-  if (!args.includes("--stack") && records.some((record) => record.stack)) {
+  if (!wantsStack && records.some((record) => record.stack)) {
     lines.push("Add `--stack` to include the stack traces.");
   }
 

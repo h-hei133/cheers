@@ -359,3 +359,134 @@ benchmark 仍是负载敏感项——**连跑三次里它失败一次、通过�
 | `evidence/savepoint/model.ts` 等 50 个零 importer 文件 | 裁决 §9.2 第 8 项 | 无可指名活轨承担者，按 `plan.md` §2.1 保留 |
 | 主题 14 个零消费令牌的删除 | 裁决 §9.2 第 6 项 | 会让用户已写的主题名失效 |
 | transcript header/version 行 | 裁决 §9.2 第 5 项 | 契约变更，且「给别人读」尚无消费者 |
+
+---
+
+## 11. 复核轮（Phase 5 之后）
+
+对 Phase 5 的 8 个实质提交做对抗式复核：5 个子代理按切片并行，
+外加主代理独立审计。**发现 7 处缺陷，全部已修并反向验证。**
+
+### 11.1 子代理分工与结果
+
+| 子代理 | 切片 | 结果 |
+|---|---|---|
+| `RvRetry-2` | T1/T5 重试 + `f5f2a771` 修复 | **零发现**（逐个 abort 点、外层循环终止性、分类正则、`Retry-After` 解析、两层默认值、`stepStream` 测试均已核） |
+| `RvConfigCompaction` | T4 配置降级 + T6 足迹 | T4 **判定安全**（无降级回写路径）；T6 **1 处缺陷** |
+| `RvModels` | T3 模型目录 | **3 处缺陷** |
+| `RvObservability` | T7 可观测 + T8 编辑 | **3 处缺陷**（与主代理独立复核重合 2 处） |
+| `RvDeletion` / `RvDeletion2` | T2 删除 | **两次均被上游 `content_filter` 中断**，主代理自行完成该审计 |
+
+`RvDeletion` 与 `RvDeletion2` 均失败于供应商侧内容过滤（非本仓库问题）。
+该切片的审计由主代理完成，方法与结论见 §11.3。
+
+### 11.2 七处缺陷
+
+| # | 位置 | 缺陷 | 严重度 |
+|---|---|---|---|
+| 1 | `observability/crashLog.ts:127` | **注册 `uncaughtException` 监听器会取代 Node 的默认终止行为**。注释写「已重抛」，代码从不重抛 → **每个致命崩溃都变成进程继续运行**。实测：无监听器 exit 1，加监听器 exit 99（存活） | 破坏用户可见行为 |
+| 2 | `observability/crashLog.ts:103` | 注释称 `unhandledRejection` 的继续运行「是 Node 默认」，**错误**——Node ≥15 起未处理拒绝是致命的。该行为是真实改变，须如实说明 | 文档失真 |
+| 3 | `core/commands/crashCommandRuntime.ts:50` | `args[0] === "--stack"` 按位置读标志 → `/crash foo --stack` **不显示栈，同时抑制了「加 `--stack`」提示**：用户既没拿到栈也没拿到怎么拿 | 破坏用户可见行为 |
+| 4 | `core/tools/registry.ts:537` | `edits[]` 与 `oldText`/`newText` 同时给出时，**前者静默胜出并返回 `success: true`**，后者的替换被丢弃 | 破坏用户可见行为 |
+| 5 | `core/tools/registry.ts:565` | 同上，`content` 与 `oldText`/`newText` 同时给出时 `content` 被静默丢弃（主代理实测发现，子代理未覆盖） | 破坏用户可见行为 |
+| 6 | `core/query/compaction/fileFootprint.ts:58,130` | 输出前 `.sort()` **把「最近 200 个」变成「字典序最后 200 个」**。checkpoint 文本回读后顺序即字典序，**第二次压缩起按字母丢文件**。实测：`zzz.ts`（最旧）存活，`a000.ts`（较新）被丢 | 契约违反 |
+| 7 | `core/models/catalog.ts` | `maxTokens`/`input` **零生产读取者**；且**所有内置模型零 `compat`** → T3 接线后对开箱模型**完全无效** | 未完成的功能 |
+| 8 | `core/tools/registry.ts:509` | `replaceAll` 与 `edits[]` 同时给出时，**`edits` 路径从不读 `replaceAll`** → 调用方以为替换了全部出现，实际只替换第一处（主代理在同型缺陷排查中追加发现） | 破坏用户可见行为 |
+
+**第 1 与第 7 项是同一类错误的两面**：一个把「声明了」当「生效了」，
+一个把「写了注释」当「实现了行为」。
+
+### 11.3 T2 删除的独立审计（子代理失败后由主代理完成）
+
+结论：**删除是闭合的**。
+
+| 检查 | 方法 | 结果 |
+|---|---|---|
+| 无悬空 import | 对 32 个被删模块路径全仓搜 `from "…<path>.js"` | **0 命中** |
+| 无存活 importer | 在父提交 `f7edc840^` 列出每个被删模块的 importer，逐个比对删除清单 | **0 个未删的 importer** |
+| 无悬空文档引用 | 搜 `.wiki/`/`docs/`/`agent-rules/`/`.normproof/`/`scripts/` | 仅 `phase-5-*` 自身（合法描述删除） |
+| 被删测试未覆盖存活模块 | 逐个检查被删 test 的同名模块是否仍在 | **0 个仍在** |
+| 行为有替代 | 读被删模块的导出，找现承担者 | `withFileMutationQueue`→`runtime/execution/fileLock.ts`；`deliveryPolicy`→`core/agent/agent.ts:47` 的 `PendingQueue`；流式/工具派发→`core/agent/loop.ts` |
+
+活轨确认：`turn/session.ts:128` → `AgentCore`（内核），内核持有流式（`loop.ts:109`）
+与工具派发（`loop.ts:216`），被删层确实已被取代。
+
+### 11.4 修复方式
+
+| # | 修复 |
+|---|---|
+| 1 | `onUncaught` 改为 `(): never` 并在写完记录后 **`throw error`**；注释写明「注册任何监听器都会取代默认终止」，并附实测退出码 |
+| 2 | 注释改写为如实描述：该行为**是**对 Node 默认的改变，并说明为什么长会话要这样 |
+| 3 | 改为 `const wantsStack = args.includes("--stack")`，读一次，按存在而非位置 |
+| 4/5 | 三种写法改为**互斥校验**：`edits`×`content`、`edits`×`oldText/newText`、`content`×`oldText/newText` 全部拒绝，任一组合都不再静默丢弃 |
+| 6 | 去掉 `extractFileFootprint` 与 `mergeFileFootprints` 两处 `.sort()`；并把「再次读到的文件」`delete` 后重加，使其真正移到最近端 |
+| 7 | `maxTokens` 接线：新增 `ResolvedRequestShape.maxOutputCeiling`，`step.ts` 在 `request.maxOutputTokens` 未设时回退到它；`input` **删除**（无消费者，见裁决 §3.2 撤销记录）；`BUILTIN_PROVIDERS` 按证据补 `compat` |
+
+**第 7 项的证据**：`pi` 的 `generate-models.ts:744` 对 DeepSeek 等设
+`maxTokensField: "max_tokens"`，对 OpenAI 推理模型设 `max_completion_tokens`；
+`:183,240` 设 `supportsDeveloperRole: false`；`:2269` 对 DeepSeek 设
+`supportsReasoningEffort: false`。**独立核实**：OpenAI 官方帮助页确认
+gpt-5/o 系列**拒绝 `max_tokens`**、要求 `max_completion_tokens` 与 `developer` 角色。
+由于 `DEFAULT_CONFIG.maxOutputTokens: 4096` 且**总是发送**，
+修复前**每一个 gpt-5/o 系列请求都会被拒**。
+
+### 11.5 反向验证
+
+每个修复都做了「还原 → 测试必须失败 → 恢复」：
+
+| # | 反向验证结果 |
+|---|---|
+| 1 | 还原为吞掉异常 → **2/12 失败**（含真实子进程退出码断言） |
+| 3 | 还原为按位置读 → **1/4 失败** |
+| 4/5 | 还原互斥校验 → 新加的 2 项失败 |
+| 8 | 还原 `replaceAll` 守卫 → 1/22 失败 |
+| 6 | 还原 `.sort()` → 1/13 失败；单独还原「重加提升」→ 1/13 失败 |
+| 7 | 还原 `compat` → **3/5 失败**；还原 `maxOutputCeiling` → 1/22 失败 |
+
+### 11.6 新增回归测试
+
+| 文件 | 覆盖 | 为什么单元测试原先抓不到 |
+|---|---|---|
+| `observability/crashLog.test.ts`（+`test-utils/crashRecorderProcess.ts`） | **真实子进程**的退出码 | 原测试直接调用 handler，**无法观察进程是否存活** |
+| `observability/startupTiming.test.ts` | 首个 mark 非零、计入 total | 原测试**把 `first: 0ms` 断言为正确**——测试固化了缺陷 |
+| `core/commands/reportCommands.test.ts` | `/crash` 的 `--stack` 三种位置、`/timings` 未开启时的说明 | 两个新命令**原先零测试** |
+| `core/tools/highValueTools.test.ts` | 四种参数组合互斥 | 只测了 `content`×`edits` 一种 |
+| `core/models/catalogShape.test.ts` | **内置目录**的线上取值 | 原测试只用手工构造的目录，**内置目录零断言** |
+| `core/models/requestShape.test.ts` | `maxOutputCeiling` | 字段当时还不存在 |
+| `core/query/compaction/fileFootprint.test.ts` | 跨两次压缩的最近性 | 原测试的 `many` 数组恰好**字典序 = 时序**，掩盖了缺陷 |
+
+**共 8 处「测试固化了缺陷 / 测试看不到缺陷」**，与 `phase-4-execution.md` §15.6
+记录的历史同类问题同型。其中 `fileFootprint` 那处最隐蔽：测试数据
+`file-0.ts … file-249.ts` 的字典序**恰好等于**时序，所以 `.sort()` 不可见。
+
+### 11.7 复核轮实机验证
+
+用**构建产物**（`npm run build:ts` → `dist/cli.js`）验证崩溃链路，而不是只跑单元测试：
+
+```bash
+# 在 CLI 装好记录器之后抛出未捕获异常
+NODE_OPTIONS="--import /tmp/boom.mjs" node dist/cli.js --print "hi"
+# → exit=7        ← 进程仍然终止（修复前是继续运行）
+# → crashes.json 写入 1 条 uncaught-exception
+```
+
+再用真实数据渲染命令：
+
+```bash
+printf '/crash --stack\n' | node dist/cli.js
+# → 1 of the last 5 recorded, oldest first:
+#   - `2026-09-23T14:48:18.697Z` **uncaught-exception**
+#     real uncaught from the built CLI
+#     ```
+#     Error: real uncaught from the built CLI
+```
+
+**退出码 7 是决定性证据**：它证明进程**没有**被记录器救活。
+修复前同一场景退出码是 99（探针的存活分支）。
+
+### 11.8 复核轮后的门禁
+
+- `tsc --noEmit`：通过
+- `verify:import-cycles` / `check:config-consumers` / `check:declarations`：通过
+- `verify:docs-drift:strict`：通过
+- 受影响套件（34 文件 / 318 项）：全部通过

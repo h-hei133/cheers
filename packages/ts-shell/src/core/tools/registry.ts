@@ -482,7 +482,8 @@ export function createCoreToolRegistry(options?: {
           },
           content: {
             type: 'string',
-            description: 'The full replacement content for the file (optional if edits are provided).',
+            description:
+              'The full replacement content for the file. An alternative to edits/oldText+newText, not a companion: give one form.',
           },
           edits: {
             type: 'array',
@@ -499,7 +500,7 @@ export function createCoreToolRegistry(options?: {
           },
           oldText: {
             type: 'string',
-            description: 'The exact or fuzzy block of text to replace (single-edit form).',
+            description: 'The exact or fuzzy block of text to replace (single-replacement form).',
           },
           newText: {
             type: 'string',
@@ -507,7 +508,8 @@ export function createCoreToolRegistry(options?: {
           },
           replaceAll: {
             type: 'boolean',
-            description: 'Whether to replace all occurrences of oldText.',
+            description:
+              'Whether to replace every occurrence of oldText. Applies to the single-replacement form only.',
           },
         },
         required: ['path'],
@@ -533,10 +535,29 @@ export function createCoreToolRegistry(options?: {
         let originalUnreadable = false
         let finalContent = ''
         const segmentEdits = readSegmentEdits(args)
+        // The three ways to say what to change are alternatives, and every
+        // combination is refused rather than resolved. Each branch below would
+        // otherwise win silently over the others, and the call would report
+        // success for an edit that dropped part of what was asked for — the one
+        // outcome a caller has no way to notice.
+        const hasLegacyPair = typeof args.oldText === 'string' || typeof args.newText === 'string'
+        if (segmentEdits && typeof args.content === 'string') {
+          throw new Error("Provide either 'content' or 'edits', not both.")
+        }
+        if (segmentEdits && hasLegacyPair) {
+          throw new Error("Provide either 'edits' or 'oldText'/'newText', not both.")
+        }
+        // `replaceAll` describes the single-replacement form, which the segments
+        // path does not consult. Accepting it here would leave the caller
+        // believing every occurrence was replaced when only the first of each
+        // segment was.
+        if (segmentEdits && args.replaceAll !== undefined) {
+          throw new Error("'replaceAll' applies to the single-replacement form; name each occurrence in 'edits' instead.")
+        }
+        if (hasLegacyPair && typeof args.content === 'string') {
+          throw new Error("Provide either 'content' or 'oldText'/'newText', not both.")
+        }
         if (segmentEdits) {
-          if (typeof args.content === 'string') {
-            throw new Error("Provide either 'content' or 'edits', not both.")
-          }
           const raw = await executionService.readTextFile({
             operationKind: 'file.read',
             absolutePath: containment.resolvedPath,

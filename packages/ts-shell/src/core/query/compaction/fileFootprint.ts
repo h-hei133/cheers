@@ -55,8 +55,13 @@ export function extractFileFootprint(messages: readonly unknown[]): FileFootprin
   }
 
   return {
-    readFiles: Array.from(readSet).sort(),
-    modifiedFiles: Array.from(modifiedSet).sort(),
+    // Encounter order, not sorted. The cap keeps the most recent entries, and a
+    // sort here would replace "most recent" with "alphabetically last" — a list
+    // read back from an earlier checkpoint is already sorted, so by the second
+    // compaction the cap would drop files in alphabetical order while claiming
+    // to drop the oldest.
+    readFiles: Array.from(readSet),
+    modifiedFiles: Array.from(modifiedSet),
   };
 }
 
@@ -113,17 +118,28 @@ export function mergeFileFootprints(
 ): FileFootprint {
   const modified = new Set<string>();
   const read = new Set<string>();
-  // Earlier entries first, so a cap keeps the later ones.
-  for (const path of [...previous.modifiedFiles, ...current.modifiedFiles]) {
-    if (path.trim() !== "") modified.add(path);
+  // Earlier entries first, so a cap keeps the later ones. A path seen twice is
+  // removed and re-added rather than left where it first appeared, so a file the
+  // current compaction touched moves to the recent end of the list — otherwise a
+  // file read once long ago and read again now would keep its old position and
+  // be the first thing a cap drops.
+  const note = (into: Set<string>, path: string): void => {
+    into.delete(path);
+    into.add(path);
+  };
+  for (const path of previous.modifiedFiles) {
+    if (path.trim() !== "") note(modified, path);
+  }
+  for (const path of current.modifiedFiles) {
+    if (path.trim() !== "") note(modified, path);
   }
   for (const path of [...previous.readFiles, ...current.readFiles]) {
     if (path.trim() === "" || modified.has(path)) continue;
-    read.add(path);
+    note(read, path);
   }
   return {
-    readFiles: capList([...read], MAX_FOOTPRINT_ENTRIES).sort(),
-    modifiedFiles: capList([...modified], MAX_FOOTPRINT_ENTRIES).sort(),
+    readFiles: capList([...read], MAX_FOOTPRINT_ENTRIES),
+    modifiedFiles: capList([...modified], MAX_FOOTPRINT_ENTRIES),
   };
 }
 

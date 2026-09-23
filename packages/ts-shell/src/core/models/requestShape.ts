@@ -29,6 +29,14 @@ export interface ResolvedRequestShape {
   readonly systemRole: "system" | "developer";
   /** The field carrying the output ceiling. */
   readonly maxTokensField: "max_tokens" | "max_completion_tokens";
+  /**
+   * The ceiling to send when the request does not set one.
+   *
+   * The ceiling is a property of the model — a value that fits one is truncated
+   * by another — so the catalog is where it belongs. Nothing means the request
+   * decides, which is what happened before the catalog could say.
+   */
+  readonly maxOutputCeiling?: number;
   /** Whether `reasoning_effort` may be sent at all. */
   readonly reasoningEffort: boolean;
   /** Whether a synthetic assistant turn bridges tool results and a user turn. */
@@ -97,6 +105,7 @@ export function resolveRequestShape(
   return {
     systemRole: compat.systemRole ?? DEFAULT_REQUEST_SHAPE.systemRole,
     maxTokensField: compat.maxTokensField ?? DEFAULT_REQUEST_SHAPE.maxTokensField,
+    ...(entry.maxTokens !== undefined ? { maxOutputCeiling: entry.maxTokens } : {}),
     reasoningEffort,
     assistantAfterToolResult: compat.assistantAfterToolResult === true,
     ...(reasoningEffort && level ? { thinkingLevelName: levelNameFor(entry, level) } : {}),

@@ -159,11 +159,21 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 
 ## 3. MISSING 详述
 
-### 3.1 崩溃日志（置信度：高）—— ✅ **2026-09-23 已收口**
+### 3.1 崩溃日志（置信度：高）—— ✅ **2026-09-23 已收口**（**复核轮修正**）
 
 > **收口说明**：新增 `observability/crashLog.ts`（保留最近 5 条，
 > `prependListener` 保证先于其他监听器运行，写入包在吞异常的 try/catch 里）
 > 与 `/crash` 命令。见 `phase-5-execution.md` §6。**下方原文保留为当时的证据。**
+>
+> ⚠️ **复核轮修正**：首次实现**有一个致命缺陷**——只写记录、**从不重抛**。
+> 注册任何 `uncaughtException` 监听器都会**取代 Node 的默认终止行为**，
+> 所以它把**每个致命崩溃都变成了「进程继续运行」**。实测：无监听器 exit 1，
+> 加监听器 exit 99（存活）。**已修为 `throw error`**，并加了真实子进程退出码断言。
+> 详见 `phase-5-execution.md` §11.2 第 1 项与 §11.6。
+>
+> 同时如实更正两处注释失真：`unhandledRejection` 的「继续运行」**不是** Node 默认
+> （Node ≥15 起未处理拒绝是致命的），以及 `time("process start")` 实际测的是
+> 模块加载完成后的间隔而非进程启动。
 
 **pi 如何实现**：`src/core/crash-log.ts:4-13` `CrashRecord` 含 `timestamp`/`version`/`kind`（`"uncaught_exception" | "fatal_error"`）/`message`/`stack`/`sessionFile`/`cwd`/`notified`；`:15-16` `MAX_CRASH_RECORDS = 5`、`MAX_AGE = 7 天`；`:18-20` 存 `~/.pi/agent/crashes.json`。`docs/sessions.md` 说明：下次交互启动显示一次警告，`/bug` 会把崩溃附加到 `diagnostics.json` 并在上传后删除该文件。
 
