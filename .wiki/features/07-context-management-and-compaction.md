@@ -53,11 +53,11 @@ grep -rnE 'microcompact|microCompact|pruneToolContent' /home/wang/projects/pi/pa
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 触发阈值依据 provider usage ✅ **已实现**（`compaction.ts` 的 `measureContextTokens` 接 `getSessionUsage`） | `compaction.ts:161-195,217-252` | `session/context.ts:3-21`；`cli/runtime/cliSessionRuntimeFactory.ts:81-85` | **DEFICIENT** | 见 §2.1 |
-| 切点允许非 user 边界 + split turn | `compaction.ts:323-377,393-472,899-938` | `session/compaction.ts:37-78` | **DEFICIENT** | 见 §2.2 |
+| 触发阈值依据 provider usage ✅ **已实现**（`compaction.ts` 的 `measureContextTokens` 接 `getSessionUsage`） | `compaction.ts:161-195,217-252` | `session/compaction.ts:36`；`cli/runtime/cliSessionRuntimeFactory.ts:113-114` | ✅ **已收口**（**2026-09-23 更正**） | `CompactionPolicy.measureContextTokens` 已定义且被 `cliSessionRuntimeFactory.ts:113` 接到 `getSessionUsage`。原表判定列未同步（行首 ✅ 已写、判定列仍写 DEFICIENT）。见 §2.1（已同步更正） |
+| 切点允许非 user 边界 + split turn | `compaction.ts:323-377,393-472,899-938` | `session/compaction.ts:127-129` `canStartTail`；`:47-60` `CompactionCut` | ✅ **已收口**（**2026-09-23 更正**） | 三件事都已实现：① **只排除 `tool` 边界**（`canStartTail`：`message.role !== "tool"`），assistant 等均可切；② **按 token 预算反向扫描**（`locateCut`：`keepRecentTokens * CHARS_PER_TOKEN`），不再按消息条数；③ **split turn 有处理**（`splitsTurn`/`turnStart`，切点落在一轮中间时标记其开启者以便单独摘要）。测试钉住：`session/compaction.test.ts:106-108`。见 §2.2（已同步更正） |
 | 重复压缩沿用上一条 kept boundary | `compaction.ts:762-790` | `session/compaction.ts:14-18,80-108` | **DEFICIENT** | 见 §2.3 |
-| 跨压缩累积文件追踪 | `compaction.ts:46-82,961-975`；`utils.ts:12-82` | `core/query/compaction/fileFootprint.ts:19-60` | **DEFICIENT** | 见 §2.4 |
-| 压缩前可取消/自定义的扩展钩子 ✅ **已实现**（`turn/session.ts:136` 的 `PreCompact` 可 block，`PostCompact` 亦派发） | `extensions/types.ts:594-630`；`agent-session.ts:2124-2138` | `core/hooks/types.ts:5-20`（仅声明） | **MISSING** | 见 §3.2 |
+| 跨压缩累积文件追踪 | `compaction.ts:46-82,961-975`；`utils.ts:12-82` | `core/query/compaction/fileFootprint.ts` | ✅ **已收口**（**2026-09-23 更正**，Phase 5 T6） | 解析 checkpoint 文本里的足迹并合并（**不加字段、不需迁移**）。**复核轮修了顺序缺陷**：输出前 `.sort()` 把「最近 200 条」变成「字典序最后 200 条」。见 §2.4（已同步更正） |
+| 压缩前可取消/自定义的扩展钩子 ✅ **已实现**（`turn/session.ts` 的 `PreCompact` 可 block，`PostCompact` 亦派发） | `extensions/types.ts:594-630`；`agent-session.ts:2124-2138` | `core/hooks/types.ts` + `turn/session.ts` | ✅ **已收口**（**2026-09-23 更正**） | `PreCompact` 的 `before` 回调返回 `decision !== "block"`，**能真正阻止压缩**；`PostCompact` 在压缩后派发（含 `summary`/`keptMessages`/`tokensBefore`）。两者均经 `hooks.dispatch`。见 §3.2（已同步更正） |
 | rewind／分支切换时摘要被放弃的分支 | `branch-summarization.ts:108-380`；`docs/compaction.md:150-179` | `picker/rewind.ts:14-17,50-55`；`SessionManager.ts:141-150` | **MISSING** | 见 §3.1 |
 | per-model reserveTokens／keepRecentTokens 覆盖 ✅ **已实现**（Phase 3 T4，`modelTokenBudgets`） | `settings-manager.ts:13-32,887-912` | 无 | **MISSING** | 见 `03-*` §3.1（同源：模型目录无 per-model 覆盖） |
 | 结构化摘要格式 | `docs/compaction.md`（Goal/Constraints/Progress…） | `core/query/compaction/summarizer.ts:1-30`（`EIGHT_SECTION_COMPACTION_PROMPT`） | **平手** | 两侧都是结构化八段式，字段名不同 |
@@ -66,7 +66,14 @@ grep -rnE 'microcompact|microCompact|pruneToolContent' /home/wang/projects/pi/pa
 
 ## 2. DEFICIENT 详述
 
-### 2.1 触发阈值用字符估算，而非 provider 报告的 usage（置信度：高）
+### 2.1 触发阈值用字符估算，而非 provider 报告的 usage（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：`CompactionPolicy.measureContextTokens`（`session/compaction.ts:36`）已定义，
+> 并由 `cli/runtime/cliSessionRuntimeFactory.ts:113-114` 接到 `getSessionUsage`——
+> **阈值用 provider 报告的真实 usage**，不再用字符估算。
+> 注释还区分了两件事：阈值问「整个请求多大」（只有 provider 能算），
+> 切点问「会话里保留多少」（按消息走）。
+> **下方原文保留为当时的证据。**
 
 **证据（我们）**：
 
@@ -93,7 +100,19 @@ grep -rnE 'microcompact|microCompact|pruneToolContent' /home/wang/projects/pi/pa
 
 **最小改动建议**：触发依据切到「最近一次 provider usage + 实际模型 contextWindow」，reserve/keepRecent 按 active model 解析。**注意**：这依赖 `03-*` §2.1 的 `getRuntimeConfig` 修复（否则 `contextWindow` 永远是 `undefined`）。
 
-### 2.2 切点只认 `user`，且无 split-turn 处理（置信度：高）
+### 2.2 切点只认 `user`，且无 split-turn 处理（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：三处全部实现（`session/compaction.ts`）：
+> ① `:127-129` `canStartTail` = `message.role !== "tool"`——**只排除 tool**，
+> 不再是「只认 user」；
+> ② `locateCut` **按 token 预算反向扫描**（`keepRecentTokens * CHARS_PER_TOKEN`），
+> 不再按消息条数；
+> ③ `:47-60` `CompactionCut` 含 `splitsTurn`/`turnStart`，切点落在一轮中间时
+> **指名该轮的开启者**以便单独摘要；`newestCutBelow` 里若 `splitsTurn` 而找不到开启者则**跳过该切点**
+> （注释：「Cutting inside a turn needs its opener to summarize; without one the request
+> that the kept tail answers would be lost silently」）。
+> 测试钉住：`session/compaction.test.ts:106-108`（`splitsTurn === true`、`turnStart === 6`）。
+> 该实现由提交 `c89f9b48` 引入。**下方原文保留为当时的证据。**
 
 **证据（我们）**：`session/compaction.ts:37-50`：
 
@@ -241,7 +260,12 @@ grep -nE 'generateBranchSummary|appendBranchSummary|branch_summary|requestCompac
 > **上述最小落地路径已于 2026-09-23 实施**（`sessionDagEngine.ts` 未采用而是删除，
 > 因为它是与本产品存储格式不兼容的重复实现）。
 
-### 3.2 压缩钩子没有运行时等价物（置信度：高）
+### 3.2 压缩钩子没有运行时等价物（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：`turn/session.ts` 在构造 `AgentCore` 时传入 `compaction.lifecycle`：
+> `before` 派发 `PreCompact` 并返回 `decision !== "block"`——**能真正阻止压缩**；
+> `after` 派发 `PostCompact`（带 `summary`/`keptMessages`/`tokensBefore`）。
+> **下方原文保留为当时的证据。**
 
 **pi 如何实现**：`extensions/types.ts:594-605` `session_before_compact` 事件带 `preparation`（含 `messagesToSummarize`、`turnPrefixMessages`、`previousSummary`、`fileOps`、`tokensBefore`、`firstKeptEntryId`、`settings`）、`reason`（`"manual"`/`"threshold"`/`"overflow"`）、`willRetry`、`signal`，**可返回 `{cancel: true}` 或自定义 summary**；`:607-630` 另有成功/失败事件；`agent-session.ts:2124-2138` 手动 compact 前发出，可被 cancel；`:2194-2199` 成功后发出。
 

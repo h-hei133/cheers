@@ -49,16 +49,16 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
 | 单一、生效的配置系统 ✅ **已解决**（`settingsLoader` 已删除，只剩 `runtimeConfig`） | `src/core/settings-manager.ts`；`docs/settings.md:1-18`（两层：global + project） | `config/runtimeConfig.ts` **与** `config/settingsLoader.ts` 并行 | **DEFICIENT** | 见 §2.1（**最高优先级**） |
-| 配置错误可见 | `src/core/settings-diagnostics.ts:4-11`（收集 + 去重）；`docs/settings.md` | `config/runtimeConfig.ts:178,240`（抛异常） | **DEFICIENT** | 见 §2.2 |
-| 崩溃日志 | `src/core/crash-log.ts`（`CrashRecord`，保留最近 5 条，7 天过期） | 无 | **MISSING** | 见 §3.1 |
+| 配置错误可见 | `src/core/settings-diagnostics.ts:4-11`（收集 + 去重）；`docs/settings.md` | `config/runtimeConfig.ts`（降级 + `configDiagnostics`） | ✅ **已收口**（**2026-09-23 更正**，Phase 5 T4） | `getRuntimeConfig` 不再抛异常，改为跳过坏文件并产出诊断；三处可见（启动横幅、`/doctor`、CLI `doctor`）。见 §2.2（已同步更正） |
+| 崩溃日志 | `src/core/crash-log.ts`（`CrashRecord`，保留最近 5 条，7 天过期） | `observability/crashLog.ts`（Phase 5 T7） | ✅ **已收口**（**2026-09-23 更正**） | 保留最近 5 条 + `/crash`（含 `--stack`）。**复核轮修了一个致命缺陷**：只记录不重抛 → 每个致命崩溃变成进程继续运行；已改为 `throw error`（实机 exit 7 + 记录先落盘）。**余量**：无 7 天过期（pi 有）。见 §3.1（已同步更正） |
 | Bug report（含脱敏与打包） | `src/core/bug-report.ts`（`redactUrl`、敏感键正则、zip、UUID） | 无 | **MISSING** | 见 §3.2 |
-| 启动性能计时 | `src/core/timings.ts`（`PI_TIMING=1`，命名空间） | 无 | **MISSING** | 见 §3.3 |
-| Metrics 采集 | `src/core/telemetry.ts`（opt-in 安装遥测 + attribution headers） | `observability/metrics.ts`（`recordCount`/`recordTiming`） | **DEFICIENT** | 见 §2.3 |
+| 启动性能计时 | `src/core/timings.ts`（`PI_TIMING=1`，命名空间） | `observability/startupTiming.ts`（Phase 5 T7） | ✅ **已收口**（**2026-09-23 更正**） | `CHEERS_TIMING=1` 门控、相邻标记差值、`/timings` 命令。**复核轮修了两处**：首个标记曾恒为 0ms 且不计入 total；标为「process start」的标记实际在模块加载之后。见 §3.3（已同步更正） |
+| Metrics 采集 | `src/core/telemetry.ts`（**opt-in 安装遥测**，`PI_TELEMETRY`——**不是通用 metrics sink**） | `observability/metrics.ts`（sink 在，**全仓仅 1 个调用点**） | **DEFICIENT**（**2026-09-23 更正**） | **复核更正两处**：① pi 的 `telemetry.ts` 是**安装遥测**，无可抄的通用 sink；② 我方 sink 是 `fs.appendFileSync`（**同步阻塞**），且 `/log tail` **丢弃 `fields`**（指标值写在 `fields` 里，**读不出来**）。**这是 Phase 6 的 T2**，见 `phase-6-decisions.md` §2 |
 | 结构化日志 | 无独立结构化日志层 | `observability/structuredLogger.ts`（脱敏 + trace 关联 + 轮转文件） | **OURS-ONLY** | 见 §4 |
 | Trace context（traceId/spanId 传播） | 无 | `observability/traceContext.ts` | **OURS-ONLY** | 见 §4 |
-| 会话用量统计（token） | `src/core/usage-totals.ts`（`UsageTotals` 含 input/output/cacheRead/cacheWrite/cost） | `observability/usageTelemetry.ts` | **DEFICIENT** | 见 §2.4 |
-| 按模型拆分的成本 | `src/core/usage-totals.ts:36-60`（`getUsageCostBreakdown` 按 `provider/model` 分组） | 无（单一固定费率） | **MISSING** | 见 §3.4 |
-| Cache 命中/浪费统计 ✅ **部分收口 2026-09-23**：usage 已带 `cacheReadTokens`/`cacheWriteTokens`（provider 实测值），`/cost` 按其计价 | `src/core/cache-stats.ts` | `observability/usageTelemetry.ts` | **部分收口**（`/cost` 已报 cache 维度） | 见 `phase-4-execution.md` §4 |
+| 会话用量统计（token） | `src/core/usage-totals.ts`（`UsageTotals` 含 input/output/cacheRead/cacheWrite/cost） | ✅ **已实现**（**2026-09-23 更正**）：`observability/usageTelemetry.ts` | ~~DEFICIENT~~ **已收口** | `recordSessionUsage`/`getSessionUsage` + `/cost` 渲染（含 cache 维度与费率）。**余量见下一行**（按模型分桶）。见 §2.4（已同步更正） |
+| 按模型拆分的成本 | `src/core/usage-totals.ts:36-60`（`getUsageCostBreakdown` 按 `provider/model` 分组） | 部分：`/cost` 按实际作答模型取费率，但**记账不按模型分桶** | **⚠️ DEFICIENT（记账错误）**（**2026-09-23 更正**） | `usageTelemetry.ts:108-110` `existing.model = usage.model` **后写覆盖**——每个 session 只有一条扁平记录。**换模型后先前 token 按最新费率计价**，`/cost` 报出一个没人会被收取的金额。**这是 Phase 6 的 T3**，见 `phase-6-decisions.md` §3 |
+| Cache 命中/浪费统计 ✅ **部分收口 2026-09-23**：usage 已带 `cacheReadTokens`/`cacheWriteTokens`（provider 实测值），`/cost` 按其计价 | `src/core/cache-stats.ts`（`CacheMiss{missedTokens,missedCost,idleMs,modelChanged}`，含空闲间隔归因） | `observability/usageTelemetry.ts` | **部分收口**（`/cost` 已报 cache 维度） | 见 `phase-4-execution.md` §4。**余量**：**无命中率、无浪费分析**——pi 算的是「本可命中却未命中」的 token 与多花的钱 |
 | 更新检查 | `docs/settings.md`（`PI_SKIP_VERSION_CHECK`、`pi.dev/api/latest-version`） | 无 | **MISSING** | 见 §3.5 |
 | 终端状态恢复（崩溃/信号） | pi 的 TUI 层各自处理 | `presentation/tui/terminal.ts:111-112,212-215`（`process.once("exit")` + `restoreSync`） | **OURS-ONLY** | 见 §4 |
 | 信号处理与优雅关闭 | — | `core/shell/signalHandlers.ts`（`handleShellSigint`/`handleShellClose`） | **OURS-ONLY** | 见 §4 |

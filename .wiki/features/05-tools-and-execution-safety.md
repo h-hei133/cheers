@@ -55,18 +55,18 @@ sed -n '5,27p' packages/ts-shell/src/core/hooks/types.ts                        
 | 全量输出落盘并可回读 | `src/core/tools/output-accumulator.ts:19-22`（`fullOutputPath`，OS temp 文件） | `core/tools/registry.ts:141`（`ArtifactManager.save`，`artifact://` URI） | **平手** | 两侧都保留完整输出；差异仅在回读载体（§2.3 已更正原误报） |
 | `ls` 工具 ✅ **2026-09-23 更正为平手**：能力已在 `read` 的目录分支（`registry.ts:239,249-253`，默认 500、max 1000，与 pi 的 `ls` 一致） | `src/core/tools/ls.ts`（175 行，`limit` 默认 500） | `read` 的目录分支 | **平手** | 见 `phase-5-execution.md` §7 |
 | `find` 工具 ✅ **2026-09-23 更正为平手**：`glob` 已只返回路径（`glob.ts:90` 的 `page.join('\n')`）、已模式匹配、已读 `.gitignore`、已剪枝。**新建 `find` 的裁决已撤销**（原前提「glob 返回文件内容」实测证伪） | `src/core/tools/find.ts`（318 行，`limit` 默认 1000，尊重 `.gitignore`） | `core/tools/glob.ts` | **平手** | 见 `phase-5-execution.md` §7.2 |
-| 多段编辑（`edits[]` 数组、重叠拒绝） | `src/core/tools/edit.ts:22-40` | `core/tools/registry.ts:389-489`（单段） | **DEFICIENT** | 见 §2.4 |
+| 多段编辑（`edits[]` 数组、重叠拒绝） | `src/core/tools/edit.ts:22-40` | `core/tools/editEngine.ts` `replaceManyInContent`（Phase 5 T8） | ✅ **已收口**（**2026-09-23 更正**） | 每段对**原文**匹配、**重叠拒绝并指名**、任一段失败则**一个字节都不写**、从后往前应用。复核轮另补了三种写法的**互斥校验**。见 §2.4（已同步更正） |
 | 同文件写入串行化 | `src/core/tools/file-mutation-queue.ts`（edit/write 各自包队列） | `tools/dispatch/executor.ts:90-99`（dispatch 层统一包队列） | **平手** | 两侧都有；我们的位置覆盖全部工具（§2.5 已更正原误判） |
-| 会话环境变量注入 bash | `docs/environment-variables.md:20-32`（5 个 `PI_*`） | 无 | **MISSING** | 见 §3.2 |
-| `powershell` 工具（Windows） | `src/core/tools/powershell.ts`（67 行，独立工具） | 无独立工具（经 shell 后端切换） | **DEFICIENT** | 见 §2.6 |
-| 工具白/黑名单 | `docs/usage.md:196-202`（`--tools`/`--exclude-tools`/`--no-builtin-tools`/`--no-tools`） | `core/tools/prefilter.ts`（`disabledTools`/`hiddenToolPrefixes`） | **DEFICIENT** | 见 §2.7 |
+| 会话环境变量注入 bash | `docs/environment-variables.md:20-32`（5 个 `PI_*`） | ✅ **已实现**（**2026-09-23 更正**）：`runtime/execution/commandEnvironment.ts:21-27` | ~~MISSING~~ **已收口** | 5 个 `CHEERS_*`：`SESSION_ID`/`SESSION_FILE`/`PROVIDER`/`MODEL`/`REASONING_LEVEL`；经 `core/tools/registry.ts:160` `...(context.commandEnv ? { env: context.commandEnv } : {})` 注入 bash 进程。**两条规则**（`:10-14` 注释）：继承值先清除（避免嵌套会话报父会话 id）、**缺失即不导出**（空串与缺失不可区分）。见 §3.2（已同步更正） |
+| `powershell` 工具（Windows） | `src/core/tools/powershell.ts`（67 行，独立工具） | **以 shell 后端形式支持**（**2026-09-23 更正**）：`core/shell/platform/types.ts:9` | **平手**（形态不同，能力覆盖） | `ShellBackendKind` 含 `"powershell"`；`shellDetector.ts:83-94` 探测 `pwsh`/`powershell.exe`；`/shell use powershell` 可切换（`shellCommandRuntime.ts:24`）。**这是正确设计**：模型不需要知道底层是哪个 shell，它只需 bash 工具能跑。见 §2.6（已同步更正） |
+| 工具白/黑名单 | `docs/usage.md:196-202`（`--tools`/`--exclude-tools`/`--no-builtin-tools`/`--no-tools`） | ✅ **已实现**（**2026-09-23 更正**）：`config/runtimeConfig.ts:83-85` | ~~DEFICIENT~~ **平手** | 三个配置字段 `allowedTools`/`disabledTools`/`hiddenToolPrefixes`，**且已接线**：`cliRuntimeInvocation.ts:476` `filterVisibleToolNames` 实际过滤 registry；`:466` 对未知名**报警而非静默**（「a typo here is invisible: the run simply offers fewer tools」）。CLI 亦有 `--allowed-tools`（`cliArgs.ts:248`）。见 §2.7（已同步更正） |
 | 工具只读/可写预设分组 | `src/core/tools/index.ts:164,173`（`createCodingToolDefinitions`／`createReadOnlyToolDefinitions`） | `turn/tools.ts:45`（`PLAN_MODE_TOOLS` 白名单） | **平手** | 两侧都有，形态不同 |
 | 输出截断（行+字节双预算） | `src/core/tools/truncate.ts`（276 行，含 `firstLineExceedsLimit`） | `core/tools/truncation.ts`（含 `truncateHead`/`truncateTail`/`truncateLineWidth`） | **平手** | 两侧都用字节计数；我们的 `truncateLineWidth` 是 pi 没有的 |
 | 沙箱与默认拒绝 | **pi 无**（`docs/security.md:33-41` 明确声明不内置沙箱） | `sandbox/{sandboxPolicy,osSandbox,sandboxEnforcer,auditTrail,escalationWorkflow}.ts` | **OURS-ONLY** | 见 §4 |
 | 审批与权限范围 | **pi 无**（`docs/usage.md:310` 明确不内置 permission popups） | `cli/approval/*`、`core/shell/approval/*` | **OURS-ONLY** | 见 §4 |
 | SSRF 防线 | **pi 无** | `browser/networkAllowlist.ts`、`browser/runtime/networkEgressGuard.ts` | **OURS-ONLY** | 见 §4 |
 | 路径围栏（workspace jail） | pi 用 `path-utils.ts` 的 `resolveToCwd`，无强制围栏 | `core/tools/registry.ts` 的 `verifyPathContainment` | **OURS-ONLY** | 见 §4 |
-| 钩子事件派发覆盖 | `docs/extensions.md`（26 个事件，全部有派发点） | `core/hooks/types.ts:5-27`（22 个声明） | **DEFICIENT** | 见 §2.8 |
+| 钩子事件派发覆盖 | `docs/extensions.md`（26 个事件，全部有派发点） | `core/hooks/types.ts` | ✅ **已收口**（**2026-09-23 更正**） | `npm run check:declarations` → `hook_events=18 dispatched=18 … findings=0`。声明数与原文的 22 不同（中间有合并/删除），**关键是全部有派发点**。见 §2.8（已同步更正） |
 
 ## 2. DEFICIENT 详述
 
@@ -196,7 +196,15 @@ if (filePath && (call.name === "write" || call.name === "edit")) {
 
 **误报原因（方法教训）**：我只查了 `withFileMutationQueue` 的 import 消费者，看到 registry 层没 import 就判为未接线，**没有继续追 dispatch 层**。这与 §2.3 是同一类错误：**证据搜索停在第一层**。
 
-### 2.6 `powershell` 不是独立工具（置信度：中）
+### 2.6 `powershell` 不是独立工具（置信度：中）—— **2026-09-23 判定更正为「平手」**
+
+> **更正说明**：原文把「不是独立工具」判为 DEFICIENT。**复核后判为平手**：
+> 我方以 **shell 后端**形式支持 PowerShell（`core/shell/platform/types.ts:9`
+> `ShellBackendKind` 含 `"powershell"`；`shellDetector.ts:83-94` 探测 `pwsh`/`powershell.exe`；
+> `/shell use powershell` 可切换）。
+> **为什么这是平手而不是更弱**：pi 把它做成独立工具，意味着**模型需要知道底层 shell 是什么**；
+> 我方做成后端，模型只调 `bash` 工具。**能力覆盖相同，认知负担更小。**
+> **下方原文保留为当时的证据。**
 
 **证据（我们）**：`core/shell/platform/types.ts:9` `ShellBackendKind = "bash" | "git-bash" | "powershell" | "wsl" | "auto"`；`core/tools/registry.ts:92-107` 的 `runCommandTool` 按**当前活动后端**决定 shell 与参数（`:96-105`），模型看到的工具始终叫 `bash`。切换入口是 `/shell use <backend>`（`core/commands/shellCommandRuntime.ts:37`）。
 
@@ -206,7 +214,13 @@ if (filePath && (call.name === "write" || call.name === "edit")) {
 
 **最小改动建议**：属 UX 层，优先级低。若要改，`runCommandTool` 可按后端暴露不同工具名。
 
-### 2.7 工具过滤只到「禁用」一层（置信度：高）
+### 2.7 工具过滤只到「禁用」一层（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：三个字段 `allowedTools`/`disabledTools`/`hiddenToolPrefixes`
+> （`config/runtimeConfig.ts:83-85`）**且已接线**：`cliRuntimeInvocation.ts:476`
+> `filterVisibleToolNames` 实际过滤 registry；`:466` 对未知名**报警**——
+> 注释写明「a typo here is invisible: the run simply offers fewer tools than intended」。
+> CLI 另有 `--allowed-tools`（`cliArgs.ts:248`）。**下方原文保留为当时的证据。**
 
 **证据（我们）**：`core/tools/prefilter.ts:9-27` 的 `buildVisibleToolPool` 三个判据：`enableMcpTools`（`:15`，MCP 前缀）、`disabledTools`（`:19`，精确名）、`hiddenToolPrefixes`（`:24`，前缀）。`entrypoints/cliRuntimeInvocation.ts:172-176` 调用 `restrictToolPool`。**只有减法，没有加法**——无法表达「只要这几个」。
 
@@ -217,7 +231,11 @@ if (filePath && (call.name === "write" || call.name === "edit")) {
 **最小改动建议**：`runtimeConfig` 增加 `allowedTools?: string[]`，`buildVisibleToolPool` 在 `disabledTools` 之前先做白名单收窄
 > ✅ **2026-09-23 已实施**（`core/tools/prefilter.ts`：白名单在最外层先收窄，MCP 判据与 `disabledTools` 其后；`undefined` = 不限制、`[]` = 全部禁用，两者可区分；`--tools` CLI 标志走 `RuntimeConfigOverrides`）。见 `phase-4-execution.md` §3。。
 
-### 2.8 22 个钩子事件中 11 个从未派发（置信度：高）
+### 2.8 ~~22 个钩子事件中 11 个从未派发~~ ✅ **2026-09-23 已收口（18/18）**
+
+> **收口说明**：`npm run check:declarations` → `hook_events=18 dispatched=18 … findings=0`。
+> 声明数从 22 变为 18（中间有合并/删除），**关键是全部有派发点**，且门禁会持续守住。
+> 见 `phase-4-execution.md`。**下方原文保留为当时的证据。**
 
 **证据（我们）**：
 
@@ -281,7 +299,13 @@ grep -oE "name: '[a-z_]+'" packages/ts-shell/src/core/tools/registry.ts | sort -
 
 **最小落地路径**：`ls` 是最便宜的一个（`fs.readdir` + 排序 + limit），且能复用 §2.1 修好后的目录遍历。
 
-### 3.2 bash 不注入会话环境变量（置信度：高）
+### 3.2 bash 不注入会话环境变量（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：`runtime/execution/commandEnvironment.ts:21-27` 定义 5 个 `CHEERS_*`；
+> 经 `core/tools/registry.ts:160` 注入 bash 进程。**两条规则值得记**（`:10-14` 注释）：
+> ① **继承值先清除**——嵌套会话否则会把父会话 id 报成自己的；
+> ② **缺失即不导出**——空串与缺失不可区分，导出空串等于谎称「有会话」。
+> **下方原文保留为当时的证据。**
 
 **pi 如何实现**：`docs/environment-variables.md:20-32` 每次 bash 调用注入 5 个变量——`PI_SESSION_ID`、`PI_SESSION_FILE`、`PI_PROVIDER`、`PI_MODEL`、`PI_REASONING_LEVEL`；值在**每条命令启动时解析**，所以切换模型/思考级别立刻对下一条命令生效。文档还给了明确用途：「When asked which model or provider is running, **inspect these variables instead of inferring the answer from the system prompt**」，并给了示例命令：
 

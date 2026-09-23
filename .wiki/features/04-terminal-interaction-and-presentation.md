@@ -60,24 +60,24 @@ pi-only:   bashMode, customMessageBg, customMessageLabel, customMessageText,
 |---|---|---|---|---|
 | 主题可达性与切换 ✅ **已修复**（配置驱动生效；仍缺 `/theme` 命令与热重载） | `docs/themes.md:17-40`；`src/modes/interactive/theme/theme-controller.ts` | `presentation/theme/theme.ts:168`；`presentation/themes/index.ts:10` | **DEFICIENT** | 见 §2.1 |
 | 主题令牌完整度 ✅ **部分收口 2026-09-23**：`dark`/`light` 均已补齐 **39/39**（原 `light` 缺 16 个含 `text`，正文渲染成纯白）；并有测试钉住「令牌集合 == 联合」。⚠️ **2026-09-23 复核更正**：39 个令牌中**只有 21 个**被 `fg`/`bg`/`bgOpen` 真正读取，18 个是死配置（§15.3 已记录，**决定不删**） | `src/modes/interactive/theme/theme-schema.json`（56 色） | `presentation/themes/{dark,light}.json`（各 39 色，21 个在用） | **DEFICIENT**（余量为 Markdown/语法细分，评估为收益不明） | 见 `phase-4-execution.md` §6、§15.3 |
-| 主题磁盘发现与 CLI 覆盖 | `docs/themes.md:17-40`（5 类位置 + `--theme`） | 静态 registry（`presentation/themes/index.ts:10`） | **DEFICIENT** | 见 `01-*` §2.4 |
+| 主题磁盘发现与 CLI 覆盖 | `docs/themes.md:17-40`（5 类位置 + `--theme`） | ✅ **磁盘发现已实现**（**2026-09-23 更正**）：`presentation/themes/index.ts` 读用户级与项目级目录 | **部分收口** | `themeCommandRuntime.ts:33` 报出 `~/.cheers/themes/*.json` 与 `<project>/.agents/themes/*.json`；`presentation/themes/index.ts:56` 按用户→项目优先级叠加。**余量**：无 `--theme` CLI 覆盖层 |
 | ~~快捷键可自定义~~ ✅ **已收口 2026-09-23**：`~/.cheers/keybindings.json`（`cli/interactive/keybindings.ts`），命名空间 action id，`/reload` 重载 | `docs/keybindings.md:1-40`（`~/.pi/agent/keybindings.json`） | `cli/interactive/keymap.ts`（**已改为数据驱动表**） | ✅ **已收口** | 见 `phase-4-execution.md` §8 |
 | ~~`@` 文件引用 + 模糊查找~~ ✅ **已收口 2026-09-23**：`cli/interactive/fileSuggestions.ts`，按工作区缓存列表、按路径段排序 | `docs/usage.md:22`（`Type @ to fuzzy-search project files`） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §8 |
 | ~~Tab 路径补全~~ ✅ **已收口 2026-09-23**：Tab 接受 `@` 引用候选（复用同一候选源） | `docs/usage.md:23`（`Press Tab to complete paths`） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §8 |
 | 外部编辑器（`Ctrl+G`） ✅ **已收口 2026-09-23**：`cli/interactive/externalEditor.ts` + `TUI.suspend`（`finally` 保证终端恢复） | `docs/usage.md:31`；`docs/settings.md`（`externalEditor`） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §8 |
 | 粘贴图片（Ctrl+V） | `docs/usage.md:27`；`docs/settings.md`（`images.*`） | 无 | **MISSING** | 见 §3.4 |
 | 长粘贴占位 | `docs/usage.md` 未单列（pi 直接内联） | `presentation/tui/pastes.ts`（`PASTE_PLACEHOLDER_THRESHOLD = 320`） | **OURS-ONLY** | 见 §4 |
-| 消息队列（steering／follow-up） | `docs/usage.md:63-73`；`docs/settings.md`（`steeringMode`／`followUpMode`） | `core/agent/queue.ts:1-40`；`core/agent/agent.ts:30-31,106-128`；`turn/session.ts:218-227` | **DEFICIENT**（仅模式不可配） | 两种投递语义已完整实现并接线；缺的是 `steeringMode`/`followUpMode` 无调用点传入（见 §2.3） |
+| 消息队列（steering／follow-up） | `docs/usage.md:63-73`；`docs/settings.md`（`steeringMode`／`followUpMode`） | `core/agent/queue.ts`；`core/agent/agent.ts:47-48`；`cli/interactive/interactiveMode.ts:419-420` | ✅ **已收口**（**2026-09-23 更正**） | 全链路已接线：**TUI**（`interactiveMode.ts:419-420` `input.steer(text)`/`input.followUp(text)`）→ **session**（`turn/session.ts:328,333`）→ **agent**（`agent.ts:122,126`）；模式由 Phase 5 T5 从 `steeringMode`/`followUpMode` 传入（`agent.ts:47-48`）。原表说「模式无调用点传入」**已过时** |
 | 转录内搜索 | `docs/keybindings.md:93,114-115`（`tui.altScreen.search`） | 无（pager 有过滤，转录没有） | **MISSING** | 见 §3.5 |
 | Mermaid 图渲染 | `src/modes/interactive/components/mermaid.ts`（89 行，`grok-mermaid`） | 无 | **MISSING** | 见 §3.6 |
-| Markdown 渲染（表格／围栏／行内） | `packages/tui` Marked 集成 | `presentation/tui/transcript/markdown.ts`（188 行） | **DEFICIENT** | 见 §2.4 |
+| Markdown 渲染（表格／围栏／行内） | `packages/tui` Marked 集成 | `presentation/tui/render/engine.ts` + `transcript/markdown.ts` | **部分收口**（**2026-09-23 更正**） | 渲染引擎存在且被 `mainScreen.ts` 使用（`presentation/tui/render/` 下 `engine.ts`/`paint.ts`/`frame.ts`）。**余量**：细分语法（语法高亮粒度）——原判「DEFICIENT」的余量是 Markdown/语法细分 |
 | ~~工具输出折叠／展开~~ ✅ **已收口 2026-09-23**：`ctrl+o` 已接（原仅有指针点击路径） | `docs/keybindings.md:163`（`ctrl+o`） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §6 |
 | ~~Thinking 块折叠~~ ✅ **已收口 2026-09-23**：`ctrl+t` 折叠思考、`ctrl+o` 折叠工具输出（分绑，避免一次按键互相抵消） | `docs/keybindings.md:157`（`ctrl+t`） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §6 |
 | ~~Kill ring（多级）~~ ✅ **已收口 2026-09-23**：`alt+y` yankPop 已接；剪切环抽为 `presentation/tui/editor/killRing.ts` | `docs/keybindings.md:69-73`（`ctrl+y`／`alt+y` yankPop） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §6 |
 | Undo | `docs/keybindings.md:71`（`ctrl+-`） | `editor.ts:251-258`；`keymap.ts:182-184`（`ctrl+z`） | **DEFICIENT** | 见 §2.6 |
 | 鼠标选择与复制 | `docs/keybindings.md:76-93`；`docs/settings.md`（`fullscreenCopyOnSelect`） | `presentation/tui/input/mouse.ts`；`transcript/selection.ts`；`cli/interactive/clipboard.ts` | **DEFICIENT** | 见 §2.7 |
 | Kitty 键盘协议协商 | `docs/tui.md:33-58`（`Focusable`、`CURSOR_MARKER`） | `presentation/tui/input/keyboardProtocol.ts:1-30` | **OURS-ONLY／平手** | 见 §4 |
-| 全屏（alt screen）模式 | `docs/usage.md:255-257`（`--tui-mode fullscreen`） | `presentation/tui/render/engine.ts:114` 恒定进入 | **DEFICIENT** | 见 §2.8 |
+| 全屏（alt screen）模式 | `docs/usage.md:255-257`（`--tui-mode fullscreen`） | ✅ **已实现且可配**（**2026-09-23 更正**）：`cli/interactive/interactiveMode.ts:270` | ~~DEFICIENT~~ **已收口** | `useAlternateScreen: runtimeConfig.tuiMode !== "regular"`；`config/runtimeConfig.ts:293` **默认 `fullscreen`**。原表说「恒定进入」**已过时**——现在是三档（`regular`/`fullscreen`/`stream`）。**注**：`regular` 曾有回归（默认值接线后不再进备用屏），已修，见 `phase-5-execution.md` |
 
 ## 2. DEFICIENT 详述
 

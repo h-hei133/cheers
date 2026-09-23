@@ -152,14 +152,21 @@ confidence: high
 
 | # | 报告 | 覆盖范围 | DEFICIENT | MISSING | OURS-ONLY | 平手 |
 |---|---|---|---:|---:|---:|---:|
-| 01 | [可扩展性与定制化](01-extensibility-and-customization.md) | 扩展宿主、技能、提示词模板、包分发、主题、上下文文件 | 4 | 10 | 1 | 0 |
-| 02 | [程序化集成与会话数据](02-programmatic-integration-and-session-data.md) | JSON 事件流、RPC、SDK、session 格式、导出与分享 | 4 | 5 | 2 | 0 |
-| 03 | [Provider 与模型层](03-provider-and-model-layer.md) | 订阅登录、模型目录、per-model 覆盖、兼容性开关、传输与缓存 | 7 | 4 | 1 | 0 |
-| 04 | [终端交互与呈现](04-terminal-interaction-and-presentation.md) | 编辑器、补全、主题、快捷键、消息队列、转录渲染 | 11 | 7 | 2 | 0 |
-| 05 | [工具与执行安全](05-tools-and-execution-safety.md) | 工具集、截断、bash、编辑并发、钩子派发、沙箱与审批 | 6 | 3 | 4 | 4 |
-| 06 | [可观测性、配置与生命周期](06-observability-config-and-lifecycle.md) | 配置系统、诊断、崩溃日志、遥测、用量统计 | 4 | 6 | 5 | 1 |
-| 07 | [上下文管理与压缩](07-context-management-and-compaction.md) | 触发阈值、切点与超大 turn、重复压缩、分支摘要、文件追踪、压缩钩子 | 4 | 3 | 1 | 2 |
-| | **合计** | | **40** | **38** | **16** | **7** |
+| 01 | [可扩展性与定制化](01-extensibility-and-customization.md) | 扩展宿主、技能、提示词模板、包分发、主题、上下文文件 | 3 | 7 | 1 | 0 |
+| 02 | [程序化集成与会话数据](02-programmatic-integration-and-session-data.md) | JSON 事件流、RPC、SDK、session 格式、导出与分享 | 1 | 5 | 2 | 0 |
+| 03 | [Provider 与模型层](03-provider-and-model-layer.md) | 订阅登录、模型目录、per-model 覆盖、兼容性开关、传输与缓存 | 3 | 2 | 1 | 0 |
+| 04 | [终端交互与呈现](04-terminal-interaction-and-presentation.md) | 编辑器、补全、主题、快捷键、消息队列、转录渲染 | 4 | 3 | 2 | 0 |
+| 05 | [工具与执行安全](05-tools-and-execution-safety.md) | 工具集、截断、bash、编辑并发、钩子派发、沙箱与审批 | 1 | 0 | 4 | 7 |
+| 06 | [可观测性、配置与生命周期](06-observability-config-and-lifecycle.md) | 配置系统、诊断、崩溃日志、遥测、用量统计 | 3 | 2 | 5 | 1 |
+| 07 | [上下文管理与压缩](07-context-management-and-compaction.md) | 触发阈值、切点与超大 turn、重复压缩、分支摘要、文件追踪、压缩钩子 | 1 | 2 | 1 | 2 |
+| | **合计（2026-09-23 重数）** | | **16** | **21** | **16** | **10** |
+| | ~~合计（各文初稿时）~~ | | ~~40~~ | ~~38~~ | ~~16~~ | ~~7~~ |
+
+> ⚠️ **两行合计的差别就是 Phase 6 前置研究的核心发现**：初稿数字是各文档**写作当时**的状态，
+> 而 Phase 3/4/5 随后收口了大量条目却**没有同步判定列**。
+> 上表是 2026-09-23 按**当前代码**重数的结果，逐行证据在各文档的「2026-09-23 更正」标记里。
+> 重数方法：解析每份文档覆盖清单的**判定列**，跳过已划删除线（`~~`）的行。
+> **仍然开放的行**见 `phase-6-pre-research.md` §2。
 
 > 注：`03` 与 `06` 是**同一轮由主代理自行完成**的切片（子代理两次因上游故障失败），
 > 其中 `03` 的核心结论经**实机执行验证**（见 §4）。

@@ -47,15 +47,15 @@ npx tsx /tmp/probe.mts
 |---|---|---|---|---|
 | 用户配置文件字段真正生效 ✅ **已全部收口 2026-09-23**（含 `tuiMode`：默认 `fullscreen`，`regular` 标为实验性） | `docs/settings.md:20-60`；`src/core/settings-manager.ts` | `config/runtimeConfig.ts:193-215` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
 | 订阅式 OAuth 登录 | `docs/providers.md:15-63`（7 家：Codex／Claude Pro／Copilot／xAI／Meta／OpenRouter／Radius） | `core/auth/oauth/providers.ts:23,59`（2 家） | **DEFICIENT** | 见 §2.2 |
-| 模型目录（内置快照 + 用户叠加 + 刷新） | `src/core/{model-registry.ts, models-store.ts, remote-catalog-provider.ts}` | `core/models/{catalog.ts, catalogStore.ts, catalogRefresh.ts}` | **DEFICIENT** | 见 §2.3 |
+| 模型目录（内置快照 + 用户叠加 + 刷新） | `src/core/{model-registry.ts, models-store.ts, remote-catalog-provider.ts}` | `core/models/{catalog.ts, catalogStore.ts, catalogRefresh.ts}` | ✅ **已收口**（**2026-09-23 更正**） | 三层叠加已实现：`catalogStore.ts:47` `loadCatalog` = builtin → cache → user；`catalogRefresh.ts:26` 注释「**Explicit, never automatic**」（刷新是显式动作，不联网启动）。见 §2.3（已同步更正） |
 | per-model 覆盖（`modelOverrides`） ✅ **判定更正 2026-09-23**：`dedupeModels` 本就是 last-write-wins，**一直生效**；真正的限制只是 `CatalogModel` 字段太少，`cost`（4 个费率，可选）已补 | `docs/models.md:354-420` | `core/models/catalog.ts` | ~~MISSING~~ **判定有误** | 见 `phase-4-execution.md` §4.2 |
-| 兼容性开关真正改变请求形状 | `docs/models.md:420-520`（`compat.supportsDeveloperRole` 等） | `provider/registry/provider.ts:28-41` | **DEFICIENT** | 见 §2.4 |
-| 自定义 provider（声明式 API 适配） | `docs/custom-provider.md`（786 行）；`src/core/provider-composer.ts` | `core/models/catalogStore.ts:74-90`（用户文件加 provider） | **DEFICIENT** | 见 §2.5 |
+| 兼容性开关真正改变请求形状 | `docs/models.md:420-520`（`compat.supportsDeveloperRole` 等） | `core/models/requestShape.ts`（Phase 5 新增） | ✅ **已收口**（**2026-09-23 更正**） | Phase 5 实现四项**改变线上字节**的决定（`requestShape.ts:106-110`）：system 角色名、输出上限字段名、是否发 `reasoning_effort`、是否需合成 assistant 桥接；复核轮补齐**内置目录的 `compat`**。其余 7 个标志**刻意保持描述性**。见 §2.4（已同步更正） |
+| 自定义 provider（声明式 API 适配） | `docs/custom-provider.md`（786 行）；`src/core/provider-composer.ts` | `core/models/catalogStore.ts`（用户文件加 provider）+ `CatalogModel.compat` | **部分收口**（**2026-09-23 更正**） | 用户可用 `models.json` 加 provider 与模型，且 Phase 5 后**可表达请求形状差异**（`compat`）。**余量**：不能自定义 API 协议实现（pi 支持 `openai-responses`/`anthropic-messages` 等多协议）。见 §2.5（已同步更正） |
 | Prompt cache 保活（warming） | `src/core/cache-warmer.ts`；`docs/settings.md:66-100` | 无 | **MISSING** | 见 §3.2 |
-| Cache 命中/未命中统计 | `src/core/cache-stats.ts` | 无 | **MISSING** | 见 §3.3 |
+| Cache 命中/未命中统计 | `src/core/cache-stats.ts`（`CacheMiss{missedTokens,missedCost,idleMs,modelChanged}`） | 部分：`observability/usageTelemetry.ts:34-35` | **部分收口**（**2026-09-23 更正**） | 我方**记录 provider 报的缓存绝对值**（`cacheReadTokens`/`cacheWriteTokens`），`/cost` 展示。**余量**：**无命中率、无浪费分析**——pi 算的是「本可命中却未命中」的 token 与多花的钱（含空闲间隔关联，`cache-stats.ts:9` `CACHE_TTL_MS`）。见 §3.3（已同步更正） |
 | 传输选择（SSE／WebSocket） | `docs/settings.md`（`transport`） | 无 | **MISSING** | 见 §3.4 |
-| HTTP 空闲超时可配 | `src/core/http-dispatcher.ts:6-19`；`docs/settings.md`（`httpIdleTimeoutMs`） | `provider/request/fetch.ts:30-32`（仅 env） | **DEFICIENT** | 见 §2.6 |
-| Per-model thinking 级别映射 | `docs/models.md:274-317`（`thinkingLevelMap`） | `config/types.ts:10`（单一 `thinkingBudget`） | **DEFICIENT** | 见 §2.7 |
+| HTTP 空闲超时可配 | `src/core/http-dispatcher.ts`（默认 300000，五档可选，`disabled` 可关） | `provider/request/fetch.ts:32-34`（30s/120s/120s，`:78-89` 读 env） | **⚠️ DEFICIENT —— 且比原文更严重**（**2026-09-23 更正**） | **不是「仅 env」而是「仅被启动预检使用」**：`createProviderFetchFromEnv` 的**唯一调用者**是 `core/shell/providerReadiness.ts:149`；活轨 `turn/step.ts:134` 用**裸 `fetch`**，`grep -rn fetchImpl entrypoints turn core/agent \| grep -v test` → **无任何生产调用方传入**。所以活轨**完全没有超时**，挂起的连接让回合无限等待。**这是 Phase 6 的 T1**，见 `phase-6-decisions.md` §1 |
+| Per-model thinking 级别映射 | `docs/models.md:274-317`（`thinkingLevelMap`） | `core/models/requestShape.ts` `levelNameFor`（Phase 5 新增） | ✅ **已收口**（**2026-09-23 更正**） | `CatalogModel.thinkingLevelMap` + `levelNameFor` 实现**下探再上探**的档位翻译：模型只支持 `high` 时，请求 `low` 仍得到 `high` 而非什么都不发。见 §2.7（已同步更正） |
 | Provider 兼容性/就绪度矩阵 | **pi 无**（直接执行，不做矩阵） | `provider/registry/provider.ts:56-110`、`core/shell/providerReadiness.ts` | **OURS-ONLY** | 见 §4 |
 
 ## 2. DEFICIENT 详述
@@ -110,7 +110,12 @@ npx tsx /tmp/probe.mts
 
 **最小改动建议**：`core/auth/oauth/providers.ts` 的设计已是「声明式条目 + 共享 flow」（文件头注释明确说「adding a provider is a dozen lines」），加 Claude Pro/Max 与 GitHub Copilot 两条配置即可，无需改 flow。
 
-### 2.3 模型目录：能叠加，不能覆盖（置信度：高）
+### 2.3 模型目录：能叠加，不能覆盖（置信度：高）—— ✅ **2026-09-23 已收口**
+
+> **收口说明**：三层叠加已实现（`catalogStore.ts:47` `loadCatalog` = builtin → cache → user），
+> 刷新是显式动作（`catalogRefresh.ts:26`「Explicit, never automatic」）。
+> `CatalogModel` 的字段也已由 Phase 5 从 3 扩到 7（`reasoning`/`thinkingLevelMap`/`maxTokens`/`compat`）。
+> **下方原文保留为当时的证据。**
 
 **证据（我们）** `core/models/catalogStore.ts:44-50` `loadCatalog()` 三层叠加（内置快照 → 刷新缓存 → 用户文件），`core/models/catalog.ts:284-314` `mergeProviders` 的合并规则是：
 
@@ -157,7 +162,12 @@ npx tsx /tmp/probe.mts
 
 **最小改动建议**：`turn/step.ts` 的 payload 构造改为读取 `ProviderCompatibilityFlags`（经 `projectProviderRegistry`），而非恒定形状 + 正则回退。这同时会让矩阵从死代码变成活代码。
 
-### 2.5 自定义 provider：能加，不能改行为（置信度：高）
+### 2.5 自定义 provider：能加，不能改行为（置信度：高）—— **2026-09-23 部分收口**
+
+> **收口说明**：用户可用 `models.json` 加 provider 与模型，且 Phase 5 后**能表达请求形状差异**
+> （`CatalogModel.compat` → `requestShape.ts`）。
+> **余量**：不能自定义**协议实现**（pi 支持 `openai-responses`/`anthropic-messages` 等多协议）。
+> **下方原文保留为当时的证据。**
 
 **证据（我们）**：`core/models/catalogStore.ts:74-90` `ensureUserCatalog()` 生成示例，字段限于 `label`/`runtime`/`auth`/`baseUrl`/`envVar`/`models[].id|contextWindow`。`CatalogModel`（`core/models/catalog.ts:20-23`）只有 `id` 与 `contextWindow`。
 
@@ -167,18 +177,33 @@ npx tsx /tmp/probe.mts
 
 **最小改动建议**：`CatalogModel` 增加 `compat?: Partial<ProviderCompatibilityFlags>` 与 `samplingParams?: Record<string, unknown>`；与 §2.3/§2.4 一起落地。
 
-### 2.6 HTTP 超时只能靠环境变量（置信度：高）
+### 2.6 HTTP 超时只能靠环境变量（置信度：高）—— ⚠️ **2026-09-23 更正：比原文更严重**
+
+> **更正说明**：原文说「只能靠环境变量」，实际是**更糟的一种情况**——
+> 那份可配实现（`provider/request/fetch.ts:32-34`，30s/120s/120s，`:78-89` 读 env）
+> **只被启动预检使用**（唯一调用者 `core/shell/providerReadiness.ts:149`），
+> 而**活轨 `turn/step.ts:134` 用裸 `fetch`，完全没有超时**。
+> 仓库里的真实形态是四种状态：**1 份可配（未接线）+ 2 处硬编码（`taskTool` 30s / `btw` 15s）+ 2 处完全没有（`step.ts` / `summarize.ts`）**。
+> **这是 Phase 6 的 T1**，裁决见 `phase-6-decisions.md` §1。
+> **下方原文保留为当时的证据。**
 
 > **2026-09-23 补充**：请求失败的重试与退避已实现（两层：provider 层默认 0 次、
-> turn 层默认 3 次，`Retry-After` 优先于本地退避）。这不改变本项记录的
-> 「超时只能靠环境变量」的事实，但**一个原本必然终止回合的瞬态失败现在可以恢复**。
-> 见 `phase-5-execution.md` §2。
+> turn 层默认 3 次，`Retry-After` 优先于本地退避）。**一个原本必然终止回合的瞬态失败现在可以恢复。**
+> **但重试不覆盖本项**：重试只在**收到响应之后**分类（`turn/step.ts:220-235`），
+> 而挂起的连接永远不产生响应，所以**重试救不了一个没有超时的连接**——
+> 这正是 T1 必须单独做的理由。见 `phase-5-execution.md` §2。
 
 **证据（我们）**：`provider/request/fetch.ts:7-9` 读 `CHEERS_PROVIDER_CONNECT_TIMEOUT_MS` / `..._HEADERS_TIMEOUT_MS` / `..._BODY_TIMEOUT_MS`；`:32-34` 默认 `30_000` / `120_000` / `120_000`。无配置文件入口。
 
 **证据（pi）**：`src/core/http-dispatcher.ts:6` `DEFAULT_HTTP_IDLE_TIMEOUT_MS = 300_000`，`:8-14` `HTTP_IDLE_TIMEOUT_CHOICES` 提供 30s/1m/2m/5m/disabled 五档，并有 `parseHttpIdleTimeoutMs` 解析 `"disabled"` 与数字；`docs/settings.md` 暴露为 `httpIdleTimeoutMs`（设 0 关闭）。
 
-**影响**：慢速推理模型（长思考、大 context）在 120s 无 body 时被我们掐断；用户只能改环境变量，且 `runtimeConfig` 里没有对应字段。
+**影响（2026-09-23 更正）**：原文说「慢速推理模型在 120s 无 body 时被我们掐断」——
+**这条影响描述是错的**。因为那份实现**没接在活轨上**，真实后果是**相反的**：
+慢速或挂起的请求**不会被掐断，而是无限等待**。
+「被掐断」是可恢复的（重试或调参），「无限等待」不是。
+用户改环境变量也**无效**——`CHEERS_PROVIDER_*_TIMEOUT_MS` 只影响启动预检。
+
+**余量**：`runtimeConfig` 里没有对应字段（Phase 6 T1 补）。
 
 **最小改动建议**：加入 config 字段并在 `resolveProviderTransportConfig` 读取；pi 的「五档 + disabled」是可直接借鉴的 UX 形状。
 
@@ -229,7 +254,13 @@ grep -rni "cacheWarming\|cache_warm" packages/ts-shell/src --include='*.ts'   # 
 
 **最小落地路径**：先让 `promptCacheTtl` 生效并接上 `cache_control` 标记；保活调度器可后置。**注意**：pi 的实现依赖模型目录里有 `promptCache` 寿命，我们的 `CatalogModel` 没有该字段（§2.3/§3.1），需一并补。
 
-### 3.3 Cache 命中/未命中统计（置信度：高）
+### 3.3 Cache 命中/未命中统计（置信度：高）—— **2026-09-23 部分收口**
+
+> **收口说明**：我方**记录 provider 报的缓存绝对值**（`usageTelemetry.ts:34-35`
+> `cacheReadTokens`/`cacheWriteTokens`），`/cost` 已展示（含费率）。
+> **余量**：**无命中率、无浪费分析**——pi 算的是「本可命中却未命中」的 token 与多花的钱，
+> 并把空闲间隔作为归因（`cache-stats.ts:9` `CACHE_TTL_MS = 5 分钟`、`:11` `NOISE_FLOOR_TOKENS = 1024`）。
+> **下方原文保留为当时的证据。**
 
 **pi 如何实现**：`src/core/cache-stats.ts` 定义 `CacheMiss { missedTokens, missedCost, idleMs, modelChanged }` 与 `CacheWasteTotals { missedTokens, missedCost, missCount }`；`:12` `CACHE_TTL_MS = 5min`，`:15` `NOISE_FLOOR_TOKENS = 1024`（低于此视为断点粒度噪声，不计数）；`docs/settings.md` 的 `showCacheMissNotices` 把每次显著 miss 显示在对话流里。
 

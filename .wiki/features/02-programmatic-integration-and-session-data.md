@@ -43,16 +43,16 @@ grep -rn "runtime/events/stream" packages/ts-shell/src --include='*.ts'         
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 单次运行的 machine-readable 事件流 | `docs/json.md:1-7,67-92`；`src/modes/json-event.ts:17-60` | `core/query/runtime/events.ts:14-74`；`core/shell/sessionRuntime.ts:81-89`；`runtime/events/stream.ts:15-100` | **DEFICIENT** | 见 §2.1 |
+| 单次运行的 machine-readable 事件流 | `docs/json.md:1-7,67-92`；`src/modes/json-event.ts:17-60` | ✅ **已实现**（**2026-09-23 更正**）：`presentation/terminal/jsonEvents.ts`；`core/query/runtime/events.ts:14-74` | ~~DEFICIENT~~ **已收口** | `jsonEvents.ts:14` `const SCHEMA_VERSION = "run-event-stream.v1"`——**版本化契约**，每行含 `schemaVersion`/`order`/`eventType`/`facts`/`truthfulness`；`:18` 注释「it never asserts that the work succeeded」。`--json` 经 `cliArgs.ts:228` → `cliRuntimeModule.ts:413` 接线。**注意**：原表引用的 `runtime/events/stream.ts` **已在 Phase 4 删除**（`ls runtime/events` → 不存在），该职责现由 `jsonEvents.ts` 承担 |
 | stdin/stdout JSONL RPC | `src/modes/rpc/rpc-types.ts:20-74,112-239`；`rpc-mode.ts:54-77`；`rpc-client.ts:56-180` | 无 | **MISSING** | 见 §3.1 |
 | 已发布的远程 integration family（CBOR protocol／client／server） | `packages/protocol/`、`packages/client/`、`packages/server/` | 无 | **MISSING** | `grep -rn "CBOR\|ByteTransport\|ServerMessageDecoder" packages/ts-shell/src` → 0 |
-| Node/TypeScript programmatic SDK | `docs/sdk.md:16-33`；`src/core/sdk.ts:41-100`；`src/index.ts:221-275` | `index.ts:1-55`（10 组纯函数） | **MISSING** | 见 §3.2 |
-| Session 文件为 versioned append-only entry log | `docs/session-format.md:197-241`；`src/core/session-manager.ts:38-101` | `session/sessionEventCodec.ts:20-36`；`session/store/sessionFileLayout.ts:11-65` | **DEFICIENT** | 见 §2.2 |
-| Session JSONL 导出（保留 header 与 branch） | `src/core/session-export.ts:8-44` | `core/commands/exportCommandRuntime.ts:73-83,120-123` | **DEFICIENT** | 见 §2.3 |
+| Node/TypeScript programmatic SDK | `docs/sdk.md:16-33`；`src/core/sdk.ts:41-100`；`src/index.ts:221-275` | `index.ts`（纯函数导出面） | **MISSING**（**2026-09-23 确认，并补一条事实**） | 见 §3.2。**补充事实**：`index.ts` 被 analyzer 标为 **`PT`**（public-API + test-only）——即**它是一个声明的公开 API 面，但生产代码零引用**。它导出纯函数（验证/工件/修复等），**不能驱动一次会话**，所以「无 SDK」的判定成立 |
+| Session 文件为 versioned append-only entry log | `docs/session-format.md:197-241`；`src/core/session-manager.ts:38-101` | `session/transcript/sessionTranscript.ts`；`session/store/sessionFileLayout.ts:11-65` | **部分收口**（**2026-09-23 更正**） | **append-only 成立**：`sessionTranscript.ts:88` `fs.appendFileSync(transcriptPath, ...)`；`:32` 注释「The transcript holds every branch, because it is append-only」。**versioned 不成立**：`sessionEventCodec.ts:139` `encodeTranscriptEvent` 就是 `JSON.stringify(event)`，**无版本字段**（`grep -n version sessionEventCodec.ts` → 空）。**余量：entry 级版本化** |
+| Session JSONL 导出（保留 header 与 branch） | `src/core/session-export.ts:8-44` | `core/commands/exportCommandRuntime.ts` | **部分收口**（**2026-09-23 更正**） | `/export jsonl` 已实现（`:43` 解析格式，`:58` 分派）；`:147-149` `asJsonl` 逐行原样导出 transcript 事件，**分支结构因此保留**。**但无 header 行**（导出内容就是 transcript 本身，而 transcript 无版本头）——**「保留 header」这一半不成立** |
 | HTML 导出 | `src/core/agent-session.ts:3579-3612`；`docs/rpc.md:597-618` | 无 | **MISSING** | `/export` 仅 markdown/jsonl（`exportCommandRuntime.ts:35-49`） |
 | Session 分享／发布链接 | `src/modes/interactive/session-share.ts:24-54,56-95` | 无 | **MISSING** | 见 §3.3 |
-| 第三方可依赖的 resume/replay 合约（`since` 游标、get_tree） | `docs/rpc.md:717-772` | `session/SessionManager.ts:187-205`；`entrypoints/cliRuntimeModule.ts:457-507` | **DEFICIENT** | 见 §2.4 |
-| observation-only／redaction 统一 runtime envelope | **pi 无**（`json-event.ts:17-60` 只做 delta 转换） | `runtime/events/stream.ts:16-31,47-92` | **OURS-ONLY** | 见 §4 |
+| 第三方可依赖的 resume/replay 合约（`since` 游标、get_tree） | `docs/rpc.md:717-772` | `session/SessionManager.ts:187-205`；`entrypoints/cliRuntimeModule.ts:457-507` | **DEFICIENT**（**2026-09-23 确认仍开放**） | 分支投影存在（`sessionTranscript.ts:44` `projectBranchMessages`），但**没有对外游标 API**；`jsonEvents.ts` 的 `order` 是**流内序号**，不是可续传游标。见 §2.4 |
+| observation-only／redaction 统一 runtime envelope | **pi 无**（`json-event.ts:17-60` 只做 delta 转换） | `presentation/terminal/jsonEvents.ts:16-27,44-48` | **OURS-ONLY** | 见 §4。**路径已更正**：原引用的 `runtime/events/stream.ts` 已删，该职责现由 `jsonEvents.ts` 承担 |
 | 目录化 session substrate（metadata/state/transcript/lock 分离） | **pi 无**（单 JSONL 文件） | `session/store/sessionFileLayout.ts:11-65` | **OURS-ONLY** | 见 §4 |
 
 ## 2. DEFICIENT 详述

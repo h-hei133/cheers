@@ -48,17 +48,17 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 扩展自动发现（磁盘目录） | `docs/extensions.md:109-127`（`~/.pi/agent/extensions/*.ts`、`.pi/extensions/*.ts`） | **无** | **MISSING** | `ls packages/ts-shell/src/core/extensions` → 不存在；`git log --oneline -1 -- packages/ts-shell/src/core/extensions` → `b463d87d`（已删） |
+| 扩展自动发现（磁盘目录） | `docs/extensions.md:109-127`（`~/.pi/agent/extensions/*.ts`、`.pi/extensions/*.ts`） | **无代码加载路径** | **MISSING**（**2026-09-23 复核确认**） | 目录不存在（`git log -1 -- src/core/extensions` → `b463d87d` 已删）。**复核更正**：`runtime/extensions/lifecycle.ts` **有**生产导入者（`runtime/resources/descriptor.ts:5,9`），但导入的全是**类型与校验谓词**，**没有任何加载或执行外部代码的函数**——缺的是宿主，不是类型。见 `phase-6-pre-research.md` §1.1 |
 | 扩展 API：注册工具 | `docs/extensions.md:1404` `pi.registerTool()` | **无** | **MISSING** | `grep -rn "registerTool" packages/ts-shell/src` → 0 |
 | 扩展 API：注册命令 | `docs/extensions.md:1564` `pi.registerCommand()` | **无** | **MISSING** | `entrypoints/slashCommandRegistry.ts:63-72` 的 `extensions` 数组只含 1 条硬编码 `PICKER_ONLY`（`statusline`），且注释自述「the router never sees them」 |
-| 扩展 API：事件订阅 | `docs/extensions.md:1391` `pi.on(event,handler)` | 部分：`core/hooks/hookDispatcher.ts:31,38` | **DEFICIENT** | 见 §2.1 |
+| 扩展 API：事件订阅 | `docs/extensions.md:1391` `pi.on(event,handler)` | 部分：`core/hooks/hookDispatcher.ts:31,38` | **DEFICIENT**（**2026-09-23 确认仍开放**） | 见 §2.1。钩子派发本身已收口（18/18 事件有派发点，`check:declarations` 通过），但那是**配置驱动的内置钩子**，不是**第三方可注册的订阅 API** |
 | 扩展 API：注册快捷键／消息渲染器／Markdown 变换器／入口渲染器 | `docs/extensions.md:1632,1636,1657,1677` | **无** | **MISSING** | 同上，无任何注册入口 |
 | 自定义 UI 组件（扩展内） | `docs/tui.md:89-124` `ctx.ui.custom()` | **无** | **MISSING** | `grep -rn "ui\.custom\|ctx\.ui" packages/ts-shell/src` → 0 |
-| 技能发现（磁盘 SKILL.md） | `src/core/skills.ts:168,409` | `core/skills/skillLoader.ts` | **DEFICIENT** | 见 §2.2 |
+| 技能发现（磁盘 SKILL.md） | `src/core/skills.ts:168,409` | `core/skills/skillLoader.ts` | **部分收口**（**2026-09-23 更正**） | 递归扫描 + `SKILL.md` 不再下钻（`skillLoader.ts:164`）；**祖先目录搜索已实现**（`:82` `projectDirectories(workspaceRoot)` 向上到根）；`disable-model-invocation` 已支持（`:219`）。**余量**：无名称/描述校验、无 `.gitignore` 忽略规则。见 §2.2（已同步更正） |
 | 技能注入上下文（模型可见清单） | `src/core/skills.ts:355-390` `formatSkillsForPrompt()` → `<available_skills>` | ✅ **已实现**（`skillLoader.renderSkillList()` + `turn/prompt.ts`） | ~~MISSING~~ | 见 §3.1 |
-| 技能作为斜杠命令 `/skill:name` | `docs/skills.md:74-91`（`enableSkillCommands`） | **无** | **MISSING** | 我们只有 `/skill <name>` 子命令形式（`core/commands/skillCommandRuntime.ts:15`），非注册命令 |
+| 技能作为斜杠命令 `/skill:name` | `docs/skills.md:74-91`（`enableSkillCommands`） | **无**（只有 `/skill <name>`） | **MISSING**（**2026-09-23 确认**） | 复核：`grep -rn '"skill:' src --include='*.ts'` → 仅测试夹具的 `runnerId`，**无 `/skill:name` 命令形式**。`/skill` 子命令在 `core/commands/registry.ts:386`（`aliases: ["skills"]`） |
 | 提示词模板（磁盘 `.md` 参数化） | `src/core/prompt-templates.ts:194,269`；`docs/prompt-templates.md` | **无** | **MISSING** | 见 §3.2 |
-| 包分发（npm/git 安装、manifest） | `src/core/package-manager.ts:112`、`src/core/pi-manifest.ts:4,17`、`docs/packages.md` | 部分：`core/commands/pluginCommandRuntime.ts:12,18` | **DEFICIENT** | 见 §2.3 |
+| 包分发（npm/git 安装、manifest） | `src/core/package-manager.ts:112`、`src/core/pi-manifest.ts:4,17`、`docs/packages.md` | 部分：`core/commands/pluginCommandRuntime.ts` | **DEFICIENT**（**2026-09-23 确认**） | 见 §2.3。**代码自述**（`pluginCommandRuntime.ts:12`）：「Registering one records an address and a manifest; **this build does not execute extensions**」 |
 | 主题发现（磁盘 JSON、CLI 覆盖） ✅ **部分收口 2026-09-23**：已支持用户级 `~/.cheers/themes/*.json` 与项目级 `<projectRoot>/.agents/themes/*.json` + `/theme` 命令；仍**无**包/CLI 覆盖层 | `docs/themes.md:17-40` | `presentation/themes/index.ts` | **DEFICIENT**（余量：包/CLI 层，我方无包系统） | 见 `phase-4-execution.md` §5 |
 | 上下文文件（AGENTS.md）分层加载 | `docs/usage.md:102-108`、`src/core/resource-loader.ts:119` `loadProjectContextFiles` | ✅ **已实现**（`context/instructions/projectInstructions.ts`） | ~~MISSING~~ | 见 §3.3 |
 | 提示词附加 `APPEND_SYSTEM.md` ✅ **已收口 2026-09-23**；`SYSTEM.md`（**替换**语义）**刻意不做** | `docs/usage.md:112-119` | `context/instructions/projectInstructions.ts`（`APPEND_CANDIDATES`） | **部分收口** | `SYSTEM.md` 替换会连带删掉 harness 自身的执行规则，是不同的信任决定；有测试钉住它未被认领。见 `phase-4-execution.md` §5 |
@@ -84,7 +84,19 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 
 **最小改动建议（已完成）**：✅ 已读 `.agents/hooks.json` 并注册，另加信任门（`core/hooks/trust.ts`）。
 
-### 2.2 技能：发现面窄、无校验、无优先级规则（置信度：高）
+### 2.2 技能：发现面窄、无校验、无优先级规则（置信度：高）—— ⚠️ **2026-09-23 部分更正**
+
+> **更正说明**：下方表格有 **3 行已过时**，实际代码已补齐。复核证据：
+> ① **祖先目录搜索已实现**——`skillLoader.ts:82` 用 `projectDirectories(workspaceRoot)`
+> 生成「从工作目录到根」的每一层 `.agents/skills`，注释明写「Reading only the working
+> directory made those skills invisible, with nothing said about it」；
+> ② **注入模型已实现**——`skillLoader.ts:252` `renderSkillList` 产出
+> `<available_skills>` 清单，由 `cliRuntimeInvocation.ts:272` 注入系统提示；
+> ③ **`disable-model-invocation` 已支持**——`skillLoader.ts:219` 读该 frontmatter 字段，
+> `:254` 据此过滤注入清单。
+> **仍然成立的余量**：**无名称/描述校验**（pi 有名称长度/字符集/连字符规则）、
+> **无 `.gitignore`/`.ignore` 忽略规则**、根目录数量少于 pi（我方 2 类 + 祖先展开）。
+> 下方原文保留为当时的证据。
 
 **证据（我们）** `core/skills/skillLoader.ts`：
 
