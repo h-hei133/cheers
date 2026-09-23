@@ -356,12 +356,14 @@ export function createCommandRegistry(
     },
     {
       name: "undo",
-      aliases: ["rewind", "revert"],
       kind: "local",
       availability: "available",
       enabled: true,
       bridgeSafe: true,
-      summary: "rewind the last conversational turn or changes",
+      // Names the files it reports, not the conversation. `rewind` and `revert`
+      // used to be aliases here, which sent anyone asking to go back in the
+      // conversation to a report about files. Going back is `/back`.
+      summary: "report the most recent file edit and the command to revert it",
       group: "session",
       execute: (args, context) => runUndoCommand(args, context),
     },

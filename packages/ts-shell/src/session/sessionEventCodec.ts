@@ -20,19 +20,22 @@ export interface CompactionTranscriptEntry {
 }
 
 /**
- * A summary of turns the user stepped back past.
+ * A record that the conversation moved to another branch.
  *
- * Going back in the conversation discards what was said after that point. The
- * turns themselves are gone, but what they established — what was tried, what
- * it ruled out — is usually still worth carrying forward, so it travels as a
- * summary attached at the point the user returned to.
+ * Written on every move, whether or not a summary was produced. The move itself
+ * is the fact worth keeping: without this, reopening a session showed a shorter
+ * conversation with nothing saying that anything had been left behind or how
+ * much. A summary, when there is one, is what the abandoned turns established.
  */
 export interface BranchSummaryTranscriptEntry {
   type: "branch_summary";
   id?: string;
-  summary: string;
-  /** How many turns were dropped at the point this summary was written. */
+  /** What the abandoned turns established, when something could summarize them. */
+  summary?: string;
+  /** How many turns were left behind at this point. */
   droppedTurns: number;
+  /** The entry the conversation moved to, so the record names where it went. */
+  toEntryId?: string;
   timestamp: string;
 }
 
@@ -143,7 +146,7 @@ function isTranscriptEvent(value: unknown): value is TranscriptEvent {
   if (record.type === "lifecycle") return typeof record.event === "string";
   if (record.type === "query-event") return record.event !== null && typeof record.event === "object";
   if (record.type === "compaction") return typeof record.summary === "string";
-  if (record.type === "branch_summary") return typeof record.summary === "string";
+  if (record.type === "branch_summary") return typeof record.droppedTurns === "number";
   return false;
 }
 

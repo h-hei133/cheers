@@ -174,13 +174,15 @@ export class SessionManager extends SessionReadSurface {
       : undefined;
 
     switchDurableSessionActiveLeaf({ session, layout, leafEntryId: entryId });
-    if (summary) {
-      appendBranchSummaryEvent(this.host.store.transcriptPath(sessionId), {
-        summary,
-        droppedTurns: abandoned.length,
-        timestamp: new Date().toISOString(),
-      });
-    }
+    // Recorded whether or not anything could summarize it. The move is the fact
+    // worth keeping: without it, reopening the session showed a shorter
+    // conversation with nothing saying anything had been left behind.
+    appendBranchSummaryEvent(this.host.store.transcriptPath(sessionId), {
+      ...(summary !== undefined ? { summary } : {}),
+      droppedTurns: abandoned.length,
+      toEntryId: entryId,
+      timestamp: new Date().toISOString(),
+    });
     return abandoned.length;
   }
 

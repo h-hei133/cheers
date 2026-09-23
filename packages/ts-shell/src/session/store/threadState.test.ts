@@ -4,7 +4,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { Session } from "../schema/sessionRecord.js";
-import { createSessionStoreLayout, projectSessionFileLayout } from "./sessionFileLayout.js";
+import {
+  createSessionStoreLayout,
+  locateExistingSessionLayout,
+  projectSessionFileLayout,
+} from "./sessionFileLayout.js";
 import { loadSessionRecord, writeSessionRecord } from "./sessionStore.js";
 import {
   appendTranscriptEvent,
@@ -12,6 +16,7 @@ import {
   readTranscriptEvents,
 } from "../transcript/sessionTranscript.js";
 import { createMessageTranscriptEvent } from "../sessionEventCodec.js";
+import { SessionManager } from "../SessionManager.js";
 import { sessionThreadPath } from "../schema/sessionThread.js";
 import { writeSessionState } from "./sessionStateStore.js";
 import {
@@ -370,6 +375,41 @@ describe("branching", () => {
         "one",
       ]);
     } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("records a move even when nothing could summarize it", async () => {
+    // The record used to depend on a model summarizing the abandoned turns. With
+    // no provider — or a failed call — the session reopened shorter with nothing
+    // saying anything had been left behind.
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "session-trace-"));
+    const priorHome = process.env.HOME;
+    try {
+      process.env.HOME = home;
+      process.env.USERPROFILE = home;
+      const manager = new SessionManager();
+      const created = manager.createNew("/repo");
+      manager.addTurn(created.id, { role: "user", content: "one" } as never);
+      manager.addTurn(created.id, { role: "assistant", content: "two" } as never);
+      manager.addTurn(created.id, { role: "user", content: "three" } as never);
+
+      const traceLayout = locateExistingSessionLayout(
+        createSessionStoreLayout(),
+        created.id,
+      );
+      const before = fs.readFileSync(traceLayout.transcriptPath, "utf8");
+
+      // No summarizer: this is the case that used to leave nothing behind.
+      await manager.revertTo(created.id, manager.getSession(created.id)!.turns[0]!.id!);
+
+      const after = fs.readFileSync(traceLayout.transcriptPath, "utf8");
+      expect(after.length).toBeGreaterThan(before.length);
+      expect(after).toContain("branch_summary");
+      expect(after).toContain("toEntryId");
+    } finally {
+      process.env.HOME = priorHome;
+      process.env.USERPROFILE = priorHome;
       fs.rmSync(home, { recursive: true, force: true });
     }
   });

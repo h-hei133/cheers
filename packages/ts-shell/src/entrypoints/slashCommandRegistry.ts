@@ -67,6 +67,11 @@ const PICKER_ONLY: readonly SlashCommandSpec[] = [
     summary: "choose which facts the status band keeps in view",
     argumentHint: "use <preset|item...>",
   },
+  {
+    name: "back",
+    group: "session",
+    summary: "ask an earlier question again, keeping the rest of the conversation",
+  },
 ];
 
 const extensions: SlashCommandSpec[] = [...PICKER_ONLY];

@@ -38,7 +38,7 @@ export interface RewindPickerInput {
 export function rewindPicker(input: RewindPickerInput): Picker {
   const points = rewindPoints(input.turns);
   return {
-    title: "Go back to",
+    title: "Ask again from",
     form: "panel",
     empty: "Nothing to go back to yet — no questions have been asked in this session.",
     async load(): Promise<readonly Option[]> {
@@ -71,17 +71,28 @@ export function rewindPoints(turns: readonly SessionMessage[]): RewindPoint[] {
     points.push({
       entryId: turn.id,
       prompt: turn.content.trim(),
-      dropped: turns.length - index,
+      // Counts what is left behind, which is everything after this question.
+      // The question itself stays — it is what goes back in the editor — so
+      // including it would overstate the cost by one every time.
+      dropped: turns.length - index - 1,
     });
   }
   return points.reverse().slice(0, MAX_POINTS);
 }
 
-/** What choosing this point costs, in what was said rather than in turn counts. */
+/**
+ * What choosing this point does.
+ *
+ * Phrased as what the user gets back rather than what is lost. "Forgets one
+ * exchange" described the same thing but read as damage, and on the newest
+ * question it read as nothing happening at all — which is what a person saw when
+ * they chose the top of the list expecting to re-ask it and found the screen
+ * unchanged.
+ */
 function describeCost(dropped: number): string {
-  if (dropped <= 1) return "the most recent question";
-  const exchanges = Math.max(1, Math.round(dropped / 2));
-  return exchanges === 1 ? "forgets one exchange after it" : `forgets ${exchanges} exchanges after it`;
+  if (dropped === 0) return "drops the answer to this question";
+  if (dropped === 1) return "drops one turn after this question";
+  return `drops ${dropped} turns after this question`;
 }
 
 function summarise(prompt: string): string {

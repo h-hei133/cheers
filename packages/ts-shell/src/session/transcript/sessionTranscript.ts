@@ -93,14 +93,19 @@ export function projectTranscriptMessages(
     } else if (event.type === "branch_summary") {
       // What the abandoned turns established, carried forward as a note. It is
       // not a turn the user took, so it reads as context rather than as speech.
-      messages = [
-        ...messages,
-        {
-          role: "user",
-          content: `[Earlier Path]\n${event.summary}`,
-          timestamp: event.timestamp,
-        },
-      ];
+      // A move with nothing to summarize adds no message: there is no content to
+      // carry, and inventing a placeholder would put a turn in the conversation
+      // that nobody said.
+      if (event.summary !== undefined) {
+        messages = [
+          ...messages,
+          {
+            role: "user",
+            content: `[Earlier Path]\n${event.summary}`,
+            timestamp: event.timestamp,
+          },
+        ];
+      }
     } else if (event.type === "message") {
       const msg = transcriptEventToSessionMessage(event);
       if (msg) {
@@ -136,16 +141,20 @@ export function appendCompactionEvent(
 export function appendBranchSummaryEvent(
   transcriptPath: string,
   input: {
-    readonly summary: string;
+    /** Absent when nothing could summarize the abandoned turns. */
+    readonly summary?: string;
     readonly droppedTurns: number;
+    /** The entry the conversation moved to. */
+    readonly toEntryId?: string;
     readonly timestamp: string;
   },
 ): void {
   appendTranscriptEvent(transcriptPath, {
     type: "branch_summary",
     id: createTranscriptEntryId("brsum"),
-    summary: input.summary,
+    ...(input.summary !== undefined ? { summary: input.summary } : {}),
     droppedTurns: input.droppedTurns,
+    ...(input.toEntryId !== undefined ? { toEntryId: input.toEntryId } : {}),
     timestamp: input.timestamp,
   });
 }

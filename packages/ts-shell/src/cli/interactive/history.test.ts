@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { restoreConversation } from "./history.js";
-import { rewindPoints } from "./picker/rewind.js";
+import { rewindPoints, rewindPicker } from "./picker/rewind.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
 let nextTurnId = 0;
@@ -192,11 +192,15 @@ describe("points to go back to", () => {
     ]);
   });
 
-  it("says how many turns going back would drop", () => {
+  it("counts what is left behind, not the question that stays", () => {
+    // The chosen question goes back in the editor, so it is not part of what the
+    // move costs. Counting it overstated every entry by one, which read as the
+    // command doing more than it did.
     const [newest, older] = rewindPoints(CONVERSATION);
 
-    expect(newest?.dropped).toBe(2);
-    expect(older?.dropped).toBe(5);
+    // "second question" is followed by one answer; "first question" by four turns.
+    expect(newest?.dropped).toBe(1);
+    expect(older?.dropped).toBe(4);
   });
 
   it("has nothing to offer before a question is asked", () => {
@@ -207,5 +211,24 @@ describe("points to go back to", () => {
     const [newest] = rewindPoints(CONVERSATION);
 
     expect(CONVERSATION.find((t) => t.id === newest!.entryId)?.content).toBe("second question");
+  });
+});
+
+describe("the record a move leaves behind", () => {
+  it("describes what choosing an entry does, not what is lost", () => {
+    // "Forgets one exchange" described the same thing but read as damage, and on
+    // the newest question it read as nothing happening — which is what a user
+    // saw when they picked the top of the list and found the screen unchanged.
+    const [newest] = rewindPoints(CONVERSATION);
+    const picker = rewindPicker({
+      turns: CONVERSATION,
+      rewind: async () => "note",
+    });
+
+    return picker.load().then((options) => {
+      expect(options[0]?.detail).not.toMatch(/forget/i);
+      expect(newest?.dropped).toBe(1);
+      expect(options[0]?.detail).toContain("after this question");
+    });
   });
 });

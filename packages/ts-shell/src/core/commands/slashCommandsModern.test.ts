@@ -96,3 +96,25 @@ describe("Modern Slash Commands Subsystem", () => {
     expect(copyRoute?.kind).toBe("local");
   });
 });
+
+describe("going back has its own name", () => {
+  it("does not answer to rewind, so the word means the conversation", async () => {
+    // `rewind` and `revert` were aliases of /undo, which reports file edits. A
+    // user asking to revisit a question was handed a report about files and had
+    // no way to tell that was not what they asked for.
+    const { listVisibleCommands } = await import("./registry.js");
+    const undo = listVisibleCommands().find((command) => command.name === "undo");
+
+    expect(undo).toBeDefined();
+    expect(undo?.aliases ?? []).not.toContain("rewind");
+    expect(undo?.aliases ?? []).not.toContain("revert");
+  });
+
+  it("describes what the file report does, not what a conversation move does", async () => {
+    const { listVisibleCommands } = await import("./registry.js");
+    const undo = listVisibleCommands().find((command) => command.name === "undo");
+
+    expect(undo?.summary).toMatch(/edit|file/i);
+    expect(undo?.summary).not.toMatch(/conversation/i);
+  });
+});

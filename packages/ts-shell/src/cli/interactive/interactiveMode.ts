@@ -334,7 +334,7 @@ export class InteractiveMode {
           this.tui.requestRender();
         },
         retry: () => this.onSubmit("/retry"),
-        openRewind: () => this.openPicker("rewind"),
+        openRewind: () => this.openPicker("back"),
         redrawAfter: (delayMs) => {
           setTimeout(() => this.tui.requestRender(), delayMs).unref?.();
         },
@@ -573,8 +573,10 @@ export class InteractiveMode {
         );
         showConversation(this.historyTarget());
         this.tui.requestRender({ force: true });
+        // Says how far back, and that the rest is still there. "Went back"
+        // alone left the user asking what the conversation now consisted of.
         return dropped > 0
-          ? "Went back. The rest is kept, not erased — /undo reverts what was written."
+          ? `Went back: this question is at the end of the conversation again, and the ${dropped === 1 ? "turn" : `${dropped} turns`} that followed ${dropped === 1 ? "is" : "are"} kept, not erased. Reopen it from /back.`
           : "Already at that point in the conversation.";
       },
       previewStatusItems: (items) => {

@@ -75,9 +75,9 @@ const PICKERS: Record<string, PickerFactory> = {
   marketplace: (host) => sourcePicker(host.commandContext),
   restore: (host) => restorePicker(host.projectRoot),
   skill: (host) => skillPicker(host.commandContext),
-  // Reached by pressing Escape twice rather than by typing a command, so it is
-  // deliberately absent from `opensPicker`'s bare-command set.
-  rewind: (host) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind }),
+  // Reachable either way: `/back`, or Escape twice on an empty prompt. The
+  // gesture is fast once known; the command is how it becomes known.
+  back: (host) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind }),
   statusline: (host) =>
     statusItemPicker({
       current: host.statusItems,
@@ -91,9 +91,6 @@ export function pickerFor(command: string, host: PickerHost): Picker | undefined
   return PICKERS[command.replace(/^\//, "").toLowerCase()]?.(host);
 }
 
-/** Pickers that a typed command must never open, however it is spelled. */
-const KEY_ONLY = new Set(["rewind"]);
-
 /** Whether a submitted line is a bare command that opens a picker. */
 export function opensPicker(line: string): boolean {
   const trimmed = line.trim();
@@ -101,5 +98,5 @@ export function opensPicker(line: string): boolean {
   // Arguments mean the user already knows what they want; only the bare form
   // opens a chooser, so `/model use x` still works as typed.
   const name = trimmed.slice(1).toLowerCase();
-  return !/\s/.test(trimmed) && name in PICKERS && !KEY_ONLY.has(name);
+  return !/\s/.test(trimmed) && name in PICKERS;
 }

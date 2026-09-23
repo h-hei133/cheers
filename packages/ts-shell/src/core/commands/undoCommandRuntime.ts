@@ -5,7 +5,7 @@ import { defaultLedgerRoot } from "./restoreCommandRuntime.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 /**
- * /undo (aliases: /rewind, /revert) — take back what was just written.
+ * /undo — report the most recent file edit and how to revert it.
  *
  * The old output was a report: session telemetry, a file count, the entire
  * `git diff HEAD`, and instructions to run something else. None of that is the
@@ -16,8 +16,12 @@ import type { CommandContext, LocalCommandResult } from "./types.js";
  * So this answers narrowly: which edit was the most recent, what it touched, and
  * the exact audited command that reverts it. The revert itself stays behind that
  * command because it writes to the working tree, and this shell does not turn one
- * word into a write. Going back in the *conversation* is a different act with its
- * own gesture — Escape twice — and does not touch files.
+ * word into a write.
+ *
+ * Going back in the *conversation* is a different act, named differently: `/back`,
+ * or Escape twice. It does not touch files, and this command does not touch the
+ * conversation. The two used to share the word `rewind`, which meant someone
+ * asking to revisit a question was handed a report about files.
  */
 export async function runUndoCommand(
   args: string[],
