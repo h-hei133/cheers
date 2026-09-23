@@ -5,7 +5,7 @@ sources: [phase-5-pre-research-2026-09-23, repo-audit-2026-09-23, pi-source-2026
 created: 2026-09-23
 updated: 2026-09-23
 tags: [features, phase-5, decisions, adjudication]
-summary: "Phase 5 开工前的**唯一裁决源**。8 项主决策 + 22 项补充裁决。核心裁决：①**删除 32 文件 / 8,330 行的「报告投影族」**（`tools/dispatch` 全族、`turn/` 七个投影模块、`provider/request|response` 八个包装模块 + 6 个连带闭包），依据是活轨已有承担者且位置更好——工具批执行在 `core/agent/tools.ts:184`、文件锁在 `runtime/execution/fileLock.ts:85`、模型请求在 `turn/step.ts:97`；②**新增重试与错误分类**，照抄 pi 的**两层结构**（provider 层默认 0 次、agent 层默认 3 次）与「服务端 `Retry-After` 优先于本地退避」；③`CatalogModel` 从 3 字段扩到 8 字段并让 `compat` **真正改变请求形状**（当前 11 个标志只用来生成说明字符串）；④配置错误改为**降级 + 诊断**而非抛异常；⑤`steeringMode`/`followUpMode` 两跳接线；⑥压缩文件足迹跨压缩累积；⑦崩溃日志 + 启动计时；⑧`edits[]` 多段编辑（**`find` 部分经复核撤销**：`glob` 已只返回路径、已匹配模式、已读 `.gitignore`，新建即重复）。**同时更正 5 条既有记录**：`ls`、`powershell`、`find` 三项更正为「平手」/「不存在差距」、主题死令牌数从 18 更正为 14、`/export jsonl` 的原始缺陷已由 Phase 4 T5 收口。"
+summary: "Phase 5 开工前的**唯一裁决源**。8 项主决策 + 22 项补充裁决。核心裁决：①**删除 32 文件 / 8,330 行的「报告投影族」**（`tools/dispatch` 全族、`turn/` 七个投影模块、`provider/request|response` 八个包装模块 + 6 个连带闭包），依据是活轨已有承担者且位置更好——工具批执行在 `core/agent/tools.ts:184`、文件锁在 `runtime/execution/fileLock.ts:85`、模型请求在 `turn/step.ts:97`；②**新增重试与错误分类**，照抄 pi 的**两层结构**（provider 层默认 0 次、agent 层默认 3 次）与「服务端 `Retry-After` 优先于本地退避」；③`CatalogModel` 从 3 字段扩到 7 字段（原裁决 8 个，执行期撤销 `input`——无任何消费者）并让 `compat` **真正改变请求形状**（当前 11 个标志只用来生成说明字符串）；④配置错误改为**降级 + 诊断**而非抛异常；⑤`steeringMode`/`followUpMode` 两跳接线；⑥压缩文件足迹跨压缩累积；⑦崩溃日志 + 启动计时；⑧`edits[]` 多段编辑（**`find` 部分经复核撤销**：`glob` 已只返回路径、已匹配模式、已读 `.gitignore`，新建即重复）。**同时更正 5 条既有记录**：`ls`、`powershell`、`find` 三项更正为「平手」/「不存在差距」、主题死令牌数从 18 更正为 14、`/export jsonl` 的原始缺陷已由 Phase 4 T5 收口。"
 confidence: high
 ---
 
