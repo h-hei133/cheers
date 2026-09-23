@@ -1,4 +1,5 @@
 import type { AgentEventSink } from "./events.js";
+import { flushMetrics, recordCount, recordTiming } from "../../observability/metrics.js";
 import type { AgentMessage, AgentStopReason } from "./state.js";
 import {
   isRetryableFailure,
@@ -74,6 +75,7 @@ export async function runAgentLoop(
   const produced: AgentMessage[] = [];
   const context: AgentMessage[] = [...seed, ...prompts];
 
+  const turnStarted = Date.now();
   await emit({ type: "agent_start" });
   await emit({ type: "turn_start" });
   for (const prompt of prompts) {
@@ -81,7 +83,15 @@ export async function runAgentLoop(
     await emit({ type: "message_end", message: prompt });
     produced.push(prompt);
   }
-  await driveLoop(context, produced, config, emit, signal, !options.skipInitialSteeringPoll);
+  try {
+    await driveLoop(context, produced, config, emit, signal, !options.skipInitialSteeringPoll);
+  } finally {
+    // Flushed even when the turn failed: a run that fell over is exactly the one
+    // whose numbers someone will want, and dropping them would make the metrics
+    // describe only the turns that went well.
+    recordTiming("turn.duration", Date.now() - turnStarted);
+    flushMetrics();
+  }
   return produced;
 }
 
@@ -111,6 +121,7 @@ async function retryStep(
     attempt += 1;
     if (attempt > policy.maxRetries) return step;
 
+    recordCount("provider.retries", 1);
     const delayMs = retryDelayMs(policy, attempt, undefined);
     await emit({ type: "retry_scheduled", attempt, maxAttempts: policy.maxRetries, delayMs });
     if (!(await waitBeforeRetry(delayMs, signal))) return step;
@@ -133,10 +144,19 @@ export async function runAgentLoopContinue(
   const produced: AgentMessage[] = [];
   const context: AgentMessage[] = [...seed];
 
+  const turnStarted = Date.now();
   await emit({ type: "agent_start" });
   await emit({ type: "turn_start" });
 
-  await driveLoop(context, produced, config, emit, signal, false);
+  try {
+    await driveLoop(context, produced, config, emit, signal, false);
+  } finally {
+    // The turn's own duration, and then everything the turn recorded. Flushed
+    // here rather than per call because the log sink appends synchronously —
+    // writing per tool call would put a blocking disk write on the hot path.
+    recordTiming("turn.duration", Date.now() - turnStarted);
+    flushMetrics();
+  }
   return produced;
 }
 

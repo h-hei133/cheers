@@ -24,6 +24,7 @@ import { requestCompactionSummary } from "../../core/query/compaction/summarize.
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
+import { recordCount } from "../../observability/metrics.js";
 import { estimateTokens } from "../../session/context.js";
 import { KEEP_RECENT_TOKENS, type CompactionPolicy, type SummarizeHistory, type SummarizeTurnPrefix } from "../../session/compaction.js";
 import { DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
@@ -229,6 +230,9 @@ export function createCliSessionRuntime(input: {
             onCompact: (record) => {
               input.sessionManager.appendCompactionEntry(sessionId, record);
               markContextUnknown(sessionId);
+              // Counted at the point a compaction actually happened, which is
+              // low frequency, so recording it inline is not a hot path.
+              recordCount("compaction.runs", 1, {});
             },
           }
         : undefined;

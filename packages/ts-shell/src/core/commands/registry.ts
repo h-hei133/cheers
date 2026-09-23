@@ -45,6 +45,7 @@ import { runShellCommand } from "./shellCommandRuntime.js";
 import { runLogCommand } from "./logCommandRuntime.js";
 import { runCrashCommand } from "./crashCommandRuntime.js";
 import { runTimingsCommand } from "./timingsCommandRuntime.js";
+import { runMetricsCommand } from "./metricsCommandRuntime.js";
 import {
   runDiagnoseCommand,
 } from "./localCommandRuntime.js";
@@ -664,6 +665,17 @@ export function createCommandRegistry(
       summary: "how long each phase of startup took, when CHEERS_TIMING=1 was set",
       group: "workspace",
       execute: (args, context) => runTimingsCommand(args, context),
+    },
+    {
+      name: "metrics",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      summary: "tool calls, timings, retries and compactions this session recorded",
+      group: "workspace",
+      argumentHint: "[lines]",
+      execute: (args, context) => runMetricsCommand(args, context),
     },
   ];
 

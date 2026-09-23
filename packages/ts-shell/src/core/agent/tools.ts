@@ -1,4 +1,5 @@
 import type { AgentEventSink } from "./events.js";
+import { recordCount, recordTiming } from "../../observability/metrics.js";
 import type { AgentMessage } from "./state.js";
 
 export interface AgentToolCall {
@@ -236,8 +237,12 @@ async function executePreparedCall(
   signal: AbortSignal | undefined,
   emit: AgentEventSink,
 ): Promise<AgentToolResult> {
+  // Timed here because this is the one place every tool call passes through,
+  // whether it ran sequentially or in a batch. The measurement is buffered, so
+  // it costs a map update rather than a disk write on the hot path.
+  const started = Date.now();
   try {
-    return await tool.execute(call.id, args, signal, (partialResult) => {
+    const result = await tool.execute(call.id, args, signal, (partialResult) => {
       void emit({
         type: "tool_execution_update",
         toolCallId: call.id,
@@ -246,7 +251,14 @@ async function executePreparedCall(
         partialResult,
       });
     });
+    recordCount("tool.calls", 1, { tool: call.name, outcome: result.isError ? "error" : "ok" });
+    recordTiming("tool.duration", Date.now() - started, { tool: call.name });
+    return result;
   } catch (error) {
+    // A throw is a tool outcome too, and leaving it uncounted would make the
+    // error rate look lower than it is.
+    recordCount("tool.calls", 1, { tool: call.name, outcome: "error" });
+    recordTiming("tool.duration", Date.now() - started, { tool: call.name });
     return {
       output: `Tool execution error: ${error instanceof Error ? error.message : String(error)}`,
       isError: true,

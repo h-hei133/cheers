@@ -53,7 +53,7 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 | 崩溃日志 | `src/core/crash-log.ts`（`CrashRecord`，保留最近 5 条，7 天过期） | `observability/crashLog.ts`（Phase 5 T7） | ✅ **已收口**（**2026-09-23 更正**） | 保留最近 5 条 + `/crash`（含 `--stack`）。**复核轮修了一个致命缺陷**：只记录不重抛 → 每个致命崩溃变成进程继续运行；已改为 `throw error`（实机 exit 7 + 记录先落盘）。**余量**：无 7 天过期（pi 有）。见 §3.1（已同步更正） |
 | Bug report（含脱敏与打包） | `src/core/bug-report.ts`（`redactUrl`、敏感键正则、zip、UUID） | 无 | **MISSING** | 见 §3.2 |
 | 启动性能计时 | `src/core/timings.ts`（`PI_TIMING=1`，命名空间） | `observability/startupTiming.ts`（Phase 5 T7） | ✅ **已收口**（**2026-09-23 更正**） | `CHEERS_TIMING=1` 门控、相邻标记差值、`/timings` 命令。**复核轮修了两处**：首个标记曾恒为 0ms 且不计入 total；标为「process start」的标记实际在模块加载之后。见 §3.3（已同步更正） |
-| Metrics 采集 | `src/core/telemetry.ts`（**opt-in 安装遥测**，`PI_TELEMETRY`——**不是通用 metrics sink**） | `observability/metrics.ts`（sink 在，**全仓仅 1 个调用点**） | **DEFICIENT**（**2026-09-23 更正**） | **复核更正两处**：① pi 的 `telemetry.ts` 是**安装遥测**，无可抄的通用 sink；② 我方 sink 是 `fs.appendFileSync`（**同步阻塞**），且 `/log tail` **丢弃 `fields`**（指标值写在 `fields` 里，**读不出来**）。**这是 Phase 6 的 T2**，见 `phase-6-decisions.md` §2 |
+| Metrics 采集 | `src/core/telemetry.ts`（**opt-in 安装遥测**，`PI_TELEMETRY`——**不是通用 metrics sink**） | ✅ **已收口**（**2026-09-24**，Phase 6 T2）：5 类采集点 + 按回合批量写 + `/metrics` 命令 | ~~DEFICIENT~~ **已收口** | **复核更正两处**：① pi 的 `telemetry.ts` 是**安装遥测**，无可抄的通用 sink；② 我方 sink 是 `fs.appendFileSync`（**同步阻塞**），且 `/log tail` **丢弃 `fields`**（指标值写在 `fields` 里，**读不出来**）。**这是 Phase 6 的 T2**，见 `phase-6-decisions.md` §2 |
 | 结构化日志 | 无独立结构化日志层 | `observability/structuredLogger.ts`（脱敏 + trace 关联 + 轮转文件） | **OURS-ONLY** | 见 §4 |
 | Trace context（traceId/spanId 传播） | 无 | `observability/traceContext.ts` | **OURS-ONLY** | 见 §4 |
 | 会话用量统计（token） | `src/core/usage-totals.ts`（`UsageTotals` 含 input/output/cacheRead/cacheWrite/cost） | ✅ **已实现**（**2026-09-23 更正**）：`observability/usageTelemetry.ts` | ~~DEFICIENT~~ **已收口** | `recordSessionUsage`/`getSessionUsage` + `/cost` 渲染（含 cache 维度与费率）。**余量见下一行**（按模型分桶）。见 §2.4（已同步更正） |
@@ -130,7 +130,20 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 
 **最小改动建议**：改为收集诊断 + 在启动横幅或 `/diagnose` 里显示，与 `catalogStore` 的降级策略统一。
 
-### 2.3 Metrics 有 API 无 sink（置信度：高）
+### 2.3 Metrics 有 API 无 sink（置信度：高）—— ✅ **2026-09-24 已收口（Phase 6 T2）**
+
+> **收口说明**：sink 早已存在，缺的是**写入面**（全仓仅 1 个调用点）与**读取面**
+> （`/log tail` 丢弃 `fields`，指标值读不出来）。
+> 已补：① 采集点——`tool.calls`/`tool.duration`（`core/agent/tools.ts:253-254`，唯一工具执行入口）、
+> `turn.duration`（`core/agent/loop.ts:90`）、`provider.retries`（`loop.ts:124`）、
+> `compaction.runs`（`cliSessionRuntimeFactory.ts:235`）；
+> ② **按回合批量写**（`metrics.ts` 的累加器 + `flushMetrics`）——sink 是
+> `fs.appendFileSync` **同步写**，逐调用写会在热路径上放几十次阻塞磁盘写；
+> ③ 新增 `/metrics` 命令，**跨进程读当天所有日志文件**（sink 是
+> `<prefix>.<date>.<pid>.log`，只读当前进程会在下次运行时看不到上次的数字）。
+> **实机验证**：真实会话后 `/metrics` 输出
+> `tool.calls | tool=read outcome=ok | 1 | total 1` 等 4 行。
+> 见 `phase-6-execution.md` §2。**下方原文保留为当时的证据。**
 
 **证据（我们）**：
 

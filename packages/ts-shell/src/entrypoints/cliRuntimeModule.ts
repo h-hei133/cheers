@@ -25,6 +25,7 @@ import {
   type TurnEndStatus,
 } from "../core/shell/turnBoundarySurface.js";
 import { recordCount } from "../observability/index.js";
+import { flushMetrics } from "../observability/metrics.js";
 import type { StructuredLogger } from "../observability/structuredLogger.js";
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
@@ -429,6 +430,11 @@ export async function executeResolvedPromptTurn(options: {
     } finally {
       unsubscribe?.();
       if (options.jsonEvents) options.renderer.clearSink();
+      // The prompt counter is recorded before the turn runs, so a run that never
+      // reached a turn — a readiness failure, an aborted start — would leave it
+      // buffered forever. Flushed here so the counter survives the failure that
+      // makes it interesting.
+      flushMetrics();
     }
   } catch (error) {
     const shellState = options.sessionRuntime.getState();
