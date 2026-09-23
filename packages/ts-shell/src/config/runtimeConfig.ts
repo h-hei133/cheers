@@ -140,18 +140,23 @@ export interface RuntimeConfig {
   /**
    * Explicit override of the interactive surface.
    *
+   * `fullscreen` is the private screen: it restores the terminal exactly on exit
+   * and takes the transcript with it. It is the default because it is what the
+   * surface did before this field had a reader — a default decides what everyone
+   * who never set the field sees, so it preserves what they already had rather
+   * than adopting another tool's choice.
+   *
    * `regular` keeps the conversation in the terminal's own scrollback and only
    * redraws the fixed block at the bottom, so a session that ends leaves
-   * something to scroll back through. `fullscreen` is the private screen, which
-   * restores the terminal exactly on exit and takes the transcript with it.
+   * something to scroll back through. **Experimental and not yet adapted**: only
+   * "do not take the alternate screen" and "write the transcript back on exit"
+   * are implemented. The fixed block is re-anchored on resize but not as content
+   * grows, so the prompt and the output drift out of place during a turn. Use it
+   * for the scrollback, not for the layout.
+   *
    * Anything else, including `stream`, is treated as `fullscreen`: `stream` is
    * reserved and has no defined meaning yet, so it does not get a behavior
    * invented for it.
-   *
-   * `fullscreen` is the default because it is what the surface did before this
-   * field had a reader. A default is not a place to adopt another tool's choice:
-   * it decides what everyone who never set the field sees, and changing it
-   * silently changes the product's appearance.
    */
   readonly tuiMode?: "regular" | "fullscreen" | "stream";
   readonly tui?: TuiPreferences;

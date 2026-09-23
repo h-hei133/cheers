@@ -1,6 +1,15 @@
 /**
  * Painting to the terminal's own screen, with its scrollback left intact.
  *
+ * **Experimental: not yet adapted to the whole surface.** What exists is the
+ * screen handling — appending the transcript once, never rewriting it, and
+ * redrawing the fixed block in place. What is missing is re-anchoring that block
+ * as content grows: the fixed block is placed relative to rows already written,
+ * and a turn that appends rows without a resize does not move it, so the prompt
+ * and the output drift apart while a turn runs. Reached through
+ * `tuiMode: "regular"`; the default is the alternate screen, which does not have
+ * this problem because it repaints the whole viewport each frame.
+ *
  * The alternate screen is the other mode: a private screen the surface owns, no
  * scrollback, and leaving it restores whatever the user had. That is the right
  * default for a full-screen application, and the wrong one for a conversation —

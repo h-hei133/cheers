@@ -702,7 +702,7 @@ enabling in-place branching without creating new files."*
 | 19 | `/reload` 主题 | **调用 `applyTheme` + 强制重绘** | 报告变化而不产生变化比不报告更糟 |
 | 20 | `tuiMode` 接线 | **做**，`regular` 不进备用屏 | scrollback 保留 |
 | 21 | `tuiMode: "stream"` | **不实现**，注释标为「保留但未定义」 | `pi` 无对应物，疑似历史遗留 |
-| 22 | `tuiMode` 的 `regular` 完整度 | **部分实现即可**（不进备用屏 + 退出回写），如实标注 | 完整 `pi` 级重定位不是本轮范围 |
+| 22 | `tuiMode` 的 `regular` 完整度 | **部分实现即可**（不进备用屏 + 退出回写），**标注为实验性/未适配** | 完整 `pi` 级重定位不是本轮范围 |
 | 23 | `tuiMode` 门禁白名单 | 接线后**移除** | 门禁条目是「决定」不是「积压」 |
 | 24 | 会话存储形态 | **保留目录三件套**，不改成单文件 DAG | 改 DAG 是存储层重写；分支能力已存在 |
 | 25 | transcript `id` | **加**；旧行按行号合成，**不迁移文件** | 迁移会破坏 append-only 承诺 |
