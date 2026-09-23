@@ -21,11 +21,26 @@ import type { Suggestion } from "../../presentation/tui/chrome/suggestions.js";
 const MAX_CANDIDATES = 5000;
 
 interface CacheEntry {
-  readonly root: string;
   readonly files: readonly string[];
 }
 
-let cache: CacheEntry | undefined;
+/**
+ * One listing per workspace, kept until something says the tree changed.
+ *
+ * A single slot was wrong: a second workspace overwrote the first, and the
+ * workspace that had just been asked about fell back to an empty list until its
+ * walk finished again. Subagent and worktree sessions reach the same process, so
+ * two roots is ordinary rather than exotic.
+ */
+const caches = new Map<string, CacheEntry>();
+/**
+ * Bumped when every listing is thrown away.
+ *
+ * A walk started before an invalidation must not install its result afterwards —
+ * that would resurrect the very listing the reload was meant to discard — so each
+ * walk records the generation it began in and only writes if it is still current.
+ */
+let generation = 0;
 
 /**
  * The files of `root`, from the cache when it is current.
@@ -36,34 +51,45 @@ let cache: CacheEntry | undefined;
  * keystroke, and a stale list is what would mislead.
  */
 export function workspaceFiles(root: string): readonly string[] {
-  if (cache?.root === root) return cache.files;
-  cache = { root, files: [] };
+  const cached = caches.get(root);
+  if (cached !== undefined) return cached.files;
+  // An empty entry marks a walk in flight, so a second keystroke does not start
+  // another one.
+  caches.set(root, { files: [] });
+  const startedIn = generation;
   void listWorkspaceFiles(root)
     .then((files) => {
-      // Only if the workspace is still the one that was asked about: a session
-      // that moved while the walk ran must not have the old tree cached under it.
-      if (cache?.root === root) {
-        cache = { root, files: files.slice(0, MAX_CANDIDATES) };
+      // A listing that started before an invalidation describes a tree nobody is
+      // asking about any more, so it is dropped rather than installed.
+      if (generation === startedIn) {
+        caches.set(root, { files: files.slice(0, MAX_CANDIDATES) });
       }
     })
     .catch(() => {
       // A walk that fails leaves the empty list in place, which completes
       // nothing rather than completing something wrong.
     });
-  return cache.files;
+  return caches.get(root)!.files;
 }
 
-/** Forget the cached listing, so the next completion walks again. */
+/** Forget every cached listing, so the next completion walks again. */
 export function invalidateWorkspaceFiles(): void {
-  cache = undefined;
+  caches.clear();
+  generation += 1;
 }
 
 /** Wait for the listing, for callers that can afford to. */
 export async function warmWorkspaceFiles(root: string): Promise<void> {
-  if (cache?.root === root && cache.files.length > 0) return;
+  const cached = caches.get(root);
+  // A populated entry needs no walk; an empty one may be a walk in flight, and
+  // waiting on it is still what this caller asked for.
+  if (cached !== undefined && cached.files.length > 0) return;
+  const startedIn = generation;
   try {
     const files = await listWorkspaceFiles(root);
-    cache = { root, files: files.slice(0, MAX_CANDIDATES) };
+    if (generation === startedIn) {
+      caches.set(root, { files: files.slice(0, MAX_CANDIDATES) });
+    }
   } catch {
     // Leaving the previous answer in place is better than clearing it: a failed
     // refresh should not take away completions that already worked.

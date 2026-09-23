@@ -81,9 +81,16 @@ export function loadSessionRecord(input: {
     // Which branch is in view is a question about the thread, so the thread
     // answers it. Without a thread — a session recorded before any of this
     // existed — every message in the transcript is the conversation, as before.
-    const branchPath = state.thread === undefined
-      ? undefined
-      : sessionThreadPath(state.thread).path.map((entry) => entry.id);
+    //
+    // A thread whose path cannot be resolved is left to `undefined` rather than
+    // passed on as an empty path: an empty path is a branch with no messages,
+    // which would load the session as a conversation that said nothing. Passing
+    // nothing instead puts the transcript back in charge, which is the only
+    // other account of what the session contained.
+    const threadPath = state.thread === undefined ? undefined : sessionThreadPath(state.thread);
+    const branchPath = threadPath?.resolved === true
+      ? threadPath.path.map((entry) => entry.id)
+      : undefined;
     const turns = projectBranchMessages(
       readTranscriptEvents(input.layout.transcriptPath),
       branchPath,

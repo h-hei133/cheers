@@ -166,24 +166,29 @@ export class SessionManager extends SessionReadSurface {
     if (!target.resolved || target.path.length === 0) return 0;
 
     const onBranch = new Set(target.path.map((entry) => entry.id));
-    const abandoned = session.turns.filter(
+    const abandonedTurns = session.turns.filter(
       (turn) => turn.id === undefined || !onBranch.has(turn.id),
     );
-    const summary = summarize && abandoned.length > 0
-      ? await summarize(abandoned).catch(() => undefined)
+    const summary = summarize && abandonedTurns.length > 0
+      ? await summarize(abandonedTurns).catch(() => undefined)
       : undefined;
 
     switchDurableSessionActiveLeaf({ session, layout, leafEntryId: entryId });
     // Recorded whether or not anything could summarize it. The move is the fact
     // worth keeping: without it, reopening the session showed a shorter
     // conversation with nothing saying anything had been left behind.
+    //
+    // The abandoned turns are named for the same reason the entry ids are: the
+    // note has to be readable back on the branch it applies to and nowhere else,
+    // and which turns went is the only thing that says which branch that is.
     appendBranchSummaryEvent(this.host.store.transcriptPath(sessionId), {
       ...(summary !== undefined ? { summary } : {}),
-      droppedTurns: abandoned.length,
+      droppedTurns: abandonedTurns.length,
       toEntryId: entryId,
+      abandonedEntryIds: abandonedTurns.flatMap((turn) => (turn.id === undefined ? [] : [turn.id])),
       timestamp: new Date().toISOString(),
     });
-    return abandoned.length;
+    return abandonedTurns.length;
   }
 
   createNewWithId(

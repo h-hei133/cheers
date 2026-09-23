@@ -121,8 +121,14 @@ function walk(dir, files = []) {
 // its own declaration module. Destructuring (`const { a } = config`) and index
 // access (`config['a']`) would escape this pattern; neither appears in this tree,
 // and the parse guards above fail loudly if the shape changes.
+//
+// `this.field` does not count. A class member with the same name as a config
+// field — `InteractiveMode` has a `tui` render engine, and `provider` and
+// `agentMode` are likewise common member names — would otherwise satisfy the gate
+// while the config value itself is never read. That is the failure the gate
+// exists to catch, so the lookbehind is what keeps it honest.
 const consumers = new Map(declared.map((field) => [field, { production: [], test: [] }]))
-const matcher = new RegExp(`\\.(${declared.join('|')})\\b`, 'g')
+const matcher = new RegExp(`(?<!this)\\.(${declared.join('|')})\\b`, 'g')
 
 for (const file of walk(resolve(targetRoot, SOURCE_ROOT))) {
   const path = relative(targetRoot, file)

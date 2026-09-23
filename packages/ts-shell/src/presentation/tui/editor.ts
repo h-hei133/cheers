@@ -63,19 +63,21 @@ export class Editor {
       this.column = next.column;
     },
   });
-  /** Where the last cut finished, so the next one can continue the same entry. */
-  private lastKill: { row: number; column: number; target: KillTarget } | undefined;
+  /**
+   * What the editor did last, for the two commands that must be consecutive.
+   *
+   * A cut continues the previous cut only if nothing happened in between, and a
+   * yank-pop only replaces a yank that is still the last thing done. Comparing
+   * caret positions instead — which is what this replaced — says "unchanged" when
+   * the user moved away and came back, or typed and deleted their way to the same
+   * spot, so a cut would silently join a ring entry from an unrelated edit and a
+   * yank-pop would reach back into a yank that had already been overwritten.
+   */
+  private lastAction: "kill" | "yank" | null = null;
   private readonly edits = new EditHistory<EditorSnapshot>(
     (state) => ({ lines: [...state.lines], row: state.row, column: state.column }),
     MAX_UNDO_DEPTH,
   );
-  /**
-   * Where the last yank landed, so consecutive yanks can walk the ring.
-   *
-   * Without it a yank only ever reaches the most recent cut, and the earlier ones
-   * are unreachable however many times the key is pressed.
-   */
-  private yankAnchor: { readonly row: number; readonly column: number; readonly length: number } | undefined;
   private readonly history: string[] = [];
   private historyIndex = -1;
   private draft = "";
@@ -120,6 +122,7 @@ export class Editor {
 
   setText(text: string): void {
     this.saveUndo();
+    this.lastAction = null;
     this.lines = text.length > 0 ? text.split("\n") : [""];
     this.row = this.lines.length - 1;
     this.column = this.lines[this.row]!.length;
@@ -134,6 +137,7 @@ export class Editor {
 
   clear(): void {
     this.saveUndo();
+    this.lastAction = null;
     this.lines = [""];
     this.row = 0;
     this.column = 0;
@@ -147,6 +151,7 @@ export class Editor {
     if (!text) return;
     this.adoptAsDraft();
     this.saveUndo();
+    this.lastAction = null;
     const clean = text.replace(/\t/g, "  ").replace(/\r\n?/g, "\n");
     const line = this.lines[this.row]!;
     const before = line.slice(0, this.column);
@@ -167,6 +172,7 @@ export class Editor {
   newline(): void {
     this.adoptAsDraft();
     this.saveUndo();
+    this.lastAction = null;
     const line = this.lines[this.row]!;
     this.lines.splice(this.row, 1, line.slice(0, this.column), line.slice(this.column));
     this.row += 1;
@@ -177,6 +183,7 @@ export class Editor {
     if (this.column > 0) {
       this.adoptAsDraft();
       this.saveUndo();
+      this.lastAction = null;
       const line = this.lines[this.row]!;
       const start = this.atomicStart(line) ?? previousCluster(line, this.column);
       this.lines[this.row] = line.slice(0, start) + line.slice(this.column);
@@ -186,6 +193,7 @@ export class Editor {
     if (this.row === 0) return;
     this.adoptAsDraft();
     this.saveUndo();
+    this.lastAction = null;
     const previous = this.lines[this.row - 1]!;
     this.column = previous.length;
     this.lines[this.row - 1] = previous + this.lines[this.row]!;
@@ -198,6 +206,7 @@ export class Editor {
     if (this.column < line.length) {
       this.adoptAsDraft();
       this.saveUndo();
+      this.lastAction = null;
       const end = this.atomicEnd(line) ?? nextCluster(line, this.column);
       this.lines[this.row] = line.slice(0, this.column) + line.slice(end);
       return;
@@ -205,6 +214,7 @@ export class Editor {
     if (this.row >= this.lines.length - 1) return;
     this.adoptAsDraft();
     this.saveUndo();
+    this.lastAction = null;
     this.lines[this.row] = line + this.lines[this.row + 1]!;
     this.lines.splice(this.row + 1, 1);
   }
@@ -237,23 +247,39 @@ export class Editor {
   kill(target: KillTarget): void {
     const line = this.lines[this.row]!;
     const backward = target !== "line-end";
-    const continuing = backward && this.killRing.continues(target, { row: this.row, column: this.column });
+    // Only a cut continues a cut. Anything else in between — a motion, a
+    // keystroke, a history recall — ends the run, so the next cut starts a new
+    // ring entry instead of appending to text the user has since edited around.
+    const continuing = backward && this.lastAction === "kill";
     let start = this.column;
     let end = this.column;
     if (target === "line-end") end = line.length;
     else if (target === "line-start") start = 0;
     else start = wordStart(line, this.column);
     if (start === end) {
-      if (!backward || this.row === 0) return;
+      // At the end of a line there is no character to cut, so the line break is
+      // what goes: the cut joins this row to the next one rather than doing
+      // nothing, which is what makes the key usable from the line end.
+      if (backward) {
+        if (this.row === 0) return;
+        this.adoptAsDraft();
+        this.saveUndo();
+        this.killRing.push("\n", { continuing, prepend: true });
+        const previous = this.lines[this.row - 1]!;
+        this.lines[this.row - 1] = previous + line;
+        this.lines.splice(this.row, 1);
+        this.row -= 1;
+        this.column = previous.length;
+        this.lastAction = "kill";
+        return;
+      }
+      if (this.row >= this.lines.length - 1) return;
       this.adoptAsDraft();
       this.saveUndo();
-      this.killRing.push("\n", { continuing, prepend: true });
-      const previous = this.lines[this.row - 1]!;
-      this.lines[this.row - 1] = previous + line;
-      this.lines.splice(this.row, 1);
-      this.row -= 1;
-      this.column = previous.length;
-      this.killRing.endedAt(target, { row: this.row, column: this.column });
+      this.killRing.push("\n", { continuing: false, prepend: false });
+      this.lines[this.row] = line + this.lines[this.row + 1]!;
+      this.lines.splice(this.row + 1, 1);
+      this.lastAction = "kill";
       return;
     }
     this.adoptAsDraft();
@@ -261,11 +287,16 @@ export class Editor {
     this.killRing.push(line.slice(start, end), { continuing, prepend: true });
     this.lines[this.row] = line.slice(0, start) + line.slice(end);
     this.column = start;
-    this.killRing.endedAt(target, { row: this.row, column: this.column });
+    this.lastAction = "kill";
   }
 
   yank(): void {
-    this.yanks.take(this.killRing);
+    this.adoptAsDraft();
+    this.saveUndo();
+    // `take` reports whether anything was there; the action is a yank either way,
+    // so a yank-pop after an empty ring is refused rather than replacing text
+    // that was never inserted.
+    if (this.yanks.take(this.killRing)) this.lastAction = "yank";
   }
 
   /**
@@ -274,9 +305,16 @@ export class Editor {
    * The yank is replaced rather than appended: pressing the key again is asking
    * for a different cut, not for the same text a second time. Without this, the
    * earlier cuts are unreachable however many times the key is pressed.
+   *
+   * Only a yank that is still the last thing done can be cycled: once anything
+   * else has happened the inserted text is part of the draft, and rewriting it
+   * would undo an edit the user made after it.
    */
   yankPop(): boolean {
-    return this.yanks.cycle(this.killRing);
+    if (this.lastAction !== "yank") return false;
+    if (!this.yanks.cycle(this.killRing)) return false;
+    this.saveUndo();
+    return true;
   }
 
   undo(): boolean {
@@ -298,10 +336,15 @@ export class Editor {
     this.lines = [...snapshot.lines];
     this.row = snapshot.row;
     this.column = snapshot.column;
+    // The draft has been replaced wholesale, so whatever ran before it is over.
+    this.lastAction = null;
   }
 
   /** Move the caret; returns false when the motion had nowhere to go. */
   move(kind: CursorMove): boolean {
+    // A motion ends the run even when it goes nowhere: the key was pressed, and
+    // pressing it is what says the cut is finished.
+    this.lastAction = null;
     const line = this.lines[this.row]!;
     switch (kind) {
       case "left":

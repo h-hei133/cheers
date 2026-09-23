@@ -5,37 +5,16 @@
  * someone wants back — the word before the last one often is. Cycling walks back
  * through them and wraps around, so the key is never a dead end.
  *
- * Two cuts in a row from the same caret are one entry: pressing the kill key
- * repeatedly is cutting one passage, not several, and splitting them would make
- * the ring fill with fragments. Moving the caret ends the run, so the next cut
- * starts its own entry.
+ * Two cuts in a row are one entry: pressing the kill key repeatedly is cutting one
+ * passage, not several, and splitting them would make the ring fill with
+ * fragments. Whether two cuts are in a row is the editor's question — it is the
+ * one that sees every key — so it passes `continuing` in rather than the ring
+ * trying to infer it from where the caret ended up.
  */
 export class KillRing {
   private readonly entries: string[] = [];
-  /**
-   * Where the last cut of each kind finished.
-   *
-   * Pressing the kill key again from the same place is cutting one passage, so the
-   * new text joins the previous entry rather than starting one. Moving the caret
-   * ends the run, which is why the position is recorded and compared.
-   */
-  private readonly lastAt = new Map<string, { readonly row: number; readonly column: number }>();
 
   constructor(private readonly limit: number) {}
-
-  /**
-   * Whether a cut of `kind` continues the previous one: same kind, and the caret
-   * has not moved since.
-   */
-  continues(kind: string, at: { readonly row: number; readonly column: number }): boolean {
-    const last = this.lastAt.get(kind);
-    return last !== undefined && last.row === at.row && last.column === at.column;
-  }
-
-  /** Record where a cut finished, so the next press can tell whether it continues. */
-  endedAt(kind: string, at: { readonly row: number; readonly column: number }): void {
-    this.lastAt.set(kind, at);
-  }
 
   /**
    * Record a cut.

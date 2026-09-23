@@ -1,3 +1,4 @@
+import { defaultTheme } from "../../theme/theme.js";
 import { type Block, renderBlock } from "./blocks.js";
 
 /**
@@ -15,6 +16,8 @@ import { type Block, renderBlock } from "./blocks.js";
 
 interface CacheEntry {
   readonly width: number;
+  /** The palette revision the rows were rendered with. */
+  readonly revision: number;
   readonly rows: readonly string[];
 }
 
@@ -115,9 +118,15 @@ export class Transcript {
   private rowsFor(block: Block, width: number): readonly string[] {
     if (!block.finalized) return renderBlock(block, width);
     const cached = this.cache.get(block);
-    if (cached && cached.width === width) return cached.rows;
+    // The palette is recolored in place, so the same block at the same width
+    // renders differently after a theme change. Keying on width alone left the
+    // scrollback in the old theme until a resize happened to invalidate it.
+    const revision = defaultTheme.colorRevision;
+    if (cached && cached.width === width && cached.revision === revision) {
+      return cached.rows;
+    }
     const rows = renderBlock(block, width);
-    this.cache.set(block, { width, rows });
+    this.cache.set(block, { width, revision, rows });
     return rows;
   }
 }

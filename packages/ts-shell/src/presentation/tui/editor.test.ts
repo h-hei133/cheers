@@ -305,6 +305,81 @@ describe("cutting back through a multi-line draft", () => {
     expect(editor.getText()).toBe("gamma");
   });
 
+  it("starts a new entry when the caret moved away and came back", () => {
+    // Coalescing used to be decided by where the caret sat, so leaving the spot
+    // and returning to it counted as "nothing happened" and the second cut was
+    // merged into the first. The two are separate passages and a yank should
+    // bring back only the one last cut.
+    const editor = new Editor();
+    editor.insert("one two");
+    editor.kill("word-left");
+    editor.move("line-start");
+    editor.move("line-end");
+    editor.kill("word-left");
+    expect(editor.getText()).toBe("");
+    editor.yank();
+    expect(editor.getText()).toBe("one ");
+  });
+
+  it("starts a new entry after a cursor motion, so the earlier cut is not reachable", () => {
+    // Two cuts with a motion between them are two entries. Before, the check was
+    // "is the caret where the last cut ended", and a motion that returned to that
+    // spot made the second cut append to the first.
+    const editor = new Editor();
+    editor.insert("alpha beta");
+    editor.kill("word-left");
+    editor.move("line-start");
+    editor.move("line-end");
+    editor.kill("word-left");
+    expect(editor.getText()).toBe("");
+    editor.yank();
+    // Only the last cut comes back; were they merged this would be "alpha beta".
+    expect(editor.getText()).toBe("alpha ");
+  });
+
+  it("merges the same two cuts when nothing happens between them", () => {
+    // A cut that runs to the end of the row makes the next one start where the
+    // last finished, so they are one passage: pressing the key twice extends the
+    // same entry, and one yank puts the whole run back.
+    const editor = new Editor();
+    editor.insert("abcdef");
+    editor.move("line-start");
+    editor.move("right");
+    editor.move("right");
+    editor.move("right");
+    editor.kill("line-end");
+    editor.kill("line-end");
+    editor.yank();
+
+    expect(editor.getText()).toBe("abcdef");
+  });
+
+  it("refuses to yank-pop once something else has happened", () => {
+    // A yank-pop rewrites the text the yank inserted. After an edit that text is
+    // part of the draft, so replacing it would throw away what the user typed.
+    const editor = new Editor();
+    editor.insert("first");
+    editor.kill("line-start");
+    editor.insert("second");
+    editor.move("line-start");
+    editor.kill("line-end");
+    editor.yank();
+    editor.insert("typed");
+    expect(editor.yankPop()).toBe(false);
+    expect(editor.getText()).toContain("typed");
+  });
+
+  it("takes the row break when cutting to the end of a full row", () => {
+    // At the end of a row there is no character left, so the break is what goes:
+    // the press joined the rows instead of doing nothing.
+    const editor = new Editor();
+    editor.insert("first\nsecond");
+    editor.move("up");
+    editor.move("line-end");
+    editor.kill("line-end");
+    expect(editor.getText()).toBe("firstsecond");
+  });
+
   it("stops at the top of the draft rather than reporting a cut it did not make", () => {
     const editor = new Editor();
     editor.insert("only");

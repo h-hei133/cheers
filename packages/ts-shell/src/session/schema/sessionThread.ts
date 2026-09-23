@@ -200,6 +200,12 @@ export function sessionTurnEntryId(sessionId: string, order: number): string {
  * Returns an empty path when the leaf is not in the thread, which the caller can
  * tell apart from a root-only path: a leaf that cannot be resolved is a damaged
  * thread, not an empty conversation.
+ *
+ * A parent that is not in the thread is the same kind of damage and is reported
+ * the same way. Walking past it would return the entries below the break as if
+ * they were the whole conversation, and the caller — which treats `resolved` as
+ * "this path is the conversation" — would show a truncated session as a complete
+ * one. Refusing is what makes the empty result mean "cannot be read".
  */
 export function sessionThreadPath(
   thread: SessionThreadSnapshot,
@@ -218,7 +224,12 @@ export function sessionThreadPath(
     if (seen.has(cursor.id)) return { path: [], resolved: false };
     seen.add(cursor.id);
     path.unshift(cursor);
-    cursor = cursor.parentId === undefined ? undefined : byId.get(cursor.parentId);
+    if (cursor.parentId === undefined) break;
+    const parent = byId.get(cursor.parentId);
+    // A parent named but absent: the chain is broken, so nothing below it can be
+    // called the path from the root.
+    if (parent === undefined) return { path: [], resolved: false };
+    cursor = parent;
   }
   return { path, resolved: true };
 }
@@ -246,10 +257,19 @@ export function catchUpSessionThread(
   // second time under a new parent.
   const known = new Set(thread.entries.map((entry) => entry.id));
   const branch = sessionThreadPath(thread);
-  const missing = session.turns.filter((turn, index) => {
-    const id = turn.id ?? sessionTurnEntryId(session.id, index + 1);
-    return !known.has(id);
-  });
+  // The name is decided here, once, and both the lookup and the entry use it.
+  // Deriving it twice — from the turn's position to look for it, from the number
+  // of entries to record it — made the two disagree as soon as a branched thread
+  // held more entries than the turn had position, so every read re-added the same
+  // turn under a name nothing had looked for.
+  const missing = session.turns
+    .map((turn, index) => ({
+      turn,
+      // A turn with no id of its own — recorded before ids existed — takes its
+      // position, which is the name the linear builder gives it too.
+      id: turn.id ?? sessionTurnEntryId(session.id, index + 1),
+    }))
+    .filter((candidate) => !known.has(candidate.id));
   if (missing.length === 0) return thread;
 
   const entries = [...thread.entries];
@@ -258,11 +278,7 @@ export function catchUpSessionThread(
   let leafId = branch.resolved && thread.activeLeafId !== undefined
     ? thread.activeLeafId
     : sessionRootEntryId(session.id);
-  missing.forEach((turn) => {
-    // Named after the turn it records, so the thread entry and the transcript
-    // line agree. A turn with no id of its own — recorded before ids existed —
-    // takes its position, which is the name the linear builder gives it too.
-    const id = turn.id ?? sessionTurnEntryId(session.id, entries.length);
+  missing.forEach(({ turn, id }) => {
     entries.push({
       id,
       parentId: leafId,

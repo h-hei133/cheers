@@ -138,8 +138,10 @@ export function loadUserKeybindings(root?: string): LoadedKeybindings {
   const config: KeybindingsConfig = {};
   for (const [actionId, value] of Object.entries(parsed as Record<string, unknown>)) {
     // An id nothing answers to is reported instead of ignored: a binding that
-    // silently never fires is the hardest kind of mistake to find.
-    if (!(actionId in KEY_ACTIONS)) {
+    // silently never fires is the hardest kind of mistake to find. `Object.hasOwn`
+    // rather than `in`: every object inherits `toString` and `constructor`, so a
+    // membership test against the prototype chain accepts ids no action declares.
+    if (!Object.hasOwn(KEY_ACTIONS, actionId)) {
       problems.push({ message: `Unknown action id \`${actionId}\`; it is ignored.` });
       continue;
     }
@@ -155,10 +157,13 @@ export function loadUserKeybindings(root?: string): LoadedKeybindings {
       problems.push({
         message:
           `\`${actionId}\` names ${unusable.map((key) => `\`${key}\``).join(", ")}, ` +
-          "which this terminal cannot produce (known modifiers: ctrl, alt, shift, meta). The binding is ignored.",
+          "which this terminal cannot produce (known modifiers: ctrl, alt, shift, meta).",
       });
-      if (keys.length === 0) continue;
     }
+    // Recorded even when nothing usable is left. Leaving the action out would
+    // make the disk path disagree with handing the same object to `setUserConfig`
+    // — the omitted action keeps its default keys, so a rebind the user asked for
+    // to a chord this terminal cannot send silently leaves the old key in place.
     config[actionId] = keys;
   }
   return { config, problems };
@@ -210,18 +215,28 @@ const KNOWN_MODIFIERS = ["ctrl", "alt", "shift", "meta"] as const;
  * shortcut they thought they had given to a chord.
  */
 function normalizeKey(key: string): string | undefined {
-  const parts = key
+  const raw = key.trim().toLowerCase();
+  if (raw === "") return undefined;
+  // A trailing `+` is the key itself, not a separator. `+` is a key a person can
+  // bind, and the parser reports it as `+` alone or as `ctrl++` when a modifier
+  // is held; splitting first and dropping the empty segments — which is what this
+  // did — turned `+` into nothing and left `ctrl++` looking like a modifier with
+  // no key, so neither could ever be bound. A lone `ctrl+` is not one of those
+  // spellings and stays rejected, because the parser never emits it.
+  const trailingPlus = raw === "+" || raw.endsWith("++");
+  const body = trailingPlus ? raw.slice(0, -1) : raw;
+  const segments = body
     .split("+")
-    .map((part) => part.trim().toLowerCase())
+    .map((part) => part.trim())
     .filter((part) => part !== "");
-  if (parts.length === 0) return undefined;
-  const name = parts.pop()!;
+  const name = trailingPlus ? "+" : segments.pop();
+  if (name === undefined || name === "") return undefined;
   // A modifier with no key after it, as `ctrl+` produces.
   if ((KNOWN_MODIFIERS as readonly string[]).includes(name)) return undefined;
-  const modifiers = KNOWN_MODIFIERS.filter((modifier) => parts.includes(modifier));
   // Every segment has to be a known modifier: one that is not names a key that
   // cannot be typed, so the binding is rejected rather than silently narrowed.
-  if (parts.some((part) => !(KNOWN_MODIFIERS as readonly string[]).includes(part))) return undefined;
+  if (segments.some((part) => !(KNOWN_MODIFIERS as readonly string[]).includes(part))) return undefined;
+  const modifiers = KNOWN_MODIFIERS.filter((modifier) => segments.includes(modifier));
   return [...modifiers, name].join("+");
 }
 
@@ -238,8 +253,11 @@ export interface KeybindingConflict {
  * re-derive anything per key. Rebuild it when the config changes, not per press.
  */
 export class Keybindings {
-  private byKey: Record<string, string> = {};
-  private byAction: Record<string, readonly string[]> = {};
+  // Null-prototype records: these are looked up by key id, and a plain object
+  // would answer for `toString` and `constructor` with an inherited function,
+  // which routing would then treat as a bound action.
+  private byKey: Record<string, string> = Object.create(null) as Record<string, string>;
+  private byAction: Record<string, readonly string[]> = Object.create(null) as Record<string, readonly string[]>;
   private readonly conflictList: KeybindingConflict[] = [];
 
   constructor(private config: KeybindingsConfig = {}) {
@@ -248,12 +266,12 @@ export class Keybindings {
 
   /** The action a key is bound to, or nothing when no action claims it. */
   actionFor(keyId: string): string | undefined {
-    return this.byKey[keyId];
+    return Object.hasOwn(this.byKey, keyId) ? this.byKey[keyId] : undefined;
   }
 
   /** The keys bound to an action, in the order they were declared. */
   keysFor(actionId: string): readonly string[] {
-    return this.byAction[actionId] ?? [];
+    return Object.hasOwn(this.byAction, actionId) ? this.byAction[actionId]! : [];
   }
 
   /** Keys claimed by more than one action, so the ambiguity is visible. */
@@ -272,8 +290,8 @@ export class Keybindings {
   }
 
   private rebuild(): void {
-    const byKey: Record<string, string> = {};
-    const byAction: Record<string, readonly string[]> = {};
+    const byKey: Record<string, string> = Object.create(null) as Record<string, string>;
+    const byAction: Record<string, readonly string[]> = Object.create(null) as Record<string, readonly string[]>;
     const claimants = new Map<string, string[]>();
 
     for (const [actionId, definition] of Object.entries(KEY_ACTIONS)) {

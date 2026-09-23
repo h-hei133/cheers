@@ -187,6 +187,15 @@ export function findCompactionCut(messages, keepRecent): number | undefined {
 > 记录见 [`phase-4-execution.md`](phase-4-execution.md) §12–§13。
 > **与 `pi` 仍有的差别**：`pi` 在 `/tree` 导航时**询问**用户是否摘要；我方是自动尝试、
 > 失败则只留记录。下面原文保留为当时的证据。
+>
+> **⚠️ 2026-09-23 复核补充：摘要的「归属」曾写错。** 上面说的「每次回退都写 `branch_summary`」
+> 只解决了**写**的问题，没解决**读**的问题：投影时它曾被应用到**每一条分叉**上，所以走
+> A→B→A 之后，A 分支自己身上会出现 A 的离开note。`pi` 的 `branchWithSummary` 把 summary 以
+> `parentId: branchFromId` 挂在路径上，因此只属于被移向的那条分支 —— 与我方「平铺在 transcript
+> 尾部、按分支过滤」的模型不同。
+> 修复：事件新增 `abandonedEntryIds`，note 只在**它被弃的 turn 不在当前路径上**时投影。
+> 见 §15.1 第 4 项；回归测试在 `sessionTranscript.test.ts` 的
+> `"branch summaries and the branch they describe"`。
 
 **pi 如何实现**：`branch-summarization.ts:108-145` `collectEntriesForBranchSummary` 从旧叶回溯到共同祖先并收集 entries；`:195-246` `prepareBranchEntries(entries, tokenBudget)` 按预算（**从新到旧**）准备消息并提取累计 file ops；`:293-380` `generateBranchSummary` 调模型；`docs/compaction.md:150-179` 描述 `/tree` 导航时询问用户是否摘要并把结果注入新分支。
 

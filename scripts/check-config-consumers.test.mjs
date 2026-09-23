@@ -112,6 +112,20 @@ test('counts a field read from another production module as consumed', (t) => {
   assert.equal(result.status, 0, result.stderr)
 })
 
+test('does not count a member access as reading the config field of the same name', (t) => {
+  // A class commonly has a member named like a config field — a render engine
+  // called `tui`, a `provider`, an `agentMode`. Reading `this.tui` says nothing
+  // about whether the resolved config's `tui` is ever read, and counting it let a
+  // declared-and-never-read field pass.
+  const root = fixture(t, configSource(['alpha', 'dead']), {
+    'packages/ts-shell/src/consumer.ts':
+      `${readerSource(['alpha', 'statusItems', 'tui'])}\nclass Host {\n  private dead?: unknown;\n  reads() { return this.dead; }\n}\n`,
+  })
+  const result = run(root)
+  assert.equal(result.status, 1, result.stdout)
+  assert.match(result.stdout, /config-field-without-consumer - dead/)
+})
+
 test('fails loudly when a required interface cannot be found', (t) => {
   // A rename must not shrink the field list and pass on what remains.
   const root = fixture(t, 'export interface SomethingElse {\n  readonly alpha?: number;\n}\n')

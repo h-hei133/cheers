@@ -55,6 +55,37 @@ describe("external editor", () => {
     it("tolerates extra whitespace", () => {
       expect(splitEditorCommand("  code   --wait  ")).toEqual({ program: "code", args: ["--wait"] });
     });
+
+    it("keeps a quoted program path whole", () => {
+      // An editor whose path contains a space is written quoted, and splitting on
+      // whitespace alone would take the opening quote as part of the program name
+      // and fail to find an editor that is installed.
+      expect(splitEditorCommand('"/Applications/Sublime Text.app/bin/subl" -w')).toEqual({
+        program: "/Applications/Sublime Text.app/bin/subl",
+        args: ["-w"],
+      });
+      expect(splitEditorCommand("'/opt/my editor/bin/edit' --wait")).toEqual({
+        program: "/opt/my editor/bin/edit",
+        args: ["--wait"],
+      });
+    });
+
+    it("keeps quoted arguments whole, including empty ones", () => {
+      expect(splitEditorCommand('code --user-data-dir="/tmp/a b"')).toEqual({
+        program: "code",
+        args: ['--user-data-dir=/tmp/a b'],
+      });
+      expect(splitEditorCommand('code ""')).toEqual({ program: "code", args: [""] });
+    });
+
+    it("takes an unterminated quote as ending at the end of the line", () => {
+      // The value was written by hand; a stray quote is more likely than an
+      // argument that means nothing.
+      expect(splitEditorCommand('"/opt/my editor/edit -w')).toEqual({
+        program: "/opt/my editor/edit -w",
+        args: [],
+      });
+    });
   });
 
   describe("running it", () => {
@@ -145,6 +176,24 @@ describe("external editor", () => {
 
       expect(created.length).toBeGreaterThan(0);
       expect(created.every((directory) => !fs.existsSync(directory))).toBe(true);
+    });
+
+    it("reports a vanished draft instead of throwing", () => {
+      // An editor that renames what it saves, or a plugin that cleans up after
+      // itself, exits successfully with nothing left to read. That is not a
+      // failure of the editor, and it must not surface as an exception out of
+      // here — the caller owns the draft and has no way to catch it.
+      const terminal = tracker();
+      const result = editExternally({
+        text: "original",
+        suspendTerminal: terminal.suspendTerminal,
+        // Deletes the file it was given, then succeeds.
+        env: { EDITOR: "sh -c 'rm -f \"$0\"' " },
+      });
+
+      expect(result.text).toBeUndefined();
+      expect(result.message).toContain("unchanged");
+      expect(terminal.depth()).toBe(0);
     });
 
     it("writes the draft where a later git status will not find it", () => {

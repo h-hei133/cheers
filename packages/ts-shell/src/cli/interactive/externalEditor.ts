@@ -35,12 +35,47 @@ export function resolveEditor(env: NodeJS.ProcessEnv = process.env): string | un
  * `emacsclient -c` are all things people set, and passing the whole string as a
  * program name fails with ENOENT on a value that is entirely valid.
  *
- * Split on whitespace rather than shell-parsed: this is a name and flags, not a
- * shell expression, and running it through a shell would give the value the power
- * to run arbitrary commands from an environment variable.
+ * Split on whitespace, except inside quotes: a program whose path contains a
+ * space is written quoted (`"/Applications/Sublime Text.app/.../subl" -w`), and
+ * splitting on whitespace alone would take the opening quote as part of the
+ * program name and fail to find an editor that is installed.
+ *
+ * Deliberately not shell-parsed: this is a name and flags, not a shell
+ * expression, and running it through a shell would give an environment variable
+ * the power to run arbitrary commands. Quotes are understood only so a path with
+ * a space can be named.
  */
 export function splitEditorCommand(command: string): { readonly program: string; readonly args: readonly string[] } {
-  const parts = command.split(/\s+/).filter((part) => part !== "");
+  const parts: string[] = [];
+  let current = "";
+  let quote: '"' | "'" | undefined;
+  let started = false;
+  for (const character of command) {
+    if (quote !== undefined) {
+      if (character === quote) quote = undefined;
+      else current += character;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      // An empty quoted string is still an argument, so opening a quote counts
+      // as having started one.
+      started = true;
+      continue;
+    }
+    if (character === " " || character === "\t" || character === "\n") {
+      if (started) parts.push(current);
+      current = "";
+      started = false;
+      continue;
+    }
+    current += character;
+    started = true;
+  }
+  // An unterminated quote is taken as ending at the end of the line rather than
+  // discarding the argument: the value was written by hand and is more likely to
+  // have a stray quote than to mean nothing.
+  if (started) parts.push(current);
   return { program: parts[0] ?? "", args: parts.slice(1) };
 }
 
@@ -101,7 +136,16 @@ export function editExternally(input: {
       return { message: `\`${editor}\` exited with status ${outcome.status ?? "unknown"}; the draft is unchanged.` };
     }
 
-    const edited = fs.readFileSync(file, "utf8");
+    // The file can be gone by now: an editor that renames what it saves, or a
+    // plugin that cleans up after itself, leaves nothing to read. That is not a
+    // failure of the editor — it exited successfully — so it is reported as no
+    // edit rather than thrown out of here into the caller that owns the draft.
+    let edited: string;
+    try {
+      edited = fs.readFileSync(file, "utf8");
+    } catch {
+      return { message: `\`${editor}\` did not leave the draft behind; it is unchanged.` };
+    }
     // An editor that saves the file unchanged should not count as an edit: the
     // surface would report a change and rewrite the draft with identical text.
     if (edited === input.text) return { message: "No changes." };

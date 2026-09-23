@@ -13,36 +13,33 @@ import { YankPlacement } from "./yank.js";
  * blank row, and a cycled yank must replace rather than append.
  */
 
-const AT = { row: 0, column: 0 };
-
 describe("KillRing", () => {
-  it("joins cuts made from the same place into one entry", () => {
+  it("joins cuts that are reported as continuing", () => {
     // Pressing the kill key repeatedly is cutting one passage, not several.
+    // Whether two cuts are consecutive is the editor's question — it is the one
+    // that sees every key — so the ring is told, not left to infer it.
     const ring = new KillRing(8);
     ring.push("b", { continuing: false, prepend: true });
-    ring.endedAt("word-left", AT);
-    ring.push("a", { continuing: ring.continues("word-left", AT), prepend: true });
+    ring.push("a", { continuing: true, prepend: true });
 
     expect(ring.size).toBe(1);
     expect(ring.newest()).toBe("ab");
   });
 
-  it("starts a new entry once the caret has moved", () => {
+  it("starts a new entry when the cut is not a continuation", () => {
     const ring = new KillRing(8);
     ring.push("first", { continuing: false, prepend: true });
-    ring.endedAt("word-left", AT);
-    ring.push("second", { continuing: ring.continues("word-left", { row: 0, column: 9 }), prepend: true });
+    ring.push("second", { continuing: false, prepend: true });
 
     expect(ring.size).toBe(2);
   });
 
-  it("does not treat a different kind of cut as a continuation", () => {
+  it("appends rather than prepends when the cut came after the text", () => {
     const ring = new KillRing(8);
-    ring.push("first", { continuing: false, prepend: true });
-    ring.endedAt("word-left", AT);
-    ring.push("second", { continuing: ring.continues("line-end", AT), prepend: true });
+    ring.push("head", { continuing: false, prepend: true });
+    ring.push("tail", { continuing: true, prepend: false });
 
-    expect(ring.size).toBe(2);
+    expect(ring.newest()).toBe("headtail");
   });
 
   it("forgets the oldest entry past its limit", () => {

@@ -34,9 +34,9 @@ export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] 
  * conversation is currently made of is a question about the thread, so the thread
  * answers it: the active path names the messages in view.
  *
- * Only message lines are filtered. Compaction and branch-summary lines keep
- * applying, because they describe how to read the history rather than being part
- * of it, and dropping them would put back the messages a checkpoint replaced.
+ * Only message lines are filtered by branch. Compaction and branch-summary lines
+ * keep applying, because they describe how to read the history rather than being
+ * part of it, and dropping them would put back the messages a checkpoint replaced.
  *
  * Falling back to the whole transcript when no thread has been written keeps a
  * session recorded before any of this existed loading exactly as it did.
@@ -60,8 +60,24 @@ export function projectBranchMessages(
     return projectTranscriptMessages(events);
   }
 
+  // A branch summary records what was left behind, so it stops applying once the
+  // branch it describes is the one in view: reading it there would tell the user
+  // what they had stepped away from while they were looking at it. The turns it
+  // names are the test — a note whose abandoned turns are on the active path
+  // describes the conversation in front of the reader, not one they left.
   return projectTranscriptMessages(
-    events.filter((event) => event.type !== "message" || (event.id !== undefined && onBranch.has(event.id))),
+    events.filter((event) => {
+      if (event.type === "message") {
+        return event.id !== undefined && onBranch.has(event.id);
+      }
+      if (event.type === "branch_summary") {
+        // A note written before the abandoned turns were recorded names none of
+        // them, so there is nothing to test it with and it stays.
+        const names = event.abandonedEntryIds ?? [];
+        return names.length === 0 || !names.some((id) => onBranch.has(id));
+      }
+      return true;
+    }),
   );
 }
 
@@ -146,6 +162,8 @@ export function appendBranchSummaryEvent(
     readonly droppedTurns: number;
     /** The entry the conversation moved to. */
     readonly toEntryId?: string;
+    /** The turns left behind, so the note can be read back only where it applies. */
+    readonly abandonedEntryIds?: readonly string[];
     readonly timestamp: string;
   },
 ): void {
@@ -155,6 +173,9 @@ export function appendBranchSummaryEvent(
     ...(input.summary !== undefined ? { summary: input.summary } : {}),
     droppedTurns: input.droppedTurns,
     ...(input.toEntryId !== undefined ? { toEntryId: input.toEntryId } : {}),
+    ...(input.abandonedEntryIds !== undefined && input.abandonedEntryIds.length > 0
+      ? { abandonedEntryIds: input.abandonedEntryIds }
+      : {}),
     timestamp: input.timestamp,
   });
 }

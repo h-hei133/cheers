@@ -100,3 +100,27 @@ describe("Semantic Theme Engine", () => {
     expect(filename).toContain("test.ts");
   });
 });
+
+describe("recoloring in place", () => {
+  it("reports a new revision when the palette changes", () => {
+    // Rendered rows are memoised, and a theme is recolored in place, so a cache
+    // that keys only on width keeps serving rows in the old colors. The revision
+    // is what lets a cache notice the palette moved.
+    const theme = new Theme({ name: "a", colors: { text: "#111111" } as never });
+    const before = theme.colorRevision;
+    theme.apply({ name: "b", colors: { text: "#222222" } as never });
+    expect(theme.colorRevision).toBeGreaterThan(before);
+  });
+
+  it("never moves the revision backwards, so a stale row cannot look current", () => {
+    const theme = new Theme({ name: "a", colors: { text: "#111111" } as never });
+    const seen = [theme.colorRevision];
+    theme.apply({ name: "b", colors: { text: "#222222" } as never });
+    seen.push(theme.colorRevision);
+    theme.apply({ name: "a", colors: { text: "#111111" } as never });
+    seen.push(theme.colorRevision);
+
+    expect([...seen].sort((left, right) => left - right)).toEqual(seen);
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+});

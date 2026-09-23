@@ -96,20 +96,23 @@ function readThemeDirectory(directory: string): DiscoveredTheme[] {
  * A parsed theme file, or nothing when it is not usable.
  *
  * The name falls back to the file name so a theme can be identified without
- * repeating itself inside the file. Colors are not validated here: a theme that
- * defines fewer tokens than the palette has is rendered with the missing ones
- * falling back, which is a visible mistake rather than a reason to refuse the
- * whole file.
+ * repeating itself inside the file.
+ *
+ * Colors are completed from the bundled dark theme rather than left to the
+ * renderer's per-token fallback. That fallback is a hardcoded white for text,
+ * which a theme defining only `accent` would then use for every message body —
+ * an unreadable theme on a light terminal, from a file that looks perfectly
+ * valid. Inheriting means a partial theme is a *recolor* of a working one, so
+ * omitting a token is never a mistake the reader has to see.
  */
 function asThemeConfig(parsed: unknown, fileName: string): ThemeConfig | undefined {
   if (!parsed || typeof parsed !== "object") return undefined;
   const record = parsed as { name?: unknown; description?: unknown; colors?: unknown };
   if (!record.colors || typeof record.colors !== "object") return undefined;
-  const colors: Record<string, string> = {};
+  const colors: Record<string, string> = { ...builtIn.dark!.colors };
   for (const [token, value] of Object.entries(record.colors as Record<string, unknown>)) {
     if (typeof value === "string") colors[token] = value;
   }
-  if (Object.keys(colors).length === 0) return undefined;
   return {
     name: typeof record.name === "string" && record.name.trim() !== ""
       ? record.name.trim()

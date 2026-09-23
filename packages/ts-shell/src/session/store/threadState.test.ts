@@ -8,6 +8,7 @@ import {
   createSessionStoreLayout,
   locateExistingSessionLayout,
   projectSessionFileLayout,
+  type SessionFileLayout,
 } from "./sessionFileLayout.js";
 import { loadSessionRecord, writeSessionRecord } from "./sessionStore.js";
 import {
@@ -158,7 +159,7 @@ describe("session thread state store", () => {
 });
 
 describe("branching", () => {
-  function seed(): { session: Session; layout: ReturnType<typeof projectSessionFileLayout>; home: string } {
+  function seed(): { session: Session; layout: SessionFileLayout; home: string } {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "session-branch-"));
     const storeLayout = createSessionStoreLayout(home);
     const layout = projectSessionFileLayout({
@@ -412,5 +413,158 @@ describe("branching", () => {
       process.env.USERPROFILE = priorHome;
       fs.rmSync(home, { recursive: true, force: true });
     }
+  });
+});
+
+describe("threads written before turns had ids", () => {
+  /** A session whose turns carry no id of their own, as older sessions do not. */
+  function legacySession(id: string, count: number): Session {
+    return {
+      id,
+      projectRoot: "/repo",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      updatedAt: "2026-06-01T00:00:00.000Z",
+      status: "completed",
+      turns: Array.from({ length: count }, (_, index) => ({
+        role: index % 2 === 0 ? "user" : "assistant",
+        content: `turn ${index + 1}`,
+        timestamp: `2026-06-01T00:00:0${index}.000Z`,
+      })),
+    } as Session;
+  }
+
+  /**
+   * A home whose thread already holds more entries than a turn has position.
+   *
+   * That is the shape that exposes the defect: the thread was branched, so its
+   * entry count no longer tracks the turn's index, and a turn named by position
+   * is looked for under one name and written under another.
+   */
+  function legacySeed(): { session: Session; layout: SessionFileLayout; home: string } {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "session-legacy-"));
+    const layout = projectSessionFileLayout({
+      sessionsDir: createSessionStoreLayout(home).sessionsDir,
+      sessionId: "sess_legacy",
+    });
+    const session = legacySession("sess_legacy", 3);
+    writeSessionRecord({ session, layout });
+    // A thread with the root, one turn, and two entries from a branch that was
+    // stepped away from — five entries for three turns.
+    writeSessionState({
+      session,
+      layout,
+      overrides: {
+        thread: {
+          schemaVersion: 1,
+          entries: [
+            { id: "sess_legacy:root", kind: "session-root", order: 0 },
+            { id: "sess_legacy:turn-1", parentId: "sess_legacy:root", kind: "turn-message", role: "user", order: 1 },
+            { id: "sess_legacy:turn-2", parentId: "sess_legacy:turn-1", kind: "turn-message", role: "assistant", order: 2 },
+            // Two entries from a branch that was stepped away from. They make the
+            // thread's entry count exceed any turn's position, which is the shape
+            // that exposed the defect.
+            { id: "sess_legacy:branch-1", parentId: "sess_legacy:turn-1", kind: "turn-message", role: "assistant", order: 3 },
+            { id: "sess_legacy:branch-2", parentId: "sess_legacy:branch-1", kind: "turn-message", role: "user", order: 4 },
+          ],
+          activeLeafId: "sess_legacy:turn-2",
+          branches: [],
+          compactions: [],
+        },
+      },
+    });
+    for (const turn of session.turns) {
+      appendTranscriptEvent(layout.transcriptPath, createMessageTranscriptEvent(turn as never));
+    }
+    return { session, layout, home };
+  }
+
+  it("does not re-add the same turn on every read", () => {
+    // The lookup named a missing turn by its position and the entry was recorded
+    // under the thread's length. On a thread already holding branch entries those
+    // disagree, so the name looked for was never the name written and every read
+    // added another copy — each with a fresh id, so nothing ever matched.
+    const { session, layout, home } = legacySeed();
+    try {
+      const first = readSessionThreadSnapshot({ session, layout });
+      writeSessionState({ session, layout });
+      const second = readSessionThreadSnapshot({ session, layout });
+      writeSessionState({ session, layout });
+      const third = readSessionThreadSnapshot({ session, layout });
+
+      expect(second.entries.length).toBe(first.entries.length);
+      expect(third.entries.length).toBe(first.entries.length);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("names each turn once, with no duplicates", () => {
+    const { session, layout, home } = legacySeed();
+    try {
+      const ids = readSessionThreadSnapshot({ session, layout }).entries.map((entry) => entry.id);
+
+      expect(new Set(ids).size).toBe(ids.length);
+      // Every turn has an entry under its positional name, which is what the
+      // linear builder would have given it too.
+      for (let order = 1; order <= 3; order++) {
+        expect(ids).toContain(`sess_legacy:turn-${order}`);
+      }
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the path resolvable after adding entries", () => {
+    // A duplicate entry id makes the walk see a cycle, and the path comes back
+    // empty — which the load path reads as "cannot be read" and discards.
+    const { session, layout, home } = legacySeed();
+    try {
+      const thread = readSessionThreadSnapshot({ session, layout });
+      const path = sessionThreadPath(thread);
+
+      expect(path.resolved).toBe(true);
+      expect(path.path.length).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("a branch tree that cannot be walked", () => {
+  it("refuses a path through a parent that is not in the thread", () => {
+    // Walking past a missing parent returned the entries below the break as if
+    // they were the whole conversation, and the caller — which reads `resolved` as
+    // "this path is the conversation" — showed a truncated session as a complete
+    // one. Refusing is what makes the empty result mean "cannot be read".
+    const thread = {
+      schemaVersion: 1 as const,
+      entries: [
+        { id: "root", kind: "session-root" as const, order: 0 },
+        { id: "a", parentId: "root", kind: "turn-message" as const, role: "user" as const, order: 1 },
+        { id: "b", parentId: "gone", kind: "turn-message" as const, role: "assistant" as const, order: 2 },
+      ],
+      activeLeafId: "b",
+      branches: [],
+      compactions: [],
+    };
+
+    expect(sessionThreadPath(thread).resolved).toBe(false);
+    expect(sessionThreadPath(thread).path).toEqual([]);
+  });
+
+  it("still resolves a path that ends at the root", () => {
+    const thread = {
+      schemaVersion: 1 as const,
+      entries: [
+        { id: "root", kind: "session-root" as const, order: 0 },
+        { id: "a", parentId: "root", kind: "turn-message" as const, role: "user" as const, order: 1 },
+      ],
+      activeLeafId: "a",
+      branches: [],
+      compactions: [],
+    };
+
+    expect(sessionThreadPath(thread).resolved).toBe(true);
+    expect(sessionThreadPath(thread).path.map((entry) => entry.id)).toEqual(["root", "a"]);
   });
 });

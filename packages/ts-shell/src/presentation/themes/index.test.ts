@@ -95,6 +95,25 @@ describe("theme discovery", () => {
     expect(loadTheme("no-such-theme", root)).toBeUndefined();
   });
 
+  it("fills in the tokens a theme does not name", () => {
+    // A theme defining only `accent` used to be rendered with the renderer's
+    // per-token fallback for everything else — a hardcoded white for text, which
+    // is unreadable on a light terminal, from a file that looked valid.
+    fs.mkdirSync(path.join(root, ".git"), { recursive: true });
+    const dir = path.join(root, ".agents", "themes");
+    fs.mkdirSync(dir, { recursive: true });
+    writeTheme(dir, "sparse.json", { name: "sparse", colors: { accent: "#ff0000" } });
+
+    const loaded = loadTheme("sparse", root);
+    const dark = loadTheme("dark", root);
+
+    expect(loaded?.colors.accent).toBe("#ff0000");
+    // Every token the bundled theme has is present, and the ones the file did not
+    // name come from the bundled theme rather than being absent.
+    expect(Object.keys(loaded!.colors).sort()).toEqual(Object.keys(dark!.colors).sort());
+    expect(loaded?.colors.text).toBe(dark?.colors.text);
+  });
+
   it("does not read a theme directory above a directory that is not a project", () => {
     // The same boundary the instruction reader uses: without a root marker the
     // chain above is part of no project.

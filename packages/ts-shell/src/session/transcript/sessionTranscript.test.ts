@@ -8,6 +8,7 @@ import {
   appendBranchSummaryEvent,
   appendSessionTurn,
   appendTranscriptEvent,
+  projectBranchMessages,
   projectTranscriptMessages,
   readTranscriptEvents,
 } from "./sessionTranscript.js";
@@ -214,5 +215,64 @@ describe("corrupt transcript lines", () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("branch summaries and the branch they describe", () => {
+  const message = (id: string, content: string) => ({
+    type: "message" as const,
+    id,
+    role: "user" as const,
+    content,
+    timestamp: "2026-06-01T00:00:00.000Z",
+  });
+  const note = (abandonedEntryIds: readonly string[]) => ({
+    type: "branch_summary" as const,
+    id: `brsum_${abandonedEntryIds.join("_")}`,
+    summary: "what was left behind",
+    droppedTurns: abandonedEntryIds.length,
+    toEntryId: "m1",
+    abandonedEntryIds,
+    timestamp: "2026-06-01T00:00:00.000Z",
+  });
+
+  it("applies on the branch the user moved to", () => {
+    const events = [message("m1", "q1"), message("m2", "a1"), note(["m2"])];
+    // Moving back to `m1` abandons `m2`, so the note describes where the reader is.
+    const projected = projectBranchMessages(events, ["root", "m1"], ["root", "m1", "m2"]);
+
+    expect(projected.some((turn) => turn.content.startsWith("[Earlier Path]"))).toBe(true);
+  });
+
+  it("does not reappear on the branch it was written about", () => {
+    // Reading it there would tell the user what they stepped away from while they
+    // were looking straight at it. Every note used to apply to every branch, so
+    // going back to a branch showed its own abandonment note.
+    const events = [message("m1", "q1"), message("m2", "a1"), note(["m2"])];
+    const projected = projectBranchMessages(events, ["root", "m1", "m2"], ["root", "m1", "m2"]);
+
+    expect(projected.map((turn) => turn.content)).toEqual(["q1", "a1"]);
+  });
+
+  it("keeps a note written before the abandoned turns were recorded", () => {
+    // There is nothing to test it with, so it stays rather than being hidden.
+    const events = [
+      message("m1", "q1"),
+      message("m2", "a1"),
+      { type: "branch_summary" as const, id: "old", summary: "old note", droppedTurns: 1, timestamp: "2026-06-01T00:00:00.000Z" },
+    ];
+    const projected = projectBranchMessages(events, ["root", "m1", "m2"], ["root", "m1", "m2"]);
+
+    expect(projected.some((turn) => turn.content.startsWith("[Earlier Path]"))).toBe(true);
+  });
+
+  it("adds no message for a move that had nothing to summarize", () => {
+    const events = [
+      message("m1", "q1"),
+      { type: "branch_summary" as const, id: "empty", droppedTurns: 1, toEntryId: "m1", abandonedEntryIds: ["m2"], timestamp: "2026-06-01T00:00:00.000Z" },
+    ];
+    const projected = projectBranchMessages(events, ["root", "m1"], ["root", "m1", "m2"]);
+
+    expect(projected.map((turn) => turn.content)).toEqual(["q1"]);
   });
 });

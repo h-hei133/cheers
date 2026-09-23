@@ -59,7 +59,7 @@ pi-only:   bashMode, customMessageBg, customMessageLabel, customMessageText,
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
 | 主题可达性与切换 ✅ **已修复**（配置驱动生效；仍缺 `/theme` 命令与热重载） | `docs/themes.md:17-40`；`src/modes/interactive/theme/theme-controller.ts` | `presentation/theme/theme.ts:168`；`presentation/themes/index.ts:10` | **DEFICIENT** | 见 §2.1 |
-| 主题令牌完整度 ✅ **部分收口 2026-09-23**：`dark`/`light` 均已补齐 **39/39**（原 `light` 缺 16 个含 `text`，正文渲染成纯白）；并有测试钉住「令牌集合 == 联合」 | `src/modes/interactive/theme/theme-schema.json`（56 色） | `presentation/themes/{dark,light}.json`（各 39 色） | **DEFICIENT**（余量为 Markdown/语法细分，评估为收益不明） | 见 `phase-4-execution.md` §6 |
+| 主题令牌完整度 ✅ **部分收口 2026-09-23**：`dark`/`light` 均已补齐 **39/39**（原 `light` 缺 16 个含 `text`，正文渲染成纯白）；并有测试钉住「令牌集合 == 联合」。⚠️ **2026-09-23 复核更正**：39 个令牌中**只有 21 个**被 `fg`/`bg`/`bgOpen` 真正读取，18 个是死配置（§15.3 已记录，**决定不删**） | `src/modes/interactive/theme/theme-schema.json`（56 色） | `presentation/themes/{dark,light}.json`（各 39 色，21 个在用） | **DEFICIENT**（余量为 Markdown/语法细分，评估为收益不明） | 见 `phase-4-execution.md` §6、§15.3 |
 | 主题磁盘发现与 CLI 覆盖 | `docs/themes.md:17-40`（5 类位置 + `--theme`） | 静态 registry（`presentation/themes/index.ts:10`） | **DEFICIENT** | 见 `01-*` §2.4 |
 | ~~快捷键可自定义~~ ✅ **已收口 2026-09-23**：`~/.cheers/keybindings.json`（`cli/interactive/keybindings.ts`），命名空间 action id，`/reload` 重载 | `docs/keybindings.md:1-40`（`~/.pi/agent/keybindings.json`） | `cli/interactive/keymap.ts`（**已改为数据驱动表**） | ✅ **已收口** | 见 `phase-4-execution.md` §8 |
 | ~~`@` 文件引用 + 模糊查找~~ ✅ **已收口 2026-09-23**：`cli/interactive/fileSuggestions.ts`，按工作区缓存列表、按路径段排序 | `docs/usage.md:22`（`Type @ to fuzzy-search project files`） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §8 |
@@ -106,6 +106,12 @@ pi-only:   bashMode, customMessageBg, customMessageLabel, customMessageText,
 ### 2.2 主题令牌缺 thinking 档位色与滚动条色（置信度：高）
 
 **证据（我们）**：`presentation/themes/dark.json` 39 色；`presentation/theme/theme.ts:13-52` 的 `ThemeColorToken` 联合类型恰好 39 项。
+
+> **⚠️ 2026-09-23 复核更正**：上面这个「39 项」是**类型联合**的规模，不等于**渲染消费**的规模。实测只有
+> **21 个**令牌被 `fg`/`bg`/`bgOpen` 读到，另外 **18 个**（`assistantText`、`dim`、`syntax*`、`tool*Bg`、
+> `selectedBg`、`thinkingText`、`userMessageText` 等）声明了但无人读取。我在 `phase-4-execution.md` §11
+> 曾写「39/39 已被引用」，那是把类型联合里的出现误当成消费 —— **该结论错误**，已在 §15.3 更正。
+> 是否清理这 18 个：**决定保留**，理由是删令牌会让用户主题文件里已写的名字失效，属产品决策而非缺陷修复。
 
 **证据（pi）**：`src/modes/interactive/theme/theme-schema.json` 56 色。差异中**有实际渲染后果的**：
 

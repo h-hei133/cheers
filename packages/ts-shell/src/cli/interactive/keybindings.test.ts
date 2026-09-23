@@ -122,9 +122,33 @@ describe("keybindings", () => {
 
     expect(loaded.problems.map((problem) => problem.message).join("\n")).toContain("cmd+z");
     expect(loaded.problems.map((problem) => problem.message).join("\n")).toContain("super+r");
-    // The usable half of the list survives, and the rejected action is dropped
-    // rather than left with one key where two were asked for.
-    expect(loaded.config).toEqual({ "tui.editor.redo": ["ctrl+shift+z"] });
+    // The usable half of the list survives. The action whose only key was
+    // unusable is recorded with no keys rather than left out: an omitted action
+    // keeps its default binding, which would leave the user pressing `ctrl+z`
+    // after asking for a key this terminal cannot send.
+    expect(loaded.config).toEqual({ "tui.editor.undo": [], "tui.editor.redo": ["ctrl+shift+z"] });
+  });
+
+  it("leaves an action unbound when its key cannot be produced, as a direct config does", () => {
+    // The same config must mean the same thing whichever way it arrives. Handing
+    // this object straight to `setUserConfig` always unbound the action; loading
+    // it from disk used to restore the default instead.
+    writeConfig(JSON.stringify({ "tui.editor.undo": "cmd+z" }));
+    const fromDisk = new Keybindings(loadUserKeybindings().config);
+    const direct = new Keybindings();
+    direct.setUserConfig({ "tui.editor.undo": "cmd+z" });
+
+    expect(fromDisk.keysFor("tui.editor.undo")).toEqual([]);
+    expect(fromDisk.keysFor("tui.editor.undo")).toEqual(direct.keysFor("tui.editor.undo"));
+    expect(fromDisk.actionFor("ctrl+z")).toBeUndefined();
+  });
+
+  it("binds a literal plus, in both spellings the parser reports", () => {
+    const bindings = new Keybindings();
+    bindings.setUserConfig({ "tui.editor.undo": "+", "tui.editor.redo": "ctrl++" });
+
+    expect(bindings.actionFor("+")).toBe("tui.editor.undo");
+    expect(bindings.actionFor("ctrl++")).toBe("tui.editor.redo");
   });
 
   it("lets a user binding take a key from a default binding", () => {

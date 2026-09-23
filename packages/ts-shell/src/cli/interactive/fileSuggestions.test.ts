@@ -9,6 +9,7 @@ import {
   invalidateWorkspaceFiles,
   rankFiles,
   warmWorkspaceFiles,
+  workspaceFiles,
 } from "./fileSuggestions.js";
 
 /**
@@ -157,6 +158,31 @@ describe("file references", () => {
       await warmWorkspaceFiles(workspace);
 
       expect(fileSuggestions("@brand-new", workspace)?.[0]?.value).toBe("@brand-new.ts");
+    });
+
+    it("keeps a listing for each workspace, not just the last one asked about", async () => {
+      // Subagent and worktree sessions reach the same process, so two roots is
+      // ordinary. A single slot meant the second workspace evicted the first, and
+      // completion in the first fell back to an empty list until its walk ran
+      // again.
+      const other = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-suggest-"));
+      fs.mkdirSync(path.join(other, "src"), { recursive: true });
+      fs.writeFileSync(path.join(other, "src", "elsewhere.ts"), "x");
+
+      await warmWorkspaceFiles(workspace);
+      await warmWorkspaceFiles(other);
+
+      // The first workspace must still answer from its own listing.
+      expect(fileSuggestions("@policy", workspace)?.[0]?.value).toBe("@src/core/policy.ts");
+      expect(fileSuggestions("@elsewhere", other)?.[0]?.value).toBe("@src/elsewhere.ts");
+    });
+
+    it("drops every workspace's listing when invalidated", async () => {
+      await warmWorkspaceFiles(workspace);
+      invalidateWorkspaceFiles();
+      // Nothing is held, so the first synchronous call reports nothing yet and
+      // must not claim a listing it no longer has.
+      expect(workspaceFiles(workspace)).toEqual([]);
     });
   });
 });

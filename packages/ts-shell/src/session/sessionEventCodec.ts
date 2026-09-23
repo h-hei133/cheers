@@ -36,6 +36,16 @@ export interface BranchSummaryTranscriptEntry {
   droppedTurns: number;
   /** The entry the conversation moved to, so the record names where it went. */
   toEntryId?: string;
+  /**
+   * The turns this move left behind, by entry id.
+   *
+   * Recorded so the note can be told apart from the branch it describes: without
+   * it there is nothing on the record that says which conversation was abandoned,
+   * and the note is read back on every branch — including the one it was written
+   * about, where it tells the reader what they stepped away from while they are
+   * looking at it.
+   */
+  abandonedEntryIds?: readonly string[];
   timestamp: string;
 }
 

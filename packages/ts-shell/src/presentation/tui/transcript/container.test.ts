@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import darkJson from "../../themes/dark.json" with { type: "json" };
+import { defaultTheme } from "../../theme/theme.js";
 import { Transcript } from "./container.js";
 import { textBlock, type Block } from "./blocks.js";
 
@@ -143,5 +145,28 @@ describe("folding a finished block", () => {
     const bodyRow = rendered.rows.findIndex((row) => row.includes("line two"));
 
     expect(rendered.owners[bodyRow]).toBe(1);
+  });
+});
+
+describe("recoloring after a theme change", () => {
+  it("re-renders a finalized block when the palette moved", () => {
+    // Rows for a finalized block are memoised, and a theme is recolored in place,
+    // so a cache keyed only on width kept the scrollback in the old theme until
+    // something happened to resize. `/reload` and `/theme` both change the
+    // palette under a transcript that is already rendered.
+    const transcript = new Transcript();
+    transcript.append(textBlock("error", "colored text"));
+
+    const before = transcript.render(WIDTH).rows.join("\n");
+    // A palette with a visibly different error color, then back to the original.
+    defaultTheme.apply({ ...darkJson, name: "probe-recolor", colors: { ...darkJson.colors, error: "#ff00ff" } });
+    const after = transcript.render(WIDTH).rows.join("\n");
+    defaultTheme.apply({ ...darkJson, name: "dark" });
+
+    // Same width, same block, different palette: the rows must differ. Equal rows
+    // here mean the memo returned the pre-change render.
+    expect(after).not.toBe(before);
+    expect(before).toContain("colored text");
+    expect(after).toContain("colored text");
   });
 });

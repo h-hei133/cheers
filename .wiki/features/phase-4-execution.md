@@ -465,3 +465,71 @@ const KEY_ONLY = new Set(["rewind"]);   // 刻意禁止键入命令唤出
 - **用户手册的内容没有搬到别处**（已确认无替代文件）。因此「`/back` / 双击 Esc 回退」「`tuiMode` 三值语义」「`/undo` 只报告文件」这些**用户可见行为**目前只在代码注释、`/help` 命令列表与本执行记录里，**不再有面向用户的手册**。
 - 若将来需要重建用户文档，`/back` 的权威描述在 `cli/interactive/picker/rewind.ts` 的文件头注释与 `slashCommandRegistry.ts` 的 `back` 条目；`tuiMode` 的在 `config/runtimeConfig.ts` 的类型注释。
 - `problem.md` 仍被 `.wiki/wiki/theses/full-fidelity-tui-engine-and-interactive-runtime-adaptation.md` 引用，该处亦为历史引用，同样保留。
+
+---
+
+## 15. 复核（2026-09-23）：五个切片，18 项发现
+
+对最近 7 个有实质代码改动的提交做独立复核，参照 `~/projects/pi` 逐项比对。五个复核者各自负责一个切片，
+**每项发现都要求带可执行证据**；下面只记录**经我复核确认成立**的项，以及处置。
+
+### 15.1 已确认并已修复（14 项）
+
+| # | 缺陷 | 位置 | 证据 | 修法 |
+|---|---|---|---|---|
+| 1 | **回退被记录后，同一 turn 每次读取都被重新追加** | `session/schema/sessionThread.ts` | 查找用 `index + 1` 命名、写入用 `entries.length` 命名。分支过的 thread 上两者不等 → 每次读都新增一条、id 永不匹配、**非幂等** | 名字只算一次，查找与写入共用 |
+| 2 | **重复 entry id 导致判环 → 路径返回空 → 对话被清空** | 同上 + `store/sessionStore.ts` | 实测 6 条消息 → 投影 **0 条**；`sessionThreadPath` 返回 `path: []` 而 `resolved` 曾为 `true` | 见 #1；并让加载方在 `resolved === false` 时回落到 transcript |
+| 3 | **悬空 `parentId` 被静默截断，却报告 `resolved: true`** | `session/schema/sessionThread.ts` | 探针：`c.parentId = "MISSING"` → `path: ['c']`, `resolved: true`。仓库里 `resolveActivePath` 早已用 `missingParentIds` 表达同一件事，两处契约不一致 | 父节点缺失即拒绝，`resolved: false` |
+| 4 | **`branch_summary` 泄漏到所有分支** | `session/transcript/sessionTranscript.ts` | 走 A→B→A 后，**A 自己身上出现自己的离开note**（`[Earlier Path]`）。pi 的 `branchWithSummary` 把 summary 以 `parentId: branchFromId` 挂在路径上，故只属于该分支 | 记录 `abandonedEntryIds`，note 只在其被弃 turn **不在**当前路径时投影 |
+| 5 | **`/reload`、`/theme` 不重绘已定稿行** | `presentation/tui/transcript/container.ts` | 缓存只以 `width` 为键；主题原地改色 → 旧行永久保留旧色。反向验证：去掉键则测试失败 | `Theme.colorRevision` + 缓存加该键 |
+| 6 | **kill ring 按坐标判定连续，而非「上一个动作」** | `presentation/tui/editor.ts`、`editor/killRing.ts` | 移开再移回同一坐标会被判为「没动过」而合并；pi 用 `lastAction: "kill" \| "yank" \| null` | 改用 `lastAction`；删除 `lastAt`/`continues`/`endedAt` |
+| 7 | **`alt+y` 在中间有其它动作后仍会改写文本** | `presentation/tui/editor.ts`、`editor/yank.ts` | `cycle()` 只要求 anchor 存在；pi 要求 `lastAction === "yank"` | 同 #6 |
+| 8 | **`yank` 未 `adoptAsDraft` / 未 `saveUndo`** | `presentation/tui/editor.ts` | 召回历史后 `ctrl+y`，`browsing` 仍为真（yank 会随历史导航被丢弃）；undo 快照停在 kill 前 | 补上两个调用 |
+| 9 | **行尾 `ctrl+k` 是静默空操作** | `presentation/tui/editor.ts` | 光标在行尾时 `start === end` 且 `backward === false` → 直接 return；pi 会吞掉换行合并下一行 | 行尾时吞换行；`enter_key` 会合并下一行 |
+| 10 | **外部编辑器临时文件消失即抛 ENOENT** | `cli/interactive/externalEditor.ts` | 探针：编辑器删文件后 exit 0 → 抛 `ENOENT` 出函数。反向验证：去掉保护则测试失败 | `readFileSync` 包 try/catch，返回「草稿未变」 |
+| 11 | **`$EDITOR` 带引号的路径被按空格切开** | `cli/interactive/externalEditor.ts` | `"/Applications/Sublime Text.app/…" -w` 被切成 `'"/Applications/Sublime'` → ENOENT | 引号感知拆分（空引号参数也保留） |
+| 12 | **文件建议缓存只有一个槽，第二个工作区挤掉第一个** | `cli/interactive/fileSuggestions.ts` | 子代理/worktree 会话共享进程，两个 root 是常态；槽位被覆盖后回到第一个 root 得到空列表 | 改为 `Map<root, entry>` + 代次防陈旧覆盖 |
+| 16 | **稀疏主题文件导致正文不可见** | `presentation/themes/index.ts` | 只定义 `accent` 的主题（`asThemeConfig` 明确接受的最稀形态）会让其余令牌落到渲染器的硬编码 `#ffffff`；实测 `fg("text", …)` 输出 `38;5;231m`，**浅色终端上正文不可见**。原注释还写着这是「可见的错误」——对正文而言它是**不可见**的 | 缺失令牌从内置 dark 继承，主题变成「重着色」而非「替换」 |
+| 17 | **`check:config-consumers` 会把 `this.tui` 当作 `runtimeConfig.tui` 的读取方** | `scripts/check-config-consumers.mjs` | 正则 `\.field\b` 匹配任意成员访问；`InteractiveMode` 有同名成员 `tui`，于是**声明但无人读取**的 `tui` 字段通过门禁 | 加 `(?<!this)` 后顾断言；并补一条门禁测试 |
+
+### 15.2 已确认并已修复（键位，3 项）
+
+| # | 缺陷 | 证据 | 修法 |
+|---|---|---|---|
+| 13 | **`+` 与 `ctrl++` 无法绑定** | 解析器会发出 `+`（单独）与 `ctrl++`（带修饰）；`split("+")` + 丢空段使两者都变 `undefined` | 末尾 `+` 视为键本身，`ctrl+` 仍拒绝 |
+| 14 | **磁盘上不可用的键会静默恢复默认绑定** | `cmd+z` 走磁盘 → 仍是 `ctrl+z`；同一对象给 `setUserConfig` → 解绑。**两条路径语义不一致** | 磁盘路径也记为 `[]`（解绑），行为与直接注入一致 |
+| 15 | **原型链污染** | `"toString" in KEY_ACTIONS` 为真，`actionFor("toString")` 返回函数 | `Object.hasOwn` + 无原型字典 |
+
+### 15.3 确认但**未修**（1 项，如实记录）
+
+- **18 个主题令牌无人消费**（`assistantText`、`dim`、`syntax*`、`tool*Bg` 等）。实测 39 个令牌只有 **21 个**被 `fg/bg/bgOpen` 真正读取。
+  **不修的理由**：删除令牌属于主题面收缩，会让用户主题文件里已有的令牌名失效，是产品决策而非缺陷修复；保留的成本只是 JSON 里的 18 行。
+  **同时更正我在 §11 的错误**：上一轮我写「39/39 已被引用」，那是把 **`ThemeColorToken` 类型联合**里的出现误当成渲染消费。真实是 **21/39**。
+
+### 15.4 复核方法
+
+- 五个只读复核者，每人一个切片，参照 `pi` 只做**针对性比对**（不广扫）。
+- 每项发现要求 `file:line` + 可执行证据；我自己**逐项复现**后才修。
+- **每处修复都做了反向验证**：改回原实现，确认新测试失败，再还原。已对 #1/#2/#3/#5/#10/#13/#14/#15/#16/#17 执行。
+- **淘汰了 2 个写不出来的测试**：为「删除中断 cut run」构造的用例，在旧实现下**也通过**
+  —— 删除必然移动光标，旧坐标判定本来就会断开 run，所以它证明不了任何事。按本仓规则，
+  这种测试不写（宁可只留能判定的那条）。这是一个可以如实说出的局限。
+
+### 15.5 复核结论
+
+- 复核者标为「不成立/低优先」的项我没有照单全收：例如「`regular` 模式的 `stream` 值没有
+  行为」经查是**有意为之**（注释写明保留），不算缺陷。
+- 反过来，复核者标为低优先的 #16（稀疏主题）经复现是**真实且会致盲**的问题。
+- 唯一的「未修」是 §15.3 的 18 个死令牌，理由是删令牌会让用户已写的主题名失效。
+
+### 15.6 验证
+
+- 受影响目录：`src/session` + `src/cli/interactive` + `src/presentation` → **1084 通过 / 2 失败**。
+- 那 2 个失败是**既有**的（`longSessionDurability`），改前改后一致：基线对照见下方。
+- 全量：**3152 通过 / 7 失败 / 1 跳过**（515 文件）。7 个失败与基线完全同集合：
+  `mcp/gateway`、`longSessionDurability`×2、`core/state/projectState`、`messagingAndTeams`、
+  `osSandbox`×2 —— 用 `git stash -u` 对照确认（基线 5 文件 8 失败）。
+- 门禁：`verify:import-cycles`、`check:config-consumers`（现 18 测试）、`check:declarations`、
+  `verify:docs-drift:strict`（0 悬空）、`test:scripts` 18/18、`tsc` 0 错、
+  `normproof judge` 退出 0（`didBlock` 未置位，`openObligationCount: 0`）。
+- `npm run build:ts` 已重建，`dist` 落后源文件数 0，且用构建产物复验了幂等与悬空父节点两处修复。

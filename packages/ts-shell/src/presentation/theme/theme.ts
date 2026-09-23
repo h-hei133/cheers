@@ -53,6 +53,15 @@ export type ThemeColorToken =
 export class Theme {
   name: string;
   private colors: Map<ThemeColorToken, string>;
+  /**
+   * Updated whenever the palette changes.
+   *
+   * A theme is recolored in place, so a surface that renders the same text twice
+   * gets different output from an unchanged input. Anything caching rendered rows
+   * has to key on this or it keeps serving rows in the old colors — the reload
+   * would change the palette and nothing on screen would follow.
+   */
+  private revision = 0;
 
   constructor(theme: ThemeConfig) {
     this.name = theme.name;
@@ -69,6 +78,12 @@ export class Theme {
   apply(theme: ThemeConfig): void {
     this.name = theme.name;
     this.colors = new Map(Object.entries(theme.colors) as [ThemeColorToken, string][]);
+    this.revision += 1;
+  }
+
+  /** Changes whenever the palette does, for caches keyed on the colors. */
+  get colorRevision(): number {
+    return this.revision;
   }
 
   fg(token: ThemeColorToken, text: string): string {

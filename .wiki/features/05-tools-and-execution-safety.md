@@ -222,11 +222,26 @@ if (filePath && (call.name === "write" || call.name === "edit")) {
 
   派发点总数：`turn/tools.ts:132,162`（Pre/PostToolUse）、`turn/session.ts:143,199`（UserPromptSubmit/Stop）——**整个回合只有 4 个派发点**。
 
-  > **✅ 2026-09-23 部分收口**：其中 **3 个已派发** —— `SessionStart`（`turn/session.ts:186`）、
-  > `SessionEnd`（`turn/session.ts:291`）、`PermissionDenied`（`turn/tools.ts:270`）。
-  > 其余 8 个**仍零派发**，并已有门禁守住：`scripts/check-declarations.mjs`
-  > 要求「每个声明的事件必须在生产代码里有 dispatch」，接入 CI。
-  > 该门禁**只覆盖钩子事件与工具工厂两类** —— 接口字段与模块导出的误报面太大，不纳入。
+  > **✅ 2026-09-23 已收口：18/18 全部有生产派发点。**
+  >
+  > 但**上面这一整段的数字与名单在本快照写下时就已经是错的**，必须一并更正，否则
+  > 「已收口」会掩盖「当时到底缺什么」：
+  >
+  > - **声明数不是 22 而是 18。** 本快照由 `d60895e3`（2026-09-20）创建，而**同一个提交**
+  >   已经把 `HookEventName` 从 22 裁到 18 —— 删掉了 `UserPromptExpansion`、`PostToolBatch`、
+  >   `TaskCreated`、`TaskCompleted` 四个。22 是 `443d28fb`（2026-08-31）时的旧值。
+  > - **这份名单没有一个是真的。** 实测对照：
+  >   - `22 声明` 那时（`443d28fb`）真正的零派发是 **14 个**；名单只列了 11 个，
+  >     漏掉的正好是 `PostToolUseFailure`、`WorktreeCreate`、`WorktreeRemove`。
+  >   - `d60895e3` 补掉 11 个、裁掉 4 个之后，剩下的恰好就是**被漏掉的那 3 个**；
+  >     而名单里列的 11 个中，7 个当时**已有派发点**，另外 4 个**已不在类型里**。
+  >   - 「整个回合只有 4 个派发点」同样是低估。
+  > - **T1 补的正是那 3 个**：`PostToolUseFailure`（`turn/tools.ts`）、`WorktreeCreate` /
+  >   `WorktreeRemove`（`core/tools/taskTool.ts`）。补完后 18/18。
+  >
+  > 恢复手段：`scripts/check-declarations.mjs` 现在要求「每个声明的事件必须在生产代码里有
+  > dispatch」，已接入 CI —— 这正是这份名单不该再靠人手维护的原因。
+  > 该门禁**只覆盖钩子事件与工具工厂两类**：接口字段与模块导出的误报面太大，不纳入。
   > 见 `phase-4-execution.md` §1。
 
 **证据（pi）**：`docs/extensions.md` 的 Events 章共 **26** 个事件（`project_trust`、`resources_discover`、`session_start`、`session_info_changed`、`session_before_switch`、`session_before_fork`、`session_before_compact`、`session_before_tree`、`session_shutdown`、`before_agent_start`、`agent_start`、`ui_prompt_start`、`turn_start`、`message_start`、`tool_execution_start`、`context`、`before_provider_headers`、`before_provider_request`、`after_provider_response`、`cache_warming_decision`、`model_select`、`thinking_level_select`、`tool_call`、`tool_result`、`user_bash`、`input`），每个都有实际派发点与文档化的返回值语义。
