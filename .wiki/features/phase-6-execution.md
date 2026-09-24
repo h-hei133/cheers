@@ -263,7 +263,7 @@ Node 官方发布说明确认 `zlib.crc32` 于 **v22.2.0** 加入、**回移至 
 | `analyze:module-facades` | 仍是原有 **5 个** monolith，**无新增** |
 | 受影响套件 | T1 52 文件/529 项、T2 31/283、T3 55/573、T4 27/210 |
 | **全量套件** | **509 文件 / 3267 通过 / 1 跳过 / 0 失败**（修复 §4.4 与 §7.1 之后） |
-| `analyze-boundaries.py` | 生产 **938 → 941**、CLI 可达 **808 → 812**、testOnly 100 → 99 |
+| `analyze-boundaries.py` | 生产 **938 → 942**、CLI 可达 **808 → 812**、testOnly 100 → 99 |
 
 **边界数字的一处说明（2026-09-24 更正）**：生产文件只**新增 3 个**
 （`core/commands/metricsCommandRuntime.ts`、`core/commands/reportCommandRuntime.ts`、
@@ -279,6 +279,11 @@ Node 官方发布说明确认 `zlib.crc32` 于 **v22.2.0** 加入、**回移至 
 `observability/types.ts` 与 `observability/metrics.ts`（`C` → `CT`）、
 `core/security/redaction.ts`（`T` → `CT`）。
 **结论不变**（没有未申报的生产文件），但**基线与文件名此前是错的**。
+
+**复核轮后的第二个文件**：`test-utils/metricsExitProcess.ts`（退出 flush 的子进程夹具）。
+分析器把 `src/` 下**非 `*.test.ts`** 的都算生产，所以 `test-utils/` 一直计入——
+`3ba4abf8` 时已有 8 个（`crashRecorderProcess.ts`、`cliHarness.ts` 等），这是**既有约定**，
+不是我引入的不一致。生产计数因此为 **942**。
 
 ---
 
