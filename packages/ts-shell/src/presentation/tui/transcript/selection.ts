@@ -56,6 +56,7 @@ export function extractSelection(
   rows: readonly string[],
   anchor: SelectionPoint,
   focus: SelectionPoint,
+  options: { readonly kind?: "drag" | "unit" } = {},
 ): string | undefined {
   const ranges = selectedRanges(rows, orderSpan(anchor, focus));
   if (ranges.length === 0) return undefined;
@@ -65,7 +66,12 @@ export function extractSelection(
   const cleaned = clean(selected, ranges[0]!.start === 0 || ranges.length === 1);
   if (cleaned.length === 0) return undefined;
   const text = cleaned.join("\n");
-  return text.replace(/\s/g, "").length >= MIN_SELECTION_CELLS ? text : undefined;
+  // A free drag has to tell "the pointer moved one cell" apart from "the user
+  // selected something", and does it by requiring more than one cell of content. A
+  // unit selection has no such doubt: the click count decided what it covers, so a
+  // one-character word is a selection the user asked for and has to survive.
+  const minimum = options.kind === "unit" ? 1 : MIN_SELECTION_CELLS;
+  return text.replace(/\s/g, "").length >= minimum ? text : undefined;
 }
 
 /** The same rows with the span shaded, so the drag shows what it has covered. */

@@ -72,6 +72,15 @@ describe("selection extraction", () => {
 
     expect(text).toBe("only row");
   });
+
+  it("keeps a one cell span that a click decided was a unit", () => {
+    // The same span is a click when it came from a drag and a selection when it
+    // came from a word click, so the caller has to say which it is.
+    expect(extractSelection(["a b"], { row: 0, column: 0 }, { row: 0, column: 0 })).toBeUndefined();
+    expect(
+      extractSelection(["a b"], { row: 0, column: 0 }, { row: 0, column: 0 }, { kind: "unit" }),
+    ).toBe("a");
+  });
 });
 
 describe("drag tracking", () => {
@@ -85,47 +94,92 @@ describe("drag tracking", () => {
     return selection.handle(parseMouseReport(sequence)!);
   }
 
+  function pressAt(selection: DragSelection, sequence: string, now: number): boolean {
+    return selection.handle(parseMouseReport(sequence)!, undefined, now);
+  }
+
   it("takes the whole word on a double click", () => {
     // The gesture every editor has. Asserted through the drag rather than on the
     // span helper, because the helper being right does not prove it is wired in.
     const { selection, copied } = build();
     // The mouse report's column is one-based; 18 is inside "live" in the third row.
     const at = "\u001b[<0;18;3M";
+    const off = "\u001b[<0;18;3m";
 
+    // A terminal sends a release between the two presses, and it has to be part of
+    // the test: the first release is what used to end the click run, which left the
+    // second press counting as the first one and the word gesture unreachable.
     press(selection, at);
+    press(selection, off);
     press(selection, at);
-    press(selection, "\u001b[<0;18;3m");
+    press(selection, off);
 
     expect(copied).toHaveLength(1);
     // The whole word, not the single character the pointer sat on.
     expect(copied[0]).toBe("live");
   });
 
+  it("takes a word of one character", () => {
+    // A word unit covers one cell here, and the drag rule that says "one cell is a
+    // click, not a selection" must not swallow it: the click decided the unit, so
+    // there is nothing ambiguous left to reject.
+    const rows = ["a b c"];
+    const copied: string[] = [];
+    const selection = new DragSelection({ rows: () => rows }, (text) => copied.push(text));
+
+    press(selection, "\u001b[<0;1;1M");
+    press(selection, "\u001b[<0;1;1m");
+    press(selection, "\u001b[<0;1;1M");
+    press(selection, "\u001b[<0;1;1m");
+
+    expect(copied).toEqual(["a"]);
+  });
+
   it("takes the whole line on a triple click", () => {
     const { selection, copied } = build();
     const at = "\x1b[<0;18;3M";
+    const off = "\x1b[<0;18;3m";
 
     press(selection, at);
+    press(selection, off);
     press(selection, at);
+    press(selection, off);
     press(selection, at);
-    press(selection, "\x1b[<0;18;3m");
+    press(selection, off);
 
-    expect(copied).toHaveLength(1);
-    expect(copied[0]).toContain("Blocks stay live while the screen has room");
+    // Each release closes a selection and copies it, which is what "copy on
+    // release" means: the second click copies the word, and the third widens it to
+    // the line and copies that. What the user is left holding is the line.
+    expect(copied).toEqual(["live", expect.stringContaining("Blocks stay live while the screen has room")]);
   });
 
   it("treats a press far apart in time as a new single click", () => {
     // A run has to end, or a later unrelated click would silently widen its
-    // selection to the word under it.
+    // selection to the word under it. The clock is passed in, because two presses on
+    // one cell are a double click in every other sense and only the interval says
+    // they are not.
     const { selection, copied } = build();
     const at = "\x1b[<0;18;3M";
 
-    press(selection, at);
-    press(selection, "\x1b[<0;18;3m");
-    press(selection, at);
-    press(selection, "\x1b[<0;18;3m");
+    pressAt(selection, at, 0);
+    pressAt(selection, "\x1b[<0;18;3m", 10);
+    pressAt(selection, at, 1_000);
+    pressAt(selection, "\x1b[<0;18;3m", 1_010);
 
     // Two single clicks on one cell select nothing, so nothing is copied.
+    expect(copied).toEqual([]);
+  });
+
+  it("does not continue the run onto a different cell", () => {
+    // Two clicks in a row on different cells are two single clicks, so neither
+    // takes a word.
+    const { selection, copied } = build();
+
+    press(selection, "\x1b[<0;18;3M");
+    press(selection, "\x1b[<0;18;3m");
+    press(selection, "\x1b[<0;20;3M");
+    press(selection, "\x1b[<0;20;3m");
+
     expect(copied).toEqual([]);
   });
 
@@ -140,6 +194,43 @@ describe("drag tracking", () => {
 
     expect(copied).toHaveLength(1);
     expect(copied[0]).toContain("Blocks stay live");
+  });
+
+  it("keeps both words whole when the drag goes backwards", () => {
+    // The unit the click chose stays whole, and so does the one the pointer reached.
+    // Anchoring on the same end regardless of direction cuts one of them, which of
+    // the two depends only on which way the drag went.
+    const rows = ["alpha beta gamma"];
+    const copied: string[] = [];
+    const selection = new DragSelection({ rows: () => rows }, (text) => copied.push(text));
+
+    press(selection, "\u001b[<0;8;1M");
+    press(selection, "\u001b[<0;8;1m");
+    press(selection, "\u001b[<0;8;1M");
+    press(selection, "\u001b[<32;2;1M");
+    press(selection, "\u001b[<0;2;1m");
+
+    expect(copied).toEqual(["alpha beta"]);
+  });
+
+  it("keeps following the pointer across the gap between two words", () => {
+    // A pointer that is plainly moving must move the selection. Holding the last
+    // word's end would freeze it until the pointer entered the next word.
+    const rows = ["alpha beta gamma"];
+    const copied: string[] = [];
+    const selection = new DragSelection({ rows: () => rows }, (text) => copied.push(text));
+
+    press(selection, "\u001b[<0;2;1M");
+    press(selection, "\u001b[<0;2;1m");
+    press(selection, "\u001b[<0;2;1M");
+    // The gap between "alpha" and "beta", then the start of "beta".
+    press(selection, "\u001b[<32;6;1M");
+    expect(selection.span?.to.column).toBe(5);
+    press(selection, "\u001b[<32;7;1M");
+    expect(selection.span?.to.column).toBe(9);
+    press(selection, "\u001b[<0;7;1m");
+
+    expect(copied).toEqual(["alpha beta"]);
   });
 
   it("hands a shift-drag back to the terminal untouched", () => {
@@ -184,6 +275,47 @@ describe("drag tracking", () => {
     selection.handle(parseMouseReport("\x1b[<0;40;3m")!);
 
     expect(copy).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes the word under the pointer on a styled row, however far right it is", () => {
+    // The pointer names a cell; a rendered line is longer than the row it shows,
+    // because its styling is carried by escape sequences that occupy no cells.
+    // Reading the line's raw string at the pointer's column therefore lands
+    // somewhere further right the user clicked — a word came back sliced into a
+    // fragment ("ove" for "over") once the drift passed the line's first style
+    // change. The word boundaries are found in the cells the line shows.
+    const rows = [
+      "\x1b[36m▌\x1b[39m the quick brown fox jumps \x1b[1mover\x1b[22m the lazy dog near the end",
+    ];
+    const copied: string[] = [];
+    const selection = new DragSelection({ rows: () => rows }, (text) => copied.push(text));
+
+    // A visible column well past the line's first style change, inside "over".
+    const column = 30;
+    const pressAt = `\u001b[<0;${column + 1};1M`;
+    const releaseAt = `\u001b[<0;${column + 1};1m`;
+    selection.handle(parseMouseReport(pressAt)!);
+    selection.handle(parseMouseReport(releaseAt)!);
+    selection.handle(parseMouseReport(pressAt)!);
+    selection.handle(parseMouseReport(releaseAt)!);
+
+    expect(copied).toEqual(["over"]);
+  });
+
+  it("takes the whole visible line on a triple click of a styled row", () => {
+    // The same drift in the line case: a row ending in styled text ended the
+    // selection short of its real end, because the raw string's idea of the last
+    // column was counted against a longer string than the one on screen.
+    const rows = ["plain start \x1b[36mstyled end\x1b[39m"];
+    const copied: string[] = [];
+    const selection = new DragSelection({ rows: () => rows }, (text) => copied.push(text));
+
+    for (let press = 0; press < 3; press += 1) {
+      selection.handle(parseMouseReport("\u001b[<0;6;1M")!);
+      selection.handle(parseMouseReport("\u001b[<0;6;1m")!);
+    }
+
+    expect(copied.at(-1)).toBe("plain start styled end");
   });
 });
 

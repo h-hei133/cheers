@@ -1,5 +1,5 @@
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
-import { nextClickCount, spanForClick, type ClickRecord } from "./clickSelect.js";
+import { nextClickCount, spanForClick, spanForDrag, type ClickRecord } from "./clickSelect.js";
 import {
   extractSelection,
   orderSpan,
@@ -35,6 +35,8 @@ export class DragSelection {
   private focus: SelectionPoint | undefined;
   private inFlight = false;
   private lastClick: ClickRecord | undefined;
+  /** The unit the click chose, so a drag can extend from it in either direction. */
+  private initial: SelectionSpan | undefined;
   /** The current run is a word or line selection, so a drag extends it. */
   private granularity: "character" | "word" | "line" = "character";
 
@@ -53,15 +55,28 @@ export class DragSelection {
     return orderSpan(this.anchor, this.focus);
   }
 
-  /** Cancel any in-progress drag without copying. */
-  clear(): void {
+  /**
+   * End the current drag without forgetting how many times the pointer was
+   * pressed.
+   *
+   * A release that selected nothing is the ordinary first click of a double click,
+   * so it has to leave the count alone — clearing it here is what made a second
+   * press always read as a first one and the word gesture unreachable.
+   */
+  private endDrag(): void {
     this.inFlight = false;
     this.anchor = undefined;
     this.focus = undefined;
-    // The click run ends with the selection: otherwise a click after a copied
+    this.initial = undefined;
+    this.granularity = "character";
+  }
+
+  /** Cancel any in-progress drag without copying, and end the click run. */
+  clear(): void {
+    this.endDrag();
+    // An explicit cancel ends the run: otherwise a click after a discarded
     // selection would count as a continuation of the one before it.
     this.lastClick = undefined;
-    this.granularity = "character";
   }
 
   /** Copy the currently selected text and clear the selection. Returns true if a selection was active. */
@@ -108,17 +123,37 @@ export class DragSelection {
         // back to a character anchor rather than selecting nothing at all.
         this.anchor = span?.from ?? coord;
         this.focus = span?.to ?? coord;
+        this.initial = span;
         return true;
       }
       case "drag":
         if (!this.anchor) return false;
         this.inFlight = true;
+        // A pointer that left the cell the run was counted on is a drag, not
+        // another click: continuing the run there would take a word when the user
+        // was selecting a phrase.
+        if (
+          this.lastClick &&
+          (this.lastClick.row !== coord.row || this.lastClick.column !== coord.column)
+        ) {
+          this.lastClick = undefined;
+        }
         // A word or line selection stays whole while the pointer moves: the unit
         // was chosen by the click, and a drag adjusts which units are covered
         // rather than dissolving back into individual characters.
         if (this.granularity !== "character") {
-          const span = spanForClick(this.screen.rows(), coord, this.granularity);
-          if (span) this.focus = span.to;
+          const target = spanForDrag(this.screen.rows(), coord, this.granularity);
+          const initial = this.initial;
+          if (target && initial) {
+            // Which end of the initial unit stays put follows the direction of the
+            // drag. Anchoring the near end either way would cut the word the drag
+            // started on, and anchoring the far end would cut the one it reached.
+            const before =
+              target.from.row < initial.from.row ||
+              (target.from.row === initial.from.row && target.from.column < initial.from.column);
+            this.anchor = before ? initial.to : initial.from;
+            this.focus = before ? target.from : target.to;
+          }
           return true;
         }
         this.focus = coord;
@@ -133,13 +168,18 @@ export class DragSelection {
         // the release column narrowed it back to wherever the pointer stopped.
         const focus = this.granularity === "character" ? coord : this.focus ?? coord;
         this.focus = focus;
-        if (anchor.row === focus.row && anchor.column === focus.column) {
-          this.clear();
-          return false;
-        }
-        const text = extractSelection(this.screen.rows(), anchor, focus);
+        const unit = this.granularity !== "character";
+        const text = extractSelection(
+          this.screen.rows(),
+          anchor,
+          focus,
+          unit ? { kind: "unit" } : {},
+        );
         if (!text) {
-          this.clear();
+          // Nothing was selected, which is what a plain click looks like. The drag
+          // ends; the click run does not, so the next press can complete a double
+          // click.
+          this.endDrag();
           return false;
         }
         this.copy(text);
