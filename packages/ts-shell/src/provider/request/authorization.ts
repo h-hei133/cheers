@@ -156,7 +156,7 @@ export async function renewAccountAuthIfExpiring(input: {
     };
   }
 
-  const inFlight = renewalsInFlight.get(input.provider);
+  const inFlight = renewalsInFlight.get(renewalKey(input.provider, refreshToken));
   if (inFlight) {
     // The token this call read is already being replaced by the exchange it is
     // waiting on, so the answer is that exchange's, not a second one's.
@@ -172,16 +172,30 @@ export async function renewAccountAuthIfExpiring(input: {
     fetchImpl: input.fetchImpl,
     ...(input.signal ? { signal: input.signal } : {}),
   });
-  renewalsInFlight.set(input.provider, run);
+  const key = renewalKey(input.provider, refreshToken);
+  renewalsInFlight.set(key, run);
   try {
     return await run;
   } finally {
-    renewalsInFlight.delete(input.provider);
+    renewalsInFlight.delete(key);
   }
 }
 
-/** The renewals in flight, one per provider, so a spent token is exchanged once. */
-const renewalsInFlight = new Map<RuntimeProvider, Promise<AccountAuthRenewal>>();
+/**
+ * Which exchange a caller can share.
+ *
+ * Keyed by the refresh token, not by the provider: the token is the thing the
+ * exchange spends, so two callers may share an exchange only when they are
+ * spending the same one. Keying by provider alone made a second account's
+ * request join the first account's exchange and receive its token — the wrong
+ * identity, silently, which is worse than the extra exchange it saved.
+ */
+function renewalKey(provider: RuntimeProvider, refreshToken: string): string {
+  return `${provider}\u0000${refreshToken}`;
+}
+
+/** The renewals in flight, one per credential, so a spent token is exchanged once. */
+const renewalsInFlight = new Map<string, Promise<AccountAuthRenewal>>();
 
 /** The label a user knows a provider by, for a message they have to act on. */
 function providerLabel(provider: RuntimeProvider): string {

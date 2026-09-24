@@ -245,6 +245,48 @@ describe("renewing a token that is about to expire", () => {
     expect(b.renewed).toBe(false);
   });
 
+  it("does not hand one account's renewed token to another account", async () => {
+    // The exchange spends the refresh token it was given, so two callers may share
+    // one only when they are spending the same token. Keyed by provider alone, a
+    // second account's request joined the first account's exchange and came back
+    // holding that account's token — the wrong identity, silently, which is worse
+    // than the extra exchange the sharing was meant to save.
+    const seen: string[] = [];
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      const body = String(init?.body ?? "");
+      const token = /refresh_token=([^&]+)/.exec(body)?.[1] ?? "";
+      seen.push(token);
+      await gate;
+      return new Response(
+        JSON.stringify({ access_token: `renewed-for-${token}`, refresh_token: "rotated", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as unknown as typeof fetch;
+
+    const first = renewAccountAuthIfExpiring({
+      provider: "openai",
+      credential: { accountAuth: openAIAuth({ expiresAt: Date.now() - 1, refreshToken: "account-one" }) },
+      fetchImpl,
+    });
+    const second = renewAccountAuthIfExpiring({
+      provider: "openai",
+      credential: { accountAuth: openAIAuth({ expiresAt: Date.now() - 1, refreshToken: "account-two" }) },
+      fetchImpl,
+    });
+    release?.();
+    const [a, b] = await Promise.all([first, second]);
+
+    // Two accounts, two exchanges.
+    expect(seen.sort()).toEqual(["account-one", "account-two"]);
+    // Each caller keeps its own identity.
+    expect(a.accountAuth?.accessToken).toBe("renewed-for-account-one");
+    expect(b.accountAuth?.accessToken).toBe("renewed-for-account-two");
+  });
+
   it("shares a failed exchange with the caller that waited for it", async () => {
     // The waiting caller would otherwise build a request on its own stale copy,
     // believing the exchange it joined had succeeded. The failure has to travel
