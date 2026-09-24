@@ -562,7 +562,7 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .cheers.json  packa
 - **`/reload` 命令**：已论证不需要（§6.2 发现 2）。
 - **嵌套目录懒加载**（裁决 §2.3）：明确移出本轮。
 - **linked worktree 遮蔽**（裁决 §2.5 #7）：backlog。
-- **CLI 级技能路径注入**（裁决 §3.6 #6）：~~backlog~~ ✅ **2026-09-24 Phase 8 施工**：`--skill <path>`（可重复）+ `--no-skills`/`-ns`，见 `phase-8-decisions.md` §2。
+- **CLI 级技能路径注入**（裁决 §3.6 #6）：~~backlog~~ ✅ **2026-09-24 Phase 8 施工**：`--skill <path>`（可重复）+ `--no-skills`/`-ns`，见 `phase-8-decisions.md` §2。**同轮复核更正**：初版只作用于提示词路径，`/skill`、`/skill:` 与选择器各自建 loader（不带 flag、不带信任门）→ 命名技能模型看得见而用户调不动，未信任项目的技能可经 `/skill:<name>` 进提示词。已统一到 `core/skills/skillCatalog.ts`，见 `phase-8-decisions.md` §8.3 D1/D2。
 - **技能名/长度不合规的警告**（裁决 §3.5）：~~**未实现**~~ ✅ **2026-09-24 Phase 8 复核更正**：本行写作时未实现，**后续施工早已补上**——`skillLoader.ts:63-65`（`MAX_NAME_LENGTH=64` + `VALID_NAME`）与 `inspectSkill` 已输出名称长度/字符集诊断（测试 `skillLoader.test.ts:237-251`）。Phase 8 又补了首尾连字符与连续连字符两条边界诊断。文档漂移入档，见 `phase-8-pre-research.md` §2.2。
 - **技能无 `description` 时硬失败**（裁决 §3.5）：行为已达成（无描述则不进入 `<available_skills>`，模型无法匹配到它）。~~但**不产生诊断**~~ ✅ **2026-09-24 更正**：`inspectSkill` 现输出「has no description」诊断（`skillLoader.ts:357-359`）。
 
