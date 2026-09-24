@@ -15,9 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The lowest version the package claims to support, so `engines` is checked
+      # rather than asserted. A run on a newer Node proves the code works on the
+      # developer's machine, which is not the promise being made: the previous pin
+      # was Node 20 while the code called `Promise.withResolvers`, and CI was red on
+      # every commit for it without anyone noticing, because local runs were newer.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.3.0
           cache: npm
 
       - name: Install dependencies

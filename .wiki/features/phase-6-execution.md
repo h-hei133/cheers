@@ -395,6 +395,11 @@ CI 日志：45 处 `Promise.withResolvers is not a function`。
 **方法论教训**：**声明的版本下限必须在那个版本上真的跑过**。
 `engines` 是承诺，不是注释；CI 应该验证下限，否则它验证的是开发机。
 
+**CI 同步修改**：`node-version` 从 `20` 改为 **`20.3.0`**（声明下限本身），
+这样 `engines` 是被**验证**的而不是被**断言**的。验证方式：下载 Node 20.3.0，
+确认它**有** `AbortSignal.any`（下限的依据）而**没有** `Promise.withResolvers`
+（这正是修复要承受的差异），再跑编译产物——`waitBeforeRetry` / `withFileLock` / `zipArchive` 三条路径全部通过。
+
 #### ⚠️ ③ `/metrics` 读不到自己写的数据
 
 四个独立缺陷，每个都会让数字**看起来是数据而实际是错的**：
