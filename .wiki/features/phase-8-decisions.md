@@ -408,3 +408,86 @@ Windows glob」。测试 2 项正反两向；反向验证：去掉归一化 →
 
 **遗留**：`--no-skills` 的实机验证未做（单元层覆盖：`slashRouter` 的
 「is absent when discovery was silenced」与 `skillLoader` 的 disableDiscovery 用例）。
+
+---
+
+## 9. A 类收口（**2026-09-25**）：两项「可做」已做
+
+> **来源**：01–07 剩余任务清点（`log.md` 2026-09-24 audit 条目）把 29 个剩余条目
+> 分成可做 / 需前置 / 需立项 / 不做四类，其中**可做**仅 2 项。本节是这 2 项的施工记录。
+
+### 9.1 A1 —— 技能发现共享统一忽略层
+
+**性质**：不是新功能，是**裁决说做、实现没做**（`phase-3-decisions.md` §3.6 #7
+裁决「目录列举与技能发现**共享同一忽略判定**」）。证据：`grep ignore skillLoader.ts`
+→ 0；`git log -S IGNORE_FILES -- src/core/skills/skillLoader.ts` → **空**（从未有过）。
+而 `directoryListing.ts` / `fileWalk.ts` 早已有该层。
+
+**后果实测**（复现）：
+```
+.gitignore: vendor/
+.agents/skills/vendor/leaked/SKILL.md
+→ DISCOVERED = ["leaked"]      # git 忽略的目录里的技能仍被发现并进入提示词
+```
+
+**做法**：把忽略层从 `fileWalk.ts` 抽成 `runtime/execution/ignoreRules.ts`——
+`listWorkspaceFilesViaGit` / `listIgnoredViaGit` / `addIgnoreFile` / `matcherForDirectory`
+原样搬出（git 优先，无仓库时进程内匹配），新增 `isDirectoryIgnored(root, dir)` 作为
+**单一问题入口**。三个读者（文件走查 / 目录列举 / 技能发现）共用，不再是第四种意见。
+
+**两处判定**：
+- **只对发现根生效**，不对 `--skill` 命名的路径生效：指名一个目录比「恰好匹配的模式」
+  更具体，否则 `--skill <dir>` 会静默什么都不加载。
+- **用户级技能目录天然不受影响**（它在仓库根之外，`isDirectoryIgnored` 对 root 之外
+  的路径返回 false）——这正是想要的：项目规则是该项目对自己文件的陈述。
+
+**验证**：复现修复（`DISCOVERED=["kept"]`、命名路径仍 `["kept","leaked"]`）；
+新增 3 项测试（git 仓库内排除 / 命名路径豁免 / **无仓库时进程内匹配**）；
+反向验证：删判定行 → **2 项失败**。
+
+### 9.2 A2 —— 主题 CLI 覆盖层（`--theme` + `--use-theme`）
+
+**性质**：`phase-4-decisions.md` §31 裁决「两层（用户+项目），**不做包/CLI 层**」，
+理由写的是「**我方无包系统**」——该理由只覆盖**包层**，**不覆盖 CLI 层**。所以
+04 文档行 63 的余量「无 `--theme` CLI 覆盖层」等于**没有理由**。
+
+**先做了语义核实（子代理 scout）**，结果修正了原计划：`pi` 的两个旗标分工不同——
+
+| pi 旗标 | 语义 |
+|---|---|
+| `--theme <path>` | **加载**一个主题文件或目录，**可重复**（`args.ts:187-189`、`docs/cli.md:162`） |
+| `--use-theme <name[/name]>` | **选择**本次运行渲染哪个（`args.ts:190-197`） |
+
+若我方把 `--theme` 实现成「按名选择」，就与 pi 的 `--theme`（路径）**语义冲突**，
+而按名选择在 pi 里叫 `--use-theme`。**故按 pi 的分工实现两个**：`--theme`（可重复，
+最后加载故覆盖磁盘与内置）+ `--use-theme <name>`。
+
+**为什么两个一起做**：只做 `--theme <path>` 会让它加载一个**无人选择**的主题——
+一次运行里加载而不选择没有意义。这是「成对能力」而非两个独立项。
+
+**接线**：`cliArgs.ts`（解析）→ `cliOptions.ts`（`themePaths` / `useTheme`）→
+`cliProcessRunner.applyStartupTheme`（**首帧之前**应用，否则第一帧画在默认色上且不再重画）
+→ `runtimeContext.themePaths` → `CommandContext.themePaths` → `/theme` 可列出并切回。
+
+**失败不致命但要说**：主题加载不了就保留默认调色板并点名（错拼的路径与同名冲突
+在渲染结果上外观相同，是用户唯一无法自行诊断的情形）；`themeNamesFromPaths` 用于
+「这个路径一个主题都没贡献」。
+
+**验证**：PTY 实机（构建产物，隔离 HOME）——`--theme /tmp/tm/mine.json --use-theme mine`
+后 `/theme` 列出 `mine — named on the command line (from disk) **(in use)**`。
+新增 5 项主题层测试 + 3 项 `/theme` 命令测试 + 4 项 CLI 解析测试；
+反向验证：删「命名路径加载」→ **5 项失败**。
+
+**全量验证（A1+A2 合起来）**：`tsc` 0 错；`npm run build` 通过；受影响套件
+**140 文件 1410 项全绿**；**全量套件 520 文件 3458 通过 / 1 skipped / 0 失败**；
+门禁 `verify:import-cycles` cycles=0、`check:config-consumers` 35/35、
+`check:declarations` 18/18+10/12、`analyze:module-facades` `monoliths=5`（无新增）。
+
+### 9.3 未做（如实记录）
+
+| 项 | 状态 |
+|---|---|
+| `pi` 的 `--no-themes` | **不做**。我方无「发现即加载」的副作用——主题只在被选择时读取，故没有需要关闭的发现行为。这是**形态差异**而非缺口 |
+| `pi` 的 `light/dark` 配对形式（`--use-theme light/dark`） | **不做**。需终端背景自动检测（OSC 11 / `COLORFGBG`）作为前提，属独立能力 |
+| 包层主题（`--theme` 之外的包分发） | **维持不做**（裁决 §31 原理由对此成立） |
+| `--theme` 的实机「错误路径」分支 | 单元层覆盖（`themeNamesFromPaths` 空结果）；实机只验了成功路径 |

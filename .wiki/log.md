@@ -2976,3 +2976,15 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
   2. **自定义 provider 的多协议缺口无任何裁决**。`03-*` 行 53 判「部分收口」、余量写「不能自定义 API 协议实现（pi 支持 `openai-responses`/`anthropic-messages` 等多协议）」，但 `grep anthropic-messages|openai-responses|多协议` 于全部 phase 裁决/施工文档 → **仅 1 处旁证**（phase-3 读 pi 源码时的引用），**没有任何裁决**。即这一行是**唯一一处「没被决定过的余量」**。
 - **处置**：两处均**记录不改**——①属技能发现的余量，与既有 10 项部分收口同性质；②需先做「是否引入多协议适配层」的裁决，属独立立项。已登记，不静默。
 - **教训（与 Phase 6/7 同型）**：**合计行是派生值**，读它等于信一个二手结论。本次重算之所以能对上，是因为前几轮已经把判定列修准了；对不上的那次（Phase 6 前置研究）正是判定列滞后的结果。**另**：`_index.md` 的 `03` 行 DEFICIENT 格写 `0` 而文档内 `03:51` 的判定列有 `~~MISSING~~`（判定有误的更正注记）——**这是索引与文档的第三类漂移**（既非判定错、也非合计错，而是索引行的分列与文档的判定列口径不同），量级 1 格，不修，记此以备下次有人核对时不必重新推导。
+
+## [2026-09-25] feat | A 类两项收口：技能发现共享忽略层（A1）+ 主题 CLI 覆盖层（A2）。**A1 是「裁决说做、实现没做」的接缝，A2 的原判定理由不成立。**
+- **A1（缺陷性质，非新功能）**：`phase-3-decisions.md` §3.6 #7 裁决「目录列举与技能发现**共享同一忽略判定**」，但 `skillLoader.ts` 对 `ignore` **零命中**，`git log -S IGNORE_FILES` → **从未有过**；而 `directoryListing.ts`/`fileWalk.ts` 早有该层。复现：`.gitignore: vendor/` + `.agents/skills/vendor/leaked/SKILL.md` → `DISCOVERED = ["leaked"]`（git 忽略目录里的技能仍进提示词）。
+- **A1 做法**：忽略层从 `fileWalk.ts` 抽成 `runtime/execution/ignoreRules.ts`（`listWorkspaceFilesViaGit`/`listIgnoredViaGit`/`addIgnoreFile`/`matcherForDirectory` 原样搬出 + 新增 `isDirectoryIgnored` 单一入口），**三个读者共用**（文件走查/目录列举/技能发现），不再是第四种意见。**两处判定**：①只对发现根生效，`--skill` 命名的路径豁免（指名比「恰好匹配的模式」更具体，否则 `--skill <dir>` 静默什么都不加载）；②用户级技能目录在仓库根之外，天然不受项目规则约束。
+- **A1 验证**：复现修复（`["kept"]` / 命名路径仍 `["kept","leaked"]`）；新增 3 项测试（含**无仓库时进程内匹配**）；反向验证删判定行 → **2 项失败**。
+- **A2（原判定理由不成立）**：`phase-4 §31` 裁决「不做包/CLI 层」，理由写「我方无包系统」——**该理由只覆盖包层，不覆盖 CLI 层**，故 04 行 63 的余量「无 `--theme` CLI 覆盖层」等于没有理由。
+- **A2 先做语义核实（scout 子代理），结果修正了原计划**：`pi` 的 `--theme <path>` 是**加载**（可重复，`args.ts:187-189`），`--use-theme <name[/name]>` 才是**选择**（`:190-197`）。若把 `--theme` 实现成「按名选择」就与 pi 语义冲突 → **按 pi 分工实现两个**。**成对做的理由**：只做 `--theme` 会加载一个无人选择的主题，一次运行里加载而不选择没有意义。
+- **A2 接线**：`cliArgs`（解析）→ `cliOptions`（`themePaths`/`useTheme`）→ `cliProcessRunner.applyStartupTheme`（**首帧之前**，否则第一帧画在默认色上且不再重画）→ `runtimeContext.themePaths` → `CommandContext.themePaths` → `/theme` 可列出并切回。失败不致命但点名（错拼路径与同名冲突在渲染结果上外观相同，是用户唯一无法自行诊断的情形）。
+- **A2 验证**：**PTY 实机**（构建产物、隔离 HOME）——`--theme /tmp/tm/mine.json --use-theme mine` 后 `/theme` 列出 `mine — named on the command line (from disk) (in use)`；新增 5 项主题层 + 3 项 `/theme` + 4 项 CLI 解析测试；反向验证删「命名路径加载」→ **5 项失败**。
+- **未做（如实记录）**：`pi` 的 `--no-themes`（我方无「发现即加载」副作用，形态差异非缺口）、`--use-theme light/dark` 配对（需终端背景自动检测作前提，独立能力）、包层（维持 §31 原理由）。
+- **门禁**：`verify:import-cycles` cycles=0、`check:config-consumers` 35/35、`check:declarations` 18/18+10/12、`analyze:module-facades` `monoliths=5`（**无新增**）、`verify:docs-drift:strict` rules pass（source-drift 78 持平）。
+- **文档**：`phase-8-decisions.md` 新增 §9（A 类收口全记录：9.1 A1 / 9.2 A2 / 9.3 未做）；`01-extensibility-and-customization.md` 技能发现行改为「余量：无」；`04-terminal-interaction-and-presentation.md` 主题磁盘发现行从「部分收口」改为「已收口」。
