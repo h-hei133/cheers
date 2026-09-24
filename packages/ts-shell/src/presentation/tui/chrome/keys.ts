@@ -32,7 +32,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["ctrl+home", "ctrl+end"], does: "first/last line of the draft, or oldest/newest conversation when empty", group: "moving" },
   {
     keys: ["ctrl+shift+f"],
-    does: "find text in the conversation; up/down walk the matches, escape closes",
+    does: "find text in the conversation; enter/↓ and shift+enter/↑ walk the matches, escape closes",
     group: "moving",
     negotiated: true,
   },

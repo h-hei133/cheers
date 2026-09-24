@@ -11,6 +11,7 @@ export interface SearchKey {
   readonly keyId: string;
   readonly text: string;
   readonly ctrl: boolean;
+  readonly shift: boolean;
   readonly alt: boolean;
 }
 
@@ -131,15 +132,23 @@ export class TranscriptSearch {
   handleKey(event: SearchKey): SearchKeyOutcome {
     if (!this.capturing) return { handled: false };
 
-    if (event.keyId === "escape" || event.keyId === "ctrl+c") {
+    // The parser names a modified key as `shift+enter`, not as `enter` with a
+    // shift flag, so the modifier and the name are both part of the key id. Reading
+    // only `enter` is what left the reverse step unreachable however it was pressed:
+    // the branch matched nothing and the key fell through to "consumed, no meaning".
+    const name = event.keyId.startsWith("shift+")
+      ? event.keyId.slice("shift+".length)
+      : event.keyId;
+
+    if (name === "escape" || name === "ctrl+c") {
       this.close();
       return { handled: true, redraw: true };
     }
-    if (event.keyId === "enter" || event.keyId === "down") {
-      return { handled: true, moved: this.step(1) };
+    if (name === "enter") {
+      return { handled: true, moved: this.step(event.shift ? -1 : 1) };
     }
-    if (event.keyId === "up") {
-      return { handled: true, moved: this.step(-1) };
+    if (name === "down" || name === "up") {
+      return { handled: true, moved: this.step(name === "down" ? 1 : -1) };
     }
     if (event.keyId === "backspace" || event.keyId === "delete") {
       return this.backspace() ? { handled: true, redraw: true, moved: true } : { handled: true };

@@ -187,7 +187,11 @@ export class InteractiveMode {
           if (this.search.active) this.search.indexFor(this.view.contentRows());
           return this.search.bar();
         },
-        highlightSearchMatches: (row, contentRow) => styleSearchRow(this.search, row, contentRow),
+        // A search opened before a run started is still open when rows begin to
+        // arrive, and rows being appended would drag their highlight along with
+        // them. The query and the counter stay; only the styling waits.
+        highlightSearchMatches: (row, contentRow) =>
+          this.busy ? row : styleSearchRow(this.search, row, contentRow),
       },
       this.state,
     );
@@ -351,6 +355,10 @@ export class InteractiveMode {
           this.tui.requestRender();
         },
         openSearch: () => {
+          // Not while a run is producing rows: the search matches the rows on
+          // screen, and rows that are still being written would move under it and
+          // carry their highlights with them.
+          if (this.busy) return;
           this.search.begin();
           this.pointer.clearSelection();
           this.tui.requestRender();

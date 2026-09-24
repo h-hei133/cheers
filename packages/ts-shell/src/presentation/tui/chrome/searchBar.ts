@@ -37,5 +37,6 @@ export function renderSearchBar(context: SearchBarContext, width: number): strin
   }
 
   parts.push(defaultTheme.dim(context.matchCount > 0 ? "↑↓ next · esc close" : "esc close"));
+  parts.push(defaultTheme.dim("· ⏎ ⇧⏎ walk"));
   return [truncateToWidth(parts.join(separator), width)];
 }
