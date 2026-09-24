@@ -180,23 +180,29 @@ describe("CLI streaming baseline (T3)", () => {
   });
 
   afterEach(() => {
-    if (!fs.existsSync(sessionsDir)) {
-      return;
-    }
+    // The child processes these tests spawn write into the fake home, and one can
+    // still be finishing as the test ends: removing a session directory while a
+    // writer is recreating a file inside it fails with ENOTEMPTY, which `force`
+    // does not cover because the directory is genuinely not empty. Retrying the
+    // whole removal, rather than a single call, is what makes the cleanup keep up
+    // with a writer that is still going.
+    removeWithRetry(fakeHomeDir);
+  });
 
-    for (const file of fs.readdirSync(sessionsDir)) {
-      if (file.startsWith("sess_")) {
-        fs.rmSync(path.join(sessionsDir, file), {
-          recursive: true,
-          force: true,
-          maxRetries: 5,
-          retryDelay: 100,
-        });
+  function removeWithRetry(target: string): void {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      try {
+        fs.rmSync(target, { recursive: true, force: true });
+        return;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        // ENOTEMPTY and EBUSY mean a writer is mid-flight; anything else is a
+        // real problem and should not be swallowed.
+        if (code !== "ENOTEMPTY" && code !== "EBUSY" && code !== "ENOENT") throw error;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
       }
     }
-
-    fs.rmSync(fakeHomeDir, { recursive: true, force: true });
-  });
+  }
 
   function seedInterruptedSessionForRecovery(sessionId: string): void {
     const sessionDir = path.join(sessionsDir, sessionId);
