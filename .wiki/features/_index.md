@@ -172,6 +172,23 @@ confidence: high
 > 三个 compaction 调用点**漏接一个**（`/back` 的摘要无超时）。
 > 全部已修并**逐项反向验证**；详见 `phase-6-execution.md` §7.1 与 §8。
 
+> **Phase 7 前置研究与裁决已完成（2026-09-24，零代码改动）**：
+> `phase-7-pre-research.md` + `phase-7-decisions.md`。
+> **本轮最重要的发现与 Phase 6 相反——表格这次不是滞后，而是错的**：
+> 四条「仍开放」的判定经代码核实**已经不成立**（重复压缩边界、rewind 分支摘要、
+> 鼠标选择与复制、Undo/redo），其中两条**还有测试在钉住**它们已实现的行为
+> （`compaction.test.ts:543` 的标题就是「revises the checkpoint it finds instead of
+> summarizing it again」）。
+> **真正仍开放 17 项**，纳入任务 8 项、明确不做 8 项。
+> **三项有明确证据的行为缺口**：①**OAuth 登录是完整的死路**——登录/刷新/解析/预检
+> 四段全在且有测试，但**请求路径只读 `apiKey`**，而 account-auth 凭据没有该字段，
+> 所以 `/connect login … --account` 之后**每个请求发空 `Bearer`**（8 项链路经独立复核者
+> 逐项验证）；②**`/skill:name` 实机直接报错**（`Unknown slash command: /skill:demo`），
+> 且提示词模板引擎不存在；③**转录内搜索**缺失。
+> **自我更正 3 处**（§0.3 与 §4.1），其中一处**推翻既有裁决的理由是错的**——
+> 我把 `firstKeptEntryId`（压缩记录字段）与 `get_tree`（树条目 `parentId`）当成同一个，
+> 经复核者证伪后**维持 Phase 5 原裁决**。
+
 | # | 报告 | 覆盖范围 | DEFICIENT | MISSING | OURS-ONLY | 平手 |
 |---|---|---|---:|---:|---:|---:|
 | 01 | [可扩展性与定制化](01-extensibility-and-customization.md) | 扩展宿主、技能、提示词模板、包分发、主题、上下文文件 | 3 | 7 | 1 | 0 |

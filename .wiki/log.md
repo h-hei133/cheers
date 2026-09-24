@@ -2861,6 +2861,18 @@ memo 键撞键（`"6000"` 与 `6000`）、超时守卫接受分数与 20 亿、
 **方法论**：压缩容器的字节扫描不是安全检查；`engines` 必须在那个版本上真跑过；
 派生值必须随源值一起改；注释里的不变量必须真检查过。
 
+
+## [2026-09-24] plan | Phase 7 前置研究与裁决完成（**零代码改动**）。产物 `.wiki/features/phase-7-pre-research.md` + `phase-7-decisions.md`。
+- **盘点方法**：对 01–07 逐行核对当前代码。**本轮最重要发现与 Phase 6 相反——表格这次不是滞后，而是错的。**
+- **四条判定被证伪**：①**重复压缩沿用上一条 kept boundary** —— `session/compaction.ts:491` `historyStart = previousSummary === undefined ? head : head + 1` **正是**排除上一条检查点；`compaction.test.ts:543` 标题即「revises the checkpoint it finds instead of summarizing it again」。反向验证：改回 `head` → **2 项测试失败**。②**rewind 分支摘要** —— `SessionManager.ts:184` `appendBranchSummaryEvent` 含 `summary`/`droppedTurns`/`abandonedEntryIds`，Phase 4 已实现。③**鼠标选择与复制** —— `pointer.ts:177,187` 边缘自动滚动、`:79` `copySelection()`、`selection.ts` 去缩进。④**Undo** —— `EditHistory` 双向栈 + `keybindings.ts:62-63` 两处绑定 + `keymap.ts:153-160` 已接线。
+- **自我更正 3 处**（关键教训）：①我用 `grep "autoScroll"` 的**空输出**断言「无边缘滚动」，实际实现叫 `startAutoScroll`；②我用 `grep "undoStack"` 断言「无 redo」，实际已换成 `EditHistory`——**字段名换过，按旧名搜必然为空**。**新增纪律：判定的依据是行为，不是标识符；先读那个文件本身。** ③我把 `firstKeptEntryId`（**压缩记录**字段）与 `get_tree`（**树条目** `parentId`）当成同一个，据此**推翻 Phase 5 §9.2 #7**——复核者证伪：`pi` 的 `getTree()`（`session-manager.ts:1522-1550`）**只用 id/parentId/label，一次都没读它**。**维持原裁决**。**新增纪律：推翻既有裁决前必须先读被引用方的实现，而不是读自己的推断。**
+- **真正仍开放 17 项**，其中三项有明确证据的行为缺口：①**OAuth 登录是完整死路**——登录/刷新/解析/预检四段全在且有测试（`providerCredentials.test.ts:121` 等三处），但 `cliRuntimeInvocation.ts:440` 只取 `credential?.apiKey`，而 account-auth 凭据**只有 `accountAuth`、没有 `apiKey`**（`providerCredentials.ts:104-121`），`step.ts:212` 无条件发 `Bearer ${apiKey}` → **空 Bearer**；且 `providerReadiness.ts:130-134` 的注释声称「Let the model adapter perform refresh」而**没有任何 adapter 做**。8 项链路经独立复核者（`RvP7A2`）逐项 **VERIFIED**。②**`/skill:name` 实机报错**（`Unknown slash command: /skill:demo`），因为 `slashRouter.ts:12` 把它当命令名查注册表。③**转录内搜索**缺失（`chrome/pager.ts` 的过滤是全屏命令输出的模态，不是转录搜索）。
+- **裁决 5 项主决策 + 17 项补充**：T1 OAuth 接线（性质同 Phase 6 T1：三段已在、只有接缝断）；T2 技能与模板展开**必须同一路径**（照 `pi` 的 `_expandSkillCommand` → `expandPromptTemplate` 串联，且**必须在未知命令分支之前**）；T3 转录搜索（照 `pi` 粘性搜索条，**需实机 PTY 验证**）；T4 Undo 合并（**扩展既有的 `lastAction`**，不新增机制）+ 双击/三击选择；T5 `get_entries(since)`/`get_tree`（**不改文件格式**，读已有 `state.json`）+ `--json` 暴露会话路径；T6 判定回写 + 死字段删除 + 检查点不变量测试。
+- **明确不做（8 项，逐项附理由）**：扩展宿主、包分发、RPC/SDK/HTML/分享/CBOR（维持 Phase 5 §9.2 与 Phase 6 §7）、图片粘贴（**三重阻塞**：`read` 工具拒绝图片、消息模型无附件、无剪贴板图片读取）、Mermaid（需新依赖）、cache 保活（**会主动发请求**，且我方内置目录零 `cost` 声明**没有可算的经济学**）、更新检查（**理由收紧**：需先建对外请求的同意机制）。
+- **复核轮推翻主代理 4 处**：①§4 的「推翻 #7」基于**错误前提**（见上）；②pre-research §2 的第 8、9 项**被静默漏掉**（已纳入 T4/T5，裁决 16/17）；③补充裁决 4 的**结论列与解释列自相矛盾**（「原样返回，不报错」vs「应给出未知技能提示」）——已拆成「技能报错、模板留空」并记录 `pi` 的架构差异；④一处排序论证得到确认（标准变更合理）。
+- **验证**：本轮**零代码改动**；`verify:docs-drift:strict` 通过（`rules-drift` pass）；`normproof judge` exit 0。
+- **子代理**：6 个勘察（`ScExtHost` 因上游 `content_filter` 失败，由 `ScExtHost2` 重派）+ 3 个复核（`RvP7A`/`RvP7B` 均因 `content_filter` 失败，由 `RvP7A2`/`RvP7B2` 重派）。**`ScTerminal` 推翻了主代理两处错误判定**，`RvP7C` 推翻了第三处——**复核的价值本轮体现为「抓出主代理把自己推断当证据」**。
+
 **CI 首次全绿**：复核暴露 CI **26/26 全红**（从未通过）。四类根因全部是「本地过、CI 不过」：
 Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞争、两个测试**钉住了被修的缺陷**。
 逐项修复后：41 → 4 → 2 → **0**。`gh run list --workflow=CI --limit 30` → **1 success / 29 failure**。
