@@ -16,14 +16,17 @@ export async function runThemeCommand(
   context: CommandContext,
 ): Promise<LocalCommandResult> {
   const asked = args[0]?.trim().toLowerCase();
+  // The paths `--theme` named, so a theme loaded at startup is listed, loadable
+  // and switchable here rather than only for the first frame.
+  const extraPaths = context.themePaths ?? [];
 
   if (!asked || asked === "list") {
-    const names = listThemes(context.cwd);
+    const names = listThemes(context.cwd, extraPaths);
     const active = currentTheme();
     const lines = ["### Themes", ""];
     for (const name of names) {
-      const config = loadTheme(name, context.cwd);
-      const where = themeSource(name, context.cwd) === "built-in" ? "built in" : "from disk";
+      const config = loadTheme(name, context.cwd, extraPaths);
+      const where = themeSource(name, context.cwd, extraPaths) === "built-in" ? "built in" : "from disk";
       const mark = name === active ? " **(in use)**" : "";
       lines.push(`- \`${name}\` — ${config?.description || "no description"} (${where})${mark}`);
     }
@@ -36,13 +39,13 @@ export async function runThemeCommand(
   }
 
   try {
-    applyTheme(asked, context.cwd);
+    applyTheme(asked, context.cwd, extraPaths);
   } catch {
     // Naming the alternatives is the whole help here: the failure is almost
     // always a typo or a file that was not saved where it was expected.
     return {
       kind: "local",
-      output: `No theme named \`${asked}\`. Available: ${listThemes(context.cwd).join(", ")}.`,
+      output: `No theme named \`${asked}\`. Available: ${listThemes(context.cwd, extraPaths).join(", ")}.`,
     };
   }
 

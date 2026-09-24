@@ -121,6 +121,7 @@ export function createCliBootstrapRuntimeContext(
               },
             }
           : {}),
+        ...(input.options.themePaths ? { themePaths: input.options.themePaths } : {}),
         gitContext: input.rootContext.gitContext,
         requestedWorkspaceRoot: input.rootContext.runtimeBaseDir,
         sessionManager,

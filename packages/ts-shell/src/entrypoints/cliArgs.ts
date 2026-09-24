@@ -42,6 +42,10 @@ const VALUE_FLAGS = new Set([
   // otherwise read it as the prompt — a path is exactly what the positional
   // project fallback treats as a project, too.
   "--skill",
+  // Same again: these take a path and a theme name, and a path among the
+  // positionals would be read as the project.
+  "--theme",
+  "--use-theme",
 ]);
 
 const RESERVED_SHELL_SLASH_COMMANDS = new Set([
@@ -257,6 +261,26 @@ export function parseCliArgs(
     }
   }
   if (skillPaths.length > 0) assignOption(options, "skillPaths", skillPaths);
+  const themePaths: string[] = [];
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    if (rawArgs[index] === "--theme") {
+      const value = rawArgs[index + 1];
+      if (!value || value.startsWith("--")) {
+        return parseError("Missing value for --theme. Example: --theme ./my-theme.json");
+      }
+      themePaths.push(value);
+      index += 1;
+    }
+  }
+  if (themePaths.length > 0) assignOption(options, "themePaths", themePaths);
+  const useThemeIdx = rawArgs.indexOf("--use-theme");
+  if (useThemeIdx !== -1) {
+    const value = rawArgs[useThemeIdx + 1];
+    if (!value || value.startsWith("--")) {
+      return parseError("Missing value for --use-theme. Example: --use-theme dark");
+    }
+    assignOption(options, "useTheme", value);
+  }
   const toolsIdx = rawArgs.indexOf("--tools");
   if (toolsIdx !== -1) {
     const value = rawArgs[toolsIdx + 1];

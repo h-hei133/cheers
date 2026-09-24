@@ -183,9 +183,13 @@ export class Theme {
 
 let currentThemeName = "dark";
 
-export function getTheme(name: string, workspaceRoot?: string): Theme {
+export function getTheme(
+  name: string,
+  workspaceRoot?: string,
+  extraPaths: readonly string[] = [],
+): Theme {
   if (name === "default") return defaultTheme;
-  const config = loadTheme(name, workspaceRoot);
+  const config = loadTheme(name, workspaceRoot, extraPaths);
   if (!config) {
     throw new Error(`Theme not found: ${name}`);
   }
@@ -198,8 +202,12 @@ export function getTheme(name: string, workspaceRoot?: string): Theme {
  * Recoloring the shared instance rather than replacing it is what makes a theme
  * change visible: the alternative is every call site holding a stale reference.
  */
-export function applyTheme(name: string, workspaceRoot?: string): void {
-  const config = loadTheme(name, workspaceRoot);
+export function applyTheme(
+  name: string,
+  workspaceRoot?: string,
+  extraPaths: readonly string[] = [],
+): void {
+  const config = loadTheme(name, workspaceRoot, extraPaths);
   if (!config) {
     throw new Error(`Theme not found: ${name}`);
   }

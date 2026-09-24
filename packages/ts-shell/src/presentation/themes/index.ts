@@ -35,7 +35,8 @@ interface DiscoveredTheme {
 }
 
 /**
- * Themes on disk, from the user's directory and from the project's.
+ * Themes on disk, from the user's directory, the project's, and any path the
+ * user named on the command line.
  *
  * Read rather than bundled because a theme is a palette, and a palette someone
  * wants is one they can edit. Bundling only two meant the answer to "can I use
@@ -44,8 +45,16 @@ interface DiscoveredTheme {
  * Both layers are searched each time rather than cached: a theme is read once per
  * session at most, and a stale cache would mean editing a file and seeing
  * nothing happen.
+ *
+ * `extraPaths` are the paths a `--theme` flag named, and they load last so they
+ * win: naming a file is a more specific statement than whatever the directories
+ * happen to contain, and a user trying a theme out expects to see the one they
+ * pointed at rather than one it collided with.
  */
-function discoverThemes(workspaceRoot: string): Map<string, DiscoveredTheme> {
+function discoverThemes(
+  workspaceRoot: string,
+  extraPaths: readonly string[] = [],
+): Map<string, DiscoveredTheme> {
   const found = new Map<string, DiscoveredTheme>();
 
   // The user's directory first, then every project directory from the outermost
@@ -63,7 +72,45 @@ function discoverThemes(workspaceRoot: string): Map<string, DiscoveredTheme> {
       found.set(theme.config.name, theme);
     }
   }
+  // A named path may be one file or a directory of them, which is the shape the
+  // reference uses: the file is the common case while developing a theme, and
+  // the directory is how a theme collection is shared.
+  for (const entry of extraPaths) {
+    for (const theme of readThemePath(entry)) {
+      found.set(theme.config.name, theme);
+    }
+  }
   return found;
+}
+
+/** The themes one named path holds, whether it is a file or a directory. */
+function readThemePath(entry: string): DiscoveredTheme[] {
+  let stats: fs.Stats;
+  try {
+    stats = fs.statSync(entry);
+  } catch {
+    // Named and unreadable: reported by the caller rather than silently dropped,
+    // because a mistyped path would otherwise look like a theme that simply did
+    // not apply.
+    return [];
+  }
+  if (stats.isDirectory()) return readThemeDirectory(entry);
+  if (!stats.isFile()) return [];
+  const theme = readThemeFile(entry);
+  return theme ? [theme] : [];
+}
+
+/** One theme file, or nothing when it is unreadable or malformed. */
+function readThemeFile(filePath: string): DiscoveredTheme | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    // A theme file with a stray comma is a broken theme, not a broken session.
+    return undefined;
+  }
+  const config = asThemeConfig(parsed, path.basename(filePath));
+  return config ? { config, filePath } : undefined;
 }
 
 /** Every readable theme file in one directory, ignoring anything malformed. */
@@ -78,16 +125,8 @@ function readThemeDirectory(directory: string): DiscoveredTheme[] {
   const themes: DiscoveredTheme[] = [];
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
-    const filePath = path.join(directory, entry.name);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    } catch {
-      // A theme file with a stray comma is a broken theme, not a broken session.
-      continue;
-    }
-    const config = asThemeConfig(parsed, entry.name);
-    if (config) themes.push({ config, filePath });
+    const theme = readThemeFile(path.join(directory, entry.name));
+    if (theme) themes.push(theme);
   }
   return themes;
 }
@@ -123,9 +162,12 @@ function asThemeConfig(parsed: unknown, fileName: string): ThemeConfig | undefin
 }
 
 /** Every theme name a user may select: the bundled ones, plus any on disk. */
-export function listThemes(workspaceRoot: string = process.cwd()): string[] {
+export function listThemes(
+  workspaceRoot: string = process.cwd(),
+  extraPaths: readonly string[] = [],
+): string[] {
   const names = new Set(Object.keys(builtIn));
-  for (const name of discoverThemes(workspaceRoot).keys()) names.add(name);
+  for (const name of discoverThemes(workspaceRoot, extraPaths).keys()) names.add(name);
   return [...names].sort();
 }
 
@@ -134,10 +176,14 @@ export function listThemes(workspaceRoot: string = process.cwd()): string[] {
  *
  * A theme on disk shadows a bundled one of the same name, so a user can adjust
  * `dark` without losing the ability to fall back to the original — deleting their
- * file restores it.
+ * file restores it. A theme named on the command line shadows both.
  */
-export function loadTheme(name: string, workspaceRoot: string = process.cwd()): ThemeConfig | undefined {
-  return discoverThemes(workspaceRoot).get(name)?.config ?? builtIn[name];
+export function loadTheme(
+  name: string,
+  workspaceRoot: string = process.cwd(),
+  extraPaths: readonly string[] = [],
+): ThemeConfig | undefined {
+  return discoverThemes(workspaceRoot, extraPaths).get(name)?.config ?? builtIn[name];
 }
 
 export function getDefaultTheme(): ThemeConfig {
@@ -145,6 +191,26 @@ export function getDefaultTheme(): ThemeConfig {
 }
 
 /** Where a theme came from, for a listing that has to explain precedence. */
-export function themeSource(name: string, workspaceRoot: string = process.cwd()): "user-or-project" | "built-in" {
-  return discoverThemes(workspaceRoot).has(name) ? "user-or-project" : "built-in";
+export function themeSource(
+  name: string,
+  workspaceRoot: string = process.cwd(),
+  extraPaths: readonly string[] = [],
+): "user-or-project" | "built-in" {
+  return discoverThemes(workspaceRoot, extraPaths).has(name) ? "user-or-project" : "built-in";
+}
+
+/**
+ * The theme names the paths a user named actually provide.
+ *
+ * Reported so a `--theme` path that contributed nothing can be said out loud. A
+ * mistyped path and a valid theme file whose name was already taken by a
+ * bundled theme both look, from the outside, exactly like the flag being
+ * ignored — which is the one outcome the user cannot diagnose.
+ */
+export function themeNamesFromPaths(extraPaths: readonly string[]): string[] {
+  const names = new Set<string>();
+  for (const entry of extraPaths) {
+    for (const theme of readThemePath(entry)) names.add(theme.config.name);
+  }
+  return [...names].sort();
 }

@@ -75,6 +75,8 @@ export interface InteractiveModeOptions {
   ) => void;
   readonly setActiveNonInteractiveApprovalMode?: (mode: ApprovalModeObject | undefined) => void;
   readonly exit?: (code?: number) => never;
+  /** Theme paths this run was started with, so `/theme` can still select them. */
+  readonly themePaths?: readonly string[];
   /** Output device; defaults to the process terminal. */
   readonly terminal?: TerminalDevice;
   /** Frame scheduler; defaults to real timers. */
@@ -581,6 +583,7 @@ export class InteractiveMode {
         ...(this.options.runtimeContext.skillOptions
           ? { skillOptions: this.options.runtimeContext.skillOptions }
           : {}),
+        ...(this.options.themePaths ? { themePaths: this.options.themePaths } : {}),
         modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
       },
       transcript: this.state.transcript,

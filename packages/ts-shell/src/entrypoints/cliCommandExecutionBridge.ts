@@ -49,6 +49,8 @@ export interface BuildCliCommandExecutionInput {
     readonly skillPaths?: readonly string[];
     readonly noSkills?: boolean;
   };
+  /** Theme paths this run was started with, so `/theme` can still select them. */
+  readonly themePaths?: readonly string[];
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
   readonly env?: Readonly<Record<string, string | undefined>>;
@@ -96,6 +98,7 @@ export async function buildCliCommandExecution(
     cwd: input.cwd,
     sessionId: input.sessionId,
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
+    ...(input.themePaths ? { themePaths: input.themePaths } : {}),
     modifierKeysReported: input.modifierKeysReported,
     refreshRuntimeConfig: input.refreshRuntimeConfig,
     compactCheckpointStore: input.compactCheckpointStore,

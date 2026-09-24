@@ -52,6 +52,14 @@ export interface ShellRuntimeContext {
     readonly skillPaths?: readonly string[]
     readonly noSkills?: boolean
   }
+  /**
+   * Theme files or directories this run was started with.
+   *
+   * Fixed for the session, like the flag that set it, and carried here so
+   * `/theme` can still list and select a theme that was only loaded because
+   * `--theme` named it.
+   */
+  themePaths?: readonly string[]
   gitContext: WorkflowGitContext
   session: Session
   activeSession: ActiveSessionIdentity
@@ -87,6 +95,7 @@ export function createShellRuntimeContext(input: {
     readonly skillPaths?: readonly string[]
     readonly noSkills?: boolean
   }
+  themePaths?: readonly string[]
   gitContext: WorkflowGitContext
   session: Session
   resumeProvenance?: SessionResumeProvenance;
@@ -113,6 +122,7 @@ export function createShellRuntimeContext(input: {
       }),
     runtimeConfig: input.runtimeConfig,
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
+    ...(input.themePaths ? { themePaths: input.themePaths } : {}),
     gitContext: input.gitContext,
     session: input.session,
     activeSession: {

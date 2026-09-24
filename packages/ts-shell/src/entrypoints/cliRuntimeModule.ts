@@ -216,6 +216,9 @@ export async function runNonInteractivePrompt(options: {
     ...(options.runtimeContext.skillOptions
       ? { skillOptions: options.runtimeContext.skillOptions }
       : {}),
+    ...(options.runtimeContext.themePaths
+      ? { themePaths: options.runtimeContext.themePaths }
+      : {}),
     // Offered on the non-interactive path too: a scripted run has the same
     // session and the same one-shot configuration read, so `/reload` must mean
     // the same thing there rather than reporting that it cannot help.

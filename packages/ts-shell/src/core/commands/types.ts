@@ -40,6 +40,14 @@ export interface CommandContext {
     readonly skillPaths?: readonly string[]
     readonly noSkills?: boolean
   }
+  /**
+   * Theme files or directories this run was started with.
+   *
+   * The same paths `--theme` named, so a theme loaded at startup can still be
+   * selected by `/theme` afterwards. Without them the flag would load a theme
+   * the session could never switch back to.
+   */
+  readonly themePaths?: readonly string[]
   /** True when the terminal agreed to report modified keys, so chords arrive. */
   readonly modifierKeysReported?: boolean
   readonly rawCommandName?: string

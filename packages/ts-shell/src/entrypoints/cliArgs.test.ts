@@ -296,3 +296,35 @@ describe("--skill and --no-skills", () => {
     expect(parsed.options.promptArg).toBe("review this repo");
   });
 });
+
+describe("--theme and --use-theme", () => {
+  it("are absent unless asked for", () => {
+    expect(expectParsed([]).options.themePaths).toBeUndefined();
+    expect(expectParsed([]).options.useTheme).toBeUndefined();
+  });
+
+  it("collects repeated --theme paths", () => {
+    expect(expectParsed(["--theme", "./a.json", "--theme", "./b.json"]).options.themePaths).toEqual([
+      "./a.json",
+      "./b.json",
+    ]);
+  });
+
+  it("keeps a theme name out of the prompt", () => {
+    // A value that leaked into the positionals would be read as the project
+    // path, which is how `--skill` used to lose its argument.
+    const parsed = expectParsed(["--use-theme", "dark"]);
+    expect(parsed.options.useTheme).toBe("dark");
+    expect(parsed.options.promptArg).toBeUndefined();
+  });
+
+  it("reports a missing value rather than swallowing the next flag", () => {
+    const missing = parseCliArgs(["--use-theme"], { cwd: process.cwd() });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.error.message).toContain("--use-theme");
+
+    const missingPath = parseCliArgs(["--theme"], { cwd: process.cwd() });
+    expect(missingPath.ok).toBe(false);
+    if (!missingPath.ok) expect(missingPath.error.message).toContain("--theme");
+  });
+});

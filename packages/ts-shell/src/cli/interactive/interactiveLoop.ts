@@ -39,6 +39,8 @@ export interface InteractiveLoopInput {
     handler: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined,
   ) => void;
   readonly setActiveNonInteractiveApprovalMode: (mode: ApprovalModeObject | undefined) => void;
+  /** Theme paths this run was started with, so `/theme` can still select them. */
+  readonly themePaths?: readonly string[];
   readonly exit?: (code?: number) => never;
 }
 

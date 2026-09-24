@@ -97,6 +97,8 @@ export function bootstrapShellRuntime(input: {
     readonly skillPaths?: readonly string[];
     readonly noSkills?: boolean;
   };
+  /** Theme paths this run was started with; carried into the runtime context. */
+  themePaths?: readonly string[];
   gitContext: WorkflowGitContext;
   requestedWorkspaceRoot?: string;
   sessionManager: SessionManager;
@@ -316,6 +318,7 @@ export function bootstrapShellRuntime(input: {
       rootBindingDiagnostics,
       runtimeConfig: input.runtimeConfig,
       ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
+      ...(input.themePaths ? { themePaths: input.themePaths } : {}),
       gitContext: boundGitContext,
       session,
     }),

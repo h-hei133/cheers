@@ -10,7 +10,9 @@ import {
 } from "../../observability/index.js";
 import { parseCliArgs } from "../../entrypoints/cliArgs.js";
 import { applyTheme } from "../../presentation/theme/theme.js";
+import { listThemes, themeNamesFromPaths } from "../../presentation/themes/index.js";
 import type { CliOptions } from "../options/cliOptions.js";
+import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { printCliDoctor } from "../../entrypoints/cliDoctor.js";
 import { time } from "../../observability/startupTiming.js";
 import {
@@ -104,10 +106,12 @@ export async function runCliProcess(
   // redrawn.
   // The workspace root is passed so a theme the project ships is found, not only
   // the user's and the built-in ones.
-  const configuredTheme = runtimeContext.runtimeConfig.theme;
-  if (configuredTheme && configuredTheme !== "auto") {
-    applyTheme(configuredTheme, runtimeContext.projectRoot ?? runtimeContext.cwd);
-  }
+  applyStartupTheme({
+    options,
+    workspaceRoot: runtimeContext.projectRoot ?? runtimeContext.cwd,
+    configured: runtimeContext.runtimeConfig.theme,
+    renderer,
+  });
   const resolvedCredential =
     providerRuntimeBridge.resolveCredentialSnapshot();
   const mcpGateway = bootstrapRuntime.mcpGateway;
@@ -196,6 +200,51 @@ export async function runCliProcess(
     setActiveNonInteractiveApprovalMode: (mode) => {
       approvalModeState.set(mode);
     },
+    ...(options.themePaths ? { themePaths: options.themePaths } : {}),
     exit: (code?: number) => input.exit(code ?? 0),
   });
+}
+
+/**
+ * The theme this run renders with, applied before the first frame.
+ *
+ * Precedence is the user's explicit statement over the saved one: `--use-theme`
+ * names the theme for this run, `--theme` adds the files it may be found in, and
+ * the configured value applies only when neither was given. Applying after the
+ * first frame would be invisible, which is why this runs before any surface
+ * exists.
+ *
+ * Nothing here is fatal. A theme that will not load leaves the default palette
+ * in place and says so: a mistyped path must not cost the user their session,
+ * and it must not pass in silence either, or the flag looks ignored.
+ */
+function applyStartupTheme(input: {
+  readonly options: CliOptions;
+  readonly workspaceRoot: string;
+  readonly configured: string | undefined;
+  readonly renderer: StreamingRenderer;
+}): void {
+  const extraPaths = input.options.themePaths ?? [];
+  const requested = input.options.useTheme ?? (input.configured === "auto" ? undefined : input.configured);
+  if (!requested) return;
+
+  // A named path that contributed nothing is reported before the theme is
+  // applied, because the two failures look identical from outside: a mistyped
+  // path and a file whose theme name is already taken both end in "the theme I
+  // asked for is not what I see".
+  for (const entry of extraPaths) {
+    if (themeNamesFromPaths([entry]).length === 0) {
+      input.renderer.renderLine(
+        `Theme path \`${entry}\` holds no readable theme, so nothing was loaded from it.`,
+      );
+    }
+  }
+
+  try {
+    applyTheme(requested, input.workspaceRoot, extraPaths);
+  } catch {
+    input.renderer.renderLine(
+      `No theme named \`${requested}\`. Using the default. Available: ${listThemes(input.workspaceRoot, extraPaths).join(", ")}.`,
+    );
+  }
 }

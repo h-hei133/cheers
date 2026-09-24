@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { listThemes, loadTheme, themeSource } from "./index.js";
+import { listThemes, loadTheme, themeNamesFromPaths, themeSource } from "./index.js";
 
 /**
  * Where themes come from.
@@ -126,5 +126,83 @@ describe("theme discovery", () => {
     });
 
     expect(listThemes(inner)).not.toContain("outside");
+  });
+});
+
+describe("themes a path named on the command line", () => {
+  let workspace = "";
+  let named = "";
+
+  beforeEach(() => {
+    workspace = fs.mkdtempSync(path.join(os.tmpdir(), "theme-named-ws-"));
+    named = fs.mkdtempSync(path.join(os.tmpdir(), "theme-named-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(named, { recursive: true, force: true });
+  });
+
+  function writeTheme(filePath: string, name: string, accent: string): void {
+    fs.writeFileSync(
+      filePath,
+      JSON.stringify({ name, description: "named", colors: { accent } }),
+      "utf8",
+    );
+  }
+
+  it("loads a theme from a file path", () => {
+    // The reason the flag exists: trying a theme out before installing it, from
+    // wherever it happens to have been written.
+    const file = path.join(named, "mine.json");
+    writeTheme(file, "mine", "#abcdef");
+
+    const config = loadTheme("mine", workspace, [file]);
+
+    expect(config?.colors.accent).toBe("#abcdef");
+    expect(listThemes(workspace, [file])).toContain("mine");
+  });
+
+  it("loads every theme in a directory path", () => {
+    // A theme collection is shared as a directory, which is the shape the
+    // reference uses too.
+    writeTheme(path.join(named, "one.json"), "one", "#111111");
+    writeTheme(path.join(named, "two.json"), "two", "#222222");
+
+    const names = listThemes(workspace, [named]);
+
+    expect(names).toContain("one");
+    expect(names).toContain("two");
+  });
+
+  it("lets a named theme shadow a bundled one of the same name", () => {
+    // Naming a file is a more specific statement than what the directories
+    // happen to contain, so it wins — otherwise pointing at a theme called
+    // `dark` would silently render the built-in one.
+    writeTheme(path.join(named, "dark.json"), "dark", "#123456");
+
+    expect(loadTheme("dark", workspace, [path.join(named, "dark.json")])?.colors.accent).toBe("#123456");
+  });
+
+  it("reports the names a path actually provides", () => {
+    // A mistyped path and a file whose theme lost a name collision both look
+    // like the flag being ignored, which is the one outcome a user cannot
+    // diagnose from the rendered palette alone.
+    const file = path.join(named, "mine.json");
+    writeTheme(file, "mine", "#abcdef");
+
+    expect(themeNamesFromPaths([file])).toEqual(["mine"]);
+    expect(themeNamesFromPaths([path.join(named, "typo.json")])).toEqual([]);
+  });
+
+  it("ignores a path that holds nothing readable", () => {
+    // A broken theme is a broken theme, not a broken session: the caller
+    // reports it and the default palette stands.
+    fs.writeFileSync(path.join(named, "broken.json"), "{ not json", "utf8");
+
+    expect(themeNamesFromPaths([path.join(named, "broken.json")])).toEqual([]);
+    expect(listThemes(workspace, [path.join(named, "broken.json")])).toEqual(
+      expect.arrayContaining(["dark", "light"]),
+    );
   });
 });

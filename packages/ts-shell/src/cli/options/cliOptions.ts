@@ -40,6 +40,23 @@ export interface CliOptions {
    */
   readonly noSkills?: boolean;
   /**
+   * Theme files or directories to load on top of discovery, repeatable.
+   *
+   * A flag rather than a setting because the reason to want it is per-run:
+   * trying a theme out before installing it, or pointing a run at one file.
+   * Loading and selecting are separate, as they are in the reference — a path
+   * says where a theme comes from, `useTheme` says which one to render.
+   */
+  readonly themePaths?: readonly string[];
+  /**
+   * The theme to render this run with, by name.
+   *
+   * Named rather than inferred from `themePaths`: a theme file may hold several
+   * themes, and a directory holds many, so "load these" does not answer "which
+   * one". Without this a `--theme` path would load a theme nothing selects.
+   */
+  readonly useTheme?: string;
+  /**
    * The only tools this run may offer, comma-separated.
    *
    * A flag rather than only a setting because a read-only pass is a per-run
