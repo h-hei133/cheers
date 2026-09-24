@@ -157,14 +157,6 @@ export interface InteractiveView extends TerminalFrameProvider {
   scrollPage(direction: -1 | 1): boolean;
   /** Jump to the newest rows, which is also what any new output implies. */
   scrollToEnd(): void;
-  /**
-   * Open the transcript search.
-   *
-   * An action rather than a view method because opening it is not a change to the
-   * view's own state: whoever receives keys has to start capturing them, and that
-   * is the mode, not the surface.
-   */
-  openSearch?(): void;
   /** Where the scrollbar was last drawn, or nothing when the content fit. */
   scrollbarGeometry(): ScrollbarGeometry | undefined;
   /** Move the window so the thumb's grab point sits on `pointerRow`. Returns whether it moved. */
@@ -188,20 +180,6 @@ export interface InteractiveView extends TerminalFrameProvider {
   toggleCollapsed(only?: "thinking" | "tool"): boolean;
   /** Screen row bounds and visual rows of the composer, for mouse drag selection. */
   composerGeometry?(): ComposerGeometry | undefined;
-  /**
-   * What the search bar should show, or nothing when no search is open.
-   *
-   * The surface renders it rather than owning it: the query and the position belong
-   * to whoever receives the keys, and a second copy here could disagree with it.
-   */
-  searchBar?(): { readonly query: string; readonly matchCount: number; readonly currentNumber: number } | undefined;
-  /**
-   * Highlight the current search's matches in a rendered row.
-   *
-   * Applied by the pane, which is where the transcript rows are assembled — the
-   * one point that sees a row before it is painted and after it is complete.
-   */
-  highlightSearchMatches?(row: string, contentRow: number): string;
   /**
    * Scroll so a content row is visible.
    *

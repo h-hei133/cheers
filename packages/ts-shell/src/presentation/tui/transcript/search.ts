@@ -107,22 +107,6 @@ export function buildSearchIndex(rows: readonly string[], query: string): Search
   return { matches, query };
 }
 
-/** The match a row participates in, for deciding whether to highlight it at all. */
-export function matchesForRow(index: SearchIndex, row: number): readonly SearchMatch[] {
-  return index.matches.filter((match) => match.row === row);
-}
-
-/**
- * Which match index the given row belongs to, so the current one can be picked out.
- *
- * A match spanning several rows is one match; this maps any of those rows back to
- * it, which is what keeps "3 of 12" counting matches rather than rows.
- */
-export function matchIndexAtRow(index: SearchIndex, row: number): number {
-  const position = index.matches.findIndex((match) => match.row === row);
-  return position;
-}
-
 /** The row a match begins on, used to scroll it into view. */
 export function matchRow(index: SearchIndex, position: number): number | undefined {
   return index.matches[clampPosition(index, position)]?.row;

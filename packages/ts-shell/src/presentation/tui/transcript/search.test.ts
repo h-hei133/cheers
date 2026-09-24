@@ -3,7 +3,6 @@ import {
   buildSearchIndex,
   clampPosition,
   highlightRowMatches,
-  matchIndexAtRow,
   matchRow,
   stepPosition,
 } from "./search.js";
@@ -105,16 +104,6 @@ describe("walking between matches", () => {
 
   it("reports the row a match begins on", () => {
     expect(matchRow(index, 1)).toBe(2);
-  });
-});
-
-describe("mapping rows back to matches", () => {
-  it("finds the match covering a row", () => {
-    const index = buildSearchIndex(["brown", "fox"], "brown fox");
-    // Both rows are part of one match, which is what keeps a count of matches
-    // rather than a count of rows.
-    expect(matchIndexAtRow(index, 0)).toBe(0);
-    expect(matchIndexAtRow(index, 1)).toBe(1);
   });
 });
 
