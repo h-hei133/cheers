@@ -1,7 +1,7 @@
 import { createCommandRegistry } from "./registry.js";
 import { SkillLoader } from "../skills/skillLoader.js";
 import { TemplateLoader } from "../prompts/templateLoader.js";
-import { expandSubmission } from "../prompts/expansion.js";
+import { expandSkill, expandTemplate } from "../prompts/expansion.js";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
 
 export async function routeSlashCommand(
@@ -20,24 +20,20 @@ export async function routeSlashCommand(
     };
   }
 
-  // A skill or template invocation expands into a prompt, which is not a command
-  // and has no entry in the registry. This has to happen before the unknown-command
-  // branch below, because that branch treats every unregistered word as a mistake —
-  // which is what made `/skill:name` answer "Unknown slash command" while the same
-  // name worked through the `/skill` command.
-  const expansion = expandSubmission({
-    text: input,
-    skills: new SkillLoader(context.cwd).load(),
-    templates: new TemplateLoader(context.cwd).load(),
-  });
-  if (expansion.expanded) {
+  // A skill invocation expands into a prompt. It is not a command and has no entry
+  // in the registry, so it has to be recognised before the unknown-command branch
+  // below — which treats every unregistered word as a mistake, and is what made
+  // `/skill:name` answer "Unknown slash command" while the same name worked through
+  // the `/skill` command.
+  const skill = expandSkill(input, new SkillLoader(context.cwd).load());
+  if (skill.skill) {
     return {
       kind: "prompt",
-      prompt: expansion.text,
-      notice: `Expanded ${expansion.expanded.kind} \`${expansion.expanded.name}\` into a prompt.`,
+      prompt: skill.text,
+      notice: `Expanded skill \`${skill.skill}\` into a prompt.`,
     };
   }
-  if (expansion.unknown?.kind === "skill") {
+  if (skill.unknownSkill) {
     const available = [...new SkillLoader(context.cwd).load().keys()].sort();
     return {
       kind: "local",
@@ -45,10 +41,10 @@ export async function routeSlashCommand(
         "Result",
         "- Outcome: blocked",
         "- BlockerKind: command-not-allowlisted",
-        `- Reason: Unknown skill: ${expansion.unknown.name}`,
+        `- Reason: Unknown skill: ${skill.unknownSkill}`,
         "- DoNext: Run /skill to see what is available, then retry.",
         "",
-        `No skill named \`${expansion.unknown.name}\`.`,
+        `No skill named \`${skill.unknownSkill}\`.`,
         available.length > 0
           ? `Available: ${available.map((name) => `/skill:${name}`).join(", ")}`
           : "No skills are installed. Put one under `.agents/skills/<name>/SKILL.md`.",
@@ -64,20 +60,33 @@ export async function routeSlashCommand(
     );
 
   if (
-    !command ||
-    command.availability === "hidden" ||
-    command.enabled === false
+    command &&
+    command.availability !== "hidden" &&
+    command.enabled !== false
   ) {
+    return command.execute(args, {
+      ...context,
+      rawCommandName: rawName,
+    });
+  }
+
+  // Only once nothing in the registry claims the name: a built-in command is a
+  // promise the product made, and a file in a prompts directory must not quietly
+  // take its name away. The template is looked up with the slash the user typed,
+  // which is the form the file is documented in.
+  const expanded = expandTemplate(input, new TemplateLoader(context.cwd).load());
+  if (expanded.template) {
     return {
-      kind: "local",
-      output: buildUnknownSlashOutput(rawName, registry),
+      kind: "prompt",
+      prompt: expanded.text,
+      notice: `Expanded template \`${expanded.template}\` into a prompt.`,
     };
   }
 
-  return command.execute(args, {
-    ...context,
-    rawCommandName: rawName,
-  });
+  return {
+    kind: "local",
+    output: buildUnknownSlashOutput(rawName, registry),
+  };
 }
 
 function buildUnknownSlashOutput(

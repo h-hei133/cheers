@@ -98,4 +98,17 @@ describe("finding templates", () => {
     // directory the user never created would be wrong.
     expect(new TemplateLoader(workspace()).load().size).toBe(0);
   });
+
+  it("lets the nearest project directory win over one further up", () => {
+    // The same rule the skills are found by: a file written for a subdirectory is
+    // the more specific statement, so it is the one that applies there. The walk
+    // and the override have to agree for that to be true.
+    const root = workspace();
+    fs.mkdirSync(path.join(root, ".git"), { recursive: true });
+    write(root, "shared", "From the repository root.");
+    const nested = path.join(root, "packages", "app");
+    write(nested, "shared", "From the subdirectory.");
+
+    expect(new TemplateLoader(nested).load().get("shared")?.content).toBe("From the subdirectory.");
+  });
 });

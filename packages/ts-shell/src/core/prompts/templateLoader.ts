@@ -50,10 +50,17 @@ export class TemplateLoader {
   constructor(workspaceRoot: string = process.cwd()) {
     // User templates first, then project ones, so a later root overrides an earlier
     // one — the same precedence the skill loader applies and for the same reason.
+    //
+    // Project directories are walked outermost-first, which is the order
+    // `projectDirectories` returns: with a later root winning, that makes the nearest
+    // directory the one that applies, which is the more specific statement about how
+    // the project works. Reversing here would give the outermost project the last
+    // word instead, so a file written for a subdirectory would lose to the repository
+    // root — the opposite of the rule stated above.
     const userDirs = resolveAllUserDataFiles("prompts");
-    const projectDirs = [...projectDirectories(workspaceRoot)]
-      .reverse()
-      .map((dir) => path.join(dir, ".agents", "prompts"));
+    const projectDirs = projectDirectories(workspaceRoot).map((dir) =>
+      path.join(dir, ".agents", "prompts"),
+    );
     this.roots = [
       ...(userDirs.length > 0 ? userDirs : [path.join(userDataDir(), "prompts")]),
       ...projectDirs,

@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { expandSubmission, parseArguments, substituteArguments, type PromptTemplate } from "./expansion.js";
+import { expandSkill, expandTemplate, parseArguments, substituteArguments, type PromptTemplate } from "./expansion.js";
 import type { Skill } from "../skills/skillLoader.js";
 
 /**
  * What a typed line turns into before the model sees it.
  *
- * Two shorthands expand here and they share one tokenizer and one order, which is
- * the reason they live in the same module: a skill name and a template name are
- * both "a short thing that stands for a longer thing", and expanding them at two
- * call sites would let them disagree about what a quoted argument means.
+ * Two shorthands expand here and they share one tokenizer, which is the reason they
+ * live in the same module: a skill name and a template name are both "a short thing
+ * that stands for a longer thing", and reading their arguments through separate
+ * tokenizers would let them disagree about what a quoted argument means. Which of
+ * them wins when both claim a name is the router's decision, so it is not asserted
+ * here.
  */
 
 function skill(name: string, body: string, overrides: Partial<Skill> = {}): Skill {
@@ -89,11 +91,11 @@ describe("template substitution", () => {
 });
 
 describe("expanding a skill invocation", () => {
+  const skills = new Map([["review", skill("review", "Check the diff.")]]);
+
   it("wraps the body and appends the arguments after it", () => {
-    const result = expandSubmission(
-      input("/skill:review extra context", { skills: [skill("review", "Check the diff.")] }),
-    );
-    expect(result.expanded).toEqual({ kind: "skill", name: "review" });
+    const result = expandSkill("/skill:review extra context", skills);
+    expect(result.skill).toBe("review");
     expect(result.text).toContain("<skill name=\"review\">");
     expect(result.text).toContain("Check the diff.");
     // The arguments follow the body rather than being spliced into it: a skill is
@@ -102,57 +104,59 @@ describe("expanding a skill invocation", () => {
   });
 
   it("works with no arguments", () => {
-    const result = expandSubmission(
-      input("/skill:review", { skills: [skill("review", "Body.")] }),
-    );
-    expect(result.expanded).toEqual({ kind: "skill", name: "review" });
-    expect(result.text).toBe(`<skill name="review">\nBody.\n</skill>`);
+    expect(expandSkill("/skill:review", skills).text).toBe(`<skill name="review">\nCheck the diff.\n</skill>`);
   });
 
-  it("reports a name it does not have", () => {
-    const result = expandSubmission(input("/skill:nope", { skills: [skill("review", "B")] }));
-    expect(result.unknown).toEqual({ kind: "skill", name: "nope" });
-    // Returned unchanged so the caller decides what to say.
+  it("reports a name it does not have, and returns the line unchanged", () => {
+    // Returned unchanged so the caller decides what to say: only it knows what else
+    // the name could have been.
+    const result = expandSkill("/skill:nope", skills);
+    expect(result.unknownSkill).toBe("nope");
     expect(result.text).toBe("/skill:nope");
+  });
+
+  it("leaves a line that is not this form alone", () => {
+    const result = expandSkill("review the diff", skills);
+    expect(result.skill).toBeUndefined();
+    expect(result.unknownSkill).toBeUndefined();
+    expect(result.text).toBe("review the diff");
   });
 });
 
 describe("expanding a template invocation", () => {
+  const templates = new Map([["review", template("review", "Review $1 now.")]]);
+
   it("substitutes the arguments into the body", () => {
-    const result = expandSubmission(
-      input("review the auth module", { templates: [template("review", "Review $1 now.")] }),
-    );
-    expect(result.expanded).toEqual({ kind: "template", name: "review" });
+    const result = expandTemplate("/review the auth module", templates);
+    expect(result.template).toBe("review");
     // `$1` is the first word only. Reaching the whole phrase needs `$@` or quotes,
     // which is what the next test covers.
     expect(result.text).toBe("Review the now.");
   });
 
   it("reaches every argument through the all-arguments form", () => {
-    const result = expandSubmission(
-      input("review the auth module", { templates: [template("review", "Review $@ now.")] }),
-    );
-    expect(result.text).toBe("Review the auth module now.");
+    const all = new Map([["review", template("review", "Review $@ now.")]]);
+    expect(expandTemplate("/review the auth module", all).text).toBe("Review the auth module now.");
   });
 
   it("treats a quoted argument as one value", () => {
-    const result = expandSubmission(
-      input('review "the auth module"', { templates: [template("review", "Review $1.")] }),
-    );
-    expect(result.text).toBe("Review the auth module.");
+    const quoted = new Map([["ask", template("ask", "Explain $1.")]]);
+    expect(expandTemplate('/ask "the auth module"', quoted).text).toBe("Explain the auth module.");
   });
 
-  it("passes an ordinary sentence through untouched", () => {
-    // The first word of a sentence matching nothing is not a mistyped command.
-    const result = expandSubmission(input("hello there", { templates: [template("review", "x")] }));
-    expect(result.text).toBe("hello there");
-    expect(result.expanded).toBeUndefined();
-    expect(result.unknown).toBeUndefined();
+  it("leaves words that are not an invocation untouched, slash or not", () => {
+    // Only a name the user deliberately invoked with the slash expands. A sentence
+    // that happens to begin with a template's name is a sentence: rewriting it would
+    // delete words the user typed without anything asking.
+    expect(expandTemplate("hello there", templates)).toEqual({ text: "hello there" });
+    expect(expandTemplate("review the auth module", templates)).toEqual({
+      text: "review the auth module",
+    });
+    expect(expandTemplate("/review", templates).template).toBe("review");
   });
 
-  it("reports a bare unknown slash word", () => {
-    const result = expandSubmission(input("/nosuchthing", { templates: [] }));
-    expect(result.unknown).toEqual({ kind: "template", name: "/nosuchthing" });
+  it("answers a name that matches nothing with the text it was given", () => {
+    expect(expandTemplate("/nosuchthing", templates)).toEqual({ text: "/nosuchthing" });
   });
 });
 
@@ -161,13 +165,13 @@ describe("the order of expansion", () => {
     // Skill first, template second. Substituting first would consume the skill
     // body's own placeholders before the body was inserted, so a skill that wants
     // its arguments at a specific point in a sentence could not express that.
-    const result = expandSubmission(
-      input("/skill:greet", {
-        skills: [skill("greet", "Say hello to $1.")],
-        templates: [template("greet", "unused")],
-      }),
-    );
-    expect(result.expanded).toEqual({ kind: "skill", name: "greet" });
-    expect(result.text).toContain("$1");
+    const skills = new Map([["greet", skill("greet", "Say hello to $1.")]]);
+    const templates = new Map([["greet", template("greet", "unused")]]);
+
+    const skillStep = expandSkill("/skill:greet", skills);
+    expect(skillStep.text).toContain("$1");
+    // The template step then runs over what the skill produced, and the skill's own
+    // placeholders are still there for the model to read as the author wrote them.
+    expect(expandTemplate(skillStep.text, templates).text).toContain("$1");
   });
 });

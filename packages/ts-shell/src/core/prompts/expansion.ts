@@ -3,16 +3,16 @@ import type { Skill } from "../skills/skillLoader.js";
 /**
  * Turning a typed line into what the model receives.
  *
- * Two kinds of shorthand expand here, and they share one entry point on purpose.
- * A skill name and a template name are both "the user typed a short thing that
- * stands for a longer thing", and both take arguments, so the tokenizer that reads
- * quotes has to be the same one. Expanding them at two call sites would mean two
- * tokenizers that can disagree about what `"a b" c` means, and two orderings that
- * can disagree about which one wins.
+ * Two kinds of shorthand expand here, and they share one tokenizer on purpose. A
+ * skill name and a template name are both "the user typed a short thing that stands
+ * for a longer thing", and both take arguments, so the reading of quotes has to be
+ * the same one: expanding them through separate tokenizers would let them disagree
+ * about what `"a b" c` means.
  *
- * The order is skill first, then template. A skill body may itself contain
- * placeholders — a skill that wants its arguments spliced into a sentence — and
- * substituting templates first would consume those before the skill was inserted.
+ * Which of the two wins when both would claim a name is not decided here. It is a
+ * routing question, and the router is the only place that knows everything else
+ * claiming the name too — a built-in command, for one. Each lookup here answers for
+ * itself and reports whether it matched.
  */
 
 /** A prompt template held in memory, discovered from disk. */
@@ -23,29 +23,6 @@ export interface PromptTemplate {
   readonly argumentHint?: string;
   readonly content: string;
   readonly filePath: string;
-}
-
-export interface ExpansionInput {
-  readonly text: string;
-  readonly skills: ReadonlyMap<string, Skill>;
-  readonly templates: ReadonlyMap<string, PromptTemplate>;
-}
-
-export interface ExpansionResult {
-  readonly text: string;
-  /**
-   * What was expanded, so a caller can say so.
-   *
-   * Reported rather than silent because the model's answer depends on the whole
-   * expanded text: a user who cannot see that a skill body was inserted has no way
-   * to tell why the answer came back the way it did.
-   */
-  readonly expanded:
-    | { readonly kind: "skill"; readonly name: string }
-    | { readonly kind: "template"; readonly name: string }
-    | undefined;
-  /** A name that looks like a command but matched nothing. */
-  readonly unknown?: { readonly kind: "skill" | "template"; readonly name: string };
 }
 
 /** The prefix that marks a skill invocation. */
@@ -130,45 +107,61 @@ function skillBlock(skill: Skill): string {
   return [`<skill name="${skill.name}">`, skill.body, "</skill>"].join("\n");
 }
 
-/**
- * Expand a submitted line into what the model receives.
- *
- * Text that matches nothing is returned unchanged, with the unmatched name
- * reported. Reporting rather than throwing is what lets the caller decide: an
- * unknown `/skill:foo` is a typo worth a message, while a line that happens to
- * start with a slash but was never meant as a command should pass through.
- */
-export function expandSubmission(input: ExpansionInput): ExpansionResult {
-  const text = input.text;
-
-  if (text.startsWith(SKILL_PREFIX)) {
-    const rest = text.slice(SKILL_PREFIX.length);
-    const spaceAt = rest.search(/\s/);
-    const name = spaceAt === -1 ? rest : rest.slice(0, spaceAt);
-    const argsText = spaceAt === -1 ? "" : rest.slice(spaceAt + 1).trim();
-    const skill = input.skills.get(name);
-    if (!skill) return { text, expanded: undefined, unknown: { kind: "skill", name } };
-    // The arguments follow the body rather than being substituted into it: a skill
-    // is prose, and splicing a sentence into the middle of it is not something the
-    // author can predict. A template, which the author wrote around its arguments,
-    // substitutes instead.
-    const body = argsText ? `${skillBlock(skill)}\n\n${argsText}` : skillBlock(skill);
-    return { text: body, expanded: { kind: "skill", name } };
-  }
-
+/** The name a line invokes, and the text after it. */
+function splitInvocation(text: string): { readonly name: string; readonly argsText: string } {
   const spaceAt = text.search(/\s/);
-  const name = spaceAt === -1 ? text : text.slice(0, spaceAt);
-  const argsText = spaceAt === -1 ? "" : text.slice(spaceAt + 1);
-  const template = input.templates.get(name);
-  if (!template) {
-    // Only a bare name can be an unknown template: a sentence whose first word
-    // happens to match nothing is an ordinary prompt, not a mistyped command.
-    return spaceAt === -1 && name.startsWith("/")
-      ? { text, expanded: undefined, unknown: { kind: "template", name } }
-      : { text, expanded: undefined };
-  }
+  return {
+    name: spaceAt === -1 ? text : text.slice(0, spaceAt),
+    argsText: spaceAt === -1 ? "" : text.slice(spaceAt + 1),
+  };
+}
+
+/**
+ * Expand a `/skill:name` line into what the model receives.
+ *
+ * The arguments follow the body rather than being substituted into it: a skill is
+ * prose, and splicing a sentence into the middle of it is not something the author
+ * can predict. A template, which its author wrote around the arguments,
+ * substitutes instead.
+ *
+ * A name that matches no skill is reported rather than passed through, because the
+ * one way to write this form is deliberately and a wrong name is a typo. The caller
+ * decides what to say, since only it knows what else the name could have been.
+ */
+export function expandSkill(
+  text: string,
+  skills: ReadonlyMap<string, Skill>,
+): { readonly text: string; readonly skill?: string; readonly unknownSkill?: string } {
+  if (!text.startsWith(SKILL_PREFIX)) return { text };
+  const { name, argsText } = splitInvocation(text.slice(SKILL_PREFIX.length));
+  const skill = skills.get(name);
+  if (!skill) return { text, unknownSkill: name };
+  const args = argsText.trim();
+  return { text: args ? `${skillBlock(skill)}\n\n${args}` : skillBlock(skill), skill: name };
+}
+
+/**
+ * Expand a `/name` line into the template body, with its placeholders filled.
+ *
+ * The leading slash is required, and the slash is the whole safety of this form: it
+ * separates a name the user deliberately invoked from a word that merely appears
+ * first in a sentence. A lookup that accepted a bare name would let a file called
+ * `review.md` replace the prompt "review this function" with its own body and delete
+ * words the user typed, with nothing asking first.
+ *
+ * A name that matches nothing comes back as the text it was given, so the caller —
+ * which knows what else could have claimed that name — says what happened.
+ */
+export function expandTemplate(
+  text: string,
+  templates: ReadonlyMap<string, PromptTemplate>,
+): { readonly text: string; readonly template?: string } {
+  if (!text.startsWith("/")) return { text };
+  const { name, argsText } = splitInvocation(text.slice(1));
+  const template = templates.get(name);
+  if (!template) return { text };
   return {
     text: substituteArguments(template.content, parseArguments(argsText)),
-    expanded: { kind: "template", name },
+    template: template.name,
   };
 }

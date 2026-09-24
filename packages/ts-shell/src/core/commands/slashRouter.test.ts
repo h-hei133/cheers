@@ -69,6 +69,40 @@ describe("slash router (W4)", () => {
     }
   });
 
+  it("expands a prompt template invoked by its file name", async () => {
+    const promptsDir = path.join(workspaceRoot, ".agents", "prompts");
+    fs.mkdirSync(promptsDir, { recursive: true });
+    fs.writeFileSync(path.join(promptsDir, "explain.md"), "Explain $@ closely.", "utf8");
+
+    const result = await routeSlashCommand("/explain the parser", { cwd: workspaceRoot });
+    expect(result?.kind).toBe("prompt");
+    if (result?.kind === "prompt") {
+      expect(result.prompt).toBe("Explain the parser closely.");
+    }
+  });
+
+  it("lets a built-in command keep its name when a template claims it", async () => {
+    // A command is a promise the product made; a file in a prompts directory must
+    // not quietly take its name away. `audit` is an alias of `/review`, which is
+    // exactly the kind of name a user-written file would otherwise shadow.
+    const promptsDir = path.join(workspaceRoot, ".agents", "prompts");
+    fs.mkdirSync(promptsDir, { recursive: true });
+    fs.writeFileSync(path.join(promptsDir, "audit.md"), "TEMPLATE BODY: $@", "utf8");
+
+    const result = await routeSlashCommand("/audit", { cwd: workspaceRoot });
+    if (result?.kind === "prompt") {
+      expect(result.prompt).not.toContain("TEMPLATE BODY");
+    }
+  });
+
+  it("still reports a slash word that is neither a command nor a template", async () => {
+    const result = await routeSlashCommand("/nosuchthing", { cwd: workspaceRoot });
+    expect(result?.kind).toBe("local");
+    if (result?.kind === "local") {
+      expect(result.output).toContain("Unknown slash command");
+    }
+  });
+
   it("routes local connect command", async () => {
     const result = await routeSlashCommand("/connect status", {
       cwd: workspaceRoot,

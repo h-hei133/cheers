@@ -168,4 +168,47 @@ describe("CLI command execution bridge", () => {
       effectivePrompt: "hello",
     });
   });
+
+  it("sends a plain line through as written, even when a template shares its first word", async () => {
+    // Templates are invoked with a slash, so a file named `review.md` must not turn
+    // the sentence "review this function" into its own body. Rewriting here deleted
+    // words the user typed without anything asking.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-bridge-prompts-"));
+    fs.mkdirSync(path.join(dir, ".agents", "prompts"), { recursive: true });
+    fs.writeFileSync(path.join(dir, ".agents", "prompts", "review.md"), "TEMPLATE BODY: $@", "utf8");
+
+    const output = renderer();
+    const resolved = await buildCliCommandExecution(
+      {
+        prompt: "review this function",
+        cwd: dir,
+        renderer: output as StreamingRenderer,
+        printMode: false,
+        interactive: true,
+      },
+      bridge(null),
+    );
+
+    expect(resolved).toEqual({ kind: "execute", effectivePrompt: "review this function" });
+    expect(output.lines).toEqual([]);
+  });
+
+  it("expands a template the user invoked with a slash", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-bridge-prompts-"));
+    fs.mkdirSync(path.join(dir, ".agents", "prompts"), { recursive: true });
+    fs.writeFileSync(path.join(dir, ".agents", "prompts", "explain.md"), "Explain $@ closely.", "utf8");
+
+    const output = renderer();
+    const resolved = await buildCliCommandExecution(
+      {
+        prompt: "/explain the parser",
+        cwd: dir,
+        renderer: output as StreamingRenderer,
+        printMode: false,
+        interactive: true,
+      },
+    );
+
+    expect(resolved).toEqual({ kind: "execute", effectivePrompt: "Explain the parser closely." });
+  });
 });
