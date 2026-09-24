@@ -2928,3 +2928,19 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **门禁**：`verify:import-cycles` pass、`check:config-consumers` 35/35、`check:declarations` 18/18+12/12、`verify:docs-drift:strict` rules pass（source-drift 78 与 Phase 6 持平）、`test:scripts` 18/18、`tsc` 0 错。
 - **全量套件 7 项失败的归属判定**（push 前必须做）：crashLog×2、metrics×2、longSessionDurability×2、mcpGateway×1。**三步定位**：①同一份 JSON 报告在**改动前的提交**（7f38ba26，经临时 worktree）上**同样 7/7 失败**；②当前树上这 4 个文件**单独运行 34/34 全过**；③这 7 个用例全部 spawn 真实子进程或演练进程退出，是既有记录的负载敏感型（Phase 7 施工记录曾实测单项 16s、默认 5s 超时改 30s 的同类）。**判定：与本次 6 个提交无关的并发抖动**——被改的 28 个文件没有一个落在这些用例的依赖面上。
 - **如实记录**：`npm run test:ts` 在本机并发负载下**不是稳定的绿灯**（~3400 项中 0–7 项随负载漂移，且漂移项与改动无关），CI 的判定以此为准；本地全绿结论只对**受影响套件**（776+679 项、多轮）成立。
+
+## [2026-09-24] plan | Phase 8 前置研究与裁决完成（零代码改动）。
+- **产出**：`phase-8-pre-research.md` + `phase-8-decisions.md`。探索 5 个并行子代理（01 表/02+03 表/04 表/散落候选/pi 深探），复核 1 个成功 + 3 次被 content_filter 拦截的部分由主代理逐点亲验。
+- **Phase 8 与前两轮的本质差异**：候选池里**没有**「已承诺但失效」的重缺陷（Phase 6 是 HTTP 超时挂死回合、Phase 7 是 OAuth 登录死路）——剩余开放行全部是「未承诺的新能力」或「跨平台长尾」。因此定位为**小修轮**：T1 sameModel 守卫、T2 --skill/--no-skills、T3 glob 反斜杠归一化（带判别条件）+技能名边界正则、T4 文档对账。13 项维持不做且理由经双侧实测收紧（扩展宿主是写进代码的显式防御立场、RPC/CBOR 在 pi 自己也是实验层、cache warmer 无可算的经济学）。
+- **复核推翻主代理两处**：①T2 初稿接线形状错误——`--no-context-files` 先例实际不进 `RuntimeConfig`（`cliOptions` 停住直接消费），初稿写「进 overrides」与先例不符；②T1 初稿漏了两个写入点——完整链 `step.ts`（生产）→ `loop.ts:202-216`（赋形）→ `session.ts:364` persist()（落盘去留）。两处均已修正进裁决正文。
+- **复核者跑完了裁决要求的 picomatch 判定实验**：全局 replace 会破坏合法转义（`foo\*.ts` 的 `\*` 是转义星号、`a\\b.ts` 是字面反斜杠、Windows 风格 pattern 现状完全不匹配所以不做无损）——T3 施工形状据此定为「带判别条件的归一化」，实验数据直接入档，施工不必重跑。
+- **两处文档漂移发现**（表格再次滞后于代码，第三次）：B-1 的 glob/目录列举截断、技能名校验，Phase 3 时代的 backlog 断言早已被后续施工修复但没回头关闭。T4 处置。
+- **content_filter 事故累计 13 次**：复核任务 3 次全拦在读 `sessionEventCodec.ts` 时。处置模式确认有效：被拦切片转主代理亲验（本轮 T1/T2 全部要点有亲验证据）；干净切片（维持清单）子代理正常完成。
+
+## [2026-09-24] feat | Phase 8 施工完成（T1–T3 + T4 对账）。小修轮，散落积压清零。
+- **T1（裁决目标被实测推翻，按 §1.2 纪律降级）**：sameModel 守卫在施工验证中发现**不可达**——`recoverOverflow` 只看当前 turn 尾部（user prompt 之后），失败步骤又被 `persist()` 空消息闸挡在下一轮 history 之外。pi 需要该守卫只因它的 session 日志保留失败条目；我方投影不保留，两结构不同源。**落地的是 origin 消息来源链**：`AssistantStep.origin`（step 闭包内 `stamp()` 盖满 8 个出口）→ `loop.ts` 赋形 → `SessionMessage`/`TranscriptEvent` 可选字段 → codec 双向保留。3 项测试钉链点，反向验证（删透传→失败）。谁写的每条回答从此可查——审计与按模型归因的地基。
+- **T2（--skill/--no-skills）**：`--skill <path>` 可重复、`--no-skills`/`-ns` 关闭发现、显式路径穿透关闭开关（照 pi 语义）；未信任项目的技能过滤对 `source:"cli"` 放行（命名的文件是用户直接指令）。**顺手修既有缺陷**：值型 flag 的值此前混入 positional 候选（`--skill ./x.md` 被 positional 项目回退吃掉；`--tools` 理论同病），修法是与 `derivePromptArgument` 合用同一份模块级 `VALUE_FLAGS`——两处逻辑合一而非再造。实机（pipe）验证：命名文件的诊断出现在 skills 组件日志，flag→parser→loader 全链在真实进程成立。
+- **T3（glob 反斜杠——降级条款触发）+ 技能名边界**：§3.1 的判别法把 `src\**\*.ts`（Windows 分隔+通配）排除在归一化外——`\*` 是转义星号还是「`*.ts` 通配」语法上不可区分，**无干净判别法**，触发降级。落点：窄版归一化（整串无转义序列时 `\`→`/`，`src\packages\a.ts` 可用）；含 `\*`/`\?`/`\\` 的模式保留既有转义语义；Windows 通配模式维持不可匹配（它从未匹配过，无行为损失），文档如实记录**不宣称支持 Windows glob**。技能名补首尾/连续连字符两条诊断（照 pi validateName）。
+- **T4 对账**：phase-3-review B-1..B-4 全部关闭（B-1/2 早被后续施工修复属文档漂移、B-3 已实现、B-4 不可达裁决）；phase-3-execution 两处漂移更正（技能名校验早已实现）；01 判定列更新；_index 与裁决 §7 施工记录。
+- **验证**：tsc 0 错；受影响套件 582 全绿；门禁 4 项全过（config-consumers 35/35）；全量 3436 项 2 失败为既有负载漂移（cli-baseline/benchmark，隔离 47/47 通过，与 Phase 7 push 门禁记录同一对）。反向验证 4 处（origin 透传、disableDiscovery、glob 归一化、连字符分支）。
+- **教训（施工确认）**：裁决 §1.2「前提验证先行」兑现了设计意图——T1 若不先验证前提就会引入一个永不触发的死守卫；降级条款让「不可达」成为诚实结论而非施工失败。

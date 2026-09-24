@@ -123,10 +123,10 @@ const truncation = truncateHead(rawOutput, { maxLines: Number.MAX_SAFE_INTEGER }
 
 | # | 项 | 证据 | 建议 |
 |---|---|---|---|
-| B-1 | **统一工具输出的字节兜底层** | `opencode` 的 `ToolOutputStore.bound` 是**唯一**统一兜底实现（`gemini-cli` 漏掉 glob/ls，我方也漏掉 glob/目录列举） | **backlog**：先做 A-1 补齐两个工具；统一兜底作为后续防御层 |
-| B-2 | **超限落盘** | `opencode` 与 `codex`（`output_spill.rs`）都做；但 `pi` 的文件搜索类工具**只给提示不落盘** | **backlog**：对「refine pattern 即可」的搜索类工具价值低；对 `bash`/`read` 更有用 |
-| B-3 | **CLI 级技能路径注入 `--skill`** | 仅 `pi` 有（additive，穿透 `--no-skills`）；`codex` 用 RPC | **backlog**：纯调试便利，不影响核心 |
-| B-4 | **模型切换溢出归属守卫** | `pi` 的 `sameModel`（`agent-session.ts:2616`）+ `codex` 的 downshift compact（`turn.rs:1101`）都做 | **backlog**：单模型到底场景下不触发；改动面涉及跨轮状态 |
+| B-1 | **统一工具输出的字节兜底层** ✅ **2026-09-24 Phase 8 复核关闭**：原文「我方漏掉 glob/目录列举」已成过去式——`glob.ts:85-101` 与 `directoryListing.ts:98-110` 均已有 50KB 截断 + artifact:// 落盘，与 pi 完全平手（pi 同样逐工具截断、无全局层）。统一拦截层维持不做（详见 `phase-8-decisions.md` §5） | `opencode` 的 `ToolOutputStore.bound` 是**唯一**统一兜底实现（`gemini-cli` 漏掉 glob/ls，~~我方也漏掉 glob/目录列举~~ **已过时**） | ~~**backlog**~~ **已收口** |
+| B-2 | **超限落盘** ✅ **2026-09-24 Phase 8 复核关闭**：我方 bash/read/glob/grep/目录列举**全落盘 artifact://**，**优于 pi**（pi 仅 bash 落盘，其余只提示） | `opencode` 与 `codex`（`output_spill.rs`）都做；`pi` 的文件搜索类工具只给提示不落盘 | ~~**backlog**~~ **已收口（优于 pi）** |
+| B-3 | **CLI 级技能路径注入 `--skill`** ✅ **2026-09-24 Phase 8 施工**：`--skill <path>`（可重复）+ `--no-skills`/`-ns`，显式路径穿透关闭开关，见 `phase-8-decisions.md` §2 | 仅 `pi` 有（additive，穿透 `--no-skills`）；`codex` 用 RPC | ~~**backlog**~~ **已实现** |
+| B-4 | **模型切换溢出归属守卫** ⚠️ **2026-09-24 Phase 8 实测关闭（不可达）**：施工中发现该守卫在我方结构里**没有可达的触发路径**——失败步骤被 `persist()` 的空消息闸挡在下一轮 history 之外，`recoverOverflow` 只看当前 turn 尾部（prompt 之后）。与 pi 差异的根因：pi 的 session 日志保留失败条目，我方投影不保留。施工改为落地 `origin` 消息来源链（step→loop→transcript，3 测试钉住），守卫未引入。见 `phase-8-decisions.md` §1 复核记录 | `pi` 的 `sameModel`（`agent-session.ts:2616`）+ `codex` 的 downshift compact（`turn.rs:1101`）都做——**前提是失败条目可达，我方不满足** | ~~**backlog**~~ **已裁决：不可达，以 origin 链替代** |
 
 ---
 

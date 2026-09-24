@@ -195,6 +195,20 @@ confidence: high
 > 我把 `firstKeptEntryId`（压缩记录字段）与 `get_tree`（树条目 `parentId`）当成同一个，
 > 经复核者证伪后**维持 Phase 5 原裁决**。
 
+> **Phase 8 前置研究、裁决与施工已完成（2026-09-24）**：
+> `phase-8-pre-research.md` + `phase-8-decisions.md` + 同文 §7 施工记录。
+> **小修轮**：候选池经五子代理逐行重验后**没有**「已承诺但失效」的重缺陷
+> （与 Phase 6/7 的关键差异）。T1（sameModel 守卫）**施工中实测发现不可达**
+> ——失败步骤被 `persist()` 空消息闸挡在下一轮 history 外，pi 需要它只因
+> pi 的日志保留失败条目；按裁决降级纪律记录，落地的是 **origin 消息来源链**
+> （step→loop→transcript，谁写的每条回答从此可查）。
+> T2 `--skill`/`--no-skills`（含顺手修的值型 flag 混入 positional 缺陷）、
+> T3 glob Windows 分隔归一化（降级条款触发，边界如实入档）+ 技能名边界诊断。
+> **散落积压至此清零**：phase-3-review 的 B-1..B-4 全部收口或裁决关闭。
+> 13 项大工程维持不做，理由经双侧实测收紧（扩展宿主是写进代码的防御立场、
+> RPC/CBOR 在 pi 侧也是实验层、cache warmer 无可算经济学）。
+> **判定列不变仍是 4/15/16/10**——Phase 8 收的是散落积压，不是表行。
+
 | # | 报告 | 覆盖范围 | DEFICIENT | MISSING | OURS-ONLY | 平手 |
 |---|---|---|---:|---:|---:|---:|
 | 01 | [可扩展性与定制化](01-extensibility-and-customization.md) | 扩展宿主、技能、提示词模板、包分发、主题、上下文文件 | 3 | 5 | 1 | 0 |

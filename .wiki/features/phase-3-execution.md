@@ -444,7 +444,7 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .cheers.json  packa
 
 - **`grep` 的字节上限**：`grep` 已有 `truncateHead(50KB)` + 溢出落盘，未改动。
 - **`lsp` 的上限**：未动（裁决未要求）。
-- **Windows glob 语义**：仍为 backlog（裁决 §1.8 #6）。
+- **Windows glob 语义**：~~仍为 backlog~~ ✅ **2026-09-24 Phase 8 部分收口**：`globMatch.ts` 现接受无转义序列的 Windows 分隔模式（`src\packages\a.ts`）；含 `\*`/`\?`/`\\` 的模式保留既有转义语义不做改写（`\*` 是转义星号还是「`*.ts` 通配」语法上不可区分，判别法与取舍见 `phase-8-decisions.md` §7.3）。Windows 通配模式（`src\**\*.ts`）维持不可匹配——它在本匹配器下从未匹配过，无行为损失。
 
 ---
 
@@ -562,9 +562,9 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .cheers.json  packa
 - **`/reload` 命令**：已论证不需要（§6.2 发现 2）。
 - **嵌套目录懒加载**（裁决 §2.3）：明确移出本轮。
 - **linked worktree 遮蔽**（裁决 §2.5 #7）：backlog。
-- **CLI 级技能路径注入**（裁决 §3.6 #6）：backlog。
-- **技能名/长度不合规的警告**（裁决 §3.5）：**未实现**——当前不校验名称格式。裁决把「名字格式不合规」定为**仅警告仍加载**，因此不做不会损失功能，但少了一条诊断。
-- **技能无 `description` 时硬失败**（裁决 §3.5）：行为已达成（无描述则不进入 `<available_skills>`，模型无法匹配到它），但**不产生诊断**。
+- **CLI 级技能路径注入**（裁决 §3.6 #6）：~~backlog~~ ✅ **2026-09-24 Phase 8 施工**：`--skill <path>`（可重复）+ `--no-skills`/`-ns`，见 `phase-8-decisions.md` §2。
+- **技能名/长度不合规的警告**（裁决 §3.5）：~~**未实现**~~ ✅ **2026-09-24 Phase 8 复核更正**：本行写作时未实现，**后续施工早已补上**——`skillLoader.ts:63-65`（`MAX_NAME_LENGTH=64` + `VALID_NAME`）与 `inspectSkill` 已输出名称长度/字符集诊断（测试 `skillLoader.test.ts:237-251`）。Phase 8 又补了首尾连字符与连续连字符两条边界诊断。文档漂移入档，见 `phase-8-pre-research.md` §2.2。
+- **技能无 `description` 时硬失败**（裁决 §3.5）：行为已达成（无描述则不进入 `<available_skills>`，模型无法匹配到它）。~~但**不产生诊断**~~ ✅ **2026-09-24 更正**：`inspectSkill` 现输出「has no description」诊断（`skillLoader.ts:357-359`）。
 
 **已补齐的裁决项**（首版遗漏，已在 `5274b2b6` 补）：
 
