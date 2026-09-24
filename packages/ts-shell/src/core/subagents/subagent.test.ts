@@ -113,7 +113,11 @@ describe("subagent subsystem", () => {
   });
 
   describe("Task Tool Integration", () => {
-    it("executes subagent task and reports results", async () => {
+    it("prepares the subagent and says it was not dispatched without a provider", async () => {
+      // No credential is configured here, so nothing is sent. The tool used to
+      // answer "success: true" with "All delegated instructions have been
+      // completed" on the strength of an empty response string, which a caller
+      // cannot tell from real work.
       const taskTool = createTaskToolDefinition();
       const result = await taskTool.execute(
         {
@@ -127,10 +131,13 @@ describe("subagent subsystem", () => {
         },
       );
 
-      expect(result.success).toBe(true);
-      expect(result.output).toContain("# 🤖 Subagent Task Executed");
-      expect(result.output).toContain("code-reviewer");
-      expect(result.output).toContain("Review auth tokens");
+      expect(result.success).toBe(false);
+      // A failed result carries its text in `error`, not `output`.
+      const report = result.error ?? "";
+      expect(report).toContain("# 🤖 Subagent Task Executed");
+      expect(report).toContain("code-reviewer");
+      expect(report).toContain("Review auth tokens");
+      expect(report).toContain("not dispatched");
     });
   });
 });
