@@ -57,6 +57,16 @@ export type TranscriptEvent =
       content: string;
       tool_calls?: readonly SessionToolCall[];
       tool_call_id?: string;
+      /**
+       * The model an assistant answer came from. Absent on every line written
+       * before the field existed, and on every role that has no model behind
+       * it. Readers treat absence as the current model, so old transcripts
+       * keep behaving as they did when they were written.
+       */
+      origin?: {
+        readonly provider?: string;
+        readonly model: string;
+      };
       timestamp: string;
     }
   | {
@@ -106,6 +116,7 @@ export function createMessageTranscriptEvent(
     content: message.content,
     ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
     ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+    ...(message.origin ? { origin: message.origin } : {}),
     timestamp: message.timestamp,
   };
 }
@@ -192,6 +203,7 @@ export function transcriptEventToSessionMessage(
     content: event.content,
     tool_calls: event.tool_calls,
     tool_call_id: event.tool_call_id,
+    ...(event.origin ? { origin: event.origin } : {}),
     timestamp: event.timestamp,
   };
 }

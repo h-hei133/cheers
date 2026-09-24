@@ -22,6 +22,19 @@ export interface AssistantStep {
   readonly toolCalls: readonly AgentToolCall[];
   readonly stopReason: AgentStopReason;
   readonly errorMessage?: string;
+  /**
+   * The model this step came from, so a failure can be told apart from the
+   * current model's failure after a switch.
+   *
+   * Absent when the step had no model behind it — a synthetic step for tests,
+   * or a step function built before the field was threaded. Readers treat an
+   * absent origin as matching, which keeps unattributed steps behaving as
+   * they did before the field existed.
+   */
+  readonly origin?: {
+    readonly provider?: string;
+    readonly model: string;
+  };
 }
 export interface NextStepSnapshot {
   readonly message: AgentMessage;
@@ -213,6 +226,7 @@ async function driveLoop(
           : {}),
         stopReason: step.stopReason,
         ...(step.errorMessage ? { errorMessage: step.errorMessage } : {}),
+        ...(step.origin ? { origin: step.origin } : {}),
       };
       await emit({ type: "message_start", message: assistant });
       await emit({ type: "message_end", message: assistant });

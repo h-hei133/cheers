@@ -142,7 +142,22 @@ export function createStepFunction(request: StepRequest): StepFunction {
   let effortAccepted = true;
   const fetchImpl = request.fetchImpl ?? fetch;
   const retry = resolveRetryPolicy("provider", request.retry ?? {});
-  return async (messages, signal, listener, options) => {
+  // The model identity travels with every step this function returns, so a
+  // failure recorded by one model can be recognized as not the current model's
+  // after a switch. Built once here because every attempt of every step from
+  // this function talks to the same target; the callers that switch models
+  // build a new step function.
+  const origin =
+    request.provider.model || request.provider.provider
+      ? { ...(request.provider.provider ? { provider: request.provider.provider } : {}), model: request.provider.model }
+      : undefined;
+  return async (messages, signal, listener, options): Promise<AssistantStep> => {
+    // Steps this call returns all come from the same target, so the origin is
+    // stamped once on whatever leaves — an answer, a refusal, or an abort —
+    // rather than threaded through each builder's signature. A `return` in
+    // this body that forgets the stamp is invisible to the type, which is why
+    // every exit goes through it.
+    const stamp = (step: AssistantStep): AssistantStep => (origin ? { ...step, origin } : step);
     for (;;) {
       const effort = effortAccepted ? getThinkingEffort(request.workspaceRoot) : undefined;
       // Resolved per attempt rather than once, because the shape depends on the
@@ -233,7 +248,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           // The conversation outgrew the window. That is answered by condensing,
           // not by asking again, so it keeps its own prefix and stops here.
           if (isContextOverflow(detail)) {
-            return errorStep(`${CONTEXT_OVERFLOW_PREFIX}${detail.slice(0, 200)}`);
+            return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${detail.slice(0, 200)}`));
           }
           if (effort && /reasoning_effort/i.test(detail)) {
             dropEffort = true;
@@ -248,7 +263,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             );
           }
         } catch (error) {
-          if (signal?.aborted) return abortedStep("");
+          if (signal?.aborted) return stamp(abortedStep(""));
           // The request never arrived, which is the failure a second attempt
           // most often fixes.
           refusal = `Network error: ${error instanceof Error ? error.message : String(error)}`;
@@ -259,9 +274,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
         }
 
         attempt += 1;
-        if (!transient || attempt > retry.maxRetries) return errorStep(refusal);
+        if (!transient || attempt > retry.maxRetries) return stamp(errorStep(refusal));
         const waited = await waitBeforeRetry(retryDelayMs(retry, attempt, requestedDelayMs), signal);
-        if (!waited) return abortedStep("");
+        if (!waited) return stamp(abortedStep(""));
       }
 
       if (dropEffort) {
@@ -270,7 +285,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         effortAccepted = false;
         continue;
       }
-      if (!response) return errorStep(refusal || "Provider returned no response.");
+      if (!response) return stamp(errorStep(refusal || "Provider returned no response."));
 
       try {
         const completion = await readCompletion(response, watched);
@@ -292,10 +307,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
             promptMessageCount: messages.length + 1,
           });
         }
-        return toStep(completion, watched);
+        return stamp(toStep(completion, watched));
       } catch (error) {
-        if (signal?.aborted) return abortedStep(shown);
-        return errorStep(`Network error: ${error instanceof Error ? error.message : String(error)}`);
+        if (signal?.aborted) return stamp(abortedStep(shown));
+        return stamp(errorStep(`Network error: ${error instanceof Error ? error.message : String(error)}`));
       } finally {
         // Reading ends as soon as the answer is complete, which can be before
         // the host closes the stream — a keep-alive proxy holds the connection

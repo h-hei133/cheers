@@ -58,6 +58,34 @@ describe("createStepFunction", () => {
     expect(result.errorMessage?.startsWith(CONTEXT_OVERFLOW_PREFIX)).toBe(true);
   });
 
+  it("names the model every kind of step came from", async () => {
+    // Every exit — an answer, a refusal the retries gave up on, an overflow —
+    // must say which model produced it. A step that forgets leaves a failure
+    // the next run cannot attribute, and attribution is the fact the origin
+    // field exists to carry.
+    const answered = createStepFunction({
+      ...request,
+      fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "hi" }, finish_reason: "stop" }] }),
+    });
+    const answer = await answered([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
+    expect(answer.origin).toEqual({ model: "m" });
+
+    const refused = createStepFunction({
+      ...request,
+      fetchImpl: async () => jsonResponse({ error: "no" }, { ok: false, status: 400 }),
+    });
+    const refusal = await refused([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
+    expect(refusal.stopReason).toBe("error");
+    expect(refusal.origin).toEqual({ model: "m" });
+
+    const overflowed = createStepFunction({
+      ...request,
+      fetchImpl: async () => jsonResponse({ error: { code: "context_length_exceeded" } }, { ok: false, status: 400 }),
+    });
+    const overflow = await overflowed([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
+    expect(overflow.origin).toEqual({ model: "m" });
+  });
+
   it("delivers a whole-body answer as one delta and parses its tool calls", async () => {
     const deltas: string[] = [];
     const step = createStepFunction({

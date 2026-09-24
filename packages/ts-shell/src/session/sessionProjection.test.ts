@@ -495,6 +495,22 @@ describe("session substrate projections", () => {
         "Session sess_blocked is not recoverable. Start a fresh session or manually repair /home/test/.cheers/sessions/sess_blocked.",
     });
   });
+
+  it("keeps a message's model origin across the transcript round trip", () => {
+    // The origin names which model produced an answer. It has to survive the
+    // write and come back on the read: a conversation rebuilt after a
+    // restart would otherwise attribute every answer to whichever model is
+    // current.
+    const event = createMessageTranscriptEvent({
+      role: "assistant",
+      content: "the answer",
+      origin: { provider: "p", model: "m" },
+      timestamp: "2026-05-19T00:00:00.000Z",
+    });
+    const decoded = decodeTranscriptLine(encodeTranscriptEvent(event));
+    const message = transcriptEventToSessionMessage(decoded);
+    expect(message?.origin).toEqual({ provider: "p", model: "m" });
+  });
 });
 
 function makeSession(input: {

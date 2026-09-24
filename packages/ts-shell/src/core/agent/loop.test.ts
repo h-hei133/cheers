@@ -84,6 +84,16 @@ describe("runAgentLoop", () => {
     expect(seen[0].map((message) => message.role)).toEqual(["user"]);
   });
 
+  it("carries the step's origin onto the message it becomes", async () => {
+    // The loop is where a step's fields become a message's fields. An origin
+    // the loop drops is one no later reader can ever see, so the handoff is
+    // what gets pinned here.
+    const { streamStep } = scriptedStream([{ text: "hello", toolCalls: [], stopReason: "stop", origin: { provider: "p", model: "m" } }]);
+    const { emit } = collect();
+    const messages = await runAgentLoop([userMessage("hi")], [], { streamStep }, emit, undefined);
+    expect(messages[1].origin).toEqual({ provider: "p", model: "m" });
+  });
+
   it("executes tool calls and continues until the model answers", async () => {
     const call: AgentToolCall = { id: "call-1", name: "read", args: { path: "a.txt" } };
     const { streamStep } = scriptedStream([toolStep([call]), textStep("done")]);
