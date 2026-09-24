@@ -2960,3 +2960,19 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **实机（真实 PTY，构建产物，隔离 HOME）**：①`--skill /tmp/ptyskill/named.md` 后 `/skill` 面板列出 `named-on-cli … cli`（修复前该面板是 `No skills found`）；②`/skill named-on-cli` 输出 `NAMED SKILL BODY`（修复前 `No skill named`）；③项目标 `untrusted` 且含 `IGNORE ALL PRIOR INSTRUCTIONS` 的 `.agents/skills/evil/SKILL.md`，`/skill evil` 输出 `No skill named \`evil\``（修复前会原样展开进提示词）。**未实机**：`/skill:` 前缀形式与 `--no-skills`（单元层覆盖，同一解析点）。
 - **方法论教训（新增一条）**：**「结论对」不能豁免「理由错」**。Phase 8 §7.1 的结论（守卫不可达）经实测成立，但支撑它的原因经不起一次直接实验。裁决纪律里「不许静默放弃」的对偶是「不许用一个错的理由支撑一个对的结论」——前者骗用户，后者骗下一个维护者。判定这类记录的方法是**做那个实验**，而不是读它的推理。
 - **文档**：`phase-8-decisions.md` 新增 §8（复核轮全记录：8.1 推翻项 / 8.2 原因更正 / 8.3 六项修复 / 8.4 不修项与理由 / 8.5 验证 / 8.6 实机）；`_index.md` 补复核摘要；`01-extensibility-and-customization.md` 两行更新（技能发现行补 catalog、`/skill:name` 行补复核修正）；`phase-3-execution.md` §7.4 技能路径注入行补更正。
+
+## [2026-09-24] audit | 01–07 剩余任务统计（零代码改动，纯清点）。**19 项开放 + 10 项部分收口**；开放项全部有既有裁决覆盖（无需新决策）；**发现 2 处「裁决说做、实现没有」的接缝**。
+- **统计方法**（不是读合计行，而是重算）：解析 7 份文档的覆盖表，按**表头命名的「判定」列**取值，**跳过划删除线的行**（与 `_index.md` 自述的重数方法一致）。7 份文档的逐行结果与 `_index.md` 的 `4/15/16/10` **完全吻合**——合计行是准的。
+- **开放清单（19 项 = 15 MISSING + 4 DEFICIENT）**：
+  - **01（7）**：扩展自动发现、注册工具、注册命令、注册快捷键/渲染器/Markdown 变换器/入口渲染器、自定义 UI 组件（以上 5 项 MISSING，同属**扩展宿主**一个根）；扩展 API 事件订阅、包分发（2 项 DEFICIENT，同根下游）。
+  - **02（5）**：stdin/stdout JSONL RPC、CBOR protocol/client/server、Node/TS SDK、HTML 导出、Session 分享链接。
+  - **03（2）**：Prompt cache 保活、传输选择（SSE/WebSocket）。
+  - **04（2）**：粘贴图片、Mermaid 渲染。另 2 项 DEFICIENT 是**主题**（磁盘发现缺 `--theme` CLI 覆盖层、令牌完整度）。
+  - **06（1）**：更新检查。
+- **部分收口（10 项，各带明确余量）**：技能发现（无 `.gitignore` 忽略规则）、`SYSTEM.md` 替换语义（刻意不做）、session 文件 entry 级版本化、`/export jsonl` header 行、订阅 OAuth（2 家 vs pi 7 家）、自定义 provider（不能自定义 API 协议）、cache 命中率/浪费分析、`--theme` CLI 层、Markdown 细分语法（语法高亮）、主题令牌。
+- **全部 19 项开放都已有裁决**，逐项对应到 `phase-6 §7` / `phase-7 §2.2+§5` / `phase-8 §5` 的「维持不做」表或 Phase 5 §9.2。**没有一项是「没决定过」**，因此本轮不产生新决策。
+- **发现 2 处接缝（裁决说做、实现没有）**：
+  1. **技能发现未共享统一忽略层**。`phase-3-decisions.md` §3.6 #7 裁决「目录列举与技能发现**共享同一忽略判定**」；实测 `skillLoader.ts` 对 `ignore` **零命中**（`git log -S IGNORE_FILES` → 从未有过），而 `directoryListing.ts`/`fileWalk.ts` 已有该层。**后果**：`.agents/skills/` 下被 `.gitignore` 排除的目录（如 `vendor/`）仍会被发现——实测复现 `DISCOVERED = ["leaked"]`。
+  2. **自定义 provider 的多协议缺口无任何裁决**。`03-*` 行 53 判「部分收口」、余量写「不能自定义 API 协议实现（pi 支持 `openai-responses`/`anthropic-messages` 等多协议）」，但 `grep anthropic-messages|openai-responses|多协议` 于全部 phase 裁决/施工文档 → **仅 1 处旁证**（phase-3 读 pi 源码时的引用），**没有任何裁决**。即这一行是**唯一一处「没被决定过的余量」**。
+- **处置**：两处均**记录不改**——①属技能发现的余量，与既有 10 项部分收口同性质；②需先做「是否引入多协议适配层」的裁决，属独立立项。已登记，不静默。
+- **教训（与 Phase 6/7 同型）**：**合计行是派生值**，读它等于信一个二手结论。本次重算之所以能对上，是因为前几轮已经把判定列修准了；对不上的那次（Phase 6 前置研究）正是判定列滞后的结果。**另**：`_index.md` 的 `03` 行 DEFICIENT 格写 `0` 而文档内 `03:51` 的判定列有 `~~MISSING~~`（判定有误的更正注记）——**这是索引与文档的第三类漂移**（既非判定错、也非合计错，而是索引行的分列与文档的判定列口径不同），量级 1 格，不修，记此以备下次有人核对时不必重新推导。
