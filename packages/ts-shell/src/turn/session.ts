@@ -248,6 +248,7 @@ export function runTurn(options: TurnOptions): TurnRun {
   /**
    * A provider that refused the context for its size gets one more chance:
    * the failed answer is dropped, the head condensed, and the step retried.
+   *
    */
   const recoverOverflow = async (): Promise<boolean> => {
     const messages = core.state.messages;
@@ -357,6 +358,12 @@ export function runTurn(options: TurnOptions): TurnRun {
  * Keep what the model saw or said. An assistant message that carried nothing —
  * an aborted or failed step — has no place in the conversation the next run
  * is built from.
+ *
+ * The step's bookkeeping (why it stopped, what went wrong) is stripped because
+ * it describes the attempt, not the answer. The origin survives that strip: it
+ * names which model produced the answer, and a later run still needs to know
+ * that — a failure written by a retired model must not be mistaken for the
+ * current model's once the model that wrote it is gone.
  */
 function persist(onMessage: (message: SessionMessage) => void, message: AgentMessage): void {
   if (message.role === "assistant" && !message.content && !(message.tool_calls && message.tool_calls.length > 0)) return;
