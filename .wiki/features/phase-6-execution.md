@@ -443,7 +443,11 @@ CI 日志：45 处 `Promise.withResolvers is not a function`。
 |---|---|
 | `57c603d1`（修复前） | **41 项失败** |
 | `9f62dbcb`（Node 修复后） | **4 项失败**，`withResolvers` 出现次数 **0**（原 45） |
-| 最终 | 见下方 |
+| `17d27442`（构建 daemon 后） | **2 项失败**（daemon 就绪超时） |
+| `4791a386`（就绪窗口 + debug profile） | ✅ **全部通过** |
+
+**这是本仓历史上第一次 CI 全绿**：`gh run list --workflow=CI --limit 30` → **1 success / 29 failure**。
+12 个步骤全部 ✓（含 `Build the Rust daemon`、`Run Focused & Unit Tests`、`Validate NormProof Architecture`）。
 
 **四类根因，每一类都是「本地过、CI 不过」**：
 
