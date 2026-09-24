@@ -121,6 +121,9 @@ export function createTaskToolDefinition(
       }
 
       let subagentResponse = "";
+      // Why no answer arrived, when none did. Without it the report below claimed
+      // the work was completed on the strength of an empty string.
+      let subagentFailure = "";
       const apiKey = process.env.SILICONFLOW_API_KEY || process.env.OPENAI_API_KEY || "";
       const baseUrl = process.env.SILICONFLOW_BASE_URL || process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
       const model = subagentDef?.model || (process.env.SILICONFLOW_API_KEY ? "deepseek-ai/DeepSeek-V4-Flash" : "gpt-4o-mini");
@@ -135,34 +138,45 @@ export function createTaskToolDefinition(
         if (apiKey && !process.env.VITEST && process.env.NODE_ENV !== "test") {
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), 30_000);
-          const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              model,
-              messages: [
-                {
-                  role: "system",
-                  content: systemPrompt,
-                },
-                {
-                  role: "user",
-                  content: `${prompt}\n\nContext:\n${contextStr || "No additional context provided."}`,
-                },
-              ],
-              temperature: 0.3,
-            }),
-            signal: controller.signal,
-          });
-          clearTimeout(timer);
-          if (res.ok) {
-            const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-            subagentResponse = data.choices?.[0]?.message?.content?.trim() || "";
+          try {
+            const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model,
+                messages: [
+                  {
+                    role: "system",
+                    content: systemPrompt,
+                  },
+                  {
+                    role: "user",
+                    content: `${prompt}\n\nContext:\n${contextStr || "No additional context provided."}`,
+                  },
+                ],
+                temperature: 0.3,
+              }),
+              signal: controller.signal,
+            });
+            if (res.ok) {
+              const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+              subagentResponse = data.choices?.[0]?.message?.content?.trim() || "";
+            } else {
+              subagentFailure = `The provider answered ${res.status}.`;
+            }
+          } finally {
+            // Disarmed after the body is read, not after the headers. Clearing it
+            // as soon as `fetch` resolved left the body read unbounded: a provider
+            // that sends headers and then stalls hung this tool forever, and the
+            // 30s deadline could not fire because it was already gone.
+            clearTimeout(timer);
           }
         }
+      } catch (error) {
+        subagentFailure = error instanceof Error ? error.message : String(error);
       } finally {
         if (allocatedWorktree) {
           await worktreeManager.releaseWorktree(subtaskId, { squashMerge: true });
@@ -200,9 +214,20 @@ export function createTaskToolDefinition(
         "",
         "## Subagent Execution Result:",
         subagentResponse ||
-          `Task "${description}" was processed by subagent \`${agentType}\`. All delegated instructions have been completed.`,
+          (subagentFailure
+            ? `The subagent could not be run: ${subagentFailure}`
+            : // No provider configured. Saying the work was completed would be a
+              // claim nothing supports — the delegation was prepared and then
+              // never sent.
+              `The subagent was not dispatched: no provider credential is configured, so nothing was sent.`),
       ];
-      return approvedResult(lines.join("\n"));
+      // A subagent that was never reached is a failure, and returning it as a
+      // success is how a caller ends up believing work happened that did not. The
+      // report goes in `error` because that is where a failed result carries its
+      // text; a caller reading `output` sees nothing rather than a success story.
+      return subagentResponse
+        ? approvedResult(lines.join("\n"))
+        : { success: false, error: lines.join("\n") };
     },
   };
 }

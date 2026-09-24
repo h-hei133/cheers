@@ -145,7 +145,11 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
   });
 
   describe("task tool", () => {
-    it("dispatches isolated subagent task and returns clean summary", async () => {
+    it("prepares the subagent and reports that nothing was dispatched without a provider", async () => {
+      // No credential is configured in the test environment, so no request is
+      // sent. The tool used to answer "All delegated instructions have been
+      // completed" on the strength of an empty response string — a claim nothing
+      // supported, and one a caller has no way to tell from real work.
       const tool = createTaskToolDefinition();
       const result = await tool.execute(
         {
@@ -156,10 +160,15 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
         { workspaceRoot: tempDir, taskId: "task-1" },
       );
 
-      expect(result.success).toBe(true);
-      expect(result.output).toContain("Subagent Task Executed");
-      expect(result.output).toContain("Description**: Analyze dependency tree");
-      expect(result.output).toContain("PLAN (Read-Only)");
+      expect(result.success).toBe(false);
+      // The report is in `error`: a failed result carries no `output`, so a caller
+      // cannot read a success story out of a run that never happened.
+      const report = result.error ?? "";
+      expect(report).toContain("Subagent Task Executed");
+      expect(report).toContain("Description**: Analyze dependency tree");
+      expect(report).toContain("PLAN (Read-Only)");
+      expect(report).toContain("not dispatched");
+      expect(report).not.toContain("have been completed");
     });
   });
 });
