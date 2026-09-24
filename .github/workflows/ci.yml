@@ -58,8 +58,16 @@ jobs:
       # waiting for a daemon that was never built. They pass locally because the
       # binary is already there, which is exactly the kind of gap a local run
       # cannot show.
+      #
+      # Both profiles, because the two are not interchangeable here. `build:rust`
+      # produces the release binary the product ships, while the tests start the
+      # daemon with `cargo run`, which uses the debug profile — warming only the
+      # release build left the tests compiling from scratch inside their own
+      # readiness window.
       - name: Build the Rust daemon
-        run: npm run build:rust
+        run: |
+          npm run build:rust
+          cargo build --manifest-path packages/rust-core/Cargo.toml --bin daemon
 
       - name: Run Focused & Unit Tests
         run: npm run test:ts

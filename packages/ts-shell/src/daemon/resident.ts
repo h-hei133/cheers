@@ -92,6 +92,21 @@ export function createResidentDaemonState(cargo: string, workspaceRoot: string):
   }
 }
 
+/**
+ * How long the first request waits for the daemon to answer.
+ *
+ * The daemon is started with `cargo run`, so on a machine that has never built it
+ * this window also covers a cold compile. Five seconds was enough wherever the
+ * build was already warm, which is every developer machine and not a fresh
+ * checkout: the CI runner spent the whole window compiling and then reported the
+ * daemon unready, while the same tests passed locally in under a second.
+ *
+ * Thirty seconds covers a cold debug build with room to spare. It is a startup
+ * budget, not a command budget — the request that follows carries the caller's own
+ * timeout.
+ */
+const DAEMON_READINESS_MS = 30_000;
+
 export async function requestDaemonResponse(
   state: ResidentDaemonState,
   request: unknown,
@@ -181,7 +196,7 @@ export async function executeViaResidentDaemon(options: {
   env?: Readonly<Record<string, string>>
 }): Promise<DaemonExecutionResult> {
   const state = await ensureResidentDaemon(options.workspaceRoot)
-  const health = await requestDaemonResponse(state, { type: 'health' }, 5_000, 'daemon readiness')
+  const health = await requestDaemonResponse(state, { type: 'health' }, DAEMON_READINESS_MS, 'daemon readiness')
   if (health.type !== 'health') {
     throw new Error(`Unexpected daemon response type for health request: ${health.type}`)
   }

@@ -450,7 +450,13 @@ CI 日志：45 处 `Promise.withResolvers is not a function`。
 1. **Node 版本**（41 项里的 37 项）——见 §8.1②。
 2. **CI 从不构建 Rust daemon**（`parity.test.ts` 2 项）——工作流只有 `build:ts`，
    而 parity 测试驱动**真实 Rust 二进制**；全新检出上它等一个不存在的 daemon 直到超时，
-   本地却能过，因为二进制早就构建好了。修复：加 `npm run build:rust`（实测 8.3 秒）。
+   本地却能过，因为二进制早就构建好了。修复：加 `npm run build:rust`。
+   **但这还不够**：`build:rust` 出的是 **release** 产物，而测试用 `cargo run`（**debug** profile）启动 daemon——
+   预热错了 profile，测试仍要在自己的 5 秒就绪窗口内**从零编译**。
+   所以又加了 `cargo build --bin daemon`（debug），并把就绪窗口从 **5 秒提到 30 秒**
+   （`daemon/resident.ts` 的 `DAEMON_READINESS_MS`）。
+   实测：**删掉整个 `target/` 后**（模拟全新检出）parity 测试 10.03 秒通过——
+   5 秒窗口确实不够，30 秒有余。
 3. **测试自己的清理与子进程竞争**（`cli-baseline` 2 项）——`afterEach` 删除 fake home 时，
    它派生的子进程可能仍在往里写，`rmSync` 抛 `ENOTEMPTY`。
    `force` 不管用（目录**确实非空**），`maxRetries` 也不管用（重试的是**系统调用**，
