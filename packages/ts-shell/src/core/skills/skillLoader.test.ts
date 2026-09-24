@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -386,5 +387,75 @@ describe("a named path that loads nothing", () => {
     // Reporting those would make every first run look broken.
     const { failures } = new SkillLoader(workspace).loadDetailed();
     expect(failures).toEqual([]);
+  });
+});
+
+describe("the repository's ignore rules", () => {
+  let workspace = "";
+
+  beforeEach(() => {
+    workspace = fs.mkdtempSync(path.join(os.tmpdir(), "skills-ignore-"));
+    // A repository, so git answers the question the way it does in a real
+    // checkout. Outside one the rules are matched in-process, which the next
+    // case covers.
+    execFileSync("git", ["init", "-q"], { cwd: workspace });
+  });
+
+  afterEach(() => {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  });
+
+  function writeSkillAt(relative: string, name: string): string {
+    const dir = path.join(workspace, relative);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "SKILL.md"),
+      `---\nname: ${name}\ndescription: what ${name} is for\n---\n\n${name} body\n`,
+      "utf8",
+    );
+    return dir;
+  }
+
+  it("does not discover a skill inside a directory the repository ignores", () => {
+    // A `.gitignore` is the project saying which of its files are not part of
+    // it. Reading a skill from one would put text the user deliberately
+    // excluded into the prompt, while every other tool hid that directory — the
+    // model would be the only party that never learned it was excluded.
+    fs.writeFileSync(path.join(workspace, ".gitignore"), "vendor/\n", "utf8");
+    writeSkillAt(path.join(".agents", "skills", "vendor", "leaked"), "leaked");
+    writeSkillAt(path.join(".agents", "skills", "kept"), "kept");
+
+    expect([...new SkillLoader(workspace).load().keys()]).toEqual(["kept"]);
+  });
+
+  it("still loads a skill the user named, whatever the rules say", () => {
+    // Naming a path is a more specific statement than a pattern that happens to
+    // match it. Honouring the pattern here would make `--skill <dir>` silently
+    // do nothing, which is the failure this whole flag exists to avoid.
+    fs.writeFileSync(path.join(workspace, ".gitignore"), "vendor/\n", "utf8");
+    const named = writeSkillAt(path.join(".agents", "skills", "vendor", "leaked"), "leaked");
+
+    const skills = new SkillLoader(workspace, { extraPaths: [named] }).load();
+    expect([...skills.keys()]).toEqual(["leaked"]);
+  });
+
+  it("applies the same rules when there is no repository to ask", () => {
+    // git exits 128 outside a repository, and losing ignore support there would
+    // be a gap rather than a degradation: the same `.gitignore` should mean the
+    // same thing whether or not the directory happens to be a checkout.
+    const bare = fs.mkdtempSync(path.join(os.tmpdir(), "skills-bare-"));
+    try {
+      fs.writeFileSync(path.join(bare, ".gitignore"), "vendor/\n", "utf8");
+      const dir = path.join(bare, ".agents", "skills", "vendor", "leaked");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, "SKILL.md"),
+        "---\nname: leaked\ndescription: excluded\n---\n\nbody\n",
+        "utf8",
+      );
+      expect([...new SkillLoader(bare).load().keys()]).toEqual([]);
+    } finally {
+      fs.rmSync(bare, { recursive: true, force: true });
+    }
   });
 });

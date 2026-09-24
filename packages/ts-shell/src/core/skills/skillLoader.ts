@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { resolveAllUserDataFiles, userDataDir } from "../paths/userHome.js";
 import { projectDirectories } from "../project/directories.js";
+import { isDirectoryIgnored } from "../../runtime/execution/ignoreRules.js";
 
 /**
  * Skill discovery.
@@ -79,6 +80,15 @@ export class SkillLoader {
    * is never asked to load reports nothing.
    */
   private readonly failures: { readonly filePath: string; readonly message: string }[] = [];
+  /**
+   * Where the repository's ignore rules are read from.
+   *
+   * Only discovered roots are subject to it. A path the user named is loaded
+   * whatever the rules say — pointing at a file is a more specific statement than
+   * a pattern that happens to match it, and honouring the pattern there would
+   * make `--skill` silently do nothing.
+   */
+  private readonly ignoreRoot: string;
 
   constructor(
     workspaceRoot: string = process.cwd(),
@@ -116,6 +126,12 @@ export class SkillLoader {
     }));
     this.extraPaths = options.extraPaths ?? [];
     this.disableDiscovery = options.disableDiscovery ?? false;
+    // The repository's rules are read from the working directory, which git
+    // resolves upward to the repository that owns it. A user-level skills
+    // directory lies outside this root and is therefore never subject to the
+    // project's rules — which is right: they are that repository's statement
+    // about its own files.
+    this.ignoreRoot = workspaceRoot;
     this.roots = this.disableDiscovery
       ? []
       : [
@@ -275,7 +291,18 @@ export class SkillLoader {
       // directory holds other people's skills. Neither is this project's.
       if (entry.isDirectory()) {
         if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
-        found.push(...this.scan(path.join(dir, entry.name), source, false));
+        const child = path.join(dir, entry.name);
+        // The repository's own ignore rules apply here as they do to every tool:
+        // a skill inside a directory git excludes is not part of what this
+        // project offers. Reading it anyway would put text from a directory the
+        // user deliberately excluded into the prompt, and the model would be the
+        // only party that never learned it was excluded.
+        //
+        // Not for a path the user named: pointing at a directory is a more
+        // specific statement than a pattern that happens to match it, so a
+        // `--skill <dir>` whose contents the repository ignores still loads.
+        if (source !== "cli" && isDirectoryIgnored(this.ignoreRoot, child)) continue;
+        found.push(...this.scan(child, source, false));
         continue;
       }
       // Loose files are only skills at the root. Deeper down, a bare `.md` is
