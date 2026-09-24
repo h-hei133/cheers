@@ -1,4 +1,7 @@
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
+import { SkillLoader } from "../core/skills/skillLoader.js";
+import { TemplateLoader } from "../core/prompts/templateLoader.js";
+import { expandSubmission } from "../core/prompts/expansion.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import { createBrowserCliExecutionBridge } from "../browser/cliExecutionBridge.js";
 import { loadBrowserCliExecutorInjectionFromEnv } from "../browser/cliExecutorInjection.js";
@@ -118,8 +121,24 @@ export async function buildCliCommandExecution(
         : `\nSlash command expanded into prompt:\n${slashResult.prompt}\n`,
     );
   }
+  // A prompt that is not a slash command may still be a template invocation. The
+  // router only sees lines beginning with `/`, so a template named without one —
+  // `review auth` — is handled here. Same module, so the tokenizer and the
+  // expansion order cannot differ between the two entry points.
+  const direct = slashResult === null ? expandSubmission({
+    text: input.prompt,
+    skills: new SkillLoader(input.cwd).load(),
+    templates: new TemplateLoader(input.cwd).load(),
+  }) : undefined;
+  if (direct?.expanded) {
+    input.renderer.renderLine(`\nExpanded template \`${direct.expanded.name}\` into a prompt.\n`);
+  }
   const rawPrompt =
-    slashResult?.kind === "prompt" ? slashResult.prompt : input.prompt;
+    slashResult?.kind === "prompt"
+      ? slashResult.prompt
+      : direct?.expanded
+        ? direct.text
+        : input.prompt;
   return {
     kind: "execute",
     effectivePrompt: rawPrompt,

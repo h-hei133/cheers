@@ -1,4 +1,7 @@
 import { createCommandRegistry } from "./registry.js";
+import { SkillLoader } from "../skills/skillLoader.js";
+import { TemplateLoader } from "../prompts/templateLoader.js";
+import { expandSubmission } from "../prompts/expansion.js";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
 
 export async function routeSlashCommand(
@@ -14,6 +17,42 @@ export async function routeSlashCommand(
     return {
       kind: "local",
       output: buildSlashDiscoveryMessage(),
+    };
+  }
+
+  // A skill or template invocation expands into a prompt, which is not a command
+  // and has no entry in the registry. This has to happen before the unknown-command
+  // branch below, because that branch treats every unregistered word as a mistake —
+  // which is what made `/skill:name` answer "Unknown slash command" while the same
+  // name worked through the `/skill` command.
+  const expansion = expandSubmission({
+    text: input,
+    skills: new SkillLoader(context.cwd).load(),
+    templates: new TemplateLoader(context.cwd).load(),
+  });
+  if (expansion.expanded) {
+    return {
+      kind: "prompt",
+      prompt: expansion.text,
+      notice: `Expanded ${expansion.expanded.kind} \`${expansion.expanded.name}\` into a prompt.`,
+    };
+  }
+  if (expansion.unknown?.kind === "skill") {
+    const available = [...new SkillLoader(context.cwd).load().keys()].sort();
+    return {
+      kind: "local",
+      output: [
+        "Result",
+        "- Outcome: blocked",
+        "- BlockerKind: command-not-allowlisted",
+        `- Reason: Unknown skill: ${expansion.unknown.name}`,
+        "- DoNext: Run /skill to see what is available, then retry.",
+        "",
+        `No skill named \`${expansion.unknown.name}\`.`,
+        available.length > 0
+          ? `Available: ${available.map((name) => `/skill:${name}`).join(", ")}`
+          : "No skills are installed. Put one under `.agents/skills/<name>/SKILL.md`.",
+      ].join("\n"),
     };
   }
 

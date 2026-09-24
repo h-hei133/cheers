@@ -40,6 +40,35 @@ describe("slash router (W4)", () => {
   });
 
 
+  it("expands a skill invocation into a prompt instead of refusing it", async () => {
+    // The defect stated as a test. `/skill:name` used to be parsed as a command
+    // name, find nothing in the registry, and answer "Unknown slash command" — so a
+    // documented invocation failed while the same skill worked through `/skill`.
+    const skillsDir = path.join(workspaceRoot, ".agents", "skills", "demo");
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(skillsDir, "SKILL.md"),
+      "---\nname: demo\ndescription: A demo\n---\nDEMO BODY",
+      "utf8",
+    );
+
+    const result = await routeSlashCommand("/skill:demo extra", { cwd: workspaceRoot });
+    expect(result?.kind).toBe("prompt");
+    if (result?.kind === "prompt") {
+      expect(result.prompt).toContain("DEMO BODY");
+      expect(result.prompt).toContain("extra");
+    }
+  });
+
+  it("names the available skills when the one asked for does not exist", async () => {
+    const result = await routeSlashCommand("/skill:nosuch", { cwd: workspaceRoot });
+    expect(result?.kind).toBe("local");
+    if (result?.kind === "local") {
+      expect(result.output).toContain("Unknown skill: nosuch");
+      expect(result.output).toContain("Run /skill to see what is available");
+    }
+  });
+
   it("routes local connect command", async () => {
     const result = await routeSlashCommand("/connect status", {
       cwd: workspaceRoot,
