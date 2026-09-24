@@ -22,6 +22,7 @@ import { runInitCommand } from "./initCommandRuntime.js";
 import { runCostCommand } from "./costCommandRuntime.js";
 import { runUndoCommand } from "./undoCommandRuntime.js";
 import { runExportCommand } from "./exportCommandRuntime.js";
+import { runEntriesCommand } from "./entriesCommandRuntime.js";
 import { runCopyCommand } from "./copyCommandRuntime.js";
 import { runHotkeyCommand } from "./hotkeyCommandRuntime.js";
 import { runRetryCommand } from "./retryCommandRuntime.js";
@@ -165,6 +166,17 @@ export function createCommandRegistry(
       argumentHint: "[preview|execute]",
       getArgumentCompletions: (prefix) => subcommandCompletions("restore", prefix),
       execute: (args, context) => runRestoreLocalCommand(args, context),
+    },
+    {
+      name: "entries",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: false,
+      summary: "read this session's entries, optionally after a cursor",
+      group: "session",
+      argumentHint: "[<entry-id>|tree [<entry-id>]|help]",
+      execute: (args, context) => runEntriesCommand(args, context),
     },
     {
       name: "resume",

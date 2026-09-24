@@ -49,6 +49,8 @@ export interface CompactionSetup {
 
 export interface TurnOptions {
   readonly sessionId: string;
+  /** Where the session's files live, when the caller knows. Carried into the event stream. */
+  readonly sessionPath?: string;
   readonly prompt: string;
   readonly workspaceRoot: string;
   readonly agentMode?: "plan" | "build";
@@ -203,7 +205,15 @@ export function runTurn(options: TurnOptions): TurnRun {
 
   let overflowRecovered = false;
   const drive = async (): Promise<void> => {
-    channel.push({ type: "query.started", sessionId: options.sessionId, prompt: options.prompt });
+    channel.push({
+      type: "query.started",
+      sessionId: options.sessionId,
+      prompt: options.prompt,
+      // Reported so a consumer of the event stream can find the transcript without
+      // reconstructing the directory layout, which would make that layout part of
+      // the contract by accident.
+      ...(options.sessionPath !== undefined ? { sessionPath: options.sessionPath } : {}),
+    });
     await options.hooks.dispatch({
       eventName: "SessionStart",
       sessionId: options.sessionId,

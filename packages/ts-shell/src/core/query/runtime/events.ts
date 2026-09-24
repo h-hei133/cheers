@@ -12,7 +12,21 @@ import type {
 import type { QueryRuntimeProofProjection } from './proof.js'
 
 export type QueryEvent =
-  | { readonly type: 'query.started'; readonly sessionId: string; readonly prompt: string }
+  | {
+      readonly type: 'query.started';
+      readonly sessionId: string;
+      readonly prompt: string;
+      /**
+       * Where this session's files live, when the emitter knows.
+       *
+       * Carried because a consumer of the event stream otherwise has to reconstruct
+       * the directory layout to find the transcript — which makes the layout part of
+       * the contract without anyone having decided that. Optional rather than
+       * required so adding it is a compatible change for a reader that only wants
+       * the id.
+       */
+      readonly sessionPath?: string;
+    }
   | { readonly type: 'runtime.next-action'; readonly turn: number; readonly role: AgentRole; readonly decision: QueryRuntimeActionDecision }
   | { readonly type: 'runtime.turn-snapshot'; readonly turn: number; readonly role: AgentRole; readonly snapshot: QueryRuntimeTurnSnapshot }
   | { readonly type: 'runtime.save-point'; readonly turn: number; readonly role: AgentRole; readonly savePoint: QueryRuntimeSavePoint }

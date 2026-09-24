@@ -397,6 +397,11 @@ function startTurn(
   const run = runTurn({
     commandEnv: commandEnvironmentFor(request),
     sessionId: request.sessionId,
+    // The directory the session writes to, so a consumer of the event stream can
+    // find the transcript without reconstructing the layout itself. Omitted when the
+    // session's files are not where the default layout says, in which case there is
+    // nothing true to report.
+    ...sessionPathOption(request.sessionId),
     prompt: request.prompt,
     workspaceRoot: request.workspaceRoot,
     agentMode: request.agentMode,
@@ -477,6 +482,21 @@ function commandEnvironmentFor(request: CliRuntimeInvocationRequest): Record<str
  */
 function providerFetch(runtimeConfig: RuntimeConfig | undefined): typeof fetch {
   return providerFetchFromTimeouts(providerTimeoutsFrom(runtimeConfig));
+}
+
+/**
+ * The session's directory as a turn option, or nothing when it cannot be located.
+ *
+ * Resolved rather than assumed: a session created against a non-default store is the
+ * case this exists for, and reporting the default path there would be worse than
+ * reporting nothing.
+ */
+function sessionPathOption(sessionId: string): { readonly sessionPath: string } | Record<string, never> {
+  try {
+    return { sessionPath: locateExistingSessionLayout(createSessionStoreLayout(), sessionId).sessionDir };
+  } catch {
+    return {};
+  }
 }
 
 function createProviderStep(
