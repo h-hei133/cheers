@@ -49,6 +49,27 @@ describe("glob pattern matching", () => {
   it("stays case-insensitive", () => {
     expect(matchesGlob("Package.json", "*.json")).toBe(true);
   });
+
+  it("accepts a Windows-style separator in a pattern that uses no escape sequences", () => {
+    // A backslash that is not escaping anything can only be a separator, and
+    // in POSIX mode it matches nothing at all — converting it is all gain.
+    expect(matchesGlob("src/packages/a.ts", "src\\packages\\a.ts")).toBe(true);
+    expect(matchesGlob("other/a.ts", "src\\packages\\a.ts")).toBe(false);
+  });
+
+  it("does not rewrite a pattern whose backslash escapes a wildcard", () => {
+    // `src\**\*.ts` reads, in POSIX mode, as escaped stars — and rewriting the
+    // backslashes would change which characters the pattern names. Windows
+    // callers typing that form lose nothing they had: it matched nothing
+    // before either. The escape reading wins because it is the one with
+    // existing matches to protect.
+    expect(matchesGlob("src/a.ts", "src\\**\\*.ts")).toBe(false);
+    expect(matchesGlob("src/a.ts", "src/**/*.ts")).toBe(true);
+    expect(matchesGlob("foo*.ts", "foo\\*.ts")).toBe(true);
+    expect(matchesGlob("foo/a.ts", "foo\\*.ts")).toBe(false);
+    expect(matchesGlob("a\\b.ts", "a\\\\b.ts")).toBe(true);
+    expect(matchesGlob("a/b.ts", "a\\\\b.ts")).toBe(false);
+  });
 });
 
 describe("glob result cap", () => {

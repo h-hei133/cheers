@@ -54,6 +54,25 @@ function matchesEverything(pattern: string): boolean {
 }
 
 /**
+ * Whether a backslash in `pattern` is being used to name a literal character.
+ *
+ * The matcher runs in POSIX mode, where a backslash escapes the character after
+ * it: `\*` is a literal star, `\\` a literal backslash. A pattern using that
+ * deliberately is expressing exact characters, and rewriting it would change
+ * what it means. Anything else — a Windows-style separator like `src\**\*.ts` —
+ * matches nothing at all in POSIX mode, so converting it is all gain.
+ */
+function usesBackslashAsEscape(pattern: string): boolean {
+  for (let index = 0; index < pattern.length; index += 1) {
+    if (pattern[index] !== '\\') continue
+    const next = pattern[index + 1]
+    if (next === '\\' || next === '*' || next === '?') return true
+    if (next === undefined) return true
+  }
+  return false
+}
+
+/**
  * Match a workspace-relative path against a glob pattern.
  *
  * A pattern with no directory separator is also tried against the basename, so
@@ -64,9 +83,12 @@ function matchesEverything(pattern: string): boolean {
 export function matchesGlob(filePath: string, pattern: string): boolean {
   const clean = pattern.trim().replace(/^\.\//, '')
   if (matchesEverything(clean)) return true
-  const match = matcherFor(clean)
+  // Windows separators are accepted only when no backslash is doing escape
+  // duty, so a pattern naming literal characters keeps its meaning.
+  const normalized = usesBackslashAsEscape(clean) ? clean : clean.replace(/\\/g, '/')
+  const match = matcherFor(normalized)
   if (match(filePath)) return true
-  if (!clean.includes('/')) {
+  if (!normalized.includes('/')) {
     const base = filePath.slice(filePath.lastIndexOf('/') + 1)
     return match(base)
   }
