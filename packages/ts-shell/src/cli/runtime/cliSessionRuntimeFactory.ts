@@ -22,6 +22,7 @@ import { compactSessionHistory } from "../../core/shell/compaction.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
+import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
 import { recordCount } from "../../observability/metrics.js";
@@ -55,7 +56,8 @@ interface CompactionWiring {
  */
 function buildCompactionWiring(input: {
   readonly provider: {
-    readonly apiKey: string;
+    /** Built from the resolved credential, so an account token reaches this path too. */
+    readonly headers: Readonly<Record<string, string>>;
     readonly baseUrl: string;
     readonly model: string;
     readonly providerId: string;
@@ -174,17 +176,32 @@ export function createCliSessionRuntime(input: {
    */
   const catalog = loadCatalog()
 
-  /** The provider both compaction paths summarize with, or nothing when none is configured. */
+  /**
+   * The provider both compaction paths summarize with, or nothing when none is
+   * configured.
+   *
+   * The guard asks whether a credential exists, not whether an API key does. It
+   * used to read `apiKey` alone and require it, so an account login produced no
+   * provider here at all and `/compact` answered "No credential for provider" to a
+   * user who had just signed in successfully.
+   */
   const compactionProvider = ():
-    | { apiKey: string; baseUrl: string; model: string; providerId: string }
+    | { headers: Readonly<Record<string, string>>; baseUrl: string; model: string; providerId: string }
     | undefined => {
     const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
-    const apiKey = resolved.credential?.apiKey;
-    const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl;
-    const model = resolved.model ?? resolved.credential?.model;
-    return apiKey && baseUrl && model
-      ? { apiKey, baseUrl, model, providerId: resolved.provider }
-      : undefined;
+    const credential = resolved.credential;
+    if (!credential) return undefined;
+    const accountAuth = accountAuthFor(resolved.provider, credential);
+    if (!credential.apiKey && !accountAuth) return undefined;
+    const baseUrl = resolved.baseUrl ?? credential.baseUrl;
+    const model = resolved.model ?? credential.model;
+    if (!baseUrl || !model) return undefined;
+    return {
+      headers: providerAuthorization({ apiKey: credential.apiKey, accountAuth }).headers,
+      baseUrl,
+      model,
+      providerId: resolved.provider,
+    };
   };
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     sessionManager: input.sessionManager,

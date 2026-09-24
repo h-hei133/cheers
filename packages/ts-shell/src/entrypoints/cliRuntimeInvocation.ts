@@ -29,6 +29,13 @@ import { projectTrust } from "../core/security/projectTrust.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../provider/request/fetch.js";
+import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../provider/request/authorization.js";
+import { persistRenewedAccountAuth } from "../core/auth/providerAuthRuntime.js";
+import type {
+  GoogleAccountAuthConfig,
+  OpenAIAccountAuthConfig,
+} from "../config/runtimeConfig.js";
+import type { RuntimeProvider } from "../config/runtimeConfig.js";
 import { createSyntheticStep } from "../turn/synthetic.js";
 import { commandEnvironment } from "../runtime/execution/commandEnvironment.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../session/store/sessionFileLayout.js";
@@ -127,6 +134,41 @@ export function runCliRuntimeInvocation(
   return startTurn(request, dependencies);
 }
 
+/**
+ * Renew an expired account token and store the replacement.
+ *
+ * Lives on the invocation path rather than in the step because it must happen
+ * before the credential is turned into headers, and because writing the new token
+ * back is a filesystem operation that has no place inside a request builder.
+ *
+ * A failed renewal is not reported here: the readiness check that follows is where
+ * a credential that cannot be used is turned into a message the user can act on,
+ * and it already distinguishes an expired token with no refresh token from a
+ * missing one.
+ */
+async function renewAccountAuth(input: {
+  readonly provider: RuntimeProvider;
+  readonly credential: {
+    readonly apiKey?: string;
+    readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  };
+  readonly runtimeConfig: RuntimeConfig | undefined;
+}): Promise<{ readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig }> {
+  // The renewal carries the same deadline as any other request to the provider's
+  // auth host, so a host that accepts the connection and never answers cannot hold
+  // up the start of a turn.
+  const fetchImpl = providerFetch(input.runtimeConfig);
+  const result = await renewAccountAuthIfExpiring({
+    provider: input.provider,
+    credential: input.credential,
+    fetchImpl,
+  });
+  if (result.renewed && result.accountAuth) {
+    persistRenewedAccountAuth({ provider: input.provider, accountAuth: result.accountAuth });
+  }
+  return { accountAuth: result.accountAuth };
+}
+
 function deferUntilReady(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
@@ -135,10 +177,18 @@ function deferUntilReady(
   const bufferedSteers: string[] = [];
   const bufferedFollowUps: string[] = [];
   const events = (async function* (): AsyncIterable<QueryEvent> {
+    // Renewed before the readiness check, because the check is what tells the user
+    // the credential is usable: one that passes on a token about to expire produces
+    // a run that fails a minute later with no hint that the login is the reason.
+    const renewed = await renewAccountAuth({
+      provider: request.providerCredentialResolution.provider,
+      credential: request.providerCredentialResolution.credential ?? {},
+      runtimeConfig: request.runtimeConfig,
+    });
     const readiness = await dependencies.checkProviderReadiness({
       provider: request.providerCredentialResolution.provider,
       apiKey: request.providerCredentialResolution.credential?.apiKey,
-      accountAuth: request.providerCredentialResolution.credential?.accountAuth,
+      accountAuth: renewed.accountAuth ?? request.providerCredentialResolution.credential?.accountAuth,
       baseUrl: request.providerCredentialResolution.baseUrl,
       model: request.providerCredentialResolution.model,
     });
@@ -437,7 +487,13 @@ function createProviderStep(
   const resolution = request.providerCredentialResolution;
   return createStepFunction({
     provider: {
-      apiKey: resolution.credential?.apiKey ?? "",
+      // Built from the whole credential, not from its key alone. An account login
+      // yields a token instead of a key, and formatting the header here from a
+      // field it does not have is what sent an empty bearer.
+      headers: providerAuthorization({
+        apiKey: resolution.credential?.apiKey,
+        accountAuth: accountAuthFor(resolution.provider, resolution.credential ?? {}),
+      }).headers,
       baseUrl: resolution.baseUrl ?? resolution.credential?.baseUrl ?? "",
       model: resolution.model ?? resolution.credential?.model ?? "",
       // The catalog is keyed by provider id, so the request shape cannot be

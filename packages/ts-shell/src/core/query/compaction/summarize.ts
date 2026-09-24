@@ -22,7 +22,14 @@ import {
 
 export interface CompactionProvider {
   readonly baseUrl: string;
-  readonly apiKey: string;
+  /**
+   * Headers this summarization authenticates with.
+   *
+   * The same shape the main request uses, for the same reason: a credential that
+   * carries an account token rather than an API key has to be able to reach this
+   * request too. Built by `providerAuthorization` at the wiring site.
+   */
+  readonly headers: Readonly<Record<string, string>>;
   readonly model: string;
 }
 
@@ -85,10 +92,7 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   const fetchImpl = request.fetchImpl;
   const res = await fetchImpl(`${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${request.provider.apiKey}`,
-    },
+    headers: request.provider.headers,
     body: JSON.stringify({
       model: request.provider.model,
       messages: [

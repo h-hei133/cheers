@@ -31,7 +31,16 @@ import {
  */
 
 export interface ProviderTarget {
-  readonly apiKey: string;
+  /**
+   * The headers this request authenticates with.
+   *
+   * Built once from the resolved credential, so both ways of earning an
+   * `Authorization` header — an API key and an account login — arrive here in the
+   * same shape. It was a bare `apiKey` before, which is why an account credential
+   * had nowhere to land: the header was formatted at the call site from a field
+   * that credential did not have.
+   */
+  readonly headers: Readonly<Record<string, string>>;
   readonly baseUrl: string;
   readonly model: string;
   /**
@@ -209,7 +218,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             `${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`,
             {
               method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${request.provider.apiKey}` },
+              headers: request.provider.headers,
               body: JSON.stringify(payload),
               signal: requestSignal,
             },
