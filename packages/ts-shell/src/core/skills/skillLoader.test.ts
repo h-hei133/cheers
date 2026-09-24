@@ -256,4 +256,102 @@ describe("skill diagnostics", () => {
 
     expect(diagnostics).toEqual([]);
   });
+
+  it("flags a name that starts or ends with a hyphen", () => {
+    // Inside the character set but outside the shape a name can be called by:
+    // `-review` reads as a flag everywhere it is written.
+    writeRaw("lead", "name: -review\ndescription: leading hyphen");
+    writeRaw("tail", "name: review-\ndescription: trailing hyphen");
+    const { diagnostics } = new SkillLoader(workspace).loadDetailed();
+    expect(diagnostics.some((d) => d.name === "-review" && /hyphen/.test(d.message))).toBe(true);
+    expect(diagnostics.some((d) => d.name === "review-" && /hyphen/.test(d.message))).toBe(true);
+  });
+
+  it("flags a name with consecutive hyphens", () => {
+    writeRaw("double", "name: code--review\ndescription: doubled hyphen");
+    const { diagnostics } = new SkillLoader(workspace).loadDetailed();
+    expect(diagnostics.some((d) => d.name === "code--review" && /consecutive/.test(d.message))).toBe(true);
+  });
+});
+
+describe("named skill paths", () => {
+  let workspace = "";
+
+  beforeEach(() => {
+    workspace = fs.mkdtempSync(path.join(os.tmpdir(), "skills-cli-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  });
+
+  function writeDiscovered(name: string): void {
+    const target = path.join(workspace, ".agents", "skills", name);
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(
+      path.join(target, "SKILL.md"),
+      `---\nname: ${name}\ndescription: discovered ${name}\n---\n\ndiscovered body\n`,
+      "utf8",
+    );
+  }
+
+  it("loads a named file directly, whatever its name", () => {
+    // The point of naming a file is to load that file; a manifest convention
+    // that rejects it would make the flag depend on how the author filed it.
+    fs.mkdirSync(path.join(workspace, "loose"), { recursive: true });
+    fs.writeFileSync(
+      path.join(workspace, "loose", "review.md"),
+      "---\nname: named-review\ndescription: a named skill\n---\n\nnamed body\n",
+      "utf8",
+    );
+    const skills = new SkillLoader(workspace, {
+      extraPaths: [path.join(workspace, "loose", "review.md")],
+    }).load();
+    expect(skills.get("named-review")?.source).toBe("cli");
+  });
+
+  it("searches a named directory the way a discovered one is searched", () => {
+    fs.mkdirSync(path.join(workspace, "bundle"), { recursive: true });
+    fs.mkdirSync(path.join(workspace, "bundle", "inner"), { recursive: true });
+    fs.writeFileSync(
+      path.join(workspace, "bundle", "inner", "SKILL.md"),
+      "---\nname: bundled\ndescription: inside a named directory\n---\n\nbundled body\n",
+      "utf8",
+    );
+    const skills = new SkillLoader(workspace, {
+      extraPaths: [path.join(workspace, "bundle")],
+    }).load();
+    expect(skills.has("bundled")).toBe(true);
+  });
+
+  it("wins a name a discovered skill shares", () => {
+    // The user pointed at the file, and that is the more specific statement
+    // about which one this run means.
+    writeDiscovered("review");
+    fs.mkdirSync(path.join(workspace, "named"), { recursive: true });
+    fs.writeFileSync(
+      path.join(workspace, "named", "SKILL.md"),
+      "---\nname: review\ndescription: the named one\n---\n\nnamed body\n",
+      "utf8",
+    );
+    const skills = new SkillLoader(workspace, {
+      extraPaths: [path.join(workspace, "named")],
+    }).load();
+    expect(skills.get("review")?.source).toBe("cli");
+  });
+
+  it("silences every discovered skill when asked, keeping the named ones", () => {
+    writeDiscovered("discovered");
+    fs.writeFileSync(
+      path.join(workspace, "explicit.md"),
+      "---\nname: explicit\ndescription: the named one\n---\n\nnamed body\n",
+      "utf8",
+    );
+    const skills = new SkillLoader(workspace, {
+      extraPaths: [path.join(workspace, "explicit.md")],
+      disableDiscovery: true,
+    }).load();
+    expect(skills.has("discovered")).toBe(false);
+    expect([...skills.keys()]).toEqual(["explicit"]);
+  });
 });

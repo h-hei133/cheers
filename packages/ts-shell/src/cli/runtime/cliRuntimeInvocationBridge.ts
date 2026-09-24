@@ -25,6 +25,11 @@ export function streamCliRuntimePrompt(input: {
   readonly providerRuntimeBridge: CliProviderRuntimeBridge;
   /** Tool visibility: disabledTools / hiddenToolPrefixes come from here. */
   readonly runtimeConfig?: RuntimeConfig;
+  /** Skill loading the run was started with: named paths, and discovery off. */
+  readonly skillOptions?: {
+    readonly skillPaths?: readonly string[];
+    readonly noSkills?: boolean;
+  };
 }): CliRuntimeInvocationResult {
   return runCliRuntimeInvocation({
     sessionId: input.sessionId,
@@ -42,5 +47,6 @@ export function streamCliRuntimePrompt(input: {
     compaction: input.compaction,
     providerModeEnv: input.providerRuntimeBridge.providerModeEnv(),
     ...(input.runtimeConfig ? { runtimeConfig: input.runtimeConfig } : {}),
+    ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
   });
 }

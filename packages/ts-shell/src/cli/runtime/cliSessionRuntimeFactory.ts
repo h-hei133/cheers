@@ -352,6 +352,14 @@ export function createCliSessionRuntime(input: {
         providerCredentialResolution: resolvedCredential,
         agentMode: sessionRuntime.getAgentMode(),
         providerRuntimeBridge: input.providerRuntimeBridge,
+        ...(input.options.skillPaths || input.options.noSkills
+          ? {
+              skillOptions: {
+                ...(input.options.skillPaths ? { skillPaths: input.options.skillPaths } : {}),
+                ...(input.options.noSkills ? { noSkills: true } : {}),
+              },
+            }
+          : {}),
       });
     },
   });

@@ -259,3 +259,40 @@ describe("--dangerously-bypass-hook-trust", () => {
     expect(parsed.options.promptArg).toBe("run the tests");
   });
 });
+
+describe("--skill and --no-skills", () => {
+  it("are absent unless asked for", () => {
+    expect(expectParsed([]).options.skillPaths).toBeUndefined();
+    expect(expectParsed([]).options.noSkills).toBe(false);
+  });
+
+  it("collects a repeated --skill in order", () => {
+    expect(
+      expectParsed(["--skill", "./a.md", "--skill", "./b"]).options.skillPaths,
+    ).toEqual(["./a.md", "./b"]);
+  });
+
+  it("lets both flags coexist", () => {
+    // Discovery off with named paths still on is the combination the
+    // semantics promise: the switch silences what was found, not what was
+    // named.
+    const parsed = expectParsed(["--no-skills", "--skill", "./a.md"]);
+    expect(parsed.options.noSkills).toBe(true);
+    expect(parsed.options.skillPaths).toEqual(["./a.md"]);
+  });
+
+  it("accepts the short form of --no-skills", () => {
+    expect(expectParsed(["-ns"]).options.noSkills).toBe(true);
+  });
+
+  it("refuses a missing value rather than reading the next flag as one", () => {
+    expect(expectParseError(["--skill"]).message).toContain("Missing value for --skill");
+    expect(expectParseError(["--skill", "--print"]).message).toContain("Missing value for --skill");
+  });
+
+  it("does not consume the prompt that follows it", () => {
+    const parsed = expectParsed(["--skill", "./a.md", "review this repo"]);
+    expect(parsed.options.skillPaths).toEqual(["./a.md"]);
+    expect(parsed.options.promptArg).toBe("review this repo");
+  });
+});

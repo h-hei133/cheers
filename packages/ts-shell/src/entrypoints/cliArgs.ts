@@ -38,6 +38,10 @@ const VALUE_FLAGS = new Set([
   // Takes a value, so the prompt scan must step over it: without this the tool
   // list is also read as part of the prompt.
   "--tools",
+  // Same reason: a named skill path is a value, and the prompt scan would
+  // otherwise read it as the prompt — a path is exactly what the positional
+  // project fallback treats as a project, too.
+  "--skill",
 ]);
 
 const RESERVED_SHELL_SLASH_COMMANDS = new Set([
@@ -157,7 +161,20 @@ export function parseCliArgs(
   }
 
   const options: CliOptions = {};
-  const positionalArgs = rawArgs.filter((arg) => !arg.startsWith("--"));
+
+  // Positional tokens are what is left after flags and the values those flags
+  // consume — `VALUE_FLAGS` decides which ones take a value. A value is not a
+  // positional: `--skill ./x.md` would otherwise read `./x.md` as a project
+  // path, because the fallback candidate is any token that names a path.
+  const positionalArgs: string[] = [];
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    if (VALUE_FLAGS.has(rawArgs[index]!)) {
+      index += 1;
+      continue;
+    }
+    if (rawArgs[index]!.startsWith("--")) continue;
+    positionalArgs.push(rawArgs[index]!);
+  }
   const projectIdx = getProjectFlagIndex(rawArgs);
   if (projectIdx !== -1) {
     if (!rawArgs[projectIdx + 1]) {
@@ -227,6 +244,19 @@ export function parseCliArgs(
   );
   assignOption(options, "jsonEvents", rawArgs.includes("--json"));
   assignOption(options, "noContextFiles", rawArgs.includes("--no-context-files"));
+  assignOption(options, "noSkills", rawArgs.includes("--no-skills") || rawArgs.includes("-ns"));
+  const skillPaths: string[] = [];
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    if (rawArgs[index] === "--skill") {
+      const value = rawArgs[index + 1];
+      if (!value || value.startsWith("--")) {
+        return parseError("Missing value for --skill. Example: --skill ./review.md");
+      }
+      skillPaths.push(value);
+      index += 1;
+    }
+  }
+  if (skillPaths.length > 0) assignOption(options, "skillPaths", skillPaths);
   const toolsIdx = rawArgs.indexOf("--tools");
   if (toolsIdx !== -1) {
     const value = rawArgs[toolsIdx + 1];

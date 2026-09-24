@@ -61,6 +61,11 @@ export interface CliRuntimeInvocationInput {
   readonly compaction?: CompactionSetup;
   readonly providerModeEnv?: string;  /** Tool visibility: disabledTools / hiddenToolPrefixes are applied from here. */
   readonly runtimeConfig?: RuntimeConfig;
+  /** Skill loading the run was started with: named paths, and discovery off. */
+  readonly skillOptions?: {
+    readonly skillPaths?: readonly string[];
+    readonly noSkills?: boolean;
+  };
 }
 
 export interface CliRuntimeInvocationRequest extends Omit<CliRuntimeInvocationInput, "providerModeEnv"> {
@@ -260,7 +265,10 @@ function deferUntilReady(
  * regardless.
  */
 function discoverSkills(request: CliRuntimeInvocationRequest): ReadonlyMap<string, Skill> {
-  const loader = new SkillLoader(request.workspaceRoot);
+  const loader = new SkillLoader(request.workspaceRoot, {
+    ...(request.skillOptions?.skillPaths ? { extraPaths: request.skillOptions.skillPaths } : {}),
+    ...(request.skillOptions?.noSkills ? { disableDiscovery: true } : {}),
+  });
   const { skills: found, collisions, diagnostics } = loader.loadDetailed();
 
   // Reported because a malformed skill is otherwise invisible: a missing
@@ -282,7 +290,11 @@ function discoverSkills(request: CliRuntimeInvocationRequest): ReadonlyMap<strin
 
   if (!projectTrust.isProjectUntrusted(request.workspaceRoot)) return found;
 
-  return new Map([...found].filter(([, skill]) => skill.source === "user"));
+  // Named paths survive the trust gate: a file the user pointed at on the
+  // command line is their own instruction, whatever directory it lives in,
+  // while a discovered project skill is text a repository nobody vouched for
+  // is trying to put in the prompt.
+  return new Map([...found].filter(([, skill]) => skill.source === "user" || skill.source === "cli"));
 }
 
 /**

@@ -25,6 +25,21 @@ export interface CliOptions {
    */
   readonly noContextFiles?: boolean;
   /**
+   * Skill files or directories to load on top of discovery, repeatable.
+   *
+   * A flag rather than a setting because the reason to want it is per-run:
+   * trying a skill out before installing it, or pointing a run at one file.
+   */
+  readonly skillPaths?: readonly string[];
+  /**
+   * Skip discovered skills for this run.
+   *
+   * Explicit `skillPaths` still load — a named file is the user's direct
+   * instruction, and a switch that silences it would make the two flags
+   * disagree about which of them owns the run.
+   */
+  readonly noSkills?: boolean;
+  /**
    * The only tools this run may offer, comma-separated.
    *
    * A flag rather than only a setting because a read-only pass is a per-run

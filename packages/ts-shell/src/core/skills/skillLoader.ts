@@ -16,7 +16,7 @@ import { projectDirectories } from "../project/directories.js";
  * nothing is executed by discovery, which is why scanning is safe to do eagerly.
  */
 
-export type SkillSource = "user" | "project";
+export type SkillSource = "user" | "project" | "cli";
 
 /** Something wrong with a skill that did not prevent it loading, or did. */
 export interface SkillDiagnostic {
@@ -66,8 +66,28 @@ const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 export class SkillLoader {
   private readonly roots: readonly { readonly dir: string; readonly source: SkillSource }[];
+  /** Paths the user named explicitly, as files or directories. */
+  private readonly extraPaths: readonly string[];
+  /** Whether the discovered roots are read at all. */
+  private readonly disableDiscovery: boolean;
 
-  constructor(workspaceRoot: string = process.cwd()) {
+  constructor(
+    workspaceRoot: string = process.cwd(),
+    options: {
+      /**
+       * Files or directories the user named on the command line. A file is
+       * loaded directly, whatever its name; a directory is searched the way a
+       * discovered one is.
+       *
+       * These load even when discovery is off: a named path is the user's
+       * direct instruction, and a switch that silenced it would make the two
+       * flags disagree about who owns the run.
+       */
+      readonly extraPaths?: readonly string[];
+      /** Skip every discovered root; only named paths are read. */
+      readonly disableDiscovery?: boolean;
+    } = {},
+  ) {
     // Every user skills directory that exists, newest first. A listing that read
     // only the current one would hide skills the user already wrote in an older
     // location — they are additional, not superseded. When none exists yet, the
@@ -85,14 +105,18 @@ export class SkillLoader {
       dir: path.join(dir, ".agents", "skills"),
       source: "project" as const,
     }));
-    this.roots = [
-      ...(userSkillDirs.length > 0 ? userSkillDirs : [path.join(userDataDir(), "skills")]).map(
-        (dir) => ({ dir, source: "user" as const }),
-      ),
-      // Project skills win: a repository that ships its own way of doing something
-      // should override the user's general habit for that repository.
-      ...projectSkillDirs,
-    ];
+    this.extraPaths = options.extraPaths ?? [];
+    this.disableDiscovery = options.disableDiscovery ?? false;
+    this.roots = this.disableDiscovery
+      ? []
+      : [
+          ...(userSkillDirs.length > 0 ? userSkillDirs : [path.join(userDataDir(), "skills")]).map(
+            (dir) => ({ dir, source: "user" as const }),
+          ),
+          // Project skills win: a repository that ships its own way of doing something
+          // should override the user's general habit for that repository.
+          ...projectSkillDirs,
+        ];
   }
 
   /** Every discoverable skill, keyed by name, project overriding user. */
@@ -120,8 +144,13 @@ export class SkillLoader {
     const skills = new Map<string, Skill>();
     const collisions: SkillCollision[] = [];
     const diagnostics: SkillDiagnostic[] = [];
-    for (const root of this.roots) {
-      for (const skill of this.scan(root.dir, root.source, true)) {
+    // Named paths last, so an explicit file wins a name a discovered skill
+    // shares: the user pointed at it, and that is the more specific statement.
+    for (const root of [
+      ...this.roots,
+      ...this.extraPaths.map((entry) => ({ dir: entry, source: "cli" as const })),
+    ]) {
+      for (const skill of this.loadRoot(root.dir, root.source)) {
         diagnostics.push(...inspectSkill(skill));
         const existing = skills.get(skill.name);
         if (existing && existing.source === skill.source) {
@@ -143,6 +172,30 @@ export class SkillLoader {
       }
     }
     return { skills, collisions, diagnostics };
+  }
+
+  /**
+   * The skills one root holds, whether that root is a discovered directory or a
+   * path the user named.
+   *
+   * A named file loads directly whatever its name — the point of naming it is
+   * to load that file, not whatever a directory convention says it should be
+   * called. A named directory is searched like a discovered one. The roots
+   * this loader discovered are all directories, so for them this is the plain
+   * scan.
+   */
+  private loadRoot(dirOrFile: string, source: SkillSource): Skill[] {
+    let stats: fs.Stats;
+    try {
+      stats = fs.statSync(dirOrFile);
+    } catch {
+      return [];
+    }
+    if (stats.isFile()) {
+      const skill = readSkill(dirOrFile, undefined, source);
+      return skill ? [skill] : [];
+    }
+    return this.scan(dirOrFile, source, true);
   }
 
   /**
@@ -308,6 +361,16 @@ function inspectSkill(skill: Skill): SkillDiagnostic[] {
     note(`name exceeds ${MAX_NAME_LENGTH} characters (${skill.name.length})`);
   } else if (!VALID_NAME.test(skill.name)) {
     note("name contains characters outside lowercase a-z, 0-9 and hyphens");
+  } else if (skill.name.startsWith("-") || skill.name.endsWith("-")) {
+    // A leading or trailing hyphen is inside the character set but outside the
+    // shape a name can be called by: `-review` reads as a flag, and a shell
+    // treats it like one too.
+    note("name starts or ends with a hyphen");
+  } else if (skill.name.includes("--")) {
+    // Consecutive hyphens make the name hard to tell apart from one whose
+    // hyphen was doubled by a typo, and they are not a shape anything else
+    // in the workspace uses.
+    note("name contains consecutive hyphens");
   }
 
   return diagnostics;
