@@ -2922,3 +2922,9 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 
 ## [2026-09-24] verify | 用户实机确认：**搜索打开与 busy 门禁在真机通过**（此前 `ctrl+shift+f` 无响应是微软拼音的繁简切换在 OS 层拦截，关闭后正常）；鼠标手势整体可用。坐标修复（右半边）以单元层反向验证为最终证据。
 - **环境门槛入档**：WSL 下 `ctrl+shift+f` 被微软拼音默认占用（繁/简切换），终端收不到；须在系统输入法设置里释放。不改默认绑定——`pi` 同键、键位可配置——但作为 WSL 用户的已知门槛记录在 `phase-7-execution.md` §10.8。
+
+## [2026-09-24] push | Phase 7 复核轮收口：6 个提交（5 修复 + 1 文档）push 前的判定记录。
+- **拆分**：`fix(tui)` 选词坐标（07422226）、`fix(tui)` 搜索反向与 busy 门禁（c7b00ebd）、`fix(provider)` 续期串行化与失败上报（1f4dafb6）、`fix(prompts)` 模板斜杠与优先级（10277736）、`fix(session)` 自引用父节点（88fe0ca5）、`docs(features)` 复核轮记录（fe53c2d7）。
+- **门禁**：`verify:import-cycles` pass、`check:config-consumers` 35/35、`check:declarations` 18/18+12/12、`verify:docs-drift:strict` rules pass（source-drift 78 与 Phase 6 持平）、`test:scripts` 18/18、`tsc` 0 错。
+- **全量套件 7 项失败的归属判定**（push 前必须做）：crashLog×2、metrics×2、longSessionDurability×2、mcpGateway×1。**三步定位**：①同一份 JSON 报告在**改动前的提交**（7f38ba26，经临时 worktree）上**同样 7/7 失败**；②当前树上这 4 个文件**单独运行 34/34 全过**；③这 7 个用例全部 spawn 真实子进程或演练进程退出，是既有记录的负载敏感型（Phase 7 施工记录曾实测单项 16s、默认 5s 超时改 30s 的同类）。**判定：与本次 6 个提交无关的并发抖动**——被改的 28 个文件没有一个落在这些用例的依赖面上。
+- **如实记录**：`npm run test:ts` 在本机并发负载下**不是稳定的绿灯**（~3400 项中 0–7 项随负载漂移，且漂移项与改动无关），CI 的判定以此为准；本地全绿结论只对**受影响套件**（776+679 项、多轮）成立。
