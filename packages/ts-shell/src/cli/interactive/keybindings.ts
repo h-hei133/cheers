@@ -69,6 +69,10 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   "tui.input.tab": { defaultKeys: ["tab"], description: "Complete the highlighted candidate" },
   "tui.altScreen.top": { defaultKeys: ["ctrl+home"], description: "Go to the oldest rows, or the start of the draft" },
   "tui.altScreen.bottom": { defaultKeys: ["ctrl+end"], description: "Go to the newest rows, or the end of the draft" },
+  // Not ctrl+f: that is the emacs-style cursor-right the editor already binds, and
+  // the reference implementation avoids it for the same reason on every platform
+  // that has the cursor binding.
+  "tui.altScreen.search": { defaultKeys: ["ctrl+shift+f"], description: "Find text in the transcript" },
   "app.interrupt": { defaultKeys: ["escape"], description: "Dismiss a list, interrupt a run, or go back" },
   "app.clear": { defaultKeys: ["ctrl+c"], description: "Clear the draft, then exit on a second press" },
   "app.exit": { defaultKeys: ["ctrl+d"], description: "Exit when the draft is empty" },

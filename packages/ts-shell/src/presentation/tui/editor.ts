@@ -64,7 +64,8 @@ export class Editor {
     },
   });
   /**
-   * What the editor did last, for the two commands that must be consecutive.
+   * The last thing that changed the text, for deciding whether the next change
+   * continues it.
    *
    * A cut continues the previous cut only if nothing happened in between, and a
    * yank-pop only replaces a yank that is still the last thing done. Comparing
@@ -72,8 +73,14 @@ export class Editor {
    * the user moved away and came back, or typed and deleted their way to the same
    * spot, so a cut would silently join a ring entry from an unrelated edit and a
    * yank-pop would reach back into a yank that had already been overwritten.
+   *
+   * Typed characters are the third case. Consecutive word characters are one undo
+   * step, so a word typed letter by letter comes back in one press rather than
+   * one press per letter. Whitespace ends the run, which is what makes the space
+   * and the word after it come back together and each word separately undoable —
+   * the convention a shell user already has.
    */
-  private lastAction: "kill" | "yank" | null = null;
+  private lastAction: "kill" | "yank" | "type" | null = null;
   private readonly edits = new EditHistory<EditorSnapshot>(
     (state) => ({ lines: [...state.lines], row: state.row, column: state.column }),
     MAX_UNDO_DEPTH,
@@ -150,8 +157,12 @@ export class Editor {
   insert(text: string): void {
     if (!text) return;
     this.adoptAsDraft();
-    this.saveUndo();
-    this.lastAction = null;
+    // A run of word characters is one undo step. Whitespace starts a new one, and
+    // so does any non-word character, so the unit a user gets back is the word
+    // they typed rather than an arbitrary slice of keystrokes.
+    const continuesWord = this.lastAction === "type" && isWordCharacter(text);
+    if (!continuesWord) this.saveUndo();
+    this.lastAction = isWordCharacter(text) ? "type" : null;
     const clean = text.replace(/\t/g, "  ").replace(/\r\n?/g, "\n");
     const line = this.lines[this.row]!;
     const before = line.slice(0, this.column);
@@ -518,4 +529,16 @@ export class Editor {
   private saveUndo(): void {
     this.edits.record({ lines: this.lines, row: this.row, column: this.column });
   }
+}
+
+/**
+ * Whether this inserted text continues a word.
+ *
+ * A single word character extends the run; anything else — a space, punctuation, a
+ * newline, or a paste of several characters — starts a new undo step. Pasted text
+ * is one step because it arrived as one action, and splitting it would make undo
+ * take back a paste in pieces.
+ */
+function isWordCharacter(text: string): boolean {
+  return text.length === 1 && /\w/.test(text);
 }

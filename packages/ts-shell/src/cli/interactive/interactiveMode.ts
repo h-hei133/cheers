@@ -31,6 +31,8 @@ import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
 import { showConversation, startFreshSession, type HistoryTarget } from "./history.js";
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
+import { TranscriptSearch } from "../../presentation/tui/transcript/searchState.js";
+import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcript/searchHost.js";
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
@@ -108,6 +110,7 @@ export class InteractiveMode {
   });
   private readonly overlay: OverlayHost;
   private readonly pager = new Pager();
+  private readonly search = new TranscriptSearch();
   private readonly pointer: Pointer;
   private readonly clipboard: Clipboard;
   private statusItems: readonly StatusItemId[];
@@ -178,6 +181,13 @@ export class InteractiveMode {
         selection: () => this.pointer.selection,
         composerSelection: () => this.pointer.composerSelection,
         toast: () => this.toast,
+        searchBar: () => {
+          // Built before asking: the count and the position only exist once the
+          // query has been matched against the rows that are on screen.
+          if (this.search.active) this.search.indexFor(this.view.contentRows());
+          return this.search.bar();
+        },
+        highlightSearchMatches: (row, contentRow) => styleSearchRow(this.search, row, contentRow),
       },
       this.state,
     );
@@ -299,6 +309,17 @@ export class InteractiveMode {
       return;
     }
     if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids))) return;
+    // An open search owns the keyboard the way a picker does: the arrows move
+    // between matches and every printable character belongs to the query, so it has
+    // to be intercepted before the keymap turns them into editor input.
+    const searchKey = routeSearchKey(this.search, event, {
+      contentRows: () => this.view.contentRows(),
+      scrollToContentRow: (row) => this.view.scrollToContentRow?.(row) ?? false,
+    });
+    if (searchKey.handled) {
+      if (searchKey.redraw) this.tui.requestRender();
+      return;
+    }
     if ((this.pointer.selection || this.pointer.composerSelection) && event.keyId !== "ctrl+c") {
       this.pointer.clearSelection();
       this.tui.requestRender();
@@ -327,6 +348,11 @@ export class InteractiveMode {
         },
         scrollPage: (direction) => {
           this.view.scrollPage(direction);
+          this.tui.requestRender();
+        },
+        openSearch: () => {
+          this.search.begin();
+          this.pointer.clearSelection();
           this.tui.requestRender();
         },
         scrollToEnd: () => {

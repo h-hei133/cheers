@@ -39,7 +39,12 @@ export class TranscriptPane {
    * The transcript rows for one frame: `capacity` rows at `width`, padded to
    * the bottom, shaded with `selection`, and carrying a scrollbar when needed.
    */
-  render(width: number, capacity: number, selection: SelectionSpan | undefined): string[] {
+  render(
+    width: number,
+    capacity: number,
+    selection: SelectionSpan | undefined,
+    highlight?: (row: string, contentRow: number) => string,
+  ): string[] {
     const safeWidth = Math.max(1, Math.floor(width));
     const safeCapacity = Math.max(1, capacity);
     const hasScrollbar = needsScrollbar(
@@ -59,12 +64,32 @@ export class TranscriptPane {
     this.total = rows.length;
     this.geometry = hasScrollbar ? scrollbarGeometry(rows.length, safeCapacity, top, safeWidth - 1) : undefined;
     const shaded = this.window.shade([...Array<string>(filler).fill(""), ...visible], selection);
-    return this.geometry ? paintScrollbar(shaded, this.geometry, safeWidth) : shaded;
+    // Search marks sit inside the shaded rows and before the scrollbar: a match
+    // highlight must be part of the row the scrollbar is appended to, or shading
+    // the matched cells would overwrite the track.
+    const marked = highlight
+      ? shaded.map((row, index) => (index < filler ? row : highlight(row, top + index - filler)))
+      : shaded;
+    return this.geometry ? paintScrollbar(marked, this.geometry, safeWidth) : marked;
   }
 
   /** How far back the window is, in rows; 0 means it is following the newest. */
   get scrolledBack(): number {
     return Math.max(0, this.total - this.capacity) - this.scroller.scrollTop;
+  }
+
+  /**
+   * Scroll so `row` is on screen.
+   *
+   * Placed in the upper part rather than the middle: a match near the bottom edge
+   * would otherwise be the last thing visible, with none of the context that makes
+   * it worth looking at.
+   */
+  scrollToContentRow(row: number): boolean {
+    const target = Math.max(0, Math.min(row - Math.floor(this.capacity / 3), Math.max(0, this.total - this.capacity)));
+    if (target === this.scroller.scrollTop) return false;
+    this.scroller.scrollTo(target);
+    return true;
   }
 
   /** Move the window by `rows` (negative scrolls back). Returns whether it moved. */

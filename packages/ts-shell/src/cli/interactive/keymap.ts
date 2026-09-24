@@ -172,6 +172,9 @@ function runAction(action: string, event: ParsedKeyEvent, context: KeymapContext
       return handleEdge(context, "start");
     case "tui.altScreen.bottom":
       return handleEdge(context, "end");
+    case "tui.altScreen.search":
+      actions.openSearch?.();
+      return "redrawn";
     case "app.interrupt":
       handleEscapeKey(context);
       return "redrawn";

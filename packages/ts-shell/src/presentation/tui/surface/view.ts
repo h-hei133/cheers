@@ -1,6 +1,7 @@
 import { renderBand } from "../chrome/band.js";
 import { renderComposer } from "../chrome/composer.js";
 import { renderHints } from "../chrome/hints.js";
+import { renderSearchBar } from "../chrome/searchBar.js";
 import type { TerminalFramePlan, ViewportSize } from "../render/frame.js";
 import type { Block } from "../transcript/blocks.js";
 import { renderActivity } from "../transcript/live.js";
@@ -68,7 +69,12 @@ export class InteractiveSurface implements InteractiveView {
       bottom: capacity + chrome.composerOffset + chrome.composerRows.length - 1,
       rows: chrome.composerRows,
     };
-    const transcriptRows = this.pane.render(width, capacity, this.context.selection());
+    const transcriptRows = this.pane.render(
+      width,
+      capacity,
+      this.context.selection(),
+      this.context.highlightSearchMatches,
+    );
     // The split and the full document are reported, not just performed: a
     // surface appending to the terminal's scrollback has no window onto the
     // transcript, so it needs every row rather than the ones that fit.
@@ -77,6 +83,16 @@ export class InteractiveSurface implements InteractiveView {
       chromeRows: chrome.rows,
       documentRows: this.pane.documentRows(width),
     };
+  }
+
+  /**
+   * Scroll so a content row is visible, for stepping through search matches.
+   *
+   * A search that knows where the match is but cannot put it on screen leaves the
+   * user cycling a counter with nothing changing in front of them.
+   */
+  scrollToContentRow(row: number): boolean {
+    return this.pane.scrollToContentRow(row);
   }
 
   get scrolledBack(): number {
@@ -164,6 +180,14 @@ export class InteractiveSurface implements InteractiveView {
     const rows = [...statusRows, ...composerRows];
     if (this.suggestionsOpen) {
       rows.push(...this.suggestions.render(width));
+    }
+    // The search bar takes the hint row rather than adding one: an open search is
+    // itself the hint, and the composer above it is where the user's text lives, so
+    // taking that row instead would lose whatever they had typed.
+    const searchBar = this.context.searchBar?.();
+    if (searchBar) {
+      rows.push(...renderSearchBar(searchBar, width));
+      return { rows, composerOffset: statusRows.length, composerRows };
     }
     rows.push(
       ...renderHints(

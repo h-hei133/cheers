@@ -181,6 +181,63 @@ describe("kill ring and undo", () => {
     expect(editor.getText()).toBe("");
   });
 
+  it("takes back a typed word in one press", () => {
+    // Letter by letter is how a keyboard delivers it. Without coalescing each
+    // letter became its own undo step, so a word took as many presses to take
+    // back as it has letters.
+    const editor = new Editor();
+    for (const char of "hello") editor.insert(char);
+
+    expect(editor.undo()).toBe(true);
+    expect(editor.getText()).toBe("");
+  });
+
+  it("takes back words separately, with the space as its own step", () => {
+    // Whitespace ends the word run, and is itself separately undoable — the
+    // convention a shell user has, and what makes undo feel predictable: pressing
+    // it repeatedly walks back through words rather than jumping over them.
+    const editor = new Editor();
+    for (const char of "one two") editor.insert(char);
+
+    expect(editor.undo()).toBe(true);
+    expect(editor.getText()).toBe("one ");
+    expect(editor.undo()).toBe(true);
+    expect(editor.getText()).toBe("one");
+    expect(editor.undo()).toBe(true);
+    expect(editor.getText()).toBe("");
+  });
+
+  it("does not join words across a motion", () => {
+    // A motion ends the run: the key was pressed, so the next word is a new step
+    // even though the characters are contiguous in the text.
+    const editor = new Editor();
+    for (const char of "one") editor.insert(char);
+    editor.move("left");
+    editor.move("right");
+    for (const char of "two") editor.insert(char);
+
+    editor.undo();
+    expect(editor.getText()).toBe("one");
+  });
+
+  it("keeps a pasted run as one step", () => {
+    // A paste arrived as one action, so taking it back in pieces would be wrong.
+    const editor = new Editor();
+    editor.insert("pasted text");
+    expect(editor.undo()).toBe(true);
+    expect(editor.getText()).toBe("");
+  });
+
+  it("undoes then redoes a coalesced word", () => {
+    // Coalescing changes how many steps exist, not what a step restores.
+    const editor = new Editor();
+    for (const char of "hi") editor.insert(char);
+    editor.undo();
+    expect(editor.getText()).toBe("");
+    expect(editor.redo()).toBe(true);
+    expect(editor.getText()).toBe("hi");
+  });
+
   it("takes back an undo", () => {
     // An undo that cannot be undone is a key that is dangerous to press: the way
     // back from a mistake becomes a mistake with no way back.
