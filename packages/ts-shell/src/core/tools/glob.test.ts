@@ -70,6 +70,16 @@ describe("glob pattern matching", () => {
     expect(matchesGlob("a\\b.ts", "a\\\\b.ts")).toBe(true);
     expect(matchesGlob("a/b.ts", "a\\\\b.ts")).toBe(false);
   });
+
+  it("treats a Windows relative prefix the way the POSIX spelling is treated", () => {
+    // `.\a.ts` and `./a.ts` are the same instruction. Stripping the prefix before
+    // normalizing left the backslash form with a separator still in it, which then
+    // suppressed the basename fallback: the POSIX spelling found `src/a.ts` and the
+    // Windows one did not.
+    expect(matchesGlob("src/a.ts", ".\\a.ts")).toBe(true);
+    expect(matchesGlob("src/a.ts", "./a.ts")).toBe(true);
+    expect(matchesGlob("a.ts", ".\\a.ts")).toBe(true);
+  });
 });
 
 describe("glob result cap", () => {

@@ -81,16 +81,20 @@ function usesBackslashAsEscape(pattern: string): boolean {
  * would silently narrow every existing `glob` filter to the workspace root.
  */
 export function matchesGlob(filePath: string, pattern: string): boolean {
-  const clean = pattern.trim().replace(/^\.\//, '')
-  if (matchesEverything(clean)) return true
-  // Windows separators are accepted only when no backslash is doing escape
-  // duty, so a pattern naming literal characters keeps its meaning.
-  const normalized = usesBackslashAsEscape(clean) ? clean : clean.replace(/\\/g, '/')
-  const match = matcherFor(normalized)
-  if (match(filePath)) return true
-  if (!normalized.includes('/')) {
-    const base = filePath.slice(filePath.lastIndexOf('/') + 1)
-    return match(base)
+  // Normalize before the prefix is stripped, so a Windows-relative `.\a.ts`
+  // becomes `./a.ts` and loses its prefix like the POSIX spelling does. Stripping
+  // first left the backslash form with a separator still in it, which then
+  // suppressed the basename fallback and made `.\a.ts` miss `src/a.ts` where
+  // `./a.ts` found it.
+  const raw = pattern.trim();
+  const normalized = usesBackslashAsEscape(raw) ? raw : raw.replace(/\\/g, "/");
+  const clean = normalized.replace(/^\.\//, "");
+  if (matchesEverything(clean)) return true;
+  const match = matcherFor(clean);
+  if (match(filePath)) return true;
+  if (!clean.includes("/")) {
+    const base = filePath.slice(filePath.lastIndexOf("/") + 1);
+    return match(base);
   }
-  return false
+  return false;
 }
