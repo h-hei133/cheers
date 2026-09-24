@@ -222,3 +222,134 @@ T3（**真实 PTY**：搜索条与匹配着色）、T5（`/entries` 四种情形
 | **T5 的 `sessionPath` 实机端到端观察** | 就绪门禁在回合开始前拦下（本环境无可用 provider），`--json` 因此不产生 `query.started`。已改为**直接验证路径解析** + **验证 `sessionPath` 经 `createJsonEventWriter` 往返**，并在测试中钉住 |
 | `pi` 7 家 OAuth 提供方 | 本轮只接线既有 2 家（`pi` 有 7 家）。**接线优先于扩面** |
 | 扩展宿主 / 包分发 / RPC / SDK / HTML / 分享 / CBOR / 图片 / Mermaid / cache 保活 / 更新检查 | 逐项登记为独立立项，见裁决 §2 与前置研究 §2.2 |
+
+---
+
+## 10. 复核轮（**2026-09-24，施工之后**）
+
+> **性质**：施工完成后的逐提交复核与修复。判定、证据、反向验证逐条在 `phase-7-decisions.md` §6；
+> 本节只记**本轮实际改了什么、怎么验证的**。
+
+### 10.1 提交表
+
+| 提交 | 范围 |
+|---|---|
+| 复核轮 | 28 文件，+868 / −276（含新增 `searchState.test.ts`；数字为最终态，来自 `git diff --stat`） |
+
+逐提交复核覆盖 **5 个实质提交**（T1/T2/T3/T4/T5），其中 **3 片由子代理完成**（T3、T4、T5），
+**2 片由主代理直接完成**（T1、T2，原因见 §10.4）。
+
+### 10.2 修复项与反向验证
+
+| # | 提交 | 问题 | 反向验证 |
+|---|---|---|---|
+| R1/R2 | T4 | **双击在真实终端永远不成立**：第一次 `release` 调 `clear()` 清掉点击计数，而真实序列是 `press→release→press→release`。原测试用 `press,press,release`（终端不会产生的序列）恰好绕过它 | 真实序列 → **3 项失败**（双击、单字符词、反向拖拽）→ 修复后全通过 |
+| R3 | T4 | 单字符词（`a`/`x`/`i`）双击选不中：`MIN_SELECTION_CELLS=2` 把单格单位判成「点击」 | 1 项失败 → 修复后通过 |
+| R4 | T4 | 反向拖拽把两端词都切掉（复现得到 `lpha be`）：锚点不随方向交换（照 `pi` `tui-alt-screen.ts:1202-1218` 修） | 1 项失败 → 修复后通过 |
+| R5 | T4 | 指针越过词间空格时选择冻结（`pi` 此时选中空白段） | 1 项失败 → 修复后通过 |
+| R6 | T5 | 自引用父节点使树构建**无限递归**（`pi` 显式把 `parentId === entry.id` 当根，`session-manager.ts:1533-1547`） | 修复前 `RangeError`；加断言后通过 |
+| R7 | T1 | 刷新失败被吞掉，与裁决 §2 第 6 行及 `pi`（抛 `ModelsError`）相反；改为经 readiness 同一条终态事件上报 | 断言 `failure` 含 `/connect login` —— 修复前该字段不存在 |
+| R8 | T1 | 裁决 §1.1 要求的**双检锁串行化**施工未做 | 「两个请求同时等待」→ 断言 `exchanges === 1`；修复前为 2 |
+| R9 | T1 | 压缩两条路径不续期 | 代码路径接线（`renewedCompactionProvider`），类型检查覆盖 |
+| R10 | T1 | `providerReadiness.ts:132` 仍在描述「adapter 会刷新」这个不存在的消费者 | 注释改写为真实位置 |
+| R11 | T3 | `Shift+Enter` 不反向循环（裁决 §1.3 与搜索条帮助文本都承诺） | 新增 `searchState.test.ts` 断言双向行走；修复前反向不动 |
+| R12 | T3 | 流式期间仍染色（裁决 §2 第 8 行明确「不」） | `openSearch`/染色两处 busy 门禁 |
+| R13 | T2 | **裸名展开静默改写用户句子**：有 `review.md` 时 `review this function` 被整句换成模板正文 | 桥接测试「普通句子原样通过」修复前失败；`pi` 首行即要求 `/` |
+| R14 | T2 | 项目模板优先级被 `.reverse()` 反转（最外层取胜，与技能加载器相反） | 新增「就近项目目录取胜」测试，修复前失败 |
+| R15 | T2 | 内置命令会被同名模板顶掉（`audit` 是 `/review` 别名） | 查找拆为 `expandSkill`/`expandTemplate`，路由按 技能 → 注册表 → 模板 定序；测试钉住 |
+| R16 | T2 | `unknown.kind === "template"` 算出来无人消费（两条路径都到不了） | 删除该分支，改为 `unknownSkill` |
+
+**不采纳 1 项**：复核者建议 T4 双击连续性改用 `pi` 的**词界**判定（容忍 1 格抖动）。
+裁决 §1.1 的「同一单元格」是**有理由的显式决定**（「指针移动了就是拖拽」），改为词界会破坏该语义 → **维持裁决，记录为已裁决差异**。
+
+### 10.3 验证与门禁
+
+| 项 | 结果 |
+|---|---|
+| `tsc -p tsconfig.build.json` | 0 错误 |
+| 受影响套件 | T1 授权 10、T2 展开 29 + 路由 30 + 桥接 8、T3 搜索 6 + 选择 40、T5 树 14 |
+| 全量套件 | 3416 项，**2 失败**（见 §10.3.1） |
+| `verify:import-cycles` | `[pass] no-dependency-cycles` |
+| `check:config-consumers` | `[pass] read=35 declared_without_reader=0` |
+| `check:declarations` | `[pass] 18/18 dispatched, 12/12 registered` |
+| `analyze:module-facades` | `monoliths=5`（无新增） |
+
+#### 10.3.1 全量套件的 2 项失败与判定
+
+| 项 | 判定 |
+|---|---|
+| `presentation/tui/surface/benchmark.test.ts`「windows a large tool output without re-laying the whole history」 | **阈值型断言在并发负载下抖动**：实测 1166ms 对 1000ms 上限。该文件是**性能基准**，与被改文件无依赖关系。单独运行 **7/7 通过**；在被改文件全部 stash 的旧树上同样**7/7 通过**（即该阈值本来就贴着上限，与本次改动无关） |
+| `cli-baseline.test.ts`「pipe-spawn interactive slash command smoke routes sessions current without provider turn」 | **子进程并发抖动**：该用例 spawn 真实 CLI 并等终端就绪。单独运行 `-t` **通过**；**整文件单独运行 40/40 通过**（128 秒）。全量套件（518 文件、3416 项）并发下超时。**判定为非本次改动引入**——但按纪律**核对了归属**：整文件单独运行与被改文件无关的两次结果一致 |
+
+**这一项是本次最该记的**：全量套件的 2 项失败**逐项定位**后才判为环境，没有直接以「负载」结案。
+定位方法：单独运行（通过）→ stash 改动后在旧树运行（同样通过）→ 确认阈值/子进程性质。
+
+### 10.4 复核方法的一处教训
+
+**T1、T2 两片的子代理被配置模型的内容过滤拦下**（`vsllm/gemini-3.8-flash-api` 返回
+`finish_reason: content_filter`），重派与改写提示词均无效，改由主代理直接逐行复核。
+**这不影响结论的强度**：两片的每一项结论都带 `file:line` 与反向验证（见 §10.2），
+反向验证是比第二双眼睛更强的证据——它证明修复去掉后断言确实失败。
+**但必须如实记录**：T1/T2 没有独立第二方复核，只有主代理的**可复现证据**。
+
+
+### 10.5 实机验证（真实 PTY）
+
+用 `script` 起真实终端跑构建后的 CLI，合成 provider 下输入查询。**能断言的**与**不能断言的**分开记：
+
+| 项 | 结果 |
+|---|---|
+| 搜索条渲染 | **实机确认**。`ctrl+shift+f` 后渲染 `find: the  ·  1/3  ·  ↑↓ next · esc close`，并带 `· ⏎ ⇧⏎ walk` 提示 |
+| `enter` 正向循环 | **实机确认**：`1/3` → `2/3`，到末尾回绕 `3/3` → `1/3` |
+| `shift+enter` 反向循环 | **实机确认**：`1/3` → `3/3`（回绕到末尾，即反向一步）。**第一次实机失败**：`shift+enter` 不动。根因：解析器把修饰键命名为 `shift+enter`（`keys.ts` 的 `formatKeyId`），而实现只认 `enter` 加 `shift` 标志——**单元测试用手写的事件形状通过了，与解析器的真实输出不一致**。修正：按真实 key id 匹配，并把测试改为**经 `parseKeyEvent` 构造事件**（`CSI 13;2u` → `shift+enter`）。反向验证：字节级探针在修正前 `positions = [2,3,3,3]`（反向不动），修正后 `[2,3,2,1]` |
+| 双击/三击选词 | **实机未验证**。该 harness 里鼠标序列（含 `;` 的 CSI）**不产生任何复制**——包括一个**改动前就该复制的普通拖拽**。所以 harness 没把鼠标事件送达，**不能**据此判断双击修复。证据停在单元测试层：`selection.test.ts` 用真实的 `press→release→press→release` 序列断言（这正是原先漏掉的那一环） |
+
+### 10.6 修复的复核（**2026-09-24，验证轮**）
+
+> **性质**：修复本身再被独立复核一轮——修复也是代码，也会错。5 片各派一个只读子代理，
+> 逐条回答「测试真的钉住这个行为吗」「还有谁在读旧形状」。
+
+| 片 | 结果 | 关键产出 |
+|---|---|---|
+| T1 续期 | **holds** | 6 问全过：in-flight Map 在 `finally` 里删除不会泄漏；joiner 拿到 `renewed:false`；invocation 层在 `startTurn` **之前**终止；压缩失败路径干净返回「No credential」；全仓只有 3 个生产调用点且都读新形状。**指出一个测试缺口**：joiner 等到失败 leader 时 `failure` 传播无断言 → 已补 `shares a failed exchange with the caller that waited for it`，反向验证：删掉传播行 → 失败 |
+| T3 搜索 | **holds** | `shift+` 前缀剥离不会误读 `ctrl+enter`（`formatKeyId` 顺序是 ctrl→alt→shift→meta，`ctrl+` 开头不匹配 `shift+`）；busy 门禁下计数与查询保留、仅染色暂停，与 `indexFor` 每帧重建一致；pager→overlay→search 的次序未被本轮改动 |
+| T4 选择 | **holds** | 三击后拖拽仍读到第三次 press 存的行 span（`selection.ts:119` 存 / `:146` 读）；所有放弃路径都走 `endDrag`，`initial` 不会泄漏；`spanForDrag` 只在越界行返回 undefined——**真实转录的空行会返回 undefined、选择会停一拍**，与 `pi` 行为一致，记录不修 |
+| T5 树 | **holds** | 自引用 guard 与 `pi` 逐行等价；更长的环（A↔B）在**两边**都从 roots 消失——**照 `pi`，不试图做得更多**；`collectSubtree` 由 `seen` 集合（`:148`）保证终止；`/entries` 是唯一递归消费者，已不可成环 |
+| T2 展开 | **主代理自查**（见下） | — |
+
+**T2 的复核子代理重派 3 次均被 `content_filter` 拦下**（共 9 次失败集中在 T1/T2 两片的措辞上）。
+改用逐条工具自查：①`grep -rn expandSubmission` → **零残留**；②路由顺序（`slashRouter.ts:55-77`）：技能 → 注册表（**含别名**，`:57-60`）→ 模板（`:77`）→ 未知命令；③`templateLoader.ts:61-63` 项目目录**不 reverse**，合并处 `templates.set` 后者覆盖 → 就近取胜；隐藏/禁用命令落到模板分支（`:62-66` 要求 `availability !== "hidden" && enabled !== false` 才执行）——这是**文档未写的选择**，已补进 01 文档表格。三个钉住的测试：`sends a plain line through as written`（桥）、`lets a built-in command keep its name`（路由）、`lets the nearest project directory win`（loader）。
+
+**一处必须记录的过程事故**：验证轮发现 `authorization.ts` 与 HEAD 一致——早先一次 `git checkout` 把它还原成了提交前状态，4 个续期测试因此失败。根因是**我自己的清理命令误伤**，不是修复错误。重新应用后 11/11 通过、`tsc` 0 错。教训已入 `.wiki/log.md`：**验证脚本结束时的清理命令与验证目标文件重叠时，先核对 `git status` 再动手**。
+
+### 10.7 用户实测报告的缺陷（**2026-09-24，坐标空间**）
+
+> **来源**：用户实机操作——双击/三击能选中，但**同一行右侧**的文本选不中；拖拽反而正常。
+> 在 `sess_1490bb947e4e3ebc_1790088117808` 中确认。
+
+**根因是坐标空间混用**，且它解释了全部三个症状：
+
+| 症状 | 解释 |
+|---|---|
+| 双击**左侧**能选 | 行首附近的字符串下标和可见列恰好接近（行首只有少量转义序列） |
+| 双击**右侧**选不中或选中残片 | 转录行内嵌 ANSI 样式序列（`\x1b[36m` 等）：每个占 **≥6 个字符串下标、0 个显示单元格**。`runBounds`/`wordBounds`/`lineSpan` 用**原始字符串下标**扫描（`line[clamped]`），而 `screenToContent` 给出的点击列是**可见单元格**坐标（`viewport.ts:129` 以 `visibleWidth` 钳制）。越靠右偏移越大：下标越过行尾、或落进转义序列里 → 词被切成残片（复现：可见列 30 双击得到 `ove`，是 `over` 的残片） |
+| **拖拽**反而正常 | `extractSelection` 走 `cellRange` → `lineCells`，全程**单元格坐标**，从未混用 |
+
+**判定依据**：`pi` 的 `getWordSelection` 在 `stripTerminalSequences(line)` 之后的可见文本上求词界（`tui-alt-screen.ts:1159`），点击列直接在可见坐标系命中段——**点击列和词界必须在同一坐标系**是这条手势的基本不变量，我方 T4 施工时违反了它。
+
+**修复**：`clickSelect.ts` 重写为可见坐标——词/空白段在 `lineCells` 给出的可见簇上扫描，答案以**单元格列**表达；`lineSpan` 的行宽同样按单元格计。宽字符（占两格的簇）是一步跨过的一个字符，选择永远不会落在它的两半之间。
+
+**反向验证**：把扫描换回原始字符串（`[...line].map(c => ({cluster: c, width: 1}))`）→ 新增的 2 个回归用例失败（`styled row` 1 失败：期望 `['over']` 得到 `['ove']`）；修复后 42/42 通过。
+
+**覆盖**：`selection.test.ts` 新增 2 个用例——带样式行长列处双击取到完整词（`takes the word under the pointer on a styled row, however far right it is`）；带样式行三击取到**可见整行**（`takes the whole visible line on a triple click of a styled row`）。受影响套件 776 项全绿，`tsc` 0 错。
+
+**仍未实机验证鼠标**：本会话的 PTY harness 依旧送不进鼠标序列（此前已记录——连修复前就正常的普通拖拽也复制不出来），故无法在假终端里看双击。**需要用户在真实终端里再点一次**：对一个长回复的右半边双击/三击，词和整行应能选中。
+
+### 10.8 实机确认（**2026-09-24，用户操作**）
+
+| 项 | 结果 |
+|---|---|
+| 转录搜索 | **用户确认可用**。此前 `ctrl+shift+f` 无响应是 **Windows 输入法（微软拼音）的繁简切换在 OS 层拦截**了该组合，与终端无关；用户关闭系统快捷键后搜索条正常打开，且**模型输出期间不再打开**（busy 门禁生效）——两条修复都在真机上得到确认 |
+| 鼠标选词 | 用户确认整体可用；§10.7 的坐标修复（右半边选不中）以单元层反向验证为最终证据，**用户未单独复测右半边** |
+
+**环境事实入档**：WSL 下 `ctrl+shift+f` 默认被微软拼音占用（繁/简切换），需要用户在系统输入法设置里释放后终端才能收到。这不构成改绑默认键位的理由——`pi` 同键，且键位本身可经配置调整——但它是 WSL 用户的已知门槛，记录于此。

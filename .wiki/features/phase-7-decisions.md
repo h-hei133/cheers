@@ -340,3 +340,54 @@ Phase 6 全是行为缺口，所以证据强度就是决定因素；
 | T5 的 `since` 跨客户端重启验证 | 需两个真实客户端进程；方法层面的语义已按 `pi` 文档对齐 |
 | 扩展宿主 / 包分发 / RPC / SDK / HTML / 分享 / CBOR / 图片 / Mermaid / cache 保活 / 更新检查 | 逐项登记为独立立项，见 §2 与 `phase-7-pre-research.md` §2.2 |
 | 任何代码改动 | 本文件性质是裁决 |
+
+---
+
+## 6. 复核轮（**2026-09-24，施工之后**）
+
+> **性质**：Phase 7 施工完成后，对 5 个实质提交（`74ace9ab`/`86047ac7`/`4419ebf6`/`6f594127`/`2dc93296`）逐片复核的**结论追加**。凡与上文冲突者以本节为准，并逐条给出证据与反向验证。
+
+### 6.1 复核推翻的施工结论（7 项）
+
+| # | 项 | 施工结论 | 复核结论 | 证据 | 处置 |
+|---|---|---|---|---|---|
+| R1 | T4 双击选词 | 「实机可用；测试抓出 release 覆盖 focus 一处真缺陷，已修」 | **在真实终端里双击永远不成立** | `selection.ts` 的 `release` 分支在「未选中任何内容」时调 `clear()`，而 `clear()` 清 `lastClick`；真实终端的双击序列是 `press→release→press→release`，第一次 release 就把计数清空 | **已修**：拆出 `endDrag()`（结束拖拽、保留计数）与 `clear()`（显式取消、结束计数）。反向验证：`repro` 3 项失败 → 修复后全通过 |
+| R2 | T4 的测试证明了接线 | 「断言走 `DragSelection` 而不是只测 `spanForClick`——正确的辅助函数不能证明它被接上了」 | **测试本身掩盖了 R1** | `selection.test.ts` 的双击用例是 `press,press,release`，**缺少真实终端必然发出的中间 release**。正是那个 release 触发 `clear()` | **已修**：用例改为真实序列。这是「驱动各段」还不够——**驱动顺序也得是真实的** |
+| R3 | T4 单字符词 | 未提及 | **双击 `a`/`x`/`i` 这类单词选不中** | `extractSelection` 末尾的 `MIN_SELECTION_CELLS=2` 把单格跨度判为「一次点击而非选择」 | **已修**：`extractSelection` 增 `{kind:"unit"}`，点击已经决定了单位，不存在「是不是选择」的疑问 |
+| R4 | T4 反向拖拽 | 「词/行选择在拖拽中保持」 | **反向拖拽把两个词都切掉** | `drag` 分支一律 `focus = span.to`、`anchor` 不动；复现：双击 `beta` 后左拖到 `alpha` → 复制出 `lpha be` | **已修**：照 `pi` 的 `selectionInitialRange` 按方向交换锚点（`pi` `tui-alt-screen.ts:1202-1218`） |
+| R5 | T4 跨空白拖拽 | 未提及 | **指针越过词间空格时选择冻结** | `spanForDrag` 缺失，`spanForClick` 在空白处返回 `undefined` → `focus` 不更新（`pi` 此时选中的是空白段，故不冻结） | **已修**：新增 `spanForDrag`（空白也算单位） |
+| R6 | T5 `get_tree` | 「树返回多根；父链断裂保留为根」 | **自引用父节点导致栈溢出** | `readSessionTree` 把 `parentId === id` 的条目的父节点找到（即它自己）→ 递归排序无限递归。`pi` 显式处理：`if (entry.parentId === null \|\| entry.parentId === entry.id)`（`session-manager.ts:1533-1547`） | **已修**：`parentId === id` 视为根。反向验证：构造自引用条目 → 修复前 `RangeError`，修复后该条为根 |
+| R7 | T1 刷新失败 | 「刷新失败不致命：保留原 token」 | **与裁决 §2 第 6 行冲突，且与 `pi` 相反** | 裁决写「报认证错误，不静默重试」；`pi` 抛 `ModelsError("oauth", …)`（`resolve.ts:155`）；带一个已被拒绝的 token 发请求，用户看到的是网络错误而非登录失效 | **已修**：`renewAccountAuthIfExpiring` 返回 `failure`，invocation 层用与就绪失败同一条终态事件上报 |
+
+### 6.2 未完成项（施工记录了但没做，本次补做）
+
+| # | 项 | 施工状态 | 复核后处置 |
+|---|---|---|---|
+| R8 | T1 并发刷新串行化 | 裁决 §1.1 明确要求「照 `pi` 的双检锁串行化」，施工**未做** | **已补**：模块级 per-provider in-flight Promise；等待者复用 leader 的结果、不重复交换（refresh token 是一次性的，并发第二个必然失败）。测试断言 `exchanges === 1` |
+| R9 | T1 压缩路径的续期 | 施工只把 `apiKey` 换成 `headers`，**未接续期** | **已补**：`/compact` 与「被放弃回合摘要」两条路径先续期再建头（它们不经 invocation 路径，拿不到回合自身的续期）。回合自身路径不重复续期 |
+| R10 | T1 的过期注释 | 裁决 §1.1 理由 3 要求「否则注释继续描述一个不存在的消费者」 | **已改**：`providerReadiness.ts:132` 原文「Let the model adapter perform refresh-token exchange」改为描述真实的续期位置 |
+| R11 | T3 `Shift+Enter` 反向循环 | 裁决 §1.3 与搜索条自己的帮助文本都承诺 Enter/Shift+Enter 双向；施工只处理 `enter`/`down`/`up` | **已补**：`SearchKey` 增 `shift`，`enter + shift` 反向。新增 `searchState.test.ts`（此前 `searchState` **零测试**，这正是漏掉它的原因） |
+| R12 | T3 流式期间不高亮 | 裁决 §2 第 8 行明确「不」；施工只做了「输入框为空」，**没有 busy 检查** | **已补**：`openSearch` 在运行中不打开；已打开的搜索在运行中不染色（查询与计数保留）。`pi` 同样避开流式 |
+
+### 6.3 复核新发现（施工裁决未覆盖）
+
+| # | 项 | 问题 | 证据 | 处置 |
+|---|---|---|---|---|
+| R13 | T2 裸名展开会静默改写用户句子 | 施工让**裸名**（`review auth`）也展开模板。于是存在 `review.md` 时，用户输入的正常句子 `review this function` 被整句替换成模板正文——**用户自己的字被删掉且无人过问** | `pi` 的 `expandPromptTemplate` 首行即 `if (!text.startsWith("/")) return text`（`prompt-templates.ts:305`），**从不**展开裸名。施工记录把这个差异写成「both go through the same module」，但那是**同一模块**，不是**同一契约** | **已删**：裸名展开路径移除，模板**必须带斜杠**（`/explain args`）。反向验证：桥接断言「普通句子原样通过」在修复前失败 |
+| R14 | T2 项目模板优先级被反转 | `TemplateLoader` 把 `projectDirectories` 结果 `.reverse()`，而合并是「后者覆盖」→ **最外层项目目录取胜**，与技能加载器（就近取胜）及其自身注释相反 | 新增测试：仓库根与子目录各一份 `shared.md`，从子目录读取必须得到子目录那份；修复前得到根那份 | **已修**：去掉 `.reverse()`，与 `SkillLoader` 的前后顺序一致 |
+| R15 | T2 优先级归属 | 施工把「谁赢」放在 `expandSubmission` 里（技能先、模板后），但**注册表在它之后**才被查询 → 一个与模板同名的内置命令会被模板顶掉 | `audit` 是 `/review` 的别名；实测 `/audit` 命中命令（正确），但那是巧合——顺序上模板本可先拿走它 | **已修**：查找拆为 `expandSkill`/`expandTemplate`，路由按 **技能 → 注册表 → 模板 → 未知命令** 决定优先级，「谁赢」回到路由层。测试钉住 `audit.md` 不能顶掉 `/audit` |
+| R16 | T2 一个算出来没人读的报告字段 | `ExpansionResult.unknown` 的 `kind: "template"` 分支被计算后**无人消费**（路由只读 `kind === "skill"`），而裸名路径的文本不以 `/` 开头 → **两条路径都到不了** | 全仓检索 `unknown?.kind`：只有 `slashRouter.ts:40` 的 `skill` 分支 | **已删**（R13 同时使模板 case 无意义）：改为 `expandSkill` 返回 `unknownSkill`，模板查找不产生报告 |
+
+### 6.4 复核不采纳（1 项，附理由）
+
+| # | 项 | 复核者建议 | 不采纳理由 |
+|---|---|---|---|
+| N1 | T4 双击连续性用**词界**而非单元格 | 复核者指出 `pi` 的 `getClickCount` 以 `wordStart/wordEnd` 判定连续性（`pi` `tui-alt-screen.ts:1225-1240`），因此指针有 1 格抖动仍算双击；建议照做 | **维持施工裁决**。裁决原话「只有**同一单元格**、且在时间窗内才延续」是**有理由的显式决定**（「指针移动了就是拖拽」），而 `pi` 的词界判定与其拖拽检测分属两条路径。改为词界会反过来破坏「按下→微移→松开」应算拖拽的语义。**记录为已裁决的差异**，不是缺陷 |
+
+### 6.5 复核未覆盖
+
+| 项 | 原因 |
+|---|---|
+| T1 真实订阅账号的端到端验证 | 同 §5，需外部授权服务器与真实账号 |
+| 全量套件的性能基准项（`surface/benchmark.test.ts`） | 阈值型断言（1000ms），在并发负载下抖动；判定见 `phase-7-execution.md` §9.1 |
+| `pi` 7 家 OAuth 提供方 | 维持 §5：接线优先于扩面 |

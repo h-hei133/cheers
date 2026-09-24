@@ -2890,3 +2890,35 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 关键细节：`build:rust` 出的是 **release**，而测试用 `cargo run`（**debug**），
 预热错 profile 等于没预热——就绪窗口因此从 5 秒提到 30 秒，并用**删掉整个 `target/`** 验证。
 - **未做**（如实记录）：真实 provider 端点的超时验证（用本地静默 server 代替）、真实发布费率（内置目录零 `cost`）、`/report` 上传与扩展宿主/RPC/SDK/HTML 导出/更新检查（裁决 §7 逐项裁定不做）。
+
+## [2026-09-24] review | Phase 7 逐提交复核轮：5 个实质提交（T1/T2/T3/T4/T5）全部复核，**16 项修复**（R1–R16）。其中「**宣称完成但实际不可用**」4 项：R1 双击在真实终端不成立、R2 测试序列本身不真实、R6 树构建爆栈、R13 裸名改写用户输入；「**裁决要求但施工未做**」5 项（R8/R9/R10/R11/R12）；「**新发现**」3 项（R3/R4/R5）；「**与裁决/`pi` 相反**」1 项（R7）；「**死代码/优先级错误**」3 项（R14/R15/R16）。
+- **最重一项（T4）**：双击/三击选词**在真实终端里永远不成立**。`release` 分支在未选中内容时调 `clear()` 清掉 `lastClick`，而真实终端的双击是 `press→release→press→release`——第一次 release 就把计数清空。**测试用的 `press,press,release` 是终端不会产生的序列**，恰好绕过它：施工记录里「断言走 `DragSelection` 而不是只测辅助函数」的自我肯定，漏掉的正是**序列本身要真实**。修复：拆 `endDrag()`（保留计数）与 `clear()`（显式取消）。反向验证 3 项失败 → 修复后通过。
+- **T4 另 3 项**：单字符词选不中（`MIN_SELECTION_CELLS=2` 把单格单位判成点击）；反向拖拽切掉两端词（复现得 `lpha be`，照 `pi` 的 `selectionInitialRange` 按方向交换锚点）；跨词间空格时选择冻结（`pi` 此时选中空白段）。新增 `spanForDrag`。
+- **T5**：`readSessionTree` 遇 `parentId === id` 会**无限递归爆栈**；`pi` 显式把该形态当根（`session-manager.ts:1533-1547`）。
+- **T1 两项未完成**：裁决 §1.1 明确要求的**双检锁串行化**没有做（refresh token 一次性，并发第二个必然失败），已补 per-provider in-flight Promise 并断言 `exchanges === 1`；压缩两条路径（`/compact`、被放弃回合摘要）不经 invocation 路径、**拿不到续期**，已接到 `renewedCompactionProvider`。另：刷新失败原先被吞掉（与裁决 §2 第 6 行及 `pi` 抛错相反）→ 改为经 readiness 同一条终态事件上报；`providerReadiness.ts:132` 描述「adapter 会刷新」这条**不存在的消费者**注释已改写。
+- **T3 两项未完成**：`Shift+Enter` 不反向循环（裁决 §1.3 与搜索条自己的帮助文本都承诺）；流式期间仍染色（裁决 §2 第 8 行明确「不」）。**`searchState` 此前零测试**，这正是漏掉它的原因 → 新增 `searchState.test.ts`。
+- **T2 三项**：①**裸名展开会静默改写用户句子**——有 `review.md` 时输入 `review this function` 被整句换成模板正文，用户自己的字被删掉且无人过问；`pi` 的 `expandPromptTemplate` 首行即 `if (!text.startsWith("/")) return text`，**从不**展开裸名。裸名路径已删除，模板必须带斜杠。②`TemplateLoader` 把 `projectDirectories` 结果 `.reverse()`，而合并是「后者覆盖」→ **最外层项目目录取胜**，与技能加载器（就近取胜）及其自身注释相反。③内置命令会被同名模板顶掉——查找拆为 `expandSkill`/`expandTemplate`，路由按 **技能 → 注册表 → 模板 → 未知命令** 定序，「谁赢」回到路由层；另删掉一个算出来无人消费的 `unknown.kind === "template"` 分支。
+- **不采纳 1 项**：复核者建议双击连续性照 `pi` 改用**词界**（容忍 1 格抖动）。裁决的「同一单元格」是有理由的显式决定（「指针移动了就是拖拽」），改为词界会破坏该语义 → 维持裁决，记录为**已裁决差异**。
+- **复核执行方式**：5 片中 3 片由子代理完成（T3/T4/T5）；**T1、T2 的子代理被配置模型 `content_filter` 拦下**（`vsllm/gemini-3.8-flash-api`，重派与改写提示词均无效），改由主代理逐行复核。**如实记录：T1/T2 没有独立第二方复核**，只有可复现的反向验证（去掉修复 → 断言失败）。
+- **验证**：`tsc` 0 错；`verify:import-cycles` pass；`check:config-consumers` read=35/0；`check:declarations` 18/18+12/12；`analyze:module-facades` `monoliths=5`（无新增）；受影响套件全绿；全量 3416 项 2 失败，逐项判定见 `phase-7-execution.md` §10.3.1（性能阈值型断言在并发负载下抖动，单独运行通过）。
+- **文档**：`phase-7-decisions.md` 新增 §6（复核裁决：7 项推翻施工结论、5 项补做、3 项新发现、1 项不采纳、3 项未覆盖）；`phase-7-execution.md` 新增 §10（改了什么、怎么验证的、复核方法教训）；`01-extensibility-and-customization.md` 两行更正（技能/模板）。
+
+## [2026-09-24] verify | 修复复核轮：5 片各派一个只读子代理验证修复本身。**4 片 holds、1 片自查**，补 1 个测试缺口，修 1 起过程事故。
+- **子代理 7 次被 `content_filter` 拦**（T2 片重派 3 次），全部集中在含「OAuth/token/展开/注入」措辞的任务上——该模型对这两类词汇过敏，改写措辞无效。T2 改为逐条工具自查：`expandSubmission` 零残留、路由顺序（注册表含别名 → 模板）逐行核实、三测试各自钉住一个契约。
+- **T1 验证指出一个真实测试缺口**：joiner 等到**失败的** leader 时 `failure` 是否传播，无断言。补 `shares a failed exchange with the caller that waited for it`；反向验证：删掉传播行 → 该测试失败。
+- **T5 验证确认与 `pi` 逐行等价**：自引用父节点当根（`session-manager.ts:1539` ↔ `sessionEntries.ts:121`），更长的环在两边都从 roots 消失——**照 `pi`，不试图做得更多**。
+- **T4 验证确认 `initial` 不会泄漏**（所有放弃路径走 `endDrag`）、三击后拖拽读到正确的行 span；`spanForDrag` 在空行返回 undefined 是**真实行为**（选择停一拍），与 `pi` 一致，记录不修。
+- **一起过程事故，如实记录**：验证轮发现 `authorization.ts` 内容与 HEAD 完全一致——早先一次 `git checkout` 把修复还原掉了，4 个续期测试因此失败。**根因是我自己的清理命令误伤，不是修复错误**。重新应用后 11/11 通过、`tsc` 0 错。教训：验证脚本结束时的清理命令与验证目标文件重叠时，先核对 `git status` 再动手。
+- **验证**：受影响 58 文件 679 项全绿；`tsc` 0 错；全仓 grep 无旧 API 残留。
+- **文档**：`phase-7-execution.md` §10.6（验证轮记录）；01 表格补「隐藏/禁用命令落到模板分支」这一未成文选择。
+
+## [2026-09-24] fix | 用户实测抓出双击/三击的坐标空间混用：**同一行右侧选不中、拖拽正常**。修复 `clickSelect.ts` 的词/行边界坐标系。
+- **症状与根因一一对应**：拖拽正常（`extractSelection` 走 `cellRange`，全程单元格坐标）；双击右侧坏（`runBounds`/`wordBounds`/`lineSpan` 用**原始字符串下标**扫行，而点击列来自 `screenToContent` 的**可见单元格**坐标）。转录行内嵌 ANSI 样式序列——每个占 ≥6 个下标、0 个单元格——两个坐标系随列数增大而漂移，行首附近恰好重合所以左侧能选。复现：可见列 30 双击取到 `ove`（`over` 的残片）。
+- **判定依据是 `pi` 的不变量**：`getWordSelection` 在 `stripTerminalSequences` 之后求词界（`tui-alt-screen.ts:1159`）——**点击列与词界同坐标系**。我方 T4 施工违反了它，且**单测全部用不带样式的行**，恰好测不出（测试数据的盲区：真实转录行才带样式）。
+- **修复**：词/空白段/行宽全部改在 `lineCells` 的可见簇上求，答案以单元格列表达；宽字符一步跨过，不会选在两半之间。反向验证：换回原始字符串 → 2 个新用例失败（`['ove']` ≠ `['over']`）。
+- **过程事故（同型第 2 次）**：反向验证的还原又用了 `git checkout --`，把 `clickSelect.ts` 连同 `spanForDrag` 一起还原掉。改用**整文件重写**恢复（内容此前已验证），并重跑 776 项全绿 + `tsc` 0 错。上次的教训只写了一半——正确做法是**反向验证一律在临时副本上做，或改回时用编辑工具**，绝不用 checkout 碰工作树。
+- **测试数据盲区的教训**：`selection.test.ts` 的 `ROWS` 夹具只有一条带样式行且样式在**行首**（`▌` 标记），行首正是两个坐标系几乎重合的位置——4 个双击用例全部落在它上面，等于从未在漂移存在的区域测过。新用例把样式放到**行中**并把点击列放到 30。
+- **实机鼠标验证依旧不可达**（harness 送不进鼠标序列），需要用户在真实终端确认：长回复右半边双击/三击。
+
+## [2026-09-24] verify | 用户实机确认：**搜索打开与 busy 门禁在真机通过**（此前 `ctrl+shift+f` 无响应是微软拼音的繁简切换在 OS 层拦截，关闭后正常）；鼠标手势整体可用。坐标修复（右半边）以单元层反向验证为最终证据。
+- **环境门槛入档**：WSL 下 `ctrl+shift+f` 被微软拼音默认占用（繁/简切换），终端收不到；须在系统输入法设置里释放。不改默认绑定——`pi` 同键、键位可配置——但作为 WSL 用户的已知门槛记录在 `phase-7-execution.md` §10.8。
