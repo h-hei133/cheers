@@ -1,4 +1,5 @@
-import { SkillLoader, type Skill } from "../skills/skillLoader.js";
+import { type Skill } from "../skills/skillLoader.js";
+import { resolveSkillCatalog } from "../skills/skillCatalog.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 /**
@@ -12,7 +13,14 @@ export async function runSkillCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const skills = new SkillLoader(context.cwd).load();
+  // The same catalog the prompt path and `/skill:` resolve through, so the list
+  // read here is the list the model was given — a skill named with `--skill`
+  // appears, and an untrusted project's skills do not.
+  const skills = resolveSkillCatalog({
+    workspaceRoot: context.cwd,
+    ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
+    ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
+  }).skills;
   const wanted = args[0]?.trim();
   if (!wanted) return { kind: "local", output: listSkills([...skills.values()]) };
 

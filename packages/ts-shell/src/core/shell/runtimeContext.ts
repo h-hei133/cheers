@@ -39,6 +39,19 @@ export interface ShellRuntimeContext {
    * Everything else this context holds is fixed for the session.
    */
   runtimeConfig: RuntimeConfig
+  /**
+   * How this run was asked to load skills.
+   *
+   * Fixed for the session, like the flags that set it, and carried here rather
+   * than re-derived at each reader because more than one reader needs the same
+   * answer: the prompt that lists the skills, the `/skill` command, and the
+   * picker. A reader that rebuilt the loader from the flags it did not have
+   * would offer a list that disagreed with the one the model was given.
+   */
+  skillOptions?: {
+    readonly skillPaths?: readonly string[]
+    readonly noSkills?: boolean
+  }
   gitContext: WorkflowGitContext
   session: Session
   activeSession: ActiveSessionIdentity
@@ -70,6 +83,10 @@ export function createShellRuntimeContext(input: {
   gitRoot: string | null
   rootBindingDiagnostics?: readonly RootBindingDiagnostic[]
   runtimeConfig: RuntimeConfig
+  skillOptions?: {
+    readonly skillPaths?: readonly string[]
+    readonly noSkills?: boolean
+  }
   gitContext: WorkflowGitContext
   session: Session
   resumeProvenance?: SessionResumeProvenance;
@@ -95,6 +112,7 @@ export function createShellRuntimeContext(input: {
         gitContext: input.gitContext,
       }),
     runtimeConfig: input.runtimeConfig,
+    ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     gitContext: input.gitContext,
     session: input.session,
     activeSession: {

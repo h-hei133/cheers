@@ -1,5 +1,5 @@
 import { createCommandRegistry } from "./registry.js";
-import { SkillLoader } from "../skills/skillLoader.js";
+import { resolveSkillCatalog } from "../skills/skillCatalog.js";
 import { TemplateLoader } from "../prompts/templateLoader.js";
 import { expandSkill, expandTemplate } from "../prompts/expansion.js";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
@@ -25,7 +25,17 @@ export async function routeSlashCommand(
   // below — which treats every unregistered word as a mistake, and is what made
   // `/skill:name` answer "Unknown slash command" while the same name worked through
   // the `/skill` command.
-  const skill = expandSkill(input, new SkillLoader(context.cwd).load());
+  //
+  // Resolved through the same catalog the prompt path uses, so the skills named
+  // here are exactly the ones the model was told about: `--skill` loads a file
+  // the model can already use, and an untrusted project's skills are absent from
+  // both lists rather than only from one.
+  const skills = resolveSkillCatalog({
+    workspaceRoot: context.cwd,
+    ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
+    ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
+  }).skills;
+  const skill = expandSkill(input, skills);
   if (skill.skill) {
     return {
       kind: "prompt",
@@ -34,7 +44,7 @@ export async function routeSlashCommand(
     };
   }
   if (skill.unknownSkill) {
-    const available = [...new SkillLoader(context.cwd).load().keys()].sort();
+    const available = [...skills.keys()].sort();
     return {
       kind: "local",
       output: [

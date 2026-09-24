@@ -355,3 +355,36 @@ describe("named skill paths", () => {
     expect([...skills.keys()]).toEqual(["explicit"]);
   });
 });
+
+describe("a named path that loads nothing", () => {
+  let workspace = "";
+
+  beforeEach(() => {
+    workspace = fs.mkdtempSync(path.join(os.tmpdir(), "skills-missing-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it("says so rather than loading nothing in silence", () => {
+    // The user named this file on the command line. Silence would leave a typo
+    // looking exactly like a skill the model chose not to use, so the loader has
+    // to report the path it could not read.
+    const { skills, failures } = new SkillLoader(workspace, {
+      extraPaths: [path.join(workspace, "typo.md")],
+    }).loadDetailed();
+
+    expect([...skills.keys()]).toEqual([]);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]?.filePath).toBe(path.join(workspace, "typo.md"));
+    expect(failures[0]?.message).toContain("does not exist");
+  });
+
+  it("stays silent about a discovered root that is simply not there", () => {
+    // A fresh install has no `~/.cheers/skills` and no project skills directory.
+    // Reporting those would make every first run look broken.
+    const { failures } = new SkillLoader(workspace).loadDetailed();
+    expect(failures).toEqual([]);
+  });
+});

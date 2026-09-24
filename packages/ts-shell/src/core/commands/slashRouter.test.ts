@@ -1195,3 +1195,64 @@ describe("slash router (W4)", () => {
     }
   });
 });
+
+describe("a skill the command line named", () => {
+  let workspaceRoot = "";
+  let fakeHomeDir = "";
+  const originalUserProfile = process.env.USERPROFILE;
+  const originalHome = process.env.HOME;
+
+  beforeEach(() => {
+    fakeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-named-skill-home-"));
+    process.env.USERPROFILE = fakeHomeDir;
+    process.env.HOME = fakeHomeDir;
+    workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-named-skill-"));
+  });
+
+  afterEach(() => {
+    process.env.USERPROFILE = originalUserProfile;
+    process.env.HOME = originalHome;
+    fs.rmSync(fakeHomeDir, { recursive: true, force: true });
+    fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it("is invocable by the name the run loaded it under", async () => {
+    // The prompt path loads `--skill <path>`, so the model is told about that
+    // skill. If the router rebuilt its own loader without the flag it answered
+    // "Unknown skill" for a skill the model had just been offered, and the two
+    // lists disagreed about what exists.
+    const named = path.join(workspaceRoot, "flagless.md");
+    fs.writeFileSync(
+      named,
+      "---\nname: flagless\ndescription: named on the command line\n---\n\nNAMED BODY\n",
+      "utf8",
+    );
+    const result = await routeSlashCommand("/skill:flagless", {
+      cwd: workspaceRoot,
+      skillOptions: { skillPaths: [named] },
+    });
+
+    expect(result?.kind).toBe("prompt");
+    if (result?.kind === "prompt") expect(result.prompt).toContain("NAMED BODY");
+  });
+
+  it("is absent when discovery was silenced without naming it", async () => {
+    // `--no-skills` means no discovered skill reaches the prompt. The router has
+    // to honour that too, or the switch would silence the model's list while
+    // leaving the user's own invocation path wide open.
+    const dir = path.join(workspaceRoot, ".agents", "skills", "discovered");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "SKILL.md"),
+      "---\nname: discovered\ndescription: from the project\n---\n\nDISCOVERED BODY\n",
+      "utf8",
+    );
+    const result = await routeSlashCommand("/skill:discovered", {
+      cwd: workspaceRoot,
+      skillOptions: { noSkills: true },
+    });
+
+    expect(result?.kind).toBe("local");
+    if (result?.kind === "local") expect(result.output).toContain("Unknown skill: discovered");
+  });
+});

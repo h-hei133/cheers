@@ -92,6 +92,11 @@ export function bootstrapShellRuntime(input: {
   cwd: string;
   launchCwd?: string;
   runtimeConfig: RuntimeConfig;
+  /** How this run was asked to load skills; carried into the runtime context. */
+  skillOptions?: {
+    readonly skillPaths?: readonly string[];
+    readonly noSkills?: boolean;
+  };
   gitContext: WorkflowGitContext;
   requestedWorkspaceRoot?: string;
   sessionManager: SessionManager;
@@ -310,6 +315,7 @@ export function bootstrapShellRuntime(input: {
       gitRoot: boundGitRoot,
       rootBindingDiagnostics,
       runtimeConfig: input.runtimeConfig,
+      ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
       gitContext: boundGitContext,
       session,
     }),

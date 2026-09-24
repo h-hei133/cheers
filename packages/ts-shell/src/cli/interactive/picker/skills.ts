@@ -1,5 +1,6 @@
 import { runSkillCommand } from "../../../core/commands/skillCommandRuntime.js";
-import { SkillLoader, type Skill } from "../../../core/skills/skillLoader.js";
+import { type Skill } from "../../../core/skills/skillLoader.js";
+import { resolveSkillCatalog } from "../../../core/skills/skillCatalog.js";
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
@@ -18,7 +19,13 @@ export function skillPicker(context: CommandContext): Picker {
     form: "panel",
     empty: "No skills found. Put a SKILL.md under .agents/skills/<name>/ to add one.",
     async load(): Promise<readonly Option[]> {
-      skills = [...new SkillLoader(context.cwd).load().values()];
+      skills = [
+        ...resolveSkillCatalog({
+          workspaceRoot: context.cwd,
+          ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
+          ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
+        }).skills.values(),
+      ];
       return skills.map<Option>((skill) => ({
         id: skill.name,
         label: skill.name,

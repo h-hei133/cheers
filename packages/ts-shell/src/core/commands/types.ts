@@ -29,6 +29,17 @@ export type CommandKind = 'local' | 'prompt' | 'shell-action'
 export interface CommandContext {
   readonly cwd: string
   readonly sessionId?: string
+  /**
+   * How this run was asked to load skills.
+   *
+   * The same options the prompt path uses, so a skill named on the command line
+   * is loadable by name here too — and an untrusted project's skills stay out of
+   * both. Absent means plain discovery.
+   */
+  readonly skillOptions?: {
+    readonly skillPaths?: readonly string[]
+    readonly noSkills?: boolean
+  }
   /** True when the terminal agreed to report modified keys, so chords arrive. */
   readonly modifierKeysReported?: boolean
   readonly rawCommandName?: string

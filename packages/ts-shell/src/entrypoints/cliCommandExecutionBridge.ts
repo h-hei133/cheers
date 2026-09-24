@@ -38,6 +38,17 @@ export interface BuildCliCommandExecutionInput {
   readonly printMode: boolean;
   readonly interactive: boolean;
   readonly sessionId?: string;
+  /**
+   * How this run was asked to load skills.
+   *
+   * Passed to the router so a skill named with `--skill` resolves here too, and
+   * an untrusted project's skills stay out of the prompt the same way they are
+   * kept out of the model's skill list.
+   */
+  readonly skillOptions?: {
+    readonly skillPaths?: readonly string[];
+    readonly noSkills?: boolean;
+  };
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
   readonly env?: Readonly<Record<string, string | undefined>>;
@@ -84,6 +95,7 @@ export async function buildCliCommandExecution(
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     cwd: input.cwd,
     sessionId: input.sessionId,
+    ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     modifierKeysReported: input.modifierKeysReported,
     refreshRuntimeConfig: input.refreshRuntimeConfig,
     compactCheckpointStore: input.compactCheckpointStore,

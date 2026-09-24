@@ -16,7 +16,8 @@ import { loadCatalog } from "../core/models/catalogStore.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
-import { renderSkillList, SkillLoader, type Skill } from "../core/skills/skillLoader.js";
+import { renderSkillList, type Skill } from "../core/skills/skillLoader.js";
+import { resolveSkillCatalog } from "../core/skills/skillCatalog.js";
 import {
   DEFAULT_INSTRUCTION_BUDGET_BYTES,
   loadAppendedInstructionFiles,
@@ -257,25 +258,29 @@ function deferUntilReady(
  *
  * Discovered once per run rather than per turn: discovery reads the filesystem,
  * and the system prompt is built once, so a per-turn scan would repeat work whose
- * result is not consulted again.
- *
- * A project explicitly marked untrusted contributes no project skills. Its skills
- * are text that would enter the system prompt, and a project nobody has vouched
- * for does not get to write there. User-level skills are the user's own and load
- * regardless.
+ * result is not consulted again. The trust gate and the CLI flags are applied by
+ * the catalog, which is the same rule `/skill` and `/skill:` resolve through —
+ * see `resolveSkillCatalog`.
  */
 function discoverSkills(request: CliRuntimeInvocationRequest): ReadonlyMap<string, Skill> {
-  const loader = new SkillLoader(request.workspaceRoot, {
-    ...(request.skillOptions?.skillPaths ? { extraPaths: request.skillOptions.skillPaths } : {}),
-    ...(request.skillOptions?.noSkills ? { disableDiscovery: true } : {}),
+  const { skills, collisions, diagnostics, failures } = resolveSkillCatalog({
+    workspaceRoot: request.workspaceRoot,
+    ...(request.skillOptions?.skillPaths ? { skillPaths: request.skillOptions.skillPaths } : {}),
+    ...(request.skillOptions?.noSkills ? { noSkills: true } : {}),
   });
-  const { skills: found, collisions, diagnostics } = loader.loadDetailed();
 
   // Reported because a malformed skill is otherwise invisible: a missing
   // description keeps it out of the model's list entirely, and a bad name is
   // something the author can only discover by noticing it never appears.
   for (const diagnostic of diagnostics) {
     createComponentLogger("skills").warn(`${diagnostic.filePath} ${diagnostic.message}.`);
+  }
+
+  // A `--skill` path that loaded nothing is named for the same reason. The user
+  // asked for that file by name, and silence would leave a typo looking exactly
+  // like a skill the model chose not to use.
+  for (const failure of failures) {
+    createComponentLogger("skills").warn(`${failure.filePath} ${failure.message}.`);
   }
 
   if (collisions.length > 0) {
@@ -288,13 +293,7 @@ function discoverSkills(request: CliRuntimeInvocationRequest): ReadonlyMap<strin
     }
   }
 
-  if (!projectTrust.isProjectUntrusted(request.workspaceRoot)) return found;
-
-  // Named paths survive the trust gate: a file the user pointed at on the
-  // command line is their own instruction, whatever directory it lives in,
-  // while a discovered project skill is text a repository nobody vouched for
-  // is trying to put in the prompt.
-  return new Map([...found].filter(([, skill]) => skill.source === "user" || skill.source === "cli"));
+  return skills;
 }
 
 /**

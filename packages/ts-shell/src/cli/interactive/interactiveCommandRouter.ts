@@ -101,6 +101,7 @@ export async function routeInteractiveCommand(
     printMode: false,
     interactive: true,
     sessionId: input.runtimeContext.session.id,
+    ...(input.runtimeContext.skillOptions ? { skillOptions: input.runtimeContext.skillOptions } : {}),
     modifierKeysReported: input.modifierKeysReported,
     // The settings live on the context this session carries, so replacing them in
     // place is what makes `/reload` take effect for the rest of the session rather

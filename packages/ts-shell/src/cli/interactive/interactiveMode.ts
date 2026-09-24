@@ -578,6 +578,9 @@ export class InteractiveMode {
       commandContext: {
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,
+        ...(this.options.runtimeContext.skillOptions
+          ? { skillOptions: this.options.runtimeContext.skillOptions }
+          : {}),
         modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
       },
       transcript: this.state.transcript,

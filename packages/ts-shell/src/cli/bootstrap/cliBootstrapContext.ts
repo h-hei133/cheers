@@ -113,6 +113,14 @@ export function createCliBootstrapRuntimeContext(
         cwd: input.rootContext.workspaceRoot,
         launchCwd: input.launchCwd,
         runtimeConfig: input.rootContext.runtimeConfig,
+        ...(input.options.skillPaths || input.options.noSkills
+          ? {
+              skillOptions: {
+                ...(input.options.skillPaths ? { skillPaths: input.options.skillPaths } : {}),
+                ...(input.options.noSkills ? { noSkills: true } : {}),
+              },
+            }
+          : {}),
         gitContext: input.rootContext.gitContext,
         requestedWorkspaceRoot: input.rootContext.runtimeBaseDir,
         sessionManager,

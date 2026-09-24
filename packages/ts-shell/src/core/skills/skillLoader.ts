@@ -70,6 +70,15 @@ export class SkillLoader {
   private readonly extraPaths: readonly string[];
   /** Whether the discovered roots are read at all. */
   private readonly disableDiscovery: boolean;
+  /**
+   * Named paths that could not be loaded, with why.
+   *
+   * Kept apart from `SkillDiagnostic` because they describe the path rather than
+   * a skill: there is no name to attribute them to, and nothing was inspected.
+   * Collected during `loadDetailed` rather than the constructor so a loader that
+   * is never asked to load reports nothing.
+   */
+  private readonly failures: { readonly filePath: string; readonly message: string }[] = [];
 
   constructor(
     workspaceRoot: string = process.cwd(),
@@ -140,10 +149,13 @@ export class SkillLoader {
     skills: ReadonlyMap<string, Skill>
     collisions: readonly SkillCollision[]
     diagnostics: readonly SkillDiagnostic[]
+    /** Named paths that could not be loaded. Empty unless one was named. */
+    failures: readonly { readonly filePath: string; readonly message: string }[]
   } {
     const skills = new Map<string, Skill>();
     const collisions: SkillCollision[] = [];
     const diagnostics: SkillDiagnostic[] = [];
+    this.failures.length = 0;
     // Named paths last, so an explicit file wins a name a discovered skill
     // shares: the user pointed at it, and that is the more specific statement.
     for (const root of [
@@ -171,7 +183,7 @@ export class SkillLoader {
         skills.set(skill.name, skill);
       }
     }
-    return { skills, collisions, diagnostics };
+    return { skills, collisions, diagnostics, failures: [...this.failures] };
   }
 
   /**
@@ -185,15 +197,45 @@ export class SkillLoader {
    * scan.
    */
   private loadRoot(dirOrFile: string, source: SkillSource): Skill[] {
+    // Only a path the user named can be reported missing. A discovered root that
+    // is absent is the ordinary state of a fresh install — nobody asked for
+    // `~/.cheers/skills`, so its absence says nothing worth saying.
+    const report = source === "cli";
     let stats: fs.Stats;
     try {
       stats = fs.statSync(dirOrFile);
-    } catch {
+    } catch (error) {
+      if (report) {
+        this.failures.push({
+          filePath: dirOrFile,
+          message:
+            error instanceof Error && "code" in error && error.code === "ENOENT"
+              ? "does not exist, so nothing was loaded from it"
+              : `could not be read (${error instanceof Error ? error.message : String(error)})`,
+        });
+      }
       return [];
     }
     if (stats.isFile()) {
       const skill = readSkill(dirOrFile, undefined, source);
+      if (!skill && report) {
+        this.failures.push({
+          filePath: dirOrFile,
+          message: "is not a readable skill file, so nothing was loaded from it",
+        });
+      }
       return skill ? [skill] : [];
+    }
+    if (!stats.isDirectory()) {
+      // A FIFO, socket, or device node. `scan` would swallow the ENOTDIR that
+      // readdirSync raises, and the named path would vanish with no explanation.
+      if (report) {
+        this.failures.push({
+          filePath: dirOrFile,
+          message: "is neither a file nor a directory, so nothing was loaded from it",
+        });
+      }
+      return [];
     }
     return this.scan(dirOrFile, source, true);
   }
