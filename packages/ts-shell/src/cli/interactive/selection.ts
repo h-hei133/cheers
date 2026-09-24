@@ -1,4 +1,5 @@
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
+import { nextClickCount, spanForClick, type ClickRecord } from "./clickSelect.js";
 import {
   extractSelection,
   orderSpan,
@@ -33,6 +34,9 @@ export class DragSelection {
   private anchor: SelectionPoint | undefined;
   private focus: SelectionPoint | undefined;
   private inFlight = false;
+  private lastClick: ClickRecord | undefined;
+  /** The current run is a word or line selection, so a drag extends it. */
+  private granularity: "character" | "word" | "line" = "character";
 
   constructor(
     private readonly screen: ScreenText,
@@ -54,6 +58,10 @@ export class DragSelection {
     this.inFlight = false;
     this.anchor = undefined;
     this.focus = undefined;
+    // The click run ends with the selection: otherwise a click after a copied
+    // selection would count as a continuation of the one before it.
+    this.lastClick = undefined;
+    this.granularity = "character";
   }
 
   /** Copy the currently selected text and clear the selection. Returns true if a selection was active. */
@@ -75,29 +83,55 @@ export class DragSelection {
    * drag, the wheel, a non-left button — so the caller can ignore it rather than
    * treat it as a selection.
    */
-  handle(report: MouseReport, contentCoord?: SelectionPoint): boolean {
+  handle(report: MouseReport, contentCoord?: SelectionPoint, now: number = Date.now()): boolean {
     if (report.shift) {
       this.clear();
       return false;
     }
     const coord = contentCoord ?? { row: report.row, column: report.column };
     switch (report.kind) {
-      case "press":
+      case "press": {
         if (report.button !== 0) return false;
         this.inFlight = true;
-        this.anchor = coord;
-        this.focus = coord;
+        // Repeated presses on one cell widen what is selected: twice for the word,
+        // three times for the line. The run is remembered so a drag that follows
+        // takes the whole word rather than shrinking to the exact cell under the
+        // pointer, which is the behaviour of every editor that has this gesture.
+        const count = nextClickCount(this.lastClick, coord, now);
+        this.lastClick = { row: coord.row, column: coord.column, at: now, count };
+        this.granularity = count === 2 ? "word" : count === 3 ? "line" : "character";
+        const span =
+          this.granularity === "character"
+            ? undefined
+            : spanForClick(this.screen.rows(), coord, this.granularity);
+        // A word click that landed on whitespace has no word to take, so it falls
+        // back to a character anchor rather than selecting nothing at all.
+        this.anchor = span?.from ?? coord;
+        this.focus = span?.to ?? coord;
         return true;
+      }
       case "drag":
         if (!this.anchor) return false;
         this.inFlight = true;
+        // A word or line selection stays whole while the pointer moves: the unit
+        // was chosen by the click, and a drag adjusts which units are covered
+        // rather than dissolving back into individual characters.
+        if (this.granularity !== "character") {
+          const span = spanForClick(this.screen.rows(), coord, this.granularity);
+          if (span) this.focus = span.to;
+          return true;
+        }
         this.focus = coord;
         return true;
       case "release": {
         this.inFlight = false;
         const anchor = this.anchor;
         if (!anchor) return false;
-        const focus = coord;
+        // A word or line selection was already decided by the click, so the release
+        // point does not redefine it. Overwriting the focus here is what made a
+        // double click copy a fragment: the span had been widened to the word, and
+        // the release column narrowed it back to wherever the pointer stopped.
+        const focus = this.granularity === "character" ? coord : this.focus ?? coord;
         this.focus = focus;
         if (anchor.row === focus.row && anchor.column === focus.column) {
           this.clear();

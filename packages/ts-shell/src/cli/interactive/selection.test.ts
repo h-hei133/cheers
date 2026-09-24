@@ -85,6 +85,50 @@ describe("drag tracking", () => {
     return selection.handle(parseMouseReport(sequence)!);
   }
 
+  it("takes the whole word on a double click", () => {
+    // The gesture every editor has. Asserted through the drag rather than on the
+    // span helper, because the helper being right does not prove it is wired in.
+    const { selection, copied } = build();
+    // The mouse report's column is one-based; 18 is inside "live" in the third row.
+    const at = "\u001b[<0;18;3M";
+
+    press(selection, at);
+    press(selection, at);
+    press(selection, "\u001b[<0;18;3m");
+
+    expect(copied).toHaveLength(1);
+    // The whole word, not the single character the pointer sat on.
+    expect(copied[0]).toBe("live");
+  });
+
+  it("takes the whole line on a triple click", () => {
+    const { selection, copied } = build();
+    const at = "\x1b[<0;18;3M";
+
+    press(selection, at);
+    press(selection, at);
+    press(selection, at);
+    press(selection, "\x1b[<0;18;3m");
+
+    expect(copied).toHaveLength(1);
+    expect(copied[0]).toContain("Blocks stay live while the screen has room");
+  });
+
+  it("treats a press far apart in time as a new single click", () => {
+    // A run has to end, or a later unrelated click would silently widen its
+    // selection to the word under it.
+    const { selection, copied } = build();
+    const at = "\x1b[<0;18;3M";
+
+    press(selection, at);
+    press(selection, "\x1b[<0;18;3m");
+    press(selection, at);
+    press(selection, "\x1b[<0;18;3m");
+
+    // Two single clicks on one cell select nothing, so nothing is copied.
+    expect(copied).toEqual([]);
+  });
+
   it("copies once, on release", () => {
     const { selection, copied } = build();
 
