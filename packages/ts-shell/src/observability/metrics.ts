@@ -22,13 +22,16 @@ export interface MetricEvent {
  * count and the tags, which is what a reader actually wants: not "a tool ran",
  * but "this tool ran eleven times and took 4.2s in total".
  *
- * **The buffer is process-wide rather than per session, which holds only because
- * one session runs at a time.** `ShellSessionRuntime` refuses a second prompt
- * while one is running, and every recording path sits inside a turn that flushes
- * on the way out, so nothing survives across sessions in practice. A change that
- * ran two sessions concurrently, or a turn that outlived its caller, would need
- * this keyed by session — otherwise the first flush would attribute the other
- * session's counts to itself.
+ * **The buffer is process-wide rather than per session.** That is safe today only
+ * because every surface chains its turns — the prompt loop, the TUI, and the print
+ * path each await the previous run before starting the next — so no two flushes
+ * can interleave. It is not enforced anywhere: `ShellSessionRuntime.executePrompt`
+ * has no busy guard, and a second call while one is running is accepted and
+ * overwrites `currentRun`. Any caller that starts a prompt without awaiting the
+ * last one would have the first flush attribute the second turn's counts to
+ * itself, so a change in that direction has to key this by session first. The
+ * comment here previously claimed the runtime refused a second prompt; it does
+ * not, and a false invariant is worse than none.
  */
 const logger = createComponentLogger("metric");
 
@@ -83,6 +86,12 @@ export function recordTiming(name: string, value: number, tags: Record<string, s
  *
  * One `logger.info` per metric rather than one per call: a turn that ran forty
  * tool calls produces a handful of lines, not forty.
+ *
+ * Also runs at process exit, which is the only way a mid-turn exit keeps its
+ * numbers: Ctrl+D while a turn is in flight, or a crash, leaves the promise chain
+ * that would have flushed it unwound. The sink appends synchronously, so a
+ * `process.on("exit")` handler can still write — an async one could not, since
+ * nothing is awaited after the exit event.
  */
 export function flushMetrics(): void {
   if (pending.size === 0) return;
@@ -119,3 +128,27 @@ export function pendingMetrics(): readonly MetricEvent[] {
 export function resetMetrics(): void {
   pending = new Map();
 }
+
+/**
+ * Flush on the way out.
+ *
+ * Registered here rather than from an entry point so that every process which can
+ * record a metric also flushes one. Leaving it to callers means the one path that
+ * exits without unwinding — the crash — is the one that forgets. The sink appends
+ * synchronously, so a `process.on("exit")` handler can still write; an async one
+ * could not, because nothing is awaited after the exit event.
+ *
+ * `once`, so importing this module more than once cannot write the buffer twice.
+ */
+function registerExitFlush(): void {
+  process.once("exit", () => {
+    try {
+      flushMetrics();
+    } catch {
+      // Nothing useful can be done while exiting, and a throw here would replace
+      // the real exit reason with a metrics error.
+    }
+  });
+}
+
+registerExitFlush();

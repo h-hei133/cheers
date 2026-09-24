@@ -34,7 +34,7 @@ T1–T4 的施工**不会让它们再变**；压到最后等于让施工者**在
 `✅ 已收口（2026-09-23 更正）` 并附证据；`### 2.x` 详情节同步加「更正说明」。
 
 **一处必须记的自我更正**：`01-*` §2.2 的技能表有 **3 行已过时**——
-祖先目录搜索（`skillLoader.ts:82` 用 `projectDirectories`）、
+祖先目录搜索（`skillLoader.ts:84` 用 `projectDirectories`）、
 注入清单（`:252` `renderSkillList` 产出 `<available_skills>`）、
 `disable-model-invocation`（`:219`）**都已实现**，而表里写的是「无」。
 
@@ -263,13 +263,22 @@ Node 官方发布说明确认 `zlib.crc32` 于 **v22.2.0** 加入、**回移至 
 | `analyze:module-facades` | 仍是原有 **5 个** monolith，**无新增** |
 | 受影响套件 | T1 52 文件/529 项、T2 31/283、T3 55/573、T4 27/210 |
 | **全量套件** | **509 文件 / 3267 通过 / 1 跳过 / 0 失败**（修复 §4.4 与 §7.1 之后） |
-| `analyze-boundaries.py` | 生产 **937 → 941**、CLI 可达 **808 → 812**、testOnly 100 → 99 |
+| `analyze-boundaries.py` | 生产 **938 → 941**、CLI 可达 **808 → 812**、testOnly 100 → 99 |
 
-**边界数字的一处说明**：生产文件只**新增 3 个**（`metricsCommandRuntime.ts`、
-`reportCommandRuntime.ts`、`zipArchive.ts`），但生产计数 +4。
-差额是 **1 个文件从 testOnly 重分类为生产**（`usageTelemetry.test.ts` 自 Phase 5 就存在，
-本轮改动使其可达性标签变化）。**没有未申报的生产文件**——已用
-`git diff --name-status 3ba4abf8..HEAD -- packages/ts-shell/src | grep '^A' | grep -v '\.test\.'` 核对。
+**边界数字的一处说明（2026-09-24 更正）**：生产文件只**新增 3 个**
+（`core/commands/metricsCommandRuntime.ts`、`core/commands/reportCommandRuntime.ts`、
+`observability/zipArchive.ts`），基线是**紧邻的前一个提交 `3ba4abf8` 的 938**，所以差额正好是 +3。
+此前这里写作「937 → 941」并把差额解释为「1 个文件从 testOnly 重分类」——**两处都错**：
+937 是更早的 `e2063abd`（Phase 5 记录）的数字，而唯一发生 testOnly→生产 迁移的文件是
+`core/security/redaction.ts`（`T` → `CT`），不是 `usageTelemetry.test.ts`（它从来不在生产集合里，
+分析器把 `*.test.ts` 排除在外）。
+
+核对方法（可复现）：把 `3ba4abf8` 导出到临时目录后跑
+`python3 scripts/analyze-boundaries.py`，得到 `production: 938`；再 diff 两次运行写出的
+`/tmp/boundary-report.json` 的 `rows`，得到**新增 3 个文件、标签迁移 3 个**：
+`observability/types.ts` 与 `observability/metrics.ts`（`C` → `CT`）、
+`core/security/redaction.ts`（`T` → `CT`）。
+**结论不变**（没有未申报的生产文件），但**基线与文件名此前是错的**。
 
 ---
 
@@ -289,7 +298,10 @@ Node 官方发布说明确认 `zlib.crc32` 于 **v22.2.0** 加入、**回移至 
 
 ---
 
-## 7.1 复核轮（施工后）
+## 7.1 复核轮（施工后，第一次）
+
+> 本节是**第一次**复核轮（2 个复核者，发现 5 处）。
+> **第二次复核轮**（5 个复核者，12 处）见 §8。
 
 施工完成后派两个对抗式复核者（`RvP6Code` 覆盖 T1/T2/T3 代码、`RvP6ZipDocs` 覆盖 T4 与文档）。
 **发现 5 处，其中 1 处是严重缺陷，全部已修并反向验证。**
@@ -340,7 +352,91 @@ secret in EXTRACTED content?  true    ← 实际上就在里面
 
 ---
 
-## 8. 未做的事（如实记录）
+## 8. 复核轮（2026-09-24，五个复核者）
+
+施工完成后派 5 个对抗式复核者（T1 超时接线、T2 metrics、T3 用量分桶、T4 报告归档、T5 文档判定），
+**共发现 12 处，其中 3 处严重**。全部已修并**逐项反向验证**（去掉修复→测试失败→恢复→通过）。
+
+### 8.1 三处严重缺陷
+
+#### ⚠️ ① 报告归档再次泄漏密钥（我的第一轮修复不完整）
+
+第一轮我把 `stack` **逐行**脱敏，理由是「保留缩进」。**这绕过了跨行规则**：
+`core/security/redaction.ts` 里有两条规则用 `[\s\S]` 匹配**跨行**内容——
+`/<html[\s\S]*?<\/html>/` 与 `/oldText[:=][\s\S]*?(?=\snewText[:=]|$)/`。
+按行切分后，每一行都不再包含完整的块，规则**永不触发**。
+
+**实机复现**（构建产物，`crashes.json` 里放一个 `<html>` 块）：
+```
+message  -> "fetch failed [raw-content-excluded]"     ← 脱敏成功
+stack    -> "Error: fetch failed <html>\n<body>SECRET-HTML-BODY-CONTENT</body>\n</html>"  ← 原块还在
+```
+**消息被脱敏了，同一段内容在旁边的 stack 里逐字保留。**
+
+**修复**：给共享脱敏器加 `preserveLines` 选项——**规则照常整段跑**（跨行规则因此有效），
+只把最后的空白折叠从 `\s+` 改成 `[^\S\n]+`，保留换行。测试改为断言**解压后的内容**且
+**必须有 `[raw-content-excluded]` 标记**（证明规则跑了，而不是内容根本没写进去）。
+**反向验证**：恢复逐行实现 → 1/13 失败。
+
+#### ⚠️ ② CI 从未通过（26/26 全红）
+
+**复核者指出 CI 在 `main` 上是红的，而我一直没查过。** 核实：
+`gh run list --workflow=CI --limit 60` → **26 次运行，0 次成功**。
+
+**根因**：`Promise.withResolvers` 需要 **Node 22**，而 `.github/workflows/ci.yml:20` 是 `node-version: 20`。
+本地是 Node 24，所以**本地全绿、CI 全红**——这正是「本地通过不等于 CI 通过」的典型。
+CI 日志：45 处 `Promise.withResolvers is not a function`。
+
+**修复**：两处生产调用（`core/agent/retry.ts:141`、`runtime/execution/fileLock.ts:100`）
+改为手写 promise，两处测试同样处理；`zlib.crc32`（需 20.15 **或** 22.2，而 22.0–22.1 **两者都没有**）
+换成自带的表驱动 CRC-32。**验证**：把 `engines` 定为**真实下限 `>=20.3.0`**（`AbortSignal.any`），
+并在**真实 Node 20.19.5** 上跑编译产物——三个路径全部通过（修复前是 `TypeError`）。
+
+**方法论教训**：**声明的版本下限必须在那个版本上真的跑过**。
+`engines` 是承诺，不是注释；CI 应该验证下限，否则它验证的是开发机。
+
+#### ⚠️ ③ `/metrics` 读不到自己写的数据
+
+四个独立缺陷，每个都会让数字**看起来是数据而实际是错的**：
+
+| # | 缺陷 | 后果 |
+|---|---|---|
+| a | 限流 `slice(-limit)` 作用在**原始行**上 | 2500 行普通日志把指标挤出窗口，命令**自信地报告「没有记录」** |
+| b | 过滤 `endsWith(".log")` | 旋转分片 `.log.1` 被排除，**旋转之后的指标全部消失** |
+| c | 旧格式行（`value` 字段）读成 `total: 0` | 真实存在的 31 行历史数据被报成 `count 9, total 0` |
+| d | `sessionId` 不在 `TAG_KEYS` | 标签**写进了磁盘**却在读取端被丢弃，无法归因到会话 |
+
+外加一个：**进程中途退出会丢缓冲区**（Ctrl+D、崩溃），因为只在 `finally` 里 flush。
+修复：先解析再限流、正则匹配 `.log` 与 `.log.N`、兼容 `value`、把 `sessionId` 纳入标签、
+**注册 `process.once("exit")` 兜底 flush**。
+**反向验证**：四个缺陷各恢复一次 → 分别失败 1/3/1/1 项；去掉 exit 钩子 → 2 项失败。
+
+### 8.2 其余缺陷
+
+| # | 位置 | 问题 | 处置 |
+|---|---|---|---|
+| 4 | `usageTelemetry.ts` | **原型污染**：模型名 `__proto__` 写进 `Object.prototype`（实机验证：`for..in` 遍历任意对象都会吐出桶字段），`constructor` 得到 `NaN` | `Object.create(null)` + `hasOwnProperty`；模型名来自未校验的 `/model` 与 provider 列表，**可达** |
+| 5 | `usageTelemetry.ts` | 分桶键只有模型名，**漏了 provider**；切 provider 会用新价重算历史 token——正是本轮要修的缺陷**换个轴** | 键改为 `<provider>/<model>`（与 pi 的 `usage-totals.ts:47` 一致）；两个消费方一起改 |
+| 6 | `cliSessionRuntimeFactory.ts:215` | 三个 compaction 调用点**漏接一个**（`summarizeAbandonedTurns`，`/back` 路径），仍用全局 fetch，**无超时且无 abort** | 补接线；并把 `fetchImpl` 从可选改为**必填**，杜绝同类遗漏 |
+| 7 | `provider/request/fetch.ts` | memo 键用 `/` 拼接原始值：`{connectTimeoutMs:"1/2"}` 与 `{1, "2/"}` 撞键；`"6000"`（`${VAR}` 插值产生）被守卫丢弃后与数字 `6000` 撞键 → **重载后沿用旧超时** | 键改用**解析后的值** `JSON.stringify([...])` |
+| 8 | 同上 | `positiveOr` 接受分数（undici 要求整数，**一个 120000.5 让所有请求失败**）、丢弃字符串、接受 20 亿（**等于没有超时**） | 强制整数、接受可解析字符串、上限 1 小时 |
+| 9 | `reportCommandRuntime.ts` | `cwd` **绝对路径**写进报告（注释还声称「故意不是绝对路径」），泄漏用户名与客户目录名 | 只留 `basename`；补测试 |
+| 10 | `metrics.ts` | 注释声称「`ShellSessionRuntime` 会拒绝第二个 prompt」——**该守卫不存在**（`executePrompt` 直接接受并发调用） | 改写注释：说明**实际**约束（所有调用方都串行）与**未强制执行** |
+| 11 | `_index.md:174` | 合计行是**派生值**，Phase 6 改了判定列却没同步：真实是 **13/19/16/10**，写着 16/21/16/10 | 重数并加第二次重数说明 |
+| 12 | `phase-6-execution.md:266` | 边界差基线写成 937（应为 `3ba4abf8` 的 **938**），并把重分类文件写成 `usageTelemetry.test.ts`（实为 `core/security/redaction.ts`） | 用可复现命令更正 |
+
+### 8.3 复核轮的方法论收获
+
+1. **压缩容器的字节扫描不是安全检查**——它通过了，而秘密就在里面。
+   两次都栽在这里：第一次是 deflate 隐藏了明文，第二次是逐行脱敏绕过了跨行规则。
+2. **兼容性声称要用对比验证**：`/cost` 单模型输出「逐字不变」是**错的**，跑旧实现 diff 才看出来。
+3. **`engines` 必须在那个版本上验证**，否则 CI 验证的是开发机。
+4. **派生值（合计行）必须随源值一起改**。
+5. **注释里的不变量必须是真检查过的**——两处注释（`cwd`、并发守卫）都在描述**不存在**的行为。
+
+---
+
+## 9. 未做的事（如实记录）
 
 | 项 | 原因 |
 |---|---|

@@ -97,10 +97,15 @@ export async function withFileLock<T>(
   const registered = registration.then(async () => {
     const key = await lockKey(absolutePath);
     const held = queues.get(key) ?? Promise.resolve();
-    const released = Promise.withResolvers<void>();
-    const tail = held.then(() => released.promise);
+    // Hand-built for the same reason as the retry wait: `Promise.withResolvers`
+    // needs Node 22, and this module is reachable from the first file edit.
+    let release!: () => void;
+    const released = new Promise<void>((settle) => {
+      release = settle;
+    });
+    const tail = held.then(() => released);
     queues.set(key, tail);
-    return { key, held, tail, release: released.resolve };
+    return { key, held, tail, release };
   });
   // A failed registration must not strand every later one behind it.
   registration = registered.then(

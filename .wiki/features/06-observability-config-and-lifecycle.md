@@ -48,10 +48,10 @@ grep -rn "setMetricSink" packages/ts-shell/src --include='*.ts' | grep -v 'obser
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 单一、生效的配置系统 ✅ **已解决**（`settingsLoader` 已删除，只剩 `runtimeConfig`） | `src/core/settings-manager.ts`；`docs/settings.md:1-18`（两层：global + project） | `config/runtimeConfig.ts` **与** `config/settingsLoader.ts` 并行 | **DEFICIENT** | 见 §2.1（**最高优先级**） |
+| 单一、生效的配置系统 | `src/core/settings-manager.ts`；`docs/settings.md:1-18`（两层：global + project） | `config/runtimeConfig.ts`（**唯一**） | **已收口**（**2026-09-24 更正**） | **原判定列写 DEFICIENT、且「我们位置」列还写着 `config/settingsLoader.ts` 与之并行——该文件已不存在**（`ls` 确认）。行首的 ✅ 才是当前状态。见 §2.1 |
 | 配置错误可见 | `src/core/settings-diagnostics.ts:4-11`（收集 + 去重）；`docs/settings.md` | `config/runtimeConfig.ts`（降级 + `configDiagnostics`） | ✅ **已收口**（**2026-09-23 更正**，Phase 5 T4） | `getRuntimeConfig` 不再抛异常，改为跳过坏文件并产出诊断；三处可见（启动横幅、`/doctor`、CLI `doctor`）。见 §2.2（已同步更正） |
 | 崩溃日志 | `src/core/crash-log.ts`（`CrashRecord`，保留最近 5 条，7 天过期） | `observability/crashLog.ts`（Phase 5 T7） | ✅ **已收口**（**2026-09-23 更正**） | 保留最近 5 条 + `/crash`（含 `--stack`）。**复核轮修了一个致命缺陷**：只记录不重抛 → 每个致命崩溃变成进程继续运行；已改为 `throw error`（实机 exit 7 + 记录先落盘）。**余量**：无 7 天过期（pi 有）。见 §3.1（已同步更正） |
-| Bug report（含脱敏与打包） | `src/core/bug-report.ts`（`redactUrl`、敏感键正则、zip、UUID） | ✅ **已收口**（**2026-09-24**，Phase 6 T4）：`/report` + `observability/zipArchive.ts` | ~~MISSING~~ **已收口** | 复用 `core/security/redaction.ts` 的**单一脱敏实现**；zip 用 `node:zlib` 手写（**零新依赖**）。**产物不含会话内容**——bug report 不是拷走用户代码的理由。**实机**：`unzip -t` 通过，密钥在**原始字节**中不存在（消息显示 `api_key=[redacted]`）。**引擎下限**：`zlib.crc32` 需 Node ≥20.15，`engines` 已从 `>=20.0.0` 提到 `>=20.15.0`。见 `phase-6-execution.md` §4 |
+| Bug report（含脱敏与打包） | `src/core/bug-report.ts`（`redactUrl`、敏感键正则、zip、UUID） | ✅ **已收口**（**2026-09-24**，Phase 6 T4）：`/report` + `observability/zipArchive.ts` | ~~MISSING~~ **已收口** | 复用 `core/security/redaction.ts` 的**单一脱敏实现**；zip 用 `node:zlib` 手写（**零新依赖**）。**产物不含会话内容**——bug report 不是拷走用户代码的理由。**实机**：`unzip -t` 通过，密钥在**解压后内容**中不存在（消息显示 `api_key=[redacted]`）。**引擎下限**（**2026-09-24 复核后更正**）：CRC-32 改为**自带表实现**，不再依赖 `zlib.crc32`；`engines` 定为**真实下限 `>=20.3.0`**（`AbortSignal.any`）。见 `phase-6-execution.md` §4 与 §8.1② |
 | 启动性能计时 | `src/core/timings.ts`（`PI_TIMING=1`，命名空间） | `observability/startupTiming.ts`（Phase 5 T7） | ✅ **已收口**（**2026-09-23 更正**） | `CHEERS_TIMING=1` 门控、相邻标记差值、`/timings` 命令。**复核轮修了两处**：首个标记曾恒为 0ms 且不计入 total；标为「process start」的标记实际在模块加载之后。见 §3.3（已同步更正） |
 | Metrics 采集 | `src/core/telemetry.ts`（**opt-in 安装遥测**，`PI_TELEMETRY`——**不是通用 metrics sink**） | ✅ **已收口**（**2026-09-24**，Phase 6 T2）：5 类采集点 + 按回合批量写 + `/metrics` 命令 | ~~DEFICIENT~~ **已收口** | **复核更正两处**：① pi 的 `telemetry.ts` 是**安装遥测**，无可抄的通用 sink；② 我方 sink 是 `fs.appendFileSync`（**同步阻塞**），且 `/log tail` **丢弃 `fields`**（指标值写在 `fields` 里，**读不出来**）。**这是 Phase 6 的 T2**，见 `phase-6-decisions.md` §2 |
 | 结构化日志 | 无独立结构化日志层 | `observability/structuredLogger.ts`（脱敏 + trace 关联 + 轮转文件） | **OURS-ONLY** | 见 §4 |
@@ -219,17 +219,21 @@ grep -rn "uncaughtException\|unhandledRejection" packages/ts-shell/src --include
 > 它自己的注释记录了「同一套规则曾被手抄进六个模块」，
 > 而 bug report 恰是**最不能有私有副本**的地方（唯一离开本机的路径）；
 > ② **产物不含会话内容**，只含环境与崩溃记录；
-> ③ 测试断言扫描**归档字节**而不是结构化字段——
+> ③ 测试断言扫描**整份归档内容**而不是逐字段——
 > 「漏在某个没想到要脱敏的字段里」正是逐字段检查会漏掉的情形。
+> （**2026-09-24 更正**：初版写的是「扫描归档**字节**」，而那**正是无效做法**——见下方复核轮说明。）
 > **⚠️ 复核轮修了一处严重缺陷**：初版把崩溃 `stack` **原样写入**归档，理由是「stack 只有文件路径与函数名」——
 > **错的**：V8 的 stack 以 `Error: <message>` 开头，消息里的密钥会逐字重复。
 > 更糟的是初版测试扫描**压缩后的原始字节**，而条目是 deflate 压缩的，密钥**不会以连续 ASCII 出现**——
 > **测试通过而秘密就在里面**。已修为逐行脱敏（保留缩进）并让测试**解压后扫描**；
 > 实机复现与修复验证见 `phase-6-execution.md` §7.1.1。
 >
-> **一处必须记录的契约变更**：`zlib.crc32` 需 Node **≥20.15.0**，
+> **一处必须记录的契约变更（2026-09-24 复核后已修订）**：初版用 `zlib.crc32`（需 Node **≥20.15.0**，
+> 且 **22.0–22.1 反而没有**——它是 v22.2.0 加入后回移的），
 > 而 `engines` 声明的是 `>=20.0.0`（CI 用 `node-version: 20`，解析为最新 20.x，**不会抓到**）。
-> 已把下限提到 `>=20.15.0`。见 `phase-6-decisions.md` §4.3。
+> 复核后改为**自带表驱动 CRC-32**，把下限定为**真实值 `>=20.3.0`**（`AbortSignal.any` 才是最高门槛）。
+> 原裁决见 `phase-6-decisions.md` §4.3；**该裁决已被执行中的发现推翻**——真正的问题不是 CRC 的版本，
+> 而是 `Promise.withResolvers`（需 Node 22）让 **CI 26/26 全红**，见 `phase-6-execution.md` §8.1②。
 > **下方原文保留为当时的证据。**
 
 **pi 如何实现**：`src/core/bug-report.ts` 定义 `BUG_REPORT_CUSTOM_ENTRY_TYPE = "pi.bug-report"` 与 `BUG_REPORT_SCHEMA_VERSION = 1`；`:26-28` `SENSITIVE_KEY` 正则覆盖 `api[-_]?key|secret|token|password|passwd|credential|authorization|cookie`（含 camelCase 拆分）；`:30-52` `redactUrl` 剥离 URL 里的 userinfo 与敏感查询参数；`docs/sessions.md` 描述产物结构（`report.json`/`diagnostics.json`/`session.jsonl`/`summary.md`）与两条出路（Radius 上传 / 导出 zip），并明确「API keys, header values, URL credentials, and the analytics tracking id are never included」。

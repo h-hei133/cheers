@@ -16,8 +16,11 @@ function tempDir(): string {
  * long the work takes and flake when the machine is busy.
  */
 function gate(): { wait: Promise<void>; open: () => void } {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  return { wait: promise, open: resolve };
+  let open!: () => void;
+  const wait = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { wait, open };
 }
 
 /** Lets every already-scheduled continuation run, without advancing real time. */

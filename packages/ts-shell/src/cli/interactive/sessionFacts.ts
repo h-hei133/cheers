@@ -52,11 +52,14 @@ export function readStatusFacts(
   live: LiveStatusFacts = {},
 ): StatusFacts {
   const usage = getSessionUsage(context.session.id);
-  // Summed across the models that answered, each at its own published rate. A
-  // session that switched models spent tokens at two prices, and the status band
-  // must not show the newest model's rate applied to all of them.
-  const { cost } = estimateSessionCost(usage, (model) =>
-    resolveModelCost(loadCatalog(), context.runtimeConfig.provider, model),
+  // Summed across the models that answered, each at the rate published for the
+  // provider that served it. A session that switched models — or providers — spent
+  // tokens at more than one price, and the status band must not show the newest
+  // rate applied to all of them. Resolving against the active provider would do
+  // exactly that.
+  const catalog = loadCatalog();
+  const { cost } = estimateSessionCost(usage, (provider, model) =>
+    resolveModelCost(catalog, provider, model),
   );
   return {
     model: activeModelName(context),

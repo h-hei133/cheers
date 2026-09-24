@@ -1,4 +1,4 @@
-import { deflateRawSync, crc32 } from "node:zlib";
+import { deflateRawSync } from "node:zlib";
 
 /**
  * A minimal ZIP writer, for the report archive.
@@ -9,9 +9,11 @@ import { deflateRawSync, crc32 } from "node:zlib";
  * larger surface than the code it replaces, in a project that keeps its
  * dependency list short on purpose.
  *
- * Uses only `node:zlib`. `crc32` needs Node 20.15 or newer, which the package
- * declares in `engines`; before that the function did not exist and the report
- * would have failed at the moment someone needed it most.
+ * Uses only `node:zlib`, and only `deflateRawSync` from it. The CRC is computed
+ * here rather than with `node:zlib`'s `crc32`, which landed in 20.15.0 and was
+ * backported to 22.2.0 — so between 22.0.0 and 22.1.x it is missing, and a
+ * `>=20.15.0` floor would have admitted those versions. A table-driven CRC-32 is
+ * a dozen lines and removes the version question entirely.
  *
  * Only what is needed is implemented: stored sizes are known up front (entries
  * are built in memory), there are no zip64 extensions, and no directories are
@@ -22,6 +24,32 @@ import { deflateRawSync, crc32 } from "node:zlib";
 export interface ZipEntry {
   readonly name: string;
   readonly data: string | Uint8Array;
+}
+
+/**
+ * CRC-32, as the ZIP format defines it: reflected polynomial 0xEDB88320.
+ *
+ * The table is built once, lazily, because the only caller is a report that is
+ * written by hand and rarely.
+ */
+const CRC_TABLE = ((): Uint32Array => {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < 256; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[index] = value >>> 0;
+  }
+  return table;
+})();
+
+function crc32Of(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc = CRC_TABLE[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 /** MS-DOS date and time, which is what the format stores. */
@@ -67,7 +95,7 @@ export function createZipArchive(entries: readonly ZipEntry[], now: Date = new D
     // Deflate rather than store: report contents are text and compress well, and
     // a stored entry would make the archive larger than its own contents.
     const compressed = deflateRawSync(data);
-    const checksum = crc32(data);
+    const checksum = crc32Of(data);
 
     const local = Buffer.alloc(30);
     local.writeUInt32LE(LOCAL_HEADER_SIGNATURE, 0);

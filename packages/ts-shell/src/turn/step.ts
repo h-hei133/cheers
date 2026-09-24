@@ -275,6 +275,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
             cacheReadTokens: cache.cacheReadTokens,
             cacheWriteTokens: cache.cacheWriteTokens,
             model: request.provider.model,
+            // Recorded with the bucket, not looked up later: a provider switch must
+            // not reprice tokens that were already spent at the old provider's rate.
+            provider: request.provider.provider,
             // The provider counted the prompt it was sent; the message count lets
             // a later reader add whatever the conversation gained since.
             promptMessageCount: messages.length + 1,

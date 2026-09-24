@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   flushMetrics,
@@ -130,5 +134,57 @@ describe("pendingMetrics", () => {
     expect(pending[0]?.name).toBe("turn.duration");
     expect(pending[0]?.value).toBe(42);
     expect(pending[0]?.unit).toBe("ms");
+  });
+});
+
+describe("the exit flush", () => {
+  function runFixture(mode: string, dir: string): { status: number | null } {
+    const repoRoot = path.resolve(process.cwd(), "../..");
+    const tsxCli = path.join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs");
+    const fixturePath = path.join(process.cwd(), "src", "test-utils", "metricsExitProcess.ts");
+    // The sink declines to write to a file when it sees a test environment, which
+    // is what keeps the suite from littering the real log directory. The child is
+    // a real process doing real work, so those markers come off; its log goes to a
+    // temporary directory instead.
+    const env = { ...process.env, CHEERS_LOG_DIR: dir };
+    delete env.VITEST;
+    delete env.NODE_ENV;
+    const result = spawnSync(process.execPath, [tsxCli, fixturePath, mode], {
+      cwd: process.cwd(),
+      env,
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+    return { status: result.status };
+  }
+
+  function logText(dir: string): string {
+    const logFile = fs.readdirSync(dir).find((name) => name.endsWith(".log"));
+    return logFile ? fs.readFileSync(path.join(dir, logFile), "utf8") : "";
+  }
+
+  it("keeps what was recorded when the process exits mid-turn", () => {
+    // The flush normally happens at the end of a turn. Ctrl+D while one is in
+    // flight unwinds nothing, so without a hook on the way out the buffer is lost
+    // — and the runs that went wrong are the ones whose numbers disappear.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "metrics-exit-"));
+    try {
+      expect(runFixture("exit", dir).status).toBe(0);
+      const written = logText(dir);
+      expect(written).toContain("cli.prompts");
+      expect(written).toContain('"total":2');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps them when the turn ends in a crash", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "metrics-crash-"));
+    try {
+      expect(runFixture("throw", dir).status).not.toBe(0);
+      expect(logText(dir)).toContain("cli.prompts");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

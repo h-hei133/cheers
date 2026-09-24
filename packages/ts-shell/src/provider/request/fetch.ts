@@ -48,6 +48,14 @@ interface ProviderTransportConfig {
 const DEFAULT_CONNECT_TIMEOUT_MS = 30_000;
 const DEFAULT_HEADERS_TIMEOUT_MS = 120_000;
 const DEFAULT_BODY_TIMEOUT_MS = 120_000;
+/**
+ * The largest deadline that is still a deadline.
+ *
+ * An hour. A field in milliseconds accepts a number large enough that the timer
+ * outlives the process, which is indistinguishable from having no deadline at
+ * all; past this the built-in applies instead.
+ */
+const MAX_TIMEOUT_MS = 60 * 60 * 1000;
 
 export function createProviderFetchFromEnv(
   options: ProviderFetchOptions = {},
@@ -98,11 +106,34 @@ let cachedProviderFetch: { readonly key: string; readonly fetch: typeof fetch } 
 export function providerFetchFromTimeouts(
   timeouts: ProviderTimeoutOverrides = {},
 ): typeof fetch {
-  const key = `${timeouts.connectTimeoutMs ?? ""}/${timeouts.headersTimeoutMs ?? ""}/${timeouts.bodyTimeoutMs ?? ""}`;
+  const resolved = resolveProviderTimeouts(timeouts);
+  // Keyed on the values actually in force, not on the raw fields. Keying the raw
+  // fields made the key ambiguous — `1/2` as one value and `1` plus `2/` as two
+  // both rendered `1/2//` — and, on the reload path this cache exists for, a
+  // string `"6000"` was dropped by the guard and then keyed identically to the
+  // number `6000`, so a reload served the old wrapper with the old deadline. That
+  // is the one thing the comment above promises cannot happen.
+  const key = JSON.stringify([resolved.connectTimeoutMs, resolved.headersTimeoutMs, resolved.bodyTimeoutMs]);
   if (cachedProviderFetch?.key === key) return cachedProviderFetch.fetch;
-  const fetchImpl = createProviderFetchFromEnv({ timeouts });
+  const fetchImpl = createProviderFetchFromEnv({ timeouts: resolved });
   cachedProviderFetch = { key, fetch: fetchImpl };
   return fetchImpl;
+}
+
+/**
+ * The deadlines a request will actually run with, each one validated.
+ *
+ * Exported so the memo key and the transport are built from the same resolved
+ * numbers rather than from the caller's raw input.
+ */
+export function resolveProviderTimeouts(
+  timeouts: ProviderTimeoutOverrides = {},
+): ProviderTimeoutOverrides {
+  return {
+    connectTimeoutMs: positiveOr(timeouts.connectTimeoutMs, DEFAULT_CONNECT_TIMEOUT_MS),
+    headersTimeoutMs: positiveOr(timeouts.headersTimeoutMs, DEFAULT_HEADERS_TIMEOUT_MS),
+    bodyTimeoutMs: positiveOr(timeouts.bodyTimeoutMs, DEFAULT_BODY_TIMEOUT_MS),
+  };
 }
 
 /**
@@ -162,9 +193,24 @@ export function resolveProviderTransportConfig(
  * which is what the environment variables already do and what a reader expects
  * from a field named in milliseconds. Silently disabling the deadline on a `0`
  * would turn a typo into the exact hang this exists to prevent.
+ *
+ * Three values that look usable are not, and each used to pass through:
+ *
+ * - A string. The config loader interpolates `${VAR}`, so a number written that
+ *   way arrives as text and was discarded, leaving the built-in deadline in force
+ *   with nothing to say so. It is coerced now, because the intent is unambiguous.
+ * - A fraction. undici requires an integer and throws on anything else, so one
+ *   fractional field failed every request in the session and surfaced only as
+ *   "fetch failed".
+ * - An absurdly large number. A deadline of 20,000,000,000 ms never fires, which
+ *   is the same as having none — the outcome the paragraph above rejects.
  */
 function positiveOr(value: number | undefined, fallback: number): number {
-  return value !== undefined && Number.isFinite(value) && value > 0 ? value : fallback;
+  const numeric = typeof value === "string" ? Number(value) : value;
+  if (numeric === undefined || !Number.isFinite(numeric)) return fallback;
+  if (!Number.isInteger(numeric)) return fallback;
+  if (numeric <= 0 || numeric > MAX_TIMEOUT_MS) return fallback;
+  return numeric;
 }
 
 export interface ProviderTransportDecision {

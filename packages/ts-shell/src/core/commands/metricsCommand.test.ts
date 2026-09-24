@@ -138,4 +138,84 @@ describe("runMetricsCommand", () => {
     expect(result.output).toContain("tool=bash");
     expect(result.output).toContain("total 4");
   });
+
+  it("reads a metric that was written after the log rotated", async () => {
+    // The sink renames a full file to `.log.<n>`. Filtering on `.log` alone
+    // dropped those parts, so everything written after a rotation was invisible.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "metrics-cmd-rot-"));
+    tempDirs.push(dir);
+    const sink = new RotatingFileSink({ logDir: dir, filePrefix: "test" });
+    setGlobalRotatingFileSink(sink);
+    const rotated = `${sink.getCurrentFilePath()}.3`;
+    fs.writeFileSync(
+      rotated,
+      `${JSON.stringify(metricEntry({ message: "tool.calls", metric: "count", count: 2, total: 2, max: 2, fields: { tool: "rotated" } }))}\n`,
+    );
+
+    const result = await runMetricsCommand([], context);
+    expect(result.output).toContain("tool=rotated");
+  });
+
+  it("keeps a metric that many ordinary log lines follow", async () => {
+    // The limit used to be applied to raw lines, so a burst of ordinary logging
+    // pushed every metric out of the window and the command reported, with
+    // confidence, that nothing had been recorded.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "metrics-cmd-noise-"));
+    tempDirs.push(dir);
+    const sink = new RotatingFileSink({ logDir: dir, filePrefix: "test" });
+    sink.write(metricEntry({ message: "tool.calls", metric: "count", count: 1, total: 1, max: 1, fields: { tool: "early" } }));
+    const noise: StructuredLogEntry[] = [];
+    for (let index = 0; index < 2500; index += 1) {
+      noise.push({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        traceId: "t",
+        spanId: "s",
+        component: "noise",
+        message: `line ${index}`,
+      });
+    }
+    for (const entry of noise) sink.write(entry);
+    setGlobalRotatingFileSink(sink);
+
+    const result = await runMetricsCommand([], context);
+    expect(result.output).not.toContain("No metrics recorded yet");
+    expect(result.output).toContain("tool=early");
+  });
+
+  it("reads the value field from a line an older version wrote", async () => {
+    // Lines written before this command existed carry `value`, not `total`.
+    // Read as an unknown field they defaulted to zero, so real prompts were
+    // reported as a measured-looking `total 0`.
+    const sink = sinkWith([
+      {
+        timestamp: new Date().toISOString(),
+        level: "info",
+        traceId: "t",
+        spanId: "s",
+        component: "metric",
+        message: "cli.prompts",
+        fields: { metric: "count", value: 9 },
+      },
+    ]);
+    setGlobalRotatingFileSink(sink);
+
+    const result = await runMetricsCommand([], context);
+    expect(result.output).toContain("total 9");
+    expect(result.output).not.toContain("total 0");
+  });
+
+  it("attributes a count to the session that produced it", async () => {
+    // The tag reaches disk but was not in the parsed set, so a count could not be
+    // traced to a session even though the writer had recorded which one.
+    const sink = sinkWith([
+      metricEntry({ message: "cli.prompts", metric: "count", count: 1, total: 1, max: 1, fields: { sessionId: "sess_A" } }),
+      metricEntry({ message: "cli.prompts", metric: "count", count: 1, total: 1, max: 1, fields: { sessionId: "sess_B" } }),
+    ]);
+    setGlobalRotatingFileSink(sink);
+
+    const result = await runMetricsCommand([], context);
+    expect(result.output).toContain("sessionId=sess_A");
+    expect(result.output).toContain("sessionId=sess_B");
+  });
 });

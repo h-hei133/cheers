@@ -58,19 +58,36 @@ function contextFor(cwd: string): CommandContext {
  * a reader of the archive would see.
  */
 function archiveContents(file: string): string {
+  return archiveEntries(file)
+    .map((entry) => entry.data)
+    .join("\n");
+}
+
+/** One entry's decompressed text, by the name in its local header. */
+function archiveEntry(file: string, name: string): string {
+  const entry = archiveEntries(file).find((candidate) => candidate.name === name);
+  if (!entry) throw new Error(`no entry named ${name}`);
+  return entry.data;
+}
+
+function archiveEntries(file: string): Array<{ name: string; data: string }> {
   const { inflateRawSync } = require("node:zlib") as typeof import("node:zlib");
   const buffer = fs.readFileSync(file);
-  const parts: string[] = [];
+  const entries: Array<{ name: string; data: string }> = [];
   let cursor = 0;
   while (cursor + 30 <= buffer.length && buffer.readUInt32LE(cursor) === 0x04034b50) {
     const compressedLength = buffer.readUInt32LE(cursor + 18);
     const nameLength = buffer.readUInt16LE(cursor + 26);
     const extraLength = buffer.readUInt16LE(cursor + 28);
-    const dataStart = cursor + 30 + nameLength + extraLength;
-    parts.push(inflateRawSync(buffer.subarray(dataStart, dataStart + compressedLength)).toString("utf8"));
+    const nameStart = cursor + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    entries.push({
+      name: buffer.subarray(nameStart, nameStart + nameLength).toString("utf8"),
+      data: inflateRawSync(buffer.subarray(dataStart, dataStart + compressedLength)).toString("utf8"),
+    });
     cursor = dataStart + compressedLength;
   }
-  return parts.join("\n");
+  return entries;
 }
 
 describe("runReportCommand", () => {
@@ -100,6 +117,21 @@ describe("runReportCommand", () => {
     expect(contents).toContain("formatVersion");
   });
 
+  it("does not disclose where on the machine it was written", async () => {
+    // The report is the one artefact whose purpose is to leave the machine, so the
+    // absolute path — which carries the account name and every directory above the
+    // project — must not be in it.
+    const dir = fakeHome();
+    const target = path.join(dir, "out.zip");
+    await runReportCommand([target], contextFor("/home/someone/secret-client/work"));
+    const report = JSON.parse(archiveEntry(target, "report.json")) as {
+      environment: Record<string, unknown>;
+    };
+    expect(JSON.stringify(report.environment)).not.toContain("/home/someone");
+    // The directory name still says what kind of project it was.
+    expect(report.environment.project).toBe("work");
+  });
+
   it("keeps a credential out of the archive", async () => {
     // The record is seeded through the real crash path, so this exercises the
     // scrubber rather than a hand-built fixture.
@@ -120,6 +152,61 @@ describe("runReportCommand", () => {
     expect(contents).not.toContain("ghp_abcdefghijklmnopqrst");
     // And it says that it scrubbed something, rather than doing it silently.
     expect(result.output).toContain("Scrubbed");
+  });
+
+  it("removes content the rules only match across a line break", async () => {
+    // The scrubber's rules for raw content match whole blocks, and a stack is
+    // multi-line, so scrubbing the stack line by line would put every line out of
+    // their reach. This is the case that survived: the message was scrubbed and
+    // the block was still in the stack beside it.
+    const { recordCrash } = await import("../../observability/crashLog.js");
+    recordCrash({
+      kind: "uncaught-exception",
+      error: new Error("fetch failed <html>\n<body>SECRET-BLOCK-BODY</body>\n</html>"),
+      cwd: "/work",
+    });
+
+    const dir = fakeHome();
+    const target = path.join(dir, "out.zip");
+    await runReportCommand([target], contextFor(dir));
+
+    const contents = archiveContents(target);
+    expect(contents).not.toContain("SECRET-BLOCK-BODY");
+    // The marker is present, which is what proves the rule ran rather than the
+    // content never being written.
+    expect(contents).toContain("[raw-content-excluded]");
+  });
+
+  it("does not report a scrub when only whitespace was tidied", async () => {
+    // Collapsing whitespace always changes the text, so a value comparison calls
+    // any multi-line message scrubbed. The marker has to mean a rule fired.
+    const { recordCrash } = await import("../../observability/crashLog.js");
+    recordCrash({
+      kind: "uncaught-exception",
+      error: new Error("a plain failure\n    at somewhere"),
+      cwd: "/work",
+    });
+
+    const dir = fakeHome();
+    const target = path.join(dir, "out.zip");
+    const result = await runReportCommand([target], contextFor(dir));
+    expect(result.output).toContain("Nothing needed scrubbing");
+  });
+
+  it("keeps a stack's frames on their own lines", async () => {
+    const { recordCrash } = await import("../../observability/crashLog.js");
+    recordCrash({ kind: "uncaught-exception", error: new Error("boom"), cwd: "/work" });
+
+    const dir = fakeHome();
+    const target = path.join(dir, "out.zip");
+    await runReportCommand([target], contextFor(dir));
+
+    const report = JSON.parse(archiveEntry(target, "report.json")) as {
+      crashes: Array<{ stack?: string }>;
+    };
+    const stack = report.crashes[0].stack ?? "";
+    // A stack joined onto one line is not worth including.
+    expect(stack.split("\n").length).toBeGreaterThan(1);
   });
 
   it("reports when nothing needed scrubbing", async () => {

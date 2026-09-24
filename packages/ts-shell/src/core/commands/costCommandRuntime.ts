@@ -4,6 +4,7 @@ import {
   estimateUsageCost,
   getSessionUsage,
   totalTokens,
+  splitBucketKey,
   usageBuckets,
   USAGE_RATES,
   type ModelUsageBucket,
@@ -11,8 +12,6 @@ import {
 import type { ModelCostRates } from "../models/catalog.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveModelCost } from "../models/window.js";
-import { resolveProviderCredential } from "../shell/providerCredentials.js";
-import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 
 /**
  * /cost — tokens spent, and what they would cost.
@@ -50,15 +49,17 @@ export async function runCostCommand(
     };
   }
 
-  // Resolved the same way the engine does, so the rate applied to each bucket is
-  // the rate for the provider the session is pointed at now.
-  const active = resolveProviderCredential({ runtimeConfig: getRuntimeConfig(context.cwd) });
-
-  const rateFor = (model: string): ModelCostRates | undefined =>
-    resolveModelCost(loadCatalog(), active.provider, model);
+  // The provider each bucket was recorded under, not the one active now. Resolving
+  // against the current provider repriced every earlier bucket on a switch: a model
+  // id two providers both serve costs different amounts, and the tokens were spent
+  // at the earlier provider's rate.
+  const catalog = loadCatalog();
+  const rateFor = (provider: string, model: string): ModelCostRates | undefined =>
+    resolveModelCost(catalog, provider, model);
   const { cost: sessionCost, everyRatePublished } = estimateSessionCost(telemetry, rateFor);
-  const sections = buckets.map(([model, bucket]) => {
-    const published = rateFor(model);
+  const sections = buckets.map(([key, bucket]) => {
+    const { provider, model } = splitBucketKey(key);
+    const published = rateFor(provider, model);
     const rates: ModelCostRates = published ?? USAGE_RATES;
     return renderModelSection({
       model,

@@ -168,7 +168,10 @@ describe("CLI runtime invocation", () => {
 
   it("buffers input handed over before the readiness check finishes", async () => {
     const { deps } = dependencies();
-    const { promise: readinessGate, resolve: releaseReadiness } = Promise.withResolvers<void>();
+    let releaseReadiness!: () => void;
+    const readinessGate = new Promise<void>((resolve) => {
+      releaseReadiness = resolve;
+    });
     const gatedDeps: CliRuntimeInvocationDependencies = {
       ...deps,
       checkProviderReadiness: async () => {

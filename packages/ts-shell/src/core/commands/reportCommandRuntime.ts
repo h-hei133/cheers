@@ -62,11 +62,15 @@ export async function runReportCommand(
     formatVersion: 1,
     generatedAt: new Date().toISOString(),
     environment: {
-      // Deliberately not the absolute path: it contains the user's name.
       platform: process.platform,
       arch: process.arch,
       nodeVersion: process.version,
-      cwd: redactReportText(context.cwd, MAX_FIELD_LENGTH, { redactions }),
+      // The directory name only. The comment here used to claim the path was not
+      // absolute while the field held `context.cwd` verbatim, so a report carried
+      // `/home/<user>/...` — the user's account name and every directory above the
+      // project. The name alone still says what kind of project it was, which is
+      // the part that helps, without identifying the machine.
+      project: redactReportText(path.basename(context.cwd), MAX_FIELD_LENGTH, { redactions }),
     },
     crashes,
   };
@@ -125,23 +129,20 @@ export function defaultReportPath(now: Date = new Date()): string {
 }
 
 /**
- * Scrub a stack without destroying its shape.
+ * Scrub a stack, keeping its line structure.
  *
- * The shared scrubber collapses runs of whitespace, which is right for a message
- * and wrong for a stack: it would join every frame onto one line and leave
- * something nobody can read. Each line is scrubbed on its own and its leading
- * indentation restored, so the frames stay distinguishable while any credential
- * inside them is still removed.
+ * Whole, not line by line. Several rules in the shared chain match across
+ * newlines — an `<html>` block, an `oldText:` payload — and splitting first puts
+ * every line out of their reach. That is not theoretical: a crash whose message
+ * was scrubbed to `[raw-content-excluded]` still carried the whole block in its
+ * stack, and the archive was written with the block intact. Found by extracting
+ * the archive, which is also why the test now does the same.
  *
- * The cap applies to the whole stack, and the tail is dropped rather than the
- * head: the frames nearest the throw are the informative ones, and a deep
- * recursion puts thousands of uninteresting ones after them.
+ * `preserveLines` keeps the frames on their own lines, which is the reason to
+ * include a stack at all, and the cap drops the tail rather than the head: the
+ * frames nearest the throw are the informative ones.
  */
 function scrubStack(stack: string, redactions: Set<string>): string {
-  const lines = stack.split("\n").map((line) => {
-    const indent = /^(\s*)/.exec(line)?.[1] ?? "";
-    return indent + redactReportText(line, MAX_FIELD_LENGTH, { redactions });
-  });
-  const joined = lines.join("\n");
-  return joined.length > MAX_STACK_LENGTH ? `${joined.slice(0, MAX_STACK_LENGTH)}\n...` : joined;
+  const scrubbed = redactReportText(stack, MAX_STACK_LENGTH, { redactions, preserveLines: true });
+  return scrubbed.length >= MAX_STACK_LENGTH ? `${scrubbed}\n...` : scrubbed;
 }

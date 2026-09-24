@@ -36,14 +36,20 @@ export interface CompactionChatMessage {
 export interface CompactionRequest {
   readonly provider: CompactionProvider;
   /**
-   * The fetch to send with, when the caller has one configured.
+   * The fetch to send with.
    *
    * Compaction issues its own model call, so it needs the same deadlines and
    * transport as the main request: a summarization that hangs is as fatal to a
    * turn as an answer that hangs, and it is the harder one to notice because the
    * conversation looks idle rather than broken.
+   *
+   * Required, and deliberately not defaulting to the global `fetch`. It was
+   * optional with that fallback, which is how one of the three callers kept the
+   * unbounded transport: the omission compiled and ran, and nothing pointed at
+   * it. A caller that must pass one cannot leave a model request without a
+   * deadline by accident.
    */
-  readonly fetchImpl?: typeof fetch;
+  readonly fetchImpl: typeof fetch;
   /** The messages to condense, in order. */
   readonly messages: readonly CompactionChatMessage[];
   readonly signal?: AbortSignal;
@@ -73,10 +79,10 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   const prompt = request.instructions?.trim()
     ? `${base}\n\nThe user asked the summary to focus on: ${request.instructions.trim()}`
     : base;
-  // The caller's fetch when it supplied one, so this request carries the same
-  // transport and deadlines as the main one. Falling back to the global keeps
-  // every existing caller working unchanged.
-  const fetchImpl = request.fetchImpl ?? fetch;
+  // Always the caller's, so this request carries the same transport and deadlines
+  // as the main one. There is no global-fetch fallback: it is what let a caller
+  // keep the unbounded transport without anything failing.
+  const fetchImpl = request.fetchImpl;
   const res = await fetchImpl(`${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
     method: "POST",
     headers: {

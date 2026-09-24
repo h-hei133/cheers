@@ -138,7 +138,15 @@ export function retryDelayMs(
 export function waitBeforeRetry(delayMs: number, signal: AbortSignal | undefined): Promise<boolean> {
   if (signal?.aborted) return Promise.resolve(false);
   if (delayMs <= 0) return Promise.resolve(true);
-  const { promise, resolve } = Promise.withResolvers<boolean>();
+  // Built by hand rather than with `Promise.withResolvers`, which needs Node 22.
+  // The declared floor is 20.3 for `AbortSignal.any`, and a helper that only exists
+  // on a newer runtime than the package claims turns the first retry into a
+  // `TypeError` on every machine inside the declared range. This went unnoticed
+  // until CI was checked: it runs Node 20, and every local run was Node 24.
+  let resolve!: (value: boolean) => void;
+  const promise = new Promise<boolean>((settle) => {
+    resolve = settle;
+  });
   const timer = setTimeout(() => {
     signal?.removeEventListener("abort", onAbort);
     resolve(true);

@@ -214,6 +214,10 @@ export function createCliSessionRuntime(input: {
       if (!provider) return Promise.resolve(undefined);
       return requestCompactionSummary({
         provider,
+        // The third of the three summarisers, and the one that was missed: it kept
+        // the global fetch, so a `/back` whose summary stalled waited forever with
+        // no deadline and no abort signal. Same wiring as its two siblings.
+        fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(input.runtimeContext.runtimeConfig)),
         messages: toChatMessages(messages),
       });
     },

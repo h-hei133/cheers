@@ -59,7 +59,7 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 | 技能作为斜杠命令 `/skill:name` | `docs/skills.md:74-91`（`enableSkillCommands`） | **无**（只有 `/skill <name>`） | **MISSING**（**2026-09-23 确认**） | 复核：`grep -rn '"skill:' src --include='*.ts'` → 仅测试夹具的 `runnerId`，**无 `/skill:name` 命令形式**。`/skill` 子命令在 `core/commands/registry.ts:386`（`aliases: ["skills"]`） |
 | 提示词模板（磁盘 `.md` 参数化） | `src/core/prompt-templates.ts:194,269`；`docs/prompt-templates.md` | **无** | **MISSING** | 见 §3.2 |
 | 包分发（npm/git 安装、manifest） | `src/core/package-manager.ts:112`、`src/core/pi-manifest.ts:4,17`、`docs/packages.md` | 部分：`core/commands/pluginCommandRuntime.ts` | **DEFICIENT**（**2026-09-23 确认**） | 见 §2.3。**代码自述**（`pluginCommandRuntime.ts:12`）：「Registering one records an address and a manifest; **this build does not execute extensions**」 |
-| 主题发现（磁盘 JSON、CLI 覆盖） ✅ **部分收口 2026-09-23**：已支持用户级 `~/.cheers/themes/*.json` 与项目级 `<projectRoot>/.agents/themes/*.json` + `/theme` 命令；仍**无**包/CLI 覆盖层 | `docs/themes.md:17-40` | `presentation/themes/index.ts` | **DEFICIENT**（余量：包/CLI 层，我方无包系统） | 见 `phase-4-execution.md` §5 |
+| 主题发现（磁盘 JSON、CLI 覆盖） ✅ **部分收口 2026-09-23**：已支持用户级 `~/.cheers/themes/*.json` 与项目级 `<projectRoot>/.agents/themes/*.json` + `/theme` 命令；仍**无**包/CLI 覆盖层 | `docs/themes.md:17-40` | `presentation/themes/index.ts` | **DEFICIENT**（**部分收口**；余量：包/CLI 层，我方无包系统） | 见 `phase-4-execution.md` §5 |
 | 上下文文件（AGENTS.md）分层加载 | `docs/usage.md:102-108`、`src/core/resource-loader.ts:119` `loadProjectContextFiles` | ✅ **已实现**（`context/instructions/projectInstructions.ts`） | ~~MISSING~~ | 见 §3.3 |
 | 提示词附加 `APPEND_SYSTEM.md` ✅ **已收口 2026-09-23**；`SYSTEM.md`（**替换**语义）**刻意不做** | `docs/usage.md:112-119` | `context/instructions/projectInstructions.ts`（`APPEND_CANDIDATES`） | **部分收口** | `SYSTEM.md` 替换会连带删掉 harness 自身的执行规则，是不同的信任决定；有测试钉住它未被认领。见 `phase-4-execution.md` §5 |
 | MCP 客户端 | **pi 无**（`docs/usage.md:310` 明确声明不内置） | `core/mcp/`（client/config/connectionManager/errorTaxonomy/gateway/types） | **OURS-ONLY** | 见 §4 |
@@ -87,7 +87,7 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 ### 2.2 技能：发现面窄、无校验、无优先级规则（置信度：高）—— ⚠️ **2026-09-23 部分更正**
 
 > **更正说明**：下方表格有 **3 行已过时**，实际代码已补齐。复核证据：
-> ① **祖先目录搜索已实现**——`skillLoader.ts:82` 用 `projectDirectories(workspaceRoot)`
+> ① **祖先目录搜索已实现**——`skillLoader.ts:84` 用 `projectDirectories(workspaceRoot)`
 > 生成「从工作目录到根」的每一层 `.agents/skills`，注释明写「Reading only the working
 > directory made those skills invisible, with nothing said about it」；
 > ② **注入模型已实现**——`skillLoader.ts:252` `renderSkillList` 产出

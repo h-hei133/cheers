@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createProviderFetchFromEnv,
   providerFetchFromTimeouts,
+  resolveProviderTimeouts,
   providerTimeoutsFrom,
   resolveProviderTransportConfig,
 } from "./fetch.js";
@@ -150,5 +151,61 @@ describe("providerFetchFromTimeouts", () => {
     const before = providerFetchFromTimeouts({ headersTimeoutMs: 4_243 });
     const after = providerFetchFromTimeouts({ headersTimeoutMs: 4_244 });
     expect(after).not.toBe(before);
+  });
+
+  it("does not confuse two different deadline triples for one", () => {
+    // The key used to be the raw values joined with "/", so these two rendered
+    // the same string and the second caller was handed the first one's wrapper.
+    const first = providerFetchFromTimeouts({ connectTimeoutMs: 1 });
+    const second = providerFetchFromTimeouts({ connectTimeoutMs: 1, headersTimeoutMs: 2 });
+    expect(second).not.toBe(first);
+  });
+
+  it("keys on the deadline in force, not on how it was written", () => {
+    // `${VAR}` interpolation yields a string. The old key used the raw field, so
+    // `"4245"` — dropped by the guard, effective 30_000 — keyed the same as the
+    // number 4245 and a reload served the stale wrapper. Now both resolve to the
+    // same number, so sharing one wrapper is correct; what must not differ is the
+    // deadline each ends up with.
+    expect(resolveProviderTimeouts({ connectTimeoutMs: "4245" as unknown as number }).connectTimeoutMs).toBe(4_245);
+    expect(resolveProviderTimeouts({ connectTimeoutMs: 4245 }).connectTimeoutMs).toBe(4_245);
+  });
+
+  it("does not confuse a delimiter for a field boundary", () => {
+    // The key joined raw values with "/", so a value containing one rendered the
+    // same as two shorter values while describing a different set of deadlines.
+    const oneValue = providerFetchFromTimeouts({ connectTimeoutMs: "1/2" as unknown as number });
+    const twoValues = providerFetchFromTimeouts({
+      connectTimeoutMs: 1,
+      headersTimeoutMs: "2/" as unknown as number,
+    });
+    expect(twoValues).not.toBe(oneValue);
+  });
+});
+
+describe("a deadline the configuration states badly", () => {
+  it("reads a number that arrived as text", async () => {
+    // `${VAR}` interpolation produces a string. Discarding it left the built-in
+    // deadline in force with nothing to say so.
+    const resolved = resolveProviderTimeouts({ connectTimeoutMs: "6000" as unknown as number });
+    expect(resolved.connectTimeoutMs).toBe(6_000);
+  });
+
+  it("refuses a fraction rather than failing every request", async () => {
+    // undici requires an integer and throws otherwise, so one fractional field
+    // broke the whole session and surfaced only as "fetch failed".
+    const resolved = resolveProviderTimeouts({ headersTimeoutMs: 120_000.5 });
+    expect(resolved.headersTimeoutMs).toBe(120_000);
+  });
+
+  it("refuses a deadline long enough to never fire", async () => {
+    const resolved = resolveProviderTimeouts({ bodyTimeoutMs: 2_000_000_000 });
+    expect(resolved.bodyTimeoutMs).toBe(120_000);
+  });
+
+  it("still treats zero and negative as not stated", async () => {
+    const resolved = resolveProviderTimeouts({ connectTimeoutMs: 0, bodyTimeoutMs: -1 });
+    expect(resolved.connectTimeoutMs).toBe(30_000);
+    expect(resolved.bodyTimeoutMs).toBe(120_000);
   });
 });

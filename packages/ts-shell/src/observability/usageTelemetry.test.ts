@@ -93,7 +93,7 @@ describe("estimateSessionCost", () => {
       cheap: { promptPerMTok: 1, completionPerMTok: 0 },
       dear: { promptPerMTok: 10, completionPerMTok: 0 },
     };
-    const { cost, everyRatePublished } = estimateSessionCost(getSessionUsage(SESSION), (model) => rates[model]);
+    const { cost, everyRatePublished } = estimateSessionCost(getSessionUsage(SESSION), (_provider, model) => rates[model]);
     expect(cost).toBeCloseTo(11, 6);
     expect(everyRatePublished).toBe(true);
   });
@@ -111,7 +111,7 @@ describe("estimateSessionCost", () => {
     recordSessionUsage(SESSION, { promptTokens: 1_000_000, completionTokens: 0, model: "cheap" });
     recordSessionUsage(SESSION, { promptTokens: 1_000_000, completionTokens: 0, model: "dear" });
 
-    const { cost } = estimateSessionCost(getSessionUsage(SESSION), (model) =>
+    const { cost } = estimateSessionCost(getSessionUsage(SESSION), (_provider, model) =>
       model === "cheap" ? { promptPerMTok: 1, completionPerMTok: 0 } : { promptPerMTok: 10, completionPerMTok: 0 },
     );
     expect(cost).not.toBeCloseTo(20, 6);
@@ -119,10 +119,63 @@ describe("estimateSessionCost", () => {
     expect(cost).toBeCloseTo(11, 6);
   });
 
+  it("prices a bucket at the rate of the provider that served it", () => {
+    // A model id two providers both serve can cost different amounts. Keying by
+    // model alone meant switching providers repriced tokens already spent at the
+    // old rate — the same defect the buckets exist to remove, one axis over.
+    recordSessionUsage(SESSION, { promptTokens: 1_000_000, completionTokens: 0, model: "shared", provider: "cheapco" });
+    recordSessionUsage(SESSION, { promptTokens: 1_000_000, completionTokens: 0, model: "shared", provider: "dearco" });
+
+    const rateFor = (provider: string, _model: string) =>
+      provider === "cheapco" ? { promptPerMTok: 1, completionPerMTok: 0 } : { promptPerMTok: 100, completionPerMTok: 0 };
+    const { cost } = estimateSessionCost(getSessionUsage(SESSION), rateFor);
+    // 1 + 100, not 2 and not 200.
+    expect(cost).toBeCloseTo(101, 6);
+    expect(Object.keys(getSessionUsage(SESSION).byModel)).toHaveLength(2);
+  });
+
+  it("says a rate is unpublished when cache tokens were charged at zero", () => {
+    // A rate that omits the cache prices is not a published rate for a bucket that
+    // spent cache tokens: those are priced at zero, and a footer claiming the
+    // rates are the model's own would be false for the row above it.
+    recordSessionUsage(SESSION, {
+      promptTokens: 10,
+      completionTokens: 0,
+      cacheReadTokens: 500,
+      model: "m",
+    });
+    const { everyRatePublished } = estimateSessionCost(getSessionUsage(SESSION), () => ({
+      promptPerMTok: 1,
+      completionPerMTok: 2,
+    }));
+    expect(everyRatePublished).toBe(false);
+  });
+
   it("uses the fallback rate for a model with no published prices", () => {
     recordSessionUsage(SESSION, { promptTokens: 1_000_000, completionTokens: 0, model: "m" });
     const { cost } = estimateSessionCost(getSessionUsage(SESSION), () => undefined);
     expect(cost).toBeCloseTo(USAGE_RATES.promptPerMTok, 6);
+  });
+});
+
+describe("model ids that name an inherited property", () => {
+  it("does not write into the prototype for a model named __proto__", () => {
+    // Model ids are unvalidated input from `/model` and from a provider's model
+    // list. A plain object lookup resolved `__proto__` to the prototype itself and
+    // accumulated into it, which corrupted the prototype for the whole process.
+    recordSessionUsage(SESSION, { promptTokens: 10, completionTokens: 1, totalTokens: 11, model: "__proto__" });
+    const probe: Record<string, unknown> = { a: 1 };
+    const seen: string[] = [];
+    for (const key in probe) seen.push(key);
+    expect(seen).toEqual(["a"]);
+    expect((Object.prototype as Record<string, unknown>).promptTokens).toBeUndefined();
+  });
+
+  it("reports a real number for a model named constructor", () => {
+    recordSessionUsage(SESSION, { promptTokens: 10, completionTokens: 1, totalTokens: 11, model: "constructor" });
+    const bucket = getSessionUsage(SESSION).byModel["constructor"];
+    expect(bucket?.totalTokens).toBe(11);
+    expect(Number.isNaN(bucket?.totalTokens ?? 0)).toBe(false);
   });
 });
 

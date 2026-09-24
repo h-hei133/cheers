@@ -50,7 +50,7 @@ sed -n '5,27p' packages/ts-shell/src/core/hooks/types.ts                        
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 目录遍历剪枝 + `.gitignore` 遵从 ✅ **已实现**（Phase 3 T1，`runtime/execution/fileWalk.ts`） | `src/core/tools/find.ts:65`（用 `fd`）、`src/core/tools/grep.ts` | `runtime/execution/service.ts:112-123`；`core/tools/registry.ts:505-524` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
+| 目录遍历剪枝 + `.gitignore` 遵从 | `src/core/tools/find.ts:65`（用 `fd`）、`src/core/tools/grep.ts` | `runtime/execution/fileWalk.ts:74`（`IGNORE_FILES = ['.gitignore', '.ignore']`）；`runtime/execution/service.ts:112-123` | **已收口**（**2026-09-24 更正**） | **原判定列写 DEFICIENT 与行首 ✅ 自相矛盾**。实测剪枝与 `.gitignore`/`.ignore` 遵从**都在 `fileWalk.ts`**，且按嵌套优先序解析。见 §2.1 |
 | ~~bash 超时可指定~~ ✅ **已收口 2026-09-23**：`timeout` 参数已实现（`runtime/execution/commandTimeout.ts`），默认保留 60s，上限拒绝而非钳制 | `src/core/tools/bash.ts:239`（`timeout` 参数） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §2 |.2 |
 | 全量输出落盘并可回读 | `src/core/tools/output-accumulator.ts:19-22`（`fullOutputPath`，OS temp 文件） | `core/tools/registry.ts:141`（`ArtifactManager.save`，`artifact://` URI） | **平手** | 两侧都保留完整输出；差异仅在回读载体（§2.3 已更正原误报） |
 | `ls` 工具 ✅ **2026-09-23 更正为平手**：能力已在 `read` 的目录分支（`registry.ts:239,249-253`，默认 500、max 1000，与 pi 的 `ls` 一致） | `src/core/tools/ls.ts`（175 行，`limit` 默认 500） | `read` 的目录分支 | **平手** | 见 `phase-5-execution.md` §7 |
@@ -59,7 +59,7 @@ sed -n '5,27p' packages/ts-shell/src/core/hooks/types.ts                        
 | 同文件写入串行化 | `src/core/tools/file-mutation-queue.ts`（edit/write 各自包队列） | `tools/dispatch/executor.ts:90-99`（dispatch 层统一包队列） | **平手** | 两侧都有；我们的位置覆盖全部工具（§2.5 已更正原误判） |
 | 会话环境变量注入 bash | `docs/environment-variables.md:20-32`（5 个 `PI_*`） | ✅ **已实现**（**2026-09-23 更正**）：`runtime/execution/commandEnvironment.ts:21-27` | ~~MISSING~~ **已收口** | 5 个 `CHEERS_*`：`SESSION_ID`/`SESSION_FILE`/`PROVIDER`/`MODEL`/`REASONING_LEVEL`；经 `core/tools/registry.ts:160` `...(context.commandEnv ? { env: context.commandEnv } : {})` 注入 bash 进程。**两条规则**（`:10-14` 注释）：继承值先清除（避免嵌套会话报父会话 id）、**缺失即不导出**（空串与缺失不可区分）。见 §3.2（已同步更正） |
 | `powershell` 工具（Windows） | `src/core/tools/powershell.ts`（67 行，独立工具） | **以 shell 后端形式支持**（**2026-09-23 更正**）：`core/shell/platform/types.ts:9` | **平手**（形态不同，能力覆盖） | `ShellBackendKind` 含 `"powershell"`；`shellDetector.ts:83-94` 探测 `pwsh`/`powershell.exe`；`/shell use powershell` 可切换（`shellCommandRuntime.ts:24`）。**这是正确设计**：模型不需要知道底层是哪个 shell，它只需 bash 工具能跑。见 §2.6（已同步更正） |
-| 工具白/黑名单 | `docs/usage.md:196-202`（`--tools`/`--exclude-tools`/`--no-builtin-tools`/`--no-tools`） | ✅ **已实现**（**2026-09-23 更正**）：`config/runtimeConfig.ts:83-85` | ~~DEFICIENT~~ **平手** | 三个配置字段 `allowedTools`/`disabledTools`/`hiddenToolPrefixes`，**且已接线**：`cliRuntimeInvocation.ts:476` `filterVisibleToolNames` 实际过滤 registry；`:466` 对未知名**报警而非静默**（「a typo here is invisible: the run simply offers fewer tools」）。CLI 亦有 `--allowed-tools`（`cliArgs.ts:248`）。见 §2.7（已同步更正） |
+| 工具白/黑名单 | `docs/usage.md:196-202`（`--tools`/`--exclude-tools`/`--no-builtin-tools`/`--no-tools`） | ✅ **已实现**（**2026-09-23 更正**）：`config/runtimeConfig.ts:83-85` | ~~DEFICIENT~~ **平手** | 三个配置字段 `allowedTools`/`disabledTools`/`hiddenToolPrefixes`，**且已接线**：`cliRuntimeInvocation.ts:491` `filterVisibleToolNames` 实际过滤 registry；`:466` 对未知名**报警而非静默**（「a typo here is invisible: the run simply offers fewer tools」）。CLI 亦有 **`--tools`**（`entrypoints/cliArgs.ts:40,230,248`；**2026-09-24 更正**：此前写作 `--allowed-tools`，**该 flag 不存在**——`allowedTools` 是**内部字段名**，不是命令行开关）。见 §2.7（已同步更正） |
 | 工具只读/可写预设分组 | `src/core/tools/index.ts:164,173`（`createCodingToolDefinitions`／`createReadOnlyToolDefinitions`） | `turn/tools.ts:45`（`PLAN_MODE_TOOLS` 白名单） | **平手** | 两侧都有，形态不同 |
 | 输出截断（行+字节双预算） | `src/core/tools/truncate.ts`（276 行，含 `firstLineExceedsLimit`） | `core/tools/truncation.ts`（含 `truncateHead`/`truncateTail`/`truncateLineWidth`） | **平手** | 两侧都用字节计数；我们的 `truncateLineWidth` 是 pi 没有的 |
 | 沙箱与默认拒绝 | **pi 无**（`docs/security.md:33-41` 明确声明不内置沙箱） | `sandbox/{sandboxPolicy,osSandbox,sandboxEnforcer,auditTrail,escalationWorkflow}.ts` | **OURS-ONLY** | 见 §4 |
@@ -217,10 +217,10 @@ if (filePath && (call.name === "write" || call.name === "edit")) {
 ### 2.7 工具过滤只到「禁用」一层（置信度：高）—— ✅ **2026-09-23 已收口**
 
 > **收口说明**：三个字段 `allowedTools`/`disabledTools`/`hiddenToolPrefixes`
-> （`config/runtimeConfig.ts:83-85`）**且已接线**：`cliRuntimeInvocation.ts:476`
+> （`config/runtimeConfig.ts:83-85`）**且已接线**：`cliRuntimeInvocation.ts:491`
 > `filterVisibleToolNames` 实际过滤 registry；`:466` 对未知名**报警**——
 > 注释写明「a typo here is invisible: the run simply offers fewer tools than intended」。
-> CLI 另有 `--allowed-tools`（`cliArgs.ts:248`）。**下方原文保留为当时的证据。**
+> CLI 另有 **`--tools`**（`entrypoints/cliArgs.ts:40,230,248`；**2026-09-24 更正**：原文写作 `--allowed-tools`，那个 flag 不存在）。**下方原文保留为当时的证据。**
 
 **证据（我们）**：`core/tools/prefilter.ts:9-27` 的 `buildVisibleToolPool` 三个判据：`enableMcpTools`（`:15`，MCP 前缀）、`disabledTools`（`:19`，精确名）、`hiddenToolPrefixes`（`:24`，前缀）。`entrypoints/cliRuntimeInvocation.ts:172-176` 调用 `restrictToolPool`。**只有减法，没有加法**——无法表达「只要这几个」。
 

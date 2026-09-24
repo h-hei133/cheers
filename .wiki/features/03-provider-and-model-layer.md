@@ -45,9 +45,9 @@ npx tsx /tmp/probe.mts
 
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
-| 用户配置文件字段真正生效 ✅ **已全部收口 2026-09-23**（含 `tuiMode`：默认 `fullscreen`，`regular` 标为实验性） | `docs/settings.md:20-60`；`src/core/settings-manager.ts` | `config/runtimeConfig.ts:193-215` | **DEFICIENT** | 见 §2.1（**最高优先级**） |
+| 用户配置文件字段真正生效 | `docs/settings.md:20-60`；`src/core/settings-manager.ts` | `config/runtimeConfig.ts:193-215` | **已收口**（**2026-09-24 更正**） | **原判定列写 DEFICIENT，与行首「已全部收口」自相矛盾**。**用仓库自己的门禁核实**：`npm run check:config-consumers` → `fields=35 read=35 declared_without_reader=0`，即**每个声明字段都有生产读取者**，这正是该行要求的。见 §2.1 |
 | 订阅式 OAuth 登录 | `docs/providers.md:15-63`（7 家：Codex／Claude Pro／Copilot／xAI／Meta／OpenRouter／Radius） | `core/auth/oauth/providers.ts:23,59`（2 家） | **DEFICIENT** | 见 §2.2 |
-| 模型目录（内置快照 + 用户叠加 + 刷新） | `src/core/{model-registry.ts, models-store.ts, remote-catalog-provider.ts}` | `core/models/{catalog.ts, catalogStore.ts, catalogRefresh.ts}` | ✅ **已收口**（**2026-09-23 更正**） | 三层叠加已实现：`catalogStore.ts:47` `loadCatalog` = builtin → cache → user；`catalogRefresh.ts:26` 注释「**Explicit, never automatic**」（刷新是显式动作，不联网启动）。见 §2.3（已同步更正） |
+| 模型目录（内置快照 + 用户叠加 + 刷新） | `src/core/{model-registry.ts, models-store.ts, remote-catalog-provider.ts}` | `core/models/{catalog.ts, catalogStore.ts, catalogRefresh.ts}` | ✅ **已收口**（**2026-09-23 更正**） | 三层叠加已实现：`catalogStore.ts:47` `loadCatalog` = builtin → cache → user；`catalogRefresh.ts:7` 注释「**Explicit, never automatic**」（刷新是显式动作，不联网启动）。见 §2.3（已同步更正） |
 | per-model 覆盖（`modelOverrides`） ✅ **判定更正 2026-09-23**：`dedupeModels` 本就是 last-write-wins，**一直生效**；真正的限制只是 `CatalogModel` 字段太少，`cost`（4 个费率，可选）已补 | `docs/models.md:354-420` | `core/models/catalog.ts` | ~~MISSING~~ **判定有误** | 见 `phase-4-execution.md` §4.2 |
 | 兼容性开关真正改变请求形状 | `docs/models.md:420-520`（`compat.supportsDeveloperRole` 等） | `core/models/requestShape.ts`（Phase 5 新增） | ✅ **已收口**（**2026-09-23 更正**） | Phase 5 实现四项**改变线上字节**的决定（`requestShape.ts:106-110`）：system 角色名、输出上限字段名、是否发 `reasoning_effort`、是否需合成 assistant 桥接；复核轮补齐**内置目录的 `compat`**。其余 7 个标志**刻意保持描述性**。见 §2.4（已同步更正） |
 | 自定义 provider（声明式 API 适配） | `docs/custom-provider.md`（786 行）；`src/core/provider-composer.ts` | `core/models/catalogStore.ts`（用户文件加 provider）+ `CatalogModel.compat` | **部分收口**（**2026-09-23 更正**） | 用户可用 `models.json` 加 provider 与模型，且 Phase 5 后**可表达请求形状差异**（`compat`）。**余量**：不能自定义 API 协议实现（pi 支持 `openai-responses`/`anthropic-messages` 等多协议）。见 §2.5（已同步更正） |
@@ -113,7 +113,7 @@ npx tsx /tmp/probe.mts
 ### 2.3 模型目录：能叠加，不能覆盖（置信度：高）—— ✅ **2026-09-23 已收口**
 
 > **收口说明**：三层叠加已实现（`catalogStore.ts:47` `loadCatalog` = builtin → cache → user），
-> 刷新是显式动作（`catalogRefresh.ts:26`「Explicit, never automatic」）。
+> 刷新是显式动作（`catalogRefresh.ts:7`「Explicit, never automatic」）。
 > `CatalogModel` 的字段也已由 Phase 5 从 3 扩到 7（`reasoning`/`thinkingLevelMap`/`maxTokens`/`compat`）。
 > **下方原文保留为当时的证据。**
 

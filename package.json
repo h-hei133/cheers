@@ -124,6 +124,6 @@
     "verify:session-durability:long": "node scripts/verify-session-durability-long.mjs"
   },
   "engines": {
-    "node": ">=20.15.0"
+    "node": ">=20.3.0"
   }
 }
