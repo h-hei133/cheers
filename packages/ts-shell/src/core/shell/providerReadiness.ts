@@ -129,8 +129,9 @@ export async function checkRealProviderReadiness(
       };
     }
 
-    // Let the model adapter perform refresh-token exchange; readiness preflight
-    // must not block a recoverable account-auth session.
+    // A refresh token is present, so the token can be renewed. The renewal happens
+    // on the invocation path, before this check runs and before the request is
+    // built, so an expiring token is replaced rather than carried into the turn.
     return { ok: true };
   }
 

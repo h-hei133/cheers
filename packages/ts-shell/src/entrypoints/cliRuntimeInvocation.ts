@@ -142,10 +142,10 @@ export function runCliRuntimeInvocation(
  * before the credential is turned into headers, and because writing the new token
  * back is a filesystem operation that has no place inside a request builder.
  *
- * A failed renewal is not reported here: the readiness check that follows is where
- * a credential that cannot be used is turned into a message the user can act on,
- * and it already distinguishes an expired token with no refresh token from a
- * missing one.
+ * A failure is reported, not swallowed: a token the provider has already refused
+ * cannot produce an answer, and the request that carries it fails for a reason the
+ * user reads as a network problem. Naming the login as the cause is the only
+ * version of this they can act on.
  */
 async function renewAccountAuth(input: {
   readonly provider: RuntimeProvider;
@@ -154,7 +154,10 @@ async function renewAccountAuth(input: {
     readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
   };
   readonly runtimeConfig: RuntimeConfig | undefined;
-}): Promise<{ readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig }> {
+}): Promise<{
+  readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly failure?: string;
+}> {
   // The renewal carries the same deadline as any other request to the provider's
   // auth host, so a host that accepts the connection and never answers cannot hold
   // up the start of a turn.
@@ -167,7 +170,10 @@ async function renewAccountAuth(input: {
   if (result.renewed && result.accountAuth) {
     persistRenewedAccountAuth({ provider: input.provider, accountAuth: result.accountAuth });
   }
-  return { accountAuth: result.accountAuth };
+  return {
+    accountAuth: result.accountAuth,
+    ...(result.failure ? { failure: result.failure } : {}),
+  };
 }
 
 function deferUntilReady(
@@ -186,6 +192,17 @@ function deferUntilReady(
       credential: request.providerCredentialResolution.credential ?? {},
       runtimeConfig: request.runtimeConfig,
     });
+    if (renewed.failure) {
+      // The same terminal shape a failed readiness check produces, because it is
+      // the same class of problem: the credential cannot be used, and the run
+      // cannot start.
+      yield dependencies.createReadinessTerminalEvent({
+        sessionId: request.sessionId,
+        prompt: request.prompt,
+        stopReason: `Provider readiness failed (provider-readiness:auth): ${renewed.failure}`,
+      });
+      return;
+    }
     const readiness = await dependencies.checkProviderReadiness({
       provider: request.providerCredentialResolution.provider,
       apiKey: request.providerCredentialResolution.credential?.apiKey,

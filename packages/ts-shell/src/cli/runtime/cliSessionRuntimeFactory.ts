@@ -22,7 +22,8 @@ import { compactSessionHistory } from "../../core/shell/compaction.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
-import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
+import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../../provider/request/authorization.js";
+import { persistRenewedAccountAuth } from "../../core/auth/providerAuthRuntime.js";
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
 import { recordCount } from "../../observability/metrics.js";
@@ -38,6 +39,13 @@ import type { CompactionSetup } from "../../turn/session.js";
 
 /** What a compaction needs from the provider, resolved once per entry point. */
 const windowLogger = createComponentLogger('model-window')
+
+interface CompactionProvider {
+  readonly headers: Readonly<Record<string, string>>;
+  readonly baseUrl: string;
+  readonly model: string;
+  readonly providerId: string;
+}
 
 interface CompactionWiring {
   readonly policy: CompactionPolicy;
@@ -184,10 +192,14 @@ export function createCliSessionRuntime(input: {
    * used to read `apiKey` alone and require it, so an account login produced no
    * provider here at all and `/compact` answered "No credential for provider" to a
    * user who had just signed in successfully.
+   *
+   * The renewal runs on the explicit paths because they are request paths of their
+   * own: `/compact` and the abandoned-turn summary do not pass through the
+   * invocation path where the turn's own token is renewed, so an expired account
+   * token would be carried into a summarization request and come back as a provider
+   * refusal. The turn's own path has already renewed by the time it gets here.
    */
-  const compactionProvider = ():
-    | { headers: Readonly<Record<string, string>>; baseUrl: string; model: string; providerId: string }
-    | undefined => {
+  const compactionTarget = () => {
     const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
     const credential = resolved.credential;
     if (!credential) return undefined;
@@ -197,45 +209,84 @@ export function createCliSessionRuntime(input: {
     const model = resolved.model ?? credential.model;
     if (!baseUrl || !model) return undefined;
     return {
-      headers: providerAuthorization({ apiKey: credential.apiKey, accountAuth }).headers,
+      provider: resolved.provider,
+      apiKey: credential.apiKey,
+      accountAuth,
       baseUrl,
       model,
-      providerId: resolved.provider,
+    };
+  };
+
+  /** The provider the turn's own compaction summarizes with. */
+  const compactionProvider = (): CompactionProvider | undefined => {
+    const target = compactionTarget();
+    if (!target) return undefined;
+    return {
+      headers: providerAuthorization({ apiKey: target.apiKey, accountAuth: target.accountAuth }).headers,
+      baseUrl: target.baseUrl,
+      model: target.model,
+      providerId: target.provider,
+    };
+  };
+
+  /** The same, with an expiring account token replaced before the request is built. */
+  const renewedCompactionProvider = async (): Promise<CompactionProvider | undefined> => {
+    const target = compactionTarget();
+    if (!target) return undefined;
+    const renewed = await renewAccountAuthIfExpiring({
+      provider: target.provider,
+      credential: { apiKey: target.apiKey, accountAuth: target.accountAuth ?? undefined },
+      fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(input.runtimeContext.runtimeConfig)),
+    });
+    if (renewed.failure) return undefined;
+    if (renewed.renewed && renewed.accountAuth) {
+      persistRenewedAccountAuth({ provider: target.provider, accountAuth: renewed.accountAuth });
+    }
+    return {
+      headers: providerAuthorization({
+        apiKey: target.apiKey,
+        accountAuth: renewed.accountAuth ?? target.accountAuth,
+      }).headers,
+      baseUrl: target.baseUrl,
+      model: target.model,
+      providerId: target.provider,
     };
   };
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     sessionManager: input.sessionManager,
     renderer: input.renderer,
     compactHistory: (sessionId, signal, instructions) => {
-      const provider = compactionProvider();
-      if (!provider) {
-        const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
-        return Promise.resolve({
-          status: "failed" as const,
-          reason: `No credential for provider ${resolved.provider}; set ${resolved.expectedEnvVarName} or configure a connection.`,
+      return renewedCompactionProvider().then((provider) => {
+        if (!provider) {
+          const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
+          return {
+            status: "failed" as const,
+            reason: `No credential for provider ${resolved.provider}; set ${resolved.expectedEnvVarName} or configure a connection.`,
+          };
+        }
+        const wiring = buildCompactionWiring({ provider, runtimeContext: input.runtimeContext, sessionId, catalog });
+        return compactSessionHistory({
+          store: input.sessionManager,
+          sessionId,
+          policy: wiring.policy,
+          summarize: wiring.summarize,
+          summarizeTurnPrefix: wiring.summarizeTurnPrefix,
+          signal,
+          instructions,
         });
-      }
-      const wiring = buildCompactionWiring({ provider, runtimeContext: input.runtimeContext, sessionId, catalog });
-      return compactSessionHistory({
-        store: input.sessionManager,
-        sessionId,
-        policy: wiring.policy,
-        summarize: wiring.summarize,
-        summarizeTurnPrefix: wiring.summarizeTurnPrefix,
-        signal,
-        instructions,
       });
     },
     summarizeAbandonedTurns: (messages) => {
-      const provider = compactionProvider();
-      if (!provider) return Promise.resolve(undefined);
-      return requestCompactionSummary({
-        provider,
-        // The third of the three summarisers, and the one that was missed: it kept
-        // the global fetch, so a `/back` whose summary stalled waited forever with
-        // no deadline and no abort signal. Same wiring as its two siblings.
-        fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(input.runtimeContext.runtimeConfig)),
-        messages: toChatMessages(messages),
+      return renewedCompactionProvider().then((provider) => {
+        if (!provider) return undefined;
+        return requestCompactionSummary({
+          provider,
+          // The third of the three summarisers, and the one that was missed: it kept
+          // the global fetch, so a `/back` whose summary stalled waited forever with
+          // no deadline and no abort signal. Same wiring as its two siblings.
+          fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(input.runtimeContext.runtimeConfig)),
+          messages: toChatMessages(messages),
+        });
       });
     },
     runPrompt: (prompt, signal): PromptRun => {

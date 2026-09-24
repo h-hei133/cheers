@@ -3,7 +3,7 @@ import type {
   OpenAIAccountAuthConfig,
   RuntimeProvider,
 } from "../../config/runtimeConfig.js";
-import { isExpiring, refreshOAuthTokens } from "../../core/auth/oauth/flow.js";
+import { isExpiring, refreshOAuthTokens, type OAuthProviderConfig } from "../../core/auth/oauth/flow.js";
 import { googleOAuthConfig, openAIOAuthConfig, resolveGoogleClientId } from "../../core/auth/oauth/providers.js";
 
 /**
@@ -98,6 +98,24 @@ function oauthConfigFor(
 }
 
 /**
+ * The outcome of renewing an account credential.
+ *
+ * `renewed` is true only for the call that performed the exchange, which is the one
+ * that writes it back. A failure is reported rather than swallowed: falling
+ * through with a token the provider has already refused sends a request that
+ * cannot succeed, and whatever the provider says about it reads as a network
+ * problem. Naming the login is the only version the user can act on.
+ */
+export interface AccountAuthRenewal {
+  /** The credential to use from here on. */
+  readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  /** True only for the call that ran the exchange. */
+  readonly renewed: boolean;
+  /** Why the exchange failed, when it did. */
+  readonly failure?: string;
+}
+
+/**
  * Renew an account token that is about to expire.
  *
  * Returns the credential to use from here on: the renewed one when the exchange
@@ -106,12 +124,14 @@ function oauthConfigFor(
  * lapses mid-session and surfaces as a provider refusing a request that worked a
  * minute ago.
  *
- * Failure is not fatal. A refresh that cannot complete leaves the existing token in
- * place, which may still be accepted; discarding it would turn a recoverable
- * situation into a certain failure.
- *
  * The renewal is written back by the caller, so the next request does not repeat it
  * — and so a restart does not begin from the expired token again.
+ *
+ * Exchange happens once per provider even when several requests find the token
+ * expiring at the same moment: the later callers wait for the one in flight. A
+ * refresh token is spent by the exchange that uses it, so a second exchange started
+ * in parallel would be rejected with the credential already rotated — which looks
+ * to the user like a login that stopped working at random.
  */
 export async function renewAccountAuthIfExpiring(input: {
   readonly provider: RuntimeProvider;
@@ -121,32 +141,79 @@ export async function renewAccountAuthIfExpiring(input: {
   };
   readonly fetchImpl: typeof fetch;
   readonly signal?: AbortSignal;
-}): Promise<{
-  readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
-  readonly renewed: boolean;
-}> {
+}): Promise<AccountAuthRenewal> {
   const account = accountAuthFor(input.provider, input.credential);
   if (!account) return { renewed: false };
   if (!isExpiring(account.expiresAt)) return { accountAuth: account, renewed: false };
 
   const config = oauthConfigFor(input.provider, account);
   const refreshToken = account.refreshToken?.trim();
-  if (!config || !refreshToken) return { accountAuth: account, renewed: false };
+  if (!config || !refreshToken) {
+    return {
+      accountAuth: account,
+      renewed: false,
+      failure: `The ${providerLabel(input.provider)} login is expired and has no refresh token. Re-run /connect login ${input.provider} --account.`,
+    };
+  }
 
+  const inFlight = renewalsInFlight.get(input.provider);
+  if (inFlight) {
+    // The token this call read is already being replaced by the exchange it is
+    // waiting on, so the answer is that exchange's, not a second one's.
+    const shared = await inFlight;
+    return { accountAuth: shared.accountAuth, renewed: false, ...(shared.failure ? { failure: shared.failure } : {}) };
+  }
+
+  const run = exchangeAccountAuth({
+    provider: input.provider,
+    account,
+    config,
+    refreshToken,
+    fetchImpl: input.fetchImpl,
+    ...(input.signal ? { signal: input.signal } : {}),
+  });
+  renewalsInFlight.set(input.provider, run);
   try {
-    const tokens = await refreshOAuthTokens(config, refreshToken, input.fetchImpl);
+    return await run;
+  } finally {
+    renewalsInFlight.delete(input.provider);
+  }
+}
+
+/** The renewals in flight, one per provider, so a spent token is exchanged once. */
+const renewalsInFlight = new Map<RuntimeProvider, Promise<AccountAuthRenewal>>();
+
+/** The label a user knows a provider by, for a message they have to act on. */
+function providerLabel(provider: RuntimeProvider): string {
+  return provider === "openai" ? "OpenAI account" : "Google account";
+}
+
+async function exchangeAccountAuth(input: {
+  readonly provider: RuntimeProvider;
+  readonly account: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly config: OAuthProviderConfig;
+  readonly refreshToken: string;
+  readonly fetchImpl: typeof fetch;
+  readonly signal?: AbortSignal;
+}): Promise<AccountAuthRenewal> {
+  try {
+    const tokens = await refreshOAuthTokens(input.config, input.refreshToken, input.fetchImpl);
     return {
       accountAuth: {
-        ...account,
+        ...input.account,
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
       },
       renewed: true,
     };
-  } catch {
-    // A provider that is simply unreachable, or a refresh token the server has
-    // retired. Either way the request can still be attempted with what we hold.
-    return { accountAuth: account, renewed: false };
+  } catch (error) {
+    return {
+      accountAuth: input.account,
+      renewed: false,
+      failure: `The ${providerLabel(input.provider)} login could not be renewed: ${
+        error instanceof Error ? error.message : String(error)
+      }. Re-run /connect login ${input.provider} --account, then retry.`,
+    };
   }
 }

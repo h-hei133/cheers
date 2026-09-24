@@ -183,29 +183,89 @@ describe("renewing a token that is about to expire", () => {
     expect(result.renewed).toBe(false);
   });
 
-  it("keeps the existing token when the exchange cannot be completed", async () => {
+  it("reports a failed exchange instead of carrying the refused token onward", async () => {
     // A provider that is unreachable, or a refresh token the server has retired.
-    // Discarding the token would turn a recoverable situation into a certain one.
+    // Sending a token the provider has already refused returns its own description
+    // of the problem, which reads as a network fault; naming the login is the only
+    // version the user can act on.
     const fetchImpl = (async () => new Response("nope", { status: 400 })) as unknown as typeof fetch;
     const credential = { accountAuth: openAIAuth({ expiresAt: Date.now() - 1 }) };
 
     const result = await renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
     expect(result.renewed).toBe(false);
+    expect(result.failure).toContain("could not be renewed");
+    expect(result.failure).toContain("/connect login openai --account");
+    // The credential is still handed back, so a caller that chose to continue has
+    // one; deciding not to is the caller's business.
     expect(result.accountAuth?.accessToken).toBe("account-token-value");
   });
 
-  it("does not attempt a refresh without a refresh token", async () => {
-    let called = false;
-    const fetchImpl = (async () => {
-      called = true;
-      return new Response("{}", { status: 200 });
-    }) as unknown as typeof fetch;
+  it("names the missing refresh token as the reason a session has to be repeated", async () => {
+    const fetchImpl = (async () => new Response("{}", { status: 200 })) as unknown as typeof fetch;
 
-    await renewAccountAuthIfExpiring({
+    const result = await renewAccountAuthIfExpiring({
       provider: "openai",
       credential: { accountAuth: openAIAuth({ refreshToken: "", expiresAt: Date.now() - 1 }) },
       fetchImpl,
     });
-    expect(called).toBe(false);
+    expect(result.failure).toContain("no refresh token");
+  });
+
+  it("exchanges a spent refresh token once when two requests race", async () => {
+    // A refresh token is spent by the exchange that uses it. A second exchange
+    // started in parallel is rejected with the credential already rotated, which
+    // looks to the user like a login that stopped working for no reason.
+    let exchanges = 0;
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetchImpl = (async () => {
+      exchanges += 1;
+      await gate;
+      return new Response(
+        JSON.stringify({ access_token: "renewed", refresh_token: "rotated", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as unknown as typeof fetch;
+    const credential = { accountAuth: openAIAuth({ expiresAt: Date.now() - 1 }) };
+
+    const first = renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
+    const second = renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
+    release?.();
+    const [a, b] = await Promise.all([first, second]);
+
+    expect(exchanges).toBe(1);
+    expect(a.accountAuth?.accessToken).toBe("renewed");
+    // The caller that waited reads the token the exchange produced, not its own
+    // stale copy.
+    expect(b.accountAuth?.accessToken).toBe("renewed");
+    // Only the caller that ran the exchange writes it back.
+    expect(a.renewed).toBe(true);
+    expect(b.renewed).toBe(false);
+  });
+
+  it("shares a failed exchange with the caller that waited for it", async () => {
+    // The waiting caller would otherwise build a request on its own stale copy,
+    // believing the exchange it joined had succeeded. The failure has to travel
+    // with the token it did produce.
+    let exchanges = 0;
+    const fetchImpl = (async () => {
+      exchanges += 1;
+      return new Response("nope", { status: 400 });
+    }) as unknown as typeof fetch;
+    const credential = { accountAuth: openAIAuth({ expiresAt: Date.now() - 1 }) };
+
+    const first = renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
+    const second = renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
+    const [a, b] = await Promise.all([first, second]);
+
+    // One exchange, not two: the second caller joined the first, it did not retry.
+    expect(exchanges).toBe(1);
+    // Both callers learn the exchange failed, and only the first ran it.
+    expect(a.failure).toContain("could not be renewed");
+    expect(b.failure).toBe(a.failure);
+    expect(a.renewed).toBe(false);
+    expect(b.renewed).toBe(false);
   });
 });
