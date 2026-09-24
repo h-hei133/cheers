@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
@@ -492,8 +493,12 @@ function providerFetch(runtimeConfig: RuntimeConfig | undefined): typeof fetch {
  * reporting nothing.
  */
 function sessionPathOption(sessionId: string): { readonly sessionPath: string } | Record<string, never> {
+  // Only a directory that exists is reported. The locator returns a path whether or
+  // not the session has been written, and reporting one that is not there would tell
+  // a consumer to look somewhere with nothing in it.
   try {
-    return { sessionPath: locateExistingSessionLayout(createSessionStoreLayout(), sessionId).sessionDir };
+    const candidate = locateExistingSessionLayout(createSessionStoreLayout(), sessionId).sessionDir;
+    return fs.existsSync(candidate) ? { sessionPath: candidate } : {};
   } catch {
     return {};
   }

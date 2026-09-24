@@ -185,20 +185,27 @@ confidence: high
 > 所以 `/connect login … --account` 之后**每个请求发空 `Bearer`**（8 项链路经独立复核者
 > 逐项验证）；②**`/skill:name` 实机直接报错**（`Unknown slash command: /skill:demo`），
 > 且提示词模板引擎不存在；③**转录内搜索**缺失。
+> **Phase 7 施工已闭环（2026-09-24，6 项任务）**：见 [`phase-7-execution.md`](phase-7-execution.md)。
+> 净变化见该文件的提交表。**施工后又关闭 5 行判定**（技能斜杠命令、提示词模板、
+> `since` 游标/`get_tree`、订阅式 OAuth 接线、转录内搜索），另**删除一个死字段**
+> （`firstRetainedEntryId`：声明且被读、**从不被写**，无门禁覆盖）。
+> **合计从 13/19/16/10 降到 4/15/16/10。**
+
 > **自我更正 3 处**（§0.3 与 §4.1），其中一处**推翻既有裁决的理由是错的**——
 > 我把 `firstKeptEntryId`（压缩记录字段）与 `get_tree`（树条目 `parentId`）当成同一个，
 > 经复核者证伪后**维持 Phase 5 原裁决**。
 
 | # | 报告 | 覆盖范围 | DEFICIENT | MISSING | OURS-ONLY | 平手 |
 |---|---|---|---:|---:|---:|---:|
-| 01 | [可扩展性与定制化](01-extensibility-and-customization.md) | 扩展宿主、技能、提示词模板、包分发、主题、上下文文件 | 3 | 7 | 1 | 0 |
-| 02 | [程序化集成与会话数据](02-programmatic-integration-and-session-data.md) | JSON 事件流、RPC、SDK、session 格式、导出与分享 | 1 | 5 | 2 | 0 |
-| 03 | [Provider 与模型层](03-provider-and-model-layer.md) | 订阅登录、模型目录、per-model 覆盖、兼容性开关、传输与缓存 | 2 | 2 | 1 | 0 |
-| 04 | [终端交互与呈现](04-terminal-interaction-and-presentation.md) | 编辑器、补全、主题、快捷键、消息队列、转录渲染 | 4 | 3 | 2 | 0 |
-| 05 | [工具与执行安全](05-tools-and-execution-safety.md) | 工具集、截断、bash、编辑并发、钩子派发、沙箱与审批 | 1 | 0 | 4 | 7 |
-| 06 | [可观测性、配置与生命周期](06-observability-config-and-lifecycle.md) | 配置系统、诊断、崩溃日志、遥测、用量统计 | 1 | 1 | 5 | 1 |
-| 07 | [上下文管理与压缩](07-context-management-and-compaction.md) | 触发阈值、切点与超大 turn、重复压缩、分支摘要、文件追踪、压缩钩子 | 1 | 1 | 1 | 2 |
-| | **合计（2026-09-24 重数）** | | **13** | **19** | **16** | **10** |
+| 01 | [可扩展性与定制化](01-extensibility-and-customization.md) | 扩展宿主、技能、提示词模板、包分发、主题、上下文文件 | 3 | 5 | 1 | 0 |
+| 02 | [程序化集成与会话数据](02-programmatic-integration-and-session-data.md) | JSON 事件流、RPC、SDK、session 格式、导出与分享 | 0 | 5 | 2 | 0 |
+| 03 | [Provider 与模型层](03-provider-and-model-layer.md) | 订阅登录、模型目录、per-model 覆盖、兼容性开关、传输与缓存 | 0 | 2 | 1 | 0 |
+| 04 | [终端交互与呈现](04-terminal-interaction-and-presentation.md) | 编辑器、补全、主题、快捷键、消息队列、转录渲染 | 1 | 2 | 2 | 0 |
+| 05 | [工具与执行安全](05-tools-and-execution-safety.md) | 工具集、截断、bash、编辑并发、钩子派发、沙箱与审批 | 0 | 0 | 4 | 7 |
+| 06 | [可观测性、配置与生命周期](06-observability-config-and-lifecycle.md) | 配置系统、诊断、崩溃日志、遥测、用量统计 | 0 | 1 | 5 | 1 |
+| 07 | [上下文管理与压缩](07-context-management-and-compaction.md) | 触发阈值、切点与超大 turn、重复压缩、分支摘要、文件追踪、压缩钩子 | 0 | 0 | 1 | 2 |
+| | **合计（2026-09-24 Phase 7 后重数）** | | **4** | **15** | **16** | **10** |
+| | ~~合计（2026-09-24 重数）~~ | | ~~13~~ | ~~19~~ | ~~16~~ | ~~10~~ |
 | | ~~合计（2026-09-23 重数）~~ | | ~~16~~ | ~~21~~ | ~~16~~ | ~~10~~ |
 | | ~~合计（各文初稿时）~~ | | ~~40~~ | ~~38~~ | ~~16~~ | ~~7~~ |
 

@@ -9,12 +9,17 @@ import {
   createCompactionStep,
   findCompactionCut,
   planCompaction,
+  readContextCheckpoint,
   shouldCompact,
   type CompactionPolicy,
 } from "./compaction.js";
 
 function userMessage(content: string): AgentMessage {
   return { role: "user", content };
+}
+
+function systemMessage(content: string): AgentMessage {
+  return { role: "system", content };
 }
 
 function assistantMessage(content: string): AgentMessage {
@@ -207,6 +212,69 @@ describe("applyCompaction", () => {
     expect(compacted[0].role).toBe("user");
     expect(compacted[0].content).toContain("older work summary");
     expect(compacted.slice(1)).toEqual(messages.slice(plan.cut));
+  });
+});
+
+describe("the checkpoint position a later compaction depends on", () => {
+  /**
+   * The reader only ever looks for the checkpoint at one position: directly after a
+   * leading system message, or at the front. That is not an accident of the
+   * implementation — it is what makes "the conversation already begins with a
+   * summary" a fact the next compaction can rely on rather than a search.
+   *
+   * Checked as a round trip because the two halves live in different functions:
+   * `applyCompaction` decides where the checkpoint goes, and `condenseContext`
+   * decides where to look. Either can regress alone, and the failure is silent —
+   * the checkpoint stops being recognised, the summary is condensed a second time,
+   * and each pass sheds a little of what it said.
+   */
+  it("writes the checkpoint where the next compaction looks for it", async () => {
+    const messages = [systemMessage("rules"), ...history(6)];
+    const plan = planCompaction(messages, policy)!;
+    const compacted = applyCompaction(messages, plan, "prior summary");
+
+    // Where it was written.
+    const checkpointIndex = compacted.findIndex((message) => readContextCheckpoint(message.content) !== undefined);
+    expect(checkpointIndex).toBe(1);
+    expect(compacted[0]!.role).toBe("system");
+
+    // And that the reader finds it there. More history is appended first, because a
+    // compaction immediately after one declines — there is nothing new to condense,
+    // and declining is the correct answer rather than a case to force.
+    const grown = [...compacted, userMessage(`later ${"z".repeat(600)}`), assistantMessage(`answer ${"w".repeat(600)}`)];
+    const seen: Array<string | undefined> = [];
+    await condenseContext({
+      messages: grown,
+      policy: { contextWindow: 100, reserveTokens: 0, keepRecentTokens: 300 },
+      force: true,
+      summarize: async (request) => {
+        seen.push(request.previousSummary);
+        return "revised";
+      },
+    });
+    expect(seen[0]).toBe("prior summary");
+  });
+
+  it("still recognises the checkpoint when there is no system message", async () => {
+    // The other position the reader accepts. Without a system message the
+    // checkpoint is the first message, and the reader has to look there instead.
+    const messages = history(6);
+    const plan = planCompaction(messages, policy)!;
+    const compacted = applyCompaction(messages, plan, "prior summary");
+    expect(readContextCheckpoint(compacted[0]!.content)).toBe("prior summary");
+
+    const grown = [...compacted, userMessage(`later ${"z".repeat(600)}`), assistantMessage(`answer ${"w".repeat(600)}`)];
+    const seen: Array<string | undefined> = [];
+    await condenseContext({
+      messages: grown,
+      policy: { contextWindow: 100, reserveTokens: 0, keepRecentTokens: 300 },
+      force: true,
+      summarize: async (request) => {
+        seen.push(request.previousSummary);
+        return "revised";
+      },
+    });
+    expect(seen[0]).toBe("prior summary");
   });
 });
 

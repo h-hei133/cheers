@@ -125,7 +125,6 @@ describe("session thread state store", () => {
           unsafeInputIds: [],
           missingFactIds: [],
           unsupportedFactIds: [],
-          firstRetainedEntryId: "sess_thread_store:turn-2",
           summaryAvailability: "available",
           summaryProvenance: "runtime-projected",
           createdAt: "2026-06-02T00:00:04.000Z",

@@ -44,7 +44,6 @@ export interface SessionCompactionRecord {
   readonly unsafeInputIds: readonly string[];
   readonly missingFactIds: readonly string[];
   readonly unsupportedFactIds: readonly string[];
-  readonly firstRetainedEntryId?: string;
   readonly summaryAvailability: "available" | "missing";
   readonly summaryProvenance:
     | "user-provided"

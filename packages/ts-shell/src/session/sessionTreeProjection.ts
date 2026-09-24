@@ -221,7 +221,6 @@ export function projectSessionTree(input: {
   const activePath = activePathResult.path.length > 0 ? activePathResult.path : [rootId];
   const durableCompactions: NormalizedCompactionInput[] = thread.compactions.map((record) => ({
     id: record.compactionId,
-    ...(record.firstRetainedEntryId ? { firstKeptEntryId: record.firstRetainedEntryId } : {}),
     ...(record.summaryAvailability === "available" ? { summary: record.compactionId } : {}),
     evidence: "observed" as const,
     sourceActivePath: record.sourceActivePath,
