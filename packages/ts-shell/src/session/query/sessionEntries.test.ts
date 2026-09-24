@@ -143,4 +143,15 @@ describe("the session tree", () => {
   it("returns an empty list for a session with no entries", () => {
     expect(readSessionTree([])).toEqual([]);
   });
+
+  it("treats an entry that names itself as its parent as a root", () => {
+    // Walking the tree must terminate. Making the entry its own child would make
+    // the walk below recurse until the stack ran out.
+    const selfParented = [threadEntry("a", "a", 1), threadEntry("b", "a", 2)];
+    const tree = readSessionTree(selfParented);
+    if (tree === "unknown-cursor") throw new Error("unexpected");
+    expect(tree).toHaveLength(1);
+    expect(tree[0]!.entry.id).toBe("a");
+    expect(tree[0]!.children.map((node) => node.entry.id)).toEqual(["b"]);
+  });
 });

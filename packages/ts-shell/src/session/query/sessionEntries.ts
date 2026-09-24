@@ -112,7 +112,13 @@ export function readSessionTree(
   const roots: SessionTreeNodeView[] = [];
   for (const entry of included) {
     const node = nodes.get(entry.id)!;
-    const parent = entry.parentId === undefined ? undefined : nodes.get(entry.parentId);
+    // An entry that names itself as its parent is a root, not its own child. The
+    // chain a client walks has to end somewhere, and this is the shape a writer
+    // takes when it has no parent to record but a field it must fill.
+    const parent =
+      entry.parentId === undefined || entry.parentId === entry.id
+        ? undefined
+        : nodes.get(entry.parentId);
     if (parent) parent.children.push(node);
     else roots.push(node);
   }
