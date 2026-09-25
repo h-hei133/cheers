@@ -71,6 +71,18 @@ export function resolveWriteTarget(request: WriteTargetRequest): WriteTargetDeci
     };
   }
 
+  // `~user` names another user's home, which this does not resolve. Left to
+  // `path.resolve` it becomes a directory literally called `~user` inside the
+  // workspace — a write that succeeds somewhere the user did not name, which is
+  // worse than one that is refused and says so.
+  if (OTHER_USER_HOME.test(requested)) {
+    return {
+      allowed: false,
+      reason: "`~user` is not supported; only `~` and `~/path` are expanded.",
+      doNext: "Use `~/path` for your own home directory, or give an absolute path.",
+    };
+  }
+
   const absolute = path.isAbsolute(requested) || requested.startsWith("~");
   const resolved = path.resolve(request.root, expandHome(requested));
 
@@ -102,6 +114,9 @@ export function resolveWriteTarget(request: WriteTargetRequest): WriteTargetDeci
 
   return { allowed: true, resolvedPath: containment.resolvedPath, outside: true };
 }
+
+/** `~name`, which names a home directory belonging to somebody else. */
+const OTHER_USER_HOME = /^~[A-Za-z0-9_-]/;
 
 /**
  * `~` at the front of a path, as the shell would have expanded it.

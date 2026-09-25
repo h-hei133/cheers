@@ -154,3 +154,19 @@ describe("a command whose own default is outside the workspace", () => {
     expect(decision).toMatchObject({ allowed: true, resolvedPath: path.join(root, "sub/out.zip") });
   });
 });
+
+describe("a home directory that is not the user's own", () => {
+  it("is refused rather than turned into a directory called `~user`", () => {
+    // `~alice/x` is not expanded, so `path.resolve` would place it at
+    // `<root>/~alice/x` and report success: a write that landed somewhere the
+    // user did not name. Refusing it says what happened.
+    const decision = resolveWriteTarget({ requested: "~alice/out.html", root });
+    expect(decision).toMatchObject({ allowed: false });
+    expect("reason" in decision && decision.reason).toContain("~user");
+  });
+
+  it("still expands the user's own home", () => {
+    const decision = resolveWriteTarget({ requested: "~/out.html", root, defaultOutside: true });
+    expect(decision.allowed).toBe(true);
+  });
+});

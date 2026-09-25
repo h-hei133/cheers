@@ -1,6 +1,36 @@
 import path from "node:path";
 import fs from "node:fs";
 
+/**
+ * The real path of the deepest ancestor of `target` that exists, with the
+ * not-yet-existing remainder appended.
+ *
+ * The remainder is appended rather than dropped so the caller compares the place
+ * the write would actually land, not merely the directory it lands in: asked to
+ * write `escape/new.html`, this answers with the resolved `escape` directory plus
+ * `new.html`, which is outside the workspace and answers the question correctly.
+ * Nothing exists at all — no path component resolves — returns nothing, and the
+ * caller falls back to the lexical answer.
+ */
+function realpathOfDeepestExisting(target: string): string | undefined {
+  const remainder: string[] = [];
+  let current = target;
+  for (;;) {
+    if (fs.existsSync(current)) {
+      try {
+        return path.join(fs.realpathSync(current), ...remainder.reverse());
+      } catch {
+        return undefined;
+      }
+    }
+    const parent = path.dirname(current);
+    // Walking past the root would loop forever, since `dirname("/")` is `"/"`.
+    if (parent === current) return undefined;
+    remainder.push(path.basename(current));
+    current = parent;
+  }
+}
+
 export interface PathContainmentResult {
   readonly allowed: boolean;
   readonly resolvedPath: string;
@@ -43,8 +73,13 @@ export function verifyPathContainment(
 
   // Check realpath if the file/dir exists to guard against symlink breakouts
   try {
-    if (fs.existsSync(resolvedTarget)) {
-      const realTarget = fs.realpathSync(resolvedTarget);
+    // A target that does not exist yet still has a directory that does, and that
+    // directory is the one that decides where the write lands. Checking only the
+    // target meant `escape/new.html` was allowed while `escape/exists.html` was
+    // refused for the same symlink: the new file had no realpath to compare, so
+    // the check was skipped and only the lexical prefix was ever consulted.
+    const realTarget = realpathOfDeepestExisting(resolvedTarget);
+    if (realTarget !== undefined) {
       const realWorkspace = fs.existsSync(normalizedWorkspace)
         ? fs.realpathSync(normalizedWorkspace)
         : normalizedWorkspace;
