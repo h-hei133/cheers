@@ -81,6 +81,39 @@ describe("sessionStore", () => {
     }
   });
 
+  /**
+   * The header is written once, when the file has nothing in it. Rewriting a
+   * session — a rename, a status change — goes through the metadata and state
+   * writers and must not touch the transcript, because putting a header in front
+   * of lines already written is the rewrite these files are never given.
+   */
+  it("does not disturb an existing transcript when the record is written again", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "session-store-rewrite-"));
+    try {
+      const layout = createSessionStoreLayout();
+      const fileLayout = locateExistingSessionLayout(layout, "sess_rewrite");
+      const session: Session = {
+        id: "sess_rewrite",
+        projectRoot: "/repo",
+        rootMode: "git-root",
+        createdAt: "2026-05-28T00:00:00.000Z",
+        updatedAt: "2026-05-28T00:00:00.000Z",
+        status: "active",
+        turns: [],
+      };
+      writeSessionRecord({ session, layout: fileLayout });
+      const written = fs.readFileSync(fileLayout.transcriptPath, "utf8");
+
+      // The same call again, as a session that already exists would get.
+      writeSessionRecord({ session, layout: fileLayout });
+      expect(fs.readFileSync(fileLayout.transcriptPath, "utf8")).toBe(written);
+      // Still exactly one header, still first.
+      expect(JSON.parse(written.trim().split("\n")[0]!)).toMatchObject({ type: "session" });
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it("finds the session directories an earlier name left behind", () => {
     // The rename must not strand state: sessions written under the previous
     // directory are still that person's sessions, and a listing or a resume that

@@ -150,23 +150,33 @@ export function appendTranscriptEvent(
 /**
  * Give a new transcript its header, and leave every other file alone.
  *
- * Emptiness is the whole test. Anything else — a missing header, a first line
- * that does not parse — describes a file that already holds something, and those
- * are not ours to rearrange.
+ * Emptiness is the whole test, and it is asked of the file's size rather than its
+ * contents. Reading the file to see whether it is empty would cost the whole
+ * transcript on every append, which is the size of the session squared over its
+ * life — on the hot path of every turn, for a question whose answer is a
+ * stat call.
+ *
+ * A file with content and no header is an older transcript, and it stays one:
+ * putting a header in front of lines already written is exactly the rewrite these
+ * files are promised never to get.
  */
 function ensureTranscriptHeader(
   transcriptPath: string,
   header: { readonly sessionId: string; readonly timestamp: string; readonly cwd: string } | undefined,
 ): void {
-  let existing: string;
+  let empty: boolean;
   try {
-    existing = fs.readFileSync(transcriptPath, "utf8");
+    empty = fs.statSync(transcriptPath).size === 0;
   } catch {
     // Absent, or unreadable. Only the absent case is ours to start.
-    if (fs.existsSync(transcriptPath)) return;
-    existing = "";
+    try {
+      fs.statSync(transcriptPath);
+      return;
+    } catch {
+      empty = true;
+    }
   }
-  if (existing !== "") return;
+  if (!empty) return;
   const written = header ?? {
     sessionId: path.basename(path.dirname(transcriptPath)),
     timestamp: new Date().toISOString(),

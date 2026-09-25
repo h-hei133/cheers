@@ -265,6 +265,27 @@ describe("entry identity", () => {
     }
   });
 
+  it("gives a header to a file that exists but holds nothing", () => {
+    // A session created by an older build left a zero-byte file behind. It has
+    // nothing to overwrite, so starting it properly is not a rewrite.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-empty-"));
+    try {
+      const transcriptPath = path.join(root, "transcript.jsonl");
+      fs.writeFileSync(transcriptPath, "", "utf8");
+
+      appendTranscriptEvent(
+        transcriptPath,
+        createMessageTranscriptEvent({ role: "user", content: "hi", timestamp: "t1", id: "msg_a" }),
+        { sessionId: "s1", timestamp: "t0", cwd: "/w" },
+      );
+
+      expect(readTranscript(transcriptPath).version).toBe(TRANSCRIPT_FORMAT_VERSION);
+      expect(readTranscriptEvents(transcriptPath).map((event) => event.id)).toEqual(["msg_a"]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   /**
    * The rule that keeps this compatible with append-only: a header is written
    * only where there is nothing to overwrite. A transcript from an older build
