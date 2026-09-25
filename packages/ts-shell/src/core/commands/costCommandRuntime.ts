@@ -121,25 +121,31 @@ function cacheWasteSection(
   if (report.totals.missCount === 0) return [];
 
   const { missedTokens, missedCost, missCount } = report.totals;
+  // Named because the headline figure is not all one kind of thing: tokens a
+  // model switch re-sent could never have been read from a cache for the new
+  // model, so the sum is real spend but not all of it is avoidable. Saying
+  // "would have been cache reads" over the total would claim otherwise.
+  const switched = report.misses.filter((miss) => miss.modelChanged).length;
   const lines = [
     "",
     "### Prompt cache",
     "",
     `- ${missedTokens.toLocaleString()} prompt tokens were sent again and billed in full, across ${missCount} ${missCount === 1 ? "request" : "requests"}`,
-    `- Estimated extra spend against those tokens having been cache reads: $${missedCost.toFixed(4)}`,
+    `- Of those, an estimated $${missedCost.toFixed(4)} extra was spent against what a cache read would have cost`,
+    ...(switched > 0
+      ? [
+          `- ${switched} of them followed a model change, which re-bills the prompt by design — those could not have been cache reads at all`,
+        ]
+      : []),
   ];
 
   // Named separately because the remedy differs: an idle gap is fixed by asking
-  // sooner, and a model switch re-bills the prompt by design.
+  // sooner, and a model switch is not a cache failure.
   const idled = report.misses.filter((miss) => miss.idleMs > CACHE_TTL_MS).length;
-  const switched = report.misses.filter((miss) => miss.modelChanged).length;
   if (idled > 0) {
     lines.push(
       `- ${idled} of them followed an idle gap longer than ${Math.round(CACHE_TTL_MS / 60000)} minutes, which is long enough for a cache to expire`,
     );
-  }
-  if (switched > 0) {
-    lines.push(`- ${switched} of them followed a model change, which re-bills the prompt by design`);
   }
 
   lines.push(

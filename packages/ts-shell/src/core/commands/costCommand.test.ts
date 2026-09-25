@@ -164,4 +164,35 @@ describe("runCostCommand", () => {
     // when the truth is there was nothing to report.
     expect(result.output).not.toContain("Prompt cache");
   });
+
+  /**
+   * The headline figure sums two different things. Tokens a model switch re-sent
+   * could never have been cache reads for the new model, so the report has to say
+   * so rather than leaving a reader to conclude the cache failed.
+   */
+  it("says a model switch could not have been a cache read, not that it should have been", async () => {
+    const home = workspace();
+    process.env.HOME = home;
+    process.env.USERPROFILE = home;
+    writeCatalogCache([
+      {
+        id: "priced",
+        models: [
+          { id: "meter", cost: { promptPerMTok: 3, completionPerMTok: 15, cacheReadPerMTok: 0.3 } },
+          { id: "other", cost: { promptPerMTok: 3, completionPerMTok: 15, cacheReadPerMTok: 0.3 } },
+        ],
+      },
+    ]);
+
+    const session = "sess_cost_switch";
+    resetSessionUsage(session);
+    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced" });
+    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "other", provider: "priced" });
+
+    const result = await runCostCommand([], contextFor(session, workspace()));
+    expect(result.output).toContain("Prompt cache");
+    expect(result.output).toContain("could not have been cache reads at all");
+    // And it is not also reported as an idle-gap failure, which is a different cause.
+    expect(result.output).not.toContain("idle gap");
+  });
 });
