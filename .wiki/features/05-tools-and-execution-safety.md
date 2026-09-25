@@ -51,7 +51,7 @@ sed -n '5,27p' packages/ts-shell/src/core/hooks/types.ts                        
 | 能力 | pi 位置 | 我们位置 | 判定 | 证据 |
 |---|---|---|---|---|
 | 目录遍历剪枝 + `.gitignore` 遵从 | `src/core/tools/find.ts:65`（用 `fd`）、`src/core/tools/grep.ts` | `runtime/execution/fileWalk.ts:74`（`IGNORE_FILES = ['.gitignore', '.ignore']`）；`runtime/execution/service.ts:112-123` | **已收口**（**2026-09-24 更正**） | **原判定列写 DEFICIENT 与行首 ✅ 自相矛盾**。实测剪枝与 `.gitignore`/`.ignore` 遵从**都在 `fileWalk.ts`**，且按嵌套优先序解析。见 §2.1 |
-| ~~bash 超时可指定~~ ✅ **已收口 2026-09-23**：`timeout` 参数已实现（`runtime/execution/commandTimeout.ts`），默认保留 60s，上限拒绝而非钳制 | `src/core/tools/bash.ts:239`（`timeout` 参数） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §2 |.2 |
+| ~~bash 超时可指定~~ ✅ **已收口 2026-09-23**：`timeout` 参数已实现（`runtime/execution/commandTimeout.ts`），默认保留 60s，上限拒绝而非钳制 | `src/core/tools/bash.ts:239`（`timeout` 参数） | **已实现** | ✅ **已收口** | 见 `phase-4-execution.md` §2.2 |
 | 全量输出落盘并可回读 | `src/core/tools/output-accumulator.ts:19-22`（`fullOutputPath`，OS temp 文件） | `core/tools/registry.ts:141`（`ArtifactManager.save`，`artifact://` URI） | **平手** | 两侧都保留完整输出；差异仅在回读载体（§2.3 已更正原误报） |
 | `ls` 工具 ✅ **2026-09-23 更正为平手**：能力已在 `read` 的目录分支（`registry.ts:239,249-253`，默认 500、max 1000，与 pi 的 `ls` 一致） | `src/core/tools/ls.ts`（175 行，`limit` 默认 500） | `read` 的目录分支 | **平手** | 见 `phase-5-execution.md` §7 |
 | `find` 工具 ✅ **2026-09-23 更正为平手**：`glob` 已只返回路径（`glob.ts:90` 的 `page.join('\n')`）、已模式匹配、已读 `.gitignore`、已剪枝。**新建 `find` 的裁决已撤销**（原前提「glob 返回文件内容」实测证伪） | `src/core/tools/find.ts`（318 行，`limit` 默认 1000，尊重 `.gitignore`） | `core/tools/glob.ts` | **平手** | 见 `phase-5-execution.md` §7.2 |
