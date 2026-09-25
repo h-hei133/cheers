@@ -26,6 +26,23 @@ import {
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, "..", "..", "..");
 const cliPath = path.join(currentDir, "entrypoints", "cli.tsx");
+
+/**
+ * A connected MCP server backed by the stdio fixture.
+ *
+ * The fixtures used to declare an unimplemented transport and attach `mockTools`,
+ * which made a server look connected without anything able to serve it. That is
+ * the behaviour the client no longer reports, so the fixtures use the transport
+ * that works and the tool the fixture server actually exposes.
+ */
+function stdioServerFixture(): { transport: string; command: string; args: string[] } {
+  return {
+    transport: "stdio",
+    command: process.execPath,
+    args: [path.join(repoRoot, "packages", "ts-shell", "src", "core", "mcp", "fixtures", "mockMcpServer.mjs")],
+  };
+}
+
 const tsxCliPath = path.join(
   repoRoot,
   "node_modules",
@@ -892,17 +909,7 @@ describe("CLI streaming baseline (T3)", () => {
         path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
-            connectedSdk: {
-              transport: "sdk",
-              mockTools: [
-                {
-                  serverName: "connectedSdk",
-                  toolName: "search",
-                  qualifiedName: "mcp__connectedSdk__search",
-                  description: "Search MCP",
-                },
-              ],
-            },
+            connectedSdk: stdioServerFixture(),
             needsAuth: {
               transport: "http",
               url: "https://example.com/mcp",
@@ -1152,17 +1159,7 @@ describe("CLI streaming baseline (T3)", () => {
         path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
-            connectedSdk: {
-              transport: "sdk",
-              mockTools: [
-                {
-                  serverName: "connectedSdk",
-                  toolName: "search",
-                  qualifiedName: "mcp__connectedSdk__search",
-                  description: "Search MCP",
-                },
-              ],
-            },
+            connectedSdk: stdioServerFixture(),
             needsAuth: {
               transport: "http",
               url: "https://example.com/mcp",
@@ -1230,17 +1227,7 @@ describe("CLI streaming baseline (T3)", () => {
         path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
-            connectedSdk: {
-              transport: "sdk",
-              mockTools: [
-                {
-                  serverName: "connectedSdk",
-                  toolName: "search",
-                  qualifiedName: "mcp__connectedSdk__search",
-                  description: "Search MCP",
-                },
-              ],
-            },
+            connectedSdk: stdioServerFixture(),
             needsAuth: {
               transport: "http",
               url: "https://example.com/mcp",
@@ -1277,7 +1264,7 @@ describe("CLI streaming baseline (T3)", () => {
       const connectedOutput = normalizeCliOutput(connectedResult.output);
       expect(connectedResult.code).toBe(0);
       expect(connectedOutput).toContain("MCP tools @ connectedSdk");
-      expect(connectedOutput).toContain("mcp__connectedSdk__search");
+      expect(connectedOutput).toContain("mcp__connectedSdk__echo_message");
       expect(connectedOutput).not.toContain("Unavailable selected servers");
 
       const authResult = await runCliCommandToClose({
@@ -1343,17 +1330,7 @@ describe("CLI streaming baseline (T3)", () => {
         path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
-            connectedSdk: {
-              transport: "sdk",
-              mockTools: [
-                {
-                  serverName: "connectedSdk",
-                  toolName: "search",
-                  qualifiedName: "mcp__connectedSdk__search",
-                  description: "Search MCP",
-                },
-              ],
-            },
+            connectedSdk: stdioServerFixture(),
             needsAuth: {
               transport: "http",
               url: "https://example.com/mcp",
@@ -1464,17 +1441,7 @@ describe("CLI streaming baseline (T3)", () => {
         path.join(projectRoot, ".cheers.mcp.json"),
         JSON.stringify({
           mcpServers: {
-            connectedSdk: {
-              transport: "sdk",
-              mockTools: [
-                {
-                  serverName: "connectedSdk",
-                  toolName: "search",
-                  qualifiedName: "mcp__connectedSdk__search",
-                  description: "Search MCP",
-                },
-              ],
-            },
+            connectedSdk: stdioServerFixture(),
             needsAuth: {
               transport: "http",
               url: "https://example.com/mcp",

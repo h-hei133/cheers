@@ -103,23 +103,17 @@ describe("core MCP gateway (W3)", () => {
     expect(await failedClient.connect()).toMatchObject({ type: "failed" });
   });
 
-  it("aggregates tools/resources/prompts through the gateway snapshot", async () => {
+  it("reports a server on an unimplemented transport as failed rather than connected", async () => {
+    // A transport we cannot reach a server through has to say so. Reporting it
+    // as connected would mark it executable and let a call come back with a
+    // success nobody performed.
     fs.writeFileSync(
       path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({
         mcpServers: {
-          localSdk: {
-            transport: "sdk",
-            mockTools: [
-              {
-                serverName: "localSdk",
-                toolName: "search",
-                qualifiedName: "mcp__localSdk__search",
-                description: "Search MCP",
-              },
-            ],
-            mockResources: [{ uri: "mcp://notes/1", name: "notes" }],
-            mockPrompts: [{ name: "draft-plan", description: "Draft a plan" }],
+          remoteOnly: {
+            transport: "http",
+            url: "https://mcp.example.test",
           },
         },
       }),
@@ -131,15 +125,13 @@ describe("core MCP gateway (W3)", () => {
 
     expect(snapshot.clients).toHaveLength(1);
     expect(snapshot.clients[0]).toMatchObject({
-      type: "connected",
-      name: "localSdk",
+      type: "failed",
+      name: "remoteOnly",
     });
-    expect(snapshot.tools.map((tool) => tool.toolName)).toContain("search");
-    expect(snapshot.tools.map((tool) => tool.qualifiedName)).toContain(
-      "mcp__localSdk__search",
-    );
-    expect(snapshot.resources.localSdk[0].uri).toBe("mcp://notes/1");
-    expect(snapshot.prompts.localSdk[0].name).toBe("draft-plan");
+    // Named so the reader can tell "we do not implement this" from "your file is
+    // malformed": the two call for different fixes.
+    expect(describeMcpConnectionState(snapshot.clients[0]!).executable).toBe(false);
+    expect(snapshot.tools).toEqual([]);
   });
 
   it("supports real stdio list and invoke with server-scoped MCP tool identity", async () => {
@@ -279,20 +271,19 @@ describe("core MCP gateway (W3)", () => {
   });
 
   it("refresh supports target/all and rejects unknown server targets", async () => {
+    const serverPath = path.resolve(
+      process.cwd(),
+      "src/core/mcp/fixtures/mockMcpServer.mjs",
+    );
+
     fs.writeFileSync(
       path.join(workspaceRoot, ".cheers.mcp.json"),
       JSON.stringify({
         mcpServers: {
-          localSdk: {
-            transport: "sdk",
-            mockTools: [
-              {
-                serverName: "localSdk",
-                toolName: "search",
-                qualifiedName: "mcp__localSdk__search",
-                description: "Search MCP",
-              },
-            ],
+          stdioEcho: {
+            transport: "stdio",
+            command: process.execPath,
+            args: [serverPath],
           },
         },
       }),
@@ -302,11 +293,11 @@ describe("core MCP gateway (W3)", () => {
     const gateway = new CoreMcpGateway(workspaceRoot);
     await gateway.snapshot();
 
-    await expect(gateway.refresh("localSdk")).resolves.toMatchObject({
-      clients: [{ type: "connected", name: "localSdk" }],
+    await expect(gateway.refresh("stdioEcho")).resolves.toMatchObject({
+      clients: [{ type: "connected", name: "stdioEcho" }],
     });
     await expect(gateway.refresh("all")).resolves.toMatchObject({
-      clients: [{ type: "connected", name: "localSdk" }],
+      clients: [{ type: "connected", name: "stdioEcho" }],
     });
     await expect(gateway.refresh("missing-server")).rejects.toThrow(
       "Unknown MCP server: missing-server",

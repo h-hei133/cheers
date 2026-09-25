@@ -11,6 +11,35 @@ import {
   McpClassifiedError,
   classifyMcpFailure,
 } from './errorTaxonomy.js'
+import type { McpTransport } from './types.js'
+
+/**
+ * The transports this build can actually reach a server through.
+ *
+ * The configuration type names more than this, and that is deliberate: a file
+ * that asks for a transport we cannot provide should say so by name, because
+ * "unknown transport" and "this transport is not built yet" call for different
+ * fixes. What must not happen is either of them being answered with a success.
+ *
+ * A server on an unsupported transport is reported as failed at connect time, so
+ * nothing downstream has to decide whether a call it is about to make is real.
+ */
+const SUPPORTED_TRANSPORTS: ReadonlySet<McpTransport> = new Set<McpTransport>(['stdio'])
+
+function isSupportedTransport(transport: McpTransport): boolean {
+  return SUPPORTED_TRANSPORTS.has(transport)
+}
+
+/**
+ * Why a transport cannot be used, in terms the reader can act on.
+ *
+ * Names the transport and says what is reachable, so the fix is either changing
+ * this server's entry or moving it to a server that speaks what we speak.
+ */
+function unsupportedTransportDetail(serverName: string, transport: McpTransport): string {
+  const supported = [...SUPPORTED_TRANSPORTS].join(', ')
+  return `MCP server '${serverName}' is configured with transport '${transport}', which this build does not implement (supported: ${supported})`
+}
 
 /**
  * Enhanced CoreMcpClient
@@ -37,21 +66,24 @@ export class CoreMcpClient {
       return { type: 'needs-auth', name: this.name, config: this.config }
     }
 
+    // Checked before the field checks, because "this transport does not exist"
+    // is the whole answer: reporting a missing URL for a transport that would
+    // never use one sends the reader to fix the wrong field.
+    if (!isSupportedTransport(this.config.transport)) {
+      return {
+        type: 'failed',
+        name: this.name,
+        config: this.config,
+        error: unsupportedTransportDetail(this.name, this.config.transport),
+      }
+    }
+
     if (this.config.transport === 'stdio' && !this.config.command) {
       return {
         type: 'failed',
         name: this.name,
         config: this.config,
         error: 'Missing stdio command',
-      }
-    }
-
-    if ((this.config.transport === 'http' || this.config.transport === 'ws') && !this.config.url) {
-      return {
-        type: 'failed',
-        name: this.name,
-        config: this.config,
-        error: 'Missing remote URL',
       }
     }
 
@@ -115,9 +147,15 @@ export class CoreMcpClient {
       return response
     }
 
-    return {
-      content: `MCP tool ${toolName} executed successfully on server ${this.name}`,
-    }
+    // No transport means no call. Answering with a success-shaped message would
+    // tell the model a tool ran when nothing left this process, which is the one
+    // outcome a caller cannot detect and cannot recover from.
+    throw new McpClassifiedError(
+      classifyMcpFailure({
+        failureClass: 'config',
+        detail: unsupportedTransportDetail(this.name, this.config.transport),
+      }),
+    )
   }
 
   private async callStdioWithRetry<T>(payload: Record<string, unknown>): Promise<T> {
