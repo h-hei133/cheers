@@ -3183,3 +3183,13 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **一处主代理自查撤回（不在任何复核意见里）**：**T7 的前提被推翻两次**。① 原注记的 `grep -c 'cost:' catalog.ts` 测的是**内置快照**而非**生效目录**；生效目录是三层合并，**刷新缓存带费率**（`catalogRefresh.ts:94,124-131,68`）。② 以为「静默回退」，实测 `costCommandRuntime.ts:92` **已按 `everyRatePublished` 分流两句文案**，连「发布了费率但没发缓存费率」这种半情况都单独算了（`usageTelemetry.ts:142-154`）。**T7 撤回，不施工**。**结论：扫出来的东西也要核实。**
 - **T4 补一处数据缺口（主代理发现）**：离线扫描要有东西可扫。参考实现扫的会话条目**自带 `usage`**，而**我方 transcript 完全没有 usage**（`grep -n usage sessionEventCodec.ts` → 0；`SessionMessage` 无该字段；usage 只在**内存 Map**）。三条出路中**选 B**（保留有上限的内存在程历史）：不动会话格式（T1 已在动，同阶段动两处风险叠加），并**明确代价**——重启丢失、`/cost` 须注明「自本次启动以来」。
 - **门禁**：`verify:docs-drift:strict` rules pass（advisory 78 持平）。两份文档 `##` 无重复、代码栅栏成对。
+
+## [2026-09-25] build | Phase 10 施工完成（T1–T6 + D1/D2 文档）。**541 文件 / 3719 通过 / 1 skipped。**
+- **T1 session 版本头 + 导出 header**（`02:50`/`02:51` → 已收口）：新 transcript 首行是 header（`TRANSCRIPT_FORMAT_VERSION`），`createTranscriptHeader` 构造。**header 不计行号**——派生 id（`line-N`）因此与无 header 文件一致，有用例钉住；实测去掉该判定 → 用例失败。**老文件不重写不迁移**：只有空文件才写 header，已写下的字节永不被改写；`/export jsonl` 的版本**取自 transcript 本身**，老会话导出为 `version: 0`。
+- **T2 崩溃日志时效**（`06:54` → 已收口）：`MAX_CRASH_AGE_MS` + `readRecentCrashes()`。**只过滤不删除**——复核抓到前一稿的致命错：让 `readCrashLog` 过滤**仍会删**，因为 `recordCrash` 正是通过它读旧记录再整文件覆写。拆成两个函数后，`/crash` 读新鲜、`recordCrash` 与 `/report` 读全部。**实测**：把过滤挪回 `readCrashLog` → 3 项用例失败。
+- **T3 主题热重载**（`04:61` → 已收口）：`presentation/themes/watch.ts`。监**目录**（编辑器保存换 inode，监文件会失效）、120ms 防抖、watcher 与定时器均 `unref`、切主题先停旧的。**检测与调度分离**——防抖与重载判定是普通逻辑（测试时钟驱动），监听本身一条真文件用例。**实机 PTY 验证**：启动渲染红（`38;5;196`），改文件后同一会话渲染绿（`38;5;46`），退出不挂起。
+- **T4 cache 浪费分析**（`06:62` → 部分收口，命中率仍缺）：`observability/cacheWaste.ts` 的 `findCacheWaste()`。噪声地板 1024；**上下文重建起新段**（否则把重建后的整个 prompt 记成浪费）；无公布费率**不判定**。**自查发现数据缺口**：transcript **不记录每次请求用量**，故历史存 `usageTelemetry.recentRequests`（上限 64，进程内），`/cost` 注明「最近 N 次」。
+- **T5 协议自注册**（`03:53` → 部分收口）：5 个文件的 `if` 收敛为**自注册注册表**。**施工中实测**：写第三个协议、自注册、**不改编任何调用方**即接通；测试里有桩钉住该承诺。协议种类仍为 2。
+- **T6 provider 声明表**（`03:49` → 部分收口）：**7 文件 54 个分支点 → 30 个**。**发现 3 处重复**（同一份允许模型列表 + 默认模型散在 3 个文件；同一「是否需用户自填端点」判定 4 份拷贝）。**发现并修掉一个真实缺陷**：原标签函数对未列举 provider 兜底返回 `"OpenAI"`，Anthropic 的失败提示会指错服务与账号。家数仍为 2。
+- **D1/D2 文档**：`01:64` 理由更正（原「会让执行规则彻底失效」**夸大**——Plan 模式有运行时硬拦截；参考实现**也没有**「不可覆盖的基底」）；`01:57` 注记更正（三项余量实测**全部已过时**）。
+- **门禁**：`verify:import-cycles` cycles=0、`check:config-consumers`、`check:declarations` 全过；`analyze:module-facades` monoliths **5**（与基线持平，施工中一度 6，已把 watcher 生命周期移入所属模块降回）。7 份文档表格**列数全部一致，0 处损坏**。

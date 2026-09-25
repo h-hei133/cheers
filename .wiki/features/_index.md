@@ -452,7 +452,20 @@ npx tsx /tmp/probe.mts
 **权威来源**：`phase-8-decisions.md` §5 的 13 项「维持不做」清单（该表有裁决编号，
 且经 `Rv-P8-Maintain` 子代理复核「correct、零发现」）。本节的分类是对它的**现状重判**。
 
-### 6.1 已完成（7 项，→ 应从「不做」移除）
+### 6.1 已完成（**13 项**，→ 应从「不做」移除）
+
+**Phase 10 又收口 6 项**（2026-09-25）：
+
+| 项 | 收口于 | 证据 |
+|---|---|---|
+| Session 版本头（02:50） | Phase 10 T1 | transcript 首行 header + `TRANSCRIPT_FORMAT_VERSION`；老文件读为版本 0，不重写 |
+| Session 导出 header（02:51） | Phase 10 T1 | `/export jsonl` 首行 header，版本取自 transcript 本身 |
+| 崩溃日志时效（06:54） | Phase 10 T2 | `MAX_CRASH_AGE_MS` + `readRecentCrashes()`；**只过滤不删除** |
+| 主题热重载（04:61） | Phase 10 T3 | `presentation/themes/watch.ts`；实机验证改文件后同会话变色 |
+| Cache 浪费分析（06:62） | Phase 10 T4 | `observability/cacheWaste.ts` 的 `findCacheWaste()` |
+| 协议自注册（03:53 部分） | Phase 10 T5 | `provider/endpoints/` 注册表；**加协议不改编任何调用方** |
+
+**Phase 9 与 Phase 8 收口的 7 项**（下表）：
 
 | 项 | 收口于 | 证据 |
 |---|---|---|
@@ -463,6 +476,13 @@ npx tsx /tmp/probe.mts
 | 更新检查（06） | Phase 8 §10.2 | `core/update/check.ts` |
 | cache 保活（03） | Phase 8 §10.3 | `turn/cacheWarm.ts` + `core/models/cacheEconomics.ts` |
 | 同意/离线开关（前置） | Phase 8 §10.1 | `core/network/policy.ts`（两项 B 的共同前置） |
+
+### 6.1bis 结构性收敛（非「收口」，余量仍在）
+
+**Phase 10 T6**（`03:49` 认证 provider）：把散在 **7 个文件、54 个分支点**的逐家硬编码
+收敛为**一张 provider 声明表**（`core/providers/facts.ts`），降到 **30 个**。
+**余量不变**：支持的家数仍是 2，真实端点验证仍缺（无订阅账号）。
+**`03:49` 的判定仍是部分收口**——收敛的是结构，不是家数。
 
 ### 6.2 仍然不做，理由经复核仍成立（6 项）
 
@@ -559,7 +579,9 @@ Phase 9 裁决已定其边界（路径 1 声明式 + 路径 2 进程外），但
 
 > **下面第 1–4 条是 Phase 0 时代写的**（P1–P3／M1–M4 是那套编号），
 > 其所指的项目**均已收口**。原文保留以存当时的判断，**当前状态以 §6 台账为准**。
-> 现状是：**剩下 9 行真开放**，其中 4 行同属「扩展宿主」一个根。
+> **2026-09-25 更新**：Phase 10 已施工完毕（T1–T6 + 两项文档修复，见 §6.1）。
+> 现状是：**剩下 9 行仍标开放**，其中 8 行同属「扩展宿主族」（宿主本体 + 下游），
+> 1 行（`02:53` Session 分享）是**独立立项**。
 
 1. **扩展宿主是否立项**（01 的 4 行同根：自动发现／注册工具／注册命令／事件订阅）。
    Phase 9 裁决已定边界——**路径 1（声明式）+ 路径 2（进程外），不做路径 3（进程内执行）**——

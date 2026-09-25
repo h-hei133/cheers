@@ -37,6 +37,23 @@ describe("providerFacts", () => {
     }
   });
 
+  /**
+   * A label is what a user reads when something fails. The function this
+   * replaced fell through to a default of "OpenAI", so an Anthropic failure was
+   * reported as an OpenAI one — which names a service the user is not using, and
+   * sends them to look at the wrong account and the wrong key.
+   */
+  it("names each provider as itself, never as the default", () => {
+    expect(providerFacts("anthropic").label).toBe("Anthropic");
+    expect(providerFacts("openai").label).toBe("OpenAI");
+    // Only `openai` may be labelled OpenAI. The function this replaced answered
+    // with that label for anything it did not list, so a failure on Anthropic
+    // was reported as an OpenAI one.
+    for (const provider of UNION.filter((p) => p !== "openai")) {
+      expect(providerFacts(provider).label, provider).not.toBe("OpenAI");
+    }
+  });
+
   it("names no two providers the same", () => {
     const labels = UNION.map((provider) => providerFacts(provider).label);
     const envVars = UNION.map((provider) => providerFacts(provider).apiKeyEnvVar);

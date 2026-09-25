@@ -61,7 +61,7 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 | 包分发（npm/git 安装、manifest） | `src/core/package-manager.ts:112`、`src/core/pi-manifest.ts:4,17`、`docs/packages.md` | 部分：`core/commands/pluginCommandRuntime.ts` | **DEFICIENT**（**2026-09-23 确认**） | 见 §2.3。**代码自述**（`pluginCommandRuntime.ts:12`）：「Registering one records an address and a manifest; **this build does not execute extensions**」 |
 | 主题发现（磁盘 JSON、CLI 覆盖） | `docs/themes.md:17-40` | `presentation/themes/index.ts`；`cli/options/cliOptions.ts:50,58` | ✅ **已收口**（**2026-09-25 更正**；余量：**包层**，与「包分发」同一前置） | **原判定写「仍无包/CLI 覆盖层」已过时**：用户级 + 项目级 + `/theme` 之外，**CLI 覆盖层已实现**（`--theme <path>` 加载、`--use-theme <name>` 选择，`cliArgs.ts:47,48,267,277`），`cliProcessRunner.applyStartupTheme` 在**首帧之前**应用。**漂移原因**：A2 施工只更新了 `04-terminal-interaction-and-presentation.md`，未回头关闭本行。见 `phase-8-decisions.md` §9.2 |
 | 上下文文件（AGENTS.md）分层加载 | `docs/usage.md:102-108`、`src/core/resource-loader.ts:119` `loadProjectContextFiles` | ✅ **已实现**（`context/instructions/projectInstructions.ts`） | ~~MISSING~~ | 见 §3.3 |
-| 提示词附加 `APPEND_SYSTEM.md` ✅ **已收口 2026-09-23**；`SYSTEM.md`（**替换**语义）**刻意不做** | `docs/usage.md:112-119` | `context/instructions/projectInstructions.ts`（`APPEND_CANDIDATES`） | **部分收口** | `SYSTEM.md` 替换会连带删掉 harness 自身的执行规则，是不同的信任决定；有测试钉住它未被认领。见 `phase-4-execution.md` §5 |
+| 提示词附加 `APPEND_SYSTEM.md` ✅ **已收口 2026-09-23**；`SYSTEM.md`（**替换**语义）**维持不做**（**2026-09-25 理由更正**） | `docs/usage.md:112-119` | `context/instructions/projectInstructions.ts`（`APPEND_CANDIDATES`） | **部分收口** | 有测试钉住 `SYSTEM.md` 未被认领。**理由已更正**（`phase-10-decisions.md` §9.1）：原写「替换会让执行规则彻底失效」**夸大了**——Plan 模式有**运行时硬拦截**（`turn/tools.ts` 的 `planModeBlock`），工具以**结构化参数**传给 provider，拒绝经工具返回值注入。真正的损失是**提示词层的引导质量**。另一处更正：参考实现**也没有**「不可覆盖的基底」——它在自定义提示词时同样跳过 tools/rules/docs，**只有信任门是真防线**。结论不变：**维持不做**，因为收益无需求支撑。 |
 | MCP 客户端 | **pi 无**（`docs/usage.md:310` 明确声明不内置） | `core/mcp/`（client/config/connectionManager/errorTaxonomy/gateway/types） | **OURS-ONLY** | 见 §4 |
 
 ## 2. DEFICIENT 详述
@@ -97,6 +97,16 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 > **仍然成立的余量**：**无名称/描述校验**（pi 有名称长度/字符集/连字符规则）、
 > **无 `.gitignore`/`.ignore` 忽略规则**、根目录数量少于 pi（我方 2 类 + 祖先展开）。
 > 下方原文保留为当时的证据。
+
+> **⚠️ 2026-09-25 再更正（Phase 10 D2）**：上面「仍然成立的余量」三项**全部已不成立**，
+> 这段注记当时漏改。逐项核实：
+> ① **名称/描述校验已实现**——`skillLoader.ts:541` `inspectSkill` 应用**四条**名称规则
+> （长度上限、字符集 `^[a-z0-9-]+$`、首尾连字符、连续连字符）**加**描述必填；
+> ② **忽略规则已接入**——`skillLoader.ts:6` 导入 `ignoreRules.js`，`:357` 实际过滤
+> （`source !== "cli"` 才过滤：直接指名的路径比恰好匹配的模式更具体）；
+> ③ **根目录数量的差距不构成缺陷**——缺的根属于**包系统／扩展宿主／设置项**，
+> 三者都在 Phase 10 的排除范围内。
+> **即：技能发现已无代码余量，这是纯文档修复。**
 
 **证据（我们）** `core/skills/skillLoader.ts`：
 
