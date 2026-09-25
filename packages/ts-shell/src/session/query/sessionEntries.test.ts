@@ -114,6 +114,44 @@ describe("the session tree", () => {
     expect(tree.map((node) => node.entry.id).sort()).toEqual(["a", "b"]);
   });
 
+  it("keeps a parent chain that closes on itself", () => {
+    // Every member of a cycle is somebody's child, so none of them is a root and
+    // the whole conversation vanished from the tree with nothing said about it.
+    // The branch is hung from a root instead, and no entry is lost doing it.
+    const cyclic = [threadEntry("a", "b", 1), threadEntry("b", "a", 2)];
+    const tree = readSessionTree(cyclic);
+    if (tree === "unknown-cursor") throw new Error("unexpected");
+
+    const seen: string[] = [];
+    const walk = (nodes: readonly { entry: { id: string }; children: readonly never[] }[]): void => {
+      for (const node of nodes) {
+        seen.push(node.entry.id);
+        walk(node.children as never);
+      }
+    };
+    walk(tree as never);
+    expect(seen.sort()).toEqual(["a", "b"]);
+  });
+
+  it("keeps every member of a longer cycle", () => {
+    const cyclic = [
+      threadEntry("a", "c", 1),
+      threadEntry("b", "a", 2),
+      threadEntry("c", "b", 3),
+    ];
+    const tree = readSessionTree(cyclic);
+    if (tree === "unknown-cursor") throw new Error("unexpected");
+    const seen: string[] = [];
+    const walk = (nodes: readonly { entry: { id: string }; children: readonly never[] }[]): void => {
+      for (const node of nodes) {
+        seen.push(node.entry.id);
+        walk(node.children as never);
+      }
+    };
+    walk(tree as never);
+    expect(seen.sort()).toEqual(["a", "b", "c"]);
+  });
+
   it("narrows to a subtree when given a cursor", () => {
     const branched = [
       threadEntry("a", undefined, 1),

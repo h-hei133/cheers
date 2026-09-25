@@ -123,6 +123,32 @@ export function readSessionTree(
     else roots.push(node);
   }
 
+  // A parent chain that returns to where it started has no entry to hang from:
+  // every member of the cycle is somebody's child, so none of them is a root and
+  // the whole branch would be missing from the tree with nothing said about it.
+  // The conversation is what a reader came for, so the cycle is broken and the
+  // branch is hung from the root instead of being dropped. The first entry in read
+  // order is detached from its parent, which is enough to make the rest a path.
+  const reachable = new Set<string>();
+  const mark = (node: SessionTreeNodeView): void => {
+    if (reachable.has(node.entry.id)) return;
+    reachable.add(node.entry.id);
+    for (const child of node.children) mark(child);
+  };
+  for (const root of roots) mark(root);
+
+  for (const entry of included) {
+    if (reachable.has(entry.id)) continue;
+    const node = nodes.get(entry.id)!;
+    const parent = entry.parentId === undefined ? undefined : nodes.get(entry.parentId);
+    if (parent) {
+      const at = parent.children.indexOf(node);
+      if (at >= 0) parent.children.splice(at, 1);
+    }
+    roots.push(node);
+    mark(node);
+  }
+
   // Append order within each level, so two reads of the same session agree.
   const sort = (list: readonly SessionTreeNodeView[]): SessionTreeNodeView[] =>
     [...list]
