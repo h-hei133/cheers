@@ -85,12 +85,13 @@ export function diagramMode(): DiagramMode {
 }
 
 /**
- * Drawn diagrams, keyed by the source that produced them.
+ * Drawn diagrams, keyed by the source that produced them and the palette.
  *
  * Bounded because the sources are model output: an answer can contain any number
  * of diagrams, and an unbounded map would hold every one of them for the life of
- * the process. Clearing wholesale on overflow is enough — the entries are cheap
- * to recompute and the alternative is a size bookkeeping problem.
+ * the process. The oldest entry is dropped on overflow rather than the whole map,
+ * because the entries a reader is looking at are the ones that would have to be
+ * redrawn synchronously on the next paint.
  */
 const cache = new Map<string, readonly string[]>();
 const MAX_CACHED_DIAGRAMS = 64;
@@ -138,7 +139,14 @@ export function renderDiagram(source: string, cells: number): readonly string[] 
     row.map((span) => styleSpan(span)).join(""),
   );
 
-  if (cache.size >= MAX_CACHED_DIAGRAMS) cache.clear();
+  // Oldest first, so the diagrams a reader is looking at survive the arrival of
+  // one more. Clearing the whole map was simpler and cost a full re-parse of
+  // every diagram still on screen the next time the transcript was painted,
+  // which is a visible stall in a long session rather than a rounding error.
+  if (cache.size >= MAX_CACHED_DIAGRAMS) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
   cache.set(key, rows);
   return rows;
 }

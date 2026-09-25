@@ -128,3 +128,31 @@ describe("the drawing follows the palette", () => {
     expect(after?.[0]).not.toBe(before?.[0]);
   });
 });
+
+describe("the drawing cache", () => {
+  it("keeps the recent diagrams instead of dropping every one", () => {
+    // The cost this guards against is work done again, and the only place that
+    // work is avoided is the cache. Detecting it needs an identity comparison
+    // against a row set captured while the cache was being filled: a re-parse
+    // returns a fresh array with identical contents, so only the object tells a
+    // hit from a miss, and only a source that was inserted well before the end
+    // tells "the oldest was evicted" from "everything was".
+    setDiagramMode("streaming");
+    const sources = Array.from(
+      { length: 70 },
+      (_, index) => `flowchart TD\n  A${index}[Start] --> B${index}[End]`,
+    );
+
+    const duringFill = sources.map((source) => renderDiagram(source, 80));
+    expect(duringFill[0]).toBeDefined();
+
+    // Inserted 30 of 70 from the end, so a bounded cache that drops one entry per
+    // insertion still holds it. A cache emptied on overflow would have dropped it
+    // at the sixty-fifth insertion and never seen it again.
+    const probe = renderDiagram(sources[30]!, 80);
+    expect(probe).toBe(duringFill[30]);
+
+    // And the newest is retained too, so the bound is not simply keeping nothing.
+    expect(renderDiagram(sources.at(-1)!, 80)).toBe(duringFill.at(-1));
+  });
+});
