@@ -3027,3 +3027,20 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **按可判定性重新分四类**：D-1 真正不做（8 项，理由本轮复核后仍成立）；**D-2 前置已变需重判（2 项）**——更新检查与 cache 保活，原理由都是「同意机制未建」，而该机制已建（§10.1）；D-3 前置只消掉一半（1 项）——cache 浪费分析，B2 已补 TTL 与费率，只差请求时间戳；D-4 长尾/收益不明（4 项）；D-5 文档卫生（3 项）。
 - **同时修掉 3 处文档漂移**（D-5）：①**01 主题发现行未随 A2 更新**——仍写「仍无包/CLI 覆盖层」，而 `--theme`/`--use-theme` 已在 `cliArgs.ts:47,48,267,277`（`git log -S "use-theme" -- 01-*.md` → **空**，A2 只改了 04 未回头关 01）；②**同一缺口两处登记**（`03 L55` ≡ `06 L62` 的 cache 统计）→ 06 为唯一登记处，03 改为指针；③04 L61 与 01 L62 对同一能力口径不一致 → 已对齐。另**修复我上轮编辑表格时吃掉的 4 行前导 `|`**（03 的 53/54/56、06 的 63）。
 - **处置**：`phase-8-decisions.md` §5 的 cache 保活与更新检查两行标注「已由 §10 收口」，**保留原文作当时的证据**（该文档既有风格）。
+
+## [2026-09-25] plan | Phase 9 裁决完成（**零代码改动**）。产物 `.wiki/features/phase-9-decisions.md`。
+- **用户裁定 5 项**：①扩展只做**路径 1（声明式）+ 路径 2（进程外）**，**不做路径 3（进程内代码执行）**；②图片输入加宽 `content` + `messageToText`；③Mermaid 默认 **`streaming`**；④HTML 导出首版做**等价交互**；⑤修 S1、同意 S4。顺序由主代理研究后自定。
+- **本轮新增研究**：5 个只读子代理（**2 个因上游内容过滤失败**——都死在读参考实现的大文件时；对应切片「Mermaid 流式」与「HTML 客户端」由主代理亲验）。全部数字经主代理复测。
+- **扩展六行的最终归类**：行 1（自动发现）/行 4（事件订阅）→ **路径 1**；行 2（注册工具）→ **路径 2**；行 3（注册命令）→ **路径 1（受限）**；**行 5/6（快捷键/渲染器/UI 组件）→ 永久不做**。行 5/6 的理由**不是偏好而是架构**：快捷键分发在 `keymap.ts` 的**同步** keypress 循环里、渲染器按**终端列宽**计算换行、UI 需要**同步帧计算**——**进程边界与同步渲染不兼容**。另查明参考实现**自己承认无隔离**（`docs/extensions.md:4-5`）且**没有任何进程外能力机制**，故「路径 2」在本仓**无参考可抄**（我方 MCP 已实现，参考实现没有）。
+- **本轮查出 4 项既有缺陷（均非本计划引入）**：
+  - **N1（最高优先级）**：**MCP 非 stdio 传输的 `invokeTool` 返回假的成功**。`client.ts:117-121` 非 `stdio` 分支直接 return `"MCP tool X executed successfully on server Y"`，**无任何调用**。**已实测复现**（临时测试未入库）：`{transport:"http"}` → `invokeTool("do_thing")` → `{"content":"MCP tool do_thing executed successfully on server remote"}`。**违反 `AGENTS.md:25`**「不得用成功态掩盖未验证结果」，且 `McpTransport` 含 `http`/`ws`/`sdk`，**配置层接受**，用户可配出这条路径。
+  - **N2**：MCP `resources`/`prompts` 只有 mock（`client.ts:92-97` 返回 `config.mockResources ?? []`），三个原语只实现了 tools，全仓零消费者。
+  - **N3**：**`/report` 与 `/export` 同形无围栏写入缺陷**（`reportCommandRuntime.ts:93-94` 亦不 import `verifyPathContainment`）——**这把 S1 从「修一个命令」变成「立一条策略，套用两处」**。
+  - **N4**：**导出只读 transcript，拿不到会话树**（`exportCommandRuntime.ts:98-105` 只读 `transcriptPath`，而树在 `state.json` 的 `SessionThreadSnapshot`）——这是 HTML 导出做侧栏树的**硬前置**。
+- **好消息（省一大块工）**：树的构建逻辑**已存在且已被生产代码使用**——`session/query/sessionEntries.ts:95-130` 的 `readSessionTree` 已按 `parentId` 建父子、自指视为根、按 `order` 稳定排序，消费者是 `core/commands/entriesCommandRuntime.ts`。**导出复用即可，不新建树逻辑**。
+- **Mermaid 实测（子代理切片失败，主代理亲测）**：库 API 是 `{plain: string[], styled: [{text,cls}][], width, warnings}`，`cls` 取值 `border`/`text` **可直接映射我方主题令牌**；无效输入返回 `null` **不抛异常**；耗时小图 0.29ms / 120 节点 3.53ms。**关键机制发现**：我方**本来就每次增量全量重解析**（`blocks.ts:253` `renderAssistant` 对未 finalize 块调 `renderMarkdown`），实测 4,001 行输入单次重解析 **4.31ms**。故 `streaming` 的增量成本 ≈ `4.31 + 3.53`ms/次——**不是新问题，是放大既有问题**，故必须加**按源文本缓存**与**体积上限**两条保护。
+- **图片输入修正**：迁移面 **19 个文件**（pre-research 说 18，**口径漏了 `TranscriptEvent`**）。按处置分类：真改 6 / 需 `messageToText` 12 / 透传 3。**唯一「漏一步就静默丢数据」的耦合**：`sessionMessage.ts` 与 `sessionEventCodec.ts:165` 的运行时守卫必须**同批改**（守卫失败 → `decodeTranscriptLineSafe` 返回 `undefined` → `readTranscriptEvents` 跳过 → 带图片的消息重载后消失）。
+- **HTML 客户端（参考 1,869 行，分段实测）**：树构建 42 / 展平 74 / 过滤 63 / **可视结构重算 125** / 节点 HTML 74 / 树渲染 77 / 可展开输出 55 / **工具卡片 191** / 分享链接 68 / 条目渲染 **148** / 统计 42 / 头部 97 / 导航 144 / 侧栏拖拽 66。我方首版**做**树/过滤/条目/工具卡片/长输出/统计/头部/导航，**不做**分享链接（依赖参考实现的分享服务）与侧栏拖拽，估 **1,100–1,300 行**客户端 + 600–800 行 CSS。**不 vendor `marked`**——复用我方终端 markdown 语义子集，保持同一会话在终端与导出页一致。
+- **执行顺序（主代理定）**：**N1 + S1/N3 写入策略 → Mermaid → 扩展路径 1 → HTML 导出 → 图片输入 → 扩展路径 2**。排序依据：**先修「会主动说假话/会丢数据/会写错地方」的，再做加法；先做独立可验证的，再做跨层的**。Mermaid 排在扩展路径 1 前是因为它有**实测性能数据与硬验收标准**；图片输入排在导出后是因为 `content` 加宽会改 `exportCommandRuntime.ts`（在 19 文件清单内），先做要改两遍。
+- **文档**：新增 `phase-9-decisions.md`（§0 四项新缺陷 / §1 扩展边界与六行归类 / §2 图片输入 / §3 Mermaid 含实测 / §4 HTML 导出 / §5 S1+S4 / §6 顺序 / §7 与 pre-research 的差异 / §8 未验证）；`01-*` 行 55/56 改「永久不做」并给架构理由、MCP 行补三条如实性缺陷；`_index.md` 补裁决摘要。
+- **未验证（如实记录）**：剪贴板三条路径未实机；`grok-mermaid` 渲染质量未目视；参考导出的 HTML 未在浏览器打开；MCP 未接真实服务器；`/report` 缺陷按同形代码证据判定，未实机复现。
