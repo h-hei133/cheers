@@ -37,6 +37,38 @@ function userStatusItems(): readonly string[] | undefined {
 }
 
 /** The project's own choice, when it names one and the file is readable. */
+/**
+ * Whether diagrams are drawn, or the default when nothing is stored.
+ *
+ * Read at startup rather than per render, matching how the theme is chosen: the
+ * value decides how every later frame is built, and re-reading a file between
+ * two frames of the same answer would let the display change mid-sentence.
+ */
+export function readDiagramMode(workspaceRoot: string): "off" | "streaming" {
+  return readProjectDiagramMode(workspaceRoot) ?? userDiagramMode() ?? "streaming";
+}
+
+function userDiagramMode(): "off" | "streaming" | undefined {
+  return readUserRuntimeConfigFile().tui?.diagrams;
+}
+
+function readProjectDiagramMode(workspaceRoot: string): "off" | "streaming" | undefined {
+  const [, projectPath] = getCandidateConfigPaths(workspaceRoot);
+  if (!fs.existsSync(projectPath)) return undefined;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(projectPath, "utf8")) as {
+      readonly tui?: { readonly diagrams?: "off" | "streaming" };
+    };
+    const value = parsed.tui?.diagrams;
+    // Only the two known values count. An unrecognised one is a typo, and
+    // silently treating it as a third mode would leave the reader unable to
+    // tell a misspelling from a setting that does nothing.
+    return value === "off" || value === "streaming" ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function readProjectStatusItems(workspaceRoot: string): readonly string[] | undefined {
   const [, projectPath] = getCandidateConfigPaths(workspaceRoot);
   if (!fs.existsSync(projectPath)) return undefined;

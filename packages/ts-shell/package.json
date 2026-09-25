@@ -17,6 +17,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "grok-mermaid": "^0.2.3",
     "ignore": "^7.0.9",
     "picomatch": "^4.0.7",
     "playwright-core": "^1.60.0",

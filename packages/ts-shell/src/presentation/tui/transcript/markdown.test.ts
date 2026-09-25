@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { setDiagramMode } from "./mermaid.js";
 import { renderInline, renderMarkdown, trimPartialFence } from "./markdown.js";
 import { visibleWidth } from "../text/measure.js";
 import { stripAnsi } from "../text/ansi.js";
@@ -110,5 +111,46 @@ describe("streaming stability", () => {
 
   it("keeps ordinary trailing text", () => {
     expect(trimPartialFence("text\nmore")).toBe("text\nmore");
+  });
+});
+
+describe("diagrams in a fenced block", () => {
+  afterEach(() => setDiagramMode("streaming"));
+  const CHART = "```mermaid\nflowchart TD\n  A[Start] --> B[End]\n```";
+
+  it("draws a diagram instead of showing its source", () => {
+    const rows = plain(renderMarkdown(CHART, 60));
+    expect(rows).toContain("Start");
+    expect(rows).not.toContain("flowchart");
+  });
+
+  it("falls back to the code block when drawing is switched off", () => {
+    // The fallback is the point: a diagram that cannot be drawn has to leave the
+    // reader with the code they wrote, not with nothing.
+    setDiagramMode("off");
+    const rows = plain(renderMarkdown(CHART, 60));
+    expect(rows).toContain("flowchart TD");
+    expect(rows).toContain("mermaid");
+  });
+
+  it("falls back when the diagram does not fit the width", () => {
+    // Narrow enough that the code block wraps, so the assertion is on the block
+    // being shown rather than on the source surviving one line.
+    const rows = plain(renderMarkdown(CHART, 6));
+    expect(rows).toContain("mermaid");
+    expect(rows).toContain("flow");
+  });
+
+  it("falls back when the source is not a diagram", () => {
+    const rows = plain(renderMarkdown("```mermaid\nnot a diagram at all\n```", 60));
+    expect(rows).toContain("not a diagram at all");
+  });
+
+  it("does not draw the same diagram twice", () => {
+    // Every delta of a streaming answer re-renders the whole block, so this path
+    // is walked many times for one diagram.
+    const first = renderMarkdown(CHART, 60);
+    const second = renderMarkdown(CHART, 60);
+    expect(second).toEqual(first);
   });
 });

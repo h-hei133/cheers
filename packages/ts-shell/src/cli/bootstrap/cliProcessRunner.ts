@@ -10,6 +10,8 @@ import {
 } from "../../observability/index.js";
 import { parseCliArgs } from "../../entrypoints/cliArgs.js";
 import { applyTheme } from "../../presentation/theme/theme.js";
+import { readDiagramMode } from "../interactive/tuiSettings.js";
+import { setDiagramMode } from "../../presentation/tui/transcript/mermaid.js";
 import { listThemes, themeNamesFromPaths } from "../../presentation/themes/index.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
@@ -114,6 +116,10 @@ export async function runCliProcess(
     configured: runtimeContext.runtimeConfig.theme,
     renderer,
   });
+  // Chosen once here for the same reason the theme is: it decides how every
+  // frame is built, so reading it later would let the display change between two
+  // frames of the same answer.
+  setDiagramMode(readDiagramMode(runtimeContext.projectRoot ?? runtimeContext.cwd));
   const resolvedCredential =
     providerRuntimeBridge.resolveCredentialSnapshot();
   const mcpGateway = bootstrapRuntime.mcpGateway;

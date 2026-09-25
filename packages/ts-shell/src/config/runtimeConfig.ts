@@ -278,6 +278,14 @@ export interface RuntimeConfig {
 export interface TuiPreferences {
   /** Status band item ids, in canonical order. Absent means the defaults. */
   readonly statusItems?: readonly string[];
+  /**
+   * How `mermaid` fenced blocks are shown.
+   *
+   * Absent means diagrams are drawn. Drawing them is the default because a
+   * diagram the author wrote is meant to be read as a picture, and the fallback
+   * when one cannot be drawn is the code block it already was.
+   */
+  readonly diagrams?: "off" | "streaming";
 }
 
 export interface RuntimeConfigFile {

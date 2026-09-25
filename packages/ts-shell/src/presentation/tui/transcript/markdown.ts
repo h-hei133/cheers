@@ -2,6 +2,7 @@ import { defaultTheme } from "../../theme/theme.js";
 import { formatCommandLine } from "../../theme/commandHighlight.js";
 import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
+import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
 /**
  * Markdown rendering for assistant prose.
  *
@@ -165,6 +166,15 @@ function renderLine(line: string, cells: number): string[] {
 
 /** A fenced block, framed so its boundaries and language are unmistakable. */
 function renderFence(body: readonly string[], language: string, cells: number): string[] {
+  // A diagram is drawn rather than shown as source, and its own rows are already
+  // aligned, so it is not framed or wrapped: a border would be drawn around
+  // something that already draws its own, and wrapping would break the alignment
+  // the diagram depends on.
+  if (language === DIAGRAM_LANGUAGE) {
+    const diagram = renderDiagram(body.join("\n"), cells);
+    if (diagram) return [...diagram];
+  }
+
   const label = language ? ` ${language} ` : " code ";
   const head = defaultTheme.fg("border", `┌${label}${"─".repeat(Math.max(0, cells - visibleWidth(label) - 2))}┐`);
   const rows = [head];
