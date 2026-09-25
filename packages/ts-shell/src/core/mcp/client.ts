@@ -130,6 +130,12 @@ export class CoreMcpClient {
       }))
     }
 
+    // Reached only when there is no stdio command to ask. Everything that reaches
+    // the tool pool goes through the gateway, which skips any server that did not
+    // report `connected` — and a server with no command fails to connect — so a
+    // user config carrying `mockTools` cannot put fake tools in front of the
+    // model. The safety is in that guard, not here: a caller that reached this
+    // method directly would get whatever the config claimed.
     return (this.config.mockTools ?? []).map(tool => ({
       ...tool,
       serverName: tool.serverName ?? this.name,

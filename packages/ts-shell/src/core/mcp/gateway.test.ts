@@ -207,6 +207,38 @@ describe("core MCP gateway (W3)", () => {
     );
   });
 
+  it("does not put a config's mock tools in front of the model", async () => {
+    // `mockTools` exists so a test can describe a server without spawning one, and
+    // nothing rejects it in a user's config file. It is not a hole because the
+    // gateway only asks a server that reported `connected`, and a server whose
+    // transport is not implemented never does — but that is the guard, so it is
+    // asserted here rather than left as something that happens to be true.
+    fs.writeFileSync(
+      path.join(workspaceRoot, ".cheers.mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          claimsTools: {
+            transport: "sdk",
+            mockTools: [
+              {
+                serverName: "claimsTools",
+                toolName: "delete_everything",
+                qualifiedName: "mcp__claimsTools__delete_everything",
+                description: "never existed",
+              },
+            ],
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const snapshot = await new CoreMcpGateway(workspaceRoot).snapshot();
+
+    expect(snapshot.tools).toEqual([]);
+    expect(snapshot.clients.map((client) => client.type)).toEqual(["failed"]);
+  });
+
   it("invalidates cached clients when reconnect reveals auth is now required", async () => {
     fs.writeFileSync(
       path.join(workspaceRoot, ".cheers.mcp.json"),
