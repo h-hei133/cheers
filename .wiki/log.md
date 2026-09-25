@@ -3108,3 +3108,15 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **验证**：`tsc` 0 错；**全量 536 文件 3637 通过 / 1 skipped**；门禁全绿（cycles=0、config-consumers 38/38、monoliths=5 无新增）。新增测试 28 项（multimodal 9 / codec 往返 7 / vision 3 / 剪贴板 2 / catalog 2 等）。**反向验证**：移除守卫 → 3 项失败；强制 `vision: true` → 1 项失败。
 - **不做**：图片缩放/格式转换（需原生解码器处理不可信字节，故首版只接受四种已知类型）、TUI 内联图片渲染（终端无图形协议）、视频/PDF。
 - **文档**：新增 `phase-9-step5-design.md`（耦合点/已有的一半/剪贴板机制/决定 I1–I8/实现结果/自身缺陷/测试修正/不做）。
+
+## [2026-09-25] fix | Phase 9 第 6 步：MCP 诚实化收尾。**不再宣称支持取不到的东西。**
+- **背景**：第 1 步已修掉最关键的一条（非 stdio 传输报告假成功）。本步处理余下两条如实性缺陷。
+- **N2 `resources`/`prompts` 只有 mock**：实测①三个 `mock*` 字段**只被测试使用**；②`listResources`/`listPrompts` **没有 stdio action**（连上真实服务器也取不到）；③`gateway` 把结果放进快照，但**三个快照消费者都不读这两个字段**——**算出来然后丢弃**。
+- **决定（M1–M4）**：**不实现** resources/prompts（无需求证据，且我方**没有消费它们的执行面**——模型不能引用 resource、命令不能插入 prompt）。改为**让类型如实**：快照**去掉**这两个字段（「空列表」读作「服务器没有」，与「本构建取不到」是两件事）；**删** `McpResourceDescriptor`/`McpPromptDescriptor` 两个类型与两个方法（零使用者）；**删** `mockResources`/`mockPrompts`（零使用，且「留一个没人用还宣称支持的字段」正是第 3 步删 10 个死令牌时处理过的问题）。`gateway` 不再计算它们。
+- **`mockTools` 保留并加注**：实测它是三个 mock 字段里**唯一还有使用者**的（`gateway.test.ts` 用它描述一个不启动进程的服务器），删掉会迫使测试去 spawn 真进程。**保留一个诚实的、有说明的测试钩子**，比删掉后让测试变慢更合适。
+- **N3 stdio 信封非标准**：类文档原写「**full JSON-RPC lifecycle**」——**实测不实**：信封是 `{action:"list-tools"}` 自有形状，不是 JSON-RPC 2.0。**后果**：**无法接任何第三方服务器**。已改为如实描述：**能**做什么（自带服务器、重连、30s 超时、EPIPE 韧性）、**不能**做什么（接第三方），以及**改造方向**（按 JSON-RPC 2.0 重写传输层）。**不改实现**——那是「实现一个真 MCP 客户端」，属新能力而非修补，且**我方唯一的服务器是自带 fixture**，改成标准形状没有可验证的对象。
+- **实机（构建产物）**：`snapshot keys: clients, tools`；`claims resources: false`；`claims prompts: false`；`http transport: failed | executable: false`；`invokeTool: threw`。
+- **反向验证**：把 `resources: {}`/`prompts: {}` 加回快照 → 新增的 `surface.test.ts` **失败**。
+- **门禁**：`verify:import-cycles` cycles=0；`check:config-consumers` 38/38；`check:declarations` 通过；`analyze:module-facades` monoliths=5（无新增）。受影响套件 50 文件 516 项通过。
+- **不做（如实记录）**：不实现 resources/prompts；不把 stdio 封包改成 JSON-RPC 2.0；不实现 http/ws/sdk 传输（第 1 步已定为「明确失败」）。
+- **文档**：新增 `phase-9-step6-design.md`（三条缺陷现状/实测/决定 M1–M6/实现结果/类文档不实的更正/不做）。
