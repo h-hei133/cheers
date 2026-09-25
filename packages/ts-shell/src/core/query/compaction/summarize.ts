@@ -10,6 +10,8 @@ import {
   formatCheckpointMessage,
   parseCompactedSummary,
 } from "./summarizer.js";
+import { chatBody, chatUrl } from "../../../provider/endpoints/chatRequest.js";
+import { readChatText } from "../../../provider/endpoints/chatResponse.js";
 
 /**
  * One summarization request.
@@ -31,12 +33,28 @@ export interface CompactionProvider {
    */
   readonly headers: Readonly<Record<string, string>>;
   readonly model: string;
+  /**
+   * Which endpoint kind this request goes to.
+   *
+   * Absent means the default one. Summarizing is a model call like any other, so
+   * it has to speak whatever the run speaks — posting the default shape to an
+   * endpoint that wants another fails a compaction that had nothing wrong with
+   * it.
+   */
+  readonly endpoint?: "anthropic-messages";
 }
 
+/**
+ * A message the summarizer sends.
+ *
+ * Text only: a summary request carries the conversation's prose, and a tool call
+ * would arrive at the endpoint as a call with no result to pair it with, which
+ * the stricter endpoint rejects outright. The tool calls a conversation contains
+ * are represented in the text the summarizer is given instead.
+ */
 export interface CompactionChatMessage {
   readonly role: "system" | "user" | "assistant" | "tool";
   readonly content?: string | null;
-  readonly tool_calls?: readonly unknown[];
   readonly tool_call_id?: string;
 }
 
@@ -90,24 +108,27 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   // as the main one. There is no global-fetch fallback: it is what let a caller
   // keep the unbounded transport without anything failing.
   const fetchImpl = request.fetchImpl;
-  const res = await fetchImpl(`${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+  const res = await fetchImpl(chatUrl(request.provider.baseUrl, request.provider.endpoint), {
     method: "POST",
     headers: request.provider.headers,
-    body: JSON.stringify({
-      model: request.provider.model,
-      messages: [
-        ...(previousSummary
-          ? [{ role: "user", content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }]
-          : []),
-        ...request.messages,
-        { role: "user", content: prompt },
-      ],
-    }),
+    body: JSON.stringify(
+      chatBody({
+        endpoint: request.provider.endpoint,
+        baseUrl: request.provider.baseUrl,
+        model: request.provider.model,
+        messages: [
+          ...(previousSummary
+            ? [{ role: "user" as const, content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }]
+            : []),
+          ...request.messages,
+          { role: "user" as const, content: prompt },
+        ],
+      }),
+    ),
     signal: request.signal,
   });
   if (!res.ok) return undefined;
-  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const summaryContent = data.choices?.[0]?.message?.content;
+  const summaryContent = readChatText(request.provider.endpoint, await res.json());
   if (!summaryContent) return undefined;
   const { rawSummary } = parseCompactedSummary(summaryContent);
   // The previous checkpoint's own footprint is merged in, so a file read before

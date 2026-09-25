@@ -48,6 +48,39 @@ describe("createStepFunction", () => {
     expect(result.errorMessage).toBe("Operation aborted");
   });
 
+  it("reports the request it sent, as it sent it", async () => {
+    // This is what a cache refresh replays. It has to be the bytes that went
+    // out, because a cache is keyed on the request's own prefix: anything
+    // rebuilt from the session's history — without the system instruction,
+    // without the microcompaction of old turns — would arrive as a miss and be
+    // charged at the full write price.
+    const sent: Array<{ url: string; body: string }> = [];
+    let receivedUrl = "";
+    let receivedBody = "";
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async (url: string | URL, init?: RequestInit) => {
+        receivedUrl = String(url);
+        receivedBody = String(init?.body ?? "");
+        return jsonResponse({ choices: [{ message: { content: "ok" } }] });
+      },
+    });
+
+    await step(
+      [{ role: "user", content: "hi" }],
+      undefined,
+      {},
+      { allowTools: true, onRequestSent: (captured) => sent.push(captured) },
+    );
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].url).toBe(receivedUrl);
+    expect(sent[0].body).toBe(receivedBody);
+    // The system instruction is part of the cached prefix, so it must be in
+    // what was captured.
+    expect(JSON.parse(sent[0].body).messages[0]).toEqual({ role: "system", content: "be brief" });
+  });
+
   it("marks a context overflow so the session can compact and retry", async () => {
     const step = createStepFunction({
       ...request,
@@ -566,5 +599,112 @@ describe("createStepFunction", () => {
     } finally {
       fs.rmSync(workspace, { recursive: true, force: true });
     }
+  });
+});
+
+describe("speaking a second endpoint", () => {
+  /** An answer in the second endpoint's own event format. */
+  function anthropicSse(text: string): Response {
+    const frames = [
+      `event: message_start\ndata: ${JSON.stringify({ type: "message_start", message: { usage: { input_tokens: 9 } } })}\n\n`,
+      `event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } })}\n\n`,
+      `event: message_delta\ndata: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 4 } })}\n\n`,
+      `event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`,
+    ].join("");
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(frames));
+        controller.close();
+      },
+    });
+    return {
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "text/event-stream" }),
+      body,
+      text: async () => "",
+      json: async () => ({}),
+    } as unknown as Response;
+  }
+
+  it("posts to the endpoint's own path with its own body", async () => {
+    // The whole reason a second endpoint exists: the default path and body are
+    // rejected by this host, so a request built in the default shape cannot
+    // succeed however correct the rest of it is.
+    let seenUrl = "";
+    let seenBody: Record<string, unknown> = {};
+    let seenHeaders: Record<string, string> = {};
+    const step = createStepFunction({
+      ...request,
+      provider: {
+        headers: { "x-api-key": "k", "anthropic-version": "2023-06-01" },
+        baseUrl: "https://api.anthropic.test/v1",
+        model: "claude-sonnet-4-5",
+        provider: "anthropic",
+        endpoint: "anthropic-messages",
+      },
+      fetchImpl: async (url, init) => {
+        seenUrl = String(url);
+        seenBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        seenHeaders = (init?.headers ?? {}) as Record<string, string>;
+        return anthropicSse("hello");
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(seenUrl).toBe("https://api.anthropic.test/v1/messages");
+    // The instruction is its own field here, not a message.
+    expect(seenBody.system).toEqual([
+      { type: "text", text: "be brief", cache_control: { type: "ephemeral" } },
+    ]);
+    expect(Array.isArray(seenBody.messages)).toBe(true);
+    expect((seenBody.messages as readonly { role: string }[]).every((m) => m.role !== "system")).toBe(true);
+    expect(typeof seenBody.max_tokens).toBe("number");
+    expect(seenHeaders["x-api-key"]).toBe("k");
+    expect(result.text).toBe("hello");
+  });
+
+  it("reads usage from both halves of that endpoint's stream", async () => {
+    // The input side arrives on the first event and the output side later, so a
+    // reader that took one of them would report a prompt size of zero.
+    resetSessionUsage("sess_step_anthropic");
+    const step = createStepFunction({
+      ...request,
+      sessionId: "sess_step_anthropic",
+      provider: {
+        headers: { "x-api-key": "k" },
+        baseUrl: "https://api.anthropic.test/v1",
+        model: "claude-sonnet-4-5",
+        provider: "anthropic",
+        endpoint: "anthropic-messages",
+      },
+      fetchImpl: async () => anthropicSse("ok"),
+    });
+
+    await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    const usage = getSessionUsage("sess_step_anthropic");
+    const bucket = Object.values(usage.byModel)[0];
+    expect(bucket?.promptTokens).toBe(9);
+    expect(bucket?.completionTokens).toBe(4);
+  });
+
+  it("still uses the default path when no endpoint is declared", async () => {
+    // The default has to stay exactly as it was: every provider that worked
+    // before declares no endpoint, so the branch must not change their request.
+    let seenUrl = "";
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async (url) => {
+        seenUrl = String(url);
+        return jsonResponse({ choices: [{ message: { content: "hi" }, finish_reason: "stop" }] });
+      },
+    });
+
+    await step([{ role: "user", content: "q" }], undefined, {}, { allowTools: true });
+
+    expect(seenUrl).toBe("https://provider.test/v1/chat/completions");
   });
 });

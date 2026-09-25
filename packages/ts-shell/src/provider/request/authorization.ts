@@ -5,6 +5,7 @@ import type {
 } from "../../config/runtimeConfig.js";
 import { isExpiring, refreshOAuthTokens, type OAuthProviderConfig } from "../../core/auth/oauth/flow.js";
 import { googleOAuthConfig, openAIOAuthConfig, resolveGoogleClientId } from "../../core/auth/oauth/providers.js";
+import { anthropicHeaders } from "../endpoints/anthropicMessages.js";
 
 /**
  * How one provider request authenticates.
@@ -61,7 +62,23 @@ export function accountAuthFor(
 export function providerAuthorization(input: {
   readonly apiKey?: string;
   readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  /**
+   * The endpoint this request goes to, when it is not the default one.
+   *
+   * A credential is not a header: the same key travels as `Authorization` to one
+   * endpoint and as `x-api-key` to another, and the second also requires a
+   * version header. Formatting the header from the key alone is what made an
+   * endpoint that wants neither form arrive unauthenticated.
+   */
+  readonly endpoint?: "openai-compatible" | "anthropic-messages";
 }): ProviderAuthorization {
+  // An endpoint with its own header shape takes the key directly: there is no
+  // account flow for it, and sending the default bearer would be a request the
+  // host rejects for a reason that looks like a bad key.
+  if (input.endpoint === "anthropic-messages" && input.apiKey?.trim()) {
+    return { headers: anthropicHeaders(input.apiKey.trim()), mode: "api-key" };
+  }
+
   const account = input.accountAuth;
   if (account) {
     const headers: Record<string, string> = {

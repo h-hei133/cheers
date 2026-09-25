@@ -7,6 +7,13 @@ import { samplingTemperature } from "../core/commands/fastCommandRuntime.js";
 import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
 import { microcompactMessages } from "../core/query/microCompact.js";
 import { isEventStream, readCompletionStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
+import {
+  anthropicRequestBody,
+  readAnthropicBody,
+  readAnthropicStream,
+} from "../provider/endpoints/anthropicMessages.js";
+import { chatUrl } from "../provider/endpoints/chatRequest.js";
+import type { SentRequest } from "../provider/request/sentRequest.js";
 import { toChatMessages, type ChatMessage } from "./prompt.js";
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
 import { resolveRequestShape } from "../core/models/requestShape.js";
@@ -51,6 +58,15 @@ export interface ProviderTarget {
    * looked like before the catalog could answer at all.
    */
   readonly provider?: string;
+  /**
+   * Which endpoint kind this target speaks.
+   *
+   * Absent means the OpenAI-compatible shape, which is what every request looked
+   * like before a second kind existed. Named rather than inferred from the
+   * provider id, because a provider is who answers and an endpoint is how they
+   * want to be asked — one provider can offer both.
+   */
+  readonly endpoint?: "openai-compatible" | "anthropic-messages";
 }
 
 /** What a step reports while it runs, before the assembled message exists. */
@@ -64,6 +80,16 @@ export interface StepListener {
 export interface StepOptions {
   /** Whether the model may call tools on this step; the last step may not. */
   readonly allowTools: boolean;
+  /**
+   * Told the request that was sent, as it was sent.
+   *
+   * Reported rather than rebuilt by a later reader: the system instruction, the
+   * microcompaction of old turns and the bridging of tool results are all
+   * applied on the way out, so the bytes cannot be reconstructed from the
+   * session's history. Anything that needs to send this request again — keeping
+   * the prompt cached — has to be handed the request itself.
+   */
+  readonly onRequestSent?: (sent: SentRequest) => void;
 }
 
 /** The model side of the kernel: the next assistant step for a context. */
@@ -138,6 +164,18 @@ interface CompletionShape {
  * again would fail again. An overflow answer comes back as a failed step with
  * its own prefix so the session can compact and retry rather than report it.
  */
+/**
+ * The endpoint kind this request speaks.
+ *
+ * One field decides, and it decides here rather than at each difference: an
+ * endpoint that disagrees about the system field, the tool schema and the stream
+ * events disagrees about all of them, and expressing that as per-model flags
+ * would spread one decision across four places that could then disagree.
+ */
+function endpointFor(request: StepRequest): "openai-compatible" | "anthropic-messages" {
+  return request.provider.endpoint === "anthropic-messages" ? "anthropic-messages" : "openai-compatible";
+}
+
 export function createStepFunction(request: StepRequest): StepFunction {
   let effortAccepted = true;
   const fetchImpl = request.fetchImpl ?? fetch;
@@ -169,7 +207,27 @@ export function createStepFunction(request: StepRequest): StepFunction {
         request.provider.model,
         effortAccepted ? effort : undefined,
       );
-      const payload = {
+      const endpoint = endpointFor(request);
+      const payload = endpoint === "anthropic-messages"
+        ? anthropicRequestBody({
+            model: request.provider.model,
+            systemPrompt: request.systemPrompt,
+            messages: bridgeToolResults(
+              microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
+              shape.assistantAfterToolResult,
+            ),
+            tools: request.tools,
+            allowTools: options.allowTools,
+            temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
+            ...(request.topP != null ? { topP: request.topP } : {}),
+            ...(request.maxOutputTokens ?? shape.maxOutputCeiling) != null
+              ? { maxOutputTokens: request.maxOutputTokens ?? shape.maxOutputCeiling }
+              : {},
+            ...(shape.reasoningEffort && shape.thinkingLevelName
+              ? { thinkingLevelName: shape.thinkingLevelName }
+              : {}),
+          })
+        : {
         model: request.provider.model,
         messages: [
           { role: shape.systemRole, content: request.systemPrompt },
@@ -230,7 +288,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         let releaseNow = true;
         try {
           const attemptResponse = await fetchImpl(
-            `${request.provider.baseUrl.replace(/\/+$/, "")}/chat/completions`,
+            chatUrl(request.provider.baseUrl, endpoint),
             {
               method: "POST",
               headers: request.provider.headers,
@@ -240,6 +298,11 @@ export function createStepFunction(request: StepRequest): StepFunction {
           );
           if (attemptResponse.ok) {
             response = attemptResponse;
+            options.onRequestSent?.({
+              url: chatUrl(request.provider.baseUrl, endpoint),
+              headers: request.provider.headers,
+              body: JSON.stringify(payload),
+            });
             releaseAfterRead = releaseStream;
             releaseNow = false;
             break;
@@ -288,7 +351,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       if (!response) return stamp(errorStep(refusal || "Provider returned no response."));
 
       try {
-        const completion = await readCompletion(response, watched);
+        const completion = await readCompletion(response, watched, endpoint);
         const usage = completion.usage;
         if (usage) {
           const cache = cacheTokensFromUsage(usage);
@@ -348,13 +411,22 @@ function bridgeToolResults(
   return bridged;
 }
 
-async function readCompletion(response: Response, listener: StepListener): Promise<CompletionShape> {
+async function readCompletion(
+  response: Response,
+  listener: StepListener,
+  endpoint: "openai-compatible" | "anthropic-messages" = "openai-compatible",
+): Promise<CompletionShape> {
   if (!isEventStream(response)) {
     // A provider that ignored `stream: true` answers with one JSON body; the
-    // text then arrives in a single delta.
+    // text then arrives in a single delta. The two endpoints disagree about the
+    // body's shape as well, so the whole-body case is read the same way the
+    // streamed one is.
+    if (endpoint === "anthropic-messages") return readAnthropicBody(await response.json());
     return (await response.json()) as CompletionShape;
   }
-  const stream = readCompletionStream(response.body!);
+  const stream = endpoint === "anthropic-messages"
+    ? readAnthropicStream(response.body!)
+    : readCompletionStream(response.body!);
   let streamed = "";
   for (;;) {
     const step = await stream.next();
