@@ -273,6 +273,55 @@ describe("skill diagnostics", () => {
     const { diagnostics } = new SkillLoader(workspace).loadDetailed();
     expect(diagnostics.some((d) => d.name === "code--review" && /consecutive/.test(d.message))).toBe(true);
   });
+  it("reads a multi-line description instead of the block marker", () => {
+    // A block scalar previously yielded the literal `|-` as the description.
+    // Nothing rejects that — it is simply the wrong text, which is why it went
+    // unnoticed: the skill loads and the model matches against a marker.
+    writeRaw("folded", "name: folded\ndescription: |-\n  Build for AWS.\n  Handles ECS.\nlicense: MIT");
+
+    const { skills } = new SkillLoader(workspace).loadDetailed();
+
+    expect(skills.get("folded")?.description).toBe("Build for AWS.\nHandles ECS.");
+  });
+
+  it("folds a folded block scalar onto one line", () => {
+    writeRaw("folded", "name: folded\ndescription: >\n  Build for AWS.\n  Handles ECS.");
+
+    const { skills } = new SkillLoader(workspace).loadDetailed();
+
+    expect(skills.get("folded")?.description).toBe("Build for AWS. Handles ECS.");
+  });
+
+  it("keeps a colon inside a quoted value", () => {
+    // The value is quoted precisely so it may contain one, so the quotes are
+    // removed and what is between them is kept.
+    writeRaw("quoted", 'name: quoted\ndescription: "Build for AWS: ECS"');
+
+    const { skills } = new SkillLoader(workspace).loadDetailed();
+
+    expect(skills.get("quoted")?.description).toBe("Build for AWS: ECS");
+  });
+
+  it("reports a spec field it records but does not act on", () => {
+    // `allowed-tools` reads as a restriction in force. This build has no
+    // per-skill tool gate, so the author has to be told rather than left to
+    // believe something is being enforced.
+    writeRaw("scoped", "name: scoped\ndescription: uses a field we do not honour\nallowed-tools: read, glob");
+
+    const { diagnostics } = new SkillLoader(workspace).loadDetailed();
+
+    expect(diagnostics.some((d) => d.name === "scoped" && /allowed-tools/.test(d.message))).toBe(true);
+  });
+
+  it("does not report a field nobody defined", () => {
+    // The ecosystem ignores unknown fields by convention. Warning about them
+    // would train the reader to ignore the warnings that matter.
+    writeRaw("odd", "name: odd\ndescription: has a private field\nx-internal-note: whatever");
+
+    const { diagnostics } = new SkillLoader(workspace).loadDetailed();
+
+    expect(diagnostics.some((d) => /x-internal-note/.test(d.message))).toBe(false);
+  });
 });
 
 describe("named skill paths", () => {

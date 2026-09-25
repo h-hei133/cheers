@@ -50,9 +50,30 @@ export interface Skill {
    * skill reachable.
    */
   readonly disableModelInvocation: boolean;
+  /**
+   * Spec fields the author wrote that this build does not act on.
+   *
+   * Named so a diagnostic can say which ones. Writing `allowed-tools` and
+   * having nothing happen is the case worth reporting: the author believes a
+   * restriction is in force. An unknown field is not reported — the ecosystem
+   * ignores those by convention, and warning about a field nobody defined would
+   * train the reader to ignore the warnings that matter.
+   */
+  readonly unhonouredFields: readonly string[];
 }
 
 const MANIFEST = "SKILL.md";
+
+/**
+ * Frontmatter fields the skill format defines but this build does not act on.
+ *
+ * `allowed-tools` would scope a skill to a set of tools, and there is no
+ * per-skill tool gate here — the tool gate decides by tool name and permission
+ * scope. The rest are descriptive metadata with no consumer. Listing them means
+ * a diagnostic can distinguish "the format defines this" from "this build
+ * ignores this", which is the difference the author needs to know.
+ */
+const UNHONOURED_SPEC_FIELDS = ["allowed-tools", "license", "compatibility", "metadata"] as const;
 
 /**
  * Per the Agent Skills spec: a length bound and a character set.
@@ -339,6 +360,7 @@ function readSkill(
     filePath,
     source,
     disableModelInvocation: fields.get("disable-model-invocation")?.trim() === "true",
+    unhonouredFields: UNHONOURED_SPEC_FIELDS.filter((field) => fields.has(field)),
   };
 }
 
@@ -347,18 +369,68 @@ function readSkill(
  *
  * Deliberately not a YAML parser: skill frontmatter in practice is a handful of
  * scalars, and pulling in a parser to read `name:` would be the larger mistake.
- * A line that is not a scalar is skipped rather than guessed at.
+ *
+ * Two shapes are handled beyond a plain scalar, because both appear in skills
+ * people write and both were previously read wrong rather than refused:
+ *
+ *   - A block scalar (`description: |-` followed by indented lines) is folded
+ *     into one line. Reading it as a scalar gave the literal `|-` as the
+ *     description, which is not an error anywhere downstream — it is just the
+ *     wrong text, which is why it went unnoticed.
+ *   - A quoted value keeps its contents verbatim, including any colon, so a
+ *     description may contain one.
+ *
+ * A line that is neither is skipped rather than guessed at.
  */
 function parseFields(block: string): Map<string, string> {
   const fields = new Map<string, string>();
-  for (const line of block.split(/\r?\n/)) {
+  const lines = block.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!;
     const separator = line.indexOf(":");
     if (separator <= 0 || line.startsWith("#") || line.startsWith(" ")) continue;
     const key = line.slice(0, separator).trim();
-    const value = line.slice(separator + 1).trim().replace(/^["']|["']$/g, "");
-    if (key) fields.set(key, value);
+    if (!key) continue;
+
+    const raw = line.slice(separator + 1).trim();
+    const blockMarker = /^([|>])([-+]?)$/.exec(raw);
+    if (blockMarker) {
+      // The indented lines below belong to this key. Their common indent is
+      // stripped, and the marker decides whether the lines are joined with
+      // spaces (`>`) or kept as written (`|`).
+      const body: string[] = [];
+      let cursor = index + 1;
+      while (cursor < lines.length && (lines[cursor]!.trim() === "" || /^\s/.test(lines[cursor]!))) {
+        body.push(lines[cursor]!);
+        cursor += 1;
+      }
+      index = cursor - 1;
+      const indent = Math.min(
+        ...body.filter((entry) => entry.trim() !== "").map((entry) => entry.length - entry.trimStart().length),
+      );
+      const stripped = body.map((entry) => entry.slice(Number.isFinite(indent) ? indent : 0));
+      const joined = blockMarker[1] === ">"
+        ? stripped.join(" ").replace(/\s+/g, " ").trim()
+        : stripped.join("\n").trim();
+      fields.set(key, joined);
+      continue;
+    }
+
+    fields.set(key, unquote(raw));
   }
   return fields;
+}
+
+/** A scalar with surrounding quotes removed, keeping what is inside them. */
+function unquote(value: string): string {
+  if (value.length >= 2) {
+    const first = value[0];
+    const last = value[value.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      return value.slice(1, -1);
+    }
+  }
+  return value;
 }
 
 /**
@@ -440,6 +512,15 @@ function inspectSkill(skill: Skill): SkillDiagnostic[] {
     // hyphen was doubled by a typo, and they are not a shape anything else
     // in the workspace uses.
     note("name contains consecutive hyphens");
+  }
+
+  if (skill.unhonouredFields.length > 0) {
+    // Reported because the author believes something is in force. A field the
+    // format defines and this build ignores is a restriction that is not being
+    // applied, which is worth a line; a field nobody defined is not.
+    note(
+      `declares ${skill.unhonouredFields.join(", ")}, which this build records but does not act on`,
+    );
   }
 
   return diagnostics;
