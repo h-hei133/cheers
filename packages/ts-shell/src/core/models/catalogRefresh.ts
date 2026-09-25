@@ -1,4 +1,4 @@
-import type { CatalogProvider, CatalogModel } from "./catalog.js";
+import type { CatalogProvider, CatalogModel, ModelCostRates } from "./catalog.js";
 import { writeCatalogCache } from "./catalogStore.js";
 
 /**
@@ -29,7 +29,26 @@ interface IndexProvider {
   readonly name?: string;
   readonly api?: string;
   readonly env?: readonly string[];
-  readonly models?: Record<string, { readonly id?: string; readonly limit?: { readonly context?: number } }>;
+  readonly models?: Record<string, IndexModel>;
+}
+
+/** One model as the index describes it. */
+interface IndexModel {
+  readonly id?: string;
+  readonly limit?: { readonly context?: number };
+  /**
+   * What the publisher charges, per million tokens.
+   *
+   * Optional in the index and optional here: a model with no published price is
+   * one nothing can be said about, and inventing a rate would make a cost report
+   * read like a measurement.
+   */
+  readonly cost?: {
+    readonly input?: number;
+    readonly output?: number;
+    readonly cache_read?: number;
+    readonly cache_write?: number;
+  };
 }
 
 export async function refreshCatalog(indexUrl: string = DEFAULT_INDEX): Promise<RefreshResult> {
@@ -58,10 +77,10 @@ export async function refreshCatalog(indexUrl: string = DEFAULT_INDEX): Promise<
 /**
  * Turn the index into provider patches.
  *
- * Only the fields we can act on are kept — id, label, models, key variable — and
- * the request shape is left alone: the index describes providers, not how this
- * shell talks to them, and guessing that from a string would break a connection
- * that already works.
+ * Only the fields we can act on are kept — id, label, models, key variable,
+ * prices — and the request shape is left alone: the index describes providers,
+ * not how this shell talks to them, and guessing that from a string would break
+ * a connection that already works.
  */
 function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProvider>[] {
   const providers: Partial<CatalogProvider>[] = [];
@@ -72,7 +91,12 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
       const resolved = model?.id ?? modelId;
       if (!resolved) continue;
       const context = model?.limit?.context;
-      models.push(context ? { id: resolved, contextWindow: context } : { id: resolved });
+      const cost = projectCost(model?.cost);
+      models.push({
+        id: resolved,
+        ...(context ? { contextWindow: context } : {}),
+        ...(cost ? { cost } : {}),
+      });
     }
     if (models.length === 0) continue;
     providers.push({
@@ -83,4 +107,36 @@ function projectIndex(index: Record<string, IndexProvider>): Partial<CatalogProv
     });
   }
   return providers;
+}
+
+/**
+ * The published prices, in this project's terms.
+ *
+ * The index names its rates `input`/`output`/`cache_read`/`cache_write` and
+ * quotes them per million tokens, which is what `ModelCostRates` expects — the
+ * mapping is a rename rather than a conversion, and it is written out so the two
+ * vocabularies cannot drift apart silently.
+ *
+ * Absent when the index states no price at all. A model whose rates are all
+ * missing is one whose cost cannot be reported, and a zero-filled entry would
+ * claim it is free.
+ */
+function projectCost(cost: IndexModel["cost"]): ModelCostRates | undefined {
+  if (!cost) return undefined;
+  const prompt = finite(cost.input);
+  const completion = finite(cost.output);
+  if (prompt === undefined && completion === undefined) return undefined;
+  const cacheRead = finite(cost.cache_read);
+  const cacheWrite = finite(cost.cache_write);
+  return {
+    promptPerMTok: prompt ?? 0,
+    completionPerMTok: completion ?? 0,
+    ...(cacheRead !== undefined ? { cacheReadPerMTok: cacheRead } : {}),
+    ...(cacheWrite !== undefined ? { cacheWritePerMTok: cacheWrite } : {}),
+  };
+}
+
+/** A published rate, or nothing when the index did not state one. */
+function finite(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }

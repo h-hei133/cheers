@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_PROVIDERS } from "./catalog.js";
+import { BUILTIN_PROVIDERS, mergeProviders, providerEndpoint } from "./catalog.js";
 import { resolveRequestShape } from "./requestShape.js";
 
 /**
@@ -54,5 +54,29 @@ describe("the shipped catalog", () => {
     for (const model of openai?.models ?? []) {
       expect(model.compat).toBeDefined();
     }
+  });
+
+  it("reads the endpoint kind a provider declares", () => {
+    // The endpoint is a property of the provider, so it is read from the
+    // catalogue rather than inferred from the provider id.
+    expect(providerEndpoint(BUILTIN_PROVIDERS, "anthropic")).toBe("anthropic-messages");
+    // Absent means the OpenAI-compatible shape every request had before a
+    // second kind existed.
+    expect(providerEndpoint(BUILTIN_PROVIDERS, "openai")).toBeUndefined();
+  });
+
+  it("keeps the endpoint kind a user declares for their own provider", () => {
+    // A provider added to reach a second protocol must be reached that way. If
+    // the merge drops this, the request goes out in the first protocol's shape
+    // and fails as though the key were wrong.
+    const merged = mergeProviders(BUILTIN_PROVIDERS, [
+      { id: "my-proxy", endpoint: "anthropic-messages", baseUrl: "https://proxy.test/v1" },
+    ]);
+    expect(providerEndpoint(merged, "my-proxy")).toBe("anthropic-messages");
+  });
+
+  it("does not invent an endpoint for a provider that declares none", () => {
+    const merged = mergeProviders(BUILTIN_PROVIDERS, [{ id: "plain", baseUrl: "https://plain.test/v1" }]);
+    expect(providerEndpoint(merged, "plain")).toBeUndefined();
   });
 });

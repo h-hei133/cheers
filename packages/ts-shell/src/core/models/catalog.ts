@@ -63,6 +63,20 @@ export interface CatalogModel {
    * `max_completion_tokens`, fails on a request that is otherwise correct.
    */
   readonly compat?: ModelRequestShape;
+  /**
+   * How long the provider keeps this model's prompt cached, in seconds.
+   *
+   * Absent means the model does not cache, or the provider does not publish how
+   * long it does — both of which leave nothing to schedule against. A refresh
+   * sent before the window lapses keeps the prefix cached; one sent after is a
+   * full-price rewrite, so without a window there is no safe time to send it.
+   */
+  readonly promptCache?: {
+    /** The default retention tier. */
+    readonly short?: number;
+    /** The extended tier, where the provider offers one. */
+    readonly long?: number;
+  };
 }
 
 /** How one model wants a request shaped, when it differs from the default. */
@@ -122,6 +136,15 @@ export interface CatalogProvider {
   readonly label: string;
   /** Which request shape this provider speaks. */
   readonly runtime: RuntimeProvider;
+  /**
+   * Which endpoint kind this provider is reached through.
+   *
+   * Absent means the OpenAI-compatible shape, which is what every provider used
+   * before a second kind existed. Separate from `runtime`, which names who
+   * answers: the endpoint is how they want to be asked, and a provider that
+   * offers both would need two entries rather than one entry with two shapes.
+   */
+  readonly endpoint?: "openai-compatible" | "anthropic-messages";
   readonly auth: ProviderAuth;
   readonly baseUrl?: string;
   /** Environment variable conventionally holding the key. */
@@ -152,12 +175,15 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     id: "anthropic",
     label: "Anthropic",
     runtime: "anthropic",
+    endpoint: "anthropic-messages",
     auth: "api-key",
+    baseUrl: "https://api.anthropic.com/v1",
     envVar: "ANTHROPIC_API_KEY",
     models: [
-      { id: "claude-opus-4-6", contextWindow: 200_000 },
-      { id: "claude-sonnet-4-5", contextWindow: 200_000 },
-      { id: "claude-haiku-4-5", contextWindow: 200_000 },
+      // Five minutes by default, an hour on the extended tier.
+      { id: "claude-opus-4-6", contextWindow: 200_000, promptCache: { short: 300, long: 3_600 } },
+      { id: "claude-sonnet-4-5", contextWindow: 200_000, promptCache: { short: 300, long: 3_600 } },
+      { id: "claude-haiku-4-5", contextWindow: 200_000, promptCache: { short: 300, long: 3_600 } },
     ],
   },
   {
@@ -172,9 +198,11 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     // run-wide output ceiling is always sent, so without this every request to
     // one of these models was a rejected one.
     models: [
-      { id: "gpt-5.3", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE },
-      { id: "gpt-5.3-codex", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE },
-      { id: "gpt-5.1-mini", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE },
+      // Five to ten minutes of inactivity, refreshed by each hit; the extended
+      // tier runs to a day.
+      { id: "gpt-5.3", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 } },
+      { id: "gpt-5.3-codex", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 } },
+      { id: "gpt-5.1-mini", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 } },
       { id: "o4-mini", contextWindow: 200_000, compat: REASONING_REQUEST_SHAPE },
     ],
   },
@@ -385,8 +413,51 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
 ];
 
 /** A provider by id, from the built-in snapshot alone. */
-export function builtinProvider(id: string): CatalogProvider | undefined {
-  return BUILTIN_PROVIDERS.find((provider) => provider.id === id);
+/**
+ * How a provider wants to be asked, when it says.
+ *
+ * Absent means the OpenAI-compatible shape, which is what every request looked
+ * like before a second kind existed. Read from the catalogue rather than inferred
+ * from the provider id: the id names who answers, and an endpoint is how they
+ * want to be asked — the same company can offer both.
+ *
+ * The merged catalogue is read, not the built-in list, so a provider a user
+ * added with its own endpoint is reached the way they declared it.
+ */
+export function providerEndpoint(
+  catalog: readonly CatalogProvider[],
+  provider: string,
+): "anthropic-messages" | undefined {
+  const declared = catalog.find((candidate) => candidate.id === provider)?.endpoint;
+  return declared === "anthropic-messages" ? "anthropic-messages" : undefined;
+}
+
+/**
+ * One model's entry, by provider first and then by id alone.
+ *
+ * The two-step lookup matches how a request is resolved elsewhere: a provider
+ * that names the model answers first, and an id nobody claims is looked for
+ * across the catalogue so a model configured without its provider still finds
+ * its prices.
+ *
+ * An id two providers both claim is left unresolved. They may disagree about
+ * what it costs and how long it stays cached, and picking one would attribute
+ * the other's numbers to it.
+ */
+export function catalogModel(
+  catalog: readonly CatalogProvider[],
+  provider: string,
+  model: string | undefined,
+): CatalogModel | undefined {
+  if (model === undefined) return undefined;
+  const direct = catalog
+    .find((candidate) => candidate.id === provider)
+    ?.models.find((candidate) => candidate.id === model);
+  if (direct !== undefined) return direct;
+  const claims = catalog
+    .map((candidate) => candidate.models.find((entry) => entry.id === model))
+    .filter((entry): entry is CatalogModel => entry !== undefined);
+  return claims.length === 1 ? claims[0] : undefined;
 }
 
 /**
@@ -413,6 +484,10 @@ export function mergeProviders(
         auth: patch.auth ?? "api-key",
         baseUrl: patch.baseUrl,
         envVar: patch.envVar,
+        // Carried, not defaulted: a provider a user added to talk to a second
+        // protocol would otherwise be reached through the first one, and the
+        // failure would look like a bad key rather than a wrong shape.
+        endpoint: patch.endpoint,
         models: patch.models ?? [],
         custom: true,
       });

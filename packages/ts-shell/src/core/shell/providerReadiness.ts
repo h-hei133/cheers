@@ -10,7 +10,19 @@ import { buildUnavailableResult } from "../tools/toolPolicyResult.js";
 import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { getProviderApiKeyEnvVarName } from "./providerCredentials.js";
 
-const DEFAULT_PROVIDER_BASE_URL = "https://api.openai.com/v1";
+/**
+ * Where a provider is reached when nothing configured one.
+ *
+ * Per provider rather than one shared default: the two endpoint kinds live at
+ * different hosts, so a single fallback would send one of them to the other's
+ * address. A provider with no entry here still needs a configured base URL, and
+ * readiness says so rather than guessing.
+ */
+const DEFAULT_BASE_URLS: Partial<Record<RuntimeProvider, string>> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+};
+const DEFAULT_PROVIDER_BASE_URL = DEFAULT_BASE_URLS.openai!;
 const DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS = 5;
 
 export type ProviderReadinessFailureKind =
@@ -89,16 +101,6 @@ export async function checkRealProviderReadiness(
   options: ProviderReadinessCheckOptions = {},
 ): Promise<ProviderReadinessCheckResult> {
   const provider = options.provider ?? "openai";
-  if (!isRealProviderSupported(provider)) {
-    return {
-      ok: false,
-      failure: providerUnavailableFailure(
-        "unsupported-provider",
-        `Provider readiness failed (provider-readiness:unsupported-provider): Provider ${provider} is configured but not yet supported by this build's real provider adapter. Switch provider to openai and retry.`,
-        "unavailable",
-      ),
-    };
-  }
 
   const envVarName = getProviderApiKeyEnvVarName(provider);
   const apiKey = (options.apiKey ?? process.env[envVarName] ?? "").trim();
@@ -150,7 +152,7 @@ export async function checkRealProviderReadiness(
   const fetchImpl = options.fetchImpl ?? createProviderFetchFromEnv();
   const timeoutMs = options.timeoutMs ?? 5000;
   const baseUrl = normalizeBaseUrl(
-    options.baseUrl ?? DEFAULT_PROVIDER_BASE_URL,
+    options.baseUrl ?? DEFAULT_BASE_URLS[provider] ?? DEFAULT_PROVIDER_BASE_URL,
   );
   const model = options.model?.trim();
 
@@ -311,10 +313,6 @@ function isOpenAICompatibleStyleProvider(provider: RuntimeProvider): boolean {
     provider === "antigravity" ||
     provider === "claudecode"
   );
-}
-
-function isRealProviderSupported(provider: RuntimeProvider): boolean {
-  return provider !== "anthropic";
 }
 
 function compatibilityFlagSummary(

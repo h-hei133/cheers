@@ -26,23 +26,30 @@ describe("provider readiness boundary", () => {
     throw new Error("Expected readiness failure for missing API key");
   });
 
-  it("blocks unsupported provider before entering query loop", async () => {
+  it("admits the endpoint that speaks a second protocol", async () => {
+    // It used to be refused outright while the catalogue shipped three of its
+    // models, so a provider the user could select could never run. What is
+    // asserted now is that readiness lets it through and reaches its own host:
+    // the point of the endpoint is that it is no longer blocked, not that the
+    // block moved somewhere else.
+    const calls: string[] = [];
     const result = await checkRealProviderReadiness({
       provider: "anthropic",
       apiKey: "test-key",
+      model: "claude-sonnet-4-5",
+      fetchImpl: (async (url: string) => {
+        calls.push(String(url));
+        return new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }) as unknown as typeof fetch,
     });
 
-    expect(result.ok).toBe(false);
-    if ("failure" in result) {
-      expect(result.failure.kind).toBe("unsupported-provider");
-      expect(result.failure.stopReason).toContain(
-        "provider-readiness:unsupported-provider",
-      );
-      expect(result.failure.stopReason).toContain("anthropic");
-      return;
-    }
-
-    throw new Error("Expected readiness failure for unsupported provider");
+    expect(result.ok).toBe(true);
+    // Its own host, not the default one: a single shared fallback would send
+    // one endpoint's probe to the other's address.
+    expect(calls[0]).toContain("api.anthropic.com");
   });
 
   it("requires base URL and model for openai-compatible providers", async () => {
@@ -146,19 +153,6 @@ describe("provider readiness boundary", () => {
     if ("failure" in authResult) {
       expect(authResult.failure.kind).toBe("auth");
       expect(authResult.failure.stopReason).not.toContain("reconnecting");
-    }
-
-    const unsupportedResult = await checkRealProviderReadiness({
-      provider: "anthropic",
-      apiKey: "test-key",
-      fetchImpl: async () => {
-        throw new Error("fetch should not be called");
-      },
-    });
-    expect(unsupportedResult.ok).toBe(false);
-    if ("failure" in unsupportedResult) {
-      expect(unsupportedResult.failure.kind).toBe("unsupported-provider");
-      expect(unsupportedResult.failure.stopReason).not.toContain("reconnecting");
     }
 
     const missingKeyResult = await checkRealProviderReadiness({
