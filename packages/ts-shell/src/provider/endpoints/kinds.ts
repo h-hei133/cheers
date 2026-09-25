@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../../turn/prompt.js";
+import type { ToolSchema } from "../../turn/tools.js";
 import {
   isEventStream,
   type CompletedBody,
@@ -45,6 +46,16 @@ export interface EndpointShape {
   readonly headers: (apiKey: string) => Record<string, string>;
   /** A request body for the callers that send no tools. */
   readonly body: (input: SimpleRequest) => Record<string, unknown>;
+  /**
+   * The body for a full turn, tools included.
+   *
+   * Separate from `body` because the two callers ask different questions: a
+   * summarizer sends a conversation and a prompt, a turn sends tools, a sampling
+   * temperature, and the model's own vocabulary for its reasoning level. Folding
+   * them together would make the simpler caller pass a dozen fields it does not
+   * have.
+   */
+  readonly turnBody: (input: TurnRequest) => Record<string, unknown>;
   /** A complete, non-streamed answer, flattened to the shape both kinds share. */
   readonly readBody: (body: unknown) => CompletedBody;
   /** The chunks of a streamed answer, and the completion they add up to. */
@@ -61,6 +72,42 @@ export interface SimpleRequest {
   readonly systemPrompt?: string;
   readonly maxOutputTokens?: number;
   readonly temperature?: number;
+}
+
+/**
+ * Everything one turn's request needs, in the terms the caller owns.
+ *
+ * This is what separates a protocol from a default: the caller says what the
+ * conversation is and what the model accepts, and the protocol decides how that
+ * becomes a body. The main turn used to decide that here with a branch on the
+ * kind, which meant a third protocol would have had to edit the turn loop — the
+ * one thing consolidating the protocols was for.
+ *
+ * The per-model facts arrive already resolved, because which of them apply is a
+ * question about the model rather than about the protocol; a protocol only
+ * decides how to write them down.
+ */
+export interface TurnRequest {
+  readonly model: string;
+  readonly systemPrompt: string;
+  readonly messages: readonly ChatMessage[];
+  readonly tools: readonly ToolSchema[];
+  readonly allowTools: boolean;
+  /** Whether this model accepts images; see `ResolvedRequestShape.vision`. */
+  readonly vision: boolean;
+  readonly temperature: number;
+  readonly topP?: number;
+  readonly maxOutputTokens?: number;
+  /** The model's own name for the reasoning level, when it has one. */
+  readonly thinkingLevelName?: string;
+  /** The role carrying the system instruction. */
+  readonly systemRole: "system" | "developer";
+  /** Whether the level may be sent at all. */
+  readonly reasoningEffort: boolean;
+  /** The field carrying the output ceiling. */
+  readonly maxTokensField: "max_tokens" | "max_completion_tokens";
+  /** Whether a synthetic assistant turn bridges tool results and a user turn. */
+  readonly assistantAfterToolResult: boolean;
 }
 
 /**
@@ -136,6 +183,14 @@ export function endpointUrl(baseUrl: string, kind: EndpointKind | undefined): st
 /** The body a request with no tools sends. */
 export function endpointBody(kind: EndpointKind | undefined, input: SimpleRequest): Record<string, unknown> {
   return endpointShape(kind).body(input);
+}
+
+/** The body a full turn sends, in the protocol's own shape. */
+export function endpointTurnBody(
+  kind: EndpointKind | undefined,
+  input: TurnRequest,
+): Record<string, unknown> {
+  return endpointShape(kind).turnBody(input);
 }
 
 /** The text of a non-streamed answer, whichever kind sent it. */

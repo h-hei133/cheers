@@ -10,7 +10,7 @@ import {
   formatCheckpointMessage,
   parseCompactedSummary,
 } from "./summarizer.js";
-import { endpointBody, endpointKind, endpointText, endpointUrl } from "../../../provider/endpoints/index.js";
+import { endpointBody, endpointKind, endpointText, endpointUrl, type EndpointKind } from "../../../provider/endpoints/index.js";
 
 /**
  * One summarization request.
@@ -40,7 +40,7 @@ export interface CompactionProvider {
    * endpoint that wants another fails a compaction that had nothing wrong with
    * it.
    */
-  readonly endpoint?: "anthropic-messages";
+  readonly endpoint?: EndpointKind;
 }
 
 /**

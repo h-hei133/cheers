@@ -25,6 +25,7 @@ import { requestCompactionSummary } from "../../core/query/compaction/summarize.
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../../provider/request/authorization.js";
 import { catalogModel, providerEndpoint } from "../../core/models/catalog.js";
+import type { EndpointKind } from "../../provider/endpoints/kinds.js";
 import { createCacheWarmingRunner, type CacheWarmingRunner } from "../../turn/cacheWarm.js";
 import { resolveCacheWarmingMode } from "../../core/models/cacheEconomics.js";
 import { sendSentRequest } from "../../provider/request/sentRequest.js";
@@ -94,7 +95,7 @@ function buildCompactionWiring(input: {
     readonly model: string;
     readonly providerId: string;
     /** Which endpoint kind the summarizer must speak, when not the default. */
-    readonly endpoint?: "anthropic-messages";
+    readonly endpoint?: EndpointKind;
   };
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionId: string;
@@ -252,7 +253,7 @@ export function createCliSessionRuntime(input: {
   };
 
   /** The endpoint kind a provider is reached through, when the catalog names one. */
-  const endpointFor = (provider: string): "anthropic-messages" | undefined =>
+  const endpointFor = (provider: string): EndpointKind | undefined =>
     providerEndpoint(catalog, provider);
 
   /** The provider the turn's own compaction summarizes with. */

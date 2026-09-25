@@ -557,6 +557,26 @@ declareEndpoint("anthropic-messages", {
       ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
     }),
+  /**
+   * The full turn. The simpler `body` above sends a prompt and no tools; this
+   * one sends what a turn has, and the differences are all in what the caller
+   * resolved rather than in anything this protocol decides.
+   */
+  turnBody: (input) =>
+    anthropicRequestBody({
+      model: input.model,
+      systemPrompt: input.systemPrompt,
+      messages: input.messages,
+      tools: input.tools,
+      allowTools: input.allowTools,
+      vision: input.vision,
+      temperature: input.temperature,
+      ...(input.topP !== undefined ? { topP: input.topP } : {}),
+      ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
+      ...(input.reasoningEffort && input.thinkingLevelName
+        ? { thinkingLevelName: input.thinkingLevelName }
+        : {}),
+    }),
   readBody: (body) => readAnthropicBody(body),
   readStream: (body) => readAnthropicStream(body),
 });

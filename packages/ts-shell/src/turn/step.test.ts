@@ -5,6 +5,7 @@ import path from "node:path";
 import { createStepFunction, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "./step.js";
 import { getSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { writeProjectState } from "../core/state/projectState.js";
+import { declareEndpoint } from "../provider/endpoints/index.js";
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -707,4 +708,78 @@ describe("speaking a second endpoint", () => {
 
     expect(seenUrl).toBe("https://provider.test/v1/chat/completions");
   });
+  /**
+   * The claim the protocol registry exists to make, measured where it counts.
+   *
+   * A protocol declared from this file — not shipped, not named anywhere in
+   * `src/` — is driven through the real step function by naming it in the
+   * catalog. Nothing in the turn loop was edited to allow that: `step.ts` asks
+   * the registry for the body and the registry has never heard of this kind
+   * except from this file's own declaration. If the payload were still built from
+   * a branch on the kind, this request would go out as the default shape and the
+   * assertion below would fail on the body it received.
+   */
+  it("sends a protocol it has never heard of through the same path", async () => {
+    const STUB = "test-turn-protocol";
+    declareEndpoint(STUB, {
+      path: "/stub-turn",
+      headers: () => ({ "x-stub": "1" }),
+      body: () => ({}),
+      turnBody: (input) => ({ stub_turn: input.model, stub_tools: input.tools.length }),
+      readBody: () => ({ choices: [{ message: { content: "from the stub" } }] }),
+      readStream: () => {
+        throw new Error("the stub does not stream");
+      },
+    });
+
+    let url = "";
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      provider: { apiKey: "k", baseUrl: "https://provider.test/v1", model: "m", endpoint: STUB },
+      catalog: [
+        { id: "stub-vendor", label: "Stub", runtime: "openai-compatible", auth: "api-key", models: [{ id: "m" }] },
+      ],
+      fetchImpl: async (sentUrl, init) => {
+        url = String(sentUrl);
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    // The resource is the stub's, so the registry answered the URL question too.
+    expect(url).toBe("https://provider.test/v1/stub-turn");
+    expect(body).toEqual({ stub_turn: "m", stub_tools: 0 });
+    expect(result.stopReason).toBe("stop");
+  });
+
+  /**
+   * A name the build does not speak comes from a file a person edited, so the
+   * step has to say which name and which kinds exist. An uncaught throw here
+   * would leave the turn through the loop's retry wrapper — which does not catch
+   * it — and reach the user as a crash that never mentions the file.
+   */
+  it("reports an endpoint kind nobody declared instead of crashing", async () => {
+    const step = createStepFunction({
+      ...request,
+      provider: { apiKey: "k", baseUrl: "https://provider.test/v1", model: "m", endpoint: "not-a-kind" },
+      catalog: [
+        { id: "v", label: "V", runtime: "openai-compatible", auth: "api-key", models: [{ id: "m" }] },
+      ],
+      fetchImpl: async () => {
+        throw new Error("no request should have been sent");
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toContain("not-a-kind");
+    // And it names the kinds that do exist, which is the part that makes the
+    // message actionable rather than merely accurate.
+    expect(result.errorMessage).toContain("openai-compatible");
+  });
+
 });

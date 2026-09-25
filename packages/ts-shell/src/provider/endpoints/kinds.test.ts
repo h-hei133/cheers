@@ -6,6 +6,7 @@ import {
   endpointKind,
   endpointShape,
   endpointText,
+  endpointTurnBody,
   endpointUrl,
 } from "./index.js";
 
@@ -31,6 +32,16 @@ function declareStub(): void {
     path: "/stub-resource",
     headers: (apiKey) => ({ "x-stub-key": apiKey }),
     body: (input) => ({ stub_model: input.model, stub_messages: input.messages }),
+    // The full-turn body, which is what the main loop asks for. A protocol that
+    // only answered the simpler question above would satisfy the registry and
+    // still be unreachable from a real turn — which is exactly the hole this
+    // stub exists to close.
+    turnBody: (input) => ({
+      stub_turn_model: input.model,
+      stub_tool_count: input.tools.length,
+      stub_system_role: input.systemRole,
+      stub_max_tokens_field: input.maxTokensField,
+    }),
     readBody: () => ({ choices: [{ message: { content: "from the stub" } }] }),
     // Never reached: these cases stop before a request is sent.
     readStream: () => {
@@ -54,6 +65,28 @@ describe("a declared protocol", () => {
     });
     expect(endpointText(STUB_KIND, { anything: true })).toBe("from the stub");
     expect(endpointShape(STUB_KIND).headers("k")).toEqual({ "x-stub-key": "k" });
+    // And the question the main turn asks, which used to be a branch in the turn
+    // loop instead of a call into here.
+    expect(
+      endpointTurnBody(STUB_KIND, {
+        model: "m",
+        systemPrompt: "",
+        messages: [],
+        tools: [],
+        allowTools: false,
+        vision: false,
+        temperature: 0.7,
+        systemRole: "system",
+        reasoningEffort: false,
+        maxTokensField: "max_tokens",
+        assistantAfterToolResult: false,
+      }),
+    ).toEqual({
+      stub_turn_model: "m",
+      stub_tool_count: 0,
+      stub_system_role: "system",
+      stub_max_tokens_field: "max_tokens",
+    });
   });
 
   it("is listed among the kinds once declared", () => {

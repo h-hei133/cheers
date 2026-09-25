@@ -21,9 +21,11 @@ export {
   endpointKind,
   endpointShape,
   endpointText,
+  endpointTurnBody,
   endpointUrl,
   isEventStream,
   type EndpointKind,
   type EndpointShape,
   type SimpleRequest,
+  type TurnRequest,
 } from "./kinds.js";

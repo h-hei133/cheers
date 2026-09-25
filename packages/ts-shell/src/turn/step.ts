@@ -1,8 +1,3 @@
-import {
-  formatNonVisionFallback,
-  toOpenAIImageUrlBlock,
-  type OpenAIImageUrlBlock,
-} from "../model-adapters/multimodal.js";
 import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
@@ -12,8 +7,7 @@ import { samplingTemperature } from "../core/commands/fastCommandRuntime.js";
 import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
 import { microcompactMessages } from "../core/query/microCompact.js";
 import { isEventStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
-import { anthropicRequestBody } from "../provider/endpoints/anthropicMessages.js";
-import { DEFAULT_ENDPOINT_KIND, endpointKind, endpointShape, endpointUrl, type EndpointKind } from "../provider/endpoints/index.js";
+import { DEFAULT_ENDPOINT_KIND, endpointKind, endpointShape, endpointTurnBody, endpointUrl, type EndpointKind } from "../provider/endpoints/index.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import { toChatMessages, type ChatMessage } from "./prompt.js";
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
@@ -209,55 +203,50 @@ export function createStepFunction(request: StepRequest): StepFunction {
         effortAccepted ? effort : undefined,
       );
       const endpoint = endpointFor(request);
-      const payload = endpoint === "anthropic-messages"
-        ? anthropicRequestBody({
-            model: request.provider.model,
-            systemPrompt: request.systemPrompt,
-            messages: bridgeToolResults(
-              microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
-              shape.assistantAfterToolResult,
-            ),
-            tools: request.tools,
-            allowTools: options.allowTools,
-            vision: shape.vision,
-            temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
-            ...(request.topP != null ? { topP: request.topP } : {}),
-            ...(request.maxOutputTokens ?? shape.maxOutputCeiling) != null
-              ? { maxOutputTokens: request.maxOutputTokens ?? shape.maxOutputCeiling }
-              : {},
-            ...(shape.reasoningEffort && shape.thinkingLevelName
-              ? { thinkingLevelName: shape.thinkingLevelName }
-              : {}),
-          })
-        : {
-        model: request.provider.model,
-        messages: [
-          { role: shape.systemRole, content: request.systemPrompt },
-          // Each message's content is put into the shape this endpoint takes:
-          // a bare string, or an array of parts when the message carries images.
-          ...bridgeToolResults(
+      // The wire body comes from the protocol's own declaration, so a third
+      // protocol is a module rather than a branch here. Everything the two
+      // protocols disagree about is either in the table or resolved from the
+      // model; the caller's own preprocessing — the compaction above and the
+      // bridging of tool results — happens once, before this, because it is the
+      // same for every protocol.
+      //
+      // A kind nobody declared is answered here rather than left to throw. The
+      // name came from a file the user edited, so the one thing worth saying is
+      // which name and which kinds exist — and an error the loop can report is
+      // where that is visible. Left as a throw it would leave the turn through
+      // the loop's retry wrapper, which does not catch it, and reach the user as
+      // an uncaught crash with no mention of the file.
+      let payload: Record<string, unknown>;
+      try {
+        payload = endpointTurnBody(endpoint, {
+          model: request.provider.model,
+          systemPrompt: request.systemPrompt,
+          messages: bridgeToolResults(
             microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
             shape.assistantAfterToolResult,
-          ).map((message) => ({ ...message, content: wireContent(message.content, shape.vision) })),
-        ],
-        tools: request.tools,
-        tool_choice: options.allowTools ? "auto" : "none",
-        stream: true,
-        stream_options: { include_usage: true },
-        temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
-        // The model's own name for the level, which is the level's own name when
-        // it did not declare a different one.
-        ...(shape.reasoningEffort && shape.thinkingLevelName
-          ? { reasoning_effort: shape.thinkingLevelName }
-          : {}),
-        ...(request.topP != null ? { top_p: request.topP } : {}),
-        // The request's own ceiling wins; the model's applies when it did not set
-        // one, because the ceiling is a property of the model rather than of the
-        // run. Neither set means the field is left off and the host decides.
-        ...((request.maxOutputTokens ?? shape.maxOutputCeiling) != null
-          ? { [shape.maxTokensField]: request.maxOutputTokens ?? shape.maxOutputCeiling }
-          : {}),
-      };
+          ),
+          tools: request.tools,
+          allowTools: options.allowTools,
+          vision: shape.vision,
+          temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
+          ...(request.topP != null ? { topP: request.topP } : {}),
+          ...((request.maxOutputTokens ?? shape.maxOutputCeiling) != null
+            ? { maxOutputTokens: request.maxOutputTokens ?? shape.maxOutputCeiling }
+            : {}),
+          ...(shape.reasoningEffort && shape.thinkingLevelName
+            ? { thinkingLevelName: shape.thinkingLevelName }
+            : {}),
+          systemRole: shape.systemRole,
+          reasoningEffort: shape.reasoningEffort,
+          maxTokensField: shape.maxTokensField,
+          assistantAfterToolResult: shape.assistantAfterToolResult,
+        });
+      } catch (error) {
+        // The only throw from this call is an undeclared kind, and it names both
+        // the kind and the ones that exist. Reported as the reason the step
+        // failed, which is what puts it in front of the user.
+        return stamp(errorStep(error instanceof Error ? error.message : String(error)));
+      }
       // What has been shown so far, so an interrupted answer keeps the part
       // the user already read instead of vanishing from the conversation.
       let shown = "";
@@ -399,33 +388,6 @@ export function createStepFunction(request: StepRequest): StepFunction {
  *
  * A no-op for every model that did not ask for it, which is all of them today.
  */
-/**
- * One message's content in the shape an OpenAI-compatible endpoint takes.
- *
- * A string stays a string, which is what every request looked like before images
- * existed. A message with images becomes the array form, because sending the
- * block array as-is would serialise to `[object Object]` and the model would read
- * that as the message.
- */
-function wireContent(
-  content: ChatMessage["content"],
-  vision: boolean,
-): string | readonly ({ readonly type: "text"; readonly text: string } | OpenAIImageUrlBlock)[] {
-  if (typeof content === "string") return content;
-  if (content === null || content === undefined) return "";
-  if (!vision) {
-    // The model cannot read a picture, so it is given the words for one instead.
-    // Sending the image anyway fails the whole request, which loses the text the
-    // user also wrote; describing it loses only what the model could not have
-    // used.
-    return content
-      .map((block) => (block.type === "text" ? block.text : formatNonVisionFallback(block)))
-      .join("\n");
-  }
-  return content.map((block) =>
-    block.type === "text" ? { type: "text" as const, text: block.text } : toOpenAIImageUrlBlock(block),
-  );
-}
 
 function bridgeToolResults(
   messages: readonly ChatMessage[],

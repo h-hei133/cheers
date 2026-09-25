@@ -1,4 +1,5 @@
 import type { RuntimeProvider } from "../../config/runtimeConfig.js";
+import type { EndpointKind } from "../../provider/endpoints/kinds.js";
 
 /**
  * Provider and model catalogue.
@@ -156,8 +157,15 @@ export interface CatalogProvider {
    * before a second kind existed. Separate from `runtime`, which names who
    * answers: the endpoint is how they want to be asked, and a provider that
    * offers both would need two entries rather than one entry with two shapes.
+   *
+   * A plain string rather than a union of the kinds that ship. The union was what
+   * made a third protocol impossible to name: the registry could hold one, and
+   * the catalogue had no way to say so, so a provider declaring it would have
+   * been read as the default shape and sent a body its endpoint does not take.
+   * An undeclared name reaches `endpointShape`, which refuses it by name instead
+   * of guessing.
    */
-  readonly endpoint?: "openai-compatible" | "anthropic-messages";
+  readonly endpoint?: EndpointKind;
   readonly auth: ProviderAuth;
   readonly baseUrl?: string;
   /** Environment variable conventionally holding the key. */
@@ -440,9 +448,13 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
 export function providerEndpoint(
   catalog: readonly CatalogProvider[],
   provider: string,
-): "anthropic-messages" | undefined {
-  const declared = catalog.find((candidate) => candidate.id === provider)?.endpoint;
-  return declared === "anthropic-messages" ? "anthropic-messages" : undefined;
+): EndpointKind | undefined {
+  // Passed through as declared, whatever it is. Mapping "anything that is not
+  // this one kind" onto the default is what a closed union forced, and it read a
+  // third protocol as the default shape — sending it a body its endpoint does not
+  // accept, with nothing to say why. An unknown name now reaches `endpointShape`,
+  // which names the kinds it does know.
+  return catalog.find((candidate) => candidate.id === provider)?.endpoint;
 }
 
 /**

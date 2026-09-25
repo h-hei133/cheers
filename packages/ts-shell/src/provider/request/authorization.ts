@@ -5,7 +5,7 @@ import type {
 } from "../../config/runtimeConfig.js";
 import { isExpiring, refreshOAuthTokens, type OAuthProviderConfig } from "../../core/auth/oauth/flow.js";
 import { googleOAuthConfig, openAIOAuthConfig, resolveGoogleClientId } from "../../core/auth/oauth/providers.js";
-import { endpointShape, type EndpointKind } from "../endpoints/index.js";
+import { DEFAULT_ENDPOINT_KIND, endpointShape, type EndpointKind } from "../endpoints/index.js";
 
 /**
  * How one provider request authenticates.
@@ -76,8 +76,10 @@ export function providerAuthorization(input: {
   // key directly: there is no account flow for it, and sending `Authorization`
   // anyway is a request the host rejects for a reason that looks like a bad key.
   // Which headers those are is the endpoint's own business, which is why this
-  // asks the shape rather than naming a protocol here.
-  if (input.endpoint && input.endpoint !== "openai-compatible" && input.apiKey?.trim()) {
+  // asks the shape for them rather than composing one here. The comparison is
+  // against the declared default rather than a spelled-out name, so the two
+  // cannot disagree about which kind that is.
+  if (input.endpoint !== undefined && input.endpoint !== DEFAULT_ENDPOINT_KIND && input.apiKey?.trim()) {
     return { headers: endpointShape(input.endpoint).headers(input.apiKey.trim()), mode: "api-key" };
   }
 
