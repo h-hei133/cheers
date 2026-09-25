@@ -70,11 +70,6 @@ export function readTranscript(transcriptPath: string): ReadTranscript {
   return { version: transcriptVersionOf(header), events };
 }
 
-/** The format version of a transcript, without reading all of it as entries. */
-export function readTranscriptVersion(transcriptPath: string): number {
-  return readTranscript(transcriptPath).version;
-}
-
 /**
  * The messages on the branch the thread is looking at.
  *

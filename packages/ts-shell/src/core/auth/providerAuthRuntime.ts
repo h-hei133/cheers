@@ -352,15 +352,20 @@ function resolveAccountAuthConfig(
   return undefined;
 }
 
+/**
+ * File a credential under the provider it belongs to and the shape it is.
+ *
+ * Both answers come from the declaration, so a provider's slot and the
+ * discriminator its credential carries cannot drift apart here. Writing a
+ * credential into the wrong slot would hand it to a different service on the next
+ * request, and the check that they agree is what the two are declared together
+ * for.
+ */
 function toProviderAccountAuthConfig(
   provider: RuntimeProvider,
   config: OpenAIAccountAuthConfig | GoogleAccountAuthConfig,
 ): NonNullable<ProviderConnectionConfig["accountAuth"]> {
-  if (provider === "openai" && config.type === "openai-chatgpt-account") {
-    return { openai: config };
-  }
-  if (provider === "google" && config.type === "google-gemini-account") {
-    return { google: config };
-  }
-  return {};
+  const facts = providerFacts(provider);
+  if (!facts.accountAuthKey || config.type !== facts.accountAuthType) return {};
+  return { [facts.accountAuthKey]: config } as NonNullable<ProviderConnectionConfig["accountAuth"]>;
 }

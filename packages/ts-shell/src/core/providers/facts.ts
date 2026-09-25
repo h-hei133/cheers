@@ -162,8 +162,3 @@ export type AccountAuthKey = NonNullable<ProviderFacts["accountAuthKey"]>;
 export function accountAuthKey(provider: RuntimeProvider): AccountAuthKey | undefined {
   return providerFacts(provider).accountAuthKey;
 }
-
-/** The credential shape a stored value must have to belong to this provider. */
-export function accountAuthType(provider: RuntimeProvider): ProviderFacts["accountAuthType"] {
-  return providerFacts(provider).accountAuthType;
-}

@@ -79,9 +79,11 @@ describe("account auth facts", () => {
   });
 
   it("pairs each slot with the credential shape that belongs in it", () => {
+    // The two are read together when a credential is filed: the slot decides
+    // where it goes and the discriminator decides whether it belongs there. A
+    // slot with no shape would accept anything written into it.
     for (const provider of UNION) {
       const facts = providerFacts(provider);
-      // A slot with no discriminator would accept any credential written there.
       expect(facts.accountAuthKey === undefined, provider).toBe(
         facts.accountAuthType === undefined,
       );
