@@ -43,6 +43,36 @@ describe("links", () => {
     expect(safeUrl("data:text/html,<script>")).toBeUndefined();
   });
 
+  it("refuses a scheme written to evade the check", () => {
+    // Each of these is a way the allowlist could have been fooled: mixed case, a
+    // control character inside the scheme, leading whitespace, and an entity a
+    // browser would decode. The first four never become a link at all.
+    expect(safeUrl("JaVaScRiPt:alert(1)")).toBeUndefined();
+    expect(safeUrl("java\tscript:alert(1)")).toBeUndefined();
+    expect(safeUrl("  javascript:alert(1)")).toBeUndefined();
+    expect(safeUrl("vbscript:msgbox(1)")).toBeUndefined();
+    expect(safeUrl("file:///etc/passwd")).toBeUndefined();
+
+    // The entity does become a link, and that is correct: the `&` is escaped to
+    // `&amp;` on the way in, so what the browser parses is the literal text
+    // `&#106;avascript:...` — no scheme, therefore a relative URL that cannot
+    // execute. Verified in a real browser: the resolved href is that literal
+    // string. Asserting the absence of `<a` would be asserting something the
+    // escaping does not do, and the guarantee that matters is this one.
+    const entity = renderInlineHtml("[x](&#106;avascript:alert(1))");
+    expect(entity).toContain("&amp;#106;");
+    expect(entity).not.toContain('href="&#106;');
+    expect(entity).not.toContain("javascript:alert(1)");
+  });
+
+  it("keeps an attribute from ending early", () => {
+    // The URL is escaped before it reaches the attribute, so a quote in it cannot
+    // close the attribute and start a new one.
+    const rendered = renderInlineHtml('[x](https://ok.com/"onmouseover="alert(1))');
+    expect(rendered).toContain("&quot;onmouseover=&quot;");
+    expect(rendered).not.toContain('"onmouseover="');
+  });
+
   it("allows a relative link, which points beside the file", () => {
     expect(safeUrl("./notes.md")).toBe("./notes.md");
   });
