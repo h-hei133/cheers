@@ -119,14 +119,6 @@ export class CoreMcpGateway {
     const clients = await this.connectionManager.connectAll(configs);
     this.pruneClientCache(clients);
     const tools = [];
-    const resources: Record<
-      string,
-      Awaited<ReturnType<CoreMcpClient["listResources"]>>
-    > = {};
-    const prompts: Record<
-      string,
-      Awaited<ReturnType<CoreMcpClient["listPrompts"]>>
-    > = {};
 
     for (const clientState of clients) {
       if (clientState.type !== "connected") {
@@ -136,16 +128,9 @@ export class CoreMcpGateway {
       const client = new CoreMcpClient(clientState.name, clientState.config);
       this.clientCache.set(clientState.name, client);
       tools.push(...(await client.listTools()));
-      resources[clientState.name] = await client.listResources();
-      prompts[clientState.name] = await client.listPrompts();
     }
 
-    return {
-      clients,
-      tools,
-      resources,
-      prompts,
-    };
+    return { clients, tools };
   }
 
   async refresh(target: string = "all"): Promise<McpClientSnapshot> {

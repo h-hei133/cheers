@@ -2,8 +2,6 @@ import { spawn } from 'node:child_process'
 import type {
   McpConnectionState,
   McpToolCallResult,
-  McpPromptDescriptor,
-  McpResourceDescriptor,
   ScopedMcpServerConfig,
   McpToolDescriptor,
 } from './types.js'
@@ -42,8 +40,26 @@ function unsupportedTransportDetail(serverName: string, transport: McpTransport)
 }
 
 /**
- * Enhanced CoreMcpClient
- * Features auto-reconnection, strict 30s timeout, EPIPE resilience, and full JSON-RPC lifecycle.
+ * A client for a server this build starts itself.
+ *
+ * The envelope is this build's own, not the protocol's: it writes
+ * `{"action":"list-tools"}` and `{"action":"invoke-tool"}` and reads a matching
+ * reply. A real protocol client writes JSON-RPC 2.0 (`tools/list`, `tools/call`),
+ * so **this cannot talk to a third-party server** — pointing the configuration at
+ * one would reach it and get a reply this does not understand.
+ *
+ * That is a deliberate scope rather than an oversight. The only servers this has
+ * ever been used with are the ones in the test fixtures, so the wire shape was
+ * free to be whatever was simplest; adopting the protocol means writing a real
+ * client, which is a capability rather than a repair, and there would be nothing
+ * here to verify it against.
+ *
+ * What the class does carry over from the protocol is the shape of the exchange —
+ * a request, a classified failure, a reconnect on a dead process — so the
+ * transport work that is not protocol-specific is already done.
+ *
+ * Reconnects once per failed call, times out at 30s, and survives an EPIPE on a
+ * server that exited early.
  */
 export class CoreMcpClient {
   readonly name: string
@@ -119,14 +135,6 @@ export class CoreMcpClient {
       serverName: tool.serverName ?? this.name,
       qualifiedName: tool.qualifiedName ?? qualifyMcpToolName(this.name, tool.toolName),
     }))
-  }
-
-  async listResources(): Promise<McpResourceDescriptor[]> {
-    return this.config.mockResources ?? []
-  }
-
-  async listPrompts(): Promise<McpPromptDescriptor[]> {
-    return this.config.mockPrompts ?? []
   }
 
   async invokeTool(toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
