@@ -10,6 +10,8 @@ import {
   type ModelUsageBucket,
 } from "../../observability/usageTelemetry.js";
 import type { ModelCostRates } from "../models/catalog.js";
+import { CACHE_TTL_MS, findCacheWaste } from "../../observability/cacheWaste.js";
+import type { SessionUsageTelemetry } from "../../observability/usageTelemetry.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveModelCost } from "../models/window.js";
 
@@ -95,8 +97,56 @@ export async function runCostCommand(
         // prices while another does not, so a flat statement would be wrong for
         // at least one table above it.
         : "The token counts are what the provider reported. Some rates are estimates at a fixed fallback that does not follow the model in use — check your provider's billing for what was actually charged.",
+      ...cacheWasteSection(telemetry, rateFor),
     ].join("\n"),
   };
+}
+
+/**
+ * What the prompt cache did not save, over the requests still held.
+ *
+ * Says nothing when there is nothing to say: a session with no counted miss, or
+ * one where no request could be judged, has no cache story and a heading with a
+ * zero under it would suggest otherwise.
+ *
+ * The window is named because it is genuinely bounded — the history keeps the
+ * recent requests, not every one — and a figure presented without that would read
+ * as the session's total.
+ */
+function cacheWasteSection(
+  telemetry: SessionUsageTelemetry,
+  rateFor: (provider: string, model: string) => ModelCostRates | undefined,
+): readonly string[] {
+  const report = findCacheWaste(telemetry.recentRequests, rateFor);
+  if (report.totals.missCount === 0) return [];
+
+  const { missedTokens, missedCost, missCount } = report.totals;
+  const lines = [
+    "",
+    "### Prompt cache",
+    "",
+    `- ${missedTokens.toLocaleString()} prompt tokens were sent again and billed in full, across ${missCount} ${missCount === 1 ? "request" : "requests"}`,
+    `- Estimated extra spend against those tokens having been cache reads: $${missedCost.toFixed(4)}`,
+  ];
+
+  // Named separately because the remedy differs: an idle gap is fixed by asking
+  // sooner, and a model switch re-bills the prompt by design.
+  const idled = report.misses.filter((miss) => miss.idleMs > CACHE_TTL_MS).length;
+  const switched = report.misses.filter((miss) => miss.modelChanged).length;
+  if (idled > 0) {
+    lines.push(
+      `- ${idled} of them followed an idle gap longer than ${Math.round(CACHE_TTL_MS / 60000)} minutes, which is long enough for a cache to expire`,
+    );
+  }
+  if (switched > 0) {
+    lines.push(`- ${switched} of them followed a model change, which re-bills the prompt by design`);
+  }
+
+  lines.push(
+    "",
+    `Counted over the last ${telemetry.recentRequests.length} requests of this session, not the whole of it.`,
+  );
+  return lines;
 }
 
 /** One model's table, with the total row. */

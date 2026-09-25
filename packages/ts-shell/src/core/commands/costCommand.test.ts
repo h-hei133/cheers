@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCostCommand } from "./costCommandRuntime.js";
 import { recordSessionUsage, resetSessionUsage } from "../../observability/usageTelemetry.js";
+import { writeCatalogCache } from "../models/catalogStore.js";
 import type { CommandContext } from "./types.js";
 
 /**
@@ -103,5 +104,64 @@ describe("runCostCommand", () => {
 
     const result = await runCostCommand([], contextFor(session, workspace()));
     expect(result.output).toContain("estimates at a fixed fallback");
+  });
+
+  /**
+   * The cache report is a comparison between one request and the one before it,
+   * so what it can say depends on both being visible. The rates come from the
+   * catalog, and a model with no published prices cannot have a cost computed for
+   * it — so this publishes prices for one model to exercise the arithmetic.
+   */
+  it("reports prompt that was sent again and billed in full", async () => {
+    const home = workspace();
+    process.env.HOME = home;
+    process.env.USERPROFILE = home;
+    writeCatalogCache([
+      {
+        id: "priced",
+        models: [{ id: "meter", cost: { promptPerMTok: 3, completionPerMTok: 15, cacheReadPerMTok: 0.3 } }],
+      },
+    ]);
+
+    const session = "sess_cost_cache";
+    resetSessionUsage(session);
+    // Two requests of the same 100k prompt with nothing read from cache: the
+    // second should have been a read, and was not.
+    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced" });
+    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced" });
+
+    const result = await runCostCommand([], contextFor(session, workspace()));
+    expect(result.output).toContain("Prompt cache");
+    expect(result.output).toContain("100,000 prompt tokens");
+    // 3.00 - 0.30 per million over 100k tokens.
+    expect(result.output).toContain("$0.2700");
+  });
+
+  it("says nothing about the cache when every request reused it", async () => {
+    const home = workspace();
+    process.env.HOME = home;
+    process.env.USERPROFILE = home;
+    writeCatalogCache([
+      {
+        id: "priced",
+        models: [{ id: "meter", cost: { promptPerMTok: 3, completionPerMTok: 15, cacheReadPerMTok: 0.3 } }],
+      },
+    ]);
+
+    const session = "sess_cost_nocache";
+    resetSessionUsage(session);
+    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced" });
+    recordSessionUsage(session, {
+      promptTokens: 100_000,
+      completionTokens: 0,
+      model: "meter",
+      provider: "priced",
+      cacheReadTokens: 100_000,
+    });
+
+    const result = await runCostCommand([], contextFor(session, workspace()));
+    // A heading with a zero under it would suggest the cache was doing badly,
+    // when the truth is there was nothing to report.
+    expect(result.output).not.toContain("Prompt cache");
   });
 });

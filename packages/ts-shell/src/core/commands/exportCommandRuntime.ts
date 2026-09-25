@@ -6,11 +6,8 @@ import {
   createSessionStoreLayout,
   locateExistingSessionLayout,
 } from "../../session/store/sessionFileLayout.js";
-import {
-  projectTranscriptMessages,
-  readTranscriptEvents,
-} from "../../session/transcript/sessionTranscript.js";
-import type { TranscriptEvent } from "../../session/sessionEventCodec.js";
+import { projectTranscriptMessages, readTranscript } from "../../session/transcript/sessionTranscript.js";
+import { createTranscriptHeader, type TranscriptEvent, type TranscriptHeader } from "../../session/sessionEventCodec.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import { resolveWriteTarget } from "../security/writeTarget.js";
 import { gatherExport } from "../../session/export/collect.js";
@@ -65,7 +62,8 @@ export async function runExportCommand(
       ].join("\n"),
     };
   }
-  const events = readTranscript(sessionId);
+  const transcript = readSessionTranscript(sessionId);
+  const events = transcript.events;
   const messages = projectTranscriptMessages(events);
   if (events.length === 0) {
     return {
@@ -116,7 +114,10 @@ export async function runExportCommand(
     }
     content = renderExportHtml(gathered.payload);
   } else {
-    content = format === "jsonl" ? asJsonl(events) : asMarkdown(messages, sessionId, root);
+    content =
+      format === "jsonl"
+        ? asJsonl(events, { version: transcript.version, sessionId, root })
+        : asMarkdown(messages, sessionId, root);
   }
   try {
     mkdirSync(path.dirname(target), { recursive: true });
@@ -135,6 +136,7 @@ export async function runExportCommand(
       output: [
         `Exported ${events.length} transcript entries to \`${shown}\`.`,
         "",
+        "- The first line is a header naming the format's version; entries follow.",
         "- One entry per line, in the order they were recorded.",
         "- Entries carry their own `type` and `id`, so a reader can tell messages",
         "  apart from compaction and branch-summary entries.",
@@ -170,13 +172,13 @@ function parseFormat(value: string | undefined): "markdown" | "jsonl" | "html" |
   return undefined;
 }
 
-/** The transcript entries this session recorded, in order. */
-function readTranscript(sessionId: string): readonly TranscriptEvent[] {
+/** This session's transcript: its entries in order, and the format it was written in. */
+function readSessionTranscript(sessionId: string): { version: number; events: readonly TranscriptEvent[] } {
   try {
     const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
-    return readTranscriptEvents(layout.transcriptPath);
+    return readTranscript(layout.transcriptPath);
   } catch {
-    return [];
+    return { version: 0, events: [] };
   }
 }
 
@@ -220,15 +222,34 @@ function asMarkdown(messages: readonly SessionMessage[], sessionId: string, root
 }
 
 /**
- * One transcript entry per line.
+ * One transcript entry per line, behind a header saying what the file is.
+ *
+ * The header goes first so a reader knows the format before it starts reading
+ * entries, which is the whole reason the on-disk transcript has one. Exported
+ * files leave this machine and are read later, by this project or by something
+ * else, and "which format is this" is the first question any of them has to
+ * answer.
+ *
+ * The version comes from the transcript rather than from this build. A session
+ * recorded before the header existed has none, and exporting it as the current
+ * version would claim its lines are in a shape they were never written in. 0
+ * says so.
  *
  * These are the entries the session recorded, not a projection of them: the
  * projection folds compaction and branch-summary entries into ordinary messages,
  * so exporting it would lose the record of what was compacted and what was
  * stepped back past.
  */
-function asJsonl(events: readonly TranscriptEvent[]): string {
-  return `${events.map((event) => JSON.stringify(event)).join("\n")}\n`;
+function asJsonl(
+  events: readonly TranscriptEvent[],
+  source: { readonly version: number; readonly sessionId: string; readonly root: string },
+): string {
+  const header: TranscriptHeader = {
+    ...createTranscriptHeader({ sessionId: source.sessionId, timestamp: new Date().toISOString(), cwd: source.root }),
+    version: source.version,
+  };
+  const lines = [JSON.stringify(header), ...events.map((event) => JSON.stringify(event))];
+  return `${lines.join("\n")}\n`;
 }
 
 function heading(role: SessionMessage["role"]): string {

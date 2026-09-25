@@ -58,7 +58,18 @@ describe("sessionStore", () => {
           runPhase: "idle",
         }),
       );
-      expect(fs.readFileSync(fileLayout.transcriptPath, "utf8")).toBe("");
+      // The transcript opens with a header naming the format, and no entries:
+      // the file has to be brought into being somehow, and a header is the one
+      // thing that must be first.
+      const transcriptLines = fs.readFileSync(fileLayout.transcriptPath, "utf8").trim().split("\n");
+      expect(transcriptLines).toHaveLength(1);
+      expect(JSON.parse(transcriptLines[0]!)).toEqual({
+        type: "session",
+        version: 1,
+        id: "sess_store",
+        timestamp: session.createdAt,
+        cwd: "/repo",
+      });
 
       expect(loadSessionRecord({
         sessionId: "sess_store",

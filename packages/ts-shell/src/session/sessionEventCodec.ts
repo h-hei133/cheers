@@ -83,6 +83,66 @@ export type TranscriptEvent =
   | BranchSummaryTranscriptEntry;
 
 /**
+ * The transcript format this build writes.
+ *
+ * One number for the whole file rather than a field on every entry: what changes
+ * between formats is how the lines are to be read, which is a property of the
+ * file. A file with no header was written before any of this existed and is
+ * version 0 — inferred from the absence rather than assigned, because assigning
+ * it would mean rewriting files this project promises never to rewrite.
+ */
+export const TRANSCRIPT_FORMAT_VERSION = 1;
+
+/**
+ * The first line of a transcript, saying what it is.
+ *
+ * Metadata only, and not part of the conversation: it names the session and the
+ * format, so a reader can tell what it is holding before deciding whether it
+ * knows how to read it. Absent from every transcript written before this
+ * existed, which is how those files are recognized.
+ */
+export interface TranscriptHeader {
+  readonly type: "session";
+  readonly version: number;
+  readonly id: string;
+  readonly timestamp: string;
+  readonly cwd: string;
+}
+
+/** The header a new transcript starts with. */
+export function createTranscriptHeader(input: {
+  readonly sessionId: string;
+  readonly timestamp: string;
+  readonly cwd: string;
+}): TranscriptHeader {
+  return {
+    type: "session",
+    version: TRANSCRIPT_FORMAT_VERSION,
+    id: input.sessionId,
+    timestamp: input.timestamp,
+    cwd: input.cwd,
+  };
+}
+
+/**
+ * Whether a parsed line is a transcript header rather than an entry.
+ *
+ * Deliberately loose about `version`: a header from a future build should be
+ * recognized as a header even by a reader that does not know its version, so the
+ * complaint can be about the version instead of about malformed input.
+ */
+export function isTranscriptHeader(value: unknown): value is TranscriptHeader {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.type === "session" &&
+    typeof record.id === "string" &&
+    typeof record.timestamp === "string" &&
+    typeof record.cwd === "string"
+  );
+}
+
+/**
  * A short, unique name for one transcript entry.
  *
  * Sequential numbers would be simpler, but the transcript is appended to by more
@@ -204,20 +264,59 @@ export function decodeTranscriptLineSafe(
   line: string,
   lineNumber?: number,
 ): TranscriptEvent | undefined {
+  const decoded = classifyTranscriptLine(line);
+  if (decoded.kind !== "entry") return undefined;
+  // Lines written before entries had ids get a name derived from their position.
+  // Derived rather than stored, because rewriting an old transcript would break
+  // the promise that these files are append-only.
+  if (decoded.event.id === undefined && lineNumber !== undefined) {
+    return { ...decoded.event, id: legacyTranscriptEntryId(lineNumber) };
+  }
+  return decoded.event;
+}
+
+/**
+ * What one line of a transcript turned out to be.
+ *
+ * A reader that takes a file from the top has to tell three things apart — a
+ * header, an entry, and a line it cannot use — and it has to do that once per
+ * line. Returning the category rather than only the entry is what lets the caller
+ * count entries without counting headers, which is the whole reason the derived
+ * names above stay stable once a header exists.
+ */
+export type TranscriptLine =
+  | { readonly kind: "header"; readonly header: TranscriptHeader }
+  | { readonly kind: "entry"; readonly event: TranscriptEvent }
+  | { readonly kind: "unreadable" };
+
+/**
+ * Read one line, and say which of the three it is.
+ *
+ * Parses once. The alternative — asking separately whether a line is a header —
+ * would parse every line twice on the way through a file that can be long.
+ */
+export function classifyTranscriptLine(line: string): TranscriptLine {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line);
   } catch {
-    return undefined;
+    return { kind: "unreadable" };
   }
-  if (!isTranscriptEvent(parsed)) return undefined;
-  // Lines written before entries had ids get a name derived from their position.
-  // Derived rather than stored, because rewriting an old transcript would break
-  // the promise that these files are append-only.
-  if (parsed.id === undefined && lineNumber !== undefined) {
-    return { ...parsed, id: legacyTranscriptEntryId(lineNumber) };
-  }
-  return parsed;
+  if (isTranscriptHeader(parsed)) return { kind: "header", header: parsed };
+  if (isTranscriptEvent(parsed)) return { kind: "entry", event: parsed };
+  return { kind: "unreadable" };
+}
+
+/**
+ * The format version a transcript was written in.
+ *
+ * A file with no header predates the header and is version 0. A header whose
+ * version is missing or unreadable is also version 0: the field did not parse,
+ * and reporting a number nobody wrote would be worse than reporting none.
+ */
+export function transcriptVersionOf(header: TranscriptHeader | undefined): number {
+  if (!header) return 0;
+  return Number.isInteger(header.version) ? header.version : 0;
 }
 
 export function transcriptEventToSessionMessage(

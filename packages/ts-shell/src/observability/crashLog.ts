@@ -37,6 +37,20 @@ export interface CrashRecord {
  */
 export const MAX_CRASH_RECORDS = 5;
 
+/**
+ * How long a crash stays worth mentioning.
+ *
+ * A limit on what gets shown, not on what gets kept. A crash from a fortnight ago
+ * says nothing about what is wrong now, and a list that led with it would bury the
+ * one that just happened.
+ *
+ * It deliberately does not delete. A record is the only trace of a crash the user
+ * may be about to report, and a rare one that happened a single time is exactly
+ * what a report needs. Keeping it costs nothing; discarding it is not a decision
+ * the passing of days should make.
+ */
+export const MAX_CRASH_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Where the crash records live. */
 export function crashLogPath(): string {
   return resolveUserDataFile("crashes.json");
@@ -56,6 +70,29 @@ export function readCrashLog(filePath: string = crashLogPath()): CrashRecord[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * The crashes recent enough to still describe a current problem, oldest first.
+ *
+ * Separate from reading the file rather than a flag on it, because the two callers
+ * want opposite things and neither should be able to get the other's answer by
+ * accident. The crash list wants what is recent; a bug report wants everything,
+ * including the one crash from last month that has not happened since, which is
+ * often the only evidence there is.
+ *
+ * A record with an unreadable timestamp is left out rather than kept. This is a
+ * filter over a diagnostic file, and a timestamp nobody can parse cannot be shown
+ * to be recent.
+ */
+export function readRecentCrashes(
+  filePath: string = crashLogPath(),
+  now: number = Date.now(),
+): CrashRecord[] {
+  return readCrashLog(filePath).filter((record) => {
+    const written = Date.parse(record.timestamp);
+    return Number.isFinite(written) && now - written <= MAX_CRASH_AGE_MS;
+  });
 }
 
 /**

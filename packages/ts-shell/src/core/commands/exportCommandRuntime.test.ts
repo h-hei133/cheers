@@ -80,11 +80,17 @@ describe("export command", () => {
       .map((line) => JSON.parse(line) as Record<string, unknown>);
   }
 
-  it("exports jsonl as the transcript entries, keeping compaction and branch summaries", async () => {
+  it("exports jsonl opening with a header, then the transcript entries", async () => {
     const result = await runExportCommand(["jsonl", "out.jsonl"], context());
     expect(result.kind).toBe("local");
 
-    const entries = readExported("out.jsonl");
+    const lines = readExported("out.jsonl");
+    // The header goes first so a reader knows the format before reading entries.
+    // A file that leaves this machine and is read later has to answer that.
+    expect(lines[0]).toMatchObject({ type: "session", version: expect.any(Number) });
+    expect(typeof lines[0]!.id).toBe("string");
+
+    const entries = lines.slice(1);
     expect(entries.map((entry) => entry.type)).toEqual([
       "message",
       "compaction",
@@ -97,10 +103,32 @@ describe("export command", () => {
     expect(entries[2]).toMatchObject({ summary: "went down another path" });
   });
 
-  it("reports the entry count for jsonl rather than a message count", async () => {
+  it("names the transcript's own format version rather than this build's", async () => {
+    // A transcript written with a header reports the version on it.
+    await runExportCommand(["jsonl", "out.jsonl"], context());
+    const headed = readExported("out.jsonl")[0];
+    expect(headed).toMatchObject({ type: "session", version: 1 });
+
+    // A transcript from an older build has content and no header, and reports 0:
+    // nobody wrote a version on it, and claiming the current one would say its
+    // lines are in a shape they never had.
+    const session = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
+    fs.writeFileSync(
+      session.transcriptPath,
+      `${JSON.stringify({ type: "message", id: "msg_old", role: "user", content: "old", timestamp: "t0" })}\n`,
+      "utf8",
+    );
+    await runExportCommand(["jsonl", "legacy.jsonl"], context());
+    const legacy = readExported("legacy.jsonl");
+    expect(legacy[0]).toMatchObject({ type: "session", version: 0 });
+    // The entries are still exported behind it.
+    expect(legacy).toHaveLength(2);
+  });
+
+  it("reports the entry count without counting the header as one", async () => {
     const result = await runExportCommand(["jsonl", "out.jsonl"], context());
     // Four entries, three projected messages: the report must not disagree with
-    // what the file holds.
+    // what the file holds, and the header is not an entry.
     expect(result.kind === "local" && result.output).toContain("4 transcript entries");
   });
 

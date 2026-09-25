@@ -42,6 +42,21 @@ export interface SessionUsageTelemetry {
    */
   byModel: Record<string, ModelUsageBucket>;
   /**
+   * The last few requests, newest last, for reading what happened turn to turn.
+   *
+   * The buckets above answer "what has this session spent". They cannot answer
+   * "was the cache used well", because that is a question about one request
+   * relative to the one before it — how much of this prompt should have been a
+   * cache read, given what the previous request had already sent. That comparison
+   * needs both requests, and summing loses exactly the ordering it depends on.
+   *
+   * Bounded rather than complete. It is a running view for a report read during
+   * the session, not a ledger: a session left open for a day does not need every
+   * request it ever made kept in memory to answer a question about the recent
+   * past, and the oldest entries are the least relevant to it.
+   */
+  recentRequests: UsageHistoryEntry[];
+  /**
    * Prompt tokens of the most recent request. This, not the cumulative total, is
    * the session's live context footprint: every request resends the whole
    * conversation, so the sum across turns counts the same context many times over.
@@ -69,6 +84,51 @@ export interface SessionUsageTelemetry {
   lastBucketKey: string;
   lastUpdated: number;
 }
+
+/**
+ * One request, as the cache comparison needs to see it.
+ *
+ * `promptTokens` is the whole prompt the provider was sent — input plus both
+ * cache figures — because that is what the next request's cache reads are
+ * measured against. `cacheRead`/`cacheWrite` stay separate so a request that
+ * reported no cache activity at all can be told from one that reported zero.
+ */
+export interface UsageHistoryEntry {
+  /** The prompt the provider was sent, in total. */
+  promptTokens: number;
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+  /** `<provider>/<model>`, for spotting a switch that re-bills the prompt. */
+  readonly bucketKey: string;
+  readonly timestamp: number;
+  /**
+   * Whether any request up to here reported cache activity.
+   *
+   * Sticky across the history, and not per-entry. A provider that never reports
+   * caching and a provider that reports a total miss look identical on one
+   * request; what separates them is whether caching was ever seen. Without this
+   * the first request on a cache-capable provider reads as a miss on every turn.
+   */
+  readonly reportedCache: boolean;
+  /**
+   * Whether this entry marks a rebuilt context rather than a request.
+   *
+   * A compaction or a branch move replaces the conversation, so the prompt that
+   * follows shares nothing with the one before. Comparing them would count the
+   * whole rebuilt prompt as a miss that should have been a cache read, which is
+   * the opposite of what happened.
+   */
+  readonly kind: "request" | "context-reset";
+}
+
+/**
+ * How many requests are kept.
+ *
+ * Enough to cover a cache's life at a normal pace — the TTL most providers use
+ * is minutes, not hours — while keeping the memory this costs bounded for a
+ * session that runs all day.
+ */
+export const MAX_RECENT_REQUESTS = 64;
 
 /** A bucket key: the provider that served the request, and the model that answered. */
 export function usageBucketKey(provider: string, model: string): string {
@@ -226,7 +286,34 @@ export function recordSessionUsage(
   existing.lastBucketKey = key;
   existing.lastUpdated = Date.now();
 
+  // The per-request view, which the buckets cannot provide: they sum, and cache
+  // waste is a comparison between one request and the one before it.
+  const cacheRead = usage.cacheReadTokens ?? 0;
+  const cacheWrite = usage.cacheWriteTokens ?? 0;
+  const previous = existing.recentRequests.at(-1);
+  const promptTotal = pTokens + cacheRead + cacheWrite;
+  if (promptTotal > 0) {
+    pushHistory(existing, {
+      promptTokens: promptTotal,
+      cacheReadTokens: cacheRead,
+      cacheWriteTokens: cacheWrite,
+      bucketKey: key,
+      timestamp: existing.lastUpdated,
+      // Sticky: once any request reported cache activity, a later request that
+      // reports none is a total miss rather than a provider that cannot cache.
+      reportedCache: (previous?.reportedCache ?? false) || cacheRead + cacheWrite > 0,
+      kind: "request",
+    });
+  }
+
   sessionTelemetries.set(sessionId, existing);
+}
+
+/** Append to the bounded history, dropping the oldest entry once it is full. */
+function pushHistory(telemetry: SessionUsageTelemetry, entry: UsageHistoryEntry): void {
+  telemetry.recentRequests.push(entry);
+  const excess = telemetry.recentRequests.length - MAX_RECENT_REQUESTS;
+  if (excess > 0) telemetry.recentRequests.splice(0, excess);
 }
 
 /** A session with nothing recorded yet. */
@@ -241,6 +328,7 @@ function emptyTelemetry(): SessionUsageTelemetry {
     toolCallsCount: 0,
     lastBucketKey: "",
     lastUpdated: Date.now(),
+    recentRequests: [],
   };
 }
 
@@ -249,16 +337,36 @@ export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
 }
 
 /**
- * Forget the live context footprint without touching the totals. After a
- * compaction the last request's prompt size describes a context that no longer
- * exists, so the gauge goes absent until the next response reports a real one.
+ * Note that the conversation was rebuilt.
+ *
+ * Two things follow from that, and they are the same fact seen twice. The live
+ * context footprint goes absent, because the last request's prompt size
+ * describes a conversation that no longer exists. And the next request starts a
+ * new segment for cache accounting, because its prompt shares nothing with the
+ * one before it — comparing them would count the whole rebuilt prompt as
+ * something that should have been read from cache.
+ *
+ * One function rather than two because every caller means both: a place that
+ * rebuilds the context has to say so to everything that was reasoning about the
+ * old one, and a caller that updated only half of that would be wrong in a way
+ * nothing would report.
  */
 export function markContextUnknown(sessionId: string): void {
   const existing = sessionTelemetries.get(sessionId);
-  if (existing) {
-    existing.lastPromptTokens = 0;
-    existing.lastPromptMessageCount = 0;
-  }
+  if (!existing) return;
+  existing.lastPromptTokens = 0;
+  existing.lastPromptMessageCount = 0;
+  pushHistory(existing, {
+    promptTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    bucketKey: existing.lastBucketKey,
+    timestamp: Date.now(),
+    // Carried forward rather than set: a rebuild says nothing about whether the
+    // provider caches, so it must not erase what was already learned about that.
+    reportedCache: existing.recentRequests.at(-1)?.reportedCache ?? false,
+    kind: "context-reset",
+  });
 }
 
 export function resetSessionUsage(sessionId: string): void {

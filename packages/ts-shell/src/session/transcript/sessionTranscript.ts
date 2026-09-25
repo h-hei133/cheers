@@ -1,29 +1,78 @@
 import * as fs from "node:fs";
+import * as path from "node:path";
 import {
+  classifyTranscriptLine,
   createMessageTranscriptEvent,
   createTranscriptEntryId,
-  decodeTranscriptLineSafe,
+  createTranscriptHeader,
   encodeTranscriptEvent,
+  legacyTranscriptEntryId,
   transcriptEventToSessionMessage,
+  transcriptVersionOf,
   type TranscriptEvent,
+  type TranscriptHeader,
 } from "../sessionEventCodec.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { Session } from "../schema/sessionRecord.js";
 
+/**
+ * The whole transcript: its format version, and the entries in order.
+ *
+ * The header is not returned as an entry. It describes the file rather than being
+ * part of the conversation, and every caller here wants the conversation.
+ */
+export interface ReadTranscript {
+  /** The format the file was written in; 0 when it has no header. */
+  readonly version: number;
+  readonly events: readonly TranscriptEvent[];
+}
+
 export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] {
+  return readTranscript(transcriptPath).events as TranscriptEvent[];
+}
+
+/**
+ * Read a transcript, header included in what is reported.
+ *
+ * Header lines are not numbered. The derived name an entry gets when it has no id
+ * comes from its position, so counting a header would shift every such name by
+ * one in a file that has one — the same entry would answer to a different name
+ * depending on whether a header happened to precede it. Entries start at one
+ * either way.
+ */
+export function readTranscript(transcriptPath: string): ReadTranscript {
   if (!fs.existsSync(transcriptPath)) {
-    return [];
+    return { version: 0, events: [] };
   }
 
   const events: TranscriptEvent[] = [];
+  let header: TranscriptHeader | undefined;
   let lineNumber = 0;
   for (const line of fs.readFileSync(transcriptPath, "utf8").split("\n")) {
     if (!line) continue;
+    const decoded = classifyTranscriptLine(line);
+    if (decoded.kind === "header") {
+      // Only the first one counts. A second can only come from a concatenated
+      // file, and letting it overwrite the real header would report the wrong
+      // version for the entries that follow it.
+      header ??= decoded.header;
+      continue;
+    }
     lineNumber += 1;
-    const event = decodeTranscriptLineSafe(line, lineNumber);
-    if (event) events.push(event);
+    if (decoded.kind === "entry") {
+      events.push(
+        decoded.event.id === undefined
+          ? { ...decoded.event, id: legacyTranscriptEntryId(lineNumber) }
+          : decoded.event,
+      );
+    }
   }
-  return events;
+  return { version: transcriptVersionOf(header), events };
+}
+
+/** The format version of a transcript, without reading all of it as entries. */
+export function readTranscriptVersion(transcriptPath: string): number {
+  return readTranscript(transcriptPath).version;
 }
 
 /**
@@ -81,11 +130,54 @@ export function projectBranchMessages(
   );
 }
 
+/**
+ * Add one entry to a transcript.
+ *
+ * This is the only place that appends, so it is the only place that has to be
+ * sure the file starts the way a transcript should. The session writer does put a
+ * header in when it creates the file, but a transcript on disk from an older
+ * build has none, and nothing stops a caller from appending to a path directly.
+ *
+ * A header is written only when the file is absent or empty. A file with content
+ * and no header is an older transcript, and it stays one: putting a header in
+ * front of lines already written is exactly the rewrite these files are promised
+ * never to get. Readers infer version 0 from the missing header instead.
+ */
 export function appendTranscriptEvent(
   transcriptPath: string,
   event: TranscriptEvent,
+  header?: { readonly sessionId: string; readonly timestamp: string; readonly cwd: string },
 ): void {
+  ensureTranscriptHeader(transcriptPath, header);
   fs.appendFileSync(transcriptPath, `${encodeTranscriptEvent(event)}\n`, "utf8");
+}
+
+/**
+ * Give a new transcript its header, and leave every other file alone.
+ *
+ * Emptiness is the whole test. Anything else — a missing header, a first line
+ * that does not parse — describes a file that already holds something, and those
+ * are not ours to rearrange.
+ */
+function ensureTranscriptHeader(
+  transcriptPath: string,
+  header: { readonly sessionId: string; readonly timestamp: string; readonly cwd: string } | undefined,
+): void {
+  let existing: string;
+  try {
+    existing = fs.readFileSync(transcriptPath, "utf8");
+  } catch {
+    // Absent, or unreadable. Only the absent case is ours to start.
+    if (fs.existsSync(transcriptPath)) return;
+    existing = "";
+  }
+  if (existing !== "") return;
+  const written = header ?? {
+    sessionId: path.basename(path.dirname(transcriptPath)),
+    timestamp: new Date().toISOString(),
+    cwd: process.cwd(),
+  };
+  fs.writeFileSync(transcriptPath, `${JSON.stringify(createTranscriptHeader(written))}\n`, "utf8");
 }
 
 export function projectTranscriptMessages(

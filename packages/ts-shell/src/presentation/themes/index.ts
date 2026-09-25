@@ -186,6 +186,22 @@ export function loadTheme(
   return discoverThemes(workspaceRoot, extraPaths).get(name)?.config ?? builtIn[name];
 }
 
+/**
+ * The file a theme was read from, when it came from disk.
+ *
+ * Nothing for a bundled theme: those are compiled in and there is no file whose
+ * editing should change anything. A caller that wants to notice a theme file
+ * being edited needs the path, and only this layer knows which one won after
+ * the user, project and command-line layers were resolved.
+ */
+export function themeSourcePath(
+  name: string,
+  workspaceRoot: string = process.cwd(),
+  extraPaths: readonly string[] = [],
+): string | undefined {
+  return discoverThemes(workspaceRoot, extraPaths).get(name)?.filePath;
+}
+
 export function getDefaultTheme(): ThemeConfig {
   return builtIn.dark!;
 }

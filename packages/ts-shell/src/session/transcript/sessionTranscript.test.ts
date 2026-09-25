@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createMessageTranscriptEvent } from "../sessionEventCodec.js";
+import { TRANSCRIPT_FORMAT_VERSION, createMessageTranscriptEvent, createTranscriptHeader } from "../sessionEventCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
 import {
   appendBranchSummaryEvent,
@@ -10,6 +10,7 @@ import {
   appendTranscriptEvent,
   projectBranchMessages,
   projectTranscriptMessages,
+  readTranscript,
   readTranscriptEvents,
 } from "./sessionTranscript.js";
 
@@ -187,6 +188,101 @@ describe("entry identity", () => {
         "utf8",
       );
       expect(readTranscriptEvents(transcriptPath)[0]?.id).toBe("msg_written");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * A header is not an entry, and it must not be counted as one. The derived name
+   * an entry gets when it has no id comes from its position, so counting the
+   * header would shift every such name by one — the same line would answer to a
+   * different name depending on whether something happened to precede it.
+   */
+  it("does not let a header shift the derived name of the entries behind it", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-header-num-"));
+    try {
+      const withoutHeader = path.join(root, "plain.jsonl");
+      const withHeader = path.join(root, "headed.jsonl");
+      const entry = JSON.stringify({ type: "message", role: "user", content: "old", timestamp: "t1" });
+
+      fs.writeFileSync(withoutHeader, `${entry}\n`, "utf8");
+      fs.writeFileSync(
+        withHeader,
+        `${JSON.stringify(createTranscriptHeader({ sessionId: "s1", timestamp: "t0", cwd: "/w" }))}\n${entry}\n`,
+        "utf8",
+      );
+
+      const plainId = readTranscriptEvents(withoutHeader)[0]?.id;
+      const headedId = readTranscriptEvents(withHeader)[0]?.id;
+      expect(plainId).toBe("line-1");
+      expect(headedId).toBe(plainId);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("reports a header's version, and zero for a file that has none", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-version-"));
+    try {
+      const plain = path.join(root, "plain.jsonl");
+      const headed = path.join(root, "headed.jsonl");
+      const entry = JSON.stringify({ type: "message", role: "user", content: "hi", timestamp: "t1" });
+
+      fs.writeFileSync(plain, `${entry}\n`, "utf8");
+      fs.writeFileSync(
+        headed,
+        `${JSON.stringify(createTranscriptHeader({ sessionId: "s1", timestamp: "t0", cwd: "/w" }))}\n${entry}\n`,
+        "utf8",
+      );
+
+      // Absence of a header is what an older transcript looks like, and saying
+      // "0" is the honest answer: nobody wrote a version on it.
+      expect(readTranscript(plain).version).toBe(0);
+      expect(readTranscript(headed).version).toBe(TRANSCRIPT_FORMAT_VERSION);
+      // The header is metadata about the file, not a turn in the conversation.
+      expect(readTranscript(headed).events).toHaveLength(1);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("starts a transcript with a header when the first entry is appended", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-append-header-"));
+    try {
+      const transcriptPath = path.join(root, "transcript.jsonl");
+      appendTranscriptEvent(
+        transcriptPath,
+        createMessageTranscriptEvent({ role: "user", content: "hi", timestamp: "t1", id: "msg_a" }),
+        { sessionId: "s1", timestamp: "t0", cwd: "/w" },
+      );
+
+      const lines = fs.readFileSync(transcriptPath, "utf8").trim().split("\n");
+      expect(JSON.parse(lines[0]!)).toMatchObject({ type: "session", version: TRANSCRIPT_FORMAT_VERSION, id: "s1" });
+      expect(readTranscriptEvents(transcriptPath).map((event) => event.id)).toEqual(["msg_a"]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * The rule that keeps this compatible with append-only: a header is written
+   * only where there is nothing to overwrite. A transcript from an older build
+   * has content and no header, and it must stay exactly as it is.
+   */
+  it("does not put a header in front of a transcript that already has entries", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "session-transcript-no-rewrite-"));
+    try {
+      const transcriptPath = path.join(root, "transcript.jsonl");
+      const original = `${JSON.stringify({ type: "message", role: "user", content: "old", timestamp: "t1" })}\n`;
+      fs.writeFileSync(transcriptPath, original, "utf8");
+
+      appendTranscriptEvent(transcriptPath, createMessageTranscriptEvent({ role: "assistant", content: "new", timestamp: "t2", id: "msg_b" }));
+
+      const after = fs.readFileSync(transcriptPath, "utf8");
+      expect(after.startsWith(original)).toBe(true);
+      expect(readTranscript(transcriptPath).version).toBe(0);
+      expect(readTranscriptEvents(transcriptPath).map((event) => event.id)).toEqual(["line-1", "msg_b"]);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

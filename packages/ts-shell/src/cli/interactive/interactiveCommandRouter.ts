@@ -36,6 +36,7 @@ import {
   runInteractiveResumeAction,
 } from "./interactivePromptRunner.js";
 import { describeCompaction, parseCompactCommand } from "./compact.js";
+import { currentTheme } from "../../presentation/theme/theme.js";
 
 export interface InteractiveCommandRouterInput {
   readonly prompt: string;
@@ -78,6 +79,13 @@ export interface InteractiveCommandRouterResult {
   readonly clearRequested?: boolean;
   /** A different session is now current; its conversation should be put back on screen. */
   readonly sessionOpened?: boolean;
+  /**
+   * The theme in effect is not the one that was in effect before the command.
+   *
+   * The host follows the theme file so an edit to it shows up without a restart,
+   * and it has to know which file that is now.
+   */
+  readonly themeChanged?: boolean;
 }
 
 export async function routeInteractiveCommand(
@@ -96,6 +104,11 @@ export async function routeInteractiveCommand(
     for (const line of describeCompaction(outcome)) input.renderer.renderLine(line);
     return { turnNumber: nextTurnNumber, refreshPromptChrome: true };
   }
+
+  // Which theme is in effect before the command runs. `/theme` and `/reload`
+  // both change it, and neither is a special case worth naming here: comparing
+  // the name either side covers both, and covers any future command that does.
+  const themeBefore = currentTheme();
 
   const resolved = await buildCliCommandExecution({
     prompt: input.prompt,
@@ -119,8 +132,9 @@ export async function routeInteractiveCommand(
       return { before, after };
     },
   });
+  const themeChanged = currentTheme() !== themeBefore;
   if (resolved.kind === "handled") {
-    return { turnNumber: nextTurnNumber };
+    return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }
   const slashResult = resolved.kind === "shell-action" ? resolved.slashResult : null;
 
@@ -142,6 +156,7 @@ export async function routeInteractiveCommand(
       turnNumber: resumeResult.turnNumber,
       refreshPromptChrome: true,
       refreshMcpGateway: true,
+      ...(themeChanged ? { themeChanged: true } : {}),
       // The runtime context is switched in place, so a changed id is the signal
       // that a different session's conversation now belongs on screen.
       sessionOpened: input.runtimeContext.session.id !== before,
@@ -163,7 +178,7 @@ export async function routeInteractiveCommand(
   if (isShellAction(slashResult, "cancel-run")) {
     input.sessionRuntime.cancelCurrentRun();
     input.renderer.renderLine("\nRequested cancellation for the current run.\n");
-    return { turnNumber: nextTurnNumber };
+    return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }
 
   if (isShellAction(slashResult, "list-sessions")) {
@@ -214,12 +229,12 @@ export async function routeInteractiveCommand(
       mcpAction: slashResult.mcpAction,
       mcpTarget: slashResult.mcpTarget,
     });
-    return { turnNumber: nextTurnNumber };
+    return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }
 
   if (isShellAction(slashResult, "show-help")) {
     renderUserHelp(input.renderer);
-    return { turnNumber: nextTurnNumber };
+    return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }
 
   if (isShellAction(slashResult, "show-view")) {
@@ -229,14 +244,14 @@ export async function routeInteractiveCommand(
         viewMode: input.sessionRuntime.getViewMode(),
       }),
     );
-    return { turnNumber: nextTurnNumber };
+    return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }
 
   if (isShellAction(slashResult, "set-view")) {
     const nextMode = slashResult.viewMode ?? "compact";
     input.sessionRuntime.setViewMode(nextMode);
     input.renderer.renderLine(formatViewModeUpdatedLine({ viewMode: nextMode }));
-    return { turnNumber: nextTurnNumber };
+    return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }
 
   if (isShellAction(slashResult, "manage-permissions")) {
@@ -247,12 +262,12 @@ export async function routeInteractiveCommand(
       permissionAction: slashResult.permissionAction,
       permissionSelector: slashResult.permissionSelector,
     });
-    return { turnNumber: nextTurnNumber };
+    return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }
 
   try {
     if (resolved.kind !== "execute") {
-      return { turnNumber: nextTurnNumber };
+      return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
     }
     nextTurnNumber += 1;
     await runInteractivePromptExecution({
@@ -280,5 +295,5 @@ export async function routeInteractiveCommand(
     }
   }
 
-  return { turnNumber: nextTurnNumber };
+  return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
 }

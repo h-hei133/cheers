@@ -43,6 +43,8 @@ import { couldBeCommand, slashSuggestions } from "./slashSuggestions.js";
 import { couldBeFileReference, fileSuggestions } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
+import { followTheme, type ThemeFollower } from "../../presentation/themes/watch.js";
+import { markContextUnknown } from "../../observability/usageTelemetry.js";
 
 /**
  * Interactive session host.
@@ -151,6 +153,14 @@ export class InteractiveMode {
    */
   private readonly queue: string[] = [];
   private releaseEvents: (() => void) | undefined;
+  /**
+   * The theme file being followed, when the theme in use came from one.
+   *
+   * Held for the life of the session: a reload after `/theme` changes which file
+   * matters, and a watcher left on the previous one would keep repainting for a
+   * theme nobody is looking at.
+   */
+  private readonly theme: ThemeFollower;
 
   constructor(private readonly options: InteractiveModeOptions) {
     this.terminal = options.terminal ?? processTerminal;
@@ -167,6 +177,14 @@ export class InteractiveMode {
     });
     this.overlay = new OverlayHost(() => this.tui.requestRender());
     this.tui = new TUI(this.terminal, options.scheduler);
+    this.theme = followTheme({
+      workspaceRoot: options.runtimeContext.projectRoot,
+      ...(options.themePaths ? { extraPaths: options.themePaths } : {}),
+      // A reload replaces the palette on a surface that is already rendered, and
+      // nothing redraws on its own. Without this the file changes and the screen
+      // does not.
+      onReload: () => this.tui.requestRender({ force: true }),
+    });
     this.tui.setDisconnectHandler(() => this.stop());
     this.state = createViewState();
     this.view = new InteractiveSurface(
@@ -299,12 +317,19 @@ export class InteractiveMode {
     this.tui.start({
       useAlternateScreen: this.options.runtimeContext.runtimeConfig.tuiMode !== "regular",
     });
+    // After the first frame, not before it: the first paint decides what the
+    // surface looks like, and a reload landing in the middle of it would be
+    // recolouring something not yet on screen.
+    this.theme.refresh();
   }
+
+
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
     if (this.tick) clearInterval(this.tick);
     this.tick = undefined;
+    this.theme.stop();
     this.releaseEvents?.();
     this.releaseEvents = undefined;
     this.clipboard.release();
@@ -521,6 +546,9 @@ export class InteractiveMode {
         refreshKeybindings: () => this.preferences.reload(),
       });
       this.turnNumber = result.turnNumber;
+      // `/theme` and `/reload` both change which file is worth following, and the
+      // watcher would otherwise keep repainting for the theme that was replaced.
+      if (result.themeChanged) this.theme.refresh();
       if (result.exitRequested) exiting = true;
       if (result.retryRequested) retrying = this.sink.retryTarget(this.lastPrompt, previousTurnFailed);
       if (result.clearRequested) clearing = true;
@@ -633,6 +661,10 @@ export class InteractiveMode {
           point.entryId,
           (abandoned) => this.options.sessionRuntime.summarizeAbandonedTurns(abandoned),
         );
+        // The conversation was replaced, so the next request's prompt shares
+        // nothing with the last one. Saying so is what keeps the rebuilt prompt
+        // from being read as prompt that should have come from the cache.
+        markContextUnknown(this.options.runtimeContext.session.id);
         showConversation(this.historyTarget());
         this.tui.requestRender({ force: true });
         // Says how far back, and that the rest is still there. "Went back"

@@ -6,6 +6,7 @@ import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { projectBranchMessages, readTranscriptEvents } from "../transcript/sessionTranscript.js";
+import { createTranscriptHeader } from "../sessionEventCodec.js";
 import { sessionThreadPath } from "../schema/sessionThread.js";
 import { readJsonFileWithRetry, writeJsonFileAtomic } from "./sessionFileStore.js";
 import type { SessionFileLayout } from "./sessionFileLayout.js";
@@ -24,7 +25,21 @@ export function writeSessionRecord(input: {
   }
 
   if (!fs.existsSync(input.layout.transcriptPath)) {
-    fs.writeFileSync(input.layout.transcriptPath, "", "utf8");
+    // The header goes in at the moment the file comes into being, while it is
+    // still empty. That is what keeps it compatible with append-only: a header
+    // has to be the first line, and writing it to a file with nothing in it is
+    // not a rewrite of anything. Appending never touches it afterwards.
+    fs.writeFileSync(
+      input.layout.transcriptPath,
+      `${JSON.stringify(
+        createTranscriptHeader({
+          sessionId: input.session.id,
+          timestamp: input.session.createdAt,
+          cwd: input.session.projectRoot,
+        }),
+      )}\n`,
+      "utf8",
+    );
   }
 
   writeSessionMetadataRecord(input);

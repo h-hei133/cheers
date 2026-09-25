@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
-import { MAX_CRASH_RECORDS, crashLogPath, installCrashRecorder, readCrashLog, recordCrash } from "./crashLog.js";
+import { MAX_CRASH_AGE_MS, MAX_CRASH_RECORDS, crashLogPath, installCrashRecorder, readCrashLog, readRecentCrashes, recordCrash } from "./crashLog.js";
 
 /**
  * A crash tears the terminal down as it goes, so the message scrolls away with
@@ -85,6 +85,75 @@ describe("recordCrash", () => {
 describe("crashLogPath", () => {
   it("lives with the rest of the user's data", () => {
     expect(crashLogPath()).toContain("crashes.json");
+  });
+});
+
+describe("readRecentCrashes", () => {
+  const NOW = Date.parse("2026-09-25T12:00:00.000Z");
+  const daysAgo = (days: number): string => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
+
+  function writeRecords(file: string, timestamps: readonly string[]): void {
+    fs.writeFileSync(
+      file,
+      JSON.stringify(
+        timestamps.map((timestamp, index) => ({
+          timestamp,
+          kind: "uncaught-exception",
+          message: `crash ${index}`,
+          cwd: "/w",
+        })),
+      ),
+      "utf8",
+    );
+  }
+
+  it("leaves out a record older than the limit and keeps a newer one", () => {
+    const file = tempFile();
+    writeRecords(file, [daysAgo(8), daysAgo(1)]);
+
+    const recent = readRecentCrashes(file, NOW);
+    expect(recent.map((record) => record.message)).toEqual(["crash 1"]);
+  });
+
+  it("keeps a record inside the limit", () => {
+    const file = tempFile();
+    writeRecords(file, [daysAgo(6)]);
+    expect(readRecentCrashes(file, NOW)).toHaveLength(1);
+  });
+
+  it("treats the limit itself as recent", () => {
+    // The boundary is inclusive: a record written exactly at the limit is not yet
+    // old, and an off-by-one here would be invisible except at this instant.
+    const file = tempFile();
+    writeRecords(file, [new Date(NOW - MAX_CRASH_AGE_MS).toISOString()]);
+    expect(readRecentCrashes(file, NOW)).toHaveLength(1);
+  });
+
+  it("leaves out a record whose timestamp cannot be read", () => {
+    // Keeping it would put a crash into the list with no way to show that it is
+    // recent, which is the one thing this reader is for.
+    const file = tempFile();
+    writeRecords(file, ["not a date"]);
+    expect(readRecentCrashes(file, NOW)).toEqual([]);
+  });
+
+  /**
+   * The point of a second reader rather than a flag: filtering must not reach the
+   * path that writes. The writer reads the file and rewrites it whole, so a
+   * filter that the writer went through would silently drop the old records on
+   * the next crash — which is the opposite of what the age limit is for.
+   */
+  it("does not cause an old record to be dropped when the next crash is recorded", () => {
+    const file = tempFile();
+    writeRecords(file, [daysAgo(30)]);
+    // Showing it is filtered; keeping it is not.
+    expect(readRecentCrashes(file, NOW)).toEqual([]);
+
+    recordCrash({ kind: "uncaught-exception", error: new Error("newer"), cwd: "/w" }, file);
+
+    const onDisk = readCrashLog(file);
+    expect(onDisk).toHaveLength(2);
+    expect(onDisk.map((record) => record.message)).toContain("crash 0");
   });
 });
 
