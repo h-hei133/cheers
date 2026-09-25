@@ -3095,3 +3095,16 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **全量套件**：**533 文件 3615 通过 / 1 skipped / 1 失败**——失败项是 `browserCacheMultiprocessScenarioExamples`（**隔离运行 6/6 通过**，并发真实 CLI 进程在满负载下的已知抖动；**该文件不触及本步任何改动模块**且早于本步存在）。
 - **不做**（各附理由）：参考的 ANSI→HTML 预渲染管线（我方直接渲染结构化卡片）、iframe/gist 注入钩子（自包含文件不需要）、浏览器内重导 JSONL、5 档过滤模式（只需「全部/只看用户」+ 文本搜索）、语法高亮器（第 3 步刚删掉 `syntax*` 令牌，因无消费者）。
 - **文档**：新增 `phase-9-step4-design.md`（前置发现/文件/载荷契约/客户端范围/实现结果/实机/安全/自身缺陷/不做）。
+
+## [2026-09-25] feat | Phase 9 第 5 步：图片输入（消息模型加宽 + 剪贴板）。**跨层改动，编译器枚举出 20 个读者。**
+- **裁决**：加宽 `content` + `messageToText`。前置复核确认三处耦合点，**最关键风险**：`sessionEventCodec.ts` 的运行时守卫是 `typeof content === "string"`，而 `decodeTranscriptLineSafe` 在守卫失败时**返回 `undefined`**、loader 跳过——**只加宽类型而不放宽守卫会让带图片的消息重载后静默消失**（类型层编译报错，守卫失败**不报错只丢数据**）。故两者同批改。
+- **迁移面由编译器枚举**：加宽后 `tsc` **逐个报出 20 个文件**，比事先估的 19 更可靠。分类：**真改 7**（契约/wire）/ **需 `messageToText` 13**。`microCompact` 的运行时守卫实测**跳过而非崩溃**，故只加宽接口。
+- **关键实现决定**：①`messageToText` 放在 `model-adapters/multimodal.ts`（实测**零 import**，是叶子）；②**纯图片返回 `""`**，13 个文本读者已把空串当「无话可说」，而**显示**消息的读者传 `placeholderForImages`；③**`vision` 缺省为 `false`**——发图给读不了图的模型会**整个请求失败**并丢掉用户同时写的文字，描述只丢模型本就用不上的部分；④**压缩用独立转换** `toCompactionMessages`——摘要模型是来概括对话的，不是来看图的；⑤两处**不**走 `messageToText`：**两个 wire 端点**（把图放进请求形状，否则模型会以为用户写了一段描述）。
+- **剪贴板**（照参考机制，`presentation/tui/clipboardImage.ts`）：**关键语义是 `null`（问了，没有）与 `undefined`（问不了）必须区分**——前者**终止**搜索，否则会落到陈旧的上一个剪贴板内容。三路：Wayland / X11 / **WSL 走 `powershell.exe`**。
+- **本机（WSL）实测**：无图 → 664ms 返回 no image（不抛错不挂起）；用 PowerShell 把 PNG 放进 Windows 剪贴板 → 读到 **image/png 172 bytes**，签名 `89504e470d0a1a0a` **是有效 PNG**。即参考实现注释里「Linux 剪贴板拿不到 `Win+Shift+S`」那个场景**真的能工作**。
+- **自身修掉 4 个问题**：①**两处 `vision` 缺省不一致**（端点写 `=== false` 即未声明视为可读图，而 `DEFAULT_REQUEST_SHAPE` 写 `false`）——**测试抓到**，已统一为 `vision === true` 才发图；②`step.ts` 的 **Anthropic 分支漏传 `vision`**（两个分支只有一个传了）；③**`execFile` 默认按 UTF-8 解码**，图片字节会被替换字符破坏且**不报错**，已显式要 `Buffer`；④项目规则 `ts-promise-with-resolvers` 触发，已改用 `Promise.withResolvers()`。
+- **一处测试自身的修正**：初版往返测试用 `decodeTranscriptLine`——**实测它是无校验的强制转换**（`JSON.parse(...) as TranscriptEvent`），故 7 项里只有 1 项在移除守卫时失败。改走**校验过的** `decodeTranscriptLineSafe` 后 **3 项**失败。即**测试必须走真正做判定的那条路**。
+- **一处类型层抓不到的缺陷**：`projection.ts` 的「解释沉默」分支 `slice` 最后一个工具结果——切片块数组会打印 `[object Object]`。类型允许（两个分支都合法）故不会编译失败，**靠人读发现**。
+- **验证**：`tsc` 0 错；**全量 536 文件 3637 通过 / 1 skipped**；门禁全绿（cycles=0、config-consumers 38/38、monoliths=5 无新增）。新增测试 28 项（multimodal 9 / codec 往返 7 / vision 3 / 剪贴板 2 / catalog 2 等）。**反向验证**：移除守卫 → 3 项失败；强制 `vision: true` → 1 项失败。
+- **不做**：图片缩放/格式转换（需原生解码器处理不可信字节，故首版只接受四种已知类型）、TUI 内联图片渲染（终端无图形协议）、视频/PDF。
+- **文档**：新增 `phase-9-step5-design.md`（耦合点/已有的一半/剪贴板机制/决定 I1–I8/实现结果/自身缺陷/测试修正/不做）。
