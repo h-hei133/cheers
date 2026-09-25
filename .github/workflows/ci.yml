@@ -42,6 +42,14 @@ jobs:
       - name: Check declared hooks dispatch and tools are registered
         run: npm run check:declarations
 
+      # Runs beside the step that pins the Node version, because it is the other
+      # half of that promise: the pin proves the tree works on the floor only if
+      # something says which APIs are above it. Three modules called
+      # `Promise.withResolvers` (Node 22) while this job ran Node 20.3, and the
+      # run was red on every push from before this gate existed.
+      - name: Check nothing needs a newer Node than the declared floor
+        run: npm run check:node-floor
+
       # The gate's own test, so a gate that stops detecting what it was written
       # for fails here rather than passing quietly. Covers every scripts/*.test.mjs.
       - name: Check the gates still detect

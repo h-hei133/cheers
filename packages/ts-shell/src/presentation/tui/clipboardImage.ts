@@ -49,7 +49,15 @@ type BackendResult = ClipboardImage | null | undefined;
 
 /** Run a clipboard command, returning its output or nothing when it could not run. */
 function run(command: string, args: readonly string[], timeoutMs: number): Promise<Buffer | undefined> {
-  const { promise, resolve } = Promise.withResolvers<Buffer | undefined>();
+  // Built by hand rather than with `Promise.withResolvers`, which needs Node 22.
+  // The declared floor is 20.3, and a helper that exists only on a newer runtime
+  // than the package claims turns the first clipboard read into a `TypeError` on
+  // every machine inside the declared range. The same reasoning is written out in
+  // the retry wait and the file lock; this call was the one that missed it.
+  let resolve!: (value: Buffer | undefined) => void;
+  const promise = new Promise<Buffer | undefined>((settle) => {
+    resolve = settle;
+  });
   // No encoding, so the output is a Buffer: clipboard image bytes are not text,
   // and decoding them as UTF-8 would replace every invalid sequence and corrupt
   // the image without any error to say so.
