@@ -193,10 +193,10 @@ Only the singleton auth candidate is classified superseded; no multi-file supers
 | §2.2 check | Result for C35 |
 |---|---|
 | 1. 功能读审 | `authCommandRuntime.ts:21-275` is the legacy `/auth` command implementation; `connectCommandRuntime.ts:70-224` is the current connection lane and explicitly documents `/connect set` as migrated compatibility. |
-| 2. 等价实现核验 | Pass for the route responsibility: `/connect status|login|use|logout` is registered at `registry.ts:125-135`; `/connect set` covers legacy set semantics at `connectCommandRuntime.ts:199-224`. This does not claim byte-for-byte equivalence for every legacy message. |
+| 2. 等价实现核验 | Pass for the route responsibility: `/connect status\|login\|use\|logout` is registered at `registry.ts:125-135`; `/connect set` covers legacy set semantics at `connectCommandRuntime.ts:199-224`. This does not claim byte-for-byte equivalence for every legacy message. |
 | 3. 消费者存活检查 | Production value consumers: 0. The only direct importer is `core/commands/authCommandRuntime.test.ts:6`; no live registry entry imports it. The live consumer is `registry.ts:135` dispatching `runConnectCommand`. |
-| 4. 动态入口检查 | `git grep -n -E 'path\\.join|spawn\\(|execFile\\(|pathToFileURL|process\\.argv|^#!|main\\(' -- packages/ts-shell/src/core/commands/authCommandRuntime.ts` returned no hits. |
-| 5. 公共面检查 | `git grep -n -E 'authCommandRuntime|runAuthCommand' -- packages/ts-shell/src/index.ts scripts package.json` returned no hits. |
+| 4. 动态入口检查 | `git grep -n -E 'path\\.join\|spawn\\(\|execFile\\(\|pathToFileURL\|process\\.argv\|^#!\|main\\(' -- packages/ts-shell/src/core/commands/authCommandRuntime.ts` returned no hits. |
+| 5. 公共面检查 | `git grep -n -E 'authCommandRuntime\|runAuthCommand' -- packages/ts-shell/src/index.ts scripts package.json` returned no hits. |
 | 6. scripts 引用检查 | The same exact-path search found no script/package reference. A broad `/auth` search finds unrelated text and is not treated as a path reference. |
 
 Test-file cost measured by:

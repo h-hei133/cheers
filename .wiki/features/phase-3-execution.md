@@ -589,7 +589,7 @@ read .    →  Directory ./ (4 entries):   .ts-shell/  src/  .cheers.json  packa
 | `core/hooks/registration.ts` | **新增**：注册全部声明 + 设置调度侧门 |
 | `core/hooks/types.ts` | `CommandHookConfig` 增 `fingerprint`/`sourcePath`；`HookApprovalRequest` 归位于此 |
 | `core/hooks/hookDispatcher.ts` | **修 fail-open**；新增 `setCommandHookTrust` + `declaredHookIsAllowed` |
-| `core/commands/trustCommandRuntime.ts` | **新增**：`/trust [status|on|off|session]` |
+| `core/commands/trustCommandRuntime.ts` | **新增**：`/trust [status\|on\|off\|session]` |
 | `core/security/projectTrust.ts` | `hasSensitiveProjectResources` **补齐 6 种形态** |
 | `core/mcp/config.ts` | 项目 MCP 配置按信任门读取（显式参数） |
 | `sandbox/osSandbox.ts` | **修「项目可关掉用户隔离」**：规则改为只收紧 |

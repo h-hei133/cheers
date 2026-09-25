@@ -3194,3 +3194,23 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **D1/D2 文档**：`01:64` 理由更正（原「会让执行规则彻底失效」**夸大**——Plan 模式有运行时硬拦截；参考实现**也没有**「不可覆盖的基底」）；`01:57` 注记更正（三项余量实测**全部已过时**）。
 - **门禁**：`verify:import-cycles` cycles=0、`check:config-consumers`、`check:declarations` 全过；`analyze:module-facades` monoliths **5**（与基线持平，施工中一度 6，已把 watcher 生命周期移入所属模块降回）。7 份文档表格**列数全部一致，0 处损坏**。
 - **施工后自查**：`appendTranscriptEvent` 的 header 守卫原**每次追加都读整个 transcript**（`readFileSync`）来判是否为空——长会话下这是 O(n²)，却在每回合的热路径上。改为 `statSync().size === 0`（语义等价：文件为空 ⟺ 大小为 0），并补一条「存在但为空的文件仍会得到 header」的用例。反向验证：把判定改成「恒为空」→ 3 项用例失败。
+
+## 2026-09-25 — Phase 10 施工后复核（对已提交代码，非裁决文本）
+
+7 个 reviewer 子代理分片并行（含 2 个专查更正），**主代理保留 transcript-codec／凭据／认证面**（该模型在这些读面上会 `content_filter` 猝死，已第 6 次确认）。完整记录见 `features/phase-10-decisions.md` §15。
+
+- **`RvEndpoints` 判 `incorrect`，最重要的一条**：T5 的「加一个协议 = 加一个模块，**不改任何调用方**」**当时是假的**。桩协议测试**只走了简单请求路径**，而**主回合 payload 仍在 `step.ts` 按协议名分支**；更严重的是 catalog 的 `endpoint` 仍是**闭联盟**，第三种协议**根本无法被命名**，`providerEndpoint()` 还会把一切非 anthropic 的值折叠成默认形状＝**静默按 OpenAI 形状发送**。**已修**：`EndpointShape` 增 `turnBody`、两种协议各自实现、`step.ts` 改为查表、三处类型放宽为 `EndpointKind`。**证伪测试**在测试文件里声明协议并走**真实 step 函数**；反向验证（恢复旧分支）→ 用例失败。专查者 `RvVerifyT5` 复核**判 `correct`，零发现**。
+- **`RvTheme`／`RvCache`／`RvCrash` 判 `correct`**（零发现），`RvTheme` 独立复算函数上限＝20（`constructor` 不计）。
+- **`RvCache` 漏了一处，主代理自查发现**：`/cost` 的 `modelChanged` miss **计入了总额**，而上方那句话说这些 token「本可作为缓存读」——**换模型后根本不可能**。数字对、**句子错**。已改措辞并**单列一句**说明，新增用例钉住。
+- **`RvDocs` 判 `correct`，2 项**：`04:61` 写「**120 行防抖**」（单位错且与常量 `100` 不符）；4 行表格**缺结尾竖线**（**Phase 10 之前就坏**）。另**扫出同类 2 行**：`phase-3-execution.md:592` 单元格里未转义的 `/trust [status|on|off|session]`（`|` 劈开行）、`interaction-issues.md:283` 一个**孤立 `**`**（会把后文全部加粗）。
+- **T6 的修复做了 4 轮，每轮都发现「上一轮只修了一半」**（这是本轮最大的教训）：①`normalizeProviderCredentials` 循环；②`normalizeProviderConnections` 不等式链；③**整文件零引用的 `model-adapters/types.ts`（155 行，含第 3 份手写 provider 联盟）→ 删除**；④`fallbackModelsForProvider` 的逐家 `if` 链（漏家时**静默落到 DeepSeek 模型**）→ 上移到声明表，**删掉任一家即编译失败**。另有 `cliArgs.ts` 重复守卫、`facts.test.ts` 自带 `UNION` 数组、`declaredProviders()` 无读者（已删）。
+- **修复自己引入的两处，由实机（非推理）抓出**：①配置里非法 provider 的**回退没有生效**（`configuredProvider ?? default` 写法错），警告里甚至写 `Using 'opemai'`；②该修复的**对照用例空转**——两次读取读的是**同一个坏文件**，删掉回退照样通过。改为对着字面量断言并反向验证。**实机确认**：警告打印、会话继续。
+- **分支点数诚实复测**：裁决写的 **54 → 30**，同口径实测是 **55 → 31 → 28 → 23**（含本轮修复）。差 1 的原因未查清，**文档已改为以复测为准**，并记下「数字写进文档后就没人再测过」这件事。
+
+- **全量套件唯一失败**：`src/cli-baseline.test.ts` 的
+  `pipe-spawn interactive slash command smoke routes sessions current without provider turn`——
+  **隔离跑 40/40 通过（本轮跑了 3 次）**，且**直接手工复现该路径**（`printf '/sessions current\n' |` 进 CLI）
+  **2.3 秒**就打印出 `Cheers Shell` / `Current session` / `- ID:`（该用例的超时是 20 秒）。
+  失败形态是 **marker 超时**而非断言，与该测试「spawn 真实子进程、对机器负载敏感」的既有记录一致
+  （log 中已有两条前例）。**不是本轮改动引入**：该用例不触及本轮改的任何模块，
+  且同样的失败在 Phase 10 之前的多轮里出现过。

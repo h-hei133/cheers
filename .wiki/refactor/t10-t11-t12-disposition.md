@@ -127,8 +127,8 @@ cd packages/ts-shell && npx vitest run \
 | 1. 功能读审 | 已读四个实现。它们都是纯 projection/check/bridge；不执行 provider、model、persistence。候选代码只消费输入并生成 snapshot/report/events。 |
 | 2. 等价实现核验 | 已找到 live 等价职责：事件由 `sidebarCommandEventAdapter`/`sidebarEventSink`/`sidebarLiveEventStore` 承担，状态/面板/实时帧由 `sidebarStateProjection`/`sidebarPanelLayout`/`sidebarLivePanelRuntime`/renderer 承担。质量报告本身没有生产等价需求，因为没有生产消费者。 |
 | 3. 消费者存活检查 | 生产 value consumer = 0；仅测试引用命中上表。 |
-| 4. 动态入口检查 | 下面命令对四个候选文件均无输出（0 命中）：`git grep -nE 'path\\.join|pathToFileURL|spawn(Sync)?\\(|execFile(Sync)?\\(|process\\.argv|^#!|(^|[^A-Za-z])main\\(' -- <四文件>`。 |
-| 5. 公共面检查 | `git grep -nE 'sidebar(EventBridge|PanelQuality|LivePanelQuality|StateQuality)' -- scripts packages/ts-shell/src/index.ts` 无输出；不在 package public surface。 |
+| 4. 动态入口检查 | 下面命令对四个候选文件均无输出（0 命中）：`git grep -nE 'path\\.join\|pathToFileURL\|spawn(Sync)?\\(\|execFile(Sync)?\\(\|process\\.argv\|^#!\|(^\|[^A-Za-z])main\\(' -- <四文件>`。 |
+| 5. 公共面检查 | `git grep -nE 'sidebar(EventBridge\|PanelQuality\|LivePanelQuality\|StateQuality)' -- scripts packages/ts-shell/src/index.ts` 无输出；不在 package public surface。 |
 | 6. `scripts/` 引用检查 | 同上命令的 `scripts/` 范围无输出；无字符串路径脚本引用。 |
 
 **T10 建议：删除。**
@@ -169,8 +169,8 @@ cd packages/ts-shell && npx vitest run \
 | 1. 功能读审 | 已读 `shellActionRuntime.ts`、`cliDisplayProjection.ts`、router、types、registry。`shellActionRuntime.ts` 同时包含 7 个 live exports 与 3 个未注册 dead exports；`cliDisplayProjection.ts` 只有 `projectPermissionListDisplay` 确认 live。不能整文件删。 |
 | 2. 等价实现核验 | sessions = `runResumeCommand`；agent-mode = Shift+Tab live lane；workspace display = `cliWorkspaceModule`/`cliWorkspaceSurface`。view-mode 没有被证明的 live command equivalent，因此保留。 |
 | 3. 消费者存活检查 | stale action 的 router consumers 仍在，但没有 live producer；`list-sessions` 的 live producer 是 `runResumeCommand`。`projectPermissionListDisplay` 有 live consumer，必须保留。 |
-| 4. 动态入口检查 | 对 `shellActionRuntime.ts` 与 `cliDisplayProjection.ts` 执行 `git grep -nE 'path\\.join|pathToFileURL|spawn(Sync)?\\(|execFile(Sync)?\\(|process\\.argv|^#!|(^|[^A-Za-z])main\\(' -- <两文件>`，无输出。 |
-| 5. 公共面检查 | `git grep -nE 'shellActionRuntime|cliDisplayProjection|show-view|set-view|show-agent-mode|set-agent-mode|formatViewMode|formatAgentMode' -- scripts packages/ts-shell/src/index.ts` 无输出；非 `index.ts` public surface。 |
+| 4. 动态入口检查 | 对 `shellActionRuntime.ts` 与 `cliDisplayProjection.ts` 执行 `git grep -nE 'path\\.join\|pathToFileURL\|spawn(Sync)?\\(\|execFile(Sync)?\\(\|process\\.argv\|^#!\|(^\|[^A-Za-z])main\\(' -- <两文件>`，无输出。 |
+| 5. 公共面检查 | `git grep -nE 'shellActionRuntime\|cliDisplayProjection\|show-view\|set-view\|show-agent-mode\|set-agent-mode\|formatViewMode\|formatAgentMode' -- scripts packages/ts-shell/src/index.ts` 无输出；非 `index.ts` public surface。 |
 | 6. `scripts/` 引用检查 | 同上命令的 `scripts/` 范围无输出；无字符串路径脚本引用。 |
 
 **T11 建议：partial。**
@@ -205,8 +205,8 @@ cd packages/ts-shell && npx vitest run \
 | 1. 功能读审 | 已读三文件。它们构造 prompt-driven browser plan/action，但没有写入当前 `BrowserCommandContract` 或 execution request，也没有 provider/model/process side effect。 |
 | 2. 等价实现核验 | 已找到活轨：显式 `/browser` contract/runner、`BrowserDryRunPlan`、`BrowserActionLoopPolicy`、`BrowserExecutionPolicy` 与 runtime/external adapters，覆盖当前 browser preview/execute/replay/repair 责任；旧 agent route 不再是现行入口。 |
 | 3. 消费者存活检查 | value consumer = 0；唯一外部边是 `workflowTaskPlanner.ts` 对 `BrowserAgentPlan` 的 type-only 字段，且无 `browserPlan:` 赋值点。删除时一并移除该 type edge。 |
-| 4. 动态入口检查 | 对三文件执行 `git grep -nE 'path\\.join|pathToFileURL|spawn(Sync)?\\(|execFile(Sync)?\\(|process\\.argv|^#!|(^|[^A-Za-z])main\\(' -- <三文件>`，无输出。 |
-| 5. 公共面检查 | `git grep -nE 'toolPolicy\\.js|browser/agent\\.js|browser/plan\\.js|browser/toolPolicy\\.js|browser/agent\\.ts|browser/plan\\.ts|browser/toolPolicy\\.ts' -- scripts packages/ts-shell/src/index.ts` 无输出；三文件不在 `index.ts` public surface。 |
+| 4. 动态入口检查 | 对三文件执行 `git grep -nE 'path\\.join\|pathToFileURL\|spawn(Sync)?\\(\|execFile(Sync)?\\(\|process\\.argv\|^#!\|(^\|[^A-Za-z])main\\(' -- <三文件>`，无输出。 |
+| 5. 公共面检查 | `git grep -nE 'toolPolicy\\.js\|browser/agent\\.js\|browser/plan\\.js\|browser/toolPolicy\\.js\|browser/agent\\.ts\|browser/plan\\.ts\|browser/toolPolicy\\.ts' -- scripts packages/ts-shell/src/index.ts` 无输出；三文件不在 `index.ts` public surface。 |
 | 6. `scripts/` 引用检查 | 同上命令的 `scripts/` 范围无输出；无脚本字符串路径入口。 |
 
 **T12 建议：删除。**

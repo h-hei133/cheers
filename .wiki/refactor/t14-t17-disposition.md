@@ -396,10 +396,10 @@ function stableId(prefix: string, parts: readonly string[]): string {
 
 | 组 | 既有记录 | 本次修正 | 原因 |
 |---|---:|---:|---|
-| `normalizeBaseUrl` | 4 | **7** | 直接扫描找到 `core/commands/connect/preset.ts`、`core/commands/modelCommandRuntime.ts`、`core/shell/providerReadiness.ts` 三个遗漏副本；其中 provider readiness 还是不同语义。
-| `normalizePathForCompare` | 7 | **7** | 数量一致；补充了 exact / same-family / cwd-aware genuine difference 分类。
-| `toRelativeTime` | 4（目标说明）/ 3（block findings 表） | **4** | `entrypoints/sessionsPanel.ts` 是第四份；其变量名不同但输出/阈值相同。
-| `stableId` | 2 | **3** | 修复多行参数提取后发现 `runtime/resources/inventory.ts` 与 `tools/policy/interception.ts` 的两份 exact 副本，另有 `planning/action/graph.ts` 的第三份不同实现。
+| `normalizeBaseUrl` | 4 | **7** | 直接扫描找到 `core/commands/connect/preset.ts`、`core/commands/modelCommandRuntime.ts`、`core/shell/providerReadiness.ts` 三个遗漏副本；其中 provider readiness 还是不同语义。 |
+| `normalizePathForCompare` | 7 | **7** | 数量一致；补充了 exact / same-family / cwd-aware genuine difference 分类。 |
+| `toRelativeTime` | 4（目标说明）/ 3（block findings 表） | **4** | `entrypoints/sessionsPanel.ts` 是第四份；其变量名不同但输出/阈值相同。 |
+| `stableId` | 2 | **3** | 修复多行参数提取后发现 `runtime/resources/inventory.ts` 与 `tools/policy/interception.ts` 的两份 exact 副本，另有 `planning/action/graph.ts` 的第三份不同实现。 |
 
 另一个重要差异是 T17：既有 §9.12 记录的“11 文件 / 16 项（9 个 5s 超时 + 2 个 cwd 文件）”没有在本次同样命令下重现。当前同一 repo-root 命令的 JSON 结果是 **2 文件 / 3 项失败**；失败原因仍然是两个测试使用 package-root 相对 cwd。当前运行中 9 个场景测试没有因默认 5s 超时失败，因此不能把旧数量继续当作当前实测。
 

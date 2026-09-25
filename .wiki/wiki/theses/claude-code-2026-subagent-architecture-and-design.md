@@ -40,7 +40,7 @@ graph TD
 | :---: | :--- | :--- | :--- |
 | **1** | 支持从 `.claude/agents/*.md` 与 `~/.claude/agents/*.md` 加载自定义子代理声明与 Frontmatter | **完全缺失加载器**，系统内无任何扫描和解析 `.claude/agents/` 目录的机制 | **无法支持用户自定义的专职智能体**（如 `code-reviewer`, `security-auditor`） |
 | **2** | 子代理执行完整的独立多轮 ReAct 循环（具备 `read`, `write`, `grep`, `bash`, `lsp` 等工具） | `taskTool.ts` 目前仅发起单次单轮无工具的直接 fetch 问答 | **子代理沦为纯问答模型，无法真正读写文件或运行代码** |
-| **3** | 支持持久化代理记忆（`memory: project|user`）挂载与 `skills` 预加载 | 缺失 `agent-memory/<name>/` 目录挂载机制，未实现技能预注入 | **子代理无法跨会话积累领域经验，技能无法自动生效** |
+| **3** | 支持持久化代理记忆（`memory: project\|user`）挂载与 `skills` 预加载 | 缺失 `agent-memory/<name>/` 目录挂载机制，未实现技能预注入 | **子代理无法跨会话积累领域经验，技能无法自动生效** |
 | **4** | 完整分发 `SubagentStart` 与 `SubagentStop` 生命周期 Hooks，支持按 `agentId` 恢复会话 | `taskTool.ts` 内部未调用 `hookDispatcher.dispatch`，无 `agentId` 记忆恢复 | **破坏了 2026 官方生命周期监控链条，无法追踪子代理轨迹** |
 
 ---

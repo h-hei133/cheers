@@ -280,7 +280,7 @@ pi **把「忙碌指示器」与「思考内容」彻底分开**：
 | **可重入（按调用链）** | 同上 | 同一条链重复获取直接通过，否则死锁。用 `AsyncLocalStorage` 区分「同链」与「另一调用者」 |
 | **锁键解析目录而非文件** | 同上 | 尚不存在的文件无法 `realpath`，而创建文件是常规操作；解析目录让同一文件在创建前后是同一个键 |
 | 包住读改写 | `core/tools/registry.ts`（`edit`、`write`） | 锁在整个读改写之外 |
-| 兜底 | `runtime/execution/service.ts`（`writeTextFile`） | 任何写入者自动获得**
+| 兜底 | `runtime/execution/service.ts`（`writeTextFile`） | 任何写入者自动获得**锁**——不经过 `edit`/`write` 的调用也被覆盖 |
 
 **为什么锁放在 `runtime/execution/`**：它是 `writeTextFile`（唯一写入咽喉）所在层，
 且只依赖 node 内置模块 —— 放在这里可被 `core/tools` 引用而**不引入循环**

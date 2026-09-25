@@ -74,7 +74,26 @@ grep -rn "runtime/events/stream" packages/ts-shell/src --include='*.ts'         
 
 **最小改动建议**：把已有 `serializeJsonRuntimeEventStream` 接到一个独立 stdout transport（而非把 prose renderer 当协议），并补 message/turn correlation 字段。
 
-### 2.2 Transcript 是 append-only JSONL，但不是可移植的 entry log（置信度：高）
+### 2.2 ~~Transcript 是 append-only JSONL，但不是可移植的 entry log~~ —— ✅ **2026-09-25 已收口（部分）**（Phase 10 T1；原文保留为历史记录）
+
+> **收口说明（2026-09-25）**：本节所指的三项缺失中，**header／`version`／稳定 entry `id` 已补**（Phase 10 T1），
+> 见 `session/sessionEventCodec.ts` `TRANSCRIPT_FORMAT_VERSION` / `createTranscriptHeader`，以及
+> `session/transcript/sessionTranscript.ts` 的 `readTranscript`（返回 `{version, events}`）。
+> **本文档原有的三处证据已全部失效**，逐条更正如下：
+> - ~~`session/sessionEventCodec.ts:20-36` 的 `TranscriptEvent` union 只有 4 类~~ —— **现在是 5 类**
+>   （`message` / `lifecycle` / `query-event` / `compaction` / `branch_summary`），
+>   且文件顶部另有独立的 **`TranscriptHeader`**（不是 union 成员：它描述文件，不是对话的一部分）。
+> - ~~**无 header、无 `version`、无稳定 entry `id`**~~ —— **三者均已补**。id 对老行仍是**派生**的 `line-N`
+>   （不重写老文件），对新行是写入的随机 id。**header 不计行号**，所以派生 id 在有／无 header 的文件里一致。
+> - ~~`decodeTranscriptLineSafe` 静默丢弃无法解析的行~~ —— **仍然成立**，且现在是**有意保留**的行为：
+>   `classifyTranscriptLine` 把行分成 header／entry／unreadable 三类，`unreadable` 仍然跳过。
+>   **余量**：一个无法解析的行仍然只表现为「少了一条」，没有向用户报告。**这一条仍开放。**
+>
+> **仍然开放的余量（不要读作已收口）**：
+> 1. **entry log 里没有 `parentId`。** 父链只存在于 `session/schema/sessionThread.ts`（thread 侧），
+>    transcript 行本身不记录它。§2.2 的原始建议提到「`parentId` 已有 schema 支撑但没有生产写入者」——
+>    **这句话对 transcript 仍然成立**，只是「支撑」在 `sessionThread.ts:122` 而不是 `:132`。
+> 2. **`unreadable` 行不报告**（见上）。
 
 **证据（我们）**：
 
@@ -86,9 +105,23 @@ grep -rn "runtime/events/stream" packages/ts-shell/src --include='*.ts'         
 
 **影响**：第三方无法用一个稳定 schema 订阅或增量同步我们的 transcript，也无法按 entry ID 判断分支或游标。
 
-**最小改动建议**：给 transcript 增加 header 行（含 `version` 与 session id）与稳定 entry id；`parentId` 已有 schema 支撑（`session/schema/sessionThread.ts:132` `createSessionBranch`），但没有生产写入者（见 §2.4）。
+**最小改动建议**：给 transcript 增加 header 行（含 `version` 与 session id）与稳定 entry id；`parentId` 已有 schema 支撑（`session/schema/sessionThread.ts` 的 `createSessionBranch`），但在 transcript 行里**没有生产写入者**（见 §2.2 余量 1）。
 
-### 2.3 `/export jsonl` 丢失会话协议元数据（置信度：高）
+### 2.3 ~~`/export jsonl` 丢失会话协议元数据~~ —— ✅ **2026-09-25 已收口**（Phase 10 T1；原文保留为历史记录）
+
+> **收口说明（2026-09-25）**：本节的缺陷**已不存在**，本文档原有的两条证据**都已失效**，因为所引用的函数已经不存在：
+> - ~~`:73-83` `readConversation()` 先 `readTranscriptEvents()` 再 `projectTranscriptMessages()`~~ ——
+>   **`readConversation` 已从 `exportCommandRuntime.ts` 删除**（`grep -rn "readConversation" src/` 为 0 条）。
+>   jsonl 路径现在**不经过投影**：`runExportCommand` 取 `readTranscript(...).events` 直接逐行导出，
+>   原始事件类型（lifecycle／query-event／compaction／branch_summary）因此**全部保留**。
+> - ~~`:120-122` `asJsonl()` 是 `messages.map((m) => JSON.stringify(m)).join("\n")`~~ ——
+>   现在的 `asJsonl(events, source)` 序列化的是 **`TranscriptEvent[]`**，并且**首行是 header**。
+> - **额外收口**：header 的 `version` **取自 transcript 本身**（`readTranscript().version`）而非本 build 的
+>   `TRANSCRIPT_FORMAT_VERSION`——老会话导出为 `version: 0`，声称当前版本会说它的行是它们从未有过的形状。
+>   header **不计入报告里的 entry 数**。
+>
+> **仍然开放（与本条同族的另一条，见 §3.1）**：下游仍**没有**对等的**导回**路径——
+> 能导出、不能导入，`parentId` 也仍不在 transcript 行里（§2.2 余量 1）。
 
 **证据（我们）** `core/commands/exportCommandRuntime.ts`：
 

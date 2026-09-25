@@ -912,3 +912,192 @@ OpenAI 注特定头）。
 3. **参考实现的真实运行**：`pi` 无 `node_modules`，其结论均来自源码与文档。
 4. **T3 的跨平台行为**：`node:fs.watch` 在 Linux/macOS/Windows 语义不同，
    本阶段只在当前平台验证。
+
+---
+
+## 15. 施工后复核（2026-09-25，对着已提交的代码）
+
+planning 之后再开一轮复核，对象是**已提交的代码**，不是裁决文本。
+5 个 reviewer 并行（每片一个），另有 2 个专查更正。**这轮的价值在于它抓到了裁决文本里没写、代码里真实存在的问题。**
+
+### 15.1 复核者与结果
+
+| 复核者 | 覆盖面 | 结果 | 处置 |
+|---|---|---|---|
+| `RvEndpoints` | T5 端点注册表 | **`incorrect`，2 项** | **两项都成立，都已修**（见 15.2） |
+| `RvProviderFacts` | T6 provider 声明 | **`content_filter` 猝死** | 主代理自查（见 15.3），并改派 `RvFactsNarrow` 复核非凭据半边 |
+| `RvTheme` | T3 主题热重载 | `correct`，零发现 | 独立复算函数上限，确认 20（`constructor` 不计） |
+| `RvCache` | T4 cache 浪费 | `correct`，零发现 | **但它漏了一处**，主代理自查发现（见 15.4） |
+| `RvCrash` | T2 崩溃日志时效 | `correct`，零发现 | 独立确认 `readCrashLog` 未过滤、`recordCrash` 走的是它 |
+| `RvDocs` | 文档与代码一致性 | `correct`，2 项 | **两项都成立，都已修**（见 15.5） |
+| `RvVerifyT5` | **专查 15.2 的更正** | 见下 | |
+| `RvFactsNarrow` | **专查 15.3 的更正** | 见下 | |
+
+### 15.2 `RvEndpoints`：**「加一个协议 = 加一个模块」当时是假的**
+
+这是本轮最重要的发现。原提交（`0f76c293`）的说明与 §6.5 都声称
+「新增协议只需加一个文件，**不改任何调用方**」，并且用一个桩协议测试作为证据。
+**但那个桩只走了 `endpointBody`（简单请求，无 tools）**，而**主回合的 payload 仍在 `step.ts` 里按协议名分支**：
+
+```ts
+const payload = endpoint === "anthropic-messages" ? anthropicRequestBody({...}) : {...}
+```
+
+桩测试因此**永远不可能证伪这句话**——它测的是注册表，不是主回合。
+更严重的是 `core/models/catalog.ts` 的 `endpoint` 仍是**闭联盟**
+（`"openai-compatible" | "anthropic-messages"`），所以**第三种协议根本无法在 catalog 里被命名**，
+而 `providerEndpoint()` 把一切非 anthropic 的值折叠成 `undefined`（即默认形状）——
+**一个声明了新协议的 provider 会被静默按 OpenAI 形状发送**。
+
+**修复（已完成）**：
+1. `EndpointShape` 新增 `turnBody(input: TurnRequest)`，两种协议各自在自己的模块里实现完整 payload。
+2. 新增 `endpointTurnBody()`；`step.ts` 改为**从表里取**，分支消失。
+3. `catalog.ts` 的 `endpoint?: EndpointKind`（`string`）——**未声明的名字现在会到达 `endpointShape` 并被点名拒绝**，
+   而不是被当成默认形状。
+4. `providerEndpoint()` 原样透传，不再折叠。
+5. **证伪测试**：`step.test.ts` 新增「sends a protocol it has never heard of through the same path」——
+   在**测试文件里**声明一个协议、写进 catalog、走**真实 step 函数**请求。
+   **反向验证**：把 `step.ts` 恢复成旧的分支写法 → 该用例失败。
+
+### 15.3 T6 自查：**还有第三条手写 provider 列表**
+
+`facts.ts` 的 `satisfies Record<RuntimeProvider, ProviderFacts>` 只保证**类型联合**里的家数都有声明，
+但**所有需要「遍历 provider」的地方各自手写了名字列表**，而这些列表**失败方式和表头注释描述的一模一样**：
+
+- `config/runtimeConfig.ts` 的 `normalizeProviderCredentials` 循环——
+  **用户配置里属于新 provider 的凭据会被静默丢弃**，配置文件看起来读过了。
+- `entrypoints/cliArgs.ts` 的 `VALID_PROVIDERS` 与**错误提示里的手写名单**。
+
+**修复（已完成）**：`config/runtimeConfig.ts` 导出 `RUNTIME_PROVIDERS`，
+`RuntimeProvider` 定义为 `(typeof RUNTIME_PROVIDERS)[number]`，三处全部派生。
+**验证**：向 `RUNTIME_PROVIDERS` 加一个 provider → `facts.ts` 立刻报 TS1360（缺声明），
+即「加一家 = 加一个声明」现在由类型检查强制。
+
+### 15.4 T4 自查：**标题数字与它上面的那句话不一致**
+
+`RvCache` 判了 `correct`，但复核意见没有覆盖**措辞与数字的关系**：
+`- Estimated extra spend against those tokens having been cache reads: $X`
+里的 `$X` 是**全部 miss 的和**，**包含 `modelChanged` 的 miss**；
+而**换模型后重新发送的 token 根本不可能从缓存读**。数字没错，**句子错**。
+**修复**：改为「其中约 $X 是相对缓存读价的额外支出」，并把「换模型」单列一句说明它**不可能是缓存读**。
+**新增用例**钉住这句话，并要求换模型的 miss **不被**同时报成 idle gap。
+
+### 15.5 `RvDocs`：两处文档与代码不符
+
+1. `04:61` 写「**120 行防抖**」——单位写错，且**数字与代码不符**（`RELOAD_DEBOUNCE_MS = 100`）。
+   已改为引用常量名与毫秒。
+2. 四行表格**缺结尾竖线**（`03:54`、`03:56`、`04:63`、`06:63`），是 `_index.md` §6.6
+   记录过的同一类损坏（行对解析器不可见）。**经查这四行在 Phase 10 之前就是这样**，一并修好。
+   **另外扫出两行同类问题**：`phase-3-execution.md:592` 的单元格里有未转义的
+   `/trust [status|on|off|session]`（`|` 把行劈开）、`interaction-issues.md:283` 有个**孤立的 `**`**
+   （会把后文全部加粗）——均已修。
+
+### 15.5bis 15.2 的修复**自己引入**的一处暴露（已闭合）
+
+把 `endpoint` 从闭联盟放宽为 `string` 之后，**用户 catalog 文件里的一个拼写错误**
+（`"anthropic-messges"`）不再被类型系统挡住，而是到达 `endpointShape` 并**抛出**。
+抛点在 `step.ts` 的 payload 构造处，**在任何 `try` 之外**，
+而 `core/agent/loop.ts` 的 `retryStep` 只调 `isRetryableFailure`、**不捕获**——
+因此它会以**未捕获异常**离开回合，用户看不到是哪个文件、哪个词。
+
+**旧行为**（闭联盟 + 折叠成 `undefined`）不会抛，但它**静默按默认形状发送**——
+那正是本条修掉的病症，不能靠退回去解决。
+
+**处置**：在 `step.ts` 把这次调用**包在 try 里**，把异常转成 `errorStep`——
+即本代码库自己表达「这一步失败了」的形状。消息本身已经点名了那个 kind 和已知的 kinds：
+```
+No endpoint declared for 'not-a-kind'. Declared: openai-compatible, anthropic-messages.
+```
+**新增用例**钉住「不崩、且消息里含那个名字与已知 kinds」。
+（另一条被考虑过又否决的路：在 `catalogStore.loadCatalog` 里校验并**丢弃**该 provider——
+否决理由是它重新制造了「声明静默消失」，与本阶段的整个目标相反。）
+
+### 15.5ter `RvFactsNarrow` 的三项（**专查 15.3 的更正**，都成立）
+
+**这说明 15.3 的修复只做了一半**——同一个文件里还有第二份手写名单：
+
+1. **`normalizeProviderConnections` 仍手写六个名字的不等式链**——
+   与 15.3 修掉的那处**同类同因**：加一家 provider 到 `RUNTIME_PROVIDERS`，
+   它的**连接**会被静默丢弃（而凭据那半已经不会了）。
+   **已修**：改用新增的 `isRuntimeProvider()` 类型守卫。
+2. **`declaredProviders()` 无生产读者**（只有测试读它）——违反仓库规则。
+   它原本的用途现在由 `RUNTIME_PROVIDERS` 承担，**已删除**；
+   相应测试改为**对着 `RUNTIME_PROVIDERS` 遍历**，而不是对着第二份名字表——
+   否则测试自己就成了「一文件之外的同一份漂移」。
+3. **配置文件里的非法 provider 会抛，而不是被诊断**——
+   `merged.provider` 从 JSON 直接赋值、无校验，非法值到达 `providerFacts()` 并抛。
+   **已修**：非法值**回退到默认 provider 并 push 一条 diagnostics**
+   （复用该文件既有的 `configDiagnostics` 通道），消息里**点名那个错名与已知 provider**。
+   **反向验证**：两处守卫各自去掉 → 对应用例失败。
+
+### 15.5quater 15.5ter 的修复**自己又错了两处**（实机抓出来的，不是推理）
+
+「复核 → 修 → 再复核」这一步的价值在这里第 3 次体现。15.5ter 的第 3 项
+（配置里的非法 provider）我写完自查时是**用类型检查和单测「确认」的**，
+**但真正的验证是启动一次真实进程**：
+
+```
+$ echo '{"provider":"opemai"}' > $HOME/.cheers/config.json && cheers "say hi"
+Fatal error: Error: No declaration for provider 'opemai'.
+    at providerFacts (…/core/providers/facts.ts:131:11)
+    at getProviderApiKeyEnvVarName (…/core/shell/providerCredentials.ts:221:10)
+```
+
+**两个错误**：
+
+1. **代码错**：我写的是
+   `const provider = configuredProvider ?? DEFAULT_CONFIG.provider;`
+   ——**回退没有发生**，非法值原样返回，警告里甚至写着
+   `Using 'opemai'`（自己打自己的脸）。**正确写法**是先判合法性再选值。
+2. **测试错（更值得记）**：我的对照是
+   `getRuntimeConfig(另一个干净目录)?.provider`——
+   但**两次读取读的是同一个坏的配置文件**，所以两边永远相等，
+   **把回退整个删掉这个断言照样通过**。这正是本阶段反复出现的「空转的用例」。
+   改为**对着字面量默认值 `"openai"` 断言**，并**反向验证**（删掉回退 → 用例失败）。
+
+**实机验证（改后）**：
+```
+- Session lifecycle: Warning: Unknown provider 'opemai' in config. Using 'openai'. Known providers: openai, anthropic, openai-compatible, google, antigravity, claudecode.
+```
+启动继续、警告可见，且 `/doctor` 也走同一条 `configDiagnostics` 通道
+（`core/shell/bootstrap.ts:132` 与 `entrypoints/cliDoctor.ts:22` 都读它）。
+
+### 15.5quinquies `RvVerifyFacts` 的四项（**专查 15.5ter/quater**）
+
+第四轮复核。**前一轮的修复又只做了一半**——这是同一个模式的第 4 次出现：
+
+| # | 发现 | 处置 |
+|---|---|---|
+| 1 | **`model-adapters/types.ts` 整文件零引用**（155 行，含另一份手写 provider 联盟 `ProviderId`） | **整文件删除**。经查它**在 Phase 10 之前就无消费者**，且 `.wiki/refactor/reachability-2026-09-15.json` 已把它列为不可达——不是本轮改坏的，是漏删的 |
+| 2 | **`fallbackModelsForProvider` 逐家 `if` 链**，漏家时**静默落到 DeepSeek 的模型** | **上移到声明表**的 `fallbackModels`，并**从 `RuntimeProvider` 派生**——删掉任一家 → **编译失败（TS2741）**。反向验证已跑 |
+| 3 | **`facts.test.ts` 自带 `UNION` 数组**（同一份漂移，就在「消除漂移」的文件里） | 改为 `const UNION = RUNTIME_PROVIDERS` |
+| 4 | **`cliArgs.ts` 本地又写了一个 `isRuntimeProvider`** | 删除本地实现，改用 `config/runtimeConfig.ts` 导出的那个；`VALID_PROVIDERS` 别名与随之无用的 `RuntimeProvider` import 一并删除 |
+
+**修复 #2 时又自查出一处自己的错**：第一版写的是
+`if (authType === "account-auth") return accountAuthModelFacts().allowed`，
+而 `accountAuthModelFacts()` **恒读 OpenAI 的声明**——
+**会把 Google 账号登录的模型列成 OpenAI 的**。改为读**该 provider 自己**的声明。
+
+### 15.5sexies 分支点数的**诚实复测**（与裁决里写的数字对不上，以复测为准）
+
+裁决 §7.2 写的是 **54 → 30**。复核轮用同一口径（`(provider|authType|account\.type|config\.type) === "`
+在 `packages/ts-shell/src` 内、排除测试）**实测**：
+
+| 版本 | 分支点数 |
+|---|---:|
+| `ac059833`（T6 之前） | **55** |
+| `8b16ec4d`（T6 提交） | **31** |
+| 复核轮修复前（`8b16ec4d` 之后） | 28 |
+| **复核轮修复后（当前工作区）** | **23** |
+
+**裁决里的 54/30 与复测差 1**，原因未查清（可能是统计时点或文件边界不同）。
+**以本表为准**，并记下这件事本身：**同一个数字写进文档后就没人再测过**。
+
+### 15.6 主代理自查发现、复核意见**没有**覆盖的两处
+
+- **`appendTranscriptEvent` 的 header 守卫每次都读整个 transcript 判空**——
+  O(n²) 落在每回合热路径上。改为 `statSync().size === 0`（语义等价），
+  反向验证：改成恒为空 → 3 项用例失败。
+- **`decodeTranscriptLine` / `readTranscriptVersion` / `accountAuthType` 等无读者的声明**——
+  按仓库规则删除。其中 `accountAuthType` **字段本身有真实用途**（凭据分派），
+  因此不是删字段而是**让它有读者**：`toProviderAccountAuthConfig` 改为读声明。

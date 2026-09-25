@@ -319,11 +319,11 @@ python3 /tmp/contract_importers.py
 
 | 检查 | 结果 | 证据 |
 |---|---|---|
-| 1. 功能读审 | 通过 | `authCommandRuntime.ts:21-50` 实现 `/auth status|set|use|logout`；`:116-231` 负责凭据写入、默认 provider、删除 credential、openai-compatible base URL/model 校验。 |
+| 1. 功能读审 | 通过 | `authCommandRuntime.ts:21-50` 实现 `/auth status\|set\|use\|logout`；`:116-231` 负责凭据写入、默认 provider、删除 credential、openai-compatible base URL/model 校验。 |
 | 2. 等价实现核验 | 通过，但限定为 route responsibility | `connectCommandRuntime.ts:70-107` 注册 status/list/login/set/use/logout；`:199-225` 把 legacy `/auth set` 参数转换为 connection add；`connect/renderer.ts:187` 明确标注兼容路径。`/connect` 不是字节级复制，但覆盖了旧命令的 provider-management responsibility。 |
 | 3. 消费者存活检查 | 通过 | 生产 `runAuthCommand` importer 为 0；唯一直接 importer 是 `authCommandRuntime.test.ts:6`。live registry 在 `registry.ts:125-135` dispatch `runConnectCommand`。 |
-| 4. 动态入口检查 | 通过 | `git grep -n -E 'path\\.join|pathToFileURL|spawn(Sync)?\\(|execFile(Sync)?\\(|process\\.argv|^#!|(^|[^A-Za-z])main\\(' -- packages/ts-shell/src/core/commands/authCommandRuntime.ts` 无命中。 |
-| 5. 公共面检查 | 通过 | `git grep -n -E 'authCommandRuntime\\.js|runAuthCommand' -- packages/ts-shell/src/index.ts scripts package.json` 无命中；未被 `index.ts` re-export。 |
+| 4. 动态入口检查 | 通过 | `git grep -n -E 'path\\.join\|pathToFileURL\|spawn(Sync)?\\(\|execFile(Sync)?\\(\|process\\.argv\|^#!\|(^\|[^A-Za-z])main\\(' -- packages/ts-shell/src/core/commands/authCommandRuntime.ts` 无命中。 |
+| 5. 公共面检查 | 通过 | `git grep -n -E 'authCommandRuntime\\.js\|runAuthCommand' -- packages/ts-shell/src/index.ts scripts package.json` 无命中；未被 `index.ts` re-export。 |
 | 6. scripts 引用检查 | 通过 | 同一精确路径扫描未发现 `scripts/`、`package.json` 或 package public surface 引用。 |
 
 **删除触发条件：** 先将 `authCommandRuntime.test.ts` 的行为测试迁移到 `connectCommandRuntime.test.ts` 的 `/connect set/use/logout/status` 路径，或由维护者明确删除 legacy-only tests；再删除 `authCommandRuntime.ts` 并跑 targeted command tests。当前报告只作推荐，不执行物理删除。

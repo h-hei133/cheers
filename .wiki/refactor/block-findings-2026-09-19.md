@@ -2180,11 +2180,11 @@ pi 的 `packages/agent/` 中，同类工具函数（`freeze`/`deepFreeze`/文本
 
 | # | 维度 | pi | 本仓 | 差距性质 |
 |---|---|---|---|---|
-| 1 | **重试** | `packages/ai/src/utils/retry.ts:101,113,176,237`（策略 + 指数退避 + 60s 上限 + 可中断 sleep + 40+ 条可重试措辞）；`utils/provider-retry.ts:38`（HTTP 层读 `retry-after`） | **主代理实测：`provider/` 内 `maxRetries|retryAfter|backoff` 零命中**。唯一"重试"是 `turn/step.ts:117-125` 的 `reasoning_effort` 拒绝后 `continue` 一次 | **能力缺失** |
+| 1 | **重试** | `packages/ai/src/utils/retry.ts:101,113,176,237`（策略 + 指数退避 + 60s 上限 + 可中断 sleep + 40+ 条可重试措辞）；`utils/provider-retry.ts:38`（HTTP 层读 `retry-after`） | **主代理实测：`provider/` 内 `maxRetries\|retryAfter\|backoff` 零命中**。唯一"重试"是 `turn/step.ts:117-125` 的 `reasoning_effort` 拒绝后 `continue` 一次 | **能力缺失** |
 | 2 | **`query.retrying`** | — | 契约齐备（`core/query/runtime/events.ts:35`；消费者 `cli/interactive/turnSink.ts:224`、`core/shell/sessionEventSurface.ts:44,117`）但**生产者零**（主代理实测 `type: "query.retrying"` 排除测试后 0 命中）| **断链**（与 §11.2 A-死-4 的 `runtime.*` 同源）|
 | 3 | **流式** | `packages/ai/src/utils/event-stream.ts:26` 泛型 `EventStream<T,R>`，9 个 `api/*.ts` 各自使用 —— **provider 模块本身是生产者** | `provider/response/stream.ts:97` 只吃 `readonly events[]` 做状态归类，**不读网络**；真流在 `turn/completion.ts:135` `readCompletionStream`（397 行手写 SSE 状态机） | **职责错位**：`provider/` 名为 provider 却不碰 HTTP |
 | 4 | **溢出判定** | `utils/overflow.ts:135` `isContextOverflow`，**25+ 条 provider 模式** + 三类检测（错误文本 / 静默超限 / length+0） | `turn/step.ts:62` `OVERFLOW_MARKERS` **仅 4 条 substring**；静默超限与 length+0 **完全未处理** | **能力缺失** |
-| 5 | **传输/代理** | `utils/node-http-proxy.ts:141`，经 SDK `fetch` 选项注入 | `provider/request/fetch.ts:36` `createProviderFetchFromEnv` 存在，但唯一生产调用者是
+| 5 | **传输/代理** | `utils/node-http-proxy.ts:141`，经 SDK `fetch` 选项注入 | `provider/request/fetch.ts:36` `createProviderFetchFromEnv` 存在，但唯一生产调用者是 ⚠ **原文自引入起就被截断**（第四列末尾与第五列均缺失，无法可靠还原） | ⚠ 同上——该行不完整，本文档其余部分未受影响 |
 `core/shell/providerReadiness.ts:149`（就绪探测）；**主模型路径 `turn/step.ts:99` 用全局 fetch** | **owner 被绕过** |
 | 6 | **JSON 修复** | `utils/json-parse.ts:32` `repairJson`（依赖 `partial-json`）| `model-adapters/jsonRepair.ts:41` 与 pi **逐字符相同**，但 partial 解析改为手写（`:102-155`）| **已分叉**（回报称本仓修了 pi 没修的流式截断，**未回灌**）|
 
