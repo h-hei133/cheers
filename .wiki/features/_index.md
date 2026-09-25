@@ -209,6 +209,21 @@ confidence: high
 > RPC/CBOR 在 pi 侧也是实验层、cache warmer 无可算经济学）。
 > **判定列不变仍是 4/15/16/10**——Phase 8 收的是散落积压，不是表行。
 >
+> **B 类与 C 类已收口（2026-09-25，见 `phase-8-decisions.md` §10）**：
+> 先建两项 B 共同的**前置**——对外请求的同意与离线开关（`core/network/policy.ts`，
+> `offline` 设置 + `--offline` 旗标，只约束自发请求）。
+> **B1 更新检查**：`core/update/check.ts`（一次 GET、5 秒超时、失败静默、
+> 交互式会话启动时**不 await**）。顺手修掉 `--version` 硬编码的问题。
+> **B2 cache 保活**：判定改为算术（`core/models/cacheEconomics.ts`，照 `pi` 的公式）。
+> 两个前置都已补：`catalogRefresh` 此前**丢掉索引里已有的价格**（实测 1244/1306 有），
+> 以及新增 `CatalogModel.promptCache` 声明窗口。默认 `streaming`，受 `offline` 约束。
+> **C 第二个端点**：唯一一处「从没被决定过」的余量，决定做——Anthropic Messages
+> （`provider/endpoints/anthropicMessages.ts`）。此前 `isRealProviderSupported`
+> **显式拒绝 anthropic**，而目录里躺着 3 个 Claude 模型。端点由 catalog 声明而非由 id 推断；
+> 三处请求构造改走共用构造。其余 8 种端点不做（约 8,000 行，无需求证据）。
+> **判定列相应更新**：03 的「Prompt cache 保活」MISSING→已收口、「传输选择」维持不做、
+> 「自定义 provider」余量收窄；06 的「更新检查」MISSING→已收口，并新增一行「对外请求的同意与离线开关」。
+>
 > **Phase 8 复核轮已完成（2026-09-24，同文 §8）**：4 个只读子代理（skills/glob/
 > provider/TUI）+ 主代理亲验 origin 链与跨轮可达性。**3 项施工结论需更正**：
 > ①§7.1 对 sameModel 守卫「不可达」的**原因写错了**——实测同轮内救援**确实触发**
