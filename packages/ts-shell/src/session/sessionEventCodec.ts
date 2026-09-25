@@ -1,3 +1,4 @@
+import type { MultimodalContentBlock } from "../model-adapters/multimodal.js";
 import { randomUUID } from "node:crypto";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage, SessionToolCall } from "./schema/sessionMessage.js";
@@ -54,7 +55,8 @@ export type TranscriptEvent =
       type: "message";
       id?: string;
       role: SessionMessage["role"];
-      content: string;
+      /** Text, or text with images; see `SessionMessage.content`. */
+      content: string | readonly MultimodalContentBlock[];
       tool_calls?: readonly SessionToolCall[];
       tool_call_id?: string;
       /**
@@ -157,12 +159,39 @@ export function decodeTranscriptLine(line: string): TranscriptEvent {
 
 const TRANSCRIPT_ROLES: ReadonlySet<unknown> = new Set(["system", "user", "assistant", "tool"]);
 
+/**
+ * Whether a recorded `content` is one this build can read.
+ *
+ * A plain string is what every entry written before images existed holds, and it
+ * stays valid. An array is a message with images, and each block must be one of
+ * the two shapes a block can be.
+ *
+ * This has to accept both from the first release that writes either. A guard that
+ * only accepted strings would make the widened writer produce entries the reader
+ * silently drops — `decodeTranscriptLineSafe` returns nothing for a line it
+ * cannot validate, and the loader skips it, so the loss would be a message that
+ * disappears on the next load with nothing to say why.
+ */
+function isTranscriptContent(value: unknown): boolean {
+  if (typeof value === "string") return true;
+  if (!Array.isArray(value)) return false;
+  return value.every((block) => {
+    if (!block || typeof block !== "object") return false;
+    const record = block as Record<string, unknown>;
+    if (record.type === "text") return typeof record.text === "string";
+    if (record.type === "image") {
+      return typeof record.data === "string" && typeof record.mimeType === "string";
+    }
+    return false;
+  });
+}
+
 function isTranscriptEvent(value: unknown): value is TranscriptEvent {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   if (typeof record.type !== "string" || typeof record.timestamp !== "string") return false;
   if (record.type === "message") {
-    return TRANSCRIPT_ROLES.has(record.role) && typeof record.content === "string";
+    return TRANSCRIPT_ROLES.has(record.role) && isTranscriptContent(record.content);
   }
   if (record.type === "lifecycle") return typeof record.event === "string";
   if (record.type === "query-event") return record.event !== null && typeof record.event === "object";

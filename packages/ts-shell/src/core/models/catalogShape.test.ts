@@ -79,4 +79,22 @@ describe("the shipped catalog", () => {
     const merged = mergeProviders(BUILTIN_PROVIDERS, [{ id: "plain", baseUrl: "https://plain.test/v1" }]);
     expect(providerEndpoint(merged, "plain")).toBeUndefined();
   });
+  it("treats an undeclared model as unable to read an image", () => {
+    // The default has to be the safe side. Sending an image to a model that
+    // cannot read one fails the whole request, which loses the text the user
+    // wrote alongside it; describing the image loses only what the model could
+    // not have used.
+    const shape = resolveRequestShape(BUILTIN_PROVIDERS, "openai", "a-model-nobody-described");
+    expect(shape.vision).toBe(false);
+  });
+
+  it("reports vision for the models that declare it", () => {
+    // Declared per model rather than guessed from the name, so a model that
+    // accepts images is not refused for looking unlike a pattern.
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, "anthropic", "claude-sonnet-4-5").vision).toBe(true);
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, "openai", "gpt-5.3").vision).toBe(true);
+    // And one that does not declare it stays false, which is a decision rather
+    // than an omission: this model is not sent images.
+    expect(resolveRequestShape(BUILTIN_PROVIDERS, "openai", "gpt-5.3-codex").vision).toBe(false);
+  });
 });

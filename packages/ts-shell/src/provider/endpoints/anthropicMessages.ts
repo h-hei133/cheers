@@ -1,3 +1,9 @@
+import {
+  formatNonVisionFallback,
+  messageToText,
+  toAnthropicImageBlock,
+  type AnthropicImageBlock,
+} from "../../model-adapters/multimodal.js";
 import type { ChatMessage } from "../../turn/prompt.js";
 import type { ToolSchema } from "../../turn/tools.js";
 import type { ProviderUsage, StreamFragment, StreamedCompletion, StreamedToolCall } from "../../turn/completion.js";
@@ -47,6 +53,13 @@ export interface AnthropicRequestInput {
   readonly messages: readonly ChatMessage[];
   readonly tools: readonly ToolSchema[];
   readonly allowTools: boolean;
+  /**
+   * Whether this model accepts image blocks.
+   *
+   * Absent means it was not declared, which is treated as no; see
+   * `ResolvedRequestShape.vision` for why the safe side is the default.
+   */
+  readonly vision?: boolean;
   readonly temperature?: number;
   readonly topP?: number;
   readonly maxOutputTokens?: number;
@@ -78,7 +91,7 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
     // value that fits one model truncates another.
     max_tokens: input.maxOutputTokens ?? DEFAULT_MAX_TOKENS,
     stream: true,
-    messages: convertMessages(input.messages),
+    messages: convertMessages(input.messages, input.vision),
   };
 
   // The instruction and the tool declarations are the stable front of every
@@ -107,6 +120,7 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
 /** One content block, as this API writes them. */
 type ContentBlock =
   | { readonly type: "text"; readonly text: string }
+  | AnthropicImageBlock
   | { readonly type: "tool_use"; readonly id: string; readonly name: string; readonly input: unknown }
   | { readonly type: "tool_result"; readonly tool_use_id: string; readonly content: string };
 
@@ -127,7 +141,7 @@ interface WireMessage {
  *   - A `tool` message becomes a `user` turn carrying a `tool_result` block: the
  *     API has no `tool` role, and its result blocks only appear in user turns.
  */
-function convertMessages(messages: readonly ChatMessage[]): WireMessage[] {
+function convertMessages(messages: readonly ChatMessage[], vision: boolean | undefined): WireMessage[] {
   const wire: WireMessage[] = [];
 
   for (const message of messages) {
@@ -137,7 +151,8 @@ function convertMessages(messages: readonly ChatMessage[]): WireMessage[] {
       const block: ContentBlock = {
         type: "tool_result",
         tool_use_id: message.tool_call_id ?? "",
-        content: message.content ?? "",
+        // A tool result is text on this side; images travel in user messages.
+        content: messageToText(message.content),
       };
       // Consecutive results belong in one user turn, which is what the API
       // expects after a turn with several tool calls.
@@ -151,7 +166,31 @@ function convertMessages(messages: readonly ChatMessage[]): WireMessage[] {
     }
 
     const blocks: ContentBlock[] = [];
-    if (message.content) blocks.push({ type: "text", text: message.content });
+    // A message may carry images, and this endpoint takes them as their own
+    // blocks in the same array as the text. Flattening to text here would send a
+    // request the model reads as a description of a picture it cannot see.
+    if (typeof message.content === "string") {
+      if (message.content) blocks.push({ type: "text", text: message.content });
+    } else if (Array.isArray(message.content)) {
+      for (const block of message.content) {
+        if (block.type === "text") {
+          blocks.push({ type: "text", text: block.text });
+          continue;
+        }
+        // A model that cannot read a picture is given the words for one instead:
+        // sending the block anyway fails the request and loses the text beside
+        // it, while the description loses only what the model could not use.
+        blocks.push(
+          // Only a model that says it can read an image gets one. Absent means
+          // the catalogue did not say, and the safe reading of that is no — the
+          // request fails entirely if the model cannot read it, while the
+          // description still carries the words the user wrote.
+          vision === true
+            ? toAnthropicImageBlock(block)
+            : { type: "text", text: formatNonVisionFallback(block) },
+        );
+      }
+    }
     for (const call of message.tool_calls ?? []) {
       blocks.push({
         type: "tool_use",

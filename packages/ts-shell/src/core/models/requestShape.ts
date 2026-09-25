@@ -42,6 +42,15 @@ export interface ResolvedRequestShape {
   /** Whether a synthetic assistant turn bridges tool results and a user turn. */
   readonly assistantAfterToolResult: boolean;
   /**
+   * Whether this model can be sent an image.
+   *
+   * Read here so the decision is made once per request rather than at each place
+   * that builds one. Absent in the catalogue means no: an image sent to a model
+   * that cannot read it fails the whole request, while the words around it still
+   * reach the model when the image is described instead.
+   */
+  readonly vision: boolean;
+  /**
    * The provider's own name for a level, or nothing when it has none.
    *
    * Nothing means send the level's own name: the endpoints that use `low` and
@@ -65,6 +74,9 @@ export const DEFAULT_REQUEST_SHAPE: ResolvedRequestShape = {
   systemRole: "system",
   maxTokensField: "max_tokens",
   reasoningEffort: true,
+  // No, not yes: this is what an undeclared model gets, and sending an image to
+  // a model that cannot read one fails the request rather than the image.
+  vision: false,
   assistantAfterToolResult: false,
 };
 
@@ -108,6 +120,7 @@ export function resolveRequestShape(
     ...(entry.maxTokens !== undefined ? { maxOutputCeiling: entry.maxTokens } : {}),
     reasoningEffort,
     assistantAfterToolResult: compat.assistantAfterToolResult === true,
+    vision: entry.vision === true,
     ...(reasoningEffort && level ? { thinkingLevelName: levelNameFor(entry, level) } : {}),
   };
 }

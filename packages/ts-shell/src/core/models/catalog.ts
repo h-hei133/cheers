@@ -77,6 +77,19 @@ export interface CatalogModel {
     /** The extended tier, where the provider offers one. */
     readonly long?: number;
   };
+  /**
+   * Whether this model accepts images.
+   *
+   * Declared rather than guessed from the model's name. A name is a label the
+   * provider chose, and matching on it means a rename silently changes whether a
+   * picture can be sent — while a model that does accept them would have its
+   * images refused for looking unlike what the pattern expected.
+   *
+   * Absent means unknown, which is treated as "no": sending an image to a model
+   * that cannot read one fails the whole request, while describing it in words
+   * still reaches the model.
+   */
+  readonly vision?: boolean;
 }
 
 /** How one model wants a request shaped, when it differs from the default. */
@@ -181,9 +194,9 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     envVar: "ANTHROPIC_API_KEY",
     models: [
       // Five minutes by default, an hour on the extended tier.
-      { id: "claude-opus-4-6", contextWindow: 200_000, promptCache: { short: 300, long: 3_600 } },
-      { id: "claude-sonnet-4-5", contextWindow: 200_000, promptCache: { short: 300, long: 3_600 } },
-      { id: "claude-haiku-4-5", contextWindow: 200_000, promptCache: { short: 300, long: 3_600 } },
+      { id: "claude-opus-4-6", contextWindow: 200_000, promptCache: { short: 300, long: 3_600 }, vision: true },
+      { id: "claude-sonnet-4-5", contextWindow: 200_000, promptCache: { short: 300, long: 3_600 }, vision: true },
+      { id: "claude-haiku-4-5", contextWindow: 200_000, promptCache: { short: 300, long: 3_600 }, vision: true },
     ],
   },
   {
@@ -200,10 +213,10 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     models: [
       // Five to ten minutes of inactivity, refreshed by each hit; the extended
       // tier runs to a day.
-      { id: "gpt-5.3", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 } },
+      { id: "gpt-5.3", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
       { id: "gpt-5.3-codex", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 } },
-      { id: "gpt-5.1-mini", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 } },
-      { id: "o4-mini", contextWindow: 200_000, compat: REASONING_REQUEST_SHAPE },
+      { id: "gpt-5.1-mini", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
+      { id: "o4-mini", contextWindow: 200_000, compat: REASONING_REQUEST_SHAPE, vision: true },
     ],
   },
   {

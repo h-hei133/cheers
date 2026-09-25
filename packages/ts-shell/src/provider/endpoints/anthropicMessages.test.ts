@@ -342,3 +342,44 @@ describe("reading a whole-body answer", () => {
     expect(readAnthropicBody({}).choices[0]?.message.content).toBe("");
   });
 });
+
+describe("a message carrying an image", () => {
+  const IMAGE = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+
+  function body(vision: boolean | undefined) {
+    return anthropicRequestBody({
+      model: "claude-x",
+      systemPrompt: "be brief",
+      messages: [{ role: "user", content: [{ type: "text", text: "look" }, IMAGE] }],
+      tools: [],
+      allowTools: false,
+      ...(vision !== undefined ? { vision } : {}),
+    });
+  }
+
+  it("sends the image as its own block", () => {
+    // The endpoint takes images as blocks in the same array as the text. Sending
+    // the array as one text block would ask the model to read a picture it was
+    // given as the word "object".
+    const blocks = (body(true).messages as Array<{ content: unknown[] }>)[0]!.content;
+    expect(blocks).toContainEqual({ type: "text", text: "look" });
+    expect(blocks).toContainEqual({
+      type: "image",
+      source: { type: "base64", media_type: "image/png", data: "aGVsbG8=" },
+    });
+  });
+
+  it("describes the image to a model that cannot read one", () => {
+    // Sending the block anyway fails the whole request, which loses the text the
+    // user also wrote; the description loses only what the model could not use.
+    const blocks = (body(false).messages as Array<{ content: unknown[] }>)[0]!.content;
+    expect(blocks).toContainEqual({ type: "text", text: "look" });
+    expect(JSON.stringify(blocks)).toContain("non-vision fallback");
+    expect(JSON.stringify(blocks)).not.toContain("aGVsbG8=");
+  });
+
+  it("treats an undeclared model as unable to read one", () => {
+    // Absent means unknown, and unknown has to be the safe side.
+    expect(JSON.stringify(body(undefined))).toContain("non-vision fallback");
+  });
+});

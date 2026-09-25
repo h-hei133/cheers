@@ -1,3 +1,4 @@
+import type { MultimodalContentBlock } from "../../model-adapters/multimodal.js";
 export interface MicrocompactOptions {
   readonly keepRecentTurns?: number;
   readonly maxOutputChars?: number;
@@ -7,7 +8,14 @@ export interface MicrocompactOptions {
 
 export interface ChatMessageLike {
   readonly role: "system" | "user" | "assistant" | "tool";
-  readonly content?: string | null;
+  /**
+   * Text, or text with images.
+   *
+   * Widened so a message carrying an image can pass through. This compactor only
+   * rewrites string content — it checks the type before touching it — so an
+   * array is carried along untouched rather than being an error.
+   */
+  readonly content?: string | readonly MultimodalContentBlock[] | null;
   readonly tool_calls?: ReadonlyArray<{
     readonly id: string;
     readonly type: "function";

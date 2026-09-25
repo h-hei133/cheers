@@ -7,10 +7,21 @@ export interface SessionToolCall {
   };
 }
 
+import type { MultimodalContentBlock } from "../../model-adapters/multimodal.js";
+
 export interface SessionMessage {
   id?: string;
   role: "system" | "user" | "assistant" | "tool";
-  content: string;
+  /**
+   * What the message says: text, or text with images attached.
+   *
+   * A union rather than a separate field, because every reader has to answer the
+   * same question and two fields would let them answer it differently — one
+   * looking at `parts`, another at `content`, and a message reading as empty to
+   * whichever looked at the wrong one. A reader that only wants the text calls
+   * `messageToText`.
+   */
+  content: string | readonly MultimodalContentBlock[];
   tool_calls?: readonly SessionToolCall[];
   tool_call_id?: string;
   timestamp?: string;
