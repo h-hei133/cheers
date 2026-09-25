@@ -41,7 +41,64 @@ export type ThemeColorToken =
   | "userMessageBg"
   | "statusBandBg"
   | "scrollbarTrack"
-  | "scrollbarThumb"
+  | "scrollbarThumb";
+
+/**
+ * Every token, as a runtime value.
+ *
+ * The union above is a type and has no runtime presence, so anything that has to
+ * check the palette at runtime — or check that every declared token has a reader —
+ * needs the list as a value. Kept beside the union so the two cannot drift: the
+ * `satisfies` rejects a name the union does not have, and the `never` below
+ * rejects a union member missing from the list. Those two are compile-time and
+ * live in production code, which is typechecked; the equivalent assertion placed
+ * in a test file would not run, because tests are excluded from the build.
+ */
+export const THEME_COLOR_TOKENS = [
+  "text",
+  "userMessageText",
+  "thinkingText",
+  "toolTitle",
+  "toolOutput",
+  "diffAdded",
+  "diffRemoved",
+  "diffContext",
+  "filename",
+  "command",
+  "commandArg",
+  "commandFlag",
+  "commandString",
+  "commandNumber",
+  "commandPipe",
+  "mdHeading",
+  "mdCode",
+  "mdLink",
+  "success",
+  "error",
+  "warning",
+  "muted",
+  "dim",
+  "accent",
+  "border",
+  "borderAccent",
+  "borderMuted",
+  "selectedBg",
+  "userMessageBg",
+  "statusBandBg",
+  "scrollbarTrack",
+  "scrollbarThumb",
+] as const satisfies readonly ThemeColorToken[];
+
+/**
+ * Proof that the list above names every member of the union.
+ *
+ * `satisfies` catches a name in the list that the union does not have. This
+ * catches the other direction: a token added to `ThemeColorToken` and forgotten
+ * here stops compiling, which is what stops it from being silently unread.
+ */
+type MissingToken = Exclude<ThemeColorToken, (typeof THEME_COLOR_TOKENS)[number]>;
+const _everyTokenIsListed: [MissingToken] extends [never] ? true : false = true;
+void _everyTokenIsListed;
 
 export class Theme {
   name: string;

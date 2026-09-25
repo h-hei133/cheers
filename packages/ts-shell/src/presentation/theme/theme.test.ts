@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import darkJson from "../themes/dark.json" with { type: "json" };
 import lightJson from "../themes/light.json" with { type: "json" };
-import { Theme, defaultTheme, getTheme, type ThemeColorToken } from "../theme/theme.js";
+import {
+  Theme,
+  THEME_COLOR_TOKENS,
+  defaultTheme,
+  getTheme,
+} from "../theme/theme.js";
 import { listThemes } from "../themes/index.js";
 
 /**
@@ -13,7 +18,17 @@ import { listThemes } from "../themes/index.js";
  * near-white background. The assertion below is what makes "the theme loads"
  * different from "the theme can be read".
  */
-const ALL_TOKENS: readonly ThemeColorToken[] = Object.keys(darkJson.colors) as ThemeColorToken[];
+
+/**
+ * The tokens the palette has, taken from the union rather than from a palette.
+ *
+ * The list lives in the theme module because the check that every declared token
+ * is named in rendering code has to start from the type, and the type has no
+ * runtime presence. Deriving it from `dark.json` here was blind to exactly the
+ * case it exists to catch: a token added to the union and nowhere else never
+ * reached the list.
+ */
+const ALL_TOKENS = THEME_COLOR_TOKENS;
 
 describe("built-in themes", () => {
   it("define every token the palette has", () => {

@@ -284,6 +284,41 @@ describe("skill diagnostics", () => {
     expect(skills.get("folded")?.description).toBe("Build for AWS.\nHandles ECS.");
   });
 
+  it("reads a block scalar that names its own indentation", () => {
+    // `|2-` and `|-2` are block headers with the indicators in either order, and
+    // both are valid YAML. Matching only `|` plus a chomping character meant the
+    // header fell through to the scalar branch and the description became the
+    // literal text `|2-` — the same defect as the `|-` one above, one indicator
+    // further along.
+    for (const header of ["|2-", "|-2", "|2", ">2-"]) {
+      writeRaw("indented", `name: indented\ndescription: ${header}\n  Build for AWS.\n  Handles ECS.`);
+
+      const { skills } = new SkillLoader(workspace).loadDetailed();
+
+      expect(skills.get("indented")?.description).toBe(
+        header.startsWith(">") ? "Build for AWS. Handles ECS." : "Build for AWS.\nHandles ECS.",
+      );
+    }
+  });
+
+  it("names every spec field it accepts but does not act on", () => {
+    // A field left off the list is dropped silently: the author wrote something
+    // the format defines and nothing tells them it does nothing here. The list
+    // has to cover what the parser accepts, not only what looks important.
+    writeRaw(
+      "declared",
+      "name: declared\ndescription: d\nargument-hint: <file>\ndisable-model-invocation: true\nmodel: opus",
+    );
+
+    const { skills } = new SkillLoader(workspace).loadDetailed();
+
+    expect(skills.get("declared")?.unhonouredFields).toEqual([
+      "disable-model-invocation",
+      "argument-hint",
+      "model",
+    ]);
+  });
+
   it("folds a folded block scalar onto one line", () => {
     writeRaw("folded", "name: folded\ndescription: >\n  Build for AWS.\n  Handles ECS.");
 

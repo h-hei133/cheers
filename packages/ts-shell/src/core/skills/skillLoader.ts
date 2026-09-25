@@ -69,11 +69,43 @@ const MANIFEST = "SKILL.md";
  *
  * `allowed-tools` would scope a skill to a set of tools, and there is no
  * per-skill tool gate here — the tool gate decides by tool name and permission
- * scope. The rest are descriptive metadata with no consumer. Listing them means
- * a diagnostic can distinguish "the format defines this" from "this build
- * ignores this", which is the difference the author needs to know.
+ * scope. `disable-model-invocation` and `user-invocable` would decide who may
+ * invoke a skill, and this build has one caller. `argument-hint` would describe
+ * the arguments a command takes, and no surface renders one. The rest select a
+ * model, a forked context, a shell, or a trigger path — capabilities this build
+ * does not have per skill. Listing them means a diagnostic can distinguish "the
+ * format defines this" from "this build ignores this", which is the difference
+ * the author needs to know. A field left off this list is silently dropped, so
+ * the list has to name every field the parser accepts, not only the ones that
+ * look important.
  */
-const UNHONOURED_SPEC_FIELDS = ["allowed-tools", "license", "compatibility", "metadata"] as const;
+const UNHONOURED_SPEC_FIELDS = [
+  "allowed-tools",
+  "license",
+  "compatibility",
+  "metadata",
+  "disable-model-invocation",
+  "user-invocable",
+  "argument-hint",
+  "arguments",
+  "when_to_use",
+  "when-to-use",
+  "model",
+  "effort",
+  "context",
+  "agent",
+  "paths",
+  "shell",
+  "hooks",
+  "version",
+  "hide-from-slash-command-tool",
+  "force-for-plugin",
+  "background",
+  "color",
+  "isolation",
+  "keep-coding-instructions",
+  "skills",
+] as const;
 
 /**
  * Per the Agent Skills spec: a length bound and a character set.
@@ -393,8 +425,19 @@ function parseFields(block: string): Map<string, string> {
     if (!key) continue;
 
     const raw = line.slice(separator + 1).trim();
-    const blockMarker = /^([|>])([-+]?)$/.exec(raw);
+    // A block header is `|` or `>`, optionally followed by a chomping indicator
+    // (`-` strip, `+` keep, absent clip) and an indentation indicator (1-9), in
+    // either order. Matching only `|` and `>` with a chomping character meant
+    // `|2-` fell through to the scalar branch and the field was set to the
+    // literal text `|2-` — the same shape of defect as the `|-` this was meant to
+    // fix, one indicator further along.
+    const blockMarker = /^([|>])(?:([1-9])([-+]?)|([-+]?)([1-9]?))?$/.exec(raw);
     if (blockMarker) {
+      // The indentation indicator is accepted and not used: the common indent of
+      // the lines below is measured from the body itself, which gives the same
+      // answer whenever the document agrees with its own indicator and a usable
+      // one when it does not.
+      const keepTrailingNewlines = (blockMarker[3] ?? blockMarker[4]) === "+";
       // The indented lines below belong to this key. Their common indent is
       // stripped, and the marker decides whether the lines are joined with
       // spaces (`>`) or kept as written (`|`).
@@ -412,7 +455,13 @@ function parseFields(block: string): Map<string, string> {
       const joined = blockMarker[1] === ">"
         ? stripped.join(" ").replace(/\s+/g, " ").trim()
         : stripped.join("\n").trim();
-      fields.set(key, joined);
+      // `+` is the one chomping indicator that asks for the trailing line breaks
+      // to survive; strip and clip both end at the last non-empty line, and a
+      // metadata field is prose, so ending there is what a reader wants.
+      fields.set(
+        key,
+        keepTrailingNewlines && blockMarker[1] === "|" ? `${stripped.join("\n").replace(/^\n+/, "").trimEnd()}\n` : joined,
+      );
       continue;
     }
 
