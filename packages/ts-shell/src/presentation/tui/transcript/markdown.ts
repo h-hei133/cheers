@@ -3,6 +3,7 @@ import { formatCommandLine } from "../../theme/commandHighlight.js";
 import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
+import { scanBlocks } from "./markdownScan.js";
 /**
  * Markdown rendering for assistant prose.
  *
@@ -17,12 +18,6 @@ import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
  * sequences, so a styled span wraps on its visible cells rather than its markup.
  */
 
-const FENCE = /^\s*(`{3,}|~{3,})\s*([\w+-]*)\s*$/;
-const HEADING = /^(#{1,6})\s+(.*)$/;
-const BULLET = /^(\s*)([-*+])\s+(.*)$/;
-const ORDERED = /^(\s*)(\d+)[.)]\s+(.*)$/;
-const QUOTE = /^\s*>\s?(.*)$/;
-const RULE = /^\s*([-*_])\1{2,}\s*$/;
 const TABLE_ROW = /^\s*\|(.+)\|\s*$/;
 const TABLE_RULE = /^\s*\|[\s:|-]+\|\s*$/;
 
@@ -53,40 +48,50 @@ export function renderInline(text: string): string {
     );
 }
 
-/** Rows for Markdown `text` fitted to `width` cells. */
+/**
+ * Rows for Markdown `text` fitted to `width` cells.
+ *
+ * The block kinds come from `scanBlocks`, so this decides only how each one
+ * looks. The exported page uses the same scan and a different renderer, which is
+ * what keeps one answer reading the same in both.
+ */
 export function renderMarkdown(text: string, width: number): string[] {
   const cells = Math.max(8, width);
   const rows: string[] = [];
-  const lines = text.split("\n");
-  let index = 0;
-  while (index < lines.length) {
-    const line = lines[index]!;
-    if (TABLE_ROW.test(line) && TABLE_RULE.test(lines[index + 1] ?? "")) {
-      const body: string[] = [];
-      let cursor = index + 2;
-      while (cursor < lines.length && TABLE_ROW.test(lines[cursor]!)) {
-        body.push(lines[cursor]!);
-        cursor += 1;
+  for (const block of scanBlocks(text)) {
+    switch (block.kind) {
+      case "table":
+        rows.push(...renderTable(block.header, block.rows, cells));
+        break;
+      case "fence":
+        rows.push(...renderFence(block.lines, block.language, cells));
+        break;
+      case "heading":
+        rows.push(...wrapWithIndent(
+          defaultTheme.bold(defaultTheme.fg("mdHeading", renderInline(block.text))), "", cells,
+        ));
+        break;
+      case "rule":
+        rows.push(defaultTheme.fg("border", "─".repeat(cells)));
+        break;
+      case "list": {
+        const glyph = /^\d+$/.test(block.marker.replace(/\.$/, "")) ? `${block.marker}` : "•";
+        rows.push(...wrapWithIndent(
+          renderInline(block.text), `${block.indent}${defaultTheme.fg("accent", glyph)} `, cells,
+        ));
+        break;
       }
-      rows.push(...renderTable(line, body, cells));
-      index = cursor;
-      continue;
+      case "quote":
+        rows.push(...wrapWithIndent(
+          defaultTheme.dim(renderInline(block.text)), `${defaultTheme.fg("border", "▏")} `, cells,
+        ));
+        break;
+      default:
+        rows.push(...wrapWithIndent(
+          block.line.trim() === "" ? "" : renderInline(block.line), "", cells,
+        ));
+        break;
     }
-    const fence = FENCE.exec(line);
-    if (fence) {
-      const closing = fence[1]!;
-      const body: string[] = [];
-      index += 1;
-      while (index < lines.length && !lines[index]!.trimStart().startsWith(closing)) {
-        body.push(lines[index]!);
-        index += 1;
-      }
-      index += 1;
-      rows.push(...renderFence(body, fence[2] ?? "", cells));
-      continue;
-    }
-    rows.push(...renderLine(line, cells));
-    index += 1;
   }
   return rows;
 }
@@ -137,31 +142,6 @@ function formatRow(row: readonly string[], widths: readonly number[], header: bo
     return padToWidth(truncateToWidth(header ? defaultTheme.bold(text) : renderInline(text), width), width);
   });
   return cellsText.join(defaultTheme.fg("border", " │ "));
-}
-
-/** One non-fence line, resolved to its block kind. */
-function renderLine(line: string, cells: number): string[] {
-  if (RULE.test(line)) return [defaultTheme.fg("border", "─".repeat(cells))];
-  const heading = HEADING.exec(line);
-  if (heading) {
-    return wrapWithIndent(defaultTheme.bold(defaultTheme.fg("mdHeading", renderInline(heading[2]!))), "", cells);
-  }
-  const quote = QUOTE.exec(line);
-  if (quote) {
-    return wrapWithIndent(defaultTheme.dim(renderInline(quote[1]!)), `${defaultTheme.fg("border", "▏")} `, cells);
-  }
-  const bullet = BULLET.exec(line);
-  if (bullet) {
-    const indent = bullet[1] ?? "";
-    return wrapWithIndent(renderInline(bullet[3]!), `${indent}${defaultTheme.fg("accent", "•")} `, cells);
-  }
-  const ordered = ORDERED.exec(line);
-  if (ordered) {
-    const indent = ordered[1] ?? "";
-    return wrapWithIndent(renderInline(ordered[3]!), `${indent}${defaultTheme.fg("accent", `${ordered[2]}.`)} `, cells);
-  }
-  if (line.trim() === "") return [""];
-  return wrapWithIndent(renderInline(line), "", cells);
 }
 
 /** A fenced block, framed so its boundaries and language are unmistakable. */
