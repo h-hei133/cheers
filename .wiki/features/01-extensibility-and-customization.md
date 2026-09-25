@@ -201,13 +201,21 @@ grep -rn "AGENTS.md" packages/ts-shell/src --include='*.ts' | grep -v test
 
 | 能力 | 我们位置 | pi 是否真的没有（检索命令+结果） |
 |---|---|---|
-| MCP 客户端与网关 | `core/mcp/{client,config,connectionManager,errorTaxonomy,gateway,types}.ts`；工具注入见 `core/tools/registry.ts:214,563-578` | **确认没有**。`docs/usage.md:310` 原文：「It intentionally does not include built-in MCP, sub-agents, permission popups, plan mode, to-dos, or background bash.」；`grep -rln "mcpServers\ | **2026-09-25 补正（Phase 9）**：三条如实性缺陷。①**非 stdio 传输的 `invokeTool` 返回假的成功**（`client.ts:117-121` 直接 return "executed successfully"，无任何调用；已实测复现）——违反 `AGENTS.md:25`，**必修**；②`resources`/`prompts` 只有 mock（`client.ts:92-97`），三个 MCP 原语只实现了 tools，须实现或在文档/类型上明确标注；③stdio 用自有 `{action:"list-tools"}` 封包而非 JSON-RPC 2.0，**与外部 MCP 服务器不互通**——这是「MCP 形状」而非「MCP 协议」，文档须如实。**安全正面确认**：`mcp__<server>__<tool>` 不命中 `READ_ONLY_TOOLS`（精确匹配），在 `ask`/`accept-edits` 下**始终要求升级**，天然免疫顶名继承豁免。见 `phase-9-decisions.md` §1.5 |
+| MCP 客户端与网关 | `core/mcp/{client,config,connectionManager,errorTaxonomy,gateway,types}.ts`；工具注入见 `core/tools/registry.ts:214,563-578` | **确认没有**。`docs/usage.md:310` 原文：「It intentionally does not include built-in MCP, sub-agents, permission popups, plan mode, to-dos, or background bash.」；`grep -rln "mcpServers\|modelcontextprotocol" packages/*/src packages/*/docs` → 仅 `docs/usage.md` 该句与一张图片 |
 | 钩子的 22 事件分类法 | `core/hooks/types.ts:5-27` | pi 的事件名集合不同（`docs/extensions.md:351-933` 按 Startup/Resource/Session/Agent/Model/Tool/UserBash/Input 分组），无同名分类法 |
 | 静态资源清单描述符（`enabledByDefault:false`、`executable:false`） | `runtime/resources/descriptor.ts:13,37-38,50` | pi 无对应物 |
 
 > 注：`runtime/resources/` 的 `StaticResourceDescriptor` 是**声明式清单**（明确 `executable: false`、`supported: false`），
 > 唯一生产消费者是 `provider/registry/provider.ts:2` 的**类型导入**。它记录「我们**不**执行扩展」这一事实，
 > 与 §2.3 的 `/plugin` 是同一设计意图的两处体现。
+
+> **2026-09-25 补正（Phase 9）**：上一轮复核发现本模块三条**如实性**缺陷，已在 Phase 9 修复。
+> ①非 stdio 传输的 `invokeTool` 曾**返回假的成功**（`client.ts` 直接 return "executed successfully"，
+> 无任何调用）；②`resources`/`prompts` 只有 mock，三个 MCP 原语实际只实现了 tools；
+> ③stdio 用自有 `{action:"list-tools"}` 封包而非 JSON-RPC 2.0，**与外部 MCP 服务器不互通**——
+> 这是「MCP 形状」而非「MCP 协议」。处置见 `phase-9-decisions.md` §1.5。
+> **安全正面确认**：`mcp__<server>__<tool>` 不命中 `READ_ONLY_TOOLS`（精确匹配），
+> 在 `ask`/`accept-edits` 下**始终要求升级**，天然免疫顶名继承豁免。
 
 ## 5. 未能验证的项
 
