@@ -3214,3 +3214,36 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
   失败形态是 **marker 超时**而非断言，与该测试「spawn 真实子进程、对机器负载敏感」的既有记录一致
   （log 中已有两条前例）。**不是本轮改动引入**：该用例不触及本轮改的任何模块，
   且同样的失败在 Phase 10 之前的多轮里出现过。
+
+## 2026-09-25 — CI 失败修复：`Promise.withResolvers` 与声明的 Node 下限不符
+
+**现象**：GitHub CI 的 `Run Focused & Unit Tests` 步骤**每次 push 都失败**——不是本轮引入的，
+`ac059833` 之前的推送就已经红。本地全绿是因为**本机 Node 24**，而 **CI 按 `engines.node` 钉在 20.3.0**。
+
+**根因**（从 job log 取到原文）：
+```
+TypeError: Promise.withResolvers is not a function
+ ❯ run src/presentation/tui/clipboardImage.ts:52:40
+```
+`Promise.withResolvers` 是 **Node 22** 的 API。全仓共 **3 处**调用过它：
+- `core/agent/retry.ts` 与 `runtime/execution/fileLock.ts` —— **早已手工改写**并留下注释说明「which needs Node 22」；
+- `presentation/tui/clipboardImage.ts` —— **第三个漏了**，于是 CI 一直红。
+
+**修复**：`clipboardImage.ts` 的 `run()` 按同样方式手工构造 promise（与那两个文件一致）。
+
+**为什么上一轮的注释没能拦住**：注释是写给**读那个文件的人**的，
+而失败出现在**没人看的那个文件**里。**这就是本轮加门禁的理由。**
+
+**新增门禁 `check:node-floor`**（`scripts/check-node-floor.mjs` + 8 项自测）：
+- 读 `package.json` 的 `engines.node`，扫 `packages/ts-shell/src`，报出**晚于该下限**的 API 调用（含行号与引入版本）；
+- **注释不算**（两个真实修复都是「不要用这个 API」的散文，不能被自己的门禁绊倒）；
+- **测试文件不算**（可能正为它写断言）；
+- **块注释保留换行**，所以行号是读者真正会找到的那一行；
+- 下限定不了 → **exit 3**，不会把删掉 `engines` 的树当成干净。
+
+**验证**：
+- **反向验证**：把 `clipboardImage.ts` 改回旧写法 → 门禁 `[fail] ... clipboardImage.ts:57 - Promise.withResolvers was added in 22.0.0`，exit 1；恢复 → pass。
+- **复现 CI 的真实错误**：本机是 WSL，`isWindowsHosted()` 为真，Windows 后端先跑且在自己的 `try/catch` 里**吞掉了**这个 TypeError——所以最初两次模拟都「通过」。把 `/proc/version` 伪装成非 WSL 才走到 CI 的那条分支，旧代码**逐字复现** `TypeError: Promise.withResolvers is not a function`，新代码通过。
+- 全仓再无其他晚于下限的 API（另扫 `Object.groupBy`／`Array.fromAsync`／`Set.prototype.union`／`fs.globSync` 等）。
+- `test:scripts` **26/26**（原 18 + 新增 8）；五道门禁全过；受影响套件 604 项通过；tsc 0 错。
+- `AGENTS.md` 的门禁清单**补上新门禁**（不补就等于文档说谎）。

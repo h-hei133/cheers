@@ -64,6 +64,7 @@ CI enforces these gates, and they exit non-zero on a violation:
 - `npm run verify:import-cycles` — dependency cycles. Note it checks cycles only; it does not report imports that fail to resolve.
 - `npm run check:config-consumers` — config fields declared with no production reader.
 - `npm run check:declarations` — hook events declared with no dispatch site, and tool factories the registry never calls.
+- `npm run check:node-floor` — a runtime API newer than the `engines.node` floor, which CI runs on. `Promise.withResolvers` reached three modules while the floor was 20.3 and every push was red for it.
 - `npm run verify:docs-drift:strict` — dangling path references in binding rules and current-state docs.
 - `npm run test:ts` — the TypeScript suite.
 - `npm run test:scripts` — the gates' own tests, so a gate that stops detecting fails here rather than passing quietly.
